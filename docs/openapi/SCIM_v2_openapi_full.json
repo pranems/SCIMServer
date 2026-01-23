@@ -1,0 +1,186 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SCIM v2 Full OpenAPI Spec (Examples)",
+    "version": "1.0.0",
+    "description": "Comprehensive OpenAPI v3 spec for SCIM v2 core endpoints, with complete request/response schemas and examples. Implementation-agnostic."
+  },
+  "servers": [{ "url": "https://api.example.com/scim/v2", "description": "Example SCIM server" }],
+  "paths": {
+    "/ServiceProviderConfig": {
+      "get": {
+        "summary": "Service provider configuration",
+        "responses": {
+          "200": {
+            "description": "ServiceProviderConfig",
+            "content": {
+              "application/scim+json": {
+                "schema": { "$ref": "#/components/schemas/ServiceProviderConfig" },
+                "example": {
+                  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"],
+                  "patch": { "supported": true },
+                  "bulk": { "supported": true, "maxOperations": 1000, "maxPayloadSize": 10485760 },
+                  "filter": { "supported": true, "maxResults": 1000 },
+                  "sort": { "supported": true },
+                  "authenticationSchemes": [ { "type": "oauthbearertoken", "name": "OAuth 2.0 Bearer Token", "specUri": "https://tools.ietf.org/html/rfc6750" } ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ResourceTypes": {
+      "get": {
+        "summary": "List resource types",
+        "responses": { "200": { "description": "ResourceTypes list", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ListResponse" } } } }
+      }
+    },
+    "/Schemas": {
+      "get": { "summary": "List schemas", "responses": { "200": { "description": "Schemas", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ListResponse" } } } } }
+    },
+    "/Users": {
+      "get": {
+        "summary": "Query / list Users",
+        "parameters": [
+          { "name": "startIndex", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "count", "in": "query", "schema": { "type": "integer", "default": 100 } },
+          { "name": "filter", "in": "query", "schema": { "type": "string" } },
+          { "name": "attributes", "in": "query", "schema": { "type": "string" } },
+          { "name": "excludedAttributes", "in": "query", "schema": { "type": "string" } },
+          { "name": "sortBy", "in": "query", "schema": { "type": "string" } },
+          { "name": "sortOrder", "in": "query", "schema": { "type": "string", "enum": ["ascending", "descending"] } }
+        ],
+        "responses": { "200": { "description": "List of Users", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ListResponse" } } } }
+      },
+      "post": {
+        "summary": "Create User",
+        "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/User" } } } },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/User" } } } },
+          "409": { "description": "Conflict (uniqueness)", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimError" } } } }
+        }
+      }
+    },
+    "/Users/{id}": {
+      "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
+      "get": { "summary": "Get User by id", "responses": { "200": { "description": "User", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/User" } } } }, "404": { "description": "Not found", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimError" } } } } },
+      "put": { "summary": "Replace User", "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/User" } } } }, "responses": { "200": { "description": "Updated", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/User" } } } }, "404": { "description": "Not found" } },
+      "patch": { "summary": "Patch User", "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/PatchOp" } } } }, "responses": { "200": { "description": "Patched" }, "404": { "description": "Not found" } } },
+      "delete": { "summary": "Delete User", "responses": { "204": { "description": "No Content" }, "404": { "description": "Not found" } } }
+    },
+    "/Groups": {
+      "get": { "summary": "List Groups", "parameters": [ { "name": "startIndex", "in": "query", "schema": { "type": "integer" } }, { "name": "count", "in": "query", "schema": { "type": "integer" } }, { "name": "filter", "in": "query", "schema": { "type": "string" } } ], "responses": { "200": { "description": "List", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ListResponse" } } } } },
+      "post": { "summary": "Create Group", "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/Group" } } } }, "responses": { "201": { "description": "Created", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/Group" } } } } }
+    },
+    "/Groups/{id}": {
+      "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
+      "get": { "summary": "Get Group", "responses": { "200": { "description": "Group", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/Group" } } } }, "404": { "description": "Not found" } } ,
+      "put": { "summary": "Replace Group", "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/Group" } } } }, "responses": { "200": { "description": "Updated" } } },
+      "patch": { "summary": "Patch Group", "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/PatchOp" } } } }, "responses": { "200": { "description": "Patched" } } },
+      "delete": { "summary": "Delete Group", "responses": { "204": { "description": "No content" } } }
+    },
+    "/Bulk": {
+      "post": { "summary": "Bulk operations (optional)", "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/BulkRequest" } } } }, "responses": { "200": { "description": "Bulk response", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/BulkResponse" } } } } }
+    }
+  },
+  "components": {
+    "schemas": {
+      "UserName": { "type": "string", "description": "Unique username" },
+      "Meta": {
+        "type": "object",
+        "properties": {
+          "resourceType": { "type": "string" },
+          "created": { "type": "string", "format": "date-time" },
+          "lastModified": { "type": "string", "format": "date-time" },
+          "location": { "type": "string", "format": "uri" }
+        }
+      },
+      "Name": {
+        "type": "object",
+        "properties": {
+          "formatted": { "type": "string" },
+          "familyName": { "type": "string" },
+          "givenName": { "type": "string" },
+          "middleName": { "type": "string" },
+          "honorificPrefix": { "type": "string" },
+          "honorificSuffix": { "type": "string" }
+        }
+      },
+      "User": {
+        "type": "object",
+        "required": ["schemas","userName"],
+        "properties": {
+          "schemas": { "type": "array", "items": { "type": "string" } },
+          "id": { "type": "string" },
+          "externalId": { "type": "string" },
+          "userName": { "$ref": "#/components/schemas/UserName" },
+          "name": { "$ref": "#/components/schemas/Name" },
+          "displayName": { "type": "string" },
+          "nickName": { "type": "string" },
+          "profileUrl": { "type": "string", "format": "uri" },
+          "title": { "type": "string" },
+          "userType": { "type": "string" },
+          "preferredLanguage": { "type": "string" },
+          "locale": { "type": "string" },
+          "timezone": { "type": "string" },
+          "active": { "type": "boolean" },
+          "password": { "type": "string" },
+          "emails": { "type": "array", "items": { "type": "object", "properties": { "value": { "type": "string" }, "type": { "type": "string" }, "primary": { "type": "boolean" } } } },
+          "phoneNumbers": { "type": "array", "items": { "type": "object", "properties": { "value": { "type": "string" }, "type": { "type": "string" } } } },
+          "ims": { "type": "array", "items": { "type": "object", "properties": { "value": { "type": "string" }, "type": { "type": "string" } } } },
+          "photos": { "type": "array", "items": { "type": "object", "properties": { "value": { "type": "string", "format": "uri" }, "type": { "type": "string" } } } },
+          "addresses": { "type": "array", "items": { "type": "object", "properties": { "streetAddress": { "type": "string" }, "locality": { "type": "string" }, "region": { "type": "string" }, "postalCode": { "type": "string" }, "country": { "type": "string" }, "type": { "type": "string" }, "formatted": { "type": "string" } } } },
+          "entitlements": { "type": "array", "items": { "type": "string" } },
+          "roles": { "type": "array", "items": { "type": "string" } },
+          "groups": { "type": "array", "items": { "type": "object", "properties": { "value": { "type": "string" }, "display": { "type": "string" } } } },
+          "meta": { "$ref": "#/components/schemas/Meta" },
+          "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": { "$ref": "#/components/schemas/EnterpriseUser" }
+        }
+      },
+      "EnterpriseUser": {
+        "type": "object",
+        "properties": {
+          "employeeNumber": { "type": "string" },
+          "costCenter": { "type": "string" },
+          "organization": { "type": "string" },
+          "division": { "type": "string" },
+          "department": { "type": "string" },
+          "manager": { "type": "object", "properties": { "value": { "type": "string" }, "displayName": { "type": "string" } } }
+        }
+      },
+      "Group": {
+        "type": "object",
+        "required": ["schemas","displayName"],
+        "properties": {
+          "schemas": { "type": "array", "items": { "type": "string" } },
+          "id": { "type": "string" },
+          "displayName": { "type": "string" },
+          "externalId": { "type": "string" },
+          "members": { "type": "array", "items": { "type": "object", "properties": { "value": { "type": "string" }, "display": { "type": "string" }, "type": { "type": "string" } } } },
+          "meta": { "$ref": "#/components/schemas/Meta" }
+        }
+      },
+      "PatchOp": {
+        "type": "object",
+        "properties": {
+          "schemas": { "type": "array", "items": { "type": "string" } },
+          "Operations": { "type": "array", "items": { "type": "object", "properties": { "op": { "type": "string", "enum": ["add","replace","remove"] }, "path": { "type": "string" }, "value": {} } } }
+        }
+      },
+      "BulkRequest": { "type": "object", "properties": { "schemas": { "type": "array" }, "Operations": { "type": "array", "items": { "type": "object" } } } },
+      "BulkResponse": { "type": "object" },
+      "BulkResponseItem": { "type": "object" },
+      "ListResponse": { "type": "object", "properties": { "schemas": { "type": "array" }, "totalResults": { "type": "integer" }, "startIndex": { "type": "integer" }, "itemsPerPage": { "type": "integer" }, "Resources": { "type": "array", "items": {} } } },
+      "ScimError": { "type": "object", "properties": { "schemas": { "type": "array" }, "status": { "type": "string" }, "scimType": { "type": "string" }, "detail": { "type": "string" } } },
+      "ServiceProviderConfig": { "type": "object", "properties": { "schemas": { "type": "array" }, "patch": { "type": "object" }, "bulk": { "type": "object" }, "filter": { "type": "object" }, "sort": { "type": "object" }, "authenticationSchemes": { "type": "array", "items": { "type": "object" } } } }
+    }
+  },
+  "components_security": {},
+  "security": [ { "bearerAuth": [] } ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    }
+  }
+}

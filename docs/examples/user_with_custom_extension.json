@@ -1,0 +1,40 @@
+{
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+    "urn:example:params:scim:schemas:extension:custom:2.0:User"
+  ],
+  "id": "a9b8c7d6-e5f4-3210-abcd-9876543210fe",
+  "externalId": "ext-9001",
+  "userName": "jane.doe@example.com",
+  "name": {
+    "formatted": "Jane Doe",
+    "familyName": "Doe",
+    "givenName": "Jane"
+  },
+  "displayName": "Jane Doe",
+  "emails": [
+    { "value": "jane.doe@example.com", "type": "work", "primary": true }
+  ],
+  "phoneNumbers": [
+    { "value": "+1-425-555-0202", "type": "work" }
+  ],
+  "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+    "employeeNumber": "EMP-9001",
+    "department": "Platform",
+    "manager": { "value": "mngr-0002", "displayName": "Sam Manager" }
+  },
+  "urn:example:params:scim:schemas:extension:custom:2.0:User": {
+    "hireDate": "2021-07-01",
+    "employeeType": "FullTime",
+    "workLocation": "Building 5, Floor 3",
+    "customFlags": ["onboarding-complete","laptop-assigned"],
+    "metadata": { "source": "hr-system", "syncedAt": "2025-01-15T12:00:00Z" }
+  },
+  "meta": {
+    "resourceType": "User",
+    "created": "2021-07-01T08:00:00Z",
+    "lastModified": "2025-01-15T12:00:00Z",
+    "location": "https://api.example.com/scim/v2/Users/a9b8c7d6-e5f4-3210-abcd-9876543210fe"
+  }
+}

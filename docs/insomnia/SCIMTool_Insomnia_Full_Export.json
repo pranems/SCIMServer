@@ -1,0 +1,102 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-01-14T00:00:00.000Z",
+  "__export_source": "SCIMTool docs generator",
+  "resources": [
+    {
+      "_id": "env_1",
+      "_type": "environment",
+      "parentId": "",
+      "name": "Base Env",
+      "data": {
+        "base_url": "http://localhost:3000",
+        "client_id": "scimtool-client",
+        "client_secret": "dev-secret-abc123",
+        "shared_secret": "S3cr3tSharedValue",
+        "token": ""
+      }
+    },
+    {
+      "_id": "req_token",
+      "_type": "request",
+      "parentId": "",
+      "name": "OAuth Token",
+      "method": "POST",
+      "url": "{{ base_url }}/oauth/token",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"grant_type\":\"client_credentials\",\"client_id\":\"{{ client_id }}\",\"client_secret\":\"{{ client_secret }}\",\"scope\":\"scim.manage scim.read scim.write\"}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "req_create_user",
+      "_type": "request",
+      "parentId": "",
+      "name": "Create User (full)",
+      "method": "POST",
+      "url": "{{ base_url }}/scim/v2/Users",
+      "body": {
+        "mimeType": "application/scim+json",
+        "text": "{\n  \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:User\",\"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User\"],\n  \"userName\": \"alice.example@example.com\",\n  \"externalId\": \"ext-000123\",\n  \"name\": { \"formatted\": \"Alice L Example\", \"familyName\": \"Example\", \"givenName\": \"Alice\" },\n  \"displayName\": \"Alice Example\",\n  \"emails\": [{ \"value\": \"alice.work@example.com\", \"type\": \"work\", \"primary\": true }],\n  \"phoneNumbers\": [{ \"value\": \"+1-425-555-0101\", \"type\": \"work\" }],\n  \"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User\": { \"employeeNumber\": \"EMP-000123\", \"department\": \"Engineering\" }\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/scim+json" },
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ]
+    },
+    {
+      "_id": "req_list_users",
+      "_type": "request",
+      "parentId": "",
+      "name": "List Users",
+      "method": "GET",
+      "url": "{{ base_url }}/scim/v2/Users?startIndex=1&count=50",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
+      "_id": "req_get_user",
+      "_type": "request",
+      "parentId": "",
+      "name": "Get User",
+      "method": "GET",
+      "url": "{{ base_url }}/scim/v2/Users/{{ user_id }}",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
+      "_id": "req_create_group",
+      "_type": "request",
+      "parentId": "",
+      "name": "Create Group",
+      "method": "POST",
+      "url": "{{ base_url }}/scim/v2/Groups",
+      "body": { "mimeType": "application/scim+json", "text": "{\n  \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:Group\"],\n  \"displayName\": \"Engineering\",\n  \"members\": [{ \"value\": \"a1b2c3d4-e5f6-7890-abcd-1234567890ab\", \"display\": \"Alice Example\" }]\n}" },
+      "headers": [ { "name": "Content-Type", "value": "application/scim+json" }, { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
+      "_id": "req_patch_add_member",
+      "_type": "request",
+      "parentId": "",
+      "name": "Patch Add Member",
+      "method": "PATCH",
+      "url": "{{ base_url }}/scim/v2/Groups/{{ group_id }}",
+      "body": { "mimeType": "application/scim+json", "text": "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\"Operations\":[{\"op\":\"add\",\"path\":\"members\",\"value\":[{\"value\":\"new-user-id-9999\",\"display\":\"New Member\"}]}]}" },
+      "headers": [ { "name": "Content-Type", "value": "application/scim+json" }, { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
+      "_id": "req_serviceproviderconfig",
+      "_type": "request",
+      "parentId": "",
+      "name": "ServiceProviderConfig",
+      "method": "GET",
+      "url": "{{ base_url }}/scim/v2/ServiceProviderConfig",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    }
+  ]
+}

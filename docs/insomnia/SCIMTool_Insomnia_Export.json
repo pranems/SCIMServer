@@ -1,0 +1,54 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-01-14T00:00:00.000Z",
+  "__export_source": "SCIMTool docs generator",
+  "resources": [
+    {
+      "_id": "env_1",
+      "_type": "environment",
+      "parentId": "",
+      "name": "Base Env",
+      "data": {
+        "base_url": "http://localhost:3000",
+        "client_id": "scimtool-client",
+        "client_secret": "dev-secret-abc123",
+        "shared_secret": "S3cr3tSharedValue"
+      }
+    },
+    {
+      "_id": "req_token",
+      "_type": "request",
+      "parentId": "",
+      "name": "OAuth Token",
+      "method": "POST",
+      "url": "{{ base_url }}/oauth/token",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"grant_type\":\"client_credentials\",\"client_id\":\"{{ client_id }}\",\"client_secret\":\"{{ client_secret }}\",\"scope\":\"scim.manage scim.read scim.write\"}"
+      },
+      "headers": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
+    {
+      "_id": "req_create_user",
+      "_type": "request",
+      "parentId": "",
+      "name": "Create User",
+      "method": "POST",
+      "url": "{{ base_url }}/scim/v2/Users",
+      "body": {
+        "mimeType": "application/scim+json",
+        "text": "{\n  \"schemas\":[\"urn:ietf:params:scim:schemas:core:2.0:User\"],\n  \"userName\":\"alice@example.com\",\n  \"displayName\":\"Alice Example\",\n  \"externalId\":\"ext-0001\",\n  \"name\": { \"givenName\":\"Alice\", \"familyName\":\"Example\" },\n  \"emails\": [{ \"value\":\"alice@example.com\", \"type\":\"work\", \"primary\":true }]\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/scim+json" },
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+  ],
+  "id": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+  "externalId": "ext-000123",
+  "userName": "alice.example@example.com",
+  "name": {
+    "formatted": "Alice L Example",
+    "familyName": "Example",
+    "givenName": "Alice",
+    "middleName": "L",
+    "honorificPrefix": "Ms.",
+    "honorificSuffix": "PhD"
+  },
+  "displayName": "Alice Example",
+  "nickName": "Ally",
+  "profileUrl": "https://profiles.example.com/alice",
+  "title": "Senior Engineer",
+  "userType": "Employee",
+  "preferredLanguage": "en-US",
+  "locale": "en_US",
+  "timezone": "America/Los_Angeles",
+  "active": true,
+  "password": "REDACTED_FOR_SECURITY",
+  "emails": [
+    { "value": "alice.work@example.com", "type": "work", "primary": true },
+    { "value": "alice.home@example.net", "type": "home" }
+  ],
+  "phoneNumbers": [
+    { "value": "+1-425-555-0101", "type": "work" },
+    { "value": "+1-425-555-0199", "type": "mobile", "primary": false }
+  ],
+  "ims": [
+    { "value": "alice_skype", "type": "skype" }
+  ],
+  "photos": [
+    { "value": "https://cdn.example.com/photos/alice.jpg", "type": "photo" }
+  ],
+  "addresses": [
+    {
+      "streetAddress": "1 Microsoft Way",
+      "locality": "Redmond",
+      "region": "WA",
+      "postalCode": "98052",
+      "country": "USA",
+      "type": "work",
+      "formatted": "1 Microsoft Way\nRedmond, WA 98052"
+    }
+  ],
+  "entitlements": ["enterprise-admin"],
+  "roles": ["engineering:senior"],
+  "x509Certificates": [],
+  "groups": [
+    { "value": "g-1111111111111", "display": "Engineering" }
+  ],
+
+  "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
+    "employeeNumber": "EMP-000123",
+    "costCenter": "CC-1000",
+    "organization": "ExampleCorp",
+    "division": "Platform",
+    "department": "Engineering",
+    "manager": { "value": "mngr-0001", "displayName": "Bob Manager" }
+  },
+
+  "meta": {
+    "resourceType": "User",
+    "created": "2025-01-10T15:23:45Z",
+    "lastModified": "2025-01-12T09:17:30Z",
+    "location": "http://localhost:3000/scim/v2/Users/a1b2c3d4-e5f6-7890-abcd-1234567890ab"
+  }
+}

@@ -1,0 +1,93 @@
+{
+  // ServiceProviderConfig template for SCIM v2
+  // This file uses JSON with comments (JSONC) to explain recommended fields.
+  // Replace example values as appropriate for your deployment.
+
+  "schemas": [ "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig" ],
+
+  // Human-readable documentation URL for integrators
+  "documentationUri": "https://docs.example.com/scim",
+
+  // Patch support (SCIM Patch Op)
+  "patch": {
+    "supported": true
+  },
+
+  // Bulk support details (optional)
+  "bulk": {
+    "supported": false,
+    "maxOperations": 1000,
+    "maxPayloadSize": 10485760
+  },
+
+  // Filtering capabilities
+  "filter": {
+    "supported": true,
+    "maxResults": 1000
+  },
+
+  // Change password support
+  "changePassword": {
+    "supported": false
+  },
+
+  // Sorting support
+  "sort": {
+    "supported": true
+  },
+
+  // ETag / conditional request support
+  "etagSupport": {
+    "supported": true,
+    "format": "W/\"<etag>\""
+  },
+
+  // Rate limiting metadata (informational)
+  "rateLimiting": {
+    "supported": true,
+    "limitHeader": "X-RateLimit-Limit",
+    "remainingHeader": "X-RateLimit-Remaining",
+    "resetHeader": "X-RateLimit-Reset",
+    "defaultLimit": 1000
+  },
+
+  // Authentication schemes supported by the server
+  "authenticationSchemes": [
+    {
+      "type": "oauthbearertoken",
+      "name": "OAuth 2.0 Bearer Token",
+      "description": "Use OAuth2 bearer tokens (client_credentials grant for machine-to-machine).",
+      "specUri": "https://tools.ietf.org/html/rfc6750",
+      "documentationUri": "https://docs.example.com/scim/auth#oauth"
+    },
+    {
+      "type": "sharedsecret",
+      "name": "Shared Secret (legacy)",
+      "description": "Legacy single-string shared secret accepted as a bearer token for trusted clients.",
+      "documentationUri": "https://docs.example.com/scim/auth#shared-secret"
+    }
+  ],
+
+  // Supported resource types and extension hints (informational)
+  "resourceTypes": [ "User", "Group" ],
+
+  // Names of supported extension schema URNs (servers should also expose full schema via GET /Schemas)
+  "schemasSupported": [
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "urn:ietf:params:scim:schemas:core:2.0:Group",
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+    "urn:example:params:scim:schemas:extension:custom:2.0:User"
+  ],
+
+  // Optional: backend-specific or policy metadata
+  "policies": {
+    "userName": {
+      "caseExact": false,
+      "unique": true
+    },
+    "deletion": {
+      "softDeleteSupported": true,
+      "retentionDays": 30
+    }
+  }
+}

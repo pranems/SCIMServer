@@ -1,0 +1,12 @@
+{
+  "id": "urn:example:params:scim:schemas:extension:custom:2.0:User",
+  "name": "CustomUserExtension",
+  "description": "Custom extension containing HR attributes",
+  "attributes": [
+    { "name": "hireDate", "type": "string", "multiValued": false, "required": false, "caseExact": false, "mutability": "ReadWrite", "returned": "default" },
+    { "name": "employeeType", "type": "string", "multiValued": false, "required": false, "caseExact": false, "mutability": "ReadWrite", "returned": "default" },
+    { "name": "workLocation", "type": "string", "multiValued": false, "required": false, "caseExact": false, "mutability": "ReadWrite", "returned": "default" },
+    { "name": "customFlags", "type": "string", "multiValued": true, "required": false, "caseExact": false, "mutability": "ReadWrite", "returned": "default" },
+    { "name": "metadata", "type": "complex", "multiValued": false, "required": false, "mutability": "ReadWrite", "returned": "default", "subAttributes": [ { "name": "source", "type": "string" }, { "name": "syncedAt", "type": "string", "format": "date-time" } ] }
+  ]
+}

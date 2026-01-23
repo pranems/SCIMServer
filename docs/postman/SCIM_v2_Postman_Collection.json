@@ -1,0 +1,39 @@
+{
+  "info": {
+    "name": "SCIM v2 - Example Collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": { "major": 1, "minor": 0 }
+  },
+  "item": [
+    {
+      "name": "Get ServiceProviderConfig",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "{{base_url}}/ServiceProviderConfig", "host": [ "{{base_url}}" ], "path": [ "ServiceProviderConfig" ] }
+      }
+    },
+    {
+      "name": "Get ResourceTypes",
+      "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{base_url}}/ResourceTypes", "host": [ "{{base_url}}" ], "path": [ "ResourceTypes" ] } }
+    },
+    {
+      "name": "Create User",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/scim+json" } ],
+        "body": { "mode": "raw", "raw": "$(cat docs/examples/user.json)", "options": { "raw": { "language": "json" } } },
+        "url": { "raw": "{{base_url}}/Users", "host": [ "{{base_url}}" ], "path": [ "Users" ] }
+      }
+    },
+    {
+      "name": "Get Users",
+      "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{base_url}}/Users?startIndex=1&count=50", "host": [ "{{base_url}}" ], "path": [ "Users" ], "query": [ { "key": "startIndex", "value": "1" }, { "key": "count", "value": "50" } ] } }
+    },
+    {
+      "name": "Create Group",
+      "request": { "method": "POST", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/scim+json" } ], "body": { "mode": "raw", "raw": "$(cat docs/examples/group.json)", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{base_url}}/Groups", "host": [ "{{base_url}}" ], "path": [ "Groups" ] } }
+    }
+  ],
+  "variable": [ { "key": "base_url", "value": "http://api.example.com/scim/v2" }, { "key": "token", "value": "" } ]
+}

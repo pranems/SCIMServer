@@ -1,0 +1,44 @@
+sequenceDiagram
+  participant Client
+  participant WebServer as main.ts middleware
+  participant Guard as SharedSecretGuard
+  participant OAuthSvc as OAuthService
+  participant Controller as UsersController
+  participant Validator as ValidationPipe
+  participant Service as ScimUsersService
+  participant PrismaClient
+  participant Logger as LoggingService
+
+  Client->>WebServer: POST /scim/v2/Users (application/scim+json)
+  WebServer->>WebServer: normalize /scim/v2 -> /scim
+  WebServer->>Guard: run canActivate (Authorization header)
+  Guard->>OAuthSvc: validate JWT (jwt.verify)
+  alt token valid
+    Guard-->>Controller: allow (request.oauth set)
+  else token invalid
+    Guard->>WebServer: compare token to SCIM_SHARED_SECRET
+    alt matches shared secret
+      Guard-->>Controller: allow (legacy mode)
+    else
+      WebServer-->>Client: 401 SCIM error (invalidToken)
+      Note right of Client: request rejected (no auth)
+    end
+  end
+  Controller->>Validator: validate CreateUserDto
+  alt validation fails
+    Controller-->>Client: 400 Bad Request
+    Note right of Client: validation error details returned
+  else
+    Controller->>Service: createUser(dto, baseUrl)
+    Service->>PrismaClient: check uniqueness (findUnique / where)
+    alt unique violation found
+      Service-->>Controller: throw ConflictError (mapped to 409)
+      Controller->>Logger: log request + 409
+      Controller-->>Client: 409 Conflict (scimType: 'uniqueness')
+    else unique ok
+      Service->>PrismaClient: prisma.scimUser.create(...)
+      PrismaClient-->>Service: created row
+      Service->>Logger: log request + 201 (store request/response)
+      Controller-->>Client: 201 Created (SCIM user resource)
+    end
+  end

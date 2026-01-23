@@ -1,0 +1,194 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SCIM v2 API (RFC 7643 / 7644) - Examples",
+    "version": "1.0.0",
+    "description": "A focused OpenAPI v3 specification covering core SCIM v2 endpoints with example payloads for use in REST clients. This is an implementation-agnostic reference for testing and integration."
+  },
+  "servers": [
+    { "url": "http://api.example.com/scim/v2", "description": "Example server (replace with your base URL)" }
+  ],
+  "paths": {
+    "/ServiceProviderConfig": {
+      "get": {
+        "summary": "Get ServiceProviderConfig",
+        "responses": {
+          "200": {
+            "description": "Service provider configuration",
+            "content": {
+              "application/scim+json": {
+                "schema": { "type": "object" },
+                "example": {
+                  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"],
+                  "patch": { "supported": true },
+                  "bulk": { "supported": false },
+                  "filter": { "supported": true, "maxResults": 1000 },
+                  "sort": { "supported": true },
+                  "authenticationSchemes": [
+                    { "type": "oauthbearertoken", "name": "OAuth 2.0 Bearer Token", "specUri": "https://tools.ietf.org/html/rfc6750" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ResourceTypes": {
+      "get": {
+        "summary": "List ResourceTypes",
+        "responses": {
+          "200": {
+            "description": "Resource types supported",
+            "content": {
+              "application/scim+json": {
+                "schema": { "type": "object" },
+                "example": {
+                  "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+                  "totalResults": 2,
+                  "Resources": [
+                    { "id": "User", "name": "User", "endpoint": "/Users" },
+                    { "id": "Group", "name": "Group", "endpoint": "/Groups" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Schemas": {
+      "get": {
+        "summary": "List SCIM Schemas",
+        "responses": {
+          "200": {
+            "description": "Schemas",
+            "content": {
+              "application/scim+json": {
+                "schema": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Users": {
+      "post": {
+        "summary": "Create a User",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/scim+json": {
+              "schema": { "type": "object" },
+              "example": {
+                "schemas": [
+                  "urn:ietf:params:scim:schemas:core:2.0:User",
+                  "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+                ],
+                "userName": "alice@example.com",
+                "externalId": "ext-0001",
+                "name": { "givenName": "Alice", "familyName": "Example", "formatted": "Alice Example" },
+                "displayName": "Alice Example",
+                "active": true,
+                "emails": [{ "value": "alice@example.com", "type": "work", "primary": true }],
+                "phoneNumbers": [{ "value": "+1-425-555-0101", "type": "work" }],
+                "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": { "employeeNumber": "EMP-0001", "department": "Engineering" }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Created", "content": { "application/scim+json": { "schema": { "type": "object" } } } },
+          "409": { "description": "Conflict / uniqueness violation" }
+        }
+      },
+      "get": {
+        "summary": "Query / List Users",
+        "parameters": [
+          { "name": "startIndex", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "count", "in": "query", "schema": { "type": "integer", "default": 100 } },
+          { "name": "filter", "in": "query", "schema": { "type": "string" } },
+          { "name": "sortBy", "in": "query", "schema": { "type": "string" } },
+          { "name": "sortOrder", "in": "query", "schema": { "type": "string", "enum": ["ascending", "descending"] } },
+          { "name": "attributes", "in": "query", "schema": { "type": "string" } },
+          { "name": "excludedAttributes", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List response",
+            "content": {
+              "application/scim+json": {
+                "schema": { "type": "object" },
+                "example": {
+                  "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+                  "totalResults": 1,
+                  "startIndex": 1,
+                  "itemsPerPage": 1,
+                  "Resources": [
+                    { "id": "a1b2c3", "userName": "alice@example.com", "displayName": "Alice Example" }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Users/{id}": {
+      "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
+      "get": {
+        "summary": "Retrieve a User",
+        "responses": {
+          "200": { "description": "User resource", "content": { "application/scim+json": { "schema": { "type": "object" } } } },
+          "404": { "description": "Not found" }
+        }
+      },
+      "put": {
+        "summary": "Replace a User",
+        "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "type": "object" } } } },
+        "responses": { "200": { "description": "Updated" }, "404": { "description": "Not found" } }
+      },
+      "patch": {
+        "summary": "Patch a User",
+        "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "type": "object" }, "example": { "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{ "op": "replace", "path": "displayName", "value": "Alice Renamed" }] } } } },
+        "responses": { "200": { "description": "Patched" }, "404": { "description": "Not found" } }
+      },
+      "delete": {
+        "summary": "Delete a User",
+        "responses": { "204": { "description": "No content" }, "404": { "description": "Not found" } }
+      }
+    },
+    "/Groups": {
+      "post": {
+        "summary": "Create Group",
+        "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "type": "object" }, "example": { "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"], "displayName": "Engineering", "members": [{ "value": "a1b2c3", "display": "Alice Example" }] } } } },
+        "responses": { "201": { "description": "Created" } }
+      },
+      "get": {
+        "summary": "List Groups",
+        "parameters": [ { "name": "startIndex", "in": "query", "schema": { "type": "integer" } }, { "name": "count", "in": "query", "schema": { "type": "integer" } }, { "name": "filter", "in": "query", "schema": { "type": "string" } } ],
+        "responses": { "200": { "description": "List", "content": { "application/scim+json": { "schema": { "type": "object" } } } }
+      }
+    },
+    "/Groups/{id}": {
+      "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
+      "get": { "summary": "Get Group", "responses": { "200": { "description": "Group" }, "404": { "description": "Not found" } } },
+      "put": { "summary": "Replace Group", "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "type": "object" } } } }, "responses": { "200": { "description": "Updated" } } },
+      "patch": { "summary": "Patch Group", "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "type": "object" }, "example": { "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{ "op": "add", "path": "members", "value": [{ "value": "new-user-id", "display": "New User" }] }] } } } }, "responses": { "200": { "description": "Patched" } } },
+      "delete": { "summary": "Delete Group", "responses": { "204": { "description": "No content" } } }
+    },
+    "/Bulk": {
+      "post": {
+        "summary": "Bulk operations (optional)",
+        "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "type": "object" } } } },
+        "responses": { "200": { "description": "Bulk response" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    }
+  },
+  "security": [ { "bearerAuth": [] } ]
+}

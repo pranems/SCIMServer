@@ -1,0 +1,25 @@
+sequenceDiagram
+  participant Client
+  participant Guard
+  participant Controller as UsersController
+  participant Service as ScimUsersService
+  participant PrismaClient
+
+  Client->>Guard: GET /scim/v2/Users?startIndex=1&count=50
+  Guard-->>Controller: allow
+  Controller->>Service: listUsers(query)
+  Service->>PrismaClient: prisma.scimUser.findMany({ skip, take, where, orderBy })
+  PrismaClient-->>Service: rows
+  Service-->>Controller: paginated SCIM list
+  Controller-->>Client: 200 { Resources: [...], totalResults: N }
+
+  Client->>Guard: GET /scim/v2/Users/:id
+  Guard-->>Controller: allow
+  Controller->>Service: getUser(id)
+  Service->>PrismaClient: prisma.scimUser.findUnique({ where: { id } })
+  alt not found
+    Controller-->>Client: 404 Not Found
+  else found
+    Service-->>Controller: resource
+    Controller-->>Client: 200 { user resource }
+  end

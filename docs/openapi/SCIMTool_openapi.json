@@ -1,0 +1,18 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SCIMTool API",
+    "version": "1.0.0",
+    "description": "Partial OpenAPI specification for SCIMTool including example payloads."
+  },
+  "servers": [ { "url": "http://localhost:3000/scim/v2" } ],
+  "paths": {
+    "/Users": {
+      "post": {
+        "summary": "Create SCIM User",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/scim+json": {
+              "schema": { "type": "object" },
+              "example": 

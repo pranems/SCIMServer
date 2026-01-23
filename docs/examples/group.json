@@ -1,0 +1,16 @@
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+  "id": "g-1111111111111",
+  "displayName": "Engineering",
+  "externalId": "group-ext-001",
+  "members": [
+    { "value": "a1b2c3d4-e5f6-7890-abcd-1234567890ab", "display": "Alice Example", "type": "User" },
+    { "value": "u-22222222-3333-4444-5555-666666666666", "display": "Carol Contributor", "type": "User" }
+  ],
+  "meta": {
+    "resourceType": "Group",
+    "created": "2025-01-10T15:50:00Z",
+    "lastModified": "2025-01-11T10:00:00Z",
+    "location": "http://localhost:3000/scim/v2/Groups/g-1111111111111"
+  }
+}

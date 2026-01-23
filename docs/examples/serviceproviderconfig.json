@@ -1,0 +1,17 @@
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"],
+  "patch": { "supported": true },
+  "bulk": { "supported": false },
+  "filter": { "supported": true, "maxResults": 200 },
+  "changePassword": { "supported": false },
+  "sort": { "supported": true },
+  "authenticationSchemes": [
+    {
+      "type": "oauthbearertoken",
+      "name": "OAuth Bearer Token",
+      "description": "Authorization using the OAuth 2.0 Bearer Token Standard",
+      "specUri": "https://tools.ietf.org/html/rfc6750",
+      "documentationUri": "https://example.com/docs/auth"
+    }
+  ]
+}
