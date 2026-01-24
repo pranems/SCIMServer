@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "npx prisma migrate deploy && node dist/main.js",
     "start:dev": "ts-node-dev --respawn --transpile-only src/main.ts",
+    "start:debug": "npx ts-node-dev --respawn --transpile-only --inspect=9229 src/main.ts",
     "lint": "eslint ./src --ext .ts",
     "format": "prettier --check \"src/**/*.ts\"",
     "format:fix": "prettier --write \"src/**/*.ts\"",
