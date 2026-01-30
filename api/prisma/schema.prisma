@@ -10,28 +10,62 @@ datasource db {
 // SQLite connection pool and timeout configuration
 // Applied via Prisma Client initialization in the code
 
+// Multi-endpoint support: Each endpoint has isolated SCIM resources
+model Endpoint {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  displayName String?
+  description String?
+  config      String?  // JSON configuration for endpoint-specific settings
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users   ScimUser[]
+  groups  ScimGroup[]
+  logs    RequestLog[]
+
+  @@index([active])
+}
+
 model ScimUser {
   id          String   @id @default(cuid())
-  scimId      String   @unique
-  externalId  String?  @unique
-  userName    String   @unique
+  endpointId  String   // Foreign key to endpoint
+  scimId      String
+  externalId  String?
+  userName    String
   active      Boolean  @default(true)
   rawPayload  String
   meta        String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  groups      GroupMember[]
+
+  endpoint Endpoint      @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  groups   GroupMember[]
+
+  // Composite unique constraint per endpoint
+  @@unique([endpointId, scimId])
+  @@unique([endpointId, userName])
+  @@unique([endpointId, externalId])
+  @@index([endpointId])
 }
 
 model ScimGroup {
-  id          String        @id @default(cuid())
-  scimId      String        @unique
+  id          String   @id @default(cuid())
+  endpointId  String   // Foreign key to endpoint
+  scimId      String
   displayName String
   rawPayload  String
   meta        String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  members     GroupMember[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  endpoint Endpoint      @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  members  GroupMember[]
+
+  // Composite unique constraint per endpoint
+  @@unique([endpointId, scimId])
+  @@index([endpointId])
 }
 
 model GroupMember {
@@ -45,10 +79,14 @@ model GroupMember {
 
   group ScimGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   user  ScimUser? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([groupId])
+  @@index([userId])
 }
 
 model RequestLog {
   id               String   @id @default(cuid())
+  endpointId       String?  // Optional - for system-wide logs
   method           String
   url              String
   status           Int?
@@ -62,7 +100,10 @@ model RequestLog {
   identifier       String?  // Persisted lightweight identifier (userName/email/displayName/etc)
   createdAt        DateTime @default(now())
 
+  endpoint Endpoint? @relation(fields: [endpointId], references: [id], onDelete: SetNull)
+
   @@index([createdAt])
   @@index([method])
   @@index([status])
+  @@index([endpointId])
 }

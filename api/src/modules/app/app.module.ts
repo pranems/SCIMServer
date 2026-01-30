@@ -9,6 +9,7 @@ import { DatabaseModule } from '../database/database.module';
 import { LoggingModule } from '../logging/logging.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ScimModule } from '../scim/scim.module';
+import { EndpointModule } from '../endpoint/endpoint.module';
 import { WebModule } from '../web/web.module';
 import { OAuthModule } from '../../oauth/oauth.module';
 
@@ -22,6 +23,7 @@ import { OAuthModule } from '../../oauth/oauth.module';
     DatabaseModule,
     PrismaModule,
     LoggingModule,
+    EndpointModule,
     ScimModule,
     WebModule,
     OAuthModule

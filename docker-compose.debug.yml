@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  api:
+    image: node:18
+    container_name: scimtool-api-dev
+    working_dir: /usr/src/app
+    volumes:
+      - ./api:/usr/src/app:rw
+      - /usr/src/app/node_modules
+    ports:
+      - "3000:3000"    # SCIM API port
+      - "9229:9229"    # Node debugger inspector
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      # Enable the Node inspector on all interfaces so the host can attach
+      NODE_OPTIONS: "--inspect=0.0.0.0:9229"
+    command: bash -lc "npm ci && npx prisma generate && npm run start:dev"
+    tty: true
+    stdin_open: true
