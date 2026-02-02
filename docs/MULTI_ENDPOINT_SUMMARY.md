@@ -10,40 +10,40 @@ A complete foundational implementation of Multi-Endpoint support for the SCIMToo
 
 ## Architecture Components
 
-### 1. **Tenant Management System**
-- **EndpointService**: CRUD operations for tenants
-- **EndpointController**: REST API for tenant administration
-- **DTOs**: Data transfer objects for tenant creation/updates
+### 1. **Endpoint Management System**
+- **EndpointService**: CRUD operations for endpoints
+- **EndpointController**: REST API for endpoint administration
+- **DTOs**: Data transfer objects for endpoint creation/updates
 
 ### 2. **endpoint-scoped SCIM Endpoints**
 - **EndpointScimController**: Routes all SCIM operations to endpoint-specific handlers
 - Serves: `/scim/endpoints/{endpointId}/Users`, `/scim/endpoints/{endpointId}/Groups`, etc.
-- Validates tenant exists before every operation
+- Validates endpoint exists before every operation
 
 ### 3. **Request Context Management**
 - **EndpointContextStorage**: AsyncLocalStorage-based context isolation
-- Ensures each request knows which tenant it's serving
+- Ensures each request knows which endpoint it's serving
 - Prevents data leakage between concurrent requests
 
 ### 4. **Database Schema**
-- **Tenant Model**: Stores endpoint configuration
+- **Endpoint Model**: Stores endpoint configuration
 - **Updated Models**: ScimUser, ScimGroup include endpointId
 - **Composite Constraints**: Unique identifiers per endpoint
-- **Cascade Deletes**: Removing tenant removes all data
+- **Cascade Deletes**: Removing endpoint removes all data
 
 ## Files Created
 
 ```
 src/modules/endpoint/
 ├── controllers/
-│   └── tenant.controller.ts          # Admin APIs for tenant management
+│   └── endpoint.controller.ts          # Admin APIs for endpoint management
 ├── services/
-│   └── tenant.service.ts             # Tenant business logic
+│   └── endpoint.service.ts             # Endpoint business logic
 ├── dto/
 │   ├── create-endpoint.dto.ts          # Create request DTO
 │   └── update-endpoint.dto.dto.ts      # Update request DTO
 ├── endpoint-context.storage.ts         # Request context isolation
-└── tenant.module.ts                  # NestJS module
+└── endpoint.module.ts                  # NestJS module
 
 src/modules/scim/controllers/
 └── endpoint-scim.controller.ts         # endpoint-specific SCIM endpoints
@@ -55,30 +55,30 @@ docs/
 └── MULTI_ENDPOINT_CHECKLIST.md         # Implementation checklist
 
 prisma/
-└── schema.prisma                     # Updated with Tenant model
+└── schema.prisma                     # Updated with Endpoint model
 
 src/modules/
-├── app/app.module.ts                 # Updated to import TenantModule
-└── scim/scim.module.ts               # Updated to include tenant components
+├── app/app.module.ts                 # Updated to import EndpointModule
+└── scim/scim.module.ts               # Updated to include endpoint components
 ```
 
 ## Files Modified
 
-- `prisma/schema.prisma` - Added Tenant model and endpointId relationships
-- `src/modules/app/app.module.ts` - Added TenantModule import
+- `prisma/schema.prisma` - Added Endpoint model and endpointId relationships
+- `src/modules/app/app.module.ts` - Added EndpointModule import
 - `src/modules/scim/scim.module.ts` - Added EndpointScimController and context storage
 
 ## API Endpoints Added
 
-### Tenant Management
+### Endpoint Management
 ```
-POST   /admin/endpoints                      # Create tenant
-GET    /admin/endpoints                      # List tenants
-GET    /admin/endpoints/{endpointId}           # Get tenant
+POST   /admin/endpoints                      # Create endpoint
+GET    /admin/endpoints                      # List endpoints
+GET    /admin/endpoints/{endpointId}           # Get endpoint
 GET    /admin/endpoints/by-name/{name}       # Get by name
-PATCH  /admin/endpoints/{endpointId}           # Update tenant
-DELETE /admin/endpoints/{endpointId}           # Delete tenant (cascade)
-GET    /admin/endpoints/{endpointId}/stats     # Tenant statistics
+PATCH  /admin/endpoints/{endpointId}           # Update endpoint
+DELETE /admin/endpoints/{endpointId}           # Delete endpoint (cascade)
+GET    /admin/endpoints/{endpointId}/stats     # Endpoint statistics
 ```
 
 ### endpoint-specific SCIM
@@ -93,7 +93,7 @@ GET    /admin/endpoints/{endpointId}/stats     # Tenant statistics
 
 ## Example Usage
 
-### 1. Create Tenant
+### 1. Create Endpoint
 ```bash
 curl -X POST http://localhost:3000/scim/admin/endpoints \
   -H "Content-Type: application/json" \
@@ -114,7 +114,7 @@ curl -X POST http://localhost:3000/scim/admin/endpoints \
 }
 ```
 
-### 2. Use Tenant's SCIM Endpoint
+### 2. Use Endpoint's SCIM Endpoint
 ```bash
 curl -X POST http://localhost:3000/scim/endpoints/clx123.../Users \
   -H "Content-Type: application/scim+json" \
@@ -125,26 +125,26 @@ curl -X POST http://localhost:3000/scim/endpoints/clx123.../Users \
   }'
 ```
 
-### 3. Delete Tenant (Cascades)
+### 3. Delete Endpoint (Cascades)
 ```bash
 curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123...
 ```
 - Deletes endpoint configuration
-- Deletes all users in tenant
-- Deletes all groups in tenant
+- Deletes all users in endpoint
+- Deletes all groups in endpoint
 - Deletes all group memberships
-- Deletes all logs for tenant
+- Deletes all logs for endpoint
 
 ## Data Isolation Features
 
 1. **Composite Unique Constraints**
-   - Same `userName` can exist in different tenants
-   - Same `externalId` can exist in different tenants
-   - Same `scimId` can exist in different tenants
+   - Same `userName` can exist in different endpoints
+   - Same `externalId` can exist in different endpoints
+   - Same `scimId` can exist in different endpoints
 
 2. **Query Filtering**
    - All database queries include `WHERE endpointId = ?`
-   - Services validate tenant existence before operations
+   - Services validate endpoint existence before operations
 
 3. **Request Context**
    - AsyncLocalStorage isolates context per request
@@ -152,14 +152,14 @@ curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123...
    - endpoint context properly cleaned up after request
 
 4. **Cascade Delete**
-   - Deleting tenant automatically removes all related data
+   - Deleting endpoint automatically removes all related data
    - Foreign key constraints prevent orphaned data
 
 ## Implementation Status
 
 ✅ **Complete (Phase 1 - Infrastructure)**
 - Database schema updated
-- Tenant module created
+- Endpoint module created
 - Admin controller implemented
 - endpoint-scoped SCIM controller created
 - Context storage implemented
@@ -168,7 +168,7 @@ curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123...
 ⏳ **Pending (Phase 2 - Service Extensions)**
 - Add `*ForEndpoint()` methods to ScimUsersService
 - Add `*ForEndpoint()` methods to ScimGroupsService
-- Implement tenant-aware filtering in queries
+- Implement endpoint-aware filtering in queries
 
 ⏳ **Pending (Phase 3 - Testing)**
 - Unit tests for services
@@ -182,12 +182,12 @@ curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123...
 
 ## Next Steps (Priority Order)
 
-1. **Extend ScimUsersService** with tenant-aware methods
+1. **Extend ScimUsersService** with endpoint-aware methods
    - Add all `*ForEndpoint()` variants
    - Update to filter by endpointId in queries
-   - Implement tenant-aware unique constraint checks
+   - Implement endpoint-aware unique constraint checks
 
-2. **Extend ScimGroupsService** with tenant-aware methods
+2. **Extend ScimGroupsService** with endpoint-aware methods
    - Add all `*ForEndpoint()` variants
    - Update to filter by endpointId in queries
    - Validate member endpointId in group operations
@@ -195,12 +195,12 @@ curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123...
 3. **Run Database Migration**
    ```bash
    cd api
-   npx prisma migrate dev --name add_multi_tenant_support
+   npx prisma migrate dev --name add_multi_endpoint_support
    ```
 
-4. **Test Tenant Operations**
-   - Create tenants
-   - Create users in tenants
+4. **Test Endpoint Operations**
+   - Create endpoints
+   - Create users in endpoints
    - Verify isolation
    - Test cascade delete
 
@@ -213,18 +213,18 @@ curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123...
 
 1. **Request-Scoped Context**: Used AsyncLocalStorage instead of dependency injection of request object to keep services clean
 
-2. **Composite Unique Constraints**: Allows same identifiers across tenants - better for Multi-Endpoint SaaS
+2. **Composite Unique Constraints**: Allows same identifiers across endpoints - better for Multi-Endpoint SaaS
 
-3. **Cascade Delete**: When tenant deleted, all data automatically removed - prevents orphaned data
+3. **Cascade Delete**: When endpoint deleted, all data automatically removed - prevents orphaned data
 
 4. **New Endpoints Pattern**: Added `/scim/endpoints/{id}/` instead of modifying existing endpoints - maintains backward compatibility
 
-5. **Validation at Controller Level**: Tenant existence verified before passing to services - fail fast pattern
+5. **Validation at Controller Level**: Endpoint existence verified before passing to services - fail fast pattern
 
 ## Performance Considerations
 
 1. **Indexes Added in Schema**
-   - Index on Tenant.active
+   - Index on Endpoint.active
    - Index on ScimUser.endpointId
    - Index on ScimGroup.endpointId
    - Index on RequestLog.endpointId
@@ -240,8 +240,8 @@ curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123...
 
 ## Security Notes
 
-1. **Tenant Validation**: Every endpoint validates tenant exists
-2. **Data Isolation**: Composite constraints prevent cross-tenant access
+1. **Endpoint Validation**: Every endpoint validates endpoint exists
+2. **Data Isolation**: Composite constraints prevent cross-endpoint access
 3. **Cascade Cleanup**: No orphaned data possible
 4. **Future**: Add authentication per endpoint for production use
 
@@ -255,14 +255,14 @@ curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123...
 ## Summary
 
 You now have a complete, production-ready Multi-Endpoint foundation. The infrastructure supports:
-- ✅ Tenant creation and management
+- ✅ Endpoint creation and management
 - ✅ endpoint-specific SCIM endpoints
 - ✅ Complete data isolation
 - ✅ Cascade deletion
 - ✅ Request context isolation
 - ✅ Async-safe operations
 
-The remaining work (Phase 2) is to extend the existing SCIM services to support tenant-aware operations. The controllers are ready to use the new service methods once they're implemented.
+The remaining work (Phase 2) is to extend the existing SCIM services to support endpoint-aware operations. The controllers are ready to use the new service methods once they're implemented.
 
 All documentation is in place to guide the implementation of Phase 2 and beyond.
 

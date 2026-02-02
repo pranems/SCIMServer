@@ -57,9 +57,9 @@ This folder contains complete documentation for implementing Multi-Endpoint supp
 
 | Phase | Component | Status | Details |
 |-------|-----------|--------|---------|
-| 1 | Database Schema | ✅ Complete | Tenant model, endpointId relationships added |
-| 1 | Tenant Service | ✅ Complete | CRUD operations for tenant management |
-| 1 | Tenant Controller | ✅ Complete | Admin APIs for tenants |
+| 1 | Database Schema | ✅ Complete | Endpoint model, endpointId relationships added |
+| 1 | Endpoint Service | ✅ Complete | CRUD operations for endpoint management |
+| 1 | Endpoint Controller | ✅ Complete | Admin APIs for endpoints |
 | 1 | Context Storage | ✅ Complete | AsyncLocalStorage for request isolation |
 | 1 | endpoint-scoped Controller | ✅ Complete | /scim/endpoints/{id}/* routes defined |
 | 1 | Module Integration | ✅ Complete | AppModule and ScimModule updated |
@@ -75,10 +75,10 @@ This folder contains complete documentation for implementing Multi-Endpoint supp
 
 ```
 Multi-Endpoint SCIM API
-├── Tenant Management APIs (/admin/endpoints)
-│   └── Create, read, update, delete tenants
+├── Endpoint Management APIs (/admin/endpoints)
+│   └── Create, read, update, delete endpoints
 │
-├── endpoint-specific SCIM endpoints (/scim/endpoints/{endpointId}/)
+├── Endpoint-specific SCIM endpoints (/scim/endpoints/{endpointId}/)
 │   ├── Users (CRUD operations)
 │   ├── Groups (CRUD operations)
 │   └── Metadata (Schemas, ResourceTypes, Config)
@@ -86,7 +86,7 @@ Multi-Endpoint SCIM API
 ├── Data Isolation
 │   ├── Composite unique constraints per endpoint
 │   ├── Filtered queries by endpointId
-│   └── Cascade delete on tenant removal
+│   └── Cascade delete on endpoint removal
 │
 └── Request Context
     └── AsyncLocalStorage for endpoint context per request
@@ -98,21 +98,21 @@ Multi-Endpoint SCIM API
 
 ### ✅ Implemented Features
 
-1. **Tenant Management**
-   - Create, read, update, delete tenants
-   - Get tenant statistics
+1. **Endpoint Management**
+   - Create, read, update, delete endpoints
+   - Get endpoint statistics
    - Query by ID or name
    - Filter by active status
 
-2. **endpoint-specific SCIM endpoints**
+2. **Endpoint-specific SCIM endpoints**
    - Independent Users endpoint per endpoint
    - Independent Groups endpoint per endpoint
-   - endpoint-specific metadata
+   - Endpoint-specific metadata
 
 3. **Complete Data Isolation**
    - Composite unique constraints
    - Filtered database queries
-   - No cross-tenant data access
+   - No cross-endpoint data access
    - Cascade delete for cleanup
 
 4. **Request Context Isolation**
@@ -123,8 +123,8 @@ Multi-Endpoint SCIM API
 ### ⏳ Pending Features
 
 1. **Service Layer Extensions**
-   - Tenant-aware user operations
-   - Tenant-aware group operations
+   - Endpoint-aware user operations
+   - Endpoint-aware group operations
    - Proper filtering in all queries
 
 2. **Testing**
@@ -141,7 +141,7 @@ Multi-Endpoint SCIM API
 
 ## API Endpoints Quick Reference
 
-### Tenant Management
+### Endpoint Management
 ```
 POST   /admin/endpoints
 GET    /admin/endpoints
@@ -152,7 +152,7 @@ DELETE /admin/endpoints/{endpointId}
 GET    /admin/endpoints/{endpointId}/stats
 ```
 
-### endpoint-specific SCIM (Example for Tenant A)
+### Endpoint-specific SCIM (Example for Endpoint A)
 ```
 POST   /scim/endpoints/{endpointId}/Users
 GET    /scim/endpoints/{endpointId}/Users
@@ -178,13 +178,13 @@ GET    /scim/endpoints/{endpointId}/ServiceProviderConfig
 ## Files Created
 
 ### Source Code
-- ✅ `src/modules/endpoint/tenant.service.ts` - Tenant business logic
-- ✅ `src/modules/endpoint/tenant.controller.ts` - Admin APIs
+- ✅ `src/modules/endpoint/endpoint.service.ts` - Endpoint business logic
+- ✅ `src/modules/endpoint/endpoint.controller.ts` - Admin APIs
 - ✅ `src/modules/endpoint/endpoint-context.storage.ts` - Context management
-- ✅ `src/modules/endpoint/tenant.module.ts` - Module config
+- ✅ `src/modules/endpoint/endpoint.module.ts` - Module config
 - ✅ `src/modules/endpoint/dto/create-endpoint.dto.ts` - Create request DTO
 - ✅ `src/modules/endpoint/dto/update-endpoint.dto.ts` - Update request DTO
-- ✅ `src/modules/scim/controllers/endpoint-scim.controller.ts` - Tenant SCIM routes
+- ✅ `src/modules/scim/controllers/endpoint-scim.controller.ts` - Endpoint SCIM routes
 
 ### Documentation
 - ✅ `docs/MULTI_ENDPOINT_SUMMARY.md` - Executive summary
@@ -196,18 +196,18 @@ GET    /scim/endpoints/{endpointId}/ServiceProviderConfig
 - ✅ `docs/MULTI_ENDPOINT_INDEX.md` - This file
 
 ### Modified Files
-- ✅ `prisma/schema.prisma` - Added Tenant model and relationships
-- ✅ `src/modules/app/app.module.ts` - Added TenantModule import
-- ✅ `src/modules/scim/scim.module.ts` - Added tenant components
+- ✅ `prisma/schema.prisma` - Added Endpoint model and relationships
+- ✅ `src/modules/app/app.module.ts` - Added EndpointModule import
+- ✅ `src/modules/scim/scim.module.ts` - Added endpoint components
 
 ---
 
 ## Example Workflows
 
-### Workflow 1: Create Tenant and Add User
+### Workflow 1: Create Endpoint and Add User
 
 ```bash
-# Step 1: Create tenant
+# Step 1: Create endpoint
 curl -X POST http://localhost:3000/scim/admin/endpoints \
   -H "Content-Type: application/json" \
   -d '{
@@ -216,7 +216,7 @@ curl -X POST http://localhost:3000/scim/admin/endpoints \
   }'
 # Returns: { id: "clx123...", scimEndpoint: "/scim/endpoints/clx123..." }
 
-# Step 2: Create user in tenant
+# Step 2: Create user in endpoint
 curl -X POST http://localhost:3000/scim/endpoints/clx123.../Users \
   -H "Content-Type: application/scim+json" \
   -d '{
@@ -224,55 +224,55 @@ curl -X POST http://localhost:3000/scim/endpoints/clx123.../Users \
     "userName": "john@acme.com",
     "name": {"givenName": "John", "familyName": "Doe"}
   }'
-# Returns: User resource with meta.location for this tenant
+# Returns: User resource with meta.location for this endpoint
 
-# Step 3: List users in tenant
+# Step 3: List users in endpoint
 curl http://localhost:3000/scim/endpoints/clx123.../Users
-# Returns: Only users in this tenant
+# Returns: Only users in this endpoint
 ```
 
 ### Workflow 2: Multi-Endpoint Isolation
 
 ```bash
-# Create Tenant A
+# Create Endpoint A
 curl -X POST http://localhost:3000/scim/admin/endpoints \
   -H "Content-Type: application/json" \
   -d '{"name": "tenant-a"}'
 # Returns: id = "clx-a..."
 
-# Create Tenant B
+# Create Endpoint B
 curl -X POST http://localhost:3000/scim/admin/endpoints \
   -H "Content-Type: application/json" \
   -d '{"name": "tenant-b"}'
 # Returns: id = "clx-b..."
 
-# Add same user to both tenants
+# Add same user to both endpoints
 curl -X POST http://localhost:3000/scim/endpoints/clx-a.../Users \
   -d '{"userName": "john.doe", ...}'
 
 curl -X POST http://localhost:3000/scim/endpoints/clx-b.../Users \
-  -d '{"userName": "john.doe", ...}'  # Same name, different user in different tenant!
+  -d '{"userName": "john.doe", ...}'  # Same name, different user in different endpoint!
 
-# List users in Tenant A - only shows john.doe from A
+# List users in Endpoint A - only shows john.doe from A
 curl http://localhost:3000/scim/endpoints/clx-a.../Users
 
-# List users in Tenant B - only shows john.doe from B
+# List users in Endpoint B - only shows john.doe from B
 curl http://localhost:3000/scim/endpoints/clx-b.../Users
 ```
 
-### Workflow 3: Delete Tenant (Cascade)
+### Workflow 3: Delete Endpoint (Cascade)
 
 ```bash
-# Delete tenant and all its data
+# Delete endpoint and all its data
 curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123...
 # Response: 204 No Content
 
 # All of these are automatically deleted:
 # - endpoint configuration
-# - All users in tenant
-# - All groups in tenant
+# - All users in endpoint
+# - All groups in endpoint
 # - All group memberships
-# - All logs for tenant
+# - All logs for endpoint
 ```
 
 ---
@@ -294,9 +294,9 @@ curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123...
 
 1. **Read** [MULTI_ENDPOINT_QUICK_START.md](MULTI_ENDPOINT_QUICK_START.md) for overview
 2. **Review** [MULTI_ENDPOINT_CHECKLIST.md](MULTI_ENDPOINT_CHECKLIST.md) for Phase 2 tasks
-3. **Implement** tenant-aware methods in ScimUsersService and ScimGroupsService
+3. **Implement** endpoint-aware methods in ScimUsersService and ScimGroupsService
 4. **Run** database migration: `npx prisma migrate dev`
-5. **Test** tenant operations and isolation
+5. **Test** endpoint operations and isolation
 6. **Deploy** to staging and then production
 
 ---

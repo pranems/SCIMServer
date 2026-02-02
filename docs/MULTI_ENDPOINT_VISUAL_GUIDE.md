@@ -21,28 +21,28 @@ All Customers Share Same Endpoints
 
 ### AFTER: Multi-Endpoint SCIM Endpoints
 ```
-Create Tenant A
+Create Endpoint A
 │
-└─ Tenant A: ACME Corp (id: clx123...)
+└─ Endpoint A: ACME Corp (id: clx123...)
    │
    └─ /scim/endpoints/clx123.../
       ├─ Users
-      │  ├─ john.doe@acme.com (Tenant A Only)
-      │  └─ jane.smith@acme.com (Tenant A Only)
+      │  ├─ john.doe@acme.com (Endpoint A Only)
+      │  └─ jane.smith@acme.com (Endpoint A Only)
       ├─ Groups
-      │  └─ ACME Corp Admins (Tenant A Only)
+      │  └─ ACME Corp Admins (Endpoint A Only)
       └─ Metadata (Schemas, ResourceTypes, etc.)
 
-Create Tenant B
+Create Endpoint B
 │
-└─ Tenant B: Beta Inc (id: clx456...)
+└─ Endpoint B: Beta Inc (id: clx456...)
    │
    └─ /scim/endpoints/clx456.../
       ├─ Users
-      │  ├─ bob.jones@beta.com (Tenant B Only)
-      │  └─ alice.brown@beta.com (Tenant B Only)
+      │  ├─ bob.jones@beta.com (Endpoint B Only)
+      │  └─ alice.brown@beta.com (Endpoint B Only)
       ├─ Groups
-      │  └─ Beta Devs (Tenant B Only)
+      │  └─ Beta Devs (Endpoint B Only)
       └─ Metadata
 
 Benefit: Complete isolation, easy management, independent lifecycle
@@ -54,14 +54,14 @@ Benefit: Complete isolation, easy management, independent lifecycle
 ```
 ┌─────────────────────────────────────────────┐
 │ 1. Update Database Schema                   │
-│    ✅ Add Tenant model                      │
+│    ✅ Add Endpoint model                    │
 │    ✅ Add endpointId to ScimUser, ScimGroup   │
 │    ✅ Add composite unique constraints      │
 │    ✅ Add cascade delete                    │
 └─────────────────────────────────────────────┘
            ↓
 ┌─────────────────────────────────────────────┐
-│ 2. Create Tenant Module                     │
+│ 2. Create Endpoint Module                   │
 │    ✅ EndpointService (CRUD operations)       │
 │    ✅ EndpointController (Admin APIs)         │
 │    ✅ EndpointContextStorage (Context mgmt)   │
@@ -77,7 +77,7 @@ Benefit: Complete isolation, easy management, independent lifecycle
            ↓
 ┌─────────────────────────────────────────────┐
 │ 4. Update Module Configuration              │
-│    ✅ AppModule (import TenantModule)       │
+│    ✅ AppModule (import EndpointModule)     │
 │    ✅ ScimModule (add new controller)       │
 └─────────────────────────────────────────────┘
            ↓
@@ -132,16 +132,16 @@ Benefit: Complete isolation, easy management, independent lifecycle
            ↓
 ┌─────────────────────────────────────────────┐
 │ 2. Integration Tests                        │
-│    ⏳ Full tenant lifecycle                  │
+│    ⏳ Full endpoint lifecycle                  │
 │    ⏳ Multi-Endpoint isolation                 │
 │    ⏳ Cascade delete operations              │
 └─────────────────────────────────────────────┘
            ↓
 ┌─────────────────────────────────────────────┐
 │ 3. E2E Tests                                │
-│    ⏳ Create tenant → Create user → List     │
-│    ⏳ Verify isolation between tenants       │
-│    ⏳ Delete tenant and verify cascade       │
+│    ⏳ Create endpoint → Create user → List    │
+│    ⏳ Verify isolation between endpoints      │
+│    ⏳ Delete endpoint and verify cascade      │
 └─────────────────────────────────────────────┘
            ↓
 ┌─────────────────────────────────────────────┐
@@ -183,25 +183,25 @@ Benefit: Complete isolation, easy management, independent lifecycle
 src/
 ├── modules/
 │   ├── app/
-│   │   └── app.module.ts ...................... Updated: Import TenantModule
+│   │   └── app.module.ts ...................... Updated: Import EndpointModule
 │   │
-│   ├── tenant/ ............................. NEW MODULE
+│   ├── endpoint/ ........................... NEW MODULE
 │   │   ├── controllers/
-│   │   │   └── tenant.controller.ts ......... Tenant admin APIs
+│   │   │   └── endpoint.controller.ts ....... Endpoint admin APIs
 │   │   ├── services/
-│   │   │   └── tenant.service.ts ........... Tenant business logic
+│   │   │   └── endpoint.service.ts ........ Endpoint business logic
 │   │   ├── dto/
 │   │   │   ├── create-endpoint.dto.ts ........ Create request
 │   │   │   └── update-endpoint.dto.ts ........ Update request
 │   │   ├── endpoint-context.storage.ts ....... Request context
-│   │   └── tenant.module.ts ................ Module config
+│   │   └── endpoint.module.ts .............. Module config
 │   │
 │   ├── scim/
 │   │   ├── controllers/
 │   │   │   ├── users.controller.ts ......... Original (unchanged)
 │   │   │   ├── groups.controller.ts ........ Original (unchanged)
 │   │   │   ├── admin.controller.ts ......... Original (unchanged)
-│   │   │   └── endpoint-scim.controller.ts ... NEW: Tenant SCIM routes
+│   │   │   └── endpoint-scim.controller.ts ... NEW: Endpoint SCIM routes
 │   │   ├── services/
 │   │   │   ├── scim-users.service.ts ....... UPDATE: Add *ForEndpoint() methods
 │   │   │   └── scim-groups.service.ts ...... UPDATE: Add *ForEndpoint() methods
@@ -212,7 +212,7 @@ src/
 └── [rest of structure unchanged]
 
 prisma/
-└── schema.prisma ............................ Updated: Add Tenant model & endpointId
+└── schema.prisma ............................ Updated: Add Endpoint model & endpointId
 
 docs/
 ├── MULTI_ENDPOINT_IMPLEMENTATION.md ........... Technical details
@@ -232,9 +232,9 @@ Route matches /scim/endpoints/{endpointId}/...
     ↓
 EndpointScimController extracts endpointId from URL
     ↓
-Validates tenant exists
+Validates endpoint exists
     ↓
-Sets TenantContext = { endpointId, baseUrl }
+Sets EndpointContext = { endpointId, baseUrl }
     ↓
 Passes endpointId to service method: *ForEndpoint(data, baseUrl, endpointId)
     ↓
@@ -249,26 +249,26 @@ Database View:
 ┌──────────┬──────────┬──────────┬──────────────┐
 │ id       │ endpointId │ scimId   │ userName     │
 ├──────────┼──────────┼──────────┼──────────────┤
-│ 1        │ tenant-a │ abc123   │ john.doe     │ ← Tenant A
-│ 2        │ tenant-a │ def456   │ jane.smith   │ ← Tenant A
-│ 3        │ tenant-b │ ghi789   │ john.doe     │ ← Tenant B (DIFFERENT!)
-│ 4        │ tenant-b │ jkl012   │ bob.jones    │ ← Tenant B
+│ 1        │ endpoint-a │ abc123   │ john.doe     │ ← Endpoint A
+│ 2        │ endpoint-a │ def456   │ jane.smith   │ ← Endpoint A
+│ 3        │ endpoint-b │ ghi789   │ john.doe     │ ← Endpoint B (DIFFERENT!)
+│ 4        │ endpoint-b │ jkl012   │ bob.jones    │ ← Endpoint B
 └──────────┴──────────┴──────────┴──────────────┘
 
-Query for Tenant A: WHERE endpointId = 'tenant-a'
+Query for Endpoint A: WHERE endpointId = 'endpoint-a'
 Result: Only rows 1, 2
 
-Query for Tenant B: WHERE endpointId = 'tenant-b'
+Query for Endpoint B: WHERE endpointId = 'endpoint-b'
 Result: Only rows 3, 4
 
-Both tenants can have 'john.doe' because composite unique is (endpointId, userName)
+Both endpoints can have 'john.doe' because composite unique is (endpointId, userName)
 ```
 
 ### 3. Cascade Delete
 ```
 DELETE /admin/endpoints/{endpointId}
     ↓
-Tenant record deleted
+Endpoint record deleted
     ↓
 Cascade delete (via foreign keys):
     ├─ RequestLog records with endpointId = ? → DELETED
@@ -281,7 +281,7 @@ Result: Completely clean, no orphaned data
 
 ## Request/Response Examples
 
-### Create Tenant
+### Create Endpoint
 ```
 Request:
 POST /admin/endpoints
@@ -304,7 +304,7 @@ Response (201):
 }
 ```
 
-### Create User in Tenant
+### Create User in Endpoint
 ```
 Request:
 POST /scim/endpoints/clx123abc.../Users
@@ -338,7 +338,7 @@ Response (201):
 ## Files You Have
 
 ✅ **Infrastructure Complete**
-- Tenant Service & Controller
+- Endpoint Service & Controller
 - endpoint-scoped SCIM Controller  
 - Context Storage
 - Updated Database Schema
@@ -352,24 +352,24 @@ Response (201):
 ## What's Next?
 
 ### Priority 1: Implement Phase 2
-Extend `ScimUsersService` and `ScimGroupsService` with tenant-aware methods
+Extend `ScimUsersService` and `ScimGroupsService` with endpoint-aware methods
 
 ### Priority 2: Run Migration
 ```bash
-npx prisma migrate dev --name add_multi_tenant_support
+npx prisma migrate dev --name add_multi_endpoint_support
 ```
 
 ### Priority 3: Test
-Create tests for tenant isolation, cascade delete, etc.
+Create tests for endpoint isolation, cascade delete, etc.
 
 ### Priority 4: Deploy
 Deploy to staging → test → deploy to production
 
 ## Success Criteria
 
-✅ Each tenant has isolated endpoint
-✅ Same data keys can exist across tenants
-✅ Deleting tenant removes all tenant data
+✅ Each endpoint has isolated SCIM endpoint
+✅ Same data keys can exist across endpoints
+✅ Deleting endpoint removes all endpoint data
 ✅ Concurrent requests don't share context
 ✅ All tests pass
 ✅ Performance acceptable with indexes

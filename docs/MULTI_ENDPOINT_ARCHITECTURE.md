@@ -16,7 +16,7 @@
                 │                     │
         ┌───────▼─────────────────────▼─────────┐
         │                                        │
-        │    Tenant Management APIs              │
+        │    Endpoint Management APIs            │
         │  ┌─────────────────────────────────┐  │
         │  │ POST   /admin/endpoints           │  │
         │  │ GET    /admin/endpoints           │  │
@@ -37,7 +37,7 @@
         │   endpoint-scoped SCIM Endpoints           │
         │   /scim/endpoints/{endpointId}/              │
         │  ┌──────────────────────────────────┐   │
-        │  │ Tenant SCIM Controller            │   │
+        │  │ Endpoint SCIM Controller          │   │
         │  │ ├─ Users   (CRUD)                 │   │
         │  │ ├─ Groups  (CRUD)                 │   │
         │  │ ├─ Schemas (Read)                 │   │
@@ -55,7 +55,7 @@
         │         └─────────┼───────┘             │
         │                   │                     │
         │         ┌─────────▼────────┐            │
-        │         │  TenantContext   │            │
+        │         │ EndpointContext  │            │
         │         │ Storage (Request)│            │
         │         │ - endpointId       │            │
         │         │ - baseUrl        │            │
@@ -79,7 +79,7 @@
         │   (SQLite)     │        │  & Constraints  │
         │                │        │                 │
         │ Models:        │        │ Composite Keys: │
-        │ ├─ Tenant      │        │ ├─ [endpointId,   │
+        │ ├─ Endpoint    │        │ ├─ [endpointId,   │
         │ ├─ ScimUser    │        │ │    scimId]    │
         │ ├─ ScimGroup   │        │ ├─ [endpointId,   │
         │ ├─ GroupMember │        │ │    userName]  │
@@ -90,7 +90,7 @@
 
 ## Data Flow for endpoint-specific Operations
 
-### Creating a User in a Tenant
+### Creating a User in a Endpoint
 
 ```
 Client Request
@@ -98,13 +98,13 @@ Client Request
 POST /scim/endpoints/{endpointId}/Users
     ↓
 EndpointScimController.createUser()
-    ├─ Validate tenant exists
-    ├─ Set TenantContext: { endpointId, baseUrl }
+    ├─ Validate endpoint exists
+    ├─ Set EndpointContext: { endpointId, baseUrl }
     └─ Call UsersService.createUserForEndpoint()
         ↓
     ScimUsersService.createUserForEndpoint(dto, baseUrl, endpointId)
         ├─ Validate schema
-        ├─ Check unique identifiers within tenant
+        ├─ Check unique identifiers within endpoint
         │  (Query: WHERE endpointId = ? AND userName = ?)
         ├─ Create user record with endpointId
         │  (INSERT INTO ScimUser (endpointId, scimId, userName, ...))
@@ -120,37 +120,37 @@ EndpointScimController.createUser()
             }
 ```
 
-### Isolating Data Between Tenants
+### Isolating Data Between Endpoints
 
 ```
-Tenant A: /scim/endpoints/tenant-a-id/
+Endpoint A: /scim/endpoints/endpoint-a-id/
     └─ Users
-        ├─ john.doe (created in tenant A)
-        ├─ jane.smith (created in tenant A)
-        └─ Database: WHERE endpointId = 'tenant-a-id'
+        ├─ john.doe (created in endpoint A)
+        ├─ jane.smith (created in endpoint A)
+        └─ Database: WHERE endpointId = 'endpoint-a-id'
 
-Tenant B: /scim/endpoints/tenant-b-id/
+Endpoint B: /scim/endpoints/endpoint-b-id/
     └─ Users
         ├─ john.doe (different user, exists independently!)
-        ├─ bob.jones (created in tenant B)
-        └─ Database: WHERE endpointId = 'tenant-b-id'
+        ├─ bob.jones (created in endpoint B)
+        └─ Database: WHERE endpointId = 'endpoint-b-id'
 
 Global Database:
 ┌─────────────────────────────────────────────────────────┐
 │ ScimUser Table                                          │
 ├─────────────────────────────────────────────────────────┤
-│ id    │ endpointId      │ scimId │ userName    │ active   │
+│ id    │ endpointId        │ scimId │ userName    │ active   │
 ├─────────────────────────────────────────────────────────┤
-│ 1     │ tenant-a-id   │ abc123 │ john.doe    │ true     │
-│ 2     │ tenant-a-id   │ def456 │ jane.smith  │ true     │
-│ 3     │ tenant-b-id   │ ghi789 │ john.doe    │ true     │ ← Different john.doe!
-│ 4     │ tenant-b-id   │ jkl012 │ bob.jones   │ true     │
+│ 1     │ endpoint-a-id   │ abc123 │ john.doe    │ true     │
+│ 2     │ endpoint-a-id   │ def456 │ jane.smith  │ true     │
+│ 3     │ endpoint-b-id   │ ghi789 │ john.doe    │ true     │ ← Different john.doe!
+│ 4     │ endpoint-b-id   │ jkl012 │ bob.jones   │ true     │
 └─────────────────────────────────────────────────────────┘
 
 Unique Constraints:
-  @@unique([endpointId, scimId])     ✓ Allows same scimId in different tenants
-  @@unique([endpointId, userName])   ✓ Allows same userName in different tenants
-  @@unique([endpointId, externalId]) ✓ Allows same externalId in different tenants
+  @@unique([endpointId, scimId])     ✓ Allows same scimId in different endpoints
+  @@unique([endpointId, userName])   ✓ Allows same userName in different endpoints
+  @@unique([endpointId, externalId]) ✓ Allows same externalId in different endpoints
 ```
 
 ## Cascade Delete Operation
@@ -158,11 +158,11 @@ Unique Constraints:
 ```
 DELETE /admin/endpoints/{endpointId}
     ↓
-EndpointController.deleteTenant(endpointId)
+EndpointController.deleteEndpoint(endpointId)
     ↓
-EndpointService.deleteTenant(endpointId)
-    ├─ Validate tenant exists
-    └─ Prisma.tenant.delete({ where: { id: endpointId } })
+EndpointService.deleteEndpoint(endpointId)
+    ├─ Validate endpoint exists
+    └─ Prisma.endpoint.delete({ where: { id: endpointId } })
         ↓
     Database CASCADE Operations (Prisma handles):
     ├─ DELETE FROM RequestLog WHERE endpointId = ?
@@ -178,12 +178,12 @@ EndpointService.deleteTenant(endpointId)
 ## Request Context Isolation with AsyncLocalStorage
 
 ```
-Request 1 (Tenant A)               Request 2 (Tenant B)
+Request 1 (Endpoint A)             Request 2 (Endpoint B)
 │                                  │
 ├─ HTTP Request Arrives            ├─ HTTP Request Arrives
 │  ├─ URL: /scim/endpoints/A/Users   │  ├─ URL: /scim/endpoints/B/Users
 │  └─ Route Handler                └─ Route Handler
-│     ├─ TenantContext.setContext({ │     ├─ TenantContext.setContext({
+│     ├─ EndpointContext.setContext({│     ├─ EndpointContext.setContext({
 │     │    endpointId: 'A',           │     │    endpointId: 'B',
 │     │    baseUrl: '...'           │     │    baseUrl: '...'
 │     │  })                         │     │  })
@@ -210,7 +210,7 @@ Request 1 (Tenant A)               Request 2 (Tenant B)
 │    DatabaseModule,                           │
 │    PrismaModule,                             │
 │    LoggingModule,                            │
-│    ├─► TenantModule ◄──────────┐            │
+│    ├─► EndpointModule ◄──────────┐            │
 │    │     └─ EndpointService       │            │
 │    │     └─ EndpointController    │            │
 │    │                             │            │
@@ -239,7 +239,7 @@ Request 1 (Tenant A)               Request 2 (Tenant B)
         ┌───────▼─────────┐
         │   SQLite DB     │
         │                 │
-        │  Tenants        │
+        │  Endpoints     │
         │  ScimUsers      │
         │  ScimGroups     │
         │  GroupMembers   │
@@ -249,10 +249,10 @@ Request 1 (Tenant A)               Request 2 (Tenant B)
 
 ## Summary
 
-- **Multi-Endpoint Support:** Each tenant has isolated SCIM endpoints and data
+- **Multi-Endpoint Support:** Each endpoint has isolated SCIM endpoints and data
 - **Request-Scoped Context:** EndpointContextStorage ensures no data leakage between concurrent requests
 - **Data Isolation:** Composite unique constraints and filtered queries maintain separation
-- **Cascade Operations:** Deleting a tenant cleanly removes all associated data
+- **Cascade Operations:** Deleting an endpoint cleanly removes all associated data
 - **Backward Compatible:** Original SCIM endpoints remain unchanged for legacy support
 
 

@@ -48,33 +48,33 @@ model Endpoint {
 #### Updated `RequestLog` Model
 - Added optional `endpointId` field for logging (allows system-wide and endpoint-specific logs)
 
-### 2. New Tenant Management Module
+### 2. New Endpoint Management Module
 
 #### Location
 - `src/modules/endpoint/`
 
 #### Components
 
-##### EndpointService (`tenant.service.ts`)
+##### EndpointService (`endpoint.service.ts`)
 **Methods:**
-- `createTenant(dto)` - Create new tenant
-- `getTenant(endpointId)` - Get tenant by ID
-- `getTenantByName(name)` - Get tenant by unique name
-- `listTenants(active?)` - List all or filtered tenants
-- `updateTenant(endpointId, dto)` - Update endpoint configuration
-- `deleteTenant(endpointId)` - Delete tenant and all associated data (cascading)
-- `getTenantStats(endpointId)` - Get statistics about tenant's resources
+- `createEndpoint(dto)` - Create new endpoint
+- `getEndpoint(endpointId)` - Get endpoint by ID
+- `getEndpointByName(name)` - Get endpoint by unique name
+- `listEndpoints(active?)` - List all or filtered endpoints
+- `updateEndpoint(endpointId, dto)` - Update endpoint configuration
+- `deleteEndpoint(endpointId)` - Delete endpoint and all associated data (cascading)
+- `getEndpointStats(endpointId)` - Get statistics about endpoint's resources
 
-##### EndpointController (`tenant.controller.ts`)
+##### EndpointController (`endpoint.controller.ts`)
 **Endpoints:**
 ```
-POST   /admin/endpoints                      - Create tenant
-GET    /admin/endpoints                      - List tenants
-GET    /admin/endpoints/{endpointId}           - Get tenant details
-GET    /admin/endpoints/by-name/{name}       - Get tenant by name
-PATCH  /admin/endpoints/{endpointId}           - Update tenant
-DELETE /admin/endpoints/{endpointId}           - Delete tenant
-GET    /admin/endpoints/{endpointId}/stats     - Get tenant statistics
+POST   /admin/endpoints                      - Create endpoint
+GET    /admin/endpoints                      - List endpoints
+GET    /admin/endpoints/{endpointId}           - Get endpoint details
+GET    /admin/endpoints/by-name/{name}       - Get endpoint by name
+PATCH  /admin/endpoints/{endpointId}           - Update endpoint
+DELETE /admin/endpoints/{endpointId}           - Delete endpoint
+GET    /admin/endpoints/{endpointId}/stats     - Get endpoint statistics
 ```
 
 ##### EndpointContextStorage (`endpoint-context.storage.ts`)
@@ -111,7 +111,7 @@ GET    /admin/endpoints/{endpointId}/stats     - Get tenant statistics
 
 ### 4. Service Layer Extensions
 
-The SCIM services (`ScimUsersService`, `ScimGroupsService`) need to be extended with tenant-aware methods:
+The SCIM services (`ScimUsersService`, `ScimGroupsService`) need to be extended with endpoint-aware methods:
 
 #### New Service Methods (to be added)
 
@@ -199,40 +199,40 @@ async deleteGroupForEndpoint(
 
 ### Step 1: Database Migration
 ```bash
-npx prisma migrate dev --name add_multi_tenant_support
+npx prisma migrate dev --name add_multi_endpoint_support
 ```
 
 ### Step 2: Update Services
-Add tenant-aware methods to `ScimUsersService` and `ScimGroupsService` that:
+Add endpoint-aware methods to `ScimUsersService` and `ScimGroupsService` that:
 1. Filter queries by `endpointId`
 2. Validate `endpointId` exists before operations
 3. Ensure data isolation per endpoint
 
-### Step 3: Test Tenant Operations
+### Step 3: Test Endpoint Operations
 ```bash
-# Create a tenant
+# Create a endpoint
 curl -X POST http://localhost:3000/scim/admin/endpoints \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "tenant-alpha",
-    "displayName": "Tenant Alpha",
-    "description": "First test tenant"
+    "name": "endpoint-alpha",
+    "displayName": "Endpoint Alpha",
+    "description": "First test endpoint"
   }'
 
 # Response:
 {
   "id": "clx...",
-  "name": "tenant-alpha",
-  "displayName": "Tenant Alpha",
+  "name": "endpoint-alpha",
+  "displayName": "Endpoint Alpha",
   "scimEndpoint": "/scim/endpoints/clx...",
   "active": true,
   "createdAt": "2026-01-28T..."
 }
 
-# List tenants
+# List endpoints
 curl http://localhost:3000/scim/admin/endpoints
 
-# Create user in tenant
+# Create user in endpoint
 curl -X POST http://localhost:3000/scim/endpoints/clx.../Users \
   -H "Content-Type: application/json" \
   -d '{
@@ -241,7 +241,7 @@ curl -X POST http://localhost:3000/scim/endpoints/clx.../Users \
     "name": {"givenName": "John", "familyName": "Doe"}
   }'
 
-# Delete tenant (cascade deletes all data)
+# Delete endpoint (cascade deletes all data)
 curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx...
 ```
 
@@ -249,14 +249,14 @@ curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx...
 
 1. **Query Isolation:** All queries filter by `endpointId`
 2. **Unique Constraints:** Identifiers (userName, externalId, scimId) are unique per endpoint, not globally
-3. **Cascade Delete:** Deleting a tenant automatically deletes all associated:
+3. **Cascade Delete:** Deleting an endpoint automatically deletes all associated:
    - Users
    - Groups
    - Group members
    - Logs
 4. **Context Isolation:** AsyncLocalStorage ensures endpoint context is isolated per HTTP request
 
-## API Response Format for Tenant Creation
+## API Response Format for Endpoint Creation
 
 ```json
 {
@@ -277,21 +277,21 @@ curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx...
 ## Next Steps
 
 1. Run the migration to update the database schema
-2. Implement tenant-aware methods in SCIM services
+2. Implement endpoint-aware methods in SCIM services
 3. Update existing endpoints to maintain backward compatibility (optional)
-4. Add tenant validation middleware
-5. Add tests for tenant isolation
+4. Add endpoint validation middleware
+5. Add tests for endpoint isolation
 6. Update documentation with Multi-Endpoint examples
 
 ## Backward Compatibility
 
-The default SCIM endpoints (`/scim/Users`, `/scim/Groups`, etc.) remain unchanged and can continue to serve a "default" or "global" tenant if needed. This allows for gradual migration to Multi-Endpoint architecture.
+The default SCIM endpoints (`/scim/Users`, `/scim/Groups`, etc.) remain unchanged and can continue to serve a "default" or "global" endpoint if needed. This allows for gradual migration to Multi-Endpoint architecture.
 
 ## Security Considerations
 
-1. **Tenant Isolation:** Always filter by `endpointId` in queries
-2. **API Authentication:** Implement authentication/authorization to restrict tenant access
-3. **Audit Logging:** Log all tenant-level operations with audit trail
+1. **Endpoint Isolation:** Always filter by `endpointId` in queries
+2. **API Authentication:** Implement authentication/authorization to restrict endpoint access
+3. **Audit Logging:** Log all endpoint-level operations with audit trail
 4. **Configuration Validation:** Validate endpoint configurations to prevent injection attacks
 
 
