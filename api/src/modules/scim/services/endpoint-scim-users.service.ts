@@ -1,0 +1,487 @@
+import { Injectable } from '@nestjs/common';
+import type { Prisma, ScimUser } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
+
+import { PrismaService } from '../../prisma/prisma.service';
+import { createScimError } from '../common/scim-errors';
+import {
+  DEFAULT_COUNT,
+  MAX_COUNT,
+  SCIM_CORE_USER_SCHEMA,
+  SCIM_LIST_RESPONSE_SCHEMA,
+  SCIM_PATCH_SCHEMA
+} from '../common/scim-constants';
+import type { ScimListResponse, ScimUserResource } from '../common/scim-types';
+import type { CreateUserDto } from '../dto/create-user.dto';
+import type { PatchUserDto } from '../dto/patch-user.dto';
+import { ScimMetadataService } from './scim-metadata.service';
+
+interface ListUsersParams {
+  filter?: string;
+  startIndex?: number;
+  count?: number;
+}
+
+/**
+ * Endpoint-specific SCIM Users Service
+ * Handles all user operations scoped to a specific endpoint
+ */
+@Injectable()
+export class EndpointScimUsersService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly metadata: ScimMetadataService
+  ) {}
+
+  async createUserForEndpoint(dto: CreateUserDto, baseUrl: string, endpointId: string): Promise<ScimUserResource> {
+    this.ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
+
+    await this.assertUniqueIdentifiersForEndpoint(dto.userName, dto.externalId ?? undefined, endpointId);
+
+    const now = new Date();
+    const scimId = randomUUID();
+    const sanitizedPayload = this.extractAdditionalAttributes(dto);
+
+    const data: Prisma.ScimUserCreateInput = {
+      scimId,
+      externalId: dto.externalId ?? null,
+      userName: dto.userName,
+      active: dto.active ?? true,
+      rawPayload: JSON.stringify(sanitizedPayload),
+      meta: JSON.stringify({
+        resourceType: 'User',
+        created: now.toISOString(),
+        lastModified: now.toISOString()
+      }),
+      endpoint: { connect: { id: endpointId } }
+    };
+
+    const created = await this.prisma.scimUser.create({ data });
+
+    return this.toScimUserResource(created, baseUrl);
+  }
+
+  async getUserForEndpoint(scimId: string, baseUrl: string, endpointId: string): Promise<ScimUserResource> {
+    const user = await this.prisma.scimUser.findFirst({ 
+      where: { 
+        scimId,
+        endpointId
+      } 
+    });
+    
+    if (!user) {
+      throw createScimError({ status: 404, detail: `Resource ${scimId} not found.` });
+    }
+
+    return this.toScimUserResource(user, baseUrl);
+  }
+
+  async listUsersForEndpoint(
+    { filter, startIndex = 1, count = DEFAULT_COUNT }: ListUsersParams,
+    baseUrl: string,
+    endpointId: string
+  ): Promise<ScimListResponse<ScimUserResource>> {
+    if (count > MAX_COUNT) {
+      count = MAX_COUNT;
+    }
+
+    const filterWhere = this.buildFilter(filter);
+    const where: Prisma.ScimUserWhereInput = {
+      ...filterWhere,
+      endpointId
+    };
+
+    const [totalResults, users] = await Promise.all([
+      this.prisma.scimUser.count({ where }),
+      this.prisma.scimUser.findMany({
+        where,
+        skip: Math.max(startIndex - 1, 0),
+        take: Math.max(Math.min(count, MAX_COUNT), 0),
+        orderBy: { createdAt: 'asc' }
+      })
+    ]);
+
+    const resources = users.map((user) => this.toScimUserResource(user, baseUrl));
+
+    return {
+      schemas: [SCIM_LIST_RESPONSE_SCHEMA],
+      totalResults,
+      startIndex,
+      itemsPerPage: resources.length,
+      Resources: resources
+    };
+  }
+
+  async patchUserForEndpoint(
+    scimId: string,
+    patchDto: PatchUserDto,
+    baseUrl: string,
+    endpointId: string
+  ): Promise<ScimUserResource> {
+    this.ensureSchema(patchDto.schemas, SCIM_PATCH_SCHEMA);
+
+    const user = await this.prisma.scimUser.findFirst({ 
+      where: { 
+        scimId,
+        endpointId
+      } 
+    });
+    
+    if (!user) {
+      throw createScimError({ status: 404, detail: `Resource ${scimId} not found.` });
+    }
+
+    const updatedData = await this.applyPatchOperationsForEndpoint(user, patchDto, endpointId);
+
+    const updatedUser = await this.prisma.scimUser.update({
+      where: { id: user.id },
+      data: updatedData
+    });
+
+    return this.toScimUserResource(updatedUser, baseUrl);
+  }
+
+  async replaceUserForEndpoint(
+    scimId: string,
+    dto: CreateUserDto,
+    baseUrl: string,
+    endpointId: string
+  ): Promise<ScimUserResource> {
+    this.ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
+
+    const user = await this.prisma.scimUser.findFirst({ 
+      where: { 
+        scimId,
+        endpointId
+      } 
+    });
+    
+    if (!user) {
+      throw createScimError({ status: 404, detail: `Resource ${scimId} not found.` });
+    }
+
+    await this.assertUniqueIdentifiersForEndpoint(dto.userName, dto.externalId ?? undefined, endpointId, scimId);
+
+    const now = new Date();
+    const sanitizedPayload = this.extractAdditionalAttributes(dto);
+    const meta = this.parseJson<Record<string, unknown>>(String(user.meta ?? '{}'));
+
+    const data: Prisma.ScimUserUpdateInput = {
+      externalId: dto.externalId ?? null,
+      userName: dto.userName,
+      active: dto.active ?? true,
+      rawPayload: JSON.stringify(sanitizedPayload),
+      meta: JSON.stringify({
+        ...meta,
+        lastModified: now.toISOString()
+      })
+    };
+
+    const updatedUser = await this.prisma.scimUser.update({
+      where: { id: user.id },
+      data
+    });
+
+    return this.toScimUserResource(updatedUser, baseUrl);
+  }
+
+  async deleteUserForEndpoint(scimId: string, endpointId: string): Promise<void> {
+    const user = await this.prisma.scimUser.findFirst({
+      where: {
+        scimId,
+        endpointId
+      }
+    });
+
+    if (!user) {
+      throw createScimError({ status: 404, detail: `Resource ${scimId} not found.` });
+    }
+
+    await this.prisma.scimUser.delete({ where: { id: user.id } });
+  }
+
+  // ===== Private Helper Methods =====
+
+  private ensureSchema(schemas: string[] | undefined, requiredSchema: string): void {
+    if (!schemas || !schemas.includes(requiredSchema)) {
+      throw createScimError({
+        status: 400,
+        detail: `Missing required schema '${requiredSchema}'.`
+      });
+    }
+  }
+
+  private buildFilter(filter?: string): Prisma.ScimUserWhereInput {
+    if (!filter) {
+      return {};
+    }
+
+    // Support simple filters: attribute eq "value"
+    const regex = /(\w+(?:\.\w+)*)\s+eq\s+"?([^"]+)"?/i;
+    const match = filter.match(regex);
+    if (!match) {
+      throw createScimError({
+        status: 400,
+        detail: `Unsupported filter expression: '${filter}'.`
+      });
+    }
+
+    const attribute = match[1];
+    const value = match[2];
+
+    switch (attribute) {
+      case 'userName':
+        return { userName: value };
+      case 'externalId':
+        return { externalId: value };
+      case 'id':
+        return { scimId: value };
+      default:
+        throw createScimError({
+          status: 400,
+          detail: `Filtering by attribute '${attribute}' is not supported.`
+        });
+    }
+  }
+
+  private async assertUniqueIdentifiersForEndpoint(
+    userName: string,
+    externalId: string | undefined,
+    endpointId: string,
+    excludeScimId?: string
+  ): Promise<void> {
+    const orConditions: Prisma.ScimUserWhereInput[] = [{ userName }];
+    if (externalId) {
+      orConditions.push({ externalId });
+    }
+
+    const filters: Prisma.ScimUserWhereInput[] = [{ endpointId }];
+    if (excludeScimId) {
+      filters.push({ NOT: { scimId: excludeScimId } });
+    }
+    if (orConditions.length === 1) {
+      filters.push(orConditions[0]);
+    } else {
+      filters.push({ OR: orConditions });
+    }
+
+    const where: Prisma.ScimUserWhereInput = { AND: filters };
+
+    const conflict = await this.prisma.scimUser.findFirst({
+      where,
+      select: { scimId: true, userName: true, externalId: true }
+    });
+
+    if (conflict) {
+      const reason =
+        conflict.userName === userName
+          ? `userName '${userName}'`
+          : `externalId '${externalId}'`;
+
+      throw createScimError({
+        status: 409,
+        scimType: 'uniqueness',
+        detail: `A resource with ${reason} already exists.`
+      });
+    }
+  }
+
+  private async applyPatchOperationsForEndpoint(
+    user: ScimUser,
+    patchDto: PatchUserDto,
+    endpointId: string
+  ): Promise<Prisma.ScimUserUpdateInput> {
+    let active = user.active;
+    let userName = user.userName;
+    let externalId: string | null = user.externalId ?? null;
+    let rawPayload = this.parseJson<Record<string, unknown>>(String(user.rawPayload ?? '{}'));
+    const meta = this.parseJson<Record<string, unknown>>(String(user.meta ?? '{}'));
+
+    for (const operation of patchDto.Operations) {
+      const op = operation.op?.toLowerCase();
+      if (!['add', 'replace', 'remove'].includes(op || '')) {
+        throw createScimError({
+          status: 400,
+          detail: `Patch operation '${operation.op}' is not supported.`
+        });
+      }
+
+      const originalPath = operation.path;
+      const path = originalPath?.toLowerCase();
+
+      if (op === 'add' || op === 'replace') {
+        if (path === 'active') {
+          const value = this.extractBooleanValue(operation.value);
+          active = value;
+          rawPayload = { ...rawPayload, active: value };
+        } else if (path === 'username') {
+          userName = this.extractStringValue(operation.value, 'userName');
+        } else if (path === 'externalid') {
+          externalId = this.extractNullableStringValue(operation.value, 'externalId');
+        } else if (originalPath) {
+          rawPayload = { ...rawPayload, [originalPath]: operation.value };
+        } else if (typeof operation.value === 'object' && operation.value !== null) {
+          rawPayload = { ...rawPayload, ...operation.value };
+        }
+      } else if (op === 'remove') {
+        if (path === 'active') {
+          active = false;
+          rawPayload = { ...rawPayload, active: false };
+        } else if (originalPath) {
+          rawPayload = this.removeAttribute(rawPayload, originalPath);
+        } else {
+          throw createScimError({
+            status: 400,
+            detail: 'Remove operation requires a path.'
+          });
+        }
+      }
+    }
+
+    rawPayload = this.stripReservedAttributes(rawPayload);
+
+    await this.assertUniqueIdentifiersForEndpoint(userName, externalId ?? undefined, endpointId, user.scimId);
+
+    return {
+      userName,
+      externalId,
+      active,
+      rawPayload: JSON.stringify(rawPayload),
+      meta: JSON.stringify({
+        ...meta,
+        lastModified: new Date().toISOString()
+      })
+    } satisfies Prisma.ScimUserUpdateInput;
+  }
+
+  private stripReservedAttributes(payload: Record<string, unknown>): Record<string, unknown> {
+    const reserved = new Set(['username', 'userid', 'userName', 'externalid', 'externalId', 'active']);
+    const entries = Object.entries(payload).filter(
+      ([key]) => !reserved.has(key) && !reserved.has(key.toLowerCase())
+    );
+    return Object.fromEntries(entries);
+  }
+
+  private removeAttribute(payload: Record<string, unknown>, attribute: string): Record<string, unknown> {
+    if (!attribute) {
+      return { ...payload };
+    }
+    const target = attribute.toLowerCase();
+    return Object.fromEntries(
+      Object.entries(payload).filter(([key]) => key.toLowerCase() !== target)
+    );
+  }
+
+  private extractStringValue(value: unknown, attribute: string): string {
+    if (typeof value === 'string') {
+      return value;
+    }
+
+    throw createScimError({
+      status: 400,
+      detail: `${attribute} must be provided as a string.`
+    });
+  }
+
+  private extractNullableStringValue(value: unknown, attribute: string): string | null {
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    if (typeof value === 'string') {
+      return value;
+    }
+
+    throw createScimError({
+      status: 400,
+      detail: `${attribute} must be provided as a string or null.`
+    });
+  }
+
+  private extractBooleanValue(value: unknown): boolean {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    // Handle string boolean values from Entra ID
+    if (typeof value === 'string') {
+      const lowerValue = value.toLowerCase();
+      if (lowerValue === 'true') return true;
+      if (lowerValue === 'false') return false;
+    }
+
+    if (typeof value === 'object' && value !== null && 'active' in value) {
+      const active = (value as { active: unknown }).active;
+      if (typeof active === 'boolean') {
+        return active;
+      }
+      // Also handle string boolean in nested objects
+      if (typeof active === 'string') {
+        const lowerActive = active.toLowerCase();
+        if (lowerActive === 'true') return true;
+        if (lowerActive === 'false') return false;
+      }
+    }
+
+    throw createScimError({
+      status: 400,
+      detail: `Patch operation requires boolean value for active. Received: ${typeof value} "${String(
+        value
+      )}"`
+    });
+  }
+
+  private toScimUserResource(user: ScimUser, baseUrl: string): ScimUserResource {
+    const meta = this.buildMeta(user, baseUrl);
+    const rawPayload = this.parseJson<Record<string, unknown>>(String(user.rawPayload ?? '{}'));
+
+    return {
+      schemas: [SCIM_CORE_USER_SCHEMA],
+      id: user.scimId,
+      userName: user.userName,
+      externalId: user.externalId ?? undefined,
+      active: user.active,
+      ...rawPayload,
+      meta
+    };
+  }
+
+  private buildMeta(user: ScimUser, baseUrl: string) {
+    const createdAt = user.createdAt.toISOString();
+    const lastModified = user.updatedAt.toISOString();
+    const location = this.metadata.buildLocation(baseUrl, 'Users', String(user.scimId));
+
+    return {
+      resourceType: 'User',
+      created: createdAt,
+      lastModified,
+      location,
+      version: `W/"${user.updatedAt.toISOString()}"`
+    };
+  }
+
+  private extractAdditionalAttributes(dto: CreateUserDto): Record<string, unknown> {
+    const { schemas, ...rest } = dto;
+    const additional = { ...rest } as Record<string, unknown>;
+    delete additional.userName;
+    delete additional.externalId;
+    delete additional.active;
+
+    return {
+      schemas,
+      ...additional
+    };
+  }
+
+  private parseJson<T>(value: string | null | undefined): T {
+    if (!value) {
+      return {} as T;
+    }
+
+    try {
+      return JSON.parse(value) as T;
+    } catch {
+      return {} as T;
+    }
+  }
+}

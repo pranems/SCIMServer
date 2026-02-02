@@ -156,7 +156,7 @@ export class EndpointService {
       id: endpoint.id,
       name: endpoint.name,
       displayName: endpoint.displayName || endpoint.name,
-      description: endpoint.description,
+      description: endpoint.description ?? undefined,
       config: endpoint.config ? JSON.parse(endpoint.config) : undefined,
       active: endpoint.active,
       scimEndpoint: `/scim/endpoints/${endpoint.id}`,

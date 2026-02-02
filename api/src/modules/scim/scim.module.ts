@@ -13,6 +13,8 @@ import { EndpointScimController } from './controllers/endpoint-scim.controller';
 import { ScimGroupsService } from './services/scim-groups.service';
 import { ScimMetadataService } from './services/scim-metadata.service';
 import { ScimUsersService } from './services/scim-users.service';
+import { EndpointScimUsersService } from './services/endpoint-scim-users.service';
+import { EndpointScimGroupsService } from './services/endpoint-scim-groups.service';
 import { EndpointContextStorage } from '../endpoint/endpoint-context.storage';
 
 @Module({
@@ -26,6 +28,13 @@ import { EndpointContextStorage } from '../endpoint/endpoint-context.storage';
     AdminController,
     EndpointScimController
   ],
-  providers: [ScimUsersService, ScimGroupsService, ScimMetadataService, EndpointContextStorage]
+  providers: [
+    ScimUsersService,
+    ScimGroupsService,
+    ScimMetadataService,
+    EndpointScimUsersService,
+    EndpointScimGroupsService,
+    EndpointContextStorage
+  ]
 })
 export class ScimModule {}
