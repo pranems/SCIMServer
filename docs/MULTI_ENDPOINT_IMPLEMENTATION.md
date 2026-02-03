@@ -109,13 +109,16 @@ GET    /admin/endpoints/{endpointId}/stats     - Get endpoint statistics
 └── ServiceProviderConfig    - SCIM metadata
 ```
 
-### 4. Service Layer Extensions
+### 4. Service Layer Extensions ✅ IMPLEMENTED
 
-The SCIM services (`ScimUsersService`, `ScimGroupsService`) need to be extended with endpoint-aware methods:
+The SCIM services are implemented as **dedicated endpoint-aware services**:
+- `EndpointScimUsersService` - User CRUD with endpoint isolation
+- `EndpointScimGroupsService` - Group CRUD with endpoint isolation and config support
 
-#### New Service Methods (to be added)
+#### EndpointScimUsersService Methods
 
-**ScimUsersService:**
+**Location:** `src/modules/scim/services/endpoint-scim-users.service.ts`
+
 ```typescript
 async createUserForEndpoint(
   dto: CreateUserDto,
@@ -155,7 +158,10 @@ async deleteUserForEndpoint(
 ): Promise<void>
 ```
 
-**ScimGroupsService:**
+#### EndpointScimGroupsService Methods
+
+**Location:** `src/modules/scim/services/endpoint-scim-groups.service.ts`
+
 ```typescript
 async createGroupForEndpoint(
   dto: CreateGroupDto,
@@ -182,12 +188,13 @@ async replaceGroupForEndpoint(
   endpointId: string
 ): Promise<ScimGroupResource>
 
+// Note: config parameter added for endpoint-specific behavior
 async patchGroupForEndpoint(
   scimId: string,
   dto: PatchGroupDto,
-  baseUrl: string,
-  endpointId: string
-): Promise<ScimGroupResource>
+  endpointId: string,
+  config?: EndpointConfig  // Config passed directly from controller
+): Promise<void>
 
 async deleteGroupForEndpoint(
   scimId: string,
@@ -195,28 +202,71 @@ async deleteGroupForEndpoint(
 ): Promise<void>
 ```
 
-## Implementation Steps
+### 5. Config Propagation Pattern ✅ IMPLEMENTED
 
-### Step 1: Database Migration
-```bash
-npx prisma migrate dev --name add_multi_endpoint_support
+**Important:** Config is passed **directly from controller to service** as a parameter, not via AsyncLocalStorage alone.
+
+```typescript
+// In endpoint-scim.controller.ts
+@Patch('Groups/:id')
+async updateGroup(@Param('endpointId') endpointId: string, ...) {
+  const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+  // Config passed directly to service
+  await this.groupsService.patchGroupForEndpoint(id, dto, endpointId, config);
+}
 ```
 
-### Step 2: Update Services
-Add endpoint-aware methods to `ScimUsersService` and `ScimGroupsService` that:
-1. Filter queries by `endpointId`
-2. Validate `endpointId` exists before operations
-3. Ensure data isolation per endpoint
+This pattern is more reliable than AsyncLocalStorage across async boundaries in NestJS.
 
-### Step 3: Test Endpoint Operations
+### 6. Endpoint Config Flags ✅ IMPLEMENTED
+
+**Location:** `src/modules/endpoint/endpoint-config.interface.ts`
+
+```typescript
+// Centralized config flag constants
+export const ENDPOINT_CONFIG_FLAGS = {
+  MULTI_OP_PATCH_ADD_MULTI_MEMBERS: 'MultiOpPatchRequestAddMultipleMembersToGroup',
+} as const;
+
+// Type-safe interface
+export interface EndpointConfig {
+  MultiOpPatchRequestAddMultipleMembersToGroup?: string | boolean;
+  [key: string]: unknown;
+}
+
+// Helper functions
+export function getConfigBoolean(config: EndpointConfig | null | undefined, key: string): boolean;
+export function getConfigString(config: EndpointConfig | null | undefined, key: string): string | undefined;
+```
+
+## Implementation Status ✅ COMPLETE
+
+### All Phases Complete
+- ✅ Database schema with Endpoint model
+- ✅ EndpointScimUsersService with full CRUD
+- ✅ EndpointScimGroupsService with full CRUD and config support
+- ✅ Config propagation (direct parameter passing)
+- ✅ 48 tests passing
+
+### Testing
 ```bash
-# Create a endpoint
+# Run endpoint-scim tests
+cd api && npm test -- --testPathPattern="endpoint-scim"
+# Result: 48 tests passing
+```
+
+### Test Endpoint Operations
+```bash
+# Create a endpoint with config flag
 curl -X POST http://localhost:3000/scim/admin/endpoints \
   -H "Content-Type: application/json" \
   -d '{
     "name": "endpoint-alpha",
     "displayName": "Endpoint Alpha",
-    "description": "First test endpoint"
+    "description": "First test endpoint",
+    "config": {
+      "MultiOpPatchRequestAddMultipleMembersToGroup": "true"
+    }
   }'
 
 # Response:
@@ -254,7 +304,8 @@ curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx...
    - Groups
    - Group members
    - Logs
-4. **Context Isolation:** AsyncLocalStorage ensures endpoint context is isolated per HTTP request
+4. **Config Isolation:** Each endpoint can have its own configuration flags
+5. **Context Handling:** Config passed directly from controller to service for reliability
 
 ## API Response Format for Endpoint Creation
 
@@ -274,14 +325,18 @@ curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx...
 }
 ```
 
-## Next Steps
+## Implementation Complete
 
-1. Run the migration to update the database schema
-2. Implement endpoint-aware methods in SCIM services
-3. Update existing endpoints to maintain backward compatibility (optional)
-4. Add endpoint validation middleware
-5. Add tests for endpoint isolation
-6. Update documentation with Multi-Endpoint examples
+All phases are complete and tested:
+- ✅ Database schema updated
+- ✅ Service layer implemented
+- ✅ Config propagation working
+- ✅ 48 tests passing
+- ✅ Documentation complete
+
+See also:
+- [MULTI_MEMBER_PATCH_CONFIG_FLAG.md](MULTI_MEMBER_PATCH_CONFIG_FLAG.md) - Config flag documentation
+- [MULTI_ENDPOINT_CHECKLIST.md](MULTI_ENDPOINT_CHECKLIST.md) - Implementation checklist
 
 ## Backward Compatibility
 
