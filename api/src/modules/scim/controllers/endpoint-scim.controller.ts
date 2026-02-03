@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
+import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { EndpointScimUsersService } from '../services/endpoint-scim-users.service';
 import { EndpointScimGroupsService } from '../services/endpoint-scim-groups.service';
 import { ScimMetadataService } from '../services/scim-metadata.service';
@@ -45,15 +46,16 @@ export class EndpointScimController {
   private async validateAndSetContext(
     endpointId: string,
     req: Request
-  ): Promise<string> {
-    // Validate endpoint exists
-    await this.endpointService.getEndpoint(endpointId);
+  ): Promise<{ baseUrl: string; config: EndpointConfig }> {
+    // Validate endpoint exists and get config
+    const endpoint = await this.endpointService.getEndpoint(endpointId);
+    const config: EndpointConfig = endpoint.config || {};
 
-    // Set endpoint context for this request
+    // Set endpoint context for this request (including config)
     const baseUrl = `${req.protocol}://${req.get('host')}/scim/endpoints/${endpointId}`;
-    this.endpointContext.setContext({ endpointId, baseUrl });
+    this.endpointContext.setContext({ endpointId, baseUrl, config });
 
-    return baseUrl;
+    return { baseUrl, config };
   }
 
   // ===== Users Endpoints =====
@@ -68,7 +70,7 @@ export class EndpointScimController {
     @Body() dto: CreateUserDto,
     @Req() req: Request
   ) {
-    const baseUrl = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
     return this.usersService.createUserForEndpoint(dto, baseUrl, endpointId);
   }
 
@@ -84,7 +86,7 @@ export class EndpointScimController {
     @Query('startIndex') startIndex?: string,
     @Query('count') count?: string
   ) {
-    const baseUrl = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
     return this.usersService.listUsersForEndpoint(
       {
         filter,
@@ -106,7 +108,7 @@ export class EndpointScimController {
     @Param('id') id: string,
     @Req() req: Request
   ) {
-    const baseUrl = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
     return this.usersService.getUserForEndpoint(id, baseUrl, endpointId);
   }
 
@@ -121,7 +123,7 @@ export class EndpointScimController {
     @Body() dto: CreateUserDto,
     @Req() req: Request
   ) {
-    const baseUrl = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
     return this.usersService.replaceUserForEndpoint(id, dto, baseUrl, endpointId);
   }
 
@@ -136,7 +138,7 @@ export class EndpointScimController {
     @Body() dto: PatchUserDto,
     @Req() req: Request
   ) {
-    const baseUrl = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
     return this.usersService.patchUserForEndpoint(id, dto, baseUrl, endpointId);
   }
 
@@ -167,7 +169,7 @@ export class EndpointScimController {
     @Body() dto: CreateGroupDto,
     @Req() req: Request
   ) {
-    const baseUrl = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
     return this.groupsService.createGroupForEndpoint(dto, baseUrl, endpointId);
   }
 
@@ -183,7 +185,7 @@ export class EndpointScimController {
     @Query('startIndex') startIndex?: string,
     @Query('count') count?: string
   ) {
-    const baseUrl = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
     return this.groupsService.listGroupsForEndpoint(
       {
         filter,
@@ -205,7 +207,7 @@ export class EndpointScimController {
     @Param('id') id: string,
     @Req() req: Request
   ) {
-    const baseUrl = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
     return this.groupsService.getGroupForEndpoint(id, baseUrl, endpointId);
   }
 
@@ -220,7 +222,7 @@ export class EndpointScimController {
     @Body() dto: CreateGroupDto,
     @Req() req: Request
   ) {
-    const baseUrl = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
     return this.groupsService.replaceGroupForEndpoint(id, dto, baseUrl, endpointId);
   }
 
@@ -235,8 +237,8 @@ export class EndpointScimController {
     @Body() dto: PatchGroupDto,
     @Req() req: Request
   ) {
-    await this.validateAndSetContext(endpointId, req);
-    return this.groupsService.patchGroupForEndpoint(id, dto, endpointId);
+    const { config } = await this.validateAndSetContext(endpointId, req);
+    return this.groupsService.patchGroupForEndpoint(id, dto, endpointId, config);
   }
 
   /**

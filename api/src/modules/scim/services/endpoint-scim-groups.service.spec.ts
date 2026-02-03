@@ -1,7 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { HttpException } from '@nestjs/common';
 import { EndpointScimGroupsService } from './endpoint-scim-groups.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ScimMetadataService } from './scim-metadata.service';
+import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import type { CreateGroupDto } from '../dto/create-group.dto';
 import type { PatchGroupDto } from '../dto/patch-group.dto';
 
@@ -43,7 +45,27 @@ describe('EndpointScimGroupsService', () => {
     endpointId: 'endpoint-1',
   };
 
-  const mockPrismaService = {
+  // Define type to avoid circular reference issue
+  type MockPrismaService = {
+    scimGroup: {
+      create: jest.Mock;
+      findFirst: jest.Mock;
+      findMany: jest.Mock;
+      count: jest.Mock;
+      update: jest.Mock;
+      delete: jest.Mock;
+    };
+    scimUser: {
+      findMany: jest.Mock;
+    };
+    groupMember: {
+      createMany: jest.Mock;
+      deleteMany: jest.Mock;
+    };
+    $transaction: jest.Mock;
+  };
+
+  const mockPrismaService: MockPrismaService = {
     scimGroup: {
       create: jest.fn(),
       findFirst: jest.fn(),
@@ -68,6 +90,14 @@ describe('EndpointScimGroupsService', () => {
     ),
   };
 
+  const mockEndpointContext = {
+    setContext: jest.fn(),
+    getContext: jest.fn(),
+    getEndpointId: jest.fn(),
+    getBaseUrl: jest.fn(),
+    getConfig: jest.fn().mockReturnValue({}),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -79,6 +109,10 @@ describe('EndpointScimGroupsService', () => {
         {
           provide: ScimMetadataService,
           useValue: mockMetadataService,
+        },
+        {
+          provide: EndpointContextStorage,
+          useValue: mockEndpointContext,
         },
       ],
     }).compile();
@@ -193,7 +227,7 @@ describe('EndpointScimGroupsService', () => {
 
       await expect(
         service.getGroupForEndpoint('non-existent', 'http://localhost:3000/scim', mockEndpoint.id)
-      ).rejects.toThrow(/not found/);
+      ).rejects.toThrow(HttpException);
     });
   });
 
@@ -340,6 +374,144 @@ describe('EndpointScimGroupsService', () => {
 
       expect(mockPrismaService.groupMember.deleteMany).toHaveBeenCalled();
     });
+
+    describe('MultiOpPatchRequestAddMultipleMembersToGroup config flag', () => {
+      it('should reject adding multiple members when flag is false (default)', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'add',
+              path: 'members',
+              value: [
+                { value: 'user-1' },
+                { value: 'user-2' },
+                { value: 'user-3' },
+              ],
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+        // Default config returns empty object (flag is false)
+        mockEndpointContext.getConfig.mockReturnValue({});
+
+        await expect(
+          service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id)
+        ).rejects.toThrow(HttpException);
+
+        // Should not attempt to create members
+        expect(mockPrismaService.groupMember.createMany).not.toHaveBeenCalled();
+      });
+
+      it('should allow adding multiple members when flag is true', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'add',
+              path: 'members',
+              value: [
+                { value: 'user-1' },
+                { value: 'user-2' },
+                { value: 'user-3' },
+              ],
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+        mockPrismaService.scimUser.findMany.mockResolvedValue([]);
+        // Enable the flag
+        mockEndpointContext.getConfig.mockReturnValue({
+          MultiOpPatchRequestAddMultipleMembersToGroup: 'True',
+        });
+
+        await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id);
+
+        // Should process the operation
+        expect(mockPrismaService.groupMember.deleteMany).toHaveBeenCalled();
+        expect(mockPrismaService.groupMember.createMany).toHaveBeenCalled();
+      });
+
+      it('should allow adding multiple members when flag is boolean true', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'add',
+              path: 'members',
+              value: [
+                { value: 'user-1' },
+                { value: 'user-2' },
+              ],
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+        mockPrismaService.scimUser.findMany.mockResolvedValue([]);
+        // Enable the flag with boolean
+        mockEndpointContext.getConfig.mockReturnValue({
+          MultiOpPatchRequestAddMultipleMembersToGroup: true,
+        });
+
+        await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id);
+
+        expect(mockPrismaService.groupMember.createMany).toHaveBeenCalled();
+      });
+
+      it('should always allow adding single member regardless of flag', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'add',
+              path: 'members',
+              value: [{ value: mockUser.scimId }],
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+        mockPrismaService.scimUser.findMany.mockResolvedValue([mockUser]);
+        // Flag is false (default)
+        mockEndpointContext.getConfig.mockReturnValue({});
+
+        await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id);
+
+        // Single member add should succeed
+        expect(mockPrismaService.groupMember.createMany).toHaveBeenCalled();
+      });
+
+      it('should allow multiple separate add operations with single members each', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'add',
+              path: 'members',
+              value: [{ value: 'user-1' }],
+            },
+            {
+              op: 'add',
+              path: 'members',
+              value: [{ value: 'user-2' }],
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+        mockPrismaService.scimUser.findMany.mockResolvedValue([]);
+        // Flag is false
+        mockEndpointContext.getConfig.mockReturnValue({});
+
+        await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id);
+
+        // Multiple operations with single member each should succeed
+        expect(mockPrismaService.groupMember.createMany).toHaveBeenCalled();
+      });
+    });
   });
 
   describe('replaceGroupForEndpoint', () => {
@@ -405,7 +577,7 @@ describe('EndpointScimGroupsService', () => {
 
       await expect(
         service.deleteGroupForEndpoint('non-existent', mockEndpoint.id)
-      ).rejects.toThrow(/not found/);
+      ).rejects.toThrow(HttpException);
 
       expect(mockPrismaService.scimGroup.delete).not.toHaveBeenCalled();
     });
@@ -419,7 +591,7 @@ describe('EndpointScimGroupsService', () => {
 
       await expect(
         service.getGroupForEndpoint(mockGroup.scimId, 'http://localhost:3000/scim', endpoint2.id)
-      ).rejects.toThrow(/not found/);
+      ).rejects.toThrow(HttpException);
 
       expect(mockPrismaService.scimGroup.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({

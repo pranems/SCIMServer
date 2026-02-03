@@ -21,7 +21,7 @@ describe('EndpointScimController', () => {
     name: 'test-endpoint',
     displayName: 'Test Endpoint',
     description: 'Test endpoint',
-    config: null,
+    config: {},
     active: true,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -409,7 +409,8 @@ describe('EndpointScimController', () => {
         expect(mockGroupsService.patchGroupForEndpoint).toHaveBeenCalledWith(
           'scim-grp-123',
           patchDto,
-          'endpoint-1'
+          'endpoint-1',
+          mockEndpoint.config
         );
       });
     });

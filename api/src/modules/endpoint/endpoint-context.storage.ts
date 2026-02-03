@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { AsyncLocalStorage } from 'async_hooks';
+import type { EndpointConfig } from './endpoint-config.interface';
 
 export interface EndpointContext {
   endpointId: string;
   baseUrl: string;
+  config?: EndpointConfig;
 }
 
 /**
@@ -28,5 +30,9 @@ export class EndpointContextStorage {
 
   getBaseUrl(): string | undefined {
     return this.storage.getStore()?.baseUrl;
+  }
+
+  getConfig(): EndpointConfig | undefined {
+    return this.storage.getStore()?.config;
   }
 }

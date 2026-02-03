@@ -3,6 +3,8 @@ import type { GroupMember, Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 
 import { PrismaService } from '../../prisma/prisma.service';
+import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
+import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { createScimError } from '../common/scim-errors';
 import {
   DEFAULT_COUNT,
@@ -42,7 +44,8 @@ interface GroupWithMembers {
 export class EndpointScimGroupsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly metadata: ScimMetadataService
+    private readonly metadata: ScimMetadataService,
+    private readonly endpointContext: EndpointContextStorage
   ) {}
 
   async createGroupForEndpoint(dto: CreateGroupDto, baseUrl: string, endpointId: string): Promise<ScimGroupResource> {
@@ -122,13 +125,17 @@ export class EndpointScimGroupsService {
     };
   }
 
-  async patchGroupForEndpoint(scimId: string, dto: PatchGroupDto, endpointId: string): Promise<void> {
+  async patchGroupForEndpoint(scimId: string, dto: PatchGroupDto, endpointId: string, config?: EndpointConfig): Promise<void> {
     this.ensureSchema(dto.schemas, SCIM_PATCH_SCHEMA);
 
     const group = await this.getGroupWithMembersForEndpoint(scimId, endpointId);
     if (!group) {
       throw createScimError({ status: 404, detail: `Resource ${scimId} not found.` });
     }
+
+    // Get endpoint config for behavior flags (use passed config or fallback to context)
+    const endpointConfig = config ?? this.endpointContext.getConfig();
+    const allowMultiMemberAdd = getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP);
 
     let displayName: string = group.displayName;
     let memberDtos: GroupMemberDto[] = this.memberEntitiesToDtos(group.members);
@@ -140,7 +147,7 @@ export class EndpointScimGroupsService {
           ({ displayName, members: memberDtos } = this.handleReplace(operation, displayName, memberDtos));
           break;
         case 'add':
-          memberDtos = this.handleAdd(operation, memberDtos);
+          memberDtos = this.handleAdd(operation, memberDtos, allowMultiMemberAdd);
           break;
         case 'remove':
           memberDtos = this.handleRemove(operation, memberDtos);
@@ -320,7 +327,8 @@ export class EndpointScimGroupsService {
 
   private handleAdd(
     operation: PatchGroupDto['Operations'][number],
-    members: GroupMemberDto[]
+    members: GroupMemberDto[],
+    allowMultiMemberAdd: boolean = false
   ): GroupMemberDto[] {
     const path = operation.path?.toLowerCase();
     if (path && path !== 'members') {
@@ -338,6 +346,19 @@ export class EndpointScimGroupsService {
     }
 
     const value = Array.isArray(operation.value) ? operation.value : [operation.value];
+    
+    // If MultiOpPatchRequestAddMultipleMembersToGroup is false and multiple members provided,
+    // reject the request - each member must be added in a separate operation
+    if (!allowMultiMemberAdd && value.length > 1) {
+      throw createScimError({
+        status: 400,
+        scimType: 'invalidValue',
+        detail: 'Adding multiple members in a single operation is not allowed. ' +
+                'Each member must be added in a separate PATCH operation. ' +
+                `To enable multi-member add, set endpoint config flag "${ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP}" to "True".`
+      });
+    }
+
     const newMembers = value.map((member) => this.toMemberDto(member));
 
     return this.ensureUniqueMembers([...members, ...newMembers]);
