@@ -70,15 +70,15 @@ src/modules/
 
 ## API Endpoints Added
 
-### Endpoint Management
+### Endpoint Management (`/scim/admin/endpoints`)
 ```
-POST   /admin/endpoints                      # Create endpoint
-GET    /admin/endpoints                      # List endpoints
-GET    /admin/endpoints/{endpointId}           # Get endpoint
-GET    /admin/endpoints/by-name/{name}       # Get by name
-PATCH  /admin/endpoints/{endpointId}           # Update endpoint
-DELETE /admin/endpoints/{endpointId}           # Delete endpoint (cascade)
-GET    /admin/endpoints/{endpointId}/stats     # Endpoint statistics
+POST   /scim/admin/endpoints                   # Create endpoint
+GET    /scim/admin/endpoints                   # List endpoints
+GET    /scim/admin/endpoints/{endpointId}      # Get endpoint
+GET    /scim/admin/endpoints/by-name/{name}    # Get by name
+PATCH  /scim/admin/endpoints/{endpointId}      # Update endpoint
+DELETE /scim/admin/endpoints/{endpointId}      # Delete endpoint (cascade)
+GET    /scim/admin/endpoints/{endpointId}/stats # Endpoint statistics
 ```
 
 ### endpoint-specific SCIM
@@ -95,7 +95,14 @@ GET    /admin/endpoints/{endpointId}/stats     # Endpoint statistics
 
 ### 1. Create Endpoint
 ```bash
+# Get OAuth token first
+TOKEN=$(curl -s -X POST http://localhost:3000/scim/oauth/token \
+  -d "client_id=scimtool-client&client_secret=changeme-oauth&grant_type=client_credentials" \
+  | jq -r '.access_token')
+
+# Create endpoint
 curl -X POST http://localhost:3000/scim/admin/endpoints \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "acme-corp",
@@ -118,6 +125,7 @@ curl -X POST http://localhost:3000/scim/admin/endpoints \
 ```bash
 curl -X POST http://localhost:3000/scim/endpoints/clx123.../Users \
   -H "Content-Type: application/scim+json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
     "userName": "john.doe@acme.com",
@@ -127,7 +135,8 @@ curl -X POST http://localhost:3000/scim/endpoints/clx123.../Users \
 
 ### 3. Delete Endpoint (Cascades)
 ```bash
-curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123...
+curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123... \
+  -H "Authorization: Bearer $TOKEN"
 ```
 - Deletes endpoint configuration
 - Deletes all users in endpoint

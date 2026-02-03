@@ -68,13 +68,13 @@ model Endpoint {
 ##### EndpointController (`endpoint.controller.ts`)
 **Endpoints:**
 ```
-POST   /admin/endpoints                      - Create endpoint
-GET    /admin/endpoints                      - List endpoints
-GET    /admin/endpoints/{endpointId}           - Get endpoint details
-GET    /admin/endpoints/by-name/{name}       - Get endpoint by name
-PATCH  /admin/endpoints/{endpointId}           - Update endpoint
-DELETE /admin/endpoints/{endpointId}           - Delete endpoint
-GET    /admin/endpoints/{endpointId}/stats     - Get endpoint statistics
+POST   /scim/admin/endpoints                   - Create endpoint
+GET    /scim/admin/endpoints                   - List endpoints
+GET    /scim/admin/endpoints/{endpointId}      - Get endpoint details
+GET    /scim/admin/endpoints/by-name/{name}    - Get endpoint by name
+PATCH  /scim/admin/endpoints/{endpointId}      - Update endpoint
+DELETE /scim/admin/endpoints/{endpointId}      - Delete endpoint
+GET    /scim/admin/endpoints/{endpointId}/stats - Get endpoint statistics
 ```
 
 ##### EndpointContextStorage (`endpoint-context.storage.ts`)
@@ -257,8 +257,14 @@ cd api && npm test -- --testPathPattern="endpoint-scim"
 
 ### Test Endpoint Operations
 ```bash
+# Get OAuth token
+TOKEN=$(curl -s -X POST http://localhost:3000/scim/oauth/token \
+  -d "client_id=scimtool-client&client_secret=changeme-oauth&grant_type=client_credentials" \
+  | jq -r '.access_token')
+
 # Create a endpoint with config flag
 curl -X POST http://localhost:3000/scim/admin/endpoints \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "endpoint-alpha",
@@ -280,11 +286,13 @@ curl -X POST http://localhost:3000/scim/admin/endpoints \
 }
 
 # List endpoints
-curl http://localhost:3000/scim/admin/endpoints
+curl http://localhost:3000/scim/admin/endpoints \
+  -H "Authorization: Bearer $TOKEN"
 
 # Create user in endpoint
 curl -X POST http://localhost:3000/scim/endpoints/clx.../Users \
-  -H "Content-Type: application/json" \
+  -H "Content-Type: application/scim+json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
     "userName": "john.doe@example.com",
@@ -292,7 +300,8 @@ curl -X POST http://localhost:3000/scim/endpoints/clx.../Users \
   }'
 
 # Delete endpoint (cascade deletes all data)
-curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx...
+curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx... \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ## Data Isolation Guarantees

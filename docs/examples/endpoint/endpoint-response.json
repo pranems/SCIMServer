@@ -1,0 +1,13 @@
+{
+  "id": "clx123abc456def789ghi",
+  "name": "acme-corp",
+  "displayName": "ACME Corporation",
+  "description": "Production endpoint for ACME Corp",
+  "config": {
+    "MultiOpPatchRequestAddMultipleMembersToGroup": "true"
+  },
+  "active": true,
+  "scimEndpoint": "/scim/endpoints/clx123abc456def789ghi",
+  "createdAt": "2026-02-03T10:00:00.000Z",
+  "updatedAt": "2026-02-03T10:00:00.000Z"
+}

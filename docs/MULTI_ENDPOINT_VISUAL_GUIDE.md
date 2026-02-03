@@ -278,7 +278,8 @@ Both endpoints can have 'john.doe' because composite unique is (endpointId, user
 
 ### 3. Cascade Delete
 ```
-DELETE /admin/endpoints/{endpointId}
+DELETE /scim/admin/endpoints/{endpointId}
+Authorization: Bearer <token>
     ↓
 Endpoint record deleted
     ↓
@@ -296,7 +297,8 @@ Result: Completely clean, no orphaned data
 ### Create Endpoint
 ```
 Request:
-POST /admin/endpoints
+POST /scim/admin/endpoints
+Authorization: Bearer <token>
 {
   "name": "acme-corp",
   "displayName": "ACME Corporation",
@@ -320,6 +322,7 @@ Response (201):
 ```
 Request:
 POST /scim/endpoints/clx123abc.../Users
+Authorization: Bearer <token>
 {
   "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
   "userName": "john@acme.com",

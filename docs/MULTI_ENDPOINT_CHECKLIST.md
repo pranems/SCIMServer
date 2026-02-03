@@ -269,6 +269,18 @@
   - [x] Bearer token validation per request
   - [x] Endpoint ID validated on each operation
 
+### Authentication Example
+```bash
+# Get OAuth token first
+TOKEN=$(curl -s -X POST http://localhost:3000/scim/oauth/token \
+  -d "client_id=scimtool-client&client_secret=changeme-oauth&grant_type=client_credentials" \
+  | jq -r '.access_token')
+
+# Use token in subsequent requests
+curl http://localhost:3000/scim/admin/endpoints \
+  -H "Authorization: Bearer $TOKEN"
+```
+
 ## Phase 6: Documentation Updates ✅ COMPLETED
 
 - [x] Multi-Endpoint documentation suite created:

@@ -1,0 +1,14 @@
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+  "displayName": "Engineering Team",
+  "members": [
+    {
+      "value": "user-uuid-12345",
+      "display": "John Doe"
+    },
+    {
+      "value": "user-uuid-67890",
+      "display": "Jane Smith"
+    }
+  ]
+}

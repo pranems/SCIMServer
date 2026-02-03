@@ -6,6 +6,14 @@ This folder contains complete documentation for implementing Multi-Endpoint supp
 
 ## Quick Links
 
+### For Complete API Reference 📖
+👉 **NEW:** [MULTI_ENDPOINT_API_REFERENCE.md](MULTI_ENDPOINT_API_REFERENCE.md)
+- Complete REST API documentation
+- Request/response examples
+- curl commands for every endpoint
+- Authentication details
+- Error responses
+
 ### For Getting Started Quickly
 👉 Start here: [MULTI_ENDPOINT_QUICK_START.md](MULTI_ENDPOINT_QUICK_START.md)
 - What was implemented
@@ -51,6 +59,12 @@ This folder contains complete documentation for implementing Multi-Endpoint supp
 - Next steps (priority order)
 - Key design decisions
 
+### For Config Flag Details
+👉 Read this: [MULTI_MEMBER_PATCH_CONFIG_FLAG.md](MULTI_MEMBER_PATCH_CONFIG_FLAG.md)
+- MultiOpPatchRequestAddMultipleMembersToGroup flag
+- Usage examples
+- Azure AD compatibility
+
 ---
 
 ## Implementation Status at a Glance
@@ -76,13 +90,38 @@ This folder contains complete documentation for implementing Multi-Endpoint supp
 
 ```
 Multi-Endpoint SCIM API
-├── Endpoint Management APIs (/admin/endpoints)
-│   └── Create, read, update, delete endpoints
 │
-├── Endpoint-specific SCIM endpoints (/scim/endpoints/{endpointId}/)
-│   ├── Users (CRUD operations)
-│   ├── Groups (CRUD operations)
-│   └── Metadata (Schemas, ResourceTypes, Config)
+├── Endpoint Management APIs (/scim/admin/endpoints)
+│   ├── POST   /scim/admin/endpoints           → Create endpoint
+│   ├── GET    /scim/admin/endpoints           → List endpoints
+│   ├── GET    /scim/admin/endpoints/{id}      → Get endpoint by ID
+│   ├── GET    /scim/admin/endpoints/by-name/{n} → Get endpoint by name
+│   ├── PATCH  /scim/admin/endpoints/{id}      → Update endpoint
+│   ├── DELETE /scim/admin/endpoints/{id}      → Delete endpoint + all data
+│   └── GET    /scim/admin/endpoints/{id}/stats → Get statistics
+│
+├── Endpoint-Scoped SCIM APIs (/scim/endpoints/{endpointId}/)
+│   │
+│   ├── Users
+│   │   ├── POST   /Users          → Create user
+│   │   ├── GET    /Users          → List users (filter, pagination)
+│   │   ├── GET    /Users/{id}     → Get user
+│   │   ├── PUT    /Users/{id}     → Replace user
+│   │   ├── PATCH  /Users/{id}     → Update user (SCIM PATCH)
+│   │   └── DELETE /Users/{id}     → Delete user
+│   │
+│   ├── Groups
+│   │   ├── POST   /Groups         → Create group
+│   │   ├── GET    /Groups         → List groups (filter, pagination)
+│   │   ├── GET    /Groups/{id}    → Get group
+│   │   ├── PUT    /Groups/{id}    → Replace group
+│   │   ├── PATCH  /Groups/{id}    → Update group (with config support)
+│   │   └── DELETE /Groups/{id}    → Delete group
+│   │
+│   └── Metadata
+│       ├── GET /Schemas                  → SCIM schemas
+│       ├── GET /ResourceTypes            → Resource types
+│       └── GET /ServiceProviderConfig    → Service config
 │
 ├── Data Isolation
 │   ├── Composite unique constraints per endpoint
@@ -143,36 +182,51 @@ Multi-Endpoint SCIM API
 
 ## API Endpoints Quick Reference
 
-### Endpoint Management
-```
-POST   /admin/endpoints
-GET    /admin/endpoints
-GET    /admin/endpoints/{endpointId}
-GET    /admin/endpoints/by-name/{name}
-PATCH  /admin/endpoints/{endpointId}
-DELETE /admin/endpoints/{endpointId}
-GET    /admin/endpoints/{endpointId}/stats
-```
+> **Full API Documentation:** See [MULTI_ENDPOINT_API_REFERENCE.md](MULTI_ENDPOINT_API_REFERENCE.md) for complete details.
 
-### Endpoint-specific SCIM (Example for Endpoint A)
-```
-POST   /scim/endpoints/{endpointId}/Users
-GET    /scim/endpoints/{endpointId}/Users
-GET    /scim/endpoints/{endpointId}/Users/{id}
-PUT    /scim/endpoints/{endpointId}/Users/{id}
-PATCH  /scim/endpoints/{endpointId}/Users/{id}
-DELETE /scim/endpoints/{endpointId}/Users/{id}
+### Endpoint Management (`/scim/admin/endpoints`)
 
-POST   /scim/endpoints/{endpointId}/Groups
-GET    /scim/endpoints/{endpointId}/Groups
-GET    /scim/endpoints/{endpointId}/Groups/{id}
-PUT    /scim/endpoints/{endpointId}/Groups/{id}
-PATCH  /scim/endpoints/{endpointId}/Groups/{id}
-DELETE /scim/endpoints/{endpointId}/Groups/{id}
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/scim/admin/endpoints` | Create endpoint |
+| GET | `/scim/admin/endpoints` | List endpoints (`?active=true/false`) |
+| GET | `/scim/admin/endpoints/{id}` | Get endpoint by ID |
+| GET | `/scim/admin/endpoints/by-name/{name}` | Get endpoint by name |
+| PATCH | `/scim/admin/endpoints/{id}` | Update endpoint config |
+| DELETE | `/scim/admin/endpoints/{id}` | Delete endpoint + cascade |
+| GET | `/scim/admin/endpoints/{id}/stats` | Get statistics |
 
-GET    /scim/endpoints/{endpointId}/Schemas
-GET    /scim/endpoints/{endpointId}/ResourceTypes
-GET    /scim/endpoints/{endpointId}/ServiceProviderConfig
+### Endpoint-Scoped SCIM (`/scim/endpoints/{endpointId}`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/endpoints/{id}/Users` | Create user |
+| GET | `/endpoints/{id}/Users` | List users |
+| GET | `/endpoints/{id}/Users/{userId}` | Get user |
+| PUT | `/endpoints/{id}/Users/{userId}` | Replace user |
+| PATCH | `/endpoints/{id}/Users/{userId}` | Update user |
+| DELETE | `/endpoints/{id}/Users/{userId}` | Delete user |
+| POST | `/endpoints/{id}/Groups` | Create group |
+| GET | `/endpoints/{id}/Groups` | List groups |
+| GET | `/endpoints/{id}/Groups/{groupId}` | Get group |
+| PUT | `/endpoints/{id}/Groups/{groupId}` | Replace group |
+| PATCH | `/endpoints/{id}/Groups/{groupId}` | Update group |
+| DELETE | `/endpoints/{id}/Groups/{groupId}` | Delete group |
+| GET | `/endpoints/{id}/Schemas` | Get schemas |
+| GET | `/endpoints/{id}/ResourceTypes` | Get resource types |
+| GET | `/endpoints/{id}/ServiceProviderConfig` | Get config |
+
+### Authentication
+
+All requests require OAuth Bearer token:
+```bash
+# Get token
+curl -X POST http://localhost:3000/scim/oauth/token \
+  -d "client_id=scimtool-client&client_secret=changeme-oauth&grant_type=client_credentials"
+
+# Use token
+curl http://localhost:3000/scim/admin/endpoints \
+  -H "Authorization: Bearer <token>"
 ```
 
 ---
@@ -181,7 +235,7 @@ GET    /scim/endpoints/{endpointId}/ServiceProviderConfig
 
 ### Source Code
 - ✅ `src/modules/endpoint/endpoint.service.ts` - Endpoint business logic
-- ✅ `src/modules/endpoint/endpoint.controller.ts` - Admin APIs
+- ✅ `src/modules/endpoint/controllers/endpoint.controller.ts` - Admin APIs
 - ✅ `src/modules/endpoint/endpoint-context.storage.ts` - Context management
 - ✅ `src/modules/endpoint/endpoint-config.interface.ts` - Config flags & interfaces
 - ✅ `src/modules/endpoint/endpoint.module.ts` - Module config
@@ -197,6 +251,7 @@ GET    /scim/endpoints/{endpointId}/ServiceProviderConfig
 - ✅ `src/modules/scim/services/endpoint-scim-groups.service.spec.ts` - Group service tests
 
 ### Documentation
+- ✅ `docs/MULTI_ENDPOINT_API_REFERENCE.md` - **Complete API reference** ← NEW
 - ✅ `docs/MULTI_ENDPOINT_SUMMARY.md` - Executive summary
 - ✅ `docs/MULTI_ENDPOINT_QUICK_START.md` - Quick start guide
 - ✅ `docs/MULTI_ENDPOINT_VISUAL_GUIDE.md` - Visual guide with diagrams
@@ -205,6 +260,18 @@ GET    /scim/endpoints/{endpointId}/ServiceProviderConfig
 - ✅ `docs/MULTI_ENDPOINT_CHECKLIST.md` - Implementation checklist
 - ✅ `docs/MULTI_ENDPOINT_INDEX.md` - This file
 - ✅ `docs/MULTI_MEMBER_PATCH_CONFIG_FLAG.md` - Config flag documentation
+
+### Example Files
+- ✅ `docs/examples/endpoint/create-endpoint.json` - Create endpoint request
+- ✅ `docs/examples/endpoint/update-endpoint.json` - Update endpoint request
+- ✅ `docs/examples/endpoint/endpoint-response.json` - Endpoint response
+- ✅ `docs/examples/endpoint/endpoint-stats-response.json` - Stats response
+- ✅ `docs/examples/endpoint/create-user-in-endpoint.json` - Create user request
+- ✅ `docs/examples/endpoint/create-group-in-endpoint.json` - Create group request
+- ✅ `docs/examples/endpoint/patch-add-single-member.json` - Add single member
+- ✅ `docs/examples/endpoint/patch-add-multiple-members.json` - Add multiple members
+- ✅ `docs/examples/endpoint/patch-remove-member.json` - Remove member
+- ✅ `docs/examples/endpoint/patch-user-deactivate.json` - Deactivate user
 
 ### Modified Files
 - ✅ `prisma/schema.prisma` - Added Endpoint model and relationships
@@ -218,18 +285,26 @@ GET    /scim/endpoints/{endpointId}/ServiceProviderConfig
 ### Workflow 1: Create Endpoint and Add User
 
 ```bash
-# Step 1: Create endpoint
+# Step 1: Get OAuth token
+TOKEN=$(curl -s -X POST http://localhost:3000/scim/oauth/token \
+  -d "client_id=scimtool-client&client_secret=changeme-oauth&grant_type=client_credentials" \
+  | jq -r '.access_token')
+
+# Step 2: Create endpoint
 curl -X POST http://localhost:3000/scim/admin/endpoints \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "name": "acme-corp",
-    "displayName": "ACME Corporation"
+    "displayName": "ACME Corporation",
+    "config": {"MultiOpPatchRequestAddMultipleMembersToGroup": "true"}
   }'
 # Returns: { id: "clx123...", scimEndpoint: "/scim/endpoints/clx123..." }
 
-# Step 2: Create user in endpoint
+# Step 3: Create user in endpoint
 curl -X POST http://localhost:3000/scim/endpoints/clx123.../Users \
   -H "Content-Type: application/scim+json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
     "userName": "john@acme.com",
@@ -237,8 +312,9 @@ curl -X POST http://localhost:3000/scim/endpoints/clx123.../Users \
   }'
 # Returns: User resource with meta.location for this endpoint
 
-# Step 3: List users in endpoint
-curl http://localhost:3000/scim/endpoints/clx123.../Users
+# Step 4: List users in endpoint
+curl http://localhost:3000/scim/endpoints/clx123.../Users \
+  -H "Authorization: Bearer $TOKEN"
 # Returns: Only users in this endpoint
 ```
 
@@ -248,34 +324,43 @@ curl http://localhost:3000/scim/endpoints/clx123.../Users
 # Create Endpoint A
 curl -X POST http://localhost:3000/scim/admin/endpoints \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"name": "tenant-a"}'
 # Returns: id = "clx-a..."
 
 # Create Endpoint B
 curl -X POST http://localhost:3000/scim/admin/endpoints \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"name": "tenant-b"}'
 # Returns: id = "clx-b..."
 
 # Add same user to both endpoints
 curl -X POST http://localhost:3000/scim/endpoints/clx-a.../Users \
+  -H "Content-Type: application/scim+json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"userName": "john.doe", ...}'
 
 curl -X POST http://localhost:3000/scim/endpoints/clx-b.../Users \
+  -H "Content-Type: application/scim+json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{"userName": "john.doe", ...}'  # Same name, different user in different endpoint!
 
 # List users in Endpoint A - only shows john.doe from A
-curl http://localhost:3000/scim/endpoints/clx-a.../Users
+curl http://localhost:3000/scim/endpoints/clx-a.../Users \
+  -H "Authorization: Bearer $TOKEN"
 
 # List users in Endpoint B - only shows john.doe from B
-curl http://localhost:3000/scim/endpoints/clx-b.../Users
+curl http://localhost:3000/scim/endpoints/clx-b.../Users \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Workflow 3: Delete Endpoint (Cascade)
 
 ```bash
 # Delete endpoint and all its data
-curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123...
+curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123... \
+  -H "Authorization: Bearer $TOKEN"
 # Response: 204 No Content
 
 # All of these are automatically deleted:
@@ -326,6 +411,12 @@ curl -X POST http://localhost:3000/scim/admin/endpoints \
 | Flag | Default | Description |
 |------|---------|-------------|
 | `MultiOpPatchRequestAddMultipleMembersToGroup` | `false` | Allow adding multiple members in one PATCH operation |
+| `excludeMeta` | `false` | Exclude `meta` attribute from responses |
+| `excludeSchemas` | `false` | Exclude `schemas` attribute from responses |
+| `customSchemaUrn` | - | Custom schema URN prefix |
+| `includeEnterpriseSchema` | `false` | Include Enterprise User extension |
+| `strictMode` | `false` | Enable strict validation |
+| `legacyMode` | `false` | Enable SCIM 1.1 compatibility |
 
 See [MULTI_MEMBER_PATCH_CONFIG_FLAG.md](MULTI_MEMBER_PATCH_CONFIG_FLAG.md) for detailed documentation.
 
@@ -334,6 +425,7 @@ See [MULTI_MEMBER_PATCH_CONFIG_FLAG.md](MULTI_MEMBER_PATCH_CONFIG_FLAG.md) for d
 ## Support & Questions
 
 All questions should be answerable from these documents:
+- **"What's the full API?"** → [MULTI_ENDPOINT_API_REFERENCE.md](MULTI_ENDPOINT_API_REFERENCE.md) ← **Complete API Reference**
 - **"How do I use it?"** → [MULTI_ENDPOINT_QUICK_START.md](MULTI_ENDPOINT_QUICK_START.md)
 - **"How is it built?"** → [MULTI_ENDPOINT_ARCHITECTURE.md](MULTI_ENDPOINT_ARCHITECTURE.md)
 - **"What's the implementation status?"** → [MULTI_ENDPOINT_CHECKLIST.md](MULTI_ENDPOINT_CHECKLIST.md)
@@ -348,6 +440,8 @@ All questions should be answerable from these documents:
 
 ```
 START HERE
+    ↓
+MULTI_ENDPOINT_API_REFERENCE.md (Full API Docs) ← START HERE FOR API USAGE
     ↓
 MULTI_ENDPOINT_QUICK_START.md (Overview)
     ├─→ Want details? → MULTI_ENDPOINT_IMPLEMENTATION.md
@@ -365,6 +459,7 @@ MULTI_ENDPOINT_QUICK_START.md (Overview)
 - Original SCIMTool README: `../../README.md`
 - SCIM 2.0 Specification: See `docs/SCIM_V2_REFERENCE.md`
 - API Reference: See `docs/COMPLETE_API_REFERENCE.md`
+- Multi-Endpoint API Reference: See `docs/MULTI_ENDPOINT_API_REFERENCE.md`
 - Deployment Guide: `../../DEPLOYMENT.md`
 
 ---

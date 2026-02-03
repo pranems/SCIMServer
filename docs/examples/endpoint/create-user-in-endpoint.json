@@ -1,0 +1,29 @@
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+  "userName": "john.doe@example.com",
+  "externalId": "emp-12345",
+  "active": true,
+  "name": {
+    "givenName": "John",
+    "familyName": "Doe",
+    "formatted": "John Doe"
+  },
+  "displayName": "John Doe",
+  "emails": [
+    {
+      "value": "john.doe@example.com",
+      "type": "work",
+      "primary": true
+    },
+    {
+      "value": "john.personal@example.net",
+      "type": "home"
+    }
+  ],
+  "phoneNumbers": [
+    {
+      "value": "+1-555-123-4567",
+      "type": "work"
+    }
+  ]
+}

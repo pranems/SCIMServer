@@ -31,13 +31,13 @@ A complete multi-endpoint architecture for the SCIMTool API is **fully implement
 
 2. **endpoint.controller.ts** - REST API endpoints for endpoint management
    ```
-   POST   /admin/endpoints
-   GET    /admin/endpoints
-   GET    /admin/endpoints/{endpointId}
-   GET    /admin/endpoints/by-name/{name}
-   PATCH  /admin/endpoints/{endpointId}
-   DELETE /admin/endpoints/{endpointId}
-   GET    /admin/endpoints/{endpointId}/stats
+   POST   /scim/admin/endpoints              - Create endpoint
+   GET    /scim/admin/endpoints              - List endpoints
+   GET    /scim/admin/endpoints/{endpointId} - Get endpoint by ID
+   GET    /scim/admin/endpoints/by-name/{name} - Get endpoint by name
+   PATCH  /scim/admin/endpoints/{endpointId} - Update endpoint
+   DELETE /scim/admin/endpoints/{endpointId} - Delete endpoint + cascade
+   GET    /scim/admin/endpoints/{endpointId}/stats - Get statistics
    ```
 
 3. **endpoint-context.storage.ts** - AsyncLocalStorage-based context management (fallback)
@@ -152,9 +152,16 @@ This is more reliable than AsyncLocalStorage across async boundaries in NestJS.
 
 ## Example Usage
 
-### Step 1: Create an Endpoint
+### Step 1: Get OAuth Token & Create an Endpoint
 ```bash
+# Get OAuth token first
+TOKEN=$(curl -s -X POST http://localhost:3000/scim/oauth/token \
+  -d "client_id=scimtool-client&client_secret=changeme-oauth&grant_type=client_credentials" \
+  | jq -r '.access_token')
+
+# Create endpoint
 curl -X POST http://localhost:3000/scim/admin/endpoints \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "acme-corp",
@@ -187,6 +194,7 @@ curl -X POST http://localhost:3000/scim/admin/endpoints \
 ```bash
 curl -X POST http://localhost:3000/scim/endpoints/clx123abc.../Users \
   -H "Content-Type: application/scim+json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
     "userName": "john.doe@acme.com",
@@ -205,13 +213,15 @@ curl -X POST http://localhost:3000/scim/endpoints/clx123abc.../Users \
 
 ### Step 3: List Users in the Endpoint
 ```bash
-curl http://localhost:3000/scim/endpoints/clx123abc.../Users
+curl http://localhost:3000/scim/endpoints/clx123abc.../Users \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ### Step 4: Create Another Endpoint
 ```bash
 curl -X POST http://localhost:3000/scim/admin/endpoints \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "name": "beta-industries",
     "displayName": "Beta Industries"
@@ -233,7 +243,8 @@ Now `john.doe@acme.com` can be created again in the new endpoint with completely
 
 ### Step 5: Delete Endpoint and All Data
 ```bash
-curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123abc...
+curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123abc... \
+  -H "Authorization: Bearer $TOKEN"
 ```
 - Removes endpoint configuration
 - Deletes all users in endpoint
@@ -255,6 +266,7 @@ Endpoints support configuration flags that control SCIM behavior:
 # Create endpoint with config flag enabled
 curl -X POST http://localhost:3000/scim/admin/endpoints \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "name": "my-endpoint",
     "config": {
@@ -265,6 +277,7 @@ curl -X POST http://localhost:3000/scim/admin/endpoints \
 # PATCH group with multiple members (only works when flag is true)
 curl -X PATCH http://localhost:3000/scim/endpoints/{endpointId}/Groups/{groupId} \
   -H "Content-Type: application/scim+json" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
     "Operations": [{
@@ -291,15 +304,15 @@ npm test -- --testPathPattern="endpoint-scim"
 
 ## API Reference Summary
 
-### Endpoint Management APIs
+### Endpoint Management APIs (`/scim/admin/endpoints`)
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/admin/endpoints` | POST | Create new endpoint |
-| `/admin/endpoints` | GET | List all endpoints |
-| `/admin/endpoints/{id}` | GET | Get endpoint details |
-| `/admin/endpoints/{id}` | PATCH | Update endpoint config |
-| `/admin/endpoints/{id}` | DELETE | Delete endpoint + all data |
-| `/admin/endpoints/{id}/stats` | GET | Get endpoint statistics |
+| `/scim/admin/endpoints` | POST | Create new endpoint |
+| `/scim/admin/endpoints` | GET | List all endpoints |
+| `/scim/admin/endpoints/{id}` | GET | Get endpoint details |
+| `/scim/admin/endpoints/{id}` | PATCH | Update endpoint config |
+| `/scim/admin/endpoints/{id}` | DELETE | Delete endpoint + all data |
+| `/scim/admin/endpoints/{id}/stats` | GET | Get endpoint statistics |
 
 ### endpoint-specific SCIM APIs
 | Endpoint | Method | Purpose |
