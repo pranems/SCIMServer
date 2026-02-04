@@ -3,6 +3,7 @@ import type { Endpoint, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CreateEndpointDto } from '../dto/create-endpoint.dto';
 import type { UpdateEndpointDto } from '../dto/update-endpoint.dto';
+import { validateEndpointConfig } from '../endpoint-config.interface';
 
 export interface EndpointResponse {
   id: string;
@@ -26,6 +27,13 @@ export class EndpointService {
       throw new BadRequestException(
         'Endpoint name must contain only alphanumeric characters, hyphens, and underscores'
       );
+    }
+
+    // Validate endpoint config values
+    try {
+      validateEndpointConfig(dto.config);
+    } catch (error) {
+      throw new BadRequestException((error as Error).message);
     }
 
     // Check if endpoint already exists
@@ -95,6 +103,13 @@ export class EndpointService {
 
     if (!endpoint) {
       throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
+    }
+
+    // Validate endpoint config values
+    try {
+      validateEndpointConfig(dto.config);
+    } catch (error) {
+      throw new BadRequestException((error as Error).message);
     }
 
     const updated = await this.prisma.endpoint.update({

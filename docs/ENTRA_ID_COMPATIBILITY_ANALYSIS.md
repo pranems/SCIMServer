@@ -203,6 +203,12 @@ Entra ID sends multiple members in a single PATCH operation:
 }
 ```
 
+**Validation:** The config flag accepts only valid boolean-like values: `true`, `false`, `"True"`, `"False"`, `"1"`, `"0"`. Invalid values are rejected with `400 Bad Request`.
+    "MultiOpPatchRequestAddMultipleMembersToGroup": "True"
+  }
+}
+```
+
 ### Test Connection Support ✅
 
 Entra ID's "Test Connection" queries for a non-existent user:
@@ -308,15 +314,22 @@ Entra ID periodically pings the endpoint to verify connectivity. SCIMTool:
 
 2. **Use HTTPS** in production environments
 
+3. **Disable endpoints when not in use** - Setting `active: false` blocks all SCIM operations with 403 Forbidden:
+   ```bash
+   curl -X PATCH "http://localhost:3000/scim/admin/endpoints/{id}" \
+     -H "Content-Type: application/json" \
+     -d '{ "active": false }'
+   ```
+
 ### Medium Priority (Performance)
 
-3. **Implement `excludedAttributes`** to reduce payload size for group queries
+4. **Implement `excludedAttributes`** to reduce payload size for group queries
 
-4. **Implement `attributes`** parameter for selective attribute return
+5. **Implement `attributes`** parameter for selective attribute return
 
 ### Low Priority (Nice to Have)
 
-5. **Add ETag validation** for optimistic concurrency
+6. **Add ETag validation** for optimistic concurrency
 
 6. **Implement complex filter operators** (`and`, `or`)
 
@@ -336,4 +349,6 @@ Entra ID periodically pings the endpoint to verify connectivity. SCIMTool:
 
 | Date | Change |
 |------|--------|
+| 2026-02-04 | Added config flag validation documentation (`MultiOpPatchRequestAddMultipleMembersToGroup` True/False only) |
+| 2026-02-04 | Documented inactive endpoint blocking (403 Forbidden) |
 | 2026-02-04 | Initial Entra ID compatibility analysis |

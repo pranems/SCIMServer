@@ -192,11 +192,13 @@ Multi-Endpoint SCIM API
 | GET | `/scim/admin/endpoints` | List endpoints (`?active=true/false`) |
 | GET | `/scim/admin/endpoints/{id}` | Get endpoint by ID |
 | GET | `/scim/admin/endpoints/by-name/{name}` | Get endpoint by name |
-| PATCH | `/scim/admin/endpoints/{id}` | Update endpoint config |
+| PATCH | `/scim/admin/endpoints/{id}` | Update endpoint config (set `active: false` to disable) |
 | DELETE | `/scim/admin/endpoints/{id}` | Delete endpoint + cascade |
 | GET | `/scim/admin/endpoints/{id}/stats` | Get statistics |
 
 ### Endpoint-Scoped SCIM (`/scim/endpoints/{endpointId}`)
+
+> **Note:** All SCIM operations return **403 Forbidden** if the endpoint is inactive.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|

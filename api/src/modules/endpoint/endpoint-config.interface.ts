@@ -145,3 +145,39 @@ export const DEFAULT_ENDPOINT_CONFIG: EndpointConfig = {
   [ENDPOINT_CONFIG_FLAGS.STRICT_MODE]: false,
   [ENDPOINT_CONFIG_FLAGS.LEGACY_MODE]: false
 };
+
+/**
+ * Valid boolean string values (case-insensitive)
+ */
+const VALID_BOOLEAN_VALUES = ['true', 'false', '1', '0'];
+
+/**
+ * Validate endpoint configuration
+ * Throws an error if any config value is invalid
+ * 
+ * @param config - The endpoint configuration to validate
+ * @throws Error if validation fails
+ */
+export function validateEndpointConfig(config: Record<string, any> | undefined): void {
+  if (!config) return;
+
+  // Validate MultiOpPatchRequestAddMultipleMembersToGroup
+  const multiOpFlag = config[ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP];
+  if (multiOpFlag !== undefined) {
+    if (typeof multiOpFlag === 'boolean') {
+      // Boolean values are always valid
+    } else if (typeof multiOpFlag === 'string') {
+      if (!VALID_BOOLEAN_VALUES.includes(multiOpFlag.toLowerCase())) {
+        throw new Error(
+          `Invalid value "${multiOpFlag}" for config flag "${ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP}". ` +
+          `Allowed values: "True", "False", true, false, "1", "0".`
+        );
+      }
+    } else {
+      throw new Error(
+        `Invalid type for config flag "${ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP}". ` +
+        `Expected boolean or string ("True"/"False"), got ${typeof multiOpFlag}.`
+      );
+    }
+  }
+}

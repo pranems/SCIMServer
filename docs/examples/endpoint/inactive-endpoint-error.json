@@ -1,0 +1,5 @@
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+  "status": "403",
+  "detail": "Endpoint \"acme-corp\" is inactive. SCIM operations are not allowed."
+}

@@ -3,10 +3,11 @@
 ## Implementation Status ✅ COMPLETE
 
 A complete multi-endpoint architecture for the SCIMTool API is **fully implemented** with:
-- 48 tests passing
+- 172 tests passing (8 test suites)
 - All service layer extensions complete
-- Config flag support
+- Config flag support with validation
 - Full CRUD operations for users and groups
+- Inactive endpoint blocking (403 Forbidden)
 
 ## Key Components Added
 
@@ -16,6 +17,8 @@ A complete multi-endpoint architecture for the SCIMTool API is **fully implement
 - `endpointId` foreign keys added to `ScimUser`, `ScimGroup`, and `RequestLog`
 - Composite unique constraints per endpoint (e.g., `@@unique([endpointId, userName])`)
 - Cascade delete relationships (deleting endpoint removes all related data)
+- **Active flag enforcement**: Inactive endpoints (`active=false`) reject all SCIM operations with `403 Forbidden`
+- **Config flag validation**: `MultiOpPatchRequestAddMultipleMembersToGroup` accepts only True/False values
 
 ### 2. Endpoint Module (`src/modules/endpoint/`)
 
@@ -94,11 +97,16 @@ A complete multi-endpoint architecture for the SCIMTool API is **fully implement
 └── GET    /ServiceProviderConfig - Get config
 ```
 
-### 5. Tests ✅ (48 Tests Passing)
+### 5. Tests ✅ (172 Tests Passing - 8 Suites)
 
-- `endpoint-scim.controller.spec.ts` - Controller tests (12 tests)
+- `endpoint.controller.spec.ts` - Endpoint controller tests (21 tests)
+- `endpoint.service.spec.ts` - Endpoint service tests (38 tests)
+- `endpoint-config.interface.spec.ts` - Config utilities tests (43 tests)
+- `endpoint-context.storage.spec.ts` - Context storage tests (10 tests)
+- `endpoint-scim.controller.spec.ts` - SCIM controller tests (16 tests)
 - `endpoint-scim-users.service.spec.ts` - User service tests (15 tests)
-- `endpoint-scim-groups.service.spec.ts` - Group service tests (21 tests)
+- `endpoint-scim-groups.service.spec.ts` - Group service tests (20 tests)
+- `activity.controller.spec.ts` - Activity controller tests (9 tests)
 
 ### 6. Module Integration
 
@@ -256,9 +264,11 @@ curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123abc... \
 
 Endpoints support configuration flags that control SCIM behavior:
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `MultiOpPatchRequestAddMultipleMembersToGroup` | `false` | Allow adding multiple members in one PATCH operation |
+| Flag | Default | Valid Values | Description |
+|------|---------|--------------|-------------|
+| `MultiOpPatchRequestAddMultipleMembersToGroup` | `false` | `true`, `false`, `"True"`, `"False"`, `"1"`, `"0"` | Allow adding multiple members in one PATCH operation |
+
+**Validation:** Invalid values are rejected with `400 Bad Request`. Only boolean-like values are accepted.
 
 ### Using Config Flags
 
@@ -298,8 +308,11 @@ See [MULTI_MEMBER_PATCH_CONFIG_FLAG.md](MULTI_MEMBER_PATCH_CONFIG_FLAG.md) for d
 
 ```bash
 cd api
-npm test -- --testPathPattern="endpoint-scim"
-# Result: 48 tests passing
+npm test
+# Result: 172 tests passing (8 suites)
+
+# Run endpoint-specific tests only
+npm test -- --testPathPattern="endpoint"
 ```
 
 ## API Reference Summary
@@ -333,13 +346,17 @@ npm test -- --testPathPattern="endpoint-scim"
 - ✅ `src/modules/endpoint/endpoint.module.ts`
 - ✅ `src/modules/endpoint/dto/create-endpoint.dto.ts`
 - ✅ `src/modules/endpoint/dto/update-endpoint.dto.ts`
+- ✅ `src/modules/endpoint/controllers/endpoint.controller.spec.ts` (21 tests)
+- ✅ `src/modules/endpoint/services/endpoint.service.spec.ts` (38 tests)
+- ✅ `src/modules/endpoint/endpoint-config.interface.spec.ts` (43 tests)
+- ✅ `src/modules/endpoint/endpoint-context.storage.spec.ts` (10 tests)
 - ✅ `src/modules/scim/controllers/endpoint-scim.controller.ts`
-- ✅ `src/modules/scim/controllers/endpoint-scim.controller.spec.ts`
+- ✅ `src/modules/scim/controllers/endpoint-scim.controller.spec.ts` (16 tests)
 - ✅ `src/modules/scim/services/endpoint-scim-users.service.ts`
-- ✅ `src/modules/scim/services/endpoint-scim-users.service.spec.ts`
+- ✅ `src/modules/scim/services/endpoint-scim-users.service.spec.ts` (15 tests)
 - ✅ `src/modules/scim/services/endpoint-scim-groups.service.ts`
-- ✅ `src/modules/scim/services/endpoint-scim-groups.service.spec.ts`
-- ✅ Documentation (8 files)
+- ✅ `src/modules/scim/services/endpoint-scim-groups.service.spec.ts` (20 tests)
+- ✅ Documentation (9 files)
 
 **Modified:**
 - ✅ `prisma/schema.prisma` - Added Endpoint model and endpointId relationships
@@ -349,8 +366,9 @@ npm test -- --testPathPattern="endpoint-scim"
 ## Status
 
 ✅ **Implementation Complete** - All components implemented and tested
-✅ **48 Tests Passing** - Full test coverage
-✅ **Config Flag Support** - Endpoint-specific configuration
+✅ **172 Tests Passing** - Comprehensive test coverage across 8 suites
+✅ **Config Flag Validation** - Endpoint-specific configuration with input validation
+✅ **Inactive Endpoint Blocking** - 403 Forbidden for disabled endpoints
 ✅ **Ready for Production** - Deploy when ready
 
 

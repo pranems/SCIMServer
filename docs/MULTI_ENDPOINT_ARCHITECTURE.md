@@ -108,6 +108,7 @@
 │   ├── PATCH  /{endpointId}                     → Update endpoint
 │   │   Body: { displayName?, description?, config?, active? }
 │   │   Response: EndpointResponse (200)
+│   │   Note: Set active=false to disable SCIM operations
 │   │
 │   ├── DELETE /{endpointId}                     → Delete endpoint + all data
 │   │   Response: 204 No Content
@@ -116,6 +117,8 @@
 │       Response: { totalUsers, totalGroups, totalGroupMembers, requestLogCount }
 │
 └── /endpoints/{endpointId}                      → Endpoint-Scoped SCIM
+    │
+    │   ⚠️ All operations return 403 Forbidden if endpoint.active=false
     │
     ├── /Users
     │   ├── POST   /                             → Create user

@@ -750,7 +750,7 @@ export class ActivityParserService {
    */
   private async resolveUserName(userId: string): Promise<string> {
     try {
-      const user = await this.prisma.scimUser.findUnique({
+      const user = await this.prisma.scimUser.findFirst({
         where: { scimId: userId },
         select: { userName: true, rawPayload: true },
       });
@@ -782,7 +782,7 @@ export class ActivityParserService {
    */
   private async resolveGroupName(groupId: string): Promise<string> {
     try {
-      const group = await this.prisma.scimGroup.findUnique({
+      const group = await this.prisma.scimGroup.findFirst({
         where: { scimId: groupId },
         select: { displayName: true },
       });

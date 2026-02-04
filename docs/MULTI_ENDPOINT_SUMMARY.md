@@ -243,10 +243,11 @@ curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123... \
 
 ## Security Notes
 
-1. **Endpoint Validation**: Every endpoint validates endpoint exists
-2. **Data Isolation**: Composite constraints prevent cross-endpoint access
-3. **Cascade Cleanup**: No orphaned data possible
-4. **Future**: Add authentication per endpoint for production use
+1. **Endpoint Validation**: Every request validates endpoint exists and is active
+2. **Inactive Endpoint Blocking**: SCIM operations return 403 Forbidden for inactive endpoints
+3. **Data Isolation**: Composite constraints prevent cross-endpoint access
+4. **Cascade Cleanup**: No orphaned data possible
+5. **Future**: Add authentication per endpoint for production use
 
 ## Documentation Files
 

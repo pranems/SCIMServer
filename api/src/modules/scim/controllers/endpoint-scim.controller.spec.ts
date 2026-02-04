@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ForbiddenException } from '@nestjs/common';
 import { EndpointScimController } from './endpoint-scim.controller';
 import { EndpointScimUsersService } from '../services/endpoint-scim-users.service';
 import { EndpointScimGroupsService } from '../services/endpoint-scim-groups.service';
@@ -474,6 +475,54 @@ describe('EndpointScimController', () => {
       ).rejects.toThrow('Endpoint not found');
 
       expect(mockUsersService.getUserForEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('should reject SCIM operations on inactive endpoints', async () => {
+      const inactiveEndpoint = {
+        ...mockEndpoint,
+        active: false,
+      };
+      mockEndpointService.getEndpoint.mockResolvedValue(inactiveEndpoint);
+
+      await expect(
+        controller.getUser('endpoint-1', 'user-123', mockRequest)
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(mockUsersService.getUserForEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('should include endpoint name in inactive endpoint error message', async () => {
+      const inactiveEndpoint = {
+        ...mockEndpoint,
+        name: 'test-endpoint',
+        active: false,
+      };
+      mockEndpointService.getEndpoint.mockResolvedValue(inactiveEndpoint);
+
+      await expect(
+        controller.createUser('endpoint-1', { schemas: [], userName: 'test' } as any, mockRequest)
+      ).rejects.toThrow('Endpoint "test-endpoint" is inactive');
+    });
+
+    it('should allow SCIM operations on active endpoints', async () => {
+      const activeEndpoint = {
+        ...mockEndpoint,
+        active: true,
+      };
+      mockEndpointService.getEndpoint.mockResolvedValue(activeEndpoint);
+      mockUsersService.getUserForEndpoint.mockResolvedValue({
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        id: 'user-123',
+        userName: 'test@example.com',
+        active: true,
+        meta: {},
+      });
+
+      await expect(
+        controller.getUser('endpoint-1', 'user-123', mockRequest)
+      ).resolves.toBeDefined();
+
+      expect(mockUsersService.getUserForEndpoint).toHaveBeenCalled();
     });
   });
 });

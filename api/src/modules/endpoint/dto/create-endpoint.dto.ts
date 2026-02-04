@@ -1,5 +1,5 @@
 export class CreateEndpointDto {
-  name: string;
+  name!: string;
   displayName?: string;
   description?: string;
   config?: Record<string, any>;

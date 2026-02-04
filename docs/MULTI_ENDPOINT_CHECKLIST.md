@@ -129,6 +129,8 @@
 
 - [x] EndpointScimController tests
   - [x] Validates endpoint exists before operations
+  - [x] Validates endpoint is active before operations
+  - [x] Returns 403 Forbidden for inactive endpoints
   - [x] Sets EndpointContext correctly
   - [x] Routes to correct service methods
   - [x] Returns 404 for non-existent endpoint

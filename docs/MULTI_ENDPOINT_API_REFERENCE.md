@@ -227,9 +227,16 @@ Authorization: Bearer <token>
 | `displayName` | string | ❌ | Update display name |
 | `description` | string | ❌ | Update description |
 | `config` | object | ❌ | Update configuration flags |
-| `active` | boolean | ❌ | Enable/disable endpoint |
+| `active` | boolean | ❌ | Enable/disable endpoint (inactive endpoints reject all SCIM operations with 403 Forbidden) |
 
 **Response (200 OK):** Updated endpoint object
+
+**⚠️ Inactive Endpoint Behavior:**
+When `active` is set to `false`, the endpoint will:
+- Return **403 Forbidden** for all SCIM operations (Users, Groups)
+- Still be visible in admin endpoint listing
+- Retain all data (users, groups, logs)
+- Be re-activatable by setting `active: true`
 
 **curl Example:**
 ```bash

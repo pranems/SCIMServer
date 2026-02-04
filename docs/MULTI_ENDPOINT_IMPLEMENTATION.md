@@ -65,6 +65,12 @@ model Endpoint {
 - `deleteEndpoint(endpointId)` - Delete endpoint and all associated data (cascading)
 - `getEndpointStats(endpointId)` - Get statistics about endpoint's resources
 
+**Active Flag Behavior:**
+- Endpoints are created with `active: true` by default
+- Setting `active: false` via PATCH disables the endpoint
+- **Inactive endpoints reject all SCIM operations with 403 Forbidden**
+- Data is preserved; the endpoint can be re-activated at any time
+
 ##### EndpointController (`endpoint.controller.ts`)
 **Endpoints:**
 ```

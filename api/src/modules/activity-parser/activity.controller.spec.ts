@@ -11,6 +11,7 @@ describe('ActivityController', () => {
   // Mock data helpers
   const createMockLog = (overrides: any = {}) => ({
     id: overrides.id || '1',
+    endpointId: overrides.endpointId !== undefined ? overrides.endpointId : null,
     method: overrides.method || 'GET',
     url: overrides.url || '/scim/v2/Users',
     status: overrides.status !== undefined ? overrides.status : 200,

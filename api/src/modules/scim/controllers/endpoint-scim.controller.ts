@@ -10,7 +10,8 @@ import {
   Query,
   Req,
   Res,
-  HttpCode
+  HttpCode,
+  ForbiddenException
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
@@ -41,7 +42,8 @@ export class EndpointScimController {
   ) {}
 
   /**
-   * Validate endpoint exists and set endpoint context for all sub-routes
+   * Validate endpoint exists, is active, and set endpoint context for all sub-routes
+   * Throws ForbiddenException if endpoint is inactive
    */
   private async validateAndSetContext(
     endpointId: string,
@@ -49,6 +51,12 @@ export class EndpointScimController {
   ): Promise<{ baseUrl: string; config: EndpointConfig }> {
     // Validate endpoint exists and get config
     const endpoint = await this.endpointService.getEndpoint(endpointId);
+    
+    // Block SCIM operations on inactive endpoints
+    if (!endpoint.active) {
+      throw new ForbiddenException(`Endpoint "${endpoint.name}" is inactive. SCIM operations are not allowed.`);
+    }
+    
     const config: EndpointConfig = endpoint.config || {};
 
     // Set endpoint context for this request (including config)
