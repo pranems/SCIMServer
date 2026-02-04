@@ -325,14 +325,14 @@ curl http://localhost:3000/scim/endpoints/clx123.../Users \
 curl -X POST http://localhost:3000/scim/admin/endpoints \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
-  -d '{"name": "tenant-a"}'
+  -d '{"name": "endpoint-a"}'
 # Returns: id = "clx-a..."
 
 # Create Endpoint B
 curl -X POST http://localhost:3000/scim/admin/endpoints \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
-  -d '{"name": "tenant-b"}'
+  -d '{"name": "endpoint-b"}'
 # Returns: id = "clx-b..."
 
 # Add same user to both endpoints

@@ -43,8 +43,8 @@ Authorization: Bearer <token>
 **Request Body:**
 ```json
 {
-  "name": "my-tenant",
-  "displayName": "My Tenant Display Name",
+  "name": "my-endpoint",
+  "displayName": "My Endpoint Display Name",
   "description": "Optional description",
   "config": {
     "MultiOpPatchRequestAddMultipleMembersToGroup": "true"
@@ -63,8 +63,8 @@ Authorization: Bearer <token>
 ```json
 {
   "id": "clx123abc456def",
-  "name": "my-tenant",
-  "displayName": "My Tenant Display Name",
+  "name": "my-endpoint",
+  "displayName": "My Endpoint Display Name",
   "description": "Optional description",
   "config": {
     "MultiOpPatchRequestAddMultipleMembersToGroup": "true"
@@ -967,7 +967,7 @@ TOKEN=$(curl -s -X POST http://localhost:3000/scim/oauth/token \
 ENDPOINT=$(curl -s -X POST http://localhost:3000/scim/admin/endpoints \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
-  -d '{"name": "demo-tenant", "displayName": "Demo Tenant"}')
+  -d '{"name": "demo-endpoint", "displayName": "Demo Endpoint"}')
 
 ENDPOINT_ID=$(echo $ENDPOINT | jq -r '.id')
 echo "Created endpoint: $ENDPOINT_ID"

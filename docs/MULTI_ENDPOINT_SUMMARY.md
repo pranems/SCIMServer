@@ -214,7 +214,7 @@ curl -X DELETE http://localhost:3000/scim/admin/endpoints/clx123... \
 
 1. **Direct Config Passing**: Config passed directly from controller to service as parameter (not via AsyncLocalStorage alone) - more reliable across async boundaries
 
-2. **Composite Unique Constraints**: Allows same identifiers across endpoints - better for multi-tenant SaaS
+2. **Composite Unique Constraints**: Allows same identifiers across endpoints - better for multi-endpoint SaaS
 
 3. **Cascade Delete**: When endpoint deleted, all data automatically removed - prevents orphaned data
 
