@@ -82,7 +82,7 @@ export class EndpointScimGroupsService {
   async getGroupForEndpoint(scimId: string, baseUrl: string, endpointId: string): Promise<ScimGroupResource> {
     const group = await this.getGroupWithMembersForEndpoint(scimId, endpointId);
     if (!group) {
-      throw createScimError({ status: 404, detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
     return this.toScimGroupResource(group, baseUrl);
@@ -130,12 +130,17 @@ export class EndpointScimGroupsService {
 
     const group = await this.getGroupWithMembersForEndpoint(scimId, endpointId);
     if (!group) {
-      throw createScimError({ status: 404, detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
     // Get endpoint config for behavior flags (use passed config or fallback to context)
     const endpointConfig = config ?? this.endpointContext.getConfig();
     const allowMultiMemberAdd = getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP);
+    const allowMultiMemberRemove = getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP);
+    // PatchOpAllowRemoveAllMembers defaults to true if not explicitly set
+    const allowRemoveAllMembers = endpointConfig?.[ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS] === undefined 
+      ? true 
+      : getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS);
 
     let displayName: string = group.displayName;
     let memberDtos: GroupMemberDto[] = this.memberEntitiesToDtos(group.members);
@@ -150,11 +155,12 @@ export class EndpointScimGroupsService {
           memberDtos = this.handleAdd(operation, memberDtos, allowMultiMemberAdd);
           break;
         case 'remove':
-          memberDtos = this.handleRemove(operation, memberDtos);
+          memberDtos = this.handleRemove(operation, memberDtos, allowMultiMemberRemove, allowRemoveAllMembers);
           break;
         default:
           throw createScimError({
             status: 400,
+            scimType: 'invalidValue',
             detail: `Patch operation '${operation.op}' is not supported.`
           });
       }
@@ -191,7 +197,7 @@ export class EndpointScimGroupsService {
 
     const group = await this.getGroupWithMembersForEndpoint(scimId, endpointId);
     if (!group) {
-      throw createScimError({ status: 404, detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
     const now = new Date();
@@ -237,7 +243,7 @@ export class EndpointScimGroupsService {
     });
 
     if (!group) {
-      throw createScimError({ status: 404, detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
     await this.prisma.scimGroup.delete({ where: { id: group.id } });
@@ -249,6 +255,7 @@ export class EndpointScimGroupsService {
     if (!schemas || !schemas.includes(requiredSchema)) {
       throw createScimError({
         status: 400,
+        scimType: 'invalidSyntax',
         detail: `Missing required schema '${requiredSchema}'.`
       });
     }
@@ -283,6 +290,7 @@ export class EndpointScimGroupsService {
     if (!match) {
       throw createScimError({
         status: 400,
+        scimType: 'invalidFilter',
         detail: `Unsupported filter expression: '${filter}'.`
       });
     }
@@ -300,6 +308,7 @@ export class EndpointScimGroupsService {
       if (typeof operation.value !== 'string') {
         throw createScimError({
           status: 400,
+          scimType: 'invalidValue',
           detail: 'Replace operation for displayName requires a string value.'
         });
       }
@@ -311,6 +320,7 @@ export class EndpointScimGroupsService {
       if (!Array.isArray(operation.value)) {
         throw createScimError({
           status: 400,
+          scimType: 'invalidValue',
           detail: 'Replace operation for members requires an array value.'
         });
       }
@@ -321,6 +331,7 @@ export class EndpointScimGroupsService {
 
     throw createScimError({
       status: 400,
+      scimType: 'invalidPath',
       detail: `Patch path '${operation.path ?? ''}' is not supported.`
     });
   }
@@ -334,6 +345,7 @@ export class EndpointScimGroupsService {
     if (path && path !== 'members') {
       throw createScimError({
         status: 400,
+        scimType: 'invalidPath',
         detail: `Add operation path '${operation.path ?? ''}' is not supported.`
       });
     }
@@ -341,6 +353,7 @@ export class EndpointScimGroupsService {
     if (!operation.value) {
       throw createScimError({
         status: 400,
+        scimType: 'invalidValue',
         detail: 'Add operation for members requires a value.'
       });
     }
@@ -366,23 +379,64 @@ export class EndpointScimGroupsService {
 
   private handleRemove(
     operation: PatchGroupDto['Operations'][number],
-    members: GroupMemberDto[]
+    members: GroupMemberDto[],
+    allowMultiMemberRemove: boolean = false,
+    allowRemoveAllMembers: boolean = true
   ): GroupMemberDto[] {
     const path = operation.path?.toLowerCase();
 
-    if (!path || path === 'members') {
-      return [];
+    // Check if value array is provided with members to remove
+    if (operation.value && Array.isArray(operation.value) && operation.value.length > 0) {
+      // Validate: if removing multiple members and flag is not set, reject
+      if (!allowMultiMemberRemove && operation.value.length > 1) {
+        throw createScimError({
+          status: 400,
+          scimType: 'invalidValue',
+          detail: 'Removing multiple members in a single operation is not allowed. ' +
+                  'Each member must be removed in a separate PATCH operation. ' +
+                  `To enable multi-member remove, set endpoint config flag "${ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP}" to "True".`
+        });
+      }
+
+      // Extract member IDs to remove from value array
+      const membersToRemove = new Set<string>();
+      for (const item of operation.value) {
+        if (item && typeof item === 'object' && 'value' in item) {
+          membersToRemove.add((item as { value: string }).value);
+        }
+      }
+
+      // Filter out the specified members
+      return members.filter((member) => !membersToRemove.has(member.value));
     }
 
-    const memberPathMatch = path.match(/^members\[value\s+eq\s+"?([^"]+)"?\]$/i);
+    // Handle targeted removal: members[value eq "user-id"]
+    const memberPathMatch = path?.match(/^members\[value\s+eq\s+"?([^"]+)"?\]$/i);
     if (memberPathMatch) {
       const valueToRemove = memberPathMatch[1];
       return members.filter((member) => member.value !== valueToRemove);
     }
 
+    // Handle path=members without value array - remove all members (RFC 7644 compliant)
+    if (path === 'members') {
+      if (!allowRemoveAllMembers) {
+        throw createScimError({
+          status: 400,
+          scimType: 'invalidValue',
+          detail: 'Removing all members via path=members is not allowed. ' +
+                  'Specify members to remove using a value array or path filter like members[value eq "user-id"]. ' +
+                  `To enable remove-all, set endpoint config flag "${ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS}" to "True".`
+        });
+      }
+      // Remove all members per RFC 7644 Section 3.5.2.2
+      return [];
+    }
+
+    // Unsupported path
     throw createScimError({
       status: 400,
-      detail: `Remove operation path '${operation.path ?? ''}' is not supported.`
+      scimType: 'invalidPath',
+      detail: `Remove operation path '${operation.path ?? ''}' is not supported for groups.`
     });
   }
 
@@ -425,6 +479,7 @@ export class EndpointScimGroupsService {
     if (!member || typeof member !== 'object' || !('value' in member)) {
       throw createScimError({
         status: 400,
+        scimType: 'invalidValue',
         detail: 'Member object must include a value property.'
       });
     }
@@ -455,7 +510,7 @@ export class EndpointScimGroupsService {
 
   private toScimGroupResource(group: GroupWithMembers | null, baseUrl: string): ScimGroupResource {
     if (!group) {
-      throw createScimError({ status: 404, detail: 'Resource not found.' });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: 'Resource not found.' });
     }
 
     const meta = this.buildMeta(group, baseUrl);

@@ -3,6 +3,7 @@
   "displayName": "ACME Corporation",
   "description": "Production endpoint for ACME Corp users and groups",
   "config": {
-    "MultiOpPatchRequestAddMultipleMembersToGroup": "true"
+    "MultiOpPatchRequestAddMultipleMembersToGroup": "true",
+    "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "true"
   }
 }

@@ -3,7 +3,7 @@
 ## Implementation Status ✅ COMPLETE
 
 A complete multi-endpoint architecture for the SCIMTool API is **fully implemented** with:
-- 172 tests passing (8 test suites)
+- 197 tests passing (8 test suites)
 - All service layer extensions complete
 - Config flag support with validation
 - Full CRUD operations for users and groups
@@ -18,7 +18,7 @@ A complete multi-endpoint architecture for the SCIMTool API is **fully implement
 - Composite unique constraints per endpoint (e.g., `@@unique([endpointId, userName])`)
 - Cascade delete relationships (deleting endpoint removes all related data)
 - **Active flag enforcement**: Inactive endpoints (`active=false`) reject all SCIM operations with `403 Forbidden`
-- **Config flag validation**: `MultiOpPatchRequestAddMultipleMembersToGroup` accepts only True/False values
+- **Config flag validation**: `MultiOpPatchRequestAddMultipleMembersToGroup` and `MultiOpPatchRequestRemoveMultipleMembersFromGroup` accept only True/False values
 
 ### 2. Endpoint Module (`src/modules/endpoint/`)
 
@@ -97,7 +97,7 @@ A complete multi-endpoint architecture for the SCIMTool API is **fully implement
 └── GET    /ServiceProviderConfig - Get config
 ```
 
-### 5. Tests ✅ (172 Tests Passing - 8 Suites)
+### 5. Tests ✅ (197 Tests Passing - 8 Suites)
 
 - `endpoint.controller.spec.ts` - Endpoint controller tests (21 tests)
 - `endpoint.service.spec.ts` - Endpoint service tests (38 tests)
@@ -267,6 +267,7 @@ Endpoints support configuration flags that control SCIM behavior:
 | Flag | Default | Valid Values | Description |
 |------|---------|--------------|-------------|
 | `MultiOpPatchRequestAddMultipleMembersToGroup` | `false` | `true`, `false`, `"True"`, `"False"`, `"1"`, `"0"` | Allow adding multiple members in one PATCH operation |
+| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | `false` | `true`, `false`, `"True"`, `"False"`, `"1"`, `"0"` | Allow removing multiple members in one PATCH operation |
 
 **Validation:** Invalid values are rejected with `400 Bad Request`. Only boolean-like values are accepted.
 
@@ -280,7 +281,8 @@ curl -X POST http://localhost:3000/scim/admin/endpoints \
   -d '{
     "name": "my-endpoint",
     "config": {
-      "MultiOpPatchRequestAddMultipleMembersToGroup": "true"
+      "MultiOpPatchRequestAddMultipleMembersToGroup": "true",
+      "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "true"
     }
   }'
 
@@ -309,7 +311,7 @@ See [MULTI_MEMBER_PATCH_CONFIG_FLAG.md](MULTI_MEMBER_PATCH_CONFIG_FLAG.md) for d
 ```bash
 cd api
 npm test
-# Result: 172 tests passing (8 suites)
+# Result: 197 tests passing (8 suites)
 
 # Run endpoint-specific tests only
 npm test -- --testPathPattern="endpoint"
@@ -366,7 +368,7 @@ npm test -- --testPathPattern="endpoint"
 ## Status
 
 ✅ **Implementation Complete** - All components implemented and tested
-✅ **172 Tests Passing** - Comprehensive test coverage across 8 suites
+✅ **197 Tests Passing** - Comprehensive test coverage across 8 suites
 ✅ **Config Flag Validation** - Endpoint-specific configuration with input validation
 ✅ **Inactive Endpoint Blocking** - 403 Forbidden for disabled endpoints
 ✅ **Ready for Production** - Deploy when ready

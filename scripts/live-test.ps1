@@ -115,6 +115,41 @@ $boolConfigBody = '{"config":{"MultiOpPatchRequestAddMultipleMembersToGroup":tru
 $boolResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $boolConfigBody
 Test-Result -Success ($true) -Message "Boolean true accepted as config value"
 
+# Test: Invalid REMOVE config value rejected on create
+Write-Host "`n--- Test: Invalid Remove Config Value Rejected on Create ---" -ForegroundColor Cyan
+$invalidRemoveConfigBody = '{"name":"invalid-remove-config-test","config":{"MultiOpPatchRequestRemoveMultipleMembersFromGroup":"Yes"}}'
+try {
+    $result = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $invalidRemoveConfigBody
+    Test-Result -Success $false -Message "Invalid remove config 'Yes' should be rejected"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "Invalid remove config 'Yes' rejected with 400 Bad Request"
+}
+
+# Test: Invalid REMOVE config value rejected on update
+Write-Host "`n--- Test: Invalid Remove Config Value Rejected on Update ---" -ForegroundColor Cyan
+$invalidRemoveUpdateBody = '{"config":{"MultiOpPatchRequestRemoveMultipleMembersFromGroup":"enabled"}}'
+try {
+    $result = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $invalidRemoveUpdateBody
+    Test-Result -Success $false -Message "Invalid remove config 'enabled' should be rejected on update"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "Invalid remove config 'enabled' rejected with 400 Bad Request"
+}
+
+# Test: Valid REMOVE config values accepted
+Write-Host "`n--- Test: Valid Remove Config Values Accepted ---" -ForegroundColor Cyan
+$validRemoveConfigBody = '{"config":{"MultiOpPatchRequestRemoveMultipleMembersFromGroup":"False"}}'
+$validRemoveResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $validRemoveConfigBody
+Test-Result -Success ($validRemoveResult.config.MultiOpPatchRequestRemoveMultipleMembersFromGroup -eq "False") -Message "Valid remove config 'False' accepted"
+
+# Test: Both flags can be set together
+Write-Host "`n--- Test: Both Config Flags Set Together ---" -ForegroundColor Cyan
+$bothFlagsBody = '{"config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"True","MultiOpPatchRequestRemoveMultipleMembersFromGroup":"True"}}'
+$bothResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $bothFlagsBody
+$bothValid = ($bothResult.config.MultiOpPatchRequestAddMultipleMembersToGroup -eq "True") -and ($bothResult.config.MultiOpPatchRequestRemoveMultipleMembersFromGroup -eq "True")
+Test-Result -Success $bothValid -Message "Both add and remove config flags set together"
+
 # ============================================
 # TEST SECTION 3: SCIM USER OPERATIONS
 # ============================================
@@ -334,8 +369,8 @@ $nfGroupBody = @{schemas=@("urn:ietf:params:scim:schemas:core:2.0:Group");displa
 $nfGroup = Invoke-RestMethod -Uri "$scimBase2/Groups" -Method POST -Headers $headers -Body $nfGroupBody
 $NoFlagGroupId = $nfGroup.id
 
-# Test: Multi-member PATCH should fail without flag
-Write-Host "`n--- Test: Multi-Member PATCH without Flag (Should Fail) ---" -ForegroundColor Cyan
+# Test: Multi-member ADD PATCH should fail without flag
+Write-Host "`n--- Test: Multi-Member ADD PATCH without Flag (Should Fail) ---" -ForegroundColor Cyan
 $noFlagMultiPatch = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
     Operations = @(@{
@@ -347,10 +382,107 @@ $noFlagMultiPatch = @{
 
 try {
     $nfResult = Invoke-RestMethod -Uri "$scimBase2/Groups/$NoFlagGroupId" -Method PATCH -Headers $headers -Body $noFlagMultiPatch
-    Test-Result -Success $false -Message "Multi-member PATCH should fail without flag"
+    Test-Result -Success $false -Message "Multi-member ADD should fail without flag"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($statusCode -eq 400) -Message "Multi-member PATCH without flag rejected with 400 Bad Request"
+    Test-Result -Success ($statusCode -eq 400) -Message "Multi-member ADD without flag rejected with 400 Bad Request"
+}
+
+# ============================================
+# TEST SECTION 5b: MULTI-MEMBER REMOVE CONFIG FLAG
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 5b: MULTI-MEMBER REMOVE CONFIG FLAG" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# First, add members individually to the group in the flag-enabled endpoint (main endpoint with add flag)
+Write-Host "`n--- Setup: Add Members Individually for Remove Test ---" -ForegroundColor Cyan
+foreach ($uid in $multiUserIds) {
+    $addSingleMember = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+        Operations = @(@{ op = "add"; path = "members"; value = @(@{value=$uid}) })
+    } | ConvertTo-Json -Depth 5
+    Invoke-RestMethod -Uri "$scimBase/Groups/$MultiGroupId" -Method PATCH -Headers $headers -Body $addSingleMember | Out-Null
+}
+# Verify members were added
+$groupBeforeRemove = Invoke-RestMethod -Uri "$scimBase/Groups/$MultiGroupId" -Method GET -Headers $headers
+Write-Host "Group has $(@($groupBeforeRemove.members).Count) members before remove test"
+
+# Test: Multi-member REMOVE via value array without flag should fail
+Write-Host "`n--- Test: Multi-Member REMOVE without Flag (Should Fail) ---" -ForegroundColor Cyan
+
+try {
+    # Use no-flag endpoint which has both flags disabled
+    # First add members to no-flag group
+    foreach ($uid in $noFlagUserIds) {
+        $addSingle = @{
+            schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+            Operations = @(@{ op = "add"; path = "members"; value = @(@{value=$uid}) })
+        } | ConvertTo-Json -Depth 5
+        Invoke-RestMethod -Uri "$scimBase2/Groups/$NoFlagGroupId" -Method PATCH -Headers $headers -Body $addSingle | Out-Null
+    }
+    
+    # Build value array with multiple members to remove
+    $removeMultipleMembersPatch = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+        Operations = @(@{ 
+            op = "remove"
+            path = "members"
+            value = @(@{value=$noFlagUserIds[0]}, @{value=$noFlagUserIds[1]})
+        })
+    } | ConvertTo-Json -Depth 5
+    
+    # Now try to remove multiple members via value array
+    Invoke-RestMethod -Uri "$scimBase2/Groups/$NoFlagGroupId" -Method PATCH -Headers $headers -Body $removeMultipleMembersPatch
+    Test-Result -Success $false -Message "Multi-member REMOVE should fail without flag"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "Multi-member REMOVE without flag rejected with 400 Bad Request"
+}
+
+# Create endpoint WITH remove flag enabled
+Write-Host "`n--- Test: Multi-Member REMOVE with Flag=True ---" -ForegroundColor Cyan
+$removeEnabledBody = @{
+    name = "live-test-remove-flag-$(Get-Random)"
+    displayName = "Remove Flag Endpoint"
+    config = @{ MultiOpPatchRequestRemoveMultipleMembersFromGroup = "True" }
+} | ConvertTo-Json
+$removeEnabledEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $removeEnabledBody
+$RemoveFlagEndpointId = $removeEnabledEndpoint.id
+$scimBase3 = "$baseUrl/scim/endpoints/$RemoveFlagEndpointId"
+
+# Create users and group in remove-flag endpoint
+$rfUser1 = Invoke-RestMethod -Uri "$scimBase3/Users" -Method POST -Headers $headers -Body (@{schemas=@("urn:ietf:params:scim:schemas:core:2.0:User");userName="rfuser1@test.com";active=$true} | ConvertTo-Json)
+$rfUser2 = Invoke-RestMethod -Uri "$scimBase3/Users" -Method POST -Headers $headers -Body (@{schemas=@("urn:ietf:params:scim:schemas:core:2.0:User");userName="rfuser2@test.com";active=$true} | ConvertTo-Json)
+$rfGroup = Invoke-RestMethod -Uri "$scimBase3/Groups" -Method POST -Headers $headers -Body (@{schemas=@("urn:ietf:params:scim:schemas:core:2.0:Group");displayName="Remove Flag Group"} | ConvertTo-Json)
+$RemoveFlagGroupId = $rfGroup.id
+
+# Add members individually
+Invoke-RestMethod -Uri "$scimBase3/Groups/$RemoveFlagGroupId" -Method PATCH -Headers $headers -Body (@{schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp");Operations=@(@{op="add";path="members";value=@(@{value=$rfUser1.id})})} | ConvertTo-Json -Depth 5) | Out-Null
+Invoke-RestMethod -Uri "$scimBase3/Groups/$RemoveFlagGroupId" -Method PATCH -Headers $headers -Body (@{schemas=@("urn:ietf:params:scim:api:messages:2.0:PatchOp");Operations=@(@{op="add";path="members";value=@(@{value=$rfUser2.id})})} | ConvertTo-Json -Depth 5) | Out-Null
+
+# Verify members added
+$rfGroupBefore = Invoke-RestMethod -Uri "$scimBase3/Groups/$RemoveFlagGroupId" -Method GET -Headers $headers
+$rfMembersBefore = if ($rfGroupBefore.members) { @($rfGroupBefore.members).Count } else { 0 }
+
+# Build value array with multiple members to remove
+$removeMultiplePatch = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{ 
+        op = "remove"
+        path = "members"
+        value = @(@{value=$rfUser1.id}, @{value=$rfUser2.id})
+    })
+} | ConvertTo-Json -Depth 5
+
+# Now try to remove multiple members via value array with flag enabled
+try {
+    Invoke-RestMethod -Uri "$scimBase3/Groups/$RemoveFlagGroupId" -Method PATCH -Headers $headers -Body $removeMultiplePatch | Out-Null
+    $rfGroupAfter = Invoke-RestMethod -Uri "$scimBase3/Groups/$RemoveFlagGroupId" -Method GET -Headers $headers
+    $rfMembersAfter = if ($rfGroupAfter.members) { @($rfGroupAfter.members).Count } else { 0 }
+    Test-Result -Success ($rfMembersAfter -eq 0) -Message "Multi-member REMOVE with flag=True accepted (removed $rfMembersBefore members)"
+} catch {
+    Test-Result -Success $false -Message "Multi-member REMOVE should succeed with flag=True"
 }
 
 # ============================================
@@ -599,6 +731,7 @@ function Remove-TestResource {
 Write-Host "`n--- Deleting Test Endpoints (Cascade Delete) ---" -ForegroundColor Cyan
 if ($EndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Name "Main Test Endpoint" }
 if ($NoFlagEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$NoFlagEndpointId" -Name "No Flag Endpoint" }
+if ($RemoveFlagEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$RemoveFlagEndpointId" -Name "Remove Flag Endpoint" }
 if ($IsolationEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$IsolationEndpointId" -Name "Isolation Endpoint" }
 if ($InactiveEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$InactiveEndpointId" -Name "Inactive Endpoint" }
 

@@ -1,0 +1,13 @@
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "remove",
+      "path": "members",
+      "value": [
+        {"value": "user-uuid-member-1"},
+        {"value": "user-uuid-member-2"}
+      ]
+    }
+  ]
+}

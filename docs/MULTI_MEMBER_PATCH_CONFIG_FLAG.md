@@ -1,18 +1,27 @@
-# MultiOpPatchRequestAddMultipleMembersToGroup Config Flag
+# Multi-Member PATCH Config Flags
 
-> **Document Purpose**: Complete API operation guide for the `MultiOpPatchRequestAddMultipleMembersToGroup` endpoint configuration flag.
+> **Document Purpose**: Complete API operation guide for the multi-member PATCH endpoint configuration flags.
 > 
 > **Created**: February 3, 2026  
-> **Last Updated**: February 3, 2026 (v2 - Fixed config propagation)
+> **Last Updated**: February 5, 2026 (v3 - Added Remove flag)
 
 ## Overview
 
-This config flag controls whether a single PATCH operation can add multiple members to a group at once. Some SCIM clients (like Azure AD) send multiple members in a single operation, while others expect each member to be added separately.
+These config flags control whether a single PATCH operation can add or remove multiple members from a group at once. Some SCIM clients (like Azure AD / Microsoft Entra) send multiple members in a single operation, while others expect each member to be processed separately.
+
+### Available Flags
+
+| Flag Name | Purpose |
+|-----------|----------|
+| `MultiOpPatchRequestAddMultipleMembersToGroup` | Controls multi-member **add** operations |
+| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | Controls multi-member **remove** operations |
+
+### Flag Values
 
 | Flag Value | Behavior |
 |------------|----------|
-| `"True"` or `true` | Allow adding multiple members in one operation |
-| `"False"`, `false`, or not set | Reject multi-member adds with 400 error |
+| `"True"` or `true` | Allow operation with multiple members |
+| `"False"`, `false`, or not set | Reject multi-member operation with 400 error |
 
 ---
 
@@ -166,6 +175,36 @@ Content-Type: application/json
 ```
 
 **Response (204 No Content):** ✅ Success - all 3 members added in one operation
+
+---
+
+### Step 5b: PATCH Group - Remove Multiple Members (Flag = True ✅)
+
+**With `MultiOpPatchRequestRemoveMultipleMembersFromGroup: "True"`:**
+
+```http
+PATCH /scim/endpoints/cml73w21n0005tcragsxs6ejq/Groups/d40a1eaa-0402-4758-a81e-c3fbf6e663ec
+Authorization: Bearer <access_token>
+Content-Type: application/json
+
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "remove",
+      "path": "members",
+      "value": [
+        { "value": "3663e3a0-6c3f-4b08-8bfc-7cf336df4fe9" },
+        { "value": "c10906d0-2066-48cb-9fc3-19ad7109c7d0" }
+      ]
+    }
+  ]
+}
+```
+
+**Response (204 No Content):** ✅ Success - 2 specified members removed in one operation
+
+> **Note**: The remove flag controls removing multiple members via a value array. Single-member removes (value array with 1 item) and targeted removes (e.g., `path=members[value eq "user-id"]`) are always allowed. Using `path=members` without a value array is not supported - you must specify which members to remove.
 
 ---
 
@@ -347,21 +386,23 @@ Content-Type: application/scim+json
 
 ## Configuration Interface
 
-The flag is defined in `endpoint-config.interface.ts`:
+The flags are defined in `endpoint-config.interface.ts`:
 
 ```typescript
 export const ENDPOINT_CONFIG_FLAGS = {
   MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP: 'MultiOpPatchRequestAddMultipleMembersToGroup',
-  // ... other flags can be added here
+  MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP: 'MultiOpPatchRequestRemoveMultipleMembersFromGroup',
 } as const;
 
 export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP]?: boolean | string;
   [key: string]: unknown;  // Allow additional config flags
 }
 
 export const DEFAULT_ENDPOINT_CONFIG: EndpointConfig = {
   [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP]: false,
+  [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP]: false,
 };
 ```
 
@@ -436,6 +477,8 @@ This script demonstrates:
 
 Tests are located in `endpoint-scim-groups.service.spec.ts`:
 
+### Add Flag Tests
+
 | Test | Description |
 |------|-------------|
 | `should reject adding multiple members when flag is false (default)` | Verifies 400 error when adding 2+ members without flag |
@@ -444,7 +487,19 @@ Tests are located in `endpoint-scim-groups.service.spec.ts`:
 | `should always allow adding single member regardless of flag` | Single-member add always works |
 | `should allow multiple separate add operations with single members each` | Workaround always works |
 
-All 48 endpoint-scim tests pass ✅
+### Remove Flag Tests
+
+| Test | Description |
+|------|-------------|
+| `should reject removing multiple members via value array when flag is false` | Verifies 400 error when removing 2+ members via value array without flag |
+| `should allow removing multiple members via value array when flag is "True"` | Verifies success with string `"True"` |
+| `should allow removing multiple members via value array when flag is boolean true` | Verifies success with boolean `true` |
+| `should always allow removing single member via value array regardless of flag` | Single-member value array always works |
+| `should always allow removing single member via path filter regardless of flag` | Targeted removes (path filter) always work |
+| `should allow multiple separate remove operations with single members each` | Workaround always works |
+| `should reject removing via path=members without value array` | path=members without value array is not supported |
+
+All 55 endpoint-scim tests pass ✅
 
 ---
 

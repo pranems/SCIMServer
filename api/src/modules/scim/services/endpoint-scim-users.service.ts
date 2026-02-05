@@ -70,7 +70,7 @@ export class EndpointScimUsersService {
     });
     
     if (!user) {
-      throw createScimError({ status: 404, detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
     return this.toScimUserResource(user, baseUrl);
@@ -128,7 +128,7 @@ export class EndpointScimUsersService {
     });
     
     if (!user) {
-      throw createScimError({ status: 404, detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
     const updatedData = await this.applyPatchOperationsForEndpoint(user, patchDto, endpointId);
@@ -157,7 +157,7 @@ export class EndpointScimUsersService {
     });
     
     if (!user) {
-      throw createScimError({ status: 404, detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
     await this.assertUniqueIdentifiersForEndpoint(dto.userName, dto.externalId ?? undefined, endpointId, scimId);
@@ -194,7 +194,7 @@ export class EndpointScimUsersService {
     });
 
     if (!user) {
-      throw createScimError({ status: 404, detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
     await this.prisma.scimUser.delete({ where: { id: user.id } });
@@ -206,6 +206,7 @@ export class EndpointScimUsersService {
     if (!schemas || !schemas.includes(requiredSchema)) {
       throw createScimError({
         status: 400,
+        scimType: 'invalidSyntax',
         detail: `Missing required schema '${requiredSchema}'.`
       });
     }
@@ -222,6 +223,7 @@ export class EndpointScimUsersService {
     if (!match) {
       throw createScimError({
         status: 400,
+        scimType: 'invalidFilter',
         detail: `Unsupported filter expression: '${filter}'.`
       });
     }
@@ -239,6 +241,7 @@ export class EndpointScimUsersService {
       default:
         throw createScimError({
           status: 400,
+          scimType: 'invalidFilter',
           detail: `Filtering by attribute '${attribute}' is not supported.`
         });
     }
@@ -302,6 +305,7 @@ export class EndpointScimUsersService {
       if (!['add', 'replace', 'remove'].includes(op || '')) {
         throw createScimError({
           status: 400,
+          scimType: 'invalidValue',
           detail: `Patch operation '${operation.op}' is not supported.`
         });
       }
@@ -332,6 +336,7 @@ export class EndpointScimUsersService {
         } else {
           throw createScimError({
             status: 400,
+            scimType: 'noTarget',
             detail: 'Remove operation requires a path.'
           });
         }
@@ -379,6 +384,7 @@ export class EndpointScimUsersService {
 
     throw createScimError({
       status: 400,
+      scimType: 'invalidValue',
       detail: `${attribute} must be provided as a string.`
     });
   }
@@ -394,6 +400,7 @@ export class EndpointScimUsersService {
 
     throw createScimError({
       status: 400,
+      scimType: 'invalidValue',
       detail: `${attribute} must be provided as a string or null.`
     });
   }
@@ -425,6 +432,7 @@ export class EndpointScimUsersService {
 
     throw createScimError({
       status: 400,
+      scimType: 'invalidValue',
       detail: `Patch operation requires boolean value for active. Received: ${typeof value} "${String(
         value
       )}"`

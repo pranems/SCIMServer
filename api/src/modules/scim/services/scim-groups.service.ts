@@ -75,7 +75,7 @@ export class ScimGroupsService {
   async getGroup(scimId: string, baseUrl: string): Promise<ScimGroupResource> {
   const group = await this.getGroupWithMembers(scimId);
     if (!group) {
-      throw createScimError({ status: 404, detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
     return this.toScimGroupResource(group, baseUrl);
@@ -85,7 +85,7 @@ export class ScimGroupsService {
     try {
       await this.prisma.scimGroup.delete({ where: { scimId } });
     } catch (error) {
-      throw createScimError({ status: 404, detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
   }
 
@@ -126,7 +126,7 @@ export class ScimGroupsService {
 
   const group = await this.getGroupWithMembers(scimId);
     if (!group) {
-      throw createScimError({ status: 404, detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
     let displayName: string = group.displayName;
@@ -147,6 +147,7 @@ export class ScimGroupsService {
         default:
           throw createScimError({
             status: 400,
+            scimType: 'invalidValue',
             detail: `Patch operation '${operation.op}' is not supported.`
           });
       }
@@ -182,7 +183,7 @@ export class ScimGroupsService {
 
     const group = await this.getGroupWithMembers(scimId);
     if (!group) {
-      throw createScimError({ status: 404, detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
     const now = new Date();
@@ -223,6 +224,7 @@ export class ScimGroupsService {
     if (!schemas || !schemas.includes(requiredSchema)) {
       throw createScimError({
         status: 400,
+        scimType: 'invalidSyntax',
         detail: `Missing required schema '${requiredSchema}'.`
       });
     }
@@ -254,6 +256,7 @@ export class ScimGroupsService {
     if (!match) {
       throw createScimError({
         status: 400,
+        scimType: 'invalidFilter',
         detail: `Unsupported filter expression: '${filter}'.`
       });
     }
@@ -271,6 +274,7 @@ export class ScimGroupsService {
       if (typeof operation.value !== 'string') {
         throw createScimError({
           status: 400,
+          scimType: 'invalidValue',
           detail: 'Replace operation for displayName requires a string value.'
         });
       }
@@ -282,6 +286,7 @@ export class ScimGroupsService {
       if (!Array.isArray(operation.value)) {
         throw createScimError({
           status: 400,
+          scimType: 'invalidValue',
           detail: 'Replace operation for members requires an array value.'
         });
       }
@@ -292,6 +297,7 @@ export class ScimGroupsService {
 
     throw createScimError({
       status: 400,
+      scimType: 'invalidPath',
       detail: `Patch path '${operation.path ?? ''}' is not supported.`
     });
   }
@@ -304,6 +310,7 @@ export class ScimGroupsService {
     if (path && path !== 'members') {
       throw createScimError({
         status: 400,
+        scimType: 'invalidPath',
         detail: `Add operation path '${operation.path ?? ''}' is not supported.`
       });
     }
@@ -322,6 +329,7 @@ export class ScimGroupsService {
     if (!operation.path) {
       throw createScimError({
         status: 400,
+        scimType: 'noTarget',
         detail: 'Remove operation requires a path.'
       });
     }
@@ -330,6 +338,7 @@ export class ScimGroupsService {
     if (!match) {
       throw createScimError({
         status: 400,
+        scimType: 'invalidPath',
         detail: `Remove operation path '${operation.path}' is not supported.`
       });
     }

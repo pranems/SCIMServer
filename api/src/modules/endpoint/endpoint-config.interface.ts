@@ -12,6 +12,18 @@ export const ENDPOINT_CONFIG_FLAGS = {
   MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP: 'MultiOpPatchRequestAddMultipleMembersToGroup',
   
   /**
+   * When true, allows a single PATCH operation to remove multiple members from a group.
+   * When false (default), each member removal requires a separate PATCH operation.
+   */
+  MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP: 'MultiOpPatchRequestRemoveMultipleMembersFromGroup',
+  
+  /**
+   * When true (default), allows removing all members from a group via path=members without value array.
+   * When false, requires explicit member specification in value array or path filter.
+   */
+  PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS: 'PatchOpAllowRemoveAllMembers',
+  
+  /**
    * When true, excludes the 'meta' attribute from responses.
    */
   EXCLUDE_META: 'excludeMeta',
@@ -66,6 +78,22 @@ export interface EndpointConfig {
    * Example config: { "MultiOpPatchRequestAddMultipleMembersToGroup": "True" }
    */
   [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP]?: boolean | string;
+
+  /**
+   * When true, allows a single PATCH operation to remove multiple members from a group.
+   * When false (default), each member removal requires a separate PATCH operation.
+   * 
+   * Example config: { "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True" }
+   */
+  [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP]?: boolean | string;
+
+  /**
+   * When true (default), allows removing all members via path=members without value array.
+   * When false, requires explicit member specification in value array or path filter.
+   * 
+   * Example config: { "PatchOpAllowRemoveAllMembers": "False" }
+   */
+  [ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS]?: boolean | string;
 
   /**
    * When true, excludes the 'meta' attribute from responses.
@@ -139,6 +167,8 @@ export function getConfigString(config: EndpointConfig | undefined, key: string)
  */
 export const DEFAULT_ENDPOINT_CONFIG: EndpointConfig = {
   [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP]: false,
+  [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP]: false,
+  [ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS]: true,
   [ENDPOINT_CONFIG_FLAGS.EXCLUDE_META]: false,
   [ENDPOINT_CONFIG_FLAGS.EXCLUDE_SCHEMAS]: false,
   [ENDPOINT_CONFIG_FLAGS.INCLUDE_ENTERPRISE_SCHEMA]: false,
@@ -162,21 +192,61 @@ export function validateEndpointConfig(config: Record<string, any> | undefined):
   if (!config) return;
 
   // Validate MultiOpPatchRequestAddMultipleMembersToGroup
-  const multiOpFlag = config[ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP];
-  if (multiOpFlag !== undefined) {
-    if (typeof multiOpFlag === 'boolean') {
+  const multiOpAddFlag = config[ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP];
+  if (multiOpAddFlag !== undefined) {
+    if (typeof multiOpAddFlag === 'boolean') {
       // Boolean values are always valid
-    } else if (typeof multiOpFlag === 'string') {
-      if (!VALID_BOOLEAN_VALUES.includes(multiOpFlag.toLowerCase())) {
+    } else if (typeof multiOpAddFlag === 'string') {
+      if (!VALID_BOOLEAN_VALUES.includes(multiOpAddFlag.toLowerCase())) {
         throw new Error(
-          `Invalid value "${multiOpFlag}" for config flag "${ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP}". ` +
+          `Invalid value "${multiOpAddFlag}" for config flag "${ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP}". ` +
           `Allowed values: "True", "False", true, false, "1", "0".`
         );
       }
     } else {
       throw new Error(
         `Invalid type for config flag "${ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP}". ` +
-        `Expected boolean or string ("True"/"False"), got ${typeof multiOpFlag}.`
+        `Expected boolean or string ("True"/"False"), got ${typeof multiOpAddFlag}.`
+      );
+    }
+  }
+
+  // Validate MultiOpPatchRequestRemoveMultipleMembersFromGroup
+  const multiOpRemoveFlag = config[ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP];
+  if (multiOpRemoveFlag !== undefined) {
+    if (typeof multiOpRemoveFlag === 'boolean') {
+      // Boolean values are always valid
+    } else if (typeof multiOpRemoveFlag === 'string') {
+      if (!VALID_BOOLEAN_VALUES.includes(multiOpRemoveFlag.toLowerCase())) {
+        throw new Error(
+          `Invalid value "${multiOpRemoveFlag}" for config flag "${ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP}". ` +
+          `Allowed values: "True", "False", true, false, "1", "0".`
+        );
+      }
+    } else {
+      throw new Error(
+        `Invalid type for config flag "${ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP}". ` +
+        `Expected boolean or string ("True"/"False"), got ${typeof multiOpRemoveFlag}.`
+      );
+    }
+  }
+
+  // Validate PatchOpAllowRemoveAllMembers
+  const allowRemoveAllFlag = config[ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS];
+  if (allowRemoveAllFlag !== undefined) {
+    if (typeof allowRemoveAllFlag === 'boolean') {
+      // Boolean values are always valid
+    } else if (typeof allowRemoveAllFlag === 'string') {
+      if (!VALID_BOOLEAN_VALUES.includes(allowRemoveAllFlag.toLowerCase())) {
+        throw new Error(
+          `Invalid value "${allowRemoveAllFlag}" for config flag "${ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS}". ` +
+          `Allowed values: "True", "False", true, false, "1", "0".`
+        );
+      }
+    } else {
+      throw new Error(
+        `Invalid type for config flag "${ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS}". ` +
+        `Expected boolean or string ("True"/"False"), got ${typeof allowRemoveAllFlag}.`
       );
     }
   }

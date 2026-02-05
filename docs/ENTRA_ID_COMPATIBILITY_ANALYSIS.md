@@ -52,7 +52,7 @@ if (tokenRequest.grant_type !== 'client_credentials') {
 | Create Group | Sends displayName, externalId | ✅ | Returns 201 with empty members |
 | Query by displayName | `filter=displayName eq "..."` | ✅ | Entra queries groups this way |
 | Add Members (PATCH) | Multiple members in single operation | ✅ | Via `MultiOpPatchRequestAddMultipleMembersToGroup` config |
-| Remove Members (PATCH) | Single member removal | ✅ | Standard SCIM PATCH |
+| Remove Members (PATCH) | Multiple members in single operation | ✅ | Via `MultiOpPatchRequestRemoveMultipleMembersFromGroup` config |
 | Delete Group | `DELETE /Groups/{id}` | ✅ | Returns 204 |
 
 ### 4. PATCH Operation Case Insensitivity ✅

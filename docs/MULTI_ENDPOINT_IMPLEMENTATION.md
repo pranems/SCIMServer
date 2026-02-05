@@ -232,11 +232,13 @@ This pattern is more reliable than AsyncLocalStorage across async boundaries in 
 // Centralized config flag constants
 export const ENDPOINT_CONFIG_FLAGS = {
   MULTI_OP_PATCH_ADD_MULTI_MEMBERS: 'MultiOpPatchRequestAddMultipleMembersToGroup',
+  MULTI_OP_PATCH_REMOVE_MULTI_MEMBERS: 'MultiOpPatchRequestRemoveMultipleMembersFromGroup',
 } as const;
 
 // Type-safe interface
 export interface EndpointConfig {
   MultiOpPatchRequestAddMultipleMembersToGroup?: string | boolean;
+  MultiOpPatchRequestRemoveMultipleMembersFromGroup?: string | boolean;
   [key: string]: unknown;
 }
 
@@ -277,7 +279,8 @@ curl -X POST http://localhost:3000/scim/admin/endpoints \
     "displayName": "Endpoint Alpha",
     "description": "First test endpoint",
     "config": {
-      "MultiOpPatchRequestAddMultipleMembersToGroup": "true"
+      "MultiOpPatchRequestAddMultipleMembersToGroup": "true",
+      "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "true"
     }
   }'
 

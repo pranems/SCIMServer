@@ -62,6 +62,7 @@ This folder contains complete documentation for implementing Multi-Endpoint supp
 ### For Config Flag Details
 👉 Read this: [MULTI_MEMBER_PATCH_CONFIG_FLAG.md](MULTI_MEMBER_PATCH_CONFIG_FLAG.md)
 - MultiOpPatchRequestAddMultipleMembersToGroup flag
+- MultiOpPatchRequestRemoveMultipleMembersFromGroup flag
 - Usage examples
 - Azure AD compatibility
 

@@ -13,6 +13,12 @@ describe('endpoint-config.interface', () => {
       expect(ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP).toBe(
         'MultiOpPatchRequestAddMultipleMembersToGroup'
       );
+      expect(ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP).toBe(
+        'MultiOpPatchRequestRemoveMultipleMembersFromGroup'
+      );
+      expect(ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS).toBe(
+        'PatchOpAllowRemoveAllMembers'
+      );
       expect(ENDPOINT_CONFIG_FLAGS.EXCLUDE_META).toBe('excludeMeta');
       expect(ENDPOINT_CONFIG_FLAGS.EXCLUDE_SCHEMAS).toBe('excludeSchemas');
       expect(ENDPOINT_CONFIG_FLAGS.CUSTOM_SCHEMA_URN).toBe('customSchemaUrn');
@@ -256,6 +262,222 @@ describe('endpoint-config.interface', () => {
       });
     });
 
+    describe('MultiOpPatchRequestRemoveMultipleMembersFromGroup validation', () => {
+      it('should accept boolean true', () => {
+        expect(() =>
+          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: true })
+        ).not.toThrow();
+      });
+
+      it('should accept boolean false', () => {
+        expect(() =>
+          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: false })
+        ).not.toThrow();
+      });
+
+      it('should accept string "true"', () => {
+        expect(() =>
+          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'true' })
+        ).not.toThrow();
+      });
+
+      it('should accept string "True"', () => {
+        expect(() =>
+          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'True' })
+        ).not.toThrow();
+      });
+
+      it('should accept string "false"', () => {
+        expect(() =>
+          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'false' })
+        ).not.toThrow();
+      });
+
+      it('should accept string "False"', () => {
+        expect(() =>
+          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'False' })
+        ).not.toThrow();
+      });
+
+      it('should accept string "1"', () => {
+        expect(() =>
+          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: '1' })
+        ).not.toThrow();
+      });
+
+      it('should accept string "0"', () => {
+        expect(() =>
+          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: '0' })
+        ).not.toThrow();
+      });
+
+      it('should throw for invalid string "Yes"', () => {
+        expect(() =>
+          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'Yes' })
+        ).toThrow(/Invalid value/);
+      });
+
+      it('should throw for invalid string "No"', () => {
+        expect(() =>
+          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'No' })
+        ).toThrow(/Invalid value/);
+      });
+
+      it('should throw for invalid string "enabled"', () => {
+        expect(() =>
+          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'enabled' })
+        ).toThrow(/Invalid value/);
+      });
+
+      it('should throw for number value', () => {
+        expect(() =>
+          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 123 })
+        ).toThrow(/Invalid type/);
+      });
+
+      it('should throw for object value', () => {
+        expect(() =>
+          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: { enabled: true } })
+        ).toThrow(/Invalid type/);
+      });
+
+      it('should throw for array value', () => {
+        expect(() =>
+          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: ['true'] })
+        ).toThrow(/Invalid type/);
+      });
+
+      it('should include flag name in error message', () => {
+        try {
+          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'invalid' });
+          fail('Expected error');
+        } catch (e) {
+          expect((e as Error).message).toContain('MultiOpPatchRequestRemoveMultipleMembersFromGroup');
+        }
+      });
+
+      it('should include allowed values in error message', () => {
+        try {
+          validateEndpointConfig({ MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'invalid' });
+          fail('Expected error');
+        } catch (e) {
+          expect((e as Error).message).toContain('Allowed values');
+        }
+      });
+    });
+
+    describe('Both flags together', () => {
+      it('should accept both flags set to valid values', () => {
+        expect(() =>
+          validateEndpointConfig({
+            MultiOpPatchRequestAddMultipleMembersToGroup: 'True',
+            MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'True',
+          })
+        ).not.toThrow();
+      });
+
+      it('should reject if add flag is invalid even if remove flag is valid', () => {
+        expect(() =>
+          validateEndpointConfig({
+            MultiOpPatchRequestAddMultipleMembersToGroup: 'invalid',
+            MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'True',
+          })
+        ).toThrow(/MultiOpPatchRequestAddMultipleMembersToGroup/);
+      });
+
+      it('should reject if remove flag is invalid even if add flag is valid', () => {
+        expect(() =>
+          validateEndpointConfig({
+            MultiOpPatchRequestAddMultipleMembersToGroup: 'True',
+            MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'invalid',
+          })
+        ).toThrow(/MultiOpPatchRequestRemoveMultipleMembersFromGroup/);
+      });
+    });
+
+    describe('PatchOpAllowRemoveAllMembers validation', () => {
+      it('should accept boolean true', () => {
+        expect(() =>
+          validateEndpointConfig({ PatchOpAllowRemoveAllMembers: true })
+        ).not.toThrow();
+      });
+
+      it('should accept boolean false', () => {
+        expect(() =>
+          validateEndpointConfig({ PatchOpAllowRemoveAllMembers: false })
+        ).not.toThrow();
+      });
+
+      it('should accept string "true"', () => {
+        expect(() =>
+          validateEndpointConfig({ PatchOpAllowRemoveAllMembers: 'true' })
+        ).not.toThrow();
+      });
+
+      it('should accept string "True"', () => {
+        expect(() =>
+          validateEndpointConfig({ PatchOpAllowRemoveAllMembers: 'True' })
+        ).not.toThrow();
+      });
+
+      it('should accept string "false"', () => {
+        expect(() =>
+          validateEndpointConfig({ PatchOpAllowRemoveAllMembers: 'false' })
+        ).not.toThrow();
+      });
+
+      it('should accept string "False"', () => {
+        expect(() =>
+          validateEndpointConfig({ PatchOpAllowRemoveAllMembers: 'False' })
+        ).not.toThrow();
+      });
+
+      it('should accept string "1"', () => {
+        expect(() =>
+          validateEndpointConfig({ PatchOpAllowRemoveAllMembers: '1' })
+        ).not.toThrow();
+      });
+
+      it('should accept string "0"', () => {
+        expect(() =>
+          validateEndpointConfig({ PatchOpAllowRemoveAllMembers: '0' })
+        ).not.toThrow();
+      });
+
+      it('should throw for invalid string "Yes"', () => {
+        expect(() =>
+          validateEndpointConfig({ PatchOpAllowRemoveAllMembers: 'Yes' })
+        ).toThrow(/Invalid value/);
+      });
+
+      it('should throw for invalid string "No"', () => {
+        expect(() =>
+          validateEndpointConfig({ PatchOpAllowRemoveAllMembers: 'No' })
+        ).toThrow(/Invalid value/);
+      });
+
+      it('should throw for number value', () => {
+        expect(() =>
+          validateEndpointConfig({ PatchOpAllowRemoveAllMembers: 123 })
+        ).toThrow(/Invalid type/);
+      });
+
+      it('should throw for object value', () => {
+        expect(() =>
+          validateEndpointConfig({ PatchOpAllowRemoveAllMembers: { enabled: true } })
+        ).toThrow(/Invalid type/);
+      });
+
+      it('should include flag name in error message', () => {
+        try {
+          validateEndpointConfig({ PatchOpAllowRemoveAllMembers: 'invalid' });
+          fail('Expected error');
+        } catch (e) {
+          expect((e as Error).message).toContain('PatchOpAllowRemoveAllMembers');
+        }
+      });
+    });
+
     it('should not validate other config flags (yet)', () => {
       // Other flags are not validated yet, so they should pass
       expect(() =>
@@ -271,6 +493,8 @@ describe('endpoint-config.interface', () => {
   describe('DEFAULT_ENDPOINT_CONFIG', () => {
     it('should have expected default values', () => {
       expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP]).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP]).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS]).toBe(true);
       expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.EXCLUDE_META]).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.EXCLUDE_SCHEMAS]).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.INCLUDE_ENTERPRISE_SCHEMA]).toBe(false);

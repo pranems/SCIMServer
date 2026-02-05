@@ -512,6 +512,237 @@ describe('EndpointScimGroupsService', () => {
         expect(mockPrismaService.groupMember.createMany).toHaveBeenCalled();
       });
     });
+
+    describe('MultiOpPatchRequestRemoveMultipleMembersFromGroup config flag', () => {
+      const groupWithMultipleMembers = {
+        ...mockGroup,
+        members: [
+          { id: 'member-1', groupId: mockGroup.id, userId: 'user-1', value: 'user-1', display: null, type: null, createdAt: new Date() },
+          { id: 'member-2', groupId: mockGroup.id, userId: 'user-2', value: 'user-2', display: null, type: null, createdAt: new Date() },
+          { id: 'member-3', groupId: mockGroup.id, userId: 'user-3', value: 'user-3', display: null, type: null, createdAt: new Date() },
+        ],
+      };
+
+      it('should reject removing multiple members via value array when flag is false', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'remove',
+              path: 'members',
+              value: [
+                { value: 'user-1' },
+                { value: 'user-2' },
+              ],
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMultipleMembers);
+        // Default config returns empty object (flag is false)
+        mockEndpointContext.getConfig.mockReturnValue({});
+
+        await expect(
+          service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id)
+        ).rejects.toThrow(HttpException);
+
+        // Should not attempt to update group
+        expect(mockPrismaService.groupMember.deleteMany).not.toHaveBeenCalled();
+      });
+
+      it('should allow removing multiple members via value array when flag is "True"', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'remove',
+              path: 'members',
+              value: [
+                { value: 'user-1' },
+                { value: 'user-2' },
+              ],
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMultipleMembers);
+        mockEndpointContext.getConfig.mockReturnValue({
+          MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'True',
+        });
+
+        await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id);
+
+        expect(mockPrismaService.groupMember.deleteMany).toHaveBeenCalled();
+      });
+
+      it('should allow removing multiple members via value array when flag is boolean true', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'remove',
+              path: 'members',
+              value: [
+                { value: 'user-1' },
+                { value: 'user-2' },
+              ],
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMultipleMembers);
+        mockEndpointContext.getConfig.mockReturnValue({
+          MultiOpPatchRequestRemoveMultipleMembersFromGroup: true,
+        });
+
+        await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id);
+
+        expect(mockPrismaService.groupMember.deleteMany).toHaveBeenCalled();
+      });
+
+      it('should always allow removing single member via value array regardless of flag', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'remove',
+              path: 'members',
+              value: [
+                { value: 'user-1' },
+              ],
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMultipleMembers);
+        // Flag is false (default)
+        mockEndpointContext.getConfig.mockReturnValue({});
+
+        await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id);
+
+        // Single member remove should succeed
+        expect(mockPrismaService.groupMember.deleteMany).toHaveBeenCalled();
+      });
+
+      it('should always allow removing single member via path filter regardless of flag', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'remove',
+              path: 'members[value eq "user-1"]',
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMultipleMembers);
+        // Flag is false (default)
+        mockEndpointContext.getConfig.mockReturnValue({});
+
+        await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id);
+
+        // Single member remove should succeed
+        expect(mockPrismaService.groupMember.deleteMany).toHaveBeenCalled();
+      });
+
+      it('should allow multiple separate remove operations with single members each', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'remove',
+              path: 'members',
+              value: [{ value: 'user-1' }],
+            },
+            {
+              op: 'remove',
+              path: 'members',
+              value: [{ value: 'user-2' }],
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMultipleMembers);
+        // Flag is false
+        mockEndpointContext.getConfig.mockReturnValue({});
+
+        await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id);
+
+        // Multiple operations with single member each should succeed
+        expect(mockPrismaService.groupMember.deleteMany).toHaveBeenCalled();
+      });
+
+      it('should allow removing via path=members without value array when PatchOpAllowRemoveAllMembers is true (default)', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'remove',
+              path: 'members',
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMultipleMembers);
+        // Default config - PatchOpAllowRemoveAllMembers defaults to true
+        mockEndpointContext.getConfig.mockReturnValue({});
+
+        await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id);
+
+        // Should remove all members (empty members array)
+        expect(mockPrismaService.groupMember.deleteMany).toHaveBeenCalled();
+        // createMany should not be called since no members remain
+        expect(mockPrismaService.groupMember.createMany).not.toHaveBeenCalled();
+      });
+
+      it('should reject removing via path=members without value array when PatchOpAllowRemoveAllMembers is false', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'remove',
+              path: 'members',
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMultipleMembers);
+        mockEndpointContext.getConfig.mockReturnValue({
+          PatchOpAllowRemoveAllMembers: false,
+        });
+
+        // path=members without value array should be rejected
+        await expect(
+          service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id)
+        ).rejects.toThrow(HttpException);
+
+        expect(mockPrismaService.groupMember.deleteMany).not.toHaveBeenCalled();
+      });
+
+      it('should reject removing via path=members without value array when PatchOpAllowRemoveAllMembers is "False"', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'remove',
+              path: 'members',
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithMultipleMembers);
+        mockEndpointContext.getConfig.mockReturnValue({
+          PatchOpAllowRemoveAllMembers: 'False',
+        });
+
+        // path=members without value array should be rejected
+        await expect(
+          service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id)
+        ).rejects.toThrow(HttpException);
+
+        expect(mockPrismaService.groupMember.deleteMany).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('replaceGroupForEndpoint', () => {

@@ -761,6 +761,25 @@ Partial update using SCIM PATCH operations.
 }
 ```
 
+**Request Body - Remove Multiple Members (via value array):**
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "remove",
+      "path": "members",
+      "value": [
+        {"value": "user-uuid-to-remove-1"},
+        {"value": "user-uuid-to-remove-2"}
+      ]
+    }
+  ]
+}
+```
+
+> **Note:** Removing multiple members via a value array requires `MultiOpPatchRequestRemoveMultipleMembersFromGroup: "true"` in endpoint config. Single-member removes (value array with 1 item) and targeted removes (`path=members[value eq "..."]`) are always allowed.
+
 **Request Body - Replace displayName:**
 ```json
 {
@@ -897,6 +916,7 @@ Configuration flags control endpoint-specific behavior.
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
 | `MultiOpPatchRequestAddMultipleMembersToGroup` | string/boolean | `false` | Allow adding multiple members in single PATCH operation |
+| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | string/boolean | `false` | Allow removing multiple members in single PATCH operation |
 | `excludeMeta` | boolean | `false` | Exclude `meta` attribute from responses |
 | `excludeSchemas` | boolean | `false` | Exclude `schemas` attribute from responses |
 | `customSchemaUrn` | string | - | Custom schema URN prefix |
@@ -913,7 +933,8 @@ curl -X POST http://localhost:3000/scim/admin/endpoints \
     "name": "azure-ad-compatible",
     "displayName": "Azure AD Compatible Endpoint",
     "config": {
-      "MultiOpPatchRequestAddMultipleMembersToGroup": "false",
+      "MultiOpPatchRequestAddMultipleMembersToGroup": "true",
+      "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "true",
       "strictMode": true
     }
   }'
