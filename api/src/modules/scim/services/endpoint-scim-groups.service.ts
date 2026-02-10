@@ -28,6 +28,7 @@ interface ListGroupsParams {
 interface GroupWithMembers {
   id: string;
   scimId: string;
+  externalId: string | null;
   displayName: string;
   rawPayload: string | null;
   meta: string | null;
@@ -51,6 +52,19 @@ export class EndpointScimGroupsService {
   async createGroupForEndpoint(dto: CreateGroupDto, baseUrl: string, endpointId: string): Promise<ScimGroupResource> {
     this.ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
 
+    // Check for duplicate displayName within the endpoint (case-insensitive)
+    await this.assertUniqueDisplayName(dto.displayName, endpointId);
+
+    // Extract externalId from the DTO (it may come as a top-level property from Entra)
+    const externalId = typeof (dto as Record<string, unknown>).externalId === 'string'
+      ? (dto as Record<string, unknown>).externalId as string
+      : null;
+
+    // Check for duplicate externalId within the endpoint
+    if (externalId) {
+      await this.assertUniqueExternalId(externalId, endpointId);
+    }
+
     const now = new Date();
     const scimId = dto.id && typeof dto.id === 'string' ? dto.id : randomUUID();
 
@@ -59,6 +73,7 @@ export class EndpointScimGroupsService {
     const group = await this.prisma.scimGroup.create({
       data: {
         scimId,
+        externalId,
         displayName: dto.displayName,
         rawPayload: JSON.stringify(sanitizedPayload),
         meta: JSON.stringify({
@@ -97,24 +112,37 @@ export class EndpointScimGroupsService {
       count = MAX_COUNT;
     }
 
-    const filterWhere = this.buildFilter(filter);
+    const { dbWhere, caseInsensitiveDisplayName, caseInsensitiveExternalId } = this.buildFilter(filter);
     const where: Prisma.ScimGroupWhereInput = {
-      ...filterWhere,
+      ...dbWhere,
       endpointId
     };
 
-    const [totalResults, groups] = await Promise.all([
-      this.prisma.scimGroup.count({ where }),
-      this.prisma.scimGroup.findMany({
-        where,
-        skip: Math.max(startIndex - 1, 0),
-        take: Math.max(Math.min(count, MAX_COUNT), 0),
-        orderBy: { createdAt: 'asc' },
-        include: { members: true }
-      })
-    ]);
+    // Fetch groups from DB (may fetch all for endpoint if case-insensitive filter needs in-code matching)
+    let allGroups = await this.prisma.scimGroup.findMany({
+      where,
+      orderBy: { createdAt: 'asc' },
+      include: { members: true }
+    });
 
-    const resources = groups.map((g) => this.toScimGroupResource(g as GroupWithMembers, baseUrl));
+    // Apply case-insensitive displayName filter in code
+    // (SQLite doesn't support Prisma's mode: 'insensitive')
+    if (caseInsensitiveDisplayName) {
+      const lowerFilter = caseInsensitiveDisplayName.toLowerCase();
+      allGroups = allGroups.filter(g => g.displayName.toLowerCase() === lowerFilter);
+    }
+
+    // Apply case-insensitive externalId filter in code (RFC 7643 §2.1)
+    if (caseInsensitiveExternalId) {
+      const lowerFilter = caseInsensitiveExternalId.toLowerCase();
+      allGroups = allGroups.filter(g => g.externalId?.toLowerCase() === lowerFilter);
+    }
+
+    const totalResults = allGroups.length;
+    const skip = Math.max(startIndex - 1, 0);
+    const take = Math.max(Math.min(count, MAX_COUNT), 0);
+    const paginatedGroups = allGroups.slice(skip, skip + take);
+    const resources = paginatedGroups.map((g) => this.toScimGroupResource(g as GroupWithMembers, baseUrl));
 
     return {
       schemas: [SCIM_LIST_RESPONSE_SCHEMA],
@@ -143,13 +171,15 @@ export class EndpointScimGroupsService {
       : getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS);
 
     let displayName: string = group.displayName;
+    let externalId: string | null = group.externalId ?? null;
     let memberDtos: GroupMemberDto[] = this.memberEntitiesToDtos(group.members);
+    let rawPayload = this.parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}'));
 
     for (const operation of dto.Operations) {
       const op = operation.op?.toLowerCase();
       switch (op) {
         case 'replace':
-          ({ displayName, members: memberDtos } = this.handleReplace(operation, displayName, memberDtos));
+          ({ displayName, externalId, members: memberDtos, rawPayload } = this.handleReplace(operation, displayName, externalId, memberDtos, rawPayload));
           break;
         case 'add':
           memberDtos = this.handleAdd(operation, memberDtos, allowMultiMemberAdd);
@@ -171,6 +201,8 @@ export class EndpointScimGroupsService {
         where: { id: group.id },
         data: {
           displayName,
+          externalId,
+          rawPayload: JSON.stringify(rawPayload),
           meta: JSON.stringify({
             ...this.parseJson<Record<string, unknown>>(String(group.meta ?? '{}')),
             lastModified: new Date().toISOString()
@@ -203,11 +235,16 @@ export class EndpointScimGroupsService {
     const now = new Date();
     const meta = this.parseJson<Record<string, unknown>>(String(group.meta ?? '{}'));
 
+    const newExternalId = typeof (dto as Record<string, unknown>).externalId === 'string'
+      ? (dto as Record<string, unknown>).externalId as string
+      : null;
+
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       await tx.scimGroup.update({
         where: { id: group.id },
         data: {
           displayName: dto.displayName,
+          externalId: newExternalId,
           rawPayload: JSON.stringify(this.extractAdditionalAttributes(dto)),
           meta: JSON.stringify({
             ...meta,
@@ -251,8 +288,66 @@ export class EndpointScimGroupsService {
 
   // ===== Private Helper Methods =====
 
+  /**
+   * Assert displayName uniqueness within the endpoint (case-insensitive).
+   * Per SCIM spec, duplicate groups should be rejected with 409 Conflict.
+   */
+  private async assertUniqueDisplayName(
+    displayName: string,
+    endpointId: string,
+    excludeScimId?: string
+  ): Promise<void> {
+    // Fetch all groups for the endpoint and check case-insensitively
+    // (SQLite doesn't support mode: 'insensitive' in Prisma)
+    const filters: Prisma.ScimGroupWhereInput = { endpointId };
+    if (excludeScimId) {
+      filters.NOT = { scimId: excludeScimId };
+    }
+
+    const groups = await this.prisma.scimGroup.findMany({
+      where: filters,
+      select: { scimId: true, displayName: true }
+    });
+
+    const lowerName = displayName.toLowerCase();
+    const conflict = groups.find(g => g.displayName.toLowerCase() === lowerName);
+
+    if (conflict) {
+      throw createScimError({
+        status: 409,
+        scimType: 'uniqueness',
+        detail: `A group with displayName '${displayName}' already exists.`
+      });
+    }
+  }
+
+  /**
+   * Assert externalId uniqueness within the endpoint.
+   * Per SCIM spec, duplicate externalId should be rejected with 409 Conflict.
+   */
+  private async assertUniqueExternalId(
+    externalId: string,
+    endpointId: string,
+    excludeScimId?: string
+  ): Promise<void> {
+    const filters: Prisma.ScimGroupWhereInput = { endpointId, externalId };
+    if (excludeScimId) {
+      filters.NOT = { scimId: excludeScimId };
+    }
+
+    const existing = await this.prisma.scimGroup.findFirst({ where: filters });
+    if (existing) {
+      throw createScimError({
+        status: 409,
+        scimType: 'uniqueness',
+        detail: `A group with externalId '${externalId}' already exists.`
+      });
+    }
+  }
+
   private ensureSchema(schemas: string[] | undefined, requiredSchema: string): void {
-    if (!schemas || !schemas.includes(requiredSchema)) {
+    const requiredLower = requiredSchema.toLowerCase();
+    if (!schemas || !schemas.some(s => s.toLowerCase() === requiredLower)) {
       throw createScimError({
         status: 400,
         scimType: 'invalidSyntax',
@@ -270,6 +365,7 @@ export class EndpointScimGroupsService {
       select: {
         id: true,
         scimId: true,
+        externalId: true,
         displayName: true,
         rawPayload: true,
         meta: true,
@@ -280,12 +376,13 @@ export class EndpointScimGroupsService {
     }) as unknown as Promise<GroupWithMembers | null>;
   }
 
-  private buildFilter(filter?: string): Prisma.ScimGroupWhereInput {
+  private buildFilter(filter?: string): { dbWhere: Prisma.ScimGroupWhereInput; caseInsensitiveDisplayName?: string; caseInsensitiveExternalId?: string } {
     if (!filter) {
-      return {};
+      return { dbWhere: {} };
     }
 
-    const regex = /(displayName)\s+eq\s+"?([^"]+)"?/i;
+    // RFC 7644 §3.4.2.2: attribute names and operators are case-insensitive
+    const regex = /(\w+(?:\.\w+)*)\s+eq\s+"?([^"]+)"?/i;
     const match = filter.match(regex);
     if (!match) {
       throw createScimError({
@@ -295,16 +392,76 @@ export class EndpointScimGroupsService {
       });
     }
 
-    return { displayName: match[2] };
+    const attribute = match[1].toLowerCase();
+    const value = match[2];
+
+    switch (attribute) {
+      case 'displayname':
+        // Case-insensitive displayName filter
+        // SQLite doesn't support Prisma's mode: 'insensitive', so filter in code
+        return { dbWhere: {}, caseInsensitiveDisplayName: value };
+      case 'externalid':
+        // Case-insensitive externalId filter (RFC 7643 §2.1)
+        // SQLite doesn't support Prisma's mode: 'insensitive', so filter in code
+        return { dbWhere: {}, caseInsensitiveExternalId: value };
+      default:
+        throw createScimError({
+          status: 400,
+          scimType: 'invalidFilter',
+          detail: `Filtering by attribute '${match[1]}' is not supported.`
+        });
+    }
   }
 
   private handleReplace(
     operation: PatchGroupDto['Operations'][number],
     currentDisplayName: string,
-    members: GroupMemberDto[]
-  ): { displayName: string; members: GroupMemberDto[] } {
+    currentExternalId: string | null,
+    members: GroupMemberDto[],
+    rawPayload: Record<string, unknown> = {}
+  ): { displayName: string; externalId: string | null; members: GroupMemberDto[]; rawPayload: Record<string, unknown> } {
     const path = operation.path?.toLowerCase();
-    if (!path || path === 'displayname') {
+
+    // No path — value is either a string (displayName) or an object with attribute(s)
+    if (!path) {
+      if (typeof operation.value === 'string') {
+        return { displayName: operation.value, externalId: currentExternalId, members, rawPayload };
+      }
+      if (typeof operation.value === 'object' && operation.value !== null) {
+        const obj = operation.value as Record<string, unknown>;
+        let newDisplayName = currentDisplayName;
+        let newExternalId = currentExternalId;
+        let newMembers = members;
+        const updatedPayload = { ...rawPayload };
+
+        if (typeof obj.displayName === 'string') {
+          newDisplayName = obj.displayName;
+        }
+        if ('externalId' in obj) {
+          newExternalId = typeof obj.externalId === 'string' ? obj.externalId : null;
+        }
+        if (Array.isArray(obj.members)) {
+          newMembers = (obj.members as unknown[]).map((m) => this.toMemberDto(m));
+          newMembers = this.ensureUniqueMembers(newMembers);
+        }
+
+        // Store any other attributes in rawPayload
+        for (const [key, val] of Object.entries(obj)) {
+          if (key !== 'displayName' && key !== 'externalId' && key !== 'members' && key !== 'schemas') {
+            updatedPayload[key] = val;
+          }
+        }
+
+        return { displayName: newDisplayName, externalId: newExternalId, members: newMembers, rawPayload: updatedPayload };
+      }
+      throw createScimError({
+        status: 400,
+        scimType: 'invalidValue',
+        detail: 'Replace operation requires a string or object value.'
+      });
+    }
+
+    if (path === 'displayname') {
       if (typeof operation.value !== 'string') {
         throw createScimError({
           status: 400,
@@ -312,8 +469,12 @@ export class EndpointScimGroupsService {
           detail: 'Replace operation for displayName requires a string value.'
         });
       }
+      return { displayName: operation.value, externalId: currentExternalId, members, rawPayload };
+    }
 
-      return { displayName: operation.value, members };
+    if (path === 'externalid') {
+      const newExtId = typeof operation.value === 'string' ? operation.value : null;
+      return { displayName: currentDisplayName, externalId: newExtId, members, rawPayload };
     }
 
     if (path === 'members') {
@@ -326,7 +487,7 @@ export class EndpointScimGroupsService {
       }
 
       const normalized = operation.value.map((member) => this.toMemberDto(member));
-      return { displayName: currentDisplayName, members: this.ensureUniqueMembers(normalized) };
+      return { displayName: currentDisplayName, externalId: currentExternalId, members: this.ensureUniqueMembers(normalized), rawPayload };
     }
 
     throw createScimError({
@@ -516,9 +677,16 @@ export class EndpointScimGroupsService {
     const meta = this.buildMeta(group, baseUrl);
     const rawPayload = this.parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}'));
 
+    // Remove attributes that have first-class DB columns to prevent stale overrides.
+    // displayName is managed via the DB column; rawPayload may hold the original creation value.
+    delete rawPayload.displayName;
+    delete rawPayload.members;
+    delete rawPayload.externalId;
+
     return {
       schemas: [SCIM_CORE_GROUP_SCHEMA],
       id: group.scimId,
+      externalId: group.externalId ?? undefined,
       displayName: group.displayName,
       members: group.members.map((member) => ({
         value: member.value,
@@ -545,7 +713,7 @@ export class EndpointScimGroupsService {
   }
 
   private extractAdditionalAttributes(dto: CreateGroupDto): Record<string, unknown> {
-    const { schemas, members, ...rest } = dto;
+    const { schemas, members, externalId, ...rest } = dto as CreateGroupDto & { externalId?: string };
     return {
       schemas,
       ...rest

@@ -3,13 +3,13 @@ sequenceDiagram
   participant WebServer as main.ts middleware
   participant Guard as SharedSecretGuard
   participant OAuthSvc as OAuthService
-  participant Controller as UsersController
+  participant Controller as EndpointScimUsersController
   participant Validator as ValidationPipe
-  participant Service as ScimUsersService
+  participant Service as EndpointScimUsersService
   participant PrismaClient
   participant Logger as LoggingService
 
-  Client->>WebServer: POST /scim/v2/Users (application/scim+json)
+  Client->>WebServer: POST /scim/endpoints/{endpointId}/Users (application/scim+json)
   WebServer->>WebServer: normalize /scim/v2 -> /scim
   WebServer->>Guard: run canActivate (Authorization header)
   Guard->>OAuthSvc: validate JWT (jwt.verify)
@@ -29,8 +29,8 @@ sequenceDiagram
     Controller-->>Client: 400 Bad Request
     Note right of Client: validation error details returned
   else
-    Controller->>Service: createUser(dto, baseUrl)
-    Service->>PrismaClient: check uniqueness (findUnique / where)
+    Controller->>Service: createUserForEndpoint(dto, baseUrl, endpointId)
+    Service->>PrismaClient: check uniqueness (findFirst / where)
     alt unique violation found
       Service-->>Controller: throw ConflictError (mapped to 409)
       Controller->>Logger: log request + 409

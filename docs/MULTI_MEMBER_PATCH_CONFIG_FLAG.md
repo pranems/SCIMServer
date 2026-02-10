@@ -312,7 +312,7 @@ Content-Type: application/scim+json
                                     │
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│  EndpointScimController.updateGroup(endpointId, id, dto, req)               │
+│  EndpointScimGroupsController.updateGroup(endpointId, id, dto, req)         │
 │  ├─ validateAndSetContext(endpointId, req)                                  │
 │  │   ├─ Load endpoint from DB: endpointService.getEndpoint(endpointId)      │
 │  │   ├─ Extract config: endpoint.config || {}                               │
@@ -369,7 +369,7 @@ Content-Type: application/scim+json
 |------|---------|
 | [endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts) | `ENDPOINT_CONFIG_FLAGS` constant, `EndpointConfig` type, `getConfigBoolean()` helper |
 | [endpoint-context.storage.ts](../api/src/modules/endpoint/endpoint-context.storage.ts) | Stores config per request via `AsyncLocalStorage` (fallback) |
-| [endpoint-scim.controller.ts](../api/src/modules/scim/controllers/endpoint-scim.controller.ts) | Loads config and **passes directly** to service |
+| [endpoint-scim-groups.controller.ts](../api/src/modules/scim/controllers/endpoint-scim-groups.controller.ts) | Loads config and **passes directly** to service |
 | [endpoint-scim-groups.service.ts](../api/src/modules/scim/services/endpoint-scim-groups.service.ts) | `patchGroupForEndpoint(id, dto, endpointId, config)` & `handleAdd()` enforce the flag |
 
 ---

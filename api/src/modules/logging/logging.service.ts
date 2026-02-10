@@ -372,7 +372,7 @@ export class LoggingService {
   private async resolveUserDisplayName(identifier: string): Promise<string | null> {
     try {
       // Try to find user by SCIM ID first
-      let user = await this.prisma.scimUser.findUnique({
+      let user = await this.prisma.scimUser.findFirst({
         where: { scimId: identifier },
         select: { userName: true, rawPayload: true },
       });

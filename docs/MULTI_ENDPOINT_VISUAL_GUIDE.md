@@ -69,8 +69,9 @@ Benefit: Complete isolation, easy management, independent lifecycle
 └─────────────────────────────────────────────┘
            ↓
 ┌─────────────────────────────────────────────┐
-│ 3. Create endpoint-scoped SCIM Controller     │
-│    ✅ EndpointScimController                  │
+│ 3. Create endpoint-scoped SCIM Controllers    │
+│    ✅ EndpointScimUsersController              │
+│    ✅ EndpointScimGroupsController             │
 │    ✅ Routes for /scim/endpoints/{id}/*       │
 │    ✅ Calls to-be-implemented service methods
 └─────────────────────────────────────────────┘
@@ -201,19 +202,17 @@ src/
 │   │
 │   ├── scim/
 │   │   ├── controllers/
-│   │   │   ├── users.controller.ts ......... Original (unchanged)
-│   │   │   ├── groups.controller.ts ........ Original (unchanged)
-│   │   │   ├── admin.controller.ts ......... Original (unchanged)
-│   │   │   └── endpoint-scim.controller.ts ... Endpoint SCIM routes
-│   │   │       └── endpoint-scim.controller.spec.ts ... Tests (12 tests)
+│   │   │   ├── admin.controller.ts ......... Updated: uses endpoint services
+│   │   │   ├── endpoint-scim-users.controller.ts ... Endpoint Users routes
+│   │   │   │   └── endpoint-scim-users.controller.spec.ts ... Tests (10 tests)
+│   │   │   └── endpoint-scim-groups.controller.ts .. Endpoint Groups + metadata routes
+│   │   │       └── endpoint-scim-groups.controller.spec.ts ... Tests (10 tests)
 │   │   ├── services/
-│   │   │   ├── scim-users.service.ts ....... Original (unchanged)
-│   │   │   ├── scim-groups.service.ts ...... Original (unchanged)
-│   │   │   ├── endpoint-scim-users.service.ts ... NEW: Endpoint user operations
+│   │   │   ├── endpoint-scim-users.service.ts ... Endpoint user operations
 │   │   │   │   └── endpoint-scim-users.service.spec.ts ... Tests (15 tests)
-│   │   │   └── endpoint-scim-groups.service.ts .. NEW: Endpoint group operations
+│   │   │   └── endpoint-scim-groups.service.ts .. Endpoint group operations
 │   │   │       └── endpoint-scim-groups.service.spec.ts ... Tests (21 tests)
-│   │   └── scim.module.ts .................. Updated: Add new components
+│   │   └── scim.module.ts .................. Updated: legacy controllers/services removed
 │   │
 │   └── [other modules unchanged]
 │
@@ -241,7 +240,7 @@ Request comes in
     ↓
 Route matches /scim/endpoints/{endpointId}/...
     ↓
-EndpointScimController extracts endpointId from URL
+EndpointScimUsersController / EndpointScimGroupsController extracts endpointId from URL
     ↓
 Validates endpoint exists, loads config
     ↓

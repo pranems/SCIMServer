@@ -244,12 +244,16 @@ curl http://localhost:3000/scim/admin/endpoints \
 - ✅ `src/modules/endpoint/endpoint.module.ts` - Module config
 - ✅ `src/modules/endpoint/dto/create-endpoint.dto.ts` - Create request DTO
 - ✅ `src/modules/endpoint/dto/update-endpoint.dto.ts` - Update request DTO
-- ✅ `src/modules/scim/controllers/endpoint-scim.controller.ts` - Endpoint SCIM routes
+- ✅ `src/modules/scim/controllers/endpoint-scim-users.controller.ts` - Endpoint Users routes
+- ✅ `src/modules/scim/controllers/endpoint-scim-groups.controller.ts` - Endpoint Groups routes
+- ✅ `src/modules/scim/controllers/endpoint-scim-discovery.controller.ts` - SCIM discovery routes (Schemas, ResourceTypes, ServiceProviderConfig)
 - ✅ `src/modules/scim/services/endpoint-scim-users.service.ts` - User CRUD operations
 - ✅ `src/modules/scim/services/endpoint-scim-groups.service.ts` - Group CRUD operations
 
 ### Test Files
-- ✅ `src/modules/scim/controllers/endpoint-scim.controller.spec.ts` - Controller tests
+- ✅ `src/modules/scim/controllers/endpoint-scim-users.controller.spec.ts` - Users controller tests (10 tests)
+- ✅ `src/modules/scim/controllers/endpoint-scim-groups.controller.spec.ts` - Groups controller tests (10 tests)
+- ✅ `src/modules/scim/controllers/endpoint-scim-discovery.controller.spec.ts` - Discovery controller tests (7 tests)
 - ✅ `src/modules/scim/services/endpoint-scim-users.service.spec.ts` - User service tests
 - ✅ `src/modules/scim/services/endpoint-scim-groups.service.spec.ts` - Group service tests
 

@@ -51,7 +51,7 @@ async function bootstrap(): Promise<void> {
     exclude: ['/'] // Exclude root path from API prefix to serve web app
   });
 
-  app.useLogger(new Logger('SCIMTool'));
+  app.useLogger(new Logger('SCIMEndpointServer'));
   // Accept both standard JSON and SCIM media type payloads
   app.use(
     json({
@@ -72,7 +72,7 @@ async function bootstrap(): Promise<void> {
 
   const port = Number(process.env.PORT ?? 3000);
   await app.listen(port);
-  Logger.log(`🚀 SCIMTool API is running on http://localhost:${port}/${globalPrefix}`);
+  Logger.log(`🚀 SCIM Endpoint Server API is running on http://localhost:${port}/${globalPrefix}`);
 }
 
 void bootstrap();

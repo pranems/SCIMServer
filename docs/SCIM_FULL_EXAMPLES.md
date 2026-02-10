@@ -1,6 +1,6 @@
-# SCIM v2 — Complete Example Resource Payloads and Requests
+# SCIM v2 ï¿½ Complete Example Resource Payloads and Requests
 
-This document provides runnable examples for SCIM v2 resources and operations. Examples populate all common SCIM attributes (core schema + common extensions such as the Enterprise User extension) with realistic sample values. Some attributes shown may not be implemented in this codebase — they are included for completeness and to help with interoperability testing against SCIM-compliant clients and IdPs.
+This document provides runnable examples for SCIM v2 resources and operations. Examples populate all common SCIM attributes (core schema + common extensions such as the Enterprise User extension) with realistic sample values. Some attributes shown may not be implemented in this codebase ï¿½ they are included for completeness and to help with interoperability testing against SCIM-compliant clients and IdPs.
 
 Warning: these examples include sample values for demonstration only. Do not use real secrets or production credentials.
 
@@ -157,7 +157,7 @@ This resource describes the SCIM service provider features like patch support, b
   "bulk": { "supported": false },
   "filter": { "supported": true, "maxResults": 200 },
   "changePassword": { "supported": false },
-  "sort": { "supported": true },
+  "sort": { "supported": false },
   "authenticationSchemes": [
     {
       "type": "oauthbearertoken",
@@ -232,7 +232,7 @@ curl -i -X PATCH "http://localhost:3000/scim/v2/Users/a1b2c3d4-e5f6-7890-abcd-12
 
 5) Example flows: token issuance + protected calls
 
-Obtain OAuth token (client_credentials) — example using the repo's OAuth endpoint
+Obtain OAuth token (client_credentials) ï¿½ example using the repo's OAuth endpoint
 
 ```sh
 curl -s -X POST "http://localhost:3000/oauth/token" \

@@ -22,7 +22,8 @@ A **complete, production-ready foundation** for multi-endpoint SCIM support with
 ✅ src/modules/endpoint/endpoint.module.ts
 ✅ src/modules/endpoint/dto/create-endpoint.dto.ts
 ✅ src/modules/endpoint/dto/update-endpoint.dto.ts
-✅ src/modules/scim/controllers/endpoint-scim.controller.ts
+✅ src/modules/scim/controllers/endpoint-scim-users.controller.ts
+✅ src/modules/scim/controllers/endpoint-scim-groups.controller.ts
 ```
 
 ### Documentation (7 files)
@@ -41,7 +42,7 @@ A **complete, production-ready foundation** for multi-endpoint SCIM support with
 ```
 ✅ prisma/schema.prisma (Endpoint model + endpointId relationships)
 ✅ src/modules/app/app.module.ts (added EndpointModule)
-✅ src/modules/scim/scim.module.ts (added EndpointScimController)
+✅ src/modules/scim/scim.module.ts (added EndpointScimUsersController, EndpointScimGroupsController)
 ```
 
 ## API Endpoints Available: 7 New Endpoint APIs
@@ -129,7 +130,7 @@ curl http://localhost:3000/scim/endpoints/clx123abc.../Users \
 
 1. **EndpointService** - Core business logic for endpoint CRUD
 2. **EndpointContextStorage** - Request-scoped context isolation
-3. **EndpointScimController** - Routes all SCIM requests to endpoint endpoints
+3. **EndpointScimUsersController / EndpointScimGroupsController** - Route all SCIM requests to endpoint endpoints
 4. **Composite Unique Constraints** - Database-level isolation
 5. **Cascade Delete** - Clean removal with no orphaned data
 
@@ -179,7 +180,7 @@ All phases are complete:
 - [x] All 9 documentation files complete
 - [x] Prisma schema updated with Endpoint model
 - [x] AppModule imports EndpointModule
-- [x] ScimModule includes EndpointScimController
+- [x] ScimModule includes EndpointScimUsersController, EndpointScimGroupsController
 - [x] EndpointContextStorage is exported
 - [x] Code compiles without errors
 - [x] 48 tests passing

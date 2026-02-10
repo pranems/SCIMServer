@@ -895,7 +895,7 @@ Get service provider configuration.
   "bulk": {"supported": false},
   "filter": {"supported": true, "maxResults": 200},
   "changePassword": {"supported": false},
-  "sort": {"supported": true},
+  "sort": {"supported": false},
   "etag": {"supported": true},
   "authenticationSchemes": [
     {

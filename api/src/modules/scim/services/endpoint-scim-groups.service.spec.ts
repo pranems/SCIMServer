@@ -27,6 +27,7 @@ describe('EndpointScimGroupsService', () => {
     id: 'group-1',
     scimId: 'scim-grp-123',
     endpointId: 'endpoint-1',
+    externalId: null as string | null,
     displayName: 'Test Group',
     rawPayload: '{"description":"Test group"}',
     meta: JSON.stringify({
@@ -133,6 +134,7 @@ describe('EndpointScimGroupsService', () => {
         displayName: 'New Group',
       };
 
+      mockPrismaService.scimGroup.findMany.mockResolvedValue([]); // uniqueness check
       mockPrismaService.scimGroup.create.mockResolvedValue(mockGroup);
       mockPrismaService.scimGroup.findFirst.mockResolvedValue({
         ...mockGroup,
@@ -166,6 +168,7 @@ describe('EndpointScimGroupsService', () => {
         ],
       };
 
+      mockPrismaService.scimGroup.findMany.mockResolvedValue([]); // uniqueness check
       mockPrismaService.scimGroup.create.mockResolvedValue(mockGroup);
       mockPrismaService.scimUser.findMany.mockResolvedValue([mockUser]);
       mockPrismaService.scimGroup.findFirst.mockResolvedValue({
@@ -257,7 +260,6 @@ describe('EndpointScimGroupsService', () => {
     });
 
     it('should filter groups by displayName within endpoint', async () => {
-      mockPrismaService.scimGroup.count.mockResolvedValue(1);
       mockPrismaService.scimGroup.findMany.mockResolvedValue([mockGroup]);
 
       const result = await service.listGroupsForEndpoint(
@@ -266,13 +268,14 @@ describe('EndpointScimGroupsService', () => {
         mockEndpoint.id
       );
 
+      // displayName filter is now applied in-code for case-insensitive matching
       expect(result.totalResults).toBe(1);
       expect(mockPrismaService.scimGroup.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            displayName: 'Test Group',
             endpointId: mockEndpoint.id,
           }),
+          orderBy: { createdAt: 'asc' },
         })
       );
     });
@@ -743,6 +746,248 @@ describe('EndpointScimGroupsService', () => {
         expect(mockPrismaService.groupMember.deleteMany).not.toHaveBeenCalled();
       });
     });
+
+    describe('no-path replace with object value (Phase 1 Task 2)', () => {
+      it('should accept object value with displayName in no-path replace', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'replace',
+              value: { displayName: 'New Display Name' },
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+        mockPrismaService.scimGroup.update.mockResolvedValue({
+          ...mockGroup,
+          displayName: 'New Display Name',
+        });
+
+        await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id);
+
+        expect(mockPrismaService.scimGroup.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              displayName: 'New Display Name',
+            }),
+          })
+        );
+      });
+
+      it('should persist externalId as first-class column from no-path replace object', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'replace',
+              value: { externalId: 'new-ext-id' },
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+        mockPrismaService.scimGroup.update.mockResolvedValue({
+          ...mockGroup,
+        });
+
+        await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id);
+
+        expect(mockPrismaService.scimGroup.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              externalId: 'new-ext-id',
+            }),
+          })
+        );
+      });
+
+      it('should handle combined displayName + externalId in no-path replace', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'replace',
+              value: { displayName: 'Combined', externalId: 'ext-combined' },
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+        mockPrismaService.scimGroup.update.mockResolvedValue({
+          ...mockGroup,
+          displayName: 'Combined',
+        });
+
+        await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id);
+
+        expect(mockPrismaService.scimGroup.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              displayName: 'Combined',
+              externalId: 'ext-combined',
+            }),
+          })
+        );
+      });
+
+      it('should handle externalId path in replace operation', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'replace',
+              path: 'externalId',
+              value: 'pathed-ext-id',
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+        mockPrismaService.scimGroup.update.mockResolvedValue({
+          ...mockGroup,
+        });
+
+        await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id);
+
+        expect(mockPrismaService.scimGroup.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              externalId: 'pathed-ext-id',
+            }),
+          })
+        );
+      });
+
+      it('should accept no-path replace with string value as displayName', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'replace',
+              value: 'Direct String Name',
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+        mockPrismaService.scimGroup.update.mockResolvedValue({
+          ...mockGroup,
+          displayName: 'Direct String Name',
+        });
+
+        await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id);
+
+        expect(mockPrismaService.scimGroup.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              displayName: 'Direct String Name',
+            }),
+          })
+        );
+      });
+
+      it('should handle no-path replace with members array in object value', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'replace',
+              value: {
+                displayName: 'Group With Members',
+                members: [{ value: 'user-scim-1' }],
+              },
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+        mockPrismaService.scimUser.findMany.mockResolvedValue([]);
+        mockPrismaService.scimGroup.update.mockResolvedValue({
+          ...mockGroup,
+          displayName: 'Group With Members',
+        });
+
+        await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id);
+
+        expect(mockPrismaService.scimGroup.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              displayName: 'Group With Members',
+            }),
+          })
+        );
+        expect(mockPrismaService.groupMember.createMany).toHaveBeenCalled();
+      });
+
+      it('should throw error for no-path replace with invalid value type', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'replace',
+              value: 42 as any,
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+
+        await expect(
+          service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id)
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('should throw error for unsupported replace path', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'replace',
+              path: 'unsupportedAttribute',
+              value: 'test',
+            },
+          ],
+        };
+
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+
+        await expect(
+          service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id)
+        ).rejects.toThrow(HttpException);
+      });
+    });
+
+    it('should throw 404 if group not found for patch', async () => {
+      const patchDto: PatchGroupDto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [
+          { op: 'replace', path: 'displayName', value: 'Updated' },
+        ],
+      };
+
+      mockPrismaService.scimGroup.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.patchGroupForEndpoint('non-existent', patchDto, mockEndpoint.id)
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('should throw error for unsupported patch operation', async () => {
+      const patchDto: PatchGroupDto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [
+          { op: 'invalidOp' as any, path: 'displayName', value: 'test' },
+        ],
+      };
+
+      mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+
+      await expect(
+        service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id)
+      ).rejects.toThrow(HttpException);
+    });
   });
 
   describe('replaceGroupForEndpoint', () => {
@@ -889,6 +1134,245 @@ describe('EndpointScimGroupsService', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             endpointId: mockEndpoint.id,
+          }),
+        })
+      );
+    });
+  });
+
+  // ─── RFC 7643 Case-Insensitivity Compliance ────────────────────────
+
+  describe('case-insensitivity compliance (RFC 7643)', () => {
+    describe('filter attribute names', () => {
+      it('should accept filter with "DisplayName" (mixed case) as attribute', async () => {
+        mockPrismaService.scimGroup.findMany.mockResolvedValue([mockGroup]);
+
+        const result = await service.listGroupsForEndpoint(
+          { filter: 'DisplayName eq "Test Group"', startIndex: 1, count: 10 },
+          'http://localhost:3000/scim',
+          mockEndpoint.id
+        );
+
+        // displayName filter applied in-code; attribute resolved case-insensitively
+        expect(result.totalResults).toBe(1);
+        expect(mockPrismaService.scimGroup.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              endpointId: mockEndpoint.id,
+            }),
+            orderBy: { createdAt: 'asc' },
+          })
+        );
+      });
+
+      it('should accept filter with "DISPLAYNAME" (all caps) as attribute', async () => {
+        mockPrismaService.scimGroup.findMany.mockResolvedValue([mockGroup]);
+
+        const result = await service.listGroupsForEndpoint(
+          { filter: 'DISPLAYNAME eq "Test Group"', startIndex: 1, count: 10 },
+          'http://localhost:3000/scim',
+          mockEndpoint.id
+        );
+
+        // displayName filter applied in-code; "DISPLAYNAME" resolved case-insensitively
+        expect(result.totalResults).toBe(1);
+        expect(mockPrismaService.scimGroup.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              endpointId: mockEndpoint.id,
+            }),
+            orderBy: { createdAt: 'asc' },
+          })
+        );
+      });
+
+      it('should filter groups by externalId', async () => {
+        const groupWithExt = { ...mockGroup, externalId: 'ext-123' };
+        const groupWithoutExt = { ...mockGroup, id: 'other-id', externalId: 'ext-999' };
+        // In-code filtering: DB returns all groups for endpoint, JS filters by externalId
+        mockPrismaService.scimGroup.findMany.mockResolvedValue([groupWithExt, groupWithoutExt]);
+
+        const result = await service.listGroupsForEndpoint(
+          { filter: 'externalId eq "ext-123"', startIndex: 1, count: 10 },
+          'http://localhost:3000/scim',
+          mockEndpoint.id
+        );
+
+        expect(result.totalResults).toBe(1);
+        expect(result.Resources[0].externalId).toBe('ext-123');
+        // externalId should NOT be in DB where — filtering is in-code for case-insensitivity
+        expect(mockPrismaService.scimGroup.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              endpointId: mockEndpoint.id,
+            }),
+          })
+        );
+        expect(mockPrismaService.scimGroup.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.not.objectContaining({
+              externalId: expect.anything(),
+            }),
+          })
+        );
+      });
+
+      it('should filter groups by externalId case-insensitively', async () => {
+        const groupWithExt = { ...mockGroup, externalId: 'ext-abc-123' };
+        mockPrismaService.scimGroup.findMany.mockResolvedValue([groupWithExt]);
+
+        const result = await service.listGroupsForEndpoint(
+          { filter: 'externalId eq "EXT-ABC-123"', startIndex: 1, count: 10 },
+          'http://localhost:3000/scim',
+          mockEndpoint.id
+        );
+
+        expect(result.totalResults).toBe(1);
+        expect(result.Resources[0].externalId).toBe('ext-abc-123');
+      });
+    });
+
+    describe('case-insensitive schema URI validation', () => {
+      it('should accept Group schema URN with different casing', async () => {
+        const createDto: CreateGroupDto = {
+          schemas: ['URN:IETF:PARAMS:SCIM:SCHEMAS:CORE:2.0:GROUP'],
+          displayName: 'Case Schema Group',
+        };
+
+        mockPrismaService.scimGroup.create.mockResolvedValue(mockGroup);
+        mockPrismaService.scimGroup.findFirst.mockResolvedValue({
+          ...mockGroup,
+          displayName: createDto.displayName,
+        });
+
+        // Should not throw despite different casing
+        const result = await service.createGroupForEndpoint(
+          createDto,
+          'http://localhost:3000/scim',
+          mockEndpoint.id
+        );
+
+        expect(result.displayName).toBe(createDto.displayName);
+      });
+    });
+  });
+
+  // ─── externalId Column Support ──────────────────────────────────────
+
+  describe('externalId column support', () => {
+    it('should store externalId on create when provided', async () => {
+      const createDto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+        displayName: 'ExtId Group',
+        externalId: 'ext-grp-001',
+      } as CreateGroupDto;
+
+      mockPrismaService.scimGroup.findMany.mockResolvedValue([]); // displayName uniqueness
+      mockPrismaService.scimGroup.findFirst
+        .mockResolvedValueOnce(null) // assertUniqueExternalId → no conflict
+        .mockResolvedValueOnce({
+          ...mockGroup,
+          externalId: 'ext-grp-001',
+          displayName: 'ExtId Group',
+        }); // getGroupWithMembersForEndpoint after create
+      mockPrismaService.scimGroup.create.mockResolvedValue({ ...mockGroup, externalId: 'ext-grp-001' });
+
+      const result = await service.createGroupForEndpoint(
+        createDto,
+        'http://localhost:3000/scim',
+        mockEndpoint.id
+      );
+
+      expect(mockPrismaService.scimGroup.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            externalId: 'ext-grp-001',
+          }),
+        })
+      );
+      expect(result.externalId).toBe('ext-grp-001');
+    });
+
+    it('should return externalId in group resource when set', async () => {
+      const groupWithExt = { ...mockGroup, externalId: 'ext-grp-002' };
+      mockPrismaService.scimGroup.findFirst.mockResolvedValue(groupWithExt);
+
+      const result = await service.getGroupForEndpoint(
+        mockGroup.scimId,
+        'http://localhost:3000/scim',
+        mockEndpoint.id
+      );
+
+      expect(result.externalId).toBe('ext-grp-002');
+    });
+
+    it('should omit externalId from response when null', async () => {
+      mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+
+      const result = await service.getGroupForEndpoint(
+        mockGroup.scimId,
+        'http://localhost:3000/scim',
+        mockEndpoint.id
+      );
+
+      expect(result.externalId).toBeUndefined();
+    });
+
+    it('should reject duplicate externalId on create within same endpoint', async () => {
+      const createDto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+        displayName: 'Another Group',
+        externalId: 'ext-duplicate',
+      } as CreateGroupDto;
+
+      mockPrismaService.scimGroup.findMany.mockResolvedValue([]); // displayName uniqueness
+      mockPrismaService.scimGroup.findFirst.mockResolvedValue({ ...mockGroup, externalId: 'ext-duplicate' }); // externalId conflict
+
+      await expect(
+        service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id)
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('should update externalId via PATCH replace with path', async () => {
+      const patchDto: PatchGroupDto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [
+          { op: 'replace', path: 'externalId', value: 'ext-updated' },
+        ],
+      };
+
+      mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+      mockPrismaService.scimGroup.update.mockResolvedValue({ ...mockGroup, externalId: 'ext-updated' });
+
+      await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id);
+
+      expect(mockPrismaService.scimGroup.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            externalId: 'ext-updated',
+          }),
+        })
+      );
+    });
+
+    it('should update externalId via no-path PATCH replace object', async () => {
+      const patchDto: PatchGroupDto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [
+          { op: 'replace', value: { displayName: 'Renamed', externalId: 'ext-via-nopath' } },
+        ],
+      };
+
+      mockPrismaService.scimGroup.findFirst.mockResolvedValue(mockGroup);
+      mockPrismaService.scimGroup.update.mockResolvedValue({ ...mockGroup, externalId: 'ext-via-nopath' });
+
+      await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, mockEndpoint.id);
+
+      expect(mockPrismaService.scimGroup.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            displayName: 'Renamed',
+            externalId: 'ext-via-nopath',
           }),
         })
       );

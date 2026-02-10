@@ -1,4 +1,4 @@
-# User API — Annotated Call Trace + Diagrams
+# User API ï¿½ Annotated Call Trace + Diagrams
 
 This document contains a concrete example payload for `POST /scim/v2/Users`, an end?to?end annotated call trace mapping to controller/service/Prisma actions and the expected DB rows and request log entry. It also includes additional mermaid diagrams showing create, list and get flows including database interactions.
 
@@ -41,12 +41,12 @@ Notes:
    - If JWT invalid, compare token to `SCIM_SHARED_SECRET` (env); allow if matches.
    - On failure: respond 401 with SCIM error JSON and `WWW-Authenticate: Bearer realm="SCIM"`.
 
-3. Controller: `UsersController.create` (`api/src/modules/scim/controllers/users.controller.ts`)
+3. Controller: `EndpointScimUsersController.createUser` (`api/src/modules/scim/controllers/endpoint-scim-users.controller.ts`)
    - `CreateUserDto` validation via global `ValidationPipe`.
    - `buildBaseUrl(request)` called to compute resource `location` for `meta.location`.
-   - Calls `ScimUsersService.createUser(dto, baseUrl)`.
+   - Resolves `endpointId` from URL param, calls `EndpointScimUsersService.createUserForEndpoint(dto, baseUrl, endpointId)`.
 
-4. Service: `ScimUsersService.createUser` (`api/src/modules/scim/services/scim-users.service.ts`)
+4. Service: `EndpointScimUsersService.createUserForEndpoint` (`api/src/modules/scim/services/endpoint-scim-users.service.ts`)
    - Normalises attributes, derives `scimId` if not provided, prepares `rawPayload` (stringified request body) and `meta` JSON.
    - Uniqueness checks using Prisma:
      - `prisma.scimUser.findUnique({ where: { userName } })` or `findFirst` for `externalId`.
@@ -131,7 +131,7 @@ Prisma `RequestLog` model stores captured request/response for UI debugging. Exa
 
 ## 5) Mermaid diagrams
 
-### Create user — sequence (success & uniqueness collision)
+### Create user ï¿½ sequence (success & uniqueness collision)
 
 ```mermaid
 sequenceDiagram
@@ -139,13 +139,13 @@ sequenceDiagram
   participant WebServer as main.ts middleware
   participant Guard as SharedSecretGuard
   participant OAuthSvc as OAuthService
-  participant Controller as UsersController
+  participant Controller as EndpointScimUsersController
   participant Validator as ValidationPipe
-  participant Service as ScimUsersService
+  participant Service as EndpointScimUsersService
   participant PrismaClient
   participant Logger as LoggingService
 
-  Client->>WebServer: POST /scim/v2/Users (application/scim+json)
+  Client->>WebServer: POST /scim/endpoints/{endpointId}/Users (application/scim+json)
   WebServer->>WebServer: normalize /scim/v2 -> /scim
   WebServer->>Guard: run canActivate (Authorization header)
   Guard->>OAuthSvc: validate JWT (jwt.verify)
@@ -165,8 +165,8 @@ sequenceDiagram
     Controller-->>Client: 400 Bad Request
     Note right of Client: validation error details returned
   else
-    Controller->>Service: createUser(dto, baseUrl)
-    Service->>PrismaClient: check uniqueness (findUnique / where)
+    Controller->>Service: createUserForEndpoint(dto, baseUrl, endpointId)
+    Service->>PrismaClient: check uniqueness (findFirst / where)
     alt unique violation found
       Service-->>Controller: throw ConflictError (mapped to 409)
       Controller->>Logger: log request + 409
@@ -180,28 +180,28 @@ sequenceDiagram
   end
 ```
 
-### List & Get user — sequence
+### List & Get user ï¿½ sequence
 
 ```mermaid
 sequenceDiagram
   participant Client
   participant Guard
-  participant Controller as UsersController
-  participant Service as ScimUsersService
+  participant Controller as EndpointScimUsersController
+  participant Service as EndpointScimUsersService
   participant PrismaClient
 
-  Client->>Guard: GET /scim/v2/Users?startIndex=1&count=50
+  Client->>Guard: GET /scim/endpoints/{endpointId}/Users?startIndex=1&count=50
   Guard-->>Controller: allow
-  Controller->>Service: listUsers(query)
+  Controller->>Service: listUsersForEndpoint(query, baseUrl, endpointId)
   Service->>PrismaClient: prisma.scimUser.findMany({ skip, take, where, orderBy })
   PrismaClient-->>Service: rows
   Service-->>Controller: paginated SCIM list
   Controller-->>Client: 200 { Resources: [...], totalResults: N }
 
-  Client->>Guard: GET /scim/v2/Users/:id
+  Client->>Guard: GET /scim/endpoints/{endpointId}/Users/:id
   Guard-->>Controller: allow
-  Controller->>Service: getUser(id)
-  Service->>PrismaClient: prisma.scimUser.findUnique({ where: { id } })
+  Controller->>Service: getUserForEndpoint(id, baseUrl, endpointId)
+  Service->>PrismaClient: prisma.scimUser.findFirst({ where: { scimId, endpointId } })
   alt not found
     Controller-->>Client: 404 Not Found
   else found

@@ -4,7 +4,7 @@
   "bulk": { "supported": false },
   "filter": { "supported": true, "maxResults": 1000 },
   "changePassword": { "supported": false },
-  "sort": { "supported": true },
+  "sort": { "supported": false },
   "authenticationSchemes": [
     {
       "type": "oauthbearertoken",

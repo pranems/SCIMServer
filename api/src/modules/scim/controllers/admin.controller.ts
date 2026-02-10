@@ -14,6 +14,7 @@
 import type { Request } from 'express';
 
 import { LoggingService } from '../../logging/logging.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { buildBaseUrl } from '../common/base-url.util';
 import { SCIM_CORE_GROUP_SCHEMA, SCIM_CORE_USER_SCHEMA } from '../common/scim-constants';
 import type { ScimGroupResource, ScimUserResource } from '../common/scim-types';
@@ -21,8 +22,8 @@ import type { CreateGroupDto } from '../dto/create-group.dto';
 import type { CreateUserDto } from '../dto/create-user.dto';
 import { ManualGroupDto } from '../dto/manual-group.dto';
 import { ManualUserDto } from '../dto/manual-user.dto';
-import { ScimGroupsService } from '../services/scim-groups.service';
-import { ScimUsersService } from '../services/scim-users.service';
+import { EndpointScimGroupsService } from '../services/endpoint-scim-groups.service';
+import { EndpointScimUsersService } from '../services/endpoint-scim-users.service';
 
 interface VersionInfo {
   version: string;
@@ -48,9 +49,24 @@ export class AdminController {
   private readonly logger = new Logger(AdminController.name);
   constructor(
     private readonly loggingService: LoggingService,
-    private readonly usersService: ScimUsersService,
-    private readonly groupsService: ScimGroupsService
+    private readonly prisma: PrismaService,
+    private readonly usersService: EndpointScimUsersService,
+    private readonly groupsService: EndpointScimGroupsService
   ) {}
+
+  /**
+   * Get or create a default endpoint for admin operations.
+   * Uses the first available endpoint, or creates one named "default".
+   */
+  private async getDefaultEndpointId(): Promise<string> {
+    const existing = await this.prisma.endpoint.findFirst({ orderBy: { createdAt: 'asc' } });
+    if (existing) return existing.id;
+
+    const created = await this.prisma.endpoint.create({
+      data: { name: 'default', active: true }
+    });
+    return created.id;
+  }
 
   @Post('logs/clear')
   @HttpCode(204)
@@ -167,7 +183,8 @@ export class AdminController {
       ...extras
     } as CreateUserDto;
 
-    return this.usersService.createUser(mergedPayload, baseUrl);
+    const endpointId = await this.getDefaultEndpointId();
+    return this.usersService.createUserForEndpoint(mergedPayload, baseUrl, endpointId);
   }
 
   @Post('groups/manual')
@@ -194,16 +211,22 @@ export class AdminController {
       (payload as Record<string, unknown>).id = scimId;
     }
 
-    return this.groupsService.createGroup(payload, baseUrl);
+    const endpointId = await this.getDefaultEndpointId();
+    return this.groupsService.createGroupForEndpoint(payload, baseUrl, endpointId);
   }
 
   @Post('users/:id/delete')
   @HttpCode(204)
   async deleteUser(@Param('id') id: string): Promise<void> {
-    const deleted = await this.usersService.deleteUserByIdentifier(id);
-    if (!deleted) {
+    // Search by Prisma PK (id) or SCIM identifier (scimId)
+    const user = await this.prisma.scimUser.findFirst({
+      where: { OR: [{ id }, { scimId: id }] },
+      select: { id: true }
+    });
+    if (!user) {
       throw new NotFoundException('User not found');
     }
+    await this.prisma.scimUser.delete({ where: { id: user.id } });
   }
 
   @Get('version')

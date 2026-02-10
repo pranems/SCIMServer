@@ -42,7 +42,9 @@
                │                       │  │ └─ GET /ServiceProviderConfig│ │
                │                       │  └─────────────────────────────┘  │
                │                       │              ↓                    │
-               │                       │    EndpointScimController         │
+               │                       │    EndpointScimUsersController /  │
+               │                       │    EndpointScimGroupsController /  │
+               │                       │    EndpointScimDiscoveryController │
                │                       │              ↓                    │
                │                       │  ┌───────────┴───────────┐        │
                │                       │  │                       │        │
@@ -199,12 +201,12 @@ Client
   ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ NestJS Router                                                    │
-│ Route: @Controller('endpoints/:endpointId') → EndpointScimController │
+│ Route: @Controller('endpoints/:endpointId') → EndpointScimUsers/Groups/DiscoveryController              │
 └─────────────────────────────────────────────────────────────────┘
   │
   ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ EndpointScimController.createUser()                             │
+│ EndpointScimUsersController.createUser()                        │
 │                                                                  │
 │ @Post('Users')                                                   │
 │ async createUser(                                                │
@@ -284,7 +286,7 @@ Client
   │
   ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ EndpointScimController.updateGroup()                            │
+│ EndpointScimGroupsController.updateGroup()                      │
 │                                                                  │
 │ @Patch('Groups/:id')                                            │
 │ async updateGroup(...) {                                        │
@@ -385,7 +387,7 @@ Config is passed **directly from controller to service** as a parameter, which i
 ```
 PATCH /scim/endpoints/{endpointId}/Groups/{id}
     ↓
-EndpointScimController.updateGroup()
+EndpointScimGroupsController.updateGroup()
     ├─ validateAndSetContext(endpointId, req)
     │   └─ Returns { baseUrl, config }  ← Config loaded here
     └─ groupsService.patchGroupForEndpoint(id, dto, endpointId, config)

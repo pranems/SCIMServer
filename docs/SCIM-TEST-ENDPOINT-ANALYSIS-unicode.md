@@ -26,7 +26,7 @@ graph LR
   C --> D[Auth Guard (Bearer / OAuth / JWT)]
   D --> E[Controllers]
   E --> E1[WebController (serves UI /assets)]
-  E --> E2[SCIM Controllers (Users, Groups, ServiceProviderConfig, Schemas)]
+  E --> E2[SCIM Controllers (Users, Groups, Discovery)]
   E --> E3[AdminController (logs, version, backup APIs)]
   E2 --> F[ScimService (business logic)]
   E3 --> G[LoggingService / BackupService]

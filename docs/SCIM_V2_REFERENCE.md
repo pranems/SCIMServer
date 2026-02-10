@@ -60,7 +60,7 @@ GET /ServiceProviderConfig
   "bulk":{"supported":true,"maxOperations":1000,"maxPayloadSize":10485760},
   "filter":{"supported":true,"maxResults":1000},
   "changePassword":{"supported":false},
-  "sort":{"supported":true},
+  "sort":{"supported":false},
   "authenticationSchemes":[{"type":"oauthbearertoken","name":"OAuth 2.0 Bearer"}]
 }
 ```
@@ -77,7 +77,7 @@ Inline minimal example (RFC fields only):
   "bulk": { "supported": false },
   "filter": { "supported": true, "maxResults": 1000 },
   "changePassword": { "supported": false },
-  "sort": { "supported": true },
+  "sort": { "supported": false },
   "authenticationSchemes": [
     {
       "type": "oauthbearertoken",

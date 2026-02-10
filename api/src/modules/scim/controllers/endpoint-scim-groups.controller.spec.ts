@@ -1,19 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ForbiddenException } from '@nestjs/common';
-import { EndpointScimController } from './endpoint-scim.controller';
-import { EndpointScimUsersService } from '../services/endpoint-scim-users.service';
+import { EndpointScimGroupsController } from './endpoint-scim-groups.controller';
 import { EndpointScimGroupsService } from '../services/endpoint-scim-groups.service';
-import { ScimMetadataService } from '../services/scim-metadata.service';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
-import type { CreateUserDto } from '../dto/create-user.dto';
 import type { CreateGroupDto } from '../dto/create-group.dto';
-import type { PatchUserDto } from '../dto/patch-user.dto';
 import type { PatchGroupDto } from '../dto/patch-group.dto';
 
-describe('EndpointScimController', () => {
-  let controller: EndpointScimController;
-  let usersService: EndpointScimUsersService;
+describe('EndpointScimGroupsController', () => {
+  let controller: EndpointScimGroupsController;
   let groupsService: EndpointScimGroupsService;
   let endpointService: EndpointService;
 
@@ -34,23 +29,8 @@ describe('EndpointScimController', () => {
       if (header === 'host') return 'localhost:3000';
       return undefined;
     }),
-    originalUrl: '/scim/endpoints/endpoint-1/Users',
+    originalUrl: '/scim/endpoints/endpoint-1/Groups',
   } as any;
-
-  const mockResponse = {
-    status: jest.fn().mockReturnThis(),
-    send: jest.fn(),
-    setHeader: jest.fn(),
-  } as any;
-
-  const mockUsersService = {
-    createUserForEndpoint: jest.fn(),
-    getUserForEndpoint: jest.fn(),
-    listUsersForEndpoint: jest.fn(),
-    patchUserForEndpoint: jest.fn(),
-    replaceUserForEndpoint: jest.fn(),
-    deleteUserForEndpoint: jest.fn(),
-  };
 
   const mockGroupsService = {
     createGroupForEndpoint: jest.fn(),
@@ -65,10 +45,6 @@ describe('EndpointScimController', () => {
     getEndpoint: jest.fn(),
   };
 
-  const mockMetadataService = {
-    buildServiceProviderConfig: jest.fn(),
-  };
-
   const mockEndpointContext = {
     run: jest.fn((endpointId: string, callback: () => any) => callback()),
     getEndpointId: jest.fn(),
@@ -77,19 +53,11 @@ describe('EndpointScimController', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      controllers: [EndpointScimController],
+      controllers: [EndpointScimGroupsController],
       providers: [
-        {
-          provide: EndpointScimUsersService,
-          useValue: mockUsersService,
-        },
         {
           provide: EndpointScimGroupsService,
           useValue: mockGroupsService,
-        },
-        {
-          provide: ScimMetadataService,
-          useValue: mockMetadataService,
         },
         {
           provide: EndpointService,
@@ -102,199 +70,13 @@ describe('EndpointScimController', () => {
       ],
     }).compile();
 
-    controller = module.get<EndpointScimController>(EndpointScimController);
-    usersService = module.get<EndpointScimUsersService>(EndpointScimUsersService);
+    controller = module.get<EndpointScimGroupsController>(EndpointScimGroupsController);
     groupsService = module.get<EndpointScimGroupsService>(EndpointScimGroupsService);
     endpointService = module.get<EndpointService>(EndpointService);
   });
 
   afterEach(() => {
     jest.clearAllMocks();
-  });
-
-  describe('User Operations', () => {
-    describe('POST /endpoints/:endpointId/Users', () => {
-      it('should create a user in specific endpoint', async () => {
-        const createDto: CreateUserDto = {
-          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
-          userName: 'test@example.com',
-          active: true,
-        };
-
-        const mockUser = {
-          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
-          id: 'scim-123',
-          userName: 'test@example.com',
-          active: true,
-          meta: {
-            resourceType: 'User',
-            created: '2024-01-01T00:00:00.000Z',
-            lastModified: '2024-01-01T00:00:00.000Z',
-            location: 'http://localhost:3000/scim/endpoints/endpoint-1/Users/scim-123',
-          },
-        };
-
-        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
-        mockUsersService.createUserForEndpoint.mockResolvedValue(mockUser);
-
-        const result = await controller.createUser(
-          'endpoint-1',
-          createDto,
-          mockRequest
-        );
-
-        expect(mockEndpointService.getEndpoint).toHaveBeenCalledWith('endpoint-1');
-        expect(mockUsersService.createUserForEndpoint).toHaveBeenCalledWith(
-          createDto,
-          expect.any(String),
-          'endpoint-1'
-        );
-        expect(result).toEqual(mockUser);
-      });
-    });
-
-    describe('GET /endpoints/:endpointId/Users/:id', () => {
-      it('should get a user from specific endpoint', async () => {
-        const mockUser = {
-          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
-          id: 'scim-123',
-          userName: 'test@example.com',
-          active: true,
-          meta: {},
-        };
-
-        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
-        mockUsersService.getUserForEndpoint.mockResolvedValue(mockUser);
-
-        await controller.getUser('endpoint-1', 'scim-123', mockRequest);
-
-        expect(mockEndpointService.getEndpoint).toHaveBeenCalledWith('endpoint-1');
-        expect(mockUsersService.getUserForEndpoint).toHaveBeenCalledWith(
-          'scim-123',
-          expect.any(String),
-          'endpoint-1'
-        );
-      });
-    });
-
-    describe('GET /endpoints/:endpointId/Users', () => {
-      it('should list users from specific endpoint', async () => {
-        const mockListResponse = {
-          schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
-          totalResults: 2,
-          startIndex: 1,
-          itemsPerPage: 2,
-          Resources: [
-            { id: 'user-1', userName: 'user1@example.com' },
-            { id: 'user-2', userName: 'user2@example.com' },
-          ],
-        };
-
-        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
-        mockUsersService.listUsersForEndpoint.mockResolvedValue(mockListResponse);
-
-        const result = await controller.listUsers(
-          'endpoint-1',
-          mockRequest,
-          undefined,
-          '1',
-          '10'
-        );
-
-        expect(mockEndpointService.getEndpoint).toHaveBeenCalledWith('endpoint-1');
-        expect(mockUsersService.listUsersForEndpoint).toHaveBeenCalledWith(
-          { filter: undefined, startIndex: 1, count: 10 },
-          expect.any(String),
-          'endpoint-1'
-        );
-        expect(result).toEqual(mockListResponse);
-      });
-    });
-
-    describe('PATCH /endpoints/:endpointId/Users/:id', () => {
-      it('should patch a user in specific endpoint', async () => {
-        const patchDto: PatchUserDto = {
-          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
-          Operations: [{ op: 'replace', path: 'active', value: false }],
-        };
-
-        const mockUser = {
-          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
-          id: 'scim-123',
-          userName: 'test@example.com',
-          active: false,
-          meta: {},
-        };
-
-        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
-        mockUsersService.patchUserForEndpoint.mockResolvedValue(mockUser);
-
-        const result = await controller.updateUser(
-          'endpoint-1',
-          'scim-123',
-          patchDto,
-          mockRequest
-        );
-
-        expect(mockUsersService.patchUserForEndpoint).toHaveBeenCalledWith(
-          'scim-123',
-          patchDto,
-          expect.any(String),
-          'endpoint-1'
-        );
-        expect(result).toEqual(mockUser);
-      });
-    });
-
-    describe('PUT /endpoints/:endpointId/Users/:id', () => {
-      it('should replace a user in specific endpoint', async () => {
-        const replaceDto: CreateUserDto = {
-          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
-          userName: 'replaced@example.com',
-          active: true,
-        };
-
-        const mockUser = {
-          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
-          id: 'scim-123',
-          userName: 'replaced@example.com',
-          active: true,
-          meta: {},
-        };
-
-        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
-        mockUsersService.replaceUserForEndpoint.mockResolvedValue(mockUser);
-
-        const result = await controller.replaceUser(
-          'endpoint-1',
-          'scim-123',
-          replaceDto,
-          mockRequest
-        );
-
-        expect(mockUsersService.replaceUserForEndpoint).toHaveBeenCalledWith(
-          'scim-123',
-          replaceDto,
-          expect.any(String),
-          'endpoint-1'
-        );
-        expect(result).toEqual(mockUser);
-      });
-    });
-
-    describe('DELETE /endpoints/:endpointId/Users/:id', () => {
-      it('should delete a user from specific endpoint', async () => {
-        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
-        mockUsersService.deleteUserForEndpoint.mockResolvedValue(undefined);
-
-        await controller.deleteUser('endpoint-1', 'scim-123', mockRequest);
-
-        expect(mockUsersService.deleteUserForEndpoint).toHaveBeenCalledWith(
-          'scim-123',
-          'endpoint-1'
-        );
-      });
-    });
   });
 
   describe('Group Operations', () => {
@@ -471,10 +253,10 @@ describe('EndpointScimController', () => {
       mockEndpointService.getEndpoint.mockRejectedValue(new Error('Endpoint not found'));
 
       await expect(
-        controller.getUser('invalid-endpoint', 'user-123', mockRequest)
+        controller.getGroup('invalid-endpoint', 'group-123', mockRequest)
       ).rejects.toThrow('Endpoint not found');
 
-      expect(mockUsersService.getUserForEndpoint).not.toHaveBeenCalled();
+      expect(mockGroupsService.getGroupForEndpoint).not.toHaveBeenCalled();
     });
 
     it('should reject SCIM operations on inactive endpoints', async () => {
@@ -485,10 +267,10 @@ describe('EndpointScimController', () => {
       mockEndpointService.getEndpoint.mockResolvedValue(inactiveEndpoint);
 
       await expect(
-        controller.getUser('endpoint-1', 'user-123', mockRequest)
+        controller.getGroup('endpoint-1', 'group-123', mockRequest)
       ).rejects.toThrow(ForbiddenException);
 
-      expect(mockUsersService.getUserForEndpoint).not.toHaveBeenCalled();
+      expect(mockGroupsService.getGroupForEndpoint).not.toHaveBeenCalled();
     });
 
     it('should include endpoint name in inactive endpoint error message', async () => {
@@ -500,7 +282,7 @@ describe('EndpointScimController', () => {
       mockEndpointService.getEndpoint.mockResolvedValue(inactiveEndpoint);
 
       await expect(
-        controller.createUser('endpoint-1', { schemas: [], userName: 'test' } as any, mockRequest)
+        controller.createGroup('endpoint-1', { schemas: [], displayName: 'test' } as any, mockRequest)
       ).rejects.toThrow('Endpoint "test-endpoint" is inactive');
     });
 
@@ -510,19 +292,19 @@ describe('EndpointScimController', () => {
         active: true,
       };
       mockEndpointService.getEndpoint.mockResolvedValue(activeEndpoint);
-      mockUsersService.getUserForEndpoint.mockResolvedValue({
-        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
-        id: 'user-123',
-        userName: 'test@example.com',
-        active: true,
+      mockGroupsService.getGroupForEndpoint.mockResolvedValue({
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+        id: 'group-123',
+        displayName: 'Test Group',
+        members: [],
         meta: {},
       });
 
       await expect(
-        controller.getUser('endpoint-1', 'user-123', mockRequest)
+        controller.getGroup('endpoint-1', 'group-123', mockRequest)
       ).resolves.toBeDefined();
 
-      expect(mockUsersService.getUserForEndpoint).toHaveBeenCalled();
+      expect(mockGroupsService.getGroupForEndpoint).toHaveBeenCalled();
     });
   });
 });

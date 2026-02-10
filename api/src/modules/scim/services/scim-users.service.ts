@@ -38,7 +38,9 @@ export class ScimUsersService {
     const scimId = randomUUID();
     const sanitizedPayload = this.extractAdditionalAttributes(dto);
 
-    const data: Prisma.ScimUserCreateInput = {
+    const endpointId = await this.getOrCreateDefaultEndpointId();
+    const data: Prisma.ScimUserUncheckedCreateInput = {
+      endpointId,
       scimId,
       externalId: dto.externalId ?? null,
       userName: dto.userName,
@@ -57,7 +59,7 @@ export class ScimUsersService {
   }
 
   async getUser(scimId: string, baseUrl: string): Promise<ScimUserResource> {
-    const user = await this.prisma.scimUser.findUnique({ where: { scimId } });
+    const user = await this.prisma.scimUser.findFirst({ where: { scimId } });
     if (!user) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
@@ -66,11 +68,11 @@ export class ScimUsersService {
   }
 
   async deleteUser(scimId: string): Promise<void> {
-    try {
-      await this.prisma.scimUser.delete({ where: { scimId } });
-    } catch (error) {
+    const user = await this.prisma.scimUser.findFirst({ where: { scimId }, select: { id: true } });
+    if (!user) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
+    await this.prisma.scimUser.delete({ where: { id: user.id } });
   }
 
   async deleteUserByIdentifier(identifier: string): Promise<boolean> {
@@ -127,7 +129,7 @@ export class ScimUsersService {
   ): Promise<ScimUserResource> {
     this.ensureSchema(patchDto.schemas, SCIM_PATCH_SCHEMA);
 
-    const user = await this.prisma.scimUser.findUnique({ where: { scimId } });
+    const user = await this.prisma.scimUser.findFirst({ where: { scimId } });
     if (!user) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
@@ -135,7 +137,7 @@ export class ScimUsersService {
   const updatedData = await this.applyPatchOperations(user, patchDto);
 
     const updatedUser = await this.prisma.scimUser.update({
-      where: { scimId },
+      where: { id: user.id },
       data: updatedData
     });
 
@@ -149,7 +151,7 @@ export class ScimUsersService {
   ): Promise<ScimUserResource> {
     this.ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
 
-    const user = await this.prisma.scimUser.findUnique({ where: { scimId } });
+    const user = await this.prisma.scimUser.findFirst({ where: { scimId } });
     if (!user) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
@@ -172,7 +174,7 @@ export class ScimUsersService {
     };
 
     const updatedUser = await this.prisma.scimUser.update({
-      where: { scimId },
+      where: { id: user.id },
       data
     });
 
@@ -491,6 +493,22 @@ export class ScimUsersService {
       schemas,
       ...additional
     };
+  }
+
+  /** Lazily resolves (or creates) a 'default' endpoint for legacy non-multi-endpoint routes. */
+  private defaultEndpointId: string | null = null;
+  private async getOrCreateDefaultEndpointId(): Promise<string> {
+    if (this.defaultEndpointId) return this.defaultEndpointId;
+    const name = 'default';
+    let ep = await this.prisma.endpoint.findUnique({ where: { name }, select: { id: true } });
+    if (!ep) {
+      ep = await this.prisma.endpoint.create({
+        data: { name, displayName: 'Default Endpoint', description: 'Auto-created for legacy routes' },
+        select: { id: true },
+      });
+    }
+    this.defaultEndpointId = ep.id;
+    return ep.id;
   }
 
   private parseJson<T>(value: string | null | undefined): T {

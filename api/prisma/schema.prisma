@@ -29,23 +29,24 @@ model Endpoint {
 }
 
 model ScimUser {
-  id          String   @id @default(cuid())
-  endpointId  String   // Foreign key to endpoint
-  scimId      String
-  externalId  String?
-  userName    String
-  active      Boolean  @default(true)
-  rawPayload  String
-  meta        String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  endpointId    String   // Foreign key to endpoint
+  scimId        String
+  externalId    String?
+  userName      String   // Original casing preserved for display
+  userNameLower String   // Lowercased for case-insensitive uniqueness & filtering (RFC 7643 §2.1)
+  active        Boolean  @default(true)
+  rawPayload    String
+  meta          String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   endpoint Endpoint      @relation(fields: [endpointId], references: [id], onDelete: Cascade)
   groups   GroupMember[]
 
-  // Composite unique constraint per endpoint
+  // Composite unique constraint per endpoint (case-insensitive via userNameLower)
   @@unique([endpointId, scimId])
-  @@unique([endpointId, userName])
+  @@unique([endpointId, userNameLower])
   @@unique([endpointId, externalId])
   @@index([endpointId])
 }
@@ -54,6 +55,7 @@ model ScimGroup {
   id          String   @id @default(cuid())
   endpointId  String   // Foreign key to endpoint
   scimId      String
+  externalId  String?  // Entra ID sends externalId for groups; first-class column for uniqueness & filtering
   displayName String
   rawPayload  String
   meta        String?
@@ -65,6 +67,7 @@ model ScimGroup {
 
   // Composite unique constraint per endpoint
   @@unique([endpointId, scimId])
+  @@unique([endpointId, externalId])
   @@index([endpointId])
 }
 

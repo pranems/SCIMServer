@@ -90,8 +90,10 @@ GET    /scim/admin/endpoints/{endpointId}/stats - Get endpoint statistics
 
 ### 3. endpoint-specific SCIM endpoints
 
-#### New Controller: EndpointScimController
-**Location:** `src/modules/scim/controllers/endpoint-scim.controller.ts`
+#### New Controllers: EndpointScimUsersController, EndpointScimGroupsController & EndpointScimDiscoveryController
+**Location (Users):** `src/modules/scim/controllers/endpoint-scim-users.controller.ts`
+**Location (Groups):** `src/modules/scim/controllers/endpoint-scim-groups.controller.ts`
+**Location (Discovery):** `src/modules/scim/controllers/endpoint-scim-discovery.controller.ts`
 
 **Endpoint Structure:**
 ```
@@ -213,7 +215,7 @@ async deleteGroupForEndpoint(
 **Important:** Config is passed **directly from controller to service** as a parameter, not via AsyncLocalStorage alone.
 
 ```typescript
-// In endpoint-scim.controller.ts
+// In endpoint-scim-groups.controller.ts
 @Patch('Groups/:id')
 async updateGroup(@Param('endpointId') endpointId: string, ...) {
   const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);

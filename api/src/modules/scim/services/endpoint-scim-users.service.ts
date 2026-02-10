@@ -15,6 +15,18 @@ import type { ScimListResponse, ScimUserResource } from '../common/scim-types';
 import type { CreateUserDto } from '../dto/create-user.dto';
 import type { PatchUserDto } from '../dto/patch-user.dto';
 import { ScimMetadataService } from './scim-metadata.service';
+import {
+  isValuePath,
+  parseValuePath,
+  applyValuePathUpdate,
+  addValuePathEntry,
+  removeValuePathEntry,
+  isExtensionPath,
+  parseExtensionPath,
+  applyExtensionUpdate,
+  removeExtensionAttribute,
+  resolveNoPathValue,
+} from '../utils/scim-patch-path';
 
 interface ListUsersParams {
   filter?: string;
@@ -46,6 +58,7 @@ export class EndpointScimUsersService {
       scimId,
       externalId: dto.externalId ?? null,
       userName: dto.userName,
+      userNameLower: dto.userName.toLowerCase(),
       active: dto.active ?? true,
       rawPayload: JSON.stringify(sanitizedPayload),
       meta: JSON.stringify({
@@ -85,23 +98,30 @@ export class EndpointScimUsersService {
       count = MAX_COUNT;
     }
 
-    const filterWhere = this.buildFilter(filter);
+    const { dbWhere, caseInsensitiveUserName } = this.buildFilter(filter);
     const where: Prisma.ScimUserWhereInput = {
-      ...filterWhere,
+      ...dbWhere,
       endpointId
     };
 
-    const [totalResults, users] = await Promise.all([
-      this.prisma.scimUser.count({ where }),
-      this.prisma.scimUser.findMany({
-        where,
-        skip: Math.max(startIndex - 1, 0),
-        take: Math.max(Math.min(count, MAX_COUNT), 0),
-        orderBy: { createdAt: 'asc' }
-      })
-    ]);
+    // Fetch users from DB (may fetch all for endpoint if case-insensitive filter requires in-code matching)
+    let allUsers = await this.prisma.scimUser.findMany({
+      where,
+      orderBy: { createdAt: 'asc' }
+    });
 
-    const resources = users.map((user) => this.toScimUserResource(user, baseUrl));
+    // Apply case-insensitive userName filter in code
+    // (SQLite doesn't support Prisma's mode: 'insensitive')
+    if (caseInsensitiveUserName) {
+      const lowerFilter = caseInsensitiveUserName.toLowerCase();
+      allUsers = allUsers.filter(u => u.userName.toLowerCase() === lowerFilter);
+    }
+
+    const totalResults = allUsers.length;
+    const skip = Math.max(startIndex - 1, 0);
+    const take = Math.max(Math.min(count, MAX_COUNT), 0);
+    const paginatedUsers = allUsers.slice(skip, skip + take);
+    const resources = paginatedUsers.map((user) => this.toScimUserResource(user, baseUrl));
 
     return {
       schemas: [SCIM_LIST_RESPONSE_SCHEMA],
@@ -169,6 +189,7 @@ export class EndpointScimUsersService {
     const data: Prisma.ScimUserUpdateInput = {
       externalId: dto.externalId ?? null,
       userName: dto.userName,
+      userNameLower: dto.userName.toLowerCase(),
       active: dto.active ?? true,
       rawPayload: JSON.stringify(sanitizedPayload),
       meta: JSON.stringify({
@@ -203,7 +224,8 @@ export class EndpointScimUsersService {
   // ===== Private Helper Methods =====
 
   private ensureSchema(schemas: string[] | undefined, requiredSchema: string): void {
-    if (!schemas || !schemas.includes(requiredSchema)) {
+    const requiredLower = requiredSchema.toLowerCase();
+    if (!schemas || !schemas.some(s => s.toLowerCase() === requiredLower)) {
       throw createScimError({
         status: 400,
         scimType: 'invalidSyntax',
@@ -212,9 +234,9 @@ export class EndpointScimUsersService {
     }
   }
 
-  private buildFilter(filter?: string): Prisma.ScimUserWhereInput {
+  private buildFilter(filter?: string): { dbWhere: Prisma.ScimUserWhereInput; caseInsensitiveUserName?: string } {
     if (!filter) {
-      return {};
+      return { dbWhere: {} };
     }
 
     // Support simple filters: attribute eq "value"
@@ -228,21 +250,23 @@ export class EndpointScimUsersService {
       });
     }
 
-    const attribute = match[1];
+    const attribute = match[1].toLowerCase();
     const value = match[2];
 
     switch (attribute) {
-      case 'userName':
-        return { userName: value };
-      case 'externalId':
-        return { externalId: value };
+      case 'username':
+        // Case-insensitive userName filter (RFC 7643 §2.1: userName caseExact=false)
+        // Use in-code filtering to ensure case-insensitivity regardless of DB collation
+        return { dbWhere: {}, caseInsensitiveUserName: value };
+      case 'externalid':
+        return { dbWhere: { externalId: value } };
       case 'id':
-        return { scimId: value };
+        return { dbWhere: { scimId: value } };
       default:
         throw createScimError({
           status: 400,
           scimType: 'invalidFilter',
-          detail: `Filtering by attribute '${attribute}' is not supported.`
+          detail: `Filtering by attribute '${match[1]}' is not supported.`
         });
     }
   }
@@ -253,7 +277,8 @@ export class EndpointScimUsersService {
     endpointId: string,
     excludeScimId?: string
   ): Promise<void> {
-    const orConditions: Prisma.ScimUserWhereInput[] = [{ userName }];
+    // RFC 7643 §2.1: userName has caseExact=false, so uniqueness is case-insensitive
+    const orConditions: Prisma.ScimUserWhereInput[] = [{ userNameLower: userName.toLowerCase() }];
     if (externalId) {
       orConditions.push({ externalId });
     }
@@ -277,7 +302,7 @@ export class EndpointScimUsersService {
 
     if (conflict) {
       const reason =
-        conflict.userName === userName
+        conflict.userName.toLowerCase() === userName.toLowerCase()
           ? `userName '${userName}'`
           : `externalId '${externalId}'`;
 
@@ -322,15 +347,60 @@ export class EndpointScimUsersService {
           userName = this.extractStringValue(operation.value, 'userName');
         } else if (path === 'externalid') {
           externalId = this.extractNullableStringValue(operation.value, 'externalId');
+        } else if (originalPath && isExtensionPath(originalPath)) {
+          // Enterprise extension URN path: urn:...:User:manager → update nested attribute
+          const extParsed = parseExtensionPath(originalPath);
+          if (extParsed) {
+            rawPayload = applyExtensionUpdate(rawPayload, extParsed, operation.value);
+          }
+        } else if (originalPath && isValuePath(originalPath)) {
+          // ValuePath filter: emails[type eq "work"].value → update in-place or create
+          const vpParsed = parseValuePath(originalPath);
+          if (vpParsed) {
+            if (op === 'add') {
+              // For add: create array/element if it doesn't exist
+              rawPayload = addValuePathEntry(rawPayload, vpParsed, operation.value);
+            } else {
+              rawPayload = applyValuePathUpdate(rawPayload, vpParsed, operation.value);
+            }
+          }
         } else if (originalPath) {
           rawPayload = { ...rawPayload, [originalPath]: operation.value };
-        } else if (typeof operation.value === 'object' && operation.value !== null) {
-          rawPayload = { ...rawPayload, ...operation.value };
+        } else if (!path && typeof operation.value === 'object' && operation.value !== null) {
+          // No-path add/replace: normalize keys case-insensitively, then extract first-class DB fields
+          const updateObj = this.normalizeObjectKeys(operation.value as Record<string, unknown>);
+          if ('userName' in updateObj) {
+            userName = this.extractStringValue(updateObj.userName, 'userName');
+            delete updateObj.userName;
+          }
+          if ('externalId' in updateObj) {
+            externalId = this.extractNullableStringValue(updateObj.externalId, 'externalId');
+            delete updateObj.externalId;
+          }
+          if ('active' in updateObj) {
+            active = this.extractBooleanValue(updateObj.active);
+            delete updateObj.active;
+          }
+          // Resolve dot-notation keys (name.givenName → nested) and
+          // extension URN keys (urn:...:User:attr → extension namespace)
+          rawPayload = resolveNoPathValue(rawPayload, updateObj);
         }
       } else if (op === 'remove') {
         if (path === 'active') {
           active = false;
           rawPayload = { ...rawPayload, active: false };
+        } else if (originalPath && isExtensionPath(originalPath)) {
+          // Remove enterprise extension attribute
+          const extParsed = parseExtensionPath(originalPath);
+          if (extParsed) {
+            rawPayload = removeExtensionAttribute(rawPayload, extParsed);
+          }
+        } else if (originalPath && isValuePath(originalPath)) {
+          // Remove valuePath entry from multi-valued attribute
+          const vpParsed = parseValuePath(originalPath);
+          if (vpParsed) {
+            rawPayload = removeValuePathEntry(rawPayload, vpParsed);
+          }
         } else if (originalPath) {
           rawPayload = this.removeAttribute(rawPayload, originalPath);
         } else {
@@ -349,6 +419,7 @@ export class EndpointScimUsersService {
 
     return {
       userName,
+      userNameLower: userName.toLowerCase(),
       externalId,
       active,
       rawPayload: JSON.stringify(rawPayload),
@@ -357,6 +428,42 @@ export class EndpointScimUsersService {
         lastModified: new Date().toISOString()
       })
     } satisfies Prisma.ScimUserUpdateInput;
+  }
+
+  /**
+   * Normalize incoming JSON object keys to canonical camelCase for known SCIM attributes.
+   * Per RFC 7643 §2.1: "Attribute names are case insensitive".
+   * Unknown keys are preserved as-is.
+   */
+  private normalizeObjectKeys(obj: Record<string, unknown>): Record<string, unknown> {
+    const keyMap: Record<string, string> = {
+      'username': 'userName',
+      'externalid': 'externalId',
+      'active': 'active',
+      'displayname': 'displayName',
+      'name': 'name',
+      'nickname': 'nickName',
+      'profileurl': 'profileUrl',
+      'title': 'title',
+      'usertype': 'userType',
+      'preferredlanguage': 'preferredLanguage',
+      'locale': 'locale',
+      'timezone': 'timezone',
+      'emails': 'emails',
+      'phonenumbers': 'phoneNumbers',
+      'addresses': 'addresses',
+      'photos': 'photos',
+      'ims': 'ims',
+      'roles': 'roles',
+      'entitlements': 'entitlements',
+      'x509certificates': 'x509Certificates',
+    };
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      const canonical = keyMap[key.toLowerCase()] ?? key;
+      result[canonical] = value;
+    }
+    return result;
   }
 
   private stripReservedAttributes(payload: Record<string, unknown>): Record<string, unknown> {
@@ -443,6 +550,9 @@ export class EndpointScimUsersService {
     const meta = this.buildMeta(user, baseUrl);
     const rawPayload = this.parseJson<Record<string, unknown>>(String(user.rawPayload ?? '{}'));
 
+    // Sanitize boolean-like strings in multi-valued attributes (Microsoft Entra sends "True"/"False")
+    this.sanitizeBooleanStrings(rawPayload);
+
     return {
       schemas: [SCIM_CORE_USER_SCHEMA],
       id: user.scimId,
@@ -452,6 +562,28 @@ export class EndpointScimUsersService {
       ...rawPayload,
       meta
     };
+  }
+
+  /**
+   * Recursively sanitize boolean-like string values ("True"/"False") to actual booleans.
+   * Microsoft Entra ID sends primary as string "True" but the SCIM validator expects boolean true.
+   */
+  private sanitizeBooleanStrings(obj: Record<string, unknown>): void {
+    for (const [key, value] of Object.entries(obj)) {
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          if (typeof item === 'object' && item !== null) {
+            this.sanitizeBooleanStrings(item as Record<string, unknown>);
+          }
+        }
+      } else if (typeof value === 'object' && value !== null) {
+        this.sanitizeBooleanStrings(value as Record<string, unknown>);
+      } else if (typeof value === 'string') {
+        const lower = value.toLowerCase();
+        if (lower === 'true') obj[key] = true;
+        else if (lower === 'false') obj[key] = false;
+      }
+    }
   }
 
   private buildMeta(user: ScimUser, baseUrl: string) {

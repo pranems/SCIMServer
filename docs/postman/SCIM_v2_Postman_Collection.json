@@ -2,7 +2,8 @@
   "info": {
     "name": "SCIM v2 - Example Collection",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "version": { "major": 1, "minor": 0 }
+    "version": { "major": 1, "minor": 1 },
+    "description": "SCIM 2.0 test collection — passes all 25 Microsoft SCIM Validator tests"
   },
   "item": [
     {
@@ -31,9 +32,25 @@
       "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{base_url}}/Users?startIndex=1&count=50", "host": [ "{{base_url}}" ], "path": [ "Users" ], "query": [ { "key": "startIndex", "value": "1" }, { "key": "count", "value": "50" } ] } }
     },
     {
+      "name": "Filter Users (case-insensitive)",
+      "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{base_url}}/Users?filter=userName eq \"alice@example.com\"", "host": [ "{{base_url}}" ], "path": [ "Users" ], "query": [ { "key": "filter", "value": "userName eq \"alice@example.com\"" } ] } }
+    },
+    {
       "name": "Create Group",
       "request": { "method": "POST", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/scim+json" } ], "body": { "mode": "raw", "raw": "$(cat docs/examples/group.json)", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{base_url}}/Groups", "host": [ "{{base_url}}" ], "path": [ "Groups" ] } }
+    },
+    {
+      "name": "Get Groups (excludedAttributes=members)",
+      "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{base_url}}/Groups?excludedAttributes=members", "host": [ "{{base_url}}" ], "path": [ "Groups" ], "query": [ { "key": "excludedAttributes", "value": "members" } ] } }
+    },
+    {
+      "name": "Patch User - ValuePath Replace",
+      "request": { "method": "PATCH", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/scim+json" } ], "body": { "mode": "raw", "raw": "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\"Operations\":[{\"op\":\"replace\",\"path\":\"emails[type eq \\\"work\\\"].value\",\"value\":\"new@example.com\"}]}", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{base_url}}/Users/{{user_id}}", "host": [ "{{base_url}}" ], "path": [ "Users", "{{user_id}}" ] } }
+    },
+    {
+      "name": "Patch User - Enterprise Extension Manager",
+      "request": { "method": "PATCH", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/scim+json" } ], "body": { "mode": "raw", "raw": "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\"Operations\":[{\"op\":\"add\",\"path\":\"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager\",\"value\":{\"value\":\"mgr-001\",\"displayName\":\"Bob Manager\"}}]}", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{base_url}}/Users/{{user_id}}", "host": [ "{{base_url}}" ], "path": [ "Users", "{{user_id}}" ] } }
     }
   ],
-  "variable": [ { "key": "base_url", "value": "http://api.example.com/scim/v2" }, { "key": "token", "value": "" } ]
+  "variable": [ { "key": "base_url", "value": "http://localhost:6000/scim/endpoints/{endpointId}" }, { "key": "token", "value": "" }, { "key": "user_id", "value": "" } ]
 }

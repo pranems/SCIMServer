@@ -9,7 +9,7 @@
 - [x] Create EndpointModule with EndpointService
 - [x] Create EndpointController with admin endpoints
 - [x] Create EndpointContextStorage for request-scoped context
-- [x] Create EndpointScimController for endpoint-specific SCIM endpoints
+- [x] Create EndpointScimUsersController, EndpointScimGroupsController, and EndpointScimDiscoveryController for endpoint-specific SCIM endpoints
 - [x] Update ScimModule to include new components
 - [x] Update AppModule to import EndpointModule
 - [x] Create DTOs (CreateEndpointDto, UpdateEndpointDto)
@@ -127,7 +127,7 @@
   - [x] deleteEndpoint() - not found error
   - [x] getEndpointStats() - returns counts
 
-- [x] EndpointScimController tests
+- [x] EndpointScimUsersController tests (10 tests)
   - [x] Validates endpoint exists before operations
   - [x] Validates endpoint is active before operations
   - [x] Returns 403 Forbidden for inactive endpoints
@@ -175,8 +175,7 @@
   - [x] Allows same displayName across different endpoints
   - [x] Only adds members from same endpoint
 
-- [x] EndpointScimController tests (12 tests)
-  - [x] Full CRUD operations for users
+- [x] EndpointScimGroupsController tests (10 tests)
   - [x] Full CRUD operations for groups
   - [x] Config passed directly from controller to service
   - [ ] deleteUserForEndpoint() deletes correct endpoint user

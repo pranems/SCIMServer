@@ -16,7 +16,9 @@ A complete foundational implementation of Multi-Endpoint support for the SCIMToo
 - **DTOs**: Data transfer objects for endpoint creation/updates
 
 ### 2. **endpoint-scoped SCIM Endpoints**
-- **EndpointScimController**: Routes all SCIM operations to endpoint-specific handlers
+- **EndpointScimUsersController**: Routes all User SCIM operations to endpoint-specific handlers
+- **EndpointScimGroupsController**: Routes all Group SCIM operations to endpoint-specific handlers
+- **EndpointScimDiscoveryController**: Routes SCIM discovery endpoints (Schemas, ResourceTypes, ServiceProviderConfig)
 - Serves: `/scim/endpoints/{endpointId}/Users`, `/scim/endpoints/{endpointId}/Groups`, etc.
 - Validates endpoint exists before every operation
 
@@ -46,7 +48,9 @@ src/modules/endpoint/
 └── endpoint.module.ts                  # NestJS module
 
 src/modules/scim/controllers/
-└── endpoint-scim.controller.ts         # endpoint-specific SCIM endpoints
+├── endpoint-scim-users.controller.ts      # endpoint-specific User SCIM endpoints
+├── endpoint-scim-groups.controller.ts     # endpoint-specific Group SCIM endpoints
+└── endpoint-scim-discovery.controller.ts  # endpoint-specific SCIM discovery (Schemas, ResourceTypes, ServiceProviderConfig)
 
 docs/
 ├── MULTI_ENDPOINT_IMPLEMENTATION.md    # Technical implementation details
@@ -66,7 +70,7 @@ src/modules/
 
 - `prisma/schema.prisma` - Added Endpoint model and endpointId relationships
 - `src/modules/app/app.module.ts` - Added EndpointModule import
-- `src/modules/scim/scim.module.ts` - Added EndpointScimController and context storage
+- `src/modules/scim/scim.module.ts` - Added EndpointScimUsersController, EndpointScimGroupsController and context storage
 
 ## API Endpoints Added
 

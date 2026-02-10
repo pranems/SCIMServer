@@ -49,8 +49,12 @@
       "formatted": "1 Microsoft Way\nRedmond, WA 98052"
     }
   ],
-  "entitlements": ["enterprise-admin"],
-  "roles": ["engineering:senior"],
+  "entitlements": [
+    { "value": "enterprise-admin", "primary": true }
+  ],
+  "roles": [
+    { "value": "engineering:senior", "display": "Senior Engineer", "primary": true }
+  ],
   "x509Certificates": [],
   "groups": [
     { "value": "g-1111111111111", "display": "Engineering" }

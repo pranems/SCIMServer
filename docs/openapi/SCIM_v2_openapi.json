@@ -23,7 +23,7 @@
                   "patch": { "supported": true },
                   "bulk": { "supported": false },
                   "filter": { "supported": true, "maxResults": 1000 },
-                  "sort": { "supported": true },
+                  "sort": { "supported": false },
                   "authenticationSchemes": [
                     { "type": "oauthbearertoken", "name": "OAuth 2.0 Bearer Token", "specUri": "https://tools.ietf.org/html/rfc6750" }
                   ]
@@ -162,17 +162,17 @@
       "post": {
         "summary": "Create Group",
         "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "type": "object" }, "example": { "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"], "displayName": "Engineering", "members": [{ "value": "a1b2c3", "display": "Alice Example" }] } } } },
-        "responses": { "201": { "description": "Created" } }
+        "responses": { "201": { "description": "Created" }, "409": { "description": "Conflict — duplicate displayName within endpoint" } }
       },
       "get": {
         "summary": "List Groups",
-        "parameters": [ { "name": "startIndex", "in": "query", "schema": { "type": "integer" } }, { "name": "count", "in": "query", "schema": { "type": "integer" } }, { "name": "filter", "in": "query", "schema": { "type": "string" } } ],
+        "parameters": [ { "name": "startIndex", "in": "query", "schema": { "type": "integer" } }, { "name": "count", "in": "query", "schema": { "type": "integer" } }, { "name": "filter", "in": "query", "schema": { "type": "string" }, "description": "e.g. displayName eq \"Engineering\" (case-insensitive)" }, { "name": "excludedAttributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to exclude, e.g. members" } ],
         "responses": { "200": { "description": "List", "content": { "application/scim+json": { "schema": { "type": "object" } } } }
       }
     },
     "/Groups/{id}": {
       "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } } ],
-      "get": { "summary": "Get Group", "responses": { "200": { "description": "Group" }, "404": { "description": "Not found" } } },
+      "get": { "summary": "Get Group", "parameters": [ { "name": "excludedAttributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to exclude, e.g. members" } ], "responses": { "200": { "description": "Group" }, "404": { "description": "Not found" } } },
       "put": { "summary": "Replace Group", "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "type": "object" } } } }, "responses": { "200": { "description": "Updated" } } },
       "patch": { "summary": "Patch Group", "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "type": "object" }, "example": { "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{ "op": "add", "path": "members", "value": [{ "value": "new-user-id", "display": "New User" }] }] } } } }, "responses": { "200": { "description": "Patched" } } },
       "delete": { "summary": "Delete Group", "responses": { "204": { "description": "No content" } } }

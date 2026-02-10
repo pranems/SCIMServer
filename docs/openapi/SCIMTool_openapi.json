@@ -2,17 +2,67 @@
   "openapi": "3.0.3",
   "info": {
     "title": "SCIMTool API",
-    "version": "1.0.0",
-    "description": "Partial OpenAPI specification for SCIMTool including example payloads."
+    "version": "1.1.0",
+    "description": "OpenAPI specification for SCIMTool SCIM 2.0 server. Passes all 25 Microsoft SCIM Validator tests."
   },
-  "servers": [ { "url": "http://localhost:3000/scim/v2" } ],
+  "servers": [{ "url": "http://localhost:6000/scim/endpoints/{endpointId}", "description": "Local dev server" }],
   "paths": {
     "/Users": {
       "post": {
         "summary": "Create SCIM User",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/scim+json": {
-              "schema": { "type": "object" },
-              "example": 
+        "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "type": "object" } } } },
+        "responses": { "201": { "description": "Created" }, "409": { "description": "Conflict — duplicate userName" } }
+      },
+      "get": {
+        "summary": "List / Filter Users",
+        "description": "Supports case-insensitive userName filtering via ?filter=userName eq \"...\"",
+        "parameters": [
+          { "name": "filter", "in": "query", "schema": { "type": "string" }, "description": "e.g. userName eq \"alice@example.com\" (case-insensitive)" },
+          { "name": "startIndex", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "count", "in": "query", "schema": { "type": "integer", "default": 100 } }
+        ],
+        "responses": { "200": { "description": "ListResponse" } }
+      }
+    },
+    "/Users/{id}": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "get": { "summary": "Get User", "responses": { "200": { "description": "User resource" }, "404": { "description": "Not found" } } },
+      "put": { "summary": "Replace User", "responses": { "200": { "description": "Updated" } } },
+      "patch": { "summary": "Patch User", "description": "Supports valuePath filters, extension URN paths, no-path object merges", "responses": { "200": { "description": "Patched" } } },
+      "delete": { "summary": "Delete User", "responses": { "204": { "description": "No content" } } }
+    },
+    "/Groups": {
+      "post": {
+        "summary": "Create Group",
+        "responses": { "201": { "description": "Created" }, "409": { "description": "Conflict — duplicate displayName" } }
+      },
+      "get": {
+        "summary": "List / Filter Groups",
+        "parameters": [
+          { "name": "filter", "in": "query", "schema": { "type": "string" }, "description": "e.g. displayName eq \"Engineering\" (case-insensitive)" },
+          { "name": "excludedAttributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to exclude, e.g. members" },
+          { "name": "startIndex", "in": "query", "schema": { "type": "integer" } },
+          { "name": "count", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "ListResponse" } }
+      }
+    },
+    "/Groups/{id}": {
+      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "get": {
+        "summary": "Get Group",
+        "parameters": [{ "name": "excludedAttributes", "in": "query", "schema": { "type": "string" }, "description": "e.g. members" }],
+        "responses": { "200": { "description": "Group resource" }, "404": { "description": "Not found" } }
+      },
+      "put": { "summary": "Replace Group", "responses": { "200": { "description": "Updated" } } },
+      "patch": { "summary": "Patch Group", "responses": { "200": { "description": "Patched" } } },
+      "delete": { "summary": "Delete Group", "responses": { "204": { "description": "No content" } } }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    }
+  },
+  "security": [{ "bearerAuth": [] }]
+}

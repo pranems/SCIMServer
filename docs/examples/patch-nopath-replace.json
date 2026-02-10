@@ -1,0 +1,14 @@
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "replace",
+      "value": {
+        "displayName": "Updated Display Name",
+        "name.givenName": "Armand",
+        "name.familyName": "Smith",
+        "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:employeeNumber": "EMP-999"
+      }
+    }
+  ]
+}

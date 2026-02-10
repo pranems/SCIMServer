@@ -1,4 +1,4 @@
-# SCIMTool — Microsoft Standard Analysis
+# SCIMTool ï¿½ Microsoft Standard Analysis
 
 Version: v0.8.15
 Date: 2025-12-29
@@ -26,7 +26,7 @@ graph LR
   C --> D[Auth Guard (Bearer / OAuth / JWT)]
   D --> E[Controllers]
   E --> E1[WebController (serves UI /assets)]
-  E --> E2[SCIM Controllers (Users, Groups, ServiceProviderConfig, Schemas)]
+  E --> E2[SCIM Controllers (Users, Groups, Discovery)]
   E --> E3[AdminController (logs, version, backup APIs)]
   E2 --> F[ScimService (business logic)]
   E3 --> G[LoggingService / BackupService]
@@ -47,7 +47,7 @@ graph LR
 ## Key components and code locations
 
 - Backend (NestJS + Prisma)
-  - Source: `api/src` — controllers, services, modules
+  - Source: `api/src` ï¿½ controllers, services, modules
   - Entrypoint: `api/src/main.ts` (app bootstrap; global pipes/guards)
   - Web controller (serves static UI): `api/src/modules/web/web.controller.ts`
   - SCIM controllers & DTOs: `api/src/modules/scim/*` (example: `list-query.dto.ts`)
@@ -56,18 +56,18 @@ graph LR
 
 - Frontend (React + Vite)
   - Source: `web/src`
-  - Api client: `web/src/api/client.ts` — all admin & scim calls used by UI
+  - Api client: `web/src/api/client.ts` ï¿½ all admin & scim calls used by UI
   - Keepalive detection: `web/src/utils/keepalive.ts` (heuristic for hiding Entra keepalive checks)
   - Main UI shell: `web/src/App.tsx`
 
 - Packaging & runtime
   - Root `Dockerfile` (multi-stage, builds web then api then runtime)
   - `api/Dockerfile` (alternative build for api-only image)
-  - Runtime entrypoint: `api/docker-entrypoint.sh` — restores backups, sets `DATABASE_URL`, runs migrations, starts app
+  - Runtime entrypoint: `api/docker-entrypoint.sh` ï¿½ restores backups, sets `DATABASE_URL`, runs migrations, starts app
 
 - Deployment automation
-  - `setup.ps1` — bootstrap one-liner for interactive or automated Azure deployment
-  - `scripts/*.ps1` — deploy/update/test helpers (e.g. `deploy-azure.ps1`, `publish-acr.ps1`, `update-scimtool-*.ps1`)
+  - `setup.ps1` ï¿½ bootstrap one-liner for interactive or automated Azure deployment
+  - `scripts/*.ps1` ï¿½ deploy/update/test helpers (e.g. `deploy-azure.ps1`, `publish-acr.ps1`, `update-scimtool-*.ps1`)
 
 ## Request flow (sequence)
 
@@ -205,15 +205,15 @@ sequenceDiagram
 4. Run tests: `cd api && npm test`
 5. For schema changes: `cd api && npx prisma migrate dev --name <desc>` then commit `prisma/migrations` files.
 
-## Appendix — Important files reference
+## Appendix ï¿½ Important files reference
 
-- `api/docker-entrypoint.sh` — startup DB restore, set `DATABASE_URL`, run migrations, start node
-- `web/src/utils/keepalive.ts` — keepalive detection
-- `web/src/api/client.ts` — client-side admin API surface
-- `web/src/App.tsx` — UI shell and hideKeepalive interaction
-- `api/src/modules/web/web.controller.ts` — serves static SPA files
-- `api/prisma/schema.prisma` — DB models
-- `setup.ps1`, `scripts/*.ps1` — deployment automation
+- `api/docker-entrypoint.sh` ï¿½ startup DB restore, set `DATABASE_URL`, run migrations, start node
+- `web/src/utils/keepalive.ts` ï¿½ keepalive detection
+- `web/src/api/client.ts` ï¿½ client-side admin API surface
+- `web/src/App.tsx` ï¿½ UI shell and hideKeepalive interaction
+- `api/src/modules/web/web.controller.ts` ï¿½ serves static SPA files
+- `api/prisma/schema.prisma` ï¿½ DB models
+- `setup.ps1`, `scripts/*.ps1` ï¿½ deployment automation
 
 ---
 This document was generated to provide maintainers and Microsoft reviewers with a compact, actionable analysis of the SCIMTool repository including diagrams and change points. For deeper code walk-throughs pick a controller or service and request an annotated read of that file.

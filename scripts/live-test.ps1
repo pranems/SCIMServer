@@ -2,7 +2,7 @@
 # This script tests endpoint CRUD, SCIM operations, config validation, and isolation
 
 $ErrorActionPreference = "Continue"
-$baseUrl = "http://localhost:3000"
+$baseUrl = "http://localhost:6000"
 $testsPassed = 0
 $testsFailed = 0
 
@@ -226,6 +226,247 @@ $reactivateBody = @{
     Operations = @(@{ op = "replace"; path = "active"; value = $true })
 } | ConvertTo-Json -Depth 3
 Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PATCH -Headers $headers -Body $reactivateBody | Out-Null
+
+# ============================================
+# TEST SECTION 3b: CASE-INSENSITIVITY (RFC 7643 §2.1)
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 3b: CASE-INSENSITIVITY (RFC 7643)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Test: Case-insensitive userName uniqueness
+Write-Host "`n--- Test: Case-Insensitive userName Uniqueness ---" -ForegroundColor Cyan
+$ciDupUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "LIVETEST-USER@TEST.COM"  # Same as existing but UPPERCASE
+    active = $true
+} | ConvertTo-Json
+try {
+    Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $ciDupUserBody | Out-Null
+    Test-Result -Success $false -Message "UPPERCASE duplicate userName should return 409"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 409) -Message "UPPERCASE duplicate userName returns 409 (case-insensitive uniqueness)"
+}
+
+# Test: Mixed-case duplicate
+$ciMixedBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "LiveTest-User@Test.Com"
+    active = $true
+} | ConvertTo-Json
+try {
+    Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $ciMixedBody | Out-Null
+    Test-Result -Success $false -Message "Mixed-case duplicate userName should return 409"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 409) -Message "Mixed-case duplicate userName returns 409"
+}
+
+# Test: Case-insensitive filter attribute names
+Write-Host "`n--- Test: Case-Insensitive Filter Attribute Names ---" -ForegroundColor Cyan
+$ciFilterResult = Invoke-RestMethod -Uri "$scimBase/Users?filter=USERNAME eq `"livetest-user@test.com`"" -Method GET -Headers $headers
+Test-Result -Success ($ciFilterResult.totalResults -eq 1) -Message "Filter with 'USERNAME' (uppercase) finds user"
+
+$ciFilterResult2 = Invoke-RestMethod -Uri "$scimBase/Users?filter=UserName eq `"livetest-user@test.com`"" -Method GET -Headers $headers
+Test-Result -Success ($ciFilterResult2.totalResults -eq 1) -Message "Filter with 'UserName' (PascalCase) finds user"
+
+# Test: Case-insensitive filter value for userName
+Write-Host "`n--- Test: Case-Insensitive Filter Value (userName) ---" -ForegroundColor Cyan
+$ciFilterValue = Invoke-RestMethod -Uri "$scimBase/Users?filter=userName eq `"LIVETEST-USER@TEST.COM`"" -Method GET -Headers $headers
+Test-Result -Success ($ciFilterValue.totalResults -eq 1) -Message "Filter with UPPERCASE value finds user (case-insensitive)"
+
+# Test: PascalCase PATCH op values (Entra compatibility)
+Write-Host "`n--- Test: PascalCase PATCH op Values ---" -ForegroundColor Cyan
+$pascalPatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{ op = "Replace"; path = "displayName"; value = "PascalCase Patched" })
+} | ConvertTo-Json -Depth 3
+$pascalPatched = Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PATCH -Headers $headers -Body $pascalPatchBody
+Test-Result -Success ($pascalPatched.displayName -eq "PascalCase Patched") -Message "PATCH with 'Replace' (PascalCase op) works"
+
+$addOpBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{ op = "Add"; path = "displayName"; value = "Add Op Patched" })
+} | ConvertTo-Json -Depth 3
+$addOpPatched = Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PATCH -Headers $headers -Body $addOpBody
+Test-Result -Success ($addOpPatched.displayName -eq "Add Op Patched") -Message "PATCH with 'Add' (PascalCase op) works"
+
+# ============================================
+# TEST SECTION 3c: ADVANCED PATCH OPERATIONS
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 3c: ADVANCED PATCH OPERATIONS" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Test: PATCH with no path (merge value object into resource)
+Write-Host "`n--- Test: PATCH with No Path (Merge) ---" -ForegroundColor Cyan
+$noPathBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        value = @{ displayName = "No-Path Merged"; active = $true }
+    })
+} | ConvertTo-Json -Depth 4
+$noPathResult = Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PATCH -Headers $headers -Body $noPathBody
+Test-Result -Success ($noPathResult.displayName -eq "No-Path Merged") -Message "PATCH with no path merges displayName"
+Test-Result -Success ($noPathResult.active -eq $true) -Message "PATCH with no path merges active"
+
+# Test: No-path PATCH with case-insensitive keys
+Write-Host "`n--- Test: No-Path PATCH with Case-Insensitive Keys ---" -ForegroundColor Cyan
+$ciNoPathBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        value = @{ DisplayName = "CI-Keys Merged"; Active = $true }
+    })
+} | ConvertTo-Json -Depth 4
+$ciNoPathResult = Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PATCH -Headers $headers -Body $ciNoPathBody
+Test-Result -Success ($ciNoPathResult.displayName -eq "CI-Keys Merged") -Message "No-path PATCH with 'DisplayName' (PascalCase key) works"
+
+# Test: PATCH with valuePath (emails[type eq \"work\"].value)
+Write-Host "`n--- Test: PATCH with valuePath ---" -ForegroundColor Cyan
+# First ensure user has emails
+$setupEmailBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        value = @{
+            emails = @(
+                @{ value = "work@test.com"; type = "work"; primary = $true },
+                @{ value = "home@test.com"; type = "home" }
+            )
+        }
+    })
+} | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PATCH -Headers $headers -Body $setupEmailBody | Out-Null
+
+$valuePathBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        path = 'emails[type eq "work"].value'
+        value = "updated-work@test.com"
+    })
+} | ConvertTo-Json -Depth 4
+$valuePathResult = Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PATCH -Headers $headers -Body $valuePathBody
+$workEmail = $valuePathResult.emails | Where-Object { $_.type -eq "work" } | Select-Object -First 1
+Test-Result -Success ($workEmail.value -eq "updated-work@test.com") -Message "PATCH with valuePath updates emails[type eq work].value"
+
+# Verify home email unchanged
+$homeEmail = $valuePathResult.emails | Where-Object { $_.type -eq "home" } | Select-Object -First 1
+Test-Result -Success ($homeEmail.value -eq "home@test.com") -Message "valuePath PATCH does not affect other email entries"
+
+# Test: PATCH with extension URN path
+Write-Host "`n--- Test: PATCH with Extension URN Path ---" -ForegroundColor Cyan
+$extUrnBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "add"
+        path = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department"
+        value = "Engineering"
+    })
+} | ConvertTo-Json -Depth 4
+$extUrnResult = Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PATCH -Headers $headers -Body $extUrnBody
+$enterpriseExt = $extUrnResult.'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'
+Test-Result -Success ($enterpriseExt.department -eq "Engineering") -Message "PATCH with extension URN path sets department"
+
+# Test: PATCH extension URN with replace
+$extReplaceBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        path = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department"
+        value = "Product"
+    })
+} | ConvertTo-Json -Depth 4
+$extReplaceResult = Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PATCH -Headers $headers -Body $extReplaceBody
+$enterpriseExt2 = $extReplaceResult.'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'
+Test-Result -Success ($enterpriseExt2.department -eq "Product") -Message "PATCH with extension URN replace updates department"
+
+# Test: Multiple operations in single PATCH request
+Write-Host "`n--- Test: Multiple Operations in Single PATCH ---" -ForegroundColor Cyan
+$multiOpBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "replace"; path = "displayName"; value = "Multi-Op User" },
+        @{ op = "replace"; path = "active"; value = $false },
+        @{ op = "add"; path = "title"; value = "Engineer" }
+    )
+} | ConvertTo-Json -Depth 4
+$multiOpResult = Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PATCH -Headers $headers -Body $multiOpBody
+Test-Result -Success ($multiOpResult.displayName -eq "Multi-Op User") -Message "Multi-op PATCH: displayName updated"
+Test-Result -Success ($multiOpResult.active -eq $false) -Message "Multi-op PATCH: active set to false"
+Test-Result -Success ($multiOpResult.title -eq "Engineer") -Message "Multi-op PATCH: title added"
+
+# Reactivate user for remaining tests
+$reactivateBody2 = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{ op = "replace"; path = "active"; value = $true })
+} | ConvertTo-Json -Depth 3
+Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PATCH -Headers $headers -Body $reactivateBody2 | Out-Null
+
+# ============================================
+# TEST SECTION 3d: PAGINATION & ADVANCED FILTERING
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 3d: PAGINATION & ADVANCED FILTERING" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Create users with externalId for pagination and filtering tests
+Write-Host "`n--- Setup: Create Users for Pagination ---" -ForegroundColor Cyan
+$paginationUserIds = @($UserId)
+for ($i = 1; $i -le 3; $i++) {
+    $pagUserBody = @{
+        schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+        userName = "pagination-user$i@test.com"
+        externalId = "ext-pag-$i"
+        displayName = "Pagination User $i"
+        active = $true
+    } | ConvertTo-Json
+    $pagUser = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $pagUserBody
+    $paginationUserIds += $pagUser.id
+    Write-Host "  Created pagination user $i : $($pagUser.id)"
+}
+
+# Test: Pagination with count
+Write-Host "`n--- Test: Pagination with count ---" -ForegroundColor Cyan
+$pagResult = Invoke-RestMethod -Uri "$scimBase/Users?count=2" -Method GET -Headers $headers
+Test-Result -Success ($pagResult.itemsPerPage -eq 2) -Message "Pagination: itemsPerPage matches count=2"
+Test-Result -Success ($pagResult.totalResults -ge 4) -Message "Pagination: totalResults >= 4 (all users)"
+Test-Result -Success ($pagResult.Resources.Count -eq 2) -Message "Pagination: Resources array has 2 items"
+
+# Test: Pagination with startIndex
+Write-Host "`n--- Test: Pagination with startIndex ---" -ForegroundColor Cyan
+$pagResult2 = Invoke-RestMethod -Uri "$scimBase/Users?startIndex=2&count=2" -Method GET -Headers $headers
+Test-Result -Success ($pagResult2.startIndex -eq 2) -Message "Pagination: startIndex=2 reflected in response"
+Test-Result -Success ($pagResult2.Resources.Count -le 2) -Message "Pagination: startIndex+count returns correct page size"
+
+# Test: Filter by externalId
+Write-Host "`n--- Test: Filter by externalId ---" -ForegroundColor Cyan
+$extIdFilter = Invoke-RestMethod -Uri "$scimBase/Users?filter=externalId eq `"ext-pag-1`"" -Method GET -Headers $headers
+Test-Result -Success ($extIdFilter.totalResults -eq 1) -Message "Filter by externalId returns exactly 1 user"
+Test-Result -Success ($extIdFilter.Resources[0].externalId -eq "ext-pag-1") -Message "Filtered user has correct externalId"
+
+# Test: Filter by externalId (case-insensitive attribute name)
+$extIdFilterCI = Invoke-RestMethod -Uri "$scimBase/Users?filter=EXTERNALID eq `"ext-pag-2`"" -Method GET -Headers $headers
+Test-Result -Success ($extIdFilterCI.totalResults -eq 1) -Message "Filter with 'EXTERNALID' (uppercase attr) finds user"
+
+# Test: externalId uniqueness (same externalId → 409)
+Write-Host "`n--- Test: externalId Uniqueness ---" -ForegroundColor Cyan
+$dupExtBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "dup-ext-test@test.com"
+    externalId = "ext-pag-1"  # Already exists
+    active = $true
+} | ConvertTo-Json
+try {
+    Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $dupExtBody | Out-Null
+    Test-Result -Success $false -Message "Duplicate externalId should return 409"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 409) -Message "Duplicate externalId returns 409 Conflict"
+}
 
 # ============================================
 # TEST SECTION 4: SCIM GROUP OPERATIONS
@@ -619,6 +860,60 @@ Test-Result -Success ($schemas.Resources.Count -gt 0) -Message "Schemas endpoint
 Write-Host "`n--- Test: ResourceTypes ---" -ForegroundColor Cyan
 $resourceTypes = Invoke-RestMethod -Uri "$scimBase/ResourceTypes" -Method GET -Headers $headers
 Test-Result -Success ($resourceTypes.Resources.Count -gt 0) -Message "ResourceTypes endpoint returns resource types"
+
+# ============================================
+# TEST SECTION 8b: CONTENT-TYPE & AUTH VERIFICATION
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 8b: CONTENT-TYPE & AUTH VERIFICATION" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Test: Response Content-Type is application/scim+json
+Write-Host "`n--- Test: Response Content-Type Header ---" -ForegroundColor Cyan
+$rawResponse = Invoke-WebRequest -Uri "$scimBase/Users" -Method GET -Headers $headers
+$contentType = $rawResponse.Headers['Content-Type']
+# Handle both single string and array (PowerShell version differences)
+$ctValue = if ($contentType -is [array]) { $contentType[0] } else { $contentType }
+Test-Result -Success ($ctValue -like "*scim+json*") -Message "Response Content-Type is application/scim+json ($ctValue)"
+
+# Test: POST response also has scim+json content type
+$postRawResponse = Invoke-WebRequest -Uri "$scimBase/Users" -Method POST -Headers $headers -Body (@{schemas=@("urn:ietf:params:scim:schemas:core:2.0:User");userName="ct-test-$(Get-Random)@test.com";active=$true} | ConvertTo-Json)
+$postCt = $postRawResponse.Headers['Content-Type']
+$postCtValue = if ($postCt -is [array]) { $postCt[0] } else { $postCt }
+Test-Result -Success ($postCtValue -like "*scim+json*") -Message "POST response Content-Type is application/scim+json"
+
+# Test: Missing Authorization header → 401
+Write-Host "`n--- Test: Missing Auth Token → 401 ---" -ForegroundColor Cyan
+try {
+    $noAuthHeaders = @{'Content-Type'='application/json'}
+    Invoke-RestMethod -Uri "$scimBase/Users" -Method GET -Headers $noAuthHeaders | Out-Null
+    Test-Result -Success $false -Message "Missing auth should return 401"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 401) -Message "Missing Authorization header returns 401"
+}
+
+# Test: Invalid token → 401
+Write-Host "`n--- Test: Invalid Auth Token → 401 ---" -ForegroundColor Cyan
+try {
+    $badAuthHeaders = @{Authorization="Bearer totally-invalid-token-xyz"; 'Content-Type'='application/json'}
+    Invoke-RestMethod -Uri "$scimBase/Users" -Method GET -Headers $badAuthHeaders | Out-Null
+    Test-Result -Success $false -Message "Invalid token should return 401"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 401) -Message "Invalid Bearer token returns 401"
+}
+
+# Test: No Bearer prefix → 401
+Write-Host "`n--- Test: Token Without Bearer Prefix → 401 ---" -ForegroundColor Cyan
+try {
+    $noBearerHeaders = @{Authorization="$Token"; 'Content-Type'='application/json'}
+    Invoke-RestMethod -Uri "$scimBase/Users" -Method GET -Headers $noBearerHeaders | Out-Null
+    Test-Result -Success $false -Message "Token without Bearer prefix should return 401"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 401) -Message "Token without 'Bearer ' prefix returns 401"
+}
 
 # ============================================
 # TEST SECTION 9: ERROR HANDLING

@@ -50,8 +50,10 @@ export class ScimGroupsService {
 
     const sanitizedPayload = this.extractAdditionalAttributes(dto);
 
-  const group = await this.prisma.scimGroup.create({
+    const endpointId = await this.getOrCreateDefaultEndpointId();
+    const group = await this.prisma.scimGroup.create({
       data: {
+        endpointId,
         scimId,
         displayName: dto.displayName,
         rawPayload: JSON.stringify(sanitizedPayload),
@@ -82,11 +84,11 @@ export class ScimGroupsService {
   }
 
   async deleteGroup(scimId: string): Promise<void> {
-    try {
-      await this.prisma.scimGroup.delete({ where: { scimId } });
-    } catch (error) {
+    const group = await this.prisma.scimGroup.findFirst({ where: { scimId }, select: { id: true } });
+    if (!group) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
+    await this.prisma.scimGroup.delete({ where: { id: group.id } });
   }
 
   async listGroups(
@@ -231,7 +233,7 @@ export class ScimGroupsService {
   }
 
   private getGroupWithMembers(scimId: string): Promise<GroupWithMembers | null> {
-    return this.prisma.scimGroup.findUnique({
+    return this.prisma.scimGroup.findFirst({
       where: { scimId },
       select: {
         id: true,
@@ -453,6 +455,22 @@ export class ScimGroupsService {
       members,
       ...rest
     };
+  }
+
+  /** Lazily resolves (or creates) a 'default' endpoint for legacy non-multi-endpoint routes. */
+  private defaultEndpointId: string | null = null;
+  private async getOrCreateDefaultEndpointId(): Promise<string> {
+    if (this.defaultEndpointId) return this.defaultEndpointId;
+    const name = 'default';
+    let ep = await this.prisma.endpoint.findUnique({ where: { name }, select: { id: true } });
+    if (!ep) {
+      ep = await this.prisma.endpoint.create({
+        data: { name, displayName: 'Default Endpoint', description: 'Auto-created for legacy routes' },
+        select: { id: true },
+      });
+    }
+    this.defaultEndpointId = ep.id;
+    return ep.id;
   }
 
   private parseJson<T>(value: string | null | undefined): T {

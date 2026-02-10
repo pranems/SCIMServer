@@ -74,7 +74,11 @@ A complete multi-endpoint architecture for the SCIMTool API is **fully implement
 - `replaceGroupForEndpoint()` - PUT operations
 - `deleteGroupForEndpoint()` - Delete group
 
-### 4. Endpoint-Scoped SCIM Controller (`src/modules/scim/controllers/endpoint-scim.controller.ts`)
+### 4. Endpoint-Scoped SCIM Controllers
+
+**Users:** `src/modules/scim/controllers/endpoint-scim-users.controller.ts`
+**Groups:** `src/modules/scim/controllers/endpoint-scim-groups.controller.ts`
+**Discovery (Schemas, ResourceTypes, ServiceProviderConfig):** `src/modules/scim/controllers/endpoint-scim-discovery.controller.ts`
 
 ✅ **Routes all SCIM endpoints under endpoint-specific paths:**
 
@@ -103,7 +107,8 @@ A complete multi-endpoint architecture for the SCIMTool API is **fully implement
 - `endpoint.service.spec.ts` - Endpoint service tests (38 tests)
 - `endpoint-config.interface.spec.ts` - Config utilities tests (43 tests)
 - `endpoint-context.storage.spec.ts` - Context storage tests (10 tests)
-- `endpoint-scim.controller.spec.ts` - SCIM controller tests (16 tests)
+- `endpoint-scim-users.controller.spec.ts` - SCIM Users controller tests (10 tests)
+- `endpoint-scim-groups.controller.spec.ts` - SCIM Groups controller tests (10 tests)
 - `endpoint-scim-users.service.spec.ts` - User service tests (15 tests)
 - `endpoint-scim-groups.service.spec.ts` - Group service tests (20 tests)
 - `activity.controller.spec.ts` - Activity controller tests (9 tests)
@@ -112,7 +117,7 @@ A complete multi-endpoint architecture for the SCIMTool API is **fully implement
 
 ✅ **Updated files:**
 - `src/modules/app/app.module.ts` - Added EndpointModule to imports
-- `src/modules/scim/scim.module.ts` - Added EndpointScimController, services, and EndpointContextStorage
+- `src/modules/scim/scim.module.ts` - Added EndpointScimUsersController, EndpointScimGroupsController, services, and EndpointContextStorage
 
 ## How It Works
 
@@ -120,7 +125,7 @@ A complete multi-endpoint architecture for the SCIMTool API is **fully implement
 Config is passed **directly from controller to service** as a parameter:
 
 ```typescript
-// In EndpointScimController
+// In EndpointScimGroupsController
 @Patch('Groups/:id')
 async updateGroup(...) {
   const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
@@ -138,7 +143,7 @@ This is more reliable than AsyncLocalStorage across async boundaries in NestJS.
 
 ### SCIM Operation Flow (endpoint-specific)
 1. Client calls `GET /scim/endpoints/{endpointId}/Users`
-2. EndpointScimController:
+2. EndpointScimUsersController:
    - Validates endpoint exists
    - Sets endpoint context via EndpointContextStorage
    - Passes `endpointId` to service layer
@@ -352,8 +357,10 @@ npm test -- --testPathPattern="endpoint"
 - ✅ `src/modules/endpoint/services/endpoint.service.spec.ts` (38 tests)
 - ✅ `src/modules/endpoint/endpoint-config.interface.spec.ts` (43 tests)
 - ✅ `src/modules/endpoint/endpoint-context.storage.spec.ts` (10 tests)
-- ✅ `src/modules/scim/controllers/endpoint-scim.controller.ts`
-- ✅ `src/modules/scim/controllers/endpoint-scim.controller.spec.ts` (16 tests)
+- ✅ `src/modules/scim/controllers/endpoint-scim-users.controller.ts`
+- ✅ `src/modules/scim/controllers/endpoint-scim-users.controller.spec.ts` (10 tests)
+- ✅ `src/modules/scim/controllers/endpoint-scim-groups.controller.ts`
+- ✅ `src/modules/scim/controllers/endpoint-scim-groups.controller.spec.ts` (10 tests)
 - ✅ `src/modules/scim/services/endpoint-scim-users.service.ts`
 - ✅ `src/modules/scim/services/endpoint-scim-users.service.spec.ts` (15 tests)
 - ✅ `src/modules/scim/services/endpoint-scim-groups.service.ts`

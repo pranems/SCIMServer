@@ -2,7 +2,7 @@
 
 Analysis of SCIMTool implementation against SCIM 2.0 specifications (RFC 7643 - Schema, RFC 7644 - Protocol).
 
-**Analysis Date:** February 4, 2026
+**Analysis Date:** February 9, 2026 (updated after Phase 5 SCIM Validator fixes)
 
 ---
 
@@ -48,10 +48,14 @@ This document compares the current SCIMTool implementation with the SCIM 2.0 spe
 
 | Operation | Status | Notes |
 |-----------|--------|-------|
-| `add` | ✅ | Add values to attributes |
-| `remove` | ✅ | Remove values from attributes |
-| `replace` | ✅ | Replace attribute values |
+| `add` | ✅ | Add values to attributes, including valuePath filter expressions |
+| `remove` | ✅ | Remove values from attributes, including enterprise extension URN paths |
+| `replace` | ✅ | Replace attribute values, valuePath in-place updates, no-path object merges |
 | PatchOp schema | ✅ | Uses `urn:ietf:params:scim:api:messages:2.0:PatchOp` |
+| ValuePath filters | ✅ | `emails[type eq "work"].value` resolved and updated in-place |
+| Enterprise extension URN | ✅ | `urn:...:enterprise:2.0:User:manager` → nested object update |
+| No-path replace (object value) | ✅ | Dot-notation keys and extension URN keys resolved into nested structures |
+| Boolean coercion | ✅ | `roles[].primary` string `"True"`/`"False"` → boolean `true`/`false` |
 
 ### 5. List Response (RFC 7644 §3.4.2)
 
@@ -85,8 +89,11 @@ This document compares the current SCIMTool implementation with the SCIM 2.0 spe
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Basic filter support | ✅ | `filter=userName eq "..."` |
+| Case-insensitive userName filter | ✅ | In-code filtering with `.toLowerCase()` (SQLite compatible) |
+| Case-insensitive displayName filter | ✅ | In-code filtering for Groups |
 | `startIndex` | ✅ | Pagination start |
 | `count` | ✅ | Page size |
+| `excludedAttributes` | ✅ | Strips specified attributes from Group responses (RFC 7644 §3.4.2.5) |
 
 ---
 
@@ -157,7 +164,7 @@ This document compares the current SCIMTool implementation with the SCIM 2.0 spe
 | Feature | Status | Notes |
 |---------|--------|-------|
 | `attributes` parameter | ❌ | Not implemented - always returns full resource |
-| `excludedAttributes` parameter | ❌ | Not implemented |
+| `excludedAttributes` parameter | ✅ | Implemented for Groups (`?excludedAttributes=members`) |
 
 ### 4. Password Management (RFC 7644 §3.5)
 
@@ -201,23 +208,24 @@ This document compares the current SCIMTool implementation with the SCIM 2.0 spe
 
 | Category | Score | Notes |
 |----------|-------|-------|
-| Core Operations | **95%** | All CRUD operations work correctly |
-| Resource Types | **90%** | User and Group supported with most attributes |
+| Core Operations | **100%** | All CRUD operations work correctly |
+| Resource Types | **95%** | User and Group supported with most attributes |
 | Media Type | **100%** | Returns `application/scim+json` per RFC 7644 §3.1 |
 | Discovery | **100%** | All 3 endpoints implemented |
-| Error Handling | **95%** | Proper SCIM error format |
-| Filtering | **60%** | Basic `eq` works, complex filters limited |
-| Pagination | **100%** | Full support |
-| Sorting | **0%** | Not implemented (though advertised) |
-| Attribute Projection | **0%** | Not implemented |
+| Error Handling | **100%** | Proper SCIM error format incl. 409 uniqueness |
+| Filtering | **85%** | `eq` with case-insensitive support, complex filters limited |
+| Pagination | **100%** | Full support (in-code slicing for filtered results) |
+| PATCH Operations | **95%** | valuePath, extension URN, no-path, boolean coercion all working |
+| Attribute Projection | **30%** | `excludedAttributes` for Groups; `attributes` not implemented |
+| Sorting | **0%** | Not implemented (correctly listed as unsupported) |
 | Bulk Operations | **0%** | Not implemented (correctly listed as unsupported) |
 | ETag | **50%** | Partial support |
 
 ---
 
-## Overall SCIM 2.0 Compliance: ~75-80%
+## Overall SCIM 2.0 Compliance: ~90%
 
-The implementation covers the most critical SCIM 2.0 features needed for Azure AD, Okta, and other identity provider integrations. The missing features (sorting, attribute projection, complex filters) are optional or less commonly used in production SCIM provisioning scenarios.
+The implementation passes all 25 Microsoft SCIM Validator tests including 7 preview tests. Remaining gaps are optional features (sorting, bulk, `attributes` parameter) that are not required for Microsoft Entra ID provisioning.
 
 ---
 
@@ -225,9 +233,12 @@ The implementation covers the most critical SCIM 2.0 features needed for Azure A
 
 | File | Purpose |
 |------|---------|
-| `endpoint-scim.controller.ts` | Endpoint-scoped SCIM API routes |
-| `endpoint-scim-users.service.ts` | User CRUD with endpoint isolation |
-| `endpoint-scim-groups.service.ts` | Group CRUD with endpoint isolation |
+| `endpoint-scim-users.controller.ts` | Endpoint-scoped SCIM User API routes |
+| `endpoint-scim-groups.controller.ts` | Endpoint-scoped SCIM Group API routes (incl. `excludedAttributes`) |
+| `endpoint-scim-discovery.controller.ts` | Endpoint-scoped SCIM discovery routes (Schemas, ResourceTypes, ServiceProviderConfig) |
+| `endpoint-scim-users.service.ts` | User CRUD with endpoint isolation, in-code case-insensitive filtering, boolean sanitization |
+| `endpoint-scim-groups.service.ts` | Group CRUD with endpoint isolation, displayName uniqueness, stale rawPayload fix |
+| `scim-patch-path.ts` | SCIM PATCH path utilities: valuePath parsing, extension URN resolution, `addValuePathEntry()`, `resolveNoPathValue()` |
 | `scim-content-type.interceptor.ts` | Sets `Content-Type: application/scim+json` on all responses (RFC 7644 §3.1) |
 | `scim-constants.ts` | SCIM schema URNs and constants |
 | `scim-errors.ts` | SCIM error response format |
@@ -252,8 +263,8 @@ According to RFC 7644, the `replace` operation replaces the value at the target 
 | If target is multi-valued attribute (no filter), replace all values | ✅ **Implemented** | Works for `members` |
 | If path specifies non-existent attribute, treat as `add` | ✅ **Implemented** | Adds to `rawPayload` |
 | If target is complex attribute, replace sub-attributes | ✅ **Implemented** | Sub-attributes in value |
-| If target uses valuePath filter matching one+ values, replace all matched | ⚠️ **Partial** | Filter-based targeting not fully implemented |
-| If valuePath filter matches zero values, return 400 with `noTarget` | ⚠️ **Partial** | Basic implementation |
+| If target uses valuePath filter matching one+ values, replace all matched | ✅ **Implemented** | `applyValuePathUpdate()` resolves filter in-place |
+| If valuePath filter matches zero values, return 400 with `noTarget` | ✅ **Implemented** | Returns `noTarget` error |
 
 ---
 
@@ -287,7 +298,7 @@ private handleReplace(
 | **Value validation** | Type must match attribute type | Checks string for `displayName`, array for `members` | ✅ Yes |
 | **scimType errors** | Return appropriate error codes | `invalidValue`, `invalidPath` used | ✅ Yes |
 | **Member deduplication** | Not explicitly required | `ensureUniqueMembers()` prevents duplicates | ✅ Bonus |
-| **Filter-based replace** | `members[value eq "..."]` | ❌ Not implemented | ⚠️ Gap |
+| **Filter-based replace** | `members[value eq "..."]` | ✅ Implemented via `applyValuePathUpdate()` | ✅ Fixed |
 
 #### Example: Replace displayName
 ```json
@@ -342,7 +353,7 @@ private handleReplace(
 | **Uniqueness enforcement** | Return 409 on conflict | Calls `assertUniqueIdentifiersForEndpoint()` | ✅ Yes |
 | **Boolean handling** | Value must be boolean | Accepts `true`/`false` as string or boolean | ✅ Yes |
 | **scimType errors** | Return appropriate codes | `invalidValue`, `noTarget` used | ✅ Yes |
-| **Filter-based replace** | `emails[type eq "work"]` | ❌ Not implemented | ⚠️ Gap |
+| **Filter-based replace** | `emails[type eq "work"]` | ✅ Implemented via `applyValuePathUpdate()` | ✅ Fixed |
 
 #### Example: Replace active status
 ```json
@@ -422,7 +433,7 @@ RFC requires checking `mutability` characteristic. Current implementation handle
 | Replace userName (User) | ✅ Covered |
 | Invalid value type | ✅ Covered |
 | Unsupported path | ✅ Covered |
-| Filter-based replace | ❌ Not covered |
+| Filter-based replace | ✅ Covered |
 
 ---
 
@@ -430,12 +441,12 @@ RFC requires checking `mutability` characteristic. Current implementation handle
 
 | Metric | Score |
 |--------|-------|
-| **RFC 7644 §3.5.2.3 Compliance** | ~85% |
+| **RFC 7644 §3.5.2.3 Compliance** | ~98% |
 | **Production Readiness** | ✅ High |
-| **Azure AD / Entra Compatibility** | ✅ Full |
+| **Azure AD / Entra Compatibility** | ✅ Full (all 25 validator tests pass) |
 | **Okta Compatibility** | ✅ Full |
 
-The PATCH replace implementation covers all common use cases required by major identity providers (Azure AD, Okta, OneLogin). The main gap is filter-based path targeting (`[attr eq "value"]`), which is less commonly used in practice.
+The PATCH replace implementation now covers all use cases required by the Microsoft SCIM Validator, including valuePath filter expressions (`emails[type eq "work"].value`), enterprise extension URN paths, no-path object merges with dot-notation resolution, and boolean coercion for multi-valued attributes.
 
 ---
 
