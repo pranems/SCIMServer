@@ -19,6 +19,8 @@ import { EndpointScimGroupsService } from '../services/endpoint-scim-groups.serv
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { CreateGroupDto } from '../dto/create-group.dto';
 import { PatchGroupDto } from '../dto/patch-group.dto';
+import { SearchRequestDto } from '../dto/search-request.dto';
+import { applyAttributeProjection, applyAttributeProjectionToList } from '../common/scim-attribute-projection';
 
 /**
  * Endpoint-specific SCIM Groups Controller
@@ -81,6 +83,7 @@ export class EndpointScimGroupsController {
     @Query('filter') filter?: string,
     @Query('startIndex') startIndex?: string,
     @Query('count') count?: string,
+    @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
     const { baseUrl } = await this.validateAndSetContext(endpointId, req);
@@ -94,11 +97,48 @@ export class EndpointScimGroupsController {
       endpointId
     );
 
-    if (excludedAttributes) {
+    if (attributes || excludedAttributes) {
       return {
         ...result,
-        Resources: result.Resources.map((r: Record<string, unknown>) =>
-          this.stripExcludedAttributes(r, excludedAttributes)
+        Resources: applyAttributeProjectionToList(
+          result.Resources,
+          attributes,
+          excludedAttributes
+        )
+      };
+    }
+    return result;
+  }
+
+  /**
+   * POST /scim/endpoints/{endpointId}/Groups/.search
+   * Search groups using POST body (RFC 7644 §3.4.3)
+   */
+  @Post('Groups/.search')
+  @HttpCode(200)
+  async searchGroups(
+    @Param('endpointId') endpointId: string,
+    @Body() dto: SearchRequestDto,
+    @Req() req: Request
+  ) {
+    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
+    const result = await this.groupsService.listGroupsForEndpoint(
+      {
+        filter: dto.filter,
+        startIndex: dto.startIndex,
+        count: dto.count
+      },
+      baseUrl,
+      endpointId
+    );
+
+    if (dto.attributes || dto.excludedAttributes) {
+      return {
+        ...result,
+        Resources: applyAttributeProjectionToList(
+          result.Resources,
+          dto.attributes,
+          dto.excludedAttributes
         )
       };
     }
@@ -114,11 +154,12 @@ export class EndpointScimGroupsController {
     @Param('endpointId') endpointId: string,
     @Param('id') id: string,
     @Req() req: Request,
+    @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
     const { baseUrl } = await this.validateAndSetContext(endpointId, req);
     const result = await this.groupsService.getGroupForEndpoint(id, baseUrl, endpointId);
-    return excludedAttributes ? this.stripExcludedAttributes(result, excludedAttributes) : result;
+    return applyAttributeProjection(result, attributes, excludedAttributes);
   }
 
   /**
@@ -164,28 +205,6 @@ export class EndpointScimGroupsController {
   ): Promise<void> {
     await this.validateAndSetContext(endpointId, req);
     return this.groupsService.deleteGroupForEndpoint(id, endpointId);
-  }
-
-  // ===== Helper Methods =====
-
-  /**
-   * Strip excluded attributes from a SCIM resource response.
-   * Per RFC 7644 §3.4.2.5: excludedAttributes query parameter.
-   */
-  private stripExcludedAttributes(
-    resource: Record<string, unknown>,
-    excludedAttributes: string
-  ): Record<string, unknown> {
-    const toExclude = new Set(
-      excludedAttributes.split(',').map(a => a.trim().toLowerCase())
-    );
-    const filtered: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(resource)) {
-      if (!toExclude.has(key.toLowerCase())) {
-        filtered[key] = value;
-      }
-    }
-    return filtered;
   }
 
 }

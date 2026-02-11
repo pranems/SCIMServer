@@ -19,6 +19,8 @@ import { EndpointScimUsersService } from '../services/endpoint-scim-users.servic
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { PatchUserDto } from '../dto/patch-user.dto';
+import { SearchRequestDto } from '../dto/search-request.dto';
+import { applyAttributeProjection, applyAttributeProjectionToList } from '../common/scim-attribute-projection';
 
 /**
  * Endpoint-specific SCIM Users Controller
@@ -78,10 +80,12 @@ export class EndpointScimUsersController {
     @Req() req: Request,
     @Query('filter') filter?: string,
     @Query('startIndex') startIndex?: string,
-    @Query('count') count?: string
+    @Query('count') count?: string,
+    @Query('attributes') attributes?: string,
+    @Query('excludedAttributes') excludedAttributes?: string
   ) {
     const { baseUrl } = await this.validateAndSetContext(endpointId, req);
-    return this.usersService.listUsersForEndpoint(
+    const result = await this.usersService.listUsersForEndpoint(
       {
         filter,
         startIndex: startIndex ? parseInt(startIndex, 10) : undefined,
@@ -90,6 +94,53 @@ export class EndpointScimUsersController {
       baseUrl,
       endpointId
     );
+
+    if (attributes || excludedAttributes) {
+      return {
+        ...result,
+        Resources: applyAttributeProjectionToList(
+          result.Resources,
+          attributes,
+          excludedAttributes
+        )
+      };
+    }
+    return result;
+  }
+
+  /**
+   * POST /scim/endpoints/{endpointId}/Users/.search
+   * Search users using POST body (RFC 7644 §3.4.3)
+   */
+  @Post('Users/.search')
+  @HttpCode(200)
+  async searchUsers(
+    @Param('endpointId') endpointId: string,
+    @Body() dto: SearchRequestDto,
+    @Req() req: Request
+  ) {
+    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
+    const result = await this.usersService.listUsersForEndpoint(
+      {
+        filter: dto.filter,
+        startIndex: dto.startIndex,
+        count: dto.count
+      },
+      baseUrl,
+      endpointId
+    );
+
+    if (dto.attributes || dto.excludedAttributes) {
+      return {
+        ...result,
+        Resources: applyAttributeProjectionToList(
+          result.Resources,
+          dto.attributes,
+          dto.excludedAttributes
+        )
+      };
+    }
+    return result;
   }
 
   /**
@@ -100,10 +151,13 @@ export class EndpointScimUsersController {
   async getUser(
     @Param('endpointId') endpointId: string,
     @Param('id') id: string,
-    @Req() req: Request
+    @Req() req: Request,
+    @Query('attributes') attributes?: string,
+    @Query('excludedAttributes') excludedAttributes?: string
   ) {
     const { baseUrl } = await this.validateAndSetContext(endpointId, req);
-    return this.usersService.getUserForEndpoint(id, baseUrl, endpointId);
+    const result = await this.usersService.getUserForEndpoint(id, baseUrl, endpointId);
+    return applyAttributeProjection(result, attributes, excludedAttributes);
   }
 
   /**

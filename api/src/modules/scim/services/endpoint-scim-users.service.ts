@@ -29,6 +29,7 @@ import {
   removeExtensionAttribute,
   resolveNoPathValue,
 } from '../utils/scim-patch-path';
+import { buildUserFilter } from '../filters/apply-scim-filter';
 
 interface ListUsersParams {
   filter?: string;
@@ -100,37 +101,45 @@ export class EndpointScimUsersService {
       count = MAX_COUNT;
     }
 
-    const { dbWhere, caseInsensitiveUserName } = this.buildFilter(filter);
+    let filterResult;
+    try {
+      filterResult = buildUserFilter(filter);
+    } catch {
+      throw createScimError({
+        status: 400,
+        scimType: 'invalidFilter',
+        detail: `Unsupported or invalid filter expression: '${filter}'.`
+      });
+    }
+
     const where: Prisma.ScimUserWhereInput = {
-      ...dbWhere,
+      ...filterResult.dbWhere,
       endpointId
     };
 
-    // Fetch users from DB (may fetch all for endpoint if case-insensitive filter requires in-code matching)
-    let allUsers = await this.prisma.scimUser.findMany({
+    // Fetch users from DB
+    const allDbUsers = await this.prisma.scimUser.findMany({
       where,
       orderBy: { createdAt: 'asc' }
     });
 
-    // Apply case-insensitive userName filter in code
-    // (SQLite doesn't support Prisma's mode: 'insensitive')
-    if (caseInsensitiveUserName) {
-      const lowerFilter = caseInsensitiveUserName.toLowerCase();
-      allUsers = allUsers.filter(u => u.userName.toLowerCase() === lowerFilter);
+    // Build SCIM resources and apply in-memory filter if needed
+    let resources = allDbUsers.map((user) => this.toScimUserResource(user, baseUrl));
+    if (filterResult.inMemoryFilter) {
+      resources = resources.filter(filterResult.inMemoryFilter);
     }
 
-    const totalResults = allUsers.length;
+    const totalResults = resources.length;
     const skip = Math.max(startIndex - 1, 0);
     const take = Math.max(Math.min(count, MAX_COUNT), 0);
-    const paginatedUsers = allUsers.slice(skip, skip + take);
-    const resources = paginatedUsers.map((user) => this.toScimUserResource(user, baseUrl));
+    const paginatedResources = resources.slice(skip, skip + take);
 
     return {
       schemas: [SCIM_LIST_RESPONSE_SCHEMA],
       totalResults,
       startIndex,
-      itemsPerPage: resources.length,
-      Resources: resources
+      itemsPerPage: paginatedResources.length,
+      Resources: paginatedResources
     };
   }
 
@@ -234,43 +243,6 @@ export class EndpointScimUsersService {
         scimType: 'invalidSyntax',
         detail: `Missing required schema '${requiredSchema}'.`
       });
-    }
-  }
-
-  private buildFilter(filter?: string): { dbWhere: Prisma.ScimUserWhereInput; caseInsensitiveUserName?: string } {
-    if (!filter) {
-      return { dbWhere: {} };
-    }
-
-    // Support simple filters: attribute eq "value"
-    const regex = /(\w+(?:\.\w+)*)\s+eq\s+"?([^"]+)"?/i;
-    const match = filter.match(regex);
-    if (!match) {
-      throw createScimError({
-        status: 400,
-        scimType: 'invalidFilter',
-        detail: `Unsupported filter expression: '${filter}'.`
-      });
-    }
-
-    const attribute = match[1].toLowerCase();
-    const value = match[2];
-
-    switch (attribute) {
-      case 'username':
-        // Case-insensitive userName filter (RFC 7643 §2.1: userName caseExact=false)
-        // Use in-code filtering to ensure case-insensitivity regardless of DB collation
-        return { dbWhere: {}, caseInsensitiveUserName: value };
-      case 'externalid':
-        return { dbWhere: { externalId: value } };
-      case 'id':
-        return { dbWhere: { scimId: value } };
-      default:
-        throw createScimError({
-          status: 400,
-          scimType: 'invalidFilter',
-          detail: `Filtering by attribute '${match[1]}' is not supported.`
-        });
     }
   }
 
