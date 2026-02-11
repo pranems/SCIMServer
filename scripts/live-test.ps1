@@ -198,6 +198,10 @@ $UserId = $user.id
 Test-Result -Success ($null -ne $UserId) -Message "Create user returned ID: $UserId"
 Test-Result -Success ($user.userName -eq "livetest-user@test.com") -Message "User userName is correct"
 Test-Result -Success ($user.meta.resourceType -eq "User") -Message "User meta.resourceType is 'User'"
+Test-Result -Success ($null -ne $user.meta.location) -Message "User meta.location is present"
+Test-Result -Success ($user.meta.location -like "*Users/$UserId") -Message "User meta.location contains correct path"
+Test-Result -Success ($null -ne $user.meta.created) -Message "User meta.created is present"
+Test-Result -Success ($null -ne $user.meta.lastModified) -Message "User meta.lastModified is present"
 
 # Test: Get user by ID
 Write-Host "`n--- Test: Get User by ID ---" -ForegroundColor Cyan
@@ -408,6 +412,34 @@ $extReplaceResult = Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PAT
 $enterpriseExt2 = $extReplaceResult.'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'
 Test-Result -Success ($enterpriseExt2.department -eq "Product") -Message "PATCH with extension URN replace updates department"
 
+# Test: Manager empty-value removal (RFC 7644 §3.5.2.3)
+Write-Host "`n--- Test: Manager Empty-Value Removal (RFC 7644 §3.5.2.3) ---" -ForegroundColor Cyan
+$setManagerBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "add"
+        path = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager"
+        value = @{ value = "manager-id-123" }
+    })
+} | ConvertTo-Json -Depth 4
+$managerSetResult = Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PATCH -Headers $headers -Body $setManagerBody
+$managerExt = $managerSetResult.'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'
+Test-Result -Success ($managerExt.manager.value -eq "manager-id-123") -Message "Manager set successfully via extension URN"
+
+# Remove manager with empty value object {"value":""}
+$removeManagerBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        path = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager"
+        value = @{ value = "" }
+    })
+} | ConvertTo-Json -Depth 4
+$managerRemovedResult = Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PATCH -Headers $headers -Body $removeManagerBody
+$managerExtAfter = $managerRemovedResult.'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'
+$managerGone = ($null -eq $managerExtAfter) -or ($null -eq $managerExtAfter.manager)
+Test-Result -Success $managerGone -Message "Manager removed when value is empty string (RFC 7644 §3.5.2.3)"
+
 # Test: Multiple operations in single PATCH request
 Write-Host "`n--- Test: Multiple Operations in Single PATCH ---" -ForegroundColor Cyan
 $multiOpBody = @{
@@ -509,6 +541,10 @@ $group = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $header
 $GroupId = $group.id
 Test-Result -Success ($null -ne $GroupId) -Message "Create group returned ID: $GroupId"
 Test-Result -Success ($group.displayName -eq "Live Test Group") -Message "Group displayName is correct"
+Test-Result -Success ($group.meta.resourceType -eq "Group") -Message "Group meta.resourceType is 'Group'"
+Test-Result -Success ($null -ne $group.meta.location) -Message "Group meta.location is present"
+Test-Result -Success ($group.meta.location -like "*Groups/$GroupId") -Message "Group meta.location contains correct path"
+Test-Result -Success ($null -ne $group.meta.created) -Message "Group meta.created is present"
 
 # Test: Get group by ID
 Write-Host "`n--- Test: Get Group by ID ---" -ForegroundColor Cyan
@@ -526,10 +562,10 @@ $addMemberBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
     Operations = @(@{ op = "add"; path = "members"; value = @(@{ value = $UserId }) })
 } | ConvertTo-Json -Depth 5
-# PATCH may return 204 No Content, so we verify by fetching the group after
-Invoke-RestMethod -Uri "$scimBase/Groups/$GroupId" -Method PATCH -Headers $headers -Body $addMemberBody | Out-Null
-$groupWithMember = Invoke-RestMethod -Uri "$scimBase/Groups/$GroupId" -Method GET -Headers $headers
-$memberCount = if ($groupWithMember.members) { @($groupWithMember.members).Count } else { 0 }
+# Group PATCH returns response body (v0.8.16 fix — RFC 7644 §3.5.2)
+$groupPatchResult = Invoke-RestMethod -Uri "$scimBase/Groups/$GroupId" -Method PATCH -Headers $headers -Body $addMemberBody
+Test-Result -Success ($null -ne $groupPatchResult.id) -Message "Group PATCH returns response body (not 204)"
+$memberCount = if ($groupPatchResult.members) { @($groupPatchResult.members).Count } else { 0 }
 Test-Result -Success ($memberCount -ge 1) -Message "PATCH add member works"
 
 # Test: PATCH group (remove member)
@@ -538,10 +574,10 @@ $removeMemberBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
     Operations = @(@{ op = "remove"; path = "members[value eq `"$UserId`"]" })
 } | ConvertTo-Json -Depth 5
-# PATCH may return 204 No Content, so we verify by fetching the group after
-Invoke-RestMethod -Uri "$scimBase/Groups/$GroupId" -Method PATCH -Headers $headers -Body $removeMemberBody | Out-Null
-$groupWithoutMember = Invoke-RestMethod -Uri "$scimBase/Groups/$GroupId" -Method GET -Headers $headers
-$memberCountAfterRemove = if ($groupWithoutMember.members) { @($groupWithoutMember.members).Count } else { 0 }
+# Group PATCH returns response body (v0.8.16 fix — RFC 7644 §3.5.2)
+$groupRemoveResult = Invoke-RestMethod -Uri "$scimBase/Groups/$GroupId" -Method PATCH -Headers $headers -Body $removeMemberBody
+Test-Result -Success ($null -ne $groupRemoveResult.id) -Message "Group PATCH remove returns response body"
+$memberCountAfterRemove = if ($groupRemoveResult.members) { @($groupRemoveResult.members).Count } else { 0 }
 Test-Result -Success ($memberCountAfterRemove -eq 0) -Message "PATCH remove member works"
 
 # Test: PUT group (replace)
@@ -552,6 +588,34 @@ $putGroupBody = @{
 } | ConvertTo-Json
 $replacedGroup = Invoke-RestMethod -Uri "$scimBase/Groups/$GroupId" -Method PUT -Headers $headers -Body $putGroupBody
 Test-Result -Success ($replacedGroup.displayName -eq "Replaced Group Name") -Message "PUT group (replace) works"
+
+# Test: Create group with externalId
+Write-Host "`n--- Test: Group externalId Support ---" -ForegroundColor Cyan
+$extGroupBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = "Group With ExternalId"
+    externalId = "ext-group-123"
+} | ConvertTo-Json
+$extGroup = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $extGroupBody
+Test-Result -Success ($extGroup.externalId -eq "ext-group-123") -Message "Group created with externalId"
+
+# Test: Filter groups by externalId
+$filteredGroups = Invoke-RestMethod -Uri "$scimBase/Groups?filter=externalId eq `"ext-group-123`"" -Method GET -Headers $headers
+Test-Result -Success ($filteredGroups.totalResults -eq 1) -Message "Filter groups by externalId returns exactly 1 group"
+
+# Test: Duplicate group externalId → 409
+$dupExtGroupBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = "Dup ExternalId Group"
+    externalId = "ext-group-123"
+} | ConvertTo-Json
+try {
+    Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $dupExtGroupBody | Out-Null
+    Test-Result -Success $false -Message "Duplicate group externalId should return 409"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 409) -Message "Duplicate group externalId returns 409 Conflict"
+}
 
 # ============================================
 # TEST SECTION 5: MULTI-MEMBER PATCH CONFIG FLAG
@@ -598,10 +662,9 @@ $multiMemberPatch = @{
 } | ConvertTo-Json -Depth 5
 
 try {
-    # PATCH may return 204 No Content, so we verify by fetching the group after
-    Invoke-RestMethod -Uri "$scimBase/Groups/$MultiGroupId" -Method PATCH -Headers $headers -Body $multiMemberPatch | Out-Null
-    $multiGroupAfter = Invoke-RestMethod -Uri "$scimBase/Groups/$MultiGroupId" -Method GET -Headers $headers
-    $multiMemberCount = if ($multiGroupAfter.members) { @($multiGroupAfter.members).Count } else { 0 }
+    # Group PATCH returns response body (v0.8.16 fix — RFC 7644 §3.5.2)
+    $multiGroupResult = Invoke-RestMethod -Uri "$scimBase/Groups/$MultiGroupId" -Method PATCH -Headers $headers -Body $multiMemberPatch
+    $multiMemberCount = if ($multiGroupResult.members) { @($multiGroupResult.members).Count } else { 0 }
     Test-Result -Success ($multiMemberCount -ge 1) -Message "Multi-member PATCH with flag=True accepted ($multiMemberCount members added)"
 } catch {
     Test-Result -Success $false -Message "Multi-member PATCH should succeed with flag=True"
@@ -905,6 +968,8 @@ $postRawResponse = Invoke-WebRequest -Uri "$scimBase/Users" -Method POST -Header
 $postCt = $postRawResponse.Headers['Content-Type']
 $postCtValue = if ($postCt -is [array]) { $postCt[0] } else { $postCt }
 Test-Result -Success ($postCtValue -like "*scim+json*") -Message "POST response Content-Type is application/scim+json"
+# Verify POST status code is 201
+Test-Result -Success ($postRawResponse.StatusCode -eq 201) -Message "POST response status code is 201 Created"
 
 # Test: Missing Authorization header → 401
 Write-Host "`n--- Test: Missing Auth Token → 401 ---" -ForegroundColor Cyan
@@ -997,6 +1062,80 @@ try {
     $code = $_.Exception.Response.StatusCode.value__
     Test-Result -Success ($code -eq 400) -Message "Invalid endpoint name returns 400 Bad Request"
 }
+
+# ============================================
+# TEST SECTION 9b: RFC 7644 COMPLIANCE CHECKS
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9b: RFC 7644 COMPLIANCE CHECKS" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Test: Location header on POST /Users (RFC 7644 §3.1)
+Write-Host "`n--- Test: Location Header on POST /Users (RFC 7644 §3.1) ---" -ForegroundColor Cyan
+$locUserBody = @{schemas=@("urn:ietf:params:scim:schemas:core:2.0:User");userName="loc-header-test-$(Get-Random)@test.com";active=$true} | ConvertTo-Json
+$locUserRaw = Invoke-WebRequest -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $locUserBody
+$locUserContent = if ($locUserRaw.Content -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($locUserRaw.Content) } else { $locUserRaw.Content }
+$locUserData = $locUserContent | ConvertFrom-Json
+$locationHeader = $locUserRaw.Headers['Location']
+$locationValue = if ($locationHeader -is [array]) { $locationHeader[0] } else { $locationHeader }
+Test-Result -Success ($locUserRaw.StatusCode -eq 201) -Message "POST /Users returns 201 Created"
+Test-Result -Success ($null -ne $locationValue -and $locationValue.Length -gt 0) -Message "POST /Users includes Location header"
+Test-Result -Success ($locationValue -eq $locUserData.meta.location) -Message "Location header matches meta.location"
+
+# Test: Location header on POST /Groups (RFC 7644 §3.1)
+Write-Host "`n--- Test: Location Header on POST /Groups (RFC 7644 §3.1) ---" -ForegroundColor Cyan
+$locGroupBody = @{schemas=@("urn:ietf:params:scim:schemas:core:2.0:Group");displayName="Loc Header Test Group"} | ConvertTo-Json
+$locGroupRaw = Invoke-WebRequest -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $locGroupBody
+$locGroupContent = if ($locGroupRaw.Content -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($locGroupRaw.Content) } else { $locGroupRaw.Content }
+$locGroupData = $locGroupContent | ConvertFrom-Json
+$groupLocationHeader = $locGroupRaw.Headers['Location']
+$groupLocationValue = if ($groupLocationHeader -is [array]) { $groupLocationHeader[0] } else { $groupLocationHeader }
+Test-Result -Success ($locGroupRaw.StatusCode -eq 201) -Message "POST /Groups returns 201 Created"
+Test-Result -Success ($null -ne $groupLocationValue -and $groupLocationValue.Length -gt 0) -Message "POST /Groups includes Location header"
+Test-Result -Success ($groupLocationValue -eq $locGroupData.meta.location) -Message "Location header matches meta.location"
+
+# Test: Error response format (RFC 7644 §3.12)
+Write-Host "`n--- Test: Error Response Format (RFC 7644 §3.12) ---" -ForegroundColor Cyan
+$errorRaw = Invoke-WebRequest -Uri "$scimBase/Users/non-existent-error-format-test" -Method GET -Headers $headers -SkipHttpErrorCheck
+$errorContent = if ($errorRaw.Content -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($errorRaw.Content) } else { $errorRaw.Content }
+$errorBody = $errorContent | ConvertFrom-Json
+$errorCt = $errorRaw.Headers['Content-Type']
+$errorCtValue = if ($errorCt -is [array]) { $errorCt[0] } else { $errorCt }
+Test-Result -Success ($errorRaw.StatusCode -eq 404) -Message "Error returns 404 status code"
+Test-Result -Success ($errorCtValue -like "*scim+json*") -Message "Error Content-Type is application/scim+json"
+Test-Result -Success ($errorBody.schemas -contains "urn:ietf:params:scim:api:messages:2.0:Error") -Message "Error has SCIM Error schema"
+Test-Result -Success ($errorBody.status -is [string]) -Message "Error status is string type: '$($errorBody.status)'"
+Test-Result -Success ($errorBody.status -eq "404") -Message "Error status value is '404'"
+Test-Result -Success ($null -ne $errorBody.detail) -Message "Error includes detail message"
+
+# Test: 409 error also has correct SCIM format
+Write-Host "`n--- Test: 409 Error Response Format ---" -ForegroundColor Cyan
+$dup409Body = @{schemas=@("urn:ietf:params:scim:schemas:core:2.0:User");userName="livetest-user@test.com";active=$true} | ConvertTo-Json
+$error409Raw = Invoke-WebRequest -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $dup409Body -SkipHttpErrorCheck
+$error409Content = if ($error409Raw.Content -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($error409Raw.Content) } else { $error409Raw.Content }
+$error409Body = $error409Content | ConvertFrom-Json
+$error409Ct = $error409Raw.Headers['Content-Type']
+$error409CtValue = if ($error409Ct -is [array]) { $error409Ct[0] } else { $error409Ct }
+Test-Result -Success ($error409Raw.StatusCode -eq 409) -Message "Duplicate returns 409"
+Test-Result -Success ($error409CtValue -like "*scim+json*") -Message "409 error Content-Type is application/scim+json"
+Test-Result -Success ($error409Body.status -eq "409") -Message "409 error status is string '409'"
+
+# Test: PATCH updates meta.lastModified timestamp
+Write-Host "`n--- Test: PATCH Updates meta.lastModified ---" -ForegroundColor Cyan
+$tsUserBody = @{schemas=@("urn:ietf:params:scim:schemas:core:2.0:User");userName="timestamp-test-$(Get-Random)@test.com";active=$true} | ConvertTo-Json
+$timestampUser = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $tsUserBody
+$originalLastModified = $timestampUser.meta.lastModified
+Start-Sleep -Milliseconds 200
+$patchTsBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{ op = "replace"; path = "displayName"; value = "Timestamp Updated" })
+} | ConvertTo-Json -Depth 3
+$patchedTimestamp = Invoke-RestMethod -Uri "$scimBase/Users/$($timestampUser.id)" -Method PATCH -Headers $headers -Body $patchTsBody
+Test-Result -Success ($patchedTimestamp.meta.lastModified -ne $originalLastModified) -Message "PATCH updates meta.lastModified timestamp"
+
+# Test: GET does not change lastModified
+$getTsUser = Invoke-RestMethod -Uri "$scimBase/Users/$($timestampUser.id)" -Method GET -Headers $headers
+Test-Result -Success ($getTsUser.meta.lastModified -eq $patchedTimestamp.meta.lastModified) -Message "GET does not change meta.lastModified"
 
 # ============================================
 # TEST SECTION 10: DELETE OPERATIONS

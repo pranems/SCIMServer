@@ -172,5 +172,164 @@ describe('ScimContentTypeInterceptor', () => {
         complete: () => done(),
       });
     });
+
+    it('should set Location header on 201 Created with meta.location (RFC 7644 §3.1)', (done) => {
+      const mockSetHeader = jest.fn();
+      const mockResponse = {
+        headersSent: false,
+        statusCode: 201,
+        setHeader: mockSetHeader,
+      };
+
+      const mockContext = {
+        switchToHttp: () => ({
+          getResponse: () => mockResponse,
+        }),
+      } as unknown as ExecutionContext;
+
+      const createdResource = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        id: 'user-123',
+        userName: 'test@example.com',
+        meta: {
+          resourceType: 'User',
+          location: 'http://localhost:3000/scim/endpoints/ep1/Users/user-123',
+        },
+      };
+
+      const mockCallHandler: CallHandler = {
+        handle: () => of(createdResource),
+      };
+
+      interceptor.intercept(mockContext, mockCallHandler).subscribe({
+        next: () => {
+          expect(mockSetHeader).toHaveBeenCalledWith(
+            'Content-Type',
+            'application/scim+json; charset=utf-8'
+          );
+          expect(mockSetHeader).toHaveBeenCalledWith(
+            'Location',
+            'http://localhost:3000/scim/endpoints/ep1/Users/user-123'
+          );
+        },
+        complete: () => done(),
+      });
+    });
+
+    it('should set Location header on 201 Created Group', (done) => {
+      const mockSetHeader = jest.fn();
+      const mockResponse = {
+        headersSent: false,
+        statusCode: 201,
+        setHeader: mockSetHeader,
+      };
+
+      const mockContext = {
+        switchToHttp: () => ({
+          getResponse: () => mockResponse,
+        }),
+      } as unknown as ExecutionContext;
+
+      const createdGroup = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+        id: 'group-456',
+        displayName: 'Engineering',
+        members: [],
+        meta: {
+          resourceType: 'Group',
+          location: 'http://localhost:3000/scim/endpoints/ep1/Groups/group-456',
+        },
+      };
+
+      const mockCallHandler: CallHandler = {
+        handle: () => of(createdGroup),
+      };
+
+      interceptor.intercept(mockContext, mockCallHandler).subscribe({
+        next: () => {
+          expect(mockSetHeader).toHaveBeenCalledWith(
+            'Location',
+            'http://localhost:3000/scim/endpoints/ep1/Groups/group-456'
+          );
+        },
+        complete: () => done(),
+      });
+    });
+
+    it('should NOT set Location header on 200 OK responses', (done) => {
+      const mockSetHeader = jest.fn();
+      const mockResponse = {
+        headersSent: false,
+        statusCode: 200,
+        setHeader: mockSetHeader,
+      };
+
+      const mockContext = {
+        switchToHttp: () => ({
+          getResponse: () => mockResponse,
+        }),
+      } as unknown as ExecutionContext;
+
+      const patchedResource = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        id: 'user-123',
+        meta: {
+          location: 'http://localhost:3000/scim/endpoints/ep1/Users/user-123',
+        },
+      };
+
+      const mockCallHandler: CallHandler = {
+        handle: () => of(patchedResource),
+      };
+
+      interceptor.intercept(mockContext, mockCallHandler).subscribe({
+        next: () => {
+          expect(mockSetHeader).toHaveBeenCalledWith(
+            'Content-Type',
+            'application/scim+json; charset=utf-8'
+          );
+          expect(mockSetHeader).not.toHaveBeenCalledWith(
+            'Location',
+            expect.anything()
+          );
+        },
+        complete: () => done(),
+      });
+    });
+
+    it('should NOT set Location header on 201 without meta.location', (done) => {
+      const mockSetHeader = jest.fn();
+      const mockResponse = {
+        headersSent: false,
+        statusCode: 201,
+        setHeader: mockSetHeader,
+      };
+
+      const mockContext = {
+        switchToHttp: () => ({
+          getResponse: () => mockResponse,
+        }),
+      } as unknown as ExecutionContext;
+
+      const resourceWithoutMeta = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        id: 'user-123',
+      };
+
+      const mockCallHandler: CallHandler = {
+        handle: () => of(resourceWithoutMeta),
+      };
+
+      interceptor.intercept(mockContext, mockCallHandler).subscribe({
+        next: () => {
+          expect(mockSetHeader).toHaveBeenCalledTimes(1); // only Content-Type
+          expect(mockSetHeader).toHaveBeenCalledWith(
+            'Content-Type',
+            'application/scim+json; charset=utf-8'
+          );
+        },
+        complete: () => done(),
+      });
+    });
   });
 });

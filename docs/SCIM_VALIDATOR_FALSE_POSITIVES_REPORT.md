@@ -1,8 +1,8 @@
 # SCIM Validator Analysis Report — scim-results-9.json
 
-**Date:** February 11, 2026 (Revised v3 — fixes implemented)  
-**Source:** `scim-results-9.json` — Microsoft SCIM Validator successful run  
-**Server:** SCIMTool2022 v0.8.15 → v0.8.16 (NestJS + Prisma + SQLite)  
+**Date:** February 11, 2026 (Revised v4 — FP #4 identified & fixed)  
+**Source:** `scim-results-9.json` + `scim-results (10).json` — Microsoft SCIM Validator  
+**Server:** SCIMTool2022 v0.8.15 → v0.8.17 (NestJS + Prisma + SQLite)  
 **Endpoint:** `http://localhost:6000/scim/endpoints/cmlfuqaft0002i30tlv47pq1f/`
 
 ---
@@ -17,7 +17,7 @@
 | Warnings       | 0     |
 | `SFComplianceFailed` | `false` |
 
-The validator reports **24/24 passed, 0 failed, 7 preview** with no warnings. A detailed inspection of every captured request/response reveals **3 categories of suspected false positives** where the validator marks tests as **pass despite RFC 7644-inconsistent server behavior**. The validator does not check error response formatting, PATCH response body presence, or attribute-removal semantics.
+The validator reports **24/24 passed, 0 failed, 7 preview** with no warnings. A detailed inspection of every captured request/response reveals **4 categories of suspected false positives** where the validator marks tests as **pass despite RFC 7644-inconsistent server behavior**. The validator does not check error response formatting, PATCH response body presence, attribute-removal semantics, or HTTP `Location` header on 201 Created.
 
 ### Correction from v1 Report
 
@@ -48,7 +48,7 @@ The v1 report listed "DELETE tests returning 404" as a false positive. **This wa
 | 15 | Filter for an existing group | GET filter | 200 OK | `application/scim+json` | ✅ Clean |
 | 16 | Filter for a non-existing group | GET filter | 200 OK | `application/scim+json` | ✅ Clean |
 | 17 | Filter for existing group different case | GET filter | 200 OK | `application/scim+json` | ✅ Clean |
-| 18 | Create a new Group | POST | 201 Created | `application/scim+json` | ✅ Clean |
+| 18 | Create a new Group | POST | 201 Created | `application/scim+json` | **FP #4** |
 | 19 | Create a duplicate Group | POST | 409 Conflict | ⚠️ `application/json` | **FP #1** |
 | 20 | Patch Group - Replace Attributes | PATCH | 200 OK (empty) | `application/scim+json` | **FP #2** |
 | 21 | Update Group displayName | PATCH | 200 OK (empty) | `application/scim+json` | **FP #2** |
@@ -1013,6 +1013,39 @@ All non-error responses use `Content-Type: application/scim+json; charset=utf-8`
 
 ---
 
+## Suspected False Positive #4 — Missing HTTP `Location` Header on 201 Created
+
+**Affected tests:** POST /Users (#1 initial step), POST /Groups (#18), and all setup POST steps  
+**Severity:** Medium — RFC MUST requirement  
+**RFC Reference:** RFC 7644 §3.1 (Resource creation response)
+
+### The Problem
+
+When a new resource is created via POST, the server returns `201 Created` with the full resource in the body (including `meta.location`), but does **not** set the HTTP `Location` response header.
+
+RFC 7644 §3.1 states:
+> the server SHALL return a 201 Created response code along with the resource's representation... The server SHALL set the Location header.
+
+### Evidence from Test #18 (POST /Groups → 201 Created)
+
+Response headers:
+```
+X-Powered-By: Express
+Vary: Origin
+ETag: W/"1d7-6uMyyhSKkrz/PfPkf1P5EofOAWM"
+Content-Type: application/scim+json; charset=utf-8
+Content-Length: 471
+← NO Location header!
+```
+
+The `meta.location` is present in the JSON body but absent as an HTTP header.
+
+### Why the Validator Missed It
+
+The Microsoft SCIM validator does **not** check for the HTTP `Location` header on POST/201 responses. It validates the response body content and status code only.
+
+---
+
 ## Recommendations — ✅ ALL IMPLEMENTED
 
 ### ✅ Priority 1 — Fix Error Response Formatting (FP #1) — DONE
@@ -1048,12 +1081,22 @@ All non-error responses use `Content-Type: application/scim+json; charset=utf-8`
 3. Added 6 new tests in `api/src/modules/scim/utils/scim-patch-path.spec.ts` covering all empty-value scenarios
 4. Added integration test in `api/src/modules/scim/services/endpoint-scim-users.service.spec.ts`: "should remove manager when replace sends empty value"
 
+### ✅ Priority 4 — Fix Missing Location Header on 201 Created (FP #4) — DONE
+
+**Impact:** All POST (resource creation) responses  
+**Fix location:** `ScimContentTypeInterceptor`
+
+**Changes made:**
+1. Updated `api/src/modules/scim/interceptors/scim-content-type.interceptor.ts` — Enhanced the existing interceptor to also set `Location` header from `meta.location` on 201 Created responses
+2. Added 4 new tests in `api/src/modules/scim/interceptors/scim-content-type.interceptor.spec.ts` — Location header on User/Group creation, NOT on 200 OK, NOT when meta.location is absent
+
 ---
 
 ## RFC References
 
 | Section | Topic | Relevance |
 |---------|-------|-----------|
+| RFC 7644 §3.1 | Resource Creation | 201 Created + Location header required |
 | RFC 7644 §3.5.2 | Modifying with PATCH | Defines 200 (with body) vs 204 (without body) |
 | RFC 7644 §3.5.2.1 | Replace operation | Semantics for replace with empty values |
 | RFC 7644 §3.5.2.3 | Remove operation | Attribute removal semantics |
