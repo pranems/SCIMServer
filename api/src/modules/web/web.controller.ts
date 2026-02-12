@@ -1,6 +1,6 @@
 ﻿import { Controller, Get, Res, Param } from '@nestjs/common';
 import { Response } from 'express';
-import { join } from 'path';
+import { join } from 'node:path';
 import { Public } from '../auth/public.decorator';
 
 @Controller()

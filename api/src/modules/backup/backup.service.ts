@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { copyFile, stat, access, constants } from 'fs/promises';
-import { existsSync, createReadStream } from 'fs';
+import { copyFile, stat, access, constants } from 'node:fs/promises';
+import { existsSync, createReadStream } from 'node:fs';
 
 // Optional blob backup support (policy-friendly) activated via env vars
 // Required env vars for blob mode:

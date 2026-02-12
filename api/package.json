@@ -4,6 +4,9 @@
   "description": "SCIMTool backend service providing SCIM 2.0 endpoints and logging for troubleshooting.",
   "license": "MIT",
   "main": "dist/main.js",
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "start": "npx prisma migrate deploy && node dist/main.js",

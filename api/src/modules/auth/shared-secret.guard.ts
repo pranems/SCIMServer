@@ -10,7 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
 
 import { SCIM_ERROR_SCHEMA } from '../scim/common/scim-constants';
-import * as crypto from 'crypto';
+import * as crypto from 'node:crypto';
 import { OAuthService } from '../../oauth/oauth.service';
 import { IS_PUBLIC_KEY } from './public.decorator';
 

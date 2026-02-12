@@ -3,18 +3,18 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import type { Request, Response, NextFunction } from 'express';
 import { NestFactory } from '@nestjs/core';
 import { json } from 'express';
-import * as dotenv from 'dotenv';
-import { join } from 'path';
+import { join } from 'node:path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
 import { AppModule } from './modules/app/app.module';
-
-dotenv.config();
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true
   });
+
+  // Enable NestJS lifecycle hooks so OnModuleDestroy (e.g. Prisma $disconnect) fires on SIGTERM/SIGINT
+  app.enableShutdownHooks();
 
   // TEMP/Compatibility: Support both /scim/* (legacy) and /scim/v2/* (spec-aligned) paths.
   // Current controllers are mounted under the global prefix (default 'scim').
