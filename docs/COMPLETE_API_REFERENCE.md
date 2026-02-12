@@ -58,8 +58,15 @@ Contents
   - `POST /admin/users/:id/delete` � delete user by identifier (204)
 - Backup endpoints (guarded)
   - `GET /admin/backup/stats` � backup statistics
-  - `POST /admin/backup/trigger` � manually trigger backup
-- OAuth endpoints
+  - `POST /admin/backup/trigger` � manually trigger backup- Log Configuration endpoints (guarded)
+  - `GET /admin/log-config` — get current log configuration
+  - `PUT /admin/log-config` — update log configuration (partial)
+  - `PUT /admin/log-config/level/:level` — quick global level change
+  - `PUT /admin/log-config/category/:category/:level` — set category level
+  - `PUT /admin/log-config/endpoint/:endpointId/:level` — set endpoint level override
+  - `DELETE /admin/log-config/endpoint/:endpointId` — remove endpoint override
+  - `GET /admin/log-config/recent` — query ring buffer (with filters)
+  - `DELETE /admin/log-config/recent` — clear ring buffer- OAuth endpoints
   - `POST /oauth/token` � client credentials token issuance (public)
   - `GET /oauth/test` � simple test endpoint (public)
 - Web UI assets (public)
@@ -538,6 +545,49 @@ Backup examples:
 curl -s -H "Authorization: Bearer ${TOKEN}" "${API_BASE}/scim/v2/admin/backup/stats" | jq .
 curl -i -X POST "${API_BASE}/scim/v2/admin/backup/trigger" -H "Authorization: Bearer ${TOKEN}"
 ```
+
+Log Configuration endpoints (runtime log management):
+
+```sh
+# Get current log configuration
+curl -s -H "Authorization: Bearer ${TOKEN}" "${API_BASE}/scim/admin/log-config" | jq .
+
+# Update configuration (partial)
+curl -s -X PUT -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"globalLevel":"INFO","includePayloads":false,"format":"json","categoryLevels":{"scim.patch":"DEBUG","auth":"WARN"}}' \
+  "${API_BASE}/scim/admin/log-config" | jq .
+
+# Quick global level change
+curl -s -X PUT -H "Authorization: Bearer ${TOKEN}" \
+  "${API_BASE}/scim/admin/log-config/level/TRACE" | jq .
+
+# Set category level
+curl -s -X PUT -H "Authorization: Bearer ${TOKEN}" \
+  "${API_BASE}/scim/admin/log-config/category/scim.patch/TRACE" | jq .
+
+# Set endpoint-specific level override
+curl -s -X PUT -H "Authorization: Bearer ${TOKEN}" \
+  "${API_BASE}/scim/admin/log-config/endpoint/ep-abc123/DEBUG" | jq .
+
+# Remove endpoint override
+curl -s -X DELETE -H "Authorization: Bearer ${TOKEN}" \
+  "${API_BASE}/scim/admin/log-config/endpoint/ep-abc123"
+
+# Query recent logs (ring buffer)
+curl -s -H "Authorization: Bearer ${TOKEN}" \
+  "${API_BASE}/scim/admin/log-config/recent?limit=20&level=WARN" | jq .
+
+# Query logs by request correlation ID
+curl -s -H "Authorization: Bearer ${TOKEN}" \
+  "${API_BASE}/scim/admin/log-config/recent?requestId=<UUID>" | jq .
+
+# Clear ring buffer
+curl -s -X DELETE -H "Authorization: Bearer ${TOKEN}" \
+  "${API_BASE}/scim/admin/log-config/recent"
+```
+
+> See [LOGGING_AND_OBSERVABILITY.md](LOGGING_AND_OBSERVABILITY.md) for full documentation on structured logging, correlation IDs, flow examples, and production configuration.
 
 OAuth token (inspect full response):
 

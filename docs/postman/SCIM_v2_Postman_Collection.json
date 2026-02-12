@@ -76,7 +76,80 @@
     {
       "name": "Patch User - Enterprise Extension Manager",
       "request": { "method": "PATCH", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/scim+json" } ], "body": { "mode": "raw", "raw": "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\"Operations\":[{\"op\":\"add\",\"path\":\"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager\",\"value\":{\"value\":\"mgr-001\",\"displayName\":\"Bob Manager\"}}]}", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{base_url}}/Users/{{user_id}}", "host": [ "{{base_url}}" ], "path": [ "Users", "{{user_id}}" ] } }
+    },
+    {
+      "name": "Get Log Configuration",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "{{admin_url}}/admin/log-config", "host": [ "{{admin_url}}" ], "path": [ "admin", "log-config" ] }
+      }
+    },
+    {
+      "name": "Update Log Configuration",
+      "request": {
+        "method": "PUT",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" } ],
+        "body": { "mode": "raw", "raw": "{\"globalLevel\":\"INFO\",\"includePayloads\":false,\"format\":\"json\",\"categoryLevels\":{\"scim.patch\":\"DEBUG\",\"auth\":\"WARN\"}}", "options": { "raw": { "language": "json" } } },
+        "url": { "raw": "{{admin_url}}/admin/log-config", "host": [ "{{admin_url}}" ], "path": [ "admin", "log-config" ] }
+      }
+    },
+    {
+      "name": "Set Global Log Level (TRACE)",
+      "request": {
+        "method": "PUT",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "{{admin_url}}/admin/log-config/level/TRACE", "host": [ "{{admin_url}}" ], "path": [ "admin", "log-config", "level", "TRACE" ] }
+      }
+    },
+    {
+      "name": "Set Category Log Level (scim.patch=TRACE)",
+      "request": {
+        "method": "PUT",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "{{admin_url}}/admin/log-config/category/scim.patch/TRACE", "host": [ "{{admin_url}}" ], "path": [ "admin", "log-config", "category", "scim.patch", "TRACE" ] }
+      }
+    },
+    {
+      "name": "Set Endpoint Log Level Override",
+      "request": {
+        "method": "PUT",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "{{admin_url}}/admin/log-config/endpoint/{{endpoint_id}}/TRACE", "host": [ "{{admin_url}}" ], "path": [ "admin", "log-config", "endpoint", "{{endpoint_id}}", "TRACE" ] }
+      }
+    },
+    {
+      "name": "Remove Endpoint Log Level Override",
+      "request": {
+        "method": "DELETE",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "{{admin_url}}/admin/log-config/endpoint/{{endpoint_id}}", "host": [ "{{admin_url}}" ], "path": [ "admin", "log-config", "endpoint", "{{endpoint_id}}" ] }
+      }
+    },
+    {
+      "name": "Get Recent Logs",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "{{admin_url}}/admin/log-config/recent?limit=50&level=WARN", "host": [ "{{admin_url}}" ], "path": [ "admin", "log-config", "recent" ], "query": [ { "key": "limit", "value": "50" }, { "key": "level", "value": "WARN" } ] }
+      }
+    },
+    {
+      "name": "Get Recent Logs by Request ID",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "{{admin_url}}/admin/log-config/recent?requestId={{request_id}}", "host": [ "{{admin_url}}" ], "path": [ "admin", "log-config", "recent" ], "query": [ { "key": "requestId", "value": "{{request_id}}" } ] }
+      }
+    },
+    {
+      "name": "Clear Recent Logs",
+      "request": {
+        "method": "DELETE",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "{{admin_url}}/admin/log-config/recent", "host": [ "{{admin_url}}" ], "path": [ "admin", "log-config", "recent" ] }
+      }
     }
   ],
-  "variable": [ { "key": "base_url", "value": "http://localhost:6000/scim/endpoints/{endpointId}" }, { "key": "token", "value": "" }, { "key": "user_id", "value": "" } ]
+  "variable": [ { "key": "base_url", "value": "http://localhost:6000/scim/endpoints/{endpointId}" }, { "key": "admin_url", "value": "http://localhost:6000/scim" }, { "key": "token", "value": "" }, { "key": "user_id", "value": "" }, { "key": "endpoint_id", "value": "" }, { "key": "request_id", "value": "" } ]
 }

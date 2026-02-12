@@ -1763,6 +1763,301 @@ $flatDotResult = Invoke-RestMethod -Uri "$scimBase/Users/$($defUser1.id)" -Metho
 Test-Result -Success ($flatDotResult.name.givenName -eq "FlatValue") -Message "Standard SCIM complex attribute paths (name.givenName) work without VerbosePatchSupported"
 
 # ============================================
+# TEST SECTION 9j: LOG CONFIGURATION API
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9j: LOG CONFIGURATION API" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# --- GET /admin/log-config ---
+Write-Host "`n--- Test: Get Log Configuration ---" -ForegroundColor Cyan
+$logConfig = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method GET -Headers $headers
+Test-Result -Success ($null -ne $logConfig.globalLevel) -Message "GET log-config returns globalLevel"
+Test-Result -Success ($null -ne $logConfig.availableLevels) -Message "GET log-config returns availableLevels"
+Test-Result -Success ($logConfig.availableLevels.Count -eq 7) -Message "availableLevels has 7 entries (TRACE..OFF)"
+Test-Result -Success ($null -ne $logConfig.availableCategories) -Message "GET log-config returns availableCategories"
+Test-Result -Success ($logConfig.availableCategories.Count -eq 12) -Message "availableCategories has 12 entries"
+Test-Result -Success ($null -ne $logConfig.format) -Message "GET log-config returns format"
+Test-Result -Success ($null -ne $logConfig.categoryLevels) -Message "GET log-config returns categoryLevels"
+Test-Result -Success ($null -ne $logConfig.endpointLevels) -Message "GET log-config returns endpointLevels"
+
+# Save original level for restoration
+$originalLevel = $logConfig.globalLevel
+
+# --- PUT /admin/log-config (partial update) ---
+Write-Host "`n--- Test: Update Log Configuration ---" -ForegroundColor Cyan
+$updateBody = @{ globalLevel = "WARN"; includePayloads = $false } | ConvertTo-Json
+$updateResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method PUT -Headers $headers -Body $updateBody
+Test-Result -Success ($updateResult.message -eq "Log configuration updated") -Message "PUT log-config returns success message"
+Test-Result -Success ($updateResult.config.globalLevel -eq "WARN") -Message "PUT log-config updates globalLevel to WARN"
+Test-Result -Success ($updateResult.config.includePayloads -eq $false) -Message "PUT log-config updates includePayloads to false"
+
+# --- PUT /admin/log-config (multi-field update with categoryLevels) ---
+Write-Host "`n--- Test: Update Multiple Config Fields ---" -ForegroundColor Cyan
+$multiUpdateBody = @{
+    globalLevel = "DEBUG"
+    format = "json"
+    categoryLevels = @{ "scim.patch" = "TRACE"; "auth" = "WARN" }
+} | ConvertTo-Json -Depth 3
+$multiResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method PUT -Headers $headers -Body $multiUpdateBody
+Test-Result -Success ($multiResult.config.globalLevel -eq "DEBUG") -Message "Multi-update sets globalLevel to DEBUG"
+Test-Result -Success ($multiResult.config.format -eq "json") -Message "Multi-update sets format to json"
+Test-Result -Success ($multiResult.config.categoryLevels.'scim.patch' -eq "TRACE") -Message "Multi-update sets scim.patch category to TRACE"
+Test-Result -Success ($multiResult.config.categoryLevels.'auth' -eq "WARN") -Message "Multi-update sets auth category to WARN"
+
+# --- PUT /admin/log-config/level/:level (shortcut) ---
+Write-Host "`n--- Test: Set Global Level Shortcut ---" -ForegroundColor Cyan
+$levelResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/level/ERROR" -Method PUT -Headers $headers
+Test-Result -Success ($levelResult.globalLevel -eq "ERROR") -Message "Level shortcut sets global level to ERROR"
+Test-Result -Success ($levelResult.message -like "*ERROR*") -Message "Level shortcut returns confirmation message"
+
+# Case-insensitive level names
+$levelCaseResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/level/trace" -Method PUT -Headers $headers
+Test-Result -Success ($levelCaseResult.globalLevel -eq "TRACE") -Message "Level shortcut accepts case-insensitive level names"
+
+# --- PUT /admin/log-config/category/:category/:level ---
+Write-Host "`n--- Test: Set Category Log Level ---" -ForegroundColor Cyan
+$catResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/category/http/TRACE" -Method PUT -Headers $headers
+Test-Result -Success ($catResult.message -like "*http*TRACE*") -Message "Category level set for 'http' to TRACE"
+
+# Verify reflected in GET
+$configAfterCat = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method GET -Headers $headers
+Test-Result -Success ($configAfterCat.categoryLevels.'http' -eq "TRACE") -Message "Category override reflected in GET config"
+
+# Unknown category
+$badCatResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/category/nonexistent/DEBUG" -Method PUT -Headers $headers
+Test-Result -Success ($badCatResult.error -like "*Unknown category*") -Message "Unknown category returns error message"
+Test-Result -Success ($badCatResult.availableCategories.Count -eq 12) -Message "Unknown category response includes available categories"
+
+# --- PUT/DELETE endpoint level overrides ---
+Write-Host "`n--- Test: Endpoint Level Override ---" -ForegroundColor Cyan
+$epOverrideResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/endpoint/$EndpointId/TRACE" -Method PUT -Headers $headers
+Test-Result -Success ($epOverrideResult.message -like "*$EndpointId*TRACE*") -Message "Endpoint level override set"
+
+# Verify reflected in GET
+$configAfterEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method GET -Headers $headers
+Test-Result -Success ($configAfterEp.endpointLevels.$EndpointId -eq "TRACE") -Message "Endpoint override reflected in GET config"
+
+# DELETE endpoint override
+$deleteEpResponse = Microsoft.PowerShell.Utility\Invoke-WebRequest -Uri "$baseUrl/scim/admin/log-config/endpoint/$EndpointId" -Method DELETE -Headers $headers
+Test-Result -Success ($deleteEpResponse.StatusCode -eq 204) -Message "DELETE endpoint override returns 204"
+
+# Verify removed
+$configAfterDelete = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method GET -Headers $headers
+$epGone = ($null -eq $configAfterDelete.endpointLevels.$EndpointId)
+Test-Result -Success $epGone -Message "Endpoint override removed after DELETE"
+
+# --- Ring Buffer: GET /admin/log-config/recent ---
+Write-Host "`n--- Test: Recent Logs (Ring Buffer) ---" -ForegroundColor Cyan
+$recentResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent" -Method GET -Headers $headers
+Test-Result -Success ($null -ne $recentResult.count) -Message "Recent logs returns count"
+Test-Result -Success ($null -ne $recentResult.entries) -Message "Recent logs returns entries array"
+Test-Result -Success ($recentResult.count -gt 0) -Message "Ring buffer has entries from previous test operations"
+
+# Limit
+$limitResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent?limit=3" -Method GET -Headers $headers
+Test-Result -Success ($limitResult.entries.Count -le 3) -Message "Recent logs respects limit=3"
+
+# Filter by level
+$levelFilter = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent?level=ERROR" -Method GET -Headers $headers
+$allError = $true
+foreach ($entry in $levelFilter.entries) {
+    if ($entry.level -notin @("ERROR", "FATAL")) { $allError = $false; break }
+}
+Test-Result -Success $allError -Message "Recent logs level filter returns only ERROR+ entries"
+
+# Filter by category
+$catFilter = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent?category=http" -Method GET -Headers $headers
+$allHttp = $true
+foreach ($entry in $catFilter.entries) {
+    if ($entry.category -ne "http") { $allHttp = $false; break }
+}
+Test-Result -Success $allHttp -Message "Recent logs category filter returns only 'http' entries"
+
+# --- DELETE /admin/log-config/recent (clear ring buffer) ---
+Write-Host "`n--- Test: Clear Ring Buffer ---" -ForegroundColor Cyan
+$clearResponse = Microsoft.PowerShell.Utility\Invoke-WebRequest -Uri "$baseUrl/scim/admin/log-config/recent" -Method DELETE -Headers $headers
+Test-Result -Success ($clearResponse.StatusCode -eq 204) -Message "DELETE recent logs returns 204"
+
+$afterClear = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent" -Method GET -Headers $headers
+Test-Result -Success ($afterClear.count -le 5) -Message "Ring buffer nearly empty after clear (only self-request entries)"
+
+# --- X-Request-Id correlation ---
+Write-Host "`n--- Test: X-Request-Id Correlation ---" -ForegroundColor Cyan
+$customRequestId = "live-test-correlation-$(Get-Random)"
+$correlationHeaders = @{ Authorization = "Bearer $Token"; 'Content-Type' = 'application/json'; 'X-Request-Id' = $customRequestId }
+$correlationResponse = Microsoft.PowerShell.Utility\Invoke-WebRequest -Uri "$baseUrl/scim/admin/log-config" -Method GET -Headers $correlationHeaders
+$returnedRequestId = if ($correlationResponse.Headers['X-Request-Id'] -is [array]) { $correlationResponse.Headers['X-Request-Id'][0] } else { $correlationResponse.Headers['X-Request-Id'] }
+Test-Result -Success ($returnedRequestId -eq $customRequestId) -Message "X-Request-Id echoed back in response: $customRequestId"
+
+# Verify auto-generated when none provided
+$noIdHeaders = @{ Authorization = "Bearer $Token"; 'Content-Type' = 'application/json' }
+$autoIdResponse = Microsoft.PowerShell.Utility\Invoke-WebRequest -Uri "$baseUrl/scim/admin/log-config" -Method GET -Headers $noIdHeaders
+$autoRequestId = if ($autoIdResponse.Headers['X-Request-Id'] -is [array]) { $autoIdResponse.Headers['X-Request-Id'][0] } else { $autoIdResponse.Headers['X-Request-Id'] }
+Test-Result -Success ($null -ne $autoRequestId -and $autoRequestId.Length -gt 10) -Message "X-Request-Id auto-generated when not provided: $autoRequestId"
+
+# --- Filter recent logs by requestId ---
+Write-Host "`n--- Test: Filter Recent Logs by Request ID ---" -ForegroundColor Cyan
+$byRequestId = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent?requestId=$customRequestId" -Method GET -Headers $headers
+$allMatchRequestId = $true
+foreach ($entry in $byRequestId.entries) {
+    if ($entry.requestId -ne $customRequestId) { $allMatchRequestId = $false; break }
+}
+Test-Result -Success $allMatchRequestId -Message "Recent logs requestId filter returns matching entries"
+
+# --- Requires authentication ---
+Write-Host "`n--- Test: Log Config Requires Authentication ---" -ForegroundColor Cyan
+try {
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method GET
+    Test-Result -Success $false -Message "GET log-config should require auth"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 401) -Message "GET log-config returns 401 without auth"
+}
+
+# --- Restore original log level ---
+Write-Host "`n--- Cleanup: Restore Original Log Level ---" -ForegroundColor Cyan
+$restoreBody = @{ globalLevel = $originalLevel; format = "pretty"; includePayloads = $true; categoryLevels = @{} } | ConvertTo-Json -Depth 3
+$restoreResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method PUT -Headers $headers -Body $restoreBody
+Test-Result -Success ($restoreResult.config.globalLevel -eq $originalLevel) -Message "Restored globalLevel to $originalLevel"
+Test-Result -Success ($restoreResult.config.format -eq "pretty") -Message "Restored format to pretty"
+
+# ============================================
+# TEST SECTION 9k: PER-ENDPOINT LOG LEVEL VIA ENDPOINT CONFIG
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9k: PER-ENDPOINT LOG LEVEL VIA ENDPOINT CONFIG" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# --- Create endpoint with logLevel in config ---
+Write-Host "`n--- Create Endpoint with logLevel Config ---" -ForegroundColor Cyan
+$logLevelEndpointBody = @{
+    name = "log-level-test-ep"
+    displayName = "Log Level Test Endpoint"
+    description = "Endpoint to test per-endpoint logLevel via config"
+    config = @{
+        logLevel = "DEBUG"
+    }
+} | ConvertTo-Json -Depth 3
+
+$logLevelEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $logLevelEndpointBody
+$logLevelEndpointId = $logLevelEndpoint.id
+Test-Result -Success ($logLevelEndpoint.config.logLevel -eq "DEBUG") -Message "Created endpoint with logLevel=DEBUG in config"
+Test-Result -Success ($logLevelEndpointId -ne $null) -Message "Endpoint ID is present: $logLevelEndpointId"
+
+# --- Verify log-config reflects the endpoint level ---
+$logConfigAfterCreate = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method GET -Headers $headers
+$epLevelAfterCreate = $logConfigAfterCreate.config.endpointLevels.$logLevelEndpointId
+Test-Result -Success ($epLevelAfterCreate -ne $null) -Message "Endpoint level appears in log-config after create"
+
+# --- Get endpoint and verify config roundtrips ---
+$getEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$logLevelEndpointId" -Method GET -Headers $headers
+Test-Result -Success ($getEndpoint.config.logLevel -eq "DEBUG") -Message "GET endpoint returns logLevel=DEBUG in config"
+
+# --- Update endpoint to change logLevel ---
+Write-Host "`n--- Update Endpoint logLevel Config ---" -ForegroundColor Cyan
+$updateBody = @{
+    config = @{
+        logLevel = "TRACE"
+    }
+} | ConvertTo-Json -Depth 3
+
+$updatedEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$logLevelEndpointId" -Method PATCH -Headers $headers -Body $updateBody
+Test-Result -Success ($updatedEndpoint.config.logLevel -eq "TRACE") -Message "Updated endpoint logLevel to TRACE"
+
+# --- Verify log-config reflects updated level ---
+$logConfigAfterUpdate = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method GET -Headers $headers
+$epLevelAfterUpdate = $logConfigAfterUpdate.config.endpointLevels.$logLevelEndpointId
+Test-Result -Success ($epLevelAfterUpdate -ne $null) -Message "Endpoint level updated in log-config after PATCH"
+
+# --- Update endpoint config without logLevel (should clear endpoint level) ---
+Write-Host "`n--- Remove logLevel from Endpoint Config ---" -ForegroundColor Cyan
+$removeLogLevelBody = @{
+    config = @{
+        strictMode = $true
+    }
+} | ConvertTo-Json -Depth 3
+
+$clearedEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$logLevelEndpointId" -Method PATCH -Headers $headers -Body $removeLogLevelBody
+Test-Result -Success ($clearedEndpoint.config.logLevel -eq $null) -Message "Endpoint config no longer has logLevel"
+Test-Result -Success ($clearedEndpoint.config.strictMode -eq $true) -Message "Other config flags preserved"
+
+# --- Verify log-config no longer has endpoint level ---
+$logConfigAfterClear = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method GET -Headers $headers
+$epLevelAfterClear = $logConfigAfterClear.config.endpointLevels.$logLevelEndpointId
+Test-Result -Success ($epLevelAfterClear -eq $null) -Message "Endpoint level cleared from log-config"
+
+# --- Create endpoint with logLevel alongside other config flags ---
+Write-Host "`n--- Create Endpoint with Mixed Config ---" -ForegroundColor Cyan
+$mixedConfigBody = @{
+    name = "log-level-mixed-ep"
+    displayName = "Mixed Config Endpoint"
+    config = @{
+        logLevel = "WARN"
+        VerbosePatchSupported = "True"
+        strictMode = $true
+    }
+} | ConvertTo-Json -Depth 3
+
+$mixedEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $mixedConfigBody
+$mixedEndpointId = $mixedEndpoint.id
+Test-Result -Success ($mixedEndpoint.config.logLevel -eq "WARN") -Message "Mixed config: logLevel=WARN"
+Test-Result -Success ($mixedEndpoint.config.VerbosePatchSupported -eq "True") -Message "Mixed config: VerbosePatchSupported=True"
+Test-Result -Success ($mixedEndpoint.config.strictMode -eq $true) -Message "Mixed config: strictMode=true"
+
+# --- Validate log-config for mixed endpoint ---
+$logConfigMixed = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method GET -Headers $headers
+$mixedEpLevel = $logConfigMixed.config.endpointLevels.$mixedEndpointId
+Test-Result -Success ($mixedEpLevel -ne $null) -Message "Mixed endpoint level in log-config"
+
+# --- Validation: reject invalid logLevel ---
+Write-Host "`n--- Validation: Invalid logLevel Values ---" -ForegroundColor Cyan
+try {
+    $badBody = @{ name = "bad-log-ep"; config = @{ logLevel = "VERBOSE" } } | ConvertTo-Json -Depth 3
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $badBody
+    Test-Result -Success $false -Message "Should reject invalid logLevel 'VERBOSE'"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "Rejects invalid logLevel 'VERBOSE' with 400"
+}
+
+try {
+    $badBody2 = @{ name = "bad-log-ep2"; config = @{ logLevel = "high" } } | ConvertTo-Json -Depth 3
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $badBody2
+    Test-Result -Success $false -Message "Should reject invalid logLevel 'high'"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "Rejects invalid logLevel 'high' with 400"
+}
+
+# --- Accept case-insensitive logLevel ---
+$ciBody = @{
+    name = "log-ci-ep"
+    config = @{ logLevel = "debug" }
+} | ConvertTo-Json -Depth 3
+$ciEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $ciBody
+$ciEndpointId = $ciEndpoint.id
+Test-Result -Success ($ciEndpoint.config.logLevel -eq "debug") -Message "Accepts lowercase logLevel 'debug'"
+
+# --- Cleanup: delete test endpoints ---
+Write-Host "`n--- Cleanup: Delete Log Level Test Endpoints ---" -ForegroundColor Cyan
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$logLevelEndpointId" -Method DELETE -Headers $headers
+Test-Result -Success $true -Message "Deleted log-level-test-ep"
+
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$mixedEndpointId" -Method DELETE -Headers $headers
+Test-Result -Success $true -Message "Deleted log-level-mixed-ep"
+
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ciEndpointId" -Method DELETE -Headers $headers
+Test-Result -Success $true -Message "Deleted log-ci-ep"
+
+# Verify cleanup cleared log-config
+$logConfigFinal = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method GET -Headers $headers
+$finalEp1 = $logConfigFinal.config.endpointLevels.$logLevelEndpointId
+$finalEp2 = $logConfigFinal.config.endpointLevels.$mixedEndpointId
+$finalEp3 = $logConfigFinal.config.endpointLevels.$ciEndpointId
+Test-Result -Success ($finalEp1 -eq $null -and $finalEp2 -eq $null -and $finalEp3 -eq $null) -Message "All endpoint levels cleaned from log-config after delete"
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow

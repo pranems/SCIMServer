@@ -27,6 +27,7 @@ describe('endpoint-config.interface', () => {
       expect(ENDPOINT_CONFIG_FLAGS.LEGACY_MODE).toBe('legacyMode');
       expect(ENDPOINT_CONFIG_FLAGS.CUSTOM_HEADERS).toBe('customHeaders');
       expect(ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED).toBe('VerbosePatchSupported');
+      expect(ENDPOINT_CONFIG_FLAGS.LOG_LEVEL).toBe('logLevel');
     });
   });
 
@@ -574,6 +575,125 @@ describe('endpoint-config.interface', () => {
         } catch (e) {
           expect((e as Error).message).toContain('Allowed values');
         }
+      });
+    });
+
+    describe('logLevel validation', () => {
+      it('should accept string "TRACE"', () => {
+        expect(() => validateEndpointConfig({ logLevel: 'TRACE' })).not.toThrow();
+      });
+
+      it('should accept string "DEBUG"', () => {
+        expect(() => validateEndpointConfig({ logLevel: 'DEBUG' })).not.toThrow();
+      });
+
+      it('should accept string "INFO"', () => {
+        expect(() => validateEndpointConfig({ logLevel: 'INFO' })).not.toThrow();
+      });
+
+      it('should accept string "WARN"', () => {
+        expect(() => validateEndpointConfig({ logLevel: 'WARN' })).not.toThrow();
+      });
+
+      it('should accept string "ERROR"', () => {
+        expect(() => validateEndpointConfig({ logLevel: 'ERROR' })).not.toThrow();
+      });
+
+      it('should accept string "FATAL"', () => {
+        expect(() => validateEndpointConfig({ logLevel: 'FATAL' })).not.toThrow();
+      });
+
+      it('should accept string "OFF"', () => {
+        expect(() => validateEndpointConfig({ logLevel: 'OFF' })).not.toThrow();
+      });
+
+      it('should accept lowercase "debug"', () => {
+        expect(() => validateEndpointConfig({ logLevel: 'debug' })).not.toThrow();
+      });
+
+      it('should accept mixed-case "Info"', () => {
+        expect(() => validateEndpointConfig({ logLevel: 'Info' })).not.toThrow();
+      });
+
+      it('should accept numeric 0 (TRACE)', () => {
+        expect(() => validateEndpointConfig({ logLevel: 0 })).not.toThrow();
+      });
+
+      it('should accept numeric 2 (INFO)', () => {
+        expect(() => validateEndpointConfig({ logLevel: 2 })).not.toThrow();
+      });
+
+      it('should accept numeric 6 (OFF)', () => {
+        expect(() => validateEndpointConfig({ logLevel: 6 })).not.toThrow();
+      });
+
+      it('should throw for invalid string "VERBOSE"', () => {
+        expect(() => validateEndpointConfig({ logLevel: 'VERBOSE' })).toThrow(/Invalid value/);
+      });
+
+      it('should throw for invalid string "high"', () => {
+        expect(() => validateEndpointConfig({ logLevel: 'high' })).toThrow(/Invalid value/);
+      });
+
+      it('should throw for empty string', () => {
+        expect(() => validateEndpointConfig({ logLevel: '' })).toThrow(/Invalid value/);
+      });
+
+      it('should throw for numeric -1 (out of range)', () => {
+        expect(() => validateEndpointConfig({ logLevel: -1 })).toThrow(/Invalid numeric value/);
+      });
+
+      it('should throw for numeric 7 (out of range)', () => {
+        expect(() => validateEndpointConfig({ logLevel: 7 })).toThrow(/Invalid numeric value/);
+      });
+
+      it('should throw for numeric 1.5 (not integer)', () => {
+        expect(() => validateEndpointConfig({ logLevel: 1.5 })).toThrow(/Invalid numeric value/);
+      });
+
+      it('should throw for boolean value', () => {
+        expect(() => validateEndpointConfig({ logLevel: true })).toThrow(/Invalid type/);
+      });
+
+      it('should throw for object value', () => {
+        expect(() => validateEndpointConfig({ logLevel: { level: 'DEBUG' } })).toThrow(/Invalid type/);
+      });
+
+      it('should throw for array value', () => {
+        expect(() => validateEndpointConfig({ logLevel: ['DEBUG'] })).toThrow(/Invalid type/);
+      });
+
+      it('should include flag name in error message', () => {
+        try {
+          validateEndpointConfig({ logLevel: 'invalid' });
+          fail('Expected error');
+        } catch (e) {
+          expect((e as Error).message).toContain('logLevel');
+        }
+      });
+
+      it('should include allowed values in error message for invalid string', () => {
+        try {
+          validateEndpointConfig({ logLevel: 'invalid' });
+          fail('Expected error');
+        } catch (e) {
+          expect((e as Error).message).toContain('TRACE');
+          expect((e as Error).message).toContain('OFF');
+        }
+      });
+
+      it('should work alongside other config flags', () => {
+        expect(() =>
+          validateEndpointConfig({
+            logLevel: 'DEBUG',
+            MultiOpPatchRequestAddMultipleMembersToGroup: 'True',
+            VerbosePatchSupported: false,
+          })
+        ).not.toThrow();
+      });
+
+      it('should not be present in config by default (undefined)', () => {
+        expect(() => validateEndpointConfig({ logLevel: undefined })).not.toThrow();
       });
     });
 

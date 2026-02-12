@@ -218,6 +218,94 @@
       "method": "GET",
       "url": "{{ base_url }}/scim/v2/Users?attributes=userName,displayName&startIndex=1&count=50",
       "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
+      "_id": "req_log_config_get",
+      "_type": "request",
+      "parentId": "",
+      "name": "Get Log Configuration",
+      "method": "GET",
+      "url": "{{ base_url }}/scim/admin/log-config",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
+      "_id": "req_log_config_update",
+      "_type": "request",
+      "parentId": "",
+      "name": "Update Log Configuration",
+      "method": "PUT",
+      "url": "{{ base_url }}/scim/admin/log-config",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\"globalLevel\":\"INFO\",\"includePayloads\":false,\"format\":\"json\",\"categoryLevels\":{\"scim.patch\":\"DEBUG\",\"auth\":\"WARN\"}}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ]
+    },
+    {
+      "_id": "req_log_config_level",
+      "_type": "request",
+      "parentId": "",
+      "name": "Set Global Log Level (TRACE)",
+      "method": "PUT",
+      "url": "{{ base_url }}/scim/admin/log-config/level/TRACE",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
+      "_id": "req_log_config_category",
+      "_type": "request",
+      "parentId": "",
+      "name": "Set Category Log Level (scim.patch=TRACE)",
+      "method": "PUT",
+      "url": "{{ base_url }}/scim/admin/log-config/category/scim.patch/TRACE",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
+      "_id": "req_log_config_endpoint_set",
+      "_type": "request",
+      "parentId": "",
+      "name": "Set Endpoint Log Level Override",
+      "method": "PUT",
+      "url": "{{ base_url }}/scim/admin/log-config/endpoint/{{ endpoint_id }}/TRACE",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
+      "_id": "req_log_config_endpoint_delete",
+      "_type": "request",
+      "parentId": "",
+      "name": "Remove Endpoint Log Level Override",
+      "method": "DELETE",
+      "url": "{{ base_url }}/scim/admin/log-config/endpoint/{{ endpoint_id }}",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
+      "_id": "req_log_recent",
+      "_type": "request",
+      "parentId": "",
+      "name": "Get Recent Logs (filtered)",
+      "method": "GET",
+      "url": "{{ base_url }}/scim/admin/log-config/recent?limit=50&level=WARN",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
+      "_id": "req_log_recent_by_request",
+      "_type": "request",
+      "parentId": "",
+      "name": "Get Recent Logs by Request ID",
+      "method": "GET",
+      "url": "{{ base_url }}/scim/admin/log-config/recent?requestId={{ request_id }}",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
+      "_id": "req_log_recent_clear",
+      "_type": "request",
+      "parentId": "",
+      "name": "Clear Recent Logs",
+      "method": "DELETE",
+      "url": "{{ base_url }}/scim/admin/log-config/recent",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
     }
   ]
 }

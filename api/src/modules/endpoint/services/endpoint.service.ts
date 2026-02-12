@@ -1,9 +1,11 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, OnModuleInit, Logger } from '@nestjs/common';
 import type { Endpoint, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CreateEndpointDto } from '../dto/create-endpoint.dto';
 import type { UpdateEndpointDto } from '../dto/update-endpoint.dto';
-import { validateEndpointConfig } from '../endpoint-config.interface';
+import { validateEndpointConfig, ENDPOINT_CONFIG_FLAGS } from '../endpoint-config.interface';
+import { ScimLogger } from '../../logging/scim-logger.service';
+import { parseLogLevel, logLevelName } from '../../logging/log-levels';
 
 export interface EndpointResponse {
   id: string;
@@ -18,8 +20,50 @@ export interface EndpointResponse {
 }
 
 @Injectable()
-export class EndpointService {
-  constructor(private readonly prisma: PrismaService) {}
+export class EndpointService implements OnModuleInit {
+  private readonly logger = new Logger(EndpointService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly scimLogger: ScimLogger,
+  ) {}
+
+  /**
+   * On module init, restore per-endpoint log levels from the database.
+   * This ensures that any previously configured logLevel in endpoint configs
+   * is applied to ScimLogger after a server restart.
+   */
+  async onModuleInit(): Promise<void> {
+    try {
+      const endpoints = await this.prisma.endpoint.findMany({
+        where: { active: true },
+        select: { id: true, name: true, config: true },
+      });
+
+      let restored = 0;
+      for (const ep of endpoints) {
+        if (!ep.config) continue;
+        try {
+          const config = JSON.parse(ep.config);
+          const logLevel = config[ENDPOINT_CONFIG_FLAGS.LOG_LEVEL];
+          if (logLevel !== undefined) {
+            const level = typeof logLevel === 'number' ? logLevel : parseLogLevel(String(logLevel));
+            this.scimLogger.setEndpointLevel(ep.id, level);
+            restored++;
+            this.logger.log(`Restored log level ${logLevelName(level)} for endpoint "${ep.name}" (${ep.id})`);
+          }
+        } catch {
+          // Skip endpoints with malformed config JSON
+        }
+      }
+
+      if (restored > 0) {
+        this.logger.log(`Restored per-endpoint log levels for ${restored} endpoint(s)`);
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to restore endpoint log levels: ${(error as Error).message}`);
+    }
+  }
 
   async createEndpoint(dto: CreateEndpointDto): Promise<EndpointResponse> {
     // Validate endpoint name
@@ -54,6 +98,9 @@ export class EndpointService {
         active: true
       }
     });
+
+    // Sync per-endpoint log level to ScimLogger
+    this.syncEndpointLogLevel(endpoint.id, dto.config);
 
     return this.toResponse(endpoint);
   }
@@ -122,6 +169,11 @@ export class EndpointService {
       }
     });
 
+    // Sync per-endpoint log level (only when config was provided in the update)
+    if (dto.config !== undefined) {
+      this.syncEndpointLogLevel(endpointId, dto.config);
+    }
+
     return this.toResponse(updated);
   }
 
@@ -138,6 +190,9 @@ export class EndpointService {
     await this.prisma.endpoint.delete({
       where: { id: endpointId }
     });
+
+    // Clean up per-endpoint log level override in ScimLogger
+    this.scimLogger.clearEndpointLevel(endpointId);
   }
 
   async getEndpointStats(endpointId: string): Promise<{
@@ -178,5 +233,24 @@ export class EndpointService {
       createdAt: endpoint.createdAt,
       updatedAt: endpoint.updatedAt
     };
+  }
+
+  /**
+   * Sync per-endpoint log level from endpoint config to ScimLogger.
+   * If config contains logLevel, sets the endpoint-level override.
+   * If logLevel is absent or config is null/undefined, clears any existing override.
+   */
+  private syncEndpointLogLevel(endpointId: string, config?: Record<string, any> | null): void {
+    const logLevelValue = config?.[ENDPOINT_CONFIG_FLAGS.LOG_LEVEL];
+    if (logLevelValue !== undefined) {
+      const level = typeof logLevelValue === 'number'
+        ? logLevelValue
+        : parseLogLevel(String(logLevelValue));
+      this.scimLogger.setEndpointLevel(endpointId, level);
+      this.logger.log(`Set log level ${logLevelName(level)} for endpoint ${endpointId}`);
+    } else {
+      // logLevel not in config — clear any existing override
+      this.scimLogger.clearEndpointLevel(endpointId);
+    }
   }
 }

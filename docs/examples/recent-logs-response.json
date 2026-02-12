@@ -1,0 +1,51 @@
+{
+  "description": "GET /scim/admin/log-config/recent — response with filtered log entries",
+  "count": 3,
+  "entries": [
+    {
+      "timestamp": "2026-02-14T10:23:45.100Z",
+      "level": "INFO",
+      "category": "http",
+      "message": "→ POST /scim/endpoints/ep-abc123/Users",
+      "requestId": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+      "endpointId": "ep-abc123",
+      "method": "POST",
+      "path": "/scim/endpoints/ep-abc123/Users",
+      "data": {
+        "userAgent": "EntraID-Provisioning/1.0",
+        "contentType": "application/scim+json",
+        "ip": "10.0.0.1"
+      }
+    },
+    {
+      "timestamp": "2026-02-14T10:23:45.115Z",
+      "level": "INFO",
+      "category": "scim.user",
+      "message": "User created",
+      "requestId": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+      "endpointId": "ep-abc123",
+      "method": "POST",
+      "path": "/scim/endpoints/ep-abc123/Users",
+      "durationMs": 15,
+      "data": {
+        "userId": "usr-789xyz",
+        "userName": "alice@example.com"
+      }
+    },
+    {
+      "timestamp": "2026-02-14T10:23:45.117Z",
+      "level": "INFO",
+      "category": "http",
+      "message": "← 201 POST /scim/endpoints/ep-abc123/Users",
+      "requestId": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+      "endpointId": "ep-abc123",
+      "method": "POST",
+      "path": "/scim/endpoints/ep-abc123/Users",
+      "durationMs": 17,
+      "data": {
+        "status": 201,
+        "durationMs": 17
+      }
+    }
+  ]
+}

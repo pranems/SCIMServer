@@ -3,6 +3,7 @@ import { HttpException } from '@nestjs/common';
 import { EndpointScimUsersService } from './endpoint-scim-users.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ScimMetadataService } from './scim-metadata.service';
+import { ScimLogger } from '../../logging/scim-logger.service';
 import type { CreateUserDto } from '../dto/create-user.dto';
 import type { PatchUserDto } from '../dto/patch-user.dto';
 import { ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
@@ -69,6 +70,18 @@ describe('EndpointScimUsersService', () => {
         {
           provide: ScimMetadataService,
           useValue: mockMetadataService,
+        },
+        {
+          provide: ScimLogger,
+          useValue: {
+            trace: jest.fn(),
+            debug: jest.fn(),
+            info: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+            fatal: jest.fn(),
+            isEnabled: jest.fn().mockReturnValue(true),
+          },
         },
       ],
     }).compile();

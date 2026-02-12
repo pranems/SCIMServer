@@ -1,0 +1,16 @@
+{
+  "description": "A single structured log entry (JSON format mode)",
+  "timestamp": "2026-02-14T10:23:45.123Z",
+  "level": "INFO",
+  "category": "scim.user",
+  "message": "User created",
+  "requestId": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
+  "endpointId": "ep-abc123",
+  "method": "POST",
+  "path": "/scim/endpoints/ep-abc123/Users",
+  "durationMs": 23,
+  "data": {
+    "userId": "usr-789xyz",
+    "userName": "alice@example.com"
+  }
+}

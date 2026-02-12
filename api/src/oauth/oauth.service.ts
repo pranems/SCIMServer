@@ -2,6 +2,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'node:crypto';
+import { ScimLogger } from '../modules/logging/scim-logger.service';
+import { LogCategory } from '../modules/logging/log-levels';
 
 export interface AccessToken {
   accessToken: string;
@@ -29,7 +31,8 @@ export class OAuthService {
 
   constructor(
     private readonly jwtService: JwtService,
-    private readonly config: ConfigService
+    private readonly config: ConfigService,
+    private readonly logger: ScimLogger,
   ) {
     const defaultClientId = this.config.get<string>('OAUTH_CLIENT_ID') || 'scimserver-client';
     const configuredSecret = this.config.get<string>('OAUTH_CLIENT_SECRET');
@@ -43,8 +46,7 @@ export class OAuthService {
       }
 
       clientSecret = crypto.randomBytes(32).toString('hex');
-      // eslint-disable-next-line no-console
-      console.warn(`[OAuth] Auto-generated development client secret for "${defaultClientId}". Configure OAUTH_CLIENT_SECRET for production.`);
+      this.logger.warn(LogCategory.OAUTH, `Auto-generated development client secret for "${defaultClientId}". Configure OAUTH_CLIENT_SECRET for production.`);
     }
 
     const scopes = configuredScopes
@@ -65,20 +67,17 @@ export class OAuthService {
     clientSecret: string,
     requestedScope?: string
   ): Promise<AccessToken> {
-    console.log('🔍 OAuth Service - Validating client:', {
+    this.logger.debug(LogCategory.OAUTH, 'Validating client credentials', {
       clientId,
-      clientSecret: clientSecret ? '***redacted***' : 'MISSING',
-      availableClients: Array.from(this.validClients.keys())
+      availableClients: Array.from(this.validClients.keys()),
     });
 
     // Validate client credentials
     const client = this.validClients.get(clientId);
-    console.log('🔍 Found client:', client ? 'YES' : 'NO');
 
     if (!client || client.clientSecret !== clientSecret) {
-      console.log('❌ Client validation failed:', {
+      this.logger.warn(LogCategory.OAUTH, 'Client validation failed', {
         clientFound: !!client,
-        secretMatch: client ? client.clientSecret === clientSecret : false
       });
       throw new UnauthorizedException('Invalid client credentials');
     }
@@ -104,10 +103,10 @@ export class OAuthService {
     const expiresIn = 3600; // 1 hour in seconds
     const accessToken = this.jwtService.sign(payload, { expiresIn: `${expiresIn}s` });
 
-    console.log('🎫 Generated Access Token:', {
+    this.logger.info(LogCategory.OAUTH, 'Access token generated', {
       clientId,
       scopes: grantedScopes,
-      expiresIn: `${expiresIn}s`
+      expiresIn,
     });
 
     return Promise.resolve({
@@ -120,13 +119,15 @@ export class OAuthService {
   validateAccessToken(token: string): Promise<TokenPayload> {
     try {
       const payload = this.jwtService.verify<TokenPayload>(token);
-      console.log('✅ Token Validation Success:', {
+      this.logger.debug(LogCategory.OAUTH, 'Token validation success', {
         clientId: payload.client_id,
-        scope: payload.scope
+        scope: payload.scope,
       });
       return Promise.resolve(payload);
     } catch (error) {
-      console.error('❌ Token Validation Failed:', error instanceof Error ? error.message : String(error));
+      this.logger.debug(LogCategory.OAUTH, 'Token validation failed', {
+        reason: error instanceof Error ? error.message : String(error),
+      });
       throw new UnauthorizedException('Invalid or expired token');
     }
   }

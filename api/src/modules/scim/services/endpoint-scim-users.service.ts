@@ -3,6 +3,8 @@ import type { Prisma, ScimUser } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 
 import { PrismaService } from '../../prisma/prisma.service';
+import { ScimLogger } from '../../logging/scim-logger.service';
+import { LogCategory } from '../../logging/log-levels';
 import { createScimError } from '../common/scim-errors';
 import {
   DEFAULT_COUNT,
@@ -45,11 +47,15 @@ interface ListUsersParams {
 export class EndpointScimUsersService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly metadata: ScimMetadataService
+    private readonly metadata: ScimMetadataService,
+    private readonly logger: ScimLogger,
   ) {}
 
   async createUserForEndpoint(dto: CreateUserDto, baseUrl: string, endpointId: string): Promise<ScimUserResource> {
     this.ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
+
+    this.logger.info(LogCategory.SCIM_USER, 'Creating user', { userName: dto.userName, endpointId });
+    this.logger.trace(LogCategory.SCIM_USER, 'Create user payload', { body: dto as unknown as Record<string, unknown> });
 
     await this.assertUniqueIdentifiersForEndpoint(dto.userName, dto.externalId ?? undefined, endpointId);
 
@@ -74,10 +80,12 @@ export class EndpointScimUsersService {
 
     const created = await this.prisma.scimUser.create({ data });
 
+    this.logger.info(LogCategory.SCIM_USER, 'User created', { scimId, userName: dto.userName, endpointId });
     return this.toScimUserResource(created, baseUrl);
   }
 
   async getUserForEndpoint(scimId: string, baseUrl: string, endpointId: string): Promise<ScimUserResource> {
+    this.logger.debug(LogCategory.SCIM_USER, 'Get user', { scimId, endpointId });
     const user = await this.prisma.scimUser.findFirst({ 
       where: { 
         scimId,
@@ -86,6 +94,7 @@ export class EndpointScimUsersService {
     });
     
     if (!user) {
+      this.logger.debug(LogCategory.SCIM_USER, 'User not found', { scimId, endpointId });
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
@@ -100,6 +109,8 @@ export class EndpointScimUsersService {
     if (count > MAX_COUNT) {
       count = MAX_COUNT;
     }
+
+    this.logger.info(LogCategory.SCIM_USER, 'List users', { filter, startIndex, count, endpointId });
 
     let filterResult;
     try {
@@ -134,6 +145,8 @@ export class EndpointScimUsersService {
     const take = Math.max(Math.min(count, MAX_COUNT), 0);
     const paginatedResources = resources.slice(skip, skip + take);
 
+    this.logger.debug(LogCategory.SCIM_USER, 'List users result', { totalResults, returned: paginatedResources.length, endpointId });
+
     return {
       schemas: [SCIM_LIST_RESPONSE_SCHEMA],
       totalResults,
@@ -151,6 +164,12 @@ export class EndpointScimUsersService {
     config?: EndpointConfig
   ): Promise<ScimUserResource> {
     this.ensureSchema(patchDto.schemas, SCIM_PATCH_SCHEMA);
+
+    this.logger.info(LogCategory.SCIM_PATCH, 'Patch user', { scimId, endpointId, opCount: patchDto.Operations?.length });
+    this.logger.debug(LogCategory.SCIM_PATCH, 'Patch operations', {
+      operations: patchDto.Operations?.map(o => ({ op: o.op, path: o.path })),
+    });
+    this.logger.trace(LogCategory.SCIM_PATCH, 'Patch user full payload', { body: patchDto as unknown as Record<string, unknown> });
 
     const user = await this.prisma.scimUser.findFirst({ 
       where: { 
@@ -170,6 +189,7 @@ export class EndpointScimUsersService {
       data: updatedData
     });
 
+    this.logger.info(LogCategory.SCIM_PATCH, 'User patched', { scimId, endpointId });
     return this.toScimUserResource(updatedUser, baseUrl);
   }
 
@@ -180,6 +200,8 @@ export class EndpointScimUsersService {
     endpointId: string
   ): Promise<ScimUserResource> {
     this.ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
+
+    this.logger.info(LogCategory.SCIM_USER, 'Replace user (PUT)', { scimId, userName: dto.userName, endpointId });
 
     const user = await this.prisma.scimUser.findFirst({ 
       where: { 
@@ -219,6 +241,7 @@ export class EndpointScimUsersService {
   }
 
   async deleteUserForEndpoint(scimId: string, endpointId: string): Promise<void> {
+    this.logger.info(LogCategory.SCIM_USER, 'Delete user', { scimId, endpointId });
     const user = await this.prisma.scimUser.findFirst({
       where: {
         scimId,
@@ -227,10 +250,12 @@ export class EndpointScimUsersService {
     });
 
     if (!user) {
+      this.logger.debug(LogCategory.SCIM_USER, 'Delete target not found', { scimId, endpointId });
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
     await this.prisma.scimUser.delete({ where: { id: user.id } });
+    this.logger.info(LogCategory.SCIM_USER, 'User deleted', { scimId, endpointId });
   }
 
   // ===== Private Helper Methods =====

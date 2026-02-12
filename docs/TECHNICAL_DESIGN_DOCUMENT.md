@@ -75,7 +75,7 @@ api/
 │   │   │   └── common/          # Constants, types, errors, utilities
 │   │   ├── endpoint/            # Endpoint management (admin CRUD)
 │   │   ├── auth/                # SharedSecretGuard, @Public decorator
-│   │   ├── logging/             # RequestLoggingInterceptor + LoggingService
+│   │   ├── logging/             # ScimLogger, LogConfigController, RequestLoggingInterceptor, log-levels
 │   │   ├── backup/              # Azure Blob snapshot backup/restore
 │   │   ├── database/            # Dashboard data queries (users/groups/stats)
 │   │   ├── activity-parser/     # SCIM log → human-readable activity
@@ -114,8 +114,10 @@ AppModule
 ├── OAuthModule
 │   ├── OAuthController → POST /oauth/token, GET /oauth/.well-known
 │   └── OAuthService → JWT generation/validation
-├── LoggingModule
-│   ├── RequestLoggingInterceptor (APP_INTERCEPTOR — global)
+├── LoggingModule (@Global)
+│   ├── RequestLoggingInterceptor (APP_INTERCEPTOR — global, correlation IDs)
+│   ├── ScimLogger → Structured leveled logger (AsyncLocalStorage correlation)
+│   ├── LogConfigController → /admin/log-config (8 REST endpoints)
 │   └── LoggingService → RequestLog persistence
 ├── ScimModule
 │   ├── EndpointScimUsersController
@@ -151,7 +153,7 @@ AppModule
 | **OAuthModule** | OAuth 2.0 flows | `OAuthController`, `OAuthService` |
 | **ScimModule** | Core SCIM protocol | Controllers, services, interceptors, utilities |
 | **EndpointModule** | Multi-endpoint management | `EndpointController`, `EndpointService` |
-| **LoggingModule** | Request/response logging | `RequestLoggingInterceptor` (global), `LoggingService` |
+| **LoggingModule** | Structured logging, traceability, admin config | `ScimLogger` (global), `RequestLoggingInterceptor`, `LogConfigController`, `LoggingService` |
 | **BackupModule** | Blob snapshot backup | `BackupService` with cron scheduler |
 | **DatabaseModule** | Dashboard data | `DatabaseController`, `DatabaseService` |
 | **ActivityParserModule** | Activity feed | `ActivityParserService` (898 lines of parsing) |

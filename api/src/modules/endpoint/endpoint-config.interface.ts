@@ -64,6 +64,14 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * When false (default), dot-notation paths are stored as literal top-level keys.
    */
   VERBOSE_PATCH_SUPPORTED: 'VerbosePatchSupported',
+
+  /**
+   * Per-endpoint log level override. Accepts log level name ("TRACE", "DEBUG", "INFO", etc.)
+   * or numeric level (0-6). When set, the ScimLogger will use this level for requests
+   * to the endpoint instead of the global/category levels.
+   * When removed, the endpoint reverts to global/category-level logging.
+   */
+  LOG_LEVEL: 'logLevel',
 } as const;
 
 /**
@@ -147,6 +155,15 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED]?: boolean | string;
 
   /**
+   * Per-endpoint log level override.
+   * Accepts log level name ("TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF")
+   * or numeric level (0-6). When set, overrides global/category levels for this endpoint.
+   *
+   * Example config: { "logLevel": "DEBUG" }
+   */
+  [ENDPOINT_CONFIG_FLAGS.LOG_LEVEL]?: string | number;
+
+  /**
    * Allow any additional configuration flags
    */
   [key: string]: unknown;
@@ -197,6 +214,11 @@ export const DEFAULT_ENDPOINT_CONFIG: EndpointConfig = {
  * Valid boolean string values (case-insensitive)
  */
 const VALID_BOOLEAN_VALUES = ['true', 'false', '1', '0'];
+
+/**
+ * Valid log level names (case-insensitive)
+ */
+const VALID_LOG_LEVEL_NAMES = ['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'off'];
 
 /**
  * Validate endpoint configuration
@@ -284,6 +306,31 @@ export function validateEndpointConfig(config: Record<string, any> | undefined):
       throw new Error(
         `Invalid type for config flag "${ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS}". ` +
         `Expected boolean or string ("True"/"False"), got ${typeof allowRemoveAllFlag}.`
+      );
+    }
+  }
+
+  // Validate logLevel
+  const logLevelFlag = config[ENDPOINT_CONFIG_FLAGS.LOG_LEVEL];
+  if (logLevelFlag !== undefined) {
+    if (typeof logLevelFlag === 'string') {
+      if (!VALID_LOG_LEVEL_NAMES.includes(logLevelFlag.toLowerCase())) {
+        throw new Error(
+          `Invalid value "${logLevelFlag}" for config flag "${ENDPOINT_CONFIG_FLAGS.LOG_LEVEL}". ` +
+          `Allowed values: "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF" (case-insensitive).`
+        );
+      }
+    } else if (typeof logLevelFlag === 'number') {
+      if (!Number.isInteger(logLevelFlag) || logLevelFlag < 0 || logLevelFlag > 6) {
+        throw new Error(
+          `Invalid numeric value ${logLevelFlag} for config flag "${ENDPOINT_CONFIG_FLAGS.LOG_LEVEL}". ` +
+          `Allowed range: 0 (TRACE) through 6 (OFF).`
+        );
+      }
+    } else {
+      throw new Error(
+        `Invalid type for config flag "${ENDPOINT_CONFIG_FLAGS.LOG_LEVEL}". ` +
+        `Expected string ("TRACE"/"DEBUG"/"INFO"/"WARN"/"ERROR"/"FATAL"/"OFF") or number (0-6), got ${typeof logLevelFlag}.`
       );
     }
   }

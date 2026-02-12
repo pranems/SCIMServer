@@ -1,7 +1,9 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { copyFile, stat, access, constants } from 'node:fs/promises';
 import { existsSync, createReadStream } from 'node:fs';
+import { ScimLogger } from '../logging/scim-logger.service';
+import { LogCategory } from '../logging/log-levels';
 
 // Optional blob backup support (policy-friendly) activated via env vars
 // Required env vars for blob mode:
@@ -27,7 +29,6 @@ try {
 
 @Injectable()
 export class BackupService implements OnModuleInit {
-  private readonly logger = new Logger(BackupService.name);
   // Primary ephemeral DB now standardized to /tmp/local-data
   private readonly localDbPath = '/tmp/local-data/scim.db';
   private readonly azureFilesBackupPath = '/app/data/scim.db'; // legacy persistent location
@@ -47,13 +48,15 @@ export class BackupService implements OnModuleInit {
   private readonly maxInitialBackupRetries = 10; // ~5 minutes if 30s cadence
   private readonly initialBackupRetryIntervalMs = 30_000;
 
+  constructor(private readonly logger: ScimLogger) {}
+
   onModuleInit() {
-    this.logger.log('Backup service initialized');
-    this.logger.log(`Local DB (ephemeral): ${this.localDbPath}`);
+    this.logger.info(LogCategory.BACKUP, 'Backup service initialized');
+    this.logger.info(LogCategory.BACKUP, `Local DB (ephemeral): ${this.localDbPath}`);
 
     if (this.blobAccount) {
       if (!BlobServiceClient) {
-        this.logger.error('Blob backup mode requested but @azure/storage-blob not installed.');
+        this.logger.error(LogCategory.BACKUP, 'Blob backup mode requested but @azure/storage-blob not installed.');
       } else {
         try {
           const endpoint = `https://${this.blobAccount}.blob.core.windows.net`;
@@ -63,13 +66,13 @@ export class BackupService implements OnModuleInit {
           const credential = new DefaultAzureCredential();
           this.blobClient = new BlobServiceClient(endpoint, credential);
           this.blobMode = true;
-          this.logger.log(`Blob backup mode enabled → container: ${this.blobContainer} (account: ${this.blobAccount})`);
+          this.logger.info(LogCategory.BACKUP, `Blob backup mode enabled`, { container: this.blobContainer, account: this.blobAccount });
         } catch (e) {
-          this.logger.error('Failed to initialize blob backup mode:', e instanceof Error ? e.message : e);
+          this.logger.error(LogCategory.BACKUP, 'Failed to initialize blob backup mode', e instanceof Error ? e : undefined);
         }
       }
     } else {
-      this.logger.log(`Azure Files backup (persistent path): ${this.azureFilesBackupPath}`);
+      this.logger.info(LogCategory.BACKUP, `Azure Files backup (persistent path): ${this.azureFilesBackupPath}`);
     }
 
     // Attempt an early initial backup after 10s; if local DB is not yet created,
@@ -77,7 +80,7 @@ export class BackupService implements OnModuleInit {
     // Attempt restore then schedule first backup
     setTimeout(() => {
       this.initialRestore().then(() => this.performBackup())
-        .catch(err => this.logger.error('Initial cycle failed:', err));
+        .catch(err => this.logger.error(LogCategory.BACKUP, 'Initial cycle failed', err instanceof Error ? err : undefined));
     }, 8000);
 
     // Retry loop to capture first backup as soon as DB file appears (common race: app starts, DB created after first request)
@@ -111,7 +114,7 @@ export class BackupService implements OnModuleInit {
       try {
         await access(this.localDbPath, constants.R_OK);
       } catch {
-        this.logger.warn(`Local database not found at ${this.localDbPath}, skipping backup`);
+        this.logger.warn(LogCategory.BACKUP, `Local database not found at ${this.localDbPath}, skipping backup`);
         this.lastBackupSucceeded = false;
         return;
       }
@@ -120,7 +123,7 @@ export class BackupService implements OnModuleInit {
       const stats = await stat(this.localDbPath);
       const fileSizeKB = (stats.size / 1024).toFixed(2);
 
-      this.logger.log(`Starting backup #${this.backupCount + 1} (${fileSizeKB} KB)`);
+      this.logger.info(LogCategory.BACKUP, `Starting backup #${this.backupCount + 1}`, { fileSizeKB });
 
       if (this.blobMode && this.blobClient) {
         await this.backupToBlob();
@@ -133,7 +136,7 @@ export class BackupService implements OnModuleInit {
           // If no persistence layer this will fail; mark explicitly
           const msg = e instanceof Error ? e.message : String(e);
           this.lastError = msg;
-          this.logger.warn(`Azure Files copy failed (no persistence mounted?): ${msg}`);
+          this.logger.warn(LogCategory.BACKUP, `Azure Files copy failed (no persistence mounted?)`, { error: msg });
           this.lastBackupSucceeded = false;
           return;
         }
@@ -145,10 +148,10 @@ export class BackupService implements OnModuleInit {
       this.lastBackupSucceeded = true;
       this.lastError = null;
 
-      this.logger.log(`✓ Backup #${this.backupCount} completed (${fileSizeKB} KB) @ ${this.lastBackupTime.toISOString()}`);
+      this.logger.info(LogCategory.BACKUP, `Backup #${this.backupCount} completed`, { fileSizeKB, timestamp: this.lastBackupTime?.toISOString() });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error('Backup failed:', errorMessage);
+      this.logger.error(LogCategory.BACKUP, 'Backup failed', error instanceof Error ? error : undefined, { errorMessage });
       this.lastError = errorMessage;
       this.lastBackupSucceeded = false;
 
@@ -188,7 +191,7 @@ export class BackupService implements OnModuleInit {
    * Manually trigger a backup (useful for testing or admin endpoint)
    */
   async triggerManualBackup(): Promise<void> {
-    this.logger.log('Manual backup triggered');
+    this.logger.info(LogCategory.BACKUP, 'Manual backup triggered');
     await this.performBackup();
   }
 
@@ -197,7 +200,7 @@ export class BackupService implements OnModuleInit {
     const container = this.blobClient.getContainerClient(this.blobContainer);
     if (!(await container.exists())) {
       await container.create();
-      this.logger.log(`Created blob container ${this.blobContainer}`);
+      this.logger.info(LogCategory.BACKUP, `Created blob container ${this.blobContainer}`);
     }
   }
 
@@ -214,7 +217,7 @@ export class BackupService implements OnModuleInit {
     };
 
     if (!existsSync(this.localDbPath)) {
-      this.logger.warn('Local DB disappeared before blob upload');
+      this.logger.warn(LogCategory.BACKUP, 'Local DB disappeared before blob upload');
       throw new Error('Local DB missing before blob upload');
     }
 
@@ -222,7 +225,7 @@ export class BackupService implements OnModuleInit {
     await blockBlob.uploadStream(stream, 4 * 1024 * 1024, 5, {
       blobHTTPHeaders: { blobContentType: 'application/octet-stream' },
     });
-    this.logger.log(`Uploaded blob snapshot: ${blobName}`);
+    this.logger.info(LogCategory.BACKUP, `Uploaded blob snapshot: ${blobName}`);
     this.hasSnapshots = true;
     await this.pruneOldBlobs(container);
   }
@@ -240,11 +243,11 @@ export class BackupService implements OnModuleInit {
       try { await container.deleteBlob(del.name); } catch (e) {
         let msg: string;
         if (e instanceof Error) { msg = e.message; } else { try { msg = JSON.stringify(e); } catch { msg = String(e); } }
-        this.logger.debug(`Failed to delete old blob ${del.name}: ${msg}`);
+        this.logger.debug(LogCategory.BACKUP, `Failed to delete old blob ${del.name}`, { error: msg });
       }
     }
     if (toDelete.length) {
-      this.logger.log(`Pruned ${toDelete.length} old blob snapshots`);
+      this.logger.info(LogCategory.BACKUP, `Pruned ${toDelete.length} old blob snapshots`);
     }
   }
 
@@ -252,13 +255,13 @@ export class BackupService implements OnModuleInit {
     this.initialRestoreAttempted = true;
     if (!this.blobMode || !this.blobClient) return;
     if (existsSync(this.localDbPath)) {
-      this.logger.log('Local DB already present, skipping restore');
+      this.logger.info(LogCategory.BACKUP, 'Local DB already present, skipping restore');
       return;
     }
-    this.logger.log('Attempting blob snapshot restore (local DB absent)');
+    this.logger.info(LogCategory.BACKUP, 'Attempting blob snapshot restore (local DB absent)');
     const container = this.blobClient.getContainerClient(this.blobContainer);
     if (!(await container.exists())) {
-      this.logger.log('Blob container does not exist yet; no restore possible');
+      this.logger.info(LogCategory.BACKUP, 'Blob container does not exist yet; no restore possible');
       return;
     }
     const blobs: { name: string }[] = [];
@@ -266,12 +269,12 @@ export class BackupService implements OnModuleInit {
       blobs.push({ name: b.name });
     }
     if (!blobs.length) {
-      this.logger.log('No snapshots found to restore');
+      this.logger.info(LogCategory.BACKUP, 'No snapshots found to restore');
       return;
     }
     blobs.sort((a, b) => b.name.localeCompare(a.name));
     const latest = blobs[0];
-    this.logger.log(`Restoring from snapshot: ${latest.name}`);
+    this.logger.info(LogCategory.BACKUP, `Restoring from snapshot: ${latest.name}`);
     // Dynamic import to keep types loose
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const block = container.getBlockBlobClient(latest.name) as any;
@@ -284,7 +287,7 @@ export class BackupService implements OnModuleInit {
         .on('finish', resolve)
         .on('error', reject);
     });
-    this.logger.log('Restore complete');
+    this.logger.info(LogCategory.BACKUP, 'Restore complete');
     this.restoredFromSnapshot = true;
     this.hasSnapshots = true;
   }

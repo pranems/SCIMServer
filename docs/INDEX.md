@@ -20,6 +20,7 @@
 | [MULTI_ENDPOINT_GUIDE.md](MULTI_ENDPOINT_GUIDE.md) | Multi-endpoint (multi-tenant) architecture, API reference, data isolation |
 | [STORAGE_AND_BACKUP.md](STORAGE_AND_BACKUP.md) | Hybrid storage architecture (local SQLite + Azure Files backup) |
 | [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | Complete REST API reference with curl examples |
+| [LOGGING_AND_OBSERVABILITY.md](LOGGING_AND_OBSERVABILITY.md) | Structured logging, traceability, correlation IDs, admin log-config API, ring buffer |
 | [USER_API_CALL_TRACE.md](USER_API_CALL_TRACE.md) | Annotated end-to-end call trace for POST /Users |
 
 ## SCIM Protocol

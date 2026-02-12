@@ -1,0 +1,38 @@
+{
+  "description": "GET /scim/admin/log-config — response showing runtime log configuration",
+  "globalLevel": "DEBUG",
+  "categoryLevels": {
+    "scim.patch": "TRACE",
+    "oauth": "WARN"
+  },
+  "endpointLevels": {
+    "ep-abc123": "TRACE"
+  },
+  "includePayloads": true,
+  "includeStackTraces": true,
+  "maxPayloadSizeBytes": 8192,
+  "format": "pretty",
+  "availableLevels": [
+    "TRACE",
+    "DEBUG",
+    "INFO",
+    "WARN",
+    "ERROR",
+    "FATAL",
+    "OFF"
+  ],
+  "availableCategories": [
+    "http",
+    "auth",
+    "scim.user",
+    "scim.group",
+    "scim.patch",
+    "scim.filter",
+    "scim.discovery",
+    "endpoint",
+    "database",
+    "backup",
+    "oauth",
+    "general"
+  ]
+}

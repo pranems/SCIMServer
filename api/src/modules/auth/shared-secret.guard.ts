@@ -13,6 +13,8 @@ import { SCIM_ERROR_SCHEMA } from '../scim/common/scim-constants';
 import * as crypto from 'node:crypto';
 import { OAuthService } from '../../oauth/oauth.service';
 import { IS_PUBLIC_KEY } from './public.decorator';
+import { ScimLogger } from '../logging/scim-logger.service';
+import { LogCategory } from '../logging/log-levels';
 
 interface AuthenticatedRequest extends Request {
   oauth?: Record<string, unknown>;
@@ -24,7 +26,8 @@ export class SharedSecretGuard implements CanActivate {
   constructor(
     private readonly configService: ConfigService,
     @Inject(OAuthService) private readonly oauthService: OAuthService,
-    private readonly reflector: Reflector
+    private readonly reflector: Reflector,
+    private readonly logger: ScimLogger,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -35,6 +38,7 @@ export class SharedSecretGuard implements CanActivate {
     ]);
 
     if (isPublic) {
+      this.logger.trace(LogCategory.AUTH, 'Skipping auth – route is public');
       return true;
     }
     const httpContext = context.switchToHttp();
@@ -52,8 +56,7 @@ export class SharedSecretGuard implements CanActivate {
     if (!expectedSecret) {
       if (process.env.NODE_ENV === 'production') {
         // Fail fast with clear message – operator must configure the secret explicitly.
-        // Using 401 path gives consistent SCIM error formatting.
-        console.error('[SCIM] SCIM_SHARED_SECRET is not configured. Set the environment variable or secret in your deployment.');
+        this.logger.fatal(LogCategory.AUTH, 'SCIM_SHARED_SECRET is not configured. Set the environment variable or secret in your deployment.');
         this.reject(response, 'SCIM shared secret not configured.');
       } else {
         // Dev / test convenience: generate once and memoize in env so subsequent guard calls reuse it.
@@ -63,12 +66,14 @@ export class SharedSecretGuard implements CanActivate {
           .replace(/=+$/g, '');
         process.env.SCIM_SHARED_SECRET = generated;
         expectedSecret = generated;
-        // eslint-disable-next-line no-console
-        console.warn(`[SCIM] Auto-generated ephemeral SCIM_SHARED_SECRET for ${process.env.NODE_ENV || 'development'}: ${generated}`);
+        this.logger.warn(LogCategory.AUTH, `Auto-generated ephemeral SCIM_SHARED_SECRET for ${process.env.NODE_ENV || 'development'}`, {
+          hint: 'Set SCIM_SHARED_SECRET env var to suppress this warning',
+        });
       }
     }
 
     if (!header || !header.startsWith('Bearer ')) {
+      this.logger.warn(LogCategory.AUTH, 'Missing or malformed Authorization header');
       this.reject(response, 'Missing bearer token.');
     }
 
@@ -77,29 +82,32 @@ export class SharedSecretGuard implements CanActivate {
     // First, try OAuth 2.0 JWT token validation
     if (token !== expectedSecret) {
       try {
-        console.log('🔍 Attempting OAuth 2.0 token validation...');
+        this.logger.debug(LogCategory.AUTH, 'Attempting OAuth 2.0 token validation');
         const payload = await this.oauthService.validateAccessToken(token);
 
         // Add OAuth payload to request for later use
         request.oauth = payload;
         request.authType = 'oauth';
 
-        console.log('✅ OAuth 2.0 authentication successful:', payload.client_id);
+        this.logger.info(LogCategory.AUTH, 'OAuth 2.0 authentication successful', {
+          clientId: payload.client_id,
+        });
         return true;
       } catch (_oauthError) {
-        console.log('❌ OAuth 2.0 validation failed, checking legacy token...');
+        this.logger.debug(LogCategory.AUTH, 'OAuth 2.0 validation failed, falling back to legacy token');
         // Fall through to legacy token check
       }
     }
 
     // Fall back to legacy bearer token validation
     if (token === expectedSecret) {
-      console.log('✅ Legacy bearer token authentication successful');
+      this.logger.info(LogCategory.AUTH, 'Legacy bearer token authentication successful');
       request.authType = 'legacy';
       return true;
     }
 
     // Both OAuth and legacy validation failed
+    this.logger.warn(LogCategory.AUTH, 'Authentication failed – both OAuth and legacy token invalid');
     this.reject(response, 'Invalid bearer token.');
   }
 

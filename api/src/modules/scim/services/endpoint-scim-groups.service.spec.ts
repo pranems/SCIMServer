@@ -4,6 +4,7 @@ import { EndpointScimGroupsService } from './endpoint-scim-groups.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ScimMetadataService } from './scim-metadata.service';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
+import { ScimLogger } from '../../logging/scim-logger.service';
 import type { CreateGroupDto } from '../dto/create-group.dto';
 import type { PatchGroupDto } from '../dto/patch-group.dto';
 
@@ -114,6 +115,18 @@ describe('EndpointScimGroupsService', () => {
         {
           provide: EndpointContextStorage,
           useValue: mockEndpointContext,
+        },
+        {
+          provide: ScimLogger,
+          useValue: {
+            trace: jest.fn(),
+            debug: jest.fn(),
+            info: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+            fatal: jest.fn(),
+            isEnabled: jest.fn().mockReturnValue(true),
+          },
         },
       ],
     }).compile();

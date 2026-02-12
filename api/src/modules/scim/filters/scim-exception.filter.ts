@@ -4,9 +4,11 @@ import {
   ArgumentsHost,
   HttpException,
 } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Response, Request } from 'express';
 
 import { SCIM_ERROR_SCHEMA } from '../common/scim-constants';
+import { ScimLogger } from '../../logging/scim-logger.service';
+import { LogCategory } from '../../logging/log-levels';
 
 /**
  * Global exception filter for SCIM endpoints.
@@ -24,11 +26,26 @@ import { SCIM_ERROR_SCHEMA } from '../common/scim-constants';
  */
 @Catch(HttpException)
 export class ScimExceptionFilter implements ExceptionFilter {
+  constructor(private readonly logger: ScimLogger) {}
+
   catch(exception: HttpException, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
+    const request = ctx.getRequest<Request>();
     const response = ctx.getResponse<Response>();
     const status = exception.getStatus();
     const exceptionResponse = exception.getResponse();
+
+    // Log the exception
+    if (status >= 500) {
+      this.logger.error(LogCategory.HTTP, `Exception ${status} on ${request?.method} ${request?.originalUrl}`, exception, {
+        status,
+      });
+    } else if (status >= 400) {
+      this.logger.warn(LogCategory.HTTP, `Client error ${status} on ${request?.method} ${request?.originalUrl}`, {
+        status,
+        detail: typeof exceptionResponse === 'object' ? (exceptionResponse as Record<string, unknown>).detail : exceptionResponse,
+      });
+    }
 
     // Build SCIM-compliant error body
     let body: Record<string, unknown>;

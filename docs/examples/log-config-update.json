@@ -1,0 +1,11 @@
+{
+  "description": "PUT /scim/admin/log-config — request body for partial config update",
+  "globalLevel": "INFO",
+  "includePayloads": false,
+  "format": "json",
+  "categoryLevels": {
+    "scim.patch": "DEBUG",
+    "auth": "WARN",
+    "http": "INFO"
+  }
+}

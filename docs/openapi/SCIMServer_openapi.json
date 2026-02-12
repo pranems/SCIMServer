@@ -145,6 +145,163 @@
       "put": { "summary": "Replace Group", "responses": { "200": { "description": "Updated", "headers": { "ETag": { "schema": { "type": "string" } } } } } },
       "patch": { "summary": "Patch Group", "responses": { "200": { "description": "Patched", "headers": { "ETag": { "schema": { "type": "string" } } } } } },
       "delete": { "summary": "Delete Group", "responses": { "204": { "description": "No content" } } }
+    },
+    "/admin/log-config": {
+      "get": {
+        "summary": "Get log configuration",
+        "description": "Returns the current runtime log configuration including global level, category overrides, endpoint overrides, and available levels/categories.",
+        "tags": ["Admin - Logging"],
+        "responses": {
+          "200": {
+            "description": "Current log configuration",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/LogConfigResponse" }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Update log configuration",
+        "description": "Partial update of runtime log configuration. Only include fields you want to change.",
+        "tags": ["Admin - Logging"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LogConfigUpdate" },
+              "example": {
+                "globalLevel": "INFO",
+                "includePayloads": false,
+                "format": "json",
+                "categoryLevels": { "scim.patch": "DEBUG", "auth": "WARN" }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Configuration updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" },
+                    "config": { "$ref": "#/components/schemas/LogConfigResponse" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/log-config/level/{level}": {
+      "put": {
+        "summary": "Set global log level",
+        "description": "Quick shortcut to change the global minimum log level.",
+        "tags": ["Admin - Logging"],
+        "parameters": [
+          { "name": "level", "in": "path", "required": true, "schema": { "type": "string", "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"] } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Global level updated",
+            "content": {
+              "application/json": {
+                "example": { "message": "Global log level set to TRACE", "globalLevel": "TRACE" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/log-config/category/{category}/{level}": {
+      "put": {
+        "summary": "Set category log level",
+        "description": "Set or override the log level for a specific log category.",
+        "tags": ["Admin - Logging"],
+        "parameters": [
+          { "name": "category", "in": "path", "required": true, "schema": { "type": "string", "enum": ["http", "auth", "scim.user", "scim.group", "scim.patch", "scim.filter", "scim.discovery", "endpoint", "database", "backup", "oauth", "general"] } },
+          { "name": "level", "in": "path", "required": true, "schema": { "type": "string", "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"] } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category level updated",
+            "content": { "application/json": { "example": { "message": "Category 'scim.patch' log level set to TRACE" } } }
+          }
+        }
+      }
+    },
+    "/admin/log-config/endpoint/{endpointId}/{level}": {
+      "put": {
+        "summary": "Set endpoint log level override",
+        "description": "Set a log level override for a specific SCIM endpoint. This takes highest priority in the 3-tier cascade.",
+        "tags": ["Admin - Logging"],
+        "parameters": [
+          { "name": "endpointId", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "level", "in": "path", "required": true, "schema": { "type": "string", "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"] } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Endpoint level override set",
+            "content": { "application/json": { "example": { "message": "Endpoint 'ep-abc123' log level set to TRACE" } } }
+          }
+        }
+      }
+    },
+    "/admin/log-config/endpoint/{endpointId}": {
+      "delete": {
+        "summary": "Remove endpoint log level override",
+        "description": "Remove the log level override for a specific SCIM endpoint, reverting to category or global level.",
+        "tags": ["Admin - Logging"],
+        "parameters": [
+          { "name": "endpointId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "204": { "description": "Endpoint override removed" }
+        }
+      }
+    },
+    "/admin/log-config/recent": {
+      "get": {
+        "summary": "Query recent log entries",
+        "description": "Retrieve entries from the in-memory ring buffer (last 500 entries). Supports filtering by level, category, requestId, and endpointId.",
+        "tags": ["Admin - Logging"],
+        "parameters": [
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 100 }, "description": "Max entries to return" },
+          { "name": "level", "in": "query", "schema": { "type": "string", "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"] }, "description": "Minimum severity filter" },
+          { "name": "category", "in": "query", "schema": { "type": "string" }, "description": "Filter by log category" },
+          { "name": "requestId", "in": "query", "schema": { "type": "string" }, "description": "Filter by correlation request ID" },
+          { "name": "endpointId", "in": "query", "schema": { "type": "string" }, "description": "Filter by SCIM endpoint ID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent log entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "count": { "type": "integer" },
+                    "entries": { "type": "array", "items": { "$ref": "#/components/schemas/StructuredLogEntry" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Clear recent log buffer",
+        "description": "Clear the in-memory ring buffer of recent log entries.",
+        "tags": ["Admin - Logging"],
+        "responses": {
+          "204": { "description": "Ring buffer cleared" }
+        }
+      }
     }
   },
   "components": {
@@ -161,6 +318,57 @@
           "excludedAttributes": { "type": "string", "description": "Comma-separated list of attributes to exclude" },
           "sortBy": { "type": "string" },
           "sortOrder": { "type": "string", "enum": ["ascending", "descending"] }
+        }
+      },
+      "LogConfigResponse": {
+        "type": "object",
+        "description": "Runtime log configuration response from GET /admin/log-config",
+        "properties": {
+          "globalLevel": { "type": "string", "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"], "description": "Current global minimum log level" },
+          "categoryLevels": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Per-category level overrides" },
+          "endpointLevels": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Per-endpoint level overrides" },
+          "includePayloads": { "type": "boolean", "description": "Whether request/response bodies are logged at TRACE/DEBUG" },
+          "includeStackTraces": { "type": "boolean", "description": "Whether stack traces are included in ERROR/FATAL output" },
+          "maxPayloadSizeBytes": { "type": "integer", "description": "Maximum payload size to log in bytes" },
+          "format": { "type": "string", "enum": ["json", "pretty"], "description": "Output format" },
+          "availableLevels": { "type": "array", "items": { "type": "string" }, "description": "All valid log level names" },
+          "availableCategories": { "type": "array", "items": { "type": "string" }, "description": "All valid log category names" }
+        }
+      },
+      "LogConfigUpdate": {
+        "type": "object",
+        "description": "Partial update body for PUT /admin/log-config",
+        "properties": {
+          "globalLevel": { "type": "string", "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"] },
+          "includePayloads": { "type": "boolean" },
+          "includeStackTraces": { "type": "boolean" },
+          "maxPayloadSizeBytes": { "type": "integer" },
+          "format": { "type": "string", "enum": ["json", "pretty"] },
+          "categoryLevels": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Category name → level overrides" }
+        }
+      },
+      "StructuredLogEntry": {
+        "type": "object",
+        "description": "A single structured log entry from the ring buffer",
+        "properties": {
+          "timestamp": { "type": "string", "format": "date-time", "description": "ISO-8601 timestamp" },
+          "level": { "type": "string", "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"], "description": "Log severity" },
+          "category": { "type": "string", "description": "Functional category (e.g. scim.user, http, auth)" },
+          "message": { "type": "string", "description": "Human-readable log message" },
+          "requestId": { "type": "string", "description": "Correlation request ID (UUID)" },
+          "endpointId": { "type": "string", "description": "SCIM endpoint ID" },
+          "method": { "type": "string", "description": "HTTP method" },
+          "path": { "type": "string", "description": "Request URL path" },
+          "durationMs": { "type": "integer", "description": "Elapsed time since request start in ms" },
+          "error": {
+            "type": "object",
+            "properties": {
+              "message": { "type": "string" },
+              "name": { "type": "string" },
+              "stack": { "type": "string" }
+            }
+          },
+          "data": { "type": "object", "additionalProperties": true, "description": "Additional structured data" }
         }
       }
     },

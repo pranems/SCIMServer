@@ -1,6 +1,8 @@
 ﻿import { Body, Controller, Get, Post, HttpException, HttpStatus } from '@nestjs/common';
 import { Public } from '../modules/auth/public.decorator';
 import { OAuthService } from './oauth.service';
+import { ScimLogger } from '../modules/logging/scim-logger.service';
+import { LogCategory } from '../modules/logging/log-levels';
 
 export interface TokenRequest {
   grant_type: string;
@@ -18,7 +20,10 @@ export interface TokenResponse {
 
 @Controller('oauth')
 export class OAuthController {
-  constructor(private readonly oauthService: OAuthService) {}
+  constructor(
+    private readonly oauthService: OAuthService,
+    private readonly logger: ScimLogger,
+  ) {}
 
   @Public()
   @Get('test')
@@ -29,12 +34,13 @@ export class OAuthController {
   @Public()
   @Post('token')
   async getToken(@Body() tokenRequest: TokenRequest): Promise<TokenResponse> {
-    console.log('🔐 OAuth Token Request FULL BODY:', tokenRequest);
-    console.log('🔐 OAuth Token Request:', {
-      grant_type: tokenRequest.grant_type,
-      client_id: tokenRequest.client_id,
-      client_secret: tokenRequest.client_secret ? '***redacted***' : 'MISSING',
-      scope: tokenRequest.scope
+    this.logger.debug(LogCategory.OAUTH, 'OAuth token request received', {
+      grantType: tokenRequest.grant_type,
+      clientId: tokenRequest.client_id,
+      scope: tokenRequest.scope,
+    });
+    this.logger.trace(LogCategory.OAUTH, 'OAuth token request full body', {
+      body: tokenRequest as unknown as Record<string, unknown>,
     });
 
     // Validate grant_type (Microsoft Entra requires client_credentials)
@@ -66,7 +72,9 @@ export class OAuthController {
         tokenRequest.scope
       );
 
-      console.log('✅ OAuth Token Generated Successfully');
+      this.logger.info(LogCategory.OAUTH, 'OAuth token generated successfully', {
+        clientId: tokenRequest.client_id,
+      });
 
       return {
         access_token: token.accessToken,
@@ -75,7 +83,10 @@ export class OAuthController {
         scope: token.scope
       };
     } catch (error) {
-      console.error('❌ OAuth Token Generation Failed:', error instanceof Error ? error.message : String(error));
+      this.logger.warn(LogCategory.OAUTH, 'OAuth token generation failed', {
+        clientId: tokenRequest.client_id,
+        reason: error instanceof Error ? error.message : String(error),
+      });
 
       throw new HttpException(
         {

@@ -5,6 +5,8 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import { ScimLogger } from '../../logging/scim-logger.service';
+import { LogCategory } from '../../logging/log-levels';
 import { createScimError } from '../common/scim-errors';
 import {
   DEFAULT_COUNT,
@@ -47,11 +49,15 @@ export class EndpointScimGroupsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly metadata: ScimMetadataService,
-    private readonly endpointContext: EndpointContextStorage
+    private readonly endpointContext: EndpointContextStorage,
+    private readonly logger: ScimLogger,
   ) {}
 
   async createGroupForEndpoint(dto: CreateGroupDto, baseUrl: string, endpointId: string): Promise<ScimGroupResource> {
     this.ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
+
+    this.logger.info(LogCategory.SCIM_GROUP, 'Creating group', { displayName: dto.displayName, memberCount: dto.members?.length ?? 0, endpointId });
+    this.logger.trace(LogCategory.SCIM_GROUP, 'Create group payload', { body: dto as unknown as Record<string, unknown> });
 
     // Check for duplicate displayName within the endpoint (case-insensitive)
     await this.assertUniqueDisplayName(dto.displayName, endpointId);
@@ -92,12 +98,15 @@ export class EndpointScimGroupsService {
     }
 
     const withMembers = await this.getGroupWithMembersForEndpoint(String(group.scimId), endpointId);
+    this.logger.info(LogCategory.SCIM_GROUP, 'Group created', { scimId, displayName: dto.displayName, endpointId });
     return this.toScimGroupResource(withMembers, baseUrl);
   }
 
   async getGroupForEndpoint(scimId: string, baseUrl: string, endpointId: string): Promise<ScimGroupResource> {
+    this.logger.debug(LogCategory.SCIM_GROUP, 'Get group', { scimId, endpointId });
     const group = await this.getGroupWithMembersForEndpoint(scimId, endpointId);
     if (!group) {
+      this.logger.debug(LogCategory.SCIM_GROUP, 'Group not found', { scimId, endpointId });
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
@@ -112,6 +121,8 @@ export class EndpointScimGroupsService {
     if (count > MAX_COUNT) {
       count = MAX_COUNT;
     }
+
+    this.logger.info(LogCategory.SCIM_GROUP, 'List groups', { filter, startIndex, count, endpointId });
 
     let filterResult;
     try {
@@ -147,6 +158,8 @@ export class EndpointScimGroupsService {
     const take = Math.max(Math.min(count, MAX_COUNT), 0);
     const paginatedResources = resources.slice(skip, skip + take);
 
+    this.logger.debug(LogCategory.SCIM_GROUP, 'List groups result', { totalResults, returned: paginatedResources.length, endpointId });
+
     return {
       schemas: [SCIM_LIST_RESPONSE_SCHEMA],
       totalResults,
@@ -158,6 +171,12 @@ export class EndpointScimGroupsService {
 
   async patchGroupForEndpoint(scimId: string, dto: PatchGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimGroupResource> {
     this.ensureSchema(dto.schemas, SCIM_PATCH_SCHEMA);
+
+    this.logger.info(LogCategory.SCIM_PATCH, 'Patch group', { scimId, endpointId, opCount: dto.Operations?.length });
+    this.logger.debug(LogCategory.SCIM_PATCH, 'Patch group operations', {
+      operations: dto.Operations?.map(o => ({ op: o.op, path: o.path })),
+    });
+    this.logger.trace(LogCategory.SCIM_PATCH, 'Patch group full payload', { body: dto as unknown as Record<string, unknown> });
 
     const group = await this.getGroupWithMembersForEndpoint(scimId, endpointId);
     if (!group) {
@@ -227,6 +246,7 @@ export class EndpointScimGroupsService {
       throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.' });
     }
 
+    this.logger.info(LogCategory.SCIM_PATCH, 'Group patched', { scimId, endpointId });
     return this.toScimGroupResource(updatedGroup, baseUrl);
   }
 
@@ -237,6 +257,8 @@ export class EndpointScimGroupsService {
     endpointId: string
   ): Promise<ScimGroupResource> {
     this.ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
+
+    this.logger.info(LogCategory.SCIM_GROUP, 'Replace group (PUT)', { scimId, displayName: dto.displayName, endpointId });
 
     const group = await this.getGroupWithMembersForEndpoint(scimId, endpointId);
     if (!group) {
@@ -283,6 +305,7 @@ export class EndpointScimGroupsService {
   }
 
   async deleteGroupForEndpoint(scimId: string, endpointId: string): Promise<void> {
+    this.logger.info(LogCategory.SCIM_GROUP, 'Delete group', { scimId, endpointId });
     const group = await this.prisma.scimGroup.findFirst({
       where: {
         scimId,
@@ -291,10 +314,12 @@ export class EndpointScimGroupsService {
     });
 
     if (!group) {
+      this.logger.debug(LogCategory.SCIM_GROUP, 'Delete target group not found', { scimId, endpointId });
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
     await this.prisma.scimGroup.delete({ where: { id: group.id } });
+    this.logger.info(LogCategory.SCIM_GROUP, 'Group deleted', { scimId, endpointId });
   }
 
   // ===== Private Helper Methods =====

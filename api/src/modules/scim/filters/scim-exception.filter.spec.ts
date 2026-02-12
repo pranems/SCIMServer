@@ -2,6 +2,7 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import { ScimExceptionFilter } from './scim-exception.filter';
 import { createScimError } from '../common/scim-errors';
 import { SCIM_ERROR_SCHEMA } from '../common/scim-constants';
+import { ScimLogger } from '../../logging/scim-logger.service';
 
 describe('ScimExceptionFilter', () => {
   let filter: ScimExceptionFilter;
@@ -12,8 +13,18 @@ describe('ScimExceptionFilter', () => {
   };
   let mockHost: any;
 
+  const mockScimLogger = {
+    trace: jest.fn(),
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    fatal: jest.fn(),
+    isEnabled: jest.fn().mockReturnValue(true),
+  };
+
   beforeEach(() => {
-    filter = new ScimExceptionFilter();
+    filter = new ScimExceptionFilter(mockScimLogger as unknown as ScimLogger);
     mockResponse = {
       status: jest.fn().mockReturnThis(),
       setHeader: jest.fn().mockReturnThis(),
