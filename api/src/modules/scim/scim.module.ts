@@ -16,6 +16,7 @@ import { EndpointScimUsersService } from './services/endpoint-scim-users.service
 import { EndpointScimGroupsService } from './services/endpoint-scim-groups.service';
 import { EndpointContextStorage } from '../endpoint/endpoint-context.storage';
 import { ScimContentTypeInterceptor } from './interceptors/scim-content-type.interceptor';
+import { ScimEtagInterceptor } from './interceptors/scim-etag.interceptor';
 import { ScimExceptionFilter } from './filters/scim-exception.filter';
 
 @Module({
@@ -41,6 +42,10 @@ import { ScimExceptionFilter } from './filters/scim-exception.filter';
     {
       provide: APP_INTERCEPTOR,
       useClass: ScimContentTypeInterceptor
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ScimEtagInterceptor
     }
   ]
 })

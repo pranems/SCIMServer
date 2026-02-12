@@ -7,13 +7,11 @@ import {
   Body,
   Param,
   HttpCode,
-  UseGuards,
   Query
 } from '@nestjs/common';
 import { EndpointService, type EndpointResponse } from '../services/endpoint.service';
 import { CreateEndpointDto } from '../dto/create-endpoint.dto';
 import { UpdateEndpointDto } from '../dto/update-endpoint.dto';
-import { Public } from '../../auth/public.decorator';
 
 /**
  * Endpoint Management API Controller

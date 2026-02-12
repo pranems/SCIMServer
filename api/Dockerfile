@@ -3,7 +3,7 @@
 ###########
 
 # Builder stage: install deps, generate Prisma, compile TS
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 RUN apk add --no-cache openssl
 WORKDIR /app
 COPY package*.json ./
@@ -17,7 +17,7 @@ RUN npm run build
 RUN npm prune --production
 
 # Runtime stage: only production deps + dist + entrypoint
-FROM node:20-alpine AS runtime
+FROM node:22-alpine AS runtime
 RUN apk add --no-cache openssl
 WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules

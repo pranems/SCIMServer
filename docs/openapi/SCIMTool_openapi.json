@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "SCIMTool API",
-    "version": "1.1.0",
-    "description": "OpenAPI specification for SCIMTool SCIM 2.0 server. Passes all 25 Microsoft SCIM Validator tests."
+    "version": "1.2.0",
+    "description": "OpenAPI specification for SCIMTool SCIM 2.0 server. Passes all 25 Microsoft SCIM Validator tests. Implements RFC 7644 §3.4.2.5 attribute projection, §3.4.3 POST /.search, §3.14 ETag/conditional requests."
   },
   "servers": [{ "url": "http://localhost:6000/scim/endpoints/{endpointId}", "description": "Local dev server" }],
   "paths": {
@@ -11,39 +11,120 @@
       "post": {
         "summary": "Create SCIM User",
         "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "type": "object" } } } },
-        "responses": { "201": { "description": "Created" }, "409": { "description": "Conflict — duplicate userName" } }
+        "responses": {
+          "201": { "description": "Created", "headers": { "ETag": { "schema": { "type": "string" }, "description": "Resource version for conditional requests" } } },
+          "409": { "description": "Conflict — duplicate userName" }
+        }
       },
       "get": {
         "summary": "List / Filter Users",
-        "description": "Supports case-insensitive userName filtering via ?filter=userName eq \"...\"",
+        "description": "Supports full ABNF filter parser (RFC 7644 §3.4.2.2), case-insensitive matching, attribute projection (§3.4.2.5)",
         "parameters": [
           { "name": "filter", "in": "query", "schema": { "type": "string" }, "description": "e.g. userName eq \"alice@example.com\" (case-insensitive)" },
           { "name": "startIndex", "in": "query", "schema": { "type": "integer", "default": 1 } },
-          { "name": "count", "in": "query", "schema": { "type": "integer", "default": 100 } }
+          { "name": "count", "in": "query", "schema": { "type": "integer", "default": 100 } },
+          { "name": "attributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to include (RFC 7644 §3.4.2.5), e.g. userName,displayName" },
+          { "name": "excludedAttributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to exclude, e.g. emails,phoneNumbers" }
         ],
+        "responses": { "200": { "description": "ListResponse" } }
+      }
+    },
+    "/Users/.search": {
+      "post": {
+        "summary": "Search Users via POST (RFC 7644 §3.4.3)",
+        "description": "POST-based search as an alternative to GET with query params. Accepts SearchRequest body.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/scim+json": {
+              "schema": { "$ref": "#/components/schemas/SearchRequest" },
+              "example": {
+                "schemas": ["urn:ietf:params:scim:api:messages:2.0:SearchRequest"],
+                "filter": "userName eq \"alice@example.com\"",
+                "startIndex": 1,
+                "count": 10,
+                "attributes": "userName,displayName"
+              }
+            }
+          }
+        },
         "responses": { "200": { "description": "ListResponse" } }
       }
     },
     "/Users/{id}": {
       "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-      "get": { "summary": "Get User", "responses": { "200": { "description": "User resource" }, "404": { "description": "Not found" } } },
-      "put": { "summary": "Replace User", "responses": { "200": { "description": "Updated" } } },
-      "patch": { "summary": "Patch User", "description": "Supports valuePath filters, extension URN paths, no-path object merges", "responses": { "200": { "description": "Patched" } } },
+      "get": {
+        "summary": "Get User",
+        "parameters": [
+          { "name": "attributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to include" },
+          { "name": "excludedAttributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to exclude" }
+        ],
+        "responses": {
+          "200": { "description": "User resource", "headers": { "ETag": { "schema": { "type": "string" }, "description": "Resource version (meta.version)" } } },
+          "304": { "description": "Not Modified — returned when If-None-Match matches current ETag" },
+          "404": { "description": "Not found" }
+        }
+      },
+      "put": {
+        "summary": "Replace User",
+        "parameters": [
+          { "name": "If-Match", "in": "header", "schema": { "type": "string" }, "description": "ETag for conditional replace (returns 412 on mismatch)" }
+        ],
+        "responses": {
+          "200": { "description": "Updated", "headers": { "ETag": { "schema": { "type": "string" } } } },
+          "412": { "description": "Precondition Failed — If-Match ETag mismatch" }
+        }
+      },
+      "patch": {
+        "summary": "Patch User",
+        "description": "Supports valuePath filters, extension URN paths, no-path object merges",
+        "parameters": [
+          { "name": "If-Match", "in": "header", "schema": { "type": "string" }, "description": "ETag for conditional patch" }
+        ],
+        "responses": {
+          "200": { "description": "Patched", "headers": { "ETag": { "schema": { "type": "string" } } } },
+          "412": { "description": "Precondition Failed" }
+        }
+      },
       "delete": { "summary": "Delete User", "responses": { "204": { "description": "No content" } } }
     },
     "/Groups": {
       "post": {
         "summary": "Create Group",
-        "responses": { "201": { "description": "Created" }, "409": { "description": "Conflict — duplicate displayName" } }
+        "responses": {
+          "201": { "description": "Created", "headers": { "ETag": { "schema": { "type": "string" } } } },
+          "409": { "description": "Conflict — duplicate displayName" }
+        }
       },
       "get": {
         "summary": "List / Filter Groups",
         "parameters": [
           { "name": "filter", "in": "query", "schema": { "type": "string" }, "description": "e.g. displayName eq \"Engineering\" (case-insensitive)" },
-          { "name": "excludedAttributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to exclude, e.g. members" },
           { "name": "startIndex", "in": "query", "schema": { "type": "integer" } },
-          { "name": "count", "in": "query", "schema": { "type": "integer" } }
+          { "name": "count", "in": "query", "schema": { "type": "integer" } },
+          { "name": "attributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to include" },
+          { "name": "excludedAttributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to exclude, e.g. members" }
         ],
+        "responses": { "200": { "description": "ListResponse" } }
+      }
+    },
+    "/Groups/.search": {
+      "post": {
+        "summary": "Search Groups via POST (RFC 7644 §3.4.3)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/scim+json": {
+              "schema": { "$ref": "#/components/schemas/SearchRequest" },
+              "example": {
+                "schemas": ["urn:ietf:params:scim:api:messages:2.0:SearchRequest"],
+                "filter": "displayName eq \"Engineering\"",
+                "startIndex": 1,
+                "count": 10
+              }
+            }
+          }
+        },
         "responses": { "200": { "description": "ListResponse" } }
       }
     },
@@ -51,15 +132,38 @@
       "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
       "get": {
         "summary": "Get Group",
-        "parameters": [{ "name": "excludedAttributes", "in": "query", "schema": { "type": "string" }, "description": "e.g. members" }],
-        "responses": { "200": { "description": "Group resource" }, "404": { "description": "Not found" } }
+        "parameters": [
+          { "name": "attributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to include" },
+          { "name": "excludedAttributes", "in": "query", "schema": { "type": "string" }, "description": "e.g. members" }
+        ],
+        "responses": {
+          "200": { "description": "Group resource", "headers": { "ETag": { "schema": { "type": "string" } } } },
+          "304": { "description": "Not Modified" },
+          "404": { "description": "Not found" }
+        }
       },
-      "put": { "summary": "Replace Group", "responses": { "200": { "description": "Updated" } } },
-      "patch": { "summary": "Patch Group", "responses": { "200": { "description": "Patched" } } },
+      "put": { "summary": "Replace Group", "responses": { "200": { "description": "Updated", "headers": { "ETag": { "schema": { "type": "string" } } } } } },
+      "patch": { "summary": "Patch Group", "responses": { "200": { "description": "Patched", "headers": { "ETag": { "schema": { "type": "string" } } } } } },
       "delete": { "summary": "Delete Group", "responses": { "204": { "description": "No content" } } }
     }
   },
   "components": {
+    "schemas": {
+      "SearchRequest": {
+        "type": "object",
+        "description": "RFC 7644 §3.4.3 SearchRequest for POST /.search",
+        "properties": {
+          "schemas": { "type": "array", "items": { "type": "string" }, "example": ["urn:ietf:params:scim:api:messages:2.0:SearchRequest"] },
+          "filter": { "type": "string", "description": "SCIM filter expression" },
+          "startIndex": { "type": "integer", "default": 1 },
+          "count": { "type": "integer", "default": 100 },
+          "attributes": { "type": "string", "description": "Comma-separated list of attributes to include" },
+          "excludedAttributes": { "type": "string", "description": "Comma-separated list of attributes to exclude" },
+          "sortBy": { "type": "string" },
+          "sortOrder": { "type": "string", "enum": ["ascending", "descending"] }
+        }
+      }
+    },
     "securitySchemes": {
       "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
     }

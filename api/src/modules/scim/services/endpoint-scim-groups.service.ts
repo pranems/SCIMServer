@@ -17,6 +17,7 @@ import type { ScimGroupResource, ScimListResponse } from '../common/scim-types';
 import type { CreateGroupDto, GroupMemberDto } from '../dto/create-group.dto';
 import type { PatchGroupDto } from '../dto/patch-group.dto';
 import { ScimMetadataService } from './scim-metadata.service';
+import { buildGroupFilter } from '../filters/apply-scim-filter';
 
 interface ListGroupsParams {
   filter?: string;
@@ -112,44 +113,46 @@ export class EndpointScimGroupsService {
       count = MAX_COUNT;
     }
 
-    const { dbWhere, caseInsensitiveDisplayName, caseInsensitiveExternalId } = this.buildFilter(filter);
+    let filterResult;
+    try {
+      filterResult = buildGroupFilter(filter);
+    } catch {
+      throw createScimError({
+        status: 400,
+        scimType: 'invalidFilter',
+        detail: `Unsupported or invalid filter expression: '${filter}'.`
+      });
+    }
+
     const where: Prisma.ScimGroupWhereInput = {
-      ...dbWhere,
+      ...filterResult.dbWhere,
       endpointId
     };
 
-    // Fetch groups from DB (may fetch all for endpoint if case-insensitive filter needs in-code matching)
-    let allGroups = await this.prisma.scimGroup.findMany({
+    // Fetch groups from DB
+    const allGroups = await this.prisma.scimGroup.findMany({
       where,
       orderBy: { createdAt: 'asc' },
       include: { members: true }
     });
 
-    // Apply case-insensitive displayName filter in code
-    // (SQLite doesn't support Prisma's mode: 'insensitive')
-    if (caseInsensitiveDisplayName) {
-      const lowerFilter = caseInsensitiveDisplayName.toLowerCase();
-      allGroups = allGroups.filter(g => g.displayName.toLowerCase() === lowerFilter);
+    // Build SCIM resources and apply in-memory filter if needed
+    let resources = allGroups.map((g) => this.toScimGroupResource(g as GroupWithMembers, baseUrl));
+    if (filterResult.inMemoryFilter) {
+      resources = resources.filter(filterResult.inMemoryFilter);
     }
 
-    // Apply case-insensitive externalId filter in code (RFC 7643 §2.1)
-    if (caseInsensitiveExternalId) {
-      const lowerFilter = caseInsensitiveExternalId.toLowerCase();
-      allGroups = allGroups.filter(g => g.externalId?.toLowerCase() === lowerFilter);
-    }
-
-    const totalResults = allGroups.length;
+    const totalResults = resources.length;
     const skip = Math.max(startIndex - 1, 0);
     const take = Math.max(Math.min(count, MAX_COUNT), 0);
-    const paginatedGroups = allGroups.slice(skip, skip + take);
-    const resources = paginatedGroups.map((g) => this.toScimGroupResource(g as GroupWithMembers, baseUrl));
+    const paginatedResources = resources.slice(skip, skip + take);
 
     return {
       schemas: [SCIM_LIST_RESPONSE_SCHEMA],
       totalResults,
       startIndex,
-      itemsPerPage: resources.length,
-      Resources: resources
+      itemsPerPage: paginatedResources.length,
+      Resources: paginatedResources
     };
   }
 
@@ -382,43 +385,6 @@ export class EndpointScimGroupsService {
         members: true
       }
     }) as unknown as Promise<GroupWithMembers | null>;
-  }
-
-  private buildFilter(filter?: string): { dbWhere: Prisma.ScimGroupWhereInput; caseInsensitiveDisplayName?: string; caseInsensitiveExternalId?: string } {
-    if (!filter) {
-      return { dbWhere: {} };
-    }
-
-    // RFC 7644 §3.4.2.2: attribute names and operators are case-insensitive
-    const regex = /(\w+(?:\.\w+)*)\s+eq\s+"?([^"]+)"?/i;
-    const match = filter.match(regex);
-    if (!match) {
-      throw createScimError({
-        status: 400,
-        scimType: 'invalidFilter',
-        detail: `Unsupported filter expression: '${filter}'.`
-      });
-    }
-
-    const attribute = match[1].toLowerCase();
-    const value = match[2];
-
-    switch (attribute) {
-      case 'displayname':
-        // Case-insensitive displayName filter
-        // SQLite doesn't support Prisma's mode: 'insensitive', so filter in code
-        return { dbWhere: {}, caseInsensitiveDisplayName: value };
-      case 'externalid':
-        // Case-insensitive externalId filter (RFC 7643 §2.1)
-        // SQLite doesn't support Prisma's mode: 'insensitive', so filter in code
-        return { dbWhere: {}, caseInsensitiveExternalId: value };
-      default:
-        throw createScimError({
-          status: 400,
-          scimType: 'invalidFilter',
-          detail: `Filtering by attribute '${match[1]}' is not supported.`
-        });
-    }
   }
 
   private handleReplace(
@@ -721,7 +687,7 @@ export class EndpointScimGroupsService {
   }
 
   private extractAdditionalAttributes(dto: CreateGroupDto): Record<string, unknown> {
-    const { schemas, members, externalId, ...rest } = dto as CreateGroupDto & { externalId?: string };
+    const { schemas, members: _members, externalId: _externalId, ...rest } = dto as CreateGroupDto & { externalId?: string };
     return {
       schemas,
       ...rest

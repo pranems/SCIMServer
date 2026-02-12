@@ -142,6 +142,52 @@ describe('EndpointScimUsersController', () => {
           'endpoint-1'
         );
       });
+
+      it('should apply attribute projection when attributes param is provided', async () => {
+        const mockUser = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          id: 'scim-123',
+          userName: 'test@example.com',
+          active: true,
+          displayName: 'Test User',
+          meta: { resourceType: 'User' },
+        };
+
+        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+        mockUsersService.getUserForEndpoint.mockResolvedValue(mockUser);
+
+        const result = await controller.getUser(
+          'endpoint-1', 'scim-123', mockRequest, 'userName', undefined
+        );
+
+        // Should include only userName + always-returned (schemas, id, meta)
+        expect(result.userName).toBe('test@example.com');
+        expect(result.schemas).toBeDefined();
+        expect(result.id).toBe('scim-123');
+        expect(result.active).toBeUndefined();
+        expect(result.displayName).toBeUndefined();
+      });
+
+      it('should apply excludedAttributes projection', async () => {
+        const mockUser = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          id: 'scim-123',
+          userName: 'test@example.com',
+          active: true,
+          displayName: 'Test User',
+          meta: { resourceType: 'User' },
+        };
+
+        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+        mockUsersService.getUserForEndpoint.mockResolvedValue(mockUser);
+
+        const result = await controller.getUser(
+          'endpoint-1', 'scim-123', mockRequest, undefined, 'displayName'
+        );
+
+        expect(result.userName).toBe('test@example.com');
+        expect(result.displayName).toBeUndefined();
+      });
     });
 
     describe('GET /endpoints/:endpointId/Users', () => {
@@ -175,6 +221,84 @@ describe('EndpointScimUsersController', () => {
           'endpoint-1'
         );
         expect(result).toEqual(mockListResponse);
+      });
+
+      it('should apply attribute projection to list results', async () => {
+        const mockListResponse = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+          totalResults: 1,
+          startIndex: 1,
+          itemsPerPage: 1,
+          Resources: [
+            { schemas: ['s'], id: 'u1', userName: 'user1@example.com', active: true, meta: {} },
+          ],
+        };
+
+        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+        mockUsersService.listUsersForEndpoint.mockResolvedValue(mockListResponse);
+
+        const result = await controller.listUsers(
+          'endpoint-1', mockRequest, undefined, '1', '10', 'userName', undefined
+        );
+
+        expect(result.Resources[0].userName).toBe('user1@example.com');
+        expect(result.Resources[0].active).toBeUndefined();
+      });
+    });
+
+    describe('POST /endpoints/:endpointId/Users/.search', () => {
+      it('should search users using POST body (RFC 7644 §3.4.3)', async () => {
+        const mockListResponse = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+          totalResults: 1,
+          startIndex: 1,
+          itemsPerPage: 1,
+          Resources: [{ id: 'u1', userName: 'alice@example.com' }],
+        };
+
+        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+        mockUsersService.listUsersForEndpoint.mockResolvedValue(mockListResponse);
+
+        const searchDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:SearchRequest'],
+          filter: 'userName eq "alice@example.com"',
+          startIndex: 1,
+          count: 10,
+        };
+
+        const result = await controller.searchUsers('endpoint-1', searchDto, mockRequest);
+
+        expect(mockUsersService.listUsersForEndpoint).toHaveBeenCalledWith(
+          { filter: 'userName eq "alice@example.com"', startIndex: 1, count: 10 },
+          expect.any(String),
+          'endpoint-1'
+        );
+        expect(result).toEqual(mockListResponse);
+      });
+
+      it('should apply attribute projection in search', async () => {
+        const mockListResponse = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+          totalResults: 1,
+          startIndex: 1,
+          itemsPerPage: 1,
+          Resources: [
+            { schemas: ['s'], id: 'u1', userName: 'alice', active: true, meta: {} },
+          ],
+        };
+
+        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+        mockUsersService.listUsersForEndpoint.mockResolvedValue(mockListResponse);
+
+        const searchDto = {
+          filter: 'userName eq "alice"',
+          attributes: 'userName',
+        };
+
+        const result = await controller.searchUsers('endpoint-1', searchDto as any, mockRequest);
+
+        expect(result.Resources[0].userName).toBe('alice');
+        expect(result.Resources[0].active).toBeUndefined();
       });
     });
 

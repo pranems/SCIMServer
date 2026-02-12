@@ -6,7 +6,7 @@
 #############################
 # Stage 1: Build web frontend (React + Vite)
 #############################
-FROM node:18-alpine AS web-build
+FROM node:22-alpine AS web-build
 WORKDIR /web
 
 # Copy package files first for better layer caching
@@ -24,7 +24,7 @@ RUN npm run build && \
 #############################
 # Stage 2: Build API (NestJS) with aggressive optimization
 #############################
-FROM node:18-alpine AS api-build
+FROM node:22-alpine AS api-build
 WORKDIR /app
 
 # Install build essentials in single layer
@@ -50,7 +50,7 @@ RUN npx prisma generate && \
 #############################
 # Stage 3: Minimal runtime using distroless-like approach
 #############################
-FROM node:18-alpine AS runtime
+FROM node:22-alpine AS runtime
 WORKDIR /app
 
 # Install minimal runtime dependencies and clean up

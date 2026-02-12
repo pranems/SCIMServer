@@ -18,8 +18,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { buildBaseUrl } from '../common/base-url.util';
 import { SCIM_CORE_GROUP_SCHEMA, SCIM_CORE_USER_SCHEMA } from '../common/scim-constants';
 import type { ScimGroupResource, ScimUserResource } from '../common/scim-types';
-import type { CreateGroupDto } from '../dto/create-group.dto';
-import type { CreateUserDto } from '../dto/create-user.dto';
+import { CreateGroupDto } from '../dto/create-group.dto';
+import { CreateUserDto } from '../dto/create-user.dto';
 import { ManualGroupDto } from '../dto/manual-group.dto';
 import { ManualUserDto } from '../dto/manual-user.dto';
 import { EndpointScimGroupsService } from '../services/endpoint-scim-groups.service';
@@ -230,7 +230,7 @@ export class AdminController {
   }
 
   @Get('version')
-  async getVersion(): Promise<VersionInfo> {
+  getVersion(): VersionInfo {
     // Prefer explicit env vars injected at build/deploy time
     const version = process.env.APP_VERSION || this.readPackageVersion();
     const commit = process.env.GIT_COMMIT;

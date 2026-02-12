@@ -89,7 +89,7 @@ For immediate testing and team collaboration:
 For developers who want to customize or contribute to SCIMTool:
 
 ### **Prerequisites**
-- Node.js 18+ and npm
+- Node.js 22+ and npm
 - Git
 - PowerShell (for Windows) or bash (for Linux/Mac)
 

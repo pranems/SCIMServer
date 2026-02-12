@@ -11,8 +11,22 @@ const config: Config = {
   transform: {
     '^.+\\.(t|j)s$': 'ts-jest'
   },
-  collectCoverageFrom: ['src/**/*.(t|j)s'],
+  collectCoverageFrom: [
+    'src/**/*.(t|j)s',
+    '!src/main.ts',
+    '!src/**/*.module.ts',
+    '!src/**/*.dto.ts',
+    '!src/**/*.interface.ts',
+  ],
   coverageDirectory: 'coverage',
+  coverageThreshold: {
+    global: {
+      branches: 75,
+      functions: 90,
+      lines: 80,
+      statements: 80,
+    },
+  },
   testRegex: '.*\\.spec\\.ts$'
 };
 

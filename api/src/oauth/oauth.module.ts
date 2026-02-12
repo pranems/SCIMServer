@@ -1,7 +1,7 @@
 ﻿import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import * as crypto from 'crypto';
+import * as crypto from 'node:crypto';
 import { OAuthController } from './oauth.controller';
 import { OAuthService } from './oauth.service';
 

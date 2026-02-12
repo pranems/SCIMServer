@@ -31,19 +31,22 @@
         "text": "{\"grant_type\":\"client_credentials\",\"client_id\":\"{{ client_id }}\",\"client_secret\":\"{{ client_secret }}\",\"scope\":\"scim.manage scim.read scim.write\"}"
       },
       "headers": [
-        { "name": "Content-Type", "value": "application/json" }
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        }
       ]
     },
     {
       "_id": "req_create_user",
       "_type": "request",
       "parentId": "",
-      "name": "Create User",
+      "name": "Create User (full)",
       "method": "POST",
       "url": "{{ base_url }}/scim/v2/Users",
       "body": {
         "mimeType": "application/scim+json",
-        "text": "{\n  \"schemas\":[\"urn:ietf:params:scim:schemas:core:2.0:User\"],\n  \"userName\":\"alice@example.com\",\n  \"displayName\":\"Alice Example\",\n  \"externalId\":\"ext-0001\",\n  \"name\": { \"givenName\":\"Alice\", \"familyName\":\"Example\" },\n  \"emails\": [{ \"value\":\"alice@example.com\", \"type\":\"work\", \"primary\":true }],\n  \"roles\": [{ \"value\":\"engineering:senior\", \"display\":\"Senior Engineer\", \"primary\":true }]\n}"
+        "text": "{\n  \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:User\",\"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User\"],\n  \"userName\": \"alice.example@example.com\",\n  \"externalId\": \"ext-000123\",\n  \"name\": { \"formatted\": \"Alice L Example\", \"familyName\": \"Example\", \"givenName\": \"Alice\" },\n  \"displayName\": \"Alice Example\",\n  \"emails\": [{ \"value\": \"alice.work@example.com\", \"type\": \"work\", \"primary\": true }],\n  \"phoneNumbers\": [{ \"value\": \"+1-425-555-0101\", \"type\": \"work\" }],\n  \"roles\": [{ \"value\": \"engineering:senior\", \"display\": \"Senior Engineer\", \"primary\": true }],\n  \"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User\": { \"employeeNumber\": \"EMP-000123\", \"department\": \"Engineering\", \"manager\": { \"value\": \"mgr-001\", \"displayName\": \"Bob Manager\" } }\n}"
       },
       "headers": [
         { "name": "Content-Type", "value": "application/scim+json" },
@@ -51,12 +54,30 @@
       ]
     },
     {
+      "_id": "req_list_users",
+      "_type": "request",
+      "parentId": "",
+      "name": "List Users",
+      "method": "GET",
+      "url": "{{ base_url }}/scim/v2/Users?startIndex=1&count=50",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
       "_id": "req_filter_users",
       "_type": "request",
       "parentId": "",
       "name": "Filter Users (case-insensitive)",
       "method": "GET",
-      "url": "{{ base_url }}/scim/v2/Users?filter=userName eq \"ALICE@EXAMPLE.COM\"",
+      "url": "{{ base_url }}/scim/v2/Users?filter=userName eq \"ALICE.EXAMPLE@EXAMPLE.COM\"",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
+      "_id": "req_get_user",
+      "_type": "request",
+      "parentId": "",
+      "name": "Get User",
+      "method": "GET",
+      "url": "{{ base_url }}/scim/v2/Users/{{ user_id }}",
       "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
     },
     {
@@ -68,7 +89,7 @@
       "url": "{{ base_url }}/scim/v2/Users/{{ user_id }}",
       "body": {
         "mimeType": "application/scim+json",
-        "text": "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\"Operations\":[{\"op\":\"replace\",\"path\":\"emails[type eq \\\"work\\\"].value\",\"value\":\"new@example.com\"}]}"
+        "text": "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\"Operations\":[{\"op\":\"replace\",\"path\":\"emails[type eq \\\"work\\\"].value\",\"value\":\"new@example.com\"},{\"op\":\"replace\",\"path\":\"phoneNumbers[type eq \\\"work\\\"].value\",\"value\":\"+1-425-555-9999\"}]}"
       },
       "headers": [
         { "name": "Content-Type", "value": "application/scim+json" },
@@ -84,12 +105,38 @@
       "url": "{{ base_url }}/scim/v2/Users/{{ user_id }}",
       "body": {
         "mimeType": "application/scim+json",
-        "text": "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\"Operations\":[{\"op\":\"add\",\"path\":\"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager\",\"value\":{\"value\":\"mgr-001\",\"displayName\":\"Bob Manager\"}}]}"
+        "text": "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\"Operations\":[{\"op\":\"add\",\"path\":\"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager\",\"value\":{\"value\":\"mgr-001\",\"displayName\":\"Bob Manager\"}},{\"op\":\"replace\",\"path\":\"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department\",\"value\":\"Platform Engineering\"}]}"
       },
       "headers": [
         { "name": "Content-Type", "value": "application/scim+json" },
         { "name": "Authorization", "value": "Bearer {{ token }}" }
       ]
+    },
+    {
+      "_id": "req_patch_nopath",
+      "_type": "request",
+      "parentId": "",
+      "name": "Patch User - No-Path Replace (dot-notation)",
+      "method": "PATCH",
+      "url": "{{ base_url }}/scim/v2/Users/{{ user_id }}",
+      "body": {
+        "mimeType": "application/scim+json",
+        "text": "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\"Operations\":[{\"op\":\"replace\",\"value\":{\"name.givenName\":\"Alicia\",\"name.familyName\":\"Updated\",\"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:employeeNumber\":\"EMP-999\"}}]}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/scim+json" },
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ]
+    },
+    {
+      "_id": "req_create_group",
+      "_type": "request",
+      "parentId": "",
+      "name": "Create Group",
+      "method": "POST",
+      "url": "{{ base_url }}/scim/v2/Groups",
+      "body": { "mimeType": "application/scim+json", "text": "{\n  \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:Group\"],\n  \"displayName\": \"Engineering\",\n  \"members\": [{ \"value\": \"a1b2c3d4-e5f6-7890-abcd-1234567890ab\", \"display\": \"Alice Example\" }]\n}" },
+      "headers": [ { "name": "Content-Type", "value": "application/scim+json" }, { "name": "Authorization", "value": "Bearer {{ token }}" } ]
     },
     {
       "_id": "req_groups_excluded",
@@ -98,6 +145,78 @@
       "name": "Get Groups (excludedAttributes=members)",
       "method": "GET",
       "url": "{{ base_url }}/scim/v2/Groups?excludedAttributes=members",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
+      "_id": "req_patch_add_member",
+      "_type": "request",
+      "parentId": "",
+      "name": "Patch Add Member",
+      "method": "PATCH",
+      "url": "{{ base_url }}/scim/v2/Groups/{{ group_id }}",
+      "body": { "mimeType": "application/scim+json", "text": "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\"Operations\":[{\"op\":\"add\",\"path\":\"members\",\"value\":[{\"value\":\"new-user-id-9999\",\"display\":\"New Member\"}]}]}" },
+      "headers": [ { "name": "Content-Type", "value": "application/scim+json" }, { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
+      "_id": "req_serviceproviderconfig",
+      "_type": "request",
+      "parentId": "",
+      "name": "ServiceProviderConfig",
+      "method": "GET",
+      "url": "{{ base_url }}/scim/v2/ServiceProviderConfig",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
+      "_id": "req_search_users",
+      "_type": "request",
+      "parentId": "",
+      "name": "Search Users (POST /.search)",
+      "method": "POST",
+      "url": "{{ base_url }}/scim/v2/Users/.search",
+      "body": {
+        "mimeType": "application/scim+json",
+        "text": "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:SearchRequest\"],\"filter\":\"userName eq \\\"alice.example@example.com\\\"\",\"startIndex\":1,\"count\":10,\"attributes\":\"userName,displayName\"}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/scim+json" },
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ]
+    },
+    {
+      "_id": "req_search_groups",
+      "_type": "request",
+      "parentId": "",
+      "name": "Search Groups (POST /.search)",
+      "method": "POST",
+      "url": "{{ base_url }}/scim/v2/Groups/.search",
+      "body": {
+        "mimeType": "application/scim+json",
+        "text": "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:SearchRequest\"],\"filter\":\"displayName eq \\\"Engineering\\\"\",\"startIndex\":1,\"count\":10,\"excludedAttributes\":\"members\"}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/scim+json" },
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ]
+    },
+    {
+      "_id": "req_get_user_etag",
+      "_type": "request",
+      "parentId": "",
+      "name": "Get User (If-None-Match / ETag)",
+      "method": "GET",
+      "url": "{{ base_url }}/scim/v2/Users/{{ user_id }}",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" },
+        { "name": "If-None-Match", "value": "W/\"1\"" }
+      ]
+    },
+    {
+      "_id": "req_users_attributes",
+      "_type": "request",
+      "parentId": "",
+      "name": "List Users (attributes projection)",
+      "method": "GET",
+      "url": "{{ base_url }}/scim/v2/Users?attributes=userName,displayName&startIndex=1&count=50",
       "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
     }
   ]

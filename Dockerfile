@@ -6,7 +6,7 @@
 #############################
 # Stage 1: Build web frontend (React + Vite) - OPTIMIZED
 #############################
-FROM node:18-alpine AS web-build
+FROM node:22-alpine AS web-build
 WORKDIR /web
 
 # Copy package files for better caching
@@ -25,7 +25,7 @@ RUN rm -rf node_modules
 #############################
 # Stage 2: Build API (NestJS) - OPTIMIZED
 #############################
-FROM node:18-alpine AS api-build
+FROM node:22-alpine AS api-build
 WORKDIR /app
 
 # Install build essentials
@@ -49,15 +49,14 @@ RUN npx prisma generate && \
     npx prisma db push && \
     npx tsc -p tsconfig.build.json
 
-# Clean up development files and dependencies
+# Clean up development files only (keep node_modules intact for prisma migrate deploy at runtime)
 RUN rm -rf src test *.ts tsconfig*.json && \
-    npm prune --production && \
     npm cache clean --force
 
 #############################
 # Stage 3: Minimal runtime - OPTIMIZED
 #############################
-FROM node:18-alpine AS runtime
+FROM node:22-alpine AS runtime
 WORKDIR /app
 
 # Install runtime essentials and create user in single layer
@@ -90,9 +89,9 @@ RUN echo "${IMAGE_TAG}" > /app/.image-tag
 COPY --chown=scim:nodejs api/docker-entrypoint.sh /app/
 RUN chmod +x /app/docker-entrypoint.sh
 
-# Clean up unnecessary files to reduce size
+# Clean up unnecessary files to reduce size (preserve effect/internal/testing for Prisma)
 RUN find ./node_modules -name "*.md" -delete && \
-    find ./node_modules -name "test*" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find ./node_modules -path "*/effect" -prune -o -name "test*" -type d -exec rm -rf {} + 2>/dev/null || true && \
     find ./node_modules -name "*.map" -delete 2>/dev/null || true
 
 USER scim

@@ -1,7 +1,6 @@
-import { existsSync, mkdirSync } from 'fs';
-import { dirname } from 'path';
-import { createWriteStream } from 'fs';
-import { pipeline } from 'stream/promises';
+import { existsSync, mkdirSync, createWriteStream } from 'node:fs';
+import { dirname } from 'node:path';
+import { pipeline } from 'node:stream/promises';
 
 async function restoreFromBlob(): Promise<void> {
   const blobAccount = process.env.BLOB_BACKUP_ACCOUNT?.trim();

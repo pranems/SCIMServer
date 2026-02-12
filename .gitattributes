@@ -1,0 +1,14 @@
+# Auto-detect text files and normalise line endings
+* text=auto
+
+# Shell scripts must always use LF (Alpine/Docker containers fail with CRLF)
+*.sh text eol=lf
+
+# Ensure Dockerfile line endings are consistent
+Dockerfile* text eol=lf
+docker-compose*.yml text eol=lf
+
+# Keep Windows scripts as CRLF
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf

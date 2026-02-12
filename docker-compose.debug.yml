@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   api:
-    image: node:18
+    image: node:22
     container_name: scimtool-api-dev
     working_dir: /usr/src/app
     volumes:

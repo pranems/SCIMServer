@@ -2,8 +2,8 @@
   "info": {
     "name": "SCIM v2 - Example Collection",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "version": { "major": 1, "minor": 1 },
-    "description": "SCIM 2.0 test collection — passes all 25 Microsoft SCIM Validator tests"
+    "version": { "major": 1, "minor": 2 },
+    "description": "SCIM 2.0 test collection — passes all 25 Microsoft SCIM Validator tests. Includes RFC 7644 §3.4.3 POST /.search, §3.4.2.5 attribute projection, and §3.14 ETag support."
   },
   "item": [
     {
@@ -32,8 +32,25 @@
       "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{base_url}}/Users?startIndex=1&count=50", "host": [ "{{base_url}}" ], "path": [ "Users" ], "query": [ { "key": "startIndex", "value": "1" }, { "key": "count", "value": "50" } ] } }
     },
     {
+      "name": "Get Users (attributes projection)",
+      "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{base_url}}/Users?startIndex=1&count=50&attributes=userName,displayName", "host": [ "{{base_url}}" ], "path": [ "Users" ], "query": [ { "key": "startIndex", "value": "1" }, { "key": "count", "value": "50" }, { "key": "attributes", "value": "userName,displayName" } ] } }
+    },
+    {
       "name": "Filter Users (case-insensitive)",
       "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{base_url}}/Users?filter=userName eq \"alice@example.com\"", "host": [ "{{base_url}}" ], "path": [ "Users" ], "query": [ { "key": "filter", "value": "userName eq \"alice@example.com\"" } ] } }
+    },
+    {
+      "name": "Search Users (POST /.search)",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/scim+json" } ],
+        "body": { "mode": "raw", "raw": "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:SearchRequest\"],\"filter\":\"userName eq \\\"alice@example.com\\\"\",\"startIndex\":1,\"count\":10,\"attributes\":\"userName,displayName\"}", "options": { "raw": { "language": "json" } } },
+        "url": { "raw": "{{base_url}}/Users/.search", "host": [ "{{base_url}}" ], "path": [ "Users", ".search" ] }
+      }
+    },
+    {
+      "name": "Get User (with ETag / If-None-Match)",
+      "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "If-None-Match", "value": "W/\"1\"", "description": "Returns 304 if resource version matches" } ], "url": { "raw": "{{base_url}}/Users/{{user_id}}", "host": [ "{{base_url}}" ], "path": [ "Users", "{{user_id}}" ] } }
     },
     {
       "name": "Create Group",
@@ -42,6 +59,15 @@
     {
       "name": "Get Groups (excludedAttributes=members)",
       "request": { "method": "GET", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ], "url": { "raw": "{{base_url}}/Groups?excludedAttributes=members", "host": [ "{{base_url}}" ], "path": [ "Groups" ], "query": [ { "key": "excludedAttributes", "value": "members" } ] } }
+    },
+    {
+      "name": "Search Groups (POST /.search)",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/scim+json" } ],
+        "body": { "mode": "raw", "raw": "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:SearchRequest\"],\"filter\":\"displayName eq \\\"Engineering\\\"\",\"startIndex\":1,\"count\":10}", "options": { "raw": { "language": "json" } } },
+        "url": { "raw": "{{base_url}}/Groups/.search", "host": [ "{{base_url}}" ], "path": [ "Groups", ".search" ] }
+      }
     },
     {
       "name": "Patch User - ValuePath Replace",

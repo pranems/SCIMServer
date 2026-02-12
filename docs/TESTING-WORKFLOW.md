@@ -196,9 +196,12 @@ Or specific version:
 - Random names without prefix (won't trigger test build)
 
 ### Testing Checklist
+- [ ] Lint passes (`cd api && npm run lint`) — 0 errors expected (48 warnings OK)
 - [ ] Backend compiles (`cd api && npm run build`)
 - [ ] Frontend compiles (`cd web && npm run build`)
-- [ ] Tests pass (`cd api && npm test`)
+- [ ] Unit tests pass (`cd api && npm test`) — 492 unit tests
+- [ ] Live integration tests pass (`.\scripts\live-test.ps1`) — 212 assertions
+- [ ] Live tests pass in verbose mode (`.\scripts\live-test.ps1 -Verbose`) — intercepted API output
 - [ ] Local testing done (if possible)
 - [ ] Test image deployed to Azure
 - [ ] Manual testing in real environment
@@ -260,4 +263,4 @@ az containerapp revision list -n <app-name> -g <rg> -o table
 
 ---
 
-**Last Updated:** November 2025 | **Version:** 0.8.15
+**Last Updated:** February 2026 | **Version:** 0.8.15

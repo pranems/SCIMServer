@@ -1,0 +1,1498 @@
+🔍 VERBOSE MODE ENABLED — request/response details will be shown
+
+
+=== STEP 1: Get OAuth Token ===
+    📋 Token endpoint: http://localhost:6000/scim/oauth/token
+    📋 → POST http://localhost:6000/scim/oauth/token
+    📋   Body: {"grant_type":"client_credentials","client_secret":"changeme-oauth","client_id":"scimtool-client"}
+    📋 ← Response: {"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzY2ltdG9vbC1jbGllbnQiLCJjbGllbnRfaWQiOiJzY2ltdG9vbC1jbGllbnQiLCJzY29wZSI6InNjaW0ucmVhZCBzY2ltLndyaXRlIHNjaW0ubWFuYWdlIiwidG9rZW5fdHlwZSI6ImFjY2Vzc190b2tlbiIsImlhdCI6MTc3MDg1NDExNCwiZXhwIjoxNzcwODU3NzE0LCJpc3MiOiJzY2ltdG9vbC1vYXV0aC1...
+✅ Token obtained: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+    📋 Token expires_in: 3600s
+
+
+========================================
+TEST SECTION 1: ENDPOINT CRUD OPERATIONS
+========================================
+
+--- Test: Create Endpoint ---
+    📋 → POST http://localhost:6000/scim/admin/endpoints
+    📋   Body: {
+  "name": "live-test-endpoint-321768979",
+  "displayName": "Live Test Endpoint",
+  "config": {
+    "MultiOpPatchRequestAddMultipleMembersToGroup": "True"
+  },
+  "description": "Created by l...
+    📋 ← Response: {"id":"cmliotfgz019d128vwurivo17","name":"live-test-endpoint-321768979","displayName":"Live Test Endpoint","description":"Created by live-test.ps1","config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"True"},"active":true,"scimEndpoint":"/scim/endpoints/cmliotfgz019d128vwurivo17","createdAt"...
+✅ Create endpoint returned ID: cmliotfgz019d128vwurivo17
+✅ New endpoint is active by default
+✅ scimEndpoint URL is correct
+
+--- Test: Get Endpoint by ID ---
+    📋 → GET http://localhost:6000/scim/admin/endpoints/cmliotfgz019d128vwurivo17
+    📋 ← Response: {"id":"cmliotfgz019d128vwurivo17","name":"live-test-endpoint-321768979","displayName":"Live Test Endpoint","description":"Created by live-test.ps1","config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"True"},"active":true,"scimEndpoint":"/scim/endpoints/cmliotfgz019d128vwurivo17","createdAt"...
+✅ Get endpoint by ID returns correct data
+
+--- Test: Get Endpoint by Name ---
+    📋 → GET http://localhost:6000/scim/admin/endpoints/by-name/live-test-endpoint-321768979
+    📋 ← Response: {"id":"cmliotfgz019d128vwurivo17","name":"live-test-endpoint-321768979","displayName":"Live Test Endpoint","description":"Created by live-test.ps1","config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"True"},"active":true,"scimEndpoint":"/scim/endpoints/cmliotfgz019d128vwurivo17","createdAt"...
+✅ Get endpoint by name returns correct data
+
+--- Test: List Endpoints ---
+    📋 → GET http://localhost:6000/scim/admin/endpoints
+    📋 ← Response: [{"id":"cmliotfgz019d128vwurivo17","name":"live-test-endpoint-321768979","displayName":"Live Test Endpoint","description":"Created by live-test.ps1","config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"True"},"active":true,"scimEndpoint":"/scim/endpoints/cmliotfgz019d128vwurivo17","createdAt...
+✅ List endpoints returns array with items
+
+--- Test: Update Endpoint ---
+    📋 → PATCH http://localhost:6000/scim/admin/endpoints/cmliotfgz019d128vwurivo17
+    📋   Body: {"displayName":"Updated Live Test Endpoint","description":"Updated description"}
+    📋 ← Response: {"id":"cmliotfgz019d128vwurivo17","name":"live-test-endpoint-321768979","displayName":"Updated Live Test Endpoint","description":"Updated description","config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"True"},"active":true,"scimEndpoint":"/scim/endpoints/cmliotfgz019d128vwurivo17","created...
+✅ Update endpoint displayName works
+✅ Update endpoint description works
+
+--- Test: Get Endpoint Stats ---
+    📋 → GET http://localhost:6000/scim/admin/endpoints/cmliotfgz019d128vwurivo17/stats
+    📋 ← Response: {"totalUsers":0,"totalGroups":0,"totalGroupMembers":0,"requestLogCount":0}
+✅ Stats includes totalUsers
+✅ Stats includes totalGroups
+
+
+========================================
+TEST SECTION 2: CONFIG VALIDATION
+========================================
+
+--- Test: Invalid Config Value Rejected on Create ---
+    📋 → POST http://localhost:6000/scim/admin/endpoints
+    📋   Body: {"name":"invalid-config-test","config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"Yes"}}
+    📋 ← Error: Response status code does not indicate success: 400 (Bad Request).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Invalid value \"Yes\" for config flag \"MultiOpPatchRequestAddMultipleMembersToGroup\". Allowed values: \"True\", \"False\", tru...
+✅ Invalid config 'Yes' rejected with 400 Bad Request
+
+--- Test: Invalid Config Value Rejected on Update ---
+    📋 → PATCH http://localhost:6000/scim/admin/endpoints/cmliotfgz019d128vwurivo17
+    📋   Body: {"config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"enabled"}}
+    📋 ← Error: Response status code does not indicate success: 400 (Bad Request).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Invalid value \"enabled\" for config flag \"MultiOpPatchRequestAddMultipleMembersToGroup\". Allowed values: \"True\", \"False\",...
+✅ Invalid config 'enabled' rejected with 400 Bad Request
+
+--- Test: Valid Config Values Accepted ---
+    📋 → PATCH http://localhost:6000/scim/admin/endpoints/cmliotfgz019d128vwurivo17
+    📋   Body: {"config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"False"}}
+    📋 ← Response: {"id":"cmliotfgz019d128vwurivo17","name":"live-test-endpoint-321768979","displayName":"Updated Live Test Endpoint","description":"Updated description","config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"False"},"active":true,"scimEndpoint":"/scim/endpoints/cmliotfgz019d128vwurivo17","create...
+✅ Valid config 'False' accepted
+    📋 → PATCH http://localhost:6000/scim/admin/endpoints/cmliotfgz019d128vwurivo17
+    📋   Body: {"config":{"MultiOpPatchRequestAddMultipleMembersToGroup":true}}
+    📋 ← Response: {"id":"cmliotfgz019d128vwurivo17","name":"live-test-endpoint-321768979","displayName":"Updated Live Test Endpoint","description":"Updated description","config":{"MultiOpPatchRequestAddMultipleMembersToGroup":true},"active":true,"scimEndpoint":"/scim/endpoints/cmliotfgz019d128vwurivo17","createdAt...
+✅ Boolean true accepted as config value
+
+--- Test: Invalid Remove Config Value Rejected on Create ---
+    📋 → POST http://localhost:6000/scim/admin/endpoints
+    📋   Body: {"name":"invalid-remove-config-test","config":{"MultiOpPatchRequestRemoveMultipleMembersFromGroup":"Yes"}}
+    📋 ← Error: Response status code does not indicate success: 400 (Bad Request).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Invalid value \"Yes\" for config flag \"MultiOpPatchRequestRemoveMultipleMembersFromGroup\". Allowed values: \"True\", \"False\"...
+✅ Invalid remove config 'Yes' rejected with 400 Bad Request
+
+--- Test: Invalid Remove Config Value Rejected on Update ---
+    📋 → PATCH http://localhost:6000/scim/admin/endpoints/cmliotfgz019d128vwurivo17
+    📋   Body: {"config":{"MultiOpPatchRequestRemoveMultipleMembersFromGroup":"enabled"}}
+    📋 ← Error: Response status code does not indicate success: 400 (Bad Request).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Invalid value \"enabled\" for config flag \"MultiOpPatchRequestRemoveMultipleMembersFromGroup\". Allowed values: \"True\", \"Fal...
+✅ Invalid remove config 'enabled' rejected with 400 Bad Request
+
+--- Test: Valid Remove Config Values Accepted ---
+    📋 → PATCH http://localhost:6000/scim/admin/endpoints/cmliotfgz019d128vwurivo17
+    📋   Body: {"config":{"MultiOpPatchRequestRemoveMultipleMembersFromGroup":"False"}}
+    📋 ← Response: {"id":"cmliotfgz019d128vwurivo17","name":"live-test-endpoint-321768979","displayName":"Updated Live Test Endpoint","description":"Updated description","config":{"MultiOpPatchRequestRemoveMultipleMembersFromGroup":"False"},"active":true,"scimEndpoint":"/scim/endpoints/cmliotfgz019d128vwurivo17","c...
+✅ Valid remove config 'False' accepted
+
+--- Test: Both Config Flags Set Together ---
+    📋 → PATCH http://localhost:6000/scim/admin/endpoints/cmliotfgz019d128vwurivo17
+    📋   Body: {"config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"True","MultiOpPatchRequestRemoveMultipleMembersFromGroup":"True"}}
+    📋 ← Response: {"id":"cmliotfgz019d128vwurivo17","name":"live-test-endpoint-321768979","displayName":"Updated Live Test Endpoint","description":"Updated description","config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"True","MultiOpPatchRequestRemoveMultipleMembersFromGroup":"True"},"active":true,"scimEnd...
+✅ Both add and remove config flags set together
+
+--- Test: Invalid VerbosePatchSupported Config Value Rejected ---
+    📋 → PATCH http://localhost:6000/scim/admin/endpoints/cmliotfgz019d128vwurivo17
+    📋   Body: {"config":{"VerbosePatchSupported":"Yes"}}
+    📋 ← Error: Response status code does not indicate success: 400 (Bad Request).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Invalid value \"Yes\" for config flag \"VerbosePatchSupported\". Allowed values: \"True\", \"False\", true, false, \"1\", \"0\"....
+✅ Invalid VerbosePatchSupported 'Yes' rejected with 400 Bad Request
+
+--- Test: Valid VerbosePatchSupported Config Value Accepted ---
+    📋 → PATCH http://localhost:6000/scim/admin/endpoints/cmliotfgz019d128vwurivo17
+    📋   Body: {"config":{"VerbosePatchSupported":true}}
+    📋 ← Response: {"id":"cmliotfgz019d128vwurivo17","name":"live-test-endpoint-321768979","displayName":"Updated Live Test Endpoint","description":"Updated description","config":{"VerbosePatchSupported":true},"active":true,"scimEndpoint":"/scim/endpoints/cmliotfgz019d128vwurivo17","createdAt":"2026-02-11T23:55:14....
+✅ VerbosePatchSupported boolean true accepted
+
+--- Test: All Three Config Flags Set Together ---
+    📋 → PATCH http://localhost:6000/scim/admin/endpoints/cmliotfgz019d128vwurivo17
+    📋   Body: {"config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"True","MultiOpPatchRequestRemoveMultipleMembersFromGroup":"True","VerbosePatchSupported":true}}
+    📋 ← Response: {"id":"cmliotfgz019d128vwurivo17","name":"live-test-endpoint-321768979","displayName":"Updated Live Test Endpoint","description":"Updated description","config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"True","MultiOpPatchRequestRemoveMultipleMembersFromGroup":"True","VerbosePatchSupported"...
+✅ All three config flags set together
+
+
+========================================
+TEST SECTION 3: SCIM USER OPERATIONS
+========================================
+
+--- Test: Create User ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋   Body: {
+  "active": true,
+  "displayName": "Live Test User",
+  "emails": [
+    {
+      "type": "work",
+      "value": "livetest-user@test.com",
+      "primary": true
+    }
+  ],
+  "name": {
+   ...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Live Test User","emails":[{"type":"work","value":"livetest-user@test.com","primary":true}],"name":{"familyName":"Test","givenName"...
+✅ Create user returned ID: 1a7a769a-3af5-433f-bd64-4d5421ae803f
+✅ User userName is correct
+✅ User meta.resourceType is 'User'
+✅ User meta.location is present
+✅ User meta.location contains correct path
+✅ User meta.created is present
+✅ User meta.lastModified is present
+
+--- Test: Get User by ID ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Live Test User","emails":[{"type":"work","value":"livetest-user@test.com","primary":true}],"name":{"familyName":"Test","givenName"...
+✅ Get user by ID returns correct data
+
+--- Test: List Users ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":1,"startIndex":1,"itemsPerPage":1,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Li...
+✅ List users returns at least 1 user
+✅ List users has correct schema
+
+--- Test: Filter Users by userName ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users?filter=userName eq "livetest-user@test.com"
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":1,"startIndex":1,"itemsPerPage":1,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Li...
+✅ Filter by userName returns exactly 1 user
+
+--- Test: PATCH User ---
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": "Updated Display Name",
+      "path": "displayName",
+      "op": "replace"
+...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Updated Display Name","emails":[{"type":"work","value":"livetest-user@test.com","primary":true}],"name":{"familyName":"Test","give...
+✅ PATCH user displayName works
+
+--- Test: PUT User (Replace) ---
+    📋 → PUT http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋   Body: {
+  "displayName": "Replaced Display Name",
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "livetest-user@test.com"
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Replaced Display Name","meta":{"resourceType":"User","created":"2026-02-11T23:55:14.383Z","lastModified":"2026-02-11T23:55:14.469Z...
+✅ PUT user (replace) works
+
+--- Test: Deactivate User (Soft Delete) ---
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": false,
+      "path": "active",
+      "op": "replace"
+    }
+  ]
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":false,"displayName":"Replaced Display Name","meta":{"resourceType":"User","created":"2026-02-11T23:55:14.383Z","lastModified":"2026-02-11T23:55:14.499...
+✅ Deactivate user (active=false) works
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": true,
+      "path": "active",
+      "op": "replace"
+    }
+  ]
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Replaced Display Name","meta":{"resourceType":"User","created":"2026-02-11T23:55:14.383Z","lastModified":"2026-02-11T23:55:14.529Z...
+
+
+========================================
+TEST SECTION 3b: CASE-INSENSITIVITY (RFC 7643)
+========================================
+
+--- Test: Case-Insensitive userName Uniqueness ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋   Body: {
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "LIVETEST-USER@TEST.COM"
+}
+    📋 ← Error: Response status code does not indicate success: 409 (Conflict).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"A resource with userName 'LIVETEST-USER@TEST.COM' already exists.","scimType":"uniqueness","status":"409"}
+✅ UPPERCASE duplicate userName returns 409 (case-insensitive uniqueness)
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋   Body: {
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "LiveTest-User@Test.Com"
+}
+    📋 ← Error: Response status code does not indicate success: 409 (Conflict).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"A resource with userName 'LiveTest-User@Test.Com' already exists.","scimType":"uniqueness","status":"409"}
+✅ Mixed-case duplicate userName returns 409
+
+--- Test: Case-Insensitive Filter Attribute Names ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users?filter=USERNAME eq "livetest-user@test.com"
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":1,"startIndex":1,"itemsPerPage":1,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Re...
+✅ Filter with 'USERNAME' (uppercase) finds user
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users?filter=UserName eq "livetest-user@test.com"
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":1,"startIndex":1,"itemsPerPage":1,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Re...
+✅ Filter with 'UserName' (PascalCase) finds user
+
+--- Test: Case-Insensitive Filter Value (userName) ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users?filter=userName eq "LIVETEST-USER@TEST.COM"
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":1,"startIndex":1,"itemsPerPage":1,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Re...
+✅ Filter with UPPERCASE value finds user (case-insensitive)
+
+--- Test: PascalCase PATCH op Values ---
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": "PascalCase Patched",
+      "path": "displayName",
+      "op": "Replace"
+  ...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"PascalCase Patched","meta":{"resourceType":"User","created":"2026-02-11T23:55:14.383Z","lastModified":"2026-02-11T23:55:14.6Z","lo...
+✅ PATCH with 'Replace' (PascalCase op) works
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": "Add Op Patched",
+      "path": "displayName",
+      "op": "Add"
+    }
+  ]
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Add Op Patched","meta":{"resourceType":"User","created":"2026-02-11T23:55:14.383Z","lastModified":"2026-02-11T23:55:14.622Z","loca...
+✅ PATCH with 'Add' (PascalCase op) works
+
+
+========================================
+TEST SECTION 3c: ADVANCED PATCH OPERATIONS
+========================================
+
+--- Test: PATCH with No Path (Merge) ---
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "op": "replace",
+      "value": {
+        "displayName": "No-Path Merged",
+        "...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"No-Path Merged","meta":{"resourceType":"User","created":"2026-02-11T23:55:14.383Z","lastModified":"2026-02-11T23:55:14.64Z","locat...
+✅ PATCH with no path merges displayName
+✅ PATCH with no path merges active
+
+--- Test: No-Path PATCH with Case-Insensitive Keys ---
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "op": "replace",
+      "value": {
+        "DisplayName": "CI-Keys Merged",
+        "...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"CI-Keys Merged","meta":{"resourceType":"User","created":"2026-02-11T23:55:14.383Z","lastModified":"2026-02-11T23:55:14.685Z","loca...
+✅ No-path PATCH with 'DisplayName' (PascalCase key) works
+
+--- Test: PATCH with valuePath ---
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "op": "replace",
+      "value": {
+        "emails": [
+          {
+            "type...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"CI-Keys Merged","emails":[{"type":"work","value":"work@test.com","primary":true},{"type":"home","value":"home@test.com"}],"meta":{...
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": "updated-work@test.com",
+      "path": "emails[type eq \"work\"].value",
+   ...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"CI-Keys Merged","emails":[{"type":"work","value":"updated-work@test.com","primary":true},{"type":"home","value":"home@test.com"}],...
+✅ PATCH with valuePath updates emails[type eq work].value
+✅ valuePath PATCH does not affect other email entries
+
+--- Test: PATCH with Extension URN Path ---
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": "Engineering",
+      "path": "urn:ietf:params:scim:schemas:extension:enterpri...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"CI-Keys Merged","emails":[{"type":"work","value":"updated-work@test.com","primary":true},{"type":"home","value":"home@test.com"}],...
+✅ PATCH with extension URN path sets department
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": "Product",
+      "path": "urn:ietf:params:scim:schemas:extension:enterprise:2...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"CI-Keys Merged","emails":[{"type":"work","value":"updated-work@test.com","primary":true},{"type":"home","value":"home@test.com"}],...
+✅ PATCH with extension URN replace updates department
+
+--- Test: Manager Empty-Value Removal (RFC 7644 §3.5.2.3) ---
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": {
+        "value": "manager-id-123"
+      },
+      "path": "urn:ietf:params...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"CI-Keys Merged","emails":[{"type":"work","value":"updated-work@test.com","primary":true},{"type":"home","value":"home@test.com"}],...
+✅ Manager set successfully via extension URN
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": {
+        "value": ""
+      },
+      "path": "urn:ietf:params:scim:schemas:...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"CI-Keys Merged","emails":[{"type":"work","value":"updated-work@test.com","primary":true},{"type":"home","value":"home@test.com"}],...
+✅ Manager removed when value is empty string (RFC 7644 §3.5.2.3)
+
+--- Test: Multiple Operations in Single PATCH ---
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": "Multi-Op User",
+      "path": "displayName",
+      "op": "replace"
+    },...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":false,"displayName":"Multi-Op User","emails":[{"type":"work","value":"updated-work@test.com","primary":true},{"type":"home","value":"home@test.com"}],...
+✅ Multi-op PATCH: displayName updated
+✅ Multi-op PATCH: active set to false
+✅ Multi-op PATCH: title added
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": true,
+      "path": "active",
+      "op": "replace"
+    }
+  ]
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Multi-Op User","emails":[{"type":"work","value":"updated-work@test.com","primary":true},{"type":"home","value":"home@test.com"}],"...
+
+
+========================================
+TEST SECTION 3d: PAGINATION & ADVANCED FILTERING
+========================================
+
+--- Setup: Create Users for Pagination ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋   Body: {
+  "externalId": "ext-pag-1",
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "pagination-user1@test.com",
+  "displayName": "Pagination ...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"ec95ae20-3519-4208-b05a-80cde5bbb8c6","userName":"pagination-user1@test.com","externalId":"ext-pag-1","active":true,"displayName":"Pagination User 1","meta":{"resourceType":"User","created":"2026-02-11T23:55:14.902Z","lastModified":"...
+  Created pagination user 1 : ec95ae20-3519-4208-b05a-80cde5bbb8c6
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋   Body: {
+  "externalId": "ext-pag-2",
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "pagination-user2@test.com",
+  "displayName": "Pagination ...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"fb5b8927-95c5-4c53-aafe-282c528b2fbf","userName":"pagination-user2@test.com","externalId":"ext-pag-2","active":true,"displayName":"Pagination User 2","meta":{"resourceType":"User","created":"2026-02-11T23:55:14.914Z","lastModified":"...
+  Created pagination user 2 : fb5b8927-95c5-4c53-aafe-282c528b2fbf
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋   Body: {
+  "externalId": "ext-pag-3",
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "pagination-user3@test.com",
+  "displayName": "Pagination ...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"abaa69df-47e6-4250-ae8b-f341283a5eec","userName":"pagination-user3@test.com","externalId":"ext-pag-3","active":true,"displayName":"Pagination User 3","meta":{"resourceType":"User","created":"2026-02-11T23:55:14.934Z","lastModified":"...
+  Created pagination user 3 : abaa69df-47e6-4250-ae8b-f341283a5eec
+
+--- Test: Pagination with count ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users?count=2
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":4,"startIndex":1,"itemsPerPage":2,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Mu...
+✅ Pagination: itemsPerPage matches count=2
+✅ Pagination: totalResults >= 4 (all users)
+✅ Pagination: Resources array has 2 items
+
+--- Test: Pagination with startIndex ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users?startIndex=2&count=2
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":4,"startIndex":2,"itemsPerPage":2,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"ec95ae20-3519-4208-b05a-80cde5bbb8c6","userName":"pagination-user1@test.com","externalId":"ext-pag-1","ac...
+✅ Pagination: startIndex=2 reflected in response
+✅ Pagination: startIndex+count returns correct page size
+
+--- Test: Filter by externalId ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users?filter=externalId eq "ext-pag-1"
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":1,"startIndex":1,"itemsPerPage":1,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"ec95ae20-3519-4208-b05a-80cde5bbb8c6","userName":"pagination-user1@test.com","externalId":"ext-pag-1","ac...
+✅ Filter by externalId returns exactly 1 user
+✅ Filtered user has correct externalId
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users?filter=EXTERNALID eq "ext-pag-2"
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":1,"startIndex":1,"itemsPerPage":1,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"fb5b8927-95c5-4c53-aafe-282c528b2fbf","userName":"pagination-user2@test.com","externalId":"ext-pag-2","ac...
+✅ Filter with 'EXTERNALID' (uppercase attr) finds user
+
+--- Test: externalId Uniqueness ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋   Body: {
+  "externalId": "ext-pag-1",
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "dup-ext-test@test.com"
+}
+    📋 ← Error: Response status code does not indicate success: 409 (Conflict).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"A resource with externalId 'ext-pag-1' already exists.","scimType":"uniqueness","status":"409"}
+✅ Duplicate externalId returns 409 Conflict
+
+
+========================================
+TEST SECTION 4: SCIM GROUP OPERATIONS
+========================================
+
+--- Test: Create Group ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:Group"
+  ],
+  "displayName": "Live Test Group"
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"f810e9f6-1e01-448c-acd2-365ffed5968f","displayName":"Live Test Group","members":[],"meta":{"resourceType":"Group","created":"2026-02-11T23:55:15.019Z","lastModified":"2026-02-11T23:55:15.019Z","location":"http://localhost:6000/scim/...
+✅ Create group returned ID: f810e9f6-1e01-448c-acd2-365ffed5968f
+✅ Group displayName is correct
+✅ Group meta.resourceType is 'Group'
+✅ Group meta.location is present
+✅ Group meta.location contains correct path
+✅ Group meta.created is present
+
+--- Test: Get Group by ID ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups/f810e9f6-1e01-448c-acd2-365ffed5968f
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"f810e9f6-1e01-448c-acd2-365ffed5968f","displayName":"Live Test Group","members":[],"meta":{"resourceType":"Group","created":"2026-02-11T23:55:15.019Z","lastModified":"2026-02-11T23:55:15.019Z","location":"http://localhost:6000/scim/...
+✅ Get group by ID returns correct data
+
+--- Test: List Groups ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":1,"startIndex":1,"itemsPerPage":1,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"f810e9f6-1e01-448c-acd2-365ffed5968f","displayName":"Live Test Group","members":[],"meta":{"resourceType...
+✅ List groups returns at least 1 group
+
+--- Test: PATCH Group (Add Member) ---
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups/f810e9f6-1e01-448c-acd2-365ffed5968f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": [
+        {
+          "value": "1a7a769a-3af5-433f-bd64-4d5421ae803f"
+     ...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"f810e9f6-1e01-448c-acd2-365ffed5968f","displayName":"Live Test Group","members":[{"value":"1a7a769a-3af5-433f-bd64-4d5421ae803f"}],"meta":{"resourceType":"Group","created":"2026-02-11T23:55:15.019Z","lastModified":"2026-02-11T23:55:...
+✅ Group PATCH returns response body (not 204)
+✅ PATCH add member works
+
+--- Test: PATCH Group (Remove Member) ---
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups/f810e9f6-1e01-448c-acd2-365ffed5968f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "op": "remove",
+      "path": "members[value eq \"1a7a769a-3af5-433f-bd64-4d5421ae803f...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"f810e9f6-1e01-448c-acd2-365ffed5968f","displayName":"Live Test Group","members":[],"meta":{"resourceType":"Group","created":"2026-02-11T23:55:15.019Z","lastModified":"2026-02-11T23:55:15.123Z","location":"http://localhost:6000/scim/...
+✅ Group PATCH remove returns response body
+✅ PATCH remove member works
+
+--- Test: PUT Group (Replace) ---
+    📋 → PUT http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups/f810e9f6-1e01-448c-acd2-365ffed5968f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:Group"
+  ],
+  "displayName": "Replaced Group Name"
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"f810e9f6-1e01-448c-acd2-365ffed5968f","displayName":"Replaced Group Name","members":[],"meta":{"resourceType":"Group","created":"2026-02-11T23:55:15.019Z","lastModified":"2026-02-11T23:55:15.152Z","location":"http://localhost:6000/s...
+✅ PUT group (replace) works
+
+--- Test: Group externalId Support ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups
+    📋   Body: {
+  "displayName": "Group With ExternalId",
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:Group"
+  ],
+  "externalId": "ext-group-123"
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"8d9351d9-2302-4339-b53a-9be70fd3de7c","externalId":"ext-group-123","displayName":"Group With ExternalId","members":[],"meta":{"resourceType":"Group","created":"2026-02-11T23:55:15.214Z","lastModified":"2026-02-11T23:55:15.214Z","loc...
+✅ Group created with externalId
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups?filter=externalId eq "ext-group-123"
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":1,"startIndex":1,"itemsPerPage":1,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"8d9351d9-2302-4339-b53a-9be70fd3de7c","externalId":"ext-group-123","displayName":"Group With ExternalId"...
+✅ Filter groups by externalId returns exactly 1 group
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups
+    📋   Body: {
+  "displayName": "Dup ExternalId Group",
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:Group"
+  ],
+  "externalId": "ext-group-123"
+}
+    📋 ← Error: Response status code does not indicate success: 409 (Conflict).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"A group with externalId 'ext-group-123' already exists.","scimType":"uniqueness","status":"409"}
+✅ Duplicate group externalId returns 409 Conflict
+
+
+========================================
+TEST SECTION 5: MULTI-MEMBER PATCH CONFIG FLAG
+========================================
+
+--- Create Additional Users for Multi-Member Test ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋   Body: {
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "livetest-multi-user2@test.com"
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"cbb25df6-1f82-4dc3-bf45-5b1186feedb8","userName":"livetest-multi-user2@test.com","active":true,"meta":{"resourceType":"User","created":"2026-02-11T23:55:15.245Z","lastModified":"2026-02-11T23:55:15.245Z","location":"http://localhost:...
+Created user 2 : cbb25df6-1f82-4dc3-bf45-5b1186feedb8
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋   Body: {
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "livetest-multi-user3@test.com"
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"ca5ba7f2-aee9-4e2e-b875-2769c1c70577","userName":"livetest-multi-user3@test.com","active":true,"meta":{"resourceType":"User","created":"2026-02-11T23:55:15.257Z","lastModified":"2026-02-11T23:55:15.257Z","location":"http://localhost:...
+Created user 3 : ca5ba7f2-aee9-4e2e-b875-2769c1c70577
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:Group"
+  ],
+  "displayName": "Multi-Member Test Group"
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"b0fb1c57-5649-467c-9ad6-3c1f7674d6d1","displayName":"Multi-Member Test Group","members":[],"meta":{"resourceType":"Group","created":"2026-02-11T23:55:15.289Z","lastModified":"2026-02-11T23:55:15.289Z","location":"http://localhost:60...
+
+--- Test: Multi-Member PATCH with Flag=True ---
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups/b0fb1c57-5649-467c-9ad6-3c1f7674d6d1
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": [
+        {
+          "value": "1a7a769a-3af5-433f-bd64-4d5421ae803f"
+     ...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"b0fb1c57-5649-467c-9ad6-3c1f7674d6d1","displayName":"Multi-Member Test Group","members":[{"value":"1a7a769a-3af5-433f-bd64-4d5421ae803f"},{"value":"cbb25df6-1f82-4dc3-bf45-5b1186feedb8"},{"value":"ca5ba7f2-aee9-4e2e-b875-2769c1c7057...
+✅ Multi-member PATCH with flag=True accepted (3 members added)
+
+--- Create Endpoint Without Flag ---
+    📋 → POST http://localhost:6000/scim/admin/endpoints
+    📋   Body: {
+  "displayName": "No Flag Endpoint",
+  "name": "live-test-no-flag-685290583"
+}
+    📋 ← Response: {"id":"cmliotgcl01bm128v331k664y","name":"live-test-no-flag-685290583","displayName":"No Flag Endpoint","active":true,"scimEndpoint":"/scim/endpoints/cmliotgcl01bm128v331k664y","createdAt":"2026-02-11T23:55:15.334Z","updatedAt":"2026-02-11T23:55:15.334Z"}
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotgcl01bm128v331k664y/Users
+    📋   Body: {
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "noflag-user1@test.com"
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"fdc33a2d-66b8-4f3c-a2cc-331ec048e448","userName":"noflag-user1@test.com","active":true,"meta":{"resourceType":"User","created":"2026-02-11T23:55:15.355Z","lastModified":"2026-02-11T23:55:15.355Z","location":"http://localhost:6000/sci...
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotgcl01bm128v331k664y/Users
+    📋   Body: {
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "noflag-user2@test.com"
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"0ec58604-f3d5-415c-a0b1-5593596c7a5b","userName":"noflag-user2@test.com","active":true,"meta":{"resourceType":"User","created":"2026-02-11T23:55:15.386Z","lastModified":"2026-02-11T23:55:15.386Z","location":"http://localhost:6000/sci...
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotgcl01bm128v331k664y/Groups
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:Group"
+  ],
+  "displayName": "No Flag Group"
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"0fad9055-3e12-4290-8e63-f0176ca895f7","displayName":"No Flag Group","members":[],"meta":{"resourceType":"Group","created":"2026-02-11T23:55:15.417Z","lastModified":"2026-02-11T23:55:15.417Z","location":"http://localhost:6000/scim/en...
+
+--- Test: Multi-Member ADD PATCH without Flag (Should Fail) ---
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotgcl01bm128v331k664y/Groups/0fad9055-3e12-4290-8e63-f0176ca895f7
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": [
+        {
+          "value": "fdc33a2d-66b8-4f3c-a2cc-331ec048e448"
+     ...
+    📋 ← Error: Response status code does not indicate success: 400 (Bad Request).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Adding multiple members in a single operation is not allowed. Each member must be added in a separate PATCH operation. To enable...
+✅ Multi-member ADD without flag rejected with 400 Bad Request
+
+
+========================================
+TEST SECTION 5b: MULTI-MEMBER REMOVE CONFIG FLAG
+========================================
+
+--- Setup: Add Members Individually for Remove Test ---
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups/b0fb1c57-5649-467c-9ad6-3c1f7674d6d1
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": [
+        {
+          "value": "1a7a769a-3af5-433f-bd64-4d5421ae803f"
+     ...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"b0fb1c57-5649-467c-9ad6-3c1f7674d6d1","displayName":"Multi-Member Test Group","members":[{"value":"1a7a769a-3af5-433f-bd64-4d5421ae803f"},{"value":"cbb25df6-1f82-4dc3-bf45-5b1186feedb8"},{"value":"ca5ba7f2-aee9-4e2e-b875-2769c1c7057...
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups/b0fb1c57-5649-467c-9ad6-3c1f7674d6d1
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": [
+        {
+          "value": "cbb25df6-1f82-4dc3-bf45-5b1186feedb8"
+     ...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"b0fb1c57-5649-467c-9ad6-3c1f7674d6d1","displayName":"Multi-Member Test Group","members":[{"value":"1a7a769a-3af5-433f-bd64-4d5421ae803f"},{"value":"cbb25df6-1f82-4dc3-bf45-5b1186feedb8"},{"value":"ca5ba7f2-aee9-4e2e-b875-2769c1c7057...
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups/b0fb1c57-5649-467c-9ad6-3c1f7674d6d1
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": [
+        {
+          "value": "ca5ba7f2-aee9-4e2e-b875-2769c1c70577"
+     ...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"b0fb1c57-5649-467c-9ad6-3c1f7674d6d1","displayName":"Multi-Member Test Group","members":[{"value":"1a7a769a-3af5-433f-bd64-4d5421ae803f"},{"value":"cbb25df6-1f82-4dc3-bf45-5b1186feedb8"},{"value":"ca5ba7f2-aee9-4e2e-b875-2769c1c7057...
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups/b0fb1c57-5649-467c-9ad6-3c1f7674d6d1
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"b0fb1c57-5649-467c-9ad6-3c1f7674d6d1","displayName":"Multi-Member Test Group","members":[{"value":"1a7a769a-3af5-433f-bd64-4d5421ae803f"},{"value":"cbb25df6-1f82-4dc3-bf45-5b1186feedb8"},{"value":"ca5ba7f2-aee9-4e2e-b875-2769c1c7057...
+Group has 3 members before remove test
+
+--- Test: Multi-Member REMOVE without Flag (Should Fail) ---
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotgcl01bm128v331k664y/Groups/0fad9055-3e12-4290-8e63-f0176ca895f7
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": [
+        {
+          "value": "fdc33a2d-66b8-4f3c-a2cc-331ec048e448"
+     ...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"0fad9055-3e12-4290-8e63-f0176ca895f7","displayName":"No Flag Group","members":[{"value":"fdc33a2d-66b8-4f3c-a2cc-331ec048e448"}],"meta":{"resourceType":"Group","created":"2026-02-11T23:55:15.417Z","lastModified":"2026-02-11T23:55:15...
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotgcl01bm128v331k664y/Groups/0fad9055-3e12-4290-8e63-f0176ca895f7
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": [
+        {
+          "value": "0ec58604-f3d5-415c-a0b1-5593596c7a5b"
+     ...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"0fad9055-3e12-4290-8e63-f0176ca895f7","displayName":"No Flag Group","members":[{"value":"fdc33a2d-66b8-4f3c-a2cc-331ec048e448"},{"value":"0ec58604-f3d5-415c-a0b1-5593596c7a5b"}],"meta":{"resourceType":"Group","created":"2026-02-11T2...
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotgcl01bm128v331k664y/Groups/0fad9055-3e12-4290-8e63-f0176ca895f7
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": [
+        {
+          "value": "fdc33a2d-66b8-4f3c-a2cc-331ec048e448"
+     ...
+    📋 ← Error: Response status code does not indicate success: 400 (Bad Request).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Removing multiple members in a single operation is not allowed. Each member must be removed in a separate PATCH operation. To en...
+✅ Multi-member REMOVE without flag rejected with 400 Bad Request
+
+--- Test: Multi-Member REMOVE with Flag=True ---
+    📋 → POST http://localhost:6000/scim/admin/endpoints
+    📋   Body: {
+  "name": "live-test-remove-flag-441837886",
+  "displayName": "Remove Flag Endpoint",
+  "config": {
+    "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True"
+  }
+}
+    📋 ← Response: {"id":"cmliotgkj01cj128vkjq1rd0x","name":"live-test-remove-flag-441837886","displayName":"Remove Flag Endpoint","config":{"MultiOpPatchRequestRemoveMultipleMembersFromGroup":"True"},"active":true,"scimEndpoint":"/scim/endpoints/cmliotgkj01cj128vkjq1rd0x","createdAt":"2026-02-11T23:55:15.619Z","up...
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotgkj01cj128vkjq1rd0x/Users
+    📋   Body: {
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "rfuser1@test.com"
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"8aecb0b2-76a6-4828-92aa-e2fbd6227efc","userName":"rfuser1@test.com","active":true,"meta":{"resourceType":"User","created":"2026-02-11T23:55:15.644Z","lastModified":"2026-02-11T23:55:15.644Z","location":"http://localhost:6000/scim/end...
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotgkj01cj128vkjq1rd0x/Users
+    📋   Body: {
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "rfuser2@test.com"
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1c67f0d2-1326-41c1-9134-2e02669f2fdf","userName":"rfuser2@test.com","active":true,"meta":{"resourceType":"User","created":"2026-02-11T23:55:15.657Z","lastModified":"2026-02-11T23:55:15.657Z","location":"http://localhost:6000/scim/end...
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotgkj01cj128vkjq1rd0x/Groups
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:Group"
+  ],
+  "displayName": "Remove Flag Group"
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"0f5a57ef-9d61-40a3-9ed2-acd980dee020","displayName":"Remove Flag Group","members":[],"meta":{"resourceType":"Group","created":"2026-02-11T23:55:15.695Z","lastModified":"2026-02-11T23:55:15.695Z","location":"http://localhost:6000/sci...
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotgkj01cj128vkjq1rd0x/Groups/0f5a57ef-9d61-40a3-9ed2-acd980dee020
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": [
+        {
+          "value": "8aecb0b2-76a6-4828-92aa-e2fbd6227efc"
+     ...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"0f5a57ef-9d61-40a3-9ed2-acd980dee020","displayName":"Remove Flag Group","members":[{"value":"8aecb0b2-76a6-4828-92aa-e2fbd6227efc"}],"meta":{"resourceType":"Group","created":"2026-02-11T23:55:15.695Z","lastModified":"2026-02-11T23:5...
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotgkj01cj128vkjq1rd0x/Groups/0f5a57ef-9d61-40a3-9ed2-acd980dee020
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": [
+        {
+          "value": "1c67f0d2-1326-41c1-9134-2e02669f2fdf"
+     ...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"0f5a57ef-9d61-40a3-9ed2-acd980dee020","displayName":"Remove Flag Group","members":[{"value":"8aecb0b2-76a6-4828-92aa-e2fbd6227efc"},{"value":"1c67f0d2-1326-41c1-9134-2e02669f2fdf"}],"meta":{"resourceType":"Group","created":"2026-02-...
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotgkj01cj128vkjq1rd0x/Groups/0f5a57ef-9d61-40a3-9ed2-acd980dee020
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"0f5a57ef-9d61-40a3-9ed2-acd980dee020","displayName":"Remove Flag Group","members":[{"value":"8aecb0b2-76a6-4828-92aa-e2fbd6227efc"},{"value":"1c67f0d2-1326-41c1-9134-2e02669f2fdf"}],"meta":{"resourceType":"Group","created":"2026-02-...
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotgkj01cj128vkjq1rd0x/Groups/0f5a57ef-9d61-40a3-9ed2-acd980dee020
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": [
+        {
+          "value": "8aecb0b2-76a6-4828-92aa-e2fbd6227efc"
+     ...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"0f5a57ef-9d61-40a3-9ed2-acd980dee020","displayName":"Remove Flag Group","members":[],"meta":{"resourceType":"Group","created":"2026-02-11T23:55:15.695Z","lastModified":"2026-02-11T23:55:15.79Z","location":"http://localhost:6000/scim...
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotgkj01cj128vkjq1rd0x/Groups/0f5a57ef-9d61-40a3-9ed2-acd980dee020
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"0f5a57ef-9d61-40a3-9ed2-acd980dee020","displayName":"Remove Flag Group","members":[],"meta":{"resourceType":"Group","created":"2026-02-11T23:55:15.695Z","lastModified":"2026-02-11T23:55:15.79Z","location":"http://localhost:6000/scim...
+✅ Multi-member REMOVE with flag=True accepted (removed 2 members)
+
+
+========================================
+TEST SECTION 6: ENDPOINT ISOLATION
+========================================
+
+--- Create Second Endpoint for Isolation Test ---
+    📋 → POST http://localhost:6000/scim/admin/endpoints
+    📋   Body: {
+  "displayName": "Isolation Test Endpoint",
+  "name": "live-test-isolation-1987663110"
+}
+    📋 ← Response: {"id":"cmliotgps01d2128vjyx2nfaf","name":"live-test-isolation-1987663110","displayName":"Isolation Test Endpoint","active":true,"scimEndpoint":"/scim/endpoints/cmliotgps01d2128vjyx2nfaf","createdAt":"2026-02-11T23:55:15.809Z","updatedAt":"2026-02-11T23:55:15.809Z"}
+
+--- Test: Same userName in Different Endpoints ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotgps01d2128vjyx2nfaf/Users
+    📋   Body: {
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "livetest-user@test.com"
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"ad8d7e98-e168-4c9b-ac06-bcd475043d2f","userName":"livetest-user@test.com","active":true,"meta":{"resourceType":"User","created":"2026-02-11T23:55:15.847Z","lastModified":"2026-02-11T23:55:15.847Z","location":"http://localhost:6000/sc...
+✅ Same userName created in different endpoint (isolation works)
+
+--- Test: Endpoint Data Isolation ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":6,"startIndex":1,"itemsPerPage":6,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Mu...
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotgps01d2128vjyx2nfaf/Users
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":1,"startIndex":1,"itemsPerPage":1,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"ad8d7e98-e168-4c9b-ac06-bcd475043d2f","userName":"livetest-user@test.com","active":true,"meta":{"resource...
+✅ Endpoints have isolated user data
+
+
+========================================
+TEST SECTION 7: INACTIVE ENDPOINT BLOCKING
+========================================
+
+--- Create Endpoint for Inactive Testing ---
+    📋 → POST http://localhost:6000/scim/admin/endpoints
+    📋   Body: {
+  "displayName": "Inactive Test Endpoint",
+  "name": "live-test-inactive-655950638"
+}
+    📋 ← Response: {"id":"cmliotgrl01d8128vn4wjb111","name":"live-test-inactive-655950638","displayName":"Inactive Test Endpoint","active":true,"scimEndpoint":"/scim/endpoints/cmliotgrl01d8128vn4wjb111","createdAt":"2026-02-11T23:55:15.874Z","updatedAt":"2026-02-11T23:55:15.874Z"}
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotgrl01d8128vn4wjb111/Users
+    📋   Body: {
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "inactive-test@test.com"
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"983db44b-197d-4c27-a0ae-09aa831d2e09","userName":"inactive-test@test.com","active":true,"meta":{"resourceType":"User","created":"2026-02-11T23:55:15.93Z","lastModified":"2026-02-11T23:55:15.93Z","location":"http://localhost:6000/scim...
+Created test user: 983db44b-197d-4c27-a0ae-09aa831d2e09
+
+--- Deactivate Endpoint ---
+    📋 → PATCH http://localhost:6000/scim/admin/endpoints/cmliotgrl01d8128vn4wjb111
+    📋   Body: {"active":false}
+    📋 ← Response: {"id":"cmliotgrl01d8128vn4wjb111","name":"live-test-inactive-655950638","displayName":"Inactive Test Endpoint","active":false,"scimEndpoint":"/scim/endpoints/cmliotgrl01d8128vn4wjb111","createdAt":"2026-02-11T23:55:15.874Z","updatedAt":"2026-02-11T23:55:15.954Z"}
+✅ Endpoint deactivated successfully
+
+--- Test: SCIM Operations Return 403 on Inactive Endpoint ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotgrl01d8128vn4wjb111/Users/983db44b-197d-4c27-a0ae-09aa831d2e09
+    📋 ← Error: Response status code does not indicate success: 403 (Forbidden).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Endpoint \"live-test-inactive-655950638\" is inactive. SCIM operations are not allowed.","status":"403"}
+✅ GET User returns 403 on inactive endpoint
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotgrl01d8128vn4wjb111/Users
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "should-fail@test.com"
+}
+    📋 ← Error: Response status code does not indicate success: 403 (Forbidden).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Endpoint \"live-test-inactive-655950638\" is inactive. SCIM operations are not allowed.","status":"403"}
+✅ POST User returns 403 on inactive endpoint
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotgrl01d8128vn4wjb111/Groups
+    📋 ← Error: Response status code does not indicate success: 403 (Forbidden).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Endpoint \"live-test-inactive-655950638\" is inactive. SCIM operations are not allowed.","status":"403"}
+✅ GET Groups returns 403 on inactive endpoint
+    📋 → GET http://localhost:6000/scim/admin/endpoints?active=false
+    📋 ← Response: {"id":"cmliotgrl01d8128vn4wjb111","name":"live-test-inactive-655950638","displayName":"Inactive Test Endpoint","active":false,"scimEndpoint":"/scim/endpoints/cmliotgrl01d8128vn4wjb111","createdAt":"2026-02-11T23:55:15.874Z","updatedAt":"2026-02-11T23:55:15.954Z"}
+✅ Inactive endpoint appears in active=false filter
+
+--- Test: Reactivate Endpoint ---
+    📋 → PATCH http://localhost:6000/scim/admin/endpoints/cmliotgrl01d8128vn4wjb111
+    📋   Body: {"active":true}
+    📋 ← Response: {"id":"cmliotgrl01d8128vn4wjb111","name":"live-test-inactive-655950638","displayName":"Inactive Test Endpoint","active":true,"scimEndpoint":"/scim/endpoints/cmliotgrl01d8128vn4wjb111","createdAt":"2026-02-11T23:55:15.874Z","updatedAt":"2026-02-11T23:55:16.01Z"}
+✅ Endpoint reactivated successfully
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotgrl01d8128vn4wjb111/Users/983db44b-197d-4c27-a0ae-09aa831d2e09
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"983db44b-197d-4c27-a0ae-09aa831d2e09","userName":"inactive-test@test.com","active":true,"meta":{"resourceType":"User","created":"2026-02-11T23:55:15.93Z","lastModified":"2026-02-11T23:55:15.93Z","location":"http://localhost:6000/scim...
+✅ GET User works after reactivation
+
+
+========================================
+TEST SECTION 8: SCIM DISCOVERY ENDPOINTS
+========================================
+
+--- Test: ServiceProviderConfig ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/ServiceProviderConfig
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"],"patch":{"supported":true},"bulk":{"supported":false},"filter":{"supported":true,"maxResults":200},"changePassword":{"supported":false},"sort":{"supported":false},"etag":{"supported":true},"authenticationSchemes":[{"type":...
+✅ ServiceProviderConfig has correct schema
+
+--- Test: Schemas ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Schemas
+Resulting JSON is truncated as serialization has exceeded the set depth of 4.
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:ListResponse"],"totalResults":2,"startIndex":1,"itemsPerPage":2,"Resources":[{"id":"urn:ietf:params:scim:schemas:core:2.0:User","name":"User","description":"User Account","attributes":[{"name":"userName","type":"string","multiValued":false,"requi...
+✅ Schemas endpoint returns schemas
+
+--- Test: ResourceTypes ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/ResourceTypes
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:ListResponse"],"totalResults":2,"startIndex":1,"itemsPerPage":2,"Resources":[{"id":"User","name":"User","endpoint":"/Users","description":"User Account","schema":"urn:ietf:params:scim:schemas:core:2.0:User","schemaExtensions":[]},{"id":"Group","n...
+✅ ResourceTypes endpoint returns resource types
+
+
+========================================
+TEST SECTION 8b: CONTENT-TYPE & AUTH VERIFICATION
+========================================
+
+--- Test: Response Content-Type Header ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋 ← HTTP 200
+    📋   ETag: W/"c38-L96gGgNsvmo32CfhSHNjxhp76Pk"
+    📋   Content-Type: application/scim+json; charset=utf-8
+✅ Response Content-Type is application/scim+json (application/scim+json; charset=utf-8)
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋   Body: {
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "ct-test-1910868230@test.com"
+}
+    📋 ← HTTP 201
+    📋   ETag: W/"2026-02-11T23:55:16.094Z"
+    📋   Content-Type: application/scim+json; charset=utf-8
+✅ POST response Content-Type is application/scim+json
+✅ POST response status code is 201 Created
+
+--- Test: Missing Auth Token → 401 ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋 ← Error: Response status code does not indicate success: 401 (Unauthorized).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Missing bearer token.","status":"401","scimType":"invalidToken"}
+✅ Missing Authorization header returns 401
+
+--- Test: Invalid Auth Token → 401 ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋 ← Error: Response status code does not indicate success: 401 (Unauthorized).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Invalid bearer token.","status":"401","scimType":"invalidToken"}
+✅ Invalid Bearer token returns 401
+
+--- Test: Token Without Bearer Prefix → 401 ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋 ← Error: Response status code does not indicate success: 401 (Unauthorized).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Missing bearer token.","status":"401","scimType":"invalidToken"}
+✅ Token without 'Bearer ' prefix returns 401
+
+
+========================================
+TEST SECTION 9: ERROR HANDLING
+========================================
+
+--- Test: 404 for Non-Existent User ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/non-existent-id-12345
+    📋 ← Error: Response status code does not indicate success: 404 (Not Found).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Resource non-existent-id-12345 not found.","scimType":"noTarget","status":"404"}
+✅ Non-existent user returns 404
+
+--- Test: 404 for Non-Existent Group ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups/non-existent-id-12345
+    📋 ← Error: Response status code does not indicate success: 404 (Not Found).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Resource non-existent-id-12345 not found.","scimType":"noTarget","status":"404"}
+✅ Non-existent group returns 404
+
+--- Test: 404 for Non-Existent Endpoint ---
+    📋 → GET http://localhost:6000/scim/admin/endpoints/non-existent-id-12345
+    📋 ← Error: Response status code does not indicate success: 404 (Not Found).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Endpoint with ID \"non-existent-id-12345\" not found","status":"404"}
+✅ Non-existent endpoint returns 404
+
+--- Test: 409 for Duplicate userName ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋   Body: {
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "livetest-user@test.com"
+}
+    📋 ← Error: Response status code does not indicate success: 409 (Conflict).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"A resource with userName 'livetest-user@test.com' already exists.","scimType":"uniqueness","status":"409"}
+✅ Duplicate userName returns 409 Conflict
+
+--- Test: 400 for Invalid Endpoint Name ---
+    📋 → POST http://localhost:6000/scim/admin/endpoints
+    📋   Body: {"name":"invalid name with spaces"}
+    📋 ← Error: Response status code does not indicate success: 400 (Bad Request).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Endpoint name must contain only alphanumeric characters, hyphens, and underscores","status":"400"}
+✅ Invalid endpoint name returns 400 Bad Request
+
+
+========================================
+TEST SECTION 9b: RFC 7644 COMPLIANCE CHECKS
+========================================
+
+--- Test: Location Header on POST /Users (RFC 7644 §3.1) ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋   Body: {
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "loc-header-test-1818547963@test.com"
+}
+    📋 ← HTTP 201
+    📋   ETag: W/"2026-02-11T23:55:16.190Z"
+    📋   Content-Type: application/scim+json; charset=utf-8
+✅ POST /Users returns 201 Created
+✅ POST /Users includes Location header
+✅ Location header matches meta.location
+
+--- Test: Location Header on POST /Groups (RFC 7644 §3.1) ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:Group"
+  ],
+  "displayName": "Loc Header Test Group"
+}
+    📋 ← HTTP 201
+    📋   ETag: W/"2026-02-11T23:55:16.203Z"
+    📋   Content-Type: application/scim+json; charset=utf-8
+✅ POST /Groups returns 201 Created
+✅ POST /Groups includes Location header
+✅ Location header matches meta.location
+
+--- Test: Error Response Format (RFC 7644 §3.12) ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/non-existent-error-format-test
+    📋 ← HTTP 404
+    📋   ETag: W/"9e-YWgP/gUNv+HaYtF6YYa2quRRIz4"
+    📋   Content-Type: application/scim+json; charset=utf-8
+✅ Error returns 404 status code
+✅ Error Content-Type is application/scim+json
+✅ Error has SCIM Error schema
+✅ Error status is string type: '404'
+✅ Error status value is '404'
+✅ Error includes detail message
+
+--- Test: 409 Error Response Format ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋   Body: {
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "livetest-user@test.com"
+}
+    📋 ← HTTP 409
+    📋   ETag: W/"af-aHyDKU1ibpB9xkCNEpyO4k83RuM"
+    📋   Content-Type: application/scim+json; charset=utf-8
+✅ Duplicate returns 409
+✅ 409 error Content-Type is application/scim+json
+✅ 409 error status is string '409'
+
+--- Test: PATCH Updates meta.lastModified ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋   Body: {
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "timestamp-test-2006770646@test.com"
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"045406bb-d916-45e3-9ed9-38307cd96c4e","userName":"timestamp-test-2006770646@test.com","active":true,"meta":{"resourceType":"User","created":"2026-02-11T23:55:16.241Z","lastModified":"2026-02-11T23:55:16.241Z","location":"http://local...
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/045406bb-d916-45e3-9ed9-38307cd96c4e
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": "Timestamp Updated",
+      "path": "displayName",
+      "op": "replace"
+   ...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"045406bb-d916-45e3-9ed9-38307cd96c4e","userName":"timestamp-test-2006770646@test.com","active":true,"displayName":"Timestamp Updated","meta":{"resourceType":"User","created":"2026-02-11T23:55:16.241Z","lastModified":"2026-02-11T23:55...
+✅ PATCH updates meta.lastModified timestamp
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/045406bb-d916-45e3-9ed9-38307cd96c4e
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"045406bb-d916-45e3-9ed9-38307cd96c4e","userName":"timestamp-test-2006770646@test.com","active":true,"displayName":"Timestamp Updated","meta":{"resourceType":"User","created":"2026-02-11T23:55:16.241Z","lastModified":"2026-02-11T23:55...
+✅ GET does not change meta.lastModified
+
+
+========================================
+TEST SECTION 9c: POST /.search (RFC 7644 §3.4.3)
+========================================
+
+--- Test: POST /Users/.search Basic ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/.search
+    📋   Body: {
+  "count": 10,
+  "startIndex": 1,
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:SearchRequest"
+  ],
+  "filter": "userName eq \"livetest-user@test.com\""
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":1,"startIndex":1,"itemsPerPage":1,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Mu...
+✅ POST /Users/.search returns ListResponse schema
+✅ POST /Users/.search finds user via filter
+✅ POST /Users/.search includes startIndex
+✅ POST /Users/.search includes itemsPerPage
+
+--- Test: POST /Users/.search Returns HTTP 200 ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/.search
+    📋   Body: {
+  "count": 10,
+  "startIndex": 1,
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:SearchRequest"
+  ],
+  "filter": "userName eq \"livetest-user@test.com\""
+}
+    📋 ← HTTP 200
+    📋   ETag: W/"323-jY93yzy5Hc9RyPlseApVWkeelpM"
+    📋   Content-Type: application/scim+json; charset=utf-8
+✅ POST /Users/.search returns HTTP 200 (not 201)
+✅ POST /Users/.search Content-Type is application/scim+json
+
+--- Test: POST /Users/.search with Attributes ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/.search
+    📋   Body: {
+  "count": 10,
+  "startIndex": 1,
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:SearchRequest"
+  ],
+  "filter": "userName eq \"livetest-user@test.com\"",
+  "attributes": "userN...
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":1,"startIndex":1,"itemsPerPage":1,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","meta":{"resourceType":"User","created":"2026-02-11T23:55:14.383Z",...
+✅ POST /.search with attributes includes userName
+✅ POST /.search always returns id (always-returned)
+✅ POST /.search always returns schemas (always-returned)
+✅ POST /.search with attributes excludes non-requested attrs (emails)
+
+--- Test: POST /Users/.search with excludedAttributes ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/.search
+    📋   Body: {
+  "excludedAttributes": "emails,phoneNumbers",
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:SearchRequest"
+  ],
+  "filter": "userName eq \"livetest-user@test.com\""
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":1,"startIndex":1,"itemsPerPage":1,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Mu...
+✅ POST /.search with excludedAttributes keeps userName
+✅ POST /.search with excludedAttributes removes emails
+
+--- Test: POST /Users/.search Without Filter ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/.search
+    📋   Body: {
+  "count": 5,
+  "startIndex": 1,
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:SearchRequest"
+  ]
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":9,"startIndex":1,"itemsPerPage":5,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Mu...
+✅ POST /Users/.search without filter lists users
+✅ POST /Users/.search respects count parameter
+
+--- Test: POST /Groups/.search Basic ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups/.search
+    📋   Body: {
+  "count": 10,
+  "startIndex": 1,
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:SearchRequest"
+  ],
+  "filter": "displayName eq \"Replaced Group Name\""
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":1,"startIndex":1,"itemsPerPage":1,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"f810e9f6-1e01-448c-acd2-365ffed5968f","displayName":"Replaced Group Name","members":[],"meta":{"resource...
+✅ POST /Groups/.search returns ListResponse schema
+✅ POST /Groups/.search finds group via filter
+
+--- Test: POST /Groups/.search with excludedAttributes ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups/.search
+    📋   Body: {
+  "excludedAttributes": "members",
+  "startIndex": 1,
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:SearchRequest"
+  ],
+  "count": 50
+}
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":4,"startIndex":1,"itemsPerPage":4,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"f810e9f6-1e01-448c-acd2-365ffed5968f","displayName":"Replaced Group Name","meta":{"resourceType":"Group"...
+✅ POST /Groups/.search excludedAttributes removes members
+✅ POST /Groups/.search excludedAttributes keeps displayName
+
+
+========================================
+TEST SECTION 9d: ATTRIBUTE PROJECTION (RFC 7644 §3.4.2.5)
+========================================
+
+--- Test: GET /Users with attributes Param ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users?attributes=userName,displayName&count=5
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":9,"startIndex":1,"itemsPerPage":5,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","meta":{"resourceType":"User","created":"2026-02-11T23:55:14.383Z",...
+✅ GET /Users?attributes works
+✅ attributes param includes userName
+✅ attributes param always returns id
+✅ attributes param always returns schemas
+✅ attributes param excludes non-requested emails
+✅ attributes param excludes non-requested active
+
+--- Test: GET /Users/:id with attributes Param ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f?attributes=userName
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","meta":{"resourceType":"User","created":"2026-02-11T23:55:14.383Z","lastModified":"2026-02-11T23:55:14.887Z","location":"http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a7...
+✅ GET User by ID with attributes includes userName
+✅ GET User by ID with attributes always returns id
+✅ GET User by ID with attributes always returns meta
+✅ GET User by ID with attributes excludes displayName
+
+--- Test: GET /Users with excludedAttributes Param ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users?excludedAttributes=emails,phoneNumbers&count=5
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":9,"startIndex":1,"itemsPerPage":5,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Mu...
+✅ excludedAttributes keeps userName
+✅ excludedAttributes always keeps id
+✅ excludedAttributes removes emails
+✅ excludedAttributes removes phoneNumbers
+
+--- Test: GET /Users/:id with excludedAttributes ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f?excludedAttributes=name,emails
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","userName":"livetest-user@test.com","active":true,"displayName":"Multi-Op User","urn:ietf:params:scim:schemas:extension:enterprise:2.0:User":{"department":"Product"},"title":"Engineer","meta":{"r...
+✅ GET User excludedAttributes keeps userName
+✅ GET User excludedAttributes removes name
+✅ GET User excludedAttributes removes emails
+✅ GET User excludedAttributes always keeps id (never excluded)
+✅ GET User excludedAttributes always keeps schemas (never excluded)
+
+--- Test: GET /Groups with attributes Param ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups?attributes=displayName&count=5
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":4,"startIndex":1,"itemsPerPage":4,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"f810e9f6-1e01-448c-acd2-365ffed5968f","meta":{"resourceType":"Group","created":"2026-02-11T23:55:15.019Z...
+✅ GET /Groups attributes includes displayName
+✅ GET /Groups attributes always returns id
+✅ GET /Groups attributes excludes non-requested members
+
+--- Test: GET /Groups/:id with excludedAttributes ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups/f810e9f6-1e01-448c-acd2-365ffed5968f?excludedAttributes=members
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],"id":"f810e9f6-1e01-448c-acd2-365ffed5968f","displayName":"Replaced Group Name","meta":{"resourceType":"Group","created":"2026-02-11T23:55:15.019Z","lastModified":"2026-02-11T23:55:15.152Z","location":"http://localhost:6000/scim/endpoints...
+✅ GET Group excludedAttributes keeps displayName
+✅ GET Group excludedAttributes removes members
+
+--- Test: attributes Precedence Over excludedAttributes ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users?attributes=userName,displayName&excludedAttributes=displayName&count=1
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:api:messages:2.0:ListResponse"],"totalResults":9,"startIndex":1,"itemsPerPage":1,"Resources":[{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"id":"1a7a769a-3af5-433f-bd64-4d5421ae803f","meta":{"resourceType":"User","created":"2026-02-11T23:55:14.383Z",...
+✅ Precedence test: attributes includes userName
+✅ Precedence test: attributes wins — displayName included despite excludedAttributes
+
+
+========================================
+TEST SECTION 9e: ETag & CONDITIONAL REQUESTS (RFC 7644 §3.14)
+========================================
+
+--- Test: ETag Header on GET /Users/:id ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋 ← HTTP 200
+    📋   ETag: W/"2026-02-11T23:55:14.887Z"
+    📋   Content-Type: application/scim+json; charset=utf-8
+✅ GET /Users/:id includes ETag header
+✅ ETag is a weak ETag (W/"...") format: W/"2026-02-11T23:55:14.887Z"
+✅ meta.version matches ETag header value
+
+--- Test: ETag Header on GET /Groups/:id ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups/f810e9f6-1e01-448c-acd2-365ffed5968f
+    📋 ← HTTP 200
+    📋   ETag: W/"2026-02-11T23:55:15.152Z"
+    📋   Content-Type: application/scim+json; charset=utf-8
+✅ GET /Groups/:id includes ETag header
+✅ Group ETag is weak ETag format
+
+--- Test: If-None-Match → 304 Not Modified ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋 ← HTTP 304
+    📋   ETag: W/"2026-02-11T23:55:14.887Z"
+✅ If-None-Match with matching ETag returns 304 Not Modified
+
+--- Test: If-None-Match with Stale ETag → 200 ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋 ← HTTP 200
+    📋   ETag: W/"2026-02-11T23:55:14.887Z"
+    📋   Content-Type: application/scim+json; charset=utf-8
+✅ If-None-Match with stale ETag returns 200 with full resource
+
+--- Test: ETag Changes After PATCH ---
+    📋 → PATCH http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋   Body: {
+  "schemas": [
+    "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+  ],
+  "Operations": [
+    {
+      "value": "ETag Changed User",
+      "path": "displayName",
+      "op": "replace"
+   ...
+    📋 ← HTTP 200
+    📋   ETag: W/"2026-02-11T23:55:16.913Z"
+    📋   Content-Type: application/scim+json; charset=utf-8
+✅ PATCH response includes ETag header
+✅ ETag changed after PATCH (before: W/"2026-02-11T23:55:14.887Z", after: W/"2026-02-11T23:55:16.913Z")
+
+--- Test: Old ETag After Modification → 200 ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋 ← HTTP 200
+    📋   ETag: W/"2026-02-11T23:55:16.913Z"
+    📋   Content-Type: application/scim+json; charset=utf-8
+✅ Old ETag after modification returns 200 (resource changed)
+
+--- Test: POST /Users Includes ETag ---
+    📋 → POST http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users
+    📋   Body: {
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "etag-create-1798278299@test.com"
+}
+    📋 ← HTTP 201
+    📋   ETag: W/"2026-02-11T23:55:16.946Z"
+    📋   Content-Type: application/scim+json; charset=utf-8
+✅ POST /Users response includes ETag header
+✅ POST /Users returns 201 with ETag
+
+--- Test: PUT /Users Includes ETag ---
+    📋 → PUT http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋   Body: {
+  "displayName": "Put ETag Test",
+  "active": true,
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User"
+  ],
+  "userName": "livetest-user@test.com"
+}
+    📋 ← HTTP 200
+    📋   ETag: W/"2026-02-11T23:55:16.968Z"
+    📋   Content-Type: application/scim+json; charset=utf-8
+✅ PUT /Users response includes ETag header
+
+--- Test: ServiceProviderConfig etag.supported ---
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/ServiceProviderConfig
+    📋 ← Response: {"schemas":["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"],"patch":{"supported":true},"bulk":{"supported":false},"filter":{"supported":true,"maxResults":200},"changePassword":{"supported":false},"sort":{"supported":false},"etag":{"supported":true},"authenticationSchemes":[{"type":...
+✅ ServiceProviderConfig etag.supported = true
+
+
+========================================
+TEST SECTION 10: DELETE OPERATIONS
+========================================
+
+--- Test: Delete User ---
+    📋 → DELETE http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋 ← Response: ""
+    📋 → GET http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Users/1a7a769a-3af5-433f-bd64-4d5421ae803f
+    📋 ← Error: Response status code does not indicate success: 404 (Not Found).
+    📋   Error Body: {"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Resource 1a7a769a-3af5-433f-bd64-4d5421ae803f not found.","scimType":"noTarget","status":"404"}
+✅ DELETE user works (returns 204, user not found after)
+
+--- Test: Delete Group ---
+    📋 → DELETE http://localhost:6000/scim/endpoints/cmliotfgz019d128vwurivo17/Groups/f810e9f6-1e01-448c-acd2-365ffed5968f
+    📋 ← Response: ""
+✅ DELETE group works
+
+
+========================================
+CLEANUP: Removing Test Endpoints
+========================================
+
+--- Deleting Test Endpoints (Cascade Delete) ---
+    📋 → DELETE http://localhost:6000/scim/admin/endpoints/cmliotfgz019d128vwurivo17
+    📋 ← Response: ""
+  ✅ Deleted Main Test Endpoint
+    📋 → DELETE http://localhost:6000/scim/admin/endpoints/cmliotgcl01bm128v331k664y
+    📋 ← Response: ""
+  ✅ Deleted No Flag Endpoint
+    📋 → DELETE http://localhost:6000/scim/admin/endpoints/cmliotgkj01cj128vkjq1rd0x
+    📋 ← Response: ""
+  ✅ Deleted Remove Flag Endpoint
+    📋 → DELETE http://localhost:6000/scim/admin/endpoints/cmliotgps01d2128vjyx2nfaf
+    📋 ← Response: ""
+  ✅ Deleted Isolation Endpoint
+    📋 → DELETE http://localhost:6000/scim/admin/endpoints/cmliotgrl01d8128vn4wjb111
+    📋 ← Response: ""
+  ✅ Deleted Inactive Endpoint
+
+
+========================================
+FINAL TEST SUMMARY
+========================================
+Tests Passed: 183
+Tests Failed: 0
+Total Tests:  183
+Duration:     3s
+    📋 Base URL: http://localhost:6000
+
+🎉 ALL TESTS PASSED!
+
+========================================
+

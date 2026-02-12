@@ -1,13 +1,13 @@
-# Visual Studio — Debugging Node (SCIMTool API) Quickstart
+# Visual Studio ï¿½ Debugging Node (SCIMTool API) Quickstart
 
 This snippet shows exact Visual Studio 2022 menu steps and sample attach settings to debug the `api` Node process locally or inside Docker using the Node inspector (port 9229).
 
 Prerequisites
 - Visual Studio 2022 with **Node.js development** workload installed.
 - Docker Desktop (if debugging inside container).
-- Node.js 18+ installed (for local runs).
+- Node.js 22+ installed (for local runs).
 
-Option A — Debug the API script directly from Visual Studio (recommended)
+Option A ï¿½ Debug the API script directly from Visual Studio (recommended)
 1. Open Visual Studio 2022.
 2. `File ? Open ? Folder...` and choose the repository root (contains the `api/` folder).
 3. In Solution Explorer expand `api/package.json` and view `Scripts`.
@@ -16,7 +16,7 @@ Option A — Debug the API script directly from Visual Studio (recommended)
 5. Set breakpoints in TypeScript files under `api/src` (e.g., `admin.controller.ts`).
 6. Make HTTP requests to `http://localhost:3000/scim/v2/...` to trigger the breakpoints.
 
-Option B — Start Node with inspector and Attach to Process
+Option B ï¿½ Start Node with inspector and Attach to Process
 (Local run)
 1. Open a terminal in the `api` directory.
 2. Start the server with inspector:

@@ -3,7 +3,7 @@
 > **Version**: 1.0  
 > **Date**: February 9, 2026  
 > **Status**: Current as-built architecture  
-> **Tech Stack**: NestJS 10 · TypeScript 5 · Prisma 5 · SQLite · React 18 · Vite 5 · Azure Container Apps
+> **Tech Stack**: NestJS 11 · TypeScript 5 · Prisma 6 · SQLite · React 18 · Vite 5 · Azure Container Apps
 
 ---
 
@@ -697,7 +697,7 @@ Azure Resource Group
 
 ```dockerfile
 # Multi-stage build (Dockerfile)
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 COPY api/package*.json ./
 RUN npm ci
@@ -705,7 +705,7 @@ COPY api/ .
 RUN npx prisma generate
 RUN npm run build
 
-FROM node:20-alpine
+FROM node:22-alpine
 WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules

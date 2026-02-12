@@ -1226,9 +1226,9 @@ describe('EndpointScimGroupsService', () => {
 
       it('should filter groups by externalId', async () => {
         const groupWithExt = { ...mockGroup, externalId: 'ext-123' };
-        const groupWithoutExt = { ...mockGroup, id: 'other-id', externalId: 'ext-999' };
-        // In-code filtering: DB returns all groups for endpoint, JS filters by externalId
-        mockPrismaService.scimGroup.findMany.mockResolvedValue([groupWithExt, groupWithoutExt]);
+        // DB push-down: externalId eq "ext-123" → Prisma where { externalId: 'ext-123' }
+        // The mock returns only the matching group (simulating DB-level filtering)
+        mockPrismaService.scimGroup.findMany.mockResolvedValue([groupWithExt]);
 
         const result = await service.listGroupsForEndpoint(
           { filter: 'externalId eq "ext-123"', startIndex: 1, count: 10 },
@@ -1238,18 +1238,12 @@ describe('EndpointScimGroupsService', () => {
 
         expect(result.totalResults).toBe(1);
         expect(result.Resources[0].externalId).toBe('ext-123');
-        // externalId should NOT be in DB where — filtering is in-code for case-insensitivity
+        // externalId eq is pushed to DB via the new filter parser
         expect(mockPrismaService.scimGroup.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
             where: expect.objectContaining({
               endpointId: mockEndpoint.id,
-            }),
-          })
-        );
-        expect(mockPrismaService.scimGroup.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.not.objectContaining({
-              externalId: expect.anything(),
+              externalId: 'ext-123',
             }),
           })
         );

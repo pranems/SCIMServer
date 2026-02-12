@@ -1,5 +1,7 @@
 # Endpoint-Specific Behavior Strategies: Complete Comparison
 
+> ⚠️ **DESIGN EXPLORATION** — This document compares architectural patterns for future extensibility. The current implementation uses **Config-Driven Conditionals** (simple flag checks). No other pattern has been implemented.
+
 > **Document Purpose**: Guide for implementing config-driven endpoint behavior variations in the SCIM Tool.
 > 
 > **Created**: February 3, 2026

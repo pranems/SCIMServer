@@ -1,0 +1,603 @@
+
+=== STEP 1: Get OAuth Token ===
+? Token obtained: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+
+
+========================================
+TEST SECTION 1: ENDPOINT CRUD OPERATIONS
+========================================
+
+--- Test: Create Endpoint ---
+? Create endpoint returned ID: cmliv1h0o0001rlegx2vw5mmv
+? New endpoint is active by default
+? scimEndpoint URL is correct
+
+--- Test: Get Endpoint by ID ---
+? Get endpoint by ID returns correct data
+
+--- Test: Get Endpoint by Name ---
+? Get endpoint by name returns correct data
+
+--- Test: List Endpoints ---
+? List endpoints returns array with items
+
+--- Test: Update Endpoint ---
+? Update endpoint displayName works
+? Update endpoint description works
+
+--- Test: Get Endpoint Stats ---
+? Stats includes totalUsers
+? Stats includes totalGroups
+
+
+========================================
+TEST SECTION 2: CONFIG VALIDATION
+========================================
+
+--- Test: Invalid Config Value Rejected on Create ---
+? Invalid config 'Yes' rejected with 400 Bad Request
+
+--- Test: Invalid Config Value Rejected on Update ---
+? Invalid config 'enabled' rejected with 400 Bad Request
+
+--- Test: Valid Config Values Accepted ---
+? Valid config 'False' accepted
+? Boolean true accepted as config value
+
+--- Test: Invalid Remove Config Value Rejected on Create ---
+? Invalid remove config 'Yes' rejected with 400 Bad Request
+
+--- Test: Invalid Remove Config Value Rejected on Update ---
+? Invalid remove config 'enabled' rejected with 400 Bad Request
+
+--- Test: Valid Remove Config Values Accepted ---
+? Valid remove config 'False' accepted
+
+--- Test: Both Config Flags Set Together ---
+? Both add and remove config flags set together
+
+--- Test: Invalid VerbosePatchSupported Config Value Rejected ---
+? Invalid VerbosePatchSupported 'Yes' rejected with 400 Bad Request
+
+--- Test: Valid VerbosePatchSupported Config Value Accepted ---
+? VerbosePatchSupported boolean true accepted
+
+--- Test: All Three Config Flags Set Together ---
+? All three config flags set together
+
+
+========================================
+TEST SECTION 3: SCIM USER OPERATIONS
+========================================
+
+--- Test: Create User ---
+? Create user returned ID: 5c0eb2e1-68a7-4fa4-98df-10c390f25b7d
+? User userName is correct
+? User meta.resourceType is 'User'
+? User meta.location is present
+? User meta.location contains correct path
+? User meta.created is present
+? User meta.lastModified is present
+
+--- Test: Get User by ID ---
+? Get user by ID returns correct data
+
+--- Test: List Users ---
+? List users returns at least 1 user
+? List users has correct schema
+
+--- Test: Filter Users by userName ---
+? Filter by userName returns exactly 1 user
+
+--- Test: PATCH User ---
+? PATCH user displayName works
+
+--- Test: PUT User (Replace) ---
+? PUT user (replace) works
+
+--- Test: Deactivate User (Soft Delete) ---
+? Deactivate user (active=false) works
+
+
+========================================
+TEST SECTION 3b: CASE-INSENSITIVITY (RFC 7643)
+========================================
+
+--- Test: Case-Insensitive userName Uniqueness ---
+? UPPERCASE duplicate userName returns 409 (case-insensitive uniqueness)
+? Mixed-case duplicate userName returns 409
+
+--- Test: Case-Insensitive Filter Attribute Names ---
+? Filter with 'USERNAME' (uppercase) finds user
+? Filter with 'UserName' (PascalCase) finds user
+
+--- Test: Case-Insensitive Filter Value (userName) ---
+? Filter with UPPERCASE value finds user (case-insensitive)
+
+--- Test: PascalCase PATCH op Values ---
+? PATCH with 'Replace' (PascalCase op) works
+? PATCH with 'Add' (PascalCase op) works
+
+
+========================================
+TEST SECTION 3c: ADVANCED PATCH OPERATIONS
+========================================
+
+--- Test: PATCH with No Path (Merge) ---
+? PATCH with no path merges displayName
+? PATCH with no path merges active
+
+--- Test: No-Path PATCH with Case-Insensitive Keys ---
+? No-path PATCH with 'DisplayName' (PascalCase key) works
+
+--- Test: PATCH with valuePath ---
+? PATCH with valuePath updates emails[type eq work].value
+? valuePath PATCH does not affect other email entries
+
+--- Test: PATCH with Extension URN Path ---
+? PATCH with extension URN path sets department
+? PATCH with extension URN replace updates department
+
+--- Test: Manager Empty-Value Removal (RFC 7644 3.5.2.3) ---
+? Manager set successfully via extension URN
+? Manager removed when value is empty string (RFC 7644 3.5.2.3)
+
+--- Test: Multiple Operations in Single PATCH ---
+? Multi-op PATCH: displayName updated
+? Multi-op PATCH: active set to false
+? Multi-op PATCH: title added
+
+
+========================================
+TEST SECTION 3d: PAGINATION & ADVANCED FILTERING
+========================================
+
+--- Setup: Create Users for Pagination ---
+  Created pagination user 1 : 25db73dd-970a-4763-9205-0ee538d63ddb
+  Created pagination user 2 : f86d6deb-889a-4d71-a2ca-e22977ba6b30
+  Created pagination user 3 : a8c47bc5-ae3a-4c28-b5ea-44bbca0d0c91
+
+--- Test: Pagination with count ---
+? Pagination: itemsPerPage matches count=2
+? Pagination: totalResults >= 4 (all users)
+? Pagination: Resources array has 2 items
+
+--- Test: Pagination with startIndex ---
+? Pagination: startIndex=2 reflected in response
+? Pagination: startIndex+count returns correct page size
+
+--- Test: Filter by externalId ---
+? Filter by externalId returns exactly 1 user
+? Filtered user has correct externalId
+? Filter with 'EXTERNALID' (uppercase attr) finds user
+
+--- Test: externalId Uniqueness ---
+? Duplicate externalId returns 409 Conflict
+
+
+========================================
+TEST SECTION 4: SCIM GROUP OPERATIONS
+========================================
+
+--- Test: Create Group ---
+? Create group returned ID: 99dcb0d6-3f0f-40a0-a84b-794aa4b77af8
+? Group displayName is correct
+? Group meta.resourceType is 'Group'
+? Group meta.location is present
+? Group meta.location contains correct path
+? Group meta.created is present
+
+--- Test: Get Group by ID ---
+? Get group by ID returns correct data
+
+--- Test: List Groups ---
+? List groups returns at least 1 group
+
+--- Test: PATCH Group (Add Member) ---
+? Group PATCH returns response body (not 204)
+? PATCH add member works
+
+--- Test: PATCH Group (Remove Member) ---
+? Group PATCH remove returns response body
+? PATCH remove member works
+
+--- Test: PUT Group (Replace) ---
+? PUT group (replace) works
+
+--- Test: Group externalId Support ---
+? Group created with externalId
+? Filter groups by externalId returns exactly 1 group
+? Duplicate group externalId returns 409 Conflict
+
+
+========================================
+TEST SECTION 5: MULTI-MEMBER PATCH CONFIG FLAG
+========================================
+
+--- Create Additional Users for Multi-Member Test ---
+Created user 2 : 5a35eca5-537e-4ab9-889c-84c6ca530988
+Created user 3 : e61708e9-08bb-4d5d-8433-d8b751f1a9e8
+
+--- Test: Multi-Member PATCH with Flag=True ---
+? Multi-member PATCH with flag=True accepted (3 members added)
+
+--- Create Endpoint Without Flag ---
+
+--- Test: Multi-Member ADD PATCH without Flag (Should Fail) ---
+? Multi-member ADD without flag rejected with 400 Bad Request
+
+
+========================================
+TEST SECTION 5b: MULTI-MEMBER REMOVE CONFIG FLAG
+========================================
+
+--- Setup: Add Members Individually for Remove Test ---
+Group has 3 members before remove test
+
+--- Test: Multi-Member REMOVE without Flag (Should Fail) ---
+? Multi-member REMOVE without flag rejected with 400 Bad Request
+
+--- Test: Multi-Member REMOVE with Flag=True ---
+? Multi-member REMOVE with flag=True accepted (removed 2 members)
+
+
+========================================
+TEST SECTION 6: ENDPOINT ISOLATION
+========================================
+
+--- Create Second Endpoint for Isolation Test ---
+
+--- Test: Same userName in Different Endpoints ---
+? Same userName created in different endpoint (isolation works)
+
+--- Test: Endpoint Data Isolation ---
+? Endpoints have isolated user data
+
+
+========================================
+TEST SECTION 7: INACTIVE ENDPOINT BLOCKING
+========================================
+
+--- Create Endpoint for Inactive Testing ---
+Created test user: 1386dd3c-bb54-41c1-98a2-b09f36e8c78c
+
+--- Deactivate Endpoint ---
+? Endpoint deactivated successfully
+
+--- Test: SCIM Operations Return 403 on Inactive Endpoint ---
+? GET User returns 403 on inactive endpoint
+? POST User returns 403 on inactive endpoint
+? GET Groups returns 403 on inactive endpoint
+? Inactive endpoint appears in active=false filter
+
+--- Test: Reactivate Endpoint ---
+? Endpoint reactivated successfully
+? GET User works after reactivation
+
+
+========================================
+TEST SECTION 8: SCIM DISCOVERY ENDPOINTS
+========================================
+
+--- Test: ServiceProviderConfig ---
+? ServiceProviderConfig has correct schema
+
+--- Test: Schemas ---
+? Schemas endpoint returns schemas
+
+--- Test: ResourceTypes ---
+? ResourceTypes endpoint returns resource types
+
+
+========================================
+TEST SECTION 8b: CONTENT-TYPE & AUTH VERIFICATION
+========================================
+
+--- Test: Response Content-Type Header ---
+? Response Content-Type is application/scim+json (application/scim+json; charset=utf-8)
+? POST response Content-Type is application/scim+json
+? POST response status code is 201 Created
+
+--- Test: Missing Auth Token  401 ---
+? Missing Authorization header returns 401
+
+--- Test: Invalid Auth Token  401 ---
+? Invalid Bearer token returns 401
+
+--- Test: Token Without Bearer Prefix  401 ---
+? Token without 'Bearer ' prefix returns 401
+
+
+========================================
+TEST SECTION 9: ERROR HANDLING
+========================================
+
+--- Test: 404 for Non-Existent User ---
+? Non-existent user returns 404
+
+--- Test: 404 for Non-Existent Group ---
+? Non-existent group returns 404
+
+--- Test: 404 for Non-Existent Endpoint ---
+? Non-existent endpoint returns 404
+
+--- Test: 400 for Invalid Endpoint Name ---
+? Invalid endpoint name returns 400 Bad Request
+
+
+========================================
+TEST SECTION 9b: RFC 7644 COMPLIANCE CHECKS
+========================================
+
+--- Test: Location Header on POST /Users (RFC 7644 3.1) ---
+? POST /Users returns 201 Created
+? POST /Users includes Location header
+? Location header matches meta.location
+
+--- Test: Location Header on POST /Groups (RFC 7644 3.1) ---
+? POST /Groups returns 201 Created
+? POST /Groups includes Location header
+? Location header matches meta.location
+
+--- Test: Error Response Format (RFC 7644 3.12) ---
+? Error returns 404 status code
+? Error Content-Type is application/scim+json
+? Error has SCIM Error schema
+? Error status is string type: '404'
+? Error status value is '404'
+? Error includes detail message
+
+--- Test: 409 Error Response Format ---
+? Duplicate returns 409
+? 409 error Content-Type is application/scim+json
+? 409 error status is string '409'
+
+--- Test: PATCH Updates meta.lastModified ---
+? PATCH updates meta.lastModified timestamp
+? GET does not change meta.lastModified
+
+
+========================================
+TEST SECTION 9c: POST /.search (RFC 7644 3.4.3)
+========================================
+
+--- Test: POST /Users/.search Basic ---
+? POST /Users/.search returns ListResponse schema
+? POST /Users/.search finds user via filter
+? POST /Users/.search includes startIndex
+? POST /Users/.search includes itemsPerPage
+
+--- Test: POST /Users/.search Returns HTTP 200 ---
+? POST /Users/.search returns HTTP 200 (not 201)
+? POST /Users/.search Content-Type is application/scim+json
+
+--- Test: POST /Users/.search with Attributes ---
+? POST /.search with attributes includes userName
+? POST /.search always returns id (always-returned)
+? POST /.search always returns schemas (always-returned)
+? POST /.search with attributes excludes non-requested attrs (emails)
+
+--- Test: POST /Users/.search with excludedAttributes ---
+? POST /.search with excludedAttributes keeps userName
+? POST /.search with excludedAttributes removes emails
+
+--- Test: POST /Users/.search Without Filter ---
+? POST /Users/.search without filter lists users
+? POST /Users/.search respects count parameter
+
+--- Test: POST /Groups/.search Basic ---
+? POST /Groups/.search returns ListResponse schema
+? POST /Groups/.search finds group via filter
+
+--- Test: POST /Groups/.search with excludedAttributes ---
+? POST /Groups/.search excludedAttributes removes members
+? POST /Groups/.search excludedAttributes keeps displayName
+
+
+========================================
+TEST SECTION 9d: ATTRIBUTE PROJECTION (RFC 7644 3.4.2.5)
+========================================
+
+--- Test: GET /Users with attributes Param ---
+? GET /Users?attributes works
+? attributes param includes userName
+? attributes param always returns id
+? attributes param always returns schemas
+? attributes param excludes non-requested emails
+? attributes param excludes non-requested active
+
+--- Test: GET /Users/:id with attributes Param ---
+? GET User by ID with attributes includes userName
+? GET User by ID with attributes always returns id
+? GET User by ID with attributes always returns meta
+? GET User by ID with attributes excludes displayName
+
+--- Test: GET /Users with excludedAttributes Param ---
+? excludedAttributes keeps userName
+? excludedAttributes always keeps id
+? excludedAttributes removes emails
+? excludedAttributes removes phoneNumbers
+
+--- Test: GET /Users/:id with excludedAttributes ---
+? GET User excludedAttributes keeps userName
+? GET User excludedAttributes removes name
+? GET User excludedAttributes removes emails
+? GET User excludedAttributes always keeps id (never excluded)
+? GET User excludedAttributes always keeps schemas (never excluded)
+
+--- Test: GET /Groups with attributes Param ---
+? GET /Groups attributes includes displayName
+? GET /Groups attributes always returns id
+? GET /Groups attributes excludes non-requested members
+
+--- Test: GET /Groups/:id with excludedAttributes ---
+? GET Group excludedAttributes keeps displayName
+? GET Group excludedAttributes removes members
+
+--- Test: attributes Precedence Over excludedAttributes ---
+? Precedence test: attributes includes userName
+? Precedence test: attributes wins - displayName included despite excludedAttributes
+
+
+========================================
+TEST SECTION 9e: ETag & CONDITIONAL REQUESTS (RFC 7644 3.14)
+========================================
+
+--- Test: ETag Header on GET /Users/:id ---
+? GET /Users/:id includes ETag header
+? ETag is a weak ETag (W/"...") format: W/"2026-02-12T02:49:28.243Z"
+? meta.version matches ETag header value
+
+--- Test: ETag Header on GET /Groups/:id ---
+? GET /Groups/:id includes ETag header
+? Group ETag is weak ETag format
+
+--- Test: If-None-Match  304 Not Modified ---
+? If-None-Match with matching ETag returns 304 Not Modified
+
+--- Test: If-None-Match with Stale ETag  200 ---
+? If-None-Match with stale ETag returns 200 with full resource
+
+--- Test: ETag Changes After PATCH ---
+? PATCH response includes ETag header
+? ETag changed after PATCH (before: W/"2026-02-12T02:49:28.243Z", after: W/"2026-02-12T02:49:30.776Z")
+
+--- Test: Old ETag After Modification  200 ---
+? Old ETag after modification returns 200 (resource changed)
+
+--- Test: POST /Users Includes ETag ---
+? POST /Users response includes ETag header
+? POST /Users returns 201 with ETag
+
+--- Test: PUT /Users Includes ETag ---
+? PUT /Users response includes ETag header
+
+--- Test: ServiceProviderConfig etag.supported ---
+? ServiceProviderConfig etag.supported = true
+
+
+========================================
+TEST SECTION 9f: PatchOpAllowRemoveAllMembers FLAG
+========================================
+
+--- Setup: Endpoint with PatchOpAllowRemoveAllMembers=False ---
+
+--- Test: Blanket Remove All Members Blocked (Flag=False) ---
+? Blanket remove all members blocked with 400 when PatchOpAllowRemoveAllMembers=False
+? Members still intact after blocked blanket remove (2 members)
+
+--- Test: Targeted Remove Still Works (Flag=False) ---
+? Targeted remove with filter works when flag=False (1 member left)
+
+--- Test: Default Behavior (Flag Not Set  Allow Blanket Remove) ---
+? Blanket remove allowed by default (PatchOpAllowRemoveAllMembers defaults to true)
+
+
+========================================
+TEST SECTION 9g: FILTER OPERATORS (co, sw, pr, and)
+========================================
+
+--- Test: Filter 'co' (contains) Operator ---
+? Filter 'co' (contains) finds users with 'livetest' in userName (found 3)
+? Filter 'co' is case-insensitive (LIVETEST finds same users)
+
+--- Test: Filter 'sw' (startsWith) Operator ---
+? Filter 'sw' (startsWith) finds users starting with 'pagination' (found 3)
+? Filter 'sw' returns 0 results for non-matching prefix
+
+--- Test: Filter 'pr' (presence) Operator ---
+? Filter 'pr' (presence) finds users with externalId present (found 3)
+? Filter 'pr' on displayName finds users with displayName present
+
+--- Test: Compound 'and' Filter ---
+? Compound 'and' filter works (userName sw + active eq true, found 3)
+? Compound 'and' filter returns 0 when second condition fails (active=false)
+
+--- Test: Group displayName Filter with 'co' ---
+? Group displayName 'co' filter finds groups containing 'Test' (found 3)
+
+
+========================================
+TEST SECTION 9h: EDGE CASES
+========================================
+
+--- Test: PATCH with Empty Operations Array ---
+? PATCH with empty Operations array returns 400 (strict validation)
+
+--- Test: Remove Non-Existent Attribute (Silent Success) ---
+? Remove non-existent attribute (nickName) succeeds silently
+
+--- Test: PATCH 'add' with No Path (Merge) ---
+? PATCH 'add' with no path merges displayName
+? PATCH 'add' with no path merges title
+
+--- Test: Filter on Non-Existent Attribute ---
+? Filter on non-existent attribute value returns 0 results
+
+--- Test: ServiceProviderConfig Detail Validation ---
+? ServiceProviderConfig includes patch capability
+? ServiceProviderConfig patch.supported = true
+? ServiceProviderConfig includes filter capability
+? ServiceProviderConfig filter.supported = true
+? ServiceProviderConfig includes bulk capability
+? ServiceProviderConfig includes changePassword capability
+? ServiceProviderConfig includes sort capability
+
+
+========================================
+TEST SECTION 9i: VerbosePatchSupported DOT-NOTATION
+========================================
+
+--- Setup: Endpoint with VerbosePatchSupported=True ---
+
+--- Test: Dot-Notation PATCH (name.givenName) ---
+? Dot-notation PATCH name.givenName resolves to nested object
+? Dot-notation PATCH does not affect sibling property (familyName unchanged)
+
+--- Test: Dot-Notation PATCH 'add' (name.middleName) ---
+? Dot-notation 'add' sets name.middleName in nested object
+
+--- Test: Dot-Notation PATCH 'remove' (name.middleName) ---
+? Dot-notation 'remove' deletes name.middleName from nested object
+
+--- Test: Known SCIM Complex Attribute Paths Work Without Flag ---
+? Standard SCIM complex attribute paths (name.givenName) work without VerbosePatchSupported
+
+
+========================================
+TEST SECTION 10: DELETE OPERATIONS
+========================================
+
+--- Test: Delete User ---
+? DELETE user works (returns 204, user not found after)
+
+--- Test: Delete Group ---
+? DELETE group works
+
+
+========================================
+CLEANUP: Removing Test Endpoints
+========================================
+
+--- Deleting Test Endpoints (Cascade Delete) ---
+  ? Deleted Main Test Endpoint
+  ? Deleted No Flag Endpoint
+  ? Deleted Remove Flag Endpoint
+  ? Deleted Isolation Endpoint
+  ? Deleted Inactive Endpoint
+  ? Deleted No Remove All Endpoint
+  ? Deleted Verbose Patch Endpoint
+
+
+========================================
+FINAL TEST SUMMARY
+========================================
+Tests Passed: 212
+Tests Failed: 0
+Total Tests:  212
+Duration:     4.9s
+
+?? ALL TESTS PASSED!
+
+========================================
+
