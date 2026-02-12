@@ -1,4 +1,4 @@
-﻿import { Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import * as crypto from 'node:crypto';
@@ -25,13 +25,13 @@ import { OAuthService } from './oauth.service';
 
           return {
             secret: generated,
-            signOptions: { issuer: 'scimtool-oauth-server' }
+            signOptions: { issuer: 'scimserver-oauth-server' }
           };
         }
 
         return {
           secret,
-          signOptions: { issuer: 'scimtool-oauth-server' }
+          signOptions: { issuer: 'scimserver-oauth-server' }
         };
       },
     }),

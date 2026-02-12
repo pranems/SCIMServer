@@ -148,7 +148,7 @@
 | `pr` | Present (has value) | `externalId pr` |
 | `and` / `or` / `not` | Logical operators | `userName eq "a" and active eq true` |
 
-> **SCIMTool note:** `eq` is fully implemented with case-insensitive matching. Other operators have limited support.
+> **SCIMServer note:** `eq` is fully implemented with case-insensitive matching. Other operators have limited support.
 
 ---
 
@@ -270,7 +270,7 @@ Common status codes: `400` (Bad Request), `401` (Unauthorized), `403` (Forbidden
 ```bash
 # Get OAuth token
 TOKEN=$(curl -s -X POST http://localhost:6000/scim/oauth/token \
-  -d "client_id=scimtool-client&client_secret=changeme-oauth&grant_type=client_credentials" \
+  -d "client_id=scimserver-client&client_secret=changeme-oauth&grant_type=client_credentials" \
   | jq -r '.access_token')
 
 # Create user

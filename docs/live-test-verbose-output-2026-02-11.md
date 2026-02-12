@@ -1,4 +1,4 @@
-# 🧪 SCIM Tool — Verbose Live Test Report
+# 🧪 SCIM Server — Verbose Live Test Report
 
 > **Date:** February 11, 2026  
 > **Target:** `http://localhost:6000`  
@@ -45,7 +45,7 @@
 **Request:**
 ```http
 POST http://localhost:6000/scim/oauth/token
-Body: {"grant_type":"client_credentials","client_secret":"changeme-oauth","client_id":"scimtool-client"}
+Body: {"grant_type":"client_credentials","client_secret":"changeme-oauth","client_id":"scimserver-client"}
 ```
 
 **Response:**

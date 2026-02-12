@@ -122,7 +122,7 @@ export const ManualProvision: React.FC = () => {
         <div className={styles.infoBox}>
           <h3>🔑 Understanding SCIM Identifiers</h3>
           <p>
-            <strong>SCIMTool uses this logic:</strong> If <code>externalId</code> is provided, it becomes the unique identifier. 
+            <strong>SCIMServer uses this logic:</strong> If <code>externalId</code> is provided, it becomes the unique identifier. 
             Otherwise, <code>userName</code> is used as the identifier.
           </p>
           <details className={styles.helpDetails}>
@@ -150,7 +150,7 @@ export const ManualProvision: React.FC = () => {
               </ul>
 
               <p>
-                <a href="https://github.com/kayasax/SCIMTool/blob/master/docs/COLLISION-TESTING-GUIDE.md" target="_blank" rel="noopener noreferrer">
+                <a href="https://github.com/kayasax/SCIMServer/blob/master/docs/COLLISION-TESTING-GUIDE.md" target="_blank" rel="noopener noreferrer">
                   📚 Full collision testing guide
                 </a>
               </p>

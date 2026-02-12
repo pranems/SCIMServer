@@ -4,7 +4,7 @@
 === STEP 1: Get OAuth Token ===
     📋 Token endpoint: http://localhost:6000/scim/oauth/token
     📋 → POST http://localhost:6000/scim/oauth/token
-    📋   Body: {"grant_type":"client_credentials","client_secret":"changeme-oauth","client_id":"scimtool-client"}
+    📋   Body: {"grant_type":"client_credentials","client_secret":"changeme-oauth","client_id":"scimserver-client"}
     📋 ← Response: {"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzY2ltdG9vbC1jbGllbnQiLCJjbGllbnRfaWQiOiJzY2ltdG9vbC1jbGllbnQiLCJzY29wZSI6InNjaW0ucmVhZCBzY2ltLndyaXRlIHNjaW0ubWFuYWdlIiwidG9rZW5fdHlwZSI6ImFjY2Vzc190b2tlbiIsImlhdCI6MTc3MDg1NDExNCwiZXhwIjoxNzcwODU3NzE0LCJpc3MiOiJzY2ltdG9vbC1vYXV0aC1...
 ✅ Token obtained: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
     📋 Token expires_in: 3600s

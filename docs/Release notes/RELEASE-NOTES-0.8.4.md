@@ -1,4 +1,4 @@
-# SCIMTool v0.8.4 – Enable Blob Snapshot Persistence
+# SCIMServer v0.8.4 – Enable Blob Snapshot Persistence
 
 ## Summary
 Adds the `@azure/identity` dependency required for managed identity authentication so blob backup mode actually activates. Improves backup diagnostics by making mode visible in UI (from prior commit) and ensuring snapshots will now upload.
@@ -10,12 +10,12 @@ Adds the `@azure/identity` dependency required for managed identity authenticati
 
 ## Upgrade
 ```
-iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMTool/master/scripts/update-scimtool-direct.ps1'); Update-SCIMToolDirect -Version v0.8.4 -ResourceGroup <rg> -AppName <app> -NoPrompt -ShowCurrent
+iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMServer/master/scripts/update-scimserver-direct.ps1'); Update-SCIMServerDirect -Version v0.8.4 -ResourceGroup <rg> -AppName <app> -NoPrompt -ShowCurrent
 ```
 
 ## Verification
 After deploy, check logs for:
-`Blob backup mode enabled → container: scimtool-backups`
+`Blob backup mode enabled → container: scimserver-backups`
 Then within 1–5 minutes: `Uploaded blob snapshot: scim-...db`
 
 ## Notes

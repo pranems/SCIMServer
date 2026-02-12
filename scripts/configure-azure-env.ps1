@@ -1,20 +1,20 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Configure Azure environment variables for SCIMTool image auto-detection.
+    Configure Azure environment variables for SCIMServer image auto-detection.
 
 .DESCRIPTION
     Sets SCIM_RG, SCIM_APP, and AZURE_SUBSCRIPTION_ID environment variables
     in the Container App to enable auto-detection of the current image tag.
 
 .PARAMETER ResourceGroup
-    Azure Resource Group name (e.g., "RG-SCIMTOOL")
+    Azure Resource Group name (e.g., "RG-SCIMSERVER")
 
 .PARAMETER AppName
-    Azure Container App name (e.g., "scimtool")
+    Azure Container App name (e.g., "scimserver")
 
 .EXAMPLE
-    .\scripts\configure-azure-env.ps1 -ResourceGroup "RG-SCIMTOOL" -AppName "scimtool"
+    .\scripts\configure-azure-env.ps1 -ResourceGroup "RG-SCIMSERVER" -AppName "scimserver"
 #>
 
 [CmdletBinding()]

@@ -1,5 +1,5 @@
-﻿#############################
-# Optimized Multi-stage Docker build for SCIMTool
+#############################
+# Optimized Multi-stage Docker build for SCIMServer
 # Target: Reduce image size from 1GB+ to <300MB
 #############################
 

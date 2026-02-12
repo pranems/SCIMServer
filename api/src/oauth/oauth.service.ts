@@ -1,4 +1,4 @@
-﻿import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'node:crypto';
@@ -31,7 +31,7 @@ export class OAuthService {
     private readonly jwtService: JwtService,
     private readonly config: ConfigService
   ) {
-    const defaultClientId = this.config.get<string>('OAUTH_CLIENT_ID') || 'scimtool-client';
+    const defaultClientId = this.config.get<string>('OAUTH_CLIENT_ID') || 'scimserver-client';
     const configuredSecret = this.config.get<string>('OAUTH_CLIENT_SECRET');
     const configuredScopes = this.config.get<string>('OAUTH_CLIENT_SCOPES');
 

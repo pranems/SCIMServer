@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import styles from './ActivityFeed.module.css';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -51,18 +51,18 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ hideKeepalive, onHid
   const storeLastActivityId = (id: string) => {
     setLastActivityId(id);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('scimtool-last-activity-id', id);
+      localStorage.setItem('scimserver-last-activity-id', id);
     }
   };
 
   const getStoredLastActivityId = () => {
     if (typeof window === 'undefined') return lastActivityId;
-    const stored = localStorage.getItem('scimtool-last-activity-id');
+    const stored = localStorage.getItem('scimserver-last-activity-id');
     return stored || lastActivityId;
   };
 
   const updateTabTitle = (count: number) => {
-    const baseTitle = 'SCIMTool - SCIM 2.0 Provisioning Monitor';
+    const baseTitle = 'SCIMServer - SCIM 2.0 Provisioning Monitor';
 
     if (count > 0) {
       const newTitle = `(${count}) ${baseTitle}`;
@@ -275,7 +275,7 @@ export const ActivityFeed: React.FC<ActivityFeedProps> = ({ hideKeepalive, onHid
   // Initialize stored activity ID on component mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const stored = localStorage.getItem('scimtool-last-activity-id');
+    const stored = localStorage.getItem('scimserver-last-activity-id');
     if (stored && !lastActivityId) {
       setLastActivityId(stored);
     }

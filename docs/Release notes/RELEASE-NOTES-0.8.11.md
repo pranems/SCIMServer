@@ -1,4 +1,4 @@
-# SCIMTool v0.8.11 – Direct Update Secret Automation
+# SCIMServer v0.8.11 – Direct Update Secret Automation
 
 ## Highlights
 - PowerShell direct-update script now provisions `jwt-secret` and `oauth-client-secret` automatically when missing, ensuring upgrades succeed without manual Container Apps edits.
@@ -7,7 +7,7 @@
 
 ## Upgrade Command
 ```powershell
-iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMTool/master/scripts/update-scimtool-direct.ps1'); Update-SCIMToolDirect -Version v0.8.11 -ResourceGroup <rg> -AppName <app> -NoPrompt
+iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMServer/master/scripts/update-scimserver-direct.ps1'); Update-SCIMServerDirect -Version v0.8.11 -ResourceGroup <rg> -AppName <app> -NoPrompt
 ```
 
 ## Post-Upgrade Checklist

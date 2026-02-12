@@ -1,4 +1,4 @@
-# 🎉 SCIMTool v0.6.0 - Persistent Storage Support
+# 🎉 SCIMServer v0.6.0 - Persistent Storage Support
 
 This release adds **persistent storage** support to ensure your SCIM monitoring data survives container restarts and scale-to-zero events.
 
@@ -35,7 +35,7 @@ This release adds **persistent storage** support to ensure your SCIM monitoring 
 ```powershell
 .\scripts\deploy-azure-full.ps1 `
     -ResourceGroup "your-rg" `
-    -AppName "scimtool" `
+    -AppName "scimserver" `
     -Location "francecentral" `
     -ScimSecret "your-secret"
 ```
@@ -44,15 +44,15 @@ This release adds **persistent storage** support to ensure your SCIM monitoring 
 ```powershell
 .\scripts\add-persistent-storage.ps1 `
     -ResourceGroup "your-rg" `
-    -AppName "scimtool"
+    -AppName "scimserver"
 ```
 
 ### Manual Update to v0.6.0
 ```powershell
 az containerapp update `
-    --name "scimtool" `
+    --name "scimserver" `
     --resource-group "your-rg" `
-    --image "ghcr.io/kayasax/scimtool:0.6.0"
+    --image "ghcr.io/kayasax/scimserver:0.6.0"
 ```
 
 ## 💰 Cost Impact
@@ -70,7 +70,7 @@ Persistent storage adds approximately **$0.35/month**:
 
 ## 📦 Docker Image
 
-- **Registry**: `ghcr.io/kayasax/scimtool`
+- **Registry**: `ghcr.io/kayasax/scimserver`
 - **Tags**: `0.6.0`, `latest`
 - **Size**: ~380MB (optimized multi-stage build)
 
@@ -80,7 +80,7 @@ Persistent storage adds approximately **$0.35/month**:
 
 ## 📝 Full Changelog
 
-See the [commit history](https://github.com/kayasax/SCIMTool/compare/v0.5.0...v0.6.0) for detailed changes.
+See the [commit history](https://github.com/kayasax/SCIMServer/compare/v0.5.0...v0.6.0) for detailed changes.
 
 ---
 

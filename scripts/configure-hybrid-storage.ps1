@@ -1,14 +1,14 @@
-# Update SCIMTool Container App to use hybrid storage approach
+# Update SCIMServer Container App to use hybrid storage approach
 # This script updates the DATABASE_URL to point to local ephemeral storage
 # while keeping Azure Files mounted for backup purposes
 
 param(
-    [string]$ResourceGroup = "RG-FR-SCIMTOOL",
-    [string]$ContainerAppName = "scimtool-ms"
+    [string]$ResourceGroup = "RG-FR-SCIMSERVER",
+    [string]$ContainerAppName = "scimserver-ms"
 )
 
 Write-Host "╔════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║  SCIMTool - Hybrid Storage Configuration                  ║" -ForegroundColor Cyan
+Write-Host "║  SCIMServer - Hybrid Storage Configuration                  ║" -ForegroundColor Cyan
 Write-Host "╚════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
 Write-Host ""
 

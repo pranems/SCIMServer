@@ -3,7 +3,7 @@ param location string = resourceGroup().location
 @description('Globally unique storage account name (lowercase, 3-24 chars)')
 param storageAccountName string
 @description('Blob container name for SQLite snapshots')
-param containerName string = 'scimtool-backups'
+param containerName string = 'scimserver-backups'
 @description('Redundancy SKU')
 @allowed([
   'Standard_LRS'
@@ -43,7 +43,7 @@ resource account 'Microsoft.Storage/storageAccounts@2023-01-01' = {
     allowSharedKeyAccess: true // retained for general ops, not required for blob with MSI but harmless
   }
   tags: {
-    project: 'scimtool'
+    project: 'scimserver'
     component: 'blob-backup'
   }
 }
@@ -85,7 +85,7 @@ resource privateEndpoint 'Microsoft.Network/privateEndpoints@2023-09-01' = {
     ]
   }
   tags: {
-    project: 'scimtool'
+    project: 'scimserver'
     component: 'blob-pe'
   }
 }

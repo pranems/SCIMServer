@@ -1,5 +1,5 @@
-﻿#############################
-# Optimized multi-stage build for SCIMTool
+#############################
+# Optimized multi-stage build for SCIMServer
 # Target: Reduce image size from 1GB+ to <400MB
 #############################
 
@@ -105,6 +105,6 @@ CMD ["/app/docker-entrypoint.sh"]
 
 #############################
 # Build args (optional):
-#   docker build --build-arg APP_VERSION=1.0.0 --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) -t <registry>/scimtool:<tag> .
+#   docker build --build-arg APP_VERSION=1.0.0 --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) -t <registry>/scimserver:<tag> .
 # Extend NestJS to read APP_VERSION & GIT_COMMIT from env if desired.
 #############################

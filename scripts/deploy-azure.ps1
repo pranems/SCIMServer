@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$ResourceGroup,
     [string]$AppName,
     [string]$Location,
@@ -42,7 +42,7 @@ if ($BlobBackupAccount -notmatch '^[a-z0-9]{3,24}$') {
     Write-Host "   WARNING: Generated invalid storage account name; generating fallback" -ForegroundColor Yellow
     $BlobBackupAccount = "scim" + (Get-Random -Minimum 100000 -Maximum 999999)
 }
-if (-not $BlobBackupContainer) { $BlobBackupContainer = 'scimtool-backups' }
+if (-not $BlobBackupContainer) { $BlobBackupContainer = 'scimserver-backups' }
 
 # --- Interactive Fallback ----------------------------------------------------
 # Allow zero‑parameter one‑liner usage via: iex (irm <raw-url>/deploy-azure.ps1)
@@ -109,7 +109,7 @@ if (-not $AppName) {
         $existingApps | ForEach-Object { Write-Host "   • $_" -ForegroundColor Gray }
         if ($existingApps.Count -eq 1) {
             $defaultAppName = $existingApps[0]
-        } elseif ($AppName -like 'scimtool-app-*') {
+        } elseif ($AppName -like 'scimserver-app-*') {
             $defaultAppName = $existingApps[0]
         }
     }
@@ -186,7 +186,7 @@ Start-Sleep -Milliseconds 300
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "SCIMTool Full Deployment to Azure Container Apps (deploy-azure.ps1 v1.1)" -ForegroundColor Green
+Write-Host "SCIMServer Full Deployment to Azure Container Apps (deploy-azure.ps1 v1.1)" -ForegroundColor Green
 Write-Host "===================================================" -ForegroundColor Green
 Write-Host ""
 
@@ -247,7 +247,7 @@ Write-Host "   Environment: $envName" -ForegroundColor White
 Write-Host "   Virtual Network: $vnetName" -ForegroundColor White
 Write-Host "   Storage Account: $storageName" -ForegroundColor White
 Write-Host "   Log Analytics: $lawName" -ForegroundColor White
-Write-Host "   Image: ghcr.io/kayasax/scimtool:$ImageTag" -ForegroundColor White
+Write-Host "   Image: ghcr.io/kayasax/scimserver:$ImageTag" -ForegroundColor White
 Write-Host "   Persistence: Blob snapshots (Account=$BlobBackupAccount Container=$BlobBackupContainer)" -ForegroundColor Green
 Write-Host ""
 
@@ -568,7 +568,7 @@ if ($appExists) {
 
     # Check current image version
     $currentImage = az containerapp show --name $AppName --resource-group $ResourceGroup --query "properties.template.containers[0].image" --output tsv 2>$null
-    $desiredImage = "ghcr.io/kayasax/scimtool:$ImageTag"
+    $desiredImage = "ghcr.io/kayasax/scimserver:$ImageTag"
 
     Write-Host "      Current image: $currentImage" -ForegroundColor Gray
     Write-Host "      Desired image: $desiredImage" -ForegroundColor Gray
@@ -580,7 +580,7 @@ if ($appExists) {
         Write-Host "   🔄 Updating to new version..." -ForegroundColor Yellow
     }
 } else {
-    Write-Host "   Deploying SCIMTool container..." -ForegroundColor Yellow
+    Write-Host "   Deploying SCIMServer container..." -ForegroundColor Yellow
 }
 
 if (-not $skipAppDeployment) {
@@ -589,7 +589,7 @@ if (-not $skipAppDeployment) {
         environmentName = $envName
         location = $Location
         acrLoginServer = "ghcr.io"
-        image = "kayasax/scimtool:$ImageTag"
+        image = "kayasax/scimserver:$ImageTag"
         scimSharedSecret = $ScimSecret
         jwtSecret = $JwtSecret
         oauthClientSecret = $OauthClientSecret
@@ -600,7 +600,7 @@ if (-not $skipAppDeployment) {
     $containerParams.blobBackupContainerName = $BlobBackupContainer
 
     # Create a temporary parameters file to avoid escaping issues with special characters
-    $paramsFile = Join-Path ([System.IO.Path]::GetTempPath()) "scimtool-params-$(Get-Date -Format 'yyyyMMddHHmmss').json"
+    $paramsFile = Join-Path ([System.IO.Path]::GetTempPath()) "scimserver-params-$(Get-Date -Format 'yyyyMMddHHmmss').json"
     $paramsJson = @{
         '$schema' = 'https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#'
         contentVersion = '1.0.0.0'

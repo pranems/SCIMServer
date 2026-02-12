@@ -1,4 +1,4 @@
-﻿import { clearStoredToken, getStoredToken, notifyTokenInvalid } from '../auth/token';
+import { clearStoredToken, getStoredToken, notifyTokenInvalid } from '../auth/token';
 
 export interface RequestLogItem {
   id: string;
@@ -119,7 +119,7 @@ export interface RemoteManifest {
   latest: string; // semver or tag
   notes?: string;
   publishedAt?: string;
-  image?: string; // e.g. myacr.azurecr.io/scimtool:0.2.0
+  image?: string; // e.g. myacr.azurecr.io/scimserver:0.2.0
 }
 
 export async function fetchRemoteManifest(url: string): Promise<RemoteManifest> {

@@ -1,4 +1,4 @@
-// Virtual network + private DNS configuration for SCIMTool Azure Container Apps
+// Virtual network + private DNS configuration for SCIMServer Azure Container Apps
 
 @description('Deployment location')
 param location string = resourceGroup().location
@@ -64,7 +64,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
     ]
   }
   tags: {
-    project: 'scimtool'
+    project: 'scimserver'
     component: 'networking'
   }
 }
@@ -73,7 +73,7 @@ resource dnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
   name: privateDnsZoneName
   location: 'global'
   tags: {
-    project: 'scimtool'
+    project: 'scimserver'
     component: 'private-dns'
   }
 }

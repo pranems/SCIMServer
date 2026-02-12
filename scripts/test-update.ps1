@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Test a pre-release version of SCIMTool without affecting other users.
+    Test a pre-release version of SCIMServer without affecting other users.
 
 .DESCRIPTION
     This script deploys a test image from GHCR to your Azure Container App
@@ -39,7 +39,7 @@
 
 .EXAMPLE
     # Deploy to specific app with revision mode
-    .\scripts\test-update.ps1 -TestTag "test-paging" -ResourceGroup "scimtool-test-rg" -AppName "scimtool-test" -CreateRevision
+    .\scripts\test-update.ps1 -TestTag "test-paging" -ResourceGroup "scimserver-test-rg" -AppName "scimserver-test" -CreateRevision
 
 .EXAMPLE
     # Rollback to production latest
@@ -204,7 +204,7 @@ if ($currentImage) {
 # Build full image reference
 # Construct image reference
 $registry = "ghcr.io"
-$imageName = "kayasax/scimtool"
+$imageName = "kayasax/scimserver"
 $imageRef = "${registry}/${imageName}:${TestTag}"
 
 # Check if tag looks like a branch name and provide helpful hint
@@ -284,7 +284,7 @@ try {
 } catch {
     Write-Host "`n❌ Update failed: $_" -ForegroundColor Red
     Write-Host "`nTroubleshooting:" -ForegroundColor Yellow
-    Write-Host "  1. Verify image exists: https://github.com/kayasax/SCIMTool/pkgs/container/scimtool" -ForegroundColor Gray
+    Write-Host "  1. Verify image exists: https://github.com/kayasax/SCIMServer/pkgs/container/scimserver" -ForegroundColor Gray
     Write-Host "  2. Check Container App logs: az containerapp logs show -n $AppName -g $ResourceGroup --tail 50" -ForegroundColor Gray
     Write-Host "  3. Verify GHCR permissions: Image must be public or you need ghcr.io credentials" -ForegroundColor Gray
     exit 1

@@ -1,4 +1,4 @@
-# SCIMTool v0.8.10 – Runtime Secret Hardening
+# SCIMServer v0.8.10 – Runtime Secret Hardening
 
 ## Highlights
 - Enforces unique `JWT_SECRET` and `OAUTH_CLIENT_SECRET` values at deployment time; dev-only fallbacks log warnings instead of shipping baked credentials.
@@ -8,7 +8,7 @@
 
 ## Upgrade Command
 ```powershell
-iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMTool/master/scripts/update-scimtool-direct.ps1'); Update-SCIMToolDirect -Version v0.8.10 -ResourceGroup <rg> -AppName <app> -NoPrompt
+iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMServer/master/scripts/update-scimserver-direct.ps1'); Update-SCIMServerDirect -Version v0.8.10 -ResourceGroup <rg> -AppName <app> -NoPrompt
 ```
 
 ## Post-Upgrade Checklist

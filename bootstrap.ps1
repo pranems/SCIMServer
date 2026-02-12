@@ -1,15 +1,15 @@
 <#!
-SCIMTool bootstrap loader to fetch the latest setup.ps1 while aggressively bypassing CDN / proxy caches.
+SCIMServer bootstrap loader to fetch the latest setup.ps1 while aggressively bypassing CDN / proxy caches.
 Usage examples:
   # Always fetch latest master with cache-bust
-  iex (iwr https://raw.githubusercontent.com/kayasax/SCIMTool/master/bootstrap.ps1).Content
+  iex (iwr https://raw.githubusercontent.com/kayasax/SCIMServer/master/bootstrap.ps1).Content
 
   # Or explicitly call with -Branch and -NoCache
-  iwr https://raw.githubusercontent.com/kayasax/SCIMTool/master/bootstrap.ps1 | iex; Invoke-SCIMToolBootstrap -NoCache
+  iwr https://raw.githubusercontent.com/kayasax/SCIMServer/master/bootstrap.ps1 | iex; Invoke-SCIMServerBootstrap -NoCache
 
 Deterministic version (commit pin):
   $sha = '<<commit-sha>>'
-  iwr https://raw.githubusercontent.com/kayasax/SCIMTool/$sha/setup.ps1 | iex
+  iwr https://raw.githubusercontent.com/kayasax/SCIMServer/$sha/setup.ps1 | iex
 !#>
 param(
   [string]$Branch = 'master',
@@ -18,13 +18,13 @@ param(
   [switch]$VerboseHeaders
 )
 
-function Invoke-SCIMToolBootstrap {
+function Invoke-SCIMServerBootstrap {
   param([string]$Branch='master',[switch]$NoCache,[string]$CommitSha,[switch]$VerboseHeaders)
   if ($CommitSha) { $target = $CommitSha } else { $target = $Branch }
   $cb = if ($NoCache) { "?cb=" + [guid]::NewGuid().ToString('N') } else { '' }
-  $url = "https://raw.githubusercontent.com/kayasax/SCIMTool/$target/setup.ps1$cb"
+  $url = "https://raw.githubusercontent.com/kayasax/SCIMServer/$target/setup.ps1$cb"
   Write-Host "[Bootstrap] Fetching: $url" -ForegroundColor Cyan
-  $headers = @{ 'Pragma'='no-cache'; 'Cache-Control'='no-cache'; 'User-Agent'='SCIMToolBootstrap/1.0' }
+  $headers = @{ 'Pragma'='no-cache'; 'Cache-Control'='no-cache'; 'User-Agent'='SCIMServerBootstrap/1.0' }
   try {
     $resp = Invoke-WebRequest -Uri $url -Headers $headers -UseBasicParsing -ErrorAction Stop
     if ($VerboseHeaders) {
@@ -41,5 +41,5 @@ function Invoke-SCIMToolBootstrap {
 
 # Auto-run if this file was invoked directly (common iex pattern)
 if ($MyInvocation.InvocationName -ne '.') {
-  Invoke-SCIMToolBootstrap -Branch $Branch -NoCache:$NoCache -CommitSha $CommitSha -VerboseHeaders:$VerboseHeaders
+  Invoke-SCIMServerBootstrap -Branch $Branch -NoCache:$NoCache -CommitSha $CommitSha -VerboseHeaders:$VerboseHeaders
 }

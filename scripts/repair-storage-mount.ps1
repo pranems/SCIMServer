@@ -5,7 +5,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-Write-Host "SCIMTool Storage Mount Repair" -ForegroundColor Cyan
+Write-Host "SCIMServer Storage Mount Repair" -ForegroundColor Cyan
 Write-Host " RG  : $ResourceGroup" -ForegroundColor Gray
 Write-Host " App : $AppName" -ForegroundColor Gray
 
@@ -20,7 +20,7 @@ if ($storageName.Length -gt 24) {
     if ($storageName.Length -gt 24) { $storageName = $storageName.Substring(0,24) }
 }
 $envName = "$AppName-env"
-$fileShare = 'scimtool-data'
+$fileShare = 'scimserver-data'
 
 Write-Host " Derived Storage Account: $storageName" -ForegroundColor Gray
 Write-Host " Environment Name     : $envName" -ForegroundColor Gray
@@ -59,7 +59,7 @@ Write-Host "Updating environment storage credentials..." -ForegroundColor Cyan
 az containerapp env storage set `
   --name $envName `
   --resource-group $ResourceGroup `
-  --storage-name scimtool-storage `
+  --storage-name scimserver-storage `
   --azure-file-account-name $storageName `
   --azure-file-account-key $key `
   --azure-file-share-name $fileShare `
@@ -72,7 +72,7 @@ az containerapp restart -n $AppName -g $ResourceGroup -o none 2>$null
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Restart command not available or failed; triggering no-op revision update." -ForegroundColor Yellow
     $rand = Get-Random
-    az containerapp update -n $AppName -g $ResourceGroup --set-env-vars SCIMTOOL_REFRESH=$rand -o none
+    az containerapp update -n $AppName -g $ResourceGroup --set-env-vars SCIMSERVER_REFRESH=$rand -o none
 }
 
 Write-Host "Waiting 20s for restart..." -ForegroundColor Gray

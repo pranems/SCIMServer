@@ -1,6 +1,6 @@
-﻿[CmdletBinding()]
+[CmdletBinding()]
 param(
-  [string]$TunnelName = "scimtool",
+  [string]$TunnelName = "scimserver",
   [int]$Port = 3000,
   [switch]$AllowAnonymous,
   [switch]$SkipInstall,

@@ -63,7 +63,7 @@
         }
       },
       "tags": {
-        "project": "scimtool"
+        "project": "scimserver"
       },
       "dependsOn": [
         "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('lawName'))]"

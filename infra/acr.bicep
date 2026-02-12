@@ -1,5 +1,5 @@
-﻿// Azure Container Registry (ACR) for SCIMTool images
-// Provides a private registry to host and version SCIMTool containers
+// Azure Container Registry (ACR) for SCIMServer images
+// Provides a private registry to host and version SCIMServer containers
 // Parameters allow reuse across environments.
 
 param location string = resourceGroup().location

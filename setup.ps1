@@ -1,19 +1,19 @@
-# SCIMTool setup script (safe header, no BOM)
+# SCIMServer setup script (safe header, no BOM)
 $ErrorActionPreference = 'Stop'
 
 # Optional deterministic overrides via environment variables:
-#   SCIMTOOL_RG, SCIMTOOL_APP, SCIMTOOL_SECRET, SCIMTOOL_LOCATION, SCIMTOOL_IMAGETAG,
-#   SCIMTOOL_JWTSECRET, SCIMTOOL_OAUTHSECRET
+#   SCIMSERVER_RG, SCIMSERVER_APP, SCIMSERVER_SECRET, SCIMSERVER_LOCATION, SCIMSERVER_IMAGETAG,
+#   SCIMSERVER_JWTSECRET, SCIMSERVER_OAUTHSECRET
 # If provided, random generation is skipped.
 
 # Auto values (no prompts to avoid hanging under iex)
-if ($env:SCIMTOOL_LOCATION -and $env:SCIMTOOL_LOCATION.Trim().Length -gt 0) {
-	$Location = $env:SCIMTOOL_LOCATION
+if ($env:SCIMSERVER_LOCATION -and $env:SCIMSERVER_LOCATION.Trim().Length -gt 0) {
+	$Location = $env:SCIMSERVER_LOCATION
 } else {
 	$Location = 'eastus'
 }
-if ($env:SCIMTOOL_IMAGETAG -and $env:SCIMTOOL_IMAGETAG.Trim().Length -gt 0) {
-    $ImageTag = $env:SCIMTOOL_IMAGETAG
+if ($env:SCIMSERVER_IMAGETAG -and $env:SCIMSERVER_IMAGETAG.Trim().Length -gt 0) {
+    $ImageTag = $env:SCIMSERVER_IMAGETAG
 } else {
     $ImageTag = 'latest'
 }
@@ -74,35 +74,35 @@ function Get-ExistingAppCandidates {
 	return @($filtered | Sort-Object -Unique)
 }
 
-if ($env:SCIMTOOL_RG -and $env:SCIMTOOL_RG.Trim().Length -gt 0) {
-	$ResourceGroup = $env:SCIMTOOL_RG
+if ($env:SCIMSERVER_RG -and $env:SCIMSERVER_RG.Trim().Length -gt 0) {
+	$ResourceGroup = $env:SCIMSERVER_RG
 } else {
-	$ResourceGroup = "scimtool-rg-$(New-Suffix)"
+	$ResourceGroup = "scimserver-rg-$(New-Suffix)"
 }
-if ($env:SCIMTOOL_APP -and $env:SCIMTOOL_APP.Trim().Length -gt 0) {
-	$AppName = $env:SCIMTOOL_APP
+if ($env:SCIMSERVER_APP -and $env:SCIMSERVER_APP.Trim().Length -gt 0) {
+	$AppName = $env:SCIMSERVER_APP
 } else {
-	$AppName = "scimtool-app-$(New-Suffix)"
+	$AppName = "scimserver-app-$(New-Suffix)"
 }
-if ($env:SCIMTOOL_SECRET -and $env:SCIMTOOL_SECRET.Trim().Length -gt 0) {
-	$ScimSecret = $env:SCIMTOOL_SECRET
+if ($env:SCIMSERVER_SECRET -and $env:SCIMSERVER_SECRET.Trim().Length -gt 0) {
+	$ScimSecret = $env:SCIMSERVER_SECRET
 } else {
 	$ScimSecret = New-ScimSecret
 }
-if ($env:SCIMTOOL_JWTSECRET -and $env:SCIMTOOL_JWTSECRET.Trim().Length -gt 0) {
-	$JwtSecret = $env:SCIMTOOL_JWTSECRET
+if ($env:SCIMSERVER_JWTSECRET -and $env:SCIMSERVER_JWTSECRET.Trim().Length -gt 0) {
+	$JwtSecret = $env:SCIMSERVER_JWTSECRET
 } else {
 	$JwtSecret = New-AppSecret
 }
-if ($env:SCIMTOOL_OAUTHSECRET -and $env:SCIMTOOL_OAUTHSECRET.Trim().Length -gt 0) {
-	$OauthClientSecret = $env:SCIMTOOL_OAUTHSECRET
+if ($env:SCIMSERVER_OAUTHSECRET -and $env:SCIMSERVER_OAUTHSECRET.Trim().Length -gt 0) {
+	$OauthClientSecret = $env:SCIMSERVER_OAUTHSECRET
 } else {
 	$OauthClientSecret = New-AppSecret
 }
 
 # Interactive prompting (unless explicitly disabled)
 $interactive = $true
-if ($env:SCIMTOOL_UNATTENDED -and $env:SCIMTOOL_UNATTENDED -in @('1','true','yes')) { $interactive = $false }
+if ($env:SCIMSERVER_UNATTENDED -and $env:SCIMSERVER_UNATTENDED -in @('1','true','yes')) { $interactive = $false }
 
 function Get-DefaultValue($label, $default) {
     $userInput = Read-Host "$label [$default]"
@@ -136,7 +136,7 @@ if ($interactive) {
 		$existingAppCandidates | ForEach-Object { Write-Host "  • $_" -ForegroundColor Gray }
 		if ($existingAppCandidates.Count -eq 1) {
 			$AppName = $existingAppCandidates[0]
-		} elseif ($AppName -like 'scimtool-app-*') {
+		} elseif ($AppName -like 'scimserver-app-*') {
 			$AppName = $existingAppCandidates[0]
 		}
 	}
@@ -167,13 +167,13 @@ Write-Host "  OAuth Secret  : $OauthClientSecret" -ForegroundColor Yellow
 Stage a temporary directory structure so the deployment script's relative
 references to ../infra/*.bicep resolve even when fetched remotely.
 #>
-$tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("scimtool-" + ([guid]::NewGuid().ToString('N')))
+$tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("scimserver-" + ([guid]::NewGuid().ToString('N')))
 $scriptsDir = Join-Path $tempRoot 'scripts'
 $infraDir   = Join-Path $tempRoot 'infra'
 New-Item -ItemType Directory -Path $scriptsDir -Force | Out-Null
 New-Item -ItemType Directory -Path $infraDir -Force   | Out-Null
 
-$rawBase = 'https://raw.githubusercontent.com/kayasax/SCIMTool/master'
+$rawBase = 'https://raw.githubusercontent.com/kayasax/SCIMServer/master'
 $files = @(
     @{ url = "$rawBase/scripts/deploy-azure.ps1"; path = Join-Path $scriptsDir 'deploy-azure.ps1' },
 	@{ url = "$rawBase/infra/networking.bicep"; path = Join-Path $infraDir   'networking.bicep' },

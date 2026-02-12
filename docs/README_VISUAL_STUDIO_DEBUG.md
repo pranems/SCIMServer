@@ -1,4 +1,4 @@
-# Visual Studio � Debugging Node (SCIMTool API) Quickstart
+# Visual Studio � Debugging Node (SCIMServer API) Quickstart
 
 This snippet shows exact Visual Studio 2022 menu steps and sample attach settings to debug the `api` Node process locally or inside Docker using the Node inspector (port 9229).
 
@@ -47,7 +47,7 @@ docker compose -f docker-compose.debug.yml up --build
 4. Set breakpoints and exercise the API.
 
 Sample attach settings (if asked for mapping):
-- Local root: `C:\Users\<youruser>\source\repos\SCIMTool2022\api`
+- Local root: `C:\Users\<youruser>\source\repos\SCIMServer2022\api`
 - Remote root: `/usr/src/app`
 
 Tips

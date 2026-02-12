@@ -1,4 +1,4 @@
-﻿// Deploy SCIMTool Container App referencing existing environment & ACR
+// Deploy SCIMServer Container App referencing existing environment & ACR
 
 @description('Location for deployment')
 param location string = resourceGroup().location
@@ -8,7 +8,7 @@ param appName string
 param environmentName string
 @description('ACR login server (e.g. myacr.azurecr.io)')
 param acrLoginServer string
-@description('Image tag to deploy (e.g. scimtool/api:latest)')
+@description('Image tag to deploy (e.g. scimserver/api:latest)')
 param image string
 @description('SCIM shared secret')
 @secure()
@@ -16,7 +16,7 @@ param scimSharedSecret string
 @description('JWT signing secret used to issue OAuth tokens')
 @secure()
 param jwtSecret string
-@description('OAuth client secret required when requesting SCIMTool tokens')
+@description('OAuth client secret required when requesting SCIMServer tokens')
 @secure()
 param oauthClientSecret string
 @description('Target port inside container')
@@ -38,7 +38,7 @@ param memory string = '1Gi'
 @description('Blob backup storage account name')
 param blobBackupAccountName string
 @description('Blob backup container name')
-param blobBackupContainerName string = 'scimtool-backups'
+param blobBackupContainerName string = 'scimserver-backups'
 
 resource env 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
   name: environmentName
@@ -85,7 +85,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
       initContainers: []
       containers: [
         {
-          name: 'scimtool'
+          name: 'scimserver'
           image: '${acrLoginServer}/${image}'
           env: [
             { name: 'SCIM_SHARED_SECRET', secretRef: 'scim-shared-secret' }
@@ -120,7 +120,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
     type: 'SystemAssigned'
   }
   tags: {
-    project: 'scimtool'
+    project: 'scimserver'
   }
 }
 

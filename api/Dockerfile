@@ -1,5 +1,5 @@
-﻿###########
-# Multi-stage build for SCIMTool API (fixes local-data permission issue)
+###########
+# Multi-stage build for SCIMServer API (fixes local-data permission issue)
 ###########
 
 # Builder stage: install deps, generate Prisma, compile TS

@@ -2,7 +2,7 @@
 
 > ⚠️ **DESIGN EXPLORATION** — This document compares architectural patterns for future extensibility. The current implementation uses **Config-Driven Conditionals** (simple flag checks). No other pattern has been implemented.
 
-> **Document Purpose**: Guide for implementing config-driven endpoint behavior variations in the SCIM Tool.
+> **Document Purpose**: Guide for implementing config-driven endpoint behavior variations in the SCIM Server.
 > 
 > **Created**: February 3, 2026
 
@@ -473,9 +473,9 @@ async createUserForEndpoint(dto: CreateUserDto, baseUrl: string, endpointId: str
 
 ---
 
-## 🎯 Recommendation for SCIM Tool
+## 🎯 Recommendation for SCIM Server
 
-For the SCIM Tool implementation, the recommended approach is:
+For the SCIM Server implementation, the recommended approach is:
 
 ### Must-Have (Phase 1)
 1. **Interceptor** - For config loading and response transformations

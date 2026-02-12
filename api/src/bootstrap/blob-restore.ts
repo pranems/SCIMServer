@@ -8,7 +8,7 @@ async function restoreFromBlob(): Promise<void> {
     return;
   }
 
-  const containerName = process.env.BLOB_BACKUP_CONTAINER?.trim() || 'scimtool-backups';
+  const containerName = process.env.BLOB_BACKUP_CONTAINER?.trim() || 'scimserver-backups';
   const localDbPath = process.env.LOCAL_DB_PATH || '/tmp/local-data/scim.db';
 
   if (existsSync(localDbPath)) {

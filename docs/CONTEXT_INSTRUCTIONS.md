@@ -1,4 +1,4 @@
-# SCIMTool — Context Instructions for AI Assistants
+# SCIMServer — Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.  
 > **Last Updated**: February 9, 2026
@@ -9,11 +9,11 @@
 
 | Field | Value |
 |-------|-------|
-| **Name** | SCIMTool (SCIMTool2022) |
+| **Name** | SCIMServer (SCIMServer2022) |
 | **Purpose** | SCIM 2.0 provisioning visibility and monitoring tool for Microsoft Entra ID |
-| **Repository** | `C:\Users\v-prasrane\source\repos\SCIMTool2022` |
-| **API Root** | `C:\Users\v-prasrane\source\repos\SCIMTool2022\api` |
-| **Frontend Root** | `C:\Users\v-prasrane\source\repos\SCIMTool2022\web` |
+| **Repository** | `C:\Users\v-prasrane\source\repos\SCIMServer2022` |
+| **API Root** | `C:\Users\v-prasrane\source\repos\SCIMServer2022\api` |
+| **Frontend Root** | `C:\Users\v-prasrane\source\repos\SCIMServer2022\web` |
 | **Standards** | RFC 7643 (Core Schema), RFC 7644 (Protocol), RFC 7642 (Concepts) |
 
 ---
@@ -139,7 +139,7 @@ npm run dev                 # Vite HMR dev server on :5173
 npm run build               # Production build → api/public/
 
 # Docker:
-docker build -t scimtool -f Dockerfile .
+docker build -t scimserver -f Dockerfile .
 docker-compose up           # Full stack
 ```
 

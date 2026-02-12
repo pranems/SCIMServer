@@ -2,7 +2,7 @@
 
 **Date:** February 11, 2026 (Revised v4 — FP #4 identified & fixed)  
 **Source:** `scim-results-9.json` + `scim-results (10).json` — Microsoft SCIM Validator  
-**Server:** SCIMTool2022 v0.8.15 → v0.8.17 (NestJS + Prisma + SQLite)  
+**Server:** SCIMServer2022 v0.8.15 → v0.8.17 (NestJS + Prisma + SQLite)  
 **Endpoint:** `http://localhost:6000/scim/endpoints/cmlfuqaft0002i30tlv47pq1f/`
 
 ---

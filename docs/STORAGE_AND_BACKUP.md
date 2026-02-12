@@ -1,12 +1,12 @@
 # Storage & Backup Architecture
 
-> How SCIMTool persists data across container restarts using hybrid local + Azure Files storage.
+> How SCIMServer persists data across container restarts using hybrid local + Azure Files storage.
 
 ---
 
 ## Architecture Overview
 
-SCIMTool uses a **hybrid storage model** to combine SQLite performance with Azure Files persistence:
+SCIMServer uses a **hybrid storage model** to combine SQLite performance with Azure Files persistence:
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -88,7 +88,7 @@ The hybrid approach uses local disk for runtime (fast) and Azure Files only for 
 ```powershell
 .\scripts\deploy-azure.ps1 `
     -ResourceGroup "scim-rg" `
-    -AppName "scimtool" `
+    -AppName "scimserver" `
     -Location "eastus" `
     -ScimSecret "your-secure-secret"
 ```
@@ -102,8 +102,8 @@ This automatically provisions:
 
 ```powershell
 .\scripts\add-persistent-storage.ps1 `
-    -ResourceGroup "RG-FR-SCIMTOOL" `
-    -AppName "scimtool-ms"
+    -ResourceGroup "RG-FR-SCIMSERVER" `
+    -AppName "scimserver-ms"
 ```
 
 ### Cost
@@ -122,7 +122,7 @@ This automatically provisions:
 Azure Storage Account names must be **globally unique**. The deploy script generates unique names by combining the app name with the resource group name:
 
 ```
-scimtoolms + rgfrscimtool + stor → scimtoolmsrgfrscimtoolstor
+scimserverms + rgfrscimserver + stor → scimservermsrgfrscimserverstor
 ```
 
 Truncated to 24 characters per Azure naming rules (lowercase, no hyphens).

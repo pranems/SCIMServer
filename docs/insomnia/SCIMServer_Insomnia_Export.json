@@ -2,7 +2,7 @@
   "_type": "export",
   "__export_format": 4,
   "__export_date": "2026-02-09T00:00:00.000Z",
-  "__export_source": "SCIMTool docs generator",
+  "__export_source": "SCIMServer docs generator",
   "resources": [
     {
       "_id": "env_1",
@@ -11,7 +11,7 @@
       "name": "Base Env",
       "data": {
         "base_url": "http://localhost:6000",
-        "client_id": "scimtool-client",
+        "client_id": "scimserver-client",
         "client_secret": "dev-secret-abc123",
         "shared_secret": "S3cr3tSharedValue",
         "token": "",

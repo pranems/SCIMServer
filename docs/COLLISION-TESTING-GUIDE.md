@@ -4,14 +4,14 @@
 
 **Prerequisites**
 - Access to Entra portal with rights to edit provisioning mappings and restart sync
-- SCIMTool deployed with Manual Provision + Database browser available
+- SCIMServer deployed with Manual Provision + Database browser available
 - Microsoft Graph permission `Synchronization.ReadWrite.All` (for the restart call)
 
 **Steps to trigger a 409 collision**
 1. **Confirm the joining attribute** in Entra → Provisioning → Mappings.
    - If `externalId` is mapped (recommended), the unique key is `externalId`.
    - If not, `userName` (UPN) is the unique key.
-2. **Seed an existing record** in SCIMTool (Manual Provision):
+2. **Seed an existing record** in SCIMServer (Manual Provision):
    - For `externalId` mapping → create a user with the target user’s `objectId` in `externalId`.
    - For `userName` mapping → create a user with the target user’s UPN in `userName`.
 3. **Break Entra’s cached match (when it keeps PATCHing):** temporarily set the matching precedence to `externalId` only, leave the manual record’s `externalId` blank, and restart provisioning with Graph:
@@ -30,7 +30,7 @@ Skip to the sections below for the “why” and troubleshooting details.
 ## 🔍 Key Concepts
 
 - **Collision = HTTP 409** because a unique identifier already exists.
-- **Identifier priority** inside SCIMTool:
+- **Identifier priority** inside SCIMServer:
   - Use `externalId` when present & non-empty.
   - Otherwise fall back to `userName`.
 - **Entra behaviour** is driven by the attribute marked “Matching” in provisioning mappings. Whatever is first in matching precedence is what Microsoft Entra uses to find existing users.
@@ -41,7 +41,7 @@ Skip to the sections below for the “why” and troubleshooting details.
 
 ### A. externalId (objectId) is the key
 1. Grab the Entra user’s `objectId` (e.g., `7b39...e58e`).
-2. Manual Provision in SCIMTool:
+2. Manual Provision in SCIMServer:
    ```
    externalId: 7b39...e58e
    userName: collision@test.com
@@ -51,7 +51,7 @@ Skip to the sections below for the “why” and troubleshooting details.
 
 ### B. userName (UPN) is the key
 1. Copy the existing user’s UPN (e.g., `hulk@yespapa.eu`).
-2. Manual Provision in SCIMTool:
+2. Manual Provision in SCIMServer:
    ```
    externalId: [leave blank]
    userName: hulk@yespapa.eu
@@ -97,7 +97,7 @@ Activity Feed shows the failed `POST /Users` and no new user is inserted in the 
 | Entra keeps PATCHing | Existing match still cached | Use **Force Entra to Re-POST** steps, then retry on-demand |
 | Manual provision succeeds (201) | Wrong identifier duplicated | Confirm which field Entra marks as Matching (mappings + raw logs) |
 | externalId missing in logs | Mapping not configured | Map `objectId` → `externalId` or adapt the scenario to userName |
-| Still seeing 200 after collision | Uniqueness bug or different environment | Verify SCIMTool version and database state, then report issue |
+| Still seeing 200 after collision | Uniqueness bug or different environment | Verify SCIMServer version and database state, then report issue |
 
 ---
 
@@ -105,7 +105,7 @@ Activity Feed shows the failed `POST /Users` and no new user is inserted in the 
 
 - [SCIM 2.0 RFC 7644 – uniqueness rules](https://datatracker.ietf.org/doc/html/rfc7644#section-3.1)
 - [Microsoft Entra SCIM provisioning guide](https://learn.microsoft.com/en-us/azure/active-directory/app-provisioning/use-scim-to-provision-users-and-groups)
-- SCIMTool docs: [Database Browser](../README.md#database-browser) & [Raw Logs](../README.md#raw-logs)
+- SCIMServer docs: [Database Browser](../README.md#database-browser) & [Raw Logs](../README.md#raw-logs)
 
 ---
 

@@ -6,7 +6,7 @@ import { existsSync, createReadStream } from 'node:fs';
 // Optional blob backup support (policy-friendly) activated via env vars
 // Required env vars for blob mode:
 //   BLOB_BACKUP_ACCOUNT  -> storage account name
-//   (optional) BLOB_BACKUP_CONTAINER (default: scimtool-backups)
+//   (optional) BLOB_BACKUP_CONTAINER (default: scimserver-backups)
 //   BLOB_BACKUP_INTERVAL_MIN (default: 5)
 // Uses DefaultAzureCredential (Managed Identity inside Azure) if available.
 // Types are imported dynamically; declare minimal interfaces to satisfy TS when not installed
@@ -32,7 +32,7 @@ export class BackupService implements OnModuleInit {
   private readonly localDbPath = '/tmp/local-data/scim.db';
   private readonly azureFilesBackupPath = '/app/data/scim.db'; // legacy persistent location
   private readonly blobAccount = process.env.BLOB_BACKUP_ACCOUNT;
-  private readonly blobContainer = process.env.BLOB_BACKUP_CONTAINER || 'scimtool-backups';
+  private readonly blobContainer = process.env.BLOB_BACKUP_CONTAINER || 'scimserver-backups';
   private readonly intervalMinutes = Number(process.env.BLOB_BACKUP_INTERVAL_MIN || '5');
   private blobClient: BlobSvc | null = null;
   private blobMode = false;
