@@ -1,4 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
+import request from 'supertest';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
 import { resetDatabase } from './helpers/db.helper';
@@ -58,6 +59,20 @@ describe('RFC Compliance (E2E)', () => {
 
     it('should return 201 Created for POST /Groups', async () => {
       await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201);
+    });
+
+    it('should include Location HTTP header on POST /Users', async () => {
+      const res = await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201);
+      const locationHeader = res.headers['location'];
+      expect(locationHeader).toBeDefined();
+      expect(locationHeader).toBe(res.body.meta.location);
+    });
+
+    it('should include Location HTTP header on POST /Groups', async () => {
+      const res = await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201);
+      const locationHeader = res.headers['location'];
+      expect(locationHeader).toBeDefined();
+      expect(locationHeader).toBe(res.body.meta.location);
     });
   });
 
@@ -180,6 +195,82 @@ describe('RFC Compliance (E2E)', () => {
       ).expect(200);
 
       expect(res.body.totalResults).toBe(1);
+    });
+
+    it('should reject case-insensitive duplicate userName', async () => {
+      await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'DupTest@example.com' })).expect(201);
+      const res = await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'duptest@example.com' })).expect(409);
+      expect(res.body.status).toBe('409');
+    });
+  });
+
+  // ───────────── RFC 7644 §3.1 — Content-Type Verification ─────────────
+
+  describe('RFC 7644 — Content-Type Verification', () => {
+    it('should return application/scim+json Content-Type on GET /Users', async () => {
+      await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201);
+      const res = await scimGet(app, `${basePath}/Users`, token).expect(200);
+      expect(res.headers['content-type']).toMatch(/scim\+json/);
+    });
+
+    it('should return application/scim+json Content-Type on POST /Users', async () => {
+      const res = await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201);
+      expect(res.headers['content-type']).toMatch(/scim\+json/);
+    });
+
+    it('should return application/scim+json Content-Type on error responses', async () => {
+      const res = await scimGet(app, `${basePath}/Users/nonexistent-ct-test`, token).expect(404);
+      expect(res.headers['content-type']).toMatch(/scim\+json/);
+    });
+
+    it('should return scim+json Content-Type on 409 error', async () => {
+      const user = validUser();
+      await scimPost(app, `${basePath}/Users`, token, user).expect(201);
+      const res = await scimPost(app, `${basePath}/Users`, token, user).expect(409);
+      expect(res.headers['content-type']).toMatch(/scim\+json/);
+    });
+  });
+
+  // ───────────── RFC 7644 §3.12 — 409 Error Format ─────────────
+
+  describe('RFC 7644 §3.12 — 409 Error Format', () => {
+    it('should return proper SCIM error format on 409', async () => {
+      const user = validUser();
+      await scimPost(app, `${basePath}/Users`, token, user).expect(201);
+      const res = await scimPost(app, `${basePath}/Users`, token, user).expect(409);
+
+      expect(res.body.schemas).toContain('urn:ietf:params:scim:api:messages:2.0:Error');
+      expect(res.body.status).toBe('409');
+      expect(typeof res.body.status).toBe('string');
+      expect(res.body.detail).toBeDefined();
+    });
+  });
+
+  // ───────────── RFC 7644 — meta.lastModified Behavior ─────────────
+
+  describe('RFC 7644 — meta.lastModified Behavior', () => {
+    it('should update meta.lastModified on PATCH', async () => {
+      const created = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+      const originalLastModified = created.meta.lastModified;
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      const patch = patchOp([{ op: 'replace', path: 'displayName', value: 'Timestamp Updated' }]);
+      const res = await scimPatch(app, `${basePath}/Users/${created.id}`, token, patch).expect(200);
+
+      expect(res.body.meta.lastModified).not.toBe(originalLastModified);
+    });
+
+    it('should not change meta.lastModified on GET', async () => {
+      const created = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      const patch = patchOp([{ op: 'replace', path: 'displayName', value: 'TS Test' }]);
+      const patched = (await scimPatch(app, `${basePath}/Users/${created.id}`, token, patch).expect(200)).body;
+
+      const fetched = (await scimGet(app, `${basePath}/Users/${created.id}`, token).expect(200)).body;
+      expect(fetched.meta.lastModified).toBe(patched.meta.lastModified);
     });
   });
 });

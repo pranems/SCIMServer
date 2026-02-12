@@ -1,0 +1,45 @@
+{
+  "_description": "Group membership PATCH examples for multi-endpoint mode (add multiple, remove single, remove multiple)",
+
+  "add_multiple_members": {
+    "_comment": "Requires config: MultiOpPatchRequestAddMultipleMembersToGroup = True",
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+    "Operations": [
+      {
+        "op": "add",
+        "path": "members",
+        "value": [
+          { "value": "user-uuid-new-member-1" },
+          { "value": "user-uuid-new-member-2" },
+          { "value": "user-uuid-new-member-3" }
+        ]
+      }
+    ]
+  },
+
+  "remove_single_member": {
+    "_comment": "Remove one member using valuePath filter — always allowed",
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+    "Operations": [
+      {
+        "op": "remove",
+        "path": "members[value eq \"user-uuid-to-remove\"]"
+      }
+    ]
+  },
+
+  "remove_multiple_members": {
+    "_comment": "Requires config: MultiOpPatchRequestRemoveMultipleMembersFromGroup = True",
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+    "Operations": [
+      {
+        "op": "remove",
+        "path": "members",
+        "value": [
+          { "value": "user-uuid-member-1" },
+          { "value": "user-uuid-member-2" }
+        ]
+      }
+    ]
+  }
+}

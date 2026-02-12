@@ -101,3 +101,57 @@ export function removeMemberPatch(userId: string): PatchFixture {
     { op: 'remove', path: `members[value eq "${userId}"]` },
   ]);
 }
+
+/** Blanket remove all members (no value filter). */
+export function removeAllMembersPatch(): PatchFixture {
+  return patchOp([{ op: 'remove', path: 'members' }]);
+}
+
+/** Add multiple members at once. */
+export function addMultipleMembersPatch(userIds: string[]): PatchFixture {
+  return patchOp([
+    { op: 'add', path: 'members', value: userIds.map((id) => ({ value: id })) },
+  ]);
+}
+
+/** Remove multiple members at once via value array. */
+export function removeMultipleMembersPatch(userIds: string[]): PatchFixture {
+  return patchOp([
+    { op: 'remove', path: 'members', value: userIds.map((id) => ({ value: id })) },
+  ]);
+}
+
+/** PATCH with no path — merge value object into resource. */
+export function noPathMergePatch(
+  op: 'replace' | 'add',
+  value: Record<string, unknown>,
+): PatchFixture {
+  return patchOp([{ op, value }]);
+}
+
+/** PATCH with multiple operations in a single request. */
+export function multiOpPatch(
+  operations: Array<{ op: string; path?: string; value?: unknown }>,
+): PatchFixture {
+  return patchOp(operations);
+}
+
+/** Search request body for POST /.search */
+export interface SearchFixture {
+  schemas: string[];
+  filter?: string;
+  startIndex?: number;
+  count?: number;
+  attributes?: string;
+  excludedAttributes?: string;
+  [key: string]: unknown;
+}
+
+export function searchRequest(overrides: Partial<Omit<SearchFixture, 'schemas'>> = {}): SearchFixture {
+  return {
+    schemas: ['urn:ietf:params:scim:api:messages:2.0:SearchRequest'],
+    startIndex: 1,
+    count: 10,
+    ...overrides,
+  };
+}

@@ -1,0 +1,7 @@
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:SearchRequest"],
+  "filter": "displayName eq \"Engineering\"",
+  "startIndex": 1,
+  "count": 25,
+  "excludedAttributes": "members"
+}

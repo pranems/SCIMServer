@@ -102,6 +102,44 @@ export async function createEndpoint(
 }
 
 /**
+ * Creates a new SCIM endpoint with configuration flags and returns its `id`.
+ * Use this to test config-dependent behaviors like multi-member PATCH,
+ * PatchOpAllowRemoveAllMembers, VerbosePatchSupported, etc.
+ */
+export async function createEndpointWithConfig(
+  app: INestApplication,
+  token: string,
+  config: Record<string, string | boolean>,
+  name?: string,
+): Promise<string> {
+  const endpointName = name ?? `e2e-cfg-${Date.now()}`;
+  const res: Response = await request(app.getHttpServer())
+    .post('/scim/admin/endpoints')
+    .set('Authorization', `Bearer ${token}`)
+    .set('Content-Type', 'application/json')
+    .send({ name: endpointName, config })
+    .expect(201);
+
+  return res.body.id as string;
+}
+
+/**
+ * Deactivates an endpoint via the admin API.
+ */
+export async function deactivateEndpoint(
+  app: INestApplication,
+  token: string,
+  endpointId: string,
+): Promise<void> {
+  await request(app.getHttpServer())
+    .patch(`/scim/admin/endpoints/${endpointId}`)
+    .set('Authorization', `Bearer ${token}`)
+    .set('Content-Type', 'application/json')
+    .send({ active: false })
+    .expect(200);
+}
+
+/**
  * Returns the SCIM base path for a given endpoint.
  * Example: `/scim/endpoints/abc123`
  */

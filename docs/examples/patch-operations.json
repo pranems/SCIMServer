@@ -1,0 +1,81 @@
+{
+  "_description": "SCIM 2.0 PATCH operation examples covering all supported patterns (RFC 7644 §3.5.2)",
+
+  "simple_path_replace": {
+    "_comment": "Replace a single attribute by path (RFC 7644 §3.5.2.1)",
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+    "Operations": [
+      { "op": "replace", "path": "displayName", "value": "Alice Renamed" }
+    ]
+  },
+
+  "valuepath_filter_replace": {
+    "_comment": "Replace multi-valued attribute entries using valuePath filter (RFC 7644 §3.5.2.1 + §3.4.2.2)",
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+    "Operations": [
+      {
+        "op": "replace",
+        "path": "emails[type eq \"work\"].value",
+        "value": "new.email@example.com"
+      },
+      {
+        "op": "replace",
+        "path": "phoneNumbers[type eq \"work\"].value",
+        "value": "+1-425-555-0200"
+      },
+      {
+        "op": "replace",
+        "path": "addresses[type eq \"work\"].streetAddress",
+        "value": "123 New Street"
+      }
+    ]
+  },
+
+  "nopath_object_merge": {
+    "_comment": "No-path replace merges value object into resource (RFC 7644 §3.5.2.1 implicit)",
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+    "Operations": [
+      {
+        "op": "replace",
+        "value": {
+          "displayName": "Updated Display Name",
+          "name.givenName": "Armand",
+          "name.familyName": "Smith",
+          "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:employeeNumber": "EMP-999"
+        }
+      }
+    ]
+  },
+
+  "enterprise_extension_paths": {
+    "_comment": "Add/replace using extension URN-qualified paths (RFC 7644 §3.10)",
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+    "Operations": [
+      {
+        "op": "add",
+        "path": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager",
+        "value": {
+          "value": "manager-scim-id-001",
+          "displayName": "Bob Manager"
+        }
+      },
+      {
+        "op": "replace",
+        "path": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department",
+        "value": "Platform Engineering"
+      }
+    ]
+  },
+
+  "group_member_add": {
+    "_comment": "Add member to a Group (RFC 7644 §3.5.2.1)",
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+    "Operations": [
+      {
+        "op": "add",
+        "path": "members",
+        "value": [{ "value": "new-user-id-9999", "display": "New Member" }]
+      }
+    ]
+  }
+}

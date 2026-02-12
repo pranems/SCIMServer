@@ -45,6 +45,20 @@ describe('Discovery Endpoints (E2E)', () => {
       expect(res.body.filter).toBeDefined();
       expect(res.body.bulk).toBeDefined();
     });
+
+    it('should include all required capability fields', async () => {
+      const res = await scimGet(app, `${basePath}/ServiceProviderConfig`, token).expect(200);
+
+      expect(res.body.patch).toBeDefined();
+      expect(res.body.patch.supported).toBe(true);
+      expect(res.body.filter).toBeDefined();
+      expect(res.body.filter.supported).toBe(true);
+      expect(res.body.bulk).toBeDefined();
+      expect(res.body.changePassword).toBeDefined();
+      expect(res.body.sort).toBeDefined();
+      expect(res.body.etag).toBeDefined();
+      expect(res.body.etag.supported).toBe(true);
+    });
   });
 
   // ───────────── Schemas ─────────────

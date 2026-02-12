@@ -182,4 +182,75 @@ describe('Edge Cases (E2E)', () => {
       expect(res.body.emails).toHaveLength(20);
     });
   });
+
+  // ───────────── Empty / No-op PATCH ─────────────
+
+  describe('Empty and no-op PATCH operations', () => {
+    it('should handle PATCH with empty Operations array', async () => {
+      const created = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+      const res = await scimPatch(app, `${basePath}/Users/${created.id}`, token, {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [],
+      });
+
+      // Either 200 (no-op) or 400 (strict) — should not crash
+      expect([200, 400]).toContain(res.status);
+    });
+
+    it('should succeed silently when removing non-existent attribute', async () => {
+      const created = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+      const patch = patchOp([{ op: 'remove', path: 'nickName' }]);
+      const res = await scimPatch(app, `${basePath}/Users/${created.id}`, token, patch).expect(200);
+      expect(res.body.id).toBe(created.id);
+    });
+
+    it('should merge with PATCH add and no path (Entra-style)', async () => {
+      const created = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+      const patch = patchOp([
+        { op: 'add', value: { displayName: 'Add-No-Path Merged', title: 'Tester' } },
+      ]);
+      const res = await scimPatch(app, `${basePath}/Users/${created.id}`, token, patch).expect(200);
+      expect(res.body.displayName).toBe('Add-No-Path Merged');
+      expect(res.body.title).toBe('Tester');
+    });
+  });
+
+  // ───────────── Filter Edge Cases ─────────────
+
+  describe('Filter edge cases', () => {
+    it('should return 0 results for filter on non-existent attribute value', async () => {
+      await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201);
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Users?filter=nickName eq "nonexistent"`,
+        token,
+      ).expect(200);
+
+      expect(res.body.totalResults).toBe(0);
+    });
+  });
+
+  // ───────────── PascalCase PATCH ops ─────────────
+
+  describe('PascalCase PATCH op values (Entra compatibility)', () => {
+    it('should accept Replace (PascalCase) as PATCH op', async () => {
+      const created = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+      const patch = patchOp([{ op: 'Replace', path: 'displayName', value: 'PascalReplaced' }]);
+      const res = await scimPatch(app, `${basePath}/Users/${created.id}`, token, patch).expect(200);
+      expect(res.body.displayName).toBe('PascalReplaced');
+    });
+
+    it('should accept Add (PascalCase) as PATCH op', async () => {
+      const created = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+      const patch = patchOp([{ op: 'Add', path: 'displayName', value: 'PascalAdded' }]);
+      const res = await scimPatch(app, `${basePath}/Users/${created.id}`, token, patch).expect(200);
+      expect(res.body.displayName).toBe('PascalAdded');
+    });
+  });
 });

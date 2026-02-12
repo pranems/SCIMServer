@@ -141,6 +141,48 @@ describe('EndpointScimGroupsController', () => {
           'endpoint-1'
         );
       });
+
+      it('should apply attribute projection when attributes param is provided', async () => {
+        const mockGroup = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          id: 'scim-grp-123',
+          displayName: 'Test Group',
+          members: [{ value: 'u1' }],
+          meta: { resourceType: 'Group' },
+        };
+
+        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+        mockGroupsService.getGroupForEndpoint.mockResolvedValue(mockGroup);
+
+        const result = await controller.getGroup(
+          'endpoint-1', 'scim-grp-123', mockRequest, 'displayName', undefined
+        );
+
+        expect(result.displayName).toBe('Test Group');
+        expect(result.schemas).toBeDefined();
+        expect(result.id).toBe('scim-grp-123');
+        expect(result.members).toBeUndefined();
+      });
+
+      it('should apply excludedAttributes projection', async () => {
+        const mockGroup = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          id: 'scim-grp-123',
+          displayName: 'Test Group',
+          members: [{ value: 'u1' }],
+          meta: { resourceType: 'Group' },
+        };
+
+        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+        mockGroupsService.getGroupForEndpoint.mockResolvedValue(mockGroup);
+
+        const result = await controller.getGroup(
+          'endpoint-1', 'scim-grp-123', mockRequest, undefined, 'members'
+        );
+
+        expect(result.displayName).toBe('Test Group');
+        expect(result.members).toBeUndefined();
+      });
     });
 
     describe('GET /endpoints/:endpointId/Groups', () => {
@@ -174,6 +216,84 @@ describe('EndpointScimGroupsController', () => {
           'endpoint-1'
         );
         expect(result).toEqual(mockListResponse);
+      });
+
+      it('should apply attribute projection to list results', async () => {
+        const mockListResponse = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+          totalResults: 1,
+          startIndex: 1,
+          itemsPerPage: 1,
+          Resources: [
+            { schemas: ['s'], id: 'g1', displayName: 'Group 1', members: [{ value: 'u1' }], meta: {} },
+          ],
+        };
+
+        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+        mockGroupsService.listGroupsForEndpoint.mockResolvedValue(mockListResponse);
+
+        const result = await controller.listGroups(
+          'endpoint-1', mockRequest, undefined, '1', '10', 'displayName', undefined
+        );
+
+        expect(result.Resources[0].displayName).toBe('Group 1');
+        expect(result.Resources[0].members).toBeUndefined();
+      });
+    });
+
+    describe('POST /endpoints/:endpointId/Groups/.search', () => {
+      it('should search groups using POST body (RFC 7644 §3.4.3)', async () => {
+        const mockListResponse = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+          totalResults: 1,
+          startIndex: 1,
+          itemsPerPage: 1,
+          Resources: [{ id: 'g1', displayName: 'Engineering' }],
+        };
+
+        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+        mockGroupsService.listGroupsForEndpoint.mockResolvedValue(mockListResponse);
+
+        const searchDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:SearchRequest'],
+          filter: 'displayName eq "Engineering"',
+          startIndex: 1,
+          count: 10,
+        };
+
+        const result = await controller.searchGroups('endpoint-1', searchDto, mockRequest);
+
+        expect(mockGroupsService.listGroupsForEndpoint).toHaveBeenCalledWith(
+          { filter: 'displayName eq "Engineering"', startIndex: 1, count: 10 },
+          expect.any(String),
+          'endpoint-1'
+        );
+        expect(result).toEqual(mockListResponse);
+      });
+
+      it('should apply excludedAttributes in search', async () => {
+        const mockListResponse = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+          totalResults: 1,
+          startIndex: 1,
+          itemsPerPage: 1,
+          Resources: [
+            { schemas: ['s'], id: 'g1', displayName: 'Eng', members: [{ value: 'u1' }], meta: {} },
+          ],
+        };
+
+        mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+        mockGroupsService.listGroupsForEndpoint.mockResolvedValue(mockListResponse);
+
+        const searchDto = {
+          filter: 'displayName eq "Eng"',
+          excludedAttributes: 'members',
+        };
+
+        const result = await controller.searchGroups('endpoint-1', searchDto as any, mockRequest);
+
+        expect(result.Resources[0].displayName).toBe('Eng');
+        expect(result.Resources[0].members).toBeUndefined();
       });
     });
 

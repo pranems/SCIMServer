@@ -2,8 +2,7 @@
   "displayName": "ACME Corporation - Updated",
   "description": "Updated description",
   "config": {
-    "MultiOpPatchRequestAddMultipleMembersToGroup": "false",
-    "strictMode": true
+    "MultiOpPatchRequestAddMultipleMembersToGroup": "False"
   },
   "active": true
 }

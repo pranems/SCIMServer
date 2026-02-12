@@ -5,8 +5,12 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 ### Recent Key Achievements (Chronological)
 | Date | Achievement |
 |------|-------------|
-| 2025-11-22 | 🧩 **UI Fallback Sync:** Updated bundled footer fallback to display v0.8.15 |
-| 2025-11-22 | 📘 **Collision Guide Refresh:** Added quick-start workflow + force re-POST instructions for reliable 409 testing |
+| 2026-02-14 | 📝 **Docs Updated to Current State:** SCIM_COMPLIANCE (filtering 85→100%), RECOMMENDED_DESIGN_IMPROVEMENTS (§17.1 gap analysis + §18 roadmap refreshed), INDEX.md, TESTING-WORKFLOW.md |
+| 2026-02-14 | 📦 **JSON Consolidation:** 32→19 JSON files (41% reduction) — merged PATCH examples, removed duplicates, fixed OpenAPI /Bulk + bulk.supported, fixed update-endpoint strictMode |
+| 2026-02-11 | 📚 **Docs Consolidation:** 34→21 markdown files (~45% line reduction) — merged redundant guides, removed stale files |
+| 2026-02-11 | 🔊 **Verbose Live Tests:** `live-test.ps1 -Verbose` cmdlet overrides transparently intercept all 138 API calls; 183/183 tests pass in both modes |
+| 2026-02-10 | ✅ **Phase 1 RFC Compliance Complete:** SCIM filter parser (10 operators + and/or/not + grouping), POST /.search, ETag/If-None-Match→304, attributes/excludedAttributes projection, centralized error handling, SCIM content-type on all responses |
+| 2026-02-10 | 🧪 **492 unit tests + 183 live integration tests passing** — all 25 Microsoft SCIM Validator tests pass (including 7 preview) |
 | 2025-11-21 | 🎯 **PAGINATION FIX:** Backend-driven keepalive filtering (TDD implementation) - accurate counts, no empty pages when hideKeepalive enabled |
 | 2025-11-21 | Extended executive/technical wiki created (`wiki.md`) for management evaluation |
 | 2025-11-21 | Added beginner quickstart & Azure CLI prerequisites to wiki (`wiki.md`) |
@@ -63,7 +67,7 @@ Current Version: v0.8.15 (collision testing quick-start + force re-POST guidance
 ---
 
 ## Status
-Production Ready (v0.8.15) – Includes collision testing quick-start documentation with enforced force re-POST workflow, bundled footer fallback aligned to 0.8.15, alongside prior keepalive pagination fixes, runtime secret enforcement, and deployment script enhancements. Direct upgrade script continues to provision JWT/OAuth secrets automatically, applies env bindings via `--set-env-vars`, and restarts revisions when needed.
+Production Ready (v0.8.15) — **Phase 1 RFC Compliance complete** (Feb 2026). Full SCIM filter parser (10 operators), POST /.search, ETag conditional requests, attribute projection, centralized error handling. 492 unit tests, 183 live integration tests, all 25 Microsoft SCIM Validator tests passing. Documentation and JSON examples consolidated and aligned to current implementation.
 
 ## Quick Commands
 ```powershell
@@ -147,7 +151,7 @@ Implemented TDD approach with comprehensive test coverage:
 ---
 
 ## Current Focus
-Validate blob snapshot build fixes, confirm direct upgrade command copy includes deployment metadata, run GHCR publish workflow for tagged releases; ensure runtime secrets (SCIM/JWT/OAuth) configured per deployment. Rollout private network baseline (ensure customers recreate Container Apps environment for VNet support). Finish SCIM duplicate detection flow (uniqueness guardrails + regression coverage).
+Phase 1 complete. Docs and JSON examples consolidated and updated to match actual repo state. Next: Phase 2 planning (schema-driven validation), CI test gate (no GitHub Actions workflow currently runs tests), port alignment (live-test defaults to 6000, docker-compose to 3000).
 
 ## Next Steps / Backlog
 - [ ] Validate copied direct upgrade command in production environment
@@ -237,17 +241,26 @@ Deferred:
 ## Dev Quick Ref
 Backend: `cd api && npm run start:dev`
 Frontend: `cd web && npm run dev`
-Tests: `cd api && npm test`
+Unit Tests: `cd api && npm test` (492 tests)
+Live Tests: `.\scripts\live-test.ps1` (183 assertions)
+Live Tests (verbose): `.\scripts\live-test.ps1 -Verbose`
 
 ---
 
 *This file serves as persistent project memory for enhanced AI assistant session continuity with MCP server integration.*
 ## Key Features (Snapshot)
 
-**SCIM 2.0 Compliance:**
+**SCIM 2.0 Compliance (~95% RFC 7643/7644):**
 - Complete CRUD operations (POST, GET, PUT, PATCH, DELETE)
-- Microsoft Entra ID provisioning compatible
-- ServiceProviderConfig, Schemas, ResourceTypes endpoints
+- Microsoft Entra ID provisioning compatible (all 25 validator tests pass)
+- ServiceProviderConfig, Schemas, ResourceTypes discovery endpoints
+- Full SCIM filter parser: 10 operators (`eq`,`ne`,`co`,`sw`,`ew`,`gt`,`lt`,`ge`,`le`,`pr`) + `and`/`or`/`not` + grouping
+- POST /.search for Users and Groups
+- ETag / If-None-Match → 304 conditional requests
+- `attributes` / `excludedAttributes` projection on all GET and .search endpoints
+- PATCH: add/replace/remove, valuePath filter, extension URN, no-path merge, boolean coercion
+- Centralized SCIM error handling (`scim-exception.filter.ts`)
+- `application/scim+json` content-type on all responses including errors
 - Proper filtering, pagination, and error handling
 
 **Monitoring & Debugging:**

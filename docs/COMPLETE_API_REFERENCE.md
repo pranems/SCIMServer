@@ -33,19 +33,21 @@ Contents
   - `GET /ResourceTypes`
   - `GET /Schemas`
 - Users resource
-  - `POST /Users` � create
-  - `GET /Users` � list / filter
-  - `GET /Users/:id` � get by id
-  - `PUT /Users/:id` � replace
-  - `PATCH /Users/:id` � patch
-  - `DELETE /Users/:id` � delete
+  - `POST /Users` — create
+  - `GET /Users` — list / filter / projection
+  - `GET /Users/:id` — get by id (with ETag)
+  - `POST /Users/.search` — search via POST body (RFC 7644 §3.4.3)
+  - `PUT /Users/:id` — replace
+  - `PATCH /Users/:id` — patch
+  - `DELETE /Users/:id` — delete
 - Groups resource
-  - `POST /Groups` � create
-  - `GET /Groups` � list / filter
-  - `GET /Groups/:id` � get by id
-  - `PUT /Groups/:id` � replace
+  - `POST /Groups` — create
+  - `GET /Groups` — list / filter / projection
+  - `GET /Groups/:id` — get by id (with ETag)
+  - `POST /Groups/.search` — search via POST body (RFC 7644 §3.4.3)
+  - `PUT /Groups/:id` — replace
   - `PATCH /Groups/:id` — patch (returns 200 OK with updated group resource)
-  - `DELETE /Groups/:id` � delete
+  - `DELETE /Groups/:id` — delete
 - Admin endpoints (`/admin`)
   - `GET /admin/version` � version & deployment info
   - `GET /admin/logs` � list request logs (with filters)
@@ -112,8 +114,11 @@ curl -X POST "https://<API_BASE>/scim/v2/Users" \
 ```
 
 2) GET /Users
-- List users with SCIM paging & filtering.
-- Query params supported (via `ListQueryDto`): `filter`, `startIndex`, `count` (or `page`/`pageSize` in admin logs context).
+- List users with SCIM paging, filtering & attribute projection.
+- Query params supported: `filter`, `startIndex`, `count`, `attributes`, `excludedAttributes`.
+  - `attributes` — comma-separated list of attributes to include (e.g., `?attributes=userName,displayName`). Always-returned: `id`, `schemas`, `meta`.
+  - `excludedAttributes` — comma-separated list of attributes to exclude (e.g., `?excludedAttributes=emails,phoneNumbers`). Cannot exclude `id`, `schemas`, `meta`.
+  - When both are specified, `attributes` takes precedence per RFC 7644 §3.4.2.5.
 - Example (list first 50):
 ```
 curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/Users?startIndex=1&count=50"
@@ -124,12 +129,35 @@ curl -G -H "Authorization: Bearer <TOKEN>" \
   --data-urlencode "filter=userName eq \"alice@example.com\"" \
   "https://<API_BASE>/scim/v2/Users"
 ```
+- Example (attribute projection):
+```
+curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/Users?attributes=userName,displayName&count=10"
+```
 
 3) GET /Users/:id
 - Retrieve single user by SCIM `id`.
+- Supports `?attributes=` and `?excludedAttributes=` for attribute projection.
+- Response includes `ETag` header (weak ETag: `W/"<timestamp>"`). Use `If-None-Match` to get 304 Not Modified.
 - Example:
 ```
 curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/Users/<USER_ID>"
+```
+- Example (conditional GET):
+```
+curl -H "Authorization: Bearer <TOKEN>" -H 'If-None-Match: W/"2026-02-11T22:42:00.940Z"' \
+  "https://<API_BASE>/scim/v2/Users/<USER_ID>"
+# Returns 304 if unchanged, 200 with full resource if changed
+```
+
+3b) POST /Users/.search (RFC 7644 §3.4.3)
+- Search users via POST body with SearchRequest schema. Returns 200 OK with ListResponse.
+- Body params: `filter`, `startIndex`, `count`, `attributes`, `excludedAttributes`.
+- Example:
+```
+curl -X POST "https://<API_BASE>/scim/v2/Users/.search" \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/scim+json" \
+  -d '{"schemas":["urn:ietf:params:scim:api:messages:2.0:SearchRequest"],"filter":"userName eq \"alice@example.com\"","startIndex":1,"count":10,"attributes":"userName,displayName"}'
 ```
 
 4) PUT /Users/:id
@@ -200,7 +228,18 @@ curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/Groups?start
 ```
 
 3) GET /Groups/:id
-- Retrieve group by id.
+- Retrieve group by id. Supports `?attributes=` and `?excludedAttributes=` for projection.
+- Response includes `ETag` header.
+
+3b) POST /Groups/.search (RFC 7644 §3.4.3)
+- Search groups via POST body. Same semantics as POST /Users/.search.
+- Example:
+```
+curl -X POST "https://<API_BASE>/scim/v2/Groups/.search" \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/scim+json" \
+  -d '{"schemas":["urn:ietf:params:scim:api:messages:2.0:SearchRequest"],"filter":"displayName eq \"Engineering\"","count":10}'
+```
 
 4) PUT /Groups/:id
 - Replace group resource.
