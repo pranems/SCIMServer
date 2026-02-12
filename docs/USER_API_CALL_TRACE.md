@@ -37,7 +37,7 @@ Notes:
 2. Global guard runs: `SharedSecretGuard` (`api/src/modules/auth/shared-secret.guard.ts`)
    - Reads `Authorization: Bearer <token>` header.
    - Attempt JWT validation via `OAuthService.validateAccessToken()` (if token != shared secret):
-     - If valid, `request.oauth` is populated with token payload (e.g., `{ client_id: 'scimtool-client', scope: 'scim.manage' }`).
+     - If valid, `request.oauth` is populated with token payload (e.g., `{ client_id: 'scimserver-client', scope: 'scim.manage' }`).
    - If JWT invalid, compare token to `SCIM_SHARED_SECRET` (env); allow if matches.
    - On failure: respond 401 with SCIM error JSON and `WWW-Authenticate: Bearer realm="SCIM"`.
 

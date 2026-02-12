@@ -1,9 +1,9 @@
-# SCIMTool Container App Update Function
+# SCIMServer Container App Update Function
 # NOTE: Saved as UTF-8 WITHOUT BOM. If remote fetch shows a leading invisible char, strip with -replace "^[\uFEFF]","".
 # (BOM stripped; ensure saved UTF-8 no BOM)
-# Usage: iex ((irm 'https://raw.githubusercontent.com/kayasax/SCIMTool/master/scripts/update-scimtool-func.ps1') -replace "^[\uFEFF]","")
+# Usage: iex ((irm 'https://raw.githubusercontent.com/kayasax/SCIMServer/master/scripts/update-scimserver-func.ps1') -replace "^[\uFEFF]","")
 
-function Update-SCIMTool {
+function Update-SCIMServer {
     param(
         [Parameter(Mandatory)]
         [string]$Version,
@@ -28,10 +28,10 @@ function Update-SCIMTool {
     }
 
     $cleanVersion = $Version.Trim().TrimStart('v','V')
-    $imageRef = "$Registry/scimtool:$cleanVersion"
+    $imageRef = "$Registry/scimserver:$cleanVersion"
 
     if (-not $Quiet) {
-        Write-Host "SCIMTool Update" -ForegroundColor Cyan
+        Write-Host "SCIMServer Update" -ForegroundColor Cyan
         Write-Host "Version: $cleanVersion" -ForegroundColor Gray
         Write-Host "Image  : $imageRef" -ForegroundColor Gray
     }
@@ -100,28 +100,28 @@ function Update-SCIMTool {
     }
 
     # Auto-detect BOM in this script content when loaded via iex without manual replace.
-    if (-not (Get-Variable -Name SCIMTool_BOMStripped -ErrorAction SilentlyContinue)) {
+    if (-not (Get-Variable -Name SCIMServer_BOMStripped -ErrorAction SilentlyContinue)) {
         $scriptText = $null
         try { $scriptText = (Get-Content -LiteralPath $PSCommandPath -Raw -ErrorAction SilentlyContinue) } catch { }
         if ($scriptText -and $scriptText.Length -gt 0 -and $scriptText[0] -eq [char]0xFEFF) {
             # Re-invoke without BOM
             $rebased = $scriptText.Substring(1)
-            $env:SCIMTool_BOMStripped = '1'
+            $env:SCIMServer_BOMStripped = '1'
             Invoke-Expression $rebased
             return
         }
-        Set-Variable -Name SCIMTool_BOMStripped -Value 1 -Scope Script -Option ReadOnly -ErrorAction SilentlyContinue
+        Set-Variable -Name SCIMServer_BOMStripped -Value 1 -Scope Script -Option ReadOnly -ErrorAction SilentlyContinue
     }
 
     if (-not $ResourceGroup -or -not $AppName) {
-        Write-Log "Discovering SCIMTool container apps" 'INFO' Cyan
+        Write-Log "Discovering SCIMServer container apps" 'INFO' Cyan
         # Collect full list (warnings may be mixed in) or simulate in SelfTest
         if ($SelfTest) {
             $rawList = @'
 UserWarning: cryptography performance issue
 Some other warning line
 [
-  {"name":"scimtool-app","resourceGroup":"rg-scim"},
+  {"name":"scimserver-app","resourceGroup":"rg-scim"},
   {"name":"otherapp","resourceGroup":"rg-other"},
   {"name":"scim-extra","resourceGroup":"rg-scim2"}
 ]
@@ -149,7 +149,7 @@ Some other warning line
         if (-not $containerApps -or $containerApps.Count -eq 0) {
             Write-Log "Primary discovery produced no results; attempting TSV fallback (sanitized)." 'INFO' Cyan
             if ($SelfTest) {
-                $tsvRaw = "scimtool-app	rg-scim`notherapp	rg-other`nscim-extra	rg-scim2"; $LASTEXITCODE = 0
+                $tsvRaw = "scimserver-app	rg-scim`notherapp	rg-other`nscim-extra	rg-scim2"; $LASTEXITCODE = 0
             } else {
                 $tsvRaw = az containerapp list --output tsv 2>$null
             }
@@ -326,11 +326,11 @@ if ($args.Count -gt 0) {
         }
     }
 
-    if ($params.Count -gt 0 -and $params.ContainsKey('Version')) { Update-SCIMTool @params }
-    else { Write-Host "Usage: Update-SCIMTool -Version 'v0.8.1' [-ResourceGroup rg] [-AppName app] [-NamePattern regex] [-NoPrompt] [-DryRun] [-Quiet] [-DebugDiscovery]" -ForegroundColor Yellow }
+    if ($params.Count -gt 0 -and $params.ContainsKey('Version')) { Update-SCIMServer @params }
+    else { Write-Host "Usage: Update-SCIMServer -Version 'v0.8.1' [-ResourceGroup rg] [-AppName app] [-NamePattern regex] [-NoPrompt] [-DryRun] [-Quiet] [-DebugDiscovery]" -ForegroundColor Yellow }
 } else {
-    Write-Host "SCIMTool update function loaded." -ForegroundColor Green
+    Write-Host "SCIMServer update function loaded." -ForegroundColor Green
     Write-Host "Examples:" -ForegroundColor Gray
-    Write-Host "  Update-SCIMTool -Version v0.8.1" -ForegroundColor Gray
-    Write-Host "  Update-SCIMTool -Version v0.8.1 -ResourceGroup rg -AppName app -Quiet" -ForegroundColor Gray
+    Write-Host "  Update-SCIMServer -Version v0.8.1" -ForegroundColor Gray
+    Write-Host "  Update-SCIMServer -Version v0.8.1 -ResourceGroup rg -AppName app -Quiet" -ForegroundColor Gray
 }

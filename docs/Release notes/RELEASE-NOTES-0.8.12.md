@@ -1,4 +1,4 @@
-# SCIMTool v0.8.12 – Direct Update Patch
+# SCIMServer v0.8.12 – Direct Update Patch
 
 ## Highlights
 - Fixes the direct-update PowerShell script so Container App environment bindings are updated correctly using `properties.template.containers[0].env`, avoiding the invalid environment-variable error seen in v0.8.11.
@@ -7,7 +7,7 @@
 
 ## Upgrade Command
 ```powershell
-iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMTool/master/scripts/update-scimtool-direct.ps1'); Update-SCIMToolDirect -Version v0.8.12 -ResourceGroup <rg> -AppName <app> -NoPrompt
+iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMServer/master/scripts/update-scimserver-direct.ps1'); Update-SCIMServerDirect -Version v0.8.12 -ResourceGroup <rg> -AppName <app> -NoPrompt
 ```
 
 ## Post-Upgrade Checklist

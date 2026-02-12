@@ -19,7 +19,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: kayasax/scimtool
+  IMAGE_NAME: kayasax/scimserver
 
 jobs:
   build-and-push:

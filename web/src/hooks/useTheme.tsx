@@ -12,14 +12,14 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>(() => {
     // Check local storage first, default to dark
-    const stored = localStorage.getItem('scimtool-theme') as Theme;
+    const stored = localStorage.getItem('scimserver-theme') as Theme;
     return stored || 'dark';
   });
 
   useEffect(() => {
     // Apply theme to document
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('scimtool-theme', theme);
+    localStorage.setItem('scimserver-theme', theme);
   }, [theme]);
 
   const toggleTheme = () => {

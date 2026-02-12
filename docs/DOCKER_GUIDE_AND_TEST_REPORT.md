@@ -1,7 +1,7 @@
-# 🐳 SCIMTool Docker Guide — Build, Deploy & Live Test Report
+# 🐳 SCIMServer Docker Guide — Build, Deploy & Live Test Report
 
 > **Date:** February 11, 2026  
-> **Image:** `scimtool:live-test` (496 MB, Alpine Linux)  
+> **Image:** `scimserver:live-test` (496 MB, Alpine Linux)  
 > **Test Result:** ✅ **212/212 tests passed** in 4.9s  
 > **Base Image:** `node:22-alpine` (multi-stage build)
 
@@ -47,7 +47,7 @@
 │  ✅ Docker Desktop running                            │
 │  ✅ PowerShell 7+ installed                           │
 │  ✅ Port 6000 available                               │
-│  ✅ SCIMTool2022 repo cloned                          │
+│  ✅ SCIMServer2022 repo cloned                          │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -63,23 +63,23 @@ For those who want to get straight to it — run these from the project root:
   Set-Content api/docker-entrypoint.sh -NoNewline -Encoding utf8NoBOM
 
 # 2. Build the Docker image
-docker build -t scimtool:live-test --build-arg IMAGE_TAG=live-test -f Dockerfile .
+docker build -t scimserver:live-test --build-arg IMAGE_TAG=live-test -f Dockerfile .
 
 # 3. Run the container
-docker run -d --name scimtool-live-test -p 6000:80 `
+docker run -d --name scimserver-live-test -p 6000:80 `
   -e PORT=80 `
   -e NODE_ENV=production `
   -e JWT_SECRET=live-test-secret-key-2026 `
   -e OAUTH_CLIENT_SECRET=changeme-oauth `
   -e SCIM_SHARED_SECRET=test-shared-secret `
-  scimtool:live-test
+  scimserver:live-test
 
 # 4. Wait ~8s for startup, then run tests
 Start-Sleep -Seconds 8
 pwsh -File scripts/live-test.ps1 -BaseUrl "http://localhost:6000"
 
 # 5. Cleanup
-docker rm -f scimtool-live-test
+docker rm -f scimserver-live-test
 ```
 
 ---
@@ -118,7 +118,7 @@ $content = $content -replace "`r`n", "`n"
 ### Step 2 — Build the Docker Image
 
 ```powershell
-docker build -t scimtool:live-test --build-arg IMAGE_TAG=live-test -f Dockerfile .
+docker build -t scimserver:live-test --build-arg IMAGE_TAG=live-test -f Dockerfile .
 ```
 
 **What happens during the build (3 stages):**
@@ -178,14 +178,14 @@ docker build -t scimtool:live-test --build-arg IMAGE_TAG=live-test -f Dockerfile
 ### Step 3 — Run the Container
 
 ```powershell
-docker run -d --name scimtool-live-test `
+docker run -d --name scimserver-live-test `
   -p 6000:80 `
   -e PORT=80 `
   -e NODE_ENV=production `
   -e JWT_SECRET=live-test-secret-key-2026 `
   -e OAUTH_CLIENT_SECRET=changeme-oauth `
   -e SCIM_SHARED_SECRET=test-shared-secret `
-  scimtool:live-test
+  scimserver:live-test
 ```
 
 **Port mapping explained:**
@@ -206,14 +206,14 @@ docker run -d --name scimtool-live-test `
 **Wait for startup (~8 seconds):**
 ```powershell
 # Option A: Watch logs
-docker logs -f scimtool-live-test
+docker logs -f scimserver-live-test
 # Look for: "🚀 SCIM Endpoint Server API is running on http://localhost:80/scim"
 
 # Option B: Script-based wait
 $ready = $false
 for ($i = 1; $i -le 15; $i++) {
     Start-Sleep -Seconds 3
-    $logs = docker logs scimtool-live-test 2>&1
+    $logs = docker logs scimserver-live-test 2>&1
     if ($logs -match "running on http") { $ready = $true; break }
 }
 ```
@@ -242,7 +242,7 @@ pwsh -File scripts/live-test.ps1 -BaseUrl "http://localhost:6000" |
   │                                                    │
   │  1. POST /scim/oauth/token                         │
   │     → Get Bearer JWT token                         │
-  │     (client_id=scimtool-client,                    │
+  │     (client_id=scimserver-client,                    │
   │      client_secret=changeme-oauth)                 │
   │                                                    │
   │  2. SECTION 1-2: Endpoint CRUD + Config validation │
@@ -282,10 +282,10 @@ pwsh -File scripts/live-test.ps1 -BaseUrl "http://localhost:6000" |
 
 ```powershell
 # Stop and remove the container
-docker rm -f scimtool-live-test
+docker rm -f scimserver-live-test
 
 # (Optional) Remove the image
-docker rmi scimtool:live-test
+docker rmi scimserver:live-test
 ```
 
 ---
@@ -635,7 +635,7 @@ version: '3.8'
 services:
   api:
     image: node:22
-    container_name: scimtool-api-dev
+    container_name: scimserver-api-dev
     working_dir: /usr/src/app
     volumes:
       - ./api:/usr/src/app:rw           # Live source mount
@@ -662,15 +662,15 @@ Features: Hot reload via `ts-node-dev`, VS Code debugger attachment on `:9229`
 ### B. Local Testing (Production Image)
 
 ```powershell
-docker build -t scimtool:live-test -f Dockerfile .
+docker build -t scimserver:live-test -f Dockerfile .
 
-docker run -d --name scimtool-test -p 6000:80 `
+docker run -d --name scimserver-test -p 6000:80 `
   -e PORT=80 `
   -e NODE_ENV=production `
   -e JWT_SECRET=test-jwt-secret `
   -e OAUTH_CLIENT_SECRET=changeme-oauth `
   -e SCIM_SHARED_SECRET=test-secret `
-  scimtool:live-test
+  scimserver:live-test
 ```
 
 Features: Matches production behavior, ephemeral SQLite, no volume mounts
@@ -680,14 +680,14 @@ Features: Matches production behavior, ephemeral SQLite, no volume mounts
 ### C. Production with Persistent Storage
 
 ```powershell
-docker run -d --name scimtool-prod -p 443:80 `
+docker run -d --name scimserver-prod -p 443:80 `
   -e NODE_ENV=production `
   -e JWT_SECRET="$(openssl rand -base64 32)" `
   -e OAUTH_CLIENT_SECRET="$(openssl rand -base64 32)" `
   -e SCIM_SHARED_SECRET="$(openssl rand -base64 32)" `
-  -v scimtool-data:/app/data `
+  -v scimserver-data:/app/data `
   --restart unless-stopped `
-  scimtool:latest
+  scimserver:latest
 ```
 
 Features: Named volume for persistent backup, auto-restart, random secrets
@@ -700,12 +700,12 @@ Features: Named volume for persistent backup, auto-restart, random secrets
 
 ```powershell
 # Tag and push to ACR
-docker tag scimtool:live-test myregistry.azurecr.io/scimtool:v0.8.15
-docker push myregistry.azurecr.io/scimtool:v0.8.15
+docker tag scimserver:live-test myregistry.azurecr.io/scimserver:v0.8.15
+docker push myregistry.azurecr.io/scimserver:v0.8.15
 
 # Deploy (see scripts/deploy-azure.ps1 for full automation)
-az containerapp update --name scimtool --resource-group my-rg \
-  --image myregistry.azurecr.io/scimtool:v0.8.15
+az containerapp update --name scimserver --resource-group my-rg \
+  --image myregistry.azurecr.io/scimserver:v0.8.15
 ```
 
 ### Health Check
@@ -742,10 +742,10 @@ HEALTHCHECK --interval=60s --timeout=3s --start-period=10s --retries=2 \
 ║                    February 11, 2026                             ║
 ╠══════════════════════════════════════════════════════════════════╣
 ║                                                                  ║
-║   Target:     Docker container (scimtool:live-test)              ║
+║   Target:     Docker container (scimserver:live-test)              ║
 ║   Base URL:   http://localhost:6000                              ║
 ║   Image:      496 MB (node:22-alpine, multi-stage)               ║
-║   Container:  scimtool-live-test (port 6000 → 80)               ║
+║   Container:  scimserver-live-test (port 6000 → 80)               ║
 ║                                                                  ║
 ║   ┌─────────────────────────────────────────────────────────┐   ║
 ║   │                                                           │   ║
@@ -1096,5 +1096,5 @@ HEALTHCHECK --interval=60s --timeout=3s --start-period=10s --retries=2 \
 ---
 
 > **Generated:** February 11, 2026  
-> **Environment:** Docker container `scimtool:live-test` (Alpine Linux, node:22-alpine)  
+> **Environment:** Docker container `scimserver:live-test` (Alpine Linux, node:22-alpine)  
 > **Raw output:** [docker-live-test-output-2026-02-11.txt](docker-live-test-output-2026-02-11.txt)

@@ -1,6 +1,6 @@
-﻿<#
+<#
 .SYNOPSIS
-    Deploy SCIMTool to Azure Container Apps
+    Deploy SCIMServer to Azure Container Apps
 
 .DESCRIPTION
     Deploys the SCIM server to Azure Container Apps for production use with
@@ -19,7 +19,7 @@
     Production SCIM shared secret
 
 .EXAMPLE
-    .\deploy-azure.ps1 -ResourceGroup "scim-rg" -AppName "scimtool-prod" -Location "eastus" -ScimSecret "your-secure-secret"
+    .\deploy-azure.ps1 -ResourceGroup "scim-rg" -AppName "scimserver-prod" -Location "eastus" -ScimSecret "your-secure-secret"
 #>
 
 param(
@@ -35,7 +35,7 @@ param(
     [string]$ScimSecret
 )
 
-Write-Host "🚀 Deploying SCIMTool to Azure Container Apps" -ForegroundColor Green
+Write-Host "🚀 Deploying SCIMServer to Azure Container Apps" -ForegroundColor Green
 Write-Host "═══════════════════════════════════════════════" -ForegroundColor Green
 Write-Host ""
 
@@ -70,9 +70,9 @@ Write-Host ""
 
 # Deploy using pre-built image from GitHub Container Registry
 Write-Host "Deploying Container App with pre-built image..." -ForegroundColor Yellow
-Write-Host "Using latest tested image: ghcr.io/kayasax/scimtool:latest" -ForegroundColor Gray
+Write-Host "Using latest tested image: ghcr.io/kayasax/scimserver:latest" -ForegroundColor Gray
 
-$ImageName = "ghcr.io/kayasax/scimtool:latest"
+$ImageName = "ghcr.io/kayasax/scimserver:latest"
 
 az containerapp up `
     --name $AppName `

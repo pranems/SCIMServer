@@ -2,7 +2,7 @@
 
 > **Version:** 2.0  
 > **Date:** February 11, 2026  
-> **Applies to:** SCIMTool2022 API  
+> **Applies to:** SCIMServer2022 API  
 > **RFC References:** [RFC 7643](https://datatracker.ietf.org/doc/html/rfc7643) (Core Schema), [RFC 7644](https://datatracker.ietf.org/doc/html/rfc7644) (Protocol), [RFC 7642](https://datatracker.ietf.org/doc/html/rfc7642) (Concepts)
 
 ---

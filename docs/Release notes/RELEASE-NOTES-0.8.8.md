@@ -1,4 +1,4 @@
-# SCIMTool v0.8.8 – Keepalive Noise Reduction
+# SCIMServer v0.8.8 – Keepalive Noise Reduction
 
 ## Highlights
 - **Suppress Entra keepalive chatter** – Raw Logs view now auto-hides recurring `userName eq <GUID>` pings, with a per-user toggle and banner telling you what was filtered.
@@ -7,8 +7,8 @@
 
 ## Upgrade Command
 ```powershell
-iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMTool/master/scripts/update-scimtool-direct.ps1');
-Update-SCIMToolDirect -Version v0.8.8 -ResourceGroup <rg> -AppName <app> -NoPrompt
+iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMServer/master/scripts/update-scimserver-direct.ps1');
+Update-SCIMServerDirect -Version v0.8.8 -ResourceGroup <rg> -AppName <app> -NoPrompt
 ```
 
 ## Verification Checklist

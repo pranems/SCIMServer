@@ -2,7 +2,7 @@
 
 > **Original analysis**: February 11, 2026  
 > **Upgrade completed**: February 14, 2026  
-> **Project**: SCIMTool2022 — NestJS + Prisma + SQLite SCIM 2.0 Server
+> **Project**: SCIMServer2022 — NestJS + Prisma + SQLite SCIM 2.0 Server
 
 ---
 

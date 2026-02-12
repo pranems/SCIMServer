@@ -1,12 +1,12 @@
 # Multi-Endpoint SCIM Guide
 
-> Consolidated reference for the multi-endpoint (multi-tenant) SCIM architecture in SCIMTool.
+> Consolidated reference for the multi-endpoint (multi-tenant) SCIM architecture in SCIMServer.
 
 ---
 
 ## Overview
 
-SCIMTool supports **multi-endpoint isolation** — each endpoint gets a dedicated SCIM base path with completely isolated Users, Groups, and configuration. This enables a single SCIMTool deployment to serve multiple Entra ID enterprise applications or tenants simultaneously.
+SCIMServer supports **multi-endpoint isolation** — each endpoint gets a dedicated SCIM base path with completely isolated Users, Groups, and configuration. This enables a single SCIMServer deployment to serve multiple Entra ID enterprise applications or tenants simultaneously.
 
 ### Key Capabilities
 
@@ -91,7 +91,7 @@ This ensures complete data isolation between concurrent requests to different en
 
 ```bash
 TOKEN=$(curl -s -X POST http://localhost:6000/scim/oauth/token \
-  -d "client_id=scimtool-client&client_secret=changeme-oauth&grant_type=client_credentials" \
+  -d "client_id=scimserver-client&client_secret=changeme-oauth&grant_type=client_credentials" \
   | jq -r '.access_token')
 
 curl -X POST http://localhost:6000/scim/admin/endpoints \

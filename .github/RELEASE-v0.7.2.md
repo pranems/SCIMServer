@@ -1,9 +1,9 @@
-# 🎉 SCIMTool v0.7.2 - Persistent Storage with Auto-Restore
+# 🎉 SCIMServer v0.7.2 - Persistent Storage with Auto-Restore
 
 ## 🚀 Major Features
 
 ### 💾 Hybrid Persistent Storage Architecture
-**The biggest enhancement yet!** SCIMTool now preserves all SCIM provisioning data across container restarts, redeployments, and scaling operations.
+**The biggest enhancement yet!** SCIMServer now preserves all SCIM provisioning data across container restarts, redeployments, and scaling operations.
 
 **How It Works:**
 - 🗄️ **Primary Database**: Fast local ephemeral SQLite storage
@@ -32,8 +32,8 @@
 ## 📚 Documentation
 
 New comprehensive documentation added:
-- [`docs/PERSISTENCE-VERIFICATION.md`](https://github.com/kayasax/SCIMTool/blob/master/docs/PERSISTENCE-VERIFICATION.md) - Complete test results and architecture validation
-- [`docs/persistent-storage-implementation.md`](https://github.com/kayasax/SCIMTool/blob/master/docs/persistent-storage-implementation.md) - Technical implementation details
+- [`docs/PERSISTENCE-VERIFICATION.md`](https://github.com/kayasax/SCIMServer/blob/master/docs/PERSISTENCE-VERIFICATION.md) - Complete test results and architecture validation
+- [`docs/persistent-storage-implementation.md`](https://github.com/kayasax/SCIMServer/blob/master/docs/persistent-storage-implementation.md) - Technical implementation details
 
 ## 🏗️ Architecture
 
@@ -70,16 +70,16 @@ Run the configuration script:
   -ResourceGroup "YOUR-RG" `
   -AppName "YOUR-APP" `
   -StorageAccountName "YOUR-STORAGE" `
-  -FileShareName "scimtool-data"
+  -FileShareName "scimserver-data"
 ```
 
-See [`docs/persistent-storage-implementation.md`](https://github.com/kayasax/SCIMTool/blob/master/docs/persistent-storage-implementation.md) for detailed instructions.
+See [`docs/persistent-storage-implementation.md`](https://github.com/kayasax/SCIMServer/blob/master/docs/persistent-storage-implementation.md) for detailed instructions.
 
 ## 📦 Docker Image
 
 ```bash
-docker pull ghcr.io/kayasax/scimtool:0.7.2
-docker pull ghcr.io/kayasax/scimtool:latest
+docker pull ghcr.io/kayasax/scimserver:0.7.2
+docker pull ghcr.io/kayasax/scimserver:latest
 ```
 
 ## 🎯 What's Next?
@@ -103,4 +103,4 @@ SQLite on Azure Files SMB has file locking limitations that cause write errors. 
 
 ---
 
-**Full Changelog**: https://github.com/kayasax/SCIMTool/compare/v0.7.1...v0.7.2
+**Full Changelog**: https://github.com/kayasax/SCIMServer/compare/v0.7.1...v0.7.2

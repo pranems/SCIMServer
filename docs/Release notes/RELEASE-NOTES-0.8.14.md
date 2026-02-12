@@ -70,8 +70,8 @@ This is a **safe, backward-compatible** update:
 ### Update Command
 ```powershell
 # Using the direct update script
-iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMTool/master/scripts/update-scimtool-direct.ps1')
-Update-SCIMToolDirect -Version v0.8.14 -ResourceGroup <your-rg> -AppName <your-app>
+iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMServer/master/scripts/update-scimserver-direct.ps1')
+Update-SCIMServerDirect -Version v0.8.14 -ResourceGroup <your-rg> -AppName <your-app>
 ```
 
 ## 🔍 Impact Assessment
@@ -141,4 +141,4 @@ Implemented using Test-Driven Development (TDD) methodology with comprehensive t
 
 ---
 
-**Full Changelog:** [v0.8.13...v0.8.14](https://github.com/kayasax/SCIMTool/compare/v0.8.13...v0.8.14)
+**Full Changelog:** [v0.8.13...v0.8.14](https://github.com/kayasax/SCIMServer/compare/v0.8.13...v0.8.14)

@@ -1,9 +1,9 @@
-﻿<#
+<#
 .SYNOPSIS
-    Add persistent storage to existing SCIMTool Container App deployment
+    Add persistent storage to existing SCIMServer Container App deployment
 
 .DESCRIPTION
-    This script adds Azure Files persistent storage to an existing SCIMTool
+    This script adds Azure Files persistent storage to an existing SCIMServer
     deployment without losing the deployment itself. Note: Current data will
     be lost during the upgrade (it's ephemeral anyway).
 
@@ -17,10 +17,10 @@
     Attempt to backup current database before upgrade (requires app to be running)
 
 .EXAMPLE
-    .\add-persistent-storage.ps1 -ResourceGroup "RG-FR-SCIMTOOL" -AppName "scimtool-ms"
+    .\add-persistent-storage.ps1 -ResourceGroup "RG-FR-SCIMSERVER" -AppName "scimserver-ms"
 
 .EXAMPLE
-    .\add-persistent-storage.ps1 -ResourceGroup "RG-FR-SCIMTOOL" -AppName "scimtool-ms" -BackupCurrentData
+    .\add-persistent-storage.ps1 -ResourceGroup "RG-FR-SCIMSERVER" -AppName "scimserver-ms" -BackupCurrentData
 #>
 
 param(
@@ -35,7 +35,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "🔄 Adding Persistent Storage to Existing SCIMTool Deployment" -ForegroundColor Cyan
+Write-Host "🔄 Adding Persistent Storage to Existing SCIMServer Deployment" -ForegroundColor Cyan
 Write-Host "════════════════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host ""
 
@@ -129,7 +129,7 @@ $storageName = $AppName.Replace("-", "").Replace("_", "").ToLower() + "stor"
 if ($storageName.Length > 24) {
     $storageName = $storageName.Substring(0, 24)
 }
-$fileShareName = "scimtool-data"
+$fileShareName = "scimserver-data"
 
 Write-Host "   Storage Account: $storageName" -ForegroundColor White
 Write-Host "   File Share: $fileShareName" -ForegroundColor White
@@ -178,7 +178,7 @@ Write-Host "🔗 Step 5/6: Linking Storage to Environment" -ForegroundColor Cyan
 az containerapp env storage set `
     --name $envName `
     --resource-group $ResourceGroup `
-    --storage-name "scimtool-storage" `
+    --storage-name "scimserver-storage" `
     --azure-file-account-name $storageName `
     --azure-file-account-key "$storageAccountKey" `
     --azure-file-share-name $fileShareName `
@@ -209,7 +209,7 @@ if (-not $currentScimSecret) {
     $scimSecret = Read-Host "Please enter your SCIM shared secret (same as before)"
 }
 
-# Parse image: "ghcr.io/kayasax/scimtool:0.5.0" -> registry="ghcr.io", image="kayasax/scimtool:0.5.0"
+# Parse image: "ghcr.io/kayasax/scimserver:0.5.0" -> registry="ghcr.io", image="kayasax/scimserver:0.5.0"
 $imageParts = $currentImage -split '/', 2
 $registry = $imageParts[0]
 $imageWithTag = $imageParts[1]

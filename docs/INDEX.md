@@ -1,4 +1,4 @@
-# 📚 SCIMTool Documentation Index
+# 📚 SCIMServer Documentation Index
 
 > Quick navigation to all project documentation. Updated February 11, 2026.
 

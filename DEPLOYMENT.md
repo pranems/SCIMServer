@@ -1,6 +1,6 @@
-﻿# 🚀 SCIMTool Deployment Options
+# 🚀 SCIMServer Deployment Options
 
-This document covers all deployment methods for SCIMTool. For the quickest start, use the container deployment method described in the main README.
+This document covers all deployment methods for SCIMServer. For the quickest start, use the container deployment method described in the main README.
 
 ---
 
@@ -11,10 +11,10 @@ Deploy to Azure Container Apps for production use with automatic scaling and ent
 
 ```powershell
 # Deploy with the included script
-.\scripts\deploy-azure.ps1 -ResourceGroup "scim-rg" -AppName "scimtool-prod" -ScimSecret "your-secure-secret"
+.\scripts\deploy-azure.ps1 -ResourceGroup "scim-rg" -AppName "scimserver-prod" -ScimSecret "your-secure-secret"
 
 # Or use the quick deploy script
-iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMTool/master/deploy.ps1')
+iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMServer/master/deploy.ps1')
 ```
 
 > The deployment script prints three secrets at the end (SCIM bearer, JWT signing, OAuth client). Store each value securely—you'll need them for future updates or to regenerate tokens.
@@ -34,8 +34,8 @@ For on-premises or custom cloud deployments:
 ```yaml
 version: '3.8'
 services:
-  scimtool:
-    image: ghcr.io/kayasax/scimtool:latest
+  scimserver:
+    image: ghcr.io/kayasax/scimserver:latest
     ports:
       - "3000:3000"
     environment:
@@ -62,7 +62,7 @@ docker run -d -p 3000:3000 \
   -e JWT_SECRET=your-jwt-secret \
   -e OAUTH_CLIENT_SECRET=your-oauth-client-secret \
   -v scim-data:/app/data \
-  ghcr.io/kayasax/scimtool:latest
+  ghcr.io/kayasax/scimserver:latest
 ```
 
 ---
@@ -72,21 +72,21 @@ docker run -d -p 3000:3000 \
 For immediate testing and team collaboration:
 
 ### **Free Hosted Instance**
-- **URL**: https://scimtool.azurewebsites.net
+- **URL**: https://scimserver.azurewebsites.net
 - **No Setup Required**: Just configure your Enterprise App to point to this URL
 - **Team Sharing**: Multiple team members can use the same instance
 - **Perfect For**: Testing, demonstrations, quick prototyping
 
 ### **Configuration**
-1. **Tenant URL**: `https://scimtool.azurewebsites.net/scim`
+1. **Tenant URL**: `https://scimserver.azurewebsites.net/scim`
 2. **Secret Token**: `changeme` (default) or contact us for a custom token
-3. **Monitoring URL**: `https://scimtool.azurewebsites.net`
+3. **Monitoring URL**: `https://scimserver.azurewebsites.net`
 
 ---
 
 ## 🔧 **Local Development**
 
-For developers who want to customize or contribute to SCIMTool:
+For developers who want to customize or contribute to SCIMServer:
 
 ### **Prerequisites**
 - Node.js 22+ and npm
@@ -96,8 +96,8 @@ For developers who want to customize or contribute to SCIMTool:
 ### **Quick Start**
 ```powershell
 # Clone and setup
-git clone https://github.com/kayasax/SCIMTool.git
-cd SCIMTool
+git clone https://github.com/kayasax/SCIMServer.git
+cd SCIMServer
 .\setup.ps1 -TestLocal
 ```
 
@@ -208,4 +208,4 @@ git pull
 
 ---
 
-**✅ That's it! Your SCIMTool instance is ready for production use.**
+**✅ That's it! Your SCIMServer instance is ready for production use.**

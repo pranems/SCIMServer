@@ -1,6 +1,6 @@
-# SCIMTool � Complete REST API Reference
+# SCIMServer � Complete REST API Reference
 
-This document enumerates all REST API endpoints and resources exposed by the SCIMTool application, with HTTP methods, purpose, common query parameters, expected request and response shapes, authentication notes, and `curl` examples for each operation.
+This document enumerates all REST API endpoints and resources exposed by the SCIMServer application, with HTTP methods, purpose, common query parameters, expected request and response shapes, authentication notes, and `curl` examples for each operation.
 
 Base path
 - The server mounts APIs under the global prefix `scim` by default. The runtime rewrites `/scim/v2/*` ? `/scim/*` for compatibility, so both `/scim/*` and `/scim/v2/*` work.
@@ -348,7 +348,7 @@ OAuth endpoints
 ```
 curl -X POST "https://<API_BASE>/oauth/token" \
   -H "Content-Type: application/json" \
-  -d '{"grant_type":"client_credentials","client_id":"scimtool-client","client_secret":"<SECRET>","scope":"scim.manage"}'
+  -d '{"grant_type":"client_credentials","client_id":"scimserver-client","client_secret":"<SECRET>","scope":"scim.manage"}'
 ```
 
 2) GET /oauth/test (public)
@@ -399,7 +399,7 @@ Appendix � Useful curl snippets
 
 - Get token and create user (combined):
 ```
-TOKEN=$(curl -s -X POST "https://<API_BASE>/oauth/token" -H "Content-Type: application/json" -d '{"grant_type":"client_credentials","client_id":"scimtool-client","client_secret":"<SECRET>","scope":"scim.manage"}' | jq -r .access_token)
+TOKEN=$(curl -s -X POST "https://<API_BASE>/oauth/token" -H "Content-Type: application/json" -d '{"grant_type":"client_credentials","client_id":"scimserver-client","client_secret":"<SECRET>","scope":"scim.manage"}' | jq -r .access_token)
 curl -X POST "https://<API_BASE>/scim/v2/Users" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/scim+json" -d '{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"alice@example.com"}'
 ```
 
@@ -421,7 +421,7 @@ Adjust values if your server runs elsewhere.
 
 Environment variables used in the examples
 - API_BASE=http://localhost:3000
-- OAUTH client_id=scimtool-client
+- OAUTH client_id=scimserver-client
 - OAUTH client_secret=dev-secret-abc123
 - Shared secret (SCIM_SHARED_SECRET)=S3cr3tSharedValue
 
@@ -430,12 +430,12 @@ Obtain an OAuth token (client_credentials) and use it to create a user:
 ```sh
 # Request a JWT access token using client credentials
 API_BASE="http://localhost:3000"
-CLIENT_ID="scimtool-client"
+CLIENT_ID="scimserver-client"
 CLIENT_SECRET="dev-secret-abc123"
 
 TOKEN=$(curl -s -X POST "${API_BASE}/oauth/token" \
   -H "Content-Type: application/json" \
-  -d '{"grant_type":"client_credentials","client_id":"scimtool-client","client_secret":"dev-secret-abc123","scope":"scim.manage scim.read scim.write"}' \
+  -d '{"grant_type":"client_credentials","client_id":"scimserver-client","client_secret":"dev-secret-abc123","scope":"scim.manage scim.read scim.write"}' \
   | jq -r .access_token)
 
 echo "Access token: ${TOKEN}"
@@ -544,7 +544,7 @@ OAuth token (inspect full response):
 ```sh
 curl -s -X POST "${API_BASE}/oauth/token" \
   -H "Content-Type: application/json" \
-  -d '{"grant_type":"client_credentials","client_id":"scimtool-client","client_secret":"dev-secret-abc123","scope":"scim.manage scim.read scim.write"}' | jq .
+  -d '{"grant_type":"client_credentials","client_id":"scimserver-client","client_secret":"dev-secret-abc123","scope":"scim.manage scim.read scim.write"}' | jq .
 ```
 
 Use shared secret for an admin endpoint (legacy):
@@ -557,10 +557,10 @@ curl -s -H "Authorization: Bearer S3cr3tSharedValue" "${API_BASE}/scim/v2/admin/
 
 Insomnia / OpenAPI
 
-I included a minimal Insomnia export under `docs/insomnia/SCIMTool_Insomnia_Export.json`. Import it into Insomnia (File ? Import ? From File) to get a workspace with ready-to-run requests. The export uses the following environment defaults:
+I included a minimal Insomnia export under `docs/insomnia/SCIMServer_Insomnia_Export.json`. Import it into Insomnia (File ? Import ? From File) to get a workspace with ready-to-run requests. The export uses the following environment defaults:
 - base_url = `http://localhost:3000`
-- client_id = `scimtool-client`
+- client_id = `scimserver-client`
 - client_secret = `dev-secret-abc123`
 - shared_secret = `S3cr3tSharedValue`
 
-If you prefer an OpenAPI JSON instead, tell me and I will generate `docs/insomnia/SCIMTool_openapi.json`.
+If you prefer an OpenAPI JSON instead, tell me and I will generate `docs/insomnia/SCIMServer_openapi.json`.

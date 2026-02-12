@@ -1,4 +1,4 @@
-# SCIMTool v0.8.6 – Resilient Persistence & SCIM Guardrails
+# SCIMServer v0.8.6 – Resilient Persistence & SCIM Guardrails
 
 ## Highlights
 - **Blob restore bootstrap:** Container entrypoint now hydrates `/tmp/local-data/scim.db` from the latest blob snapshot when Azure Files backup is absent, preventing data loss on cold starts.
@@ -12,6 +12,6 @@
 
 ## Commands
 ```powershell
-iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMTool/master/scripts/update-scimtool-direct.ps1'); \
-  Update-SCIMToolDirect -Version v0.8.6 -ResourceGroup <rg> -AppName <app> -NoPrompt
+iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMServer/master/scripts/update-scimserver-direct.ps1'); \
+  Update-SCIMServerDirect -Version v0.8.6 -ResourceGroup <rg> -AppName <app> -NoPrompt
 ```

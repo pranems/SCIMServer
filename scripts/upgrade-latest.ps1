@@ -1,8 +1,8 @@
-﻿<#!
+<#!
 .SYNOPSIS
   Re-pulls the latest image tag (e.g. :latest) for the running Container App.
 .DESCRIPTION
-  Azure Container Apps resolves an image tag (e.g. myacr.azurecr.io/scimtool:latest) to an immutable digest
+  Azure Container Apps resolves an image tag (e.g. myacr.azurecr.io/scimserver:latest) to an immutable digest
   at deployment time. Pushing a new image to the same tag does NOT automatically update the running revision.
 
   This helper updates (or re-updates) the container app to the specified tag so that ACA resolves it again
@@ -18,13 +18,13 @@
 .PARAMETER Tag
   Image tag to deploy (default: latest).
 .PARAMETER Image
-  Full base image reference WITHOUT tag (e.g. myacr.azurecr.io/scimtool). If omitted, current image base will be inferred.
+  Full base image reference WITHOUT tag (e.g. myacr.azurecr.io/scimserver). If omitted, current image base will be inferred.
 .PARAMETER DryRun
   Show the command only; do not execute.
 .EXAMPLE
-  ./upgrade-latest.ps1 -ResourceGroup scimtool-rg -AppName scimtool-prod
+  ./upgrade-latest.ps1 -ResourceGroup scimserver-rg -AppName scimserver-prod
 .EXAMPLE
-  ./upgrade-latest.ps1 -ResourceGroup scimtool-rg -AppName scimtool-prod -Tag nightly
+  ./upgrade-latest.ps1 -ResourceGroup scimserver-rg -AppName scimserver-prod -Tag nightly
 #>
 param(
   [Parameter(Mandatory)][string]$ResourceGroup,
@@ -34,7 +34,7 @@ param(
   [switch]$DryRun
 )
 
-Write-Host "🔄 SCIMTool Re-Pull Tag Helper" -ForegroundColor Cyan
+Write-Host "🔄 SCIMServer Re-Pull Tag Helper" -ForegroundColor Cyan
 Write-Host " Resource Group : $ResourceGroup" -ForegroundColor Gray
 Write-Host " App Name      : $AppName" -ForegroundColor Gray
 Write-Host " Desired Tag   : $Tag" -ForegroundColor Gray

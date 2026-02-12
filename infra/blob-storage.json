@@ -24,7 +24,7 @@
     },
     "containerName": {
       "type": "string",
-      "defaultValue": "scimtool-backups",
+      "defaultValue": "scimserver-backups",
       "metadata": {
         "description": "Blob container name for SQLite snapshots"
       }
@@ -89,7 +89,7 @@
         "allowSharedKeyAccess": true
       },
       "tags": {
-        "project": "scimtool",
+        "project": "scimserver",
         "component": "blob-backup"
       }
     },
@@ -134,7 +134,7 @@
         ]
       },
       "tags": {
-        "project": "scimtool",
+        "project": "scimserver",
         "component": "blob-pe"
       },
       "dependsOn": [

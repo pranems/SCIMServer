@@ -17,7 +17,7 @@ export LOCAL_DB_PATH="$LOCAL_DB"
 mkdir -p "$LOCAL_DIR"
 
 echo "╔════════════════════════════════════════════════════════════╗"
-echo "║  SCIMTool - Hybrid Storage Initialization                 ║"
+echo "║  SCIMServer - Hybrid Storage Initialization                 ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 
 # Check if backup exists on Azure Files and restore it

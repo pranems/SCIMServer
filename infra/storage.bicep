@@ -1,4 +1,4 @@
-// Azure Storage Account + File Share for SCIMTool persistent database storage
+// Azure Storage Account + File Share for SCIMServer persistent database storage
 // Uses classic Microsoft.Storage provider for SMB file share
 
 @description('Location for the storage account')
@@ -8,7 +8,7 @@ param location string = resourceGroup().location
 param storageAccountName string
 
 @description('File share name for SQLite database')
-param fileShareName string = 'scimtool-data'
+param fileShareName string = 'scimserver-data'
 
 @description('File share quota in GiB')
 @minValue(5)
@@ -44,7 +44,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
     }
   }
   tags: {
-    project: 'scimtool'
+    project: 'scimserver'
     component: 'storage'
   }
 }

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTheme } from '../hooks/useTheme';
 import { fetchBackupStats, type BackupStats } from '../api/client';
 import styles from './Header.module.css';
@@ -72,7 +72,7 @@ export const Header: React.FC<HeaderProps> = ({ onChangeToken, tokenConfigured }
             </svg>
           </div>
           <div className={styles.brandText}>
-            <h1 className={styles.title}>SCIMTool</h1>
+            <h1 className={styles.title}>SCIMServer</h1>
             <p className={styles.subtitle}>SCIM 2.0 Provisioning Monitor</p>
           </div>
         </div>

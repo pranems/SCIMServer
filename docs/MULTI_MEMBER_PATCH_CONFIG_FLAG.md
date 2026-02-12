@@ -34,7 +34,7 @@ These config flags control whether a single PATCH operation can add or remove mu
 POST /scim/oauth/token
 Content-Type: application/x-www-form-urlencoded
 
-client_id=scimtool-client&client_secret=changeme-oauth&grant_type=client_credentials
+client_id=scimserver-client&client_secret=changeme-oauth&grant_type=client_credentials
 ```
 
 **Response:**
@@ -460,7 +460,7 @@ A comprehensive test script is available at `scripts/live-test.ps1`:
 
 ```powershell
 # Run the live test
-& c:\path\to\SCIMTool2022\scripts\live-test.ps1
+& c:\path\to\SCIMServer2022\scripts\live-test.ps1
 ```
 
 This script demonstrates:

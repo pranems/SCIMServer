@@ -1,6 +1,6 @@
-export const TOKEN_STORAGE_KEY = 'scimtool.authToken';
-export const TOKEN_CHANGED_EVENT = 'scimtool:token-changed';
-export const TOKEN_INVALID_EVENT = 'scimtool:token-invalid';
+export const TOKEN_STORAGE_KEY = 'scimserver.authToken';
+export const TOKEN_CHANGED_EVENT = 'scimserver:token-changed';
+export const TOKEN_INVALID_EVENT = 'scimserver:token-invalid';
 
 type TokenEventDetail = { token: string | null };
 

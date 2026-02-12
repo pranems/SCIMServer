@@ -134,7 +134,7 @@ if ($VerboseMode) {
 # Step 1: Get OAuth token
 Write-Host "`n=== STEP 1: Get OAuth Token ===" -ForegroundColor Cyan
 Write-VerboseLog "Token endpoint" "$baseUrl/scim/oauth/token"
-$tokenBody = @{client_id='scimtool-client';client_secret='changeme-oauth';grant_type='client_credentials'}
+$tokenBody = @{client_id='scimserver-client';client_secret='changeme-oauth';grant_type='client_credentials'}
 $tokenResponse = Invoke-RestMethod -Uri "$baseUrl/scim/oauth/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body $tokenBody
 $Token = $tokenResponse.access_token
 Write-Host "✅ Token obtained: $($Token.Substring(0,30))..."

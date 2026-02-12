@@ -1,4 +1,4 @@
-﻿# SCIMTool Admin / Author Guide – Upgrade & Release Flow
+# SCIMServer Admin / Author Guide – Upgrade & Release Flow
 
 Internal doc for you (the author) – not end-user facing. This captures the exact, repeatable steps to develop a change, test it, publish a new container image to the public ACR, and surface the upgrade to running environments via the built‑in banner.
 
@@ -8,8 +8,8 @@ Internal doc for you (the author) – not end-user facing. This captures the exa
 2. Bump `api/package.json` version (e.g. 0.1.0 -> 0.2.0) – keep semver.
 3. Commit & push.
 4. (Optional but recommended when you start using Releases) Create annotated git tag: `git tag -a v0.2.0 -m "v0.2.0"` then `git push origin v0.2.0`.
-5. Build & push image to ACR: `pwsh ./scripts/publish-acr.ps1 -Registry scimtoolpublic -ResourceGroup scimtool-rg -Latest` (adds version + latest).
-6. Update Container App: `az containerapp update -n scimtool-prod -g scimtool-rg --image ghcr.io/kayasax/scimtool:0.2.0`.
+5. Build & push image to ACR: `pwsh ./scripts/publish-acr.ps1 -Registry scimserverpublic -ResourceGroup scimserver-rg -Latest` (adds version + latest).
+6. Update Container App: `az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/kayasax/scimserver:0.2.0`.
 7. Open UI → banner should show if newer than running instance.
 8. (Optional) Publish a GitHub Release for richer banner notes.
 
@@ -64,7 +64,7 @@ Unified (web + api) image is built from repo root `Dockerfile`.
 
 Local build (fast, if Docker installed):
 ```powershell
-pwsh ./scripts/publish-acr.ps1 -Registry scimtoolpublic -ResourceGroup scimtool-rg -Latest
+pwsh ./scripts/publish-acr.ps1 -Registry scimserverpublic -ResourceGroup scimserver-rg -Latest
 ```
 Flags:
 - `-Latest` also tags `:latest` pointing to the same digest.
@@ -74,23 +74,23 @@ Flags:
 
 Resulting references:
 ```
-scimtoolpublic.azurecr.io/scimtool:0.2.0
-scimtoolpublic.azurecr.io/scimtool:latest
+scimserverpublic.azurecr.io/scimserver:0.2.0
+scimserverpublic.azurecr.io/scimserver:latest
 ```
 
 ### 5. Deploy to Azure Container App
 ```powershell
-az containerapp update -n scimtool-prod -g scimtool-rg --image ghcr.io/kayasax/scimtool:0.2.0
+az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/kayasax/scimserver:0.2.0
 ```
 To always use the moving pointer (still need manual update):
 ```powershell
-az containerapp update -n scimtool-prod -g scimtool-rg --image ghcr.io/kayasax/scimtool:latest
+az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/kayasax/scimserver:latest
 ```
 
 ### 6. Verify
 Logs:
 ```powershell
-az containerapp logs show -n scimtool-prod -g scimtool-rg --tail 50
+az containerapp logs show -n scimserver-prod -g scimserver-rg --tail 50
 ```
 Version endpoint:
 ```powershell
@@ -109,7 +109,7 @@ The UI now provides a streamlined update experience:
 **Hosted PowerShell Script**:
 Users can update with a single command (copied from banner):
 ```powershell
-iex (irm https://scimtoolpublic.azurecr.io/scimtool/update-scimtool.ps1)
+iex (irm https://scimserverpublic.azurecr.io/scimserver/update-scimserver.ps1)
 ```
 
 The hosted script:
@@ -121,17 +121,17 @@ The hosted script:
 
 **Alternative**: Direct Azure CLI (still supported):
 ```powershell
-az containerapp update -n scimtool-prod -g scimtool-rg --image ghcr.io/kayasax/scimtool:0.2.0
+az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/kayasax/scimserver:0.2.0
 ```
 
 ### 7. Rollback
 List revisions:
 ```powershell
-az containerapp revision list -n scimtool-prod -g scimtool-rg --query "[].{rev:name,img:properties.template.containers[0].image,active:active}" -o table
+az containerapp revision list -n scimserver-prod -g scimserver-rg --query "[].{rev:name,img:properties.template.containers[0].image,active:active}" -o table
 ```
 Roll back by updating image to the prior version tag:
 ```powershell
-az containerapp update -n scimtool-prod -g scimtool-rg --image scimtoolpublic.azurecr.io/scimtool:0.1.0
+az containerapp update -n scimserver-prod -g scimserver-rg --image scimserverpublic.azurecr.io/scimserver:0.1.0
 ```
 
 ### 8. Tagging & Releases Strategy
@@ -150,11 +150,11 @@ az containerapp update -n scimtool-prod -g scimtool-rg --image scimtoolpublic.az
 | Wrong image version deployed | Forgot to bump package.json | Bump version, rebuild, redeploy |
 | Remote ACR build fails | Unicode log + large context | Use local build path |
 | 404 from releases API | No Releases exist | Expected; fallback to tags active |
-| Anonymous pull fails | Registry not public yet | Run: `az acr update -n scimtoolpublic --anonymous-pull-enabled` |
+| Anonymous pull fails | Registry not public yet | Run: `az acr update -n scimserverpublic --anonymous-pull-enabled` |
 
 ### 10. Local Smoke Test of Built Image
 ```powershell
-docker run --rm -p 8080:80 ghcr.io/kayasax/scimtool:0.2.0
+docker run --rm -p 8080:80 ghcr.io/kayasax/scimserver:0.2.0
 # Then: curl http://localhost:8080/scim/admin/version (with header if auth required)
 ```
 
@@ -179,13 +179,13 @@ git add api/package.json; git commit -m "chore: bump version"; git push
 git tag -a v0.2.0 -m "v0.2.0"; git push origin v0.2.0
 
 # Build & push
-pwsh ./scripts/publish-acr.ps1 -Registry scimtoolpublic -ResourceGroup scimtool-rg -Latest
+pwsh ./scripts/publish-acr.ps1 -Registry scimserverpublic -ResourceGroup scimserver-rg -Latest
 
 # Deploy
-az containerapp update -n scimtool-prod -g scimtool-rg --image ghcr.io/kayasax/scimtool:0.2.0
+az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/kayasax/scimserver:0.2.0
 
 # Verify
-az containerapp logs show -n scimtool-prod -g scimtool-rg --tail 50
+az containerapp logs show -n scimserver-prod -g scimserver-rg --tail 50
 Invoke-RestMethod -Headers @{ Authorization = 'Bearer S@g@r2011' } -Uri https://<FQDN>/scim/admin/version
 ```
 

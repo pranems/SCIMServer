@@ -1,4 +1,4 @@
-# SCIMTool — Technical Design Document (TDD)
+# SCIMServer — Technical Design Document (TDD)
 
 > **Version**: 1.0  
 > **Date**: February 9, 2026  
@@ -43,7 +43,7 @@
 │  └───────────────────────────────────────────────────────────┘ │
 │                          │                                      │
 │  ┌───────────────────────▼─────────────────────────────────────┐│
-│  │  Azure Blob Storage (scimtool-backups)                      ││
+│  │  Azure Blob Storage (scimserver-backups)                      ││
 │  │  • 5-minute snapshot cron                                   ││
 │  │  • 20-snapshot retention                                    ││
 │  │  • Restore-on-startup                                       ││
@@ -534,7 +534,7 @@ Incoming Request
 ### 7.2 OAuth 2.0 Token Flow
 
 ```
-Client                                  SCIMTool
+Client                                  SCIMServer
   │                                        │
   │  POST /scim/oauth/token                │
   │  grant_type=client_credentials         │
@@ -679,14 +679,14 @@ npm run start:prod   # node dist/main.js
 Azure Resource Group
 ├── Container Apps Environment (containerapp-env.bicep)
 │   └── Container App (containerapp.bicep)
-│       ├── Image: <acr>.azurecr.io/scimtool:latest
+│       ├── Image: <acr>.azurecr.io/scimserver:latest
 │       ├── Min replicas: 0 (scale-to-zero)
 │       ├── Max replicas: 1
 │       ├── CPU: 0.5, Memory: 1Gi
 │       └── Env vars: DATABASE_URL, SCIM_SHARED_SECRET, BLOB_BACKUP_*
 ├── Azure Container Registry (acr.bicep)
 ├── Storage Account (blob-storage.bicep)
-│   └── Blob Container: scimtool-backups
+│   └── Blob Container: scimserver-backups
 ├── Virtual Network (networking.bicep)
 │   ├── infra-subnet → Container Apps Environment
 │   └── storage-subnet → Private Endpoint → Storage
@@ -784,7 +784,7 @@ CMD ["node", "dist/main.js"]
 | `OAUTH_CLIENT_SECRET` | Auto-generated | OAuth client secret |
 | `OAUTH_CLIENT_SCOPES` | `scim.read,scim.write,scim.manage` | Allowed OAuth scopes |
 | `BLOB_BACKUP_ACCOUNT` | — | Azure Storage account for backups |
-| `BLOB_BACKUP_CONTAINER` | `scimtool-backups` | Blob container name |
+| `BLOB_BACKUP_CONTAINER` | `scimserver-backups` | Blob container name |
 | `BLOB_BACKUP_INTERVAL_MIN` | `5` | Backup interval in minutes |
 | `NODE_ENV` | `development` | Environment mode |
 
@@ -806,4 +806,4 @@ CMD ["node", "dist/main.js"]
 
 ---
 
-*This document describes the as-built architecture of SCIMTool as of February 2026.*
+*This document describes the as-built architecture of SCIMServer as of February 2026.*

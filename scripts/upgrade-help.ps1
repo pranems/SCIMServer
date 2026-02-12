@@ -1,6 +1,6 @@
-﻿<#!
+<#!
 .SYNOPSIS
-  Provides an assisted upgrade workflow for an existing SCIMTool Azure Container App deployment.
+  Provides an assisted upgrade workflow for an existing SCIMServer Azure Container App deployment.
 .DESCRIPTION
   Fetches the currently running version (local) and compares it with an upstream GitHub release tag list.
   If a newer version exists, offers to run an az containerapp update using the chosen tag.
@@ -13,28 +13,28 @@
 .PARAMETER AppName
   Azure Container App name
 .PARAMETER Image
-  Base image reference (e.g. myregistry.azurecr.io/scimtool)
+  Base image reference (e.g. myregistry.azurecr.io/scimserver)
 .PARAMETER GitHubRepo
-  GitHub repo in owner/name form (default: kayasax/SCIMTool)
+  GitHub repo in owner/name form (default: kayasax/SCIMServer)
 .PARAMETER Prerelease
   Include pre-release versions (default: false)
 .PARAMETER DryRun
   Show actions but do not perform update
 .EXAMPLE
-  ./upgrade-help.ps1 -ResourceGroup scimtool-rg -AppName scimtool-prod -Image myacr.azurecr.io/scimtool
+  ./upgrade-help.ps1 -ResourceGroup scimserver-rg -AppName scimserver-prod -Image myacr.azurecr.io/scimserver
 .EXAMPLE
-  ./upgrade-help.ps1 -ResourceGroup scimtool-rg -AppName scimtool-prod -Image myacr.azurecr.io/scimtool -Prerelease
+  ./upgrade-help.ps1 -ResourceGroup scimserver-rg -AppName scimserver-prod -Image myacr.azurecr.io/scimserver -Prerelease
 #>
 param(
   [Parameter(Mandatory)][string]$ResourceGroup,
   [Parameter(Mandatory)][string]$AppName,
   [Parameter(Mandatory)][string]$Image,
-  [string]$GitHubRepo = 'kayasax/SCIMTool',
+  [string]$GitHubRepo = 'kayasax/SCIMServer',
   [switch]$Prerelease,
   [switch]$DryRun
 )
 
-Write-Host "🔍 SCIMTool Upgrade Helper" -ForegroundColor Cyan
+Write-Host "🔍 SCIMServer Upgrade Helper" -ForegroundColor Cyan
 Write-Host "Resource Group: $ResourceGroup" -ForegroundColor Gray
 Write-Host "App Name      : $AppName" -ForegroundColor Gray
 Write-Host "Base Image    : $Image" -ForegroundColor Gray
@@ -73,7 +73,7 @@ try {
 Write-Host "📥 Fetching GitHub releases..." -ForegroundColor Cyan
 $releasesUri = "https://api.github.com/repos/$GitHubRepo/releases"
 try {
-  $releases = Invoke-RestMethod -Uri $releasesUri -Headers @{ 'User-Agent' = 'SCIMToolUpgradeScript' }
+  $releases = Invoke-RestMethod -Uri $releasesUri -Headers @{ 'User-Agent' = 'SCIMServerUpgradeScript' }
 } catch {
   Write-Host "❌ Failed to fetch releases from GitHub: $($_.Exception.Message)" -ForegroundColor Red
   exit 1

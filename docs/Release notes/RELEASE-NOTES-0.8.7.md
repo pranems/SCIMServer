@@ -1,4 +1,4 @@
-# SCIMTool v0.8.7 – Manual Provisioning Superpowers
+# SCIMServer v0.8.7 – Manual Provisioning Superpowers
 
 ## Highlights
 - **Manual provisioning console:** New admin tab lets you craft SCIM Users and Groups on demand, including duplicate-ready identifiers and membership payloads, without reaching for Postman.
@@ -11,6 +11,6 @@
 
 ## Commands
 ```powershell
-iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMTool/master/scripts/update-scimtool-direct.ps1'); \
-  Update-SCIMToolDirect -Version v0.8.7 -ResourceGroup <rg> -AppName <app> -NoPrompt
+iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMServer/master/scripts/update-scimserver-direct.ps1'); \
+  Update-SCIMServerDirect -Version v0.8.7 -ResourceGroup <rg> -AppName <app> -NoPrompt
 ```

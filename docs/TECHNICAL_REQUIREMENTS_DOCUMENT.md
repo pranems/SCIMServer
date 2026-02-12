@@ -1,4 +1,4 @@
-# SCIMTool — Technical Requirements Document (TRD)
+# SCIMServer — Technical Requirements Document (TRD)
 
 > **Version**: 1.0  
 > **Date**: February 9, 2026  
@@ -9,7 +9,7 @@
 
 ## 1. Purpose & Scope
 
-SCIMTool is a **SCIM 2.0 provisioning visibility and monitoring tool** for Microsoft Entra ID (Azure AD). It provides a fully compliant SCIM 2.0 server that captures, stores, and visualizes provisioning events in real-time. The tool enables identity engineers to debug, test, and validate SCIM provisioning flows without a production target system.
+SCIMServer is a **SCIM 2.0 provisioning visibility and monitoring tool** for Microsoft Entra ID (Azure AD). It provides a fully compliant SCIM 2.0 server that captures, stores, and visualizes provisioning events in real-time. The tool enables identity engineers to debug, test, and validate SCIM provisioning flows without a production target system.
 
 ### 1.1 Target Users
 
@@ -24,7 +24,7 @@ SCIMTool is a **SCIM 2.0 provisioning visibility and monitoring tool** for Micro
 
 ```
 ┌────────────────────┐     SCIM 2.0      ┌────────────────────┐
-│ Microsoft Entra ID │ ────────────────── │     SCIMTool       │
+│ Microsoft Entra ID │ ────────────────── │     SCIMServer       │
 │ (or any SCIM       │  POST/GET/PATCH/   │  ┌──────────────┐  │
 │  client)           │  PUT/DELETE        │  │ SCIM Server  │  │
 └────────────────────┘                    │  │ (NestJS API) │  │
@@ -383,4 +383,4 @@ SCIMTool is a **SCIM 2.0 provisioning visibility and monitoring tool** for Micro
 
 ---
 
-*This document is the source of truth for all functional and non-functional requirements of SCIMTool.*
+*This document is the source of truth for all functional and non-functional requirements of SCIMServer.*

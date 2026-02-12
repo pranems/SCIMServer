@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to SCIMTool will be documented in this file.
+All notable changes to SCIMServer will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -184,7 +184,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version Format
 
-SCIMTool follows semantic versioning: `MAJOR.MINOR.PATCH`
+SCIMServer follows semantic versioning: `MAJOR.MINOR.PATCH`
 
 - **MAJOR:** Incompatible API changes
 - **MINOR:** Backward-compatible functionality additions
@@ -192,6 +192,6 @@ SCIMTool follows semantic versioning: `MAJOR.MINOR.PATCH`
 
 ## Links
 
-- [Latest Release](https://github.com/kayasax/SCIMTool/releases/latest)
-- [All Releases](https://github.com/kayasax/SCIMTool/releases)
-- [Documentation](https://github.com/kayasax/SCIMTool/blob/master/README.md)
+- [Latest Release](https://github.com/kayasax/SCIMServer/releases/latest)
+- [All Releases](https://github.com/kayasax/SCIMServer/releases)
+- [Documentation](https://github.com/kayasax/SCIMServer/blob/master/README.md)

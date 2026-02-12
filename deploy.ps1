@@ -1,15 +1,15 @@
 <#
 .SYNOPSIS
-    SCIMTool - One-Click Deployment for Microsoft Colleagues
+    SCIMServer - One-Click Deployment for Microsoft Colleagues
 
 .DESCRIPTION
-    Downloads and deploys SCIMTool SCIM 2.0 server to Azure Container Apps.
+    Downloads and deploys SCIMServer SCIM 2.0 server to Azure Container Apps.
     No git clone needed - everything downloads automatically!
 
 .EXAMPLE
-    iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMTool/master/deploy.ps1')
+    iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMServer/master/deploy.ps1')
     # Or with custom branch:
-    $Branch = "dev"; iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMTool/master/deploy.ps1')
+    $Branch = "dev"; iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMServer/master/deploy.ps1')
 #>
 
 # Default branch - can be overridden by setting $Branch variable before calling
@@ -17,7 +17,7 @@ if (-not (Get-Variable -Name "Branch" -ErrorAction SilentlyContinue)) {
     $Branch = "master"
 }
 
-Write-Host "🚀 SCIMTool - One-Click Deployment" -ForegroundColor Green
+Write-Host "🚀 SCIMServer - One-Click Deployment" -ForegroundColor Green
 Write-Host "═══════════════════════════════════" -ForegroundColor Green
 Write-Host ""
 
@@ -110,7 +110,7 @@ function Get-ValidContainerAppName {
     param([string]$inputName)
 
     if ([string]::IsNullOrWhiteSpace($inputName)) {
-        return "scimtool-prod"
+        return "scimserver-prod"
     }
 
     # Convert to lowercase
@@ -142,16 +142,16 @@ function Get-ValidContainerAppName {
 Write-Host "🏗️ Azure Deployment Configuration" -ForegroundColor Yellow
 Write-Host "Configure your Azure resources (press Enter for defaults):" -ForegroundColor Gray
 
-$ResourceGroup = Read-Host -Prompt "Resource Group name (default: scimtool-rg)"
+$ResourceGroup = Read-Host -Prompt "Resource Group name (default: scimserver-rg)"
 if ([string]::IsNullOrWhiteSpace($ResourceGroup)) {
-    $ResourceGroup = "scimtool-rg"
+    $ResourceGroup = "scimserver-rg"
 }
 
 # Container App name validation
 do {
-    $AppName = Read-Host -Prompt "Container App name (default: scimtool-prod)"
+    $AppName = Read-Host -Prompt "Container App name (default: scimserver-prod)"
     if ([string]::IsNullOrWhiteSpace($AppName)) {
-        $AppName = "scimtool-prod"
+        $AppName = "scimserver-prod"
     }
 
     # Validate Container App naming requirements
@@ -193,7 +193,7 @@ do {
         # Suggest a valid name
         $suggestedName = Get-ValidContainerAppName -inputName $AppName
         Write-Host "💡 Suggested valid name: $suggestedName" -ForegroundColor Cyan
-        Write-Host "   Or try: scimtool-prod, scim-monitor, my-scim-app" -ForegroundColor Gray
+        Write-Host "   Or try: scimserver-prod, scim-monitor, my-scim-app" -ForegroundColor Gray
         Write-Host ""
     }
 } while (-not $isValidName)
@@ -207,16 +207,16 @@ Write-Host "✅ Will deploy to: $ResourceGroup / $AppName in $Location" -Foregro
 Write-Host ""
 
 # Create temp directory
-$TempDir = Join-Path ([System.IO.Path]::GetTempPath()) "SCIMTool-$(Get-Random)"
+$TempDir = Join-Path ([System.IO.Path]::GetTempPath()) "SCIMServer-$(Get-Random)"
 New-Item -ItemType Directory -Path $TempDir -Force | Out-Null
 Push-Location $TempDir
 
 try {
-    Write-Host "📥 Downloading SCIMTool source..." -ForegroundColor Cyan
+    Write-Host "📥 Downloading SCIMServer source..." -ForegroundColor Cyan
 
     # Download the source as ZIP
-    $RepoUrl = "https://github.com/kayasax/SCIMTool/archive/refs/heads/$Branch.zip"
-    $ZipPath = Join-Path $TempDir "scimtool.zip"
+    $RepoUrl = "https://github.com/kayasax/SCIMServer/archive/refs/heads/$Branch.zip"
+    $ZipPath = Join-Path $TempDir "scimserver.zip"
 
     Invoke-WebRequest -Uri $RepoUrl -OutFile $ZipPath -UseBasicParsing
 
@@ -233,7 +233,7 @@ try {
     Write-Host "This may take 3-5 minutes..." -ForegroundColor Gray
     Write-Host ""
 
-    # Use the deploy-azure.ps1 script from the SCIMTool project
+    # Use the deploy-azure.ps1 script from the SCIMServer project
     $deployResult = .\scripts\deploy-azure.ps1 -ResourceGroup $ResourceGroup -AppName $AppName -ScimSecret $ScimSecret -Location $Location -JwtSecret $JwtSecret -OauthClientSecret $OauthClientSecret
     $result = $deployResult
 
@@ -245,7 +245,7 @@ try {
         $AppUrl = ($result | Where-Object { $_ -match "https://.*\.azurecontainerapps\.io" } | Select-Object -First 1) -replace '.*?(https://[^\s]+).*', '$1'
 
         if ($AppUrl) {
-            Write-Host "🌐 Your SCIMTool is ready!" -ForegroundColor Green
+            Write-Host "🌐 Your SCIMServer is ready!" -ForegroundColor Green
             Write-Host "   URL: $AppUrl" -ForegroundColor Cyan
             Write-Host "   Secret Token: $ScimSecret" -ForegroundColor Cyan
             Write-Host "   JWT Secret: $JwtSecret" -ForegroundColor Cyan
@@ -274,4 +274,4 @@ try {
 }
 
 Write-Host ""
-Write-Host "✨ SCIMTool deployment complete!" -ForegroundColor Green
+Write-Host "✨ SCIMServer deployment complete!" -ForegroundColor Green

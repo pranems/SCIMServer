@@ -1,11 +1,11 @@
-# SCIMTool Direct Update Script (UTF-8 no BOM)
+# SCIMServer Direct Update Script (UTF-8 no BOM)
 # Minimal variant: requires explicit Resource Group and Container App name.
-# Intended for generation by the running SCIMTool app so discovery is unnecessary.
+# Intended for generation by the running SCIMServer app so discovery is unnecessary.
 # Usage example (app can render this ready to copy):
-#   iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMTool/master/scripts/update-scimtool-direct.ps1'); \
-#     Update-SCIMTool -Version v0.8.1 -ResourceGroup my-rg -AppName scimtool-app -NoPrompt
+#   iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMServer/master/scripts/update-scimserver-direct.ps1'); \
+#     Update-SCIMServer -Version v0.8.1 -ResourceGroup my-rg -AppName scimserver-app -NoPrompt
 
-function Update-SCIMToolDirect {
+function Update-SCIMServerDirect {
     [CmdletBinding()] param(
         [Parameter(Mandatory)][string]$Version,
         [Parameter(Mandatory)][string]$ResourceGroup,
@@ -35,7 +35,7 @@ function Update-SCIMToolDirect {
 
     # Normalize version tag
     $cleanVersion = $Version.Trim().TrimStart('v','V')
-    $imageRef = "$Registry/scimtool:$cleanVersion"
+    $imageRef = "$Registry/scimserver:$cleanVersion"
 
     Log "Update target image: $imageRef" 'INFO' Cyan
 
@@ -208,9 +208,9 @@ function Update-SCIMToolDirect {
 # Auto-execute if called with inline params after fetch
 if($args.Count -gt 0){
     $p=@{}; for($i=0;$i -lt $args.Count;$i++){ $a=$args[$i]; if($a.StartsWith('-')){ $n=$a.TrimStart('-'); if($n -in @('NoPrompt','Quiet','DryRun','Force','ShowCurrent')){ $p[$n]=$true } elseif(($i+1) -lt $args.Count -and -not $args[$i+1].StartsWith('-')){ $p[$n]=$args[$i+1]; $i++ } } }
-    if($p.ContainsKey('Version') -and $p.ContainsKey('ResourceGroup') -and $p.ContainsKey('AppName')){ Update-SCIMToolDirect @p } else { Write-Host "Usage: Update-SCIMToolDirect -Version v0.8.1 -ResourceGroup <rg> -AppName <app> [-Force] [-NoPrompt] [-Quiet] [-DryRun] [-ShowCurrent]" -ForegroundColor Yellow }
+    if($p.ContainsKey('Version') -and $p.ContainsKey('ResourceGroup') -and $p.ContainsKey('AppName')){ Update-SCIMServerDirect @p } else { Write-Host "Usage: Update-SCIMServerDirect -Version v0.8.1 -ResourceGroup <rg> -AppName <app> [-Force] [-NoPrompt] [-Quiet] [-DryRun] [-ShowCurrent]" -ForegroundColor Yellow }
 } else {
-    Write-Host 'SCIMTool direct update function loaded (Update-SCIMToolDirect).' -ForegroundColor Green
+    Write-Host 'SCIMServer direct update function loaded (Update-SCIMServerDirect).' -ForegroundColor Green
     Write-Host 'Example:' -ForegroundColor Gray
-    Write-Host '  Update-SCIMToolDirect -Version v0.8.1 -ResourceGroup my-rg -AppName scimtool-app -NoPrompt' -ForegroundColor Gray
+    Write-Host '  Update-SCIMServerDirect -Version v0.8.1 -ResourceGroup my-rg -AppName scimserver-app -NoPrompt' -ForegroundColor Gray
 }

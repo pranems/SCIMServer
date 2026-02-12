@@ -55,8 +55,8 @@ git push origin test/collision-ui-improvements
 ```
 
 **GitHub Actions automatically builds** and pushes image as:
-- `ghcr.io/kayasax/scimtool:test-collision-ui-improvements`
-- `ghcr.io/kayasax/scimtool:sha-abc123def`
+- `ghcr.io/kayasax/scimserver:test-collision-ui-improvements`
+- `ghcr.io/kayasax/scimserver:sha-abc123def`
 
 ### Step 2: Deploy Test Image to Your Environment
 
@@ -67,7 +67,7 @@ git push origin test/collision-ui-improvements
 
 **Option B - Specify app:**
 ```powershell
-.\scripts\test-update.ps1 -ResourceGroup "scimtool-rg" -AppName "scimtool-app-1234"
+.\scripts\test-update.ps1 -ResourceGroup "scimserver-rg" -AppName "scimserver-app-1234"
 ```
 
 **Option C - Test specific tag:**
@@ -82,7 +82,7 @@ git push origin test/collision-ui-improvements
 3. Check Activity Feed, Manual Provision, etc.
 4. Monitor logs:
    ```powershell
-   az containerapp logs show -n scimtool-app-1234 -g scimtool-rg --tail 50 --follow
+   az containerapp logs show -n scimserver-app-1234 -g scimserver-rg --tail 50 --follow
    ```
 
 ### Step 4: Iterate or Release
@@ -115,7 +115,7 @@ git tag -a v0.8.15 -m "v0.8.15 - Collision testing improvements"
 git push origin v0.8.15
 
 # Create GitHub Release (triggers update notifications)
-# Go to: https://github.com/kayasax/SCIMTool/releases/new
+# Go to: https://github.com/kayasax/SCIMServer/releases/new
 ```
 
 ---
@@ -126,10 +126,10 @@ git push origin v0.8.15
 
 Instead of pushing a branch, trigger build manually:
 
-1. Go to: https://github.com/kayasax/SCIMTool/actions/workflows/build-test.yml
+1. Go to: https://github.com/kayasax/SCIMServer/actions/workflows/build-test.yml
 2. Click "Run workflow"
 3. Enter test tag suffix (e.g., "manual-test")
-4. Builds as: `ghcr.io/kayasax/scimtool:test-manual-test`
+4. Builds as: `ghcr.io/kayasax/scimserver:test-manual-test`
 
 ### Create Test Revision (A/B Testing)
 
@@ -145,7 +145,7 @@ This creates a new revision with 0% traffic. To test:
 
 To rollback:
 ```powershell
-az containerapp revision deactivate -n scimtool-app -g scimtool-rg --revision <test-revision-name>
+az containerapp revision deactivate -n scimserver-app -g scimserver-rg --revision <test-revision-name>
 ```
 
 ### Rollback to Production
@@ -220,12 +220,12 @@ Or specific version:
 ### Test image not built
 **Check:**
 1. Branch name has correct prefix (`test/`, `dev/`, `feature/`)
-2. GitHub Actions tab: https://github.com/kayasax/SCIMTool/actions
+2. GitHub Actions tab: https://github.com/kayasax/SCIMServer/actions
 3. Workflow run completed successfully
 
 ### Update fails with "image not found"
 **Fix:**
-1. Verify image exists: https://github.com/kayasax/SCIMTool/pkgs/container/scimtool
+1. Verify image exists: https://github.com/kayasax/SCIMServer/pkgs/container/scimserver
 2. Check image is public (or configure GHCR credentials)
 3. Wait for GitHub Actions to finish building
 

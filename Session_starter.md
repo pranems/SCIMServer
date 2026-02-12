@@ -1,4 +1,4 @@
-## SCIMTool – Condensed Session Memory
+## SCIMServer – Condensed Session Memory
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 
@@ -72,10 +72,10 @@ Production Ready (v0.8.15) — **Phase 1 RFC Compliance complete** (Feb 2026). F
 ## Quick Commands
 ```powershell
 # Publish latest image
-pwsh ./scripts/publish-acr.ps1 -Registry scimtoolpublic -ResourceGroup scimtool-rg -Latest
+pwsh ./scripts/publish-acr.ps1 -Registry scimserverpublic -ResourceGroup scimserver-rg -Latest
 
 # Customer update to latest (example)
-iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMTool/master/scripts/update-scimtool-direct.ps1'); Update-SCIMToolDirect -Version v0.8.15 -ResourceGroup <rg> -AppName <app> -NoPrompt
+iex (irm 'https://raw.githubusercontent.com/kayasax/SCIMServer/master/scripts/update-scimserver-direct.ps1'); Update-SCIMServerDirect -Version v0.8.15 -ResourceGroup <rg> -AppName <app> -NoPrompt
 
 > NOTE: Direct upgrade one‑liner integrated into UI copy button; user has not yet tested the copied command end‑to‑end.
 ```
@@ -208,18 +208,18 @@ Phase 1 complete. Docs and JSON examples consolidated and updated to match actua
 | 2025-09-26 | 🔧 **STATIC ASSETS FIX** - Web UI fully functional with proper CSS/JS serving |
 | 2025-09-26 | ✅ **FINAL VERIFICATION** - Web UI accessible without authentication, assets working |
 | 2025-09-26 | 🔧 **API URL FIX** - Resolved double /scim prefix issue in web client API calls |
-| 2025-09-26 | 🎉 **COMPLETE SUCCESS** - Containerized SCIMTool fully functional and ready for teams |
+| 2025-09-26 | 🎉 **COMPLETE SUCCESS** - Containerized SCIMServer fully functional and ready for teams |
 | 2025-09-26 | 🌿 `feature/acr-automation` branch created and pushed to start Azure Container Registry automation work |
 | 2025-09-26 | 🆕 Added /scim/admin/version endpoint (backend version reporting) |
 | 2025-09-26 | 🔔 Frontend upgrade banner + remote manifest polling (L1+L2) implemented |
 | 2025-09-26 | 🧩 Added dynamic upgrade helper script (GitHub Releases based) |
 | 2025-09-26 | 🎨 Microsoft-inspired theming completed (dark/light parity, refined filters, log modal polish) |
 | 2025-09-26 | 🔍 Admin log noise hidden from UI; SCIM request list now focused on provisioning traffic |
-| 2025-12-29 | � **GITHUB REGISTRY MIGRATION** - Migrated from ACR to ghcr.io/kayasax/scimtool with automated builds |
+| 2025-12-29 | � **GITHUB REGISTRY MIGRATION** - Migrated from ACR to ghcr.io/kayasax/scimserver with automated builds |
 | 2025-12-26 | 🛠️ **UNIFIED DOCKERFILE** - Multi-stage build (web+API) with fixed SQLite permissions |
 | 2025-12-26 | 🚀 **CONTAINER DEPLOYMENT** - Production deployment working via public registry |
 | 2025-12-26 | 🔧 **SQLITE PERMISSIONS FIX** - Resolved readonly database errors with proper user ownership |
-| 2025-12-26 | 📋 **AUTOMATION SCRIPTS** - publish-acr.ps1, tag-and-release.ps1, update-scimtool.ps1 created |
+| 2025-12-26 | 📋 **AUTOMATION SCRIPTS** - publish-acr.ps1, tag-and-release.ps1, update-scimserver.ps1 created |
 | 2025-12-26 | 🎯 **UPGRADE BANNER COMPLETE** - Compact banner with modal, hosted PowerShell script integration |
 | 2025-12-26 | 📖 **ADMIN DOCUMENTATION** - Complete release workflow and user update process documented |
 

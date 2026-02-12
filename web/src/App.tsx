@@ -56,7 +56,7 @@ const AppContent: React.FC = () => {
   const [needsToken, setNeedsToken] = useState(() => !token);
   const [hideKeepalive, setHideKeepalive] = useState<boolean>(() => {
     if (typeof window === 'undefined') return true;
-    const stored = window.localStorage.getItem('scimtool-hideKeepalive');
+    const stored = window.localStorage.getItem('scimserver-hideKeepalive');
     if (stored === null) return true;
     return stored !== 'false';
   });
@@ -64,7 +64,7 @@ const AppContent: React.FC = () => {
   const [deploymentInfo, setDeploymentInfo] = useState<DeploymentInfo | null>(null);
   const [isTestVersion, setIsTestVersion] = useState(false);
   // Hard-coded upstream GitHub repository for release discovery
-  const githubRepo = 'kayasax/SCIMTool';
+  const githubRepo = 'kayasax/SCIMServer';
 
   // Basic semver normalization + comparison (ignores pre-release precedence nuances)
   function normalize(v?: string | null): string | null {
@@ -111,8 +111,8 @@ const AppContent: React.FC = () => {
   const upgradeCommand = useMemo(() => {
     if (!(upgradeAvailable && latestTag)) return '';
 
-    const directUrl = 'https://raw.githubusercontent.com/kayasax/SCIMTool/master/scripts/update-scimtool-direct.ps1';
-    const funcUrl = 'https://raw.githubusercontent.com/kayasax/SCIMTool/master/scripts/update-scimtool-func.ps1';
+    const directUrl = 'https://raw.githubusercontent.com/kayasax/SCIMServer/master/scripts/update-scimserver-direct.ps1';
+    const funcUrl = 'https://raw.githubusercontent.com/kayasax/SCIMServer/master/scripts/update-scimserver-func.ps1';
   const cleanTag = latestTag.startsWith('v') ? latestTag.slice(1) : latestTag;
 
     const resourceGroup = effectiveDeployment.resourceGroup;
@@ -158,10 +158,10 @@ const AppContent: React.FC = () => {
       if (registry) {
         args.push(`-Registry ${psQuote(registry)}`);
       }
-      return `iex (irm '${directUrl}'); Update-SCIMToolDirect ${args.join(' ')}`;
+      return `iex (irm '${directUrl}'); Update-SCIMServerDirect ${args.join(' ')}`;
     }
 
-  return `iex (irm '${funcUrl}'); Update-SCIMTool -Version ${cleanTag}`;
+  return `iex (irm '${funcUrl}'); Update-SCIMServer -Version ${cleanTag}`;
   }, [effectiveDeployment, latestTag, upgradeAvailable]);
 
   useEffect(() => {
@@ -350,7 +350,7 @@ const AppContent: React.FC = () => {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem('scimtool-hideKeepalive', hideKeepalive ? 'true' : 'false');
+      window.localStorage.setItem('scimserver-hideKeepalive', hideKeepalive ? 'true' : 'false');
     }
   }, [hideKeepalive]);
 
@@ -509,7 +509,7 @@ const AppContent: React.FC = () => {
               </button>
             </div>
             <p className={styles.tokenHint}>
-              Enter the bearer token configured for this SCIMTool deployment. The value is stored locally in your browser only and never embedded in the app bundle.
+              Enter the bearer token configured for this SCIMServer deployment. The value is stored locally in your browser only and never embedded in the app bundle.
             </p>
             <form className={styles.tokenForm} onSubmit={handleTokenSave}>
               <input
@@ -639,7 +639,7 @@ const AppContent: React.FC = () => {
           <span>Made by <strong>Loïc MICHEL</strong></span>
           <span>v{localVersion?.version || '0.8.15'}</span>
           <a
-            href="https://github.com/kayasax/SCIMTool"
+            href="https://github.com/kayasax/SCIMServer"
             target="_blank"
             rel="noopener noreferrer"
             className={styles.footerLink}

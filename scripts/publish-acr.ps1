@@ -1,6 +1,6 @@
-﻿<#!
+<#!
 .SYNOPSIS
-  Build and publish the unified SCIMTool (API + Web) container image to Azure Container Registry with optional anonymous pull enablement.
+  Build and publish the unified SCIMServer (API + Web) container image to Azure Container Registry with optional anonymous pull enablement.
 
 .PARAMETER Registry
   Name of the ACR (no FQDN, just the resource name).
@@ -50,7 +50,7 @@ if (-not $Tag) {
   if (-not $Tag) { $Tag = 'dev' }
 }
 
-$fullName = "$Registry.azurecr.io/scimtool:$Tag"
+$fullName = "$Registry.azurecr.io/scimserver:$Tag"
 Write-Info "Image will be pushed as $fullName"
 
 # Ensure resource group exists
@@ -76,14 +76,14 @@ if ($EnableAnonymous) {
 
 if ($UseRemoteBuild) {
   Write-Info 'Performing remote ACR build'
-  az acr build --registry $Registry --image scimtool:$Tag .
+  az acr build --registry $Registry --image scimserver:$Tag .
   if ($LASTEXITCODE -ne 0) {
     Write-Err 'Remote build failed. Rerun without -UseRemoteBuild to attempt local build.'
     exit 2
   }
   if ($Latest) {
     Write-Info 'Creating additional :latest tag via ACR import'
-    az acr import --name $Registry --source "$Registry.azurecr.io/scimtool:$Tag" --image scimtool:latest --force | Out-Null
+    az acr import --name $Registry --source "$Registry.azurecr.io/scimserver:$Tag" --image scimserver:latest --force | Out-Null
   }
 } else {
   if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { Write-Err 'Docker CLI not found and --UseRemoteBuild not specified.'; exit 1 }
@@ -94,7 +94,7 @@ if ($UseRemoteBuild) {
   Write-Info 'Pushing version tag'
   docker push $fullName
   if ($Latest) {
-    $latestRef = "$Registry.azurecr.io/scimtool:latest"
+    $latestRef = "$Registry.azurecr.io/scimserver:latest"
     Write-Info 'Tagging and pushing :latest'
     docker tag $fullName $latestRef
     docker push $latestRef
@@ -102,13 +102,13 @@ if ($UseRemoteBuild) {
 }
 
 Write-Info 'Listing tags (recent)'
-az acr repository show-tags -n $Registry --repository scimtool --orderby time_desc --top 10
+az acr repository show-tags -n $Registry --repository scimserver --orderby time_desc --top 10
 
 if ($EnableAnonymous) {
   $anon = az acr show -n $Registry --query anonymousPullEnabled -o tsv
   Write-Info "Anonymous pull enabled: $anon"
-  Write-Info "Anonymous test pull (logout first): docker logout $Registry.azurecr.io; docker pull $Registry.azurecr.io/scimtool:$Tag"
+  Write-Info "Anonymous test pull (logout first): docker logout $Registry.azurecr.io; docker pull $Registry.azurecr.io/scimserver:$Tag"
 }
 
 Write-Host "\nSuccess. Image reference: $fullName" -ForegroundColor Green
-if ($Latest) { Write-Host "Also tagged: $Registry.azurecr.io/scimtool:latest" -ForegroundColor Green }
+if ($Latest) { Write-Host "Also tagged: $Registry.azurecr.io/scimserver:latest" -ForegroundColor Green }

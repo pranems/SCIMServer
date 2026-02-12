@@ -1,4 +1,4 @@
-﻿// Container Apps Environment for SCIMTool
+// Container Apps Environment for SCIMServer
 
 param location string = resourceGroup().location
 @description('Name of the Container Apps Environment')
@@ -40,7 +40,7 @@ resource env 'Microsoft.App/managedEnvironments@2024-03-01' = {
     // Dapr instrumentation key intentionally omitted
   }
   tags: {
-    project: 'scimtool'
+    project: 'scimserver'
   }
 }
 

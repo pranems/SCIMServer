@@ -1,6 +1,6 @@
 # SCIM 2.0 Compliance & Entra ID Compatibility
 
-> RFC compliance status and Microsoft Entra ID provisioning compatibility for SCIMTool.
+> RFC compliance status and Microsoft Entra ID provisioning compatibility for SCIMServer.
 
 **Last Updated:** February 11, 2026
 
@@ -91,7 +91,7 @@
 
 **Overall Entra ID Compatibility: ~95%** ✅
 
-SCIMTool passes all critical requirements for Microsoft Entra ID enterprise application provisioning.
+SCIMServer passes all critical requirements for Microsoft Entra ID enterprise application provisioning.
 
 ### Entra-Specific Requirements
 

@@ -715,7 +715,7 @@ Each tenant should have **its own ServiceProviderConfig** reflecting its actual,
 function buildServiceProviderConfig(tenant: Tenant): ServiceProviderConfig {
   return {
     schemas: ['urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig'],
-    documentationUri: `https://scimtool.dev/docs/${tenant.name}`,
+    documentationUri: `https://scimserver.dev/docs/${tenant.name}`,
     patch: {
       supported: tenant.config.patchEnabled ?? true
     },
@@ -743,7 +743,7 @@ function buildServiceProviderConfig(tenant: Tenant): ServiceProviderConfig {
         name: 'OAuth Bearer Token',
         description: 'Authentication scheme using the OAuth Bearer Token Standard',
         specUri: 'https://www.rfc-editor.org/info/rfc6750',
-        documentationUri: 'https://scimtool.dev/docs/auth',
+        documentationUri: 'https://scimserver.dev/docs/auth',
         primary: true
       }
     ],
