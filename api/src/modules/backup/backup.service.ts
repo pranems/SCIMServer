@@ -29,6 +29,12 @@ try {
 
 @Injectable()
 export class BackupService implements OnModuleInit {
+  // SQLite compromise (CRITICAL): The entire BackupService exists because SQLite is a
+  // file-based database stored on ephemeral container storage. Data is lost on restart
+  // without periodic backups to persistent storage (Azure Blob / Azure Files).
+  // PostgreSQL migration: remove this service entirely — managed DB handles persistence.
+  // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.3.2, §3.3.3, §3.6
+  //
   // Primary ephemeral DB now standardized to /tmp/local-data
   private readonly localDbPath = '/tmp/local-data/scim.db';
   private readonly azureFilesBackupPath = '/app/data/scim.db'; // legacy persistent location

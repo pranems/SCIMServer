@@ -20,8 +20,11 @@ export class LoggingService implements OnModuleDestroy {
   private readonly logger = new Logger(LoggingService.name);
 
   // ── Buffered logging to reduce SQLite write contention ──
-  // Instead of writing per-request (2 writes each), we accumulate in memory
-  // and flush in a single batch INSERT periodically or when the buffer is full.
+  // SQLite compromise (CRITICAL): Per-request logging (2 writes each) competes for the
+  // single SQLite writer lock with SCIM operations. Buffering trades real-time logging
+  // (up to 3s data loss on crash) for reduced lock contention.
+  // PostgreSQL migration: remove buffering, use direct create() per request.
+  // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.2.2
   private logBuffer: Array<Prisma.RequestLogCreateInput & { _identifier?: string }> = [];
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private flushInProgress = false;
@@ -113,8 +116,10 @@ export class LoggingService implements OnModuleDestroy {
       // Single batch insert (1 write instead of N*2 writes)
       await this.prisma.requestLog.createMany({ data: createData });
 
-      // Best-effort: backfill identifiers. Since createMany doesn't return IDs
-      // in SQLite, we update the most recent N rows in one raw statement.
+      // SQLite compromise: createMany doesn't support RETURNING in SQLite.
+      // We fetch the most recent N rows by rowid to correlate batch-inserted records.
+      // PostgreSQL migration: use createMany with RETURNING or createManyAndReturn().
+      // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.4.2
       if (identifiers.length > 0) {
         // Fetch the last N created rows (ordered by rowid DESC) to correlate
         try {

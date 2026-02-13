@@ -9,6 +9,7 @@ import type { Request } from 'express';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { SCIM_SP_CONFIG_SCHEMA } from '../common/scim-constants';
+import { buildBaseUrl } from '../common/base-url.util';
 
 /**
  * Endpoint-specific SCIM Discovery Controller
@@ -45,7 +46,7 @@ export class EndpointScimDiscoveryController {
     }
 
     const config = endpoint.config || {};
-    const baseUrl = `${req.protocol}://${req.get('host')}/scim/endpoints/${endpointId}`;
+    const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
     this.endpointContext.setContext({ endpointId, baseUrl, config });
   }
 

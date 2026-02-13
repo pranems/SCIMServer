@@ -123,6 +123,13 @@ export function buildGroupFilter(filter?: string): GroupFilterResult {
  * Attempt to convert a simple `attrPath eq "value"` AST into a Prisma where clause.
  * Returns null if the AST is too complex for DB push-down.
  *
+ * SQLite compromise (MEDIUM): Only the `eq` operator is pushed to the database.
+ * All other operators (co, sw, ew, gt, lt, and, or) fall back to fetchAll + in-memory
+ * evaluation because SQLite lacks ILIKE, JSONB path queries, and case-insensitive LIKE.
+ * PostgreSQL migration: expand this function to handle co/sw/ew/gt/lt via ILIKE and
+ * JSONB operators, eliminating full-table-scan fallback for most filters.
+ * See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.4.1 and §3.4.3
+ *
  * For userName, comparison is always case-insensitive (RFC 7643 §2.1: caseExact=false),
  * so we query via the lowercase column.
  */

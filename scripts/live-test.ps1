@@ -2,12 +2,22 @@
 # This script tests endpoint CRUD, SCIM operations, config validation, and isolation
 #
 # Usage:
-#   .\live-test.ps1                    # Normal mode (pass/fail only)
-#   .\live-test.ps1 -Verbose           # Verbose mode (show request/response details)
-#   .\live-test.ps1 -BaseUrl http://localhost:3000   # Custom base URL
+#   .\live-test.ps1                                          # Local dev (defaults)
+#   .\live-test.ps1 -Verbose                                 # Verbose mode (shows request/response)
+#   .\live-test.ps1 -BaseUrl http://localhost:3000            # Custom local port
+#   .\live-test.ps1 -BaseUrl https://myapp.azurecontainerapps.io -ClientSecret "my-secret"   # Azure
+#   .\live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "docker-secret"              # Docker
+#
+# Parameters:
+#   -BaseUrl        Target server URL (default: http://localhost:6000)
+#   -ClientId       OAuth client_id  (default: scimserver-client, matches OAUTH_CLIENT_ID env var)
+#   -ClientSecret   OAuth client_secret (default: changeme-oauth, must match server's OAUTH_CLIENT_SECRET)
+#   -Verbose        Show full HTTP request/response details
 
 param(
     [string]$BaseUrl = "http://localhost:6000",
+    [string]$ClientId = "scimserver-client",
+    [string]$ClientSecret = "changeme-oauth",
     [switch]$Verbose
 )
 
@@ -55,7 +65,7 @@ function Invoke-RestMethod {
         }
     }
     try {
-        $result = Microsoft.PowerShell.Utility\Invoke-RestMethod @PSBoundParameters
+        $result = Microsoft.PowerShell.Utility\Invoke-RestMethod @PSBoundParameters -AllowInsecureRedirect
     } catch {
         if ($script:VerboseMode) {
             Write-Host "    📋 ← Error: $($_.Exception.Message)" -ForegroundColor DarkYellow
@@ -94,7 +104,7 @@ function Invoke-WebRequest {
         }
     }
     try {
-        $result = Microsoft.PowerShell.Utility\Invoke-WebRequest @PSBoundParameters
+        $result = Microsoft.PowerShell.Utility\Invoke-WebRequest @PSBoundParameters -AllowInsecureRedirect
     } catch {
         if ($script:VerboseMode) {
             Write-Host "    📋 ← HTTP Error: $($_.Exception.Message)" -ForegroundColor DarkYellow
@@ -134,7 +144,8 @@ if ($VerboseMode) {
 # Step 1: Get OAuth token
 Write-Host "`n=== STEP 1: Get OAuth Token ===" -ForegroundColor Cyan
 Write-VerboseLog "Token endpoint" "$baseUrl/scim/oauth/token"
-$tokenBody = @{client_id='scimserver-client';client_secret='changeme-oauth';grant_type='client_credentials'}
+Write-VerboseLog "Client ID" $ClientId
+$tokenBody = @{client_id=$ClientId;client_secret=$ClientSecret;grant_type='client_credentials'}
 $tokenResponse = Invoke-RestMethod -Uri "$baseUrl/scim/oauth/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body $tokenBody
 $Token = $tokenResponse.access_token
 Write-Host "✅ Token obtained: $($Token.Substring(0,30))..."

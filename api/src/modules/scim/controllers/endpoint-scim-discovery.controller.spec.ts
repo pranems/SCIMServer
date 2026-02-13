@@ -20,6 +20,8 @@ describe('EndpointScimDiscoveryController', () => {
 
   const mockRequest = {
     protocol: 'http',
+    headers: {} as Record<string, string>,
+    baseUrl: '/scim',
     get: jest.fn((header: string) => {
       if (header === 'host') return 'localhost:3000';
       return undefined;

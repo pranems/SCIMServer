@@ -21,6 +21,7 @@ import { CreateUserDto } from '../dto/create-user.dto';
 import { PatchUserDto } from '../dto/patch-user.dto';
 import { SearchRequestDto } from '../dto/search-request.dto';
 import { applyAttributeProjection, applyAttributeProjectionToList } from '../common/scim-attribute-projection';
+import { buildBaseUrl } from '../common/base-url.util';
 
 /**
  * Endpoint-specific SCIM Users Controller
@@ -50,7 +51,7 @@ export class EndpointScimUsersController {
     }
 
     const config: EndpointConfig = endpoint.config || {};
-    const baseUrl = `${req.protocol}://${req.get('host')}/scim/endpoints/${endpointId}`;
+    const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
     this.endpointContext.setContext({ endpointId, baseUrl, config });
 
     return { baseUrl, config };

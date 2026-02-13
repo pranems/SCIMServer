@@ -13,7 +13,10 @@ const config: Config = {
   },
   testRegex: '.*\\.e2e-spec\\.ts$',
   testTimeout: 30_000,
-  // Run sequentially — E2E tests share a single SQLite DB file
+  // SQLite compromise: E2E tests must run sequentially because SQLite’s single-file
+  // database cannot handle concurrent access from multiple Jest workers.
+  // PostgreSQL migration: set maxWorkers to 4+ and use isolated test schemas.
+  // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.2.5
   maxWorkers: 1,
   // E2E setup — bootstrap app + DB before all suites
   globalSetup: '<rootDir>/test/e2e/global-setup.ts',

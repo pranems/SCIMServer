@@ -243,7 +243,7 @@ At the end of deployment, you'll see:
 
 - **Image**: `ghcr.io/pranems/scimserver:latest`
 - **CPU**: 0.5 cores | **Memory**: 1 GiB
-- **Replicas**: 1-2 (auto-scaled)
+- **Replicas**: 1 (fixed — SQLite requires single replica; increase after migrating to PostgreSQL)
 - **Port**: 80 (internal) → HTTPS (external, auto TLS)
 - **Health check**: HTTP GET `/health` every 60s
 

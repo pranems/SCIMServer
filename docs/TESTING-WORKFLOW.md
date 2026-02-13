@@ -208,6 +208,107 @@ Or specific version:
 - [ ] Logs checked for errors
 - [ ] Database operations verified
 
+---
+
+## 🧪 Live Test Script — Multi-Environment Usage
+
+The live test script (`scripts/live-test.ps1`) runs 212+ integration assertions against a running SCIMServer instance. It supports any deployment target via CLI parameters.
+
+### Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `-BaseUrl` | `http://localhost:6000` | Full URL of the running SCIMServer (no trailing slash) |
+| `-ClientId` | `scimserver-client` | OAuth `client_id` — must match the server's `OAUTH_CLIENT_ID` env var |
+| `-ClientSecret` | `changeme-oauth` | OAuth `client_secret` — must match the server's `OAUTH_CLIENT_SECRET` env var |
+| `-Verbose` | off | Print full HTTP request/response bodies for debugging |
+
+### Scenario 1: Local Development (ts-node-dev)
+
+Start the server from the `api/` directory, then run tests. In dev mode, if `OAUTH_CLIENT_SECRET` is not set, a random secret is auto-generated and printed to the console — copy it into `-ClientSecret`.
+
+```powershell
+# Terminal 1 — start server
+cd api
+$env:PORT = 6000
+npx ts-node-dev --respawn --transpile-only src/main.ts
+
+# Terminal 2 — run tests (use the auto-generated secret from server output)
+.\scripts\live-test.ps1
+# Or with a known secret:
+$env:OAUTH_CLIENT_SECRET = "changeme-oauth"   # set on server side
+.\scripts\live-test.ps1 -ClientSecret "changeme-oauth"
+```
+
+### Scenario 2: Local Docker Container
+
+```powershell
+# Run container with a known OAuth secret
+docker run -d -p 8080:8080 -e OAUTH_CLIENT_SECRET=mysecret ghcr.io/pranems/scimserver:latest
+
+# Run tests against Docker
+.\scripts\live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "mysecret"
+```
+
+### Scenario 3: Azure Container App
+
+The secret must match `OAUTH_CLIENT_SECRET` configured in the Container App environment variables (set during deployment via Bicep or `az containerapp update`).
+
+```powershell
+# If deployed with OAUTH_CLIENT_SECRET=changeme-oauth (default for testing):
+.\scripts\live-test.ps1 `
+    -BaseUrl "https://scimserver-app.prouddune-131ec58e.eastus.azurecontainerapps.io" `
+    -ClientSecret "changeme-oauth"
+
+# If deployed with a custom secret:
+.\scripts\live-test.ps1 `
+    -BaseUrl "https://myapp.eastus.azurecontainerapps.io" `
+    -ClientSecret "my-production-secret-here"
+```
+
+To update the secret on an existing Azure deployment:
+```powershell
+az containerapp update --name scimserver-app --resource-group scimserver-rg `
+    --set-env-vars "OAUTH_CLIENT_SECRET=changeme-oauth"
+```
+
+### Scenario 4: Remote / CI Pipeline
+
+```powershell
+# Use environment variables instead of inline secrets
+$env:LIVE_TEST_URL = "https://staging.example.com"
+$env:LIVE_TEST_SECRET = "ci-secret-from-keyvault"
+
+.\scripts\live-test.ps1 `
+    -BaseUrl $env:LIVE_TEST_URL `
+    -ClientSecret $env:LIVE_TEST_SECRET `
+    -Verbose
+```
+
+### Scenario 5: Custom OAuth Client ID
+
+If the server has `OAUTH_CLIENT_ID` set to something other than the default:
+
+```powershell
+.\scripts\live-test.ps1 `
+    -BaseUrl http://localhost:6000 `
+    -ClientId "my-custom-client" `
+    -ClientSecret "my-custom-secret"
+```
+
+### Server-Side Environment Variables (Reference)
+
+These env vars on the **server** determine what credentials the live test script needs:
+
+| Server Env Var | Default | Maps to Script Param |
+|----------------|---------|---------------------|
+| `OAUTH_CLIENT_ID` | `scimserver-client` | `-ClientId` |
+| `OAUTH_CLIENT_SECRET` | auto-generated (dev) / required (prod) | `-ClientSecret` |
+| `PORT` | `3000` | Affects `-BaseUrl` port |
+| `API_PREFIX` | `scim` | Hardcoded in test URLs as `/scim/` |
+
+---
+
 ### Version Bumping
 - **Patch** (0.9.1 → 0.9.2): Bug fixes, small improvements
 - **Minor** (0.9.1 → 0.10.0): New features, non-breaking changes

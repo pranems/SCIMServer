@@ -1,3 +1,10 @@
+// SQLite compromise: This entire Bicep module exists to provide persistent backup
+// storage for the file-based SQLite database. Azure Blob Storage is used to store
+// periodic binary snapshots of the .db file.
+// PostgreSQL migration: remove this module — Azure Database for PostgreSQL provides
+// built-in backup with point-in-time recovery.
+// See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.6.3
+
 @description('Location for storage account')
 param location string = resourceGroup().location
 @description('Globally unique storage account name (lowercase, 3-24 chars)')

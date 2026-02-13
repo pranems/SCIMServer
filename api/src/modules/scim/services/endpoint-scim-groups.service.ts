@@ -219,7 +219,10 @@ export class EndpointScimGroupsService {
       }
     }
 
-    // Pre-resolve member user IDs OUTSIDE the transaction to minimise lock hold time.
+    // SQLite compromise (HIGH): Pre-resolve member user IDs OUTSIDE the transaction to
+    // minimise write-lock hold time. Every ms inside $transaction holds the global SQLite
+    // writer lock. PostgreSQL’s row-level locking makes this pattern unnecessary.
+    // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.2.3
     // The user data is stable within this request context so the lookup is safe here.
     const memberData = memberDtos.length > 0
       ? await this.mapMembersForPersistenceForEndpoint(group.id, memberDtos, endpointId)

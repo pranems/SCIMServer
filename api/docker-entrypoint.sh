@@ -2,6 +2,17 @@
 set -e
 
 #############################################
+# SQLite Compromise: Hybrid Storage         #
+# The entire startup restore/backup dance   #
+# exists because SQLite is file-based and   #
+# lives on ephemeral container storage.     #
+# PostgreSQL migration: replace with just   #
+#   npx prisma migrate deploy              #
+#   exec node dist/main.js                 #
+# See docs/SQLITE_COMPROMISE_ANALYSIS.md    #
+#     §3.3.3 and §3.3.5                     #
+#############################################
+#
 # Unified ephemeral DB location strategy    #
 # Primary (writable) DB: /tmp/local-data    #
 # Persistent backup:     /app/data/scim.db  #

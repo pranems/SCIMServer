@@ -808,4 +808,9 @@ CMD ["node", "dist/main.js"]
 
 ---
 
+> **SQLite Compromises**: This design incorporates 28 documented SQLite-specific compromises
+> (single-writer lock, derived lowercase columns, buffered logging, ephemeral storage, etc.).
+> For a complete audit with migration recommendations, see
+> [SQLITE_COMPROMISE_ANALYSIS.md](SQLITE_COMPROMISE_ANALYSIS.md).
+
 *This document describes the as-built architecture of SCIMServer as of February 2026.*

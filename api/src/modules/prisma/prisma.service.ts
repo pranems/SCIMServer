@@ -31,9 +31,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     await this.$connect();
 
     // Enable WAL journal mode and set busy timeout for better concurrent write handling.
-    // SQLite default journal mode (DELETE) serialises writes aggressively; WAL allows
-    // readers and a single writer to proceed concurrently, which prevents the Prisma
-    // interactive-transaction timeout that occurs under load (e.g. SCIM validator).
+    // SQLite compromise (CRITICAL): SQLite allows only ONE writer at a time. WAL mode
+    // lets readers proceed during writes but does NOT enable concurrent writers.
+    // busy_timeout=15000 makes a blocked writer wait up to 15s instead of failing immediately.
+    // PostgreSQL migration: remove these PRAGMAs entirely — MVCC provides true concurrent writes.
+    // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.2.1
     try {
       const walResult = await this.$queryRawUnsafe<Array<{ journal_mode: string }>>('PRAGMA journal_mode = WAL;');
       const busyResult = await this.$queryRawUnsafe<Array<{ busy_timeout: number }>>('PRAGMA busy_timeout = 15000;');

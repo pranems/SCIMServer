@@ -2,6 +2,9 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// ⚠ SQLite provider — see docs/SQLITE_COMPROMISE_ANALYSIS.md for 28 documented
+//   compromises (no CITEXT, no JSONB, single-writer lock, no horizontal scaling).
+//   Migration target: PostgreSQL (provider = "postgresql").
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
@@ -34,7 +37,8 @@ model ScimUser {
   scimId        String
   externalId    String?
   userName      String   // Original casing preserved for display
-  userNameLower String   // Lowercased for case-insensitive uniqueness & filtering (RFC 7643 §2.1)
+  userNameLower String   // SQLite compromise: derived lowercase column for case-insensitive uniqueness (RFC 7643 §2.1).
+                         // PostgreSQL: replace with @db.Citext on userName and remove this column.
   active        Boolean  @default(true)
   rawPayload    String
   meta          String?
@@ -57,7 +61,8 @@ model ScimGroup {
   scimId           String
   externalId       String?  // Entra ID sends externalId for groups; first-class column for uniqueness & filtering
   displayName      String
-  displayNameLower String   // Lowercased for case-insensitive filtering & uniqueness (RFC 7643 §2.1)
+  displayNameLower String   // SQLite compromise: derived lowercase column for case-insensitive filtering (RFC 7643 §2.1).
+                           // PostgreSQL: replace with @db.Citext on displayName and remove this column.
   rawPayload       String
   meta             String?
   createdAt        DateTime @default(now())

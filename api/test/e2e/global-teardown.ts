@@ -5,6 +5,10 @@ import * as path from 'path';
  * Jest globalTeardown — runs once after all E2E suites.
  * Removes the temporary test database file and marker.
  *
+ * SQLite compromise: Must clean up .db, -journal, and -wal satellite files.
+ * PostgreSQL migration: replace with DROP SCHEMA or simply disconnect.
+ * See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.3.6
+ *
  * Note: SQLite files may still be locked by Prisma connection pool
  * even after app.close(). We silently ignore EBUSY / EPERM errors
  * because global-setup always recreates the DB fresh.

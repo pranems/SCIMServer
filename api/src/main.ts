@@ -13,6 +13,11 @@ async function bootstrap(): Promise<void> {
     bufferLogs: true
   });
 
+  // Trust reverse proxy (Azure Container Apps, NGINX, etc.) so that
+  // req.protocol, req.hostname and req.ip reflect the original client request
+  // rather than the internal HTTP connection between the proxy and the container.
+  app.set('trust proxy', true);
+
   // Enable NestJS lifecycle hooks so OnModuleDestroy (e.g. Prisma $disconnect) fires on SIGTERM/SIGINT
   app.enableShutdownHooks();
 

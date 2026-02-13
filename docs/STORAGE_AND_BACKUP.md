@@ -136,7 +136,7 @@ Truncated to 24 characters per Azure naming rules (lowercase, no hyphens).
 | **RPO** | Maximum 5 minutes of data loss if container crashes between backups |
 | **Scaling** | Keep `maxReplicas: 1` — SQLite is single-writer only |
 | **Backup failures** | Non-blocking — app continues running; logged as errors |
-| **Zero data loss** | Requires migration to PostgreSQL/MySQL (not yet implemented) |
+| **Zero data loss** | Requires migration to PostgreSQL/MySQL — see [SQLITE_COMPROMISE_ANALYSIS.md](SQLITE_COMPROMISE_ANALYSIS.md) for full roadmap |
 
 ---
 
@@ -152,5 +152,10 @@ Truncated to 24 characters per Azure naming rules (lowercase, no hyphens).
 | `scripts/add-persistent-storage.ps1` | Add storage to existing deployment |
 
 ---
+
+> **Note**: The entire hybrid storage architecture is a SQLite compromise. A PostgreSQL
+> migration eliminates the backup service, entrypoint restore logic, and Azure Storage
+> infrastructure entirely. See [SQLITE_COMPROMISE_ANALYSIS.md](SQLITE_COMPROMISE_ANALYSIS.md)
+> §3.3 and §3.6 for details.
 
 *Consolidated from: persistent-storage-analysis, persistent-storage-implementation, HYBRID-STORAGE-FIX, PERSISTENCE-VERIFICATION, MIGRATION-GUIDE, MULTI-ENVIRONMENT-FIX*

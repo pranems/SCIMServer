@@ -23,8 +23,8 @@ param oauthClientSecret string
 param targetPort int = 8080
 @description('Min replicas')
 param minReplicas int = 1
-@description('Max replicas')
-param maxReplicas int = 2
+@description('Max replicas – keep at 1 while using SQLite (file-based DB cannot be shared across replicas)')
+param maxReplicas int = 1
 @description('CPU cores per replica (allowed: 0.25,0.5,1,2). Use 1 for reliability if unsure.')
 @allowed([
   '0.25'
@@ -163,6 +163,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           volumeMounts: []
         }
       ]
+      // SQLite compromise (CRITICAL): maxReplicas must stay at 1 while using SQLite.
+      // Multiple replicas each get their own isolated .db file → split brain.
+      // PostgreSQL migration: set maxReplicas to 3+ for HA and auto-scaling.
+      // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.3.1
       scale: {
         minReplicas: minReplicas
         maxReplicas: maxReplicas
