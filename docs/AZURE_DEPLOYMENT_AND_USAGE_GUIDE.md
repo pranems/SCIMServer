@@ -1,6 +1,6 @@
 # SCIMServer — Azure Deployment & Usage Guide
 
-> **Version**: 0.9.1 | **Repository**: [github.com/pranems/SCIMServer](https://github.com/pranems/SCIMServer) | **Registry**: `ghcr.io/pranems/scimserver`
+> **Version**: 0.9.2 | **Repository**: [github.com/pranems/SCIMServer](https://github.com/pranems/SCIMServer) | **Registry**: `ghcr.io/pranems/scimserver`
 
 ---
 

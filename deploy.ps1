@@ -257,6 +257,20 @@ try {
             Write-Host "2. Create new application → Non-gallery application" -ForegroundColor White
             Write-Host "3. Configure SCIM provisioning with your URL and secret" -ForegroundColor White
             Write-Host ""
+            Write-Host "📊 Log Viewing Commands (copy & paste):" -ForegroundColor Yellow
+            Write-Host "   Real-time streaming:" -ForegroundColor White
+            Write-Host "   az containerapp logs show -n $AppName -g $ResourceGroup --type console --follow" -ForegroundColor Gray
+            Write-Host "" 
+            Write-Host "   Recent logs (last 50):" -ForegroundColor White
+            Write-Host "   az containerapp logs show -n $AppName -g $ResourceGroup --type console --tail 50" -ForegroundColor Gray
+            Write-Host ""
+            Write-Host "   System logs:" -ForegroundColor White
+            Write-Host "   az containerapp logs show -n $AppName -g $ResourceGroup --type system --tail 30" -ForegroundColor Gray
+            Write-Host ""
+            Write-Host "   Admin REST endpoints (from any machine):" -ForegroundColor White
+            Write-Host "   curl $AppUrl/scim/admin/logs -H 'Authorization: Bearer <SECRET>'" -ForegroundColor Gray
+            Write-Host "   curl $AppUrl/scim/admin/log-config/recent -H 'Authorization: Bearer <SECRET>'" -ForegroundColor Gray
+            Write-Host ""
             Write-Host "🎉 Share this URL with your team for monitoring!" -ForegroundColor Green
         }
     } else {

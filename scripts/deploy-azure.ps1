@@ -768,7 +768,22 @@ Write-Host "   • Resource: $ResourceGroup > $AppName" -ForegroundColor Gray
 Write-Host "   • Logs: $ResourceGroup > $lawName" -ForegroundColor Gray
 Write-Host ""
 
-Write-Host "💰 Estimated Monthly Cost:" -ForegroundColor Cyan
+Write-Host "� Log Viewing Commands (copy & paste):" -ForegroundColor Cyan
+Write-Host "   Real-time streaming:" -ForegroundColor White
+Write-Host "   az containerapp logs show -n $AppName -g $ResourceGroup --type console --follow" -ForegroundColor Gray
+Write-Host "" 
+Write-Host "   Recent logs (last 50):" -ForegroundColor White
+Write-Host "   az containerapp logs show -n $AppName -g $ResourceGroup --type console --tail 50" -ForegroundColor Gray
+Write-Host ""
+Write-Host "   System logs:" -ForegroundColor White
+Write-Host "   az containerapp logs show -n $AppName -g $ResourceGroup --type system --tail 30" -ForegroundColor Gray
+Write-Host ""
+Write-Host "   Admin REST endpoints (from any machine):" -ForegroundColor White
+Write-Host "   curl $url/scim/admin/logs -H 'Authorization: Bearer <SECRET>'" -ForegroundColor Gray
+Write-Host "   curl $url/scim/admin/log-config/recent -H 'Authorization: Bearer <SECRET>'" -ForegroundColor Gray
+Write-Host ""
+
+Write-Host "�💰 Estimated Monthly Cost:" -ForegroundColor Cyan
 Write-Host '   Container App: ~$5-15 (scales to zero when idle)' -ForegroundColor White
 Write-Host '   Blob Storage (snapshots): ~$0.20-0.50 (light DB snapshots)' -ForegroundColor White
 Write-Host '   Log Analytics: ~$0-5 (depends on log volume)' -ForegroundColor White

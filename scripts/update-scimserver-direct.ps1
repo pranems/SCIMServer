@@ -198,8 +198,14 @@ function Update-SCIMServerDirect {
             Log 'Update successful' 'OK' Green
             if(-not $Quiet){
                 Write-Host "Revision list: az containerapp revision list -n $AppName -g $ResourceGroup -o table" -ForegroundColor Gray
-                Write-Host "Logs (tail):  az containerapp logs show -n $AppName -g $ResourceGroup --tail 20" -ForegroundColor Gray
-                Write-Host "FQDN:         az containerapp show -n $AppName -g $ResourceGroup --query properties.configuration.ingress.fqdn -o tsv" -ForegroundColor Gray
+                Write-Host "Logs (tail):   az containerapp logs show -n $AppName -g $ResourceGroup --tail 50" -ForegroundColor Gray
+                Write-Host "Logs (stream): az containerapp logs show -n $AppName -g $ResourceGroup --type console --follow" -ForegroundColor Gray
+                Write-Host "System logs:   az containerapp logs show -n $AppName -g $ResourceGroup --type system --tail 30" -ForegroundColor Gray
+                Write-Host "FQDN:          az containerapp show -n $AppName -g $ResourceGroup --query properties.configuration.ingress.fqdn -o tsv" -ForegroundColor Gray
+                $fqdn = az containerapp show -n $AppName -g $ResourceGroup --query properties.configuration.ingress.fqdn -o tsv 2>$null
+                if ($fqdn) {
+                    Write-Host "Admin logs:    curl https://$fqdn/scim/admin/logs -H 'Authorization: Bearer <SECRET>'" -ForegroundColor Gray
+                }
             }
         } else { Log "Update failed (exit $LASTEXITCODE)" 'ERROR' Red }
     } catch { Log "Error: $($_.Exception.Message)" 'ERROR' Red }

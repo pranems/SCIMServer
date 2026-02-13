@@ -18,6 +18,9 @@ build/
 
 # Database
 *.db
+*.db-shm
+*.db-wal
+*.db-journal
 *.sqlite
 
 # IDE

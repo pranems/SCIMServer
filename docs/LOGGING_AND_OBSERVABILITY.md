@@ -1058,6 +1058,100 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 
 ## 12. Integration with External Systems
 
+### Azure Container Apps — Remote Log Access
+
+When deployed to Azure Container Apps, all `stdout` / `stderr` output from the NestJS application is automatically captured by the platform. Logs are accessible remotely from any machine with `az login` authenticated.
+
+#### Real-time Streaming
+
+```powershell
+# Live tail — application console output (like docker logs -f)
+az containerapp logs show `
+    --name scimserver-app `
+    --resource-group scimserver-rg `
+    --type console `
+    --follow
+
+# System logs — platform events (restarts, crashes, scaling, image pulls)
+az containerapp logs show `
+    --name scimserver-app `
+    --resource-group scimserver-rg `
+    --type system `
+    --follow
+
+# Recent 100 lines (without live follow)
+az containerapp logs show `
+    --name scimserver-app `
+    --resource-group scimserver-rg `
+    --type console `
+    --tail 100
+```
+
+#### Log Analytics Queries (KQL — 30-day retention)
+
+```powershell
+# Get workspace ID
+$wsId = az containerapp env show `
+    --name scimserver-env `
+    --resource-group scimserver-rg `
+    --query "properties.appLogsConfiguration.logAnalyticsConfiguration.customerId" -o tsv
+
+# Last hour of app logs
+az monitor log-analytics query -w $wsId `
+    --analytics-query "ContainerAppConsoleLogs_CL | where TimeGenerated > ago(1h) | order by TimeGenerated desc | take 200" `
+    -o table
+
+# Errors only (last 24h)
+az monitor log-analytics query -w $wsId `
+    --analytics-query "ContainerAppConsoleLogs_CL | where Log_s contains 'ERROR' | where TimeGenerated > ago(24h) | order by TimeGenerated desc" `
+    -o table
+
+# System events — container restarts, image pulls, scaling
+az monitor log-analytics query -w $wsId `
+    --analytics-query "ContainerAppSystemLogs_CL | where TimeGenerated > ago(24h) | order by TimeGenerated desc | take 100" `
+    -o table
+
+# Count errors per hour (last 12h)
+az monitor log-analytics query -w $wsId `
+    --analytics-query "ContainerAppConsoleLogs_CL | where Log_s contains 'ERROR' | where TimeGenerated > ago(12h) | summarize count() by bin(TimeGenerated, 1h) | order by TimeGenerated desc" `
+    -o table
+```
+
+#### Azure Portal (GUI)
+
+| Section | Path |
+|---------|------|
+| **Log stream** | Container Apps → scimserver-app → Log stream (real-time) |
+| **Logs** | Container Apps → scimserver-app → Logs (KQL query editor) |
+| **Metrics** | Container Apps → scimserver-app → Metrics (CPU, memory, requests) |
+| **Revisions** | Container Apps → scimserver-app → Revisions (health per deployment) |
+
+#### Application-Level Logs via REST API
+
+These endpoints are available from any HTTP client — no Azure CLI required:
+
+```powershell
+$url = "https://<fqdn>"
+$h = @{ Authorization = "Bearer <secret>" }
+
+# Paginated request logs (stored in SQLite)
+Invoke-RestMethod "$url/scim/admin/logs?pageSize=50" -Headers $h
+
+# In-memory ring buffer (last ~200 structured entries)
+Invoke-RestMethod "$url/scim/admin/log-config/recent" -Headers $h
+
+# Current log levels
+Invoke-RestMethod "$url/scim/admin/log-config" -Headers $h
+
+# Change global log level at runtime (no restart)
+Invoke-RestMethod "$url/scim/admin/log-config/level/DEBUG" -Method PUT -Headers $h
+
+# Set category-level override
+Invoke-RestMethod "$url/scim/admin/log-config/category/scim/TRACE" -Method PUT -Headers $h
+```
+
+> **Tip**: Set `LOG_FORMAT=json` in the container env vars for structured JSON output that integrates best with Log Analytics queries and external log aggregators.
+
 ### Azure Monitor / Application Insights
 
 With `LOG_FORMAT=json`, stdout/stderr output is JSON-structured and automatically ingested by Azure Container Apps logging:
