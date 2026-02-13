@@ -116,7 +116,8 @@ export class AdminController {
     @Body() dto: ManualUserDto,
     @Req() request: Request
   ): Promise<ScimUserResource> {
-    const baseUrl = buildBaseUrl(request);
+    const endpointId = await this.getDefaultEndpointId();
+    const baseUrl = `${buildBaseUrl(request)}/endpoints/${endpointId}`;
     const userName = dto.userName.trim();
     const payload: CreateUserDto = {
       schemas: [SCIM_CORE_USER_SCHEMA],
@@ -183,7 +184,6 @@ export class AdminController {
       ...extras
     } as CreateUserDto;
 
-    const endpointId = await this.getDefaultEndpointId();
     return this.usersService.createUserForEndpoint(mergedPayload, baseUrl, endpointId);
   }
 
@@ -193,7 +193,8 @@ export class AdminController {
     @Body() dto: ManualGroupDto,
     @Req() request: Request
   ): Promise<ScimGroupResource> {
-    const baseUrl = buildBaseUrl(request);
+    const endpointId = await this.getDefaultEndpointId();
+    const baseUrl = `${buildBaseUrl(request)}/endpoints/${endpointId}`;
     const displayName = dto.displayName.trim();
     const members = dto.memberIds
       ?.map((member) => member.trim())
@@ -211,7 +212,6 @@ export class AdminController {
       (payload as Record<string, unknown>).id = scimId;
     }
 
-    const endpointId = await this.getDefaultEndpointId();
     return this.groupsService.createGroupForEndpoint(payload, baseUrl, endpointId);
   }
 
