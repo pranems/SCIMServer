@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   api:
-    image: node:22
+    image: node:24
     container_name: scimserver-api-dev
     working_dir: /usr/src/app
     volumes:

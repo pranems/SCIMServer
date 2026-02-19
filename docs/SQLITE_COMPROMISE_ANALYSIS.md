@@ -2,7 +2,7 @@
 
 > **Version**: 1.0  
 > **Date**: 2026-02-13  
-> **Scope**: Full audit of SQLite-specific compromises in SCIMServer v0.9.1  
+> **Scope**: Full audit of SQLite-specific compromises in SCIMServer v0.10.0 (including fixes introduced in v0.9.1)  
 > **Audience**: Engineering team, architects, and decision-makers evaluating a PostgreSQL migration
 
 ---
@@ -151,7 +151,7 @@ model ScimUser {
 **Severity**: HIGH  
 **Files**: `api/prisma/schema.prisma`, `api/src/modules/scim/filters/apply-scim-filter.ts`
 
-Identical to `userNameLower`. Added in v0.9.1 to pass the SCIM validator's "Filter for existing group with different case" test.
+Identical to `userNameLower`. Introduced in v0.9.1 (and part of current v0.10.0 baseline) to pass the SCIM validator's "Filter for existing group with different case" test.
 
 ```prisma
 model ScimGroup {

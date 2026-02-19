@@ -1,5 +1,5 @@
 ﻿import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../../generated/prisma/client';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -38,7 +38,7 @@ export class LoggingService implements OnModuleDestroy {
    * in batches to avoid per-request SQLite write-lock contention with SCIM
    * transactions.
    */
-  async recordRequest({
+  recordRequest({
     method,
     url,
     status,
@@ -48,7 +48,7 @@ export class LoggingService implements OnModuleDestroy {
     responseHeaders,
     responseBody,
     error
-  }: CreateRequestLogOptions): Promise<void> {
+  }: CreateRequestLogOptions): void {
     const errorMessage = this.extractErrorMessage(error);
     const errorStack = this.extractErrorStack(error);
     // Compute identifier once (cheap vs later bulk parsing). Works for Users (userName/email/externalId) & Groups (displayName)

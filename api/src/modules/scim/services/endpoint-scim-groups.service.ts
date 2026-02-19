@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { GroupMember, Prisma } from '@prisma/client';
+import type { GroupMember, Prisma } from '../../../generated/prisma/client';
 import { randomUUID } from 'node:crypto';
 
 import { PrismaService } from '../../prisma/prisma.service';

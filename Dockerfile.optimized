@@ -1,12 +1,13 @@
 #############################
 # Optimized Multi-stage Docker build for SCIMServer
+# Prisma 7 + Node 24 + better-sqlite3 driver adapter
 # Target: Reduce image size from 1GB+ to <300MB
 #############################
 
 #############################
 # Stage 1: Build web frontend (React + Vite)
 #############################
-FROM node:22-alpine AS web-build
+FROM node:24-alpine AS web-build
 WORKDIR /web
 
 # Copy package files first for better layer caching
@@ -24,36 +25,41 @@ RUN npm run build && \
 #############################
 # Stage 2: Build API (NestJS) with aggressive optimization
 #############################
-FROM node:22-alpine AS api-build
+FROM node:24-alpine AS api-build
 WORKDIR /app
 
-# Install build essentials in single layer
+# openssl needed for Prisma migration engine (Rust binary used by prisma migrate deploy)
 RUN apk add --no-cache openssl
 
 # Copy package files for better caching
 COPY api/package*.json ./
 
-# Install, build, and clean in optimized layers
-RUN npm ci --no-audit --no-fund --no-optional
+# Install all dependencies (prisma devDep needed at runtime for migrate deploy)
+RUN npm ci --no-audit --no-fund
 
 COPY api/ ./
 COPY --from=web-build /web/dist ./public
 
-# Build everything and clean up in single layer to minimize size
+# Prisma 7: generate client (→ src/generated/prisma/), push schema, then build
+ENV DATABASE_URL="file:./data.db"
 RUN npx prisma generate && \
-    npx tsc -p tsconfig.build.json && \
+    npx prisma db push && \
+    npx tsc -p tsconfig.build.json
+
+# Clean dev files; preserve prisma.config.ts (needed at runtime for prisma migrate deploy)
+RUN cp prisma.config.ts /tmp/prisma.config.ts && \
     rm -rf src test *.ts tsconfig*.json *.md .eslint* jest.config.js && \
-    npm prune --production && \
+    mv /tmp/prisma.config.ts ./prisma.config.ts && \
     npm cache clean --force && \
     rm -rf /root/.npm /tmp/*
 
 #############################
 # Stage 3: Minimal runtime using distroless-like approach
 #############################
-FROM node:22-alpine AS runtime
+FROM node:24-alpine AS runtime
 WORKDIR /app
 
-# Install minimal runtime dependencies and clean up
+# openssl needed for Prisma migration engine at container startup
 RUN apk add --no-cache openssl && \
     rm -rf /var/cache/apk/* /tmp/* && \
     addgroup -g 1001 -S nodejs && \
@@ -61,29 +67,37 @@ RUN apk add --no-cache openssl && \
 
 # Production environment variables
 ENV NODE_ENV=production \
-    PORT=80 \
+    PORT=8080 \
     DATABASE_URL="file:./data.db" \
     NODE_OPTIONS="--max_old_space_size=512"
+
+# Create data directory for volume mount
+RUN mkdir -p /app/data && chown scim:nodejs /app/data
 
 # Copy only production artifacts (minimal footprint)
 COPY --from=api-build --chown=scim:nodejs /app/node_modules ./node_modules
 COPY --from=api-build --chown=scim:nodejs /app/dist ./dist
 COPY --from=api-build --chown=scim:nodejs /app/public ./public
 COPY --from=api-build --chown=scim:nodejs /app/prisma ./prisma
+COPY --from=api-build --chown=scim:nodejs /app/prisma.config.ts ./prisma.config.ts
 COPY --from=api-build --chown=scim:nodejs /app/package.json ./package.json
 
-# Remove any remaining unnecessary files
+# Copy entrypoint script (handles migrations + hybrid storage)
+COPY --chown=scim:nodejs api/docker-entrypoint.sh /app/
+RUN chmod +x /app/docker-entrypoint.sh
+
+# Remove unnecessary files (preserve effect/ which Prisma 7 depends on internally)
 RUN find ./node_modules -name "*.md" -delete && \
     find ./node_modules -name "*.txt" -delete && \
-    find ./node_modules -name "test" -type d -exec rm -rf {} + 2>/dev/null || true && \
-    find ./node_modules -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find ./node_modules -path "*/effect" -prune -o -name "test" -type d -exec rm -rf {} + 2>/dev/null || true && \
+    find ./node_modules -path "*/effect" -prune -o -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true && \
     find ./node_modules -name "*.map" -delete 2>/dev/null || true
 
 USER scim
-EXPOSE 80
+EXPOSE 8080
 
 # Minimal health check
 HEALTHCHECK --interval=60s --timeout=3s --start-period=10s --retries=2 \
-    CMD node -e "process.exit(require('http').get('http://127.0.0.1:80/health',r=>r.statusCode===200?0:1).on('error',()=>1))"
+    CMD node -e "require('http').get('http://127.0.0.1:8080/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
 
-CMD ["node", "dist/main.js"]
+CMD ["/app/docker-entrypoint.sh"]

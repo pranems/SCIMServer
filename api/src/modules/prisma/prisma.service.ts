@@ -1,5 +1,6 @@
 ﻿import { Injectable, OnModuleDestroy, OnModuleInit, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../../generated/prisma/client';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
@@ -19,10 +20,11 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       console.warn(`[PrismaService] DATABASE_URL not set – using fallback '${fallback}'.`);
     }
 
+    // Prisma 7: Use better-sqlite3 driver adapter (Rust-free, faster, smaller bundle)
+    const adapter = new PrismaBetterSqlite3({ url: effectiveUrl });
+
     super({
-      datasources: {
-        db: { url: effectiveUrl },
-      },
+      adapter,
       log: ['warn', 'error'],
     });
   }
@@ -37,9 +39,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     // PostgreSQL migration: remove these PRAGMAs entirely — MVCC provides true concurrent writes.
     // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.2.1
     try {
-      const walResult = await this.$queryRawUnsafe<Array<{ journal_mode: string }>>('PRAGMA journal_mode = WAL;');
-      const busyResult = await this.$queryRawUnsafe<Array<{ busy_timeout: number }>>('PRAGMA busy_timeout = 15000;');
-      this.logger.log(`SQLite PRAGMAs set: journal_mode=${JSON.stringify(walResult)}, busy_timeout=${JSON.stringify(busyResult)}`);
+      await this.$queryRawUnsafe('PRAGMA journal_mode = WAL;');
+      await this.$queryRawUnsafe('PRAGMA busy_timeout = 15000;');
+      this.logger.log('SQLite PRAGMAs set: journal_mode=WAL, busy_timeout=15000');
     } catch (err) {
       // Non-fatal: if the database is not SQLite (e.g. tests with in-memory), silently skip.
       this.logger.warn(`Could not set SQLite PRAGMAs: ${err instanceof Error ? err.message : String(err)}`);

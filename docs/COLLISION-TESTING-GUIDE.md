@@ -1,5 +1,9 @@
 # 🎯 SCIM Collision Testing Guide
 
+> **Status**: Living test procedure  
+> **Last Updated**: February 18, 2026  
+> **Baseline**: SCIMServer v0.10.0
+
 ## ⚡ Quick Start (tl;dr)
 
 **Prerequisites**
@@ -109,5 +113,5 @@ Activity Feed shows the failed `POST /Users` and no new user is inserted in the 
 
 ---
 
-**Last Updated**: February 2026 | **Version**: 0.9.1+
+**Last Updated**: February 2026 | **Version**: 0.10.0+
 

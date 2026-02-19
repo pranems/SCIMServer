@@ -1,8 +1,12 @@
 # SCIM Validator Analysis Report — scim-results-9.json
 
+> **Status**: Historical validator analysis with current-state relevance notes  
+> **Last Updated**: February 18, 2026  
+> **Baseline**: SCIMServer v0.10.0
+
 **Date:** February 11, 2026 (Revised v4 — FP #4 identified & fixed)  
 **Source:** `scim-results-9.json` + `scim-results (10).json` — Microsoft SCIM Validator  
-**Server:** SCIMServer v0.9.1 (NestJS + Prisma + SQLite)  
+**Server:** SCIMServer v0.10.0 (NestJS + Prisma + SQLite)  
 **Endpoint:** `http://localhost:6000/scim/endpoints/cmlfuqaft0002i30tlv47pq1f/`
 
 ---

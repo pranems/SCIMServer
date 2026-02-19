@@ -105,7 +105,45 @@ export interface VersionInfo {
   version: string;
   commit?: string;
   buildTime?: string;
-  runtime: { node: string; platform: string };
+  service?: {
+    name: string;
+    environment: string;
+    apiPrefix: string;
+    scimBasePath: string;
+    now: string;
+    startedAt: string;
+    uptimeSeconds: number;
+    timezone: string;
+  };
+  runtime: {
+    node: string;
+    platform: string;
+    arch?: string;
+    pid?: number;
+    hostname?: string;
+    cpus?: number;
+    containerized?: boolean;
+    memory?: {
+      rss: number;
+      heapTotal: number;
+      heapUsed: number;
+      external: number;
+      arrayBuffers: number;
+    };
+  };
+  auth?: {
+    oauthClientId?: string;
+    oauthClientSecretConfigured: boolean;
+    jwtSecretConfigured: boolean;
+    scimSharedSecretConfigured: boolean;
+  };
+  storage?: {
+    databaseUrl?: string;
+    databaseProvider: 'sqlite';
+    blobBackupConfigured: boolean;
+    blobAccount?: string;
+    blobContainer?: string;
+  };
   deployment?: DeploymentInfo;
 }
 

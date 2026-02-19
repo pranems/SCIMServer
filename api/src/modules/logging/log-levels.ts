@@ -33,7 +33,7 @@ export function parseLogLevel(value: string | undefined): LogLevel {
   if (typeof mapped === 'number') return mapped;
   // Numeric fallback
   const num = Number(upper);
-  if (!isNaN(num) && num >= LogLevel.TRACE && num <= LogLevel.OFF) return num;
+  if (!isNaN(num) && num >= (LogLevel.TRACE as number) && num <= (LogLevel.OFF as number)) return num;
   return LogLevel.INFO;
 }
 

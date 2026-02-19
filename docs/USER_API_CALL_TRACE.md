@@ -1,6 +1,8 @@
-# User API � Annotated Call Trace + Diagrams
+# User API — Annotated Call Trace + Diagrams
 
-This document contains a concrete example payload for `POST /scim/v2/Users`, an end?to?end annotated call trace mapping to controller/service/Prisma actions and the expected DB rows and request log entry. It also includes additional mermaid diagrams showing create, list and get flows including database interactions.
+> Version baseline: v0.10.0 · Updated: February 18, 2026 · Flow reflects current RequestLoggingInterceptor + ScimLogger behavior
+
+This document contains a concrete example payload for `POST /scim/v2/Users`, an end-to-end annotated call trace mapping to controller/service/Prisma actions and the expected DB rows and request log entry. It also includes additional Mermaid diagrams showing create, list, and get flows including database interactions.
 
 ---
 
@@ -30,8 +32,8 @@ Notes:
 
 ## 2) Annotated call trace (step-by-step)
 
-1. Client ? main middleware (`api/src/main.ts`)
-   - Path normalized: `/scim/v2/Users` ? `/scim/Users`.
+1. Client → main middleware (`api/src/main.ts`)
+  - Path normalized: `/scim/v2/Users` → `/scim/Users`.
    - JSON body parsed with SCIM media type support.
 
 2. Global guard runs: `SharedSecretGuard` (`api/src/modules/auth/shared-secret.guard.ts`)
@@ -88,14 +90,14 @@ Example inserted row (JSON representation):
 ```json
 {
   "id": "cjld2cj...",
-  "scimId": "user-2025-12-29-0001",
+  "scimId": "user-2026-02-18-0001",
   "externalId": "7b39e58e-0000-4000-8000-000000000001",
   "userName": "alice@example.com",
   "active": true,
   "rawPayload": "{\"schemas\":[\"urn:ietf:params:scim:schemas:core:2.0:User\"],\"userName\":\"alice@example.com\",...}",
   "meta": "{\"location\":\"https://<API_BASE>/scim/v2/Users/cjld2cj...\",\"resourceType\":\"User\"}",
-  "createdAt": "2025-12-29T12:34:56.000Z",
-  "updatedAt": "2025-12-29T12:34:56.000Z"
+  "createdAt": "2026-02-18T12:34:56.000Z",
+  "updatedAt": "2026-02-18T12:34:56.000Z"
 }
 ```
 
@@ -123,7 +125,7 @@ Prisma `RequestLog` model stores captured request/response for UI debugging. Exa
   "responseBody": "{\"schemas\":[...],\"id\":\"cjld2cj...\",...}",
   "errorMessage": null,
   "identifier": "alice@example.com",
-  "createdAt": "2025-12-29T12:34:56.000Z"
+  "createdAt": "2026-02-18T12:34:56.000Z"
 }
 ```
 
@@ -131,22 +133,24 @@ Prisma `RequestLog` model stores captured request/response for UI debugging. Exa
 
 ## 5) Mermaid diagrams
 
-### Create user � sequence (success & uniqueness collision)
+### Create user — sequence (success & uniqueness collision)
 
 ```mermaid
 sequenceDiagram
   participant Client
   participant WebServer as main.ts middleware
+  participant ReqLog as RequestLoggingInterceptor
   participant Guard as SharedSecretGuard
   participant OAuthSvc as OAuthService
   participant Controller as EndpointScimUsersController
   participant Validator as ValidationPipe
   participant Service as EndpointScimUsersService
   participant PrismaClient
-  participant Logger as LoggingService
+  participant ScimLogger
 
-  Client->>WebServer: POST /scim/endpoints/{endpointId}/Users (application/scim+json)
+  Client->>WebServer: POST /scim/v2/Users (or /scim/endpoints/{endpointId}/Users)
   WebServer->>WebServer: normalize /scim/v2 -> /scim
+  WebServer->>ReqLog: create correlation context
   WebServer->>Guard: run canActivate (Authorization header)
   Guard->>OAuthSvc: validate JWT (jwt.verify)
   alt token valid
@@ -169,28 +173,31 @@ sequenceDiagram
     Service->>PrismaClient: check uniqueness (findFirst / where)
     alt unique violation found
       Service-->>Controller: throw ConflictError (mapped to 409)
-      Controller->>Logger: log request + 409
+      Controller->>ScimLogger: emit structured error entry
       Controller-->>Client: 409 Conflict (scimType: 'uniqueness')
     else unique ok
       Service->>PrismaClient: prisma.scimUser.create(...)
       PrismaClient-->>Service: created row
-      Service->>Logger: log request + 201 (store request/response)
+      Service->>ScimLogger: emit create success entry
       Controller-->>Client: 201 Created (SCIM user resource)
     end
   end
+  ReqLog-->>Client: persist request metadata (buffered)
 ```
 
-### List & Get user � sequence
+### List & Get user — sequence
 
 ```mermaid
 sequenceDiagram
   participant Client
+  participant ReqLog as RequestLoggingInterceptor
   participant Guard
   participant Controller as EndpointScimUsersController
   participant Service as EndpointScimUsersService
   participant PrismaClient
 
-  Client->>Guard: GET /scim/endpoints/{endpointId}/Users?startIndex=1&count=50
+  Client->>ReqLog: GET /scim/v2/Users?startIndex=1&count=50
+  ReqLog->>Guard: apply auth + correlation checks
   Guard-->>Controller: allow
   Controller->>Service: listUsersForEndpoint(query, baseUrl, endpointId)
   Service->>PrismaClient: prisma.scimUser.findMany({ skip, take, where, orderBy })
@@ -198,7 +205,8 @@ sequenceDiagram
   Service-->>Controller: paginated SCIM list
   Controller-->>Client: 200 { Resources: [...], totalResults: N }
 
-  Client->>Guard: GET /scim/endpoints/{endpointId}/Users/:id
+  Client->>ReqLog: GET /scim/v2/Users/:id
+  ReqLog->>Guard: apply auth + correlation checks
   Guard-->>Controller: allow
   Controller->>Service: getUserForEndpoint(id, baseUrl, endpointId)
   Service->>PrismaClient: prisma.scimUser.findFirst({ where: { scimId, endpointId } })
@@ -228,9 +236,3 @@ npm run start:dev
 3. Inspect SQLite DB file (runtime path `/tmp/local-data/scim.db` when running in container). For local dev the `DATABASE_URL` may point to `file:./dev.db` depending on environment. Use `npx prisma studio` or `sqlite3` to inspect rows.
 
 ---
-
-If you want, I can also:
-- Add this file under `docs/` (done) and create a separate `.mmd` file for diagrams if you prefer a dedicated mermaid file.
-- Produce a small test script (bash/PowerShell) that requests a token, creates a user, and queries the DB locally.
-
-Which next?  

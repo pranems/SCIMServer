@@ -310,4 +310,214 @@ describe('LogConfigController', () => {
       expect(scimLogger.getRecentLogs()).toHaveLength(0);
     });
   });
+
+  // ─── GET /admin/log-config/stream (SSE) ───────────────────────────
+
+  describe('streamLogs (SSE)', () => {
+    function createMockResponse() {
+      const chunks: string[] = [];
+      const headers: Record<string, string> = {};
+      const res = {
+        setHeader: jest.fn((key: string, value: string) => { headers[key] = value; }),
+        flushHeaders: jest.fn(),
+        write: jest.fn((data: string) => { chunks.push(data); return true; }),
+        end: jest.fn(),
+        on: jest.fn(),
+        chunks,
+        headers,
+      };
+      return res;
+    }
+
+    it('should set SSE headers', () => {
+      const res = createMockResponse();
+      controller.streamLogs(undefined, undefined, undefined, res as never);
+      expect(res.headers['Content-Type']).toBe('text/event-stream');
+      expect(res.headers['Cache-Control']).toBe('no-cache');
+      expect(res.headers['Connection']).toBe('keep-alive');
+      expect(res.headers['X-Accel-Buffering']).toBe('no');
+      expect(res.flushHeaders).toHaveBeenCalled();
+    });
+
+    it('should send initial connected event', () => {
+      const res = createMockResponse();
+      controller.streamLogs(undefined, undefined, undefined, res as never);
+      expect(res.chunks[0]).toContain('event: connected');
+      expect(res.chunks[0]).toContain('Log stream connected');
+    });
+
+    it('should stream log entries in real-time', () => {
+      const res = createMockResponse();
+      controller.streamLogs(undefined, undefined, undefined, res as never);
+      const initialCount = res.chunks.length;
+
+      // Emit a log entry
+      scimLogger.info(LogCategory.HTTP, 'streamed entry');
+
+      expect(res.chunks.length).toBeGreaterThan(initialCount);
+      const lastChunk = res.chunks[res.chunks.length - 1];
+      expect(lastChunk).toContain('data:');
+      expect(lastChunk).toContain('streamed entry');
+
+      // Trigger cleanup (simulate disconnect)
+      const closeHandler = (res.on as jest.Mock).mock.calls.find(
+        (call: [string, () => void]) => call[0] === 'close'
+      );
+      if (closeHandler) closeHandler[1]();
+    });
+
+    it('should filter by level', () => {
+      const res = createMockResponse();
+      controller.streamLogs('WARN', undefined, undefined, res as never);
+      const afterConnect = res.chunks.length;
+
+      scimLogger.info(LogCategory.HTTP, 'info entry - should be filtered');
+      expect(res.chunks.length).toBe(afterConnect); // no new chunk
+
+      scimLogger.warn(LogCategory.HTTP, 'warn entry - should pass');
+      expect(res.chunks.length).toBe(afterConnect + 1);
+
+      // Cleanup
+      const closeHandler = (res.on as jest.Mock).mock.calls.find(
+        (call: [string, () => void]) => call[0] === 'close'
+      );
+      if (closeHandler) closeHandler[1]();
+    });
+
+    it('should filter by category', () => {
+      const res = createMockResponse();
+      controller.streamLogs(undefined, 'auth', undefined, res as never);
+      const afterConnect = res.chunks.length;
+
+      scimLogger.info(LogCategory.HTTP, 'http entry - should be filtered');
+      expect(res.chunks.length).toBe(afterConnect);
+
+      scimLogger.info(LogCategory.AUTH, 'auth entry - should pass');
+      expect(res.chunks.length).toBe(afterConnect + 1);
+
+      // Cleanup
+      const closeHandler = (res.on as jest.Mock).mock.calls.find(
+        (call: [string, () => void]) => call[0] === 'close'
+      );
+      if (closeHandler) closeHandler[1]();
+    });
+
+    it('should filter by endpointId', () => {
+      const res = createMockResponse();
+      controller.streamLogs(undefined, undefined, 'ep-123', res as never);
+      const afterConnect = res.chunks.length;
+
+      scimLogger.info(LogCategory.HTTP, 'no endpoint');
+      expect(res.chunks.length).toBe(afterConnect);
+
+      scimLogger.runWithContext({ requestId: 'r1', endpointId: 'ep-123' }, () => {
+        scimLogger.info(LogCategory.HTTP, 'target endpoint');
+      });
+      expect(res.chunks.length).toBe(afterConnect + 1);
+
+      // Cleanup
+      const closeHandler = (res.on as jest.Mock).mock.calls.find(
+        (call: [string, () => void]) => call[0] === 'close'
+      );
+      if (closeHandler) closeHandler[1]();
+    });
+
+    it('should unsubscribe on close', () => {
+      const res = createMockResponse();
+      controller.streamLogs(undefined, undefined, undefined, res as never);
+      const afterConnect = res.chunks.length;
+
+      // Trigger close
+      const closeHandler = (res.on as jest.Mock).mock.calls.find(
+        (call: [string, () => void]) => call[0] === 'close'
+      );
+      expect(closeHandler).toBeDefined();
+      closeHandler![1]();
+
+      // New log should NOT appear
+      scimLogger.info(LogCategory.HTTP, 'after disconnect');
+      expect(res.chunks.length).toBe(afterConnect);
+      expect(res.end).toHaveBeenCalled();
+    });
+  });
+
+  // ─── GET /admin/log-config/download ───────────────────────────────
+
+  describe('downloadLogs', () => {
+    function createMockResponse() {
+      const headers: Record<string, string> = {};
+      let body = '';
+      const res = {
+        setHeader: jest.fn((key: string, value: string) => { headers[key] = value; }),
+        send: jest.fn((data: string) => { body = data; }),
+        headers,
+        get body() { return body; },
+      };
+      return res;
+    }
+
+    beforeEach(() => {
+      scimLogger.clearRecentLogs();
+      scimLogger.info(LogCategory.HTTP, 'log entry 1');
+      scimLogger.warn(LogCategory.AUTH, 'log entry 2');
+      scimLogger.error(LogCategory.DATABASE, 'log entry 3', new Error('db issue'));
+    });
+
+    it('should default to NDJSON format', () => {
+      const res = createMockResponse();
+      controller.downloadLogs(undefined, undefined, undefined, undefined, undefined, undefined, res as never);
+      expect(res.headers['Content-Type']).toBe('application/x-ndjson');
+      expect(res.headers['Content-Disposition']).toContain('attachment');
+      expect(res.headers['Content-Disposition']).toContain('.ndjson');
+    });
+
+    it('should support JSON format', () => {
+      const res = createMockResponse();
+      controller.downloadLogs('json', undefined, undefined, undefined, undefined, undefined, res as never);
+      expect(res.headers['Content-Type']).toBe('application/json');
+      expect(res.headers['Content-Disposition']).toContain('.json');
+      const parsed = JSON.parse(res.body);
+      expect(Array.isArray(parsed)).toBe(true);
+      expect(parsed.length).toBe(3);
+    });
+
+    it('should produce valid NDJSON with all entries', () => {
+      const res = createMockResponse();
+      controller.downloadLogs(undefined, undefined, undefined, undefined, undefined, undefined, res as never);
+      const lines = res.body.trim().split('\n');
+      expect(lines).toHaveLength(3);
+      for (const line of lines) {
+        expect(() => JSON.parse(line)).not.toThrow();
+      }
+    });
+
+    it('should filter by level', () => {
+      const res = createMockResponse();
+      controller.downloadLogs(undefined, undefined, 'ERROR', undefined, undefined, undefined, res as never);
+      const lines = res.body.trim().split('\n');
+      expect(lines).toHaveLength(1);
+      expect(JSON.parse(lines[0]).level).toBe('ERROR');
+    });
+
+    it('should filter by category', () => {
+      const res = createMockResponse();
+      controller.downloadLogs(undefined, undefined, undefined, 'auth', undefined, undefined, res as never);
+      const lines = res.body.trim().split('\n');
+      expect(lines).toHaveLength(1);
+      expect(JSON.parse(lines[0]).category).toBe('auth');
+    });
+
+    it('should include timestamp in filename', () => {
+      const res = createMockResponse();
+      controller.downloadLogs(undefined, undefined, undefined, undefined, undefined, undefined, res as never);
+      expect(res.headers['Content-Disposition']).toMatch(/scimserver-logs-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}/);
+    });
+
+    it('should respect limit parameter', () => {
+      const res = createMockResponse();
+      controller.downloadLogs(undefined, '2', undefined, undefined, undefined, undefined, res as never);
+      const lines = res.body.trim().split('\n');
+      expect(lines).toHaveLength(2);
+    });
+  });
 });

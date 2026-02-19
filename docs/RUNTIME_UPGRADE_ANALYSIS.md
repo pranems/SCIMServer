@@ -1,8 +1,12 @@
 # ✅ Runtime Upgrade Report — Completed
 
+> **Status**: Historical completion report (retained for auditability)  
+> **Last Updated**: February 18, 2026  
+> **Baseline**: SCIMServer v0.10.0
+
 > **Original analysis**: February 11, 2026  
 > **Upgrade completed**: February 14, 2026  
-> **Project**: SCIMServer2022 — NestJS + Prisma + SQLite SCIM 2.0 Server
+> **Project**: SCIMServer — NestJS + Prisma + SQLite SCIM 2.0 Server
 
 ---
 
@@ -10,14 +14,14 @@
 
 | Component | Before | After | Change |
 |-----------|--------|-------|--------|
-| **Node.js** (Docker) | `node:18-alpine` | `node:22-alpine` | ✅ 2 major versions |
+| **Node.js** (Docker) | `node:18-alpine` | `node:24-alpine` | ✅ 2 major versions |
 | **Node.js** (local dev) | v24.13.0 | v24.13.0 | — (unchanged) |
 | **NestJS** | 10.4.22 | **11.1.13** | ✅ Major upgrade |
-| **Prisma** | 5.16.0 | **6.19.2** | ✅ Major upgrade |
+| **Prisma** | 5.16.0 | **7.4.0** | ✅ Major upgrade |
 | **TypeScript** | 5.4.5 | **5.9.3** | ✅ Minor upgrade |
 | **TS target** (API) | `es2019` | **`es2022`** | ✅ 3 years forward |
 | **TS target** (Web) | `ES2020` | **`ES2022`** | ✅ 2 years forward |
-| **@typescript-eslint** | 7.8.0 | **8.55.0** | ✅ Major upgrade |
+| **@typescript-eslint** | 7.8.0 | **8.56.0** | ✅ Major upgrade |
 | **@types/node** | 20.12.7 | **25.2.3** | ✅ Major upgrade |
 | **@types/jest** | 29.5.12 | **30.0.0** | ✅ Major upgrade |
 | **@types/express** | 4.17.21 | **5.0.6** | ✅ Major upgrade |
@@ -30,10 +34,10 @@
 | **@azure/identity** | ^4.0.1 | **^4.13.0** | ✅ Minor upgrade |
 | **@azure/storage-blob** | ^12.18.0 | **^12.31.0** | ✅ Minor upgrade |
 | **eslint-config-prettier** | 9.x | **10.1.8** | ✅ Major upgrade |
-| **React** | 18.3.1 | 18.3.1 | — (deferred) |
-| **Vite** | 5.2.0 | 5.2.0 | — (deferred) |
-| **Jest** | 29.7.0 | 29.7.0 | — (deferred) |
-| **ESLint** | 8.57.0 | 8.57.0 | — (flat-config migration deferred) |
+| **React** | 18.3.1 | **19.2.4** | ✅ Major upgrade |
+| **Vite** | 5.2.0 | **7.3.1** | ✅ Major upgrade |
+| **Jest** | 29.7.0 | **30.2.0** | ✅ Major upgrade |
+| **ESLint** | 8.57.0 | **10.0.0** | ✅ Major upgrade |
 
 ---
 
@@ -41,11 +45,11 @@
 
 | Test Tier | Count | Result |
 |-----------|-------|--------|
-| **Unit tests** | 648 / 648 (19 suites) | ✅ All passing |
-| **E2E tests** | 177 / 177 (14 suites) | ✅ All passing |
-| **Live tests (local)** | 272 / 272 | ✅ All passing |
-| **Live tests (Docker)** | 272 / 272 | ✅ All passing |
-| **ESLint** | 0 errors, 48 warnings | ✅ Clean (warnings are intentional `any` + test scaffolding) |
+| **Unit tests** | 666 / 666 (19 suites) | ✅ All passing |
+| **E2E tests** | 184 / 184 (14 suites) | ✅ All passing |
+| **Live tests (local)** | 280 / 280 | ✅ All passing |
+| **Live tests (Docker)** | 280 / 280 | ✅ All passing |
+| **ESLint** | 0 errors, 74 warnings | ✅ Clean (warnings are intentional `any` + test scaffolding) |
 
 ---
 
@@ -62,15 +66,15 @@
 - @Param('0')          →  @Param('path')
 ```
 
-### 2. Prisma 7 — Incompatible Schema Config
+### 2. Prisma 7 — Config Pattern Migration
 
-**Problem**: Prisma 7.4.0 requires a new `prisma.config.ts` file and removes `url` from `schema.prisma` datasource. This is a fundamental breaking change.
+**Change**: Prisma 7.4.0 requires a `prisma.config.ts` file and updated datasource configuration handling.
 
-**Decision**: Stayed on Prisma **6.19.2** — fully functional, no schema changes required. Prisma 7 migration deferred until the new config pattern stabilizes.
+**Outcome**: Migrated successfully to Prisma **7.4.0** with `prisma.config.ts` in place and all migrations, tests, and runtime flows validated.
 
 ### 3. Docker — `effect` Package Deletion
 
-**Problem**: The Docker cleanup step `find -name "test*" -type d -exec rm -rf` was deleting `effect/dist/cjs/internal/testing/` — a directory that Prisma 6 CLI requires at runtime.
+**Problem**: The Docker cleanup step `find -name "test*" -type d -exec rm -rf` was deleting `effect/dist/cjs/internal/testing/` — a directory that Prisma 7 CLI requires at runtime.
 
 **Fix** in `Dockerfile`:
 ```diff
@@ -97,7 +101,7 @@
 - Added test-file overrides: `no-explicit-any`, `unbound-method`, `require-await` relaxed in `*.spec.ts`
 - Added `caughtErrorsIgnorePattern: '^_|^e$'` to `no-unused-vars`
 - Fixed 8 actual source errors: unused imports, misused promises, unnecessary `async`, unused destructured vars
-- **Result**: 0 errors, 48 warnings (all non-blocking)
+- **Result**: 0 errors, 74 warnings (all non-blocking)
 
 ---
 
@@ -105,18 +109,16 @@
 
 | Component | Current | Latest | Reason Deferred |
 |-----------|---------|--------|-----------------|
-| **Prisma** | 6.19.2 | 7.4.0 | Requires new `prisma.config.ts` pattern; wait for ecosystem stabilization |
-| **React** | 18.3.1 | 19.x | Breaking changes (`ref` forwarding, context API); web UI is lightweight admin tool |
-| **Vite** | 5.2.0 | 7.x | Rolldown bundler is still maturing; no build perf issues at current scale |
-| **Jest** | 29.7.0 | 30.x | Config format changes; current test suite is stable |
-| **ESLint** | 8.57.0 | 10.x | Flat-config migration requires `.eslintrc` → `eslint.config.js` rewrite |
+| **TypeScript** | 5.9.3 | 5.x latest | Update periodically with ecosystem validation |
+| **NestJS** | 11.1.13 | 11.x latest | Track minor/patch cadence |
+| **Prisma** | 7.4.0 | 7.x latest | Track Prisma 7 minor updates and adapter stability |
 
 ---
 
 ## 📈 Benefits Realized
 
-- **Security**: Node.js 18 (EOL April 2025) eliminated from all Dockerfiles → Node 22 LTS (supported through April 2027)
-- **Performance**: V8 v12.x Maglev JIT, Prisma 6 faster query engine, ES2022 native features (less polyfill overhead)
+- **Security**: Node.js 18 (EOL April 2025) eliminated from all Dockerfiles → Node 24 (supported through April 2027)
+- **Performance**: V8 v12.x Maglev JIT, Prisma 7 query engine improvements, ES2022 native features (less polyfill overhead)
 - **DX**: TypeScript 5.9 improved error messages, NestJS 11 better DI diagnostics
 - **Compatibility**: Azure SDK patches, improved Managed Identity support
 

@@ -2,8 +2,8 @@
   "info": {
     "name": "SCIM v2 - Example Collection",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "version": { "major": 1, "minor": 3 },
-    "description": "SCIM 2.0 test collection — passes all 24 Microsoft SCIM Validator tests + 7 preview. Includes RFC 7644 §3.4.3 POST /.search, §3.4.2.5 attribute projection, and §3.14 ETag support."
+    "version": { "major": 1, "minor": 4 },
+    "description": "SCIM 2.0 test collection — passes all 24 Microsoft SCIM Validator tests + 7 preview. Includes RFC 7644 §3.4.3 POST /.search, §3.4.2.5 attribute projection, §3.14 ETag support, SSE log streaming, and log file download."
   },
   "item": [
     {
@@ -12,6 +12,19 @@
         "method": "GET",
         "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
         "url": { "raw": "{{base_url}}/ServiceProviderConfig", "host": [ "{{base_url}}" ], "path": [ "ServiceProviderConfig" ] }
+      }
+    },
+    {
+      "name": "Get Instance Version & Runtime Info",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": {
+          "raw": "{{admin_url}}/admin/version",
+          "host": [ "{{admin_url}}" ],
+          "path": [ "admin", "version" ]
+        },
+        "description": "Returns running instance metadata: version, service uptime, runtime/memory, auth configuration flags, storage, and deployment details."
       }
     },
     {
@@ -148,6 +161,33 @@
         "method": "DELETE",
         "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
         "url": { "raw": "{{admin_url}}/admin/log-config/recent", "host": [ "{{admin_url}}" ], "path": [ "admin", "log-config", "recent" ] }
+      }
+    },
+    {
+      "name": "Stream Logs (SSE)",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Accept", "value": "text/event-stream" } ],
+        "url": { "raw": "{{admin_url}}/admin/log-config/stream?level=INFO", "host": [ "{{admin_url}}" ], "path": [ "admin", "log-config", "stream" ], "query": [ { "key": "level", "value": "INFO", "description": "Minimum log level: TRACE, DEBUG, INFO, WARN, ERROR, FATAL" }, { "key": "category", "value": "", "disabled": true, "description": "Filter by category: http, auth, scim.user, scim.group, scim.patch, scim.filter, scim.discovery, endpoint, database, backup, oauth, general" }, { "key": "endpointId", "value": "", "disabled": true, "description": "Filter by SCIM endpoint ID" } ] },
+        "description": "Server-Sent Events (SSE) endpoint for real-time log tailing. Connect with curl -N or EventSource API. Sends keep-alive pings every 30s."
+      }
+    },
+    {
+      "name": "Download Logs (NDJSON)",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "{{admin_url}}/admin/log-config/download?format=ndjson", "host": [ "{{admin_url}}" ], "path": [ "admin", "log-config", "download" ], "query": [ { "key": "format", "value": "ndjson", "description": "Output format: ndjson (default) or json" }, { "key": "limit", "value": "100", "disabled": true, "description": "Max entries (up to 500)" }, { "key": "level", "value": "", "disabled": true, "description": "Minimum log level filter" }, { "key": "category", "value": "", "disabled": true, "description": "Category filter" }, { "key": "requestId", "value": "", "disabled": true, "description": "Filter by X-Request-Id correlation ID" }, { "key": "endpointId", "value": "", "disabled": true, "description": "Filter by SCIM endpoint ID" } ] },
+        "description": "Download ring buffer logs as NDJSON or JSON file. Returns Content-Disposition header with timestamped filename."
+      }
+    },
+    {
+      "name": "Download Logs (JSON)",
+      "request": {
+        "method": "GET",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" } ],
+        "url": { "raw": "{{admin_url}}/admin/log-config/download?format=json", "host": [ "{{admin_url}}" ], "path": [ "admin", "log-config", "download" ], "query": [ { "key": "format", "value": "json" }, { "key": "limit", "value": "100", "disabled": true }, { "key": "level", "value": "ERROR", "disabled": true, "description": "Download only ERROR+ entries" } ] },
+        "description": "Download ring buffer logs as a JSON array."
       }
     }
   ],

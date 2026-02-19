@@ -1,9 +1,12 @@
 # Endpoint-Specific Behavior Strategies: Complete Comparison
 
+> **Status**: Exploratory design document (non-authoritative for current implementation)  
+> **Last Updated**: February 18, 2026  
+> **Baseline**: SCIMServer v0.10.0
+
 > ⚠️ **DESIGN EXPLORATION** — This document compares architectural patterns for future extensibility. The current implementation uses **Config-Driven Conditionals** (simple flag checks). No other pattern has been implemented.
 
 > **Document Purpose**: Guide for implementing config-driven endpoint behavior variations in the SCIM Server.
-> 
 > **Created**: February 3, 2026
 
 ## Overview of All Approaches

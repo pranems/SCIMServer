@@ -209,32 +209,48 @@ Write-Host ""
 # Create temp directory
 $TempDir = Join-Path ([System.IO.Path]::GetTempPath()) "SCIMServer-$(Get-Random)"
 New-Item -ItemType Directory -Path $TempDir -Force | Out-Null
-Push-Location $TempDir
+
+# Prefer local repo deploy script when present; fallback to downloaded source otherwise.
+$LocalDeployScript = Join-Path (Get-Location) "scripts\deploy-azure.ps1"
+$UseLocalDeployScript = Test-Path $LocalDeployScript
+
+if (-not $UseLocalDeployScript) {
+    Push-Location $TempDir
+}
 
 try {
-    Write-Host "📥 Downloading SCIMServer source..." -ForegroundColor Cyan
+    if ($UseLocalDeployScript) {
+        Write-Host "📦 Using local deployment script: $LocalDeployScript" -ForegroundColor Cyan
+        Write-Host ""
+    } else {
+        Write-Host "📥 Downloading SCIMServer source..." -ForegroundColor Cyan
 
-    # Download the source as ZIP
-    $RepoUrl = "https://github.com/pranems/SCIMServer/archive/refs/heads/$Branch.zip"
-    $ZipPath = Join-Path $TempDir "scimserver.zip"
+        # Download the source as ZIP
+        $RepoUrl = "https://github.com/pranems/SCIMServer/archive/refs/heads/$Branch.zip"
+        $ZipPath = Join-Path $TempDir "scimserver.zip"
 
-    Invoke-WebRequest -Uri $RepoUrl -OutFile $ZipPath -UseBasicParsing
+        Invoke-WebRequest -Uri $RepoUrl -OutFile $ZipPath -UseBasicParsing
 
-    # Extract ZIP
-    Expand-Archive -Path $ZipPath -DestinationPath $TempDir -Force
-    $ExtractedDir = Get-ChildItem -Directory | Select-Object -First 1
-    Set-Location $ExtractedDir.FullName
+        # Extract ZIP
+        Expand-Archive -Path $ZipPath -DestinationPath $TempDir -Force
+        $ExtractedDir = Get-ChildItem -Directory | Select-Object -First 1
+        Set-Location $ExtractedDir.FullName
 
-    Write-Host "✅ Source downloaded and extracted" -ForegroundColor Green
-    Write-Host ""
+        Write-Host "✅ Source downloaded and extracted" -ForegroundColor Green
+        Write-Host ""
+    }
 
     # Deploy to Azure
     Write-Host "🚀 Deploying to Azure Container Apps..." -ForegroundColor Cyan
     Write-Host "This may take 3-5 minutes..." -ForegroundColor Gray
     Write-Host ""
 
-    # Use the deploy-azure.ps1 script from the SCIMServer project
-    $deployResult = .\scripts\deploy-azure.ps1 -ResourceGroup $ResourceGroup -AppName $AppName -ScimSecret $ScimSecret -Location $Location -JwtSecret $JwtSecret -OauthClientSecret $OauthClientSecret
+    # Use local deploy script when available, otherwise use downloaded project script
+    if ($UseLocalDeployScript) {
+        $deployResult = & $LocalDeployScript -ResourceGroup $ResourceGroup -AppName $AppName -ScimSecret $ScimSecret -Location $Location -JwtSecret $JwtSecret -OauthClientSecret $OauthClientSecret
+    } else {
+        $deployResult = .\scripts\deploy-azure.ps1 -ResourceGroup $ResourceGroup -AppName $AppName -ScimSecret $ScimSecret -Location $Location -JwtSecret $JwtSecret -OauthClientSecret $OauthClientSecret
+    }
     $result = $deployResult
 
     if ($LASTEXITCODE -eq 0) {
@@ -283,7 +299,9 @@ try {
 
 } finally {
     # Cleanup
-    Pop-Location
+    if (-not $UseLocalDeployScript) {
+        Pop-Location
+    }
     Remove-Item -Path $TempDir -Recurse -Force -ErrorAction SilentlyContinue
 }
 

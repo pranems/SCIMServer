@@ -1,5 +1,9 @@
 # Storage & Backup Architecture
 
+> **Status**: Active operational guide  
+> **Last Updated**: February 18, 2026  
+> **Baseline**: SCIMServer v0.10.0
+
 > How SCIMServer persists data across container restarts using hybrid local + Azure Files storage.
 
 ---

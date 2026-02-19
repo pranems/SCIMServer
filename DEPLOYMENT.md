@@ -1,5 +1,7 @@
 # SCIMServer Deployment Options
 
+> Version baseline: v0.10.0 · Updated: February 18, 2026 · Scope: production + local deployment paths
+
 This document covers all deployment methods for SCIMServer. For the quickest start, use the Azure deployment described in the main [README.md](./README.md). For the most comprehensive Azure guide with architecture diagrams, see [docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md).
 
 ---
@@ -28,6 +30,30 @@ Optional parameters: `-JwtSecret`, `-OauthClientSecret`, `-ImageTag`, `-BlobBack
 
 > The deployment script prints three secrets at the end (SCIM bearer, JWT signing, OAuth client). **Store each value securely** — they are not stored anywhere else.
 
+### Quick Log Access (after deploy)
+
+The deployment output now prints copy/paste commands for log access. Core endpoints are:
+
+- `GET /scim/admin/log-config/recent?limit=25` (recent ring-buffer logs)
+- `GET /scim/admin/log-config/stream?level=INFO` (live SSE stream)
+- `GET /scim/admin/log-config/download?format=json` (download logs)
+
+Examples:
+
+```powershell
+# Recent logs from deployed app
+curl "https://<app-url>/scim/admin/log-config/recent?limit=25" -H "Authorization: Bearer <SCIM_SECRET>"
+
+# Live stream (SSE)
+curl -N "https://<app-url>/scim/admin/log-config/stream?level=INFO" -H "Authorization: Bearer <SCIM_SECRET>"
+
+# Download JSON logs
+curl "https://<app-url>/scim/admin/log-config/download?format=json" -H "Authorization: Bearer <SCIM_SECRET>" -o scim-logs.json
+
+# Convenience script (from repo root)
+.\scripts\remote-logs.ps1 -Mode tail -BaseUrl https://<app-url>
+```
+
 ### What Gets Deployed
 
 | Step | Resource | Bicep Template |
@@ -48,7 +74,7 @@ Optional parameters: `-JwtSecret`, `-OauthClientSecret`, `-ImageTag`, `-BlobBack
 - **Managed Identity**: No storage keys — system-assigned identity with RBAC
 - **Log Analytics**: Centralized logging with 30-day retention
 
-> **New in v0.8.4+**: `deploy-azure.ps1` provisions an isolated virtual network, private DNS zone, and blob storage private endpoint so the snapshot container never requires public access.
+> **Current baseline**: `deploy-azure.ps1` provisions an isolated virtual network, private DNS zone, and blob storage private endpoint so the snapshot container never requires public access.
 
 ---
 
@@ -60,10 +86,12 @@ services:
   scimserver:
     image: ghcr.io/pranems/scimserver:latest
     ports:
-      - "3000:80"
+      - "3000:8080"
     environment:
+      - PORT=8080
       - SCIM_SHARED_SECRET=your-secret-here
       - JWT_SECRET=your-jwt-secret
+      - OAUTH_CLIENT_ID=scimserver-client
       - OAUTH_CLIENT_SECRET=your-oauth-client-secret
       - DATABASE_URL=file:/tmp/local-data/scim.db
     volumes:
@@ -79,9 +107,11 @@ docker-compose up -d
 ## Standalone Docker
 
 ```powershell
-docker run -d -p 3000:80 `
+docker run -d -p 3000:8080 `
+  -e PORT=8080 `
   -e SCIM_SHARED_SECRET=your-secret `
   -e JWT_SECRET=your-jwt-secret `
+  -e OAUTH_CLIENT_ID=scimserver-client `
   -e OAUTH_CLIENT_SECRET=your-oauth-client-secret `
   -v scim-data:/app/data `
   ghcr.io/pranems/scimserver:latest
@@ -93,7 +123,7 @@ docker run -d -p 3000:80 `
 
 ### Prerequisites
 
-- Node.js 22+ and npm
+- Node.js 24+ and npm
 - Git
 - PowerShell (Windows) or bash (macOS/Linux)
 
@@ -112,7 +142,7 @@ cd SCIMServer
 cd api
 npm install
 npx prisma generate
-npx prisma migrate dev
+npx prisma migrate deploy
 npm run start:dev
 
 # Frontend Web UI (terminal 2)
@@ -169,10 +199,10 @@ npm run start:debug 2>&1 | Tee-Object -FilePath scimserver.log
 
 - **Registry**: GitHub Container Registry
 - **Image**: `ghcr.io/pranems/scimserver`
-- **Tags**: `latest`, version tags (e.g., `0.9.1`), test tags (`test-<branch>`)
-- **Base**: `node:22-alpine`
+- **Tags**: `latest`, version tags (e.g., `0.10.0`), test tags (`test-<branch>`)
+- **Base**: `node:24-alpine`
 - **Size**: ~350 MB
-- **Port**: 80 (internal)
+- **Port**: 8080 (internal)
 
 ### CI/CD Pipelines
 
@@ -188,10 +218,10 @@ npm run start:debug 2>&1 | Tee-Object -FilePath scimserver.log
 ```powershell
 # Auto-discovery update
 iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-func.ps1'); `
-  Update-SCIMServer -Version v0.9.1
+  Update-SCIMServer -Version v0.10.0
 
 # Or manual image update
-az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.9.1
+az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.10.0
 ```
 
 ---
@@ -211,6 +241,12 @@ az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/prane
 ```powershell
 # Stream container logs
 az containerapp logs show -n <app-name> -g <resource-group> --follow
+
+# Recent SCIMServer logs via admin API
+curl "https://<app-url>/scim/admin/log-config/recent?limit=25" -H "Authorization: Bearer <SCIM_SECRET>"
+
+# Live SCIMServer log stream (SSE)
+curl -N "https://<app-url>/scim/admin/log-config/stream?level=INFO" -H "Authorization: Bearer <SCIM_SECRET>"
 
 # Test SCIM endpoint
 curl -H "Authorization: Bearer your-secret" https://your-url/scim/v2/ServiceProviderConfig

@@ -1,0 +1,189 @@
+{
+  "count": 18,
+  "entries": [
+    {
+      "timestamp": "2026-02-19T01:47:00.972Z",
+      "level": "INFO",
+      "category": "backup",
+      "message": "Backup service initialized"
+    },
+    {
+      "timestamp": "2026-02-19T01:47:00.973Z",
+      "level": "INFO",
+      "category": "backup",
+      "message": "Local DB (ephemeral): /tmp/local-data/scim.db"
+    },
+    {
+      "timestamp": "2026-02-19T01:47:00.973Z",
+      "level": "INFO",
+      "category": "backup",
+      "message": "Azure Files backup (persistent path): /app/data/scim.db"
+    },
+    {
+      "timestamp": "2026-02-19T01:47:03.588Z",
+      "level": "WARN",
+      "category": "http",
+      "message": "Client error 404 on GET /health",
+      "data": {
+        "status": 404
+      }
+    },
+    {
+      "timestamp": "2026-02-19T01:47:08.984Z",
+      "level": "INFO",
+      "category": "backup",
+      "message": "Starting backup #1",
+      "data": {
+        "fileSizeKB": "128.00"
+      }
+    },
+    {
+      "timestamp": "2026-02-19T01:47:08.986Z",
+      "level": "INFO",
+      "category": "backup",
+      "message": "Backup #1 completed",
+      "data": {
+        "fileSizeKB": "128.00",
+        "timestamp": "2026-02-19T01:47:08.986Z"
+      }
+    },
+    {
+      "timestamp": "2026-02-19T01:47:20.058Z",
+      "level": "WARN",
+      "category": "http",
+      "message": "Client error 404 on HEAD /scim",
+      "data": {
+        "status": 404
+      }
+    },
+    {
+      "timestamp": "2026-02-19T01:47:20.153Z",
+      "level": "INFO",
+      "category": "http",
+      "message": "→ HEAD /",
+      "requestId": "ad10d137-cfac-4b54-84e0-054a47b5e9aa",
+      "method": "HEAD",
+      "path": "/",
+      "durationMs": 3,
+      "data": {
+        "userAgent": "curl/8.16.0",
+        "ip": "::ffff:172.17.0.1"
+      }
+    },
+    {
+      "timestamp": "2026-02-19T01:47:20.16Z",
+      "level": "INFO",
+      "category": "http",
+      "message": "← 200 HEAD /",
+      "requestId": "ad10d137-cfac-4b54-84e0-054a47b5e9aa",
+      "method": "HEAD",
+      "path": "/",
+      "durationMs": 10,
+      "data": {
+        "status": 200,
+        "durationMs": 10
+      }
+    },
+    {
+      "timestamp": "2026-02-19T01:47:30.975Z",
+      "level": "INFO",
+      "category": "backup",
+      "message": "Starting backup #2",
+      "data": {
+        "fileSizeKB": "128.00"
+      }
+    },
+    {
+      "timestamp": "2026-02-19T01:47:30.978Z",
+      "level": "INFO",
+      "category": "backup",
+      "message": "Backup #2 completed",
+      "data": {
+        "fileSizeKB": "128.00",
+        "timestamp": "2026-02-19T01:47:30.978Z"
+      }
+    },
+    {
+      "timestamp": "2026-02-19T01:47:35.169Z",
+      "level": "INFO",
+      "category": "http",
+      "message": "→ GET /",
+      "requestId": "09d15b50-ece9-41bc-92b0-c6d07effd45c",
+      "method": "GET",
+      "path": "/",
+      "durationMs": 0,
+      "data": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36",
+        "ip": "::ffff:172.17.0.1"
+      }
+    },
+    {
+      "timestamp": "2026-02-19T01:47:35.17Z",
+      "level": "INFO",
+      "category": "http",
+      "message": "← 200 GET /",
+      "requestId": "09d15b50-ece9-41bc-92b0-c6d07effd45c",
+      "method": "GET",
+      "path": "/",
+      "durationMs": 1,
+      "data": {
+        "status": 200,
+        "durationMs": 1
+      }
+    },
+    {
+      "timestamp": "2026-02-19T01:47:45.197Z",
+      "level": "INFO",
+      "category": "auth",
+      "message": "Legacy bearer token authentication successful"
+    },
+    {
+      "timestamp": "2026-02-19T01:47:45.197Z",
+      "level": "INFO",
+      "category": "http",
+      "message": "→ GET /scim/admin/version",
+      "requestId": "b086aca0-fd50-466c-8bcb-b2b2ef3806bd",
+      "method": "GET",
+      "path": "/scim/admin/version",
+      "durationMs": 0,
+      "data": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Microsoft Windows 10.0.26200; en-US) PowerShell/7.4.13",
+        "ip": "::ffff:172.17.0.1"
+      }
+    },
+    {
+      "timestamp": "2026-02-19T01:47:45.206Z",
+      "level": "INFO",
+      "category": "http",
+      "message": "← 200 GET /scim/admin/version",
+      "requestId": "b086aca0-fd50-466c-8bcb-b2b2ef3806bd",
+      "method": "GET",
+      "path": "/scim/admin/version",
+      "durationMs": 9,
+      "data": {
+        "status": 200,
+        "durationMs": 9
+      }
+    },
+    {
+      "timestamp": "2026-02-19T01:47:45.233Z",
+      "level": "INFO",
+      "category": "auth",
+      "message": "Legacy bearer token authentication successful"
+    },
+    {
+      "timestamp": "2026-02-19T01:47:45.233Z",
+      "level": "INFO",
+      "category": "http",
+      "message": "→ GET /scim/admin/log-config/recent?limit=25",
+      "requestId": "f5b40231-f2f9-441b-ae4e-f2338b466a0a",
+      "method": "GET",
+      "path": "/scim/admin/log-config/recent?limit=25",
+      "durationMs": 0,
+      "data": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Microsoft Windows 10.0.26200; en-US) PowerShell/7.4.13",
+        "ip": "::ffff:172.17.0.1"
+      }
+    }
+  ]
+}

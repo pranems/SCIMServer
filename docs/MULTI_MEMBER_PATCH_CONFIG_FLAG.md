@@ -460,7 +460,7 @@ A comprehensive test script is available at `scripts/live-test.ps1`:
 
 ```powershell
 # Run the live test
-& c:\path\to\SCIMServer2022\scripts\live-test.ps1
+& c:\path\to\SCIMServer\scripts\live-test.ps1
 ```
 
 This script demonstrates:

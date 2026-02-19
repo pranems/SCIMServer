@@ -1,11 +1,13 @@
 sequenceDiagram
   participant Client
+  participant ReqLog as RequestLoggingInterceptor
   participant Guard
   participant Controller as EndpointScimUsersController
   participant Service as EndpointScimUsersService
   participant PrismaClient
 
-  Client->>Guard: GET /scim/endpoints/{endpointId}/Users?startIndex=1&count=50
+  Client->>ReqLog: GET /scim/v2/Users?startIndex=1&count=50
+  ReqLog->>Guard: apply auth + correlation checks
   Guard-->>Controller: allow
   Controller->>Service: listUsersForEndpoint(query, baseUrl, endpointId)
   Service->>PrismaClient: prisma.scimUser.findMany({ skip, take, where, orderBy })
@@ -13,7 +15,8 @@ sequenceDiagram
   Service-->>Controller: paginated SCIM list
   Controller-->>Client: 200 { Resources: [...], totalResults: N }
 
-  Client->>Guard: GET /scim/endpoints/{endpointId}/Users/:id
+  Client->>ReqLog: GET /scim/v2/Users/:id
+  ReqLog->>Guard: apply auth + correlation checks
   Guard-->>Controller: allow
   Controller->>Service: getUserForEndpoint(id, baseUrl, endpointId)
   Service->>PrismaClient: prisma.scimUser.findFirst({ where: { scimId, endpointId } })

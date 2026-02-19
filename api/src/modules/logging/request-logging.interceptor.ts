@@ -11,7 +11,7 @@ import { randomUUID } from 'node:crypto';
 
 import { LoggingService } from './logging.service';
 import { ScimLogger } from './scim-logger.service';
-import { LogLevel, LogCategory } from './log-levels';
+import { LogCategory } from './log-levels';
 
 @Injectable()
 export class RequestLoggingInterceptor implements NestInterceptor {

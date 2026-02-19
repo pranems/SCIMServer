@@ -1,5 +1,6 @@
-import { Injectable, Scope } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { AsyncLocalStorage } from 'async_hooks';
+import { EventEmitter } from 'node:events';
 import {
   LogLevel,
   LogCategory,
@@ -89,8 +90,24 @@ export class ScimLogger {
   private readonly ringBuffer: StructuredLogEntry[] = [];
   private readonly maxRingBufferSize = 500;
 
+  /** EventEmitter for real-time log streaming (SSE subscribers) */
+  private readonly emitter = new EventEmitter();
+
   constructor() {
     this.config = buildDefaultLogConfig();
+    // Allow many SSE subscribers without warning
+    this.emitter.setMaxListeners(50);
+  }
+
+  // ─── Live Stream (SSE) ────────────────────────────────────────────
+
+  /**
+   * Subscribe to live log entries. Returns an unsubscribe function.
+   * Used by the SSE /admin/log-config/stream endpoint.
+   */
+  subscribe(listener: (entry: StructuredLogEntry) => void): () => void {
+    this.emitter.on('log', listener);
+    return () => this.emitter.off('log', listener);
   }
 
   // ─── Correlation Context ──────────────────────────────────────────
@@ -168,12 +185,12 @@ export class ScimLogger {
     this.log(LogLevel.WARN, category, message, data);
   }
 
-  error(category: LogCategory, message: string, error?: Error | unknown, data?: Record<string, unknown>): void {
+  error(category: LogCategory, message: string, error?: unknown, data?: Record<string, unknown>): void {
     const errorData = this.formatError(error);
     this.log(LogLevel.ERROR, category, message, data, errorData);
   }
 
-  fatal(category: LogCategory, message: string, error?: Error | unknown, data?: Record<string, unknown>): void {
+  fatal(category: LogCategory, message: string, error?: unknown, data?: Record<string, unknown>): void {
     const errorData = this.formatError(error);
     this.log(LogLevel.FATAL, category, message, data, errorData);
   }
@@ -194,11 +211,11 @@ export class ScimLogger {
       const minLevel = options.level;
       entries = entries.filter(e => {
         const entryLevel = LogLevel[e.level as keyof typeof LogLevel] ?? LogLevel.INFO;
-        return entryLevel >= minLevel;
+        return (entryLevel as number) >= (minLevel as number);
       });
     }
     if (options?.category) {
-      entries = entries.filter(e => e.category === options.category);
+      entries = entries.filter(e => e.category === (options.category as string));
     }
     if (options?.requestId) {
       entries = entries.filter(e => e.requestId === options.requestId);
@@ -260,6 +277,9 @@ export class ScimLogger {
       this.ringBuffer.shift();
     }
 
+    // Notify live stream subscribers (SSE)
+    this.emitter.emit('log', entry);
+
     // Emit to console
     this.emit(level, entry);
   }
@@ -282,7 +302,7 @@ export class ScimLogger {
   }
 
   /** Format an error object for structured output. */
-  private formatError(error: Error | unknown): StructuredLogEntry['error'] | undefined {
+  private formatError(error: unknown): StructuredLogEntry['error'] | undefined {
     if (!error) return undefined;
     if (error instanceof Error) {
       return {

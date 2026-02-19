@@ -1,5 +1,9 @@
 # Multi-Endpoint SCIM Guide
 
+> **Status**: Living architecture guide  
+> **Last Updated**: February 18, 2026  
+> **Baseline**: SCIMServer v0.10.0
+
 > Consolidated reference for the multi-endpoint (multi-tenant) SCIM architecture in SCIMServer.
 
 ---

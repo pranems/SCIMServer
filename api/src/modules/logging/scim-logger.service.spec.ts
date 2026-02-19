@@ -588,4 +588,62 @@ describe('ScimLogger', () => {
       expect(entry.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
     });
   });
+
+  // ─── Live Stream (subscribe) ──────────────────────────────────────
+
+  describe('subscribe', () => {
+    it('should notify subscribers when a log is emitted', () => {
+      const received: StructuredLogEntry[] = [];
+      const unsub = logger.subscribe(entry => received.push(entry));
+
+      logger.info(LogCategory.HTTP, 'test entry');
+
+      expect(received).toHaveLength(1);
+      expect(received[0].message).toBe('test entry');
+      expect(received[0].level).toBe('INFO');
+
+      unsub();
+    });
+
+    it('should stop notifying after unsubscribe', () => {
+      const received: StructuredLogEntry[] = [];
+      const unsub = logger.subscribe(entry => received.push(entry));
+
+      logger.info(LogCategory.HTTP, 'before unsub');
+      unsub();
+      logger.info(LogCategory.HTTP, 'after unsub');
+
+      expect(received).toHaveLength(1);
+      expect(received[0].message).toBe('before unsub');
+    });
+
+    it('should support multiple subscribers', () => {
+      const received1: StructuredLogEntry[] = [];
+      const received2: StructuredLogEntry[] = [];
+      const unsub1 = logger.subscribe(entry => received1.push(entry));
+      const unsub2 = logger.subscribe(entry => received2.push(entry));
+
+      logger.info(LogCategory.HTTP, 'multi');
+
+      expect(received1).toHaveLength(1);
+      expect(received2).toHaveLength(1);
+
+      unsub1();
+      unsub2();
+    });
+
+    it('should only deliver entries at enabled log levels', () => {
+      logger.setGlobalLevel(LogLevel.WARN);
+      const received: StructuredLogEntry[] = [];
+      const unsub = logger.subscribe(entry => received.push(entry));
+
+      logger.debug(LogCategory.HTTP, 'filtered out');
+      logger.warn(LogCategory.HTTP, 'should arrive');
+
+      expect(received).toHaveLength(1);
+      expect(received[0].level).toBe('WARN');
+
+      unsub();
+    });
+  });
 });

@@ -1,6 +1,6 @@
 # SCIMServer — Logging, Traceability & Observability Guide
 
-> **Version**: 1.1 · **Date**: February 2026 · **Applies to**: SCIMServer v0.9.1+
+> **Version**: 1.2 · **Date**: February 2026 · **Applies to**: SCIMServer v0.10.0+
 
 ---
 
@@ -605,6 +605,91 @@ curl -s -X DELETE -H "Authorization: Bearer $TOKEN" \
 
 ---
 
+### 6.10 GET /scim/admin/log-config/stream — Live Log Tailing (SSE)
+
+> **New in v0.10.0** — Real-time Server-Sent Events log stream.
+
+**Query Parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `level` | string | Minimum log level: TRACE, DEBUG, INFO, WARN, ERROR, FATAL |
+| `category` | string | Filter by category: http, auth, scim.user, scim.group, etc. |
+| `endpointId` | string | Filter by SCIM endpoint ID |
+
+**curl:**
+```bash
+# Tail all logs (requires -N to disable buffering)
+curl -N http://localhost:6000/scim/admin/log-config/stream
+
+# Tail only WARN+ logs
+curl -N "http://localhost:6000/scim/admin/log-config/stream?level=WARN"
+
+# Tail specific category
+curl -N "http://localhost:6000/scim/admin/log-config/stream?category=scim.patch"
+
+# Tail with authentication
+curl -N -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:6000/scim/admin/log-config/stream?level=INFO"
+```
+
+**Response (SSE format):**
+```
+event: connected
+data: {"message":"Log stream connected","filters":{"level":"ALL","category":"ALL","endpointId":"ALL"}}
+
+data: {"timestamp":"2026-02-18T14:30:00.123Z","level":"INFO","category":"http","message":"→ POST /scim/v2/Users","requestId":"a1b2c3d4-..."}
+
+: ping 2026-02-18T14:30:30.000Z
+```
+
+**Notes:**
+- Server sends keep-alive `: ping` comments every 30 seconds
+- `X-Accel-Buffering: no` header disables NGINX proxy buffering
+- Browser EventSource API auto-reconnects on disconnect
+- Maximum 50 concurrent SSE subscribers (configurable via EventEmitter maxListeners)
+
+---
+
+### 6.11 GET /scim/admin/log-config/download — Download Log File
+
+> **New in v0.10.0** — Download ring buffer contents as a file.
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `format` | string | `ndjson` | Output format: `ndjson` or `json` |
+| `limit` | number | all | Max entries (up to 500) |
+| `level` | string | all | Minimum level filter |
+| `category` | string | all | Category filter |
+| `requestId` | string | — | Filter by X-Request-Id |
+| `endpointId` | string | — | Filter by endpoint ID |
+
+**curl:**
+```bash
+# Download as NDJSON (default)
+curl -o scim-logs.ndjson http://localhost:6000/scim/admin/log-config/download
+
+# Download as JSON array
+curl -o scim-logs.json "http://localhost:6000/scim/admin/log-config/download?format=json"
+
+# Download only ERROR+ entries
+curl -o errors.ndjson "http://localhost:6000/scim/admin/log-config/download?level=ERROR"
+
+# Download logs for a specific request
+curl -o trace.ndjson \
+  "http://localhost:6000/scim/admin/log-config/download?requestId=a1b2c3d4-..."
+```
+
+**Response Headers:**
+```
+Content-Type: application/x-ndjson
+Content-Disposition: attachment; filename="scimserver-logs-2026-02-18T14-30-00.ndjson"
+```
+
+---
+
 ### API Summary Table
 
 | Method | Endpoint | Status | Description |
@@ -617,10 +702,16 @@ curl -s -X DELETE -H "Authorization: Bearer $TOKEN" \
 | `DELETE` | `/scim/admin/log-config/endpoint/:endpointId` | 204 | Remove endpoint override |
 | `GET` | `/scim/admin/log-config/recent` | 200 | Query in-memory ring buffer |
 | `DELETE` | `/scim/admin/log-config/recent` | 204 | Clear ring buffer |
+| `GET` | `/scim/admin/log-config/stream` | SSE | **Live log tailing (Server-Sent Events)** |
+| `GET` | `/scim/admin/log-config/download` | 200 | **Download logs as NDJSON or JSON file** |
 
 > **Tip:** Per-endpoint log levels can also be set via the `logLevel` field in endpoint config
 > (`POST/PATCH /scim/admin/endpoints/:id`). Config-based levels persist across restarts.
 > See §6.7 for details.
+
+> **See also:** [Remote Debugging & Diagnosis Guide](REMOTE_DEBUGGING_AND_DIAGNOSIS.md) for
+> comprehensive troubleshooting workflows, Azure Container Apps access methods, and the
+> `scripts/remote-logs.ps1` PowerShell script for remote log management.
 
 ---
 

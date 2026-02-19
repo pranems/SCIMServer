@@ -1,7 +1,7 @@
 # SCIMServer — Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.  
-> **Last Updated**: February 9, 2026
+> **Last Updated**: February 18, 2026
 
 ---
 
@@ -9,11 +9,11 @@
 
 | Field | Value |
 |-------|-------|
-| **Name** | SCIMServer (SCIMServer2022) |
+| **Name** | SCIMServer |
 | **Purpose** | SCIM 2.0 provisioning visibility and monitoring tool for Microsoft Entra ID |
-| **Repository** | `C:\Users\v-prasrane\source\repos\SCIMServer2022` |
-| **API Root** | `C:\Users\v-prasrane\source\repos\SCIMServer2022\api` |
-| **Frontend Root** | `C:\Users\v-prasrane\source\repos\SCIMServer2022\web` |
+| **Repository** | `C:\Users\v-prasrane\source\repos\SCIMServer` |
+| **API Root** | `C:\Users\v-prasrane\source\repos\SCIMServer\api` |
+| **Frontend Root** | `C:\Users\v-prasrane\source\repos\SCIMServer\web` |
 | **Standards** | RFC 7643 (Core Schema), RFC 7644 (Protocol), RFC 7642 (Concepts) |
 
 ---
@@ -22,15 +22,15 @@
 
 | Layer | Technology | Version |
 |-------|-----------|---------|
-| **Runtime** | Node.js | 20.x (Alpine in Docker) |
+| **Runtime** | Node.js | 24.x (Alpine in Docker) |
 | **Language** | TypeScript | 5.x |
-| **Framework** | NestJS | 10.x |
-| **ORM** | Prisma | 5.16.x |
+| **Framework** | NestJS | 11.x |
+| **ORM** | Prisma | 7.x |
 | **Database** | SQLite | (via Prisma) |
-| **Frontend** | React | 18.3.x |
-| **Bundler** | Vite | 5.2.x |
+| **Frontend** | React | 19.x |
+| **Bundler** | Vite | 7.x |
 | **Auth** | JWT + Bearer token | @nestjs/jwt |
-| **Testing** | Jest | 29.x with ts-jest |
+| **Testing** | Jest | 30.x with ts-jest |
 | **Deployment** | Azure Container Apps | via Bicep IaC |
 | **Backup** | Azure Blob Storage | @azure/storage-blob |
 
@@ -126,11 +126,14 @@ infra/storage.bicep                                      # Storage account
 # From api/ directory:
 npm run start:dev           # NestJS with --watch (hot reload)
 npm run build               # TypeScript compilation to dist/
-npm run start:prod          # Production mode
-npm test                    # Run all 317 tests (Jest)
+npm run start               # Production mode (runs prisma migrate deploy first)
+npm test                    # Run unit tests (Jest)
+npm run test:e2e            # Run E2E suite
+npm run test:ci             # Unit + E2E CI sequence
 npm test -- --watch         # Watch mode
 npm test -- --verbose       # Verbose output
 npx prisma migrate dev      # Run migrations
+npx prisma migrate deploy   # Apply migrations in production-compatible mode
 npx prisma generate         # Regenerate Prisma client
 npx prisma studio           # Visual DB browser
 
@@ -142,6 +145,14 @@ npm run build               # Production build → api/public/
 docker build -t scimserver -f Dockerfile .
 docker-compose up           # Full stack
 ```
+
+### 4.1 Runtime Reality Notes (Source-of-truth from code)
+
+- **Do not use repo-root `npm start`** for API startup. Run from `api/` (`npm run start` or `npm run start:dev`).
+- **Local API default port**: `3000` when `PORT` is not set (`api/src/main.ts`).
+- **Docker runtime port**: `8080` (image `ENV PORT=8080`, `EXPOSE 8080`, healthcheck on `:8080`).
+- **SCIM path compatibility**: requests to `/scim/v2/*` are rewritten to `/scim/*` at runtime middleware.
+- **Production auth secrets required**: `SCIM_SHARED_SECRET`, `JWT_SECRET`, and `OAUTH_CLIENT_SECRET`.
 
 ---
 
@@ -231,46 +242,38 @@ Four categories of PATCH paths, handled in order:
 
 ## 7. Current Compliance Status
 
-### 7.1 SCIM 2.0 Compliance: ~80%
+### 7.1 SCIM 2.0 Compliance (Current v0.10.0 Baseline)
 
 | Feature | Status |
 |---------|--------|
 | ✅ Users CRUD (POST/GET/PUT/PATCH/DELETE) | Complete |
 | ✅ Groups CRUD (POST/GET/PUT/PATCH/DELETE) | Complete |
-| ✅ PATCH: add/replace/remove all path types | Complete |
-| ✅ Case-insensitive attributes/URIs/filters | Complete (RFC 7643 §2.1) |
+| ✅ PATCH (add/replace/remove, valuePath, extension URNs, no-path merge) | Complete |
+| ✅ Case-insensitive behavior (RFC 7643 §2.1) | Complete |
 | ✅ Discovery endpoints | Complete |
 | ✅ Pagination (startIndex, count) | Complete |
-| ✅ Filtering (eq operator) | Complete |
-| ⚠️ Filtering (co, sw, ne, ew, gt, ge, lt, le) | Partial |
-| ❌ Attribute projection (attributes/excludedAttributes) | Not implemented |
-| ❌ Sorting (sortBy, sortOrder) | Not implemented (advertised as unsupported) |
-| ❌ Bulk operations | Not implemented |
-| ❌ ETag / If-Match | Not implemented |
-| ❌ /Me endpoint | Not implemented |
+| ✅ Filtering operators (`eq`, `ne`, `co`, `sw`, `ew`, `gt`, `ge`, `lt`, `le`, `pr`) | Complete |
+| ✅ Attribute projection (`attributes`, `excludedAttributes`) | Complete |
+| ✅ ETag / If-None-Match conditional GET behavior | Complete |
+| ⚠️ Sorting (`sortBy`, `sortOrder`) | Advertised unsupported (`sort.supported=false`) |
+| ⚠️ Bulk operations (`/Bulk`) | Advertised unsupported (`bulk.supported=false`) |
+| ⚠️ `/Me` endpoint | Not required for Entra provisioning |
 
-### 7.2 Microsoft Entra ID Compatibility: ~90%
+### 7.2 Microsoft Entra ID Compatibility
 
-All critical Entra provisioning flows work:
-- User create, update (PUT + PATCH), soft-delete (active=false), hard-delete
-- Group create, update, member add/remove
-- Filter by externalId and userName
-- OAuth 2.0 client_credentials authentication
+- ✅ Critical provisioning flows validated
+- ✅ Microsoft SCIM Validator: 24/24 pass (+ 7 preview)
+- ✅ OAuth client credentials + bearer token flows operational
 
 ---
 
 ## 8. Test Coverage
 
-- **317 tests** across **11 suites**, all passing
-- Test runner: `npm test` from `api/` directory
-- Key test files in `api/test/`:
-  - User CRUD, Group CRUD, PATCH operations
-  - Case-insensitivity (23 tests)
-  - Filtering, pagination
-  - Multi-endpoint isolation
-  - Authentication flows
-  - Discovery endpoints
-  - Error handling
+- **Unit**: 666 tests passing
+- **E2E**: 184 tests passing
+- **Live integration**: 280 tests passing (local + Docker)
+- Test runners: `npm test`, `npm run test:e2e`, `pwsh ../scripts/live-test.ps1`
+- Coverage includes SCIM CRUD, PATCH path variants, case-insensitivity, filtering, projection, ETag behavior, endpoint isolation, auth, logging config, and admin operations.
 
 ---
 

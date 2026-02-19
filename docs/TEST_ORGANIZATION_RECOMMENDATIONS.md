@@ -1,8 +1,12 @@
 # 🧪 Test Organization Recommendations
 
+> **Status**: Active guidance (partially strategic; validate against current repo layout before adoption)  
+> **Last Updated**: February 18, 2026  
+> **Baseline**: SCIMServer v0.10.0
+
 > Best-practice test strategy for a **NestJS + Prisma + SQLite** SCIM 2.0 API server.
 >
-> **Created:** 2026-02-11 | **Project:** SCIMServer2022
+> **Created:** 2026-02-11 | **Project:** SCIMServer
 
 ---
 

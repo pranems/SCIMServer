@@ -1,7 +1,7 @@
 # Persistence & Performance Analysis — SCIM Server
 
 > **Date**: February 2026  
-> **Status**: ✅ **Critical fixes 1–3 implemented in v0.9.1** — SCIM validator now at 24/24 passing.  
+> **Status**: ✅ **Critical fixes 1–3 implemented** (introduced in v0.9.1 and retained in v0.10.0) — SCIM validator now at 24/24 passing.  
 > **Scope**: End-to-end analysis of SQLite persistence patterns, write contention, SCIM validator failures, and holistic improvement recommendations.  
 > **Audience**: Development team, reviewers, future contributors.  
 > **See also**: [SCIM_GROUP_PERFORMANCE_ANALYSIS.md](SCIM_GROUP_PERFORMANCE_ANALYSIS.md) for the detailed timeline and interaction diagrams.
@@ -34,13 +34,13 @@
 
 ## 1. Executive Summary
 
-Microsoft's SCIM validator ~~reports **21/24 tests passing** with **3 failures**~~ now shows **24/24 tests passing** after fixes applied in v0.9.1. The original 3 failures were all in Group PATCH operations (Update displayName, Add Member, Remove Member). Root cause analysis revealed **four compounding issues** in the persistence layer:
+Microsoft's SCIM validator ~~reports **21/24 tests passing** with **3 failures**~~ now shows **24/24 tests passing** after the implemented fixes. The original 3 failures were all in Group PATCH operations (Update displayName, Add Member, Remove Member). Root cause analysis revealed **four compounding issues** in the persistence layer:
 
 | # | Issue | Impact | Severity | Status |
 |---|-------|--------|----------|--------|
-| 1 | `displayName` missing from `GROUP_DB_COLUMNS` | Every group filter = full table scan | **High** | ✅ Fixed (v0.9.1) |
-| 2 | User ID resolution inside `$transaction` | Extends write-lock hold time | **High** | ✅ Fixed (v0.9.1) |
-| 3 | Request logging competes for SQLite writer lock | Transactions timeout waiting for lock | **Critical** | ✅ Fixed (v0.9.1) |
+| 1 | `displayName` missing from `GROUP_DB_COLUMNS` | Every group filter = full table scan | **High** | ✅ Fixed (current v0.10.0 baseline) |
+| 2 | User ID resolution inside `$transaction` | Extends write-lock hold time | **High** | ✅ Fixed (current v0.10.0 baseline) |
+| 3 | Request logging competes for SQLite writer lock | Transactions timeout waiting for lock | **Critical** | ✅ Fixed (current v0.10.0 baseline) |
 | 4 | Delete-all + recreate members on every PATCH | Unnecessary write amplification | **Medium** | Open |
 
 Fixes 1–3 resolved all 3 SCIM validator failures. Fix 4 remains as a future optimization.
@@ -634,7 +634,7 @@ The best approach is a **hybrid**: use file-based logging for the hot path (ever
 
 ## 7. Recommended Fixes — ✅ Critical Fixes Implemented
 
-### Fix 1: Add `displayName` to GROUP_DB_COLUMNS — ✅ IMPLEMENTED (v0.9.1)
+### Fix 1: Add `displayName` to GROUP_DB_COLUMNS — ✅ IMPLEMENTED (introduced in v0.9.1)
 
 **File**: `api/src/modules/scim/filters/apply-scim-filter.ts`
 
@@ -653,7 +653,7 @@ Additionally, `assertUniqueDisplayName` was refactored from O(N) `findMany` full
 
 ---
 
-### Fix 2: Move Member Resolution Outside Transaction — ✅ IMPLEMENTED (v0.9.1)
+### Fix 2: Move Member Resolution Outside Transaction — ✅ IMPLEMENTED (introduced in v0.9.1)
 
 **File**: `api/src/modules/scim/services/endpoint-scim-groups.service.ts`
 
@@ -686,7 +686,7 @@ await this.prisma.$transaction(async (tx) => {
 
 ---
 
-### Fix 3: Buffered Request Logging — ✅ IMPLEMENTED (v0.9.1)
+### Fix 3: Buffered Request Logging — ✅ IMPLEMENTED (introduced in v0.9.1)
 
 **File**: `api/src/modules/logging/logging.service.ts`
 
@@ -732,20 +732,20 @@ private async flushLogs(): Promise<void> {
 
 | # | Issue | Location | Severity | Status |
 |---|-------|----------|----------|--------|
-| 1 | displayName missing from GROUP_DB_COLUMNS | apply-scim-filter.ts | **High** | ✅ Fixed (v0.9.1) — `displayNameLower` column + DB push-down |
-| 2 | User resolution inside transaction | endpoint-scim-groups.service.ts | **High** | ✅ Fixed (v0.9.1) — moved outside `$transaction` |
-| 3 | Per-request fire-and-forget log writes | logging.service.ts | **Critical** | ✅ Fixed (v0.9.1) — buffered logging (3s / 50 entries) |
+| 1 | displayName missing from GROUP_DB_COLUMNS | apply-scim-filter.ts | **High** | ✅ Fixed (current v0.10.0 baseline; introduced in v0.9.1) — `displayNameLower` column + DB push-down |
+| 2 | User resolution inside transaction | endpoint-scim-groups.service.ts | **High** | ✅ Fixed (current v0.10.0 baseline; introduced in v0.9.1) — moved outside `$transaction` |
+| 3 | Per-request fire-and-forget log writes | logging.service.ts | **Critical** | ✅ Fixed (current v0.10.0 baseline; introduced in v0.9.1) — buffered logging (3s / 50 entries) |
 | 4 | Delete-all + recreate members pattern | endpoint-scim-groups.service.ts | **Medium** | Open |
 | 5 | No log rotation/cleanup | RequestLog model | **High** | Open |
 | 6 | N+1 queries in listLogs | logging.service.ts | **High** | Open |
-| 7 | assertUniqueDisplayName O(N) scan | endpoint-scim-groups.service.ts | **Medium** | ✅ Fixed (v0.9.1) — `findFirst` with `displayNameLower` index |
+| 7 | assertUniqueDisplayName O(N) scan | endpoint-scim-groups.service.ts | **Medium** | ✅ Fixed (current v0.10.0 baseline; introduced in v0.9.1) — `findFirst` with `displayNameLower` index |
 | 8 | getActivitySummary unbounded query | activity.controller.ts | **High** | Open |
 | 9 | No WAL checkpoint before backup | backup.service.ts | **Low** | Open |
 | 10 | Group create missing transaction | endpoint-scim-groups.service.ts | **Low** | Open |
 | 11 | Full-text search on TEXT blobs | logging.service.ts | **Medium** | Open |
 | 12 | No composite unique on GroupMember | schema.prisma | **Low** | Open |
 
-**Fixes 1, 2, 3, and 7 together resolved all 3 SCIM validator failures (v0.9.1).** Remaining issues are performance optimizations for future work.
+**Fixes 1, 2, 3, and 7 together resolved all 3 SCIM validator failures (introduced in v0.9.1 and retained in v0.10.0).** Remaining issues are performance optimizations for future work.
 
 ---
 

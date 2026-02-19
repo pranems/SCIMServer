@@ -78,6 +78,9 @@ async function bootstrap(): Promise<void> {
   const port = Number(process.env.PORT ?? 3000);
   await app.listen(port);
   Logger.log(`🚀 SCIM Endpoint Server API is running on http://localhost:${port}/${globalPrefix}`);
+  Logger.log(`🔎 Log API quick access: http://localhost:${port}/scim/admin/log-config/recent?limit=25`);
+  Logger.log(`🔎 Log stream (SSE): http://localhost:${port}/scim/admin/log-config/stream?level=INFO`);
+  Logger.log(`🔎 Log download (JSON): http://localhost:${port}/scim/admin/log-config/download?format=json`);
 }
 
 void bootstrap();

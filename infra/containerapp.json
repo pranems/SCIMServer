@@ -1,0 +1,272 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.39.26.7824",
+      "templateHash": "4851677401753757797"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for deployment"
+      }
+    },
+    "appName": {
+      "type": "string",
+      "metadata": {
+        "description": "Container App name"
+      }
+    },
+    "environmentName": {
+      "type": "string",
+      "metadata": {
+        "description": "Managed Environment name (should exist or be deployed via containerapp-env.bicep)"
+      }
+    },
+    "acrLoginServer": {
+      "type": "string",
+      "metadata": {
+        "description": "ACR login server (e.g. myacr.azurecr.io)"
+      }
+    },
+    "image": {
+      "type": "string",
+      "metadata": {
+        "description": "Image tag to deploy (e.g. scimserver/api:latest)"
+      }
+    },
+    "scimSharedSecret": {
+      "type": "securestring",
+      "metadata": {
+        "description": "SCIM shared secret"
+      }
+    },
+    "jwtSecret": {
+      "type": "securestring",
+      "metadata": {
+        "description": "JWT signing secret used to issue OAuth tokens"
+      }
+    },
+    "oauthClientSecret": {
+      "type": "securestring",
+      "metadata": {
+        "description": "OAuth client secret required when requesting SCIMServer tokens"
+      }
+    },
+    "targetPort": {
+      "type": "int",
+      "defaultValue": 8080,
+      "metadata": {
+        "description": "Target port inside container"
+      }
+    },
+    "minReplicas": {
+      "type": "int",
+      "defaultValue": 1,
+      "metadata": {
+        "description": "Min replicas"
+      }
+    },
+    "maxReplicas": {
+      "type": "int",
+      "defaultValue": 1,
+      "metadata": {
+        "description": "Max replicas – keep at 1 while using SQLite (file-based DB cannot be shared across replicas)"
+      }
+    },
+    "cpuCores": {
+      "type": "string",
+      "defaultValue": "0.5",
+      "allowedValues": [
+        "0.25",
+        "0.5",
+        "1",
+        "2"
+      ],
+      "metadata": {
+        "description": "CPU cores per replica (allowed: 0.25,0.5,1,2). Use 1 for reliability if unsure."
+      }
+    },
+    "memory": {
+      "type": "string",
+      "defaultValue": "1Gi",
+      "metadata": {
+        "description": "Optional memory per replica"
+      }
+    },
+    "blobBackupAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "Blob backup storage account name"
+      }
+    },
+    "blobBackupContainerName": {
+      "type": "string",
+      "defaultValue": "scimserver-backups",
+      "metadata": {
+        "description": "Blob backup container name"
+      }
+    },
+    "ghcrUsername": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "GHCR username for pulling container images (optional, only for private packages)"
+      }
+    },
+    "ghcrPassword": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "GHCR PAT token for pulling container images (optional, only for private packages)"
+      }
+    }
+  },
+  "variables": {
+    "useGhcrCredentials": "[and(and(equals(parameters('acrLoginServer'), 'ghcr.io'), not(equals(parameters('ghcrUsername'), ''))), not(equals(parameters('ghcrPassword'), '')))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.App/containerApps",
+      "apiVersion": "2024-03-01",
+      "name": "[parameters('appName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "environmentId": "[resourceId('Microsoft.App/managedEnvironments', parameters('environmentName'))]",
+        "configuration": {
+          "ingress": {
+            "external": true,
+            "targetPort": "[parameters('targetPort')]",
+            "transport": "auto"
+          },
+          "registries": "[if(variables('useGhcrCredentials'), createArray(createObject('server', 'ghcr.io', 'username', parameters('ghcrUsername'), 'passwordSecretRef', 'ghcr-password')), if(not(equals(parameters('acrLoginServer'), 'ghcr.io')), createArray(createObject('server', parameters('acrLoginServer'), 'identity', 'system')), createArray()))]",
+          "secrets": "[concat(createArray(createObject('name', 'scim-shared-secret', 'value', parameters('scimSharedSecret')), createObject('name', 'jwt-secret', 'value', parameters('jwtSecret')), createObject('name', 'oauth-client-secret', 'value', parameters('oauthClientSecret'))), if(variables('useGhcrCredentials'), createArray(createObject('name', 'ghcr-password', 'value', parameters('ghcrPassword'))), createArray()))]"
+        },
+        "template": {
+          "initContainers": [],
+          "containers": [
+            {
+              "name": "scimserver",
+              "image": "[format('{0}/{1}', parameters('acrLoginServer'), parameters('image'))]",
+              "env": [
+                {
+                  "name": "SCIM_SHARED_SECRET",
+                  "secretRef": "scim-shared-secret"
+                },
+                {
+                  "name": "JWT_SECRET",
+                  "secretRef": "jwt-secret"
+                },
+                {
+                  "name": "OAUTH_CLIENT_SECRET",
+                  "secretRef": "oauth-client-secret"
+                },
+                {
+                  "name": "NODE_ENV",
+                  "value": "production"
+                },
+                {
+                  "name": "PORT",
+                  "value": "[string(parameters('targetPort'))]"
+                },
+                {
+                  "name": "DATABASE_URL",
+                  "value": "file:/tmp/local-data/scim.db"
+                },
+                {
+                  "name": "BLOB_BACKUP_ACCOUNT",
+                  "value": "[parameters('blobBackupAccountName')]"
+                },
+                {
+                  "name": "BLOB_BACKUP_CONTAINER",
+                  "value": "[parameters('blobBackupContainerName')]"
+                },
+                {
+                  "name": "SCIM_RG",
+                  "value": "[resourceGroup().name]"
+                },
+                {
+                  "name": "SCIM_APP",
+                  "value": "[parameters('appName')]"
+                },
+                {
+                  "name": "SCIM_REGISTRY",
+                  "value": "[parameters('acrLoginServer')]"
+                },
+                {
+                  "name": "SCIM_CURRENT_IMAGE",
+                  "value": "[format('{0}/{1}', parameters('acrLoginServer'), parameters('image'))]"
+                }
+              ],
+              "resources": {
+                "cpu": "[json(parameters('cpuCores'))]",
+                "memory": "[parameters('memory')]"
+              },
+              "probes": [
+                {
+                  "type": "Startup",
+                  "httpGet": {
+                    "path": "/index.html",
+                    "port": "[parameters('targetPort')]",
+                    "scheme": "HTTP"
+                  },
+                  "initialDelaySeconds": 10,
+                  "periodSeconds": 5,
+                  "timeoutSeconds": 3,
+                  "failureThreshold": 30,
+                  "successThreshold": 1
+                },
+                {
+                  "type": "Liveness",
+                  "httpGet": {
+                    "path": "/index.html",
+                    "port": "[parameters('targetPort')]",
+                    "scheme": "HTTP"
+                  },
+                  "periodSeconds": 30,
+                  "timeoutSeconds": 5,
+                  "failureThreshold": 3
+                },
+                {
+                  "type": "Readiness",
+                  "httpGet": {
+                    "path": "/index.html",
+                    "port": "[parameters('targetPort')]",
+                    "scheme": "HTTP"
+                  },
+                  "periodSeconds": 10,
+                  "timeoutSeconds": 3,
+                  "failureThreshold": 3,
+                  "successThreshold": 1
+                }
+              ],
+              "volumeMounts": []
+            }
+          ],
+          "scale": {
+            "minReplicas": "[parameters('minReplicas')]",
+            "maxReplicas": "[parameters('maxReplicas')]"
+          },
+          "volumes": []
+        }
+      },
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "tags": {
+        "project": "scimserver"
+      }
+    }
+  ],
+  "outputs": {
+    "containerAppFqdn": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.App/containerApps', parameters('appName')), '2024-03-01').configuration.ingress.fqdn]"
+    }
+  }
+}

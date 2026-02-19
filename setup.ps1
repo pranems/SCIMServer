@@ -221,6 +221,9 @@ while (-not $fqdn -and $attempts -lt $maxAttempts) {
 if ($fqdn) {
 	Write-Host "FINAL URL: https://$fqdn" -ForegroundColor Green
 	Write-Host "SCIM Endpoint: https://$fqdn/scim/v2" -ForegroundColor Green
+	Write-Host "Quick Logs (recent): https://$fqdn/scim/admin/log-config/recent?limit=25" -ForegroundColor Green
+	Write-Host "Quick Logs (stream): https://$fqdn/scim/admin/log-config/stream?level=INFO" -ForegroundColor Green
+	Write-Host "Quick Logs (download): https://$fqdn/scim/admin/log-config/download?format=json" -ForegroundColor Green
 } else {
 	Write-Host 'FINAL URL: <unavailable - check portal>' -ForegroundColor Yellow
 }

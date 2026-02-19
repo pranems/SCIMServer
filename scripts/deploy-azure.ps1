@@ -15,18 +15,80 @@ param(
 
 if (-not $Location -or $Location -eq '') { $Location = 'eastus' }
 $requiredProviders = @('Microsoft.App','Microsoft.ContainerService')
+$script:DeploymentTranscriptStarted = $false
+$script:DeploymentLogFile = $null
+$script:DeploymentStatePath = $null
+$script:DeploymentState = $null
+
+function Start-DeploymentLogging {
+    try {
+        $logDir = Join-Path $PSScriptRoot 'logs'
+        if (-not (Test-Path $logDir)) {
+            New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+        }
+
+        $timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+        $script:DeploymentLogFile = Join-Path $logDir "deploy-azure-$timestamp.log"
+        Start-Transcript -Path $script:DeploymentLogFile -IncludeInvocationHeader -Force | Out-Null
+        $script:DeploymentTranscriptStarted = $true
+        Write-Host "📝 Deployment run log: $script:DeploymentLogFile" -ForegroundColor DarkGray
+    } catch {
+        Write-Host "⚠️ Could not start transcript logging: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
+function Stop-DeploymentLogging {
+    if ($script:DeploymentTranscriptStarted) {
+        try {
+            Stop-Transcript | Out-Null
+        } catch {
+            # Best effort only
+        }
+        $script:DeploymentTranscriptStarted = $false
+    }
+}
+
+function Stop-Deployment {
+    param(
+        [string]$Message,
+        [string]$Hint
+    )
+
+    Write-Host "❌ $Message" -ForegroundColor Red
+    if ($Hint) {
+        Write-Host "   $Hint" -ForegroundColor Yellow
+    }
+    if ($script:DeploymentLogFile) {
+        Write-Host "   Log file: $script:DeploymentLogFile" -ForegroundColor DarkGray
+    }
+    Stop-DeploymentLogging
+    exit 1
+}
 
 function Ensure-AzProvider {
     param([string]$Namespace)
 
-    $state = az provider show --namespace $Namespace --query "registrationState" -o tsv 2>$null
-    if ($LASTEXITCODE -ne 0) { $state = '' }
+    $state = az provider show --namespace $Namespace --query "registrationState" -o tsv --only-show-errors 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "   ❌ Unable to read provider state for $Namespace" -ForegroundColor Red
+        Write-Host "      Azure CLI: $state" -ForegroundColor DarkGray
+        Write-Host "      Missing permission likely: Microsoft.Resources/subscriptions/providers/read" -ForegroundColor Yellow
+        return $false
+    }
 
     if ($state -ne 'Registered') {
         Write-Host "🔁 Registering resource provider $Namespace..." -ForegroundColor Yellow
-        az provider register --namespace $Namespace --wait -o none 2>$null
+        $registerResult = az provider register --namespace $Namespace --wait -o none --only-show-errors 2>&1
         if ($LASTEXITCODE -ne 0) {
+            $stateAfterFailure = az provider show --namespace $Namespace --query "registrationState" -o tsv --only-show-errors 2>$null
+            if ($LASTEXITCODE -eq 0 -and $stateAfterFailure -eq 'Registered') {
+                Write-Host "   ⚠️ Register call failed but provider is already registered. Continuing..." -ForegroundColor Yellow
+                return $true
+            }
+
             Write-Host "   ❌ Failed to register $Namespace" -ForegroundColor Red
+            Write-Host "      Azure CLI: $registerResult" -ForegroundColor DarkGray
+            Write-Host "      Missing permission likely: Microsoft.Resources/subscriptions/providers/register/action" -ForegroundColor Yellow
             return $false
         }
         Write-Host "   ✅ $Namespace registered" -ForegroundColor Green
@@ -64,9 +126,82 @@ function New-RandomSecret {
     return $builder.Substring(0, $length)
 }
 
+function Get-DeploymentStatePath {
+    param(
+        [string]$RgName,
+        [string]$ContainerAppName
+    )
+
+    $stateDir = Join-Path $PSScriptRoot 'state'
+    if (-not (Test-Path $stateDir)) {
+        New-Item -ItemType Directory -Path $stateDir -Force | Out-Null
+    }
+
+    $safeRg = if ([string]::IsNullOrWhiteSpace($RgName)) { 'unknown-rg' } else { ($RgName.ToLower() -replace '[^a-z0-9-]', '-') }
+    $safeApp = if ([string]::IsNullOrWhiteSpace($ContainerAppName)) { 'unknown-app' } else { ($ContainerAppName.ToLower() -replace '[^a-z0-9-]', '-') }
+    return Join-Path $stateDir "deploy-state-$safeRg-$safeApp.json"
+}
+
+function Load-DeploymentState {
+    param([string]$StatePath)
+
+    if ([string]::IsNullOrWhiteSpace($StatePath) -or -not (Test-Path $StatePath)) {
+        return $null
+    }
+
+    try {
+        return Get-Content -Path $StatePath -Raw | ConvertFrom-Json
+    } catch {
+        Write-Host "⚠️ Could not read deployment state file '$StatePath': $($_.Exception.Message)" -ForegroundColor Yellow
+        return $null
+    }
+}
+
+function Save-DeploymentState {
+    param(
+        [string]$StatePath,
+        [string]$ScimSharedSecret,
+        [string]$JwtSigningSecret,
+        [string]$OAuthSecret
+    )
+
+    if ([string]::IsNullOrWhiteSpace($StatePath)) {
+        return
+    }
+
+    try {
+        $payload = [ordered]@{
+            updatedAtUtc = (Get-Date).ToUniversalTime().ToString('o')
+            scimSecret = $ScimSharedSecret
+            jwtSecret = $JwtSigningSecret
+            oauthClientSecret = $OAuthSecret
+        }
+        $payload | ConvertTo-Json -Depth 4 | Set-Content -Path $StatePath -Encoding utf8
+    } catch {
+        Write-Host "⚠️ Could not write deployment state file '$StatePath': $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
+function Test-GhcrAnonymousPullSupported {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Repository
+    )
+
+    try {
+        $tokenUrl = "https://ghcr.io/token?service=ghcr.io&scope=repository:$Repository`:pull"
+        $response = Invoke-RestMethod -Uri $tokenUrl -Method Get -TimeoutSec 15 -ErrorAction Stop
+        return -not [string]::IsNullOrWhiteSpace($response.token)
+    } catch {
+        return $false
+    }
+}
+
+Start-DeploymentLogging
+
 if (-not $ResourceGroup) {
     $ResourceGroup = Read-Host "Enter Resource Group name (will be created if missing)"
-    if (-not $ResourceGroup) { Write-Host "Resource Group is required." -ForegroundColor Red; return }
+    if (-not $ResourceGroup) { Stop-Deployment -Message "Resource Group is required." }
 }
 
 function Get-ExistingContainerApps {
@@ -125,12 +260,23 @@ if (-not $AppName) {
             $AppName = $defaultAppName
             Write-Host "Using existing container app '$AppName'" -ForegroundColor Yellow
         } else {
-            Write-Host "App Name is required." -ForegroundColor Red
-            return
+            Stop-Deployment -Message "App Name is required."
         }
     } else {
         $AppName = $inputName
     }
+}
+
+$script:DeploymentStatePath = Get-DeploymentStatePath -RgName $ResourceGroup -ContainerAppName $AppName
+$script:DeploymentState = Load-DeploymentState -StatePath $script:DeploymentStatePath
+if ($script:DeploymentState) {
+    Write-Host "🔁 Loaded previous deployment secrets cache for '$ResourceGroup/$AppName'" -ForegroundColor DarkGray
+}
+
+if (-not $ScimSecret -and $env:SCIM_SHARED_SECRET) { $ScimSecret = $env:SCIM_SHARED_SECRET }
+if (-not $ScimSecret -and $script:DeploymentState -and $script:DeploymentState.scimSecret) {
+    $ScimSecret = $script:DeploymentState.scimSecret
+    Write-Host "Using cached SCIM shared secret from prior run" -ForegroundColor DarkGray
 }
 
 if (-not $ScimSecret) {
@@ -145,6 +291,14 @@ if (-not $ScimSecret) {
 
 if (-not $JwtSecret -and $env:JWT_SECRET) { $JwtSecret = $env:JWT_SECRET }
 if (-not $OauthClientSecret -and $env:OAUTH_CLIENT_SECRET) { $OauthClientSecret = $env:OAUTH_CLIENT_SECRET }
+if (-not $JwtSecret -and $script:DeploymentState -and $script:DeploymentState.jwtSecret) {
+    $JwtSecret = $script:DeploymentState.jwtSecret
+    Write-Host "Using cached JWT secret from prior run" -ForegroundColor DarkGray
+}
+if (-not $OauthClientSecret -and $script:DeploymentState -and $script:DeploymentState.oauthClientSecret) {
+    $OauthClientSecret = $script:DeploymentState.oauthClientSecret
+    Write-Host "Using cached OAuth client secret from prior run" -ForegroundColor DarkGray
+}
 
 if (-not $JwtSecret) {
     $jwtInput = Read-Host "Enter JWT signing secret (press Enter to auto-generate secure value)"
@@ -167,18 +321,39 @@ if (-not $OauthClientSecret) {
 }
 
 if ([string]::IsNullOrWhiteSpace($JwtSecret) -or [string]::IsNullOrWhiteSpace($OauthClientSecret)) {
-    Write-Host "JWT and OAuth client secrets are required." -ForegroundColor Red
-    return
+    Stop-Deployment -Message "JWT and OAuth client secrets are required."
 }
 
-# GHCR credentials (required if package is private)
-if (-not $GhcrUsername) {
-    $ghcrInput = Read-Host "Enter GitHub username for GHCR pull (press Enter to skip for public packages)"
-    if (-not [string]::IsNullOrWhiteSpace($ghcrInput)) { $GhcrUsername = $ghcrInput }
+Save-DeploymentState -StatePath $script:DeploymentStatePath -ScimSharedSecret $ScimSecret -JwtSigningSecret $JwtSecret -OAuthSecret $OauthClientSecret
+if ($script:DeploymentStatePath) {
+    Write-Host "🗂️ Deployment secrets cache updated: $script:DeploymentStatePath" -ForegroundColor DarkGray
 }
+
+# GHCR credentials are optional by default.
+# Only prompt for credentials when anonymous pull is not available (private package scenario).
+$imageRepository = 'pranems/scimserver'
+$anonymousPullSupported = $true
+
+if ([string]::IsNullOrWhiteSpace($GhcrUsername) -and [string]::IsNullOrWhiteSpace($GhcrPassword)) {
+    $anonymousPullSupported = Test-GhcrAnonymousPullSupported -Repository $imageRepository
+    if (-not $anonymousPullSupported) {
+        Write-Host "Anonymous GHCR pull is unavailable for '$($imageRepository):$ImageTag'." -ForegroundColor Yellow
+        $ghcrInput = Read-Host "Enter GitHub username for GHCR pull (required for private image)"
+        if (-not [string]::IsNullOrWhiteSpace($ghcrInput)) {
+            $GhcrUsername = $ghcrInput
+            $ghcrPat = Read-Host "Enter GitHub PAT for GHCR pull (needs read:packages scope)"
+            if (-not [string]::IsNullOrWhiteSpace($ghcrPat)) {
+                $GhcrPassword = $ghcrPat
+            }
+        }
+    }
+}
+
 if ($GhcrUsername -and -not $GhcrPassword) {
-    $ghcrPat = Read-Host "Enter GitHub PAT for GHCR pull (needs read:packages scope)"
-    if (-not [string]::IsNullOrWhiteSpace($ghcrPat)) { $GhcrPassword = $ghcrPat }
+    Stop-Deployment -Message "GHCR username provided without PAT." -Hint "Provide both -GhcrUsername and -GhcrPassword for private images."
+}
+if ($GhcrPassword -and -not $GhcrUsername) {
+    Stop-Deployment -Message "GHCR PAT provided without username." -Hint "Provide both -GhcrUsername and -GhcrPassword for private images."
 }
 
 if (-not $ImageTag) { $ImageTag = "latest" }
@@ -190,6 +365,7 @@ Write-Host "  Location       : $Location" -ForegroundColor White
 Write-Host "  Image Tag      : $ImageTag" -ForegroundColor White
 Write-Host "  Blob Backup Acct : $BlobBackupAccount" -ForegroundColor White
 Write-Host "  Blob Container   : $BlobBackupContainer" -ForegroundColor White
+Write-Host "  GHCR Pull Mode : $([string]::IsNullOrWhiteSpace($GhcrUsername) ? 'Anonymous (public image)' : 'Authenticated (private image)')" -ForegroundColor White
 Write-Host "  SCIM Secret    : $ScimSecret" -ForegroundColor Yellow
 Write-Host "  JWT Secret     : (set)" -ForegroundColor Yellow
 Write-Host "  OAuth Secret   : (set)" -ForegroundColor Yellow
@@ -209,14 +385,14 @@ try {
     Write-Host "Azure CLI authenticated as: $($account.user.name)" -ForegroundColor Green
     Write-Host "   Subscription: $($account.name)" -ForegroundColor Gray
 } catch {
-    Write-Host "Azure CLI not authenticated" -ForegroundColor Red
-    Write-Host "   Run: az login" -ForegroundColor Yellow
-    return
+    Stop-Deployment -Message "Azure CLI not authenticated" -Hint "Run: az login"
 }
 
 # Ensure required resource providers are registered
 foreach ($ns in $requiredProviders) {
-    if (-not (Ensure-AzProvider -Namespace $ns)) { return }
+    if (-not (Ensure-AzProvider -Namespace $ns)) {
+        Stop-Deployment -Message "Provider readiness check failed for '$ns'." -Hint "Ask subscription admin for Reader + provider read/register permissions, then retry."
+    }
 }
 
 # Generate resource names
@@ -274,8 +450,7 @@ if ($rgExitCode -ne 0 -or -not $rgJson) {
     Write-Host "   Creating resource group '$ResourceGroup'..." -ForegroundColor Yellow
     az group create --name $ResourceGroup --location $Location --output none 2>$null
     if ($LASTEXITCODE -ne 0) {
-    Write-Host "   ❌ Failed to create resource group" -ForegroundColor Red
-    return
+    Stop-Deployment -Message "Failed to create resource group '$ResourceGroup'." -Hint "Ensure you have Microsoft.Resources/subscriptions/resourceGroups/write on this subscription."
     }
     Write-Host "   ✅ Resource group created" -ForegroundColor Green
 } else {
@@ -359,8 +534,7 @@ if ($LASTEXITCODE -eq 0 -and $existingVnetJson) {
     $privateEndpointSubnetId = GetOrCreate-VnetSubnetId -ResourceGroupName $ResourceGroup -VirtualNetworkName $vnetName -SubnetName $expectedPeSubnetName -AddressPrefix $privateEndpointPrefix
 
     if (-not $infrastructureSubnetId -or -not $privateEndpointSubnetId) {
-        Write-Host "   ❌ Unable to ensure required subnets exist" -ForegroundColor Red
-        return
+        Stop-Deployment -Message "Unable to ensure required subnets exist."
     }
 
     $privateDnsZoneJson = az network private-dns zone show --resource-group $ResourceGroup --name $expectedDnsZoneName --output json 2>$null
@@ -371,8 +545,7 @@ if ($LASTEXITCODE -eq 0 -and $existingVnetJson) {
             --name $expectedDnsZoneName `
             --output json 2>$null
         if ($LASTEXITCODE -ne 0 -or -not $privateDnsZoneJson) {
-            Write-Host "   ❌ Failed to create private DNS zone" -ForegroundColor Red
-            return
+            Stop-Deployment -Message "Failed to create private DNS zone."
         }
     }
 
@@ -390,8 +563,7 @@ if ($LASTEXITCODE -eq 0 -and $existingVnetJson) {
             --registration-enabled false `
             --output json 2>$null
         if ($LASTEXITCODE -ne 0 -or -not $dnsLinkJson) {
-            Write-Host "   ❌ Failed to create DNS link" -ForegroundColor Red
-            return
+            Stop-Deployment -Message "Failed to create DNS link."
         }
     }
 
@@ -421,7 +593,7 @@ if (-not $networkHealthy) {
     if ($LASTEXITCODE -ne 0) {
         Write-Host "   ❌ Failed to provision network" -ForegroundColor Red
         Write-Host $networkDeployOutput -ForegroundColor Red
-        return
+        Stop-Deployment -Message "Network deployment failed."
     }
 
     $networkOutputs = $networkDeployOutput | ConvertFrom-Json
@@ -451,7 +623,7 @@ $storageDeployOutput = az deployment group create `
 if ($LASTEXITCODE -ne 0) {
     Write-Host "   ❌ Failed to deploy blob storage" -ForegroundColor Red
     Write-Host $storageDeployOutput -ForegroundColor Red
-    return
+    Stop-Deployment -Message "Blob storage deployment failed."
 }
 
 $storageOutputs = $storageDeployOutput | ConvertFrom-Json
@@ -502,7 +674,7 @@ if (-not $skipEnvDeployment) {
     if ($LASTEXITCODE -ne 0) {
     Write-Host "   ❌ Failed to start environment deployment" -ForegroundColor Red
     Write-Host $envDeployOutput -ForegroundColor Red
-    return
+    Stop-Deployment -Message "Container App Environment deployment start failed."
     }
 
     # Poll environment deployment
@@ -533,7 +705,7 @@ if (-not $skipEnvDeployment) {
                 --query "properties.error" `
                 --output json 2>$null
             Write-Host "   Error details: $errorDetails" -ForegroundColor Red
-            return
+            Stop-Deployment -Message "Container App Environment deployment failed."
         } elseif ($status -in @("Running", "Accepted", "")) {
             Write-Host "   ⏳ Still deploying... ($elapsed seconds elapsed)" -ForegroundColor Gray
         }
@@ -542,7 +714,7 @@ if (-not $skipEnvDeployment) {
     if (-not $deploymentSucceeded) {
         Write-Host "   ⚠️  Environment deployment timeout" -ForegroundColor Yellow
         Write-Host "   Check Azure Portal for status: $ResourceGroup" -ForegroundColor Yellow
-        return
+        Stop-Deployment -Message "Container App Environment deployment timed out."
     }
 
     # Deployment succeeded, but managed environment may still provision in background.
@@ -652,7 +824,7 @@ if (-not $skipAppDeployment) {
     Write-Host "   ❌ Failed to start container app deployment" -ForegroundColor Red
     Write-Host "   Error output:" -ForegroundColor Red
     Write-Host $deployOutput -ForegroundColor Red
-    return
+    Stop-Deployment -Message "Container app deployment start failed."
     }
 
     # Poll deployment status with timeout
@@ -684,7 +856,7 @@ if (-not $skipAppDeployment) {
                 --output json
             Write-Host "   Error details:" -ForegroundColor Red
             Write-Host $errorDetails -ForegroundColor Red
-            return
+            Stop-Deployment -Message "Container app deployment failed."
         } elseif ($status -in @("Running", "Accepted", "")) {
             Write-Host "   ⏳ Still deploying... ($elapsed seconds elapsed)" -ForegroundColor Gray
         } else {
@@ -696,7 +868,7 @@ if (-not $skipAppDeployment) {
     Write-Host "   ⚠️  Deployment timeout after $maxWaitSeconds seconds" -ForegroundColor Yellow
     Write-Host "   The deployment may still be running. Check Azure Portal:" -ForegroundColor Yellow
     Write-Host "   https://portal.azure.com/#@/resource/subscriptions/$((az account show --query id -o tsv))/resourceGroups/$ResourceGroup/deployments" -ForegroundColor Cyan
-    return
+    Stop-Deployment -Message "Container app deployment timed out."
     }
 }
 Write-Host ""
@@ -711,8 +883,38 @@ if ($appDetails -and $appDetails.properties.configuration.ingress.fqdn) {
     $url = "https://$($appDetails.properties.configuration.ingress.fqdn)"
     Write-Host "   ✅ Deployment complete!" -ForegroundColor Green
 } else {
-    Write-Host "   ⚠️  Could not retrieve app URL" -ForegroundColor Yellow
-    $url = "Unable to retrieve URL"
+    Stop-Deployment -Message "Could not retrieve app URL for verification."
+}
+
+Write-Host "🔍 Verifying deployed instance (GET /scim/admin/version)..." -ForegroundColor Cyan
+$versionEndpoint = "$url/scim/admin/version"
+$verifyHeaders = @{ Authorization = "Bearer $ScimSecret" }
+$verifyMaxAttempts = 18
+$verifyDelaySeconds = 10
+$verified = $false
+$versionInfo = $null
+
+for ($attempt = 1; $attempt -le $verifyMaxAttempts; $attempt++) {
+    try {
+        $versionInfo = Invoke-RestMethod -Uri $versionEndpoint -Method Get -Headers $verifyHeaders -TimeoutSec 20 -ErrorAction Stop
+        if ($versionInfo -and $versionInfo.version) {
+            Write-Host "   ✅ Verification successful (version=$($versionInfo.version))" -ForegroundColor Green
+            $verified = $true
+            break
+        }
+        Write-Host "   ⚠️ Verification response missing version field (attempt $attempt/$verifyMaxAttempts)" -ForegroundColor Yellow
+    } catch {
+        $errMsg = $_.Exception.Message
+        Write-Host "   ⏳ Verification attempt $attempt/$verifyMaxAttempts failed: $errMsg" -ForegroundColor Gray
+    }
+
+    if ($attempt -lt $verifyMaxAttempts) {
+        Start-Sleep -Seconds $verifyDelaySeconds
+    }
+}
+
+if (-not $verified) {
+    Stop-Deployment -Message "Deployment verification failed: $versionEndpoint did not become ready in time." -Hint "Check app logs and ingress settings, then retry."
 }
 
 Write-Host ""
@@ -730,6 +932,32 @@ if ($secretEcho) { Write-Host "   SCIM Shared Secret: $secretEcho" -ForegroundCo
 Write-Host "   JWT Secret: $JwtSecret" -ForegroundColor Yellow
 Write-Host "   OAuth Client Secret: $OauthClientSecret" -ForegroundColor Yellow
 Write-Host "   Persistence: Blob snapshot backups (enabled)" -ForegroundColor Green
+Write-Host ""
+
+Write-Host "✅ Verified Runtime (/scim/admin/version):" -ForegroundColor Cyan
+if ($versionInfo) {
+    try {
+        Write-Host "   version: $($versionInfo.version)" -ForegroundColor White
+        if ($versionInfo.service) {
+            Write-Host "   service.environment: $($versionInfo.service.environment)" -ForegroundColor White
+            Write-Host "   service.uptimeSeconds: $($versionInfo.service.uptimeSeconds)" -ForegroundColor White
+        }
+        if ($versionInfo.runtime) {
+            Write-Host "   runtime.node: $($versionInfo.runtime.node)" -ForegroundColor White
+            Write-Host "   runtime.platform: $($versionInfo.runtime.platform)" -ForegroundColor White
+        }
+
+        Write-Host "   full response:" -ForegroundColor Gray
+        $versionPretty = $versionInfo | ConvertTo-Json -Depth 10
+        foreach ($line in ($versionPretty -split "`r?`n")) {
+            Write-Host "     $line" -ForegroundColor Gray
+        }
+    } catch {
+        Write-Host "   (Could not format version response: $($_.Exception.Message))" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "   (No version response captured)" -ForegroundColor Yellow
+}
 Write-Host ""
 
 Write-Host "💾 Blob Backup Strategy:" -ForegroundColor Cyan
@@ -768,7 +996,7 @@ Write-Host "   • Resource: $ResourceGroup > $AppName" -ForegroundColor Gray
 Write-Host "   • Logs: $ResourceGroup > $lawName" -ForegroundColor Gray
 Write-Host ""
 
-Write-Host "� Log Viewing Commands (copy & paste):" -ForegroundColor Cyan
+Write-Host "🔎 Quick Log Access (copy & paste):" -ForegroundColor Cyan
 Write-Host "   Real-time streaming:" -ForegroundColor White
 Write-Host "   az containerapp logs show -n $AppName -g $ResourceGroup --type console --follow" -ForegroundColor Gray
 Write-Host "" 
@@ -778,12 +1006,22 @@ Write-Host ""
 Write-Host "   System logs:" -ForegroundColor White
 Write-Host "   az containerapp logs show -n $AppName -g $ResourceGroup --type system --tail 30" -ForegroundColor Gray
 Write-Host ""
-Write-Host "   Admin REST endpoints (from any machine):" -ForegroundColor White
-Write-Host "   curl $url/scim/admin/logs -H 'Authorization: Bearer <SECRET>'" -ForegroundColor Gray
-Write-Host "   curl $url/scim/admin/log-config/recent -H 'Authorization: Bearer <SECRET>'" -ForegroundColor Gray
+Write-Host "   Admin API (recent):" -ForegroundColor White
+Write-Host "   curl `"$url/scim/admin/log-config/recent?limit=25`" -H `"Authorization: Bearer <SECRET>`"" -ForegroundColor Gray
+Write-Host ""
+Write-Host "   Admin API (download JSON):" -ForegroundColor White
+Write-Host "   curl `"$url/scim/admin/log-config/download?format=json`" -H `"Authorization: Bearer <SECRET>`" -o scim-logs.json" -ForegroundColor Gray
+Write-Host ""
+Write-Host "   Admin API (live stream via SSE):" -ForegroundColor White
+Write-Host "   curl -N `"$url/scim/admin/log-config/stream?level=INFO`" -H `"Authorization: Bearer <SECRET>`"" -ForegroundColor Gray
+Write-Host ""
+Write-Host "   Helper script examples (from repo root):" -ForegroundColor White
+Write-Host "   .\scripts\remote-logs.ps1 -Mode recent -BaseUrl $url" -ForegroundColor Gray
+Write-Host "   .\scripts\remote-logs.ps1 -Mode tail -BaseUrl $url" -ForegroundColor Gray
+Write-Host "   .\scripts\remote-logs.ps1 -Mode download -BaseUrl $url -Format json" -ForegroundColor Gray
 Write-Host ""
 
-Write-Host "�💰 Estimated Monthly Cost:" -ForegroundColor Cyan
+Write-Host "💰 Estimated Monthly Cost:" -ForegroundColor Cyan
 Write-Host '   Container App: ~$5-15 (scales to zero when idle)' -ForegroundColor White
 Write-Host '   Blob Storage (snapshots): ~$0.20-0.50 (light DB snapshots)' -ForegroundColor White
 Write-Host '   Log Analytics: ~$0-5 (depends on log volume)' -ForegroundColor White
@@ -791,3 +1029,7 @@ Write-Host '   Total: ~$5.20-20/month' -ForegroundColor Yellow
 Write-Host ""
 
 Write-Host "🏁 Deployment complete!" -ForegroundColor Green
+if ($script:DeploymentLogFile) {
+    Write-Host "📝 Deployment run log saved to: $script:DeploymentLogFile" -ForegroundColor Green
+}
+Stop-DeploymentLogging

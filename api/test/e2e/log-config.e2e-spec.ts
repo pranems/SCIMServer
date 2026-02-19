@@ -15,6 +15,8 @@ import { getAuthToken } from './helpers/auth.helper';
  *   DELETE /scim/admin/log-config/endpoint/:endpointId
  *   GET    /scim/admin/log-config/recent
  *   DELETE /scim/admin/log-config/recent
+ *   GET    /scim/admin/log-config/download
+ *   GET    /scim/admin/log-config/stream
  */
 describe('Log Configuration API (E2E)', () => {
   let app: INestApplication;
@@ -314,6 +316,78 @@ describe('Log Configuration API (E2E)', () => {
       // After clearing, requesting recent should return a small number of entries
       // (only the current GET request's own log entries: auth, oauth, http ≈ 3–4)
       expect(res.body.count).toBeLessThanOrEqual(5);
+    });
+  });
+
+  // ─── Download Logs ───────────────────────────────────────────────
+
+  describe('GET /scim/admin/log-config/download', () => {
+    it('should download NDJSON by default', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/scim/admin/log-config/download')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.headers['content-type']).toContain('application/x-ndjson');
+      expect(res.headers['content-disposition']).toContain('attachment; filename="scimserver-logs-');
+
+      const lines = res.text
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+
+      expect(lines.length).toBeGreaterThan(0);
+      const first = JSON.parse(lines[0]) as { timestamp?: string; level?: string };
+      expect(first.timestamp).toBeDefined();
+      expect(first.level).toBeDefined();
+    });
+
+    it('should download JSON format when requested', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/scim/admin/log-config/download?format=json&limit=10')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.headers['content-type']).toContain('application/json');
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeLessThanOrEqual(10);
+    });
+
+    it('should support requestId filter', async () => {
+      const requestId = `e2e-download-${Date.now()}`;
+
+      await request(app.getHttpServer())
+        .get('/scim/admin/log-config')
+        .set('Authorization', `Bearer ${token}`)
+        .set('X-Request-Id', requestId)
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .get(`/scim/admin/log-config/download?format=json&requestId=${requestId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('X-Request-Id', requestId)
+        .expect(200);
+
+      expect(Array.isArray(res.body)).toBe(true);
+      for (const entry of res.body as Array<{ requestId?: string }>) {
+        expect(entry.requestId).toBe(requestId);
+      }
+    });
+
+    it('should require authentication', async () => {
+      await request(app.getHttpServer())
+        .get('/scim/admin/log-config/download')
+        .expect(401);
+    });
+  });
+
+  // ─── Stream Logs (SSE) ───────────────────────────────────────────
+
+  describe('GET /scim/admin/log-config/stream', () => {
+    it('should require authentication', async () => {
+      await request(app.getHttpServer())
+        .get('/scim/admin/log-config/stream')
+        .expect(401);
     });
   });
 

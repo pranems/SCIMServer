@@ -12,6 +12,8 @@
   Logger
 } from '@nestjs/common';
 import type { Request } from 'express';
+import os from 'node:os';
+import fs from 'node:fs';
 
 import { LoggingService } from '../../logging/logging.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -29,9 +31,44 @@ interface VersionInfo {
   version: string;
   commit?: string;
   buildTime?: string; // ISO string
+  service: {
+    name: string;
+    environment: string;
+    apiPrefix: string;
+    scimBasePath: string;
+    now: string;
+    startedAt: string;
+    uptimeSeconds: number;
+    timezone: string;
+  };
   runtime: {
     node: string;
     platform: string;
+    arch: string;
+    pid: number;
+    hostname: string;
+    cpus: number;
+    containerized: boolean;
+    memory: {
+      rss: number;
+      heapTotal: number;
+      heapUsed: number;
+      external: number;
+      arrayBuffers: number;
+    };
+  };
+  auth: {
+    oauthClientId?: string;
+    oauthClientSecretConfigured: boolean;
+    jwtSecretConfigured: boolean;
+    scimSharedSecretConfigured: boolean;
+  };
+  storage: {
+    databaseUrl?: string;
+    databaseProvider: 'sqlite';
+    blobBackupConfigured: boolean;
+    blobAccount?: string;
+    blobContainer?: string;
   };
   deployment?: {
     resourceGroup?: string;
@@ -43,6 +80,8 @@ interface VersionInfo {
     blobContainer?: string;
   };
 }
+
+const serviceBootTime = new Date();
 
 @Controller('admin')
 export class AdminController {
@@ -235,9 +274,13 @@ export class AdminController {
     const version = process.env.APP_VERSION || this.readPackageVersion();
     const commit = process.env.GIT_COMMIT;
     const buildTime = process.env.BUILD_TIME;
+    const now = new Date();
     const blobAccount = process.env.BLOB_BACKUP_ACCOUNT;
     const blobContainer = process.env.BLOB_BACKUP_CONTAINER;
     const backupMode: 'blob' | 'azureFiles' | 'none' = blobAccount ? 'blob' : 'none';
+    const databaseUrl = this.maskSensitiveUrl(process.env.DATABASE_URL);
+    const memory = process.memoryUsage();
+    const apiPrefix = process.env.API_PREFIX ?? 'scim';
 
     // Image tag detection moved to frontend (see web build in Dockerfile)
     const currentImage = undefined;
@@ -246,9 +289,44 @@ export class AdminController {
       version,
       commit,
       buildTime,
+      service: {
+        name: 'SCIMServer API',
+        environment: process.env.NODE_ENV ?? 'development',
+        apiPrefix,
+        scimBasePath: `/${apiPrefix}/v2`,
+        now: now.toISOString(),
+        startedAt: serviceBootTime.toISOString(),
+        uptimeSeconds: Number(process.uptime().toFixed(3)),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+      },
       runtime: {
         node: process.version,
-        platform: `${process.platform}-${process.arch}`
+        platform: process.platform,
+        arch: process.arch,
+        pid: process.pid,
+        hostname: os.hostname(),
+        cpus: os.cpus().length,
+        containerized: this.isContainerized(),
+        memory: {
+          rss: memory.rss,
+          heapTotal: memory.heapTotal,
+          heapUsed: memory.heapUsed,
+          external: memory.external,
+          arrayBuffers: memory.arrayBuffers
+        }
+      },
+      auth: {
+        oauthClientId: process.env.OAUTH_CLIENT_ID,
+        oauthClientSecretConfigured: this.isConfigured(process.env.OAUTH_CLIENT_SECRET),
+        jwtSecretConfigured: this.isConfigured(process.env.JWT_SECRET),
+        scimSharedSecretConfigured: this.isConfigured(process.env.SCIM_SHARED_SECRET)
+      },
+      storage: {
+        databaseUrl,
+        databaseProvider: 'sqlite',
+        blobBackupConfigured: this.isConfigured(blobAccount) && this.isConfigured(blobContainer),
+        blobAccount,
+        blobContainer
       },
       deployment: {
         resourceGroup: process.env.SCIM_RG,
@@ -260,6 +338,21 @@ export class AdminController {
         blobContainer
       }
     };
+  }
+
+  private isConfigured(value: string | undefined): boolean {
+    return Boolean(value && value.trim().length > 0);
+  }
+
+  private maskSensitiveUrl(value: string | undefined): string | undefined {
+    if (!value) return undefined;
+    return value
+      .replace(/(token|secret|password)=([^&]+)/gi, '$1=***')
+      .replace(/\bBearer\s+[A-Za-z0-9._-]+/gi, 'Bearer ***');
+  }
+
+  private isContainerized(): boolean {
+    return fs.existsSync('/.dockerenv') || this.isConfigured(process.env.CONTAINER_APP_NAME);
   }
 
   private readPackageVersion(): string {

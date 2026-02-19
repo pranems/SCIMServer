@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException, OnModuleInit, Logger } from '@nestjs/common';
-import type { Endpoint, Prisma } from '@prisma/client';
+import type { Endpoint, Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CreateEndpointDto } from '../dto/create-endpoint.dto';
 import type { UpdateEndpointDto } from '../dto/update-endpoint.dto';

@@ -5,15 +5,34 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 ### Recent Key Achievements (Chronological)
 | Date | Achievement |
 |------|-------------|
-| 2026-02-13 | 🎯 **SCIM VALIDATOR 24/24:** Added `displayNameLower` column to ScimGroup, buffered request logging, moved member resolution outside transactions — all 24 SCIM validator tests pass, 648 unit tests pass (v0.9.1) |
-| 2026-02-15 | 🔄 **FULL REPO MIGRATION:** All references migrated from `kayasax` to `pranems` GitHub account (35+ files, 92 occurrences) |
+| 2026-02-19 | 🔐 **Deploy Secret Reuse on Rerun:** Enhanced `scripts/deploy-azure.ps1` to cache SCIM/JWT/OAuth secrets per `ResourceGroup + AppName` in `scripts/state/deploy-state-<rg>-<app>.json`, auto-reuse them on subsequent reruns when parameters are omitted, and persist cache immediately after prompt/validation so intermediate deployment failures do not lose initial secret inputs. |
+| 2026-02-19 | 🧾 **Formatted Version Output in Deploy Summary:** Enhanced `scripts/deploy-azure.ps1` to print the verified `GET /scim/admin/version` response in a readable, formatted block at the end of deployment output (key runtime fields + full pretty JSON payload) alongside existing summary details. |
+| 2026-02-19 | ✅ **Post-Deploy Runtime Verification Added:** `scripts/deploy-azure.ps1` now verifies the deployed instance by calling `GET /scim/admin/version` with bearer auth (`SCIM_SHARED_SECRET`) using retry/backoff before declaring success. Deployment now hard-fails if version endpoint never becomes ready. |
+| 2026-02-19 | 🗂️ **Per-Run Deploy Logging Added:** `scripts/deploy-azure.ps1` now writes a unique local transcript log for every execution under `scripts/logs/deploy-azure-YYYYMMDD-HHMMSS.log`, capturing full console/runtime output. Failure path now also prints the log file path and closes transcript before exit. |
+| 2026-02-19 | 🔁 **Wrapper Deploy Flow Aligned to Local Script:** Updated `deploy.ps1` to prefer local `scripts/deploy-azure.ps1` when running from repo, avoiding stale downloaded script behavior. This ensures current GHCR logic is used: anonymous-by-default for public image, prompt for GH credentials only when anonymous pull is unavailable (private image fallback). |
+| 2026-02-19 | 🌐 **Anonymous Public GHCR Deploy Support:** Updated `scripts/deploy-azure.ps1` + `infra/containerapp.bicep` so public `ghcr.io/pranems/scimserver` images deploy without GH username/PAT prompts. GHCR auth is now strictly conditional (both username + password required), defaults to anonymous pull otherwise, and validated via deploy script run showing `GHCR Pull Mode: Anonymous (public image)` with no credential prompts. |
+| 2026-02-19 | 🛡️ **Azure Deploy Failure Hardening + Root Cause Isolation:** Confirmed active subscription lacks `Microsoft.Resources/subscriptions/providers/read` (and related RG read) permissions, which blocks provider checks/deployment. Hardened `scripts/deploy-azure.ps1` to fail fast with explicit RBAC diagnostics and non-zero exit (`exit 1`) instead of silent `return` paths, and validated behavior with terminal run (now exits code 1 with actionable message). |
+| 2026-02-18 | 🧠 **Repo/API Understanding Docs Update:** Performed code-verified pass over core runtime/auth/routing files (`api/src/main.ts`, OAuth/auth guard, Docker runtime + entrypoint), added a canonical implementation baseline doc (`docs/REPO_API_UNDERSTANDING_BASELINE.md`), updated docs index linkage, and corrected stale Docker guide port guidance from `:80` to current `:8080` runtime behavior. |
+| 2026-02-18 | 🏷️ **Final Docs Metadata Normalization:** Completed standardized `Status / Last Updated / Baseline` header blocks for remaining weak-header docs (`docs/SCIM_VALIDATOR_FALSE_POSITIVES_REPORT.md`, `docs/STORAGE_AND_BACKUP.md`, `docs/TEST_ORGANIZATION_RECOMMENDATIONS.md`) and revalidated touched files with no markdown/editor errors. |
+| 2026-02-18 | 🧭 **Diagrams + JSON Artifacts Refresh:** Repaired invalid docs JSON exports (`docs/postman/SCIM_v2_Postman_Collection.json`, `docs/openapi/SCIM_v2_openapi_full.json`), validated all `docs/**/*.json` artifacts parse cleanly, and refreshed sequence flow diagrams (`docs/create-user-sequence.mmd`, `docs/list-get-user-sequence.mmd`, `docs/USER_API_CALL_TRACE.md`) to current request-correlation and logging behavior. |
+| 2026-02-18 | 📚 **Repository-Wide Docs Reorganization Pass:** Standardized core docs theme (metadata headers, onboarding-first flow, living-vs-historical labeling), corrected deployment/runtime facts (Node 24, Prisma 7 baseline, Docker port `8080`), fixed encoding artifacts in high-traffic docs, refreshed compliance/testing snapshots, and removed AI-conversational leftovers from reference documents. |
+| 2026-02-18 | 📘 **README Best-Practice Reorganization:** Reworked README into a modern onboarding-first flow (why, quick start options, prerequisites, configuration, Entra setup, operations, quality status, docs index), corrected Docker run guidance to container port `8080`, and streamlined operational links for maintainability. |
+| 2026-02-18 | 🧾 **README Image Removal + Text/JSON Replacement:** Removed all README image embeds (including badges) and replaced visual snapshot sections with formatted metadata table plus structured JSON samples for admin version and recent log outputs, while retaining links to captured raw JSON artifacts. |
+| 2026-02-18 | 🧹 **Docs + JSON Current-State Sweep:** Normalized release-facing docs/examples to `v0.10.0`, removed remaining legacy repo naming references, refreshed OpenAPI description/version wording, and aligned long-form analysis docs to current baseline while preserving historical fix context. |
+| 2026-02-18 | ✅ **Admin Version Rollout + Full Validation Pipeline:** Updated docs and API collections for expanded `GET /scim/admin/version` payload (`docs/COMPLETE_API_REFERENCE.md`, Postman/Insomnia JSON), aligned web `VersionInfo` typing, and validated end-to-end: clean builds (API + web), lint (0 errors / 74 warnings), unit (666/666), e2e (184/184), live local instance (280/280), fresh `scimserver:latest` Docker build + container live tests (280/280). |
+| 2026-02-18 | 🧭 **Admin Version Endpoint Expanded:** `GET /scim/admin/version` now returns full running-instance metadata (service timing, runtime host/process/memory, auth configuration flags, storage details, deployment context) with sensitive values masked. Added e2e coverage in `api/test/e2e/admin-version.e2e-spec.ts` for auth requirement and response contract validation. |
+| 2026-02-18 | 🔎 **Log Access UX Improvements:** Added easy log-access output to Azure deploy flow (`scripts/deploy-azure.ps1`) and bootstrap wrapper (`setup.ps1`) with copy/paste commands for recent, stream (SSE), and download endpoints. Added startup console hints in `api/src/main.ts` and updated deployment docs (`DEPLOYMENT.md`, `docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md`) to mirror the same quick commands. |
+| 2026-02-18 | 🧪 **Test Coverage Expansion + Full Matrix Validation:** Added missing e2e coverage for `GET /scim/admin/log-config/download` and auth coverage for `GET /scim/admin/log-config/stream`; added live tests for log download formats/filters and SSE stream connectivity. Clean rebuild + full validation completed: 666 unit, 182 e2e, and 280 live tests passing on both local instance (`:6000`) and Docker latest (`:8080`). |
+| 2026-02-18 | 🔧 **Remote Debugging & Diagnosis:** SSE live log tailing endpoint (`GET /stream`), log file download (`GET /download`), `scripts/remote-logs.ps1` (4-mode PowerShell script), comprehensive `docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md` (14 sections, Mermaid diagrams, curl/PS examples). 18 new unit tests (134 logging tests total). Postman v1.4 + Insomnia updated. |
+| 2026-02-18 | 🚀 **v0.10.0 — Full Stack Upgrade:** Prisma 6→7 (driver adapter, prisma-client generator, prisma.config.ts), ESLint 8→10 (flat config), Jest 29→30, React 18→19, Vite 5→7. All 6 Dockerfiles updated node:22→24. 666 unit + 184 e2e + 280 live tests passing (local + Docker) |
 | 2026-02-15 | 📖 **AZURE DEPLOYMENT GUIDE:** Created comprehensive `docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md` with architecture diagrams, step-by-step deployment, Entra ID setup, usage guide, troubleshooting, and cost estimates |
 | 2026-02-15 | 📝 **README.md REWRITTEN:** Complete rewrite with architecture diagram, feature tables, Docker/Azure sections, documentation index, and project structure |
 | 2026-02-15 | 📝 **DEPLOYMENT.md REWRITTEN:** Streamlined all deployment methods (Azure/Docker/Local) with comparison table, CI/CD pipeline info, and links to detailed guide |
 | 2026-02-15 | 🔧 **VS CODE DEBUG CONFIGS:** Added `.vscode/launch.json` with 3 debug configurations (launch, launch+log, attach) and `start:debug:log` npm script |
 | 2026-02-15 | ✅ **CI/CD VERIFIED:** GitHub Actions `build-test.yml` and `publish-ghcr.yml` confirmed pointing to `pranems/scimserver` |
-| 2026-02-14 | 🧹 **ESLint Hardened:** `.eslintrc.cjs` updated for @typescript-eslint 8.x — 223→0 errors (8 source fixes + config overrides), 48 remaining warnings (intentional `any` + test scaffolding). `fast-xml-parser` CVE patched. || 2026-02-14 | � **Major Dependency Upgrade:** Node 22-alpine Docker, NestJS 10→11, Prisma 5→6, TypeScript 5.4→5.9, tsconfig targets es2022. 492 unit + 154 e2e + 212 live tests passing (local & Docker) |
-| 2026-02-14 | �📝 **Docs Updated to Current State:** SCIM_COMPLIANCE (filtering 85→100%), RECOMMENDED_DESIGN_IMPROVEMENTS (§17.1 gap analysis + §18 roadmap refreshed), INDEX.md, TESTING-WORKFLOW.md |
+| 2026-02-14 | 🧹 **ESLint Hardened:** `.eslintrc.cjs` updated for @typescript-eslint 8.x — 223→0 errors (8 source fixes + config overrides), 48 remaining warnings (intentional `any` + test scaffolding). `fast-xml-parser` CVE patched. |
+| 2026-02-14 | 🚀 **Major Dependency Upgrade:** Node 22-alpine Docker, NestJS 10→11, Prisma 5→6, TypeScript 5.4→5.9, tsconfig targets es2022. 492 unit + 154 e2e + 212 live tests passing (local & Docker) |
+| 2026-02-14 | 📝 **Docs Updated to Current State:** SCIM_COMPLIANCE (filtering 85→100%), RECOMMENDED_DESIGN_IMPROVEMENTS (§17.1 gap analysis + §18 roadmap refreshed), INDEX.md, TESTING-WORKFLOW.md |
 | 2026-02-14 | 📦 **JSON Consolidation:** 32→19 JSON files (41% reduction) — merged PATCH examples, removed duplicates, fixed OpenAPI /Bulk + bulk.supported, fixed update-endpoint strictMode |
 | 2026-02-11 | 📚 **Docs Consolidation:** 34→21 markdown files (~45% line reduction) — merged redundant guides, removed stale files |
 | 2026-02-11 | 🔊 **Verbose Live Tests:** `live-test.ps1 -Verbose` cmdlet overrides transparently intercept all API calls; 183/183 tests at the time (later expanded to 212) |
@@ -70,12 +89,12 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 | 2025-09-28 | PATCH Add operation fix (Entra compatibility) |
 | 2025-09-27 | v0.3.0: Full SCIM 2.0 compliance baseline |
 
-Current Version: v0.9.1 (displayNameLower + buffered logging + member resolution fixes)
+Current Version: v0.10.0 (Prisma 7 + ESLint 10 + Jest 30 + React 19 + Vite 7 + Node 24 Docker)
 
 ---
 
 ## Status
-Production Ready (v0.9.1) — **Phase 1 RFC Compliance complete** (Feb 2026). Full SCIM filter parser (10 operators), POST /.search, ETag conditional requests, attribute projection, centralized error handling. 648 unit tests (19 suites), 177 e2e tests (14 suites), 272 live integration tests, all 24 Microsoft SCIM Validator tests passing + 7 preview. Documentation and JSON examples consolidated and aligned to current implementation.
+Production Ready (v0.10.0) — **Phase 1 RFC Compliance complete** (Feb 2026). Full SCIM filter parser (10 operators), POST /.search, ETag conditional requests, attribute projection, centralized error handling. 666 unit tests (19 suites), 184 e2e tests (14 suites), 280 live integration tests, all 24 Microsoft SCIM Validator tests passing + 7 preview. Full tech stack at latest: Prisma 7, ESLint 10, Jest 30, React 19, Vite 7, Node 24.
 
 ## Quick Commands
 ```powershell
@@ -83,7 +102,7 @@ Production Ready (v0.9.1) — **Phase 1 RFC Compliance complete** (Feb 2026). Fu
 pwsh ./scripts/publish-acr.ps1 -Registry scimserverpublic -ResourceGroup scimserver-rg -Latest
 
 # Customer update to latest (example)
-iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-direct.ps1'); Update-SCIMServerDirect -Version v0.9.1 -ResourceGroup <rg> -AppName <app> -NoPrompt
+iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-direct.ps1'); Update-SCIMServerDirect -Version v0.10.0 -ResourceGroup <rg> -AppName <app> -NoPrompt
 
 > NOTE: Direct upgrade one‑liner integrated into UI copy button; user has not yet tested the copied command end‑to‑end.
 ```
@@ -107,11 +126,12 @@ iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/up
 - Clear instructions for Azure Portal setup
 
 **Core Technologies:**
-- Node.js 22 LTS & TypeScript 5.9
-- NestJS 11 service layer with Prisma 6 ORM
+- Node.js 24 & TypeScript 5.9
+- NestJS 11 service layer with Prisma 7 ORM (better-sqlite3 driver adapter)
 - SQLite (file-backed) for low-volume persistence
-- React + Vite frontend
-- Docker (local/dev) & Azure Container Apps (deployment target)
+- React 19 + Vite 7 frontend
+- ESLint 10 (flat config) + Jest 30
+- Docker (node:24-alpine) & Azure Container Apps (deployment target)
 
 AI Assist Notes: Microsoft Docs MCP consulted for SCIM spec alignment when needed.
 
@@ -162,6 +182,7 @@ Implemented TDD approach with comprehensive test coverage:
 Phase 1 complete. Full repo migration from `kayasax` to `pranems` GitHub account done. Documentation overhauled: new Azure Deployment & Usage Guide, rewritten README.md and DEPLOYMENT.md. GitHub Actions CI/CD pipelines (`build-test.yml`, `publish-ghcr.yml`) verified for `pranems/SCIMServer`. VS Code debug configurations added. Next: Phase 2 planning (schema-driven validation), CI test gate improvements, port alignment (live-test defaults to 6000, docker-compose to 3000).
 
 ## Next Steps / Backlog
+- [x] ✅ COMPLETED - Finalize docs metadata normalization for remaining weak-header files
 - [x] ✅ COMPLETED - Migrate all repo references from kayasax to pranems
 - [x] ✅ COMPLETED - Create comprehensive Azure Deployment & Usage Guide (docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md)
 - [x] ✅ COMPLETED - Rewrite README.md for current project state
@@ -177,6 +198,7 @@ Phase 1 complete. Full repo migration from `kayasax` to `pranems` GitHub account
 - [ ] Add release automation (GitHub Action) for drafts on tag push
 - [ ] Provide migration helper to rebuild the Container Apps environment when moving to the private VNet baseline
 - [ ] Add SCIM duplicate-handling regression tests (POST + PATCH scenarios)
+- [ ] Obtain Azure RBAC on target subscription (`providers/read`, `providers/register/action`, `resourceGroups/*`) or switch to a subscription with deploy rights
 ## 🏗️ Architecture
 
 **SCIM 2.0 Server:**
@@ -230,7 +252,7 @@ Phase 1 complete. Full repo migration from `kayasax` to `pranems` GitHub account
 | 2025-09-26 | 🧩 Added dynamic upgrade helper script (GitHub Releases based) |
 | 2025-09-26 | 🎨 Microsoft-inspired theming completed (dark/light parity, refined filters, log modal polish) |
 | 2025-09-26 | 🔍 Admin log noise hidden from UI; SCIM request list now focused on provisioning traffic |
-| 2025-12-29 | � **GITHUB REGISTRY MIGRATION** - Migrated from ACR to ghcr.io/pranems/scimserver with automated builds |
+| 2025-12-29 | 🔁 **GITHUB REGISTRY MIGRATION** - Migrated from ACR to ghcr.io/pranems/scimserver with automated builds |
 | 2025-12-26 | 🛠️ **UNIFIED DOCKERFILE** - Multi-stage build (web+API) with fixed SQLite permissions |
 | 2025-12-26 | 🚀 **CONTAINER DEPLOYMENT** - Production deployment working via public registry |
 | 2025-12-26 | 🔧 **SQLITE PERMISSIONS FIX** - Resolved readonly database errors with proper user ownership |

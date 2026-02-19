@@ -1,5 +1,9 @@
 # 🧪 Testing Pre-Release Changes
 
+> **Status**: Living workflow guide  
+> **Last Updated**: February 18, 2026  
+> **Baseline**: SCIMServer v0.10.0
+
 This guide explains how to test new features before releasing them to production users.
 
 ---
@@ -105,14 +109,14 @@ git merge test/collision-ui-improvements
 git push origin master
 
 # Bump version
-# Edit api/package.json and web/package.json: "version": "0.9.1"
+# Edit api/package.json and web/package.json: "version": "0.10.0"
 git add api/package.json web/package.json
-git commit -m "chore: bump version to 0.9.1"
+git commit -m "chore: bump version to 0.10.0"
 git push
 
 # Create release tag (triggers production build with 'latest' tag)
-git tag -a v0.9.1 -m "v0.9.1 - Performance & compliance improvements"
-git push origin v0.9.1
+git tag -a v0.10.0 -m "v0.10.0 - Runtime + logging + docs refresh"
+git push origin v0.10.0
 
 # Create GitHub Release (triggers update notifications)
 # Go to: https://github.com/pranems/SCIMServer/releases/new
@@ -156,7 +160,7 @@ az containerapp revision deactivate -n scimserver-app -g scimserver-rg --revisio
 
 Or specific version:
 ```powershell
-.\.scripts\test-update.ps1 -TestTag "0.9.1"
+.\.scripts\test-update.ps1 -TestTag "0.10.0"
 ```
 
 ---
@@ -170,8 +174,8 @@ Or specific version:
 **Does NOT tag:** `latest` (no update notifications)
 
 ### `build-and-push.yml` (Production Release)
-**Trigger:** Push tag matching `v*` (e.g., `v0.9.1`)
-**Tags:** `0.9.1`, `0.9`, `latest`
+**Trigger:** Push tag matching `v*` (e.g., `v0.10.0`)
+**Tags:** `0.10.0`, `0.10`, `latest`
 **Purpose:** Official releases
 **Does tag:** `latest` (triggers update notifications)
 
@@ -310,9 +314,9 @@ These env vars on the **server** determine what credentials the live test script
 ---
 
 ### Version Bumping
-- **Patch** (0.9.1 → 0.9.2): Bug fixes, small improvements
-- **Minor** (0.9.1 → 0.10.0): New features, non-breaking changes
-- **Major** (0.9.0 → 1.0.0): Breaking changes, major redesign
+- **Patch** (0.10.0 → 0.10.1): Bug fixes, small improvements
+- **Minor** (0.10.0 → 0.11.0): New features, non-breaking changes
+- **Major** (0.10.0 → 1.0.0): Breaking changes, major redesign
 
 ---
 
@@ -364,4 +368,4 @@ az containerapp revision list -n <app-name> -g <rg> -o table
 
 ---
 
-**Last Updated:** February 2026 | **Version:** 0.9.1
+**Last Updated:** February 2026 | **Version:** 0.10.0

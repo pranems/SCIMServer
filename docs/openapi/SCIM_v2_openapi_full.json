@@ -34,11 +34,11 @@
     "/ResourceTypes": {
       "get": {
         "summary": "List resource types",
-        "responses": { "200": { "description": "ResourceTypes list", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ListResponse" } } } }
+        "responses": { "200": { "description": "ResourceTypes list", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ListResponse" } } } } }
       }
     },
     "/Schemas": {
-      "get": { "summary": "List schemas", "responses": { "200": { "description": "Schemas", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ListResponse" } } } } }
+      "get": { "summary": "List schemas", "responses": { "200": { "description": "Schemas", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ListResponse" } } } } } }
     },
     "/Users": {
       "get": {
@@ -100,7 +100,7 @@
         ],
         "responses": { "200": { "description": "List", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ListResponse" } } } } }
       },
-      "post": { "summary": "Create Group", "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/Group" } } } }, "responses": { "201": { "description": "Created", "headers": { "ETag": { "schema": { "type": "string" } } }, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/Group" } } } } }
+      "post": { "summary": "Create Group", "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/Group" } } } }, "responses": { "201": { "description": "Created", "headers": { "ETag": { "schema": { "type": "string" } } }, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/Group" } } } } } }
     },
     "/Groups/.search": {
       "post": {

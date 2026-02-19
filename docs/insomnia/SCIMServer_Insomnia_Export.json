@@ -220,6 +220,16 @@
       "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
     },
     {
+      "_id": "req_admin_version",
+      "_type": "request",
+      "parentId": "",
+      "name": "Get Instance Version & Runtime Info",
+      "description": "Returns running instance metadata: version, service uptime, runtime/memory, auth configuration flags, storage, and deployment details.",
+      "method": "GET",
+      "url": "{{ base_url }}/scim/admin/version",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
       "_id": "req_log_config_get",
       "_type": "request",
       "parentId": "",
@@ -305,6 +315,39 @@
       "name": "Clear Recent Logs",
       "method": "DELETE",
       "url": "{{ base_url }}/scim/admin/log-config/recent",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
+      "_id": "req_log_stream",
+      "_type": "request",
+      "parentId": "",
+      "name": "Stream Logs (SSE)",
+      "description": "Server-Sent Events endpoint for real-time log tailing. Use curl -N or EventSource API. Supports level, category, and endpointId query filters. Sends keep-alive pings every 30s.",
+      "method": "GET",
+      "url": "{{ base_url }}/scim/admin/log-config/stream?level=INFO",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ token }}" },
+        { "name": "Accept", "value": "text/event-stream" }
+      ]
+    },
+    {
+      "_id": "req_log_download_ndjson",
+      "_type": "request",
+      "parentId": "",
+      "name": "Download Logs (NDJSON)",
+      "description": "Download ring buffer logs as newline-delimited JSON. Supports format (ndjson/json), limit, level, category, requestId, endpointId query parameters.",
+      "method": "GET",
+      "url": "{{ base_url }}/scim/admin/log-config/download?format=ndjson",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
+    },
+    {
+      "_id": "req_log_download_json",
+      "_type": "request",
+      "parentId": "",
+      "name": "Download Logs (JSON)",
+      "description": "Download ring buffer logs as a JSON array.",
+      "method": "GET",
+      "url": "{{ base_url }}/scim/admin/log-config/download?format=json&level=ERROR",
       "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
     }
   ]

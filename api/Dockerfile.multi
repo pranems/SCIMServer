@@ -1,5 +1,6 @@
-﻿# Multi-stage build for better optimization
-FROM node:22-alpine AS builder
+﻿# Multi-stage build for SCIMServer API
+# Prisma 7 + Node 24 + better-sqlite3 driver adapter
+FROM node:24-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -13,14 +14,17 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build the application
-RUN npx tsc -p tsconfig.build.json
-
-# Generate Prisma client
-RUN npx prisma generate
+# Prisma 7: generate client (→ src/generated/prisma/), push schema, build
+ENV DATABASE_URL="file:./data.db"
+RUN npx prisma generate && \
+    npx prisma db push && \
+    npx tsc -p tsconfig.build.json
 
 # Production stage
-FROM node:22-alpine AS production
+FROM node:24-alpine AS production
+
+# openssl needed for Prisma migration engine at container startup
+RUN apk add --no-cache openssl
 
 # Set working directory
 WORKDIR /app
@@ -28,28 +32,33 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install only production dependencies
-RUN npm ci --omit=dev
+# Install all dependencies (prisma devDep needed at runtime for migrate deploy)
+RUN npm ci
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+COPY --from=builder /app/public ./public
+
+# Copy entrypoint script
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh
 
 # Create non-root user for security
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S nestjs -u 1001
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nestjs -u 1001 && \
+    mkdir -p /app/local-data && \
+    chown -R nestjs:nodejs /app/local-data /app
 
-# Change ownership of the app directory
-RUN chown -R nestjs:nodejs /app
 USER nestjs
 
-# Expose port 80
-EXPOSE 80
+# Expose port 8080
+EXPOSE 8080
 
-# Health check
+# Health check using node (no wget dependency)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:80/health || exit 1
+  CMD node -e "require('http').get('http://127.0.0.1:8080/health',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
 
-# Start the application
-CMD ["node", "dist/main"]
+# Start the application via entrypoint (handles migrations + hybrid storage)
+CMD ["/app/docker-entrypoint.sh"]

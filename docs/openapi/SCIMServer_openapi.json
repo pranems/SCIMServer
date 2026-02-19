@@ -3,7 +3,7 @@
   "info": {
     "title": "SCIMServer API",
     "version": "1.3.0",
-    "description": "OpenAPI specification for SCIMServer SCIM 2.0 server (v0.9.1). Passes all 24 Microsoft SCIM Validator tests + 7 preview. Implements RFC 7644 §3.4.2.5 attribute projection, §3.4.3 POST /.search, §3.14 ETag/conditional requests."
+    "description": "OpenAPI specification for SCIMServer SCIM 2.0 server (v0.10.0). Passes all 24 Microsoft SCIM Validator tests + 7 preview. Implements RFC 7644 §3.4.2.5 attribute projection, §3.4.3 POST /.search, §3.14 ETag/conditional requests."
   },
   "servers": [{ "url": "http://localhost:6000/scim/endpoints/{endpointId}", "description": "Local dev server" }],
   "paths": {

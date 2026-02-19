@@ -5,6 +5,53 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-02-18
+
+### Added
+- **SSE Live Log Tailing** (`GET /scim/admin/log-config/stream`) — Real-time Server-Sent Events endpoint for remote log streaming with query filters (level, category, endpointId), 30s keep-alive pings, and auto-reconnect support
+- **Log File Download** (`GET /scim/admin/log-config/download`) — Download ring buffer logs as NDJSON or JSON file with filters (level, category, requestId, endpointId, limit) and timestamped Content-Disposition filename
+- **EventEmitter pub/sub in ScimLogger** — `subscribe()` method for real-time log entry streaming to SSE and other subscribers (max 50 concurrent)
+- **Remote Log Script** (`scripts/remote-logs.ps1`) — PowerShell script with 4 modes: `tail` (colored SSE stream), `recent` (ring buffer query), `download` (save as file), `config` (view/update runtime config with quick level shortcuts)
+- **Remote Debugging & Diagnosis Guide** (`docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md`) — Comprehensive guide with 14 sections covering all admin log endpoints, SSE protocol, Azure Container Apps access methods (5 methods), diagnosis workflows with Mermaid diagrams, log samples at every level, X-Request-Id correlation tracing, Postman/curl reference, and troubleshooting playbook
+- **18 new unit tests** for SSE streaming (6 tests) and log download (7 tests) in LogConfigController, and EventEmitter subscribe (4 tests) in ScimLogger — total 134 passing in logging module
+
+### Changed
+- **Major Dependency Upgrade — Round 2:** Second comprehensive upgrade of the entire dependency stack
+  - **Prisma** 6.19.2 → 7.4.0 (major ORM upgrade)
+    - Migrated to `prisma-client` generator with output to `src/generated/prisma/`
+    - Added `prisma.config.ts` with `defineConfig` for CLI configuration
+    - Switched to `@prisma/adapter-better-sqlite3` driver adapter (Rust-free, faster)
+    - Updated all import paths from `@prisma/client` to relative `generated/prisma/client`
+  - **ESLint** 8.x → 10.0.0 (major linter upgrade)
+    - Migrated from `.eslintrc.cjs` legacy config to `eslint.config.mjs` flat config
+    - Fixed 9 new errors across 4 logging files (unused imports, redundant types, unsafe enum comparisons, unnecessary async)
+  - **Jest** 29.x → 30.2.0 (major test framework upgrade)
+  - **React** 18.3.1 → 19.2.4 (major frontend framework upgrade)
+  - **Vite** 5.2.0 → 7.3.1 (major build tool upgrade)
+  - **@vitejs/plugin-react** 4.2.1 → 5.1.4
+  - **@types/react** 18.2.22 → 19.2.14, **@types/react-dom** 18.2.7 → 19.2.3
+  - **typescript-eslint** 8.55.0 → 8.56.0
+  - **NestJS** 11.1.13 → 11.1.14 (patch)
+  - **dotenv** 17.2.4 → 17.3.1 (patch)
+- **Docker:** All 6 Dockerfiles updated from `node:22-alpine` to `node:24-alpine`
+  - Fixed Prisma 7 compatibility across all Dockerfile variants (prisma.config.ts preservation, generated client paths, driver adapter)
+  - Fixed `Dockerfile.optimized`, `Dockerfile.ultra`, `api/Dockerfile.multi` which were broken for Prisma 7
+  - Unified container port to 8080 across all variants
+  - `docker-compose.debug.yml` updated to `node:24`
+  - Added `effect/` preservation in node_modules cleanup (Prisma 7 internal dependency)
+  - Removed `npm prune --production` from Dockerfiles needing prisma at runtime for `migrate deploy`
+- **Node.js engine requirement** bumped from `>=22.0.0` to `>=24.0.0`
+- **Version** bumped to 0.10.0 across api and web packages
+
+### Verified
+- **648/648 unit tests passing** (19 test suites)
+- **177/177 e2e tests passing** (14 suites)
+- **272/272 live integration tests passing** (local + Docker container)
+- Build clean (TypeScript), Lint clean (ESLint 10, 0 errors)
+- Docker image built and live-tested on `node:24-alpine`
+
+---
+
 ## [0.9.1] - 2026-02-13
 
 ### Fixed

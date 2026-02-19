@@ -128,10 +128,10 @@ function Invoke-WebRequest {
 function Test-Result {
     param([bool]$Success, [string]$Message)
     if ($Success) {
-        Write-Host "✅ $Message" -ForegroundColor Green
+        Write-Host "PASS: $Message" -ForegroundColor Green
         $script:testsPassed++
     } else {
-        Write-Host "❌ $Message" -ForegroundColor Red
+        Write-Host "FAIL: $Message" -ForegroundColor Red
         $script:testsFailed++
     }
 }
@@ -1915,6 +1915,60 @@ foreach ($entry in $byRequestId.entries) {
     if ($entry.requestId -ne $customRequestId) { $allMatchRequestId = $false; break }
 }
 Test-Result -Success $allMatchRequestId -Message "Recent logs requestId filter returns matching entries"
+
+# --- Download logs: GET /admin/log-config/download ---
+Write-Host "`n--- Test: Download Logs (NDJSON/JSON) ---" -ForegroundColor Cyan
+
+$downloadNdjson = Microsoft.PowerShell.Utility\Invoke-WebRequest -Uri "$baseUrl/scim/admin/log-config/download?format=ndjson&limit=10" -Method GET -Headers $headers
+$downloadNdjsonContentType = if ($downloadNdjson.Headers['Content-Type'] -is [array]) { $downloadNdjson.Headers['Content-Type'][0] } else { $downloadNdjson.Headers['Content-Type'] }
+$downloadNdjsonDisposition = if ($downloadNdjson.Headers['Content-Disposition'] -is [array]) { $downloadNdjson.Headers['Content-Disposition'][0] } else { $downloadNdjson.Headers['Content-Disposition'] }
+$downloadNdjsonContent = if ($downloadNdjson.Content -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($downloadNdjson.Content) } else { [string]$downloadNdjson.Content }
+
+Test-Result -Success ($downloadNdjsonContentType -like "*application/x-ndjson*") -Message "Download NDJSON returns application/x-ndjson content type"
+Test-Result -Success ($downloadNdjsonDisposition -like "*scimserver-logs-*") -Message "Download NDJSON returns attachment filename header"
+
+$ndjsonLines = @($downloadNdjsonContent -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne "" })
+Test-Result -Success ($ndjsonLines.Count -gt 0) -Message "Download NDJSON returns at least one log line"
+
+$isValidNdjson = $false
+foreach ($line in $ndjsonLines) {
+    try {
+        $parsedNdjson = $line | ConvertFrom-Json
+        if (($null -ne $parsedNdjson.timestamp) -and ($null -ne $parsedNdjson.level)) {
+            $isValidNdjson = $true
+            break
+        }
+    } catch {
+        continue
+    }
+}
+Test-Result -Success $isValidNdjson -Message "Download NDJSON contains valid JSON log entries"
+
+$downloadJson = Microsoft.PowerShell.Utility\Invoke-WebRequest -Uri "$baseUrl/scim/admin/log-config/download?format=json&limit=10" -Method GET -Headers $headers
+$downloadJsonContentType = if ($downloadJson.Headers['Content-Type'] -is [array]) { $downloadJson.Headers['Content-Type'][0] } else { $downloadJson.Headers['Content-Type'] }
+Test-Result -Success ($downloadJsonContentType -like "*application/json*") -Message "Download JSON returns application/json content type"
+
+try {
+    $downloadJsonContent = if ($downloadJson.Content -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($downloadJson.Content) } else { [string]$downloadJson.Content }
+    $downloadJsonBody = $downloadJsonContent | ConvertFrom-Json
+    $isJsonArray = $downloadJsonBody -is [System.Array]
+} catch {
+    $isJsonArray = $false
+}
+Test-Result -Success $isJsonArray -Message "Download JSON returns a JSON array"
+
+$downloadByRequest = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/download?format=json&requestId=$customRequestId" -Method GET -Headers $headers
+$downloadRequestMatches = $true
+foreach ($entry in $downloadByRequest) {
+    if ($entry.requestId -ne $customRequestId) { $downloadRequestMatches = $false; break }
+}
+Test-Result -Success $downloadRequestMatches -Message "Download logs requestId filter returns matching entries"
+
+# --- Stream logs: GET /admin/log-config/stream (SSE) ---
+Write-Host "`n--- Test: Stream Logs (SSE) ---" -ForegroundColor Cyan
+$streamOutput = & curl.exe -s -N --max-time 4 -H "Authorization: Bearer $Token" "$baseUrl/scim/admin/log-config/stream?level=INFO" 2>$null
+$hasConnectedEvent = ($streamOutput -match "event:\s*connected") -or ($streamOutput -match "Log stream connected")
+Test-Result -Success $hasConnectedEvent -Message "SSE stream returns connected event"
 
 # --- Requires authentication ---
 Write-Host "`n--- Test: Log Config Requires Authentication ---" -ForegroundColor Cyan

@@ -5,11 +5,11 @@ Internal doc for you (the author) – not end-user facing. This captures the exa
 ---
 ## TL;DR Fast Path
 1. Dev & test locally.
-2. Bump `api/package.json` version (e.g. 0.1.0 -> 0.2.0) – keep semver.
+2. Bump `api/package.json` version (e.g. 0.9.0 -> 0.10.0) – keep semver.
 3. Commit & push.
-4. (Optional but recommended when you start using Releases) Create annotated git tag: `git tag -a v0.2.0 -m "v0.2.0"` then `git push origin v0.2.0`.
+4. (Optional but recommended when you start using Releases) Create annotated git tag: `git tag -a v0.10.0 -m "v0.10.0"` then `git push origin v0.10.0`.
 5. Build & push image to ACR: `pwsh ./scripts/publish-acr.ps1 -Registry scimserverpublic -ResourceGroup scimserver-rg -Latest` (adds version + latest).
-6. Update Container App: `az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.2.0`.
+6. Update Container App: `az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.10.0`.
 7. Open UI → banner should show if newer than running instance.
 8. (Optional) Publish a GitHub Release for richer banner notes.
 
@@ -35,27 +35,27 @@ Validate new functionality & log capture.
 ### 2. Version Bump
 Edit `api/package.json`:
 ```json
-  "version": "0.2.0"
+  "version": "0.10.0"
 ```
 Keep to semantic versioning: MAJOR (breaking) / MINOR (feature) / PATCH (fix).
 
 Stage & commit:
 ```powershell
 git add api/package.json
-git commit -m "chore: bump version to 0.2.0"
+git commit -m "chore: bump version to 0.10.0"
 git push
 ```
 
 ### 3. (Optional) Tag & Release
 If you are **not** using GitHub Releases yet and rely only on tags, this still lets the banner work (fallback path):
 ```powershell
-git tag -a v0.2.0 -m "v0.2.0"
-git push origin v0.2.0
+git tag -a v0.10.0 -m "v0.10.0"
+git push origin v0.10.0
 ```
 When ready to leverage richer notes:
 1. Go to GitHub → Releases → Draft new release.
-2. Tag: `v0.2.0` (create if not existing).
-3. Title: `v0.2.0`.
+2. Tag: `v0.10.0` (create if not existing).
+3. Title: `v0.10.0`.
 4. Notes: bullet changes.
 5. Publish.
 
@@ -68,19 +68,19 @@ pwsh ./scripts/publish-acr.ps1 -Registry scimserverpublic -ResourceGroup scimser
 ```
 Flags:
 - `-Latest` also tags `:latest` pointing to the same digest.
-- Add `-Tag 0.2.0` to override auto-detected version (rarely needed).
+- Add `-Tag 0.10.0` to override auto-detected version (rarely needed).
 - Add `-EnableAnonymous` only once (stay public).
 - Use `-UseRemoteBuild` if you want ACR to perform the build (note: we previously saw remote build issues with unicode output & big context; local is currently more stable).
 
 Resulting references:
 ```
-scimserverpublic.azurecr.io/scimserver:0.2.0
+scimserverpublic.azurecr.io/scimserver:0.10.0
 scimserverpublic.azurecr.io/scimserver:latest
 ```
 
 ### 5. Deploy to Azure Container App
 ```powershell
-az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.2.0
+az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.10.0
 ```
 To always use the moving pointer (still need manual update):
 ```powershell
@@ -121,7 +121,7 @@ The hosted script:
 
 **Alternative**: Direct Azure CLI (still supported):
 ```powershell
-az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.2.0
+az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.10.0
 ```
 
 ### 7. Rollback
@@ -131,7 +131,7 @@ az containerapp revision list -n scimserver-prod -g scimserver-rg --query "[].{r
 ```
 Roll back by updating image to the prior version tag:
 ```powershell
-az containerapp update -n scimserver-prod -g scimserver-rg --image scimserverpublic.azurecr.io/scimserver:0.1.0
+az containerapp update -n scimserver-prod -g scimserver-rg --image scimserverpublic.azurecr.io/scimserver:0.9.0
 ```
 
 ### 8. Tagging & Releases Strategy
@@ -139,8 +139,8 @@ az containerapp update -n scimserver-prod -g scimserver-rg --image scimserverpub
 |----------|--------|
 | Quick internal build, no public announcement | Tag only (optional) |
 | Public / visible upgrade | Git tag + GitHub Release |
-| Hotfix | Increment PATCH (0.2.1) |
-| Feature batch | Increment MINOR (0.3.0) |
+| Hotfix | Increment PATCH (0.10.1) |
+| Feature batch | Increment MINOR (0.11.0) |
 | Breaking API / contract | Increment MAJOR (1.0.0) |
 
 ### 9. Common Pitfalls
@@ -154,7 +154,7 @@ az containerapp update -n scimserver-prod -g scimserver-rg --image scimserverpub
 
 ### 10. Local Smoke Test of Built Image
 ```powershell
-docker run --rm -p 8080:80 ghcr.io/pranems/scimserver:0.2.0
+docker run --rm -p 8080:80 ghcr.io/pranems/scimserver:0.10.0
 # Then: curl http://localhost:8080/scim/admin/version (with header if auth required)
 ```
 
@@ -176,13 +176,13 @@ Potential GitHub Actions workflow:
 git add api/package.json; git commit -m "chore: bump version"; git push
 
 # Tag
-git tag -a v0.2.0 -m "v0.2.0"; git push origin v0.2.0
+git tag -a v0.10.0 -m "v0.10.0"; git push origin v0.10.0
 
 # Build & push
 pwsh ./scripts/publish-acr.ps1 -Registry scimserverpublic -ResourceGroup scimserver-rg -Latest
 
 # Deploy
-az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.2.0
+az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.10.0
 
 # Verify
 az containerapp logs show -n scimserver-prod -g scimserver-rg --tail 50

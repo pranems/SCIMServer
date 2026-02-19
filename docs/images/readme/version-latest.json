@@ -1,0 +1,43 @@
+{
+  "version": "0.10.0",
+  "service": {
+    "name": "SCIMServer API",
+    "environment": "production",
+    "apiPrefix": "scim",
+    "scimBasePath": "/scim/v2",
+    "now": "2026-02-19T01:47:45.202Z",
+    "startedAt": "2026-02-19T01:47:00.537Z",
+    "uptimeSeconds": 46.846,
+    "timezone": "UTC"
+  },
+  "runtime": {
+    "node": "v24.13.1",
+    "platform": "linux",
+    "arch": "x64",
+    "pid": 1,
+    "hostname": "7d32d069b1af",
+    "cpus": 16,
+    "containerized": true,
+    "memory": {
+      "rss": 145825792,
+      "heapTotal": 74199040,
+      "heapUsed": 39995856,
+      "external": 3874640,
+      "arrayBuffers": 22646
+    }
+  },
+  "auth": {
+    "oauthClientId": "scimserver-client",
+    "oauthClientSecretConfigured": true,
+    "jwtSecretConfigured": true,
+    "scimSharedSecretConfigured": true
+  },
+  "storage": {
+    "databaseUrl": "file:/tmp/local-data/scim.db",
+    "databaseProvider": "sqlite",
+    "blobBackupConfigured": false
+  },
+  "deployment": {
+    "backupMode": "none"
+  }
+}

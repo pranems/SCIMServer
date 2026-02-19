@@ -1,6 +1,6 @@
 # SCIMServer — Azure Deployment & Usage Guide
 
-> **Version**: 0.9.2 | **Repository**: [github.com/pranems/SCIMServer](https://github.com/pranems/SCIMServer) | **Registry**: `ghcr.io/pranems/scimserver`
+> **Version**: 0.10.0 | **Repository**: [github.com/pranems/SCIMServer](https://github.com/pranems/SCIMServer) | **Registry**: `ghcr.io/pranems/scimserver`
 
 ---
 
@@ -222,6 +222,23 @@ At the end of deployment, you'll see:
 
 > **IMPORTANT**: Copy and save all three secrets. They are not stored anywhere else.
 
+### Quick Log Access from Deployment Output
+
+The deploy script now prints copy/paste commands for these endpoints:
+
+- `GET /scim/admin/log-config/recent?limit=25`
+- `GET /scim/admin/log-config/stream?level=INFO`
+- `GET /scim/admin/log-config/download?format=json`
+
+Examples:
+
+```powershell
+curl "https://<your-app-url>/scim/admin/log-config/recent?limit=25" -H "Authorization: Bearer <your-secret>"
+curl -N "https://<your-app-url>/scim/admin/log-config/stream?level=INFO" -H "Authorization: Bearer <your-secret>"
+curl "https://<your-app-url>/scim/admin/log-config/download?format=json" -H "Authorization: Bearer <your-secret>" -o scim-logs.json
+.\scripts\remote-logs.ps1 -Mode tail -BaseUrl https://<your-app-url>
+```
+
 ---
 
 ## 4. What Gets Deployed
@@ -425,10 +442,10 @@ When a new version notification appears in the web dashboard:
 ```powershell
 # Auto-discovery (finds your RG and App automatically)
 iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-func.ps1'); `
-  Update-SCIMServer -Version v0.9.1
+  Update-SCIMServer -Version v0.10.0
 
 # Explicit (if multiple deployments)
-Update-SCIMServer -Version v0.9.1 -ResourceGroup scimserver-rg -AppName scimserver-prod
+Update-SCIMServer -Version v0.10.0 -ResourceGroup scimserver-rg -AppName scimserver-prod
 ```
 
 ### Manual Image Update
@@ -437,7 +454,7 @@ Update-SCIMServer -Version v0.9.1 -ResourceGroup scimserver-rg -AppName scimserv
 az containerapp update `
   -n scimserver-prod `
   -g scimserver-rg `
-  --image ghcr.io/pranems/scimserver:0.9.1
+  --image ghcr.io/pranems/scimserver:0.10.0
 ```
 
 ### View Logs
@@ -445,6 +462,12 @@ az containerapp update `
 ```powershell
 # Stream live logs
 az containerapp logs show -n scimserver-prod -g scimserver-rg --follow
+
+# SCIMServer admin logs (recent ring buffer)
+curl "https://<your-app>/scim/admin/log-config/recent?limit=25" -H "Authorization: Bearer <your-secret>"
+
+# SCIMServer admin logs (live SSE stream)
+curl -N "https://<your-app>/scim/admin/log-config/stream?level=INFO" -H "Authorization: Bearer <your-secret>"
 
 # Query Log Analytics
 az monitor log-analytics query `
@@ -524,6 +547,8 @@ Invoke-RestMethod -Uri "https://<your-app>/scim/admin/backup/trigger" `
 │                                                          │
 │  Logs:                                                   │
 │  az containerapp logs show -n <app> -g <rg> --follow     │
+│  curl .../scim/admin/log-config/recent?limit=25          │
+│  curl -N .../scim/admin/log-config/stream?level=INFO     │
 │                                                          │
 │  GitHub:  https://github.com/pranems/SCIMServer          │
 │  Image:   ghcr.io/pranems/scimserver:latest              │

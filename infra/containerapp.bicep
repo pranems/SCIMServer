@@ -45,6 +45,8 @@ param ghcrUsername string = ''
 @secure()
 param ghcrPassword string = ''
 
+var useGhcrCredentials = acrLoginServer == 'ghcr.io' && ghcrUsername != '' && ghcrPassword != ''
+
 resource env 'Microsoft.App/managedEnvironments@2024-03-01' existing = {
   name: environmentName
 }
@@ -64,7 +66,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
         transport: 'auto'
       }
       // Configure registry authentication
-      registries: acrLoginServer == 'ghcr.io' && ghcrUsername != '' ? [
+      registries: useGhcrCredentials ? [
         {
           server: 'ghcr.io'
           username: ghcrUsername
@@ -89,7 +91,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'oauth-client-secret'
           value: oauthClientSecret
         }
-      ], ghcrPassword != '' ? [
+      ], useGhcrCredentials ? [
         {
           name: 'ghcr-password'
           value: ghcrPassword

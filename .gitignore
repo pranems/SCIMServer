@@ -9,6 +9,9 @@ dist/
 build/
 *.tsbuildinfo
 
+# Prisma 7 generated client (re-generated via `npx prisma generate`)
+api/src/generated/
+
 # Environment files
 .env
 .env.local

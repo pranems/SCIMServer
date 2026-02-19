@@ -1,9 +1,11 @@
-# SCIMServer � Complete REST API Reference
+# SCIMServer — Complete REST API Reference
+
+> Version baseline: v0.10.0 · Updated: February 18, 2026 · Scope: SCIM + admin + OAuth + web routes
 
 This document enumerates all REST API endpoints and resources exposed by the SCIMServer application, with HTTP methods, purpose, common query parameters, expected request and response shapes, authentication notes, and `curl` examples for each operation.
 
 Base path
-- The server mounts APIs under the global prefix `scim` by default. The runtime rewrites `/scim/v2/*` ? `/scim/*` for compatibility, so both `/scim/*` and `/scim/v2/*` work.
+- The server mounts APIs under the global prefix `scim` by default. Runtime compatibility rewrites allow both `/scim/*` and `/scim/v2/*`.
 - Base URL (example): `https://<API_HOST>/scim/v2`.
 
 Authentication
@@ -18,14 +20,14 @@ Content type
 - **Response:** All SCIM endpoints return `Content-Type: application/scim+json; charset=utf-8` as required by [RFC 7644 §3.1](https://datatracker.ietf.org/doc/html/rfc7644#section-3.1). Success responses are handled by the `ScimContentTypeInterceptor`; error responses are handled by the `ScimExceptionFilter`, which also ensures the `status` field is a string per RFC 7644 §3.12.
 
 Common response codes
-- 200 OK � successful retrieval or update (sometimes 204 for operations that return no content).
-- 201 Created � resource created.
-- 204 No Content � successful deletion or empty responses where specified.
-- 400 Bad Request � validation or malformed payload.
-- 401 Unauthorized � missing/invalid token.
-- 404 Not Found � resource not found.
-- 409 Conflict � uniqueness collision (SCIM uniqueness error).
-- 500 Internal Server Error � unexpected failures.
+- 200 OK — successful retrieval or update (sometimes 204 for operations that return no content).
+- 201 Created — resource created.
+- 204 No Content — successful deletion or empty responses where specified.
+- 400 Bad Request — validation or malformed payload.
+- 401 Unauthorized — missing/invalid token.
+- 404 Not Found — resource not found.
+- 409 Conflict — uniqueness collision (SCIM uniqueness error).
+- 500 Internal Server Error — unexpected failures.
 
 Contents
 - SCIM metadata endpoints
@@ -49,16 +51,17 @@ Contents
   - `PATCH /Groups/:id` — patch (returns 200 OK with updated group resource)
   - `DELETE /Groups/:id` — delete
 - Admin endpoints (`/admin`)
-  - `GET /admin/version` � version & deployment info
-  - `GET /admin/logs` � list request logs (with filters)
-  - `GET /admin/logs/:id` � get single log
-  - `POST /admin/logs/clear` � clear logs (204)
-  - `POST /admin/users/manual` � create manual user (admin convenience)
-  - `POST /admin/groups/manual` � create manual group
-  - `POST /admin/users/:id/delete` � delete user by identifier (204)
+  - `GET /admin/version` — version & deployment info
+  - `GET /admin/logs` — list request logs (with filters)
+  - `GET /admin/logs/:id` — get single log
+  - `POST /admin/logs/clear` — clear logs (204)
+  - `POST /admin/users/manual` — create manual user (admin convenience)
+  - `POST /admin/groups/manual` — create manual group
+  - `POST /admin/users/:id/delete` — delete user by identifier (204)
 - Backup endpoints (guarded)
-  - `GET /admin/backup/stats` � backup statistics
-  - `POST /admin/backup/trigger` � manually trigger backup- Log Configuration endpoints (guarded)
+  - `GET /admin/backup/stats` — backup statistics
+  - `POST /admin/backup/trigger` — manually trigger backup
+- Log Configuration endpoints (guarded)
   - `GET /admin/log-config` — get current log configuration
   - `PUT /admin/log-config` — update log configuration (partial)
   - `PUT /admin/log-config/level/:level` — quick global level change
@@ -66,12 +69,13 @@ Contents
   - `PUT /admin/log-config/endpoint/:endpointId/:level` — set endpoint level override
   - `DELETE /admin/log-config/endpoint/:endpointId` — remove endpoint override
   - `GET /admin/log-config/recent` — query ring buffer (with filters)
-  - `DELETE /admin/log-config/recent` — clear ring buffer- OAuth endpoints
-  - `POST /oauth/token` � client credentials token issuance (public)
-  - `GET /oauth/test` � simple test endpoint (public)
+  - `DELETE /admin/log-config/recent` — clear ring buffer
+- OAuth endpoints
+  - `POST /oauth/token` — client credentials token issuance (public)
+  - `GET /oauth/test` — simple test endpoint (public)
 - Web UI assets (public)
-  - `GET /` `GET /admin` � serve SPA
-  - `GET /assets/*` � static assets
+  - `GET /` `GET /admin` — serve SPA
+  - `GET /assets/*` — static assets
 
 ---
 
@@ -79,7 +83,7 @@ SCIM metadata endpoints
 
 1) GET /ServiceProviderConfig
 - Purpose: Return SCIM service provider capabilities (patch, filter, sort, auth schemes).
-- Auth: Protected (guard) � requires bearer token unless decorated public.
+- Auth: Protected (guard) — requires bearer token unless decorated public.
 - Example:
   curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/ServiceProviderConfig"
 
@@ -95,7 +99,7 @@ SCIM metadata endpoints
 
 ---
 
-Users resource � operations and examples
+Users resource — operations and examples
 
 1) POST /Users
 - Create SCIM User.
@@ -208,7 +212,7 @@ Notes on errors
 
 ---
 
-Groups resource � operations and examples
+Groups resource — operations and examples
 
 1) POST /Groups
 - Create group. Body example:
@@ -262,10 +266,51 @@ curl -X POST "https://<API_BASE>/scim/v2/Groups/.search" \
 Admin endpoints (non-SCIM but mounted under `/scim/admin`)
 
 1) GET /admin/version
-- Returns `VersionInfo` including `version`, `commit`, `buildTime`, `runtime`, and `deployment` metadata.
+- Returns `VersionInfo` including:
+  - `version`, `commit`, `buildTime`
+  - `service` (environment, API prefix/base path, uptime, timezone)
+  - `runtime` (node/platform/arch, pid/hostname/cpu, memory usage, containerized flag)
+  - `auth` (configuration status booleans only; no secrets)
+  - `storage` (database URL with sensitive values masked, blob backup config)
+  - `deployment` metadata
 - Example:
 ```
 curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/admin/version"
+```
+
+- Sample response (trimmed):
+```
+{
+  "version": "0.10.0",
+  "service": {
+    "environment": "production",
+    "scimBasePath": "/scim/v2",
+    "uptimeSeconds": 1234.567
+  },
+  "runtime": {
+    "node": "v24.x",
+    "platform": "linux",
+    "arch": "x64",
+    "containerized": true,
+    "memory": {
+      "rss": 123456789,
+      "heapUsed": 34567890
+    }
+  },
+  "auth": {
+    "oauthClientSecretConfigured": true,
+    "jwtSecretConfigured": true,
+    "scimSharedSecretConfigured": true
+  },
+  "storage": {
+    "databaseUrl": "file:/tmp/local-data/scim.db",
+    "databaseProvider": "sqlite",
+    "blobBackupConfigured": true
+  },
+  "deployment": {
+    "backupMode": "blob"
+  }
+}
 ```
 
 2) GET /admin/logs
@@ -365,12 +410,12 @@ curl -X POST "https://<API_BASE>/oauth/token" \
 
 Web UI (public)
 
-- `GET /` `GET /admin` serve `public/index.html` � the React SPA.
+- `GET /` `GET /admin` serve `public/index.html` — the React SPA.
 - `GET /assets/*` serve static assets.
 
 ---
 
-Examples � error responses
+Examples — error responses
 
 1) 401 Unauthorized (invalid token)
 - Response header: `WWW-Authenticate: Bearer realm="SCIM"`.
@@ -402,7 +447,7 @@ Persistence & models
 
 ---
 
-Appendix � Useful curl snippets
+Appendix — Useful curl snippets
 
 - Get token and create user (combined):
 ```
@@ -607,10 +652,8 @@ curl -s -H "Authorization: Bearer S3cr3tSharedValue" "${API_BASE}/scim/v2/admin/
 
 Insomnia / OpenAPI
 
-I included a minimal Insomnia export under `docs/insomnia/SCIMServer_Insomnia_Export.json`. Import it into Insomnia (File ? Import ? From File) to get a workspace with ready-to-run requests. The export uses the following environment defaults:
+I included a minimal Insomnia export under `docs/insomnia/SCIMServer_Insomnia_Export.json`. Import it into Insomnia (`File > Import > From File`) to get a workspace with ready-to-run requests. The export uses the following environment defaults:
 - base_url = `http://localhost:3000`
 - client_id = `scimserver-client`
 - client_secret = `dev-secret-abc123`
 - shared_secret = `S3cr3tSharedValue`
-
-If you prefer an OpenAPI JSON instead, tell me and I will generate `docs/insomnia/SCIMServer_openapi.json`.

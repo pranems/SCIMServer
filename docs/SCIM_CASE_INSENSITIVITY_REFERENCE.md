@@ -706,7 +706,7 @@ Since `externalId` is `caseExact: true`, the value comparison MUST be case-sensi
 
 ## 12. Implementation Checklist
 
-> **Status**: Updated February 13, 2026 — Phase 5 SCIM Validator compliance complete + v0.9.1 performance fixes
+> **Status**: Updated February 18, 2026 — Phase 5 SCIM Validator compliance complete + performance fixes in current v0.10.0 baseline
 
 ### Attribute Name Resolution
 
@@ -750,12 +750,12 @@ Since `externalId` is `caseExact: true`, the value comparison MUST be case-sensi
 - [x] Unique constraint moved from `[endpointId, userName]` to `[endpointId, userNameLower]`
 - [x] Migration SQL: `20260209120000_add_username_lower_column` — ALTER TABLE, backfill, re-index
 - [x] All write paths (create, replace, PATCH) set `userNameLower = userName.toLowerCase()`
-- [x] Added `displayNameLower` column to `ScimGroup` model (Prisma schema) — v0.9.1
-- [x] Unique constraint `@@unique([endpointId, displayNameLower])` for Groups — v0.9.1
-- [x] Migration SQL: `20260213064256_add_display_name_lower` — ALTER TABLE, backfill `LOWER(displayName)`, re-index — v0.9.1
-- [x] All group write paths (create, PATCH, PUT) set `displayNameLower = displayName.toLowerCase()` — v0.9.1
-- [x] Group filter `displayName eq` now uses DB push-down via `displayNameLower` column (no longer in-memory scan) — v0.9.1
-- [x] `assertUniqueDisplayName` refactored from `findMany` O(N) to `findFirst` O(1) using `displayNameLower` index — v0.9.1
+- [x] Added `displayNameLower` column to `ScimGroup` model (Prisma schema) — introduced in v0.9.1, current in v0.10.0
+- [x] Unique constraint `@@unique([endpointId, displayNameLower])` for Groups — introduced in v0.9.1, current in v0.10.0
+- [x] Migration SQL: `20260213064256_add_display_name_lower` — ALTER TABLE, backfill `LOWER(displayName)`, re-index — introduced in v0.9.1, current in v0.10.0
+- [x] All group write paths (create, PATCH, PUT) set `displayNameLower = displayName.toLowerCase()` — introduced in v0.9.1, current in v0.10.0
+- [x] Group filter `displayName eq` now uses DB push-down via `displayNameLower` column (no longer in-memory scan) — introduced in v0.9.1, current in v0.10.0
+- [x] `assertUniqueDisplayName` refactored from `findMany` O(N) to `findFirst` O(1) using `displayNameLower` index — introduced in v0.9.1, current in v0.10.0
 - [x] ServiceProviderConfig: `sort.supported` set to `false`
 - [x] In-code filtering for case-insensitive userName/displayName (SQLite doesn't support Prisma `mode: 'insensitive'`)
 

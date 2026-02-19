@@ -1,5 +1,9 @@
 # SCIM Validation Gap Analysis & Fix Plan
 
+> **Status**: Historical analysis with current-state annotations  
+> **Last Updated**: February 18, 2026  
+> **Baseline**: SCIMServer v0.10.0
+
 **Date**: February 6, 2026 (analysis) · February 9, 2026 (all fixes implemented)  
 **Test Tool**: Microsoft SCIM Validator  
 **Endpoint Under Test**: `http://localhost:6000/scim/endpoints/cml8l0ldv000ki0hiz6uzqxyp`  
@@ -16,7 +20,7 @@
 | 🔍 Preview      | 7     | All passing (informational) |
 | ⚠️ Warnings     | 0     | Content-Type header fixed |
 
-> **🎉 FULLY COMPLIANT** — All 13 failures resolved on February 9, 2026. The 13 failures mapped to **8 distinct root-cause bugs** (A–H), all now fixed across 4 source files. Subsequent v0.9.1 performance fixes bring the total to **648 unit tests passing** (19 suites) with **24/24 SCIM validator tests passing**.
+> **🎉 FULLY COMPLIANT** — All 13 failures resolved on February 9, 2026. The 13 failures mapped to **8 distinct root-cause bugs** (A–H), all now fixed across 4 source files. Subsequent performance fixes (introduced in v0.9.1 and retained in v0.10.0) bring the total to **24/24 SCIM validator tests passing**.
 
 ---
 
@@ -1074,7 +1078,7 @@ Call this during both **create** (in `extractAdditionalAttributes`) and **patch*
 
 All items completed February 9, 2026:
 
-- [x] Run `npm test` — all 317 unit tests pass (11 suites, 0 failures)
+- [x] Run `npm test` — all unit tests passed at the time of this phase (current repo baseline now tracks 666 unit tests)
 - [x] Run Microsoft SCIM Validator — target 25/25 tests passing
 - [x] Verify `Content-Type: application/scim+json; charset=utf-8` header in all responses
 - [x] Verify case-insensitive filtering works for both Users and Groups
@@ -1083,6 +1087,8 @@ All items completed February 9, 2026:
 - [x] Verify `roles[].primary` returns boolean `true`/`false` not string
 - [x] Verify enterprise extension PATCH add/replace/remove works correctly
 - [x] Verify valuePath PATCH operations update nested attributes in-place
+
+Current baseline note (February 18, 2026): broader regression coverage now reports 666 unit, 184 e2e, and 280 live integration tests passing.
 - [x] Verify no-path PATCH replace updates both DB columns and rawPayload
 - [x] Update `Session_starter.md` with completion status
 - [x] Update `docs/SCIM_2.0_COMPLIANCE_ANALYSIS.md` with new compliance scores

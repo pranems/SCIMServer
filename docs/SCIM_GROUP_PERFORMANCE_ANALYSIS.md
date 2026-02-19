@@ -1,17 +1,21 @@
 # SCIM Group Operations — Performance & Failure Analysis
 
-> **✅ ALL ISSUES RESOLVED** — February 13, 2026 (v0.9.1). All 3 failures fixed; 24/24 SCIM validator tests now pass.
+> **Status**: Historical analysis with current-state annotations  
+> **Last Updated**: February 18, 2026  
+> **Baseline**: SCIMServer v0.10.0
+
+> **✅ ALL ISSUES RESOLVED** — February 13, 2026 (fixes introduced in v0.9.1, retained in v0.10.0). All 3 failures fixed; 24/24 SCIM validator tests now pass.
 > See also: [PERSISTENCE_PERFORMANCE_ANALYSIS.md](PERSISTENCE_PERFORMANCE_ANALYSIS.md) for the holistic 12-issue persistence analysis.
 
 **Date:** February 2026  
-**Context:** Microsoft Entra SCIM Validator test run against SCIMServer v0.9.1 on Azure Container Apps  
-**Result:** ~~21/24 passed, 3 failed~~ → **24/24 passed, 0 failed** (all fixes applied in v0.9.1)
+**Context:** Microsoft Entra SCIM Validator test run against SCIMServer on Azure Container Apps  
+**Result:** ~~21/24 passed, 3 failed~~ → **24/24 passed, 0 failed** (all fixes now in current v0.10.0 baseline)
 
 ---
 
 ## 1. Executive Summary
 
-> **Resolution (v0.9.1):** All three Group PATCH failures have been fixed by applying fixes to buffered logging, `displayNameLower` DB push-down, and pre-transaction member resolution. The sections below retain the original analysis for reference.
+> **Resolution:** All three Group PATCH failures have been fixed by applying fixes to buffered logging, `displayNameLower` DB push-down, and pre-transaction member resolution. The sections below retain the original analysis for reference.
 
 Three Group PATCH operations ~~fail~~ **previously failed** during the Entra SCIM Validator run. All three shared a common root — **SQLite write-lock contention** amplified by two architectural issues: request-log writes competing for the single-writer lock, and an in-memory group filter that delays responses enough to chain-stall subsequent transactions.
 
@@ -565,7 +569,7 @@ AFTER (read before transaction):
 
 ---
 
-## 8. Fix Plan — ✅ ALL IMPLEMENTED (v0.9.1)
+## 8. Fix Plan — ✅ ALL IMPLEMENTED
 
 | Fix | Issue Addressed | Change | Status |
 |-----|----------------|--------|--------|

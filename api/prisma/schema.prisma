@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 // ⚠ SQLite provider — see docs/SQLITE_COMPROMISE_ANALYSIS.md for 28 documented
@@ -7,7 +8,6 @@ generator client {
 //   Migration target: PostgreSQL (provider = "postgresql").
 datasource db {
   provider = "sqlite"
-  url      = env("DATABASE_URL")
 }
 
 // SQLite connection pool and timeout configuration

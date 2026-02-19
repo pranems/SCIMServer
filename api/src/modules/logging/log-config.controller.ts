@@ -7,7 +7,9 @@ import {
   Param,
   Query,
   HttpCode,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { ScimLogger } from './scim-logger.service';
 import {
   LogLevel,
@@ -190,5 +192,114 @@ export class LogConfigController {
   @HttpCode(204)
   clearRecentLogs() {
     this.scimLogger.clearRecentLogs();
+  }
+
+  /**
+   * GET /scim/admin/log-config/stream
+   * Server-Sent Events (SSE) endpoint for real-time log tailing.
+   *
+   * Streams log entries as they occur. Supports optional query filters:
+   *   ?level=WARN      — only entries ≥ WARN
+   *   ?category=http   — only entries matching category
+   *   ?endpointId=xxx  — only entries for a specific endpoint
+   *
+   * Usage:
+   *   curl -N https://host/scim/admin/log-config/stream?level=INFO
+   *   EventSource: new EventSource('/scim/admin/log-config/stream')
+   */
+  @Get('stream')
+  streamLogs(
+    @Query('level') level: string | undefined,
+    @Query('category') category: string | undefined,
+    @Query('endpointId') endpointId: string | undefined,
+    @Res() res: Response,
+  ) {
+    // SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable NGINX buffering
+    res.flushHeaders();
+
+    // Send initial connection event
+    res.write(`event: connected\ndata: ${JSON.stringify({ message: 'Log stream connected', filters: { level: level ?? 'ALL', category: category ?? 'ALL', endpointId: endpointId ?? 'ALL' } })}\n\n`);
+
+    // Parse filter options
+    const minLevel = level ? parseLogLevel(level) : undefined;
+    const filterCategory = category as LogCategory | undefined;
+
+    // Subscribe to live log entries
+    const unsubscribe = this.scimLogger.subscribe((entry) => {
+      // Apply filters
+      if (minLevel !== undefined) {
+        const parsed = LogLevel[entry.level as keyof typeof LogLevel];
+        const entryLevel = typeof parsed === 'number' ? parsed : Number(LogLevel.INFO);
+        if (entryLevel < Number(minLevel)) return;
+      }
+      if (filterCategory && entry.category !== (filterCategory as string)) return;
+      if (endpointId && entry.endpointId !== endpointId) return;
+
+      // Send SSE event
+      res.write(`data: ${JSON.stringify(entry)}\n\n`);
+    });
+
+    // Keep-alive ping every 30s to prevent proxy timeouts
+    const keepAlive = setInterval(() => {
+      res.write(`: ping ${new Date().toISOString()}\n\n`);
+    }, 30_000);
+
+    // Cleanup on client disconnect
+    res.on('close', () => {
+      unsubscribe();
+      clearInterval(keepAlive);
+      res.end();
+    });
+  }
+
+  /**
+   * GET /scim/admin/log-config/download
+   * Download recent log entries as a JSON or NDJSON file.
+   *
+   * Query params:
+   *   ?format=ndjson  — Newline-delimited JSON (default)
+   *   ?format=json    — JSON array
+   *   ?limit=500      — Max entries (default: all in ring buffer, max 500)
+   *   ?level=WARN     — Minimum level filter
+   *   ?category=http  — Category filter
+   *
+   * The response is a downloadable file with Content-Disposition header.
+   */
+  @Get('download')
+  downloadLogs(
+    @Query('format') format: string | undefined,
+    @Query('limit') limit: string | undefined,
+    @Query('level') level: string | undefined,
+    @Query('category') category: string | undefined,
+    @Query('requestId') requestId: string | undefined,
+    @Query('endpointId') endpointId: string | undefined,
+    @Res() res: Response,
+  ) {
+    const entries = this.scimLogger.getRecentLogs({
+      limit: limit ? parseInt(limit, 10) : undefined,
+      level: level ? parseLogLevel(level) : undefined,
+      category: category as LogCategory | undefined,
+      requestId: requestId || undefined,
+      endpointId: endpointId || undefined,
+    });
+
+    const outputFormat = format === 'json' ? 'json' : 'ndjson';
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const filename = `scimserver-logs-${timestamp}.${outputFormat}`;
+
+    res.setHeader('Content-Type', outputFormat === 'json' ? 'application/json' : 'application/x-ndjson');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    if (outputFormat === 'json') {
+      res.send(JSON.stringify(entries, null, 2));
+    } else {
+      // NDJSON — one JSON object per line
+      const ndjson = entries.map(e => JSON.stringify(e)).join('\n') + '\n';
+      res.send(ndjson);
+    }
   }
 }

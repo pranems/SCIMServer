@@ -2,8 +2,10 @@
 
 > **Date:** February 11, 2026  
 > **Image:** `scimserver:live-test` (496 MB, Alpine Linux)  
-> **Test Result:** ✅ **212/212 tests passed** in 4.9s  
-> **Base Image:** `node:22-alpine` (multi-stage build)
+> **Test Result (historical run):** ✅ **212/212 tests passed** in 4.9s  
+> **Current baseline:** ✅ **280/280 live integration tests passed** (local + Docker)  
+> **Base Image:** `node:24-alpine` (multi-stage build)
+> **Runtime note:** Current production image exposes and serves on `8080` (not `80`).
 
 ---
 
@@ -47,7 +49,7 @@
 │  ✅ Docker Desktop running                            │
 │  ✅ PowerShell 7+ installed                           │
 │  ✅ Port 6000 available                               │
-│  ✅ SCIMServer2022 repo cloned                          │
+│  ✅ SCIMServer repo cloned                              │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -66,8 +68,8 @@ For those who want to get straight to it — run these from the project root:
 docker build -t scimserver:live-test --build-arg IMAGE_TAG=live-test -f Dockerfile .
 
 # 3. Run the container
-docker run -d --name scimserver-live-test -p 6000:80 `
-  -e PORT=80 `
+docker run -d --name scimserver-live-test -p 6000:8080 `
+  -e PORT=8080 `
   -e NODE_ENV=production `
   -e JWT_SECRET=live-test-secret-key-2026 `
   -e OAUTH_CLIENT_SECRET=changeme-oauth `
@@ -129,7 +131,7 @@ docker build -t scimserver:live-test --build-arg IMAGE_TAG=live-test -f Dockerfi
 │                                                                     │
 │  Stage 1: web-build              Stage 2: api-build                 │
 │  ┌───────────────────┐          ┌────────────────────────┐          │
-│  │ FROM node:22-alpine│          │ FROM node:22-alpine     │         │
+│  │ FROM node:24-alpine│          │ FROM node:24-alpine     │         │
 │  │                    │          │                          │         │
 │  │ 1. npm ci (web)    │          │ 1. apk add openssl      │         │
 │  │ 2. vite build      │─────────▶│ 2. npm ci (api)         │         │
@@ -144,7 +146,7 @@ docker build -t scimserver:live-test --build-arg IMAGE_TAG=live-test -f Dockerfi
 │                                              │                       │
 │                          Stage 3: runtime    │                       │
 │                          ┌───────────────────▼──────────────┐       │
-│                          │ FROM node:22-alpine               │       │
+│                          │ FROM node:24-alpine               │       │
 │                          │                                    │       │
 │                          │ 1. apk add openssl                │       │
 │                          │ 2. Create user scim:nodejs         │       │
@@ -153,7 +155,7 @@ docker build -t scimserver:live-test --build-arg IMAGE_TAG=live-test -f Dockerfi
 │                          │ 4. COPY docker-entrypoint.sh       │       │
 │                          │ 5. Remove *.md, *.map, test dirs   │       │
 │                          │ 6. USER scim (non-root)            │       │
-│                          │ 7. EXPOSE 80 + HEALTHCHECK         │       │
+│                          │ 7. EXPOSE 8080 + HEALTHCHECK       │       │
 │                          │                                    │       │
 │                          │ Final image: ~496 MB               │       │
 │                          └────────────────────────────────────┘      │
@@ -179,8 +181,8 @@ docker build -t scimserver:live-test --build-arg IMAGE_TAG=live-test -f Dockerfi
 
 ```powershell
 docker run -d --name scimserver-live-test `
-  -p 6000:80 `
-  -e PORT=80 `
+  -p 6000:8080 `
+  -e PORT=8080 `
   -e NODE_ENV=production `
   -e JWT_SECRET=live-test-secret-key-2026 `
   -e OAUTH_CLIENT_SECRET=changeme-oauth `
@@ -193,8 +195,8 @@ docker run -d --name scimserver-live-test `
 ```
   Host Machine                    Docker Container
   ┌───────────────┐              ┌───────────────────────┐
-  │                │   -p 6000:80 │                       │
-  │  localhost:6000│─────────────▶│  NestJS listening :80 │
+  │                │ -p 6000:8080 │                       │
+  │  localhost:6000│─────────────▶│ NestJS listening :8080│
   │                │              │                       │
   │  Test script   │              │  ┌─────────────────┐  │
   │  hits :6000    │              │  │ Prisma + SQLite  │  │
@@ -207,7 +209,7 @@ docker run -d --name scimserver-live-test `
 ```powershell
 # Option A: Watch logs
 docker logs -f scimserver-live-test
-# Look for: "🚀 SCIM Endpoint Server API is running on http://localhost:80/scim"
+# Look for: "🚀 SCIM Endpoint Server API is running on http://localhost:8080/scim"
 
 # Option B: Script-based wait
 $ready = $false
@@ -355,7 +357,7 @@ Get-NetTCPConnection -LocalPort 6000 | ForEach-Object {
 Stop-Process -Id <PID> -Force
 
 # Or use a different port
-docker run -p 7000:80 ...
+docker run -p 7000:8080 ...
 pwsh -File scripts/live-test.ps1 -BaseUrl "http://localhost:7000"
 ```
 
@@ -397,7 +399,7 @@ docker info  # Should succeed when ready
 │  └───────────────────────────┬─────────────────────────────────────┘    │
 │                              │                                           │
 │  ┌───────────────────────────▼─────────────────────────────────────┐    │
-│  │                     NestJS Application (:80)                     │    │
+│  │                    NestJS Application (:8080)                    │    │
 │  │                                                                   │    │
 │  │  ┌────────────┐  ┌────────────┐  ┌──────────────────────────┐   │    │
 │  │  │ OAuth      │  │ Admin API  │  │ SCIM API                  │   │    │
@@ -416,7 +418,7 @@ docker info  # Should succeed when ready
 │  │  └───────────────────────────────────────────────────────────┘   │    │
 │  └───────────────────────────────────────────────────────────────────┘    │
 │                                                                          │
-│  EXPOSE 80  │  HEALTHCHECK /health  │  Max Heap: 384 MB                  │
+│ EXPOSE 8080 │  HEALTHCHECK /health  │  Max Heap: 384 MB                  │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -424,12 +426,12 @@ docker info  # Should succeed when ready
 
 | File | Purpose | Base Image | Use Case |
 |------|---------|------------|----------|
-| `Dockerfile` | **Production** (root, multi-stage) | `node:22-alpine` | Full build: web + api + runtime |
-| `api/Dockerfile` | API-only build | `node:22-alpine` | Standalone API without web frontend |
-| `api/Dockerfile.multi` | API multi-stage | `node:22-alpine` | API with optimized layers |
-| `Dockerfile.optimized` | Size-optimized | `node:22-alpine` | Smaller image variant |
-| `Dockerfile.ultra` | Ultra-minimal | `node:22-alpine` | Smallest possible image |
-| `docker-compose.debug.yml` | **Development** | `node:22` | Hot-reload + debugger on `:9229` |
+| `Dockerfile` | **Production** (root, multi-stage) | `node:24-alpine` | Full build: web + api + runtime |
+| `api/Dockerfile` | API-only build | `node:24-alpine` | Standalone API without web frontend |
+| `api/Dockerfile.multi` | API multi-stage | `node:24-alpine` | API with optimized layers |
+| `Dockerfile.optimized` | Size-optimized | `node:24-alpine` | Smaller image variant |
+| `Dockerfile.ultra` | Ultra-minimal | `node:24-alpine` | Smallest possible image |
+| `docker-compose.debug.yml` | **Development** | `node:24` | Hot-reload + debugger on `:9229` |
 
 ---
 
@@ -438,7 +440,7 @@ docker info  # Should succeed when ready
 ### Stage 1: `web-build` — Frontend Compilation
 
 ```dockerfile
-FROM node:22-alpine AS web-build
+FROM node:24-alpine AS web-build
 WORKDIR /web
 COPY web/package*.json ./        # Leverage Docker cache for deps
 RUN npm ci --no-audit --no-fund  # Deterministic install
@@ -453,7 +455,7 @@ RUN rm -rf node_modules          # Cleanup in same layer
 ### Stage 2: `api-build` — Backend Compilation
 
 ```dockerfile
-FROM node:22-alpine AS api-build
+FROM node:24-alpine AS api-build
 WORKDIR /app
 RUN apk add --no-cache openssl            # Required by Prisma
 COPY api/package*.json ./
@@ -471,7 +473,7 @@ RUN npm prune --production                 # Remove dev dependencies
 ### Stage 3: `runtime` — Minimal Production Image
 
 ```dockerfile
-FROM node:22-alpine AS runtime
+FROM node:24-alpine AS runtime
 WORKDIR /app
 
 # Security: non-root user
@@ -486,7 +488,7 @@ COPY --from=api-build /app/package.json ./package.json
 COPY api/docker-entrypoint.sh /app/
 
 USER scim        # Run as non-root
-EXPOSE 80
+EXPOSE 8080
 CMD ["/app/docker-entrypoint.sh"]
 ```
 
@@ -497,7 +499,7 @@ CMD ["/app/docker-entrypoint.sh"]
 │  Final Image: ~496 MB                            │
 │                                                   │
 │  ┌──────────────────────────────┐  ≈174 MB       │
-│  │ node:22-alpine base          │                 │
+│  │ node:24-alpine base          │                 │
 │  └──────────────────────────────┘                 │
 │  ┌──────────────────────────────┐  ≈310 MB       │
 │  │ node_modules (production)     │                 │
@@ -634,7 +636,7 @@ CMD ["/app/docker-entrypoint.sh"]
 version: '3.8'
 services:
   api:
-    image: node:22
+    image: node:24
     container_name: scimserver-api-dev
     working_dir: /usr/src/app
     volumes:
@@ -664,8 +666,8 @@ Features: Hot reload via `ts-node-dev`, VS Code debugger attachment on `:9229`
 ```powershell
 docker build -t scimserver:live-test -f Dockerfile .
 
-docker run -d --name scimserver-test -p 6000:80 `
-  -e PORT=80 `
+docker run -d --name scimserver-test -p 6000:8080 `
+  -e PORT=8080 `
   -e NODE_ENV=production `
   -e JWT_SECRET=test-jwt-secret `
   -e OAUTH_CLIENT_SECRET=changeme-oauth `
@@ -680,7 +682,7 @@ Features: Matches production behavior, ephemeral SQLite, no volume mounts
 ### C. Production with Persistent Storage
 
 ```powershell
-docker run -d --name scimserver-prod -p 443:80 `
+docker run -d --name scimserver-prod -p 443:8080 `
   -e NODE_ENV=production `
   -e JWT_SECRET="$(openssl rand -base64 32)" `
   -e OAUTH_CLIENT_SECRET="$(openssl rand -base64 32)" `
@@ -700,12 +702,12 @@ Features: Named volume for persistent backup, auto-restart, random secrets
 
 ```powershell
 # Tag and push to ACR
-docker tag scimserver:live-test myregistry.azurecr.io/scimserver:v0.9.1
-docker push myregistry.azurecr.io/scimserver:v0.9.1
+docker tag scimserver:live-test myregistry.azurecr.io/scimserver:v0.10.0
+docker push myregistry.azurecr.io/scimserver:v0.10.0
 
 # Deploy (see scripts/deploy-azure.ps1 for full automation)
 az containerapp update --name scimserver --resource-group my-rg \
-  --image myregistry.azurecr.io/scimserver:v0.9.1
+  --image myregistry.azurecr.io/scimserver:v0.10.0
 ```
 
 ### Health Check
@@ -714,7 +716,7 @@ The container includes a built-in health check:
 
 ```dockerfile
 HEALTHCHECK --interval=60s --timeout=3s --start-period=10s --retries=2 \
-  CMD node -e "require('http').get('http://127.0.0.1:80/health', r => {
+  CMD node -e "require('http').get('http://127.0.0.1:8080/health', r => {
     process.exit(r.statusCode === 200 ? 0 : 1)
   }).on('error', () => process.exit(1))"
 ```
@@ -744,7 +746,7 @@ HEALTHCHECK --interval=60s --timeout=3s --start-period=10s --retries=2 \
 ║                                                                  ║
 ║   Target:     Docker container (scimserver:live-test)              ║
 ║   Base URL:   http://localhost:6000                              ║
-║   Image:      496 MB (node:22-alpine, multi-stage)               ║
+║   Image:      496 MB (node:24-alpine, multi-stage)               ║
 ║   Container:  scimserver-live-test (port 6000 → 80)               ║
 ║                                                                  ║
 ║   ┌─────────────────────────────────────────────────────────┐   ║
@@ -1096,5 +1098,5 @@ HEALTHCHECK --interval=60s --timeout=3s --start-period=10s --retries=2 \
 ---
 
 > **Generated:** February 11, 2026  
-> **Environment:** Docker container `scimserver:live-test` (Alpine Linux, node:22-alpine)  
+> **Environment:** Docker container `scimserver:live-test` (Alpine Linux, node:24-alpine)  
 > **Raw output:** [docker-live-test-output-2026-02-11.txt](docker-live-test-output-2026-02-11.txt)

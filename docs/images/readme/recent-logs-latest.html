@@ -1,0 +1,189 @@
+<html><body style='font-family:Consolas,monospace;background:#0f172a;color:#e2e8f0;padding:24px'><h2 style='margin-top:0'>GET /scim/admin/log-config/recent?limit=25 (latest)</h2><pre style='white-space:pre-wrap'>{
+  &quot;count&quot;: 18,
+  &quot;entries&quot;: [
+    {
+      &quot;timestamp&quot;: &quot;2026-02-19T01:47:00.972Z&quot;,
+      &quot;level&quot;: &quot;INFO&quot;,
+      &quot;category&quot;: &quot;backup&quot;,
+      &quot;message&quot;: &quot;Backup service initialized&quot;
+    },
+    {
+      &quot;timestamp&quot;: &quot;2026-02-19T01:47:00.973Z&quot;,
+      &quot;level&quot;: &quot;INFO&quot;,
+      &quot;category&quot;: &quot;backup&quot;,
+      &quot;message&quot;: &quot;Local DB (ephemeral): /tmp/local-data/scim.db&quot;
+    },
+    {
+      &quot;timestamp&quot;: &quot;2026-02-19T01:47:00.973Z&quot;,
+      &quot;level&quot;: &quot;INFO&quot;,
+      &quot;category&quot;: &quot;backup&quot;,
+      &quot;message&quot;: &quot;Azure Files backup (persistent path): /app/data/scim.db&quot;
+    },
+    {
+      &quot;timestamp&quot;: &quot;2026-02-19T01:47:03.588Z&quot;,
+      &quot;level&quot;: &quot;WARN&quot;,
+      &quot;category&quot;: &quot;http&quot;,
+      &quot;message&quot;: &quot;Client error 404 on GET /health&quot;,
+      &quot;data&quot;: {
+        &quot;status&quot;: 404
+      }
+    },
+    {
+      &quot;timestamp&quot;: &quot;2026-02-19T01:47:08.984Z&quot;,
+      &quot;level&quot;: &quot;INFO&quot;,
+      &quot;category&quot;: &quot;backup&quot;,
+      &quot;message&quot;: &quot;Starting backup #1&quot;,
+      &quot;data&quot;: {
+        &quot;fileSizeKB&quot;: &quot;128.00&quot;
+      }
+    },
+    {
+      &quot;timestamp&quot;: &quot;2026-02-19T01:47:08.986Z&quot;,
+      &quot;level&quot;: &quot;INFO&quot;,
+      &quot;category&quot;: &quot;backup&quot;,
+      &quot;message&quot;: &quot;Backup #1 completed&quot;,
+      &quot;data&quot;: {
+        &quot;fileSizeKB&quot;: &quot;128.00&quot;,
+        &quot;timestamp&quot;: &quot;2026-02-19T01:47:08.986Z&quot;
+      }
+    },
+    {
+      &quot;timestamp&quot;: &quot;2026-02-19T01:47:20.058Z&quot;,
+      &quot;level&quot;: &quot;WARN&quot;,
+      &quot;category&quot;: &quot;http&quot;,
+      &quot;message&quot;: &quot;Client error 404 on HEAD /scim&quot;,
+      &quot;data&quot;: {
+        &quot;status&quot;: 404
+      }
+    },
+    {
+      &quot;timestamp&quot;: &quot;2026-02-19T01:47:20.153Z&quot;,
+      &quot;level&quot;: &quot;INFO&quot;,
+      &quot;category&quot;: &quot;http&quot;,
+      &quot;message&quot;: &quot;→ HEAD /&quot;,
+      &quot;requestId&quot;: &quot;ad10d137-cfac-4b54-84e0-054a47b5e9aa&quot;,
+      &quot;method&quot;: &quot;HEAD&quot;,
+      &quot;path&quot;: &quot;/&quot;,
+      &quot;durationMs&quot;: 3,
+      &quot;data&quot;: {
+        &quot;userAgent&quot;: &quot;curl/8.16.0&quot;,
+        &quot;ip&quot;: &quot;::ffff:172.17.0.1&quot;
+      }
+    },
+    {
+      &quot;timestamp&quot;: &quot;2026-02-19T01:47:20.16Z&quot;,
+      &quot;level&quot;: &quot;INFO&quot;,
+      &quot;category&quot;: &quot;http&quot;,
+      &quot;message&quot;: &quot;← 200 HEAD /&quot;,
+      &quot;requestId&quot;: &quot;ad10d137-cfac-4b54-84e0-054a47b5e9aa&quot;,
+      &quot;method&quot;: &quot;HEAD&quot;,
+      &quot;path&quot;: &quot;/&quot;,
+      &quot;durationMs&quot;: 10,
+      &quot;data&quot;: {
+        &quot;status&quot;: 200,
+        &quot;durationMs&quot;: 10
+      }
+    },
+    {
+      &quot;timestamp&quot;: &quot;2026-02-19T01:47:30.975Z&quot;,
+      &quot;level&quot;: &quot;INFO&quot;,
+      &quot;category&quot;: &quot;backup&quot;,
+      &quot;message&quot;: &quot;Starting backup #2&quot;,
+      &quot;data&quot;: {
+        &quot;fileSizeKB&quot;: &quot;128.00&quot;
+      }
+    },
+    {
+      &quot;timestamp&quot;: &quot;2026-02-19T01:47:30.978Z&quot;,
+      &quot;level&quot;: &quot;INFO&quot;,
+      &quot;category&quot;: &quot;backup&quot;,
+      &quot;message&quot;: &quot;Backup #2 completed&quot;,
+      &quot;data&quot;: {
+        &quot;fileSizeKB&quot;: &quot;128.00&quot;,
+        &quot;timestamp&quot;: &quot;2026-02-19T01:47:30.978Z&quot;
+      }
+    },
+    {
+      &quot;timestamp&quot;: &quot;2026-02-19T01:47:35.169Z&quot;,
+      &quot;level&quot;: &quot;INFO&quot;,
+      &quot;category&quot;: &quot;http&quot;,
+      &quot;message&quot;: &quot;→ GET /&quot;,
+      &quot;requestId&quot;: &quot;09d15b50-ece9-41bc-92b0-c6d07effd45c&quot;,
+      &quot;method&quot;: &quot;GET&quot;,
+      &quot;path&quot;: &quot;/&quot;,
+      &quot;durationMs&quot;: 0,
+      &quot;data&quot;: {
+        &quot;userAgent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36&quot;,
+        &quot;ip&quot;: &quot;::ffff:172.17.0.1&quot;
+      }
+    },
+    {
+      &quot;timestamp&quot;: &quot;2026-02-19T01:47:35.17Z&quot;,
+      &quot;level&quot;: &quot;INFO&quot;,
+      &quot;category&quot;: &quot;http&quot;,
+      &quot;message&quot;: &quot;← 200 GET /&quot;,
+      &quot;requestId&quot;: &quot;09d15b50-ece9-41bc-92b0-c6d07effd45c&quot;,
+      &quot;method&quot;: &quot;GET&quot;,
+      &quot;path&quot;: &quot;/&quot;,
+      &quot;durationMs&quot;: 1,
+      &quot;data&quot;: {
+        &quot;status&quot;: 200,
+        &quot;durationMs&quot;: 1
+      }
+    },
+    {
+      &quot;timestamp&quot;: &quot;2026-02-19T01:47:45.197Z&quot;,
+      &quot;level&quot;: &quot;INFO&quot;,
+      &quot;category&quot;: &quot;auth&quot;,
+      &quot;message&quot;: &quot;Legacy bearer token authentication successful&quot;
+    },
+    {
+      &quot;timestamp&quot;: &quot;2026-02-19T01:47:45.197Z&quot;,
+      &quot;level&quot;: &quot;INFO&quot;,
+      &quot;category&quot;: &quot;http&quot;,
+      &quot;message&quot;: &quot;→ GET /scim/admin/version&quot;,
+      &quot;requestId&quot;: &quot;b086aca0-fd50-466c-8bcb-b2b2ef3806bd&quot;,
+      &quot;method&quot;: &quot;GET&quot;,
+      &quot;path&quot;: &quot;/scim/admin/version&quot;,
+      &quot;durationMs&quot;: 0,
+      &quot;data&quot;: {
+        &quot;userAgent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Microsoft Windows 10.0.26200; en-US) PowerShell/7.4.13&quot;,
+        &quot;ip&quot;: &quot;::ffff:172.17.0.1&quot;
+      }
+    },
+    {
+      &quot;timestamp&quot;: &quot;2026-02-19T01:47:45.206Z&quot;,
+      &quot;level&quot;: &quot;INFO&quot;,
+      &quot;category&quot;: &quot;http&quot;,
+      &quot;message&quot;: &quot;← 200 GET /scim/admin/version&quot;,
+      &quot;requestId&quot;: &quot;b086aca0-fd50-466c-8bcb-b2b2ef3806bd&quot;,
+      &quot;method&quot;: &quot;GET&quot;,
+      &quot;path&quot;: &quot;/scim/admin/version&quot;,
+      &quot;durationMs&quot;: 9,
+      &quot;data&quot;: {
+        &quot;status&quot;: 200,
+        &quot;durationMs&quot;: 9
+      }
+    },
+    {
+      &quot;timestamp&quot;: &quot;2026-02-19T01:47:45.233Z&quot;,
+      &quot;level&quot;: &quot;INFO&quot;,
+      &quot;category&quot;: &quot;auth&quot;,
+      &quot;message&quot;: &quot;Legacy bearer token authentication successful&quot;
+    },
+    {
+      &quot;timestamp&quot;: &quot;2026-02-19T01:47:45.233Z&quot;,
+      &quot;level&quot;: &quot;INFO&quot;,
+      &quot;category&quot;: &quot;http&quot;,
+      &quot;message&quot;: &quot;→ GET /scim/admin/log-config/recent?limit=25&quot;,
+      &quot;requestId&quot;: &quot;f5b40231-f2f9-441b-ae4e-f2338b466a0a&quot;,
+      &quot;method&quot;: &quot;GET&quot;,
+      &quot;path&quot;: &quot;/scim/admin/log-config/recent?limit=25&quot;,
+      &quot;durationMs&quot;: 0,
+      &quot;data&quot;: {
+        &quot;userAgent&quot;: &quot;Mozilla/5.0 (Windows NT 10.0; Microsoft Windows 10.0.26200; en-US) PowerShell/7.4.13&quot;,
+        &quot;ip&quot;: &quot;::ffff:172.17.0.1&quot;
+      }
+    }
+  ]
+}</pre></body></html>

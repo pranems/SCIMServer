@@ -8,7 +8,7 @@
  * @see scim-filter-parser.ts for the AST types and evaluator
  */
 
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '../../../generated/prisma/client';
 import {
   parseScimFilter,
   evaluateFilter,

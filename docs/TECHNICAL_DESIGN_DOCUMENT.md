@@ -3,7 +3,7 @@
 > **Version**: 1.1  
 > **Date**: February 13, 2026  
 > **Status**: Current as-built architecture  
-> **Tech Stack**: NestJS 11 · TypeScript 5 · Prisma 6 · SQLite · React 18 · Vite 5 · Azure Container Apps
+> **Tech Stack**: NestJS 11 · TypeScript 5 · Prisma 7 · SQLite · React 19 · Vite 7 · Azure Container Apps
 
 ---
 
@@ -83,7 +83,7 @@ api/
 │   │   ├── web/                 # SPA serving controller
 │   │   └── admin/               # Admin panel API routes
 │   └── oauth/                   # OAuth 2.0 client_credentials module
-└── test/                        # Jest test suites (11 files, 317 tests)
+└── test/                        # Jest suites (unit + e2e coverage; see current matrix)
 
 web/                             # React SPA source (Vite dev server)
 ├── src/
@@ -699,7 +699,7 @@ Azure Resource Group
 
 ```dockerfile
 # Multi-stage build (Dockerfile)
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 COPY api/package*.json ./
 RUN npm ci
@@ -707,7 +707,7 @@ COPY api/ .
 RUN npx prisma generate
 RUN npm run build
 
-FROM node:22-alpine
+FROM node:24-alpine
 WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
@@ -734,10 +734,10 @@ CMD ["node", "dist/main.js"]
 
 ### 11.1 Test Framework
 
-- **Framework**: Jest 29 with `ts-jest` transform
+- **Framework**: Jest 30 with `ts-jest` transform
 - **Test Location**: `api/test/` directory
 - **Test Pattern**: `*.spec.ts` and `*.test.ts`
-- **Total**: 317 tests across 11 test suites, all passing
+- **Current matrix**: 666 unit + 184 e2e + 280 live integration tests passing
 
 ### 11.2 Test Categories
 
