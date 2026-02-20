@@ -8,7 +8,6 @@
  * @see scim-filter-parser.ts for the AST types and evaluator
  */
 
-import type { Prisma } from '../../../generated/prisma/client';
 import {
   parseScimFilter,
   evaluateFilter,
@@ -26,8 +25,8 @@ const USER_DB_COLUMNS: Record<string, string> = {
 };
 
 export interface UserFilterResult {
-  /** Prisma where clause for DB-level filtering */
-  dbWhere: Prisma.ScimUserWhereInput;
+  /** DB-level filter clause (simple key-value object). */
+  dbWhere: Record<string, unknown>;
   /** If set, the in-memory filter fn to apply after DB fetch */
   inMemoryFilter?: (resource: Record<string, unknown>) => boolean;
   /** When true, the DB fetch should return all records for the endpoint (filter is in-memory only) */
@@ -88,7 +87,7 @@ const GROUP_DB_COLUMNS: Record<string, string> = {
 };
 
 export interface GroupFilterResult {
-  dbWhere: Prisma.ScimGroupWhereInput;
+  dbWhere: Record<string, unknown>;
   inMemoryFilter?: (resource: Record<string, unknown>) => boolean;
   fetchAll: boolean;
 }

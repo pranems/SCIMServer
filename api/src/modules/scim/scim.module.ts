@@ -4,6 +4,7 @@ import { APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
 import { LoggingModule } from '../logging/logging.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { EndpointModule } from '../endpoint/endpoint.module';
+import { RepositoryModule } from '../../infrastructure/repositories/repository.module';
 import { AdminController } from './controllers/admin.controller';
 import { ResourceTypesController } from './controllers/resource-types.controller';
 import { SchemasController } from './controllers/schemas.controller';
@@ -20,7 +21,7 @@ import { ScimEtagInterceptor } from './interceptors/scim-etag.interceptor';
 import { ScimExceptionFilter } from './filters/scim-exception.filter';
 
 @Module({
-  imports: [PrismaModule, LoggingModule, EndpointModule],
+  imports: [PrismaModule, LoggingModule, EndpointModule, RepositoryModule.register()],
   controllers: [
     ServiceProviderConfigController,
     ResourceTypesController,

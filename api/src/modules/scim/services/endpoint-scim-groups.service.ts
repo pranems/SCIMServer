@@ -1,8 +1,16 @@
-import { Injectable } from '@nestjs/common';
-import type { GroupMember, Prisma } from '../../../generated/prisma/client';
+import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 
-import { PrismaService } from '../../prisma/prisma.service';
+import type { IGroupRepository } from '../../../domain/repositories/group.repository.interface';
+import type { IUserRepository } from '../../../domain/repositories/user.repository.interface';
+import type {
+  GroupWithMembers,
+  GroupCreateInput,
+  GroupUpdateInput,
+  MemberCreateInput,
+  MemberRecord,
+} from '../../../domain/models/group.model';
+import { USER_REPOSITORY, GROUP_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
@@ -27,19 +35,6 @@ interface ListGroupsParams {
   count?: number;
 }
 
-// Narrowed type used internally to avoid Prisma JSON 'any' leakage in intersections
-interface GroupWithMembers {
-  id: string;
-  scimId: string;
-  externalId: string | null;
-  displayName: string;
-  rawPayload: string | null;
-  meta: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  members: GroupMember[];
-}
-
 /**
  * Endpoint-specific SCIM Groups Service
  * Handles all group operations scoped to a specific endpoint
@@ -47,7 +42,10 @@ interface GroupWithMembers {
 @Injectable()
 export class EndpointScimGroupsService {
   constructor(
-    private readonly prisma: PrismaService,
+    @Inject(GROUP_REPOSITORY)
+    private readonly groupRepo: IGroupRepository,
+    @Inject(USER_REPOSITORY)
+    private readonly userRepo: IUserRepository,
     private readonly metadata: ScimMetadataService,
     private readonly endpointContext: EndpointContextStorage,
     private readonly logger: ScimLogger,
@@ -77,35 +75,36 @@ export class EndpointScimGroupsService {
 
     const sanitizedPayload = this.extractAdditionalAttributes(dto);
 
-    const group = await this.prisma.scimGroup.create({
-      data: {
-        scimId,
-        externalId,
-        displayName: dto.displayName,
-        displayNameLower: dto.displayName.toLowerCase(),
-        rawPayload: JSON.stringify(sanitizedPayload),
-        meta: JSON.stringify({
-          resourceType: 'Group',
-          created: now.toISOString(),
-          lastModified: now.toISOString()
-        }),
-        endpoint: { connect: { id: endpointId } }
-      }
-    });
+    const input: GroupCreateInput = {
+      endpointId,
+      scimId,
+      externalId,
+      displayName: dto.displayName,
+      displayNameLower: dto.displayName.toLowerCase(),
+      rawPayload: JSON.stringify(sanitizedPayload),
+      meta: JSON.stringify({
+        resourceType: 'Group',
+        created: now.toISOString(),
+        lastModified: now.toISOString()
+      }),
+    };
+
+    const group = await this.groupRepo.create(input);
 
     const members = dto.members ?? [];
     if (members.length > 0) {
-      await this.persistMembersForEndpoint(String(group.id), members, endpointId);
+      const memberInputs = await this.resolveMemberInputs(members, endpointId);
+      await this.groupRepo.addMembers(String(group.id), memberInputs);
     }
 
-    const withMembers = await this.getGroupWithMembersForEndpoint(String(group.scimId), endpointId);
+    const withMembers = await this.groupRepo.findWithMembers(endpointId, String(group.scimId));
     this.logger.info(LogCategory.SCIM_GROUP, 'Group created', { scimId, displayName: dto.displayName, endpointId });
     return this.toScimGroupResource(withMembers, baseUrl);
   }
 
   async getGroupForEndpoint(scimId: string, baseUrl: string, endpointId: string): Promise<ScimGroupResource> {
     this.logger.debug(LogCategory.SCIM_GROUP, 'Get group', { scimId, endpointId });
-    const group = await this.getGroupWithMembersForEndpoint(scimId, endpointId);
+    const group = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!group) {
       this.logger.debug(LogCategory.SCIM_GROUP, 'Group not found', { scimId, endpointId });
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
@@ -136,20 +135,15 @@ export class EndpointScimGroupsService {
       });
     }
 
-    const where: Prisma.ScimGroupWhereInput = {
-      ...filterResult.dbWhere,
-      endpointId
-    };
-
-    // Fetch groups from DB
-    const allGroups = await this.prisma.scimGroup.findMany({
-      where,
-      orderBy: { createdAt: 'asc' },
-      include: { members: true }
-    });
+    // Fetch groups from DB (repository handles endpointId scoping + member include)
+    const allGroups = await this.groupRepo.findAllWithMembers(
+      endpointId,
+      filterResult.dbWhere,
+      { field: 'createdAt', direction: 'asc' },
+    );
 
     // Build SCIM resources and apply in-memory filter if needed
-    let resources = allGroups.map((g) => this.toScimGroupResource(g as GroupWithMembers, baseUrl));
+    let resources = allGroups.map((g) => this.toScimGroupResource(g, baseUrl));
     if (filterResult.inMemoryFilter) {
       resources = resources.filter(filterResult.inMemoryFilter);
     }
@@ -179,7 +173,7 @@ export class EndpointScimGroupsService {
     });
     this.logger.trace(LogCategory.SCIM_PATCH, 'Patch group full payload', { body: dto as unknown as Record<string, unknown> });
 
-    const group = await this.getGroupWithMembersForEndpoint(scimId, endpointId);
+    const group = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!group) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
@@ -195,7 +189,7 @@ export class EndpointScimGroupsService {
 
     let displayName: string = group.displayName;
     let externalId: string | null = group.externalId ?? null;
-    let memberDtos: GroupMemberDto[] = this.memberEntitiesToDtos(group.members);
+    let memberDtos: GroupMemberDto[] = this.memberRecordsToDtos(group.members);
     let rawPayload = this.parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}'));
 
     for (const operation of dto.Operations) {
@@ -224,32 +218,21 @@ export class EndpointScimGroupsService {
     // writer lock. PostgreSQL’s row-level locking makes this pattern unnecessary.
     // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.2.3
     // The user data is stable within this request context so the lookup is safe here.
-    const memberData = memberDtos.length > 0
-      ? await this.mapMembersForPersistenceForEndpoint(group.id, memberDtos, endpointId)
+    const memberInputs = memberDtos.length > 0
+      ? await this.resolveMemberInputs(memberDtos, endpointId)
       : [];
 
     try {
-      await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        await tx.scimGroup.update({
-          where: { id: group.id },
-          data: {
-            displayName,
-            displayNameLower: displayName.toLowerCase(),
-            externalId,
-            rawPayload: JSON.stringify(rawPayload),
-            meta: JSON.stringify({
-              ...this.parseJson<Record<string, unknown>>(String(group.meta ?? '{}')),
-              lastModified: new Date().toISOString()
-            })
-          }
-        });
-
-        await tx.groupMember.deleteMany({ where: { groupId: group.id } });
-
-        if (memberData.length > 0) {
-          await tx.groupMember.createMany({ data: memberData });
-        }
-      }, { maxWait: 10000, timeout: 30000 });
+      await this.groupRepo.updateGroupWithMembers(group.id, {
+        displayName,
+        displayNameLower: displayName.toLowerCase(),
+        externalId,
+        rawPayload: JSON.stringify(rawPayload),
+        meta: JSON.stringify({
+          ...this.parseJson<Record<string, unknown>>(String(group.meta ?? '{}')),
+          lastModified: new Date().toISOString()
+        })
+      }, memberInputs);
     } catch (error) {
       this.logger.error(LogCategory.SCIM_PATCH, 'Transaction failed during group patch', { scimId, endpointId, error: String(error) });
       throw createScimError({
@@ -259,7 +242,7 @@ export class EndpointScimGroupsService {
     }
 
     // RFC 7644 §3.5.2: Return the updated resource with 200 OK
-    const updatedGroup = await this.getGroupWithMembersForEndpoint(scimId, endpointId);
+    const updatedGroup = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!updatedGroup) {
       throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.' });
     }
@@ -278,7 +261,7 @@ export class EndpointScimGroupsService {
 
     this.logger.info(LogCategory.SCIM_GROUP, 'Replace group (PUT)', { scimId, displayName: dto.displayName, endpointId });
 
-    const group = await this.getGroupWithMembersForEndpoint(scimId, endpointId);
+    const group = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!group) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
@@ -291,33 +274,21 @@ export class EndpointScimGroupsService {
       : null;
 
     // Pre-resolve member user IDs OUTSIDE the transaction to minimise lock hold time.
-    const replaceMemberData = (dto.members && dto.members.length > 0)
-      ? await this.mapMembersForPersistenceForEndpoint(group.id, dto.members, endpointId)
+    const replaceMemberInputs = (dto.members && dto.members.length > 0)
+      ? await this.resolveMemberInputs(dto.members, endpointId)
       : [];
 
     try {
-      await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        await tx.scimGroup.update({
-          where: { id: group.id },
-          data: {
-            displayName: dto.displayName,
-            displayNameLower: dto.displayName.toLowerCase(),
-            externalId: newExternalId,
-            rawPayload: JSON.stringify(this.extractAdditionalAttributes(dto)),
-            meta: JSON.stringify({
-              ...meta,
-              lastModified: now.toISOString()
-            })
-          }
-        });
-
-        // Replace all members with new ones
-        await tx.groupMember.deleteMany({ where: { groupId: group.id } });
-
-        if (replaceMemberData.length > 0) {
-          await tx.groupMember.createMany({ data: replaceMemberData });
-        }
-      }, { maxWait: 10000, timeout: 30000 });
+      await this.groupRepo.updateGroupWithMembers(group.id, {
+        displayName: dto.displayName,
+        displayNameLower: dto.displayName.toLowerCase(),
+        externalId: newExternalId,
+        rawPayload: JSON.stringify(this.extractAdditionalAttributes(dto)),
+        meta: JSON.stringify({
+          ...meta,
+          lastModified: now.toISOString()
+        })
+      }, replaceMemberInputs);
     } catch (error) {
       this.logger.error(LogCategory.SCIM_GROUP, 'Transaction failed during group replace', { scimId, endpointId, error: String(error) });
       throw createScimError({
@@ -327,7 +298,7 @@ export class EndpointScimGroupsService {
     }
 
     // Return updated group
-    const updatedGroup = await this.getGroupWithMembersForEndpoint(scimId, endpointId);
+    const updatedGroup = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!updatedGroup) {
       throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.' });
     }
@@ -337,19 +308,14 @@ export class EndpointScimGroupsService {
 
   async deleteGroupForEndpoint(scimId: string, endpointId: string): Promise<void> {
     this.logger.info(LogCategory.SCIM_GROUP, 'Delete group', { scimId, endpointId });
-    const group = await this.prisma.scimGroup.findFirst({
-      where: {
-        scimId,
-        endpointId
-      }
-    });
+    const group = await this.groupRepo.findByScimId(endpointId, scimId);
 
     if (!group) {
       this.logger.debug(LogCategory.SCIM_GROUP, 'Delete target group not found', { scimId, endpointId });
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
-    await this.prisma.scimGroup.delete({ where: { id: group.id } });
+    await this.groupRepo.delete(group.id);
     this.logger.info(LogCategory.SCIM_GROUP, 'Group deleted', { scimId, endpointId });
   }
 
@@ -364,20 +330,8 @@ export class EndpointScimGroupsService {
     endpointId: string,
     excludeScimId?: string
   ): Promise<void> {
-    // Use the displayNameLower column for an efficient DB-level case-insensitive check
     const lowerName = displayName.toLowerCase();
-    const filters: Prisma.ScimGroupWhereInput = {
-      endpointId,
-      displayNameLower: lowerName,
-    };
-    if (excludeScimId) {
-      filters.NOT = { scimId: excludeScimId };
-    }
-
-    const conflict = await this.prisma.scimGroup.findFirst({
-      where: filters,
-      select: { scimId: true }
-    });
+    const conflict = await this.groupRepo.findByDisplayName(endpointId, lowerName, excludeScimId);
 
     if (conflict) {
       throw createScimError({
@@ -397,12 +351,7 @@ export class EndpointScimGroupsService {
     endpointId: string,
     excludeScimId?: string
   ): Promise<void> {
-    const filters: Prisma.ScimGroupWhereInput = { endpointId, externalId };
-    if (excludeScimId) {
-      filters.NOT = { scimId: excludeScimId };
-    }
-
-    const existing = await this.prisma.scimGroup.findFirst({ where: filters });
+    const existing = await this.groupRepo.findByExternalId(endpointId, externalId, excludeScimId);
     if (existing) {
       throw createScimError({
         status: 409,
@@ -421,26 +370,6 @@ export class EndpointScimGroupsService {
         detail: `Missing required schema '${requiredSchema}'.`
       });
     }
-  }
-
-  private getGroupWithMembersForEndpoint(scimId: string, endpointId: string): Promise<GroupWithMembers | null> {
-    return this.prisma.scimGroup.findFirst({
-      where: { 
-        scimId,
-        endpointId
-      },
-      select: {
-        id: true,
-        scimId: true,
-        externalId: true,
-        displayName: true,
-        rawPayload: true,
-        meta: true,
-        createdAt: true,
-        updatedAt: true,
-        members: true
-      }
-    }) as unknown as Promise<GroupWithMembers | null>;
   }
 
   private handleReplace(
@@ -631,38 +560,21 @@ export class EndpointScimGroupsService {
     });
   }
 
-  private async persistMembersForEndpoint(groupId: string, members: GroupMemberDto[], endpointId: string): Promise<void> {
-    const data = await this.mapMembersForPersistenceForEndpoint(groupId, members, endpointId);
-    if (data.length > 0) {
-      await this.prisma.groupMember.createMany({ data });
-    }
-  }
-
-  private async mapMembersForPersistenceForEndpoint(
-    groupId: string,
-    members: GroupMemberDto[],
+  private async resolveMemberInputs(
+    memberDtos: GroupMemberDto[],
     endpointId: string,
-    tx: Prisma.TransactionClient = this.prisma
-  ): Promise<Array<Omit<Prisma.GroupMemberCreateManyInput, 'id'>>> {
-    const values = members.map((member) => member.value);
-    const users: Array<{ id: string; scimId: string }> = values.length
-      ? await tx.scimUser.findMany({
-          where: { 
-            scimId: { in: values },
-            endpointId
-          },
-          select: { id: true, scimId: true }
-        })
+  ): Promise<MemberCreateInput[]> {
+    const values = memberDtos.map((m) => m.value);
+    const users = values.length > 0
+      ? await this.userRepo.findByScimIds(endpointId, values)
       : [];
-    const userMap = new Map(users.map((user) => [user.scimId, user.id] as const));
+    const userMap = new Map(users.map((u) => [u.scimId, u.id] as const));
 
-    return members.map((member) => ({
-      groupId,
-      userId: userMap.get(member.value) ?? null,
-      value: member.value,
-      type: member.type ?? null,
-      display: member.display ?? null,
-      createdAt: new Date()
+    return memberDtos.map((m) => ({
+      userId: userMap.get(m.value) ?? null,
+      value: m.value,
+      type: m.type ?? null,
+      display: m.display ?? null,
     }));
   }
 
@@ -691,7 +603,7 @@ export class EndpointScimGroupsService {
     return Array.from(seen.values());
   }
 
-  private memberEntitiesToDtos(members: GroupMember[]): GroupMemberDto[] {
+  private memberRecordsToDtos(members: MemberRecord[]): GroupMemberDto[] {
     return members.map((member) => ({
       value: member.value,
       display: member.display ?? undefined,

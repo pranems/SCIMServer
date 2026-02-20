@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException } from '@nestjs/common';
 import { EndpointScimUsersService } from './endpoint-scim-users.service';
-import { PrismaService } from '../../prisma/prisma.service';
+import { USER_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { ScimMetadataService } from './scim-metadata.service';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import type { CreateUserDto } from '../dto/create-user.dto';
@@ -10,7 +10,6 @@ import { ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpo
 
 describe('EndpointScimUsersService', () => {
   let service: EndpointScimUsersService;
-  let prismaService: PrismaService;
   let metadataService: ScimMetadataService;
 
   const mockEndpoint = {
@@ -42,15 +41,14 @@ describe('EndpointScimUsersService', () => {
     updatedAt: new Date('2024-01-01T00:00:00.000Z'),
   };
 
-  const mockPrismaService = {
-    scimUser: {
-      create: jest.fn(),
-      findFirst: jest.fn(),
-      findMany: jest.fn(),
-      count: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-    },
+  const mockUserRepo = {
+    create: jest.fn(),
+    findByScimId: jest.fn(),
+    findAll: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+    findConflict: jest.fn(),
+    findByScimIds: jest.fn(),
   };
 
   const mockMetadataService = {
@@ -64,8 +62,8 @@ describe('EndpointScimUsersService', () => {
       providers: [
         EndpointScimUsersService,
         {
-          provide: PrismaService,
-          useValue: mockPrismaService,
+          provide: USER_REPOSITORY,
+          useValue: mockUserRepo,
         },
         {
           provide: ScimMetadataService,
@@ -87,7 +85,6 @@ describe('EndpointScimUsersService', () => {
     }).compile();
 
     service = module.get<EndpointScimUsersService>(EndpointScimUsersService);
-    prismaService = module.get<PrismaService>(PrismaService);
     metadataService = module.get<ScimMetadataService>(ScimMetadataService);
   });
 
@@ -105,8 +102,8 @@ describe('EndpointScimUsersService', () => {
         displayName: 'New User',
       };
 
-      mockPrismaService.scimUser.findFirst.mockResolvedValue(null); // No conflicts
-      mockPrismaService.scimUser.create.mockResolvedValue({
+      mockUserRepo.findConflict.mockResolvedValue(null); // No conflicts
+      mockUserRepo.create.mockResolvedValue({
         ...mockUser,
         userName: createDto.userName,
         externalId: createDto.externalId,
@@ -121,13 +118,11 @@ describe('EndpointScimUsersService', () => {
       expect(result.userName).toBe(createDto.userName);
       expect(result.externalId).toBe(createDto.externalId);
       expect(result.schemas).toContain('urn:ietf:params:scim:schemas:core:2.0:User');
-      expect(mockPrismaService.scimUser.create).toHaveBeenCalledWith(
+      expect(mockUserRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({
-            userName: createDto.userName,
-            externalId: createDto.externalId,
-            endpoint: { connect: { id: mockEndpoint.id } },
-          }),
+          userName: createDto.userName,
+          externalId: createDto.externalId,
+          endpointId: mockEndpoint.id,
         })
       );
     });
@@ -139,13 +134,13 @@ describe('EndpointScimUsersService', () => {
         active: true,
       };
 
-      mockPrismaService.scimUser.findFirst.mockResolvedValue(mockUser);
+      mockUserRepo.findConflict.mockResolvedValue(mockUser);
 
       await expect(
         service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id)
       ).rejects.toThrow();
 
-      expect(mockPrismaService.scimUser.create).not.toHaveBeenCalled();
+      expect(mockUserRepo.create).not.toHaveBeenCalled();
     });
 
     it('should enforce unique externalId within endpoint', async () => {
@@ -156,19 +151,19 @@ describe('EndpointScimUsersService', () => {
         active: true,
       };
 
-      mockPrismaService.scimUser.findFirst.mockResolvedValue(mockUser);
+      mockUserRepo.findConflict.mockResolvedValue(mockUser);
 
       await expect(
         service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id)
       ).rejects.toThrow();
 
-      expect(mockPrismaService.scimUser.create).not.toHaveBeenCalled();
+      expect(mockUserRepo.create).not.toHaveBeenCalled();
     });
   });
 
   describe('getUserForEndpoint', () => {
     it('should retrieve a user by scimId within endpoint', async () => {
-      mockPrismaService.scimUser.findFirst.mockResolvedValue(mockUser);
+      mockUserRepo.findByScimId.mockResolvedValue(mockUser);
 
       const result = await service.getUserForEndpoint(
         mockUser.scimId,
@@ -178,16 +173,11 @@ describe('EndpointScimUsersService', () => {
 
       expect(result.id).toBe(mockUser.scimId);
       expect(result.userName).toBe(mockUser.userName);
-      expect(mockPrismaService.scimUser.findFirst).toHaveBeenCalledWith({
-        where: {
-          scimId: mockUser.scimId,
-          endpointId: mockEndpoint.id,
-        },
-      });
+      expect(mockUserRepo.findByScimId).toHaveBeenCalledWith(mockEndpoint.id, mockUser.scimId);
     });
 
     it('should throw 404 if user not found in endpoint', async () => {
-      mockPrismaService.scimUser.findFirst.mockResolvedValue(null);
+      mockUserRepo.findByScimId.mockResolvedValue(null);
 
       await expect(
         service.getUserForEndpoint('non-existent', 'http://localhost:3000/scim', mockEndpoint.id)
@@ -199,8 +189,7 @@ describe('EndpointScimUsersService', () => {
     it('should list users within a specific endpoint', async () => {
       const users = [mockUser, { ...mockUser, id: 'user-2', scimId: 'scim-456' }];
 
-      mockPrismaService.scimUser.count.mockResolvedValue(2);
-      mockPrismaService.scimUser.findMany.mockResolvedValue(users);
+      mockUserRepo.findAll.mockResolvedValue(users);
 
       const result = await service.listUsersForEndpoint(
         { startIndex: 1, count: 10 },
@@ -211,17 +200,11 @@ describe('EndpointScimUsersService', () => {
       expect(result.totalResults).toBe(2);
       expect(result.Resources).toHaveLength(2);
       expect(result.startIndex).toBe(1);
-      expect(mockPrismaService.scimUser.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            endpointId: mockEndpoint.id,
-          }),
-        })
-      );
+      expect(mockUserRepo.findAll).toHaveBeenCalledWith(mockEndpoint.id, expect.anything(), expect.anything());
     });
 
     it('should filter users by userName within endpoint', async () => {
-      mockPrismaService.scimUser.findMany.mockResolvedValue([mockUser]);
+      mockUserRepo.findAll.mockResolvedValue([mockUser]);
 
       const result = await service.listUsersForEndpoint(
         { filter: 'userName eq "test@example.com"', startIndex: 1, count: 10 },
@@ -231,14 +214,7 @@ describe('EndpointScimUsersService', () => {
 
       // userName filter is now applied in-code (not via Prisma where) for case-insensitive matching
       expect(result.totalResults).toBe(1);
-      expect(mockPrismaService.scimUser.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            endpointId: mockEndpoint.id,
-          }),
-          orderBy: { createdAt: 'asc' },
-        })
-      );
+      expect(mockUserRepo.findAll).toHaveBeenCalledWith(mockEndpoint.id, expect.anything(), expect.anything());
     });
 
     it('should respect pagination within endpoint', async () => {
@@ -250,7 +226,7 @@ describe('EndpointScimUsersService', () => {
         userName: `user${i}@example.com`,
         userNameLower: `user${i}@example.com`,
       }));
-      mockPrismaService.scimUser.findMany.mockResolvedValue(manyUsers);
+      mockUserRepo.findAll.mockResolvedValue(manyUsers);
 
       const result = await service.listUsersForEndpoint(
         { startIndex: 11, count: 20 },
@@ -262,14 +238,7 @@ describe('EndpointScimUsersService', () => {
       expect(result.totalResults).toBe(30);
       expect(result.startIndex).toBe(11);
       expect(result.itemsPerPage).toBe(20);
-      expect(mockPrismaService.scimUser.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            endpointId: mockEndpoint.id,
-          }),
-          orderBy: { createdAt: 'asc' },
-        })
-      );
+      expect(mockUserRepo.findAll).toHaveBeenCalledWith(mockEndpoint.id, expect.anything(), expect.anything());
     });
   });
 
@@ -287,10 +256,9 @@ describe('EndpointScimUsersService', () => {
       };
 
       // First call finds the user, second call is for uniqueness check (returns null = no conflict)
-      mockPrismaService.scimUser.findFirst
-        .mockResolvedValueOnce(mockUser)
-        .mockResolvedValueOnce(null);
-      mockPrismaService.scimUser.update.mockResolvedValue({
+      mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
+      mockUserRepo.update.mockResolvedValue({
         ...mockUser,
         active: false,
       });
@@ -303,12 +271,7 @@ describe('EndpointScimUsersService', () => {
       );
 
       expect(result.active).toBe(false);
-      expect(mockPrismaService.scimUser.findFirst).toHaveBeenCalledWith({
-        where: {
-          scimId: mockUser.scimId,
-          endpointId: mockEndpoint.id,
-        },
-      });
+      expect(mockUserRepo.findByScimId).toHaveBeenCalledWith(mockEndpoint.id, mockUser.scimId);
     });
 
     it('should update userName ensuring uniqueness within endpoint', async () => {
@@ -323,11 +286,10 @@ describe('EndpointScimUsersService', () => {
         ],
       };
 
-      mockPrismaService.scimUser.findFirst
-        .mockResolvedValueOnce(mockUser) // Find user to update
-        .mockResolvedValueOnce(null); // No conflict
+      mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null); // No conflict
 
-      mockPrismaService.scimUser.update.mockResolvedValue({
+      mockUserRepo.update.mockResolvedValue({
         ...mockUser,
         userName: 'newemail@example.com',
       });
@@ -353,11 +315,10 @@ describe('EndpointScimUsersService', () => {
         ],
       };
 
-      mockPrismaService.scimUser.findFirst
-        .mockResolvedValueOnce(mockUser)
-        .mockResolvedValueOnce(null);
+      mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-      mockPrismaService.scimUser.update.mockResolvedValue({
+      mockUserRepo.update.mockResolvedValue({
         ...mockUser,
         userName: 'nopath@example.com',
       });
@@ -370,13 +331,9 @@ describe('EndpointScimUsersService', () => {
       );
 
       expect(result.userName).toBe('nopath@example.com');
-      expect(mockPrismaService.scimUser.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            userName: 'nopath@example.com',
-          }),
-        })
-      );
+      expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, expect.objectContaining({
+        userName: 'nopath@example.com',
+      }));
     });
 
     it('should update externalId and active via no-path replace', async () => {
@@ -390,11 +347,10 @@ describe('EndpointScimUsersService', () => {
         ],
       };
 
-      mockPrismaService.scimUser.findFirst
-        .mockResolvedValueOnce(mockUser)
-        .mockResolvedValueOnce(null);
+      mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-      mockPrismaService.scimUser.update.mockResolvedValue({
+      mockUserRepo.update.mockResolvedValue({
         ...mockUser,
         externalId: 'new-ext-id',
         active: false,
@@ -431,11 +387,10 @@ describe('EndpointScimUsersService', () => {
         ],
       };
 
-      mockPrismaService.scimUser.findFirst
-        .mockResolvedValueOnce(userWithEmails)
-        .mockResolvedValueOnce(null);
+      mockUserRepo.findByScimId.mockResolvedValueOnce(userWithEmails);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-      mockPrismaService.scimUser.update.mockImplementation(async ({ data }: any) => ({
+      mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
         ...userWithEmails,
         rawPayload: data.rawPayload,
       }));
@@ -448,8 +403,7 @@ describe('EndpointScimUsersService', () => {
       );
 
       // The rawPayload stored should have the email updated in-place
-      const updateCall = mockPrismaService.scimUser.update.mock.calls[0][0];
-      const storedPayload = JSON.parse(updateCall.data.rawPayload);
+      const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
       expect(storedPayload.emails[0].value).toBe('new@example.com');
       expect(storedPayload.emails[0].type).toBe('work');
       expect(storedPayload.emails[0].primary).toBe(true);
@@ -476,11 +430,10 @@ describe('EndpointScimUsersService', () => {
         ],
       };
 
-      mockPrismaService.scimUser.findFirst
-        .mockResolvedValueOnce(userWithEnterprise)
-        .mockResolvedValueOnce(null);
+      mockUserRepo.findByScimId.mockResolvedValueOnce(userWithEnterprise);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-      mockPrismaService.scimUser.update.mockImplementation(async ({ data }: any) => ({
+      mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
         ...userWithEnterprise,
         rawPayload: data.rawPayload,
       }));
@@ -492,8 +445,7 @@ describe('EndpointScimUsersService', () => {
         mockEndpoint.id
       );
 
-      const updateCall = mockPrismaService.scimUser.update.mock.calls[0][0];
-      const storedPayload = JSON.parse(updateCall.data.rawPayload);
+      const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
       expect(storedPayload[URN].manager).toEqual({ value: 'MGR-123' });
       expect(storedPayload[URN].department).toBe('Engineering');
     });
@@ -518,11 +470,10 @@ describe('EndpointScimUsersService', () => {
         ],
       };
 
-      mockPrismaService.scimUser.findFirst
-        .mockResolvedValueOnce(userWithManager)
-        .mockResolvedValueOnce(null);
+      mockUserRepo.findByScimId.mockResolvedValueOnce(userWithManager);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-      mockPrismaService.scimUser.update.mockImplementation(async ({ data }: any) => ({
+      mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
         ...userWithManager,
         rawPayload: data.rawPayload,
       }));
@@ -534,8 +485,7 @@ describe('EndpointScimUsersService', () => {
         mockEndpoint.id
       );
 
-      const updateCall = mockPrismaService.scimUser.update.mock.calls[0][0];
-      const storedPayload = JSON.parse(updateCall.data.rawPayload);
+      const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
       expect(storedPayload[URN].manager).toBeUndefined();
       expect(storedPayload[URN].department).toBe('Eng');
     });
@@ -561,11 +511,10 @@ describe('EndpointScimUsersService', () => {
         ],
       };
 
-      mockPrismaService.scimUser.findFirst
-        .mockResolvedValueOnce(userWithManager)
-        .mockResolvedValueOnce(null);
+      mockUserRepo.findByScimId.mockResolvedValueOnce(userWithManager);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-      mockPrismaService.scimUser.update.mockImplementation(async ({ data }: any) => ({
+      mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
         ...userWithManager,
         rawPayload: data.rawPayload,
       }));
@@ -577,8 +526,7 @@ describe('EndpointScimUsersService', () => {
         mockEndpoint.id
       );
 
-      const updateCall = mockPrismaService.scimUser.update.mock.calls[0][0];
-      const storedPayload = JSON.parse(updateCall.data.rawPayload);
+      const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
       expect(storedPayload[URN].manager).toEqual({ value: 'NEW-MGR' });
     });
 
@@ -603,11 +551,10 @@ describe('EndpointScimUsersService', () => {
         ],
       };
 
-      mockPrismaService.scimUser.findFirst
-        .mockResolvedValueOnce(userWithManager)
-        .mockResolvedValueOnce(null);
+      mockUserRepo.findByScimId.mockResolvedValueOnce(userWithManager);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-      mockPrismaService.scimUser.update.mockImplementation(async ({ data }: any) => ({
+      mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
         ...userWithManager,
         rawPayload: data.rawPayload,
       }));
@@ -619,8 +566,7 @@ describe('EndpointScimUsersService', () => {
         mockEndpoint.id
       );
 
-      const updateCall = mockPrismaService.scimUser.update.mock.calls[0][0];
-      const storedPayload = JSON.parse(updateCall.data.rawPayload);
+      const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
       expect(storedPayload[URN].manager).toBeUndefined();
       expect(storedPayload[URN].department).toBe('Eng');
     });
@@ -647,11 +593,10 @@ describe('EndpointScimUsersService', () => {
         ],
       };
 
-      mockPrismaService.scimUser.findFirst
-        .mockResolvedValueOnce(userWithEmails)
-        .mockResolvedValueOnce(null);
+      mockUserRepo.findByScimId.mockResolvedValueOnce(userWithEmails);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-      mockPrismaService.scimUser.update.mockImplementation(async ({ data }: any) => ({
+      mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
         ...userWithEmails,
         rawPayload: data.rawPayload,
       }));
@@ -663,8 +608,7 @@ describe('EndpointScimUsersService', () => {
         mockEndpoint.id
       );
 
-      const updateCall = mockPrismaService.scimUser.update.mock.calls[0][0];
-      const storedPayload = JSON.parse(updateCall.data.rawPayload);
+      const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
       expect(storedPayload.emails).toHaveLength(1);
       expect(storedPayload.emails[0].type).toBe('home');
     });
@@ -679,9 +623,8 @@ describe('EndpointScimUsersService', () => {
         ],
       };
 
-      mockPrismaService.scimUser.findFirst
-        .mockResolvedValueOnce(mockUser)
-        .mockResolvedValueOnce(null);
+      mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
       await expect(
         service.patchUserForEndpoint(mockUser.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id)
@@ -700,9 +643,8 @@ describe('EndpointScimUsersService', () => {
         ],
       };
 
-      mockPrismaService.scimUser.findFirst
-        .mockResolvedValueOnce(mockUser)
-        .mockResolvedValueOnce(null);
+      mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
       await expect(
         service.patchUserForEndpoint(mockUser.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id)
@@ -717,8 +659,8 @@ describe('EndpointScimUsersService', () => {
         ],
       };
 
-      mockPrismaService.scimUser.findFirst.mockReset();
-      mockPrismaService.scimUser.findFirst.mockResolvedValue(null);
+      mockUserRepo.findByScimId.mockReset();
+      mockUserRepo.findByScimId.mockResolvedValue(null);
 
       await expect(
         service.patchUserForEndpoint('non-existent', patchDto, 'http://localhost:3000/scim', mockEndpoint.id)
@@ -734,11 +676,10 @@ describe('EndpointScimUsersService', () => {
         ],
       };
 
-      mockPrismaService.scimUser.findFirst
-        .mockResolvedValueOnce(mockUser)
-        .mockResolvedValueOnce(null);
+      mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-      mockPrismaService.scimUser.update.mockResolvedValue({
+      mockUserRepo.update.mockResolvedValue({
         ...mockUser,
         userName: 'multi@example.com',
         active: false,
@@ -767,11 +708,10 @@ describe('EndpointScimUsersService', () => {
         ],
       };
 
-      mockPrismaService.scimUser.findFirst
-        .mockResolvedValueOnce(mockUser)
-        .mockResolvedValueOnce(null);
+      mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-      mockPrismaService.scimUser.update.mockImplementation(async ({ data }: any) => ({
+      mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
         ...mockUser,
         rawPayload: data.rawPayload,
       }));
@@ -783,8 +723,7 @@ describe('EndpointScimUsersService', () => {
         mockEndpoint.id
       );
 
-      const updateCall = mockPrismaService.scimUser.update.mock.calls[0][0];
-      const storedPayload = JSON.parse(updateCall.data.rawPayload);
+      const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
       expect(storedPayload.nickName).toBe('TestNick');
     });
 
@@ -800,11 +739,10 @@ describe('EndpointScimUsersService', () => {
         ],
       };
 
-      mockPrismaService.scimUser.findFirst
-        .mockResolvedValueOnce(mockUser)
-        .mockResolvedValueOnce(null);
+      mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-      mockPrismaService.scimUser.update.mockResolvedValue({
+      mockUserRepo.update.mockResolvedValue({
         ...mockUser,
         externalId: 'pathed-ext-id',
       });
@@ -817,13 +755,9 @@ describe('EndpointScimUsersService', () => {
       );
 
       expect(result.externalId).toBe('pathed-ext-id');
-      expect(mockPrismaService.scimUser.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            externalId: 'pathed-ext-id',
-          }),
-        })
-      );
+      expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, expect.objectContaining({
+        externalId: 'pathed-ext-id',
+      }));
     });
 
     it('should remove simple attribute via path', async () => {
@@ -842,11 +776,10 @@ describe('EndpointScimUsersService', () => {
         ],
       };
 
-      mockPrismaService.scimUser.findFirst
-        .mockResolvedValueOnce(userWithNick)
-        .mockResolvedValueOnce(null);
+      mockUserRepo.findByScimId.mockResolvedValueOnce(userWithNick);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-      mockPrismaService.scimUser.update.mockImplementation(async ({ data }: any) => ({
+      mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
         ...userWithNick,
         rawPayload: data.rawPayload,
       }));
@@ -858,8 +791,7 @@ describe('EndpointScimUsersService', () => {
         mockEndpoint.id
       );
 
-      const updateCall = mockPrismaService.scimUser.update.mock.calls[0][0];
-      const storedPayload = JSON.parse(updateCall.data.rawPayload);
+      const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
       expect(storedPayload.nickName).toBeUndefined();
       expect(storedPayload.displayName).toBe('Test User');
     });
@@ -878,11 +810,10 @@ describe('EndpointScimUsersService', () => {
         ],
       };
 
-      mockPrismaService.scimUser.findFirst
-        .mockResolvedValueOnce(mockUser)
-        .mockResolvedValueOnce(null);
+      mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-      mockPrismaService.scimUser.update.mockImplementation(async ({ data }: any) => ({
+      mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
         ...mockUser,
         userName: data.userName,
         rawPayload: data.rawPayload,
@@ -895,9 +826,8 @@ describe('EndpointScimUsersService', () => {
         mockEndpoint.id
       );
 
-      const updateCall = mockPrismaService.scimUser.update.mock.calls[0][0];
-      expect(updateCall.data.userName).toBe('stripped@example.com');
-      const storedPayload = JSON.parse(updateCall.data.rawPayload);
+      expect(mockUserRepo.update.mock.calls[0][1].userName).toBe('stripped@example.com');
+      const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
       expect(storedPayload.displayName).toBe('Kept Display Name');
       // userName should be stripped from rawPayload since it's a DB column
       expect(storedPayload.userName).toBeUndefined();
@@ -925,11 +855,10 @@ describe('EndpointScimUsersService', () => {
           }),
         };
 
-        mockPrismaService.scimUser.findFirst
-          .mockResolvedValueOnce(userWithName)
-          .mockResolvedValueOnce(null);
+        mockUserRepo.findByScimId.mockResolvedValueOnce(userWithName);
+        mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-        mockPrismaService.scimUser.update.mockImplementation(async ({ data }: any) => ({
+        mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
           ...userWithName,
           rawPayload: data.rawPayload,
         }));
@@ -942,8 +871,7 @@ describe('EndpointScimUsersService', () => {
           verboseConfig
         );
 
-        const updateCall = mockPrismaService.scimUser.update.mock.calls[0][0];
-        const storedPayload = JSON.parse(updateCall.data.rawPayload);
+        const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
         expect(storedPayload.name).toBeDefined();
         expect(storedPayload.name.givenName).toBe('Lysanne');
         expect(storedPayload.name.familyName).toBe('Linwood');
@@ -968,11 +896,10 @@ describe('EndpointScimUsersService', () => {
           }),
         };
 
-        mockPrismaService.scimUser.findFirst
-          .mockResolvedValueOnce(userWithName)
-          .mockResolvedValueOnce(null);
+        mockUserRepo.findByScimId.mockResolvedValueOnce(userWithName);
+        mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-        mockPrismaService.scimUser.update.mockImplementation(async ({ data }: any) => ({
+        mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
           ...userWithName,
           rawPayload: data.rawPayload,
         }));
@@ -985,8 +912,7 @@ describe('EndpointScimUsersService', () => {
           mockEndpoint.id
         );
 
-        const updateCall = mockPrismaService.scimUser.update.mock.calls[0][0];
-        const storedPayload = JSON.parse(updateCall.data.rawPayload);
+        const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
         // Without the flag, dot-notation is stored as a flat key
         expect(storedPayload['name.givenName']).toBe('Lysanne');
         // Original name object should remain unchanged
@@ -1006,11 +932,10 @@ describe('EndpointScimUsersService', () => {
           rawPayload: JSON.stringify({ displayName: 'Test User' }),
         };
 
-        mockPrismaService.scimUser.findFirst
-          .mockResolvedValueOnce(userNoName)
-          .mockResolvedValueOnce(null);
+        mockUserRepo.findByScimId.mockResolvedValueOnce(userNoName);
+        mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-        mockPrismaService.scimUser.update.mockImplementation(async ({ data }: any) => ({
+        mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
           ...userNoName,
           rawPayload: data.rawPayload,
         }));
@@ -1023,8 +948,7 @@ describe('EndpointScimUsersService', () => {
           verboseConfig
         );
 
-        const updateCall = mockPrismaService.scimUser.update.mock.calls[0][0];
-        const storedPayload = JSON.parse(updateCall.data.rawPayload);
+        const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
         expect(storedPayload.name).toEqual({ givenName: 'Alice' });
       });
 
@@ -1043,11 +967,10 @@ describe('EndpointScimUsersService', () => {
           }),
         };
 
-        mockPrismaService.scimUser.findFirst
-          .mockResolvedValueOnce(userWithFullName)
-          .mockResolvedValueOnce(null);
+        mockUserRepo.findByScimId.mockResolvedValueOnce(userWithFullName);
+        mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-        mockPrismaService.scimUser.update.mockImplementation(async ({ data }: any) => ({
+        mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
           ...userWithFullName,
           rawPayload: data.rawPayload,
         }));
@@ -1060,8 +983,7 @@ describe('EndpointScimUsersService', () => {
           verboseConfig
         );
 
-        const updateCall = mockPrismaService.scimUser.update.mock.calls[0][0];
-        const storedPayload = JSON.parse(updateCall.data.rawPayload);
+        const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
         expect(storedPayload.name.givenName).toBe('Updated');
         expect(storedPayload.name.familyName).toBe('Keep');
         expect(storedPayload.name.formatted).toBe('Keep This');
@@ -1082,11 +1004,10 @@ describe('EndpointScimUsersService', () => {
           }),
         };
 
-        mockPrismaService.scimUser.findFirst
-          .mockResolvedValueOnce(userWithMiddleName)
-          .mockResolvedValueOnce(null);
+        mockUserRepo.findByScimId.mockResolvedValueOnce(userWithMiddleName);
+        mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-        mockPrismaService.scimUser.update.mockImplementation(async ({ data }: any) => ({
+        mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
           ...userWithMiddleName,
           rawPayload: data.rawPayload,
         }));
@@ -1099,8 +1020,7 @@ describe('EndpointScimUsersService', () => {
           verboseConfig
         );
 
-        const updateCall = mockPrismaService.scimUser.update.mock.calls[0][0];
-        const storedPayload = JSON.parse(updateCall.data.rawPayload);
+        const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
         expect(storedPayload.name.givenName).toBe('Alice');
         expect(storedPayload.name.familyName).toBe('Smith');
         expect(storedPayload.name.middleName).toBeUndefined();
@@ -1127,11 +1047,10 @@ describe('EndpointScimUsersService', () => {
           }),
         };
 
-        mockPrismaService.scimUser.findFirst
-          .mockResolvedValueOnce(userWithName)
-          .mockResolvedValueOnce(null);
+        mockUserRepo.findByScimId.mockResolvedValueOnce(userWithName);
+        mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-        mockPrismaService.scimUser.update.mockImplementation(async ({ data }: any) => ({
+        mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
           ...userWithName,
           rawPayload: data.rawPayload,
         }));
@@ -1144,8 +1063,7 @@ describe('EndpointScimUsersService', () => {
           verboseConfig
         );
 
-        const updateCall = mockPrismaService.scimUser.update.mock.calls[0][0];
-        const storedPayload = JSON.parse(updateCall.data.rawPayload);
+        const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
         expect(storedPayload.name.givenName).toBe('Lysanne');
         expect(storedPayload.name.familyName).toBe('Linwood');
         expect(storedPayload.name.formatted).toBe('Cristopher');
@@ -1166,11 +1084,10 @@ describe('EndpointScimUsersService', () => {
         displayName: 'Replaced User',
       };
 
-      mockPrismaService.scimUser.findFirst
-        .mockResolvedValueOnce(mockUser) // Find user to replace
-        .mockResolvedValueOnce(null); // No conflict
+      mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser); // Find user to replace
+      mockUserRepo.findConflict.mockResolvedValueOnce(null); // No conflict
 
-      mockPrismaService.scimUser.update.mockResolvedValue({
+      mockUserRepo.update.mockResolvedValue({
         ...mockUser,
         userName: replaceDto.userName,
         externalId: replaceDto.externalId,
@@ -1192,30 +1109,23 @@ describe('EndpointScimUsersService', () => {
 
   describe('deleteUserForEndpoint', () => {
     it('should delete user within endpoint', async () => {
-      mockPrismaService.scimUser.findFirst.mockResolvedValue(mockUser);
-      mockPrismaService.scimUser.delete.mockResolvedValue(mockUser);
+      mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+      mockUserRepo.delete.mockResolvedValue(mockUser);
 
       await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id);
 
-      expect(mockPrismaService.scimUser.findFirst).toHaveBeenCalledWith({
-        where: {
-          scimId: mockUser.scimId,
-          endpointId: mockEndpoint.id,
-        },
-      });
-      expect(mockPrismaService.scimUser.delete).toHaveBeenCalledWith({
-        where: { id: mockUser.id },
-      });
+      expect(mockUserRepo.findByScimId).toHaveBeenCalledWith(mockEndpoint.id, mockUser.scimId);
+      expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id);
     });
 
     it('should throw 404 if user not found in endpoint', async () => {
-      mockPrismaService.scimUser.findFirst.mockResolvedValue(null);
+      mockUserRepo.findByScimId.mockResolvedValue(null);
 
       await expect(
         service.deleteUserForEndpoint('non-existent', mockEndpoint.id)
       ).rejects.toThrow(HttpException);
 
-      expect(mockPrismaService.scimUser.delete).not.toHaveBeenCalled();
+      expect(mockUserRepo.delete).not.toHaveBeenCalled();
     });
   });
 
@@ -1223,18 +1133,13 @@ describe('EndpointScimUsersService', () => {
     it('should not allow accessing users from different endpoints', async () => {
       const endpoint2 = { ...mockEndpoint, id: 'endpoint-2' };
       
-      mockPrismaService.scimUser.findFirst.mockResolvedValue(null);
+      mockUserRepo.findByScimId.mockResolvedValue(null);
 
       await expect(
         service.getUserForEndpoint(mockUser.scimId, 'http://localhost:3000/scim', endpoint2.id)
       ).rejects.toThrow(HttpException);
 
-      expect(mockPrismaService.scimUser.findFirst).toHaveBeenCalledWith({
-        where: {
-          scimId: mockUser.scimId,
-          endpointId: endpoint2.id,
-        },
-      });
+      expect(mockUserRepo.findByScimId).toHaveBeenCalledWith(endpoint2.id, mockUser.scimId);
     });
 
     it('should allow same userName across different endpoints', async () => {
@@ -1245,8 +1150,8 @@ describe('EndpointScimUsersService', () => {
       };
 
       // No conflict within endpoint-2
-      mockPrismaService.scimUser.findFirst.mockResolvedValue(null);
-      mockPrismaService.scimUser.create.mockResolvedValue({
+      mockUserRepo.findConflict.mockResolvedValue(null);
+      mockUserRepo.create.mockResolvedValue({
         ...mockUser,
         id: 'user-2',
         endpointId: 'endpoint-2',
@@ -1262,7 +1167,7 @@ describe('EndpointScimUsersService', () => {
 
       expect(result.userName).toBe(createDto.userName);
       // Verify that endpoint isolation is enforced in the uniqueness check
-      expect(mockPrismaService.scimUser.findFirst).toHaveBeenCalled();
+      expect(mockUserRepo.findConflict).toHaveBeenCalled();
     });
   });
 
@@ -1271,7 +1176,7 @@ describe('EndpointScimUsersService', () => {
   describe('case-insensitivity compliance (RFC 7643)', () => {
     describe('filter attribute names', () => {
       it('should accept filter with "UserName" (mixed case) as attribute', async () => {
-        mockPrismaService.scimUser.findMany.mockResolvedValue([mockUser]);
+        mockUserRepo.findAll.mockResolvedValue([mockUser]);
 
         const result = await service.listUsersForEndpoint(
           { filter: 'UserName eq "test@example.com"', startIndex: 1, count: 10 },
@@ -1281,18 +1186,11 @@ describe('EndpointScimUsersService', () => {
 
         // userName filter is applied in-code for case-insensitive matching
         expect(result.totalResults).toBe(1);
-        expect(mockPrismaService.scimUser.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              endpointId: mockEndpoint.id,
-            }),
-            orderBy: { createdAt: 'asc' },
-          })
-        );
+        expect(mockUserRepo.findAll).toHaveBeenCalledWith(mockEndpoint.id, expect.anything(), expect.anything());
       });
 
       it('should accept filter with "USERNAME" (all caps) as attribute', async () => {
-        mockPrismaService.scimUser.findMany.mockResolvedValue([mockUser]);
+        mockUserRepo.findAll.mockResolvedValue([mockUser]);
 
         const result = await service.listUsersForEndpoint(
           { filter: 'USERNAME eq "test@example.com"', startIndex: 1, count: 10 },
@@ -1302,19 +1200,11 @@ describe('EndpointScimUsersService', () => {
 
         // userName filter applied in-code; "USERNAME" attribute resolved case-insensitively
         expect(result.totalResults).toBe(1);
-        expect(mockPrismaService.scimUser.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              endpointId: mockEndpoint.id,
-            }),
-            orderBy: { createdAt: 'asc' },
-          })
-        );
+        expect(mockUserRepo.findAll).toHaveBeenCalledWith(mockEndpoint.id, expect.anything(), expect.anything());
       });
 
       it('should accept filter with "EXTERNALID" (all caps) as attribute', async () => {
-        mockPrismaService.scimUser.count.mockResolvedValue(1);
-        mockPrismaService.scimUser.findMany.mockResolvedValue([mockUser]);
+        mockUserRepo.findAll.mockResolvedValue([mockUser]);
 
         await service.listUsersForEndpoint(
           { filter: 'EXTERNALID eq "ext-123"', startIndex: 1, count: 10 },
@@ -1322,19 +1212,15 @@ describe('EndpointScimUsersService', () => {
           mockEndpoint.id
         );
 
-        expect(mockPrismaService.scimUser.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              externalId: 'ext-123',
-            }),
-          })
-        );
+        expect(mockUserRepo.findAll).toHaveBeenCalledWith(mockEndpoint.id, expect.objectContaining({
+          externalId: 'ext-123',
+        }), expect.anything());
       });
     });
 
     describe('case-insensitive userName filter value', () => {
       it('should lowercase userName filter value for case-insensitive matching', async () => {
-        mockPrismaService.scimUser.findMany.mockResolvedValue([mockUser]);
+        mockUserRepo.findAll.mockResolvedValue([mockUser]);
 
         // Filter value "Test@Example.COM" should match mockUser.userName "test@example.com" case-insensitively
         const result = await service.listUsersForEndpoint(
@@ -1358,16 +1244,18 @@ describe('EndpointScimUsersService', () => {
         };
 
         // Simulate conflict found by userNameLower query
-        mockPrismaService.scimUser.findFirst.mockResolvedValue({
-          ...mockUser,
+        mockUserRepo.findConflict.mockReset();
+        mockUserRepo.findConflict.mockResolvedValue({
+          scimId: mockUser.scimId,
           userName: 'test@example.com',
+          externalId: null,
         });
 
         await expect(
           service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id)
         ).rejects.toThrow();
 
-        expect(mockPrismaService.scimUser.create).not.toHaveBeenCalled();
+        expect(mockUserRepo.create).not.toHaveBeenCalled();
       });
 
       it('should query uniqueness using userNameLower', async () => {
@@ -1377,8 +1265,8 @@ describe('EndpointScimUsersService', () => {
           active: true,
         };
 
-        mockPrismaService.scimUser.findFirst.mockResolvedValue(null);
-        mockPrismaService.scimUser.create.mockResolvedValue({
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.create.mockResolvedValue({
           ...mockUser,
           userName: 'NewUser@Example.COM',
           userNameLower: 'newuser@example.com',
@@ -1386,15 +1274,12 @@ describe('EndpointScimUsersService', () => {
 
         await service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
-        // Uniqueness check should use userNameLower
-        expect(mockPrismaService.scimUser.findFirst).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: expect.objectContaining({
-              AND: expect.arrayContaining([
-                expect.objectContaining({ userNameLower: 'newuser@example.com' }),
-              ]),
-            }),
-          })
+        // findConflict receives the raw userName; the repository handles lowercasing internally
+        expect(mockUserRepo.findConflict).toHaveBeenCalledWith(
+          mockEndpoint.id,
+          'NewUser@Example.COM',
+          undefined,
+          undefined,
         );
       });
     });
@@ -1407,8 +1292,8 @@ describe('EndpointScimUsersService', () => {
           active: true,
         };
 
-        mockPrismaService.scimUser.findFirst.mockResolvedValue(null);
-        mockPrismaService.scimUser.create.mockResolvedValue({
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.create.mockResolvedValue({
           ...mockUser,
           userName: createDto.userName,
           userNameLower: createDto.userName.toLowerCase(),
@@ -1433,8 +1318,8 @@ describe('EndpointScimUsersService', () => {
           active: true,
         };
 
-        mockPrismaService.scimUser.findFirst.mockResolvedValue(null);
-        mockPrismaService.scimUser.create.mockResolvedValue({
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.create.mockResolvedValue({
           ...mockUser,
           userName: createDto.userName,
           userNameLower: 'mixedcase@example.com',
@@ -1442,12 +1327,10 @@ describe('EndpointScimUsersService', () => {
 
         await service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
-        expect(mockPrismaService.scimUser.create).toHaveBeenCalledWith(
+        expect(mockUserRepo.create).toHaveBeenCalledWith(
           expect.objectContaining({
-            data: expect.objectContaining({
-              userName: 'MixedCase@Example.COM',
-              userNameLower: 'mixedcase@example.com',
-            }),
+            userName: 'MixedCase@Example.COM',
+            userNameLower: 'mixedcase@example.com',
           })
         );
       });
@@ -1459,11 +1342,10 @@ describe('EndpointScimUsersService', () => {
           active: true,
         };
 
-        mockPrismaService.scimUser.findFirst
-          .mockResolvedValueOnce(mockUser)
-          .mockResolvedValueOnce(null);
+        mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser);
+        mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-        mockPrismaService.scimUser.update.mockResolvedValue({
+        mockUserRepo.update.mockResolvedValue({
           ...mockUser,
           userName: replaceDto.userName,
           userNameLower: 'replaced@example.com',
@@ -1476,14 +1358,10 @@ describe('EndpointScimUsersService', () => {
           mockEndpoint.id
         );
 
-        expect(mockPrismaService.scimUser.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            data: expect.objectContaining({
-              userName: 'REPLACED@EXAMPLE.COM',
-              userNameLower: 'replaced@example.com',
-            }),
-          })
-        );
+        expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, expect.objectContaining({
+          userName: 'REPLACED@EXAMPLE.COM',
+          userNameLower: 'replaced@example.com',
+        }));
       });
 
       it('should store userNameLower on PATCH userName update', async () => {
@@ -1494,11 +1372,10 @@ describe('EndpointScimUsersService', () => {
           ],
         };
 
-        mockPrismaService.scimUser.findFirst
-          .mockResolvedValueOnce(mockUser)
-          .mockResolvedValueOnce(null);
+        mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser);
+        mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-        mockPrismaService.scimUser.update.mockResolvedValue({
+        mockUserRepo.update.mockResolvedValue({
           ...mockUser,
           userName: 'PATCHED@EXAMPLE.COM',
           userNameLower: 'patched@example.com',
@@ -1511,14 +1388,10 @@ describe('EndpointScimUsersService', () => {
           mockEndpoint.id
         );
 
-        expect(mockPrismaService.scimUser.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            data: expect.objectContaining({
-              userName: 'PATCHED@EXAMPLE.COM',
-              userNameLower: 'patched@example.com',
-            }),
-          })
-        );
+        expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, expect.objectContaining({
+          userName: 'PATCHED@EXAMPLE.COM',
+          userNameLower: 'patched@example.com',
+        }));
       });
     });
 
@@ -1534,11 +1407,10 @@ describe('EndpointScimUsersService', () => {
           ],
         };
 
-        mockPrismaService.scimUser.findFirst
-          .mockResolvedValueOnce(mockUser)
-          .mockResolvedValueOnce(null);
+        mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser);
+        mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-        mockPrismaService.scimUser.update.mockImplementation(async ({ data }: any) => ({
+        mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
           ...mockUser,
           userName: data.userName,
           rawPayload: data.rawPayload,
@@ -1552,13 +1424,9 @@ describe('EndpointScimUsersService', () => {
         );
 
         expect(result.userName).toBe('normalized@example.com');
-        expect(mockPrismaService.scimUser.update).toHaveBeenCalledWith(
-          expect.objectContaining({
-            data: expect.objectContaining({
-              userName: 'normalized@example.com',
-            }),
-          })
-        );
+        expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, expect.objectContaining({
+          userName: 'normalized@example.com',
+        }));
       });
 
       it('should normalize DISPLAYNAME to displayName in no-path replace', async () => {
@@ -1572,11 +1440,10 @@ describe('EndpointScimUsersService', () => {
           ],
         };
 
-        mockPrismaService.scimUser.findFirst
-          .mockResolvedValueOnce(mockUser)
-          .mockResolvedValueOnce(null);
+        mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser);
+        mockUserRepo.findConflict.mockResolvedValueOnce(null);
 
-        mockPrismaService.scimUser.update.mockImplementation(async ({ data }: any) => ({
+        mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
           ...mockUser,
           rawPayload: data.rawPayload,
         }));
@@ -1588,8 +1455,7 @@ describe('EndpointScimUsersService', () => {
           mockEndpoint.id
         );
 
-        const updateCall = mockPrismaService.scimUser.update.mock.calls[0][0];
-        const storedPayload = JSON.parse(updateCall.data.rawPayload);
+        const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
         expect(storedPayload.displayName).toBe('All Caps Key');
         // DISPLAYNAME should not appear as a separate key
         expect(storedPayload.DISPLAYNAME).toBeUndefined();
