@@ -1,9 +1,9 @@
 /**
  * PrismaUserRepository — IUserRepository backed by Prisma (SQLite / PostgreSQL).
  *
- * This is a thin wrapper around PrismaService that translates between
- * domain types and Prisma-generated types. All Prisma-specific concerns
- * (relation syntax, where-clause shapes, transactions) are contained here.
+ * Phase 2: Queries the unified `ScimResource` table with `resourceType = 'User'`
+ * instead of the legacy `ScimUser` table. The domain types (UserRecord, etc.)
+ * remain unchanged — this repository handles the mapping transparently.
  */
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../modules/prisma/prisma.service';
@@ -16,13 +16,31 @@ import type {
 } from '../../../domain/models/user.model';
 import type { Prisma } from '../../../generated/prisma/client';
 
+/** Maps a ScimResource row to the UserRecord domain type. */
+function toUserRecord(resource: Record<string, unknown>): UserRecord {
+  return {
+    id: resource.id as string,
+    endpointId: resource.endpointId as string,
+    scimId: resource.scimId as string,
+    externalId: (resource.externalId as string) ?? null,
+    userName: resource.userName as string,
+    userNameLower: resource.userNameLower as string,
+    active: resource.active as boolean,
+    rawPayload: resource.rawPayload as string,
+    meta: (resource.meta as string) ?? null,
+    createdAt: resource.createdAt as Date,
+    updatedAt: resource.updatedAt as Date,
+  };
+}
+
 @Injectable()
 export class PrismaUserRepository implements IUserRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(input: UserCreateInput): Promise<UserRecord> {
-    const created = await this.prisma.scimUser.create({
+    const created = await this.prisma.scimResource.create({
       data: {
+        resourceType: 'User',
         scimId: input.scimId,
         externalId: input.externalId,
         userName: input.userName,
@@ -33,14 +51,14 @@ export class PrismaUserRepository implements IUserRepository {
         endpoint: { connect: { id: input.endpointId } },
       },
     });
-    return created as UserRecord;
+    return toUserRecord(created as unknown as Record<string, unknown>);
   }
 
   async findByScimId(endpointId: string, scimId: string): Promise<UserRecord | null> {
-    const user = await this.prisma.scimUser.findFirst({
-      where: { scimId, endpointId },
+    const resource = await this.prisma.scimResource.findFirst({
+      where: { scimId, endpointId, resourceType: 'User' },
     });
-    return user as UserRecord | null;
+    return resource ? toUserRecord(resource as unknown as Record<string, unknown>) : null;
   }
 
   async findAll(
@@ -48,32 +66,33 @@ export class PrismaUserRepository implements IUserRepository {
     dbFilter?: Record<string, unknown>,
     orderBy?: { field: string; direction: 'asc' | 'desc' },
   ): Promise<UserRecord[]> {
-    const where: Prisma.ScimUserWhereInput = {
-      ...(dbFilter as Prisma.ScimUserWhereInput),
+    const where: Prisma.ScimResourceWhereInput = {
+      ...(dbFilter as Prisma.ScimResourceWhereInput),
       endpointId,
+      resourceType: 'User',
     };
 
     const prismaOrderBy = orderBy
       ? { [orderBy.field]: orderBy.direction }
       : { createdAt: 'asc' as const };
 
-    const users = await this.prisma.scimUser.findMany({
+    const resources = await this.prisma.scimResource.findMany({
       where,
       orderBy: prismaOrderBy,
     });
-    return users as UserRecord[];
+    return resources.map((r) => toUserRecord(r as unknown as Record<string, unknown>));
   }
 
   async update(id: string, data: UserUpdateInput): Promise<UserRecord> {
-    const updated = await this.prisma.scimUser.update({
+    const updated = await this.prisma.scimResource.update({
       where: { id },
-      data: data as Prisma.ScimUserUpdateInput,
+      data: data as Prisma.ScimResourceUpdateInput,
     });
-    return updated as UserRecord;
+    return toUserRecord(updated as unknown as Record<string, unknown>);
   }
 
   async delete(id: string): Promise<void> {
-    await this.prisma.scimUser.delete({ where: { id } });
+    await this.prisma.scimResource.delete({ where: { id } });
   }
 
   async findConflict(
@@ -82,14 +101,16 @@ export class PrismaUserRepository implements IUserRepository {
     externalId?: string,
     excludeScimId?: string,
   ): Promise<UserConflictResult | null> {
-    const orConditions: Prisma.ScimUserWhereInput[] = [
+    const orConditions: Prisma.ScimResourceWhereInput[] = [
       { userNameLower: userName.toLowerCase() },
     ];
     if (externalId) {
       orConditions.push({ externalId });
     }
 
-    const filters: Prisma.ScimUserWhereInput[] = [{ endpointId }];
+    const filters: Prisma.ScimResourceWhereInput[] = [
+      { endpointId, resourceType: 'User' },
+    ];
     if (excludeScimId) {
       filters.push({ NOT: { scimId: excludeScimId } });
     }
@@ -99,16 +120,16 @@ export class PrismaUserRepository implements IUserRepository {
       filters.push({ OR: orConditions });
     }
 
-    const conflict = await this.prisma.scimUser.findFirst({
+    const conflict = await this.prisma.scimResource.findFirst({
       where: { AND: filters },
       select: { scimId: true, userName: true, externalId: true },
     });
 
-    if (!conflict) return null;
+    if (!conflict || !conflict.userName) return null;
     return {
       scimId: conflict.scimId,
       userName: conflict.userName,
-      externalId: conflict.externalId,
+      externalId: conflict.externalId ?? null,
     };
   }
 
@@ -117,8 +138,8 @@ export class PrismaUserRepository implements IUserRepository {
     scimIds: string[],
   ): Promise<Array<Pick<UserRecord, 'id' | 'scimId'>>> {
     if (scimIds.length === 0) return [];
-    return this.prisma.scimUser.findMany({
-      where: { scimId: { in: scimIds }, endpointId },
+    return this.prisma.scimResource.findMany({
+      where: { scimId: { in: scimIds }, endpointId, resourceType: 'User' },
       select: { id: true, scimId: true },
     });
   }

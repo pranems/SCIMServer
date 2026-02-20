@@ -24,9 +24,13 @@ model Endpoint {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  // Legacy relations — kept for data migration (Phase 2 transitional)
   users   ScimUser[]
   groups  ScimGroup[]
   logs    RequestLog[]
+
+  // Phase 2: Unified resource relation
+  resources ScimResource[]
 
   @@index([active])
 }
@@ -116,4 +120,60 @@ model RequestLog {
   @@index([method])
   @@index([status])
   @@index([endpointId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 2 — Unified scim_resource table
+//
+// Replaces separate ScimUser + ScimGroup tables with a single polymorphic table.
+// The resourceType discriminator ("User" / "Group") determines which columns are
+// populated. This enables adding new resource types without schema changes.
+//
+// The old models (ScimUser, ScimGroup, GroupMember) above are kept temporarily
+// for data migration support. They will be removed once migration is verified.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model ScimResource {
+  id               String   @id @default(cuid())
+  endpointId       String   // FK to Endpoint (tenant isolation)
+  resourceType     String   // "User" or "Group" (discriminator)
+  scimId           String   // SCIM-visible identifier
+  externalId       String?  // Provisioning client identifier
+  userName         String?  // Only for Users — original casing preserved
+  userNameLower    String?  // Only for Users — SQLite compromise for case-insensitive uniqueness
+  displayName      String?  // Only for Groups (or Users with display name)
+  displayNameLower String?  // Only for Groups — SQLite compromise for case-insensitive filtering
+  active           Boolean  @default(true)
+  rawPayload       String   // Full SCIM JSON (String until Phase 3 → JSONB)
+  version          Int      @default(1) // Optimistic locking (Phase 7)
+  meta             String?  // SCIM meta object JSON
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  endpoint         Endpoint         @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  membersAsGroup   ResourceMember[] @relation("GroupMembers")
+  membersAsMember  ResourceMember[] @relation("MemberResources")
+
+  // Composite unique constraints
+  @@unique([endpointId, scimId])
+  @@unique([endpointId, userNameLower])       // NULL-safe: allows multiple NULLs for Groups
+  @@unique([endpointId, displayNameLower])    // NULL-safe: allows multiple NULLs for Users
+  @@unique([endpointId, resourceType, externalId]) // Scoped per type to avoid User/Group externalId collisions
+  @@index([endpointId, resourceType])
+}
+
+model ResourceMember {
+  id               String    @id @default(cuid())
+  groupResourceId  String    // FK to ScimResource (the group)
+  memberResourceId String?   // FK to ScimResource (the member user/group) — nullable for unresolved refs
+  value            String    // SCIM member value (typically the member's scimId)
+  type             String?   // SCIM member type ("User", "Group", etc.)
+  display          String?   // Display name of the member
+  createdAt        DateTime  @default(now())
+
+  group  ScimResource  @relation("GroupMembers", fields: [groupResourceId], references: [id], onDelete: Cascade)
+  member ScimResource? @relation("MemberResources", fields: [memberResourceId], references: [id], onDelete: SetNull)
+
+  @@index([groupResourceId])
+  @@index([memberResourceId])
 }
