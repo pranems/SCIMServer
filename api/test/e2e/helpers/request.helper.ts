@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { Response } from 'supertest';
+import { beginE2eFlowStep, finishE2eFlowStep } from './flow-trace.helper';
 
 /**
  * SCIM-aware HTTP request helpers.
@@ -17,11 +18,33 @@ export function scimPost(
   token: string,
   body: object,
 ): request.Test {
-  return request(app.getHttpServer())
+  const req = request(app.getHttpServer())
     .post(path)
     .set('Authorization', `Bearer ${token}`)
     .set('Content-Type', 'application/scim+json')
     .send(body);
+  const trace = beginE2eFlowStep({
+    method: 'POST',
+    url: path,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/scim+json',
+    },
+    body,
+  });
+  req.on('response', (res: any) => {
+    finishE2eFlowStep(trace, {
+      status: res.status,
+      headers: res.headers,
+      body: res.body ?? res.text,
+    });
+  });
+  req.on('error', (err: Error) => {
+    finishE2eFlowStep(trace, {
+      errorMessage: err.message,
+    });
+  });
+  return req;
 }
 
 // ────────────────────── GET ──────────────────────
@@ -31,10 +54,31 @@ export function scimGet(
   path: string,
   token: string,
 ): request.Test {
-  return request(app.getHttpServer())
+  const req = request(app.getHttpServer())
     .get(path)
     .set('Authorization', `Bearer ${token}`)
     .set('Accept', 'application/scim+json');
+  const trace = beginE2eFlowStep({
+    method: 'GET',
+    url: path,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/scim+json',
+    },
+  });
+  req.on('response', (res: any) => {
+    finishE2eFlowStep(trace, {
+      status: res.status,
+      headers: res.headers,
+      body: res.body ?? res.text,
+    });
+  });
+  req.on('error', (err: Error) => {
+    finishE2eFlowStep(trace, {
+      errorMessage: err.message,
+    });
+  });
+  return req;
 }
 
 // ────────────────────── PUT ──────────────────────
@@ -45,11 +89,33 @@ export function scimPut(
   token: string,
   body: object,
 ): request.Test {
-  return request(app.getHttpServer())
+  const req = request(app.getHttpServer())
     .put(path)
     .set('Authorization', `Bearer ${token}`)
     .set('Content-Type', 'application/scim+json')
     .send(body);
+  const trace = beginE2eFlowStep({
+    method: 'PUT',
+    url: path,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/scim+json',
+    },
+    body,
+  });
+  req.on('response', (res: any) => {
+    finishE2eFlowStep(trace, {
+      status: res.status,
+      headers: res.headers,
+      body: res.body ?? res.text,
+    });
+  });
+  req.on('error', (err: Error) => {
+    finishE2eFlowStep(trace, {
+      errorMessage: err.message,
+    });
+  });
+  return req;
 }
 
 // ────────────────────── PATCH ──────────────────────
@@ -60,11 +126,33 @@ export function scimPatch(
   token: string,
   body: object,
 ): request.Test {
-  return request(app.getHttpServer())
+  const req = request(app.getHttpServer())
     .patch(path)
     .set('Authorization', `Bearer ${token}`)
     .set('Content-Type', 'application/scim+json')
     .send(body);
+  const trace = beginE2eFlowStep({
+    method: 'PATCH',
+    url: path,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/scim+json',
+    },
+    body,
+  });
+  req.on('response', (res: any) => {
+    finishE2eFlowStep(trace, {
+      status: res.status,
+      headers: res.headers,
+      body: res.body ?? res.text,
+    });
+  });
+  req.on('error', (err: Error) => {
+    finishE2eFlowStep(trace, {
+      errorMessage: err.message,
+    });
+  });
+  return req;
 }
 
 // ────────────────────── DELETE ──────────────────────
@@ -74,9 +162,29 @@ export function scimDelete(
   path: string,
   token: string,
 ): request.Test {
-  return request(app.getHttpServer())
+  const req = request(app.getHttpServer())
     .delete(path)
     .set('Authorization', `Bearer ${token}`);
+  const trace = beginE2eFlowStep({
+    method: 'DELETE',
+    url: path,
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  req.on('response', (res: any) => {
+    finishE2eFlowStep(trace, {
+      status: res.status,
+      headers: res.headers,
+      body: res.body ?? res.text,
+    });
+  });
+  req.on('error', (err: Error) => {
+    finishE2eFlowStep(trace, {
+      errorMessage: err.message,
+    });
+  });
+  return req;
 }
 
 // ────────────────────── Endpoint helpers ──────────────────────
@@ -91,12 +199,28 @@ export async function createEndpoint(
   name?: string,
 ): Promise<string> {
   const endpointName = name ?? `e2e-${Date.now()}`;
+  const requestBody = { name: endpointName };
+  const trace = beginE2eFlowStep({
+    method: 'POST',
+    url: '/scim/admin/endpoints',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: requestBody,
+  });
   const res: Response = await request(app.getHttpServer())
     .post('/scim/admin/endpoints')
     .set('Authorization', `Bearer ${token}`)
     .set('Content-Type', 'application/json')
-    .send({ name: endpointName })
+    .send(requestBody)
     .expect(201);
+
+  finishE2eFlowStep(trace, {
+    status: res.status,
+    headers: res.headers as Record<string, string | string[]>,
+    body: res.body,
+  });
 
   return res.body.id as string;
 }
@@ -113,12 +237,28 @@ export async function createEndpointWithConfig(
   name?: string,
 ): Promise<string> {
   const endpointName = name ?? `e2e-cfg-${Date.now()}`;
+  const requestBody = { name: endpointName, config };
+  const trace = beginE2eFlowStep({
+    method: 'POST',
+    url: '/scim/admin/endpoints',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: requestBody,
+  });
   const res: Response = await request(app.getHttpServer())
     .post('/scim/admin/endpoints')
     .set('Authorization', `Bearer ${token}`)
     .set('Content-Type', 'application/json')
-    .send({ name: endpointName, config })
+    .send(requestBody)
     .expect(201);
+
+  finishE2eFlowStep(trace, {
+    status: res.status,
+    headers: res.headers as Record<string, string | string[]>,
+    body: res.body,
+  });
 
   return res.body.id as string;
 }
@@ -131,12 +271,27 @@ export async function deactivateEndpoint(
   token: string,
   endpointId: string,
 ): Promise<void> {
-  await request(app.getHttpServer())
+  const trace = beginE2eFlowStep({
+    method: 'PATCH',
+    url: `/scim/admin/endpoints/${endpointId}`,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: { active: false },
+  });
+  const res = await request(app.getHttpServer())
     .patch(`/scim/admin/endpoints/${endpointId}`)
     .set('Authorization', `Bearer ${token}`)
     .set('Content-Type', 'application/json')
     .send({ active: false })
     .expect(200);
+
+  finishE2eFlowStep(trace, {
+    status: res.status,
+    headers: res.headers as Record<string, string | string[]>,
+    body: res.body,
+  });
 }
 
 /**

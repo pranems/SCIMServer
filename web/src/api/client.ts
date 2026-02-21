@@ -114,6 +114,7 @@ export interface VersionInfo {
     startedAt: string;
     uptimeSeconds: number;
     timezone: string;
+    utcOffset?: string;
   };
   runtime: {
     node: string;
@@ -139,10 +140,27 @@ export interface VersionInfo {
   };
   storage?: {
     databaseUrl?: string;
-    databaseProvider: 'sqlite';
-    blobBackupConfigured: boolean;
-    blobAccount?: string;
-    blobContainer?: string;
+    databaseProvider: 'postgresql';
+    persistenceBackend: 'prisma' | 'inmemory';
+    connectionPool?: {
+      maxConnections: number;
+    };
+  };
+  container?: {
+    app: {
+      id?: string;
+      name?: string;
+      image?: string;
+      runtime: string;
+      platform: string;
+    };
+    database?: {
+      host: string;
+      port: number;
+      name: string;
+      provider: string;
+      version?: string;
+    };
   };
   deployment?: DeploymentInfo;
 }

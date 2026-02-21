@@ -268,10 +268,11 @@ Admin endpoints (non-SCIM but mounted under `/scim/admin`)
 1) GET /admin/version
 - Returns `VersionInfo` including:
   - `version`, `commit`, `buildTime`
-  - `service` (environment, API prefix/base path, uptime, timezone)
+  - `service` (environment, API prefix/base path, uptime, timezone, utcOffset)
   - `runtime` (node/platform/arch, pid/hostname/cpu, memory usage, containerized flag)
   - `auth` (configuration status booleans only; no secrets)
-  - `storage` (database URL with sensitive values masked, blob backup config)
+  - `storage` (database URL with credentials masked, provider, persistence backend, connection pool)
+  - `container` (present only when containerized — app id/name/image/runtime/platform; database host/port/name/provider)
   - `deployment` metadata
 - Example:
 ```
@@ -281,11 +282,13 @@ curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/admin/versio
 - Sample response (trimmed):
 ```
 {
-  "version": "0.10.0",
+  "version": "0.11.0",
   "service": {
     "environment": "production",
     "scimBasePath": "/scim/v2",
-    "uptimeSeconds": 1234.567
+    "uptimeSeconds": 1234.567,
+    "timezone": "UTC",
+    "utcOffset": "+00:00"
   },
   "runtime": {
     "node": "v24.x",
@@ -303,12 +306,27 @@ curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/admin/versio
     "scimSharedSecretConfigured": true
   },
   "storage": {
-    "databaseUrl": "file:/tmp/local-data/scim.db",
-    "databaseProvider": "sqlite",
-    "blobBackupConfigured": true
+    "databaseUrl": "postgresql://***:***@postgres:5432/scimdb?schema=public",
+    "databaseProvider": "postgresql",
+    "persistenceBackend": "prisma",
+    "connectionPool": { "maxConnections": 5 }
+  },
+  "container": {
+    "app": {
+      "id": "7d32d069b1af",
+      "name": "7d32d069b1af",
+      "runtime": "Node.js v24.13.1",
+      "platform": "linux/x64"
+    },
+    "database": {
+      "host": "postgres",
+      "port": 5432,
+      "name": "scimdb",
+      "provider": "PostgreSQL 17-alpine"
+    }
   },
   "deployment": {
-    "backupMode": "blob"
+    "migratePhase": "Phase 3 — PostgreSQL Migration"
   }
 }
 ```

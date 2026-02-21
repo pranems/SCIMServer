@@ -29,7 +29,6 @@ describe('EndpointScimUsersService', () => {
     endpointId: 'endpoint-1',
     externalId: 'ext-123',
     userName: 'test@example.com',
-    userNameLower: 'test@example.com',
     active: true,
     rawPayload: '{"displayName":"Test User"}',
     meta: JSON.stringify({
@@ -224,7 +223,6 @@ describe('EndpointScimUsersService', () => {
         id: `user-${i}`,
         scimId: `scim-${i}`,
         userName: `user${i}@example.com`,
-        userNameLower: `user${i}@example.com`,
       }));
       mockUserRepo.findAll.mockResolvedValue(manyUsers);
 
@@ -1156,7 +1154,6 @@ describe('EndpointScimUsersService', () => {
         id: 'user-2',
         endpointId: 'endpoint-2',
         userName: createDto.userName,
-        userNameLower: createDto.userName.toLowerCase(),
       });
 
       const result = await service.createUserForEndpoint(
@@ -1243,7 +1240,7 @@ describe('EndpointScimUsersService', () => {
           active: true,
         };
 
-        // Simulate conflict found by userNameLower query
+        // Simulate conflict found by userName query (CITEXT case-insensitive)
         mockUserRepo.findConflict.mockReset();
         mockUserRepo.findConflict.mockResolvedValue({
           scimId: mockUser.scimId,
@@ -1258,7 +1255,7 @@ describe('EndpointScimUsersService', () => {
         expect(mockUserRepo.create).not.toHaveBeenCalled();
       });
 
-      it('should query uniqueness using userNameLower', async () => {
+      it('should query uniqueness using userName (case-insensitive via CITEXT)', async () => {
         const createDto: CreateUserDto = {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
           userName: 'NewUser@Example.COM',
@@ -1269,7 +1266,6 @@ describe('EndpointScimUsersService', () => {
         mockUserRepo.create.mockResolvedValue({
           ...mockUser,
           userName: 'NewUser@Example.COM',
-          userNameLower: 'newuser@example.com',
         });
 
         await service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id);
@@ -1296,7 +1292,6 @@ describe('EndpointScimUsersService', () => {
         mockUserRepo.create.mockResolvedValue({
           ...mockUser,
           userName: createDto.userName,
-          userNameLower: createDto.userName.toLowerCase(),
         });
 
         // Should not throw despite different casing
@@ -1307,91 +1302,6 @@ describe('EndpointScimUsersService', () => {
         );
 
         expect(result.userName).toBe(createDto.userName);
-      });
-    });
-
-    describe('userNameLower stored on write operations', () => {
-      it('should store userNameLower on create', async () => {
-        const createDto: CreateUserDto = {
-          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
-          userName: 'MixedCase@Example.COM',
-          active: true,
-        };
-
-        mockUserRepo.findConflict.mockResolvedValue(null);
-        mockUserRepo.create.mockResolvedValue({
-          ...mockUser,
-          userName: createDto.userName,
-          userNameLower: 'mixedcase@example.com',
-        });
-
-        await service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id);
-
-        expect(mockUserRepo.create).toHaveBeenCalledWith(
-          expect.objectContaining({
-            userName: 'MixedCase@Example.COM',
-            userNameLower: 'mixedcase@example.com',
-          })
-        );
-      });
-
-      it('should store userNameLower on replace/PUT', async () => {
-        const replaceDto: CreateUserDto = {
-          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
-          userName: 'REPLACED@EXAMPLE.COM',
-          active: true,
-        };
-
-        mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser);
-        mockUserRepo.findConflict.mockResolvedValueOnce(null);
-
-        mockUserRepo.update.mockResolvedValue({
-          ...mockUser,
-          userName: replaceDto.userName,
-          userNameLower: 'replaced@example.com',
-        });
-
-        await service.replaceUserForEndpoint(
-          mockUser.scimId,
-          replaceDto,
-          'http://localhost:3000/scim',
-          mockEndpoint.id
-        );
-
-        expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, expect.objectContaining({
-          userName: 'REPLACED@EXAMPLE.COM',
-          userNameLower: 'replaced@example.com',
-        }));
-      });
-
-      it('should store userNameLower on PATCH userName update', async () => {
-        const patchDto: PatchUserDto = {
-          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
-          Operations: [
-            { op: 'replace', path: 'userName', value: 'PATCHED@EXAMPLE.COM' },
-          ],
-        };
-
-        mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser);
-        mockUserRepo.findConflict.mockResolvedValueOnce(null);
-
-        mockUserRepo.update.mockResolvedValue({
-          ...mockUser,
-          userName: 'PATCHED@EXAMPLE.COM',
-          userNameLower: 'patched@example.com',
-        });
-
-        await service.patchUserForEndpoint(
-          mockUser.scimId,
-          patchDto,
-          'http://localhost:3000/scim',
-          mockEndpoint.id
-        );
-
-        expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, expect.objectContaining({
-          userName: 'PATCHED@EXAMPLE.COM',
-          userNameLower: 'patched@example.com',
-        }));
       });
     });
 
@@ -1459,6 +1369,154 @@ describe('EndpointScimUsersService', () => {
         expect(storedPayload.displayName).toBe('All Caps Key');
         // DISPLAYNAME should not appear as a separate key
         expect(storedPayload.DISPLAYNAME).toBeUndefined();
+      });
+    });
+  });
+
+  // ───────────── SCIM ID LEAK PREVENTION (Issue 16) ─────────────
+
+  describe('SCIM ID leak prevention', () => {
+    describe('createUserForEndpoint — client-supplied id must be ignored', () => {
+      it('should not leak client-supplied id into the response', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'idleak@example.com',
+          active: true,
+          displayName: 'ID Leak Test',
+          id: 'client-fake-id-should-be-ignored',  // Client tries to supply an id
+        } as CreateUserDto & { id: string };
+
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.create.mockResolvedValue({
+          ...mockUser,
+          userName: createDto.userName,
+          rawPayload: '{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"displayName":"ID Leak Test"}',
+        });
+
+        const result = await service.createUserForEndpoint(
+          createDto,
+          'http://localhost:3000/scim',
+          mockEndpoint.id,
+        );
+
+        // Response id must be the server-assigned scimId, NOT the client-supplied value
+        expect(result.id).toBe(mockUser.scimId);
+        expect(result.id).not.toBe('client-fake-id-should-be-ignored');
+      });
+
+      it('should strip id from the stored rawPayload', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'idstrip@example.com',
+          active: true,
+          displayName: 'Strip ID Test',
+          id: 'sneaky-client-id',
+        } as CreateUserDto & { id: string };
+
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.create.mockResolvedValue({
+          ...mockUser,
+          userName: createDto.userName,
+          rawPayload: '{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"displayName":"Strip ID Test"}',
+        });
+
+        await service.createUserForEndpoint(
+          createDto,
+          'http://localhost:3000/scim',
+          mockEndpoint.id,
+        );
+
+        // The rawPayload stored should NOT contain the client-supplied id
+        const storedPayload = JSON.parse(mockUserRepo.create.mock.calls[0][0].rawPayload);
+        expect(storedPayload.id).toBeUndefined();
+        expect(storedPayload.displayName).toBe('Strip ID Test');
+      });
+    });
+
+    describe('toScimUserResource — rawPayload id must never override scimId', () => {
+      it('should use scimId even when rawPayload contains id', async () => {
+        const userWithLeakedId = {
+          ...mockUser,
+          // Simulate a stored rawPayload that somehow has an id field
+          rawPayload: JSON.stringify({
+            displayName: 'Test User',
+            id: 'leaked-id-in-payload',
+          }),
+        };
+
+        mockUserRepo.findByScimId.mockResolvedValue(userWithLeakedId);
+
+        const result = await service.getUserForEndpoint(
+          mockUser.scimId,
+          'http://localhost:3000/scim',
+          mockEndpoint.id,
+        );
+
+        // scimId must win over rawPayload.id
+        expect(result.id).toBe(mockUser.scimId);
+        expect(result.id).not.toBe('leaked-id-in-payload');
+      });
+
+      it('should include scimId in meta.location, not rawPayload id', async () => {
+        const userWithLeakedId = {
+          ...mockUser,
+          rawPayload: JSON.stringify({
+            displayName: 'Location Check',
+            id: 'wrong-id-for-location',
+          }),
+        };
+
+        mockUserRepo.findByScimId.mockResolvedValue(userWithLeakedId);
+
+        const result = await service.getUserForEndpoint(
+          mockUser.scimId,
+          'http://localhost:3000/scim',
+          mockEndpoint.id,
+        );
+
+        expect(result.meta.location).toContain(`Users/${mockUser.scimId}`);
+        expect(result.meta.location).not.toContain('wrong-id-for-location');
+      });
+    });
+
+    describe('PATCH — stripReservedAttributes must strip id', () => {
+      it('should strip id from no-path replace value', async () => {
+        const patchDto: PatchUserDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            {
+              op: 'replace',
+              value: {
+                displayName: 'Patched User',
+                id: 'attacker-supplied-id',
+              },
+            },
+          ],
+        };
+
+        mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser);
+        mockUserRepo.findConflict.mockResolvedValueOnce(null);
+
+        mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
+          ...mockUser,
+          rawPayload: data.rawPayload,
+        }));
+
+        const result = await service.patchUserForEndpoint(
+          mockUser.scimId,
+          patchDto,
+          'http://localhost:3000/scim',
+          mockEndpoint.id,
+        );
+
+        // The response id must be the server-assigned scimId
+        expect(result.id).toBe(mockUser.scimId);
+        expect(result.id).not.toBe('attacker-supplied-id');
+
+        // The stored rawPayload must not contain the client-supplied id
+        const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
+        expect(storedPayload.id).toBeUndefined();
+        expect(storedPayload.displayName).toBe('Patched User');
       });
     });
   });

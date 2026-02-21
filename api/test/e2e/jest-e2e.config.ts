@@ -21,6 +21,11 @@ const config: Config = {
   // E2E setup — bootstrap app + DB before all suites
   globalSetup: '<rootDir>/test/e2e/global-setup.ts',
   globalTeardown: '<rootDir>/test/e2e/global-teardown.ts',
+  // JSON results reporter — writes test-results/e2e-results-<timestamp>.json
+  reporters: [
+    'default',
+    '<rootDir>/test/e2e/reporters/json-results-reporter.ts',
+  ],
 };
 
 export default config;

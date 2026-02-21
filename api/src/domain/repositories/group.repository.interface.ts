@@ -2,8 +2,11 @@
  * IGroupRepository — persistence port for SCIM Group resources.
  *
  * Implementations:
- *   - PrismaGroupRepository  (SQLite / PostgreSQL via Prisma)
+ *   - PrismaGroupRepository  (PostgreSQL via Prisma)
  *   - InMemoryGroupRepository (testing / lightweight deployments)
+ *
+ * Phase 3: displayNameLower parameter renamed to displayName — CITEXT/InMemory
+ * handles case-insensitive comparison without a pre-computed lowercase column.
  */
 import type {
   GroupRecord,
@@ -43,12 +46,12 @@ export interface IGroupRepository {
   delete(id: string): Promise<void>;
 
   /**
-   * Check for displayName uniqueness within a tenant.
+   * Check for displayName uniqueness within a tenant (case-insensitive).
    * @returns The conflicting record's scimId, or null if unique.
    */
   findByDisplayName(
     endpointId: string,
-    displayNameLower: string,
+    displayName: string,
     excludeScimId?: string,
   ): Promise<{ scimId: string } | null>;
 

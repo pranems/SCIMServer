@@ -40,6 +40,7 @@ interface VersionInfo {
     startedAt: string;
     uptimeSeconds: number;
     timezone: string;
+    utcOffset: string;
   };
   runtime: {
     node: string;
@@ -65,19 +66,34 @@ interface VersionInfo {
   };
   storage: {
     databaseUrl?: string;
-    databaseProvider: 'sqlite';
-    blobBackupConfigured: boolean;
-    blobAccount?: string;
-    blobContainer?: string;
+    databaseProvider: 'postgresql';
+    persistenceBackend: 'prisma' | 'inmemory';
+    connectionPool?: {
+      maxConnections: number;
+    };
+  };
+  container?: {
+    app: {
+      id?: string;
+      name?: string;
+      image?: string;
+      runtime: string;
+      platform: string;
+    };
+    database?: {
+      host: string;
+      port: number;
+      name: string;
+      provider: string;
+      version?: string;
+    };
   };
   deployment?: {
     resourceGroup?: string;
     containerApp?: string;
     registry?: string;
     currentImage?: string;
-    backupMode?: 'blob' | 'azureFiles' | 'none';
-    blobAccount?: string;
-    blobContainer?: string;
+    migratePhase: string;
   };
 }
 
@@ -258,14 +274,14 @@ export class AdminController {
   @HttpCode(204)
   async deleteUser(@Param('id') id: string): Promise<void> {
     // Search by Prisma PK (id) or SCIM identifier (scimId)
-    const user = await this.prisma.scimUser.findFirst({
-      where: { OR: [{ id }, { scimId: id }] },
+    const user = await this.prisma.scimResource.findFirst({
+      where: { OR: [{ id }, { scimId: id }], resourceType: 'User' },
       select: { id: true }
     });
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    await this.prisma.scimUser.delete({ where: { id: user.id } });
+    await this.prisma.scimResource.delete({ where: { id: user.id } });
   }
 
   @Get('version')
@@ -275,15 +291,29 @@ export class AdminController {
     const commit = process.env.GIT_COMMIT;
     const buildTime = process.env.BUILD_TIME;
     const now = new Date();
-    const blobAccount = process.env.BLOB_BACKUP_ACCOUNT;
-    const blobContainer = process.env.BLOB_BACKUP_CONTAINER;
-    const backupMode: 'blob' | 'azureFiles' | 'none' = blobAccount ? 'blob' : 'none';
+    const persistenceBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() as 'prisma' | 'inmemory';
     const databaseUrl = this.maskSensitiveUrl(process.env.DATABASE_URL);
     const memory = process.memoryUsage();
     const apiPrefix = process.env.API_PREFIX ?? 'scim';
 
     // Image tag detection moved to frontend (see web build in Dockerfile)
     const currentImage = undefined;
+
+    // Connection pool max from DATABASE_URL or default
+    const poolMax = persistenceBackend === 'prisma' ? 5 : undefined;
+
+    // Timezone: use TZ env if set, then Intl, then fall back to 'UTC'
+    const ianaTimezone = process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const utcOffsetMinutes = -now.getTimezoneOffset();
+    const offsetSign = utcOffsetMinutes >= 0 ? '+' : '-';
+    const absMinutes = Math.abs(utcOffsetMinutes);
+    const offsetHours = String(Math.floor(absMinutes / 60)).padStart(2, '0');
+    const offsetMins = String(absMinutes % 60).padStart(2, '0');
+    const utcOffset = `${offsetSign}${offsetHours}:${offsetMins}`;
+
+    // Container info — populated only when running in a container
+    const containerized = this.isContainerized();
+    const containerBlock = containerized ? this.buildContainerInfo(databaseUrl) : undefined;
 
     return {
       version,
@@ -297,7 +327,8 @@ export class AdminController {
         now: now.toISOString(),
         startedAt: serviceBootTime.toISOString(),
         uptimeSeconds: Number(process.uptime().toFixed(3)),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+        timezone: ianaTimezone,
+        utcOffset
       },
       runtime: {
         node: process.version,
@@ -306,7 +337,7 @@ export class AdminController {
         pid: process.pid,
         hostname: os.hostname(),
         cpus: os.cpus().length,
-        containerized: this.isContainerized(),
+        containerized,
         memory: {
           rss: memory.rss,
           heapTotal: memory.heapTotal,
@@ -323,19 +354,17 @@ export class AdminController {
       },
       storage: {
         databaseUrl,
-        databaseProvider: 'sqlite',
-        blobBackupConfigured: this.isConfigured(blobAccount) && this.isConfigured(blobContainer),
-        blobAccount,
-        blobContainer
+        databaseProvider: 'postgresql',
+        persistenceBackend,
+        ...(poolMax ? { connectionPool: { maxConnections: poolMax } } : {})
       },
+      ...(containerBlock ? { container: containerBlock } : {}),
       deployment: {
         resourceGroup: process.env.SCIM_RG,
         containerApp: process.env.SCIM_APP,
         registry: process.env.SCIM_REGISTRY,
         currentImage,
-        backupMode,
-        blobAccount,
-        blobContainer
+        migratePhase: 'Phase 3 — PostgreSQL Migration'
       }
     };
   }
@@ -347,12 +376,86 @@ export class AdminController {
   private maskSensitiveUrl(value: string | undefined): string | undefined {
     if (!value) return undefined;
     return value
+      // Mask userinfo in connection strings: postgresql://user:password@host → postgresql://***:***@host
+      .replace(/:\/\/([^:@]+):([^@]+)@/, '://***:***@')
       .replace(/(token|secret|password)=([^&]+)/gi, '$1=***')
       .replace(/\bBearer\s+[A-Za-z0-9._-]+/gi, 'Bearer ***');
   }
 
   private isContainerized(): boolean {
     return fs.existsSync('/.dockerenv') || this.isConfigured(process.env.CONTAINER_APP_NAME);
+  }
+
+  /**
+   * Build container metadata block from available Docker / env sources.
+   */
+  private buildContainerInfo(databaseUrl: string | undefined): NonNullable<VersionInfo['container']> {
+    // Container ID: hostname inside Docker is the short container ID
+    const containerId = this.readContainerId();
+    const containerName = process.env.HOSTNAME || undefined;
+
+    // Docker image: injected via DOCKER_IMAGE env or label
+    const image = process.env.DOCKER_IMAGE || process.env.CONTAINER_IMAGE || undefined;
+
+    // Parse database host/port/name from raw DATABASE_URL (not the masked version)
+    let dbInfo: NonNullable<VersionInfo['container']>['database'] | undefined = undefined;
+    const rawDbUrl = process.env.DATABASE_URL;
+    if (rawDbUrl) {
+      try {
+        const url = new URL(rawDbUrl);
+        dbInfo = {
+          host: url.hostname,
+          port: parseInt(url.port, 10) || 5432,
+          name: url.pathname.replace(/^\//, ''),
+          provider: 'PostgreSQL 17-alpine',
+          version: process.env.POSTGRES_VERSION || undefined,
+        };
+      } catch {
+        // If URL parsing fails, provide what we can
+        dbInfo = {
+          host: 'unknown',
+          port: 5432,
+          name: 'scimdb',
+          provider: 'PostgreSQL',
+        };
+      }
+    }
+
+    return {
+      app: {
+        id: containerId,
+        name: containerName,
+        image,
+        runtime: `Node.js ${process.version}`,
+        platform: `${process.platform}/${process.arch}`,
+      },
+      ...(dbInfo ? { database: dbInfo } : {}),
+    };
+  }
+
+  /**
+   * Read the Docker container ID from /proc/self/cgroup or hostname.
+   */
+  private readContainerId(): string | undefined {
+    try {
+      // On Linux Docker, /proc/self/cgroup contains the full container ID
+      if (fs.existsSync('/proc/self/cgroup')) {
+        const cgroup = fs.readFileSync('/proc/self/cgroup', 'utf8');
+        const match = cgroup.match(/[0-9a-f]{64}/);
+        if (match) return match[0].substring(0, 12); // short ID
+      }
+      // On Docker Desktop / newer cgroupv2, /proc/self/mountinfo may have it
+      if (fs.existsSync('/proc/self/mountinfo')) {
+        const mountinfo = fs.readFileSync('/proc/self/mountinfo', 'utf8');
+        const match = mountinfo.match(/\/docker\/containers\/([0-9a-f]{64})/);
+        if (match) return match[1].substring(0, 12);
+      }
+    } catch {
+      // Ignore read errors — not every environment has /proc
+    }
+    // Fallback: hostname is the short container ID in Docker
+    const hostname = os.hostname();
+    return /^[0-9a-f]{12}$/.test(hostname) ? hostname : undefined;
   }
 
   private readPackageVersion(): string {

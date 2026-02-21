@@ -111,12 +111,12 @@ describe('Attribute Projection (E2E)', () => {
       await scimPost(app, `${basePath}/Groups`, token, validGroup({ members: [{ value: user.id }] })).expect(201);
 
       const res = await scimGet(app, `${basePath}/Groups?attributes=displayName&count=5`, token).expect(200);
-      if (res.body.Resources.length > 0) {
-        const group = res.body.Resources[0];
-        expect(group.displayName).toBeDefined();
-        expect(group.id).toBeDefined(); // always-returned
-        expect(group.members).toBeUndefined(); // not requested
-      }
+      // Guard: group was created above — must appear in results
+      expect(res.body.Resources.length).toBeGreaterThan(0);
+      const group = res.body.Resources[0];
+      expect(group.displayName).toBeDefined();
+      expect(group.id).toBeDefined(); // always-returned
+      expect(group.members).toBeUndefined(); // not requested
     });
   });
 

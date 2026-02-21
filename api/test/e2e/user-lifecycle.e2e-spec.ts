@@ -79,6 +79,34 @@ describe('User Lifecycle (E2E)', () => {
       const res = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
       expect(res.body.externalId).toBe('ext-abc-123');
     });
+
+    it('should ignore client-supplied id and assign server-generated id (Issue 16)', async () => {
+      const clientSuppliedId = 'a1b2c3d4-e5f6-7890-abcd-1234567890ab';
+      const user = validUser({ id: clientSuppliedId });
+      const res = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
+
+      // Server must assign its own id, ignoring the client-supplied value
+      expect(res.body.id).toBeDefined();
+      expect(res.body.id).not.toBe(clientSuppliedId);
+
+      // meta.location must reference the server-assigned id
+      expect(res.body.meta.location).toContain(`/Users/${res.body.id}`);
+      expect(res.body.meta.location).not.toContain(clientSuppliedId);
+    });
+
+    it('should allow GET by server-assigned id when client supplied a different id', async () => {
+      const clientSuppliedId = 'fake-client-id-00000000';
+      const user = validUser({ id: clientSuppliedId });
+      const created = (await scimPost(app, `${basePath}/Users`, token, user).expect(201)).body;
+
+      // GET by the server-assigned id must succeed
+      const res = await scimGet(app, `${basePath}/Users/${created.id}`, token).expect(200);
+      expect(res.body.id).toBe(created.id);
+      expect(res.body.userName).toBe(created.userName);
+
+      // GET by the client-supplied id must return 404
+      await scimGet(app, `${basePath}/Users/${clientSuppliedId}`, token).expect(404);
+    });
   });
 
   // ───────────── READ ─────────────
@@ -181,6 +209,28 @@ describe('User Lifecycle (E2E)', () => {
       expect(new Date(res.body.meta.lastModified).getTime())
         .toBeGreaterThanOrEqual(new Date(created.meta.lastModified).getTime());
     });
+
+    it('should return 404 when replacing non-existent user', async () => {
+      const replacement = validUser();
+      await scimPut(app, `${basePath}/Users/does-not-exist`, token, replacement).expect(404);
+    });
+
+    it('should ignore client-supplied id in PUT body (Issue 16)', async () => {
+      const user = validUser();
+      const created = (await scimPost(app, `${basePath}/Users`, token, user).expect(201)).body;
+
+      const replacement = validUser({
+        userName: created.userName,
+        id: 'put-override-attempt',
+      });
+
+      const res = await scimPut(app, `${basePath}/Users/${created.id}`, token, replacement).expect(200);
+
+      // id must remain the server-assigned value
+      expect(res.body.id).toBe(created.id);
+      expect(res.body.id).not.toBe('put-override-attempt');
+      expect(res.body.meta.location).toContain(`/Users/${created.id}`);
+    });
   });
 
   // ───────────── PATCH ─────────────
@@ -215,6 +265,22 @@ describe('User Lifecycle (E2E)', () => {
     it('should return 404 when patching non-existent user', async () => {
       const patch = patchOp([{ op: 'replace', path: 'active', value: false }]);
       await scimPatch(app, `${basePath}/Users/does-not-exist`, token, patch).expect(404);
+    });
+
+    it('should not allow id override via no-path replace PATCH (Issue 16)', async () => {
+      const created = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+      const patch = patchOp([
+        { op: 'replace', value: { displayName: 'Patched Name', id: 'attacker-id' } },
+      ]);
+
+      const res = await scimPatch(app, `${basePath}/Users/${created.id}`, token, patch).expect(200);
+
+      // id must remain the server-assigned value
+      expect(res.body.id).toBe(created.id);
+      expect(res.body.id).not.toBe('attacker-id');
+      expect(res.body.displayName).toBe('Patched Name');
+      expect(res.body.meta.location).toContain(`/Users/${created.id}`);
     });
   });
 

@@ -1,9 +1,10 @@
 /**
- * PrismaGroupRepository — IGroupRepository backed by Prisma (SQLite / PostgreSQL).
+ * PrismaGroupRepository — IGroupRepository backed by Prisma (PostgreSQL).
  *
- * Phase 2: Queries the unified `ScimResource` table with `resourceType = 'Group'`
- * and `ResourceMember` instead of the legacy `ScimGroup` / `GroupMember` tables.
- * The domain types (GroupRecord, MemberRecord, etc.) remain unchanged.
+ * Phase 3: Queries the unified `ScimResource` table with `resourceType = 'Group'`
+ * and `ResourceMember`. CITEXT on displayName handles case-insensitive matching
+ * natively — no displayNameLower helper column. JSONB payload is converted
+ * to/from string at the repository boundary.
  */
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../modules/prisma/prisma.service';
@@ -17,17 +18,19 @@ import type {
   MemberRecord,
 } from '../../../domain/models/group.model';
 import type { Prisma } from '../../../generated/prisma/client';
+import { isValidUuid } from './uuid-guard';
 
-/** Maps a ScimResource row to the GroupRecord domain type. */
+/** Maps a ScimResource row (with JSONB payload) to the GroupRecord domain type. */
 function toGroupRecord(resource: Record<string, unknown>): GroupRecord {
+  const payload = resource.payload;
+  const rawPayload = typeof payload === 'string' ? payload : JSON.stringify(payload ?? {});
   return {
     id: resource.id as string,
     endpointId: resource.endpointId as string,
     scimId: resource.scimId as string,
     externalId: (resource.externalId as string) ?? null,
     displayName: resource.displayName as string,
-    displayNameLower: resource.displayNameLower as string,
-    rawPayload: resource.rawPayload as string,
+    rawPayload,
     meta: (resource.meta as string) ?? null,
     createdAt: resource.createdAt as Date,
     updatedAt: resource.updatedAt as Date,
@@ -67,8 +70,7 @@ export class PrismaGroupRepository implements IGroupRepository {
         scimId: input.scimId,
         externalId: input.externalId,
         displayName: input.displayName,
-        displayNameLower: input.displayNameLower,
-        rawPayload: input.rawPayload,
+        payload: JSON.parse(input.rawPayload),   // domain string → JSONB
         meta: input.meta,
         endpoint: { connect: { id: input.endpointId } },
       },
@@ -77,6 +79,7 @@ export class PrismaGroupRepository implements IGroupRepository {
   }
 
   async findByScimId(endpointId: string, scimId: string): Promise<GroupRecord | null> {
+    if (!isValidUuid(scimId)) return null;   // PostgreSQL UUID column rejects non-UUID strings
     const resource = await this.prisma.scimResource.findFirst({
       where: { scimId, endpointId, resourceType: 'Group' },
     });
@@ -84,6 +87,7 @@ export class PrismaGroupRepository implements IGroupRepository {
   }
 
   async findWithMembers(endpointId: string, scimId: string): Promise<GroupWithMembers | null> {
+    if (!isValidUuid(scimId)) return null;   // PostgreSQL UUID column rejects non-UUID strings
     const resource = await this.prisma.scimResource.findFirst({
       where: { scimId, endpointId, resourceType: 'Group' },
       include: { membersAsGroup: true },
@@ -115,9 +119,15 @@ export class PrismaGroupRepository implements IGroupRepository {
   }
 
   async update(id: string, data: GroupUpdateInput): Promise<GroupRecord> {
+    // Convert rawPayload string → JSONB if present in the update
+    const prismaData: Record<string, unknown> = { ...data };
+    if (data.rawPayload !== undefined) {
+      prismaData.payload = JSON.parse(data.rawPayload);
+      delete prismaData.rawPayload;
+    }
     const updated = await this.prisma.scimResource.update({
       where: { id },
-      data: data as Prisma.ScimResourceUpdateInput,
+      data: prismaData as Prisma.ScimResourceUpdateInput,
     });
     return toGroupRecord(updated as unknown as Record<string, unknown>);
   }
@@ -128,13 +138,14 @@ export class PrismaGroupRepository implements IGroupRepository {
 
   async findByDisplayName(
     endpointId: string,
-    displayNameLower: string,
+    displayName: string,
     excludeScimId?: string,
   ): Promise<{ scimId: string } | null> {
+    // Phase 3: CITEXT handles case-insensitive comparison natively
     const where: Prisma.ScimResourceWhereInput = {
       endpointId,
       resourceType: 'Group',
-      displayNameLower,
+      displayName,
     };
     if (excludeScimId) {
       where.NOT = { scimId: excludeScimId };
@@ -184,11 +195,18 @@ export class PrismaGroupRepository implements IGroupRepository {
     data: GroupUpdateInput,
     members: MemberCreateInput[],
   ): Promise<void> {
+    // Convert rawPayload string → JSONB if present in the update
+    const prismaData: Record<string, unknown> = { ...data };
+    if (data.rawPayload !== undefined) {
+      prismaData.payload = JSON.parse(data.rawPayload);
+      delete prismaData.rawPayload;
+    }
+
     await this.prisma.$transaction(
       async (tx: Prisma.TransactionClient) => {
         await tx.scimResource.update({
           where: { id: groupId },
-          data: data as Prisma.ScimResourceUpdateInput,
+          data: prismaData as Prisma.ScimResourceUpdateInput,
         });
 
         await tx.resourceMember.deleteMany({ where: { groupResourceId: groupId } });

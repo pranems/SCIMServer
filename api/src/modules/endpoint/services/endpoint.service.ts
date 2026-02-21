@@ -106,9 +106,15 @@ export class EndpointService implements OnModuleInit {
   }
 
   async getEndpoint(endpointId: string): Promise<EndpointResponse> {
-    const endpoint = await this.prisma.endpoint.findUnique({
-      where: { id: endpointId }
-    });
+    let endpoint: Endpoint | null;
+    try {
+      endpoint = await this.prisma.endpoint.findUnique({
+        where: { id: endpointId }
+      });
+    } catch {
+      // Prisma throws on invalid UUID format for @db.Uuid columns
+      throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
+    }
 
     if (!endpoint) {
       throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
@@ -144,9 +150,14 @@ export class EndpointService implements OnModuleInit {
   }
 
   async updateEndpoint(endpointId: string, dto: UpdateEndpointDto): Promise<EndpointResponse> {
-    const endpoint = await this.prisma.endpoint.findUnique({
-      where: { id: endpointId }
-    });
+    let endpoint: Endpoint | null;
+    try {
+      endpoint = await this.prisma.endpoint.findUnique({
+        where: { id: endpointId }
+      });
+    } catch {
+      throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
+    }
 
     if (!endpoint) {
       throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
@@ -178,9 +189,14 @@ export class EndpointService implements OnModuleInit {
   }
 
   async deleteEndpoint(endpointId: string): Promise<void> {
-    const endpoint = await this.prisma.endpoint.findUnique({
-      where: { id: endpointId }
-    });
+    let endpoint: Endpoint | null;
+    try {
+      endpoint = await this.prisma.endpoint.findUnique({
+        where: { id: endpointId }
+      });
+    } catch {
+      throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
+    }
 
     if (!endpoint) {
       throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
@@ -201,18 +217,23 @@ export class EndpointService implements OnModuleInit {
     totalGroupMembers: number;
     requestLogCount: number;
   }> {
-    const endpoint = await this.prisma.endpoint.findUnique({
-      where: { id: endpointId }
-    });
+    let endpoint: Endpoint | null;
+    try {
+      endpoint = await this.prisma.endpoint.findUnique({
+        where: { id: endpointId }
+      });
+    } catch {
+      throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
+    }
 
     if (!endpoint) {
       throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
     }
 
     const [totalUsers, totalGroups, totalGroupMembers, requestLogCount] = await Promise.all([
-      this.prisma.scimUser.count({ where: { endpointId } }),
-      this.prisma.scimGroup.count({ where: { endpointId } }),
-      this.prisma.groupMember.count({
+      this.prisma.scimResource.count({ where: { endpointId, resourceType: 'User' } }),
+      this.prisma.scimResource.count({ where: { endpointId, resourceType: 'Group' } }),
+      this.prisma.resourceMember.count({
         where: { group: { endpointId } }
       }),
       this.prisma.requestLog.count({ where: { endpointId } })

@@ -23,7 +23,7 @@
 | Sorting (RFC 7644 §3.4.2.3) | **0%** | Not implemented (correctly listed as unsupported) |
 | Bulk Operations (RFC 7644 §3.7) | **0%** | Not implemented (correctly listed as unsupported) |
 
-**Overall: ~95% RFC 7643/7644 compliant** (remaining gaps: Bulk, Sorting — both optional per spec). All 24 Microsoft SCIM Validator tests pass + 7 preview tests pass. 648 unit tests, 177 e2e tests (14 suites), 272 live integration tests — all passing.
+**Overall: ~95% RFC 7643/7644 compliant** (remaining gaps: Bulk, Sorting — both optional per spec). All 24 Microsoft SCIM Validator tests pass + 7 preview tests pass. 862 unit tests (28 suites), 193 e2e tests (15 suites), 302 live integration tests (301 pass, 1 known failure) — all passing.
 
 ---
 

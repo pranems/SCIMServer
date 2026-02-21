@@ -5,6 +5,11 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 ### Recent Key Achievements (Chronological)
 | Date | Achievement |
 |------|-------------|
+| 2026-02-21 | ✅ **Full Validation Pipeline Re-Run (Clean Build + Local + Docker):** Completed clean API rebuild and full E2E verification (**193/193 passing**). Ran local instance live validation with latest flow-trace script (**302/302 passing**). Performed no-cache Docker rebuild (`scimserver:latest`), started container against host PostgreSQL, and ran full live suite again (**302/302 passing**). Updated changelog verification status to reflect fully green live matrix. |
+| 2026-02-20 | 🌐 **Root SPA + Test Trace JSON Enhancements:** Refreshed root SPA static bundle sync (`web/dist` → `api/public`) to eliminate stale hashed asset mismatch and ensure `/` renders correctly in latest repo state. Added root non-SPA fallback section with quick links (version endpoint, recent logs, README, docs index). Enhanced E2E + live test JSON outputs with step-level flow tracing (request method/url/headers/body, response status/headers/body, timing, action-step IDs linked to assertions). Validated runs: live tests now **302/302 passed** with `totalFlowSteps` and per-test `actionStepIds` in `test-results/live-results-latest.json`; E2E JSON includes `flowSteps` and linked `actionStepIds` in `test-results/e2e-results-latest.json`. |
+| 2026-02-21 | 🔧 **Version Endpoint Enhancement (Issue 19):** Added `container` block (app id/name/image/runtime/platform + database host/port/name/provider) when containerized, `utcOffset` field (`±HH:MM`), fixed `maskSensitiveUrl()` to mask userinfo in connection strings (`://user:pass@` → `://***:***@`). Updated web client `VersionInfo` type (sqlite→postgresql + new fields). E2E tests updated with `utcOffset` regex + userinfo masking assertions. SCIM Validator verified: **25/25 passed + 7 preview, 0 false positives** (all 4 previous FPs confirmed fixed). Updated docs: version-latest.json/html, COMPLETE_API_REFERENCE.md, SCIM_VALIDATOR_FALSE_POSITIVES_REPORT.md, PHASE_03_ISSUES_AND_RESOLUTIONS.md. All tests green: **862 unit** (28 suites), **193 E2E** (15 suites). |
+| 2026-02-21 | 🔍 **False Positive Test Audit (Issue 18):** Comprehensive audit of all 1,357 tests across 3 levels. Found and fixed 29 false positives: 8 E2E (tautological assertions, empty-loop skips, conditional guards, overly permissive assertions across 5 files), 10 unit (weak `toBeDefined` assertions, no-assertion tests in 2 files), 11 live (hardcoded `$true`, unguarded deletes, vacuously-true loops in `live-test.ps1`). All tests validated green: **862 unit** (28 suites), **193 E2E** (15 suites). Updated 10 source files + 6 documentation files. |
+| 2026-02-21 | �🐛 **SCIM ID Leak Fix + Comprehensive Test Coverage (Issues 16-17):** Fixed critical SCIM ID leak bug (client-supplied `id` in POST/PATCH body could override server-assigned `scimId` via `rawPayload` spread). Added `'id'` to `stripReservedAttributes()` reserved set. Updated version endpoint for Phase 3 (removed blob fields, added `persistenceBackend`, `connectionPool`, `migratePhase`). Bumped to v0.11.0. Added 24 new tests: 5 unit tests (ID leak prevention in create/get/patch), 4 E2E tests (POST/PUT/PATCH with client id, GET by server id), 15 live tests (Section 3e). All validation passed: **862 unit tests** (28 suites), **193 E2E tests** (15 suites), **301/302 live tests** on both local server + Docker container (1 pre-existing failure). Updated PHASE_03_ISSUES_AND_RESOLUTIONS.md (Issues 16-17) and PHASE_03_POSTGRESQL_MIGRATION.md (test counts, known issues). |
 | 2026-02-21 | 🏗️ **Phase 1 Repository Pattern — COMPLETE:** Extracted full Repository Pattern abstraction from Prisma-direct services. Created 10 new files: domain models (`UserRecord`, `GroupRecord`, `MemberRecord`, `GroupWithMembers`), repository interfaces (`IUserRepository`, `IGroupRepository`), string tokens, Prisma implementations (thin wrappers), in-memory implementations (`Map`-based with secondary indexes), and `RepositoryModule.register()` dynamic module with `PERSISTENCE_BACKEND` env toggle (`prisma` default / `inmemory`). Refactored both SCIM services (`endpoint-scim-users.service.ts`, `endpoint-scim-groups.service.ts`) to use `@Inject(TOKEN)` pattern — zero Prisma imports remain in service layer. Transformed both spec files (~3000 lines total) from `mockPrismaService` to flat repository mocks with context-dependent method mapping. Updated filter module to `Record<string, unknown>`. All verification passed: 666 unit tests (19 suites), 184 e2e tests (15 suites), Docker build + container live tests (admin API, user CRUD, group with member, list operations). |
 | 2026-02-20 | � **Migration Automation Strategy Doc:** Created comprehensive `docs/MIGRATION_AUTOMATION_STRATEGY_v1_2026-02-20.md` — 14-section automation analysis covering both PostgreSQL + In-Memory migration paths. Includes full codebase inventory (46 Prisma call sites across 4 services mapped to repository methods), per-phase automation assessment heatmap (60-95% automatable), AI vs Human effort breakdown tables, Copilot Agent session workflow with exact prompt templates, 2-developer parallel execution plan with conflict-free ownership matrix, risk quadrant chart with 8 risks + mitigations, CI pipeline changes for dual-driver testing, quality gate verification workflow, complete Prisma call-site inventory (4 appendix tables), generated file map (31 new + 17 modified files). Timeline: manual 16 weeks → automated 5-6 weeks for both paths (65% reduction). 12 Mermaid diagrams. |
 | 2026-02-20 | �🧠 **In-Memory Architecture & Plan Doc:** Created comprehensive `docs/INMEMORY_ARCHITECTURE_AND_PLAN_v1_2026-02-20.md` — 16-section combined architecture, comparison, and migration plan for in-memory (`Map`-based) repository implementation. Includes full PostgreSQL vs In-Memory comparison matrices (feature parity, performance, operational), `InMemoryStore` with secondary indexes, complete `InMemoryResourceRepository`/`InMemoryMembershipRepository`/`InMemoryTenantRepository` implementations, filter/sort/pagination comparison, ETag/concurrency analysis, optional snapshot persistence, decision framework flowchart, 12-phase effort comparison (37% less LOC than PostgreSQL path), side-by-side code examples, 14 Mermaid diagrams, and deployment topology differences. |
@@ -95,12 +100,12 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 | 2025-09-28 | PATCH Add operation fix (Entra compatibility) |
 | 2025-09-27 | v0.3.0: Full SCIM 2.0 compliance baseline |
 
-Current Version: v0.10.0 (Prisma 7 + ESLint 10 + Jest 30 + React 19 + Vite 7 + Node 24 Docker)
+Current Version: v0.11.0 (Prisma 7 + PostgreSQL 17 + ESLint 10 + Jest 30 + React 19 + Vite 7 + Node 24 Docker)
 
 ---
 
 ## Status
-Production Ready (v0.10.0) — **Phase 1 Repository Pattern complete** (Feb 2026). Prisma abstracted behind `IUserRepository`/`IGroupRepository` interfaces with `PERSISTENCE_BACKEND` env toggle. Full SCIM filter parser (10 operators), POST /.search, ETag conditional requests, attribute projection, centralized error handling. 666 unit tests (19 suites), 184 e2e tests (15 suites), 280 live integration tests, all 24 Microsoft SCIM Validator tests passing + 7 preview. Full tech stack at latest: Prisma 7, ESLint 10, Jest 30, React 19, Vite 7, Node 24.
+Production Ready (v0.11.0) — **Phase 3 PostgreSQL Migration code-complete** (Feb 2026). SQLite→PostgreSQL migration with unified resource table, Prisma 7 driver adapter for `pg`. Repository Pattern (`IUserRepository`/`IGroupRepository`) with `PERSISTENCE_BACKEND` env toggle. Full SCIM filter parser (10 operators), POST /.search, ETag conditional requests, attribute projection, centralized error handling. 862 unit tests (28 suites), 193 e2e tests (15 suites), 302 live integration tests (302 pass), all 25 Microsoft SCIM Validator tests passing + 7 preview (0 false positives). Version endpoint with container metadata, timezone+utcOffset, credential masking. Full tech stack at latest: Prisma 7, PostgreSQL 17, ESLint 10, Jest 30, React 19, Vite 7, Node 24.
 
 ## Quick Commands
 ```powershell
@@ -108,7 +113,7 @@ Production Ready (v0.10.0) — **Phase 1 Repository Pattern complete** (Feb 2026
 pwsh ./scripts/publish-acr.ps1 -Registry scimserverpublic -ResourceGroup scimserver-rg -Latest
 
 # Customer update to latest (example)
-iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-direct.ps1'); Update-SCIMServerDirect -Version v0.10.0 -ResourceGroup <rg> -AppName <app> -NoPrompt
+iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-direct.ps1'); Update-SCIMServerDirect -Version v0.11.0 -ResourceGroup <rg> -AppName <app> -NoPrompt
 
 > NOTE: Direct upgrade one‑liner integrated into UI copy button; user has not yet tested the copied command end‑to‑end.
 ```
@@ -133,8 +138,8 @@ iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/up
 
 **Core Technologies:**
 - Node.js 24 & TypeScript 5.9
-- NestJS 11 service layer with Prisma 7 ORM (better-sqlite3 driver adapter)
-- SQLite (file-backed) for low-volume persistence
+- NestJS 11 service layer with Prisma 7 ORM (pg driver adapter)
+- PostgreSQL 17 (Docker postgres:17-alpine) for persistence
 - React 19 + Vite 7 frontend
 - ESLint 10 (flat config) + Jest 30
 - Docker (node:24-alpine) & Azure Container Apps (deployment target)
@@ -185,7 +190,7 @@ Implemented TDD approach with comprehensive test coverage:
 ---
 
 ## Current Focus
-Phase 1 (Repository Pattern extraction) complete. Services (`endpoint-scim-users.service.ts`, `endpoint-scim-groups.service.ts`) now depend on `IUserRepository`/`IGroupRepository` interfaces injected via string tokens. `RepositoryModule.register()` selects Prisma or in-memory backend based on `PERSISTENCE_BACKEND` env var. Admin controller still uses PrismaService directly (deferred to later phase). Ready for Phase 2 or next user direction.
+Phase 3 (PostgreSQL Migration) code-complete. SQLite→PostgreSQL migration with unified Resource table, Prisma 7 `pg` driver adapter, docker-compose with postgres:17-alpine. 18 issues found and resolved during migration (see `docs/phases/PHASE_03_ISSUES_AND_RESOLUTIONS.md`). 29 false-positive tests audited and fixed across all levels. All tests green: 862 unit (28 suites), 193 E2E (15 suites), 302 live (302 pass). Latest quality enhancement adds rich per-step flow traces to E2E/live JSON outputs and maps action step IDs back to each assertion.
 
 ## Next Steps / Backlog
 - [x] ✅ COMPLETED - Phase 1 Repository Pattern extraction (domain models, interfaces, Prisma + in-memory implementations, RepositoryModule, service + spec refactoring)
@@ -211,7 +216,7 @@ Phase 1 (Repository Pattern extraction) complete. Services (`endpoint-scim-users
 **SCIM 2.0 Server:**
 - NestJS controllers for `/Users`, `/Groups`, `/ServiceProviderConfig`, `/Schemas`
 - Full CRUD operations: POST, GET, PUT, PATCH, DELETE
-- Prisma + SQLite for data persistence and request logging
+- Prisma + PostgreSQL for data persistence and request logging
 - Bearer token + OAuth 2.0 dual authentication
 
 **Web UI:**
@@ -285,8 +290,9 @@ Deferred:
 ## Dev Quick Ref
 Backend: `cd api && npm run start:dev`
 Frontend: `cd web && npm run dev`
-Unit Tests: `cd api && npm test` (648 tests, 19 suites)
-Live Tests: `.\scripts\live-test.ps1` (212 assertions)
+Unit Tests: `cd api && npm test` (862 tests, 28 suites)
+E2E Tests: `cd api && npm run test:e2e` (193 tests, 15 suites)
+Live Tests: `.\scripts\live-test.ps1` (302 assertions, 301 pass)
 Live Tests (verbose): `.\scripts\live-test.ps1 -Verbose`
 
 ---
@@ -329,7 +335,7 @@ Live Tests (verbose): `.\scripts\live-test.ps1 -Verbose`
 
 **Performance Insights:**
 - Expected request volume is low; focus on clarity of logs over throughput.
-- Lightweight SQLite reduces operational overhead while supporting ad-hoc queries.
+- PostgreSQL provides robust concurrent access and production-grade persistence.
 - Microsoft docs MCP confirmed Entra request patterns to optimize initial test coverage.
 - Removing large text columns from primary list query yields major latency reduction.
 - Persisting identifiers removes need to parse bodies repeatedly (final integration pending).

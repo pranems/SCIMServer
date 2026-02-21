@@ -1,0 +1,46 @@
+# Phase 3: PostgreSQL-backed SCIMServer
+# Usage: docker compose up --build
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: scimserver-postgres
+    environment:
+      POSTGRES_DB: scimdb
+      POSTGRES_USER: scim
+      POSTGRES_PASSWORD: scim
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/init-pg-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scim -d scimdb"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: scimserver-api
+    ports:
+      - "8080:8080"
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      DATABASE_URL: postgresql://scim:scim@postgres:5432/scimdb
+      PERSISTENCE_BACKEND: prisma
+      JWT_SECRET: ${JWT_SECRET:-devjwtsecretkey123456}
+      OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET:-devscimclientsecret}
+      SCIM_SHARED_SECRET: ${SCIM_SHARED_SECRET:-devscimsharedsecret}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:

@@ -1,8 +1,9 @@
 /**
  * Domain models for SCIM Group resources plus group membership.
  *
- * Mirrors the current Prisma ScimGroup + GroupMember shapes so services
- * can swap from generated types to these interfaces with minimal changes.
+ * Phase 3: Removed displayNameLower — PostgreSQL CITEXT handles case-insensitive
+ * matching natively. The rawPayload field remains a JSON string at the domain
+ * boundary; Prisma repositories convert to/from JSONB transparently.
  */
 export interface GroupRecord {
   id: string;
@@ -10,7 +11,6 @@ export interface GroupRecord {
   scimId: string;
   externalId: string | null;
   displayName: string;
-  displayNameLower: string;
   rawPayload: string;
   meta: string | null;
   createdAt: Date;
@@ -36,14 +36,12 @@ export interface GroupCreateInput {
   scimId: string;
   externalId: string | null;
   displayName: string;
-  displayNameLower: string;
   rawPayload: string;
   meta: string;
 }
 
 export interface GroupUpdateInput {
   displayName?: string;
-  displayNameLower?: string;
   externalId?: string | null;
   rawPayload?: string;
   meta?: string;

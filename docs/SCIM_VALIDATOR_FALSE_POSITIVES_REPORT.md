@@ -1,17 +1,40 @@
 # SCIM Validator Analysis Report — scim-results-9.json
 
-> **Status**: Historical validator analysis with current-state relevance notes  
-> **Last Updated**: February 18, 2026  
-> **Baseline**: SCIMServer v0.10.0
+> **Status**: ✅ ALL FALSE POSITIVES RESOLVED — verified in scim-results (22).json  
+> **Last Updated**: February 19, 2026  
+> **Baseline**: SCIMServer v0.11.0
 
-**Date:** February 11, 2026 (Revised v4 — FP #4 identified & fixed)  
-**Source:** `scim-results-9.json` + `scim-results (10).json` — Microsoft SCIM Validator  
-**Server:** SCIMServer v0.10.0 (NestJS + Prisma + SQLite)  
-**Endpoint:** `http://localhost:6000/scim/endpoints/cmlfuqaft0002i30tlv47pq1f/`
+**Date:** February 11, 2026 (Revised v5 — All 4 FPs confirmed fixed in scim-results (22).json)  
+**Source:** `scim-results-9.json` (original analysis) → `scim-results (22).json` (current validation)  
+**Server:** SCIMServer v0.11.0 (NestJS + Prisma + PostgreSQL 17)  
+**Endpoint:** `http://localhost:6000/scim/v2/endpoints/cmlfuqaft0002i30tlv47pq1f/`
 
 ---
 
-## Executive Summary
+## Current State (scim-results (22).json)
+
+| Category       | Count |
+|----------------|-------|
+| Passed Tests   | **25** |
+| Failed Tests   | 0     |
+| Preview Tests  | 7 (all pass) |
+| False Positives | **0** |
+| `SFComplianceFailed` | `false` |
+
+All 4 previously identified false positives have been **fixed and verified**:
+- **FP #1** (Error Content-Type `application/json`): ✅ Now returns `application/scim+json` on all error responses
+- **FP #2** (Group PATCH empty body): ✅ Now returns full group resource with 200 OK
+- **FP #3** (Remove Manager leaves empty string): ✅ Manager attribute now absent after removal
+- **FP #4** (Missing Location header on 201): ✅ Location header now present on all POST responses
+
+New test #9 "Patch User - Add Attributes Verbose Request" appeared in scim-results (22).json and passes cleanly.  
+Endpoint URL updated from `/scim/endpoints/` to `/scim/v2/endpoints/` reflecting the v2 path prefix.
+
+---
+
+## Original Analysis (scim-results-9.json)
+
+### Executive Summary (Historical)
 
 | Category       | Count |
 |----------------|-------|

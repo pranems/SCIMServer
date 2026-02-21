@@ -19,12 +19,11 @@ export interface CreateRequestLogOptions {
 export class LoggingService implements OnModuleDestroy {
   private readonly logger = new Logger(LoggingService.name);
 
-  // ── Buffered logging to reduce SQLite write contention ──
-  // SQLite compromise (CRITICAL): Per-request logging (2 writes each) competes for the
-  // single SQLite writer lock with SCIM operations. Buffering trades real-time logging
-  // (up to 3s data loss on crash) for reduced lock contention.
-  // PostgreSQL migration: remove buffering, use direct create() per request.
-  // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.2.2
+  // ── Buffered logging for performance ──
+  // Buffering trades real-time logging (up to 3s data loss on crash) for reduced
+  // database write overhead. Single batch insert instead of N individual writes.
+  // Originally introduced to mitigate SQLite single-writer contention; retained
+  // for PostgreSQL to reduce connection pool pressure.
   private logBuffer: Array<Prisma.RequestLogCreateInput & { _identifier?: string }> = [];
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private flushInProgress = false;
@@ -35,8 +34,7 @@ export class LoggingService implements OnModuleDestroy {
 
   /**
    * Buffer a request log entry. The entry is written to the DB asynchronously
-   * in batches to avoid per-request SQLite write-lock contention with SCIM
-   * transactions.
+   * in batches to reduce per-request database write overhead.
    */
   recordRequest({
     method,
@@ -87,7 +85,7 @@ export class LoggingService implements OnModuleDestroy {
   }
 
   /**
-   * Flush the accumulated log buffer to SQLite in a single batch.
+   * Flush the accumulated log buffer to PostgreSQL in a single batch.
    * Uses createMany for the bulk insert, then a single raw UPDATE for identifiers.
    */
   async flushLogs(): Promise<void> {
@@ -116,22 +114,19 @@ export class LoggingService implements OnModuleDestroy {
       // Single batch insert (1 write instead of N*2 writes)
       await this.prisma.requestLog.createMany({ data: createData });
 
-      // SQLite compromise: createMany doesn't support RETURNING in SQLite.
-      // We fetch the most recent N rows by rowid to correlate batch-inserted records.
-      // PostgreSQL migration: use createMany with RETURNING or createManyAndReturn().
-      // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.4.2
+      // Phase 3 (PostgreSQL): Fetch the most recent N rows by createdAt to correlate
+      // batch-inserted records with their identifiers.
       if (identifiers.length > 0) {
-        // Fetch the last N created rows (ordered by rowid DESC) to correlate
         try {
           const recentRows: Array<{ id: string }> = await this.prisma.$queryRawUnsafe(
-            `SELECT id FROM RequestLog ORDER BY rowid DESC LIMIT ${batch.length}`
+            `SELECT "id" FROM "RequestLog" ORDER BY "createdAt" DESC LIMIT ${batch.length}`
           );
           // recentRows[0] = newest (last in batch), so reverse to align with batch order
           const ordered = [...recentRows].reverse();
           for (const { index, identifier } of identifiers) {
             if (ordered[index]) {
               await this.prisma.$executeRawUnsafe(
-                'UPDATE RequestLog SET identifier = ? WHERE id = ?',
+                `UPDATE "RequestLog" SET "identifier" = $1 WHERE "id" = $2`,
                 identifier,
                 ordered[index].id,
               );
@@ -310,7 +305,7 @@ export class LoggingService implements OnModuleDestroy {
       if (ids.length) {
         // Unsafe raw only over internal generated IDs (cuid) - controlled
         const rows: Array<{ id: string; identifier: string | null }> = await this.prisma.$queryRawUnsafe(
-          `SELECT id, identifier FROM RequestLog WHERE id IN (${ids})`
+          `SELECT "id", "identifier" FROM "RequestLog" WHERE "id" IN (${ids})`
         );
         for (const row of rows) identifierMap[row.id] = row.identifier;
       }
@@ -454,24 +449,24 @@ export class LoggingService implements OnModuleDestroy {
   private async resolveUserDisplayName(identifier: string): Promise<string | null> {
     try {
       // Try to find user by SCIM ID first
-      let user = await this.prisma.scimUser.findFirst({
-        where: { scimId: identifier },
-        select: { userName: true, rawPayload: true },
+      let user = await this.prisma.scimResource.findFirst({
+        where: { scimId: identifier, resourceType: 'User' },
+        select: { userName: true, payload: true },
       });
 
       // If not found by SCIM ID, try by userName
       if (!user) {
-        user = await this.prisma.scimUser.findFirst({
-          where: { userName: identifier },
-          select: { userName: true, rawPayload: true },
+        user = await this.prisma.scimResource.findFirst({
+          where: { userName: identifier, resourceType: 'User' },
+          select: { userName: true, payload: true },
         });
       }
 
       if (user) {
         // Try to get display name from raw payload first
         try {
-          if (user.rawPayload && typeof user.rawPayload === 'string') {
-            const payload = JSON.parse(user.rawPayload);
+          const payload = user.payload as Record<string, any> | null;
+          if (payload) {
             if (payload.displayName) return payload.displayName;
             if (payload.name?.formatted) return payload.name.formatted;
             if (payload.name?.givenName && payload.name?.familyName) {

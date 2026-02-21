@@ -8,10 +8,27 @@
       body { margin: 0; font-family: system-ui, Arial, sans-serif; background:#0f1115; color:#f4f6f8; }
       a { color:#4ea1ff; }
     </style>
-    <script type="module" crossorigin src="/assets/index-D98WU-ka.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-Cblq_3jT.css">
+    <script type="module" crossorigin src="/assets/index-Bge3Ir9E.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BDj65C42.css">
   </head>
   <body>
+    <section id="root-fallback" aria-label="SCIMServer quick links">
+      <h1>SCIMServer</h1>
+      <p>SCIM 2.0 server + admin monitoring UI.</p>
+      <ul>
+        <li><a href="/scim/admin/version">Version Endpoint</a></li>
+        <li><a href="/scim/admin/log-config/recent?limit=25">Recent Logs (JSON)</a></li>
+        <li><a href="https://github.com/pranems/SCIMServer/blob/master/README.md">README</a></li>
+        <li><a href="https://github.com/pranems/SCIMServer/blob/master/docs/INDEX.md">Documentation Index</a></li>
+      </ul>
+      <p>If the UI does not load, verify static asset paths and rebuild the web bundle.</p>
+    </section>
     <div id="root"></div>
+    <script>
+      (function () {
+        var fallback = document.getElementById('root-fallback');
+        if (fallback) fallback.remove();
+      })();
+    </script>
   </body>
 </html>

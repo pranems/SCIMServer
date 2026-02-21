@@ -5,6 +5,9 @@
  * For simple `eq` filters on indexed DB columns, produces a Prisma `where` clause.
  * For all other filters, falls back to in-memory evaluation using evaluateFilter().
  *
+ * Phase 3: Column maps now reference actual column names (userName, displayName)
+ * because PostgreSQL CITEXT handles case-insensitive comparison natively.
+ *
  * @see scim-filter-parser.ts for the AST types and evaluator
  */
 
@@ -17,9 +20,9 @@ import {
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 
-/** DB-pushable column map for ScimUser (attribute name → Prisma column) */
+/** DB-pushable column map for Users (attribute name → Prisma column) */
 const USER_DB_COLUMNS: Record<string, string> = {
-  username: 'userNameLower',   // case-insensitive via lowercase column
+  username: 'userName',       // Phase 3: CITEXT handles case-insensitive eq natively
   externalid: 'externalId',
   id: 'scimId',
 };
@@ -69,21 +72,15 @@ export function buildUserFilter(filter?: string): UserFilterResult {
 // ─── Groups ──────────────────────────────────────────────────────────────────
 
 /**
- * DB-pushable column map for ScimGroup.
+ * DB-pushable column map for Groups.
  *
- * displayName is included for DB push-down on `eq` filters. SQLite's default
- * case-sensitive `=` is acceptable because SCIM clients (Entra ID, the SCIM 
- * validator) send exact-cased values in `eq` filters. For operators that need
- * case-insensitive matching (`co`, `sw`), the parser returns `null` from
- * tryPushToDb and the in-memory evaluator handles the filter correctly.
- *
- * Long-term: add a `displayNameLower` column (like userNameLower) and map
- * `displayname` → `displayNameLower` here for full RFC 7643 §2.1 compliance.
+ * Phase 3: displayName maps directly to the CITEXT column now — no need for
+ * displayNameLower helper column. CITEXT handles case-insensitive eq natively.
  */
 const GROUP_DB_COLUMNS: Record<string, string> = {
   externalid: 'externalId',
   id: 'scimId',
-  displayname: 'displayNameLower',
+  displayname: 'displayName',
 };
 
 export interface GroupFilterResult {
@@ -122,15 +119,9 @@ export function buildGroupFilter(filter?: string): GroupFilterResult {
  * Attempt to convert a simple `attrPath eq "value"` AST into a Prisma where clause.
  * Returns null if the AST is too complex for DB push-down.
  *
- * SQLite compromise (MEDIUM): Only the `eq` operator is pushed to the database.
- * All other operators (co, sw, ew, gt, lt, and, or) fall back to fetchAll + in-memory
- * evaluation because SQLite lacks ILIKE, JSONB path queries, and case-insensitive LIKE.
- * PostgreSQL migration: expand this function to handle co/sw/ew/gt/lt via ILIKE and
- * JSONB operators, eliminating full-table-scan fallback for most filters.
- * See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.4.1 and §3.4.3
- *
- * For userName, comparison is always case-insensitive (RFC 7643 §2.1: caseExact=false),
- * so we query via the lowercase column.
+ * Phase 3: CITEXT columns (userName, displayName) handle case-insensitive
+ * comparison natively in PostgreSQL — no toLowerCase needed. The InMemory
+ * repository also handles case-insensitive comparison at query time.
  */
 function tryPushToDb(
   ast: FilterNode,
@@ -146,10 +137,6 @@ function tryPushToDb(
   const column = columnMap[attrLower];
   if (!column) return null;
 
-  // For userName and displayName we stored lowercase columns; compare against lowercase value
-  if ((attrLower === 'username' || attrLower === 'displayname') && typeof node.value === 'string') {
-    return { [column]: node.value.toLowerCase() };
-  }
-
+  // Phase 3: Pass value as-is — CITEXT handles case-insensitive matching
   return { [column]: node.value };
 }

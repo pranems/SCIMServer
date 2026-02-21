@@ -5,6 +5,51 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-02-20
+
+### Added
+- **PostgreSQL Migration (Phase 3):** Replaced SQLite (better-sqlite3) with PostgreSQL 17 as the persistence backend
+  - `CITEXT` columns for native case-insensitive `userName`/`displayName` — eliminated `*Lower` mirror columns
+  - `JSONB` payload storage — enables future GIN-indexed SCIM filter push-down
+  - `UUID` primary keys via `pgcrypto` `gen_random_uuid()`
+  - `TIMESTAMPTZ` for proper timezone-aware timestamps
+  - PostgreSQL extensions: `citext`, `pgcrypto`, `pg_trgm`
+- **Prisma 7 Driver Adapter:** `PrismaPg` adapter wrapping `pg.Pool` (replaces removed `datasourceUrl` constructor option)
+- **Docker Compose:** Full local development stack — `postgres:17-alpine` + API container with healthchecks
+- **InMemory Backend:** Standalone `PERSISTENCE_BACKEND=inmemory` for testing without any database
+- **UUID Guard:** `isValidUuid()` validation preventing PostgreSQL P2007 errors on non-UUID lookups
+- **SCIM ID Safety:** Triple-layer defense against client-supplied `id` leaking into responses (extractAdditionalAttributes, toScimUserResource, stripReservedAttributes)
+- **False Positive Test Audit:** Comprehensive audit and fix of 29 false positive tests across all test levels
+  - **8 E2E fixes:** tautological assertion, empty-loop skips, conditional guards, missing negative assertion, overly permissive assertion
+  - **10 unit fixes:** weak `toBeDefined()` assertions strengthened to verify config values, no-assertion test fixed
+  - **11 live fixes:** hardcoded `$true`, unguarded deletes, vacuously-true collection assertions, fallback `$true` branches
+- **Fresh PostgreSQL Baseline Migration:** Single idempotent migration replacing 8 incremental SQLite migrations
+
+### Changed
+- **Version Endpoint Updated:** `GET /scim/admin/version` now reports `persistenceBackend`, `connectionPool`, `migratePhase`; removed blob backup fields
+- **`package.json` dependencies:** Added `@prisma/adapter-pg`, `pg`, `@types/pg`; removed `@prisma/adapter-better-sqlite3`
+- **Dockerfile:** Removed SQLite native build deps (`python3`, `make`, `g++`); keeps only `*.postgresql.*` WASM runtimes
+- **All repositories:** Query unified `ScimResource` table with `resourceType` filter instead of separate `ScimUser`/`ScimGroup` tables
+- **Services:** Removed all `userNameLower`/`displayNameLower` computation; CITEXT handles case-insensitivity natively
+- **Version** bumped to 0.11.0
+
+### Removed
+- `better-sqlite3` and `@prisma/adapter-better-sqlite3` dependencies
+- `userNameLower`, `displayNameLower` columns and all related code
+- `rawPayload` TEXT column (replaced by `payload` JSONB)
+- 8 incremental SQLite migrations (replaced by 1 PostgreSQL baseline)
+
+### Verified
+- **862/862 unit tests passing** (28 test suites)
+- **193/193 e2e tests passing** (15 suites)
+- **302/302 live tests passing** (local instance and Docker instance)
+- Build clean (TypeScript), Lint clean
+- Docker image built and tested against PostgreSQL 17-alpine container
+- **False positive test audit:** 29 false positives identified and fixed (8 E2E, 10 unit, 11 live)
+- **2026-02-21 re-validation:** Clean API rebuild, full E2E run, local live run, and fresh `scimserver:latest` Docker live run all green
+
+---
+
 ## [0.10.0] - 2026-02-18
 
 ### Added

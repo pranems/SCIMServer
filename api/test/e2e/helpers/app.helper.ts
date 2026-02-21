@@ -11,25 +11,29 @@ import { AppModule } from '@app/modules/app/app.module';
 /**
  * Bootstraps a full NestJS application for E2E testing.
  *
- * - Points Prisma at the test SQLite database (created by global-setup.ts)
- * - Applies the same middleware stack as production (global prefix, JSON parsing, etc.)
+ * - When PERSISTENCE_BACKEND=inmemory, uses InMemory SCIM storage
+ * - When using Prisma backend, points at the PostgreSQL URL from marker file
+ * - Applies the same middleware stack as production
  * - Sets known auth credentials so test helpers can acquire tokens deterministically
  *
  * Call `app.close()` in your `afterAll()` to shut down cleanly.
  */
 export async function createTestApp(): Promise<INestApplication> {
-  // Read the test DB path from the marker file written by global-setup
+  // Read the database URL from the marker file written by global-setup
   const markerPath = path.resolve(__dirname, '..', '.test-db-path');
-  let testDbPath: string;
+  const backend = process.env.PERSISTENCE_BACKEND?.toLowerCase() ?? 'prisma';
 
-  if (fs.existsSync(markerPath)) {
-    testDbPath = fs.readFileSync(markerPath, 'utf-8').trim();
-  } else {
-    testDbPath = path.resolve(__dirname, '..', '..', 'prisma', 'test.db');
+  if (backend !== 'inmemory') {
+    let dbUrl: string;
+    if (fs.existsSync(markerPath)) {
+      dbUrl = fs.readFileSync(markerPath, 'utf-8').trim();
+    } else {
+      dbUrl = process.env.DATABASE_URL ?? 'postgresql://scim:scim@localhost:5432/scimdb';
+    }
+    process.env.DATABASE_URL = dbUrl;
   }
 
   // Deterministic auth credentials for E2E tests
-  process.env.DATABASE_URL = `file:${testDbPath}`;
   process.env.SCIM_SHARED_SECRET = 'e2e-test-secret';
   process.env.JWT_SECRET = 'e2e-test-jwt-secret';
   process.env.OAUTH_CLIENT_ID = 'e2e-client';

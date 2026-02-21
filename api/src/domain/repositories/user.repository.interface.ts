@@ -2,8 +2,11 @@
  * IUserRepository — persistence port for SCIM User resources.
  *
  * Implementations:
- *   - PrismaUserRepository  (SQLite / PostgreSQL via Prisma)
+ *   - PrismaUserRepository  (PostgreSQL via Prisma)
  *   - InMemoryUserRepository (testing / lightweight deployments)
+ *
+ * Phase 3: userNameLower column removed — CITEXT/InMemory handles
+ * case-insensitive comparison without a pre-computed lowercase column.
  */
 import type {
   UserRecord,
@@ -24,7 +27,7 @@ export interface IUserRepository {
    *
    * @param endpointId Tenant identifier (mandatory for isolation).
    * @param dbFilter   Simple key-value filter pushed down from the SCIM filter parser.
-   *                   Example: `{ userNameLower: 'alice' }`.
+   *                   Example: `{ userName: 'alice' }`.
    * @param orderBy    Sort specification, e.g. `{ field: 'createdAt', direction: 'asc' }`.
    */
   findAll(
@@ -42,8 +45,9 @@ export interface IUserRepository {
   /**
    * Check for uniqueness violations within a tenant.
    *
-   * Searches for any existing user whose `userNameLower` matches
-   * `userName.toLowerCase()` OR whose `externalId` matches `externalId`.
+   * Searches for any existing user whose `userName` matches
+   * case-insensitively (via CITEXT or toLowerCase) OR whose
+   * `externalId` matches `externalId`.
    * Optionally excludes a record with the given `scimId` (for PUT/PATCH).
    *
    * @returns The conflicting record's identifiers, or `null` if unique.

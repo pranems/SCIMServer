@@ -26,6 +26,11 @@ $baseUrl = $BaseUrl
 $testsPassed = 0
 $testsFailed = 0
 $VerboseMode = $Verbose.IsPresent
+$script:testResults = @()
+$script:flowSteps = @()
+$script:flowStepCounter = 0
+$script:lastLinkedFlowStepId = 0
+$script:currentSection = "Setup"
 
 function Write-VerboseLog {
     param([string]$Label, $Data)
@@ -38,6 +43,91 @@ function Write-VerboseLog {
         $json = try { $Data | ConvertTo-Json -Depth 4 -Compress } catch { "$Data" }
         if ($json.Length -gt 300) { $json = $json.Substring(0, 297) + "..." }
         Write-Host "    📋 ${Label}: $json" -ForegroundColor DarkGray
+    }
+}
+
+function Convert-FlowHeaders {
+    param([System.Collections.IDictionary]$Headers)
+    if ($null -eq $Headers) { return $null }
+    $normalized = [ordered]@{}
+    foreach ($key in $Headers.Keys) {
+        $value = $Headers[$key]
+        $headerName = [string]$key
+        if ($headerName -ieq 'Authorization') {
+            $normalized[$headerName] = 'Bearer ***'
+            continue
+        }
+        if ($value -is [array]) {
+            $normalized[$headerName] = ($value -join ', ')
+        } else {
+            $normalized[$headerName] = [string]$value
+        }
+    }
+    return $normalized
+}
+
+function Convert-FlowBody {
+    param($Body)
+    if ($null -eq $Body) { return $null }
+    if ($Body -is [string]) {
+        if ($Body.Length -gt 6000) { return $Body.Substring(0, 6000) + '...' }
+        return $Body
+    }
+    try {
+        $json = $Body | ConvertTo-Json -Depth 10
+        if ($json.Length -gt 6000) { return $json.Substring(0, 6000) + '...' }
+        return $Body
+    } catch {
+        $str = [string]$Body
+        if ($str.Length -gt 6000) { return $str.Substring(0, 6000) + '...' }
+        return $str
+    }
+}
+
+function Add-FlowStep {
+    param(
+        [datetime]$StartedAt,
+        [string]$Method,
+        [string]$Uri,
+        [System.Collections.IDictionary]$RequestHeaders,
+        $RequestBody,
+        [int]$StatusCode,
+        [System.Collections.IDictionary]$ResponseHeaders,
+        $ResponseBody,
+        [string]$ErrorMessage
+    )
+
+    $finishedAt = Get-Date
+    $script:flowStepCounter++
+    $script:flowSteps += [PSCustomObject]@{
+        stepId      = $script:flowStepCounter
+        section     = $script:currentSection
+        actionStep  = "$Method $Uri"
+        startedAt   = $StartedAt.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
+        finishedAt  = $finishedAt.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
+        durationMs  = [math]::Round(($finishedAt - $StartedAt).TotalMilliseconds)
+        request     = [ordered]@{
+            method  = $Method
+            url     = $Uri
+            headers = Convert-FlowHeaders -Headers $RequestHeaders
+            body    = Convert-FlowBody -Body $RequestBody
+        }
+        response    = if ($StatusCode -gt 0 -or $null -ne $ResponseHeaders -or $null -ne $ResponseBody) {
+            [ordered]@{
+                status  = $StatusCode
+                headers = Convert-FlowHeaders -Headers $ResponseHeaders
+                body    = Convert-FlowBody -Body $ResponseBody
+            }
+        } else {
+            $null
+        }
+        error       = if ($ErrorMessage) {
+            [ordered]@{
+                message = $ErrorMessage
+            }
+        } else {
+            $null
+        }
     }
 }
 
@@ -55,8 +145,9 @@ function Invoke-RestMethod {
         [object]$Body,
         [string]$ContentType
     )
+    $requestStart = Get-Date
+    $m = if ($Method) { $Method.ToUpperInvariant() } else { "GET" }
     if ($script:VerboseMode) {
-        $m = if ($Method) { $Method } else { "GET" }
         Write-Host "    📋 → $m $Uri" -ForegroundColor DarkGray
         if ($Body) {
             $bs = if ($Body -is [string]) { $Body } else { try { $Body | ConvertTo-Json -Compress } catch { "$Body" } }
@@ -64,9 +155,17 @@ function Invoke-RestMethod {
             Write-Host "    📋   Body: $bs" -ForegroundColor DarkGray
         }
     }
+    $restResponseHeaders = $null
+    $restStatusCode = 0
     try {
-        $result = Microsoft.PowerShell.Utility\Invoke-RestMethod @PSBoundParameters -AllowInsecureRedirect
+        $result = Microsoft.PowerShell.Utility\Invoke-RestMethod @PSBoundParameters -AllowInsecureRedirect -ResponseHeadersVariable restResponseHeaders -StatusCodeVariable restStatusCode
+        Add-FlowStep -StartedAt $requestStart -Method $m -Uri $Uri -RequestHeaders $Headers -RequestBody $Body -StatusCode $restStatusCode -ResponseHeaders $restResponseHeaders -ResponseBody $result -ErrorMessage $null
     } catch {
+        $errorStatus = 0
+        if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+            try { $errorStatus = [int]$_.Exception.Response.StatusCode } catch { $errorStatus = 0 }
+        }
+        Add-FlowStep -StartedAt $requestStart -Method $m -Uri $Uri -RequestHeaders $Headers -RequestBody $Body -StatusCode $errorStatus -ResponseHeaders $null -ResponseBody $_.ErrorDetails.Message -ErrorMessage $_.Exception.Message
         if ($script:VerboseMode) {
             Write-Host "    📋 ← Error: $($_.Exception.Message)" -ForegroundColor DarkYellow
             if ($_.ErrorDetails.Message) {
@@ -94,8 +193,9 @@ function Invoke-WebRequest {
         [object]$Body,
         [switch]$SkipHttpErrorCheck
     )
+    $requestStart = Get-Date
+    $m = if ($Method) { $Method.ToUpperInvariant() } else { "GET" }
     if ($script:VerboseMode) {
-        $m = if ($Method) { $Method } else { "GET" }
         Write-Host "    📋 → $m $Uri" -ForegroundColor DarkGray
         if ($Body) {
             $bs = if ($Body -is [string]) { $Body } else { try { $Body | ConvertTo-Json -Compress } catch { "$Body" } }
@@ -105,7 +205,13 @@ function Invoke-WebRequest {
     }
     try {
         $result = Microsoft.PowerShell.Utility\Invoke-WebRequest @PSBoundParameters -AllowInsecureRedirect
+        Add-FlowStep -StartedAt $requestStart -Method $m -Uri $Uri -RequestHeaders $Headers -RequestBody $Body -StatusCode $result.StatusCode -ResponseHeaders $result.Headers -ResponseBody $result.Content -ErrorMessage $null
     } catch {
+        $errorStatus = 0
+        if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
+            try { $errorStatus = [int]$_.Exception.Response.StatusCode } catch { $errorStatus = 0 }
+        }
+        Add-FlowStep -StartedAt $requestStart -Method $m -Uri $Uri -RequestHeaders $Headers -RequestBody $Body -StatusCode $errorStatus -ResponseHeaders $null -ResponseBody $_.ErrorDetails.Message -ErrorMessage $_.Exception.Message
         if ($script:VerboseMode) {
             Write-Host "    📋 ← HTTP Error: $($_.Exception.Message)" -ForegroundColor DarkYellow
         }
@@ -127,6 +233,23 @@ function Invoke-WebRequest {
 
 function Test-Result {
     param([bool]$Success, [string]$Message)
+    $status = if ($Success) { "passed" } else { "failed" }
+    $newFlowStepIds = @($script:flowSteps | Where-Object { $_.stepId -gt $script:lastLinkedFlowStepId } | ForEach-Object { $_.stepId })
+    if ($script:flowSteps.Count -gt 0) {
+        $script:lastLinkedFlowStepId = $script:flowSteps[-1].stepId
+    }
+    $latestAction = if ($newFlowStepIds.Count -gt 0) {
+        ($script:flowSteps | Where-Object { $_.stepId -eq $newFlowStepIds[-1] } | Select-Object -First 1).actionStep
+    } else {
+        $null
+    }
+    $script:testResults += [PSCustomObject]@{
+        section       = $script:currentSection
+        name          = $Message
+        status        = $status
+        actionStep    = $latestAction
+        actionStepIds = $newFlowStepIds
+    }
     if ($Success) {
         Write-Host "PASS: $Message" -ForegroundColor Green
         $script:testsPassed++
@@ -157,6 +280,7 @@ $script:startTime = Get-Date
 # ============================================
 # TEST SECTION 1: ENDPOINT CRUD OPERATIONS
 # ============================================
+$script:currentSection = "1: Endpoint CRUD"
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 1: ENDPOINT CRUD OPERATIONS" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
@@ -206,6 +330,7 @@ Test-Result -Success ($null -ne $stats.totalGroups) -Message "Stats includes tot
 # ============================================
 # TEST SECTION 2: CONFIG VALIDATION
 # ============================================
+$script:currentSection = "2: Config Validation"
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 2: CONFIG VALIDATION" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
@@ -241,7 +366,7 @@ Test-Result -Success ($validResult.config.MultiOpPatchRequestAddMultipleMembersT
 # Test: Boolean true also valid
 $boolConfigBody = '{"config":{"MultiOpPatchRequestAddMultipleMembersToGroup":true}}'
 $boolResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $boolConfigBody
-Test-Result -Success ($true) -Message "Boolean true accepted as config value"
+Test-Result -Success ($boolResult.config.MultiOpPatchRequestAddMultipleMembersToGroup -eq $true) -Message "Boolean true accepted as config value"
 
 # Test: Invalid REMOVE config value rejected on create
 Write-Host "`n--- Test: Invalid Remove Config Value Rejected on Create ---" -ForegroundColor Cyan
@@ -293,7 +418,7 @@ try {
 Write-Host "`n--- Test: Valid VerbosePatchSupported Config Value Accepted ---" -ForegroundColor Cyan
 $validVerboseBody = '{"config":{"VerbosePatchSupported":true}}'
 $validVerboseResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $validVerboseBody
-Test-Result -Success ($true) -Message "VerbosePatchSupported boolean true accepted"
+Test-Result -Success ($validVerboseResult.config.VerbosePatchSupported -eq $true) -Message "VerbosePatchSupported boolean true accepted"
 
 # Test: All three flags can be set together
 Write-Host "`n--- Test: All Three Config Flags Set Together ---" -ForegroundColor Cyan
@@ -305,6 +430,7 @@ Test-Result -Success $allValid -Message "All three config flags set together"
 # ============================================
 # TEST SECTION 3: SCIM USER OPERATIONS
 # ============================================
+$script:currentSection = "3: User Operations"
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 3: SCIM USER OPERATIONS" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
@@ -385,6 +511,7 @@ Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PATCH -Headers $headers
 
 # ============================================
 # TEST SECTION 3b: CASE-INSENSITIVITY (RFC 7643 §2.1)
+$script:currentSection = "3b: Case-Insensitivity"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 3b: CASE-INSENSITIVITY (RFC 7643)" -ForegroundColor Yellow
@@ -450,6 +577,7 @@ Test-Result -Success ($addOpPatched.displayName -eq "Add Op Patched") -Message "
 
 # ============================================
 # TEST SECTION 3c: ADVANCED PATCH OPERATIONS
+$script:currentSection = "3c: Advanced Patch"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 3c: ADVANCED PATCH OPERATIONS" -ForegroundColor Yellow
@@ -592,6 +720,7 @@ Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PATCH -Headers $headers
 
 # ============================================
 # TEST SECTION 3d: PAGINATION & ADVANCED FILTERING
+$script:currentSection = "3d: Pagination & Filtering"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 3d: PAGINATION & ADVANCED FILTERING" -ForegroundColor Yellow
@@ -653,8 +782,85 @@ try {
 }
 
 # ============================================
+# TEST SECTION 3e: SCIM ID LEAK PREVENTION (Issue 16)
+$script:currentSection = "3e: SCIM ID Leak Prevention"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 3e: SCIM ID LEAK PREVENTION (Issue 16)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Test: POST with client-supplied id — server must ignore it
+Write-Host "`n--- Test: POST with Client-Supplied id (Must Be Ignored) ---" -ForegroundColor Cyan
+$clientSuppId = "a1b2c3d4-e5f6-7890-abcd-1234567890ab"
+$idLeakBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    id = $clientSuppId
+    userName = "idleak-test@test.com"
+    displayName = "ID Leak Test User"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$idLeakUser = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $idLeakBody
+$serverAssignedId = $idLeakUser.id
+Test-Result -Success ($null -ne $serverAssignedId) -Message "Server assigned an id: $serverAssignedId"
+Test-Result -Success ($serverAssignedId -ne $clientSuppId) -Message "Server-assigned id is NOT the client-supplied id"
+Test-Result -Success ($idLeakUser.meta.location -like "*Users/$serverAssignedId") -Message "meta.location uses server-assigned id"
+Test-Result -Success ($idLeakUser.meta.location -notlike "*Users/$clientSuppId") -Message "meta.location does NOT use client-supplied id"
+
+# Test: GET by server-assigned id should succeed
+Write-Host "`n--- Test: GET by Server-Assigned ID ---" -ForegroundColor Cyan
+$fetchedIdLeakUser = Invoke-RestMethod -Uri "$scimBase/Users/$serverAssignedId" -Method GET -Headers $headers
+Test-Result -Success ($fetchedIdLeakUser.id -eq $serverAssignedId) -Message "GET by server-assigned id returns correct user"
+
+# Test: GET by client-supplied id should return 404
+Write-Host "`n--- Test: GET by Client-Supplied ID (Must Return 404) ---" -ForegroundColor Cyan
+try {
+    Invoke-RestMethod -Uri "$scimBase/Users/$clientSuppId" -Method GET -Headers $headers | Out-Null
+    Test-Result -Success $false -Message "GET by client-supplied id should return 404"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 404) -Message "GET by client-supplied id returns 404 (server ignores client id)"
+}
+
+# Test: PATCH with id in no-path value — must not override scimId
+Write-Host "`n--- Test: PATCH with id in No-Path Value (Must Not Override) ---" -ForegroundColor Cyan
+$patchIdBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        value = @{
+            displayName = "Patched ID Leak"
+            id = "attacker-id-in-patch"
+        }
+    })
+} | ConvertTo-Json -Depth 4
+$patchedIdUser = Invoke-RestMethod -Uri "$scimBase/Users/$serverAssignedId" -Method PATCH -Headers $headers -Body $patchIdBody
+Test-Result -Success ($patchedIdUser.id -eq $serverAssignedId) -Message "PATCH id remains server-assigned (not attacker value)"
+Test-Result -Success ($patchedIdUser.id -ne "attacker-id-in-patch") -Message "PATCH does not allow id override via no-path replace"
+Test-Result -Success ($patchedIdUser.displayName -eq "Patched ID Leak") -Message "PATCH displayName applied despite id in value"
+Test-Result -Success ($patchedIdUser.meta.location -like "*Users/$serverAssignedId") -Message "meta.location unchanged after PATCH with id injection"
+
+# Test: PUT with client-supplied id — must not override scimId
+Write-Host "`n--- Test: PUT with Client-Supplied id (Must Be Ignored) ---" -ForegroundColor Cyan
+$putIdBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    id = "put-override-attempt"
+    userName = "idleak-test@test.com"
+    displayName = "PUT ID Override Test"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$putIdUser = Invoke-RestMethod -Uri "$scimBase/Users/$serverAssignedId" -Method PUT -Headers $headers -Body $putIdBody
+Test-Result -Success ($putIdUser.id -eq $serverAssignedId) -Message "PUT id remains server-assigned (not client value)"
+Test-Result -Success ($putIdUser.id -ne "put-override-attempt") -Message "PUT does not allow id override"
+Test-Result -Success ($putIdUser.displayName -eq "PUT ID Override Test") -Message "PUT body applied correctly despite client id"
+
+# Cleanup: Delete the ID leak test user
+Invoke-RestMethod -Uri "$scimBase/Users/$serverAssignedId" -Method DELETE -Headers $headers | Out-Null
+Write-Host "  Cleaned up ID leak test user: $serverAssignedId" -ForegroundColor DarkGray
+
+# ============================================
 # TEST SECTION 4: SCIM GROUP OPERATIONS
 # ============================================
+$script:currentSection = "4: Group Operations"
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 4: SCIM GROUP OPERATIONS" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
@@ -748,6 +954,7 @@ try {
 # ============================================
 # TEST SECTION 5: MULTI-MEMBER PATCH CONFIG FLAG
 # ============================================
+$script:currentSection = "5: Multi-Member Patch"
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 5: MULTI-MEMBER PATCH CONFIG FLAG" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
@@ -846,6 +1053,7 @@ try {
 
 # ============================================
 # TEST SECTION 5b: MULTI-MEMBER REMOVE CONFIG FLAG
+$script:currentSection = "5b: Multi-Member Remove"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 5b: MULTI-MEMBER REMOVE CONFIG FLAG" -ForegroundColor Yellow
@@ -944,6 +1152,7 @@ try {
 # ============================================
 # TEST SECTION 6: ENDPOINT ISOLATION
 # ============================================
+$script:currentSection = "6: Endpoint Isolation"
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 6: ENDPOINT ISOLATION" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
@@ -982,6 +1191,7 @@ Test-Result -Success ($endpoint1Users.totalResults -ne $endpoint2Users.totalResu
 # ============================================
 # TEST SECTION 7: INACTIVE ENDPOINT BLOCKING
 # ============================================
+$script:currentSection = "7: Inactive Endpoint"
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 7: INACTIVE ENDPOINT BLOCKING" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
@@ -1059,6 +1269,7 @@ try {
 
 # ============================================
 # TEST SECTION 8: SCIM DISCOVERY ENDPOINTS
+$script:currentSection = "8: Discovery Endpoints"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 8: SCIM DISCOVERY ENDPOINTS" -ForegroundColor Yellow
@@ -1078,6 +1289,7 @@ Test-Result -Success ($resourceTypes.Resources.Count -gt 0) -Message "ResourceTy
 
 # ============================================
 # TEST SECTION 8b: CONTENT-TYPE & AUTH VERIFICATION
+$script:currentSection = "8b: Content-Type & Auth"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 8b: CONTENT-TYPE & AUTH VERIFICATION" -ForegroundColor Yellow
@@ -1135,6 +1347,7 @@ try {
 # ============================================
 # TEST SECTION 9: ERROR HANDLING
 # ============================================
+$script:currentSection = "9: Error Handling"
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 9: ERROR HANDLING" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
@@ -1162,11 +1375,111 @@ try {
 # Test: 404 for non-existent endpoint
 Write-Host "`n--- Test: 404 for Non-Existent Endpoint ---" -ForegroundColor Cyan
 try {
-    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/non-existent-id-12345" -Method GET -Headers $headers | Out-Null
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/00000000-0000-0000-0000-000000012345" -Method GET -Headers $headers | Out-Null
     Test-Result -Success $false -Message "Non-existent endpoint should return 404"
 } catch {
     $code = $_.Exception.Response.StatusCode.value__
     Test-Result -Success ($code -eq 404) -Message "Non-existent endpoint returns 404"
+}
+
+# Test: PUT 404 for non-existent user
+Write-Host "`n--- Test: PUT 404 for Non-Existent User ---" -ForegroundColor Cyan
+$putNonExistUserBody = @{schemas=@("urn:ietf:params:scim:schemas:core:2.0:User");userName="ghost@test.com";active=$true} | ConvertTo-Json
+try {
+    Invoke-RestMethod -Uri "$scimBase/Users/non-existent-id-12345" -Method PUT -Headers $headers -Body $putNonExistUserBody | Out-Null
+    Test-Result -Success $false -Message "PUT non-existent user should return 404"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 404) -Message "PUT non-existent user returns 404"
+}
+
+# Test: PATCH 404 for non-existent user
+Write-Host "`n--- Test: PATCH 404 for Non-Existent User ---" -ForegroundColor Cyan
+$patchNonExistUserBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{ op = "replace"; path = "displayName"; value = "Ghost" })
+} | ConvertTo-Json -Depth 3
+try {
+    Invoke-RestMethod -Uri "$scimBase/Users/non-existent-id-12345" -Method PATCH -Headers $headers -Body $patchNonExistUserBody | Out-Null
+    Test-Result -Success $false -Message "PATCH non-existent user should return 404"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 404) -Message "PATCH non-existent user returns 404"
+}
+
+# Test: DELETE 404 for non-existent user
+Write-Host "`n--- Test: DELETE 404 for Non-Existent User ---" -ForegroundColor Cyan
+try {
+    Invoke-RestMethod -Uri "$scimBase/Users/non-existent-id-12345" -Method DELETE -Headers $headers | Out-Null
+    Test-Result -Success $false -Message "DELETE non-existent user should return 404"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 404) -Message "DELETE non-existent user returns 404"
+}
+
+# Test: PUT 404 for non-existent group
+Write-Host "`n--- Test: PUT 404 for Non-Existent Group ---" -ForegroundColor Cyan
+$putNonExistGroupBody = @{schemas=@("urn:ietf:params:scim:schemas:core:2.0:Group");displayName="Ghost Group"} | ConvertTo-Json
+try {
+    Invoke-RestMethod -Uri "$scimBase/Groups/non-existent-id-12345" -Method PUT -Headers $headers -Body $putNonExistGroupBody | Out-Null
+    Test-Result -Success $false -Message "PUT non-existent group should return 404"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 404) -Message "PUT non-existent group returns 404"
+}
+
+# Test: PATCH 404 for non-existent group
+Write-Host "`n--- Test: PATCH 404 for Non-Existent Group ---" -ForegroundColor Cyan
+$patchNonExistGroupBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{ op = "replace"; path = "displayName"; value = "Ghost Group" })
+} | ConvertTo-Json -Depth 3
+try {
+    Invoke-RestMethod -Uri "$scimBase/Groups/non-existent-id-12345" -Method PATCH -Headers $headers -Body $patchNonExistGroupBody | Out-Null
+    Test-Result -Success $false -Message "PATCH non-existent group should return 404"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 404) -Message "PATCH non-existent group returns 404"
+}
+
+# Test: DELETE 404 for non-existent group
+Write-Host "`n--- Test: DELETE 404 for Non-Existent Group ---" -ForegroundColor Cyan
+try {
+    Invoke-RestMethod -Uri "$scimBase/Groups/non-existent-id-12345" -Method DELETE -Headers $headers | Out-Null
+    Test-Result -Success $false -Message "DELETE non-existent group should return 404"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 404) -Message "DELETE non-existent group returns 404"
+}
+
+# Test: DELETE idempotent — second delete returns 404
+Write-Host "`n--- Test: DELETE Idempotent (Second Delete → 404) ---" -ForegroundColor Cyan
+$idempDelGroupBody = @{schemas=@("urn:ietf:params:scim:schemas:core:2.0:Group");displayName="Idempotent Delete Test"} | ConvertTo-Json
+$idempDelGroup = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $idempDelGroupBody
+Invoke-RestMethod -Uri "$scimBase/Groups/$($idempDelGroup.id)" -Method DELETE -Headers $headers | Out-Null
+try {
+    Invoke-RestMethod -Uri "$scimBase/Groups/$($idempDelGroup.id)" -Method DELETE -Headers $headers | Out-Null
+    Test-Result -Success $false -Message "Second DELETE should return 404"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 404) -Message "DELETE idempotent — second delete returns 404"
+}
+
+# Test: Non-UUID ID returns 404 (not 500) — UUID guard validation
+Write-Host "`n--- Test: Non-UUID ID Returns 404 (UUID Guard) ---" -ForegroundColor Cyan
+try {
+    Invoke-RestMethod -Uri "$scimBase/Users/not-a-uuid" -Method GET -Headers $headers | Out-Null
+    Test-Result -Success $false -Message "Non-UUID user ID should return 404"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 404) -Message "Non-UUID user ID returns 404 (not 500)"
+}
+try {
+    Invoke-RestMethod -Uri "$scimBase/Groups/not-a-uuid" -Method GET -Headers $headers | Out-Null
+    Test-Result -Success $false -Message "Non-UUID group ID should return 404"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 404) -Message "Non-UUID group ID returns 404 (not 500)"
 }
 
 # (Duplicate userName 409 already covered in Section 3b — case-insensitive uniqueness)
@@ -1184,6 +1497,7 @@ try {
 
 # ============================================
 # TEST SECTION 9b: RFC 7644 COMPLIANCE CHECKS
+$script:currentSection = "9b: RFC 7644 Compliance"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 9b: RFC 7644 COMPLIANCE CHECKS" -ForegroundColor Yellow
@@ -1258,6 +1572,7 @@ Test-Result -Success ($getTsUser.meta.lastModified -eq $patchedTimestamp.meta.la
 
 # ============================================
 # TEST SECTION 9c: POST /.search (RFC 7644 §3.4.3)
+$script:currentSection = "9c: POST /.search"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 9c: POST /.search (RFC 7644 §3.4.3)" -ForegroundColor Yellow
@@ -1351,11 +1666,12 @@ if ($searchGroupExclResult.Resources.Count -gt 0) {
     Test-Result -Success ($null -eq $firstGroupRes.members) -Message "POST /Groups/.search excludedAttributes removes members"
     Test-Result -Success ($null -ne $firstGroupRes.displayName) -Message "POST /Groups/.search excludedAttributes keeps displayName"
 } else {
-    Test-Result -Success $true -Message "POST /Groups/.search excludedAttributes returned empty list (ok)"
+    Test-Result -Success $false -Message "POST /Groups/.search excludedAttributes returned empty list (groups were created — this is a bug)"
 }
 
 # ============================================
 # TEST SECTION 9d: ATTRIBUTE PROJECTION (RFC 7644 §3.4.2.5)
+$script:currentSection = "9d: Attribute Projection"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 9d: ATTRIBUTE PROJECTION (RFC 7644 §3.4.2.5)" -ForegroundColor Yellow
@@ -1407,7 +1723,7 @@ if ($grpAttrResult.Resources.Count -gt 0) {
     Test-Result -Success ($null -ne $firstAttrGroup.id) -Message "GET /Groups attributes always returns id"
     Test-Result -Success ($null -eq $firstAttrGroup.members) -Message "GET /Groups attributes excludes non-requested members"
 } else {
-    Test-Result -Success $true -Message "GET /Groups attributes returned empty list (ok)"
+    Test-Result -Success $false -Message "GET /Groups attributes returned empty list (groups were created — this is a bug)"
 }
 
 # Test: GET /Groups/:id?excludedAttributes=members
@@ -1425,6 +1741,7 @@ Test-Result -Success ($null -ne $firstPrecedence.displayName) -Message "Preceden
 
 # ============================================
 # TEST SECTION 9e: ETag & CONDITIONAL REQUESTS (RFC 7644 §3.14)
+$script:currentSection = "9e: ETag & Conditional"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 9e: ETag & CONDITIONAL REQUESTS (RFC 7644 §3.14)" -ForegroundColor Yellow
@@ -1504,6 +1821,7 @@ Test-Result -Success ($spcEtag.etag.supported -eq $true) -Message "ServiceProvid
 
 # ============================================
 # TEST SECTION 9f: PatchOpAllowRemoveAllMembers FLAG
+$script:currentSection = "9f: RemoveAllMembers"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 9f: PatchOpAllowRemoveAllMembers FLAG" -ForegroundColor Yellow
@@ -1591,6 +1909,7 @@ try {
 
 # ============================================
 # TEST SECTION 9g: FILTER OPERATORS (co, sw, pr, and)
+$script:currentSection = "9g: Filter Operators"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 9g: FILTER OPERATORS (co, sw, pr, and)" -ForegroundColor Yellow
@@ -1639,6 +1958,7 @@ Test-Result -Success ($groupCoResult.totalResults -ge 1) -Message "Group display
 
 # ============================================
 # TEST SECTION 9h: EDGE CASES
+$script:currentSection = "9h: Edge Cases"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 9h: EDGE CASES" -ForegroundColor Yellow
@@ -1703,6 +2023,7 @@ Test-Result -Success ($null -ne $spcDetail.sort) -Message "ServiceProviderConfig
 
 # ============================================
 # TEST SECTION 9i: VerbosePatchSupported DOT-NOTATION
+$script:currentSection = "9i: Verbose Patch Dot-Notation"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 9i: VerbosePatchSupported DOT-NOTATION" -ForegroundColor Yellow
@@ -1775,6 +2096,7 @@ Test-Result -Success ($flatDotResult.name.givenName -eq "FlatValue") -Message "S
 
 # ============================================
 # TEST SECTION 9j: LOG CONFIGURATION API
+$script:currentSection = "9j: Log Configuration"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 9j: LOG CONFIGURATION API" -ForegroundColor Yellow
@@ -1872,18 +2194,30 @@ Test-Result -Success ($limitResult.entries.Count -le 3) -Message "Recent logs re
 # Filter by level
 $levelFilter = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent?level=ERROR" -Method GET -Headers $headers
 $allError = $true
-foreach ($entry in $levelFilter.entries) {
-    if ($entry.level -notin @("ERROR", "FATAL")) { $allError = $false; break }
+if ($null -eq $levelFilter.entries -or $levelFilter.entries.Count -eq 0) {
+    # No ERROR+ entries — still valid (no errors occurred), but note it's vacuous
+    $allError = $true
+    Write-Host "  [INFO] No ERROR-level entries in buffer — level filter is vacuously true" -ForegroundColor Gray
+} else {
+    foreach ($entry in $levelFilter.entries) {
+        if ($entry.level -notin @("ERROR", "FATAL")) { $allError = $false; break }
+    }
 }
-Test-Result -Success $allError -Message "Recent logs level filter returns only ERROR+ entries"
+Test-Result -Success $allError -Message "Recent logs level filter returns only ERROR+ entries (count: $($levelFilter.entries.Count))"
 
 # Filter by category
 $catFilter = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent?category=http" -Method GET -Headers $headers
 $allHttp = $true
-foreach ($entry in $catFilter.entries) {
-    if ($entry.category -ne "http") { $allHttp = $false; break }
+$catCount = 0
+if ($null -ne $catFilter.entries) { $catCount = $catFilter.entries.Count }
+if ($catCount -eq 0) {
+    $allHttp = $false  # Must find http entries — previous requests generate them
+} else {
+    foreach ($entry in $catFilter.entries) {
+        if ($entry.category -ne "http") { $allHttp = $false; break }
+    }
 }
-Test-Result -Success $allHttp -Message "Recent logs category filter returns only 'http' entries"
+Test-Result -Success $allHttp -Message "Recent logs category filter returns only 'http' entries (count: $catCount)"
 
 # --- DELETE /admin/log-config/recent (clear ring buffer) ---
 Write-Host "`n--- Test: Clear Ring Buffer ---" -ForegroundColor Cyan
@@ -1911,10 +2245,16 @@ Test-Result -Success ($null -ne $autoRequestId -and $autoRequestId.Length -gt 10
 Write-Host "`n--- Test: Filter Recent Logs by Request ID ---" -ForegroundColor Cyan
 $byRequestId = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent?requestId=$customRequestId" -Method GET -Headers $headers
 $allMatchRequestId = $true
-foreach ($entry in $byRequestId.entries) {
-    if ($entry.requestId -ne $customRequestId) { $allMatchRequestId = $false; break }
+$reqIdCount = 0
+if ($null -ne $byRequestId.entries) { $reqIdCount = $byRequestId.entries.Count }
+if ($reqIdCount -eq 0) {
+    $allMatchRequestId = $false  # We just sent a request with this ID — must find entries
+} else {
+    foreach ($entry in $byRequestId.entries) {
+        if ($entry.requestId -ne $customRequestId) { $allMatchRequestId = $false; break }
+    }
 }
-Test-Result -Success $allMatchRequestId -Message "Recent logs requestId filter returns matching entries"
+Test-Result -Success $allMatchRequestId -Message "Recent logs requestId filter returns matching entries (count: $reqIdCount)"
 
 # --- Download logs: GET /admin/log-config/download ---
 Write-Host "`n--- Test: Download Logs (NDJSON/JSON) ---" -ForegroundColor Cyan
@@ -1959,10 +2299,16 @@ Test-Result -Success $isJsonArray -Message "Download JSON returns a JSON array"
 
 $downloadByRequest = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/download?format=json&requestId=$customRequestId" -Method GET -Headers $headers
 $downloadRequestMatches = $true
-foreach ($entry in $downloadByRequest) {
-    if ($entry.requestId -ne $customRequestId) { $downloadRequestMatches = $false; break }
+$dlReqCount = 0
+if ($downloadByRequest -is [System.Array]) { $dlReqCount = $downloadByRequest.Count }
+if ($dlReqCount -eq 0) {
+    $downloadRequestMatches = $false  # We sent a request with this ID — must find entries
+} else {
+    foreach ($entry in $downloadByRequest) {
+        if ($entry.requestId -ne $customRequestId) { $downloadRequestMatches = $false; break }
+    }
 }
-Test-Result -Success $downloadRequestMatches -Message "Download logs requestId filter returns matching entries"
+Test-Result -Success $downloadRequestMatches -Message "Download logs requestId filter returns matching entries (count: $dlReqCount)"
 
 # --- Stream logs: GET /admin/log-config/stream (SSE) ---
 Write-Host "`n--- Test: Stream Logs (SSE) ---" -ForegroundColor Cyan
@@ -1989,6 +2335,7 @@ Test-Result -Success ($restoreResult.config.format -eq "pretty") -Message "Resto
 
 # ============================================
 # TEST SECTION 9k: PER-ENDPOINT LOG LEVEL VIA ENDPOINT CONFIG
+$script:currentSection = "9k: Per-Endpoint Log Level"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 9k: PER-ENDPOINT LOG LEVEL VIA ENDPOINT CONFIG" -ForegroundColor Yellow
@@ -2106,14 +2453,26 @@ Test-Result -Success ($ciEndpoint.config.logLevel -eq "debug") -Message "Accepts
 
 # --- Cleanup: delete test endpoints ---
 Write-Host "`n--- Cleanup: Delete Log Level Test Endpoints ---" -ForegroundColor Cyan
-Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$logLevelEndpointId" -Method DELETE -Headers $headers
-Test-Result -Success $true -Message "Deleted log-level-test-ep"
+try {
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$logLevelEndpointId" -Method DELETE -Headers $headers | Out-Null
+    Test-Result -Success $true -Message "Deleted log-level-test-ep"
+} catch {
+    Test-Result -Success $false -Message "Deleted log-level-test-ep"
+}
 
-Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$mixedEndpointId" -Method DELETE -Headers $headers
-Test-Result -Success $true -Message "Deleted log-level-mixed-ep"
+try {
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$mixedEndpointId" -Method DELETE -Headers $headers | Out-Null
+    Test-Result -Success $true -Message "Deleted log-level-mixed-ep"
+} catch {
+    Test-Result -Success $false -Message "Deleted log-level-mixed-ep"
+}
 
-Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ciEndpointId" -Method DELETE -Headers $headers
-Test-Result -Success $true -Message "Deleted log-ci-ep"
+try {
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ciEndpointId" -Method DELETE -Headers $headers | Out-Null
+    Test-Result -Success $true -Message "Deleted log-ci-ep"
+} catch {
+    Test-Result -Success $false -Message "Deleted log-ci-ep"
+}
 
 # Verify cleanup cleared log-config
 $logConfigFinal = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method GET -Headers $headers
@@ -2124,6 +2483,7 @@ Test-Result -Success ($finalEp1 -eq $null -and $finalEp2 -eq $null -and $finalEp
 
 # ============================================
 # TEST SECTION 10: DELETE OPERATIONS
+$script:currentSection = "10: Cleanup"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
 Write-Host "TEST SECTION 10: DELETE OPERATIONS" -ForegroundColor Yellow
@@ -2184,6 +2544,8 @@ if ($VPEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$VP
 # FINAL SUMMARY
 # ============================================
 $elapsed = (Get-Date) - $script:startTime
+$finishedAt = Get-Date
+
 Write-Host "`n`n========================================" -ForegroundColor Magenta
 Write-Host "FINAL TEST SUMMARY" -ForegroundColor Magenta
 Write-Host "========================================" -ForegroundColor Magenta
@@ -2198,5 +2560,77 @@ if ($testsFailed -eq 0) {
 } else {
     Write-Host "`n⚠️ Some tests failed. Review output above." -ForegroundColor Yellow
 }
+
+# ============================================
+# WRITE JSON RESULTS FILE
+# ============================================
+$totalTests = $testsPassed + $testsFailed
+$successRate = if ($totalTests -gt 0) { [math]::Round(($testsPassed / $totalTests) * 100, 1) } else { 0 }
+$timestamp = $finishedAt.ToString("yyyy-MM-dd_HH-mm-ss")
+$runId = "live-$timestamp"
+
+# Determine target (local vs docker vs azure)
+$target = if ($baseUrl -match 'localhost:8080|:8080') { "docker" }
+           elseif ($baseUrl -match 'azurecontainerapps|azure') { "azure" }
+           else { "local" }
+
+# Group tests by section for the sections array
+$sectionGroups = $script:testResults | Group-Object -Property section
+$sectionsArray = @()
+foreach ($group in $sectionGroups) {
+    $sectionPassed = ($group.Group | Where-Object { $_.status -eq 'passed' }).Count
+    $sectionFailed = ($group.Group | Where-Object { $_.status -eq 'failed' }).Count
+    $sectionsArray += [PSCustomObject]@{
+        name   = $group.Name
+        tests  = $group.Count
+        passed = $sectionPassed
+        failed = $sectionFailed
+        status = if ($sectionFailed -eq 0) { "passed" } else { "failed" }
+    }
+}
+
+# Build the full results object
+$resultsObj = [ordered]@{
+    testRunner        = "Live Integration Tests (SCIMServer)"
+    version           = "0.11.0"
+    runId             = $runId
+    target            = $target
+    baseUrl           = $baseUrl
+    startedAt         = $script:startTime.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+    finishedAt        = $finishedAt.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+    durationMs        = [math]::Round($elapsed.TotalMilliseconds)
+    durationFormatted = "$([math]::Round($elapsed.TotalSeconds, 1))s"
+    environment       = [ordered]@{
+        hostname = $env:COMPUTERNAME
+        platform = if ($IsLinux) { "linux" } elseif ($IsMacOS) { "darwin" } else { "win32" }
+        powershellVersion = $PSVersionTable.PSVersion.ToString()
+    }
+    summary           = [ordered]@{
+        totalSections = $sectionGroups.Count
+        totalTests    = $totalTests
+        passed        = $testsPassed
+        failed        = $testsFailed
+        totalFlowSteps = $script:flowSteps.Count
+        successRate   = "$successRate%"
+    }
+    sections          = $sectionsArray
+    tests             = $script:testResults
+    flowSteps         = $script:flowSteps
+}
+
+# Write to test-results directory
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$outDir = Join-Path $repoRoot "test-results"
+if (-not (Test-Path $outDir)) { New-Item -ItemType Directory -Path $outDir -Force | Out-Null }
+
+$outFile = Join-Path $outDir "$runId.json"
+$latestFile = Join-Path $outDir "live-results-latest.json"
+
+$jsonContent = $resultsObj | ConvertTo-Json -Depth 10
+
+$jsonContent | Out-File -FilePath $outFile -Encoding utf8
+$jsonContent | Out-File -FilePath $latestFile -Encoding utf8
+
+Write-Host "`n📊 Live test results JSON written to: test-results/$runId.json" -ForegroundColor Cyan
 
 Write-Host "`n========================================`n" -ForegroundColor Magenta

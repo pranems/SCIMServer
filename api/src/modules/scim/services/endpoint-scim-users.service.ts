@@ -70,7 +70,6 @@ export class EndpointScimUsersService {
       scimId,
       externalId: dto.externalId ?? null,
       userName: dto.userName,
-      userNameLower: dto.userName.toLowerCase(),
       active: dto.active ?? true,
       rawPayload: JSON.stringify(sanitizedPayload),
       meta: JSON.stringify({
@@ -203,7 +202,6 @@ export class EndpointScimUsersService {
     const data: UserUpdateInput = {
       externalId: dto.externalId ?? null,
       userName: dto.userName,
-      userNameLower: dto.userName.toLowerCase(),
       active: dto.active ?? true,
       rawPayload: JSON.stringify(sanitizedPayload),
       meta: JSON.stringify({
@@ -404,7 +402,6 @@ export class EndpointScimUsersService {
 
     return {
       userName,
-      userNameLower: userName.toLowerCase(),
       externalId,
       active,
       rawPayload: JSON.stringify(rawPayload),
@@ -452,7 +449,7 @@ export class EndpointScimUsersService {
   }
 
   private stripReservedAttributes(payload: Record<string, unknown>): Record<string, unknown> {
-    const reserved = new Set(['username', 'userid', 'userName', 'externalid', 'externalId', 'active']);
+    const reserved = new Set(['id', 'username', 'userid', 'userName', 'externalid', 'externalId', 'active']);
     const entries = Object.entries(payload).filter(
       ([key]) => !reserved.has(key) && !reserved.has(key.toLowerCase())
     );
@@ -538,13 +535,17 @@ export class EndpointScimUsersService {
     // Sanitize boolean-like strings in multi-valued attributes (Microsoft Entra sends "True"/"False")
     this.sanitizeBooleanStrings(rawPayload);
 
+    // Remove reserved server-assigned attributes from rawPayload to prevent overwriting
+    // (e.g., a client-supplied "id" in the POST body must never override scimId)
+    delete rawPayload.id;
+
     return {
       schemas: [SCIM_CORE_USER_SCHEMA],
+      ...rawPayload,
       id: user.scimId,
       userName: user.userName,
       externalId: user.externalId ?? undefined,
       active: user.active,
-      ...rawPayload,
       meta
     };
   }
@@ -591,6 +592,7 @@ export class EndpointScimUsersService {
     delete additional.userName;
     delete additional.externalId;
     delete additional.active;
+    delete additional.id;  // RFC 7643 §3.1: id is assigned by the service provider — ignore client-supplied values
 
     return {
       schemas,

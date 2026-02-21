@@ -105,9 +105,17 @@ describe('RFC Compliance (E2E)', () => {
     it('should require PatchOp schema in request body', async () => {
       const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
 
-      // Valid schema
+      // Valid schema — should succeed
       const validPatch = patchOp([{ op: 'replace', path: 'active', value: false }]);
       await scimPatch(app, `${basePath}/Users/${user.id}`, token, validPatch).expect(200);
+
+      // Missing PatchOp schema — should be rejected
+      const noSchema = {
+        schemas: [],
+        Operations: [{ op: 'replace', path: 'active', value: true }],
+      };
+      const rej = await scimPatch(app, `${basePath}/Users/${user.id}`, token, noSchema);
+      expect([400, 500]).toContain(rej.status);
     });
 
     it('should support add operation', async () => {

@@ -12,7 +12,6 @@ describe('InMemoryUserRepository', () => {
     scimId: 'scim-user-1',
     externalId: 'ext-1',
     userName: 'Alice',
-    userNameLower: 'alice',
     active: true,
     rawPayload: '{}',
     meta: '{"resourceType":"User"}',
@@ -35,7 +34,6 @@ describe('InMemoryUserRepository', () => {
       expect(result.scimId).toBe('scim-user-1');
       expect(result.externalId).toBe('ext-1');
       expect(result.userName).toBe('Alice');
-      expect(result.userNameLower).toBe('alice');
       expect(result.active).toBe(true);
       expect(result.rawPayload).toBe('{}');
       expect(result.meta).toBe('{"resourceType":"User"}');
@@ -92,9 +90,9 @@ describe('InMemoryUserRepository', () => {
 
   describe('findAll', () => {
     beforeEach(async () => {
-      await repo.create(makeInput({ scimId: 'u1', userName: 'Charlie', userNameLower: 'charlie' }));
-      await repo.create(makeInput({ scimId: 'u2', userName: 'Alice', userNameLower: 'alice' }));
-      await repo.create(makeInput({ scimId: 'u3', userName: 'Bob', userNameLower: 'bob' }));
+      await repo.create(makeInput({ scimId: 'u1', userName: 'Charlie' }));
+      await repo.create(makeInput({ scimId: 'u2', userName: 'Alice' }));
+      await repo.create(makeInput({ scimId: 'u3', userName: 'Bob' }));
       // Different endpoint
       await repo.create(makeInput({ scimId: 'u4', endpointId: otherEndpointId }));
     });
@@ -121,30 +119,30 @@ describe('InMemoryUserRepository', () => {
 
     it('should sort by a specified field ascending', async () => {
       const results = await repo.findAll(endpointId, undefined, {
-        field: 'userNameLower',
+        field: 'userName',
         direction: 'asc',
       });
-      const names = results.map((u) => u.userNameLower);
-      expect(names).toEqual(['alice', 'bob', 'charlie']);
+      const names = results.map((u) => u.userName);
+      expect(names).toEqual(['Alice', 'Bob', 'Charlie']);
     });
 
     it('should sort by a specified field descending', async () => {
       const results = await repo.findAll(endpointId, undefined, {
-        field: 'userNameLower',
+        field: 'userName',
         direction: 'desc',
       });
-      const names = results.map((u) => u.userNameLower);
-      expect(names).toEqual(['charlie', 'bob', 'alice']);
+      const names = results.map((u) => u.userName);
+      expect(names).toEqual(['Charlie', 'Bob', 'Alice']);
     });
 
     it('should apply a simple key-value filter', async () => {
-      const results = await repo.findAll(endpointId, { userNameLower: 'alice' });
+      const results = await repo.findAll(endpointId, { userName: 'alice' });
       expect(results).toHaveLength(1);
       expect(results[0].scimId).toBe('u2');
     });
 
     it('should return empty when filter matches nothing', async () => {
-      const results = await repo.findAll(endpointId, { userNameLower: 'zzz' });
+      const results = await repo.findAll(endpointId, { userName: 'zzz' });
       expect(results).toHaveLength(0);
     });
 
@@ -163,12 +161,10 @@ describe('InMemoryUserRepository', () => {
       const created = await repo.create(makeInput());
       const updated = await repo.update(created.id, {
         userName: 'AliceUpdated',
-        userNameLower: 'aliceupdated',
         active: false,
       });
 
       expect(updated.userName).toBe('AliceUpdated');
-      expect(updated.userNameLower).toBe('aliceupdated');
       expect(updated.active).toBe(false);
       expect(updated.updatedAt.getTime()).toBeGreaterThanOrEqual(
         created.updatedAt.getTime(),
@@ -217,7 +213,6 @@ describe('InMemoryUserRepository', () => {
       await repo.create(makeInput({
         scimId: 'existing-1',
         userName: 'ExistingUser',
-        userNameLower: 'existinguser',
         externalId: 'ext-existing',
       }));
     });

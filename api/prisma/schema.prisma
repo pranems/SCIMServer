@@ -1,32 +1,28 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
-// ⚠ SQLite provider — see docs/SQLITE_COMPROMISE_ANALYSIS.md for 28 documented
-//   compromises (no CITEXT, no JSONB, single-writer lock, no horizontal scaling).
-//   Migration target: PostgreSQL (provider = "postgresql").
+// Phase 3: PostgreSQL provider — CITEXT for case-insensitive columns, JSONB for
+// payload storage, row-level locking for concurrent writes, GIN indexes for
+// filter push-down. See docs/phases/PHASE_03_POSTGRESQL_MIGRATION.md
 datasource db {
-  provider = "sqlite"
+  provider   = "postgresql"
+  extensions = [citext, pgcrypto, pg_trgm]
 }
-
-// SQLite connection pool and timeout configuration
-// Applied via Prisma Client initialization in the code
 
 // Multi-endpoint support: Each endpoint has isolated SCIM resources
 model Endpoint {
-  id          String   @id @default(cuid())
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name        String   @unique
   displayName String?
   description String?
   config      String?  // JSON configuration for endpoint-specific settings
   active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @db.Timestamptz
+  updatedAt   DateTime @updatedAt     @db.Timestamptz
 
-  // Legacy relations — kept for data migration (Phase 2 transitional)
-  users   ScimUser[]
-  groups  ScimGroup[]
   logs    RequestLog[]
 
   // Phase 2: Unified resource relation
@@ -35,72 +31,9 @@ model Endpoint {
   @@index([active])
 }
 
-model ScimUser {
-  id            String   @id @default(cuid())
-  endpointId    String   // Foreign key to endpoint
-  scimId        String
-  externalId    String?
-  userName      String   // Original casing preserved for display
-  userNameLower String   // SQLite compromise: derived lowercase column for case-insensitive uniqueness (RFC 7643 §2.1).
-                         // PostgreSQL: replace with @db.Citext on userName and remove this column.
-  active        Boolean  @default(true)
-  rawPayload    String
-  meta          String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  endpoint Endpoint      @relation(fields: [endpointId], references: [id], onDelete: Cascade)
-  groups   GroupMember[]
-
-  // Composite unique constraint per endpoint (case-insensitive via userNameLower)
-  @@unique([endpointId, scimId])
-  @@unique([endpointId, userNameLower])
-  @@unique([endpointId, externalId])
-  @@index([endpointId])
-}
-
-model ScimGroup {
-  id               String   @id @default(cuid())
-  endpointId       String   // Foreign key to endpoint
-  scimId           String
-  externalId       String?  // Entra ID sends externalId for groups; first-class column for uniqueness & filtering
-  displayName      String
-  displayNameLower String   // SQLite compromise: derived lowercase column for case-insensitive filtering (RFC 7643 §2.1).
-                           // PostgreSQL: replace with @db.Citext on displayName and remove this column.
-  rawPayload       String
-  meta             String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  endpoint Endpoint      @relation(fields: [endpointId], references: [id], onDelete: Cascade)
-  members  GroupMember[]
-
-  // Composite unique constraint per endpoint
-  @@unique([endpointId, scimId])
-  @@unique([endpointId, externalId])
-  @@unique([endpointId, displayNameLower])
-  @@index([endpointId])
-}
-
-model GroupMember {
-  id        String    @id @default(cuid())
-  groupId   String
-  userId    String?
-  value     String
-  type      String?
-  display   String?
-  createdAt DateTime  @default(now())
-
-  group ScimGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  user  ScimUser? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([groupId])
-  @@index([userId])
-}
-
 model RequestLog {
-  id               String   @id @default(cuid())
-  endpointId       String?  // Optional - for system-wide logs
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  endpointId       String?  @db.Uuid
   method           String
   url              String
   status           Int?
@@ -111,8 +44,8 @@ model RequestLog {
   responseBody     String?
   errorMessage     String?
   errorStack       String?
-  identifier       String?  // Persisted lightweight identifier (userName/email/displayName/etc)
-  createdAt        DateTime @default(now())
+  identifier       String?
+  createdAt        DateTime @default(now()) @db.Timestamptz
 
   endpoint Endpoint? @relation(fields: [endpointId], references: [id], onDelete: SetNull)
 
@@ -123,32 +56,27 @@ model RequestLog {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Phase 2 — Unified scim_resource table
+// Phase 2 → Phase 3 — Unified scim_resource table (PostgreSQL-native)
 //
-// Replaces separate ScimUser + ScimGroup tables with a single polymorphic table.
-// The resourceType discriminator ("User" / "Group") determines which columns are
-// populated. This enables adding new resource types without schema changes.
-//
-// The old models (ScimUser, ScimGroup, GroupMember) above are kept temporarily
-// for data migration support. They will be removed once migration is verified.
+// Polymorphic table: resourceType discriminator ("User" / "Group") determines
+// which columns are populated. CITEXT on userName/displayName eliminates the
+// need for helper lowercase columns. JSONB payload enables GIN-indexed queries.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 model ScimResource {
-  id               String   @id @default(cuid())
-  endpointId       String   // FK to Endpoint (tenant isolation)
-  resourceType     String   // "User" or "Group" (discriminator)
-  scimId           String   // SCIM-visible identifier
-  externalId       String?  // Provisioning client identifier
-  userName         String?  // Only for Users — original casing preserved
-  userNameLower    String?  // Only for Users — SQLite compromise for case-insensitive uniqueness
-  displayName      String?  // Only for Groups (or Users with display name)
-  displayNameLower String?  // Only for Groups — SQLite compromise for case-insensitive filtering
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  endpointId       String   @db.Uuid
+  resourceType     String   @db.VarChar(50)
+  scimId           String   @db.Uuid
+  externalId       String?  @db.VarChar(255)
+  userName         String?  @db.Citext        // CITEXT — case-insensitive natively (Phase 3)
+  displayName      String?  @db.Citext        // CITEXT — case-insensitive natively (Phase 3)
   active           Boolean  @default(true)
-  rawPayload       String   // Full SCIM JSON (String until Phase 3 → JSONB)
-  version          Int      @default(1) // Optimistic locking (Phase 7)
-  meta             String?  // SCIM meta object JSON
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  payload          Json                        // JSONB — replaces rawPayload String (Phase 3)
+  version          Int      @default(1)
+  meta             String?
+  createdAt        DateTime @default(now()) @db.Timestamptz
+  updatedAt        DateTime @updatedAt     @db.Timestamptz
 
   endpoint         Endpoint         @relation(fields: [endpointId], references: [id], onDelete: Cascade)
   membersAsGroup   ResourceMember[] @relation("GroupMembers")
@@ -156,20 +84,20 @@ model ScimResource {
 
   // Composite unique constraints
   @@unique([endpointId, scimId])
-  @@unique([endpointId, userNameLower])       // NULL-safe: allows multiple NULLs for Groups
-  @@unique([endpointId, displayNameLower])    // NULL-safe: allows multiple NULLs for Users
-  @@unique([endpointId, resourceType, externalId]) // Scoped per type to avoid User/Group externalId collisions
+  @@unique([endpointId, userName])                 // CITEXT handles case-insensitive uniqueness
+  @@unique([endpointId, displayName])              // CITEXT handles case-insensitive uniqueness
+  @@unique([endpointId, resourceType, externalId]) // Scoped per type to avoid collisions
   @@index([endpointId, resourceType])
 }
 
 model ResourceMember {
-  id               String    @id @default(cuid())
-  groupResourceId  String    // FK to ScimResource (the group)
-  memberResourceId String?   // FK to ScimResource (the member user/group) — nullable for unresolved refs
-  value            String    // SCIM member value (typically the member's scimId)
-  type             String?   // SCIM member type ("User", "Group", etc.)
-  display          String?   // Display name of the member
-  createdAt        DateTime  @default(now())
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  groupResourceId  String    @db.Uuid
+  memberResourceId String?   @db.Uuid
+  value            String
+  type             String?
+  display          String?
+  createdAt        DateTime  @default(now()) @db.Timestamptz
 
   group  ScimResource  @relation("GroupMembers", fields: [groupResourceId], references: [id], onDelete: Cascade)
   member ScimResource? @relation("MemberResources", fields: [memberResourceId], references: [id], onDelete: SetNull)

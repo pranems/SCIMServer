@@ -130,6 +130,11 @@ describe('Group Lifecycle (E2E)', () => {
 
       expect(res.body.id).toBe(created.id);
     });
+
+    it('should return 404 when replacing non-existent group', async () => {
+      const replacement = validGroup();
+      await scimPut(app, `${basePath}/Groups/does-not-exist`, token, replacement).expect(404);
+    });
   });
 
   // ───────────── PATCH: Membership ─────────────
@@ -180,6 +185,15 @@ describe('Group Lifecycle (E2E)', () => {
 
       expect(res.body.displayName).toBe('Renamed Group');
     });
+
+    it('should return 404 when patching non-existent group', async () => {
+      await scimPatch(
+        app,
+        `${basePath}/Groups/does-not-exist`,
+        token,
+        replaceDisplayNamePatch('Nope'),
+      ).expect(404);
+    });
   });
 
   // ───────────── DELETE ─────────────
@@ -190,6 +204,17 @@ describe('Group Lifecycle (E2E)', () => {
 
       await scimDelete(app, `${basePath}/Groups/${created.id}`, token).expect(204);
       await scimGet(app, `${basePath}/Groups/${created.id}`, token).expect(404);
+    });
+
+    it('should return 404 when deleting non-existent group', async () => {
+      await scimDelete(app, `${basePath}/Groups/does-not-exist`, token).expect(404);
+    });
+
+    it('should be idempotent — second delete returns 404', async () => {
+      const created = (await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)).body;
+
+      await scimDelete(app, `${basePath}/Groups/${created.id}`, token).expect(204);
+      await scimDelete(app, `${basePath}/Groups/${created.id}`, token).expect(404);
     });
   });
 });

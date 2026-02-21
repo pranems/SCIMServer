@@ -40,6 +40,9 @@ Thumbs.db
 logs/
 *.log
 
+# Test results (generated per run)
+test-results/
+
 # Temporary files
 tmp/
 temp/

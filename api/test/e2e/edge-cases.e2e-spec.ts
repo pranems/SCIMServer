@@ -194,8 +194,8 @@ describe('Edge Cases (E2E)', () => {
         Operations: [],
       });
 
-      // Either 200 (no-op) or 400 (strict) — should not crash
-      expect([200, 400]).toContain(res.status);
+      // Server is strict: empty Operations returns 400
+      expect(res.status).toBe(400);
     });
 
     it('should succeed silently when removing non-existent attribute', async () => {

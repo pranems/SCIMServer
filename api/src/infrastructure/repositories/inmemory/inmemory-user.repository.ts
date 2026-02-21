@@ -1,8 +1,8 @@
 /**
  * InMemoryUserRepository — IUserRepository backed by an in-memory Map.
  *
- * Suitable for testing, lightweight deployments, and validating business
- * logic without a real database. Data is lost on process restart.
+ * Phase 3: Removed userNameLower — case-insensitive comparison is done at
+ * query time via toLowerCase(). Suitable for testing and lightweight deployments.
  */
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
@@ -26,7 +26,6 @@ export class InMemoryUserRepository implements IUserRepository {
       scimId: input.scimId,
       externalId: input.externalId,
       userName: input.userName,
-      userNameLower: input.userNameLower,
       active: input.active,
       rawPayload: input.rawPayload,
       meta: input.meta,
@@ -57,9 +56,14 @@ export class InMemoryUserRepository implements IUserRepository {
 
     if (dbFilter) {
       for (const [key, value] of Object.entries(dbFilter)) {
-        results = results.filter(
-          (u) => (u as unknown as Record<string, unknown>)[key] === value,
-        );
+        results = results.filter((u) => {
+          const stored = (u as unknown as Record<string, unknown>)[key];
+          // Case-insensitive comparison for userName (matches CITEXT behavior)
+          if (key === 'userName' && typeof stored === 'string' && typeof value === 'string') {
+            return stored.toLowerCase() === value.toLowerCase();
+          }
+          return stored === value;
+        });
       }
     }
 
@@ -104,7 +108,8 @@ export class InMemoryUserRepository implements IUserRepository {
     for (const user of this.users.values()) {
       if (user.endpointId !== endpointId) continue;
       if (excludeScimId && user.scimId === excludeScimId) continue;
-      if (user.userNameLower === lowerName) {
+      // Phase 3: Compare at query time instead of relying on pre-computed lowercase column
+      if (user.userName.toLowerCase() === lowerName) {
         return {
           scimId: user.scimId,
           userName: user.userName,

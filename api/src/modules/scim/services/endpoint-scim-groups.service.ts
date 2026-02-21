@@ -80,7 +80,6 @@ export class EndpointScimGroupsService {
       scimId,
       externalId,
       displayName: dto.displayName,
-      displayNameLower: dto.displayName.toLowerCase(),
       rawPayload: JSON.stringify(sanitizedPayload),
       meta: JSON.stringify({
         resourceType: 'Group',
@@ -225,7 +224,6 @@ export class EndpointScimGroupsService {
     try {
       await this.groupRepo.updateGroupWithMembers(group.id, {
         displayName,
-        displayNameLower: displayName.toLowerCase(),
         externalId,
         rawPayload: JSON.stringify(rawPayload),
         meta: JSON.stringify({
@@ -281,7 +279,6 @@ export class EndpointScimGroupsService {
     try {
       await this.groupRepo.updateGroupWithMembers(group.id, {
         displayName: dto.displayName,
-        displayNameLower: dto.displayName.toLowerCase(),
         externalId: newExternalId,
         rawPayload: JSON.stringify(this.extractAdditionalAttributes(dto)),
         meta: JSON.stringify({
@@ -330,8 +327,8 @@ export class EndpointScimGroupsService {
     endpointId: string,
     excludeScimId?: string
   ): Promise<void> {
-    const lowerName = displayName.toLowerCase();
-    const conflict = await this.groupRepo.findByDisplayName(endpointId, lowerName, excludeScimId);
+    // Phase 3: Pass original name — CITEXT (PostgreSQL) / toLowerCase (InMemory) handles case-insensitivity
+    const conflict = await this.groupRepo.findByDisplayName(endpointId, displayName, excludeScimId);
 
     if (conflict) {
       throw createScimError({
@@ -624,9 +621,11 @@ export class EndpointScimGroupsService {
     delete rawPayload.displayName;
     delete rawPayload.members;
     delete rawPayload.externalId;
+    delete rawPayload.id;  // RFC 7643 §3.1: id is server-assigned — never let rawPayload override
 
     return {
       schemas: [SCIM_CORE_GROUP_SCHEMA],
+      ...rawPayload,
       id: group.scimId,
       externalId: group.externalId ?? undefined,
       displayName: group.displayName,
@@ -635,7 +634,6 @@ export class EndpointScimGroupsService {
         display: member.display ?? undefined,
         type: member.type ?? undefined
       })),
-      ...rawPayload,
       meta
     };
   }
@@ -656,9 +654,11 @@ export class EndpointScimGroupsService {
 
   private extractAdditionalAttributes(dto: CreateGroupDto): Record<string, unknown> {
     const { schemas, members: _members, externalId: _externalId, ...rest } = dto as CreateGroupDto & { externalId?: string };
+    const additional = { ...rest } as Record<string, unknown>;
+    delete additional.id;  // RFC 7643 §3.1: id is server-assigned
     return {
       schemas,
-      ...rest
+      ...additional
     };
   }
 

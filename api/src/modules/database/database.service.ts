@@ -29,7 +29,7 @@ export class DatabaseService {
         { userName: { contains: search, mode: 'insensitive' } },
         { scimId: { contains: search, mode: 'insensitive' } },
         { externalId: { contains: search, mode: 'insensitive' } },
-        { rawPayload: { contains: search, mode: 'insensitive' } }, // Search in raw payload for any custom fields
+        // Note: JSONB payload cannot be searched with simple contains
       ];
     }
 
@@ -37,8 +37,9 @@ export class DatabaseService {
       where.active = active;
     }
 
+    where.resourceType = 'User';
     const [users, total] = await Promise.all([
-      this.prisma.scimUser.findMany({
+      this.prisma.scimResource.findMany({
         where,
         skip,
         take: limit,
@@ -49,10 +50,10 @@ export class DatabaseService {
           scimId: true,
           externalId: true,
           active: true,
-          rawPayload: true,
+          payload: true,
           createdAt: true,
           updatedAt: true,
-          groups: {
+          membersAsMember: {
             select: {
               group: {
                 select: {
@@ -64,26 +65,19 @@ export class DatabaseService {
           },
         },
       }),
-      this.prisma.scimUser.count({ where }),
+      this.prisma.scimResource.count({ where }),
     ]);
 
     return {
       users: users.map(user => {
-        let parsedPayload = {};
-        try {
-          parsedPayload = JSON.parse(user.rawPayload);
-        } catch (e) {
-          // If parsing fails, use basic fields
-          parsedPayload = {
-            userName: user.userName,
-            active: user.active,
-          };
-        }
+        const parsedPayload = (user.payload && typeof user.payload === 'object')
+          ? user.payload as Record<string, unknown>
+          : { userName: user.userName, active: user.active };
 
         return {
           ...user,
           ...parsedPayload, // Include all fields from the raw SCIM payload
-          groups: user.groups.map((groupMember: any) => groupMember.group),
+          groups: (user as any).membersAsMember?.map((rm: any) => rm.group) ?? [],
         };
       }),
       pagination: {
@@ -99,17 +93,16 @@ export class DatabaseService {
     const { page, limit, search } = query;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: any = { resourceType: 'Group' };
     
     if (search) {
       where.OR = [
         { displayName: { contains: search, mode: 'insensitive' } },
-        { rawPayload: { contains: search, mode: 'insensitive' } }, // Search in raw payload for any custom fields
       ];
     }
 
     const [groups, total] = await Promise.all([
-      this.prisma.scimGroup.findMany({
+      this.prisma.scimResource.findMany({
         where,
         skip,
         take: limit,
@@ -117,35 +110,29 @@ export class DatabaseService {
         select: {
           id: true,
           displayName: true,
-          rawPayload: true,
+          payload: true,
           createdAt: true,
           updatedAt: true,
           _count: {
             select: {
-              members: true,
+              membersAsGroup: true,
             },
           },
         },
       }),
-      this.prisma.scimGroup.count({ where }),
+      this.prisma.scimResource.count({ where }),
     ]);
 
     return {
       groups: groups.map(group => {
-        let parsedPayload = {};
-        try {
-          parsedPayload = JSON.parse(group.rawPayload);
-        } catch (e) {
-          // If parsing fails, use basic fields
-          parsedPayload = {
-            displayName: group.displayName,
-          };
-        }
+        const parsedPayload = (group.payload && typeof group.payload === 'object')
+          ? group.payload as Record<string, unknown>
+          : { displayName: group.displayName };
 
         return {
           ...group,
-          ...parsedPayload, // Include all fields from the raw SCIM payload
-          memberCount: group._count.members,
+          ...parsedPayload,
+          memberCount: (group as any)._count.membersAsGroup,
         };
       }),
       pagination: {
@@ -158,10 +145,10 @@ export class DatabaseService {
   }
 
   async getUserDetails(id: string) {
-    const user = await this.prisma.scimUser.findUnique({
-      where: { id },
+    const user = await this.prisma.scimResource.findFirst({
+      where: { id, resourceType: 'User' },
       include: {
-        groups: {
+        membersAsMember: {
           include: {
             group: {
               select: {
@@ -180,17 +167,17 @@ export class DatabaseService {
 
     return {
       ...user,
-      groups: user.groups.map((ug: any) => ug.group),
+      groups: user.membersAsMember.map((rm: any) => rm.group),
     };
   }
 
   async getGroupDetails(id: string) {
-    const group = await this.prisma.scimGroup.findUnique({
-      where: { id },
+    const group = await this.prisma.scimResource.findFirst({
+      where: { id, resourceType: 'Group' },
       include: {
-        members: {
+        membersAsGroup: {
           include: {
-            user: {
+            member: {
               select: {
                 id: true,
                 userName: true,
@@ -208,7 +195,7 @@ export class DatabaseService {
 
     return {
       ...group,
-      members: group.members.map((gm: any) => gm.user),
+      members: group.membersAsGroup.map((rm: any) => rm.member),
     };
   }
 
@@ -220,9 +207,9 @@ export class DatabaseService {
       totalLogs,
       recentActivity,
     ] = await Promise.all([
-      this.prisma.scimUser.count(),
-      this.prisma.scimUser.count({ where: { active: true } }),
-      this.prisma.scimGroup.count(),
+      this.prisma.scimResource.count({ where: { resourceType: 'User' } }),
+      this.prisma.scimResource.count({ where: { resourceType: 'User', active: true } }),
+      this.prisma.scimResource.count({ where: { resourceType: 'Group' } }),
       this.prisma.requestLog.count(),
       this.prisma.requestLog.count({
         where: {

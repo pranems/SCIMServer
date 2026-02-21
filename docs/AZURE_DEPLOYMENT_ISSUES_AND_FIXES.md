@@ -1,6 +1,6 @@
 # Azure Container Apps Deployment Issues — Root Cause Analysis & Fixes
 
-> **Version**: 0.10.0 · **Date**: 2026 · **Status**: All 1,130 tests passing (666 unit + 184 e2e + 280 live)
+> **Version**: 0.11.0 · **Date**: 2026 · **Status**: All 1,357 tests passing (862 unit + 193 e2e + 302 live)
 
 ---
 

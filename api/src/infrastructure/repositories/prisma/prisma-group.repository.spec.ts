@@ -1,9 +1,10 @@
 /**
- * PrismaGroupRepository — Unit tests for Phase 2 unified ScimResource table.
+ * PrismaGroupRepository — Unit tests for Phase 3 PostgreSQL migration.
  *
  * Verifies that all queries target `scimResource` with `resourceType: 'Group'`,
  * that members use `resourceMember` (not `groupMember`), and that the mapping
  * from ScimResource/ResourceMember → GroupRecord/MemberRecord is correct.
+ * PostgreSQL CITEXT handles case-insensitive displayName; payload stored as JSONB.
  */
 import { PrismaGroupRepository } from './prisma-group.repository';
 import type { PrismaService } from '../../../modules/prisma/prisma.service';
@@ -39,19 +40,20 @@ function createMockPrismaService(): PrismaService {
   } as unknown as PrismaService;
 }
 
+// Valid UUID constants used in tests — PostgreSQL UUID columns reject non-UUID strings
+const GRP_SCIM_ID = '10000000-0000-4000-a000-000000000001';
+
 function fakeGroupResource(overrides: Record<string, unknown> = {}) {
   return {
     id: 'grp-1',
     endpointId: 'ep-1',
     resourceType: 'Group',
-    scimId: 'grp-scim-1',
+    scimId: GRP_SCIM_ID,
     externalId: null,
     userName: null,
-    userNameLower: null,
     displayName: 'Engineering',
-    displayNameLower: 'engineering',
     active: true,
-    rawPayload: '{}',
+    payload: {},
     version: 1,
     meta: '{"resourceType":"Group"}',
     createdAt: new Date('2025-01-01'),
@@ -90,10 +92,9 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
     it('should insert with resourceType "Group" into scimResource', async () => {
       const input = {
         endpointId: 'ep-1',
-        scimId: 'grp-scim-1',
+        scimId: GRP_SCIM_ID,
         externalId: null,
         displayName: 'Engineering',
-        displayNameLower: 'engineering',
         rawPayload: '{}',
         meta: '{}',
       };
@@ -119,10 +120,9 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
 
       const result = await repo.create({
         endpointId: 'ep-1',
-        scimId: 'grp-scim-1',
+        scimId: GRP_SCIM_ID,
         externalId: null,
         displayName: 'Engineering',
-        displayNameLower: 'engineering',
         rawPayload: '{}',
         meta: '{}',
       });
@@ -131,7 +131,6 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
         expect.objectContaining({
           id: 'grp-1',
           displayName: 'Engineering',
-          displayNameLower: 'engineering',
         }),
       );
       expect(result).not.toHaveProperty('resourceType');
@@ -145,22 +144,32 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
     it('should query scimResource with resourceType: Group', async () => {
       (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(fakeGroupResource());
 
-      await repo.findByScimId('ep-1', 'grp-scim-1');
+      await repo.findByScimId('ep-1', GRP_SCIM_ID);
 
       expect(prisma.scimResource.findFirst).toHaveBeenCalledWith({
-        where: { scimId: 'grp-scim-1', endpointId: 'ep-1', resourceType: 'Group' },
+        where: { scimId: GRP_SCIM_ID, endpointId: 'ep-1', resourceType: 'Group' },
       });
     });
 
-    it('should return null when not found', async () => {
-      (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(null);
+    it('should return null for non-UUID scimId without hitting DB', async () => {
       expect(await repo.findByScimId('ep-1', 'nonexistent')).toBeNull();
+      expect(prisma.scimResource.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('should return null when not found (valid UUID)', async () => {
+      (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(null);
+      expect(await repo.findByScimId('ep-1', GRP_SCIM_ID)).toBeNull();
     });
   });
 
   // ─── findWithMembers ─────────────────────────────────────────────────
 
   describe('findWithMembers', () => {
+    it('should return null for non-UUID scimId without hitting DB', async () => {
+      expect(await repo.findWithMembers('ep-1', 'does-not-exist')).toBeNull();
+      expect(prisma.scimResource.findFirst).not.toHaveBeenCalled();
+    });
+
     it('should include membersAsGroup relation', async () => {
       const dbRow = {
         ...fakeGroupResource(),
@@ -168,10 +177,10 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
       };
       (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(dbRow);
 
-      const result = await repo.findWithMembers('ep-1', 'grp-scim-1');
+      const result = await repo.findWithMembers('ep-1', GRP_SCIM_ID);
 
       expect(prisma.scimResource.findFirst).toHaveBeenCalledWith({
-        where: { scimId: 'grp-scim-1', endpointId: 'ep-1', resourceType: 'Group' },
+        where: { scimId: GRP_SCIM_ID, endpointId: 'ep-1', resourceType: 'Group' },
         include: { membersAsGroup: true },
       });
 
@@ -195,7 +204,7 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
       };
       (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(dbRow);
 
-      const result = await repo.findWithMembers('ep-1', 'grp-scim-1');
+      const result = await repo.findWithMembers('ep-1', GRP_SCIM_ID);
       const member = result!.members[0];
 
       expect(member.id).toBe('mem-42');
@@ -213,7 +222,7 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
       };
       (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(dbRow);
 
-      const result = await repo.findWithMembers('ep-1', 'grp-scim-1');
+      const result = await repo.findWithMembers('ep-1', GRP_SCIM_ID);
       expect(result!.members[0].userId).toBeNull();
     });
   });
@@ -236,11 +245,11 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
     it('should merge dbFilter with resourceType', async () => {
       (prisma.scimResource.findMany as jest.Mock).mockResolvedValue([]);
 
-      await repo.findAllWithMembers('ep-1', { displayNameLower: 'engineering' });
+      await repo.findAllWithMembers('ep-1', { displayName: 'Engineering' });
 
       expect(prisma.scimResource.findMany).toHaveBeenCalledWith({
         where: expect.objectContaining({
-          displayNameLower: 'engineering',
+          displayName: 'Engineering',
           resourceType: 'Group',
         }),
         orderBy: { createdAt: 'asc' },
@@ -310,7 +319,7 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
         where: expect.objectContaining({
           endpointId: 'ep-1',
           resourceType: 'Group',
-          displayNameLower: 'engineering',
+          displayName: 'engineering',
         }),
         select: { scimId: true },
       });
@@ -393,7 +402,7 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
 
   describe('updateGroupWithMembers', () => {
     it('should use transaction with scimResource and resourceMember', async () => {
-      const data = { displayName: 'Updated', displayNameLower: 'updated' };
+      const data = { displayName: 'Updated' };
       const members = [
         { userId: 'user-res-1', value: 'scim-1', type: 'User', display: 'Alice' },
       ];

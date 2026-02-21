@@ -1,8 +1,9 @@
 /**
- * PrismaUserRepository — Unit tests for Phase 2 unified ScimResource table.
+ * PrismaUserRepository — Unit tests for Phase 3 PostgreSQL migration.
  *
  * Verifies that all queries target `scimResource` with `resourceType: 'User'`
  * and that the mapping from ScimResource → UserRecord is correct.
+ * PostgreSQL CITEXT handles case-insensitive userName; payload stored as JSONB.
  */
 import { PrismaUserRepository } from './prisma-user.repository';
 import type { PrismaService } from '../../../modules/prisma/prisma.service';
@@ -21,19 +22,26 @@ function createMockPrismaService(): PrismaService {
   } as unknown as PrismaService;
 }
 
+// Valid UUID constants used in tests — PostgreSQL UUID columns reject non-UUID strings
+const SCIM_ID_1 = '00000000-0000-4000-a000-000000000001';
+const SCIM_ID_2 = '00000000-0000-4000-a000-000000000002';
+const SCIM_ID_S1 = '00000000-0000-4000-a000-0000000000a1';
+const SCIM_ID_S2 = '00000000-0000-4000-a000-0000000000a2';
+const SCIM_ID_FOUND = '00000000-0000-4000-a000-000000000099';
+const SCIM_ID_EXCLUDE = '00000000-0000-4000-a000-000000000088';
+const SCIM_ID_EXISTING = '00000000-0000-4000-a000-000000000077';
+
 function fakeScimResource(overrides: Record<string, unknown> = {}) {
   return {
     id: 'res-1',
     endpointId: 'ep-1',
     resourceType: 'User',
-    scimId: 'scim-1',
+    scimId: SCIM_ID_1,
     externalId: null,
     userName: 'alice',
-    userNameLower: 'alice',
     displayName: null,
-    displayNameLower: null,
     active: true,
-    rawPayload: '{}',
+    payload: {},
     version: 1,
     meta: '{"resourceType":"User"}',
     createdAt: new Date('2025-01-01'),
@@ -59,10 +67,9 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
     it('should insert with resourceType "User" into scimResource', async () => {
       const input = {
         endpointId: 'ep-1',
-        scimId: 'scim-1',
+        scimId: SCIM_ID_1,
         externalId: null,
         userName: 'alice',
-        userNameLower: 'alice',
         active: true,
         rawPayload: '{}',
         meta: '{}',
@@ -76,7 +83,7 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
       expect(prisma.scimResource.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           resourceType: 'User',
-          scimId: 'scim-1',
+          scimId: SCIM_ID_1,
           userName: 'alice',
           endpoint: { connect: { id: 'ep-1' } },
         }),
@@ -89,7 +96,6 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
       const dbRow = fakeScimResource({
         id: 'uid-42',
         userName: 'Bob',
-        userNameLower: 'bob',
         externalId: 'ext-99',
         active: false,
       });
@@ -97,10 +103,9 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
 
       const result = await repo.create({
         endpointId: 'ep-1',
-        scimId: 'scim-1',
+        scimId: SCIM_ID_1,
         externalId: 'ext-99',
         userName: 'Bob',
-        userNameLower: 'bob',
         active: false,
         rawPayload: '{}',
         meta: '{}',
@@ -110,7 +115,6 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
         expect.objectContaining({
           id: 'uid-42',
           userName: 'Bob',
-          userNameLower: 'bob',
           externalId: 'ext-99',
           active: false,
         }),
@@ -128,27 +132,33 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
       const dbRow = fakeScimResource();
       (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(dbRow);
 
-      await repo.findByScimId('ep-1', 'scim-1');
+      await repo.findByScimId('ep-1', SCIM_ID_1);
 
       expect(prisma.scimResource.findFirst).toHaveBeenCalledWith({
-        where: { scimId: 'scim-1', endpointId: 'ep-1', resourceType: 'User' },
+        where: { scimId: SCIM_ID_1, endpointId: 'ep-1', resourceType: 'User' },
       });
     });
 
-    it('should return null when not found', async () => {
+    it('should return null for non-UUID scimId without hitting DB', async () => {
+      const result = await repo.findByScimId('ep-1', 'nonexistent');
+      expect(result).toBeNull();
+      expect(prisma.scimResource.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('should return null when not found (valid UUID)', async () => {
       (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(null);
 
-      const result = await repo.findByScimId('ep-1', 'nonexistent');
+      const result = await repo.findByScimId('ep-1', SCIM_ID_2);
       expect(result).toBeNull();
     });
 
     it('should return mapped UserRecord when found', async () => {
-      const dbRow = fakeScimResource({ scimId: 'found-id' });
+      const dbRow = fakeScimResource({ scimId: SCIM_ID_FOUND });
       (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(dbRow);
 
-      const result = await repo.findByScimId('ep-1', 'found-id');
+      const result = await repo.findByScimId('ep-1', SCIM_ID_FOUND);
       expect(result).not.toBeNull();
-      expect(result!.scimId).toBe('found-id');
+      expect(result!.scimId).toBe(SCIM_ID_FOUND);
       expect(result!.userName).toBe('alice');
     });
   });
@@ -170,11 +180,11 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
     it('should merge dbFilter with resourceType constraint', async () => {
       (prisma.scimResource.findMany as jest.Mock).mockResolvedValue([]);
 
-      await repo.findAll('ep-1', { userNameLower: 'alice' });
+      await repo.findAll('ep-1', { userName: 'alice' });
 
       expect(prisma.scimResource.findMany).toHaveBeenCalledWith({
         where: expect.objectContaining({
-          userNameLower: 'alice',
+          userName: 'alice',
           endpointId: 'ep-1',
           resourceType: 'User',
         }),
@@ -265,7 +275,7 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
       );
       expect(orClause.OR).toEqual(
         expect.arrayContaining([
-          { userNameLower: 'alice' },
+          { userName: 'alice' },
           { externalId: 'ext-1' },
         ]),
       );
@@ -274,26 +284,26 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
     it('should exclude specific scimId', async () => {
       (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(null);
 
-      await repo.findConflict('ep-1', 'alice', undefined, 'exclude-me');
+      await repo.findConflict('ep-1', 'alice', undefined, SCIM_ID_EXCLUDE);
 
       const call = (prisma.scimResource.findFirst as jest.Mock).mock.calls[0][0];
       expect(call.where.AND).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ NOT: { scimId: 'exclude-me' } }),
+          expect.objectContaining({ NOT: { scimId: SCIM_ID_EXCLUDE } }),
         ]),
       );
     });
 
     it('should return mapped conflict result when found', async () => {
       (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue({
-        scimId: 'existing-id',
+        scimId: SCIM_ID_EXISTING,
         userName: 'alice',
         externalId: 'ext-1',
       });
 
       const result = await repo.findConflict('ep-1', 'alice');
       expect(result).toEqual({
-        scimId: 'existing-id',
+        scimId: SCIM_ID_EXISTING,
         userName: 'alice',
         externalId: 'ext-1',
       });
@@ -318,17 +328,34 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
 
     it('should query scimResource with resourceType filter', async () => {
       (prisma.scimResource.findMany as jest.Mock).mockResolvedValue([
-        { id: 'u1', scimId: 's1' },
-        { id: 'u2', scimId: 's2' },
+        { id: 'u1', scimId: SCIM_ID_S1 },
+        { id: 'u2', scimId: SCIM_ID_S2 },
       ]);
 
-      const result = await repo.findByScimIds('ep-1', ['s1', 's2']);
+      const result = await repo.findByScimIds('ep-1', [SCIM_ID_S1, SCIM_ID_S2]);
 
       expect(prisma.scimResource.findMany).toHaveBeenCalledWith({
-        where: { scimId: { in: ['s1', 's2'] }, endpointId: 'ep-1', resourceType: 'User' },
+        where: { scimId: { in: [SCIM_ID_S1, SCIM_ID_S2] }, endpointId: 'ep-1', resourceType: 'User' },
         select: { id: true, scimId: true },
       });
       expect(result).toHaveLength(2);
+    });
+
+    it('should filter out non-UUID values', async () => {
+      (prisma.scimResource.findMany as jest.Mock).mockResolvedValue([]);
+
+      await repo.findByScimIds('ep-1', ['not-a-uuid', SCIM_ID_S1]);
+
+      expect(prisma.scimResource.findMany).toHaveBeenCalledWith({
+        where: { scimId: { in: [SCIM_ID_S1] }, endpointId: 'ep-1', resourceType: 'User' },
+        select: { id: true, scimId: true },
+      });
+    });
+
+    it('should return empty array when all IDs are non-UUID', async () => {
+      const result = await repo.findByScimIds('ep-1', ['bad-1', 'bad-2']);
+      expect(result).toEqual([]);
+      expect(prisma.scimResource.findMany).not.toHaveBeenCalled();
     });
   });
 });

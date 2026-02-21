@@ -1,8 +1,8 @@
 /**
  * InMemoryGroupRepository — IGroupRepository backed by in-memory Maps.
  *
- * Suitable for testing, lightweight deployments, and validating business
- * logic without a real database. Data is lost on process restart.
+ * Phase 3: Removed displayNameLower — case-insensitive comparison done at
+ * query time via toLowerCase(). Suitable for testing and lightweight deployments.
  */
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
@@ -29,7 +29,6 @@ export class InMemoryGroupRepository implements IGroupRepository {
       scimId: input.scimId,
       externalId: input.externalId,
       displayName: input.displayName,
-      displayNameLower: input.displayNameLower,
       rawPayload: input.rawPayload,
       meta: input.meta,
       createdAt: now,
@@ -68,9 +67,14 @@ export class InMemoryGroupRepository implements IGroupRepository {
 
     if (dbFilter) {
       for (const [key, value] of Object.entries(dbFilter)) {
-        results = results.filter(
-          (g) => (g as unknown as Record<string, unknown>)[key] === value,
-        );
+        results = results.filter((g) => {
+          const stored = (g as unknown as Record<string, unknown>)[key];
+          // Case-insensitive comparison for displayName (matches CITEXT behavior)
+          if (key === 'displayName' && typeof stored === 'string' && typeof value === 'string') {
+            return stored.toLowerCase() === value.toLowerCase();
+          }
+          return stored === value;
+        });
       }
     }
 
@@ -116,13 +120,15 @@ export class InMemoryGroupRepository implements IGroupRepository {
 
   async findByDisplayName(
     endpointId: string,
-    displayNameLower: string,
+    displayName: string,
     excludeScimId?: string,
   ): Promise<{ scimId: string } | null> {
+    // Phase 3: Case-insensitive comparison at query time (matches CITEXT behavior)
+    const lowerName = displayName.toLowerCase();
     for (const group of this.groups.values()) {
       if (group.endpointId !== endpointId) continue;
       if (excludeScimId && group.scimId === excludeScimId) continue;
-      if (group.displayNameLower === displayNameLower) {
+      if (group.displayName.toLowerCase() === lowerName) {
         return { scimId: group.scimId };
       }
     }
@@ -164,17 +170,14 @@ export class InMemoryGroupRepository implements IGroupRepository {
     data: GroupUpdateInput,
     members: MemberCreateInput[],
   ): Promise<void> {
-    // Update group
     await this.update(groupId, data);
 
-    // Delete existing members for this group
     for (const [memberId, member] of this.members) {
       if (member.groupId === groupId) {
         this.members.delete(memberId);
       }
     }
 
-    // Add new members
     await this.addMembers(groupId, members);
   }
 
@@ -183,8 +186,6 @@ export class InMemoryGroupRepository implements IGroupRepository {
     this.groups.clear();
     this.members.clear();
   }
-
-  // ─── Private Helpers ───────────────────────────────────────────────────────
 
   private getMembersForGroup(groupId: string): MemberRecord[] {
     const result: MemberRecord[] = [];

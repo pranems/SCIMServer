@@ -117,17 +117,16 @@ describe('Filter Operators (E2E)', () => {
     });
 
     it('should find users where displayName is present', async () => {
-      await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201);
+      await scimPost(app, `${basePath}/Users`, token, validUser({ displayName: 'Presence Test User' })).expect(201);
 
-      // Set displayName via initial data
       const res = await scimGet(
         app,
         `${basePath}/Users?filter=displayName pr`,
         token,
       ).expect(200);
 
-      // May or may not find users depending on whether displayName is set by default
-      expect(res.body.totalResults).toBeGreaterThanOrEqual(0);
+      // User was created with explicit displayName — must be found
+      expect(res.body.totalResults).toBeGreaterThanOrEqual(1);
     });
   });
 

@@ -1,9 +1,10 @@
 /**
- * PrismaUserRepository — IUserRepository backed by Prisma (SQLite / PostgreSQL).
+ * PrismaUserRepository — IUserRepository backed by Prisma (PostgreSQL).
  *
- * Phase 2: Queries the unified `ScimResource` table with `resourceType = 'User'`
- * instead of the legacy `ScimUser` table. The domain types (UserRecord, etc.)
- * remain unchanged — this repository handles the mapping transparently.
+ * Phase 3: Queries the unified `ScimResource` table with `resourceType = 'User'`.
+ * CITEXT on userName handles case-insensitive uniqueness natively — no
+ * userNameLower helper column. JSONB payload is converted to/from string
+ * at the repository boundary so the domain layer stays unchanged.
  */
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../modules/prisma/prisma.service';
@@ -15,18 +16,21 @@ import type {
   UserConflictResult,
 } from '../../../domain/models/user.model';
 import type { Prisma } from '../../../generated/prisma/client';
+import { isValidUuid } from './uuid-guard';
 
-/** Maps a ScimResource row to the UserRecord domain type. */
+/** Maps a ScimResource row (with JSONB payload) to the UserRecord domain type. */
 function toUserRecord(resource: Record<string, unknown>): UserRecord {
+  // payload comes back as a parsed JS object from Prisma JSONB — stringify for domain
+  const payload = resource.payload;
+  const rawPayload = typeof payload === 'string' ? payload : JSON.stringify(payload ?? {});
   return {
     id: resource.id as string,
     endpointId: resource.endpointId as string,
     scimId: resource.scimId as string,
     externalId: (resource.externalId as string) ?? null,
     userName: resource.userName as string,
-    userNameLower: resource.userNameLower as string,
     active: resource.active as boolean,
-    rawPayload: resource.rawPayload as string,
+    rawPayload,
     meta: (resource.meta as string) ?? null,
     createdAt: resource.createdAt as Date,
     updatedAt: resource.updatedAt as Date,
@@ -44,9 +48,8 @@ export class PrismaUserRepository implements IUserRepository {
         scimId: input.scimId,
         externalId: input.externalId,
         userName: input.userName,
-        userNameLower: input.userNameLower,
         active: input.active,
-        rawPayload: input.rawPayload,
+        payload: JSON.parse(input.rawPayload),   // domain string → JSONB
         meta: input.meta,
         endpoint: { connect: { id: input.endpointId } },
       },
@@ -55,6 +58,7 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async findByScimId(endpointId: string, scimId: string): Promise<UserRecord | null> {
+    if (!isValidUuid(scimId)) return null;   // PostgreSQL UUID column rejects non-UUID strings
     const resource = await this.prisma.scimResource.findFirst({
       where: { scimId, endpointId, resourceType: 'User' },
     });
@@ -84,9 +88,15 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async update(id: string, data: UserUpdateInput): Promise<UserRecord> {
+    // Convert rawPayload string → JSONB if present in the update
+    const prismaData: Record<string, unknown> = { ...data };
+    if (data.rawPayload !== undefined) {
+      prismaData.payload = JSON.parse(data.rawPayload);
+      delete prismaData.rawPayload;
+    }
     const updated = await this.prisma.scimResource.update({
       where: { id },
-      data: data as Prisma.ScimResourceUpdateInput,
+      data: prismaData as Prisma.ScimResourceUpdateInput,
     });
     return toUserRecord(updated as unknown as Record<string, unknown>);
   }
@@ -101,8 +111,9 @@ export class PrismaUserRepository implements IUserRepository {
     externalId?: string,
     excludeScimId?: string,
   ): Promise<UserConflictResult | null> {
+    // Phase 3: CITEXT handles case-insensitive comparison natively — no toLowerCase needed
     const orConditions: Prisma.ScimResourceWhereInput[] = [
-      { userNameLower: userName.toLowerCase() },
+      { userName },
     ];
     if (externalId) {
       orConditions.push({ externalId });
@@ -137,9 +148,11 @@ export class PrismaUserRepository implements IUserRepository {
     endpointId: string,
     scimIds: string[],
   ): Promise<Array<Pick<UserRecord, 'id' | 'scimId'>>> {
-    if (scimIds.length === 0) return [];
+    // Filter out non-UUID values to avoid PostgreSQL P2007 errors
+    const validIds = scimIds.filter(isValidUuid);
+    if (validIds.length === 0) return [];
     return this.prisma.scimResource.findMany({
-      where: { scimId: { in: scimIds }, endpointId, resourceType: 'User' },
+      where: { scimId: { in: validIds }, endpointId, resourceType: 'User' },
       select: { id: true, scimId: true },
     });
   }

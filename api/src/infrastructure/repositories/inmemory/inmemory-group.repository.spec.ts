@@ -15,7 +15,6 @@ describe('InMemoryGroupRepository', () => {
     scimId: 'scim-grp-1',
     externalId: 'ext-g1',
     displayName: 'Engineering',
-    displayNameLower: 'engineering',
     rawPayload: '{}',
     meta: '{"resourceType":"Group"}',
     ...overrides,
@@ -44,7 +43,6 @@ describe('InMemoryGroupRepository', () => {
       expect(result.scimId).toBe('scim-grp-1');
       expect(result.externalId).toBe('ext-g1');
       expect(result.displayName).toBe('Engineering');
-      expect(result.displayNameLower).toBe('engineering');
       expect(result.createdAt).toBeInstanceOf(Date);
       expect(result.updatedAt).toBeInstanceOf(Date);
     });
@@ -127,8 +125,8 @@ describe('InMemoryGroupRepository', () => {
 
   describe('findAllWithMembers', () => {
     beforeEach(async () => {
-      const g1 = await repo.create(makeGroupInput({ scimId: 'g1', displayName: 'Zeta', displayNameLower: 'zeta' }));
-      const g2 = await repo.create(makeGroupInput({ scimId: 'g2', displayName: 'Alpha', displayNameLower: 'alpha' }));
+      const g1 = await repo.create(makeGroupInput({ scimId: 'g1', displayName: 'Zeta' }));
+      const g2 = await repo.create(makeGroupInput({ scimId: 'g2', displayName: 'Alpha' }));
       await repo.create(makeGroupInput({ scimId: 'g3', endpointId: otherEndpointId }));
 
       await repo.addMembers(g1.id, [makeMemberInput()]);
@@ -152,24 +150,24 @@ describe('InMemoryGroupRepository', () => {
       expect(g2!.members).toHaveLength(2);
     });
 
-    it('should sort by displayNameLower ascending', async () => {
+    it('should sort by displayName ascending', async () => {
       const results = await repo.findAllWithMembers(endpointId, undefined, {
-        field: 'displayNameLower',
+        field: 'displayName',
         direction: 'asc',
       });
-      expect(results.map((g) => g.displayNameLower)).toEqual(['alpha', 'zeta']);
+      expect(results.map((g) => g.displayName)).toEqual(['Alpha', 'Zeta']);
     });
 
-    it('should sort by displayNameLower descending', async () => {
+    it('should sort by displayName descending', async () => {
       const results = await repo.findAllWithMembers(endpointId, undefined, {
-        field: 'displayNameLower',
+        field: 'displayName',
         direction: 'desc',
       });
-      expect(results.map((g) => g.displayNameLower)).toEqual(['zeta', 'alpha']);
+      expect(results.map((g) => g.displayName)).toEqual(['Zeta', 'Alpha']);
     });
 
     it('should apply a key-value filter', async () => {
-      const results = await repo.findAllWithMembers(endpointId, { displayNameLower: 'alpha' });
+      const results = await repo.findAllWithMembers(endpointId, { displayName: 'alpha' });
       expect(results).toHaveLength(1);
       expect(results[0].scimId).toBe('g2');
     });
@@ -187,11 +185,9 @@ describe('InMemoryGroupRepository', () => {
       const created = await repo.create(makeGroupInput());
       const updated = await repo.update(created.id, {
         displayName: 'Design',
-        displayNameLower: 'design',
       });
 
       expect(updated.displayName).toBe('Design');
-      expect(updated.displayNameLower).toBe('design');
       expect(updated.updatedAt.getTime()).toBeGreaterThanOrEqual(
         created.updatedAt.getTime(),
       );
@@ -243,7 +239,6 @@ describe('InMemoryGroupRepository', () => {
       await repo.create(makeGroupInput({
         scimId: 'existing-g',
         displayName: 'Marketing',
-        displayNameLower: 'marketing',
       }));
     });
 
@@ -365,7 +360,7 @@ describe('InMemoryGroupRepository', () => {
 
       await repo.updateGroupWithMembers(
         group.id,
-        { displayName: 'Updated', displayNameLower: 'updated' },
+        { displayName: 'Updated' },
         [
           makeMemberInput({ userId: 'new-u1', display: 'NewMember1' }),
           makeMemberInput({ userId: 'new-u2', display: 'NewMember2' }),

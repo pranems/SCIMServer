@@ -1,5 +1,5 @@
 {
-  "version": "0.10.0",
+  "version": "0.11.0",
   "service": {
     "name": "SCIMServer API",
     "environment": "production",
@@ -8,7 +8,8 @@
     "now": "2026-02-19T01:47:45.202Z",
     "startedAt": "2026-02-19T01:47:00.537Z",
     "uptimeSeconds": 46.846,
-    "timezone": "UTC"
+    "timezone": "UTC",
+    "utcOffset": "+00:00"
   },
   "runtime": {
     "node": "v24.13.1",
@@ -33,11 +34,29 @@
     "scimSharedSecretConfigured": true
   },
   "storage": {
-    "databaseUrl": "file:/tmp/local-data/scim.db",
-    "databaseProvider": "sqlite",
-    "blobBackupConfigured": false
+    "databaseUrl": "postgresql://***:***@postgres:5432/scimdb?schema=public",
+    "databaseProvider": "postgresql",
+    "persistenceBackend": "prisma",
+    "connectionPool": {
+      "maxConnections": 5
+    }
+  },
+  "container": {
+    "app": {
+      "id": "7d32d069b1af",
+      "name": "7d32d069b1af",
+      "image": "scimserver-api:latest",
+      "runtime": "Node.js v24.13.1",
+      "platform": "linux/x64"
+    },
+    "database": {
+      "host": "postgres",
+      "port": 5432,
+      "name": "scimdb",
+      "provider": "PostgreSQL 17-alpine"
+    }
   },
   "deployment": {
-    "backupMode": "none"
+    "migratePhase": "Phase 3 — PostgreSQL Migration"
   }
 }

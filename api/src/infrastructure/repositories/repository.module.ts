@@ -33,7 +33,7 @@ export class RepositoryModule {
       };
     }
 
-    // Default: Prisma (supports SQLite now, PostgreSQL after Phase 3)
+    // Default: Prisma (PostgreSQL — Phase 3)
     return {
       module: RepositoryModule,
       global: true,
