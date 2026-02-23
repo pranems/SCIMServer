@@ -1,10 +1,12 @@
 import { ServiceProviderConfigController } from './service-provider-config.controller';
+import { ScimDiscoveryService } from '../discovery/scim-discovery.service';
 
 describe('ServiceProviderConfigController', () => {
   let controller: ServiceProviderConfigController;
 
   beforeEach(() => {
-    controller = new ServiceProviderConfigController();
+    const discoveryService = new ScimDiscoveryService();
+    controller = new ServiceProviderConfigController(discoveryService);
   });
 
   it('should be defined', () => {
@@ -55,7 +57,25 @@ describe('ServiceProviderConfigController', () => {
       expect(result.authenticationSchemes).toHaveLength(1);
       expect(result.authenticationSchemes[0].type).toBe('oauthbearertoken');
       expect(result.authenticationSchemes[0].name).toBe('OAuth Bearer Token');
-      expect(result.authenticationSchemes[0].specificationUrl).toContain('rfc6750');
+      expect(result.authenticationSchemes[0].specUri).toContain('rfc6750');
+    });
+
+    it('should include meta with resourceType (RFC 7644 §4)', () => {
+      const result = controller.getConfig();
+      expect(result.meta).toBeDefined();
+      expect(result.meta.resourceType).toBe('ServiceProviderConfig');
+    });
+
+    it('should include documentationUri', () => {
+      const result = controller.getConfig();
+      expect(result.documentationUri).toBeDefined();
+      expect(typeof result.documentationUri).toBe('string');
+    });
+
+    it('should include bulk maxOperations and maxPayloadSize', () => {
+      const result = controller.getConfig();
+      expect(result.bulk.maxOperations).toBe(0);
+      expect(result.bulk.maxPayloadSize).toBe(0);
     });
   });
 });

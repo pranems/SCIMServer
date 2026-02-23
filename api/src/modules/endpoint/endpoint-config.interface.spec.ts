@@ -19,13 +19,6 @@ describe('endpoint-config.interface', () => {
       expect(ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS).toBe(
         'PatchOpAllowRemoveAllMembers'
       );
-      expect(ENDPOINT_CONFIG_FLAGS.EXCLUDE_META).toBe('excludeMeta');
-      expect(ENDPOINT_CONFIG_FLAGS.EXCLUDE_SCHEMAS).toBe('excludeSchemas');
-      expect(ENDPOINT_CONFIG_FLAGS.CUSTOM_SCHEMA_URN).toBe('customSchemaUrn');
-      expect(ENDPOINT_CONFIG_FLAGS.INCLUDE_ENTERPRISE_SCHEMA).toBe('includeEnterpriseSchema');
-      expect(ENDPOINT_CONFIG_FLAGS.STRICT_MODE).toBe('strictMode');
-      expect(ENDPOINT_CONFIG_FLAGS.LEGACY_MODE).toBe('legacyMode');
-      expect(ENDPOINT_CONFIG_FLAGS.CUSTOM_HEADERS).toBe('customHeaders');
       expect(ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED).toBe('VerbosePatchSupported');
       expect(ENDPOINT_CONFIG_FLAGS.LOG_LEVEL).toBe('logLevel');
     });
@@ -141,12 +134,12 @@ describe('endpoint-config.interface', () => {
       expect(getConfigString(config, 'testKey')).toBeUndefined();
     });
 
-    it('should work with customSchemaUrn flag', () => {
+    it('should work with custom string flags', () => {
       const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.CUSTOM_SCHEMA_URN]: 'urn:custom:scim',
+        customFlag: 'custom-value',
       };
-      expect(getConfigString(config, ENDPOINT_CONFIG_FLAGS.CUSTOM_SCHEMA_URN)).toBe(
-        'urn:custom:scim'
+      expect(getConfigString(config, 'customFlag')).toBe(
+        'custom-value'
       );
     });
   });
@@ -714,11 +707,6 @@ describe('endpoint-config.interface', () => {
       expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP]).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP]).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS]).toBe(true);
-      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.EXCLUDE_META]).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.EXCLUDE_SCHEMAS]).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.INCLUDE_ENTERPRISE_SCHEMA]).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.STRICT_MODE]).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.LEGACY_MODE]).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED]).toBe(false);
     });
   });

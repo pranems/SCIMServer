@@ -3,6 +3,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { EndpointScimDiscoveryController } from './endpoint-scim-discovery.controller';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
+import { ScimDiscoveryService } from '../discovery/scim-discovery.service';
 
 describe('EndpointScimDiscoveryController', () => {
   let controller: EndpointScimDiscoveryController;
@@ -43,6 +44,7 @@ describe('EndpointScimDiscoveryController', () => {
       providers: [
         { provide: EndpointService, useValue: mockEndpointService },
         { provide: EndpointContextStorage, useValue: mockEndpointContext },
+        ScimDiscoveryService,
       ],
     }).compile();
 
@@ -64,14 +66,17 @@ describe('EndpointScimDiscoveryController', () => {
       const result = await controller.getSchemas('endpoint-1', mockRequest);
 
       expect(result.schemas).toEqual([
-        'urn:ietf:params:scim:schemas:core:2.0:ListResponse',
+        'urn:ietf:params:scim:api:messages:2.0:ListResponse',
       ]);
-      expect(result.totalResults).toBe(2);
-      expect(result.Resources).toHaveLength(2);
+      expect(result.totalResults).toBe(3);
+      expect(result.Resources).toHaveLength(3);
       expect(result.Resources[0].id).toBe(
         'urn:ietf:params:scim:schemas:core:2.0:User'
       );
       expect(result.Resources[1].id).toBe(
+        'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'
+      );
+      expect(result.Resources[2].id).toBe(
         'urn:ietf:params:scim:schemas:core:2.0:Group'
       );
     });
@@ -100,7 +105,7 @@ describe('EndpointScimDiscoveryController', () => {
       const result = await controller.getResourceTypes('endpoint-1', mockRequest);
 
       expect(result.schemas).toEqual([
-        'urn:ietf:params:scim:schemas:core:2.0:ListResponse',
+        'urn:ietf:params:scim:api:messages:2.0:ListResponse',
       ]);
       expect(result.totalResults).toBe(2);
       expect(result.Resources).toHaveLength(2);

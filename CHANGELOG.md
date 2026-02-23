@@ -5,6 +5,33 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-02-23
+
+### Added
+- **Data-Driven Discovery (Phase 6):** Centralized all SCIM discovery endpoints into injectable `ScimDiscoveryService`, replacing ~280 lines of hardcoded JSON across 4 controllers
+  - `ScimDiscoveryService` — injectable service with `getSchemas()`, `getResourceTypes()`, `getServiceProviderConfig()`, `buildResourceSchemas()`
+  - Rich RFC 7643 schema constants: User (17 attributes with subAttributes), Enterprise User Extension (6 attributes with complex manager), Group (3 attributes)
+  - Enterprise User Extension schema added to `/Schemas` response (3 schemas, was 2)
+  - Enterprise User schema extension declared on User ResourceType (`schemaExtensions`)
+  - `meta` object added to ServiceProviderConfig response (RFC 7644 §4 SHOULD)
+  - Centralized `KNOWN_EXTENSION_URNS` export in `scim-constants.ts`
+- **36 new unit tests** for ScimDiscoveryService and updated controller specs
+- **3 new E2E tests** for Enterprise User schema, extension on ResourceTypes, meta on ServiceProviderConfig
+- **Phase 6 Documentation:** `docs/phases/PHASE_06_DATA_DRIVEN_DISCOVERY.md`
+
+### Changed
+- **Discovery controllers now thin delegates:** `SchemasController` (144→14 lines), `ResourceTypesController` (36→14), `ServiceProviderConfigController` (31→14), `EndpointScimDiscoveryController` (284→99)
+- **Dynamic `schemas[]` in User responses:** Enterprise User extension URN included when enterprise data present in payload (G19 fix)
+- **`scim-patch-path.ts`:** Uses centralized `KNOWN_EXTENSION_URNS` export instead of local constant (G16 fix)
+
+### Removed
+- **7 dead config flags** from `EndpointConfig`: `EXCLUDE_META`, `EXCLUDE_SCHEMAS`, `CUSTOM_SCHEMA_URN`, `INCLUDE_ENTERPRISE_SCHEMA`, `STRICT_MODE`, `LEGACY_MODE`, `CUSTOM_HEADERS` (G20 fix)
+
+### Verified
+- **1171/1171 unit tests passing** (47 suites) — up from 1135 (+36 new)
+- **196/196 E2E tests passing** (15 suites) — up from 193 (+3 new)
+- Build clean (TypeScript), zero compilation errors
+
 ## [0.13.0] - 2026-02-21
 
 ### Added

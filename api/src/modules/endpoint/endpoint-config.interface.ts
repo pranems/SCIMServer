@@ -22,41 +22,6 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * When false, requires explicit member specification in value array or path filter.
    */
   PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS: 'PatchOpAllowRemoveAllMembers',
-  
-  /**
-   * When true, excludes the 'meta' attribute from responses.
-   */
-  EXCLUDE_META: 'excludeMeta',
-  
-  /**
-   * When true, excludes the 'schemas' attribute from responses.
-   */
-  EXCLUDE_SCHEMAS: 'excludeSchemas',
-  
-  /**
-   * Custom schema URN prefix to replace the standard 'urn:ietf:params:scim'.
-   */
-  CUSTOM_SCHEMA_URN: 'customSchemaUrn',
-  
-  /**
-   * When true, includes the Enterprise User schema extension in User responses.
-   */
-  INCLUDE_ENTERPRISE_SCHEMA: 'includeEnterpriseSchema',
-  
-  /**
-   * When true, enforces strict validation rules.
-   */
-  STRICT_MODE: 'strictMode',
-  
-  /**
-   * When true, enables legacy SCIM 1.1 compatibility mode.
-   */
-  LEGACY_MODE: 'legacyMode',
-  
-  /**
-   * Custom headers to include in responses.
-   */
-  CUSTOM_HEADERS: 'customHeaders',
 
   /**
    * When true, enables verbose PATCH support with dot-notation path resolution.
@@ -109,41 +74,6 @@ export interface EndpointConfig {
    * Example config: { "PatchOpAllowRemoveAllMembers": "False" }
    */
   [ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS]?: boolean | string;
-
-  /**
-   * When true, excludes the 'meta' attribute from responses.
-   */
-  [ENDPOINT_CONFIG_FLAGS.EXCLUDE_META]?: boolean;
-
-  /**
-   * When true, excludes the 'schemas' attribute from responses.
-   */
-  [ENDPOINT_CONFIG_FLAGS.EXCLUDE_SCHEMAS]?: boolean;
-
-  /**
-   * Custom schema URN prefix to replace the standard 'urn:ietf:params:scim'.
-   */
-  [ENDPOINT_CONFIG_FLAGS.CUSTOM_SCHEMA_URN]?: string;
-
-  /**
-   * When true, includes the Enterprise User schema extension in User responses.
-   */
-  [ENDPOINT_CONFIG_FLAGS.INCLUDE_ENTERPRISE_SCHEMA]?: boolean;
-
-  /**
-   * When true, enforces strict validation rules.
-   */
-  [ENDPOINT_CONFIG_FLAGS.STRICT_MODE]?: boolean;
-
-  /**
-   * When true, enables legacy SCIM 1.1 compatibility mode.
-   */
-  [ENDPOINT_CONFIG_FLAGS.LEGACY_MODE]?: boolean;
-
-  /**
-   * Custom headers to include in responses.
-   */
-  [ENDPOINT_CONFIG_FLAGS.CUSTOM_HEADERS]?: Record<string, string>;
 
   /**
    * When true, enables verbose PATCH support with dot-notation path resolution.
@@ -202,11 +132,6 @@ export const DEFAULT_ENDPOINT_CONFIG: EndpointConfig = {
   [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP]: false,
   [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP]: false,
   [ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS]: true,
-  [ENDPOINT_CONFIG_FLAGS.EXCLUDE_META]: false,
-  [ENDPOINT_CONFIG_FLAGS.EXCLUDE_SCHEMAS]: false,
-  [ENDPOINT_CONFIG_FLAGS.INCLUDE_ENTERPRISE_SCHEMA]: false,
-  [ENDPOINT_CONFIG_FLAGS.STRICT_MODE]: false,
-  [ENDPOINT_CONFIG_FLAGS.LEGACY_MODE]: false,
   [ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED]: false
 };
 

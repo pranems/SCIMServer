@@ -1,10 +1,19 @@
 ﻿export const SCIM_CORE_USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User';
 export const SCIM_CORE_GROUP_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:Group';
+export const SCIM_ENTERPRISE_USER_SCHEMA = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
 export const SCIM_LIST_RESPONSE_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:ListResponse';
 export const SCIM_PATCH_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:PatchOp';
 export const SCIM_ERROR_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:Error';
 export const SCIM_SP_CONFIG_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig';
 export const SCIM_SEARCH_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:SearchRequest';
+
+/**
+ * All known SCIM extension schema URNs supported by this server.
+ * Used for dynamic schemas[] inclusion and PATCH path resolution.
+ */
+export const KNOWN_EXTENSION_URNS: readonly string[] = [
+  SCIM_ENTERPRISE_USER_SCHEMA,
+] as const;
 
 export const DEFAULT_COUNT = 100;
 export const MAX_COUNT = 200;

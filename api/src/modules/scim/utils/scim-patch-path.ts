@@ -10,11 +10,7 @@
  *   - Enterprise extension URN-prefixed paths:
  *       "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager"
  */
-
-// Well-known schema extension URN prefixes (terminated with a colon separator)
-const KNOWN_EXTENSION_URNS = [
-  'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User',
-] as const;
+import { KNOWN_EXTENSION_URNS } from '../common/scim-constants';
 
 /** Result of parsing a valuePath expression like `emails[type eq "work"].value` */
 export interface ValuePathExpression {

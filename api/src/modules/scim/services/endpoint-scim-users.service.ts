@@ -12,7 +12,8 @@ import {
   MAX_COUNT,
   SCIM_CORE_USER_SCHEMA,
   SCIM_LIST_RESPONSE_SCHEMA,
-  SCIM_PATCH_SCHEMA
+  SCIM_PATCH_SCHEMA,
+  KNOWN_EXTENSION_URNS,
 } from '../common/scim-constants';
 import type { ScimListResponse, ScimUserResource } from '../common/scim-types';
 import type { CreateUserDto } from '../dto/create-user.dto';
@@ -319,12 +320,20 @@ export class EndpointScimUsersService {
     // Sanitize boolean-like strings in multi-valued attributes (Microsoft Entra sends "True"/"False")
     this.sanitizeBooleanStrings(rawPayload);
 
+    // Build schemas[] dynamically — include extension URNs present in payload (G19 fix)
+    const schemas: [string, ...string[]] = [SCIM_CORE_USER_SCHEMA];
+    for (const urn of KNOWN_EXTENSION_URNS) {
+      if (urn in rawPayload) {
+        schemas.push(urn);
+      }
+    }
+
     // Remove reserved server-assigned attributes from rawPayload to prevent overwriting
     // (e.g., a client-supplied "id" in the POST body must never override scimId)
     delete rawPayload.id;
 
     return {
-      schemas: [SCIM_CORE_USER_SCHEMA],
+      schemas,
       ...rawPayload,
       id: user.scimId,
       userName: user.userName,

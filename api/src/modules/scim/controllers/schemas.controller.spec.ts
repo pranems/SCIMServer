@@ -1,10 +1,12 @@
 import { SchemasController } from './schemas.controller';
+import { ScimDiscoveryService } from '../discovery/scim-discovery.service';
 
 describe('SchemasController', () => {
   let controller: SchemasController;
 
   beforeEach(() => {
-    controller = new SchemasController();
+    const discoveryService = new ScimDiscoveryService();
+    controller = new SchemasController(discoveryService);
   });
 
   it('should be defined', () => {
@@ -15,14 +17,14 @@ describe('SchemasController', () => {
     it('should return ListResponse schema', () => {
       const result = controller.getSchemas();
       expect(result.schemas).toEqual([
-        'urn:ietf:params:scim:schemas:core:2.0:ListResponse',
+        'urn:ietf:params:scim:api:messages:2.0:ListResponse',
       ]);
     });
 
-    it('should return 2 schema definitions', () => {
+    it('should return 3 schema definitions (User, EnterpriseUser, Group)', () => {
       const result = controller.getSchemas();
-      expect(result.totalResults).toBe(2);
-      expect(result.Resources).toHaveLength(2);
+      expect(result.totalResults).toBe(3);
+      expect(result.Resources).toHaveLength(3);
     });
 
     it('should include User schema with correct id', () => {
@@ -32,6 +34,17 @@ describe('SchemasController', () => {
       );
       expect(userSchema).toBeDefined();
       expect(userSchema!.name).toBe('User');
+    });
+
+    it('should include Enterprise User Extension schema', () => {
+      const result = controller.getSchemas();
+      const enterpriseSchema = result.Resources.find(
+        (r: any) =>
+          r.id ===
+          'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User',
+      );
+      expect(enterpriseSchema).toBeDefined();
+      expect(enterpriseSchema!.name).toBe('EnterpriseUser');
     });
 
     it('should include Group schema with correct id', () => {
@@ -80,7 +93,7 @@ describe('SchemasController', () => {
       const result = controller.getSchemas();
       const userSchema = result.Resources.find(
         (r: any) => r.id === 'urn:ietf:params:scim:schemas:core:2.0:User',
-      )!;
+      )! as any;
       const emails = userSchema.attributes.find((a: any) => a.name === 'emails');
       expect(emails).toBeDefined();
       expect(emails!.type).toBe('complex');
@@ -102,7 +115,7 @@ describe('SchemasController', () => {
     it('should have correct pagination metadata', () => {
       const result = controller.getSchemas();
       expect(result.startIndex).toBe(1);
-      expect(result.itemsPerPage).toBe(2);
+      expect(result.itemsPerPage).toBe(3);
     });
   });
 });

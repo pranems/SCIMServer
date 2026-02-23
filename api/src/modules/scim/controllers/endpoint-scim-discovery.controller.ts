@@ -8,7 +8,7 @@ import {
 import type { Request } from 'express';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
-import { SCIM_SP_CONFIG_SCHEMA } from '../common/scim-constants';
+import { ScimDiscoveryService } from '../discovery/scim-discovery.service';
 import { buildBaseUrl } from '../common/base-url.util';
 
 /**
@@ -26,7 +26,8 @@ import { buildBaseUrl } from '../common/base-url.util';
 export class EndpointScimDiscoveryController {
   constructor(
     private readonly endpointService: EndpointService,
-    private readonly endpointContext: EndpointContextStorage
+    private readonly endpointContext: EndpointContextStorage,
+    private readonly discoveryService: ScimDiscoveryService
   ) {}
 
   /**
@@ -62,7 +63,7 @@ export class EndpointScimDiscoveryController {
     @Req() req: Request
   ) {
     await this.validateAndSetContext(endpointId, req);
-    return this.getSchemasJSON();
+    return this.discoveryService.getSchemas();
   }
 
   // ===== ResourceTypes =====
@@ -77,7 +78,7 @@ export class EndpointScimDiscoveryController {
     @Req() req: Request
   ) {
     await this.validateAndSetContext(endpointId, req);
-    return this.getResourceTypesJSON();
+    return this.discoveryService.getResourceTypes();
   }
 
   // ===== ServiceProviderConfig =====
@@ -92,192 +93,6 @@ export class EndpointScimDiscoveryController {
     @Req() req: Request
   ) {
     await this.validateAndSetContext(endpointId, req);
-    return this.getServiceProviderConfigJSON();
-  }
-
-  // ===== Private helpers (static JSON – TODO: migrate to ScimMetadataService) =====
-
-  private getSchemasJSON() {
-    return {
-      schemas: ['urn:ietf:params:scim:schemas:core:2.0:ListResponse'],
-      totalResults: 2,
-      startIndex: 1,
-      itemsPerPage: 2,
-      Resources: [this.userSchema(), this.groupSchema()]
-    };
-  }
-
-  private userSchema() {
-    return {
-      id: 'urn:ietf:params:scim:schemas:core:2.0:User',
-      name: 'User',
-      description: 'User Account',
-      attributes: [
-        {
-          name: 'userName',
-          type: 'string',
-          multiValued: false,
-          required: true,
-          caseExact: false,
-          mutability: 'readWrite',
-          returned: 'always',
-          uniqueness: 'server'
-        },
-        {
-          name: 'displayName',
-          type: 'string',
-          multiValued: false,
-          required: false,
-          caseExact: false,
-          mutability: 'readWrite',
-          returned: 'default'
-        },
-        {
-          name: 'active',
-          type: 'boolean',
-          multiValued: false,
-          required: false,
-          caseExact: false,
-          mutability: 'readWrite',
-          returned: 'default'
-        },
-        {
-          name: 'emails',
-          type: 'complex',
-          multiValued: true,
-          required: false,
-          subAttributes: [
-            {
-              name: 'value',
-              type: 'string',
-              multiValued: false,
-              required: true,
-              caseExact: false,
-              mutability: 'readWrite',
-              returned: 'always'
-            },
-            {
-              name: 'type',
-              type: 'string',
-              multiValued: false,
-              required: false,
-              caseExact: false,
-              mutability: 'readWrite',
-              returned: 'default'
-            },
-            {
-              name: 'primary',
-              type: 'boolean',
-              multiValued: false,
-              required: false,
-              caseExact: false,
-              mutability: 'readWrite',
-              returned: 'default'
-            }
-          ],
-          mutability: 'readWrite',
-          returned: 'default'
-        }
-      ]
-    };
-  }
-
-  private groupSchema() {
-    return {
-      id: 'urn:ietf:params:scim:schemas:core:2.0:Group',
-      name: 'Group',
-      description: 'Group',
-      attributes: [
-        {
-          name: 'displayName',
-          type: 'string',
-          multiValued: false,
-          required: true,
-          mutability: 'readWrite',
-          returned: 'always'
-        },
-        {
-          name: 'members',
-          type: 'complex',
-          multiValued: true,
-          required: false,
-          mutability: 'readWrite',
-          returned: 'default',
-          subAttributes: [
-            {
-              name: 'value',
-              type: 'string',
-              multiValued: false,
-              required: true,
-              mutability: 'immutable',
-              returned: 'always'
-            },
-            {
-              name: 'display',
-              type: 'string',
-              multiValued: false,
-              required: false,
-              mutability: 'immutable',
-              returned: 'default'
-            },
-            {
-              name: 'type',
-              type: 'string',
-              multiValued: false,
-              required: false,
-              mutability: 'immutable',
-              returned: 'default'
-            }
-          ]
-        }
-      ]
-    };
-  }
-
-  private getResourceTypesJSON() {
-    return {
-      schemas: ['urn:ietf:params:scim:schemas:core:2.0:ListResponse'],
-      totalResults: 2,
-      startIndex: 1,
-      itemsPerPage: 2,
-      Resources: [
-        {
-          id: 'User',
-          name: 'User',
-          endpoint: '/Users',
-          description: 'User Account',
-          schema: 'urn:ietf:params:scim:schemas:core:2.0:User',
-          schemaExtensions: []
-        },
-        {
-          id: 'Group',
-          name: 'Group',
-          endpoint: '/Groups',
-          description: 'Group',
-          schema: 'urn:ietf:params:scim:schemas:core:2.0:Group',
-          schemaExtensions: []
-        }
-      ]
-    };
-  }
-
-  private getServiceProviderConfigJSON() {
-    return {
-      schemas: [SCIM_SP_CONFIG_SCHEMA],
-      patch: { supported: true },
-      bulk: { supported: false },
-      filter: { supported: true, maxResults: 200 },
-      changePassword: { supported: false },
-      sort: { supported: false },
-      etag: { supported: true },
-      authenticationSchemes: [
-        {
-          type: 'oauthbearertoken',
-          name: 'OAuth Bearer Token',
-          description: 'Authentication scheme using the OAuth Bearer Token Standard',
-          specificationUrl: 'https://www.rfc-editor.org/info/rfc6750'
-        }
-      ]
-    };
+    return this.discoveryService.getServiceProviderConfig();
   }
 }

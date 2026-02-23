@@ -1,10 +1,12 @@
 import { ResourceTypesController } from './resource-types.controller';
+import { ScimDiscoveryService } from '../discovery/scim-discovery.service';
 
 describe('ResourceTypesController', () => {
   let controller: ResourceTypesController;
 
   beforeEach(() => {
-    controller = new ResourceTypesController();
+    const discoveryService = new ScimDiscoveryService();
+    controller = new ResourceTypesController(discoveryService);
   });
 
   it('should be defined', () => {
@@ -15,7 +17,7 @@ describe('ResourceTypesController', () => {
     it('should return ListResponse schema', () => {
       const result = controller.getResourceTypes();
       expect(result.schemas).toEqual([
-        'urn:ietf:params:scim:schemas:core:2.0:ListResponse',
+        'urn:ietf:params:scim:api:messages:2.0:ListResponse',
       ]);
     });
 
@@ -34,13 +36,24 @@ describe('ResourceTypesController', () => {
       expect(userType!.schema).toBe('urn:ietf:params:scim:schemas:core:2.0:User');
     });
 
-    it('should include Group resource type', () => {
+    it('should include Enterprise User extension on User resource type', () => {
+      const result = controller.getResourceTypes();
+      const userType = result.Resources.find((r: any) => r.id === 'User');
+      expect(userType!.schemaExtensions).toHaveLength(1);
+      expect(userType!.schemaExtensions[0].schema).toBe(
+        'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User',
+      );
+      expect(userType!.schemaExtensions[0].required).toBe(false);
+    });
+
+    it('should include Group resource type with no extensions', () => {
       const result = controller.getResourceTypes();
       const groupType = result.Resources.find((r: any) => r.id === 'Group');
       expect(groupType).toBeDefined();
       expect(groupType!.name).toBe('Group');
       expect(groupType!.endpoint).toBe('/Groups');
       expect(groupType!.schema).toBe('urn:ietf:params:scim:schemas:core:2.0:Group');
+      expect(groupType!.schemaExtensions).toHaveLength(0);
     });
 
     it('should have correct pagination metadata', () => {

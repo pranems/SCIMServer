@@ -13,6 +13,7 @@ import { EndpointScimUsersController } from './controllers/endpoint-scim-users.c
 import { EndpointScimGroupsController } from './controllers/endpoint-scim-groups.controller';
 import { EndpointScimDiscoveryController } from './controllers/endpoint-scim-discovery.controller';
 import { ScimMetadataService } from './services/scim-metadata.service';
+import { ScimDiscoveryService } from './discovery/scim-discovery.service';
 import { EndpointScimUsersService } from './services/endpoint-scim-users.service';
 import { EndpointScimGroupsService } from './services/endpoint-scim-groups.service';
 import { EndpointContextStorage } from '../endpoint/endpoint-context.storage';
@@ -33,6 +34,7 @@ import { ScimExceptionFilter } from './filters/scim-exception.filter';
   ],
   providers: [
     ScimMetadataService,
+    ScimDiscoveryService,
     EndpointScimUsersService,
     EndpointScimGroupsService,
     EndpointContextStorage,
