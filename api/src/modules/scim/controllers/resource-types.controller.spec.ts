@@ -1,11 +1,13 @@
 import { ResourceTypesController } from './resource-types.controller';
 import { ScimDiscoveryService } from '../discovery/scim-discovery.service';
+import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 
 describe('ResourceTypesController', () => {
   let controller: ResourceTypesController;
 
   beforeEach(() => {
-    const discoveryService = new ScimDiscoveryService();
+    const registry = new ScimSchemaRegistry();
+    const discoveryService = new ScimDiscoveryService(registry);
     controller = new ResourceTypesController(discoveryService);
   });
 

@@ -80,9 +80,10 @@ export function parseValuePath(path: string): ValuePathExpression | null {
  * @example isExtensionPath("urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager") → true
  * @example isExtensionPath("displayName") → false
  */
-export function isExtensionPath(path: string): boolean {
+export function isExtensionPath(path: string, extensionUrns?: readonly string[]): boolean {
+  const urns = extensionUrns ?? KNOWN_EXTENSION_URNS;
   const lowerPath = path.toLowerCase();
-  return KNOWN_EXTENSION_URNS.some((urn) => lowerPath.startsWith(urn.toLowerCase() + ':'));
+  return urns.some((urn) => lowerPath.startsWith(urn.toLowerCase() + ':'));
 }
 
 /**
@@ -92,9 +93,10 @@ export function isExtensionPath(path: string): boolean {
  *   parseExtensionPath("urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager")
  *   // → { schemaUrn: "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", attributePath: "manager" }
  */
-export function parseExtensionPath(path: string): ExtensionPathExpression | null {
+export function parseExtensionPath(path: string, extensionUrns?: readonly string[]): ExtensionPathExpression | null {
+  const urns = extensionUrns ?? KNOWN_EXTENSION_URNS;
   const lowerPath = path.toLowerCase();
-  for (const urn of KNOWN_EXTENSION_URNS) {
+  for (const urn of urns) {
     const prefix = urn.toLowerCase() + ':';
     if (lowerPath.startsWith(prefix)) {
       const attributePath = path.slice(prefix.length); // preserve original casing for the attribute

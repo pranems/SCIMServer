@@ -19,13 +19,13 @@ export interface IUserRepository {
   /** Create a new user and return the complete record. */
   create(input: UserCreateInput): Promise<UserRecord>;
 
-  /** Find a user by its SCIM-visible id within a tenant. */
+  /** Find a user by its SCIM-visible id within an endpoint. */
   findByScimId(endpointId: string, scimId: string): Promise<UserRecord | null>;
 
   /**
-   * List users for a tenant, optionally filtered.
+   * List users for an endpoint, optionally filtered.
    *
-   * @param endpointId Tenant identifier (mandatory for isolation).
+   * @param endpointId Endpoint identifier (mandatory for isolation).
    * @param dbFilter   Simple key-value filter pushed down from the SCIM filter parser.
    *                   Example: `{ userName: 'alice' }`.
    * @param orderBy    Sort specification, e.g. `{ field: 'createdAt', direction: 'asc' }`.
@@ -43,7 +43,7 @@ export interface IUserRepository {
   delete(id: string): Promise<void>;
 
   /**
-   * Check for uniqueness violations within a tenant.
+   * Check for uniqueness violations within an endpoint.
    *
    * Searches for any existing user whose `userName` matches
    * case-insensitively (via CITEXT or toLowerCase) OR whose

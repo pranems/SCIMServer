@@ -219,9 +219,9 @@ model ResourceMember {
 | Constraint | Purpose | NULL handling |
 |------------|---------|---------------|
 | `[endpointId, scimId]` | Global SCIM ID uniqueness | scimId is never null |
-| `[endpointId, userNameLower]` | Username uniqueness per tenant | Groups have NULL → multiple NULLs allowed |
-| `[endpointId, displayNameLower]` | Group name uniqueness per tenant | Users have NULL → multiple NULLs allowed |
-| `[endpointId, resourceType, externalId]` | ExternalId uniqueness per type per tenant | Prevents User/Group externalId collision |
+| `[endpointId, userNameLower]` | Username uniqueness per endpoint | Groups have NULL → multiple NULLs allowed |
+| `[endpointId, displayNameLower]` | Group name uniqueness per endpoint | Users have NULL → multiple NULLs allowed |
+| `[endpointId, resourceType, externalId]` | ExternalId uniqueness per type per endpoint | Prevents User/Group externalId collision |
 
 ---
 

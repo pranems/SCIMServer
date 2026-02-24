@@ -6,6 +6,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { EndpointModule } from '../endpoint/endpoint.module';
 import { RepositoryModule } from '../../infrastructure/repositories/repository.module';
 import { AdminController } from './controllers/admin.controller';
+import { AdminSchemaController } from './controllers/admin-schema.controller';
 import { ResourceTypesController } from './controllers/resource-types.controller';
 import { SchemasController } from './controllers/schemas.controller';
 import { ServiceProviderConfigController } from './controllers/service-provider-config.controller';
@@ -13,6 +14,7 @@ import { EndpointScimUsersController } from './controllers/endpoint-scim-users.c
 import { EndpointScimGroupsController } from './controllers/endpoint-scim-groups.controller';
 import { EndpointScimDiscoveryController } from './controllers/endpoint-scim-discovery.controller';
 import { ScimMetadataService } from './services/scim-metadata.service';
+import { ScimSchemaRegistry } from './discovery/scim-schema-registry';
 import { ScimDiscoveryService } from './discovery/scim-discovery.service';
 import { EndpointScimUsersService } from './services/endpoint-scim-users.service';
 import { EndpointScimGroupsService } from './services/endpoint-scim-groups.service';
@@ -28,12 +30,14 @@ import { ScimExceptionFilter } from './filters/scim-exception.filter';
     ResourceTypesController,
     SchemasController,
     AdminController,
+    AdminSchemaController,
     EndpointScimUsersController,
     EndpointScimGroupsController,
     EndpointScimDiscoveryController
   ],
   providers: [
     ScimMetadataService,
+    ScimSchemaRegistry,
     ScimDiscoveryService,
     EndpointScimUsersService,
     EndpointScimGroupsService,

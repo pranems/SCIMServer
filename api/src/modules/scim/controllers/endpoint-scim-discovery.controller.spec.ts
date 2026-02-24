@@ -4,6 +4,7 @@ import { EndpointScimDiscoveryController } from './endpoint-scim-discovery.contr
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { ScimDiscoveryService } from '../discovery/scim-discovery.service';
+import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 
 describe('EndpointScimDiscoveryController', () => {
   let controller: EndpointScimDiscoveryController;
@@ -44,6 +45,7 @@ describe('EndpointScimDiscoveryController', () => {
       providers: [
         { provide: EndpointService, useValue: mockEndpointService },
         { provide: EndpointContextStorage, useValue: mockEndpointContext },
+        ScimSchemaRegistry,
         ScimDiscoveryService,
       ],
     }).compile();

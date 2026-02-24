@@ -28,6 +28,9 @@ model Endpoint {
   // Phase 2: Unified resource relation
   resources ScimResource[]
 
+  // Phase 6: Per-endpoint schema extensions
+  schemaExtensions EndpointSchema[]
+
   @@index([active])
 }
 
@@ -104,4 +107,30 @@ model ResourceMember {
 
   @@index([groupResourceId])
   @@index([memberResourceId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 6 — Per-endpoint SCIM schema extensions
+//
+// Persists custom extension schemas registered per endpoint. On startup the
+// ScimSchemaRegistry loads these rows and hydrates its per-endpoint overlay.
+// Admin API allows CRUD on extensions without redeployment.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model EndpointSchema {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  endpointId      String   @db.Uuid
+  schemaUrn       String   @db.VarChar(512)    // Extension schema URN (e.g., "urn:example:custom:2.0:User")
+  name            String   @db.VarChar(255)
+  description     String?
+  resourceTypeId  String?  @db.VarChar(50)     // Resource type to attach to ("User", "Group", or null)
+  required        Boolean  @default(false)      // Whether extension is required on the resource type
+  attributes      Json                          // JSONB — array of ScimSchemaAttribute definitions
+  createdAt       DateTime @default(now()) @db.Timestamptz
+  updatedAt       DateTime @updatedAt     @db.Timestamptz
+
+  endpoint Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@unique([endpointId, schemaUrn])            // One schema URN per endpoint
+  @@index([endpointId])
 }

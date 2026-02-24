@@ -1,11 +1,13 @@
 import { ServiceProviderConfigController } from './service-provider-config.controller';
 import { ScimDiscoveryService } from '../discovery/scim-discovery.service';
+import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 
 describe('ServiceProviderConfigController', () => {
   let controller: ServiceProviderConfigController;
 
   beforeEach(() => {
-    const discoveryService = new ScimDiscoveryService();
+    const registry = new ScimSchemaRegistry();
+    const discoveryService = new ScimDiscoveryService(registry);
     controller = new ServiceProviderConfigController(discoveryService);
   });
 

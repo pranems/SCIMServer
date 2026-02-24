@@ -29,7 +29,7 @@ User responses, and removes 7 dead configuration flags.
 **Constants-based discovery** (not database-backed). The `ScimDiscoveryService`
 returns static RFC 7643 definitions. The service interface is designed to allow
 a future migration to database-driven per-endpoint discovery data (e.g.,
-`tenant_schema`/`tenant_resource_type` tables) without changing consuming code.
+`endpoint_schema`/`endpoint_resource_type` tables) without changing consuming code.
 
 This decision balances pragmatism with extensibility:
 - No new database tables or Prisma migrations required

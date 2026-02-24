@@ -1,4 +1,5 @@
 import { ScimDiscoveryService } from './scim-discovery.service';
+import { ScimSchemaRegistry } from './scim-schema-registry';
 import {
   SCIM_CORE_USER_SCHEMA,
   SCIM_CORE_GROUP_SCHEMA,
@@ -12,7 +13,8 @@ describe('ScimDiscoveryService', () => {
   let service: ScimDiscoveryService;
 
   beforeEach(() => {
-    service = new ScimDiscoveryService();
+    const registry = new ScimSchemaRegistry();
+    service = new ScimDiscoveryService(registry);
   });
 
   // ─── getSchemas ─────────────────────────────────────────────────────────

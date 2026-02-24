@@ -7,6 +7,7 @@ import { ScimLogger } from '../../logging/scim-logger.service';
 import type { CreateUserDto } from '../dto/create-user.dto';
 import type { PatchUserDto } from '../dto/patch-user.dto';
 import { ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 
 describe('EndpointScimUsersService', () => {
   let service: EndpointScimUsersService;
@@ -61,6 +62,7 @@ describe('EndpointScimUsersService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EndpointScimUsersService,
+        ScimSchemaRegistry,
         {
           provide: USER_REPOSITORY,
           useValue: mockUserRepo,

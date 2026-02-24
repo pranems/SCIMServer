@@ -63,7 +63,7 @@ export class EndpointScimDiscoveryController {
     @Req() req: Request
   ) {
     await this.validateAndSetContext(endpointId, req);
-    return this.discoveryService.getSchemas();
+    return this.discoveryService.getSchemas(endpointId);
   }
 
   // ===== ResourceTypes =====
@@ -78,7 +78,7 @@ export class EndpointScimDiscoveryController {
     @Req() req: Request
   ) {
     await this.validateAndSetContext(endpointId, req);
-    return this.discoveryService.getResourceTypes();
+    return this.discoveryService.getResourceTypes(endpointId);
   }
 
   // ===== ServiceProviderConfig =====

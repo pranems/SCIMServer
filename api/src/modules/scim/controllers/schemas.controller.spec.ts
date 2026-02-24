@@ -1,11 +1,13 @@
 import { SchemasController } from './schemas.controller';
 import { ScimDiscoveryService } from '../discovery/scim-discovery.service';
+import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 
 describe('SchemasController', () => {
   let controller: SchemasController;
 
   beforeEach(() => {
-    const discoveryService = new ScimDiscoveryService();
+    const registry = new ScimSchemaRegistry();
+    const discoveryService = new ScimDiscoveryService(registry);
     controller = new SchemasController(discoveryService);
   });
 

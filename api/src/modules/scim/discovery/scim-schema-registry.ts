@@ -1,0 +1,501 @@
+import { Injectable, BadRequestException, Inject, Logger, type OnModuleInit, Optional } from '@nestjs/common';
+import {
+  SCIM_CORE_USER_SCHEMA,
+  SCIM_CORE_GROUP_SCHEMA,
+} from '../common/scim-constants';
+import {
+  SCIM_USER_SCHEMA_DEFINITION,
+  SCIM_ENTERPRISE_USER_SCHEMA_DEFINITION,
+  SCIM_GROUP_SCHEMA_DEFINITION,
+  SCIM_USER_RESOURCE_TYPE,
+  SCIM_GROUP_RESOURCE_TYPE,
+  SCIM_SERVICE_PROVIDER_CONFIG,
+} from './scim-schemas.constants';
+import { ENDPOINT_SCHEMA_REPOSITORY } from '../../../domain/repositories/repository.tokens';
+import type { IEndpointSchemaRepository } from '../../../domain/repositories/endpoint-schema.repository.interface';
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+/** RFC 7643 §7 Schema attribute definition */
+export interface ScimSchemaAttribute {
+  name: string;
+  type: string;
+  multiValued: boolean;
+  required: boolean;
+  description?: string;
+  mutability?: string;
+  returned?: string;
+  caseExact?: boolean;
+  uniqueness?: string;
+  referenceTypes?: readonly string[];
+  subAttributes?: readonly ScimSchemaAttribute[];
+}
+
+/** RFC 7643 §7 Schema definition */
+export interface ScimSchemaDefinition {
+  id: string;
+  name: string;
+  description: string;
+  attributes: readonly ScimSchemaAttribute[];
+  meta?: {
+    resourceType: string;
+    location: string;
+  };
+}
+
+/** RFC 7643 §6 Schema extension on a ResourceType */
+export interface SchemaExtensionRef {
+  schema: string;
+  required: boolean;
+}
+
+/** RFC 7643 §6 ResourceType definition */
+export interface ScimResourceType {
+  id: string;
+  name: string;
+  endpoint: string;
+  description: string;
+  schema: string;
+  schemaExtensions: SchemaExtensionRef[];
+  meta?: {
+    resourceType: string;
+    location: string;
+  };
+}
+
+// ─── Registry ───────────────────────────────────────────────────────────────
+
+/** Per-endpoint extension overlay */
+interface EndpointOverlay {
+  /** Extension schemas registered for this specific endpoint */
+  schemas: Map<string, ScimSchemaDefinition>;
+  /** Extension URNs attached to each resource type for this endpoint */
+  extensionsByResourceType: Map<string, Set<string>>;
+}
+
+/**
+ * ScimSchemaRegistry — Per-Endpoint Runtime Schema Extension Registry
+ *
+ * Manages SCIM schema definitions and resource type declarations with
+ * two layers:
+ *
+ * 1. **Global layer** — Pre-loaded with RFC 7643 built-in schemas
+ *    (User, EnterpriseUser, Group). Shared by all endpoints. Extensions
+ *    registered globally (without endpointId) apply to every endpoint.
+ *
+ * 2. **Per-endpoint layer** — Each endpoint can register additional
+ *    extension schemas via `registerExtension(schema, rtId, required, endpointId)`.
+ *    These appear only in that endpoint's discovery responses.
+ *
+ * Query methods accept an optional `endpointId`. When provided, results
+ * merge global + endpoint-specific data. When omitted, only global data
+ * is returned (backward compatible).
+ *
+ * @example
+ *   // Register a global extension (all endpoints see it)
+ *   registry.registerExtension(badgeSchema, 'User');
+ *
+ *   // Register an endpoint-specific extension
+ *   registry.registerExtension(customSchema, 'User', false, 'endpoint-1');
+ *
+ *   // Query for endpoint-1 — sees global + endpoint-1 extensions
+ *   registry.getAllSchemas('endpoint-1');
+ *
+ *   // Query for endpoint-2 — sees only global extensions
+ *   registry.getAllSchemas('endpoint-2');
+ */
+@Injectable()
+export class ScimSchemaRegistry implements OnModuleInit {
+  private readonly logger = new Logger(ScimSchemaRegistry.name);
+
+  // ─── Global layer ─────────────────────────────────────────────────────
+
+  /** All global schema definitions keyed by schema URN */
+  private readonly schemas = new Map<string, ScimSchemaDefinition>();
+
+  /** All registered resource types keyed by resource type id */
+  private readonly resourceTypes = new Map<string, ScimResourceType>();
+
+  /** Global extension URNs keyed by resource type id */
+  private readonly extensionsByResourceType = new Map<string, Set<string>>();
+
+  /** Core (non-extension) schema URNs — these cannot be unregistered */
+  private readonly coreSchemaUrns = new Set<string>();
+
+  // ─── Per-endpoint layer ───────────────────────────────────────────────
+
+  /** Per-endpoint extension overlays */
+  private readonly endpointOverlays = new Map<string, EndpointOverlay>();
+
+  constructor(
+    @Optional()
+    @Inject(ENDPOINT_SCHEMA_REPOSITORY)
+    private readonly schemaRepo?: IEndpointSchemaRepository,
+  ) {
+    this.loadBuiltInSchemas();
+  }
+
+  /**
+   * OnModuleInit — Load persisted per-endpoint schema extensions from the
+   * database and hydrate the in-memory registry. This ensures that all
+   * previously registered extensions are available immediately on startup.
+   */
+  async onModuleInit(): Promise<void> {
+    if (!this.schemaRepo) {
+      this.logger.debug('No EndpointSchema repository injected — skipping DB hydration.');
+      return;
+    }
+
+    try {
+      const rows = await this.schemaRepo.findAll();
+      let count = 0;
+
+      for (const row of rows) {
+        const definition: ScimSchemaDefinition = {
+          id: row.schemaUrn,
+          name: row.name,
+          description: row.description ?? '',
+          attributes: Array.isArray(row.attributes)
+            ? (row.attributes as ScimSchemaAttribute[])
+            : [],
+          meta: {
+            resourceType: 'Schema',
+            location: `/Schemas/${row.schemaUrn}`,
+          },
+        };
+
+        this.registerExtension(
+          definition,
+          row.resourceTypeId ?? undefined,
+          row.required,
+          row.endpointId,
+        );
+        count++;
+      }
+
+      if (count > 0) {
+        this.logger.log(`Hydrated ${count} persisted schema extension(s) from database.`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to hydrate schema extensions from database', error);
+    }
+  }
+
+  // ─── Built-in initialization ────────────────────────────────────────────
+
+  private loadBuiltInSchemas(): void {
+    // Core schemas
+    this.schemas.set(SCIM_USER_SCHEMA_DEFINITION.id, SCIM_USER_SCHEMA_DEFINITION as ScimSchemaDefinition);
+    this.schemas.set(SCIM_ENTERPRISE_USER_SCHEMA_DEFINITION.id, SCIM_ENTERPRISE_USER_SCHEMA_DEFINITION as ScimSchemaDefinition);
+    this.schemas.set(SCIM_GROUP_SCHEMA_DEFINITION.id, SCIM_GROUP_SCHEMA_DEFINITION as ScimSchemaDefinition);
+
+    this.coreSchemaUrns.add(SCIM_CORE_USER_SCHEMA);
+    this.coreSchemaUrns.add(SCIM_CORE_GROUP_SCHEMA);
+
+    // Resource types (deep copy to allow mutation of schemaExtensions)
+    const userRT: ScimResourceType = {
+      ...SCIM_USER_RESOURCE_TYPE,
+      schemaExtensions: [...SCIM_USER_RESOURCE_TYPE.schemaExtensions],
+    };
+    const groupRT: ScimResourceType = {
+      ...SCIM_GROUP_RESOURCE_TYPE,
+      schemaExtensions: [...SCIM_GROUP_RESOURCE_TYPE.schemaExtensions],
+    };
+    this.resourceTypes.set(userRT.id, userRT);
+    this.resourceTypes.set(groupRT.id, groupRT);
+
+    // Track built-in extension URNs
+    for (const ext of userRT.schemaExtensions) {
+      this.getOrCreateExtensionSet('User').add(ext.schema);
+    }
+  }
+
+  // ─── Registration ──────────────────────────────────────────────────────
+
+  /**
+   * Register a custom extension schema, optionally scoped to an endpoint.
+   *
+   * @param schema         RFC 7643 §7 schema definition with `id`, `name`, `attributes`
+   * @param resourceTypeId Resource type to attach to (e.g., 'User', 'Group'). Optional.
+   * @param required       Whether the extension is required on the resource type (default: false)
+   * @param endpointId     If provided, the extension is scoped to this endpoint only.
+   *                       If omitted, the extension is registered globally (all endpoints see it).
+   *
+   * @throws BadRequestException if schema id is missing, already a core schema,
+   *         or the resource type does not exist
+   *
+   * @example
+   *   // Global extension — all endpoints see it
+   *   registry.registerExtension(badgeSchema, 'User');
+   *
+   *   // Endpoint-specific extension — only endpoint-1 sees it
+   *   registry.registerExtension(customSchema, 'User', false, 'endpoint-1');
+   */
+  registerExtension(
+    schema: ScimSchemaDefinition,
+    resourceTypeId?: string,
+    required = false,
+    endpointId?: string,
+  ): void {
+    // Validate
+    if (!schema.id) {
+      throw new BadRequestException('Schema definition must have an "id" (schema URN).');
+    }
+    if (this.coreSchemaUrns.has(schema.id)) {
+      throw new BadRequestException(
+        `Cannot overwrite core schema "${schema.id}". Only extension schemas can be registered.`,
+      );
+    }
+    if (resourceTypeId && !this.resourceTypes.has(resourceTypeId)) {
+      throw new BadRequestException(
+        `Resource type "${resourceTypeId}" not found. Available: ${[...this.resourceTypes.keys()].join(', ')}`,
+      );
+    }
+
+    // Ensure meta is populated
+    const definition: ScimSchemaDefinition = {
+      ...schema,
+      meta: schema.meta ?? {
+        resourceType: 'Schema',
+        location: `/Schemas/${schema.id}`,
+      },
+    };
+
+    if (endpointId) {
+      // ─── Per-endpoint registration ────────────────────────────────
+      const overlay = this.getOrCreateOverlay(endpointId);
+      overlay.schemas.set(definition.id, definition);
+
+      if (resourceTypeId) {
+        const extSet = this.getOrCreateOverlayExtensionSet(overlay, resourceTypeId);
+        extSet.add(definition.id);
+      }
+    } else {
+      // ─── Global registration ──────────────────────────────────────
+      this.schemas.set(definition.id, definition);
+
+      if (resourceTypeId) {
+        const rt = this.resourceTypes.get(resourceTypeId)!;
+        const alreadyAttached = rt.schemaExtensions.some((e) => e.schema === definition.id);
+        if (!alreadyAttached) {
+          rt.schemaExtensions.push({ schema: definition.id, required });
+          this.getOrCreateExtensionSet(resourceTypeId).add(definition.id);
+        }
+      }
+    }
+  }
+
+  /**
+   * Unregister a custom extension schema.
+   * Core schemas (User, Group) cannot be unregistered.
+   *
+   * @param schemaUrn  The schema URN to remove
+   * @param endpointId If provided, removes only the endpoint-specific registration.
+   *                   If omitted, removes from the global layer.
+   * @returns true if the schema was removed, false if it was not found
+   */
+  unregisterExtension(schemaUrn: string, endpointId?: string): boolean {
+    if (this.coreSchemaUrns.has(schemaUrn)) {
+      throw new BadRequestException(`Cannot unregister core schema "${schemaUrn}".`);
+    }
+
+    if (endpointId) {
+      // ─── Per-endpoint removal ─────────────────────────────────────
+      const overlay = this.endpointOverlays.get(endpointId);
+      if (!overlay) return false;
+
+      const existed = overlay.schemas.delete(schemaUrn);
+      for (const extSet of overlay.extensionsByResourceType.values()) {
+        extSet.delete(schemaUrn);
+      }
+      return existed;
+    }
+
+    // ─── Global removal ───────────────────────────────────────────────
+    const existed = this.schemas.delete(schemaUrn);
+
+    // Remove from all resource types
+    for (const [rtId, rt] of this.resourceTypes) {
+      rt.schemaExtensions = rt.schemaExtensions.filter((e) => e.schema !== schemaUrn);
+      this.extensionsByResourceType.get(rtId)?.delete(schemaUrn);
+    }
+
+    return existed;
+  }
+
+  // ─── Queries ───────────────────────────────────────────────────────────
+
+  /**
+   * All schema definitions visible to an endpoint (global + endpoint-specific).
+   * If endpointId is omitted, returns only global schemas.
+   */
+  getAllSchemas(endpointId?: string): ScimSchemaDefinition[] {
+    const result = [...this.schemas.values()];
+    if (endpointId) {
+      const overlay = this.endpointOverlays.get(endpointId);
+      if (overlay) {
+        for (const [urn, schema] of overlay.schemas) {
+          // Endpoint-specific overrides global if same URN
+          if (!this.schemas.has(urn)) {
+            result.push(schema);
+          }
+        }
+      }
+    }
+    return result;
+  }
+
+  /** Get a single schema by URN (checks endpoint overlay first, then global) */
+  getSchema(schemaUrn: string, endpointId?: string): ScimSchemaDefinition | undefined {
+    if (endpointId) {
+      const overlay = this.endpointOverlays.get(endpointId);
+      const epSchema = overlay?.schemas.get(schemaUrn);
+      if (epSchema) return epSchema;
+    }
+    return this.schemas.get(schemaUrn);
+  }
+
+  /**
+   * All resource types with merged schema extensions for an endpoint.
+   * Global resource types are deep-copied with endpoint-specific extensions appended.
+   */
+  getAllResourceTypes(endpointId?: string): ScimResourceType[] {
+    const overlay = endpointId ? this.endpointOverlays.get(endpointId) : undefined;
+
+    return [...this.resourceTypes.values()].map((rt) => {
+      if (!overlay) return rt;
+
+      const epExtensions = overlay.extensionsByResourceType.get(rt.id);
+      if (!epExtensions || epExtensions.size === 0) return rt;
+
+      // Merge: global extensions + endpoint-specific extensions
+      const mergedExtensions = [...rt.schemaExtensions];
+      for (const urn of epExtensions) {
+        if (!mergedExtensions.some((e) => e.schema === urn)) {
+          mergedExtensions.push({ schema: urn, required: false });
+        }
+      }
+      return { ...rt, schemaExtensions: mergedExtensions };
+    });
+  }
+
+  /** Get a single resource type by id (with endpoint extensions merged) */
+  getResourceType(resourceTypeId: string, endpointId?: string): ScimResourceType | undefined {
+    const rt = this.resourceTypes.get(resourceTypeId);
+    if (!rt) return undefined;
+    if (!endpointId) return rt;
+
+    const overlay = this.endpointOverlays.get(endpointId);
+    const epExtensions = overlay?.extensionsByResourceType.get(resourceTypeId);
+    if (!epExtensions || epExtensions.size === 0) return rt;
+
+    const mergedExtensions = [...rt.schemaExtensions];
+    for (const urn of epExtensions) {
+      if (!mergedExtensions.some((e) => e.schema === urn)) {
+        mergedExtensions.push({ schema: urn, required: false });
+      }
+    }
+    return { ...rt, schemaExtensions: mergedExtensions };
+  }
+
+  /**
+   * All known extension URNs across all resource types, merged with
+   * endpoint-specific extensions when endpointId is provided.
+   */
+  getExtensionUrns(endpointId?: string): readonly string[] {
+    const urns = new Set<string>();
+    for (const extSet of this.extensionsByResourceType.values()) {
+      for (const urn of extSet) {
+        urns.add(urn);
+      }
+    }
+    if (endpointId) {
+      const overlay = this.endpointOverlays.get(endpointId);
+      if (overlay) {
+        for (const extSet of overlay.extensionsByResourceType.values()) {
+          for (const urn of extSet) {
+            urns.add(urn);
+          }
+        }
+      }
+    }
+    return [...urns];
+  }
+
+  /**
+   * Extension URNs for a specific resource type, merged with endpoint-specific.
+   */
+  getExtensionUrnsForResourceType(resourceTypeId: string, endpointId?: string): readonly string[] {
+    const urns = new Set(this.extensionsByResourceType.get(resourceTypeId) ?? []);
+    if (endpointId) {
+      const overlay = this.endpointOverlays.get(endpointId);
+      const epExts = overlay?.extensionsByResourceType.get(resourceTypeId);
+      if (epExts) {
+        for (const urn of epExts) urns.add(urn);
+      }
+    }
+    return [...urns];
+  }
+
+  /** ServiceProviderConfig (static — not registry-managed) */
+  getServiceProviderConfig() {
+    return { ...SCIM_SERVICE_PROVIDER_CONFIG };
+  }
+
+  /** Whether a schema URN is registered (global or endpoint-specific) */
+  hasSchema(schemaUrn: string, endpointId?: string): boolean {
+    if (this.schemas.has(schemaUrn)) return true;
+    if (endpointId) {
+      const overlay = this.endpointOverlays.get(endpointId);
+      if (overlay?.schemas.has(schemaUrn)) return true;
+    }
+    return false;
+  }
+
+  /** Whether a schema is a core (non-removable) schema */
+  isCoreSchema(schemaUrn: string): boolean {
+    return this.coreSchemaUrns.has(schemaUrn);
+  }
+
+  /** List all endpoint IDs that have custom overrides */
+  getEndpointIds(): string[] {
+    return [...this.endpointOverlays.keys()];
+  }
+
+  /** Remove all endpoint-specific extensions for an endpoint */
+  clearEndpointOverlay(endpointId: string): void {
+    this.endpointOverlays.delete(endpointId);
+  }
+
+  // ─── Internals ─────────────────────────────────────────────────────────
+
+  private getOrCreateExtensionSet(resourceTypeId: string): Set<string> {
+    let set = this.extensionsByResourceType.get(resourceTypeId);
+    if (!set) {
+      set = new Set<string>();
+      this.extensionsByResourceType.set(resourceTypeId, set);
+    }
+    return set;
+  }
+
+  private getOrCreateOverlay(endpointId: string): EndpointOverlay {
+    let overlay = this.endpointOverlays.get(endpointId);
+    if (!overlay) {
+      overlay = {
+        schemas: new Map(),
+        extensionsByResourceType: new Map(),
+      };
+      this.endpointOverlays.set(endpointId, overlay);
+    }
+    return overlay;
+  }
+
+  private getOrCreateOverlayExtensionSet(overlay: EndpointOverlay, resourceTypeId: string): Set<string> {
+    let set = overlay.extensionsByResourceType.get(resourceTypeId);
+    if (!set) {
+      set = new Set<string>();
+      overlay.extensionsByResourceType.set(resourceTypeId, set);
+    }
+    return set;
+  }
+}

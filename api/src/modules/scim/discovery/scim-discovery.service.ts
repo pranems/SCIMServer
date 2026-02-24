@@ -2,24 +2,17 @@ import { Injectable } from '@nestjs/common';
 import {
   SCIM_LIST_RESPONSE_SCHEMA,
 } from '../common/scim-constants';
-import {
-  SCIM_USER_SCHEMA_DEFINITION,
-  SCIM_ENTERPRISE_USER_SCHEMA_DEFINITION,
-  SCIM_GROUP_SCHEMA_DEFINITION,
-  SCIM_USER_RESOURCE_TYPE,
-  SCIM_GROUP_RESOURCE_TYPE,
-  SCIM_SERVICE_PROVIDER_CONFIG,
-} from './scim-schemas.constants';
+import { ScimSchemaRegistry } from './scim-schema-registry';
 
 /**
  * ScimDiscoveryService — Phase 6: Data-Driven Discovery
  *
  * Centralizes all SCIM discovery endpoint responses (Schemas, ResourceTypes,
- * ServiceProviderConfig) into a single injectable service, replacing the
- * hardcoded private methods scattered across 4 controllers.
+ * ServiceProviderConfig) into a single injectable service.
  *
- * Current implementation uses constants; the service interface allows
- * a future migration to database-backed per-endpoint discovery data.
+ * Delegates to {@link ScimSchemaRegistry} for the authoritative list of
+ * schemas, resource types, and extension URNs. Custom extensions registered
+ * via the registry are automatically reflected in discovery responses.
  *
  * @see RFC 7643 §7 (Schemas)
  * @see RFC 7643 §6 (ResourceTypes)
@@ -27,18 +20,16 @@ import {
  */
 @Injectable()
 export class ScimDiscoveryService {
+  constructor(private readonly registry: ScimSchemaRegistry) {}
+
   // ─── Schemas ────────────────────────────────────────────────────────────
 
   /**
    * Returns the full ListResponse for GET /Schemas.
-   * Includes Core User, Enterprise User Extension, and Core Group.
+   * Includes all registered schemas (core + global extensions + endpoint-specific).
    */
-  getSchemas() {
-    const resources = [
-      SCIM_USER_SCHEMA_DEFINITION,
-      SCIM_ENTERPRISE_USER_SCHEMA_DEFINITION,
-      SCIM_GROUP_SCHEMA_DEFINITION,
-    ];
+  getSchemas(endpointId?: string) {
+    const resources = this.registry.getAllSchemas(endpointId);
 
     return {
       schemas: [SCIM_LIST_RESPONSE_SCHEMA],
@@ -53,13 +44,10 @@ export class ScimDiscoveryService {
 
   /**
    * Returns the full ListResponse for GET /ResourceTypes.
-   * User includes Enterprise User as a schema extension.
+   * Includes schema extensions registered via the registry (global + endpoint-specific).
    */
-  getResourceTypes() {
-    const resources = [
-      SCIM_USER_RESOURCE_TYPE,
-      SCIM_GROUP_RESOURCE_TYPE,
-    ];
+  getResourceTypes(endpointId?: string) {
+    const resources = this.registry.getAllResourceTypes(endpointId);
 
     return {
       schemas: [SCIM_LIST_RESPONSE_SCHEMA],
@@ -77,30 +65,32 @@ export class ScimDiscoveryService {
    * Includes meta object per RFC 7644 §4 SHOULD recommendation.
    */
   getServiceProviderConfig() {
-    return { ...SCIM_SERVICE_PROVIDER_CONFIG };
+    return this.registry.getServiceProviderConfig();
   }
 
   // ─── Dynamic schemas[] helper ───────────────────────────────────────────
 
   /**
-   * Build the schemas[] array for a SCIM User resource response.
-   * Dynamically includes the Enterprise User extension URN when
-   * the payload contains enterprise extension data.
-   *
-   * Fixes G19: schemas[] now correctly reflects extension data presence.
+   * Build the schemas[] array for a SCIM resource response.
+   * Dynamically includes any extension URN whose key is present
+   * in the payload object.
    *
    * @param payload - The raw JSONB payload from the database
    * @param coreSchema - The core schema URN (User or Group)
+   * @param extensionUrns - Override list; defaults to all registered extensions
+   * @param endpointId - If provided, includes endpoint-specific extension URNs
    */
   buildResourceSchemas(
     payload: Record<string, unknown> | undefined,
     coreSchema: string,
-    extensionUrns: readonly string[] = [],
+    extensionUrns?: readonly string[],
+    endpointId?: string,
   ): string[] {
+    const urns = extensionUrns ?? this.registry.getExtensionUrns(endpointId);
     const schemas: string[] = [coreSchema];
 
     if (payload) {
-      for (const urn of extensionUrns) {
+      for (const urn of urns) {
         if (urn in payload) {
           schemas.push(urn);
         }

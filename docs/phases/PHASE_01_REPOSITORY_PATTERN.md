@@ -287,7 +287,7 @@ api/src/
 // api/src/domain/models/user.model.ts
 export interface UserRecord {
   id: string;            // Internal storage ID (UUID)
-  endpointId: string;    // Tenant/endpoint isolation key
+  endpointId: string;    // Endpoint isolation key
   scimId: string;        // SCIM-visible ID (returned to clients)
   externalId: string | null;
   userName: string;
@@ -605,7 +605,7 @@ export class InMemoryUserRepository implements IUserRepository {
     orderBy?: { field: string; direction: 'asc' | 'desc' },
   ): Promise<UserRecord[]> {
     let results = Array.from(this.users.values())
-      .filter((u) => u.endpointId === endpointId);  // ← Tenant isolation
+      .filter((u) => u.endpointId === endpointId);  // ← Endpoint isolation
 
     if (dbFilter) {
       for (const [key, value] of Object.entries(dbFilter)) {
@@ -950,7 +950,7 @@ flowchart TB
 
     subgraph Live["Live Tests (280 existing)"]
         LT1["Full server + real DB"]
-        LT2["Multi-tenant scenarios"]
+        LT2["Multi-endpoint scenarios"]
         LT3["Collision detection"]
     end
 

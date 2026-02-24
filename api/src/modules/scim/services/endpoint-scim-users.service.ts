@@ -13,8 +13,8 @@ import {
   SCIM_CORE_USER_SCHEMA,
   SCIM_LIST_RESPONSE_SCHEMA,
   SCIM_PATCH_SCHEMA,
-  KNOWN_EXTENSION_URNS,
 } from '../common/scim-constants';
+import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import type { ScimListResponse, ScimUserResource } from '../common/scim-types';
 import type { CreateUserDto } from '../dto/create-user.dto';
 import type { PatchUserDto } from '../dto/patch-user.dto';
@@ -42,6 +42,7 @@ export class EndpointScimUsersService {
     private readonly userRepo: IUserRepository,
     private readonly metadata: ScimMetadataService,
     private readonly logger: ScimLogger,
+    private readonly schemaRegistry: ScimSchemaRegistry,
   ) {}
 
   async createUserForEndpoint(dto: CreateUserDto, baseUrl: string, endpointId: string): Promise<ScimUserResource> {
@@ -74,7 +75,7 @@ export class EndpointScimUsersService {
     const created = await this.userRepo.create(input);
 
     this.logger.info(LogCategory.SCIM_USER, 'User created', { scimId, userName: dto.userName, endpointId });
-    return this.toScimUserResource(created, baseUrl);
+    return this.toScimUserResource(created, baseUrl, endpointId);
   }
 
   async getUserForEndpoint(scimId: string, baseUrl: string, endpointId: string): Promise<ScimUserResource> {
@@ -86,7 +87,7 @@ export class EndpointScimUsersService {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
-    return this.toScimUserResource(user, baseUrl);
+    return this.toScimUserResource(user, baseUrl, endpointId);
   }
 
   async listUsersForEndpoint(
@@ -119,7 +120,7 @@ export class EndpointScimUsersService {
     );
 
     // Build SCIM resources and apply in-memory filter if needed
-    let resources = allDbUsers.map((user) => this.toScimUserResource(user, baseUrl));
+    let resources = allDbUsers.map((user) => this.toScimUserResource(user, baseUrl, endpointId));
     if (filterResult.inMemoryFilter) {
       resources = resources.filter(filterResult.inMemoryFilter);
     }
@@ -166,7 +167,7 @@ export class EndpointScimUsersService {
     const updatedUser = await this.userRepo.update(user.id, updatedData);
 
     this.logger.info(LogCategory.SCIM_PATCH, 'User patched', { scimId, endpointId });
-    return this.toScimUserResource(updatedUser, baseUrl);
+    return this.toScimUserResource(updatedUser, baseUrl, endpointId);
   }
 
   async replaceUserForEndpoint(
@@ -205,7 +206,7 @@ export class EndpointScimUsersService {
 
     const updatedUser = await this.userRepo.update(user.id, data);
 
-    return this.toScimUserResource(updatedUser, baseUrl);
+    return this.toScimUserResource(updatedUser, baseUrl, endpointId);
   }
 
   async deleteUserForEndpoint(scimId: string, endpointId: string): Promise<void> {
@@ -313,7 +314,7 @@ export class EndpointScimUsersService {
     } satisfies UserUpdateInput;
   }
 
-  private toScimUserResource(user: UserRecord, baseUrl: string): ScimUserResource {
+  private toScimUserResource(user: UserRecord, baseUrl: string, endpointId?: string): ScimUserResource {
     const meta = this.buildMeta(user, baseUrl);
     const rawPayload = this.parseJson<Record<string, unknown>>(String(user.rawPayload ?? '{}'));
 
@@ -321,8 +322,9 @@ export class EndpointScimUsersService {
     this.sanitizeBooleanStrings(rawPayload);
 
     // Build schemas[] dynamically — include extension URNs present in payload (G19 fix)
+    const extensionUrns = this.schemaRegistry.getExtensionUrns(endpointId);
     const schemas: [string, ...string[]] = [SCIM_CORE_USER_SCHEMA];
-    for (const urn of KNOWN_EXTENSION_URNS) {
+    for (const urn of extensionUrns) {
       if (urn in rawPayload) {
         schemas.push(urn);
       }

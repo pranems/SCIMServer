@@ -20,16 +20,16 @@ export interface IGroupRepository {
   /** Create a new group (without members) and return the record. */
   create(input: GroupCreateInput): Promise<GroupRecord>;
 
-  /** Find a group by SCIM id within a tenant (without members). */
+  /** Find a group by SCIM id within an endpoint (without members). */
   findByScimId(endpointId: string, scimId: string): Promise<GroupRecord | null>;
 
-  /** Find a group by SCIM id within a tenant, including members. */
+  /** Find a group by SCIM id within an endpoint, including members. */
   findWithMembers(endpointId: string, scimId: string): Promise<GroupWithMembers | null>;
 
   /**
-   * List groups for a tenant, including members.
+   * List groups for an endpoint, including members.
    *
-   * @param endpointId Tenant identifier.
+   * @param endpointId Endpoint identifier.
    * @param dbFilter   Simple key-value filter from the SCIM filter parser.
    * @param orderBy    Sort specification.
    */
@@ -46,7 +46,7 @@ export interface IGroupRepository {
   delete(id: string): Promise<void>;
 
   /**
-   * Check for displayName uniqueness within a tenant (case-insensitive).
+   * Check for displayName uniqueness within an endpoint (case-insensitive).
    * @returns The conflicting record's scimId, or null if unique.
    */
   findByDisplayName(
@@ -56,7 +56,7 @@ export interface IGroupRepository {
   ): Promise<{ scimId: string } | null>;
 
   /**
-   * Check for externalId uniqueness within a tenant.
+   * Check for externalId uniqueness within an endpoint.
    * @returns The conflicting record, or null if unique.
    */
   findByExternalId(
