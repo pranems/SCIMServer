@@ -1466,6 +1466,115 @@ describe('EndpointScimGroupsService', () => {
         ).rejects.toThrow(HttpException);
       });
     });
+
+    describe('schema attribute type validation through service', () => {
+      const strictConfig: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true };
+
+      it('should reject wrong type for displayName on create (strict)', async () => {
+        const createDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 123,  // should be string
+        } as any;
+
+        await expect(
+          service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig)
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('should reject unknown core attribute on create (strict)', async () => {
+        const createDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Valid Group',
+          unknownGroupField: 'should-fail',
+        } as any;
+
+        await expect(
+          service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig)
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('should reject non-array members on create (strict)', async () => {
+        const createDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Invalid Members Group',
+          members: { value: 'u1' },  // should be array
+        } as any;
+
+        await expect(
+          service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig)
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('should accept valid Group payload on create (strict)', async () => {
+        const createDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Engineering',
+          members: [{ value: 'u1', display: 'Alice' }],
+        } as any;
+
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.create.mockResolvedValue(mockGroup);
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+          ...mockGroup,
+          displayName: createDto.displayName,
+        });
+
+        const result = await service.createGroupForEndpoint(
+          createDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig
+        );
+        expect(result.displayName).toBe(createDto.displayName);
+      });
+
+      it('should include error detail in schema validation HttpException', async () => {
+        const createDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 42,
+        } as any;
+
+        try {
+          await service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig);
+          fail('Should have thrown');
+        } catch (e) {
+          expect(e).toBeInstanceOf(HttpException);
+          const resp = (e as HttpException).getResponse();
+          expect(JSON.stringify(resp)).toContain('Schema validation failed');
+          expect((e as HttpException).getStatus()).toBe(400);
+        }
+      });
+
+      it('should NOT reject wrong type when strict mode is OFF', async () => {
+        const lenientConfig: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: false };
+        const createDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Lenient Group',
+        } as any;
+
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.create.mockResolvedValue(mockGroup);
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+          ...mockGroup,
+          displayName: createDto.displayName,
+        });
+
+        const result = await service.createGroupForEndpoint(
+          createDto, 'http://localhost:3000/scim', mockEndpoint.id, lenientConfig
+        );
+        expect(result.displayName).toBe(createDto.displayName);
+      });
+
+      it('should reject wrong type on replace (strict)', async () => {
+        const replaceDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: false,  // should be string
+        } as any;
+
+        mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
+
+        await expect(
+          service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig)
+        ).rejects.toThrow(HttpException);
+      });
+    });
   });
 
   describe('dynamic schemas[] in group response', () => {

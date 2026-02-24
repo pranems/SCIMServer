@@ -1764,6 +1764,155 @@ describe('EndpointScimUsersService', () => {
         expect(result.userName).toBe(replaceDto.userName);
       });
     });
+
+    describe('schema attribute type validation through service', () => {
+      const strictConfig: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true };
+
+      it('should reject wrong type for boolean active on create (strict)', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'typeerror@example.com',
+          active: 'yes' as any,  // should be boolean
+        };
+
+        await expect(
+          service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig)
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('should reject wrong type in name complex attribute on create (strict)', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'typeerror@example.com',
+          name: 'not-an-object' as any,  // should be object
+        } as any;
+
+        await expect(
+          service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig)
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('should reject unknown core attribute on create (strict)', async () => {
+        const createDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'unknown@example.com',
+          active: true,
+          totallyFakeAttribute: 'should-fail',
+        } as any;
+
+        await expect(
+          service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig)
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('should include error detail in schema validation HttpException', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'detail@example.com',
+          active: 42 as any,  // wrong type
+        };
+
+        try {
+          await service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig);
+          fail('Should have thrown');
+        } catch (e) {
+          expect(e).toBeInstanceOf(HttpException);
+          const resp = (e as HttpException).getResponse();
+          expect(JSON.stringify(resp)).toContain('Schema validation failed');
+          expect((e as HttpException).getStatus()).toBe(400);
+        }
+      });
+
+      it('should NOT reject wrong type when strict mode is OFF', async () => {
+        const lenientConfig: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: false };
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'lenient@example.com',
+          active: 'yes' as any,  // wrong type, but no validation
+        };
+
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.create.mockResolvedValue({ ...mockUser, userName: createDto.userName });
+
+        const result = await service.createUserForEndpoint(
+          createDto, 'http://localhost:3000/scim', mockEndpoint.id, lenientConfig
+        );
+        expect(result.userName).toBe(createDto.userName);
+      });
+
+      it('should reject wrong type for boolean active on replace (strict)', async () => {
+        const replaceDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'replace@example.com',
+          active: 'no' as any,
+        };
+
+        mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+
+        await expect(
+          service.replaceUserForEndpoint(mockUser.scimId, replaceDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig)
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('should accept valid payload with all core types on create (strict)', async () => {
+        const createDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'valid@example.com',
+          active: true,
+          displayName: 'Valid User',
+          name: { givenName: 'Valid', familyName: 'User' },
+          emails: [{ value: 'valid@example.com', type: 'work', primary: true }],
+        } as any;
+
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.create.mockResolvedValue({
+          ...mockUser,
+          userName: createDto.userName,
+          rawPayload: JSON.stringify(createDto),
+        });
+
+        const result = await service.createUserForEndpoint(
+          createDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig
+        );
+        expect(result.userName).toBe(createDto.userName);
+      });
+
+      it('should reject wrong sub-attribute type in emails on create (strict)', async () => {
+        const createDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'subattr@example.com',
+          emails: [{ value: 'a@b.com', primary: 'yes' }],  // primary should be boolean
+        } as any;
+
+        await expect(
+          service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig)
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('should reject non-array for multi-valued emails on create (strict)', async () => {
+        const createDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'multi@example.com',
+          emails: { value: 'a@b.com' },  // should be array
+        } as any;
+
+        await expect(
+          service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig)
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('should validate enterprise extension attribute types on create (strict)', async () => {
+        const createDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User', ENTERPRISE_USER_URN],
+          userName: 'ext@example.com',
+          [ENTERPRISE_USER_URN]: { employeeNumber: 42 },  // should be string
+        } as any;
+
+        await expect(
+          service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, strictConfig)
+        ).rejects.toThrow(HttpException);
+      });
+    });
   });
 
   // ═══════════════════════════════════════════════════════════

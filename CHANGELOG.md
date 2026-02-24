@@ -5,6 +5,27 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-02-24
+
+### Added
+- **Phase 8: Schema Validation Engine — Comprehensive Test Coverage**
+  - **`SchemaValidator` domain class** (383 lines) — Pure RFC 7643 payload validator: type checking (string/boolean/integer/decimal/dateTime/binary/reference/complex), mutability enforcement (readOnly rejection on create/replace, immutable/writeOnly acceptance), required attribute enforcement (create/replace only, skipped on patch), unknown attribute detection (strict mode), sub-attribute recursive validation, multi-valued array element validation, extension schema validation with case-insensitive attribute matching
+  - **`validation-types.ts`** (70 lines) — `SchemaValidationContext`, `SchemaValidationError`, `SchemaAttributeDefinition`, `SchemaDefinition` interfaces
+  - **179 new unit tests** — `schema-validator-comprehensive.spec.ts` (20 describe blocks): scalar type validation (string/boolean/integer/decimal/dateTime/binary/reference with valid/invalid values), complex attribute type checking, mutability enforcement (readOnly/immutable/writeOnly), multi-valued array validation, Group schema validation, extension schema validation (required/type/readOnly/complex sub-attrs/unknown attrs/case-insensitivity), custom extension validation, multiple simultaneous extensions, real-world User schema payloads, complex attribute sub-attributes (name/phoneNumbers/addresses), cross-schema error accumulation, edge cases (null/empty/NaN/Infinity/large payloads), error reporting format, schema metadata attributes (caseExact/uniqueness/returned/referenceTypes)
+  - **19 new service-level tests** — 11 in `endpoint-scim-users.service.spec.ts` + 8 in `endpoint-scim-groups.service.spec.ts`: schema attribute type validation through service layer (wrong type rejection, valid types acceptance, complex attribute validation, strict mode unknown attributes, multi-valued enforcement, readOnly rejection)
+  - **49 new E2E tests** — `schema-validation.e2e-spec.ts` (14 describe blocks): complex attribute type validation, multi-valued enforcement, unknown attribute rejection, sub-attribute type errors, enterprise extension validation, Group schema validation, PUT replace validation, error response format (RFC 7644 §3.12), flag on/off comparison, extension URN edge cases, complex realistic payloads, cross-resource schema isolation, DTO implicit conversion documentation, reserved keys behaviour
+  - **Phase 8 discovery: NestJS `ValidationPipe` implicit conversion** — Documented that `transform: true` + `enableImplicitConversion: true` causes class-transformer to coerce DTO-declared properties (e.g., `active: 'yes'` → `true`, `userName: 12345` → `'12345'`) before schema validation runs. Non-DTO properties (`name`, `emails`, `phoneNumbers`) via `[key: string]: unknown` pass through uncoerced and ARE validated by `SchemaValidator`
+
+### Changed
+- **`api/package.json`** — Version bump from `0.15.0` to `0.17.0`
+
+### Verified
+- **1685/1685 unit tests passing** (54 suites) — up from 1429 (+256 new: 179 comprehensive + 60 base + 19 service-level, some from prior Phase 8 implementation)
+- **342/342 E2E tests passing** (19 suites) — up from 293 (+49 new)
+- **318/318 live integration tests passing** — Docker container rebuilt and verified
+- Build clean (TypeScript), zero compilation errors
+- Docker containers healthy (postgres:17-alpine + node:24-alpine)
+
 ## [0.16.0] - 2026-02-24
 
 ### Added

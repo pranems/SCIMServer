@@ -43,6 +43,14 @@ logs/
 # Test results (generated per run)
 test-results/
 
+# Local test output files
+local-live-*.txt
+api/e2e-results.json
+api/e2e-test-output.txt
+api/unit-results.json
+api/unit-test-output.txt
+scripts/live-test-docker-output.txt
+
 # Temporary files
 tmp/
 temp/

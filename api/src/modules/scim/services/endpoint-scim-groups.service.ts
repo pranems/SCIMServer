@@ -32,6 +32,8 @@ import { ScimMetadataService } from './scim-metadata.service';
 import { buildGroupFilter } from '../filters/apply-scim-filter';
 import { GroupPatchEngine } from '../../../domain/patch/group-patch-engine';
 import { PatchError } from '../../../domain/patch/patch-error';
+import { SchemaValidator } from '../../../domain/validation';
+import type { SchemaDefinition } from '../../../domain/validation';
 
 interface ListGroupsParams {
   filter?: string;
@@ -59,6 +61,7 @@ export class EndpointScimGroupsService {
   async createGroupForEndpoint(dto: CreateGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimGroupResource> {
     this.ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
     this.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
+    this.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, config, 'create');
 
     this.logger.info(LogCategory.SCIM_GROUP, 'Creating group', { displayName: dto.displayName, memberCount: dto.members?.length ?? 0, endpointId });
     this.logger.trace(LogCategory.SCIM_GROUP, 'Create group payload', { body: dto as unknown as Record<string, unknown> });
@@ -263,6 +266,7 @@ export class EndpointScimGroupsService {
   ): Promise<ScimGroupResource> {
     this.ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
     this.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
+    this.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, config, 'replace');
 
     this.logger.info(LogCategory.SCIM_GROUP, 'Replace group (PUT)', { scimId, displayName: dto.displayName, endpointId });
 
@@ -453,6 +457,64 @@ export class EndpointScimGroupsService {
           });
         }
       }
+    }
+  }
+
+  /**
+   * Phase 8: Attribute-level payload validation against schema definitions.
+   *
+   * When StrictSchemaValidation is enabled, validates:
+   *  - Required attributes are present (create/replace only)
+   *  - Attribute types match schema definitions
+   *  - Mutability constraints (readOnly rejection)
+   *  - Unknown attributes in strict mode
+   *  - Multi-valued / single-valued enforcement
+   *  - Sub-attribute validation for complex types
+   *
+   * @see RFC 7643 §2.1 — Attribute Characteristics
+   */
+  private validatePayloadSchema(
+    dto: Record<string, unknown>,
+    endpointId: string,
+    config: EndpointConfig | undefined,
+    mode: 'create' | 'replace',
+  ): void {
+    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
+      return;
+    }
+
+    // Build schema definitions from the registry
+    const coreSchema = this.schemaRegistry.getSchema(SCIM_CORE_GROUP_SCHEMA, endpointId);
+    const schemas: SchemaDefinition[] = [];
+    if (coreSchema) {
+      schemas.push(coreSchema as SchemaDefinition);
+    }
+
+    // Include extension schemas declared in payload's schemas[] array
+    const declaredSchemas = (dto.schemas as string[] | undefined) ?? [];
+    for (const urn of declaredSchemas) {
+      if (urn !== SCIM_CORE_GROUP_SCHEMA) {
+        const extSchema = this.schemaRegistry.getSchema(urn, endpointId);
+        if (extSchema) {
+          schemas.push(extSchema as SchemaDefinition);
+        }
+      }
+    }
+
+    if (schemas.length === 0) return;
+
+    const result = SchemaValidator.validate(dto, schemas, {
+      strictMode: true,
+      mode,
+    });
+
+    if (!result.valid) {
+      const details = result.errors.map(e => `${e.path}: ${e.message}`).join('; ');
+      throw createScimError({
+        status: 400,
+        scimType: result.errors[0]?.scimType ?? 'invalidValue',
+        detail: `Schema validation failed: ${details}`,
+      });
     }
   }
 
