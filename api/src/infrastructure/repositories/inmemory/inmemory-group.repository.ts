@@ -34,6 +34,7 @@ export class InMemoryGroupRepository implements IGroupRepository {
       externalId: input.externalId,
       displayName: input.displayName,
       rawPayload: input.rawPayload,
+      version: 1,
       meta: input.meta,
       createdAt: now,
       updatedAt: now,
@@ -96,9 +97,11 @@ export class InMemoryGroupRepository implements IGroupRepository {
     if (!existing) {
       throw new Error(`Group with id ${id} not found`);
     }
+    // Phase 7: Increment version for ETag-based concurrency control
     const updated: GroupRecord = {
       ...existing,
       ...data,
+      version: (existing.version ?? 1) + 1,
       updatedAt: new Date(),
     };
     this.groups.set(id, updated);

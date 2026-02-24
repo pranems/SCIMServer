@@ -16,6 +16,7 @@ import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '..
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { createScimError } from '../common/scim-errors';
+import { assertIfMatch } from '../interceptors/scim-etag.interceptor';
 import {
   DEFAULT_COUNT,
   MAX_COUNT,
@@ -168,7 +169,7 @@ export class EndpointScimGroupsService {
     };
   }
 
-  async patchGroupForEndpoint(scimId: string, dto: PatchGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimGroupResource> {
+  async patchGroupForEndpoint(scimId: string, dto: PatchGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig, ifMatch?: string): Promise<ScimGroupResource> {
     this.ensureSchema(dto.schemas, SCIM_PATCH_SCHEMA);
 
     this.logger.info(LogCategory.SCIM_PATCH, 'Patch group', { scimId, endpointId, opCount: dto.Operations?.length });
@@ -181,6 +182,9 @@ export class EndpointScimGroupsService {
     if (!group) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
+
+    // Phase 7: Pre-write If-Match enforcement
+    this.enforceIfMatch(group.version, ifMatch, config);
 
     // Get endpoint config for behavior flags (use passed config or fallback to context)
     const endpointConfig = config ?? this.endpointContext.getConfig();
@@ -254,7 +258,8 @@ export class EndpointScimGroupsService {
     dto: CreateGroupDto,
     baseUrl: string,
     endpointId: string,
-    config?: EndpointConfig
+    config?: EndpointConfig,
+    ifMatch?: string,
   ): Promise<ScimGroupResource> {
     this.ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
     this.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
@@ -265,6 +270,9 @@ export class EndpointScimGroupsService {
     if (!group) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
+
+    // Phase 7: Pre-write If-Match enforcement
+    this.enforceIfMatch(group.version, ifMatch, config);
 
     const now = new Date();
     const meta = this.parseJson<Record<string, unknown>>(String(group.meta ?? '{}'));
@@ -305,7 +313,7 @@ export class EndpointScimGroupsService {
     return this.toScimGroupResource(updatedGroup, baseUrl, endpointId);
   }
 
-  async deleteGroupForEndpoint(scimId: string, endpointId: string, config?: EndpointConfig): Promise<void> {
+  async deleteGroupForEndpoint(scimId: string, endpointId: string, config?: EndpointConfig, ifMatch?: string): Promise<void> {
     this.logger.info(LogCategory.SCIM_GROUP, 'Delete group', { scimId, endpointId });
     const group = await this.groupRepo.findByScimId(endpointId, scimId);
 
@@ -313,6 +321,9 @@ export class EndpointScimGroupsService {
       this.logger.debug(LogCategory.SCIM_GROUP, 'Delete target group not found', { scimId, endpointId });
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
+
+    // Phase 7: Pre-write If-Match enforcement
+    this.enforceIfMatch(group.version, ifMatch, config);
 
     const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
 
@@ -327,6 +338,30 @@ export class EndpointScimGroupsService {
   }
 
   // ===== Private Helper Methods =====
+
+  /**
+   * Phase 7: Pre-write If-Match enforcement (RFC 7644 §3.14).
+   *
+   * When the client sends an If-Match header, the resource's current version-based
+   * ETag must match — otherwise 412 Precondition Failed is thrown BEFORE the write.
+   * When RequireIfMatch is enabled, a missing If-Match header → 428 Precondition Required.
+   */
+  private enforceIfMatch(currentVersion: number, ifMatch?: string, config?: EndpointConfig): void {
+    const requireIfMatch = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH);
+
+    if (!ifMatch) {
+      if (requireIfMatch) {
+        throw createScimError({
+          status: 428,
+          detail: 'If-Match header is required for this operation. Include the resource ETag (e.g., If-Match: W/"v1").',
+        });
+      }
+      return; // If-Match not provided and not required → allow
+    }
+
+    const currentETag = `W/"v${currentVersion}"`;
+    assertIfMatch(currentETag, ifMatch);
+  }
 
   /**
    * Assert displayName uniqueness within the endpoint (case-insensitive).
@@ -496,7 +531,7 @@ export class EndpointScimGroupsService {
       created: createdAt,
       lastModified,
       location,
-      version: `W/"${group.updatedAt.toISOString()}"`
+      version: `W/"v${group.version}"`
     };
   }
 

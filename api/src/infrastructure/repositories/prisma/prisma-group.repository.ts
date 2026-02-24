@@ -31,6 +31,7 @@ function toGroupRecord(resource: Record<string, unknown>): GroupRecord {
     externalId: (resource.externalId as string) ?? null,
     displayName: resource.displayName as string,
     rawPayload,
+    version: (resource.version as number) ?? 1,
     meta: (resource.meta as string) ?? null,
     createdAt: resource.createdAt as Date,
     updatedAt: resource.updatedAt as Date,
@@ -125,6 +126,8 @@ export class PrismaGroupRepository implements IGroupRepository {
       prismaData.payload = JSON.parse(data.rawPayload);
       delete prismaData.rawPayload;
     }
+    // Phase 7: Atomically increment version for ETag-based concurrency control
+    prismaData.version = { increment: 1 };
     const updated = await this.prisma.scimResource.update({
       where: { id },
       data: prismaData as Prisma.ScimResourceUpdateInput,
@@ -204,9 +207,13 @@ export class PrismaGroupRepository implements IGroupRepository {
 
     await this.prisma.$transaction(
       async (tx: Prisma.TransactionClient) => {
+        // Phase 7: Include version increment in the transaction
         await tx.scimResource.update({
           where: { id: groupId },
-          data: prismaData as Prisma.ScimResourceUpdateInput,
+          data: {
+            ...prismaData,
+            version: { increment: 1 },
+          } as Prisma.ScimResourceUpdateInput,
         });
 
         await tx.resourceMember.deleteMany({ where: { groupResourceId: groupId } });

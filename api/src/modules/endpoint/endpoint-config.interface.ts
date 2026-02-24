@@ -52,6 +52,13 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * is silently accepted (lenient mode — matches most real-world SCIM clients).
    */
   STRICT_SCHEMA_VALIDATION: 'StrictSchemaValidation',
+
+  /**
+   * Phase 7: When true, PUT/PATCH/DELETE requests MUST include an If-Match header
+   * with the current resource ETag. Missing If-Match → 428 Precondition Required.
+   * When false (default), If-Match is optional but still validated when present.
+   */
+  REQUIRE_IF_MATCH: 'RequireIfMatch',
 } as const;
 
 /**
@@ -125,6 +132,15 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]?: boolean | string;
 
   /**
+   * Phase 7: When true, PUT/PATCH/DELETE must include If-Match header.
+   * Missing If-Match → 428 Precondition Required.
+   * When false (default), If-Match is optional but validated when present.
+   *
+   * Example config: { "RequireIfMatch": "True" }
+   */
+  [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]?: boolean | string;
+
+  /**
    * Allow any additional configuration flags
    */
   [key: string]: unknown;
@@ -165,7 +181,8 @@ export const DEFAULT_ENDPOINT_CONFIG: EndpointConfig = {
   [ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS]: true,
   [ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED]: false,
   [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: false,
-  [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: false
+  [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: false,
+  [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: false
 };
 
 /**
@@ -218,6 +235,7 @@ export function validateEndpointConfig(config: Record<string, any> | undefined):
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS);
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH);
 
   // Validate logLevel
   const logLevelFlag = config[ENDPOINT_CONFIG_FLAGS.LOG_LEVEL];

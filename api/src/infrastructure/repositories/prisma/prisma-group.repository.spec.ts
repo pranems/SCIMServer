@@ -134,7 +134,7 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
         }),
       );
       expect(result).not.toHaveProperty('resourceType');
-      expect(result).not.toHaveProperty('version');
+      expect(result).toHaveProperty('version', 1);
     });
   });
 
@@ -287,7 +287,7 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
 
       expect(prisma.scimResource.update).toHaveBeenCalledWith({
         where: { id: 'grp-1' },
-        data: { displayName: 'Updated' },
+        data: { displayName: 'Updated', version: { increment: 1 } },
       });
       expect(result.displayName).toBe('Updated');
     });
@@ -422,7 +422,7 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
       // Should update scimResource (not scimGroup)
       expect(tx.scimResource.update).toHaveBeenCalledWith({
         where: { id: 'grp-1' },
-        data,
+        data: { ...data, version: { increment: 1 } },
       });
 
       // Should delete from resourceMember using groupResourceId (not groupId)

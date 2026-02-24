@@ -12,6 +12,7 @@ export interface GroupRecord {
   externalId: string | null;
   displayName: string;
   rawPayload: string;
+  version: number;
   meta: string | null;
   createdAt: Date;
   updatedAt: Date;

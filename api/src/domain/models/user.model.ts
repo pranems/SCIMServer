@@ -14,6 +14,7 @@ export interface UserRecord {
   displayName: string | null;
   active: boolean;
   rawPayload: string;
+  version: number;
   meta: string | null;
   createdAt: Date;
   updatedAt: Date;

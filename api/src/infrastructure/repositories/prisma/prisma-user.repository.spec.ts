@@ -121,9 +121,9 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
           active: false,
         }),
       );
-      // Should NOT have resourceType or version in domain model
+      // Should NOT have resourceType in domain model (version IS now included)
       expect(result).not.toHaveProperty('resourceType');
-      expect(result).not.toHaveProperty('version');
+      expect(result).toHaveProperty('version', 1);
     });
   });
 
@@ -230,7 +230,7 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
 
       expect(prisma.scimResource.update).toHaveBeenCalledWith({
         where: { id: 'res-1' },
-        data: { active: false },
+        data: { active: false, version: { increment: 1 } },
       });
       expect(result.active).toBe(false);
     });

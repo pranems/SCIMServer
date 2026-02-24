@@ -33,6 +33,7 @@ export class InMemoryUserRepository implements IUserRepository {
       displayName: input.displayName,
       active: input.active,
       rawPayload: input.rawPayload,
+      version: 1,
       meta: input.meta,
       createdAt: now,
       updatedAt: now,
@@ -83,9 +84,11 @@ export class InMemoryUserRepository implements IUserRepository {
     if (!existing) {
       throw new Error(`User with id ${id} not found`);
     }
+    // Phase 7: Increment version for ETag-based concurrency control
     const updated: UserRecord = {
       ...existing,
       ...data,
+      version: (existing.version ?? 1) + 1,
       updatedAt: new Date(),
     };
     this.users.set(id, updated);

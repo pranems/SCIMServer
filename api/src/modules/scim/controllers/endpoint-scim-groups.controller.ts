@@ -175,7 +175,8 @@ export class EndpointScimGroupsController {
     @Req() req: Request
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
-    return this.groupsService.replaceGroupForEndpoint(id, dto, baseUrl, endpointId, config);
+    const ifMatch = req.headers['if-match'] as string | undefined;
+    return this.groupsService.replaceGroupForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
   }
 
   /**
@@ -190,7 +191,8 @@ export class EndpointScimGroupsController {
     @Req() req: Request
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
-    return this.groupsService.patchGroupForEndpoint(id, dto, baseUrl, endpointId, config);
+    const ifMatch = req.headers['if-match'] as string | undefined;
+    return this.groupsService.patchGroupForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
   }
 
   /**
@@ -205,7 +207,8 @@ export class EndpointScimGroupsController {
     @Req() req: Request
   ): Promise<void> {
     const { config } = await this.validateAndSetContext(endpointId, req);
-    return this.groupsService.deleteGroupForEndpoint(id, endpointId, config);
+    const ifMatch = req.headers['if-match'] as string | undefined;
+    return this.groupsService.deleteGroupForEndpoint(id, endpointId, config, ifMatch);
   }
 
 }

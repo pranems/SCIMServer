@@ -40,6 +40,7 @@ describe('EndpointScimUsersService', () => {
     }),
     createdAt: new Date('2024-01-01T00:00:00.000Z'),
     updatedAt: new Date('2024-01-01T00:00:00.000Z'),
+    version: 1,
   };
 
   const mockUserRepo = {
@@ -2017,6 +2018,146 @@ describe('EndpointScimUsersService', () => {
         createDto, 'http://localhost:3000/scim', mockEndpoint.id, config
       );
       expect(result.userName).toBe(createDto.userName);
+    });
+  });
+
+  // ─── Phase 7: ETag & Conditional Requests ──────────────────────────────
+
+  describe('ETag & Conditional Requests (Phase 7)', () => {
+    const patchDto: PatchUserDto = {
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+      Operations: [{ op: 'replace', path: 'active', value: false }],
+    };
+
+    const replaceDto: CreateUserDto = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+      userName: 'replaced@example.com',
+      active: true,
+    };
+
+    const baseUrl = 'http://localhost:3000/scim';
+
+    describe('patchUserForEndpoint', () => {
+      beforeEach(() => {
+        mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.update.mockResolvedValue({ ...mockUser, active: false });
+      });
+
+      it('should succeed when If-Match matches current ETag', async () => {
+        const result = await service.patchUserForEndpoint(
+          mockUser.scimId, patchDto, baseUrl, mockEndpoint.id, undefined, 'W/"v1"'
+        );
+        expect(result).toBeDefined();
+        expect(result.active).toBe(false);
+      });
+
+      it('should throw 412 when If-Match does not match current ETag', async () => {
+        await expect(
+          service.patchUserForEndpoint(mockUser.scimId, patchDto, baseUrl, mockEndpoint.id, undefined, 'W/"v999"')
+        ).rejects.toThrow(HttpException);
+
+        await expect(
+          service.patchUserForEndpoint(mockUser.scimId, patchDto, baseUrl, mockEndpoint.id, undefined, 'W/"v999"')
+        ).rejects.toMatchObject({ status: 412 });
+      });
+
+      it('should throw 428 when RequireIfMatch=true and no If-Match header', async () => {
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: true };
+        await expect(
+          service.patchUserForEndpoint(mockUser.scimId, patchDto, baseUrl, mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+
+        await expect(
+          service.patchUserForEndpoint(mockUser.scimId, patchDto, baseUrl, mockEndpoint.id, config)
+        ).rejects.toMatchObject({ status: 428 });
+      });
+
+      it('should succeed when RequireIfMatch=false and no If-Match header', async () => {
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: false };
+        const result = await service.patchUserForEndpoint(
+          mockUser.scimId, patchDto, baseUrl, mockEndpoint.id, config
+        );
+        expect(result).toBeDefined();
+      });
+
+      it('should succeed when If-Match is wildcard (*)', async () => {
+        const result = await service.patchUserForEndpoint(
+          mockUser.scimId, patchDto, baseUrl, mockEndpoint.id, undefined, '*'
+        );
+        expect(result).toBeDefined();
+      });
+    });
+
+    describe('replaceUserForEndpoint', () => {
+      beforeEach(() => {
+        mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.update.mockResolvedValue({ ...mockUser, userName: replaceDto.userName });
+      });
+
+      it('should succeed when If-Match matches current ETag', async () => {
+        const result = await service.replaceUserForEndpoint(
+          mockUser.scimId, replaceDto, baseUrl, mockEndpoint.id, undefined, 'W/"v1"'
+        );
+        expect(result).toBeDefined();
+      });
+
+      it('should throw 412 when If-Match does not match current ETag', async () => {
+        await expect(
+          service.replaceUserForEndpoint(mockUser.scimId, replaceDto, baseUrl, mockEndpoint.id, undefined, 'W/"v999"')
+        ).rejects.toMatchObject({ status: 412 });
+      });
+
+      it('should throw 428 when RequireIfMatch=true and no If-Match header', async () => {
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: true };
+        await expect(
+          service.replaceUserForEndpoint(mockUser.scimId, replaceDto, baseUrl, mockEndpoint.id, config)
+        ).rejects.toMatchObject({ status: 428 });
+      });
+    });
+
+    describe('deleteUserForEndpoint', () => {
+      beforeEach(() => {
+        mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+        mockUserRepo.delete.mockResolvedValue(mockUser);
+      });
+
+      it('should succeed when If-Match matches current ETag', async () => {
+        await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, undefined, 'W/"v1"');
+        expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id);
+      });
+
+      it('should throw 412 when If-Match does not match current ETag', async () => {
+        await expect(
+          service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, undefined, 'W/"v999"')
+        ).rejects.toMatchObject({ status: 412 });
+      });
+
+      it('should throw 428 when RequireIfMatch=true and no If-Match header', async () => {
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: true };
+        await expect(
+          service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, config)
+        ).rejects.toMatchObject({ status: 428 });
+      });
+    });
+
+    describe('ETag format', () => {
+      it('should include version-based ETag W/"v{N}" in response meta', async () => {
+        mockUserRepo.findByScimId.mockResolvedValue({ ...mockUser, version: 3 });
+        const result = await service.getUserForEndpoint(
+          mockUser.scimId, baseUrl, mockEndpoint.id
+        );
+        expect(result.meta.version).toBe('W/"v3"');
+      });
+
+      it('should use W/"v1" for newly created resources', async () => {
+        mockUserRepo.findByScimId.mockResolvedValue(mockUser); // version: 1
+        const result = await service.getUserForEndpoint(
+          mockUser.scimId, baseUrl, mockEndpoint.id
+        );
+        expect(result.meta.version).toBe('W/"v1"');
+      });
     });
   });
 });

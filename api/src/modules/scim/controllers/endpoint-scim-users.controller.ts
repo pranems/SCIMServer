@@ -173,7 +173,8 @@ export class EndpointScimUsersController {
     @Req() req: Request
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
-    return this.usersService.replaceUserForEndpoint(id, dto, baseUrl, endpointId, config);
+    const ifMatch = req.headers['if-match'] as string | undefined;
+    return this.usersService.replaceUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
   }
 
   /**
@@ -188,7 +189,8 @@ export class EndpointScimUsersController {
     @Req() req: Request
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
-    return this.usersService.patchUserForEndpoint(id, dto, baseUrl, endpointId, config);
+    const ifMatch = req.headers['if-match'] as string | undefined;
+    return this.usersService.patchUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
   }
 
   /**
@@ -203,6 +205,7 @@ export class EndpointScimUsersController {
     @Req() req: Request
   ): Promise<void> {
     const { config } = await this.validateAndSetContext(endpointId, req);
-    return this.usersService.deleteUserForEndpoint(id, endpointId, config);
+    const ifMatch = req.headers['if-match'] as string | undefined;
+    return this.usersService.deleteUserForEndpoint(id, endpointId, config, ifMatch);
   }
 }

@@ -40,6 +40,7 @@ describe('EndpointScimGroupsService', () => {
     createdAt: new Date('2024-01-01T00:00:00.000Z'),
     updatedAt: new Date('2024-01-01T00:00:00.000Z'),
     members: [],
+    version: 1,
   };
 
   const mockUser = {
@@ -1628,6 +1629,121 @@ describe('EndpointScimGroupsService', () => {
       await expect(
         service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, config)
       ).rejects.toThrow();
+    });
+  });
+
+  // ─── Phase 7: ETag & Conditional Requests ──────────────────────────────
+
+  describe('ETag & Conditional Requests (Phase 7)', () => {
+    const patchDto: PatchGroupDto = {
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+      Operations: [{ op: 'replace', path: 'displayName', value: 'Updated Group' }],
+    };
+
+    const replaceDto: CreateGroupDto = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+      displayName: 'Replaced Group',
+    };
+
+    const baseUrl = 'http://localhost:3000/scim';
+
+    describe('patchGroupForEndpoint', () => {
+      beforeEach(() => {
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup) // initial lookup
+          .mockResolvedValueOnce({ ...mockGroup, displayName: 'Updated Group' }); // re-read after update
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+      });
+
+      it('should succeed when If-Match matches current ETag', async () => {
+        const result = await service.patchGroupForEndpoint(
+          mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id, undefined, 'W/"v1"'
+        );
+        expect(result).toBeDefined();
+      });
+
+      it('should throw 412 when If-Match does not match current ETag', async () => {
+        await expect(
+          service.patchGroupForEndpoint(mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id, undefined, 'W/"v999"')
+        ).rejects.toMatchObject({ status: 412 });
+      });
+
+      it('should throw 428 when RequireIfMatch=true and no If-Match header', async () => {
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: true };
+        await expect(
+          service.patchGroupForEndpoint(mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id, config)
+        ).rejects.toMatchObject({ status: 428 });
+      });
+
+      it('should succeed when If-Match is wildcard (*)', async () => {
+        const result = await service.patchGroupForEndpoint(
+          mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id, undefined, '*'
+        );
+        expect(result).toBeDefined();
+      });
+    });
+
+    describe('replaceGroupForEndpoint', () => {
+      beforeEach(() => {
+        mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
+        mockGroupRepo.findByDisplayName.mockResolvedValue(null);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+      });
+
+      it('should succeed when If-Match matches current ETag', async () => {
+        const result = await service.replaceGroupForEndpoint(
+          mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id, undefined, 'W/"v1"'
+        );
+        expect(result).toBeDefined();
+      });
+
+      it('should throw 412 when If-Match does not match current ETag', async () => {
+        await expect(
+          service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id, undefined, 'W/"v999"')
+        ).rejects.toMatchObject({ status: 412 });
+      });
+
+      it('should throw 428 when RequireIfMatch=true and no If-Match header', async () => {
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: true };
+        await expect(
+          service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id, config)
+        ).rejects.toMatchObject({ status: 428 });
+      });
+    });
+
+    describe('deleteGroupForEndpoint', () => {
+      beforeEach(() => {
+        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+        mockGroupRepo.delete.mockResolvedValue(mockGroup);
+      });
+
+      it('should succeed when If-Match matches current ETag', async () => {
+        await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, undefined, 'W/"v1"');
+        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+      });
+
+      it('should throw 412 when If-Match does not match current ETag', async () => {
+        await expect(
+          service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, undefined, 'W/"v999"')
+        ).rejects.toMatchObject({ status: 412 });
+      });
+
+      it('should throw 428 when RequireIfMatch=true and no If-Match header', async () => {
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: true };
+        await expect(
+          service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config)
+        ).rejects.toMatchObject({ status: 428 });
+      });
+    });
+
+    describe('ETag format', () => {
+      it('should include version-based ETag W/"v{N}" in response meta', async () => {
+        mockGroupRepo.findWithMembers.mockResolvedValue({ ...mockGroup, version: 5 });
+        const result = await service.getGroupForEndpoint(
+          mockGroup.scimId, baseUrl, mockEndpoint.id
+        );
+        expect(result.meta.version).toBe('W/"v5"');
+      });
     });
   });
 });

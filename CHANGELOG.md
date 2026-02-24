@@ -5,6 +5,33 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-02-24
+
+### Added
+- **Phase 7: ETag & Conditional Requests** — Version-based ETag concurrency control with pre-write If-Match enforcement (resolves G7 HIGH + G13 MEDIUM)
+  - **Version-based ETags** — Changed ETag format from timestamp-based `W/"<ISO-8601>"` to monotonic `W/"v{N}"` using Prisma `version Int @default(1)` column; deterministic, collision-free
+  - **Pre-write If-Match enforcement** — New `enforceIfMatch()` in both user and group services; checks *before* write (not post-write in interceptor); returns 412 `versionMismatch` on ETag mismatch
+  - **RequireIfMatch config flag** — New per-endpoint boolean config `RequireIfMatch` (default `false`); when `true`, PATCH/PUT/DELETE without `If-Match` header returns 428 Precondition Required
+  - **Atomic version increment** — Prisma repositories use `version: { increment: 1 }` for atomic DB-level version bumps; InMemory repositories use `(existing.version ?? 1) + 1`
+  - **Simplified ETag interceptor** — Removed dead post-write If-Match block (was never enforcing); interceptor now only sets ETag header + handles If-None-Match→304 for conditional GET
+- **24 new unit tests** — 13 user service (5 PATCH + 3 PUT + 3 DELETE + 2 ETag format), 11 group service (4 PATCH + 3 PUT + 3 DELETE + 1 ETag format)
+- **17 new E2E tests** — Version-based ETag format (5), If-Match pre-write enforcement (7), RequireIfMatch config flag (5)
+- **Phase 7 Documentation:** `docs/phases/PHASE_07_ETAG_CONDITIONAL_REQUESTS.md`
+
+### Changed
+- **Domain models** — Added `version: number` to `UserRecord` and `GroupRecord` interfaces
+- **Prisma repositories** — `toUserRecord()`/`toGroupRecord()` now map `version`; `update()` and `updateGroupWithMembers()` include `version: { increment: 1 }`
+- **InMemory repositories** — `create()` sets `version: 1`; `update()` increments version
+- **User/Group services** — `buildMeta()` uses `W/"v${version}"` instead of `W/"${updatedAt.toISOString()}"`; PATCH/PUT/DELETE methods accept `ifMatch?: string` parameter
+- **User/Group controllers** — Extract `req.headers['if-match']` and pass to service methods
+- **ETag interceptor** — Simplified to read-side only (set ETag header + If-None-Match→304); JSDoc updated to note Phase 7 moved write-side enforcement to services
+- **Endpoint config** — Added `REQUIRE_IF_MATCH` to `ENDPOINT_CONFIG_FLAGS`, interface, defaults, and validation
+
+### Verified
+- **1429/1429 unit tests passing** (52 suites) — up from 1405 (+24 new)
+- **293/293 E2E tests passing** (18 suites) — up from 276 (+17 new)
+- Build clean (TypeScript), zero compilation errors
+
 ## [0.15.0] - 2026-02-23
 
 ### Added

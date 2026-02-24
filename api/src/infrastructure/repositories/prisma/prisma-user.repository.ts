@@ -32,6 +32,7 @@ function toUserRecord(resource: Record<string, unknown>): UserRecord {
     displayName: (resource.displayName as string) ?? null,
     active: resource.active as boolean,
     rawPayload,
+    version: (resource.version as number) ?? 1,
     meta: (resource.meta as string) ?? null,
     createdAt: resource.createdAt as Date,
     updatedAt: resource.updatedAt as Date,
@@ -96,6 +97,8 @@ export class PrismaUserRepository implements IUserRepository {
       prismaData.payload = JSON.parse(data.rawPayload);
       delete prismaData.rawPayload;
     }
+    // Phase 7: Atomically increment version for ETag-based concurrency control
+    prismaData.version = { increment: 1 };
     const updated = await this.prisma.scimResource.update({
       where: { id },
       data: prismaData as Prisma.ScimResourceUpdateInput,

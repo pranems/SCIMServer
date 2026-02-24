@@ -335,7 +335,8 @@ describe('EndpointScimUsersController', () => {
           patchDto,
           expect.any(String),
           'endpoint-1',
-          expect.any(Object)
+          expect.any(Object),
+          undefined,
         );
         expect(result).toEqual(mockUser);
       });
@@ -372,7 +373,8 @@ describe('EndpointScimUsersController', () => {
           replaceDto,
           expect.any(String),
           'endpoint-1',
-          expect.any(Object)
+          expect.any(Object),
+          undefined,
         );
         expect(result).toEqual(mockUser);
       });
@@ -388,7 +390,8 @@ describe('EndpointScimUsersController', () => {
         expect(mockUsersService.deleteUserForEndpoint).toHaveBeenCalledWith(
           'scim-123',
           'endpoint-1',
-          expect.any(Object)
+          expect.any(Object),
+          undefined,
         );
       });
     });
