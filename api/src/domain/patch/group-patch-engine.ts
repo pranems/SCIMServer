@@ -22,6 +22,14 @@ import type {
   GroupMemberDto,
 } from './patch-types';
 
+import {
+  isExtensionPath,
+  parseExtensionPath,
+  applyExtensionUpdate,
+  removeExtensionAttribute,
+  resolveNoPathValue,
+} from '../../modules/scim/utils/scim-patch-path';
+
 import { PatchError } from './patch-error';
 
 // ─── Input State ─────────────────────────────────────────────────────────────
@@ -68,7 +76,7 @@ export class GroupPatchEngine {
       switch (op) {
         case 'replace': {
           const result = GroupPatchEngine.handleReplace(
-            operation, displayName, externalId, members, rawPayload,
+            operation, displayName, externalId, members, rawPayload, config,
           );
           displayName = result.displayName;
           externalId = result.externalId;
@@ -77,11 +85,27 @@ export class GroupPatchEngine {
           break;
         }
         case 'add':
+          // Check for extension path first; otherwise delegate to member-only handler
+          if (operation.path && isExtensionPath(operation.path, config.extensionUrns)) {
+            const extParsed = parseExtensionPath(operation.path, config.extensionUrns);
+            if (extParsed) {
+              rawPayload = applyExtensionUpdate({ ...rawPayload }, extParsed, operation.value);
+              break;
+            }
+          }
           members = GroupPatchEngine.handleAdd(
             operation, members, config.allowMultiMemberAdd,
           );
           break;
         case 'remove':
+          // Check for extension path first; otherwise delegate to member-only handler
+          if (operation.path && isExtensionPath(operation.path, config.extensionUrns)) {
+            const extParsed = parseExtensionPath(operation.path, config.extensionUrns);
+            if (extParsed) {
+              rawPayload = removeExtensionAttribute({ ...rawPayload }, extParsed);
+              break;
+            }
+          }
           members = GroupPatchEngine.handleRemove(
             operation, members, config.allowMultiMemberRemove, config.allowRemoveAllMembers,
           );
@@ -100,8 +124,10 @@ export class GroupPatchEngine {
     currentExternalId: string | null,
     members: GroupMemberDto[],
     rawPayload: Record<string, unknown>,
+    config: GroupMemberPatchConfig,
   ): { displayName: string; externalId: string | null; members: GroupMemberDto[]; rawPayload: Record<string, unknown> } {
     const path = operation.path?.toLowerCase();
+    const originalPath = operation.path;
 
     // No path — value is either a string (displayName) or an object with attribute(s)
     if (!path) {
@@ -113,7 +139,6 @@ export class GroupPatchEngine {
         let newDisplayName = currentDisplayName;
         let newExternalId = currentExternalId;
         let newMembers = members;
-        const updatedPayload = { ...rawPayload };
 
         if (typeof obj.displayName === 'string') {
           newDisplayName = obj.displayName;
@@ -126,12 +151,14 @@ export class GroupPatchEngine {
           newMembers = GroupPatchEngine.ensureUniqueMembers(newMembers);
         }
 
-        // Store any other attributes in rawPayload
+        // Store any other attributes in rawPayload (resolves extension URN keys)
+        const updateObj: Record<string, unknown> = {};
         for (const [key, val] of Object.entries(obj)) {
           if (key !== 'displayName' && key !== 'externalId' && key !== 'members' && key !== 'schemas') {
-            updatedPayload[key] = val;
+            updateObj[key] = val;
           }
         }
+        const updatedPayload = resolveNoPathValue({ ...rawPayload }, updateObj, config.extensionUrns);
 
         return { displayName: newDisplayName, externalId: newExternalId, members: newMembers, rawPayload: updatedPayload };
       }
@@ -173,6 +200,15 @@ export class GroupPatchEngine {
         members: GroupPatchEngine.ensureUniqueMembers(normalized),
         rawPayload,
       };
+    }
+
+    // Extension URN-prefixed path (e.g., urn:...:CustomExt:myAttr)
+    if (originalPath && isExtensionPath(originalPath, config.extensionUrns)) {
+      const extParsed = parseExtensionPath(originalPath, config.extensionUrns);
+      if (extParsed) {
+        const updatedPayload = applyExtensionUpdate({ ...rawPayload }, extParsed, operation.value);
+        return { displayName: currentDisplayName, externalId: currentExternalId, members, rawPayload: updatedPayload };
+      }
     }
 
     throw new PatchError(

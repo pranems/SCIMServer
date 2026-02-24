@@ -151,7 +151,7 @@ export const USER_SCHEMA_ATTRIBUTES = [
     description: 'Email addresses for the user.',
     subAttributes: [
       { name: 'value', type: 'string', multiValued: false, required: true, caseExact: false, mutability: 'readWrite', returned: 'always', description: 'Email address value.' },
-      { name: 'type', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', description: 'Label (e.g., "work", "home").' },
+      { name: 'type', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', canonicalValues: ['work', 'home', 'other'], description: 'Label (e.g., "work", "home").' },
       { name: 'primary', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'Whether this is the primary email.' },
     ],
   },
@@ -165,7 +165,7 @@ export const USER_SCHEMA_ATTRIBUTES = [
     description: 'Phone numbers for the User.',
     subAttributes: [
       { name: 'value', type: 'string', multiValued: false, required: true, caseExact: false, mutability: 'readWrite', returned: 'default', description: 'Phone number value.' },
-      { name: 'type', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', description: 'Label (e.g., "work", "mobile", "fax").' },
+      { name: 'type', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', canonicalValues: ['work', 'home', 'mobile', 'fax', 'pager', 'other'], description: 'Label (e.g., "work", "mobile", "fax").' },
       { name: 'primary', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'Whether this is the primary phone number.' },
     ],
   },
@@ -184,7 +184,7 @@ export const USER_SCHEMA_ATTRIBUTES = [
       { name: 'region', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'The state or region component.' },
       { name: 'postalCode', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'The zip or postal code component.' },
       { name: 'country', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'The country name component.' },
-      { name: 'type', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', description: 'Label (e.g., "work", "home").' },
+      { name: 'type', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', canonicalValues: ['work', 'home', 'other'], description: 'Label (e.g., "work", "home").' },
       { name: 'primary', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'Whether this is the primary address.' },
     ],
   },
@@ -228,6 +228,7 @@ export const ENTERPRISE_USER_ATTRIBUTES = [
     mutability: 'readWrite',
     returned: 'default',
     description: 'Numeric or alphanumeric identifier assigned to a person.',
+    uniqueness: 'none',
   },
   {
     name: 'costCenter',
@@ -238,6 +239,7 @@ export const ENTERPRISE_USER_ATTRIBUTES = [
     mutability: 'readWrite',
     returned: 'default',
     description: 'Identifies the name of a cost center.',
+    uniqueness: 'none',
   },
   {
     name: 'organization',
@@ -248,6 +250,7 @@ export const ENTERPRISE_USER_ATTRIBUTES = [
     mutability: 'readWrite',
     returned: 'default',
     description: 'Identifies the name of an organization.',
+    uniqueness: 'none',
   },
   {
     name: 'division',
@@ -258,6 +261,7 @@ export const ENTERPRISE_USER_ATTRIBUTES = [
     mutability: 'readWrite',
     returned: 'default',
     description: 'Identifies the name of a division.',
+    uniqueness: 'none',
   },
   {
     name: 'department',
@@ -268,6 +272,7 @@ export const ENTERPRISE_USER_ATTRIBUTES = [
     mutability: 'readWrite',
     returned: 'default',
     description: 'Identifies the name of a department.',
+    uniqueness: 'none',
   },
   {
     name: 'manager',

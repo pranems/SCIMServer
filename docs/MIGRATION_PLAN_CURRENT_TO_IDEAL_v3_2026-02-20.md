@@ -42,8 +42,15 @@ The table below maps every gap between the current codebase and the ideal archit
 | G5 | **PATCH engine embedded in service** (~200 lines inline) | HIGH | `endpoint-scim-users.service.ts` (lines 320–440), `endpoint-scim-groups.service.ts` (PATCH handlers) | Standalone `PatchEngine` in Domain layer, schema-aware, zero DB imports | 5 |
 | G6 | **Discovery endpoints hardcoded** | MEDIUM | `endpoint-scim-discovery.controller.ts` (private methods, static JSON) | `endpoint_schema` + `endpoint_resource_type` tables, `DiscoveryService` | 6 |
 | G7 | **ETag If-Match NOT enforced** before writes | HIGH | `scim-etag.interceptor.ts` (assertIfMatch exists but never called) | Pre-write check in Orchestrator; monotonic integer version | 7 |
-| G8 | **No schema validation** against endpoint schema definitions | MEDIUM | None (no validation logic exists) | `SchemaValidator` validates payload against `endpoint_schema.attributes` | 8 |
+| G8 | ~~**No schema validation** against endpoint schema definitions~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.0)** — `SchemaValidator` domain class validates type/required/mutability/multiValued/unknown-attrs/sub-attrs | `SchemaValidator` validates payload against `endpoint_schema.attributes` | 8 |
 | G8b | **No custom resource type registration** — only hardcoded User/Group | MEDIUM | `scim-schemas.constants.ts` (static resource types), per-type controllers/services/repos | `EndpointResourceType` table + Admin API + generic wildcard controller + `customResourceTypesEnabled` config flag | 8.2 |
+| G8c | **PatchEngine has zero mutability checks** — readOnly/immutable attrs can be modified via PATCH | HIGH | `user-patch-engine.ts`, `group-patch-engine.ts` (no schema awareness) | PatchEngine consults `SchemaDefinition` before applying ops; rejects readOnly, guards immutable | 8.1 |
+| G8d | ~~**`immutable` not enforced on PUT**~~ — existing immutable values can be overwritten | ~~HIGH~~ | ✅ **DONE (v0.17.0)** — `SchemaValidator.checkImmutable()` + service integration in PUT/PATCH for Users & Groups | SchemaValidator compares new vs existing for immutable attrs on replace; 400 mutability | 8.1 |
+| G8e | **Response `returned` not enforced** — never/request/writeOnly attrs leak in responses | MEDIUM | `toScimUserResource()` (spreads rawPayload as-is) | Schema-driven response filter strips `returned:never`/`writeOnly`; `request` gated | 8.3 |
+| G8f | **`caseExact` ignored in filter evaluation** — all string comparisons case-insensitive | MEDIUM | `scim-filter-parser.ts` (hardcoded `.toLowerCase()`) | Filter evaluator consults `caseExact` per-attribute from schema definitions | 8.4 |
+| G8g | **Input hardening: validation disabled by default + DTO gaps** — ~~no payload size limit~~ ✅ (5MB limit added), `SearchRequestDto` has zero validators, `PatchOperationDto.value` is `unknown`, prototype pollution via index signature, `userName` allows whitespace-only | HIGH | `StrictSchemaValidation=false` (default), DTOs with `[key: string]: unknown`, no `@ArrayMaxSize` on PATCH ops | Always-on basic type validation (split from strict mode), DTO guards (`@IsIn`, `@ArrayMaxSize`, `@IsNotEmpty`), prototype key stripping | 8.5 |
+| G8h | **Required sub-attributes + canonicalValues not enforced** — `emails[].value` is `required:true` but unchecked; `emails[].type` accepts any string | MEDIUM | `validateSubAttributes()` only type-checks provided keys, never checks missing required; `canonicalValues` defined but unused | Add required sub-attr check in `validateSubAttributes()`; optional `canonicalValues` enforcement | 8.6 |
+| G8i | **Filter/PATCH hardening: no depth/length limits, valuePath regex gaps** — filter parser has no recursion depth limit (stack overflow), PATCH dot-notation allows `__proto__`, `stripReservedAttributes` missing `meta`/`schemas` | MEDIUM | `scim-filter-parser.ts` (recursive descent, no depth counter), `user-patch-engine.ts` (`applyDotNotation`, `stripReservedAttributes`) | Max filter depth/length, semantic attr validation; PATCH path sanitization; strip `meta`/`schemas` from reserved attrs | 8.7 |
 | G9 | **No /Bulk endpoint** | LOW | Missing entirely | `BulkController` + `BulkProcessor` with bulkId resolution | 9 |
 | G10 | **No /Me endpoint** | LOW | Missing entirely | `MeController` mapping authenticated user to resource | 10 |
 | G11 | **Global shared-secret auth** | MEDIUM | `shared-secret.guard.ts` (single SCIM_SHARED_SECRET for all endpoints) | Per-endpoint credentials in `endpoint_credential` table | 11 |
@@ -60,18 +67,20 @@ The table below maps every gap between the current codebase and the ideal archit
 ### Gap Heat Map (Severity × Impact on RFC Compliance)
 
 ```
-                    ┌─────────────────────────────────────────────┐
-                    │          SEVERITY ASSESSMENT                 │
-                    ├──────────────┬──────────────────────────────┤
-  RFC Compliance ───│ HIGH         │ G1 G3 G4 G5 G7             │
-                    │              │ (Architectural / data model) │
-                    ├──────────────┼──────────────────────────────┤
-  Correctness ──────│ MEDIUM       │ G2 G6 G8 G11 G13 G14 G16   │
-                    │              │ (Missing per-endpoint data)   │
-                    ├──────────────┼──────────────────────────────┤
-  Completeness ─────│ LOW          │ G9 G10 G12 G15 G17 G18     │
-                    │              │ (Features / cleanup)        │
-                    └──────────────┴──────────────────────────────┘
+                    ┌───────────────────────────────────────────────────────────────────┐
+                    │          SEVERITY ASSESSMENT (updated 2026-02-24)                  │
+                    ├──────────────┬────────────────────────────────────────────────────┤
+  RFC Compliance ───│ HIGH         │ ✅G1 ✅G3 ✅G4 ✅G5 ✅G7   G8c ✅G8d G8g       │
+                    │              │ (Architectural + input hardening)                  │
+                    ├──────────────┼────────────────────────────────────────────────────┤
+  Correctness ──────│ MEDIUM       │ G2 ✅G6 ✅G8 G8b G8e G8f G8h G8i G11 ✅G13 G14 │
+                    │              │ (Validation gaps + per-endpoint data)              │
+                    ├──────────────┼────────────────────────────────────────────────────┤
+  Completeness ─────│ LOW          │ G9 G10 G12 ✅G15 G17 G18                         │
+                    │              │ (Features / cleanup)                              │
+                    └──────────────┴────────────────────────────────────────────────────┘
+
+  ✅ = Resolved in v0.10.0–v0.17.0
 ```
 
 ### Gap Resolution Flow
@@ -137,8 +146,14 @@ Phase 4  Filter Push-Down           ████     (perf + compliance)
 Phase 5  Domain PATCH Engine        ██████   (correctness + testability)
 Phase 6  Data-Driven Discovery      ████     (per-endpoint schema)
 Phase 7  ETag & Versioning          ████     (concurrency)
-Phase 8  Schema Validation          ████     (strictness)
+Phase 8  Schema Validation          ████     (strictness)         ✅ DONE v0.17.0
+Phase 8.1 Mutability Enforcement    ████     (readOnly/immutable in PATCH+PUT)
 Phase 8.2 Custom Resource Types     ████     (extensibility)
+Phase 8.3 Response Returned Filter  ███      (never/request/writeOnly stripping)
+Phase 8.4 caseExact in Filters      ██       (schema-aware filter comparisons)
+Phase 8.5 Input Hardening           ███      (always-on type validation, DTO guards, payload limits)
+Phase 8.6 Sub-attr & Canonical Val  ██       (required sub-attrs, canonicalValues enforcement)
+Phase 8.7 Filter & PATCH Hardening  ██       (depth/length limits, path sanitization)
 Phase 9  Bulk Operations            ███      (feature)
 Phase 10 /Me Endpoint               ██       (feature)
 Phase 11 Per-Endpoint Credentials     ████     (security)
@@ -156,8 +171,14 @@ Phase 4             ███
 Phase 5             ██████
 Phase 6                  ███
 Phase 7                  ███
-Phase 8                     ███
-Phase 8.2                      ██
+Phase 8  ✅ DONE            ███
+Phase 8.1                      ██
+Phase 8.2                        ██
+Phase 8.3                          ██
+Phase 8.4                           █
+Phase 8.5                           ██
+Phase 8.6                            █
+Phase 8.7                            █
 Phase 9                          ███
 Phase 10                          ██
 Phase 11                          ████
@@ -1908,11 +1929,34 @@ sequenceDiagram
 
 ---
 
-## 10. Phase 8 — Schema Validation
+## 10. Phase 8 — Schema Validation ✅ COMPLETE (v0.17.0)
 
-### Why?
+> **Status:** ✅ Complete — implemented 2026-02-24 in v0.17.0  
+> **Files:** 6 new + 6 modified | **Tests:** +297 (179 unit + 19 service + 49 E2E + 60 core unit)  
+> **Doc:** [`docs/phases/PHASE_08_SCHEMA_VALIDATION.md`](phases/PHASE_08_SCHEMA_VALIDATION.md) | **Gap Analysis:** [`docs/RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md`](RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md)
 
-Currently, the server accepts any attributes in a SCIM resource without validation against the endpoint's schema definitions. For example, if a client sends `{"schemas": [...], "userName": "john", "favoriteColor": "blue"}`, the server stores `favoriteColor` without any warning or error.
+### What Was Delivered
+
+- **`SchemaValidator`** — Pure-domain class (383 lines, zero NestJS/Prisma deps) validates SCIM payloads against registered schema definitions
+- **6 validation checks:** required attrs, type checking (all 8 SCIM types), mutability (readOnly rejection), multiValued enforcement, unknown attribute detection (strict mode), sub-attribute recursive validation
+- **Service integration** — `validatePayloadSchema()` added to both User and Group services, gated behind `StrictSchemaValidation` config flag
+- **297 new tests** — 179 comprehensive unit + 60 core unit + 19 service-level + 49 E2E (14 sections)
+- **Key discovery:** NestJS `ValidationPipe` with `enableImplicitConversion: true` coerces DTO properties before the validator runs — documented in E2E §13
+
+### Remaining Sub-Phases (identified via RFC gap analysis)
+
+| Sub-Phase | Gap | Description | Effort |
+|-----------|-----|-------------|--------|
+| **8.1** | G8c, G8d | PatchEngine mutability checks + immutable on PUT | ~5-8 hrs |
+| **8.2** | G8b | Custom Resource Type Registration (already planned) | ~9 days |
+| **8.3** | G8e | Response `returned` filtering (never/request/writeOnly) | ~6-8 hrs |
+| **8.4** | G8f | `caseExact` in filter evaluation | ~3-4 hrs |
+
+See [`docs/RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md`](RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md) for the complete 15-gap analysis with code examples, diagrams, and remediation plans.
+
+### Original Design
+
+~~Currently, the server accepts any attributes in a SCIM resource without validation against the endpoint's schema definitions.~~ *(Resolved — SchemaValidator now enforces attribute characteristics when StrictSchemaValidation is enabled.)*
 
 RFC 7643 §2.1 defines attribute characteristics (type, required, mutability, etc.) that SHOULD be enforced on the server side, especially when `strictMode: true`.
 
@@ -4000,7 +4044,7 @@ flowchart TB
 | Hardcoded `userSchema()` / `groupSchema()` | `endpoint_schema` + `endpoint_resource_type` DB rows | 6 |
 | `W/"${updatedAt.toISOString()}"` | `W/"v${version}"` monotonic integer | 7 |
 | `assertIfMatch()` exists but never called | `orchestrator.assertIfMatch()` before every write | 7 |
-| No schema validation | `SchemaValidator` with strictMode | 8 |
+| ~~No schema validation~~ | ✅ `SchemaValidator` with strictMode — **DONE v0.17.0** | 8 |
 | Hardcoded User/Group resource types only | `endpoint_resource_type` DB rows + Admin API + generic wildcard controller | 8.2 |
 | `bulk: {supported: false}` | `BulkProcessor` with bulkId resolution | 9 |
 | No /Me | `MeController` | 10 |

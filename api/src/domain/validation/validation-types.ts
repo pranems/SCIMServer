@@ -38,6 +38,7 @@ export interface SchemaAttributeDefinition {
   returned?: string;
   caseExact?: boolean;
   uniqueness?: string;
+  canonicalValues?: readonly string[];
   referenceTypes?: readonly string[];
   subAttributes?: readonly SchemaAttributeDefinition[];
 }

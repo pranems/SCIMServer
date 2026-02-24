@@ -56,11 +56,19 @@ describe('applyAttributeProjection', () => {
       expect(result.name).toBeUndefined();
     });
 
-    it('should always include schemas, id, and meta', () => {
-      const result = applyAttributeProjection(fullUser, 'userName');
+    it('should always include schemas, id, meta, userName, and displayName', () => {
+      const result = applyAttributeProjection(fullUser, 'emails');
       expect(result.schemas).toEqual(['urn:ietf:params:scim:schemas:core:2.0:User']);
       expect(result.id).toBe('user-123');
       expect(result.meta).toBeDefined();
+      expect(result.userName).toBe('alice@example.com');
+      expect(result.displayName).toBe('Alice Example');
+    });
+
+    it('should never exclude userName or displayName (returned:always per RFC 7643)', () => {
+      const result = applyAttributeProjection(fullUser, undefined, 'userName,displayName');
+      expect(result.userName).toBe('alice@example.com');
+      expect(result.displayName).toBe('Alice Example');
     });
 
     it('should support dotted sub-attribute paths', () => {
@@ -98,11 +106,13 @@ describe('applyAttributeProjection', () => {
       expect(result.name).toBeUndefined();
     });
 
-    it('should never exclude always-returned attributes (schemas, id, meta)', () => {
-      const result = applyAttributeProjection(fullUser, undefined, 'schemas,id,meta');
+    it('should never exclude always-returned attributes (schemas, id, meta, userName, displayName)', () => {
+      const result = applyAttributeProjection(fullUser, undefined, 'schemas,id,meta,userName,displayName');
       expect(result.schemas).toBeDefined();
       expect(result.id).toBeDefined();
       expect(result.meta).toBeDefined();
+      expect(result.userName).toBeDefined();
+      expect(result.displayName).toBeDefined();
     });
 
     it('should support dotted sub-attribute paths for exclusion', () => {
@@ -114,9 +124,12 @@ describe('applyAttributeProjection', () => {
     });
 
     it('should be case-insensitive', () => {
-      const result = applyAttributeProjection(fullUser, undefined, 'EMAILS,DISPLAYNAME');
+      const result = applyAttributeProjection(fullUser, undefined, 'EMAILS,ACTIVE');
       expect(result.emails).toBeUndefined();
-      expect(result.displayName).toBeUndefined();
+      expect(result.active).toBeUndefined();
+      // displayName and userName are always-returned — they should still be present
+      expect(result.displayName).toBe('Alice Example');
+      expect(result.userName).toBe('alice@example.com');
     });
   });
 

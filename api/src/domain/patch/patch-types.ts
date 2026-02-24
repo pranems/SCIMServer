@@ -26,6 +26,8 @@ export interface PatchOperation {
 export interface PatchConfig {
   /** Enable dot-notation path resolution (e.g., name.givenName) */
   verbosePatch: boolean;
+  /** Extension URNs registered for this endpoint (for PATCH path resolution) */
+  extensionUrns?: readonly string[];
 }
 
 /** Configuration flags for group member PATCH behavior */
@@ -36,6 +38,8 @@ export interface GroupMemberPatchConfig {
   allowMultiMemberRemove: boolean;
   /** Allow removing all members via path=members (no value filter) */
   allowRemoveAllMembers: boolean;
+  /** Extension URNs registered for this endpoint (for PATCH path resolution) */
+  extensionUrns?: readonly string[];
 }
 
 // ─── PATCH Result ────────────────────────────────────────────────────────────

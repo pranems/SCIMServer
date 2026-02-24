@@ -198,6 +198,8 @@ export class EndpointScimGroupsService {
       ? true 
       : getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS);
 
+    const extensionUrns = this.schemaRegistry.getExtensionUrns(endpointId);
+
     let patchResult;
     try {
       patchResult = GroupPatchEngine.apply(
@@ -208,7 +210,7 @@ export class EndpointScimGroupsService {
           members: this.memberRecordsToDtos(group.members),
           rawPayload: this.parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}')),
         },
-        { allowMultiMemberAdd, allowMultiMemberRemove, allowRemoveAllMembers },
+        { allowMultiMemberAdd, allowMultiMemberRemove, allowRemoveAllMembers, extensionUrns },
       );
     } catch (err) {
       if (err instanceof PatchError) {
@@ -219,11 +221,26 @@ export class EndpointScimGroupsService {
 
     const { displayName, externalId, members: memberDtos, payload: rawPayload } = patchResult;
 
-    // SQLite compromise (HIGH): Pre-resolve member user IDs OUTSIDE the transaction to
-    // minimise write-lock hold time. Every ms inside $transaction holds the global SQLite
-    // writer lock. PostgreSQL’s row-level locking makes this pattern unnecessary.
-    // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.2.3
-    // The user data is stable within this request context so the lookup is safe here.
+    // H-1: Post-PATCH schema validation — validate the resulting payload
+    const resultPayload: Record<string, unknown> = {
+      schemas: [SCIM_CORE_GROUP_SCHEMA],
+      displayName,
+      externalId,
+      members: memberDtos,
+      ...rawPayload,
+    };
+    // Include extension URNs in schemas[] for proper validation
+    for (const urn of extensionUrns) {
+      if (urn in rawPayload) {
+        (resultPayload.schemas as string[]).push(urn);
+      }
+    }
+    this.validatePayloadSchema(resultPayload, endpointId, config, 'patch');
+
+    // H-2: Immutable attribute enforcement — compare existing state with PATCH result
+    this.checkImmutableAttributes(group, resultPayload, endpointId, config);
+
+    // Pre-resolve member user IDs OUTSIDE the transaction to minimise lock hold time.
     const memberInputs = memberDtos.length > 0
       ? await this.resolveMemberInputs(memberDtos, endpointId)
       : [];
@@ -277,6 +294,9 @@ export class EndpointScimGroupsService {
 
     // Phase 7: Pre-write If-Match enforcement
     this.enforceIfMatch(group.version, ifMatch, config);
+
+    // H-2: Immutable attribute enforcement — compare existing resource with incoming payload
+    this.checkImmutableAttributes(group, dto as unknown as Record<string, unknown>, endpointId, config);
 
     const now = new Date();
     const meta = this.parseJson<Record<string, unknown>>(String(group.meta ?? '{}'));
@@ -477,30 +497,13 @@ export class EndpointScimGroupsService {
     dto: Record<string, unknown>,
     endpointId: string,
     config: EndpointConfig | undefined,
-    mode: 'create' | 'replace',
+    mode: 'create' | 'replace' | 'patch',
   ): void {
     if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
       return;
     }
 
-    // Build schema definitions from the registry
-    const coreSchema = this.schemaRegistry.getSchema(SCIM_CORE_GROUP_SCHEMA, endpointId);
-    const schemas: SchemaDefinition[] = [];
-    if (coreSchema) {
-      schemas.push(coreSchema as SchemaDefinition);
-    }
-
-    // Include extension schemas declared in payload's schemas[] array
-    const declaredSchemas = (dto.schemas as string[] | undefined) ?? [];
-    for (const urn of declaredSchemas) {
-      if (urn !== SCIM_CORE_GROUP_SCHEMA) {
-        const extSchema = this.schemaRegistry.getSchema(urn, endpointId);
-        if (extSchema) {
-          schemas.push(extSchema as SchemaDefinition);
-        }
-      }
-    }
-
+    const schemas = this.buildSchemaDefinitions(dto, endpointId);
     if (schemas.length === 0) return;
 
     const result = SchemaValidator.validate(dto, schemas, {
@@ -516,6 +519,86 @@ export class EndpointScimGroupsService {
         detail: `Schema validation failed: ${details}`,
       });
     }
+  }
+
+  /**
+   * H-2: Immutable attribute enforcement (RFC 7643 §2.2).
+   *
+   * Compares the existing resource state (from DB) with the incoming payload
+   * and rejects changes to attributes declared as immutable.
+   * Only runs when StrictSchemaValidation is enabled.
+   */
+  private checkImmutableAttributes(
+    existingGroup: GroupWithMembers,
+    incomingDto: Record<string, unknown>,
+    endpointId: string,
+    config?: EndpointConfig,
+  ): void {
+    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
+      return;
+    }
+
+    const schemas = this.buildSchemaDefinitions(incomingDto, endpointId);
+    if (schemas.length === 0) return;
+
+    // Reconstruct existing resource as a SCIM payload for comparison
+    const existingPayload = this.buildExistingPayload(existingGroup);
+
+    const result = SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas);
+
+    if (!result.valid) {
+      const details = result.errors.map(e => `${e.path}: ${e.message}`).join('; ');
+      throw createScimError({
+        status: 400,
+        scimType: 'mutability',
+        detail: `Immutable attribute violation: ${details}`,
+      });
+    }
+  }
+
+  /**
+   * Build schema definitions from the registry for a given payload.
+   * Shared by validatePayloadSchema and checkImmutableAttributes.
+   */
+  private buildSchemaDefinitions(
+    dto: Record<string, unknown>,
+    endpointId: string,
+  ): SchemaDefinition[] {
+    const coreSchema = this.schemaRegistry.getSchema(SCIM_CORE_GROUP_SCHEMA, endpointId);
+    const schemas: SchemaDefinition[] = [];
+    if (coreSchema) {
+      schemas.push(coreSchema as SchemaDefinition);
+    }
+
+    const declaredSchemas = (dto.schemas as string[] | undefined) ?? [];
+    for (const urn of declaredSchemas) {
+      if (urn !== SCIM_CORE_GROUP_SCHEMA) {
+        const extSchema = this.schemaRegistry.getSchema(urn, endpointId);
+        if (extSchema) {
+          schemas.push(extSchema as SchemaDefinition);
+        }
+      }
+    }
+
+    return schemas;
+  }
+
+  /**
+   * Reconstruct existing group DB record as a SCIM payload object (data only, no meta/location).
+   * Used for immutable attribute comparison.
+   */
+  private buildExistingPayload(group: GroupWithMembers): Record<string, unknown> {
+    const rawPayload = this.parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}'));
+    return {
+      ...rawPayload,
+      displayName: group.displayName,
+      externalId: group.externalId ?? undefined,
+      members: group.members.map((member) => ({
+        value: member.value,
+        display: member.display ?? undefined,
+        type: member.type ?? undefined,
+      })),
+    };
   }
 
   private async resolveMemberInputs(

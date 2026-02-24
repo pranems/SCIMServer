@@ -185,8 +185,8 @@ export class UserPatchEngine {
       };
     }
 
-    if (originalPath && isExtensionPath(originalPath)) {
-      const extParsed = parseExtensionPath(originalPath);
+    if (originalPath && isExtensionPath(originalPath, config.extensionUrns)) {
+      const extParsed = parseExtensionPath(originalPath, config.extensionUrns);
       if (extParsed) {
         rawPayload = applyExtensionUpdate(rawPayload, extParsed, value);
       }
@@ -232,7 +232,7 @@ export class UserPatchEngine {
         active = UserPatchEngine.extractBooleanValue(updateObj.active);
         delete updateObj.active;
       }
-      rawPayload = resolveNoPathValue(rawPayload, updateObj);
+      rawPayload = resolveNoPathValue(rawPayload, updateObj, config.extensionUrns);
       return { userName, displayName, externalId, active, rawPayload };
     }
 
@@ -252,8 +252,8 @@ export class UserPatchEngine {
       return { active: false, rawPayload: { ...rawPayload, active: false } };
     }
 
-    if (originalPath && isExtensionPath(originalPath)) {
-      const extParsed = parseExtensionPath(originalPath);
+    if (originalPath && isExtensionPath(originalPath, config.extensionUrns)) {
+      const extParsed = parseExtensionPath(originalPath, config.extensionUrns);
       if (extParsed) {
         rawPayload = removeExtensionAttribute(rawPayload, extParsed);
       }

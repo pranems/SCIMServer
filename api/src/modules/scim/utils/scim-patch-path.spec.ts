@@ -678,5 +678,26 @@ describe('scim-patch-path utilities', () => {
       const ext = result[URN] as Record<string, unknown>;
       expect(ext.manager).toEqual({ value: 'MGR-STRING' });
     });
+
+    it('should resolve custom extension URN keys when extensionUrns provided', () => {
+      const CUSTOM_URN = 'urn:example:custom:2.0:User';
+      const payload: Record<string, unknown> = {};
+      const result = resolveNoPathValue(payload, {
+        [`${CUSTOM_URN}:customAttr`]: 'custom-val',
+      }, [CUSTOM_URN]);
+      const ext = result[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext?.customAttr).toBe('custom-val');
+    });
+
+    it('should NOT resolve custom URN keys without extensionUrns — key is mangled by dot-notation', () => {
+      const CUSTOM_URN = 'urn:example:custom:2.0:User';
+      const payload: Record<string, unknown> = {};
+      const result = resolveNoPathValue(payload, {
+        [`${CUSTOM_URN}:customAttr`]: 'custom-val',
+      });
+      // Without extensionUrns, the URN contains "2.0" which triggers dot-notation splitting.
+      // The key is NOT correctly stored — this demonstrates why extensionUrns is needed.
+      expect(result[CUSTOM_URN]).toBeUndefined();
+    });
   });
 });

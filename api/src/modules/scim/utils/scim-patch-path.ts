@@ -385,12 +385,13 @@ export function removeExtensionAttribute(
  */
 export function resolveNoPathValue(
   rawPayload: Record<string, unknown>,
-  updateObj: Record<string, unknown>
+  updateObj: Record<string, unknown>,
+  extensionUrns?: readonly string[],
 ): Record<string, unknown> {
   for (const [key, value] of Object.entries(updateObj)) {
-    if (isExtensionPath(key)) {
+    if (isExtensionPath(key, extensionUrns)) {
       // Extension URN key: urn:...:User:employeeNumber → update extension namespace
-      const parsed = parseExtensionPath(key);
+      const parsed = parseExtensionPath(key, extensionUrns);
       if (parsed) {
         rawPayload = applyExtensionUpdate(rawPayload, parsed, value);
       } else {

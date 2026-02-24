@@ -398,4 +398,56 @@ describe('GroupPatchEngine', () => {
       expect(result.externalId).toBe('ext-combined');
     });
   });
+
+  // ── Custom Extension URN support (BUG-001 fix) ──────────────────────
+
+  describe('extension URN support', () => {
+    const CUSTOM_URN = 'urn:example:custom:2.0:Group';
+    const extConfig: GroupMemberPatchConfig = {
+      ...defaultConfig,
+      extensionUrns: [CUSTOM_URN],
+    };
+
+    it('should replace extension attribute via URN-prefixed path', () => {
+      const result = GroupPatchEngine.apply(
+        [{ op: 'replace', path: `${CUSTOM_URN}:customField`, value: 'ext-val' }],
+        makeState(),
+        extConfig,
+      );
+      const ext = result.payload[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext?.customField).toBe('ext-val');
+    });
+
+    it('should add extension attribute via URN-prefixed path', () => {
+      const result = GroupPatchEngine.apply(
+        [{ op: 'add', path: `${CUSTOM_URN}:addedField`, value: 123 }],
+        makeState(),
+        extConfig,
+      );
+      const ext = result.payload[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext?.addedField).toBe(123);
+    });
+
+    it('should remove extension attribute via URN-prefixed path', () => {
+      const result = GroupPatchEngine.apply(
+        [{ op: 'remove', path: `${CUSTOM_URN}:fieldToRemove` }],
+        makeState({ rawPayload: { [CUSTOM_URN]: { fieldToRemove: 'gone', keepMe: 'stay' } } }),
+        extConfig,
+      );
+      const ext = result.payload[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext?.fieldToRemove).toBeUndefined();
+      expect(ext?.keepMe).toBe('stay');
+    });
+
+    it('should resolve extension URN keys in no-path replace object', () => {
+      const result = GroupPatchEngine.apply(
+        [{ op: 'replace', value: { [`${CUSTOM_URN}:customField`]: 'no-path-val', displayName: 'Updated' } }],
+        makeState(),
+        extConfig,
+      );
+      const ext = result.payload[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext?.customField).toBe('no-path-val');
+      expect(result.displayName).toBe('Updated');
+    });
+  });
 });

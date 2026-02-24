@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **49 new E2E tests** — `schema-validation.e2e-spec.ts` (14 describe blocks): complex attribute type validation, multi-valued enforcement, unknown attribute rejection, sub-attribute type errors, enterprise extension validation, Group schema validation, PUT replace validation, error response format (RFC 7644 §3.12), flag on/off comparison, extension URN edge cases, complex realistic payloads, cross-resource schema isolation, DTO implicit conversion documentation, reserved keys behaviour
   - **Phase 8 discovery: NestJS `ValidationPipe` implicit conversion** — Documented that `transform: true` + `enableImplicitConversion: true` causes class-transformer to coerce DTO-declared properties (e.g., `active: 'yes'` → `true`, `userName: 12345` → `'12345'`) before schema validation runs. Non-DTO properties (`name`, `emails`, `phoneNumbers`) via `[key: string]: unknown` pass through uncoerced and ARE validated by `SchemaValidator`
 
+### Documentation
+- **`docs/RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md`** (NEW) — Comprehensive RFC 7643/7644 attribute characteristics gap analysis: all 11 characteristics mapped against current implementation, 15 gaps identified (G1-G15) with severity/effort/remediation, sub-phases 8.1-8.5 defined (~22-30 hrs remaining work), Mermaid diagrams, HTTP request/response examples, DB value representations
+- **`docs/phases/PHASE_08_SCHEMA_VALIDATION.md`** (NEW) — Phase 8 implementation documentation with architecture diagrams, issue analysis, and test coverage breakdown
+- **`docs/MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md`** — Updated: Phase 8 marked ✅ DONE, new gaps G8c-G8f added for mutability/returned/caseExact enforcement, sub-phases 8.1-8.4 in timeline/overview
+- **`docs/INDEX.md`** — Added Migration & Roadmap section and Phase Documentation section with all phase docs
+
 ### Changed
 - **`api/package.json`** — Version bump from `0.15.0` to `0.17.0`
 

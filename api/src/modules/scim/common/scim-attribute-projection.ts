@@ -17,8 +17,16 @@
  * @see https://datatracker.ietf.org/doc/html/rfc7644#section-3.4.2.5
  */
 
-/** Attributes that MUST always be returned per RFC 7643 §7 ("returned": "always") */
-const ALWAYS_RETURNED = new Set(['schemas', 'id', 'meta']);
+/**
+ * Attributes that MUST always be returned per RFC 7643 §7 ("returned": "always").
+ * These are never excluded by "attributes" or "excludedAttributes" parameters.
+ *
+ * Includes framework attributes (schemas, id, meta) plus resource-type attributes
+ * that are declared as returned:"always" in the schema definitions:
+ *   - userName (User core schema)
+ *   - displayName (Group core schema — always returned for Groups)
+ */
+const ALWAYS_RETURNED = new Set(['schemas', 'id', 'meta', 'username', 'displayname']);
 
 /**
  * Apply attribute projection to a single SCIM resource.

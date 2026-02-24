@@ -202,6 +202,9 @@ export class EndpointScimUsersService {
     // Phase 7: Pre-write If-Match enforcement
     this.enforceIfMatch(user.version, ifMatch, config);
 
+    // H-2: Immutable attribute enforcement — compare existing resource with incoming payload
+    this.checkImmutableAttributes(user, dto, endpointId, config);
+
     await this.assertUniqueIdentifiersForEndpoint(dto.userName, dto.externalId ?? undefined, endpointId, scimId);
 
     const now = new Date();
@@ -351,30 +354,13 @@ export class EndpointScimUsersService {
     dto: Record<string, unknown>,
     endpointId: string,
     config: EndpointConfig | undefined,
-    mode: 'create' | 'replace',
+    mode: 'create' | 'replace' | 'patch',
   ): void {
     if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
       return;
     }
 
-    // Build schema definitions from the registry
-    const coreSchema = this.schemaRegistry.getSchema(SCIM_CORE_USER_SCHEMA, endpointId);
-    const schemas: SchemaDefinition[] = [];
-    if (coreSchema) {
-      schemas.push(coreSchema as SchemaDefinition);
-    }
-
-    // Include extension schemas declared in payload's schemas[] array
-    const declaredSchemas = (dto.schemas as string[] | undefined) ?? [];
-    for (const urn of declaredSchemas) {
-      if (urn !== SCIM_CORE_USER_SCHEMA) {
-        const extSchema = this.schemaRegistry.getSchema(urn, endpointId);
-        if (extSchema) {
-          schemas.push(extSchema as SchemaDefinition);
-        }
-      }
-    }
-
+    const schemas = this.buildSchemaDefinitions(dto, endpointId);
     if (schemas.length === 0) return;
 
     const result = SchemaValidator.validate(dto, schemas, {
@@ -390,6 +376,83 @@ export class EndpointScimUsersService {
         detail: `Schema validation failed: ${details}`,
       });
     }
+  }
+
+  /**
+   * H-2: Immutable attribute enforcement (RFC 7643 §2.2).
+   *
+   * Compares the existing resource state (from DB) with the incoming payload
+   * and rejects changes to attributes declared as immutable.
+   * Only runs when StrictSchemaValidation is enabled.
+   */
+  private checkImmutableAttributes(
+    existingRecord: UserRecord,
+    incomingDto: Record<string, unknown>,
+    endpointId: string,
+    config?: EndpointConfig,
+  ): void {
+    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
+      return;
+    }
+
+    const schemas = this.buildSchemaDefinitions(incomingDto, endpointId);
+    if (schemas.length === 0) return;
+
+    // Reconstruct existing resource as a SCIM payload for comparison
+    const existingPayload = this.buildExistingPayload(existingRecord);
+
+    const result = SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas);
+
+    if (!result.valid) {
+      const details = result.errors.map(e => `${e.path}: ${e.message}`).join('; ');
+      throw createScimError({
+        status: 400,
+        scimType: 'mutability',
+        detail: `Immutable attribute violation: ${details}`,
+      });
+    }
+  }
+
+  /**
+   * Build schema definitions from the registry for a given payload.
+   * Shared by validatePayloadSchema and checkImmutableAttributes.
+   */
+  private buildSchemaDefinitions(
+    dto: Record<string, unknown>,
+    endpointId: string,
+  ): SchemaDefinition[] {
+    const coreSchema = this.schemaRegistry.getSchema(SCIM_CORE_USER_SCHEMA, endpointId);
+    const schemas: SchemaDefinition[] = [];
+    if (coreSchema) {
+      schemas.push(coreSchema as SchemaDefinition);
+    }
+
+    const declaredSchemas = (dto.schemas as string[] | undefined) ?? [];
+    for (const urn of declaredSchemas) {
+      if (urn !== SCIM_CORE_USER_SCHEMA) {
+        const extSchema = this.schemaRegistry.getSchema(urn, endpointId);
+        if (extSchema) {
+          schemas.push(extSchema as SchemaDefinition);
+        }
+      }
+    }
+
+    return schemas;
+  }
+
+  /**
+   * Reconstruct the existing DB record as a SCIM payload object (data only, no meta/location).
+   * Used for immutable attribute comparison.
+   */
+  private buildExistingPayload(record: UserRecord): Record<string, unknown> {
+    const rawPayload = this.parseJson<Record<string, unknown>>(String(record.rawPayload ?? '{}'));
+    return {
+      ...rawPayload,
+      userName: record.userName,
+      externalId: record.externalId ?? undefined,
+      active: record.active,
+      displayName: record.displayName ?? undefined,
+    };
   }
 
   private async assertUniqueIdentifiersForEndpoint(
@@ -426,6 +489,7 @@ export class EndpointScimUsersService {
     config?: EndpointConfig
   ): Promise<UserUpdateInput> {
     const verbosePatch = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED);
+    const extensionUrns = this.schemaRegistry.getExtensionUrns(endpointId);
     const rawPayload = this.parseJson<Record<string, unknown>>(String(user.rawPayload ?? '{}'));
     const meta = this.parseJson<Record<string, unknown>>(String(user.meta ?? '{}'));
 
@@ -440,7 +504,7 @@ export class EndpointScimUsersService {
           active: user.active,
           rawPayload,
         },
-        { verbosePatch },
+        { verbosePatch, extensionUrns },
       );
     } catch (err) {
       if (err instanceof PatchError) {
@@ -450,6 +514,25 @@ export class EndpointScimUsersService {
     }
 
     const { extractedFields, payload } = result;
+
+    // H-1: Post-PATCH schema validation — validate the resulting payload
+    const resultPayload: Record<string, unknown> = {
+      schemas: [SCIM_CORE_USER_SCHEMA],
+      userName: extractedFields.userName ?? user.userName,
+      displayName: extractedFields.displayName,
+      active: extractedFields.active,
+      ...payload,
+    };
+    // Include extension URNs in schemas[] for proper validation
+    for (const urn of extensionUrns) {
+      if (urn in payload) {
+        (resultPayload.schemas as string[]).push(urn);
+      }
+    }
+    this.validatePayloadSchema(resultPayload, endpointId, config, 'patch');
+
+    // H-2: Immutable attribute enforcement — compare existing state with PATCH result
+    this.checkImmutableAttributes(user, resultPayload, endpointId, config);
 
     await this.assertUniqueIdentifiersForEndpoint(
       extractedFields.userName ?? user.userName,

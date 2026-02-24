@@ -676,4 +676,219 @@ describe('SchemaValidator', () => {
       expect(result.errors.length).toBeGreaterThanOrEqual(3);
     });
   });
+
+  // ── checkImmutable — H-2 immutable attribute enforcement ──────────────
+
+  describe('checkImmutable', () => {
+    it('should pass when no immutable attributes are defined', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'userName', mutability: 'readWrite' }),
+        makeAttr({ name: 'displayName', mutability: 'readWrite' }),
+      ]);
+      const existing = { userName: 'alice', displayName: 'Alice' };
+      const incoming = { userName: 'bob', displayName: 'Bob' };
+      const result = SchemaValidator.checkImmutable(existing, incoming, [schema]);
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should pass when immutable attribute is not set in existing resource (first write)', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'immField', mutability: 'immutable' }),
+      ]);
+      const existing = {};
+      const incoming = { immField: 'first-value' };
+      const result = SchemaValidator.checkImmutable(existing, incoming, [schema]);
+      expect(result.valid).toBe(true);
+    });
+
+    it('should pass when immutable attribute value is unchanged', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'immField', mutability: 'immutable' }),
+      ]);
+      const existing = { immField: 'set-once' };
+      const incoming = { immField: 'set-once' };
+      const result = SchemaValidator.checkImmutable(existing, incoming, [schema]);
+      expect(result.valid).toBe(true);
+    });
+
+    it('should reject when immutable attribute value changes', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'immField', mutability: 'immutable' }),
+      ]);
+      const existing = { immField: 'original' };
+      const incoming = { immField: 'changed' };
+      const result = SchemaValidator.checkImmutable(existing, incoming, [schema]);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].path).toBe('immField');
+      expect(result.errors[0].scimType).toBe('mutability');
+      expect(result.errors[0].message).toContain('immutable');
+    });
+
+    it('should allow omitting immutable attribute in incoming (not modifying it)', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'immField', mutability: 'immutable' }),
+      ]);
+      const existing = { immField: 'original' };
+      const incoming = {};
+      const result = SchemaValidator.checkImmutable(existing, incoming, [schema]);
+      expect(result.valid).toBe(true);
+    });
+
+    it('should pass when existing immutable attribute is null (not yet set)', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'immField', mutability: 'immutable' }),
+      ]);
+      const existing = { immField: null };
+      const incoming = { immField: 'now-setting-it' };
+      const result = SchemaValidator.checkImmutable(existing, incoming, [schema]);
+      expect(result.valid).toBe(true);
+    });
+
+    it('should check immutable attributes in extension schemas', () => {
+      const coreSchema = makeCoreSchema([makeAttr({ name: 'userName', mutability: 'readWrite' })]);
+      const extSchema = makeExtensionSchema([
+        makeAttr({ name: 'costCenter', mutability: 'immutable' }),
+      ]);
+      const existing = { userName: 'alice', [EXTENSION_SCHEMA_ID]: { costCenter: 'CC-100' } };
+      const incoming = { userName: 'alice', [EXTENSION_SCHEMA_ID]: { costCenter: 'CC-200' } };
+      const result = SchemaValidator.checkImmutable(existing, incoming, [coreSchema, extSchema]);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].path).toContain('costCenter');
+      expect(result.errors[0].scimType).toBe('mutability');
+    });
+
+    it('should allow setting extension immutable attribute for the first time', () => {
+      const coreSchema = makeCoreSchema([makeAttr({ name: 'userName', mutability: 'readWrite' })]);
+      const extSchema = makeExtensionSchema([
+        makeAttr({ name: 'costCenter', mutability: 'immutable' }),
+      ]);
+      const existing = { userName: 'alice' };
+      const incoming = { userName: 'alice', [EXTENSION_SCHEMA_ID]: { costCenter: 'CC-100' } };
+      const result = SchemaValidator.checkImmutable(existing, incoming, [coreSchema, extSchema]);
+      expect(result.valid).toBe(true);
+    });
+
+    it('should check immutable sub-attributes in multi-valued complex types', () => {
+      const schema = makeCoreSchema([
+        makeAttr({
+          name: 'members',
+          type: 'complex',
+          multiValued: true,
+          mutability: 'readWrite',
+          subAttributes: [
+            makeAttr({ name: 'value', mutability: 'immutable' }),
+            makeAttr({ name: 'display', mutability: 'immutable' }),
+            makeAttr({ name: 'type', mutability: 'immutable' }),
+          ],
+        }),
+      ]);
+      const existing = {
+        members: [
+          { value: 'user-1', display: 'Alice', type: 'User' },
+          { value: 'user-2', display: 'Bob', type: 'User' },
+        ],
+      };
+      // Try to change display of user-1
+      const incoming = {
+        members: [
+          { value: 'user-1', display: 'Alice Updated', type: 'User' },
+          { value: 'user-2', display: 'Bob', type: 'User' },
+        ],
+      };
+      const result = SchemaValidator.checkImmutable(existing, incoming, [schema]);
+      expect(result.valid).toBe(false);
+      expect(result.errors.length).toBeGreaterThanOrEqual(1);
+      expect(result.errors[0].message).toContain('immutable');
+    });
+
+    it('should allow adding new elements to multi-valued complex with immutable sub-attrs', () => {
+      const schema = makeCoreSchema([
+        makeAttr({
+          name: 'members',
+          type: 'complex',
+          multiValued: true,
+          mutability: 'readWrite',
+          subAttributes: [
+            makeAttr({ name: 'value', mutability: 'immutable' }),
+            makeAttr({ name: 'display', mutability: 'immutable' }),
+          ],
+        }),
+      ]);
+      const existing = {
+        members: [{ value: 'user-1', display: 'Alice' }],
+      };
+      const incoming = {
+        members: [
+          { value: 'user-1', display: 'Alice' },
+          { value: 'user-2', display: 'Bob' },
+        ],
+      };
+      const result = SchemaValidator.checkImmutable(existing, incoming, [schema]);
+      expect(result.valid).toBe(true);
+    });
+
+    it('should report multiple immutable violations', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'field1', mutability: 'immutable' }),
+        makeAttr({ name: 'field2', mutability: 'immutable' }),
+        makeAttr({ name: 'field3', mutability: 'readWrite' }),
+      ]);
+      const existing = { field1: 'a', field2: 'b', field3: 'c' };
+      const incoming = { field1: 'x', field2: 'y', field3: 'z' };
+      const result = SchemaValidator.checkImmutable(existing, incoming, [schema]);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toHaveLength(2); // field1 and field2 changed
+    });
+
+    it('should handle case-insensitive attribute names', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'immField', mutability: 'immutable' }),
+      ]);
+      const existing = { ImmField: 'original' };
+      const incoming = { immfield: 'changed' };
+      const result = SchemaValidator.checkImmutable(existing, incoming, [schema]);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toHaveLength(1);
+    });
+
+    it('should pass when immutable attribute is the same complex object', () => {
+      const schema = makeCoreSchema([
+        makeAttr({
+          name: 'immObj',
+          type: 'complex',
+          mutability: 'immutable',
+          subAttributes: [
+            makeAttr({ name: 'key1' }),
+            makeAttr({ name: 'key2' }),
+          ],
+        }),
+      ]);
+      const existing = { immObj: { key1: 'a', key2: 'b' } };
+      const incoming = { immObj: { key1: 'a', key2: 'b' } };
+      const result = SchemaValidator.checkImmutable(existing, incoming, [schema]);
+      expect(result.valid).toBe(true);
+    });
+
+    it('should reject when immutable complex attribute changes', () => {
+      const schema = makeCoreSchema([
+        makeAttr({
+          name: 'immObj',
+          type: 'complex',
+          mutability: 'immutable',
+          subAttributes: [
+            makeAttr({ name: 'key1' }),
+            makeAttr({ name: 'key2' }),
+          ],
+        }),
+      ]);
+      const existing = { immObj: { key1: 'a', key2: 'b' } };
+      const incoming = { immObj: { key1: 'a', key2: 'CHANGED' } };
+      const result = SchemaValidator.checkImmutable(existing, incoming, [schema]);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toHaveLength(1);
+    });
+  });
 });

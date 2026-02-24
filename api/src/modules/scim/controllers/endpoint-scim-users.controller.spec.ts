@@ -163,12 +163,12 @@ describe('EndpointScimUsersController', () => {
           'endpoint-1', 'scim-123', mockRequest, 'userName', undefined
         );
 
-        // Should include only userName + always-returned (schemas, id, meta)
+        // Should include only userName + always-returned (schemas, id, meta, userName, displayName)
         expect(result.userName).toBe('test@example.com');
         expect(result.schemas).toBeDefined();
         expect(result.id).toBe('scim-123');
         expect(result.active).toBeUndefined();
-        expect(result.displayName).toBeUndefined();
+        expect(result.displayName).toBe('Test User'); // displayName is returned:always per RFC 7643
       });
 
       it('should apply excludedAttributes projection', async () => {
@@ -189,7 +189,8 @@ describe('EndpointScimUsersController', () => {
         );
 
         expect(result.userName).toBe('test@example.com');
-        expect(result.displayName).toBeUndefined();
+        // displayName is returned:always per RFC 7643 — cannot be excluded
+        expect(result.displayName).toBe('Test User');
       });
     });
 

@@ -500,4 +500,73 @@ describe('UserPatchEngine', () => {
       expect((result.payload.name as any).familyName).toBe('NewFamily');
     });
   });
+
+  // ── Custom Extension URN support (BUG-001 fix) ──────────────────────
+
+  describe('custom extension URN support', () => {
+    const CUSTOM_URN = 'urn:example:custom:2.0:User';
+    const customConfig: PatchConfig = {
+      verbosePatch: true,
+      extensionUrns: [CUSTOM_URN],
+    };
+
+    it('should replace a custom extension attribute via path', () => {
+      const result = apply(
+        [{ op: 'replace', path: `${CUSTOM_URN}:customField`, value: 'custom-value' }],
+        undefined,
+        customConfig,
+      );
+      const ext = result.payload[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext?.customField).toBe('custom-value');
+    });
+
+    it('should add a custom extension attribute via path', () => {
+      const result = apply(
+        [{ op: 'add', path: `${CUSTOM_URN}:newField`, value: 42 }],
+        undefined,
+        customConfig,
+      );
+      const ext = result.payload[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext?.newField).toBe(42);
+    });
+
+    it('should remove a custom extension attribute via path', () => {
+      const state = makeState({
+        rawPayload: {
+          displayName: 'John Doe',
+          [CUSTOM_URN]: { customField: 'to-remove', otherField: 'keep' },
+        },
+      });
+      const result = UserPatchEngine.apply(
+        [{ op: 'remove', path: `${CUSTOM_URN}:customField` }],
+        state,
+        customConfig,
+      );
+      const ext = result.payload[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext?.customField).toBeUndefined();
+      expect(ext?.otherField).toBe('keep');
+    });
+
+    it('should resolve custom extension URN keys in no-path replace', () => {
+      const result = apply(
+        [{ op: 'replace', value: { [`${CUSTOM_URN}:customField`]: 'no-path-value' } }],
+        undefined,
+        customConfig,
+      );
+      const ext = result.payload[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext?.customField).toBe('no-path-value');
+    });
+
+    it('should NOT correctly resolve custom URN without extensionUrns config', () => {
+      // Without the custom URN in config, the URN path contains "2.0" which
+      // causes misparsing — this is the bug that BUG-001 fixes
+      const result = apply(
+        [{ op: 'replace', path: `${CUSTOM_URN}:customField`, value: 'val' }],
+        undefined,
+        { verbosePatch: true }, // No extensionUrns
+      );
+      // Should NOT create the correct extension namespace
+      expect(result.payload[CUSTOM_URN]).toBeUndefined();
+    });
+  });
 });

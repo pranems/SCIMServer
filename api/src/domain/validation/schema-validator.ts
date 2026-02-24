@@ -370,6 +370,180 @@ export class SchemaValidator {
   }
 
   /**
+   * Check immutable attribute enforcement (RFC 7643 §2.2).
+   *
+   * Compares two SCIM payloads (existing resource vs incoming/updated resource)
+   * and reports errors for any attribute where:
+   *  - `mutability === 'immutable'`
+   *  - The attribute was previously set (not null/undefined) in the existing resource
+   *  - The value has changed in the incoming resource
+   *
+   * Immutable attributes may be set on creation but MUST NOT be modified thereafter.
+   *
+   * @param existing  - The current resource payload (before modification)
+   * @param incoming  - The new resource payload (after modification / incoming PUT body)
+   * @param schemas   - Schema definitions for the resource type
+   * @returns ValidationResult with immutability violation errors (if any)
+   */
+  static checkImmutable(
+    existing: Record<string, unknown>,
+    incoming: Record<string, unknown>,
+    schemas: readonly SchemaDefinition[],
+  ): ValidationResult {
+    const errors: ValidationError[] = [];
+
+    const coreAttributes = new Map<string, SchemaAttributeDefinition>();
+    const extensionSchemas = new Map<string, SchemaDefinition>();
+
+    for (const schema of schemas) {
+      if (schema.id.startsWith('urn:ietf:params:scim:schemas:core:')) {
+        for (const attr of schema.attributes) {
+          coreAttributes.set(attr.name.toLowerCase(), attr);
+        }
+      } else {
+        extensionSchemas.set(schema.id, schema);
+      }
+    }
+
+    // Check core attributes
+    for (const [, attrDef] of coreAttributes) {
+      this.checkImmutableAttribute(
+        attrDef.name,
+        existing,
+        incoming,
+        attrDef,
+        errors,
+      );
+    }
+
+    // Check extension attributes
+    for (const [urn, schema] of extensionSchemas) {
+      const existingExt = existing[urn] as Record<string, unknown> | undefined;
+      const incomingExt = incoming[urn] as Record<string, unknown> | undefined;
+      if (!existingExt && !incomingExt) continue;
+
+      for (const attrDef of schema.attributes) {
+        this.checkImmutableAttribute(
+          `${urn}.${attrDef.name}`,
+          existingExt ?? {},
+          incomingExt ?? {},
+          attrDef,
+          errors,
+        );
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
+
+  /**
+   * Check a single attribute for immutability violation.
+   */
+  private static checkImmutableAttribute(
+    path: string,
+    existing: Record<string, unknown>,
+    incoming: Record<string, unknown>,
+    attrDef: SchemaAttributeDefinition,
+    errors: ValidationError[],
+  ): void {
+    if (attrDef.mutability !== 'immutable') {
+      // For complex attributes with sub-attributes, check sub-attribute immutability
+      if (attrDef.type === 'complex' && attrDef.subAttributes) {
+        const hasImmutableSubs = attrDef.subAttributes.some(sa => sa.mutability === 'immutable');
+        if (!hasImmutableSubs) return;
+
+        const existingVal = this.getValueIgnoreCase(existing, attrDef.name);
+        const incomingVal = this.getValueIgnoreCase(incoming, attrDef.name);
+
+        if (attrDef.multiValued) {
+          // Multi-valued complex: compare each matched element's immutable sub-attrs
+          this.checkImmutableMultiValuedComplex(
+            path, existingVal, incomingVal, attrDef.subAttributes, errors,
+          );
+        } else if (existingVal && incomingVal &&
+                   typeof existingVal === 'object' && typeof incomingVal === 'object') {
+          for (const subDef of attrDef.subAttributes) {
+            this.checkImmutableAttribute(
+              `${path}.${subDef.name}`,
+              existingVal as Record<string, unknown>,
+              incomingVal as Record<string, unknown>,
+              subDef,
+              errors,
+            );
+          }
+        }
+      }
+      return;
+    }
+
+    // This attribute IS immutable
+    const existingVal = this.getValueIgnoreCase(existing, attrDef.name);
+    const incomingVal = this.getValueIgnoreCase(incoming, attrDef.name);
+
+    // Not previously set → allow (first write)
+    if (existingVal === null || existingVal === undefined) return;
+
+    // Not present in incoming → allow (attribute not being modified)
+    if (incomingVal === undefined) return;
+
+    // Compare values
+    if (!this.deepEqual(existingVal, incomingVal)) {
+      errors.push({
+        path,
+        message: `Attribute '${attrDef.name}' is immutable and cannot be changed once set.`,
+        scimType: 'mutability',
+      });
+    }
+  }
+
+  /**
+   * Check immutable sub-attributes in multi-valued complex arrays.
+   * Matches elements by a shared identifier (typically 'value' sub-attribute).
+   */
+  private static checkImmutableMultiValuedComplex(
+    parentPath: string,
+    existingVal: unknown,
+    incomingVal: unknown,
+    subAttributes: readonly SchemaAttributeDefinition[],
+    errors: ValidationError[],
+  ): void {
+    if (!Array.isArray(existingVal) || !Array.isArray(incomingVal)) return;
+
+    const immutableSubs = subAttributes.filter(sa => sa.mutability === 'immutable');
+
+    // Build a lookup of existing elements by 'value' sub-attribute (the standard SCIM identifier)
+    const existingMap = new Map<string, Record<string, unknown>>();
+    for (const item of existingVal) {
+      if (item && typeof item === 'object' && 'value' in item) {
+        existingMap.set(String((item as Record<string, unknown>).value), item as Record<string, unknown>);
+      }
+    }
+
+    for (let i = 0; i < incomingVal.length; i++) {
+      const incomingItem = incomingVal[i];
+      if (!incomingItem || typeof incomingItem !== 'object') continue;
+      const incomingObj = incomingItem as Record<string, unknown>;
+
+      // Try to match with existing element by 'value'
+      if ('value' in incomingObj) {
+        const matchKey = String(incomingObj.value);
+        const existingItem = existingMap.get(matchKey);
+        if (existingItem) {
+          for (const subDef of immutableSubs) {
+            this.checkImmutableAttribute(
+              `${parentPath}[${i}].${subDef.name}`,
+              existingItem,
+              incomingObj,
+              subDef,
+              errors,
+            );
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * Case-insensitive key existence check — SCIM attribute names are case-insensitive.
    */
   private static findKeyIgnoreCase(
@@ -378,5 +552,42 @@ export class SchemaValidator {
   ): boolean {
     const lower = attrName.toLowerCase();
     return Object.keys(obj).some(k => k.toLowerCase() === lower);
+  }
+
+  /**
+   * Case-insensitive key value retrieval.
+   */
+  private static getValueIgnoreCase(
+    obj: Record<string, unknown>,
+    attrName: string,
+  ): unknown {
+    const lower = attrName.toLowerCase();
+    const key = Object.keys(obj).find(k => k.toLowerCase() === lower);
+    return key !== undefined ? obj[key] : undefined;
+  }
+
+  /**
+   * Deep equality comparison for SCIM attribute values.
+   */
+  private static deepEqual(a: unknown, b: unknown): boolean {
+    if (a === b) return true;
+    if (a === null || b === null) return false;
+    if (typeof a !== typeof b) return false;
+
+    if (Array.isArray(a) && Array.isArray(b)) {
+      if (a.length !== b.length) return false;
+      return a.every((val, i) => this.deepEqual(val, b[i]));
+    }
+
+    if (typeof a === 'object' && typeof b === 'object') {
+      const aObj = a as Record<string, unknown>;
+      const bObj = b as Record<string, unknown>;
+      const aKeys = Object.keys(aObj);
+      const bKeys = Object.keys(bObj);
+      if (aKeys.length !== bKeys.length) return false;
+      return aKeys.every(key => this.deepEqual(aObj[key], bObj[key]));
+    }
+
+    return false;
   }
 }

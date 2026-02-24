@@ -1,6 +1,6 @@
 # 📚 SCIMServer Documentation Index
 
-> Quick navigation to all project documentation. Updated February 23, 2026.
+> Quick navigation to all project documentation. Updated February 24, 2026.
 
 > Theme conventions: onboarding-first, current-state metadata, explicit historical-context labeling, and cross-linking to canonical sources.
 
@@ -93,6 +93,30 @@
 | [postman/](postman/) | Postman collection (v1.4) |
 | [insomnia/](insomnia/) | Insomnia API client exports |
 | [examples/](examples/) | Example JSON payloads |
+
+## Migration & Roadmap
+
+| Document | Description |
+|----------|-------------|
+| [MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md](MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md) | Master migration plan — 12+ phases, gap table, dependency graph, timeline |
+| [RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md](RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md) | RFC 7643/7644 attribute characteristics gap analysis — 15 gaps, sub-phases 8.1-8.5, remediation plans |
+| [H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md](H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md) | H-1 (PATCH validation) & H-2 (immutable enforcement) — architecture analysis & implementation |
+| [ATTRIBUTE_CHARACTERISTICS_GAPS.md](ATTRIBUTE_CHARACTERISTICS_GAPS.md) | RFC 7643 §2 attribute characteristics gaps, bugs, fixes — master tracking |
+| [IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md](IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md) | Ideal SCIM architecture v3 — N-tier, unified table, JSONB, data-driven discovery |
+| [INMEMORY_ARCHITECTURE_AND_PLAN_v1_2026-02-20.md](INMEMORY_ARCHITECTURE_AND_PLAN_v1_2026-02-20.md) | In-memory architecture & plan — Map-based repo implementation |
+| [MIGRATION_AUTOMATION_STRATEGY_v1_2026-02-20.md](MIGRATION_AUTOMATION_STRATEGY_v1_2026-02-20.md) | Migration automation strategy — AI-assisted effort reduction analysis |
+
+## Phase Documentation
+
+| Document | Description |
+|----------|-------------|
+| [phases/PHASE_03_POSTGRESQL_MIGRATION.md](phases/PHASE_03_POSTGRESQL_MIGRATION.md) | Phase 3 — PostgreSQL Migration (v0.11.0) |
+| [phases/PHASE_04_FILTER_PUSHDOWN.md](phases/PHASE_04_FILTER_PUSHDOWN.md) | Phase 4 — Filter Push-Down Expansion (v0.12.0) |
+| [phases/PHASE_05_PATCH_ENGINE.md](phases/PHASE_05_PATCH_ENGINE.md) | Phase 5 — Domain-Layer PATCH Engine (v0.13.0) |
+| [phases/PHASE_06_DATA_DRIVEN_DISCOVERY.md](phases/PHASE_06_DATA_DRIVEN_DISCOVERY.md) | Phase 6 — Data-Driven Discovery (v0.14.0) |
+| [phases/PHASE_07_ETAG_CONDITIONAL_REQUESTS.md](phases/PHASE_07_ETAG_CONDITIONAL_REQUESTS.md) | Phase 7 — ETag & Conditional Requests (v0.16.0) |
+| [phases/PHASE_08_SCHEMA_VALIDATION.md](phases/PHASE_08_SCHEMA_VALIDATION.md) | Phase 8 — Schema Validation Engine (v0.17.0) |
+| [PHASE_08_REMAINING_ANALYSIS.md](PHASE_08_REMAINING_ANALYSIS.md) | Phase 8 — Remaining analysis, adversarial validation gaps (33 gaps), Part 2 scope |
 
 ## Diagrams
 
