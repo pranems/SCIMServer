@@ -937,6 +937,48 @@ Test-Result -Success ($extGroup.externalId -eq "ext-group-123") -Message "Group 
 $filteredGroups = Invoke-RestMethod -Uri "$scimBase/Groups?filter=externalId eq `"ext-group-123`"" -Method GET -Headers $headers
 Test-Result -Success ($filteredGroups.totalResults -eq 1) -Message "Filter groups by externalId returns exactly 1 group"
 
+# Test: Filter groups by externalId with DIFFERENT CASE (CITEXT case-insensitive — SCIM Validator)
+Write-Host "`n--- Test: Group externalId Case-Insensitive Filter (SCIM Validator) ---" -ForegroundColor Cyan
+$extIdFilterCIGroup = Invoke-RestMethod -Uri "$scimBase/Groups?filter=externalId eq `"EXT-GROUP-123`"" -Method GET -Headers $headers
+Test-Result -Success ($extIdFilterCIGroup.totalResults -eq 1) -Message "Filter group with UPPERCASE externalId finds group (CITEXT)"
+Test-Result -Success ($extIdFilterCIGroup.Resources[0].externalId -eq "ext-group-123") -Message "Returned group preserves original externalId case"
+
+# Test: Filter groups by externalId with mixed case
+$extIdFilterMixed = Invoke-RestMethod -Uri "$scimBase/Groups?filter=externalId eq `"Ext-Group-123`"" -Method GET -Headers $headers
+Test-Result -Success ($extIdFilterMixed.totalResults -eq 1) -Message "Filter group with MixedCase externalId finds group"
+
+# Test: Filter groups by externalId with UPPERCASE attribute name
+$extIdFilterAttrCI = Invoke-RestMethod -Uri "$scimBase/Groups?filter=EXTERNALID eq `"ext-group-123`"" -Method GET -Headers $headers
+Test-Result -Success ($extIdFilterAttrCI.totalResults -eq 1) -Message "Filter with 'EXTERNALID' (uppercase attr) on Groups finds group"
+
+# Test: Filter for non-existing group by externalId
+$extIdFilterNone = Invoke-RestMethod -Uri "$scimBase/Groups?filter=externalId eq `"nonexistent-ext-id`"" -Method GET -Headers $headers
+Test-Result -Success ($extIdFilterNone.totalResults -eq 0) -Message "Filter for non-existing group externalId returns 0"
+
+# Test: PATCH group externalId update
+Write-Host "`n--- Test: PATCH Group externalId Update ---" -ForegroundColor Cyan
+$patchExtBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{ op = "replace"; value = @{ externalId = "updated-ext-789" } })
+} | ConvertTo-Json -Depth 5
+$patchExtResult = Invoke-RestMethod -Uri "$scimBase/Groups/$($extGroup.id)" -Method PATCH -Headers $headers -Body $patchExtBody
+Test-Result -Success ($patchExtResult.externalId -eq "updated-ext-789") -Message "PATCH group externalId update works"
+
+# Test: Case-insensitive externalId uniqueness for Groups
+Write-Host "`n--- Test: Group externalId Case-Insensitive Uniqueness ---" -ForegroundColor Cyan
+$ciDupGroupBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = "CI Dup Group"
+    externalId = "UPDATED-EXT-789"  # Same as updated-ext-789 just in UPPERCASE
+} | ConvertTo-Json
+try {
+    Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $ciDupGroupBody | Out-Null
+    Test-Result -Success $false -Message "Case-insensitive duplicate group externalId should return 409"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 409) -Message "Case-insensitive duplicate group externalId returns 409 (CITEXT)"
+}
+
 # Test: Duplicate group externalId → 409
 $dupExtGroupBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
@@ -950,6 +992,124 @@ try {
     $code = $_.Exception.Response.StatusCode.value__
     Test-Result -Success ($code -eq 409) -Message "Duplicate group externalId returns 409 Conflict"
 }
+
+# ============================================
+# TEST SECTION 4b: SCIM VALIDATOR MULTI-OP PATCH
+# ============================================
+$script:currentSection = "4b: Validator Multi-Op PATCH"
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 4b: SCIM VALIDATOR MULTI-OP PATCH" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Test: Multiple Ops on different User attributes (add/replace/remove)
+Write-Host "`n--- Test: Multi-Op PATCH User (different attributes) ---" -ForegroundColor Cyan
+$multiOpUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "multiop-test@test.com"
+    displayName = "OriginalDisplay"
+    title = "OriginalTitle"
+    active = $true
+} | ConvertTo-Json
+$multiOpUser = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $multiOpUserBody
+$multiOpPatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "add"; path = "displayName"; value = "NewDisplayName" },
+        @{ op = "replace"; path = "title"; value = "NewTitle" },
+        @{ op = "remove"; path = "preferredLanguage" }
+    )
+} | ConvertTo-Json -Depth 5
+$multiOpResult = Invoke-RestMethod -Uri "$scimBase/Users/$($multiOpUser.id)" -Method PATCH -Headers $headers -Body $multiOpPatchBody
+Test-Result -Success ($multiOpResult.displayName -eq "NewDisplayName") -Message "Multi-op PATCH: add displayName works"
+Test-Result -Success ($multiOpResult.title -eq "NewTitle") -Message "Multi-op PATCH: replace title works"
+
+# Test: Multiple Ops on same User attribute (remove→add→replace)
+Write-Host "`n--- Test: Multi-Op PATCH User (same attribute) ---" -ForegroundColor Cyan
+$sameAttrPatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "remove"; path = "displayName" },
+        @{ op = "add"; path = "displayName"; value = "IntermediateDisplay" },
+        @{ op = "replace"; path = "displayName"; value = "FinalDisplay" }
+    )
+} | ConvertTo-Json -Depth 5
+$sameAttrResult = Invoke-RestMethod -Uri "$scimBase/Users/$($multiOpUser.id)" -Method PATCH -Headers $headers -Body $sameAttrPatchBody
+Test-Result -Success ($sameAttrResult.displayName -eq "FinalDisplay") -Message "Multi-op PATCH: sequential ops on same attr gives final value"
+
+# Test: DELETE non-existent user → 404
+Write-Host "`n--- Test: DELETE Non-Existent User (Preview Test) ---" -ForegroundColor Cyan
+try {
+    Invoke-RestMethod -Uri "$scimBase/Users/00000000-0000-0000-0000-999999999999" -Method DELETE -Headers $headers | Out-Null
+    Test-Result -Success $false -Message "DELETE non-existent user should return 404"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 404) -Message "DELETE non-existent user returns 404"
+}
+
+# Test: DELETE same user twice → 204 then 404
+Write-Host "`n--- Test: DELETE Same User Twice (Preview Test) ---" -ForegroundColor Cyan
+$delTwiceUserBody = @{ schemas = @("urn:ietf:params:scim:schemas:core:2.0:User"); userName = "deltwice@test.com"; active = $true } | ConvertTo-Json
+$delTwiceUser = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $delTwiceUserBody
+Invoke-RestMethod -Uri "$scimBase/Users/$($delTwiceUser.id)" -Method DELETE -Headers $headers | Out-Null
+try {
+    Invoke-RestMethod -Uri "$scimBase/Users/$($delTwiceUser.id)" -Method DELETE -Headers $headers | Out-Null
+    Test-Result -Success $false -Message "Second DELETE of same user should return 404"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 404) -Message "Second DELETE of same user returns 404"
+}
+
+# Test: Multi-op PATCH on Group (add then remove member)
+Write-Host "`n--- Test: Multi-Op PATCH Group (add+remove member) ---" -ForegroundColor Cyan
+$moGroupUserBody = @{ schemas = @("urn:ietf:params:scim:schemas:core:2.0:User"); userName = "mogroup-member@test.com"; active = $true } | ConvertTo-Json
+$moGroupUser = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $moGroupUserBody
+$moGroupBody = @{ schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group"); displayName = "MultiOp Group" } | ConvertTo-Json
+$moGroup = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $moGroupBody
+$moGroupPatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "add"; path = "members"; value = @(@{ value = $moGroupUser.id }) },
+        @{ op = "remove"; path = "members[value eq `"$($moGroupUser.id)`"]" }
+    )
+} | ConvertTo-Json -Depth 5
+$moGroupResult = Invoke-RestMethod -Uri "$scimBase/Groups/$($moGroup.id)" -Method PATCH -Headers $headers -Body $moGroupPatchBody
+$moMemberCount = if ($moGroupResult.members) { @($moGroupResult.members).Count } else { 0 }
+Test-Result -Success ($moMemberCount -eq 0) -Message "Multi-op PATCH group: add+remove member results in 0 members"
+
+# Test: DELETE non-existent group → 404
+Write-Host "`n--- Test: DELETE Non-Existent Group (Preview Test) ---" -ForegroundColor Cyan
+try {
+    Invoke-RestMethod -Uri "$scimBase/Groups/00000000-0000-0000-0000-999999999999" -Method DELETE -Headers $headers | Out-Null
+    Test-Result -Success $false -Message "DELETE non-existent group should return 404"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 404) -Message "DELETE non-existent group returns 404"
+}
+
+# Test: DELETE same group twice → 204 then 404
+Write-Host "`n--- Test: DELETE Same Group Twice (Preview Test) ---" -ForegroundColor Cyan
+$delTwiceGroupBody = @{ schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group"); displayName = "DelTwice Group" } | ConvertTo-Json
+$delTwiceGroup = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $delTwiceGroupBody
+Invoke-RestMethod -Uri "$scimBase/Groups/$($delTwiceGroup.id)" -Method DELETE -Headers $headers | Out-Null
+try {
+    Invoke-RestMethod -Uri "$scimBase/Groups/$($delTwiceGroup.id)" -Method DELETE -Headers $headers | Out-Null
+    Test-Result -Success $false -Message "Second DELETE of same group should return 404"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 404) -Message "Second DELETE of same group returns 404"
+}
+
+# Test: User externalId case-insensitive filter
+Write-Host "`n--- Test: User externalId Case-Insensitive Filter ---" -ForegroundColor Cyan
+$ciExtUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "ci-ext-user@test.com"
+    externalId = "ext-user-citest"
+    active = $true
+} | ConvertTo-Json
+Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $ciExtUserBody | Out-Null
+$ciExtUserFilter = Invoke-RestMethod -Uri "$scimBase/Users?filter=externalId eq `"EXT-USER-CITEST`"" -Method GET -Headers $headers
+Test-Result -Success ($ciExtUserFilter.totalResults -eq 1) -Message "Filter user with UPPERCASE externalId finds user (CITEXT)"
 
 # ============================================
 # TEST SECTION 5: MULTI-MEMBER PATCH CONFIG FLAG

@@ -190,10 +190,20 @@ Admin/release references:
 
 Latest validated matrix:
 
-- Unit tests: **862/862** (28 suites)
-- E2E tests: **193/193** (15 suites)
-- Live integration tests: **302** (301 pass, 1 known failure) (local + Docker)
-- Microsoft SCIM Validator: **24/24 passed** (+ 7 preview scenarios)
+- Unit tests: **1316/1316** (52 suites)
+- E2E tests: **251/251** (17 suites)
+- Live integration tests: **322** (local + Docker)
+- Microsoft SCIM Validator: **25/25 passed** (+ 7 preview scenarios)
+
+### Coverage scripts
+
+```powershell
+cd api
+npm run test:cov          # Unit test coverage → coverage/
+npm run test:e2e:cov      # E2E test coverage  → coverage-e2e/
+npm run test:cov:all      # Both unit + E2E coverage
+npm run test:all          # Unit + E2E + live smoke tests
+```
 
 Testing references:
 

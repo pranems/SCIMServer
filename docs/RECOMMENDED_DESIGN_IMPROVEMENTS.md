@@ -12,7 +12,7 @@
 ## Table of Contents
 
 1. [Design Philosophy](#1-design-philosophy)
-2. [Tenant & URL Architecture](#2-tenant--url-architecture)
+2. [Endpoint & URL Architecture](#2-endpoint--url-architecture)
 3. [Resource Type System](#3-resource-type-system)
 4. [Schema-Driven Data Model](#4-schema-driven-data-model)
 5. [Attribute Characteristics Engine](#5-attribute-characteristics-engine)
@@ -46,11 +46,11 @@
 
 1. **Schema is the Source of Truth** — Every behavior (mutability, returnability, filtering, case sensitivity) should be derived from schema definitions, not hardcoded per-attribute. RFC 7643 §7 defines the schema definition format; the server should load it and act on it.
 
-2. **Resource Types are Pluggable** — RFC 7643 §3.2 says _"SCIM may be extended to define new classes of resources by defining a resource type."_ The server should not be "User + Group only" — it should treat resource types as registrations that can be added, removed, or customized per tenant.
+2. **Resource Types are Pluggable** — RFC 7643 §3.2 says _"SCIM may be extended to define new classes of resources by defining a resource type."_ The server should not be "User + Group only" — it should treat resource types as registrations that can be added, removed, or customized per endpoint.
 
-3. **Discovery Drives the Contract** — RFC 7644 §4 defines `/ServiceProviderConfig`, `/Schemas`, `/ResourceTypes` as the client's way to understand the server. These must be per-tenant, truthful, and generated from actual server capabilities — never hardcoded.
+3. **Discovery Drives the Contract** — RFC 7644 §4 defines `/ServiceProviderConfig`, `/Schemas`, `/ResourceTypes` as the client's way to understand the server. These must be per-endpoint, truthful, and generated from actual server capabilities — never hardcoded.
 
-4. **Multi-Tenancy is URL-Based** — RFC 7644 §6 gives three patterns: URL prefix, subdomain, HTTP header. For a multi-endpoint testing server, URL prefix (`/{tenantId}/Users`) is the most standard and discoverable approach.
+4. **Multi-Tenancy is URL-Based** — RFC 7644 §6 gives three patterns: URL prefix, subdomain, HTTP header. For a multi-endpoint testing server, URL prefix (`/{endpointId}/Users`) is the most standard and discoverable approach.
 
 5. **Attribute Characteristics are Not Optional** — `mutability`, `returned`, `uniqueness`, `caseExact`, `required` from RFC 7643 §2.2 must govern CRUD behavior. Read-only attributes are ignored on PUT. "never" returned attributes don't appear in responses. "always" returned attributes can't be excluded.
 
@@ -60,21 +60,21 @@
 
 ---
 
-## 2. Tenant & URL Architecture
+## 2. Endpoint & URL Architecture
 
 ### 2.1 What the RFCs Say
 
 > **RFC 7644 §6**: "The SCIM protocol does not define a scheme for multi-tenancy" but suggests:
-> - **URL prefix**: `https://example.com/Tenants/{tenant_id}/v2/Users`  
-> - **Sub-domain**: `https://{tenant_id}.example.com/v2/Groups`  
-> - **HTTP header**: A custom header carrying the tenant_id
+> - **URL prefix**: `https://example.com/Endpoints/{endpoint_id}/v2/Users`  
+> - **Sub-domain**: `https://{endpoint_id}.example.com/v2/Groups`  
+> - **HTTP header**: A custom header carrying the endpoint_id
 
 > **RFC 7644 §3.13**: "The Base URL MAY be appended with a version identifier... the character 'v' followed by the desired SCIM version number"
 
 ### 2.2 Recommended URL Design
 
 ```
-Base URL per tenant:  https://host/scim/v2/{tenantId}
+Base URL per endpoint:  https://host/scim/v2/{endpointId}
 
 Derived endpoints:
   {baseUrl}/Users                      → CRUD for Users
@@ -92,23 +92,23 @@ Derived endpoints:
   {baseUrl}/Me                         → Authenticated subject alias
 
 Admin (non-SCIM):
-  https://host/admin/tenants           → Tenant CRUD
-  https://host/admin/tenants/{id}      → Tenant detail + config
-  https://host/admin/tenants/{id}/schemas   → Per-tenant schema management
+  https://host/admin/endpoints           → Endpoint CRUD
+  https://host/admin/endpoints/{id}      → Endpoint detail + config
+  https://host/admin/endpoints/{id}/schemas   → Per-endpoint schema management
 ```
 
 ### 2.3 Why This Matters
 
-Identity providers (Entra ID, Okta, OneLogin, Ping) configure a single **"Tenant URL"** and append standard SCIM paths. If the server uses `/scim/endpoints/{id}/Users`, the tenant URL becomes `https://host/scim/endpoints/{id}` — this leaks the implementation term "endpoints" and is non-standard. Using `/scim/v2/{tenantId}` makes the base URL opaque and version-aware per RFC 7644 §3.13.
+Identity providers (Entra ID, Okta, OneLogin, Ping) configure a single **"Endpoint URL"** and append standard SCIM paths. If the server uses `/scim/endpoints/{id}/Users`, the endpoint URL becomes `https://host/scim/endpoints/{id}` — this leaks the implementation term "endpoints" and is non-standard. Using `/scim/v2/{endpointId}` makes the base URL opaque and version-aware per RFC 7644 §3.13.
 
-### 2.4 Tenant Isolation Model
+### 2.4 Endpoint Isolation Model
 
 Per RFC 7644 §6.2:
-- **SCIM `id`s** need not be globally unique — they must be unique within a tenant
-- **`externalId`** must be unique within the resources of the same type in a tenant
-- `meta.location` must include the full tenant-scoped URL
+- **SCIM `id`s** need not be globally unique — they must be unique within a endpoint
+- **`externalId`** must be unique within the resources of the same type in a endpoint
+- `meta.location` must include the full endpoint-scoped URL
 
-Each tenant is a complete, isolated SCIM service provider. Tenants SHOULD have independent:
+Each endpoint is a complete, isolated SCIM service provider. Endpoints SHOULD have independent:
 - Schema registrations (which extensions are active)
 - ServiceProviderConfig (which features are enabled)
 - Resource type registrations (which resource types are supported)
@@ -164,26 +164,26 @@ interface ResourceTypeDefinition {
 
 Adding a new resource type (e.g., `Device`, `Application`, `Role`) should require:
 1. Define its schema (attributes + characteristics)
-2. Register the resource type with a tenant
+2. Register the resource type with a endpoint
 3. Routes and CRUD handlers are generated automatically — **no new controller code**
 
-### 3.3 Per-Tenant Resource Type Configuration
+### 3.3 Per-Endpoint Resource Type Configuration
 
-Each tenant can have a different set of active resource types and extensions:
+Each endpoint can have a different set of active resource types and extensions:
 
 ```typescript
-interface TenantResourceConfig {
-  tenantId: string;
+interface EndpointResourceConfig {
+  endpointId: string;
   resourceTypes: ResourceTypeDefinition[];
-  enabledExtensions: string[];  // Extension schema URIs active for this tenant
+  enabledExtensions: string[];  // Extension schema URIs active for this endpoint
 }
 ```
 
 This enables scenarios like:
-- **Tenant A**: `User` + `Group` + Enterprise Extension (standard Entra ID provisioning)
-- **Tenant B**: `User` + `Group` + Custom extension (Okta with custom fields)
-- **Tenant C**: `User` only (simple user sync)
-- **Tenant D**: `User` + `Group` + `Device` + `Role` (complex enterprise)
+- **Endpoint A**: `User` + `Group` + Enterprise Extension (standard Entra ID provisioning)
+- **Endpoint B**: `User` + `Group` + Custom extension (Okta with custom fields)
+- **Endpoint C**: `User` only (simple user sync)
+- **Endpoint D**: `User` + `Group` + `Device` + `Role` (complex enterprise)
 
 ### 3.4 The "Common" Resource Attributes
 
@@ -261,7 +261,7 @@ Store all SCIM resources in a unified way that doesn't require schema-per-column
 │  Table: ScimResource                                               │
 │                                                                     │
 │  id            UUID PK           (internal database ID)             │
-│  tenantId      UUID FK → Tenant  (isolation boundary)               │
+│  endpointId      UUID FK → Endpoint  (isolation boundary)               │
 │  resourceType  String            ("User", "Group", ...)             │
 │  scimId        String            (SCIM-visible ID, UUID format)     │
 │  externalId    String?           (client-assigned identifier)       │
@@ -270,17 +270,17 @@ Store all SCIM resources in a unified way that doesn't require schema-per-column
 │  createdAt     DateTime          (meta.created)                     │
 │  lastModified  DateTime          (meta.lastModified)                │
 │                                                                     │
-│  @@unique([tenantId, resourceType, scimId])                         │
-│  @@unique([tenantId, resourceType, externalId])                     │
-│  @@index([tenantId, resourceType])                                  │
-│  @@index([tenantId, resourceType, data->'userName'])  -- GIN index  │
+│  @@unique([endpointId, resourceType, scimId])                         │
+│  @@unique([endpointId, resourceType, externalId])                     │
+│  @@index([endpointId, resourceType])                                  │
+│  @@index([endpointId, resourceType, data->'userName'])  -- GIN index  │
 └─────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────┐
 │  Table: ScimResourceMembership (for Group members, etc.)             │
 │                                                                       │
 │  id            UUID PK                                                │
-│  tenantId      UUID FK → Tenant                                       │
+│  endpointId      UUID FK → Endpoint                                       │
 │  groupId       UUID FK → ScimResource (where resourceType = Group)    │
 │  memberId      UUID FK → ScimResource (any resource type)             │
 │  memberScimId  String   (denormalized for efficient SCIM $ref)        │
@@ -288,26 +288,26 @@ Store all SCIM resources in a unified way that doesn't require schema-per-column
 │  display       String?  (denormalized for display field)              │
 │                                                                       │
 │  @@unique([groupId, memberId])                                        │
-│  @@index([tenantId, groupId])                                         │
+│  @@index([endpointId, groupId])                                         │
 │  @@index([memberId])  -- for reverse lookups (which groups am I in?)  │
 └───────────────────────────────────────────────────────────────────────┘
 
 ┌───────────────────────────────────────────────────────────────────────┐
-│  Table: Tenant                                                         │
+│  Table: Endpoint                                                         │
 │                                                                         │
 │  id            UUID PK                                                  │
 │  name          String @unique        (URL-safe slug for path param)     │
 │  displayName   String?               (human-readable name)              │
 │  description   String?                                                  │
-│  config        JSONB                 (tenant-specific behavior flags)    │
+│  config        JSONB                 (endpoint-specific behavior flags)    │
 │  active        Boolean @default(true)                                   │
 │  createdAt     DateTime                                                 │
 │  updatedAt     DateTime                                                 │
 │                                                                         │
 │  Relationships:                                                         │
 │  ├── resources      ScimResource[]                                      │
-│  ├── resourceTypes  TenantResourceType[]  (which types are active)      │
-│  └── schemas        TenantSchema[]        (which schemas are active)    │
+│  ├── resourceTypes  EndpointResourceType[]  (which types are active)      │
+│  └── schemas        EndpointSchema[]        (which schemas are active)    │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -328,14 +328,14 @@ Store all SCIM resources in a unified way that doesn't require schema-per-column
 
 Per RFC 7643 §7 attribute definition, `uniqueness` can be:
 - `"none"` — no constraint
-- `"server"` — unique across the server (within the tenant, per resource type)
-- `"global"` — unique globally across all tenants
+- `"server"` — unique across the server (within the endpoint, per resource type)
+- `"global"` — unique globally across all endpoints
 
 The schema engine should read the `uniqueness` characteristic and enforce it:
 
 ```typescript
 async function enforceUniqueness(
-  tenantId: string,
+  endpointId: string,
   resourceType: string,
   schema: SchemaDefinition,
   data: Record<string, unknown>,
@@ -350,8 +350,8 @@ async function enforceUniqueness(
     const normalizedValue = attr.caseExact ? value : String(value).toLowerCase();
     
     const scope = attr.uniqueness === 'global' 
-      ? { resourceType }                           // all tenants
-      : { tenantId, resourceType };                 // this tenant only
+      ? { resourceType }                           // all endpoints
+      : { endpointId, resourceType };                 // this endpoint only
     
     const existing = await store.findByAttribute(scope, attr.name, normalizedValue);
     if (existing && existing.scimId !== existingId) {
@@ -643,12 +643,12 @@ FilterNode → SQL/Query builder AST → Database query
 For JSONB storage (PostgreSQL example):
 ```sql
 -- eq filter on userName (caseExact=false)
-WHERE tenant_id = $1
+WHERE endpoint_id = $1
   AND resource_type = 'User'
   AND LOWER(data->>'userName') = LOWER($2)
 
 -- co filter on emails.value (multi-valued complex attribute)
-WHERE tenant_id = $1
+WHERE endpoint_id = $1
   AND resource_type = 'User'
   AND EXISTS (
     SELECT 1 FROM jsonb_array_elements(data->'emails') elem
@@ -656,7 +656,7 @@ WHERE tenant_id = $1
   )
 
 -- Compound: userName sw "J" and active eq true
-WHERE tenant_id = $1
+WHERE endpoint_id = $1
   AND resource_type = 'User'
   AND LOWER(data->>'userName') LIKE LOWER($2) || '%'
   AND (data->>'active')::boolean = true
@@ -664,7 +664,7 @@ WHERE tenant_id = $1
 
 **Approach B — Application-side (acceptable for test/dev server)**:
 ```
-Fetch all resources for tenant → Evaluate FilterNode in-memory → Return matches
+Fetch all resources for endpoint → Evaluate FilterNode in-memory → Return matches
 ```
 
 The in-memory evaluator is useful for development and for databases that don't support JSONB natively (like SQLite). A well-designed filter engine can support **both** strategies transparently.
@@ -707,32 +707,32 @@ This is required for queries that are too complex or sensitive for URL query str
 
 > **RFC 7643 §5**: ServiceProviderConfig schema includes: `patch.supported`, `bulk.supported/maxOperations/maxPayloadSize`, `filter.supported/maxResults`, `changePassword.supported`, `sort.supported`, `etag.supported`, `authenticationSchemes[]`.
 
-### 8.2 Recommended Design: Per-Tenant Dynamic Discovery
+### 8.2 Recommended Design: Per-Endpoint Dynamic Discovery
 
-Each tenant should have **its own ServiceProviderConfig** reflecting its actual, truthful capabilities:
+Each endpoint should have **its own ServiceProviderConfig** reflecting its actual, truthful capabilities:
 
 ```typescript
-function buildServiceProviderConfig(tenant: Tenant): ServiceProviderConfig {
+function buildServiceProviderConfig(endpoint: Endpoint): ServiceProviderConfig {
   return {
     schemas: ['urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig'],
-    documentationUri: `https://scimserver.dev/docs/${tenant.name}`,
+    documentationUri: `https://scimserver.dev/docs/${endpoint.name}`,
     patch: {
-      supported: tenant.config.patchEnabled ?? true
+      supported: endpoint.config.patchEnabled ?? true
     },
     bulk: {
-      supported: tenant.config.bulkEnabled ?? false,
-      maxOperations: tenant.config.bulkMaxOperations ?? 1000,
-      maxPayloadSize: tenant.config.bulkMaxPayloadSize ?? 1048576
+      supported: endpoint.config.bulkEnabled ?? false,
+      maxOperations: endpoint.config.bulkMaxOperations ?? 1000,
+      maxPayloadSize: endpoint.config.bulkMaxPayloadSize ?? 1048576
     },
     filter: {
       supported: true,
-      maxResults: tenant.config.filterMaxResults ?? 200
+      maxResults: endpoint.config.filterMaxResults ?? 200
     },
     changePassword: {
       supported: false
     },
     sort: {
-      supported: tenant.config.sortEnabled ?? true
+      supported: endpoint.config.sortEnabled ?? true
     },
     etag: {
       supported: true
@@ -749,7 +749,7 @@ function buildServiceProviderConfig(tenant: Tenant): ServiceProviderConfig {
     ],
     meta: {
       resourceType: 'ServiceProviderConfig',
-      location: `${tenant.baseUrl}/ServiceProviderConfig`
+      location: `${endpoint.baseUrl}/ServiceProviderConfig`
     }
   };
 }
@@ -759,25 +759,25 @@ function buildServiceProviderConfig(tenant: Tenant): ServiceProviderConfig {
 
 The `/Schemas` endpoint should return schemas **dynamically generated from the schema registry**, not from hardcoded JSON. This ensures:
 - Custom extensions appear in `/Schemas`
-- Per-tenant schema customizations are reflected
+- Per-endpoint schema customizations are reflected
 - The schema definition matches actual server behavior
 
 ```
-GET /scim/v2/{tenantId}/Schemas
-→ ListResponse of all schemas active for this tenant
+GET /scim/v2/{endpointId}/Schemas
+→ ListResponse of all schemas active for this endpoint
    (core:User, core:Group, extension:enterprise:2.0:User, any custom)
 
-GET /scim/v2/{tenantId}/Schemas/urn:ietf:params:scim:schemas:core:2.0:User
+GET /scim/v2/{endpointId}/Schemas/urn:ietf:params:scim:schemas:core:2.0:User
 → Single schema definition with full attribute metadata
 ```
 
 ### 8.4 /ResourceTypes — Generated from Resource Type Registry
 
 ```
-GET /scim/v2/{tenantId}/ResourceTypes
-→ ListResponse of all resource types active for this tenant
+GET /scim/v2/{endpointId}/ResourceTypes
+→ ListResponse of all resource types active for this endpoint
 
-GET /scim/v2/{tenantId}/ResourceTypes/User
+GET /scim/v2/{endpointId}/ResourceTypes/User
 → Single resource type definition:
 {
   "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
@@ -793,7 +793,7 @@ GET /scim/v2/{tenantId}/ResourceTypes/User
     }
   ],
   "meta": {
-    "location": "https://host/scim/v2/{tenantId}/ResourceTypes/User",
+    "location": "https://host/scim/v2/{endpointId}/ResourceTypes/User",
     "resourceType": "ResourceType"
   }
 }
@@ -953,7 +953,7 @@ class ScimError extends Error {
 | 304 | Conditional GET — ETag matches | No body |
 | 400 | Bad request (with scimType detail) | Error body |
 | 401 | Missing or invalid authentication | `WWW-Authenticate` header + Error body |
-| 403 | Forbidden (inactive tenant, filter on /ServiceProviderConfig) | Error body |
+| 403 | Forbidden (inactive endpoint, filter on /ServiceProviderConfig) | Error body |
 | 404 | Resource not found | Error body |
 | 409 | Conflict (uniqueness violation, bulk circular reference) | Error body |
 | 412 | ETag precondition failed | Error body |
@@ -1019,10 +1019,10 @@ schemaRegistry.registerExtension({
 
 ### 12.3 Custom Extension Support
 
-The server should support **custom extensions** registered per-tenant at runtime:
+The server should support **custom extensions** registered per-endpoint at runtime:
 
 ```json
-POST /admin/tenants/{id}/extensions
+POST /admin/endpoints/{id}/extensions
 {
   "id": "urn:example:scim:schemas:custom:1.0:Employee",
   "name": "Custom Employee Fields",
@@ -1059,9 +1059,9 @@ Once registered:
 
 > **RFC 7644 §7.5.2**: "Sensitive information SHALL NOT be transmitted over request URIs." This is why POST-based search exists.
 
-> **RFC 7643 §9.3**: Privacy — "Information should be shared on an as-needed basis." Per-tenant identifier isolation is recommended.
+> **RFC 7643 §9.3**: Privacy — "Information should be shared on an as-needed basis." Per-endpoint identifier isolation is recommended.
 
-> **RFC 7644 §7**: Full security considerations section covering TLS, token validation, bearer token risks, cross-tenant isolation.
+> **RFC 7644 §7**: Full security considerations section covering TLS, token validation, bearer token risks, cross-endpoint isolation.
 
 ### 13.2 Recommended Auth Design
 
@@ -1075,14 +1075,14 @@ Once registered:
 │  3. Validate token:                                │
 │     a. JWT: verify signature, issuer, expiry       │
 │     b. Opaque: introspect with auth server         │
-│     c. Shared secret: compare with tenant config   │
-│  4. Extract tenant claim from token                │
-│     → Must match {tenantId} in URL path            │
-│  5. Verify tenant is active                        │
-│  6. Set tenant context for request                 │
+│     c. Shared secret: compare with endpoint config   │
+│  4. Extract endpoint claim from token                │
+│     → Must match {endpointId} in URL path            │
+│  5. Verify endpoint is active                        │
+│  6. Set endpoint context for request                 │
 │  7. Apply authorization scopes                     │
 │                                                    │
-│  Per-Tenant Auth Modes:                            │
+│  Per-Endpoint Auth Modes:                            │
 │  ┌──────────────────────────────────────────┐      │
 │  │ Mode          │ Use Case                 │      │
 │  ├───────────────┼──────────────────────────┤      │
@@ -1094,17 +1094,17 @@ Once registered:
 └────────────────────────────────────────────────────┘
 ```
 
-### 13.3 Per-Tenant Auth Isolation
+### 13.3 Per-Endpoint Auth Isolation
 
 | Security Property | Requirement |
 |-------------------|-------------|
-| **Token binding** | Token is bound to a specific tenant; cannot access other tenants' data |
-| **Credential isolation** | Each tenant has unique credentials (client_id/secret, shared token, etc.) |
+| **Token binding** | Token is bound to a specific endpoint; cannot access other endpoints' data |
+| **Credential isolation** | Each endpoint has unique credentials (client_id/secret, shared token, etc.) |
 | **Password handling** | `password` attribute has `returned: "never"` and `mutability: "writeOnly"` |
-| **Audit logging** | All operations logged with tenant_id, actor, timestamp, resource, operation |
-| **Rate limiting** | Per-tenant rate limits to prevent abuse and ensure fair usage |
+| **Audit logging** | All operations logged with endpoint_id, actor, timestamp, resource, operation |
+| **Rate limiting** | Per-endpoint rate limits to prevent abuse and ensure fair usage |
 | **TLS required** | All connections must use HTTPS in production (RFC 7644 §7.1) |
-| **Cross-tenant isolation** | No API call can read or modify another tenant's resources |
+| **Cross-endpoint isolation** | No API call can read or modify another endpoint's resources |
 
 ---
 
@@ -1117,24 +1117,24 @@ The SCIM server should define a **storage interface** and allow different implem
 ```typescript
 interface ScimResourceStore {
   // === CRUD ===
-  create(tenantId: string, resourceType: string, data: Resource): Promise<StoredResource>;
-  get(tenantId: string, resourceType: string, scimId: string): Promise<StoredResource | null>;
-  replace(tenantId: string, resourceType: string, scimId: string, data: Resource, ifMatch?: string): Promise<StoredResource>;
-  patch(tenantId: string, resourceType: string, scimId: string, ops: PatchOp[], ifMatch?: string): Promise<StoredResource>;
-  delete(tenantId: string, resourceType: string, scimId: string, ifMatch?: string): Promise<void>;
+  create(endpointId: string, resourceType: string, data: Resource): Promise<StoredResource>;
+  get(endpointId: string, resourceType: string, scimId: string): Promise<StoredResource | null>;
+  replace(endpointId: string, resourceType: string, scimId: string, data: Resource, ifMatch?: string): Promise<StoredResource>;
+  patch(endpointId: string, resourceType: string, scimId: string, ops: PatchOp[], ifMatch?: string): Promise<StoredResource>;
+  delete(endpointId: string, resourceType: string, scimId: string, ifMatch?: string): Promise<void>;
 
   // === Query ===
-  list(tenantId: string, resourceType: string, options: ListOptions): Promise<ListResult>;
-  search(tenantId: string, filter: FilterNode, options: ListOptions): Promise<ListResult>;
+  list(endpointId: string, resourceType: string, options: ListOptions): Promise<ListResult>;
+  search(endpointId: string, filter: FilterNode, options: ListOptions): Promise<ListResult>;
 
   // === Membership (Group members) ===
-  addMembers(tenantId: string, groupScimId: string, members: MemberRef[]): Promise<void>;
-  removeMembers(tenantId: string, groupScimId: string, memberScimIds: string[]): Promise<void>;
-  replaceMembers(tenantId: string, groupScimId: string, members: MemberRef[]): Promise<void>;
-  getMembers(tenantId: string, groupScimId: string): Promise<MemberRef[]>;
+  addMembers(endpointId: string, groupScimId: string, members: MemberRef[]): Promise<void>;
+  removeMembers(endpointId: string, groupScimId: string, memberScimIds: string[]): Promise<void>;
+  replaceMembers(endpointId: string, groupScimId: string, members: MemberRef[]): Promise<void>;
+  getMembers(endpointId: string, groupScimId: string): Promise<MemberRef[]>;
 
   // === Bulk ===
-  bulk(tenantId: string, operations: BulkOperation[]): Promise<BulkResult>;
+  bulk(endpointId: string, operations: BulkOperation[]): Promise<BulkResult>;
 }
 
 interface ListOptions {
@@ -1202,17 +1202,17 @@ By programming against the interface, you can:
 The `/Me` endpoint resolves the authenticated user's identity and delegates to the standard resource endpoint:
 
 ```typescript
-// GET /scim/v2/{tenantId}/Me → resolve to GET /scim/v2/{tenantId}/Users/{authenticatedUserId}
+// GET /scim/v2/{endpointId}/Me → resolve to GET /scim/v2/{endpointId}/Users/{authenticatedUserId}
 async handleMeGet(authContext: AuthContext): Promise<Resource> {
   const userId = await resolveAuthenticatedUser(authContext);
-  return this.usersService.get(authContext.tenantId, userId);
+  return this.usersService.get(authContext.endpointId, userId);
 }
 ```
 
 Resolution strategies:
 1. **JWT `sub` claim** → look up user by externalId or userName
 2. **Token introspection** → extract user identity from token metadata
-3. **Mapped claim** → tenant-configurable claim-to-attribute mapping
+3. **Mapped claim** → endpoint-configurable claim-to-attribute mapping
 
 ---
 
@@ -1267,7 +1267,7 @@ interface PaginatedResponse<T> {
 | **`attributes`/`excludedAttributes` params** | 7644 §3.9 | ✅ Implemented on all GET and POST /.search endpoints (Users + Groups) | ✅ Implemented |
 | **`returned` characteristic** | 7643 §2.2 | Not enforced — all attributes always returned | 🟡 Phase 2 |
 | **`mutability` on PUT** | 7644 §3.5.1 | Not enforced — readOnly attributes accepted | 🟡 Phase 2 |
-| **Dynamic ServiceProviderConfig** | 7644 §4 | Hardcoded JSON; same for all tenants | 🟡 Phase 2 |
+| **Dynamic ServiceProviderConfig** | 7644 §4 | Hardcoded JSON; same for all endpoints | 🟡 Phase 2 |
 | **Dynamic /Schemas** | 7644 §4 | Hardcoded JSON | 🟡 Phase 2 |
 | **Dynamic /ResourceTypes** | 7644 §4 | Hardcoded JSON | 🟡 Phase 2 |
 | **PATCH path: full ABNF** | 7644 Figure 1 | ✅ valuePath filter, extension URN, no-path merge, dot-notation (via VerbosePatchSupported flag) | ✅ Implemented |
@@ -1283,16 +1283,16 @@ interface PaginatedResponse<T> {
 | Area | Current State | Ideal (RFC-First) State |
 |------|--------------|-------------------------|
 | **Data model** | Column-per-attribute + `rawPayload` JSON blob | Single `data` JSONB document per resource |
-| **Schema registry** | Hardcoded schema JSON in controllers | Programmatic registry with per-tenant customization |
+| **Schema registry** | Hardcoded schema JSON in controllers | Programmatic registry with per-endpoint customization |
 | **Resource type system** | Hardcoded User + Group with separate services | Pluggable resource type registry with generic handler |
 | **Attribute processing** | Per-attribute hardcoded logic in each service | Schema-characteristic-driven `AttributeProcessor` |
 | **Filter engine** | In-memory `eq`-only comparison | Parsed AST with database-side evaluation for all operators |
 | **Storage interface** | Direct Prisma calls scattered across services | Abstract `ScimResourceStore` with multiple implementations |
 | **Discovery endpoints** | Duplicated hardcoded JSON in 3+ controllers | Auto-generated from schema and resource type registries |
-| **Config system** | 11 flags stored as JSON string, parsed per request | Typed per-tenant configuration with validation |
+| **Config system** | 11 flags stored as JSON string, parsed per request | Typed per-endpoint configuration with validation |
 | **Error handling** | Mix of NestJS exceptions and SCIM error objects | Unified `ScimError` class through NestJS exception filter |
 | **PATCH engine** | Split across service and utils with partial path support | Centralized engine with full ABNF parser |
-| **Auth system** | Hardcoded legacy token + partial OAuth | Per-tenant configurable auth with JWT validation |
+| **Auth system** | Hardcoded legacy token + partial OAuth | Per-endpoint configurable auth with JWT validation |
 | **Test architecture** | Mock-heavy unit tests | Contract tests against RFC-defined examples + store interface tests |
 
 ### 17.3 Code Hygiene Issues
@@ -1303,7 +1303,7 @@ interface PaginatedResponse<T> {
 | Legacy services (1000+ lines) retained but unwired | Dead code | Delete or archive |
 | Schema JSON duplicated in 3+ files | Inconsistency risk | Single source of truth via schema registry |
 | `AsyncLocalStorage.enterWith()` in context storage | Context leak across requests | Switch to `run()` with callback |
-| Hardcoded legacy credential in auth guard | Security vulnerability | Remove; use per-tenant config only |
+| Hardcoded legacy credential in auth guard | Security vulnerability | Remove; use per-endpoint config only |
 | `whitelist: true` in ValidationPipe | Accepts malformed properties silently | Switch to strict DTO validation |
 | In-memory filtering fetches ALL records | Won't scale beyond thousands | Database-side query evaluation |
 | Config stored as JSON string blob | Parsed on every request, no type safety | Typed configuration interface with caching |
@@ -1352,17 +1352,17 @@ interface PaginatedResponse<T> {
 | 3.4 | Refactor services to use store interface instead of direct Prisma calls | 🟡 Medium | Large |
 | 3.5 | Migrate data model: columnar → document-based (with migration tool) | 🟡 Medium | Large |
 
-### Phase 4: Multi-Tenant Excellence
+### Phase 4: Multi-Endpoint Excellence
 
-**Goal**: Make each tenant a fully independent, configurable SCIM service.
+**Goal**: Make each endpoint a fully independent, configurable SCIM service.
 
 | # | Task | Impact | Effort |
 |---|------|--------|--------|
-| 4.1 | Rename "endpoint" to "tenant" in URL paths and admin API | 🟢 Low | Medium |
-| 4.2 | Per-tenant ServiceProviderConfig (truthfully reflects tenant capabilities) | 🟡 Medium | Small |
-| 4.3 | Per-tenant schema extensions and resource type registrations | 🟡 Medium | Medium |
-| 4.4 | Per-tenant auth configuration (bearer, client creds, shared secret, none) | 🟡 Medium | Large |
-| 4.5 | Per-tenant behavior flags with typed configuration | 🟡 Medium | Medium |
+| 4.1 | Rename "endpoint" to "endpoint" in URL paths and admin API | 🟢 Low | Medium |
+| 4.2 | Per-endpoint ServiceProviderConfig (truthfully reflects endpoint capabilities) | 🟡 Medium | Small |
+| 4.3 | Per-endpoint schema extensions and resource type registrations | 🟡 Medium | Medium |
+| 4.4 | Per-endpoint auth configuration (bearer, client creds, shared secret, none) | 🟡 Medium | Large |
+| 4.5 | Per-endpoint behavior flags with typed configuration | 🟡 Medium | Medium |
 
 ### Phase 5: Advanced Features — Full RFC Coverage
 
@@ -1373,7 +1373,7 @@ interface PaginatedResponse<T> {
 | 5.1 | Bulk operations engine (bulkId resolution, failOnErrors, atomicity) | 🟡 Medium | Large |
 | 5.2 | Sorting support (sortBy, sortOrder, caseExact-aware) | 🟡 Medium | Medium |
 | 5.3 | Resource type plugin system (register custom types with auto-routing) | 🟡 Medium | Large |
-| 5.4 | Custom extension registration API (per-tenant runtime extensions) | 🟡 Medium | Large |
+| 5.4 | Custom extension registration API (per-endpoint runtime extensions) | 🟡 Medium | Large |
 | 5.5 | `/Me` authenticated subject alias | 🟢 Low | Small |
 | 5.6 | `$ref` in Group member responses | 🟢 Low | Small |
 | 5.7 | PostgreSQL JSONB store implementation (production-grade) | 🟡 Medium | Large |
@@ -1384,11 +1384,11 @@ interface PaginatedResponse<T> {
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│                     SCIM Multi-Tenant Server                             │
+│                     SCIM Multi-Endpoint Server                             │
 │                                                                          │
 │  ┌──────────────┐  ┌───────────────┐  ┌────────────────────────────────┐ │
-│  │   Routing     │  │   Auth Guard  │  │   Tenant Context               │ │
-│  │   Layer       │  │   (per-tenant │  │   (AsyncLocalStorage.run()     │ │
+│  │   Routing     │  │   Auth Guard  │  │   Endpoint Context               │ │
+│  │   Layer       │  │   (per-endpoint │  │   (AsyncLocalStorage.run()     │ │
 │  │   (dynamic    │  │    config)    │  │    scoped to request)          │ │
 │  │    routes per │  │               │  │                                │ │
 │  │    resource   │  │               │  │                                │ │
@@ -1403,7 +1403,7 @@ interface PaginatedResponse<T> {
 │  │  │ (definitions,   │  │ (full ABNF,     │  │ (shared path       │   │  │
 │  │  │  extensions,    │  │  all operators,  │  │  parser, op        │   │  │
 │  │  │  characteristics│  │  AST → SQL/mem) │  │  router,           │   │  │
-│  │  │  per tenant)    │  │                  │  │  mutability check) │   │  │
+│  │  │  per endpoint)    │  │                  │  │  mutability check) │   │  │
 │  │  └───────┬─────────┘  └────────┬─────────┘  └────────┬───────────┘   │  │
 │  │          │                     │                      │              │  │
 │  │  ┌───────▼─────────────────────▼──────────────────────▼───────────┐  │  │
@@ -1433,7 +1433,7 @@ interface PaginatedResponse<T> {
 │  ┌──────────────────────────────────────────────────────────────────────┐  │
 │  │                     Discovery (Auto-Generated)                       │  │
 │  │                                                                      │  │
-│  │  /ServiceProviderConfig  ← truthfully built from tenant config       │  │
+│  │  /ServiceProviderConfig  ← truthfully built from endpoint config       │  │
 │  │  /Schemas                ← dynamically from schema registry          │  │
 │  │  /ResourceTypes          ← dynamically from resource type registry   │  │
 │  └──────────────────────────────────────────────────────────────────────┘  │
@@ -1446,7 +1446,7 @@ interface PaginatedResponse<T> {
 |----------------|----------------|
 | **Hardcoded per-resource logic** — separate UserService, GroupService with duplicated CRUD | **Generic resource handler** — one handler processes any resource type through schema-driven rules |
 | **Column-per-attribute persistence** — schema migrations for every attribute change | **Document-based storage** — JSONB stores any resource shape; schema changes need zero DB migrations |
-| **Static discovery responses** — same hardcoded JSON for all tenants | **Dynamic discovery** — per-tenant, truthful, auto-generated from registries |
+| **Static discovery responses** — same hardcoded JSON for all endpoints | **Dynamic discovery** — per-endpoint, truthful, auto-generated from registries |
 
 ### Design Philosophy Summarized
 

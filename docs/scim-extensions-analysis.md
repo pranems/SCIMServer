@@ -1,6 +1,6 @@
 # SCIM Extensions Analysis — Enterprise & Custom Extensions
 
-> **⚠️ SUPERSEDED** — This v1 document (Feb 16) has been superseded by the v3 architecture docs (Feb 20, 2026). The code-driven `IScimExtension` pattern described here was replaced by a data-driven `tenant_schema` + `tenant_resource_type` model. **Retained for**: concrete extension implementation examples, `IScimExtension` interface reference, hybrid storage analysis, and the new-extension checklist.
+> **⚠️ SUPERSEDED** — This v1 document (Feb 16) has been superseded by the v3 architecture docs (Feb 20, 2026). The code-driven `IScimExtension` pattern described here was replaced by a data-driven `endpoint_schema` + `endpoint_resource_type` model. **Retained for**: concrete extension implementation examples, `IScimExtension` interface reference, hybrid storage analysis, and the new-extension checklist.
 > **See**: [`IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md`](IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md) · [`MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md`](MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md)
 
 > **Date**: February 16, 2026

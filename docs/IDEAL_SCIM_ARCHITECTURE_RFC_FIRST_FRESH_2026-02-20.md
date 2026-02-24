@@ -1,18 +1,18 @@
-# Ideal SCIM 2.0 Multi-Tenant Architecture (RFC-First, Fresh Design)
+# Ideal SCIM 2.0 Multi-Endpoint Architecture (RFC-First, Fresh Design)
 
 Status: Draft (fresh redesign)
 Last Updated: 2026-02-20
-Scope: RFC-first ideal target for a multi-tenant SCIM 2.0 server with independently configurable schema and behavior flags per tenant.
+Scope: RFC-first ideal target for a multi-endpoint SCIM 2.0 server with independently configurable schema and behavior flags per endpoint.
 
 ---
 
 ## 1) Design Goals
 
 1. Strict protocol and schema correctness for RFC 7643 and RFC 7644.
-2. Hard multi-tenant isolation (data, schema, behavior, and throttling boundaries).
-3. Dynamic schema and ResourceType discovery with no code changes per tenant.
+2. Hard multi-endpoint isolation (data, schema, behavior, and throttling boundaries).
+3. Dynamic schema and ResourceType discovery with no code changes per endpoint.
 4. High query efficiency for SCIM filters and pagination at scale.
-5. Extensible behavior through tenant-level policy/config flags.
+5. Extensible behavior through endpoint-level policy/config flags.
 6. Persistence-agnostic domain via Repository Pattern, with a recommended concrete implementation.
 7. Operational simplicity: debuggability, observability, safe migrations, and predictable performance.
 
@@ -47,7 +47,7 @@ graph TD
   end
 
   subgraph Application
-    CTRL --> RCTX[Tenant Resolver + Request Context]
+    CTRL --> RCTX[Endpoint Resolver + Request Context]
     CTRL --> PROJ[Attribute Projection Engine]
     CTRL --> ETAG[Conditional Request Engine]
   end
@@ -64,7 +64,7 @@ graph TD
     ORCH --> IRES[IResourceRepository]
     ORCH --> ISCH[ISchemaRepository]
     ORCH --> IRT[IResourceTypeRepository]
-    ORCH --> ICFG[ITenantConfigRepository]
+    ORCH --> ICFG[IEndpointConfigRepository]
   end
 
   subgraph Infrastructure
@@ -81,7 +81,7 @@ graph TD
 ### Why this split
 - Protocol logic is isolated from persistence logic.
 - Any persistence technology can implement repository interfaces.
-- Multi-tenant concerns are centralized in request context and repository scoping.
+- Multi-endpoint concerns are centralized in request context and repository scoping.
 
 ---
 
@@ -106,21 +106,21 @@ Use hybrid modeling:
 
 ```mermaid
 erDiagram
-  TENANT ||--o{ TENANT_CONFIG : has
-  TENANT ||--o{ TENANT_SCHEMA : defines
-  TENANT ||--o{ TENANT_RESOURCE_TYPE : defines
-  TENANT ||--o{ SCIM_RESOURCE : owns
+  ENDPOINT ||--o{ ENDPOINT_CONFIG : has
+  ENDPOINT ||--o{ ENDPOINT_SCHEMA : defines
+  ENDPOINT ||--o{ ENDPOINT_RESOURCE_TYPE : defines
+  ENDPOINT ||--o{ SCIM_RESOURCE : owns
 
-  TENANT {
+  ENDPOINT {
     uuid id PK
-    text tenant_key UK
+    text endpoint_key UK
     text status
     timestamptz created_at
   }
 
-  TENANT_CONFIG {
+  ENDPOINT_CONFIG {
     uuid id PK
-    uuid tenant_id FK
+    uuid endpoint_id FK
     jsonb service_provider_config
     jsonb behavior_flags
     integer filter_max_results
@@ -129,9 +129,9 @@ erDiagram
     timestamptz updated_at
   }
 
-  TENANT_SCHEMA {
+  ENDPOINT_SCHEMA {
     uuid id PK
-    uuid tenant_id FK
+    uuid endpoint_id FK
     text schema_urn UK
     text name
     text description
@@ -141,9 +141,9 @@ erDiagram
     timestamptz updated_at
   }
 
-  TENANT_RESOURCE_TYPE {
+  ENDPOINT_RESOURCE_TYPE {
     uuid id PK
-    uuid tenant_id FK
+    uuid endpoint_id FK
     text name
     text endpoint
     text description
@@ -155,7 +155,7 @@ erDiagram
 
   SCIM_RESOURCE {
     uuid id PK
-    uuid tenant_id FK
+    uuid endpoint_id FK
     text resource_type
     text scim_id UK
     text external_id
@@ -170,9 +170,9 @@ erDiagram
 ```
 
 ### Key indexes
-- `(tenant_id, resource_type, scim_id)` unique.
-- `(tenant_id, resource_type, external_id)` unique where non-null.
-- `(tenant_id, resource_type, user_name_citext)` unique where applicable.
+- `(endpoint_id, resource_type, scim_id)` unique.
+- `(endpoint_id, resource_type, external_id)` unique where non-null.
+- `(endpoint_id, resource_type, user_name_citext)` unique where applicable.
 - `GIN(data jsonb_path_ops)` for filter pushdown.
 - Additional expression indexes for frequent filters (e.g., emails value/type, members value).
 
@@ -180,11 +180,11 @@ erDiagram
 
 ## 6) Relation: ResourceTypes ↔ Schemas ↔ Attribute Definitions
 
-1. `TenantResourceType.base_schema_urn` points to one schema document in `TenantSchema.schema_urn`.
-2. `TenantResourceType.schema_extensions[]` points to 0..N extension schema URNs.
-3. Each `TenantSchema.attributes` JSONB contains complete recursive attribute definitions.
+1. `EndpointResourceType.base_schema_urn` points to one schema document in `EndpointSchema.schema_urn`.
+2. `EndpointResourceType.schema_extensions[]` points to 0..N extension schema URNs.
+3. Each `EndpointSchema.attributes` JSONB contains complete recursive attribute definitions.
 4. Effective validation model for a resource type = `base schema` + `extensions` (merged by URN path).
-5. Reuse: one extension schema can be attached to multiple resource types in same tenant.
+5. Reuse: one extension schema can be attached to multiple resource types in same endpoint.
 
 This relation is the core of dynamic discovery and validation.
 
@@ -193,7 +193,7 @@ This relation is the core of dynamic discovery and validation.
 ## 7) Discovery APIs (Mandatory)
 
 ### `GET /ServiceProviderConfig`
-Must return tenant-specific capability declaration:
+Must return endpoint-specific capability declaration:
 - patch support
 - bulk support and limits
 - filter support and limits
@@ -202,11 +202,11 @@ Must return tenant-specific capability declaration:
 - auth schemes
 
 ### `GET /Schemas`
-Must return all active schema definitions for tenant.
+Must return all active schema definitions for endpoint.
 Each schema includes full attribute definitions and characteristics.
 
 ### `GET /ResourceTypes`
-Must return all active resource types for tenant.
+Must return all active resource types for endpoint.
 Each resource type references base schema and schema extensions and endpoint URI.
 
 ### Discovery flow
@@ -215,13 +215,13 @@ Each resource type references base schema and schema extensions and endpoint URI
 sequenceDiagram
   participant Client
   participant API
-  participant Resolver as Tenant Resolver
+  participant Resolver as Endpoint Resolver
   participant Repo as Schema/Config Repos
 
-  Client->>API: GET /scim/{tenant}/ResourceTypes
-  API->>Resolver: Resolve tenant + auth scope
-  Resolver-->>API: tenantId
-  API->>Repo: getResourceTypes(tenantId)
+  Client->>API: GET /scim/{endpoint}/ResourceTypes
+  API->>Resolver: Resolve endpoint + auth scope
+  Resolver-->>API: endpointId
+  API->>Repo: getResourceTypes(endpointId)
   Repo-->>API: ResourceType[]
   API-->>Client: 200 ListResponse
 ```
@@ -305,9 +305,9 @@ Prevents invalid end-state after legal individual operations.
 
 ---
 
-## 12) Tenant Config Flags (Behavior Policy Layer)
+## 12) Endpoint Config Flags (Behavior Policy Layer)
 
-Tenant config should be explicit and typed. Example:
+Endpoint config should be explicit and typed. Example:
 
 ```json
 {
@@ -334,18 +334,18 @@ Rules:
 
 ## 13) Security and Isolation
 
-- Tenant isolation key enforced on every data access path.
+- Endpoint isolation key enforced on every data access path.
 - Strong auth for SCIM APIs (OAuth bearer preferred; shared secret mode controlled and auditable).
 - Secret values never echoed in logs.
-- Per-tenant request rate limiting and abuse controls.
+- Per-endpoint request rate limiting and abuse controls.
 - Audit logging for write operations and admin config changes.
 
 ---
 
 ## 14) Observability and Operations
 
-- Structured logs with requestId, tenantId, resourceType, operation, status.
-- Metrics: p95 latency by endpoint and tenant, filter pushdown ratio, patch failure reason categories.
+- Structured logs with requestId, endpointId, resourceType, operation, status.
+- Metrics: p95 latency by endpoint and endpoint, filter pushdown ratio, patch failure reason categories.
 - Trace critical flows: filter parse/plan/execute, patch apply/validate/persist, discovery load/cache.
 - Background schema cache invalidation on schema/resource type updates.
 
@@ -367,4 +367,4 @@ Rules:
 - RFC 7643: Core Schema.
 - RFC 7644: Protocol (operations, filters, patch, discovery, versioning).
 - HTTP conditional request semantics (`ETag`, `If-Match`, `If-None-Match`).
-- Multi-tenant SaaS design principles (isolation, config-as-data, policy-driven behavior).
+- Multi-endpoint SaaS design principles (isolation, config-as-data, policy-driven behavior).

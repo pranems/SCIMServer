@@ -55,15 +55,15 @@ Every recommendation in this document is grounded in these three RFCs and the de
 │ 2 │ Resource Types are Pluggable — server should      │ §3.2    │ ❌ NO     │
 │   │ not be "User + Group only"; resource types        │ RFC7643 │ Hardcoded │
 │   │ should be registrations that can be added,        │         │ User+Group│
-│   │ removed, or customized per tenant.                │         │           │
+│   │ removed, or customized per endpoint.                │         │           │
 ├───┼──────────────────────────────────────────────────┼─────────┼───────────┤
 │ 3 │ Discovery Drives the Contract — /SPC,             │ §4      │ ❌ NO     │
-│   │ /Schemas, /ResourceTypes must be per-tenant,      │ RFC7644 │ Static    │
+│   │ /Schemas, /ResourceTypes must be per-endpoint,      │ RFC7644 │ Static    │
 │   │ truthful, and generated from actual server        │         │ hardcoded │
 │   │ capabilities — never hardcoded.                   │         │ identical │
 ├───┼──────────────────────────────────────────────────┼─────────┼───────────┤
 │ 4 │ Multi-Tenancy is URL-Based — URL prefix           │ §6      │ ✅ YES    │
-│   │ (/{tenantId}/Users) is the most standard and      │ RFC7644 │ endpoints/│
+│   │ (/{endpointId}/Users) is the most standard and      │ RFC7644 │ endpoints/│
 │   │ discoverable approach.                            │         │ :endpointId│
 ├───┼──────────────────────────────────────────────────┼─────────┼───────────┤
 │ 5 │ Attribute Characteristics are Not Optional —       │ §2.2    │ ⚠️ PARTIAL│
@@ -120,7 +120,7 @@ After auditing every layer of the SCIMServer codebase against all three SCIM RFC
 
 **The problem**: The metadata layer is disconnected from the config layer — discovery endpoints (including ServiceProviderConfig) are hardcoded and identical across all endpoints, schemas arrays never include extension URNs, and 7 of 12 endpoint config flags are dead code. The server tells clients one story while behaving differently.
 
-> **Design Principle #3 violated**: "Discovery Drives the Contract" — /ServiceProviderConfig, /Schemas, /ResourceTypes must be per-tenant, truthful, and generated from actual server capabilities — never hardcoded.
+> **Design Principle #3 violated**: "Discovery Drives the Contract" — /ServiceProviderConfig, /Schemas, /ResourceTypes must be per-endpoint, truthful, and generated from actual server capabilities — never hardcoded.
 
 ---
 
@@ -327,7 +327,7 @@ Client                              SCIMServer
 
 ## 2A. Per-Endpoint Isolation Audit
 
-> **Design Principle #4**: "Multi-Tenancy is URL-Based — RFC 7644 §6 gives three patterns: URL prefix, subdomain, HTTP header. For a multi-endpoint testing server, URL prefix (/{tenantId}/Users) is the most standard and discoverable approach."
+> **Design Principle #4**: "Multi-Tenancy is URL-Based — RFC 7644 §6 gives three patterns: URL prefix, subdomain, HTTP header. For a multi-endpoint testing server, URL prefix (/{endpointId}/Users) is the most standard and discoverable approach."
 
 ### What Works Well (Endpoint Isolation Foundations)
 
@@ -364,7 +364,7 @@ The server's per-endpoint isolation is **architecturally sound** across the DB, 
 │  │  ├── GET /endpoints/:endpointId/ResourceTypes  (Discovery controller)   │ │
 │  │  └── GET /endpoints/:endpointId/ServiceProviderConfig (Discovery ctrl)  │ │
 │  │                                                                         │ │
-│  │  Each endpoint ID maps to a separate "tenant" with its own             │ │
+│  │  Each endpoint ID maps to a separate "endpoint" with its own             │ │
 │  │  users, groups, and configuration.                                      │ │
 │  └─────────────────────────────────────────────────────────────────────────┘ │
 │                                                                               │
@@ -445,7 +445,7 @@ Despite the strong foundations, **the discovery layer ignores per-endpoint confi
 
 ### Per-Endpoint Discovery — RFC 7644 §4 Requirement
 
-RFC 7644 §4 states that discovery endpoints allow clients to understand the server's capabilities. In a multi-tenant system, this means each tenant's discovery responses **must reflect that tenant's actual configuration**.
+RFC 7644 §4 states that discovery endpoints allow clients to understand the server's capabilities. In a multi-endpoint system, this means each endpoint's discovery responses **must reflect that endpoint's actual configuration**.
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────────┐
@@ -485,7 +485,7 @@ RFC 7644 §4 states that discovery endpoints allow clients to understand the ser
 
 ## 2B. ServiceProviderConfig Audit
 
-> **Design Principle #3**: "Discovery Drives the Contract — /ServiceProviderConfig, /Schemas, /ResourceTypes must be per-tenant, truthful, and generated from actual server capabilities — never hardcoded."
+> **Design Principle #3**: "Discovery Drives the Contract — /ServiceProviderConfig, /Schemas, /ResourceTypes must be per-endpoint, truthful, and generated from actual server capabilities — never hardcoded."
 
 ### Current State
 
@@ -1484,7 +1484,7 @@ export class ResourceTypeRegistry {
 
   /**
    * Register a custom resource type for an endpoint.
-   * This enables custom resource types per-tenant.
+   * This enables custom resource types per-endpoint.
    */
   async registerResourceType(
     endpointId: string,

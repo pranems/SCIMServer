@@ -18,9 +18,10 @@
 8. [Phase 6 — Data-Driven Discovery](#8-phase-6--data-driven-discovery)
 9. [Phase 7 — ETag & Conditional Requests (Strict)](#9-phase-7--etag--conditional-requests)
 10. [Phase 8 — Schema Validation](#10-phase-8--schema-validation)
+10b. [Phase 8 Part 2 — Custom Resource Type Registration](#10b-phase-8-part-2--custom-resource-type-registration)
 11. [Phase 9 — Bulk Operations](#11-phase-9--bulk-operations)
 12. [Phase 10 — /Me Endpoint](#12-phase-10--me-endpoint)
-13. [Phase 11 — Per-Tenant Credentials](#13-phase-11--per-tenant-credentials)
+13. [Phase 11 — Per-Endpoint Credentials](#13-phase-11--per-endpoint-credentials)
 14. [Phase 12 — Sorting, Search, and Cleanup](#14-phase-12--sorting-search-and-cleanup)
 15. [Risk Matrix & Mitigation](#15-risk-matrix--mitigation)
 16. [Dependency Graph](#16-dependency-graph)
@@ -39,21 +40,22 @@ The table below maps every gap between the current codebase and the ideal archit
 | G3 | **SQLite** — no CITEXT, no JSONB, no GIN, single-writer lock | HIGH | `schema.prisma` (provider="sqlite") | PostgreSQL with CITEXT, JSONB, GIN, `pg_trgm` | 3 |
 | G4 | **Filter push-down only for `eq`** on 3 columns | HIGH | `apply-scim-filter.ts` (`tryPushToDb` returns null for all non-eq ops) | Full operator support via PostgreSQL ILIKE, JSONB operators, `pg_trgm` | 4 |
 | G5 | **PATCH engine embedded in service** (~200 lines inline) | HIGH | `endpoint-scim-users.service.ts` (lines 320–440), `endpoint-scim-groups.service.ts` (PATCH handlers) | Standalone `PatchEngine` in Domain layer, schema-aware, zero DB imports | 5 |
-| G6 | **Discovery endpoints hardcoded** | MEDIUM | `endpoint-scim-discovery.controller.ts` (private methods, static JSON) | `tenant_schema` + `tenant_resource_type` tables, `DiscoveryService` | 6 |
+| G6 | **Discovery endpoints hardcoded** | MEDIUM | `endpoint-scim-discovery.controller.ts` (private methods, static JSON) | `endpoint_schema` + `endpoint_resource_type` tables, `DiscoveryService` | 6 |
 | G7 | **ETag If-Match NOT enforced** before writes | HIGH | `scim-etag.interceptor.ts` (assertIfMatch exists but never called) | Pre-write check in Orchestrator; monotonic integer version | 7 |
-| G8 | **No schema validation** against tenant schema definitions | MEDIUM | None (no validation logic exists) | `SchemaValidator` validates payload against `tenant_schema.attributes` | 8 |
+| G8 | **No schema validation** against endpoint schema definitions | MEDIUM | None (no validation logic exists) | `SchemaValidator` validates payload against `endpoint_schema.attributes` | 8 |
+| G8b | **No custom resource type registration** — only hardcoded User/Group | MEDIUM | `scim-schemas.constants.ts` (static resource types), per-type controllers/services/repos | `EndpointResourceType` table + Admin API + generic wildcard controller + `customResourceTypesEnabled` config flag | 8.2 |
 | G9 | **No /Bulk endpoint** | LOW | Missing entirely | `BulkController` + `BulkProcessor` with bulkId resolution | 9 |
 | G10 | **No /Me endpoint** | LOW | Missing entirely | `MeController` mapping authenticated user to resource | 10 |
-| G11 | **Global shared-secret auth** | MEDIUM | `shared-secret.guard.ts` (single SCIM_SHARED_SECRET for all tenants) | Per-tenant credentials in `tenant_credential` table | 11 |
+| G11 | **Global shared-secret auth** | MEDIUM | `shared-secret.guard.ts` (single SCIM_SHARED_SECRET for all endpoints) | Per-endpoint credentials in `endpoint_credential` table | 11 |
 | G12 | **No sortBy/sortOrder support** | LOW | ServiceProviderConfig returns `sort: {supported: false}` | Sort push-down to DB; in-memory fallback for JSONB paths | 12 |
 | G13 | **ETag uses timestamp** (collision-prone) | MEDIUM | `buildMeta()` → `W/"${updatedAt.toISOString()}"` | Monotonic `version INT` column | 7 |
 | G14 | **`rawPayload` stored as String** (not JSONB) | MEDIUM | `schema.prisma` → `rawPayload String` | `payload JSONB` column with GIN index | 2,3 |
 | G15 | **`userNameLower` / `displayNameLower`** helper columns | LOW | `schema.prisma` | Remove; use PostgreSQL CITEXT for transparent case-insensitivity | 3 |
-| G16 | **Extension URN hardcoded** to Enterprise User only | MEDIUM | `scim-patch-path.ts` → `KNOWN_EXTENSION_URNS` | Dynamic from `tenant_schema` rows | 6 |
+| G16 | **Extension URN hardcoded** to Enterprise User only | MEDIUM | `scim-patch-path.ts` → `KNOWN_EXTENSION_URNS` | Dynamic from `endpoint_schema` rows | 6 |
 | G17 | **Code duplication** between User/Group services | MEDIUM | ~600 lines each with isomorphic patterns | Single `ResourceOrchestrator` parameterized by resource type | 2,5 |
 | G18 | **No POST /.search** endpoint | LOW | Missing | Add alongside existing GET list | 12 |
-| G19 | **Response `schemas[]` never includes extension URNs** | MEDIUM | `toScimUserResource()` hardcodes `schemas[]`; `includeEnterpriseSchema` flag defined (L47) + defaulted false (L204) but **never consumed** at runtime | `schemas[]` dynamically built from `{resource payload keys} ∩ {tenant_schema URNs}` | 6 |
-| G20 | **7 of 12 config flags are dead code (58%)** | MEDIUM | `excludeMeta`, `excludeSchemas`, `customSchemaUrn`, `includeEnterpriseSchema`, `strictMode`, `legacyMode`, `customHeaders` — all defined + defaulted but **never consumed** at runtime | Remove dead flags or wire them to behavior; document live-flag contract in tenant config | 6 |
+| G19 | **Response `schemas[]` never includes extension URNs** | MEDIUM | `toScimUserResource()` hardcodes `schemas[]`; `includeEnterpriseSchema` flag defined (L47) + defaulted false (L204) but **never consumed** at runtime | `schemas[]` dynamically built from `{resource payload keys} ∩ {endpoint_schema URNs}` | 6 |
+| G20 | **7 of 12 config flags are dead code (58%)** | MEDIUM | `excludeMeta`, `excludeSchemas`, `customSchemaUrn`, `includeEnterpriseSchema`, `strictMode`, `legacyMode`, `customHeaders` — all defined + defaulted but **never consumed** at runtime | Remove dead flags or wire them to behavior; document live-flag contract in endpoint config | 6 |
 
 ### Gap Heat Map (Severity × Impact on RFC Compliance)
 
@@ -65,7 +67,7 @@ The table below maps every gap between the current codebase and the ideal archit
                     │              │ (Architectural / data model) │
                     ├──────────────┼──────────────────────────────┤
   Correctness ──────│ MEDIUM       │ G2 G6 G8 G11 G13 G14 G16   │
-                    │              │ (Missing per-tenant data)   │
+                    │              │ (Missing per-endpoint data)   │
                     ├──────────────┼──────────────────────────────┤
   Completeness ─────│ LOW          │ G9 G10 G12 G15 G17 G18     │
                     │              │ (Features / cleanup)        │
@@ -133,12 +135,13 @@ Phase 2  Unified Resource Table     ██████   (data model alignment)
 Phase 3  PostgreSQL Migration       ██████   (infrastructure swap)
 Phase 4  Filter Push-Down           ████     (perf + compliance)
 Phase 5  Domain PATCH Engine        ██████   (correctness + testability)
-Phase 6  Data-Driven Discovery      ████     (per-tenant schema)
+Phase 6  Data-Driven Discovery      ████     (per-endpoint schema)
 Phase 7  ETag & Versioning          ████     (concurrency)
 Phase 8  Schema Validation          ████     (strictness)
+Phase 8.2 Custom Resource Types     ████     (extensibility)
 Phase 9  Bulk Operations            ███      (feature)
 Phase 10 /Me Endpoint               ██       (feature)
-Phase 11 Per-Tenant Credentials     ████     (security)
+Phase 11 Per-Endpoint Credentials     ████     (security)
 Phase 12 Sort, Search, Cleanup      ████     (polish)
 ```
 
@@ -154,7 +157,8 @@ Phase 5             ██████
 Phase 6                  ███
 Phase 7                  ███
 Phase 8                     ███
-Phase 9                        ███
+Phase 8.2                      ██
+Phase 9                          ███
 Phase 10                          ██
 Phase 11                          ████
 Phase 12                              ████
@@ -181,9 +185,10 @@ gantt
 
     section Features
     P8 Schema Validation         :p8, after p6, 2w
+    P8b Custom Resource Types    :p8b, after p8, 1.5w
     P9 Bulk Operations           :p9, after p5, 2w
     P10 /Me Endpoint             :p10, after p1, 1w
-    P11 Per-Tenant Credentials   :p11, after p3, 2w
+    P11 Per-Endpoint Credentials   :p11, after p3, 2w
 
     section Polish
     P12 Sort, Search, Cleanup    :p12, after p4, 2w
@@ -287,18 +292,18 @@ src/
   domain/
     ports/
       resource.repository.ts          ← Interface
-      tenant.repository.ts            ← Interface
+      endpoint.repository.ts            ← Interface
       schema.repository.ts            ← Interface
       membership.repository.ts        ← Interface
     models/
       scim-resource.model.ts          ← Plain TypeScript types
-      tenant.model.ts
+      endpoint.model.ts
       schema.model.ts
   infrastructure/
     persistence/
       prisma/
         prisma-resource.repository.ts  ← Implements IResourceRepository
-        prisma-tenant.repository.ts
+        prisma-endpoint.repository.ts
         prisma-schema.repository.ts
         prisma-membership.repository.ts
 ```
@@ -311,7 +316,7 @@ src/
 // src/domain/ports/resource.repository.ts
 
 export interface ResourceCreateInput {
-  tenantId: string;
+  endpointId: string;
   resourceType: string;    // "User" | "Group"
   scimId: string;
   externalId?: string | null;
@@ -331,7 +336,7 @@ export interface ResourceUpdateInput {
 }
 
 export interface ResourceQueryOptions {
-  tenantId: string;
+  endpointId: string;
   resourceType: string;
   where?: Record<string, unknown>;  // Abstracted filter (not Prisma-specific)
   orderBy?: { field: string; direction: 'asc' | 'desc' };
@@ -346,13 +351,13 @@ export interface ResourceQueryResult<T> {
 
 export interface IResourceRepository {
   create(input: ResourceCreateInput): Promise<ScimResourceModel>;
-  findById(tenantId: string, scimId: string): Promise<ScimResourceModel | null>;
-  findByExternalId(tenantId: string, externalId: string): Promise<ScimResourceModel | null>;
-  findByUserName(tenantId: string, userName: string): Promise<ScimResourceModel | null>;
+  findById(endpointId: string, scimId: string): Promise<ScimResourceModel | null>;
+  findByExternalId(endpointId: string, externalId: string): Promise<ScimResourceModel | null>;
+  findByUserName(endpointId: string, userName: string): Promise<ScimResourceModel | null>;
   query(options: ResourceQueryOptions): Promise<ResourceQueryResult<ScimResourceModel>>;
   update(id: string, input: ResourceUpdateInput): Promise<ScimResourceModel>;
   delete(id: string): Promise<void>;
-  assertUnique(tenantId: string, userName?: string, externalId?: string, excludeScimId?: string): Promise<void>;
+  assertUnique(endpointId: string, userName?: string, externalId?: string, excludeScimId?: string): Promise<void>;
 }
 ```
 
@@ -363,7 +368,7 @@ export interface IResourceRepository {
 
 export interface ScimResourceModel {
   id: string;           // Internal storage ID
-  tenantId: string;
+  endpointId: string;
   resourceType: string;
   scimId: string;        // SCIM-visible id
   externalId: string | null;
@@ -404,7 +409,7 @@ export class PrismaResourceRepository implements IResourceRepository {
           active: input.active ?? true,
           rawPayload: JSON.stringify(input.payload),
           meta: JSON.stringify({ resourceType: 'User', created: new Date().toISOString(), lastModified: new Date().toISOString() }),
-          endpoint: { connect: { id: input.tenantId } }
+          endpoint: { connect: { id: input.endpointId } }
         }
       });
       return this.toModel(created, 'User');
@@ -418,7 +423,7 @@ export class PrismaResourceRepository implements IResourceRepository {
   private toModel(row: any, resourceType: string): ScimResourceModel {
     return {
       id: row.id,
-      tenantId: row.endpointId,
+      endpointId: row.endpointId,
       resourceType,
       scimId: row.scimId,
       externalId: row.externalId,
@@ -458,7 +463,7 @@ Replace `this.prisma.scimUser.xxx()` calls with `this.resourceRepo.xxx()` one me
 | Service Method | Before (direct Prisma) | After (Repository) |
 |---------------|----------------------|---------------------|
 | `createUserForEndpoint` | `this.prisma.scimUser.create({data})` | `this.resourceRepo.create(input)` |
-| `getUserForEndpoint` | `this.prisma.scimUser.findFirst({where})` | `this.resourceRepo.findById(tenantId, scimId)` |
+| `getUserForEndpoint` | `this.prisma.scimUser.findFirst({where})` | `this.resourceRepo.findById(endpointId, scimId)` |
 | `listUsersForEndpoint` | `this.prisma.scimUser.findMany({where})` | `this.resourceRepo.query(options)` |
 | `replaceUserForEndpoint` | `this.prisma.scimUser.update({where, data})` | `this.resourceRepo.update(id, input)` |
 | `deleteUserForEndpoint` | `this.prisma.scimUser.delete({where})` | `this.resourceRepo.delete(id)` |
@@ -525,10 +530,10 @@ Endpoint ───────>│ rawPayload   │
                  ┌─────────────────┐
                  │  scim_resource   │
                  │ id               │
-     ┌──────────>│ tenant_id (FK)   │
+     ┌──────────>│ endpoint_id (FK)   │
      │           │ resource_type    │  ← "User" / "Group"
 Endpoint ──────>│ scim_id          │
-(tenant)        │ user_name        │  ← NULL for Groups
+(endpoint)        │ user_name        │  ← NULL for Groups
                  │ display_name     │
                  │ payload (JSONB)  │  ← String until Phase 3
                  │ version (INT)    │  ← 1 until Phase 7
@@ -681,11 +686,11 @@ export class ResourceOrchestrator {
     private readonly patchEngine: IPatchEngine,  // Placeholder until Phase 5
   ) {}
 
-  async create(tenantId: string, resourceType: string, dto: any, baseUrl: string) {
+  async create(endpointId: string, resourceType: string, dto: any, baseUrl: string) {
     // Generic create — works for User, Group, or any future type
   }
 
-  async get(tenantId: string, scimId: string, baseUrl: string) {
+  async get(endpointId: string, scimId: string, baseUrl: string) {
     // Generic get
   }
 
@@ -969,7 +974,7 @@ erDiagram
         varchar display
     }
 
-    tenant_schema {
+    endpoint_schema {
         uuid id PK
         uuid endpoint_id FK
         varchar schema_urn UK
@@ -977,7 +982,7 @@ erDiagram
         jsonb attributes
     }
 
-    tenant_resource_type {
+    endpoint_resource_type {
         uuid id PK
         uuid endpoint_id FK
         varchar name UK
@@ -986,7 +991,7 @@ erDiagram
         jsonb schema_extensions
     }
 
-    tenant_credential {
+    endpoint_credential {
         uuid id PK
         uuid endpoint_id FK
         varchar credential_type
@@ -999,9 +1004,9 @@ erDiagram
     Endpoint ||--o{ scim_resource : "has"
     scim_resource ||--o{ resource_member : "group has members"
     scim_resource ||--o{ resource_member : "is member of"
-    Endpoint ||--o{ tenant_schema : "defines schemas"
-    Endpoint ||--o{ tenant_resource_type : "defines types"
-    Endpoint ||--o{ tenant_credential : "authenticates via"
+    Endpoint ||--o{ endpoint_schema : "defines schemas"
+    Endpoint ||--o{ endpoint_resource_type : "defines types"
+    Endpoint ||--o{ endpoint_credential : "authenticates via"
 ```
 
 ---
@@ -1223,11 +1228,11 @@ sequenceDiagram
     participant DB as PostgreSQL
 
     CLIENT->>CTRL: PATCH /Users/abc123<br/>If-Match: W/"v5"<br/>Body: {Operations: [...]}
-    CTRL->>ORCH: patch(tenantId, "abc123", ops, "W/\"v5\"")
+    CTRL->>ORCH: patch(endpointId, "abc123", ops, "W/\"v5\"")
 
     rect rgb(230, 245, 255)
         Note over ORCH,DB: Infrastructure — Read
-        ORCH->>REPO: findById(tenantId, "abc123")
+        ORCH->>REPO: findById(endpointId, "abc123")
         REPO->>DB: SELECT * FROM scim_resource WHERE scim_id = 'abc123'
         DB-->>REPO: {payload, version: 5, ...}
         REPO-->>ORCH: ScimResourceModel
@@ -1250,7 +1255,7 @@ sequenceDiagram
 
     rect rgb(230, 255, 230)
         Note over ORCH,DB: Infrastructure — Write
-        ORCH->>REPO: assertUnique(tenantId, extractedFields)
+        ORCH->>REPO: assertUnique(endpointId, extractedFields)
         REPO->>DB: SELECT ... WHERE userName = ...
         DB-->>REPO: No conflict
         ORCH->>REPO: update(id, result, version: {increment: 1})
@@ -1490,7 +1495,7 @@ private userSchema() {
 ```
 
 This means:
-- All tenants see the same schemas (no per-tenant schema customization)
+- All endpoints see the same schemas (no per-endpoint schema customization)
 - Adding attributes requires code changes + redeployment
 - Enterprise extension is hardcoded to a single URN
 - ServiceProviderConfig says `bulk: {supported: false}` even when bulk is implemented
@@ -1516,7 +1521,7 @@ Of the 12 config flags defined in the endpoint config model, **only 5 are live**
 | `legacyMode` | DEAD | Defined L50, defaulted false L206 — never consumed |
 | `customHeaders` | DEAD | Defined L51, defaulted null L207 — never consumed |
 
-**Impact:** Phase 6 must decide per flag: wire to behavior, or remove. The dead discovery-related flags (`excludeMeta`, `excludeSchemas`, `includeEnterpriseSchema`, `customSchemaUrn`) should be replaced by the data-driven `tenant_schema` model.
+**Impact:** Phase 6 must decide per flag: wire to behavior, or remove. The dead discovery-related flags (`excludeMeta`, `excludeSchemas`, `includeEnterpriseSchema`, `customSchemaUrn`) should be replaced by the data-driven `endpoint_schema` model.
 
 ### ServiceProviderConfig Compliance Gaps
 
@@ -1526,31 +1531,31 @@ The current `ServiceProviderConfig` response is missing 4 required or best-pract
 
 | Missing Field | RFC Requirement | Current Behavior | Fix |
 |---------------|----------------|------------------|-----|
-| `bulk.maxOperations` | REQUIRED when bulk supported | Missing entirely | Add `maxOperations: 1000` (configurable per tenant) |
+| `bulk.maxOperations` | REQUIRED when bulk supported | Missing entirely | Add `maxOperations: 1000` (configurable per endpoint) |
 | `bulk.maxPayloadSize` | REQUIRED when bulk supported | Missing entirely | Add `maxPayloadSize: 1048576` (1 MB, configurable) |
 | `meta` object | SHOULD (§3.1) | Missing from SPC response | Add `meta: {resourceType: "ServiceProviderConfig", created: ..., location: ...}` |
-| `documentationUri` | OPTIONAL but best practice | Missing | Add `documentationUri` pointing to tenant docs |
+| `documentationUri` | OPTIONAL but best practice | Missing | Add `documentationUri` pointing to endpoint docs |
 
-Additionally, the current ServiceProviderConfig response is **identical for all endpoints** — it ignores per-endpoint config. Phase 6 must derive SPC dynamically from `tenant.config` JSONB so that each tenant's capabilities are accurately reflected.
+Additionally, the current ServiceProviderConfig response is **identical for all endpoints** — it ignores per-endpoint config. Phase 6 must derive SPC dynamically from `endpoint.config` JSONB so that each endpoint's capabilities are accurately reflected.
 
 ### Target State
 
-Discovery endpoints read from `tenant_schema` and `tenant_resource_type` tables:
+Discovery endpoints read from `endpoint_schema` and `endpoint_resource_type` tables:
 
 ```
-GET /tenants/{id}/Schemas
-  → DiscoveryService.listSchemas(tenantId)
-    → schemaRepo.findByTenant(tenantId)
-      → SELECT * FROM tenant_schema WHERE tenant_id = $1
+GET /endpoints/{id}/Schemas
+  → DiscoveryService.listSchemas(endpointId)
+    → schemaRepo.findByEndpoint(endpointId)
+      → SELECT * FROM endpoint_schema WHERE endpoint_id = $1
 
-GET /tenants/{id}/ResourceTypes
-  → DiscoveryService.listResourceTypes(tenantId)
-    → resourceTypeRepo.findByTenant(tenantId)
-      → SELECT * FROM tenant_resource_type WHERE tenant_id = $1
+GET /endpoints/{id}/ResourceTypes
+  → DiscoveryService.listResourceTypes(endpointId)
+    → resourceTypeRepo.findByEndpoint(endpointId)
+      → SELECT * FROM endpoint_resource_type WHERE endpoint_id = $1
 
-GET /tenants/{id}/ServiceProviderConfig
-  → DiscoveryService.getServiceProviderConfig(tenantId)
-    → Derived from tenant.config JSONB
+GET /endpoints/{id}/ServiceProviderConfig
+  → DiscoveryService.getServiceProviderConfig(endpointId)
+    → Derived from endpoint.config JSONB
 ```
 
 ### Step-by-Step Implementation
@@ -1558,7 +1563,7 @@ GET /tenants/{id}/ServiceProviderConfig
 #### Step 6.1: Add Database Models
 
 ```prisma
-model TenantSchema {
+model EndpointSchema {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   endpointId  String   @db.Uuid
   schemaUrn   String   @db.VarChar(255)
@@ -1572,7 +1577,7 @@ model TenantSchema {
   @@unique([endpointId, schemaUrn])
 }
 
-model TenantResourceType {
+model EndpointResourceType {
   id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   endpointId       String   @db.Uuid
   name             String   @db.VarChar(100)
@@ -1588,29 +1593,29 @@ model TenantResourceType {
 }
 ```
 
-#### Step 6.2: Seed Default Schemas on Tenant Creation
+#### Step 6.2: Seed Default Schemas on Endpoint Creation
 
 ```typescript
-// When creating a new tenant, seed the standard SCIM schemas:
-async function seedDefaultSchemas(tenantId: string, prisma: PrismaClient) {
-  await prisma.tenantSchema.createMany({
+// When creating a new endpoint, seed the standard SCIM schemas:
+async function seedDefaultSchemas(endpointId: string, prisma: PrismaClient) {
+  await prisma.endpointSchema.createMany({
     data: [
       {
-        endpointId: tenantId,
+        endpointId: endpointId,
         schemaUrn: 'urn:ietf:params:scim:schemas:core:2.0:User',
         name: 'User',
         description: 'User Account',
         attributes: USER_SCHEMA_ATTRIBUTES,  // From constants
       },
       {
-        endpointId: tenantId,
+        endpointId: endpointId,
         schemaUrn: 'urn:ietf:params:scim:schemas:core:2.0:Group',
         name: 'Group',
         description: 'Group',
         attributes: GROUP_SCHEMA_ATTRIBUTES,
       },
       {
-        endpointId: tenantId,
+        endpointId: endpointId,
         schemaUrn: 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User',
         name: 'EnterpriseUser',
         description: 'Enterprise User Extension',
@@ -1634,10 +1639,10 @@ async function seedDefaultSchemas(tenantId: string, prisma: PrismaClient) {
     ]
   });
 
-  await prisma.tenantResourceType.createMany({
+  await prisma.endpointResourceType.createMany({
     data: [
       {
-        endpointId: tenantId,
+        endpointId: endpointId,
         name: 'User',
         endpoint_path: '/Users',
         description: 'User Account',
@@ -1647,7 +1652,7 @@ async function seedDefaultSchemas(tenantId: string, prisma: PrismaClient) {
         ],
       },
       {
-        endpointId: tenantId,
+        endpointId: endpointId,
         name: 'Group',
         endpoint_path: '/Groups',
         description: 'Group',
@@ -1685,15 +1690,15 @@ flowchart TD
     subgraph CURRENT["Current: Hardcoded"]
         C_REQ["GET /Schemas"] --> C_CTRL["DiscoveryController"]
         C_CTRL --> C_PRIV["private userSchema()<br/>private groupSchema()<br/>hardcoded JSON"]
-        C_PRIV --> C_RES["Static response<br/>(same for all tenants)"]
+        C_PRIV --> C_RES["Static response<br/>(same for all endpoints)"]
     end
 
     subgraph TARGET["Target: Data-Driven"]
-        T_REQ["GET /tenants/:id/Schemas"] --> T_CTRL["DiscoveryController"]
+        T_REQ["GET /endpoints/:id/Schemas"] --> T_CTRL["DiscoveryController"]
         T_CTRL --> T_SVC["DiscoveryService"]
         T_SVC --> T_REPO["ISchemaRepository"]
-        T_REPO --> T_DB[("tenant_schema table<br/>Per-tenant definitions")]
-        T_DB --> T_RES["Dynamic response<br/>(per-tenant schemas)"]
+        T_REPO --> T_DB[("endpoint_schema table<br/>Per-endpoint definitions")]
+        T_DB --> T_RES["Dynamic response<br/>(per-endpoint schemas)"]
     end
 
     style CURRENT fill:#ffdddd,color:#333
@@ -1706,13 +1711,13 @@ flowchart TD
 // BEFORE (scim-patch-path.ts):
 const KNOWN_EXTENSION_URNS = ['urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'];
 
-// AFTER (loaded from tenant_schema):
-function getExtensionUrns(tenantSchemas: TenantSchema[]): string[] {
+// AFTER (loaded from endpoint_schema):
+function getExtensionUrns(endpointSchemas: EndpointSchema[]): string[] {
   const coreUrns = new Set([
     'urn:ietf:params:scim:schemas:core:2.0:User',
     'urn:ietf:params:scim:schemas:core:2.0:Group',
   ]);
-  return tenantSchemas
+  return endpointSchemas
     .filter(s => !coreUrns.has(s.schemaUrn))
     .map(s => s.schemaUrn);
 }
@@ -1771,8 +1776,8 @@ version: `W/"v${resource.version}"`
 
 ```typescript
 // ResourceOrchestrator.patch()
-async patch(tenantId: string, scimId: string, ops: PatchOperation[], ifMatch?: string) {
-  const resource = await this.resourceRepo.findById(tenantId, scimId);
+async patch(endpointId: string, scimId: string, ops: PatchOperation[], ifMatch?: string) {
+  const resource = await this.resourceRepo.findById(endpointId, scimId);
   if (!resource) throw createScimError({ status: 404, scimType: 'noTarget' });
 
   // ← ENFORCE HERE, not in interceptor
@@ -1787,7 +1792,7 @@ async patch(tenantId: string, scimId: string, ops: PatchOperation[], ifMatch?: s
   }
 
   // If strictMode and no If-Match header → reject
-  const config = await this.tenantRepo.getConfig(tenantId);
+  const config = await this.endpointRepo.getConfig(endpointId);
   if (config.strictMode && !ifMatch) {
     throw createScimError({
       status: 428,
@@ -1907,7 +1912,7 @@ sequenceDiagram
 
 ### Why?
 
-Currently, the server accepts any attributes in a SCIM resource without validation against the tenant's schema definitions. For example, if a client sends `{"schemas": [...], "userName": "john", "favoriteColor": "blue"}`, the server stores `favoriteColor` without any warning or error.
+Currently, the server accepts any attributes in a SCIM resource without validation against the endpoint's schema definitions. For example, if a client sends `{"schemas": [...], "userName": "john", "favoriteColor": "blue"}`, the server stores `favoriteColor` without any warning or error.
 
 RFC 7643 §2.1 defines attribute characteristics (type, required, mutability, etc.) that SHOULD be enforced on the server side, especially when `strictMode: true`.
 
@@ -1960,7 +1965,7 @@ export class SchemaValidator {
 ```mermaid
 flowchart TD
     REQ["POST /Users<br/>or PATCH /Users/:id"] --> ORCH["ResourceOrchestrator"]
-    ORCH --> LOAD["Load tenant schema<br/>from tenant_schema table"]
+    ORCH --> LOAD["Load endpoint schema<br/>from endpoint_schema table"]
     LOAD --> VALIDATE["SchemaValidator.validate()"]
     
     VALIDATE --> CHK_REQ{"Required attrs<br/>present?"}
@@ -1985,6 +1990,1053 @@ flowchart TD
 
 ---
 
+## 10b. Phase 8 Part 2 — Custom Resource Type Registration
+
+### Why?
+
+RFC 7643 §6 defines the `ResourceType` metadata object and RFC 7644 §4 mandates that `GET /ResourceTypes` returns all available resource types. The RFCs deliberately allow resource types beyond `User` and `Group` (e.g., `Device`, `Application`, `Organization`), but do not prescribe how a server registers or manages them — that is an implementation concern.
+
+Currently, the server has only two hardcoded resource types (`User`, `Group`) baked into constants, controllers, services, and repositories. Adding a new resource type requires code changes across ~12 files and a redeployment. This violates the architecture's own design principle P3 ("New resource types require zero code changes — only DB rows").
+
+Phase 8 Part 2 closes this gap by making resource type registration **data-driven** via the Admin API, per-endpoint, and gated behind a config flag.
+
+### Prerequisites
+
+| Prerequisite | Reason |
+|---|---|
+| **Phase 6** (Data-Driven Discovery) | Provides the per-endpoint overlay architecture in `ScimSchemaRegistry`, the `EndpointSchema` table pattern, and the Admin API for schema extensions |
+| **Phase 8** (Schema Validation) | The `SchemaValidator` must exist before custom types are accepted — without it, arbitrary payloads would be stored with no structural validation |
+
+### Gap Resolved
+
+| Gap | Description | Resolution |
+|---|---|---|
+| G8b | Only hardcoded User/Group resource types; adding types requires code changes across ~12 files | `EndpointResourceType` DB table + Admin API + generic wildcard controller + per-endpoint `customResourceTypesEnabled` config flag |
+
+### Design Principles
+
+| # | Principle | How Applied |
+|---|---|---|
+| 1 | **RFC fidelity** | Custom types appear in `GET /ResourceTypes` and `GET /Schemas` per RFC 7644 §4; wire format is identical to built-in types |
+| 2 | **Zero impact on built-in types** | User/Group retain their dedicated controller+service+repository stack; no performance or behavioral change |
+| 3 | **Per-endpoint isolation** | Resource types registered for Endpoint A are invisible to Endpoint B |
+| 4 | **Feature-flagged** | `customResourceTypesEnabled: false` (default) — endpoints that don't need this feature see zero overhead |
+| 5 | **Schema-validated** | Every custom resource type must reference a registered core schema URN from the `EndpointSchema` table |
+
+### Step-by-Step Implementation
+
+#### Step 8.2.1: Database Model — `EndpointResourceType`
+
+```prisma
+model EndpointResourceType {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  endpointId        String   @db.Uuid
+  name              String   @db.VarChar(50)    // "Device", "Application"
+  scimEndpoint      String   @db.VarChar(100)   // "/Devices", "/Applications"
+  description       String?
+  coreSchemaUrn     String   @db.VarChar(512)   // FK-like reference to EndpointSchema.schemaUrn
+  schemaExtensions  Json     @default("[]")     // [{schema: "urn:...", required: false}]
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now()) @db.Timestamptz
+  updatedAt         DateTime @updatedAt @db.Timestamptz
+
+  endpoint Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@unique([endpointId, name])
+  @@unique([endpointId, scimEndpoint])
+}
+```
+
+**Migration:**
+
+```sql
+CREATE TABLE endpoint_resource_type (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  endpoint_id     UUID NOT NULL REFERENCES endpoint(id) ON DELETE CASCADE,
+  name            VARCHAR(50)  NOT NULL,
+  scim_endpoint   VARCHAR(100) NOT NULL,
+  description     TEXT,
+  core_schema_urn VARCHAR(512) NOT NULL,
+  schema_extensions JSONB NOT NULL DEFAULT '[]',
+  active          BOOLEAN NOT NULL DEFAULT true,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE UNIQUE INDEX idx_ert_endpoint_name
+  ON endpoint_resource_type(endpoint_id, name);
+CREATE UNIQUE INDEX idx_ert_endpoint_path
+  ON endpoint_resource_type(endpoint_id, scim_endpoint);
+```
+
+**Database values example row:**
+
+| Column | Value |
+|---|---|
+| `id` | `f1a2b3c4-...` |
+| `endpoint_id` | `a1b2c3d4-...` (FK to `endpoint.id`) |
+| `name` | `Device` |
+| `scim_endpoint` | `/Devices` |
+| `description` | `IoT Device resource` |
+| `core_schema_urn` | `urn:example:scim:schemas:core:2.0:Device` |
+| `schema_extensions` | `[{"schema": "urn:example:scim:schemas:extension:azure:2.0:Device", "required": false}]` |
+| `active` | `true` |
+| `created_at` | `2026-02-23T14:30:00.000Z` |
+| `updated_at` | `2026-02-23T14:30:00.000Z` |
+
+#### Step 8.2.2: Endpoint Config Flag
+
+```typescript
+// endpoint-config.interface.ts — add to EndpointConfig
+export interface EndpointConfig {
+  // ... existing flags ...
+  customResourceTypesEnabled?: boolean;  // default: false
+}
+
+// DEFAULT_ENDPOINT_CONFIG
+export const DEFAULT_ENDPOINT_CONFIG: EndpointConfig = {
+  // ... existing defaults ...
+  customResourceTypesEnabled: false,
+};
+```
+
+**Effect:**
+- `false` (default): Only built-in `User`/`Group` are surfaced in discovery and accept CRUD. The generic controller rejects requests with `404 Not Found`.
+- `true`: Custom resource types registered via Admin API are surfaced in `GET /ResourceTypes` and `GET /Schemas`, and the generic controller accepts CRUD operations for them.
+
+#### Step 8.2.3: Repository Layer
+
+**Token:**
+```typescript
+// domain/repositories/repository.tokens.ts
+export const ENDPOINT_RESOURCE_TYPE_REPOSITORY = 'ENDPOINT_RESOURCE_TYPE_REPOSITORY';
+```
+
+**Interface:**
+```typescript
+// domain/repositories/endpoint-resource-type-repository.interface.ts
+export interface IEndpointResourceTypeRepository {
+  create(input: CreateEndpointResourceTypeInput): Promise<EndpointResourceTypeRecord>;
+  findByEndpoint(endpointId: string): Promise<EndpointResourceTypeRecord[]>;
+  findByEndpointAndName(endpointId: string, name: string): Promise<EndpointResourceTypeRecord | null>;
+  deleteByEndpointAndName(endpointId: string, name: string): Promise<void>;
+  findAll(): Promise<EndpointResourceTypeRecord[]>;
+}
+
+export interface EndpointResourceTypeRecord {
+  id: string;
+  endpointId: string;
+  name: string;
+  scimEndpoint: string;
+  description?: string;
+  coreSchemaUrn: string;
+  schemaExtensions: SchemaExtensionRef[];
+  active: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateEndpointResourceTypeInput {
+  endpointId: string;
+  name: string;
+  scimEndpoint: string;
+  description?: string;
+  coreSchemaUrn: string;
+  schemaExtensions?: SchemaExtensionRef[];
+}
+```
+
+**Prisma Implementation:**
+```typescript
+// infrastructure/repositories/prisma-endpoint-resource-type.repository.ts
+@Injectable()
+export class PrismaEndpointResourceTypeRepository implements IEndpointResourceTypeRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async create(input: CreateEndpointResourceTypeInput): Promise<EndpointResourceTypeRecord> {
+    return this.prisma.endpointResourceType.create({
+      data: {
+        endpointId: input.endpointId,
+        name: input.name,
+        scimEndpoint: input.scimEndpoint,
+        description: input.description,
+        coreSchemaUrn: input.coreSchemaUrn,
+        schemaExtensions: input.schemaExtensions ?? [],
+      },
+    });
+  }
+
+  async findByEndpoint(endpointId: string): Promise<EndpointResourceTypeRecord[]> {
+    return this.prisma.endpointResourceType.findMany({
+      where: { endpointId },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async findByEndpointAndName(endpointId: string, name: string): Promise<EndpointResourceTypeRecord | null> {
+    return this.prisma.endpointResourceType.findUnique({
+      where: { endpointId_name: { endpointId, name } },
+    });
+  }
+
+  async deleteByEndpointAndName(endpointId: string, name: string): Promise<void> {
+    await this.prisma.endpointResourceType.delete({
+      where: { endpointId_name: { endpointId, name } },
+    });
+  }
+
+  async findAll(): Promise<EndpointResourceTypeRecord[]> {
+    return this.prisma.endpointResourceType.findMany();
+  }
+}
+```
+
+**Repository Module Registration:**
+```typescript
+// repository.module.ts — add alongside existing tokens
+{
+  provide: ENDPOINT_RESOURCE_TYPE_REPOSITORY,
+  useClass: PrismaEndpointResourceTypeRepository,
+},
+```
+
+#### Step 8.2.4: Admin API — Resource Type CRUD Controller
+
+```typescript
+// modules/scim/controllers/admin-resource-type.controller.ts
+@Controller('admin/endpoints')
+export class AdminResourceTypeController {
+  constructor(
+    @Inject(ENDPOINT_RESOURCE_TYPE_REPOSITORY)
+    private readonly resourceTypeRepo: IEndpointResourceTypeRepository,
+    private readonly endpointService: EndpointService,
+    private readonly schemaRegistry: ScimSchemaRegistry,
+  ) {}
+
+  @Post(':endpointId/resource-types')
+  @HttpCode(201)
+  async registerResourceType(
+    @Param('endpointId') endpointId: string,
+    @Body() dto: CreateEndpointResourceTypeDto,
+  ) { /* ... */ }
+
+  @Get(':endpointId/resource-types')
+  async listResourceTypes(@Param('endpointId') endpointId: string) { /* ... */ }
+
+  @Get(':endpointId/resource-types/:name')
+  async getResourceType(
+    @Param('endpointId') endpointId: string,
+    @Param('name') name: string,
+  ) { /* ... */ }
+
+  @Delete(':endpointId/resource-types/:name')
+  @HttpCode(204)
+  async unregisterResourceType(
+    @Param('endpointId') endpointId: string,
+    @Param('name') name: string,
+  ) { /* ... */ }
+}
+```
+
+**DTO Validation:**
+```typescript
+// modules/scim/dto/create-endpoint-resource-type.dto.ts
+export class CreateEndpointResourceTypeDto {
+  @IsString()
+  @MaxLength(50)
+  @Matches(/^[A-Z][a-zA-Z0-9]+$/, {
+    message: 'name must be PascalCase (e.g., Device, Application)',
+  })
+  name: string;        // "Device"
+
+  @IsString()
+  @MaxLength(100)
+  @Matches(/^\/[A-Z][a-zA-Z0-9]+s$/, {
+    message: 'scimEndpoint must start with / and be pluralized (e.g., /Devices)',
+  })
+  scimEndpoint: string; // "/Devices"
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsString()
+  @MaxLength(512)
+  coreSchemaUrn: string; // "urn:example:scim:schemas:core:2.0:Device"
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SchemaExtensionRefDto)
+  schemaExtensions?: SchemaExtensionRefDto[];
+}
+
+export class SchemaExtensionRefDto {
+  @IsString()
+  @MaxLength(512)
+  schema: string;
+
+  @IsBoolean()
+  @IsOptional()
+  required?: boolean;
+}
+```
+
+**Admin API Route Table:**
+
+| Method | Route | Handler | Description |
+|---|---|---|---|
+| `POST` | `/scim/admin/endpoints/:endpointId/resource-types` | `registerResourceType()` | Register a custom resource type |
+| `GET` | `/scim/admin/endpoints/:endpointId/resource-types` | `listResourceTypes()` | List all custom resource types for an endpoint |
+| `GET` | `/scim/admin/endpoints/:endpointId/resource-types/:name` | `getResourceType()` | Get a specific resource type by name |
+| `DELETE` | `/scim/admin/endpoints/:endpointId/resource-types/:name` | `unregisterResourceType()` | Remove a custom resource type |
+
+##### Register Resource Type — Full Request/Response Example
+
+**Request:**
+```http
+POST /scim/admin/endpoints/a1b2c3d4-e5f6-7890-abcd-000000000001/resource-types
+Content-Type: application/json
+Authorization: Bearer devscimclientsecret
+
+{
+  "name": "Device",
+  "scimEndpoint": "/Devices",
+  "description": "IoT Device resource for fleet management",
+  "coreSchemaUrn": "urn:example:scim:schemas:core:2.0:Device",
+  "schemaExtensions": [
+    {
+      "schema": "urn:example:scim:schemas:extension:azure:2.0:Device",
+      "required": false
+    }
+  ]
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "id": "f1a2b3c4-d5e6-7890-abcd-ef1234567890",
+  "endpointId": "a1b2c3d4-e5f6-7890-abcd-000000000001",
+  "name": "Device",
+  "scimEndpoint": "/Devices",
+  "description": "IoT Device resource for fleet management",
+  "coreSchemaUrn": "urn:example:scim:schemas:core:2.0:Device",
+  "schemaExtensions": [
+    {
+      "schema": "urn:example:scim:schemas:extension:azure:2.0:Device",
+      "required": false
+    }
+  ],
+  "active": true,
+  "createdAt": "2026-02-23T14:30:00.000Z",
+  "updatedAt": "2026-02-23T14:30:00.000Z"
+}
+```
+
+**Error Response — duplicate name (409):**
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+  "scimType": "uniqueness",
+  "detail": "Resource type 'Device' is already registered for this endpoint.",
+  "status": "409"
+}
+```
+
+**Error Response — missing core schema (400):**
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+  "scimType": "invalidValue",
+  "detail": "Core schema URN 'urn:example:scim:schemas:core:2.0:Device' must be registered as an EndpointSchema before registering a resource type that references it.",
+  "status": "400"
+}
+```
+
+##### List Resource Types for an Endpoint
+
+**Request:**
+```http
+GET /scim/admin/endpoints/a1b2c3d4-e5f6-7890-abcd-000000000001/resource-types
+Authorization: Bearer devscimclientsecret
+```
+
+**Response (200):**
+```json
+{
+  "totalResults": 1,
+  "resources": [
+    {
+      "id": "f1a2b3c4-d5e6-7890-abcd-ef1234567890",
+      "name": "Device",
+      "scimEndpoint": "/Devices",
+      "description": "IoT Device resource for fleet management",
+      "coreSchemaUrn": "urn:example:scim:schemas:core:2.0:Device",
+      "schemaExtensions": [
+        {
+          "schema": "urn:example:scim:schemas:extension:azure:2.0:Device",
+          "required": false
+        }
+      ],
+      "active": true
+    }
+  ]
+}
+```
+
+#### Step 8.2.5: Schema Registry Enhancement — `registerResourceType()`
+
+```typescript
+// scim-schema-registry.ts — additions
+
+// New per-endpoint overlay field
+interface EndpointOverlay {
+  schemas: Map<string, ScimSchemaDefinition>;
+  extensionsByResourceType: Map<string, Set<string>>;
+  resourceTypes: Map<string, ScimResourceType>;  // NEW
+}
+
+// New method
+registerResourceType(
+  rt: ScimResourceType,
+  endpointId: string,
+): void {
+  let overlay = this.endpointOverlays.get(endpointId);
+  if (!overlay) {
+    overlay = { schemas: new Map(), extensionsByResourceType: new Map(), resourceTypes: new Map() };
+    this.endpointOverlays.set(endpointId, overlay);
+  }
+  overlay.resourceTypes.set(rt.id, rt);
+  this.logger.log(`Registered resource type "${rt.id}" for endpoint ${endpointId}`);
+}
+
+unregisterResourceType(name: string, endpointId: string): void {
+  const overlay = this.endpointOverlays.get(endpointId);
+  if (overlay) {
+    overlay.resourceTypes.delete(name);
+    this.logger.log(`Unregistered resource type "${name}" from endpoint ${endpointId}`);
+  }
+}
+
+// Enhanced getAllResourceTypes(endpointId?)
+getAllResourceTypes(endpointId?: string): ScimResourceType[] {
+  // 1. Start with global (built-in User, Group)
+  const result = new Map<string, ScimResourceType>();
+  for (const [id, rt] of this.resourceTypes) {
+    result.set(id, { ...rt, schemaExtensions: [...rt.schemaExtensions] });
+  }
+
+  // 2. Merge global extensions into built-in types
+  // ... (existing logic) ...
+
+  // 3. Merge per-endpoint custom resource types (NEW)
+  if (endpointId) {
+    const overlay = this.endpointOverlays.get(endpointId);
+    if (overlay?.resourceTypes) {
+      for (const [id, rt] of overlay.resourceTypes) {
+        result.set(id, { ...rt });
+      }
+    }
+  }
+
+  return [...result.values()];
+}
+
+// Hydration in onModuleInit()
+async onModuleInit(): Promise<void> {
+  // ... existing schema hydration ...
+
+  // Hydrate persisted custom resource types
+  const allResourceTypes = await this.resourceTypeRepo.findAll();
+  for (const rt of allResourceTypes) {
+    this.registerResourceType({
+      id: rt.name,
+      name: rt.name,
+      endpoint: rt.scimEndpoint,
+      schema: rt.coreSchemaUrn,
+      schemaExtensions: rt.schemaExtensions,
+      meta: {
+        resourceType: 'ResourceType',
+        location: `/ResourceTypes/${rt.name}`,
+      },
+    }, rt.endpointId);
+  }
+  this.logger.log(`Hydrated ${allResourceTypes.length} persisted custom resource type(s) from database.`);
+}
+```
+
+#### Step 8.2.6: Generic Wildcard Controller
+
+This is the **critical architectural piece**. A single `EndpointScimGenericController` handles CRUD for all custom resource types via a wildcard `:resourceType` parameter.
+
+```typescript
+// modules/scim/controllers/endpoint-scim-generic.controller.ts
+@Controller('endpoints/:endpointId')
+export class EndpointScimGenericController {
+  constructor(
+    private readonly genericService: EndpointScimGenericService,
+    private readonly endpointService: EndpointService,
+    private readonly schemaRegistry: ScimSchemaRegistry,
+  ) {}
+
+  // --- Validation helper ---
+  private validateCustomResourceType(endpointId: string, resourceType: string, config: EndpointConfig): void {
+    if (!config.customResourceTypesEnabled) {
+      throw new NotFoundException(`Resource type "${resourceType}" not found.`);
+    }
+    const allTypes = this.schemaRegistry.getAllResourceTypes(endpointId);
+    const match = allTypes.find(rt => rt.endpoint === `/${resourceType}`);
+    if (!match) {
+      throw new NotFoundException(`Resource type "${resourceType}" is not registered for this endpoint.`);
+    }
+  }
+
+  // --- CRUD Routes ---
+  // NestJS evaluates routes in registration order.
+  // The dedicated Users/Groups controllers are registered BEFORE this one in scim.module.ts,
+  // so /Users and /Groups will be handled by their dedicated controllers.
+  // This controller catches everything else: /Devices, /Applications, etc.
+
+  @Post(':resourceType')
+  @HttpCode(201)
+  async create(
+    @Param('endpointId') endpointId: string,
+    @Param('resourceType') resourceType: string,
+    @Body() body: Record<string, unknown>,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { config } = await this.validateAndSetContext(endpointId, req);
+    this.validateCustomResourceType(endpointId, resourceType, config);
+    const result = await this.genericService.create(endpointId, resourceType, body);
+    res.setHeader('Location', result.meta.location);
+    return result;
+  }
+
+  @Get(':resourceType')
+  async list(
+    @Param('endpointId') endpointId: string,
+    @Param('resourceType') resourceType: string,
+    @Query('filter') filter?: string,
+    @Query('startIndex') startIndex?: string,
+    @Query('count') count?: string,
+    @Req() req?: Request,
+  ) {
+    const { config } = await this.validateAndSetContext(endpointId, req);
+    this.validateCustomResourceType(endpointId, resourceType, config);
+    return this.genericService.list(endpointId, resourceType, { filter, startIndex, count });
+  }
+
+  @Get(':resourceType/:scimId')
+  async get(
+    @Param('endpointId') endpointId: string,
+    @Param('resourceType') resourceType: string,
+    @Param('scimId') scimId: string,
+    @Req() req: Request,
+  ) {
+    const { config } = await this.validateAndSetContext(endpointId, req);
+    this.validateCustomResourceType(endpointId, resourceType, config);
+    return this.genericService.get(endpointId, resourceType, scimId);
+  }
+
+  @Put(':resourceType/:scimId')
+  async replace(
+    @Param('endpointId') endpointId: string,
+    @Param('resourceType') resourceType: string,
+    @Param('scimId') scimId: string,
+    @Body() body: Record<string, unknown>,
+    @Req() req: Request,
+  ) {
+    const { config } = await this.validateAndSetContext(endpointId, req);
+    this.validateCustomResourceType(endpointId, resourceType, config);
+    return this.genericService.replace(endpointId, resourceType, scimId, body, req.headers['if-match']);
+  }
+
+  @Patch(':resourceType/:scimId')
+  async patch(
+    @Param('endpointId') endpointId: string,
+    @Param('resourceType') resourceType: string,
+    @Param('scimId') scimId: string,
+    @Body() body: Record<string, unknown>,
+    @Req() req: Request,
+  ) {
+    const { config } = await this.validateAndSetContext(endpointId, req);
+    this.validateCustomResourceType(endpointId, resourceType, config);
+    return this.genericService.patch(endpointId, resourceType, scimId, body, req.headers['if-match']);
+  }
+
+  @Delete(':resourceType/:scimId')
+  @HttpCode(204)
+  async delete(
+    @Param('endpointId') endpointId: string,
+    @Param('resourceType') resourceType: string,
+    @Param('scimId') scimId: string,
+    @Req() req: Request,
+  ) {
+    const { config } = await this.validateAndSetContext(endpointId, req);
+    this.validateCustomResourceType(endpointId, resourceType, config);
+    return this.genericService.delete(endpointId, resourceType, scimId, req.headers['if-match']);
+  }
+
+  @Post(':resourceType/.search')
+  async search(
+    @Param('endpointId') endpointId: string,
+    @Param('resourceType') resourceType: string,
+    @Body() body: Record<string, unknown>,
+    @Req() req: Request,
+  ) {
+    const { config } = await this.validateAndSetContext(endpointId, req);
+    this.validateCustomResourceType(endpointId, resourceType, config);
+    return this.genericService.search(endpointId, resourceType, body);
+  }
+}
+```
+
+**Route priority in `scim.module.ts`:**
+```typescript
+@Module({
+  controllers: [
+    // ... global controllers ...
+    // Dedicated controllers FIRST (specific routes win)
+    EndpointScimUsersController,       // /endpoints/:id/Users
+    EndpointScimGroupsController,      // /endpoints/:id/Groups
+    EndpointScimDiscoveryController,   // /endpoints/:id/Schemas|ResourceTypes|ServiceProviderConfig
+    // Generic controller LAST (catches /endpoints/:id/:anything_else)
+    EndpointScimGenericController,     // /endpoints/:id/:resourceType (wildcard)
+  ],
+})
+```
+
+#### Step 8.2.7: Generic Resource Service
+
+```typescript
+// modules/scim/services/endpoint-scim-generic.service.ts
+@Injectable()
+export class EndpointScimGenericService {
+  constructor(
+    @Inject(USER_REPOSITORY) private readonly resourceRepo: IUserRepository,  // reuse unified ScimResource table
+    private readonly schemaRegistry: ScimSchemaRegistry,
+    private readonly schemaValidator: SchemaValidator,  // Phase 8 prerequisite
+    private readonly endpointContextStorage: EndpointContextStorage,
+  ) {}
+
+  async create(
+    endpointId: string,
+    resourceType: string,
+    body: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    const rtMeta = this.getResourceTypeMeta(endpointId, resourceType);
+    const schemaDef = this.schemaRegistry.getSchemaByUrn(rtMeta.schema, endpointId);
+
+    // 1. Schema validation (Phase 8 prerequisite)
+    this.schemaValidator.validate(body, schemaDef, { strictMode: true, mode: 'create' });
+
+    // 2. Generate server-assigned SCIM id
+    const scimId = randomUUID();
+    const now = new Date();
+
+    // 3. Persist via unified ScimResource table
+    const saved = await this.resourceRepo.create({
+      endpointId,
+      resourceType: rtMeta.name,      // "Device" — stored in resource_type discriminator
+      scimId,
+      externalId: body.externalId as string ?? null,
+      userName: null,                   // Not applicable for custom types
+      displayName: body.displayName as string ?? null,
+      active: true,
+      payload: body,
+    });
+
+    // 4. Build SCIM response
+    return this.toScimResource(saved, rtMeta, endpointId);
+  }
+
+  async get(endpointId: string, resourceType: string, scimId: string) { /* ... */ }
+  async list(endpointId: string, resourceType: string, opts: ListOptions) { /* ... */ }
+  async replace(endpointId: string, resourceType: string, scimId: string, body: any, ifMatch?: string) { /* ... */ }
+  async patch(endpointId: string, resourceType: string, scimId: string, body: any, ifMatch?: string) { /* ... */ }
+  async delete(endpointId: string, resourceType: string, scimId: string, ifMatch?: string) { /* ... */ }
+  async search(endpointId: string, resourceType: string, body: any) { /* ... */ }
+
+  /**
+   * Build a generic SCIM resource response.
+   * Unlike toScimUserResource()/toScimGroupResource() which extract type-specific fields,
+   * this returns the JSONB payload as-is with schemas[], id, and meta.
+   */
+  private toScimResource(
+    record: ScimResourceRecord,
+    rtMeta: ScimResourceType,
+    endpointId: string,
+  ): Record<string, unknown> {
+    const payload = typeof record.payload === 'string'
+      ? JSON.parse(record.payload)
+      : record.payload;
+
+    // Build schemas[] dynamically
+    const schemas = [rtMeta.schema];
+    const extensionUrns = this.schemaRegistry.getExtensionUrnsForResourceType(rtMeta.id, endpointId);
+    for (const urn of extensionUrns) {
+      if (payload[urn]) schemas.push(urn);
+    }
+
+    const { baseUrl } = this.endpointContextStorage.getContext();
+    return {
+      schemas,
+      ...payload,
+      id: record.scimId,
+      meta: {
+        resourceType: rtMeta.name,
+        created: record.createdAt.toISOString(),
+        lastModified: record.updatedAt.toISOString(),
+        location: `${baseUrl}${rtMeta.endpoint}/${record.scimId}`,
+        version: `W/"v${record.version}"`,
+      },
+    };
+  }
+
+  private getResourceTypeMeta(endpointId: string, resourceType: string): ScimResourceType {
+    const allTypes = this.schemaRegistry.getAllResourceTypes(endpointId);
+    const match = allTypes.find(rt => rt.endpoint === `/${resourceType}`);
+    if (!match) throw new NotFoundException(`Unknown resource type: ${resourceType}`);
+    return match;
+  }
+}
+```
+
+#### Step 8.2.8: PATCH Engine for Custom Types
+
+Custom resource types use a **generic JSONB PATCH engine** — no type-specific field extraction logic:
+
+```typescript
+// domain/patch/generic-patch-engine.ts
+export class GenericPatchEngine {
+  /**
+   * Applies PATCH operations to a raw JSONB payload.
+   * Unlike UserPatchEngine/GroupPatchEngine, this has NO type-specific
+   * field extraction (userName, displayName, active, members).
+   * All attributes live in the JSONB payload.
+   */
+  apply(
+    currentPayload: Record<string, unknown>,
+    operations: PatchOperation[],
+    schemaDef: SchemaDefinition,
+  ): GenericPatchResult {
+    const payload = structuredClone(currentPayload);
+
+    for (const op of operations) {
+      switch (op.op) {
+        case 'add':    this.applyAdd(payload, op, schemaDef); break;
+        case 'replace': this.applyReplace(payload, op, schemaDef); break;
+        case 'remove':  this.applyRemove(payload, op); break;
+        default: throw new PatchError(`Unsupported op: ${op.op}`);
+      }
+    }
+
+    // Extract displayName/externalId if present (for DB column updates)
+    return {
+      payload,
+      displayName: payload.displayName as string | undefined,
+      externalId: payload.externalId as string | null | undefined,
+    };
+  }
+}
+```
+
+#### Step 8.2.9: Filter Engine for Custom Types
+
+Custom resource types fall back to **JSONB-only filtering** because they don't have dedicated indexed columns:
+
+```typescript
+// In apply-scim-filter.ts — buildGenericFilter()
+function buildGenericFilter(
+  ast: FilterNode,
+  endpointId: string,
+  resourceType: string,
+): PrismaWhereInput {
+  return {
+    endpointId,
+    resourceType,
+    // All attribute comparisons use JSONB operators:
+    // payload->>'attr' = $1 (via Prisma rawQuery or JsonFilter)
+    ...buildJsonbFilter(ast),
+  };
+}
+```
+
+This is slower than the indexed-column path used by User/Group, but acceptable for custom types which are typically lower-volume.
+
+### Phase 8 Part 2 — Discovery Impact
+
+**After registering a `Device` resource type for an endpoint, the discovery endpoints automatically surface it.**
+
+##### `GET /scim/endpoints/{endpointId}/ResourceTypes` — Response
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+  "totalResults": 3,
+  "Resources": [
+    {
+      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
+      "id": "User",
+      "name": "User",
+      "endpoint": "/Users",
+      "description": "User Account",
+      "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+      "schemaExtensions": [
+        { "schema": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", "required": false }
+      ],
+      "meta": { "resourceType": "ResourceType", "location": "/ResourceTypes/User" }
+    },
+    {
+      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
+      "id": "Group",
+      "name": "Group",
+      "endpoint": "/Groups",
+      "description": "Group",
+      "schema": "urn:ietf:params:scim:schemas:core:2.0:Group",
+      "schemaExtensions": [],
+      "meta": { "resourceType": "ResourceType", "location": "/ResourceTypes/Group" }
+    },
+    {
+      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"],
+      "id": "Device",
+      "name": "Device",
+      "endpoint": "/Devices",
+      "description": "IoT Device resource for fleet management",
+      "schema": "urn:example:scim:schemas:core:2.0:Device",
+      "schemaExtensions": [
+        { "schema": "urn:example:scim:schemas:extension:azure:2.0:Device", "required": false }
+      ],
+      "meta": { "resourceType": "ResourceType", "location": "/ResourceTypes/Device" }
+    }
+  ]
+}
+```
+
+##### CRUD on Custom Resource Type — Full Example
+
+**Create a Device:**
+```http
+POST /scim/endpoints/a1b2c3d4-e5f6-7890-abcd-000000000001/Devices
+Content-Type: application/scim+json
+Authorization: Bearer devscimclientsecret
+
+{
+  "schemas": [
+    "urn:example:scim:schemas:core:2.0:Device",
+    "urn:example:scim:schemas:extension:azure:2.0:Device"
+  ],
+  "displayName": "Conference Room Sensor A",
+  "deviceType": "sensor",
+  "manufacturer": "Contoso",
+  "serialNumber": "SN-2026-001",
+  "urn:example:scim:schemas:extension:azure:2.0:Device": {
+    "azureDeviceId": "dev-abc-123",
+    "enrollmentStatus": "enrolled",
+    "complianceState": "compliant"
+  }
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "schemas": [
+    "urn:example:scim:schemas:core:2.0:Device",
+    "urn:example:scim:schemas:extension:azure:2.0:Device"
+  ],
+  "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+  "displayName": "Conference Room Sensor A",
+  "deviceType": "sensor",
+  "manufacturer": "Contoso",
+  "serialNumber": "SN-2026-001",
+  "urn:example:scim:schemas:extension:azure:2.0:Device": {
+    "azureDeviceId": "dev-abc-123",
+    "enrollmentStatus": "enrolled",
+    "complianceState": "compliant"
+  },
+  "meta": {
+    "resourceType": "Device",
+    "created": "2026-02-23T15:00:00.000Z",
+    "lastModified": "2026-02-23T15:00:00.000Z",
+    "location": "https://scim.example.com/scim/endpoints/a1b2.../Devices/b2c3d4e5-f6a7-8901-bcde-f12345678901",
+    "version": "W/\"v1\""
+  }
+}
+```
+
+**List Devices with filter:**
+```http
+GET /scim/endpoints/a1b2c3d4-.../Devices?filter=displayName co "Sensor"&count=10
+Authorization: Bearer devscimclientsecret
+```
+
+**PATCH Device:**
+```http
+PATCH /scim/endpoints/a1b2c3d4-.../Devices/b2c3d4e5-f6a7-8901-bcde-f12345678901
+Content-Type: application/scim+json
+Authorization: Bearer devscimclientsecret
+If-Match: W/"v1"
+
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "replace",
+      "path": "urn:example:scim:schemas:extension:azure:2.0:Device:complianceState",
+      "value": "noncompliant"
+    }
+  ]
+}
+```
+
+### Phase 8 Part 2 — End-to-End Registration & Runtime Flow
+
+```mermaid
+sequenceDiagram
+    participant ADM as Admin Client
+    participant AC as AdminResourceTypeController
+    participant DB as PostgreSQL
+    participant REG as ScimSchemaRegistry
+    participant CLI as SCIM Client
+    participant GC as GenericController
+    participant GS as GenericService
+    participant DISC as DiscoveryController
+
+    Note over ADM,REG: Step 1 — Register custom schema (prerequisite)
+    ADM->>AC: POST /admin/endpoints/{id}/schemas<br/>{schemaUrn: "urn:...Device", attributes: [...]}
+    AC->>DB: INSERT endpoint_schema
+    AC->>REG: registerExtension(schemaDef, null, false, endpointId)
+    AC-->>ADM: 201 Created
+
+    Note over ADM,REG: Step 2 — Register custom resource type
+    ADM->>AC: POST /admin/endpoints/{id}/resource-types<br/>{name: "Device", scimEndpoint: "/Devices", coreSchemaUrn: "urn:...Device"}
+    AC->>AC: Validate endpoint exists & is active
+    AC->>AC: Validate customResourceTypesEnabled = true
+    AC->>AC: Validate coreSchemaUrn exists in EndpointSchema
+    AC->>AC: Validate no duplicate name/endpoint
+    AC->>DB: INSERT endpoint_resource_type
+    AC->>REG: registerResourceType({id: "Device", endpoint: "/Devices", ...}, endpointId)
+    AC-->>ADM: 201 Created
+
+    Note over CLI,DISC: Step 3 — Client discovers the new type
+    CLI->>DISC: GET /endpoints/{id}/ResourceTypes
+    DISC->>REG: getAllResourceTypes(endpointId)
+    REG-->>DISC: [User, Group, Device]
+    DISC-->>CLI: 200 OK (3 resource types including Device)
+
+    Note over CLI,GS: Step 4 — Client CRUDs the custom type
+    CLI->>GC: POST /endpoints/{id}/Devices<br/>{schemas:[...], displayName: "Sensor A", ...}
+    GC->>GC: validateCustomResourceType(endpointId, "Devices", config)
+    GC->>GS: create(endpointId, "Devices", body)
+    GS->>GS: SchemaValidator.validate(body, deviceSchema)
+    GS->>DB: INSERT scim_resource (resource_type = "Device")
+    GS-->>GC: ScimResource {id, meta, ...}
+    GC-->>CLI: 201 Created, Location: .../Devices/{scimId}
+```
+
+### Phase 8 Part 2 — Architecture Layers Impact
+
+```mermaid
+flowchart TB
+    subgraph UNCHANGED["Unchanged (Built-in User/Group)"]
+        direction TB
+        UC["EndpointScimUsersController<br/>POST/GET/PUT/PATCH/DELETE /Users"]
+        GrC["EndpointScimGroupsController<br/>POST/GET/PUT/PATCH/DELETE /Groups"]
+        US["EndpointScimUsersService<br/>UserPatchEngine"]
+        GrS["EndpointScimGroupsService<br/>GroupPatchEngine"]
+        UR["PrismaUserRepository<br/>resourceType: 'User'"]
+        GrR["PrismaGroupRepository<br/>resourceType: 'Group'"]
+    end
+
+    subgraph NEW["New (Custom Resource Types)"]
+        direction TB
+        ART["AdminResourceTypeController<br/>POST/GET/DELETE /admin/endpoints/:id/resource-types"]
+        GC["EndpointScimGenericController<br/>POST/GET/PUT/PATCH/DELETE /endpoints/:id/:resourceType"]
+        GS["EndpointScimGenericService<br/>GenericPatchEngine<br/>JSONB-only filtering"]
+        ERT[("endpoint_resource_type<br/>DB Table")]
+    end
+
+    subgraph SHARED["Enhanced (Shared Infrastructure)"]
+        direction TB
+        REG["ScimSchemaRegistry<br/>+ registerResourceType()<br/>+ per-endpoint overlay.resourceTypes"]
+        DISC["ScimDiscoveryService<br/>(no changes — already generic)"]
+        SR[("scim_resource<br/>resource_type = 'Device'")]
+        CFG["EndpointConfig<br/>+ customResourceTypesEnabled"]
+    end
+
+    ART --> ERT
+    ART --> REG
+    GC --> GS
+    GS --> SR
+    GS --> REG
+    DISC --> REG
+    GC --> CFG
+
+    style UNCHANGED fill:#e8f5e9,color:#333
+    style NEW fill:#e3f2fd,color:#333
+    style SHARED fill:#fff3e0,color:#333
+```
+
+### Runtime Impact Assessment
+
+| Concern | Impact | Detail |
+|---|---|---|
+| **Request routing** | Negligible | One `Map.has()` lookup per request on generic controller to validate resource type |
+| **User/Group performance** | Zero | Dedicated controllers/services/repos remain unchanged; generic controller only catches unknown paths |
+| **Custom type filtering** | JSONB-only | No indexed columns for custom types — uses `payload->>'attr'` operators. Acceptable for lower-volume custom types |
+| **Memory** | ~500 bytes/definition | Per-endpoint resource type in registry overlay Map |
+| **Startup** | One extra query | `findAll()` on `endpoint_resource_type` table during `onModuleInit()` |
+| **Schema validation** | Same as built-in | Uses Phase 8 `SchemaValidator` — custom types validated against their registered schema |
+| **Discovery** | Automatic | Custom types automatically appear in `GET /ResourceTypes` and `GET /Schemas` |
+| **Feature-flag OFF** | Zero overhead | If `customResourceTypesEnabled: false`, the generic controller returns `404` immediately |
+
+### Test Plan
+
+| Category | Tests | Description |
+|---|---|---|
+| **Admin API unit tests** | ~15 | Register/list/get/delete resource type, validation errors (duplicate, missing schema, invalid name) |
+| **Repository unit tests** | ~10 | CRUD operations, findAll, findByEndpointAndName |
+| **Schema Registry unit tests** | ~10 | registerResourceType(), unregisterResourceType(), getAllResourceTypes() merging |
+| **Generic controller unit tests** | ~20 | CRUD operations, feature flag enforcement, 404 for unregistered types |
+| **Generic service unit tests** | ~15 | Create/get/list/replace/patch/delete, schema validation delegation, toScimResource() |
+| **Generic PATCH engine unit tests** | ~15 | add/replace/remove on JSONB, extension URN paths |
+| **E2E tests** | ~20 | Full registration→discovery→CRUD→delete lifecycle, multi-endpoint isolation |
+| **Estimated total** | ~105 | |
+
+### Files Changed Summary
+
+| Category | New Files | Modified Files |
+|---|---|---|
+| **Prisma** | Migration file | `schema.prisma` (+model) |
+| **Domain** | `endpoint-resource-type-repository.interface.ts`, `generic-patch-engine.ts` | `repository.tokens.ts` (+token) |
+| **Infrastructure** | `prisma-endpoint-resource-type.repository.ts`, `inmemory-endpoint-resource-type.repository.ts` | `repository.module.ts` (+provider) |
+| **Admin API** | `admin-resource-type.controller.ts`, `create-endpoint-resource-type.dto.ts` | — |
+| **SCIM Controllers** | `endpoint-scim-generic.controller.ts` | `scim.module.ts` (+controller, +service, +provider) |
+| **SCIM Services** | `endpoint-scim-generic.service.ts` | — |
+| **Registry** | — | `scim-schema-registry.ts` (+registerResourceType, +overlay.resourceTypes, +hydration) |
+| **Config** | — | `endpoint-config.interface.ts` (+customResourceTypesEnabled) |
+| **Tests** | ~7 new test files | ~3 existing test files updated |
+
+### Effort Estimate
+
+| Work Item | Days |
+|---|---|
+| DB model + Prisma migration | 0.5 |
+| Repository (interface + Prisma + InMemory) | 1 |
+| Registry `registerResourceType()` + overlay + hydration | 0.5 |
+| Admin API controller + DTO + validation | 1 |
+| Config flag + guard logic | 0.5 |
+| Generic wildcard controller | 1 |
+| Generic resource service + serializer | 1.5 |
+| Generic PATCH engine | 1 |
+| Unit + E2E tests | 2 |
+| **Total** | **~9 days** |
+
+---
+
 ## 11. Phase 9 — Bulk Operations
 
 ### Why?
@@ -2006,7 +3058,7 @@ export class BulkProcessor {
   ) {}
 
   async process(
-    tenantId: string,
+    endpointId: string,
     request: BulkRequest,
     baseUrl: string,
   ): Promise<BulkResponse> {
@@ -2023,7 +3075,7 @@ export class BulkProcessor {
         // Resolve bulkId references in the operation
         const resolvedOp = this.resolveBulkIds(op, bulkIdMap);
         
-        const result = await this.executeOperation(tenantId, resolvedOp, baseUrl);
+        const result = await this.executeOperation(endpointId, resolvedOp, baseUrl);
         
         // Track bulkId → id mapping for later operations
         if (op.bulkId && result.id) {
@@ -2137,7 +3189,7 @@ export class MeController {
     }
     
     const resource = await this.resourceRepo.findByUserName(
-      authContext.tenantId,
+      authContext.endpointId,
       authContext.userName
     );
     
@@ -2146,7 +3198,7 @@ export class MeController {
     }
     
     // Return as if GET /Users/{id}
-    return this.orchestrator.get(authContext.tenantId, resource.scimId, baseUrl);
+    return this.orchestrator.get(authContext.endpointId, resource.scimId, baseUrl);
   }
 }
 ```
@@ -2164,39 +3216,39 @@ sequenceDiagram
 
     CLIENT->>GUARD: GET /Me<br/>Authorization: Bearer <token>
     GUARD->>GUARD: Validate token → extract userName
-    GUARD-->>ME: req.authContext = {tenantId, userName}
+    GUARD-->>ME: req.authContext = {endpointId, userName}
 
-    ME->>REPO: findByUserName(tenantId, userName)
+    ME->>REPO: findByUserName(endpointId, userName)
     REPO->>DB: SELECT * FROM scim_resource<br/>WHERE user_name = $1 AND endpoint_id = $2
     DB-->>REPO: ScimResource row
     REPO-->>ME: resource.scimId
 
-    ME->>ORCH: get(tenantId, scimId, baseUrl)
+    ME->>ORCH: get(endpointId, scimId, baseUrl)
     ORCH-->>ME: Full SCIM User JSON
     ME-->>CLIENT: 200 OK<br/>{id, userName, emails, ...}
 ```
 
 ---
 
-## 13. Phase 11 — Per-Tenant Credentials
+## 13. Phase 11 — Per-Endpoint Credentials
 
 ### Why?
 
-Currently, `shared-secret.guard.ts` uses a single `SCIM_SHARED_SECRET` environment variable for ALL tenants:
+Currently, `shared-secret.guard.ts` uses a single `SCIM_SHARED_SECRET` environment variable for ALL endpoints:
 
 ```typescript
 // shared-secret.guard.ts (current — line ~60)
 const secret = this.configService.get<string>('SCIM_SHARED_SECRET');
 ```
 
-This means a token valid for Tenant A can access Tenant B's data — a security concern.
+This means a token valid for Endpoint A can access Endpoint B's data — a security concern.
 
 ### Implementation
 
-#### Step 11.1: Add `tenant_credential` Table
+#### Step 11.1: Add `endpoint_credential` Table
 
 ```prisma
-model TenantCredential {
+model EndpointCredential {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   endpointId     String   @db.Uuid
   credentialType String   @db.VarChar(50)  // "bearer" | "oauth_client"
@@ -2220,23 +3272,23 @@ const secret = this.configService.get<string>('SCIM_SHARED_SECRET');
 if (token === secret) return true;
 
 // AFTER:
-const tenantId = this.extractTenantId(request);
-const credentials = await this.credentialRepo.findActive(tenantId);
+const endpointId = this.extractEndpointId(request);
+const credentials = await this.credentialRepo.findActive(endpointId);
 for (const cred of credentials) {
   if (await bcrypt.compare(token, cred.credentialHash)) {
-    request['authContext'] = { tenantId, credentialId: cred.id };
+    request['authContext'] = { endpointId, credentialId: cred.id };
     return true;
   }
 }
-throw new UnauthorizedException('Invalid bearer token for this tenant.');
+throw new UnauthorizedException('Invalid bearer token for this endpoint.');
 ```
 
 #### Step 11.3: Admin Credential Management API
 
 ```
-POST   /admin/tenants/{id}/credentials   ← Generate new token, return plaintext once
-GET    /admin/tenants/{id}/credentials   ← List (hash masked)
-DELETE /admin/tenants/{id}/credentials/{credId} ← Revoke
+POST   /admin/endpoints/{id}/credentials   ← Generate new token, return plaintext once
+GET    /admin/endpoints/{id}/credentials   ← List (hash masked)
+DELETE /admin/endpoints/{id}/credentials/{credId} ← Revoke
 ```
 
 ### Phase 11 — Authentication Flow (Before vs After)
@@ -2246,18 +3298,18 @@ flowchart TB
     subgraph BEFORE["Current: Global Shared Secret"]
         REQ_B["Any SCIM request<br/>Bearer: abc123"] --> GUARD_B["SharedSecretGuard"]
         GUARD_B -->|"compare with<br/>SCIM_SHARED_SECRET"| CHECK_B{"abc123 == env.secret?"}
-        CHECK_B -->|Yes| ACCESS_B["✅ Access ALL tenants"]
+        CHECK_B -->|Yes| ACCESS_B["✅ Access ALL endpoints"]
         CHECK_B -->|No| DENY_B["❌ 401"]
     end
 
-    subgraph AFTER["After: Per-Tenant Credentials"]
-        REQ_A["SCIM request for Tenant X<br/>Bearer: xyz789"] --> GUARD_A["TenantAuthGuard"]
-        GUARD_A --> EXTRACT["Extract tenantId<br/>from URL path"]
-        EXTRACT --> LOOKUP["credentialRepo.findActive(tenantId)"]
-        LOOKUP --> DB_A[("tenant_credential<br/>WHERE endpoint_id = X<br/>AND active = true")]
+    subgraph AFTER["After: Per-Endpoint Credentials"]
+        REQ_A["SCIM request for Endpoint X<br/>Bearer: xyz789"] --> GUARD_A["EndpointAuthGuard"]
+        GUARD_A --> EXTRACT["Extract endpointId<br/>from URL path"]
+        EXTRACT --> LOOKUP["credentialRepo.findActive(endpointId)"]
+        LOOKUP --> DB_A[("endpoint_credential<br/>WHERE endpoint_id = X<br/>AND active = true")]
         DB_A --> BCRYPT{"bcrypt.compare<br/>token vs hash?"}
-        BCRYPT -->|Match| ACCESS_A["✅ Access Tenant X only"]
-        BCRYPT -->|No match| DENY_A["❌ 401 Invalid token<br/>for this tenant"]
+        BCRYPT -->|Match| ACCESS_A["✅ Access Endpoint X only"]
+        BCRYPT -->|No match| DENY_A["❌ 401 Invalid token<br/>for this endpoint"]
     end
 
     style BEFORE fill:#fff3e0,color:#333
@@ -2327,7 +3379,7 @@ async search(
 sequenceDiagram
     participant IDP as Identity Provider
     participant LB as Container App Ingress
-    participant AUTH as TenantAuthGuard
+    participant AUTH as EndpointAuthGuard
     participant CTRL as ResourceController
     participant ORCH as ResourceOrchestrator
     participant ETAG as ETagService
@@ -2336,23 +3388,23 @@ sequenceDiagram
     participant REPO as PrismaResourceRepository
     participant PG as PostgreSQL 17
 
-    IDP->>LB: POST /tenants/:id/Users<br/>Authorization: Bearer <token>
+    IDP->>LB: POST /endpoints/:id/Users<br/>Authorization: Bearer <token>
     LB->>AUTH: Route to Container App
 
     rect rgb(255, 245, 230)
         Note over AUTH: Authentication
-        AUTH->>PG: SELECT * FROM tenant_credential<br/>WHERE endpoint_id = $1 AND active = true
+        AUTH->>PG: SELECT * FROM endpoint_credential<br/>WHERE endpoint_id = $1 AND active = true
         PG-->>AUTH: credential rows
         AUTH->>AUTH: bcrypt.compare(token, hash)
         Note over AUTH: ✅ Authenticated
     end
 
     AUTH->>CTRL: Authorized request
-    CTRL->>ORCH: create(tenantId, payload, baseUrl)
+    CTRL->>ORCH: create(endpointId, payload, baseUrl)
 
     rect rgb(230, 245, 255)
         Note over ORCH,VALID: Validation
-        ORCH->>PG: SELECT attributes FROM tenant_schema<br/>WHERE endpoint_id = $1 AND schema_urn = $2
+        ORCH->>PG: SELECT attributes FROM endpoint_schema<br/>WHERE endpoint_id = $1 AND schema_urn = $2
         PG-->>ORCH: Schema definition
         ORCH->>VALID: validate(payload, schema, {mode: 'create'})
         VALID-->>ORCH: ✅ Valid
@@ -2360,10 +3412,10 @@ sequenceDiagram
 
     rect rgb(230, 255, 230)
         Note over ORCH,PG: Persistence
-        ORCH->>REPO: assertUnique(tenantId, {userName})
+        ORCH->>REPO: assertUnique(endpointId, {userName})
         REPO->>PG: SELECT id FROM scim_resource WHERE user_name = $1 (CITEXT)
         PG-->>REPO: No conflict
-        ORCH->>REPO: create({tenantId, type:'User', payload, ...})
+        ORCH->>REPO: create({endpointId, type:'User', payload, ...})
         REPO->>PG: INSERT INTO scim_resource ... RETURNING *
         PG-->>REPO: New row (version=1)
     end
@@ -2385,7 +3437,7 @@ sequenceDiagram
 | **Filter behavior change** | Medium | Medium | Run existing filter tests against both SQLite and PostgreSQL implementations during Phase 4 |
 | **ETag format change breaks clients** | Medium | Medium | Phased rollout: accept both old format (`W/"<timestamp>"`) and new (`W/"v<N>"`) for 2 weeks |
 | **Downtime during schema migration** | Low | High | Use Prisma `prisma migrate deploy` — typically <1 second for schema changes |
-| **Per-tenant credential migration** | Low | Medium | Keep global `SCIM_SHARED_SECRET` as fallback during Phase 11; remove after all tenants migrated |
+| **Per-endpoint credential migration** | Low | Medium | Keep global `SCIM_SHARED_SECRET` as fallback during Phase 11; remove after all endpoints migrated |
 
 ### Risk Timeline Visualization
 
@@ -2437,9 +3489,10 @@ graph TD
     P6["Phase 6<br/>Data-Driven Discovery"]
     P7["Phase 7<br/>ETag & Versioning"]
     P8["Phase 8<br/>Schema Validation"]
+    P8b["Phase 8.2<br/>Custom Resource Types"]
     P9["Phase 9<br/>Bulk Operations"]
     P10["Phase 10<br/>/Me Endpoint"]
-    P11["Phase 11<br/>Per-Tenant Credentials"]
+    P11["Phase 11<br/>Per-Endpoint Credentials"]
     P12["Phase 12<br/>Sort & Cleanup"]
 
     P1 --> P2
@@ -2449,6 +3502,8 @@ graph TD
     P3 --> P6
     P3 --> P7
     P6 --> P8
+    P8 --> P8b
+    P8b --> P9
     P5 --> P9
     P7 --> P9
     P1 --> P10
@@ -2464,6 +3519,7 @@ graph TD
     style P6 fill:#feca57,color:#333
     style P7 fill:#feca57,color:#333
     style P8 fill:#48dbfb,color:#333
+    style P8b fill:#48dbfb,color:#333
     style P9 fill:#48dbfb,color:#333
     style P10 fill:#0abde3,color:#fff
     style P11 fill:#0abde3,color:#fff
@@ -2590,9 +3646,10 @@ Deployment Files
 | **P6 — Discovery** | `prisma migrate dev` | Rebuild image | Rebuild image | Rebuild + migration on start |
 | **P7 — ETag** | `prisma migrate dev` | Rebuild image | Rebuild image | Rebuild + migration on start |
 | **P8 — Schema Validation** | No change | No change | Rebuild image | Rebuild image |
+| **P8.2 — Custom Resource Types** | `prisma migrate dev` | Rebuild image | Rebuild image | Rebuild + migration on start |
 | **P9 — Bulk Operations** | No change | No change | Rebuild image | Rebuild image |
 | **P10 — /Me Endpoint** | No change | No change | Rebuild image | Rebuild image |
-| **P11 — Per-Tenant Creds** | New env vars | New env vars | New env vars | New secrets in Bicep |
+| **P11 — Per-Endpoint Creds** | New env vars | New env vars | New env vars | New secrets in Bicep |
 | **P12 — Sort & Cleanup** | No change | No change | Rebuild image | Rebuild image |
 
 ### 17.5 Phase 3 — PostgreSQL Migration: Detailed Deployment Changes
@@ -2777,7 +3834,7 @@ output serverFqdn string = postgres.properties.fullyQualifiedDomainName
 - Remove blob storage and file share provisioning
 - Update `DATABASE_URL` construction to PostgreSQL connection string
 
-### 17.6 Phase 11 — Per-Tenant Credentials: Deployment Changes
+### 17.6 Phase 11 — Per-Endpoint Credentials: Deployment Changes
 
 #### All Modes
 - **New env vars**: `CREDENTIAL_ENCRYPTION_KEY` (for encrypting stored credentials)
@@ -2940,11 +3997,12 @@ flowchart TB
 | SQLite with `better-sqlite3` | PostgreSQL 17 with CITEXT, JSONB, GIN | 3 |
 | `tryPushToDb()` → eq only | Full operator push-down | 4 |
 | 200-line inline PATCH in service | Pure `PatchEngine` class in Domain | 5 |
-| Hardcoded `userSchema()` / `groupSchema()` | `tenant_schema` + `tenant_resource_type` DB rows | 6 |
+| Hardcoded `userSchema()` / `groupSchema()` | `endpoint_schema` + `endpoint_resource_type` DB rows | 6 |
 | `W/"${updatedAt.toISOString()}"` | `W/"v${version}"` monotonic integer | 7 |
 | `assertIfMatch()` exists but never called | `orchestrator.assertIfMatch()` before every write | 7 |
 | No schema validation | `SchemaValidator` with strictMode | 8 |
+| Hardcoded User/Group resource types only | `endpoint_resource_type` DB rows + Admin API + generic wildcard controller | 8.2 |
 | `bulk: {supported: false}` | `BulkProcessor` with bulkId resolution | 9 |
 | No /Me | `MeController` | 10 |
-| Single `SCIM_SHARED_SECRET` | `tenant_credential` with bcrypt hashes | 11 |
+| Single `SCIM_SHARED_SECRET` | `endpoint_credential` with bcrypt hashes | 11 |
 | `sort: {supported: false}` | `SortEngine` + DB push-down | 12 |

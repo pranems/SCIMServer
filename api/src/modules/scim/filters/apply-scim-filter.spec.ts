@@ -317,5 +317,68 @@ describe('apply-scim-filter', () => {
       expect(result.fetchAll).toBe(true);
       expect(result.inMemoryFilter).toBeDefined();
     });
+
+    // ─── SCIM Validator: Case-insensitive externalId (CITEXT) ──────────
+
+    it('should preserve value case for externalId eq (CITEXT handles case at DB level)', () => {
+      const result = buildGroupFilter('externalId eq "ABC-DEF-1234"');
+      expect(result.dbWhere).toEqual({ externalId: 'ABC-DEF-1234' });
+      expect(result.fetchAll).toBe(false);
+      // Value is passed as-is — CITEXT column handles case-insensitive comparison
+    });
+
+    it('should push externalId eq with mixed case to DB without lowering', () => {
+      const result = buildGroupFilter('externalId eq "MiXeD-CaSe-GrOuP"');
+      expect(result.dbWhere).toEqual({ externalId: 'MiXeD-CaSe-GrOuP' });
+      expect(result.fetchAll).toBe(false);
+      expect(result.inMemoryFilter).toBeUndefined();
+    });
+
+    it('should push externalId eq with uppercase attribute name to DB', () => {
+      const result = buildGroupFilter('EXTERNALID eq "ext-grp-99"');
+      expect(result.dbWhere).toEqual({ externalId: 'ext-grp-99' });
+      expect(result.fetchAll).toBe(false);
+    });
+
+    it('should push co filter on externalId to DB', () => {
+      const result = buildGroupFilter('externalId co "grp"');
+      expect(result.dbWhere).toEqual({ externalId: { contains: 'grp', mode: 'insensitive' } });
+      expect(result.fetchAll).toBe(false);
+    });
+
+    it('should push sw filter on externalId to DB', () => {
+      const result = buildGroupFilter('externalId sw "ext-"');
+      expect(result.dbWhere).toEqual({ externalId: { startsWith: 'ext-', mode: 'insensitive' } });
+      expect(result.fetchAll).toBe(false);
+    });
+  });
+
+  // ── SCIM Validator: User externalId case-insensitive ─────────────────────
+
+  describe('User externalId case-insensitive filtering', () => {
+    it('should push eq filter on externalId with uppercase value to DB', () => {
+      const result = buildUserFilter('externalId eq "EXT-USER-ABC"');
+      expect(result.dbWhere).toEqual({ externalId: 'EXT-USER-ABC' });
+      expect(result.fetchAll).toBe(false);
+      // CITEXT handles case-insensitive matching at the DB level
+    });
+
+    it('should push externalId eq with UPPERCASE attribute name to DB', () => {
+      const result = buildUserFilter('EXTERNALID eq "ext-123"');
+      expect(result.dbWhere).toEqual({ externalId: 'ext-123' });
+      expect(result.fetchAll).toBe(false);
+    });
+
+    it('should push co filter on user externalId to DB', () => {
+      const result = buildUserFilter('externalId co "USER"');
+      expect(result.dbWhere).toEqual({ externalId: { contains: 'USER', mode: 'insensitive' } });
+      expect(result.fetchAll).toBe(false);
+    });
+
+    it('should push sw filter on user externalId to DB', () => {
+      const result = buildUserFilter('externalId sw "ext-"');
+      expect(result.dbWhere).toEqual({ externalId: { startsWith: 'ext-', mode: 'insensitive' } });
+      expect(result.fetchAll).toBe(false);
+    });
   });
 });

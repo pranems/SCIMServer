@@ -181,7 +181,7 @@ flowchart TB
         P8["P8 Schema<br/>Validation<br/>🟡 70%"]
         P9["P9 Bulk<br/>Operations<br/>🟡 75%"]
         P10["P10 /Me<br/>Endpoint<br/>🟢 95%"]
-        P11["P11 Per-Tenant<br/>Credentials<br/>🟢 85%"]
+        P11["P11 Per-Endpoint<br/>Credentials<br/>🟢 85%"]
         P12["P12 Sort &<br/>Cleanup<br/>🟢 85%"]
     end
 
@@ -280,7 +280,7 @@ AI generates the skeleton + 70% of logic, human fills in domain-specific decisio
 | **Bulk operations** | Generates `BulkProcessor` with loop + error handling | Decides transaction vs undo-log semantics, failOnErrors threshold |
 | **Schema validation** | Generates `SchemaValidator` with attribute type checking | Defines which attributes are required/readOnly/immutable per RFC |
 | **Discovery endpoints** | Generates `/Schemas`, `/ResourceTypes`, `/ServiceProviderConfig` | Defines exact schema attribute metadata per RFC 7643 §8 |
-| **Per-tenant credentials** | Generates storage + bcrypt compare | Reviews auth flow, token rotation, expiry handling |
+| **Per-endpoint credentials** | Generates storage + bcrypt compare | Reviews auth flow, token rotation, expiry handling |
 
 ### Tier 3: AI-Assisted (50-65%)
 
@@ -516,8 +516,8 @@ flowchart LR
 
 | Step | Actor | What | Time |
 |------|-------|------|------|
-| Generate `InMemoryStore` with all Maps + secondary indexes | AI | Resources, userName/externalId indexes, members, tenants | 10 min |
-| Generate all 5 In-Memory repository implementations | AI | Resource, Membership, Tenant, Schema, Credential repos | 30 min |
+| Generate `InMemoryStore` with all Maps + secondary indexes | AI | Resources, userName/externalId indexes, members, endpoints | 10 min |
+| Generate all 5 In-Memory repository implementations | AI | Resource, Membership, Endpoint, Schema, Credential repos | 30 min |
 | Generate snapshot service (optional) | AI | serialize/deserialize Maps ↔ JSON | 15 min |
 | Wire into PersistenceModule | AI | Already done in P1 | 0 |
 | Review + quick test | **Human** | Sanity check, run unit tests with in-memory | **1h** |

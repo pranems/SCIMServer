@@ -373,14 +373,14 @@ Entra Portal Flow:
 
 3. Admin Credentials:
    ┌────────────────────────────────────────────────────────┐
-   │ Tenant URL:    https://<your-app-url>/scim/v2          │
+   │ Endpoint URL:    https://<your-app-url>/scim/v2          │
    │                                                        │
    │ Secret Token:  <your-scim-secret>                      │
    └────────────────────────────────────────────────────────┘
 
    If using multi-endpoint mode:
    ┌────────────────────────────────────────────────────────┐
-   │ Tenant URL:    https://<your-app-url>/scim/endpoints/  │
+   │ Endpoint URL:    https://<your-app-url>/scim/endpoints/  │
    │                <endpoint-id>/                          │
    └────────────────────────────────────────────────────────┘
 

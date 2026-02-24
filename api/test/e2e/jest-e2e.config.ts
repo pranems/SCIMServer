@@ -13,6 +13,14 @@ const config: Config = {
   },
   testRegex: '.*\\.e2e-spec\\.ts$',
   testTimeout: 30_000,
+  collectCoverageFrom: [
+    'src/**/*.(t|j)s',
+    '!src/main.ts',
+    '!src/**/*.module.ts',
+    '!src/**/*.dto.ts',
+    '!src/**/*.interface.ts',
+  ],
+  coverageDirectory: 'coverage-e2e',
   // SQLite compromise: E2E tests must run sequentially because SQLite’s single-file
   // database cannot handle concurrent access from multiple Jest workers.
   // PostgreSQL migration: set maxWorkers to 4+ and use isolated test schemas.

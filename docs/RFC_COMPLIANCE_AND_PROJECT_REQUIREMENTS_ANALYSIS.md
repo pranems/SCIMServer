@@ -270,7 +270,7 @@ The SCIM server (v0.14.0) has completed **Phases 1–6** of a 12-phase migration
 | Requirement | RFC Level | Status | Phase |
 |---|---|---|---|
 | Multi-tenancy support | OPTIONAL | ✅ | 1 | Via endpoint-based tenancy |
-| Tenant isolation | MAY | ✅ | 1 | Each endpoint = isolated tenant |
+| Endpoint isolation | MAY | ✅ | 1 | Each endpoint = isolated endpoint |
 
 ---
 
@@ -401,7 +401,7 @@ The SCIM server (v0.14.0) has completed **Phases 1–6** of a 12-phase migration
 | **G8** | Schema validation against declared attribute schemas | 🟢 | 🔲 | 8 | RFC 7643 §7 |
 | **G9** | Bulk operations with bulkId resolution | 🟢 | 🔲 | 9 | RFC 7644 §3.7 |
 | **G10** | /Me endpoint mapping authenticated user | ⚪ | 🔲 | 10 | RFC 7644 §3.11 |
-| **G11** | Per-tenant credential management | 🟡 | 🔲 | 11 | — (security) |
+| **G11** | Per-endpoint credential management | 🟡 | 🔲 | 11 | — (security) |
 | **G12** | Sorting with SQL push-down | ⚪ | 🔲 | 12 | RFC 7644 §3.4.2.3 |
 | **G13** | POST /.search cleanup and optimization | ⚪ | 🔲 | 12 | RFC 7644 §3.4.3 |
 | **G14** | Case-insensitive attribute filtering | 🟡 | ✅ | 4 | RFC 7644 §3.4.2.2 |
@@ -443,7 +443,7 @@ gantt
     P8 Schema Validation        :p8, 2026-03, 2026-04
     P9 Bulk Operations          :p9, 2026-04, 2026-05
     P10 /Me Endpoint            :p10, 2026-05, 2026-05
-    P11 Per-Tenant Credentials  :p11, 2026-05, 2026-06
+    P11 Per-Endpoint Credentials  :p11, 2026-05, 2026-06
     P12 Sorting & Cleanup       :p12, 2026-06, 2026-07
 ```
 
@@ -499,7 +499,7 @@ gantt
 - **Goal**: G8
 - **RFC Coverage**: RFC 7643 §7, RFC 7644 §3.5.2 (mutability enforcement)
 - **Deliverables**:
-  - `SchemaValidator` service validating against tenant_schema definitions
+  - `SchemaValidator` service validating against endpoint_schema definitions
   - Unknown attribute rejection (when `strictMode` enabled)
   - Attribute mutability enforcement (readOnly, immutable, writeOnly)
   - Required attribute validation
@@ -526,14 +526,14 @@ gantt
   - 501 for unsupported if not configured
 - **Impact**: /Me compliance (optional feature)
 
-#### Phase 11: Per-Tenant Credentials 🔲
+#### Phase 11: Per-Endpoint Credentials 🔲
 - **Goal**: G11
 - **RFC Coverage**: RFC 7644 §2 (authentication), §6 (multi-tenancy)
 - **Deliverables**:
-  - `tenant_credential` table replacing global shared-secret
+  - `endpoint_credential` table replacing global shared-secret
   - Per-endpoint bearer token validation
   - Credential rotation support
-- **Impact**: Security hardening, proper multi-tenant authentication
+- **Impact**: Security hardening, proper multi-endpoint authentication
 
 #### Phase 12: Sorting, Search Cleanup & Final Polish 🔲
 - **Goals**: G12, G13, G18
@@ -818,7 +818,7 @@ export class EndpointBehaviorInterceptor implements NestInterceptor {
 
 ### Future: Strategy Factory
 
-For significant business logic variations (e.g., different validation rules per tenant), the **Strategy Factory** pattern provides maximum extensibility:
+For significant business logic variations (e.g., different validation rules per endpoint), the **Strategy Factory** pattern provides maximum extensibility:
 
 ```typescript
 // Future: Strategy factory for per-endpoint behavior
@@ -858,7 +858,7 @@ The project's core extensibility requirement — **per-endpoint behavior change 
 | **8** | Schema validation flags (`rejectUnknownAttributes`) with attribute-level enforcement |
 | **9** | Bulk behavior flags (`maxOperations`, `maxPayloadSize`) per endpoint |
 | **10** | /Me alias configuration per endpoint |
-| **11** | Per-tenant credential isolation (each endpoint can have unique auth) |
+| **11** | Per-endpoint credential isolation (each endpoint can have unique auth) |
 | **12** | Sorting behavior flags per endpoint |
 
 The underlying architecture — `endpoint.config` JSONB column → `EndpointContextStorage` (AsyncLocalStorage) → `getConfigBoolean()`/`getConfigString()` — is already in place and scales to unlimited flags without schema changes (JSONB is schemaless).

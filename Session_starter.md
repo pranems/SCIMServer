@@ -5,6 +5,7 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 ### Recent Key Achievements (Chronological)
 | Date | Achievement |
 |------|-------------|
+| 2026-02-23 | 📝 **Phase 8 Part 2 — Custom Resource Type Registration — DOCUMENTED:** Designed and documented comprehensive Phase 8.2 (Custom Resource Type Registration) in migration plan and architecture v3 docs. Covers: `EndpointResourceType` DB model + Prisma migration, `ENDPOINT_RESOURCE_TYPE_REPOSITORY` token + interface + Prisma/InMemory implementations, `ScimSchemaRegistry.registerResourceType()` with per-endpoint overlay + hydration, Admin API `POST/GET/DELETE /admin/endpoints/:id/resource-types`, `customResourceTypesEnabled` config flag (default false), generic wildcard `EndpointScimGenericController` (catches `:resourceType` after dedicated User/Group controllers), `EndpointScimGenericService` with JSONB-only storage + schema-guided validation, `GenericPatchEngine` for JSONB payloads, JSONB-only filter fallback. Full request/response examples, Mermaid sequence/architecture diagrams, discovery impact examples, runtime impact assessment, ~105 test plan, ~9 day effort estimate. Updated: migration plan (TOC, gap table G8b, phase overview, timeline, Gantt, dependency graph P8b node, deployment matrix, summary table), architecture v3 (config flag matrix, ER diagram columns, API route map with admin + generic routes, Appendix B.7b examples). No code changes — documentation only. |
 | 2026-02-23 | ✅ **Phase 6 — Data-Driven Discovery — COMPLETE (v0.14.0):** Centralized all SCIM discovery endpoints into injectable `ScimDiscoveryService`, replacing ~280 lines of hardcoded JSON across 4 controllers. Added Enterprise User Extension schema (RFC 7643 §4.3) to `/Schemas` (3 schemas, was 2). Enterprise extension declared on User ResourceType. Dynamic `schemas[]` in User responses (G19). `meta` object on ServiceProviderConfig (RFC 7644 §4). Centralized `KNOWN_EXTENSION_URNS` (G16). Removed 7 dead config flags (G20). Rich RFC 7643 schema constants with full attribute definitions. Full validation: **1171/1171 unit tests** (47 suites, +36 new), **196/196 E2E tests** (15 suites, +3 new). Phase doc: `docs/phases/PHASE_06_DATA_DRIVEN_DISCOVERY.md`. |
 | 2026-02-21 | ✅ **Phase 5 — Domain-Layer PATCH Engine — COMPLETE (v0.13.0):** Extracted inline SCIM PATCH logic into pure-domain `UserPatchEngine` (~290 lines) and `GroupPatchEngine` (~240 lines) with zero NestJS/Prisma dependencies. Created `PatchError` domain error class, typed `PatchConfig`/`GroupMemberPatchConfig` interfaces, barrel export. Refactored both services to thin orchestrators (34%/31% line reduction). Added 73 new unit tests (36+37). Full validation: **984/984 unit tests** (29 suites), **193/193 E2E tests** (15 suites). Docker build + container healthy. Phase doc: `docs/phases/PHASE_05_PATCH_ENGINE.md`. |
 | 2026-02-21 | 🧪 **Comprehensive Test Gap Analysis & Expansion:** Identified 19 untested source files (59.6% gap rate). Created 14 new test files: `PatchError`, `createScimError`, `buildBaseUrl`, `ScimMetadataService`, `OAuthService` (16 tests), `OAuthController`, `SharedSecretGuard` (11 tests), `ScimAuthGuard`, `RequestLoggingInterceptor`, `ServiceProviderConfigController`, `ResourceTypesController`, `SchemasController`, `DatabaseController`, `AdminController` (18 tests), `WebController`. **Tests: 1135/1135 unit (46 suites) + 193/193 E2E (15 suites). +151 net new tests, +17 new suites.** |
@@ -295,9 +296,13 @@ Deferred:
 ## Dev Quick Ref
 Backend: `cd api && npm run start:dev`
 Frontend: `cd web && npm run dev`
-Unit Tests: `cd api && npm test` (862 tests, 28 suites)
-E2E Tests: `cd api && npm run test:e2e` (193 tests, 15 suites)
-Live Tests: `.\scripts\live-test.ps1` (302 assertions, 301 pass)
+Unit Tests: `cd api && npm test` (1316 tests, 52 suites)
+Unit Coverage: `cd api && npm run test:cov` → coverage/
+E2E Tests: `cd api && npm run test:e2e` (251 tests, 17 suites)
+E2E Coverage: `cd api && npm run test:e2e:cov` → coverage-e2e/
+All Coverage: `cd api && npm run test:cov:all` (unit + E2E)
+Full Pipeline: `cd api && npm run test:all` (unit + E2E + smoke)
+Live Tests: `.\scripts\live-test.ps1` (322 assertions)
 Live Tests (verbose): `.\scripts\live-test.ps1 -Verbose`
 
 ---

@@ -46,7 +46,7 @@ Every single example in RFC 7643 uses UUID format:
 
 ### RFC 7643 §9.3 — Privacy Considerations
 
-> "SCIM defines attributes such as `id`, `externalId`, and SCIM resource URIs, which cause new PII to be generated [...] Where possible, assign and bind identifiers to specific tenants and/or clients."
+> "SCIM defines attributes such as `id`, `externalId`, and SCIM resource URIs, which cause new PII to be generated [...] Where possible, assign and bind identifiers to specific endpoints and/or clients."
 
 UUIDs are recommended for privacy because they are:
 - Not sequential (unlike auto-increment IDs)

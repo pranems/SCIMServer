@@ -71,7 +71,7 @@ model ScimResource {
   endpointId       String   @db.Uuid
   resourceType     String   @db.VarChar(50)
   scimId           String   @db.Uuid
-  externalId       String?  @db.VarChar(255)
+  externalId       String?  @db.Citext        // CITEXT — case-insensitive per SCIM RFC §3.1
   userName         String?  @db.Citext        // CITEXT — case-insensitive natively (Phase 3)
   displayName      String?  @db.Citext        // CITEXT — case-insensitive natively (Phase 3)
   active           Boolean  @default(true)

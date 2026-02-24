@@ -1036,7 +1036,7 @@ If PostgreSQL migration is not immediately feasible, these should be implemented
           │ • Zero data loss │            │ • Dev/test envs  │
           │ • Full SCIM      │            │ • PoC / demos    │
           │   compliance     │            │ • < 1K users     │
-          │ • Simpler infra  │            │ • Single-tenant  │
+          │ • Simpler infra  │            │ • Single-endpoint  │
           └──────────────────┘            └──────────────────┘
 ```
 

@@ -128,8 +128,13 @@ npm run start:dev           # NestJS with --watch (hot reload)
 npm run build               # TypeScript compilation to dist/
 npm run start               # Production mode (runs prisma migrate deploy first)
 npm test                    # Run unit tests (Jest)
+npm run test:cov            # Unit tests with coverage → coverage/
 npm run test:e2e            # Run E2E suite
+npm run test:e2e:cov        # E2E tests with coverage → coverage-e2e/
+npm run test:cov:all        # Unit + E2E coverage combined
+npm run test:all            # Unit + E2E + live smoke (full pipeline)
 npm run test:ci             # Unit + E2E CI sequence
+npm run test:smoke          # Live integration tests (PowerShell)
 npm test -- --watch         # Watch mode
 npm test -- --verbose       # Verbose output
 npx prisma migrate dev      # Run migrations
@@ -269,11 +274,14 @@ Four categories of PATCH paths, handled in order:
 
 ## 8. Test Coverage
 
-- **Unit**: 666 tests passing
-- **E2E**: 184 tests passing
-- **Live integration**: 280 tests passing (local + Docker)
-- Test runners: `npm test`, `npm run test:e2e`, `pwsh ../scripts/live-test.ps1`
-- Coverage includes SCIM CRUD, PATCH path variants, case-insensitivity, filtering, projection, ETag behavior, endpoint isolation, auth, logging config, and admin operations.
+- **Unit**: 1316 tests passing (52 suites)
+- **E2E**: 251 tests passing (17 suites)
+- **Live integration**: 322 tests passing (local + Docker)
+- **SCIM Validator**: 25/25 required + 7/7 preview
+- Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
+- Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`
+- Full pipeline: `npm run test:all` (unit + E2E + live smoke)
+- Coverage includes SCIM CRUD, PATCH path variants, case-insensitivity, filtering, projection, ETag behavior, endpoint isolation, auth, logging config, admin operations, and SCIM validator compliance scenarios.
 
 ---
 

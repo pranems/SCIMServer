@@ -339,4 +339,63 @@ describe('GroupPatchEngine', () => {
       expect(result.find(m => m.value === 'a')?.display).toBe('Second');
     });
   });
+
+  // ── SCIM Validator: Multi-op scenarios ─────────────────────────────────
+
+  describe('SCIM Validator: multi-op scenarios', () => {
+    it('should apply add then remove member in a single patch (add→remove = empty)', () => {
+      const result = apply(
+        [
+          { op: 'add', path: 'members', value: [{ value: 'user-new' }] },
+          { op: 'remove', path: 'members[value eq "user-new"]' },
+        ],
+        { members: [] },
+      );
+      expect(result.members).toHaveLength(0);
+    });
+
+    it('should apply replace displayName via no-path object (Entra-style)', () => {
+      const result = apply([{
+        op: 'replace',
+        value: { displayName: 'EntraReplacedName' },
+      }]);
+      expect(result.displayName).toBe('EntraReplacedName');
+    });
+
+    it('should apply replace externalId via no-path object', () => {
+      const result = apply([{
+        op: 'replace',
+        value: { externalId: 'new-ext-from-entra' },
+      }]);
+      expect(result.externalId).toBe('new-ext-from-entra');
+    });
+
+    it('should apply replace members via path (full member replacement)', () => {
+      const result = apply([{
+        op: 'replace',
+        path: 'members',
+        value: [{ value: 'user-A' }],
+      }], { members: makeMembers('user-1', 'user-2') });
+      expect(result.members).toHaveLength(1);
+      expect(result.members[0].value).toBe('user-A');
+    });
+
+    it('should handle remove member via value filter path', () => {
+      const result = apply(
+        [{ op: 'remove', path: 'members[value eq "user-1"]' }],
+        { members: makeMembers('user-1', 'user-2') },
+      );
+      expect(result.members).toHaveLength(1);
+      expect(result.members[0].value).toBe('user-2');
+    });
+
+    it('should apply combined displayName + externalId replace in single op', () => {
+      const result = apply([{
+        op: 'replace',
+        value: { displayName: 'Combined', externalId: 'ext-combined' },
+      }]);
+      expect(result.displayName).toBe('Combined');
+      expect(result.externalId).toBe('ext-combined');
+    });
+  });
 });

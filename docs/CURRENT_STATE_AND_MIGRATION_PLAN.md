@@ -15,13 +15,13 @@ It outlines the gaps in the current implementation and provides a detailed, step
 
 ### 1.2. Filtering & Querying (RFC 7644 §3.4)
 *   **Ideal:** SCIM filters are parsed into an Abstract Syntax Tree (AST) and translated directly into database queries (e.g., PostgreSQL `jsonb_path_ops`).
-*   **Current:** An excellent AST parser exists (`api/src/modules/scim/filters/scim-filter-parser.ts`). However, `apply-scim-filter.ts` reveals that only simple `eq` filters on indexed columns (`userNameLower`, `externalId`) are pushed to the DB. For any complex filter (e.g., `emails.type eq "work"`), the system fetches *all* records for the tenant and evaluates the AST in-memory.
-*   **Gap:** Massive performance and scalability bottleneck. In-memory evaluation of thousands of records per request is not viable for production multi-tenant environments.
+*   **Current:** An excellent AST parser exists (`api/src/modules/scim/filters/scim-filter-parser.ts`). However, `apply-scim-filter.ts` reveals that only simple `eq` filters on indexed columns (`userNameLower`, `externalId`) are pushed to the DB. For any complex filter (e.g., `emails.type eq "work"`), the system fetches *all* records for the endpoint and evaluates the AST in-memory.
+*   **Gap:** Massive performance and scalability bottleneck. In-memory evaluation of thousands of records per request is not viable for production multi-endpoint environments.
 
 ### 1.3. Schema & Configuration Engine (RFC 7643)
-*   **Ideal:** Dynamic, tenant-specific schemas stored in the database. A robust Schema Validator enforces `mutability`, `returned`, and `type` characteristics dynamically at runtime.
+*   **Ideal:** Dynamic, endpoint-specific schemas stored in the database. A robust Schema Validator enforces `mutability`, `returned`, and `type` characteristics dynamically at runtime.
 *   **Current:** Schemas are hardcoded in `api/src/modules/scim/controllers/endpoint-scim-discovery.controller.ts` (e.g., `private userSchema()`). Validation in services (`endpoint-scim-users.service.ts`) is basic and manual.
-*   **Gap:** The system cannot support tenant-specific custom extensions (e.g., `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User`) without modifying source code.
+*   **Gap:** The system cannot support endpoint-specific custom extensions (e.g., `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User`) without modifying source code.
 
 ### 1.4. The PATCH Engine (RFC 7644 §3.5.2)
 *   **Ideal:** An in-memory JSON patch engine that utilizes the AST parser to resolve value selection filters (e.g., `emails[type eq "work"]`) and validates the mutated object against the dynamic schema before saving.
@@ -42,7 +42,7 @@ To bring the current implementation to the ideal state, the following phased app
 ### Phase 1: Database Migration & Foundation (The Enabler)
 *Reasoning: You cannot push complex AST filters to the database or support dynamic schemas efficiently without a document-capable relational database. To align with the Agnostic Architecture, we must implement the Repository Pattern while choosing a concrete persistence layer.*
 
-1.  **Implement Repository Interfaces:** Create `IResourceRepository`, `ISchemaRepository`, and `ITenantConfigRepository` interfaces in the Business Logic Layer. Ensure the SCIM Engine only depends on these interfaces, not Prisma directly.
+1.  **Implement Repository Interfaces:** Create `IResourceRepository`, `ISchemaRepository`, and `IEndpointConfigRepository` interfaces in the Business Logic Layer. Ensure the SCIM Engine only depends on these interfaces, not Prisma directly.
 2.  **Choose Concrete Persistence (PostgreSQL):** While the architecture is agnostic, PostgreSQL is chosen as the concrete implementation for its superior hybrid relational/document capabilities (`JSONB` and `GIN` indexes).
 3.  **Migrate Prisma to PostgreSQL:** Update `api/prisma/schema.prisma` to use `provider = "postgresql"`.
 4.  **Convert Payload Storage:** Change `rawPayload String` to `data JsonB` in the Prisma schema.
@@ -51,14 +51,14 @@ To bring the current implementation to the ideal state, the following phased app
 7.  **Implement Concrete Repositories:** Create `PostgresResourceRepository` (implementing `IResourceRepository`) that uses Prisma to interact with the new PostgreSQL schema.
 
 ### Phase 2: Dynamic Schema & Configuration Engine
-*Reasoning: Before fixing the PATCH engine or validation, the system needs to know what the rules are dynamically per tenant.*
+*Reasoning: Before fixing the PATCH engine or validation, the system needs to know what the rules are dynamically per endpoint.*
 
-1.  **Create Schema Models:** Add `TenantSchema`, `TenantResourceType`, and `TenantConfig` models to `schema.prisma`, linking them to the existing `Endpoint` model. This allows each tenant to define their own custom resources (e.g., `EnterpriseUser`, `Device`, `Role`) beyond the standard `User` and `Group`.
-    *   **Attribute Persistence (`TenantSchema`):** The `TenantSchema` model must store attribute definitions as a `JSONB` column (e.g., `attributes JsonB`). This allows the database to store the deeply nested, recursive nature of SCIM attributes (where a `complex` attribute contains an array of `subAttributes`, which themselves have `type`, `mutability`, etc.) exactly as defined in RFC 7643 §2.2, without requiring a massive, brittle relational table structure for every single sub-attribute.
-    *   **ResourceType Persistence (`TenantResourceType`):** The `TenantResourceType` model must store the `schema` (the base schema URI, e.g., `urn:ietf:params:scim:schemas:core:2.0:User`), the `endpoint` (the relative URI, e.g., `/Users`), and a `schemaExtensions` `JSONB` column. The `schemaExtensions` column stores an array of objects defining the extension schema URIs and whether they are `required` (boolean), exactly as defined in RFC 7643 §6.
-    *   **The Relational Link:** The `TenantResourceType` acts as the "glue". When a client queries a `ResourceType` (e.g., `User`), the system looks at the `schema` URI and the `schemaExtensions` URIs defined in the `TenantResourceType` record. It then uses those URIs to look up the corresponding `TenantSchema` records to retrieve the actual `attributes JsonB` definitions. This ensures that a single schema definition (e.g., an Enterprise Extension) can be reused across multiple Resource Types.
-2.  **Implement `ISchemaRepository`:** Create a service to fetch and cache tenant schemas and resource types from the database (using Redis or in-memory LRU).
-3.  **Build the RFC 7643 Schema Validator:** Create a dedicated validation service that takes a JSON payload and a `TenantSchema` definition. It must enforce all RFC 7643 §2.2 attribute characteristics:
+1.  **Create Schema Models:** Add `EndpointSchema`, `EndpointResourceType`, and `EndpointConfig` models to `schema.prisma`, linking them to the existing `Endpoint` model. This allows each endpoint to define their own custom resources (e.g., `EnterpriseUser`, `Device`, `Role`) beyond the standard `User` and `Group`.
+    *   **Attribute Persistence (`EndpointSchema`):** The `EndpointSchema` model must store attribute definitions as a `JSONB` column (e.g., `attributes JsonB`). This allows the database to store the deeply nested, recursive nature of SCIM attributes (where a `complex` attribute contains an array of `subAttributes`, which themselves have `type`, `mutability`, etc.) exactly as defined in RFC 7643 §2.2, without requiring a massive, brittle relational table structure for every single sub-attribute.
+    *   **ResourceType Persistence (`EndpointResourceType`):** The `EndpointResourceType` model must store the `schema` (the base schema URI, e.g., `urn:ietf:params:scim:schemas:core:2.0:User`), the `endpoint` (the relative URI, e.g., `/Users`), and a `schemaExtensions` `JSONB` column. The `schemaExtensions` column stores an array of objects defining the extension schema URIs and whether they are `required` (boolean), exactly as defined in RFC 7643 §6.
+    *   **The Relational Link:** The `EndpointResourceType` acts as the "glue". When a client queries a `ResourceType` (e.g., `User`), the system looks at the `schema` URI and the `schemaExtensions` URIs defined in the `EndpointResourceType` record. It then uses those URIs to look up the corresponding `EndpointSchema` records to retrieve the actual `attributes JsonB` definitions. This ensures that a single schema definition (e.g., an Enterprise Extension) can be reused across multiple Resource Types.
+2.  **Implement `ISchemaRepository`:** Create a service to fetch and cache endpoint schemas and resource types from the database (using Redis or in-memory LRU).
+3.  **Build the RFC 7643 Schema Validator:** Create a dedicated validation service that takes a JSON payload and a `EndpointSchema` definition. It must enforce all RFC 7643 §2.2 attribute characteristics:
     *   `type` & `multiValued`: Ensure data types match (string, boolean, complex, etc.) and arrays are used when required.
     *   `mutability`: Strip `readOnly` fields on input; reject changes to `immutable` fields on PUT/PATCH; allow `readWrite` and `writeOnly`.
     *   `returned`: Strip `writeOnly` fields (like passwords) on output; handle `always`, `never`, `default`, and `request` characteristics.
@@ -68,9 +68,9 @@ To bring the current implementation to the ideal state, the following phased app
     *   `canonicalValues`: Restrict inputs to allowed predefined values (e.g., "work", "home").
     *   `referenceTypes`: Validate that `reference` attributes point to valid resource URIs (e.g., `User`, `Group`).
 4.  **Refactor Discovery Controllers:** Update `EndpointScimDiscoveryController` to serve the three mandatory discovery endpoints dynamically from the database instead of using hardcoded JSON methods, strictly adhering to RFC 7644 §4:
-    *   **`/ServiceProviderConfig`:** Must return the `TenantConfig` detailing supported operations (e.g., `patch`, `bulk`, `filter`, `etag`, `sort`) and authentication schemes. This dictates to the client exactly what the server is capable of.
-    *   **`/Schemas`:** Must return the `TenantSchema` definitions. This allows clients to discover the exact attribute characteristics (type, mutability, required, etc.) for every core and extension schema supported by the tenant.
-    *   **`/ResourceTypes`:** Must return the `TenantResourceType` definitions. This dynamically lists all resources configured for the specific tenant (e.g., `User`, `Group`, `Device`), including their base schema, schema extensions, and the exact HTTP endpoint URIs where they can be accessed.
+    *   **`/ServiceProviderConfig`:** Must return the `EndpointConfig` detailing supported operations (e.g., `patch`, `bulk`, `filter`, `etag`, `sort`) and authentication schemes. This dictates to the client exactly what the server is capable of.
+    *   **`/Schemas`:** Must return the `EndpointSchema` definitions. This allows clients to discover the exact attribute characteristics (type, mutability, required, etc.) for every core and extension schema supported by the endpoint.
+    *   **`/ResourceTypes`:** Must return the `EndpointResourceType` definitions. This dynamically lists all resources configured for the specific endpoint (e.g., `User`, `Group`, `Device`), including their base schema, schema extensions, and the exact HTTP endpoint URIs where they can be accessed.
 
 ### Phase 3: Query Pushdown & AST Translation
 *Reasoning: With JSONB in place, we can eliminate the in-memory filtering bottleneck.*

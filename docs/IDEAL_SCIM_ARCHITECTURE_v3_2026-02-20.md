@@ -1,4 +1,4 @@
-# Ideal Multi-Tenant SCIM 2.0 Server — RFC-First Architecture v3
+# Ideal Multi-Endpoint SCIM 2.0 Server — RFC-First Architecture v3
 
 > **Version**: 3.0 · **Date**: 2026-02-20
 > **Approach**: Ground-up, RFC-first. No legacy assumptions.
@@ -11,7 +11,7 @@
 1. [Design Principles](#1-design-principles)
 2. [System Context & Deployment Topology](#2-system-context--deployment-topology)
 3. [Layered Architecture](#3-layered-architecture)
-4. [Tenant Model & Isolation](#4-tenant-model--isolation)
+4. [Endpoint Model & Isolation](#4-endpoint-model--isolation)
 5. [Database Schema (PostgreSQL)](#5-database-schema-postgresql)
 6. [Discovery Endpoints (RFC 7644 §4)](#6-discovery-endpoints-rfc-7644-4)
 7. [Resource CRUD Operations (RFC 7644 §3)](#7-resource-crud-operations-rfc-7644-3)
@@ -35,11 +35,11 @@
 |---|-----------|-----------|
 | P1 | **RFC-First** | Every API decision traces to a specific RFC section. Non-compliance is an explicit, documented deviation. |
 | P2 | **Simplicity** | Each concern has exactly one owner. No flag-branching inside domain logic; behavior variation lives in configuration, not `if` blocks. |
-| P3 | **Extensibility** | New resource types (Device, Application) require zero code changes — only `tenant_schema` + `tenant_resource_type` rows. |
+| P3 | **Extensibility** | New resource types (Device, Application) require zero code changes — only `endpoint_schema` + `endpoint_resource_type` rows. |
 | P4 | **Persistence Agnosticism** | Domain logic depends only on Repository interfaces. PostgreSQL, SQLite, or DynamoDB can be swapped without touching business rules. |
 | P5 | **Optimal Efficiency** | Filters are pushed to the database. In-memory fallback is a measurable exception, not the default. |
-| P6 | **Tenant Isolation** | Each tenant (endpoint) has independent schema definitions, config flags, resources, and log streams. Cross-tenant data leakage is structurally impossible. |
-| P7 | **Fail-Safe Defaults** | Strict mode by default. Lenient flags are opt-in per tenant, never global. |
+| P6 | **Endpoint Isolation** | Each endpoint (endpoint) has independent schema definitions, config flags, resources, and log streams. Cross-endpoint data leakage is structurally impossible. |
+| P7 | **Fail-Safe Defaults** | Strict mode by default. Lenient flags are opt-in per endpoint, never global. |
 
 ---
 
@@ -58,13 +58,13 @@
     ┌────────────────────────────────────────────────────────┐
     │              SCIM 2.0 Server (NestJS)                  │
     │  ┌─────────────────────────────────────────────────┐   │
-    │  │  /scim/v2/tenants/{tenantId}/Users              │   │
-    │  │  /scim/v2/tenants/{tenantId}/Groups             │   │
-    │  │  /scim/v2/tenants/{tenantId}/ServiceProviderConfig │ │
-    │  │  /scim/v2/tenants/{tenantId}/Schemas            │   │
-    │  │  /scim/v2/tenants/{tenantId}/ResourceTypes      │   │
-    │  │  /scim/v2/tenants/{tenantId}/Bulk               │   │
-    │  │  /scim/v2/tenants/{tenantId}/Me                 │   │
+    │  │  /scim/v2/endpoints/{endpointId}/Users              │   │
+    │  │  /scim/v2/endpoints/{endpointId}/Groups             │   │
+    │  │  /scim/v2/endpoints/{endpointId}/ServiceProviderConfig │ │
+    │  │  /scim/v2/endpoints/{endpointId}/Schemas            │   │
+    │  │  /scim/v2/endpoints/{endpointId}/ResourceTypes      │   │
+    │  │  /scim/v2/endpoints/{endpointId}/Bulk               │   │
+    │  │  /scim/v2/endpoints/{endpointId}/Me                 │   │
     │  └──────────────────────┬──────────────────────────┘   │
     │                         │                              │
     │  ┌──────────────────────▼──────────────────────────┐   │
@@ -92,8 +92,8 @@
 │  - Apply attribute projection (§3.4.2.5)                         │
 ├─────────────────────────────────────────────────────────────────┤
 │ APPLICATION LAYER                                                │
-│  TenantResolver · ResourceOrchestrator · BulkProcessor           │
-│  - Resolve tenant context from route parameter                   │
+│  EndpointResolver · ResourceOrchestrator · BulkProcessor           │
+│  - Resolve endpoint context from route parameter                   │
 │  - Coordinate create/read/update/delete flows                    │
 │  - Delegate to domain services                                   │
 │  - Manage database transactions                                  │
@@ -108,13 +108,13 @@
 │ DATA ACCESS LAYER                                                │
 │  Repository Interfaces (Ports)                                   │
 │  ┌──────────────────────────┐ ┌─────────────────────────┐       │
-│  │ IResourceRepository      │ │ ITenantRepository       │       │
+│  │ IResourceRepository      │ │ IEndpointRepository       │       │
 │  │ ISchemaRepository         │ │ IResourceTypeRepository │       │
 │  │ IMembershipRepository     │ │ IRequestLogRepository   │       │
 │  └──────────────────────────┘ └─────────────────────────┘       │
 ├─────────────────────────────────────────────────────────────────┤
 │ INFRASTRUCTURE LAYER                                             │
-│  PostgresResourceRepository · PostgresTenantRepository           │
+│  PostgresResourceRepository · PostgresEndpointRepository           │
 │  PostgresSchemaRepository · RedisCache · PrismaClient            │
 │  - Concrete implementations of repository interfaces             │
 │  - Database-specific query building                              │
@@ -138,35 +138,35 @@
 
 ---
 
-## 4. Tenant Model & Isolation
+## 4. Endpoint Model & Isolation
 
-Each **tenant** (called "endpoint" in the current codebase) is a fully isolated SCIM service provider with its own:
+Each **endpoint** (called "endpoint" in the current codebase) is a fully isolated SCIM service provider with its own:
 
 | Concern | Isolation Mechanism | RFC Reference |
 |---------|-------------------|---------------|
-| Schema definitions | `tenant_schema` rows per tenant | §7643 §7 |
-| Resource types | `tenant_resource_type` rows per tenant | §7643 §6 |
-| Config flags | `tenant.config` JSONB column | — |
-| Resources (Users/Groups) | `scim_resource.tenant_id` foreign key | §7644 §3 |
-| Request logs | `request_log.tenant_id` foreign key | — |
-| Auth credentials | `tenant_credential` rows per tenant | — |
+| Schema definitions | `endpoint_schema` rows per endpoint | §7643 §7 |
+| Resource types | `endpoint_resource_type` rows per endpoint | §7643 §6 |
+| Config flags | `endpoint.config` JSONB column | — |
+| Resources (Users/Groups) | `scim_resource.endpoint_id` foreign key | §7644 §3 |
+| Request logs | `request_log.endpoint_id` foreign key | — |
+| Auth credentials | `endpoint_credential` rows per endpoint | — |
 
 ### Current State Assessment — What's Already Strong
 
 > _Sourced from per-endpoint isolation audit — see `SCIM_EXTENSIONS_DEEP_ANALYSIS.md` §2A for detailed 4-layer analysis._
 
-The current codebase already provides **architecturally sound multi-tenant isolation** across 4 layers:
+The current codebase already provides **architecturally sound multi-endpoint isolation** across 4 layers:
 
 | Layer | Mechanism | Assessment |
 |-------|-----------|------------|
-| **Database** | Composite unique constraints (`endpointId` + `userName`/`displayName`); FK cascades ensure `ON DELETE CASCADE` from endpoint → resources | **Strong** — no cross-tenant data leakage possible |
+| **Database** | Composite unique constraints (`endpointId` + `userName`/`displayName`); FK cascades ensure `ON DELETE CASCADE` from endpoint → resources | **Strong** — no cross-endpoint data leakage possible |
 | **URL** | `@Controller('endpoints/:endpointId')` prefix on all resource controllers | **Strong** — every request is scoped by URL parameter |
-| **Runtime** | `AsyncLocalStorage` carries `endpointId` through the request lifecycle | **Strong** — service layer always has tenant context |
-| **Config** | Per-endpoint JSON blob (`EndpointService.getConfig()`) stores tenant-specific flags | **Partial** — blob is loaded correctly but 7 of 12 flags are dead code (see G20) |
+| **Runtime** | `AsyncLocalStorage` carries `endpointId` through the request lifecycle | **Strong** — service layer always has endpoint context |
+| **Config** | Per-endpoint JSON blob (`EndpointService.getConfig()`) stores endpoint-specific flags | **Partial** — blob is loaded correctly but 7 of 12 flags are dead code (see G20) |
 
-**One gap remains:** The **discovery layer** (`/Schemas`, `/ResourceTypes`, `/ServiceProviderConfig`) ignores per-endpoint config entirely — it returns the same hardcoded response for all tenants. This is addressed by Phase 6 of the Migration Plan.
+**One gap remains:** The **discovery layer** (`/Schemas`, `/ResourceTypes`, `/ServiceProviderConfig`) ignores per-endpoint config entirely — it returns the same hardcoded response for all endpoints. This is addressed by Phase 6 of the Migration Plan.
 
-### Tenant Config Flags (JSONB)
+### Endpoint Config Flags (JSONB)
 
 ```jsonc
 {
@@ -189,7 +189,7 @@ The current codebase already provides **architecturally sound multi-tenant isola
   "customSchemaUrn": null,              // Override base URN prefix
   
   // Logging
-  "logLevel": "INFO"                    // Per-tenant log level override
+  "logLevel": "INFO"                    // Per-endpoint log level override
 }
 ```
 
@@ -206,6 +206,7 @@ The current codebase already provides **architecturally sound multi-tenant isola
 | `excludeMeta` | All responses | `false` | `meta` block omitted from response body | `meta` included per RFC |
 | `excludeSchemas` | All responses | `false` | `schemas` array omitted from response body | `schemas` included per RFC |
 | `legacyMode` | All operations | `false` | SCIM 1.1 compat (e.g., `id` as `externalId`) | Full 2.0 behavior |
+| `customResourceTypesEnabled` | Custom resource routing | `false` | Custom resource types registered via Admin API are surfaced in discovery and accept CRUD via generic wildcard controller | Only built-in User/Group are available; generic controller returns 404 |
 
 ---
 
@@ -215,26 +216,28 @@ The current codebase already provides **architecturally sound multi-tenant isola
 
 ```
 ┌──────────────┐     ┌─────────────────┐     ┌─────────────────────┐
-│   tenant     │──┐  │  tenant_schema  │     │ tenant_resource_type │
+│   endpoint     │──┐  │  endpoint_schema  │     │ endpoint_resource_type │
 │──────────────│  │  │─────────────────│     │─────────────────────│
 │ id (PK)      │  │  │ id (PK)         │     │ id (PK)             │
-│ name (UQ)    │  ├─>│ tenant_id (FK)  │  ┌─>│ tenant_id (FK)      │
+│ name (UQ)    │  ├─>│ endpoint_id (FK)  │  ┌─>│ endpoint_id (FK)      │
 │ display_name │  │  │ schema_urn (UQ) │  │  │ name                │
 │ config JSONB │  │  │ name            │  │  │ endpoint             │
 │ active       │  │  │ description     │  │  │ description          │
-│ created_at   │  │  │ attributes JSONB│  │  │ base_schema_urn(FK)  │
+│ created_at   │  │  │ attributes JSONB│  │  │ core_schema_urn      │
 │ updated_at   │  │  │ created_at      │  │  │ schema_extensions    │
 └──────────────┘  │  └─────────────────┘  │  │   JSONB              │
-                  │                        │  │ created_at           │
-                  ├────────────────────────┘  └─────────────────────┘
+                  │                        │  │ active               │
+                  ├────────────────────────┘  │ created_at           │
+                  │                           │ updated_at           │
+                  │                           └─────────────────────┘
                   │
                   │  ┌─────────────────────────────┐
                   │  │       scim_resource          │
                   │  │─────────────────────────────│
                   ├─>│ id (PK)                     │
-                  │  │ tenant_id (FK)              │
-                  │  │ resource_type VARCHAR        │  ← "User" or "Group"
-                  │  │ scim_id UUID (UQ per tenant) │
+                  │  │ endpoint_id (FK)              │
+                  │  │ resource_type VARCHAR        │  ← "User", "Group", or custom (e.g., "Device")
+                  │  │ scim_id UUID (UQ per endpoint) │
                   │  │ external_id VARCHAR          │
                   │  │ display_name CITEXT          │
                   │  │ user_name CITEXT             │  ← NULL for Groups
@@ -258,10 +261,10 @@ The current codebase already provides **architecturally sound multi-tenant isola
                   │  └─────────────────────────────┘
                   │
                   │  ┌─────────────────────────────┐
-                  │  │      tenant_credential       │
+                  │  │      endpoint_credential       │
                   │  │─────────────────────────────│
                   ├─>│ id (PK)                     │
-                  │  │ tenant_id (FK)              │
+                  │  │ endpoint_id (FK)              │
                   │  │ credential_type VARCHAR      │ ← "bearer" / "oauth_client"
                   │  │ credential_hash VARCHAR      │
                   │  │ metadata JSONB               │ ← {clientId, scopes, ...}
@@ -273,7 +276,7 @@ The current codebase already provides **architecturally sound multi-tenant isola
                   │  │       request_log            │
                   │  │─────────────────────────────│
                   └─>│ id (PK)                     │
-                     │ tenant_id (FK, nullable)     │
+                     │ endpoint_id (FK, nullable)     │
                      │ method, url, status          │
                      │ duration_ms                  │
                      │ request_headers JSONB         │
@@ -286,16 +289,16 @@ The current codebase already provides **architecturally sound multi-tenant isola
 
 ### Detailed Column Descriptions
 
-#### `tenant` table
+#### `endpoint` table
 
 | Column | Type | Constraints | Purpose |
 |--------|------|-------------|---------|
 | `id` | `UUID` | PK, default gen_random_uuid() | Internal identifier |
-| `name` | `VARCHAR(100)` | UNIQUE, NOT NULL | URL-safe slug: `/tenants/{name}` |
+| `name` | `VARCHAR(100)` | UNIQUE, NOT NULL | URL-safe slug: `/endpoints/{name}` |
 | `display_name` | `VARCHAR(255)` | Nullable | Human-readable title |
 | `description` | `TEXT` | Nullable | Purpose / notes |
 | `config` | `JSONB` | DEFAULT '{}' | Behavior flags (see §4 matrix) |
-| `active` | `BOOLEAN` | DEFAULT true | Inactive tenants reject all requests |
+| `active` | `BOOLEAN` | DEFAULT true | Inactive endpoints reject all requests |
 | `created_at` | `TIMESTAMPTZ` | DEFAULT now() | Audit trail |
 | `updated_at` | `TIMESTAMPTZ` | Auto-updated | Audit trail |
 
@@ -304,11 +307,11 @@ The current codebase already provides **architecturally sound multi-tenant isola
 | Column | Type | Constraints | Purpose |
 |--------|------|-------------|---------|
 | `id` | `UUID` | PK | Internal storage ID (never exposed to clients) |
-| `tenant_id` | `UUID` | FK→tenant(id), CASCADE | Tenant isolation |
-| `resource_type` | `VARCHAR(50)` | NOT NULL | Discriminator: "User", "Group", etc. |
-| `scim_id` | `UUID` | UQ(tenant_id, scim_id) | SCIM `id` field, exposed to clients |
-| `external_id` | `VARCHAR(255)` | UQ(tenant_id, external_id) WHERE NOT NULL | IdP-assigned identifier |
-| `user_name` | `CITEXT` | UQ(tenant_id, user_name) WHERE NOT NULL | RFC 7643 §4.1: case-insensitive |
+| `endpoint_id` | `UUID` | FK→endpoint(id), CASCADE | Endpoint isolation |
+| `resource_type` | `VARCHAR(50)` | NOT NULL | Discriminator: "User", "Group", or custom (e.g., "Device") |
+| `scim_id` | `UUID` | UQ(endpoint_id, scim_id) | SCIM `id` field, exposed to clients |
+| `external_id` | `VARCHAR(255)` | UQ(endpoint_id, external_id) WHERE NOT NULL | IdP-assigned identifier |
+| `user_name` | `CITEXT` | UQ(endpoint_id, user_name) WHERE NOT NULL | RFC 7643 §4.1: case-insensitive |
 | `display_name` | `CITEXT` | | RFC 7643 §4.1.1 / §4.2 |
 | `active` | `BOOLEAN` | DEFAULT true | User active status |
 | `payload` | `JSONB` | NOT NULL | Complete resource body (emails, addresses, extension attrs, etc.) |
@@ -325,22 +328,22 @@ The current codebase already provides **architecturally sound multi-tenant isola
 | **First-class indexed columns (`user_name`, `display_name`, `external_id`)** | Attributes that appear in `eq` filters or uniqueness constraints deserve indexed columns for O(log n) lookup instead of JSONB scan. |
 | **`CITEXT` type** | RFC 7643 §2.1: `userName` has `caseExact: false`. PostgreSQL CITEXT provides transparent case-insensitive comparison without lowercase helper columns. |
 | **`version INT`** | Monotonic integer incremented on every write. Generates deterministic ETags: `W/"v{version}"`. Avoids timestamp-based collisions. |
-| **`tenant_schema.attributes JSONB`** | Schema attributes (§7643 §7) are a recursive tree (attribute → subAttributes → subAttributes…). JSONB is the natural representation. |
-| **`tenant_resource_type.schema_extensions JSONB`** | ResourceType→Schema links (§7643 §6) include `{schema, required}` pairs. An array of these in JSONB avoids a join table. |
+| **`endpoint_schema.attributes JSONB`** | Schema attributes (§7643 §7) are a recursive tree (attribute → subAttributes → subAttributes…). JSONB is the natural representation. |
+| **`endpoint_resource_type.schema_extensions JSONB`** | ResourceType→Schema links (§7643 §6) include `{schema, required}` pairs. An array of these in JSONB avoids a join table. |
 | **Partial unique indexes** | `external_id` may be NULL for resources not synced from an IdP. PostgreSQL partial unique index (`WHERE external_id IS NOT NULL`) enforces uniqueness only on non-null values. |
 
 ### Indexing Strategy
 
 ```sql
--- Uniqueness (per-tenant)
-CREATE UNIQUE INDEX idx_resource_tenant_scimid 
-  ON scim_resource(tenant_id, scim_id);
-CREATE UNIQUE INDEX idx_resource_tenant_username 
-  ON scim_resource(tenant_id, user_name) WHERE user_name IS NOT NULL;
-CREATE UNIQUE INDEX idx_resource_tenant_externalid 
-  ON scim_resource(tenant_id, external_id) WHERE external_id IS NOT NULL;
-CREATE UNIQUE INDEX idx_resource_tenant_displayname_group
-  ON scim_resource(tenant_id, display_name)
+-- Uniqueness (per-endpoint)
+CREATE UNIQUE INDEX idx_resource_endpoint_scimid 
+  ON scim_resource(endpoint_id, scim_id);
+CREATE UNIQUE INDEX idx_resource_endpoint_username 
+  ON scim_resource(endpoint_id, user_name) WHERE user_name IS NOT NULL;
+CREATE UNIQUE INDEX idx_resource_endpoint_externalid 
+  ON scim_resource(endpoint_id, external_id) WHERE external_id IS NOT NULL;
+CREATE UNIQUE INDEX idx_resource_endpoint_displayname_group
+  ON scim_resource(endpoint_id, display_name)
   WHERE resource_type = 'Group';
 
 -- Filter push-down (GIN on JSONB)
@@ -355,8 +358,8 @@ CREATE INDEX idx_resource_username_trgm
   ON scim_resource USING GIN (user_name gin_trgm_ops);
 
 -- Type partitioning for common queries
-CREATE INDEX idx_resource_tenant_type 
-  ON scim_resource(tenant_id, resource_type);
+CREATE INDEX idx_resource_endpoint_type 
+  ON scim_resource(endpoint_id, resource_type);
 
 -- Foreign key lookups for membership
 CREATE INDEX idx_member_group ON resource_member(group_resource_id);
@@ -364,13 +367,13 @@ CREATE INDEX idx_member_member ON resource_member(member_resource_id);
 
 -- Request log time-series
 CREATE INDEX idx_log_created ON request_log(created_at DESC);
-CREATE INDEX idx_log_tenant ON request_log(tenant_id);
+CREATE INDEX idx_log_endpoint ON request_log(endpoint_id);
 
 -- Schema/ResourceType lookups
-CREATE UNIQUE INDEX idx_schema_tenant_urn 
-  ON tenant_schema(tenant_id, schema_urn);
-CREATE UNIQUE INDEX idx_rt_tenant_name 
-  ON tenant_resource_type(tenant_id, name);
+CREATE UNIQUE INDEX idx_schema_endpoint_urn 
+  ON endpoint_schema(endpoint_id, schema_urn);
+CREATE UNIQUE INDEX idx_rt_endpoint_name 
+  ON endpoint_resource_type(endpoint_id, name);
 ```
 
 ### Why Not Separate User/Group Tables?
@@ -388,19 +391,19 @@ The `resource_type` discriminator + nullable type-specific columns (`user_name` 
 
 ## 6. Discovery Endpoints (RFC 7644 §4)
 
-RFC 7644 §4 mandates three discovery endpoints at every SCIM root. In our multi-tenant model, each tenant's root is `/scim/v2/tenants/{tenantId}/`.
+RFC 7644 §4 mandates three discovery endpoints at every SCIM root. In our multi-endpoint model, each endpoint's root is `/scim/v2/endpoints/{endpointId}/`.
 
 ### 6.1 ServiceProviderConfig (§4.2)
 
 **Purpose**: Declares server capabilities so clients can adapt behavior.
 
-**Source**: `tenant.config` JSONB → mapped to SCIM ServiceProviderConfig format by `DiscoveryService`.
+**Source**: `endpoint.config` JSONB → mapped to SCIM ServiceProviderConfig format by `DiscoveryService`.
 
 ```
-GET /scim/v2/tenants/{tenantId}/ServiceProviderConfig
+GET /scim/v2/endpoints/{endpointId}/ServiceProviderConfig
 ```
 
-Response (derived from tenant config):
+Response (derived from endpoint config):
 
 ```json
 {
@@ -434,14 +437,14 @@ Response (derived from tenant config):
 
 **Purpose**: Returns full schema definitions including attribute metadata (type, mutability, returned, uniqueness, subAttributes).
 
-**Source**: `tenant_schema` rows filtered by `tenant_id`.
+**Source**: `endpoint_schema` rows filtered by `endpoint_id`.
 
 ```
-GET /scim/v2/tenants/{tenantId}/Schemas
-GET /scim/v2/tenants/{tenantId}/Schemas/{schemaUrn}
+GET /scim/v2/endpoints/{endpointId}/Schemas
+GET /scim/v2/endpoints/{endpointId}/Schemas/{schemaUrn}
 ```
 
-Each `tenant_schema.attributes` JSONB column stores the recursive attribute tree:
+Each `endpoint_schema.attributes` JSONB column stores the recursive attribute tree:
 
 ```json
 [
@@ -490,21 +493,21 @@ Each `tenant_schema.attributes` JSONB column stores the recursive attribute tree
 
 **Purpose**: Declares which resource types are available and their schema bindings.
 
-**Source**: `tenant_resource_type` rows filtered by `tenant_id`.
+**Source**: `endpoint_resource_type` rows filtered by `endpoint_id`.
 
 ```
-GET /scim/v2/tenants/{tenantId}/ResourceTypes
-GET /scim/v2/tenants/{tenantId}/ResourceTypes/{name}
+GET /scim/v2/endpoints/{endpointId}/ResourceTypes
+GET /scim/v2/endpoints/{endpointId}/ResourceTypes/{name}
 ```
 
 The relational link between ResourceTypes and Schemas:
 
 ```
-tenant_resource_type.base_schema_urn ──references──> tenant_schema.schema_urn
-tenant_resource_type.schema_extensions[].schema ──references──> tenant_schema.schema_urn
+endpoint_resource_type.base_schema_urn ──references──> endpoint_schema.schema_urn
+endpoint_resource_type.schema_extensions[].schema ──references──> endpoint_schema.schema_urn
 ```
 
-Example `tenant_resource_type` row:
+Example `endpoint_resource_type` row:
 ```json
 {
   "name": "User",
@@ -527,23 +530,23 @@ Client GET /Schemas
        │
        ▼
 ┌─ Presentation ──────────────────────────────────┐
-│ DiscoveryController.getSchemas(tenantId)         │
-│   → TenantResolver.resolve(tenantId)             │
-│   → DiscoveryService.listSchemas(tenantId)       │
+│ DiscoveryController.getSchemas(endpointId)         │
+│   → EndpointResolver.resolve(endpointId)             │
+│   → DiscoveryService.listSchemas(endpointId)       │
 └──────────────────────┬───────────────────────────┘
                        │
                        ▼
 ┌─ Domain ─────────────────────────────────────────┐
 │ DiscoveryService                                  │
-│   schemas = schemaRepo.findByTenant(tenantId)     │
+│   schemas = schemaRepo.findByEndpoint(endpointId)     │
 │   return schemas.map(toScimSchemaResponse)         │
 └──────────────────────┬───────────────────────────┘
                        │
                        ▼
 ┌─ Infrastructure ─────────────────────────────────┐
 │ PostgresSchemaRepository                          │
-│   SELECT * FROM tenant_schema                     │
-│   WHERE tenant_id = $1                            │
+│   SELECT * FROM endpoint_schema                     │
+│   WHERE endpoint_id = $1                            │
 │   ORDER BY schema_urn                             │
 └──────────────────────────────────────────────────┘
 ```
@@ -554,7 +557,7 @@ Client GET /Schemas
 
 ### 7.1 Generic Resource Pipeline
 
-Every CRUD operation follows the same pipeline, parameterized by tenant context:
+Every CRUD operation follows the same pipeline, parameterized by endpoint context:
 
 ```
  HTTP Request
@@ -562,12 +565,12 @@ Every CRUD operation follows the same pipeline, parameterized by tenant context:
       ▼
 ┌─ Guard ──────────────────────┐
 │ Authenticate (OAuth/Bearer)   │
-│ Check tenant active           │
+│ Check endpoint active           │
 └──────────┬───────────────────┘
            ▼
-┌─ TenantResolver Middleware ──┐
-│ Load tenant config            │
-│ Load tenant schemas           │
+┌─ EndpointResolver Middleware ──┐
+│ Load endpoint config            │
+│ Load endpoint schemas           │
 │ Set AsyncLocalStorage context │
 └──────────┬───────────────────┘
            ▼
@@ -634,8 +637,8 @@ Every CRUD operation follows the same pipeline, parameterized by tenant context:
 | `id` MUST be assigned by server | UUID v4 generated server-side | §3.3 |
 | Response MUST be 201 Created | Controller `@HttpCode(201)` + Location header | §3.3 |
 | Response MUST include `meta.location` | `MetaBuilder.build()` computes `{baseUrl}/{ResourceType}/{id}` | §3.1 |
-| `userName` uniqueness (case-insensitive) | CITEXT unique index per tenant | §7643 §2.1 |
-| `externalId` uniqueness per tenant | Partial unique index (WHERE NOT NULL) | §3.3 |
+| `userName` uniqueness (case-insensitive) | CITEXT unique index per endpoint | §7643 §2.1 |
+| `externalId` uniqueness per endpoint | Partial unique index (WHERE NOT NULL) | §3.3 |
 
 ### 7.3 Read (GET) — RFC 7644 §3.4.1
 
@@ -710,7 +713,7 @@ interface IPatchEngine {
   apply(
     currentPayload: Record<string, unknown>,
     operations: PatchOperation[],
-    tenantConfig: TenantConfig,
+    endpointConfig: EndpointConfig,
     schemaDefinition: SchemaDefinition,
   ): PatchResult;
 }
@@ -924,7 +927,7 @@ Response MUST include `totalResults` (total matching resources, not page size).
 }
 ```
 
-**Implementation**: SQL `OFFSET` + `LIMIT` (acceptable for SCIM's expected dataset sizes of hundreds to thousands per tenant). For extreme scale, cursor-based pagination can be layered behind the same interface.
+**Implementation**: SQL `OFFSET` + `LIMIT` (acceptable for SCIM's expected dataset sizes of hundreds to thousands per endpoint). For extreme scale, cursor-based pagination can be layered behind the same interface.
 
 ---
 
@@ -977,14 +980,14 @@ Example: W/"v42"
 | PATCH | N/A | **Enforced** → 412 | Service layer `assertIfMatch()` before write |
 | DELETE | N/A | **Enforced** → 412 | Service layer `assertIfMatch()` before write |
 
-When `strictMode: true` in tenant config: If-Match is **required** for PUT/PATCH/DELETE (missing header → 428 Precondition Required).
+When `strictMode: true` in endpoint config: If-Match is **required** for PUT/PATCH/DELETE (missing header → 428 Precondition Required).
 
 ---
 
 ## 13. Bulk Operations (RFC 7644 §3.7)
 
 ```
-POST /scim/v2/tenants/{tenantId}/Bulk
+POST /scim/v2/endpoints/{endpointId}/Bulk
 Content-Type: application/scim+json
 
 {
@@ -1049,7 +1052,7 @@ Content-Type: application/scim+json
 │            │     │                  │     │    fail→step 4   │
 │            │     │                  │     │                  │
 │            │     │ 4. Compare with  │     │                  │
-│            │     │    per-tenant    │     │                  │
+│            │     │    per-endpoint    │     │                  │
 │            │     │    credential   │     │                  │
 │            │     │    (bcrypt hash) │     │                  │
 │            │     │                  │     │                  │
@@ -1058,9 +1061,9 @@ Content-Type: application/scim+json
 └────────────┘     └──────────────────┘     └──────────────────┘
 ```
 
-### Per-Tenant Credentials
+### Per-Endpoint Credentials
 
-Each tenant has its own bearer token or OAuth client in `tenant_credential`:
+Each endpoint has its own bearer token or OAuth client in `endpoint_credential`:
 
 ```json
 {
@@ -1072,7 +1075,7 @@ Each tenant has its own bearer token or OAuth client in `tenant_credential`:
 }
 ```
 
-This prevents a token valid for Tenant A from accessing Tenant B's data.
+This prevents a token valid for Endpoint A from accessing Endpoint B's data.
 
 ---
 
@@ -1081,36 +1084,48 @@ This prevents a token valid for Tenant A from accessing Tenant B's data.
 | Method | Path | Handler | RFC Ref | Status Codes |
 |--------|------|---------|---------|--------------|
 | **Discovery** | | | | |
-| GET | `/tenants/{id}/ServiceProviderConfig` | DiscoveryController | §4.2 | 200 |
-| GET | `/tenants/{id}/Schemas` | DiscoveryController | §4.3 | 200 |
-| GET | `/tenants/{id}/Schemas/{urn}` | DiscoveryController | §4.3 | 200, 404 |
-| GET | `/tenants/{id}/ResourceTypes` | DiscoveryController | §4.4 | 200 |
-| GET | `/tenants/{id}/ResourceTypes/{name}` | DiscoveryController | §4.4 | 200, 404 |
+| GET | `/endpoints/{id}/ServiceProviderConfig` | DiscoveryController | §4.2 | 200 |
+| GET | `/endpoints/{id}/Schemas` | DiscoveryController | §4.3 | 200 |
+| GET | `/endpoints/{id}/Schemas/{urn}` | DiscoveryController | §4.3 | 200, 404 |
+| GET | `/endpoints/{id}/ResourceTypes` | DiscoveryController | §4.4 | 200 |
+| GET | `/endpoints/{id}/ResourceTypes/{name}` | DiscoveryController | §4.4 | 200, 404 |
 | **Users** | | | | |
-| POST | `/tenants/{id}/Users` | ResourceController | §3.3 | 201, 400, 409 |
-| GET | `/tenants/{id}/Users` | ResourceController | §3.4.2 | 200, 400 |
-| GET | `/tenants/{id}/Users/{scimId}` | ResourceController | §3.4.1 | 200, 304, 404 |
-| PUT | `/tenants/{id}/Users/{scimId}` | ResourceController | §3.5.1 | 200, 404, 412 |
-| PATCH | `/tenants/{id}/Users/{scimId}` | ResourceController | §3.5.2 | 200, 400, 404, 412 |
-| DELETE | `/tenants/{id}/Users/{scimId}` | ResourceController | §3.6 | 204, 404, 412 |
-| POST | `/tenants/{id}/Users/.search` | ResourceController | §3.4.3 | 200 |
+| POST | `/endpoints/{id}/Users` | ResourceController | §3.3 | 201, 400, 409 |
+| GET | `/endpoints/{id}/Users` | ResourceController | §3.4.2 | 200, 400 |
+| GET | `/endpoints/{id}/Users/{scimId}` | ResourceController | §3.4.1 | 200, 304, 404 |
+| PUT | `/endpoints/{id}/Users/{scimId}` | ResourceController | §3.5.1 | 200, 404, 412 |
+| PATCH | `/endpoints/{id}/Users/{scimId}` | ResourceController | §3.5.2 | 200, 400, 404, 412 |
+| DELETE | `/endpoints/{id}/Users/{scimId}` | ResourceController | §3.6 | 204, 404, 412 |
+| POST | `/endpoints/{id}/Users/.search` | ResourceController | §3.4.3 | 200 |
 | **Groups** | | | | |
-| POST | `/tenants/{id}/Groups` | ResourceController | §3.3 | 201, 400, 409 |
-| GET | `/tenants/{id}/Groups` | ResourceController | §3.4.2 | 200, 400 |
-| GET | `/tenants/{id}/Groups/{scimId}` | ResourceController | §3.4.1 | 200, 304, 404 |
-| PUT | `/tenants/{id}/Groups/{scimId}` | ResourceController | §3.5.1 | 200, 404, 412 |
-| PATCH | `/tenants/{id}/Groups/{scimId}` | ResourceController | §3.5.2 | 200, 400, 404, 412 |
-| DELETE | `/tenants/{id}/Groups/{scimId}` | ResourceController | §3.6 | 204, 404, 412 |
-| POST | `/tenants/{id}/Groups/.search` | ResourceController | §3.4.3 | 200 |
+| POST | `/endpoints/{id}/Groups` | ResourceController | §3.3 | 201, 400, 409 |
+| GET | `/endpoints/{id}/Groups` | ResourceController | §3.4.2 | 200, 400 |
+| GET | `/endpoints/{id}/Groups/{scimId}` | ResourceController | §3.4.1 | 200, 304, 404 |
+| PUT | `/endpoints/{id}/Groups/{scimId}` | ResourceController | §3.5.1 | 200, 404, 412 |
+| PATCH | `/endpoints/{id}/Groups/{scimId}` | ResourceController | §3.5.2 | 200, 400, 404, 412 |
+| DELETE | `/endpoints/{id}/Groups/{scimId}` | ResourceController | §3.6 | 204, 404, 412 |
+| POST | `/endpoints/{id}/Groups/.search` | ResourceController | §3.4.3 | 200 |
 | **Bulk** | | | | |
-| POST | `/tenants/{id}/Bulk` | BulkController | §3.7 | 200 |
+| POST | `/endpoints/{id}/Bulk` | BulkController | §3.7 | 200 |
 | **Me** | | | | |
-| GET | `/tenants/{id}/Me` | MeController | §3.11 | 200, 501 |
+| GET | `/endpoints/{id}/Me` | MeController | §3.11 | 200, 501 |
 | **Admin (non-SCIM)** | | | | |
-| POST | `/admin/tenants` | TenantController | — | 201 |
-| GET | `/admin/tenants` | TenantController | — | 200 |
-| PATCH | `/admin/tenants/{id}` | TenantController | — | 200 |
-| DELETE | `/admin/tenants/{id}` | TenantController | — | 204 |
+| POST | `/admin/endpoints` | EndpointController | — | 201 |
+| GET | `/admin/endpoints` | EndpointController | — | 200 |
+| PATCH | `/admin/endpoints/{id}` | EndpointController | — | 200 |
+| DELETE | `/admin/endpoints/{id}` | EndpointController | — | 204 |
+| POST | `/admin/endpoints/{id}/resource-types` | AdminResourceTypeController | — | 201, 400, 409 |
+| GET | `/admin/endpoints/{id}/resource-types` | AdminResourceTypeController | — | 200 |
+| GET | `/admin/endpoints/{id}/resource-types/{name}` | AdminResourceTypeController | — | 200, 404 |
+| DELETE | `/admin/endpoints/{id}/resource-types/{name}` | AdminResourceTypeController | — | 204, 404 |
+| **Custom Resource Types (generic)** | | | | |
+| POST | `/endpoints/{id}/{ResourceType}` | GenericController | §3.3 | 201, 400, 404, 409 |
+| GET | `/endpoints/{id}/{ResourceType}` | GenericController | §3.4.2 | 200, 400, 404 |
+| GET | `/endpoints/{id}/{ResourceType}/{scimId}` | GenericController | §3.4.1 | 200, 304, 404 |
+| PUT | `/endpoints/{id}/{ResourceType}/{scimId}` | GenericController | §3.5.1 | 200, 404, 412 |
+| PATCH | `/endpoints/{id}/{ResourceType}/{scimId}` | GenericController | §3.5.2 | 200, 400, 404, 412 |
+| DELETE | `/endpoints/{id}/{ResourceType}/{scimId}` | GenericController | §3.6 | 204, 404, 412 |
+| POST | `/endpoints/{id}/{ResourceType}/.search` | GenericController | §3.4.3 | 200, 404 |
 | POST | `/oauth/token` | OAuthController | RFC 6749 | 200, 401 |
 
 ---
@@ -1129,18 +1144,18 @@ This prevents a token valid for Tenant A from accessing Tenant B's data.
 
 ### Observability
 
-- **Structured logging**: JSON format, per-tenant log level, request correlation ID
-- **Metrics**: Prometheus-compatible (request count, duration histogram, error rate by tenant)
+- **Structured logging**: JSON format, per-endpoint log level, request correlation ID
+- **Metrics**: Prometheus-compatible (request count, duration histogram, error rate by endpoint)
 - **Health check**: `/health` → `{"status":"up","db":"connected","version":"..."}`
 - **Request tracing**: Correlation ID propagated through AsyncLocalStorage
 
 ### Security
 
-- Bearer tokens stored as bcrypt hashes in `tenant_credential`
+- Bearer tokens stored as bcrypt hashes in `endpoint_credential`
 - OAuth JWT validation with clock skew tolerance
-- Rate limiting per tenant (configurable)
+- Rate limiting per endpoint (configurable)
 - No PII in logs above INFO level
-- CORS restricted per tenant configuration
+- CORS restricted per endpoint configuration
 - Input size limits enforced (5MB body, 200 max results per page)
 
 ### Operational
@@ -1161,7 +1176,7 @@ This prevents a token valid for Tenant A from accessing Tenant B's data.
 sequenceDiagram
     participant C as Client
     participant G as AuthGuard
-    participant TR as TenantResolver
+    participant TR as EndpointResolver
     participant RC as ResourceController
     participant RO as ResourceOrchestrator
     participant SV as SchemaValidator
@@ -1169,18 +1184,18 @@ sequenceDiagram
     participant RR as ResourceRepository
     participant MB as MetaBuilder
 
-    C->>G: POST /tenants/{id}/Users<br/>Authorization: Bearer <token>
+    C->>G: POST /endpoints/{id}/Users<br/>Authorization: Bearer <token>
     G->>G: Validate token
-    G->>TR: Resolve tenant
+    G->>TR: Resolve endpoint
     TR->>TR: Load config, schemas<br/>Set AsyncLocalStorage
     TR->>RC: Forward request
     RC->>RC: Validate DTO
-    RC->>RO: create(tenantId, dto, baseUrl)
-    RO->>SV: validate(dto, tenantSchemas)
+    RC->>RO: create(endpointId, dto, baseUrl)
+    RO->>SV: validate(dto, endpointSchemas)
     SV-->>RO: OK / throw 400
-    RO->>UC: assertUnique(userName, externalId, tenantId)
+    RO->>UC: assertUnique(userName, externalId, endpointId)
     UC-->>RO: OK / throw 409
-    RO->>RR: create({tenantId, scimId: uuid(), payload, ...})
+    RO->>RR: create({endpointId, scimId: uuid(), payload, ...})
     RR-->>RO: savedResource
     RO->>MB: build(savedResource, baseUrl)
     MB-->>RO: {meta: {location, version, ...}}
@@ -1200,11 +1215,11 @@ sequenceDiagram
     participant SE as SortEngine
     participant PG as Paginator
 
-    C->>RC: GET /tenants/{id}/Users?filter=userName eq "john"&startIndex=1&count=10
-    RC->>RO: list(tenantId, filter, sort, pagination)
+    C->>RC: GET /endpoints/{id}/Users?filter=userName eq "john"&startIndex=1&count=10
+    RC->>RO: list(endpointId, filter, sort, pagination)
     RO->>FP: plan(parseScimFilter(filterStr))
     FP-->>RO: {sqlWhere: {user_name: "john"}, inMemoryFilter: null}
-    RO->>RR: query(tenantId, sqlWhere, orderBy, offset, limit)
+    RO->>RR: query(endpointId, sqlWhere, orderBy, offset, limit)
     RR-->>RO: {rows, totalCount}
     RO->>SE: sort(rows, sortBy, sortOrder)
     SE-->>RO: sortedRows
@@ -1225,9 +1240,9 @@ sequenceDiagram
     participant RR as ResourceRepository
     participant PE as PatchEngine
 
-    C->>RC: PATCH /tenants/{id}/Users/{scimId}<br/>If-Match: W/"v5"
-    RC->>RO: patch(tenantId, scimId, operations, ifMatch)
-    RO->>RR: findById(tenantId, scimId)
+    C->>RC: PATCH /endpoints/{id}/Users/{scimId}<br/>If-Match: W/"v5"
+    RC->>RO: patch(endpointId, scimId, operations, ifMatch)
+    RO->>RR: findById(endpointId, scimId)
     RR-->>RO: resource (version=5)
     RO->>ES: assertIfMatch("W/\"v5\"", "W/\"v5\"")
     ES-->>RO: OK (match)
@@ -1299,7 +1314,7 @@ sequenceDiagram
     "resourceType": "User",
     "created": "2026-02-20T10:00:00.000Z",
     "lastModified": "2026-02-20T10:00:00.000Z",
-    "location": "https://scim.example.com/scim/v2/tenants/t1/Users/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "location": "https://scim.example.com/scim/v2/endpoints/t1/Users/a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "version": "W/\"v1\""
   }
 }
@@ -1364,7 +1379,7 @@ sequenceDiagram
 }
 ```
 
-### B.6 Tenant Config — Full Example
+### B.6 Endpoint Config — Full Example
 
 ```json
 {
@@ -1413,6 +1428,107 @@ sequenceDiagram
 }
 ```
 
+### B.7b Custom Resource Type Registration Example
+
+**Register a custom "Device" resource type:**
+
+```http
+POST /scim/admin/endpoints/a1b2c3d4-e5f6-7890-abcd-000000000001/resource-types
+Content-Type: application/json
+Authorization: Bearer devscimclientsecret
+```
+
+```json
+{
+  "name": "Device",
+  "scimEndpoint": "/Devices",
+  "description": "IoT Device resource for fleet management",
+  "coreSchemaUrn": "urn:example:scim:schemas:core:2.0:Device",
+  "schemaExtensions": [
+    {
+      "schema": "urn:example:scim:schemas:extension:azure:2.0:Device",
+      "required": false
+    }
+  ]
+}
+```
+
+**Response (201 Created):**
+
+```json
+{
+  "id": "f1a2b3c4-d5e6-7890-abcd-ef1234567890",
+  "endpointId": "a1b2c3d4-e5f6-7890-abcd-000000000001",
+  "name": "Device",
+  "scimEndpoint": "/Devices",
+  "description": "IoT Device resource for fleet management",
+  "coreSchemaUrn": "urn:example:scim:schemas:core:2.0:Device",
+  "schemaExtensions": [
+    {
+      "schema": "urn:example:scim:schemas:extension:azure:2.0:Device",
+      "required": false
+    }
+  ],
+  "active": true,
+  "createdAt": "2026-02-23T14:30:00.000Z",
+  "updatedAt": "2026-02-23T14:30:00.000Z"
+}
+```
+
+**Create a custom Device resource instance:**
+
+```http
+POST /scim/endpoints/a1b2c3d4-e5f6-7890-abcd-000000000001/Devices
+Content-Type: application/scim+json
+Authorization: Bearer devscimclientsecret
+```
+
+```json
+{
+  "schemas": [
+    "urn:example:scim:schemas:core:2.0:Device",
+    "urn:example:scim:schemas:extension:azure:2.0:Device"
+  ],
+  "displayName": "Conference Room Sensor A",
+  "deviceType": "sensor",
+  "manufacturer": "Contoso",
+  "serialNumber": "SN-2026-001",
+  "urn:example:scim:schemas:extension:azure:2.0:Device": {
+    "azureDeviceId": "dev-abc-123",
+    "enrollmentStatus": "enrolled",
+    "complianceState": "compliant"
+  }
+}
+```
+
+**Response (201 Created):**
+
+```json
+{
+  "schemas": [
+    "urn:example:scim:schemas:core:2.0:Device",
+    "urn:example:scim:schemas:extension:azure:2.0:Device"
+  ],
+  "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+  "displayName": "Conference Room Sensor A",
+  "deviceType": "sensor",
+  "manufacturer": "Contoso",
+  "serialNumber": "SN-2026-001",
+  "urn:example:scim:schemas:extension:azure:2.0:Device": {
+    "azureDeviceId": "dev-abc-123",
+    "enrollmentStatus": "enrolled",
+    "complianceState": "compliant"
+  },
+  "meta": {
+    "resourceType": "Device",
+    "created": "2026-02-23T15:00:00.000Z",
+    "lastModified": "2026-02-23T15:00:00.000Z",
+    "location": "https://scim.example.com/scim/endpoints/a1b2.../Devices/b2c3d4e5-f6a7-8901-bcde-f12345678901",
+    "version": "W/\"v1\""
+  }
+}
+```
+
 ### B.8 ServiceProviderConfig Full Example
 
 ```json
@@ -1449,7 +1565,7 @@ sequenceDiagram
   ],
   "meta": {
     "resourceType": "ServiceProviderConfig",
-    "location": "https://scim.example.com/scim/v2/tenants/t1/ServiceProviderConfig",
+    "location": "https://scim.example.com/scim/v2/endpoints/t1/ServiceProviderConfig",
     "created": "2026-01-01T00:00:00.000Z",
     "lastModified": "2026-02-20T10:00:00.000Z"
   }

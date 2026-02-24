@@ -27,7 +27,7 @@ Scope: Deep migration from current `api` implementation to the ideal target in `
 
 3. **Discovery is mostly static/hardcoded**
    - `Schemas`, `ResourceTypes`, `ServiceProviderConfig` controllers return fixed JSON.
-   - Not dynamically driven by tenant-stored schema and resource type models.
+   - Not dynamically driven by endpoint-stored schema and resource type models.
 
 4. **PATCH engine complexity risk**
    - User PATCH path handling is manual and branch-heavy in `endpoint-scim-users.service.ts`.
@@ -82,7 +82,7 @@ Acceptance:
 
 ### 1.2 Introduce explicit domain contracts
 - Add interfaces in a new domain package/module:
-  - `IResourceRepository`, `ISchemaRepository`, `IResourceTypeRepository`, `ITenantConfigRepository`.
+  - `IResourceRepository`, `ISchemaRepository`, `IResourceTypeRepository`, `IEndpointConfigRepository`.
 - Add domain types for effective schema model and filter AST query plan.
 
 Why:
@@ -93,21 +93,21 @@ Acceptance:
 
 ---
 
-## Phase 2 — Persist Dynamic Schemas, ResourceTypes, and Tenant Config
+## Phase 2 — Persist Dynamic Schemas, ResourceTypes, and Endpoint Config
 
 ### 2.1 Add persistence models (initially alongside current models)
 Create new tables/entities:
-- `tenant`
-- `tenant_schema` (`schema_urn`, `attributes jsonb`, status/version)
-- `tenant_resource_type` (`name`, `endpoint`, `base_schema_urn`, `schema_extensions jsonb`)
-- `tenant_config` (`service_provider_config jsonb`, `behavior_flags jsonb`)
+- `endpoint`
+- `endpoint_schema` (`schema_urn`, `attributes jsonb`, status/version)
+- `endpoint_resource_type` (`name`, `endpoint`, `base_schema_urn`, `schema_extensions jsonb`)
+- `endpoint_config` (`service_provider_config jsonb`, `behavior_flags jsonb`)
 
 Why:
 - Discovery and validation must become config/data-driven.
 
 ### 2.2 ResourceType ↔ Schema relation implementation
-- `tenant_resource_type.base_schema_urn` references one `tenant_schema.schema_urn`.
-- `tenant_resource_type.schema_extensions[]` references 0..N `tenant_schema.schema_urn`.
+- `endpoint_resource_type.base_schema_urn` references one `endpoint_schema.schema_urn`.
+- `endpoint_resource_type.schema_extensions[]` references 0..N `endpoint_schema.schema_urn`.
 - Add repository-level referential validation for these URNs.
 
 Why:
@@ -121,11 +121,11 @@ Refactor controllers:
 - `service-provider-config.controller.ts`
 
 New behavior:
-- Query repositories by tenant/endpoint context.
+- Query repositories by endpoint/endpoint context.
 - Build SCIM `ListResponse` dynamically.
 
 Acceptance:
-- Tenant A and Tenant B can advertise different ResourceTypes and capabilities without code changes.
+- Endpoint A and Endpoint B can advertise different ResourceTypes and capabilities without code changes.
 
 ---
 
@@ -173,7 +173,7 @@ Acceptance:
 - Query plans verified with explain snapshots.
 
 Acceptance:
-- No full tenant scans for common filters.
+- No full endpoint scans for common filters.
 - p95 list/search latency materially reduced under load.
 
 ---
@@ -221,7 +221,7 @@ Acceptance:
 ### 6.1 `/Bulk`
 - Add bulk transaction orchestrator.
 - Support `bulkId` resolution graph.
-- Respect max operations/payload limits from tenant config.
+- Respect max operations/payload limits from endpoint config.
 
 ### 6.2 `/Me`
 - Resolve authenticated subject to resource id via policy.
@@ -235,8 +235,8 @@ Acceptance:
 ## Phase 7 — Operational Hardening and Rollout
 
 ### 7.1 Feature-flagged rollout
-- Enable dynamic discovery and schema validation per tenant.
-- Canary tenants first.
+- Enable dynamic discovery and schema validation per endpoint.
+- Canary endpoints first.
 
 ### 7.2 Observability gates
 - Add metrics dashboards:
@@ -270,17 +270,17 @@ Acceptance:
   - Refactor from hardcoded JSON to dynamic repository-backed responses.
 
 - `src/modules/endpoint/endpoint-config.interface.ts`
-  - Convert behavior flags into typed, discoverable tenant policy model.
+  - Convert behavior flags into typed, discoverable endpoint policy model.
 
 - `prisma/schema.prisma`
-  - Introduce tenant schema/resource type/config models.
+  - Introduce endpoint schema/resource type/config models.
   - Migrate resource payload storage to JSONB.
 
 ---
 
 ## 5) Example: Dynamic ResourceType + Schema Persistence
 
-`tenant_schema` row:
+`endpoint_schema` row:
 ```json
 {
   "schema_urn": "urn:ietf:params:scim:schemas:core:2.0:User",
@@ -290,7 +290,7 @@ Acceptance:
 }
 ```
 
-`tenant_resource_type` row:
+`endpoint_resource_type` row:
 ```json
 {
   "name": "User",
@@ -320,14 +320,14 @@ Runtime relation:
 3. **Risk: migration data incompatibility**
    - Mitigation: preflight validators, dry-run migration, rollback snapshots.
 
-4. **Risk: tenant policy misconfiguration**
+4. **Risk: endpoint policy misconfiguration**
    - Mitigation: config schema validation and admin guardrails.
 
 ---
 
 ## 7) Definition of Done
 
-- Discovery endpoints fully dynamic and tenant-specific.
+- Discovery endpoints fully dynamic and endpoint-specific.
 - Full attribute characteristic enforcement in one shared validator.
 - ResourceType-to-schema linkage persisted and validated.
 - Filter execution primarily database-pushdown; in-memory fallback rare and observable.

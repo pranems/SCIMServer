@@ -69,9 +69,9 @@ An in-memory repository implementation fulfills several critical needs:
 | **ETag (version)** | ✅ `version INT` column | ✅ `version` property on stored object | Same `W/"v{N}"` format |
 | **If-Match / If-None-Match** | ✅ Full | ✅ Full | Domain-layer logic, not persistence-dependent |
 | **Bulk Operations** | ✅ Transaction | ✅ Sequential (no rollback) | In-memory has no true transaction semantics |
-| **Multi-Tenancy** | ✅ `tenant_id` FK | ✅ `Map<tenantId, Map<scimId, Resource>>` | Isolated by nested Map keys |
-| **Data-Driven Discovery** | ✅ `tenant_schema` table | ✅ `Map<tenantId, Schema[]>` | Same interface, different storage |
-| **Per-Tenant Credentials** | ✅ `tenant_credential` table | ✅ `Map<tenantId, Credential[]>` | Same bcrypt comparison |
+| **Multi-Tenancy** | ✅ `endpoint_id` FK | ✅ `Map<endpointId, Map<scimId, Resource>>` | Isolated by nested Map keys |
+| **Data-Driven Discovery** | ✅ `endpoint_schema` table | ✅ `Map<endpointId, Schema[]>` | Same interface, different storage |
+| **Per-Endpoint Credentials** | ✅ `endpoint_credential` table | ✅ `Map<endpointId, Credential[]>` | Same bcrypt comparison |
 | **Case-Insensitive Search** | ✅ CITEXT | ✅ `toLowerCase()` comparison | Explicit case folding in memory |
 | **Unique Constraints** | ✅ Partial unique index | ✅ Secondary index Maps | Must be manually enforced |
 
@@ -119,7 +119,7 @@ The key insight: the **in-memory implementation sits entirely in the Infrastruct
 │              ← IDENTICAL for both PostgreSQL and In-Memory →     │
 ├─────────────────────────────────────────────────────────────────┤
 │ APPLICATION LAYER                                                │
-│  TenantResolver · ResourceOrchestrator · BulkProcessor           │
+│  EndpointResolver · ResourceOrchestrator · BulkProcessor           │
 │              ← IDENTICAL for both PostgreSQL and In-Memory →     │
 ├─────────────────────────────────────────────────────────────────┤
 │ DOMAIN LAYER (no framework imports)                              │
@@ -127,7 +127,7 @@ The key insight: the **in-memory implementation sits entirely in the Infrastruct
 │              ← IDENTICAL for both PostgreSQL and In-Memory →     │
 ├─────────────────────────────────────────────────────────────────┤
 │ DATA ACCESS LAYER — Repository Interfaces (Ports)                │
-│  IResourceRepository · ITenantRepository · ISchemaRepository     │
+│  IResourceRepository · IEndpointRepository · ISchemaRepository     │
 │              ← IDENTICAL interface for both implementations →    │
 ├──────────────────────┬──────────────────────────────────────────┤
 │ INFRASTRUCTURE       │ INFRASTRUCTURE                            │
@@ -135,7 +135,7 @@ The key insight: the **in-memory implementation sits entirely in the Infrastruct
 │                      │                                           │
 │ PrismaResource-      │ InMemoryResource-                        │
 │   Repository         │   Repository                              │
-│ PrismaTenant-        │ InMemoryTenant-                           │
+│ PrismaEndpoint-        │ InMemoryEndpoint-                           │
 │   Repository         │   Repository                              │
 │ PrismaSchema-        │ InMemorySchema-                           │
 │   Repository         │   Repository                              │
@@ -159,19 +159,19 @@ flowchart TB
         CTRL["Presentation<br/>Controllers · Guards · Interceptors"]
         APP["Application<br/>ResourceOrchestrator · BulkProcessor"]
         DOM["Domain<br/>PatchEngine · SchemaValidator · FilterPlanner"]
-        PORT["Ports<br/>IResourceRepository · ITenantRepository<br/>ISchemaRepository · IMembershipRepository"]
+        PORT["Ports<br/>IResourceRepository · IEndpointRepository<br/>ISchemaRepository · IMembershipRepository"]
 
         CTRL --> APP --> DOM --> PORT
     end
 
     subgraph PG_IMPL["PostgreSQL Implementation"]
-        PG_REPO["PrismaResourceRepository<br/>PrismaTenantRepository<br/>PrismaSchemaRepository"]
+        PG_REPO["PrismaResourceRepository<br/>PrismaEndpointRepository<br/>PrismaSchemaRepository"]
         PG_DB[("PostgreSQL 17<br/>JSONB · CITEXT · GIN")]
         PG_REPO --> PG_DB
     end
 
     subgraph MEM_IMPL["In-Memory Implementation"]
-        MEM_REPO["InMemoryResourceRepository<br/>InMemoryTenantRepository<br/>InMemorySchemaRepository"]
+        MEM_REPO["InMemoryResourceRepository<br/>InMemoryEndpointRepository<br/>InMemorySchemaRepository"]
         MEM_STORE[("Map&lt;string, Map&gt;<br/>JS Objects in heap")]
         MEM_REPO --> MEM_STORE
     end
@@ -196,14 +196,14 @@ export class PersistenceModule {
       driver === 'memory'
         ? [
             { provide: 'IResourceRepository', useClass: InMemoryResourceRepository },
-            { provide: 'ITenantRepository', useClass: InMemoryTenantRepository },
+            { provide: 'IEndpointRepository', useClass: InMemoryEndpointRepository },
             { provide: 'ISchemaRepository', useClass: InMemorySchemaRepository },
             { provide: 'IMembershipRepository', useClass: InMemoryMembershipRepository },
             { provide: 'ICredentialRepository', useClass: InMemoryCredentialRepository },
           ]
         : [
             { provide: 'IResourceRepository', useClass: PrismaResourceRepository },
-            { provide: 'ITenantRepository', useClass: PrismaTenantRepository },
+            { provide: 'IEndpointRepository', useClass: PrismaEndpointRepository },
             { provide: 'ISchemaRepository', useClass: PrismaSchemaRepository },
             { provide: 'IMembershipRepository', useClass: PrismaMembershipRepository },
             { provide: 'ICredentialRepository', useClass: PrismaCredentialRepository },
@@ -241,36 +241,36 @@ export class AppModule {}
 
 /**
  * Central in-memory data store.
- * All Maps are organized: tenantId → resourceId → resource
- * to provide O(1) lookup and natural tenant isolation.
+ * All Maps are organized: endpointId → resourceId → resource
+ * to provide O(1) lookup and natural endpoint isolation.
  */
 export class InMemoryStore {
   // ── Core Resources ──────────────────────────────────────────
-  /** tenantId → scimId → ScimResourceModel */
+  /** endpointId → scimId → ScimResourceModel */
   readonly resources = new Map<string, Map<string, ScimResourceModel>>();
 
   // ── Secondary Indexes (for O(1) lookups on unique fields) ──
-  /** tenantId → userNameLower → scimId */
+  /** endpointId → userNameLower → scimId */
   readonly userNameIndex = new Map<string, Map<string, string>>();
-  /** tenantId → externalId → scimId */
+  /** endpointId → externalId → scimId */
   readonly externalIdIndex = new Map<string, Map<string, string>>();
 
   // ── Membership ──────────────────────────────────────────────
   /** groupScimId → Set<memberScimId> (with display/type metadata) */
   readonly members = new Map<string, Map<string, MemberEntry>>();
 
-  // ── Tenant Config ───────────────────────────────────────────
-  /** tenantId → TenantModel */
-  readonly tenants = new Map<string, TenantModel>();
+  // ── Endpoint Config ───────────────────────────────────────────
+  /** endpointId → EndpointModel */
+  readonly endpoints = new Map<string, EndpointModel>();
 
   // ── Schema / ResourceType Discovery ─────────────────────────
-  /** tenantId → SchemaModel[] */
+  /** endpointId → SchemaModel[] */
   readonly schemas = new Map<string, SchemaModel[]>();
-  /** tenantId → ResourceTypeModel[] */
+  /** endpointId → ResourceTypeModel[] */
   readonly resourceTypes = new Map<string, ResourceTypeModel[]>();
 
   // ── Credentials ─────────────────────────────────────────────
-  /** tenantId → CredentialModel[] */
+  /** endpointId → CredentialModel[] */
   readonly credentials = new Map<string, CredentialModel[]>();
 
   // ── Auto-increment counters ─────────────────────────────────
@@ -285,7 +285,7 @@ export class InMemoryStore {
     this.userNameIndex.clear();
     this.externalIdIndex.clear();
     this.members.clear();
-    this.tenants.clear();
+    this.endpoints.clear();
     this.schemas.clear();
     this.resourceTypes.clear();
     this.credentials.clear();
@@ -305,7 +305,7 @@ export interface MemberEntry {
 ```mermaid
 erDiagram
     InMemoryStore ||--o{ ResourceMap : "resources"
-    InMemoryStore ||--o{ TenantMap : "tenants"
+    InMemoryStore ||--o{ EndpointMap : "endpoints"
     InMemoryStore ||--o{ SchemaList : "schemas"
     InMemoryStore ||--o{ CredentialList : "credentials"
     InMemoryStore ||--o{ MemberMap : "members"
@@ -313,22 +313,22 @@ erDiagram
     InMemoryStore ||--o{ ExternalIdIndex : "externalIdIndex"
 
     ResourceMap {
-        string tenantId PK
+        string endpointId PK
         Map scimId_to_Resource "Map<scimId, ScimResourceModel>"
     }
 
-    TenantMap {
-        string tenantId PK
-        TenantModel config "name, displayName, config JSONB"
+    EndpointMap {
+        string endpointId PK
+        EndpointModel config "name, displayName, config JSONB"
     }
 
     SchemaList {
-        string tenantId PK
+        string endpointId PK
         SchemaModel[] schemas "schemaUrn, name, attributes"
     }
 
     CredentialList {
-        string tenantId PK
+        string endpointId PK
         CredentialModel[] creds "type, hash, active, expiresAt"
     }
 
@@ -338,12 +338,12 @@ erDiagram
     }
 
     UserNameIndex {
-        string tenantId PK
+        string endpointId PK
         Map userName_to_scimId "case-folded userName → scimId"
     }
 
     ExternalIdIndex {
-        string tenantId PK
+        string endpointId PK
         Map externalId_to_scimId "externalId → scimId"
     }
 ```
@@ -352,14 +352,14 @@ erDiagram
 
 | PostgreSQL Table | In-Memory Equivalent | Indexing |
 |-----------------|---------------------|----------|
-| `scim_resource` | `resources: Map<tenantId, Map<scimId, Model>>` | Primary: `Map.get(scimId)` O(1) |
-| `UNIQUE(tenant_id, user_name)` CITEXT index | `userNameIndex: Map<tenantId, Map<lower(userName), scimId>>` | Secondary: `Map.get(lower(name))` O(1) |
-| `UNIQUE(tenant_id, external_id)` partial index | `externalIdIndex: Map<tenantId, Map<externalId, scimId>>` | Secondary: `Map.get(externalId)` O(1) |
+| `scim_resource` | `resources: Map<endpointId, Map<scimId, Model>>` | Primary: `Map.get(scimId)` O(1) |
+| `UNIQUE(endpoint_id, user_name)` CITEXT index | `userNameIndex: Map<endpointId, Map<lower(userName), scimId>>` | Secondary: `Map.get(lower(name))` O(1) |
+| `UNIQUE(endpoint_id, external_id)` partial index | `externalIdIndex: Map<endpointId, Map<externalId, scimId>>` | Secondary: `Map.get(externalId)` O(1) |
 | `resource_member` | `members: Map<groupScimId, Map<memberScimId, Entry>>` | Group lookup: `Map.get(groupId)` O(1) |
-| `tenant` | `tenants: Map<tenantId, TenantModel>` | Direct: `Map.get(tenantId)` O(1) |
-| `tenant_schema` | `schemas: Map<tenantId, SchemaModel[]>` | Linear scan within tenant's schemas |
-| `tenant_resource_type` | `resourceTypes: Map<tenantId, ResourceTypeModel[]>` | Linear scan within tenant's types |
-| `tenant_credential` | `credentials: Map<tenantId, CredentialModel[]>` | Linear scan within tenant's credentials |
+| `endpoint` | `endpoints: Map<endpointId, EndpointModel>` | Direct: `Map.get(endpointId)` O(1) |
+| `endpoint_schema` | `schemas: Map<endpointId, SchemaModel[]>` | Linear scan within endpoint's schemas |
+| `endpoint_resource_type` | `resourceTypes: Map<endpointId, ResourceTypeModel[]>` | Linear scan within endpoint's types |
+| `endpoint_credential` | `credentials: Map<endpointId, CredentialModel[]>` | Linear scan within endpoint's credentials |
 | GIN index on `payload JSONB` | No index — full scan + deep object traversal | O(n) per query |
 | pg_trgm GIN for `co`/`sw`/`ew` | No index — `String.includes/startsWith/endsWith` | O(n) per query |
 
@@ -385,7 +385,7 @@ export class InMemoryResourceRepository implements IResourceRepository {
     // 2. Build model
     const model: ScimResourceModel = {
       id,
-      tenantId: input.tenantId,
+      endpointId: input.endpointId,
       resourceType: input.resourceType,
       scimId,
       externalId: input.externalId ?? null,
@@ -398,24 +398,24 @@ export class InMemoryResourceRepository implements IResourceRepository {
       updatedAt: now,
     };
 
-    // 3. Ensure tenant map exists
-    if (!this.store.resources.has(input.tenantId)) {
-      this.store.resources.set(input.tenantId, new Map());
-      this.store.userNameIndex.set(input.tenantId, new Map());
-      this.store.externalIdIndex.set(input.tenantId, new Map());
+    // 3. Ensure endpoint map exists
+    if (!this.store.resources.has(input.endpointId)) {
+      this.store.resources.set(input.endpointId, new Map());
+      this.store.userNameIndex.set(input.endpointId, new Map());
+      this.store.externalIdIndex.set(input.endpointId, new Map());
     }
 
     // 4. Store resource
-    this.store.resources.get(input.tenantId)!.set(scimId, model);
+    this.store.resources.get(input.endpointId)!.set(scimId, model);
 
     // 5. Update secondary indexes
     if (model.userName) {
-      this.store.userNameIndex.get(input.tenantId)!.set(
+      this.store.userNameIndex.get(input.endpointId)!.set(
         model.userName.toLowerCase(), scimId
       );
     }
     if (model.externalId) {
-      this.store.externalIdIndex.get(input.tenantId)!.set(
+      this.store.externalIdIndex.get(input.endpointId)!.set(
         model.externalId, scimId
       );
     }
@@ -423,28 +423,28 @@ export class InMemoryResourceRepository implements IResourceRepository {
     return model;
   }
 
-  async findById(tenantId: string, scimId: string): Promise<ScimResourceModel | null> {
-    return this.store.resources.get(tenantId)?.get(scimId) ?? null;
+  async findById(endpointId: string, scimId: string): Promise<ScimResourceModel | null> {
+    return this.store.resources.get(endpointId)?.get(scimId) ?? null;
   }
 
-  async findByUserName(tenantId: string, userName: string): Promise<ScimResourceModel | null> {
-    const scimId = this.store.userNameIndex.get(tenantId)?.get(userName.toLowerCase());
+  async findByUserName(endpointId: string, userName: string): Promise<ScimResourceModel | null> {
+    const scimId = this.store.userNameIndex.get(endpointId)?.get(userName.toLowerCase());
     if (!scimId) return null;
-    return this.findById(tenantId, scimId);
+    return this.findById(endpointId, scimId);
   }
 
-  async findByExternalId(tenantId: string, externalId: string): Promise<ScimResourceModel | null> {
-    const scimId = this.store.externalIdIndex.get(tenantId)?.get(externalId);
+  async findByExternalId(endpointId: string, externalId: string): Promise<ScimResourceModel | null> {
+    const scimId = this.store.externalIdIndex.get(endpointId)?.get(externalId);
     if (!scimId) return null;
-    return this.findById(tenantId, scimId);
+    return this.findById(endpointId, scimId);
   }
 
   async query(options: ResourceQueryOptions): Promise<ResourceQueryResult<ScimResourceModel>> {
-    const tenantMap = this.store.resources.get(options.tenantId);
-    if (!tenantMap) return { items: [], totalCount: 0 };
+    const endpointMap = this.store.resources.get(options.endpointId);
+    if (!endpointMap) return { items: [], totalCount: 0 };
 
     // 1. Collect all resources of the requested type
-    let results = Array.from(tenantMap.values())
+    let results = Array.from(endpointMap.values())
       .filter(r => r.resourceType === options.resourceType);
 
     // 2. Apply filter (in-memory evaluation)
@@ -468,18 +468,18 @@ export class InMemoryResourceRepository implements IResourceRepository {
   }
 
   async update(id: string, input: ResourceUpdateInput): Promise<ScimResourceModel> {
-    // Find the resource by internal id across all tenants
-    for (const [tenantId, tenantMap] of this.store.resources) {
-      for (const [scimId, resource] of tenantMap) {
+    // Find the resource by internal id across all endpoints
+    for (const [endpointId, endpointMap] of this.store.resources) {
+      for (const [scimId, resource] of endpointMap) {
         if (resource.id === id) {
           // Update secondary indexes if userName changed
           if (input.userName !== undefined && input.userName !== resource.userName) {
-            const idx = this.store.userNameIndex.get(tenantId)!;
+            const idx = this.store.userNameIndex.get(endpointId)!;
             if (resource.userName) idx.delete(resource.userName.toLowerCase());
             if (input.userName) idx.set(input.userName.toLowerCase(), scimId);
           }
           if (input.externalId !== undefined && input.externalId !== resource.externalId) {
-            const idx = this.store.externalIdIndex.get(tenantId)!;
+            const idx = this.store.externalIdIndex.get(endpointId)!;
             if (resource.externalId) idx.delete(resource.externalId);
             if (input.externalId) idx.set(input.externalId, scimId);
           }
@@ -491,7 +491,7 @@ export class InMemoryResourceRepository implements IResourceRepository {
             version: (input.version ?? resource.version) + 1,
             updatedAt: new Date(),
           };
-          tenantMap.set(scimId, updated);
+          endpointMap.set(scimId, updated);
           return updated;
         }
       }
@@ -500,17 +500,17 @@ export class InMemoryResourceRepository implements IResourceRepository {
   }
 
   async delete(id: string): Promise<void> {
-    for (const [tenantId, tenantMap] of this.store.resources) {
-      for (const [scimId, resource] of tenantMap) {
+    for (const [endpointId, endpointMap] of this.store.resources) {
+      for (const [scimId, resource] of endpointMap) {
         if (resource.id === id) {
           // Clean up secondary indexes
           if (resource.userName) {
-            this.store.userNameIndex.get(tenantId)?.delete(resource.userName.toLowerCase());
+            this.store.userNameIndex.get(endpointId)?.delete(resource.userName.toLowerCase());
           }
           if (resource.externalId) {
-            this.store.externalIdIndex.get(tenantId)?.delete(resource.externalId);
+            this.store.externalIdIndex.get(endpointId)?.delete(resource.externalId);
           }
-          tenantMap.delete(scimId);
+          endpointMap.delete(scimId);
           // Clean up memberships
           this.store.members.delete(scimId);
           for (const [, memberMap] of this.store.members) {
@@ -523,19 +523,19 @@ export class InMemoryResourceRepository implements IResourceRepository {
   }
 
   async assertUnique(
-    tenantId: string,
+    endpointId: string,
     userName?: string,
     externalId?: string,
     excludeScimId?: string,
   ): Promise<void> {
     if (userName) {
-      const existingScimId = this.store.userNameIndex.get(tenantId)?.get(userName.toLowerCase());
+      const existingScimId = this.store.userNameIndex.get(endpointId)?.get(userName.toLowerCase());
       if (existingScimId && existingScimId !== excludeScimId) {
         throw createScimError({ status: 409, detail: `userName '${userName}' already exists.` });
       }
     }
     if (externalId) {
-      const existingScimId = this.store.externalIdIndex.get(tenantId)?.get(externalId);
+      const existingScimId = this.store.externalIdIndex.get(endpointId)?.get(externalId);
       if (existingScimId && existingScimId !== excludeScimId) {
         throw createScimError({ status: 409, detail: `externalId '${externalId}' already exists.` });
       }
@@ -613,37 +613,37 @@ export class InMemoryMembershipRepository implements IMembershipRepository {
 }
 ```
 
-### InMemoryTenantRepository
+### InMemoryEndpointRepository
 
 ```typescript
 @Injectable()
-export class InMemoryTenantRepository implements ITenantRepository {
+export class InMemoryEndpointRepository implements IEndpointRepository {
   constructor(private readonly store: InMemoryStore) {}
 
-  async findById(tenantId: string): Promise<TenantModel | null> {
-    return this.store.tenants.get(tenantId) ?? null;
+  async findById(endpointId: string): Promise<EndpointModel | null> {
+    return this.store.endpoints.get(endpointId) ?? null;
   }
 
-  async findByName(name: string): Promise<TenantModel | null> {
-    for (const tenant of this.store.tenants.values()) {
-      if (tenant.name === name) return tenant;
+  async findByName(name: string): Promise<EndpointModel | null> {
+    for (const endpoint of this.store.endpoints.values()) {
+      if (endpoint.name === name) return endpoint;
     }
     return null;
   }
 
-  async create(input: TenantCreateInput): Promise<TenantModel> {
+  async create(input: EndpointCreateInput): Promise<EndpointModel> {
     const id = this.store.generateId();
-    const tenant: TenantModel = {
+    const endpoint: EndpointModel = {
       id, name: input.name, displayName: input.displayName ?? null,
       config: input.config ?? {}, active: true,
       createdAt: new Date(), updatedAt: new Date(),
     };
-    this.store.tenants.set(id, tenant);
-    return tenant;
+    this.store.endpoints.set(id, endpoint);
+    return endpoint;
   }
 
-  async getConfig(tenantId: string): Promise<Record<string, unknown>> {
-    return this.store.tenants.get(tenantId)?.config ?? {};
+  async getConfig(endpointId: string): Promise<Record<string, unknown>> {
+    return this.store.endpoints.get(endpointId)?.config ?? {};
   }
 }
 ```
@@ -782,15 +782,15 @@ sequenceDiagram
 
 ```typescript
 // In-Memory Bulk — no true transactions, but can implement rollback log
-async processBulk(tenantId: string, ops: BulkOperation[]): Promise<BulkResponse> {
+async processBulk(endpointId: string, ops: BulkOperation[]): Promise<BulkResponse> {
   const undoLog: Array<() => void> = [];
   const results: BulkResult[] = [];
 
   for (const op of ops) {
     try {
-      const before = this.snapshot(tenantId); // Optional: capture state before
-      const result = await this.executeOp(tenantId, op);
-      undoLog.push(() => this.restore(tenantId, before));
+      const before = this.snapshot(endpointId); // Optional: capture state before
+      const result = await this.executeOp(endpointId, op);
+      undoLog.push(() => this.restore(endpointId, before));
       results.push(result);
     } catch (error) {
       // On failure with failOnErrors, undo all previous ops
@@ -874,7 +874,7 @@ export class SnapshotService implements OnModuleInit, OnModuleDestroy {
     const data = {
       version: 1,
       timestamp: new Date().toISOString(),
-      tenants: Object.fromEntries(this.store.tenants),
+      endpoints: Object.fromEntries(this.store.endpoints),
       resources: Object.fromEntries(
         Array.from(this.store.resources.entries()).map(
           ([tid, map]) => [tid, Object.fromEntries(map)]
@@ -896,8 +896,8 @@ export class SnapshotService implements OnModuleInit, OnModuleDestroy {
     if (!fs.existsSync(this.snapshotPath)) return;
     const raw = JSON.parse(fs.readFileSync(this.snapshotPath, 'utf-8'));
     // Reconstruct Maps from JSON...
-    for (const [tid, tenant] of Object.entries(raw.tenants ?? {})) {
-      this.store.tenants.set(tid, tenant as TenantModel);
+    for (const [tid, endpoint] of Object.entries(raw.endpoints ?? {})) {
+      this.store.endpoints.set(tid, endpoint as EndpointModel);
     }
     for (const [tid, resources] of Object.entries(raw.resources ?? {})) {
       const map = new Map<string, ScimResourceModel>();
@@ -1070,7 +1070,7 @@ flowchart LR
         P8["Phase 8<br/>Schema Validation"]
         P9["Phase 9<br/>Bulk Operations"]
         P10["Phase 10<br/>/Me Endpoint"]
-        P11["Phase 11<br/>Per-Tenant Credentials"]
+        P11["Phase 11<br/>Per-Endpoint Credentials"]
         P12["Phase 12<br/>Sort & Cleanup"]
     end
 
@@ -1104,12 +1104,12 @@ flowchart LR
 | P3 — Storage Implementation | PostgreSQL migration (CITEXT, JSONB, GIN, schema changes, Docker Compose postgres service) | `InMemoryResourceRepository` (~200 LOC) | ❌ Entirely different |
 | P4 — Filter Expansion | SQL operators (ILIKE, JSONB `@>`, pg_trgm) | `evaluateFilter()` with deep object traversal | ❌ Different implementation, same interface |
 | P5 — PATCH Engine | Pure domain — no DB dependency | Same | ✅ 100% |
-| P6 — Discovery | `tenant_schema` table (PostgreSQL) | `schemas Map` | ⚠️ Interface shared, storage differs |
+| P6 — Discovery | `endpoint_schema` table (PostgreSQL) | `schemas Map` | ⚠️ Interface shared, storage differs |
 | P7 — ETag & Versioning | `version INT` column, `FOR UPDATE` lock | `version` property, single-thread safe | ⚠️ Same logic, different concurrency model |
 | P8 — Schema Validation | Pure domain | Same | ✅ 100% |
 | P9 — Bulk Operations | `BEGIN`/`COMMIT` transaction | Undo log or best-effort | ⚠️ Different transaction semantics |
 | P10 — /Me Endpoint | Pure application logic | Same | ✅ 100% |
-| P11 — Per-Tenant Credentials | `tenant_credential` table | `credentials Map` | ⚠️ Interface shared, storage differs |
+| P11 — Per-Endpoint Credentials | `endpoint_credential` table | `credentials Map` | ⚠️ Interface shared, storage differs |
 | P12 — Sort & Cleanup | `ORDER BY` SQL | `Array.sort()` | ⚠️ Same result, different implementation |
 
 ### Effort Comparison
@@ -1154,7 +1154,7 @@ export class InMemoryStoreModule {}
 | Repository Interface | PostgreSQL Implementation | In-Memory Implementation |
 |---------------------|--------------------------|-------------------------|
 | `IResourceRepository` | `PrismaResourceRepository` (~300 LOC) | `InMemoryResourceRepository` (~200 LOC) |
-| `ITenantRepository` | `PrismaTenantRepository` (~100 LOC) | `InMemoryTenantRepository` (~60 LOC) |
+| `IEndpointRepository` | `PrismaEndpointRepository` (~100 LOC) | `InMemoryEndpointRepository` (~60 LOC) |
 | `ISchemaRepository` | `PrismaSchemaRepository` (~80 LOC) | `InMemorySchemaRepository` (~50 LOC) |
 | `IMembershipRepository` | `PrismaMembershipRepository` (~100 LOC) | `InMemoryMembershipRepository` (~60 LOC) |
 | `ICredentialRepository` | `PrismaCredentialRepository` (~80 LOC) | `InMemoryCredentialRepository` (~40 LOC) |
@@ -1166,12 +1166,12 @@ PostgreSQL uses CITEXT for transparent case-insensitivity. In-memory must handle
 
 ```typescript
 // In-Memory: Explicit case folding for all lookups
-async findByUserName(tenantId: string, userName: string): Promise<ScimResourceModel | null> {
+async findByUserName(endpointId: string, userName: string): Promise<ScimResourceModel | null> {
   const scimId = this.store.userNameIndex
-    .get(tenantId)
+    .get(endpointId)
     ?.get(userName.toLowerCase()); // ← Explicit case folding
   if (!scimId) return null;
-  return this.findById(tenantId, scimId);
+  return this.findById(endpointId, scimId);
 }
 
 // PostgreSQL: CITEXT handles it transparently
@@ -1370,28 +1370,28 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     participant IDP as Identity Provider
-    participant AUTH as TenantAuthGuard
+    participant AUTH as EndpointAuthGuard
     participant CTRL as ResourceController
     participant ORCH as ResourceOrchestrator
     participant VALID as SchemaValidator
     participant REPO as InMemoryResourceRepository
     participant STORE as InMemoryStore
 
-    IDP->>AUTH: POST /tenants/:id/Users<br/>Authorization: Bearer <token>
+    IDP->>AUTH: POST /endpoints/:id/Users<br/>Authorization: Bearer <token>
 
     rect rgb(255, 245, 230)
         Note over AUTH,STORE: Authentication (same as PostgreSQL)
-        AUTH->>STORE: credentials.get(tenantId)
+        AUTH->>STORE: credentials.get(endpointId)
         STORE-->>AUTH: CredentialModel[]
         AUTH->>AUTH: bcrypt.compare(token, hash)
     end
 
     AUTH->>CTRL: Authorized request
-    CTRL->>ORCH: create(tenantId, payload, baseUrl)
+    CTRL->>ORCH: create(endpointId, payload, baseUrl)
 
     rect rgb(230, 245, 255)
         Note over ORCH,VALID: Validation (same as PostgreSQL)
-        ORCH->>STORE: schemas.get(tenantId)
+        ORCH->>STORE: schemas.get(endpointId)
         STORE-->>ORCH: SchemaModel[]
         ORCH->>VALID: validate(payload, schema, {mode: 'create'})
         VALID-->>ORCH: ✅ Valid
@@ -1399,13 +1399,13 @@ sequenceDiagram
 
     rect rgb(230, 255, 230)
         Note over ORCH,STORE: Persistence (In-Memory specific)
-        ORCH->>REPO: assertUnique(tenantId, {userName})
-        REPO->>STORE: userNameIndex.get(tenantId).get(lower(userName))
+        ORCH->>REPO: assertUnique(endpointId, {userName})
+        REPO->>STORE: userNameIndex.get(endpointId).get(lower(userName))
         STORE-->>REPO: null (no conflict)
 
-        ORCH->>REPO: create({tenantId, type:'User', payload, ...})
-        REPO->>STORE: resources.get(tenantId).set(scimId, model)
-        REPO->>STORE: userNameIndex.get(tenantId).set(lower(userName), scimId)
+        ORCH->>REPO: create({endpointId, type:'User', payload, ...})
+        REPO->>STORE: resources.get(endpointId).set(scimId, model)
+        REPO->>STORE: userNameIndex.get(endpointId).set(lower(userName), scimId)
         STORE-->>REPO: ScimResourceModel {version: 1}
     end
 
@@ -1452,7 +1452,7 @@ sequenceDiagram
 async create(input: ResourceCreateInput): Promise<ScimResourceModel> {
   const created = await this.prisma.scimResource.create({
     data: {
-      endpointId: input.tenantId,
+      endpointId: input.endpointId,
       resourceType: input.resourceType,
       scimId: crypto.randomUUID(),
       externalId: input.externalId,
@@ -1473,7 +1473,7 @@ async create(input: ResourceCreateInput): Promise<ScimResourceModel> {
   const scimId = crypto.randomUUID();
   const model: ScimResourceModel = {
     id: this.store.generateId(),
-    tenantId: input.tenantId,
+    endpointId: input.endpointId,
     resourceType: input.resourceType,
     scimId,
     externalId: input.externalId ?? null,
@@ -1485,10 +1485,10 @@ async create(input: ResourceCreateInput): Promise<ScimResourceModel> {
     createdAt: new Date(),
     updatedAt: new Date(),
   };
-  this.store.resources.get(input.tenantId)!.set(scimId, model);
+  this.store.resources.get(input.endpointId)!.set(scimId, model);
   // Manually maintain secondary indexes (CITEXT → toLowerCase)
   if (model.userName) {
-    this.store.userNameIndex.get(input.tenantId)!
+    this.store.userNameIndex.get(input.endpointId)!
       .set(model.userName.toLowerCase(), scimId);
   }
   return model;
@@ -1515,12 +1515,12 @@ const results = await prisma.scimResource.findMany({ where });
 // In-Memory — JavaScript evaluation
 // ═══════════════════════════════════════════════
 // Same filter: userName co "john" AND active eq true
-const results = Array.from(tenantResources.values())
+const results = Array.from(endpointResources.values())
   .filter(r =>
     r.userName?.toLowerCase().includes('john') &&
     r.active === true
   );
-// Full scan of all resources in tenant
+// Full scan of all resources in endpoint
 ```
 
 ### Unique Constraint — Side by Side
@@ -1542,7 +1542,7 @@ try {
 // In-Memory — Application-enforced uniqueness
 // ═══════════════════════════════════════════════
 const existing = this.store.userNameIndex
-  .get(tenantId)
+  .get(endpointId)
   ?.get('john@example.com'.toLowerCase()); // Manual case folding
 
 if (existing && existing !== excludeScimId) {

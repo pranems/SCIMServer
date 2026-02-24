@@ -1,6 +1,6 @@
 # Complete Technology-Agnostic SCIM 2.0 Architecture
 
-This document provides a comprehensive, technology-agnostic architectural blueprint for a multi-tenant SCIM 2.0 server. It strictly adheres to **RFC 7642 (Concepts)**, **RFC 7643 (Core Schema)**, and **RFC 7644 (Protocol)** in their absolute entirety. 
+This document provides a comprehensive, technology-agnostic architectural blueprint for a multi-endpoint SCIM 2.0 server. It strictly adheres to **RFC 7642 (Concepts)**, **RFC 7643 (Core Schema)**, and **RFC 7644 (Protocol)** in their absolute entirety. 
 
 By utilizing an N-Tier architecture and the **Repository Pattern**, this design ensures that the core SCIM logic is completely decoupled from any specific database, programming language, or caching technology.
 
@@ -29,17 +29,17 @@ graph TD
     subgraph Data Access Layer ["Data Access Layer (Repository Pattern)"]
         ProtocolService --> IResourceRepo[IResourceRepository]
         ProtocolService --> ISchemaRepo[ISchemaRepository]
-        ProtocolService --> ITenantRepo[ITenantConfigRepository]
+        ProtocolService --> IEndpointRepo[IEndpointConfigRepository]
     end
     
     subgraph Infrastructure Layer ["Infrastructure Layer (Pluggable)"]
         IResourceRepo -.-> Datastore[(Document/Relational Datastore)]
         ISchemaRepo -.-> Cache[(Distributed Cache)]
-        ITenantRepo -.-> Cache
+        IEndpointRepo -.-> Cache
     end
 
     classDef interface fill:#f9f,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5;
-    class IResourceRepo,ISchemaRepo,ITenantRepo interface;
+    class IResourceRepo,ISchemaRepo,IEndpointRepo interface;
 ```
 
 ---
@@ -59,25 +59,25 @@ The core mechanism for achieving true persistence agnosticism is the **Repositor
 
 interface IResourceRepository {
     // CRUD
-    create(tenantId: string, resource: ScimResource): ResourceEntity;
-    getById(tenantId: string, resourceType: string, id: string): ResourceEntity | null;
-    update(tenantId: string, resource: ScimResource, expectedVersion: string): ResourceEntity;
-    delete(tenantId: string, resourceType: string, id: string): boolean;
+    create(endpointId: string, resource: ScimResource): ResourceEntity;
+    getById(endpointId: string, resourceType: string, id: string): ResourceEntity | null;
+    update(endpointId: string, resource: ScimResource, expectedVersion: string): ResourceEntity;
+    delete(endpointId: string, resourceType: string, id: string): boolean;
     
     // Querying (Receives an Abstract Syntax Tree, not a raw string)
-    search(tenantId: string, query: ScimQueryAST, pagination: Pagination, sort: SortConfig): PaginatedResult<ResourceEntity>;
+    search(endpointId: string, query: ScimQueryAST, pagination: Pagination, sort: SortConfig): PaginatedResult<ResourceEntity>;
     
     // Uniqueness Checks
-    checkUnique(tenantId: string, attributePath: string, value: any): boolean;
+    checkUnique(endpointId: string, attributePath: string, value: any): boolean;
 }
 
 interface ISchemaRepository {
-    getSchemas(tenantId: string): SchemaDefinition[];
-    getResourceTypes(tenantId: string): ResourceTypeDefinition[];
+    getSchemas(endpointId: string): SchemaDefinition[];
+    getResourceTypes(endpointId: string): ResourceTypeDefinition[];
 }
 
-interface ITenantConfigRepository {
-    getConfig(tenantId: string): ServiceProviderConfig;
+interface IEndpointConfigRepository {
+    getConfig(endpointId: string): ServiceProviderConfig;
 }
 ```
 
@@ -98,7 +98,7 @@ This component enforces the strict rules defined in RFC 7643 for every attribute
    * `request`: Only included if explicitly requested via `?attributes=`.
 4. **Uniqueness:**
    * `none`: No check required.
-   * `server`: Checked against `IResourceRepository.checkUnique` scoped to the `tenantId`.
+   * `server`: Checked against `IResourceRepository.checkUnique` scoped to the `endpointId`.
    * `global`: Checked against `IResourceRepository.checkUnique` globally.
 5. **Other:** `required`, `caseExact`, `multiValued`, `canonicalValues`.
 
@@ -107,18 +107,18 @@ This component enforces the strict rules defined in RFC 7643 for every attribute
 ## 3. Detailed API Flows & Data Models
 
 ### 3.1. Discovery: ServiceProviderConfig (RFC 7644 §4)
-Clients query this endpoint to understand what the specific tenant supports.
+Clients query this endpoint to understand what the specific endpoint supports.
 
 **Request:**
 ```http
 GET /ServiceProviderConfig HTTP/1.1
 Host: api.scim.example.com
-Authorization: Bearer <tenant_token>
+Authorization: Bearer <endpoint_token>
 ```
 
 **Data Flow:**
-1. `Controller` extracts `tenantId` from the token.
-2. `Controller` calls `ITenantConfigRepository.getConfig(tenantId)`.
+1. `Controller` extracts `endpointId` from the token.
+2. `Controller` calls `IEndpointConfigRepository.getConfig(endpointId)`.
 3. `Controller` returns the JSON.
 
 **Response:**
@@ -156,7 +156,7 @@ sequenceDiagram
     participant Repo as IResourceRepository
     
     Client->>Controller: POST /Users (JSON Body)
-    Controller->>Validator: Validate(Payload, "User", TenantSchemas)
+    Controller->>Validator: Validate(Payload, "User", EndpointSchemas)
     
     alt Missing Required Attribute
         Validator-->>Controller: Error (scimType: invalidValue)
@@ -171,7 +171,7 @@ sequenceDiagram
     end
     
     Validator-->>Controller: Validated Payload
-    Controller->>Repo: create(tenantId, Payload)
+    Controller->>Repo: create(endpointId, Payload)
     Repo-->>Controller: Created Entity (with ID, meta.version)
     Controller->>Validator: Apply Return Characteristics (Strip writeOnly)
     Controller-->>Client: 201 Created (Location, ETag)
@@ -181,7 +181,7 @@ sequenceDiagram
 ```http
 POST /Users HTTP/1.1
 Host: api.scim.example.com
-Authorization: Bearer <tenant_token>
+Authorization: Bearer <endpoint_token>
 Content-Type: application/scim+json
 
 {
@@ -334,6 +334,6 @@ The `/Me` endpoint allows users to update their own profile without knowing thei
 
 Because the architecture relies on the `ISchemaRepository` to provide schema definitions at runtime, the system is infinitely extensible. 
 
-If a tenant wishes to support a custom Enterprise extension (e.g., `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User`), the new schema definition is simply added to the datastore backing the `ISchemaRepository`. 
+If a endpoint wishes to support a custom Enterprise extension (e.g., `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User`), the new schema definition is simply added to the datastore backing the `ISchemaRepository`. 
 
 The `SchemaValidator` will immediately begin enforcing the new rules (mutability, required fields, types), and the `FilterParser` will immediately allow querying on the new fields, all without requiring a single line of code to be changed or recompiled in the Business Logic Layer.

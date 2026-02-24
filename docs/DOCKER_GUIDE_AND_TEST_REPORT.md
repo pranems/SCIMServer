@@ -262,7 +262,7 @@ pwsh -File scripts/live-test.ps1 -BaseUrl "http://localhost:6000" |
   │                                                    │
   │  5. SECTION 5-6: Config flags + isolation          │
   │     → Multi-member PATCH flags                     │
-  │     → Endpoint tenant isolation                    │
+  │     → Endpoint endpoint isolation                    │
   │                                                    │
   │  6. SECTION 7-9: Compliance + Edge Cases           │
   │     → Discovery endpoints                          │
@@ -1086,7 +1086,7 @@ HEALTHCHECK --interval=60s --timeout=3s --start-period=10s --retries=2 \
 | RFC 7644 §3.14 | ETag + conditional requests (304/412) | 12 | ✅ |
 | RFC 7644 §4 | Discovery: ServiceProviderConfig, Schemas, ResourceTypes | 3 | ✅ |
 | — | Authentication (OAuth 2.0 bearer) | 4 | ✅ |
-| — | Multi-tenant endpoint isolation | 2 | ✅ |
+| — | Multi-endpoint endpoint isolation | 2 | ✅ |
 | — | Inactive endpoint blocking (403) | 6 | ✅ |
 | — | Config flag validation | 13 | ✅ |
 | — | Pagination (startIndex, count) | 5 | ✅ |

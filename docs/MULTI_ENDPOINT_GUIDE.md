@@ -4,13 +4,13 @@
 > **Last Updated**: February 18, 2026  
 > **Baseline**: SCIMServer v0.10.0
 
-> Consolidated reference for the multi-endpoint (multi-tenant) SCIM architecture in SCIMServer.
+> Consolidated reference for the multi-endpoint (multi-endpoint) SCIM architecture in SCIMServer.
 
 ---
 
 ## Overview
 
-SCIMServer supports **multi-endpoint isolation** — each endpoint gets a dedicated SCIM base path with completely isolated Users, Groups, and configuration. This enables a single SCIMServer deployment to serve multiple Entra ID enterprise applications or tenants simultaneously.
+SCIMServer supports **multi-endpoint isolation** — each endpoint gets a dedicated SCIM base path with completely isolated Users, Groups, and configuration. This enables a single SCIMServer deployment to serve multiple Entra ID enterprise applications or endpoints simultaneously.
 
 ### Key Capabilities
 
