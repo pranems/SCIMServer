@@ -349,4 +349,155 @@ describe('UserPatchEngine', () => {
       expect(Object.keys(result)).toEqual(['title']);
     });
   });
+
+  // ── PATCH on soft-deleted (active=false) users ─────────────────────
+
+  describe('PATCH on soft-deleted state (active=false)', () => {
+    it('should replace displayName while preserving active=false', () => {
+      const result = apply(
+        [{ op: 'replace', path: 'displayName', value: 'Updated Name' }],
+        { active: false },
+      );
+      expect(result.extractedFields.displayName).toBe('Updated Name');
+      // active is not changed by this op, but engine tracks initial state
+    });
+
+    it('should re-activate user via replace active=true from inactive state', () => {
+      const result = apply(
+        [{ op: 'replace', path: 'active', value: true }],
+        { active: false },
+      );
+      expect(result.extractedFields.active).toBe(true);
+    });
+
+    it('should apply valuePath update on inactive user', () => {
+      const result = apply(
+        [{ op: 'replace', path: 'emails[type eq "work"].value', value: 'reactivated@work.com' }],
+        { active: false },
+      );
+      const emails = result.payload.emails as Array<{ type: string; value: string }>;
+      const work = emails.find(e => e.type === 'work');
+      expect(work?.value).toBe('reactivated@work.com');
+    });
+
+    it('should apply extension URN update on inactive user', () => {
+      const result = apply(
+        [{
+          op: 'replace',
+          path: 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department',
+          value: 'NewDept',
+        }],
+        { active: false },
+      );
+      const ext = result.payload['urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'] as Record<string, unknown>;
+      expect(ext?.department).toBe('NewDept');
+    });
+
+    it('should apply multiple ops including reactivation', () => {
+      const result = apply([
+        { op: 'replace', path: 'active', value: true },
+        { op: 'replace', path: 'displayName', value: 'Reactivated User' },
+        { op: 'add', path: 'title', value: 'Restored' },
+      ], { active: false });
+      expect(result.extractedFields.active).toBe(true);
+      expect(result.extractedFields.displayName).toBe('Reactivated User');
+      expect(result.payload.title).toBe('Restored');
+    });
+  });
+
+  // ── Additional valuePath patterns ──────────────────────────────────
+
+  describe('additional valuePath patterns', () => {
+    it('should add to phoneNumbers array via valuePath', () => {
+      const result = apply([{
+        op: 'add',
+        path: 'phoneNumbers[type eq "mobile"].value',
+        value: '+1-555-0199',
+      }], {
+        rawPayload: {
+          displayName: 'Test',
+          phoneNumbers: [{ type: 'work', value: '+1-555-0100' }],
+        },
+      });
+      const phones = result.payload.phoneNumbers as Array<{ type: string; value: string }>;
+      expect(phones.some(p => p.type === 'mobile' && p.value === '+1-555-0199')).toBe(true);
+      expect(phones.some(p => p.type === 'work')).toBe(true);
+    });
+
+    it('should replace specific phoneNumber via valuePath', () => {
+      const result = apply([{
+        op: 'replace',
+        path: 'phoneNumbers[type eq "work"].value',
+        value: '+1-555-9999',
+      }], {
+        rawPayload: {
+          displayName: 'Test',
+          phoneNumbers: [
+            { type: 'work', value: '+1-555-0100' },
+            { type: 'mobile', value: '+1-555-0200' },
+          ],
+        },
+      });
+      const phones = result.payload.phoneNumbers as Array<{ type: string; value: string }>;
+      const work = phones.find(p => p.type === 'work');
+      expect(work?.value).toBe('+1-555-9999');
+      const mobile = phones.find(p => p.type === 'mobile');
+      expect(mobile?.value).toBe('+1-555-0200');
+    });
+
+    it('should remove specific address via valuePath', () => {
+      const result = apply([{
+        op: 'remove',
+        path: 'addresses[type eq "home"]',
+      }], {
+        rawPayload: {
+          displayName: 'Test',
+          addresses: [
+            { type: 'work', streetAddress: '100 Main St' },
+            { type: 'home', streetAddress: '200 Elm St' },
+          ],
+        },
+      });
+      const addr = result.payload.addresses as Array<{ type: string }>;
+      expect(addr.some(a => a.type === 'home')).toBe(false);
+      expect(addr.some(a => a.type === 'work')).toBe(true);
+    });
+
+    it('should create array when valuePath target attribute does not exist', () => {
+      const result = apply([{
+        op: 'add',
+        path: 'ims[type eq "skype"].value',
+        value: 'john.doe.skype',
+      }], {
+        rawPayload: { displayName: 'Test' }, // no ims array
+      });
+      const ims = result.payload.ims as Array<{ type: string; value: string }>;
+      expect(ims).toBeDefined();
+      expect(ims.some(im => im.type === 'skype' && im.value === 'john.doe.skype')).toBe(true);
+    });
+  });
+
+  // ── Dot-notation + valuePath combinations ──────────────────────────
+
+  describe('dot-notation + valuePath combinations (verbose)', () => {
+    it('should handle dot-notation after valuePath in sequence', () => {
+      const result = apply([
+        { op: 'replace', path: 'emails[type eq "work"].value', value: 'combo@work.com' },
+        { op: 'replace', path: 'name.givenName', value: 'ComboGiven' },
+      ], undefined, verboseConfig);
+      const emails = result.payload.emails as Array<{ type: string; value: string }>;
+      expect(emails.find(e => e.type === 'work')?.value).toBe('combo@work.com');
+      expect((result.payload.name as any).givenName).toBe('ComboGiven');
+    });
+
+    it('should handle extension URN + dot-notation in same request', () => {
+      const result = apply([
+        { op: 'replace', path: 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department', value: 'Sales' },
+        { op: 'replace', path: 'name.familyName', value: 'NewFamily' },
+      ], undefined, verboseConfig);
+      const ext = result.payload['urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'] as Record<string, unknown>;
+      expect(ext?.department).toBe('Sales');
+      expect((result.payload.name as any).familyName).toBe('NewFamily');
+    });
+  });
 });

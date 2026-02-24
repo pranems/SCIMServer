@@ -67,8 +67,8 @@ export class EndpointScimUsersController {
     @Body() dto: CreateUserDto,
     @Req() req: Request
   ) {
-    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
-    return this.usersService.createUserForEndpoint(dto, baseUrl, endpointId);
+    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    return this.usersService.createUserForEndpoint(dto, baseUrl, endpointId, config);
   }
 
   /**
@@ -172,8 +172,8 @@ export class EndpointScimUsersController {
     @Body() dto: CreateUserDto,
     @Req() req: Request
   ) {
-    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
-    return this.usersService.replaceUserForEndpoint(id, dto, baseUrl, endpointId);
+    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    return this.usersService.replaceUserForEndpoint(id, dto, baseUrl, endpointId, config);
   }
 
   /**
@@ -202,7 +202,7 @@ export class EndpointScimUsersController {
     @Param('id') id: string,
     @Req() req: Request
   ): Promise<void> {
-    await this.validateAndSetContext(endpointId, req);
-    return this.usersService.deleteUserForEndpoint(id, endpointId);
+    const { config } = await this.validateAndSetContext(endpointId, req);
+    return this.usersService.deleteUserForEndpoint(id, endpointId, config);
   }
 }

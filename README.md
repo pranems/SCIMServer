@@ -4,7 +4,7 @@ Production-ready SCIM 2.0 server with a built-in observability UI for Microsoft 
 
 | Key | Value |
 |---|---|
-| Version | [`v0.11.0`](https://github.com/pranems/SCIMServer/releases/latest) |
+| Version | [`v0.15.0`](https://github.com/pranems/SCIMServer/releases/latest) |
 | Protocol | [SCIM 2.0](https://scim.cloud/) |
 | Target Platform | [Microsoft Entra ID](https://entra.microsoft.com/) |
 | Runtime | Node.js 24 |
@@ -98,7 +98,7 @@ npm run dev
 |---|---|---|
 | `PORT` | `8080` | API/web runtime port |
 | `OAUTH_CLIENT_ID` | `scimserver-client` | OAuth client identifier |
-| `DATABASE_URL` | `file:./data.db` | SQLite DB path/connection |
+| `DATABASE_URL` | `postgresql://scim:scim@localhost:5432/scimdb` | PostgreSQL connection string |
 | `NODE_ENV` | `production` (container) | Runtime mode |
 
 Security note: treat all secrets as sensitive and rotate after sharing/output exposure.
@@ -190,10 +190,21 @@ Admin/release references:
 
 Latest validated matrix:
 
-- Unit tests: **1316/1316** (52 suites)
+- Unit tests: **1374/1374** (52 suites)
 - E2E tests: **251/251** (17 suites)
-- Live integration tests: **322** (local + Docker)
+- Live integration tests: **318/318** (local + Docker)
 - Microsoft SCIM Validator: **25/25 passed** (+ 7 preview scenarios)
+
+### Per-Endpoint Config Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `SoftDeleteEnabled` | `false` | Soft delete (set `active=false`) instead of physical row deletion |
+| `StrictSchemaValidation` | `false` | Reject extension URNs not declared in `schemas[]` or not registered |
+| `MultiOpPatchRequestAddMultipleMembersToGroup` | `false` | Allow multi-member add in single PATCH |
+| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | `false` | Allow multi-member remove in single PATCH |
+| `VerbosePatchSupported` | `false` | Dot-notation PATCH path resolution |
+| `PatchOpAllowRemoveAllMembers` | `true` | Allow removing all members via `path=members` |
 
 ### Coverage scripts
 

@@ -37,6 +37,21 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * When removed, the endpoint reverts to global/category-level logging.
    */
   LOG_LEVEL: 'logLevel',
+
+  /**
+   * When true, DELETE operations set `active=false` instead of physically removing the resource.
+   * Soft-deleted resources are excluded from GET/LIST responses.
+   * When false (default), DELETE permanently removes the resource from the database.
+   */
+  SOFT_DELETE_ENABLED: 'SoftDeleteEnabled',
+
+  /**
+   * When true, POST/PUT requests must include ALL extension schema URNs in the `schemas[]`
+   * array for any extension data present in the request body.
+   * When false (default), extension data in the body without a matching `schemas[]` entry
+   * is silently accepted (lenient mode — matches most real-world SCIM clients).
+   */
+  STRICT_SCHEMA_VALIDATION: 'StrictSchemaValidation',
 } as const;
 
 /**
@@ -94,6 +109,22 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.LOG_LEVEL]?: string | number;
 
   /**
+   * When true, DELETE operations perform soft-delete (set active=false).
+   * When false (default), DELETE permanently removes the resource.
+   *
+   * Example config: { "SoftDeleteEnabled": "True" }
+   */
+  [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]?: boolean | string;
+
+  /**
+   * When true, POST/PUT must include all extension URNs in schemas[] for any
+   * extension data in the body. When false (default), lenient mode.
+   *
+   * Example config: { "StrictSchemaValidation": "True" }
+   */
+  [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]?: boolean | string;
+
+  /**
    * Allow any additional configuration flags
    */
   [key: string]: unknown;
@@ -132,7 +163,9 @@ export const DEFAULT_ENDPOINT_CONFIG: EndpointConfig = {
   [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP]: false,
   [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP]: false,
   [ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS]: true,
-  [ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED]: false
+  [ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED]: false,
+  [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: false,
+  [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: false
 };
 
 /**
@@ -146,6 +179,29 @@ const VALID_BOOLEAN_VALUES = ['true', 'false', '1', '0'];
 const VALID_LOG_LEVEL_NAMES = ['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'off'];
 
 /**
+ * Helper to validate a boolean-typed config flag.
+ * Avoids repetition for each boolean flag validation.
+ */
+function validateBooleanFlag(config: Record<string, any>, flagName: string): void {
+  const value = config[flagName];
+  if (value === undefined) return;
+  if (typeof value === 'boolean') return;
+  if (typeof value === 'string') {
+    if (!VALID_BOOLEAN_VALUES.includes(value.toLowerCase())) {
+      throw new Error(
+        `Invalid value "${value}" for config flag "${flagName}". ` +
+        `Allowed values: "True", "False", true, false, "1", "0".`
+      );
+    }
+  } else {
+    throw new Error(
+      `Invalid type for config flag "${flagName}". ` +
+      `Expected boolean or string ("True"/"False"), got ${typeof value}.`
+    );
+  }
+}
+
+/**
  * Validate endpoint configuration
  * Throws an error if any config value is invalid
  * 
@@ -155,85 +211,13 @@ const VALID_LOG_LEVEL_NAMES = ['trace', 'debug', 'info', 'warn', 'error', 'fatal
 export function validateEndpointConfig(config: Record<string, any> | undefined): void {
   if (!config) return;
 
-  // Validate MultiOpPatchRequestAddMultipleMembersToGroup
-  const multiOpAddFlag = config[ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP];
-  if (multiOpAddFlag !== undefined) {
-    if (typeof multiOpAddFlag === 'boolean') {
-      // Boolean values are always valid
-    } else if (typeof multiOpAddFlag === 'string') {
-      if (!VALID_BOOLEAN_VALUES.includes(multiOpAddFlag.toLowerCase())) {
-        throw new Error(
-          `Invalid value "${multiOpAddFlag}" for config flag "${ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP}". ` +
-          `Allowed values: "True", "False", true, false, "1", "0".`
-        );
-      }
-    } else {
-      throw new Error(
-        `Invalid type for config flag "${ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP}". ` +
-        `Expected boolean or string ("True"/"False"), got ${typeof multiOpAddFlag}.`
-      );
-    }
-  }
-
-  // Validate MultiOpPatchRequestRemoveMultipleMembersFromGroup
-  const multiOpRemoveFlag = config[ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP];
-  if (multiOpRemoveFlag !== undefined) {
-    if (typeof multiOpRemoveFlag === 'boolean') {
-      // Boolean values are always valid
-    } else if (typeof multiOpRemoveFlag === 'string') {
-      if (!VALID_BOOLEAN_VALUES.includes(multiOpRemoveFlag.toLowerCase())) {
-        throw new Error(
-          `Invalid value "${multiOpRemoveFlag}" for config flag "${ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP}". ` +
-          `Allowed values: "True", "False", true, false, "1", "0".`
-        );
-      }
-    } else {
-      throw new Error(
-        `Invalid type for config flag "${ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP}". ` +
-        `Expected boolean or string ("True"/"False"), got ${typeof multiOpRemoveFlag}.`
-      );
-    }
-  }
-
-  // Validate VerbosePatchSupported
-  const verbosePatchFlag = config[ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED];
-  if (verbosePatchFlag !== undefined) {
-    if (typeof verbosePatchFlag === 'boolean') {
-      // Boolean values are always valid
-    } else if (typeof verbosePatchFlag === 'string') {
-      if (!VALID_BOOLEAN_VALUES.includes(verbosePatchFlag.toLowerCase())) {
-        throw new Error(
-          `Invalid value "${verbosePatchFlag}" for config flag "${ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED}". ` +
-          `Allowed values: "True", "False", true, false, "1", "0".`
-        );
-      }
-    } else {
-      throw new Error(
-        `Invalid type for config flag "${ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED}". ` +
-        `Expected boolean or string ("True"/"False"), got ${typeof verbosePatchFlag}.`
-      );
-    }
-  }
-
-  // Validate PatchOpAllowRemoveAllMembers
-  const allowRemoveAllFlag = config[ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS];
-  if (allowRemoveAllFlag !== undefined) {
-    if (typeof allowRemoveAllFlag === 'boolean') {
-      // Boolean values are always valid
-    } else if (typeof allowRemoveAllFlag === 'string') {
-      if (!VALID_BOOLEAN_VALUES.includes(allowRemoveAllFlag.toLowerCase())) {
-        throw new Error(
-          `Invalid value "${allowRemoveAllFlag}" for config flag "${ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS}". ` +
-          `Allowed values: "True", "False", true, false, "1", "0".`
-        );
-      }
-    } else {
-      throw new Error(
-        `Invalid type for config flag "${ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS}". ` +
-        `Expected boolean or string ("True"/"False"), got ${typeof allowRemoveAllFlag}.`
-      );
-    }
-  }
+  // Validate boolean flags
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION);
 
   // Validate logLevel
   const logLevelFlag = config[ENDPOINT_CONFIG_FLAGS.LOG_LEVEL];

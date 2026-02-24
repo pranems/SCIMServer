@@ -19,9 +19,9 @@ describe('ScimSchemaRegistry', () => {
   // ─── Built-in initialization ────────────────────────────────────────────
 
   describe('built-in schemas', () => {
-    it('should initialize with 3 schemas (User, EnterpriseUser, Group)', () => {
+    it('should initialize with 7 schemas (User, EnterpriseUser, Group + 4 msfttest)', () => {
       const schemas = registry.getAllSchemas();
-      expect(schemas).toHaveLength(3);
+      expect(schemas).toHaveLength(7);
       const ids = schemas.map((s) => s.id);
       expect(ids).toContain(SCIM_CORE_USER_SCHEMA);
       expect(ids).toContain(SCIM_ENTERPRISE_USER_SCHEMA);
@@ -39,14 +39,14 @@ describe('ScimSchemaRegistry', () => {
     it('should have Enterprise User extension on User resource type', () => {
       const userRT = registry.getResourceType('User');
       expect(userRT).toBeDefined();
-      expect(userRT!.schemaExtensions).toHaveLength(1);
+      expect(userRT!.schemaExtensions).toHaveLength(3);
       expect(userRT!.schemaExtensions[0].schema).toBe(SCIM_ENTERPRISE_USER_SCHEMA);
       expect(userRT!.schemaExtensions[0].required).toBe(false);
     });
 
-    it('should have no extensions on Group resource type', () => {
+    it('should have msfttest extensions on Group resource type', () => {
       const groupRT = registry.getResourceType('Group');
-      expect(groupRT!.schemaExtensions).toHaveLength(0);
+      expect(groupRT!.schemaExtensions).toHaveLength(2);
     });
 
     it('should return Enterprise User as extension URN', () => {
@@ -91,7 +91,7 @@ describe('ScimSchemaRegistry', () => {
 
       expect(registry.hasSchema(customSchema.id)).toBe(true);
       const schemas = registry.getAllSchemas();
-      expect(schemas).toHaveLength(4);
+      expect(schemas).toHaveLength(8);
     });
 
     it('should return the registered schema via getSchema()', () => {
@@ -126,9 +126,9 @@ describe('ScimSchemaRegistry', () => {
       registry.registerExtension(customSchema, 'User');
 
       const userRT = registry.getResourceType('User')!;
-      expect(userRT.schemaExtensions).toHaveLength(2); // Enterprise + Custom
-      expect(userRT.schemaExtensions[1].schema).toBe(customSchema.id);
-      expect(userRT.schemaExtensions[1].required).toBe(false);
+      expect(userRT.schemaExtensions).toHaveLength(4); // Enterprise + 2 msfttest + Custom
+      expect(userRT.schemaExtensions[3].schema).toBe(customSchema.id);
+      expect(userRT.schemaExtensions[3].required).toBe(false);
     });
 
     it('should respect the required parameter', () => {
@@ -171,7 +171,7 @@ describe('ScimSchemaRegistry', () => {
 
       // But not attached to any resource type
       const userRT = registry.getResourceType('User')!;
-      expect(userRT.schemaExtensions).toHaveLength(1); // only Enterprise
+      expect(userRT.schemaExtensions).toHaveLength(3); // Enterprise + 2 msfttest
     });
 
     it('should register multiple extensions on same resource type', () => {
@@ -186,7 +186,7 @@ describe('ScimSchemaRegistry', () => {
       registry.registerExtension(secondSchema, 'User');
 
       const userRT = registry.getResourceType('User')!;
-      expect(userRT.schemaExtensions).toHaveLength(3); // Enterprise + 2 custom
+      expect(userRT.schemaExtensions).toHaveLength(5); // Enterprise + 2 msfttest + 2 custom
     });
 
     it('should register extension on Group resource type', () => {
@@ -200,8 +200,8 @@ describe('ScimSchemaRegistry', () => {
       registry.registerExtension(groupExt, 'Group');
 
       const groupRT = registry.getResourceType('Group')!;
-      expect(groupRT.schemaExtensions).toHaveLength(1);
-      expect(groupRT.schemaExtensions[0].schema).toBe(groupExt.id);
+      expect(groupRT.schemaExtensions).toHaveLength(3);
+      expect(groupRT.schemaExtensions[2].schema).toBe(groupExt.id);
     });
 
     // ─── Validation errors ────────────────────────────────────────────────
@@ -301,9 +301,9 @@ describe('ScimSchemaRegistry', () => {
       expect(registry.hasSchema('urn:unknown')).toBe(false);
     });
 
-    it('getExtensionUrnsForResourceType returns empty for no extensions', () => {
+    it('getExtensionUrnsForResourceType returns msfttest extensions for Group', () => {
       const urns = registry.getExtensionUrnsForResourceType('Group');
-      expect(urns).toHaveLength(0);
+      expect(urns).toHaveLength(2);
     });
 
     it('getServiceProviderConfig returns a copy', () => {
@@ -332,11 +332,11 @@ describe('ScimSchemaRegistry', () => {
 
       // Visible to ep-1
       expect(registry.hasSchema(epSchema.id, 'ep-1')).toBe(true);
-      expect(registry.getAllSchemas('ep-1')).toHaveLength(4);
+      expect(registry.getAllSchemas('ep-1')).toHaveLength(8);
 
       // NOT visible globally
       expect(registry.hasSchema(epSchema.id)).toBe(false);
-      expect(registry.getAllSchemas()).toHaveLength(3);
+      expect(registry.getAllSchemas()).toHaveLength(7);
     });
 
     it('should not affect other endpoints', () => {
@@ -344,7 +344,7 @@ describe('ScimSchemaRegistry', () => {
 
       // ep-2 does not see ep-1's extension
       expect(registry.hasSchema(epSchema.id, 'ep-2')).toBe(false);
-      expect(registry.getAllSchemas('ep-2')).toHaveLength(3);
+      expect(registry.getAllSchemas('ep-2')).toHaveLength(7);
     });
 
     it('should merge global + endpoint schemas in getAllSchemas(endpointId)', () => {
@@ -357,11 +357,11 @@ describe('ScimSchemaRegistry', () => {
       registry.registerExtension(globalExt, 'User');
       registry.registerExtension(epSchema, 'User', false, 'ep-1');
 
-      // ep-1 sees: 3 built-in + 1 global + 1 endpoint = 5
-      expect(registry.getAllSchemas('ep-1')).toHaveLength(5);
+      // ep-1 sees: 7 built-in + 1 global + 1 endpoint = 9
+      expect(registry.getAllSchemas('ep-1')).toHaveLength(9);
 
-      // ep-2 sees: 3 built-in + 1 global = 4
-      expect(registry.getAllSchemas('ep-2')).toHaveLength(4);
+      // ep-2 sees: 7 built-in + 1 global = 8
+      expect(registry.getAllSchemas('ep-2')).toHaveLength(8);
     });
 
     it('should include endpoint extension URNs in getExtensionUrns(endpointId)', () => {
@@ -379,13 +379,13 @@ describe('ScimSchemaRegistry', () => {
     it('should merge endpoint extensions into resource type', () => {
       registry.registerExtension(epSchema, 'User', false, 'ep-1');
 
-      // ep-1 User RT has 2 extensions (Enterprise + endpoint)
+      // ep-1 User RT has 4 extensions (Enterprise + 2 msfttest + endpoint)
       const ep1UserRT = registry.getResourceType('User', 'ep-1')!;
-      expect(ep1UserRT.schemaExtensions).toHaveLength(2);
+      expect(ep1UserRT.schemaExtensions).toHaveLength(4);
 
-      // Global User RT has only Enterprise
+      // Global User RT has Enterprise + 2 msfttest
       const globalUserRT = registry.getResourceType('User')!;
-      expect(globalUserRT.schemaExtensions).toHaveLength(1);
+      expect(globalUserRT.schemaExtensions).toHaveLength(3);
     });
 
     it('should merge endpoint extensions in getAllResourceTypes(endpointId)', () => {
@@ -393,11 +393,11 @@ describe('ScimSchemaRegistry', () => {
 
       const rts = registry.getAllResourceTypes('ep-1');
       const userRT = rts.find((r) => r.id === 'User')!;
-      expect(userRT.schemaExtensions).toHaveLength(2);
+      expect(userRT.schemaExtensions).toHaveLength(4);
 
-      // Group RT is unaffected
+      // Group RT has 2 msfttest extensions
       const groupRT = rts.find((r) => r.id === 'Group')!;
-      expect(groupRT.schemaExtensions).toHaveLength(0);
+      expect(groupRT.schemaExtensions).toHaveLength(2);
     });
 
     it('should include endpoint URNs in getExtensionUrnsForResourceType(rt, endpointId)', () => {
@@ -462,11 +462,11 @@ describe('ScimSchemaRegistry', () => {
         attributes: [],
       }, 'User', false, 'ep-1');
 
-      expect(registry.getAllSchemas('ep-1')).toHaveLength(5); // 3 + 2
+      expect(registry.getAllSchemas('ep-1')).toHaveLength(9); // 7 + 2
 
       registry.clearEndpointOverlay('ep-1');
 
-      expect(registry.getAllSchemas('ep-1')).toHaveLength(3); // back to defaults
+      expect(registry.getAllSchemas('ep-1')).toHaveLength(7); // back to defaults
     });
 
     // ─── getEndpointIds ─────────────────────────────────────────────────
@@ -618,7 +618,7 @@ describe('ScimSchemaRegistry', () => {
       await expect(reg.onModuleInit()).resolves.toBeUndefined();
 
       // Should still have only built-in schemas
-      expect(reg.getAllSchemas()).toHaveLength(3);
+      expect(reg.getAllSchemas()).toHaveLength(7);
     });
 
     it('should handle empty database (no persisted extensions)', async () => {
@@ -629,7 +629,7 @@ describe('ScimSchemaRegistry', () => {
 
       expect(mockRepo.findAll).toHaveBeenCalled();
       // Only built-in schemas
-      expect(reg.getAllSchemas()).toHaveLength(3);
+      expect(reg.getAllSchemas()).toHaveLength(7);
     });
 
     it('should handle database errors gracefully (log and continue)', async () => {
@@ -641,7 +641,7 @@ describe('ScimSchemaRegistry', () => {
       await expect(reg.onModuleInit()).resolves.toBeUndefined();
 
       // Built-in schemas should still be intact
-      expect(reg.getAllSchemas()).toHaveLength(3);
+      expect(reg.getAllSchemas()).toHaveLength(7);
     });
 
     it('should handle records with null description and resourceTypeId', async () => {

@@ -5,6 +5,44 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2026-02-23
+
+### Added
+- **Soft / Hard Delete** — New `SoftDeleteEnabled` per-endpoint config flag (default `false`). When enabled, `DELETE /Users/{id}` and `DELETE /Groups/{id}` set `active=false` (soft-delete) instead of physical row removal
+- **Strict Schema Validation** — New `StrictSchemaValidation` per-endpoint config flag (default `false`). When enabled, POST/PUT reject request bodies containing extension URN keys not declared in `schemas[]` or not registered in `ScimSchemaRegistry` (returns 400 `invalidSyntax` / `invalidValue`)
+- **4 Microsoft Test Extension URNs** — Pre-registered globally in `ScimSchemaRegistry` for Microsoft Entra ID / SCIM Validator compatibility:
+  - `urn:msfttest:cloud:scim:schemas:extension:custom:2.0:User`
+  - `urn:msfttest:cloud:scim:schemas:extension:custom:2.0:Group`
+  - `urn:ietf:params:scim:schemas:extension:msfttest:User`
+  - `urn:ietf:params:scim:schemas:extension:msfttest:Group`
+- **Dynamic `schemas[]` in Group responses** — `toScimGroupResource()` now dynamically includes extension URNs present in `rawPayload`, matching User service behavior
+- **107 new unit tests** — 33 config validation, 25 user service (soft delete + strict schema + GET/LIST/filter interactions + config flag combos), 21 group service (soft delete + strict schema + dynamic schemas + config flag combos), 14 user-patch-engine (soft-deleted state, valuePath patterns, dot-notation combos), 14 assertion updates across discovery specs
+- **25 new E2E tests** — `soft-delete-flags.e2e-spec.ts`: SoftDeleteEnabled Users (6), Groups (3), PATCH on soft-deleted users (4), config flag combinations (5), StrictSchemaValidation (3), PATCH path patterns (4)
+- **Feature documentation**: `docs/FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md`
+- **Issues & root cause analysis**: `docs/ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md`
+
+### Changed
+- **Controllers pass config to services** — `createUser/Group`, `replaceUser/Group`, `deleteUser/Group` now receive `EndpointConfig` from controller
+- **`GroupUpdateInput`** — Added `active?: boolean` field for soft-delete support
+- **Schema counts** — Built-in schemas: 3→7 | User extensions: 1→3 | Group extensions: 0→2
+- **`validateEndpointConfig()`** — Refactored to use `validateBooleanFlag()` helper for all 6 boolean flags
+- **`ScimSchemaRegistry`** — Injects `ScimSchemaRegistry` into `EndpointScimGroupsService` for dynamic schema resolution
+
+### Fixed
+- **Live test Unicode parse errors** — Replaced em-dash (U+2014) and section sign (U+00A7) characters with ASCII equivalents; saved with UTF-8 BOM for PowerShell compatibility
+- **Live test externalId logic bug** — Duplicate group `externalId` test used stale value after PATCH update; corrected to use current externalId
+- **Prisma migration ordering** — Fixed P3018/P3009 by renaming migration directory timestamp and clearing failed migration state
+- **Discovery E2E schema count assertions** — Updated `discovery-endpoints.e2e-spec.ts` from hardcoded 3/1 to `>=3`/`>=1` and find-by-schema lookup; fixes pre-existing failures caused by 4 custom extension URNs
+- **`package.json` version stale in Docker** — Bumped from `0.13.0` to `0.15.0` in `api/package.json`; Docker image was reporting old version via `/admin/version`
+- **Live test parameter name mismatch** — Script uses `-ClientSecret` not `-OAuthSecret`; previous invocations silently ignored wrong param name, causing OAuth to use default secret against Docker's different credential
+
+### Verified
+- **1405/1405 unit tests passing** (52 suites) — up from 1316 (+89 new)
+- **276/276 E2E tests passing** (18 suites) — up from 251 (+25 new)
+- **318/318 live integration tests passing** — up from 302
+- Build clean (TypeScript), zero compilation errors
+- Docker containers healthy (postgres:17-alpine + node:24-alpine)
+
 ## [0.14.0] - 2026-02-23
 
 ### Added

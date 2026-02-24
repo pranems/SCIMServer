@@ -115,7 +115,8 @@ describe('EndpointScimGroupsController', () => {
         expect(mockGroupsService.createGroupForEndpoint).toHaveBeenCalledWith(
           createDto,
           expect.any(String),
-          'endpoint-1'
+          'endpoint-1',
+          expect.any(Object)
         );
         expect(result).toEqual(mockGroup);
       });
@@ -350,7 +351,8 @@ describe('EndpointScimGroupsController', () => {
           'scim-grp-123',
           replaceDto,
           expect.any(String),
-          'endpoint-1'
+          'endpoint-1',
+          expect.any(Object)
         );
         expect(result).toEqual(mockGroup);
       });
@@ -365,7 +367,8 @@ describe('EndpointScimGroupsController', () => {
 
         expect(mockGroupsService.deleteGroupForEndpoint).toHaveBeenCalledWith(
           'scim-grp-123',
-          'endpoint-1'
+          'endpoint-1',
+          expect.any(Object)
         );
       });
     });

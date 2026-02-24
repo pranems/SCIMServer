@@ -23,6 +23,7 @@ import {
   SCIM_LIST_RESPONSE_SCHEMA,
   SCIM_PATCH_SCHEMA
 } from '../common/scim-constants';
+import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import type { ScimGroupResource, ScimListResponse } from '../common/scim-types';
 import type { CreateGroupDto, GroupMemberDto } from '../dto/create-group.dto';
 import type { PatchGroupDto } from '../dto/patch-group.dto';
@@ -51,10 +52,12 @@ export class EndpointScimGroupsService {
     private readonly metadata: ScimMetadataService,
     private readonly endpointContext: EndpointContextStorage,
     private readonly logger: ScimLogger,
+    private readonly schemaRegistry: ScimSchemaRegistry,
   ) {}
 
-  async createGroupForEndpoint(dto: CreateGroupDto, baseUrl: string, endpointId: string): Promise<ScimGroupResource> {
+  async createGroupForEndpoint(dto: CreateGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimGroupResource> {
     this.ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
+    this.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
 
     this.logger.info(LogCategory.SCIM_GROUP, 'Creating group', { displayName: dto.displayName, memberCount: dto.members?.length ?? 0, endpointId });
     this.logger.trace(LogCategory.SCIM_GROUP, 'Create group payload', { body: dto as unknown as Record<string, unknown> });
@@ -100,7 +103,7 @@ export class EndpointScimGroupsService {
 
     const withMembers = await this.groupRepo.findWithMembers(endpointId, String(group.scimId));
     this.logger.info(LogCategory.SCIM_GROUP, 'Group created', { scimId, displayName: dto.displayName, endpointId });
-    return this.toScimGroupResource(withMembers, baseUrl);
+    return this.toScimGroupResource(withMembers, baseUrl, endpointId);
   }
 
   async getGroupForEndpoint(scimId: string, baseUrl: string, endpointId: string): Promise<ScimGroupResource> {
@@ -111,7 +114,7 @@ export class EndpointScimGroupsService {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
-    return this.toScimGroupResource(group, baseUrl);
+    return this.toScimGroupResource(group, baseUrl, endpointId);
   }
 
   async listGroupsForEndpoint(
@@ -144,7 +147,7 @@ export class EndpointScimGroupsService {
     );
 
     // Build SCIM resources and apply in-memory filter if needed
-    let resources = allGroups.map((g) => this.toScimGroupResource(g, baseUrl));
+    let resources = allGroups.map((g) => this.toScimGroupResource(g, baseUrl, endpointId));
     if (filterResult.inMemoryFilter) {
       resources = resources.filter(filterResult.inMemoryFilter);
     }
@@ -243,16 +246,18 @@ export class EndpointScimGroupsService {
     }
 
     this.logger.info(LogCategory.SCIM_PATCH, 'Group patched', { scimId, endpointId });
-    return this.toScimGroupResource(updatedGroup, baseUrl);
+    return this.toScimGroupResource(updatedGroup, baseUrl, endpointId);
   }
 
   async replaceGroupForEndpoint(
     scimId: string,
     dto: CreateGroupDto,
     baseUrl: string,
-    endpointId: string
+    endpointId: string,
+    config?: EndpointConfig
   ): Promise<ScimGroupResource> {
     this.ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
+    this.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
 
     this.logger.info(LogCategory.SCIM_GROUP, 'Replace group (PUT)', { scimId, displayName: dto.displayName, endpointId });
 
@@ -297,10 +302,10 @@ export class EndpointScimGroupsService {
       throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.' });
     }
 
-    return this.toScimGroupResource(updatedGroup, baseUrl);
+    return this.toScimGroupResource(updatedGroup, baseUrl, endpointId);
   }
 
-  async deleteGroupForEndpoint(scimId: string, endpointId: string): Promise<void> {
+  async deleteGroupForEndpoint(scimId: string, endpointId: string, config?: EndpointConfig): Promise<void> {
     this.logger.info(LogCategory.SCIM_GROUP, 'Delete group', { scimId, endpointId });
     const group = await this.groupRepo.findByScimId(endpointId, scimId);
 
@@ -309,8 +314,16 @@ export class EndpointScimGroupsService {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
-    await this.groupRepo.delete(group.id);
-    this.logger.info(LogCategory.SCIM_GROUP, 'Group deleted', { scimId, endpointId });
+    const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
+
+    if (softDelete) {
+      this.logger.info(LogCategory.SCIM_GROUP, 'Soft-deleting group (setting active=false)', { scimId, endpointId });
+      await this.groupRepo.update(group.id, { active: false });
+      this.logger.info(LogCategory.SCIM_GROUP, 'Group soft-deleted', { scimId, endpointId });
+    } else {
+      await this.groupRepo.delete(group.id);
+      this.logger.info(LogCategory.SCIM_GROUP, 'Group hard-deleted', { scimId, endpointId });
+    }
   }
 
   // ===== Private Helper Methods =====
@@ -366,6 +379,48 @@ export class EndpointScimGroupsService {
     }
   }
 
+  /**
+   * Strict Schema Validation — when StrictSchemaValidation is enabled, reject
+   * any request body that contains extension URN keys not listed in the
+   * request's `schemas[]` array or not registered in the schema registry.
+   */
+  private enforceStrictSchemaValidation(
+    dto: Record<string, unknown>,
+    endpointId: string,
+    config?: EndpointConfig
+  ): void {
+    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
+      return;
+    }
+
+    const declaredSchemas = (dto.schemas as string[] | undefined) ?? [];
+    const declaredLower = new Set(declaredSchemas.map(s => s.toLowerCase()));
+    const registeredUrns = this.schemaRegistry.getExtensionUrns(endpointId);
+    const registeredLower = new Set(registeredUrns.map(u => u.toLowerCase()));
+
+    for (const key of Object.keys(dto)) {
+      if (key.startsWith('urn:')) {
+        const keyLower = key.toLowerCase();
+        if (!declaredLower.has(keyLower)) {
+          throw createScimError({
+            status: 400,
+            scimType: 'invalidSyntax',
+            detail: `Extension URN "${key}" found in request body but not declared in schemas[]. ` +
+              `When StrictSchemaValidation is enabled, all extension URNs must be listed in the schemas array.`,
+          });
+        }
+        if (!registeredLower.has(keyLower)) {
+          throw createScimError({
+            status: 400,
+            scimType: 'invalidValue',
+            detail: `Extension URN "${key}" is not a registered extension schema for this endpoint. ` +
+              `Registered extensions: [${registeredUrns.join(', ')}].`,
+          });
+        }
+      }
+    }
+  }
+
   private async resolveMemberInputs(
     memberDtos: GroupMemberDto[],
     endpointId: string,
@@ -392,7 +447,7 @@ export class EndpointScimGroupsService {
     }));
   }
 
-  private toScimGroupResource(group: GroupWithMembers | null, baseUrl: string): ScimGroupResource {
+  private toScimGroupResource(group: GroupWithMembers | null, baseUrl: string, endpointId?: string): ScimGroupResource {
     if (!group) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: 'Resource not found.' });
     }
@@ -407,8 +462,17 @@ export class EndpointScimGroupsService {
     delete rawPayload.externalId;
     delete rawPayload.id;  // RFC 7643 §3.1: id is server-assigned — never let rawPayload override
 
+    // Build schemas[] dynamically — include extension URNs present in payload
+    const extensionUrns = this.schemaRegistry.getExtensionUrns(endpointId);
+    const schemas: [string, ...string[]] = [SCIM_CORE_GROUP_SCHEMA];
+    for (const urn of extensionUrns) {
+      if (urn in rawPayload) {
+        schemas.push(urn);
+      }
+    }
+
     return {
-      schemas: [SCIM_CORE_GROUP_SCHEMA],
+      schemas,
       ...rawPayload,
       id: group.scimId,
       externalId: group.externalId ?? undefined,

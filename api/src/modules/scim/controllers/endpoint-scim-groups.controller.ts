@@ -69,8 +69,8 @@ export class EndpointScimGroupsController {
     @Body() dto: CreateGroupDto,
     @Req() req: Request
   ) {
-    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
-    return this.groupsService.createGroupForEndpoint(dto, baseUrl, endpointId);
+    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    return this.groupsService.createGroupForEndpoint(dto, baseUrl, endpointId, config);
   }
 
   /**
@@ -174,8 +174,8 @@ export class EndpointScimGroupsController {
     @Body() dto: CreateGroupDto,
     @Req() req: Request
   ) {
-    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
-    return this.groupsService.replaceGroupForEndpoint(id, dto, baseUrl, endpointId);
+    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    return this.groupsService.replaceGroupForEndpoint(id, dto, baseUrl, endpointId, config);
   }
 
   /**
@@ -204,8 +204,8 @@ export class EndpointScimGroupsController {
     @Param('id') id: string,
     @Req() req: Request
   ): Promise<void> {
-    await this.validateAndSetContext(endpointId, req);
-    return this.groupsService.deleteGroupForEndpoint(id, endpointId);
+    const { config } = await this.validateAndSetContext(endpointId, req);
+    return this.groupsService.deleteGroupForEndpoint(id, endpointId, config);
   }
 
 }

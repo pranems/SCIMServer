@@ -23,10 +23,10 @@ describe('SchemasController', () => {
       ]);
     });
 
-    it('should return 3 schema definitions (User, EnterpriseUser, Group)', () => {
+    it('should return 7 schema definitions (User, EnterpriseUser, Group + 4 msfttest)', () => {
       const result = controller.getSchemas();
-      expect(result.totalResults).toBe(3);
-      expect(result.Resources).toHaveLength(3);
+      expect(result.totalResults).toBe(7);
+      expect(result.Resources).toHaveLength(7);
     });
 
     it('should include User schema with correct id', () => {
@@ -117,7 +117,7 @@ describe('SchemasController', () => {
     it('should have correct pagination metadata', () => {
       const result = controller.getSchemas();
       expect(result.startIndex).toBe(1);
-      expect(result.itemsPerPage).toBe(3);
+      expect(result.itemsPerPage).toBe(7);
     });
   });
 });

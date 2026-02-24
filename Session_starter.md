@@ -5,6 +5,7 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 ### Recent Key Achievements (Chronological)
 | Date | Achievement |
 |------|-------------|
+| 2026-02-23 | 🧪 **v0.15.0 Test Expansion — COMPLETE:** Added 59 new tests (34 unit + 25 E2E) for soft-delete, config flag combinations, and PATCH path patterns. **Unit tests:** 12 user service (soft-delete GET/LIST/filter, config combos), 8 group service (soft-delete interactions, flag combos), 14 user-patch-engine (soft-deleted PATCH, valuePath patterns, dot-notation combos). **E2E tests:** New `soft-delete-flags.e2e-spec.ts` — SoftDeleteEnabled Users (6), Groups (3), PATCH on soft-deleted users (4), config flag combinations (5), StrictSchemaValidation (3), PATCH path patterns (4). Fixed 2 pre-existing discovery-endpoints E2E failures (schema count assertions stale after custom extension URNs). Fixed `package.json` version 0.13.0→0.15.0. Fixed live-test parameter name mismatch (`-ClientSecret` not `-OAuthSecret`). Added 3 new issues (#9-#11) to RCA doc. Final counts: **1405 unit (52 suites), 276 E2E (18 suites), 318 live** — all passing. Updated CHANGELOG, INDEX, Session_starter, ISSUES_BUGS_ROOT_CAUSE_ANALYSIS. |
 | 2026-02-23 | 📝 **Phase 8 Part 2 — Custom Resource Type Registration — DOCUMENTED:** Designed and documented comprehensive Phase 8.2 (Custom Resource Type Registration) in migration plan and architecture v3 docs. Covers: `EndpointResourceType` DB model + Prisma migration, `ENDPOINT_RESOURCE_TYPE_REPOSITORY` token + interface + Prisma/InMemory implementations, `ScimSchemaRegistry.registerResourceType()` with per-endpoint overlay + hydration, Admin API `POST/GET/DELETE /admin/endpoints/:id/resource-types`, `customResourceTypesEnabled` config flag (default false), generic wildcard `EndpointScimGenericController` (catches `:resourceType` after dedicated User/Group controllers), `EndpointScimGenericService` with JSONB-only storage + schema-guided validation, `GenericPatchEngine` for JSONB payloads, JSONB-only filter fallback. Full request/response examples, Mermaid sequence/architecture diagrams, discovery impact examples, runtime impact assessment, ~105 test plan, ~9 day effort estimate. Updated: migration plan (TOC, gap table G8b, phase overview, timeline, Gantt, dependency graph P8b node, deployment matrix, summary table), architecture v3 (config flag matrix, ER diagram columns, API route map with admin + generic routes, Appendix B.7b examples). No code changes — documentation only. |
 | 2026-02-23 | ✅ **Phase 6 — Data-Driven Discovery — COMPLETE (v0.14.0):** Centralized all SCIM discovery endpoints into injectable `ScimDiscoveryService`, replacing ~280 lines of hardcoded JSON across 4 controllers. Added Enterprise User Extension schema (RFC 7643 §4.3) to `/Schemas` (3 schemas, was 2). Enterprise extension declared on User ResourceType. Dynamic `schemas[]` in User responses (G19). `meta` object on ServiceProviderConfig (RFC 7644 §4). Centralized `KNOWN_EXTENSION_URNS` (G16). Removed 7 dead config flags (G20). Rich RFC 7643 schema constants with full attribute definitions. Full validation: **1171/1171 unit tests** (47 suites, +36 new), **196/196 E2E tests** (15 suites, +3 new). Phase doc: `docs/phases/PHASE_06_DATA_DRIVEN_DISCOVERY.md`. |
 | 2026-02-21 | ✅ **Phase 5 — Domain-Layer PATCH Engine — COMPLETE (v0.13.0):** Extracted inline SCIM PATCH logic into pure-domain `UserPatchEngine` (~290 lines) and `GroupPatchEngine` (~240 lines) with zero NestJS/Prisma dependencies. Created `PatchError` domain error class, typed `PatchConfig`/`GroupMemberPatchConfig` interfaces, barrel export. Refactored both services to thin orchestrators (34%/31% line reduction). Added 73 new unit tests (36+37). Full validation: **984/984 unit tests** (29 suites), **193/193 E2E tests** (15 suites). Docker build + container healthy. Phase doc: `docs/phases/PHASE_05_PATCH_ENGINE.md`. |
@@ -106,12 +107,12 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 | 2025-09-28 | PATCH Add operation fix (Entra compatibility) |
 | 2025-09-27 | v0.3.0: Full SCIM 2.0 compliance baseline |
 
-Current Version: v0.14.0 (Prisma 7 + PostgreSQL 17 + ESLint 10 + Jest 30 + React 19 + Vite 7 + Node 24 Docker)
+Current Version: v0.15.0 (Prisma 7 + PostgreSQL 17 + ESLint 10 + Jest 30 + React 19 + Vite 7 + Node 24 Docker)
 
 ---
 
 ## Status
-Production Ready (v0.14.0) — **Phase 6 Data-Driven Discovery complete** (Feb 2026). Centralized `ScimDiscoveryService` with RFC 7643 schema constants. SQLite→PostgreSQL migration with unified resource table, Prisma 7 driver adapter for `pg`. Repository Pattern (`IUserRepository`/`IGroupRepository`) with `PERSISTENCE_BACKEND` env toggle. Pure-domain `UserPatchEngine`/`GroupPatchEngine`. Full SCIM filter parser (10 operators), POST /.search, ETag conditional requests, attribute projection, centralized error handling. 1171 unit tests (47 suites), 196 e2e tests (15 suites), 302 live integration tests (302 pass), all 25 Microsoft SCIM Validator tests passing + 7 preview (0 false positives). Version endpoint with container metadata, timezone+utcOffset, credential masking. Full tech stack at latest: Prisma 7, PostgreSQL 17, ESLint 10, Jest 30, React 19, Vite 7, Node 24.
+Production Ready (v0.15.0) — **Soft delete, strict schema validation, custom extension URNs** (Feb 2026). Centralized `ScimDiscoveryService` with RFC 7643 schema constants + 4 msfttest extension schemas. SQLite→PostgreSQL migration with unified resource table, Prisma 7 driver adapter for `pg`. Repository Pattern (`IUserRepository`/`IGroupRepository`) with `PERSISTENCE_BACKEND` env toggle. Pure-domain `UserPatchEngine`/`GroupPatchEngine`. Full SCIM filter parser (10 operators), POST /.search, ETag conditional requests, attribute projection, centralized error handling. Per-endpoint config flags: `SoftDeleteEnabled`, `StrictSchemaValidation`, multi-member PATCH, verbose PATCH, remove-all-members. 7 built-in schemas (was 3), User extensions 3 (was 1), Group extensions 2 (was 0). **1405 unit tests (52 suites), 276 E2E tests (18 suites), 318 live integration tests** — all passing. 25 Microsoft SCIM Validator tests passing + 7 preview (0 false positives). Comprehensive E2E coverage for soft-delete flag combos, strict schema validation, PATCH paths on soft-deleted users, and all 6 config flag permutations. Version endpoint with container metadata, timezone+utcOffset, credential masking. Full tech stack at latest: Prisma 7, PostgreSQL 17, ESLint 10, Jest 30, React 19, Vite 7, Node 24.
 
 ## Quick Commands
 ```powershell
@@ -296,13 +297,13 @@ Deferred:
 ## Dev Quick Ref
 Backend: `cd api && npm run start:dev`
 Frontend: `cd web && npm run dev`
-Unit Tests: `cd api && npm test` (1316 tests, 52 suites)
+Unit Tests: `cd api && npm test` (1374 tests, 52 suites)
 Unit Coverage: `cd api && npm run test:cov` → coverage/
 E2E Tests: `cd api && npm run test:e2e` (251 tests, 17 suites)
 E2E Coverage: `cd api && npm run test:e2e:cov` → coverage-e2e/
 All Coverage: `cd api && npm run test:cov:all` (unit + E2E)
 Full Pipeline: `cd api && npm run test:all` (unit + E2E + smoke)
-Live Tests: `.\scripts\live-test.ps1` (322 assertions)
+Live Tests: `.\scripts\live-test.ps1` (318 assertions)
 Live Tests (verbose): `.\scripts\live-test.ps1 -Verbose`
 
 ---

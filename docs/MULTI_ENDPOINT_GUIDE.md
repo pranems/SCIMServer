@@ -1,8 +1,8 @@
 # Multi-Endpoint SCIM Guide
 
 > **Status**: Living architecture guide  
-> **Last Updated**: February 18, 2026  
-> **Baseline**: SCIMServer v0.10.0
+> **Last Updated**: February 23, 2026  
+> **Baseline**: SCIMServer v0.15.0
 
 > Consolidated reference for the multi-endpoint (multi-endpoint) SCIM architecture in SCIMServer.
 
@@ -159,6 +159,9 @@ Per-endpoint config flags control PATCH behavior. Set via the `config` JSON obje
 | `MultiOpPatchRequestAddMultipleMembersToGroup` | `"true"` / `"false"` | `"false"` | Allow adding multiple group members in a single PATCH operation |
 | `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | `"true"` / `"false"` | `"false"` | Allow removing multiple group members in a single PATCH operation |
 | `VerbosePatchSupported` | `"true"` / `"false"` | `"false"` | Enable dot-notation PATCH path resolution (e.g., `name.givenName`) |
+| `SoftDeleteEnabled` | `"true"` / `"false"` | `"false"` | Soft delete (set `active=false`) instead of physical row deletion on DELETE |
+| `StrictSchemaValidation` | `"true"` / `"false"` | `"false"` | Reject extension URNs not declared in `schemas[]` or not registered in schema registry |
+| `PatchOpAllowRemoveAllMembers` | `"true"` / `"false"` | `"true"` | Allow removing all members via `path=members` PATCH operation |
 
 **Enable for Microsoft Entra ID:** Set both multi-member flags to `"true"` since Entra sends multi-member PATCH operations.
 

@@ -43,6 +43,7 @@ export interface GroupCreateInput {
 export interface GroupUpdateInput {
   displayName?: string;
   externalId?: string | null;
+  active?: boolean;
   rawPayload?: string;
   meta?: string;
 }

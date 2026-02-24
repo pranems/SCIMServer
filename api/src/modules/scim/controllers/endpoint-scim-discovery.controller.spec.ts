@@ -70,8 +70,8 @@ describe('EndpointScimDiscoveryController', () => {
       expect(result.schemas).toEqual([
         'urn:ietf:params:scim:api:messages:2.0:ListResponse',
       ]);
-      expect(result.totalResults).toBe(3);
-      expect(result.Resources).toHaveLength(3);
+      expect(result.totalResults).toBe(7);
+      expect(result.Resources).toHaveLength(7);
       expect(result.Resources[0].id).toBe(
         'urn:ietf:params:scim:schemas:core:2.0:User'
       );

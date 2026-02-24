@@ -1,8 +1,8 @@
 # SCIM v2 Reference & Examples
 
 > **Status**: Living reference  
-> **Last Updated**: February 18, 2026  
-> **Baseline**: SCIMServer v0.10.0
+> **Last Updated**: February 23, 2026  
+> **Baseline**: SCIMServer v0.15.0
 
 > Implementation-agnostic SCIM 2.0 API reference with runnable example payloads.
 
@@ -32,14 +32,14 @@
 | `POST` | `/Users/.search` | Search users via POST body |
 | `PUT` | `/Users/{id}` | Replace user |
 | `PATCH` | `/Users/{id}` | Partial update user |
-| `DELETE` | `/Users/{id}` | Delete user (204) |
+| `DELETE` | `/Users/{id}` | Delete user (204). Supports `SoftDeleteEnabled` config flag for soft delete |
 | `POST` | `/Groups` | Create group (201 + Location) |
 | `GET` | `/Groups` | List groups |
 | `GET` | `/Groups/{id}` | Get group by ID |
 | `POST` | `/Groups/.search` | Search groups via POST body |
 | `PUT` | `/Groups/{id}` | Replace group |
 | `PATCH` | `/Groups/{id}` | Partial update group |
-| `DELETE` | `/Groups/{id}` | Delete group (204) |
+| `DELETE` | `/Groups/{id}` | Delete group (204). Supports `SoftDeleteEnabled` config flag for soft delete |
 
 ---
 

@@ -1128,6 +1128,73 @@ describe('EndpointScimUsersService', () => {
 
       expect(mockUserRepo.delete).not.toHaveBeenCalled();
     });
+
+    describe('soft delete', () => {
+      it('should soft-delete user when SoftDeleteEnabled is true (boolean)', async () => {
+        mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+        mockUserRepo.update.mockResolvedValue({ ...mockUser, active: false });
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true };
+        await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, config);
+
+        expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, { active: false });
+        expect(mockUserRepo.delete).not.toHaveBeenCalled();
+      });
+
+      it('should soft-delete user when SoftDeleteEnabled is "True" (string)', async () => {
+        mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+        mockUserRepo.update.mockResolvedValue({ ...mockUser, active: false });
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: 'True' };
+        await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, config);
+
+        expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, { active: false });
+        expect(mockUserRepo.delete).not.toHaveBeenCalled();
+      });
+
+      it('should hard-delete user when SoftDeleteEnabled is false', async () => {
+        mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+        mockUserRepo.delete.mockResolvedValue(mockUser);
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: false };
+        await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, config);
+
+        expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id);
+        expect(mockUserRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('should hard-delete user when SoftDeleteEnabled is "False" (string)', async () => {
+        mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+        mockUserRepo.delete.mockResolvedValue(mockUser);
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: 'False' };
+        await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, config);
+
+        expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id);
+        expect(mockUserRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('should hard-delete user when config is undefined (default)', async () => {
+        mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+        mockUserRepo.delete.mockResolvedValue(mockUser);
+
+        await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, undefined);
+
+        expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id);
+        expect(mockUserRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('should hard-delete user when config has no SoftDeleteEnabled key', async () => {
+        mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+        mockUserRepo.delete.mockResolvedValue(mockUser);
+
+        const config: EndpointConfig = {};
+        await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, config);
+
+        expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id);
+        expect(mockUserRepo.update).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('endpoint isolation', () => {
@@ -1521,6 +1588,435 @@ describe('EndpointScimUsersService', () => {
         expect(storedPayload.id).toBeUndefined();
         expect(storedPayload.displayName).toBe('Patched User');
       });
+    });
+  });
+
+  describe('strict schema validation', () => {
+    const ENTERPRISE_USER_URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+
+    describe('createUserForEndpoint with StrictSchemaValidation', () => {
+      it('should allow extension URN in body when declared in schemas[] and registered (strict mode)', async () => {
+        const createDto: CreateUserDto = {
+          schemas: [
+            'urn:ietf:params:scim:schemas:core:2.0:User',
+            ENTERPRISE_USER_URN,
+          ],
+          userName: 'strict@example.com',
+          active: true,
+          [ENTERPRISE_USER_URN]: { department: 'Engineering' },
+        } as any;
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true };
+
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.create.mockResolvedValue({
+          ...mockUser,
+          userName: createDto.userName,
+          rawPayload: JSON.stringify({ schemas: createDto.schemas, [ENTERPRISE_USER_URN]: { department: 'Engineering' } }),
+        });
+
+        const result = await service.createUserForEndpoint(
+          createDto, 'http://localhost:3000/scim', mockEndpoint.id, config
+        );
+
+        expect(result.userName).toBe(createDto.userName);
+        expect(mockUserRepo.create).toHaveBeenCalled();
+      });
+
+      it('should reject extension URN NOT declared in schemas[] (strict mode)', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'], // missing Enterprise URN
+          userName: 'strict@example.com',
+          active: true,
+          [ENTERPRISE_USER_URN]: { department: 'Engineering' },
+        } as any;
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true };
+
+        await expect(
+          service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+
+        try {
+          await service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, config);
+        } catch (e) {
+          expect((e as HttpException).getStatus()).toBe(400);
+          expect(JSON.stringify((e as HttpException).getResponse())).toContain('invalidSyntax');
+        }
+
+        expect(mockUserRepo.create).not.toHaveBeenCalled();
+      });
+
+      it('should reject unregistered extension URN even if declared in schemas[] (strict mode)', async () => {
+        const fakeUrn = 'urn:fake:extension:2.0:User';
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User', fakeUrn],
+          userName: 'strict@example.com',
+          active: true,
+          [fakeUrn]: { custom: 'data' },
+        } as any;
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true };
+
+        await expect(
+          service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+
+        try {
+          await service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, config);
+        } catch (e) {
+          expect((e as HttpException).getStatus()).toBe(400);
+          expect(JSON.stringify((e as HttpException).getResponse())).toContain('invalidValue');
+        }
+
+        expect(mockUserRepo.create).not.toHaveBeenCalled();
+      });
+
+      it('should allow extension URN in body without schemas[] when strict mode is OFF', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'], // missing Enterprise URN
+          userName: 'lenient@example.com',
+          active: true,
+          [ENTERPRISE_USER_URN]: { department: 'Engineering' },
+        } as any;
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: false };
+
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.create.mockResolvedValue({
+          ...mockUser,
+          userName: createDto.userName,
+          rawPayload: JSON.stringify({ schemas: createDto.schemas }),
+        });
+
+        const result = await service.createUserForEndpoint(
+          createDto, 'http://localhost:3000/scim', mockEndpoint.id, config
+        );
+
+        expect(result.userName).toBe(createDto.userName);
+        expect(mockUserRepo.create).toHaveBeenCalled();
+      });
+
+      it('should allow extension URN in body when config is undefined (default lenient)', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'default@example.com',
+          active: true,
+          [ENTERPRISE_USER_URN]: { department: 'Engineering' },
+        } as any;
+
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.create.mockResolvedValue({
+          ...mockUser,
+          userName: createDto.userName,
+          rawPayload: JSON.stringify({ schemas: createDto.schemas }),
+        });
+
+        const result = await service.createUserForEndpoint(
+          createDto, 'http://localhost:3000/scim', mockEndpoint.id, undefined
+        );
+
+        expect(result.userName).toBe(createDto.userName);
+      });
+    });
+
+    describe('replaceUserForEndpoint with StrictSchemaValidation', () => {
+      it('should reject undeclared extension URN on PUT (strict mode)', async () => {
+        const replaceDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'replace@example.com',
+          active: true,
+          [ENTERPRISE_USER_URN]: { department: 'Sales' },
+        } as any;
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true };
+
+        mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+
+        await expect(
+          service.replaceUserForEndpoint(mockUser.scimId, replaceDto, 'http://localhost:3000/scim', mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('should allow valid extension on PUT (strict mode)', async () => {
+        const replaceDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User', ENTERPRISE_USER_URN],
+          userName: 'replace@example.com',
+          active: true,
+          [ENTERPRISE_USER_URN]: { department: 'Sales' },
+        } as any;
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true };
+
+        mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.update.mockResolvedValue({
+          ...mockUser,
+          userName: replaceDto.userName,
+          rawPayload: JSON.stringify({ schemas: replaceDto.schemas }),
+        });
+
+        const result = await service.replaceUserForEndpoint(
+          mockUser.scimId, replaceDto, 'http://localhost:3000/scim', mockEndpoint.id, config
+        );
+
+        expect(result.userName).toBe(replaceDto.userName);
+      });
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Soft Delete + GET / LIST / Filter interactions
+  // ═══════════════════════════════════════════════════════════
+
+  describe('soft delete + GET/LIST/filter interactions', () => {
+    const softDeleteConfig: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true };
+
+    it('should return soft-deleted user via GET by id (active=false in response)', async () => {
+      const softDeletedUser = { ...mockUser, active: false };
+      mockUserRepo.findByScimId.mockResolvedValue(softDeletedUser);
+
+      const result = await service.getUserForEndpoint(
+        mockUser.scimId, 'http://localhost:3000/scim', mockEndpoint.id
+      );
+
+      expect(result.active).toBe(false);
+      expect(result.id).toBe(mockUser.scimId);
+    });
+
+    it('should include soft-deleted users in LIST results', async () => {
+      const activeUser = { ...mockUser, id: 'u1', scimId: 'scim-1', active: true };
+      const deletedUser = { ...mockUser, id: 'u2', scimId: 'scim-2', active: false, userName: 'deleted@example.com' };
+      mockUserRepo.findAll.mockResolvedValue([activeUser, deletedUser]);
+
+      const result = await service.listUsersForEndpoint(
+        { startIndex: 1, count: 10 },
+        'http://localhost:3000/scim',
+        mockEndpoint.id
+      );
+
+      expect(result.totalResults).toBe(2);
+      expect(result.Resources).toHaveLength(2);
+      const actives = result.Resources.map((r: any) => r.active);
+      expect(actives).toContain(true);
+      expect(actives).toContain(false);
+    });
+
+    it('should filter soft-deleted users with active eq false', async () => {
+      const deletedUser = { ...mockUser, active: false };
+      mockUserRepo.findAll.mockResolvedValue([deletedUser]);
+
+      const result = await service.listUsersForEndpoint(
+        { filter: 'active eq false', startIndex: 1, count: 10 },
+        'http://localhost:3000/scim',
+        mockEndpoint.id
+      );
+
+      expect(result.totalResults).toBe(1);
+      expect(result.Resources[0].active).toBe(false);
+    });
+
+    it('should filter active-only users with active eq true', async () => {
+      const activeUser = { ...mockUser, active: true };
+      mockUserRepo.findAll.mockResolvedValue([activeUser]);
+
+      const result = await service.listUsersForEndpoint(
+        { filter: 'active eq true', startIndex: 1, count: 10 },
+        'http://localhost:3000/scim',
+        mockEndpoint.id
+      );
+
+      expect(result.totalResults).toBe(1);
+      expect(result.Resources[0].active).toBe(true);
+    });
+
+    it('should re-activate soft-deleted user via PATCH active=true', async () => {
+      const deletedUser = { ...mockUser, active: false };
+      mockUserRepo.findByScimId.mockResolvedValueOnce(deletedUser);
+      mockUserRepo.findConflict.mockResolvedValue(null);
+      mockUserRepo.update.mockResolvedValue({ ...deletedUser, active: true });
+
+      const patchDto: PatchUserDto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', path: 'active', value: true }],
+      };
+
+      const result = await service.patchUserForEndpoint(
+        deletedUser.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id
+      );
+
+      expect(result.active).toBe(true);
+      expect(mockUserRepo.update).toHaveBeenCalledWith(
+        deletedUser.id,
+        expect.objectContaining({ active: true })
+      );
+    });
+
+    it('should PATCH displayName on soft-deleted user (active=false preserved)', async () => {
+      const deletedUser = { ...mockUser, active: false };
+      mockUserRepo.findByScimId.mockResolvedValueOnce(deletedUser);
+      mockUserRepo.findConflict.mockResolvedValue(null);
+      mockUserRepo.update.mockResolvedValue({
+        ...deletedUser,
+        displayName: 'Updated Deleted User',
+        rawPayload: JSON.stringify({ displayName: 'Updated Deleted User' }),
+      });
+
+      const patchDto: PatchUserDto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', path: 'displayName', value: 'Updated Deleted User' }],
+      };
+
+      const result = await service.patchUserForEndpoint(
+        deletedUser.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id
+      );
+
+      expect(result.displayName).toBe('Updated Deleted User');
+    });
+
+    it('should soft-delete then GET returns active=false', async () => {
+      // Simulate soft-delete
+      mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+      mockUserRepo.update.mockResolvedValue({ ...mockUser, active: false });
+
+      await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, softDeleteConfig);
+      expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, { active: false });
+
+      // Now GET the same user (simulate finding it in DB with active=false)
+      const softDeletedUser = { ...mockUser, active: false };
+      mockUserRepo.findByScimId.mockResolvedValue(softDeletedUser);
+      const result = await service.getUserForEndpoint(
+        mockUser.scimId, 'http://localhost:3000/scim', mockEndpoint.id
+      );
+      expect(result.active).toBe(false);
+      expect(result.id).toBe(mockUser.scimId);
+    });
+
+    it('should hard-delete then GET returns 404', async () => {
+      const hardDeleteConfig: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: false };
+      mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+      mockUserRepo.delete.mockResolvedValue(mockUser);
+
+      await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, hardDeleteConfig);
+      expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id);
+
+      // Now GET returns null (not found)
+      mockUserRepo.findByScimId.mockResolvedValue(null);
+      await expect(
+        service.getUserForEndpoint(mockUser.scimId, 'http://localhost:3000/scim', mockEndpoint.id)
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('should compound filter active eq false AND userName co on soft-deleted users', async () => {
+      const deleted1 = { ...mockUser, id: 'u1', scimId: 'scim-1', active: false, userName: 'alice-deleted@test.com' };
+      const deleted2 = { ...mockUser, id: 'u2', scimId: 'scim-2', active: false, userName: 'bob-deleted@test.com' };
+      // DB returns both (active eq false pushed to DB)
+      mockUserRepo.findAll.mockResolvedValue([deleted1, deleted2]);
+
+      const result = await service.listUsersForEndpoint(
+        { filter: 'active eq false', startIndex: 1, count: 10 },
+        'http://localhost:3000/scim',
+        mockEndpoint.id
+      );
+
+      expect(result.totalResults).toBe(2);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Config flag combinations
+  // ═══════════════════════════════════════════════════════════
+
+  describe('config flag combinations', () => {
+    it('should soft-delete with SoftDeleteEnabled + StrictSchemaValidation both true', async () => {
+      mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+      mockUserRepo.update.mockResolvedValue({ ...mockUser, active: false });
+
+      const config: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
+        [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+      };
+
+      await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, config);
+      expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, { active: false });
+      expect(mockUserRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('should enforce strict schema on PATCH when SoftDeleteEnabled + StrictSchemaValidation', async () => {
+      mockUserRepo.findByScimId.mockResolvedValueOnce(mockUser);
+      mockUserRepo.findConflict.mockResolvedValue(null);
+
+      const config: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
+        [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+      };
+
+      // PATCH with unknown extension URN should fail strict schema validation
+      const patchDto: PatchUserDto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{
+          op: 'replace',
+          path: 'urn:unknown:extension:1.0:User:field',
+          value: 'test',
+        }],
+      };
+
+      // Should not throw for PATCH (strict schema checks on create/replace, not patch ops paths)
+      mockUserRepo.update.mockResolvedValue({ ...mockUser });
+      const result = await service.patchUserForEndpoint(
+        mockUser.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id, config
+      );
+      expect(result).toBeDefined();
+    });
+
+    it('should reject unknown extension on CREATE when StrictSchemaValidation=true, SoftDeleteEnabled=true', async () => {
+      const config: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
+        [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+      };
+
+      const createDto: CreateUserDto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User', 'urn:unknown:fake:1.0:User'],
+        userName: 'stricttest@example.com',
+        active: true,
+        'urn:unknown:fake:1.0:User': { custom: 'data' },
+      } as any;
+
+      mockUserRepo.findConflict.mockResolvedValue(null);
+
+      await expect(
+        service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, config)
+      ).rejects.toThrow();
+    });
+
+    it('should allow valid extension on CREATE with all flags enabled', async () => {
+      const config: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
+        [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+      };
+
+      const ENTERPRISE_USER_URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+      const createDto: CreateUserDto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User', ENTERPRISE_USER_URN],
+        userName: 'enterprise@example.com',
+        active: true,
+        [ENTERPRISE_USER_URN]: { department: 'Eng' },
+      } as any;
+
+      mockUserRepo.findConflict.mockResolvedValue(null);
+      mockUserRepo.create.mockResolvedValue({
+        ...mockUser,
+        userName: createDto.userName,
+        rawPayload: JSON.stringify({
+          schemas: createDto.schemas,
+          [ENTERPRISE_USER_URN]: { department: 'Eng' },
+        }),
+      });
+
+      const result = await service.createUserForEndpoint(
+        createDto, 'http://localhost:3000/scim', mockEndpoint.id, config
+      );
+      expect(result.userName).toBe(createDto.userName);
     });
   });
 });

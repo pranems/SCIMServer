@@ -2,6 +2,10 @@ import { Injectable, BadRequestException, Inject, Logger, type OnModuleInit, Opt
 import {
   SCIM_CORE_USER_SCHEMA,
   SCIM_CORE_GROUP_SCHEMA,
+  MSFTTEST_CUSTOM_USER_SCHEMA,
+  MSFTTEST_CUSTOM_GROUP_SCHEMA,
+  MSFTTEST_IETF_USER_SCHEMA,
+  MSFTTEST_IETF_GROUP_SCHEMA,
 } from '../common/scim-constants';
 import {
   SCIM_USER_SCHEMA_DEFINITION,
@@ -207,6 +211,48 @@ export class ScimSchemaRegistry implements OnModuleInit {
     // Track built-in extension URNs
     for (const ext of userRT.schemaExtensions) {
       this.getOrCreateExtensionSet('User').add(ext.schema);
+    }
+
+    // ─── Microsoft Test (msfttest) extension schemas ──────────────────────
+    // These are used by the SCIM Validator and Microsoft Entra test harness.
+    // Registered globally so every endpoint can accept them by default.
+    const msfttestSchemas: { urn: string; name: string; resourceType: 'User' | 'Group' }[] = [
+      { urn: MSFTTEST_CUSTOM_USER_SCHEMA,  name: 'MsftTest Custom User Extension',  resourceType: 'User' },
+      { urn: MSFTTEST_CUSTOM_GROUP_SCHEMA, name: 'MsftTest Custom Group Extension', resourceType: 'Group' },
+      { urn: MSFTTEST_IETF_USER_SCHEMA,    name: 'MsftTest IETF User Extension',    resourceType: 'User' },
+      { urn: MSFTTEST_IETF_GROUP_SCHEMA,   name: 'MsftTest IETF Group Extension',   resourceType: 'Group' },
+    ];
+
+    for (const ext of msfttestSchemas) {
+      const definition: ScimSchemaDefinition = {
+        id: ext.urn,
+        name: ext.name,
+        description: `Built-in extension schema for ${ext.name}`,
+        attributes: [
+          {
+            name: 'name',
+            type: 'string',
+            multiValued: false,
+            required: false,
+            description: 'Extension attribute (name)',
+            mutability: 'readWrite',
+            returned: 'default',
+          },
+        ],
+        meta: {
+          resourceType: 'Schema',
+          location: `/Schemas/${ext.urn}`,
+        },
+      };
+
+      this.schemas.set(definition.id, definition);
+      this.getOrCreateExtensionSet(ext.resourceType).add(ext.urn);
+
+      // Add to the resource type's schemaExtensions so /ResourceTypes reports them
+      const rt = this.resourceTypes.get(ext.resourceType);
+      if (rt) {
+        rt.schemaExtensions.push({ schema: ext.urn, required: false });
+      }
     }
   }
 

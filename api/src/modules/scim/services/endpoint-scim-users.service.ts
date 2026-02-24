@@ -45,8 +45,9 @@ export class EndpointScimUsersService {
     private readonly schemaRegistry: ScimSchemaRegistry,
   ) {}
 
-  async createUserForEndpoint(dto: CreateUserDto, baseUrl: string, endpointId: string): Promise<ScimUserResource> {
+  async createUserForEndpoint(dto: CreateUserDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimUserResource> {
     this.ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
+    this.enforceStrictSchemaValidation(dto, endpointId, config);
 
     this.logger.info(LogCategory.SCIM_USER, 'Creating user', { userName: dto.userName, endpointId });
     this.logger.trace(LogCategory.SCIM_USER, 'Create user payload', { body: dto as unknown as Record<string, unknown> });
@@ -174,9 +175,11 @@ export class EndpointScimUsersService {
     scimId: string,
     dto: CreateUserDto,
     baseUrl: string,
-    endpointId: string
+    endpointId: string,
+    config?: EndpointConfig
   ): Promise<ScimUserResource> {
     this.ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
+    this.enforceStrictSchemaValidation(dto, endpointId, config);
 
     this.logger.info(LogCategory.SCIM_USER, 'Replace user (PUT)', { scimId, userName: dto.userName, endpointId });
 
@@ -209,7 +212,7 @@ export class EndpointScimUsersService {
     return this.toScimUserResource(updatedUser, baseUrl, endpointId);
   }
 
-  async deleteUserForEndpoint(scimId: string, endpointId: string): Promise<void> {
+  async deleteUserForEndpoint(scimId: string, endpointId: string, config?: EndpointConfig): Promise<void> {
     this.logger.info(LogCategory.SCIM_USER, 'Delete user', { scimId, endpointId });
     const user = await this.userRepo.findByScimId(endpointId, scimId);
 
@@ -218,8 +221,16 @@ export class EndpointScimUsersService {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
-    await this.userRepo.delete(user.id);
-    this.logger.info(LogCategory.SCIM_USER, 'User deleted', { scimId, endpointId });
+    const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
+
+    if (softDelete) {
+      this.logger.info(LogCategory.SCIM_USER, 'Soft-deleting user (setting active=false)', { scimId, endpointId });
+      await this.userRepo.update(user.id, { active: false });
+      this.logger.info(LogCategory.SCIM_USER, 'User soft-deleted', { scimId, endpointId });
+    } else {
+      await this.userRepo.delete(user.id);
+      this.logger.info(LogCategory.SCIM_USER, 'User hard-deleted', { scimId, endpointId });
+    }
   }
 
   // ===== Private Helper Methods =====
@@ -232,6 +243,54 @@ export class EndpointScimUsersService {
         scimType: 'invalidSyntax',
         detail: `Missing required schema '${requiredSchema}'.`
       });
+    }
+  }
+
+  /**
+   * Strict Schema Validation — when StrictSchemaValidation is enabled, reject
+   * any request body that contains extension URN keys not listed in the
+   * request's `schemas[]` array or not registered in the schema registry.
+   *
+   * RFC 7643 §3.1: "The 'schemas' attribute is a REQUIRED attribute and is an
+   * array of Strings containing URIs that are used to indicate the namespaces
+   * of the SCIM schemas."
+   */
+  private enforceStrictSchemaValidation(
+    dto: Record<string, unknown>,
+    endpointId: string,
+    config?: EndpointConfig
+  ): void {
+    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
+      return;
+    }
+
+    const declaredSchemas = (dto.schemas as string[] | undefined) ?? [];
+    const declaredLower = new Set(declaredSchemas.map(s => s.toLowerCase()));
+    const registeredUrns = this.schemaRegistry.getExtensionUrns(endpointId);
+    const registeredLower = new Set(registeredUrns.map(u => u.toLowerCase()));
+
+    // Find any top-level key that looks like an extension URN
+    for (const key of Object.keys(dto)) {
+      if (key.startsWith('urn:')) {
+        const keyLower = key.toLowerCase();
+        // Must be both declared in schemas[] AND registered in the registry
+        if (!declaredLower.has(keyLower)) {
+          throw createScimError({
+            status: 400,
+            scimType: 'invalidSyntax',
+            detail: `Extension URN "${key}" found in request body but not declared in schemas[]. ` +
+              `When StrictSchemaValidation is enabled, all extension URNs must be listed in the schemas array.`,
+          });
+        }
+        if (!registeredLower.has(keyLower)) {
+          throw createScimError({
+            status: 400,
+            scimType: 'invalidValue',
+            detail: `Extension URN "${key}" is not a registered extension schema for this endpoint. ` +
+              `Registered extensions: [${registeredUrns.join(', ')}].`,
+          });
+        }
+      }
     }
   }
 

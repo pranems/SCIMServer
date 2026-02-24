@@ -2,7 +2,7 @@
 
 > RFC compliance status and Microsoft Entra ID provisioning compatibility for SCIMServer.
 
-**Last Updated:** February 13, 2026
+**Last Updated:** February 23, 2026
 
 ---
 
@@ -23,7 +23,17 @@
 | Sorting (RFC 7644 §3.4.2.3) | **0%** | Not implemented (correctly listed as unsupported) |
 | Bulk Operations (RFC 7644 §3.7) | **0%** | Not implemented (correctly listed as unsupported) |
 
-**Overall: ~95% RFC 7643/7644 compliant** (remaining gaps: Bulk, Sorting — both optional per spec). All 24 Microsoft SCIM Validator tests pass + 7 preview tests pass. 862 unit tests (28 suites), 193 e2e tests (15 suites), 302 live integration tests (301 pass, 1 known failure) — all passing.
+**Overall: ~95% RFC 7643/7644 compliant** (remaining gaps: Bulk, Sorting — both optional per spec). All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. 1374 unit tests (52 suites), 251 e2e tests (17 suites), 318 live integration tests (318 pass, 0 known failures) — all passing.
+
+### New in v0.15.0
+
+| Feature | Description |
+|---------|-------------|
+| `SoftDeleteEnabled` config flag | Soft delete (set `active=false`) instead of physical row deletion on DELETE |
+| `StrictSchemaValidation` config flag | Reject extension URNs not declared in `schemas[]` or not registered |
+| Custom Extension URNs (msfttest) | 4 msfttest extension schemas registered globally (2 User + 2 Group) |
+| Dynamic `schemas[]` on Groups | Group responses include extension URNs from `rawPayload` |
+| 7 built-in schemas | User, EnterpriseUser, Group + 4 msfttest extensions (was 3) |
 
 ---
 
@@ -48,7 +58,7 @@
 | POST (Search) | `/Users/.search`, `/Groups/.search` | ✅ 200 + ListResponse |
 | PUT (Replace) | `/Users/{id}`, `/Groups/{id}` | ✅ Full resource replacement |
 | PATCH (Update) | `/Users/{id}`, `/Groups/{id}` | ✅ PatchOp with add/replace/remove |
-| DELETE | `/Users/{id}`, `/Groups/{id}` | ✅ 204 No Content |
+| DELETE | `/Users/{id}`, `/Groups/{id}` | ✅ 204 No Content (supports `SoftDeleteEnabled` for soft delete) |
 
 ## PATCH Operations (RFC 7644 §3.5.2)
 

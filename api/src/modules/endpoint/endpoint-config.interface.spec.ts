@@ -21,6 +21,8 @@ describe('endpoint-config.interface', () => {
       );
       expect(ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED).toBe('VerbosePatchSupported');
       expect(ENDPOINT_CONFIG_FLAGS.LOG_LEVEL).toBe('logLevel');
+      expect(ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED).toBe('SoftDeleteEnabled');
+      expect(ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION).toBe('StrictSchemaValidation');
     });
   });
 
@@ -708,6 +710,184 @@ describe('endpoint-config.interface', () => {
       expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP]).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS]).toBe(true);
       expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED]).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]).toBe(false);
+    });
+  });
+
+  describe('SoftDeleteEnabled validation', () => {
+    it('should accept boolean true', () => {
+      expect(() => validateEndpointConfig({ SoftDeleteEnabled: true })).not.toThrow();
+    });
+
+    it('should accept boolean false', () => {
+      expect(() => validateEndpointConfig({ SoftDeleteEnabled: false })).not.toThrow();
+    });
+
+    it('should accept string "True"', () => {
+      expect(() => validateEndpointConfig({ SoftDeleteEnabled: 'True' })).not.toThrow();
+    });
+
+    it('should accept string "true"', () => {
+      expect(() => validateEndpointConfig({ SoftDeleteEnabled: 'true' })).not.toThrow();
+    });
+
+    it('should accept string "False"', () => {
+      expect(() => validateEndpointConfig({ SoftDeleteEnabled: 'False' })).not.toThrow();
+    });
+
+    it('should accept string "false"', () => {
+      expect(() => validateEndpointConfig({ SoftDeleteEnabled: 'false' })).not.toThrow();
+    });
+
+    it('should accept string "1"', () => {
+      expect(() => validateEndpointConfig({ SoftDeleteEnabled: '1' })).not.toThrow();
+    });
+
+    it('should accept string "0"', () => {
+      expect(() => validateEndpointConfig({ SoftDeleteEnabled: '0' })).not.toThrow();
+    });
+
+    it('should throw for invalid string "Yes"', () => {
+      expect(() => validateEndpointConfig({ SoftDeleteEnabled: 'Yes' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for invalid string "No"', () => {
+      expect(() => validateEndpointConfig({ SoftDeleteEnabled: 'No' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for number value', () => {
+      expect(() => validateEndpointConfig({ SoftDeleteEnabled: 123 })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for object value', () => {
+      expect(() => validateEndpointConfig({ SoftDeleteEnabled: { enabled: true } })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for array value', () => {
+      expect(() => validateEndpointConfig({ SoftDeleteEnabled: ['true'] })).toThrow(/Invalid type/);
+    });
+
+    it('should include flag name in error message', () => {
+      try {
+        validateEndpointConfig({ SoftDeleteEnabled: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('SoftDeleteEnabled');
+      }
+    });
+
+    it('should include allowed values in error message', () => {
+      try {
+        validateEndpointConfig({ SoftDeleteEnabled: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('Allowed values');
+      }
+    });
+  });
+
+  describe('StrictSchemaValidation validation', () => {
+    it('should accept boolean true', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: true })).not.toThrow();
+    });
+
+    it('should accept boolean false', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: false })).not.toThrow();
+    });
+
+    it('should accept string "True"', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: 'True' })).not.toThrow();
+    });
+
+    it('should accept string "true"', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: 'true' })).not.toThrow();
+    });
+
+    it('should accept string "False"', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: 'False' })).not.toThrow();
+    });
+
+    it('should accept string "false"', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: 'false' })).not.toThrow();
+    });
+
+    it('should accept string "1"', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: '1' })).not.toThrow();
+    });
+
+    it('should accept string "0"', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: '0' })).not.toThrow();
+    });
+
+    it('should throw for invalid string "Yes"', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: 'Yes' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for invalid string "No"', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: 'No' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for number value', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: 123 })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for object value', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: { enabled: true } })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for array value', () => {
+      expect(() => validateEndpointConfig({ StrictSchemaValidation: ['true'] })).toThrow(/Invalid type/);
+    });
+
+    it('should include flag name in error message', () => {
+      try {
+        validateEndpointConfig({ StrictSchemaValidation: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('StrictSchemaValidation');
+      }
+    });
+
+    it('should include allowed values in error message', () => {
+      try {
+        validateEndpointConfig({ StrictSchemaValidation: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('Allowed values');
+      }
+    });
+  });
+
+  describe('All new flags together', () => {
+    it('should accept all new flags set to valid values', () => {
+      expect(() =>
+        validateEndpointConfig({
+          SoftDeleteEnabled: 'True',
+          StrictSchemaValidation: 'False',
+          MultiOpPatchRequestAddMultipleMembersToGroup: true,
+          VerbosePatchSupported: false,
+          logLevel: 'DEBUG',
+        })
+      ).not.toThrow();
+    });
+
+    it('should reject if SoftDeleteEnabled is invalid even if others are valid', () => {
+      expect(() =>
+        validateEndpointConfig({
+          SoftDeleteEnabled: 'invalid',
+          StrictSchemaValidation: 'True',
+        })
+      ).toThrow(/SoftDeleteEnabled/);
+    });
+
+    it('should reject if StrictSchemaValidation is invalid even if others are valid', () => {
+      expect(() =>
+        validateEndpointConfig({
+          SoftDeleteEnabled: 'True',
+          StrictSchemaValidation: 'invalid',
+        })
+      ).toThrow(/StrictSchemaValidation/);
     });
   });
 });

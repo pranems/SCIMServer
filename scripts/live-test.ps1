@@ -1,4 +1,4 @@
-# Live Test Script for All Endpoint Flows
+﻿# Live Test Script for All Endpoint Flows
 # This script tests endpoint CRUD, SCIM operations, config validation, and isolation
 #
 # Usage:
@@ -133,7 +133,7 @@ function Add-FlowStep {
 
 # Override built-in cmdlets to inject verbose logging transparently.
 # All 138+ existing Invoke-RestMethod/Invoke-WebRequest calls get verbose
-# output automatically — no changes needed at call sites.
+# output automatically -- no changes needed at call sites.
 # Originals are called via module-qualified names.
 
 function Invoke-RestMethod {
@@ -260,7 +260,7 @@ function Test-Result {
 }
 
 if ($VerboseMode) {
-    Write-Host "🔍 VERBOSE MODE ENABLED — request/response details will be shown" -ForegroundColor Magenta
+    Write-Host "🔍 VERBOSE MODE ENABLED -- request/response details will be shown" -ForegroundColor Magenta
     Write-Host ""
 }
 
@@ -510,7 +510,7 @@ $reactivateBody = @{
 Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PATCH -Headers $headers -Body $reactivateBody | Out-Null
 
 # ============================================
-# TEST SECTION 3b: CASE-INSENSITIVITY (RFC 7643 §2.1)
+# TEST SECTION 3b: CASE-INSENSITIVITY (RFC 7643 S2.1)
 $script:currentSection = "3b: Case-Insensitivity"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
@@ -668,8 +668,8 @@ $extReplaceResult = Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PAT
 $enterpriseExt2 = $extReplaceResult.'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'
 Test-Result -Success ($enterpriseExt2.department -eq "Product") -Message "PATCH with extension URN replace updates department"
 
-# Test: Manager empty-value removal (RFC 7644 §3.5.2.3)
-Write-Host "`n--- Test: Manager Empty-Value Removal (RFC 7644 §3.5.2.3) ---" -ForegroundColor Cyan
+# Test: Manager empty-value removal (RFC 7644 S3.5.2.3)
+Write-Host "`n--- Test: Manager Empty-Value Removal (RFC 7644 S3.5.2.3) ---" -ForegroundColor Cyan
 $setManagerBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
     Operations = @(@{
@@ -694,7 +694,7 @@ $removeManagerBody = @{
 $managerRemovedResult = Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PATCH -Headers $headers -Body $removeManagerBody
 $managerExtAfter = $managerRemovedResult.'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'
 $managerGone = ($null -eq $managerExtAfter) -or ($null -eq $managerExtAfter.manager)
-Test-Result -Success $managerGone -Message "Manager removed when value is empty string (RFC 7644 §3.5.2.3)"
+Test-Result -Success $managerGone -Message "Manager removed when value is empty string (RFC 7644 S3.5.2.3)"
 
 # Test: Multiple operations in single PATCH request
 Write-Host "`n--- Test: Multiple Operations in Single PATCH ---" -ForegroundColor Cyan
@@ -789,7 +789,7 @@ Write-Host "`n`n========================================" -ForegroundColor Yello
 Write-Host "TEST SECTION 3e: SCIM ID LEAK PREVENTION (Issue 16)" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
 
-# Test: POST with client-supplied id — server must ignore it
+# Test: POST with client-supplied id -- server must ignore it
 Write-Host "`n--- Test: POST with Client-Supplied id (Must Be Ignored) ---" -ForegroundColor Cyan
 $clientSuppId = "a1b2c3d4-e5f6-7890-abcd-1234567890ab"
 $idLeakBody = @{
@@ -821,7 +821,7 @@ try {
     Test-Result -Success ($code -eq 404) -Message "GET by client-supplied id returns 404 (server ignores client id)"
 }
 
-# Test: PATCH with id in no-path value — must not override scimId
+# Test: PATCH with id in no-path value -- must not override scimId
 Write-Host "`n--- Test: PATCH with id in No-Path Value (Must Not Override) ---" -ForegroundColor Cyan
 $patchIdBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
@@ -839,7 +839,7 @@ Test-Result -Success ($patchedIdUser.id -ne "attacker-id-in-patch") -Message "PA
 Test-Result -Success ($patchedIdUser.displayName -eq "Patched ID Leak") -Message "PATCH displayName applied despite id in value"
 Test-Result -Success ($patchedIdUser.meta.location -like "*Users/$serverAssignedId") -Message "meta.location unchanged after PATCH with id injection"
 
-# Test: PUT with client-supplied id — must not override scimId
+# Test: PUT with client-supplied id -- must not override scimId
 Write-Host "`n--- Test: PUT with Client-Supplied id (Must Be Ignored) ---" -ForegroundColor Cyan
 $putIdBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
@@ -896,7 +896,7 @@ $addMemberBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
     Operations = @(@{ op = "add"; path = "members"; value = @(@{ value = $UserId }) })
 } | ConvertTo-Json -Depth 5
-# Group PATCH returns response body (v0.8.16 fix — RFC 7644 §3.5.2)
+# Group PATCH returns response body (v0.8.16 fix -- RFC 7644 S3.5.2)
 $groupPatchResult = Invoke-RestMethod -Uri "$scimBase/Groups/$GroupId" -Method PATCH -Headers $headers -Body $addMemberBody
 Test-Result -Success ($null -ne $groupPatchResult.id) -Message "Group PATCH returns response body (not 204)"
 $memberCount = if ($groupPatchResult.members) { @($groupPatchResult.members).Count } else { 0 }
@@ -908,7 +908,7 @@ $removeMemberBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
     Operations = @(@{ op = "remove"; path = "members[value eq `"$UserId`"]" })
 } | ConvertTo-Json -Depth 5
-# Group PATCH returns response body (v0.8.16 fix — RFC 7644 §3.5.2)
+# Group PATCH returns response body (v0.8.16 fix -- RFC 7644 S3.5.2)
 $groupRemoveResult = Invoke-RestMethod -Uri "$scimBase/Groups/$GroupId" -Method PATCH -Headers $headers -Body $removeMemberBody
 Test-Result -Success ($null -ne $groupRemoveResult.id) -Message "Group PATCH remove returns response body"
 $memberCountAfterRemove = if ($groupRemoveResult.members) { @($groupRemoveResult.members).Count } else { 0 }
@@ -937,7 +937,7 @@ Test-Result -Success ($extGroup.externalId -eq "ext-group-123") -Message "Group 
 $filteredGroups = Invoke-RestMethod -Uri "$scimBase/Groups?filter=externalId eq `"ext-group-123`"" -Method GET -Headers $headers
 Test-Result -Success ($filteredGroups.totalResults -eq 1) -Message "Filter groups by externalId returns exactly 1 group"
 
-# Test: Filter groups by externalId with DIFFERENT CASE (CITEXT case-insensitive — SCIM Validator)
+# Test: Filter groups by externalId with DIFFERENT CASE (CITEXT case-insensitive -- SCIM Validator)
 Write-Host "`n--- Test: Group externalId Case-Insensitive Filter (SCIM Validator) ---" -ForegroundColor Cyan
 $extIdFilterCIGroup = Invoke-RestMethod -Uri "$scimBase/Groups?filter=externalId eq `"EXT-GROUP-123`"" -Method GET -Headers $headers
 Test-Result -Success ($extIdFilterCIGroup.totalResults -eq 1) -Message "Filter group with UPPERCASE externalId finds group (CITEXT)"
@@ -983,7 +983,7 @@ try {
 $dupExtGroupBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
     displayName = "Dup ExternalId Group"
-    externalId = "ext-group-123"
+    externalId = "updated-ext-789"
 } | ConvertTo-Json
 try {
     Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $dupExtGroupBody | Out-Null
@@ -1157,7 +1157,7 @@ $multiMemberPatch = @{
 } | ConvertTo-Json -Depth 5
 
 try {
-    # Group PATCH returns response body (v0.8.16 fix — RFC 7644 §3.5.2)
+    # Group PATCH returns response body (v0.8.16 fix -- RFC 7644 S3.5.2)
     $multiGroupResult = Invoke-RestMethod -Uri "$scimBase/Groups/$MultiGroupId" -Method PATCH -Headers $headers -Body $multiMemberPatch
     $multiMemberCount = if ($multiGroupResult.members) { @($multiGroupResult.members).Count } else { 0 }
     Test-Result -Success ($multiMemberCount -ge 1) -Message "Multi-member PATCH with flag=True accepted ($multiMemberCount members added)"
@@ -1612,7 +1612,7 @@ try {
     Test-Result -Success ($code -eq 404) -Message "DELETE non-existent group returns 404"
 }
 
-# Test: DELETE idempotent — second delete returns 404
+# Test: DELETE idempotent -- second delete returns 404
 Write-Host "`n--- Test: DELETE Idempotent (Second Delete → 404) ---" -ForegroundColor Cyan
 $idempDelGroupBody = @{schemas=@("urn:ietf:params:scim:schemas:core:2.0:Group");displayName="Idempotent Delete Test"} | ConvertTo-Json
 $idempDelGroup = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $idempDelGroupBody
@@ -1622,10 +1622,10 @@ try {
     Test-Result -Success $false -Message "Second DELETE should return 404"
 } catch {
     $code = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($code -eq 404) -Message "DELETE idempotent — second delete returns 404"
+    Test-Result -Success ($code -eq 404) -Message "DELETE idempotent -- second delete returns 404"
 }
 
-# Test: Non-UUID ID returns 404 (not 500) — UUID guard validation
+# Test: Non-UUID ID returns 404 (not 500) -- UUID guard validation
 Write-Host "`n--- Test: Non-UUID ID Returns 404 (UUID Guard) ---" -ForegroundColor Cyan
 try {
     Invoke-RestMethod -Uri "$scimBase/Users/not-a-uuid" -Method GET -Headers $headers | Out-Null
@@ -1642,7 +1642,7 @@ try {
     Test-Result -Success ($code -eq 404) -Message "Non-UUID group ID returns 404 (not 500)"
 }
 
-# (Duplicate userName 409 already covered in Section 3b — case-insensitive uniqueness)
+# (Duplicate userName 409 already covered in Section 3b -- case-insensitive uniqueness)
 
 # Test: 400 for invalid endpoint name
 Write-Host "`n--- Test: 400 for Invalid Endpoint Name ---" -ForegroundColor Cyan
@@ -1663,8 +1663,8 @@ Write-Host "`n`n========================================" -ForegroundColor Yello
 Write-Host "TEST SECTION 9b: RFC 7644 COMPLIANCE CHECKS" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
 
-# Test: Location header on POST /Users (RFC 7644 §3.1)
-Write-Host "`n--- Test: Location Header on POST /Users (RFC 7644 §3.1) ---" -ForegroundColor Cyan
+# Test: Location header on POST /Users (RFC 7644 S3.1)
+Write-Host "`n--- Test: Location Header on POST /Users (RFC 7644 S3.1) ---" -ForegroundColor Cyan
 $locUserBody = @{schemas=@("urn:ietf:params:scim:schemas:core:2.0:User");userName="loc-header-test-$(Get-Random)@test.com";active=$true} | ConvertTo-Json
 $locUserRaw = Invoke-WebRequest -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $locUserBody
 $locUserContent = if ($locUserRaw.Content -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($locUserRaw.Content) } else { $locUserRaw.Content }
@@ -1675,8 +1675,8 @@ Test-Result -Success ($locUserRaw.StatusCode -eq 201) -Message "POST /Users retu
 Test-Result -Success ($null -ne $locationValue -and $locationValue.Length -gt 0) -Message "POST /Users includes Location header"
 Test-Result -Success ($locationValue -eq $locUserData.meta.location) -Message "Location header matches meta.location"
 
-# Test: Location header on POST /Groups (RFC 7644 §3.1)
-Write-Host "`n--- Test: Location Header on POST /Groups (RFC 7644 §3.1) ---" -ForegroundColor Cyan
+# Test: Location header on POST /Groups (RFC 7644 S3.1)
+Write-Host "`n--- Test: Location Header on POST /Groups (RFC 7644 S3.1) ---" -ForegroundColor Cyan
 $locGroupBody = @{schemas=@("urn:ietf:params:scim:schemas:core:2.0:Group");displayName="Loc Header Test Group"} | ConvertTo-Json
 $locGroupRaw = Invoke-WebRequest -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $locGroupBody
 $locGroupContent = if ($locGroupRaw.Content -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($locGroupRaw.Content) } else { $locGroupRaw.Content }
@@ -1687,8 +1687,8 @@ Test-Result -Success ($locGroupRaw.StatusCode -eq 201) -Message "POST /Groups re
 Test-Result -Success ($null -ne $groupLocationValue -and $groupLocationValue.Length -gt 0) -Message "POST /Groups includes Location header"
 Test-Result -Success ($groupLocationValue -eq $locGroupData.meta.location) -Message "Location header matches meta.location"
 
-# Test: Error response format (RFC 7644 §3.12)
-Write-Host "`n--- Test: Error Response Format (RFC 7644 §3.12) ---" -ForegroundColor Cyan
+# Test: Error response format (RFC 7644 S3.12)
+Write-Host "`n--- Test: Error Response Format (RFC 7644 S3.12) ---" -ForegroundColor Cyan
 $errorRaw = Invoke-WebRequest -Uri "$scimBase/Users/non-existent-error-format-test" -Method GET -Headers $headers -SkipHttpErrorCheck
 $errorContent = if ($errorRaw.Content -is [byte[]]) { [System.Text.Encoding]::UTF8.GetString($errorRaw.Content) } else { $errorRaw.Content }
 $errorBody = $errorContent | ConvertFrom-Json
@@ -1731,11 +1731,11 @@ $getTsUser = Invoke-RestMethod -Uri "$scimBase/Users/$($timestampUser.id)" -Meth
 Test-Result -Success ($getTsUser.meta.lastModified -eq $patchedTimestamp.meta.lastModified) -Message "GET does not change meta.lastModified"
 
 # ============================================
-# TEST SECTION 9c: POST /.search (RFC 7644 §3.4.3)
+# TEST SECTION 9c: POST /.search (RFC 7644 S3.4.3)
 $script:currentSection = "9c: POST /.search"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
-Write-Host "TEST SECTION 9c: POST /.search (RFC 7644 §3.4.3)" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9c: POST /.search (RFC 7644 S3.4.3)" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
 
 # Test: POST /Users/.search basic
@@ -1826,15 +1826,15 @@ if ($searchGroupExclResult.Resources.Count -gt 0) {
     Test-Result -Success ($null -eq $firstGroupRes.members) -Message "POST /Groups/.search excludedAttributes removes members"
     Test-Result -Success ($null -ne $firstGroupRes.displayName) -Message "POST /Groups/.search excludedAttributes keeps displayName"
 } else {
-    Test-Result -Success $false -Message "POST /Groups/.search excludedAttributes returned empty list (groups were created — this is a bug)"
+    Test-Result -Success $false -Message "POST /Groups/.search excludedAttributes returned empty list (groups were created -- this is a bug)"
 }
 
 # ============================================
-# TEST SECTION 9d: ATTRIBUTE PROJECTION (RFC 7644 §3.4.2.5)
+# TEST SECTION 9d: ATTRIBUTE PROJECTION (RFC 7644 S3.4.2.5)
 $script:currentSection = "9d: Attribute Projection"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
-Write-Host "TEST SECTION 9d: ATTRIBUTE PROJECTION (RFC 7644 §3.4.2.5)" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9d: ATTRIBUTE PROJECTION (RFC 7644 S3.4.2.5)" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
 
 # Test: GET /Users?attributes=userName,displayName
@@ -1883,7 +1883,7 @@ if ($grpAttrResult.Resources.Count -gt 0) {
     Test-Result -Success ($null -ne $firstAttrGroup.id) -Message "GET /Groups attributes always returns id"
     Test-Result -Success ($null -eq $firstAttrGroup.members) -Message "GET /Groups attributes excludes non-requested members"
 } else {
-    Test-Result -Success $false -Message "GET /Groups attributes returned empty list (groups were created — this is a bug)"
+    Test-Result -Success $false -Message "GET /Groups attributes returned empty list (groups were created -- this is a bug)"
 }
 
 # Test: GET /Groups/:id?excludedAttributes=members
@@ -1892,19 +1892,19 @@ $grpExclResult = Invoke-RestMethod -Uri "$scimBase/Groups/$GroupId`?excludedAttr
 Test-Result -Success ($null -ne $grpExclResult.displayName) -Message "GET Group excludedAttributes keeps displayName"
 Test-Result -Success ($null -eq $grpExclResult.members) -Message "GET Group excludedAttributes removes members"
 
-# Test: Precedence — attributes wins over excludedAttributes (RFC 7644 §3.4.2.5)
+# Test: Precedence -- attributes wins over excludedAttributes (RFC 7644 S3.4.2.5)
 Write-Host "`n--- Test: attributes Precedence Over excludedAttributes ---" -ForegroundColor Cyan
 $precedenceResult = Invoke-RestMethod -Uri "$scimBase/Users?attributes=userName,displayName&excludedAttributes=displayName&count=1" -Method GET -Headers $headers
 $firstPrecedence = $precedenceResult.Resources[0]
 Test-Result -Success ($null -ne $firstPrecedence.userName) -Message "Precedence test: attributes includes userName"
-Test-Result -Success ($null -ne $firstPrecedence.displayName) -Message "Precedence test: attributes wins — displayName included despite excludedAttributes"
+Test-Result -Success ($null -ne $firstPrecedence.displayName) -Message "Precedence test: attributes wins -- displayName included despite excludedAttributes"
 
 # ============================================
-# TEST SECTION 9e: ETag & CONDITIONAL REQUESTS (RFC 7644 §3.14)
+# TEST SECTION 9e: ETag & CONDITIONAL REQUESTS (RFC 7644 S3.14)
 $script:currentSection = "9e: ETag & Conditional"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
-Write-Host "TEST SECTION 9e: ETag & CONDITIONAL REQUESTS (RFC 7644 §3.14)" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9e: ETag & CONDITIONAL REQUESTS (RFC 7644 S3.14)" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
 
 # Test: ETag header present on GET /Users/:id
@@ -2134,7 +2134,7 @@ try {
     $emptyOpsUser = Invoke-RestMethod -Uri "$scimBase/Users/$($defUser1.id)" -Method PATCH -Headers $headers -Body $emptyOpsBody
     Test-Result -Success ($null -ne $emptyOpsUser.id) -Message "PATCH with empty Operations array returns resource (no-op)"
 } catch {
-    # Some implementations reject empty ops — either way, it shouldn't crash
+    # Some implementations reject empty ops -- either way, it shouldn't crash
     $code = $_.Exception.Response.StatusCode.value__
     Test-Result -Success ($code -eq 400) -Message "PATCH with empty Operations array returns 400 (strict validation)"
 }
@@ -2245,7 +2245,7 @@ Test-Result -Success $middleGone -Message "Dot-notation 'remove' deletes name.mi
 # Test: Without VerbosePatchSupported, known SCIM complex attribute paths still resolve
 Write-Host "`n--- Test: Known SCIM Complex Attribute Paths Work Without Flag ---" -ForegroundColor Cyan
 # Use main endpoint (no VerbosePatchSupported flag)
-# name.givenName is a standard SCIM complex attribute — the server resolves it to nested
+# name.givenName is a standard SCIM complex attribute -- the server resolves it to nested
 # regardless of VerbosePatchSupported (that flag is for non-standard custom dot-notation)
 $flatDotBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
@@ -2355,9 +2355,9 @@ Test-Result -Success ($limitResult.entries.Count -le 3) -Message "Recent logs re
 $levelFilter = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent?level=ERROR" -Method GET -Headers $headers
 $allError = $true
 if ($null -eq $levelFilter.entries -or $levelFilter.entries.Count -eq 0) {
-    # No ERROR+ entries — still valid (no errors occurred), but note it's vacuous
+    # No ERROR+ entries -- still valid (no errors occurred), but note it's vacuous
     $allError = $true
-    Write-Host "  [INFO] No ERROR-level entries in buffer — level filter is vacuously true" -ForegroundColor Gray
+    Write-Host "  [INFO] No ERROR-level entries in buffer -- level filter is vacuously true" -ForegroundColor Gray
 } else {
     foreach ($entry in $levelFilter.entries) {
         if ($entry.level -notin @("ERROR", "FATAL")) { $allError = $false; break }
@@ -2371,7 +2371,7 @@ $allHttp = $true
 $catCount = 0
 if ($null -ne $catFilter.entries) { $catCount = $catFilter.entries.Count }
 if ($catCount -eq 0) {
-    $allHttp = $false  # Must find http entries — previous requests generate them
+    $allHttp = $false  # Must find http entries -- previous requests generate them
 } else {
     foreach ($entry in $catFilter.entries) {
         if ($entry.category -ne "http") { $allHttp = $false; break }
@@ -2408,7 +2408,7 @@ $allMatchRequestId = $true
 $reqIdCount = 0
 if ($null -ne $byRequestId.entries) { $reqIdCount = $byRequestId.entries.Count }
 if ($reqIdCount -eq 0) {
-    $allMatchRequestId = $false  # We just sent a request with this ID — must find entries
+    $allMatchRequestId = $false  # We just sent a request with this ID -- must find entries
 } else {
     foreach ($entry in $byRequestId.entries) {
         if ($entry.requestId -ne $customRequestId) { $allMatchRequestId = $false; break }
@@ -2462,7 +2462,7 @@ $downloadRequestMatches = $true
 $dlReqCount = 0
 if ($downloadByRequest -is [System.Array]) { $dlReqCount = $downloadByRequest.Count }
 if ($dlReqCount -eq 0) {
-    $downloadRequestMatches = $false  # We sent a request with this ID — must find entries
+    $downloadRequestMatches = $false  # We sent a request with this ID -- must find entries
 } else {
     foreach ($entry in $downloadByRequest) {
         if ($entry.requestId -ne $customRequestId) { $downloadRequestMatches = $false; break }

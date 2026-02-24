@@ -25,10 +25,10 @@ describe('ScimDiscoveryService', () => {
       expect(result.schemas).toEqual([SCIM_LIST_RESPONSE_SCHEMA]);
     });
 
-    it('should include 3 schema definitions (User, EnterpriseUser, Group)', () => {
+    it('should include 7 schema definitions (User, EnterpriseUser, Group + 4 msfttest)', () => {
       const result = service.getSchemas();
-      expect(result.totalResults).toBe(3);
-      expect(result.Resources).toHaveLength(3);
+      expect(result.totalResults).toBe(7);
+      expect(result.Resources).toHaveLength(7);
     });
 
     it('should include Core User schema with correct id', () => {
@@ -125,18 +125,18 @@ describe('ScimDiscoveryService', () => {
       expect(user).toBeDefined();
       expect(user.endpoint).toBe('/Users');
       expect(user.schema).toBe(SCIM_CORE_USER_SCHEMA);
-      expect(user.schemaExtensions).toHaveLength(1);
+      expect(user.schemaExtensions).toHaveLength(3); // Enterprise + 2 msfttest User extensions
       expect(user.schemaExtensions[0].schema).toBe(SCIM_ENTERPRISE_USER_SCHEMA);
       expect(user.schemaExtensions[0].required).toBe(false);
     });
 
-    it('should include Group resource type with no extensions', () => {
+    it('should include Group resource type with msfttest extensions', () => {
       const result = service.getResourceTypes();
       const group = result.Resources.find((r: any) => r.id === 'Group')! as any;
       expect(group).toBeDefined();
       expect(group.endpoint).toBe('/Groups');
       expect(group.schema).toBe(SCIM_CORE_GROUP_SCHEMA);
-      expect(group.schemaExtensions).toHaveLength(0);
+      expect(group.schemaExtensions).toHaveLength(2); // 2 msfttest Group extensions
     });
 
     it('should have meta.resourceType on each resource type', () => {

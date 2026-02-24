@@ -1089,14 +1089,14 @@ Response:
 { "id": "e1e2e3e4-5678-4def-abcd-444455556666", "name": "contoso", ... }
 ```
 
-#### Step 2: Verify Default Discovery (3 schemas)
+#### Step 2: Verify Default Discovery (7 schemas)
 
 ```http
 GET /scim/endpoints/e1e2e3e4-.../Schemas HTTP/1.1
 Authorization: Bearer <token>
 ```
 
-Response: `totalResults: 3` → User, EnterpriseUser, Group
+Response: `totalResults: 7` → User, EnterpriseUser, Group + 4 msfttest extensions
 
 #### Step 3: Register Custom Extension
 
@@ -1132,14 +1132,14 @@ Content-Type: application/json
 
 Response: `201 Created`
 
-#### Step 4: Verify Discovery Now Shows 4 Schemas
+#### Step 4: Verify Discovery Now Shows 8 Schemas
 
 ```http
 GET /scim/endpoints/e1e2e3e4-.../Schemas HTTP/1.1
 Authorization: Bearer <token>
 ```
 
-Response: `totalResults: 4` — includes the custom extension
+Response: `totalResults: 8` — includes the custom extension
 
 #### Step 5: Verify ResourceTypes Shows Merged Extensions
 
@@ -1161,14 +1161,14 @@ Authorization: Bearer <token>
 
 Response: `204 No Content`
 
-#### Step 7: Verify Discovery Reverts to 3 Schemas
+#### Step 7: Verify Discovery Reverts to 7 Schemas
 
 ```http
 GET /scim/endpoints/e1e2e3e4-.../Schemas HTTP/1.1
 Authorization: Bearer <token>
 ```
 
-Response: `totalResults: 3` — custom extension removed
+Response: `totalResults: 7` — custom extension removed
 
 ---
 
@@ -1281,10 +1281,10 @@ sequenceDiagram
     Note over Registry: Stored in endpointOverlays["A"]
 
     EP_A->>Registry: getAllSchemas("A")
-    Registry-->>EP_A: [User, EnterpriseUser, Group, Badge] ← 4 schemas
+    Registry-->>EP_A: [User, EnterpriseUser, Group, 4 msfttest, Badge] ← 8 schemas
 
     EP_B->>Registry: getAllSchemas("B")
-    Registry-->>EP_B: [User, EnterpriseUser, Group] ← 3 schemas only
+    Registry-->>EP_B: [User, EnterpriseUser, Group, 4 msfttest] ← 7 schemas only
 
     Note over EP_A,EP_B: Same URN can be registered on both endpoints independently
 ```

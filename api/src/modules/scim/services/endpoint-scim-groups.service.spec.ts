@@ -5,8 +5,10 @@ import { USER_REPOSITORY, GROUP_REPOSITORY } from '../../../domain/repositories/
 import { ScimMetadataService } from './scim-metadata.service';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { ScimLogger } from '../../logging/scim-logger.service';
+import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import type { CreateGroupDto } from '../dto/create-group.dto';
 import type { PatchGroupDto } from '../dto/patch-group.dto';
+import { ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 
 describe('EndpointScimGroupsService', () => {
   let service: EndpointScimGroupsService;
@@ -81,6 +83,7 @@ describe('EndpointScimGroupsService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EndpointScimGroupsService,
+        ScimSchemaRegistry,
         {
           provide: GROUP_REPOSITORY,
           useValue: mockGroupRepo,
@@ -1032,6 +1035,73 @@ describe('EndpointScimGroupsService', () => {
 
       expect(mockGroupRepo.delete).not.toHaveBeenCalled();
     });
+
+    describe('soft delete', () => {
+      it('should soft-delete group when SoftDeleteEnabled is true (boolean)', async () => {
+        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+        mockGroupRepo.update.mockResolvedValue({ ...mockGroup, active: false });
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true };
+        await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
+
+        expect(mockGroupRepo.update).toHaveBeenCalledWith(mockGroup.id, { active: false });
+        expect(mockGroupRepo.delete).not.toHaveBeenCalled();
+      });
+
+      it('should soft-delete group when SoftDeleteEnabled is "True" (string)', async () => {
+        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+        mockGroupRepo.update.mockResolvedValue({ ...mockGroup, active: false });
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: 'True' };
+        await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
+
+        expect(mockGroupRepo.update).toHaveBeenCalledWith(mockGroup.id, { active: false });
+        expect(mockGroupRepo.delete).not.toHaveBeenCalled();
+      });
+
+      it('should hard-delete group when SoftDeleteEnabled is false', async () => {
+        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+        mockGroupRepo.delete.mockResolvedValue(undefined);
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: false };
+        await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
+
+        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+        expect(mockGroupRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('should hard-delete group when SoftDeleteEnabled is "False" (string)', async () => {
+        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+        mockGroupRepo.delete.mockResolvedValue(undefined);
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: 'False' };
+        await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
+
+        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+        expect(mockGroupRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('should hard-delete group when config is undefined (default)', async () => {
+        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+        mockGroupRepo.delete.mockResolvedValue(undefined);
+
+        await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, undefined);
+
+        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+        expect(mockGroupRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('should hard-delete group when config has no SoftDeleteEnabled key', async () => {
+        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+        mockGroupRepo.delete.mockResolvedValue(undefined);
+
+        const config: EndpointConfig = {};
+        await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
+
+        expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+        expect(mockGroupRepo.update).not.toHaveBeenCalled();
+      });
+    });
   });
 
   describe('endpoint isolation', () => {
@@ -1309,6 +1379,255 @@ describe('EndpointScimGroupsService', () => {
         displayName: 'Renamed',
         externalId: 'ext-via-nopath',
       }), expect.any(Array));
+    });
+  });
+
+  describe('strict schema validation', () => {
+    const ENTERPRISE_USER_URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+
+    describe('createGroupForEndpoint with StrictSchemaValidation', () => {
+      it('should reject extension URN NOT declared in schemas[] (strict mode)', async () => {
+        const createDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Strict Group',
+          [ENTERPRISE_USER_URN]: { department: 'Engineering' },
+        } as any;
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true };
+
+        await expect(
+          service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+
+        expect(mockGroupRepo.create).not.toHaveBeenCalled();
+      });
+
+      it('should allow extension URN when strict mode is OFF', async () => {
+        const createDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Lenient Group',
+          [ENTERPRISE_USER_URN]: { department: 'Engineering' },
+        } as any;
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: false };
+
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.create.mockResolvedValue(mockGroup);
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+          ...mockGroup,
+          displayName: createDto.displayName,
+        });
+
+        const result = await service.createGroupForEndpoint(
+          createDto, 'http://localhost:3000/scim', mockEndpoint.id, config
+        );
+
+        expect(result.displayName).toBe(createDto.displayName);
+        expect(mockGroupRepo.create).toHaveBeenCalled();
+      });
+
+      it('should allow extension URN when config is undefined (default lenient)', async () => {
+        const createDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Default Group',
+          [ENTERPRISE_USER_URN]: { department: 'Engineering' },
+        } as any;
+
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.create.mockResolvedValue(mockGroup);
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce({
+          ...mockGroup,
+          displayName: createDto.displayName,
+        });
+
+        const result = await service.createGroupForEndpoint(
+          createDto, 'http://localhost:3000/scim', mockEndpoint.id, undefined
+        );
+
+        expect(result.displayName).toBe(createDto.displayName);
+      });
+    });
+
+    describe('replaceGroupForEndpoint with StrictSchemaValidation', () => {
+      it('should reject undeclared extension URN on PUT (strict mode)', async () => {
+        const replaceDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Replaced Group',
+          [ENTERPRISE_USER_URN]: { department: 'Sales' },
+        } as any;
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true };
+
+        mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
+
+        await expect(
+          service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, 'http://localhost:3000/scim', mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+      });
+    });
+  });
+
+  describe('dynamic schemas[] in group response', () => {
+    it('should include extension URNs present in rawPayload', async () => {
+      const extensionUrn = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+      const groupWithExtension = {
+        ...mockGroup,
+        rawPayload: JSON.stringify({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          [extensionUrn]: { department: 'Test' },
+        }),
+      };
+
+      mockGroupRepo.findWithMembers.mockResolvedValue(groupWithExtension);
+
+      const result = await service.getGroupForEndpoint(
+        mockGroup.scimId, 'http://localhost:3000/scim', mockEndpoint.id
+      );
+
+      // The result should have the core schema
+      expect(result.schemas).toContain('urn:ietf:params:scim:schemas:core:2.0:Group');
+    });
+
+    it('should not include extension URNs NOT present in rawPayload', async () => {
+      const groupWithoutExtension = {
+        ...mockGroup,
+        rawPayload: JSON.stringify({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          description: 'Plain group',
+        }),
+      };
+
+      mockGroupRepo.findWithMembers.mockResolvedValue(groupWithoutExtension);
+
+      const result = await service.getGroupForEndpoint(
+        mockGroup.scimId, 'http://localhost:3000/scim', mockEndpoint.id
+      );
+
+      expect(result.schemas).toEqual(['urn:ietf:params:scim:schemas:core:2.0:Group']);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Soft Delete + GET / LIST interactions (Groups)
+  // ═══════════════════════════════════════════════════════════
+
+  describe('soft delete + GET/LIST interactions (Groups)', () => {
+    const softDeleteConfig: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true };
+
+    it('should soft-delete group, then GET returns the group (active=false implied)', async () => {
+      mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+      mockGroupRepo.update.mockResolvedValue({ ...mockGroup });
+
+      await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, softDeleteConfig);
+      expect(mockGroupRepo.update).toHaveBeenCalledWith(mockGroup.id, { active: false });
+      expect(mockGroupRepo.delete).not.toHaveBeenCalled();
+
+      // GET after soft-delete: group still found
+      mockGroupRepo.findWithMembers.mockResolvedValue({ ...mockGroup, members: [] });
+      const result = await service.getGroupForEndpoint(
+        mockGroup.scimId, 'http://localhost:3000/scim', mockEndpoint.id
+      );
+      expect(result).toBeDefined();
+      expect(result.displayName).toBe(mockGroup.displayName);
+    });
+
+    it('should hard-delete group, then GET returns 404', async () => {
+      const hardDeleteConfig: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: false };
+      mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+      mockGroupRepo.delete.mockResolvedValue(mockGroup);
+
+      await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, hardDeleteConfig);
+      expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+
+      // GET after hard-delete: not found
+      mockGroupRepo.findWithMembers.mockResolvedValue(null);
+      await expect(
+        service.getGroupForEndpoint(mockGroup.scimId, 'http://localhost:3000/scim', mockEndpoint.id)
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('should include soft-deleted groups in LIST results', async () => {
+      const activeGroup = { ...mockGroup, id: 'g1', scimId: 'scim-g1', members: [] };
+      const deletedGroup = { ...mockGroup, id: 'g2', scimId: 'scim-g2', displayName: 'Deleted Group', members: [] };
+      mockGroupRepo.findAllWithMembers.mockResolvedValue([activeGroup, deletedGroup]);
+
+      const result = await service.listGroupsForEndpoint(
+        { startIndex: 1, count: 10 },
+        'http://localhost:3000/scim',
+        mockEndpoint.id
+      );
+
+      expect(result.totalResults).toBe(2);
+      expect(result.Resources).toHaveLength(2);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Config flag combinations (Groups)
+  // ═══════════════════════════════════════════════════════════
+
+  describe('config flag combinations (Groups)', () => {
+    it('should soft-delete with SoftDeleteEnabled + StrictSchemaValidation both true', async () => {
+      mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+      mockGroupRepo.update.mockResolvedValue({ ...mockGroup });
+
+      const config: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
+        [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+      };
+
+      await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
+      expect(mockGroupRepo.update).toHaveBeenCalledWith(mockGroup.id, { active: false });
+      expect(mockGroupRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('should soft-delete with SoftDeleteEnabled + MultiOpPatch flags', async () => {
+      mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+      mockGroupRepo.update.mockResolvedValue({ ...mockGroup });
+
+      const config: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
+        MultiOpPatchRequestAddMultipleMembersToGroup: true,
+        MultiOpPatchRequestRemoveMultipleMembersFromGroup: true,
+      };
+
+      await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
+      expect(mockGroupRepo.update).toHaveBeenCalledWith(mockGroup.id, { active: false });
+    });
+
+    it('should hard-delete when SoftDeleteEnabled=false despite other flags', async () => {
+      mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+      mockGroupRepo.delete.mockResolvedValue(mockGroup);
+
+      const config: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: false,
+        [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+        MultiOpPatchRequestAddMultipleMembersToGroup: true,
+      };
+
+      await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
+      expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
+      expect(mockGroupRepo.update).not.toHaveBeenCalled();
+    });
+
+    it('should reject unknown extension on CREATE when StrictSchemaValidation=true', async () => {
+      const config: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
+        [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+      };
+
+      const createDto: CreateGroupDto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', 'urn:unknown:fake:1.0:Group'],
+        displayName: 'Strict Test Group',
+        'urn:unknown:fake:1.0:Group': { custom: 'data' },
+      } as any;
+
+      mockGroupRepo.findByDisplayName.mockResolvedValue(null);
+      mockGroupRepo.findByExternalId.mockResolvedValue(null);
+
+      await expect(
+        service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, config)
+      ).rejects.toThrow();
     });
   });
 });

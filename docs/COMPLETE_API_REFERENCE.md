@@ -1,6 +1,6 @@
 # SCIMServer — Complete REST API Reference
 
-> Version baseline: v0.10.0 · Updated: February 18, 2026 · Scope: SCIM + admin + OAuth + web routes
+> Version baseline: v0.15.0 · Updated: February 23, 2026 · Scope: SCIM + admin + OAuth + web routes
 
 This document enumerates all REST API endpoints and resources exposed by the SCIMServer application, with HTTP methods, purpose, common query parameters, expected request and response shapes, authentication notes, and `curl` examples for each operation.
 
@@ -93,7 +93,7 @@ SCIM metadata endpoints
   curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/ResourceTypes"
 
 3) GET /Schemas
-- Purpose: Return SCIM `User` and `Group` schema descriptions.
+- Purpose: Return all registered SCIM schema descriptions (7 built-in: User, EnterpriseUser, Group + 4 msfttest extensions).
 - Example:
   curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/Schemas"
 
@@ -201,7 +201,7 @@ curl -X PATCH "https://<API_BASE>/scim/v2/Users/<USER_ID>" \
 ```
 
 6) DELETE /Users/:id
-- Delete user by id.
+- Delete user by id. When `SoftDeleteEnabled` is `true` on the endpoint config, the user is soft-deleted (set `active=false`) instead of physically removed; returns `204 No Content` in both cases.
 - Example:
 ```
 curl -X DELETE "https://<API_BASE>/scim/v2/Users/<USER_ID>" -H "Authorization: Bearer <TOKEN>"
@@ -259,7 +259,7 @@ curl -X POST "https://<API_BASE>/scim/v2/Groups/.search" \
 - SCIM Patch semantics for group membership; returns 200 OK with the updated Group resource body.
 
 6) DELETE /Groups/:id
-- Remove group.
+- Remove group. When `SoftDeleteEnabled` is `true` on the endpoint config, the group is soft-deleted (set `active=false`) instead of physically removed; returns `204 No Content` in both cases.
 
 ---
 

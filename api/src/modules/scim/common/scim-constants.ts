@@ -7,12 +7,24 @@ export const SCIM_ERROR_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:Error';
 export const SCIM_SP_CONFIG_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig';
 export const SCIM_SEARCH_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:SearchRequest';
 
+// ─── Custom Microsoft Test Extension URNs ───────────────────────────────────
+// Hardcoded extension schemas for Microsoft SCIM testing compliance.
+export const MSFTTEST_CUSTOM_USER_SCHEMA = 'urn:msfttest:cloud:scim:schemas:extension:custom:2.0:User';
+export const MSFTTEST_CUSTOM_GROUP_SCHEMA = 'urn:msfttest:cloud:scim:schemas:extension:custom:2.0:Group';
+export const MSFTTEST_IETF_USER_SCHEMA = 'urn:ietf:params:scim:schemas:extension:msfttest:User';
+export const MSFTTEST_IETF_GROUP_SCHEMA = 'urn:ietf:params:scim:schemas:extension:msfttest:Group';
+
 /**
  * All known SCIM extension schema URNs supported by this server.
  * Used for dynamic schemas[] inclusion and PATCH path resolution.
+ * Includes Enterprise User + Microsoft test extension schemas.
  */
 export const KNOWN_EXTENSION_URNS: readonly string[] = [
   SCIM_ENTERPRISE_USER_SCHEMA,
+  MSFTTEST_CUSTOM_USER_SCHEMA,
+  MSFTTEST_CUSTOM_GROUP_SCHEMA,
+  MSFTTEST_IETF_USER_SCHEMA,
+  MSFTTEST_IETF_GROUP_SCHEMA,
 ] as const;
 
 export const DEFAULT_COUNT = 100;
