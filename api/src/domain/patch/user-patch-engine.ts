@@ -77,7 +77,29 @@ const CANONICAL_KEY_MAP: Record<string, string> = {
 
 const RESERVED_ATTRIBUTES = new Set([
   'id', 'username', 'userid', 'userName', 'externalid', 'externalId', 'active',
+  'meta', 'schemas',
 ]);
+
+// ─── Prototype pollution guard ──────────────────────────────────────────────
+
+/** Keys that MUST be rejected to prevent prototype pollution attacks */
+const DANGEROUS_KEYS = new Set([
+  '__proto__', 'constructor', 'prototype',
+]);
+
+/** Throws PatchError if path contains a dangerous prototype-polluting key */
+function guardPrototypePollution(path: string): void {
+  const segments = path.split('.');
+  for (const seg of segments) {
+    if (DANGEROUS_KEYS.has(seg)) {
+      throw new PatchError(
+        400,
+        `Attribute path '${path}' contains a forbidden key '${seg}'.`,
+        'invalidPath',
+      );
+    }
+  }
+}
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -204,11 +226,13 @@ export class UserPatchEngine {
     }
 
     if (config.verbosePatch && originalPath && originalPath.includes('.')) {
+      guardPrototypePollution(originalPath);
       rawPayload = UserPatchEngine.applyDotNotation(rawPayload, originalPath, value);
       return { userName, displayName, externalId, active, rawPayload };
     }
 
     if (originalPath) {
+      guardPrototypePollution(originalPath);
       rawPayload = { ...rawPayload, [originalPath]: value };
       return { userName, displayName, externalId, active, rawPayload };
     }
@@ -216,6 +240,10 @@ export class UserPatchEngine {
     // No-path add/replace: object merged into resource
     if (!path && typeof value === 'object' && value !== null) {
       const updateObj = UserPatchEngine.normalizeObjectKeys(value as Record<string, unknown>);
+      // Strip prototype-polluting keys from no-path merge
+      for (const dk of DANGEROUS_KEYS) {
+        delete updateObj[dk];
+      }
       if ('userName' in updateObj) {
         userName = UserPatchEngine.extractStringValue(updateObj.userName, 'userName');
         delete updateObj.userName;
@@ -269,11 +297,13 @@ export class UserPatchEngine {
     }
 
     if (config.verbosePatch && originalPath && originalPath.includes('.')) {
+      guardPrototypePollution(originalPath);
       rawPayload = UserPatchEngine.removeDotNotation(rawPayload, originalPath);
       return { active, rawPayload };
     }
 
     if (originalPath) {
+      guardPrototypePollution(originalPath);
       rawPayload = UserPatchEngine.removeAttribute(rawPayload, originalPath);
       return { active, rawPayload };
     }

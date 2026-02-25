@@ -493,6 +493,30 @@ export class EndpointScimUsersService {
     const rawPayload = this.parseJson<Record<string, unknown>>(String(user.rawPayload ?? '{}'));
     const meta = this.parseJson<Record<string, unknown>>(String(user.meta ?? '{}'));
 
+    // V2: Pre-PATCH validation — validate each operation value against its schema attribute
+    if (getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
+      const resultPayloadPlaceholder: Record<string, unknown> = {
+        schemas: [SCIM_CORE_USER_SCHEMA],
+      };
+      for (const urn of extensionUrns) {
+        (resultPayloadPlaceholder.schemas as string[]).push(urn);
+      }
+      const schemaDefs = this.buildSchemaDefinitions(resultPayloadPlaceholder, endpointId);
+      for (const op of patchDto.Operations) {
+        const preResult = SchemaValidator.validatePatchOperationValue(
+          op.op, op.path, op.value, schemaDefs,
+        );
+        if (!preResult.valid) {
+          const messages = preResult.errors.map(e => e.message).join('; ');
+          throw createScimError({
+            status: 400,
+            scimType: preResult.errors[0]?.scimType ?? 'invalidValue',
+            detail: `PATCH operation value validation failed: ${messages}`,
+          });
+        }
+      }
+    }
+
     let result;
     try {
       result = UserPatchEngine.apply(

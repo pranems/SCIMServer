@@ -152,7 +152,7 @@ describe('SchemaValidator — Comprehensive', () => {
       { type: 'decimal',   valid: [0, 3.14, -2.71, 42],         invalid: ['pi', true, {}] },
       { type: 'reference', valid: ['https://example.com/Users/1', 'urn:ietf:1'], invalid: [42, true, {}] },
       { type: 'binary',    valid: ['dGVzdA==', ''],              invalid: [123, true, []] },
-      { type: 'dateTime',  valid: ['2025-01-15T10:30:00Z', '2025-01-15'], invalid: [12345, true] },
+      { type: 'dateTime',  valid: ['2025-01-15T10:30:00Z', '2025-01-15T10:30:00.000+05:30'], invalid: [12345, true, '2025-01-15'] },
     ];
 
     for (const { type, valid, invalid } of types) {
@@ -231,9 +231,6 @@ describe('SchemaValidator — Comprehensive', () => {
       '2025-01-15T10:30:00Z',
       '2025-01-15T10:30:00.000Z',
       '2025-01-15T10:30:00+05:30',
-      '2025-01-15',
-      '2025-01-15T10:30:00',
-      'Tue, 15 Jan 2025 10:30:00 GMT',  // Date.parse accepts RFC 2822
     ])('should accept valid dateTime: %s', (dt) => {
       const payload = { schemas: [CORE_USER_SCHEMA_ID], ts: dt };
       expect(SchemaValidator.validate(payload, [schema], opts).valid).toBe(true);
@@ -241,9 +238,12 @@ describe('SchemaValidator — Comprehensive', () => {
 
     it.each([
       'not-a-date',
-      '2025-13-01',  // invalid month
+      '2025-13-01',  // invalid month — also no time/tz
       'yesterday',
-      '',  // empty string — Date.parse('') returns NaN
+      '',  // empty string
+      '2025-01-15',  // date-only (no time) — RFC 7643 §2.3.5 requires xsd:dateTime
+      '2025-01-15T10:30:00',  // no timezone — xsd:dateTime requires Z or ±HH:MM
+      'Tue, 15 Jan 2025 10:30:00 GMT',  // RFC 2822 — not xsd:dateTime
     ])('should reject invalid dateTime: "%s"', (dt) => {
       const payload = { schemas: [CORE_USER_SCHEMA_ID], ts: dt };
       expect(SchemaValidator.validate(payload, [schema], opts).valid).toBe(false);

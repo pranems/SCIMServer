@@ -32,6 +32,12 @@ import {
 
 import { PatchError } from './patch-error';
 
+/**
+ * Keys that must never appear in user-supplied objects to prevent
+ * prototype-pollution attacks (V19).
+ */
+const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 // ─── Input State ─────────────────────────────────────────────────────────────
 
 /** Current group state provided by the service before PATCH application */
@@ -154,7 +160,8 @@ export class GroupPatchEngine {
         // Store any other attributes in rawPayload (resolves extension URN keys)
         const updateObj: Record<string, unknown> = {};
         for (const [key, val] of Object.entries(obj)) {
-          if (key !== 'displayName' && key !== 'externalId' && key !== 'members' && key !== 'schemas') {
+          // Skip well-known fields and dangerous/reserved keys (V19, V20)
+          if (key !== 'displayName' && key !== 'externalId' && key !== 'members' && key !== 'schemas' && key !== 'meta' && !DANGEROUS_KEYS.has(key)) {
             updateObj[key] = val;
           }
         }

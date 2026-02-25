@@ -1,4 +1,4 @@
-﻿import { ArrayNotEmpty, IsArray, IsBoolean, IsOptional, IsString } from 'class-validator';
+﻿import { ArrayNotEmpty, IsArray, IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateUserDto {
   @IsArray()
@@ -6,6 +6,7 @@ export class CreateUserDto {
   schemas!: string[];
 
   @IsString()
+  @IsNotEmpty({ message: 'userName must not be empty or whitespace-only.' })
   userName!: string;
 
   @IsOptional()

@@ -11,6 +11,10 @@
  *  4. Unknown attribute detection (strict mode only)
  *  5. Multi-valued / single-valued enforcement
  *  6. Sub-attribute validation for complex types
+ *  7. Canonical value enforcement (V10)
+ *  8. Required sub-attribute enforcement (V9)
+ *  9. Strict ISO 8601 dateTime format validation (V31)
+ * 10. schemas array validation (V25)
  *
  * @see RFC 7643 §2.1 — Attribute Characteristics
  * @see RFC 7643 §7 — Schema Definition
@@ -34,6 +38,14 @@ const RESERVED_KEYS = new Set([
   'externalId',
   'meta',
 ]);
+
+/**
+ * xsd:dateTime regex (RFC 7643 §2.3.5).
+ * Validates ISO 8601 / xsd:dateTime format:
+ *   YYYY-MM-DDTHH:MM:SSZ  or  YYYY-MM-DDTHH:MM:SS.sss±HH:MM
+ * Not anchored to allow timezone offset variants.
+ */
+const XSD_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/;
 
 export class SchemaValidator {
   /**
@@ -102,6 +114,36 @@ export class SchemaValidator {
     }
 
     // ── 2-5. Per-attribute validation (type, mutability, unknown) ───────
+
+    // ── V25: Validate schemas array ────────────────────────────────────
+    if (Array.isArray(payload.schemas)) {
+      const knownUrns = new Set<string>();
+      for (const s of schemas) {
+        knownUrns.add(s.id);
+      }
+      for (const urn of payload.schemas as unknown[]) {
+        if (typeof urn !== 'string') {
+          errors.push({
+            path: 'schemas',
+            message: `Each entry in 'schemas' must be a string.`,
+            scimType: 'invalidValue',
+          });
+        } else if (options.strictMode && !knownUrns.has(urn)) {
+          errors.push({
+            path: 'schemas',
+            message: `Schema URN '${urn}' is not recognized for this resource type.`,
+            scimType: 'invalidValue',
+          });
+        }
+      }
+    } else if (payload.schemas !== undefined) {
+      errors.push({
+        path: 'schemas',
+        message: `'schemas' must be an array of schema URN strings.`,
+        scimType: 'invalidSyntax',
+      });
+    }
+
     for (const [key, value] of Object.entries(payload)) {
       // Skip reserved SCIM keys
       if (RESERVED_KEYS.has(key)) continue;
@@ -299,12 +341,11 @@ export class SchemaValidator {
             message: `Attribute '${attrDef.name}' must be a dateTime string, got ${typeof value}.`,
             scimType: 'invalidValue',
           });
-        }
-        // Basic ISO 8601 validation
-        if (typeof value === 'string' && isNaN(Date.parse(value))) {
+        } else if (!XSD_DATETIME_RE.test(value)) {
+          // V31: Strict xsd:dateTime format (RFC 7643 §2.3.5)
           errors.push({
             path,
-            message: `Attribute '${attrDef.name}' is not a valid dateTime: '${value}'.`,
+            message: `Attribute '${attrDef.name}' is not a valid xsd:dateTime (expected ISO 8601 format like 2011-08-01T21:32:44.882Z): '${value}'.`,
             scimType: 'invalidValue',
           });
         }
@@ -335,6 +376,25 @@ export class SchemaValidator {
         // Unknown type — skip validation (forward-compatible)
         break;
     }
+
+    // ── V10: Canonical values enforcement ────────────────────────────
+    // If the attribute defines canonicalValues and the value is a string,
+    // verify the value is one of the allowed canonical values (case-insensitive).
+    if (
+      attrDef.canonicalValues &&
+      attrDef.canonicalValues.length > 0 &&
+      typeof value === 'string'
+    ) {
+      const lower = value.toLowerCase();
+      const allowed = attrDef.canonicalValues.map(cv => cv.toLowerCase());
+      if (!allowed.includes(lower)) {
+        errors.push({
+          path,
+          message: `Attribute '${attrDef.name}' value '${value}' is not one of the canonical values: [${attrDef.canonicalValues.join(', ')}].`,
+          scimType: 'invalidValue',
+        });
+      }
+    }
   }
 
   /**
@@ -350,6 +410,19 @@ export class SchemaValidator {
     const subMap = new Map<string, SchemaAttributeDefinition>();
     for (const sa of subAttrDefs) {
       subMap.set(sa.name.toLowerCase(), sa);
+    }
+
+    // V9: Required sub-attribute enforcement (create/replace only)
+    if (options.mode !== 'patch') {
+      for (const sa of subAttrDefs) {
+        if (sa.required && !this.findKeyIgnoreCase(obj, sa.name)) {
+          errors.push({
+            path: `${parentPath}.${sa.name}`,
+            message: `Required sub-attribute '${sa.name}' is missing in '${parentPath}'.`,
+            scimType: 'invalidValue',
+          });
+        }
+      }
     }
 
     for (const [key, value] of Object.entries(obj)) {
@@ -589,5 +662,155 @@ export class SchemaValidator {
     }
 
     return false;
+  }
+
+  // ─── V2: PATCH Operation Pre-Validation ──────────────────────────────
+
+  /**
+   * Validate a single PATCH operation value BEFORE it is applied by the engine.
+   *
+   * Resolves the PATCH path to the matching schema attribute definition and
+   * validates the operation value against it (type, canonical values, etc.).
+   *
+   * Does NOT check required (patch mode) or mutability (done post-PATCH by H-1/H-2).
+   * For "remove" ops, value validation is skipped.
+   *
+   * @param op     - Operation type: 'add' | 'replace' | 'remove'
+   * @param path   - SCIM attribute path (e.g. "userName", "name.givenName", "emails[type eq \"work\"].value")
+   * @param value  - Operation value (may be object for no-path ops)
+   * @param schemas - Schema definitions for the resource type
+   * @returns ValidationResult with errors (if any)
+   */
+  static validatePatchOperationValue(
+    op: string,
+    path: string | undefined,
+    value: unknown,
+    schemas: readonly SchemaDefinition[],
+  ): ValidationResult {
+    const errors: ValidationError[] = [];
+
+    // Remove operations don't need value validation
+    if (op.toLowerCase() === 'remove') {
+      return { valid: true, errors: [] };
+    }
+
+    // Build attribute index
+    const coreAttributes = new Map<string, SchemaAttributeDefinition>();
+    const extensionSchemas = new Map<string, SchemaDefinition>();
+    for (const schema of schemas) {
+      if (schema.id.startsWith('urn:ietf:params:scim:schemas:core:')) {
+        for (const attr of schema.attributes) {
+          coreAttributes.set(attr.name.toLowerCase(), attr);
+        }
+      } else {
+        extensionSchemas.set(schema.id, schema);
+      }
+    }
+
+    // No path — value is an object whose keys are top-level attributes
+    if (!path) {
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        const obj = value as Record<string, unknown>;
+        for (const [key, val] of Object.entries(obj)) {
+          if (RESERVED_KEYS.has(key)) continue;
+          // Extension blocks
+          if (key.startsWith('urn:')) {
+            const extSchema = extensionSchemas.get(key);
+            if (extSchema && val && typeof val === 'object' && !Array.isArray(val)) {
+              this.validateAttributes(
+                val as Record<string, unknown>,
+                extSchema.attributes,
+                key,
+                { strictMode: false, mode: 'patch' },
+                errors,
+              );
+            }
+            continue;
+          }
+          const attrDef = coreAttributes.get(key.toLowerCase());
+          if (attrDef) {
+            this.validateAttribute(key, val, attrDef, { strictMode: false, mode: 'patch' }, errors);
+          }
+        }
+      }
+      return { valid: errors.length === 0, errors };
+    }
+
+    // Resolve the path to its attribute definition
+    const attrDef = this.resolvePatchPath(path, coreAttributes, extensionSchemas);
+
+    if (attrDef) {
+      this.validateAttribute(
+        path,
+        value,
+        attrDef,
+        { strictMode: false, mode: 'patch' },
+        errors,
+      );
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
+
+  /**
+   * Resolve a SCIM PATCH path to its attribute definition.
+   *
+   * Handles formats:
+   *  - "attrName" → core attribute
+   *  - "attrName.subAttrName" → sub-attribute of complex core attr
+   *  - "urn:...:ExtUrn:attrName" → extension attribute
+   *  - "attrName[filter]" → multi-valued attribute (returns parent def)
+   *  - "attrName[filter].subAttr" → sub-attribute via value filter
+   */
+  private static resolvePatchPath(
+    path: string,
+    coreAttributes: Map<string, SchemaAttributeDefinition>,
+    extensionSchemas: Map<string, SchemaDefinition>,
+  ): SchemaAttributeDefinition | undefined {
+    // Strip value filter (e.g., emails[type eq "work"].value → emails.value)
+    const cleanPath = path.replace(/\[.*?\]/g, '');
+
+    // Check for extension URN prefix
+    for (const [urn, schema] of extensionSchemas) {
+      if (cleanPath.startsWith(urn + ':') || cleanPath.startsWith(urn + '.')) {
+        const remainder = cleanPath.slice(urn.length + 1);
+        const extAttrMap = new Map<string, SchemaAttributeDefinition>();
+        for (const a of schema.attributes) {
+          extAttrMap.set(a.name.toLowerCase(), a);
+        }
+        if (!remainder) return undefined;
+        const segments = remainder.split('.');
+        return this.walkAttributePath(segments, extAttrMap);
+      }
+    }
+
+    // Core attribute path
+    const segments = cleanPath.split('.');
+    return this.walkAttributePath(segments, coreAttributes);
+  }
+
+  /**
+   * Walk a dot-separated path through an attribute hierarchy.
+   */
+  private static walkAttributePath(
+    segments: string[],
+    attrMap: Map<string, SchemaAttributeDefinition>,
+  ): SchemaAttributeDefinition | undefined {
+    if (segments.length === 0) return undefined;
+
+    const attrDef = attrMap.get(segments[0].toLowerCase());
+    if (!attrDef) return undefined;
+    if (segments.length === 1) return attrDef;
+
+    // Walk into sub-attributes
+    if (attrDef.subAttributes && attrDef.subAttributes.length > 0) {
+      const subMap = new Map<string, SchemaAttributeDefinition>();
+      for (const sa of attrDef.subAttributes) {
+        subMap.set(sa.name.toLowerCase(), sa);
+      }
+      return this.walkAttributePath(segments.slice(1), subMap);
+    }
+
+    return undefined;
   }
 }

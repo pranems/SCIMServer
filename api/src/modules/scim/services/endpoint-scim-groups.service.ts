@@ -200,6 +200,30 @@ export class EndpointScimGroupsService {
 
     const extensionUrns = this.schemaRegistry.getExtensionUrns(endpointId);
 
+    // V2: Pre-PATCH validation — validate each operation value against schema definitions
+    if (getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
+      const resultPayloadPlaceholder: Record<string, unknown> = {
+        schemas: [SCIM_CORE_GROUP_SCHEMA],
+      };
+      for (const urn of extensionUrns) {
+        (resultPayloadPlaceholder.schemas as string[]).push(urn);
+      }
+      const schemaDefs = this.buildSchemaDefinitions(resultPayloadPlaceholder, endpointId);
+      for (const op of dto.Operations) {
+        const preResult = SchemaValidator.validatePatchOperationValue(
+          op.op, op.path, op.value, schemaDefs,
+        );
+        if (!preResult.valid) {
+          const messages = preResult.errors.map(e => e.message).join('; ');
+          throw createScimError({
+            status: 400,
+            scimType: preResult.errors[0]?.scimType ?? 'invalidValue',
+            detail: `PATCH operation value validation failed: ${messages}`,
+          });
+        }
+      }
+    }
+
     let patchResult;
     try {
       patchResult = GroupPatchEngine.apply(
