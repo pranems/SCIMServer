@@ -49,8 +49,8 @@ api/src/modules/scim/controllers/
   endpoint-scim-groups.controller.ts                     # Groups CRUD controller
   endpoint-scim-discovery.controller.ts                  # SCIM discovery (Schemas, ResourceTypes, ServiceProviderConfig)
 api/src/modules/scim/services/
-  endpoint-scim-users.service.ts    (857 lines)          # Users business logic
-  endpoint-scim-groups.service.ts   (946 lines)          # Groups business logic
+  endpoint-scim-users.service.ts    (858 lines)          # Users business logic
+  endpoint-scim-groups.service.ts   (947 lines)          # Groups business logic
   scim-metadata.service.ts          (13 lines)           # buildLocation, timestamp
 api/src/modules/scim/dto/
   create-user.dto.ts                                     # User creation DTO
@@ -276,8 +276,8 @@ Four categories of PATCH paths, handled in order:
 
 ## 8. Test Coverage
 
-- **Unit**: 2063 tests passing (61 suites)
-- **E2E**: 358 tests passing (19 suites)
+- **Unit**: 2096 tests passing (61 suites)
+- **E2E**: 368 tests passing (19 suites)
 - **Live integration**: 334 tests passing (local + Docker)
 - **SCIM Validator**: 25/25 required + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`

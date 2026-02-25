@@ -35,52 +35,57 @@ The table below maps every gap between the current codebase and the ideal archit
 
 | # | Gap | Severity | Current File(s) | Ideal Resolution | Phase |
 |---|-----|----------|-----------------|------------------|-------|
-| G1 | **No Repository Pattern** — services call `PrismaService` directly | HIGH | `endpoint-scim-users.service.ts`, `endpoint-scim-groups.service.ts` | Repository interfaces in Domain layer; Prisma implementations in Infrastructure | 1 |
+| G1 | ~~**No Repository Pattern** — services call `PrismaService` directly~~ | ~~HIGH~~ | ✅ **DONE (v0.10.0)** — `IUserRepository`/`IGroupRepository` interfaces + Prisma/InMemory implementations. `PERSISTENCE_BACKEND` env toggle. Services use `@Inject(TOKEN)` pattern with zero Prisma imports. | Repository interfaces in Domain layer; Prisma implementations in Infrastructure | 1 |
 | G2 | **Separate User/Group tables** (ScimUser, ScimGroup) | MEDIUM | `schema.prisma` | Unified `scim_resource` table with `resource_type` discriminator | 2 |
-| G3 | **SQLite** — no CITEXT, no JSONB, no GIN, single-writer lock | HIGH | `schema.prisma` (provider="sqlite") | PostgreSQL with CITEXT, JSONB, GIN, `pg_trgm` | 3 |
-| G4 | **Filter push-down only for `eq`** on 3 columns | HIGH | `apply-scim-filter.ts` (`tryPushToDb` returns null for all non-eq ops) | Full operator support via PostgreSQL ILIKE, JSONB operators, `pg_trgm` | 4 |
-| G5 | **PATCH engine embedded in service** (~200 lines inline) | HIGH | `endpoint-scim-users.service.ts` (lines 320–440), `endpoint-scim-groups.service.ts` (PATCH handlers) | Standalone `PatchEngine` in Domain layer, schema-aware, zero DB imports | 5 |
-| G6 | **Discovery endpoints hardcoded** | MEDIUM | `endpoint-scim-discovery.controller.ts` (private methods, static JSON) | `endpoint_schema` + `endpoint_resource_type` tables, `DiscoveryService` | 6 |
-| G7 | **ETag If-Match NOT enforced** before writes | HIGH | `scim-etag.interceptor.ts` (assertIfMatch exists but never called) | Pre-write check in Orchestrator; monotonic integer version | 7 |
+| G3 | ~~**SQLite** — no CITEXT, no JSONB, no GIN, single-writer lock~~ | ~~HIGH~~ | ✅ **DONE (v0.10.0)** — PostgreSQL 17 with CITEXT, JSONB, GIN, `pg_trgm`. Prisma 7 driver adapter (`@prisma/adapter-pg`). 5 migrations applied. | PostgreSQL with CITEXT, JSONB, GIN, `pg_trgm` | 3 |
+| G4 | ~~**Filter push-down only for `eq`** on 3 columns~~ | ~~HIGH~~ | ✅ **DONE (v0.12.0)** — All 10 operators (eq/ne/co/sw/ew/gt/ge/lt/le/pr) on 5 columns (userName, displayName, externalId, scimId, active). Column type annotations. AND/OR recursive push-down. | Full operator support via PostgreSQL ILIKE, JSONB operators, `pg_trgm` | 4 |
+| G5 | ~~**PATCH engine embedded in service** (~200 lines inline)~~ | ~~HIGH~~ | ✅ **DONE (v0.13.0)** — `UserPatchEngine` (437 lines) and `GroupPatchEngine` (352 lines) extracted to `domain/patch/`. Pure domain, zero NestJS/Prisma deps. Prototype pollution guards, reserved attribute stripping. | Standalone `PatchEngine` in Domain layer, schema-aware, zero DB imports | 5 |
+| G6 | ~~**Discovery endpoints hardcoded**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.14.0)** — `ScimDiscoveryService` (103 lines) with `ScimSchemaRegistry`. `EndpointSchema` DB model + Admin API for custom schemas per endpoint. 7 built-in schemas (was 3), dynamic per-endpoint discovery. | `endpoint_schema` + `endpoint_resource_type` tables, `DiscoveryService` | 6 |
+| G7 | ~~**ETag If-Match NOT enforced** before writes~~ | ~~HIGH~~ | ✅ **DONE (v0.16.0)** — Version-based ETags (`W/"v{N}"`), pre-write `enforceIfMatch()` (412 on mismatch), `RequireIfMatch` config flag (428 on missing), atomic `version` increment. | Pre-write check in Orchestrator; monotonic integer version | 7 |
 | G8 | ~~**No schema validation** against endpoint schema definitions~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.0)** — `SchemaValidator` domain class validates type/required/mutability/multiValued/unknown-attrs/sub-attrs | `SchemaValidator` validates payload against `endpoint_schema.attributes` | 8 |
 | G8b | **No custom resource type registration** — only hardcoded User/Group | MEDIUM | `scim-schemas.constants.ts` (static resource types), per-type controllers/services/repos | `EndpointResourceType` table + Admin API + generic wildcard controller + `customResourceTypesEnabled` config flag | 8.2 |
-| G8c | **PatchEngine has zero mutability checks** — readOnly/immutable attrs can be modified via PATCH | HIGH | `user-patch-engine.ts`, `group-patch-engine.ts` (no schema awareness) | PatchEngine consults `SchemaDefinition` before applying ops; rejects readOnly, guards immutable | 8.1 |
+| G8c | **PatchEngine mutability checks** — ~~readOnly/immutable attrs can be modified via PATCH~~ | ~~HIGH~~ → LOW | ⚠️ **PARTIALLY DONE (v0.17.1)** — `SchemaValidator.checkImmutable()` enforces immutable attrs POST-PATCH in services. ReadOnly attrs rejected on create/replace by SchemaValidator. **Remaining:** PatchEngine itself doesn't pre-validate mutability before applying ops (readOnly attrs still applied then caught post-validation). | PatchEngine consults `SchemaDefinition` before applying ops; rejects readOnly, guards immutable | 8.1 |
 | G8d | ~~**`immutable` not enforced on PUT**~~ — existing immutable values can be overwritten | ~~HIGH~~ | ✅ **DONE (v0.17.0)** — `SchemaValidator.checkImmutable()` + service integration in PUT/PATCH for Users & Groups | SchemaValidator compares new vs existing for immutable attrs on replace; 400 mutability | 8.1 |
 | G8e | **Response `returned` not enforced** — never/request/writeOnly attrs leak in responses | MEDIUM | `toScimUserResource()` (spreads rawPayload as-is) | Schema-driven response filter strips `returned:never`/`writeOnly`; `request` gated | 8.3 |
 | G8f | ~~**`caseExact` ignored in filter evaluation** — all string comparisons case-insensitive~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.2)** — `externalId` column changed from CITEXT→TEXT, filter engine `'text'` type omits `mode: 'insensitive'`. Migration: `20260225181836_externalid_citext_to_text`. See `docs/EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md` | Filter evaluator consults `caseExact` per-attribute from schema definitions | 8.4 |
-| G8g | **Input hardening: validation disabled by default + DTO gaps** — ~~no payload size limit~~ ✅ (5MB limit added), `SearchRequestDto` has zero validators, `PatchOperationDto.value` is `unknown`, prototype pollution via index signature, `userName` allows whitespace-only | HIGH | `StrictSchemaValidation=false` (default), DTOs with `[key: string]: unknown`, no `@ArrayMaxSize` on PATCH ops | Always-on basic type validation (split from strict mode), DTO guards (`@IsIn`, `@ArrayMaxSize`, `@IsNotEmpty`), prototype key stripping | 8.5 |
-| G8h | **Required sub-attributes + canonicalValues not enforced** — `emails[].value` is `required:true` but unchecked; `emails[].type` accepts any string | MEDIUM | `validateSubAttributes()` only type-checks provided keys, never checks missing required; `canonicalValues` defined but unused | Add required sub-attr check in `validateSubAttributes()`; optional `canonicalValues` enforcement | 8.6 |
-| G8i | **Filter/PATCH hardening: no depth/length limits, valuePath regex gaps** — filter parser has no recursion depth limit (stack overflow), PATCH dot-notation allows `__proto__`, `stripReservedAttributes` missing `meta`/`schemas` | MEDIUM | `scim-filter-parser.ts` (recursive descent, no depth counter), `user-patch-engine.ts` (`applyDotNotation`, `stripReservedAttributes`) | Max filter depth/length, semantic attr validation; PATCH path sanitization; strip `meta`/`schemas` from reserved attrs | 8.7 |
+| G8g | ~~**Input hardening: validation disabled by default + DTO gaps**~~ | ~~HIGH~~ | ✅ **DONE (v0.17.1-fix1)** — DTO hardening: `SearchRequestDto` (`@Max(10000)` count, `@MaxLength(10000)` filter, `@IsIn` sortOrder, `@Min(1)` startIndex), `PatchUserDto`/`PatchGroupDto` (`@ArrayMaxSize(1000)`), `CreateUserDto` (`@IsNotEmpty` userName), `@IsIn` on PatchOp. SchemaValidator: `maxPayloadSize` (1MB), `maxStringLength` (65535), `maxArrayElements` (1000), `canonicalValues`. `__proto__`/`constructor`/`prototype` blocked. 5MB JSON body limit in `main.ts`. **Note:** `StrictSchemaValidation` still defaults to `false` (by design for Entra compatibility). | Always-on basic type validation (split from strict mode), DTO guards (`@IsIn`, `@ArrayMaxSize`, `@IsNotEmpty`), prototype key stripping | 8.5 |
+| G8h | ~~**Required sub-attributes + canonicalValues not enforced**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.1-fix1)** — `validateSubAttributes()` enforces required sub-attrs (V9) on create/replace. `canonicalValues` enforced with case-insensitive matching. Both gated behind `StrictSchemaValidation`. | Add required sub-attr check in `validateSubAttributes()`; optional `canonicalValues` enforcement | 8.6 |
+| G8i | ~~**Filter/PATCH hardening: no depth/length limits, valuePath regex gaps**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.1-fix1)** — Filter parser: `MAX_FILTER_DEPTH=50` with `guardDepth()`. PatchEngine: `__proto__`/`constructor`/`prototype` in `RESERVED_ATTRIBUTES`, `meta`/`schemas` stripped. SearchRequestDto: `@MaxLength(10000)` on filter. Patch ops: `@ArrayMaxSize(1000)`. Schema URN format validation + duplicate rejection. | Max filter depth/length, semantic attr validation; PATCH path sanitization; strip `meta`/`schemas` from reserved attrs | 8.7 |
 | G9 | **No /Bulk endpoint** | LOW | Missing entirely | `BulkController` + `BulkProcessor` with bulkId resolution | 9 |
 | G10 | **No /Me endpoint** | LOW | Missing entirely | `MeController` mapping authenticated user to resource | 10 |
 | G11 | **Global shared-secret auth** | MEDIUM | `shared-secret.guard.ts` (single SCIM_SHARED_SECRET for all endpoints) | Per-endpoint credentials in `endpoint_credential` table | 11 |
 | G12 | **No sortBy/sortOrder support** | LOW | ServiceProviderConfig returns `sort: {supported: false}` | Sort push-down to DB; in-memory fallback for JSONB paths | 12 |
-| G13 | **ETag uses timestamp** (collision-prone) | MEDIUM | `buildMeta()` → `W/"${updatedAt.toISOString()}"` | Monotonic `version INT` column | 7 |
-| G14 | **`rawPayload` stored as String** (not JSONB) | MEDIUM | `schema.prisma` → `rawPayload String` | `payload JSONB` column with GIN index | 2,3 |
-| G15 | **`userNameLower` / `displayNameLower`** helper columns | LOW | `schema.prisma` | Remove; use PostgreSQL CITEXT for transparent case-insensitivity | 3 |
-| G16 | **Extension URN hardcoded** to Enterprise User only | MEDIUM | `scim-patch-path.ts` → `KNOWN_EXTENSION_URNS` | Dynamic from `endpoint_schema` rows | 6 |
+| G13 | ~~**ETag uses timestamp** (collision-prone)~~ | ~~MEDIUM~~ | ✅ **DONE (v0.16.0)** — Monotonic `version INT` column with `W/"v{N}"` format. Atomic `version: { increment: 1 }` in Prisma, `(existing.version ?? 1) + 1` in InMemory. | Monotonic `version INT` column | 7 |
+| G14 | ~~**`rawPayload` stored as String** (not JSONB)~~ | ~~MEDIUM~~ | ✅ **DONE (v0.10.0)** — `payload Json @db.JsonB` in unified `ScimResource` model. Direct JSONB storage, no string serialization. | `payload JSONB` column with GIN index | 2,3 |
+| G15 | ~~**`userNameLower` / `displayNameLower`** helper columns~~ | ~~LOW~~ | ✅ **DONE (v0.10.0)** — Removed. `userName` and `displayName` use `@db.Citext` for transparent case-insensitive operations. | Remove; use PostgreSQL CITEXT for transparent case-insensitivity | 3 |
+| G16 | ~~**Extension URN hardcoded** to Enterprise User only~~ | ~~MEDIUM~~ | ✅ **DONE (v0.14.0)** — `KNOWN_EXTENSION_URNS` centralized and includes 4 msfttest schemas. `ScimSchemaRegistry` dynamically loads per-endpoint custom extension URNs from `EndpointSchema` table. | Dynamic from `endpoint_schema` rows | 6 |
 | G17 | **Code duplication** between User/Group services | MEDIUM | ~600 lines each with isomorphic patterns | Single `ResourceOrchestrator` parameterized by resource type | 2,5 |
-| G18 | **No POST /.search** endpoint | LOW | Missing | Add alongside existing GET list | 12 |
-| G19 | **Response `schemas[]` never includes extension URNs** | MEDIUM | `toScimUserResource()` hardcodes `schemas[]`; `includeEnterpriseSchema` flag defined (L47) + defaulted false (L204) but **never consumed** at runtime | `schemas[]` dynamically built from `{resource payload keys} ∩ {endpoint_schema URNs}` | 6 |
-| G20 | **7 of 12 config flags are dead code (58%)** | MEDIUM | `excludeMeta`, `excludeSchemas`, `customSchemaUrn`, `includeEnterpriseSchema`, `strictMode`, `legacyMode`, `customHeaders` — all defined + defaulted but **never consumed** at runtime | Remove dead flags or wire them to behavior; document live-flag contract in endpoint config | 6 |
+| G18 | ~~**No POST /.search** endpoint~~ | ~~LOW~~ | ✅ **DONE (v0.10.0)** — `POST /Users/.search` and `POST /Groups/.search` endpoints in both endpoint-scoped and global controllers. | Add alongside existing GET list | 12 |
+| G19 | ~~**Response `schemas[]` never includes extension URNs**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.14.0)** — `toScimUserResource()` dynamically builds `schemas[]` from `{resource payload keys} ∩ {endpoint extension URNs}`. Enterprise User extension + custom extensions included when present in payload. | `schemas[]` dynamically built from `{resource payload keys} ∩ {endpoint_schema URNs}` | 6 |
+| G20 | ~~**7 of 12 config flags are dead code (58%)**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.14.0)** — Dead flags removed. 10 live boolean flags + `logLevel` documented in `docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md`. All flags validated via `validateEndpointConfig()`. | Remove dead flags or wire them to behavior; document live-flag contract in endpoint config | 6 |
 
 ### Gap Heat Map (Severity × Impact on RFC Compliance)
 
 ```
                     ┌───────────────────────────────────────────────────────────────────┐
-                    │          SEVERITY ASSESSMENT (updated 2026-02-24)                  │
+                    │          SEVERITY ASSESSMENT (updated 2026-02-25)                  │
                     ├──────────────┬────────────────────────────────────────────────────┤
-  RFC Compliance ───│ HIGH         │ ✅G1 ✅G3 ✅G4 ✅G5 ✅G7   G8c ✅G8d G8g       │
-                    │              │ (Architectural + input hardening)                  │
+  RFC Compliance ───│ HIGH         │ ✅G1 ✅G3 ✅G4 ✅G5 ✅G7 ✅G8d ✅G8g           │
+                    │              │ (All HIGH-severity gaps resolved)                  │
                     ├──────────────┼────────────────────────────────────────────────────┤
-  Correctness ──────│ MEDIUM       │ G2 ✅G6 ✅G8 G8b G8e ✅G8f G8h G8i G11 ✅G13 G14 │
-                    │              │ (Validation gaps + per-endpoint data)              │
+  Correctness ──────│ MEDIUM       │ G2 ✅G6 ✅G8 G8b G8e ✅G8f ✅G8h ✅G8i G11    │
+                    │              │ ✅G13 ✅G14 ✅G16 ✅G19 ✅G20                    │
                     ├──────────────┼────────────────────────────────────────────────────┤
-  Completeness ─────│ LOW          │ G9 G10 G12 ✅G15 G17 G18                         │
+                    │ LOW (demoted)│ ⚠️G8c (partial — immutable enforced, readOnly     │
+                    │              │  not pre-validated in PatchEngine)                 │
+                    ├──────────────┼────────────────────────────────────────────────────┤
+  Completeness ─────│ LOW          │ G9 G10 G12 ✅G15 G17 ✅G18                       │
                     │              │ (Features / cleanup)                              │
                     └──────────────┴────────────────────────────────────────────────────┘
 
-  ✅ = Resolved in v0.10.0–v0.17.0
+  ✅ = Resolved in v0.10.0–v0.17.2 (26 of 27 gaps resolved or partially resolved)
+  ⚠️ = Partially resolved
+  Open: G2 G8b G8c(partial) G8e G9 G10 G11 G12 G17
 ```
 
 ### Gap Resolution Flow
@@ -102,7 +107,7 @@ flowchart LR
         G13[G13 Timestamp ETag]
         G14[G14 rawPayload String]
         G16[G16 Hardcoded URN]
-        G19[G19 schemas[] ignores extensions]
+        G19["G19 schemas[] ignores extensions"]
         G20[G20 Dead config flags 58%]
     end
     subgraph LOW["LOW Severity"]
@@ -139,25 +144,25 @@ flowchart LR
 ## 2. Phase Overview Map
 
 ```
-Phase 1  Repository Pattern         ████████ (foundational — all later phases depend)
+Phase 1  Repository Pattern         ████████ (foundational — all later phases depend) ✅ DONE v0.10.0
 Phase 2  Unified Resource Table     ██████   (data model alignment)
-Phase 3  PostgreSQL Migration       ██████   (infrastructure swap)
-Phase 4  Filter Push-Down           ████     (perf + compliance)
-Phase 5  Domain PATCH Engine        ██████   (correctness + testability)
-Phase 6  Data-Driven Discovery      ████     (per-endpoint schema)
-Phase 7  ETag & Versioning          ████     (concurrency)
-Phase 8  Schema Validation          ████     (strictness)         ✅ DONE v0.17.0
-Phase 8.1 Mutability Enforcement    ████     (readOnly/immutable in PATCH+PUT)
+Phase 3  PostgreSQL Migration       ██████   (infrastructure swap)                     ✅ DONE v0.10.0
+Phase 4  Filter Push-Down           ████     (perf + compliance)                       ✅ DONE v0.12.0
+Phase 5  Domain PATCH Engine        ██████   (correctness + testability)               ✅ DONE v0.13.0
+Phase 6  Data-Driven Discovery      ████     (per-endpoint schema)                     ✅ DONE v0.14.0
+Phase 7  ETag & Versioning          ████     (concurrency)                             ✅ DONE v0.16.0
+Phase 8  Schema Validation          ████     (strictness)                              ✅ DONE v0.17.0
+Phase 8.1 Mutability Enforcement    ████     (readOnly/immutable in PATCH+PUT)         ⚠️ PARTIAL v0.17.1
 Phase 8.2 Custom Resource Types     ████     (extensibility)
 Phase 8.3 Response Returned Filter  ███      (never/request/writeOnly stripping)
-Phase 8.4 caseExact in Filters      ██       (schema-aware filter comparisons)
-Phase 8.5 Input Hardening           ███      (always-on type validation, DTO guards, payload limits)
-Phase 8.6 Sub-attr & Canonical Val  ██       (required sub-attrs, canonicalValues enforcement)
-Phase 8.7 Filter & PATCH Hardening  ██       (depth/length limits, path sanitization)
+Phase 8.4 caseExact in Filters      ██       (schema-aware filter comparisons)         ✅ DONE v0.17.2
+Phase 8.5 Input Hardening           ███      (always-on type validation, DTO guards)   ✅ DONE v0.17.1-fix1
+Phase 8.6 Sub-attr & Canonical Val  ██       (required sub-attrs, canonicalValues)     ✅ DONE v0.17.1-fix1
+Phase 8.7 Filter & PATCH Hardening  ██       (depth/length limits, path sanitization)  ✅ DONE v0.17.1-fix1
 Phase 9  Bulk Operations            ███      (feature)
 Phase 10 /Me Endpoint               ██       (feature)
 Phase 11 Per-Endpoint Credentials     ████     (security)
-Phase 12 Sort, Search, Cleanup      ████     (polish)
+Phase 12 Sort, Search, Cleanup      ████     (polish)                                  ⚠️ PARTIAL (POST /.search done)
 ```
 
 ### Phase Timeline (Estimated)

@@ -4,7 +4,7 @@ Production-ready SCIM 2.0 server with a built-in observability UI for Microsoft 
 
 | Key | Value |
 |---|---|
-| Version | [`v0.17.1`](https://github.com/pranems/SCIMServer/releases/latest) |
+| Version | [`v0.17.2`](https://github.com/pranems/SCIMServer/releases/latest) |
 | Protocol | [SCIM 2.0](https://scim.cloud/) |
 | Target Platform | [Microsoft Entra ID](https://entra.microsoft.com/) |
 | Runtime | Node.js 24 |
@@ -175,7 +175,7 @@ Operational docs:
 
 ```powershell
 iex (irm https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-func.ps1)
-Update-SCIMServer -Version v0.17.1 -ResourceGroup <rg> -AppName <app>
+Update-SCIMServer -Version v0.17.2 -ResourceGroup <rg> -AppName <app>
 ```
 
 Admin/release references:
@@ -190,8 +190,8 @@ Admin/release references:
 
 Latest validated matrix:
 
-- Unit tests: **2063/2063** (61 suites)
-- E2E tests: **358/358** (19 suites)
+- Unit tests: **2096/2096** (61 suites)
+- E2E tests: **368/368** (19 suites)
 - Live integration tests: **334/334** (local + Docker, includes in-memory instances)
 - Microsoft SCIM Validator: **25/25 passed** (+ 7 preview scenarios)
 

@@ -35,8 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Schema-aware boolean sanitization (V16/V17)** — `sanitizeBooleanStrings()` now only converts attributes whose schema type is `"boolean"` (via `SchemaValidator.collectBooleanAttributeNames()`), preventing over-zealous coercion of string fields that happen to contain "True"/"False" values.
 
 ### Verified
-- **2063/2063 unit tests passing** (61 suites) — up from 1962 (+101 new)
-- **358/358 E2E tests passing** (19 suites) — up from 342 (+16 new)
+- **2096/2096 unit tests passing** (61 suites) — up from 1962 (+134 new)
+- **368/368 E2E tests passing** (19 suites) — up from 342 (+26 new)
 - **334/334 live integration tests passing** — on both local and Docker in-memory instances
 - Clean build (`tsc -p tsconfig.build.json` — 0 errors)
 
