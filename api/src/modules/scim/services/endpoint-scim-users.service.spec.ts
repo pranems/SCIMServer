@@ -2811,4 +2811,88 @@ describe('EndpointScimUsersService', () => {
       });
     });
   });
+
+  // ───────────── G8e: returned characteristic filtering ─────────────
+
+  describe('G8e — returned characteristic filtering', () => {
+    const baseUrl = 'http://localhost:3000/scim/endpoints/endpoint-1';
+
+    describe('toScimUserResource — returned:never stripping', () => {
+      it('should strip password from response when rawPayload contains it', async () => {
+        const userWithPassword = {
+          ...mockUser,
+          rawPayload: JSON.stringify({ displayName: 'Test User', password: 'SuperSecret123!' }),
+        };
+
+        mockUserRepo.findByScimId.mockResolvedValue(userWithPassword);
+
+        const result = await service.getUserForEndpoint(
+          userWithPassword.scimId,
+          baseUrl,
+          mockEndpoint.id,
+        );
+
+        expect(result.userName).toBe(userWithPassword.userName);
+        expect(result).not.toHaveProperty('password');
+      });
+
+      it('should strip password from create response', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'pw-test@example.com',
+          password: 'Secret123!',
+          active: true,
+        };
+
+        const createdRecord = {
+          ...mockUser,
+          userName: createDto.userName,
+          rawPayload: JSON.stringify({ displayName: 'PW User', password: 'Secret123!' }),
+        };
+
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.create.mockResolvedValue(createdRecord);
+
+        const result = await service.createUserForEndpoint(createDto, baseUrl, mockEndpoint.id);
+
+        expect(result.userName).toBe('pw-test@example.com');
+        expect(result).not.toHaveProperty('password');
+      });
+
+      it('should preserve non-password attributes while stripping password', async () => {
+        const userWithMixed = {
+          ...mockUser,
+          rawPayload: JSON.stringify({
+            displayName: 'Mixed User',
+            password: 'Secret!',
+            nickName: 'mixie',
+            title: 'Engineer',
+          }),
+        };
+
+        mockUserRepo.findByScimId.mockResolvedValue(userWithMixed);
+
+        const result = await service.getUserForEndpoint(
+          userWithMixed.scimId,
+          baseUrl,
+          mockEndpoint.id,
+        );
+
+        expect(result).not.toHaveProperty('password');
+        expect(result.displayName).toBe('Mixed User');
+        expect((result as Record<string, unknown>).nickName).toBe('mixie');
+        expect((result as Record<string, unknown>).title).toBe('Engineer');
+      });
+    });
+
+    describe('getRequestOnlyAttributes', () => {
+      it('should return a Set of request-only attribute names', () => {
+        const requestOnlyAttrs = service.getRequestOnlyAttributes(mockEndpoint.id);
+
+        // The default User schema has no request-only attributes, so the set should be empty
+        expect(requestOnlyAttrs).toBeInstanceOf(Set);
+        expect(requestOnlyAttrs.size).toBe(0);
+      });
+    });
+  });
 });

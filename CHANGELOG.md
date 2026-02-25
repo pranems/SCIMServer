@@ -5,6 +5,31 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.4] - 2026-02-25
+
+### Added
+- **G8e — Response `returned` Characteristic Filtering** — RFC 7643 §2.4 compliance. Two-layer architecture:
+  - **Service layer**: `toScimUserResource()` / `toScimGroupResource()` strip `returned:'never'` attributes (e.g. `password`) from ALL responses (POST, PUT, PATCH, GET, LIST).
+  - **Controller layer**: Enhanced `applyAttributeProjection()` strips `returned:'request'` attributes from GET/LIST/SEARCH responses unless explicitly requested via `attributes` query parameter. Write operation responses also strip request-only attributes.
+- **`password` attribute added to User schema constants** — RFC 7643 §4.1 compliance: `USER_SCHEMA_ATTRIBUTES` now includes `password` with `returned: 'never'`, `mutability: 'writeOnly'`, `type: 'string'`. Previously missing entirely from `/Schemas` output.
+- **`SchemaValidator.collectReturnedCharacteristics()`** — New static method that collects `returned: 'never'` and `returned: 'request'` attribute names from schema definitions, supporting sub-attributes and extension schemas.
+- **`stripReturnedNever()` export** — New utility in `scim-attribute-projection.ts` for service-layer use. Handles both top-level and extension URN nested attributes.
+- **`getRequestOnlyAttributes()` public method** — Added to both `EndpointScimUsersService` and `EndpointScimGroupsService` for controllers to access `returned: 'request'` attribute sets.
+- **Deep-freeze schema constants** — All exported schema constant arrays/objects in `scim-schemas.constants.ts` are now recursively frozen at module load via `deepFreeze()`. Prevents a pre-existing runtime mutation bug where shared schema arrays (e.g. `USER_SCHEMA_ATTRIBUTES`) were silently modified during request processing, corrupting `/Schemas` discovery output and breaking G8e characteristic lookups. TypeScript `as const` provides compile-time safety only; `Object.freeze` provides the runtime guarantee.
+- **10 new live integration tests** — `scripts/live-test.ps1` TEST SECTION 9l: POST/GET/LIST/PUT/PATCH/SEARCH password stripping, `?attributes=password` override rejection, mixed attribute requests, `/Schemas` metadata validation, POST `/.search` with attributes override.
+- **40 new unit tests** — `scim-attribute-projection.spec.ts` (16 new: requestOnlyAttrs filtering, stripReturnedNever, extension URN handling, case-insensitivity), `schema-validator-v16-v32.spec.ts` (10 new: collectReturnedCharacteristics with never/request/always/default/sub-attributes/multiple schemas/empty/case-insensitive), `endpoint-scim-users.service.spec.ts` (4 new: password stripping, request-only attributes), `endpoint-scim-groups.service.spec.ts` (2 new: never-returned stripping, request-only attributes), `endpoint-scim-users.controller.spec.ts` (4 new: G8e request-only attribute filtering across CRUD ops), `endpoint-scim-groups.controller.spec.ts` (4 new: G8e request-only attribute filtering across CRUD ops).
+- **8 new E2E tests** — `returned-characteristic.e2e-spec.ts`: POST/GET/PUT/PATCH/LIST/SEARCH password stripping, explicit `attributes=password` rejection, `/Schemas` discovery validation.
+- **Feature doc** — `docs/G8E_RETURNED_CHARACTERISTIC_FILTERING.md` — RFC references, two-layer architecture, implementation details, Mermaid diagrams, test coverage.
+
+### Fixed
+- **Schema constant runtime mutation bug** — Pre-existing bug where `USER_SCHEMA_ATTRIBUTES` (and potentially other schema constant arrays) were silently mutated during request processing, removing attributes like `password` (writeOnly) and `groups` (readOnly). This caused `/Schemas` endpoint to return only 16 of 18 attributes after the first request cycle. Root cause: `ScimSchemaRegistry.loadBuiltInSchemas()` stored direct references to the constant arrays; some downstream code path then mutated these shared references. Fixed by applying recursive `Object.freeze()` to all schema constants at module load. The freeze causes any mutation attempt to silently fail (in non-strict mode) or throw (in strict mode), protecting the shared state.
+
+### Verified
+- **2,156/2,156 unit tests passing** (61 suites) — up from 2,116 (+40 new)
+- **382/382 E2E tests passing** (20 suites) — up from 374 (+8 new)
+- **361/361 live tests passing** — up from 334 (+27 new), tested on both local (inmemory) and Docker (PostgreSQL)
+- Clean build (`tsc -p tsconfig.build.json` — 0 errors)
+
 ## [0.17.3] - 2026-02-25
 
 ### Added

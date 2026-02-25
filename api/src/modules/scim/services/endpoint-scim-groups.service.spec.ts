@@ -2636,4 +2636,40 @@ describe('EndpointScimGroupsService', () => {
       });
     });
   });
+
+  // ───────────── G8e: returned characteristic filtering ─────────────
+
+  describe('G8e — returned characteristic filtering', () => {
+    const baseUrl = 'http://localhost:3000/scim/endpoints/endpoint-1';
+
+    describe('toScimGroupResource — returned:never stripping', () => {
+      it('should strip returned:never attributes from group response', async () => {
+        const groupWithExtra = {
+          ...mockGroup,
+          rawPayload: JSON.stringify({ description: 'Test group' }),
+        };
+        mockGroupRepo.findWithMembers.mockReset();
+        mockGroupRepo.findWithMembers.mockResolvedValue(groupWithExtra);
+
+        const result = await service.getGroupForEndpoint(
+          mockGroup.scimId,
+          baseUrl,
+          mockEndpoint.id,
+        );
+
+        expect(result.displayName).toBe(groupWithExtra.displayName);
+        expect(result.id).toBe(mockGroup.scimId);
+      });
+    });
+
+    describe('getRequestOnlyAttributes', () => {
+      it('should return a Set of request-only attribute names', () => {
+        const requestOnlyAttrs = service.getRequestOnlyAttributes(mockEndpoint.id);
+
+        // The default Group schema has no request-only attributes
+        expect(requestOnlyAttrs).toBeInstanceOf(Set);
+        expect(requestOnlyAttrs.size).toBe(0);
+      });
+    });
+  });
 });

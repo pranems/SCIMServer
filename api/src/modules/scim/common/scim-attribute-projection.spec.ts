@@ -1,6 +1,7 @@
 import {
   applyAttributeProjection,
   applyAttributeProjectionToList,
+  stripReturnedNever,
 } from './scim-attribute-projection';
 
 describe('applyAttributeProjection', () => {
@@ -206,5 +207,165 @@ describe('applyAttributeProjectionToList', () => {
     expect(result[0].active).toBeUndefined();
     expect(result[1].active).toBeUndefined();
     expect(result[0].userName).toBe('alice');
+  });
+
+  it('should strip request-only attrs from all resources when passed', () => {
+    const requestOnly = new Set(['active']);
+    const result = applyAttributeProjectionToList(resources, undefined, undefined, requestOnly);
+    expect(result).toHaveLength(2);
+    expect(result[0].active).toBeUndefined();
+    expect(result[1].active).toBeUndefined();
+    expect(result[0].userName).toBe('alice');
+  });
+});
+
+// ─── G8e: returned:'request' filtering ────────────────────────────────────────
+
+describe('applyAttributeProjection with requestOnlyAttrs (G8e)', () => {
+  const user = {
+    schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+    id: 'u1',
+    userName: 'alice',
+    displayName: 'Alice',
+    costCenter: 'CC-100',
+    secretField: 'hidden-value',
+    meta: { resourceType: 'User' },
+  };
+
+  it('should strip request-only attrs when no attributes param specified', () => {
+    const requestOnly = new Set(['costcenter', 'secretfield']);
+    const result = applyAttributeProjection(user, undefined, undefined, requestOnly);
+    expect(result.costCenter).toBeUndefined();
+    expect(result.secretField).toBeUndefined();
+    expect(result.userName).toBe('alice');
+    expect(result.displayName).toBe('Alice');
+  });
+
+  it('should include request-only attrs when explicitly in attributes param', () => {
+    const requestOnly = new Set(['costcenter']);
+    const result = applyAttributeProjection(user, 'costCenter,userName', undefined, requestOnly);
+    expect(result.costCenter).toBe('CC-100');
+    expect(result.userName).toBe('alice');
+    expect(result.displayName).toBeUndefined();
+  });
+
+  it('should strip request-only attrs when using excludedAttributes', () => {
+    const requestOnly = new Set(['costcenter']);
+    const result = applyAttributeProjection(user, undefined, 'displayName', requestOnly);
+    expect(result.costCenter).toBeUndefined();
+    expect(result.displayName).toBeUndefined();
+    expect(result.userName).toBe('alice');
+  });
+
+  it('should not strip if requestOnlyAttrs is empty', () => {
+    const result = applyAttributeProjection(user, undefined, undefined, new Set());
+    expect(result.costCenter).toBe('CC-100');
+    expect(result.secretField).toBe('hidden-value');
+  });
+
+  it('should not strip if requestOnlyAttrs is undefined', () => {
+    const result = applyAttributeProjection(user, undefined, undefined, undefined);
+    expect(result).toBe(user); // reference identity — no-op
+  });
+
+  it('should handle request-only attrs inside extension URN objects', () => {
+    const userWithExt = {
+      ...user,
+      'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User': {
+        department: 'Engineering',
+        costCenter: 'CC-200',
+      },
+    };
+    const requestOnly = new Set(['costcenter']);
+    const result = applyAttributeProjection(userWithExt, undefined, undefined, requestOnly);
+    expect(result.costCenter).toBeUndefined();
+    const ext = result['urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'] as Record<string, unknown>;
+    expect(ext.costCenter).toBeUndefined();
+    expect(ext.department).toBe('Engineering');
+  });
+
+  it('should be case-insensitive on request-only matching', () => {
+    const requestOnly = new Set(['costcenter']);
+    const result = applyAttributeProjection(
+      { ...user, CostCenter: 'CC-300' },
+      undefined, undefined, requestOnly,
+    );
+    expect(result.CostCenter).toBeUndefined();
+  });
+});
+
+// ─── G8e: stripReturnedNever ──────────────────────────────────────────────────
+
+describe('stripReturnedNever (G8e)', () => {
+  it('should strip never-returned attributes from top level', () => {
+    const resource = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+      id: 'u1',
+      userName: 'alice',
+      password: 'secret123',
+      meta: { resourceType: 'User' },
+    };
+    const neverAttrs = new Set(['password']);
+    const result = stripReturnedNever(resource, neverAttrs);
+    expect(result.password).toBeUndefined();
+    expect(result.userName).toBe('alice');
+    expect(result.id).toBe('u1');
+  });
+
+  it('should strip never-returned attributes inside extension URN objects', () => {
+    const resource = {
+      schemas: ['s1'],
+      id: 'u1',
+      'urn:ext:custom': {
+        department: 'Eng',
+        apiSecret: 'hidden',
+      },
+    };
+    const neverAttrs = new Set(['apisecret']);
+    const result = stripReturnedNever(resource, neverAttrs);
+    const ext = result['urn:ext:custom'] as Record<string, unknown>;
+    expect(ext.apiSecret).toBeUndefined();
+    expect(ext.department).toBe('Eng');
+  });
+
+  it('should be case-insensitive', () => {
+    const resource = { id: 'u1', Password: 'secret', schemas: ['s'] };
+    const result = stripReturnedNever(resource, new Set(['password']));
+    expect(result.Password).toBeUndefined();
+  });
+
+  it('should return resource as-is when neverAttrs is empty', () => {
+    const resource = { id: 'u1', password: 'secret', schemas: ['s'] };
+    const result = stripReturnedNever(resource, new Set());
+    expect(result).toBe(resource); // reference identity — no-op
+    expect(result.password).toBe('secret');
+  });
+
+  it('should handle null/undefined neverAttrs gracefully', () => {
+    const resource = { id: 'u1', password: 'secret', schemas: ['s'] };
+    const result = stripReturnedNever(resource, undefined as unknown as Set<string>);
+    expect(result).toBe(resource);
+  });
+
+  it('should strip multiple never-returned attributes', () => {
+    const resource = { id: 'u1', password: 'p', apiKey: 'k', name: 'test', schemas: ['s'] };
+    const result = stripReturnedNever(resource, new Set(['password', 'apikey']));
+    expect(result.password).toBeUndefined();
+    expect(result.apiKey).toBeUndefined();
+    expect(result.name).toBe('test');
+  });
+
+  it('should not strip non-matching attributes', () => {
+    const resource = { id: 'u1', displayName: 'Alice', userName: 'alice', schemas: ['s'] };
+    const result = stripReturnedNever(resource, new Set(['password']));
+    expect(result.displayName).toBe('Alice');
+    expect(result.userName).toBe('alice');
+  });
+
+  it('should mutate the resource in-place for perf', () => {
+    const resource = { id: 'u1', password: 'secret', schemas: ['s'] };
+    const result = stripReturnedNever(resource, new Set(['password']));
+    expect(result).toBe(resource); // same reference
+    expect(resource.password).toBeUndefined();
   });
 });

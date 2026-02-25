@@ -743,12 +743,30 @@ export class EndpointScimUsersService {
     const booleanKeys = this.getUserBooleanKeys(endpointId);
     this.sanitizeBooleanStrings(rawPayload, booleanKeys);
 
+    // G8e: Strip returned:'never' attributes from rawPayload (e.g. password)
+    // Per RFC 7643 §2.4, these MUST NOT appear in any response.
+    const { never: neverAttrs } = this.getUserReturnedCharacteristics(endpointId);
+    for (const key of Object.keys(rawPayload)) {
+      if (neverAttrs.has(key.toLowerCase())) {
+        delete rawPayload[key];
+      }
+    }
+
     // Build schemas[] dynamically — include extension URNs present in payload (G19 fix)
     const extensionUrns = this.schemaRegistry.getExtensionUrns(endpointId);
     const schemas: [string, ...string[]] = [SCIM_CORE_USER_SCHEMA];
     for (const urn of extensionUrns) {
       if (urn in rawPayload) {
         schemas.push(urn);
+        // Also strip never-returned attrs inside extension objects
+        const extObj = rawPayload[urn];
+        if (typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
+          for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
+            if (neverAttrs.has(extKey.toLowerCase())) {
+              delete (extObj as Record<string, unknown>)[extKey];
+            }
+          }
+        }
       }
     }
 
@@ -768,19 +786,43 @@ export class EndpointScimUsersService {
   }
 
   /**
-   * Build the set of boolean attribute names for the User schema.
-   * Cached per-call — collects names from core + extension schemas.
+   * Get the returned:'request' attribute names for User resources.
+   * Used by controllers to filter response attributes per RFC 7643 §2.4.
    */
-  private getUserBooleanKeys(endpointId?: string): Set<string> {
+  getRequestOnlyAttributes(endpointId?: string): Set<string> {
+    const { request } = this.getUserReturnedCharacteristics(endpointId);
+    return request;
+  }
+
+  /**
+   * Collect returned characteristic sets (never + request) for User schemas.
+   */
+  private getUserReturnedCharacteristics(endpointId?: string): { never: Set<string>; request: Set<string> } {
+    const schemas = this.getUserSchemaDefinitions(endpointId);
+    return SchemaValidator.collectReturnedCharacteristics(schemas);
+  }
+
+  /**
+   * Get all User schema definitions (core + extensions) for the endpoint.
+   */
+  private getUserSchemaDefinitions(endpointId?: string): SchemaDefinition[] {
     const coreSchema = this.schemaRegistry.getSchema(SCIM_CORE_USER_SCHEMA, endpointId);
     const schemas: SchemaDefinition[] = [];
     if (coreSchema) schemas.push(coreSchema as SchemaDefinition);
-    // Include extension schemas
     const extUrns = this.schemaRegistry.getExtensionUrns(endpointId);
     for (const urn of extUrns) {
       const ext = this.schemaRegistry.getSchema(urn, endpointId);
       if (ext) schemas.push(ext as SchemaDefinition);
     }
+    return schemas;
+  }
+
+  /**
+   * Build the set of boolean attribute names for the User schema.
+   * Cached per-call — collects names from core + extension schemas.
+   */
+  private getUserBooleanKeys(endpointId?: string): Set<string> {
+    const schemas = this.getUserSchemaDefinitions(endpointId);
     return SchemaValidator.collectBooleanAttributeNames(schemas);
   }
 

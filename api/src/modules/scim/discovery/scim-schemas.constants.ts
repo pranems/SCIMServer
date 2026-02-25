@@ -219,6 +219,16 @@ export const USER_SCHEMA_ATTRIBUTES = [
     ],
   },
   {
+    name: 'password',
+    type: 'string',
+    multiValued: false,
+    required: false,
+    caseExact: false,
+    mutability: 'writeOnly',
+    returned: 'never',
+    description: 'The User\'s cleartext password. This attribute is intended to be used as a means to specify an initial password when creating a new User or to reset an existing User\'s password.',
+  },
+  {
     name: 'externalId',
     type: 'string',
     multiValued: false,
@@ -453,3 +463,36 @@ export const SCIM_SERVICE_PROVIDER_CONFIG = {
     location: '/ServiceProviderConfig',
   },
 };
+
+// ─── Runtime immutability ───────────────────────────────────────────────────
+//
+// Deep-freeze all schema constants to prevent accidental runtime mutation.
+// These objects are shared references used by ScimSchemaRegistry, discovery
+// endpoints, and attribute characteristic filtering (G8e / RFC 7643 §2.4).
+// Any mutation would corrupt the shared state for all consumers.
+//
+// TypeScript `as const` provides compile-time readonly guarantees only;
+// Object.freeze provides the runtime guarantee.
+
+/** Recursively freeze an object and all nested objects/arrays. */
+function deepFreeze<T>(obj: T): T {
+  Object.freeze(obj);
+  if (obj !== null && typeof obj === 'object') {
+    for (const value of Object.values(obj as Record<string, unknown>)) {
+      if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
+        deepFreeze(value);
+      }
+    }
+  }
+  return obj;
+}
+
+deepFreeze(USER_SCHEMA_ATTRIBUTES);
+deepFreeze(ENTERPRISE_USER_ATTRIBUTES);
+deepFreeze(GROUP_SCHEMA_ATTRIBUTES);
+deepFreeze(SCIM_USER_SCHEMA_DEFINITION);
+deepFreeze(SCIM_ENTERPRISE_USER_SCHEMA_DEFINITION);
+deepFreeze(SCIM_GROUP_SCHEMA_DEFINITION);
+deepFreeze(SCIM_USER_RESOURCE_TYPE);
+deepFreeze(SCIM_GROUP_RESOURCE_TYPE);
+deepFreeze(SCIM_SERVICE_PROVIDER_CONFIG);

@@ -20,7 +20,7 @@ import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { PatchUserDto } from '../dto/patch-user.dto';
 import { SearchRequestDto } from '../dto/search-request.dto';
-import { applyAttributeProjection, applyAttributeProjectionToList } from '../common/scim-attribute-projection';
+import { applyAttributeProjection, applyAttributeProjectionToList, stripReturnedNever } from '../common/scim-attribute-projection';
 import { buildBaseUrl } from '../common/base-url.util';
 
 /**
@@ -68,7 +68,15 @@ export class EndpointScimUsersController {
     @Req() req: Request
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
-    return this.usersService.createUserForEndpoint(dto, baseUrl, endpointId, config);
+    const result = await this.usersService.createUserForEndpoint(dto, baseUrl, endpointId, config);
+    // G8e: Strip returned:'request' attributes from write operation responses
+    const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
+    if (requestOnlyAttrs.size > 0) {
+      for (const key of Object.keys(result)) {
+        if (requestOnlyAttrs.has(key.toLowerCase())) delete (result as Record<string, unknown>)[key];
+      }
+    }
+    return result;
   }
 
   /**
@@ -98,12 +106,27 @@ export class EndpointScimUsersController {
     );
 
     if (attributes || excludedAttributes) {
+      const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
       return {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources,
           attributes,
-          excludedAttributes
+          excludedAttributes,
+          requestOnlyAttrs
+        )
+      };
+    }
+    // G8e: Even without projection params, strip returned:'request' attrs
+    const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
+    if (requestOnlyAttrs.size > 0) {
+      return {
+        ...result,
+        Resources: applyAttributeProjectionToList(
+          result.Resources,
+          undefined,
+          undefined,
+          requestOnlyAttrs
         )
       };
     }
@@ -134,12 +157,26 @@ export class EndpointScimUsersController {
     );
 
     if (dto.attributes || dto.excludedAttributes) {
+      const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
       return {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources,
           dto.attributes,
-          dto.excludedAttributes
+          dto.excludedAttributes,
+          requestOnlyAttrs
+        )
+      };
+    }
+    const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
+    if (requestOnlyAttrs.size > 0) {
+      return {
+        ...result,
+        Resources: applyAttributeProjectionToList(
+          result.Resources,
+          undefined,
+          undefined,
+          requestOnlyAttrs
         )
       };
     }
@@ -160,7 +197,8 @@ export class EndpointScimUsersController {
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const result = await this.usersService.getUserForEndpoint(id, baseUrl, endpointId, config);
-    return applyAttributeProjection(result, attributes, excludedAttributes);
+    const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
+    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs);
   }
 
   /**
@@ -176,7 +214,14 @@ export class EndpointScimUsersController {
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const ifMatch = req.headers['if-match'] as string | undefined;
-    return this.usersService.replaceUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
+    const result = await this.usersService.replaceUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
+    const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
+    if (requestOnlyAttrs.size > 0) {
+      for (const key of Object.keys(result)) {
+        if (requestOnlyAttrs.has(key.toLowerCase())) delete (result as Record<string, unknown>)[key];
+      }
+    }
+    return result;
   }
 
   /**
@@ -192,7 +237,14 @@ export class EndpointScimUsersController {
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const ifMatch = req.headers['if-match'] as string | undefined;
-    return this.usersService.patchUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
+    const result = await this.usersService.patchUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
+    const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
+    if (requestOnlyAttrs.size > 0) {
+      for (const key of Object.keys(result)) {
+        if (requestOnlyAttrs.has(key.toLowerCase())) delete (result as Record<string, unknown>)[key];
+      }
+    }
+    return result;
   }
 
   /**

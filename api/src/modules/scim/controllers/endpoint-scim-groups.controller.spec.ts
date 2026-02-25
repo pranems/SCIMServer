@@ -41,6 +41,7 @@ describe('EndpointScimGroupsController', () => {
     patchGroupForEndpoint: jest.fn(),
     replaceGroupForEndpoint: jest.fn(),
     deleteGroupForEndpoint: jest.fn(),
+    getRequestOnlyAttributes: jest.fn().mockReturnValue(new Set<string>()),
   };
 
   const mockEndpointService = {
@@ -437,6 +438,101 @@ describe('EndpointScimGroupsController', () => {
       ).resolves.toBeDefined();
 
       expect(mockGroupsService.getGroupForEndpoint).toHaveBeenCalled();
+    });
+  });
+
+  // ───────────── G8e: returned characteristic filtering ─────────────
+
+  describe('G8e — returned:request attribute filtering', () => {
+    it('POST createGroup should strip returned:request attributes from response', async () => {
+      const createDto: CreateGroupDto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+        displayName: 'G8e Test Group',
+      };
+
+      const mockGroupWithRequestAttr = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+        id: 'scim-grp-g8e',
+        displayName: 'G8e Test Group',
+        members: [],
+        secretTag: 'internal-only',
+        meta: { resourceType: 'Group' },
+      };
+
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      mockGroupsService.createGroupForEndpoint.mockResolvedValue(mockGroupWithRequestAttr);
+      mockGroupsService.getRequestOnlyAttributes.mockReturnValue(new Set(['secrettag']));
+
+      const result = await controller.createGroup('endpoint-1', createDto, mockRequest);
+
+      expect(result.secretTag).toBeUndefined();
+      expect(result.displayName).toBe('G8e Test Group');
+    });
+
+    it('GET listGroups should pass requestOnlyAttrs to projection', async () => {
+      const mockListResponse = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+        totalResults: 1,
+        startIndex: 1,
+        itemsPerPage: 1,
+        Resources: [
+          { schemas: ['s'], id: 'g1', displayName: 'Group 1', secretTag: 'hidden', meta: {} },
+        ],
+      };
+
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      mockGroupsService.listGroupsForEndpoint.mockResolvedValue(mockListResponse);
+      mockGroupsService.getRequestOnlyAttributes.mockReturnValue(new Set(['secrettag']));
+
+      const result = await controller.listGroups('endpoint-1', mockRequest);
+
+      expect(result.Resources[0].secretTag).toBeUndefined();
+      expect(result.Resources[0].displayName).toBe('Group 1');
+    });
+
+    it('GET getGroup should pass requestOnlyAttrs to applyAttributeProjection', async () => {
+      const fullGroup = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+        id: 'scim-grp-g8e-get',
+        displayName: 'G8e Get Group',
+        members: [],
+        secretTag: 'confidential',
+        meta: { resourceType: 'Group' },
+      };
+
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      mockGroupsService.getGroupForEndpoint.mockResolvedValue(fullGroup);
+      mockGroupsService.getRequestOnlyAttributes.mockReturnValue(new Set(['secrettag']));
+
+      const result = await controller.getGroup('endpoint-1', 'scim-grp-g8e-get', mockRequest);
+
+      expect(result.secretTag).toBeUndefined();
+      expect(result.displayName).toBe('G8e Get Group');
+    });
+
+    it('PUT replaceGroup should strip returned:request attributes from response', async () => {
+      const replaceDto: CreateGroupDto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+        displayName: 'Replaced G8e Group',
+      };
+
+      const mockGroupResult = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+        id: 'scim-grp-g8e-put',
+        displayName: 'Replaced G8e Group',
+        members: [],
+        secretTag: 'classified',
+        meta: { resourceType: 'Group' },
+      };
+
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      mockGroupsService.replaceGroupForEndpoint.mockResolvedValue(mockGroupResult);
+      mockGroupsService.getRequestOnlyAttributes.mockReturnValue(new Set(['secrettag']));
+
+      const result = await controller.replaceGroup('endpoint-1', 'scim-grp-g8e-put', replaceDto, mockRequest);
+
+      expect(result.secretTag).toBeUndefined();
+      expect(result.displayName).toBe('Replaced G8e Group');
     });
   });
 });

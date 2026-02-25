@@ -20,7 +20,7 @@ import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { CreateGroupDto } from '../dto/create-group.dto';
 import { PatchGroupDto } from '../dto/patch-group.dto';
 import { SearchRequestDto } from '../dto/search-request.dto';
-import { applyAttributeProjection, applyAttributeProjectionToList } from '../common/scim-attribute-projection';
+import { applyAttributeProjection, applyAttributeProjectionToList, stripReturnedNever } from '../common/scim-attribute-projection';
 import { buildBaseUrl } from '../common/base-url.util';
 
 /**
@@ -70,7 +70,14 @@ export class EndpointScimGroupsController {
     @Req() req: Request
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
-    return this.groupsService.createGroupForEndpoint(dto, baseUrl, endpointId, config);
+    const result = await this.groupsService.createGroupForEndpoint(dto, baseUrl, endpointId, config);
+    const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
+    if (requestOnlyAttrs.size > 0) {
+      for (const key of Object.keys(result)) {
+        if (requestOnlyAttrs.has(key.toLowerCase())) delete (result as Record<string, unknown>)[key];
+      }
+    }
+    return result;
   }
 
   /**
@@ -100,12 +107,26 @@ export class EndpointScimGroupsController {
     );
 
     if (attributes || excludedAttributes) {
+      const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
       return {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources,
           attributes,
-          excludedAttributes
+          excludedAttributes,
+          requestOnlyAttrs
+        )
+      };
+    }
+    const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
+    if (requestOnlyAttrs.size > 0) {
+      return {
+        ...result,
+        Resources: applyAttributeProjectionToList(
+          result.Resources,
+          undefined,
+          undefined,
+          requestOnlyAttrs
         )
       };
     }
@@ -136,12 +157,26 @@ export class EndpointScimGroupsController {
     );
 
     if (dto.attributes || dto.excludedAttributes) {
+      const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
       return {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources,
           dto.attributes,
-          dto.excludedAttributes
+          dto.excludedAttributes,
+          requestOnlyAttrs
+        )
+      };
+    }
+    const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
+    if (requestOnlyAttrs.size > 0) {
+      return {
+        ...result,
+        Resources: applyAttributeProjectionToList(
+          result.Resources,
+          undefined,
+          undefined,
+          requestOnlyAttrs
         )
       };
     }
@@ -162,7 +197,8 @@ export class EndpointScimGroupsController {
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const result = await this.groupsService.getGroupForEndpoint(id, baseUrl, endpointId, config);
-    return applyAttributeProjection(result, attributes, excludedAttributes);
+    const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
+    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs);
   }
 
   /**
@@ -178,7 +214,14 @@ export class EndpointScimGroupsController {
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const ifMatch = req.headers['if-match'] as string | undefined;
-    return this.groupsService.replaceGroupForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
+    const result = await this.groupsService.replaceGroupForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
+    const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
+    if (requestOnlyAttrs.size > 0) {
+      for (const key of Object.keys(result)) {
+        if (requestOnlyAttrs.has(key.toLowerCase())) delete (result as Record<string, unknown>)[key];
+      }
+    }
+    return result;
   }
 
   /**
@@ -194,7 +237,14 @@ export class EndpointScimGroupsController {
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const ifMatch = req.headers['if-match'] as string | undefined;
-    return this.groupsService.patchGroupForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
+    const result = await this.groupsService.patchGroupForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
+    const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
+    if (requestOnlyAttrs.size > 0) {
+      for (const key of Object.keys(result)) {
+        if (requestOnlyAttrs.has(key.toLowerCase())) delete (result as Record<string, unknown>)[key];
+      }
+    }
+    return result;
   }
 
   /**

@@ -125,4 +125,25 @@ When working on development projects:
 - Build incrementally on documented progress and achievements
 - Use MCP servers for accurate, up-to-date information when needed
 
+## Feature / Bug-Fix Commit Checklist (Standing Rule)
+
+Every feature or significant change commit MUST include ALL of the following before committing. Do NOT skip any item:
+
+1. **Unit Tests** — Service-level (`.service.spec.ts`) and Controller-level (`.controller.spec.ts`) tests covering the new behavior
+2. **E2E Tests** — End-to-end spec (`test/e2e/*.e2e-spec.ts`) exercising the feature through HTTP
+3. **Live Integration Tests** — New test section in `scripts/live-test.ps1` covering the feature for all deployment scenarios (local server on port 6000, Docker container on port 8080, Azure). Must be runnable with both `.\live-test.ps1` (local) and `.\live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "docker-secret"` (Docker)
+4. **Feature Documentation** — Dedicated doc in `docs/` (e.g., `docs/G8E_RETURNED_CHARACTERISTIC_FILTERING.md`) with architecture, RFC references, Mermaid diagrams, implementation details, and test coverage tables
+5. **INDEX.md Update** — Add the new feature doc reference to `docs/INDEX.md`
+6. **CHANGELOG.md Update** — Version bump entry with full test counts and feature summary
+7. **Session & Context Updates** — Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts, version, and feature status
+8. **Version Management** — Bump version in `package.json` and all relevant version references
+
+**Live Test Conventions:**
+- New sections go before TEST SECTION 10 (DELETE OPERATIONS / Cleanup)
+- Use sequential section numbering (e.g., `9l`, `9m`, `9n`, ...)
+- Set `$script:currentSection` for result tracking
+- Create dedicated test resources, verify behavior, then clean up at end of section
+- Test all CRUD operations plus edge cases (e.g., `?attributes=` override attempts for returned:never)
+- Follow existing patterns: `Test-Result -Success <bool> -Message <string>`, `Invoke-RestMethod`, `$scimBase`, `$headers`
+
 **This ensures consistent, productive development sessions with persistent project memory and enhanced AI capabilities through MCP server integration.**

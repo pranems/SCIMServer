@@ -841,12 +841,30 @@ export class EndpointScimGroupsService {
     delete rawPayload.active;
     delete rawPayload.id;  // RFC 7643 §3.1: id is server-assigned — never let rawPayload override
 
+    // G8e: Strip returned:'never' attributes from rawPayload
+    // Per RFC 7643 §2.4, these MUST NOT appear in any response.
+    const { never: neverAttrs } = this.getGroupReturnedCharacteristics(endpointId);
+    for (const key of Object.keys(rawPayload)) {
+      if (neverAttrs.has(key.toLowerCase())) {
+        delete rawPayload[key];
+      }
+    }
+
     // Build schemas[] dynamically — include extension URNs present in payload
     const extensionUrns = this.schemaRegistry.getExtensionUrns(endpointId);
     const schemas: [string, ...string[]] = [SCIM_CORE_GROUP_SCHEMA];
     for (const urn of extensionUrns) {
       if (urn in rawPayload) {
         schemas.push(urn);
+        // Also strip never-returned attrs inside extension objects
+        const extObj = rawPayload[urn];
+        if (typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
+          for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
+            if (neverAttrs.has(extKey.toLowerCase())) {
+              delete (extObj as Record<string, unknown>)[extKey];
+            }
+          }
+        }
       }
     }
 
@@ -903,9 +921,26 @@ export class EndpointScimGroupsService {
   }
 
   /**
-   * Build the set of boolean attribute names for the Group schema.
+   * Get the returned:'request' attribute names for Group resources.
+   * Used by controllers to filter response attributes per RFC 7643 §2.4.
    */
-  private getGroupBooleanKeys(endpointId?: string): Set<string> {
+  getRequestOnlyAttributes(endpointId?: string): Set<string> {
+    const { request } = this.getGroupReturnedCharacteristics(endpointId);
+    return request;
+  }
+
+  /**
+   * Collect returned characteristic sets (never + request) for Group schemas.
+   */
+  private getGroupReturnedCharacteristics(endpointId?: string): { never: Set<string>; request: Set<string> } {
+    const schemas = this.getGroupSchemaDefinitions(endpointId);
+    return SchemaValidator.collectReturnedCharacteristics(schemas);
+  }
+
+  /**
+   * Get all Group schema definitions (core + extensions) for the endpoint.
+   */
+  private getGroupSchemaDefinitions(endpointId?: string): SchemaDefinition[] {
     const coreSchema = this.schemaRegistry.getSchema(SCIM_CORE_GROUP_SCHEMA, endpointId);
     const schemas: SchemaDefinition[] = [];
     if (coreSchema) schemas.push(coreSchema as SchemaDefinition);
@@ -914,6 +949,14 @@ export class EndpointScimGroupsService {
       const ext = this.schemaRegistry.getSchema(urn, endpointId);
       if (ext) schemas.push(ext as SchemaDefinition);
     }
+    return schemas;
+  }
+
+  /**
+   * Build the set of boolean attribute names for the Group schema.
+   */
+  private getGroupBooleanKeys(endpointId?: string): Set<string> {
+    const schemas = this.getGroupSchemaDefinitions(endpointId);
     return SchemaValidator.collectBooleanAttributeNames(schemas);
   }
 

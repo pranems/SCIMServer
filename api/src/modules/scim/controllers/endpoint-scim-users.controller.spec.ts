@@ -41,6 +41,7 @@ describe('EndpointScimUsersController', () => {
     patchUserForEndpoint: jest.fn(),
     replaceUserForEndpoint: jest.fn(),
     deleteUserForEndpoint: jest.fn(),
+    getRequestOnlyAttributes: jest.fn().mockReturnValue(new Set<string>()),
   };
 
   const mockEndpointService = {
@@ -457,6 +458,107 @@ describe('EndpointScimUsersController', () => {
       ).resolves.toBeDefined();
 
       expect(mockUsersService.getUserForEndpoint).toHaveBeenCalled();
+    });
+  });
+
+  // ───────────── G8e: returned characteristic filtering ─────────────
+
+  describe('G8e — returned:request attribute filtering', () => {
+    it('POST createUser should strip returned:request attributes from response', async () => {
+      const createDto: CreateUserDto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'g8e-test@example.com',
+        active: true,
+      };
+
+      const mockUserWithRequestAttr = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        id: 'scim-g8e',
+        userName: 'g8e-test@example.com',
+        active: true,
+        secretQuestion: 'What is your pet?',
+        meta: { resourceType: 'User' },
+      };
+
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      mockUsersService.createUserForEndpoint.mockResolvedValue(mockUserWithRequestAttr);
+      // Simulate a request-only attribute
+      mockUsersService.getRequestOnlyAttributes.mockReturnValue(new Set(['secretquestion']));
+
+      const result = await controller.createUser('endpoint-1', createDto, mockRequest);
+
+      // secretQuestion has returned:'request' → stripped from write-op response
+      expect(result.secretQuestion).toBeUndefined();
+      expect(result.userName).toBe('g8e-test@example.com');
+    });
+
+    it('GET listUsers should pass requestOnlyAttrs to projection', async () => {
+      const mockListResponse = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+        totalResults: 1,
+        startIndex: 1,
+        itemsPerPage: 1,
+        Resources: [
+          { schemas: ['s'], id: 'u1', userName: 'user1@example.com', secretQuestion: 'Pet?', meta: {} },
+        ],
+      };
+
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      mockUsersService.listUsersForEndpoint.mockResolvedValue(mockListResponse);
+      mockUsersService.getRequestOnlyAttributes.mockReturnValue(new Set(['secretquestion']));
+
+      const result = await controller.listUsers('endpoint-1', mockRequest);
+
+      // returned:'request' attr should be stripped even without attributes param
+      expect(result.Resources[0].secretQuestion).toBeUndefined();
+      expect(result.Resources[0].userName).toBe('user1@example.com');
+    });
+
+    it('GET getUser should pass requestOnlyAttrs to applyAttributeProjection', async () => {
+      const fullUser = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        id: 'scim-g8e-get',
+        userName: 'g8e-get@example.com',
+        active: true,
+        secretQuestion: 'Favorite color?',
+        meta: { resourceType: 'User' },
+      };
+
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      mockUsersService.getUserForEndpoint.mockResolvedValue(fullUser);
+      mockUsersService.getRequestOnlyAttributes.mockReturnValue(new Set(['secretquestion']));
+
+      const result = await controller.getUser('endpoint-1', 'scim-g8e-get', mockRequest);
+
+      // returned:'request' attr stripped because not in ?attributes= param
+      expect(result.secretQuestion).toBeUndefined();
+      expect(result.userName).toBe('g8e-get@example.com');
+    });
+
+    it('PUT replaceUser should strip returned:request attributes from response', async () => {
+      const replaceDto: CreateUserDto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'g8e-put@example.com',
+        active: true,
+      };
+
+      const mockUserResult = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        id: 'scim-g8e-put',
+        userName: 'g8e-put@example.com',
+        active: true,
+        secretQuestion: 'Birth city?',
+        meta: { resourceType: 'User' },
+      };
+
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      mockUsersService.replaceUserForEndpoint.mockResolvedValue(mockUserResult);
+      mockUsersService.getRequestOnlyAttributes.mockReturnValue(new Set(['secretquestion']));
+
+      const result = await controller.replaceUser('endpoint-1', 'scim-g8e-put', replaceDto, mockRequest);
+
+      expect(result.secretQuestion).toBeUndefined();
+      expect(result.userName).toBe('g8e-put@example.com');
     });
   });
 });

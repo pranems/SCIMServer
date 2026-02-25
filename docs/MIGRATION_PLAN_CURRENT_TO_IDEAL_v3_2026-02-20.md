@@ -46,7 +46,7 @@ The table below maps every gap between the current codebase and the ideal archit
 | G8b | **No custom resource type registration** — only hardcoded User/Group | MEDIUM | `scim-schemas.constants.ts` (static resource types), per-type controllers/services/repos | `EndpointResourceType` table + Admin API + generic wildcard controller + `customResourceTypesEnabled` config flag | 8.2 |
 | G8c | ~~**PatchEngine mutability checks** — readOnly/immutable attrs can be modified via PATCH~~ | ~~HIGH~~ | ✅ **DONE (v0.17.3)** — `SchemaValidator.validatePatchOperationValue()` now enforces readOnly on PATCH ops (add/replace/remove). `resolveRootAttribute()` checks parent readOnly for value-filter paths. No-path ops check each key + extension attributes. `groups` attribute added to `USER_SCHEMA_ATTRIBUTES` (RFC 7643 §4.1). Gated behind `StrictSchemaValidation`. 25 unit + 7 E2E tests. See `docs/G8C_PATCH_READONLY_PREVALIDATION.md`. | PatchEngine consults `SchemaDefinition` before applying ops; rejects readOnly, guards immutable | 8.1 |
 | G8d | ~~**`immutable` not enforced on PUT**~~ — existing immutable values can be overwritten | ~~HIGH~~ | ✅ **DONE (v0.17.0)** — `SchemaValidator.checkImmutable()` + service integration in PUT/PATCH for Users & Groups | SchemaValidator compares new vs existing for immutable attrs on replace; 400 mutability | 8.1 |
-| G8e | **Response `returned` not enforced** — never/request/writeOnly attrs leak in responses | MEDIUM | `toScimUserResource()` (spreads rawPayload as-is) | Schema-driven response filter strips `returned:never`/`writeOnly`; `request` gated | 8.3 |
+| G8e | ~~**Response `returned` not enforced** — never/request/writeOnly attrs leak in responses~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.4)** — Two-layer filtering: service strips `returned:'never'` (e.g. `password`) in `toScim*Resource()`; controller strips `returned:'request'` via enhanced `applyAttributeProjection()`. `password` added to User schema constants (`returned:'never'`, `mutability:'writeOnly'`). `SchemaValidator.collectReturnedCharacteristics()` drives both layers. `stripReturnedNever()` export for write ops. 26 new unit + 8 E2E tests. | Schema-driven response filter strips `returned:never`/`writeOnly`; `request` gated | 8.3 |
 | G8f | ~~**`caseExact` ignored in filter evaluation** — all string comparisons case-insensitive~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.2)** — `externalId` column changed from CITEXT→TEXT, filter engine `'text'` type omits `mode: 'insensitive'`. Migration: `20260225181836_externalid_citext_to_text`. See `docs/EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md` | Filter evaluator consults `caseExact` per-attribute from schema definitions | 8.4 |
 | G8g | ~~**Input hardening: validation disabled by default + DTO gaps**~~ | ~~HIGH~~ | ✅ **DONE (v0.17.1-fix1)** — DTO hardening: `SearchRequestDto` (`@Max(10000)` count, `@MaxLength(10000)` filter, `@IsIn` sortOrder, `@Min(1)` startIndex), `PatchUserDto`/`PatchGroupDto` (`@ArrayMaxSize(1000)`), `CreateUserDto` (`@IsNotEmpty` userName), `@IsIn` on PatchOp. SchemaValidator: `maxPayloadSize` (1MB), `maxStringLength` (65535), `maxArrayElements` (1000), `canonicalValues`. `__proto__`/`constructor`/`prototype` blocked. 5MB JSON body limit in `main.ts`. **Note:** `StrictSchemaValidation` still defaults to `false` (by design for Entra compatibility). | Always-on basic type validation (split from strict mode), DTO guards (`@IsIn`, `@ArrayMaxSize`, `@IsNotEmpty`), prototype key stripping | 8.5 |
 | G8h | ~~**Required sub-attributes + canonicalValues not enforced**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.1-fix1)** — `validateSubAttributes()` enforces required sub-attrs (V9) on create/replace. `canonicalValues` enforced with case-insensitive matching. Both gated behind `StrictSchemaValidation`. | Add required sub-attr check in `validateSubAttributes()`; optional `canonicalValues` enforcement | 8.6 |
@@ -73,7 +73,7 @@ The table below maps every gap between the current codebase and the ideal archit
   RFC Compliance ───│ HIGH         │ ✅G1 ✅G3 ✅G4 ✅G5 ✅G7 ✅G8d ✅G8g           │
                     │              │ (All HIGH-severity gaps resolved)                  │
                     ├──────────────┼────────────────────────────────────────────────────┤
-  Correctness ──────│ MEDIUM       │ G2 ✅G6 ✅G8 G8b G8e ✅G8f ✅G8h ✅G8i G11    │
+  Correctness ──────│ MEDIUM       │ G2 ✅G6 ✅G8 G8b ✅G8e ✅G8f ✅G8h ✅G8i G11  │
                     │              │ ✅G13 ✅G14 ✅G16 ✅G19 ✅G20                    │
                     ├──────────────┼────────────────────────────────────────────────────┤
                     │ LOW (demoted)│ ✅G8c (DONE v0.17.3 — readOnly pre-validated      │
@@ -84,7 +84,7 @@ The table below maps every gap between the current codebase and the ideal archit
                     └──────────────┴────────────────────────────────────────────────────┘
 
   ✅ = Resolved in v0.10.0–v0.17.3 (27 of 27 gaps resolved or partially resolved)
-  Open: G2 G8b G8e G9 G10 G11 G12 G17
+  Open: G2 G8b G9 G10 G11 G12 G17
 ```
 
 ### Gap Resolution Flow

@@ -1000,16 +1000,51 @@ export class SchemaValidator {
     return undefined;
   }
 
+  // ─── G8e: Returned characteristic collection ──────────────────────
+
   /**
-   * Resolve the ROOT (top-level) attribute from a SCIM PATCH path.
+   * Collect attribute names grouped by their `returned` characteristic.
    *
-   * For paths like "groups[value eq \"x\"].display" or "name.givenName",
-   * returns the definition of the first segment ("groups" or "name").
-   * For single-segment paths, returns the same as resolvePatchPath.
+   * Per RFC 7643 §2.4:
+   *  - `never`   — MUST NOT be returned in any response
+   *  - `request` — returned only when explicitly requested via `attributes` param
+   *  - `always`  — always included in responses (id, schemas, meta, etc.)
+   *  - `default` — returned by default, excludable via `excludedAttributes`
    *
-   * Used by G8c to check if the parent attribute is readOnly — if so,
-   * the entire sub-path is unreachable for client writes.
+   * @param schemas  Core + extension schema definitions
+   * @returns Object with `never` and `request` sets of lowercase attribute names
    */
+  static collectReturnedCharacteristics(
+    schemas: readonly SchemaDefinition[],
+  ): { never: Set<string>; request: Set<string> } {
+    const never = new Set<string>();
+    const request = new Set<string>();
+
+    const collect = (attrs: readonly SchemaAttributeDefinition[]): void => {
+      for (const attr of attrs) {
+        const returned = attr.returned?.toLowerCase();
+        if (returned === 'never') {
+          never.add(attr.name.toLowerCase());
+        } else if (returned === 'request') {
+          request.add(attr.name.toLowerCase());
+        }
+        // Sub-attributes inherit parent returned if not specified,
+        // but individual sub-attrs can override — collect those too
+        if (attr.subAttributes) {
+          collect(attr.subAttributes);
+        }
+      }
+    };
+
+    for (const schema of schemas) {
+      collect(schema.attributes);
+    }
+
+    return { never, request };
+  }
+
+  // ─── G8c: PATCH path utilities ────────────────────────────────────
+
   private static resolveRootAttribute(
     path: string,
     coreAttributes: Map<string, SchemaAttributeDefinition>,

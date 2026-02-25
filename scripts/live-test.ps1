@@ -2865,6 +2865,162 @@ try {
 }
 
 # ============================================
+# TEST SECTION 9l: RETURNED CHARACTERISTIC FILTERING (G8e / RFC 7643 S2.4)
+$script:currentSection = "9l: Returned Characteristic (G8e)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9l: RETURNED CHARACTERISTIC FILTERING (G8e / RFC 7643 S2.4)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# RFC 7643 Section 2.4 defines the "returned" characteristic for attributes:
+#   - "always"  : Always returned (id, schemas, meta)
+#   - "default" : Returned unless excludedAttributes lists it
+#   - "request" : Only returned when explicitly requested via ?attributes=
+#   - "never"   : NEVER returned (e.g. password) — even if explicitly requested
+#
+# G8e ensures the server enforces returned:"never" for password across ALL operations.
+
+# --- Setup: Create a user WITH password for returned-characteristic testing ---
+Write-Host "`n--- Setup: Create User with Password for G8e Tests ---" -ForegroundColor Cyan
+$g8eUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "g8e-returned-test-$(Get-Random)@test.com"
+    displayName = "G8e Returned Test User"
+    password = "SuperSecret123!"
+    name = @{ givenName = "G8e"; familyName = "Test" }
+    emails = @(@{ value = "g8e-returned@test.com"; type = "work"; primary = $true })
+    active = $true
+} | ConvertTo-Json -Depth 3
+
+# Test 9l.1: POST /Users with password — response must NOT contain password
+Write-Host "`n--- Test 9l.1: POST /Users with password — password stripped from response ---" -ForegroundColor Cyan
+$g8eUser = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $g8eUserBody
+$g8eUserId = $g8eUser.id
+Test-Result -Success ($null -ne $g8eUserId) -Message "POST /Users with password returns ID: $g8eUserId"
+Test-Result -Success ($null -eq $g8eUser.password) -Message "POST /Users response does NOT contain password (returned:never)"
+Test-Result -Success ($null -ne $g8eUser.userName) -Message "POST /Users response still contains userName"
+Test-Result -Success ($null -ne $g8eUser.displayName) -Message "POST /Users response still contains displayName"
+
+# Test 9l.2: GET /Users/:id — password must NOT be present
+Write-Host "`n--- Test 9l.2: GET /Users/:id — password stripped ---" -ForegroundColor Cyan
+$g8eGetUser = Invoke-RestMethod -Uri "$scimBase/Users/$g8eUserId" -Method GET -Headers $headers
+Test-Result -Success ($null -eq $g8eGetUser.password) -Message "GET /Users/:id does NOT return password"
+Test-Result -Success ($g8eGetUser.userName -like "g8e-returned-test-*") -Message "GET /Users/:id returns userName correctly"
+
+# Test 9l.3: GET /Users (list) — no resource should contain password
+Write-Host "`n--- Test 9l.3: GET /Users list — password stripped from all resources ---" -ForegroundColor Cyan
+$g8eListResult = Invoke-RestMethod -Uri "$scimBase/Users?filter=userName sw `"g8e-returned-test-`"" -Method GET -Headers $headers
+$g8eHasPassword = $false
+foreach ($res in $g8eListResult.Resources) {
+    if ($null -ne $res.password) { $g8eHasPassword = $true; break }
+}
+Test-Result -Success (-not $g8eHasPassword) -Message "GET /Users list — no resource contains password"
+Test-Result -Success ($g8eListResult.totalResults -ge 1) -Message "GET /Users list found g8e test user"
+
+# Test 9l.4: PUT /Users/:id with password — response must NOT contain password
+Write-Host "`n--- Test 9l.4: PUT /Users with password — password stripped from response ---" -ForegroundColor Cyan
+$g8ePutBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $g8eUser.userName
+    displayName = "G8e Put Updated"
+    password = "NewSecret456!"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$g8ePutResult = Invoke-RestMethod -Uri "$scimBase/Users/$g8eUserId" -Method PUT -Headers $headers -Body $g8ePutBody
+Test-Result -Success ($null -eq $g8ePutResult.password) -Message "PUT /Users response does NOT contain password (returned:never)"
+Test-Result -Success ($g8ePutResult.displayName -eq "G8e Put Updated") -Message "PUT /Users response shows updated displayName"
+
+# Test 9l.5: PATCH /Users/:id — response must NOT contain password
+Write-Host "`n--- Test 9l.5: PATCH /Users — password stripped from response ---" -ForegroundColor Cyan
+$g8ePatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        value = @{
+            displayName = "G8e Patch Updated"
+            password = "PatchedSecret789!"
+        }
+    })
+} | ConvertTo-Json -Depth 4
+$g8ePatchResult = Invoke-RestMethod -Uri "$scimBase/Users/$g8eUserId" -Method PATCH -Headers $headers -Body $g8ePatchBody
+Test-Result -Success ($null -eq $g8ePatchResult.password) -Message "PATCH /Users response does NOT contain password (returned:never)"
+Test-Result -Success ($g8ePatchResult.displayName -eq "G8e Patch Updated") -Message "PATCH /Users response shows updated displayName"
+
+# Test 9l.6: POST /Users/.search — password must NOT appear in search results
+Write-Host "`n--- Test 9l.6: POST /Users/.search — password stripped from results ---" -ForegroundColor Cyan
+$g8eSearchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:SearchRequest")
+    filter = "userName eq `"$($g8eUser.userName)`""
+    startIndex = 1
+    count = 10
+} | ConvertTo-Json
+$g8eSearchResult = Invoke-RestMethod -Uri "$scimBase/Users/.search" -Method POST -Headers $headers -Body $g8eSearchBody
+$g8eSearchHasPwd = $false
+foreach ($res in $g8eSearchResult.Resources) {
+    if ($null -ne $res.password) { $g8eSearchHasPwd = $true; break }
+}
+Test-Result -Success (-not $g8eSearchHasPwd) -Message "POST /Users/.search — no resource contains password"
+Test-Result -Success ($g8eSearchResult.totalResults -ge 1) -Message "POST /Users/.search found g8e test user"
+
+# Test 9l.7: GET /Users?attributes=password — password still NOT returned (returned:never overrides explicit request)
+Write-Host "`n--- Test 9l.7: GET /Users?attributes=password — returned:never overrides explicit request ---" -ForegroundColor Cyan
+$g8eAttrPwd = Invoke-RestMethod -Uri "$scimBase/Users/$g8eUserId`?attributes=password" -Method GET -Headers $headers
+Test-Result -Success ($null -eq $g8eAttrPwd.password) -Message "GET /Users/:id?attributes=password — password NOT returned (returned:never wins)"
+Test-Result -Success ($null -ne $g8eAttrPwd.id) -Message "GET /Users/:id?attributes=password — id still returned (always-returned)"
+Test-Result -Success ($null -ne $g8eAttrPwd.schemas) -Message "GET /Users/:id?attributes=password — schemas still returned (always-returned)"
+
+# Test 9l.8: GET /Users?attributes=password,userName — password stripped, userName included
+Write-Host "`n--- Test 9l.8: GET /Users?attributes=password,userName — mixed request ---" -ForegroundColor Cyan
+$g8eMixedAttr = Invoke-RestMethod -Uri "$scimBase/Users/$g8eUserId`?attributes=password,userName" -Method GET -Headers $headers
+Test-Result -Success ($null -eq $g8eMixedAttr.password) -Message "GET ?attributes=password,userName — password not returned"
+Test-Result -Success ($null -ne $g8eMixedAttr.userName) -Message "GET ?attributes=password,userName — userName IS returned"
+
+# Test 9l.9: GET /Schemas — verify password attribute has returned:never and mutability:writeOnly
+Write-Host "`n--- Test 9l.9: GET /Schemas — password attribute metadata ---" -ForegroundColor Cyan
+$g8eSchemas = Invoke-RestMethod -Uri "$scimBase/Schemas" -Method GET -Headers $headers
+$userSchema = $g8eSchemas.Resources | Where-Object { $_.id -eq "urn:ietf:params:scim:schemas:core:2.0:User" }
+Test-Result -Success ($null -ne $userSchema) -Message "Schemas endpoint returns User schema"
+if ($userSchema) {
+    $passwordAttr = $userSchema.attributes | Where-Object { $_.name -eq "password" }
+    Test-Result -Success ($null -ne $passwordAttr) -Message "User schema contains password attribute definition"
+    if ($passwordAttr) {
+        Test-Result -Success ($passwordAttr.returned -eq "never") -Message "password attribute returned=never in schema"
+        Test-Result -Success ($passwordAttr.mutability -eq "writeOnly") -Message "password attribute mutability=writeOnly in schema"
+        Test-Result -Success ($passwordAttr.type -eq "string") -Message "password attribute type=string in schema"
+    }
+}
+
+# Test 9l.10: POST /Users/.search with attributes=password — password NOT in results
+Write-Host "`n--- Test 9l.10: POST /.search with attributes=password — returned:never wins ---" -ForegroundColor Cyan
+$g8eSearchAttrBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:SearchRequest")
+    filter = "userName eq `"$($g8eUser.userName)`""
+    attributes = "password,userName"
+    startIndex = 1
+    count = 10
+} | ConvertTo-Json
+$g8eSearchAttrResult = Invoke-RestMethod -Uri "$scimBase/Users/.search" -Method POST -Headers $headers -Body $g8eSearchAttrBody
+$g8eSearchAttrHasPwd = $false
+foreach ($res in $g8eSearchAttrResult.Resources) {
+    if ($null -ne $res.password) { $g8eSearchAttrHasPwd = $true; break }
+}
+Test-Result -Success (-not $g8eSearchAttrHasPwd) -Message "POST /.search attributes=password — password NOT returned (never wins)"
+if ($g8eSearchAttrResult.Resources.Count -gt 0) {
+    Test-Result -Success ($null -ne $g8eSearchAttrResult.Resources[0].userName) -Message "POST /.search attributes=password,userName — userName IS returned"
+}
+
+# Cleanup: Delete G8e test user
+Write-Host "`n--- Cleanup: G8e test user ---" -ForegroundColor Cyan
+try {
+    if ($g8eUserId) {
+        Invoke-RestMethod -Uri "$scimBase/Users/$g8eUserId" -Method DELETE -Headers $headers | Out-Null
+        Test-Result -Success $true -Message "G8e test user cleaned up"
+    }
+} catch {
+    Test-Result -Success $false -Message "G8e test user cleanup: $_"
+}
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
