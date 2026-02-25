@@ -44,7 +44,7 @@ The table below maps every gap between the current codebase and the ideal archit
 | G7 | ~~**ETag If-Match NOT enforced** before writes~~ | ~~HIGH~~ | ✅ **DONE (v0.16.0)** — Version-based ETags (`W/"v{N}"`), pre-write `enforceIfMatch()` (412 on mismatch), `RequireIfMatch` config flag (428 on missing), atomic `version` increment. | Pre-write check in Orchestrator; monotonic integer version | 7 |
 | G8 | ~~**No schema validation** against endpoint schema definitions~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.0)** — `SchemaValidator` domain class validates type/required/mutability/multiValued/unknown-attrs/sub-attrs | `SchemaValidator` validates payload against `endpoint_schema.attributes` | 8 |
 | G8b | **No custom resource type registration** — only hardcoded User/Group | MEDIUM | `scim-schemas.constants.ts` (static resource types), per-type controllers/services/repos | `EndpointResourceType` table + Admin API + generic wildcard controller + `customResourceTypesEnabled` config flag | 8.2 |
-| G8c | **PatchEngine mutability checks** — ~~readOnly/immutable attrs can be modified via PATCH~~ | ~~HIGH~~ → LOW | ⚠️ **PARTIALLY DONE (v0.17.1)** — `SchemaValidator.checkImmutable()` enforces immutable attrs POST-PATCH in services. ReadOnly attrs rejected on create/replace by SchemaValidator. **Remaining:** PatchEngine itself doesn't pre-validate mutability before applying ops (readOnly attrs still applied then caught post-validation). | PatchEngine consults `SchemaDefinition` before applying ops; rejects readOnly, guards immutable | 8.1 |
+| G8c | ~~**PatchEngine mutability checks** — readOnly/immutable attrs can be modified via PATCH~~ | ~~HIGH~~ | ✅ **DONE (v0.17.3)** — `SchemaValidator.validatePatchOperationValue()` now enforces readOnly on PATCH ops (add/replace/remove). `resolveRootAttribute()` checks parent readOnly for value-filter paths. No-path ops check each key + extension attributes. `groups` attribute added to `USER_SCHEMA_ATTRIBUTES` (RFC 7643 §4.1). Gated behind `StrictSchemaValidation`. 25 unit + 7 E2E tests. See `docs/G8C_PATCH_READONLY_PREVALIDATION.md`. | PatchEngine consults `SchemaDefinition` before applying ops; rejects readOnly, guards immutable | 8.1 |
 | G8d | ~~**`immutable` not enforced on PUT**~~ — existing immutable values can be overwritten | ~~HIGH~~ | ✅ **DONE (v0.17.0)** — `SchemaValidator.checkImmutable()` + service integration in PUT/PATCH for Users & Groups | SchemaValidator compares new vs existing for immutable attrs on replace; 400 mutability | 8.1 |
 | G8e | **Response `returned` not enforced** — never/request/writeOnly attrs leak in responses | MEDIUM | `toScimUserResource()` (spreads rawPayload as-is) | Schema-driven response filter strips `returned:never`/`writeOnly`; `request` gated | 8.3 |
 | G8f | ~~**`caseExact` ignored in filter evaluation** — all string comparisons case-insensitive~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.2)** — `externalId` column changed from CITEXT→TEXT, filter engine `'text'` type omits `mode: 'insensitive'`. Migration: `20260225181836_externalid_citext_to_text`. See `docs/EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md` | Filter evaluator consults `caseExact` per-attribute from schema definitions | 8.4 |
@@ -76,16 +76,15 @@ The table below maps every gap between the current codebase and the ideal archit
   Correctness ──────│ MEDIUM       │ G2 ✅G6 ✅G8 G8b G8e ✅G8f ✅G8h ✅G8i G11    │
                     │              │ ✅G13 ✅G14 ✅G16 ✅G19 ✅G20                    │
                     ├──────────────┼────────────────────────────────────────────────────┤
-                    │ LOW (demoted)│ ⚠️G8c (partial — immutable enforced, readOnly     │
-                    │              │  not pre-validated in PatchEngine)                 │
+                    │ LOW (demoted)│ ✅G8c (DONE v0.17.3 — readOnly pre-validated      │
+                    │              │  in PATCH via SchemaValidator)                     │
                     ├──────────────┼────────────────────────────────────────────────────┤
   Completeness ─────│ LOW          │ G9 G10 G12 ✅G15 G17 ✅G18                       │
                     │              │ (Features / cleanup)                              │
                     └──────────────┴────────────────────────────────────────────────────┘
 
-  ✅ = Resolved in v0.10.0–v0.17.2 (26 of 27 gaps resolved or partially resolved)
-  ⚠️ = Partially resolved
-  Open: G2 G8b G8c(partial) G8e G9 G10 G11 G12 G17
+  ✅ = Resolved in v0.10.0–v0.17.3 (27 of 27 gaps resolved or partially resolved)
+  Open: G2 G8b G8e G9 G10 G11 G12 G17
 ```
 
 ### Gap Resolution Flow

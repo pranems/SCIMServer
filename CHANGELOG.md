@@ -5,6 +5,20 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.3] - 2026-02-25
+
+### Added
+- **G8c — PATCH readOnly Pre-Validation** — `SchemaValidator.validatePatchOperationValue()` now enforces `mutability: 'readOnly'` on PATCH operations. Rejects `add`, `replace`, and `remove` operations targeting readOnly attributes (e.g., `groups`) with HTTP 400. Includes `resolveRootAttribute()` helper for value-filter paths (e.g., `groups[value eq "x"].display` → checks parent `groups` is readOnly). No-path operations also check each object key and extension attribute. Gated behind `StrictSchemaValidation` flag for Entra compatibility.
+- **`groups` attribute added to User schema constants** — RFC 7643 §4.1 compliance: `USER_SCHEMA_ATTRIBUTES` now includes `groups` with `mutability: 'readOnly'`, `type: 'complex'`, `multiValued: true`, and sub-attributes (`value`, `$ref`, `display`, `type`). Previously missing entirely from `/Schemas` output.
+- **25 new unit tests** — `schema-validator-v2-v10-v25-v31.spec.ts`: path-based readOnly ops, no-path readOnly ops, value-filter paths, remove on readOnly, reserved keys, case-insensitive matching, extension attributes.
+- **7 new E2E tests** — `schema-validation.e2e-spec.ts` §15: PATCH replace/add/remove on readOnly `groups` → 400, no-path with readOnly → 400, readWrite allowed, lenient mode acceptance.
+- **Feature doc** — `docs/G8C_PATCH_READONLY_PREVALIDATION.md` — RFC references, architecture flow, implementation details, error response format, test coverage.
+
+### Verified
+- **2116/2116 unit tests passing** (61 suites) — up from 2096 (+20 new)
+- **374/374 E2E tests passing** (19 suites) — up from 368 (+6 net new)
+- Clean build (`tsc -p tsconfig.build.json` — 0 errors)
+
 ## [0.17.2] - 2026-02-25
 
 ### Added

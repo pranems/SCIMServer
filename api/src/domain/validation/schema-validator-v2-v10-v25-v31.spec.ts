@@ -1,5 +1,5 @@
 /**
- * Phase 8.1 / 8.6 Gap Tests — V2, V9, V10, V25, V31
+ * Phase 8.1 / 8.6 Gap Tests — V2, V9, V10, V25, V31, G8c
  *
  * Tests for:
  *  V2  — PATCH pre-validation via validatePatchOperationValue()
@@ -7,6 +7,7 @@
  *  V10 — Canonical value enforcement
  *  V25 — schemas array validation
  *  V31 — Strict xsd:dateTime format
+ *  G8c — readOnly mutability pre-validation in PATCH operations
  */
 
 import { SchemaValidator } from './schema-validator';
@@ -595,5 +596,248 @@ describe('V31 — dateTime additional edge cases', () => {
     const payload = { schemas: [CORE_SCHEMA_ID], lastLogin: '2024-01-15 10:30:00Z' };
     const result = SchemaValidator.validate(payload, [schema], createOpts);
     expect(result.valid).toBe(false);
+  });
+});
+
+// ─── G8c: readOnly mutability pre-validation in PATCH ────────────────────────
+
+describe('G8c — readOnly attribute rejection in PATCH operations', () => {
+  const GROUP_CORE_SCHEMA_ID = 'urn:ietf:params:scim:schemas:core:2.0:Group';
+
+  const userSchemas: SchemaDefinition[] = [
+    makeCoreSchema([
+      makeAttr({ name: 'userName', required: true }),
+      makeAttr({ name: 'displayName' }),
+      makeAttr({ name: 'active', type: 'boolean' }),
+      makeAttr({ name: 'groups', type: 'complex', multiValued: true, mutability: 'readOnly',
+        subAttributes: [
+          makeAttr({ name: 'value' }),
+          makeAttr({ name: 'display' }),
+          makeAttr({ name: 'type' }),
+          makeAttr({ name: '$ref', type: 'reference' }),
+        ],
+      }),
+      makeAttr({
+        name: 'name',
+        type: 'complex',
+        subAttributes: [
+          makeAttr({ name: 'givenName' }),
+          makeAttr({ name: 'familyName' }),
+          makeAttr({ name: 'formatted', mutability: 'readOnly' }),
+        ],
+      }),
+    ]),
+    makeExtSchema([
+      makeAttr({ name: 'department' }),
+      makeAttr({ name: 'organization', mutability: 'readOnly' }),
+    ]),
+  ];
+
+  // ── Path-based operations ──
+
+  describe('path-based operations', () => {
+    it('should reject replace on readOnly attribute (groups)', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'replace', 'groups', [{ value: 'g1' }], userSchemas,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].scimType).toBe('mutability');
+      expect(result.errors[0].message).toMatch(/readOnly/);
+      expect(result.errors[0].message).toMatch(/groups/i);
+    });
+
+    it('should reject add on readOnly attribute (groups)', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'add', 'groups', [{ value: 'g1' }], userSchemas,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].scimType).toBe('mutability');
+    });
+
+    it('should reject remove on readOnly attribute (groups)', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'remove', 'groups', undefined, userSchemas,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].scimType).toBe('mutability');
+      expect(result.errors[0].message).toMatch(/removed/);
+    });
+
+    it('should allow replace on readWrite attribute (displayName)', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'replace', 'displayName', 'Alice', userSchemas,
+      );
+      expect(result.valid).toBe(true);
+    });
+
+    it('should allow add on readWrite attribute', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'add', 'active', true, userSchemas,
+      );
+      expect(result.valid).toBe(true);
+    });
+
+    it('should reject replace on readOnly sub-attribute via dot path (name.formatted)', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'replace', 'name.formatted', 'Dr. Alice Smith', userSchemas,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].scimType).toBe('mutability');
+      expect(result.errors[0].message).toMatch(/readOnly/);
+    });
+
+    it('should allow replace on readWrite sub-attribute via dot path (name.givenName)', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'replace', 'name.givenName', 'Bob', userSchemas,
+      );
+      expect(result.valid).toBe(true);
+    });
+
+    it('should reject replace on readOnly extension attribute via URN path', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'replace',
+        `${EXT_SCHEMA_ID}:organization`,
+        'Acme Corp',
+        userSchemas,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].scimType).toBe('mutability');
+      expect(result.errors[0].message).toMatch(/readOnly/);
+    });
+
+    it('should allow replace on readWrite extension attribute via URN path', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'replace',
+        `${EXT_SCHEMA_ID}:department`,
+        'Engineering',
+        userSchemas,
+      );
+      expect(result.valid).toBe(true);
+    });
+
+    it('should reject readOnly via value-filter path (groups[value eq "x"])', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'replace', 'groups[value eq "g1"].display', 'Group 1', userSchemas,
+      );
+      // groups is readOnly → should be rejected even with value filter
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].scimType).toBe('mutability');
+    });
+  });
+
+  // ── No-path operations (value is an object) ──
+
+  describe('no-path operations', () => {
+    it('should reject readOnly core attribute in no-path replace', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'replace', undefined,
+        { displayName: 'Alice', groups: [{ value: 'g1' }] },
+        userSchemas,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].scimType).toBe('mutability');
+      expect(result.errors[0].path).toBe('groups');
+    });
+
+    it('should reject readOnly core attribute in no-path add', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'add', undefined,
+        { groups: [{ value: 'g1' }] },
+        userSchemas,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].scimType).toBe('mutability');
+    });
+
+    it('should allow no-path replace with only readWrite attributes', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'replace', undefined,
+        { displayName: 'Alice', active: true },
+        userSchemas,
+      );
+      expect(result.valid).toBe(true);
+    });
+
+    it('should reject readOnly extension attribute in no-path object', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'replace', undefined,
+        {
+          [EXT_SCHEMA_ID]: { organization: 'Acme Corp' },
+        },
+        userSchemas,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].scimType).toBe('mutability');
+      expect(result.errors[0].path).toContain('organization');
+    });
+
+    it('should allow readWrite extension attribute in no-path object', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'replace', undefined,
+        {
+          [EXT_SCHEMA_ID]: { department: 'Engineering' },
+        },
+        userSchemas,
+      );
+      expect(result.valid).toBe(true);
+    });
+
+    it('should reject multiple readOnly attributes and report all errors', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'replace', undefined,
+        {
+          groups: [{ value: 'g1' }],
+          [EXT_SCHEMA_ID]: { organization: 'Acme' },
+        },
+        userSchemas,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errors.length).toBeGreaterThanOrEqual(2);
+      expect(result.errors.every(e => e.scimType === 'mutability')).toBe(true);
+    });
+
+    it('should skip reserved keys (schemas, meta, id) — no readOnly error', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'replace', undefined,
+        { schemas: ['urn:some:schema'], meta: {}, id: 'xyz', displayName: 'Alice' },
+        userSchemas,
+      );
+      // Reserved keys are always skipped — should not produce readOnly errors
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  // ── Case-insensitive path matching ──
+
+  describe('case-insensitive path matching', () => {
+    it('should reject readOnly attribute with different case (Groups vs groups)', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'replace', 'Groups', [{ value: 'g1' }], userSchemas,
+      );
+      // resolvePatchPath normalizes to lowercase → should still find groups → readOnly
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].scimType).toBe('mutability');
+    });
+  });
+
+  // ── Remove on readOnly with no value ──
+
+  describe('remove operations on readOnly', () => {
+    it('should reject remove on readOnly attribute with no value', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'remove', 'groups', undefined, userSchemas,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].message).toMatch(/removed/);
+    });
+
+    it('should allow remove on readWrite attribute', () => {
+      const result = SchemaValidator.validatePatchOperationValue(
+        'remove', 'displayName', undefined, userSchemas,
+      );
+      expect(result.valid).toBe(true);
+    });
   });
 });

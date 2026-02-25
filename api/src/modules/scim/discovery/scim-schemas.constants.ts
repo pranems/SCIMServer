@@ -204,6 +204,21 @@ export const USER_SCHEMA_ATTRIBUTES = [
     ],
   },
   {
+    name: 'groups',
+    type: 'complex',
+    multiValued: true,
+    required: false,
+    mutability: 'readOnly',
+    returned: 'default',
+    description: 'A list of groups to which the user belongs, either thorough direct membership, through nested groups, or dynamically calculated. (RFC 7643 §4.1)',
+    subAttributes: [
+      { name: 'value', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readOnly', returned: 'default', description: 'The identifier of the User\'s group.' },
+      { name: '$ref', type: 'reference', multiValued: false, required: false, caseExact: false, mutability: 'readOnly', returned: 'default', referenceTypes: ['User', 'Group'], description: 'The URI of the corresponding "Group" resource.' },
+      { name: 'display', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readOnly', returned: 'default', description: 'A human-readable name, primarily used for display purposes.' },
+      { name: 'type', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readOnly', returned: 'default', canonicalValues: ['direct', 'indirect'], description: 'A label indicating the attribute\'s function (e.g., "direct" or "indirect").' },
+    ],
+  },
+  {
     name: 'externalId',
     type: 'string',
     multiValued: false,

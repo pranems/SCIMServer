@@ -7,7 +7,7 @@
  * Validations performed:
  *  1. Required attributes (on create/replace only, not patch)
  *  2. Attribute type checking (string, boolean, integer, decimal, complex, dateTime, reference, binary)
- *  3. Mutability constraints (readOnly attributes should not be set by client on create/replace)
+ *  3. Mutability constraints (readOnly attributes rejected on create/replace AND on PATCH operations)
  *  4. Unknown attribute detection (strict mode only)
  *  5. Multi-valued / single-valued enforcement
  *  6. Sub-attribute validation for complex types
@@ -804,10 +804,11 @@ export class SchemaValidator {
    * Validate a single PATCH operation value BEFORE it is applied by the engine.
    *
    * Resolves the PATCH path to the matching schema attribute definition and
-   * validates the operation value against it (type, canonical values, etc.).
+   * validates the operation value against it:
+   *  - readOnly mutability check (G8c) — rejects add/replace/remove targeting readOnly attrs
+   *  - type checking, canonical values, etc.
    *
-   * Does NOT check required (patch mode) or mutability (done post-PATCH by H-1/H-2).
-   * For "remove" ops, value validation is skipped.
+   * Does NOT check required (patch mode) or immutable (done post-PATCH by H-2).
    *
    * @param op     - Operation type: 'add' | 'replace' | 'remove'
    * @param path   - SCIM attribute path (e.g. "userName", "name.givenName", "emails[type eq \"work\"].value")
@@ -823,11 +824,6 @@ export class SchemaValidator {
   ): ValidationResult {
     const errors: ValidationError[] = [];
 
-    // Remove operations don't need value validation
-    if (op.toLowerCase() === 'remove') {
-      return { valid: true, errors: [] };
-    }
-
     // Build attribute index
     const coreAttributes = new Map<string, SchemaAttributeDefinition>();
     const extensionSchemas = new Map<string, SchemaDefinition>();
@@ -841,6 +837,8 @@ export class SchemaValidator {
       }
     }
 
+    const opLower = op.toLowerCase();
+
     // No path — value is an object whose keys are top-level attributes
     if (!path) {
       if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -851,6 +849,19 @@ export class SchemaValidator {
           if (key.startsWith('urn:')) {
             const extSchema = extensionSchemas.get(key);
             if (extSchema && val && typeof val === 'object' && !Array.isArray(val)) {
+              // G8c: Check readOnly on extension attributes
+              for (const [extKey] of Object.entries(val as Record<string, unknown>)) {
+                const extAttrDef = extSchema.attributes.find(
+                  a => a.name.toLowerCase() === extKey.toLowerCase(),
+                );
+                if (extAttrDef?.mutability === 'readOnly') {
+                  errors.push({
+                    path: `${key}:${extKey}`,
+                    message: `Attribute '${extKey}' is readOnly and cannot be modified via PATCH.`,
+                    scimType: 'mutability',
+                  });
+                }
+              }
               this.validateAttributes(
                 val as Record<string, unknown>,
                 extSchema.attributes,
@@ -863,6 +874,15 @@ export class SchemaValidator {
           }
           const attrDef = coreAttributes.get(key.toLowerCase());
           if (attrDef) {
+            // G8c: readOnly mutability check for no-path operations
+            if (attrDef.mutability === 'readOnly') {
+              errors.push({
+                path: key,
+                message: `Attribute '${attrDef.name}' is readOnly and cannot be modified via PATCH.`,
+                scimType: 'mutability',
+              });
+              continue;
+            }
             this.validateAttribute(key, val, attrDef, { strictMode: false, mode: 'patch' }, errors);
           }
         }
@@ -873,7 +893,36 @@ export class SchemaValidator {
     // Resolve the path to its attribute definition
     const attrDef = this.resolvePatchPath(path, coreAttributes, extensionSchemas);
 
+    // G8c: Also check if the ROOT attribute in the path chain is readOnly.
+    // e.g. "groups[value eq \"x\"].display" — `groups` is readOnly, so the
+    // entire sub-path is unreachable for client writes.
+    const rootAttrDef = this.resolveRootAttribute(path, coreAttributes, extensionSchemas);
+
+    if (rootAttrDef?.mutability === 'readOnly') {
+      errors.push({
+        path,
+        message: `Attribute '${rootAttrDef.name}' is readOnly and cannot be ${opLower === 'remove' ? 'removed' : 'modified'} via PATCH.`,
+        scimType: 'mutability',
+      });
+      return { valid: false, errors };
+    }
+
     if (attrDef) {
+      // G8c: readOnly mutability pre-check — reject any operation targeting a readOnly attr
+      if (attrDef.mutability === 'readOnly') {
+        errors.push({
+          path,
+          message: `Attribute '${attrDef.name}' is readOnly and cannot be ${opLower === 'remove' ? 'removed' : 'modified'} via PATCH.`,
+          scimType: 'mutability',
+        });
+        return { valid: false, errors };
+      }
+
+      // For remove ops, skip further value validation (no value expected)
+      if (opLower === 'remove') {
+        return { valid: true, errors: [] };
+      }
+
       this.validateAttribute(
         path,
         value,
@@ -881,6 +930,9 @@ export class SchemaValidator {
         { strictMode: false, mode: 'patch' },
         errors,
       );
+    } else if (opLower === 'remove') {
+      // Remove ops with unresolved paths: no value validation needed
+      return { valid: true, errors: [] };
     }
 
     return { valid: errors.length === 0, errors };
@@ -946,5 +998,40 @@ export class SchemaValidator {
     }
 
     return undefined;
+  }
+
+  /**
+   * Resolve the ROOT (top-level) attribute from a SCIM PATCH path.
+   *
+   * For paths like "groups[value eq \"x\"].display" or "name.givenName",
+   * returns the definition of the first segment ("groups" or "name").
+   * For single-segment paths, returns the same as resolvePatchPath.
+   *
+   * Used by G8c to check if the parent attribute is readOnly — if so,
+   * the entire sub-path is unreachable for client writes.
+   */
+  private static resolveRootAttribute(
+    path: string,
+    coreAttributes: Map<string, SchemaAttributeDefinition>,
+    extensionSchemas: Map<string, SchemaDefinition>,
+  ): SchemaAttributeDefinition | undefined {
+    // Strip value filters
+    const cleanPath = path.replace(/\[.*?\]/g, '');
+
+    // Extension URN prefix → root is the first extension attribute
+    for (const [urn, schema] of extensionSchemas) {
+      if (cleanPath.startsWith(urn + ':') || cleanPath.startsWith(urn + '.')) {
+        const remainder = cleanPath.slice(urn.length + 1);
+        if (!remainder) return undefined;
+        const rootName = remainder.split('.')[0];
+        return schema.attributes.find(
+          a => a.name.toLowerCase() === rootName.toLowerCase(),
+        );
+      }
+    }
+
+    // Core attribute — first segment
+    const rootName = cleanPath.split('.')[0];
+    return coreAttributes.get(rootName.toLowerCase());
   }
 }

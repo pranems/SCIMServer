@@ -276,8 +276,8 @@ Four categories of PATCH paths, handled in order:
 
 ## 8. Test Coverage
 
-- **Unit**: 2096 tests passing (61 suites)
-- **E2E**: 368 tests passing (19 suites)
+- **Unit**: 2116 tests passing (61 suites)
+- **E2E**: 374 tests passing (19 suites)
 - **Live integration**: 334 tests passing (local + Docker)
 - **SCIM Validator**: 25/25 required + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
