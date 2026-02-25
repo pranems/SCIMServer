@@ -1,38 +1,47 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { PrismaClient } from '../../src/generated/prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import pg from 'pg';
 
 /**
  * Jest globalTeardown — runs once after all E2E suites.
- * Removes the temporary test database file and marker.
  *
- * SQLite compromise: Must clean up .db, -journal, and -wal satellite files.
- * PostgreSQL migration: replace with DROP SCHEMA or simply disconnect.
- * See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.3.6
- *
- * Note: SQLite files may still be locked by Prisma connection pool
- * even after app.close(). We silently ignore EBUSY / EPERM errors
- * because global-setup always recreates the DB fresh.
+ * Truncates all SCIM data tables so test runs don't accumulate stale data.
+ * When PERSISTENCE_BACKEND=inmemory, nothing to clean up.
  */
 export default async function globalTeardown(): Promise<void> {
   const markerPath = path.resolve(__dirname, '.test-db-path');
+  if (!fs.existsSync(markerPath)) return;
 
-  if (fs.existsSync(markerPath)) {
-    const testDbPath = fs.readFileSync(markerPath, 'utf-8').trim();
+  const marker = fs.readFileSync(markerPath, 'utf-8').trim();
 
-    // Try to delete the DB — tolerate lock errors
-    for (const file of [testDbPath, `${testDbPath}-journal`, `${testDbPath}-wal`]) {
-      try {
-        if (fs.existsSync(file)) fs.unlinkSync(file);
-      } catch {
-        // File still locked by Prisma — global-setup will recreate it
-      }
-    }
+  // Clean up the marker file
+  try {
+    fs.unlinkSync(markerPath);
+  } catch {
+    // Ignore
+  }
 
-    // Clean up the marker file
-    try {
-      fs.unlinkSync(markerPath);
-    } catch {
-      // Ignore
-    }
+  // InMemory backend — nothing to clean up
+  if (marker === 'inmemory') return;
+
+  // Prisma/PostgreSQL backend — truncate all tables
+  const pool = new pg.Pool({ connectionString: marker, max: 1 });
+  const adapter = new PrismaPg(pool);
+  const prisma = new PrismaClient({ adapter });
+  try {
+    await prisma.$transaction([
+      prisma.requestLog.deleteMany(),
+      prisma.endpointSchema.deleteMany(),
+      prisma.resourceMember.deleteMany(),
+      prisma.scimResource.deleteMany(),
+      prisma.endpoint.deleteMany(),
+    ]);
+  } catch {
+    // Tolerate connection errors — DB may already be gone
+  } finally {
+    await prisma.$disconnect();
+    await pool.end();
   }
 }

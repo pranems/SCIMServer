@@ -198,7 +198,8 @@ export async function createEndpoint(
   token: string,
   name?: string,
 ): Promise<string> {
-  const endpointName = name ?? `e2e-${Date.now()}`;
+  const wk = process.env.JEST_WORKER_ID ?? '0';
+  const endpointName = name ?? `e2e-w${wk}-${Date.now()}`;
   const requestBody = { name: endpointName };
   const trace = beginE2eFlowStep({
     method: 'POST',
@@ -236,7 +237,8 @@ export async function createEndpointWithConfig(
   config: Record<string, string | boolean>,
   name?: string,
 ): Promise<string> {
-  const endpointName = name ?? `e2e-cfg-${Date.now()}`;
+  const wk = process.env.JEST_WORKER_ID ?? '0';
+  const endpointName = name ?? `e2e-cfg-w${wk}-${Date.now()}`;
   const requestBody = { name: endpointName, config };
   const trace = beginE2eFlowStep({
     method: 'POST',

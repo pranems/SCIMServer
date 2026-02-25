@@ -21,11 +21,10 @@ const config: Config = {
     '!src/**/*.interface.ts',
   ],
   coverageDirectory: 'coverage-e2e',
-  // SQLite compromise: E2E tests must run sequentially because SQLite’s single-file
-  // database cannot handle concurrent access from multiple Jest workers.
-  // PostgreSQL migration: set maxWorkers to 4+ and use isolated test schemas.
-  // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.2.5
-  maxWorkers: 1,
+  // Parallel execution: each test creates its own endpoint UUID, so SCIM
+  // data is fully isolated. globalTeardown truncates all tables after the run.
+  // Workers share the same PostgreSQL database but never touch each other's endpoints.
+  maxWorkers: 4,
   // E2E setup — bootstrap app + DB before all suites
   globalSetup: '<rootDir>/test/e2e/global-setup.ts',
   globalTeardown: '<rootDir>/test/e2e/global-teardown.ts',

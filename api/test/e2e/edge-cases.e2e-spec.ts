@@ -1,7 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
-import { resetDatabase } from './helpers/db.helper';
 import {
   scimPost,
   scimGet,
@@ -37,7 +36,6 @@ describe('Edge Cases (E2E)', () => {
   });
 
   beforeEach(async () => {
-    await resetDatabase(app);
     resetFixtureCounter();
     endpointId = await createEndpoint(app, token);
     basePath = scimBasePath(endpointId);
@@ -135,7 +133,7 @@ describe('Edge Cases (E2E)', () => {
   describe('Inactive endpoint', () => {
     it('should reject SCIM operations on an inactive endpoint', async () => {
       // Create endpoint, then deactivate it via the admin API
-      const endpoint2 = await createEndpoint(app, token, 'inactive-ep');
+      const endpoint2 = await createEndpoint(app, token);
 
       // Deactivate the endpoint via admin API (PATCH /scim/admin/endpoints/:id)
       await request(app.getHttpServer())

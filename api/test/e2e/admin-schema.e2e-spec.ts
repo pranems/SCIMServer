@@ -2,7 +2,6 @@ import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
-import { resetDatabase } from './helpers/db.helper';
 import { createEndpoint } from './helpers/request.helper';
 import { resetFixtureCounter } from './helpers/fixtures';
 
@@ -57,9 +56,8 @@ describe('Admin Schema Extensions API (E2E)', () => {
   });
 
   beforeEach(async () => {
-    await resetDatabase(app);
     resetFixtureCounter();
-    endpointId = await createEndpoint(app, token, 'schema-test');
+    endpointId = await createEndpoint(app, token);
   });
 
   // ─── Authentication ─────────────────────────────────────────────────
@@ -133,7 +131,7 @@ describe('Admin Schema Extensions API (E2E)', () => {
     });
 
     it('should allow same URN on different endpoints', async () => {
-      const endpointId2 = await createEndpoint(app, token, 'schema-test-2');
+      const endpointId2 = await createEndpoint(app, token);
 
       await request(app.getHttpServer())
         .post(`/scim/admin/endpoints/${endpointId}/schemas`)
@@ -201,7 +199,7 @@ describe('Admin Schema Extensions API (E2E)', () => {
     });
 
     it('should not show schemas from other endpoints', async () => {
-      const endpointId2 = await createEndpoint(app, token, 'other-ep');
+      const endpointId2 = await createEndpoint(app, token);
 
       await request(app.getHttpServer())
         .post(`/scim/admin/endpoints/${endpointId}/schemas`)
@@ -338,7 +336,7 @@ describe('Admin Schema Extensions API (E2E)', () => {
     });
 
     it('should not show endpoint-specific extension in other endpoint discovery', async () => {
-      const endpointId2 = await createEndpoint(app, token, 'discovery-other');
+      const endpointId2 = await createEndpoint(app, token);
 
       // Register on endpoint 1 only
       await request(app.getHttpServer())
