@@ -32,6 +32,7 @@ export class InMemoryUserRepository implements IUserRepository {
       userName: input.userName,
       displayName: input.displayName,
       active: input.active,
+      deletedAt: null,
       rawPayload: input.rawPayload,
       version: 1,
       meta: input.meta,
@@ -115,6 +116,8 @@ export class InMemoryUserRepository implements IUserRepository {
           scimId: user.scimId,
           userName: user.userName,
           externalId: user.externalId,
+          active: user.active,
+          deletedAt: user.deletedAt,
         };
       }
       if (externalId && user.externalId === externalId) {
@@ -122,6 +125,8 @@ export class InMemoryUserRepository implements IUserRepository {
           scimId: user.scimId,
           userName: user.userName,
           externalId: user.externalId,
+          active: user.active,
+          deletedAt: user.deletedAt,
         };
       }
     }

@@ -32,6 +32,7 @@ describe('EndpointScimUsersService', () => {
     userName: 'test@example.com',
     displayName: 'Test User',
     active: true,
+    deletedAt: null as Date | null,
     rawPayload: '{"displayName":"Test User"}',
     meta: JSON.stringify({
       resourceType: 'User',
@@ -161,6 +162,169 @@ describe('EndpointScimUsersService', () => {
       ).rejects.toThrow();
 
       expect(mockUserRepo.create).not.toHaveBeenCalled();
+    });
+
+    describe('ReprovisionOnConflictForSoftDeletedResource', () => {
+      const softDeletedConflict = {
+        ...mockUser,
+        active: false,
+        deletedAt: new Date('2023-06-15T10:00:00.000Z'),
+        meta: JSON.stringify({
+          resourceType: 'User',
+          created: '2023-06-15T10:00:00.000Z',
+          lastModified: '2023-06-15T10:00:00.000Z',
+        }),
+      };
+
+      const createDto: CreateUserDto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'test@example.com',
+        externalId: 'ext-123',
+        displayName: 'Reprovisioned User',
+        active: true,
+      };
+
+      const reprovisionConfig: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
+        [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: true,
+      };
+
+      it('should re-provision a soft-deleted user when both flags are enabled', async () => {
+        mockUserRepo.findConflict.mockResolvedValue(softDeletedConflict);
+        mockUserRepo.findByScimId.mockResolvedValue(softDeletedConflict);
+        mockUserRepo.update.mockResolvedValue({ ...softDeletedConflict, ...createDto, active: true });
+
+        const result = await service.createUserForEndpoint(
+          createDto, 'http://localhost:3000/scim', mockEndpoint.id, reprovisionConfig,
+        );
+
+        expect(result.id).toBe(softDeletedConflict.scimId);
+        expect(result.active).toBe(true);
+        expect(mockUserRepo.update).toHaveBeenCalledWith(
+          softDeletedConflict.id,
+          expect.objectContaining({ userName: createDto.userName, active: true }),
+        );
+        expect(mockUserRepo.create).not.toHaveBeenCalled();
+      });
+
+      it('should preserve original created date during re-provision', async () => {
+        mockUserRepo.findConflict.mockResolvedValue(softDeletedConflict);
+        mockUserRepo.findByScimId.mockResolvedValue(softDeletedConflict);
+        mockUserRepo.update.mockResolvedValue({ ...softDeletedConflict, ...createDto, active: true });
+
+        await service.createUserForEndpoint(
+          createDto, 'http://localhost:3000/scim', mockEndpoint.id, reprovisionConfig,
+        );
+
+        const updateCall = mockUserRepo.update.mock.calls[0][1];
+        const meta = JSON.parse(updateCall.meta);
+        expect(meta.created).toBe('2023-06-15T10:00:00.000Z');
+      });
+
+      it('should throw 409 when conflict is with an ACTIVE user even with both flags enabled', async () => {
+        const activeConflict = { ...mockUser, active: true };
+        mockUserRepo.findConflict.mockResolvedValue(activeConflict);
+
+        await expect(
+          service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, reprovisionConfig),
+        ).rejects.toThrow(HttpException);
+
+        expect(mockUserRepo.update).not.toHaveBeenCalled();
+        expect(mockUserRepo.create).not.toHaveBeenCalled();
+      });
+
+      it('should throw 409 when SoftDeleteEnabled is true but ReprovisionOnConflict is false', async () => {
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
+          [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: false,
+        };
+        mockUserRepo.findConflict.mockResolvedValue(softDeletedConflict);
+
+        await expect(
+          service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, config),
+        ).rejects.toThrow(HttpException);
+
+        expect(mockUserRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('should throw 409 when SoftDeleteEnabled is false but ReprovisionOnConflict is true', async () => {
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: false,
+          [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: true,
+        };
+        mockUserRepo.findConflict.mockResolvedValue(softDeletedConflict);
+
+        await expect(
+          service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, config),
+        ).rejects.toThrow(HttpException);
+
+        expect(mockUserRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('should throw 409 when no config is provided (default off)', async () => {
+        mockUserRepo.findConflict.mockResolvedValue(softDeletedConflict);
+
+        await expect(
+          service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id),
+        ).rejects.toThrow(HttpException);
+
+        expect(mockUserRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('should handle string config flags "True"/"True" for re-provision', async () => {
+        const stringConfig: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: 'True',
+          [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: 'True',
+        };
+        mockUserRepo.findConflict.mockResolvedValue(softDeletedConflict);
+        mockUserRepo.findByScimId.mockResolvedValue(softDeletedConflict);
+        mockUserRepo.update.mockResolvedValue({ ...softDeletedConflict, ...createDto, active: true });
+
+        const result = await service.createUserForEndpoint(
+          createDto, 'http://localhost:3000/scim', mockEndpoint.id, stringConfig,
+        );
+
+        expect(result.active).toBe(true);
+        expect(mockUserRepo.update).toHaveBeenCalled();
+        expect(mockUserRepo.create).not.toHaveBeenCalled();
+      });
+
+      it('should throw 500 if soft-deleted resource cannot be found during re-provision', async () => {
+        mockUserRepo.findConflict.mockResolvedValue(softDeletedConflict);
+        mockUserRepo.findByScimId.mockResolvedValue(null); // race condition / data inconsistency
+
+        await expect(
+          service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, reprovisionConfig),
+        ).rejects.toThrow(HttpException);
+
+        expect(mockUserRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('should re-provision with externalId conflict on soft-deleted user', async () => {
+        const externalIdDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'different-user@example.com',
+          externalId: 'ext-123',
+          active: true,
+        };
+        // findConflict returns match on externalId (different userName)
+        const externalIdConflict = {
+          ...softDeletedConflict,
+          userName: 'old-user@example.com',
+          externalId: 'ext-123',
+        };
+        mockUserRepo.findConflict.mockResolvedValue(externalIdConflict);
+        mockUserRepo.findByScimId.mockResolvedValue(externalIdConflict);
+        mockUserRepo.update.mockResolvedValue({ ...externalIdConflict, ...externalIdDto, active: true });
+
+        const result = await service.createUserForEndpoint(
+          externalIdDto, 'http://localhost:3000/scim', mockEndpoint.id, reprovisionConfig,
+        );
+
+        expect(result.active).toBe(true);
+        expect(mockUserRepo.update).toHaveBeenCalled();
+        expect(mockUserRepo.create).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -1133,23 +1297,23 @@ describe('EndpointScimUsersService', () => {
     describe('soft delete', () => {
       it('should soft-delete user when SoftDeleteEnabled is true (boolean)', async () => {
         mockUserRepo.findByScimId.mockResolvedValue(mockUser);
-        mockUserRepo.update.mockResolvedValue({ ...mockUser, active: false });
+        mockUserRepo.update.mockResolvedValue({ ...mockUser, active: false, deletedAt: new Date() });
 
         const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true };
         await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, config);
 
-        expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, { active: false });
+        expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, { active: false, deletedAt: expect.any(Date) });
         expect(mockUserRepo.delete).not.toHaveBeenCalled();
       });
 
       it('should soft-delete user when SoftDeleteEnabled is "True" (string)', async () => {
         mockUserRepo.findByScimId.mockResolvedValue(mockUser);
-        mockUserRepo.update.mockResolvedValue({ ...mockUser, active: false });
+        mockUserRepo.update.mockResolvedValue({ ...mockUser, active: false, deletedAt: new Date() });
 
         const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: 'True' };
         await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, config);
 
-        expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, { active: false });
+        expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, { active: false, deletedAt: expect.any(Date) });
         expect(mockUserRepo.delete).not.toHaveBeenCalled();
       });
 
@@ -1345,7 +1509,6 @@ describe('EndpointScimUsersService', () => {
         expect(mockUserRepo.findConflict).toHaveBeenCalledWith(
           mockEndpoint.id,
           'NewUser@Example.COM',
-          undefined,
           undefined,
         );
       });
@@ -1922,7 +2085,16 @@ describe('EndpointScimUsersService', () => {
   describe('soft delete + GET/LIST/filter interactions', () => {
     const softDeleteConfig: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true };
 
-    it('should return soft-deleted user via GET by id (active=false in response)', async () => {
+    it('should return 404 for soft-deleted user via GET when SoftDeleteEnabled (RFC 7644 §3.6)', async () => {
+      const softDeletedUser = { ...mockUser, active: false, deletedAt: new Date() };
+      mockUserRepo.findByScimId.mockResolvedValue(softDeletedUser);
+
+      await expect(
+        service.getUserForEndpoint(mockUser.scimId, 'http://localhost:3000/scim', mockEndpoint.id, softDeleteConfig)
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('should return soft-deleted user via GET when SoftDeleteEnabled is off (backward compat)', async () => {
       const softDeletedUser = { ...mockUser, active: false };
       mockUserRepo.findByScimId.mockResolvedValue(softDeletedUser);
 
@@ -1934,7 +2106,24 @@ describe('EndpointScimUsersService', () => {
       expect(result.id).toBe(mockUser.scimId);
     });
 
-    it('should include soft-deleted users in LIST results', async () => {
+    it('should exclude soft-deleted users from LIST results when SoftDeleteEnabled', async () => {
+      const activeUser = { ...mockUser, id: 'u1', scimId: 'scim-1', active: true };
+      const deletedUser = { ...mockUser, id: 'u2', scimId: 'scim-2', active: false, deletedAt: new Date(), userName: 'deleted@example.com' };
+      mockUserRepo.findAll.mockResolvedValue([activeUser, deletedUser]);
+
+      const result = await service.listUsersForEndpoint(
+        { startIndex: 1, count: 10 },
+        'http://localhost:3000/scim',
+        mockEndpoint.id,
+        softDeleteConfig,
+      );
+
+      expect(result.totalResults).toBe(1);
+      expect(result.Resources).toHaveLength(1);
+      expect(result.Resources[0].active).toBe(true);
+    });
+
+    it('should include soft-deleted users in LIST results when SoftDeleteEnabled is off', async () => {
       const activeUser = { ...mockUser, id: 'u1', scimId: 'scim-1', active: true };
       const deletedUser = { ...mockUser, id: 'u2', scimId: 'scim-2', active: false, userName: 'deleted@example.com' };
       mockUserRepo.findAll.mockResolvedValue([activeUser, deletedUser]);
@@ -1942,7 +2131,7 @@ describe('EndpointScimUsersService', () => {
       const result = await service.listUsersForEndpoint(
         { startIndex: 1, count: 10 },
         'http://localhost:3000/scim',
-        mockEndpoint.id
+        mockEndpoint.id,
       );
 
       expect(result.totalResults).toBe(2);
@@ -2024,15 +2213,24 @@ describe('EndpointScimUsersService', () => {
       expect(result.displayName).toBe('Updated Deleted User');
     });
 
-    it('should soft-delete then GET returns active=false', async () => {
+    it('should soft-delete then GET returns 404 with SoftDeleteEnabled config (RFC 7644 §3.6)', async () => {
       // Simulate soft-delete
       mockUserRepo.findByScimId.mockResolvedValue(mockUser);
-      mockUserRepo.update.mockResolvedValue({ ...mockUser, active: false });
+      mockUserRepo.update.mockResolvedValue({ ...mockUser, active: false, deletedAt: new Date() });
 
       await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, softDeleteConfig);
-      expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, { active: false });
+      expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, { active: false, deletedAt: expect.any(Date) });
 
-      // Now GET the same user (simulate finding it in DB with active=false)
+      // Now GET the same user with SoftDeleteEnabled — must return 404
+      const softDeletedUser = { ...mockUser, active: false, deletedAt: new Date() };
+      mockUserRepo.findByScimId.mockResolvedValue(softDeletedUser);
+      await expect(
+        service.getUserForEndpoint(mockUser.scimId, 'http://localhost:3000/scim', mockEndpoint.id, softDeleteConfig)
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('should soft-delete then GET without config returns active=false (backward compat)', async () => {
+      // Without SoftDeleteEnabled config, soft-deleted users are still accessible
       const softDeletedUser = { ...mockUser, active: false };
       mockUserRepo.findByScimId.mockResolvedValue(softDeletedUser);
       const result = await service.getUserForEndpoint(
@@ -2040,6 +2238,47 @@ describe('EndpointScimUsersService', () => {
       );
       expect(result.active).toBe(false);
       expect(result.id).toBe(mockUser.scimId);
+    });
+
+    it('should double-delete soft-deleted user returns 404 (RFC 7644 §3.6)', async () => {
+      const softDeletedUser = { ...mockUser, active: false, deletedAt: new Date() };
+      mockUserRepo.findByScimId.mockResolvedValue(softDeletedUser);
+
+      await expect(
+        service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, softDeleteConfig)
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('should PATCH on soft-deleted user returns 404 when SoftDeleteEnabled', async () => {
+      const softDeletedUser = { ...mockUser, active: false, deletedAt: new Date() };
+      mockUserRepo.findByScimId.mockResolvedValue(softDeletedUser);
+
+      const patchDto: PatchUserDto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', path: 'displayName', value: 'New Name' }],
+      };
+
+      await expect(
+        service.patchUserForEndpoint(
+          mockUser.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id, softDeleteConfig
+        )
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('should PUT on soft-deleted user returns 404 when SoftDeleteEnabled', async () => {
+      const softDeletedUser = { ...mockUser, active: false, deletedAt: new Date() };
+      mockUserRepo.findByScimId.mockResolvedValue(softDeletedUser);
+
+      const dto: CreateUserDto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'replaced@example.com',
+      };
+
+      await expect(
+        service.replaceUserForEndpoint(
+          mockUser.scimId, dto, 'http://localhost:3000/scim', mockEndpoint.id, softDeleteConfig
+        )
+      ).rejects.toThrow(HttpException);
     });
 
     it('should hard-delete then GET returns 404', async () => {
@@ -2080,7 +2319,7 @@ describe('EndpointScimUsersService', () => {
   describe('config flag combinations', () => {
     it('should soft-delete with SoftDeleteEnabled + StrictSchemaValidation both true', async () => {
       mockUserRepo.findByScimId.mockResolvedValue(mockUser);
-      mockUserRepo.update.mockResolvedValue({ ...mockUser, active: false });
+      mockUserRepo.update.mockResolvedValue({ ...mockUser, active: false, deletedAt: new Date() });
 
       const config: EndpointConfig = {
         [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
@@ -2088,7 +2327,7 @@ describe('EndpointScimUsersService', () => {
       };
 
       await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, config);
-      expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, { active: false });
+      expect(mockUserRepo.update).toHaveBeenCalledWith(mockUser.id, { active: false, deletedAt: expect.any(Date) });
       expect(mockUserRepo.delete).not.toHaveBeenCalled();
     });
 
@@ -2306,6 +2545,269 @@ describe('EndpointScimUsersService', () => {
           mockUser.scimId, baseUrl, mockEndpoint.id
         );
         expect(result.meta.version).toBe('W/"v1"');
+      });
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // AllowAndCoerceBooleanStrings flag
+  // ═══════════════════════════════════════════════════════════
+
+  describe('AllowAndCoerceBooleanStrings', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+
+    describe('createUserForEndpoint', () => {
+      it('should coerce boolean string "True" to true (default: flag on)', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'coerce@example.com',
+          active: true,
+          roles: [{ value: 'admin', primary: 'True' }],
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+          // AllowAndCoerceBooleanStrings: not set → defaults to true
+        };
+
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.create.mockImplementation(async (input) => ({
+          ...mockUser,
+          userName: createDto.userName,
+          rawPayload: input.rawPayload,
+        }));
+
+        const result = await service.createUserForEndpoint(createDto, baseUrl, mockEndpoint.id, config);
+        expect(result).toBeDefined();
+        expect(result.userName).toBe('coerce@example.com');
+
+        // Verify the DTO was coerced before storage
+        const storedPayload = JSON.parse(mockUserRepo.create.mock.calls[0][0].rawPayload);
+        expect(storedPayload.roles[0].primary).toBe(true);
+      });
+
+      it('should coerce boolean string "False" to false', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'coerce2@example.com',
+          active: true,
+          roles: [{ value: 'admin', primary: 'False' }],
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+          [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: true,
+        };
+
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.create.mockImplementation(async (input) => ({
+          ...mockUser,
+          userName: createDto.userName,
+          rawPayload: input.rawPayload,
+        }));
+
+        const result = await service.createUserForEndpoint(createDto, baseUrl, mockEndpoint.id, config);
+        expect(result).toBeDefined();
+
+        const storedPayload = JSON.parse(mockUserRepo.create.mock.calls[0][0].rawPayload);
+        expect(storedPayload.roles[0].primary).toBe(false);
+      });
+
+      it('should reject boolean string when flag is explicitly disabled', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'nococerce@example.com',
+          active: true,
+          roles: [{ value: 'admin', primary: 'True' }],
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+          [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: false,
+        };
+
+        await expect(
+          service.createUserForEndpoint(createDto, baseUrl, mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('should not coerce non-boolean string attributes (e.g., roles[].value = "true")', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'nocoerce3@example.com',
+          active: true,
+          roles: [{ value: 'true', primary: 'True' }],
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+          [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: true,
+        };
+
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.create.mockImplementation(async (input) => ({
+          ...mockUser,
+          userName: createDto.userName,
+          rawPayload: input.rawPayload,
+        }));
+
+        const result = await service.createUserForEndpoint(createDto, baseUrl, mockEndpoint.id, config);
+        expect(result).toBeDefined();
+
+        const storedPayload = JSON.parse(mockUserRepo.create.mock.calls[0][0].rawPayload);
+        // "value" is a string-type attribute — should NOT be coerced
+        expect(storedPayload.roles[0].value).toBe('true');
+        // "primary" is a boolean-type attribute — should be coerced
+        expect(storedPayload.roles[0].primary).toBe(true);
+      });
+    });
+
+    describe('replaceUserForEndpoint', () => {
+      it('should coerce boolean strings on PUT with flag on (default)', async () => {
+        const replaceDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'replace@example.com',
+          active: true,
+          emails: [{ value: 'test@test.com', type: 'work', primary: 'True' }],
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+        };
+
+        mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.update.mockImplementation(async (_id, input) => ({
+          ...mockUser,
+          userName: replaceDto.userName,
+          rawPayload: input.rawPayload!,
+        }));
+
+        const result = await service.replaceUserForEndpoint(
+          mockUser.scimId, replaceDto, baseUrl, mockEndpoint.id, config
+        );
+        expect(result).toBeDefined();
+      });
+
+      it('should reject boolean strings on PUT when flag is off', async () => {
+        const replaceDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'replace@example.com',
+          active: true,
+          emails: [{ value: 'test@test.com', type: 'work', primary: 'True' }],
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+          [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: false,
+        };
+
+        mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+
+        await expect(
+          service.replaceUserForEndpoint(mockUser.scimId, replaceDto, baseUrl, mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+      });
+    });
+
+    describe('flag interaction matrix', () => {
+      it('StrictSchema=ON + Coerce=ON (default): boolean strings accepted and coerced', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'matrix1@example.com',
+          active: true,
+          roles: [{ value: 'admin', primary: 'True' }],
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+          [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: true,
+        };
+
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.create.mockImplementation(async (input) => ({
+          ...mockUser,
+          userName: createDto.userName,
+          rawPayload: input.rawPayload,
+        }));
+
+        await expect(
+          service.createUserForEndpoint(createDto, baseUrl, mockEndpoint.id, config)
+        ).resolves.toBeDefined();
+      });
+
+      it('StrictSchema=ON + Coerce=OFF: boolean strings rejected', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'matrix2@example.com',
+          active: true,
+          roles: [{ value: 'admin', primary: 'True' }],
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+          [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: false,
+        };
+
+        await expect(
+          service.createUserForEndpoint(createDto, baseUrl, mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('StrictSchema=OFF + Coerce=ON: boolean strings accepted (no validation), coerced for storage', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'matrix3@example.com',
+          active: true,
+          roles: [{ value: 'admin', primary: 'True' }],
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: false,
+          [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: true,
+        };
+
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.create.mockImplementation(async (input) => ({
+          ...mockUser,
+          userName: createDto.userName,
+          rawPayload: input.rawPayload,
+        }));
+
+        const result = await service.createUserForEndpoint(createDto, baseUrl, mockEndpoint.id, config);
+        expect(result).toBeDefined();
+
+        // Even without strict validation, coercion should normalise storage
+        const storedPayload = JSON.parse(mockUserRepo.create.mock.calls[0][0].rawPayload);
+        expect(storedPayload.roles[0].primary).toBe(true);
+      });
+
+      it('StrictSchema=OFF + Coerce=OFF: boolean strings pass through as-is', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'matrix4@example.com',
+          active: true,
+          roles: [{ value: 'admin', primary: 'True' }],
+        } as any;
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: false,
+          [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: false,
+        };
+
+        mockUserRepo.findConflict.mockResolvedValue(null);
+        mockUserRepo.create.mockImplementation(async (input) => ({
+          ...mockUser,
+          userName: createDto.userName,
+          rawPayload: input.rawPayload,
+        }));
+
+        const result = await service.createUserForEndpoint(createDto, baseUrl, mockEndpoint.id, config);
+        expect(result).toBeDefined();
+
+        const storedPayload = JSON.parse(mockUserRepo.create.mock.calls[0][0].rawPayload);
+        // String pass-through — not coerced
+        expect(storedPayload.roles[0].primary).toBe('True');
       });
     });
   });

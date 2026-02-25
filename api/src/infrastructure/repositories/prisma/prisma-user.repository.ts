@@ -31,6 +31,7 @@ function toUserRecord(resource: Record<string, unknown>): UserRecord {
     userName: resource.userName as string,
     displayName: (resource.displayName as string) ?? null,
     active: resource.active as boolean,
+    deletedAt: (resource.deletedAt as Date) ?? null,
     rawPayload,
     version: (resource.version as number) ?? 1,
     meta: (resource.meta as string) ?? null,
@@ -138,7 +139,7 @@ export class PrismaUserRepository implements IUserRepository {
 
     const conflict = await this.prisma.scimResource.findFirst({
       where: { AND: filters },
-      select: { scimId: true, userName: true, externalId: true },
+      select: { scimId: true, userName: true, externalId: true, active: true, deletedAt: true },
     });
 
     if (!conflict || !conflict.userName) return null;
@@ -146,6 +147,8 @@ export class PrismaUserRepository implements IUserRepository {
       scimId: conflict.scimId,
       userName: conflict.userName,
       externalId: conflict.externalId ?? null,
+      active: conflict.active,
+      deletedAt: conflict.deletedAt ?? null,
     };
   }
 

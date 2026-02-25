@@ -159,9 +159,12 @@ Per-endpoint config flags control PATCH behavior. Set via the `config` JSON obje
 | `MultiOpPatchRequestAddMultipleMembersToGroup` | `"true"` / `"false"` | `"false"` | Allow adding multiple group members in a single PATCH operation |
 | `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | `"true"` / `"false"` | `"false"` | Allow removing multiple group members in a single PATCH operation |
 | `VerbosePatchSupported` | `"true"` / `"false"` | `"false"` | Enable dot-notation PATCH path resolution (e.g., `name.givenName`) |
-| `SoftDeleteEnabled` | `"true"` / `"false"` | `"false"` | Soft delete (set `active=false`) instead of physical row deletion on DELETE |
+| `SoftDeleteEnabled` | `"true"` / `"false"` | `"false"` | Soft delete (set `active=false` + `deletedAt`) instead of physical row deletion on DELETE |
+| `ReprovisionOnConflictForSoftDeletedResource` | `"true"` / `"false"` | `"false"` | Re-activate soft-deleted resource on POST conflict instead of 409 (requires SoftDeleteEnabled) |
 | `StrictSchemaValidation` | `"true"` / `"false"` | `"false"` | Reject extension URNs not declared in `schemas[]` or not registered in schema registry |
 | `PatchOpAllowRemoveAllMembers` | `"true"` / `"false"` | `"true"` | Allow removing all members via `path=members` PATCH operation |
+| `RequireIfMatch` | `"true"` / `"false"` | `"false"` | Require If-Match header on PUT/PATCH/DELETE (428 if missing) |
+| `AllowAndCoerceBooleanStrings` | `"true"` / `"false"` | `"true"` | Coerce boolean string values ("True"/"False") to native booleans before schema validation |
 
 **Enable for Microsoft Entra ID:** Set both multi-member flags to `"true"` since Entra sends multi-member PATCH operations.
 

@@ -5,6 +5,40 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.2] - 2026-02-25
+
+### Added
+- **`AllowAndCoerceBooleanStrings` config flag** (default `true`) — Coerces boolean-typed string values (`"True"`, `"False"`) to native booleans (`true`, `false`) before schema validation. Fixes Microsoft SCIM Validator failures caused by `roles[].primary = "True"` (string) being rejected by `SchemaValidator`. Applied on all write paths: POST body, PUT body, PATCH operation values, PATCH filter literals, and post-PATCH result payloads. Boolean attribute names are now **schema-aware** — only attributes whose schema type is `"boolean"` are coerced (V16/V17 fix).
+- **`ReprovisionOnConflictForSoftDeletedResource` config flag** (default `false`) — When enabled alongside `SoftDeleteEnabled`, POST operations that collide with a soft-deleted resource (same `userName`/`externalId` for Users, same `displayName`/`externalId` for Groups) **re-activate the existing resource** with the new payload instead of returning 409 Conflict. Clears `deletedAt`, sets `active=true`, and replaces the resource payload. For Groups, member references are re-resolved. This is the **10th boolean config flag** (11 total including `logLevel`).
+- **Soft-delete `deletedAt` timestamp tracking** — Soft-deleted resources now set both `active=false` AND `deletedAt=<timestamp>` on DELETE. The `guardSoftDeleted()` check uses `deletedAt != null` (not `active === false`) to distinguish soft-deleted resources from PATCH-disabled resources (`active=false` via PATCH is a normal state, not soft-deletion). New `deletedAt DateTime? @db.Timestamptz` column added to Prisma `ScimResource` model, and `deletedAt: Date | null` added to `UserRecord`, `GroupRecord`, `UserUpdateInput`, `GroupUpdateInput`, and `UserConflictResult` domain models.
+- **Group `active` field** — `GroupRecord` and `GroupCreateInput` now include `active: boolean`. Groups are created with `active: true`. Group SCIM responses include `active` in the output. The `active` boolean attribute is now defined in scim-schemas constants for Groups.
+- **`getConfigBooleanWithDefault()` helper** — New config helper for flags that default to `true` (unlike `getConfigBoolean` which defaults to `false`). Used by `AllowAndCoerceBooleanStrings` and available for future flags.
+- **PATCH filter boolean matching** — `matchesFilter()` in `scim-patch-path.ts` now correctly handles boolean-to-string comparisons (e.g., `roles[primary eq "True"]` matches `primary: true`).
+- **`SchemaValidator.collectBooleanAttributeNames()`** — New static method that extracts all boolean-typed attribute names from schema definitions, used for schema-aware boolean string coercion (V16/V17).
+- **`SchemaValidator.validateFilterAttributePaths()`** — New V32 validation method that validates filter attribute paths against registered schema definitions.
+- **`scim-filter-parser.ts`** — New module for extracting attribute path strings from parsed SCIM filter AST for validation purposes.
+- **Startup warning for StrictSchemaValidation** — `main.ts` now logs a `Logger.warn()` when `StrictSchemaValidation` is OFF by default, alerting operators that schema validation is lenient.
+- **101 new unit tests** — `endpoint-config.interface.spec.ts` (flag validation, `getConfigBooleanWithDefault`, `ReprovisionOnConflictForSoftDeletedResource` combo tests), `endpoint-scim-users.service.spec.ts` (create/replace/PATCH coercion, reprovision, guardSoftDeleted with deletedAt), `endpoint-scim-groups.service.spec.ts` (reprovision, Group active, guardSoftDeleted), `schema-validator-v16-v32.spec.ts` (292 lines — collectBooleanAttributeNames, validateFilterAttributePaths), `sanitize-boolean-strings.spec.ts` (154 lines — schema-aware sanitization), `scim-filter-parser.spec.ts` (96 lines — filter AST extraction), `scim-patch-path.spec.ts` (boolean filter matching)
+- **16 new E2E tests** — `soft-delete-flags.e2e-spec.ts` (POST/PUT/PATCH coercion, reprovision flows, deletedAt tracking, flag on/off, filter paths, StrictSchema combinations)
+- **14+ new live integration tests** — Section 9f: AllowAndCoerceBooleanStrings live tests (boolean string coercion on create/replace/patch, flag interaction with StrictSchemaValidation)
+- **Comprehensive Flag Reference** — `docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md` — All 10 boolean flags + logLevel documented with applicability, precedence, examples, flag interaction matrix, Mermaid diagrams, JSON request/response examples for all combinations
+- **In-memory persistence for EndpointService & LoggingService** — Both services now detect `PERSISTENCE_BACKEND=inmemory` and use in-memory stores (`Map`-based endpoint CRUD, array-based log buffer with filtering/pagination) instead of Prisma. Enables fully Prisma-free operation when running with inmemory repository persistence.
+- **Resource-type-aware attribute projection** — `applyAttributeProjection()` now detects resource type from `schemas[]`. Per RFC 7643: User `displayName` has `returned: 'default'` (excludable), Group `displayName` has `returned: 'always'` (never excluded). Fixes incorrect User `displayName` behavior where it was always returned even when excluded via `?excludedAttributes=displayName`.
+- **Live test RFC alignment (externalId caseExact)** — Updated live test expectation for case-variant group `externalId` from 409 (conflict) to 201 (allowed). Per RFC 7643 §2.4, `externalId` has `caseExact: true`, so `"ABC"` and `"abc"` are distinct values, not duplicates.
+
+### Fixed
+- **Microsoft SCIM Validator Results #26** — All 17 failures (13 mandatory + 4 preview) resolved. Root cause: `roles[].primary = "True"` (string) rejected by `SchemaValidator`. Score: 10/23 → **23/23 mandatory**, 3/7 → **7/7 preview**. See `docs/SCIM_VALIDATOR_RESULTS_26_ANALYSIS.md`.
+- **User `displayName` incorrectly always-returned** — `displayName` was in the global `ALWAYS_RETURNED` set for attribute projection, but per RFC 7643 User schema `displayName` has `returned: 'default'`, not `returned: 'always'`. Only Group `displayName` is `returned: 'always'`. Fixed by making `ALWAYS_RETURNED` resource-type-aware.
+- **PATCH filter boolean-to-string matching** — `matchesFilter()` now handles `roles[primary eq "True"]` correctly when `primary` is stored as boolean `true`.
+- **Soft-delete guard improved** — `guardSoftDeleted()` now checks `deletedAt != null` instead of `active === false`, correctly distinguishing soft-deleted resources from PATCH-disabled resources (where a client sets `active=false` via PATCH — a normal state, not soft-deletion).
+- **Schema-aware boolean sanitization (V16/V17)** — `sanitizeBooleanStrings()` now only converts attributes whose schema type is `"boolean"` (via `SchemaValidator.collectBooleanAttributeNames()`), preventing over-zealous coercion of string fields that happen to contain "True"/"False" values.
+
+### Verified
+- **2063/2063 unit tests passing** (61 suites) — up from 1962 (+101 new)
+- **358/358 E2E tests passing** (19 suites) — up from 342 (+16 new)
+- **334/334 live integration tests passing** — on both local and Docker in-memory instances
+- Clean build (`tsc -p tsconfig.build.json` — 0 errors)
+
 ## [0.17.1] - 2026-02-24
 
 ### Added

@@ -190,22 +190,24 @@ Admin/release references:
 
 Latest validated matrix:
 
-- Unit tests: **1962/1962** (59 suites)
-- E2E tests: **342/342** (19 suites)
-- Live integration tests: **318/318** (local + Docker)
+- Unit tests: **2063/2063** (61 suites)
+- E2E tests: **358/358** (19 suites)
+- Live integration tests: **334/334** (local + Docker, includes in-memory instances)
 - Microsoft SCIM Validator: **25/25 passed** (+ 7 preview scenarios)
 
 ### Per-Endpoint Config Flags
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `SoftDeleteEnabled` | `false` | Soft delete (set `active=false`) instead of physical row deletion |
+| `SoftDeleteEnabled` | `false` | Soft delete (set `active=false` + `deletedAt`) instead of physical row deletion |
+| `ReprovisionOnConflictForSoftDeletedResource` | `false` | Re-activate soft-deleted resource on POST conflict instead of 409 (requires SoftDeleteEnabled) |
 | `StrictSchemaValidation` | `false` | Reject extension URNs not declared in `schemas[]` or not registered |
 | `MultiOpPatchRequestAddMultipleMembersToGroup` | `false` | Allow multi-member add in single PATCH |
 | `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | `false` | Allow multi-member remove in single PATCH |
 | `VerbosePatchSupported` | `false` | Dot-notation PATCH path resolution |
 | `PatchOpAllowRemoveAllMembers` | `true` | Allow removing all members via `path=members` |
 | `RequireIfMatch` | `false` | Require If-Match header on mutating requests (428 if missing) |
+| `AllowAndCoerceBooleanStrings` | `true` | Coerce boolean string values ("True"/"False") to native booleans before schema validation |
 
 ### Coverage scripts
 

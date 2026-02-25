@@ -45,8 +45,9 @@ test-results/
 
 # Local test output files
 local-live-*.txt
-api/e2e-results.json
-api/e2e-test-output.txt
+api/e2e-*.txt
+api/e2e-*.json
+api/test-out*.txt
 api/unit-results.json
 api/unit-test-output.txt
 scripts/live-test-docker-output.txt

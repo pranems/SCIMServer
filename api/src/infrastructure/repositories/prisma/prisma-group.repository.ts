@@ -30,6 +30,8 @@ function toGroupRecord(resource: Record<string, unknown>): GroupRecord {
     scimId: resource.scimId as string,
     externalId: (resource.externalId as string) ?? null,
     displayName: resource.displayName as string,
+    active: (resource.active as boolean) ?? true,
+    deletedAt: (resource.deletedAt as Date) ?? null,
     rawPayload,
     version: (resource.version as number) ?? 1,
     meta: (resource.meta as string) ?? null,
@@ -71,6 +73,7 @@ export class PrismaGroupRepository implements IGroupRepository {
         scimId: input.scimId,
         externalId: input.externalId,
         displayName: input.displayName,
+        active: input.active,
         payload: JSON.parse(input.rawPayload),   // domain string → JSONB
         meta: input.meta,
         endpoint: { connect: { id: input.endpointId } },
@@ -143,7 +146,7 @@ export class PrismaGroupRepository implements IGroupRepository {
     endpointId: string,
     displayName: string,
     excludeScimId?: string,
-  ): Promise<{ scimId: string } | null> {
+  ): Promise<{ scimId: string; active: boolean; deletedAt: Date | null } | null> {
     // Phase 3: CITEXT handles case-insensitive comparison natively
     const where: Prisma.ScimResourceWhereInput = {
       endpointId,
@@ -156,9 +159,9 @@ export class PrismaGroupRepository implements IGroupRepository {
 
     const conflict = await this.prisma.scimResource.findFirst({
       where,
-      select: { scimId: true },
+      select: { scimId: true, active: true, deletedAt: true },
     });
-    return conflict;
+    return conflict ? { scimId: conflict.scimId, active: conflict.active, deletedAt: conflict.deletedAt ?? null } : null;
   }
 
   async findByExternalId(

@@ -142,7 +142,8 @@ describe('EndpointScimUsersController', () => {
         expect(mockUsersService.getUserForEndpoint).toHaveBeenCalledWith(
           'scim-123',
           expect.any(String),
-          'endpoint-1'
+          'endpoint-1',
+          expect.any(Object)
         );
       });
 
@@ -163,12 +164,12 @@ describe('EndpointScimUsersController', () => {
           'endpoint-1', 'scim-123', mockRequest, 'userName', undefined
         );
 
-        // Should include only userName + always-returned (schemas, id, meta, userName, displayName)
+        // Should include only userName + always-returned (schemas, id, meta, userName)
         expect(result.userName).toBe('test@example.com');
         expect(result.schemas).toBeDefined();
         expect(result.id).toBe('scim-123');
         expect(result.active).toBeUndefined();
-        expect(result.displayName).toBe('Test User'); // displayName is returned:always per RFC 7643
+        expect(result.displayName).toBeUndefined();
       });
 
       it('should apply excludedAttributes projection', async () => {
@@ -189,8 +190,7 @@ describe('EndpointScimUsersController', () => {
         );
 
         expect(result.userName).toBe('test@example.com');
-        // displayName is returned:always per RFC 7643 — cannot be excluded
-        expect(result.displayName).toBe('Test User');
+        expect(result.displayName).toBeUndefined();
       });
     });
 
@@ -222,7 +222,8 @@ describe('EndpointScimUsersController', () => {
         expect(mockUsersService.listUsersForEndpoint).toHaveBeenCalledWith(
           { filter: undefined, startIndex: 1, count: 10 },
           expect.any(String),
-          'endpoint-1'
+          'endpoint-1',
+          expect.any(Object)
         );
         expect(result).toEqual(mockListResponse);
       });
@@ -275,7 +276,8 @@ describe('EndpointScimUsersController', () => {
         expect(mockUsersService.listUsersForEndpoint).toHaveBeenCalledWith(
           { filter: 'userName eq "alice@example.com"', startIndex: 1, count: 10 },
           expect.any(String),
-          'endpoint-1'
+          'endpoint-1',
+          expect.any(Object)
         );
         expect(result).toEqual(mockListResponse);
       });

@@ -111,6 +111,12 @@ export function parseExtensionPath(path: string, extensionUrns?: readonly string
 /**
  * Checks whether a single record matches a simple SCIM filter expression.
  * Only `eq` is fully supported (case-insensitive string comparison).
+ *
+ * Boolean-aware: When comparing a boolean actual value against a string filter
+ * value (e.g., `primary eq "True"`), the comparison coerces the boolean to
+ * its string representation for a case-insensitive match. This handles the
+ * common case where SCIM clients use filter expressions like
+ * `roles[primary eq "True"]` against boolean attributes.
  */
 export function matchesFilter(
   item: Record<string, unknown>,
@@ -127,10 +133,17 @@ export function matchesFilter(
       if (typeof actual === 'string' && typeof filterValue === 'string') {
         return actual.toLowerCase() === filterValue.toLowerCase();
       }
+      // Boolean-to-string comparison: `true` eq "True" → match
+      if (typeof actual === 'boolean') {
+        return String(actual).toLowerCase() === filterValue.toLowerCase();
+      }
       return String(actual) === String(filterValue);
     }
     default:
       // For unsupported operators, fall back to strict equality
+      if (typeof actual === 'boolean') {
+        return String(actual).toLowerCase() === filterValue.toLowerCase();
+      }
       return String(actual) === String(filterValue);
   }
 }

@@ -664,6 +664,140 @@ export class SchemaValidator {
     return false;
   }
 
+  // ─── V16: Schema-aware Boolean attribute name collection ─────────────
+
+  /**
+   * Collect all attribute names whose schema type is "boolean", including
+   * sub-attributes of complex types.  The returned Set contains lowercase
+   * names so callers can do a case-insensitive check.
+   *
+   * This is used by `sanitizeBooleanStrings()` in the service layer so that
+   * only actual boolean attributes are coerced from string → boolean
+   * (prevents corruption of string attributes like `roles[].value = "true"`).
+   *
+   * @param schemas  Schema definitions (core + extension)
+   * @returns Set of lowercase attribute names that are boolean-typed
+   */
+  static collectBooleanAttributeNames(
+    schemas: readonly SchemaDefinition[],
+  ): Set<string> {
+    const names = new Set<string>();
+
+    const collect = (attrs: readonly SchemaAttributeDefinition[]): void => {
+      for (const attr of attrs) {
+        if (attr.type === 'boolean') {
+          names.add(attr.name.toLowerCase());
+        }
+        if (attr.subAttributes) {
+          collect(attr.subAttributes);
+        }
+      }
+    };
+
+    for (const schema of schemas) {
+      collect(schema.attributes);
+    }
+
+    return names;
+  }
+
+  // ─── V32: Filter attribute path validation ──────────────────────────
+
+  /**
+   * Validate that all attribute paths referenced in a parsed filter AST
+   * are known in the given schema definitions.
+   *
+   * Returns validation errors for any unknown attribute paths.
+   * Intended for use when StrictSchemaValidation is enabled.
+   *
+   * @param filterPaths - Array of attribute path strings from the filter AST
+   * @param schemas     - Schema definitions for the resource type
+   * @returns ValidationResult with errors for unknown paths
+   */
+  static validateFilterAttributePaths(
+    filterPaths: readonly string[],
+    schemas: readonly SchemaDefinition[],
+  ): ValidationResult {
+    const errors: ValidationError[] = [];
+
+    // Build attribute lookup
+    const coreAttributes = new Map<string, SchemaAttributeDefinition>();
+    const extensionSchemas = new Map<string, SchemaDefinition>();
+    for (const schema of schemas) {
+      if (schema.id.startsWith('urn:ietf:params:scim:schemas:core:')) {
+        for (const attr of schema.attributes) {
+          coreAttributes.set(attr.name.toLowerCase(), attr);
+        }
+      } else {
+        extensionSchemas.set(schema.id, schema);
+      }
+    }
+
+    // Also allow meta sub-attributes (resourceType, created, lastModified, location, version)
+    const metaSubAttrs = new Set([
+      'resourcetype', 'created', 'lastmodified', 'location', 'version',
+    ]);
+
+    for (const attrPath of filterPaths) {
+      // Reserved/meta paths are always valid
+      if (attrPath.toLowerCase() === 'id' ||
+          attrPath.toLowerCase() === 'externalid' ||
+          attrPath.toLowerCase().startsWith('meta.')) {
+        // Validate meta sub-path
+        if (attrPath.toLowerCase().startsWith('meta.')) {
+          const subPath = attrPath.toLowerCase().slice(5);
+          if (!metaSubAttrs.has(subPath)) {
+            errors.push({
+              path: attrPath,
+              message: `Unknown meta sub-attribute '${attrPath}' in filter.`,
+              scimType: 'invalidFilter',
+            });
+          }
+        }
+        continue;
+      }
+
+      // Extension URN paths
+      let resolved = false;
+      for (const [urn, schema] of extensionSchemas) {
+        if (attrPath.startsWith(urn + ':') || attrPath.startsWith(urn + '.')) {
+          const remainder = attrPath.slice(urn.length + 1);
+          const extAttrMap = new Map<string, SchemaAttributeDefinition>();
+          for (const a of schema.attributes) {
+            extAttrMap.set(a.name.toLowerCase(), a);
+          }
+          if (remainder) {
+            const segments = remainder.split('.');
+            const found = this.walkAttributePath(segments, extAttrMap);
+            if (!found) {
+              errors.push({
+                path: attrPath,
+                message: `Unknown attribute '${attrPath}' is not defined in extension schema '${urn}'.`,
+                scimType: 'invalidFilter',
+              });
+            }
+          }
+          resolved = true;
+          break;
+        }
+      }
+      if (resolved) continue;
+
+      // Core attribute path
+      const segments = attrPath.split('.');
+      const found = this.walkAttributePath(segments, coreAttributes);
+      if (!found) {
+        errors.push({
+          path: attrPath,
+          message: `Unknown attribute '${attrPath}' is not defined in the schema. Filter references an unrecognized attribute.`,
+          scimType: 'invalidFilter',
+        });
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
+
   // ─── V2: PATCH Operation Pre-Validation ──────────────────────────────
 
   /**

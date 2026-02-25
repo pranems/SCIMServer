@@ -250,6 +250,32 @@ describe('scim-patch-path utilities', () => {
     it('should return false with case-mismatched attribute when value does not match', () => {
       expect(matchesFilter({ Type: 'home' }, 'TYPE', 'eq', 'work')).toBe(false);
     });
+
+    // Boolean-to-string filter matching (AllowAndCoerceBooleanStrings support)
+    it('should match boolean true against string "True" (case-insensitive)', () => {
+      expect(matchesFilter({ primary: true }, 'primary', 'eq', 'True')).toBe(true);
+      expect(matchesFilter({ primary: true }, 'primary', 'eq', 'true')).toBe(true);
+      expect(matchesFilter({ primary: true }, 'primary', 'eq', 'TRUE')).toBe(true);
+    });
+
+    it('should match boolean false against string "False" (case-insensitive)', () => {
+      expect(matchesFilter({ primary: false }, 'primary', 'eq', 'False')).toBe(true);
+      expect(matchesFilter({ primary: false }, 'primary', 'eq', 'false')).toBe(true);
+    });
+
+    it('should not match boolean true against string "False"', () => {
+      expect(matchesFilter({ primary: true }, 'primary', 'eq', 'False')).toBe(false);
+    });
+
+    it('should not match boolean false against string "True"', () => {
+      expect(matchesFilter({ primary: false }, 'primary', 'eq', 'True')).toBe(false);
+    });
+
+    it('should handle boolean in unsupported operator fallback', () => {
+      expect(matchesFilter({ primary: true }, 'primary', 'sw', 'true')).toBe(true);
+      expect(matchesFilter({ primary: true }, 'primary', 'sw', 'True')).toBe(true);
+      expect(matchesFilter({ primary: false }, 'primary', 'sw', 'false')).toBe(true);
+    });
   });
 
   // ─── applyValuePathUpdate ────────────────────────────────────────────

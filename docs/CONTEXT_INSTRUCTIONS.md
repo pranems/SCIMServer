@@ -1,7 +1,7 @@
 # SCIMServer — Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.  
-> **Last Updated**: February 24, 2026
+> **Last Updated**: February 25, 2026
 
 ---
 
@@ -49,8 +49,8 @@ api/src/modules/scim/controllers/
   endpoint-scim-groups.controller.ts                     # Groups CRUD controller
   endpoint-scim-discovery.controller.ts                  # SCIM discovery (Schemas, ResourceTypes, ServiceProviderConfig)
 api/src/modules/scim/services/
-  endpoint-scim-users.service.ts    (673 lines)          # Users business logic
-  endpoint-scim-groups.service.ts   (728 lines)          # Groups business logic
+  endpoint-scim-users.service.ts    (857 lines)          # Users business logic
+  endpoint-scim-groups.service.ts   (946 lines)          # Groups business logic
   scim-metadata.service.ts          (13 lines)           # buildLocation, timestamp
 api/src/modules/scim/dto/
   create-user.dto.ts                                     # User creation DTO
@@ -64,20 +64,22 @@ api/src/modules/scim/common/
   scim-errors.ts                                         # createScimError()
 api/src/modules/scim/utils/
   scim-patch-path.ts                                     # 9 exported patch path utilities
-  endpoint-config.interface.ts                           # 10 config flags + helpers
+  endpoint-config.interface.ts                           # 11 config flags + helpers (incl. getConfigBooleanWithDefault)
   endpoint-context.storage.ts                            # AsyncLocalStorage for endpoint context
   base-url.util.ts                                       # buildBaseUrl() from request
+api/src/modules/scim/filters/
+  scim-filter-parser.ts                                  # Filter AST attribute path extraction
 api/src/modules/scim/interceptors/
   scim-content-type.interceptor.ts                       # Sets application/scim+json
 api/src/modules/auth/
   shared-secret.guard.ts                                 # Global auth guard (JWT + legacy)
   public.decorator.ts                                    # @Public() route exemption
 api/src/modules/logging/
-  logging.service.ts                                     # RequestLog persistence
+  logging.service.ts                                     # RequestLog persistence (supports in-memory mode)
   request-logging.interceptor.ts                         # Global request/response logging
 api/src/modules/endpoint/
   endpoint.controller.ts                                 # Admin CRUD for endpoints
-  endpoint.service.ts                                    # Endpoint business logic
+  endpoint.service.ts                                    # Endpoint business logic (supports in-memory mode)
 api/src/modules/backup/backup.service.ts                 # Azure Blob snapshot backup (290 lines)
 api/src/modules/database/
   database.controller.ts                                 # Dashboard data APIs
@@ -247,7 +249,7 @@ Four categories of PATCH paths, handled in order:
 
 ## 7. Current Compliance Status
 
-### 7.1 SCIM 2.0 Compliance (Current v0.17.1 Baseline)
+### 7.1 SCIM 2.0 Compliance (Current v0.17.2 Baseline)
 
 | Feature | Status |
 |---------|--------|
@@ -274,9 +276,9 @@ Four categories of PATCH paths, handled in order:
 
 ## 8. Test Coverage
 
-- **Unit**: 1962 tests passing (59 suites)
-- **E2E**: 342 tests passing (19 suites)
-- **Live integration**: 318 tests passing (local + Docker)
+- **Unit**: 2063 tests passing (61 suites)
+- **E2E**: 358 tests passing (19 suites)
+- **Live integration**: 334 tests passing (local + Docker)
 - **SCIM Validator**: 25/25 required + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
 - Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`
@@ -331,7 +333,7 @@ Four categories of PATCH paths, handled in order:
 6. **Auto-generated secrets** — In dev mode, `SCIM_SHARED_SECRET` and `OAUTH_CLIENT_SECRET` are auto-generated and logged to console. NEVER do this in production.
 7. **ValidationPipe whitelist: false** — We do NOT strip unknown properties, because SCIM resources have arbitrary attributes in extensions
 8. **The `/scim/v2` rewrite** — Express middleware in `main.ts` rewrites `/scim/v2/*` to `/scim/*` for spec compliance
-9. **SchemaValidator** — 816-line pure domain class for RFC 7643 payload validation. Gated behind `StrictSchemaValidation` config flag. Validates type, mutability (readOnly + immutable), required attrs, unknown attrs, sub-attributes, canonicalValues, size limits.
+9. **SchemaValidator** — 950-line pure domain class for RFC 7643 payload validation. Gated behind `StrictSchemaValidation` config flag. Validates type, mutability (readOnly + immutable), required attrs, unknown attrs, sub-attributes, canonicalValues, size limits. New: `collectBooleanAttributeNames()` for schema-aware boolean coercion, `validateFilterAttributePaths()` for filter validation (V32).
 10. **Repository Pattern** — `IUserRepository`/`IGroupRepository` interfaces injected via tokens. `PERSISTENCE_BACKEND` env var toggles between `prisma` and `inmemory` implementations.
 
 ---

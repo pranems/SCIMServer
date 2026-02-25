@@ -28,6 +28,20 @@ describe('applyAttributeProjection', () => {
     },
   };
 
+  const fullGroup = {
+    schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+    id: 'group-123',
+    displayName: 'Engineering',
+    members: [{ value: 'u1', type: 'User' }],
+    meta: {
+      resourceType: 'Group',
+      created: '2025-01-01T00:00:00Z',
+      lastModified: '2025-06-01T00:00:00Z',
+      location: 'https://example.com/Groups/group-123',
+      version: 'W/"2025-06-01T00:00:00Z"',
+    },
+  };
+
   // ─── No projection ──────────────────────────────────────────────────────
 
   it('should return resource as-is when neither attributes nor excludedAttributes specified', () => {
@@ -56,19 +70,27 @@ describe('applyAttributeProjection', () => {
       expect(result.name).toBeUndefined();
     });
 
-    it('should always include schemas, id, meta, userName, and displayName', () => {
+    it('should always include schemas, id, meta, and userName for user resources', () => {
       const result = applyAttributeProjection(fullUser, 'emails');
       expect(result.schemas).toEqual(['urn:ietf:params:scim:schemas:core:2.0:User']);
       expect(result.id).toBe('user-123');
       expect(result.meta).toBeDefined();
       expect(result.userName).toBe('alice@example.com');
-      expect(result.displayName).toBe('Alice Example');
+      expect(result.displayName).toBeUndefined();
     });
 
-    it('should never exclude userName or displayName (returned:always per RFC 7643)', () => {
+    it('should never exclude userName for user resources', () => {
       const result = applyAttributeProjection(fullUser, undefined, 'userName,displayName');
       expect(result.userName).toBe('alice@example.com');
-      expect(result.displayName).toBe('Alice Example');
+      expect(result.displayName).toBeUndefined();
+    });
+
+    it('should always include displayName for group resources', () => {
+      const result = applyAttributeProjection(fullGroup, 'members');
+      expect(result.schemas).toEqual(['urn:ietf:params:scim:schemas:core:2.0:Group']);
+      expect(result.id).toBe('group-123');
+      expect(result.meta).toBeDefined();
+      expect(result.displayName).toBe('Engineering');
     });
 
     it('should support dotted sub-attribute paths', () => {
@@ -106,13 +128,21 @@ describe('applyAttributeProjection', () => {
       expect(result.name).toBeUndefined();
     });
 
-    it('should never exclude always-returned attributes (schemas, id, meta, userName, displayName)', () => {
+    it('should never exclude always-returned attributes for user resources (schemas, id, meta, userName)', () => {
       const result = applyAttributeProjection(fullUser, undefined, 'schemas,id,meta,userName,displayName');
       expect(result.schemas).toBeDefined();
       expect(result.id).toBeDefined();
       expect(result.meta).toBeDefined();
       expect(result.userName).toBeDefined();
-      expect(result.displayName).toBeDefined();
+      expect(result.displayName).toBeUndefined();
+    });
+
+    it('should never exclude always-returned attributes for group resources (schemas, id, meta, displayName)', () => {
+      const result = applyAttributeProjection(fullGroup, undefined, 'schemas,id,meta,displayName');
+      expect(result.schemas).toBeDefined();
+      expect(result.id).toBeDefined();
+      expect(result.meta).toBeDefined();
+      expect(result.displayName).toBe('Engineering');
     });
 
     it('should support dotted sub-attribute paths for exclusion', () => {

@@ -15,6 +15,7 @@ describe('InMemoryGroupRepository', () => {
     scimId: 'scim-grp-1',
     externalId: 'ext-g1',
     displayName: 'Engineering',
+    active: true,
     rawPayload: '{}',
     meta: '{"resourceType":"Group"}',
     ...overrides,

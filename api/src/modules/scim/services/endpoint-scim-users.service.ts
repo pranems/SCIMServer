@@ -21,7 +21,7 @@ import type { CreateUserDto } from '../dto/create-user.dto';
 import type { PatchUserDto } from '../dto/patch-user.dto';
 import { ScimMetadataService } from './scim-metadata.service';
 import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
-import { ENDPOINT_CONFIG_FLAGS, getConfigBoolean } from '../../endpoint/endpoint-config.interface';
+import { ENDPOINT_CONFIG_FLAGS, getConfigBoolean, getConfigBooleanWithDefault } from '../../endpoint/endpoint-config.interface';
 import { buildUserFilter } from '../filters/apply-scim-filter';
 import { UserPatchEngine } from '../../../domain/patch/user-patch-engine';
 import { PatchError } from '../../../domain/patch/patch-error';
@@ -51,12 +51,39 @@ export class EndpointScimUsersService {
   async createUserForEndpoint(dto: CreateUserDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimUserResource> {
     this.ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
     this.enforceStrictSchemaValidation(dto, endpointId, config);
+
+    // Coerce boolean strings ("True"/"False") to native booleans before schema validation.
+    // Supersedes StrictSchemaValidation boolean type rejections when enabled.
+    this.coerceBooleanStringsIfEnabled(dto as Record<string, unknown>, endpointId, config);
+
     this.validatePayloadSchema(dto, endpointId, config, 'create');
 
     this.logger.info(LogCategory.SCIM_USER, 'Creating user', { userName: dto.userName, endpointId });
     this.logger.trace(LogCategory.SCIM_USER, 'Create user payload', { body: dto as unknown as Record<string, unknown> });
 
-    await this.assertUniqueIdentifiersForEndpoint(dto.userName, dto.externalId ?? undefined, endpointId);
+    // Check uniqueness — if conflict is with a soft-deleted resource and
+    // ReprovisionOnConflictForSoftDeletedResource is enabled, re-activate it instead of 409.
+    const conflict = await this.userRepo.findConflict(endpointId, dto.userName, dto.externalId ?? undefined);
+    if (conflict) {
+      const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
+      const reprovision = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED);
+
+      if (softDelete && reprovision && conflict.deletedAt != null) {
+        this.logger.info(LogCategory.SCIM_USER, 'Re-provisioning soft-deleted user', { scimId: conflict.scimId, userName: dto.userName, endpointId });
+        return this.reprovisionUser(conflict.scimId, dto, baseUrl, endpointId, config);
+      }
+
+      // Normal conflict — throw 409
+      const reason =
+        conflict.userName.toLowerCase() === dto.userName.toLowerCase()
+          ? `userName '${dto.userName}'`
+          : `externalId '${dto.externalId}'`;
+      throw createScimError({
+        status: 409,
+        scimType: 'uniqueness',
+        detail: `A resource with ${reason} already exists.`,
+      });
+    }
 
     const now = new Date();
     const scimId = randomUUID();
@@ -83,7 +110,7 @@ export class EndpointScimUsersService {
     return this.toScimUserResource(created, baseUrl, endpointId);
   }
 
-  async getUserForEndpoint(scimId: string, baseUrl: string, endpointId: string): Promise<ScimUserResource> {
+  async getUserForEndpoint(scimId: string, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimUserResource> {
     this.logger.debug(LogCategory.SCIM_USER, 'Get user', { scimId, endpointId });
     const user = await this.userRepo.findByScimId(endpointId, scimId);
     
@@ -92,13 +119,17 @@ export class EndpointScimUsersService {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
+    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
+    this.guardSoftDeleted(user, config, scimId);
+
     return this.toScimUserResource(user, baseUrl, endpointId);
   }
 
   async listUsersForEndpoint(
     { filter, startIndex = 1, count = DEFAULT_COUNT }: ListUsersParams,
     baseUrl: string,
-    endpointId: string
+    endpointId: string,
+    config?: EndpointConfig,
   ): Promise<ScimListResponse<ScimUserResource>> {
     if (count > MAX_COUNT) {
       count = MAX_COUNT;
@@ -125,7 +156,13 @@ export class EndpointScimUsersService {
     );
 
     // Build SCIM resources and apply in-memory filter if needed
-    let resources = allDbUsers.map((user) => this.toScimUserResource(user, baseUrl, endpointId));
+    // RFC 7644 §3.6: Soft-deleted resources (deletedAt set) MUST be omitted from future query results
+    const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
+    const filteredDbUsers = softDelete
+      ? allDbUsers.filter((u) => u.deletedAt == null)
+      : allDbUsers;
+    let resources = filteredDbUsers.map((user) => this.toScimUserResource(user, baseUrl, endpointId));
+
     if (filterResult.inMemoryFilter) {
       resources = resources.filter(filterResult.inMemoryFilter);
     }
@@ -168,6 +205,9 @@ export class EndpointScimUsersService {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
+    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
+    this.guardSoftDeleted(user, config, scimId);
+
     // Phase 7: Pre-write If-Match enforcement
     this.enforceIfMatch(user.version, ifMatch, config);
 
@@ -189,6 +229,10 @@ export class EndpointScimUsersService {
   ): Promise<ScimUserResource> {
     this.ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
     this.enforceStrictSchemaValidation(dto, endpointId, config);
+
+    // Coerce boolean strings before schema validation (same as create path)
+    this.coerceBooleanStringsIfEnabled(dto as Record<string, unknown>, endpointId, config);
+
     this.validatePayloadSchema(dto, endpointId, config, 'replace');
 
     this.logger.info(LogCategory.SCIM_USER, 'Replace user (PUT)', { scimId, userName: dto.userName, endpointId });
@@ -198,6 +242,9 @@ export class EndpointScimUsersService {
     if (!user) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
+
+    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
+    this.guardSoftDeleted(user, config, scimId);
 
     // Phase 7: Pre-write If-Match enforcement
     this.enforceIfMatch(user.version, ifMatch, config);
@@ -237,14 +284,17 @@ export class EndpointScimUsersService {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
+    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations (double-delete)
+    this.guardSoftDeleted(user, config, scimId);
+
     // Phase 7: Pre-write If-Match enforcement
     this.enforceIfMatch(user.version, ifMatch, config);
 
     const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
 
     if (softDelete) {
-      this.logger.info(LogCategory.SCIM_USER, 'Soft-deleting user (setting active=false)', { scimId, endpointId });
-      await this.userRepo.update(user.id, { active: false });
+      this.logger.info(LogCategory.SCIM_USER, 'Soft-deleting user (setting active=false + deletedAt)', { scimId, endpointId });
+      await this.userRepo.update(user.id, { active: false, deletedAt: new Date() });
       this.logger.info(LogCategory.SCIM_USER, 'User soft-deleted', { scimId, endpointId });
     } else {
       await this.userRepo.delete(user.id);
@@ -253,6 +303,62 @@ export class EndpointScimUsersService {
   }
 
   // ===== Private Helper Methods =====
+
+  /**
+   * RFC 7644 §3.6: Guard against operations on soft-deleted resources.
+   *
+   * When SoftDeleteEnabled is active, a resource with deletedAt set is considered
+   * deleted and MUST return 404 for all subsequent operations (GET, PATCH, PUT, DELETE).
+   * Note: A user disabled via PATCH (active=false) is NOT soft-deleted — only DELETE sets deletedAt.
+   */
+  private guardSoftDeleted(user: UserRecord, config: EndpointConfig | undefined, scimId: string): void {
+    const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
+    if (softDelete && user.deletedAt != null) {
+      this.logger.debug(LogCategory.SCIM_USER, 'Soft-deleted user accessed — returning 404', { scimId });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
+    }
+  }
+
+  /**
+   * Re-provision a soft-deleted user: reactivate with new payload data.
+   * Called when ReprovisionOnConflictForSoftDeletedResource is enabled and
+   * a POST conflicts with a soft-deleted user.
+   */
+  private async reprovisionUser(
+    existingScimId: string,
+    dto: CreateUserDto,
+    baseUrl: string,
+    endpointId: string,
+    config?: EndpointConfig,
+  ): Promise<ScimUserResource> {
+    const existing = await this.userRepo.findByScimId(endpointId, existingScimId);
+    if (!existing) {
+      throw createScimError({ status: 500, detail: 'Failed to locate soft-deleted resource for re-provisioning.' });
+    }
+
+    const now = new Date();
+    const sanitizedPayload = this.extractAdditionalAttributes(dto);
+
+    const updateData: UserUpdateInput = {
+      userName: dto.userName,
+      externalId: dto.externalId ?? null,
+      displayName: typeof dto.displayName === 'string' ? dto.displayName : null,
+      active: dto.active ?? true,
+      deletedAt: null,  // Clear soft-delete marker on re-provisioning
+      rawPayload: JSON.stringify(sanitizedPayload),
+      meta: JSON.stringify({
+        resourceType: 'User',
+        created: (this.parseJson<Record<string, unknown>>(String(existing.meta ?? '{}')) as Record<string, unknown>).created ?? now.toISOString(),
+        lastModified: now.toISOString(),
+      }),
+    };
+
+    const updated = await this.userRepo.update(existing.id, updateData);
+    this.logger.info(LogCategory.SCIM_USER, 'User re-provisioned (soft-deleted resource reactivated)', {
+      scimId: existingScimId, userName: dto.userName, endpointId,
+    });
+    return this.toScimUserResource(updated, baseUrl, endpointId);
+  }
 
   /**
    * Phase 7: Pre-write If-Match enforcement (RFC 7644 §3.14).
@@ -379,6 +485,31 @@ export class EndpointScimUsersService {
   }
 
   /**
+   * Coerce boolean-typed string values to native booleans on write payloads.
+   *
+   * Gated by AllowAndCoerceBooleanStrings (default: true). When enabled, converts
+   * attributes like roles[].primary = "True" → true before schema validation,
+   * preventing StrictSchemaValidation from rejecting valid-intent payloads.
+   *
+   * @see RFC 7644 §3.12 — "Be liberal in what you accept" (Postel's Law)
+   */
+  private coerceBooleanStringsIfEnabled(
+    dto: Record<string, unknown>,
+    endpointId: string,
+    config?: EndpointConfig,
+  ): void {
+    const coerceEnabled = getConfigBooleanWithDefault(
+      config,
+      ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS,
+      true,
+    );
+    if (!coerceEnabled) return;
+
+    const booleanKeys = this.getUserBooleanKeys(endpointId);
+    this.sanitizeBooleanStrings(dto, booleanKeys);
+  }
+
+  /**
    * H-2: Immutable attribute enforcement (RFC 7643 §2.2).
    *
    * Compares the existing resource state (from DB) with the incoming payload
@@ -502,6 +633,24 @@ export class EndpointScimUsersService {
         (resultPayloadPlaceholder.schemas as string[]).push(urn);
       }
       const schemaDefs = this.buildSchemaDefinitions(resultPayloadPlaceholder, endpointId);
+
+      // Coerce boolean strings in PATCH operation values before validation
+      const coerceEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS, true);
+      if (coerceEnabled) {
+        const booleanKeys = this.getUserBooleanKeys(endpointId);
+        for (const op of patchDto.Operations) {
+          if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
+            this.sanitizeBooleanStrings(op.value as Record<string, unknown>, booleanKeys);
+          } else if (Array.isArray(op.value)) {
+            for (const item of op.value) {
+              if (typeof item === 'object' && item !== null) {
+                this.sanitizeBooleanStrings(item as Record<string, unknown>, booleanKeys);
+              }
+            }
+          }
+        }
+      }
+
       for (const op of patchDto.Operations) {
         const preResult = SchemaValidator.validatePatchOperationValue(
           op.op, op.path, op.value, schemaDefs,
@@ -553,6 +702,12 @@ export class EndpointScimUsersService {
         (resultPayload.schemas as string[]).push(urn);
       }
     }
+
+    // Coerce boolean strings in post-PATCH payload before schema validation.
+    // PATCH filter expressions like roles[primary eq "True"] can materialise string
+    // literals into the result payload — this converts them to native booleans.
+    this.coerceBooleanStringsIfEnabled(resultPayload, endpointId, config);
+
     this.validatePayloadSchema(resultPayload, endpointId, config, 'patch');
 
     // H-2: Immutable attribute enforcement — compare existing state with PATCH result
@@ -582,8 +737,11 @@ export class EndpointScimUsersService {
     const meta = this.buildMeta(user, baseUrl);
     const rawPayload = this.parseJson<Record<string, unknown>>(String(user.rawPayload ?? '{}'));
 
-    // Sanitize boolean-like strings in multi-valued attributes (Microsoft Entra sends "True"/"False")
-    this.sanitizeBooleanStrings(rawPayload);
+    // V16 fix: Schema-aware boolean sanitization — only convert attributes whose schema
+    // type is "boolean" (e.g. active, emails[].primary). Prevents corruption of string
+    // attributes like roles[].value = "true" which is a legitimate string value.
+    const booleanKeys = this.getUserBooleanKeys(endpointId);
+    this.sanitizeBooleanStrings(rawPayload, booleanKeys);
 
     // Build schemas[] dynamically — include extension URNs present in payload (G19 fix)
     const extensionUrns = this.schemaRegistry.getExtensionUrns(endpointId);
@@ -610,20 +768,46 @@ export class EndpointScimUsersService {
   }
 
   /**
-   * Recursively sanitize boolean-like string values ("True"/"False") to actual booleans.
-   * Microsoft Entra ID sends primary as string "True" but the SCIM validator expects boolean true.
+   * Build the set of boolean attribute names for the User schema.
+   * Cached per-call — collects names from core + extension schemas.
    */
-  private sanitizeBooleanStrings(obj: Record<string, unknown>): void {
+  private getUserBooleanKeys(endpointId?: string): Set<string> {
+    const coreSchema = this.schemaRegistry.getSchema(SCIM_CORE_USER_SCHEMA, endpointId);
+    const schemas: SchemaDefinition[] = [];
+    if (coreSchema) schemas.push(coreSchema as SchemaDefinition);
+    // Include extension schemas
+    const extUrns = this.schemaRegistry.getExtensionUrns(endpointId);
+    for (const urn of extUrns) {
+      const ext = this.schemaRegistry.getSchema(urn, endpointId);
+      if (ext) schemas.push(ext as SchemaDefinition);
+    }
+    return SchemaValidator.collectBooleanAttributeNames(schemas);
+  }
+
+  /**
+   * Recursively sanitize boolean-like string values ("True"/"False") to actual booleans,
+   * but ONLY for attributes whose schema type is "boolean".
+   *
+   * V16 fix: Previously this converted ALL string values matching "true"/"false" to
+   * booleans indiscriminately, corrupting string attributes like roles[].value = "true".
+   * Now restricted to declared boolean attribute names (e.g. "active", "primary").
+   *
+   * Microsoft Entra ID sends primary as string "True" but the SCIM spec expects boolean true.
+   *
+   * @param obj          - The object to sanitize (mutated in place)
+   * @param booleanKeys  - Set of lowercase attribute names that are type "boolean"
+   */
+  private sanitizeBooleanStrings(obj: Record<string, unknown>, booleanKeys: Set<string>): void {
     for (const [key, value] of Object.entries(obj)) {
       if (Array.isArray(value)) {
         for (const item of value) {
           if (typeof item === 'object' && item !== null) {
-            this.sanitizeBooleanStrings(item as Record<string, unknown>);
+            this.sanitizeBooleanStrings(item as Record<string, unknown>, booleanKeys);
           }
         }
       } else if (typeof value === 'object' && value !== null) {
-        this.sanitizeBooleanStrings(value as Record<string, unknown>);
-      } else if (typeof value === 'string') {
+        this.sanitizeBooleanStrings(value as Record<string, unknown>, booleanKeys);
+      } else if (typeof value === 'string' && booleanKeys.has(key.toLowerCase())) {
         const lower = value.toLowerCase();
         if (lower === 'true') obj[key] = true;
         else if (lower === 'false') obj[key] = false;

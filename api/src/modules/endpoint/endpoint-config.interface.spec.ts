@@ -1,6 +1,7 @@
 import {
   ENDPOINT_CONFIG_FLAGS,
   getConfigBoolean,
+  getConfigBooleanWithDefault,
   getConfigString,
   validateEndpointConfig,
   DEFAULT_ENDPOINT_CONFIG,
@@ -23,6 +24,8 @@ describe('endpoint-config.interface', () => {
       expect(ENDPOINT_CONFIG_FLAGS.LOG_LEVEL).toBe('logLevel');
       expect(ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED).toBe('SoftDeleteEnabled');
       expect(ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION).toBe('StrictSchemaValidation');
+      expect(ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH).toBe('RequireIfMatch');
+      expect(ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS).toBe('AllowAndCoerceBooleanStrings');
     });
   });
 
@@ -712,6 +715,8 @@ describe('endpoint-config.interface', () => {
       expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED]).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]).toBe(true);
     });
   });
 
@@ -888,6 +893,133 @@ describe('endpoint-config.interface', () => {
           StrictSchemaValidation: 'invalid',
         })
       ).toThrow(/StrictSchemaValidation/);
+    });
+
+    it('should accept AllowAndCoerceBooleanStrings with other flags', () => {
+      expect(() =>
+        validateEndpointConfig({
+          AllowAndCoerceBooleanStrings: 'True',
+          StrictSchemaValidation: 'True',
+          SoftDeleteEnabled: 'False',
+        })
+      ).not.toThrow();
+    });
+
+    it('should reject invalid AllowAndCoerceBooleanStrings even if others are valid', () => {
+      expect(() =>
+        validateEndpointConfig({
+          AllowAndCoerceBooleanStrings: 'invalid',
+          StrictSchemaValidation: 'True',
+        })
+      ).toThrow(/AllowAndCoerceBooleanStrings/);
+    });
+  });
+
+  describe('getConfigBooleanWithDefault', () => {
+    it('should return defaultValue for undefined config', () => {
+      expect(getConfigBooleanWithDefault(undefined, 'anyKey', true)).toBe(true);
+      expect(getConfigBooleanWithDefault(undefined, 'anyKey', false)).toBe(false);
+    });
+
+    it('should return defaultValue for missing key', () => {
+      const config: EndpointConfig = {};
+      expect(getConfigBooleanWithDefault(config, 'missing', true)).toBe(true);
+      expect(getConfigBooleanWithDefault(config, 'missing', false)).toBe(false);
+    });
+
+    it('should return actual boolean value when present', () => {
+      expect(getConfigBooleanWithDefault({ test: true }, 'test', false)).toBe(true);
+      expect(getConfigBooleanWithDefault({ test: false }, 'test', true)).toBe(false);
+    });
+
+    it('should parse string "True" correctly', () => {
+      expect(getConfigBooleanWithDefault({ test: 'True' }, 'test', false)).toBe(true);
+      expect(getConfigBooleanWithDefault({ test: 'true' }, 'test', false)).toBe(true);
+      expect(getConfigBooleanWithDefault({ test: 'TRUE' }, 'test', false)).toBe(true);
+    });
+
+    it('should parse string "False" correctly', () => {
+      expect(getConfigBooleanWithDefault({ test: 'False' }, 'test', true)).toBe(false);
+      expect(getConfigBooleanWithDefault({ test: 'false' }, 'test', true)).toBe(false);
+      expect(getConfigBooleanWithDefault({ test: 'FALSE' }, 'test', true)).toBe(false);
+    });
+
+    it('should parse string "1" as true', () => {
+      expect(getConfigBooleanWithDefault({ test: '1' }, 'test', false)).toBe(true);
+    });
+
+    it('should parse string "0" as false', () => {
+      expect(getConfigBooleanWithDefault({ test: '0' }, 'test', true)).toBe(false);
+    });
+
+    it('should return defaultValue for non-boolean/non-string value', () => {
+      expect(getConfigBooleanWithDefault({ test: 123 }, 'test', true)).toBe(true);
+      expect(getConfigBooleanWithDefault({ test: {} }, 'test', false)).toBe(false);
+    });
+
+    it('should use default=true for AllowAndCoerceBooleanStrings when not set', () => {
+      const config: EndpointConfig = { StrictSchemaValidation: 'True' };
+      expect(getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS, true)).toBe(true);
+    });
+
+    it('should respect explicit AllowAndCoerceBooleanStrings=False', () => {
+      const config: EndpointConfig = { AllowAndCoerceBooleanStrings: 'False' };
+      expect(getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS, true)).toBe(false);
+    });
+  });
+
+  describe('AllowAndCoerceBooleanStrings validation', () => {
+    it('should accept boolean true', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: true })).not.toThrow();
+    });
+
+    it('should accept boolean false', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: false })).not.toThrow();
+    });
+
+    it('should accept string "True"', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: 'True' })).not.toThrow();
+    });
+
+    it('should accept string "true"', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: 'true' })).not.toThrow();
+    });
+
+    it('should accept string "False"', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: 'False' })).not.toThrow();
+    });
+
+    it('should accept string "false"', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: 'false' })).not.toThrow();
+    });
+
+    it('should accept string "1"', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: '1' })).not.toThrow();
+    });
+
+    it('should accept string "0"', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: '0' })).not.toThrow();
+    });
+
+    it('should throw for invalid string "Yes"', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: 'Yes' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for number value', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: 123 })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for array value', () => {
+      expect(() => validateEndpointConfig({ AllowAndCoerceBooleanStrings: ['true'] })).toThrow(/Invalid type/);
+    });
+
+    it('should include flag name in error message', () => {
+      try {
+        validateEndpointConfig({ AllowAndCoerceBooleanStrings: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('AllowAndCoerceBooleanStrings');
+      }
     });
   });
 });

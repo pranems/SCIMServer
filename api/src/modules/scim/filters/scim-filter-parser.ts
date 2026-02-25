@@ -214,13 +214,22 @@ function tokenize(input: string): Token[] {
  *              | attrPath "pr"                   (presence)
  *              | attrPath compareOp compValue    (comparison)
  */
+/**
+ * Maximum nesting depth for filter expressions.
+ * Prevents stack overflow from adversarial deeply-nested filters like
+ * `((((...50+ levels...))))` even within the 10000-char DTO limit.
+ */
+const MAX_FILTER_DEPTH = 50;
+
 class Parser {
   private tokens: Token[];
   private pos: number;
+  private depth: number;
 
   constructor(tokens: Token[]) {
     this.tokens = tokens;
     this.pos = 0;
+    this.depth = 0;
   }
 
   parse(): FilterNode {
@@ -231,6 +240,16 @@ class Parser {
       );
     }
     return node;
+  }
+
+  private guardDepth(): void {
+    this.depth++;
+    if (this.depth > MAX_FILTER_DEPTH) {
+      throw new Error(
+        `Filter expression exceeds maximum nesting depth of ${MAX_FILTER_DEPTH}. ` +
+        `Simplify the filter to reduce nesting.`
+      );
+    }
   }
 
   private current(): Token {
@@ -281,18 +300,22 @@ class Parser {
 
     // NOT expression
     if (t.type === 'NOT') {
+      this.guardDepth();
       this.advance();
       this.expect('LPAREN');
       const filter = this.parseOrExpr();
       this.expect('RPAREN');
+      this.depth--;
       return { type: 'not', filter };
     }
 
     // Grouped expression
     if (t.type === 'LPAREN') {
+      this.guardDepth();
       this.advance();
       const filter = this.parseOrExpr();
       this.expect('RPAREN');
+      this.depth--;
       return filter;
     }
 
@@ -307,9 +330,11 @@ class Parser {
 
     // Value path: attrPath "[" filter "]"
     if (this.current().type === 'LBRACKET') {
+      this.guardDepth();
       this.advance(); // consume '['
       const filter = this.parseOrExpr();
       this.expect('RBRACKET');
+      this.depth--;
       return { type: 'valuePath', attrPath, filter };
     }
 
@@ -540,4 +565,39 @@ export function evaluateFilter(node: FilterNode, resource: Record<string, unknow
     default:
       return false;
   }
+}
+
+/**
+ * Extract all attribute paths referenced in a parsed filter AST.
+ *
+ * Used by V32 (filter attribute validation) to collect all attrPath values
+ * from CompareNode and ValuePathNode for schema validation.
+ *
+ * @param node - Root of the parsed filter AST
+ * @returns Array of unique attribute path strings
+ */
+export function extractFilterPaths(node: FilterNode): string[] {
+  const paths = new Set<string>();
+
+  const walk = (n: FilterNode): void => {
+    switch (n.type) {
+      case 'compare':
+        paths.add(n.attrPath);
+        break;
+      case 'valuePath':
+        paths.add(n.attrPath);
+        walk(n.filter);
+        break;
+      case 'logical':
+        walk(n.left);
+        walk(n.right);
+        break;
+      case 'not':
+        walk(n.filter);
+        break;
+    }
+  };
+
+  walk(node);
+  return [...paths];
 }

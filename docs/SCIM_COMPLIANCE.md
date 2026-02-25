@@ -23,7 +23,25 @@
 | Sorting (RFC 7644 §3.4.2.3) | **0%** | Not implemented (correctly listed as unsupported) |
 | Bulk Operations (RFC 7644 §3.7) | **0%** | Not implemented (correctly listed as unsupported) |
 
-**Overall: ~96% RFC 7643/7644 compliant** (remaining gaps: Bulk, Sorting — both optional per spec). All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. 1962 unit tests (59 suites), 342 E2E tests (19 suites), 318 live integration tests (318 pass, 0 known failures) — all passing.
+**Overall: ~96% RFC 7643/7644 compliant** (remaining gaps: Bulk, Sorting — both optional per spec). All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. 2063 unit tests (61 suites), 358 E2E tests (19 suites), 334 live integration tests (334 pass, 0 known failures) — all passing.
+
+### New in v0.17.2
+
+| Feature | Description |
+|---------|-------------|
+| `AllowAndCoerceBooleanStrings` flag | Coerces `"True"`/`"False"` strings to native booleans before schema validation (default on). Schema-aware: only coerces attributes whose schema type is `"boolean"` (V16/V17 fix). |
+| `ReprovisionOnConflictForSoftDeletedResource` flag | Re-activates soft-deleted resources on POST conflict (clears `deletedAt`, sets `active=true`) instead of 409 (requires SoftDeleteEnabled). 10th boolean flag. |
+| Soft-delete `deletedAt` tracking | Soft-delete now sets `deletedAt` timestamp + `active=false`. Guard uses `deletedAt != null` (not `active`) to distinguish from PATCH-disabled resources. New Prisma column: `deletedAt DateTime? @db.Timestamptz`. |
+| Group `active` field | Groups now include `active: boolean` in domain models and SCIM responses. Created with `active: true`. |
+| Reprovision (re-activation) | Soft-deleted Users and Groups can be re-activated on POST conflict when `ReprovisionOnConflictForSoftDeletedResource` is enabled. |
+| In-memory EndpointService/LoggingService | Both services support `PERSISTENCE_BACKEND=inmemory` for fully Prisma-free operation |
+| Resource-type-aware projection | `displayName` always-returned only for Groups (RFC 7643); excludable for Users |
+| `getConfigBooleanWithDefault()` | Config helper for flags defaulting to `true` |
+| externalId caseExact compliance | `externalId` treated as case-sensitive per RFC 7643 §2.4 (`caseExact: true`) |
+| `SchemaValidator.collectBooleanAttributeNames()` | New static method — extracts boolean-typed attribute names from schema definitions for schema-aware coercion |
+| `SchemaValidator.validateFilterAttributePaths()` | V32 — validates filter attribute paths against registered schema definitions |
+| `scim-filter-parser.ts` | New module for extracting attribute paths from parsed SCIM filter AST |
+| Startup StrictSchemaValidation warning | `main.ts` logs warning when StrictSchemaValidation is OFF by default |
 
 ### New in v0.17.1
 
@@ -81,7 +99,7 @@
 | No-path replace (object merge) | ✅ |
 | Empty-value removal (RFC 7644 §3.5.2.3) | ✅ |
 | Dot-notation path resolution (`name.givenName`) | ✅ (via VerbosePatchSupported flag) |
-| Boolean coercion (string `"True"` → boolean `true`) | ✅ |
+| Boolean coercion (string `"True"` → boolean `true`) | ✅ (via `AllowAndCoerceBooleanStrings` flag, default on) |
 | Group PATCH returns 200 with body | ✅ |
 
 ## Attribute Projection (RFC 7644 §3.4.2.5)
@@ -92,6 +110,7 @@
 | `?excludedAttributes=emails,members` on GET | ✅ |
 | `attributes` / `excludedAttributes` in POST /.search body | ✅ |
 | Always-returned attributes (`id`, `schemas`, `meta`) never excluded | ✅ |
+| Resource-type-aware always-returned (`displayName` always for Groups, default for Users) | ✅ |
 | `attributes` takes precedence over `excludedAttributes` | ✅ |
 
 ## ETag & Conditional Requests (RFC 7644 §3.14)
@@ -152,7 +171,7 @@ SCIMServer passes all critical requirements for Microsoft Entra ID enterprise ap
 | `sortBy` / `sortOrder` | Low | Listed as unsupported in ServiceProviderConfig |
 | Bulk operations (`POST /Bulk`) | Low | Optional per spec; not used by Entra |
 | `returned: never` attribute enforcement | Low | Attributes with `returned: 'never'` are not stripped from responses |
-| `caseExact` enforcement in filters | Low | Filter operators do not consult `caseExact` attribute metadata |
+| `caseExact` enforcement in filters | Low | Filter operators do not consult `caseExact` attribute metadata (externalId uniqueness is case-sensitive per RFC) |
 
 ---
 

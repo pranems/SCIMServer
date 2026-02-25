@@ -12,7 +12,7 @@ import type {
 } from '../../../domain/models/group.model';
 import { USER_REPOSITORY, GROUP_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
-import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import { getConfigBoolean, getConfigBooleanWithDefault, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { createScimError } from '../common/scim-errors';
@@ -61,22 +61,57 @@ export class EndpointScimGroupsService {
   async createGroupForEndpoint(dto: CreateGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimGroupResource> {
     this.ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
     this.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
+
+    // Coerce boolean strings ("True"/"False") to native booleans before schema validation
+    this.coerceBooleanStringsIfEnabled(dto as unknown as Record<string, unknown>, endpointId, config);
+
     this.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, config, 'create');
 
     this.logger.info(LogCategory.SCIM_GROUP, 'Creating group', { displayName: dto.displayName, memberCount: dto.members?.length ?? 0, endpointId });
     this.logger.trace(LogCategory.SCIM_GROUP, 'Create group payload', { body: dto as unknown as Record<string, unknown> });
-
-    // Check for duplicate displayName within the endpoint (case-insensitive)
-    await this.assertUniqueDisplayName(dto.displayName, endpointId);
 
     // Extract externalId from the DTO (it may come as a top-level property from Entra)
     const externalId = typeof (dto as Record<string, unknown>).externalId === 'string'
       ? (dto as Record<string, unknown>).externalId as string
       : null;
 
+    // Check for duplicate displayName — if conflict is with a soft-deleted resource and
+    // ReprovisionOnConflictForSoftDeletedResource is enabled, re-activate it instead of 409.
+    const displayNameConflict = await this.groupRepo.findByDisplayName(endpointId, dto.displayName);
+    if (displayNameConflict) {
+      const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
+      const reprovision = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED);
+
+      if (softDelete && reprovision && displayNameConflict.deletedAt != null) {
+        this.logger.info(LogCategory.SCIM_GROUP, 'Re-provisioning soft-deleted group', { scimId: displayNameConflict.scimId, displayName: dto.displayName, endpointId });
+        return this.reprovisionGroup(displayNameConflict.scimId, dto, externalId, baseUrl, endpointId);
+      }
+
+      throw createScimError({
+        status: 409,
+        scimType: 'uniqueness',
+        detail: `A group with displayName '${dto.displayName}' already exists.`,
+      });
+    }
+
     // Check for duplicate externalId within the endpoint
     if (externalId) {
-      await this.assertUniqueExternalId(externalId, endpointId);
+      const externalIdConflict = await this.groupRepo.findByExternalId(endpointId, externalId);
+      if (externalIdConflict) {
+        const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
+        const reprovision = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED);
+
+        if (softDelete && reprovision && externalIdConflict.deletedAt != null) {
+          this.logger.info(LogCategory.SCIM_GROUP, 'Re-provisioning soft-deleted group (externalId match)', { scimId: externalIdConflict.scimId, externalId, endpointId });
+          return this.reprovisionGroup(externalIdConflict.scimId, dto, externalId, baseUrl, endpointId);
+        }
+
+        throw createScimError({
+          status: 409,
+          scimType: 'uniqueness',
+          detail: `A group with externalId '${externalId}' already exists.`,
+        });
+      }
     }
 
     const now = new Date();
@@ -89,6 +124,7 @@ export class EndpointScimGroupsService {
       scimId,
       externalId,
       displayName: dto.displayName,
+      active: true,
       rawPayload: JSON.stringify(sanitizedPayload),
       meta: JSON.stringify({
         resourceType: 'Group',
@@ -110,7 +146,7 @@ export class EndpointScimGroupsService {
     return this.toScimGroupResource(withMembers, baseUrl, endpointId);
   }
 
-  async getGroupForEndpoint(scimId: string, baseUrl: string, endpointId: string): Promise<ScimGroupResource> {
+  async getGroupForEndpoint(scimId: string, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimGroupResource> {
     this.logger.debug(LogCategory.SCIM_GROUP, 'Get group', { scimId, endpointId });
     const group = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!group) {
@@ -118,13 +154,17 @@ export class EndpointScimGroupsService {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
+    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
+    this.guardSoftDeleted(group, config, scimId);
+
     return this.toScimGroupResource(group, baseUrl, endpointId);
   }
 
   async listGroupsForEndpoint(
     { filter, startIndex = 1, count = DEFAULT_COUNT }: ListGroupsParams,
     baseUrl: string,
-    endpointId: string
+    endpointId: string,
+    config?: EndpointConfig,
   ): Promise<ScimListResponse<ScimGroupResource>> {
     if (count > MAX_COUNT) {
       count = MAX_COUNT;
@@ -151,7 +191,13 @@ export class EndpointScimGroupsService {
     );
 
     // Build SCIM resources and apply in-memory filter if needed
-    let resources = allGroups.map((g) => this.toScimGroupResource(g, baseUrl, endpointId));
+    // RFC 7644 §3.6: Soft-deleted resources (deletedAt set) MUST be omitted from future query results
+    const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
+    const filteredGroups = softDelete
+      ? allGroups.filter((g) => g.deletedAt == null)
+      : allGroups;
+    let resources = filteredGroups.map((g) => this.toScimGroupResource(g, baseUrl, endpointId));
+
     if (filterResult.inMemoryFilter) {
       resources = resources.filter(filterResult.inMemoryFilter);
     }
@@ -186,6 +232,9 @@ export class EndpointScimGroupsService {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
+    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
+    this.guardSoftDeleted(group, config, scimId);
+
     // Phase 7: Pre-write If-Match enforcement
     this.enforceIfMatch(group.version, ifMatch, config);
 
@@ -209,6 +258,24 @@ export class EndpointScimGroupsService {
         (resultPayloadPlaceholder.schemas as string[]).push(urn);
       }
       const schemaDefs = this.buildSchemaDefinitions(resultPayloadPlaceholder, endpointId);
+
+      // Coerce boolean strings in PATCH operation values before validation
+      const coerceEnabled = getConfigBooleanWithDefault(endpointConfig, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS, true);
+      if (coerceEnabled) {
+        const booleanKeys = this.getGroupBooleanKeys(endpointId);
+        for (const op of dto.Operations) {
+          if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
+            this.sanitizeBooleanStrings(op.value as Record<string, unknown>, booleanKeys);
+          } else if (Array.isArray(op.value)) {
+            for (const item of op.value) {
+              if (typeof item === 'object' && item !== null) {
+                this.sanitizeBooleanStrings(item as Record<string, unknown>, booleanKeys);
+              }
+            }
+          }
+        }
+      }
+
       for (const op of dto.Operations) {
         const preResult = SchemaValidator.validatePatchOperationValue(
           op.op, op.path, op.value, schemaDefs,
@@ -259,6 +326,10 @@ export class EndpointScimGroupsService {
         (resultPayload.schemas as string[]).push(urn);
       }
     }
+
+    // Coerce boolean strings in post-PATCH payload before schema validation
+    this.coerceBooleanStringsIfEnabled(resultPayload, endpointId, config);
+
     this.validatePayloadSchema(resultPayload, endpointId, config, 'patch');
 
     // H-2: Immutable attribute enforcement — compare existing state with PATCH result
@@ -307,6 +378,10 @@ export class EndpointScimGroupsService {
   ): Promise<ScimGroupResource> {
     this.ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
     this.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
+
+    // Coerce boolean strings before schema validation (same as create path)
+    this.coerceBooleanStringsIfEnabled(dto as unknown as Record<string, unknown>, endpointId, config);
+
     this.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, config, 'replace');
 
     this.logger.info(LogCategory.SCIM_GROUP, 'Replace group (PUT)', { scimId, displayName: dto.displayName, endpointId });
@@ -315,6 +390,9 @@ export class EndpointScimGroupsService {
     if (!group) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
+
+    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
+    this.guardSoftDeleted(group, config, scimId);
 
     // Phase 7: Pre-write If-Match enforcement
     this.enforceIfMatch(group.version, ifMatch, config);
@@ -370,14 +448,17 @@ export class EndpointScimGroupsService {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
+    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations (double-delete)
+    this.guardSoftDeleted(group, config, scimId);
+
     // Phase 7: Pre-write If-Match enforcement
     this.enforceIfMatch(group.version, ifMatch, config);
 
     const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
 
     if (softDelete) {
-      this.logger.info(LogCategory.SCIM_GROUP, 'Soft-deleting group (setting active=false)', { scimId, endpointId });
-      await this.groupRepo.update(group.id, { active: false });
+      this.logger.info(LogCategory.SCIM_GROUP, 'Soft-deleting group (setting active=false + deletedAt)', { scimId, endpointId });
+      await this.groupRepo.update(group.id, { active: false, deletedAt: new Date() });
       this.logger.info(LogCategory.SCIM_GROUP, 'Group soft-deleted', { scimId, endpointId });
     } else {
       await this.groupRepo.delete(group.id);
@@ -386,6 +467,69 @@ export class EndpointScimGroupsService {
   }
 
   // ===== Private Helper Methods =====
+
+  /**
+   * RFC 7644 §3.6: Guard against operations on soft-deleted resources.
+   *
+   * When SoftDeleteEnabled is active, a resource with deletedAt set is considered
+   * deleted and MUST return 404 for all subsequent operations (GET, PATCH, PUT, DELETE).
+   * Note: A group disabled via PATCH (active=false) is NOT soft-deleted — only DELETE sets deletedAt.
+   */
+  private guardSoftDeleted(group: GroupWithMembers | { active: boolean; deletedAt?: Date | null }, config: EndpointConfig | undefined, scimId: string): void {
+    const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
+    if (softDelete && group.deletedAt != null) {
+      this.logger.debug(LogCategory.SCIM_GROUP, 'Soft-deleted group accessed — returning 404', { scimId });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
+    }
+  }
+
+  /**
+   * Re-provision a soft-deleted group: reactivate with new payload data and members.
+   * Called when ReprovisionOnConflictForSoftDeletedResource is enabled and
+   * a POST conflicts with a soft-deleted group.
+   */
+  private async reprovisionGroup(
+    existingScimId: string,
+    dto: CreateGroupDto,
+    externalId: string | null,
+    baseUrl: string,
+    endpointId: string,
+  ): Promise<ScimGroupResource> {
+    const existing = await this.groupRepo.findWithMembers(endpointId, existingScimId);
+    if (!existing) {
+      throw createScimError({ status: 500, detail: 'Failed to locate soft-deleted group for re-provisioning.' });
+    }
+
+    const now = new Date();
+    const sanitizedPayload = this.extractAdditionalAttributes(dto);
+    const existingMeta = this.parseJson<Record<string, unknown>>(String(existing.meta ?? '{}'));
+
+    // Resolve incoming members
+    const members = dto.members ?? [];
+    const memberInputs = members.length > 0
+      ? await this.resolveMemberInputs(members, endpointId)
+      : [];
+
+    // Update group fields + replace members atomically
+    await this.groupRepo.updateGroupWithMembers(existing.id, {
+      displayName: dto.displayName,
+      externalId,
+      active: true,
+      deletedAt: null,  // Clear soft-delete marker on re-provisioning
+      rawPayload: JSON.stringify(sanitizedPayload),
+      meta: JSON.stringify({
+        resourceType: 'Group',
+        created: (existingMeta.created as string) ?? now.toISOString(),
+        lastModified: now.toISOString(),
+      }),
+    }, memberInputs);
+
+    const withMembers = await this.groupRepo.findWithMembers(endpointId, existingScimId);
+    this.logger.info(LogCategory.SCIM_GROUP, 'Group re-provisioned (soft-deleted resource reactivated)', {
+      scimId: existingScimId, displayName: dto.displayName, endpointId,
+    });
+    return this.toScimGroupResource(withMembers, baseUrl, endpointId);
+  }
 
   /**
    * Phase 7: Pre-write If-Match enforcement (RFC 7644 §3.14).
@@ -546,6 +690,31 @@ export class EndpointScimGroupsService {
   }
 
   /**
+   * Coerce boolean-typed string values to native booleans on write payloads.
+   *
+   * Gated by AllowAndCoerceBooleanStrings (default: true). When enabled, converts
+   * attributes like primary = "True" → true before schema validation,
+   * preventing StrictSchemaValidation from rejecting valid-intent payloads.
+   *
+   * @see RFC 7644 §3.12 — "Be liberal in what you accept" (Postel's Law)
+   */
+  private coerceBooleanStringsIfEnabled(
+    dto: Record<string, unknown>,
+    endpointId: string,
+    config?: EndpointConfig,
+  ): void {
+    const coerceEnabled = getConfigBooleanWithDefault(
+      config,
+      ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS,
+      true,
+    );
+    if (!coerceEnabled) return;
+
+    const booleanKeys = this.getGroupBooleanKeys(endpointId);
+    this.sanitizeBooleanStrings(dto, booleanKeys);
+  }
+
+  /**
    * H-2: Immutable attribute enforcement (RFC 7643 §2.2).
    *
    * Compares the existing resource state (from DB) with the incoming payload
@@ -659,11 +828,17 @@ export class EndpointScimGroupsService {
     const meta = this.buildMeta(group, baseUrl);
     const rawPayload = this.parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}'));
 
+    // V17 fix: Schema-aware boolean sanitization for Groups (parity with Users V16 fix).
+    // Only convert attributes whose schema type is "boolean" (e.g. extension sub-attrs).
+    const booleanKeys = this.getGroupBooleanKeys(endpointId);
+    this.sanitizeBooleanStrings(rawPayload, booleanKeys);
+
     // Remove attributes that have first-class DB columns to prevent stale overrides.
     // displayName is managed via the DB column; rawPayload may hold the original creation value.
     delete rawPayload.displayName;
     delete rawPayload.members;
     delete rawPayload.externalId;
+    delete rawPayload.active;
     delete rawPayload.id;  // RFC 7643 §3.1: id is server-assigned — never let rawPayload override
 
     // Build schemas[] dynamically — include extension URNs present in payload
@@ -681,6 +856,7 @@ export class EndpointScimGroupsService {
       id: group.scimId,
       externalId: group.externalId ?? undefined,
       displayName: group.displayName,
+      active: group.active,
       members: group.members.map((member) => ({
         value: member.value,
         display: member.display ?? undefined,
@@ -723,6 +899,48 @@ export class EndpointScimGroupsService {
       return JSON.parse(value) as T;
     } catch {
       return {} as T;
+    }
+  }
+
+  /**
+   * Build the set of boolean attribute names for the Group schema.
+   */
+  private getGroupBooleanKeys(endpointId?: string): Set<string> {
+    const coreSchema = this.schemaRegistry.getSchema(SCIM_CORE_GROUP_SCHEMA, endpointId);
+    const schemas: SchemaDefinition[] = [];
+    if (coreSchema) schemas.push(coreSchema as SchemaDefinition);
+    const extUrns = this.schemaRegistry.getExtensionUrns(endpointId);
+    for (const urn of extUrns) {
+      const ext = this.schemaRegistry.getSchema(urn, endpointId);
+      if (ext) schemas.push(ext as SchemaDefinition);
+    }
+    return SchemaValidator.collectBooleanAttributeNames(schemas);
+  }
+
+  /**
+   * Recursively sanitize boolean-like string values ("True"/"False") to actual booleans,
+   * but ONLY for attributes whose schema type is "boolean".
+   *
+   * V17 fix: Groups service parity with Users V16 fix.
+   *
+   * @param obj          - The object to sanitize (mutated in place)
+   * @param booleanKeys  - Set of lowercase attribute names that are type "boolean"
+   */
+  private sanitizeBooleanStrings(obj: Record<string, unknown>, booleanKeys: Set<string>): void {
+    for (const [key, value] of Object.entries(obj)) {
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          if (typeof item === 'object' && item !== null) {
+            this.sanitizeBooleanStrings(item as Record<string, unknown>, booleanKeys);
+          }
+        }
+      } else if (typeof value === 'object' && value !== null) {
+        this.sanitizeBooleanStrings(value as Record<string, unknown>, booleanKeys);
+      } else if (typeof value === 'string' && booleanKeys.has(key.toLowerCase())) {
+        const lower = value.toLowerCase();
+        if (lower === 'true') obj[key] = true;
+        else if (lower === 'false') obj[key] = false;
+      }
     }
   }
 }

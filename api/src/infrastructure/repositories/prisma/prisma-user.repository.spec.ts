@@ -41,6 +41,7 @@ function fakeScimResource(overrides: Record<string, unknown> = {}) {
     userName: 'alice',
     displayName: null,
     active: true,
+    deletedAt: null,
     payload: {},
     version: 1,
     meta: '{"resourceType":"User"}',
@@ -301,6 +302,8 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
         scimId: SCIM_ID_EXISTING,
         userName: 'alice',
         externalId: 'ext-1',
+        active: true,
+        deletedAt: null,
       });
 
       const result = await repo.findConflict('ep-1', 'alice');
@@ -308,6 +311,8 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
         scimId: SCIM_ID_EXISTING,
         userName: 'alice',
         externalId: 'ext-1',
+        active: true,
+        deletedAt: null,
       });
     });
 

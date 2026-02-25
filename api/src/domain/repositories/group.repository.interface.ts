@@ -47,13 +47,13 @@ export interface IGroupRepository {
 
   /**
    * Check for displayName uniqueness within an endpoint (case-insensitive).
-   * @returns The conflicting record's scimId, or null if unique.
+   * @returns The conflicting record's scimId, active status, and deletedAt, or null if unique.
    */
   findByDisplayName(
     endpointId: string,
     displayName: string,
     excludeScimId?: string,
-  ): Promise<{ scimId: string } | null>;
+  ): Promise<{ scimId: string; active: boolean; deletedAt: Date | null } | null>;
 
   /**
    * Check for externalId uniqueness within an endpoint.

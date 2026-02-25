@@ -141,7 +141,8 @@ describe('EndpointScimGroupsController', () => {
         expect(mockGroupsService.getGroupForEndpoint).toHaveBeenCalledWith(
           'scim-grp-123',
           expect.any(String),
-          'endpoint-1'
+          'endpoint-1',
+          expect.any(Object)
         );
       });
 
@@ -216,7 +217,8 @@ describe('EndpointScimGroupsController', () => {
         expect(mockGroupsService.listGroupsForEndpoint).toHaveBeenCalledWith(
           { filter: undefined, startIndex: 1, count: 10 },
           expect.any(String),
-          'endpoint-1'
+          'endpoint-1',
+          expect.any(Object)
         );
         expect(result).toEqual(mockListResponse);
       });
@@ -269,7 +271,8 @@ describe('EndpointScimGroupsController', () => {
         expect(mockGroupsService.listGroupsForEndpoint).toHaveBeenCalledWith(
           { filter: 'displayName eq "Engineering"', startIndex: 1, count: 10 },
           expect.any(String),
-          'endpoint-1'
+          'endpoint-1',
+          expect.any(Object)
         );
         expect(result).toEqual(mockListResponse);
       });

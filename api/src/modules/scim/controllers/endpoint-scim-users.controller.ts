@@ -85,7 +85,7 @@ export class EndpointScimUsersController {
     @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
-    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const result = await this.usersService.listUsersForEndpoint(
       {
         filter,
@@ -93,7 +93,8 @@ export class EndpointScimUsersController {
         count: count ? parseInt(count, 10) : undefined
       },
       baseUrl,
-      endpointId
+      endpointId,
+      config,
     );
 
     if (attributes || excludedAttributes) {
@@ -120,7 +121,7 @@ export class EndpointScimUsersController {
     @Body() dto: SearchRequestDto,
     @Req() req: Request
   ) {
-    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const result = await this.usersService.listUsersForEndpoint(
       {
         filter: dto.filter,
@@ -128,7 +129,8 @@ export class EndpointScimUsersController {
         count: dto.count
       },
       baseUrl,
-      endpointId
+      endpointId,
+      config,
     );
 
     if (dto.attributes || dto.excludedAttributes) {
@@ -156,8 +158,8 @@ export class EndpointScimUsersController {
     @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
-    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
-    const result = await this.usersService.getUserForEndpoint(id, baseUrl, endpointId);
+    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    const result = await this.usersService.getUserForEndpoint(id, baseUrl, endpointId, config);
     return applyAttributeProjection(result, attributes, excludedAttributes);
   }
 

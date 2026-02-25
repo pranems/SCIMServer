@@ -22,11 +22,33 @@
  * These are never excluded by "attributes" or "excludedAttributes" parameters.
  *
  * Includes framework attributes (schemas, id, meta) plus resource-type attributes
- * that are declared as returned:"always" in the schema definitions:
- *   - userName (User core schema)
- *   - displayName (Group core schema — always returned for Groups)
+ * that are declared as returned:"always" in the schema definitions.
  */
-const ALWAYS_RETURNED = new Set(['schemas', 'id', 'meta', 'username', 'displayname']);
+const ALWAYS_RETURNED_BASE = new Set(['schemas', 'id', 'meta', 'username']);
+
+function getAlwaysReturnedForResource(resource: Record<string, unknown>): Set<string> {
+  const alwaysReturned = new Set(ALWAYS_RETURNED_BASE);
+
+  const meta = resource['meta'];
+  const resourceType =
+    meta && typeof meta === 'object' && !Array.isArray(meta)
+      ? (meta as Record<string, unknown>)['resourceType']
+      : undefined;
+  const isGroupByMeta = typeof resourceType === 'string' && resourceType.toLowerCase() === 'group';
+
+  const schemas = resource['schemas'];
+  const isGroupBySchema =
+    Array.isArray(schemas) &&
+    schemas.some(
+      (schema) => typeof schema === 'string' && schema.toLowerCase() === 'urn:ietf:params:scim:schemas:core:2.0:group',
+    );
+
+  if (isGroupByMeta || isGroupBySchema) {
+    alwaysReturned.add('displayname');
+  }
+
+  return alwaysReturned;
+}
 
 /**
  * Apply attribute projection to a single SCIM resource.
@@ -88,9 +110,10 @@ function includeOnly(
   attrs: Set<string>,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
+  const alwaysReturned = getAlwaysReturnedForResource(resource);
 
   // Always include "always returned" attributes
-  for (const key of ALWAYS_RETURNED) {
+  for (const key of alwaysReturned) {
     const match = findKey(resource, key);
     if (match !== undefined) {
       result[match] = resource[match];
@@ -153,12 +176,13 @@ function excludeAttrs(
   attrs: Set<string>,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = { ...resource };
+  const alwaysReturned = getAlwaysReturnedForResource(resource);
 
   // Group by top-level
   const topLevel = new Map<string, Set<string> | null>();
   for (const attr of attrs) {
     // Never allow excluding always-returned attributes
-    if (ALWAYS_RETURNED.has(attr.toLowerCase().split('.')[0])) continue;
+    if (alwaysReturned.has(attr.toLowerCase().split('.')[0])) continue;
 
     const dot = attr.indexOf('.');
     if (dot === -1) {

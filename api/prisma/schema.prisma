@@ -75,6 +75,7 @@ model ScimResource {
   userName         String?  @db.Citext        // CITEXT — case-insensitive natively (Phase 3)
   displayName      String?  @db.Citext        // CITEXT — case-insensitive natively (Phase 3)
   active           Boolean  @default(true)
+  deletedAt        DateTime?                   @db.Timestamptz  // Soft-delete marker (DELETE sets this; PATCH active=false does NOT)
   payload          Json                        // JSONB — replaces rawPayload String (Phase 3)
   version          Int      @default(1)
   meta             String?

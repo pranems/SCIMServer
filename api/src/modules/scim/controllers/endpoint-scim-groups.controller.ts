@@ -87,7 +87,7 @@ export class EndpointScimGroupsController {
     @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
-    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const result = await this.groupsService.listGroupsForEndpoint(
       {
         filter,
@@ -95,7 +95,8 @@ export class EndpointScimGroupsController {
         count: count ? parseInt(count, 10) : undefined
       },
       baseUrl,
-      endpointId
+      endpointId,
+      config,
     );
 
     if (attributes || excludedAttributes) {
@@ -122,7 +123,7 @@ export class EndpointScimGroupsController {
     @Body() dto: SearchRequestDto,
     @Req() req: Request
   ) {
-    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
+    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const result = await this.groupsService.listGroupsForEndpoint(
       {
         filter: dto.filter,
@@ -130,7 +131,8 @@ export class EndpointScimGroupsController {
         count: dto.count
       },
       baseUrl,
-      endpointId
+      endpointId,
+      config,
     );
 
     if (dto.attributes || dto.excludedAttributes) {
@@ -158,8 +160,8 @@ export class EndpointScimGroupsController {
     @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
-    const { baseUrl } = await this.validateAndSetContext(endpointId, req);
-    const result = await this.groupsService.getGroupForEndpoint(id, baseUrl, endpointId);
+    const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
+    const result = await this.groupsService.getGroupForEndpoint(id, baseUrl, endpointId, config);
     return applyAttributeProjection(result, attributes, excludedAttributes);
   }
 

@@ -59,7 +59,35 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * When false (default), If-Match is optional but still validated when present.
    */
   REQUIRE_IF_MATCH: 'RequireIfMatch',
-} as const;
+
+  /**
+   * When true (default), boolean-typed attributes received as strings ("True", "False")
+   * are automatically coerced to native booleans before schema validation and storage.
+   * This enables interoperability with clients like Microsoft Entra ID that send boolean
+   * values as strings (e.g., roles[].primary = "True" instead of true).
+   *
+   * Scope: All paths — POST/PUT body, PATCH values, PATCH filter literals, GET/LIST output.
+   * Supersedes StrictSchemaValidation for boolean type checks when enabled.
+   *
+   * When false, string boolean values are passed through as-is and will be rejected
+   * by StrictSchemaValidation if that flag is also enabled.
+   *
+   * @see RFC 7643 §2.2 — Boolean attribute type
+   * @see RFC 7644 §3.12 — "Be liberal in what you accept" (Postel's Law)
+   */
+  ALLOW_AND_COERCE_BOOLEAN_STRINGS: 'AllowAndCoerceBooleanStrings',
+  /**
+   * When true, POST (create) operations that collide with a soft-deleted resource
+   * (same userName/externalId for Users, same displayName/externalId for Groups)
+   * will re-activate the existing resource with the new payload instead of returning 409.
+   * Requires SoftDeleteEnabled to also be true — has no effect with hard-delete.
+   * When false (default), uniqueness collisions with soft-deleted resources return
+   * 409 Conflict like any other duplicate.
+   *
+   * @see RFC 7644 §3.3 — Creating Resources (uniqueness)
+   * @see RFC 7644 §3.6 — Deleting Resources (soft-delete)
+   */
+  REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED: 'ReprovisionOnConflictForSoftDeletedResource',} as const;
 
 /**
  * Type for endpoint config flag keys
@@ -141,6 +169,27 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]?: boolean | string;
 
   /**
+   * When true (default), boolean-typed attributes received as strings ("True"/"False")
+   * are coerced to native booleans before schema validation and storage.
+   * Enables interoperability with clients that send boolean values as strings
+   * (e.g., Microsoft Entra ID sends roles[].primary = "True").
+   *
+   * Supersedes StrictSchemaValidation for boolean type checks when enabled.
+   *
+   * Example config: { "AllowAndCoerceBooleanStrings": "True" }
+   */
+  [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]?: boolean | string;
+
+  /**
+   * When true, POST that collides with a soft-deleted resource will re-activate
+   * it with the new payload instead of returning 409 Conflict.
+   * Requires SoftDeleteEnabled. When false (default), 409 is returned.
+   *
+   * Example config: { "ReprovisionOnConflictForSoftDeletedResource": "True" }
+   */
+  [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]?: boolean | string;
+
+  /**
    * Allow any additional configuration flags
    */
   [key: string]: unknown;
@@ -159,6 +208,25 @@ export function getConfigBoolean(config: EndpointConfig | undefined, key: string
     return value.toLowerCase() === 'true' || value === '1';
   }
   return false;
+}
+
+/**
+ * Helper function to parse config value as boolean with a custom default.
+ * Unlike getConfigBoolean (which defaults to false), this allows specifying
+ * what to return when the key is absent or the config is undefined.
+ *
+ * Used for flags that should default to true (e.g., AllowAndCoerceBooleanStrings).
+ */
+export function getConfigBooleanWithDefault(config: EndpointConfig | undefined, key: string, defaultValue: boolean): boolean {
+  if (!config) return defaultValue;
+  
+  const value = config[key];
+  if (value === undefined) return defaultValue;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    return value.toLowerCase() === 'true' || value === '1';
+  }
+  return defaultValue;
 }
 
 /**
@@ -182,7 +250,9 @@ export const DEFAULT_ENDPOINT_CONFIG: EndpointConfig = {
   [ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED]: false,
   [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: false,
   [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: false,
-  [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: false
+  [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: false,
+  [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: true,
+  [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: false,
 };
 
 /**
@@ -236,6 +306,8 @@ export function validateEndpointConfig(config: Record<string, any> | undefined):
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION);
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED);
 
   // Validate logLevel
   const logLevelFlag = config[ENDPOINT_CONFIG_FLAGS.LOG_LEVEL];

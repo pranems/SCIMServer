@@ -964,19 +964,18 @@ $patchExtBody = @{
 $patchExtResult = Invoke-RestMethod -Uri "$scimBase/Groups/$($extGroup.id)" -Method PATCH -Headers $headers -Body $patchExtBody
 Test-Result -Success ($patchExtResult.externalId -eq "updated-ext-789") -Message "PATCH group externalId update works"
 
-# Test: Case-insensitive externalId uniqueness for Groups
-Write-Host "`n--- Test: Group externalId Case-Insensitive Uniqueness ---" -ForegroundColor Cyan
+# Test: externalId is caseExact=true for Groups (case-variant value should be allowed)
+Write-Host "`n--- Test: Group externalId Case-Exact Uniqueness ---" -ForegroundColor Cyan
 $ciDupGroupBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
     displayName = "CI Dup Group"
     externalId = "UPDATED-EXT-789"  # Same as updated-ext-789 just in UPPERCASE
 } | ConvertTo-Json
 try {
-    Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $ciDupGroupBody | Out-Null
-    Test-Result -Success $false -Message "Case-insensitive duplicate group externalId should return 409"
+    $ciDupGroup = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $ciDupGroupBody
+    Test-Result -Success ($null -ne $ciDupGroup.id) -Message "Case-variant group externalId allowed (caseExact=true)"
 } catch {
-    $code = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($code -eq 409) -Message "Case-insensitive duplicate group externalId returns 409 (CITEXT)"
+    Test-Result -Success $false -Message "Case-variant group externalId should be allowed (caseExact=true)"
 }
 
 # Test: Duplicate group externalId → 409
@@ -2640,6 +2639,227 @@ $finalEp1 = $logConfigFinal.endpointLevels.$logLevelEndpointId
 $finalEp2 = $logConfigFinal.endpointLevels.$mixedEndpointId
 $finalEp3 = $logConfigFinal.endpointLevels.$ciEndpointId
 Test-Result -Success ($finalEp1 -eq $null -and $finalEp2 -eq $null -and $finalEp3 -eq $null) -Message "All endpoint levels cleaned from log-config after delete"
+
+# ============================================
+# TEST SECTION 9f: AllowAndCoerceBooleanStrings
+$script:currentSection = "9f: BooleanCoercion"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9f: AllowAndCoerceBooleanStrings" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Create a dedicated endpoint with StrictSchemaValidation + coercion defaults
+Write-Host "`n--- Setup: Create coercion test endpoint ---" -ForegroundColor Cyan
+$boolCoerceEndpointBody = @{
+    name = "bool-coerce-ep-$(Get-Random)"
+    displayName = "Boolean Coercion Test Endpoint"
+    description = "Endpoint for AllowAndCoerceBooleanStrings tests"
+    config = @{
+        StrictSchemaValidation = "True"
+        # AllowAndCoerceBooleanStrings defaults to true
+    }
+} | ConvertTo-Json
+$boolCoerceEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $boolCoerceEndpointBody
+$boolCoerceEndpointId = $boolCoerceEndpoint.id
+$boolCoerceScimBase = "$baseUrl/scim/endpoints/$boolCoerceEndpointId"
+Test-Result -Success ($null -ne $boolCoerceEndpointId) -Message "Created bool-coerce endpoint: $boolCoerceEndpointId"
+
+# Test 9f.1: POST user with roles[].primary = "True" — should coerce to boolean true
+Write-Host "`n--- Test 9f.1: POST User with boolean string 'True' in roles[].primary ---" -ForegroundColor Cyan
+$coerceUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "coerce-user-$(Get-Random)@test.com"
+    active = $true
+    roles = @(
+        @{ value = "admin"; primary = "True" }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    $coerceUser = Invoke-RestMethod -Uri "$boolCoerceScimBase/Users" -Method POST -Headers $headers -Body $coerceUserBody
+    $rolePrimary = $coerceUser.roles[0].primary
+    Test-Result -Success ($rolePrimary -eq $true -and $rolePrimary.GetType().Name -eq 'Boolean') -Message "POST user: roles[].primary 'True' coerced to boolean true (got: $rolePrimary, type: $($rolePrimary.GetType().Name))"
+    $coerceUserId = $coerceUser.id
+} catch {
+    Test-Result -Success $false -Message "POST user with boolean string should succeed: $_"
+}
+
+# Test 9f.2: POST user with emails[].primary = "False" — should coerce to boolean false
+Write-Host "`n--- Test 9f.2: POST User with boolean string 'False' in emails[].primary ---" -ForegroundColor Cyan
+$coerceUser2Body = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "coerce-user2-$(Get-Random)@test.com"
+    active = $true
+    emails = @(
+        @{ value = "work@test.com"; type = "work"; primary = "True" },
+        @{ value = "home@test.com"; type = "home"; primary = "False" }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    $coerceUser2 = Invoke-RestMethod -Uri "$boolCoerceScimBase/Users" -Method POST -Headers $headers -Body $coerceUser2Body
+    $workPrimary = ($coerceUser2.emails | Where-Object { $_.type -eq 'work' }).primary
+    $homePrimary = ($coerceUser2.emails | Where-Object { $_.type -eq 'home' }).primary
+    Test-Result -Success ($workPrimary -eq $true) -Message "POST user: emails[work].primary 'True' → true"
+    Test-Result -Success ($homePrimary -eq $false) -Message "POST user: emails[home].primary 'False' → false"
+    $coerceUser2Id = $coerceUser2.id
+} catch {
+    Test-Result -Success $false -Message "POST user with False boolean string should succeed: $_"
+}
+
+# Test 9f.3: PUT user with boolean string — should coerce
+Write-Host "`n--- Test 9f.3: PUT User with boolean string coercion ---" -ForegroundColor Cyan
+if ($coerceUserId) {
+    $putCoerceBody = @{
+        schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+        userName = $coerceUser.userName
+        active = $true
+        roles = @(
+            @{ value = "editor"; primary = "True" }
+        )
+    } | ConvertTo-Json -Depth 5
+    try {
+        $putResult = Invoke-RestMethod -Uri "$boolCoerceScimBase/Users/$coerceUserId" -Method PUT -Headers $headers -Body $putCoerceBody
+        $putPrimary = $putResult.roles[0].primary
+        Test-Result -Success ($putPrimary -eq $true -and $putPrimary.GetType().Name -eq 'Boolean') -Message "PUT user: roles[].primary 'True' coerced to true"
+    } catch {
+        Test-Result -Success $false -Message "PUT user with boolean string should succeed: $_"
+    }
+}
+
+# Test 9f.4: PATCH user with boolean string in value object — should coerce
+Write-Host "`n--- Test 9f.4: PATCH User with boolean string coercion ---" -ForegroundColor Cyan
+if ($coerceUserId) {
+    $patchCoerceBody = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+        Operations = @(
+            @{
+                op = "replace"
+                value = @{
+                    roles = @(
+                        @{ value = "superadmin"; primary = "True" }
+                    )
+                }
+            }
+        )
+    } | ConvertTo-Json -Depth 6
+    try {
+        $patchResult = Invoke-RestMethod -Uri "$boolCoerceScimBase/Users/$coerceUserId" -Method PATCH -Headers $headers -Body $patchCoerceBody
+        $patchPrimary = $patchResult.roles[0].primary
+        Test-Result -Success ($patchPrimary -eq $true -and $patchPrimary.GetType().Name -eq 'Boolean') -Message "PATCH user: roles[].primary 'True' coerced to true"
+    } catch {
+        Test-Result -Success $false -Message "PATCH user with boolean string should succeed: $_"
+    }
+}
+
+# Test 9f.5: Create endpoint with coercion OFF + StrictSchema ON — should reject boolean strings
+Write-Host "`n--- Test 9f.5: Reject boolean string when flag is OFF ---" -ForegroundColor Cyan
+$rejectEndpointBody = @{
+    name = "bool-reject-ep-$(Get-Random)"
+    displayName = "Boolean Reject Test Endpoint"
+    config = @{
+        StrictSchemaValidation = "True"
+        AllowAndCoerceBooleanStrings = "False"
+    }
+} | ConvertTo-Json
+$rejectEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $rejectEndpointBody
+$rejectEndpointId = $rejectEndpoint.id
+$rejectScimBase = "$baseUrl/scim/endpoints/$rejectEndpointId"
+
+$rejectUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "reject-user-$(Get-Random)@test.com"
+    active = $true
+    roles = @(
+        @{ value = "admin"; primary = "True" }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    Invoke-RestMethod -Uri "$rejectScimBase/Users" -Method POST -Headers $headers -Body $rejectUserBody -ErrorAction Stop | Out-Null
+    Test-Result -Success $false -Message "POST with boolean string should be rejected when flag is OFF"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "Boolean string rejected with 400 when AllowAndCoerceBooleanStrings=False (got: $statusCode)"
+}
+
+# Test 9f.6: Multiple boolean attrs across multiple multi-valued arrays
+Write-Host "`n--- Test 9f.6: Multi-attribute boolean coercion ---" -ForegroundColor Cyan
+$multiAttrBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "multi-bool-$(Get-Random)@test.com"
+    active = $true
+    emails = @(
+        @{ value = "a@t.com"; type = "work"; primary = "True" },
+        @{ value = "b@t.com"; type = "home"; primary = "False" }
+    )
+    phoneNumbers = @(
+        @{ value = "+1234567890"; type = "work"; primary = "True" }
+    )
+    roles = @(
+        @{ value = "admin"; primary = "True" },
+        @{ value = "user"; primary = "False" }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    $multiResult = Invoke-RestMethod -Uri "$boolCoerceScimBase/Users" -Method POST -Headers $headers -Body $multiAttrBody
+    $workEmailPrimary = ($multiResult.emails | Where-Object { $_.type -eq 'work' }).primary
+    $homeEmailPrimary = ($multiResult.emails | Where-Object { $_.type -eq 'home' }).primary
+    $phonePrimary = $multiResult.phoneNumbers[0].primary
+    $adminPrimary = ($multiResult.roles | Where-Object { $_.value -eq 'admin' }).primary
+    $userPrimary = ($multiResult.roles | Where-Object { $_.value -eq 'user' }).primary
+    Test-Result -Success ($workEmailPrimary -eq $true) -Message "Multi-attr: emails[work].primary → true"
+    Test-Result -Success ($homeEmailPrimary -eq $false) -Message "Multi-attr: emails[home].primary → false"
+    Test-Result -Success ($phonePrimary -eq $true) -Message "Multi-attr: phoneNumbers[work].primary → true"
+    Test-Result -Success ($adminPrimary -eq $true) -Message "Multi-attr: roles[admin].primary → true"
+    Test-Result -Success ($userPrimary -eq $false) -Message "Multi-attr: roles[user].primary → false"
+} catch {
+    Test-Result -Success $false -Message "Multi-attr boolean coercion should succeed: $_"
+}
+
+# Test 9f.7: Non-boolean string attrs preserved (roles[].value = "true" should stay as string)
+Write-Host "`n--- Test 9f.7: Non-boolean string attrs preserved ---" -ForegroundColor Cyan
+$preserveBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "preserve-$(Get-Random)@test.com"
+    active = $true
+    roles = @(
+        @{ value = "true"; primary = "True" }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    $preserveResult = Invoke-RestMethod -Uri "$boolCoerceScimBase/Users" -Method POST -Headers $headers -Body $preserveBody
+    $roleValue = $preserveResult.roles[0].value
+    $rolePrimary2 = $preserveResult.roles[0].primary
+    Test-Result -Success ($roleValue -eq "true") -Message "Non-boolean string attr roles[].value preserved as 'true'"
+    Test-Result -Success ($rolePrimary2 -eq $true -and $rolePrimary2.GetType().Name -eq 'Boolean') -Message "Boolean attr roles[].primary coerced to true"
+} catch {
+    Test-Result -Success $false -Message "Preserve non-boolean string test should succeed: $_"
+}
+
+# Test 9f.8: Group with core schema (no boolean attrs) - pipeline works without error
+Write-Host "`n--- Test 9f.8: Group POST with coercion pipeline (core schema, no boolean attrs) ---" -ForegroundColor Cyan
+$groupCoerceBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = "Bool-Test-Group-$(Get-Random)"
+} | ConvertTo-Json -Depth 3
+try {
+    $groupResult = Invoke-RestMethod -Uri "$boolCoerceScimBase/Groups" -Method POST -Headers $headers -Body $groupCoerceBody
+    Test-Result -Success ($null -ne $groupResult.id) -Message "Group POST with coercion pipeline succeeds (no boolean attrs in core Group schema)"
+    $boolGroupId = $groupResult.id
+} catch {
+    Test-Result -Success $false -Message "Group POST should succeed with coercion enabled: $_"
+}
+
+# Cleanup: Delete test resources and endpoints
+Write-Host "`n--- Cleanup: Boolean coercion test resources ---" -ForegroundColor Cyan
+try {
+    if ($coerceUserId) { Invoke-RestMethod -Uri "$boolCoerceScimBase/Users/$coerceUserId" -Method DELETE -Headers $headers | Out-Null }
+    if ($coerceUser2Id) { Invoke-RestMethod -Uri "$boolCoerceScimBase/Users/$coerceUser2Id" -Method DELETE -Headers $headers | Out-Null }
+    if ($boolGroupId) { Invoke-RestMethod -Uri "$boolCoerceScimBase/Groups/$boolGroupId" -Method DELETE -Headers $headers | Out-Null }
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$boolCoerceEndpointId" -Method DELETE -Headers $headers | Out-Null
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$rejectEndpointId" -Method DELETE -Headers $headers | Out-Null
+    Test-Result -Success $true -Message "Boolean coercion test endpoints cleaned up"
+} catch {
+    Test-Result -Success $false -Message "Boolean coercion cleanup: $_"
+}
 
 # ============================================
 # TEST SECTION 10: DELETE OPERATIONS

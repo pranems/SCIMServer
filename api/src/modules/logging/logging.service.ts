@@ -1,5 +1,6 @@
 ﻿import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import type { Prisma } from '../../generated/prisma/client';
+import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -18,6 +19,7 @@ export interface CreateRequestLogOptions {
 @Injectable()
 export class LoggingService implements OnModuleDestroy {
   private readonly logger = new Logger(LoggingService.name);
+  private readonly isInMemoryBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() === 'inmemory';
 
   // ── Buffered logging for performance ──
   // Buffering trades real-time logging (up to 3s data loss on crash) for reduced
@@ -29,6 +31,21 @@ export class LoggingService implements OnModuleDestroy {
   private flushInProgress = false;
   private static readonly FLUSH_INTERVAL_MS = 3_000;  // flush every 3 seconds
   private static readonly MAX_BUFFER_SIZE = 50;        // or when 50 entries accumulate
+  private inMemoryLogRows: Array<{
+    id: string;
+    method: string;
+    url: string;
+    status: number | null;
+    durationMs: number | null;
+    createdAt: Date;
+    requestHeaders: string | null;
+    requestBody: string | null;
+    responseHeaders: string | null;
+    responseBody: string | null;
+    errorMessage: string | null;
+    errorStack: string | null;
+    identifier: string | null;
+  }> = [];
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -47,6 +64,37 @@ export class LoggingService implements OnModuleDestroy {
     responseBody,
     error
   }: CreateRequestLogOptions): void {
+    if (this.isInMemoryBackend) {
+      const errorMessage = this.extractErrorMessage(error);
+      const errorStack = this.extractErrorStack(error);
+      let identifier: string | undefined;
+      try {
+        const idCandidate = this.deriveReportableIdentifier(url, requestBody, responseBody) ||
+          (/\/scim\/Groups/i.test(url) ? this.deriveGroupDisplayName(
+            this.normalizeObject(requestBody) ?? null,
+            this.normalizeObject(responseBody) ?? null
+          ) : undefined) || this.deriveIdentifierFromUrl(url);
+        if (idCandidate && typeof idCandidate === 'string') identifier = idCandidate;
+      } catch { /* swallow */ }
+
+      this.inMemoryLogRows.push({
+        id: randomUUID(),
+        method,
+        url,
+        status: status ?? null,
+        durationMs: durationMs ?? null,
+        createdAt: new Date(),
+        requestHeaders: this.stringifyValue(requestHeaders) ?? '{}',
+        requestBody: this.stringifyValue(requestBody),
+        responseHeaders: this.stringifyValue(responseHeaders),
+        responseBody: this.stringifyValue(responseBody),
+        errorMessage,
+        errorStack,
+        identifier: identifier ?? null,
+      });
+      return;
+    }
+
     const errorMessage = this.extractErrorMessage(error);
     const errorStack = this.extractErrorStack(error);
     // Compute identifier once (cheap vs later bulk parsing). Works for Users (userName/email/externalId) & Groups (displayName)
@@ -89,6 +137,10 @@ export class LoggingService implements OnModuleDestroy {
    * Uses createMany for the bulk insert, then a single raw UPDATE for identifiers.
    */
   async flushLogs(): Promise<void> {
+    if (this.isInMemoryBackend) {
+      return;
+    }
+
     if (this.flushInProgress || this.logBuffer.length === 0) return;
     this.flushInProgress = true;
 
@@ -153,6 +205,12 @@ export class LoggingService implements OnModuleDestroy {
   }
 
   async clearLogs(): Promise<number> {
+    if (this.isInMemoryBackend) {
+      const count = this.inMemoryLogRows.length;
+      this.inMemoryLogRows = [];
+      return count;
+    }
+
     const result = await this.prisma.requestLog.deleteMany();
     return result.count;
   }
@@ -170,6 +228,37 @@ export class LoggingService implements OnModuleDestroy {
     includeAdmin?: boolean;
     hideKeepalive?: boolean;
   } = {}) {
+    if (this.isInMemoryBackend) {
+      const pageSize = Math.min(Math.max(filters.pageSize ?? 50, 1), 200);
+      const page = Math.max(filters.page ?? 1, 1);
+      const skip = (page - 1) * pageSize;
+      const records = [...this.inMemoryLogRows]
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .slice(skip, skip + pageSize);
+
+      const items = records.map((r) => ({
+        id: r.id,
+        method: r.method,
+        url: r.url,
+        status: r.status ?? undefined,
+        durationMs: r.durationMs ?? undefined,
+        createdAt: r.createdAt,
+        errorMessage: r.errorMessage ?? undefined,
+        reportableIdentifier: r.identifier ?? this.deriveIdentifierFromUrl(r.url),
+      }));
+
+      const total = this.inMemoryLogRows.length;
+      return {
+        total,
+        page,
+        pageSize,
+        count: items.length,
+        hasNext: skip + items.length < total,
+        hasPrev: page > 1,
+        items,
+      };
+    }
+
     const pageSize = Math.min(Math.max(filters.pageSize ?? 50, 1), 200);
     const page = Math.max(filters.page ?? 1, 1);
 
@@ -360,6 +449,36 @@ export class LoggingService implements OnModuleDestroy {
   }
 
   async getLog(id: string) {
+    if (this.isInMemoryBackend) {
+      const row = this.inMemoryLogRows.find((r) => r.id === id);
+      if (!row) return null;
+      const parsedRequest = this.safeParse(row.requestBody ? String(row.requestBody) : null);
+      const parsedResponse = this.safeParse(row.responseBody ? String(row.responseBody) : null);
+      const rid =
+        row.identifier ||
+        this.deriveReportableIdentifier(row.url, parsedRequest, parsedResponse) ||
+        this.deriveGroupDisplayName(
+          parsedRequest as Record<string, unknown> | null,
+          parsedResponse as Record<string, unknown> | null,
+        ) ||
+        this.deriveIdentifierFromUrl(row.url);
+
+      return {
+        id: row.id,
+        method: row.method,
+        url: row.url,
+        status: row.status ?? undefined,
+        durationMs: row.durationMs ?? undefined,
+        createdAt: row.createdAt,
+        requestHeaders: this.safeParse(row.requestHeaders ? String(row.requestHeaders) : null),
+        requestBody: parsedRequest,
+        responseHeaders: this.safeParse(row.responseHeaders ? String(row.responseHeaders) : null),
+        responseBody: parsedResponse,
+        errorMessage: row.errorMessage ?? undefined,
+        reportableIdentifier: rid,
+      };
+    }
+
     const row = await this.prisma.requestLog.findUnique({ where: { id } });
     if (!row) return null;
     // Parse bodies once for identifier + returned payload
