@@ -937,15 +937,14 @@ Test-Result -Success ($extGroup.externalId -eq "ext-group-123") -Message "Group 
 $filteredGroups = Invoke-RestMethod -Uri "$scimBase/Groups?filter=externalId eq `"ext-group-123`"" -Method GET -Headers $headers
 Test-Result -Success ($filteredGroups.totalResults -eq 1) -Message "Filter groups by externalId returns exactly 1 group"
 
-# Test: Filter groups by externalId with DIFFERENT CASE (CITEXT case-insensitive -- SCIM Validator)
-Write-Host "`n--- Test: Group externalId Case-Insensitive Filter (SCIM Validator) ---" -ForegroundColor Cyan
+# Test: Filter groups by externalId with DIFFERENT CASE — should NOT match (TEXT = case-sensitive, caseExact=true)
+Write-Host "`n--- Test: Group externalId Case-Sensitive Filter (RFC 7643 §3.1 caseExact=true) ---" -ForegroundColor Cyan
 $extIdFilterCIGroup = Invoke-RestMethod -Uri "$scimBase/Groups?filter=externalId eq `"EXT-GROUP-123`"" -Method GET -Headers $headers
-Test-Result -Success ($extIdFilterCIGroup.totalResults -eq 1) -Message "Filter group with UPPERCASE externalId finds group (CITEXT)"
-Test-Result -Success ($extIdFilterCIGroup.Resources[0].externalId -eq "ext-group-123") -Message "Returned group preserves original externalId case"
+Test-Result -Success ($extIdFilterCIGroup.totalResults -eq 0) -Message "Filter group with UPPERCASE externalId does NOT match (TEXT case-sensitive)"
 
-# Test: Filter groups by externalId with mixed case
+# Test: Filter groups by externalId with mixed case — should NOT match
 $extIdFilterMixed = Invoke-RestMethod -Uri "$scimBase/Groups?filter=externalId eq `"Ext-Group-123`"" -Method GET -Headers $headers
-Test-Result -Success ($extIdFilterMixed.totalResults -eq 1) -Message "Filter group with MixedCase externalId finds group"
+Test-Result -Success ($extIdFilterMixed.totalResults -eq 0) -Message "Filter group with MixedCase externalId does NOT match (TEXT case-sensitive)"
 
 # Test: Filter groups by externalId with UPPERCASE attribute name
 $extIdFilterAttrCI = Invoke-RestMethod -Uri "$scimBase/Groups?filter=EXTERNALID eq `"ext-group-123`"" -Method GET -Headers $headers
@@ -1098,8 +1097,8 @@ try {
     Test-Result -Success ($code -eq 404) -Message "Second DELETE of same group returns 404"
 }
 
-# Test: User externalId case-insensitive filter
-Write-Host "`n--- Test: User externalId Case-Insensitive Filter ---" -ForegroundColor Cyan
+# Test: User externalId case-sensitive filter (RFC 7643 §3.1 caseExact=true)
+Write-Host "`n--- Test: User externalId Case-Sensitive Filter ---" -ForegroundColor Cyan
 $ciExtUserBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
     userName = "ci-ext-user@test.com"
@@ -1107,8 +1106,12 @@ $ciExtUserBody = @{
     active = $true
 } | ConvertTo-Json
 Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $ciExtUserBody | Out-Null
-$ciExtUserFilter = Invoke-RestMethod -Uri "$scimBase/Users?filter=externalId eq `"EXT-USER-CITEST`"" -Method GET -Headers $headers
-Test-Result -Success ($ciExtUserFilter.totalResults -eq 1) -Message "Filter user with UPPERCASE externalId finds user (CITEXT)"
+# Exact case match → should find 1
+$ciExtUserFilter = Invoke-RestMethod -Uri "$scimBase/Users?filter=externalId eq `"ext-user-citest`"" -Method GET -Headers $headers
+Test-Result -Success ($ciExtUserFilter.totalResults -eq 1) -Message "Filter user with exact-case externalId finds user (TEXT)"
+# Different case → should find 0 (case-sensitive)
+$ciExtUserFilterUpper = Invoke-RestMethod -Uri "$scimBase/Users?filter=externalId eq `"EXT-USER-CITEST`"" -Method GET -Headers $headers
+Test-Result -Success ($ciExtUserFilterUpper.totalResults -eq 0) -Message "Filter user with UPPERCASE externalId does NOT match (TEXT case-sensitive)"
 
 # ============================================
 # TEST SECTION 5: MULTI-MEMBER PATCH CONFIG FLAG

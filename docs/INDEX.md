@@ -54,6 +54,7 @@
 | [MULTI_MEMBER_PATCH_CONFIG_FLAG.md](MULTI_MEMBER_PATCH_CONFIG_FLAG.md) | Multi-member PATCH config flags reference |
 | [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | **Complete flag reference** — All 10 boolean flags + logLevel with applicability, precedence, combinations, diagrams, JSON examples |
 | [FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md](FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md) | Soft delete, strict schema validation, custom extension URNs — feature docs with diagrams, examples, DB values |
+| [EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md](EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md) | externalId CITEXT→TEXT migration — RFC 7643 §3.1 caseExact compliance fix with sequence diagrams, DB diffs, filter examples, rollback strategy |
 
 ## Validation & Testing
 

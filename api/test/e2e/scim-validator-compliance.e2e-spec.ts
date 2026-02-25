@@ -378,13 +378,13 @@ describe('SCIM Validator Compliance (E2E)', () => {
       expect(res.body.Resources).toHaveLength(0);
     });
 
-    it('should filter for an existing group with externalId in different case (case-insensitive)', async () => {
-      // This is the test that was FAILING before the CITEXT fix
+    it('should filter for an existing group with externalId using exact case (case-sensitive per RFC 7643)', async () => {
+      // externalId has caseExact=true — TEXT column does case-sensitive eq
       await scimPost(app, `${basePath}/Groups`, token, validGroup({ externalId: 'abc-def-1234' })).expect(201);
 
       const res = await scimGet(
         app,
-        `${basePath}/Groups?filter=externalId eq "ABC-DEF-1234"`,
+        `${basePath}/Groups?filter=externalId eq "abc-def-1234"`,
         token,
       ).expect(200);
 
@@ -393,7 +393,7 @@ describe('SCIM Validator Compliance (E2E)', () => {
       expect(res.body.Resources[0].externalId).toBe('abc-def-1234');
     });
 
-    it('should filter group externalId case-insensitively with mixed case', async () => {
+    it('should NOT match group externalId when filter case differs (caseExact=true)', async () => {
       await scimPost(app, `${basePath}/Groups`, token, validGroup({ externalId: 'MiXeD-CaSe-GrOuP' })).expect(201);
 
       const res = await scimGet(
@@ -402,10 +402,10 @@ describe('SCIM Validator Compliance (E2E)', () => {
         token,
       ).expect(200);
 
-      expect(res.body.totalResults).toBe(1);
+      expect(res.body.totalResults).toBe(0);
     });
 
-    it('should filter user externalId case-insensitively', async () => {
+    it('should NOT match user externalId when filter case differs (caseExact=true)', async () => {
       await scimPost(app, `${basePath}/Users`, token, validUser({ externalId: 'ext-USER-abc' })).expect(201);
 
       const res = await scimGet(
@@ -414,8 +414,7 @@ describe('SCIM Validator Compliance (E2E)', () => {
         token,
       ).expect(200);
 
-      expect(res.body.totalResults).toBe(1);
-      expect(res.body.Resources[0].externalId).toBe('ext-USER-abc');
+      expect(res.body.totalResults).toBe(0);
     });
   });
 
@@ -587,18 +586,19 @@ describe('SCIM Validator Compliance (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // ADDITIONAL: Case-insensitive externalId uniqueness
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ADDITIONAL: externalId uniqueness is case-SENSITIVE (TEXT column, caseExact=true)
+  // RFC 7643 §3.1: externalId uniqueness="none" — server may enforce but must respect case
+  // ═════════════════════════════════════════════════════════════════════════
 
-  describe('Case-insensitive externalId uniqueness', () => {
-    it('should reject User with same externalId in different case', async () => {
+  describe('Case-sensitive externalId uniqueness (caseExact=true)', () => {
+    it('should allow User with same externalId in different case (case-sensitive)', async () => {
       await scimPost(app, `${basePath}/Users`, token, validUser({ externalId: 'ext-CaSe-Test' })).expect(201);
-      await scimPost(app, `${basePath}/Users`, token, validUser({ externalId: 'EXT-CASE-TEST' })).expect(409);
+      await scimPost(app, `${basePath}/Users`, token, validUser({ externalId: 'EXT-CASE-TEST' })).expect(201);
     });
 
-    it('should reject Group with same externalId in different case', async () => {
+    it('should allow Group with same externalId in different case (case-sensitive)', async () => {
       await scimPost(app, `${basePath}/Groups`, token, validGroup({ externalId: 'grp-CaSe-Id' })).expect(201);
-      await scimPost(app, `${basePath}/Groups`, token, validGroup({ externalId: 'GRP-CASE-ID' })).expect(409);
+      await scimPost(app, `${basePath}/Groups`, token, validGroup({ externalId: 'GRP-CASE-ID' })).expect(201);
     });
   });
 });

@@ -47,7 +47,7 @@ The table below maps every gap between the current codebase and the ideal archit
 | G8c | **PatchEngine has zero mutability checks** — readOnly/immutable attrs can be modified via PATCH | HIGH | `user-patch-engine.ts`, `group-patch-engine.ts` (no schema awareness) | PatchEngine consults `SchemaDefinition` before applying ops; rejects readOnly, guards immutable | 8.1 |
 | G8d | ~~**`immutable` not enforced on PUT**~~ — existing immutable values can be overwritten | ~~HIGH~~ | ✅ **DONE (v0.17.0)** — `SchemaValidator.checkImmutable()` + service integration in PUT/PATCH for Users & Groups | SchemaValidator compares new vs existing for immutable attrs on replace; 400 mutability | 8.1 |
 | G8e | **Response `returned` not enforced** — never/request/writeOnly attrs leak in responses | MEDIUM | `toScimUserResource()` (spreads rawPayload as-is) | Schema-driven response filter strips `returned:never`/`writeOnly`; `request` gated | 8.3 |
-| G8f | **`caseExact` ignored in filter evaluation** — all string comparisons case-insensitive | MEDIUM | `scim-filter-parser.ts` (hardcoded `.toLowerCase()`) | Filter evaluator consults `caseExact` per-attribute from schema definitions | 8.4 |
+| G8f | ~~**`caseExact` ignored in filter evaluation** — all string comparisons case-insensitive~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.2)** — `externalId` column changed from CITEXT→TEXT, filter engine `'text'` type omits `mode: 'insensitive'`. Migration: `20260225181836_externalid_citext_to_text`. See `docs/EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md` | Filter evaluator consults `caseExact` per-attribute from schema definitions | 8.4 |
 | G8g | **Input hardening: validation disabled by default + DTO gaps** — ~~no payload size limit~~ ✅ (5MB limit added), `SearchRequestDto` has zero validators, `PatchOperationDto.value` is `unknown`, prototype pollution via index signature, `userName` allows whitespace-only | HIGH | `StrictSchemaValidation=false` (default), DTOs with `[key: string]: unknown`, no `@ArrayMaxSize` on PATCH ops | Always-on basic type validation (split from strict mode), DTO guards (`@IsIn`, `@ArrayMaxSize`, `@IsNotEmpty`), prototype key stripping | 8.5 |
 | G8h | **Required sub-attributes + canonicalValues not enforced** — `emails[].value` is `required:true` but unchecked; `emails[].type` accepts any string | MEDIUM | `validateSubAttributes()` only type-checks provided keys, never checks missing required; `canonicalValues` defined but unused | Add required sub-attr check in `validateSubAttributes()`; optional `canonicalValues` enforcement | 8.6 |
 | G8i | **Filter/PATCH hardening: no depth/length limits, valuePath regex gaps** — filter parser has no recursion depth limit (stack overflow), PATCH dot-notation allows `__proto__`, `stripReservedAttributes` missing `meta`/`schemas` | MEDIUM | `scim-filter-parser.ts` (recursive descent, no depth counter), `user-patch-engine.ts` (`applyDotNotation`, `stripReservedAttributes`) | Max filter depth/length, semantic attr validation; PATCH path sanitization; strip `meta`/`schemas` from reserved attrs | 8.7 |
@@ -73,7 +73,7 @@ The table below maps every gap between the current codebase and the ideal archit
   RFC Compliance ───│ HIGH         │ ✅G1 ✅G3 ✅G4 ✅G5 ✅G7   G8c ✅G8d G8g       │
                     │              │ (Architectural + input hardening)                  │
                     ├──────────────┼────────────────────────────────────────────────────┤
-  Correctness ──────│ MEDIUM       │ G2 ✅G6 ✅G8 G8b G8e G8f G8h G8i G11 ✅G13 G14 │
+  Correctness ──────│ MEDIUM       │ G2 ✅G6 ✅G8 G8b G8e ✅G8f G8h G8i G11 ✅G13 G14 │
                     │              │ (Validation gaps + per-endpoint data)              │
                     ├──────────────┼────────────────────────────────────────────────────┤
   Completeness ─────│ LOW          │ G9 G10 G12 ✅G15 G17 G18                         │
@@ -1950,7 +1950,7 @@ sequenceDiagram
 | **8.1** | G8c, G8d | PatchEngine mutability checks + immutable on PUT | ~5-8 hrs |
 | **8.2** | G8b | Custom Resource Type Registration (already planned) | ~9 days |
 | **8.3** | G8e | Response `returned` filtering (never/request/writeOnly) | ~6-8 hrs |
-| **8.4** | G8f | `caseExact` in filter evaluation | ~3-4 hrs |
+| **8.4** | ✅ G8f | ~~`caseExact` in filter evaluation~~ — **DONE (v0.17.2)** | ✅ Complete |
 
 See [`docs/RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md`](RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md) for the complete 15-gap analysis with code examples, diagrams, and remediation plans.
 

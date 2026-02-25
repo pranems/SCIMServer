@@ -334,10 +334,10 @@ graph TD
 
 | Level | Suites | Tests | Status | Lines |
 |---|---|---|---|---|
-| **Unit** | 61 | 2,009+ | All Passing | 21,863 |
-| **E2E** | 19 | 342+ | All Passing | 6,059 |
-| **Live Integration** | 1 | 318 | 317/318 (1 pre-existing) | ~5,000 |
-| **TOTAL** | **81** | **2,669+** | **~99.96% pass rate** | **~32,922** |
+| **Unit** | 61 | 2,096 | All Passing | 21,863 |
+| **E2E** | 19 | 368 | All Passing | 6,059 |
+| **Live Integration** | 1 | 334 | 334/334 (0 known failures) | ~5,000 |
+| **TOTAL** | **81** | **2,798** | **100% pass rate** | **~32,922** |
 
 ### Test-to-Source Line Ratio
 
@@ -379,7 +379,7 @@ graph TD
 |---|---|---|
 | Live NDJSON download test | LOW | Pre-existing — format assertion mismatch |
 | InMemory repository full E2E | MEDIUM | E2E tests run against Prisma only |
-| Filter push-down edge cases (CITEXT) | LOW | PostgreSQL-specific behavior |
+| ~~Filter push-down edge cases (CITEXT)~~ | ~~LOW~~ | ✅ Fixed — `externalId` changed from CITEXT to TEXT (v0.17.2). Filter engine uses `'text'` column type for case-sensitive ops. |
 | Load/stress testing | MEDIUM | No performance test suite exists |
 | WebSocket / SSE streaming tests | LOW | SSE tested manually only |
 

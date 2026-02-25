@@ -1417,8 +1417,9 @@ describe('EndpointScimGroupsService', () => {
         }), expect.any(Object));
       });
 
-      it('should filter groups by externalId case-insensitively', async () => {
-        const groupWithExt = { ...mockGroup, externalId: 'ext-abc-123' };
+      it('should filter groups by externalId case-sensitively (caseExact=true)', async () => {
+        // externalId is TEXT (case-sensitive). DB returns matches for the exact case.
+        const groupWithExt = { ...mockGroup, externalId: 'EXT-ABC-123' };
         mockGroupRepo.findAllWithMembers.mockResolvedValue([groupWithExt]);
 
         const result = await service.listGroupsForEndpoint(
@@ -1428,7 +1429,7 @@ describe('EndpointScimGroupsService', () => {
         );
 
         expect(result.totalResults).toBe(1);
-        expect(result.Resources[0].externalId).toBe('ext-abc-123');
+        expect(result.Resources[0].externalId).toBe('EXT-ABC-123');
       });
     });
 

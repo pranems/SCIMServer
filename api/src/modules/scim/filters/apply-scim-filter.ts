@@ -28,7 +28,7 @@ import {
 // ─── Column Map Types ────────────────────────────────────────────────────────
 
 /** Column type determines which Prisma operators are valid for push-down */
-type ColumnType = 'citext' | 'varchar' | 'boolean' | 'uuid';
+type ColumnType = 'citext' | 'text' | 'varchar' | 'boolean' | 'uuid';
 
 interface ColumnMapping {
   /** Prisma model field name (e.g. 'userName', 'displayName') */
@@ -52,7 +52,7 @@ type ColumnMap = Record<string, ColumnMapping>;
 const USER_DB_COLUMNS: ColumnMap = {
   username:    { column: 'userName',    type: 'citext' },
   displayname: { column: 'displayName', type: 'citext' },
-  externalid:  { column: 'externalId',  type: 'varchar' },
+  externalid:  { column: 'externalId',  type: 'text' },    // caseExact=true per RFC 7643
   id:          { column: 'scimId',      type: 'uuid' },
   active:      { column: 'active',      type: 'boolean' },
 };
@@ -98,7 +98,7 @@ export function buildUserFilter(filter?: string): UserFilterResult {
  */
 const GROUP_DB_COLUMNS: ColumnMap = {
   displayname: { column: 'displayName', type: 'citext' },
-  externalid:  { column: 'externalId',  type: 'varchar' },
+  externalid:  { column: 'externalId',  type: 'text' },    // caseExact=true per RFC 7643
   id:          { column: 'scimId',      type: 'uuid' },
   active:      { column: 'active',      type: 'boolean' },
 };
@@ -197,8 +197,9 @@ function pushCompareToDb(
 /**
  * Translate a SCIM operator + value into a Prisma field-level filter.
  *
- * For citext/varchar string columns, co/sw/ew use Prisma's contains/startsWith/endsWith
- * with mode:'insensitive'. PostgreSQL pg_trgm GIN indexes accelerate ILIKE under the hood.
+ * Case sensitivity follows RFC 7643 §2.2 "caseExact" semantics:
+ *   - citext/varchar columns (caseExact=false): co/sw/ew use mode:'insensitive'
+ *   - text columns (caseExact=true, e.g. externalId): co/sw/ew are case-sensitive
  *
  * For boolean columns, only eq/ne/pr make semantic sense.
  */
@@ -208,6 +209,11 @@ function buildColumnFilter(
   op: string,
   value: unknown,
 ): Record<string, unknown> | null {
+  // String types that support co/sw/ew
+  const isStringType = type === 'citext' || type === 'varchar' || type === 'text';
+  // Case-insensitive types (caseExact=false per RFC)
+  const isCaseInsensitive = type === 'citext' || type === 'varchar';
+
   switch (op) {
     case 'eq':
       return { [column]: value };
@@ -216,16 +222,22 @@ function buildColumnFilter(
       return { [column]: { not: value } };
 
     case 'co':
-      if (type !== 'citext' && type !== 'varchar') return null;
-      return { [column]: { contains: String(value), mode: 'insensitive' } };
+      if (!isStringType) return null;
+      return isCaseInsensitive
+        ? { [column]: { contains: String(value), mode: 'insensitive' } }
+        : { [column]: { contains: String(value) } };
 
     case 'sw':
-      if (type !== 'citext' && type !== 'varchar') return null;
-      return { [column]: { startsWith: String(value), mode: 'insensitive' } };
+      if (!isStringType) return null;
+      return isCaseInsensitive
+        ? { [column]: { startsWith: String(value), mode: 'insensitive' } }
+        : { [column]: { startsWith: String(value) } };
 
     case 'ew':
-      if (type !== 'citext' && type !== 'varchar') return null;
-      return { [column]: { endsWith: String(value), mode: 'insensitive' } };
+      if (!isStringType) return null;
+      return isCaseInsensitive
+        ? { [column]: { endsWith: String(value), mode: 'insensitive' } }
+        : { [column]: { endsWith: String(value) } };
 
     case 'gt':
       return { [column]: { gt: value } };

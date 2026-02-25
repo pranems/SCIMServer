@@ -123,19 +123,16 @@ Neither PatchEngine checks attribute mutability against schema. A `readOnly` att
 
 ---
 
-### BUG-006: `caseExact` never consulted by any code path (MEDIUM)
+### BUG-006: `caseExact` never consulted by any code path — ✅ PARTIALLY FIXED
 
-**Location:** `scim-filter-parser.ts` L422-435, `schema-validator.ts`  
+**Location:** `apply-scim-filter.ts`, `schema.prisma`  
 **RFC:** 7643 §2.2
 
-`caseExact` is declared on schema attributes but **never read** by:
-- SchemaValidator (no case-sensitive value matching)
-- Filter parser (`compareValues()` always does `toLowerCase()`)
-- Uniqueness checks (always case-insensitive)
+**Status:** ✅ **FIXED for `externalId`** (the only first-class `caseExact: true` string attribute).
 
-**Impact:** `externalId` is declared `caseExact: true`. Filtering with `externalId eq "ABC"` would match `externalId = "abc"`, which is incorrect per schema.
+`externalId` column changed from `@db.Citext` (case-insensitive) to `@db.Text` (case-sensitive) per RFC 7643 §3.1 (`caseExact: true`). Filter engine now uses `'text'` column type for `externalId` — `co`/`sw`/`ew` operators omit `mode: 'insensitive'`, and `eq` uses PostgreSQL `TEXT =` (case-sensitive). Migration: `20260225181836_externalid_citext_to_text`.
 
-**Fix:** Filter parser should consult schema for `caseExact` flag. Not fixing in this iteration (requires schema lookup plumbed into filter evaluation). Document as known limitation.
+**Remaining:** Schema-driven `caseExact` lookup is still not implemented for dynamic/extension attributes. All first-class indexed columns (`userName`, `displayName`, `externalId`, `id`, `active`) now have correct case semantics through their column types. See `docs/EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md` for details.
 
 ---
 
@@ -227,6 +224,7 @@ Missing or malformed attribute definitions (no `type`, no `multiValued`) cause S
 | 8 | **H-1**: PATCH SchemaValidator integration | ✅ DONE | endpoint-scim-users.service.ts, endpoint-scim-groups.service.ts |
 | 9 | **H-2**: Immutable attribute enforcement | ✅ DONE | schema-validator.ts, endpoint-scim-users.service.ts, endpoint-scim-groups.service.ts |
 | — | Full test suite | ✅ All pass | — |
+| 10 | **BUG-006**: `caseExact` in filter evaluation — externalId CITEXT→TEXT | ✅ DONE (v0.17.2) | schema.prisma, apply-scim-filter.ts, apply-scim-filter.spec.ts, endpoint-scim-groups.service.spec.ts, scim-validator-compliance.e2e-spec.ts, live-test.ps1, migration `20260225181836_externalid_citext_to_text` |
 
 ### Deferred (documented, not fixing now)
 
@@ -235,10 +233,10 @@ Missing or malformed attribute definitions (no `type`, no `multiValued`) cause S
 | BUG-002 | `returned:"never"` stripping | No `returned:"never"` attributes currently exist; requires response builder refactor |
 | ~~BUG-004~~ | ~~`immutable` mutability enforcement~~ | ✅ Fixed — `SchemaValidator.checkImmutable()` + service integration |
 | ~~BUG-005~~ | ~~PATCH mutability enforcement~~ | ✅ Fixed — post-PATCH `SchemaValidator.validate()` with mode:'patch' |
-| BUG-006 | `caseExact` in filter parser | Requires schema lookup plumbed into filter evaluation |
+| ~~BUG-006~~ | ~~`caseExact` in filter parser~~ | ✅ Fixed (v0.17.2) — externalId changed from CITEXT→TEXT, filter engine uses `'text'` column type for case-sensitive matching |
 | BUG-009 | `referenceTypes` validation | RFC says MAY; most servers don't |
 | BUG-010 | Custom schema JSONB validation | Needs admin API changes |
 
 ---
 
-*Generated: 2026-02-24 | Updated: 2026-02-24 | SCIMServer v0.17.0*
+*Generated: 2026-02-24 | Updated: 2026-02-25 | SCIMServer v0.17.2*

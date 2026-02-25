@@ -23,7 +23,7 @@
 | Sorting (RFC 7644 §3.4.2.3) | **0%** | Not implemented (correctly listed as unsupported) |
 | Bulk Operations (RFC 7644 §3.7) | **0%** | Not implemented (correctly listed as unsupported) |
 
-**Overall: ~96% RFC 7643/7644 compliant** (remaining gaps: Bulk, Sorting — both optional per spec). All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. 2063 unit tests (61 suites), 358 E2E tests (19 suites), 334 live integration tests (334 pass, 0 known failures) — all passing.
+**Overall: ~96% RFC 7643/7644 compliant** (remaining gaps: Bulk, Sorting — both optional per spec). All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. 2096 unit tests (61 suites), 368 E2E tests (19 suites), 334 live integration tests (334 pass, 0 known failures) — all passing.
 
 ### New in v0.17.2
 
@@ -37,7 +37,7 @@
 | In-memory EndpointService/LoggingService | Both services support `PERSISTENCE_BACKEND=inmemory` for fully Prisma-free operation |
 | Resource-type-aware projection | `displayName` always-returned only for Groups (RFC 7643); excludable for Users |
 | `getConfigBooleanWithDefault()` | Config helper for flags defaulting to `true` |
-| externalId caseExact compliance | `externalId` treated as case-sensitive per RFC 7643 §2.4 (`caseExact: true`) |
+| externalId caseExact compliance | `externalId` column changed from `CITEXT` to `TEXT` — case-sensitive per RFC 7643 §3.1 (`caseExact: true`). Filter engine uses `'text'` type for case-sensitive `co`/`sw`/`ew`. Migration: `20260225181836_externalid_citext_to_text`. See `docs/EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md`. |
 | `SchemaValidator.collectBooleanAttributeNames()` | New static method — extracts boolean-typed attribute names from schema definitions for schema-aware coercion |
 | `SchemaValidator.validateFilterAttributePaths()` | V32 — validates filter attribute paths against registered schema definitions |
 | `scim-filter-parser.ts` | New module for extracting attribute paths from parsed SCIM filter AST |
@@ -171,7 +171,7 @@ SCIMServer passes all critical requirements for Microsoft Entra ID enterprise ap
 | `sortBy` / `sortOrder` | Low | Listed as unsupported in ServiceProviderConfig |
 | Bulk operations (`POST /Bulk`) | Low | Optional per spec; not used by Entra |
 | `returned: never` attribute enforcement | Low | Attributes with `returned: 'never'` are not stripped from responses |
-| `caseExact` enforcement in filters | Low | Filter operators do not consult `caseExact` attribute metadata (externalId uniqueness is case-sensitive per RFC) |
+| `caseExact` enforcement in filters | Low | ✅ Fixed for `externalId` (CITEXT → TEXT). Schema-driven `caseExact` for dynamic attributes still pending |
 
 ---
 
