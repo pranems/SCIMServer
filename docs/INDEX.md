@@ -23,7 +23,7 @@
 | [LOGGING_AND_OBSERVABILITY.md](LOGGING_AND_OBSERVABILITY.md) | Structured logging, runtime log configuration, ring buffer, and SSE stream |
 | [REMOTE_DEBUGGING_AND_DIAGNOSIS.md](REMOTE_DEBUGGING_AND_DIAGNOSIS.md) | Remote diagnosis playbooks, log collection patterns, and troubleshooting workflows |
 | [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) | Docker build/run guide and live test report |
-| [STORAGE_AND_BACKUP.md](STORAGE_AND_BACKUP.md) | Persistence and backup architecture for SQLite + cloud backup workflows |
+| [STORAGE_AND_BACKUP.md](STORAGE_AND_BACKUP.md) | ⚠️ Historical — SQLite hybrid backup architecture (pre-v0.11.0, replaced by PostgreSQL) |
 | [AZURE_DEPLOYMENT_ISSUES_AND_FIXES.md](AZURE_DEPLOYMENT_ISSUES_AND_FIXES.md) | Known Azure deployment/runtime issues and proven fixes |
 
 ## Architecture & Design

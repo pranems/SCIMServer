@@ -1,10 +1,10 @@
 # Storage & Backup Architecture
 
-> **Status**: Active operational guide  
-> **Last Updated**: February 18, 2026  
-> **Baseline**: SCIMServer v0.10.0
+> **Status**: ⚠️ **HISTORICAL** — This document describes the SQLite + Azure Files hybrid storage model used prior to v0.11.0. Since Phase 3 (v0.11.0), SCIMServer uses **PostgreSQL 17** as its primary database. The SQLite file paths, hybrid backup architecture, and blob snapshot workflows described below no longer apply to current deployments. Retained for historical context.  
+> **Last Updated**: February 24, 2026 (marked historical)  
+> **Baseline**: SCIMServer v0.10.0 (pre-PostgreSQL migration)
 
-> How SCIMServer persists data across container restarts using hybrid local + Azure Files storage.
+> How SCIMServer **previously** persisted data across container restarts using hybrid local + Azure Files storage.
 
 ---
 

@@ -1,6 +1,6 @@
 # SCIMServer Deployment Options
 
-> Version baseline: v0.10.0 · Updated: February 18, 2026 · Scope: production + local deployment paths
+> Version baseline: v0.17.1 · Updated: February 24, 2026 · Scope: production + local deployment paths
 
 This document covers all deployment methods for SCIMServer. For the quickest start, use the Azure deployment described in the main [README.md](./README.md). For the most comprehensive Azure guide with architecture diagrams, see [docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md).
 
@@ -83,6 +83,16 @@ curl "https://<app-url>/scim/admin/log-config/download?format=json" -H "Authoriz
 ```yaml
 version: '3.8'
 services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=scim
+      - POSTGRES_PASSWORD=scim
+      - POSTGRES_DB=scimdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
   scimserver:
     image: ghcr.io/pranems/scimserver:latest
     ports:
@@ -93,11 +103,11 @@ services:
       - JWT_SECRET=your-jwt-secret
       - OAUTH_CLIENT_ID=scimserver-client
       - OAUTH_CLIENT_SECRET=your-oauth-client-secret
-      - DATABASE_URL=file:/tmp/local-data/scim.db
-    volumes:
-      - scim-data:/app/data
+      - DATABASE_URL=postgresql://scim:scim@postgres:5432/scimdb
+    depends_on:
+      - postgres
 volumes:
-  scim-data:
+  pgdata:
 ```
 
 ```powershell
@@ -159,7 +169,7 @@ SCIM_SHARED_SECRET=changeme
 JWT_SECRET=changeme-jwt
 OAUTH_CLIENT_SECRET=changeme-oauth
 PORT=3000
-DATABASE_URL=file:./dev.db
+DATABASE_URL=postgresql://scim:scim@localhost:5432/scimdb
 CORS_ORIGINS=http://localhost:5173
 ```
 
@@ -199,7 +209,7 @@ npm run start:debug 2>&1 | Tee-Object -FilePath scimserver.log
 
 - **Registry**: GitHub Container Registry
 - **Image**: `ghcr.io/pranems/scimserver`
-- **Tags**: `latest`, version tags (e.g., `0.10.0`), test tags (`test-<branch>`)
+- **Tags**: `latest`, version tags (e.g., `0.17.1`), test tags (`test-<branch>`)
 - **Base**: `node:24-alpine`
 - **Size**: ~350 MB
 - **Port**: 8080 (internal)
@@ -218,10 +228,10 @@ npm run start:debug 2>&1 | Tee-Object -FilePath scimserver.log
 ```powershell
 # Auto-discovery update
 iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-func.ps1'); `
-  Update-SCIMServer -Version v0.10.0
+  Update-SCIMServer -Version v0.17.1
 
 # Or manual image update
-az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.10.0
+az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.17.1
 ```
 
 ---

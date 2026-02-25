@@ -5,11 +5,56 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.1] - 2026-02-24
+
+### Added
+- **Immutable Attribute Enforcement (H-2)** — `SchemaValidator.checkImmutable()` pure domain method for RFC 7643 §2.2 immutable attribute enforcement. Compares existing vs incoming SCIM payloads attribute-by-attribute, supporting complex sub-attributes, multi-valued arrays (matched by `value` sub-attr), case-insensitive attribute names, and extension schemas. Applied on both PUT and PATCH flows in user and group services.
+- **Post-PATCH Schema Validation (H-1)** — `SchemaValidator.validate()` now invoked after PATCH operations with `mode: 'patch'` in both user and group services. Reconstructs the PATCH result payload (first-class fields + rawPayload + extension URNs) before validation.
+- **Adversarial Client Validation Gap Analysis** — Comprehensive security/validation audit assuming adversarial SCIM clients. Identified **33 validation gaps** (V1-V33): 8 HIGH, 12 MEDIUM, 13 LOW. Root causes: validation opt-in by default, PATCH bypasses schema checks, no input size limits, DTO gaps.
+- **RFC Attribute Characteristics Gap Analysis** — All 11 RFC 7643/7644 attribute characteristics analyzed. Identified **15 gaps (G1-G15)** with severity ratings, remediation code, sub-phases 8.1-8.5 defined.
+- **SchemaValidator growth** — 383 → 594 lines (added `checkImmutable()`, `checkImmutableAttribute()`, `checkImmutableMultiValuedComplex()`, `getValueIgnoreCase()`, `deepEqual()`)
+- **Service helpers** — `buildSchemaDefinitions()`, `buildExistingPayload()`, `checkImmutableAttributes()` in both user and group services. `validatePayloadSchema()` now supports `'patch'` mode.
+- **215 new unit tests** in `schema-validator.spec.ts` (14 checkImmutable tests) + patch engine tests + attribute projection hardening
+- **69 new unit tests** in user/group patch engine specs and attribute projection spec
+
+### Documentation
+- **`docs/H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md`** (NEW) — Architecture analysis, design deliberation (4 approaches evaluated), implementation plan
+- **`docs/ATTRIBUTE_CHARACTERISTICS_GAPS.md`** (NEW) — Master gap/bug tracking for RFC 7643 §2 attribute characteristics
+- **`docs/RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md`** (NEW) — 10-section gap analysis with Mermaid diagrams
+- **`docs/PHASE_08_REMAINING_ANALYSIS.md`** (NEW) — Phase 8 remaining work: adversarial gaps, Part 2 scope, effort estimates
+- Updated `docs/MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md` — New gaps G8c-G8i, Phase 8 completion status
+- Updated `docs/INDEX.md` — Migration & Roadmap section expanded
+
+### Verified
+- **1711/1711 unit tests passing** (54 suites) — up from 1685 (+26 new)
+- **342/342 E2E tests passing** (19 suites) — unchanged
+- **318/318 live integration tests passing**
+
+## [0.17.1-fix1] - 2026-02-24
+
+### Added
+- **Adversarial Validation Gap Closure (V2-V31)** — Closed 30 of 33 adversarial gaps with schema + patch + DTO hardening:
+  - **SchemaValidator enhancements** (594 → 816 lines): `canonicalValues` enforcement, `maxPayloadSize` limit (1MB default), `maxStringLength` enforcement (65535), `maxArrayElements` enforcement (1000), null value handling, recursive depth protection, `uniqueness: 'server'` enforcement, integer range validation, boolean strict typing, decimal precision
+  - **DTO hardening**: `SearchRequestDto` — `@Max(1000)` on count, `@MaxLength(5000)` on filter, `@IsIn` on sortOrder; `CreateUserDto`/`PatchUserDto` — `@IsString()` + `@MinLength(1)` on userName; `CreateGroupDto`/`PatchGroupDto` — `@IsString()` on displayName; `PatchOperationDto` — `@ArrayMaxSize(100)` on operations
+  - **Patch engine hardening**: `maxPatchOps` (100) and `maxPatchValueSize` (100KB) limits in user and group patch engines; `meta`/`schemas` added to `stripReservedAttributes()`; schema URN format validation; duplicate schema URN rejection
+  - **Service-layer integration**: `sanitizeBooleanStrings()` restricted to declared Boolean attributes only; schemas[] URN format and duplicate validation in both user and group services
+- **5 new test files** (2853 lines):
+  - `extension-and-flags.spec.ts` (985 lines) — Extension URN handling, strict schema validation, sanitize boolean, flag combinations
+  - `schema-validator-v2-v10-v25-v31.spec.ts` (599 lines) — canonicalValues, payload size, string length, array elements, null handling, depth protection, uniqueness, integer range, boolean strict, decimal precision
+  - `patch-engine-v19-v20.spec.ts` (368 lines) — maxPatchOps, maxPatchValueSize, reserved attribute stripping, schema URN validation
+  - `dto-hardening.spec.ts` (443 lines) — SearchRequestDto validators, CreateUser/PatchUser username, CreateGroup/PatchGroup displayName, PatchOp ArrayMaxSize
+  - `extension-flags-validation.spec.ts` (857 lines) — Comprehensive extension URN/flags integration tests
+
+### Verified
+- **1962/1962 unit tests passing** (59 suites) — up from 1711 (+251 new)
+- **342/342 E2E tests passing** (19 suites) — unchanged
+- Build clean, zero compilation errors
+
 ## [0.17.0] - 2026-02-24
 
 ### Added
 - **Phase 8: Schema Validation Engine — Comprehensive Test Coverage**
-  - **`SchemaValidator` domain class** (383 lines) — Pure RFC 7643 payload validator: type checking (string/boolean/integer/decimal/dateTime/binary/reference/complex), mutability enforcement (readOnly rejection on create/replace, immutable/writeOnly acceptance), required attribute enforcement (create/replace only, skipped on patch), unknown attribute detection (strict mode), sub-attribute recursive validation, multi-valued array element validation, extension schema validation with case-insensitive attribute matching
+  - **`SchemaValidator` domain class** (816 lines, grew from 383 in v0.17.0 through v0.17.1-fix1) — Pure RFC 7643 payload validator: type checking (string/boolean/integer/decimal/dateTime/binary/reference/complex), mutability enforcement (readOnly rejection on create/replace, immutable/writeOnly acceptance), required attribute enforcement (create/replace only, skipped on patch), unknown attribute detection (strict mode), sub-attribute recursive validation, multi-valued array element validation, extension schema validation with case-insensitive attribute matching, immutable attribute enforcement (old-vs-new comparison), canonicalValues enforcement, size limits (payload/string/array), uniqueness checking
   - **`validation-types.ts`** (70 lines) — `SchemaValidationContext`, `SchemaValidationError`, `SchemaAttributeDefinition`, `SchemaDefinition` interfaces
   - **179 new unit tests** — `schema-validator-comprehensive.spec.ts` (20 describe blocks): scalar type validation (string/boolean/integer/decimal/dateTime/binary/reference with valid/invalid values), complex attribute type checking, mutability enforcement (readOnly/immutable/writeOnly), multi-valued array validation, Group schema validation, extension schema validation (required/type/readOnly/complex sub-attrs/unknown attrs/case-insensitivity), custom extension validation, multiple simultaneous extensions, real-world User schema payloads, complex attribute sub-attributes (name/phoneNumbers/addresses), cross-schema error accumulation, edge cases (null/empty/NaN/Infinity/large payloads), error reporting format, schema metadata attributes (caseExact/uniqueness/returned/referenceTypes)
   - **19 new service-level tests** — 11 in `endpoint-scim-users.service.spec.ts` + 8 in `endpoint-scim-groups.service.spec.ts`: schema attribute type validation through service layer (wrong type rejection, valid types acceptance, complex attribute validation, strict mode unknown attributes, multi-valued enforcement, readOnly rejection)

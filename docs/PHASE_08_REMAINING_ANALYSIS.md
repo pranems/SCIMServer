@@ -1,6 +1,6 @@
 # Phase 8 — Schema Validation: Complete Remaining-Work Analysis
 
-> **Date:** 2026-02-24 | **Current Version:** v0.17.0 (uncommitted)  
+> **Date:** 2026-02-24 | **Current Version:** v0.17.1 (committed, HEAD=1ae3453)  
 > **Author:** Copilot Session Analysis  
 > **Scope:** Phase 8 Part 1 (Schema Validation Engine) + Phase 8 Part 2 (Custom Resource Type Registration)
 
@@ -89,7 +89,7 @@ Phase 8 Part 2 is a substantial separate feature requiring new DB models, Prisma
 ```mermaid
 graph TB
     subgraph "Domain Layer (Framework-Free)"
-        SV["SchemaValidator<br/>(383 lines, pure static)"]
+        SV["SchemaValidator<br/>(816 lines, pure static)"]
         VT["validation-types.ts<br/>(ValidationError, ValidationResult,<br/>SchemaDefinition, SchemaAttributeDefinition,<br/>ValidationOptions)"]
     end
     subgraph "Service Layer (NestJS)"
@@ -1027,7 +1027,7 @@ pie title Validation Gaps by Architectural Layer (28 remaining)
 
 #### Reanalysis Status (2026-02-24)
 
-> Reanalysis performed against latest codebase (1711 unit tests, 54 suites — all passing).
+> Reanalysis performed against latest codebase (1962 unit tests, 59 suites — all passing).
 
 | Status | Count | Gaps |
 |--------|-------|------|
@@ -1555,4 +1555,4 @@ sequenceDiagram
 
 ---
 
-*Generated: 2026-02-24 | SCIMServer v0.17.0 (uncommitted) | Phase 8 Analysis*
+*Generated: 2026-02-24 | SCIMServer v0.17.1 (committed) | Phase 8 Analysis*

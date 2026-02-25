@@ -1,8 +1,8 @@
 # Repo + API Understanding Baseline (Code-Verified)
 
 > **Status**: Living implementation baseline  
-> **Last Updated**: February 18, 2026  
-> **Baseline**: SCIMServer v0.10.0
+> **Last Updated**: February 24, 2026  
+> **Baseline**: SCIMServer v0.17.1
 
 This document captures the current implementation reality after reading core repo and API sources. It is intended to prevent documentation drift.
 
@@ -10,7 +10,7 @@ This document captures the current implementation reality after reading core rep
 
 ## 1) Repository Structure (Practical)
 
-- `api/`: NestJS backend, SCIM + admin APIs, Prisma + SQLite, OAuth/JWT auth.
+- `api/`: NestJS backend, SCIM + admin APIs, Prisma + PostgreSQL 17, OAuth/JWT auth.
 - `web/`: React/Vite observability and operations UI, built into `api/public` for container runtime.
 - `docs/`: operational guides, protocol references, architecture analyses, and historical notes.
 - `scripts/`: deployment, live tests, maintenance helpers.
@@ -51,8 +51,8 @@ This document captures the current implementation reality after reading core rep
 
 ## 5) Operational Reality
 
-- Container startup runs `docker-entrypoint.sh`, restores SQLite backup if present, runs `prisma migrate deploy`, then starts app.
-- Primary runtime DB in container is `/tmp/local-data/scim.db` (ephemeral fast path), with backup copy at `/app/data/scim.db`.
+- Container startup runs `docker-entrypoint.sh`, runs `prisma migrate deploy` against PostgreSQL, then starts app.
+- Database is PostgreSQL 17 running in a separate container (`postgres:17-alpine`) via docker-compose.
 - Backup module supports blob backup configuration via env.
 
 ---

@@ -2,7 +2,7 @@
 
 > RFC compliance status and Microsoft Entra ID provisioning compatibility for SCIMServer.
 
-**Last Updated:** February 23, 2026
+**Last Updated:** February 24, 2026
 
 ---
 
@@ -19,11 +19,21 @@
 | Filtering (RFC 7644 §3.4.2.2) | **100%** | All 10 operators: `eq`, `ne`, `co`, `sw`, `ew`, `gt`, `lt`, `ge`, `le`, `pr` + `and`/`or`/`not` + grouping |
 | POST /.search (RFC 7644 §3.4.3) | **100%** | SearchRequest body with filter, pagination, attributes, excludedAttributes |
 | Attribute Projection (RFC 7644 §3.4.2.5) | **100%** | `attributes` and `excludedAttributes` params on GET and /.search |
-| ETag / Conditional Requests (RFC 7644 §3.14) | **95%** | Weak ETags on all responses, If-None-Match → 304 |
+| ETag / Conditional Requests (RFC 7644 §3.14) | **100%** | Version-based ETags `W/"v{N}"`, If-None-Match → 304, If-Match → 412, RequireIfMatch → 428 |
 | Sorting (RFC 7644 §3.4.2.3) | **0%** | Not implemented (correctly listed as unsupported) |
 | Bulk Operations (RFC 7644 §3.7) | **0%** | Not implemented (correctly listed as unsupported) |
 
-**Overall: ~95% RFC 7643/7644 compliant** (remaining gaps: Bulk, Sorting — both optional per spec). All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. 1374 unit tests (52 suites), 251 e2e tests (17 suites), 318 live integration tests (318 pass, 0 known failures) — all passing.
+**Overall: ~96% RFC 7643/7644 compliant** (remaining gaps: Bulk, Sorting — both optional per spec). All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. 1962 unit tests (59 suites), 342 E2E tests (19 suites), 318 live integration tests (318 pass, 0 known failures) — all passing.
+
+### New in v0.17.1
+
+| Feature | Description |
+|---------|-------------|
+| `SchemaValidator` (816 lines) | Pure domain RFC 7643 payload validator: 8 SCIM types, mutability enforcement, required attrs, unknown attrs, sub-attribute recursion, canonicalValues, size limits |
+| Immutable enforcement | `checkImmutable()` enforces RFC 7643 §2.2 on PUT + PATCH flows (old-vs-new comparison) |
+| Post-PATCH validation | SchemaValidator.validate() with `mode: 'patch'` in user and group services |
+| Adversarial hardening | 30 of 33 validation gaps closed: DTO validators, payload size limits, patch op limits, schema URN validation |
+| Version-based ETags | `W/"v{N}"` monotonic ETags with pre-write If-Match enforcement (412) and RequireIfMatch config (428) |
 
 ### New in v0.15.0
 
@@ -88,11 +98,13 @@
 
 | Feature | Status |
 |---------|--------|
-| `ETag` header on GET/POST/PUT/PATCH responses | ✅ Weak ETag `W/"<timestamp>"` |
+| `ETag` header on GET/POST/PUT/PATCH responses | ✅ Weak ETag `W/"v{N}"` (version-based, monotonic) |
 | `meta.version` matches ETag value | ✅ |
 | `If-None-Match` → 304 Not Modified | ✅ |
 | `If-None-Match` with stale ETag → 200 | ✅ |
-| ETag changes after modifications | ✅ |
+| `If-Match` pre-write enforcement → 412 Precondition Failed | ✅ (PATCH/PUT/DELETE) |
+| `RequireIfMatch` config → 428 Precondition Required | ✅ Per-endpoint flag |
+| ETag changes after modifications | ✅ Atomic version increment |
 | ServiceProviderConfig `etag.supported = true` | ✅ |
 
 ---
@@ -139,9 +151,8 @@ SCIMServer passes all critical requirements for Microsoft Entra ID enterprise ap
 |---------|----------|-------|
 | `sortBy` / `sortOrder` | Low | Listed as unsupported in ServiceProviderConfig |
 | Bulk operations (`POST /Bulk`) | Low | Optional per spec; not used by Entra |
-| `If-Match` header (412 Precondition Failed) | Low | Infrastructure exists (`assertIfMatch`) but not wired to controllers |
-| Strong schema validation for User attributes | Low | phoneNumbers, addresses, etc. stored but not strongly typed |
-| Schema-driven validation (RFC 7643 §7) | Medium | Hardcoded per-attribute logic; future Phase 2 work |
+| `returned: never` attribute enforcement | Low | Attributes with `returned: 'never'` are not stripped from responses |
+| `caseExact` enforcement in filters | Low | Filter operators do not consult `caseExact` attribute metadata |
 
 ---
 

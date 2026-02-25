@@ -4,7 +4,7 @@ Production-ready SCIM 2.0 server with a built-in observability UI for Microsoft 
 
 | Key | Value |
 |---|---|
-| Version | [`v0.15.0`](https://github.com/pranems/SCIMServer/releases/latest) |
+| Version | [`v0.17.1`](https://github.com/pranems/SCIMServer/releases/latest) |
 | Protocol | [SCIM 2.0](https://scim.cloud/) |
 | Target Platform | [Microsoft Entra ID](https://entra.microsoft.com/) |
 | Runtime | Node.js 24 |
@@ -128,7 +128,7 @@ References:
 flowchart LR
     Entra[Microsoft Entra ID\nProvisioning] -->|SCIM / HTTPS| App[SCIMServer\nAzure Container Apps]
     App --> UI[Built-in Web UI\n/admin + logs + activity]
-    App --> DB[(SQLite)]
+    App --> DB[(PostgreSQL 17)]
     App --> Blob[(Azure Blob snapshots\noptional backup mode)]
 ```
 
@@ -175,7 +175,7 @@ Operational docs:
 
 ```powershell
 iex (irm https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-func.ps1)
-Update-SCIMServer -Version v0.10.0 -ResourceGroup <rg> -AppName <app>
+Update-SCIMServer -Version v0.17.1 -ResourceGroup <rg> -AppName <app>
 ```
 
 Admin/release references:
@@ -190,8 +190,8 @@ Admin/release references:
 
 Latest validated matrix:
 
-- Unit tests: **1374/1374** (52 suites)
-- E2E tests: **251/251** (17 suites)
+- Unit tests: **1962/1962** (59 suites)
+- E2E tests: **342/342** (19 suites)
 - Live integration tests: **318/318** (local + Docker)
 - Microsoft SCIM Validator: **25/25 passed** (+ 7 preview scenarios)
 
@@ -205,6 +205,7 @@ Latest validated matrix:
 | `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | `false` | Allow multi-member remove in single PATCH |
 | `VerbosePatchSupported` | `false` | Dot-notation PATCH path resolution |
 | `PatchOpAllowRemoveAllMembers` | `true` | Allow removing all members via `path=members` |
+| `RequireIfMatch` | `false` | Require If-Match header on mutating requests (428 if missing) |
 
 ### Coverage scripts
 
@@ -235,7 +236,7 @@ High-value paths:
 - API and collections: [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md), [docs/openapi/](docs/openapi/), [docs/postman/](docs/postman/), [docs/insomnia/](docs/insomnia/)
 - SCIM protocol: [docs/SCIM_REFERENCE.md](docs/SCIM_REFERENCE.md), [docs/SCIM_RFC_COMPLIANCE_LAYER.md](docs/SCIM_RFC_COMPLIANCE_LAYER.md)
 - Observability: [docs/LOGGING_AND_OBSERVABILITY.md](docs/LOGGING_AND_OBSERVABILITY.md), [docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md](docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md)
-- Design context: [docs/TECHNICAL_DESIGN_DOCUMENT.md](docs/TECHNICAL_DESIGN_DOCUMENT.md), [docs/SQLITE_COMPROMISE_ANALYSIS.md](docs/SQLITE_COMPROMISE_ANALYSIS.md)
+- Design context: [docs/TECHNICAL_DESIGN_DOCUMENT.md](docs/TECHNICAL_DESIGN_DOCUMENT.md), [docs/SQLITE_COMPROMISE_ANALYSIS.md](docs/SQLITE_COMPROMISE_ANALYSIS.md) (historical, pre-PostgreSQL)
 
 ---
 

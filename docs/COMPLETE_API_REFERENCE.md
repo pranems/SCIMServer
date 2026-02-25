@@ -1,6 +1,6 @@
 # SCIMServer — Complete REST API Reference
 
-> Version baseline: v0.15.0 · Updated: February 23, 2026 · Scope: SCIM + admin + OAuth + web routes
+> Version baseline: v0.17.1 · Updated: February 24, 2026 · Scope: SCIM + admin + OAuth + web routes
 
 This document enumerates all REST API endpoints and resources exposed by the SCIMServer application, with HTTP methods, purpose, common query parameters, expected request and response shapes, authentication notes, and `curl` examples for each operation.
 
@@ -148,14 +148,14 @@ curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/Users?attrib
 3) GET /Users/:id
 - Retrieve single user by SCIM `id`.
 - Supports `?attributes=` and `?excludedAttributes=` for attribute projection.
-- Response includes `ETag` header (weak ETag: `W/"<timestamp>"`). Use `If-None-Match` to get 304 Not Modified.
+- Response includes `ETag` header (weak ETag: `W/"v{N}"` — version-based, monotonic). Use `If-None-Match` to get 304 Not Modified. Use `If-Match` on PUT/PATCH/DELETE for pre-write concurrency control (412 Precondition Failed on mismatch).
 - Example:
 ```
 curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/Users/<USER_ID>"
 ```
 - Example (conditional GET):
 ```
-curl -H "Authorization: Bearer <TOKEN>" -H 'If-None-Match: W/"2026-02-11T22:42:00.940Z"' \
+curl -H "Authorization: Bearer <TOKEN>" -H 'If-None-Match: W/"v3"' \
   "https://<API_BASE>/scim/v2/Users/<USER_ID>"
 # Returns 304 if unchanged, 200 with full resource if changed
 ```
@@ -282,7 +282,7 @@ curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/admin/versio
 - Sample response (trimmed):
 ```
 {
-  "version": "0.11.0",
+  "version": "0.17.1",
   "service": {
     "environment": "production",
     "scimBasePath": "/scim/v2",

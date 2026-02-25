@@ -74,7 +74,7 @@ graph TB
 api/src/domain/validation/
 ├── index.ts                              # Barrel export
 ├── validation-types.ts                   # Pure interfaces (zero deps)
-├── schema-validator.ts                   # Static validate() method (383 lines)
+├── schema-validator.ts                   # Static validate() + checkImmutable() methods (816 lines)
 ├── schema-validator.spec.ts              # Core unit tests (60 tests)
 └── schema-validator-comprehensive.spec.ts # Comprehensive tests (179 tests)
 ```
@@ -870,7 +870,7 @@ validateSubAttributes() → directly calls validateSingleValue()
 
 | Level | Count | Suites | Status |
 |-------|-------|--------|--------|
-| **Unit tests** | 1685 | 54 | ✅ All passing |
+| **Unit tests** | 1962 | 59 | ✅ All passing |
 | **E2E tests** | 342 | 19 | ✅ All passing |
 | **Live tests (local)** | 318 | — | ✅ All passing |
 | **Live tests (Docker)** | 318 | — | ✅ All passing |

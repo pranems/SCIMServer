@@ -1,7 +1,7 @@
 # SCIMServer — Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.  
-> **Last Updated**: February 18, 2026
+> **Last Updated**: February 24, 2026
 
 ---
 
@@ -26,7 +26,7 @@
 | **Language** | TypeScript | 5.x |
 | **Framework** | NestJS | 11.x |
 | **ORM** | Prisma | 7.x |
-| **Database** | SQLite | (via Prisma) |
+| **Database** | PostgreSQL 17 | (via Prisma, docker postgres:17-alpine) |
 | **Frontend** | React | 19.x |
 | **Bundler** | Vite | 7.x |
 | **Auth** | JWT + Bearer token | @nestjs/jwt |
@@ -49,9 +49,9 @@ api/src/modules/scim/controllers/
   endpoint-scim-groups.controller.ts                     # Groups CRUD controller
   endpoint-scim-discovery.controller.ts                  # SCIM discovery (Schemas, ResourceTypes, ServiceProviderConfig)
 api/src/modules/scim/services/
-  endpoint-scim-users.service.ts    (585 lines)          # Users business logic
-  endpoint-scim-groups.service.ts   (632 lines)          # Groups business logic
-  scim-metadata.service.ts          (14 lines)           # buildLocation, timestamp
+  endpoint-scim-users.service.ts    (673 lines)          # Users business logic
+  endpoint-scim-groups.service.ts   (728 lines)          # Groups business logic
+  scim-metadata.service.ts          (13 lines)           # buildLocation, timestamp
 api/src/modules/scim/dto/
   create-user.dto.ts                                     # User creation DTO
   patch-user.dto.ts                                      # PATCH operations DTO
@@ -89,7 +89,7 @@ api/src/oauth/
   oauth.service.ts                 (138 lines)           # JWT generation/validation
 api/src/modules/prisma/prisma.service.ts                 # Extended PrismaClient
 api/src/modules/web/web.controller.ts                    # SPA serving
-api/prisma/schema.prisma                                 # 5 models: Endpoint, ScimUser, ScimGroup, GroupMember, RequestLog
+api/prisma/schema.prisma                                 # 5 models: Endpoint, RequestLog, ScimResource, ResourceMember, EndpointSchema
 ```
 
 ### 3.2 Frontend (React SPA)
@@ -187,11 +187,11 @@ docker-compose up           # Full stack
 
 ### 5.3 Data Storage Pattern
 
-The project uses a **"rawPayload + derived columns"** pattern:
-- `rawPayload`: Stores the FULL SCIM resource as a JSON string
-- Derived columns (`userName`, `userNameLower`, `active`, `externalId`, `displayName`): Extracted for queries and uniqueness
-- On read: `rawPayload` is parsed and enriched with server-managed fields (`id`, `meta`)
-- On write: Full JSON is stored in `rawPayload`, derived columns are also updated
+The project uses a **"payload (JSONB) + derived columns"** pattern:
+- `payload`: Stores the FULL SCIM resource as JSONB (PostgreSQL native JSON type)
+- Derived columns (`userName`, `active`, `externalId`, `displayName`): Extracted via CITEXT/VARCHAR for queries and uniqueness
+- On read: `payload` is merged with server-managed fields (`id`, `meta`)
+- On write: Full JSON is stored in `payload`, derived columns are also updated
 
 ### 5.4 Endpoint Isolation Pattern
 
@@ -233,21 +233,21 @@ Four categories of PATCH paths, handled in order:
 
 | Decision | Rationale |
 |----------|-----------|
-| **SQLite** (not PostgreSQL) | Single-file DB perfect for ephemeral container with blob backup; no DB server needed |
-| **rawPayload as JSON** | SCIM resources have arbitrary attributes; structured columns can't capture all; rawPayload preserves fidelity |
-| **Derived columns** | Needed for uniqueness constraints and efficient filtering in SQLite |
-| **userNameLower** column | RFC 7643 §2.1 requires case-insensitive userName uniqueness; SQLite lacks `CITEXT` |
+| **PostgreSQL 17** (migrated from SQLite in Phase 3) | Production-grade RDBMS with CITEXT for case-insensitive columns, JSONB for schema-free SCIM attributes, GIN indexes for filter push-down |
+| **payload as JSONB** | SCIM resources have arbitrary attributes; structured columns can't capture all; JSONB preserves fidelity with native query support |
+| **Derived columns** | Indexed VARCHAR/CITEXT columns for uniqueness constraints and efficient filtering |
+| **CITEXT columns** | RFC 7643 §2.1 requires case-insensitive userName uniqueness; PostgreSQL CITEXT handles this natively |
 | **AsyncLocalStorage** | Endpoint context propagation without threading endpoint ID through every method signature |
-| **Blob snapshot backup** | Azure Container Apps have ephemeral storage; blob snapshots preserve data across restarts |
+| **Repository Pattern** | `IUserRepository`/`IGroupRepository` interfaces with `PERSISTENCE_BACKEND` env toggle (prisma/inmemory) |
 | **Dual auth** | OAuth for production clients (Entra); legacy token for simple testing/debugging |
 | **Global prefix `/scim`** | All routes under `/scim/`; URL rewrite middleware supports `/scim/v2` for spec compliance |
-| **In-memory filtering** | Filters are applied post-fetch; enables full SCIM filter expression support without SQL translation |
+| **Filter push-down** | All 10 SCIM operators pushed to PostgreSQL WHERE clauses; compound AND/OR supported; no in-memory filtering |
 
 ---
 
 ## 7. Current Compliance Status
 
-### 7.1 SCIM 2.0 Compliance (Current v0.10.0 Baseline)
+### 7.1 SCIM 2.0 Compliance (Current v0.17.1 Baseline)
 
 | Feature | Status |
 |---------|--------|
@@ -267,16 +267,16 @@ Four categories of PATCH paths, handled in order:
 ### 7.2 Microsoft Entra ID Compatibility
 
 - ✅ Critical provisioning flows validated
-- ✅ Microsoft SCIM Validator: 24/24 pass (+ 7 preview)
+- ✅ Microsoft SCIM Validator: 25/25 pass (+ 7 preview)
 - ✅ OAuth client credentials + bearer token flows operational
 
 ---
 
 ## 8. Test Coverage
 
-- **Unit**: 1316 tests passing (52 suites)
-- **E2E**: 251 tests passing (17 suites)
-- **Live integration**: 322 tests passing (local + Docker)
+- **Unit**: 1962 tests passing (59 suites)
+- **E2E**: 342 tests passing (19 suites)
+- **Live integration**: 318 tests passing (local + Docker)
 - **SCIM Validator**: 25/25 required + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
 - Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`
@@ -303,7 +303,7 @@ Four categories of PATCH paths, handled in order:
   - `endpoint-scim-discovery.controller.ts`
 
 ### Phase 3: Case-Insensitivity (RFC 7643 §2.1)
-- Added `userNameLower` column + migration
+- Added CITEXT columns for userName, externalId (case-insensitive uniqueness)
 - Case-insensitive userName uniqueness enforcement
 - Case-insensitive filter attribute names
 - Case-insensitive schema URI validation
@@ -324,13 +324,15 @@ Four categories of PATCH paths, handled in order:
 ## 10. Important Gotchas & Warnings
 
 1. **`endpoint-scim.controller.ts` was deleted** — superseded by Users, Groups, and Discovery controllers
-2. **rawPayload is a JSON string** — always `JSON.parse()` before use, `JSON.stringify()` before save
-3. **SQLite limitations** — no native `ILIKE`, no concurrent writes, no `CITEXT` — hence the `userNameLower` approach
-4. **In-memory filtering** — ALL users/groups for an endpoint are loaded, then filtered in JS. This works for the monitoring use case (low volume) but wouldn't scale
+2. **payload is JSONB** — native JSON type in PostgreSQL; use Prisma's JSON operations for queries
+3. **PostgreSQL CITEXT** — userName and externalId use CITEXT for case-insensitive uniqueness; no derived `*Lower` columns needed
+4. **Filter push-down** — ALL 10 SCIM operators are pushed to PostgreSQL WHERE clauses; compound AND/OR supported. No in-memory post-fetch filtering.
 5. **Backup depends on Azure** — `BackupService` silently skips if `BLOB_BACKUP_ACCOUNT` isn't set (local dev)
 6. **Auto-generated secrets** — In dev mode, `SCIM_SHARED_SECRET` and `OAUTH_CLIENT_SECRET` are auto-generated and logged to console. NEVER do this in production.
 7. **ValidationPipe whitelist: false** — We do NOT strip unknown properties, because SCIM resources have arbitrary attributes in extensions
 8. **The `/scim/v2` rewrite** — Express middleware in `main.ts` rewrites `/scim/v2/*` to `/scim/*` for spec compliance
+9. **SchemaValidator** — 816-line pure domain class for RFC 7643 payload validation. Gated behind `StrictSchemaValidation` config flag. Validates type, mutability (readOnly + immutable), required attrs, unknown attrs, sub-attributes, canonicalValues, size limits.
+10. **Repository Pattern** — `IUserRepository`/`IGroupRepository` interfaces injected via tokens. `PERSISTENCE_BACKEND` env var toggles between `prisma` and `inmemory` implementations.
 
 ---
 
