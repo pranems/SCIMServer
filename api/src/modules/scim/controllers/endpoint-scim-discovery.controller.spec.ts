@@ -130,7 +130,7 @@ describe('EndpointScimDiscoveryController', () => {
         'urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig',
       ]);
       expect(result.patch.supported).toBe(true);
-      expect(result.bulk.supported).toBe(false);
+      expect(result.bulk.supported).toBe(true);
       expect(result.filter.supported).toBe(true);
       expect(result.authenticationSchemes).toHaveLength(1);
       expect(result.authenticationSchemes[0].type).toBe('oauthbearertoken');

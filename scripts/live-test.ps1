@@ -3240,6 +3240,455 @@ try {
 Write-Host "`n--- G8b: Custom Resource Type Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9n: BULK OPERATIONS (Phase 9 / RFC 7644 §3.7)
+$script:currentSection = "9n: Bulk Operations (Phase 9)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9n: BULK OPERATIONS (Phase 9 / RFC 7644 S3.7)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# --- Setup: Create endpoint WITH BulkOperationsEnabled ---
+Write-Host "`n--- Bulk Setup: Creating endpoint with BulkOperationsEnabled ---" -ForegroundColor Cyan
+$bulkEndpointBody = @{
+    name = "live-test-bulk-$(Get-Random)"
+    displayName = "Bulk Operations Test Endpoint"
+    description = "Endpoint for Phase 9 Bulk Operations live tests"
+    config = @{ BulkOperationsEnabled = "True" }
+} | ConvertTo-Json
+$bulkEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $bulkEndpointBody
+$BulkEndpointId = $bulkEndpoint.id
+$scimBaseBulk = "$baseUrl/scim/endpoints/$BulkEndpointId"
+Test-Result -Success ($null -ne $BulkEndpointId) -Message "Bulk endpoint created with BulkOperationsEnabled"
+
+# --- Also create endpoint WITHOUT the flag ---
+$bulkNoFlagBody = @{
+    name = "live-test-bulk-noflag-$(Get-Random)"
+    displayName = "Bulk No Flag Endpoint"
+    description = "Endpoint WITHOUT BulkOperationsEnabled"
+} | ConvertTo-Json
+$bulkNoFlagEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $bulkNoFlagBody
+$BulkNoFlagEndpointId = $bulkNoFlagEndpoint.id
+$scimBaseBulkNoFlag = "$baseUrl/scim/endpoints/$BulkNoFlagEndpointId"
+
+# --- Test 9n.1: Config flag gating — should 403 when disabled ---
+Write-Host "`n--- Test 9n.1: Config flag gating (should 403 when disabled) ---" -ForegroundColor Cyan
+$bulkBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+    Operations = @(
+        @{ method = "POST"; path = "/Users"; data = @{ schemas = @("urn:ietf:params:scim:schemas:core:2.0:User"); userName = "bulk-gating-test" } }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    $null = Invoke-RestMethod -Uri "$scimBaseBulkNoFlag/Bulk" -Method POST -Headers $headers -Body $bulkBody -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9n.1 Should have been rejected with 403"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 403) -Message "9n.1 Config flag gating rejects when disabled (HTTP $statusCode)"
+}
+
+# --- Test 9n.2: Config flag — should succeed when enabled ---
+Write-Host "`n--- Test 9n.2: Config flag gating (should succeed when enabled) ---" -ForegroundColor Cyan
+try {
+    $bulkResult = Invoke-RestMethod -Uri "$scimBaseBulk/Bulk" -Method POST -Headers $headers -Body $bulkBody -ContentType "application/scim+json"
+    Test-Result -Success ($bulkResult.schemas -contains "urn:ietf:params:scim:api:messages:2.0:BulkResponse") -Message "9n.2 Bulk request succeeds when enabled (schemas=$($bulkResult.schemas -join ','))"
+    # Clean up the user created in this test
+    $bulkCreatedUserId = $bulkResult.Operations[0].location -replace '.*/', ''
+    if ($bulkCreatedUserId) {
+        try { $null = Invoke-RestMethod -Uri "$scimBaseBulk/Users/$bulkCreatedUserId" -Method DELETE -Headers $headers } catch {}
+    }
+} catch {
+    Test-Result -Success $false -Message "9n.2 Bulk request failed when enabled: $_"
+}
+
+# --- Test 9n.3: POST user via bulk ---
+Write-Host "`n--- Test 9n.3: POST user via bulk ---" -ForegroundColor Cyan
+$bulkPostBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+    Operations = @(
+        @{
+            method = "POST"
+            path = "/Users"
+            bulkId = "user1"
+            data = @{
+                schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+                userName = "bulk-user-$(Get-Random)"
+                displayName = "Bulk Test User"
+                name = @{ givenName = "Bulk"; familyName = "User" }
+                active = $true
+            }
+        }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    $bulkPostResult = Invoke-RestMethod -Uri "$scimBaseBulk/Bulk" -Method POST -Headers $headers -Body $bulkPostBody -ContentType "application/scim+json"
+    $op = $bulkPostResult.Operations[0]
+    $bulkUserId = $op.location -replace '.*/', ''
+    Test-Result -Success ($op.status -eq "201" -and $null -ne $bulkUserId) -Message "9n.3 POST user via bulk (status=$($op.status), id=$bulkUserId)"
+} catch {
+    Test-Result -Success $false -Message "9n.3 POST user via bulk failed: $_"
+    $bulkUserId = $null
+}
+
+# --- Test 9n.4: PUT (replace) user via bulk ---
+Write-Host "`n--- Test 9n.4: PUT user via bulk ---" -ForegroundColor Cyan
+if ($bulkUserId) {
+    $bulkPutBody = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+        Operations = @(
+            @{
+                method = "PUT"
+                path = "/Users/$bulkUserId"
+                data = @{
+                    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+                    userName = "bulk-user-replaced"
+                    displayName = "Replaced Bulk User"
+                    name = @{ givenName = "Replaced"; familyName = "BulkUser" }
+                    active = $true
+                }
+            }
+        )
+    } | ConvertTo-Json -Depth 5
+    try {
+        $bulkPutResult = Invoke-RestMethod -Uri "$scimBaseBulk/Bulk" -Method POST -Headers $headers -Body $bulkPutBody -ContentType "application/scim+json"
+        $op = $bulkPutResult.Operations[0]
+        Test-Result -Success ($op.status -eq "200") -Message "9n.4 PUT user via bulk (status=$($op.status))"
+    } catch {
+        Test-Result -Success $false -Message "9n.4 PUT user via bulk failed: $_"
+    }
+}
+
+# --- Test 9n.5: PATCH user via bulk ---
+Write-Host "`n--- Test 9n.5: PATCH user via bulk ---" -ForegroundColor Cyan
+if ($bulkUserId) {
+    $bulkPatchBody = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+        Operations = @(
+            @{
+                method = "PATCH"
+                path = "/Users/$bulkUserId"
+                data = @{
+                    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+                    Operations = @(
+                        @{ op = "replace"; path = "displayName"; value = "Patched Bulk User" }
+                    )
+                }
+            }
+        )
+    } | ConvertTo-Json -Depth 6
+    try {
+        $bulkPatchResult = Invoke-RestMethod -Uri "$scimBaseBulk/Bulk" -Method POST -Headers $headers -Body $bulkPatchBody -ContentType "application/scim+json"
+        $op = $bulkPatchResult.Operations[0]
+        Test-Result -Success ($op.status -eq "200") -Message "9n.5 PATCH user via bulk (status=$($op.status))"
+    } catch {
+        Test-Result -Success $false -Message "9n.5 PATCH user via bulk failed: $_"
+    }
+}
+
+# --- Test 9n.6: DELETE user via bulk ---
+Write-Host "`n--- Test 9n.6: DELETE user via bulk ---" -ForegroundColor Cyan
+if ($bulkUserId) {
+    $bulkDeleteBody = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+        Operations = @(
+            @{
+                method = "DELETE"
+                path = "/Users/$bulkUserId"
+            }
+        )
+    } | ConvertTo-Json -Depth 5
+    try {
+        $bulkDeleteResult = Invoke-RestMethod -Uri "$scimBaseBulk/Bulk" -Method POST -Headers $headers -Body $bulkDeleteBody -ContentType "application/scim+json"
+        $op = $bulkDeleteResult.Operations[0]
+        Test-Result -Success ($op.status -eq "204") -Message "9n.6 DELETE user via bulk (status=$($op.status))"
+        $bulkUserId = $null  # Cleaned up
+    } catch {
+        Test-Result -Success $false -Message "9n.6 DELETE user via bulk failed: $_"
+    }
+}
+
+# --- Test 9n.7: POST group via bulk ---
+Write-Host "`n--- Test 9n.7: POST group via bulk ---" -ForegroundColor Cyan
+$bulkGroupBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+    Operations = @(
+        @{
+            method = "POST"
+            path = "/Groups"
+            bulkId = "group1"
+            data = @{
+                schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+                displayName = "Bulk Test Group $(Get-Random)"
+            }
+        }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    $bulkGroupResult = Invoke-RestMethod -Uri "$scimBaseBulk/Bulk" -Method POST -Headers $headers -Body $bulkGroupBody -ContentType "application/scim+json"
+    $op = $bulkGroupResult.Operations[0]
+    $bulkGroupId = $op.location -replace '.*/', ''
+    Test-Result -Success ($op.status -eq "201" -and $null -ne $bulkGroupId) -Message "9n.7 POST group via bulk (status=$($op.status), id=$bulkGroupId)"
+} catch {
+    Test-Result -Success $false -Message "9n.7 POST group via bulk failed: $_"
+    $bulkGroupId = $null
+}
+
+# --- Test 9n.8: DELETE group via bulk ---
+Write-Host "`n--- Test 9n.8: DELETE group via bulk ---" -ForegroundColor Cyan
+if ($bulkGroupId) {
+    $bulkGroupDeleteBody = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+        Operations = @(
+            @{
+                method = "DELETE"
+                path = "/Groups/$bulkGroupId"
+            }
+        )
+    } | ConvertTo-Json -Depth 5
+    try {
+        $bulkGroupDeleteResult = Invoke-RestMethod -Uri "$scimBaseBulk/Bulk" -Method POST -Headers $headers -Body $bulkGroupDeleteBody -ContentType "application/scim+json"
+        $op = $bulkGroupDeleteResult.Operations[0]
+        Test-Result -Success ($op.status -eq "204") -Message "9n.8 DELETE group via bulk (status=$($op.status))"
+        $bulkGroupId = $null
+    } catch {
+        Test-Result -Success $false -Message "9n.8 DELETE group via bulk failed: $_"
+    }
+}
+
+# --- Test 9n.9: bulkId cross-referencing ---
+Write-Host "`n--- Test 9n.9: bulkId cross-referencing (POST + PATCH) ---" -ForegroundColor Cyan
+$bulkIdBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+    Operations = @(
+        @{
+            method = "POST"
+            path = "/Users"
+            bulkId = "xref-user"
+            data = @{
+                schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+                userName = "bulk-xref-$(Get-Random)"
+                displayName = "Cross-ref User"
+            }
+        },
+        @{
+            method = "PATCH"
+            path = '/Users/bulkId:xref-user'
+            data = @{
+                schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+                Operations = @(
+                    @{ op = "replace"; path = "displayName"; value = "Cross-ref Patched" }
+                )
+            }
+        }
+    )
+} | ConvertTo-Json -Depth 6
+try {
+    $xrefResult = Invoke-RestMethod -Uri "$scimBaseBulk/Bulk" -Method POST -Headers $headers -Body $bulkIdBody -ContentType "application/scim+json"
+    $postOp = $xrefResult.Operations[0]
+    $patchOp = $xrefResult.Operations[1]
+    $xrefUserId = $postOp.location -replace '.*/', ''
+    Test-Result -Success ($postOp.status -eq "201" -and $patchOp.status -eq "200") -Message "9n.9 bulkId cross-ref: POST=$($postOp.status), PATCH=$($patchOp.status)"
+    # Clean up
+    if ($xrefUserId) {
+        try { $null = Invoke-RestMethod -Uri "$scimBaseBulk/Users/$xrefUserId" -Method DELETE -Headers $headers } catch {}
+    }
+} catch {
+    Test-Result -Success $false -Message "9n.9 bulkId cross-referencing failed: $_"
+}
+
+# --- Test 9n.10: failOnErrors — stop after threshold ---
+Write-Host "`n--- Test 9n.10: failOnErrors threshold ---" -ForegroundColor Cyan
+$failOnErrorsBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+    failOnErrors = 1
+    Operations = @(
+        @{
+            method = "DELETE"
+            path = "/Users/nonexistent-id-001"
+        },
+        @{
+            method = "DELETE"
+            path = "/Users/nonexistent-id-002"
+        },
+        @{
+            method = "DELETE"
+            path = "/Users/nonexistent-id-003"
+        }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    $foeResult = Invoke-RestMethod -Uri "$scimBaseBulk/Bulk" -Method POST -Headers $headers -Body $failOnErrorsBody -ContentType "application/scim+json"
+    # With failOnErrors=1, only the first operation should be processed (and fail), rest skipped
+    $processedCount = $foeResult.Operations.Count
+    Test-Result -Success ($processedCount -le 2) -Message "9n.10 failOnErrors=1 stopped processing early (ops returned=$processedCount)"
+} catch {
+    Test-Result -Success $false -Message "9n.10 failOnErrors test failed: $_"
+}
+
+# --- Test 9n.11: Request validation — missing schema ---
+Write-Host "`n--- Test 9n.11: Missing schema validation ---" -ForegroundColor Cyan
+$noSchemaBody = @{
+    schemas = @("urn:wrong:schema")
+    Operations = @(
+        @{ method = "POST"; path = "/Users"; data = @{ schemas = @("urn:ietf:params:scim:schemas:core:2.0:User"); userName = "no-schema-test" } }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    $null = Invoke-RestMethod -Uri "$scimBaseBulk/Bulk" -Method POST -Headers $headers -Body $noSchemaBody -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9n.11 Should have been rejected with 400"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "9n.11 Missing BulkRequest schema rejected (HTTP $statusCode)"
+}
+
+# --- Test 9n.12: Unsupported resource type ---
+Write-Host "`n--- Test 9n.12: Unsupported resource type ---" -ForegroundColor Cyan
+$unsupportedBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+    Operations = @(
+        @{ method = "POST"; path = "/FakeResource"; data = @{ schemas = @("urn:custom:Fake"); displayName = "fake" } }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    $unsupportedResult = Invoke-RestMethod -Uri "$scimBaseBulk/Bulk" -Method POST -Headers $headers -Body $unsupportedBody -ContentType "application/scim+json"
+    $op = $unsupportedResult.Operations[0]
+    Test-Result -Success ($op.status -eq "400") -Message "9n.12 Unsupported resource type returns 400 in-band (status=$($op.status))"
+} catch {
+    Test-Result -Success $false -Message "9n.12 Unsupported resource type test failed: $_"
+}
+
+# --- Test 9n.13: Mixed user + group operations ---
+Write-Host "`n--- Test 9n.13: Mixed user + group operations ---" -ForegroundColor Cyan
+$mixedBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+    Operations = @(
+        @{
+            method = "POST"
+            path = "/Users"
+            bulkId = "mixed-user"
+            data = @{
+                schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+                userName = "bulk-mixed-user-$(Get-Random)"
+                displayName = "Mixed Bulk User"
+            }
+        },
+        @{
+            method = "POST"
+            path = "/Groups"
+            bulkId = "mixed-group"
+            data = @{
+                schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+                displayName = "Mixed Bulk Group $(Get-Random)"
+            }
+        }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    $mixedResult = Invoke-RestMethod -Uri "$scimBaseBulk/Bulk" -Method POST -Headers $headers -Body $mixedBody -ContentType "application/scim+json"
+    $userOp = $mixedResult.Operations[0]
+    $groupOp = $mixedResult.Operations[1]
+    $mixedUserId = $userOp.location -replace '.*/', ''
+    $mixedGroupId = $groupOp.location -replace '.*/', ''
+    Test-Result -Success ($userOp.status -eq "201" -and $groupOp.status -eq "201") -Message "9n.13 Mixed ops: User=$($userOp.status), Group=$($groupOp.status)"
+    # Clean up
+    if ($mixedUserId) { try { $null = Invoke-RestMethod -Uri "$scimBaseBulk/Users/$mixedUserId" -Method DELETE -Headers $headers } catch {} }
+    if ($mixedGroupId) { try { $null = Invoke-RestMethod -Uri "$scimBaseBulk/Groups/$mixedGroupId" -Method DELETE -Headers $headers } catch {} }
+} catch {
+    Test-Result -Success $false -Message "9n.13 Mixed operations failed: $_"
+}
+
+# --- Test 9n.14: ServiceProviderConfig advertises bulk.supported=true ---
+Write-Host "`n--- Test 9n.14: SPC advertises bulk.supported=true ---" -ForegroundColor Cyan
+try {
+    $spc = Invoke-RestMethod -Uri "$scimBaseBulk/ServiceProviderConfig" -Method GET -Headers $headers
+    Test-Result -Success ($spc.bulk.supported -eq $true -and $spc.bulk.maxOperations -eq 1000) -Message "9n.14 SPC bulk.supported=$($spc.bulk.supported), maxOperations=$($spc.bulk.maxOperations)"
+} catch {
+    Test-Result -Success $false -Message "9n.14 SPC check failed: $_"
+}
+
+# --- Test 9n.15: Response includes BulkResponse schema ---
+Write-Host "`n--- Test 9n.15: Response includes BulkResponse schema ---" -ForegroundColor Cyan
+$schemaCheckBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+    Operations = @(
+        @{
+            method = "POST"
+            path = "/Users"
+            bulkId = "schema-check"
+            data = @{
+                schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+                userName = "bulk-schema-check-$(Get-Random)"
+            }
+        }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    $schemaResult = Invoke-RestMethod -Uri "$scimBaseBulk/Bulk" -Method POST -Headers $headers -Body $schemaCheckBody -ContentType "application/scim+json"
+    $hasResponseSchema = $schemaResult.schemas -contains "urn:ietf:params:scim:api:messages:2.0:BulkResponse"
+    $hasBulkId = $schemaResult.Operations[0].bulkId -eq "schema-check"
+    Test-Result -Success ($hasResponseSchema -and $hasBulkId) -Message "9n.15 Response has BulkResponse schema=$hasResponseSchema, bulkId echo=$hasBulkId"
+    # Clean up
+    $scUserId = $schemaResult.Operations[0].location -replace '.*/', ''
+    if ($scUserId) { try { $null = Invoke-RestMethod -Uri "$scimBaseBulk/Users/$scUserId" -Method DELETE -Headers $headers } catch {} }
+} catch {
+    Test-Result -Success $false -Message "9n.15 Schema check failed: $_"
+}
+
+# --- Test 9n.16: Duplicate userName collision via bulk ---
+Write-Host "`n--- Test 9n.16: Uniqueness collision ---" -ForegroundColor Cyan
+$dupeUserName = "bulk-dupe-$(Get-Random)"
+$dupeBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+    Operations = @(
+        @{
+            method = "POST"
+            path = "/Users"
+            bulkId = "dupe1"
+            data = @{
+                schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+                userName = $dupeUserName
+            }
+        },
+        @{
+            method = "POST"
+            path = "/Users"
+            bulkId = "dupe2"
+            data = @{
+                schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+                userName = $dupeUserName
+            }
+        }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    $dupeResult = Invoke-RestMethod -Uri "$scimBaseBulk/Bulk" -Method POST -Headers $headers -Body $dupeBody -ContentType "application/scim+json"
+    $op1 = $dupeResult.Operations[0]
+    $op2 = $dupeResult.Operations[1]
+    Test-Result -Success ($op1.status -eq "201" -and $op2.status -eq "409") -Message "9n.16 Uniqueness: first=$($op1.status), duplicate=$($op2.status)"
+    # Clean up the first user
+    $dupeUserId = $op1.location -replace '.*/', ''
+    if ($dupeUserId) { try { $null = Invoke-RestMethod -Uri "$scimBaseBulk/Users/$dupeUserId" -Method DELETE -Headers $headers } catch {} }
+} catch {
+    Test-Result -Success $false -Message "9n.16 Uniqueness collision test failed: $_"
+}
+
+# --- Cleanup: Delete bulk test endpoints ---
+Write-Host "`n--- Bulk Cleanup: Deleting test endpoints ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$BulkEndpointId" -Method DELETE -Headers $headers
+    Test-Result -Success $true -Message "Bulk enabled endpoint cleaned up"
+} catch {
+    Test-Result -Success $false -Message "Bulk endpoint cleanup: $_"
+}
+try {
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$BulkNoFlagEndpointId" -Method DELETE -Headers $headers
+    Test-Result -Success $true -Message "Bulk no-flag endpoint cleaned up"
+} catch {
+    Test-Result -Success $false -Message "Bulk no-flag endpoint cleanup: $_"
+}
+
+Write-Host "`n--- Phase 9: Bulk Operations Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

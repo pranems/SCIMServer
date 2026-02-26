@@ -1,7 +1,7 @@
 # SCIMServer — Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.  
-> **Last Updated**: February 25, 2026
+> **Last Updated**: February 26, 2026
 
 ---
 
@@ -47,12 +47,15 @@ api/src/modules/scim/scim.module.ts                      # SCIM feature module
 api/src/modules/scim/controllers/
   endpoint-scim-users.controller.ts                      # Users CRUD controller
   endpoint-scim-groups.controller.ts                     # Groups CRUD controller
+  endpoint-scim-bulk.controller.ts                       # Bulk Operations controller (RFC 7644 §3.7)
   endpoint-scim-discovery.controller.ts                  # SCIM discovery (Schemas, ResourceTypes, ServiceProviderConfig)
 api/src/modules/scim/services/
   endpoint-scim-users.service.ts    (858 lines)          # Users business logic
   endpoint-scim-groups.service.ts   (947 lines)          # Groups business logic
+  bulk-processor.service.ts         (395 lines)          # Bulk operation processor with bulkId resolution
   scim-metadata.service.ts          (13 lines)           # buildLocation, timestamp
 api/src/modules/scim/dto/
+  bulk-request.dto.ts                                    # BulkRequest/Response DTOs (RFC 7644 §3.7)
   create-user.dto.ts                                     # User creation DTO
   patch-user.dto.ts                                      # PATCH operations DTO
   create-group.dto.ts                                    # Group creation DTO
@@ -276,9 +279,9 @@ Four categories of PATCH paths, handled in order:
 
 ## 8. Test Coverage
 
-- **Unit**: 2,277 tests passing (67 suites)
-- **E2E**: 411 tests passing (21 suites)
-- **Live integration**: 381+ tests passing (local + Docker)
+- **Unit**: 2,320 tests passing (69 suites)
+- **E2E**: 435 tests passing (22 suites)
+- **Live integration**: 401+ tests passing (local + Docker)
 - **SCIM Validator**: 25/25 required + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
 - Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`

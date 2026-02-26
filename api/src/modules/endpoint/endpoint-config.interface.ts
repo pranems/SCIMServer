@@ -98,6 +98,16 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * @see Phase 8b — Custom Resource Type Registration
    */
   CUSTOM_RESOURCE_TYPES_ENABLED: 'CustomResourceTypesEnabled',
+
+  /**
+   * When true, enables SCIM Bulk Operations (RFC 7644 §3.7) for this endpoint.
+   * Clients can POST to /Bulk with multiple operations in a single request.
+   * When false (default), POST /Bulk returns 403 Forbidden for this endpoint.
+   *
+   * @see Phase 9 — Bulk Operations
+   * @see https://datatracker.ietf.org/doc/html/rfc7644#section-3.7
+   */
+  BULK_OPERATIONS_ENABLED: 'BulkOperationsEnabled',
 } as const;
 
 /**
@@ -209,6 +219,14 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED]?: boolean | string;
 
   /**
+   * When true, enables SCIM Bulk Operations (RFC 7644 §3.7) for this endpoint.
+   * When false (default), POST /Bulk returns 403 Forbidden.
+   *
+   * Example config: { "BulkOperationsEnabled": "True" }
+   */
+  [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]?: boolean | string;
+
+  /**
    * Allow any additional configuration flags
    */
   [key: string]: unknown;
@@ -273,6 +291,7 @@ export const DEFAULT_ENDPOINT_CONFIG: EndpointConfig = {
   [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: true,
   [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: false,
   [ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED]: false,
+  [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: false,
 };
 
 /**
@@ -329,6 +348,7 @@ export function validateEndpointConfig(config: Record<string, any> | undefined):
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS);
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED);
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED);
 
   // Validate logLevel
   const logLevelFlag = config[ENDPOINT_CONFIG_FLAGS.LOG_LEVEL];

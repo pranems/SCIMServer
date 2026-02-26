@@ -444,7 +444,7 @@ export const SCIM_SERVICE_PROVIDER_CONFIG = {
   schemas: [SCIM_SP_CONFIG_SCHEMA],
   documentationUri: 'https://github.com/pranems/SCIMServer',
   patch: { supported: true },
-  bulk: { supported: false, maxOperations: 0, maxPayloadSize: 0 },
+  bulk: { supported: true, maxOperations: 1000, maxPayloadSize: 1048576 },
   filter: { supported: true, maxResults: 200 },
   changePassword: { supported: false },
   sort: { supported: false },

@@ -28,9 +28,9 @@ describe('ServiceProviderConfigController', () => {
       expect(result.patch.supported).toBe(true);
     });
 
-    it('should report bulk as not supported', () => {
+    it('should report bulk as supported', () => {
       const result = controller.getConfig();
-      expect(result.bulk.supported).toBe(false);
+      expect(result.bulk.supported).toBe(true);
     });
 
     it('should report filter as supported with maxResults', () => {
@@ -76,8 +76,8 @@ describe('ServiceProviderConfigController', () => {
 
     it('should include bulk maxOperations and maxPayloadSize', () => {
       const result = controller.getConfig();
-      expect(result.bulk.maxOperations).toBe(0);
-      expect(result.bulk.maxPayloadSize).toBe(0);
+      expect(result.bulk.maxOperations).toBe(1000);
+      expect(result.bulk.maxPayloadSize).toBe(1048576);
     });
   });
 });

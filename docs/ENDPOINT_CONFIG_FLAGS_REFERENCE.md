@@ -1,6 +1,6 @@
 # Endpoint Configuration Flags — Complete Reference
 
-> **Status:** Living document · **Last Updated:** 2026-02-25 · **Baseline:** v0.17.2
+> **Status:** Living document · **Last Updated:** 2026-02-26 · **Baseline:** v0.19.0
 >
 > Authoritative reference for all per-endpoint configuration flags in SCIMServer.
 > Covers flag definitions, defaults, type handling, precedence rules, applicability matrices,
@@ -23,7 +23,9 @@
    - 4.7 [PatchOpAllowRemoveAllMembers](#47-patchopallowremoveallmembers)
    - 4.8 [RequireIfMatch](#48-requireifmatch)
    - 4.9 [ReprovisionOnConflictForSoftDeletedResource](#49-reprovisiononconflictforsoftdeletedresource)
-   - 4.10 [logLevel](#410-loglevel)
+   - 4.10 [CustomResourceTypesEnabled](#410-customresourcetypesenabled)
+   - 4.11 [BulkOperationsEnabled](#411-bulkoperationsenabled)
+   - 4.12 [logLevel](#412-loglevel)
 5. [Flag Applicability Matrix](#5-flag-applicability-matrix)
 6. [Flag Interaction & Precedence](#6-flag-interaction--precedence)
 7. [Flag Combination Examples](#7-flag-combination-examples)
@@ -35,7 +37,7 @@
 
 ## 1. Overview
 
-SCIMServer supports **10 per-endpoint configuration flags** (plus 1 per-endpoint log level override) that control SCIM protocol behavior. Flags are stored in the `config` JSON column of each endpoint record and are resolved at request time.
+SCIMServer supports **11 per-endpoint configuration flags** (plus 1 per-endpoint log level override) that control SCIM protocol behavior. Flags are stored in the `config` JSON column of each endpoint record and are resolved at request time.
 
 ### Key Concepts
 
@@ -67,9 +69,11 @@ api/src/modules/endpoint/endpoint-config.interface.ts
 | 7 | `PatchOpAllowRemoveAllMembers` | `PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS` | **`true`** | boolean | PATCH (Groups) | Allow removing all members via `path=members` |
 | 8 | `RequireIfMatch` | `REQUIRE_IF_MATCH` | `false` | boolean | PUT, PATCH, DELETE | Require If-Match header (428 if missing) |
 | 9 | `ReprovisionOnConflictForSoftDeletedResource` | `REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED` | `false` | boolean | POST | Re-activate soft-deleted resource on POST conflict instead of 409 (requires SoftDeleteEnabled) |
-| 10 | `logLevel` | `LOG_LEVEL` | *(unset)* | string/number | All requests | Per-endpoint log level override |
+| 10 | `CustomResourceTypesEnabled` | `CUSTOM_RESOURCE_TYPES_ENABLED` | `false` | boolean | Admin API, SCIM CRUD | Enable custom resource type registration and generic SCIM CRUD beyond User/Group |
+| 11 | `BulkOperationsEnabled` | `BULK_OPERATIONS_ENABLED` | `false` | boolean | POST /Bulk | Enable SCIM Bulk Operations (RFC 7644 §3.7) — batch processing of multiple operations |
+| 12 | `logLevel` | `LOG_LEVEL` | *(unset)* | string/number | All requests | Per-endpoint log level override |
 
-> **Note:** Three flags default to `true`: `AllowAndCoerceBooleanStrings`, `PatchOpAllowRemoveAllMembers`. All others default to `false`. `ReprovisionOnConflictForSoftDeletedResource` has no effect unless `SoftDeleteEnabled` is also `true`.
+> **Note:** Two flags default to `true`: `AllowAndCoerceBooleanStrings`, `PatchOpAllowRemoveAllMembers`. All others default to `false`. `ReprovisionOnConflictForSoftDeletedResource` has no effect unless `SoftDeleteEnabled` is also `true`.
 
 ---
 
@@ -574,7 +578,180 @@ Response (200): Success, version incremented to `W/"v4"`.
 
 ---
 
-### 4.10 logLevel
+### 4.10 CustomResourceTypesEnabled
+
+| Property | Value |
+|----------|-------|
+| **Config key** | `CustomResourceTypesEnabled` |
+| **Constant** | `ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED` |
+| **Default** | `false` |
+| **Helper** | `getConfigBoolean(config, key)` |
+| **Scope** | Admin API (resource type registration), SCIM CRUD (generic wildcard routes) |
+| **RFC** | RFC 7643 §6 (Defining New Resource Types) |
+| **Added** | v0.18.0 |
+
+**Purpose:** Enables data-driven extensibility beyond the built-in User and Group resource types. When ON, administrators can register custom resource types via the Admin API (`POST /admin/endpoints/:endpointId/resource-types`), and the generic SCIM CRUD controller processes requests for those resource types. When OFF (default), Admin API returns 403 and generic SCIM routes return 404.
+
+**What it gates:**
+- **Admin API**: `POST`, `GET`, `GET /:name`, `DELETE /:name` at `/admin/endpoints/:endpointId/resource-types`
+- **Generic SCIM CRUD**: `POST`, `GET`, `GET /:id`, `PUT /:id`, `PATCH /:id`, `DELETE /:id` on wildcard `:resourceType` routes (e.g., `/scim/endpoints/:endpointId/Devices`)
+
+**Validation guards:**
+- Reserved names blocked (`User`, `Group`)
+- Reserved paths blocked (`/Users`, `/Groups`, `/Schemas`, `/ResourceTypes`, `/ServiceProviderConfig`, `/Bulk`, `/Me`)
+- Generic SCIM controller registered LAST in module to avoid intercepting built-in routes
+
+**Example — Register a custom resource type:**
+
+```http
+POST /scim/admin/endpoints/42020f1f-.../resource-types
+Content-Type: application/json
+Authorization: Bearer <admin-token>
+```
+
+```json
+{
+  "name": "Device",
+  "endpoint": "/Devices",
+  "description": "IoT device records",
+  "schema": "urn:example:scim:schemas:2.0:Device",
+  "schemaExtensions": []
+}
+```
+
+Response (201):
+```json
+{
+  "name": "Device",
+  "endpoint": "/Devices",
+  "description": "IoT device records",
+  "schema": "urn:example:scim:schemas:2.0:Device",
+  "schemaExtensions": [],
+  "endpointId": "42020f1f-..."
+}
+```
+
+---
+
+### 4.11 BulkOperationsEnabled
+
+| Property | Value |
+|----------|-------|
+| **Config key** | `BulkOperationsEnabled` |
+| **Constant** | `ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED` |
+| **Default** | `false` |
+| **Helper** | `getConfigBoolean(config, key)` |
+| **Scope** | POST /Bulk |
+| **RFC** | RFC 7644 §3.7 (Bulk Operations) |
+| **Added** | v0.19.0 |
+
+**Purpose:** Enables SCIM Bulk Operations (RFC 7644 §3.7) for this endpoint. When ON, clients can POST to `/endpoints/:endpointId/Bulk` with multiple SCIM operations (POST, PUT, PATCH, DELETE) in a single HTTP request. When OFF (default), `POST /Bulk` returns `403 Forbidden`.
+
+**Key behaviors when enabled:**
+- **Sequential processing**: Operations are processed in array order to honor `bulkId` dependencies
+- **bulkId cross-referencing**: A POST operation can assign a `bulkId`; subsequent operations can reference it via `bulkId:<id>` in their `path` field — the server resolves the reference to the created resource's server-assigned SCIM ID
+- **failOnErrors**: Optional integer threshold — if the number of errors reaches this count, remaining operations are skipped (0 = process all)
+- **Supported resource types**: `Users` and `Groups` (other types return 400)
+- **Limits**: `maxOperations = 1000`, `maxPayloadSize = 1,048,576` bytes (1 MB)
+- **Per-operation error isolation**: A failing operation does not abort the batch (unless `failOnErrors` threshold reached)
+
+**Example — Bulk create user + add to group with bulkId cross-ref:**
+
+```http
+POST /scim/endpoints/42020f1f-.../Bulk
+Content-Type: application/scim+json
+Authorization: Bearer <token>
+```
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
+  "Operations": [
+    {
+      "method": "POST",
+      "path": "/Users",
+      "bulkId": "user1",
+      "data": {
+        "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        "userName": "bulk-user@example.com",
+        "displayName": "Bulk User"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/Groups/group-id-here",
+      "data": {
+        "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+        "Operations": [
+          {
+            "op": "add",
+            "path": "members",
+            "value": [{ "value": "bulkId:user1" }]
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+Response (200):
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:BulkResponse"],
+  "Operations": [
+    {
+      "method": "POST",
+      "bulkId": "user1",
+      "location": "https://host/scim/endpoints/42020f1f-.../Users/a1b2c3d4-...",
+      "status": "201"
+    },
+    {
+      "method": "PATCH",
+      "location": "https://host/scim/endpoints/42020f1f-.../Groups/group-id-here",
+      "status": "200"
+    }
+  ]
+}
+```
+
+**Example — Config flag OFF (default):**
+
+```http
+POST /scim/endpoints/42020f1f-.../Bulk
+Content-Type: application/scim+json
+Authorization: Bearer <token>
+```
+
+Response (403):
+
+```json
+{
+  "statusCode": 403,
+  "message": "Bulk operations are not enabled for this endpoint. Set the \"BulkOperationsEnabled\" config flag to \"True\" to enable."
+}
+```
+
+**ServiceProviderConfig advertisement:**
+
+When Bulk Operations is supported at the application level, `ServiceProviderConfig` advertises:
+
+```json
+{
+  "bulk": {
+    "supported": true,
+    "maxOperations": 1000,
+    "maxPayloadSize": 1048576
+  }
+}
+```
+
+> **Note:** The SPC advertises `bulk.supported = true` globally. The actual per-endpoint availability is controlled by the `BulkOperationsEnabled` config flag. Clients should check both SPC (capability) and per-endpoint config (authorization).
+
+---
+
+### 4.12 logLevel
 
 | Property | Value |
 |----------|-------|
@@ -614,6 +791,8 @@ Which flags affect which HTTP methods and resource types:
 | `MultiOpPatchRemove...` | — | — | ✅ | — | — | — | — | ✅ |
 | `PatchOpAllowRemoveAll...` | — | — | ✅ | — | — | — | — | ✅ |
 | `RequireIfMatch` | — | ✅ | ✅ | ✅ | — | — | ✅ | ✅ |
+| `CustomResourceTypesEnabled` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
+| `BulkOperationsEnabled` | ✅ | — | — | — | — | — | ✅ | ✅ |
 | `logLevel` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ---
@@ -706,6 +885,24 @@ flowchart TD
     J -->|no| L[400: Multi-member remove not permitted]
 ```
 
+### 6.6 BulkOperationsEnabled × POST /Bulk
+
+```mermaid
+flowchart TD
+    A[POST /endpoints/:id/Bulk] --> B{BulkOperationsEnabled?}
+    B -->|false| C[403 Forbidden<br>Bulk not enabled]
+    B -->|true| D{Valid schema URN?}
+    D -->|no| E[400 Invalid Value]
+    D -->|yes| F{Payload size <= 1MB?}
+    F -->|no| G[413 Too Large]
+    F -->|yes| H[Process operations sequentially]
+    H --> I{failOnErrors threshold?}
+    I -->|reached| J[Skip remaining ops]
+    I -->|not reached| K[Continue processing]
+    K --> L[Return BulkResponse 200]
+    J --> L
+```
+
 ---
 
 ## 7. Flag Combination Examples
@@ -724,6 +921,7 @@ flowchart TD
     "StrictSchemaValidation": "True",
     "AllowAndCoerceBooleanStrings": "True",
     "RequireIfMatch": "False",
+    "BulkOperationsEnabled": "True",
     "logLevel": "INFO"
   }
 }
@@ -736,6 +934,7 @@ flowchart TD
 - `StrictSchemaValidation`: Full type/schema enforcement
 - `AllowAndCoerceBooleanStrings`: Entra sends `"True"` for boolean attrs
 - `RequireIfMatch`: `False` — Entra does not send If-Match headers
+- `BulkOperationsEnabled`: `True` — enables batch provisioning for large-scale syncs
 
 ### 7.2 Strict-Mode Maximum Validation
 
@@ -801,6 +1000,8 @@ Or equivalently:
     "StrictSchemaValidation": "True",
     "AllowAndCoerceBooleanStrings": "True",
     "RequireIfMatch": "True",
+    "CustomResourceTypesEnabled": "True",
+    "BulkOperationsEnabled": "True",
     "logLevel": "DEBUG"
   }
 }
@@ -818,7 +1019,9 @@ Or equivalently:
     "SoftDeleteEnabled": "False",
     "StrictSchemaValidation": "False",
     "AllowAndCoerceBooleanStrings": "False",
-    "RequireIfMatch": "False"
+    "RequireIfMatch": "False",
+    "CustomResourceTypesEnabled": "False",
+    "BulkOperationsEnabled": "False"
   }
 }
 ```
@@ -935,7 +1138,8 @@ Authorization: Bearer <admin-token>
     "SoftDeleteEnabled": "True",
     "VerbosePatchSupported": "True",
     "MultiOpPatchRequestAddMultipleMembersToGroup": "True",
-    "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True"
+    "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True",
+    "BulkOperationsEnabled": "True"
   }
 }
 ```
@@ -1016,6 +1220,7 @@ For production use with Microsoft Entra ID (Azure AD) provisioning, the recommen
     "SoftDeleteEnabled": "True",
     "StrictSchemaValidation": "True",
     "AllowAndCoerceBooleanStrings": "True",
+    "BulkOperationsEnabled": "True",
     "logLevel": "INFO"
   }
 }
@@ -1033,6 +1238,7 @@ For production use with Microsoft Entra ID (Azure AD) provisioning, the recommen
 | `StrictSchemaValidation` = True | Full type/schema enforcement for data quality |
 | `AllowAndCoerceBooleanStrings` = True | **Critical**: Entra sends `roles[].primary = "True"` (string), not `true` (boolean) |
 | `RequireIfMatch` = False (default) | Entra does NOT send If-Match headers — enabling would reject all writes |
+| `BulkOperationsEnabled` = True | Enables batch provisioning for large-scale initial syncs |
 
 > **SCIM Validator Score with this config:** 23/23 mandatory + 7/7 preview = **30/30 passed** ✅
 

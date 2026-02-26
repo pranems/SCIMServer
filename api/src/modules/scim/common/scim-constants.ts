@@ -56,6 +56,8 @@ export const SCIM_ERROR_TYPE = {
   TOO_MANY: 'tooMany',
   /** The attempted modification is not compatible with the target's existing attribute (400) */
   SENSITIVE: 'sensitive',
+  /** Request payload exceeds server size limit (413 Payload Too Large) */
+  TOO_LARGE: 'tooLarge',
 } as const;
 
 export type ScimErrorType = typeof SCIM_ERROR_TYPE[keyof typeof SCIM_ERROR_TYPE];

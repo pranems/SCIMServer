@@ -172,11 +172,11 @@ describe('ScimDiscoveryService', () => {
       expect(result.etag.supported).toBe(true);
     });
 
-    it('should advertise bulk as not supported with maxOperations=0', () => {
+    it('should advertise bulk as supported with maxOperations=1000', () => {
       const result = service.getServiceProviderConfig();
-      expect(result.bulk.supported).toBe(false);
-      expect(result.bulk.maxOperations).toBe(0);
-      expect(result.bulk.maxPayloadSize).toBe(0);
+      expect(result.bulk.supported).toBe(true);
+      expect(result.bulk.maxOperations).toBe(1000);
+      expect(result.bulk.maxPayloadSize).toBe(1048576);
     });
 
     it('should include meta.resourceType (RFC 7644 §4 SHOULD)', () => {

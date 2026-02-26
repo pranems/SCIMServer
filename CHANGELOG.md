@@ -5,6 +5,27 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.0] - 2026-02-26
+
+### Added
+- **Phase 9 — Bulk Operations (RFC 7644 §3.7)** — Process multiple SCIM operations in a single HTTP request. Per-endpoint, gated behind `BulkOperationsEnabled` config flag (default: false).
+  - **BulkController**: `POST /endpoints/:endpointId/Bulk` with config flag gate, schema URN validation, and payload size guard (1MB max).
+  - **BulkProcessorService**: Sequential operation processing with `bulkId` cross-referencing (`Map<string, string>`), `failOnErrors` threshold, and per-operation error isolation.
+  - **BulkRequest/Response DTOs**: `BulkOperationDto`, `BulkRequestDto`, `BulkOperationResult`, `BulkResponse` with RFC-compliant schema URNs.
+  - **ServiceProviderConfig**: Updated to advertise `bulk.supported = true`, `maxOperations = 1000`, `maxPayloadSize = 1048576`.
+  - **New error type**: `TOO_LARGE: 'tooLarge'` added to `SCIM_ERROR_TYPE` for 413 responses.
+- **`BulkOperationsEnabled` config flag** — New per-endpoint boolean flag in `endpoint-config.interface.ts`. When disabled (default), bulk endpoint returns 403.
+- **43 new unit tests** — `bulk-processor.service.spec.ts` (32), `endpoint-scim-bulk.controller.spec.ts` (11).
+- **24 new E2E tests** — `bulk-operations.e2e-spec.ts`: Config flag gating, User/Group CRUD via bulk, bulkId cross-referencing, failOnErrors, request validation, mixed operations, response format, uniqueness collision.
+- **18 new live integration tests** — `scripts/live-test.ps1` TEST SECTION 9n: Flag gating, User/Group CRUD, bulkId cross-ref, failOnErrors, schema validation, unsupported types, mixed ops, SPC, response format, uniqueness collision.
+- **Feature doc** — `docs/PHASE_09_BULK_OPERATIONS.md` — Architecture, API reference, Mermaid diagrams, test coverage tables.
+
+### Verified
+- **2,320/2,320 unit tests passing** (69 suites) — up from 2,277 (+43 new, +2 suites)
+- **435/435 E2E tests passing** (22 suites) — up from 411 (+24 new, +1 suite)
+- **401/401 live integration tests passing** — up from 381 (+18 new, section 9n + 2 cleanup)
+- Docker build + container live tests: all passing
+
 ## [0.18.0] - 2026-02-26
 
 ### Added
