@@ -279,7 +279,7 @@ Four categories of PATCH paths, handled in order:
 
 ## 8. Test Coverage
 
-- **Unit**: 2,353 tests passing (69 suites)
+- **Unit**: 2,357 tests passing (69 suites)
 - **E2E**: 455 tests passing (22 suites)
 - **Live integration**: 444+ tests passing (local + Docker)
 - **SCIM Validator**: 25/25 required + 7/7 preview

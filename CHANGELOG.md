@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **G8g — Write-Response Attribute Projection (RFC 7644 §3.9)** — `attributes` and `excludedAttributes` query parameters were ignored on POST (create), PUT (replace), and PATCH (modify) write operations. Clients could not request partial resource representations on write responses. All 6 write controller methods (3 Users + 3 Groups) now accept these query parameters and delegate to `applyAttributeProjection()` — the same function already used by read operations — ensuring consistent RFC-compliant attribute projection across all SCIM operations.
 
 ### Added
-- **23 new unit tests** — `endpoint-scim-users.controller.spec.ts` (12) + `endpoint-scim-groups.controller.spec.ts` (11): POST/PUT/PATCH with `attributes`, `excludedAttributes`, both params (precedence), `returned:'request'` interaction, always-returned protection, dotted sub-attribute paths, and without params.
+- **27 new unit tests** — `endpoint-scim-users.controller.spec.ts` (12) + `endpoint-scim-groups.controller.spec.ts` (11) for G8g write-response projection + `prisma-filter-evaluator.spec.ts` (4) for CITEXT/TEXT filter fix: POST/PUT/PATCH with `attributes`, `excludedAttributes`, both params (precedence), `returned:'request'` interaction, always-returned protection, dotted sub-attribute paths, and without params.
 - **14 new E2E tests** — `attribute-projection.e2e-spec.ts`: POST/PUT/PATCH × Users/Groups with `attributes` and `excludedAttributes` projection, precedence rules, always-returned protection, dotted sub-attributes.
 - **33 new live integration tests** — `scripts/live-test.ps1` TEST SECTION 9p: POST/PUT/PATCH × Users/Groups write-response projection with `attributes`, `excludedAttributes`, both params (precedence), always-returned protection, setup + cleanup.
 - **Feature doc** — `docs/G8G_WRITE_RESPONSE_ATTRIBUTE_PROJECTION.md` — Architecture, projection flow, implementation details, test coverage tables.
@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed unused `stripReturnedNever` import from both controllers (replaced by `applyAttributeProjection` calls).
 
 ### Verified
-- **2,353/2,353 unit tests passing** (69 suites) — up from 2,330 (+23 new)
+- **2,357/2,357 unit tests passing** (69 suites) — up from 2,330 (+27 new: 23 G8g + 4 CITEXT filter)
 - **455/455 E2E tests passing** (22 suites) — up from 441 (+14 new)
 - **444/444 live integration tests passing** — up from 411 (+33 new)
 

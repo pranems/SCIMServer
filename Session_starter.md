@@ -314,7 +314,7 @@ Deferred:
 ## Dev Quick Ref
 Backend: `cd api && npm run start:dev`
 Frontend: `cd web && npm run dev`
-Unit Tests: `cd api && npm test` (2353 tests, 69 suites)
+Unit Tests: `cd api && npm test` (2357 tests, 69 suites)
 Unit Coverage: `cd api && npm run test:cov` → coverage/
 E2E Tests: `cd api && npm run test:e2e` (455 tests, 22 suites)
 E2E Coverage: `cd api && npm run test:e2e:cov` → coverage-e2e/

@@ -23,7 +23,7 @@
 | Sorting (RFC 7644 §3.4.2.3) | **0%** | Not implemented (correctly listed as unsupported) |
 | Bulk Operations (RFC 7644 §3.7) | **100%** | `POST /Bulk` with sequential processing, `bulkId` cross-referencing, `failOnErrors` threshold, per-endpoint `BulkOperationsEnabled` flag (v0.19.0) |
 
-**Overall: ~98% RFC 7643/7644 compliant** (remaining gap: Sorting — optional per spec). All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. 2,353 unit tests (69 suites), 455 E2E tests (22 suites), 444 live integration tests — all passing.
+**Overall: ~98% RFC 7643/7644 compliant** (remaining gap: Sorting — optional per spec). All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. 2,357 unit tests (69 suites), 455 E2E tests (22 suites), 444 live integration tests — all passing.
 
 ### New in v0.17.2
 
@@ -161,7 +161,7 @@ SCIMServer passes all critical requirements for Microsoft Entra ID enterprise ap
 
 | Feature | Status | Impact |
 |---------|--------|--------|
-| Bulk operations | ❌ Not implemented | None — Entra doesn't use `/Bulk` |
+| Bulk operations | ✅ Implemented (v0.19.0) | None — Entra doesn't use `/Bulk` |
 | `/Me` endpoint | ❌ Not implemented | None — Entra provisioning doesn't use `/Me` |
 | Complex filter operators (co, sw, ew, etc.) | ✅ Implemented | All 10 operators available (Entra only uses `eq` + `and`) |
 | Sorting | ❌ Not implemented | None — Entra doesn't request sorting |

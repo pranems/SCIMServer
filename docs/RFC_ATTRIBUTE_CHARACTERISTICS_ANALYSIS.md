@@ -981,18 +981,18 @@ SELECT key, value FROM "EndpointConfig" WHERE "endpointId" = 'ep-1';
 ┌───┬──────────────────────────────────────┬──────────┬───────────────────────────┐
 │ # │ Gap                                  │ Severity │ Where to Fix              │
 ├───┼──────────────────────────────────────┼──────────┼───────────────────────────┤
-│G1 │ PatchEngine: no mutability checks    │ HIGH     │ PatchEngine + schema wire │
-│G2 │ immutable not enforced on PUT        │ HIGH     │ SchemaValidator + service │
+│G1 │ ✅ PatchEngine mutability (H-1+G8c)   │ ~~HIGH~~ │ PatchEngine + schema wire │
+│G2 │ ✅ immutable enforced on PUT (H-2)     │ ~~HIGH~~ │ SchemaValidator + service │
 │G3 │ ✅ returned:never stripped (G8e)      │ ~~MEDIUM~~ │ Response builder        │
 │G4 │ ✅ returned:request gated (G8e/G8g)   │ ~~MEDIUM~~ │ Response builder        │
 │G5 │ ✅ userName always-returned (G8e)      │ ~~MEDIUM~~ │ Attribute projection    │
 │G6 │ ✅ Projection on POST/PUT/PATCH (G8g)  │ ~~MEDIUM~~ │ Controller layer        │
 │G7 │ caseExact ignored in filters         │ MEDIUM   │ Filter evaluator          │
-│G8 │ canonicalValues not defined          │ LOW      │ Schema constants + types  │
+│G8 │ ✅ canonicalValues defined (BUG-007)  │ ~~LOW~~  │ Schema constants + types  │
 │G9 │ referenceTypes not enforced          │ LOW      │ SchemaValidator           │
-│G10│ password attr not in schema          │ MEDIUM   │ Schema constants          │
+│G10│ ✅ password in schema (G8e)           │ ~~MEDIUM~~ │ Schema constants        │
 │G11│ binary/reference not fully validated │ LOW      │ SchemaValidator           │
-│G12│ Group PATCH doesn't recheck uniquness│ MEDIUM   │ Groups service            │
+│G12│ ✅ Group PATCH uniqueness (G8f)       │ ~~MEDIUM~~ │ Groups service          │
 │G13│ PATCH remove required → no error     │ MEDIUM   │ PatchEngine               │
 │G14│ members.$ref missing from constants  │ LOW      │ Schema constants          │
 │G15│ required attrs not always enforced   │ MEDIUM   │ Service layer (flag gate) │
