@@ -14,15 +14,28 @@ import {
   SCIM_CORE_GROUP_SCHEMA,
   SCIM_ENTERPRISE_USER_SCHEMA,
   SCIM_SP_CONFIG_SCHEMA,
+  SCIM_SCHEMA_SCHEMA,
+  SCIM_RESOURCE_TYPE_SCHEMA,
 } from '../common/scim-constants';
 
 // ─── Attribute definitions ──────────────────────────────────────────────────
 
 /**
  * SCIM Core User Schema attributes (RFC 7643 §4.1)
- * Only attributes actually handled by the server are listed.
+ * Includes RFC 7643 §3.1 common attributes (id, meta) that apply to all resources.
  */
 export const USER_SCHEMA_ATTRIBUTES = [
+  {
+    name: 'id',
+    type: 'string',
+    multiValued: false,
+    required: true,
+    caseExact: true,
+    mutability: 'readOnly',
+    returned: 'always',
+    uniqueness: 'server',
+    description: 'A unique identifier for a SCIM resource as defined by the service provider.',
+  },
   {
     name: 'userName',
     type: 'string',
@@ -238,6 +251,22 @@ export const USER_SCHEMA_ATTRIBUTES = [
     returned: 'default',
     description: 'An identifier for the Resource as defined by the Service Consumer.',
   },
+  {
+    name: 'meta',
+    type: 'complex',
+    multiValued: false,
+    required: false,
+    mutability: 'readOnly',
+    returned: 'default',
+    description: 'A complex attribute containing resource metadata.',
+    subAttributes: [
+      { name: 'resourceType', type: 'string', multiValued: false, required: false, caseExact: true, mutability: 'readOnly', returned: 'default', description: 'The name of the resource type of the resource.' },
+      { name: 'created', type: 'dateTime', multiValued: false, required: false, mutability: 'readOnly', returned: 'default', description: 'The DateTime that the resource was added to the service provider.' },
+      { name: 'lastModified', type: 'dateTime', multiValued: false, required: false, mutability: 'readOnly', returned: 'default', description: 'The most recent DateTime that the details of this resource were updated at the service provider.' },
+      { name: 'location', type: 'reference', multiValued: false, required: false, caseExact: true, mutability: 'readOnly', returned: 'default', referenceTypes: ['uri'], description: 'The URI of the resource being returned.' },
+      { name: 'version', type: 'string', multiValued: false, required: false, caseExact: true, mutability: 'readOnly', returned: 'default', description: 'The version of the resource being returned (ETag).' },
+    ],
+  },
 ] as const;
 
 /**
@@ -320,6 +349,17 @@ export const ENTERPRISE_USER_ATTRIBUTES = [
  */
 export const GROUP_SCHEMA_ATTRIBUTES = [
   {
+    name: 'id',
+    type: 'string',
+    multiValued: false,
+    required: true,
+    caseExact: true,
+    mutability: 'readOnly',
+    returned: 'always',
+    uniqueness: 'server',
+    description: 'A unique identifier for a SCIM resource as defined by the service provider.',
+  },
+  {
     name: 'displayName',
     type: 'string',
     multiValued: false,
@@ -362,12 +402,29 @@ export const GROUP_SCHEMA_ATTRIBUTES = [
     returned: 'always',
     description: 'A Boolean value indicating the Group\'s administrative status. When soft-delete is enabled, a deleted Group has active set to false.',
   },
+  {
+    name: 'meta',
+    type: 'complex',
+    multiValued: false,
+    required: false,
+    mutability: 'readOnly',
+    returned: 'default',
+    description: 'A complex attribute containing resource metadata.',
+    subAttributes: [
+      { name: 'resourceType', type: 'string', multiValued: false, required: false, caseExact: true, mutability: 'readOnly', returned: 'default', description: 'The name of the resource type of the resource.' },
+      { name: 'created', type: 'dateTime', multiValued: false, required: false, mutability: 'readOnly', returned: 'default', description: 'The DateTime that the resource was added to the service provider.' },
+      { name: 'lastModified', type: 'dateTime', multiValued: false, required: false, mutability: 'readOnly', returned: 'default', description: 'The most recent DateTime that the details of this resource were updated at the service provider.' },
+      { name: 'location', type: 'reference', multiValued: false, required: false, caseExact: true, mutability: 'readOnly', returned: 'default', referenceTypes: ['uri'], description: 'The URI of the resource being returned.' },
+      { name: 'version', type: 'string', multiValued: false, required: false, caseExact: true, mutability: 'readOnly', returned: 'default', description: 'The version of the resource being returned (ETag).' },
+    ],
+  },
 ] as const;
 
 // ─── Full schema objects ────────────────────────────────────────────────────
 
 /** SCIM Core User schema definition (RFC 7643 §7 format) */
 export const SCIM_USER_SCHEMA_DEFINITION = {
+  schemas: [SCIM_SCHEMA_SCHEMA],
   id: SCIM_CORE_USER_SCHEMA,
   name: 'User',
   description: 'User Account',
@@ -380,6 +437,7 @@ export const SCIM_USER_SCHEMA_DEFINITION = {
 
 /** SCIM Enterprise User Extension schema definition (RFC 7643 §7 format) */
 export const SCIM_ENTERPRISE_USER_SCHEMA_DEFINITION = {
+  schemas: [SCIM_SCHEMA_SCHEMA],
   id: SCIM_ENTERPRISE_USER_SCHEMA,
   name: 'EnterpriseUser',
   description: 'Enterprise User Extension',
@@ -392,6 +450,7 @@ export const SCIM_ENTERPRISE_USER_SCHEMA_DEFINITION = {
 
 /** SCIM Core Group schema definition (RFC 7643 §7 format) */
 export const SCIM_GROUP_SCHEMA_DEFINITION = {
+  schemas: [SCIM_SCHEMA_SCHEMA],
   id: SCIM_CORE_GROUP_SCHEMA,
   name: 'Group',
   description: 'Group',
@@ -406,6 +465,7 @@ export const SCIM_GROUP_SCHEMA_DEFINITION = {
 
 /** SCIM User ResourceType definition (RFC 7643 §6) */
 export const SCIM_USER_RESOURCE_TYPE = {
+  schemas: [SCIM_RESOURCE_TYPE_SCHEMA],
   id: 'User',
   name: 'User',
   endpoint: '/Users',
@@ -425,6 +485,7 @@ export const SCIM_USER_RESOURCE_TYPE = {
 
 /** SCIM Group ResourceType definition (RFC 7643 §6) */
 export const SCIM_GROUP_RESOURCE_TYPE = {
+  schemas: [SCIM_RESOURCE_TYPE_SCHEMA],
   id: 'Group',
   name: 'Group',
   endpoint: '/Groups',
@@ -456,6 +517,7 @@ export const SCIM_SERVICE_PROVIDER_CONFIG = {
       description: 'Authentication scheme using the OAuth Bearer Token Standard',
       specUri: 'https://www.rfc-editor.org/info/rfc6750',
       documentationUri: 'https://github.com/pranems/SCIMServer#authentication',
+      primary: true,
     },
   ],
   meta: {

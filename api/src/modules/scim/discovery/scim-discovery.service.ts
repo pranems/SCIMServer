@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import {
   SCIM_LIST_RESPONSE_SCHEMA,
 } from '../common/scim-constants';
+import { createScimError } from '../common/scim-errors';
 import { ScimSchemaRegistry } from './scim-schema-registry';
+import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
 
 /**
  * ScimDiscoveryService — Phase 6: Data-Driven Discovery
@@ -40,6 +42,25 @@ export class ScimDiscoveryService {
     };
   }
 
+  /**
+   * Returns a single Schema by URN for GET /Schemas/{uri}.
+   * Throws a SCIM 404 error if the schema is not found.
+   *
+   * @param schemaUrn - The schema URN identifier (e.g. urn:ietf:params:scim:schemas:core:2.0:User)
+   * @param endpointId - Optional endpoint ID for endpoint-scoped lookups
+   * @see RFC 7644 §4 — An HTTP GET to retrieve an individual Schema
+   */
+  getSchemaByUrn(schemaUrn: string, endpointId?: string) {
+    const schema = this.registry.getSchema(schemaUrn, endpointId);
+    if (!schema) {
+      throw createScimError({
+        status: 404,
+        detail: `Schema "${schemaUrn}" not found.`,
+      });
+    }
+    return schema;
+  }
+
   // ─── ResourceTypes ──────────────────────────────────────────────────────
 
   /**
@@ -58,14 +79,38 @@ export class ScimDiscoveryService {
     };
   }
 
+  /**
+   * Returns a single ResourceType by id for GET /ResourceTypes/{id}.
+   * Throws a SCIM 404 error if the resource type is not found.
+   *
+   * @param resourceTypeId - The resource type id (e.g. "User", "Group")
+   * @param endpointId - Optional endpoint ID for endpoint-scoped lookups
+   * @see RFC 7644 §4 — An HTTP GET to retrieve an individual ResourceType
+   */
+  getResourceTypeById(resourceTypeId: string, endpointId?: string) {
+    const rt = this.registry.getResourceType(resourceTypeId, endpointId);
+    if (!rt) {
+      throw createScimError({
+        status: 404,
+        detail: `ResourceType "${resourceTypeId}" not found.`,
+      });
+    }
+    return rt;
+  }
+
   // ─── ServiceProviderConfig ──────────────────────────────────────────────
 
   /**
    * Returns the ServiceProviderConfig for GET /ServiceProviderConfig.
    * Includes meta object per RFC 7644 §4 SHOULD recommendation.
+   *
+   * When called with an EndpointConfig, dynamically adjusts capability
+   * flags (e.g., bulk.supported) based on per-endpoint configuration.
+   *
+   * @param config - Optional per-endpoint configuration to reflect in SPC
    */
-  getServiceProviderConfig() {
-    return this.registry.getServiceProviderConfig();
+  getServiceProviderConfig(config?: EndpointConfig) {
+    return this.registry.getServiceProviderConfig(config);
   }
 
   // ─── Dynamic schemas[] helper ───────────────────────────────────────────

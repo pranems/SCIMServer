@@ -6,6 +6,8 @@ import {
   MSFTTEST_CUSTOM_GROUP_SCHEMA,
   MSFTTEST_IETF_USER_SCHEMA,
   MSFTTEST_IETF_GROUP_SCHEMA,
+  SCIM_SCHEMA_SCHEMA,
+  SCIM_RESOURCE_TYPE_SCHEMA,
 } from '../common/scim-constants';
 import {
   SCIM_USER_SCHEMA_DEFINITION,
@@ -15,6 +17,8 @@ import {
   SCIM_GROUP_RESOURCE_TYPE,
   SCIM_SERVICE_PROVIDER_CONFIG,
 } from './scim-schemas.constants';
+import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import { ENDPOINT_CONFIG_FLAGS, getConfigBooleanWithDefault } from '../../endpoint/endpoint-config.interface';
 import { ENDPOINT_SCHEMA_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { ENDPOINT_RESOURCE_TYPE_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import type { IEndpointSchemaRepository } from '../../../domain/repositories/endpoint-schema.repository.interface';
@@ -39,6 +43,7 @@ export interface ScimSchemaAttribute {
 
 /** RFC 7643 §7 Schema definition */
 export interface ScimSchemaDefinition {
+  schemas?: readonly string[];
   id: string;
   name: string;
   description: string;
@@ -57,6 +62,7 @@ export interface SchemaExtensionRef {
 
 /** RFC 7643 §6 ResourceType definition */
 export interface ScimResourceType {
+  schemas?: readonly string[];
   id: string;
   name: string;
   endpoint: string;
@@ -161,6 +167,7 @@ export class ScimSchemaRegistry implements OnModuleInit {
 
         for (const row of rows) {
           const definition: ScimSchemaDefinition = {
+            schemas: [SCIM_SCHEMA_SCHEMA],
             id: row.schemaUrn,
             name: row.name,
             description: row.description ?? '',
@@ -272,6 +279,7 @@ export class ScimSchemaRegistry implements OnModuleInit {
 
     for (const ext of msfttestSchemas) {
       const definition: ScimSchemaDefinition = {
+        schemas: [SCIM_SCHEMA_SCHEMA],
         id: ext.urn,
         name: ext.name,
         description: `Built-in extension schema for ${ext.name}`,
@@ -355,9 +363,10 @@ export class ScimSchemaRegistry implements OnModuleInit {
       }
     }
 
-    // Ensure meta is populated
+    // Ensure meta and schemas are populated
     const definition: ScimSchemaDefinition = {
       ...schema,
+      schemas: schema.schemas ?? [SCIM_SCHEMA_SCHEMA],
       meta: schema.meta ?? {
         resourceType: 'Schema',
         location: `/Schemas/${schema.id}`,
@@ -458,9 +467,10 @@ export class ScimSchemaRegistry implements OnModuleInit {
       throw new BadRequestException('Custom resource types must be scoped to an endpoint.');
     }
 
-    // Ensure meta is populated
+    // Ensure meta and schemas are populated
     const rt: ScimResourceType = {
       ...resourceType,
+      schemas: resourceType.schemas ?? [SCIM_RESOURCE_TYPE_SCHEMA],
       schemaExtensions: [...resourceType.schemaExtensions],
       meta: resourceType.meta ?? {
         resourceType: 'ResourceType',
@@ -661,9 +671,31 @@ export class ScimSchemaRegistry implements OnModuleInit {
     return [...urns];
   }
 
-  /** ServiceProviderConfig (static — not registry-managed) */
-  getServiceProviderConfig() {
-    return { ...SCIM_SERVICE_PROVIDER_CONFIG };
+  /**
+   * ServiceProviderConfig — dynamically adjusted per-endpoint.
+   *
+   * When called without config, returns the default SPC (all capabilities
+   * as defined in the constant). When called with an EndpointConfig,
+   * adjusts capability flags based on the endpoint's configuration:
+   *  - bulk.supported reflects BulkOperationsEnabled flag
+   *
+   * @param config - Optional per-endpoint configuration
+   * @see RFC 7644 §4
+   */
+  getServiceProviderConfig(config?: EndpointConfig) {
+    const spc = {
+      ...SCIM_SERVICE_PROVIDER_CONFIG,
+      bulk: { ...SCIM_SERVICE_PROVIDER_CONFIG.bulk },
+    };
+
+    if (config) {
+      // Adjust bulk.supported based on endpoint config flag
+      // Default is true (server supports bulk); set to false only if explicitly disabled
+      const bulkEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED, true);
+      spc.bulk.supported = bulkEnabled;
+    }
+
+    return spc;
   }
 
   /** Whether a schema URN is registered (global or endpoint-specific) */

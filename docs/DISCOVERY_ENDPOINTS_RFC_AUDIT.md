@@ -3,7 +3,7 @@
 > **Document Purpose**: Comprehensive audit of SCIM discovery endpoints (`/ServiceProviderConfig`, `/ResourceTypes`, `/Schemas`) against RFC 7643 §5–§7 and RFC 7644 §4 requirements.
 >
 > **Created**: February 26, 2026
-> **Version**: v0.19.2
+> **Version**: v0.19.3
 > **RFC References**: RFC 7643 §5 (SPC), RFC 7643 §6 (ResourceTypes), RFC 7643 §7 (Schemas), RFC 7644 §4 (Discovery)
 
 ---
@@ -24,15 +24,17 @@
 
 ## 1. Executive Summary
 
-SCIMServer exposes all three RFC-mandated discovery endpoints (`/ServiceProviderConfig`, `/ResourceTypes`, `/Schemas`) with correct response shapes, proper `application/scim+json` content types, and comprehensive attribute definitions. However, the audit identified **6 gaps** (1 HIGH, 2 MEDIUM, 2 LOW, 1 VERY LOW) in strict RFC conformance.
+SCIMServer exposes all three RFC-mandated discovery endpoints (`/ServiceProviderConfig`, `/ResourceTypes`, `/Schemas`) with correct response shapes, proper `application/scim+json` content types, and comprehensive attribute definitions. The audit originally identified **6 gaps** (1 HIGH, 2 MEDIUM, 2 LOW, 1 VERY LOW) — **all 6 have been remediated** as of v0.19.3.
+
+> **🏢 Multi-Tenant Architecture**: Discovery endpoints are served at **two tiers**. **Endpoint-scoped routes** (`/scim/endpoints/{endpointId}/...`) are the **primary** interface for multi-tenant consumers — they return per-tenant schemas, resource types, and config. **Root-level routes** (`/scim/v2/...`) return global defaults and are intended for admin tooling and service introspection. See [§3.5 Multi-Tenant Discovery Architecture](#35-multi-tenant-discovery-architecture) for details.
 
 ### Quick Scorecard
 
 | Endpoint | Response Shape | Content-Type | Auth Bypass | Individual Lookup | `schemas` Array | Overall |
 |----------|:---:|:---:|:---:|:---:|:---:|:---:|
-| `/ServiceProviderConfig` | ✅ | ✅ | ❌ D1 | N/A (singleton) | ✅ | 90% |
-| `/ResourceTypes` | ✅ | ✅ | ❌ D1 | ❌ D3 | ❌ D5 | 70% |
-| `/Schemas` | ✅ | ✅ | ❌ D1 | ❌ D2 | ❌ D4 | 70% |
+| `/ServiceProviderConfig` | ✅ | ✅ | ✅ D1 | N/A (singleton) | ✅ | 100% |
+| `/ResourceTypes` | ✅ | ✅ | ✅ D1 | ✅ D3 | ✅ D5 | 100% |
+| `/Schemas` | ✅ | ✅ | ✅ D1 | ✅ D2 | ✅ D4 | 100% |
 
 ---
 
@@ -144,11 +146,14 @@ Each **attribute definition** in `attributes[]`:
 
 ```mermaid
 graph TB
-    subgraph "Two Controller Layers"
-        ROOT_SPC["ServiceProviderConfigController<br/>GET /ServiceProviderConfig"]
-        ROOT_RT["ResourceTypesController<br/>GET /ResourceTypes"]
-        ROOT_SCH["SchemasController<br/>GET /Schemas"]
-        EP_DISC["EndpointScimDiscoveryController<br/>GET /endpoints/:id/ServiceProviderConfig<br/>GET /endpoints/:id/ResourceTypes<br/>GET /endpoints/:id/Schemas"]
+    subgraph "Root-Level Controllers (Global Defaults)"
+        ROOT_SPC["ServiceProviderConfigController<br/>GET /scim/v2/ServiceProviderConfig"]
+        ROOT_RT["ResourceTypesController<br/>GET /scim/v2/ResourceTypes<br/>GET /scim/v2/ResourceTypes/:id"]
+        ROOT_SCH["SchemasController<br/>GET /scim/v2/Schemas<br/>GET /scim/v2/Schemas/:uri"]
+    end
+
+    subgraph "Endpoint-Scoped Controller (PRIMARY — Multi-Tenant)"
+        EP_DISC["EndpointScimDiscoveryController<br/>GET /endpoints/:id/ServiceProviderConfig<br/>GET /endpoints/:id/Schemas + /:uri<br/>GET /endpoints/:id/ResourceTypes + /:id"]
     end
 
     subgraph "Service Layer"
@@ -161,28 +166,29 @@ graph TB
             GL["User, EnterpriseUser, Group schemas<br/>User, Group resource types<br/>4 msfttest extensions"]
         end
         subgraph "Per-Endpoint Overlays"
-            EP["Dynamic extensions per endpointId"]
+            EPO["Dynamic extensions per endpointId<br/>Custom schemas, resource types, extensions"]
         end
     end
 
     subgraph "Auth (Global APP_GUARD)"
-        GUARD["SharedSecretGuard<br/>⚠️ Applies to ALL routes"]
+        GUARD["SharedSecretGuard<br/>@Public() bypasses on all discovery"]
     end
 
-    ROOT_SPC --> SDS
-    ROOT_RT --> SDS
-    ROOT_SCH --> SDS
-    EP_DISC --> SDS
+    ROOT_SPC -->|"no endpointId"| SDS
+    ROOT_RT -->|"no endpointId"| SDS
+    ROOT_SCH -->|"no endpointId"| SDS
+    EP_DISC -->|"endpointId ✓"| SDS
     SDS --> REG
     REG --> GL
-    REG --> EP
+    REG --> EPO
 
-    GUARD -.->|"Blocks unauthenticated"| ROOT_SPC
-    GUARD -.->|"Blocks unauthenticated"| ROOT_RT
-    GUARD -.->|"Blocks unauthenticated"| ROOT_SCH
-    GUARD -.->|"Blocks unauthenticated"| EP_DISC
+    GUARD -.->|"@Public()"| ROOT_SPC
+    GUARD -.->|"@Public()"| ROOT_RT
+    GUARD -.->|"@Public()"| ROOT_SCH
+    GUARD -.->|"@Public()"| EP_DISC
 
-    style GUARD fill:#f99,stroke:#c00,color:#000
+    style EP_DISC fill:#bdf,stroke:#08f,color:#000
+    style GUARD fill:#9f9,stroke:#0c0,color:#000
 ```
 
 ### 3.2 File Inventory
@@ -199,6 +205,44 @@ graph TB
 | `api/src/modules/auth/shared-secret.guard.ts` | Global APP_GUARD (blocks all unauthenticated) | 124 |
 | `api/src/modules/auth/public.decorator.ts` | `@Public()` decorator to bypass guard | 4 |
 
+### 3.5 Multi-Tenant Discovery Architecture
+
+SCIMServer is a **multi-tenant/multi-endpoint** server. Each SCIM endpoint (tenant) can have:
+
+- **Custom schema extensions** registered via the admin API
+- **Custom resource types** (when `CustomResourceTypesEnabled` is set)
+- **Per-endpoint config flags** (e.g., `BulkOperationsEnabled: 'True'|'False'`)
+
+This means discovery responses **differ per tenant**. The architecture uses a **two-tier routing model**:
+
+| Tier | Route Pattern | endpointId | Data Source | Use Case |
+|------|---------------|:----------:|-------------|----------|
+| **Root-Level** | `/scim/v2/ServiceProviderConfig` | ❌ Not passed | Global defaults only | Admin tooling, service health checks, generic SCIM clients |
+| **Endpoint-Scoped** ⭐ | `/scim/endpoints/{id}/ServiceProviderConfig` | ✅ Passed | Global + per-endpoint overlays | **Primary for multi-tenant consumers** |
+
+**How overlay merging works in `ScimSchemaRegistry`:**
+
+1. **Schemas**: Global built-in schemas (User, Group, EnterpriseUser) + any per-endpoint custom schemas
+2. **Resource Types**: Global RTs deep-copied, then per-endpoint extensions merged into `schemaExtensions` + custom RTs appended
+3. **ServiceProviderConfig**: Global SPC template, with `bulk.supported` adjusted based on endpoint's `BulkOperationsEnabled` config flag
+
+```mermaid
+flowchart LR
+    subgraph "Root-Level Request"
+        R1["GET /scim/v2/Schemas"] --> S1["getSchemas()"]
+        S1 --> G1["Global schemas only"]
+    end
+
+    subgraph "Endpoint-Scoped Request"
+        R2["GET /endpoints/abc/Schemas"] --> S2["getSchemas('abc')"]
+        S2 --> G2["Global + overlay for 'abc'"]
+    end
+```
+
+> **For SCIM provisioning clients**: Always use the endpoint-scoped routes. They reflect the actual schema extensions, resource types, and capabilities configured for that specific tenant.
+
+---
+
 ### 3.3 Auth Flow
 
 ```mermaid
@@ -210,17 +254,13 @@ sequenceDiagram
 
     C->>G: GET /ServiceProviderConfig (no auth header)
     G->>G: Check @Public() metadata
-    Note over G: ❌ No @Public() on discovery controllers
-    G->>C: 401 Unauthorized
-
-    C->>G: GET /ServiceProviderConfig (valid Bearer token)
-    G->>G: Validate token
-    G->>D: Forward request
+    Note over G: ✅ @Public() on all discovery controllers
+    G->>D: Forward request (bypass auth)
     D->>S: getServiceProviderConfig()
     S->>C: 200 + SPC JSON
 ```
 
-> **Issue**: RFC 7644 §4 requires discovery endpoints to be accessible **without authentication**. Currently, all discovery routes go through the global `SharedSecretGuard` and will return 401 without a valid Bearer token.
+> **✅ Resolved**: All discovery controllers now have `@Public()` decorator at class level, bypassing the global `SharedSecretGuard`. Discovery endpoints are accessible without authentication per RFC 7644 §4.
 
 ### 3.4 Response Shape Analysis
 
@@ -313,12 +353,12 @@ sequenceDiagram
 | `authenticationSchemes[].name` | ✅ | `"OAuth Bearer Token"` |
 | `authenticationSchemes[].description` | ✅ | Present |
 | `authenticationSchemes[].specUri` | ✅ | RFC 6750 URI |
-| `authenticationSchemes[].primary` | ⚠️ D6 | Not set (optional, recommended) |
+| `authenticationSchemes[].primary` | ✅ D6 | `true` — set on single auth scheme |
 | `meta.resourceType` | ✅ | `"ServiceProviderConfig"` |
 | `meta.location` | ✅ | `"/ServiceProviderConfig"` |
 | `documentationUri` | ✅ | GitHub URL |
 | Content-Type `application/scim+json` | ✅ | `@Header` decorator |
-| **SHALL NOT require auth** | ❌ D1 | Global `SharedSecretGuard` blocks unauthenticated access |
+| **SHALL NOT require auth** | ✅ D1 | `@Public()` decorator on controller class |
 | Singleton (no `ListResponse`, no `/{id}`) | ✅ | Correct — `@Get()` only |
 | Dynamic per-endpoint `bulk.supported` | ✅ | `BulkOperationsEnabled` flag honored |
 
@@ -332,9 +372,9 @@ sequenceDiagram
 | `meta.location` | ✅ | `/ResourceTypes/User`, `/ResourceTypes/Group` |
 | ListResponse wrapper | ✅ | `ScimDiscoveryService.getResourceTypes()` wraps in `schemas`/`totalResults`/`Resources` |
 | Content-Type `application/scim+json` | ✅ | `@Header` decorator |
-| **SHALL NOT require auth** | ❌ D1 | Global guard blocks |
-| `GET /ResourceTypes/{id}` individual lookup | ❌ D3 | No `@Get(':id')` route |
-| Each resource has `schemas` array | ❌ D5 | No `schemas: ["...ResourceType"]` on resource objects |
+| **SHALL NOT require auth** | ✅ D1 | `@Public()` decorator on controller class |
+| `GET /ResourceTypes/{id}` individual lookup | ✅ D3 | `@Get(':id')` route on ResourceTypesController + EndpointScimDiscoveryController |
+| Each resource has `schemas` array | ✅ D5 | `schemas: ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"]` on all RT resources |
 
 ### 5.3 Schemas
 
@@ -347,98 +387,87 @@ sequenceDiagram
 | `meta.location` | ✅ | `/Schemas/{urn}` format |
 | ListResponse wrapper | ✅ | `ScimDiscoveryService.getSchemas()` wraps correctly |
 | Content-Type `application/scim+json` | ✅ | `@Header` decorator |
-| **SHALL NOT require auth** | ❌ D1 | Global guard blocks |
-| `GET /Schemas/{uri}` individual lookup by URN | ❌ D2 | No `@Get(':uri')` route |
-| Each resource has `schemas` array | ❌ D4 | No `schemas: ["...Schema"]` on schema definition objects |
+| **SHALL NOT require auth** | ✅ D1 | `@Public()` decorator on controller class |
+| `GET /Schemas/{uri}` individual lookup by URN | ✅ D2 | `@Get(':uri')` route on SchemasController + EndpointScimDiscoveryController |
+| Each resource has `schemas` array | ✅ D4 | `schemas: ["urn:ietf:params:scim:schemas:core:2.0:Schema"]` on all schema definitions |
 
 ---
 
 ## 6. Gap Inventory
 
 ```
-┌────┬──────────────────────────────────────────────────┬──────────┬──────────────────────────────────────────┐
-│ #  │ Gap                                              │ Severity │ RFC Reference                            │
-├────┼──────────────────────────────────────────────────┼──────────┼──────────────────────────────────────────┤
-│ D1 │ Discovery endpoints require authentication       │ HIGH     │ RFC 7644 §4 — "SHALL NOT require auth"   │
-│ D2 │ No GET /Schemas/{uri} individual lookup          │ MEDIUM   │ RFC 7643 §7 + RFC 7644 §4               │
-│ D3 │ No GET /ResourceTypes/{id} individual lookup     │ MEDIUM   │ RFC 7643 §6 + RFC 7644 §4               │
-│ D4 │ Schema resources missing own `schemas` array     │ LOW      │ RFC 7643 §7 — each resource is a Schema │
-│ D5 │ ResourceType resources missing `schemas` array   │ LOW      │ RFC 7643 §6 — each resource is an RT    │
-│ D6 │ SPC authenticationSchemes missing `primary` flag │ VERY LOW │ RFC 7643 §5 — optional but recommended   │
-└────┴──────────────────────────────────────────────────┴──────────┴──────────────────────────────────────────┘
+┌────┬──────────────────────────────────────────────────┬──────────┬──────────────────────────────────────────┬────────┐
+│ #  │ Gap                                              │ Severity │ RFC Reference                            │ Status │
+├────┼──────────────────────────────────────────────────┼──────────┼──────────────────────────────────────────┼────────┤
+│ D1 │ Discovery endpoints require authentication       │ HIGH     │ RFC 7644 §4 — "SHALL NOT require auth"   │ ✅     │
+│ D2 │ No GET /Schemas/{uri} individual lookup          │ MEDIUM   │ RFC 7643 §7 + RFC 7644 §4               │ ✅     │
+│ D3 │ No GET /ResourceTypes/{id} individual lookup     │ MEDIUM   │ RFC 7643 §6 + RFC 7644 §4               │ ✅     │
+│ D4 │ Schema resources missing own `schemas` array     │ LOW      │ RFC 7643 §7 — each resource is a Schema │ ✅     │
+│ D5 │ ResourceType resources missing `schemas` array   │ LOW      │ RFC 7643 §6 — each resource is an RT    │ ✅     │
+│ D6 │ SPC authenticationSchemes missing `primary` flag │ VERY LOW │ RFC 7643 §5 — optional but recommended   │ ✅     │
+└────┴──────────────────────────────────────────────────┴──────────┴──────────────────────────────────────────┴────────┘
 ```
 
-### D1 — Discovery Endpoints Require Authentication (HIGH)
+### D1 — Discovery Endpoints Require Authentication (HIGH) — ✅ RESOLVED
 
-**Problem**: The global `SharedSecretGuard` is registered as `APP_GUARD` in `auth.module.ts`. It applies to every route unless explicitly bypassed with `@Public()`. Currently only `/scim/oauth/token` and web routes use `@Public()`. All four discovery controllers (3 root + 1 endpoint-scoped) are behind auth.
+**Problem**: The global `SharedSecretGuard` was registered as `APP_GUARD` in `auth.module.ts`. It applied to every route unless explicitly bypassed with `@Public()`. All four discovery controllers (3 root + 1 endpoint-scoped) were behind auth.
 
-**RFC text**: RFC 7644 §4 states: *"An HTTP client MAY use these endpoints to discover required information..."* and the intent is that discovery is pre-authentication — clients discover auth schemes before authenticating.
+**Resolution**: Added `@Public()` decorator at class level to all 4 discovery controllers:
+- `ServiceProviderConfigController`
+- `ResourceTypesController`
+- `SchemasController`
+- `EndpointScimDiscoveryController`
 
-**Impact**: Clients that follow the RFC flow (discover → authenticate → CRUD) will get `401` on their first request to `/ServiceProviderConfig`.
+### D2 — No GET /Schemas/{uri} Individual Lookup (MEDIUM) — ✅ RESOLVED
 
-**Fix**: Add `@Public()` decorator to:
-- `ServiceProviderConfigController` (class level)
-- `ResourceTypesController` (class level)
-- `SchemasController` (class level)
-- `EndpointScimDiscoveryController` (class level)
+**Problem**: Only `GET /Schemas` (list) existed. RFC 7643 §7 defines `GET /Schemas/{schema-uri}` for retrieving a single schema by its URN.
 
-### D2 — No GET /Schemas/{uri} Individual Lookup (MEDIUM)
+**Resolution**: Added `@Get(':uri')` method to `SchemasController` and `EndpointScimDiscoveryController`. `ScimDiscoveryService.getSchemaByUrn()` delegates to registry and throws SCIM 404 if not found.
 
-**Problem**: Only `GET /Schemas` (list) exists. RFC 7643 §7 defines `GET /Schemas/{schema-uri}` for retrieving a single schema by its URN.
+### D3 — No GET /ResourceTypes/{id} Individual Lookup (MEDIUM) — ✅ RESOLVED
 
-**Impact**: Clients that want a specific schema definition must fetch the full list and filter client-side.
+**Problem**: Only `GET /ResourceTypes` (list) existed. RFC 7643 §6 defines `GET /ResourceTypes/{id}` for retrieving a single resource type.
 
-**Fix**: Add `@Get(':uri')` method to `SchemasController` and `EndpointScimDiscoveryController` that looks up a schema in the registry by URN.
+**Resolution**: Added `@Get(':id')` method to `ResourceTypesController` and `EndpointScimDiscoveryController`. `ScimDiscoveryService.getResourceTypeById()` delegates to registry and throws SCIM 404 if not found.
 
-### D3 — No GET /ResourceTypes/{id} Individual Lookup (MEDIUM)
-
-**Problem**: Only `GET /ResourceTypes` (list) exists. RFC 7643 §6 defines `GET /ResourceTypes/{id}` for retrieving a single resource type.
-
-**Impact**: Same as D2 — forces full list retrieval.
-
-**Fix**: Add `@Get(':id')` method to `ResourceTypesController` and `EndpointScimDiscoveryController`.
-
-### D4 — Schema Resources Missing `schemas` Array (LOW)
+### D4 — Schema Resources Missing `schemas` Array (LOW) — ✅ RESOLVED
 
 **Problem**: Each `Schema` resource in `/Schemas` responses should include:
 ```json
 "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Schema"]
 ```
-Currently the definitions only have `id`, `name`, `description`, `attributes`, `meta`.
 
-**Impact**: Strictly non-compliant; most clients don't check this field on discovery resources.
+**Resolution**: Added `schemas` property to all schema definitions (`SCIM_USER_SCHEMA_DEFINITION`, `SCIM_ENTERPRISE_USER_SCHEMA_DEFINITION`, `SCIM_GROUP_SCHEMA_DEFINITION`) and dynamic registration paths in `ScimSchemaRegistry`. New constant `SCIM_SCHEMA_SCHEMA` added to `scim-constants.ts`.
 
-**Fix**: Add `schemas` property to `SCIM_USER_SCHEMA_DEFINITION`, `SCIM_ENTERPRISE_USER_SCHEMA_DEFINITION`, `SCIM_GROUP_SCHEMA_DEFINITION`, and the dynamic extension registration path.
-
-### D5 — ResourceType Resources Missing `schemas` Array (LOW)
+### D5 — ResourceType Resources Missing `schemas` Array (LOW) — ✅ RESOLVED
 
 **Problem**: Each `ResourceType` resource should include:
 ```json
 "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"]
 ```
 
-**Fix**: Add `schemas` property to `SCIM_USER_RESOURCE_TYPE`, `SCIM_GROUP_RESOURCE_TYPE`, and the dynamic resource type registration path.
+**Resolution**: Added `schemas` property to `SCIM_USER_RESOURCE_TYPE`, `SCIM_GROUP_RESOURCE_TYPE`, and dynamic resource type registration in `ScimSchemaRegistry`. New constant `SCIM_RESOURCE_TYPE_SCHEMA` added to `scim-constants.ts`.
 
-### D6 — SPC `authenticationSchemes` Missing `primary` Flag (VERY LOW)
+### D6 — SPC `authenticationSchemes` Missing `primary` Flag (VERY LOW) — ✅ RESOLVED
 
-**Problem**: The `authenticationSchemes[0]` object doesn't include `"primary": true`. RFC 7643 §5 defines this as an optional boolean.
+**Problem**: The `authenticationSchemes[0]` object didn't include `"primary": true`. RFC 7643 §5 defines this as an optional boolean.
 
-**Impact**: Minimal — only one scheme exists, and `primary` is optional.
-
-**Fix**: Add `primary: true` to the single auth scheme object.
+**Resolution**: Added `primary: true` to the single auth scheme object in `SCIM_SERVICE_PROVIDER_CONFIG`.
 
 ---
 
-## 7. Remediation Plan
+## 7. Remediation Plan — ✅ COMPLETED
 
-### Priority Order
+All 6 gaps have been remediated. Summary of changes:
 
-| Priority | Gaps | Effort | Risk |
-|:--------:|------|:------:|:----:|
-| 1 | D1 (auth bypass) | Low — add `@Public()` to 4 controllers | Low |
-| 2 | D4 + D5 (`schemas` arrays) | Low — add property to 5 constants + dynamic path | Low |
-| 3 | D6 (`primary` flag) | Trivial — add 1 property | None |
-| 4 | D2 + D3 (individual lookups) | Medium — new routes + registry lookup methods + tests | Low |
+| Gap | Files Modified | Tests Added |
+|-----|---------------|:-----------:|
+| D1 | 4 controllers (`@Public()` decorator) | 6 E2E |
+| D2 | `schemas.controller.ts`, `endpoint-scim-discovery.controller.ts`, `scim-discovery.service.ts` | 5 unit + 4 E2E |
+| D3 | `resource-types.controller.ts`, `endpoint-scim-discovery.controller.ts`, `scim-discovery.service.ts` | 5 unit + 5 E2E |
+| D4 | `scim-schemas.constants.ts`, `scim-schema-registry.ts`, `scim-constants.ts` | 3 unit + 1 E2E |
+| D5 | `scim-schemas.constants.ts`, `scim-schema-registry.ts`, `scim-constants.ts` | 2 unit + 1 E2E |
+| D6 | `scim-schemas.constants.ts` | 2 unit + 1 E2E |
 
 ### Estimated Implementation
 
@@ -475,17 +504,20 @@ gantt
 
 | Spec File | Tests | Coverage |
 |-----------|:-----:|----------|
-| `discovery-endpoints.e2e-spec.ts` | 10 | SPC structure, required fields, meta, Schema list (User/EnterpriseUser/Group), totalResults, RT list (User/Group), endpoint/schema/extensions |
+| `discovery-endpoints.e2e-spec.ts` | 35 | SPC structure, required fields, meta, Schema list, totalResults, RT list, endpoint/schema/extensions, **D1** unauthenticated access (6 tests), **D2** individual Schema lookup (4 tests), **D3** individual ResourceType lookup (5 tests), **D4+D5** schemas[] arrays (2 tests), **D6** primary flag (1 test), **Multi-Tenant** SPC per-endpoint config (4 tests), endpoint-scoped schemas/RTs (4 tests), unauthenticated endpoint-scoped discovery (1 test) |
 
-### Test Gaps After Remediation
+### Multi-Tenant Discovery Tests
 
-| Area | New Tests Needed |
-|------|-----------------|
-| D1 — unauthenticated access | E2E: 3 tests (GET each endpoint without token → 200) |
-| D2 — `GET /Schemas/{uri}` | Unit: 2 (found, not found), E2E: 2 (valid URN, invalid URN → 404) |
-| D3 — `GET /ResourceTypes/{id}` | Unit: 2 (found, not found), E2E: 2 (valid id, invalid id → 404) |
-| D4/D5 — `schemas` arrays | Unit: 2 (verify arrays on Schema + RT), E2E: assertions in existing tests |
-| D6 — `primary` flag | Unit: 1 (verify in SPC), E2E: assertion in existing test |
+| Layer | Tests | Coverage |
+|-------|:-----:|----------|
+| Unit (controller) | 7 | endpointId passthrough to all service methods, SPC with endpoint config, different configs different SPCs, context with correct endpointId/baseUrl |
+| Unit (service) | 7 | endpointId passthrough to all registry methods (spy-verified), SPC config adjustment |
+| E2E | 9 | SPC reflects per-endpoint BulkOperationsEnabled (on/off), root-level unaffected, two endpoints with different configs, core schemas present at endpoint scope, RT with extensions, individual schema/RT lookup at endpoint scope, all 5 endpoint-scoped routes without auth |
+| **Total** | **23** | Full multi-tenant discovery coverage |
+
+### ✅ All Test Gaps Resolved
+
+All test gaps identified in the original audit have been addressed with both unit and E2E tests covering all 6 remediated gaps plus comprehensive multi-tenant discovery testing (23 additional tests).
 
 ---
 
@@ -498,8 +530,8 @@ gantt
 | [RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md](RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md) | Gap inventory — D1–D6 should be tracked alongside G1–G15 |
 | [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | Config flags affecting SPC (e.g., `BulkOperationsEnabled`) |
 | [phases/PHASE_06_DATA_DRIVEN_DISCOVERY.md](phases/PHASE_06_DATA_DRIVEN_DISCOVERY.md) | Phase 6 implementation history |
-| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | API routes — needs update for new individual lookup routes |
+| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | API routes — multi-tenant two-tier discovery documented with 10 routes |
 
 ---
 
-*This audit was generated from direct source code inspection (v0.19.2, commit c295d10) against RFC 7643 (SCIM Core Schema) and RFC 7644 (SCIM Protocol). All findings are evidence-based with specific file/line references.*
+*This audit was generated from direct source code inspection (v0.19.3) against RFC 7643 (SCIM Core Schema) and RFC 7644 (SCIM Protocol). Multi-tenant architecture section added to reflect two-tier discovery routing. All findings are evidence-based with specific file/line references.*

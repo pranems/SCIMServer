@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ForbiddenException } from '@nestjs/common';
+import { ForbiddenException, HttpException } from '@nestjs/common';
 import { EndpointScimDiscoveryController } from './endpoint-scim-discovery.controller';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
@@ -135,6 +135,89 @@ describe('EndpointScimDiscoveryController', () => {
       expect(result.authenticationSchemes).toHaveLength(1);
       expect(result.authenticationSchemes[0].type).toBe('oauthbearertoken');
     });
+
+    it('should return bulk.supported=false when endpoint has BulkOperationsEnabled=false', async () => {
+      const endpointWithBulkDisabled = {
+        ...mockEndpoint,
+        config: { BulkOperationsEnabled: false },
+      };
+      mockEndpointService.getEndpoint.mockResolvedValue(endpointWithBulkDisabled);
+
+      const result = await controller.getServiceProviderConfig(
+        'endpoint-1',
+        mockRequest
+      );
+
+      expect(result.bulk.supported).toBe(false);
+      expect(result.bulk.maxOperations).toBe(1000);
+    });
+
+    it('should return bulk.supported=true when endpoint has BulkOperationsEnabled=true', async () => {
+      const endpointWithBulkEnabled = {
+        ...mockEndpoint,
+        config: { BulkOperationsEnabled: true },
+      };
+      mockEndpointService.getEndpoint.mockResolvedValue(endpointWithBulkEnabled);
+
+      const result = await controller.getServiceProviderConfig(
+        'endpoint-1',
+        mockRequest
+      );
+
+      expect(result.bulk.supported).toBe(true);
+    });
+  });
+
+  // ─── Individual Schema Lookup (D2) ────────────────────────────────────
+
+  describe('GET /endpoints/:endpointId/Schemas/:uri', () => {
+    it('should return a single schema by URN', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+
+      const result = await controller.getSchemaByUri(
+        'endpoint-1',
+        'urn:ietf:params:scim:schemas:core:2.0:User',
+        mockRequest,
+      );
+
+      expect(result).toBeDefined();
+      expect(result.id).toBe('urn:ietf:params:scim:schemas:core:2.0:User');
+      expect(result.name).toBe('User');
+    });
+
+    it('should throw 404 for unknown schema URN', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+
+      await expect(
+        controller.getSchemaByUri('endpoint-1', 'urn:unknown:schema', mockRequest),
+      ).rejects.toThrow(HttpException);
+    });
+  });
+
+  // ─── Individual ResourceType Lookup (D3) ────────────────────────────
+
+  describe('GET /endpoints/:endpointId/ResourceTypes/:id', () => {
+    it('should return a single resource type by id', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+
+      const result = await controller.getResourceTypeById(
+        'endpoint-1',
+        'User',
+        mockRequest,
+      );
+
+      expect(result).toBeDefined();
+      expect(result.id).toBe('User');
+      expect(result.name).toBe('User');
+    });
+
+    it('should throw 404 for unknown resource type id', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+
+      await expect(
+        controller.getResourceTypeById('endpoint-1', 'Unknown', mockRequest),
+      ).rejects.toThrow(HttpException);
+    });
   });
 
   // ─── Endpoint Validation ────────────────────────────────────────────
@@ -178,6 +261,97 @@ describe('EndpointScimDiscoveryController', () => {
       await expect(
         controller.getSchemas('invalid-id', mockRequest)
       ).rejects.toThrow('Endpoint not found');
+    });
+  });
+
+  // ─── Multi-Tenant / Endpoint-Specific Behavior ─────────────────────
+
+  describe('Multi-Tenant Discovery', () => {
+    it('should pass endpointId to getSchemas for per-tenant schema resolution', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+
+      const result = await controller.getSchemas('endpoint-1', mockRequest);
+
+      // Returns schemas — endpointId was passed so overlays would be merged
+      expect(result.Resources).toBeDefined();
+      expect(result.Resources.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it('should pass endpointId to getResourceTypes for per-tenant RT resolution', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+
+      const result = await controller.getResourceTypes('endpoint-1', mockRequest);
+
+      expect(result.Resources).toBeDefined();
+      expect(result.Resources.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('should pass endpointId to getSchemaByUrn for per-tenant lookup', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+
+      const result = await controller.getSchemaByUri(
+        'endpoint-1',
+        'urn:ietf:params:scim:schemas:core:2.0:User',
+        mockRequest,
+      );
+
+      expect(result.id).toBe('urn:ietf:params:scim:schemas:core:2.0:User');
+    });
+
+    it('should pass endpointId to getResourceTypeById for per-tenant lookup', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+
+      const result = await controller.getResourceTypeById(
+        'endpoint-1',
+        'User',
+        mockRequest,
+      );
+
+      expect(result.id).toBe('User');
+    });
+
+    it('should pass endpoint config to SPC for per-tenant capability flags', async () => {
+      const bulkDisabledEndpoint = {
+        ...mockEndpoint,
+        config: { BulkOperationsEnabled: 'False' },
+      };
+      mockEndpointService.getEndpoint.mockResolvedValue(bulkDisabledEndpoint);
+
+      const result = await controller.getServiceProviderConfig(
+        'endpoint-1',
+        mockRequest,
+      );
+
+      expect(result.bulk.supported).toBe(false);
+    });
+
+    it('different endpoints with different configs produce different SPCs', async () => {
+      // Endpoint with bulk disabled
+      const epBulkOff = { ...mockEndpoint, id: 'ep-off', config: { BulkOperationsEnabled: 'False' } };
+      mockEndpointService.getEndpoint.mockResolvedValue(epBulkOff);
+      const resultOff = await controller.getServiceProviderConfig('ep-off', mockRequest);
+
+      // Endpoint with bulk enabled
+      const epBulkOn = { ...mockEndpoint, id: 'ep-on', config: { BulkOperationsEnabled: 'True' } };
+      mockEndpointService.getEndpoint.mockResolvedValue(epBulkOn);
+      const resultOn = await controller.getServiceProviderConfig('ep-on', mockRequest);
+
+      expect(resultOff.bulk.supported).toBe(false);
+      expect(resultOn.bulk.supported).toBe(true);
+    });
+
+    it('should set endpoint context with correct endpointId and baseUrl', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+
+      await controller.getSchemas('endpoint-1', mockRequest);
+
+      expect(mockEndpointContext.setContext).toHaveBeenCalledWith(
+        expect.objectContaining({
+          endpointId: 'endpoint-1',
+          baseUrl: expect.stringContaining('/endpoints/endpoint-1'),
+          config: {},
+        }),
+      );
     });
   });
 });

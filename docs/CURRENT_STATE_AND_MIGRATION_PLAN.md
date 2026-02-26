@@ -29,9 +29,9 @@ It outlines the gaps in the current implementation and provides a detailed, step
 *   **Gap:** The current implementation is brittle, hard to maintain, and prone to edge-case bugs when handling deeply nested or complex RFC 7644 patch scenarios.
 
 ### 1.5. Missing RFC 7644 Features
-*   **Bulk Operations (`/Bulk`):** Explicitly marked as `supported: false` in the discovery controllers. Not implemented.
+*   **Bulk Operations (`/Bulk`):** ✅ Implemented (v0.19.0). `bulk.supported: true` in ServiceProviderConfig, with `maxOperations: 1000` and `maxPayloadSize: 1048576`.
 *   **Authenticated Subject Alias (`/Me`):** Not implemented.
-*   **ETag Concurrency Control:** Advertised as `supported: true` in `/ServiceProviderConfig`, but `If-Match` and `If-None-Match` headers are not actually extracted or evaluated in the resource controllers (`endpoint-scim-users.controller.ts`).
+*   **ETag Concurrency Control:** ✅ Fully implemented (Phase 7). Weak ETags on all responses, `If-Match` required when `RequireIfMatch=true` (428), `If-None-Match` → 304, version mismatch → 412.
 
 ---
 

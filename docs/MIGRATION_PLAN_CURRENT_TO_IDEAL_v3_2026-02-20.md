@@ -43,7 +43,7 @@ The table below maps every gap between the current codebase and the ideal archit
 | G6 | ~~**Discovery endpoints hardcoded**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.14.0)** — `ScimDiscoveryService` (103 lines) with `ScimSchemaRegistry`. `EndpointSchema` DB model + Admin API for custom schemas per endpoint. 7 built-in schemas (was 3), dynamic per-endpoint discovery. | `endpoint_schema` + `endpoint_resource_type` tables, `DiscoveryService` | 6 |
 | G7 | ~~**ETag If-Match NOT enforced** before writes~~ | ~~HIGH~~ | ✅ **DONE (v0.16.0)** — Version-based ETags (`W/"v{N}"`), pre-write `enforceIfMatch()` (412 on mismatch), `RequireIfMatch` config flag (428 on missing), atomic `version` increment. | Pre-write check in Orchestrator; monotonic integer version | 7 |
 | G8 | ~~**No schema validation** against endpoint schema definitions~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.0)** — `SchemaValidator` domain class validates type/required/mutability/multiValued/unknown-attrs/sub-attrs | `SchemaValidator` validates payload against `endpoint_schema.attributes` | 8 |
-| G8b | **No custom resource type registration** — only hardcoded User/Group | MEDIUM | `scim-schemas.constants.ts` (static resource types), per-type controllers/services/repos | `EndpointResourceType` table + Admin API + generic wildcard controller + `customResourceTypesEnabled` config flag | 8.2 |
+| G8b | ~~**No custom resource type registration** — only hardcoded User/Group~~ | ~~MEDIUM~~ | ✅ **DONE (v0.18.0)** — `EndpointResourceType` table + Admin API (POST/GET/GET/:name/DELETE/:name) + generic wildcard controller + `GenericPatchEngine` for JSONB PATCH + `CustomResourceTypesEnabled` config flag. `ScimSchemaRegistry` enhanced with per-endpoint overlay. Reserved name/path protection. 121 unit + 29 E2E + 20 live tests. See `docs/G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md`. | `EndpointResourceType` table + Admin API + generic wildcard controller + `customResourceTypesEnabled` config flag | 8.2 |
 | G8c | ~~**PatchEngine mutability checks** — readOnly/immutable attrs can be modified via PATCH~~ | ~~HIGH~~ | ✅ **DONE (v0.17.3)** — `SchemaValidator.validatePatchOperationValue()` now enforces readOnly on PATCH ops (add/replace/remove). `resolveRootAttribute()` checks parent readOnly for value-filter paths. No-path ops check each key + extension attributes. `groups` attribute added to `USER_SCHEMA_ATTRIBUTES` (RFC 7643 §4.1). Gated behind `StrictSchemaValidation`. 25 unit + 7 E2E tests. See `docs/G8C_PATCH_READONLY_PREVALIDATION.md`. | PatchEngine consults `SchemaDefinition` before applying ops; rejects readOnly, guards immutable | 8.1 |
 | G8d | ~~**`immutable` not enforced on PUT**~~ — existing immutable values can be overwritten | ~~HIGH~~ | ✅ **DONE (v0.17.0)** — `SchemaValidator.checkImmutable()` + service integration in PUT/PATCH for Users & Groups | SchemaValidator compares new vs existing for immutable attrs on replace; 400 mutability | 8.1 |
 | G8e | ~~**Response `returned` not enforced** — never/request/writeOnly attrs leak in responses~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.4)** — Two-layer filtering: service strips `returned:'never'` (e.g. `password`) in `toScim*Resource()`; controller strips `returned:'request'` via enhanced `applyAttributeProjection()`. `password` added to User schema constants (`returned:'never'`, `mutability:'writeOnly'`). `SchemaValidator.collectReturnedCharacteristics()` drives both layers. `stripReturnedNever()` export for write ops. 26 new unit + 8 E2E tests. | Schema-driven response filter strips `returned:never`/`writeOnly`; `request` gated | 8.3 |
@@ -51,7 +51,7 @@ The table below maps every gap between the current codebase and the ideal archit
 | G8g | ~~**Input hardening: validation disabled by default + DTO gaps**~~ | ~~HIGH~~ | ✅ **DONE (v0.17.1-fix1)** — DTO hardening: `SearchRequestDto` (`@Max(10000)` count, `@MaxLength(10000)` filter, `@IsIn` sortOrder, `@Min(1)` startIndex), `PatchUserDto`/`PatchGroupDto` (`@ArrayMaxSize(1000)`), `CreateUserDto` (`@IsNotEmpty` userName), `@IsIn` on PatchOp. SchemaValidator: `maxPayloadSize` (1MB), `maxStringLength` (65535), `maxArrayElements` (1000), `canonicalValues`. `__proto__`/`constructor`/`prototype` blocked. 5MB JSON body limit in `main.ts`. **Note:** `StrictSchemaValidation` still defaults to `false` (by design for Entra compatibility). | Always-on basic type validation (split from strict mode), DTO guards (`@IsIn`, `@ArrayMaxSize`, `@IsNotEmpty`), prototype key stripping | 8.5 |
 | G8h | ~~**Required sub-attributes + canonicalValues not enforced**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.1-fix1)** — `validateSubAttributes()` enforces required sub-attrs (V9) on create/replace. `canonicalValues` enforced with case-insensitive matching. Both gated behind `StrictSchemaValidation`. | Add required sub-attr check in `validateSubAttributes()`; optional `canonicalValues` enforcement | 8.6 |
 | G8i | ~~**Filter/PATCH hardening: no depth/length limits, valuePath regex gaps**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.1-fix1)** — Filter parser: `MAX_FILTER_DEPTH=50` with `guardDepth()`. PatchEngine: `__proto__`/`constructor`/`prototype` in `RESERVED_ATTRIBUTES`, `meta`/`schemas` stripped. SearchRequestDto: `@MaxLength(10000)` on filter. Patch ops: `@ArrayMaxSize(1000)`. Schema URN format validation + duplicate rejection. | Max filter depth/length, semantic attr validation; PATCH path sanitization; strip `meta`/`schemas` from reserved attrs | 8.7 |
-| G9 | **No /Bulk endpoint** | LOW | Missing entirely | `BulkController` + `BulkProcessor` with bulkId resolution | 9 |
+| G9 | ~~**No /Bulk endpoint**~~ | ~~LOW~~ | ✅ **DONE (v0.19.0)** — `BulkController` + `BulkProcessorService` (395 lines) with sequential processing, `bulkId` cross-referencing, `failOnErrors` threshold, per-operation error isolation. `BulkOperationsEnabled` per-endpoint flag (default: false). SPC: `bulk.supported=true, maxOperations=1000, maxPayloadSize=1048576`. 43 unit + 24 E2E + 18 live tests. See `docs/PHASE_09_BULK_OPERATIONS.md`. | `BulkController` + `BulkProcessor` with bulkId resolution | 9 |
 | G10 | **No /Me endpoint** | LOW | Missing entirely | `MeController` mapping authenticated user to resource | 10 |
 | G11 | **Global shared-secret auth** | MEDIUM | `shared-secret.guard.ts` (single SCIM_SHARED_SECRET for all endpoints) | Per-endpoint credentials in `endpoint_credential` table | 11 |
 | G12 | **No sortBy/sortOrder support** | LOW | ServiceProviderConfig returns `sort: {supported: false}` | Sort push-down to DB; in-memory fallback for JSONB paths | 12 |
@@ -73,18 +73,18 @@ The table below maps every gap between the current codebase and the ideal archit
   RFC Compliance ───│ HIGH         │ ✅G1 ✅G3 ✅G4 ✅G5 ✅G7 ✅G8d ✅G8g           │
                     │              │ (All HIGH-severity gaps resolved)                  │
                     ├──────────────┼────────────────────────────────────────────────────┤
-  Correctness ──────│ MEDIUM       │ G2 ✅G6 ✅G8 G8b ✅G8e ✅G8f ✅G8h ✅G8i G11  │
+  Correctness ──────│ MEDIUM       │ G2 ✅G6 ✅G8 ✅G8b ✅G8e ✅G8f ✅G8h ✅G8i G11  │
                     │              │ ✅G13 ✅G14 ✅G16 ✅G19 ✅G20                    │
                     ├──────────────┼────────────────────────────────────────────────────┤
                     │ LOW (demoted)│ ✅G8c (DONE v0.17.3 — readOnly pre-validated      │
                     │              │  in PATCH via SchemaValidator)                     │
                     ├──────────────┼────────────────────────────────────────────────────┤
-  Completeness ─────│ LOW          │ G9 G10 G12 ✅G15 G17 ✅G18                       │
+  Completeness ─────│ LOW          │ ✅G9 G10 G12 ✅G15 G17 ✅G18                    │
                     │              │ (Features / cleanup)                              │
                     └──────────────┴────────────────────────────────────────────────────┘
 
-  ✅ = Resolved in v0.10.0–v0.17.3 (27 of 27 gaps resolved or partially resolved)
-  Open: G2 G8b G9 G10 G11 G12 G17
+  ✅ = Resolved in v0.10.0–v0.19.3 (24 of 27 gaps fully resolved)
+  Open: G2 G10 G11 G12 G17
 ```
 
 ### Gap Resolution Flow
@@ -110,9 +110,12 @@ flowchart LR
         G20[G20 Dead config flags 58%]
     end
     subgraph LOW["LOW Severity"]
-        G9[G9 No /Bulk]
+        G9["G9 No /Bulk ✅ v0.19.0"]
         G10[G10 No /Me]
         G12[G12 No sort]
+        G15["G15 Helper columns ✅ v0.10.0"]
+        G17[G17 User/Group duplication]
+        G18["G18 No POST /.search ✅ v0.10.0"]
     end
 
     G1 -->|Phase 1| P1((P1))
@@ -151,14 +154,18 @@ Phase 5  Domain PATCH Engine        ██████   (correctness + testabil
 Phase 6  Data-Driven Discovery      ████     (per-endpoint schema)                     ✅ DONE v0.14.0
 Phase 7  ETag & Versioning          ████     (concurrency)                             ✅ DONE v0.16.0
 Phase 8  Schema Validation          ████     (strictness)                              ✅ DONE v0.17.0
-Phase 8.1 Mutability Enforcement    ████     (readOnly/immutable in PATCH+PUT)         ⚠️ PARTIAL v0.17.1
-Phase 8.2 Custom Resource Types     ████     (extensibility)
-Phase 8.3 Response Returned Filter  ███      (never/request/writeOnly stripping)
+Phase 8.1 Mutability Enforcement    ████     (readOnly/immutable in PATCH+PUT)         ✅ DONE v0.17.3 (G8c + G8d)
+Phase 8.2 Custom Resource Types     ████     (extensibility)                            ✅ DONE v0.18.0 (G8b)
+Phase 8.3 Response Returned Filter  ███      (never/request/writeOnly stripping)        ✅ DONE v0.17.4 (G8e)
 Phase 8.4 caseExact in Filters      ██       (schema-aware filter comparisons)         ✅ DONE v0.17.2
 Phase 8.5 Input Hardening           ███      (always-on type validation, DTO guards)   ✅ DONE v0.17.1-fix1
 Phase 8.6 Sub-attr & Canonical Val  ██       (required sub-attrs, canonicalValues)     ✅ DONE v0.17.1-fix1
 Phase 8.7 Filter & PATCH Hardening  ██       (depth/length limits, path sanitization)  ✅ DONE v0.17.1-fix1
-Phase 9  Bulk Operations            ███      (feature)
+Phase 9  Bulk Operations            ███      (feature)                                  ✅ DONE v0.19.0
+Phase 9.1 Group Uniqueness PUT/PATCH ██      (G8f data integrity)                       ✅ DONE v0.19.1
+Phase 9.2 Write-Response Projection ██       (G8g RFC 7644 §3.9)                       ✅ DONE v0.19.2
+Phase 9.3 Discovery D1–D6 RFC Audit ██       (auth bypass, individual lookups, etc.)   ✅ DONE v0.19.3
+Phase 9.4 Multi-Tenant Discovery    ██       (two-tier endpoint-scoped primary)        ✅ DONE v0.19.3
 Phase 10 /Me Endpoint               ██       (feature)
 Phase 11 Per-Endpoint Credentials     ████     (security)
 Phase 12 Sort, Search, Cleanup      ████     (polish)                                  ⚠️ PARTIAL (POST /.search done)

@@ -48,7 +48,7 @@ api/src/modules/scim/controllers/
   endpoint-scim-users.controller.ts                      # Users CRUD controller
   endpoint-scim-groups.controller.ts                     # Groups CRUD controller
   endpoint-scim-bulk.controller.ts                       # Bulk Operations controller (RFC 7644 §3.7)
-  endpoint-scim-discovery.controller.ts                  # SCIM discovery (Schemas, ResourceTypes, ServiceProviderConfig)
+  endpoint-scim-discovery.controller.ts                  # SCIM discovery — PRIMARY endpoint-scoped (multi-tenant)
 api/src/modules/scim/services/
   endpoint-scim-users.service.ts    (858 lines)          # Users business logic
   endpoint-scim-groups.service.ts   (947 lines)          # Groups business logic
@@ -252,7 +252,7 @@ Four categories of PATCH paths, handled in order:
 
 ## 7. Current Compliance Status
 
-### 7.1 SCIM 2.0 Compliance (Current v0.19.2 Baseline)
+### 7.1 SCIM 2.0 Compliance (Current v0.19.3 Baseline)
 
 | Feature | Status |
 |---------|--------|
@@ -260,7 +260,7 @@ Four categories of PATCH paths, handled in order:
 | ✅ Groups CRUD (POST/GET/PUT/PATCH/DELETE) | Complete |
 | ✅ PATCH (add/replace/remove, valuePath, extension URNs, no-path merge) | Complete |
 | ✅ Case-insensitive behavior (RFC 7643 §2.1) | Complete |
-| ⚠️ Discovery endpoints | 85% — 6 gaps (D1–D6): auth bypass, individual lookups, schemas arrays. See [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](../docs/DISCOVERY_ENDPOINTS_RFC_AUDIT.md) |
+| ✅ Discovery endpoints | 100% — All 6 gaps (D1–D6) resolved. Two-tier multi-tenant architecture: root-level (global defaults) + endpoint-scoped (primary, per-tenant overlays). 23 multi-tenant tests. See [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](../docs/DISCOVERY_ENDPOINTS_RFC_AUDIT.md) |
 | ✅ Pagination (startIndex, count) | Complete |
 | ✅ Filtering operators (`eq`, `ne`, `co`, `sw`, `ew`, `gt`, `ge`, `lt`, `le`, `pr`) | Complete |
 | ✅ Attribute projection (`attributes`, `excludedAttributes`) | Complete |

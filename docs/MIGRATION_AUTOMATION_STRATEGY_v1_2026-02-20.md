@@ -3,6 +3,7 @@
 > **Version**: 1.0 · **Date**: 2026-02-20
 > **Companion docs**: `IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md` · `MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md` · `INMEMORY_ARCHITECTURE_AND_PLAN_v1_2026-02-20.md`
 > **Scope**: How to automate the 12-phase migration for both PostgreSQL and In-Memory repository paths using AI-assisted development.
+> **Note**: Test counts throughout this doc (666/184/280) are the baseline at time of writing. Current baseline (v0.19.2): 2,357 unit, 455 E2E, 444 live.
 
 ---
 

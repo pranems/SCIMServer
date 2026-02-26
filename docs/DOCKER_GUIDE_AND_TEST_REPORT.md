@@ -3,10 +3,10 @@
 > **Date:** February 11, 2026  
 > **Image:** `scimserver:live-test` (496 MB, Alpine Linux)  
 > **Test Result (historical run):** ✅ **212/212 tests passed** in 4.9s  
-> **Current baseline:** ✅ **318/318 live integration tests passed** (local + Docker)  
+> **Current baseline:** ✅ **444/444 live integration tests passed** (local + Docker)  
 > **Database:** PostgreSQL 17 (docker postgres:17-alpine)  
 > **Base Image:** `node:24-alpine` (multi-stage build)
-> **Runtime note:** Current production image exposes and serves on `8080` (not `80`). Unit tests: **1962/1962** (59 suites). E2E tests: **342/342** (19 suites).
+> **Runtime note:** Current production image exposes and serves on `8080` (not `80`). Unit tests: **2,357/2,357** (69 suites). E2E tests: **455/455** (22 suites).
 
 ---
 

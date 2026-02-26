@@ -1,9 +1,9 @@
 # Live Integration Test — Norms, Best Practices & Industry Recommendations
 
-> **Last Updated**: February 25, 2026  
-> **Applies to**: SCIMServer v0.17.4+  
+> **Last Updated**: February 26, 2026  
+> **Applies to**: SCIMServer v0.19.2+  
 > **Persistence**: PostgreSQL 17 (Prisma ORM)  
-> **Script**: `scripts/live-test.ps1` (3,176 lines, 361+ tests, 10+ sections)  
+> **Script**: `scripts/live-test.ps1` (3,176 lines, 444+ tests, 10+ sections)  
 > **Targets**: Local (`:6000`), Docker Compose (`:8080`), Azure Container Apps
 
 ---
@@ -588,7 +588,7 @@ npm run start:dev            # Auto-reload on file changes, port 3000
                     │   • Interceptor behavior  │
                     │   • Guard enforcement     │
                     ├───────────────────────────┤
-                    │     Unit Tests            │  2,156 tests, 61 suites
+                    │     Unit Tests            │  2,357 tests, 69 suites
                     │  (Pure domain, no I/O)    │  npx jest
                     │                           │  Target: functions/classes
                     │  Uniquely covers:         │

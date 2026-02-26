@@ -2,11 +2,62 @@
   "openapi": "3.0.3",
   "info": {
     "title": "SCIMServer API",
-    "version": "1.3.0",
-    "description": "OpenAPI specification for SCIMServer SCIM 2.0 server (v0.10.0). Passes all 24 Microsoft SCIM Validator tests + 7 preview. Implements RFC 7644 §3.4.2.5 attribute projection, §3.4.3 POST /.search, §3.14 ETag/conditional requests."
+    "version": "2.0.0",
+    "description": "OpenAPI specification for SCIMServer SCIM 2.0 server (v0.19.3). Passes all 25 Microsoft SCIM Validator tests. Implements RFC 7644 §3.4.2.5 attribute projection, §3.4.3 POST /.search, §3.7 Bulk operations, §3.14 ETag/conditional requests, and full RFC 7643/7644 discovery endpoints."
   },
-  "servers": [{ "url": "http://localhost:6000/scim/endpoints/{endpointId}", "description": "Local dev server" }],
+  "servers": [
+    { "url": "http://localhost:6000/scim/v2", "description": "Root-level discovery (ServiceProviderConfig, Schemas, ResourceTypes)" },
+    { "url": "http://localhost:6000/scim/endpoints/{endpointId}", "description": "Endpoint-scoped SCIM operations" }
+  ],
   "paths": {
+    "/ServiceProviderConfig": {
+      "get": {
+        "summary": "Service Provider Configuration (RFC 7643 §5)",
+        "description": "Public — no authentication required per RFC 7644 §4. Returns server capabilities.",
+        "tags": ["SCIM - Discovery"],
+        "responses": { "200": { "description": "ServiceProviderConfig", "content": { "application/scim+json": {} } } }
+      }
+    },
+    "/Schemas": {
+      "get": {
+        "summary": "List all schemas (RFC 7643 §7)",
+        "description": "Public — no authentication required. Returns all SCIM schema definitions.",
+        "tags": ["SCIM - Discovery"],
+        "responses": { "200": { "description": "ListResponse of SchemaDefinitions", "content": { "application/scim+json": {} } } }
+      }
+    },
+    "/Schemas/{uri}": {
+      "get": {
+        "summary": "Get schema by URN (RFC 7644 §4)",
+        "description": "Public — no authentication required. Returns a single schema definition.",
+        "tags": ["SCIM - Discovery"],
+        "parameters": [{ "name": "uri", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Schema URN (e.g. urn:ietf:params:scim:schemas:core:2.0:User)" }],
+        "responses": {
+          "200": { "description": "Schema definition", "content": { "application/scim+json": {} } },
+          "404": { "description": "Not found — SCIM error response", "content": { "application/scim+json": {} } }
+        }
+      }
+    },
+    "/ResourceTypes": {
+      "get": {
+        "summary": "List all resource types (RFC 7643 §6)",
+        "description": "Public — no authentication required. Returns all SCIM resource type definitions.",
+        "tags": ["SCIM - Discovery"],
+        "responses": { "200": { "description": "ListResponse of ResourceTypes", "content": { "application/scim+json": {} } } }
+      }
+    },
+    "/ResourceTypes/{id}": {
+      "get": {
+        "summary": "Get resource type by ID (RFC 7644 §4)",
+        "description": "Public — no authentication required. Returns a single resource type definition.",
+        "tags": ["SCIM - Discovery"],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "ResourceType id (e.g. User, Group)" }],
+        "responses": {
+          "200": { "description": "ResourceType", "content": { "application/scim+json": {} } },
+          "404": { "description": "Not found — SCIM error response", "content": { "application/scim+json": {} } }
+        }
+      }
+    },
     "/Users": {
       "post": {
         "summary": "Create SCIM User",
@@ -145,6 +196,37 @@
       "put": { "summary": "Replace Group", "responses": { "200": { "description": "Updated", "headers": { "ETag": { "schema": { "type": "string" } } } } } },
       "patch": { "summary": "Patch Group", "responses": { "200": { "description": "Patched", "headers": { "ETag": { "schema": { "type": "string" } } } } } },
       "delete": { "summary": "Delete Group", "responses": { "204": { "description": "No content" } } }
+    },
+    "/Bulk": {
+      "post": {
+        "summary": "Bulk Operations (RFC 7644 §3.7)",
+        "description": "Process multiple SCIM operations in a single HTTP request. Supports POST (Create), PUT (Replace), PATCH (Update), and DELETE with bulkId cross-referencing. Max 1000 operations, max 1MB payload.",
+        "tags": ["SCIM - Bulk"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/scim+json": {
+              "schema": { "$ref": "#/components/schemas/BulkRequest" },
+              "example": {
+                "schemas": ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
+                "failOnErrors": 2,
+                "Operations": [
+                  { "method": "POST", "path": "/Users", "bulkId": "user-1", "data": { "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "userName": "bulk-user@example.com" } },
+                  { "method": "PATCH", "path": "/Users/abc-123", "data": { "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{ "op": "replace", "path": "active", "value": false }] } },
+                  { "method": "DELETE", "path": "/Groups/def-456" }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bulk response with per-operation results",
+            "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/BulkResponse" } } }
+          },
+          "413": { "description": "Payload too large — exceeds maxPayloadSize (1048576 bytes)" }
+        }
+      }
     },
     "/admin/log-config": {
       "get": {
@@ -318,6 +400,48 @@
           "excludedAttributes": { "type": "string", "description": "Comma-separated list of attributes to exclude" },
           "sortBy": { "type": "string" },
           "sortOrder": { "type": "string", "enum": ["ascending", "descending"] }
+        }
+      },
+      "BulkRequest": {
+        "type": "object",
+        "description": "RFC 7644 §3.7 BulkRequest for POST /Bulk",
+        "required": ["schemas", "Operations"],
+        "properties": {
+          "schemas": { "type": "array", "items": { "type": "string" } },
+          "failOnErrors": { "type": "integer", "description": "Stop processing after this many errors" },
+          "Operations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["method", "path"],
+              "properties": {
+                "method": { "type": "string", "enum": ["POST", "PUT", "PATCH", "DELETE"] },
+                "bulkId": { "type": "string" },
+                "path": { "type": "string" },
+                "data": { "type": "object" }
+              }
+            }
+          }
+        }
+      },
+      "BulkResponse": {
+        "type": "object",
+        "description": "RFC 7644 §3.7 BulkResponse",
+        "properties": {
+          "schemas": { "type": "array", "items": { "type": "string" } },
+          "Operations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "method": { "type": "string" },
+                "bulkId": { "type": "string" },
+                "location": { "type": "string", "format": "uri" },
+                "status": { "type": "string" },
+                "response": { "type": "object" }
+              }
+            }
+          }
         }
       },
       "LogConfigResponse": {

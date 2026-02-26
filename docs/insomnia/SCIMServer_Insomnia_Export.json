@@ -230,6 +230,23 @@
       "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ]
     },
     {
+      "_id": "req_bulk",
+      "_type": "request",
+      "parentId": "",
+      "name": "Bulk Operations (POST /Bulk)",
+      "description": "RFC 7644 §3.7 — Process multiple SCIM operations in a single request. Supports POST/PUT/PATCH/DELETE with bulkId cross-referencing. Max 1000 operations, max 1MB payload.",
+      "method": "POST",
+      "url": "{{ base_url }}/scim/v2/Bulk",
+      "body": {
+        "mimeType": "application/scim+json",
+        "text": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:BulkRequest\"],\n  \"failOnErrors\": 2,\n  \"Operations\": [\n    {\n      \"method\": \"POST\",\n      \"path\": \"/Users\",\n      \"bulkId\": \"user-1\",\n      \"data\": {\n        \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:User\"],\n        \"userName\": \"bulk-user@example.com\",\n        \"displayName\": \"Bulk User\"\n      }\n    },\n    {\n      \"method\": \"DELETE\",\n      \"path\": \"/Users/some-user-id\"\n    }\n  ]\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/scim+json" },
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ]
+    },
+    {
       "_id": "req_log_config_get",
       "_type": "request",
       "parentId": "",

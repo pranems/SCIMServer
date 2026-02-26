@@ -692,6 +692,8 @@ A `Location` header with the wrong protocol (`http://` instead of `https://`) vi
 
 ## Test Results After All Fixes
 
+> *Counts below are from the time of these fixes. Current baseline (v0.19.2): 2,357 unit (69 suites), 455 E2E (22 suites), 444 live.*
+
 ```
 Unit Tests:     648/648 PASS  (19 suites)
 E2E Tests:      177/177 PASS  (14 suites)

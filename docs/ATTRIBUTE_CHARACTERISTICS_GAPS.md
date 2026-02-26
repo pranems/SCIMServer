@@ -1,6 +1,6 @@
 # Attribute Characteristics Gaps, Bugs & Issues
 
-> **Date:** 2026-02-24 | **Version:** v0.17.0 (Phase 8 staged)  
+> **Date:** 2026-02-26 | **Version:** v0.19.2  
 > **Scope:** RFC 7643 §2 attribute characteristics across all flows + extension/custom extension handling
 
 ---
@@ -239,4 +239,4 @@ Missing or malformed attribute definitions (no `type`, no `multiValued`) cause S
 
 ---
 
-*Generated: 2026-02-24 | Updated: 2026-02-25 | SCIMServer v0.17.2*
+*Generated: 2026-02-24 | Updated: 2026-02-26 | SCIMServer v0.19.2*

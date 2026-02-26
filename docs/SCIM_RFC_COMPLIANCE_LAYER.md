@@ -1653,4 +1653,4 @@ HTTP/1.1 200 OK
 
 ---
 
-> **Last verified:** February 2026 — 272/272 live tests passing, 177/177 e2e tests, 648/648 unit tests against `localhost:6000`
+> **Last verified:** February 2026 — 444/444 live tests passing, 455/455 e2e tests, 2,357/2,357 unit tests against `localhost:6000`

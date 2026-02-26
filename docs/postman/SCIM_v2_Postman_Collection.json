@@ -3,7 +3,7 @@
     "name": "SCIM v2 - Example Collection",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "version": { "major": 1, "minor": 4 },
-    "description": "SCIM 2.0 test collection — passes all 24 Microsoft SCIM Validator tests + 7 preview. Includes RFC 7644 §3.4.3 POST /.search, §3.4.2.5 attribute projection, §3.14 ETag support, SSE log streaming, and log file download."
+    "description": "SCIM 2.0 test collection — passes all 25 Microsoft SCIM Validator tests. Includes RFC 7644 §3.4.3 POST /.search, §3.4.2.5 attribute projection, §3.7 Bulk operations, §3.14 ETag support, SSE log streaming, and log file download."
   },
   "item": [
     {
@@ -89,6 +89,16 @@
     {
       "name": "Patch User - Enterprise Extension Manager",
       "request": { "method": "PATCH", "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/scim+json" } ], "body": { "mode": "raw", "raw": "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\"Operations\":[{\"op\":\"add\",\"path\":\"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager\",\"value\":{\"value\":\"mgr-001\",\"displayName\":\"Bob Manager\"}}]}", "options": { "raw": { "language": "json" } } }, "url": { "raw": "{{base_url}}/Users/{{user_id}}", "host": [ "{{base_url}}" ], "path": [ "Users", "{{user_id}}" ] } }
+    },
+    {
+      "name": "Bulk Operations (POST /Bulk)",
+      "request": {
+        "method": "POST",
+        "header": [ { "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/scim+json" } ],
+        "body": { "mode": "raw", "raw": "{\"schemas\":[\"urn:ietf:params:scim:api:messages:2.0:BulkRequest\"],\"failOnErrors\":2,\"Operations\":[{\"method\":\"POST\",\"path\":\"/Users\",\"bulkId\":\"user-1\",\"data\":{\"schemas\":[\"urn:ietf:params:scim:schemas:core:2.0:User\"],\"userName\":\"bulk-user@example.com\",\"displayName\":\"Bulk User\"}},{\"method\":\"DELETE\",\"path\":\"/Users/{{user_id}}\"}]}", "options": { "raw": { "language": "json" } } },
+        "url": { "raw": "{{base_url}}/Bulk", "host": [ "{{base_url}}" ], "path": [ "Bulk" ] },
+        "description": "RFC 7644 §3.7 — Process multiple SCIM operations in a single request. Supports POST/PUT/PATCH/DELETE with bulkId cross-referencing. Max 1000 operations, max 1MB payload."
+      }
     },
     {
       "name": "Get Log Configuration",

@@ -19,11 +19,11 @@
                 "example": {
                   "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"],
                   "patch": { "supported": true },
-                  "bulk": { "supported": false },
+                  "bulk": { "supported": true, "maxOperations": 1000, "maxPayloadSize": 1048576 },
                   "filter": { "supported": true, "maxResults": 200 },
                   "sort": { "supported": false },
                   "etag": { "supported": true },
-                  "authenticationSchemes": [ { "type": "oauthbearertoken", "name": "OAuth 2.0 Bearer Token", "specUri": "https://tools.ietf.org/html/rfc6750" } ]
+                  "authenticationSchemes": [ { "type": "oauthbearertoken", "name": "OAuth 2.0 Bearer Token", "specUri": "https://tools.ietf.org/html/rfc6750", "primary": true } ]
                 }
               }
             }
@@ -37,8 +37,28 @@
         "responses": { "200": { "description": "ResourceTypes list", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ListResponse" } } } } }
       }
     },
+    "/ResourceTypes/{id}": {
+      "get": {
+        "summary": "Get a single resource type by ID",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "ResourceType id (e.g. User, Group)" }],
+        "responses": {
+          "200": { "description": "ResourceType", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ResourceType" } } } },
+          "404": { "description": "Not found", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimError" } } } }
+        }
+      }
+    },
     "/Schemas": {
       "get": { "summary": "List schemas", "responses": { "200": { "description": "Schemas", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ListResponse" } } } } } }
+    },
+    "/Schemas/{uri}": {
+      "get": {
+        "summary": "Get a single schema by URN",
+        "parameters": [{ "name": "uri", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Schema URN (e.g. urn:ietf:params:scim:schemas:core:2.0:User)" }],
+        "responses": {
+          "200": { "description": "Schema definition", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/SchemaDefinition" } } } },
+          "404": { "description": "Not found", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimError" } } } }
+        }
+      }
     },
     "/Users": {
       "get": {
@@ -126,6 +146,40 @@
       "put": { "summary": "Replace Group", "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/Group" } } } }, "responses": { "200": { "description": "Updated", "headers": { "ETag": { "schema": { "type": "string" } } } }, "412": { "description": "Precondition Failed" } } },
       "patch": { "summary": "Patch Group", "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/PatchOp" } } } }, "responses": { "200": { "description": "Patched", "headers": { "ETag": { "schema": { "type": "string" } } } }, "412": { "description": "Precondition Failed" } } },
       "delete": { "summary": "Delete Group", "responses": { "204": { "description": "No content" } } }
+    },
+    "/Bulk": {
+      "post": {
+        "summary": "Bulk Operations (RFC 7644 §3.7)",
+        "description": "Process multiple SCIM operations in a single HTTP request. Supports Create, Update (PUT/PATCH), and Delete operations with bulkId cross-referencing.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/scim+json": {
+              "schema": { "$ref": "#/components/schemas/BulkRequest" },
+              "example": {
+                "schemas": ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
+                "failOnErrors": 2,
+                "Operations": [
+                  { "method": "POST", "path": "/Users", "bulkId": "user-1", "data": { "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "userName": "bulk-user@example.com" } },
+                  { "method": "PATCH", "path": "/Users/abc-123", "data": { "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{ "op": "replace", "path": "active", "value": false }] } },
+                  { "method": "DELETE", "path": "/Groups/def-456" }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bulk response with per-operation results",
+            "content": {
+              "application/scim+json": {
+                "schema": { "$ref": "#/components/schemas/BulkResponse" }
+              }
+            }
+          },
+          "413": { "description": "Payload too large — exceeds maxPayloadSize (1048576 bytes)" }
+        }
+      }
     }
   },
   "components": {
@@ -216,6 +270,32 @@
       "ListResponse": { "type": "object", "properties": { "schemas": { "type": "array" }, "totalResults": { "type": "integer" }, "startIndex": { "type": "integer" }, "itemsPerPage": { "type": "integer" }, "Resources": { "type": "array", "items": {} } } },
       "ScimError": { "type": "object", "properties": { "schemas": { "type": "array" }, "status": { "type": "string" }, "scimType": { "type": "string" }, "detail": { "type": "string" } } },
       "ServiceProviderConfig": { "type": "object", "properties": { "schemas": { "type": "array" }, "patch": { "type": "object" }, "bulk": { "type": "object" }, "filter": { "type": "object" }, "sort": { "type": "object" }, "etag": { "type": "object", "properties": { "supported": { "type": "boolean" } } }, "authenticationSchemes": { "type": "array", "items": { "type": "object" } } } },
+      "ResourceType": {
+        "type": "object",
+        "description": "RFC 7643 §6 ResourceType definition",
+        "properties": {
+          "schemas": { "type": "array", "items": { "type": "string" } },
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "endpoint": { "type": "string" },
+          "schema": { "type": "string", "description": "Core schema URN" },
+          "schemaExtensions": { "type": "array", "items": { "type": "object", "properties": { "schema": { "type": "string" }, "required": { "type": "boolean" } } } },
+          "meta": { "$ref": "#/components/schemas/Meta" }
+        }
+      },
+      "SchemaDefinition": {
+        "type": "object",
+        "description": "RFC 7643 §7 Schema definition",
+        "properties": {
+          "schemas": { "type": "array", "items": { "type": "string" } },
+          "id": { "type": "string", "description": "Schema URN" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "attributes": { "type": "array", "items": { "type": "object" } },
+          "meta": { "$ref": "#/components/schemas/Meta" }
+        }
+      },
       "SearchRequest": {
         "type": "object",
         "description": "RFC 7644 §3.4.3 SearchRequest for POST /.search",
@@ -228,6 +308,48 @@
           "excludedAttributes": { "type": "string" },
           "sortBy": { "type": "string" },
           "sortOrder": { "type": "string", "enum": ["ascending", "descending"] }
+        }
+      },
+      "BulkRequest": {
+        "type": "object",
+        "description": "RFC 7644 §3.7 BulkRequest for POST /Bulk",
+        "required": ["schemas", "Operations"],
+        "properties": {
+          "schemas": { "type": "array", "items": { "type": "string" } },
+          "failOnErrors": { "type": "integer", "description": "Stop processing after this many errors (0 or omitted = process all)" },
+          "Operations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["method", "path"],
+              "properties": {
+                "method": { "type": "string", "enum": ["POST", "PUT", "PATCH", "DELETE"] },
+                "bulkId": { "type": "string", "description": "Client-assigned ID for cross-referencing created resources" },
+                "path": { "type": "string", "description": "Resource path, e.g. /Users or /Groups/abc-123" },
+                "data": { "type": "object", "description": "Request body for POST/PUT/PATCH operations" }
+              }
+            }
+          }
+        }
+      },
+      "BulkResponse": {
+        "type": "object",
+        "description": "RFC 7644 §3.7 BulkResponse",
+        "properties": {
+          "schemas": { "type": "array", "items": { "type": "string" } },
+          "Operations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "method": { "type": "string" },
+                "bulkId": { "type": "string" },
+                "location": { "type": "string", "format": "uri" },
+                "status": { "type": "string", "description": "HTTP status code as string, e.g. 201, 200, 204" },
+                "response": { "type": "object", "description": "Full resource or error response" }
+              }
+            }
+          }
         }
       }
     },

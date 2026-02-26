@@ -5,6 +5,44 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.3] - 2026-02-26
+
+### Fixed
+- **D1 — Discovery Auth Bypass (RFC 7644 §4)** — All 4 discovery controllers (`ServiceProviderConfigController`, `ResourceTypesController`, `SchemasController`, `EndpointScimDiscoveryController`) now have `@Public()` decorator at class level, allowing unauthenticated access per RFC 7644 §4 "SHALL NOT require authentication".
+- **D4 — Schema resources missing `schemas` array** — Each Schema definition resource now includes `schemas: ["urn:ietf:params:scim:schemas:core:2.0:Schema"]` per RFC 7643 §7.
+- **D5 — ResourceType resources missing `schemas` array** — Each ResourceType resource now includes `schemas: ["urn:ietf:params:scim:schemas:core:2.0:ResourceType"]` per RFC 7643 §6.
+- **D6 — `authenticationSchemes` missing `primary` flag** — Added `primary: true` to the OAuth Bearer Token authentication scheme in SPC per RFC 7643 §5.
+
+### Added
+- **D2 — `GET /Schemas/{uri}` individual lookup** — New route on `SchemasController` and `EndpointScimDiscoveryController` for retrieving a single schema by URN. Returns SCIM 404 error for unknown URNs.
+- **D3 — `GET /ResourceTypes/{id}` individual lookup** — New route on `ResourceTypesController` and `EndpointScimDiscoveryController` for retrieving a single resource type by id. Returns SCIM 404 error for unknown ids.
+- **`getSchemaByUrn()` and `getResourceTypeById()`** — New methods on `ScimDiscoveryService` delegating to registry with proper SCIM 404 error handling.
+- **`SCIM_SCHEMA_SCHEMA` and `SCIM_RESOURCE_TYPE_SCHEMA`** — New URN constants in `scim-constants.ts`.
+- **26 new unit tests** — Individual lookup (found/not-found), `schemas[]` arrays, `primary:true` flag across 5 spec files.
+- **16 new E2E tests** — Unauthenticated discovery access (6), individual Schema lookup (4), individual ResourceType lookup (5), schemas[] validation (2), primary flag (1).
+
+### Changed
+- Discovery endpoints compliance score: 85% → **100%** in SCIM_COMPLIANCE.md.
+- `ScimSchemaDefinition` and `ScimResourceType` interfaces now include optional `schemas` property.
+- All dynamic registration paths (DB-hydrated, msfttest, `registerExtension()`, `registerResourceType()`) populate `schemas` with fallback defaults.
+
+### Verified
+- **124/124 discovery unit tests passing** (5 suites) — up from 110 (+14 multi-tenant)
+- **35/35 discovery E2E tests passing** (1 suite) — up from 26 (+9 multi-tenant)
+
+### Multi-Tenant Discovery Enhancement
+
+#### Added
+- **Two-tier discovery architecture documented** — Root-level routes (`/scim/v2/...`) serve global defaults for admin tooling; endpoint-scoped routes (`/scim/endpoints/{id}/...`) are the **primary** interface for multi-tenant consumers, returning per-tenant schemas, resource types, and config.
+- **14 new unit tests** — `endpoint-scim-discovery.controller.spec.ts` (7): endpointId passthrough to all service methods, SPC with endpoint config, different configs → different SPCs, context with correct endpointId/baseUrl. `scim-discovery.service.spec.ts` (7): spy-verified endpointId passthrough to all registry methods, SPC config adjustment.
+- **9 new E2E tests** — `discovery-endpoints.e2e-spec.ts`: SPC reflects per-endpoint `BulkOperationsEnabled` (on/off), root-level unaffected by endpoint config, two endpoints with different configs produce different SPCs, core schemas present at endpoint scope, RT with extensions, individual schema/RT lookup at endpoint scope, all 5 endpoint-scoped routes accessible without auth.
+
+#### Changed
+- All 4 discovery controllers updated with JSDoc clarifying multi-tenant roles (root-level = global defaults, endpoint-scoped = primary for multi-tenant).
+- `DISCOVERY_ENDPOINTS_RFC_AUDIT.md` — Added §3.5 Multi-Tenant Discovery Architecture section with two-tier routing table and Mermaid diagrams. Updated architecture diagram, test coverage tables, and cross-references.
+- `COMPLETE_API_REFERENCE.md` — Restructured SCIM metadata section with Multi-Tenant Note table and separate Root-Level / Endpoint-Scoped subsections (10 routes total).
+- `CONTEXT_INSTRUCTIONS.md` — Updated discovery feature status with multi-tenant details.
+
 ## [0.19.2] - 2026-02-26
 
 ### Fixed

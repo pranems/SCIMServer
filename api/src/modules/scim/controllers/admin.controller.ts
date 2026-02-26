@@ -364,7 +364,7 @@ export class AdminController {
         containerApp: process.env.SCIM_APP,
         registry: process.env.SCIM_REGISTRY,
         currentImage,
-        migratePhase: 'Phase 3 — PostgreSQL Migration'
+        migratePhase: `Phase 9 — Bulk Operations (v${version})`
       }
     };
   }

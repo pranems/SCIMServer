@@ -4,7 +4,7 @@ Production-ready SCIM 2.0 server with a built-in observability UI for Microsoft 
 
 | Key | Value |
 |---|---|
-| Version | [`v0.17.3`](https://github.com/pranems/SCIMServer/releases/latest) |
+| Version | [`v0.19.3`](https://github.com/pranems/SCIMServer/releases/latest) |
 | Protocol | [SCIM 2.0](https://scim.cloud/) |
 | Target Platform | [Microsoft Entra ID](https://entra.microsoft.com/) |
 | Runtime | Node.js 24 |
@@ -18,7 +18,7 @@ Admin & observability endpoint family: `/scim/admin/*`
 ## Why SCIMServer
 
 - Full SCIM resource surface: Users, Groups, Schemas, ResourceTypes, ServiceProviderConfig
-- Entra-focused behavior and validator alignment (24/24 + 7 preview scenarios)
+- Entra-focused behavior and validator alignment (25/25 + 7 preview scenarios)
 - Built-in UI for activity feed, log inspection, endpoint management, and runtime status
 - Production operations support: log streaming/download, backup stats, version metadata
 - Cloud-ready deployment with Azure Container Apps and optional blob snapshot backup mode
@@ -175,7 +175,7 @@ Operational docs:
 
 ```powershell
 iex (irm https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-func.ps1)
-Update-SCIMServer -Version v0.17.3 -ResourceGroup <rg> -AppName <app>
+Update-SCIMServer -Version v0.19.3 -ResourceGroup <rg> -AppName <app>
 ```
 
 Admin/release references:
@@ -190,9 +190,9 @@ Admin/release references:
 
 Latest validated matrix:
 
-- Unit tests: **2116/2116** (61 suites)
-- E2E tests: **374/374** (19 suites)
-- Live integration tests: **334/334** (local + Docker, includes in-memory instances)
+- Unit tests: **2,357/2,357** (69 suites)
+- E2E tests: **455/455** (22 suites)
+- Live integration tests: **444/444** (local + Docker, includes in-memory instances)
 - Microsoft SCIM Validator: **25/25 passed** (+ 7 preview scenarios)
 
 ### Per-Endpoint Config Flags
@@ -208,6 +208,8 @@ Latest validated matrix:
 | `PatchOpAllowRemoveAllMembers` | `true` | Allow removing all members via `path=members` |
 | `RequireIfMatch` | `false` | Require If-Match header on mutating requests (428 if missing) |
 | `AllowAndCoerceBooleanStrings` | `true` | Coerce boolean string values ("True"/"False") to native booleans before schema validation |
+| `CustomResourceTypesEnabled` | `false` | Enable custom resource type registration and generic SCIM CRUD beyond User/Group |
+| `BulkOperationsEnabled` | `false` | Enable `POST /Bulk` batch processing (RFC 7644 §3.7) |
 
 ### Coverage scripts
 

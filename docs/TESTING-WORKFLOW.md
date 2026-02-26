@@ -2,7 +2,7 @@
 
 > **Status**: Living workflow guide  
 > **Last Updated**: February 24, 2026  
-> **Baseline**: SCIMServer v0.17.1
+> **Baseline**: SCIMServer v0.19.2
 
 This guide explains how to test new features before releasing them to production users.
 
@@ -203,11 +203,11 @@ Or specific version:
 - [ ] Lint passes (`cd api && npm run lint`) — 0 errors expected
 - [ ] Backend compiles (`cd api && npm run build`)
 - [ ] Frontend compiles (`cd web && npm run build`)
-- [ ] Unit tests pass (`cd api && npm test`) — 1962 tests (59 suites)
-- [ ] E2E tests pass (`cd api && npm run test:e2e`) — 342 tests (19 suites)
+- [ ] Unit tests pass (`cd api && npm test`) — 2,357 tests (69 suites)
+- [ ] E2E tests pass (`cd api && npm run test:e2e`) — 455 tests (22 suites)
 - [ ] Unit coverage meets thresholds (`cd api && npm run test:cov`) — branches 75%, functions 90%, lines 80%
 - [ ] E2E coverage report generated (`cd api && npm run test:e2e:cov`) → `coverage-e2e/`
-- [ ] Live integration tests pass (`.\scripts\live-test.ps1`) — 318 assertions
+- [ ] Live integration tests pass (`.\scripts\live-test.ps1`) — 444 assertions
 - [ ] Live tests pass in verbose mode (`.\scripts\live-test.ps1 -Verbose`) — intercepted API output
 - [ ] SCIM Validator passes (`25/25 required + 7 preview`)
 - [ ] Local testing done (if possible)
@@ -236,7 +236,7 @@ Coverage thresholds (enforced in `jest.config.ts`):
 
 ## 🧪 Live Test Script — Multi-Environment Usage
 
-The live test script (`scripts/live-test.ps1`) runs 212+ integration assertions against a running SCIMServer instance. It supports any deployment target via CLI parameters.
+The live test script (`scripts/live-test.ps1`) runs 444+ integration assertions against a running SCIMServer instance. It supports any deployment target via CLI parameters.
 
 ### Parameters
 
@@ -388,4 +388,4 @@ az containerapp revision list -n <app-name> -g <rg> -o table
 
 ---
 
-**Last Updated:** February 2026 | **Version:** 0.17.1
+**Last Updated:** February 2026 | **Version:** 0.19.2

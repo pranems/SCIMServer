@@ -1,6 +1,6 @@
 # H-1 & H-2: Architecture Analysis, Deliberation & Implementation
 
-> **Date:** 2026-02-24 | **Version:** v0.17.0  
+> **Date:** 2026-02-24 | **Version:** v0.17.0 (implemented) | **Current:** v0.19.2  
 > **Scope:** PATCH SchemaValidator integration (H-1) and Immutable attribute enforcement (H-2)  
 > **Status:** ✅ IMPLEMENTED
 
@@ -24,7 +24,7 @@
 
 **RFC Reference:** RFC 7644 §3.5.2, RFC 7643 §2.1
 
-The `SchemaValidator` (383 lines, pure domain class) validates payloads on POST (`create`) and PUT (`replace`) operations when `StrictSchemaValidation=true`. However, PATCH operations completely bypass schema validation. After `UserPatchEngine.apply()` or `GroupPatchEngine.apply()` produce the modified resource state, it is saved directly to the DB without any schema validation of the resulting payload.
+The `SchemaValidator` (~950 lines, pure domain class) validates payloads on POST (`create`) and PUT (`replace`) operations when `StrictSchemaValidation=true`. However, PATCH operations completely bypass schema validation. After `UserPatchEngine.apply()` or `GroupPatchEngine.apply()` produce the modified resource state, it is saved directly to the DB without any schema validation of the resulting payload.
 
 **Current flow (PATCH):**
 ```

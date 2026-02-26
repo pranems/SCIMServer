@@ -530,11 +530,12 @@ RFC 7644 §4 Table 1 defines the required SPC attributes:
 │  documentationUri    │ No       │ ❌ missing   │ Should point to docs   │
 │  patch.supported     │ Yes      │ ✅ true      │ Correct — server does  │
 │                      │          │              │ support PATCH          │
-│  bulk.supported      │ Yes      │ ✅ false     │ Correct — no bulk      │
-│  bulk.maxOperations  │ Required │ ❌ missing   │ Required when bulk     │
-│                      │ if bulk  │              │ object is present      │
-│  bulk.maxPayloadSize │ Required │ ❌ missing   │ Required when bulk     │
-│                      │ if bulk  │              │ object is present      │
+│  bulk.supported      │ Yes      │ ✅ true      │ Correct — bulk         │
+│                      │          │              │ supported (v0.19.0)    │
+│  bulk.maxOperations  │ Required │ ✅ 1000      │ Correct                │
+│                      │ if bulk  │              │                        │
+│  bulk.maxPayloadSize │ Required │ ✅ 1048576   │ Correct                │
+│                      │ if bulk  │              │                        │
 │  filter.supported    │ Yes      │ ✅ true      │ Correct                │
 │  filter.maxResults   │ Required │ ✅ 200       │ Correct                │
 │                      │ if filter│              │                        │

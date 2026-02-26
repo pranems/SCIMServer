@@ -37,7 +37,7 @@ Scope: Deep migration from current `api` implementation to the ideal target in `
    - Interceptor notes best-effort behavior; full precondition check should happen before mutation.
 
 6. **Optional RFC features pending**
-   - `/Bulk` not implemented.
+   - `/Bulk` ✅ implemented (v0.19.0).
    - `/Me` not implemented.
 
 ---

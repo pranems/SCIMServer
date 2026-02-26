@@ -737,7 +737,7 @@ CMD ["node", "dist/main.js"]
 - **Framework**: Jest 30 with `ts-jest` transform
 - **Test Location**: `api/test/` directory
 - **Test Pattern**: `*.spec.ts` and `*.test.ts`
-- **Current matrix**: 862 unit (28 suites) + 193 e2e (15 suites) + 302 live integration tests passing
+- **Current matrix**: 2,357 unit (69 suites) + 455 e2e (22 suites) + 444 live integration tests passing
 
 ### 11.2 Test Categories
 

@@ -73,7 +73,7 @@ The SCIM server (v0.14.0) has completed **Phases 1–6** of a 12-phase migration
 | GET /ServiceProviderConfig | MUST | ✅ | 6 | Dynamic per-endpoint config |
 | GET /Schemas | MUST | ✅ | 6 | Dynamic schema discovery |
 | GET /ResourceTypes | MUST | ✅ | 6 | Dynamic resource type discovery |
-| POST /Bulk | OPTIONAL | ❌ | 9 | Not implemented |
+| POST /Bulk | OPTIONAL | ✅ | 9 | Implemented (v0.19.0) |
 | POST /.search | OPTIONAL | ✅ | 4 | Full implementation |
 | /Me | OPTIONAL | ❌ | 10 | Not implemented |
 

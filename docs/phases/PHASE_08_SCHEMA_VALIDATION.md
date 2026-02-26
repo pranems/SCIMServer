@@ -74,7 +74,7 @@ graph TB
 api/src/domain/validation/
 ├── index.ts                              # Barrel export
 ├── validation-types.ts                   # Pure interfaces (zero deps)
-├── schema-validator.ts                   # Static validate() + checkImmutable() methods (816 lines)
+├── schema-validator.ts                   # Static validate() + checkImmutable() methods (~950 lines)
 ├── schema-validator.spec.ts              # Core unit tests (60 tests)
 └── schema-validator-comprehensive.spec.ts # Comprehensive tests (179 tests)
 ```
@@ -824,7 +824,7 @@ validateSubAttributes() → directly calls validateSingleValue()
 | **Service Integration** | `endpoint-scim-users.service.spec.ts` (added) | 9 | Users service flag-gated validation |
 | **Service Integration** | `endpoint-scim-groups.service.spec.ts` (added) | 10 | Groups service flag-gated validation |
 | **E2E** | `schema-validation.e2e-spec.ts` | 49 | Full HTTP pipeline validation |
-| **Live** | `live-test.ps1` (existing) | 318 | No regressions |
+| **Live** | `live-test.ps1` (existing) | 444 | No regressions |
 | | **Total new tests** | **307** | |
 
 ### Comprehensive Unit Test Sections (179 tests)
@@ -866,14 +866,14 @@ validateSubAttributes() → directly calls validateSingleValue()
 
 ## 11. Full Validation Pipeline Results
 
-### Final Test Counts (v0.17.0)
+### Final Test Counts (v0.17.0 → current: v0.19.2)
 
 | Level | Count | Suites | Status |
-|-------|-------|--------|--------|
-| **Unit tests** | 1962 | 59 | ✅ All passing |
-| **E2E tests** | 342 | 19 | ✅ All passing |
-| **Live tests (local)** | 318 | — | ✅ All passing |
-| **Live tests (Docker)** | 318 | — | ✅ All passing |
+|-------|-------|--------|---------|
+| **Unit tests** | 2,357 | 69 | ✅ All passing |
+| **E2E tests** | 455 | 22 | ✅ All passing |
+| **Live tests (local)** | 444 | — | ✅ All passing |
+| **Live tests (Docker)** | 444 | — | ✅ All passing |
 
 ### Docker Container
 

@@ -43,6 +43,8 @@
 
 ## 🧪 Validation Results
 
+> *Counts below are from the time of the runtime upgrade. Current baseline (v0.19.2): 2,357 unit (69 suites), 455 E2E (22 suites), 444 live.*
+
 | Test Tier | Count | Result |
 |-----------|-------|--------|
 | **Unit tests** | 666 / 666 (19 suites) | ✅ All passing |

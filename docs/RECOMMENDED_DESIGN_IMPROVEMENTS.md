@@ -1254,22 +1254,22 @@ interface PaginatedResponse<T> {
 
 ### 17.1 RFC Compliance Gaps
 
-> **Phase 1 (Foundation — RFC Compliance Core) was completed Feb 2026.** Items marked ✅ below are now implemented and covered by 648 unit tests + 272 live integration tests.
+> **Phase 1 (Foundation — RFC Compliance Core) was completed Feb 2026.** Items marked ✅ below are now implemented and covered by 2,357 unit tests + 444 live integration tests.
 
 | RFC Requirement | RFC Section | Current State | Status |
 |----------------|-------------|---------------|--------|
 | **Filter operators** beyond `eq` | 7644 §3.4.2.2 | `eq` fully implemented (case-insensitive); `co`, `sw`, `ew`, `gt`, `lt`, `ge`, `le`, `ne` supported via ABNF parser | ✅ Implemented |
-| **Schema-driven validation** | 7643 §7 | Hardcoded per-attribute logic | 🔴 **Phase 2** |
+| **Schema-driven validation** | 7643 §7 | ✅ SchemaValidator (~950 lines) validates per schema definitions | ✅ Done (v0.17.0) |
 | **POST /.search** | 7644 §3.4.3 | ✅ Implemented for Users and Groups with filter, pagination, attributes, excludedAttributes | ✅ Implemented |
-| **Bulk operations** | 7644 §3.7 | Not implemented (correctly advertised as `bulk.supported: false`) | 🟡 Optional |
+| **Bulk operations** | 7644 §3.7 | ✅ Implemented (v0.19.0) — `bulk.supported: true`, maxOperations: 1000 | ✅ Done |
 | **Sorting** | 7644 §3.4.2.3 | Not implemented (correctly advertised as `sort.supported: false`) | 🟡 Optional |
 | **ETag conditional enforcement** | 7644 §3.14 | ✅ Weak ETags on all responses; `If-None-Match` → 304 Not Modified | ✅ Implemented |
 | **`attributes`/`excludedAttributes` params** | 7644 §3.9 | ✅ Implemented on all GET and POST /.search endpoints (Users + Groups) | ✅ Implemented |
-| **`returned` characteristic** | 7643 §2.2 | Not enforced — all attributes always returned | 🟡 Phase 2 |
-| **`mutability` on PUT** | 7644 §3.5.1 | Not enforced — readOnly attributes accepted | 🟡 Phase 2 |
-| **Dynamic ServiceProviderConfig** | 7644 §4 | Hardcoded JSON; same for all endpoints | 🟡 Phase 2 |
-| **Dynamic /Schemas** | 7644 §4 | Hardcoded JSON | 🟡 Phase 2 |
-| **Dynamic /ResourceTypes** | 7644 §4 | Hardcoded JSON | 🟡 Phase 2 |
+| **`returned` characteristic** | 7643 §2.2 | ✅ Schema-driven response filtering (G8e v0.17.4 + G8g v0.19.2) | ✅ Done |
+| **`mutability` on PUT** | 7644 §3.5.1 | ✅ readOnly rejected on create/replace; immutable enforced (H-2) | ✅ Done |
+| **Dynamic ServiceProviderConfig** | 7644 §4 | ✅ Per-endpoint config-driven discovery | ✅ Done (Phase 6) |
+| **Dynamic /Schemas** | 7644 §4 | ✅ Data-driven schema discovery | ✅ Done (Phase 6) |
+| **Dynamic /ResourceTypes** | 7644 §4 | ✅ Data-driven resource type discovery | ✅ Done (Phase 6) |
 | **PATCH path: full ABNF** | 7644 Figure 1 | ✅ valuePath filter, extension URN, no-path merge, dot-notation (via VerbosePatchSupported flag) | ✅ Implemented |
 | **PATCH: implicit schemas update** | 7644 §3.5.2 | Not implemented | 🟢 Low |
 | **`caseExact` on filtering** | 7643 §2.2 | All attributes treated as case-insensitive (correct for userName, emails; per RFC) | 🟢 Low |
@@ -1316,7 +1316,7 @@ interface PaginatedResponse<T> {
 
 **Goal**: Make the existing server truthfully RFC-compliant for the features it already supports.
 
-> **All 7 tasks completed.** 648 unit tests, 272 live integration tests, all 24 Microsoft SCIM Validator tests passing + 7 preview.
+> **All 7 tasks completed.** 2,357 unit tests, 444 live integration tests, all 25 Microsoft SCIM Validator tests passing.
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|

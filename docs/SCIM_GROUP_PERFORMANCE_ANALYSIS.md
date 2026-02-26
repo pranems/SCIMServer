@@ -580,4 +580,4 @@ AFTER (read before transaction):
 ### Actual Impact After Fixes
 
 All 3 previously-failing tests now pass. Group filter operations reduced from ~10,000ms to ~250ms.
-648 unit tests pass (19 suites). 24/24 SCIM validator tests pass.
+2,357 unit tests pass (69 suites). 25/25 SCIM validator tests pass.

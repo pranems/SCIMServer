@@ -1,6 +1,6 @@
 # SCIMServer — Complete REST API Reference
 
-> Version baseline: v0.17.1 · Updated: February 24, 2026 · Scope: SCIM + admin + OAuth + web routes
+> Version baseline: v0.19.3 · Updated: February 26, 2026 · Scope: SCIM + admin + OAuth + web routes
 
 This document enumerates all REST API endpoints and resources exposed by the SCIMServer application, with HTTP methods, purpose, common query parameters, expected request and response shapes, authentication notes, and `curl` examples for each operation.
 
@@ -50,6 +50,14 @@ Contents
   - `PUT /Groups/:id` — replace
   - `PATCH /Groups/:id` — patch (returns 200 OK with updated group resource)
   - `DELETE /Groups/:id` — delete
+- Bulk Operations (RFC 7644 §3.7)
+  - `POST /Bulk` — batch processing (requires `BulkOperationsEnabled` config flag)
+- Custom Resource Types (requires `CustomResourceTypesEnabled` config flag)
+  - `POST /admin/endpoints/:endpointId/resource-types` — register custom resource type
+  - `GET /admin/endpoints/:endpointId/resource-types` — list registered types
+  - `GET /admin/endpoints/:endpointId/resource-types/:name` — get by name
+  - `DELETE /admin/endpoints/:endpointId/resource-types/:name` — delete by name
+  - Generic SCIM CRUD: `POST/GET/PUT/PATCH/DELETE /:resourceType` for registered types
 - Admin endpoints (`/admin`)
   - `GET /admin/version` — version & deployment info
   - `GET /admin/logs` — list request logs (with filters)
@@ -79,23 +87,90 @@ Contents
 
 ---
 
-SCIM metadata endpoints
+SCIM metadata endpoints (RFC 7644 §4 — SHALL NOT require authentication)
+
+> **Multi-Tenant Note:** SCIMServer is a multi-tenant/multi-endpoint server. Each SCIM endpoint
+> can have its own configuration flags and custom schema extensions. Discovery routes exist at
+> **two levels**:
+>
+> | Level | Path prefix | Behavior |
+> |---|---|---|
+> | **Root-level** (global defaults) | `/scim/v2/` | Returns global defaults without endpoint context |
+> | **Endpoint-scoped** (**primary**) | `/scim/endpoints/{endpointId}/` | Returns tenant-specific discovery merging global + per-endpoint overlays |
+>
+> **Clients provisioning a specific endpoint should always use endpoint-scoped routes** to see
+> accurate capabilities (e.g. `bulk.supported` reflecting `BulkOperationsEnabled` flag),
+> endpoint-specific schema extensions, and custom resource types.
+
+### Root-Level Discovery (global defaults)
 
 1) GET /ServiceProviderConfig
-- Purpose: Return SCIM service provider capabilities (patch, filter, sort, auth schemes).
-- Auth: Protected (guard) — requires bearer token unless decorated public.
+- Purpose: Return SCIM service provider capabilities (patch, filter, sort, auth schemes) — global defaults.
+- Auth: Public — no authentication required per RFC 7644 §4.
+- Note: Returns default capabilities. For per-endpoint capabilities, use the endpoint-scoped route.
 - Example:
-  curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/ServiceProviderConfig"
+  curl "https://<API_BASE>/scim/v2/ServiceProviderConfig"
 
 2) GET /ResourceTypes
-- Purpose: Return list of resource types supported (`User`, `Group`).
+- Purpose: Return list of resource types supported (`User`, `Group`) — global defaults.
+- Auth: Public.
 - Example:
-  curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/ResourceTypes"
+  curl "https://<API_BASE>/scim/v2/ResourceTypes"
 
-3) GET /Schemas
-- Purpose: Return all registered SCIM schema descriptions (7 built-in: User, EnterpriseUser, Group + 4 msfttest extensions).
+3) GET /ResourceTypes/{id}
+- Purpose: Return a single resource type by id (e.g., `User`, `Group`).
+- Auth: Public.
 - Example:
-  curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/Schemas"
+  curl "https://<API_BASE>/scim/v2/ResourceTypes/User"
+- Error: 404 with SCIM error body if `{id}` is unknown.
+
+4) GET /Schemas
+- Purpose: Return all registered SCIM schema descriptions (7 built-in: User, EnterpriseUser, Group + 4 msfttest extensions) — global defaults.
+- Auth: Public.
+- Example:
+  curl "https://<API_BASE>/scim/v2/Schemas"
+
+5) GET /Schemas/{uri}
+- Purpose: Return a single schema definition by its URN.
+- Auth: Public.
+- Example:
+  curl "https://<API_BASE>/scim/v2/Schemas/urn:ietf:params:scim:schemas:core:2.0:User"
+- Error: 404 with SCIM error body if `{uri}` is unknown.
+
+### Endpoint-Scoped Discovery (primary — multi-tenant)
+
+6) GET /endpoints/{endpointId}/ServiceProviderConfig
+- Purpose: Return SCIM service provider capabilities for a specific endpoint.
+- Auth: Public.
+- Behavior: Dynamically adjusts capabilities based on endpoint config flags (e.g. `BulkOperationsEnabled`).
+- Example:
+  curl "https://<API_BASE>/scim/endpoints/{endpointId}/ServiceProviderConfig"
+
+7) GET /endpoints/{endpointId}/Schemas
+- Purpose: Return all schemas visible to this endpoint (global + endpoint-specific extensions).
+- Auth: Public.
+- Example:
+  curl "https://<API_BASE>/scim/endpoints/{endpointId}/Schemas"
+
+8) GET /endpoints/{endpointId}/Schemas/{uri}
+- Purpose: Return a single schema by URN for this endpoint.
+- Auth: Public.
+- Example:
+  curl "https://<API_BASE>/scim/endpoints/{endpointId}/Schemas/urn:ietf:params:scim:schemas:core:2.0:User"
+- Error: 404 with SCIM error body if `{uri}` is unknown.
+
+9) GET /endpoints/{endpointId}/ResourceTypes
+- Purpose: Return resource types for this endpoint (global + per-endpoint custom types with merged extensions).
+- Auth: Public.
+- Example:
+  curl "https://<API_BASE>/scim/endpoints/{endpointId}/ResourceTypes"
+
+10) GET /endpoints/{endpointId}/ResourceTypes/{id}
+- Purpose: Return a single resource type by id for this endpoint.
+- Auth: Public.
+- Example:
+  curl "https://<API_BASE>/scim/endpoints/{endpointId}/ResourceTypes/User"
+- Error: 404 with SCIM error body if `{id}` is unknown.
 
 ---
 
@@ -263,6 +338,32 @@ curl -X POST "https://<API_BASE>/scim/v2/Groups/.search" \
 
 ---
 
+Bulk Operations (RFC 7644 §3.7)
+
+1) POST /Bulk
+- Purpose: Process multiple SCIM operations in a single HTTP request.
+- Requires `BulkOperationsEnabled` config flag to be `true` on the endpoint (default: `false`; returns 403 when disabled).
+- Request Content-Type: `application/scim+json`.
+- Body:
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
+  "Operations": [
+    { "method": "POST", "path": "/Users", "bulkId": "user1", "data": { "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "userName": "bulk-user@example.com" } },
+    { "method": "PATCH", "path": "/Users/bulkId:user1", "data": { "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{ "op": "replace", "path": "displayName", "value": "Updated" }] } }
+  ],
+  "failOnErrors": 5
+}
+```
+- Response: `200 OK` with `BulkResponse` body containing per-operation results.
+- `bulkId` cross-referencing: Use `bulkId:reference` in subsequent operation paths to reference resources created earlier in the same batch.
+- `failOnErrors`: Stop processing after this many operation failures.
+- Max payload size: 1MB. Max operations: 1000.
+- Example:
+  curl -X POST -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/scim+json" -d @bulk-request.json "https://<API_BASE>/scim/v2/endpoints/<endpointId>/Bulk"
+
+---
+
 Admin endpoints (non-SCIM but mounted under `/scim/admin`)
 
 1) GET /admin/version
@@ -282,7 +383,7 @@ curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/admin/versio
 - Sample response (trimmed):
 ```
 {
-  "version": "0.17.1",
+  "version": "0.19.3",
   "service": {
     "environment": "production",
     "scimBasePath": "/scim/v2",
