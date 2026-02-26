@@ -9,18 +9,33 @@ import { AdminResourceTypeController } from './admin-resource-type.controller';
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import { ENDPOINT_RESOURCE_TYPE_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { InMemoryEndpointResourceTypeRepository } from '../../../infrastructure/repositories/inmemory/inmemory-endpoint-resource-type.repository';
-import { PrismaService } from '../../prisma/prisma.service';
+import { EndpointService } from '../../endpoint/services/endpoint.service';
 import type { CreateEndpointResourceTypeDto } from '../dto/create-endpoint-resource-type.dto';
 
 describe('AdminResourceTypeController', () => {
   let controller: AdminResourceTypeController;
   let registry: ScimSchemaRegistry;
-  let mockPrisma: { endpoint: { findUnique: jest.Mock } };
+  let mockEndpointService: { getEndpoint: jest.Mock };
 
   const endpointId = 'ep-test-1';
-  const enabledConfig = JSON.stringify({ CustomResourceTypesEnabled: 'True' });
-  const mockEndpoint = { id: endpointId, name: 'test', active: true, config: enabledConfig };
-  const mockEndpointDisabled = { id: endpointId, name: 'test', active: true, config: null };
+  const mockEndpoint = {
+    id: endpointId,
+    name: 'test',
+    active: true,
+    config: { CustomResourceTypesEnabled: 'True' },
+    scimEndpoint: '/scim/endpoints/' + endpointId,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  const mockEndpointDisabled = {
+    id: endpointId,
+    name: 'test',
+    active: true,
+    config: null,
+    scimEndpoint: '/scim/endpoints/' + endpointId,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
 
   const sampleDto: CreateEndpointResourceTypeDto = {
     name: 'Device',
@@ -33,10 +48,8 @@ describe('AdminResourceTypeController', () => {
   };
 
   beforeEach(async () => {
-    mockPrisma = {
-      endpoint: {
-        findUnique: jest.fn().mockResolvedValue(mockEndpoint),
-      },
+    mockEndpointService = {
+      getEndpoint: jest.fn().mockResolvedValue(mockEndpoint),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -47,7 +60,7 @@ describe('AdminResourceTypeController', () => {
           useClass: InMemoryEndpointResourceTypeRepository,
         },
         ScimSchemaRegistry,
-        { provide: PrismaService, useValue: mockPrisma },
+        { provide: EndpointService, useValue: mockEndpointService },
       ],
     }).compile();
 
@@ -84,7 +97,7 @@ describe('AdminResourceTypeController', () => {
     });
 
     it('should throw NotFoundException for unknown endpoint', async () => {
-      mockPrisma.endpoint.findUnique.mockResolvedValue(null);
+      mockEndpointService.getEndpoint.mockRejectedValue(new NotFoundException('Not found'));
 
       await expect(
         controller.registerResourceType('unknown', sampleDto),
@@ -92,7 +105,7 @@ describe('AdminResourceTypeController', () => {
     });
 
     it('should throw ForbiddenException when CustomResourceTypesEnabled is not set', async () => {
-      mockPrisma.endpoint.findUnique.mockResolvedValue(mockEndpointDisabled);
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpointDisabled);
 
       await expect(
         controller.registerResourceType(endpointId, sampleDto),
@@ -190,7 +203,7 @@ describe('AdminResourceTypeController', () => {
     });
 
     it('should throw NotFoundException for unknown endpoint', async () => {
-      mockPrisma.endpoint.findUnique.mockResolvedValue(null);
+      mockEndpointService.getEndpoint.mockRejectedValue(new NotFoundException('Not found'));
       await expect(controller.listResourceTypes('unknown')).rejects.toThrow(NotFoundException);
     });
   });

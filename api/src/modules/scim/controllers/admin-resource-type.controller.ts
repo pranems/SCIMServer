@@ -34,7 +34,7 @@ import type { IEndpointResourceTypeRepository } from '../../../domain/repositori
 import type { EndpointResourceTypeCreateInput } from '../../../domain/models/endpoint-resource-type.model';
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import { CreateEndpointResourceTypeDto } from '../dto/create-endpoint-resource-type.dto';
-import { PrismaService } from '../../prisma/prisma.service';
+import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS } from '../../endpoint/endpoint-config.interface';
 
 /** Built-in resource type names that cannot be registered as custom types */
@@ -51,7 +51,7 @@ export class AdminResourceTypeController {
     @Inject(ENDPOINT_RESOURCE_TYPE_REPOSITORY)
     private readonly resourceTypeRepo: IEndpointResourceTypeRepository,
     private readonly schemaRegistry: ScimSchemaRegistry,
-    private readonly prisma: PrismaService,
+    private readonly endpointService: EndpointService,
   ) {}
 
   /**
@@ -59,17 +59,9 @@ export class AdminResourceTypeController {
    * is invalid (e.g. not a UUID — Prisma would throw a raw error).
    */
   private async requireEndpoint(endpointId: string) {
-    let endpoint: { id: string; config: string | null } | null;
-    try {
-      endpoint = await this.prisma.endpoint.findUnique({
-        where: { id: endpointId },
-      });
-    } catch {
-      throw new NotFoundException(`Endpoint "${endpointId}" not found.`);
-    }
-    if (!endpoint) {
-      throw new NotFoundException(`Endpoint "${endpointId}" not found.`);
-    }
+    // EndpointService.getEndpoint() handles both inmemory and Prisma backends,
+    // and throws NotFoundException if the endpoint doesn't exist or ID is invalid.
+    const endpoint = await this.endpointService.getEndpoint(endpointId);
     return endpoint;
   }
 
@@ -88,7 +80,8 @@ export class AdminResourceTypeController {
     const endpoint = await this.requireEndpoint(endpointId);
 
     // Check if custom resource types are enabled for this endpoint
-    const config = endpoint.config ? JSON.parse(endpoint.config) : {};
+    // EndpointResponse.config is already parsed as Record<string, any>
+    const config = endpoint.config ?? {};
     if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED)) {
       throw new ForbiddenException(
         `Custom resource types are not enabled for endpoint "${endpointId}". ` +
