@@ -74,13 +74,14 @@ export function matchesPrismaFilter(
 }
 
 /**
- * Case-insensitive equality comparison.
- * Matches CITEXT behavior: string comparisons are case-insensitive.
+ * Case-sensitive equality comparison.
+ *
+ * Simple equality `{ column: value }` is case-sensitive, matching PostgreSQL
+ * TEXT column behavior. For CITEXT columns, the filter builder emits
+ * `{ column: { equals: value, mode: 'insensitive' } }` which is handled by
+ * matchOperator instead.
  */
 function matchEquality(stored: unknown, expected: unknown): boolean {
-  if (typeof stored === 'string' && typeof expected === 'string') {
-    return stored.toLowerCase() === expected.toLowerCase();
-  }
   return stored === expected;
 }
 
@@ -93,14 +94,26 @@ function matchEquality(stored: unknown, expected: unknown): boolean {
 function matchOperator(stored: unknown, opObj: Record<string, unknown>): boolean {
   const caseInsensitive = opObj.mode === 'insensitive';
 
-  // not: { not: value } or { not: null }
+  // equals: { equals: value, mode?: 'insensitive' }
+  // Emitted by the filter builder for eq on CITEXT columns.
+  if ('equals' in opObj) {
+    if (caseInsensitive && typeof stored === 'string' && typeof opObj.equals === 'string') {
+      return stored.toLowerCase() === opObj.equals.toLowerCase();
+    }
+    return stored === opObj.equals;
+  }
+
+  // not: { not: value, mode?: 'insensitive' } or { not: null }
   if ('not' in opObj && !('contains' in opObj || 'startsWith' in opObj || 'endsWith' in opObj || 'gt' in opObj)) {
     const notValue = opObj.not;
     if (notValue === null) {
       // { not: null } → presence check (value is not null/undefined)
       return stored !== null && stored !== undefined;
     }
-    return !matchEquality(stored, notValue);
+    if (caseInsensitive && typeof stored === 'string' && typeof notValue === 'string') {
+      return stored.toLowerCase() !== notValue.toLowerCase();
+    }
+    return stored !== notValue;
   }
 
   // contains: { contains: string, mode?: 'insensitive' }

@@ -216,10 +216,16 @@ function buildColumnFilter(
 
   switch (op) {
     case 'eq':
-      return { [column]: value };
+      // CITEXT columns: explicit case-insensitive Prisma filter so InMemory evaluator
+      // can distinguish from case-sensitive TEXT equality.
+      return isCaseInsensitive
+        ? { [column]: { equals: value, mode: 'insensitive' } }
+        : { [column]: value };
 
     case 'ne':
-      return { [column]: { not: value } };
+      return isCaseInsensitive
+        ? { [column]: { not: value, mode: 'insensitive' } }
+        : { [column]: { not: value } };
 
     case 'co':
       if (!isStringType) return null;

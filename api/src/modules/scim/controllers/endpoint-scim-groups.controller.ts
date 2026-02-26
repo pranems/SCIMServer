@@ -20,7 +20,7 @@ import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { CreateGroupDto } from '../dto/create-group.dto';
 import { PatchGroupDto } from '../dto/patch-group.dto';
 import { SearchRequestDto } from '../dto/search-request.dto';
-import { applyAttributeProjection, applyAttributeProjectionToList, stripReturnedNever } from '../common/scim-attribute-projection';
+import { applyAttributeProjection, applyAttributeProjectionToList } from '../common/scim-attribute-projection';
 import { buildBaseUrl } from '../common/base-url.util';
 
 /**
@@ -67,17 +67,15 @@ export class EndpointScimGroupsController {
   async createGroup(
     @Param('endpointId') endpointId: string,
     @Body() dto: CreateGroupDto,
-    @Req() req: Request
+    @Req() req: Request,
+    @Query('attributes') attributes?: string,
+    @Query('excludedAttributes') excludedAttributes?: string
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const result = await this.groupsService.createGroupForEndpoint(dto, baseUrl, endpointId, config);
+    // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
     const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
-    if (requestOnlyAttrs.size > 0) {
-      for (const key of Object.keys(result)) {
-        if (requestOnlyAttrs.has(key.toLowerCase())) delete (result as Record<string, unknown>)[key];
-      }
-    }
-    return result;
+    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs);
   }
 
   /**
@@ -210,18 +208,16 @@ export class EndpointScimGroupsController {
     @Param('endpointId') endpointId: string,
     @Param('id') id: string,
     @Body() dto: CreateGroupDto,
-    @Req() req: Request
+    @Req() req: Request,
+    @Query('attributes') attributes?: string,
+    @Query('excludedAttributes') excludedAttributes?: string
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.groupsService.replaceGroupForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
+    // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
     const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
-    if (requestOnlyAttrs.size > 0) {
-      for (const key of Object.keys(result)) {
-        if (requestOnlyAttrs.has(key.toLowerCase())) delete (result as Record<string, unknown>)[key];
-      }
-    }
-    return result;
+    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs);
   }
 
   /**
@@ -233,18 +229,16 @@ export class EndpointScimGroupsController {
     @Param('endpointId') endpointId: string,
     @Param('id') id: string,
     @Body() dto: PatchGroupDto,
-    @Req() req: Request
+    @Req() req: Request,
+    @Query('attributes') attributes?: string,
+    @Query('excludedAttributes') excludedAttributes?: string
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.groupsService.patchGroupForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
+    // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
     const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
-    if (requestOnlyAttrs.size > 0) {
-      for (const key of Object.keys(result)) {
-        if (requestOnlyAttrs.has(key.toLowerCase())) delete (result as Record<string, unknown>)[key];
-      }
-    }
-    return result;
+    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs);
   }
 
   /**

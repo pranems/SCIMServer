@@ -120,6 +120,11 @@ describe('EndpointScimGroupsService', () => {
 
     service = module.get<EndpointScimGroupsService>(EndpointScimGroupsService);
     metadataService = module.get<ScimMetadataService>(ScimMetadataService);
+
+    // G8f: Default mock returns for uniqueness checks (no conflict)
+    // These are called on PUT/PATCH paths to enforce displayName/externalId uniqueness.
+    mockGroupRepo.findByDisplayName.mockResolvedValue(null);
+    mockGroupRepo.findByExternalId.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -2669,6 +2674,304 @@ describe('EndpointScimGroupsService', () => {
         // The default Group schema has no request-only attributes
         expect(requestOnlyAttrs).toBeInstanceOf(Set);
         expect(requestOnlyAttrs.size).toBe(0);
+      });
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // G8f — Group uniqueness enforcement on PUT/PATCH
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  describe('G8f — uniqueness enforcement on PUT/PATCH', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+
+    const conflictGroup = {
+      ...mockGroup,
+      id: 'group-conflict',
+      scimId: 'scim-grp-conflict',
+      displayName: 'Conflicting Group',
+      externalId: 'ext-conflict',
+    };
+
+    // ─── PUT (replaceGroupForEndpoint) ─────────────────────────────────
+
+    describe('replaceGroupForEndpoint — uniqueness', () => {
+      it('should reject PUT with 409 when displayName conflicts with another group', async () => {
+        const replaceDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Conflicting Group',
+          members: [],
+        };
+
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
+        // assertUniqueDisplayName finds a conflict (different group with same displayName)
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(conflictGroup);
+
+        await expect(
+          service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id)
+        ).rejects.toThrow(HttpException);
+
+        try {
+          await service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id);
+        } catch (e: any) {
+          expect(e.getStatus()).toBe(409);
+          expect(e.getResponse()).toMatchObject({
+            detail: expect.stringContaining('displayName'),
+            scimType: 'uniqueness',
+          });
+        }
+      });
+
+      it('should reject PUT with 409 when externalId conflicts with another group', async () => {
+        const replaceDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Unique Name',
+          members: [],
+          externalId: 'ext-conflict',
+        } as CreateGroupDto & { externalId: string };
+
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
+        // displayName is unique
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        // externalId conflicts
+        mockGroupRepo.findByExternalId.mockResolvedValueOnce(conflictGroup);
+
+        await expect(
+          service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id)
+        ).rejects.toThrow(HttpException);
+
+        try {
+          mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
+          mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+          mockGroupRepo.findByExternalId.mockResolvedValueOnce(conflictGroup);
+          await service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id);
+        } catch (e: any) {
+          expect(e.getStatus()).toBe(409);
+          expect(e.getResponse()).toMatchObject({
+            detail: expect.stringContaining('externalId'),
+            scimType: 'uniqueness',
+          });
+        }
+      });
+
+      it('should allow PUT when displayName is same as own (self-exclusion)', async () => {
+        const replaceDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Test Group', // Same as mockGroup's own displayName
+          members: [],
+        };
+
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup) // lookup
+          .mockResolvedValueOnce(mockGroup); // return after update
+        // assertUniqueDisplayName with excludeScimId — no conflict
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+
+        const result = await service.replaceGroupForEndpoint(
+          mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id
+        );
+
+        expect(result.displayName).toBe('Test Group');
+        expect(mockGroupRepo.findByDisplayName).toHaveBeenCalledWith(
+          mockEndpoint.id, 'Test Group', mockGroup.scimId
+        );
+      });
+
+      it('should pass scimId as excludeScimId to assertUniqueDisplayName and assertUniqueExternalId', async () => {
+        const replaceDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Updated Group',
+          members: [],
+          externalId: 'ext-new',
+        } as CreateGroupDto & { externalId: string };
+
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup)
+          .mockResolvedValueOnce({ ...mockGroup, displayName: 'Updated Group', externalId: 'ext-new' });
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.findByExternalId.mockResolvedValueOnce(null);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+
+        await service.replaceGroupForEndpoint(
+          mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id
+        );
+
+        // Verify self-exclusion: scimId is passed as 3rd arg to exclude self from conflict check
+        expect(mockGroupRepo.findByDisplayName).toHaveBeenCalledWith(
+          mockEndpoint.id, 'Updated Group', mockGroup.scimId
+        );
+        expect(mockGroupRepo.findByExternalId).toHaveBeenCalledWith(
+          mockEndpoint.id, 'ext-new', mockGroup.scimId
+        );
+      });
+
+      it('should not call assertUniqueExternalId when externalId is null/absent', async () => {
+        const replaceDto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'No ExtId Group',
+          members: [],
+          // no externalId
+        };
+
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup)
+          .mockResolvedValueOnce({ ...mockGroup, displayName: 'No ExtId Group' });
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+
+        await service.replaceGroupForEndpoint(
+          mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id
+        );
+
+        expect(mockGroupRepo.findByDisplayName).toHaveBeenCalled();
+        // findByExternalId should NOT be called since no externalId was provided
+        // (beforeEach sets default mockResolvedValue, but it should not be invoked)
+        expect(mockGroupRepo.findByExternalId).not.toHaveBeenCalledWith(
+          mockEndpoint.id, expect.any(String), mockGroup.scimId
+        );
+      });
+    });
+
+    // ─── PATCH (patchGroupForEndpoint) ─────────────────────────────────
+
+    describe('patchGroupForEndpoint — uniqueness', () => {
+      it('should reject PATCH with 409 when displayName conflicts with another group', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            { op: 'replace', path: 'displayName', value: 'Conflicting Group' },
+          ],
+        };
+
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
+        // assertUniqueDisplayName finds a conflict
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(conflictGroup);
+
+        await expect(
+          service.patchGroupForEndpoint(mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id)
+        ).rejects.toThrow(HttpException);
+
+        try {
+          mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
+          mockGroupRepo.findByDisplayName.mockResolvedValueOnce(conflictGroup);
+          await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id);
+        } catch (e: any) {
+          expect(e.getStatus()).toBe(409);
+          expect(e.getResponse()).toMatchObject({
+            detail: expect.stringContaining('displayName'),
+            scimType: 'uniqueness',
+          });
+        }
+      });
+
+      it('should reject PATCH with 409 when externalId conflicts with another group', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            { op: 'replace', path: 'externalId', value: 'ext-conflict' },
+          ],
+        };
+
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
+        // displayName is unchanged — uses mockGroup.displayName, no conflict
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        // externalId conflicts
+        mockGroupRepo.findByExternalId.mockResolvedValueOnce(conflictGroup);
+
+        await expect(
+          service.patchGroupForEndpoint(mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id)
+        ).rejects.toThrow(HttpException);
+
+        try {
+          mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
+          mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+          mockGroupRepo.findByExternalId.mockResolvedValueOnce(conflictGroup);
+          await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id);
+        } catch (e: any) {
+          expect(e.getStatus()).toBe(409);
+          expect(e.getResponse()).toMatchObject({
+            detail: expect.stringContaining('externalId'),
+            scimType: 'uniqueness',
+          });
+        }
+      });
+
+      it('should allow PATCH when displayName does not conflict (self-exclusion)', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            { op: 'replace', path: 'displayName', value: 'New Unique Name' },
+          ],
+        };
+
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup)
+          .mockResolvedValueOnce({ ...mockGroup, displayName: 'New Unique Name' });
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+
+        const result = await service.patchGroupForEndpoint(
+          mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id
+        );
+
+        expect(result.displayName).toBe('New Unique Name');
+        // Verify scimId was passed as excludeScimId
+        expect(mockGroupRepo.findByDisplayName).toHaveBeenCalledWith(
+          mockEndpoint.id, 'New Unique Name', mockGroup.scimId
+        );
+      });
+
+      it('should pass scimId as excludeScimId for PATCH uniqueness checks', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            { op: 'replace', value: { displayName: 'Patched', externalId: 'ext-patched' } },
+          ],
+        };
+
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup)
+          .mockResolvedValueOnce({ ...mockGroup, displayName: 'Patched', externalId: 'ext-patched' });
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.findByExternalId.mockResolvedValueOnce(null);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+
+        await service.patchGroupForEndpoint(
+          mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id
+        );
+
+        expect(mockGroupRepo.findByDisplayName).toHaveBeenCalledWith(
+          mockEndpoint.id, 'Patched', mockGroup.scimId
+        );
+        expect(mockGroupRepo.findByExternalId).toHaveBeenCalledWith(
+          mockEndpoint.id, 'ext-patched', mockGroup.scimId
+        );
+      });
+
+      it('should not call assertUniqueExternalId when externalId is null after PATCH', async () => {
+        const patchDto: PatchGroupDto = {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [
+            { op: 'replace', path: 'displayName', value: 'Updated Only Name' },
+          ],
+        };
+
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup) // externalId is null on mockGroup
+          .mockResolvedValueOnce({ ...mockGroup, displayName: 'Updated Only Name' });
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
+
+        await service.patchGroupForEndpoint(
+          mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id
+        );
+
+        // findByExternalId should NOT be called with the excludeScimId pattern
+        // since externalId is null after PATCH
+        expect(mockGroupRepo.findByExternalId).not.toHaveBeenCalledWith(
+          mockEndpoint.id, expect.any(String), mockGroup.scimId
+        );
       });
     });
   });

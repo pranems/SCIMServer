@@ -5,6 +5,41 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.19.2] - 2026-02-26
+
+### Fixed
+- **G8g — Write-Response Attribute Projection (RFC 7644 §3.9)** — `attributes` and `excludedAttributes` query parameters were ignored on POST (create), PUT (replace), and PATCH (modify) write operations. Clients could not request partial resource representations on write responses. All 6 write controller methods (3 Users + 3 Groups) now accept these query parameters and delegate to `applyAttributeProjection()` — the same function already used by read operations — ensuring consistent RFC-compliant attribute projection across all SCIM operations.
+
+### Added
+- **23 new unit tests** — `endpoint-scim-users.controller.spec.ts` (12) + `endpoint-scim-groups.controller.spec.ts` (11): POST/PUT/PATCH with `attributes`, `excludedAttributes`, both params (precedence), `returned:'request'` interaction, always-returned protection, dotted sub-attribute paths, and without params.
+- **14 new E2E tests** — `attribute-projection.e2e-spec.ts`: POST/PUT/PATCH × Users/Groups with `attributes` and `excludedAttributes` projection, precedence rules, always-returned protection, dotted sub-attributes.
+- **33 new live integration tests** — `scripts/live-test.ps1` TEST SECTION 9p: POST/PUT/PATCH × Users/Groups write-response projection with `attributes`, `excludedAttributes`, both params (precedence), always-returned protection, setup + cleanup.
+- **Feature doc** — `docs/G8G_WRITE_RESPONSE_ATTRIBUTE_PROJECTION.md` — Architecture, projection flow, implementation details, test coverage tables.
+
+### Changed
+- Removed unused `stripReturnedNever` import from both controllers (replaced by `applyAttributeProjection` calls).
+
+### Verified
+- **2,353/2,353 unit tests passing** (69 suites) — up from 2,330 (+23 new)
+- **455/455 E2E tests passing** (22 suites) — up from 441 (+14 new)
+- **444/444 live integration tests passing** — up from 411 (+33 new)
+
+## [0.19.1] - 2026-02-26
+
+### Fixed
+- **G8f — Group Uniqueness Enforcement on PUT/PATCH** — `assertUniqueDisplayName()` and `assertUniqueExternalId()` were defined but never called on PUT (replace) and PATCH (modify) operations. Groups could silently end up with duplicate `displayName` or `externalId` values within the same endpoint. Both methods are now called with proper self-exclusion (`excludeScimId`) on both PUT and PATCH paths.
+
+### Added
+- **10 new unit tests** — `endpoint-scim-groups.service.spec.ts`: PUT/PATCH uniqueness enforcement (displayName conflict, externalId conflict, self-exclusion, excludeScimId verification, null externalId skip).
+- **6 new E2E tests** — `group-lifecycle.e2e-spec.ts`: PUT/PATCH 409 on displayName/externalId collisions, self-update success.
+- **10 new live integration tests** — `scripts/live-test.ps1` TEST SECTION 9o: PUT/PATCH uniqueness (displayName/externalId conflicts, self-update, unique update success), setup + cleanup.
+- **Feature doc** — `docs/G8F_GROUP_UNIQUENESS_PUT_PATCH.md` — Architecture, self-exclusion pattern, test coverage tables.
+
+### Verified
+- **2,330/2,330 unit tests passing** (69 suites) — up from 2,320 (+10 new)
+- **441/441 E2E tests passing** (22 suites) — up from 435 (+6 new)
+- **411/411 live integration tests passing** — up from 401 (+10 new)
+
 ## [0.19.0] - 2026-02-26
 
 ### Added

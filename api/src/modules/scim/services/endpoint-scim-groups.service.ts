@@ -335,6 +335,12 @@ export class EndpointScimGroupsService {
     // H-2: Immutable attribute enforcement — compare existing state with PATCH result
     this.checkImmutableAttributes(group, resultPayload, endpointId, config);
 
+    // G8f: Uniqueness enforcement on PATCH — displayName and externalId must remain unique
+    await this.assertUniqueDisplayName(displayName, endpointId, scimId);
+    if (externalId) {
+      await this.assertUniqueExternalId(externalId, endpointId, scimId);
+    }
+
     // Pre-resolve member user IDs OUTSIDE the transaction to minimise lock hold time.
     const memberInputs = memberDtos.length > 0
       ? await this.resolveMemberInputs(memberDtos, endpointId)
@@ -400,12 +406,17 @@ export class EndpointScimGroupsService {
     // H-2: Immutable attribute enforcement — compare existing resource with incoming payload
     this.checkImmutableAttributes(group, dto as unknown as Record<string, unknown>, endpointId, config);
 
-    const now = new Date();
-    const meta = this.parseJson<Record<string, unknown>>(String(group.meta ?? '{}'));
-
+    // G8f: Uniqueness enforcement on PUT — displayName and externalId must remain unique
+    await this.assertUniqueDisplayName(dto.displayName, endpointId, scimId);
     const newExternalId = typeof (dto as Record<string, unknown>).externalId === 'string'
       ? (dto as Record<string, unknown>).externalId as string
       : null;
+    if (newExternalId) {
+      await this.assertUniqueExternalId(newExternalId, endpointId, scimId);
+    }
+
+    const now = new Date();
+    const meta = this.parseJson<Record<string, unknown>>(String(group.meta ?? '{}'));
 
     // Pre-resolve member user IDs OUTSIDE the transaction to minimise lock hold time.
     const replaceMemberInputs = (dto.members && dto.members.length > 0)

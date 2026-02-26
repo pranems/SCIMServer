@@ -137,13 +137,14 @@ describe('InMemoryUserRepository', () => {
     });
 
     it('should apply a simple key-value filter', async () => {
-      const results = await repo.findAll(endpointId, { userName: 'alice' });
+      // CITEXT-style: use { equals, mode: 'insensitive' } to match case-insensitively
+      const results = await repo.findAll(endpointId, { userName: { equals: 'alice', mode: 'insensitive' } });
       expect(results).toHaveLength(1);
       expect(results[0].scimId).toBe('u2');
     });
 
     it('should return empty when filter matches nothing', async () => {
-      const results = await repo.findAll(endpointId, { userName: 'zzz' });
+      const results = await repo.findAll(endpointId, { userName: { equals: 'zzz', mode: 'insensitive' } });
       expect(results).toHaveLength(0);
     });
 

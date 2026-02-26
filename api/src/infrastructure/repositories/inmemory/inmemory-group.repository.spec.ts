@@ -168,7 +168,8 @@ describe('InMemoryGroupRepository', () => {
     });
 
     it('should apply a key-value filter', async () => {
-      const results = await repo.findAllWithMembers(endpointId, { displayName: 'alpha' });
+      // CITEXT-style: use { equals, mode: 'insensitive' } to match case-insensitively
+      const results = await repo.findAllWithMembers(endpointId, { displayName: { equals: 'alpha', mode: 'insensitive' } });
       expect(results).toHaveLength(1);
       expect(results[0].scimId).toBe('g2');
     });

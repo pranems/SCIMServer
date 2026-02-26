@@ -5,6 +5,8 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 ### Recent Key Achievements (Chronological)
 | Date | Achievement |
 |------|-------------|
+| 2026-02-26 | ✅ **G8g — Write-Response Attribute Projection (v0.19.2):** RFC 7644 §3.9 compliance — `attributes`/`excludedAttributes` query parameters now honored on POST/PUT/PATCH write responses. Replaced 6 inline `returned:'request'` stripping loops with `applyAttributeProjection()` calls in both controllers. Removed unused `stripReturnedNever` import. 23 new unit tests (precedence, returned:request interaction, always-returned protection, dotted sub-attrs), 14 E2E tests, 33 live tests (section 9p). Created `docs/G8G_WRITE_RESPONSE_ATTRIBUTE_PROJECTION.md`. Updated 5 docs (SCIM_COMPLIANCE, CONTEXT_INSTRUCTIONS, RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS). Gap G8g: ✅ CLOSED. **2,353 unit (69 suites), 455 E2E (22 suites), 444 live — all passing.** |
+| 2026-02-26 | ✅ **G8f — Group Uniqueness on PUT/PATCH (v0.19.1):** Fixed data integrity bug — `assertUniqueDisplayName()` and `assertUniqueExternalId()` were defined but never called on PUT/PATCH paths (only POST had inline checks). Both methods now called with `excludeScimId` self-exclusion on `replaceGroupForEndpoint` and `patchGroupForEndpoint`. 10 new unit tests, 6 E2E tests, 10 live tests (section 9o). Created `docs/G8F_GROUP_UNIQUENESS_PUT_PATCH.md`. Gap G8f: ✅ CLOSED. **2,330 unit (69 suites), 441 E2E (22 suites), 411 live — all passing.** |
 | 2026-02-26 | ✅ **Phase 9 — Bulk Operations (RFC 7644 §3.7, v0.19.0):** `POST /endpoints/:endpointId/Bulk` for batch SCIM processing. Per-endpoint `BulkOperationsEnabled` config flag (default: false, 11th boolean flag). `BulkProcessorService` (395 lines): sequential operation processing with `bulkId` cross-referencing (`Map<string, string>`), `failOnErrors` threshold, per-operation error isolation. `BulkController` with config flag gate, schema URN validation, payload size guard (1MB). DTOs: `BulkOperationDto`, `BulkRequestDto`, `BulkOperationResult`, `BulkResponse`. SPC: `bulk.supported=true, maxOperations=1000, maxPayloadSize=1048576`. New error type: `TOO_LARGE: 'tooLarge'`. Created `docs/PHASE_09_BULK_OPERATIONS.md`. Updated `docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md` (now 11 boolean flags + logLevel). **2,320 unit (69 suites), 435 E2E (22 suites), 401+ live — all passing.** |
 | 2026-02-26 | ✅ **G8b — Custom Resource Type Registration (v0.18.0):** Data-driven extensibility beyond User/Group. Per-endpoint `CustomResourceTypesEnabled` config flag (default: false). Admin API (POST/GET/GET/:name/DELETE/:name) at `/admin/endpoints/:endpointId/resource-types`. Generic SCIM CRUD controller with wildcard `:resourceType` routing (registered LAST in module). `GenericPatchEngine` for JSONB-based PATCH with URN-aware paths. `EndpointResourceType` DB table with cascade-delete. `ScimSchemaRegistry` enhanced with per-endpoint resource type overlay. Reserved name/path protection. 15 new implementation files, 6 modified files. Created `docs/G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md`. **2,277 unit (67 suites), 411 E2E (21 suites), 20 new live tests — all passing.** |
 | 2026-02-25 | ✅ **G8e — Response `returned` Characteristic Filtering (v0.17.4):** Two-layer RFC 7643 §2.4 compliance: (1) Service layer strips `returned:'never'` in `toScim*Resource()` for ALL responses (POST/PUT/PATCH/GET/LIST). (2) Controller layer strips `returned:'request'` via enhanced `applyAttributeProjection()` for read ops, direct stripping for write ops. Added `password` to User schema constants (`returned:'never'`, `mutability:'writeOnly'`). Added `SchemaValidator.collectReturnedCharacteristics()`, `stripReturnedNever()` export, `getRequestOnlyAttributes()` on both services. 40 new unit + 8 E2E tests (service-level + controller-level + projection + validator). Created `docs/G8E_RETURNED_CHARACTERISTIC_FILTERING.md`. Gap G8e: ✅ CLOSED. **2,156 unit (61 suites), 382 E2E (20 suites) — all passing.** |
@@ -312,13 +314,13 @@ Deferred:
 ## Dev Quick Ref
 Backend: `cd api && npm run start:dev`
 Frontend: `cd web && npm run dev`
-Unit Tests: `cd api && npm test` (2320 tests, 69 suites)
+Unit Tests: `cd api && npm test` (2353 tests, 69 suites)
 Unit Coverage: `cd api && npm run test:cov` → coverage/
-E2E Tests: `cd api && npm run test:e2e` (435 tests, 22 suites)
+E2E Tests: `cd api && npm run test:e2e` (455 tests, 22 suites)
 E2E Coverage: `cd api && npm run test:e2e:cov` → coverage-e2e/
 All Coverage: `cd api && npm run test:cov:all` (unit + E2E)
 Full Pipeline: `cd api && npm run test:all` (unit + E2E + smoke)
-Live Tests: `.\scripts\live-test.ps1` (401 assertions)
+Live Tests: `.\scripts\live-test.ps1` (444 assertions)
 Live Tests (verbose): `.\scripts\live-test.ps1 -Verbose`
 
 ---

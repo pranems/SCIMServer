@@ -20,7 +20,7 @@ import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { PatchUserDto } from '../dto/patch-user.dto';
 import { SearchRequestDto } from '../dto/search-request.dto';
-import { applyAttributeProjection, applyAttributeProjectionToList, stripReturnedNever } from '../common/scim-attribute-projection';
+import { applyAttributeProjection, applyAttributeProjectionToList } from '../common/scim-attribute-projection';
 import { buildBaseUrl } from '../common/base-url.util';
 
 /**
@@ -65,18 +65,15 @@ export class EndpointScimUsersController {
   async createUser(
     @Param('endpointId') endpointId: string,
     @Body() dto: CreateUserDto,
-    @Req() req: Request
+    @Req() req: Request,
+    @Query('attributes') attributes?: string,
+    @Query('excludedAttributes') excludedAttributes?: string
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const result = await this.usersService.createUserForEndpoint(dto, baseUrl, endpointId, config);
-    // G8e: Strip returned:'request' attributes from write operation responses
+    // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
     const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
-    if (requestOnlyAttrs.size > 0) {
-      for (const key of Object.keys(result)) {
-        if (requestOnlyAttrs.has(key.toLowerCase())) delete (result as Record<string, unknown>)[key];
-      }
-    }
-    return result;
+    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs);
   }
 
   /**
@@ -210,18 +207,16 @@ export class EndpointScimUsersController {
     @Param('endpointId') endpointId: string,
     @Param('id') id: string,
     @Body() dto: CreateUserDto,
-    @Req() req: Request
+    @Req() req: Request,
+    @Query('attributes') attributes?: string,
+    @Query('excludedAttributes') excludedAttributes?: string
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.usersService.replaceUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
+    // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
     const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
-    if (requestOnlyAttrs.size > 0) {
-      for (const key of Object.keys(result)) {
-        if (requestOnlyAttrs.has(key.toLowerCase())) delete (result as Record<string, unknown>)[key];
-      }
-    }
-    return result;
+    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs);
   }
 
   /**
@@ -233,18 +228,16 @@ export class EndpointScimUsersController {
     @Param('endpointId') endpointId: string,
     @Param('id') id: string,
     @Body() dto: PatchUserDto,
-    @Req() req: Request
+    @Req() req: Request,
+    @Query('attributes') attributes?: string,
+    @Query('excludedAttributes') excludedAttributes?: string
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.usersService.patchUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
+    // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
     const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
-    if (requestOnlyAttrs.size > 0) {
-      for (const key of Object.keys(result)) {
-        if (requestOnlyAttrs.has(key.toLowerCase())) delete (result as Record<string, unknown>)[key];
-      }
-    }
-    return result;
+    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs);
   }
 
   /**

@@ -58,6 +58,8 @@
 | [G8C_PATCH_READONLY_PREVALIDATION.md](G8C_PATCH_READONLY_PREVALIDATION.md) | G8c — PATCH readOnly pre-validation: RFC 7643 §2.2 enforcement, architecture, test coverage |
 | [G8E_RETURNED_CHARACTERISTIC_FILTERING.md](G8E_RETURNED_CHARACTERISTIC_FILTERING.md) | G8e — Response `returned` characteristic filtering: RFC 7643 §2.4 enforcement, two-layer architecture, test coverage |
 | [G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md](G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md) | G8b — Custom resource type registration: Data-driven extensibility beyond User/Group, Admin API, generic SCIM CRUD, per-endpoint flag gating |
+| [G8F_GROUP_UNIQUENESS_PUT_PATCH.md](G8F_GROUP_UNIQUENESS_PUT_PATCH.md) | G8f — Group uniqueness enforcement on PUT/PATCH: `displayName`/`externalId` collision detection with self-exclusion, 409 Conflict responses |
+| [G8G_WRITE_RESPONSE_ATTRIBUTE_PROJECTION.md](G8G_WRITE_RESPONSE_ATTRIBUTE_PROJECTION.md) | G8g — Write-response `attributes`/`excludedAttributes` projection on POST/PUT/PATCH for RFC 7644 §3.9 compliance |
 | [PHASE_09_BULK_OPERATIONS.md](PHASE_09_BULK_OPERATIONS.md) | Phase 9 — Bulk Operations (RFC 7644 §3.7): Sequential batch processing, bulkId cross-referencing, failOnErrors, per-endpoint `BulkOperationsEnabled` flag gating |
 
 ## Validation & Testing

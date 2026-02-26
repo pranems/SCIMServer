@@ -18,12 +18,12 @@
 | Pagination (RFC 7644 §3.4.2) | **100%** | startIndex, count, totalResults, itemsPerPage |
 | Filtering (RFC 7644 §3.4.2.2) | **100%** | All 10 operators: `eq`, `ne`, `co`, `sw`, `ew`, `gt`, `lt`, `ge`, `le`, `pr` + `and`/`or`/`not` + grouping |
 | POST /.search (RFC 7644 §3.4.3) | **100%** | SearchRequest body with filter, pagination, attributes, excludedAttributes |
-| Attribute Projection (RFC 7644 §3.4.2.5) | **100%** | `attributes` and `excludedAttributes` params on GET and /.search |
+| Attribute Projection (RFC 7644 §3.4.2.5) | **100%** | `attributes` and `excludedAttributes` params on GET, /.search, POST, PUT, and PATCH (write-response projection added in v0.19.2 — G8g) |
 | ETag / Conditional Requests (RFC 7644 §3.14) | **100%** | Version-based ETags `W/"v{N}"`, If-None-Match → 304, If-Match → 412, RequireIfMatch → 428 |
 | Sorting (RFC 7644 §3.4.2.3) | **0%** | Not implemented (correctly listed as unsupported) |
-| Bulk Operations (RFC 7644 §3.7) | **0%** | Not implemented (correctly listed as unsupported) |
+| Bulk Operations (RFC 7644 §3.7) | **100%** | `POST /Bulk` with sequential processing, `bulkId` cross-referencing, `failOnErrors` threshold, per-endpoint `BulkOperationsEnabled` flag (v0.19.0) |
 
-**Overall: ~96% RFC 7643/7644 compliant** (remaining gaps: Bulk, Sorting — both optional per spec). All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. 2096 unit tests (61 suites), 368 E2E tests (19 suites), 334 live integration tests (334 pass, 0 known failures) — all passing.
+**Overall: ~98% RFC 7643/7644 compliant** (remaining gap: Sorting — optional per spec). All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. 2,353 unit tests (69 suites), 455 E2E tests (22 suites), 444 live integration tests — all passing.
 
 ### New in v0.17.2
 
@@ -109,9 +109,13 @@
 | `?attributes=userName,displayName` on GET | ✅ |
 | `?excludedAttributes=emails,members` on GET | ✅ |
 | `attributes` / `excludedAttributes` in POST /.search body | ✅ |
+| `?attributes` / `?excludedAttributes` on POST, PUT, PATCH write responses (RFC 7644 §3.9) | ✅ (G8g) |
 | Always-returned attributes (`id`, `schemas`, `meta`) never excluded | ✅ |
 | Resource-type-aware always-returned (`displayName` always for Groups, default for Users) | ✅ |
 | `attributes` takes precedence over `excludedAttributes` | ✅ |
+| Dotted sub-attribute paths (`name.givenName`) in projection | ✅ |
+| `returned:'never'` attributes stripped from ALL responses (POST/PUT/PATCH/GET) | ✅ (G8e) |
+| `returned:'request'` attributes stripped unless explicitly requested via `?attributes=` | ✅ (G8e/G8g) |
 
 ## ETag & Conditional Requests (RFC 7644 §3.14)
 
@@ -169,8 +173,6 @@ SCIMServer passes all critical requirements for Microsoft Entra ID enterprise ap
 | Feature | Priority | Notes |
 |---------|----------|-------|
 | `sortBy` / `sortOrder` | Low | Listed as unsupported in ServiceProviderConfig |
-| Bulk operations (`POST /Bulk`) | Low | Optional per spec; not used by Entra |
-| `returned: never` attribute enforcement | Low | Attributes with `returned: 'never'` are not stripped from responses |
 | `caseExact` enforcement in filters | Low | ✅ Fixed for `externalId` (CITEXT → TEXT). Schema-driven `caseExact` for dynamic attributes still pending |
 
 ---

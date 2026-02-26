@@ -195,7 +195,7 @@ flowchart TB
 
     subgraph "Response Building"
         RB["toScimUserResource()<br/>✅ schemas[] dynamic<br/>❌ NO returned filtering<br/>❌ NO writeOnly stripping"]
-        PROJ["scim-attribute-projection<br/>✅ attributes/excludedAttributes<br/>✅ ALWAYS_RETURNED (3 keys)<br/>❌ NOT schema-driven<br/>❌ NOT on POST/PUT/PATCH"]
+        PROJ["scim-attribute-projection<br/>✅ attributes/excludedAttributes<br/>✅ ALWAYS_RETURNED (3 keys + userName)<br/>✅ On POST/PUT/PATCH (G8g v0.19.2)<br/>✅ returned:never stripped (G8e)<br/>✅ returned:request gated (G8e/G8g)"]
     end
 
     subgraph "Filter Evaluation"
@@ -461,7 +461,7 @@ flowchart TB
 
     subgraph "Current Implementation"
         A2[Resource from DB] --> B2["toScimUserResource()<br/>Spread rawPayload as-is"]
-        B2 --> C2["applyAttributeProjection()<br/>(GET only, not POST/PUT/PATCH)"]
+        B2 --> C2["applyAttributeProjection()<br/>(GET + POST/PUT/PATCH — G8g v0.19.2)"]
         C2 --> D2[Response — may contain<br/>writeOnly/never attrs]
     end
 ```
@@ -469,11 +469,11 @@ flowchart TB
 **Current state:**
 - ✅ `ALWAYS_RETURNED = {schemas, id, meta}` — protected from exclusion (hardcoded)
 - ✅ `attributes` and `excludedAttributes` query params work on GET
-- ❌ `returned: "never"` — no attribute is ever stripped from responses
-- ❌ `returned: "request"` — not implemented (all default attrs returned)
-- ❌ `returned: "always"` — not schema-driven (userName should be always-returned but isn't in the set)
-- ❌ Projection not applied on POST/PUT/PATCH response bodies
-- ❌ No schema-aware response filtering at all
+- ✅ `returned: "never"` — stripped from ALL responses via `stripReturnedNever()` in `toScim*Resource()` **(G8e v0.17.4)**
+- ✅ `returned: "request"` — stripped from responses unless explicitly requested via `?attributes=` **(G8e/G8g)**
+- ✅ `returned: "always"` — `userName` added to always-returned set for Users **(G8e v0.17.4)**
+- ✅ Projection applied on POST/PUT/PATCH response bodies **(G8g v0.19.2)**
+- ✅ Schema-aware response filtering via `SchemaValidator.collectReturnedCharacteristics()` **(G8e v0.17.4)**
 
 **Example — password leaks in response (if stored):**
 
@@ -983,10 +983,10 @@ SELECT key, value FROM "EndpointConfig" WHERE "endpointId" = 'ep-1';
 ├───┼──────────────────────────────────────┼──────────┼───────────────────────────┤
 │G1 │ PatchEngine: no mutability checks    │ HIGH     │ PatchEngine + schema wire │
 │G2 │ immutable not enforced on PUT        │ HIGH     │ SchemaValidator + service │
-│G3 │ returned:never not stripped          │ MEDIUM   │ Response builder          │
-│G4 │ returned:request not implemented     │ MEDIUM   │ Response builder          │
-│G5 │ ALWAYS_RETURNED not schema-driven    │ MEDIUM   │ Attribute projection      │
-│G6 │ Projection not on POST/PUT/PATCH     │ MEDIUM   │ Controller layer          │
+│G3 │ ✅ returned:never stripped (G8e)      │ ~~MEDIUM~~ │ Response builder        │
+│G4 │ ✅ returned:request gated (G8e/G8g)   │ ~~MEDIUM~~ │ Response builder        │
+│G5 │ ✅ userName always-returned (G8e)      │ ~~MEDIUM~~ │ Attribute projection    │
+│G6 │ ✅ Projection on POST/PUT/PATCH (G8g)  │ ~~MEDIUM~~ │ Controller layer        │
 │G7 │ caseExact ignored in filters         │ MEDIUM   │ Filter evaluator          │
 │G8 │ canonicalValues not defined          │ LOW      │ Schema constants + types  │
 │G9 │ referenceTypes not enforced          │ LOW      │ SchemaValidator           │

@@ -39,7 +39,7 @@ describe('apply-scim-filter', () => {
 
     it('should push eq filter on userName to DB', () => {
       const result = buildUserFilter('userName eq "john@example.com"');
-      expect(result.dbWhere).toEqual({ userName: 'john@example.com' });
+      expect(result.dbWhere).toEqual({ userName: { equals: 'john@example.com', mode: 'insensitive' } });
       expect(result.fetchAll).toBe(false);
       expect(result.inMemoryFilter).toBeUndefined();
     });
@@ -58,20 +58,20 @@ describe('apply-scim-filter', () => {
 
     it('should be case-insensitive on attribute name for DB push', () => {
       const result = buildUserFilter('UserName eq "test"');
-      expect(result.dbWhere).toEqual({ userName: 'test' });
+      expect(result.dbWhere).toEqual({ userName: { equals: 'test', mode: 'insensitive' } });
       expect(result.fetchAll).toBe(false);
     });
 
     it('should preserve value case (CITEXT handles case-insensitivity)', () => {
       const result = buildUserFilter('userName eq "John@Example.COM"');
-      expect(result.dbWhere).toEqual({ userName: 'John@Example.COM' });
+      expect(result.dbWhere).toEqual({ userName: { equals: 'John@Example.COM', mode: 'insensitive' } });
     });
 
     // ─── Phase 4: displayName now in User column map ───────────────────
 
     it('should push eq on displayName to DB (Phase 4: added to column map)', () => {
       const result = buildUserFilter('displayName eq "John Doe"');
-      expect(result.dbWhere).toEqual({ displayName: 'John Doe' });
+      expect(result.dbWhere).toEqual({ displayName: { equals: 'John Doe', mode: 'insensitive' } });
       expect(result.fetchAll).toBe(false);
       expect(result.inMemoryFilter).toBeUndefined();
     });
@@ -106,7 +106,7 @@ describe('apply-scim-filter', () => {
 
     it('should push ne filter on userName to DB', () => {
       const result = buildUserFilter('userName ne "admin"');
-      expect(result.dbWhere).toEqual({ userName: { not: 'admin' } });
+      expect(result.dbWhere).toEqual({ userName: { not: 'admin', mode: 'insensitive' } });
       expect(result.fetchAll).toBe(false);
     });
 
@@ -164,7 +164,7 @@ describe('apply-scim-filter', () => {
       const result = buildUserFilter('userName eq "john" and active eq true');
       expect(result.dbWhere).toEqual({
         AND: [
-          { userName: 'john' },
+          { userName: { equals: 'john', mode: 'insensitive' } },
           { active: true },
         ],
       });
@@ -178,8 +178,8 @@ describe('apply-scim-filter', () => {
       const result = buildUserFilter('userName eq "john" or displayName eq "John"');
       expect(result.dbWhere).toEqual({
         OR: [
-          { userName: 'john' },
-          { displayName: 'John' },
+          { userName: { equals: 'john', mode: 'insensitive' } },
+          { displayName: { equals: 'John', mode: 'insensitive' } },
         ],
       });
       expect(result.fetchAll).toBe(false);
@@ -244,7 +244,7 @@ describe('apply-scim-filter', () => {
 
     it('should push eq filter on displayName to DB', () => {
       const result = buildGroupFilter('displayName eq "Engineering"');
-      expect(result.dbWhere).toEqual({ displayName: 'Engineering' });
+      expect(result.dbWhere).toEqual({ displayName: { equals: 'Engineering', mode: 'insensitive' } });
       expect(result.fetchAll).toBe(false);
     });
 
@@ -262,12 +262,12 @@ describe('apply-scim-filter', () => {
 
     it('should be case-insensitive on attribute name', () => {
       const result = buildGroupFilter('DISPLAYNAME eq "Ops"');
-      expect(result.dbWhere).toEqual({ displayName: 'Ops' });
+      expect(result.dbWhere).toEqual({ displayName: { equals: 'Ops', mode: 'insensitive' } });
     });
 
     it('should preserve value case (CITEXT handles case-insensitivity)', () => {
       const result = buildGroupFilter('displayName eq "Engineering Team"');
-      expect(result.dbWhere).toEqual({ displayName: 'Engineering Team' });
+      expect(result.dbWhere).toEqual({ displayName: { equals: 'Engineering Team', mode: 'insensitive' } });
     });
 
     // ─── Phase 4: co/sw/ew operators pushed to DB ──────────────────────
@@ -289,7 +289,7 @@ describe('apply-scim-filter', () => {
 
     it('should push ne filter on displayName to DB', () => {
       const result = buildGroupFilter('displayName ne "Admin"');
-      expect(result.dbWhere).toEqual({ displayName: { not: 'Admin' } });
+      expect(result.dbWhere).toEqual({ displayName: { not: 'Admin', mode: 'insensitive' } });
       expect(result.fetchAll).toBe(false);
     });
 

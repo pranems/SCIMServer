@@ -16,9 +16,10 @@ describe('matchesPrismaFilter', () => {
       expect(matchesPrismaFilter({ userName: 'john' }, { userName: 'john' })).toBe(true);
     });
 
-    it('should match string equality case-insensitively', () => {
-      expect(matchesPrismaFilter({ userName: 'John' }, { userName: 'john' })).toBe(true);
-      expect(matchesPrismaFilter({ userName: 'JOHN' }, { userName: 'john' })).toBe(true);
+    it('should match string equality case-sensitively (TEXT column behavior)', () => {
+      expect(matchesPrismaFilter({ externalId: 'ABC-123' }, { externalId: 'ABC-123' })).toBe(true);
+      expect(matchesPrismaFilter({ externalId: 'ABC-123' }, { externalId: 'abc-123' })).toBe(false);
+      expect(matchesPrismaFilter({ externalId: 'abc-123' }, { externalId: 'ABC-123' })).toBe(false);
     });
 
     it('should not match different string values', () => {
@@ -45,6 +46,32 @@ describe('matchesPrismaFilter', () => {
     });
   });
 
+  // ── equals operator with mode ──────────────────────────────────────────────
+
+  describe('equals operator (CITEXT mode)', () => {
+    it('should match case-insensitively with mode:insensitive', () => {
+      expect(matchesPrismaFilter(
+        { userName: 'John' },
+        { userName: { equals: 'john', mode: 'insensitive' } },
+      )).toBe(true);
+      expect(matchesPrismaFilter(
+        { userName: 'JOHN' },
+        { userName: { equals: 'john', mode: 'insensitive' } },
+      )).toBe(true);
+    });
+
+    it('should match case-sensitively without mode flag', () => {
+      expect(matchesPrismaFilter(
+        { userName: 'John' },
+        { userName: { equals: 'john' } },
+      )).toBe(false);
+      expect(matchesPrismaFilter(
+        { userName: 'john' },
+        { userName: { equals: 'john' } },
+      )).toBe(true);
+    });
+  });
+
   // ── not operator ───────────────────────────────────────────────────────────
 
   describe('not operator', () => {
@@ -54,6 +81,28 @@ describe('matchesPrismaFilter', () => {
 
     it('should not match when value equals not condition', () => {
       expect(matchesPrismaFilter({ userName: 'john' }, { userName: { not: 'john' } })).toBe(false);
+    });
+
+    it('should handle case-insensitive not with mode:insensitive', () => {
+      expect(matchesPrismaFilter(
+        { userName: 'JOHN' },
+        { userName: { not: 'john', mode: 'insensitive' } },
+      )).toBe(false);
+      expect(matchesPrismaFilter(
+        { userName: 'jane' },
+        { userName: { not: 'john', mode: 'insensitive' } },
+      )).toBe(true);
+    });
+
+    it('should handle case-sensitive not without mode', () => {
+      expect(matchesPrismaFilter(
+        { externalId: 'ABC' },
+        { externalId: { not: 'abc' } },
+      )).toBe(true);
+      expect(matchesPrismaFilter(
+        { externalId: 'abc' },
+        { externalId: { not: 'abc' } },
+      )).toBe(false);
     });
 
     it('should handle { not: null } as presence check', () => {

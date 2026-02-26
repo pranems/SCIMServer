@@ -64,3 +64,10 @@ Dockerfile.dockerignore# Version sync: Ensure image contains v0.4.8
 
 admin.md
 wiki.md
+api/unit-results3.json
+api/unit-results2.json
+api/failed-tests.txt
+api/unit-results-pipeline.json
+api/pipeline-e2e.json
+api/pipeline-unit.json
+api/unit-counts.json

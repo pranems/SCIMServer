@@ -3689,6 +3689,319 @@ try {
 Write-Host "`n--- Phase 9: Bulk Operations Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9o: GROUP UNIQUENESS ON PUT/PATCH (G8f)
+$script:currentSection = "9o: Group Uniqueness PUT/PATCH (G8f)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9o: GROUP UNIQUENESS ON PUT/PATCH (G8f)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# RFC 7644 §3.5.1 (PUT) / §3.5.2 (PATCH): Unique displayName and externalId must be
+# enforced on replace/modify operations, not just POST create.
+# G8f ensures assertUniqueDisplayName/assertUniqueExternalId are called on PUT/PATCH.
+
+# --- Setup: Create two groups for uniqueness collision testing ---
+Write-Host "`n--- Setup: Create Groups for G8f Uniqueness Tests ---" -ForegroundColor Cyan
+$g8fGroupABody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = "G8f-GroupA-$(Get-Random)"
+    externalId = "g8f-ext-a-$(Get-Random)"
+} | ConvertTo-Json
+$g8fGroupA = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $g8fGroupABody
+$g8fGroupAId = $g8fGroupA.id
+Test-Result -Success ($null -ne $g8fGroupAId) -Message "G8f setup: Created GroupA (id=$g8fGroupAId)"
+
+$g8fGroupBBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = "G8f-GroupB-$(Get-Random)"
+    externalId = "g8f-ext-b-$(Get-Random)"
+} | ConvertTo-Json
+$g8fGroupB = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $g8fGroupBBody
+$g8fGroupBId = $g8fGroupB.id
+Test-Result -Success ($null -ne $g8fGroupBId) -Message "G8f setup: Created GroupB (id=$g8fGroupBId)"
+
+# Test 9o.1: PUT — changing displayName to GroupA's name → 409
+Write-Host "`n--- Test 9o.1: PUT GroupB with GroupA's displayName → 409 ---" -ForegroundColor Cyan
+$g8fPutConflictBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = $g8fGroupA.displayName
+} | ConvertTo-Json
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase/Groups/$g8fGroupBId" -Method PUT -Headers $headers -Body $g8fPutConflictBody
+    Test-Result -Success $false -Message "PUT with conflicting displayName should return 409"
+} catch {
+    $status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($status -eq 409) -Message "PUT with conflicting displayName returns 409 (got $status)"
+}
+
+# Test 9o.2: PUT — self-update keeping same displayName → 200
+Write-Host "`n--- Test 9o.2: PUT GroupA keeping own displayName → 200 ---" -ForegroundColor Cyan
+$g8fPutSelfBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = $g8fGroupA.displayName
+    externalId = $g8fGroupA.externalId
+} | ConvertTo-Json
+try {
+    $g8fPutSelf = Invoke-RestMethod -Uri "$scimBase/Groups/$g8fGroupAId" -Method PUT -Headers $headers -Body $g8fPutSelfBody
+    Test-Result -Success ($g8fPutSelf.displayName -eq $g8fGroupA.displayName) -Message "PUT self-update with same displayName succeeds"
+} catch {
+    Test-Result -Success $false -Message "PUT self-update should succeed: $_"
+}
+
+# Test 9o.3: PUT — changing externalId to GroupA's externalId → 409
+Write-Host "`n--- Test 9o.3: PUT GroupB with GroupA's externalId → 409 ---" -ForegroundColor Cyan
+$g8fPutExtConflictBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = $g8fGroupB.displayName
+    externalId = $g8fGroupA.externalId
+} | ConvertTo-Json
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase/Groups/$g8fGroupBId" -Method PUT -Headers $headers -Body $g8fPutExtConflictBody
+    Test-Result -Success $false -Message "PUT with conflicting externalId should return 409"
+} catch {
+    $status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($status -eq 409) -Message "PUT with conflicting externalId returns 409 (got $status)"
+}
+
+# Test 9o.4: PATCH — changing displayName to GroupA's name → 409
+Write-Host "`n--- Test 9o.4: PATCH GroupB with GroupA's displayName → 409 ---" -ForegroundColor Cyan
+$g8fPatchConflictBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        value = @{ displayName = $g8fGroupA.displayName }
+    })
+} | ConvertTo-Json -Depth 4
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase/Groups/$g8fGroupBId" -Method PATCH -Headers $headers -Body $g8fPatchConflictBody
+    Test-Result -Success $false -Message "PATCH with conflicting displayName should return 409"
+} catch {
+    $status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($status -eq 409) -Message "PATCH with conflicting displayName returns 409 (got $status)"
+}
+
+# Test 9o.5: PATCH — update to unique displayName → 200
+Write-Host "`n--- Test 9o.5: PATCH GroupB with unique displayName → 200 ---" -ForegroundColor Cyan
+$g8fNewName = "G8f-Unique-$(Get-Random)"
+$g8fPatchUniqueBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        value = @{ displayName = $g8fNewName }
+    })
+} | ConvertTo-Json -Depth 4
+try {
+    $g8fPatchUnique = Invoke-RestMethod -Uri "$scimBase/Groups/$g8fGroupBId" -Method PATCH -Headers $headers -Body $g8fPatchUniqueBody
+    Test-Result -Success ($g8fPatchUnique.displayName -eq $g8fNewName) -Message "PATCH with unique displayName succeeds"
+} catch {
+    Test-Result -Success $false -Message "PATCH with unique displayName should succeed: $_"
+}
+
+# Test 9o.6: PATCH — changing externalId to GroupA's externalId → 409
+Write-Host "`n--- Test 9o.6: PATCH GroupB with GroupA's externalId → 409 ---" -ForegroundColor Cyan
+$g8fPatchExtConflictBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        value = @{ externalId = $g8fGroupA.externalId }
+    })
+} | ConvertTo-Json -Depth 4
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase/Groups/$g8fGroupBId" -Method PATCH -Headers $headers -Body $g8fPatchExtConflictBody
+    Test-Result -Success $false -Message "PATCH with conflicting externalId should return 409"
+} catch {
+    $status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($status -eq 409) -Message "PATCH with conflicting externalId returns 409 (got $status)"
+}
+
+# --- G8f Cleanup ---
+Write-Host "`n--- G8f Cleanup: Deleting test groups ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase/Groups/$g8fGroupAId" -Method DELETE -Headers $headers
+    Test-Result -Success $true -Message "G8f GroupA cleaned up"
+} catch {
+    Test-Result -Success $false -Message "G8f GroupA cleanup: $_"
+}
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase/Groups/$g8fGroupBId" -Method DELETE -Headers $headers
+    Test-Result -Success $true -Message "G8f GroupB cleaned up"
+} catch {
+    Test-Result -Success $false -Message "G8f GroupB cleanup: $_"
+}
+
+Write-Host "`n--- G8f: Group Uniqueness on PUT/PATCH Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9p: WRITE-RESPONSE ATTRIBUTE PROJECTION (G8g)
+$script:currentSection = "9p: Write-Response Projection (G8g)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9p: WRITE-RESPONSE ATTRIBUTE PROJECTION (G8g)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# RFC 7644 §3.9: Clients MAY include attributes/excludedAttributes query params
+# on POST, PUT, and PATCH operations to control which attributes are returned
+# in the write-response body.
+
+# --- Setup: Create a user for projection testing ---
+Write-Host "`n--- Setup: Create User for G8g Projection Tests ---" -ForegroundColor Cyan
+$g8gUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "g8g-proj-test-$(Get-Random)@test.com"
+    displayName = "G8g Projection User"
+    name = @{ givenName = "G8g"; familyName = "Proj" }
+    emails = @(@{ value = "g8g-proj@test.com"; type = "work"; primary = $true })
+    active = $true
+} | ConvertTo-Json -Depth 3
+
+# Test 9p.1: POST /Users?attributes=userName — only userName + always-returned in response
+Write-Host "`n--- Test 9p.1: POST /Users?attributes=userName --- projection on create ---" -ForegroundColor Cyan
+$g8gPostResult = Invoke-RestMethod -Uri "$scimBase/Users?attributes=userName" -Method POST -Headers $headers -Body $g8gUserBody
+$g8gUserId = $g8gPostResult.id
+Test-Result -Success ($null -ne $g8gUserId) -Message "POST with ?attributes=userName returns id (always-returned)"
+Test-Result -Success ($null -ne $g8gPostResult.userName) -Message "POST with ?attributes=userName returns userName (requested)"
+Test-Result -Success ($null -ne $g8gPostResult.schemas) -Message "POST with ?attributes=userName returns schemas (always-returned)"
+Test-Result -Success ($null -eq $g8gPostResult.displayName) -Message "POST with ?attributes=userName omits displayName (not requested)"
+Test-Result -Success ($null -eq $g8gPostResult.emails) -Message "POST with ?attributes=userName omits emails (not requested)"
+
+# Test 9p.2: PUT /Users/:id?attributes=displayName — only displayName + always-returned
+Write-Host "`n--- Test 9p.2: PUT /Users?attributes=displayName --- projection on replace ---" -ForegroundColor Cyan
+$g8gPutBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $g8gPostResult.userName
+    displayName = "G8g Put Updated"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$g8gPutResult = Invoke-RestMethod -Uri "$scimBase/Users/${g8gUserId}?attributes=displayName" -Method PUT -Headers $headers -Body $g8gPutBody
+Test-Result -Success ($g8gPutResult.displayName -eq "G8g Put Updated") -Message "PUT ?attributes=displayName returns displayName (requested)"
+Test-Result -Success ($null -ne $g8gPutResult.id) -Message "PUT ?attributes=displayName returns id (always-returned)"
+Test-Result -Success ($null -eq $g8gPutResult.emails) -Message "PUT ?attributes=displayName omits emails (not requested)"
+
+# Test 9p.3: PATCH /Users/:id?excludedAttributes=name,emails — omit specified
+Write-Host "`n--- Test 9p.3: PATCH /Users?excludedAttributes=name,emails --- omit specified ---" -ForegroundColor Cyan
+$g8gPatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        value = @{ displayName = "G8g Patch Updated" }
+    })
+} | ConvertTo-Json -Depth 4
+$g8gPatchResult = Invoke-RestMethod -Uri "$scimBase/Users/${g8gUserId}?excludedAttributes=name,emails" -Method PATCH -Headers $headers -Body $g8gPatchBody
+Test-Result -Success ($g8gPatchResult.displayName -eq "G8g Patch Updated") -Message "PATCH ?excludedAttributes=name,emails returns displayName (not excluded)"
+Test-Result -Success ($null -ne $g8gPatchResult.userName) -Message "PATCH ?excludedAttributes=name,emails returns userName (not excluded)"
+Test-Result -Success ($null -eq $g8gPatchResult.name) -Message "PATCH ?excludedAttributes=name,emails omits name (excluded)"
+Test-Result -Success ($null -eq $g8gPatchResult.emails) -Message "PATCH ?excludedAttributes=name,emails omits emails (excluded)"
+
+# Test 9p.4: POST /Groups?attributes=displayName — projection on group create
+Write-Host "`n--- Test 9p.4: POST /Groups?attributes=displayName --- projection on group create ---" -ForegroundColor Cyan
+$g8gGroupBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = "G8g-ProjGroup-$(Get-Random)"
+} | ConvertTo-Json
+$g8gGroupResult = Invoke-RestMethod -Uri "$scimBase/Groups?attributes=displayName" -Method POST -Headers $headers -Body $g8gGroupBody
+$g8gGroupId = $g8gGroupResult.id
+Test-Result -Success ($null -ne $g8gGroupId) -Message "POST Groups ?attributes=displayName returns id (always-returned)"
+Test-Result -Success ($null -ne $g8gGroupResult.displayName) -Message "POST Groups ?attributes=displayName returns displayName (requested)"
+Test-Result -Success ($null -eq $g8gGroupResult.members) -Message "POST Groups ?attributes=displayName omits members (not requested)"
+
+# Test 9p.5: PUT /Groups/:id?excludedAttributes=members — omit members on replace
+Write-Host "`n--- Test 9p.5: PUT /Groups?excludedAttributes=members --- omit members ---" -ForegroundColor Cyan
+$g8gGroupPutBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = "G8g-ProjGroup-Updated"
+} | ConvertTo-Json
+$g8gGroupPutResult = Invoke-RestMethod -Uri "$scimBase/Groups/${g8gGroupId}?excludedAttributes=members" -Method PUT -Headers $headers -Body $g8gGroupPutBody
+Test-Result -Success ($g8gGroupPutResult.displayName -eq "G8g-ProjGroup-Updated") -Message "PUT Groups ?excludedAttributes=members returns displayName (not excluded)"
+Test-Result -Success ($null -eq $g8gGroupPutResult.members) -Message "PUT Groups ?excludedAttributes=members omits members (excluded)"
+
+# Test 9p.6: PATCH /Groups?attributes=displayName — only requested attrs
+Write-Host "`n--- Test 9p.6: PATCH /Groups?attributes=displayName --- projection on group patch ---" -ForegroundColor Cyan
+$g8gGroupPatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        value = @{ displayName = "G8g-ProjGroup-Patched" }
+    })
+} | ConvertTo-Json -Depth 4
+$g8gGroupPatchResult = Invoke-RestMethod -Uri "$scimBase/Groups/${g8gGroupId}?attributes=displayName" -Method PATCH -Headers $headers -Body $g8gGroupPatchBody
+Test-Result -Success ($g8gGroupPatchResult.displayName -eq "G8g-ProjGroup-Patched") -Message "PATCH Groups ?attributes=displayName returns displayName (requested)"
+Test-Result -Success ($null -ne $g8gGroupPatchResult.id) -Message "PATCH Groups ?attributes=displayName returns id (always-returned)"
+Test-Result -Success ($null -eq $g8gGroupPatchResult.members) -Message "PATCH Groups ?attributes=displayName omits members (not requested)"
+
+# Test 9p.7: POST /Users with BOTH attributes AND excludedAttributes — attributes wins
+Write-Host "`n--- Test 9p.7: POST /Users with BOTH params --- attributes takes precedence ---" -ForegroundColor Cyan
+$g8gBothBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "g8g-both-test-$(Get-Random)@test.com"
+    displayName = "G8g Both Test"
+    name = @{ givenName = "Both"; familyName = "Test" }
+    emails = @(@{ value = "g8g-both@test.com"; type = "work"; primary = $true })
+    active = $true
+} | ConvertTo-Json -Depth 3
+$g8gBothResult = Invoke-RestMethod -Uri "$scimBase/Users?attributes=userName,displayName&excludedAttributes=displayName" -Method POST -Headers $headers -Body $g8gBothBody
+$g8gBothUserId = $g8gBothResult.id
+Test-Result -Success ($null -ne $g8gBothResult.userName) -Message "Both params: attributes wins — userName present (requested)"
+Test-Result -Success ($null -ne $g8gBothResult.displayName) -Message "Both params: attributes wins — displayName present (in attributes list)"
+Test-Result -Success ($null -ne $g8gBothResult.id) -Message "Both params: id present (always-returned)"
+Test-Result -Success ($null -eq $g8gBothResult.emails) -Message "Both params: emails absent (not in attributes list)"
+
+# Test 9p.8: POST /Users with excludedAttributes=id,schemas,meta — always-returned protection
+Write-Host "`n--- Test 9p.8: excludedAttributes=id,schemas,meta --- always-returned protection ---" -ForegroundColor Cyan
+$g8gAlwaysBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "g8g-always-test-$(Get-Random)@test.com"
+    displayName = "G8g Always Test"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$g8gAlwaysResult = Invoke-RestMethod -Uri "$scimBase/Users?excludedAttributes=id,schemas,meta" -Method POST -Headers $headers -Body $g8gAlwaysBody
+$g8gAlwaysUserId = $g8gAlwaysResult.id
+Test-Result -Success ($null -ne $g8gAlwaysResult.id) -Message "Always-returned protection: id present (cannot be excluded)"
+Test-Result -Success ($null -ne $g8gAlwaysResult.schemas) -Message "Always-returned protection: schemas present (cannot be excluded)"
+Test-Result -Success ($null -ne $g8gAlwaysResult.meta) -Message "Always-returned protection: meta present (cannot be excluded)"
+Test-Result -Success ($null -ne $g8gAlwaysResult.userName) -Message "Always-returned protection: userName present (always-returned for User)"
+
+# Test 9p.9: PUT /Users?excludedAttributes=emails,name — omit specified on PUT
+Write-Host "`n--- Test 9p.9: PUT /Users?excludedAttributes=emails,name --- omit specified on replace ---" -ForegroundColor Cyan
+$g8gPutExclBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $g8gPostResult.userName
+    displayName = "G8g Put Excl Updated"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$g8gPutExclResult = Invoke-RestMethod -Uri "$scimBase/Users/${g8gUserId}?excludedAttributes=emails,name" -Method PUT -Headers $headers -Body $g8gPutExclBody
+Test-Result -Success ($g8gPutExclResult.displayName -eq "G8g Put Excl Updated") -Message "PUT ?excludedAttributes=emails,name returns displayName (not excluded)"
+Test-Result -Success ($null -ne $g8gPutExclResult.userName) -Message "PUT ?excludedAttributes=emails,name returns userName (always-returned)"
+Test-Result -Success ($null -eq $g8gPutExclResult.emails) -Message "PUT ?excludedAttributes=emails,name omits emails (excluded)"
+Test-Result -Success ($null -eq $g8gPutExclResult.name) -Message "PUT ?excludedAttributes=emails,name omits name (excluded)"
+
+# --- G8g Extended Cleanup ---
+Write-Host "`n--- G8g Extended Cleanup: Deleting additional test resources ---" -ForegroundColor Cyan
+try {
+    if ($g8gBothUserId) { $null = Invoke-RestMethod -Uri "$scimBase/Users/$g8gBothUserId" -Method DELETE -Headers $headers }
+    if ($g8gAlwaysUserId) { $null = Invoke-RestMethod -Uri "$scimBase/Users/$g8gAlwaysUserId" -Method DELETE -Headers $headers }
+    Test-Result -Success $true -Message "G8g extended test users cleaned up"
+} catch {
+    Test-Result -Success $false -Message "G8g extended cleanup: $_"
+}
+
+# --- G8g Cleanup ---
+Write-Host "`n--- G8g Cleanup: Deleting test resources ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase/Users/$g8gUserId" -Method DELETE -Headers $headers
+    Test-Result -Success $true -Message "G8g test user cleaned up"
+} catch {
+    Test-Result -Success $false -Message "G8g user cleanup: $_"
+}
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase/Groups/$g8gGroupId" -Method DELETE -Headers $headers
+    Test-Result -Success $true -Message "G8g test group cleaned up"
+} catch {
+    Test-Result -Success $false -Message "G8g group cleanup: $_"
+}
+
+Write-Host "`n--- G8g: Write-Response Projection Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
