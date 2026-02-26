@@ -2,7 +2,7 @@
 
 > RFC compliance status and Microsoft Entra ID provisioning compatibility for SCIMServer.
 
-**Last Updated:** February 24, 2026
+**Last Updated:** February 26, 2026
 
 ---
 
@@ -12,7 +12,7 @@
 |----------|-------|-------|
 | Core Operations (CRUD) | **100%** | All operations for Users and Groups |
 | Media Type (RFC 7644 §3.1) | **100%** | `application/scim+json` on all responses including errors |
-| Discovery Endpoints (RFC 7644 §4) | **100%** | ServiceProviderConfig, Schemas, ResourceTypes |
+| Discovery Endpoints (RFC 7644 §4) | **85%** | ServiceProviderConfig, Schemas, ResourceTypes — 6 gaps: auth bypass (D1), individual lookups (D2/D3), `schemas` arrays (D4/D5), `primary` flag (D6). See [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](DISCOVERY_ENDPOINTS_RFC_AUDIT.md) |
 | Error Handling (RFC 7644 §3.12) | **100%** | SCIM error schema, string status, scimType, detail |
 | PATCH Operations (RFC 7644 §3.5.2) | **98%** | add/replace/remove, valuePath, extension URN, no-path merge, boolean coercion |
 | Pagination (RFC 7644 §3.4.2) | **100%** | startIndex, count, totalResults, itemsPerPage |
@@ -24,6 +24,42 @@
 | Bulk Operations (RFC 7644 §3.7) | **100%** | `POST /Bulk` with sequential processing, `bulkId` cross-referencing, `failOnErrors` threshold, per-endpoint `BulkOperationsEnabled` flag (v0.19.0) |
 
 **Overall: ~98% RFC 7643/7644 compliant** (remaining gap: Sorting — optional per spec). All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. 2,357 unit tests (69 suites), 455 E2E tests (22 suites), 444 live integration tests — all passing.
+
+### New in v0.19.2
+
+| Feature | Description |
+|---------|-------------|
+| G8g — Write-Response Attribute Projection | `attributes`/`excludedAttributes` query params honored on POST/PUT/PATCH write responses (RFC 7644 §3.9). Replaced 6 inline stripping loops with `applyAttributeProjection()` calls. 23+14+33 new tests. |
+
+### New in v0.19.1
+
+| Feature | Description |
+|---------|-------------|
+| G8f — Group Uniqueness on PUT/PATCH | `assertUniqueDisplayName()` and `assertUniqueExternalId()` now called on PUT/PATCH paths with `excludeScimId` self-exclusion. 10+6+10 new tests. |
+
+### New in v0.19.0
+
+| Feature | Description |
+|---------|-------------|
+| Phase 9 — Bulk Operations (RFC 7644 §3.7) | `POST /Bulk` with sequential processing, `bulkId` cross-referencing, `failOnErrors` threshold. `BulkOperationsEnabled` per-endpoint flag (default: false). SPC: `bulk.supported=true, maxOperations=1000, maxPayloadSize=1048576`. 43+24+18 new tests. |
+
+### New in v0.18.0
+
+| Feature | Description |
+|---------|-------------|
+| G8b — Custom Resource Type Registration | Data-driven extensibility beyond User/Group. Admin API for resource type CRUD. Generic SCIM CRUD controller with wildcard `:resourceType` routing. `GenericPatchEngine` for JSONB-based PATCH. `CustomResourceTypesEnabled` per-endpoint flag (default: false). 121+29+20 new tests. |
+
+### New in v0.17.4
+
+| Feature | Description |
+|---------|-------------|
+| G8e — `returned` Characteristic Filtering | RFC 7643 §2.4 compliance. Service layer strips `returned:'never'` (e.g. `password`) from ALL responses. Controller layer strips `returned:'request'` from read ops unless explicitly requested. `password` attribute added to User schema constants. Deep-frozen schema constants prevent runtime mutation. 40+8+10 new tests. |
+
+### New in v0.17.3
+
+| Feature | Description |
+|---------|-------------|
+| G8c — PATCH readOnly Pre-Validation | `SchemaValidator.validatePatchOperationValue()` enforces `mutability:'readOnly'` on PATCH ops. Rejects add/replace/remove on readOnly attrs (e.g. `groups`) with 400. `groups` attribute added to User schema constants. Gated behind `StrictSchemaValidation`. 25+7 new tests. |
 
 ### New in v0.17.2
 
@@ -172,6 +208,12 @@ SCIMServer passes all critical requirements for Microsoft Entra ID enterprise ap
 
 | Feature | Priority | Notes |
 |---------|----------|-------|
+| D1 — Discovery endpoints require auth | High | RFC 7644 §4 — SHALL NOT require authentication. Add `@Public()` to 4 controllers |
+| D2 — No `GET /Schemas/{uri}` individual lookup | Medium | RFC 7643 §7 — single schema retrieval by URN |
+| D3 — No `GET /ResourceTypes/{id}` individual lookup | Medium | RFC 7643 §6 — single resource type retrieval by id |
+| D4 — Schema resources missing `schemas` array | Low | Each Schema resource should have `schemas: ["...core:2.0:Schema"]` |
+| D5 — ResourceType resources missing `schemas` array | Low | Each ResourceType resource should have `schemas: ["...core:2.0:ResourceType"]` |
+| D6 — SPC `authenticationSchemes` missing `primary` flag | Very Low | Optional but recommended per RFC 7643 §5 |
 | `sortBy` / `sortOrder` | Low | Listed as unsupported in ServiceProviderConfig |
 | `caseExact` enforcement in filters | Low | ✅ Fixed for `externalId` (CITEXT → TEXT). Schema-driven `caseExact` for dynamic attributes still pending |
 

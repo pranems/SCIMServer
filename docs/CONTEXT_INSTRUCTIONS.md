@@ -252,7 +252,7 @@ Four categories of PATCH paths, handled in order:
 
 ## 7. Current Compliance Status
 
-### 7.1 SCIM 2.0 Compliance (Current v0.18.0 Baseline)
+### 7.1 SCIM 2.0 Compliance (Current v0.19.2 Baseline)
 
 | Feature | Status |
 |---------|--------|
@@ -260,13 +260,13 @@ Four categories of PATCH paths, handled in order:
 | ✅ Groups CRUD (POST/GET/PUT/PATCH/DELETE) | Complete |
 | ✅ PATCH (add/replace/remove, valuePath, extension URNs, no-path merge) | Complete |
 | ✅ Case-insensitive behavior (RFC 7643 §2.1) | Complete |
-| ✅ Discovery endpoints | Complete |
+| ⚠️ Discovery endpoints | 85% — 6 gaps (D1–D6): auth bypass, individual lookups, schemas arrays. See [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](../docs/DISCOVERY_ENDPOINTS_RFC_AUDIT.md) |
 | ✅ Pagination (startIndex, count) | Complete |
 | ✅ Filtering operators (`eq`, `ne`, `co`, `sw`, `ew`, `gt`, `ge`, `lt`, `le`, `pr`) | Complete |
 | ✅ Attribute projection (`attributes`, `excludedAttributes`) | Complete |
 | ✅ ETag / If-None-Match conditional GET behavior | Complete |
 | ⚠️ Sorting (`sortBy`, `sortOrder`) | Advertised unsupported (`sort.supported=false`) |
-| ⚠️ Bulk operations (`/Bulk`) | Advertised unsupported (`bulk.supported=false`) |
+| ✅ Bulk operations (`/Bulk`) | Complete (v0.19.0, RFC 7644 §3.7, `BulkOperationsEnabled` flag) |
 | ⚠️ `/Me` endpoint | Not required for Entra provisioning |
 
 ### 7.2 Microsoft Entra ID Compatibility

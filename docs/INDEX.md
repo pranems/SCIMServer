@@ -61,6 +61,7 @@
 | [G8F_GROUP_UNIQUENESS_PUT_PATCH.md](G8F_GROUP_UNIQUENESS_PUT_PATCH.md) | G8f — Group uniqueness enforcement on PUT/PATCH: `displayName`/`externalId` collision detection with self-exclusion, 409 Conflict responses |
 | [G8G_WRITE_RESPONSE_ATTRIBUTE_PROJECTION.md](G8G_WRITE_RESPONSE_ATTRIBUTE_PROJECTION.md) | G8g — Write-response `attributes`/`excludedAttributes` projection on POST/PUT/PATCH for RFC 7644 §3.9 compliance |
 | [PHASE_09_BULK_OPERATIONS.md](PHASE_09_BULK_OPERATIONS.md) | Phase 9 — Bulk Operations (RFC 7644 §3.7): Sequential batch processing, bulkId cross-referencing, failOnErrors, per-endpoint `BulkOperationsEnabled` flag gating |
+| [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](DISCOVERY_ENDPOINTS_RFC_AUDIT.md) | Discovery endpoints RFC audit — SPC/ResourceTypes/Schemas vs RFC 7643 §5–§7 + RFC 7644 §4: 6 gaps (D1–D6), auth bypass, individual lookups, schemas arrays |
 
 ## Validation & Testing
 

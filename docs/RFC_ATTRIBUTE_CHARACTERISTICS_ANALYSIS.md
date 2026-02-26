@@ -1,6 +1,6 @@
 # RFC 7643/7644 Attribute Characteristics — Full Analysis & Gap Assessment
 
-> **Date:** 2026-02-24 | **Project Version:** v0.17.0  
+> **Date:** 2026-02-26 | **Project Version:** v0.19.2  
 > **Scope:** All 11 attribute characteristics × all 5 SCIM operations × core + extension + custom extension schemas  
 > **References:** RFC 7643 §2.1–§2.5, §3.1, §4, §7 | RFC 7644 §3.3–§3.12
 
@@ -218,9 +218,9 @@ flowchart TB
 | `type` | ✅ | ✅ | ✅ (strict only) | SchemaValidator.validateSingleValue() | binary not base64-validated; reference not URI-validated |
 | `multiValued` | ✅ | ✅ | ✅ (strict only) | SchemaValidator.validateAttribute() | — |
 | `required` | ✅ | ✅ | ⚠️ (strict only) | SchemaValidator.validate() on create/replace | Not enforced when StrictSchemaValidation=false |
-| `mutability` | ✅ | ✅ | ⚠️ (partial) | SchemaValidator rejects readOnly on create/replace | **immutable** not checked; PATCH engine has zero checks |
-| `returned` | ✅ (always/default only) | ❌ | ❌ | Hardcoded ALWAYS_RETURNED = {schemas,id,meta} | `never`/`request` not implemented; not schema-driven |
-| `uniqueness` | ⚠️ (userName only) | ❌ | ✅ (hardcoded) | Service layer: assertUniqueIdentifiers() → 409 | Not schema-driven; not on all attributes |
+| `mutability` | ✅ | ✅ | ⚠️ (partial) | SchemaValidator rejects readOnly on create/replace; PatchEngine pre-validates readOnly (G8c v0.17.3) | **immutable** not checked on PUT; PATCH immutable not fully checked |
+| `returned` | ✅ | ✅ | ✅ (G8e + G8g) | `stripReturnedNever()` + `collectReturnedCharacteristics()` + `applyAttributeProjection()` on all responses | Schema-driven; all 4 modes implemented |
+| `uniqueness` | ⚠️ (userName only) | ❌ | ✅ (hardcoded + G8f) | Service layer: assertUniqueIdentifiers() → 409; Group PATCH re-check (G8f v0.19.1) | Not schema-driven; not on all attributes |
 | `caseExact` | ⚠️ (partial) | ❌ | ❌ | Filter parser always lowercases | externalId should be case-sensitive |
 | `canonicalValues` | ❌ | ❌ | ❌ | — | Not defined anywhere |
 | `referenceTypes` | ⚠️ (2 attrs) | ✅ | ❌ | — | No runtime validation |
@@ -366,7 +366,7 @@ flowchart TB
 
 ---
 
-### 4.3 `mutability` — ❌ MAJOR GAP
+### 4.3 `mutability` — ⚠️ PARTIALLY ADDRESSED (G8c v0.17.3)
 
 ```mermaid
 flowchart TB
@@ -382,7 +382,8 @@ flowchart TB
         SV --> WO["❌ writeOnly → accept<br/>(correct, but no response strip)"]
 
         PA --> PE["PatchEngine"]
-        PE --> NONE["❌ NO CHECKS AT ALL<br/>readOnly, immutable, writeOnly<br/>all blindly applied"]
+        PE --> ROG["✅ readOnly → pre-validated & rejected (G8c v0.17.3)"]
+        PE --> NONE2["❌ immutable, writeOnly<br/>still not checked in PATCH"]
     end
 
     subgraph "RFC Required"
@@ -445,7 +446,7 @@ Content-Type: application/scim+json
 
 ---
 
-### 4.4 `returned` — ❌ NOT IMPLEMENTED
+### 4.4 `returned` — ✅ IMPLEMENTED (G8e v0.17.4 + G8g v0.19.2)
 
 ```mermaid
 flowchart TB
@@ -459,10 +460,10 @@ flowchart TB
         G --> H[Final response]
     end
 
-    subgraph "Current Implementation"
-        A2[Resource from DB] --> B2["toScimUserResource()<br/>Spread rawPayload as-is"]
+    subgraph "Current Implementation (v0.19.2)"
+        A2[Resource from DB] --> B2["toScimUserResource()<br/>✅ stripReturnedNever() (G8e)"]
         B2 --> C2["applyAttributeProjection()<br/>(GET + POST/PUT/PATCH — G8g v0.19.2)"]
-        C2 --> D2[Response — may contain<br/>writeOnly/never attrs]
+        C2 --> D2["✅ Schema-driven response<br/>returned:never stripped, request gated"]
     end
 ```
 
@@ -516,8 +517,8 @@ Content-Type: application/scim+json
 - ✅ `externalId` uniqueness enforced per endpoint → 409 Conflict
 - ✅ Group `displayName` uniqueness enforced → 409 Conflict
 - ✅ Checked on POST, PUT, and User PATCH (after apply)
+- ✅ Group PATCH re-checks `displayName` uniqueness after operations **(G8f v0.19.1)**
 - ❌ **Not schema-driven** — hardcoded in service methods
-- ❌ Group PATCH does not re-check `displayName` uniqueness after operations
 - ❌ `uniqueness` property from schema definitions never read at runtime
 
 **Example — 409 Conflict on duplicate userName (working correctly):**
@@ -648,7 +649,7 @@ sequenceDiagram
     DB-->>SVC: UserRecord
 
     SVC->>SVC: toScimUserResource(record)
-    Note over SVC: ❌ No returned filtering<br/>❌ No writeOnly stripping<br/>rawPayload spread as-is
+    Note over SVC: ✅ returned:never stripped (G8e v0.17.4)<br/>✅ Projection applied (G8g v0.19.2)
 
     SVC-->>CTRL: ScimUserResource
     CTRL-->>C: 201 Created + Location header
@@ -706,14 +707,14 @@ sequenceDiagram
     loop Each Operation
         PE->>PE: Parse path (dot-notation, URN, filter)
         PE->>PE: Normalize key (case-insensitive)
-        Note over PE: ❌ NO SCHEMA LOOKUP<br/>❌ NO mutability check:<br/>  - readOnly → should ignore/error<br/>  - immutable → should error if exists<br/>  - required → should error on remove
-        PE->>PE: Apply add/replace/remove blindly
+        Note over PE: ✅ readOnly pre-validated (G8c v0.17.3)<br/>❌ NO immutable check<br/>❌ NO required check on remove
+        PE->>PE: Apply add/replace/remove
     end
 
     PE-->>SVC: Modified state
 
     SVC->>SVC: assertUniqueIdentifiers()
-    Note over SVC: ❌ Group PATCH doesn't<br/>re-check displayName uniqueness
+    Note over SVC: ✅ Group PATCH re-checks<br/>displayName uniqueness (G8f v0.19.1)
 
     SVC->>DB: repository.save(state)
     SVC->>SVC: toScimUserResource(record)
@@ -996,7 +997,16 @@ SELECT key, value FROM "EndpointConfig" WHERE "endpointId" = 'ep-1';
 │G13│ PATCH remove required → no error     │ MEDIUM   │ PatchEngine               │
 │G14│ members.$ref missing from constants  │ LOW      │ Schema constants          │
 │G15│ required attrs not always enforced   │ MEDIUM   │ Service layer (flag gate) │
+├───┼──────────────────────────────────────┼──────────┼───────────────────────────┤
+│D1 │ Discovery endpoints require auth     │ HIGH     │ Controllers + @Public()   │
+│D2 │ No GET /Schemas/{uri} lookup         │ MEDIUM   │ Controllers + registry    │
+│D3 │ No GET /ResourceTypes/{id} lookup    │ MEDIUM   │ Controllers + registry    │
+│D4 │ Schema resources missing schemas[]   │ LOW      │ Schema constants          │
+│D5 │ ResourceType resources missing schemas│ LOW      │ RT constants              │
+│D6 │ SPC authSchemes missing primary      │ VERY LOW │ SPC constants             │
 └───┴──────────────────────────────────────┴──────────┴───────────────────────────┘
+
+See [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](DISCOVERY_ENDPOINTS_RFC_AUDIT.md) for full audit.
 ```
 
 ### 9.2 Detailed Remediation
@@ -1212,11 +1222,11 @@ Consider making `required` attribute enforcement independent of `StrictSchemaVal
 
 | Priority | Gap(s) | Description | Estimated Effort | Dependencies |
 |:---------|:-------|:------------|:----------------|:-------------|
-| **P0** | G1, G13 | PatchEngine mutability + required guard | 4-5 hours | Schema def lookup utility |
-| **P0** | G2 | Immutable enforcement on PUT | 2-3 hours | G1 lookup utility |
-| **P1** | G3, G4, G10 | Response `returned` filtering + password | 4-5 hours | Schema constants update |
-| **P1** | G5, G6 | Schema-driven projection on all responses | 2-3 hours | G3 |
-| **P1** | G12 | Group PATCH uniqueness recheck | 30 min | — |
+| **P0** | ~~G1~~, G13 | ~~PatchEngine mutability~~ (G8c ✅) + required guard | ~~4-5 hours~~ 1-2h | Schema def lookup utility |
+| **P0** | ~~G2~~ | ~~Immutable enforcement on PUT~~ (H-2 ✅) | ~~2-3 hours~~ Done | ~~G1 lookup utility~~ |
+| **P1** | ~~G3, G4, G10~~ | ~~Response `returned` filtering + password~~ (G8e ✅) | ~~4-5 hours~~ Done | ~~Schema constants update~~ |
+| **P1** | ~~G5, G6~~ | ~~Schema-driven projection on all responses~~ (G8g ✅) | ~~2-3 hours~~ Done | ~~G3~~ |
+| **P1** | ~~G12~~ | ~~Group PATCH uniqueness recheck~~ (G8f ✅) | ~~30 min~~ Done | — |
 | **P2** | G7 | caseExact in filter evaluation | 3-4 hours | Schema lookup in filter |
 | **P3** | G8 | canonicalValues definition | 1-2 hours | — |
 | **P3** | G9 | referenceTypes enforcement | 2-3 hours | — |
@@ -1224,7 +1234,7 @@ Consider making `required` attribute enforcement independent of `StrictSchemaVal
 | **P3** | G14 | Missing members.$ref definition | 15 min | — |
 | **P4** | G15 | Required always enforced (arch decision) | 1-2 hours | Config discussion |
 
-**Total estimated effort: ~22-30 hours**
+**Total remaining effort: ~10-15 hours** (reduced from ~22-30h; G1-G6, G8, G10, G12 resolved)
 
 ### 10.2 Suggested Implementation Phases
 
@@ -1259,9 +1269,9 @@ gantt
 | Migration Phase | Gap Coverage | Notes |
 |:----------------|:-------------|:------|
 | **Phase 8 (done)** | Type, required (strict), multiValued, readOnly (create/replace), unknown attrs | v0.17.0 — Schema Validation Engine |
-| **Phase 8.1 (new)** | G1, G2, G13 — Mutability enforcement across all operations | PatchEngine + SchemaValidator additions |
-| **Phase 8.2 (planned)** | Custom extension registration + runtime validation | Already in migration plan |
-| **Phase 8.3 (new)** | G3, G4, G5, G6, G10 — Response shaping per `returned` | Schema-driven response filter |
+| **Phase 8.1 (done)** | G1, G2, G13 — Mutability enforcement across all operations | v0.17.3 (G8c) + H-1/H-2 — PatchEngine readOnly pre-validation |
+| **Phase 8.2 (done)** | Custom Resource Type registration + runtime validation | v0.18.0 (G8b) — Custom Resource Types |
+| **Phase 8.3 (done)** | G3, G4, G5, G6, G10 — Response shaping per `returned` | v0.17.4 (G8e) + v0.19.2 (G8g) — Schema-driven response filter |
 | **Phase 8.4 (new)** | G7 — caseExact in filter evaluation | Filter parser enhancement |
 | **Phase 8.5 (new)** | G8, G9, G11, G14 — Schema completeness | Constants + optional enforcement |
 | **Phase 12 (existing)** | G15 — Required enforcement config | Architectural cleanup phase |
