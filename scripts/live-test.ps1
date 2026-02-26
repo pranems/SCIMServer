@@ -3021,6 +3021,225 @@ try {
 }
 
 # ============================================
+# TEST SECTION 9m: CUSTOM RESOURCE TYPE REGISTRATION (G8b)
+$script:currentSection = "9m: Custom Resource Types (G8b)"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9m: CUSTOM RESOURCE TYPE REGISTRATION (G8b)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# --- Setup: Create a dedicated endpoint with CustomResourceTypesEnabled ---
+Write-Host "`n--- G8b Setup: Creating dedicated endpoint with CustomResourceTypesEnabled ---" -ForegroundColor Cyan
+$g8bEndpointBody = @{
+    name = "live-test-g8b-$(Get-Random)"
+    displayName = "G8b Custom Resource Types Endpoint"
+    description = "Endpoint for G8b live integration tests"
+    config = @{ CustomResourceTypesEnabled = "True" }
+} | ConvertTo-Json
+$g8bEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $g8bEndpointBody
+$G8bEndpointId = $g8bEndpoint.id
+$scimBaseG8b = "$baseUrl/scim/endpoints/$G8bEndpointId"
+$adminBaseG8b = "$baseUrl/scim/admin/endpoints/$G8bEndpointId"
+Test-Result -Success ($null -ne $G8bEndpointId) -Message "G8b endpoint created with CustomResourceTypesEnabled"
+
+# --- Also create an endpoint WITHOUT the flag for gating tests ---
+$g8bNoFlagBody = @{
+    name = "live-test-g8b-noflag-$(Get-Random)"
+    displayName = "G8b No Flag Endpoint"
+    description = "Endpoint WITHOUT CustomResourceTypesEnabled for gating tests"
+} | ConvertTo-Json
+$g8bNoFlagEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $g8bNoFlagBody
+$G8bNoFlagEndpointId = $g8bNoFlagEndpoint.id
+
+# --- Test 9m.1: Config flag gating — should 403 when flag not enabled ---
+Write-Host "`n--- Test 9m.1: Config flag gating (should 403 when disabled) ---" -ForegroundColor Cyan
+$deviceSchema = @{
+    name = "Device"
+    schemaUri = "urn:ietf:params:scim:schemas:custom:Device"
+    endpoint = "/Devices"
+    description = "Custom Device resource type"
+} | ConvertTo-Json
+try {
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$G8bNoFlagEndpointId/resource-types" -Method POST -Headers $headers -Body $deviceSchema
+    Test-Result -Success $false -Message "9m.1 Should have been rejected with 403"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 403) -Message "9m.1 Config flag gating rejects when disabled (HTTP $statusCode)"
+}
+
+# --- Test 9m.2: Register a custom resource type ---
+Write-Host "`n--- Test 9m.2: Register Device resource type ---" -ForegroundColor Cyan
+$deviceReg = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method POST -Headers $headers -Body $deviceSchema
+Test-Result -Success ($deviceReg.name -eq "Device" -and $deviceReg.endpoint -eq "/Devices") -Message "9m.2 Device resource type registered (name=$($deviceReg.name), endpoint=$($deviceReg.endpoint))"
+
+# --- Test 9m.3: Reject reserved name "User" ---
+Write-Host "`n--- Test 9m.3: Reject reserved name 'User' ---" -ForegroundColor Cyan
+$reservedBody = @{
+    name = "User"
+    schemaUri = "urn:custom:User"
+    endpoint = "/CustomUsers"
+} | ConvertTo-Json
+try {
+    $null = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method POST -Headers $headers -Body $reservedBody
+    Test-Result -Success $false -Message "9m.3 Should have been rejected for reserved name"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "9m.3 Reserved name 'User' rejected (HTTP $statusCode)"
+}
+
+# --- Test 9m.4: Reject reserved endpoint path /Groups ---
+Write-Host "`n--- Test 9m.4: Reject reserved endpoint path /Groups ---" -ForegroundColor Cyan
+$reservedPathBody = @{
+    name = "CustomGroup"
+    schemaUri = "urn:custom:Group"
+    endpoint = "/Groups"
+} | ConvertTo-Json
+try {
+    $null = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method POST -Headers $headers -Body $reservedPathBody
+    Test-Result -Success $false -Message "9m.4 Should have been rejected for reserved path"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "9m.4 Reserved endpoint path '/Groups' rejected (HTTP $statusCode)"
+}
+
+# --- Test 9m.5: Reject duplicate resource type name ---
+Write-Host "`n--- Test 9m.5: Reject duplicate resource type name ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method POST -Headers $headers -Body $deviceSchema
+    Test-Result -Success $false -Message "9m.5 Should have been rejected as duplicate"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 409) -Message "9m.5 Duplicate name 'Device' rejected (HTTP $statusCode)"
+}
+
+# --- Test 9m.6: List registered resource types ---
+Write-Host "`n--- Test 9m.6: List registered resource types ---" -ForegroundColor Cyan
+$listing = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method GET -Headers $headers
+Test-Result -Success ($listing.totalResults -ge 1) -Message "9m.6 List resource types returns $($listing.totalResults) item(s)"
+
+# --- Test 9m.7: Get specific resource type by name ---
+Write-Host "`n--- Test 9m.7: Get resource type by name ---" -ForegroundColor Cyan
+$deviceGet = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types/Device" -Method GET -Headers $headers
+Test-Result -Success ($deviceGet.name -eq "Device" -and $deviceGet.schemaUri -eq "urn:ietf:params:scim:schemas:custom:Device") -Message "9m.7 GET /resource-types/Device returns correct data"
+
+# --- Test 9m.8: Create a custom Device resource ---
+Write-Host "`n--- Test 9m.8: Create a custom Device resource via SCIM ---" -ForegroundColor Cyan
+$deviceBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:custom:Device")
+    displayName = "Test Laptop G8b"
+    externalId = "device-ext-001"
+} | ConvertTo-Json
+$deviceRes = Invoke-RestMethod -Uri "$scimBaseG8b/Devices" -Method POST -Headers $headers -Body $deviceBody -ContentType "application/scim+json"
+$g8bDeviceId = $deviceRes.id
+Test-Result -Success ($null -ne $g8bDeviceId -and $deviceRes.meta.resourceType -eq "Device") -Message "9m.8 Device created (id=$g8bDeviceId, resourceType=$($deviceRes.meta.resourceType))"
+
+# --- Test 9m.9: GET the created Device ---
+Write-Host "`n--- Test 9m.9: GET the created Device ---" -ForegroundColor Cyan
+$deviceFetched = Invoke-RestMethod -Uri "$scimBaseG8b/Devices/$g8bDeviceId" -Method GET -Headers $headers
+Test-Result -Success ($deviceFetched.id -eq $g8bDeviceId -and $deviceFetched.displayName -eq "Test Laptop G8b") -Message "9m.9 GET Device returns correct resource"
+
+# --- Test 9m.10: List Devices ---
+Write-Host "`n--- Test 9m.10: List Devices ---" -ForegroundColor Cyan
+$deviceList = Invoke-RestMethod -Uri "$scimBaseG8b/Devices" -Method GET -Headers $headers
+Test-Result -Success ($deviceList.totalResults -ge 1 -and $deviceList.Resources.Count -ge 1) -Message "9m.10 GET /Devices list returns $($deviceList.totalResults) resource(s)"
+
+# --- Test 9m.11: PUT replace the Device ---
+Write-Host "`n--- Test 9m.11: PUT replace the Device ---" -ForegroundColor Cyan
+$putBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:custom:Device")
+    displayName = "Updated Laptop G8b"
+    externalId = "device-ext-001-updated"
+} | ConvertTo-Json
+$devicePut = Invoke-RestMethod -Uri "$scimBaseG8b/Devices/$g8bDeviceId" -Method PUT -Headers $headers -Body $putBody -ContentType "application/scim+json"
+Test-Result -Success ($devicePut.displayName -eq "Updated Laptop G8b") -Message "9m.11 PUT replace Device succeeds (displayName=$($devicePut.displayName))"
+
+# --- Test 9m.12: PATCH the Device ---
+Write-Host "`n--- Test 9m.12: PATCH the Device ---" -ForegroundColor Cyan
+$patchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "replace"; path = "displayName"; value = "Patched Laptop G8b" }
+    )
+} | ConvertTo-Json -Depth 3
+$devicePatched = Invoke-RestMethod -Uri "$scimBaseG8b/Devices/$g8bDeviceId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/scim+json"
+Test-Result -Success ($devicePatched.displayName -eq "Patched Laptop G8b") -Message "9m.12 PATCH Device succeeds (displayName=$($devicePatched.displayName))"
+
+# --- Test 9m.13: DELETE the Device ---
+Write-Host "`n--- Test 9m.13: DELETE the Device ---" -ForegroundColor Cyan
+$null = Invoke-RestMethod -Uri "$scimBaseG8b/Devices/$g8bDeviceId" -Method DELETE -Headers $headers
+try {
+    $null = Invoke-RestMethod -Uri "$scimBaseG8b/Devices/$g8bDeviceId" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9m.13 Deleted Device should not be found"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 404) -Message "9m.13 DELETE Device works (resource returns 404 after)"
+}
+
+# --- Test 9m.14: 404 for non-existent Device ---
+Write-Host "`n--- Test 9m.14: GET non-existent Device returns 404 ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$scimBaseG8b/Devices/00000000-0000-0000-0000-000000000099" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9m.14 Should have returned 404"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 404) -Message "9m.14 Non-existent Device returns 404 (HTTP $statusCode)"
+}
+
+# --- Test 9m.15: Register a second resource type (Application) ---
+Write-Host "`n--- Test 9m.15: Register Application resource type on same endpoint ---" -ForegroundColor Cyan
+$appSchema = @{
+    name = "Application"
+    schemaUri = "urn:ietf:params:scim:schemas:custom:Application"
+    endpoint = "/Applications"
+    description = "Custom Application resource type"
+} | ConvertTo-Json
+$appReg = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method POST -Headers $headers -Body $appSchema
+Test-Result -Success ($appReg.name -eq "Application") -Message "9m.15 Application resource type registered"
+
+# --- Test 9m.16: Create an Application resource ---
+Write-Host "`n--- Test 9m.16: Create an Application resource ---" -ForegroundColor Cyan
+$appBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:custom:Application")
+    displayName = "Test App G8b"
+} | ConvertTo-Json
+$appRes = Invoke-RestMethod -Uri "$scimBaseG8b/Applications" -Method POST -Headers $headers -Body $appBody -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $appRes.id -and $appRes.meta.resourceType -eq "Application") -Message "9m.16 Application created (id=$($appRes.id))"
+
+# --- Test 9m.17: Endpoint isolation — other endpoints should NOT see Devices ---
+Write-Host "`n--- Test 9m.17: Endpoint isolation ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase/Devices" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9m.17 Main endpoint should NOT serve /Devices"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 404) -Message "9m.17 Endpoint isolation works — main endpoint returns 404 for /Devices (HTTP $statusCode)"
+}
+
+# --- Test 9m.18: Built-in routes still work ---
+Write-Host "`n--- Test 9m.18: Built-in /Users still works on G8b endpoint ---" -ForegroundColor Cyan
+$usersOnG8b = Invoke-RestMethod -Uri "$scimBaseG8b/Users" -Method GET -Headers $headers
+Test-Result -Success ($null -ne $usersOnG8b.totalResults) -Message "9m.18 Built-in /Users works on G8b endpoint (totalResults=$($usersOnG8b.totalResults))"
+
+# --- Test 9m.19: Delete a custom resource type ---
+Write-Host "`n--- Test 9m.19: Delete Application resource type ---" -ForegroundColor Cyan
+$null = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types/Application" -Method DELETE -Headers $headers
+$listAfterDelete = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method GET -Headers $headers
+$appStillExists = $listAfterDelete.resourceTypes | Where-Object { $_.name -eq "Application" }
+Test-Result -Success ($null -eq $appStillExists) -Message "9m.19 Application resource type deleted (no longer in list)"
+
+# --- Test 9m.20: Reject deletion of built-in type ---
+Write-Host "`n--- Test 9m.20: Reject deletion of built-in type 'User' ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types/User" -Method DELETE -Headers $headers
+    Test-Result -Success $false -Message "9m.20 Should have been rejected"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "9m.20 Deletion of built-in type 'User' rejected (HTTP $statusCode)"
+}
+
+Write-Host "`n--- G8b: Custom Resource Type Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
@@ -3078,6 +3297,8 @@ if ($IsolationEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoi
 if ($InactiveEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$InactiveEndpointId" -Name "Inactive Endpoint" }
 if ($NoRemoveAllEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$NoRemoveAllEndpointId" -Name "No Remove All Endpoint" }
 if ($VPEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$VPEndpointId" -Name "Verbose Patch Endpoint" }
+if ($G8bEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$G8bEndpointId" -Name "G8b Custom Resource Types Endpoint" }
+if ($G8bNoFlagEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$G8bNoFlagEndpointId" -Name "G8b No Flag Endpoint" }
 
 # ============================================
 # FINAL SUMMARY

@@ -5,6 +5,27 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] - 2026-02-26
+
+### Added
+- **G8b — Custom Resource Type Registration** — Data-driven extensibility beyond built-in User/Group. Per-endpoint, gated behind `CustomResourceTypesEnabled` config flag (default: false).
+  - **Admin API**: `POST/GET/GET(:name)/DELETE(:name)` at `/admin/endpoints/:endpointId/resource-types` for registering, listing, retrieving, and removing custom resource types.
+  - **Generic SCIM CRUD**: Full SCIM lifecycle (POST create, GET single, GET list, PUT replace, PATCH, DELETE) via wildcard `:resourceType` controller. Supports `displayName eq` and `externalId eq` filter predicates.
+  - **GenericPatchEngine**: JSONB-based PATCH engine with `add`/`replace`/`remove` operations, dot-notation path resolution, and URN-aware extension attribute paths (handles version dots like `2.0`).
+  - **Database**: New `EndpointResourceType` table with cascade-delete, unique constraints on `[endpointId, name]` and `[endpointId, endpoint]`.
+  - **ScimSchemaRegistry**: Enhanced with per-endpoint resource type overlay, DB-hydrated on startup, supports runtime registration/unregistration.
+  - **Validation**: Reserved name protection (User, Group), reserved path protection (/Users, /Groups, /Schemas, /ResourceTypes, /ServiceProviderConfig, /Bulk, /Me), regex-validated name/endpoint formats, duplicate detection.
+- **`CustomResourceTypesEnabled` config flag** — New per-endpoint boolean flag in `endpoint-config.interface.ts`. When disabled (default), Admin API returns 403 and generic SCIM routes return 404.
+- **121 new unit tests** — `generic-patch-engine.spec.ts` (23), `admin-resource-type.controller.spec.ts` (20), `create-endpoint-resource-type.dto.spec.ts` (18), `endpoint-scim-generic.service.spec.ts` (19), `scim-schema-registry.spec.ts` (14 new), `inmemory-endpoint-resource-type.repository.spec.ts` (12), `inmemory-generic-resource.repository.spec.ts` (15).
+- **29 new E2E tests** — `custom-resource-types.e2e-spec.ts`: Config flag gating, Admin API CRUD, generic SCIM CRUD, endpoint isolation, built-in routes protection, multiple resource types.
+- **20 new live integration tests** — `scripts/live-test.ps1` TEST SECTION 9m: Flag gating, registration, reserved names/paths, duplicate rejection, list/get, full SCIM CRUD lifecycle, endpoint isolation, built-in route preservation, delete resource type, built-in type delete rejection.
+- **Feature doc** — `docs/G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md` — Architecture, API reference, Mermaid diagrams, test coverage tables.
+
+### Verified
+- **2,277/2,277 unit tests passing** (67 suites) — up from 2,156 (+121 new, +6 suites)
+- **411/411 E2E tests passing** (21 suites) — up from 382 (+29 new, +1 suite)
+- **Live integration tests**: 20 new tests in section 9m
+
 ## [0.17.4] - 2026-02-25
 
 ### Added

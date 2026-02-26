@@ -249,7 +249,7 @@ Four categories of PATCH paths, handled in order:
 
 ## 7. Current Compliance Status
 
-### 7.1 SCIM 2.0 Compliance (Current v0.17.4 Baseline)
+### 7.1 SCIM 2.0 Compliance (Current v0.18.0 Baseline)
 
 | Feature | Status |
 |---------|--------|
@@ -276,9 +276,9 @@ Four categories of PATCH paths, handled in order:
 
 ## 8. Test Coverage
 
-- **Unit**: 2,156 tests passing (61 suites)
-- **E2E**: 382 tests passing (20 suites)
-- **Live integration**: 361 tests passing (local + Docker)
+- **Unit**: 2,277 tests passing (67 suites)
+- **E2E**: 411 tests passing (21 suites)
+- **Live integration**: 381+ tests passing (local + Docker)
 - **SCIM Validator**: 25/25 required + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
 - Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`

@@ -7,17 +7,20 @@ import { EndpointModule } from '../endpoint/endpoint.module';
 import { RepositoryModule } from '../../infrastructure/repositories/repository.module';
 import { AdminController } from './controllers/admin.controller';
 import { AdminSchemaController } from './controllers/admin-schema.controller';
+import { AdminResourceTypeController } from './controllers/admin-resource-type.controller';
 import { ResourceTypesController } from './controllers/resource-types.controller';
 import { SchemasController } from './controllers/schemas.controller';
 import { ServiceProviderConfigController } from './controllers/service-provider-config.controller';
 import { EndpointScimUsersController } from './controllers/endpoint-scim-users.controller';
 import { EndpointScimGroupsController } from './controllers/endpoint-scim-groups.controller';
 import { EndpointScimDiscoveryController } from './controllers/endpoint-scim-discovery.controller';
+import { EndpointScimGenericController } from './controllers/endpoint-scim-generic.controller';
 import { ScimMetadataService } from './services/scim-metadata.service';
 import { ScimSchemaRegistry } from './discovery/scim-schema-registry';
 import { ScimDiscoveryService } from './discovery/scim-discovery.service';
 import { EndpointScimUsersService } from './services/endpoint-scim-users.service';
 import { EndpointScimGroupsService } from './services/endpoint-scim-groups.service';
+import { EndpointScimGenericService } from './services/endpoint-scim-generic.service';
 import { EndpointContextStorage } from '../endpoint/endpoint-context.storage';
 import { ScimContentTypeInterceptor } from './interceptors/scim-content-type.interceptor';
 import { ScimEtagInterceptor } from './interceptors/scim-etag.interceptor';
@@ -31,9 +34,13 @@ import { ScimExceptionFilter } from './filters/scim-exception.filter';
     SchemasController,
     AdminController,
     AdminSchemaController,
+    AdminResourceTypeController,
     EndpointScimUsersController,
     EndpointScimGroupsController,
-    EndpointScimDiscoveryController
+    EndpointScimDiscoveryController,
+    // Generic controller MUST be registered LAST — its wildcard :resourceType
+    // param would otherwise shadow built-in routes like /Users, /Groups, etc.
+    EndpointScimGenericController,
   ],
   providers: [
     ScimMetadataService,
@@ -41,6 +48,7 @@ import { ScimExceptionFilter } from './filters/scim-exception.filter';
     ScimDiscoveryService,
     EndpointScimUsersService,
     EndpointScimGroupsService,
+    EndpointScimGenericService,
     EndpointContextStorage,
     {
       provide: APP_FILTER,

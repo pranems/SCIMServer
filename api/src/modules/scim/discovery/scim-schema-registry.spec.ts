@@ -674,4 +674,143 @@ describe('ScimSchemaRegistry', () => {
       expect(ext!.attributes).toEqual([]);
     });
   });
+
+  // ─── Custom Resource Types (Phase 8b) ────────────────────────────────
+
+  describe('registerResourceType', () => {
+    const epId = 'ep-rt-1';
+    const deviceType = {
+      id: 'Device',
+      name: 'Device',
+      endpoint: '/Devices',
+      description: 'IoT devices',
+      schema: 'urn:ietf:params:scim:schemas:core:2.0:Device',
+      schemaExtensions: [],
+    };
+
+    it('should register a custom resource type for an endpoint', () => {
+      registry.registerResourceType(deviceType, epId);
+      expect(registry.hasResourceType('Device', epId)).toBe(true);
+    });
+
+    it('should make the type visible in getAllResourceTypes(endpointId)', () => {
+      registry.registerResourceType(deviceType, epId);
+      const types = registry.getAllResourceTypes(epId);
+      const ids = types.map((t) => t.id);
+      expect(ids).toContain('Device');
+      // Built-in types still present
+      expect(ids).toContain('User');
+      expect(ids).toContain('Group');
+    });
+
+    it('should make the type retrievable via getResourceType(id, endpointId)', () => {
+      registry.registerResourceType(deviceType, epId);
+      const rt = registry.getResourceType('Device', epId);
+      expect(rt).toBeDefined();
+      expect(rt!.name).toBe('Device');
+      expect(rt!.endpoint).toBe('/Devices');
+    });
+
+    it('should NOT leak custom types to other endpoints', () => {
+      registry.registerResourceType(deviceType, epId);
+      const types = registry.getAllResourceTypes('other-ep');
+      const ids = types.map((t) => t.id);
+      expect(ids).not.toContain('Device');
+    });
+
+    it('should NOT leak into global getAllResourceTypes()', () => {
+      registry.registerResourceType(deviceType, epId);
+      const globalTypes = registry.getAllResourceTypes();
+      const ids = globalTypes.map((t) => t.id);
+      expect(ids).not.toContain('Device');
+    });
+
+    it('should require an endpointId (compiler enforces this — testing runtime guard)', () => {
+      expect(() => (registry as any).registerResourceType(deviceType, '')).toThrow(BadRequestException);
+    });
+
+    it('should require id/name fields', () => {
+      expect(() =>
+        registry.registerResourceType({ ...deviceType, id: '' } as any, epId),
+      ).toThrow(BadRequestException);
+    });
+  });
+
+  describe('unregisterResourceType', () => {
+    const epId = 'ep-rt-2';
+    const appType = {
+      id: 'Application',
+      name: 'Application',
+      endpoint: '/Applications',
+      description: 'Applications',
+      schema: 'urn:example:app:2.0',
+      schemaExtensions: [],
+    };
+
+    it('should remove a custom resource type from an endpoint', () => {
+      registry.registerResourceType(appType, epId);
+      expect(registry.hasResourceType('Application', epId)).toBe(true);
+
+      registry.unregisterResourceType('Application', epId);
+      expect(registry.hasResourceType('Application', epId)).toBe(false);
+    });
+
+    it('should no-op when unregistering a non-existent type', () => {
+      // Should not throw
+      registry.unregisterResourceType('NonExistent', epId);
+    });
+  });
+
+  describe('getCustomResourceTypes', () => {
+    const epId = 'ep-rt-3';
+    const printerType = {
+      id: 'Printer',
+      name: 'Printer',
+      endpoint: '/Printers',
+      description: 'Printers',
+      schema: 'urn:example:printer:2.0',
+      schemaExtensions: [],
+    };
+
+    it('should return only custom types, not built-in', () => {
+      registry.registerResourceType(printerType, epId);
+      const custom = registry.getCustomResourceTypes(epId);
+      expect(custom).toHaveLength(1);
+      expect(custom[0].id).toBe('Printer');
+    });
+
+    it('should return empty for an endpoint with no custom types', () => {
+      const custom = registry.getCustomResourceTypes('no-custom');
+      expect(custom).toEqual([]);
+    });
+  });
+
+  describe('findResourceTypeByEndpointPath', () => {
+    const epId = 'ep-rt-4';
+    const sensorType = {
+      id: 'Sensor',
+      name: 'Sensor',
+      endpoint: '/Sensors',
+      description: 'Sensors',
+      schema: 'urn:example:sensor:2.0',
+      schemaExtensions: [],
+    };
+
+    it('should find a custom type by endpoint path', () => {
+      registry.registerResourceType(sensorType, epId);
+      const found = registry.findResourceTypeByEndpointPath('/Sensors', epId);
+      expect(found).toBeDefined();
+      expect(found!.id).toBe('Sensor');
+    });
+
+    it('should NOT find built-in types (routed by dedicated controllers)', () => {
+      const found = registry.findResourceTypeByEndpointPath('/Users', epId);
+      expect(found).toBeUndefined();
+    });
+
+    it('should return undefined for unknown path', () => {
+      const found = registry.findResourceTypeByEndpointPath('/Unknown', epId);
+      expect(found).toBeUndefined();
+    });
+  });
 });

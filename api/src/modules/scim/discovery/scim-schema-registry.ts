@@ -16,7 +16,9 @@ import {
   SCIM_SERVICE_PROVIDER_CONFIG,
 } from './scim-schemas.constants';
 import { ENDPOINT_SCHEMA_REPOSITORY } from '../../../domain/repositories/repository.tokens';
+import { ENDPOINT_RESOURCE_TYPE_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import type { IEndpointSchemaRepository } from '../../../domain/repositories/endpoint-schema.repository.interface';
+import type { IEndpointResourceTypeRepository } from '../../../domain/repositories/endpoint-resource-type.repository.interface';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -75,6 +77,8 @@ interface EndpointOverlay {
   schemas: Map<string, ScimSchemaDefinition>;
   /** Extension URNs attached to each resource type for this endpoint */
   extensionsByResourceType: Map<string, Set<string>>;
+  /** Custom resource types registered for this specific endpoint (Phase 8b) */
+  resourceTypes: Map<string, ScimResourceType>;
 }
 
 /**
@@ -135,6 +139,9 @@ export class ScimSchemaRegistry implements OnModuleInit {
     @Optional()
     @Inject(ENDPOINT_SCHEMA_REPOSITORY)
     private readonly schemaRepo?: IEndpointSchemaRepository,
+    @Optional()
+    @Inject(ENDPOINT_RESOURCE_TYPE_REPOSITORY)
+    private readonly resourceTypeRepo?: IEndpointResourceTypeRepository,
   ) {
     this.loadBuiltInSchemas();
   }
@@ -145,43 +152,83 @@ export class ScimSchemaRegistry implements OnModuleInit {
    * previously registered extensions are available immediately on startup.
    */
   async onModuleInit(): Promise<void> {
-    if (!this.schemaRepo) {
-      this.logger.debug('No EndpointSchema repository injected — skipping DB hydration.');
-      return;
+    // ─── Hydrate persisted schema extensions ──────────────────────────
+
+    if (this.schemaRepo) {
+      try {
+        const rows = await this.schemaRepo.findAll();
+        let count = 0;
+
+        for (const row of rows) {
+          const definition: ScimSchemaDefinition = {
+            id: row.schemaUrn,
+            name: row.name,
+            description: row.description ?? '',
+            attributes: Array.isArray(row.attributes)
+              ? (row.attributes as ScimSchemaAttribute[])
+              : [],
+            meta: {
+              resourceType: 'Schema',
+              location: `/Schemas/${row.schemaUrn}`,
+            },
+          };
+
+          this.registerExtension(
+            definition,
+            row.resourceTypeId ?? undefined,
+            row.required,
+            row.endpointId,
+          );
+          count++;
+        }
+
+        if (count > 0) {
+          this.logger.log(`Hydrated ${count} persisted schema extension(s) from database.`);
+        }
+      } catch (error) {
+        this.logger.error('Failed to hydrate schema extensions from database', error);
+      }
+    } else {
+      this.logger.debug('No EndpointSchema repository injected — skipping schema DB hydration.');
     }
 
-    try {
-      const rows = await this.schemaRepo.findAll();
-      let count = 0;
+    // ─── Hydrate persisted custom resource types (Phase 8b) ───────────
 
-      for (const row of rows) {
-        const definition: ScimSchemaDefinition = {
-          id: row.schemaUrn,
-          name: row.name,
-          description: row.description ?? '',
-          attributes: Array.isArray(row.attributes)
-            ? (row.attributes as ScimSchemaAttribute[])
-            : [],
-          meta: {
-            resourceType: 'Schema',
-            location: `/Schemas/${row.schemaUrn}`,
-          },
-        };
+    if (this.resourceTypeRepo) {
+      try {
+        const rows = await this.resourceTypeRepo.findAll();
+        let count = 0;
 
-        this.registerExtension(
-          definition,
-          row.resourceTypeId ?? undefined,
-          row.required,
-          row.endpointId,
-        );
-        count++;
+        for (const row of rows) {
+          const extensions = Array.isArray(row.schemaExtensions)
+            ? row.schemaExtensions.map((e) => ({
+                schema: e.schema,
+                required: e.required,
+              }))
+            : [];
+
+          this.registerResourceType(
+            {
+              id: row.name,
+              name: row.name,
+              endpoint: row.endpoint,
+              description: row.description ?? `Custom resource type: ${row.name}`,
+              schema: row.schemaUri,
+              schemaExtensions: extensions,
+            },
+            row.endpointId,
+          );
+          count++;
+        }
+
+        if (count > 0) {
+          this.logger.log(`Hydrated ${count} persisted custom resource type(s) from database.`);
+        }
+      } catch (error) {
+        this.logger.error('Failed to hydrate custom resource types from database', error);
       }
-
-      if (count > 0) {
-        this.logger.log(`Hydrated ${count} persisted schema extension(s) from database.`);
-      }
-    } catch (error) {
-      this.logger.error('Failed to hydrate schema extensions from database', error);
+    } else {
+      this.logger.debug('No EndpointResourceType repository injected — skipping resource type DB hydration.');
     }
   }
 
@@ -293,9 +340,19 @@ export class ScimSchemaRegistry implements OnModuleInit {
       );
     }
     if (resourceTypeId && !this.resourceTypes.has(resourceTypeId)) {
-      throw new BadRequestException(
-        `Resource type "${resourceTypeId}" not found. Available: ${[...this.resourceTypes.keys()].join(', ')}`,
-      );
+      // For per-endpoint registrations, also check the endpoint overlay resource types
+      if (endpointId) {
+        const overlay = this.endpointOverlays.get(endpointId);
+        if (!overlay?.resourceTypes.has(resourceTypeId)) {
+          throw new BadRequestException(
+            `Resource type "${resourceTypeId}" not found. Available: ${[...this.resourceTypes.keys(), ...(overlay?.resourceTypes.keys() ?? [])].join(', ')}`,
+          );
+        }
+      } else {
+        throw new BadRequestException(
+          `Resource type "${resourceTypeId}" not found. Available: ${[...this.resourceTypes.keys()].join(', ')}`,
+        );
+      }
     }
 
     // Ensure meta is populated
@@ -369,6 +426,109 @@ export class ScimSchemaRegistry implements OnModuleInit {
     return existed;
   }
 
+  // ─── Custom Resource Type Registration (Phase 8b) ─────────────────────
+
+  /**
+   * Register a custom resource type, scoped to a specific endpoint.
+   *
+   * Custom resource types are always per-endpoint — they are NOT registered globally.
+   * This method adds the resource type to the endpoint overlay so that discovery
+   * responses include it and the generic controller can serve CRUD for it.
+   *
+   * @param resourceType RFC 7643 §6 ResourceType definition
+   * @param endpointId   The endpoint to register for (required for custom types)
+   *
+   * @throws BadRequestException if the resource type id conflicts with a built-in type
+   *
+   * @example
+   *   registry.registerResourceType({
+   *     id: 'Device',
+   *     name: 'Device',
+   *     endpoint: '/Devices',
+   *     description: 'IoT Device resource',
+   *     schema: 'urn:ietf:params:scim:schemas:core:2.0:Device',
+   *     schemaExtensions: [],
+   *   }, 'endpoint-1');
+   */
+  registerResourceType(resourceType: ScimResourceType, endpointId: string): void {
+    if (!resourceType.id || !resourceType.name) {
+      throw new BadRequestException('ResourceType must have an "id" and "name".');
+    }
+    if (!endpointId) {
+      throw new BadRequestException('Custom resource types must be scoped to an endpoint.');
+    }
+
+    // Ensure meta is populated
+    const rt: ScimResourceType = {
+      ...resourceType,
+      schemaExtensions: [...resourceType.schemaExtensions],
+      meta: resourceType.meta ?? {
+        resourceType: 'ResourceType',
+        location: `/ResourceTypes/${resourceType.id}`,
+      },
+    };
+
+    const overlay = this.getOrCreateOverlay(endpointId);
+    overlay.resourceTypes.set(rt.id, rt);
+  }
+
+  /**
+   * Unregister a custom resource type from a specific endpoint.
+   *
+   * @param resourceTypeId The resource type id/name to remove (e.g., "Device")
+   * @param endpointId     The endpoint to remove from
+   * @returns true if the resource type was removed, false if not found
+   */
+  unregisterResourceType(resourceTypeId: string, endpointId: string): boolean {
+    const overlay = this.endpointOverlays.get(endpointId);
+    if (!overlay) return false;
+
+    const existed = overlay.resourceTypes.delete(resourceTypeId);
+    // Also remove any extensions keyed to this resource type
+    overlay.extensionsByResourceType.delete(resourceTypeId);
+    return existed;
+  }
+
+  /**
+   * Check if a resource type is registered (globally or per-endpoint).
+   */
+  hasResourceType(resourceTypeId: string, endpointId?: string): boolean {
+    if (this.resourceTypes.has(resourceTypeId)) return true;
+    if (endpointId) {
+      const overlay = this.endpointOverlays.get(endpointId);
+      if (overlay?.resourceTypes.has(resourceTypeId)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Get only the custom (per-endpoint) resource types for an endpoint.
+   * Does NOT include built-in User/Group types.
+   */
+  getCustomResourceTypes(endpointId: string): ScimResourceType[] {
+    const overlay = this.endpointOverlays.get(endpointId);
+    if (!overlay) return [];
+    return [...overlay.resourceTypes.values()];
+  }
+
+  /**
+   * Find a custom resource type by its SCIM endpoint path.
+   * Used by the generic controller to resolve /:resourceType path to a registered type.
+   *
+   * @param endpointPath The SCIM endpoint path (e.g., "/Devices")
+   * @param endpointId   The SCIM endpoint id
+   * @returns The matching resource type or undefined
+   */
+  findResourceTypeByEndpointPath(endpointPath: string, endpointId: string): ScimResourceType | undefined {
+    const overlay = this.endpointOverlays.get(endpointId);
+    if (!overlay) return undefined;
+
+    for (const rt of overlay.resourceTypes.values()) {
+      if (rt.endpoint === endpointPath) return rt;
+    }
+    return undefined;
+  }
+
   // ─── Queries ───────────────────────────────────────────────────────────
 
   /**
@@ -404,11 +564,13 @@ export class ScimSchemaRegistry implements OnModuleInit {
   /**
    * All resource types with merged schema extensions for an endpoint.
    * Global resource types are deep-copied with endpoint-specific extensions appended.
+   * Per-endpoint custom resource types (Phase 8b) are included.
    */
   getAllResourceTypes(endpointId?: string): ScimResourceType[] {
     const overlay = endpointId ? this.endpointOverlays.get(endpointId) : undefined;
 
-    return [...this.resourceTypes.values()].map((rt) => {
+    // Start with global resource types (User, Group) with endpoint extensions merged
+    const result = [...this.resourceTypes.values()].map((rt) => {
       if (!overlay) return rt;
 
       const epExtensions = overlay.extensionsByResourceType.get(rt.id);
@@ -423,11 +585,27 @@ export class ScimSchemaRegistry implements OnModuleInit {
       }
       return { ...rt, schemaExtensions: mergedExtensions };
     });
+
+    // Append per-endpoint custom resource types (Phase 8b)
+    if (overlay) {
+      for (const customRT of overlay.resourceTypes.values()) {
+        result.push(customRT);
+      }
+    }
+
+    return result;
   }
 
-  /** Get a single resource type by id (with endpoint extensions merged) */
+  /** Get a single resource type by id (with endpoint extensions merged, or custom per-endpoint) */
   getResourceType(resourceTypeId: string, endpointId?: string): ScimResourceType | undefined {
     const rt = this.resourceTypes.get(resourceTypeId);
+
+    // Check per-endpoint custom resource types (Phase 8b)
+    if (!rt && endpointId) {
+      const overlay = this.endpointOverlays.get(endpointId);
+      return overlay?.resourceTypes.get(resourceTypeId);
+    }
+
     if (!rt) return undefined;
     if (!endpointId) return rt;
 
@@ -530,6 +708,7 @@ export class ScimSchemaRegistry implements OnModuleInit {
       overlay = {
         schemas: new Map(),
         extensionsByResourceType: new Map(),
+        resourceTypes: new Map(),
       };
       this.endpointOverlays.set(endpointId, overlay);
     }

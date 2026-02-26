@@ -14,13 +14,19 @@ import {
   USER_REPOSITORY,
   GROUP_REPOSITORY,
   ENDPOINT_SCHEMA_REPOSITORY,
+  ENDPOINT_RESOURCE_TYPE_REPOSITORY,
+  GENERIC_RESOURCE_REPOSITORY,
 } from '../../domain/repositories/repository.tokens';
 import { PrismaUserRepository } from './prisma/prisma-user.repository';
 import { PrismaGroupRepository } from './prisma/prisma-group.repository';
 import { PrismaEndpointSchemaRepository } from './prisma/prisma-endpoint-schema.repository';
+import { PrismaEndpointResourceTypeRepository } from './prisma/prisma-endpoint-resource-type.repository';
+import { PrismaGenericResourceRepository } from './prisma/prisma-generic-resource.repository';
 import { InMemoryUserRepository } from './inmemory/inmemory-user.repository';
 import { InMemoryGroupRepository } from './inmemory/inmemory-group.repository';
 import { InMemoryEndpointSchemaRepository } from './inmemory/inmemory-endpoint-schema.repository';
+import { InMemoryEndpointResourceTypeRepository } from './inmemory/inmemory-endpoint-resource-type.repository';
+import { InMemoryGenericResourceRepository } from './inmemory/inmemory-generic-resource.repository';
 import { PrismaModule } from '../../modules/prisma/prisma.module';
 
 @Module({})
@@ -36,8 +42,10 @@ export class RepositoryModule {
           { provide: USER_REPOSITORY, useClass: InMemoryUserRepository },
           { provide: GROUP_REPOSITORY, useClass: InMemoryGroupRepository },
           { provide: ENDPOINT_SCHEMA_REPOSITORY, useClass: InMemoryEndpointSchemaRepository },
+          { provide: ENDPOINT_RESOURCE_TYPE_REPOSITORY, useClass: InMemoryEndpointResourceTypeRepository },
+          { provide: GENERIC_RESOURCE_REPOSITORY, useClass: InMemoryGenericResourceRepository },
         ],
-        exports: [USER_REPOSITORY, GROUP_REPOSITORY, ENDPOINT_SCHEMA_REPOSITORY],
+        exports: [USER_REPOSITORY, GROUP_REPOSITORY, ENDPOINT_SCHEMA_REPOSITORY, ENDPOINT_RESOURCE_TYPE_REPOSITORY, GENERIC_RESOURCE_REPOSITORY],
       };
     }
 
@@ -50,8 +58,10 @@ export class RepositoryModule {
         { provide: USER_REPOSITORY, useClass: PrismaUserRepository },
         { provide: GROUP_REPOSITORY, useClass: PrismaGroupRepository },
         { provide: ENDPOINT_SCHEMA_REPOSITORY, useClass: PrismaEndpointSchemaRepository },
+        { provide: ENDPOINT_RESOURCE_TYPE_REPOSITORY, useClass: PrismaEndpointResourceTypeRepository },
+        { provide: GENERIC_RESOURCE_REPOSITORY, useClass: PrismaGenericResourceRepository },
       ],
-      exports: [USER_REPOSITORY, GROUP_REPOSITORY, ENDPOINT_SCHEMA_REPOSITORY],
+      exports: [USER_REPOSITORY, GROUP_REPOSITORY, ENDPOINT_SCHEMA_REPOSITORY, ENDPOINT_RESOURCE_TYPE_REPOSITORY, GENERIC_RESOURCE_REPOSITORY],
     };
   }
 }

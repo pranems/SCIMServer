@@ -87,7 +87,18 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * @see RFC 7644 §3.3 — Creating Resources (uniqueness)
    * @see RFC 7644 §3.6 — Deleting Resources (soft-delete)
    */
-  REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED: 'ReprovisionOnConflictForSoftDeletedResource',} as const;
+  REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED: 'ReprovisionOnConflictForSoftDeletedResource',
+
+  /**
+   * When true, enables registration and use of custom resource types beyond
+   * the built-in User and Group types for this endpoint. Custom resource types
+   * are registered via the Admin API and stored in the EndpointResourceType table.
+   * When false (default), only the built-in User and Group types are available.
+   *
+   * @see Phase 8b — Custom Resource Type Registration
+   */
+  CUSTOM_RESOURCE_TYPES_ENABLED: 'CustomResourceTypesEnabled',
+} as const;
 
 /**
  * Type for endpoint config flag keys
@@ -190,6 +201,14 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]?: boolean | string;
 
   /**
+   * When true, enables registration and use of custom resource types beyond
+   * User and Group for this endpoint. When false (default), only built-in types.
+   *
+   * Example config: { "CustomResourceTypesEnabled": "True" }
+   */
+  [ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED]?: boolean | string;
+
+  /**
    * Allow any additional configuration flags
    */
   [key: string]: unknown;
@@ -253,6 +272,7 @@ export const DEFAULT_ENDPOINT_CONFIG: EndpointConfig = {
   [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: false,
   [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: true,
   [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: false,
+  [ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED]: false,
 };
 
 /**
@@ -308,6 +328,7 @@ export function validateEndpointConfig(config: Record<string, any> | undefined):
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH);
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS);
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED);
 
   // Validate logLevel
   const logLevelFlag = config[ENDPOINT_CONFIG_FLAGS.LOG_LEVEL];
