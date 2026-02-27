@@ -216,7 +216,7 @@ describe('EndpointScimGroupsController', () => {
 
         expect(mockEndpointService.getEndpoint).toHaveBeenCalledWith('endpoint-1');
         expect(mockGroupsService.listGroupsForEndpoint).toHaveBeenCalledWith(
-          { filter: undefined, startIndex: 1, count: 10 },
+          { filter: undefined, startIndex: 1, count: 10, sortBy: undefined, sortOrder: undefined },
           expect.any(String),
           'endpoint-1',
           expect.any(Object)
@@ -239,7 +239,7 @@ describe('EndpointScimGroupsController', () => {
         mockGroupsService.listGroupsForEndpoint.mockResolvedValue(mockListResponse);
 
         const result = await controller.listGroups(
-          'endpoint-1', mockRequest, undefined, '1', '10', 'displayName', undefined
+          'endpoint-1', mockRequest, undefined, '1', '10', undefined, undefined, 'displayName', undefined
         );
 
         expect(result.Resources[0].displayName).toBe('Group 1');
@@ -270,7 +270,7 @@ describe('EndpointScimGroupsController', () => {
         const result = await controller.searchGroups('endpoint-1', searchDto, mockRequest);
 
         expect(mockGroupsService.listGroupsForEndpoint).toHaveBeenCalledWith(
-          { filter: 'displayName eq "Engineering"', startIndex: 1, count: 10 },
+          { filter: 'displayName eq "Engineering"', startIndex: 1, count: 10, sortBy: undefined, sortOrder: undefined },
           expect.any(String),
           'endpoint-1',
           expect.any(Object)

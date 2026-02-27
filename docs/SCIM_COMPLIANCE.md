@@ -20,10 +20,10 @@
 | POST /.search (RFC 7644 §3.4.3) | **100%** | SearchRequest body with filter, pagination, attributes, excludedAttributes |
 | Attribute Projection (RFC 7644 §3.4.2.5) | **100%** | `attributes` and `excludedAttributes` params on GET, /.search, POST, PUT, and PATCH (write-response projection added in v0.19.2 — G8g) |
 | ETag / Conditional Requests (RFC 7644 §3.14) | **100%** | Version-based ETags `W/"v{N}"`, If-None-Match → 304, If-Match → 412, RequireIfMatch → 428 |
-| Sorting (RFC 7644 §3.4.2.3) | **0%** | Not implemented (correctly listed as unsupported) |
+| Sorting (RFC 7644 §3.4.2.3) | **100%** | `sortBy` / `sortOrder` on GET and POST `/.search` for Users, Groups, Generic. SPC: `sort.supported: true` (v0.20.0) |
 | Bulk Operations (RFC 7644 §3.7) | **100%** | `POST /Bulk` with sequential processing, `bulkId` cross-referencing, `failOnErrors` threshold, per-endpoint `BulkOperationsEnabled` flag (v0.19.0) |
 
-**Overall: ~98% RFC 7643/7644 compliant** (remaining gaps: Sorting \u2014 optional per spec, /Me endpoint). All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. Discovery: 124 unit + 35 E2E tests. Full suite: 2,357+ unit tests (69 suites), 455+ E2E tests (22 suites), 444 live integration tests \u2014 all passing.
+**Overall: ~99% RFC 7643/7644 compliant** (remaining gap: G11 per-endpoint credentials — optional). All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. Discovery: 124 unit + 35 E2E tests. Full suite: 2,548+ unit tests (75 suites), 506+ E2E tests (24 suites), 463 live integration tests.
 
 ### New in v0.19.3
 
@@ -205,9 +205,9 @@ SCIMServer passes all critical requirements for Microsoft Entra ID enterprise ap
 | Feature | Status | Impact |
 |---------|--------|--------|
 | Bulk operations | ✅ Implemented (v0.19.0) | None — Entra doesn't use `/Bulk` |
-| `/Me` endpoint | ❌ Not implemented | None — Entra provisioning doesn't use `/Me` |
+| `/Me` endpoint | ✅ Implemented (v0.20.0) | None — Entra provisioning doesn't use `/Me` |
 | Complex filter operators (co, sw, ew, etc.) | ✅ Implemented | All 10 operators available (Entra only uses `eq` + `and`) |
-| Sorting | ❌ Not implemented | None — Entra doesn't request sorting |
+| Sorting | ✅ Implemented (v0.20.0) | None — Entra doesn't request sorting |
 
 ---
 
@@ -221,8 +221,8 @@ SCIMServer passes all critical requirements for Microsoft Entra ID enterprise ap
 | ~~D4 — Schema resources missing `schemas` array~~ | ~~Low~~ | ✅ Resolved v0.19.3 — `schemas: ["...Schema"]` added |
 | ~~D5 — ResourceType resources missing `schemas` array~~ | ~~Low~~ | ✅ Resolved v0.19.3 — `schemas: ["...ResourceType"]` added |
 | ~~D6 — SPC `authenticationSchemes` missing `primary` flag~~ | ~~Very Low~~ | ✅ Resolved v0.19.3 — `primary: true` added |
-| `sortBy` / `sortOrder` | Low | Listed as unsupported in ServiceProviderConfig |
-| `/Me` endpoint | Low | Not required for Entra ID provisioning |
+| ~~`sortBy` / `sortOrder`~~ | ~~Low~~ | ✅ Resolved v0.20.0 — `sort.supported: true`, sortBy/sortOrder on GET and `/.search` |
+| ~~`/Me` endpoint~~ | ~~Low~~ | ✅ Resolved v0.20.0 — JWT `sub` → userName identity resolution, full CRUD |
 | `caseExact` enforcement in filters | Low | ✅ Fixed for `externalId` (CITEXT → TEXT). Schema-driven `caseExact` for dynamic attributes still pending |
 
 ---

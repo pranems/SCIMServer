@@ -265,9 +265,9 @@ Four categories of PATCH paths, handled in order:
 | ✅ Filtering operators (`eq`, `ne`, `co`, `sw`, `ew`, `gt`, `ge`, `lt`, `le`, `pr`) | Complete |
 | ✅ Attribute projection (`attributes`, `excludedAttributes`) | Complete |
 | ✅ ETag / If-None-Match conditional GET behavior | Complete |
-| ⚠️ Sorting (`sortBy`, `sortOrder`) | Advertised unsupported (`sort.supported=false`) |
+| ✅ Sorting (`sortBy`, `sortOrder`) | Complete (v0.20.0, `sort.supported=true`) |
 | ✅ Bulk operations (`/Bulk`) | Complete (v0.19.0, RFC 7644 §3.7, `BulkOperationsEnabled` flag) |
-| ⚠️ `/Me` endpoint | Not required for Entra provisioning |
+| ✅ `/Me` endpoint | Complete (v0.20.0, JWT sub → userName identity resolution) |
 
 ### 7.2 Microsoft Entra ID Compatibility
 
@@ -279,9 +279,9 @@ Four categories of PATCH paths, handled in order:
 
 ## 8. Test Coverage
 
-- **Unit**: 2,357 tests passing (69 suites)
-- **E2E**: 455 tests passing (22 suites)
-- **Live integration**: 444+ tests passing (local + Docker)
+- **Unit**: 2,548 tests passing (75 suites)
+- **E2E**: 506 tests passing (24 suites)
+- **Live integration**: 463 tests passing (local + Docker)
 - **SCIM Validator**: 25/25 required + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
 - Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`
@@ -332,12 +332,15 @@ Four categories of PATCH paths, handled in order:
 2. **payload is JSONB** — native JSON type in PostgreSQL; use Prisma's JSON operations for queries
 3. **PostgreSQL CITEXT** — userName and externalId use CITEXT for case-insensitive uniqueness; no derived `*Lower` columns needed
 4. **Filter push-down** — ALL 10 SCIM operators are pushed to PostgreSQL WHERE clauses; compound AND/OR supported. No in-memory post-fetch filtering.
-5. **Backup depends on Azure** — `BackupService` silently skips if `BLOB_BACKUP_ACCOUNT` isn't set (local dev)
+5. **Backup depends on Azure** — `BackupService` silently skips if `BLOB_BACKUP_ACCOUNT` isn't set (local dev). **Note:** This service is a SQLite-era relic flagged for removal; PostgreSQL uses standard backup mechanisms.
 6. **Auto-generated secrets** — In dev mode, `SCIM_SHARED_SECRET` and `OAUTH_CLIENT_SECRET` are auto-generated and logged to console. NEVER do this in production.
 7. **ValidationPipe whitelist: false** — We do NOT strip unknown properties, because SCIM resources have arbitrary attributes in extensions
 8. **The `/scim/v2` rewrite** — Express middleware in `main.ts` rewrites `/scim/v2/*` to `/scim/*` for spec compliance
 9. **SchemaValidator** — 950-line pure domain class for RFC 7643 payload validation. Gated behind `StrictSchemaValidation` config flag. Validates type, mutability (readOnly + immutable), required attrs, unknown attrs, sub-attributes, canonicalValues, size limits. New: `collectBooleanAttributeNames()` for schema-aware boolean coercion, `validateFilterAttributePaths()` for filter validation (V32).
 10. **Repository Pattern** — `IUserRepository`/`IGroupRepository` interfaces injected via tokens. `PERSISTENCE_BACKEND` env var toggles between `prisma` and `inmemory` implementations.
+11. **G2 is DONE** — Despite two service files (`EndpointScimUsersService`/`EndpointScimGroupsService`), the database already uses a single unified `ScimResource` table with a `resourceType` discriminator. There are no separate User/Group tables. G17 (service code deduplication) remains open.
+12. **Legacy auth guard** — `scim-auth.guard.ts` contains a hardcoded legacy bearer token and uses `console.log`/`console.error` instead of NestJS Logger. Both should be cleaned up.
+13. **CORS wildcard** — `main.ts` sets `origin: true` (accept all origins). Should be restricted for production deployments.
 
 ---
 

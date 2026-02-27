@@ -508,7 +508,7 @@ export const SCIM_SERVICE_PROVIDER_CONFIG = {
   bulk: { supported: true, maxOperations: 1000, maxPayloadSize: 1048576 },
   filter: { supported: true, maxResults: 200 },
   changePassword: { supported: false },
-  sort: { supported: false },
+  sort: { supported: true },
   etag: { supported: true },
   authenticationSchemes: [
     {

@@ -4002,6 +4002,220 @@ try {
 Write-Host "`n--- G8g: Write-Response Projection Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9q: SORTING (Phase 12 / RFC 7644 S3.4.2.3)
+$script:currentSection = "9q: Sorting"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9q: SORTING (Phase 12 / RFC 7644 S3.4.2.3)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# --- Setup: Create users with distinct, sortable userNames ---
+Write-Host "`n--- Setup: Create Users for Sorting Tests ---" -ForegroundColor Cyan
+$sortUserIds = @()
+$sortNames = @("alpha-sort@test.com", "charlie-sort@test.com", "bravo-sort@test.com")
+foreach ($sn in $sortNames) {
+    $sortBody = @{
+        schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+        userName = $sn
+        displayName = "Sort User $sn"
+        active = $true
+    } | ConvertTo-Json
+    $sortUser = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $sortBody
+    $sortUserIds += $sortUser.id
+    Write-Host "  Created sort test user: $sn ($($sortUser.id))"
+}
+
+# Test 9q.1: GET /Users?sortBy=userName&sortOrder=ascending
+Write-Host "`n--- Test 9q.1: GET /Users?sortBy=userName&sortOrder=ascending ---" -ForegroundColor Cyan
+$sortAsc = Invoke-RestMethod -Uri "$scimBase/Users?sortBy=userName&sortOrder=ascending&filter=userName co `"sort@test.com`"" -Method GET -Headers $headers
+Test-Result -Success ($sortAsc.Resources.Count -ge 3) -Message "Sort ascending: returned >= 3 sort users"
+$userNamesAsc = $sortAsc.Resources | ForEach-Object { $_.userName }
+$isSorted = $true
+for ($i = 0; $i -lt $userNamesAsc.Count - 1; $i++) {
+    if ($userNamesAsc[$i] -gt $userNamesAsc[$i+1]) { $isSorted = $false; break }
+}
+Test-Result -Success $isSorted -Message "Sort ascending: userNames are in ascending order"
+
+# Test 9q.2: GET /Users?sortBy=userName&sortOrder=descending
+Write-Host "`n--- Test 9q.2: GET /Users?sortBy=userName&sortOrder=descending ---" -ForegroundColor Cyan
+$sortDesc = Invoke-RestMethod -Uri "$scimBase/Users?sortBy=userName&sortOrder=descending&filter=userName co `"sort@test.com`"" -Method GET -Headers $headers
+$userNamesDesc = $sortDesc.Resources | ForEach-Object { $_.userName }
+$isSortedDesc = $true
+for ($i = 0; $i -lt $userNamesDesc.Count - 1; $i++) {
+    if ($userNamesDesc[$i] -lt $userNamesDesc[$i+1]) { $isSortedDesc = $false; break }
+}
+Test-Result -Success $isSortedDesc -Message "Sort descending: userNames are in descending order"
+
+# Test 9q.3: Default sortOrder is ascending when only sortBy is specified
+Write-Host "`n--- Test 9q.3: Default sortOrder is ascending ---" -ForegroundColor Cyan
+$sortDefault = Invoke-RestMethod -Uri "$scimBase/Users?sortBy=userName&filter=userName co `"sort@test.com`"" -Method GET -Headers $headers
+$userNamesDefault = $sortDefault.Resources | ForEach-Object { $_.userName }
+$isSortedDefault = $true
+for ($i = 0; $i -lt $userNamesDefault.Count - 1; $i++) {
+    if ($userNamesDefault[$i] -gt $userNamesDefault[$i+1]) { $isSortedDefault = $false; break }
+}
+Test-Result -Success $isSortedDefault -Message "Default sortOrder: ascending when sortBy specified without sortOrder"
+
+# Test 9q.4: POST /.search with sortBy/sortOrder in body
+Write-Host "`n--- Test 9q.4: POST /.search with sorting ---" -ForegroundColor Cyan
+$searchSortBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:SearchRequest")
+    filter = "userName co `"sort@test.com`""
+    sortBy = "userName"
+    sortOrder = "descending"
+} | ConvertTo-Json
+$searchSortResult = Invoke-RestMethod -Uri "$scimBase/Users/.search" -Method POST -Headers $headers -Body $searchSortBody
+$searchNames = $searchSortResult.Resources | ForEach-Object { $_.userName }
+$isSearchSorted = $true
+for ($i = 0; $i -lt $searchNames.Count - 1; $i++) {
+    if ($searchNames[$i] -lt $searchNames[$i+1]) { $isSearchSorted = $false; break }
+}
+Test-Result -Success $isSearchSorted -Message "POST /.search: sorting works in search body (descending)"
+
+# Test 9q.5: Sorting with pagination (sortBy + count + startIndex)
+Write-Host "`n--- Test 9q.5: Sorting with pagination ---" -ForegroundColor Cyan
+$sortPag = Invoke-RestMethod -Uri "$scimBase/Users?sortBy=userName&sortOrder=ascending&filter=userName co `"sort@test.com`"&count=2&startIndex=1" -Method GET -Headers $headers
+Test-Result -Success ($sortPag.Resources.Count -le 2) -Message "Sorting with pagination: respects count=2"
+Test-Result -Success ($sortPag.totalResults -ge 3) -Message "Sorting with pagination: totalResults reflects all matching"
+
+# Test 9q.6: Sort Groups by displayName
+Write-Host "`n--- Test 9q.6: Sort Groups by displayName ---" -ForegroundColor Cyan
+$sortGroupIds = @()
+$sortGroupNames = @("Zebra-Sort-Group", "Alpha-Sort-Group", "Mango-Sort-Group")
+foreach ($sgn in $sortGroupNames) {
+    $sgBody = @{
+        schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+        displayName = $sgn
+    } | ConvertTo-Json
+    $sg = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $sgBody
+    $sortGroupIds += $sg.id
+    Write-Host "  Created sort test group: $sgn ($($sg.id))"
+}
+$sortGroups = Invoke-RestMethod -Uri "$scimBase/Groups?sortBy=displayName&sortOrder=ascending&filter=displayName co `"Sort-Group`"" -Method GET -Headers $headers
+$groupNamesAsc = $sortGroups.Resources | ForEach-Object { $_.displayName }
+$isGroupSorted = $true
+for ($i = 0; $i -lt $groupNamesAsc.Count - 1; $i++) {
+    if ($groupNamesAsc[$i] -gt $groupNamesAsc[$i+1]) { $isGroupSorted = $false; break }
+}
+Test-Result -Success $isGroupSorted -Message "Sort Groups by displayName ascending: correct order"
+
+# Test 9q.7: SPC /ServiceProviderConfig reflects sort.supported=true
+Write-Host "`n--- Test 9q.7: SPC sort.supported ---" -ForegroundColor Cyan
+$spc = Invoke-RestMethod -Uri "$scimBase/ServiceProviderConfig" -Method GET -Headers $headers
+Test-Result -Success ($spc.sort.supported -eq $true) -Message "ServiceProviderConfig: sort.supported is true"
+
+# --- 9q Cleanup ---
+Write-Host "`n--- 9q Cleanup: Deleting sort test resources ---" -ForegroundColor Cyan
+foreach ($sid in $sortUserIds) {
+    try { $null = Invoke-RestMethod -Uri "$scimBase/Users/$sid" -Method DELETE -Headers $headers } catch {}
+}
+foreach ($sgid in $sortGroupIds) {
+    try { $null = Invoke-RestMethod -Uri "$scimBase/Groups/$sgid" -Method DELETE -Headers $headers } catch {}
+}
+Test-Result -Success $true -Message "Sort test resources cleaned up"
+
+Write-Host "`n--- 9q: Sorting Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9r: /Me ENDPOINT (Phase 10 / RFC 7644 S3.11)
+$script:currentSection = "9r: /Me Endpoint"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9r: /Me ENDPOINT (Phase 10 / RFC 7644 S3.11)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# The /Me endpoint resolves the currently authenticated subject (JWT sub claim)
+# to a SCIM User whose userName matches. The live-test OAuth token has sub=$ClientId.
+
+# --- Setup: Create a user whose userName matches the OAuth sub claim ---
+Write-Host "`n--- Setup: Create User matching JWT sub claim ($ClientId) ---" -ForegroundColor Cyan
+$meUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $ClientId
+    displayName = "Me Test User"
+    name = @{ givenName = "Me"; familyName = "Test" }
+    emails = @(@{ value = "me-test@test.com"; type = "work"; primary = $true })
+    active = $true
+} | ConvertTo-Json -Depth 3
+$meUser = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $meUserBody
+$meUserId = $meUser.id
+Write-Host "  Created /Me test user: $ClientId ($meUserId)"
+Test-Result -Success ($null -ne $meUserId) -Message "/Me setup: user created with userName=$ClientId"
+
+# Test 9r.1: GET /Me returns the authenticated user
+Write-Host "`n--- Test 9r.1: GET /Me ---" -ForegroundColor Cyan
+$meGet = Invoke-RestMethod -Uri "$scimBase/Me" -Method GET -Headers $headers
+Test-Result -Success ($meGet.id -eq $meUserId) -Message "GET /Me: returns correct user id"
+Test-Result -Success ($meGet.userName -eq $ClientId) -Message "GET /Me: userName matches JWT sub"
+Test-Result -Success ($null -ne $meGet.meta) -Message "GET /Me: includes meta"
+
+# Test 9r.2: GET /Me?attributes=userName — attribute projection
+Write-Host "`n--- Test 9r.2: GET /Me?attributes=userName ---" -ForegroundColor Cyan
+$meGetProj = Invoke-RestMethod -Uri "$scimBase/Me?attributes=userName" -Method GET -Headers $headers
+Test-Result -Success ($null -ne $meGetProj.userName) -Message "GET /Me?attributes=userName: userName present"
+Test-Result -Success ($null -eq $meGetProj.displayName) -Message "GET /Me?attributes=userName: displayName omitted"
+
+# Test 9r.3: PATCH /Me — update displayName
+Write-Host "`n--- Test 9r.3: PATCH /Me ---" -ForegroundColor Cyan
+$mePatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        value = @{ displayName = "Me Patched" }
+    })
+} | ConvertTo-Json -Depth 4
+$mePatch = Invoke-RestMethod -Uri "$scimBase/Me" -Method PATCH -Headers $headers -Body $mePatchBody
+Test-Result -Success ($mePatch.displayName -eq "Me Patched") -Message "PATCH /Me: displayName updated"
+Test-Result -Success ($mePatch.id -eq $meUserId) -Message "PATCH /Me: same user id"
+
+# Test 9r.4: Verify PATCH persisted via GET /Me
+Write-Host "`n--- Test 9r.4: Verify PATCH /Me persisted ---" -ForegroundColor Cyan
+$meGetAfterPatch = Invoke-RestMethod -Uri "$scimBase/Me" -Method GET -Headers $headers
+Test-Result -Success ($meGetAfterPatch.displayName -eq "Me Patched") -Message "GET /Me after PATCH: displayName persisted"
+
+# Test 9r.5: PUT /Me — full replace
+Write-Host "`n--- Test 9r.5: PUT /Me ---" -ForegroundColor Cyan
+$mePutBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $ClientId
+    displayName = "Me Put Replaced"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$mePut = Invoke-RestMethod -Uri "$scimBase/Me" -Method PUT -Headers $headers -Body $mePutBody
+Test-Result -Success ($mePut.displayName -eq "Me Put Replaced") -Message "PUT /Me: displayName replaced"
+Test-Result -Success ($mePut.id -eq $meUserId) -Message "PUT /Me: same user id"
+
+# Test 9r.6: Cross-validate GET /Me matches GET /Users/{id}
+Write-Host "`n--- Test 9r.6: Cross-validate /Me vs /Users/{id} ---" -ForegroundColor Cyan
+$meGetFinal = Invoke-RestMethod -Uri "$scimBase/Me" -Method GET -Headers $headers
+$directGet = Invoke-RestMethod -Uri "$scimBase/Users/$meUserId" -Method GET -Headers $headers
+Test-Result -Success ($meGetFinal.userName -eq $directGet.userName) -Message "Cross-validate: /Me and /Users/{id} return same userName"
+Test-Result -Success ($meGetFinal.displayName -eq $directGet.displayName) -Message "Cross-validate: /Me and /Users/{id} return same displayName"
+
+# Test 9r.7: DELETE /Me
+Write-Host "`n--- Test 9r.7: DELETE /Me ---" -ForegroundColor Cyan
+$null = Invoke-WebRequest -Uri "$scimBase/Me" -Method DELETE -Headers $headers
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase/Me" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "DELETE /Me: user should no longer exist"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 404) -Message "DELETE /Me: returns 404 after deletion"
+}
+
+# Test 9r.8: GET /Me when no matching user — 404
+Write-Host "`n--- Test 9r.8: GET /Me with no matching user ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase/Me" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "/Me no matching user: should return 404"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 404) -Message "/Me no matching user: returns 404"
+}
+
+Write-Host "`n--- 9r: /Me Endpoint Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

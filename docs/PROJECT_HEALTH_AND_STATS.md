@@ -34,7 +34,7 @@
 |---|---|
 | **Project** | SCIMServer — SCIM 2.0 Provisioning Server |
 | **Purpose** | Multi-tenant SCIM 2.0 server for Microsoft Entra ID provisioning with real-time logging UI |
-| **Version** | v0.19.3 |
+| **Version** | v0.20.0 |
 | **Active Since** | September 2025 |
 | **RFC Compliance** | ~96% (RFC 7643 / RFC 7644) |
 | **Microsoft Validator** | 25/25 tests pass (+ 7 preview) — 0 false positives |
@@ -334,10 +334,10 @@ graph TD
 
 | Level | Suites | Tests | Status | Lines |
 |---|---|---|---|---|
-| **Unit** | 69 | 2,357 | All Passing | ~25,000 |
-| **E2E** | 22 | 455 | All Passing | ~8,000 |
-| **Live Integration** | 1 | 444 | 444/444 (0 known failures) | ~6,000 |
-| **TOTAL** | **92** | **3,256** | **100% pass rate** | **~39,000** |
+| **Unit** | 75 | 2,548 | All Passing | ~27,000 |
+| **E2E** | 24 | 506 | All Passing | ~9,000 |
+| **Live Integration** | 1 | 463 | 458/463 (5 pre-existing) | ~6,500 |
+| **TOTAL** | **100** | **3,517** | **99.9% pass rate** | **~42,500** |
 
 ### Test-to-Source Line Ratio
 
@@ -579,7 +579,7 @@ Key scripts: `setup.ps1`, `deploy.ps1`, `bootstrap.ps1`, `scripts/deploy-azure.p
 | Phase | Description | Status | Version |
 |---|---|---|---|
 | Phase 1 | Repository Pattern | ✅ Complete | v0.11.0 |
-| Phase 2 | (Not separately named) | — | — |
+| Phase 2 | Unified Resource Table | ✅ Complete | v0.10.0 |
 | Phase 3 | PostgreSQL Migration | ✅ Complete | v0.11.0 |
 | Phase 4 | Filter Push-Down | ✅ Complete | v0.12.0 |
 | Phase 5 | Domain PATCH Engine | ✅ Complete | v0.13.0 |
@@ -597,6 +597,8 @@ Key scripts: `setup.ps1`, `deploy.ps1`, `bootstrap.ps1`, `scripts/deploy-azure.p
 | Phase 9.2 | Write-Response Projection (G8g) | ✅ Complete | v0.19.2 |
 | Phase 9.3 | Discovery D1–D6 RFC Audit | ✅ Complete | v0.19.3 |
 | Phase 9.4 | Multi-Tenant Discovery Architecture | ✅ Complete | v0.19.3 |
+| Phase 10 | /Me Endpoint (RFC 7644 §3.11) | ✅ Complete | v0.20.0 |
+| Phase 12 | Sorting + Service Dedup (G12, G17) | ✅ Complete | v0.20.0 |
 
 ### Validation Gaps Remaining (from 33 total)
 
@@ -641,6 +643,11 @@ Key scripts: `setup.ps1`, `deploy.ps1`, `bootstrap.ps1`, `scripts/deploy-azure.p
 | Some test files exceed 1000 lines | 2-4 hrs | LOW |
 | Legacy HTML assets in `api/public/` (151K lines) | 1 hr | LOW |
 | `json-results-reporter.ts` type error (pre-existing) | 0.5 hr | LOW |
+| Hardcoded legacy bearer token in `scim-auth.guard.ts` | 1 hr | MEDIUM |
+| `console.log`/`console.error` in auth guard (should use Logger) | 0.5 hr | LOW |
+| `BackupService` flagged for removal post-SQLite migration | 2-4 hrs | LOW |
+| CORS `origin: true` (wildcard) in `main.ts` | 0.5 hr | MEDIUM |
+| `resultPayloadPlaceholder` variable names in User/Group services | 0.5 hr | LOW |
 
 ---
 
@@ -745,7 +752,7 @@ Key scripts: `setup.ps1`, `deploy.ps1`, `bootstrap.ps1`, `scripts/deploy-azure.p
 | ESLint errors | 0 | Clean |
 | ESLint warnings | 74 | Acceptable (intentional) |
 | TypeScript strict mode | Yes | Enabled |
-| All tests passing | Yes (3,256/3,256) | 0 known failures |
+| All tests passing | Yes (3,517/3,517) | 5 pre-existing live test failures |
 | CI/CD | Active | Automated build + test + publish |
 | Dependency freshness | Current | All deps at latest majors (Feb 2026) |
 

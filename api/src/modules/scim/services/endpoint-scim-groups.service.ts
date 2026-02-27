@@ -16,7 +16,6 @@ import { getConfigBoolean, getConfigBooleanWithDefault, ENDPOINT_CONFIG_FLAGS, t
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { createScimError } from '../common/scim-errors';
-import { assertIfMatch } from '../interceptors/scim-etag.interceptor';
 import {
   DEFAULT_COUNT,
   MAX_COUNT,
@@ -30,15 +29,25 @@ import type { CreateGroupDto, GroupMemberDto } from '../dto/create-group.dto';
 import type { PatchGroupDto } from '../dto/patch-group.dto';
 import { ScimMetadataService } from './scim-metadata.service';
 import { buildGroupFilter } from '../filters/apply-scim-filter';
+import { resolveGroupSortParams } from '../common/scim-sort.util';
 import { GroupPatchEngine } from '../../../domain/patch/group-patch-engine';
 import { PatchError } from '../../../domain/patch/patch-error';
 import { SchemaValidator } from '../../../domain/validation';
-import type { SchemaDefinition } from '../../../domain/validation';
+import {
+  parseJson,
+  ensureSchema,
+  enforceIfMatch,
+  sanitizeBooleanStrings,
+  guardSoftDeleted,
+  ScimSchemaHelpers,
+} from '../common/scim-service-helpers';
 
 interface ListGroupsParams {
   filter?: string;
   startIndex?: number;
   count?: number;
+  sortBy?: string;
+  sortOrder?: 'ascending' | 'descending';
 }
 
 /**
@@ -47,6 +56,8 @@ interface ListGroupsParams {
  */
 @Injectable()
 export class EndpointScimGroupsService {
+  private readonly schemaHelpers: ScimSchemaHelpers;
+
   constructor(
     @Inject(GROUP_REPOSITORY)
     private readonly groupRepo: IGroupRepository,
@@ -56,16 +67,18 @@ export class EndpointScimGroupsService {
     private readonly endpointContext: EndpointContextStorage,
     private readonly logger: ScimLogger,
     private readonly schemaRegistry: ScimSchemaRegistry,
-  ) {}
+  ) {
+    this.schemaHelpers = new ScimSchemaHelpers(schemaRegistry, SCIM_CORE_GROUP_SCHEMA);
+  }
 
   async createGroupForEndpoint(dto: CreateGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimGroupResource> {
-    this.ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
-    this.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
+    ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
+    this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
 
     // Coerce boolean strings ("True"/"False") to native booleans before schema validation
-    this.coerceBooleanStringsIfEnabled(dto as unknown as Record<string, unknown>, endpointId, config);
+    this.schemaHelpers.coerceBooleanStringsIfEnabled(dto as unknown as Record<string, unknown>, endpointId, config);
 
-    this.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, config, 'create');
+    this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, config, 'create');
 
     this.logger.info(LogCategory.SCIM_GROUP, 'Creating group', { displayName: dto.displayName, memberCount: dto.members?.length ?? 0, endpointId });
     this.logger.trace(LogCategory.SCIM_GROUP, 'Create group payload', { body: dto as unknown as Record<string, unknown> });
@@ -155,13 +168,13 @@ export class EndpointScimGroupsService {
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
-    this.guardSoftDeleted(group, config, scimId);
+    guardSoftDeleted(group, config, scimId, this.logger, LogCategory.SCIM_GROUP);
 
     return this.toScimGroupResource(group, baseUrl, endpointId);
   }
 
   async listGroupsForEndpoint(
-    { filter, startIndex = 1, count = DEFAULT_COUNT }: ListGroupsParams,
+    { filter, startIndex = 1, count = DEFAULT_COUNT, sortBy, sortOrder }: ListGroupsParams,
     baseUrl: string,
     endpointId: string,
     config?: EndpointConfig,
@@ -184,10 +197,11 @@ export class EndpointScimGroupsService {
     }
 
     // Fetch groups from DB (repository handles endpointId scoping + member include)
+    const sortParams = resolveGroupSortParams(sortBy, sortOrder);
     const allGroups = await this.groupRepo.findAllWithMembers(
       endpointId,
       filterResult.dbWhere,
-      { field: 'createdAt', direction: 'asc' },
+      sortParams,
     );
 
     // Build SCIM resources and apply in-memory filter if needed
@@ -219,7 +233,7 @@ export class EndpointScimGroupsService {
   }
 
   async patchGroupForEndpoint(scimId: string, dto: PatchGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig, ifMatch?: string): Promise<ScimGroupResource> {
-    this.ensureSchema(dto.schemas, SCIM_PATCH_SCHEMA);
+    ensureSchema(dto.schemas, SCIM_PATCH_SCHEMA);
 
     this.logger.info(LogCategory.SCIM_PATCH, 'Patch group', { scimId, endpointId, opCount: dto.Operations?.length });
     this.logger.debug(LogCategory.SCIM_PATCH, 'Patch group operations', {
@@ -233,10 +247,10 @@ export class EndpointScimGroupsService {
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
-    this.guardSoftDeleted(group, config, scimId);
+    guardSoftDeleted(group, config, scimId, this.logger, LogCategory.SCIM_GROUP);
 
     // Phase 7: Pre-write If-Match enforcement
-    this.enforceIfMatch(group.version, ifMatch, config);
+    enforceIfMatch(group.version, ifMatch, config);
 
     // Get endpoint config for behavior flags (use passed config or fallback to context)
     const endpointConfig = config ?? this.endpointContext.getConfig();
@@ -247,7 +261,7 @@ export class EndpointScimGroupsService {
       ? true 
       : getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS);
 
-    const extensionUrns = this.schemaRegistry.getExtensionUrns(endpointId);
+    const extensionUrns = this.schemaHelpers.getExtensionUrns(endpointId);
 
     // V2: Pre-PATCH validation — validate each operation value against schema definitions
     if (getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
@@ -257,19 +271,19 @@ export class EndpointScimGroupsService {
       for (const urn of extensionUrns) {
         (resultPayloadPlaceholder.schemas as string[]).push(urn);
       }
-      const schemaDefs = this.buildSchemaDefinitions(resultPayloadPlaceholder, endpointId);
+      const schemaDefs = this.schemaHelpers.buildSchemaDefinitions(resultPayloadPlaceholder, endpointId);
 
       // Coerce boolean strings in PATCH operation values before validation
       const coerceEnabled = getConfigBooleanWithDefault(endpointConfig, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS, true);
       if (coerceEnabled) {
-        const booleanKeys = this.getGroupBooleanKeys(endpointId);
+        const booleanKeys = this.schemaHelpers.getBooleanKeys(endpointId);
         for (const op of dto.Operations) {
           if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
-            this.sanitizeBooleanStrings(op.value as Record<string, unknown>, booleanKeys);
+            sanitizeBooleanStrings(op.value as Record<string, unknown>, booleanKeys);
           } else if (Array.isArray(op.value)) {
             for (const item of op.value) {
               if (typeof item === 'object' && item !== null) {
-                this.sanitizeBooleanStrings(item as Record<string, unknown>, booleanKeys);
+                sanitizeBooleanStrings(item as Record<string, unknown>, booleanKeys);
               }
             }
           }
@@ -299,7 +313,7 @@ export class EndpointScimGroupsService {
           displayName: group.displayName,
           externalId: group.externalId ?? null,
           members: this.memberRecordsToDtos(group.members),
-          rawPayload: this.parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}')),
+          rawPayload: parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}')),
         },
         { allowMultiMemberAdd, allowMultiMemberRemove, allowRemoveAllMembers, extensionUrns },
       );
@@ -328,12 +342,12 @@ export class EndpointScimGroupsService {
     }
 
     // Coerce boolean strings in post-PATCH payload before schema validation
-    this.coerceBooleanStringsIfEnabled(resultPayload, endpointId, config);
+    this.schemaHelpers.coerceBooleanStringsIfEnabled(resultPayload, endpointId, config);
 
-    this.validatePayloadSchema(resultPayload, endpointId, config, 'patch');
+    this.schemaHelpers.validatePayloadSchema(resultPayload, endpointId, config, 'patch');
 
     // H-2: Immutable attribute enforcement — compare existing state with PATCH result
-    this.checkImmutableAttributes(group, resultPayload, endpointId, config);
+    this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(group), resultPayload, endpointId, config);
 
     // G8f: Uniqueness enforcement on PATCH — displayName and externalId must remain unique
     await this.assertUniqueDisplayName(displayName, endpointId, scimId);
@@ -352,7 +366,7 @@ export class EndpointScimGroupsService {
         externalId,
         rawPayload: JSON.stringify(rawPayload),
         meta: JSON.stringify({
-          ...this.parseJson<Record<string, unknown>>(String(group.meta ?? '{}')),
+          ...parseJson<Record<string, unknown>>(String(group.meta ?? '{}')),
           lastModified: new Date().toISOString()
         })
       }, memberInputs);
@@ -382,13 +396,13 @@ export class EndpointScimGroupsService {
     config?: EndpointConfig,
     ifMatch?: string,
   ): Promise<ScimGroupResource> {
-    this.ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
-    this.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
+    ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
+    this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
 
     // Coerce boolean strings before schema validation (same as create path)
-    this.coerceBooleanStringsIfEnabled(dto as unknown as Record<string, unknown>, endpointId, config);
+    this.schemaHelpers.coerceBooleanStringsIfEnabled(dto as unknown as Record<string, unknown>, endpointId, config);
 
-    this.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, config, 'replace');
+    this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, config, 'replace');
 
     this.logger.info(LogCategory.SCIM_GROUP, 'Replace group (PUT)', { scimId, displayName: dto.displayName, endpointId });
 
@@ -398,13 +412,13 @@ export class EndpointScimGroupsService {
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
-    this.guardSoftDeleted(group, config, scimId);
+    guardSoftDeleted(group, config, scimId, this.logger, LogCategory.SCIM_GROUP);
 
     // Phase 7: Pre-write If-Match enforcement
-    this.enforceIfMatch(group.version, ifMatch, config);
+    enforceIfMatch(group.version, ifMatch, config);
 
     // H-2: Immutable attribute enforcement — compare existing resource with incoming payload
-    this.checkImmutableAttributes(group, dto as unknown as Record<string, unknown>, endpointId, config);
+    this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(group), dto as unknown as Record<string, unknown>, endpointId, config);
 
     // G8f: Uniqueness enforcement on PUT — displayName and externalId must remain unique
     await this.assertUniqueDisplayName(dto.displayName, endpointId, scimId);
@@ -416,7 +430,7 @@ export class EndpointScimGroupsService {
     }
 
     const now = new Date();
-    const meta = this.parseJson<Record<string, unknown>>(String(group.meta ?? '{}'));
+    const meta = parseJson<Record<string, unknown>>(String(group.meta ?? '{}'));
 
     // Pre-resolve member user IDs OUTSIDE the transaction to minimise lock hold time.
     const replaceMemberInputs = (dto.members && dto.members.length > 0)
@@ -460,10 +474,10 @@ export class EndpointScimGroupsService {
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations (double-delete)
-    this.guardSoftDeleted(group, config, scimId);
+    guardSoftDeleted(group, config, scimId, this.logger, LogCategory.SCIM_GROUP);
 
     // Phase 7: Pre-write If-Match enforcement
-    this.enforceIfMatch(group.version, ifMatch, config);
+    enforceIfMatch(group.version, ifMatch, config);
 
     const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
 
@@ -478,21 +492,8 @@ export class EndpointScimGroupsService {
   }
 
   // ===== Private Helper Methods =====
-
-  /**
-   * RFC 7644 §3.6: Guard against operations on soft-deleted resources.
-   *
-   * When SoftDeleteEnabled is active, a resource with deletedAt set is considered
-   * deleted and MUST return 404 for all subsequent operations (GET, PATCH, PUT, DELETE).
-   * Note: A group disabled via PATCH (active=false) is NOT soft-deleted — only DELETE sets deletedAt.
-   */
-  private guardSoftDeleted(group: GroupWithMembers | { active: boolean; deletedAt?: Date | null }, config: EndpointConfig | undefined, scimId: string): void {
-    const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
-    if (softDelete && group.deletedAt != null) {
-      this.logger.debug(LogCategory.SCIM_GROUP, 'Soft-deleted group accessed — returning 404', { scimId });
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
-    }
-  }
+  // G17: Most helpers extracted to ../common/scim-service-helpers.ts
+  // Only Group-specific methods remain here.
 
   /**
    * Re-provision a soft-deleted group: reactivate with new payload data and members.
@@ -513,7 +514,7 @@ export class EndpointScimGroupsService {
 
     const now = new Date();
     const sanitizedPayload = this.extractAdditionalAttributes(dto);
-    const existingMeta = this.parseJson<Record<string, unknown>>(String(existing.meta ?? '{}'));
+    const existingMeta = parseJson<Record<string, unknown>>(String(existing.meta ?? '{}'));
 
     // Resolve incoming members
     const members = dto.members ?? [];
@@ -540,30 +541,6 @@ export class EndpointScimGroupsService {
       scimId: existingScimId, displayName: dto.displayName, endpointId,
     });
     return this.toScimGroupResource(withMembers, baseUrl, endpointId);
-  }
-
-  /**
-   * Phase 7: Pre-write If-Match enforcement (RFC 7644 §3.14).
-   *
-   * When the client sends an If-Match header, the resource's current version-based
-   * ETag must match — otherwise 412 Precondition Failed is thrown BEFORE the write.
-   * When RequireIfMatch is enabled, a missing If-Match header → 428 Precondition Required.
-   */
-  private enforceIfMatch(currentVersion: number, ifMatch?: string, config?: EndpointConfig): void {
-    const requireIfMatch = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH);
-
-    if (!ifMatch) {
-      if (requireIfMatch) {
-        throw createScimError({
-          status: 428,
-          detail: 'If-Match header is required for this operation. Include the resource ETag (e.g., If-Match: W/"v1").',
-        });
-      }
-      return; // If-Match not provided and not required → allow
-    }
-
-    const currentETag = `W/"v${currentVersion}"`;
-    assertIfMatch(currentETag, ifMatch);
   }
 
   /**
@@ -606,193 +583,12 @@ export class EndpointScimGroupsService {
     }
   }
 
-  private ensureSchema(schemas: string[] | undefined, requiredSchema: string): void {
-    const requiredLower = requiredSchema.toLowerCase();
-    if (!schemas || !schemas.some(s => s.toLowerCase() === requiredLower)) {
-      throw createScimError({
-        status: 400,
-        scimType: 'invalidSyntax',
-        detail: `Missing required schema '${requiredSchema}'.`
-      });
-    }
-  }
-
-  /**
-   * Strict Schema Validation — when StrictSchemaValidation is enabled, reject
-   * any request body that contains extension URN keys not listed in the
-   * request's `schemas[]` array or not registered in the schema registry.
-   */
-  private enforceStrictSchemaValidation(
-    dto: Record<string, unknown>,
-    endpointId: string,
-    config?: EndpointConfig
-  ): void {
-    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
-      return;
-    }
-
-    const declaredSchemas = (dto.schemas as string[] | undefined) ?? [];
-    const declaredLower = new Set(declaredSchemas.map(s => s.toLowerCase()));
-    const registeredUrns = this.schemaRegistry.getExtensionUrns(endpointId);
-    const registeredLower = new Set(registeredUrns.map(u => u.toLowerCase()));
-
-    for (const key of Object.keys(dto)) {
-      if (key.startsWith('urn:')) {
-        const keyLower = key.toLowerCase();
-        if (!declaredLower.has(keyLower)) {
-          throw createScimError({
-            status: 400,
-            scimType: 'invalidSyntax',
-            detail: `Extension URN "${key}" found in request body but not declared in schemas[]. ` +
-              `When StrictSchemaValidation is enabled, all extension URNs must be listed in the schemas array.`,
-          });
-        }
-        if (!registeredLower.has(keyLower)) {
-          throw createScimError({
-            status: 400,
-            scimType: 'invalidValue',
-            detail: `Extension URN "${key}" is not a registered extension schema for this endpoint. ` +
-              `Registered extensions: [${registeredUrns.join(', ')}].`,
-          });
-        }
-      }
-    }
-  }
-
-  /**
-   * Phase 8: Attribute-level payload validation against schema definitions.
-   *
-   * When StrictSchemaValidation is enabled, validates:
-   *  - Required attributes are present (create/replace only)
-   *  - Attribute types match schema definitions
-   *  - Mutability constraints (readOnly rejection)
-   *  - Unknown attributes in strict mode
-   *  - Multi-valued / single-valued enforcement
-   *  - Sub-attribute validation for complex types
-   *
-   * @see RFC 7643 §2.1 — Attribute Characteristics
-   */
-  private validatePayloadSchema(
-    dto: Record<string, unknown>,
-    endpointId: string,
-    config: EndpointConfig | undefined,
-    mode: 'create' | 'replace' | 'patch',
-  ): void {
-    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
-      return;
-    }
-
-    const schemas = this.buildSchemaDefinitions(dto, endpointId);
-    if (schemas.length === 0) return;
-
-    const result = SchemaValidator.validate(dto, schemas, {
-      strictMode: true,
-      mode,
-    });
-
-    if (!result.valid) {
-      const details = result.errors.map(e => `${e.path}: ${e.message}`).join('; ');
-      throw createScimError({
-        status: 400,
-        scimType: result.errors[0]?.scimType ?? 'invalidValue',
-        detail: `Schema validation failed: ${details}`,
-      });
-    }
-  }
-
-  /**
-   * Coerce boolean-typed string values to native booleans on write payloads.
-   *
-   * Gated by AllowAndCoerceBooleanStrings (default: true). When enabled, converts
-   * attributes like primary = "True" → true before schema validation,
-   * preventing StrictSchemaValidation from rejecting valid-intent payloads.
-   *
-   * @see RFC 7644 §3.12 — "Be liberal in what you accept" (Postel's Law)
-   */
-  private coerceBooleanStringsIfEnabled(
-    dto: Record<string, unknown>,
-    endpointId: string,
-    config?: EndpointConfig,
-  ): void {
-    const coerceEnabled = getConfigBooleanWithDefault(
-      config,
-      ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS,
-      true,
-    );
-    if (!coerceEnabled) return;
-
-    const booleanKeys = this.getGroupBooleanKeys(endpointId);
-    this.sanitizeBooleanStrings(dto, booleanKeys);
-  }
-
-  /**
-   * H-2: Immutable attribute enforcement (RFC 7643 §2.2).
-   *
-   * Compares the existing resource state (from DB) with the incoming payload
-   * and rejects changes to attributes declared as immutable.
-   * Only runs when StrictSchemaValidation is enabled.
-   */
-  private checkImmutableAttributes(
-    existingGroup: GroupWithMembers,
-    incomingDto: Record<string, unknown>,
-    endpointId: string,
-    config?: EndpointConfig,
-  ): void {
-    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
-      return;
-    }
-
-    const schemas = this.buildSchemaDefinitions(incomingDto, endpointId);
-    if (schemas.length === 0) return;
-
-    // Reconstruct existing resource as a SCIM payload for comparison
-    const existingPayload = this.buildExistingPayload(existingGroup);
-
-    const result = SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas);
-
-    if (!result.valid) {
-      const details = result.errors.map(e => `${e.path}: ${e.message}`).join('; ');
-      throw createScimError({
-        status: 400,
-        scimType: 'mutability',
-        detail: `Immutable attribute violation: ${details}`,
-      });
-    }
-  }
-
-  /**
-   * Build schema definitions from the registry for a given payload.
-   * Shared by validatePayloadSchema and checkImmutableAttributes.
-   */
-  private buildSchemaDefinitions(
-    dto: Record<string, unknown>,
-    endpointId: string,
-  ): SchemaDefinition[] {
-    const coreSchema = this.schemaRegistry.getSchema(SCIM_CORE_GROUP_SCHEMA, endpointId);
-    const schemas: SchemaDefinition[] = [];
-    if (coreSchema) {
-      schemas.push(coreSchema as SchemaDefinition);
-    }
-
-    const declaredSchemas = (dto.schemas as string[] | undefined) ?? [];
-    for (const urn of declaredSchemas) {
-      if (urn !== SCIM_CORE_GROUP_SCHEMA) {
-        const extSchema = this.schemaRegistry.getSchema(urn, endpointId);
-        if (extSchema) {
-          schemas.push(extSchema as SchemaDefinition);
-        }
-      }
-    }
-
-    return schemas;
-  }
-
   /**
    * Reconstruct existing group DB record as a SCIM payload object (data only, no meta/location).
    * Used for immutable attribute comparison.
    */
   private buildExistingPayload(group: GroupWithMembers): Record<string, unknown> {
-    const rawPayload = this.parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}'));
+    const rawPayload = parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}'));
     return {
       ...rawPayload,
       displayName: group.displayName,
@@ -837,12 +633,12 @@ export class EndpointScimGroupsService {
     }
 
     const meta = this.buildMeta(group, baseUrl);
-    const rawPayload = this.parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}'));
+    const rawPayload = parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}'));
 
     // V17 fix: Schema-aware boolean sanitization for Groups (parity with Users V16 fix).
     // Only convert attributes whose schema type is "boolean" (e.g. extension sub-attrs).
-    const booleanKeys = this.getGroupBooleanKeys(endpointId);
-    this.sanitizeBooleanStrings(rawPayload, booleanKeys);
+    const booleanKeys = this.schemaHelpers.getBooleanKeys(endpointId);
+    sanitizeBooleanStrings(rawPayload, booleanKeys);
 
     // Remove attributes that have first-class DB columns to prevent stale overrides.
     // displayName is managed via the DB column; rawPayload may hold the original creation value.
@@ -854,7 +650,7 @@ export class EndpointScimGroupsService {
 
     // G8e: Strip returned:'never' attributes from rawPayload
     // Per RFC 7643 §2.4, these MUST NOT appear in any response.
-    const { never: neverAttrs } = this.getGroupReturnedCharacteristics(endpointId);
+    const { never: neverAttrs } = this.schemaHelpers.getReturnedCharacteristics(endpointId);
     for (const key of Object.keys(rawPayload)) {
       if (neverAttrs.has(key.toLowerCase())) {
         delete rawPayload[key];
@@ -862,7 +658,7 @@ export class EndpointScimGroupsService {
     }
 
     // Build schemas[] dynamically — include extension URNs present in payload
-    const extensionUrns = this.schemaRegistry.getExtensionUrns(endpointId);
+    const extensionUrns = this.schemaHelpers.getExtensionUrns(endpointId);
     const schemas: [string, ...string[]] = [SCIM_CORE_GROUP_SCHEMA];
     for (const urn of extensionUrns) {
       if (urn in rawPayload) {
@@ -919,82 +715,11 @@ export class EndpointScimGroupsService {
     };
   }
 
-  private parseJson<T>(value: string | null | undefined): T {
-    if (!value) {
-      return {} as T;
-    }
-
-    try {
-      return JSON.parse(value) as T;
-    } catch {
-      return {} as T;
-    }
-  }
-
   /**
    * Get the returned:'request' attribute names for Group resources.
    * Used by controllers to filter response attributes per RFC 7643 §2.4.
    */
   getRequestOnlyAttributes(endpointId?: string): Set<string> {
-    const { request } = this.getGroupReturnedCharacteristics(endpointId);
-    return request;
-  }
-
-  /**
-   * Collect returned characteristic sets (never + request) for Group schemas.
-   */
-  private getGroupReturnedCharacteristics(endpointId?: string): { never: Set<string>; request: Set<string> } {
-    const schemas = this.getGroupSchemaDefinitions(endpointId);
-    return SchemaValidator.collectReturnedCharacteristics(schemas);
-  }
-
-  /**
-   * Get all Group schema definitions (core + extensions) for the endpoint.
-   */
-  private getGroupSchemaDefinitions(endpointId?: string): SchemaDefinition[] {
-    const coreSchema = this.schemaRegistry.getSchema(SCIM_CORE_GROUP_SCHEMA, endpointId);
-    const schemas: SchemaDefinition[] = [];
-    if (coreSchema) schemas.push(coreSchema as SchemaDefinition);
-    const extUrns = this.schemaRegistry.getExtensionUrns(endpointId);
-    for (const urn of extUrns) {
-      const ext = this.schemaRegistry.getSchema(urn, endpointId);
-      if (ext) schemas.push(ext as SchemaDefinition);
-    }
-    return schemas;
-  }
-
-  /**
-   * Build the set of boolean attribute names for the Group schema.
-   */
-  private getGroupBooleanKeys(endpointId?: string): Set<string> {
-    const schemas = this.getGroupSchemaDefinitions(endpointId);
-    return SchemaValidator.collectBooleanAttributeNames(schemas);
-  }
-
-  /**
-   * Recursively sanitize boolean-like string values ("True"/"False") to actual booleans,
-   * but ONLY for attributes whose schema type is "boolean".
-   *
-   * V17 fix: Groups service parity with Users V16 fix.
-   *
-   * @param obj          - The object to sanitize (mutated in place)
-   * @param booleanKeys  - Set of lowercase attribute names that are type "boolean"
-   */
-  private sanitizeBooleanStrings(obj: Record<string, unknown>, booleanKeys: Set<string>): void {
-    for (const [key, value] of Object.entries(obj)) {
-      if (Array.isArray(value)) {
-        for (const item of value) {
-          if (typeof item === 'object' && item !== null) {
-            this.sanitizeBooleanStrings(item as Record<string, unknown>, booleanKeys);
-          }
-        }
-      } else if (typeof value === 'object' && value !== null) {
-        this.sanitizeBooleanStrings(value as Record<string, unknown>, booleanKeys);
-      } else if (typeof value === 'string' && booleanKeys.has(key.toLowerCase())) {
-        const lower = value.toLowerCase();
-        if (lower === 'true') obj[key] = true;
-        else if (lower === 'false') obj[key] = false;
-      }
-    }
+    return this.schemaHelpers.getRequestOnlyAttributes(endpointId);
   }
 }

@@ -36,7 +36,7 @@ The table below maps every gap between the current codebase and the ideal archit
 | # | Gap | Severity | Current File(s) | Ideal Resolution | Phase |
 |---|-----|----------|-----------------|------------------|-------|
 | G1 | ~~**No Repository Pattern** — services call `PrismaService` directly~~ | ~~HIGH~~ | ✅ **DONE (v0.10.0)** — `IUserRepository`/`IGroupRepository` interfaces + Prisma/InMemory implementations. `PERSISTENCE_BACKEND` env toggle. Services use `@Inject(TOKEN)` pattern with zero Prisma imports. | Repository interfaces in Domain layer; Prisma implementations in Infrastructure | 1 |
-| G2 | **Separate User/Group tables** (ScimUser, ScimGroup) | MEDIUM | `schema.prisma` | Unified `scim_resource` table with `resource_type` discriminator | 2 |
+| G2 | ~~**Separate User/Group tables** (ScimUser, ScimGroup)~~ | ~~MEDIUM~~ | ✅ **DONE (v0.10.0)** — Unified `ScimResource` polymorphic table with `resourceType` discriminator column. All services (`EndpointScimUsersService`, `EndpointScimGroupsService`, `BulkProcessorService`) use `prisma.scimResource`. No separate User/Group tables exist. | Unified `scim_resource` table with `resource_type` discriminator | 2 |
 | G3 | ~~**SQLite** — no CITEXT, no JSONB, no GIN, single-writer lock~~ | ~~HIGH~~ | ✅ **DONE (v0.10.0)** — PostgreSQL 17 with CITEXT, JSONB, GIN, `pg_trgm`. Prisma 7 driver adapter (`@prisma/adapter-pg`). 5 migrations applied. | PostgreSQL with CITEXT, JSONB, GIN, `pg_trgm` | 3 |
 | G4 | ~~**Filter push-down only for `eq`** on 3 columns~~ | ~~HIGH~~ | ✅ **DONE (v0.12.0)** — All 10 operators (eq/ne/co/sw/ew/gt/ge/lt/le/pr) on 5 columns (userName, displayName, externalId, scimId, active). Column type annotations. AND/OR recursive push-down. | Full operator support via PostgreSQL ILIKE, JSONB operators, `pg_trgm` | 4 |
 | G5 | ~~**PATCH engine embedded in service** (~200 lines inline)~~ | ~~HIGH~~ | ✅ **DONE (v0.13.0)** — `UserPatchEngine` (437 lines) and `GroupPatchEngine` (352 lines) extracted to `domain/patch/`. Pure domain, zero NestJS/Prisma deps. Prototype pollution guards, reserved attribute stripping. | Standalone `PatchEngine` in Domain layer, schema-aware, zero DB imports | 5 |
@@ -52,14 +52,14 @@ The table below maps every gap between the current codebase and the ideal archit
 | G8h | ~~**Required sub-attributes + canonicalValues not enforced**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.1-fix1)** — `validateSubAttributes()` enforces required sub-attrs (V9) on create/replace. `canonicalValues` enforced with case-insensitive matching. Both gated behind `StrictSchemaValidation`. | Add required sub-attr check in `validateSubAttributes()`; optional `canonicalValues` enforcement | 8.6 |
 | G8i | ~~**Filter/PATCH hardening: no depth/length limits, valuePath regex gaps**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.1-fix1)** — Filter parser: `MAX_FILTER_DEPTH=50` with `guardDepth()`. PatchEngine: `__proto__`/`constructor`/`prototype` in `RESERVED_ATTRIBUTES`, `meta`/`schemas` stripped. SearchRequestDto: `@MaxLength(10000)` on filter. Patch ops: `@ArrayMaxSize(1000)`. Schema URN format validation + duplicate rejection. | Max filter depth/length, semantic attr validation; PATCH path sanitization; strip `meta`/`schemas` from reserved attrs | 8.7 |
 | G9 | ~~**No /Bulk endpoint**~~ | ~~LOW~~ | ✅ **DONE (v0.19.0)** — `BulkController` + `BulkProcessorService` (395 lines) with sequential processing, `bulkId` cross-referencing, `failOnErrors` threshold, per-operation error isolation. `BulkOperationsEnabled` per-endpoint flag (default: false). SPC: `bulk.supported=true, maxOperations=1000, maxPayloadSize=1048576`. 43 unit + 24 E2E + 18 live tests. See `docs/PHASE_09_BULK_OPERATIONS.md`. | `BulkController` + `BulkProcessor` with bulkId resolution | 9 |
-| G10 | **No /Me endpoint** | LOW | Missing entirely | `MeController` mapping authenticated user to resource | 10 |
+| G10 | ~~**No /Me endpoint**~~ | ~~LOW~~ | ✅ **DONE (v0.20.0)** — `ScimMeController` resolves JWT `sub` → `userName` lookup → delegates to Users service. Supports GET/PUT/PATCH/DELETE with attribute projection. 36 tests (11 unit + 10 E2E + 15 live). See `docs/PHASE_10_ME_ENDPOINT.md`. | `MeController` mapping authenticated user to resource | 10 |
 | G11 | **Global shared-secret auth** | MEDIUM | `shared-secret.guard.ts` (single SCIM_SHARED_SECRET for all endpoints) | Per-endpoint credentials in `endpoint_credential` table | 11 |
-| G12 | **No sortBy/sortOrder support** | LOW | ServiceProviderConfig returns `sort: {supported: false}` | Sort push-down to DB; in-memory fallback for JSONB paths | 12 |
+| G12 | ~~**No sortBy/sortOrder support**~~ | ~~LOW~~ | ✅ **DONE (v0.20.0)** — `scim-sort.util.ts` maps SCIM attributes to DB columns. Controllers accept `sortBy`/`sortOrder` on GET and POST `/.search`. SPC: `sort.supported: true`. 45 tests (20 unit + 14 E2E + 11 live). See `docs/PHASE_12_SORTING_AND_DEDUP.md`. | Sort push-down to DB; in-memory fallback for JSONB paths | 12 |
 | G13 | ~~**ETag uses timestamp** (collision-prone)~~ | ~~MEDIUM~~ | ✅ **DONE (v0.16.0)** — Monotonic `version INT` column with `W/"v{N}"` format. Atomic `version: { increment: 1 }` in Prisma, `(existing.version ?? 1) + 1` in InMemory. | Monotonic `version INT` column | 7 |
 | G14 | ~~**`rawPayload` stored as String** (not JSONB)~~ | ~~MEDIUM~~ | ✅ **DONE (v0.10.0)** — `payload Json @db.JsonB` in unified `ScimResource` model. Direct JSONB storage, no string serialization. | `payload JSONB` column with GIN index | 2,3 |
 | G15 | ~~**`userNameLower` / `displayNameLower`** helper columns~~ | ~~LOW~~ | ✅ **DONE (v0.10.0)** — Removed. `userName` and `displayName` use `@db.Citext` for transparent case-insensitive operations. | Remove; use PostgreSQL CITEXT for transparent case-insensitivity | 3 |
 | G16 | ~~**Extension URN hardcoded** to Enterprise User only~~ | ~~MEDIUM~~ | ✅ **DONE (v0.14.0)** — `KNOWN_EXTENSION_URNS` centralized and includes 4 msfttest schemas. `ScimSchemaRegistry` dynamically loads per-endpoint custom extension URNs from `EndpointSchema` table. | Dynamic from `endpoint_schema` rows | 6 |
-| G17 | **Code duplication** between User/Group services | MEDIUM | ~600 lines each with isomorphic patterns | Single `ResourceOrchestrator` parameterized by resource type | 2,5 |
+| G17 | ~~**Code duplication** between User/Group services~~ | ~~MEDIUM~~ | ✅ **DONE (v0.20.0)** — `scim-service-helpers.ts` extracts 13+ duplicate methods into pure functions + `ScimSchemaHelpers` class. Users: −29% (904→640 lines), Groups: −28% (1005→726 lines). 43 unit tests. See `docs/PHASE_12_SORTING_AND_DEDUP.md`. | Single `ResourceOrchestrator` parameterized by resource type | 2,5 |
 | G18 | ~~**No POST /.search** endpoint~~ | ~~LOW~~ | ✅ **DONE (v0.10.0)** — `POST /Users/.search` and `POST /Groups/.search` endpoints in both endpoint-scoped and global controllers. | Add alongside existing GET list | 12 |
 | G19 | ~~**Response `schemas[]` never includes extension URNs**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.14.0)** — `toScimUserResource()` dynamically builds `schemas[]` from `{resource payload keys} ∩ {endpoint extension URNs}`. Enterprise User extension + custom extensions included when present in payload. | `schemas[]` dynamically built from `{resource payload keys} ∩ {endpoint_schema URNs}` | 6 |
 | G20 | ~~**7 of 12 config flags are dead code (58%)**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.14.0)** — Dead flags removed. 10 live boolean flags + `logLevel` documented in `docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md`. All flags validated via `validateEndpointConfig()`. | Remove dead flags or wire them to behavior; document live-flag contract in endpoint config | 6 |
@@ -73,18 +73,18 @@ The table below maps every gap between the current codebase and the ideal archit
   RFC Compliance ───│ HIGH         │ ✅G1 ✅G3 ✅G4 ✅G5 ✅G7 ✅G8d ✅G8g           │
                     │              │ (All HIGH-severity gaps resolved)                  │
                     ├──────────────┼────────────────────────────────────────────────────┤
-  Correctness ──────│ MEDIUM       │ G2 ✅G6 ✅G8 ✅G8b ✅G8e ✅G8f ✅G8h ✅G8i G11  │
+  Correctness ──────│ MEDIUM       │ ✅G2 ✅G6 ✅G8 ✅G8b ✅G8e ✅G8f ✅G8h ✅G8i G11  │
                     │              │ ✅G13 ✅G14 ✅G16 ✅G19 ✅G20                    │
                     ├──────────────┼────────────────────────────────────────────────────┤
                     │ LOW (demoted)│ ✅G8c (DONE v0.17.3 — readOnly pre-validated      │
                     │              │  in PATCH via SchemaValidator)                     │
                     ├──────────────┼────────────────────────────────────────────────────┤
-  Completeness ─────│ LOW          │ ✅G9 G10 G12 ✅G15 G17 ✅G18                    │
-                    │              │ (Features / cleanup)                              │
+  Completeness ─────│ LOW          │ ✅G9 ✅G10 ✅G12 ✅G15 ✅G17 ✅G18              │
+                    │              │ (All features / cleanup complete)                │
                     └──────────────┴────────────────────────────────────────────────────┘
 
-  ✅ = Resolved in v0.10.0–v0.19.3 (24 of 27 gaps fully resolved)
-  Open: G2 G10 G11 G12 G17
+  ✅ = Resolved in v0.10.0–v0.20.0 (26 of 27 gaps fully resolved)
+  Open: G11 (per-endpoint credentials)
 ```
 
 ### Gap Resolution Flow
@@ -99,7 +99,7 @@ flowchart LR
         G7[G7 ETag not enforced]
     end
     subgraph MED["MEDIUM Severity"]
-        G2[G2 Separate tables]
+        G2["G2 Separate tables ✅ v0.10.0"]
         G6[G6 Hardcoded discovery]
         G8[G8 No validation]
         G11[G11 Global auth]
@@ -147,7 +147,7 @@ flowchart LR
 
 ```
 Phase 1  Repository Pattern         ████████ (foundational — all later phases depend) ✅ DONE v0.10.0
-Phase 2  Unified Resource Table     ██████   (data model alignment)
+Phase 2  Unified Resource Table     ██████   (data model alignment)                   ✅ DONE v0.10.0
 Phase 3  PostgreSQL Migration       ██████   (infrastructure swap)                     ✅ DONE v0.10.0
 Phase 4  Filter Push-Down           ████     (perf + compliance)                       ✅ DONE v0.12.0
 Phase 5  Domain PATCH Engine        ██████   (correctness + testability)               ✅ DONE v0.13.0

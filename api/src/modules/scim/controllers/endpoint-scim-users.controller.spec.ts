@@ -221,7 +221,7 @@ describe('EndpointScimUsersController', () => {
 
         expect(mockEndpointService.getEndpoint).toHaveBeenCalledWith('endpoint-1');
         expect(mockUsersService.listUsersForEndpoint).toHaveBeenCalledWith(
-          { filter: undefined, startIndex: 1, count: 10 },
+          { filter: undefined, startIndex: 1, count: 10, sortBy: undefined, sortOrder: undefined },
           expect.any(String),
           'endpoint-1',
           expect.any(Object)
@@ -244,7 +244,7 @@ describe('EndpointScimUsersController', () => {
         mockUsersService.listUsersForEndpoint.mockResolvedValue(mockListResponse);
 
         const result = await controller.listUsers(
-          'endpoint-1', mockRequest, undefined, '1', '10', 'userName', undefined
+          'endpoint-1', mockRequest, undefined, '1', '10', undefined, undefined, 'userName', undefined
         );
 
         expect(result.Resources[0].userName).toBe('user1@example.com');
@@ -275,7 +275,7 @@ describe('EndpointScimUsersController', () => {
         const result = await controller.searchUsers('endpoint-1', searchDto, mockRequest);
 
         expect(mockUsersService.listUsersForEndpoint).toHaveBeenCalledWith(
-          { filter: 'userName eq "alice@example.com"', startIndex: 1, count: 10 },
+          { filter: 'userName eq "alice@example.com"', startIndex: 1, count: 10, sortBy: undefined, sortOrder: undefined },
           expect.any(String),
           'endpoint-1',
           expect.any(Object)

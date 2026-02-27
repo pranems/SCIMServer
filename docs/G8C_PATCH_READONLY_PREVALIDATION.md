@@ -248,4 +248,4 @@ File: `api/test/e2e/schema-validation.e2e-spec.ts` (§15)
 
 - **Gap G8c**: ✅ CLOSED — PatchEngine readOnly pre-validation is now enforced via `SchemaValidator.validatePatchOperationValue()`
 - **Heat Map**: `schema-validator.ts` moves to GREEN (all G8c validations implemented)
-- **Remaining gaps**: G8e (response `returned` filter), G8b (custom resource type registration), G2/G17 (unified resource table), G9-G12 (advanced features)
+- **Remaining gaps**: G10 (/Me endpoint), G11 (per-endpoint credentials), G12 (sorting), G17 (User/Group service duplication)

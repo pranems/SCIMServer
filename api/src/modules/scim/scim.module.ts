@@ -16,6 +16,7 @@ import { EndpointScimGroupsController } from './controllers/endpoint-scim-groups
 import { EndpointScimDiscoveryController } from './controllers/endpoint-scim-discovery.controller';
 import { EndpointScimBulkController } from './controllers/endpoint-scim-bulk.controller';
 import { EndpointScimGenericController } from './controllers/endpoint-scim-generic.controller';
+import { ScimMeController } from './controllers/scim-me.controller';
 import { ScimMetadataService } from './services/scim-metadata.service';
 import { ScimSchemaRegistry } from './discovery/scim-schema-registry';
 import { ScimDiscoveryService } from './discovery/scim-discovery.service';
@@ -41,6 +42,7 @@ import { ScimExceptionFilter } from './filters/scim-exception.filter';
     EndpointScimGroupsController,
     EndpointScimBulkController,
     EndpointScimDiscoveryController,
+    ScimMeController,
     // Generic controller MUST be registered LAST — its wildcard :resourceType
     // param would otherwise shadow built-in routes like /Users, /Groups, etc.
     EndpointScimGenericController,

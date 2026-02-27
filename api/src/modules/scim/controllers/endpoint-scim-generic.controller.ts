@@ -134,6 +134,8 @@ export class EndpointScimGenericController {
     @Query('filter') filter?: string,
     @Query('startIndex') startIndex?: string,
     @Query('count') count?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ascending' | 'descending',
   ) {
     const { baseUrl, config, resourceType } = await this.resolveContext(
       endpointId,
@@ -145,6 +147,8 @@ export class EndpointScimGenericController {
         filter,
         startIndex: startIndex ? parseInt(startIndex, 10) : undefined,
         count: count ? parseInt(count, 10) : undefined,
+        sortBy,
+        sortOrder,
       },
       baseUrl,
       endpointId,
@@ -162,7 +166,7 @@ export class EndpointScimGenericController {
   async searchResources(
     @Param('endpointId') endpointId: string,
     @Param('resourceType') resourceTypePath: string,
-    @Body() body: { filter?: string; startIndex?: number; count?: number },
+    @Body() body: { filter?: string; startIndex?: number; count?: number; sortBy?: string; sortOrder?: 'ascending' | 'descending' },
     @Req() req: Request,
   ) {
     const { baseUrl, config, resourceType } = await this.resolveContext(
@@ -175,6 +179,8 @@ export class EndpointScimGenericController {
         filter: body.filter,
         startIndex: body.startIndex,
         count: body.count,
+        sortBy: body.sortBy,
+        sortOrder: body.sortOrder,
       },
       baseUrl,
       endpointId,

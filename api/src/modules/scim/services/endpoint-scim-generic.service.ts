@@ -46,6 +46,8 @@ interface ListGenericParams {
   filter?: string;
   startIndex?: number;
   count?: number;
+  sortBy?: string;
+  sortOrder?: 'ascending' | 'descending';
 }
 
 interface PatchOperation {
@@ -204,6 +206,28 @@ export class EndpointScimGenericService {
 
     // Exclude soft-deleted
     records = records.filter((r) => !r.deletedAt);
+
+    // In-memory sort for generic resources (RFC 7644 §3.4.2.3)
+    if (params.sortBy) {
+      const sortField = params.sortBy.toLowerCase();
+      const direction = params.sortOrder === 'descending' ? -1 : 1;
+      // Map SCIM attribute names to record fields
+      const fieldMap: Record<string, string> = {
+        id: 'scimId',
+        externalid: 'externalId',
+        displayname: 'displayName',
+        'meta.created': 'createdAt',
+        'meta.lastmodified': 'updatedAt',
+      };
+      const dbField = fieldMap[sortField];
+      if (dbField) {
+        records.sort((a, b) => {
+          const va = String((a as unknown as Record<string, unknown>)[dbField] ?? '');
+          const vb = String((b as unknown as Record<string, unknown>)[dbField] ?? '');
+          return va.localeCompare(vb) * direction;
+        });
+      }
+    }
 
     const totalResults = records.length;
     const pageRecords = records.slice(startIndex - 1, startIndex - 1 + count);

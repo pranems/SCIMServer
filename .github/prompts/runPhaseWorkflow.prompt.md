@@ -32,6 +32,7 @@ You are executing the next project phase in a phased migration roadmap.
    - Start a fresh local instance and run as-is live tests
    - Build a fresh latest local container, run it, and run as-is live tests against it
 5. If failures appear, diagnose root cause, implement minimal robust fixes, and re-run impacted tests until green.
+6. **Keep the final Docker container running** after all validations pass. Do not stop or remove it — leave it available for the user to inspect and interact with.
 
 ## Documentation Deliverables
 Create/update two detailed phase documents:
@@ -72,13 +73,32 @@ Must include for each issue faced during this phase:
 3. Add those tests and re-run the necessary validation set.
 4. Update phase docs with final fixes, diagnostics, and validated outcomes.
 
+## Self-Improvement & Documentation Update
+After phase implementation is validated and complete:
+1. **Update all project documentation** to reflect this phase's outcomes:
+   - `Session_starter.md` — progress log, version, test counts, assistant memory
+   - `CHANGELOG.md` — version bump entry with feature summary and test counts
+   - `docs/CONTEXT_INSTRUCTIONS.md` — new gotchas, constraints, or architectural decisions
+   - `docs/INDEX.md` — add references to any new phase docs created
+   - `docs/CURRENT_STATE_AND_MIGRATION_PLAN.md` — mark phase complete, update heat map and counts
+   - `docs/PROJECT_HEALTH_REPORT.md` — update tech debt, test counts, and phase status
+   - `docs/SCIM_COMPLIANCE_MATRIX.md` — update compliance status for affected RFC sections
+   - `package.json` — bump version number
+2. **Review this prompt template** for lessons learned:
+   - Did any step prove unnecessary or missing?
+   - Were there recurring issues that a new checklist item could prevent?
+   - If improvements are identified, apply them to this prompt file and its variants.
+3. **Verify consistency** across all updated docs (version numbers, test counts, feature lists match).
+
 ## Output Format
 Return a concise final report with:
 - What changed (implementation)
 - What changed (tests)
 - Validation results (unit/e2e/live-local/live-container)
 - Docs produced/updated
+- Project docs updated (list)
 - Issues found and fixed
 - On-track assessment
 - Final commit message suggestion
 - Any residual risks or follow-ups
+- Docker container status (image tag, container name/ID, port mapping — confirm running)

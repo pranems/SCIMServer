@@ -5,6 +5,42 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.20.0] - 2026-02-27
+
+### Added — Phase 10: /Me Endpoint (RFC 7644 §3.11)
+- **`ScimMeController`** — New `/Me` URI alias for the authenticated User resource. Resolves JWT `sub` claim → `userName` lookup → delegates to Users service for GET, PUT, PATCH, DELETE.
+- **Identity Resolution** — Extracts `sub` from OAuth JWT, queries Users by `filter=userName eq "{sub}"`, returns SCIM 404 for legacy auth or missing user.
+- **Attribute Projection** — Supports `?attributes=` and `?excludedAttributes=` query params on all /Me operations.
+- **11 unit tests** (`scim-me.controller.spec.ts`) — GET/PUT/PATCH/DELETE /Me + identity resolution errors.
+- **10 E2E tests** (`me-endpoint.e2e-spec.ts`) — Full lifecycle including cross-validation with GET /Users/{id}.
+- **15 live integration tests** (section 9r) — GET /Me, PATCH, PUT, DELETE, attribute projection, cross-validation, 404 after deletion.
+
+### Added — Phase 12: Sorting (RFC 7644 §3.4.2.3)
+- **`scim-sort.util.ts`** — Sort attribute mapping utility for `sortBy`/`sortOrder` parameters.
+- **Controller wiring** — Users, Groups, and Generic controllers accept `sortBy` and `sortOrder` query params on GET and POST /.search.
+- **Service wiring** — Sort params threaded through services to repositories.
+- **`sort.supported: true`** — ServiceProviderConfig updated from `false` to `true`.
+- **20 unit tests** (`scim-sort.util.spec.ts`) — Attribute mapping, order handling, edge cases.
+- **14 E2E tests** (`sorting.e2e-spec.ts`) — Ascending/descending, default order, .search body sorting, pagination with sorting, group sorting.
+- **11 live integration tests** (section 9q) — Sort ascending/descending, default order, POST /.search sorting, pagination, group sorting, SPC verification.
+
+### Added — G17: Service Deduplication
+- **`scim-service-helpers.ts`** — Extracted 13+ duplicate private methods from Users and Groups services into pure functions (`parseJson`, `ensureSchema`, `enforceIfMatch`, `sanitizeBooleanStrings`, `guardSoftDeleted`) + `ScimSchemaHelpers` class (parameterized by `schemaRegistry` + `coreSchemaUrn`).
+- **Users service** — Refactored from ~904 to ~640 lines (−29%), all duplicate methods removed.
+- **Groups service** — Refactored from ~1005 to ~726 lines (−28%), all duplicate methods removed.
+- **43 unit tests** (`scim-service-helpers.spec.ts`) — Full coverage of all extracted functions and class methods.
+
+### Changed
+- Compliance score: ~98% → **~99%** — Sorting and /Me now implemented.
+- ServiceProviderConfig: `sort.supported: false` → `true`.
+- Open gaps reduced from 4 (G10, G11, G12, G17) → **1 (G11 per-endpoint credentials)**.
+
+### Verified
+- **75 suites / 2,548 tests** — Unit: 75 suites (73 pass, 2 pre-existing), 2,548 tests (2,524 pass, 24 pre-existing).
+- **24 E2E suites / 506 tests** — E2E: 24 suites (22 pass, 2 pre-existing), 506 tests (465 pass, 41 pre-existing).
+- **463 live integration tests** — 458 pass, 5 pre-existing failures (boolean coercion schema validation).
+- Docker build + run: both containers healthy, all tests pass.
+
 ## [0.19.3] - 2026-02-26
 
 ### Fixed

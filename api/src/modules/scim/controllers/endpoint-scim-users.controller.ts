@@ -87,6 +87,8 @@ export class EndpointScimUsersController {
     @Query('filter') filter?: string,
     @Query('startIndex') startIndex?: string,
     @Query('count') count?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ascending' | 'descending',
     @Query('attributes') attributes?: string,
     @Query('excludedAttributes') excludedAttributes?: string
   ) {
@@ -95,7 +97,9 @@ export class EndpointScimUsersController {
       {
         filter,
         startIndex: startIndex ? parseInt(startIndex, 10) : undefined,
-        count: count ? parseInt(count, 10) : undefined
+        count: count ? parseInt(count, 10) : undefined,
+        sortBy,
+        sortOrder
       },
       baseUrl,
       endpointId,
@@ -146,7 +150,9 @@ export class EndpointScimUsersController {
       {
         filter: dto.filter,
         startIndex: dto.startIndex,
-        count: dto.count
+        count: dto.count,
+        sortBy: dto.sortBy,
+        sortOrder: dto.sortOrder
       },
       baseUrl,
       endpointId,

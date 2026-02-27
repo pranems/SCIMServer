@@ -134,6 +134,8 @@
 | [phases/PHASE_08_SCHEMA_VALIDATION.md](phases/PHASE_08_SCHEMA_VALIDATION.md) | Phase 8 — Schema Validation Engine (v0.17.0) |
 | [PHASE_08_REMAINING_ANALYSIS.md](PHASE_08_REMAINING_ANALYSIS.md) | Phase 8 — Remaining analysis, adversarial validation gaps (33 gaps), Part 2 scope |
 | [PHASE_09_BULK_OPERATIONS.md](PHASE_09_BULK_OPERATIONS.md) | Phase 9 — Bulk Operations (v0.19.0, RFC 7644 §3.7) |
+| [PHASE_10_ME_ENDPOINT.md](PHASE_10_ME_ENDPOINT.md) | Phase 10 — /Me Endpoint (v0.20.0, RFC 7644 §3.11): Identity resolution via JWT sub → userName, full CRUD delegation |
+| [PHASE_12_SORTING_AND_DEDUP.md](PHASE_12_SORTING_AND_DEDUP.md) | Phase 12 — Sorting + Service Dedup (v0.20.0, RFC 7644 §3.4.2.3): sortBy/sortOrder, G17 service helpers extraction |
 
 ## Diagrams
 

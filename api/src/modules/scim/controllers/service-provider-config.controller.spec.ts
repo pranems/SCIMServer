@@ -44,9 +44,9 @@ describe('ServiceProviderConfigController', () => {
       expect(result.changePassword.supported).toBe(false);
     });
 
-    it('should report sort as not supported', () => {
+    it('should report sort as supported', () => {
       const result = controller.getConfig();
-      expect(result.sort.supported).toBe(false);
+      expect(result.sort.supported).toBe(true);
     });
 
     it('should report etag as supported', () => {
