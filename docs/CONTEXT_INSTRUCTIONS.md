@@ -268,6 +268,7 @@ Four categories of PATCH paths, handled in order:
 | ✅ Sorting (`sortBy`, `sortOrder`) | Complete (v0.20.0, `sort.supported=true`) |
 | ✅ Bulk operations (`/Bulk`) | Complete (v0.19.0, RFC 7644 §3.7, `BulkOperationsEnabled` flag) |
 | ✅ `/Me` endpoint | Complete (v0.20.0, JWT sub → userName identity resolution) |
+| ✅ Per-endpoint credentials | Complete (v0.21.0, `PerEndpointCredentialsEnabled` flag, bcrypt tokens, fallback chain) |
 
 ### 7.2 Microsoft Entra ID Compatibility
 
@@ -279,9 +280,9 @@ Four categories of PATCH paths, handled in order:
 
 ## 8. Test Coverage
 
-- **Unit**: 2,548 tests passing (75 suites)
-- **E2E**: 506 tests passing (24 suites)
-- **Live integration**: 463 tests passing (local + Docker)
+- **Unit**: 2,581 tests passing (77 suites)
+- **E2E**: 522 tests passing (25 suites)
+- **Live integration**: 485 tests passing (local + Docker)
 - **SCIM Validator**: 25/25 required + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
 - Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`

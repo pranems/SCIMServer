@@ -37,7 +37,7 @@
 
 ## 1. Overview
 
-SCIMServer supports **11 per-endpoint configuration flags** (plus 1 per-endpoint log level override) that control SCIM protocol behavior. Flags are stored in the `config` JSON column of each endpoint record and are resolved at request time.
+SCIMServer supports **12 per-endpoint configuration flags** (plus 1 per-endpoint log level override) that control SCIM protocol behavior. Flags are stored in the `config` JSON column of each endpoint record and are resolved at request time.
 
 ### Key Concepts
 
@@ -71,7 +71,8 @@ api/src/modules/endpoint/endpoint-config.interface.ts
 | 9 | `ReprovisionOnConflictForSoftDeletedResource` | `REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED` | `false` | boolean | POST | Re-activate soft-deleted resource on POST conflict instead of 409 (requires SoftDeleteEnabled) |
 | 10 | `CustomResourceTypesEnabled` | `CUSTOM_RESOURCE_TYPES_ENABLED` | `false` | boolean | Admin API, SCIM CRUD | Enable custom resource type registration and generic SCIM CRUD beyond User/Group |
 | 11 | `BulkOperationsEnabled` | `BULK_OPERATIONS_ENABLED` | `false` | boolean | POST /Bulk | Enable SCIM Bulk Operations (RFC 7644 §3.7) — batch processing of multiple operations |
-| 12 | `logLevel` | `LOG_LEVEL` | *(unset)* | string/number | All requests | Per-endpoint log level override |
+| 12 | `PerEndpointCredentialsEnabled` | `PER_ENDPOINT_CREDENTIALS_ENABLED` | `false` | boolean | Auth (all requests) | Enable per-endpoint bearer token credentials with bcrypt hashing and admin CRUD API |
+| 13 | `logLevel` | `LOG_LEVEL` | *(unset)* | string/number | All requests | Per-endpoint log level override |
 
 > **Note:** Two flags default to `true`: `AllowAndCoerceBooleanStrings`, `PatchOpAllowRemoveAllMembers`. All others default to `false`. `ReprovisionOnConflictForSoftDeletedResource` has no effect unless `SoftDeleteEnabled` is also `true`.
 

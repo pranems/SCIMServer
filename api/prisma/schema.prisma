@@ -34,6 +34,9 @@ model Endpoint {
   // Phase 8b: Per-endpoint custom resource type registrations
   resourceTypes EndpointResourceType[]
 
+  // Phase 11: Per-endpoint credentials
+  credentials EndpointCredential[]
+
   @@index([active])
 }
 
@@ -166,4 +169,29 @@ model EndpointResourceType {
   @@unique([endpointId, name])                  // One resource type name per endpoint
   @@unique([endpointId, endpoint])              // One endpoint path per resource type per endpoint
   @@index([endpointId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 11 — Per-endpoint credentials
+//
+// Stores bcrypt-hashed bearer tokens or OAuth client credentials scoped to a
+// specific endpoint. When the `PerEndpointCredentialsEnabled` config flag is
+// true for an endpoint, the SharedSecretGuard will validate incoming tokens
+// against this table instead of (or in addition to) the global shared secret.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model EndpointCredential {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  endpointId     String    @db.Uuid
+  credentialType String    @db.VarChar(50)   // "bearer" | "oauth_client"
+  credentialHash String    @db.VarChar(255)  // bcrypt hash of the token/secret
+  label          String?   @db.VarChar(255)  // Human-readable label for management
+  metadata       Json?                       // {clientId, scopes, ...} for OAuth
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now()) @db.Timestamptz
+  expiresAt      DateTime?                   @db.Timestamptz
+
+  endpoint Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([endpointId, active])
 }

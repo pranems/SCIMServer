@@ -5,6 +5,36 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.21.0] - 2026-02-27
+
+### Added — Phase 11: Per-Endpoint Credentials (G11)
+- **`EndpointCredential` Prisma model** — `endpoint_credential` table with bcrypt-hashed credential storage, optional expiry, active/inactive state, cascade delete on endpoint.
+- **`PerEndpointCredentialsEnabled` config flag** — Per-endpoint boolean flag (default: `false`). 12th boolean flag in endpoint configuration.
+- **`AdminCredentialController`** — Admin API at `/admin/endpoints/{id}/credentials` for credential CRUD:
+  - `POST` — Generate 32-byte base64url token, bcrypt hash (12 rounds), return plaintext once.
+  - `GET` — List all credentials (hash never returned).
+  - `DELETE` — Revoke (deactivate) credential.
+- **3-tier auth fallback chain** — `SharedSecretGuard` extended: per-endpoint bcrypt credentials → OAuth 2.0 JWT → global `SCIM_SHARED_SECRET`. Graceful fallback on any per-endpoint error.
+- **Lazy bcrypt loading** — Dynamic import of native `bcrypt` module; cached after first use.
+- **Credential repository** — `IEndpointCredentialRepository` interface with Prisma and InMemory implementations. Filters active + non-expired credentials.
+- **33 unit tests** — 14 admin controller tests + 19 guard tests (7 new per-endpoint scenarios).
+- **16 E2E tests** — Admin CRUD, per-endpoint auth, fallback scenarios, credential expiry.
+- **22 live integration tests** (section 9s) — Full lifecycle: create, list, auth, CRUD with per-endpoint token, OAuth fallback, reject invalid/revoked, flag-disabled rejection, expiry.
+
+### Changed
+- Compliance score: ~99% → **100%** — All 27 migration gaps (G1–G20) now fully resolved.
+- Open gaps reduced from 1 (G11) → **0**.
+- Auth architecture: Single-secret → 3-tier fallback chain.
+
+### Dependencies
+- Added `bcrypt` + `@types/bcrypt` for credential hashing.
+
+### Verified
+- **77 suites / 2,581 tests** — Unit: 77 suites, 2,581 tests (2,557 pass, 24 pre-existing).
+- **25 E2E suites / 522 tests** — E2E: 25 suites, 522 tests (481 pass, 41 pre-existing).
+- **485 live integration tests** — 480 pass, 5 pre-existing failures (boolean coercion schema validation).
+- Docker build + run: both containers healthy, all per-endpoint credential tests pass.
+
 ## [0.20.0] - 2026-02-27
 
 ### Added — Phase 10: /Me Endpoint (RFC 7644 §3.11)

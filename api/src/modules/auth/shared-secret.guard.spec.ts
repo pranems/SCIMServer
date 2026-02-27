@@ -9,6 +9,8 @@ describe('SharedSecretGuard', () => {
   let mockOAuthService: any;
   let mockReflector: jest.Mocked<Reflector>;
   let mockLogger: any;
+  let mockCredentialRepo: any;
+  let mockEndpointService: any;
 
   function createMockContext(authHeader?: string, isPublic = false) {
     const mockResponse = {
@@ -16,6 +18,7 @@ describe('SharedSecretGuard', () => {
     };
     const mockRequest: any = {
       headers: authHeader ? { authorization: authHeader } : {},
+      url: '/some/path',
     };
     const mockContext: any = {
       switchToHttp: () => ({
@@ -29,6 +32,25 @@ describe('SharedSecretGuard', () => {
     // Set up reflector to return isPublic value
     mockReflector.getAllAndOverride.mockReturnValue(isPublic);
 
+    return { context: mockContext, request: mockRequest, response: mockResponse };
+  }
+
+  /** Helper: create a mock context with an endpoint-scoped URL */
+  function createEndpointMockContext(endpointId: string, authHeader?: string) {
+    const mockResponse = { setHeader: jest.fn() };
+    const mockRequest: any = {
+      headers: authHeader ? { authorization: authHeader } : {},
+      url: `/endpoints/${endpointId}/Users`,
+    };
+    const mockContext: any = {
+      switchToHttp: () => ({
+        getRequest: () => mockRequest,
+        getResponse: () => mockResponse,
+      }),
+      getHandler: () => ({}),
+      getClass: () => ({}),
+    };
+    mockReflector.getAllAndOverride.mockReturnValue(false);
     return { context: mockContext, request: mockRequest, response: mockResponse };
   }
 
@@ -56,11 +78,31 @@ describe('SharedSecretGuard', () => {
       fatal: jest.fn(),
     };
 
+    mockCredentialRepo = {
+      findActiveByEndpoint: jest.fn().mockResolvedValue([]),
+      create: jest.fn(),
+      findById: jest.fn(),
+      findByEndpoint: jest.fn(),
+      deactivate: jest.fn(),
+      delete: jest.fn(),
+    };
+
+    mockEndpointService = {
+      getEndpoint: jest.fn().mockResolvedValue({
+        id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        name: 'test',
+        config: {},
+        active: true,
+      }),
+    };
+
     guard = new SharedSecretGuard(
       mockConfigService,
       mockOAuthService,
       mockReflector,
       mockLogger,
+      mockCredentialRepo,
+      mockEndpointService,
     );
   });
 
@@ -144,7 +186,7 @@ describe('SharedSecretGuard', () => {
       delete process.env.SCIM_SHARED_SECRET;
 
       mockConfigService.get.mockReturnValue(undefined);
-      guard = new SharedSecretGuard(mockConfigService, mockOAuthService, mockReflector, mockLogger);
+      guard = new SharedSecretGuard(mockConfigService, mockOAuthService, mockReflector, mockLogger, mockCredentialRepo, mockEndpointService);
 
       // First call triggers auto-generation and rejects (we don't know the secret yet)
       // but the secret is now in process.env.SCIM_SHARED_SECRET
@@ -172,6 +214,149 @@ describe('SharedSecretGuard', () => {
       } else {
         delete process.env.SCIM_SHARED_SECRET;
       }
+    });
+  });
+
+  describe('per-endpoint credentials', () => {
+    const endpointId = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+    it('should skip per-endpoint check when flag is disabled', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        id: endpointId,
+        name: 'test',
+        config: { PerEndpointCredentialsEnabled: false },
+        active: true,
+      });
+
+      // Use endpoint-scoped URL but with legacy token
+      const { context, request } = createEndpointMockContext(endpointId, 'Bearer test-shared-secret');
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('legacy');
+    });
+
+    it('should authenticate with valid per-endpoint credential', async () => {
+      // bcrypt: mock module at top of test
+      const bcrypt = await import('bcrypt');
+      const hash = await bcrypt.hash('my-endpoint-token', 10);
+
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        id: endpointId,
+        name: 'test',
+        config: { PerEndpointCredentialsEnabled: true },
+        active: true,
+      });
+      mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([
+        {
+          id: 'cred-1',
+          endpointId,
+          credentialType: 'bearer',
+          credentialHash: hash,
+          label: 'Test',
+          active: true,
+          createdAt: new Date(),
+          expiresAt: null,
+        },
+      ]);
+
+      const { context, request } = createEndpointMockContext(endpointId, 'Bearer my-endpoint-token');
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('endpoint_credential');
+      expect(request.authCredentialId).toBe('cred-1');
+    });
+
+    it('should fall back to legacy when per-endpoint credential does not match', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        id: endpointId,
+        name: 'test',
+        config: { PerEndpointCredentialsEnabled: true },
+        active: true,
+      });
+      mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([
+        {
+          id: 'cred-1',
+          endpointId,
+          credentialType: 'bearer',
+          credentialHash: '$2b$10$invalidhashxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
+          label: 'Test',
+          active: true,
+          createdAt: new Date(),
+          expiresAt: null,
+        },
+      ]);
+
+      const { context, request } = createEndpointMockContext(endpointId, 'Bearer test-shared-secret');
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('legacy'); // Fell back to global secret
+    });
+
+    it('should fall back to legacy when no active credentials exist', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        id: endpointId,
+        name: 'test',
+        config: { PerEndpointCredentialsEnabled: true },
+        active: true,
+      });
+      mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([]);
+
+      const { context, request } = createEndpointMockContext(endpointId, 'Bearer test-shared-secret');
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('legacy');
+    });
+
+    it('should fall back to OAuth when per-endpoint check fails and token is not legacy', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue({
+        id: endpointId,
+        name: 'test',
+        config: { PerEndpointCredentialsEnabled: true },
+        active: true,
+      });
+      mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([]);
+
+      const oauthPayload = { sub: 'client', client_id: 'c', scope: 's' };
+      mockOAuthService.validateAccessToken.mockResolvedValue(oauthPayload);
+
+      const { context, request } = createEndpointMockContext(endpointId, 'Bearer some-jwt');
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('oauth');
+    });
+
+    it('should not check per-endpoint credentials for non-endpoint URLs', async () => {
+      // URL without /endpoints/:uuid/ pattern, using legacy secret
+      const { context, request } = createMockContext('Bearer test-shared-secret');
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('legacy');
+      expect(mockEndpointService.getEndpoint).not.toHaveBeenCalled();
+    });
+
+    it('should handle endpoint service errors gracefully and fall back', async () => {
+      mockEndpointService.getEndpoint.mockRejectedValue(new Error('DB error'));
+
+      const { context, request } = createEndpointMockContext(endpointId, 'Bearer test-shared-secret');
+      const result = await guard.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('legacy'); // Graceful fallback
+    });
+
+    it('should work without credential repo (optional injection)', async () => {
+      const guardNoRepo = new SharedSecretGuard(
+        mockConfigService,
+        mockOAuthService,
+        mockReflector,
+        mockLogger,
+        null,  // no credential repo
+        null,  // no endpoint service
+      );
+
+      const { context, request } = createEndpointMockContext(endpointId, 'Bearer test-shared-secret');
+      const result = await guardNoRepo.canActivate(context);
+      expect(result).toBe(true);
+      expect(request.authType).toBe('legacy');
     });
   });
 });

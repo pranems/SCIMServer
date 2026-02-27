@@ -136,6 +136,7 @@
 | [PHASE_09_BULK_OPERATIONS.md](PHASE_09_BULK_OPERATIONS.md) | Phase 9 — Bulk Operations (v0.19.0, RFC 7644 §3.7) |
 | [PHASE_10_ME_ENDPOINT.md](PHASE_10_ME_ENDPOINT.md) | Phase 10 — /Me Endpoint (v0.20.0, RFC 7644 §3.11): Identity resolution via JWT sub → userName, full CRUD delegation |
 | [PHASE_12_SORTING_AND_DEDUP.md](PHASE_12_SORTING_AND_DEDUP.md) | Phase 12 — Sorting + Service Dedup (v0.20.0, RFC 7644 §3.4.2.3): sortBy/sortOrder, G17 service helpers extraction |
+| [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) | Phase 11 — Per-Endpoint Credentials (v0.21.0): bcrypt-hashed per-endpoint auth tokens, admin CRUD API, fallback chain |
 
 ## Diagrams
 

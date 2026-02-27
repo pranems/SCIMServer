@@ -108,6 +108,18 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * @see https://datatracker.ietf.org/doc/html/rfc7644#section-3.7
    */
   BULK_OPERATIONS_ENABLED: 'BulkOperationsEnabled',
+
+  /**
+   * When true, enables per-endpoint credential validation for this endpoint.
+   * Incoming bearer tokens are validated against the EndpointCredential table
+   * (bcrypt-hashed per-endpoint tokens). If no matching credential is found
+   * AND this flag is true, the guard falls back to the global SCIM_SHARED_SECRET
+   * and OAuth JWT validation.
+   * When false (default), only the global SCIM_SHARED_SECRET and OAuth JWT are used.
+   *
+   * @see Phase 11 — Per-Endpoint Credentials (RFC 7643 §7 multi-tenant isolation)
+   */
+  PER_ENDPOINT_CREDENTIALS_ENABLED: 'PerEndpointCredentialsEnabled',
 } as const;
 
 /**
@@ -227,6 +239,15 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]?: boolean | string;
 
   /**
+   * When true, enables per-endpoint credential validation for this endpoint.
+   * Tokens are checked against EndpointCredential table before global fallback.
+   * When false (default), only global SCIM_SHARED_SECRET and OAuth JWT are used.
+   *
+   * Example config: { "PerEndpointCredentialsEnabled": "True" }
+   */
+  [ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED]?: boolean | string;
+
+  /**
    * Allow any additional configuration flags
    */
   [key: string]: unknown;
@@ -292,6 +313,7 @@ export const DEFAULT_ENDPOINT_CONFIG: EndpointConfig = {
   [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: false,
   [ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED]: false,
   [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: false,
+  [ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED]: false,
 };
 
 /**
@@ -349,6 +371,7 @@ export function validateEndpointConfig(config: Record<string, any> | undefined):
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED);
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED);
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED);
 
   // Validate logLevel
   const logLevelFlag = config[ENDPOINT_CONFIG_FLAGS.LOG_LEVEL];

@@ -4216,6 +4216,148 @@ try {
 Write-Host "`n--- 9r: /Me Endpoint Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9s: PER-ENDPOINT CREDENTIALS (Phase 11 / G11)
+$script:currentSection = "9s: Per-Endpoint Credentials"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9s: PER-ENDPOINT CREDENTIALS (Phase 11 / G11)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Create an endpoint with PerEndpointCredentialsEnabled=True
+Write-Host "`n--- Setup: Create Cred-Enabled Endpoint ---" -ForegroundColor Cyan
+$credEpBody = @{
+    name = "per-cred-test-$(Get-Date -Format 'HHmmss')"
+    config = @{ PerEndpointCredentialsEnabled = "True" }
+} | ConvertTo-Json -Depth 3
+$credEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $credEpBody
+$credEpId = $credEp.id
+$credScimBase = "$baseUrl/scim/endpoints/$credEpId"
+Write-Host "  Created endpoint: $credEpId"
+Test-Result -Success ($null -ne $credEpId) -Message "9s setup: per-cred endpoint created"
+
+# Test 9s.1: Create a per-endpoint credential
+Write-Host "`n--- Test 9s.1: Create per-endpoint credential ---" -ForegroundColor Cyan
+$credCreateBody = @{
+    credentialType = "bearer"
+    label = "live-test-cred"
+} | ConvertTo-Json
+$credCreate = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$credEpId/credentials" -Method POST -Headers $headers -Body $credCreateBody
+$credId = $credCreate.id
+$credToken = $credCreate.token
+Test-Result -Success ($null -ne $credId) -Message "9s.1: credential id returned"
+Test-Result -Success ($null -ne $credToken -and $credToken.Length -gt 20) -Message "9s.1: plaintext token returned (length $($credToken.Length))"
+Test-Result -Success ($credCreate.credentialType -eq "bearer") -Message "9s.1: credentialType is 'bearer'"
+Test-Result -Success ($credCreate.active -eq $true) -Message "9s.1: credential is active"
+Test-Result -Success ($null -eq $credCreate.credentialHash) -Message "9s.1: hash not exposed in response"
+
+# Test 9s.2: List credentials (hash must not be returned)
+Write-Host "`n--- Test 9s.2: List credentials ---" -ForegroundColor Cyan
+$credList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$credEpId/credentials" -Method GET -Headers $headers
+Test-Result -Success ($credList.Count -ge 1) -Message "9s.2: at least 1 credential listed"
+$firstCred = $credList[0]
+Test-Result -Success ($null -eq $firstCred.credentialHash) -Message "9s.2: credentialHash not in list response"
+Test-Result -Success ($firstCred.id -eq $credId) -Message "9s.2: credential id matches"
+
+# Test 9s.3: Authenticate with per-endpoint credential
+Write-Host "`n--- Test 9s.3: Authenticate with per-endpoint token ---" -ForegroundColor Cyan
+$credHeaders = @{Authorization="Bearer $credToken"; 'Accept'='application/scim+json'}
+$credAuthResult = Invoke-RestMethod -Uri "$credScimBase/Users" -Method GET -Headers $credHeaders
+Test-Result -Success ($credAuthResult.schemas -contains "urn:ietf:params:scim:api:messages:2.0:ListResponse") -Message "9s.3: per-endpoint token auth → ListResponse"
+Test-Result -Success ($null -ne $credAuthResult.totalResults) -Message "9s.3: totalResults present"
+
+# Test 9s.4: CRUD with per-endpoint credential
+Write-Host "`n--- Test 9s.4: Create user with per-endpoint token ---" -ForegroundColor Cyan
+$credUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "cred-user-live-$(Get-Date -Format 'HHmmss')"
+    displayName = "Credential User"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$credPostHeaders = @{Authorization="Bearer $credToken"; 'Content-Type'='application/scim+json'}
+$credUser = Invoke-RestMethod -Uri "$credScimBase/Users" -Method POST -Headers $credPostHeaders -Body $credUserBody
+$credUserId = $credUser.id
+Test-Result -Success ($null -ne $credUserId) -Message "9s.4: user created via per-endpoint token"
+
+# Read the user with per-endpoint token
+$credUserGet = Invoke-RestMethod -Uri "$credScimBase/Users/$credUserId" -Method GET -Headers $credHeaders
+Test-Result -Success ($credUserGet.id -eq $credUserId) -Message "9s.4: user readable via per-endpoint token"
+
+# Delete with per-endpoint token
+$null = Invoke-WebRequest -Uri "$credScimBase/Users/$credUserId" -Method DELETE -Headers $credHeaders
+Test-Result -Success $true -Message "9s.4: user deleted via per-endpoint token"
+
+# Test 9s.5: Legacy/OAuth fallback still works when flag is enabled
+Write-Host "`n--- Test 9s.5: OAuth/legacy fallback ---" -ForegroundColor Cyan
+$fallbackResult = Invoke-RestMethod -Uri "$credScimBase/Users" -Method GET -Headers $headers
+Test-Result -Success ($fallbackResult.schemas -contains "urn:ietf:params:scim:api:messages:2.0:ListResponse") -Message "9s.5: OAuth token still works on cred-enabled endpoint"
+
+# Test 9s.6: Reject invalid per-endpoint credential
+Write-Host "`n--- Test 9s.6: Reject invalid token ---" -ForegroundColor Cyan
+$badHeaders = @{Authorization="Bearer invalid-token-that-matches-nothing"; 'Accept'='application/scim+json'}
+try {
+    $null = Invoke-RestMethod -Uri "$credScimBase/Users" -Method GET -Headers $badHeaders
+    Test-Result -Success $false -Message "9s.6: should reject invalid token"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 401) -Message "9s.6: invalid token → 401"
+}
+
+# Test 9s.7: Revoke credential and verify it no longer works
+Write-Host "`n--- Test 9s.7: Revoke credential ---" -ForegroundColor Cyan
+$null = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$credEpId/credentials/$credId" -Method DELETE -Headers $headers
+Test-Result -Success $true -Message "9s.7: credential revoked (HTTP 204)"
+
+# Revoked token should no longer work for per-endpoint auth
+# It will also fail OAuth/legacy → 401
+try {
+    $null = Invoke-RestMethod -Uri "$credScimBase/Users" -Method GET -Headers $credHeaders
+    Test-Result -Success $false -Message "9s.7: revoked token should fail"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 401) -Message "9s.7: revoked token → 401"
+}
+
+# Test 9s.8: Credential creation rejected when flag is disabled
+Write-Host "`n--- Test 9s.8: Reject cred creation when flag disabled ---" -ForegroundColor Cyan
+$disabledEpBody = @{
+    name = "no-cred-test-$(Get-Date -Format 'HHmmss')"
+    config = @{ PerEndpointCredentialsEnabled = "False" }
+} | ConvertTo-Json -Depth 3
+$disabledEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $disabledEpBody
+$disabledEpId = $disabledEp.id
+try {
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$disabledEpId/credentials" -Method POST -Headers $headers -Body $credCreateBody
+    Test-Result -Success $false -Message "9s.8: should reject when flag disabled"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 403) -Message "9s.8: cred creation blocked → 403 (flag disabled)"
+}
+
+# Test 9s.9: Credential with future expiry
+Write-Host "`n--- Test 9s.9: Credential with expiry ---" -ForegroundColor Cyan
+$futureDate = (Get-Date).AddDays(1).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+$expiringCredBody = @{
+    credentialType = "bearer"
+    label = "expiring-cred"
+    expiresAt = $futureDate
+} | ConvertTo-Json
+$expiringCred = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$credEpId/credentials" -Method POST -Headers $headers -Body $expiringCredBody
+Test-Result -Success ($null -ne $expiringCred.expiresAt) -Message "9s.9: credential created with expiresAt"
+Test-Result -Success ($null -ne $expiringCred.token) -Message "9s.9: token returned for expiring credential"
+
+# Verify the expiring credential works for auth
+$expiringHeaders = @{Authorization="Bearer $($expiringCred.token)"; 'Accept'='application/scim+json'}
+$expiringAuthResult = Invoke-RestMethod -Uri "$credScimBase/Users" -Method GET -Headers $expiringHeaders
+Test-Result -Success ($expiringAuthResult.schemas -contains "urn:ietf:params:scim:api:messages:2.0:ListResponse") -Message "9s.9: expiring credential authenticates successfully"
+
+# Cleanup: delete the test endpoints
+Write-Host "`n--- 9s: Cleanup ---" -ForegroundColor Cyan
+try { $null = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$credEpId" -Method DELETE -Headers $headers } catch {}
+try { $null = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$disabledEpId" -Method DELETE -Headers $headers } catch {}
+
+Write-Host "`n--- 9s: Per-Endpoint Credentials Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

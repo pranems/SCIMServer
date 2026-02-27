@@ -71,3 +71,7 @@ api/unit-results-pipeline.json
 api/pipeline-e2e.json
 api/pipeline-unit.json
 api/unit-counts.json
+api/fix-check.json
+docker-live-test-output.txt
+live-test-output.txt
+api/groups-test-output.txt

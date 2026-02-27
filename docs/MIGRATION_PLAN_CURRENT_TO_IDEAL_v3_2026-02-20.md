@@ -53,7 +53,7 @@ The table below maps every gap between the current codebase and the ideal archit
 | G8i | ~~**Filter/PATCH hardening: no depth/length limits, valuePath regex gaps**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.1-fix1)** — Filter parser: `MAX_FILTER_DEPTH=50` with `guardDepth()`. PatchEngine: `__proto__`/`constructor`/`prototype` in `RESERVED_ATTRIBUTES`, `meta`/`schemas` stripped. SearchRequestDto: `@MaxLength(10000)` on filter. Patch ops: `@ArrayMaxSize(1000)`. Schema URN format validation + duplicate rejection. | Max filter depth/length, semantic attr validation; PATCH path sanitization; strip `meta`/`schemas` from reserved attrs | 8.7 |
 | G9 | ~~**No /Bulk endpoint**~~ | ~~LOW~~ | ✅ **DONE (v0.19.0)** — `BulkController` + `BulkProcessorService` (395 lines) with sequential processing, `bulkId` cross-referencing, `failOnErrors` threshold, per-operation error isolation. `BulkOperationsEnabled` per-endpoint flag (default: false). SPC: `bulk.supported=true, maxOperations=1000, maxPayloadSize=1048576`. 43 unit + 24 E2E + 18 live tests. See `docs/PHASE_09_BULK_OPERATIONS.md`. | `BulkController` + `BulkProcessor` with bulkId resolution | 9 |
 | G10 | ~~**No /Me endpoint**~~ | ~~LOW~~ | ✅ **DONE (v0.20.0)** — `ScimMeController` resolves JWT `sub` → `userName` lookup → delegates to Users service. Supports GET/PUT/PATCH/DELETE with attribute projection. 36 tests (11 unit + 10 E2E + 15 live). See `docs/PHASE_10_ME_ENDPOINT.md`. | `MeController` mapping authenticated user to resource | 10 |
-| G11 | **Global shared-secret auth** | MEDIUM | `shared-secret.guard.ts` (single SCIM_SHARED_SECRET for all endpoints) | Per-endpoint credentials in `endpoint_credential` table | 11 |
+| G11 | ~~**Global shared-secret auth**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.21.0)** — `EndpointCredential` model with bcrypt-hashed tokens. `PerEndpointCredentialsEnabled` per-endpoint flag (default: false). `AdminCredentialController` (POST/GET/DELETE). `SharedSecretGuard` extended with 3-tier fallback: per-endpoint bcrypt → OAuth JWT → global SCIM_SHARED_SECRET. 33 unit + 16 E2E + 22 live tests. See `docs/G11_PER_ENDPOINT_CREDENTIALS.md`. | Per-endpoint credentials in `endpoint_credential` table | 11 |
 | G12 | ~~**No sortBy/sortOrder support**~~ | ~~LOW~~ | ✅ **DONE (v0.20.0)** — `scim-sort.util.ts` maps SCIM attributes to DB columns. Controllers accept `sortBy`/`sortOrder` on GET and POST `/.search`. SPC: `sort.supported: true`. 45 tests (20 unit + 14 E2E + 11 live). See `docs/PHASE_12_SORTING_AND_DEDUP.md`. | Sort push-down to DB; in-memory fallback for JSONB paths | 12 |
 | G13 | ~~**ETag uses timestamp** (collision-prone)~~ | ~~MEDIUM~~ | ✅ **DONE (v0.16.0)** — Monotonic `version INT` column with `W/"v{N}"` format. Atomic `version: { increment: 1 }` in Prisma, `(existing.version ?? 1) + 1` in InMemory. | Monotonic `version INT` column | 7 |
 | G14 | ~~**`rawPayload` stored as String** (not JSONB)~~ | ~~MEDIUM~~ | ✅ **DONE (v0.10.0)** — `payload Json @db.JsonB` in unified `ScimResource` model. Direct JSONB storage, no string serialization. | `payload JSONB` column with GIN index | 2,3 |
@@ -73,7 +73,7 @@ The table below maps every gap between the current codebase and the ideal archit
   RFC Compliance ───│ HIGH         │ ✅G1 ✅G3 ✅G4 ✅G5 ✅G7 ✅G8d ✅G8g           │
                     │              │ (All HIGH-severity gaps resolved)                  │
                     ├──────────────┼────────────────────────────────────────────────────┤
-  Correctness ──────│ MEDIUM       │ ✅G2 ✅G6 ✅G8 ✅G8b ✅G8e ✅G8f ✅G8h ✅G8i G11  │
+  Correctness ──────│ MEDIUM       │ ✅G2 ✅G6 ✅G8 ✅G8b ✅G8e ✅G8f ✅G8h ✅G8i ✅G11 │
                     │              │ ✅G13 ✅G14 ✅G16 ✅G19 ✅G20                    │
                     ├──────────────┼────────────────────────────────────────────────────┤
                     │ LOW (demoted)│ ✅G8c (DONE v0.17.3 — readOnly pre-validated      │
@@ -83,8 +83,8 @@ The table below maps every gap between the current codebase and the ideal archit
                     │              │ (All features / cleanup complete)                │
                     └──────────────┴────────────────────────────────────────────────────┘
 
-  ✅ = Resolved in v0.10.0–v0.20.0 (26 of 27 gaps fully resolved)
-  Open: G11 (per-endpoint credentials)
+  ✅ = Resolved in v0.10.0–v0.21.0 (27 of 27 gaps fully resolved)
+  🎉 ALL GAPS RESOLVED — No open gaps remaining
 ```
 
 ### Gap Resolution Flow

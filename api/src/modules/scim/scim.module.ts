@@ -8,6 +8,7 @@ import { RepositoryModule } from '../../infrastructure/repositories/repository.m
 import { AdminController } from './controllers/admin.controller';
 import { AdminSchemaController } from './controllers/admin-schema.controller';
 import { AdminResourceTypeController } from './controllers/admin-resource-type.controller';
+import { AdminCredentialController } from './controllers/admin-credential.controller';
 import { ResourceTypesController } from './controllers/resource-types.controller';
 import { SchemasController } from './controllers/schemas.controller';
 import { ServiceProviderConfigController } from './controllers/service-provider-config.controller';
@@ -38,6 +39,7 @@ import { ScimExceptionFilter } from './filters/scim-exception.filter';
     AdminController,
     AdminSchemaController,
     AdminResourceTypeController,
+    AdminCredentialController,
     EndpointScimUsersController,
     EndpointScimGroupsController,
     EndpointScimBulkController,
