@@ -1,7 +1,7 @@
 # SCIMServer — Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.  
-> **Last Updated**: February 18, 2026
+> **Last Updated**: February 27, 2026
 
 ---
 
@@ -26,13 +26,12 @@
 | **Language** | TypeScript | 5.x |
 | **Framework** | NestJS | 11.x |
 | **ORM** | Prisma | 7.x |
-| **Database** | SQLite | (via Prisma) |
+| **Database** | PostgreSQL 17 | (via Prisma, docker postgres:17-alpine) |
 | **Frontend** | React | 19.x |
 | **Bundler** | Vite | 7.x |
 | **Auth** | JWT + Bearer token | @nestjs/jwt |
 | **Testing** | Jest | 30.x with ts-jest |
 | **Deployment** | Azure Container Apps | via Bicep IaC |
-| **Backup** | Azure Blob Storage | @azure/storage-blob |
 
 ---
 
@@ -47,12 +46,17 @@ api/src/modules/scim/scim.module.ts                      # SCIM feature module
 api/src/modules/scim/controllers/
   endpoint-scim-users.controller.ts                      # Users CRUD controller
   endpoint-scim-groups.controller.ts                     # Groups CRUD controller
-  endpoint-scim-discovery.controller.ts                  # SCIM discovery (Schemas, ResourceTypes, ServiceProviderConfig)
+  endpoint-scim-bulk.controller.ts                       # Bulk Operations controller (RFC 7644 §3.7)
+  endpoint-scim-discovery.controller.ts                  # SCIM discovery — PRIMARY endpoint-scoped (multi-tenant)
 api/src/modules/scim/services/
-  endpoint-scim-users.service.ts    (585 lines)          # Users business logic
-  endpoint-scim-groups.service.ts   (632 lines)          # Groups business logic
-  scim-metadata.service.ts          (14 lines)           # buildLocation, timestamp
+  endpoint-scim-users.service.ts    (528 lines)          # Users business logic (G17 dedup: −29%)
+  endpoint-scim-groups.service.ts   (627 lines)          # Groups business logic (G17 dedup: −28%)
+  bulk-processor.service.ts         (395 lines)          # Bulk operation processor with bulkId resolution
+  scim-metadata.service.ts                               # buildLocation, timestamp
+api/src/modules/scim/common/
+  scim-service-helpers.ts           (353 lines)          # G17: parseJson, ensureSchema, enforceIfMatch, sanitizeBooleanStrings, guardSoftDeleted, ScimSchemaHelpers
 api/src/modules/scim/dto/
+  bulk-request.dto.ts                                    # BulkRequest/Response DTOs (RFC 7644 §3.7)
   create-user.dto.ts                                     # User creation DTO
   patch-user.dto.ts                                      # PATCH operations DTO
   create-group.dto.ts                                    # Group creation DTO
@@ -64,21 +68,28 @@ api/src/modules/scim/common/
   scim-errors.ts                                         # createScimError()
 api/src/modules/scim/utils/
   scim-patch-path.ts                                     # 9 exported patch path utilities
-  endpoint-config.interface.ts                           # 10 config flags + helpers
-  endpoint-context.storage.ts                            # AsyncLocalStorage for endpoint context
   base-url.util.ts                                       # buildBaseUrl() from request
+api/src/modules/scim/controllers/
+  scim-me.controller.ts                                  # /Me endpoint (RFC 7644 §3.11, v0.20.0)
+  admin-credential.controller.ts                         # Per-endpoint credential CRUD (v0.21.0)
+api/src/modules/scim/common/
+  scim-sort.util.ts                                      # sortBy/sortOrder mapping utility (v0.20.0)
+api/src/modules/endpoint/
+  endpoint-config.interface.ts                           # 14 boolean flags + logLevel + helpers (incl. getConfigBooleanWithDefault)
+  endpoint-context.storage.ts                            # AsyncLocalStorage for endpoint context
+api/src/modules/scim/filters/
+  scim-filter-parser.ts                                  # Filter AST attribute path extraction
 api/src/modules/scim/interceptors/
   scim-content-type.interceptor.ts                       # Sets application/scim+json
 api/src/modules/auth/
   shared-secret.guard.ts                                 # Global auth guard (JWT + legacy)
   public.decorator.ts                                    # @Public() route exemption
 api/src/modules/logging/
-  logging.service.ts                                     # RequestLog persistence
+  logging.service.ts                                     # RequestLog persistence (supports in-memory mode)
   request-logging.interceptor.ts                         # Global request/response logging
 api/src/modules/endpoint/
   endpoint.controller.ts                                 # Admin CRUD for endpoints
-  endpoint.service.ts                                    # Endpoint business logic
-api/src/modules/backup/backup.service.ts                 # Azure Blob snapshot backup (290 lines)
+  endpoint.service.ts                                    # Endpoint business logic (supports in-memory mode)
 api/src/modules/database/
   database.controller.ts                                 # Dashboard data APIs
   database.service.ts                                    # User/group/stats queries
@@ -89,7 +100,7 @@ api/src/oauth/
   oauth.service.ts                 (138 lines)           # JWT generation/validation
 api/src/modules/prisma/prisma.service.ts                 # Extended PrismaClient
 api/src/modules/web/web.controller.ts                    # SPA serving
-api/prisma/schema.prisma                                 # 5 models: Endpoint, ScimUser, ScimGroup, GroupMember, RequestLog
+api/prisma/schema.prisma                                 # 7 models: Endpoint, RequestLog, ScimResource, ResourceMember, EndpointSchema, EndpointResourceType, EndpointCredential
 ```
 
 ### 3.2 Frontend (React SPA)
@@ -109,9 +120,9 @@ web/vite.config.ts                                       # Dev proxy to :3000
 infra/containerapp.bicep                                 # Container App definition
 infra/containerapp-env.bicep                             # Environment (VNet-integrated)
 infra/acr.bicep                                          # Azure Container Registry
-infra/blob-storage.bicep                                 # Backup storage
-infra/networking.bicep                                   # VNet, subnets, private endpoints
-infra/storage.bicep                                      # Storage account
+infra/networking.bicep                                   # VNet, subnets (aca-infra, aca-runtime, private-endpoints)
+infra/postgres.bicep                                     # Azure PostgreSQL Flexible Server
+infra/storage.bicep                                      # Storage account (Azure Files)
 ```
 
 ### 3.4 Legacy Files
@@ -128,8 +139,13 @@ npm run start:dev           # NestJS with --watch (hot reload)
 npm run build               # TypeScript compilation to dist/
 npm run start               # Production mode (runs prisma migrate deploy first)
 npm test                    # Run unit tests (Jest)
+npm run test:cov            # Unit tests with coverage → coverage/
 npm run test:e2e            # Run E2E suite
+npm run test:e2e:cov        # E2E tests with coverage → coverage-e2e/
+npm run test:cov:all        # Unit + E2E coverage combined
+npm run test:all            # Unit + E2E + live smoke (full pipeline)
 npm run test:ci             # Unit + E2E CI sequence
+npm run test:smoke          # Live integration tests (PowerShell)
 npm test -- --watch         # Watch mode
 npm test -- --verbose       # Verbose output
 npx prisma migrate dev      # Run migrations
@@ -182,11 +198,11 @@ docker-compose up           # Full stack
 
 ### 5.3 Data Storage Pattern
 
-The project uses a **"rawPayload + derived columns"** pattern:
-- `rawPayload`: Stores the FULL SCIM resource as a JSON string
-- Derived columns (`userName`, `userNameLower`, `active`, `externalId`, `displayName`): Extracted for queries and uniqueness
-- On read: `rawPayload` is parsed and enriched with server-managed fields (`id`, `meta`)
-- On write: Full JSON is stored in `rawPayload`, derived columns are also updated
+The project uses a **"payload (JSONB) + derived columns"** pattern:
+- `payload`: Stores the FULL SCIM resource as JSONB (PostgreSQL native JSON type)
+- Derived columns (`userName`, `active`, `externalId`, `displayName`): Extracted via CITEXT/VARCHAR for queries and uniqueness
+- On read: `payload` is merged with server-managed fields (`id`, `meta`)
+- On write: Full JSON is stored in `payload`, derived columns are also updated
 
 ### 5.4 Endpoint Isolation Pattern
 
@@ -198,10 +214,21 @@ All SCIM resources are scoped to an `endpointId`:
 
 ### 5.5 Authentication Pattern
 
-**Dual-strategy auth** via global `SharedSecretGuard`:
-1. OAuth 2.0 JWT (preferred) — `OAuthService.validateAccessToken()`
-2. Legacy bearer token — direct string comparison with `SCIM_SHARED_SECRET`
-3. Public routes exempted via `@Public()` decorator
+**3-tier fallback auth** via global `SharedSecretGuard` (v0.21.0, G11):
+1. **Per-endpoint bcrypt credentials** (if `PerEndpointCredentialsEnabled` + endpoint has active credentials) — `IEndpointCredentialRepository.findActive()` + bcrypt verify → `req.authType = 'endpoint_credential'`
+2. **OAuth 2.0 JWT** — `OAuthService.validateAccessToken()` (Bearer JWT) → `req.authType = 'oauth'`
+3. **Global shared secret** — direct string comparison with `SCIM_SHARED_SECRET` → `req.authType = 'legacy'`
+4. Public routes exempted via `@Public()` decorator
+
+**Credential Admin API** (requires `PerEndpointCredentialsEnabled` flag):
+- `POST /scim/admin/endpoints/:id/credentials` — Generate 32-byte base64url token, store bcrypt hash (12 rounds), return plaintext once
+- `GET /scim/admin/endpoints/:id/credentials` — List credentials (hash never returned)
+- `DELETE /scim/admin/endpoints/:id/credentials/:credentialId` — Revoke (deactivate)
+
+**Source files:**
+- Guard: `api/src/modules/auth/shared-secret.guard.ts`
+- Credential controller: `api/src/modules/scim/controllers/admin-credential.controller.ts`
+- Credential repository: `api/src/modules/scim/repositories/endpoint-credential/`
 
 ### 5.6 Error Handling Pattern
 
@@ -222,27 +249,37 @@ Four categories of PATCH paths, handled in order:
 3. **valuePath**: Bracket filter expression (`emails[type eq "work"].value`)
 4. **Extension URN**: Full URN prefix (`urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department`)
 
+### 5.8 ReadOnly Attribute Stripping (v0.22.0)
+
+POST/PUT payloads auto-strip `mutability:'readOnly'` attrs (`id`, `meta`, `groups`, custom readOnly) before business logic. PATCH ops targeting readOnly attrs are silently stripped when `StrictSchemaValidation` is OFF or `IgnoreReadOnlyAttributesInPatch` is ON. Warning URN (`urn:scimserver:api:messages:2.0:Warning`) attached when `IncludeWarningAboutIgnoredReadOnlyAttribute` enabled. Covers Users, Groups, AND Generic (custom) resource types.
+
+**Source files:**
+- Strip helpers: `api/src/modules/scim/common/scim-service-helpers.ts` (`stripReadOnlyAttributes()`, `stripReadOnlyPatchOps()`)
+- Warning accumulation: `api/src/modules/endpoint/endpoint-context.storage.ts` (`addWarnings()`, `getWarnings()`)
+- Middleware: `EndpointContextStorage.createMiddleware()` + `ScimModule.configure()` (Express middleware with `storage.run()`)
+- Feature doc: `docs/READONLY_ATTRIBUTE_STRIPPING_AND_WARNINGS.md`
+
 ---
 
 ## 6. Key Architectural Decisions
 
 | Decision | Rationale |
 |----------|-----------|
-| **SQLite** (not PostgreSQL) | Single-file DB perfect for ephemeral container with blob backup; no DB server needed |
-| **rawPayload as JSON** | SCIM resources have arbitrary attributes; structured columns can't capture all; rawPayload preserves fidelity |
-| **Derived columns** | Needed for uniqueness constraints and efficient filtering in SQLite |
-| **userNameLower** column | RFC 7643 §2.1 requires case-insensitive userName uniqueness; SQLite lacks `CITEXT` |
-| **AsyncLocalStorage** | Endpoint context propagation without threading endpoint ID through every method signature |
-| **Blob snapshot backup** | Azure Container Apps have ephemeral storage; blob snapshots preserve data across restarts |
+| **PostgreSQL 17** (migrated from SQLite in Phase 3) | Production-grade RDBMS with CITEXT for case-insensitive columns, JSONB for schema-free SCIM attributes, GIN indexes for filter push-down |
+| **payload as JSONB** | SCIM resources have arbitrary attributes; structured columns can't capture all; JSONB preserves fidelity with native query support |
+| **Derived columns** | Indexed VARCHAR/CITEXT columns for uniqueness constraints and efficient filtering |
+| **CITEXT columns** | RFC 7643 §2.1 requires case-insensitive userName uniqueness; PostgreSQL CITEXT handles this natively |
+| **AsyncLocalStorage** | Endpoint context propagation without threading endpoint ID through every method signature. Uses `storage.run()` via Express middleware (not `enterWith()`) to ensure context survives NestJS interceptor pipeline boundaries. |
+| **Repository Pattern** | `IUserRepository`/`IGroupRepository` interfaces with `PERSISTENCE_BACKEND` env toggle (prisma/inmemory) |
 | **Dual auth** | OAuth for production clients (Entra); legacy token for simple testing/debugging |
 | **Global prefix `/scim`** | All routes under `/scim/`; URL rewrite middleware supports `/scim/v2` for spec compliance |
-| **In-memory filtering** | Filters are applied post-fetch; enables full SCIM filter expression support without SQL translation |
+| **Filter push-down** | All 10 SCIM operators pushed to PostgreSQL WHERE clauses; compound AND/OR supported; no in-memory filtering |
 
 ---
 
 ## 7. Current Compliance Status
 
-### 7.1 SCIM 2.0 Compliance (Current v0.10.0 Baseline)
+### 7.1 SCIM 2.0 Compliance (Current v0.22.0 Baseline)
 
 | Feature | Status |
 |---------|--------|
@@ -250,30 +287,35 @@ Four categories of PATCH paths, handled in order:
 | ✅ Groups CRUD (POST/GET/PUT/PATCH/DELETE) | Complete |
 | ✅ PATCH (add/replace/remove, valuePath, extension URNs, no-path merge) | Complete |
 | ✅ Case-insensitive behavior (RFC 7643 §2.1) | Complete |
-| ✅ Discovery endpoints | Complete |
+| ✅ Discovery endpoints | 100% — All 6 gaps (D1–D6) resolved. Two-tier multi-tenant architecture: root-level (global defaults) + endpoint-scoped (primary, per-tenant overlays). See [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](../docs/DISCOVERY_ENDPOINTS_RFC_AUDIT.md) |
 | ✅ Pagination (startIndex, count) | Complete |
 | ✅ Filtering operators (`eq`, `ne`, `co`, `sw`, `ew`, `gt`, `ge`, `lt`, `le`, `pr`) | Complete |
 | ✅ Attribute projection (`attributes`, `excludedAttributes`) | Complete |
 | ✅ ETag / If-None-Match conditional GET behavior | Complete |
-| ⚠️ Sorting (`sortBy`, `sortOrder`) | Advertised unsupported (`sort.supported=false`) |
-| ⚠️ Bulk operations (`/Bulk`) | Advertised unsupported (`bulk.supported=false`) |
-| ⚠️ `/Me` endpoint | Not required for Entra provisioning |
+| ✅ Sorting (`sortBy`, `sortOrder`) | Complete (v0.20.0, `sort.supported=true`) |
+| ✅ Bulk operations (`/Bulk`) | Complete (v0.19.0, RFC 7644 §3.7, `BulkOperationsEnabled` flag) |
+| ✅ `/Me` endpoint | Complete (v0.20.0, JWT sub → userName identity resolution) |
+| ✅ Per-endpoint credentials | Complete (v0.21.0, `PerEndpointCredentialsEnabled` flag, bcrypt tokens, 3-tier fallback) |
+| ✅ ReadOnly attribute stripping | Complete (v0.22.0, RFC 7643 §2.2, `IncludeWarningAboutIgnoredReadOnlyAttribute` + `IgnoreReadOnlyAttributesInPatch` flags, warning URN extension) |
 
 ### 7.2 Microsoft Entra ID Compatibility
 
 - ✅ Critical provisioning flows validated
-- ✅ Microsoft SCIM Validator: 24/24 pass (+ 7 preview)
+- ✅ Microsoft SCIM Validator: 25/25 pass (+ 7 preview)
 - ✅ OAuth client credentials + bearer token flows operational
 
 ---
 
-## 8. Test Coverage
+## 8. Test Coverage (v0.22.0)
 
-- **Unit**: 666 tests passing
-- **E2E**: 184 tests passing
-- **Live integration**: 280 tests passing (local + Docker)
-- Test runners: `npm test`, `npm run test:e2e`, `pwsh ../scripts/live-test.ps1`
-- Coverage includes SCIM CRUD, PATCH path variants, case-insensitivity, filtering, projection, ETag behavior, endpoint isolation, auth, logging config, and admin operations.
+- **Unit**: 2,532 passing / 2,532 total (73 suites) — **all passing (0 failures)**
+- **E2E**: 539 passing / 539 total (26 suites) — **all passing (0 failures)**
+- **Live integration**: 485 total (expected all passing after SchemaValidator id fix)
+- **SCIM Validator**: 25/25 required + 7/7 preview
+- Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
+- Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`
+- Full pipeline: `npm run test:all` (unit + E2E + live smoke)
+- Coverage includes SCIM CRUD, PATCH path variants, case-insensitivity, filtering, projection, ETag behavior, endpoint isolation, auth, logging config, admin operations, and SCIM validator compliance scenarios.
 
 ---
 
@@ -295,7 +337,7 @@ Four categories of PATCH paths, handled in order:
   - `endpoint-scim-discovery.controller.ts`
 
 ### Phase 3: Case-Insensitivity (RFC 7643 §2.1)
-- Added `userNameLower` column + migration
+- Added CITEXT columns for userName, externalId (case-insensitive uniqueness)
 - Case-insensitive userName uniqueness enforcement
 - Case-insensitive filter attribute names
 - Case-insensitive schema URI validation
@@ -316,13 +358,18 @@ Four categories of PATCH paths, handled in order:
 ## 10. Important Gotchas & Warnings
 
 1. **`endpoint-scim.controller.ts` was deleted** — superseded by Users, Groups, and Discovery controllers
-2. **rawPayload is a JSON string** — always `JSON.parse()` before use, `JSON.stringify()` before save
-3. **SQLite limitations** — no native `ILIKE`, no concurrent writes, no `CITEXT` — hence the `userNameLower` approach
-4. **In-memory filtering** — ALL users/groups for an endpoint are loaded, then filtered in JS. This works for the monitoring use case (low volume) but wouldn't scale
-5. **Backup depends on Azure** — `BackupService` silently skips if `BLOB_BACKUP_ACCOUNT` isn't set (local dev)
+2. **payload is JSONB** — native JSON type in PostgreSQL; use Prisma's JSON operations for queries
+3. **PostgreSQL CITEXT** — userName and externalId use CITEXT for case-insensitive uniqueness; no derived `*Lower` columns needed
+4. **Filter push-down** — ALL 10 SCIM operators are pushed to PostgreSQL WHERE clauses; compound AND/OR supported. No in-memory post-fetch filtering.
+5. **Blob backup removed (v0.23.0)** — `BackupService`, `BackupModule`, `blob-restore.ts`, and `infra/blob-storage.bicep` were deleted. PostgreSQL uses Azure-native WAL backup (configured via `backupRetentionDays` in `postgres.bicep`). `@azure/identity` and `@azure/storage-blob` npm packages also removed.
 6. **Auto-generated secrets** — In dev mode, `SCIM_SHARED_SECRET` and `OAUTH_CLIENT_SECRET` are auto-generated and logged to console. NEVER do this in production.
 7. **ValidationPipe whitelist: false** — We do NOT strip unknown properties, because SCIM resources have arbitrary attributes in extensions
 8. **The `/scim/v2` rewrite** — Express middleware in `main.ts` rewrites `/scim/v2/*` to `/scim/*` for spec compliance
+9. **SchemaValidator** — 950-line pure domain class for RFC 7643 payload validation. Gated behind `StrictSchemaValidation` config flag. Validates type, mutability (readOnly + immutable), required attrs, unknown attrs, sub-attributes, canonicalValues, size limits. New: `collectBooleanAttributeNames()` for schema-aware boolean coercion, `collectReadOnlyAttributes()` for readOnly stripping, `validateFilterAttributePaths()` for filter validation (V32).
+10. **Repository Pattern** — `IUserRepository`/`IGroupRepository` interfaces injected via tokens. `PERSISTENCE_BACKEND` env var toggles between `prisma` and `inmemory` implementations.
+11. **G2 is DONE + G17 RESOLVED (v0.20.0)** — Database uses a single unified `ScimResource` table. G17 service code deduplication completed: 13+ duplicate private methods extracted into `scim-service-helpers.ts` (`parseJson`, `ensureSchema`, `enforceIfMatch`, `sanitizeBooleanStrings`, `guardSoftDeleted`, `ScimSchemaHelpers`). All 27 migration gaps (G1–G20) are now closed.
+12. **3-tier auth guard** — `SharedSecretGuard` now implements 3-tier fallback: per-endpoint bcrypt credentials → OAuth JWT → global `SCIM_SHARED_SECRET`. Per-endpoint credentials use lazy-loaded native bcrypt (12 rounds, cached after first use). Active + non-expired credentials only.
+13. **CORS wildcard** — `main.ts` sets `origin: true` (accept all origins). Should be restricted for production deployments.
 
 ---
 

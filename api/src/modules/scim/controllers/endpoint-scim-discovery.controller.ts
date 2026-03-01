@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Header,
   Param,
   Req,
   ForbiddenException
@@ -8,25 +9,43 @@ import {
 import type { Request } from 'express';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
-import { SCIM_SP_CONFIG_SCHEMA } from '../common/scim-constants';
+import { ScimDiscoveryService } from '../discovery/scim-discovery.service';
 import { buildBaseUrl } from '../common/base-url.util';
+import { Public } from '../../auth/public.decorator';
 
 /**
- * Endpoint-specific SCIM Discovery Controller
+ * Endpoint-specific SCIM Discovery Controller — **PRIMARY** for multi-tenant use.
+ *
  * Handles metadata / discovery endpoints scoped to a specific endpoint:
  *   - /scim/endpoints/{endpointId}/Schemas
+ *   - /scim/endpoints/{endpointId}/Schemas/{uri}
  *   - /scim/endpoints/{endpointId}/ResourceTypes
+ *   - /scim/endpoints/{endpointId}/ResourceTypes/{id}
  *   - /scim/endpoints/{endpointId}/ServiceProviderConfig
  *
  * These are mandated by RFC 7644 §4 and must be present at every SCIM
  * service-provider root.  They are intentionally separated from the
  * resource CRUD controllers (Users / Groups) for clarity.
+ *
+ * **Multi-tenancy**: Each endpoint can register custom schemas, resource
+ * types, and extension URNs. Discovery responses are computed by merging
+ * global defaults with per-endpoint overlays from the SchemaRegistry.
+ * ServiceProviderConfig adjusts capability flags (e.g. `bulk.supported`)
+ * based on per-endpoint configuration.
+ *
+ * Root-level routes (`/scim/Schemas`, `/scim/ResourceTypes`,
+ * `/scim/ServiceProviderConfig`) return global defaults without
+ * endpoint context and are primarily for tooling / admin use.
+ *
+ * RFC 7644 §4 — SHALL NOT require authentication.
  */
+@Public()
 @Controller('endpoints/:endpointId')
 export class EndpointScimDiscoveryController {
   constructor(
     private readonly endpointService: EndpointService,
-    private readonly endpointContext: EndpointContextStorage
+    private readonly endpointContext: EndpointContextStorage,
+    private readonly discoveryService: ScimDiscoveryService
   ) {}
 
   /**
@@ -57,12 +76,29 @@ export class EndpointScimDiscoveryController {
    * Returns the SCIM schema definitions supported by this endpoint.
    */
   @Get('Schemas')
+  @Header('Content-Type', 'application/scim+json')
   async getSchemas(
     @Param('endpointId') endpointId: string,
     @Req() req: Request
   ) {
     await this.validateAndSetContext(endpointId, req);
-    return this.getSchemasJSON();
+    return this.discoveryService.getSchemas(endpointId);
+  }
+
+  /**
+   * GET /scim/endpoints/{endpointId}/Schemas/:uri
+   * Returns a single schema definition by URN for this endpoint.
+   * @see RFC 7644 §4 — HTTP GET to retrieve individual schema
+   */
+  @Get('Schemas/:uri')
+  @Header('Content-Type', 'application/scim+json')
+  async getSchemaByUri(
+    @Param('endpointId') endpointId: string,
+    @Param('uri') uri: string,
+    @Req() req: Request
+  ) {
+    await this.validateAndSetContext(endpointId, req);
+    return this.discoveryService.getSchemaByUrn(uri, endpointId);
   }
 
   // ===== ResourceTypes =====
@@ -72,12 +108,29 @@ export class EndpointScimDiscoveryController {
    * Returns the resource type definitions supported by this endpoint.
    */
   @Get('ResourceTypes')
+  @Header('Content-Type', 'application/scim+json')
   async getResourceTypes(
     @Param('endpointId') endpointId: string,
     @Req() req: Request
   ) {
     await this.validateAndSetContext(endpointId, req);
-    return this.getResourceTypesJSON();
+    return this.discoveryService.getResourceTypes(endpointId);
+  }
+
+  /**
+   * GET /scim/endpoints/{endpointId}/ResourceTypes/:id
+   * Returns a single resource type definition by id for this endpoint.
+   * @see RFC 7644 §4 — HTTP GET to retrieve individual resource type
+   */
+  @Get('ResourceTypes/:id')
+  @Header('Content-Type', 'application/scim+json')
+  async getResourceTypeById(
+    @Param('endpointId') endpointId: string,
+    @Param('id') id: string,
+    @Req() req: Request
+  ) {
+    await this.validateAndSetContext(endpointId, req);
+    return this.discoveryService.getResourceTypeById(id, endpointId);
   }
 
   // ===== ServiceProviderConfig =====
@@ -87,197 +140,13 @@ export class EndpointScimDiscoveryController {
    * Returns the service provider configuration for this endpoint.
    */
   @Get('ServiceProviderConfig')
+  @Header('Content-Type', 'application/scim+json')
   async getServiceProviderConfig(
     @Param('endpointId') endpointId: string,
     @Req() req: Request
   ) {
     await this.validateAndSetContext(endpointId, req);
-    return this.getServiceProviderConfigJSON();
-  }
-
-  // ===== Private helpers (static JSON – TODO: migrate to ScimMetadataService) =====
-
-  private getSchemasJSON() {
-    return {
-      schemas: ['urn:ietf:params:scim:schemas:core:2.0:ListResponse'],
-      totalResults: 2,
-      startIndex: 1,
-      itemsPerPage: 2,
-      Resources: [this.userSchema(), this.groupSchema()]
-    };
-  }
-
-  private userSchema() {
-    return {
-      id: 'urn:ietf:params:scim:schemas:core:2.0:User',
-      name: 'User',
-      description: 'User Account',
-      attributes: [
-        {
-          name: 'userName',
-          type: 'string',
-          multiValued: false,
-          required: true,
-          caseExact: false,
-          mutability: 'readWrite',
-          returned: 'always',
-          uniqueness: 'server'
-        },
-        {
-          name: 'displayName',
-          type: 'string',
-          multiValued: false,
-          required: false,
-          caseExact: false,
-          mutability: 'readWrite',
-          returned: 'default'
-        },
-        {
-          name: 'active',
-          type: 'boolean',
-          multiValued: false,
-          required: false,
-          caseExact: false,
-          mutability: 'readWrite',
-          returned: 'default'
-        },
-        {
-          name: 'emails',
-          type: 'complex',
-          multiValued: true,
-          required: false,
-          subAttributes: [
-            {
-              name: 'value',
-              type: 'string',
-              multiValued: false,
-              required: true,
-              caseExact: false,
-              mutability: 'readWrite',
-              returned: 'always'
-            },
-            {
-              name: 'type',
-              type: 'string',
-              multiValued: false,
-              required: false,
-              caseExact: false,
-              mutability: 'readWrite',
-              returned: 'default'
-            },
-            {
-              name: 'primary',
-              type: 'boolean',
-              multiValued: false,
-              required: false,
-              caseExact: false,
-              mutability: 'readWrite',
-              returned: 'default'
-            }
-          ],
-          mutability: 'readWrite',
-          returned: 'default'
-        }
-      ]
-    };
-  }
-
-  private groupSchema() {
-    return {
-      id: 'urn:ietf:params:scim:schemas:core:2.0:Group',
-      name: 'Group',
-      description: 'Group',
-      attributes: [
-        {
-          name: 'displayName',
-          type: 'string',
-          multiValued: false,
-          required: true,
-          mutability: 'readWrite',
-          returned: 'always'
-        },
-        {
-          name: 'members',
-          type: 'complex',
-          multiValued: true,
-          required: false,
-          mutability: 'readWrite',
-          returned: 'default',
-          subAttributes: [
-            {
-              name: 'value',
-              type: 'string',
-              multiValued: false,
-              required: true,
-              mutability: 'immutable',
-              returned: 'always'
-            },
-            {
-              name: 'display',
-              type: 'string',
-              multiValued: false,
-              required: false,
-              mutability: 'immutable',
-              returned: 'default'
-            },
-            {
-              name: 'type',
-              type: 'string',
-              multiValued: false,
-              required: false,
-              mutability: 'immutable',
-              returned: 'default'
-            }
-          ]
-        }
-      ]
-    };
-  }
-
-  private getResourceTypesJSON() {
-    return {
-      schemas: ['urn:ietf:params:scim:schemas:core:2.0:ListResponse'],
-      totalResults: 2,
-      startIndex: 1,
-      itemsPerPage: 2,
-      Resources: [
-        {
-          id: 'User',
-          name: 'User',
-          endpoint: '/Users',
-          description: 'User Account',
-          schema: 'urn:ietf:params:scim:schemas:core:2.0:User',
-          schemaExtensions: []
-        },
-        {
-          id: 'Group',
-          name: 'Group',
-          endpoint: '/Groups',
-          description: 'Group',
-          schema: 'urn:ietf:params:scim:schemas:core:2.0:Group',
-          schemaExtensions: []
-        }
-      ]
-    };
-  }
-
-  private getServiceProviderConfigJSON() {
-    return {
-      schemas: [SCIM_SP_CONFIG_SCHEMA],
-      patch: { supported: true },
-      bulk: { supported: false },
-      filter: { supported: true, maxResults: 200 },
-      changePassword: { supported: false },
-      sort: { supported: false },
-      etag: { supported: true },
-      authenticationSchemes: [
-        {
-          type: 'oauthbearertoken',
-          name: 'OAuth Bearer Token',
-          description: 'Authentication scheme using the OAuth Bearer Token Standard',
-          specificationUrl: 'https://www.rfc-editor.org/info/rfc6750'
-        }
-      ]
-    };
+    const endpoint = await this.endpointService.getEndpoint(endpointId);
+    return this.discoveryService.getServiceProviderConfig(endpoint.config);
   }
 }

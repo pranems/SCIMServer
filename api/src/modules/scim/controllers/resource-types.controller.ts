@@ -1,33 +1,35 @@
-﻿import { Controller, Get, Header } from '@nestjs/common';
+﻿import { Controller, Get, Header, Param } from '@nestjs/common';
+import { ScimDiscoveryService } from '../discovery/scim-discovery.service';
+import { Public } from '../../auth/public.decorator';
 
+/**
+ * Root-level ResourceTypes endpoint — returns global defaults.
+ *
+ * In a multi-tenant deployment, prefer the endpoint-scoped route
+ * `GET /scim/endpoints/{endpointId}/ResourceTypes` which returns
+ * tenant-specific resource types (global + per-endpoint custom types/extensions).
+ *
+ * RFC 7644 §4 — SHALL NOT require authentication.
+ */
+@Public()
 @Controller('ResourceTypes')
 export class ResourceTypesController {
+  constructor(private readonly discoveryService: ScimDiscoveryService) {}
+
   @Get()
   @Header('Content-Type', 'application/scim+json')
   getResourceTypes() {
-    return {
-      schemas: ['urn:ietf:params:scim:schemas:core:2.0:ListResponse'],
-      totalResults: 2,
-      startIndex: 1,
-      itemsPerPage: 2,
-      Resources: [
-        {
-          id: 'User',
-          name: 'User',
-          endpoint: '/Users',
-          description: 'User Account',
-          schema: 'urn:ietf:params:scim:schemas:core:2.0:User',
-          schemaExtensions: []
-        },
-        {
-          id: 'Group',
-          name: 'Group',
-          endpoint: '/Groups',
-          description: 'Group',
-          schema: 'urn:ietf:params:scim:schemas:core:2.0:Group',
-          schemaExtensions: []
-        }
-      ]
-    };
+    return this.discoveryService.getResourceTypes();
+  }
+
+  /**
+   * GET /ResourceTypes/:id
+   * Returns a single resource type definition by its id.
+   * @see RFC 7644 §4 — HTTP GET to retrieve individual resource type
+   */
+  @Get(':id')
+  @Header('Content-Type', 'application/scim+json')
+  getResourceTypeById(@Param('id') id: string) {
+    return this.discoveryService.getResourceTypeById(id);
   }
 }

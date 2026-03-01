@@ -7,6 +7,7 @@ export default defineConfig({
     path: 'prisma/migrations',
   },
   datasource: {
-    url: env('DATABASE_URL') ?? 'file:./dev.db',
+    // Phase 3: PostgreSQL connection string
+    url: env('DATABASE_URL') ?? 'postgresql://scim:scim@localhost:5432/scimdb',
   },
 });

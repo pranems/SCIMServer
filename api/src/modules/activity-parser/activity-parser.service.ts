@@ -750,16 +750,16 @@ export class ActivityParserService {
    */
   private async resolveUserName(userId: string): Promise<string> {
     try {
-      const user = await this.prisma.scimUser.findFirst({
-        where: { scimId: userId },
-        select: { userName: true, rawPayload: true },
+      const user = await this.prisma.scimResource.findFirst({
+        where: { scimId: userId, resourceType: 'User' },
+        select: { userName: true, payload: true },
       });
 
       if (user) {
-        // Try to get display name from raw payload first
+        // Try to get display name from payload (JSONB)
         try {
-          if (user.rawPayload && typeof user.rawPayload === 'string') {
-            const payload = JSON.parse(user.rawPayload);
+          const payload = user.payload as Record<string, any> | null;
+          if (payload) {
             if (payload.displayName) return payload.displayName;
             if (payload.name?.formatted) return payload.name.formatted;
             if (payload.name?.givenName && payload.name?.familyName) {
@@ -769,7 +769,7 @@ export class ActivityParserService {
         } catch (e) {
           // Fall back to userName if payload parsing fails
         }
-        return user.userName;
+        return user.userName ?? userId;
       }
     } catch (e) {
       // If lookup fails, return the original ID
@@ -782,8 +782,8 @@ export class ActivityParserService {
    */
   private async resolveGroupName(groupId: string): Promise<string> {
     try {
-      const group = await this.prisma.scimGroup.findFirst({
-        where: { scimId: groupId },
+      const group = await this.prisma.scimResource.findFirst({
+        where: { scimId: groupId, resourceType: 'Group' },
         select: { displayName: true },
       });
 

@@ -3,7 +3,7 @@
 > **Document Purpose**: Complete API operation guide for the multi-member PATCH endpoint configuration flags.
 > 
 > **Created**: February 3, 2026  
-> **Last Updated**: February 5, 2026 (v3 - Added Remove flag)
+> **Last Updated**: February 23, 2026 (v4 - Added SoftDeleteEnabled and StrictSchemaValidation flags)
 
 ## Overview
 
@@ -16,6 +16,12 @@ These config flags control whether a single PATCH operation can add or remove mu
 | `MultiOpPatchRequestAddMultipleMembersToGroup` | Controls multi-member **add** operations |
 | `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | Controls multi-member **remove** operations |
 | `VerbosePatchSupported` | Enables dot-notation path resolution in PATCH (e.g., `name.givenName`) |
+| `SoftDeleteEnabled` | Soft delete (`active=false` + `deletedAt`) instead of physical row deletion on DELETE |
+| `ReprovisionOnConflictForSoftDeletedResource` | Re-activate soft-deleted resource on POST conflict instead of 409 (requires SoftDeleteEnabled) |
+| `StrictSchemaValidation` | Reject extension URNs not declared in `schemas[]` or not registered in schema registry |
+| `PatchOpAllowRemoveAllMembers` | Allow removing all members from a group via `path=members` PATCH |
+| `RequireIfMatch` | Require If-Match header on PUT/PATCH/DELETE (428 Precondition Required if missing) |
+| `AllowAndCoerceBooleanStrings` | Coerce boolean string values ("True"/"False") to native booleans before schema validation |
 
 ### Flag Values
 

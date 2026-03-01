@@ -4,30 +4,29 @@ import * as fs from 'fs';
 
 /**
  * Jest globalSetup — runs once before all E2E suites.
- * Creates a fresh SQLite test database and applies all Prisma migrations.
  *
- * SQLite compromise: Creates a physical .db file and runs prisma migrate deploy.
- * PostgreSQL migration: create an isolated test schema per worker process
- * and set DATABASE_URL to the schema-scoped connection string.
- * See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.2.5
+ * Phase 3: When PERSISTENCE_BACKEND=inmemory, no database setup is needed.
+ * When using Prisma backend, applies PostgreSQL migrations via prisma migrate deploy.
  */
 export default async function globalSetup(): Promise<void> {
-  const testDbPath = path.resolve(__dirname, '..', '..', 'prisma', 'test.db');
-  const testDbUrl = `file:${testDbPath}`;
+  const backend = process.env.PERSISTENCE_BACKEND?.toLowerCase() ?? 'prisma';
 
-  // Remove stale test DB if it exists
-  if (fs.existsSync(testDbPath)) {
-    fs.unlinkSync(testDbPath);
+  if (backend === 'inmemory') {
+    // InMemory backend — no database setup required
+    const markerPath = path.resolve(__dirname, '.test-db-path');
+    fs.writeFileSync(markerPath, 'inmemory', 'utf-8');
+    return;
   }
 
-  // Apply all migrations to create a clean schema
+  // Prisma backend — PostgreSQL migrations
+  const dbUrl = process.env.DATABASE_URL ?? 'postgresql://scim:scim@localhost:5432/scimdb';
+
   execSync('npx prisma migrate deploy', {
     cwd: path.resolve(__dirname, '..', '..'),
-    env: { ...process.env, DATABASE_URL: testDbUrl },
+    env: { ...process.env, DATABASE_URL: dbUrl },
     stdio: 'pipe',
   });
 
-  // Write DB path to a marker file so test suites (which run in worker processes) can read it
   const markerPath = path.resolve(__dirname, '.test-db-path');
-  fs.writeFileSync(markerPath, testDbPath, 'utf-8');
+  fs.writeFileSync(markerPath, dbUrl, 'utf-8');
 }

@@ -34,13 +34,10 @@ describe('EndpointService', () => {
               update: jest.fn(),
               delete: jest.fn(),
             },
-            scimUser: {
+            scimResource: {
               count: jest.fn(),
             },
-            scimGroup: {
-              count: jest.fn(),
-            },
-            groupMember: {
+            resourceMember: {
               count: jest.fn(),
             },
             requestLog: {
@@ -76,6 +73,8 @@ describe('EndpointService', () => {
         });
 
         expect(result).toBeDefined();
+        expect(result.name).toBe('test-endpoint');
+        expect(result.config!.MultiOpPatchRequestAddMultipleMembersToGroup).toBe('True');
       });
 
       it('should accept "False" as valid value', async () => {
@@ -91,6 +90,7 @@ describe('EndpointService', () => {
         });
 
         expect(result).toBeDefined();
+        expect(result.config!.MultiOpPatchRequestAddMultipleMembersToGroup).toBe('False');
       });
 
       it('should accept boolean true as valid value', async () => {
@@ -106,6 +106,7 @@ describe('EndpointService', () => {
         });
 
         expect(result).toBeDefined();
+        expect(result.config!.MultiOpPatchRequestAddMultipleMembersToGroup).toBe(true);
       });
 
       it('should accept boolean false as valid value', async () => {
@@ -121,6 +122,7 @@ describe('EndpointService', () => {
         });
 
         expect(result).toBeDefined();
+        expect(result.config!.MultiOpPatchRequestAddMultipleMembersToGroup).toBe(false);
       });
 
       it('should accept "true" (lowercase) as valid value', async () => {
@@ -136,6 +138,7 @@ describe('EndpointService', () => {
         });
 
         expect(result).toBeDefined();
+        expect(result.config!.MultiOpPatchRequestAddMultipleMembersToGroup).toBe('true');
       });
 
       it('should accept "1" as valid value', async () => {
@@ -151,6 +154,7 @@ describe('EndpointService', () => {
         });
 
         expect(result).toBeDefined();
+        expect(result.config!.MultiOpPatchRequestAddMultipleMembersToGroup).toBe('1');
       });
 
       it('should accept "0" as valid value', async () => {
@@ -166,6 +170,7 @@ describe('EndpointService', () => {
         });
 
         expect(result).toBeDefined();
+        expect(result.config!.MultiOpPatchRequestAddMultipleMembersToGroup).toBe('0');
       });
 
       it('should reject invalid string value "Yes"', async () => {
@@ -454,9 +459,9 @@ describe('EndpointService', () => {
   describe('getEndpointStats', () => {
     it('should return endpoint statistics', async () => {
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
-      (prisma.scimUser.count as jest.Mock).mockResolvedValue(10);
-      (prisma.scimGroup.count as jest.Mock).mockResolvedValue(5);
-      (prisma.groupMember.count as jest.Mock).mockResolvedValue(25);
+      (prisma.scimResource.count as jest.Mock).mockResolvedValueOnce(10);
+      (prisma.scimResource.count as jest.Mock).mockResolvedValueOnce(5);
+      (prisma.resourceMember.count as jest.Mock).mockResolvedValue(25);
       (prisma.requestLog.count as jest.Mock).mockResolvedValue(100);
 
       const result = await service.getEndpointStats('test-endpoint-id');
@@ -471,9 +476,9 @@ describe('EndpointService', () => {
 
     it('should return zero counts for empty endpoint', async () => {
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
-      (prisma.scimUser.count as jest.Mock).mockResolvedValue(0);
-      (prisma.scimGroup.count as jest.Mock).mockResolvedValue(0);
-      (prisma.groupMember.count as jest.Mock).mockResolvedValue(0);
+      (prisma.scimResource.count as jest.Mock).mockResolvedValueOnce(0);
+      (prisma.scimResource.count as jest.Mock).mockResolvedValueOnce(0);
+      (prisma.resourceMember.count as jest.Mock).mockResolvedValue(0);
       (prisma.requestLog.count as jest.Mock).mockResolvedValue(0);
 
       const result = await service.getEndpointStats('test-endpoint-id');
@@ -672,12 +677,14 @@ describe('EndpointService', () => {
         (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([]);
 
         await expect(service.onModuleInit()).resolves.not.toThrow();
+        expect(scimLogger.setEndpointLevel).not.toHaveBeenCalled();
       });
 
       it('should handle database errors gracefully', async () => {
         (prisma.endpoint.findMany as jest.Mock).mockRejectedValue(new Error('DB error'));
 
         await expect(service.onModuleInit()).resolves.not.toThrow();
+        expect(scimLogger.setEndpointLevel).not.toHaveBeenCalled();
       });
 
       it('should skip endpoints with malformed config JSON', async () => {

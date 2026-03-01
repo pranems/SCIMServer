@@ -278,13 +278,15 @@ describe('Log Configuration API (E2E)', () => {
 
     it('should filter by level query parameter', async () => {
       const res = await request(app.getHttpServer())
-        .get('/scim/admin/log-config/recent?level=ERROR')
+        .get('/scim/admin/log-config/recent?level=INFO')
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      // All returned entries should be ERROR or above
+      // Previous requests in this suite generate INFO-level HTTP logs
+      expect(res.body.entries.length).toBeGreaterThan(0);
+      // All returned entries should be at INFO level or above
       for (const entry of res.body.entries) {
-        expect(['ERROR', 'FATAL']).toContain(entry.level);
+        expect(['INFO', 'WARN', 'ERROR', 'FATAL']).toContain(entry.level);
       }
     });
 
@@ -294,6 +296,8 @@ describe('Log Configuration API (E2E)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
+      // Previous requests in this suite generate 'http' category entries
+      expect(res.body.entries.length).toBeGreaterThan(0);
       for (const entry of res.body.entries) {
         expect(entry.category).toBe('http');
       }
@@ -369,6 +373,8 @@ describe('Log Configuration API (E2E)', () => {
         .expect(200);
 
       expect(Array.isArray(res.body)).toBe(true);
+      // The custom X-Request-Id was set on a prior request — entries must exist
+      expect(res.body.length).toBeGreaterThan(0);
       for (const entry of res.body as Array<{ requestId?: string }>) {
         expect(entry.requestId).toBe(requestId);
       }

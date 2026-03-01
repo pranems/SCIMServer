@@ -3,9 +3,17 @@
  *
  * Every factory returns a fresh object with unique values (using a counter)
  * and accepts an `overrides` spread so individual tests can tweak fields.
+ *
+ * Worker-aware: counter values are prefixed with JEST_WORKER_ID so that
+ * parallel Jest workers never generate colliding userNames / displayNames.
  */
 
 let counter = 0;
+
+/** Worker prefix for parallel-safe unique names (e.g. "w1-", "w2-"). */
+const workerPrefix = process.env.JEST_WORKER_ID
+  ? `w${process.env.JEST_WORKER_ID}-`
+  : '';
 
 function nextId(): number {
   return ++counter;
@@ -32,11 +40,11 @@ export function validUser(overrides: Partial<UserFixture> = {}): UserFixture {
   const n = nextId();
   return {
     schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
-    userName: `e2euser${n}@example.com`,
-    externalId: `ext-user-${n}`,
+    userName: `${workerPrefix}e2euser${n}@example.com`,
+    externalId: `${workerPrefix}ext-user-${n}`,
     active: true,
-    name: { givenName: 'Test', familyName: `User${n}` },
-    emails: [{ value: `e2euser${n}@example.com`, type: 'work', primary: true }],
+    name: { givenName: 'Test', familyName: `${workerPrefix}User${n}` },
+    emails: [{ value: `${workerPrefix}e2euser${n}@example.com`, type: 'work', primary: true }],
     ...overrides,
   };
 }
@@ -55,7 +63,7 @@ export function validGroup(overrides: Partial<GroupFixture> = {}): GroupFixture 
   const n = nextId();
   return {
     schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
-    displayName: `E2E Group ${n}`,
+    displayName: `${workerPrefix}E2E Group ${n}`,
     ...overrides,
   };
 }

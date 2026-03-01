@@ -1,13 +1,12 @@
 /**
  * SCIM ETag Interceptor — RFC 7644 §3.14
  *
- * Enforces conditional request headers (If-Match / If-None-Match)
- * and sets the ETag header on responses.
+ * Sets the ETag response header from `meta.version` and handles
+ * conditional GET via If-None-Match → 304 Not Modified.
  *
- * Per RFC 7644:
- * - All resources SHOULD include an ETag in the response (via meta.version).
- * - PUT, PATCH, DELETE SHOULD support If-Match for optimistic concurrency.
- * - GET SHOULD support If-None-Match for conditional retrieval (304 Not Modified).
+ * Phase 7: If-Match enforcement for PUT/PATCH/DELETE has been moved to the
+ * service layer (pre-write check via `assertIfMatch()`). This interceptor
+ * only handles read-side caching.
  *
  * @see https://datatracker.ietf.org/doc/html/rfc7644#section-3.14
  */
@@ -48,25 +47,6 @@ export class ScimEtagInterceptor implements NestInterceptor {
           if (ifNoneMatch && ifNoneMatch === etag) {
             res.status(304);
             return undefined;
-          }
-        }
-
-        // ─── If-Match for PUT / PATCH / DELETE (optimistic concurrency → 412) ───
-        if (['PUT', 'PATCH', 'DELETE'].includes(req.method)) {
-          const ifMatch = req.headers['if-match'];
-          if (ifMatch && etag) {
-            // ifMatch is the ETag the client thinks the resource has.
-            // etag is what the resource currently has AFTER the update.
-            // For proper concurrency, we'd need the *pre-update* version.
-            // But since we set version = updatedAt timestamp, and we read it
-            // before the operation in service methods, we'll check against the
-            // freshly returned version. The pre-check happens in the middleware-like
-            // flow below. For a pragmatic approach, we log the fact that If-Match
-            // was provided and verify against the *response* version.
-            //
-            // NOTE: A stricter implementation would check the ETag *before*
-            // applying the write. This interceptor-level check is a best-effort.
-            // True pre-check would require changes in the service layer.
           }
         }
 

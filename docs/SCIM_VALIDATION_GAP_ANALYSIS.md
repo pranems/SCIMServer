@@ -1078,7 +1078,7 @@ Call this during both **create** (in `extractAdditionalAttributes`) and **patch*
 
 All items completed February 9, 2026:
 
-- [x] Run `npm test` — all unit tests passed at the time of this phase (current repo baseline now tracks 666 unit tests)
+- [x] Run `npm test` — all unit tests passed at the time of this phase (current repo baseline now tracks 2,357 unit tests)
 - [x] Run Microsoft SCIM Validator — target 25/25 tests passing
 - [x] Verify `Content-Type: application/scim+json; charset=utf-8` header in all responses
 - [x] Verify case-insensitive filtering works for both Users and Groups
@@ -1088,7 +1088,7 @@ All items completed February 9, 2026:
 - [x] Verify enterprise extension PATCH add/replace/remove works correctly
 - [x] Verify valuePath PATCH operations update nested attributes in-place
 
-Current baseline note (February 18, 2026): broader regression coverage now reports 666 unit, 184 e2e, and 280 live integration tests passing.
+Current baseline note (February 26, 2026): broader regression coverage now reports 2,357 unit, 455 e2e, and 444 live integration tests passing.
 - [x] Verify no-path PATCH replace updates both DB columns and rawPayload
 - [x] Update `Session_starter.md` with completion status
 - [x] Update `docs/SCIM_2.0_COMPLIANCE_ANALYSIS.md` with new compliance scores

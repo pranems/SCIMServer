@@ -250,6 +250,32 @@ describe('scim-patch-path utilities', () => {
     it('should return false with case-mismatched attribute when value does not match', () => {
       expect(matchesFilter({ Type: 'home' }, 'TYPE', 'eq', 'work')).toBe(false);
     });
+
+    // Boolean-to-string filter matching (AllowAndCoerceBooleanStrings support)
+    it('should match boolean true against string "True" (case-insensitive)', () => {
+      expect(matchesFilter({ primary: true }, 'primary', 'eq', 'True')).toBe(true);
+      expect(matchesFilter({ primary: true }, 'primary', 'eq', 'true')).toBe(true);
+      expect(matchesFilter({ primary: true }, 'primary', 'eq', 'TRUE')).toBe(true);
+    });
+
+    it('should match boolean false against string "False" (case-insensitive)', () => {
+      expect(matchesFilter({ primary: false }, 'primary', 'eq', 'False')).toBe(true);
+      expect(matchesFilter({ primary: false }, 'primary', 'eq', 'false')).toBe(true);
+    });
+
+    it('should not match boolean true against string "False"', () => {
+      expect(matchesFilter({ primary: true }, 'primary', 'eq', 'False')).toBe(false);
+    });
+
+    it('should not match boolean false against string "True"', () => {
+      expect(matchesFilter({ primary: false }, 'primary', 'eq', 'True')).toBe(false);
+    });
+
+    it('should handle boolean in unsupported operator fallback', () => {
+      expect(matchesFilter({ primary: true }, 'primary', 'sw', 'true')).toBe(true);
+      expect(matchesFilter({ primary: true }, 'primary', 'sw', 'True')).toBe(true);
+      expect(matchesFilter({ primary: false }, 'primary', 'sw', 'false')).toBe(true);
+    });
   });
 
   // ─── applyValuePathUpdate ────────────────────────────────────────────
@@ -677,6 +703,27 @@ describe('scim-patch-path utilities', () => {
       });
       const ext = result[URN] as Record<string, unknown>;
       expect(ext.manager).toEqual({ value: 'MGR-STRING' });
+    });
+
+    it('should resolve custom extension URN keys when extensionUrns provided', () => {
+      const CUSTOM_URN = 'urn:example:custom:2.0:User';
+      const payload: Record<string, unknown> = {};
+      const result = resolveNoPathValue(payload, {
+        [`${CUSTOM_URN}:customAttr`]: 'custom-val',
+      }, [CUSTOM_URN]);
+      const ext = result[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext?.customAttr).toBe('custom-val');
+    });
+
+    it('should NOT resolve custom URN keys without extensionUrns — key is mangled by dot-notation', () => {
+      const CUSTOM_URN = 'urn:example:custom:2.0:User';
+      const payload: Record<string, unknown> = {};
+      const result = resolveNoPathValue(payload, {
+        [`${CUSTOM_URN}:customAttr`]: 'custom-val',
+      });
+      // Without extensionUrns, the URN contains "2.0" which triggers dot-notation splitting.
+      // The key is NOT correctly stored — this demonstrates why extensionUrns is needed.
+      expect(result[CUSTOM_URN]).toBeUndefined();
     });
   });
 });

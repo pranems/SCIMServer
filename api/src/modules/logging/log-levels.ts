@@ -64,8 +64,6 @@ export enum LogCategory {
   ENDPOINT = 'endpoint',
   /** Database / Prisma operations */
   DATABASE = 'database',
-  /** Backup & restore */
-  BACKUP = 'backup',
   /** OAuth token operations */
   OAUTH = 'oauth',
   /** General / uncategorized */

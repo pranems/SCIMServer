@@ -81,6 +81,16 @@ async function bootstrap(): Promise<void> {
   Logger.log(`🔎 Log API quick access: http://localhost:${port}/scim/admin/log-config/recent?limit=25`);
   Logger.log(`🔎 Log stream (SSE): http://localhost:${port}/scim/admin/log-config/stream?level=INFO`);
   Logger.log(`🔎 Log download (JSON): http://localhost:${port}/scim/admin/log-config/download?format=json`);
+
+  // V1 awareness: Log a warning when schema validation is disabled (the default).
+  // StrictSchemaValidation defaults to false for Entra compatibility, but this means
+  // no attribute-level type/required/mutability checking runs on POST/PUT/PATCH.
+  Logger.warn(
+    '⚠️  StrictSchemaValidation is OFF by default for all endpoints. ' +
+    'SCIM payloads will NOT be type-checked against schema definitions. ' +
+    'Enable per-endpoint via config: { "StrictSchemaValidation": "True" }',
+    'SchemaValidation',
+  );
 }
 
 void bootstrap();

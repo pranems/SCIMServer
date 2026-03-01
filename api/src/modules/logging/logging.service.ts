@@ -1,5 +1,6 @@
 ﻿import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import type { Prisma } from '../../generated/prisma/client';
+import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -18,25 +19,39 @@ export interface CreateRequestLogOptions {
 @Injectable()
 export class LoggingService implements OnModuleDestroy {
   private readonly logger = new Logger(LoggingService.name);
+  private readonly isInMemoryBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() === 'inmemory';
 
-  // ── Buffered logging to reduce SQLite write contention ──
-  // SQLite compromise (CRITICAL): Per-request logging (2 writes each) competes for the
-  // single SQLite writer lock with SCIM operations. Buffering trades real-time logging
-  // (up to 3s data loss on crash) for reduced lock contention.
-  // PostgreSQL migration: remove buffering, use direct create() per request.
-  // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.2.2
+  // ── Buffered logging for performance ──
+  // Buffering trades real-time logging (up to 3s data loss on crash) for reduced
+  // database write overhead. Single batch insert instead of N individual writes.
+  // Originally introduced to mitigate SQLite single-writer contention; retained
+  // for PostgreSQL to reduce connection pool pressure.
   private logBuffer: Array<Prisma.RequestLogCreateInput & { _identifier?: string }> = [];
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private flushInProgress = false;
   private static readonly FLUSH_INTERVAL_MS = 3_000;  // flush every 3 seconds
   private static readonly MAX_BUFFER_SIZE = 50;        // or when 50 entries accumulate
+  private inMemoryLogRows: Array<{
+    id: string;
+    method: string;
+    url: string;
+    status: number | null;
+    durationMs: number | null;
+    createdAt: Date;
+    requestHeaders: string | null;
+    requestBody: string | null;
+    responseHeaders: string | null;
+    responseBody: string | null;
+    errorMessage: string | null;
+    errorStack: string | null;
+    identifier: string | null;
+  }> = [];
 
   constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Buffer a request log entry. The entry is written to the DB asynchronously
-   * in batches to avoid per-request SQLite write-lock contention with SCIM
-   * transactions.
+   * in batches to reduce per-request database write overhead.
    */
   recordRequest({
     method,
@@ -49,6 +64,37 @@ export class LoggingService implements OnModuleDestroy {
     responseBody,
     error
   }: CreateRequestLogOptions): void {
+    if (this.isInMemoryBackend) {
+      const errorMessage = this.extractErrorMessage(error);
+      const errorStack = this.extractErrorStack(error);
+      let identifier: string | undefined;
+      try {
+        const idCandidate = this.deriveReportableIdentifier(url, requestBody, responseBody) ||
+          (/\/scim\/Groups/i.test(url) ? this.deriveGroupDisplayName(
+            this.normalizeObject(requestBody) ?? null,
+            this.normalizeObject(responseBody) ?? null
+          ) : undefined) || this.deriveIdentifierFromUrl(url);
+        if (idCandidate && typeof idCandidate === 'string') identifier = idCandidate;
+      } catch { /* swallow */ }
+
+      this.inMemoryLogRows.push({
+        id: randomUUID(),
+        method,
+        url,
+        status: status ?? null,
+        durationMs: durationMs ?? null,
+        createdAt: new Date(),
+        requestHeaders: this.stringifyValue(requestHeaders) ?? '{}',
+        requestBody: this.stringifyValue(requestBody),
+        responseHeaders: this.stringifyValue(responseHeaders),
+        responseBody: this.stringifyValue(responseBody),
+        errorMessage,
+        errorStack,
+        identifier: identifier ?? null,
+      });
+      return;
+    }
+
     const errorMessage = this.extractErrorMessage(error);
     const errorStack = this.extractErrorStack(error);
     // Compute identifier once (cheap vs later bulk parsing). Works for Users (userName/email/externalId) & Groups (displayName)
@@ -87,10 +133,14 @@ export class LoggingService implements OnModuleDestroy {
   }
 
   /**
-   * Flush the accumulated log buffer to SQLite in a single batch.
+   * Flush the accumulated log buffer to PostgreSQL in a single batch.
    * Uses createMany for the bulk insert, then a single raw UPDATE for identifiers.
    */
   async flushLogs(): Promise<void> {
+    if (this.isInMemoryBackend) {
+      return;
+    }
+
     if (this.flushInProgress || this.logBuffer.length === 0) return;
     this.flushInProgress = true;
 
@@ -116,22 +166,19 @@ export class LoggingService implements OnModuleDestroy {
       // Single batch insert (1 write instead of N*2 writes)
       await this.prisma.requestLog.createMany({ data: createData });
 
-      // SQLite compromise: createMany doesn't support RETURNING in SQLite.
-      // We fetch the most recent N rows by rowid to correlate batch-inserted records.
-      // PostgreSQL migration: use createMany with RETURNING or createManyAndReturn().
-      // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.4.2
+      // Phase 3 (PostgreSQL): Fetch the most recent N rows by createdAt to correlate
+      // batch-inserted records with their identifiers.
       if (identifiers.length > 0) {
-        // Fetch the last N created rows (ordered by rowid DESC) to correlate
         try {
           const recentRows: Array<{ id: string }> = await this.prisma.$queryRawUnsafe(
-            `SELECT id FROM RequestLog ORDER BY rowid DESC LIMIT ${batch.length}`
+            `SELECT "id" FROM "RequestLog" ORDER BY "createdAt" DESC LIMIT ${batch.length}`
           );
           // recentRows[0] = newest (last in batch), so reverse to align with batch order
           const ordered = [...recentRows].reverse();
           for (const { index, identifier } of identifiers) {
             if (ordered[index]) {
               await this.prisma.$executeRawUnsafe(
-                'UPDATE RequestLog SET identifier = ? WHERE id = ?',
+                `UPDATE "RequestLog" SET "identifier" = $1 WHERE "id" = $2`,
                 identifier,
                 ordered[index].id,
               );
@@ -158,6 +205,12 @@ export class LoggingService implements OnModuleDestroy {
   }
 
   async clearLogs(): Promise<number> {
+    if (this.isInMemoryBackend) {
+      const count = this.inMemoryLogRows.length;
+      this.inMemoryLogRows = [];
+      return count;
+    }
+
     const result = await this.prisma.requestLog.deleteMany();
     return result.count;
   }
@@ -175,6 +228,37 @@ export class LoggingService implements OnModuleDestroy {
     includeAdmin?: boolean;
     hideKeepalive?: boolean;
   } = {}) {
+    if (this.isInMemoryBackend) {
+      const pageSize = Math.min(Math.max(filters.pageSize ?? 50, 1), 200);
+      const page = Math.max(filters.page ?? 1, 1);
+      const skip = (page - 1) * pageSize;
+      const records = [...this.inMemoryLogRows]
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .slice(skip, skip + pageSize);
+
+      const items = records.map((r) => ({
+        id: r.id,
+        method: r.method,
+        url: r.url,
+        status: r.status ?? undefined,
+        durationMs: r.durationMs ?? undefined,
+        createdAt: r.createdAt,
+        errorMessage: r.errorMessage ?? undefined,
+        reportableIdentifier: r.identifier ?? this.deriveIdentifierFromUrl(r.url),
+      }));
+
+      const total = this.inMemoryLogRows.length;
+      return {
+        total,
+        page,
+        pageSize,
+        count: items.length,
+        hasNext: skip + items.length < total,
+        hasPrev: page > 1,
+        items,
+      };
+    }
+
     const pageSize = Math.min(Math.max(filters.pageSize ?? 50, 1), 200);
     const page = Math.max(filters.page ?? 1, 1);
 
@@ -310,7 +394,7 @@ export class LoggingService implements OnModuleDestroy {
       if (ids.length) {
         // Unsafe raw only over internal generated IDs (cuid) - controlled
         const rows: Array<{ id: string; identifier: string | null }> = await this.prisma.$queryRawUnsafe(
-          `SELECT id, identifier FROM RequestLog WHERE id IN (${ids})`
+          `SELECT "id", "identifier" FROM "RequestLog" WHERE "id" IN (${ids})`
         );
         for (const row of rows) identifierMap[row.id] = row.identifier;
       }
@@ -365,6 +449,36 @@ export class LoggingService implements OnModuleDestroy {
   }
 
   async getLog(id: string) {
+    if (this.isInMemoryBackend) {
+      const row = this.inMemoryLogRows.find((r) => r.id === id);
+      if (!row) return null;
+      const parsedRequest = this.safeParse(row.requestBody ? String(row.requestBody) : null);
+      const parsedResponse = this.safeParse(row.responseBody ? String(row.responseBody) : null);
+      const rid =
+        row.identifier ||
+        this.deriveReportableIdentifier(row.url, parsedRequest, parsedResponse) ||
+        this.deriveGroupDisplayName(
+          parsedRequest as Record<string, unknown> | null,
+          parsedResponse as Record<string, unknown> | null,
+        ) ||
+        this.deriveIdentifierFromUrl(row.url);
+
+      return {
+        id: row.id,
+        method: row.method,
+        url: row.url,
+        status: row.status ?? undefined,
+        durationMs: row.durationMs ?? undefined,
+        createdAt: row.createdAt,
+        requestHeaders: this.safeParse(row.requestHeaders ? String(row.requestHeaders) : null),
+        requestBody: parsedRequest,
+        responseHeaders: this.safeParse(row.responseHeaders ? String(row.responseHeaders) : null),
+        responseBody: parsedResponse,
+        errorMessage: row.errorMessage ?? undefined,
+        reportableIdentifier: rid,
+      };
+    }
+
     const row = await this.prisma.requestLog.findUnique({ where: { id } });
     if (!row) return null;
     // Parse bodies once for identifier + returned payload
@@ -454,24 +568,24 @@ export class LoggingService implements OnModuleDestroy {
   private async resolveUserDisplayName(identifier: string): Promise<string | null> {
     try {
       // Try to find user by SCIM ID first
-      let user = await this.prisma.scimUser.findFirst({
-        where: { scimId: identifier },
-        select: { userName: true, rawPayload: true },
+      let user = await this.prisma.scimResource.findFirst({
+        where: { scimId: identifier, resourceType: 'User' },
+        select: { userName: true, payload: true },
       });
 
       // If not found by SCIM ID, try by userName
       if (!user) {
-        user = await this.prisma.scimUser.findFirst({
-          where: { userName: identifier },
-          select: { userName: true, rawPayload: true },
+        user = await this.prisma.scimResource.findFirst({
+          where: { userName: identifier, resourceType: 'User' },
+          select: { userName: true, payload: true },
         });
       }
 
       if (user) {
         // Try to get display name from raw payload first
         try {
-          if (user.rawPayload && typeof user.rawPayload === 'string') {
-            const payload = JSON.parse(user.rawPayload);
+          const payload = user.payload as Record<string, any> | null;
+          if (payload) {
             if (payload.displayName) return payload.displayName;
             if (payload.name?.formatted) return payload.name.formatted;
             if (payload.name?.givenName && payload.name?.familyName) {

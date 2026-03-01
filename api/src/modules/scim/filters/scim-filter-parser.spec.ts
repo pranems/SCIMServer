@@ -2,6 +2,7 @@ import {
   parseScimFilter,
   evaluateFilter,
   resolveAttrPath,
+  extractFilterPaths,
 } from './scim-filter-parser';
 import type { FilterNode, CompareNode, LogicalNode, NotNode, ValuePathNode } from './scim-filter-parser';
 
@@ -447,5 +448,100 @@ describe('resolveAttrPath', () => {
   it('should be case-insensitive for attribute lookup', () => {
     expect(resolveAttrPath(resource, 'USERNAME')).toBe('test');
     expect(resolveAttrPath(resource, 'Name.GivenName')).toBe('Test');
+  });
+});
+
+// ─── V12: Filter Depth Guard ─────────────────────────────────────────────────
+
+describe('ScimFilterParser — depth guard (V12)', () => {
+  it('should parse moderately nested filters without error', () => {
+    // 10 levels of nesting — well within limit
+    const filter = '(' .repeat(10) + 'userName eq "a"' + ')'.repeat(10);
+    const ast = parseScimFilter(filter);
+    expect(ast).toBeDefined();
+  });
+
+  it('should reject filters that exceed MAX_FILTER_DEPTH (50)', () => {
+    // 51 levels of parenthesised nesting
+    const filter = '(' .repeat(51) + 'userName eq "a"' + ')'.repeat(51);
+    expect(() => parseScimFilter(filter)).toThrow(
+      /exceeds maximum nesting depth of 50/,
+    );
+  });
+
+  it('should reject deeply nested parenthesised chains', () => {
+    // Each "not (" increments depth by 1 (guardDepth in NOT branch);
+    // decrement happens after recursion returns. Need > 50 to trigger.
+    let filter = '';
+    for (let i = 0; i < 51; i++) filter += 'not (';
+    filter += 'userName pr';
+    for (let i = 0; i < 51; i++) filter += ')';
+    expect(() => parseScimFilter(filter)).toThrow(
+      /exceeds maximum nesting depth/,
+    );
+  });
+
+  it('should accept exactly 50 levels of nesting', () => {
+    // Exactly at the boundary — should still succeed
+    const filter = '(' .repeat(50) + 'userName eq "a"' + ')'.repeat(50);
+    expect(() => parseScimFilter(filter)).not.toThrow();
+  });
+});
+
+// ─── extractFilterPaths ──────────────────────────────────────────────────────
+
+describe('extractFilterPaths', () => {
+  it('should extract single attribute path from simple filter', () => {
+    const ast = parseScimFilter('userName eq "john"');
+    const paths = extractFilterPaths(ast);
+    expect(paths).toEqual(['userName']);
+  });
+
+  it('should extract multiple attribute paths from logical filter', () => {
+    const ast = parseScimFilter('userName eq "john" and active eq "true"');
+    const paths = extractFilterPaths(ast);
+    expect(paths).toContain('userName');
+    expect(paths).toContain('active');
+    expect(paths).toHaveLength(2);
+  });
+
+  it('should deduplicate attribute paths', () => {
+    const ast = parseScimFilter('userName eq "a" or userName sw "b"');
+    const paths = extractFilterPaths(ast);
+    expect(paths).toEqual(['userName']);
+  });
+
+  it('should extract paths from valuePath (bracket) filters', () => {
+    const ast = parseScimFilter('emails[type eq "work"]');
+    const paths = extractFilterPaths(ast);
+    expect(paths).toContain('emails');
+    expect(paths).toContain('type');
+  });
+
+  it('should extract paths from NOT filters', () => {
+    const ast = parseScimFilter('not (userName eq "john")');
+    const paths = extractFilterPaths(ast);
+    expect(paths).toContain('userName');
+  });
+
+  it('should extract paths from presence (pr) filters', () => {
+    const ast = parseScimFilter('title pr');
+    const paths = extractFilterPaths(ast);
+    expect(paths).toEqual(['title']);
+  });
+
+  it('should extract dotted sub-attribute paths', () => {
+    const ast = parseScimFilter('name.givenName eq "John"');
+    const paths = extractFilterPaths(ast);
+    expect(paths).toEqual(['name.givenName']);
+  });
+
+  it('should extract URN-prefixed paths', () => {
+    const ast = parseScimFilter(
+      'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department eq "Engineering"',
+    );
+    const paths = extractFilterPaths(ast);
+    expect(paths).toHaveLength(1);
+    expect(paths[0]).toContain('department');
   });
 });

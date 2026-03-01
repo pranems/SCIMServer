@@ -41,6 +41,7 @@ describe('EndpointScimUsersController', () => {
     patchUserForEndpoint: jest.fn(),
     replaceUserForEndpoint: jest.fn(),
     deleteUserForEndpoint: jest.fn(),
+    getRequestOnlyAttributes: jest.fn().mockReturnValue(new Set<string>()),
   };
 
   const mockEndpointService = {
@@ -51,6 +52,8 @@ describe('EndpointScimUsersController', () => {
     run: jest.fn((endpointId: string, callback: () => any) => callback()),
     getEndpointId: jest.fn(),
     setContext: jest.fn(),
+    getWarnings: jest.fn().mockReturnValue([]),
+    addWarnings: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -116,7 +119,8 @@ describe('EndpointScimUsersController', () => {
         expect(mockUsersService.createUserForEndpoint).toHaveBeenCalledWith(
           createDto,
           expect.any(String),
-          'endpoint-1'
+          'endpoint-1',
+          expect.any(Object)
         );
         expect(result).toEqual(mockUser);
       });
@@ -141,7 +145,8 @@ describe('EndpointScimUsersController', () => {
         expect(mockUsersService.getUserForEndpoint).toHaveBeenCalledWith(
           'scim-123',
           expect.any(String),
-          'endpoint-1'
+          'endpoint-1',
+          expect.any(Object)
         );
       });
 
@@ -162,7 +167,7 @@ describe('EndpointScimUsersController', () => {
           'endpoint-1', 'scim-123', mockRequest, 'userName', undefined
         );
 
-        // Should include only userName + always-returned (schemas, id, meta)
+        // Should include only userName + always-returned (schemas, id, meta, userName)
         expect(result.userName).toBe('test@example.com');
         expect(result.schemas).toBeDefined();
         expect(result.id).toBe('scim-123');
@@ -218,9 +223,10 @@ describe('EndpointScimUsersController', () => {
 
         expect(mockEndpointService.getEndpoint).toHaveBeenCalledWith('endpoint-1');
         expect(mockUsersService.listUsersForEndpoint).toHaveBeenCalledWith(
-          { filter: undefined, startIndex: 1, count: 10 },
+          { filter: undefined, startIndex: 1, count: 10, sortBy: undefined, sortOrder: undefined },
           expect.any(String),
-          'endpoint-1'
+          'endpoint-1',
+          expect.any(Object)
         );
         expect(result).toEqual(mockListResponse);
       });
@@ -240,7 +246,7 @@ describe('EndpointScimUsersController', () => {
         mockUsersService.listUsersForEndpoint.mockResolvedValue(mockListResponse);
 
         const result = await controller.listUsers(
-          'endpoint-1', mockRequest, undefined, '1', '10', 'userName', undefined
+          'endpoint-1', mockRequest, undefined, '1', '10', undefined, undefined, 'userName', undefined
         );
 
         expect(result.Resources[0].userName).toBe('user1@example.com');
@@ -271,9 +277,10 @@ describe('EndpointScimUsersController', () => {
         const result = await controller.searchUsers('endpoint-1', searchDto, mockRequest);
 
         expect(mockUsersService.listUsersForEndpoint).toHaveBeenCalledWith(
-          { filter: 'userName eq "alice@example.com"', startIndex: 1, count: 10 },
+          { filter: 'userName eq "alice@example.com"', startIndex: 1, count: 10, sortBy: undefined, sortOrder: undefined },
           expect.any(String),
-          'endpoint-1'
+          'endpoint-1',
+          expect.any(Object)
         );
         expect(result).toEqual(mockListResponse);
       });
@@ -334,7 +341,8 @@ describe('EndpointScimUsersController', () => {
           patchDto,
           expect.any(String),
           'endpoint-1',
-          expect.any(Object)
+          expect.any(Object),
+          undefined,
         );
         expect(result).toEqual(mockUser);
       });
@@ -370,7 +378,9 @@ describe('EndpointScimUsersController', () => {
           'scim-123',
           replaceDto,
           expect.any(String),
-          'endpoint-1'
+          'endpoint-1',
+          expect.any(Object),
+          undefined,
         );
         expect(result).toEqual(mockUser);
       });
@@ -385,7 +395,9 @@ describe('EndpointScimUsersController', () => {
 
         expect(mockUsersService.deleteUserForEndpoint).toHaveBeenCalledWith(
           'scim-123',
-          'endpoint-1'
+          'endpoint-1',
+          expect.any(Object),
+          undefined,
         );
       });
     });
@@ -448,6 +460,360 @@ describe('EndpointScimUsersController', () => {
       ).resolves.toBeDefined();
 
       expect(mockUsersService.getUserForEndpoint).toHaveBeenCalled();
+    });
+  });
+
+  // ───────────── G8e: returned characteristic filtering ─────────────
+
+  describe('G8e — returned:request attribute filtering', () => {
+    it('POST createUser should strip returned:request attributes from response', async () => {
+      const createDto: CreateUserDto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'g8e-test@example.com',
+        active: true,
+      };
+
+      const mockUserWithRequestAttr = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        id: 'scim-g8e',
+        userName: 'g8e-test@example.com',
+        active: true,
+        secretQuestion: 'What is your pet?',
+        meta: { resourceType: 'User' },
+      };
+
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      mockUsersService.createUserForEndpoint.mockResolvedValue(mockUserWithRequestAttr);
+      // Simulate a request-only attribute
+      mockUsersService.getRequestOnlyAttributes.mockReturnValue(new Set(['secretquestion']));
+
+      const result = await controller.createUser('endpoint-1', createDto, mockRequest);
+
+      // secretQuestion has returned:'request' → stripped from write-op response
+      expect(result.secretQuestion).toBeUndefined();
+      expect(result.userName).toBe('g8e-test@example.com');
+    });
+
+    it('GET listUsers should pass requestOnlyAttrs to projection', async () => {
+      const mockListResponse = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+        totalResults: 1,
+        startIndex: 1,
+        itemsPerPage: 1,
+        Resources: [
+          { schemas: ['s'], id: 'u1', userName: 'user1@example.com', secretQuestion: 'Pet?', meta: {} },
+        ],
+      };
+
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      mockUsersService.listUsersForEndpoint.mockResolvedValue(mockListResponse);
+      mockUsersService.getRequestOnlyAttributes.mockReturnValue(new Set(['secretquestion']));
+
+      const result = await controller.listUsers('endpoint-1', mockRequest);
+
+      // returned:'request' attr should be stripped even without attributes param
+      expect(result.Resources[0].secretQuestion).toBeUndefined();
+      expect(result.Resources[0].userName).toBe('user1@example.com');
+    });
+
+    it('GET getUser should pass requestOnlyAttrs to applyAttributeProjection', async () => {
+      const fullUser = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        id: 'scim-g8e-get',
+        userName: 'g8e-get@example.com',
+        active: true,
+        secretQuestion: 'Favorite color?',
+        meta: { resourceType: 'User' },
+      };
+
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      mockUsersService.getUserForEndpoint.mockResolvedValue(fullUser);
+      mockUsersService.getRequestOnlyAttributes.mockReturnValue(new Set(['secretquestion']));
+
+      const result = await controller.getUser('endpoint-1', 'scim-g8e-get', mockRequest);
+
+      // returned:'request' attr stripped because not in ?attributes= param
+      expect(result.secretQuestion).toBeUndefined();
+      expect(result.userName).toBe('g8e-get@example.com');
+    });
+
+    it('PUT replaceUser should strip returned:request attributes from response', async () => {
+      const replaceDto: CreateUserDto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'g8e-put@example.com',
+        active: true,
+      };
+
+      const mockUserResult = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        id: 'scim-g8e-put',
+        userName: 'g8e-put@example.com',
+        active: true,
+        secretQuestion: 'Birth city?',
+        meta: { resourceType: 'User' },
+      };
+
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      mockUsersService.replaceUserForEndpoint.mockResolvedValue(mockUserResult);
+      mockUsersService.getRequestOnlyAttributes.mockReturnValue(new Set(['secretquestion']));
+
+      const result = await controller.replaceUser('endpoint-1', 'scim-g8e-put', replaceDto, mockRequest);
+
+      expect(result.secretQuestion).toBeUndefined();
+      expect(result.userName).toBe('g8e-put@example.com');
+    });
+  });
+
+  // ───────────── G8g: write-response attribute projection ─────────────
+
+  describe('G8g — write-response attributes/excludedAttributes projection', () => {
+    const fullUser = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+      id: 'scim-g8g',
+      userName: 'g8g-test@example.com',
+      displayName: 'G8g Test User',
+      active: true,
+      emails: [{ value: 'g8g@example.com', type: 'work', primary: true }],
+      meta: { resourceType: 'User', created: '2026-01-01T00:00:00Z' },
+    };
+
+    beforeEach(() => {
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
+      mockUsersService.getRequestOnlyAttributes.mockReturnValue(new Set<string>());
+    });
+
+    it('POST createUser with ?attributes= should only return requested attributes', async () => {
+      mockUsersService.createUserForEndpoint.mockResolvedValue({ ...fullUser });
+
+      const result = await controller.createUser(
+        'endpoint-1',
+        { schemas: fullUser.schemas, userName: 'g8g-test@example.com', active: true } as CreateUserDto,
+        mockRequest,
+        'userName',
+        undefined
+      );
+
+      expect(result.userName).toBe('g8g-test@example.com');
+      expect(result.id).toBe('scim-g8g'); // always-returned
+      expect(result.schemas).toBeDefined(); // always-returned
+      expect(result.meta).toBeDefined(); // always-returned
+      expect(result.displayName).toBeUndefined(); // not requested
+      expect(result.emails).toBeUndefined(); // not requested
+    });
+
+    it('POST createUser with ?excludedAttributes= should omit specified attributes', async () => {
+      mockUsersService.createUserForEndpoint.mockResolvedValue({ ...fullUser });
+
+      const result = await controller.createUser(
+        'endpoint-1',
+        { schemas: fullUser.schemas, userName: 'g8g-test@example.com', active: true } as CreateUserDto,
+        mockRequest,
+        undefined,
+        'displayName,emails'
+      );
+
+      expect(result.userName).toBe('g8g-test@example.com');
+      expect(result.displayName).toBeUndefined(); // excluded
+      expect(result.emails).toBeUndefined(); // excluded
+      expect(result.active).toBe(true); // not excluded
+    });
+
+    it('PUT replaceUser with ?attributes= should project response', async () => {
+      mockUsersService.replaceUserForEndpoint.mockResolvedValue({ ...fullUser });
+
+      const result = await controller.replaceUser(
+        'endpoint-1',
+        'scim-g8g',
+        { schemas: fullUser.schemas, userName: 'g8g-test@example.com', active: true } as CreateUserDto,
+        mockRequest,
+        'displayName',
+        undefined
+      );
+
+      expect(result.displayName).toBe('G8g Test User'); // requested
+      expect(result.id).toBe('scim-g8g'); // always-returned
+      expect(result.emails).toBeUndefined(); // not requested
+      expect(result.active).toBeUndefined(); // not requested
+    });
+
+    it('PATCH updateUser with ?attributes= should project response', async () => {
+      mockUsersService.patchUserForEndpoint.mockResolvedValue({ ...fullUser });
+
+      const patchDto: PatchUserDto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', value: { displayName: 'Updated' } }],
+      };
+
+      const result = await controller.updateUser(
+        'endpoint-1',
+        'scim-g8g',
+        patchDto,
+        mockRequest,
+        'displayName,active',
+        undefined
+      );
+
+      expect(result.displayName).toBe('G8g Test User'); // requested
+      expect(result.active).toBe(true); // requested
+      expect(result.emails).toBeUndefined(); // not requested
+    });
+
+    it('PATCH updateUser with ?excludedAttributes= should omit specified', async () => {
+      mockUsersService.patchUserForEndpoint.mockResolvedValue({ ...fullUser });
+
+      const patchDto: PatchUserDto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', value: { active: false } }],
+      };
+
+      const result = await controller.updateUser(
+        'endpoint-1',
+        'scim-g8g',
+        patchDto,
+        mockRequest,
+        undefined,
+        'emails,displayName'
+      );
+
+      expect(result.active).toBe(true); // not excluded
+      expect(result.emails).toBeUndefined(); // excluded
+      expect(result.displayName).toBeUndefined(); // excluded
+    });
+
+    it('POST/PUT/PATCH without query params should still return full response', async () => {
+      mockUsersService.createUserForEndpoint.mockResolvedValue({ ...fullUser });
+
+      const result = await controller.createUser(
+        'endpoint-1',
+        { schemas: fullUser.schemas, userName: 'g8g-test@example.com', active: true } as CreateUserDto,
+        mockRequest
+      );
+
+      // All attributes present when no projection params
+      expect(result.userName).toBe('g8g-test@example.com');
+      expect(result.displayName).toBe('G8g Test User');
+      expect(result.emails).toBeDefined();
+      expect(result.active).toBe(true);
+    });
+
+    it('PUT replaceUser with ?excludedAttributes= should omit specified attributes', async () => {
+      mockUsersService.replaceUserForEndpoint.mockResolvedValue({ ...fullUser });
+
+      const result = await controller.replaceUser(
+        'endpoint-1',
+        'scim-g8g',
+        { schemas: fullUser.schemas, userName: 'g8g-test@example.com', active: true } as CreateUserDto,
+        mockRequest,
+        undefined,
+        'emails,displayName'
+      );
+
+      expect(result.userName).toBe('g8g-test@example.com'); // not excluded
+      expect(result.emails).toBeUndefined(); // excluded
+      expect(result.displayName).toBeUndefined(); // excluded
+      expect(result.active).toBe(true); // not excluded
+      expect(result.id).toBe('scim-g8g'); // always-returned
+    });
+
+    it('POST with both attributes AND excludedAttributes — attributes takes precedence', async () => {
+      mockUsersService.createUserForEndpoint.mockResolvedValue({ ...fullUser });
+
+      const result = await controller.createUser(
+        'endpoint-1',
+        { schemas: fullUser.schemas, userName: 'g8g-test@example.com', active: true } as CreateUserDto,
+        mockRequest,
+        'userName,displayName',       // include-only
+        'displayName'                 // also try to exclude displayName
+      );
+
+      // Per RFC 7644: attributes takes precedence — displayName IS in the include list
+      expect(result.userName).toBe('g8g-test@example.com');
+      expect(result.displayName).toBe('G8g Test User'); // included via attributes
+      expect(result.id).toBe('scim-g8g'); // always-returned
+      expect(result.emails).toBeUndefined(); // not in attributes list
+    });
+
+    it('returned:request attr should be INCLUDED when explicitly requested via ?attributes=', async () => {
+      const userWithRequestAttr = {
+        ...fullUser,
+        secretQuestion: 'What is your pet?',
+      };
+      mockUsersService.createUserForEndpoint.mockResolvedValue({ ...userWithRequestAttr });
+      mockUsersService.getRequestOnlyAttributes.mockReturnValue(new Set(['secretquestion']));
+
+      const result = await controller.createUser(
+        'endpoint-1',
+        { schemas: fullUser.schemas, userName: 'g8g-test@example.com', active: true } as CreateUserDto,
+        mockRequest,
+        'userName,secretQuestion',  // explicitly requesting the request-only attr
+        undefined
+      );
+
+      // returned:'request' attr IS included because client explicitly requested it
+      expect(result.secretQuestion).toBe('What is your pet?');
+      expect(result.userName).toBe('g8g-test@example.com');
+    });
+
+    it('returned:request attr should be STRIPPED when only excludedAttributes is used', async () => {
+      const userWithRequestAttr = {
+        ...fullUser,
+        secretQuestion: 'What is your pet?',
+      };
+      mockUsersService.createUserForEndpoint.mockResolvedValue({ ...userWithRequestAttr });
+      mockUsersService.getRequestOnlyAttributes.mockReturnValue(new Set(['secretquestion']));
+
+      const result = await controller.createUser(
+        'endpoint-1',
+        { schemas: fullUser.schemas, userName: 'g8g-test@example.com', active: true } as CreateUserDto,
+        mockRequest,
+        undefined,
+        'emails'  // excludedAttributes — no explicit request for secretQuestion
+      );
+
+      // returned:'request' is stripped because it's not in an attributes= list
+      expect(result.secretQuestion).toBeUndefined();
+      expect(result.emails).toBeUndefined(); // excluded
+      expect(result.userName).toBe('g8g-test@example.com');
+    });
+
+    it('excludedAttributes cannot remove always-returned fields (id, schemas, meta)', async () => {
+      mockUsersService.createUserForEndpoint.mockResolvedValue({ ...fullUser });
+
+      const result = await controller.createUser(
+        'endpoint-1',
+        { schemas: fullUser.schemas, userName: 'g8g-test@example.com', active: true } as CreateUserDto,
+        mockRequest,
+        undefined,
+        'id,schemas,meta,userName'  // try to exclude all always-returned + userName
+      );
+
+      // Always-returned fields survive excludedAttributes
+      expect(result.id).toBe('scim-g8g');
+      expect(result.schemas).toBeDefined();
+      expect(result.meta).toBeDefined();
+      expect(result.userName).toBe('g8g-test@example.com'); // always-returned for User
+    });
+
+    it('dotted sub-attribute path (name.givenName) on POST should return only sub-attr', async () => {
+      mockUsersService.createUserForEndpoint.mockResolvedValue({
+        ...fullUser,
+        name: { givenName: 'Test', familyName: 'User' },
+      });
+
+      const result = await controller.createUser(
+        'endpoint-1',
+        { schemas: fullUser.schemas, userName: 'g8g-test@example.com', active: true } as CreateUserDto,
+        mockRequest,
+        'name.givenName',
+        undefined
+      );
+
+      // Only name.givenName sub-attribute included
+      expect(result.name).toBeDefined();
+      expect((result.name as Record<string, unknown>).givenName).toBe('Test');
+      expect((result.name as Record<string, unknown>).familyName).toBeUndefined();
+      expect(result.id).toBe('scim-g8g'); // always-returned
+      expect(result.emails).toBeUndefined(); // not requested
     });
   });
 });

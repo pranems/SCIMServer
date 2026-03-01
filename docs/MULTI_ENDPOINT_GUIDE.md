@@ -1,16 +1,16 @@
 # Multi-Endpoint SCIM Guide
 
 > **Status**: Living architecture guide  
-> **Last Updated**: February 18, 2026  
-> **Baseline**: SCIMServer v0.10.0
+> **Last Updated**: February 23, 2026  
+> **Baseline**: SCIMServer v0.15.0
 
-> Consolidated reference for the multi-endpoint (multi-tenant) SCIM architecture in SCIMServer.
+> Consolidated reference for the multi-endpoint (multi-endpoint) SCIM architecture in SCIMServer.
 
 ---
 
 ## Overview
 
-SCIMServer supports **multi-endpoint isolation** — each endpoint gets a dedicated SCIM base path with completely isolated Users, Groups, and configuration. This enables a single SCIMServer deployment to serve multiple Entra ID enterprise applications or tenants simultaneously.
+SCIMServer supports **multi-endpoint isolation** — each endpoint gets a dedicated SCIM base path with completely isolated Users, Groups, and configuration. This enables a single SCIMServer deployment to serve multiple Entra ID enterprise applications or endpoints simultaneously.
 
 ### Key Capabilities
 
@@ -159,6 +159,12 @@ Per-endpoint config flags control PATCH behavior. Set via the `config` JSON obje
 | `MultiOpPatchRequestAddMultipleMembersToGroup` | `"true"` / `"false"` | `"false"` | Allow adding multiple group members in a single PATCH operation |
 | `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | `"true"` / `"false"` | `"false"` | Allow removing multiple group members in a single PATCH operation |
 | `VerbosePatchSupported` | `"true"` / `"false"` | `"false"` | Enable dot-notation PATCH path resolution (e.g., `name.givenName`) |
+| `SoftDeleteEnabled` | `"true"` / `"false"` | `"false"` | Soft delete (set `active=false` + `deletedAt`) instead of physical row deletion on DELETE |
+| `ReprovisionOnConflictForSoftDeletedResource` | `"true"` / `"false"` | `"false"` | Re-activate soft-deleted resource on POST conflict instead of 409 (requires SoftDeleteEnabled) |
+| `StrictSchemaValidation` | `"true"` / `"false"` | `"false"` | Reject extension URNs not declared in `schemas[]` or not registered in schema registry |
+| `PatchOpAllowRemoveAllMembers` | `"true"` / `"false"` | `"true"` | Allow removing all members via `path=members` PATCH operation |
+| `RequireIfMatch` | `"true"` / `"false"` | `"false"` | Require If-Match header on PUT/PATCH/DELETE (428 if missing) |
+| `AllowAndCoerceBooleanStrings` | `"true"` / `"false"` | `"true"` | Coerce boolean string values ("True"/"False") to native booleans before schema validation |
 
 **Enable for Microsoft Entra ID:** Set both multi-member flags to `"true"` since Entra sends multi-member PATCH operations.
 

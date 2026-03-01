@@ -40,6 +40,18 @@ Thumbs.db
 logs/
 *.log
 
+# Test results (generated per run)
+test-results/
+
+# Local test output files
+local-live-*.txt
+api/e2e-*.txt
+api/e2e-*.json
+api/test-out*.txt
+api/unit-results.json
+api/unit-test-output.txt
+scripts/live-test-docker-output.txt
+
 # Temporary files
 tmp/
 temp/
@@ -52,3 +64,21 @@ Dockerfile.dockerignore# Version sync: Ensure image contains v0.4.8
 
 admin.md
 wiki.md
+api/unit-results3.json
+api/unit-results2.json
+api/failed-tests.txt
+api/unit-results-pipeline.json
+api/pipeline-e2e.json
+api/pipeline-unit.json
+api/unit-counts.json
+api/fix-check.json
+docker-live-test-output.txt
+live-test-output.txt
+api/groups-test-output.txt
+docker-live-pipeline.txt
+docker-live-test-pipeline.txt
+api/ctx-test.txt
+api/debug-output.txt
+api/fail-detail.txt
+api/unit-check.json
+api/unit-check.json

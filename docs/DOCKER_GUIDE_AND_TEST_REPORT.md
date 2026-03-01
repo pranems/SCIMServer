@@ -1,11 +1,14 @@
 # 🐳 SCIMServer Docker Guide — Build, Deploy & Live Test Report
 
+> **⚠️ PARTIAL HISTORICAL CONTENT:** Sections describing Azure Files mounts, blob snapshot restore logic, and `BackupService` cron are SQLite-era (pre-v0.11.0) and no longer apply. The startup flow, environment variables, and test results are current.
+
 > **Date:** February 11, 2026  
 > **Image:** `scimserver:live-test` (496 MB, Alpine Linux)  
 > **Test Result (historical run):** ✅ **212/212 tests passed** in 4.9s  
-> **Current baseline:** ✅ **280/280 live integration tests passed** (local + Docker)  
+> **Current baseline:** ✅ **485/485 live integration tests passed** (local + Docker)  
+> **Database:** PostgreSQL 17 (docker postgres:17-alpine)  
 > **Base Image:** `node:24-alpine` (multi-stage build)
-> **Runtime note:** Current production image exposes and serves on `8080` (not `80`).
+> **Runtime note:** Current production image exposes and serves on `8080` (not `80`). Unit tests: **2,532/2,532** (73 suites). E2E tests: **539/539** (26 suites).
 
 ---
 
@@ -262,7 +265,7 @@ pwsh -File scripts/live-test.ps1 -BaseUrl "http://localhost:6000" |
   │                                                    │
   │  5. SECTION 5-6: Config flags + isolation          │
   │     → Multi-member PATCH flags                     │
-  │     → Endpoint tenant isolation                    │
+  │     → Endpoint endpoint isolation                    │
   │                                                    │
   │  6. SECTION 7-9: Compliance + Edge Cases           │
   │     → Discovery endpoints                          │
@@ -593,9 +596,9 @@ CMD ["/app/docker-entrypoint.sh"]
 
 | Variable | Purpose | Example Value |
 |----------|---------|---------------|
-| `JWT_SECRET` | Signs OAuth 2.0 JWT tokens | `my-super-secret-jwt-key-123` |
-| `OAUTH_CLIENT_SECRET` | Client credentials grant password | `changeme-oauth` |
-| `SCIM_SHARED_SECRET` | Admin API bearer token authentication | `my-admin-secret` |
+| `JWT_SECRET` | Signs OAuth 2.0 JWT tokens (tier 2 auth) | `my-super-secret-jwt-key-123` |
+| `OAUTH_CLIENT_SECRET` | Client credentials grant password (tier 2 auth) | `changeme-oauth` |
+| `SCIM_SHARED_SECRET` | Global shared secret bearer token (tier 3 auth fallback) | `my-admin-secret` |
 
 ### Optional / Configurable
 
@@ -608,6 +611,18 @@ CMD ["/app/docker-entrypoint.sh"]
 | `BLOB_BACKUP_ACCOUNT` | _(empty)_ | Azure Blob storage account for snapshots |
 | `NODE_OPTIONS` | `--max_old_space_size=384` | Node.js heap limit |
 | `IMAGE_TAG` | `unknown` | Build-time arg written to `/app/.image-tag` |
+
+### Authentication Model (3-Tier Fallback — v0.21.0)
+
+All non-public routes are protected by `SharedSecretGuard` (global `APP_GUARD`). Each `Authorization: Bearer <token>` is evaluated in order:
+
+| Tier | Method | Env / Config Requirement | `req.authType` |
+|------|--------|--------------------------|----------------|
+| 1 | **Per-endpoint bcrypt credential** | `PerEndpointCredentialsEnabled` flag on endpoint + active credential | `endpoint_credential` |
+| 2 | **OAuth 2.0 JWT** | `JWT_SECRET` + `OAUTH_CLIENT_SECRET` | `oauth` |
+| 3 | **Global shared secret** | `SCIM_SHARED_SECRET` | `legacy` |
+
+All tiers fail → `401 Unauthorized` with `WWW-Authenticate: Bearer realm="SCIM"`. Per-endpoint credentials are managed via `POST/GET/DELETE /scim/admin/endpoints/:id/credentials` (requires `PerEndpointCredentialsEnabled` flag).
 
 ### Security Matrix
 
@@ -1086,7 +1101,7 @@ HEALTHCHECK --interval=60s --timeout=3s --start-period=10s --retries=2 \
 | RFC 7644 §3.14 | ETag + conditional requests (304/412) | 12 | ✅ |
 | RFC 7644 §4 | Discovery: ServiceProviderConfig, Schemas, ResourceTypes | 3 | ✅ |
 | — | Authentication (OAuth 2.0 bearer) | 4 | ✅ |
-| — | Multi-tenant endpoint isolation | 2 | ✅ |
+| — | Multi-endpoint endpoint isolation | 2 | ✅ |
 | — | Inactive endpoint blocking (403) | 6 | ✅ |
 | — | Config flag validation | 13 | ✅ |
 | — | Pagination (startIndex, count) | 5 | ✅ |

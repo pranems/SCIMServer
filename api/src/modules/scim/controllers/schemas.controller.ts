@@ -1,143 +1,35 @@
-﻿import { Controller, Get, Header } from '@nestjs/common';
+﻿import { Controller, Get, Header, Param } from '@nestjs/common';
+import { ScimDiscoveryService } from '../discovery/scim-discovery.service';
+import { Public } from '../../auth/public.decorator';
 
+/**
+ * Root-level Schemas endpoint — returns global defaults.
+ *
+ * In a multi-tenant deployment, prefer the endpoint-scoped route
+ * `GET /scim/endpoints/{endpointId}/Schemas` which returns tenant-specific
+ * schemas (global + per-endpoint extensions/overlays).
+ *
+ * RFC 7644 §4 — SHALL NOT require authentication.
+ */
+@Public()
 @Controller('Schemas')
 export class SchemasController {
+  constructor(private readonly discoveryService: ScimDiscoveryService) {}
+
   @Get()
   @Header('Content-Type', 'application/scim+json')
   getSchemas() {
-    return {
-      schemas: ['urn:ietf:params:scim:schemas:core:2.0:ListResponse'],
-      totalResults: 2,
-      startIndex: 1,
-      itemsPerPage: 2,
-      Resources: [this.userSchema(), this.groupSchema()]
-    };
+    return this.discoveryService.getSchemas();
   }
 
-  private userSchema() {
-    return {
-      id: 'urn:ietf:params:scim:schemas:core:2.0:User',
-      name: 'User',
-      description: 'User Account',
-      attributes: [
-        {
-          name: 'userName',
-          type: 'string',
-          multiValued: false,
-          required: true,
-          caseExact: false,
-          mutability: 'readWrite',
-          returned: 'always',
-          uniqueness: 'server'
-        },
-        {
-          name: 'displayName',
-          type: 'string',
-          multiValued: false,
-          required: false,
-          caseExact: false,
-          mutability: 'readWrite',
-          returned: 'default'
-        },
-        {
-          name: 'active',
-          type: 'boolean',
-          multiValued: false,
-          required: false,
-          caseExact: false,
-          mutability: 'readWrite',
-          returned: 'default'
-        },
-        {
-          name: 'emails',
-          type: 'complex',
-          multiValued: true,
-          required: false,
-          subAttributes: [
-            {
-              name: 'value',
-              type: 'string',
-              multiValued: false,
-              required: true,
-              caseExact: false,
-              mutability: 'readWrite',
-              returned: 'always'
-            },
-            {
-              name: 'type',
-              type: 'string',
-              multiValued: false,
-              required: false,
-              caseExact: false,
-              mutability: 'readWrite',
-              returned: 'default'
-            },
-            {
-              name: 'primary',
-              type: 'boolean',
-              multiValued: false,
-              required: false,
-              caseExact: false,
-              mutability: 'readWrite',
-              returned: 'default'
-            }
-          ],
-          mutability: 'readWrite',
-          returned: 'default'
-        }
-      ]
-    };
-  }
-
-  private groupSchema() {
-    return {
-      id: 'urn:ietf:params:scim:schemas:core:2.0:Group',
-      name: 'Group',
-      description: 'Group',
-      attributes: [
-        {
-          name: 'displayName',
-          type: 'string',
-          multiValued: false,
-          required: true,
-          mutability: 'readWrite',
-          returned: 'always'
-        },
-        {
-          name: 'members',
-          type: 'complex',
-          multiValued: true,
-          required: false,
-          mutability: 'readWrite',
-          returned: 'default',
-          subAttributes: [
-            {
-              name: 'value',
-              type: 'string',
-              multiValued: false,
-              required: true,
-              mutability: 'immutable',
-              returned: 'always'
-            },
-            {
-              name: 'display',
-              type: 'string',
-              multiValued: false,
-              required: false,
-              mutability: 'immutable',
-              returned: 'default'
-            },
-            {
-              name: 'type',
-              type: 'string',
-              multiValued: false,
-              required: false,
-              mutability: 'immutable',
-              returned: 'default'
-            }
-          ]
-        }
-      ]
-    };
+  /**
+   * GET /Schemas/:uri
+   * Returns a single schema definition by its URN.
+   * @see RFC 7644 §4 — HTTP GET to retrieve individual schema
+   */
+  @Get(':uri')
+  @Header('Content-Type', 'application/scim+json')
+  getSchemaByUri(@Param('uri') uri: string) {
+    return this.discoveryService.getSchemaByUrn(uri);
   }
 }

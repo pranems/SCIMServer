@@ -222,8 +222,12 @@ describe('LogConfigController', () => {
     });
 
     it('should be a no-op for non-existent endpoint', () => {
-      // Should not throw
+      const configBefore = scimLogger.getConfig();
+      const levelsBefore = { ...configBefore.endpointLevels };
+      // Should not throw and should not change any existing config
       controller.clearEndpointLevel('ep-nonexistent');
+      const configAfter = scimLogger.getConfig();
+      expect(configAfter.endpointLevels).toEqual(levelsBefore);
     });
   });
 

@@ -1,10 +1,33 @@
 ﻿export const SCIM_CORE_USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User';
 export const SCIM_CORE_GROUP_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:Group';
+export const SCIM_ENTERPRISE_USER_SCHEMA = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
 export const SCIM_LIST_RESPONSE_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:ListResponse';
 export const SCIM_PATCH_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:PatchOp';
 export const SCIM_ERROR_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:Error';
 export const SCIM_SP_CONFIG_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig';
+export const SCIM_SCHEMA_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:Schema';
+export const SCIM_RESOURCE_TYPE_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:ResourceType';
 export const SCIM_SEARCH_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:SearchRequest';
+
+// ─── Custom Microsoft Test Extension URNs ───────────────────────────────────
+// Hardcoded extension schemas for Microsoft SCIM testing compliance.
+export const MSFTTEST_CUSTOM_USER_SCHEMA = 'urn:msfttest:cloud:scim:schemas:extension:custom:2.0:User';
+export const MSFTTEST_CUSTOM_GROUP_SCHEMA = 'urn:msfttest:cloud:scim:schemas:extension:custom:2.0:Group';
+export const MSFTTEST_IETF_USER_SCHEMA = 'urn:ietf:params:scim:schemas:extension:msfttest:User';
+export const MSFTTEST_IETF_GROUP_SCHEMA = 'urn:ietf:params:scim:schemas:extension:msfttest:Group';
+
+/**
+ * All known SCIM extension schema URNs supported by this server.
+ * Used for dynamic schemas[] inclusion and PATCH path resolution.
+ * Includes Enterprise User + Microsoft test extension schemas.
+ */
+export const KNOWN_EXTENSION_URNS: readonly string[] = [
+  SCIM_ENTERPRISE_USER_SCHEMA,
+  MSFTTEST_CUSTOM_USER_SCHEMA,
+  MSFTTEST_CUSTOM_GROUP_SCHEMA,
+  MSFTTEST_IETF_USER_SCHEMA,
+  MSFTTEST_IETF_GROUP_SCHEMA,
+] as const;
 
 export const DEFAULT_COUNT = 100;
 export const MAX_COUNT = 200;
@@ -35,6 +58,8 @@ export const SCIM_ERROR_TYPE = {
   TOO_MANY: 'tooMany',
   /** The attempted modification is not compatible with the target's existing attribute (400) */
   SENSITIVE: 'sensitive',
+  /** Request payload exceeds server size limit (413 Payload Too Large) */
+  TOO_LARGE: 'tooLarge',
 } as const;
 
 export type ScimErrorType = typeof SCIM_ERROR_TYPE[keyof typeof SCIM_ERROR_TYPE];

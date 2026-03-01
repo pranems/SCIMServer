@@ -40,6 +40,7 @@ describe('Admin Version API (E2E)', () => {
         startedAt: expect.any(String),
         uptimeSeconds: expect.any(Number),
         timezone: expect.any(String),
+        utcOffset: expect.stringMatching(/^[+-]\d{2}:\d{2}$/),
       }),
     );
 
@@ -72,22 +73,22 @@ describe('Admin Version API (E2E)', () => {
 
     expect(res.body.storage).toEqual(
       expect.objectContaining({
-        databaseProvider: 'sqlite',
-        blobBackupConfigured: expect.any(Boolean),
+        databaseProvider: 'postgresql',
+        persistenceBackend: expect.stringMatching(/^(prisma|inmemory)$/),
       }),
     );
 
     if (res.body.storage.databaseUrl) {
       expect(res.body.storage.databaseUrl).not.toMatch(/(token|secret|password)=/i);
       expect(res.body.storage.databaseUrl).not.toMatch(/Bearer\s+[A-Za-z0-9._-]+/i);
+      // Verify userinfo credentials are masked in connection strings
+      expect(res.body.storage.databaseUrl).not.toMatch(/:\/\/[^*]+:[^*]+@/);
     }
 
     expect(res.body.deployment).toEqual(
       expect.objectContaining({
-        backupMode: expect.any(String),
+        migratePhase: expect.any(String),
       }),
     );
-
-    expect(['blob', 'azureFiles', 'none']).toContain(res.body.deployment.backupMode);
   });
 });

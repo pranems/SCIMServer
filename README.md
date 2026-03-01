@@ -4,7 +4,7 @@ Production-ready SCIM 2.0 server with a built-in observability UI for Microsoft 
 
 | Key | Value |
 |---|---|
-| Version | [`v0.10.0`](https://github.com/pranems/SCIMServer/releases/latest) |
+| Version | [`v0.19.3`](https://github.com/pranems/SCIMServer/releases/latest) |
 | Protocol | [SCIM 2.0](https://scim.cloud/) |
 | Target Platform | [Microsoft Entra ID](https://entra.microsoft.com/) |
 | Runtime | Node.js 24 |
@@ -18,10 +18,10 @@ Admin & observability endpoint family: `/scim/admin/*`
 ## Why SCIMServer
 
 - Full SCIM resource surface: Users, Groups, Schemas, ResourceTypes, ServiceProviderConfig
-- Entra-focused behavior and validator alignment (24/24 + 7 preview scenarios)
+- Entra-focused behavior and validator alignment (25/25 + 7 preview scenarios)
 - Built-in UI for activity feed, log inspection, endpoint management, and runtime status
-- Production operations support: log streaming/download, backup stats, version metadata
-- Cloud-ready deployment with Azure Container Apps and optional blob snapshot backup mode
+- Production operations support: log streaming/download, health endpoint, version metadata
+- Cloud-ready deployment with Azure Container Apps + PostgreSQL with auto-scale to zero
 
 ---
 
@@ -88,9 +88,13 @@ npm run dev
 
 | Variable | Purpose |
 |---|---|
-| `SCIM_SHARED_SECRET` | Entra provisioning bearer token for SCIM calls |
-| `JWT_SECRET` | OAuth/JWT signing key |
-| `OAUTH_CLIENT_SECRET` | OAuth client credential secret |
+| `SCIM_SHARED_SECRET` | Global shared secret bearer token — legacy fallback (tier 3 of 3-tier auth) |
+| `JWT_SECRET` | OAuth/JWT signing key (tier 2) |
+| `OAUTH_CLIENT_SECRET` | OAuth client credential secret (tier 2) |
+
+> **3-tier auth (v0.21.0):** Incoming `Bearer` tokens are evaluated as: (1) per-endpoint bcrypt credential → (2) OAuth JWT → (3) global `SCIM_SHARED_SECRET`. Enable per-endpoint credentials via the `PerEndpointCredentialsEnabled` flag and the Admin Credential API.
+
+> **ReadOnly attribute stripping (v0.22.0):** POST/PUT payloads automatically strip `mutability:'readOnly'` attributes (`id`, `meta`, `groups`, custom readOnly) per RFC 7643 §2.2. PATCH ops targeting readOnly attrs are silently stripped (non-strict) or rejected (strict). Optional warning URN extension via `IncludeWarningAboutIgnoredReadOnlyAttribute` flag.
 
 ### Common optional variables
 
@@ -98,7 +102,7 @@ npm run dev
 |---|---|---|
 | `PORT` | `8080` | API/web runtime port |
 | `OAUTH_CLIENT_ID` | `scimserver-client` | OAuth client identifier |
-| `DATABASE_URL` | `file:./data.db` | SQLite DB path/connection |
+| `DATABASE_URL` | `postgresql://scim:scim@localhost:5432/scimdb` | PostgreSQL connection string |
 | `NODE_ENV` | `production` (container) | Runtime mode |
 
 Security note: treat all secrets as sensitive and rotate after sharing/output exposure.
@@ -110,7 +114,12 @@ Security note: treat all secrets as sensitive and rotate after sharing/output ex
 Use these values in Enterprise Application provisioning:
 
 - Tenant URL: `https://<your-app-url>/scim/v2`
-- Secret Token: value of `SCIM_SHARED_SECRET`
+- Secret Token: value of `SCIM_SHARED_SECRET` **or** a per-endpoint credential token (recommended for multi-tenant isolation)
+
+To use a per-endpoint credential instead of the global secret:
+1. Enable `PerEndpointCredentialsEnabled` on the endpoint (`PATCH /scim/admin/endpoints/:id`)
+2. Create a credential via `POST /scim/admin/endpoints/:id/credentials`
+3. Copy the returned plaintext token (shown once) into the Entra "Secret Token" field
 
 Then test connection, configure mappings, assign users/groups, and enable provisioning.
 
@@ -128,8 +137,7 @@ References:
 flowchart LR
     Entra[Microsoft Entra ID\nProvisioning] -->|SCIM / HTTPS| App[SCIMServer\nAzure Container Apps]
     App --> UI[Built-in Web UI\n/admin + logs + activity]
-    App --> DB[(SQLite)]
-    App --> Blob[(Azure Blob snapshots\noptional backup mode)]
+    App --> DB[(PostgreSQL 17)]
 ```
 
 Request shape:
@@ -148,7 +156,6 @@ Key admin endpoints:
 - `GET /scim/admin/log-config/recent?limit=25`
 - `GET /scim/admin/log-config/stream?level=INFO` (SSE)
 - `GET /scim/admin/log-config/download?format=json`
-- `GET /scim/admin/backup/stats`
 
 Remote log helper:
 
@@ -167,7 +174,6 @@ Operational docs:
 
 - [docs/LOGGING_AND_OBSERVABILITY.md](docs/LOGGING_AND_OBSERVABILITY.md)
 - [docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md](docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md)
-- [docs/STORAGE_AND_BACKUP.md](docs/STORAGE_AND_BACKUP.md)
 
 ---
 
@@ -175,7 +181,7 @@ Operational docs:
 
 ```powershell
 iex (irm https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-func.ps1)
-Update-SCIMServer -Version v0.10.0 -ResourceGroup <rg> -AppName <app>
+Update-SCIMServer -Version v0.19.3 -ResourceGroup <rg> -AppName <app>
 ```
 
 Admin/release references:
@@ -190,10 +196,39 @@ Admin/release references:
 
 Latest validated matrix:
 
-- Unit tests: **666/666**
-- E2E tests: **184/184**
-- Live integration tests: **280/280** (local + Docker)
-- Microsoft SCIM Validator: **24/24 passed** (+ 7 preview scenarios)
+- Unit tests: **2,532/2,532** (73 suites)
+- E2E tests: **539/539** (26 suites)
+- Live integration tests: **485/485** (local + Docker, includes in-memory instances)
+- Microsoft SCIM Validator: **25/25 passed** (+ 7 preview scenarios)
+
+### Per-Endpoint Config Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `SoftDeleteEnabled` | `false` | Soft delete (set `active=false` + `deletedAt`) instead of physical row deletion |
+| `ReprovisionOnConflictForSoftDeletedResource` | `false` | Re-activate soft-deleted resource on POST conflict instead of 409 (requires SoftDeleteEnabled) |
+| `StrictSchemaValidation` | `false` | Reject extension URNs not declared in `schemas[]` or not registered |
+| `MultiOpPatchRequestAddMultipleMembersToGroup` | `false` | Allow multi-member add in single PATCH |
+| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | `false` | Allow multi-member remove in single PATCH |
+| `VerbosePatchSupported` | `false` | Dot-notation PATCH path resolution |
+| `PatchOpAllowRemoveAllMembers` | `true` | Allow removing all members via `path=members` |
+| `RequireIfMatch` | `false` | Require If-Match header on mutating requests (428 if missing) |
+| `AllowAndCoerceBooleanStrings` | `true` | Coerce boolean string values ("True"/"False") to native booleans before schema validation |
+| `CustomResourceTypesEnabled` | `false` | Enable custom resource type registration and generic SCIM CRUD beyond User/Group |
+| `BulkOperationsEnabled` | `false` | Enable `POST /Bulk` batch processing (RFC 7644 §3.7) |
+| `PerEndpointCredentialsEnabled` | `false` | Enable per-endpoint bcrypt bearer token credentials (3-tier auth) |
+| `IncludeWarningAboutIgnoredReadOnlyAttribute` | `false` | Attach warning URN to responses when readOnly attrs stripped (RFC 7643 §2.2) |
+| `IgnoreReadOnlyAttributesInPatch` | `false` | Override G8c strict PATCH rejection → strip+warn (requires StrictSchemaValidation ON) |
+
+### Coverage scripts
+
+```powershell
+cd api
+npm run test:cov          # Unit test coverage → coverage/
+npm run test:e2e:cov      # E2E test coverage  → coverage-e2e/
+npm run test:cov:all      # Both unit + E2E coverage
+npm run test:all          # Unit + E2E + live smoke tests
+```
 
 Testing references:
 
@@ -214,7 +249,7 @@ High-value paths:
 - API and collections: [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md), [docs/openapi/](docs/openapi/), [docs/postman/](docs/postman/), [docs/insomnia/](docs/insomnia/)
 - SCIM protocol: [docs/SCIM_REFERENCE.md](docs/SCIM_REFERENCE.md), [docs/SCIM_RFC_COMPLIANCE_LAYER.md](docs/SCIM_RFC_COMPLIANCE_LAYER.md)
 - Observability: [docs/LOGGING_AND_OBSERVABILITY.md](docs/LOGGING_AND_OBSERVABILITY.md), [docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md](docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md)
-- Design context: [docs/TECHNICAL_DESIGN_DOCUMENT.md](docs/TECHNICAL_DESIGN_DOCUMENT.md), [docs/SQLITE_COMPROMISE_ANALYSIS.md](docs/SQLITE_COMPROMISE_ANALYSIS.md)
+- Design context: [docs/TECHNICAL_DESIGN_DOCUMENT.md](docs/TECHNICAL_DESIGN_DOCUMENT.md), [docs/SQLITE_COMPROMISE_ANALYSIS.md](docs/SQLITE_COMPROMISE_ANALYSIS.md) (historical, pre-PostgreSQL)
 
 ---
 

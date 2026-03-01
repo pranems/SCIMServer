@@ -10,11 +10,7 @@
  *   - Enterprise extension URN-prefixed paths:
  *       "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager"
  */
-
-// Well-known schema extension URN prefixes (terminated with a colon separator)
-const KNOWN_EXTENSION_URNS = [
-  'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User',
-] as const;
+import { KNOWN_EXTENSION_URNS } from '../common/scim-constants';
 
 /** Result of parsing a valuePath expression like `emails[type eq "work"].value` */
 export interface ValuePathExpression {
@@ -84,9 +80,10 @@ export function parseValuePath(path: string): ValuePathExpression | null {
  * @example isExtensionPath("urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager") → true
  * @example isExtensionPath("displayName") → false
  */
-export function isExtensionPath(path: string): boolean {
+export function isExtensionPath(path: string, extensionUrns?: readonly string[]): boolean {
+  const urns = extensionUrns ?? KNOWN_EXTENSION_URNS;
   const lowerPath = path.toLowerCase();
-  return KNOWN_EXTENSION_URNS.some((urn) => lowerPath.startsWith(urn.toLowerCase() + ':'));
+  return urns.some((urn) => lowerPath.startsWith(urn.toLowerCase() + ':'));
 }
 
 /**
@@ -96,9 +93,10 @@ export function isExtensionPath(path: string): boolean {
  *   parseExtensionPath("urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager")
  *   // → { schemaUrn: "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", attributePath: "manager" }
  */
-export function parseExtensionPath(path: string): ExtensionPathExpression | null {
+export function parseExtensionPath(path: string, extensionUrns?: readonly string[]): ExtensionPathExpression | null {
+  const urns = extensionUrns ?? KNOWN_EXTENSION_URNS;
   const lowerPath = path.toLowerCase();
-  for (const urn of KNOWN_EXTENSION_URNS) {
+  for (const urn of urns) {
     const prefix = urn.toLowerCase() + ':';
     if (lowerPath.startsWith(prefix)) {
       const attributePath = path.slice(prefix.length); // preserve original casing for the attribute
@@ -113,6 +111,12 @@ export function parseExtensionPath(path: string): ExtensionPathExpression | null
 /**
  * Checks whether a single record matches a simple SCIM filter expression.
  * Only `eq` is fully supported (case-insensitive string comparison).
+ *
+ * Boolean-aware: When comparing a boolean actual value against a string filter
+ * value (e.g., `primary eq "True"`), the comparison coerces the boolean to
+ * its string representation for a case-insensitive match. This handles the
+ * common case where SCIM clients use filter expressions like
+ * `roles[primary eq "True"]` against boolean attributes.
  */
 export function matchesFilter(
   item: Record<string, unknown>,
@@ -129,10 +133,17 @@ export function matchesFilter(
       if (typeof actual === 'string' && typeof filterValue === 'string') {
         return actual.toLowerCase() === filterValue.toLowerCase();
       }
+      // Boolean-to-string comparison: `true` eq "True" → match
+      if (typeof actual === 'boolean') {
+        return String(actual).toLowerCase() === filterValue.toLowerCase();
+      }
       return String(actual) === String(filterValue);
     }
     default:
       // For unsupported operators, fall back to strict equality
+      if (typeof actual === 'boolean') {
+        return String(actual).toLowerCase() === filterValue.toLowerCase();
+      }
       return String(actual) === String(filterValue);
   }
 }
@@ -387,12 +398,13 @@ export function removeExtensionAttribute(
  */
 export function resolveNoPathValue(
   rawPayload: Record<string, unknown>,
-  updateObj: Record<string, unknown>
+  updateObj: Record<string, unknown>,
+  extensionUrns?: readonly string[],
 ): Record<string, unknown> {
   for (const [key, value] of Object.entries(updateObj)) {
-    if (isExtensionPath(key)) {
+    if (isExtensionPath(key, extensionUrns)) {
       // Extension URN key: urn:...:User:employeeNumber → update extension namespace
-      const parsed = parseExtensionPath(key);
+      const parsed = parseExtensionPath(key, extensionUrns);
       if (parsed) {
         rawPayload = applyExtensionUpdate(rawPayload, parsed, value);
       } else {

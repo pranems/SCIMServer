@@ -1,10 +1,18 @@
-import { Injectable } from '@nestjs/common';
-import type { GroupMember, Prisma } from '../../../generated/prisma/client';
+import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 
-import { PrismaService } from '../../prisma/prisma.service';
+import type { IGroupRepository } from '../../../domain/repositories/group.repository.interface';
+import type { IUserRepository } from '../../../domain/repositories/user.repository.interface';
+import type {
+  GroupWithMembers,
+  GroupCreateInput,
+  GroupUpdateInput,
+  MemberCreateInput,
+  MemberRecord,
+} from '../../../domain/models/group.model';
+import { USER_REPOSITORY, GROUP_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
-import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import { getConfigBoolean, getConfigBooleanWithDefault, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { createScimError } from '../common/scim-errors';
@@ -15,29 +23,31 @@ import {
   SCIM_LIST_RESPONSE_SCHEMA,
   SCIM_PATCH_SCHEMA
 } from '../common/scim-constants';
+import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import type { ScimGroupResource, ScimListResponse } from '../common/scim-types';
 import type { CreateGroupDto, GroupMemberDto } from '../dto/create-group.dto';
 import type { PatchGroupDto } from '../dto/patch-group.dto';
 import { ScimMetadataService } from './scim-metadata.service';
 import { buildGroupFilter } from '../filters/apply-scim-filter';
+import { resolveGroupSortParams } from '../common/scim-sort.util';
+import { GroupPatchEngine } from '../../../domain/patch/group-patch-engine';
+import { PatchError } from '../../../domain/patch/patch-error';
+import { SchemaValidator } from '../../../domain/validation';
+import {
+  parseJson,
+  ensureSchema,
+  enforceIfMatch,
+  sanitizeBooleanStrings,
+  guardSoftDeleted,
+  ScimSchemaHelpers,
+} from '../common/scim-service-helpers';
 
 interface ListGroupsParams {
   filter?: string;
   startIndex?: number;
   count?: number;
-}
-
-// Narrowed type used internally to avoid Prisma JSON 'any' leakage in intersections
-interface GroupWithMembers {
-  id: string;
-  scimId: string;
-  externalId: string | null;
-  displayName: string;
-  rawPayload: string | null;
-  meta: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  members: GroupMember[];
+  sortBy?: string;
+  sortOrder?: 'ascending' | 'descending';
 }
 
 /**
@@ -46,78 +56,140 @@ interface GroupWithMembers {
  */
 @Injectable()
 export class EndpointScimGroupsService {
+  private readonly schemaHelpers: ScimSchemaHelpers;
+
   constructor(
-    private readonly prisma: PrismaService,
+    @Inject(GROUP_REPOSITORY)
+    private readonly groupRepo: IGroupRepository,
+    @Inject(USER_REPOSITORY)
+    private readonly userRepo: IUserRepository,
     private readonly metadata: ScimMetadataService,
     private readonly endpointContext: EndpointContextStorage,
     private readonly logger: ScimLogger,
-  ) {}
+    private readonly schemaRegistry: ScimSchemaRegistry,
+  ) {
+    this.schemaHelpers = new ScimSchemaHelpers(schemaRegistry, SCIM_CORE_GROUP_SCHEMA);
+  }
 
-  async createGroupForEndpoint(dto: CreateGroupDto, baseUrl: string, endpointId: string): Promise<ScimGroupResource> {
-    this.ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
+  async createGroupForEndpoint(dto: CreateGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimGroupResource> {
+    ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
+    this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
+
+    // Coerce boolean strings ("True"/"False") to native booleans before schema validation
+    this.schemaHelpers.coerceBooleanStringsIfEnabled(dto as unknown as Record<string, unknown>, endpointId, config);
+
+    this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, config, 'create');
+
+    // Strip readOnly attributes from POST payload (RFC 7643 §2.2)
+    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as unknown as Record<string, unknown>, endpointId);
+    if (strippedAttrs.length > 0) {
+      this.logger.warn(LogCategory.SCIM_GROUP, 'Stripped readOnly attributes from POST payload', {
+        attributes: strippedAttrs,
+      });
+      this.endpointContext.addWarnings(
+        strippedAttrs.map(attr => `Attribute '${attr}' is readOnly and was ignored`),
+      );
+    }
 
     this.logger.info(LogCategory.SCIM_GROUP, 'Creating group', { displayName: dto.displayName, memberCount: dto.members?.length ?? 0, endpointId });
     this.logger.trace(LogCategory.SCIM_GROUP, 'Create group payload', { body: dto as unknown as Record<string, unknown> });
-
-    // Check for duplicate displayName within the endpoint (case-insensitive)
-    await this.assertUniqueDisplayName(dto.displayName, endpointId);
 
     // Extract externalId from the DTO (it may come as a top-level property from Entra)
     const externalId = typeof (dto as Record<string, unknown>).externalId === 'string'
       ? (dto as Record<string, unknown>).externalId as string
       : null;
 
+    // Check for duplicate displayName — if conflict is with a soft-deleted resource and
+    // ReprovisionOnConflictForSoftDeletedResource is enabled, re-activate it instead of 409.
+    const displayNameConflict = await this.groupRepo.findByDisplayName(endpointId, dto.displayName);
+    if (displayNameConflict) {
+      const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
+      const reprovision = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED);
+
+      if (softDelete && reprovision && displayNameConflict.deletedAt != null) {
+        this.logger.info(LogCategory.SCIM_GROUP, 'Re-provisioning soft-deleted group', { scimId: displayNameConflict.scimId, displayName: dto.displayName, endpointId });
+        return this.reprovisionGroup(displayNameConflict.scimId, dto, externalId, baseUrl, endpointId);
+      }
+
+      throw createScimError({
+        status: 409,
+        scimType: 'uniqueness',
+        detail: `A group with displayName '${dto.displayName}' already exists.`,
+      });
+    }
+
     // Check for duplicate externalId within the endpoint
     if (externalId) {
-      await this.assertUniqueExternalId(externalId, endpointId);
+      const externalIdConflict = await this.groupRepo.findByExternalId(endpointId, externalId);
+      if (externalIdConflict) {
+        const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
+        const reprovision = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED);
+
+        if (softDelete && reprovision && externalIdConflict.deletedAt != null) {
+          this.logger.info(LogCategory.SCIM_GROUP, 'Re-provisioning soft-deleted group (externalId match)', { scimId: externalIdConflict.scimId, externalId, endpointId });
+          return this.reprovisionGroup(externalIdConflict.scimId, dto, externalId, baseUrl, endpointId);
+        }
+
+        throw createScimError({
+          status: 409,
+          scimType: 'uniqueness',
+          detail: `A group with externalId '${externalId}' already exists.`,
+        });
+      }
     }
 
     const now = new Date();
-    const scimId = dto.id && typeof dto.id === 'string' ? dto.id : randomUUID();
+    // BF-1: Server MUST generate id (RFC 7643 §2.2 — id is readOnly, server-assigned)
+    const scimId = randomUUID();
 
     const sanitizedPayload = this.extractAdditionalAttributes(dto);
 
-    const group = await this.prisma.scimGroup.create({
-      data: {
-        scimId,
-        externalId,
-        displayName: dto.displayName,
-        displayNameLower: dto.displayName.toLowerCase(),
-        rawPayload: JSON.stringify(sanitizedPayload),
-        meta: JSON.stringify({
-          resourceType: 'Group',
-          created: now.toISOString(),
-          lastModified: now.toISOString()
-        }),
-        endpoint: { connect: { id: endpointId } }
-      }
-    });
+    const input: GroupCreateInput = {
+      endpointId,
+      scimId,
+      externalId,
+      displayName: dto.displayName,
+      active: true,
+      rawPayload: JSON.stringify(sanitizedPayload),
+      meta: JSON.stringify({
+        resourceType: 'Group',
+        created: now.toISOString(),
+        lastModified: now.toISOString()
+      }),
+    };
+
+    const group = await this.groupRepo.create(input);
 
     const members = dto.members ?? [];
     if (members.length > 0) {
-      await this.persistMembersForEndpoint(String(group.id), members, endpointId);
+      const memberInputs = await this.resolveMemberInputs(members, endpointId);
+      await this.groupRepo.addMembers(String(group.id), memberInputs);
     }
 
-    const withMembers = await this.getGroupWithMembersForEndpoint(String(group.scimId), endpointId);
+    const withMembers = await this.groupRepo.findWithMembers(endpointId, String(group.scimId));
     this.logger.info(LogCategory.SCIM_GROUP, 'Group created', { scimId, displayName: dto.displayName, endpointId });
-    return this.toScimGroupResource(withMembers, baseUrl);
+    return this.toScimGroupResource(withMembers, baseUrl, endpointId);
   }
 
-  async getGroupForEndpoint(scimId: string, baseUrl: string, endpointId: string): Promise<ScimGroupResource> {
+  async getGroupForEndpoint(scimId: string, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimGroupResource> {
     this.logger.debug(LogCategory.SCIM_GROUP, 'Get group', { scimId, endpointId });
-    const group = await this.getGroupWithMembersForEndpoint(scimId, endpointId);
+    const group = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!group) {
       this.logger.debug(LogCategory.SCIM_GROUP, 'Group not found', { scimId, endpointId });
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
-    return this.toScimGroupResource(group, baseUrl);
+    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
+    guardSoftDeleted(group, config, scimId, this.logger, LogCategory.SCIM_GROUP);
+
+    return this.toScimGroupResource(group, baseUrl, endpointId);
   }
 
   async listGroupsForEndpoint(
-    { filter, startIndex = 1, count = DEFAULT_COUNT }: ListGroupsParams,
+    { filter, startIndex = 1, count = DEFAULT_COUNT, sortBy, sortOrder }: ListGroupsParams,
     baseUrl: string,
-    endpointId: string
+    endpointId: string,
+    config?: EndpointConfig,
   ): Promise<ScimListResponse<ScimGroupResource>> {
     if (count > MAX_COUNT) {
       count = MAX_COUNT;
@@ -136,20 +208,22 @@ export class EndpointScimGroupsService {
       });
     }
 
-    const where: Prisma.ScimGroupWhereInput = {
-      ...filterResult.dbWhere,
-      endpointId
-    };
-
-    // Fetch groups from DB
-    const allGroups = await this.prisma.scimGroup.findMany({
-      where,
-      orderBy: { createdAt: 'asc' },
-      include: { members: true }
-    });
+    // Fetch groups from DB (repository handles endpointId scoping + member include)
+    const sortParams = resolveGroupSortParams(sortBy, sortOrder);
+    const allGroups = await this.groupRepo.findAllWithMembers(
+      endpointId,
+      filterResult.dbWhere,
+      sortParams,
+    );
 
     // Build SCIM resources and apply in-memory filter if needed
-    let resources = allGroups.map((g) => this.toScimGroupResource(g as GroupWithMembers, baseUrl));
+    // RFC 7644 §3.6: Soft-deleted resources (deletedAt set) MUST be omitted from future query results
+    const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
+    const filteredGroups = softDelete
+      ? allGroups.filter((g) => g.deletedAt == null)
+      : allGroups;
+    let resources = filteredGroups.map((g) => this.toScimGroupResource(g, baseUrl, endpointId));
+
     if (filterResult.inMemoryFilter) {
       resources = resources.filter(filterResult.inMemoryFilter);
     }
@@ -170,8 +244,8 @@ export class EndpointScimGroupsService {
     };
   }
 
-  async patchGroupForEndpoint(scimId: string, dto: PatchGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimGroupResource> {
-    this.ensureSchema(dto.schemas, SCIM_PATCH_SCHEMA);
+  async patchGroupForEndpoint(scimId: string, dto: PatchGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig, ifMatch?: string): Promise<ScimGroupResource> {
+    ensureSchema(dto.schemas, SCIM_PATCH_SCHEMA);
 
     this.logger.info(LogCategory.SCIM_PATCH, 'Patch group', { scimId, endpointId, opCount: dto.Operations?.length });
     this.logger.debug(LogCategory.SCIM_PATCH, 'Patch group operations', {
@@ -179,10 +253,16 @@ export class EndpointScimGroupsService {
     });
     this.logger.trace(LogCategory.SCIM_PATCH, 'Patch group full payload', { body: dto as unknown as Record<string, unknown> });
 
-    const group = await this.getGroupWithMembersForEndpoint(scimId, endpointId);
+    const group = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!group) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
+
+    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
+    guardSoftDeleted(group, config, scimId, this.logger, LogCategory.SCIM_GROUP);
+
+    // Phase 7: Pre-write If-Match enforcement
+    enforceIfMatch(group.version, ifMatch, config);
 
     // Get endpoint config for behavior flags (use passed config or fallback to context)
     const endpointConfig = config ?? this.endpointContext.getConfig();
@@ -193,63 +273,133 @@ export class EndpointScimGroupsService {
       ? true 
       : getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS);
 
-    let displayName: string = group.displayName;
-    let externalId: string | null = group.externalId ?? null;
-    let memberDtos: GroupMemberDto[] = this.memberEntitiesToDtos(group.members);
-    let rawPayload = this.parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}'));
+    const extensionUrns = this.schemaHelpers.getExtensionUrns(endpointId);
 
-    for (const operation of dto.Operations) {
-      const op = operation.op?.toLowerCase();
-      switch (op) {
-        case 'replace':
-          ({ displayName, externalId, members: memberDtos, rawPayload } = this.handleReplace(operation, displayName, externalId, memberDtos, rawPayload));
-          break;
-        case 'add':
-          memberDtos = this.handleAdd(operation, memberDtos, allowMultiMemberAdd);
-          break;
-        case 'remove':
-          memberDtos = this.handleRemove(operation, memberDtos, allowMultiMemberRemove, allowRemoveAllMembers);
-          break;
-        default:
-          throw createScimError({
-            status: 400,
-            scimType: 'invalidValue',
-            detail: `Patch operation '${operation.op}' is not supported.`
-          });
+    // ReadOnly attribute stripping for PATCH operations
+    // Matrix: strict OFF → strip; strict ON + IgnorePatchRO ON → strip; strict ON + IgnorePatchRO OFF → keep G8c 400
+    const strictSchemaEnabled = getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION);
+    const ignorePatchReadOnly = getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH);
+    if (!strictSchemaEnabled || ignorePatchReadOnly) {
+      const { filtered, stripped } = this.schemaHelpers.stripReadOnlyFromPatchOps(dto.Operations, endpointId);
+      if (stripped.length > 0) {
+        this.logger.warn(LogCategory.SCIM_PATCH, 'Stripped readOnly PATCH operations on Group', {
+          count: stripped.length,
+          attributes: stripped,
+        });
+        this.endpointContext.addWarnings(
+          stripped.map(attr => `Attribute '${attr}' is readOnly and was ignored in PATCH`),
+        );
+        dto.Operations = filtered;
       }
     }
 
-    // SQLite compromise (HIGH): Pre-resolve member user IDs OUTSIDE the transaction to
-    // minimise write-lock hold time. Every ms inside $transaction holds the global SQLite
-    // writer lock. PostgreSQL’s row-level locking makes this pattern unnecessary.
-    // See docs/SQLITE_COMPROMISE_ANALYSIS.md §3.2.3
-    // The user data is stable within this request context so the lookup is safe here.
-    const memberData = memberDtos.length > 0
-      ? await this.mapMembersForPersistenceForEndpoint(group.id, memberDtos, endpointId)
+    // V2: Pre-PATCH validation — validate each operation value against schema definitions
+    if (strictSchemaEnabled) {
+      const resultPayloadPlaceholder: Record<string, unknown> = {
+        schemas: [SCIM_CORE_GROUP_SCHEMA],
+      };
+      for (const urn of extensionUrns) {
+        (resultPayloadPlaceholder.schemas as string[]).push(urn);
+      }
+      const schemaDefs = this.schemaHelpers.buildSchemaDefinitions(resultPayloadPlaceholder, endpointId);
+
+      // Coerce boolean strings in PATCH operation values before validation
+      const coerceEnabled = getConfigBooleanWithDefault(endpointConfig, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS, true);
+      if (coerceEnabled) {
+        const booleanKeys = this.schemaHelpers.getBooleanKeys(endpointId);
+        for (const op of dto.Operations) {
+          if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
+            sanitizeBooleanStrings(op.value as Record<string, unknown>, booleanKeys);
+          } else if (Array.isArray(op.value)) {
+            for (const item of op.value) {
+              if (typeof item === 'object' && item !== null) {
+                sanitizeBooleanStrings(item as Record<string, unknown>, booleanKeys);
+              }
+            }
+          }
+        }
+      }
+
+      for (const op of dto.Operations) {
+        const preResult = SchemaValidator.validatePatchOperationValue(
+          op.op, op.path, op.value, schemaDefs,
+        );
+        if (!preResult.valid) {
+          const messages = preResult.errors.map(e => e.message).join('; ');
+          throw createScimError({
+            status: 400,
+            scimType: preResult.errors[0]?.scimType ?? 'invalidValue',
+            detail: `PATCH operation value validation failed: ${messages}`,
+          });
+        }
+      }
+    }
+
+    let patchResult;
+    try {
+      patchResult = GroupPatchEngine.apply(
+        dto.Operations,
+        {
+          displayName: group.displayName,
+          externalId: group.externalId ?? null,
+          members: this.memberRecordsToDtos(group.members),
+          rawPayload: parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}')),
+        },
+        { allowMultiMemberAdd, allowMultiMemberRemove, allowRemoveAllMembers, extensionUrns },
+      );
+    } catch (err) {
+      if (err instanceof PatchError) {
+        throw createScimError({ status: err.status, scimType: err.scimType, detail: err.message });
+      }
+      throw err;
+    }
+
+    const { displayName, externalId, members: memberDtos, payload: rawPayload } = patchResult;
+
+    // H-1: Post-PATCH schema validation — validate the resulting payload
+    const resultPayload: Record<string, unknown> = {
+      schemas: [SCIM_CORE_GROUP_SCHEMA],
+      displayName,
+      externalId,
+      members: memberDtos,
+      ...rawPayload,
+    };
+    // Include extension URNs in schemas[] for proper validation
+    for (const urn of extensionUrns) {
+      if (urn in rawPayload) {
+        (resultPayload.schemas as string[]).push(urn);
+      }
+    }
+
+    // Coerce boolean strings in post-PATCH payload before schema validation
+    this.schemaHelpers.coerceBooleanStringsIfEnabled(resultPayload, endpointId, config);
+
+    this.schemaHelpers.validatePayloadSchema(resultPayload, endpointId, config, 'patch');
+
+    // H-2: Immutable attribute enforcement — compare existing state with PATCH result
+    this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(group), resultPayload, endpointId, config);
+
+    // G8f: Uniqueness enforcement on PATCH — displayName and externalId must remain unique
+    await this.assertUniqueDisplayName(displayName, endpointId, scimId);
+    if (externalId) {
+      await this.assertUniqueExternalId(externalId, endpointId, scimId);
+    }
+
+    // Pre-resolve member user IDs OUTSIDE the transaction to minimise lock hold time.
+    const memberInputs = memberDtos.length > 0
+      ? await this.resolveMemberInputs(memberDtos, endpointId)
       : [];
 
     try {
-      await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        await tx.scimGroup.update({
-          where: { id: group.id },
-          data: {
-            displayName,
-            displayNameLower: displayName.toLowerCase(),
-            externalId,
-            rawPayload: JSON.stringify(rawPayload),
-            meta: JSON.stringify({
-              ...this.parseJson<Record<string, unknown>>(String(group.meta ?? '{}')),
-              lastModified: new Date().toISOString()
-            })
-          }
-        });
-
-        await tx.groupMember.deleteMany({ where: { groupId: group.id } });
-
-        if (memberData.length > 0) {
-          await tx.groupMember.createMany({ data: memberData });
-        }
-      }, { maxWait: 10000, timeout: 30000 });
+      await this.groupRepo.updateGroupWithMembers(group.id, {
+        displayName,
+        externalId,
+        rawPayload: JSON.stringify(rawPayload),
+        meta: JSON.stringify({
+          ...parseJson<Record<string, unknown>>(String(group.meta ?? '{}')),
+          lastModified: new Date().toISOString()
+        })
+      }, memberInputs);
     } catch (error) {
       this.logger.error(LogCategory.SCIM_PATCH, 'Transaction failed during group patch', { scimId, endpointId, error: String(error) });
       throw createScimError({
@@ -259,65 +409,85 @@ export class EndpointScimGroupsService {
     }
 
     // RFC 7644 §3.5.2: Return the updated resource with 200 OK
-    const updatedGroup = await this.getGroupWithMembersForEndpoint(scimId, endpointId);
+    const updatedGroup = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!updatedGroup) {
       throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.' });
     }
 
     this.logger.info(LogCategory.SCIM_PATCH, 'Group patched', { scimId, endpointId });
-    return this.toScimGroupResource(updatedGroup, baseUrl);
+    return this.toScimGroupResource(updatedGroup, baseUrl, endpointId);
   }
 
   async replaceGroupForEndpoint(
     scimId: string,
     dto: CreateGroupDto,
     baseUrl: string,
-    endpointId: string
+    endpointId: string,
+    config?: EndpointConfig,
+    ifMatch?: string,
   ): Promise<ScimGroupResource> {
-    this.ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
+    ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
+    this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
+
+    // Coerce boolean strings before schema validation (same as create path)
+    this.schemaHelpers.coerceBooleanStringsIfEnabled(dto as unknown as Record<string, unknown>, endpointId, config);
+
+    this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, config, 'replace');
+
+    // Strip readOnly attributes from PUT payload (RFC 7643 §2.2)
+    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as unknown as Record<string, unknown>, endpointId);
+    if (strippedAttrs.length > 0) {
+      this.logger.warn(LogCategory.SCIM_GROUP, 'Stripped readOnly attributes from PUT payload', {
+        attributes: strippedAttrs,
+      });
+      this.endpointContext.addWarnings(
+        strippedAttrs.map(attr => `Attribute '${attr}' is readOnly and was ignored`),
+      );
+    }
 
     this.logger.info(LogCategory.SCIM_GROUP, 'Replace group (PUT)', { scimId, displayName: dto.displayName, endpointId });
 
-    const group = await this.getGroupWithMembersForEndpoint(scimId, endpointId);
+    const group = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!group) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
-    const now = new Date();
-    const meta = this.parseJson<Record<string, unknown>>(String(group.meta ?? '{}'));
+    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
+    guardSoftDeleted(group, config, scimId, this.logger, LogCategory.SCIM_GROUP);
 
+    // Phase 7: Pre-write If-Match enforcement
+    enforceIfMatch(group.version, ifMatch, config);
+
+    // H-2: Immutable attribute enforcement — compare existing resource with incoming payload
+    this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(group), dto as unknown as Record<string, unknown>, endpointId, config);
+
+    // G8f: Uniqueness enforcement on PUT — displayName and externalId must remain unique
+    await this.assertUniqueDisplayName(dto.displayName, endpointId, scimId);
     const newExternalId = typeof (dto as Record<string, unknown>).externalId === 'string'
       ? (dto as Record<string, unknown>).externalId as string
       : null;
+    if (newExternalId) {
+      await this.assertUniqueExternalId(newExternalId, endpointId, scimId);
+    }
+
+    const now = new Date();
+    const meta = parseJson<Record<string, unknown>>(String(group.meta ?? '{}'));
 
     // Pre-resolve member user IDs OUTSIDE the transaction to minimise lock hold time.
-    const replaceMemberData = (dto.members && dto.members.length > 0)
-      ? await this.mapMembersForPersistenceForEndpoint(group.id, dto.members, endpointId)
+    const replaceMemberInputs = (dto.members && dto.members.length > 0)
+      ? await this.resolveMemberInputs(dto.members, endpointId)
       : [];
 
     try {
-      await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-        await tx.scimGroup.update({
-          where: { id: group.id },
-          data: {
-            displayName: dto.displayName,
-            displayNameLower: dto.displayName.toLowerCase(),
-            externalId: newExternalId,
-            rawPayload: JSON.stringify(this.extractAdditionalAttributes(dto)),
-            meta: JSON.stringify({
-              ...meta,
-              lastModified: now.toISOString()
-            })
-          }
-        });
-
-        // Replace all members with new ones
-        await tx.groupMember.deleteMany({ where: { groupId: group.id } });
-
-        if (replaceMemberData.length > 0) {
-          await tx.groupMember.createMany({ data: replaceMemberData });
-        }
-      }, { maxWait: 10000, timeout: 30000 });
+      await this.groupRepo.updateGroupWithMembers(group.id, {
+        displayName: dto.displayName,
+        externalId: newExternalId,
+        rawPayload: JSON.stringify(this.extractAdditionalAttributes(dto)),
+        meta: JSON.stringify({
+          ...meta,
+          lastModified: now.toISOString()
+        })
+      }, replaceMemberInputs);
     } catch (error) {
       this.logger.error(LogCategory.SCIM_GROUP, 'Transaction failed during group replace', { scimId, endpointId, error: String(error) });
       throw createScimError({
@@ -327,33 +497,92 @@ export class EndpointScimGroupsService {
     }
 
     // Return updated group
-    const updatedGroup = await this.getGroupWithMembersForEndpoint(scimId, endpointId);
+    const updatedGroup = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!updatedGroup) {
       throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.' });
     }
 
-    return this.toScimGroupResource(updatedGroup, baseUrl);
+    return this.toScimGroupResource(updatedGroup, baseUrl, endpointId);
   }
 
-  async deleteGroupForEndpoint(scimId: string, endpointId: string): Promise<void> {
+  async deleteGroupForEndpoint(scimId: string, endpointId: string, config?: EndpointConfig, ifMatch?: string): Promise<void> {
     this.logger.info(LogCategory.SCIM_GROUP, 'Delete group', { scimId, endpointId });
-    const group = await this.prisma.scimGroup.findFirst({
-      where: {
-        scimId,
-        endpointId
-      }
-    });
+    const group = await this.groupRepo.findByScimId(endpointId, scimId);
 
     if (!group) {
       this.logger.debug(LogCategory.SCIM_GROUP, 'Delete target group not found', { scimId, endpointId });
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
     }
 
-    await this.prisma.scimGroup.delete({ where: { id: group.id } });
-    this.logger.info(LogCategory.SCIM_GROUP, 'Group deleted', { scimId, endpointId });
+    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations (double-delete)
+    guardSoftDeleted(group, config, scimId, this.logger, LogCategory.SCIM_GROUP);
+
+    // Phase 7: Pre-write If-Match enforcement
+    enforceIfMatch(group.version, ifMatch, config);
+
+    const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
+
+    if (softDelete) {
+      this.logger.info(LogCategory.SCIM_GROUP, 'Soft-deleting group (setting active=false + deletedAt)', { scimId, endpointId });
+      await this.groupRepo.update(group.id, { active: false, deletedAt: new Date() });
+      this.logger.info(LogCategory.SCIM_GROUP, 'Group soft-deleted', { scimId, endpointId });
+    } else {
+      await this.groupRepo.delete(group.id);
+      this.logger.info(LogCategory.SCIM_GROUP, 'Group hard-deleted', { scimId, endpointId });
+    }
   }
 
   // ===== Private Helper Methods =====
+  // G17: Most helpers extracted to ../common/scim-service-helpers.ts
+  // Only Group-specific methods remain here.
+
+  /**
+   * Re-provision a soft-deleted group: reactivate with new payload data and members.
+   * Called when ReprovisionOnConflictForSoftDeletedResource is enabled and
+   * a POST conflicts with a soft-deleted group.
+   */
+  private async reprovisionGroup(
+    existingScimId: string,
+    dto: CreateGroupDto,
+    externalId: string | null,
+    baseUrl: string,
+    endpointId: string,
+  ): Promise<ScimGroupResource> {
+    const existing = await this.groupRepo.findWithMembers(endpointId, existingScimId);
+    if (!existing) {
+      throw createScimError({ status: 500, detail: 'Failed to locate soft-deleted group for re-provisioning.' });
+    }
+
+    const now = new Date();
+    const sanitizedPayload = this.extractAdditionalAttributes(dto);
+    const existingMeta = parseJson<Record<string, unknown>>(String(existing.meta ?? '{}'));
+
+    // Resolve incoming members
+    const members = dto.members ?? [];
+    const memberInputs = members.length > 0
+      ? await this.resolveMemberInputs(members, endpointId)
+      : [];
+
+    // Update group fields + replace members atomically
+    await this.groupRepo.updateGroupWithMembers(existing.id, {
+      displayName: dto.displayName,
+      externalId,
+      active: true,
+      deletedAt: null,  // Clear soft-delete marker on re-provisioning
+      rawPayload: JSON.stringify(sanitizedPayload),
+      meta: JSON.stringify({
+        resourceType: 'Group',
+        created: (existingMeta.created as string) ?? now.toISOString(),
+        lastModified: now.toISOString(),
+      }),
+    }, memberInputs);
+
+    const withMembers = await this.groupRepo.findWithMembers(endpointId, existingScimId);
+    this.logger.info(LogCategory.SCIM_GROUP, 'Group re-provisioned (soft-deleted resource reactivated)', {
+      scimId: existingScimId, displayName: dto.displayName, endpointId,
+    });
+    return this.toScimGroupResource(withMembers, baseUrl, endpointId);
+  }
 
   /**
    * Assert displayName uniqueness within the endpoint (case-insensitive).
@@ -364,20 +593,8 @@ export class EndpointScimGroupsService {
     endpointId: string,
     excludeScimId?: string
   ): Promise<void> {
-    // Use the displayNameLower column for an efficient DB-level case-insensitive check
-    const lowerName = displayName.toLowerCase();
-    const filters: Prisma.ScimGroupWhereInput = {
-      endpointId,
-      displayNameLower: lowerName,
-    };
-    if (excludeScimId) {
-      filters.NOT = { scimId: excludeScimId };
-    }
-
-    const conflict = await this.prisma.scimGroup.findFirst({
-      where: filters,
-      select: { scimId: true }
-    });
+    // Phase 3: Pass original name — CITEXT (PostgreSQL) / toLowerCase (InMemory) handles case-insensitivity
+    const conflict = await this.groupRepo.findByDisplayName(endpointId, displayName, excludeScimId);
 
     if (conflict) {
       throw createScimError({
@@ -397,12 +614,7 @@ export class EndpointScimGroupsService {
     endpointId: string,
     excludeScimId?: string
   ): Promise<void> {
-    const filters: Prisma.ScimGroupWhereInput = { endpointId, externalId };
-    if (excludeScimId) {
-      filters.NOT = { scimId: excludeScimId };
-    }
-
-    const existing = await this.prisma.scimGroup.findFirst({ where: filters });
+    const existing = await this.groupRepo.findByExternalId(endpointId, externalId, excludeScimId);
     if (existing) {
       throw createScimError({
         status: 409,
@@ -412,286 +624,43 @@ export class EndpointScimGroupsService {
     }
   }
 
-  private ensureSchema(schemas: string[] | undefined, requiredSchema: string): void {
-    const requiredLower = requiredSchema.toLowerCase();
-    if (!schemas || !schemas.some(s => s.toLowerCase() === requiredLower)) {
-      throw createScimError({
-        status: 400,
-        scimType: 'invalidSyntax',
-        detail: `Missing required schema '${requiredSchema}'.`
-      });
-    }
-  }
-
-  private getGroupWithMembersForEndpoint(scimId: string, endpointId: string): Promise<GroupWithMembers | null> {
-    return this.prisma.scimGroup.findFirst({
-      where: { 
-        scimId,
-        endpointId
-      },
-      select: {
-        id: true,
-        scimId: true,
-        externalId: true,
-        displayName: true,
-        rawPayload: true,
-        meta: true,
-        createdAt: true,
-        updatedAt: true,
-        members: true
-      }
-    }) as unknown as Promise<GroupWithMembers | null>;
-  }
-
-  private handleReplace(
-    operation: PatchGroupDto['Operations'][number],
-    currentDisplayName: string,
-    currentExternalId: string | null,
-    members: GroupMemberDto[],
-    rawPayload: Record<string, unknown> = {}
-  ): { displayName: string; externalId: string | null; members: GroupMemberDto[]; rawPayload: Record<string, unknown> } {
-    const path = operation.path?.toLowerCase();
-
-    // No path — value is either a string (displayName) or an object with attribute(s)
-    if (!path) {
-      if (typeof operation.value === 'string') {
-        return { displayName: operation.value, externalId: currentExternalId, members, rawPayload };
-      }
-      if (typeof operation.value === 'object' && operation.value !== null) {
-        const obj = operation.value as Record<string, unknown>;
-        let newDisplayName = currentDisplayName;
-        let newExternalId = currentExternalId;
-        let newMembers = members;
-        const updatedPayload = { ...rawPayload };
-
-        if (typeof obj.displayName === 'string') {
-          newDisplayName = obj.displayName;
-        }
-        if ('externalId' in obj) {
-          newExternalId = typeof obj.externalId === 'string' ? obj.externalId : null;
-        }
-        if (Array.isArray(obj.members)) {
-          newMembers = (obj.members as unknown[]).map((m) => this.toMemberDto(m));
-          newMembers = this.ensureUniqueMembers(newMembers);
-        }
-
-        // Store any other attributes in rawPayload
-        for (const [key, val] of Object.entries(obj)) {
-          if (key !== 'displayName' && key !== 'externalId' && key !== 'members' && key !== 'schemas') {
-            updatedPayload[key] = val;
-          }
-        }
-
-        return { displayName: newDisplayName, externalId: newExternalId, members: newMembers, rawPayload: updatedPayload };
-      }
-      throw createScimError({
-        status: 400,
-        scimType: 'invalidValue',
-        detail: 'Replace operation requires a string or object value.'
-      });
-    }
-
-    if (path === 'displayname') {
-      if (typeof operation.value !== 'string') {
-        throw createScimError({
-          status: 400,
-          scimType: 'invalidValue',
-          detail: 'Replace operation for displayName requires a string value.'
-        });
-      }
-      return { displayName: operation.value, externalId: currentExternalId, members, rawPayload };
-    }
-
-    if (path === 'externalid') {
-      const newExtId = typeof operation.value === 'string' ? operation.value : null;
-      return { displayName: currentDisplayName, externalId: newExtId, members, rawPayload };
-    }
-
-    if (path === 'members') {
-      if (!Array.isArray(operation.value)) {
-        throw createScimError({
-          status: 400,
-          scimType: 'invalidValue',
-          detail: 'Replace operation for members requires an array value.'
-        });
-      }
-
-      const normalized = operation.value.map((member) => this.toMemberDto(member));
-      return { displayName: currentDisplayName, externalId: currentExternalId, members: this.ensureUniqueMembers(normalized), rawPayload };
-    }
-
-    throw createScimError({
-      status: 400,
-      scimType: 'invalidPath',
-      detail: `Patch path '${operation.path ?? ''}' is not supported.`
-    });
-  }
-
-  private handleAdd(
-    operation: PatchGroupDto['Operations'][number],
-    members: GroupMemberDto[],
-    allowMultiMemberAdd: boolean = false
-  ): GroupMemberDto[] {
-    const path = operation.path?.toLowerCase();
-    if (path && path !== 'members') {
-      throw createScimError({
-        status: 400,
-        scimType: 'invalidPath',
-        detail: `Add operation path '${operation.path ?? ''}' is not supported.`
-      });
-    }
-
-    if (!operation.value) {
-      throw createScimError({
-        status: 400,
-        scimType: 'invalidValue',
-        detail: 'Add operation for members requires a value.'
-      });
-    }
-
-    const value = Array.isArray(operation.value) ? operation.value : [operation.value];
-    
-    // If MultiOpPatchRequestAddMultipleMembersToGroup is false and multiple members provided,
-    // reject the request - each member must be added in a separate operation
-    if (!allowMultiMemberAdd && value.length > 1) {
-      throw createScimError({
-        status: 400,
-        scimType: 'invalidValue',
-        detail: 'Adding multiple members in a single operation is not allowed. ' +
-                'Each member must be added in a separate PATCH operation. ' +
-                `To enable multi-member add, set endpoint config flag "${ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP}" to "True".`
-      });
-    }
-
-    const newMembers = value.map((member) => this.toMemberDto(member));
-
-    return this.ensureUniqueMembers([...members, ...newMembers]);
-  }
-
-  private handleRemove(
-    operation: PatchGroupDto['Operations'][number],
-    members: GroupMemberDto[],
-    allowMultiMemberRemove: boolean = false,
-    allowRemoveAllMembers: boolean = true
-  ): GroupMemberDto[] {
-    const path = operation.path?.toLowerCase();
-
-    // Check if value array is provided with members to remove
-    if (operation.value && Array.isArray(operation.value) && operation.value.length > 0) {
-      // Validate: if removing multiple members and flag is not set, reject
-      if (!allowMultiMemberRemove && operation.value.length > 1) {
-        throw createScimError({
-          status: 400,
-          scimType: 'invalidValue',
-          detail: 'Removing multiple members in a single operation is not allowed. ' +
-                  'Each member must be removed in a separate PATCH operation. ' +
-                  `To enable multi-member remove, set endpoint config flag "${ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP}" to "True".`
-        });
-      }
-
-      // Extract member IDs to remove from value array
-      const membersToRemove = new Set<string>();
-      for (const item of operation.value) {
-        if (item && typeof item === 'object' && 'value' in item) {
-          membersToRemove.add((item as { value: string }).value);
-        }
-      }
-
-      // Filter out the specified members
-      return members.filter((member) => !membersToRemove.has(member.value));
-    }
-
-    // Handle targeted removal: members[value eq "user-id"]
-    const memberPathMatch = path?.match(/^members\[value\s+eq\s+"?([^"]+)"?\]$/i);
-    if (memberPathMatch) {
-      const valueToRemove = memberPathMatch[1];
-      return members.filter((member) => member.value !== valueToRemove);
-    }
-
-    // Handle path=members without value array - remove all members (RFC 7644 compliant)
-    if (path === 'members') {
-      if (!allowRemoveAllMembers) {
-        throw createScimError({
-          status: 400,
-          scimType: 'invalidValue',
-          detail: 'Removing all members via path=members is not allowed. ' +
-                  'Specify members to remove using a value array or path filter like members[value eq "user-id"]. ' +
-                  `To enable remove-all, set endpoint config flag "${ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS}" to "True".`
-        });
-      }
-      // Remove all members per RFC 7644 Section 3.5.2.2
-      return [];
-    }
-
-    // Unsupported path
-    throw createScimError({
-      status: 400,
-      scimType: 'invalidPath',
-      detail: `Remove operation path '${operation.path ?? ''}' is not supported for groups.`
-    });
-  }
-
-  private async persistMembersForEndpoint(groupId: string, members: GroupMemberDto[], endpointId: string): Promise<void> {
-    const data = await this.mapMembersForPersistenceForEndpoint(groupId, members, endpointId);
-    if (data.length > 0) {
-      await this.prisma.groupMember.createMany({ data });
-    }
-  }
-
-  private async mapMembersForPersistenceForEndpoint(
-    groupId: string,
-    members: GroupMemberDto[],
-    endpointId: string,
-    tx: Prisma.TransactionClient = this.prisma
-  ): Promise<Array<Omit<Prisma.GroupMemberCreateManyInput, 'id'>>> {
-    const values = members.map((member) => member.value);
-    const users: Array<{ id: string; scimId: string }> = values.length
-      ? await tx.scimUser.findMany({
-          where: { 
-            scimId: { in: values },
-            endpointId
-          },
-          select: { id: true, scimId: true }
-        })
-      : [];
-    const userMap = new Map(users.map((user) => [user.scimId, user.id] as const));
-
-    return members.map((member) => ({
-      groupId,
-      userId: userMap.get(member.value) ?? null,
-      value: member.value,
-      type: member.type ?? null,
-      display: member.display ?? null,
-      createdAt: new Date()
-    }));
-  }
-
-  private toMemberDto(member: unknown): GroupMemberDto {
-    if (!member || typeof member !== 'object' || !('value' in member)) {
-      throw createScimError({
-        status: 400,
-        scimType: 'invalidValue',
-        detail: 'Member object must include a value property.'
-      });
-    }
-
-    const typed = member as { value: string; display?: string; type?: string };
+  /**
+   * Reconstruct existing group DB record as a SCIM payload object (data only, no meta/location).
+   * Used for immutable attribute comparison.
+   */
+  private buildExistingPayload(group: GroupWithMembers): Record<string, unknown> {
+    const rawPayload = parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}'));
     return {
-      value: typed.value,
-      display: typed.display,
-      type: typed.type
+      ...rawPayload,
+      displayName: group.displayName,
+      externalId: group.externalId ?? undefined,
+      members: group.members.map((member) => ({
+        value: member.value,
+        display: member.display ?? undefined,
+        type: member.type ?? undefined,
+      })),
     };
   }
 
-  private ensureUniqueMembers(members: GroupMemberDto[]): GroupMemberDto[] {
-    const seen = new Map<string, GroupMemberDto>();
-    for (const member of members) {
-      seen.set(member.value, member);
-    }
-    return Array.from(seen.values());
+  private async resolveMemberInputs(
+    memberDtos: GroupMemberDto[],
+    endpointId: string,
+  ): Promise<MemberCreateInput[]> {
+    const values = memberDtos.map((m) => m.value);
+    const users = values.length > 0
+      ? await this.userRepo.findByScimIds(endpointId, values)
+      : [];
+    const userMap = new Map(users.map((u) => [u.scimId, u.id] as const));
+
+    return memberDtos.map((m) => ({
+      userId: userMap.get(m.value) ?? null,
+      value: m.value,
+      type: m.type ?? null,
+      display: m.display ?? null,
+    }));
   }
 
-  private memberEntitiesToDtos(members: GroupMember[]): GroupMemberDto[] {
+  private memberRecordsToDtos(members: MemberRecord[]): GroupMemberDto[] {
     return members.map((member) => ({
       value: member.value,
       display: member.display ?? undefined,
@@ -699,31 +668,66 @@ export class EndpointScimGroupsService {
     }));
   }
 
-  private toScimGroupResource(group: GroupWithMembers | null, baseUrl: string): ScimGroupResource {
+  private toScimGroupResource(group: GroupWithMembers | null, baseUrl: string, endpointId?: string): ScimGroupResource {
     if (!group) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: 'Resource not found.' });
     }
 
     const meta = this.buildMeta(group, baseUrl);
-    const rawPayload = this.parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}'));
+    const rawPayload = parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}'));
+
+    // V17 fix: Schema-aware boolean sanitization for Groups (parity with Users V16 fix).
+    // Only convert attributes whose schema type is "boolean" (e.g. extension sub-attrs).
+    const booleanKeys = this.schemaHelpers.getBooleanKeys(endpointId);
+    sanitizeBooleanStrings(rawPayload, booleanKeys);
 
     // Remove attributes that have first-class DB columns to prevent stale overrides.
     // displayName is managed via the DB column; rawPayload may hold the original creation value.
     delete rawPayload.displayName;
     delete rawPayload.members;
     delete rawPayload.externalId;
+    delete rawPayload.active;
+    delete rawPayload.id;  // RFC 7643 §3.1: id is server-assigned — never let rawPayload override
+
+    // G8e: Strip returned:'never' attributes from rawPayload
+    // Per RFC 7643 §2.4, these MUST NOT appear in any response.
+    const { never: neverAttrs } = this.schemaHelpers.getReturnedCharacteristics(endpointId);
+    for (const key of Object.keys(rawPayload)) {
+      if (neverAttrs.has(key.toLowerCase())) {
+        delete rawPayload[key];
+      }
+    }
+
+    // Build schemas[] dynamically — include extension URNs present in payload
+    const extensionUrns = this.schemaHelpers.getExtensionUrns(endpointId);
+    const schemas: [string, ...string[]] = [SCIM_CORE_GROUP_SCHEMA];
+    for (const urn of extensionUrns) {
+      if (urn in rawPayload) {
+        schemas.push(urn);
+        // Also strip never-returned attrs inside extension objects
+        const extObj = rawPayload[urn];
+        if (typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
+          for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
+            if (neverAttrs.has(extKey.toLowerCase())) {
+              delete (extObj as Record<string, unknown>)[extKey];
+            }
+          }
+        }
+      }
+    }
 
     return {
-      schemas: [SCIM_CORE_GROUP_SCHEMA],
+      schemas,
+      ...rawPayload,
       id: group.scimId,
       externalId: group.externalId ?? undefined,
       displayName: group.displayName,
+      active: group.active,
       members: group.members.map((member) => ({
         value: member.value,
         display: member.display ?? undefined,
         type: member.type ?? undefined
       })),
-      ...rawPayload,
       meta
     };
   }
@@ -738,27 +742,25 @@ export class EndpointScimGroupsService {
       created: createdAt,
       lastModified,
       location,
-      version: `W/"${group.updatedAt.toISOString()}"`
+      version: `W/"v${group.version}"`
     };
   }
 
   private extractAdditionalAttributes(dto: CreateGroupDto): Record<string, unknown> {
     const { schemas, members: _members, externalId: _externalId, ...rest } = dto as CreateGroupDto & { externalId?: string };
+    const additional = { ...rest } as Record<string, unknown>;
+    delete additional.id;  // RFC 7643 §3.1: id is server-assigned
     return {
       schemas,
-      ...rest
+      ...additional
     };
   }
 
-  private parseJson<T>(value: string | null | undefined): T {
-    if (!value) {
-      return {} as T;
-    }
-
-    try {
-      return JSON.parse(value) as T;
-    } catch {
-      return {} as T;
-    }
+  /**
+   * Get the returned:'request' attribute names for Group resources.
+   * Used by controllers to filter response attributes per RFC 7643 §2.4.
+   */
+  getRequestOnlyAttributes(endpointId?: string): Set<string> {
+    return this.schemaHelpers.getRequestOnlyAttributes(endpointId);
   }
 }

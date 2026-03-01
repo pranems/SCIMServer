@@ -100,4 +100,106 @@ describe('EndpointContextStorage', () => {
       expect(storage.getConfig()).toBeUndefined();
     });
   });
+
+  // ─── Warnings ─────────────────────────────────────────────────────
+
+  describe('addWarnings / getWarnings', () => {
+    it('should return empty array when no context exists', () => {
+      expect(storage.getWarnings()).toEqual([]);
+    });
+
+    it('should return empty array when no warnings added', () => {
+      storage.setContext({ endpointId: 'ep', baseUrl: 'http://x' });
+      expect(storage.getWarnings()).toEqual([]);
+    });
+
+    it('should accumulate warnings', () => {
+      storage.setContext({ endpointId: 'ep', baseUrl: 'http://x' });
+      storage.addWarnings(['id']);
+      storage.addWarnings(['groups', 'meta']);
+      expect(storage.getWarnings()).toEqual(['id', 'groups', 'meta']);
+    });
+
+    it('should not add when warning array is empty', () => {
+      storage.setContext({ endpointId: 'ep', baseUrl: 'http://x' });
+      storage.addWarnings([]);
+      expect(storage.getWarnings()).toEqual([]);
+    });
+
+    it('should silently ignore addWarnings when no store exists', () => {
+      // No setContext called — addWarnings should not throw
+      storage.addWarnings(['id']);
+      expect(storage.getWarnings()).toEqual([]);
+    });
+  });
+
+  // ─── Middleware (storage.run) ─────────────────────────────────────
+
+  describe('createMiddleware', () => {
+    it('should create a function that wraps next() in a storage run', (done) => {
+      const mw = storage.createMiddleware();
+
+      mw({} as any, {} as any, () => {
+        // Inside the middleware callback, the store should exist
+        expect(storage.getContext()).toBeDefined();
+        expect(storage.getContext()!.endpointId).toBe('');
+        done();
+      });
+    });
+
+    it('should allow setContext to mutate the store created by middleware', (done) => {
+      const mw = storage.createMiddleware();
+
+      mw({} as any, {} as any, () => {
+        storage.setContext({ endpointId: 'ep-1', baseUrl: 'http://x', config: {} });
+        expect(storage.getEndpointId()).toBe('ep-1');
+        done();
+      });
+    });
+
+    it('should propagate warnings through middleware + setContext flow', (done) => {
+      const mw = storage.createMiddleware();
+
+      mw({} as any, {} as any, () => {
+        // Simulate controller → service → controller flow
+        storage.setContext({ endpointId: 'ep-1', baseUrl: 'http://x' });
+        storage.addWarnings(['id', 'groups']);
+        expect(storage.getWarnings()).toEqual(['id', 'groups']);
+        done();
+      });
+    });
+
+    it('should preserve warnings across setContext calls within same middleware scope', (done) => {
+      const mw = storage.createMiddleware();
+
+      mw({} as any, {} as any, () => {
+        // Warnings added before setContext
+        storage.addWarnings(['early-warning']);
+        // setContext mutates existing store — warnings should persist
+        storage.setContext({ endpointId: 'ep-1', baseUrl: 'http://x' });
+        storage.addWarnings(['late-warning']);
+        expect(storage.getWarnings()).toEqual(['early-warning', 'late-warning']);
+        done();
+      });
+    });
+  });
+
+  // ─── run() scoped context ────────────────────────────────────────
+
+  describe('run', () => {
+    it('should scope context to the callback', () => {
+      const result = storage.run({ endpointId: 'ep-run', baseUrl: 'http://x' }, () => {
+        return storage.getEndpointId();
+      });
+      expect(result).toBe('ep-run');
+      expect(storage.getEndpointId()).toBeUndefined();
+    });
+
+    it('should support warnings inside run scope', () => {
+      storage.run({ endpointId: 'ep', baseUrl: 'http://x' }, () => {
+        storage.addWarnings(['stripped-attr']);
+        expect(storage.getWarnings()).toEqual(['stripped-attr']);
+      });
+    });
+  });
 });

@@ -1,8 +1,9 @@
 /**
- * SCIM Attribute Projection — RFC 7644 §3.4.2.5
+ * SCIM Attribute Projection — RFC 7644 §3.4.2.5 + RFC 7643 §2.4
  *
  * Implements the `attributes` and `excludedAttributes` query parameters
- * for SCIM list and GET operations.
+ * for SCIM list and GET operations, PLUS schema-driven response filtering
+ * for the `returned` attribute characteristic.
  *
  * Per RFC 7644:
  * - "attributes" — A multi-valued list of strings indicating the names
@@ -11,14 +12,51 @@
  * - "excludedAttributes" — A multi-valued list of strings indicating the
  *   names of resource attributes to be removed from the default set.
  *
+ * Per RFC 7643 §2.4 `returned` characteristic:
+ * - "always"  — Always returned regardless of query params.
+ * - "default" — Returned by default, removable via excludedAttributes.
+ * - "never"   — MUST NOT appear in any response (e.g. password).
+ * - "request" — Only returned when explicitly requested via `attributes`.
+ *
  * Both parameters are comma-separated, case-insensitive, and support
  * dotted sub-attribute paths (e.g., "name.givenName").
  *
  * @see https://datatracker.ietf.org/doc/html/rfc7644#section-3.4.2.5
+ * @see https://datatracker.ietf.org/doc/html/rfc7643#section-2.4
  */
 
-/** Attributes that MUST always be returned per RFC 7643 §7 ("returned": "always") */
-const ALWAYS_RETURNED = new Set(['schemas', 'id', 'meta']);
+/**
+ * Attributes that MUST always be returned per RFC 7643 §7 ("returned": "always").
+ * These are never excluded by "attributes" or "excludedAttributes" parameters.
+ *
+ * Includes framework attributes (schemas, id, meta) plus resource-type attributes
+ * that are declared as returned:"always" in the schema definitions.
+ */
+const ALWAYS_RETURNED_BASE = new Set(['schemas', 'id', 'meta', 'username']);
+
+function getAlwaysReturnedForResource(resource: Record<string, unknown>): Set<string> {
+  const alwaysReturned = new Set(ALWAYS_RETURNED_BASE);
+
+  const meta = resource['meta'];
+  const resourceType =
+    meta && typeof meta === 'object' && !Array.isArray(meta)
+      ? (meta as Record<string, unknown>)['resourceType']
+      : undefined;
+  const isGroupByMeta = typeof resourceType === 'string' && resourceType.toLowerCase() === 'group';
+
+  const schemas = resource['schemas'];
+  const isGroupBySchema =
+    Array.isArray(schemas) &&
+    schemas.some(
+      (schema) => typeof schema === 'string' && schema.toLowerCase() === 'urn:ietf:params:scim:schemas:core:2.0:group',
+    );
+
+  if (isGroupByMeta || isGroupBySchema) {
+    alwaysReturned.add('displayname');
+  }
+
+  return alwaysReturned;
+}
 
 /**
  * Apply attribute projection to a single SCIM resource.
@@ -26,6 +64,7 @@ const ALWAYS_RETURNED = new Set(['schemas', 'id', 'meta']);
  * @param resource  The full SCIM resource object
  * @param attributes  Comma-separated list of attribute names to include (undefined = all)
  * @param excludedAttributes  Comma-separated list of attribute names to exclude (undefined = none)
+ * @param requestOnlyAttrs  Set of lowercase attribute names with returned:'request' — stripped unless in `attributes`
  * @returns A new object with only the requested attributes
  *
  * Per RFC 7644 §3.4.2.5: If both are specified, attributes takes precedence.
@@ -34,18 +73,24 @@ export function applyAttributeProjection(
   resource: Record<string, unknown>,
   attributes?: string,
   excludedAttributes?: string,
+  requestOnlyAttrs?: Set<string>,
 ): Record<string, unknown> {
-  // If neither specified, return as-is
-  if (!attributes && !excludedAttributes) {
-    return resource;
-  }
+  let result = resource;
 
   // "attributes" takes precedence over "excludedAttributes" per RFC
   if (attributes) {
-    return includeOnly(resource, parseAttrList(attributes));
+    result = includeOnly(resource, parseAttrList(attributes));
+  } else if (excludedAttributes) {
+    result = excludeAttrs(resource, parseAttrList(excludedAttributes));
   }
 
-  return excludeAttrs(resource, parseAttrList(excludedAttributes!));
+  // Strip returned:'request' attributes (unless explicitly named in `attributes`)
+  if (requestOnlyAttrs && requestOnlyAttrs.size > 0) {
+    const requestedSet = attributes ? parseAttrList(attributes) : new Set<string>();
+    result = stripRequestOnlyAttrs(result, requestOnlyAttrs, requestedSet);
+  }
+
+  return result;
 }
 
 /**
@@ -55,15 +100,91 @@ export function applyAttributeProjectionToList<T extends Record<string, unknown>
   resources: T[],
   attributes?: string,
   excludedAttributes?: string,
+  requestOnlyAttrs?: Set<string>,
 ): Record<string, unknown>[] {
-  if (!attributes && !excludedAttributes) {
+  if (!attributes && !excludedAttributes && (!requestOnlyAttrs || requestOnlyAttrs.size === 0)) {
     return resources;
   }
 
-  return resources.map(r => applyAttributeProjection(r, attributes, excludedAttributes));
+  return resources.map(r => applyAttributeProjection(r, attributes, excludedAttributes, requestOnlyAttrs));
+}
+
+/**
+ * Strip attributes with `returned: 'never'` from a SCIM resource.
+ *
+ * Per RFC 7643 §2.4: attributes with returned='never' MUST NOT appear
+ * in any SCIM response (e.g. password). This applies to ALL responses
+ * including POST, PUT, PATCH — not just GET/LIST.
+ *
+ * Handles both top-level attributes and attributes within extension URN objects.
+ *
+ * @param resource   The SCIM resource to filter (mutated in place for performance)
+ * @param neverAttrs Set of lowercase attribute names with returned:'never'
+ * @returns The resource with never-returned attributes removed
+ */
+export function stripReturnedNever(
+  resource: Record<string, unknown>,
+  neverAttrs: Set<string>,
+): Record<string, unknown> {
+  if (!neverAttrs || neverAttrs.size === 0) return resource;
+
+  for (const key of Object.keys(resource)) {
+    if (neverAttrs.has(key.toLowerCase())) {
+      delete resource[key];
+      continue;
+    }
+    // Check inside extension URN objects (e.g. "urn:...": { password: "..." })
+    const value = resource[key];
+    if (typeof key === 'string' && key.startsWith('urn:') && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      const extObj = value as Record<string, unknown>;
+      for (const extKey of Object.keys(extObj)) {
+        if (neverAttrs.has(extKey.toLowerCase())) {
+          delete extObj[extKey];
+        }
+      }
+    }
+  }
+
+  return resource;
 }
 
 // ─── Internals ───────────────────────────────────────────────────────────────
+
+/**
+ * Strip returned:'request' attributes from a resource.
+ * These should only appear when explicitly requested via `attributes` param.
+ */
+function stripRequestOnlyAttrs(
+  resource: Record<string, unknown>,
+  requestOnlyAttrs: Set<string>,
+  requestedAttrs: Set<string>,
+): Record<string, unknown> {
+  const result = { ...resource };
+
+  for (const key of Object.keys(result)) {
+    const keyLower = key.toLowerCase();
+    // Only strip if it's in request-only set AND not explicitly requested
+    if (requestOnlyAttrs.has(keyLower) && !requestedAttrs.has(keyLower)) {
+      delete result[key];
+      continue;
+    }
+    // Check inside extension URN objects
+    const value = result[key];
+    if (typeof key === 'string' && key.startsWith('urn:') && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      const extCopy = { ...(value as Record<string, unknown>) };
+      let changed = false;
+      for (const extKey of Object.keys(extCopy)) {
+        if (requestOnlyAttrs.has(extKey.toLowerCase()) && !requestedAttrs.has(extKey.toLowerCase())) {
+          delete extCopy[extKey];
+          changed = true;
+        }
+      }
+      if (changed) result[key] = extCopy;
+    }
+  }
+
+  return result;
+}
 
 function parseAttrList(raw: string): Set<string> {
   return new Set(
@@ -80,9 +201,10 @@ function includeOnly(
   attrs: Set<string>,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
+  const alwaysReturned = getAlwaysReturnedForResource(resource);
 
   // Always include "always returned" attributes
-  for (const key of ALWAYS_RETURNED) {
+  for (const key of alwaysReturned) {
     const match = findKey(resource, key);
     if (match !== undefined) {
       result[match] = resource[match];
@@ -145,12 +267,13 @@ function excludeAttrs(
   attrs: Set<string>,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = { ...resource };
+  const alwaysReturned = getAlwaysReturnedForResource(resource);
 
   // Group by top-level
   const topLevel = new Map<string, Set<string> | null>();
   for (const attr of attrs) {
     // Never allow excluding always-returned attributes
-    if (ALWAYS_RETURNED.has(attr.toLowerCase().split('.')[0])) continue;
+    if (alwaysReturned.has(attr.toLowerCase().split('.')[0])) continue;
 
     const dot = attr.indexOf('.');
     if (dot === -1) {

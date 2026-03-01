@@ -1,11 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { AsyncLocalStorage } from 'async_hooks';
+import type { Request, Response } from 'express';
 import type { EndpointConfig } from './endpoint-config.interface';
 
 export interface EndpointContext {
   endpointId: string;
   baseUrl: string;
   config?: EndpointConfig;
+  /** Accumulated warnings for the current request (e.g. stripped readOnly attributes) */
+  warnings?: string[];
 }
 
 /**
@@ -14,7 +17,11 @@ export interface EndpointContext {
  *
  * Provides two modes:
  * - `run(context, fn)` — preferred, scopes the context to the fn's execution (safe)
- * - `setContext(context)` — legacy convenience for controllers that can't wrap in run()
+ * - `setContext(context)` — populates the current store established by the middleware
+ *
+ * A global Express middleware (`createContextMiddleware()`) initialises the
+ * AsyncLocalStorage store so that `setContext()` can safely mutate it across
+ * NestJS interceptors, guards, and handler methods.
  *
  * @see https://nodejs.org/api/async_context.html
  */
@@ -31,11 +38,34 @@ export class EndpointContextStorage {
   }
 
   /**
-   * Set context for the current async scope (convenience for NestJS controllers).
-   * Uses enterWith() — the context persists for the lifetime of the current async scope.
+   * Build an Express middleware that wraps each request in a fresh
+   * AsyncLocalStorage store so that setContext / addWarnings / getWarnings
+   * work consistently across the NestJS request pipeline (guards,
+   * interceptors, pipes, handlers).
+   */
+  createMiddleware(): (req: Request, res: Response, next: () => void) => void {
+    return (_req: Request, _res: Response, next: () => void): void => {
+      this.storage.run({ endpointId: '', baseUrl: '' }, () => next());
+    };
+  }
+
+  /**
+   * Populate the endpoint context for the current request.
+   *
+   * If a store already exists (created by the middleware), its properties are
+   * mutated in-place so the same object reference is visible throughout the
+   * request lifecycle.  Falls back to `enterWith()` when no store exists yet.
    */
   setContext(context: EndpointContext): void {
-    this.storage.enterWith(context);
+    const existing = this.storage.getStore();
+    if (existing) {
+      existing.endpointId = context.endpointId;
+      existing.baseUrl = context.baseUrl;
+      existing.config = context.config;
+      // Do NOT reset warnings — they may have been accumulated before setContext
+    } else {
+      this.storage.enterWith(context);
+    }
   }
 
   getContext(): EndpointContext | undefined {
@@ -52,5 +82,24 @@ export class EndpointContextStorage {
 
   getConfig(): EndpointConfig | undefined {
     return this.storage.getStore()?.config;
+  }
+
+  /**
+   * Append warnings to the current request context.
+   * Used by services to record stripped readOnly attributes.
+   */
+  addWarnings(warnings: string[]): void {
+    const store = this.storage.getStore();
+    if (!store || warnings.length === 0) return;
+    if (!store.warnings) store.warnings = [];
+    store.warnings.push(...warnings);
+  }
+
+  /**
+   * Get accumulated warnings for the current request.
+   * Used by controllers to decide whether to attach warning URN.
+   */
+  getWarnings(): string[] {
+    return this.storage.getStore()?.warnings ?? [];
   }
 }

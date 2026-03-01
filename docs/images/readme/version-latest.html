@@ -1,5 +1,5 @@
 <html><body style='font-family:Consolas,monospace;background:#0f172a;color:#e2e8f0;padding:24px'><h2 style='margin-top:0'>GET /scim/admin/version (latest)</h2><pre style='white-space:pre-wrap'>{
-  &quot;version&quot;: &quot;0.10.0&quot;,
+  &quot;version&quot;: &quot;0.11.0&quot;,
   &quot;service&quot;: {
     &quot;name&quot;: &quot;SCIMServer API&quot;,
     &quot;environment&quot;: &quot;production&quot;,
@@ -8,7 +8,8 @@
     &quot;now&quot;: &quot;2026-02-19T01:47:45.202Z&quot;,
     &quot;startedAt&quot;: &quot;2026-02-19T01:47:00.537Z&quot;,
     &quot;uptimeSeconds&quot;: 46.846,
-    &quot;timezone&quot;: &quot;UTC&quot;
+    &quot;timezone&quot;: &quot;UTC&quot;,
+    &quot;utcOffset&quot;: &quot;+00:00&quot;
   },
   &quot;runtime&quot;: {
     &quot;node&quot;: &quot;v24.13.1&quot;,
@@ -33,11 +34,29 @@
     &quot;scimSharedSecretConfigured&quot;: true
   },
   &quot;storage&quot;: {
-    &quot;databaseUrl&quot;: &quot;file:/tmp/local-data/scim.db&quot;,
-    &quot;databaseProvider&quot;: &quot;sqlite&quot;,
-    &quot;blobBackupConfigured&quot;: false
+    &quot;databaseUrl&quot;: &quot;postgresql://***:***@postgres:5432/scimdb?schema=public&quot;,
+    &quot;databaseProvider&quot;: &quot;postgresql&quot;,
+    &quot;persistenceBackend&quot;: &quot;prisma&quot;,
+    &quot;connectionPool&quot;: {
+      &quot;maxConnections&quot;: 5
+    }
+  },
+  &quot;container&quot;: {
+    &quot;app&quot;: {
+      &quot;id&quot;: &quot;7d32d069b1af&quot;,
+      &quot;name&quot;: &quot;7d32d069b1af&quot;,
+      &quot;image&quot;: &quot;scimserver-api:latest&quot;,
+      &quot;runtime&quot;: &quot;Node.js v24.13.1&quot;,
+      &quot;platform&quot;: &quot;linux/x64&quot;
+    },
+    &quot;database&quot;: {
+      &quot;host&quot;: &quot;postgres&quot;,
+      &quot;port&quot;: 5432,
+      &quot;name&quot;: &quot;scimdb&quot;,
+      &quot;provider&quot;: &quot;PostgreSQL 17-alpine&quot;
+    }
   },
   &quot;deployment&quot;: {
-    &quot;backupMode&quot;: &quot;none&quot;
+    &quot;migratePhase&quot;: &quot;Phase 3 — PostgreSQL Migration&quot;
   }
 }</pre></body></html>

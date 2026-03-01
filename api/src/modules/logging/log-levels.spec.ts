@@ -111,7 +111,6 @@ describe('log-levels', () => {
       expect(LogCategory.SCIM_DISCOVERY).toBe('scim.discovery');
       expect(LogCategory.ENDPOINT).toBe('endpoint');
       expect(LogCategory.DATABASE).toBe('database');
-      expect(LogCategory.BACKUP).toBe('backup');
       expect(LogCategory.OAUTH).toBe('oauth');
       expect(LogCategory.GENERAL).toBe('general');
     });

@@ -4,16 +4,22 @@ param(
     [string]$Location,
     [string]$ScimSecret,
     [string]$ImageTag,
-    [string]$BlobBackupAccount,
-    [string]$BlobBackupContainer,
     [string]$JwtSecret,
     [string]$OauthClientSecret,
     [string]$GhcrUsername,
     [string]$GhcrPassword,
-    [switch]$EnablePersistentStorage
+    [switch]$EnablePersistentStorage,
+    # PostgreSQL: provide an existing connection string OR let the script provision a new Flexible Server
+    [string]$DatabaseUrl,
+    [switch]$ProvisionPostgres,
+    [string]$PgAdminPassword,
+    # Optional: deploy PostgreSQL to a different region (some subscriptions restrict PG in eastus)
+    [string]$PgLocation
 )
 
 if (-not $Location -or $Location -eq '') { $Location = 'eastus' }
+# PgLocation defaults to same as Location but can be overridden per-region quota restrictions
+if (-not $PgLocation -or $PgLocation -eq '') { $PgLocation = $Location }
 $requiredProviders = @('Microsoft.App','Microsoft.ContainerService')
 $script:DeploymentTranscriptStarted = $false
 $script:DeploymentLogFile = $null
@@ -97,16 +103,6 @@ function Ensure-AzProvider {
 }
 
 if (-not $ImageTag -or $ImageTag -eq '') { $ImageTag = 'latest' }
-if (-not $BlobBackupAccount) { $BlobBackupAccount = "$($AppName.ToLower())backup" }
-# Sanitize blob backup storage account name (must be 3-24 chars, lowercase/numbers only)
-$BlobBackupAccount = ($BlobBackupAccount -replace '[^a-z0-9]', '')
-if ($BlobBackupAccount.Length -lt 3) { $BlobBackupAccount = ("scim" + (Get-Random -Minimum 100 -Maximum 999)) }
-if ($BlobBackupAccount.Length -gt 24) { $BlobBackupAccount = $BlobBackupAccount.Substring(0,24) }
-if ($BlobBackupAccount -notmatch '^[a-z0-9]{3,24}$') {
-    Write-Host "   WARNING: Generated invalid storage account name; generating fallback" -ForegroundColor Yellow
-    $BlobBackupAccount = "scim" + (Get-Random -Minimum 100000 -Maximum 999999)
-}
-if (-not $BlobBackupContainer) { $BlobBackupContainer = 'scimserver-backups' }
 
 # --- Interactive Fallback ----------------------------------------------------
 # Allow zero‑parameter one‑liner usage via: iex (irm <raw-url>/deploy-azure.ps1)
@@ -162,7 +158,8 @@ function Save-DeploymentState {
         [string]$StatePath,
         [string]$ScimSharedSecret,
         [string]$JwtSigningSecret,
-        [string]$OAuthSecret
+        [string]$OAuthSecret,
+        [string]$DbUrl
     )
 
     if ([string]::IsNullOrWhiteSpace($StatePath)) {
@@ -175,6 +172,7 @@ function Save-DeploymentState {
             scimSecret = $ScimSharedSecret
             jwtSecret = $JwtSigningSecret
             oauthClientSecret = $OAuthSecret
+            databaseUrl = $DbUrl
         }
         $payload | ConvertTo-Json -Depth 4 | Set-Content -Path $StatePath -Encoding utf8
     } catch {
@@ -299,6 +297,10 @@ if (-not $OauthClientSecret -and $script:DeploymentState -and $script:Deployment
     $OauthClientSecret = $script:DeploymentState.oauthClientSecret
     Write-Host "Using cached OAuth client secret from prior run" -ForegroundColor DarkGray
 }
+if (-not $DatabaseUrl -and $script:DeploymentState -and $script:DeploymentState.databaseUrl) {
+    $DatabaseUrl = $script:DeploymentState.databaseUrl
+    Write-Host "Using cached DATABASE_URL from prior run" -ForegroundColor DarkGray
+}
 
 if (-not $JwtSecret) {
     $jwtInput = Read-Host "Enter JWT signing secret (press Enter to auto-generate secure value)"
@@ -324,7 +326,48 @@ if ([string]::IsNullOrWhiteSpace($JwtSecret) -or [string]::IsNullOrWhiteSpace($O
     Stop-Deployment -Message "JWT and OAuth client secrets are required."
 }
 
-Save-DeploymentState -StatePath $script:DeploymentStatePath -ScimSharedSecret $ScimSecret -JwtSigningSecret $JwtSecret -OAuthSecret $OauthClientSecret
+# --- PostgreSQL DATABASE_URL -------------------------------------------
+# Phase 3 requires a PostgreSQL connection string. Three paths:
+#   1. -DatabaseUrl "postgresql://..."  passed explicitly (BYO database)
+#   2. -ProvisionPostgres               deploy infra/postgres.bicep (new Flexible Server)
+#   3. No flag → interactive prompt (choose BYO or provision)
+
+if (-not $DatabaseUrl -and $env:DATABASE_URL -and $env:DATABASE_URL.StartsWith('postgresql')) {
+    $DatabaseUrl = $env:DATABASE_URL
+    Write-Host "Using DATABASE_URL from environment" -ForegroundColor DarkGray
+}
+
+if (-not $DatabaseUrl -and -not $ProvisionPostgres) {
+    Write-Host ""
+    Write-Host "PostgreSQL database required (Phase 3)." -ForegroundColor Cyan
+    Write-Host "  [1] I have an existing PostgreSQL connection string (BYO database)" -ForegroundColor White
+    Write-Host "  [2] Provision a new Azure Database for PostgreSQL Flexible Server" -ForegroundColor White
+    $dbChoice = Read-Host "Choose [1/2]"
+    if ($dbChoice -eq '2') {
+        $ProvisionPostgres = $true
+    } else {
+        $dbInput = Read-Host "Enter PostgreSQL connection string (e.g. postgresql://user:pass@host:5432/db?sslmode=require)"
+        if ([string]::IsNullOrWhiteSpace($dbInput)) {
+            Stop-Deployment -Message "DATABASE_URL is required." -Hint "Provide -DatabaseUrl or -ProvisionPostgres."
+        }
+        $DatabaseUrl = $dbInput.Trim()
+    }
+}
+
+if ($ProvisionPostgres -and -not $DatabaseUrl) {
+    if (-not $PgAdminPassword) {
+        $pgPwInput = Read-Host "Enter PostgreSQL admin password (leave blank to auto-generate)"
+        if ([string]::IsNullOrWhiteSpace($pgPwInput)) {
+            $PgAdminPassword = New-RandomSecret 24
+            Write-Host "Generated PG admin password: $PgAdminPassword" -ForegroundColor Yellow
+        } else {
+            $PgAdminPassword = $pgPwInput
+        }
+    }
+    # Will provision PG in Step 3/5. DatabaseUrl will be set from output.
+}
+
+Save-DeploymentState -StatePath $script:DeploymentStatePath -ScimSharedSecret $ScimSecret -JwtSigningSecret $JwtSecret -OAuthSecret $OauthClientSecret -DbUrl $DatabaseUrl
 if ($script:DeploymentStatePath) {
     Write-Host "🗂️ Deployment secrets cache updated: $script:DeploymentStatePath" -ForegroundColor DarkGray
 }
@@ -363,9 +406,11 @@ Write-Host "  Resource Group : $ResourceGroup" -ForegroundColor White
 Write-Host "  App Name       : $AppName" -ForegroundColor White
 Write-Host "  Location       : $Location" -ForegroundColor White
 Write-Host "  Image Tag      : $ImageTag" -ForegroundColor White
-Write-Host "  Blob Backup Acct : $BlobBackupAccount" -ForegroundColor White
-Write-Host "  Blob Container   : $BlobBackupContainer" -ForegroundColor White
 Write-Host "  GHCR Pull Mode : $([string]::IsNullOrWhiteSpace($GhcrUsername) ? 'Anonymous (public image)' : 'Authenticated (private image)')" -ForegroundColor White
+Write-Host "  Database       : $($ProvisionPostgres ? 'Provision new Flexible Server' : '(BYO — see DATABASE_URL)')" -ForegroundColor White
+if ($ProvisionPostgres -and $PgLocation -ne $Location) {
+    Write-Host "  PG Location    : $PgLocation (overrides main location)" -ForegroundColor Yellow
+}
 Write-Host "  SCIM Secret    : $ScimSecret" -ForegroundColor Yellow
 Write-Host "  JWT Secret     : (set)" -ForegroundColor Yellow
 Write-Host "  OAuth Secret   : (set)" -ForegroundColor Yellow
@@ -396,31 +441,6 @@ foreach ($ns in $requiredProviders) {
 }
 
 # Generate resource names
-# Storage account names must be globally unique (3-24 chars, lowercase alphanumeric)
-# Include resource group name to ensure uniqueness across deployments
-$rgSuffix = $ResourceGroup.Replace("-", "").Replace("_", "").ToLower()
-$appPrefix = $AppName.Replace("-", "").Replace("_", "").ToLower()
-$storageName = $appPrefix + $rgSuffix + "stor"
-# Truncate to 24 characters if too long
-if ($storageName.Length -gt 24) {
-    # Keep app prefix + truncated RG suffix + "stor"
-    $maxRgLength = 24 - $appPrefix.Length - 4  # 4 for "stor"
-    if ($maxRgLength -gt 0) {
-        $rgSuffix = $rgSuffix.Substring(0, [Math]::Min($rgSuffix.Length, $maxRgLength))
-        $storageName = $appPrefix + $rgSuffix + "stor"
-    } else {
-        # If app name alone is too long, just truncate everything
-        $storageName = $storageName.Substring(0, 24)
-    }
-}
-
-# Final validation
-if ($storageName.Length -gt 24) {
-    Write-Host "   WARNING: Storage name too long after truncation: $storageName ($($storageName.Length) chars)" -ForegroundColor Yellow
-    $storageName = $storageName.Substring(0, 24)
-    Write-Host "   Truncated to: $storageName" -ForegroundColor Green
-}
-
 $vnetName = "$AppName-vnet"
 
 $envName = "$AppName-env"
@@ -433,14 +453,16 @@ Write-Host "   Location: $Location" -ForegroundColor White
 Write-Host "   Container App: $AppName" -ForegroundColor White
 Write-Host "   Environment: $envName" -ForegroundColor White
 Write-Host "   Virtual Network: $vnetName" -ForegroundColor White
-Write-Host "   Storage Account: $storageName" -ForegroundColor White
 Write-Host "   Log Analytics: $lawName" -ForegroundColor White
 Write-Host "   Image: ghcr.io/pranems/scimserver:$ImageTag" -ForegroundColor White
-Write-Host "   Persistence: Blob snapshots (Account=$BlobBackupAccount Container=$BlobBackupContainer)" -ForegroundColor Green
+Write-Host "   Database: $($ProvisionPostgres ? 'Azure PostgreSQL Flexible Server (will provision)' : 'External PostgreSQL (BYO)')" -ForegroundColor White
+if ($ProvisionPostgres -and $PgLocation -ne $Location) {
+    Write-Host "   PG Location: $PgLocation (overriding main location - quota restriction)" -ForegroundColor Yellow
+}
 Write-Host ""
 
 # Step 1: Create or verify resource group
-Write-Host "📦 Step 1/6: Resource Group" -ForegroundColor Cyan
+Write-Host "📦 Step 1/5: Resource Group" -ForegroundColor Cyan
 $ErrorActionPreference = 'SilentlyContinue'
 $rgJson = az group show --name $ResourceGroup --output json 2>$null
 $rgExitCode = $LASTEXITCODE
@@ -460,7 +482,7 @@ Write-Host ""
 
 
 # Step 2: Private network + DNS linkage for Container Apps
-Write-Host "🌐 Step 2/6: Network & Private DNS" -ForegroundColor Cyan
+Write-Host "🌐 Step 2/5: Network" -ForegroundColor Cyan
 
 function GetOrCreate-VnetSubnetId {
     param(
@@ -511,8 +533,6 @@ function GetOrCreate-VnetSubnetId {
 
 $expectedInfraSubnetName = 'aca-infra'
 $expectedPeSubnetName = 'private-endpoints'
-$expectedDnsZoneName = 'privatelink.blob.core.windows.net'
-$dnsLinkName = "$vnetName-link"
 $infraPrefix = '10.40.0.0/21'
 $runtimeSubnetName = 'aca-runtime'
 $runtimePrefix = '10.40.8.0/21'
@@ -523,7 +543,6 @@ $networkHealthy = $false
 $infrastructureSubnetId = $null
 $privateEndpointSubnetId = $null
 $workloadSubnetId = $null
-$privateDnsZoneName = $expectedDnsZoneName
 
 if ($LASTEXITCODE -eq 0 -and $existingVnetJson) {
     $existingVnet = $existingVnetJson | ConvertFrom-Json
@@ -537,36 +556,6 @@ if ($LASTEXITCODE -eq 0 -and $existingVnetJson) {
         Stop-Deployment -Message "Unable to ensure required subnets exist."
     }
 
-    $privateDnsZoneJson = az network private-dns zone show --resource-group $ResourceGroup --name $expectedDnsZoneName --output json 2>$null
-    if ($LASTEXITCODE -ne 0 -or -not $privateDnsZoneJson) {
-        Write-Host "   ➕ Creating private DNS zone '$expectedDnsZoneName'" -ForegroundColor Yellow
-        $privateDnsZoneJson = az network private-dns zone create `
-            --resource-group $ResourceGroup `
-            --name $expectedDnsZoneName `
-            --output json 2>$null
-        if ($LASTEXITCODE -ne 0 -or -not $privateDnsZoneJson) {
-            Stop-Deployment -Message "Failed to create private DNS zone."
-        }
-    }
-
-    $privateDnsZone = $privateDnsZoneJson | ConvertFrom-Json
-    $privateDnsZoneName = $privateDnsZone.name
-
-    $dnsLinkJson = az network private-dns link vnet show --resource-group $ResourceGroup --zone-name $privateDnsZoneName --name $dnsLinkName --output json 2>$null
-    if ($LASTEXITCODE -ne 0 -or -not $dnsLinkJson) {
-        Write-Host "   🔗 Creating DNS link '$dnsLinkName'" -ForegroundColor Yellow
-        $dnsLinkJson = az network private-dns link vnet create `
-            --resource-group $ResourceGroup `
-            --zone-name $privateDnsZoneName `
-            --name $dnsLinkName `
-            --virtual-network $existingVnet.id `
-            --registration-enabled false `
-            --output json 2>$null
-        if ($LASTEXITCODE -ne 0 -or -not $dnsLinkJson) {
-            Stop-Deployment -Message "Failed to create DNS link."
-        }
-    }
-
     Write-Host "      Infrastructure subnet: $infrastructureSubnetId" -ForegroundColor Gray
     if ($workloadSubnetId) {
         Write-Host "      Runtime subnet: $workloadSubnetId" -ForegroundColor Gray
@@ -574,7 +563,6 @@ if ($LASTEXITCODE -eq 0 -and $existingVnetJson) {
         Write-Host "      Runtime subnet: (not configured)" -ForegroundColor Gray
     }
     Write-Host "      Private endpoint subnet: $privateEndpointSubnetId" -ForegroundColor Gray
-    Write-Host "      Private DNS zone: $privateDnsZoneName" -ForegroundColor Gray
     $networkHealthy = $true
 }
 
@@ -599,44 +587,50 @@ if (-not $networkHealthy) {
     $networkOutputs = $networkDeployOutput | ConvertFrom-Json
     $infrastructureSubnetId = $networkOutputs.infrastructureSubnetId.value
     $privateEndpointSubnetId = $networkOutputs.privateEndpointSubnetId.value
-    $privateDnsZoneName = $networkOutputs.privateDnsZoneName.value
 
     Write-Host "   ✅ Network deployed" -ForegroundColor Green
     Write-Host "      Infrastructure subnet: $infrastructureSubnetId" -ForegroundColor Gray
     Write-Host "      Private endpoint subnet: $privateEndpointSubnetId" -ForegroundColor Gray
-    Write-Host "      Private DNS zone: $privateDnsZoneName" -ForegroundColor Gray
 }
 Write-Host ""
 
-# Step 3: Blob Storage (private endpoint snapshots)
-Write-Host "💾 Step 3/6: Blob Storage (private endpoint)" -ForegroundColor Cyan
+# Step 3/5: PostgreSQL Flexible Server (optional, if -ProvisionPostgres)
+if ($ProvisionPostgres -and -not $DatabaseUrl) {
+    Write-Host "🐘 Step 3/5: PostgreSQL Flexible Server" -ForegroundColor Cyan
+    $pgServerName = "$($AppName.ToLower() -replace '[^a-z0-9-]','-')-pg"
+    if ($pgServerName.Length -gt 63) { $pgServerName = $pgServerName.Substring(0,63) }
+    Write-Host "   Server name: $pgServerName" -ForegroundColor Gray
 
-$storageDeploymentName = "blob-$(Get-Date -Format 'yyyyMMddHHmmss')"
-$storageDeployOutput = az deployment group create `
-    --resource-group $ResourceGroup `
-    --name $storageDeploymentName `
-    --template-file "$PSScriptRoot/../infra/blob-storage.bicep" `
-    --parameters storageAccountName=$BlobBackupAccount containerName=$BlobBackupContainer privateEndpointSubnetId=$privateEndpointSubnetId location=$Location `
-    --query properties.outputs `
-    --output json
+    $pgDeployName = "postgres-$(Get-Date -Format 'yyyyMMddHHmmss')"
+    $pgDeployOutput = az deployment group create `
+        --resource-group $ResourceGroup `
+        --name $pgDeployName `
+        --template-file "$PSScriptRoot/../infra/postgres.bicep" `
+        --parameters serverName=$pgServerName adminPassword=$PgAdminPassword location=$PgLocation `
+        --query properties.outputs `
+        --output json 2>$null
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "   ❌ Failed to deploy blob storage" -ForegroundColor Red
-    Write-Host $storageDeployOutput -ForegroundColor Red
-    Stop-Deployment -Message "Blob storage deployment failed."
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "   ❌ PostgreSQL provisioning failed" -ForegroundColor Red
+        Write-Host $pgDeployOutput -ForegroundColor Red
+        Stop-Deployment -Message "PostgreSQL Flexible Server deployment failed."
+    }
+
+    $pgOutputs = $pgDeployOutput | ConvertFrom-Json
+    $DatabaseUrl = $pgOutputs.databaseUrl.value
+    Write-Host "   ✅ PostgreSQL Flexible Server provisioned: $pgServerName" -ForegroundColor Green
+    Write-Host "      FQDN: $($pgOutputs.serverFqdn.value)" -ForegroundColor Gray
+    # Persist to state cache so re-runs don't need to re-enter
+    Save-DeploymentState -StatePath $script:DeploymentStatePath -ScimSharedSecret $ScimSecret -JwtSigningSecret $JwtSecret -OAuthSecret $OauthClientSecret -DbUrl $DatabaseUrl
+    Write-Host ""
 }
 
-$storageOutputs = $storageDeployOutput | ConvertFrom-Json
-$storageAccountId = $storageOutputs.storageAccountId.value
-$blobEndpoint = "https://$($storageOutputs.storageAccountName.value).blob.core.windows.net/"
-
-Write-Host "   ✅ Storage account locked behind private endpoint" -ForegroundColor Green
-Write-Host "      Storage account ID: $storageAccountId" -ForegroundColor Gray
-Write-Host "      Blob endpoint (private): $blobEndpoint" -ForegroundColor Gray
-Write-Host ""
+if ([string]::IsNullOrWhiteSpace($DatabaseUrl)) {
+    Stop-Deployment -Message "DATABASE_URL is required but was not set." -Hint "Pass -DatabaseUrl or -ProvisionPostgres."
+}
 
 # Step 4: Deploy Container App Environment
-Write-Host "🌐 Step 4/6: Container App Environment" -ForegroundColor Cyan
+Write-Host "🌐 Step 4/5: Container App Environment" -ForegroundColor Cyan
 
 # Check if environment exists
 $skipEnvDeployment = $false
@@ -738,8 +732,8 @@ if (-not $skipEnvDeployment) {
 }
 Write-Host ""
 
-# Step 4: Deploy Container App
-Write-Host "🐳 Step 5/6: Container App" -ForegroundColor Cyan
+# Step 5: Deploy Container App
+Write-Host "🐳 Step 5/5: Container App" -ForegroundColor Cyan
 
 # Check if container app already exists
 $appCheck = az containerapp show --name $AppName --resource-group $ResourceGroup --query "name" --output tsv 2>$null
@@ -777,11 +771,8 @@ if (-not $skipAppDeployment) {
         scimSharedSecret = $ScimSecret
         jwtSecret = $JwtSecret
         oauthClientSecret = $OauthClientSecret
+        databaseUrl = $DatabaseUrl
     }
-
-    # Pass blob backup parameters
-    $containerParams.blobBackupAccountName = $BlobBackupAccount
-    $containerParams.blobBackupContainerName = $BlobBackupContainer
 
     # Pass GHCR credentials if provided (for private packages)
     if ($GhcrUsername) { $containerParams.ghcrUsername = $GhcrUsername }
@@ -873,8 +864,8 @@ if (-not $skipAppDeployment) {
 }
 Write-Host ""
 
-# Step 5: Get deployment details
-Write-Host "📊 Step 6/6: Finalizing" -ForegroundColor Cyan
+# Finalize deployment
+Write-Host "📊 Finalizing" -ForegroundColor Cyan
 Write-Host "   Retrieving deployment details..." -ForegroundColor Yellow
 
 $appDetails = az containerapp show --name $AppName --resource-group $ResourceGroup --output json | ConvertFrom-Json
@@ -931,7 +922,7 @@ if (-not $secretEcho -and $env:SCIM_SHARED_SECRET) { $secretEcho = $env:SCIM_SHA
 if ($secretEcho) { Write-Host "   SCIM Shared Secret: $secretEcho" -ForegroundColor Yellow }
 Write-Host "   JWT Secret: $JwtSecret" -ForegroundColor Yellow
 Write-Host "   OAuth Client Secret: $OauthClientSecret" -ForegroundColor Yellow
-Write-Host "   Persistence: Blob snapshot backups (enabled)" -ForegroundColor Green
+Write-Host "   Persistence: PostgreSQL (primary) | Blob: $BlobBackupAccount (optional app-level backups)" -ForegroundColor Green
 Write-Host ""
 
 Write-Host "✅ Verified Runtime (/scim/admin/version):" -ForegroundColor Cyan
@@ -960,11 +951,11 @@ if ($versionInfo) {
 }
 Write-Host ""
 
-Write-Host "💾 Blob Backup Strategy:" -ForegroundColor Cyan
+Write-Host "💾 Blob Backup / Storage:" -ForegroundColor Cyan
 Write-Host "   Account: $BlobBackupAccount" -ForegroundColor White
 Write-Host "   Container: $BlobBackupContainer" -ForegroundColor White
-Write-Host "   Runtime DB: /tmp/local-data/scim.db (ephemeral)" -ForegroundColor White
-Write-Host "   Snapshots: timestamped SQLite copies in blob storage" -ForegroundColor Gray
+Write-Host "   Database: PostgreSQL (persistence managed by Azure Database / external PG)" -ForegroundColor White
+Write-Host "   Blob storage: available for application-level backups / blob backup module" -ForegroundColor Gray
 Write-Host ""
 
 # Assign role to container app system identity (after app exists)
@@ -1023,9 +1014,11 @@ Write-Host ""
 
 Write-Host "💰 Estimated Monthly Cost:" -ForegroundColor Cyan
 Write-Host '   Container App: ~$5-15 (scales to zero when idle)' -ForegroundColor White
-Write-Host '   Blob Storage (snapshots): ~$0.20-0.50 (light DB snapshots)' -ForegroundColor White
+Write-Host '   Blob Storage: ~$0.20-0.50' -ForegroundColor White
 Write-Host '   Log Analytics: ~$0-5 (depends on log volume)' -ForegroundColor White
-Write-Host '   Total: ~$5.20-20/month' -ForegroundColor Yellow
+Write-Host '   PostgreSQL Flexible Server (B1ms): ~$15-25/mo (if provisioned via -ProvisionPostgres)' -ForegroundColor White
+Write-Host '   BYO PostgreSQL: depends on your provider / existing tier' -ForegroundColor White
+Write-Host '   Total (with managed PG): ~$20-45/month' -ForegroundColor Yellow
 Write-Host ""
 
 Write-Host "🏁 Deployment complete!" -ForegroundColor Green

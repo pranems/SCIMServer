@@ -706,7 +706,7 @@ Since `externalId` is `caseExact: true`, the value comparison MUST be case-sensi
 
 ## 12. Implementation Checklist
 
-> **Status**: Updated February 18, 2026 — Phase 5 SCIM Validator compliance complete + performance fixes in current v0.10.0 baseline
+> **Status**: Updated February 25, 2026 — Phase 8.4 caseExact enforcement complete (v0.17.2). `externalId` CITEXT→TEXT migration applied.
 
 ### Attribute Name Resolution
 
@@ -758,6 +758,8 @@ Since `externalId` is `caseExact: true`, the value comparison MUST be case-sensi
 - [x] `assertUniqueDisplayName` refactored from `findMany` O(N) to `findFirst` O(1) using `displayNameLower` index — introduced in v0.9.1, current in v0.10.0
 - [x] ServiceProviderConfig: `sort.supported` set to `false`
 - [x] In-code filtering for case-insensitive userName/displayName (SQLite doesn't support Prisma `mode: 'insensitive'`)
+- [x] `externalId` column changed from `@db.Citext` to `@db.Text` — case-sensitive per RFC 7643 §3.1 (`caseExact: true`). Migration: `20260225181836_externalid_citext_to_text`. See `EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md`.
+- [x] Filter engine `ColumnType` expanded: `'text'` type added — `co`/`sw`/`ew` operators on `text` columns omit `mode: 'insensitive'` (case-sensitive matching)
 
 ---
 

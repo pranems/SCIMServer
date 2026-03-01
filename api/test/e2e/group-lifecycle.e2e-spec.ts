@@ -1,7 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
-import { resetDatabase } from './helpers/db.helper';
 import {
   scimPost,
   scimGet,
@@ -36,7 +35,6 @@ describe('Group Lifecycle (E2E)', () => {
   });
 
   beforeEach(async () => {
-    await resetDatabase(app);
     resetFixtureCounter();
     endpointId = await createEndpoint(app, token);
     basePath = scimBasePath(endpointId);
@@ -130,6 +128,43 @@ describe('Group Lifecycle (E2E)', () => {
 
       expect(res.body.id).toBe(created.id);
     });
+
+    it('should return 404 when replacing non-existent group', async () => {
+      const replacement = validGroup();
+      await scimPut(app, `${basePath}/Groups/does-not-exist`, token, replacement).expect(404);
+    });
+
+    // G8f: Uniqueness enforcement on PUT
+    it('should return 409 when PUT changes displayName to one that already exists', async () => {
+      const groupA = (await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'GroupA' })).expect(201)).body;
+      const groupB = (await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'GroupB' })).expect(201)).body;
+
+      // Try to PUT groupB with groupA's displayName
+      const replacement = validGroup({ displayName: 'GroupA' });
+      const res = await scimPut(app, `${basePath}/Groups/${groupB.id}`, token, replacement).expect(409);
+      expect(res.body.detail).toContain('displayName');
+      expect(res.body.scimType).toBe('uniqueness');
+    });
+
+    it('should allow PUT with same displayName (self-update)', async () => {
+      const group = (await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'SelfUpdate' })).expect(201)).body;
+
+      // PUT same group with same displayName — should succeed
+      const replacement = validGroup({ displayName: 'SelfUpdate' });
+      const res = await scimPut(app, `${basePath}/Groups/${group.id}`, token, replacement).expect(200);
+      expect(res.body.displayName).toBe('SelfUpdate');
+    });
+
+    it('should return 409 when PUT changes externalId to one that already exists', async () => {
+      const groupA = (await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'ExtA', externalId: 'ext-a' } as any)).expect(201)).body;
+      const groupB = (await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'ExtB', externalId: 'ext-b' } as any)).expect(201)).body;
+
+      // Try to PUT groupB with groupA's externalId
+      const replacement = { ...validGroup({ displayName: 'ExtB-Updated' }), externalId: 'ext-a' };
+      const res = await scimPut(app, `${basePath}/Groups/${groupB.id}`, token, replacement).expect(409);
+      expect(res.body.detail).toContain('externalId');
+      expect(res.body.scimType).toBe('uniqueness');
+    });
   });
 
   // ───────────── PATCH: Membership ─────────────
@@ -180,6 +215,67 @@ describe('Group Lifecycle (E2E)', () => {
 
       expect(res.body.displayName).toBe('Renamed Group');
     });
+
+    it('should return 404 when patching non-existent group', async () => {
+      await scimPatch(
+        app,
+        `${basePath}/Groups/does-not-exist`,
+        token,
+        replaceDisplayNamePatch('Nope'),
+      ).expect(404);
+    });
+
+    // G8f: Uniqueness enforcement on PATCH
+    it('should return 409 when PATCH changes displayName to one that already exists', async () => {
+      const groupA = (await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'PatchGroupA' })).expect(201)).body;
+      const groupB = (await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'PatchGroupB' })).expect(201)).body;
+
+      // Try to PATCH groupB's displayName to groupA's displayName
+      const res = await scimPatch(
+        app,
+        `${basePath}/Groups/${groupB.id}`,
+        token,
+        replaceDisplayNamePatch('PatchGroupA'),
+      ).expect(409);
+
+      expect(res.body.detail).toContain('displayName');
+      expect(res.body.scimType).toBe('uniqueness');
+    });
+
+    it('should allow PATCH with a unique displayName', async () => {
+      await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'ExistingGroup' })).expect(201);
+      const groupB = (await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'ToBeRenamed' })).expect(201)).body;
+
+      // PATCH to a new unique name — should succeed
+      const res = await scimPatch(
+        app,
+        `${basePath}/Groups/${groupB.id}`,
+        token,
+        replaceDisplayNamePatch('BrandNewName'),
+      ).expect(200);
+
+      expect(res.body.displayName).toBe('BrandNewName');
+    });
+
+    it('should return 409 when PATCH changes externalId to one that already exists', async () => {
+      // Create groupA with externalId ext-patch-a
+      await scimPost(app, `${basePath}/Groups`, token, { ...validGroup({ displayName: 'PatchExtA' }), externalId: 'ext-patch-a' }).expect(201);
+      const groupB = (await scimPost(app, `${basePath}/Groups`, token, { ...validGroup({ displayName: 'PatchExtB' }), externalId: 'ext-patch-b' }).expect(201)).body;
+
+      // Try to PATCH groupB's externalId to groupA's externalId
+      const res = await scimPatch(
+        app,
+        `${basePath}/Groups/${groupB.id}`,
+        token,
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'externalId', value: 'ext-patch-a' }],
+        },
+      ).expect(409);
+
+      expect(res.body.detail).toContain('externalId');
+      expect(res.body.scimType).toBe('uniqueness');
+    });
   });
 
   // ───────────── DELETE ─────────────
@@ -190,6 +286,17 @@ describe('Group Lifecycle (E2E)', () => {
 
       await scimDelete(app, `${basePath}/Groups/${created.id}`, token).expect(204);
       await scimGet(app, `${basePath}/Groups/${created.id}`, token).expect(404);
+    });
+
+    it('should return 404 when deleting non-existent group', async () => {
+      await scimDelete(app, `${basePath}/Groups/does-not-exist`, token).expect(404);
+    });
+
+    it('should be idempotent — second delete returns 404', async () => {
+      const created = (await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)).body;
+
+      await scimDelete(app, `${basePath}/Groups/${created.id}`, token).expect(204);
+      await scimDelete(app, `${basePath}/Groups/${created.id}`, token).expect(404);
     });
   });
 });

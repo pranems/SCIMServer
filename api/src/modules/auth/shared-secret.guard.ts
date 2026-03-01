@@ -3,7 +3,8 @@
   ExecutionContext,
   Injectable,
   UnauthorizedException,
-  Inject
+  Inject,
+  Optional,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
@@ -15,10 +16,26 @@ import { OAuthService } from '../../oauth/oauth.service';
 import { IS_PUBLIC_KEY } from './public.decorator';
 import { ScimLogger } from '../logging/scim-logger.service';
 import { LogCategory } from '../logging/log-levels';
+import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../domain/repositories/repository.tokens';
+import type { IEndpointCredentialRepository } from '../../domain/repositories/endpoint-credential.repository.interface';
+import { EndpointService } from '../endpoint/services/endpoint.service';
+import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS } from '../endpoint/endpoint-config.interface';
+
+// bcrypt is heavy — lazy-load via dynamic import cached on first use
+let bcryptCompare: (data: string, hash: string) => Promise<boolean>;
+async function loadBcryptCompare(): Promise<typeof bcryptCompare> {
+  if (!bcryptCompare) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const bcrypt = await import('bcrypt');
+    bcryptCompare = bcrypt.compare.bind(bcrypt);
+  }
+  return bcryptCompare;
+}
 
 interface AuthenticatedRequest extends Request {
   oauth?: Record<string, unknown>;
-  authType?: 'oauth' | 'legacy';
+  authType?: 'oauth' | 'legacy' | 'endpoint_credential';
+  authCredentialId?: string;
 }
 
 @Injectable()
@@ -28,6 +45,10 @@ export class SharedSecretGuard implements CanActivate {
     @Inject(OAuthService) private readonly oauthService: OAuthService,
     private readonly reflector: Reflector,
     private readonly logger: ScimLogger,
+    @Optional() @Inject(ENDPOINT_CREDENTIAL_REPOSITORY)
+    private readonly credentialRepo: IEndpointCredentialRepository | null,
+    @Optional() @Inject(EndpointService)
+    private readonly endpointService: EndpointService | null,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -79,7 +100,16 @@ export class SharedSecretGuard implements CanActivate {
 
     const token = header?.slice(7) ?? '';
 
-    // First, try OAuth 2.0 JWT token validation
+    // ── Phase 11: Per-endpoint credential check ──────────────────────
+    // If the URL contains an endpointId segment and the endpoint has
+    // PerEndpointCredentialsEnabled=true, try per-endpoint credentials first.
+    const endpointId = this.extractEndpointId(request);
+    if (endpointId && this.credentialRepo && this.endpointService) {
+      const matched = await this.tryEndpointCredential(endpointId, token, request);
+      if (matched) return true;
+    }
+
+    // ── OAuth 2.0 JWT token validation ───────────────────────────────
     if (token !== expectedSecret) {
       try {
         this.logger.debug(LogCategory.AUTH, 'Attempting OAuth 2.0 token validation');
@@ -99,16 +129,85 @@ export class SharedSecretGuard implements CanActivate {
       }
     }
 
-    // Fall back to legacy bearer token validation
+    // ── Legacy global bearer token ───────────────────────────────────
     if (token === expectedSecret) {
       this.logger.info(LogCategory.AUTH, 'Legacy bearer token authentication successful');
       request.authType = 'legacy';
       return true;
     }
 
-    // Both OAuth and legacy validation failed
-    this.logger.warn(LogCategory.AUTH, 'Authentication failed – both OAuth and legacy token invalid');
+    // Both per-endpoint, OAuth, and legacy validation failed
+    this.logger.warn(LogCategory.AUTH, 'Authentication failed – per-endpoint, OAuth, and legacy token all invalid');
     this.reject(response, 'Invalid bearer token.');
+  }
+
+  // ── Per-endpoint credential helpers ────────────────────────────────
+
+  /**
+   * Extract endpointId from URL pattern /endpoints/:endpointId/...
+   */
+  private extractEndpointId(request: Request): string | null {
+    const match = request.url.match(/\/endpoints\/([0-9a-f-]{36})\//i);
+    return match ? match[1] : null;
+  }
+
+  /**
+   * Try to authenticate via per-endpoint credentials.
+   * Returns true if a matching active credential is found.
+   * Returns false to allow fallback to OAuth/legacy.
+   */
+  private async tryEndpointCredential(
+    endpointId: string,
+    token: string,
+    request: AuthenticatedRequest,
+  ): Promise<boolean> {
+    try {
+      // Check if the endpoint has per-endpoint credentials enabled
+      const endpoint = await this.endpointService!.getEndpoint(endpointId);
+      const config = endpoint.config ?? {};
+      const perEndpointEnabled = getConfigBoolean(
+        config,
+        ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED,
+      );
+
+      if (!perEndpointEnabled) {
+        this.logger.debug(LogCategory.AUTH, 'Per-endpoint credentials not enabled for this endpoint', { endpointId });
+        return false; // Fall through to OAuth/legacy
+      }
+
+      // Load active credentials for this endpoint
+      const credentials = await this.credentialRepo!.findActiveByEndpoint(endpointId);
+      if (credentials.length === 0) {
+        this.logger.debug(LogCategory.AUTH, 'No active per-endpoint credentials found, falling back', { endpointId });
+        return false; // Fall through to OAuth/legacy
+      }
+
+      // Compare token against each credential's bcrypt hash
+      const compare = await loadBcryptCompare();
+      for (const cred of credentials) {
+        const isMatch = await compare(token, cred.credentialHash);
+        if (isMatch) {
+          request.authType = 'endpoint_credential';
+          request.authCredentialId = cred.id;
+          this.logger.info(LogCategory.AUTH, 'Per-endpoint credential authentication successful', {
+            endpointId,
+            credentialId: cred.id,
+            label: cred.label,
+          });
+          return true;
+        }
+      }
+
+      this.logger.debug(LogCategory.AUTH, 'Per-endpoint credential mismatch, falling back to OAuth/legacy', { endpointId });
+      return false; // No match — fall through to OAuth/legacy
+    } catch (error) {
+      // If endpoint not found or any error, fall through to global auth
+      this.logger.debug(LogCategory.AUTH, 'Per-endpoint credential check failed, falling back', {
+        endpointId,
+        error: (error as Error).message,
+      });
+      return false;
+    }
   }
 
   private reject(response: Response, detail: string): never {

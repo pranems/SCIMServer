@@ -74,7 +74,6 @@ The logging subsystem is built on four pillars:
                     │  ScimGroupsService    → scimLogger.info(SCIM_GROUP, ...)      │
                     │  ScimExceptionFilter  → scimLogger.error(HTTP, ...)           │
                     │  OAuthService         → scimLogger.info(OAUTH, ...)           │
-                    │  BackupService        → scimLogger.info(BACKUP, ...)          │
                     └──────────────────────────┬──────────────────────────────────┘
                                                │
                     ┌──────────────────────────┼──────────────────────────────────┐
@@ -133,8 +132,8 @@ Levels follow **RFC 5424 / OpenTelemetry severity** conventions, ordered by asce
 |-------|---------|---------|-----------|
 | **TRACE** | 0 | `stdout` | Full request/response bodies, SQL queries, PATCH path resolution steps, filter parse trees |
 | **DEBUG** | 1 | `stdout` | Operational detail: filter parsing, member resolution, config reads, auth token validation |
-| **INFO** | 2 | `stdout` | Business events: user created, group patched, endpoint activated, backup completed |
-| **WARN** | 3 | `stderr` | Recoverable anomalies: deprecated header, slow query (>2s), backup retry, unknown category |
+| **INFO** | 2 | `stdout` | Business events: user created, group patched, endpoint activated |
+| **WARN** | 3 | `stderr` | Recoverable anomalies: deprecated header, slow query (>2s), unknown category |
 | **ERROR** | 4 | `stderr` | Failed operations: auth failure, uniqueness violation, DB error, PATCH conflict |
 | **FATAL** | 5 | `stderr` | Unrecoverable: DB connection lost, required secret not configured |
 | **OFF** | 6 | — | Suppress all log output |
@@ -300,7 +299,7 @@ curl -s -H "Authorization: Bearer $TOKEN" \
   "availableCategories": [
     "http", "auth", "scim.user", "scim.group", "scim.patch",
     "scim.filter", "scim.discovery", "endpoint", "database",
-    "backup", "oauth", "general"
+    "oauth", "general"
   ]
 }
 ```
@@ -353,7 +352,7 @@ curl -s -X PUT -H "Authorization: Bearer $TOKEN" \
     "maxPayloadSizeBytes": 4096,
     "format": "json",
     "availableLevels": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"],
-    "availableCategories": ["http", "auth", "scim.user", "scim.group", "scim.patch", "scim.filter", "scim.discovery", "endpoint", "database", "backup", "oauth", "general"]
+    "availableCategories": ["http", "auth", "scim.user", "scim.group", "scim.patch", "scim.filter", "scim.discovery", "endpoint", "database", "oauth", "general"]
   }
 }
 ```
@@ -414,7 +413,7 @@ curl -s -X PUT -H "Authorization: Bearer $TOKEN" \
   "availableCategories": [
     "http", "auth", "scim.user", "scim.group", "scim.patch",
     "scim.filter", "scim.discovery", "endpoint", "database",
-    "backup", "oauth", "general"
+    "oauth", "general"
   ]
 }
 ```
@@ -984,14 +983,6 @@ Content-Type: application/json
 ```
 
 ---
-
-### 8.6 Backup Operation
-
-**Log Output (cron-triggered, no HTTP request):**
-```
-10:45:00.000 INFO  backup         Backup started | {"type":"scheduled","retention":20}
-10:45:02.500 INFO  backup         Backup completed | {"sizeBytes":245760,"durationMs":2500,"destination":"azure-blob"}
-```
 
 ---
 

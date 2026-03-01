@@ -1,0 +1,811 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for generated/prisma/internal/class.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../../prettify.css" />
+    <link rel="stylesheet" href="../../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../../index.html">All files</a> / <a href="index.html">generated/prisma/internal</a> class.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">53.84% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>7/13</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>0/0</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">14.28% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>1/7</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">53.84% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>7/13</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line medium'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a>
+<a name='L150'></a><a href='#L150'>150</a>
+<a name='L151'></a><a href='#L151'>151</a>
+<a name='L152'></a><a href='#L152'>152</a>
+<a name='L153'></a><a href='#L153'>153</a>
+<a name='L154'></a><a href='#L154'>154</a>
+<a name='L155'></a><a href='#L155'>155</a>
+<a name='L156'></a><a href='#L156'>156</a>
+<a name='L157'></a><a href='#L157'>157</a>
+<a name='L158'></a><a href='#L158'>158</a>
+<a name='L159'></a><a href='#L159'>159</a>
+<a name='L160'></a><a href='#L160'>160</a>
+<a name='L161'></a><a href='#L161'>161</a>
+<a name='L162'></a><a href='#L162'>162</a>
+<a name='L163'></a><a href='#L163'>163</a>
+<a name='L164'></a><a href='#L164'>164</a>
+<a name='L165'></a><a href='#L165'>165</a>
+<a name='L166'></a><a href='#L166'>166</a>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a>
+<a name='L170'></a><a href='#L170'>170</a>
+<a name='L171'></a><a href='#L171'>171</a>
+<a name='L172'></a><a href='#L172'>172</a>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a>
+<a name='L178'></a><a href='#L178'>178</a>
+<a name='L179'></a><a href='#L179'>179</a>
+<a name='L180'></a><a href='#L180'>180</a>
+<a name='L181'></a><a href='#L181'>181</a>
+<a name='L182'></a><a href='#L182'>182</a>
+<a name='L183'></a><a href='#L183'>183</a>
+<a name='L184'></a><a href='#L184'>184</a>
+<a name='L185'></a><a href='#L185'>185</a>
+<a name='L186'></a><a href='#L186'>186</a>
+<a name='L187'></a><a href='#L187'>187</a>
+<a name='L188'></a><a href='#L188'>188</a>
+<a name='L189'></a><a href='#L189'>189</a>
+<a name='L190'></a><a href='#L190'>190</a>
+<a name='L191'></a><a href='#L191'>191</a>
+<a name='L192'></a><a href='#L192'>192</a>
+<a name='L193'></a><a href='#L193'>193</a>
+<a name='L194'></a><a href='#L194'>194</a>
+<a name='L195'></a><a href='#L195'>195</a>
+<a name='L196'></a><a href='#L196'>196</a>
+<a name='L197'></a><a href='#L197'>197</a>
+<a name='L198'></a><a href='#L198'>198</a>
+<a name='L199'></a><a href='#L199'>199</a>
+<a name='L200'></a><a href='#L200'>200</a>
+<a name='L201'></a><a href='#L201'>201</a>
+<a name='L202'></a><a href='#L202'>202</a>
+<a name='L203'></a><a href='#L203'>203</a>
+<a name='L204'></a><a href='#L204'>204</a>
+<a name='L205'></a><a href='#L205'>205</a>
+<a name='L206'></a><a href='#L206'>206</a>
+<a name='L207'></a><a href='#L207'>207</a>
+<a name='L208'></a><a href='#L208'>208</a>
+<a name='L209'></a><a href='#L209'>209</a>
+<a name='L210'></a><a href='#L210'>210</a>
+<a name='L211'></a><a href='#L211'>211</a>
+<a name='L212'></a><a href='#L212'>212</a>
+<a name='L213'></a><a href='#L213'>213</a>
+<a name='L214'></a><a href='#L214'>214</a>
+<a name='L215'></a><a href='#L215'>215</a>
+<a name='L216'></a><a href='#L216'>216</a>
+<a name='L217'></a><a href='#L217'>217</a>
+<a name='L218'></a><a href='#L218'>218</a>
+<a name='L219'></a><a href='#L219'>219</a>
+<a name='L220'></a><a href='#L220'>220</a>
+<a name='L221'></a><a href='#L221'>221</a>
+<a name='L222'></a><a href='#L222'>222</a>
+<a name='L223'></a><a href='#L223'>223</a>
+<a name='L224'></a><a href='#L224'>224</a>
+<a name='L225'></a><a href='#L225'>225</a>
+<a name='L226'></a><a href='#L226'>226</a>
+<a name='L227'></a><a href='#L227'>227</a>
+<a name='L228'></a><a href='#L228'>228</a>
+<a name='L229'></a><a href='#L229'>229</a>
+<a name='L230'></a><a href='#L230'>230</a>
+<a name='L231'></a><a href='#L231'>231</a>
+<a name='L232'></a><a href='#L232'>232</a>
+<a name='L233'></a><a href='#L233'>233</a>
+<a name='L234'></a><a href='#L234'>234</a>
+<a name='L235'></a><a href='#L235'>235</a>
+<a name='L236'></a><a href='#L236'>236</a>
+<a name='L237'></a><a href='#L237'>237</a>
+<a name='L238'></a><a href='#L238'>238</a>
+<a name='L239'></a><a href='#L239'>239</a>
+<a name='L240'></a><a href='#L240'>240</a>
+<a name='L241'></a><a href='#L241'>241</a>
+<a name='L242'></a><a href='#L242'>242</a>
+<a name='L243'></a><a href='#L243'>243</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">&nbsp;
+/* !!! This is code generated by Prisma. Do not edit directly. !!! */
+/* eslint-disable */
+// biome-ignore-all lint: generated file
+// @ts-nocheck 
+/*
+ * WARNING: This is an internal file that is subject to change!
+ *
+ * 🛑 Under no circumstances should you import this file directly! 🛑
+ *
+ * Please import the `PrismaClient` class from the `client.ts` file instead.
+ */
+&nbsp;
+import * as runtime from "@prisma/client/runtime/client"
+import type * as Prisma from "./prismaNamespace"
+&nbsp;
+&nbsp;
+const config: runtime.GetPrismaClientConfig = {
+  "previewFeatures": [
+    "postgresqlExtensions"
+  ],
+  "clientVersion": "7.4.0",
+  "engineVersion": "ab56fe763f921d033a6c195e7ddeb3e255bdbb57",
+  "activeProvider": "postgresql",
+  "inlineSchema": "generator client {\n  provider        = \"prisma-client\"\n  output          = \"../src/generated/prisma\"\n  previewFeatures = [\"postgresqlExtensions\"]\n}\n\n// Phase 3: PostgreSQL provider — CITEXT for case-insensitive columns, JSONB for\n// payload storage, row-level locking for concurrent writes, GIN indexes for\n// filter push-down. See docs/phases/PHASE_03_POSTGRESQL_MIGRATION.md\ndatasource db {\n  provider   = \"postgresql\"\n  extensions = [citext, pgcrypto, pg_trgm]\n}\n\n// Multi-endpoint support: Each endpoint has isolated SCIM resources\nmodel Endpoint {\n  id          String   @id @default(dbgenerated(\"gen_random_uuid()\")) @db.Uuid\n  name        String   @unique\n  displayName String?\n  description String?\n  config      String? // JSON configuration for endpoint-specific settings\n  active      Boolean  @default(true)\n  createdAt   DateTime @default(now()) @db.Timestamptz\n  updatedAt   DateTime @updatedAt @db.Timestamptz\n\n  logs RequestLog[]\n\n  // Phase 2: Unified resource relation\n  resources ScimResource[]\n\n  // Phase 6: Per-endpoint schema extensions\n  schemaExtensions EndpointSchema[]\n\n  @@index([active])\n}\n\nmodel RequestLog {\n  id              String   @id @default(dbgenerated(\"gen_random_uuid()\")) @db.Uuid\n  endpointId      String?  @db.Uuid\n  method          String\n  url             String\n  status          Int?\n  durationMs      Int?\n  requestHeaders  String\n  requestBody     String?\n  responseHeaders String?\n  responseBody    String?\n  errorMessage    String?\n  errorStack      String?\n  identifier      String?\n  createdAt       DateTime @default(now()) @db.Timestamptz\n\n  endpoint Endpoint? @relation(fields: [endpointId], references: [id], onDelete: SetNull)\n\n  @@index([createdAt])\n  @@index([method])\n  @@index([status])\n  @@index([endpointId])\n}\n\n// ═══════════════════════════════════════════════════════════════════════════════\n// Phase 2 → Phase 3 — Unified scim_resource table (PostgreSQL-native)\n//\n// Polymorphic table: resourceType discriminator (\"User\" / \"Group\") determines\n// which columns are populated. CITEXT on userName/displayName eliminates the\n// need for helper lowercase columns. JSONB payload enables GIN-indexed queries.\n// ═══════════════════════════════════════════════════════════════════════════════\n\nmodel ScimResource {\n  id           String   @id @default(dbgenerated(\"gen_random_uuid()\")) @db.Uuid\n  endpointId   String   @db.Uuid\n  resourceType String   @db.VarChar(50)\n  scimId       String   @db.Uuid\n  externalId   String?  @db.VarChar(255)\n  userName     String?  @db.Citext // CITEXT — case-insensitive natively (Phase 3)\n  displayName  String?  @db.Citext // CITEXT — case-insensitive natively (Phase 3)\n  active       Boolean  @default(true)\n  payload      Json // JSONB — replaces rawPayload String (Phase 3)\n  version      Int      @default(1)\n  meta         String?\n  createdAt    DateTime @default(now()) @db.Timestamptz\n  updatedAt    DateTime @updatedAt @db.Timestamptz\n\n  endpoint        Endpoint         @relation(fields: [endpointId], references: [id], onDelete: Cascade)\n  membersAsGroup  ResourceMember[] @relation(\"GroupMembers\")\n  membersAsMember ResourceMember[] @relation(\"MemberResources\")\n\n  // Composite unique constraints\n  @@unique([endpointId, scimId])\n  @@unique([endpointId, userName]) // CITEXT handles case-insensitive uniqueness\n  @@unique([endpointId, displayName]) // CITEXT handles case-insensitive uniqueness\n  @@unique([endpointId, resourceType, externalId]) // Scoped per type to avoid collisions\n  @@index([endpointId, resourceType])\n}\n\nmodel ResourceMember {\n  id               String   @id @default(dbgenerated(\"gen_random_uuid()\")) @db.Uuid\n  groupResourceId  String   @db.Uuid\n  memberResourceId String?  @db.Uuid\n  value            String\n  type             String?\n  display          String?\n  createdAt        DateTime @default(now()) @db.Timestamptz\n\n  group  ScimResource  @relation(\"GroupMembers\", fields: [groupResourceId], references: [id], onDelete: Cascade)\n  member ScimResource? @relation(\"MemberResources\", fields: [memberResourceId], references: [id], onDelete: SetNull)\n\n  @@index([groupResourceId])\n  @@index([memberResourceId])\n}\n\n// ═══════════════════════════════════════════════════════════════════════════════\n// Phase 6 — Per-endpoint SCIM schema extensions\n//\n// Persists custom extension schemas registered per endpoint. On startup the\n// ScimSchemaRegistry loads these rows and hydrates its per-endpoint overlay.\n// Admin API allows CRUD on extensions without redeployment.\n// ═══════════════════════════════════════════════════════════════════════════════\n\nmodel EndpointSchema {\n  id             String   @id @default(dbgenerated(\"gen_random_uuid()\")) @db.Uuid\n  endpointId     String   @db.Uuid\n  schemaUrn      String   @db.VarChar(512) // Extension schema URN (e.g., \"urn:example:custom:2.0:User\")\n  name           String   @db.VarChar(255)\n  description    String?\n  resourceTypeId String?  @db.VarChar(50) // Resource type to attach to (\"User\", \"Group\", or null)\n  required       Boolean  @default(false) // Whether extension is required on the resource type\n  attributes     Json // JSONB — array of ScimSchemaAttribute definitions\n  createdAt      DateTime @default(now()) @db.Timestamptz\n  updatedAt      DateTime @updatedAt @db.Timestamptz\n\n  endpoint Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)\n\n  @@unique([endpointId, schemaUrn]) // One schema URN per endpoint\n  @@index([endpointId])\n}\n",
+  "runtimeDataModel": {
+    "models": {},
+    "enums": {},
+    "types": {}
+  },
+  "parameterizationSchema": {
+    "strings": [],
+    "graph": ""
+  }
+}
+&nbsp;
+config.runtimeDataModel = JSON.parse("{\"models\":{\"Endpoint\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"displayName\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"description\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"config\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"active\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"logs\",\"kind\":\"object\",\"type\":\"RequestLog\",\"relationName\":\"EndpointToRequestLog\"},{\"name\":\"resources\",\"kind\":\"object\",\"type\":\"ScimResource\",\"relationName\":\"EndpointToScimResource\"},{\"name\":\"schemaExtensions\",\"kind\":\"object\",\"type\":\"EndpointSchema\",\"relationName\":\"EndpointToEndpointSchema\"}],\"dbName\":null},\"RequestLog\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"endpointId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"method\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"url\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"status\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"durationMs\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"requestHeaders\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"requestBody\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"responseHeaders\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"responseBody\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"errorMessage\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"errorStack\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"identifier\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"endpoint\",\"kind\":\"object\",\"type\":\"Endpoint\",\"relationName\":\"EndpointToRequestLog\"}],\"dbName\":null},\"ScimResource\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"endpointId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"resourceType\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"scimId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"externalId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"userName\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"displayName\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"active\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"payload\",\"kind\":\"scalar\",\"type\":\"Json\"},{\"name\":\"version\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"meta\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"endpoint\",\"kind\":\"object\",\"type\":\"Endpoint\",\"relationName\":\"EndpointToScimResource\"},{\"name\":\"membersAsGroup\",\"kind\":\"object\",\"type\":\"ResourceMember\",\"relationName\":\"GroupMembers\"},{\"name\":\"membersAsMember\",\"kind\":\"object\",\"type\":\"ResourceMember\",\"relationName\":\"MemberResources\"}],\"dbName\":null},\"ResourceMember\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"groupResourceId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"memberResourceId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"value\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"type\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"display\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"group\",\"kind\":\"object\",\"type\":\"ScimResource\",\"relationName\":\"GroupMembers\"},{\"name\":\"member\",\"kind\":\"object\",\"type\":\"ScimResource\",\"relationName\":\"MemberResources\"}],\"dbName\":null},\"EndpointSchema\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"endpointId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"schemaUrn\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"description\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"resourceTypeId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"required\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"attributes\",\"kind\":\"scalar\",\"type\":\"Json\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"endpoint\",\"kind\":\"object\",\"type\":\"Endpoint\",\"relationName\":\"EndpointToEndpointSchema\"}],\"dbName\":null}},\"enums\":{},\"types\":{}}")
+config.parameterizationSchema = {
+  strings: JSON.parse("[\"where\",\"orderBy\",\"cursor\",\"endpoint\",\"logs\",\"group\",\"member\",\"membersAsGroup\",\"membersAsMember\",\"_count\",\"resources\",\"schemaExtensions\",\"Endpoint.findUnique\",\"Endpoint.findUniqueOrThrow\",\"Endpoint.findFirst\",\"Endpoint.findFirstOrThrow\",\"Endpoint.findMany\",\"data\",\"Endpoint.createOne\",\"Endpoint.createMany\",\"Endpoint.createManyAndReturn\",\"Endpoint.updateOne\",\"Endpoint.updateMany\",\"Endpoint.updateManyAndReturn\",\"create\",\"update\",\"Endpoint.upsertOne\",\"Endpoint.deleteOne\",\"Endpoint.deleteMany\",\"having\",\"_min\",\"_max\",\"Endpoint.groupBy\",\"Endpoint.aggregate\",\"RequestLog.findUnique\",\"RequestLog.findUniqueOrThrow\",\"RequestLog.findFirst\",\"RequestLog.findFirstOrThrow\",\"RequestLog.findMany\",\"RequestLog.createOne\",\"RequestLog.createMany\",\"RequestLog.createManyAndReturn\",\"RequestLog.updateOne\",\"RequestLog.updateMany\",\"RequestLog.updateManyAndReturn\",\"RequestLog.upsertOne\",\"RequestLog.deleteOne\",\"RequestLog.deleteMany\",\"_avg\",\"_sum\",\"RequestLog.groupBy\",\"RequestLog.aggregate\",\"ScimResource.findUnique\",\"ScimResource.findUniqueOrThrow\",\"ScimResource.findFirst\",\"ScimResource.findFirstOrThrow\",\"ScimResource.findMany\",\"ScimResource.createOne\",\"ScimResource.createMany\",\"ScimResource.createManyAndReturn\",\"ScimResource.updateOne\",\"ScimResource.updateMany\",\"ScimResource.updateManyAndReturn\",\"ScimResource.upsertOne\",\"ScimResource.deleteOne\",\"ScimResource.deleteMany\",\"ScimResource.groupBy\",\"ScimResource.aggregate\",\"ResourceMember.findUnique\",\"ResourceMember.findUniqueOrThrow\",\"ResourceMember.findFirst\",\"ResourceMember.findFirstOrThrow\",\"ResourceMember.findMany\",\"ResourceMember.createOne\",\"ResourceMember.createMany\",\"ResourceMember.createManyAndReturn\",\"ResourceMember.updateOne\",\"ResourceMember.updateMany\",\"ResourceMember.updateManyAndReturn\",\"ResourceMember.upsertOne\",\"ResourceMember.deleteOne\",\"ResourceMember.deleteMany\",\"ResourceMember.groupBy\",\"ResourceMember.aggregate\",\"EndpointSchema.findUnique\",\"EndpointSchema.findUniqueOrThrow\",\"EndpointSchema.findFirst\",\"EndpointSchema.findFirstOrThrow\",\"EndpointSchema.findMany\",\"EndpointSchema.createOne\",\"EndpointSchema.createMany\",\"EndpointSchema.createManyAndReturn\",\"EndpointSchema.updateOne\",\"EndpointSchema.updateMany\",\"EndpointSchema.updateManyAndReturn\",\"EndpointSchema.upsertOne\",\"EndpointSchema.deleteOne\",\"EndpointSchema.deleteMany\",\"EndpointSchema.groupBy\",\"EndpointSchema.aggregate\",\"AND\",\"OR\",\"NOT\",\"id\",\"endpointId\",\"schemaUrn\",\"name\",\"description\",\"resourceTypeId\",\"required\",\"attributes\",\"createdAt\",\"updatedAt\",\"equals\",\"in\",\"notIn\",\"lt\",\"lte\",\"gt\",\"gte\",\"not\",\"string_contains\",\"string_starts_with\",\"string_ends_with\",\"array_starts_with\",\"array_ends_with\",\"array_contains\",\"contains\",\"startsWith\",\"endsWith\",\"groupResourceId\",\"memberResourceId\",\"value\",\"type\",\"display\",\"resourceType\",\"scimId\",\"externalId\",\"userName\",\"displayName\",\"active\",\"payload\",\"version\",\"meta\",\"method\",\"url\",\"status\",\"durationMs\",\"requestHeaders\",\"requestBody\",\"responseHeaders\",\"responseBody\",\"errorMessage\",\"errorStack\",\"identifier\",\"config\",\"endpointId_schemaUrn\",\"endpointId_scimId\",\"endpointId_userName\",\"endpointId_displayName\",\"endpointId_resourceType_externalId\",\"every\",\"some\",\"none\",\"is\",\"isNot\",\"connectOrCreate\",\"upsert\",\"createMany\",\"set\",\"disconnect\",\"delete\",\"connect\",\"updateMany\",\"deleteMany\",\"increment\",\"decrement\",\"multiply\",\"divide\"]"),
+  graph: "1AIvUA4EAADEAQAgCgAAxQEAIAsAAMYBACBkAADDAQAwZQAABwAQZgAAwwEAMGcBAAAAAWoBAAAAAWsBALEBACFvQAC0AQAhcEAAtAEAIYsBAQCxAQAhjAEgALIBACGbAQEAsQEAIQEAAAABACASAwAAyQEAIGQAAMcBADBlAAADABBmAADHAQAwZwEArwEAIWgBALgBACFvQAC0AQAhkAEBALABACGRAQEAsAEAIZIBAgDIAQAhkwECAMgBACGUAQEAsAEAIZUBAQCxAQAhlgEBALEBACGXAQEAsQEAIZgBAQCxAQAhmQEBALEBACGaAQEAsQEAIQoDAAC0AgAgaAAAygEAIJIBAADKAQAgkwEAAMoBACCVAQAAygEAIJYBAADKAQAglwEAAMoBACCYAQAAygEAIJkBAADKAQAgmgEAAMoBACASAwAAyQEAIGQAAMcBADBlAAADABBmAADHAQAwZwEAAAABaAEAuAEAIW9AALQBACGQAQEAsAEAIZEBAQCwAQAhkgECAMgBACGTAQIAyAEAIZQBAQCwAQAhlQEBALEBACGWAQEAsQEAIZcBAQCxAQAhmAEBALEBACGZAQEAsQEAIZoBAQCxAQAhAwAAAAMAIAEAAAQAMAIAAAUAIA4EAADEAQAgCgAAxQEAIAsAAMYBACBkAADDAQAwZQAABwAQZgAAwwEAMGcBAK8BACFqAQCwAQAhawEAsQEAIW9AALQBACFwQAC0AQAhiwEBALEBACGMASAAsgEAIZsBAQCxAQAhAQAAAAcAIBMDAAC1AQAgBwAAwgEAIAgAAMIBACBkAADAAQAwZQAACQAQZgAAwAEAMGcBAK8BACFoAQCvAQAhb0AAtAEAIXBAALQBACGHAQEAsAEAIYgBAQCvAQAhiQEBALEBACGKAQEAsQEAIYsBAQCxAQAhjAEgALIBACGNAQAAswEAII4BAgDBAQAhjwEBALEBACEHAwAAtAIAIAcAALYCACAIAAC2AgAgiQEAAMoBACCKAQAAygEAIIsBAADKAQAgjwEAAMoBACAXAwAAtQEAIAcAAMIBACAIAADCAQAgZAAAwAEAMGUAAAkAEGYAAMABADBnAQAAAAFoAQCvAQAhb0AAtAEAIXBAALQBACGHAQEAsAEAIYgBAQCvAQAhiQEBALEBACGKAQEAsQEAIYsBAQCxAQAhjAEgALIBACGNAQAAswEAII4BAgDBAQAhjwEBALEBACGdAQAAvAEAIJ4BAAC9AQAgnwEAAL4BACCgAQAAvwEAIAMAAAAJACABAAAKADACAAALACAMBQAAuQEAIAYAALoBACBkAAC3AQAwZQAADQAQZgAAtwEAMGcBAK8BACFvQAC0AQAhggEBAK8BACGDAQEAuAEAIYQBAQCwAQAhhQEBALEBACGGAQEAsQEAIQUFAAC1AgAgBgAAtQIAIIMBAADKAQAghQEAAMoBACCGAQAAygEAIAwFAAC5AQAgBgAAugEAIGQAALcBADBlAAANABBmAAC3AQAwZwEAAAABb0AAtAEAIYIBAQCvAQAhgwEBALgBACGEAQEAsAEAIYUBAQCxAQAhhgEBALEBACEDAAAADQAgAQAADgAwAgAADwAgAQAAAAkAIAMAAAANACABAAAOADACAAAPACABAAAADQAgAQAAAA0AIA4DAAC1AQAgZAAArgEAMGUAABUAEGYAAK4BADBnAQCvAQAhaAEArwEAIWkBALABACFqAQCwAQAhawEAsQEAIWwBALEBACFtIACyAQAhbgAAswEAIG9AALQBACFwQAC0AQAhAwMAALQCACBrAADKAQAgbAAAygEAIA8DAAC1AQAgZAAArgEAMGUAABUAEGYAAK4BADBnAQAAAAFoAQCvAQAhaQEAsAEAIWoBALABACFrAQCxAQAhbAEAsQEAIW0gALIBACFuAACzAQAgb0AAtAEAIXBAALQBACGcAQAArQEAIAMAAAAVACABAAAWADACAAAXACABAAAAAwAgAQAAAAkAIAEAAAAVACABAAAAAQAgBgQAALECACAKAACyAgAgCwAAswIAIGsAAMoBACCLAQAAygEAIJsBAADKAQAgAwAAAAcAIAEAAB0AMAIAAAEAIAMAAAAHACABAAAdADACAAABACADAAAABwAgAQAAHQAwAgAAAQAgCwQAAK4CACAKAACvAgAgCwAAsAIAIGcBAAAAAWoBAAAAAWsBAAAAAW9AAAAAAXBAAAAAAYsBAQAAAAGMASAAAAABmwEBAAAAAQERAAAhACAIZwEAAAABagEAAAABawEAAAABb0AAAAABcEAAAAABiwEBAAAAAYwBIAAAAAGbAQEAAAABAREAACMAMAERAAAjADALBAAAhwIAIAoAAIgCACALAACJAgAgZwEAzgEAIWoBAM4BACFrAQDPAQAhb0AA0QEAIXBAANEBACGLAQEAzwEAIYwBIADQAQAhmwEBAM8BACECAAAAAQAgEQAAJgAgCGcBAM4BACFqAQDOAQAhawEAzwEAIW9AANEBACFwQADRAQAhiwEBAM8BACGMASAA0AEAIZsBAQDPAQAhAgAAAAcAIBEAACgAIAIAAAAHACARAAAoACADAAAAAQAgGAAAIQAgGQAAJgAgAQAAAAEAIAEAAAAHACAGCQAAhAIAIB4AAIYCACAfAACFAgAgawAAygEAIIsBAADKAQAgmwEAAMoBACALZAAArAEAMGUAAC8AEGYAAKwBADBnAQCPAQAhagEAkAEAIWsBAJEBACFvQACUAQAhcEAAlAEAIYsBAQCRAQAhjAEgAJIBACGbAQEAkQEAIQMAAAAHACABAAAuADAdAAAvACADAAAABwAgAQAAHQAwAgAAAQAgAQAAAAUAIAEAAAAFACADAAAAAwAgAQAABAAwAgAABQAgAwAAAAMAIAEAAAQAMAIAAAUAIAMAAAADACABAAAEADACAAAFACAPAwAAgwIAIGcBAAAAAWgBAAAAAW9AAAAAAZABAQAAAAGRAQEAAAABkgECAAAAAZMBAgAAAAGUAQEAAAABlQEBAAAAAZYBAQAAAAGXAQEAAAABmAEBAAAAAZkBAQAAAAGaAQEAAAABAREAADcAIA5nAQAAAAFoAQAAAAFvQAAAAAGQAQEAAAABkQEBAAAAAZIBAgAAAAGTAQIAAAABlAEBAAAAAZUBAQAAAAGWAQEAAAABlwEBAAAAAZgBAQAAAAGZAQEAAAABmgEBAAAAAQERAAA5ADABEQAAOQAwAQAAAAcAIA8DAACCAgAgZwEAzgEAIWgBAM8BACFvQADRAQAhkAEBAM4BACGRAQEAzgEAIZIBAgCBAgAhkwECAIECACGUAQEAzgEAIZUBAQDPAQAhlgEBAM8BACGXAQEAzwEAIZgBAQDPAQAhmQEBAM8BACGaAQEAzwEAIQIAAAAFACARAAA9ACAOZwEAzgEAIWgBAM8BACFvQADRAQAhkAEBAM4BACGRAQEAzgEAIZIBAgCBAgAhkwECAIECACGUAQEAzgEAIZUBAQDPAQAhlgEBAM8BACGXAQEAzwEAIZgBAQDPAQAhmQEBAM8BACGaAQEAzwEAIQIAAAADACARAAA_ACACAAAAAwAgEQAAPwAgAQAAAAcAIAMAAAAFACAYAAA3ACAZAAA9ACABAAAABQAgAQAAAAMAIA4JAAD8AQAgHgAA_wEAIB8AAP4BACAwAAD9AQAgMQAAgAIAIGgAAMoBACCSAQAAygEAIJMBAADKAQAglQEAAMoBACCWAQAAygEAIJcBAADKAQAgmAEAAMoBACCZAQAAygEAIJoBAADKAQAgEWQAAKgBADBlAABHABBmAACoAQAwZwEAjwEAIWgBAKIBACFvQACUAQAhkAEBAJABACGRAQEAkAEAIZIBAgCpAQAhkwECAKkBACGUAQEAkAEAIZUBAQCRAQAhlgEBAJEBACGXAQEAkQEAIZgBAQCRAQAhmQEBAJEBACGaAQEAkQEAIQMAAAADACABAABGADAdAABHACADAAAAAwAgAQAABAAwAgAABQAgAQAAAAsAIAEAAAALACADAAAACQAgAQAACgAwAgAACwAgAwAAAAkAIAEAAAoAMAIAAAsAIAMAAAAJACABAAAKADACAAALACAQAwAA-QEAIAcAAPoBACAIAAD7AQAgZwEAAAABaAEAAAABb0AAAAABcEAAAAABhwEBAAAAAYgBAQAAAAGJAQEAAAABigEBAAAAAYsBAQAAAAGMASAAAAABjQGAAAAAAY4BAgAAAAGPAQEAAAABAREAAE8AIA1nAQAAAAFoAQAAAAFvQAAAAAFwQAAAAAGHAQEAAAABiAEBAAAAAYkBAQAAAAGKAQEAAAABiwEBAAAAAYwBIAAAAAGNAYAAAAABjgECAAAAAY8BAQAAAAEBEQAAUQAwAREAAFEAMBADAADhAQAgBwAA4gEAIAgAAOMBACBnAQDOAQAhaAEAzgEAIW9AANEBACFwQADRAQAhhwEBAM4BACGIAQEAzgEAIYkBAQDPAQAhigEBAM8BACGLAQEAzwEAIYwBIADQAQAhjQGAAAAAAY4BAgDgAQAhjwEBAM8BACECAAAACwAgEQAAVAAgDWcBAM4BACFoAQDOAQAhb0AA0QEAIXBAANEBACGHAQEAzgEAIYgBAQDOAQAhiQEBAM8BACGKAQEAzwEAIYsBAQDPAQAhjAEgANABACGNAYAAAAABjgECAOABACGPAQEAzwEAIQIAAAAJACARAABWACACAAAACQAgEQAAVgAgAwAAAAsAIBgAAE8AIBkAAFQAIAEAAAALACABAAAACQAgCQkAANsBACAeAADeAQAgHwAA3QEAIDAAANwBACAxAADfAQAgiQEAAMoBACCKAQAAygEAIIsBAADKAQAgjwEAAMoBACAQZAAApAEAMGUAAF0AEGYAAKQBADBnAQCPAQAhaAEAjwEAIW9AAJQBACFwQACUAQAhhwEBAJABACGIAQEAjwEAIYkBAQCRAQAhigEBAJEBACGLAQEAkQEAIYwBIACSAQAhjQEAAJMBACCOAQIApQEAIY8BAQCRAQAhAwAAAAkAIAEAAFwAMB0AAF0AIAMAAAAJACABAAAKADACAAALACABAAAADwAgAQAAAA8AIAMAAAANACABAAAOADACAAAPACADAAAADQAgAQAADgAwAgAADwAgAwAAAA0AIAEAAA4AMAIAAA8AIAkFAADZAQAgBgAA2gEAIGcBAAAAAW9AAAAAAYIBAQAAAAGDAQEAAAABhAEBAAAAAYUBAQAAAAGGAQEAAAABAREAAGUAIAdnAQAAAAFvQAAAAAGCAQEAAAABgwEBAAAAAYQBAQAAAAGFAQEAAAABhgEBAAAAAQERAABnADABEQAAZwAwAQAAAAkAIAkFAADXAQAgBgAA2AEAIGcBAM4BACFvQADRAQAhggEBAM4BACGDAQEAzwEAIYQBAQDOAQAhhQEBAM8BACGGAQEAzwEAIQIAAAAPACARAABrACAHZwEAzgEAIW9AANEBACGCAQEAzgEAIYMBAQDPAQAhhAEBAM4BACGFAQEAzwEAIYYBAQDPAQAhAgAAAA0AIBEAAG0AIAIAAAANACARAABtACABAAAACQAgAwAAAA8AIBgAAGUAIBkAAGsAIAEAAAAPACABAAAADQAgBgkAANQBACAeAADWAQAgHwAA1QEAIIMBAADKAQAghQEAAMoBACCGAQAAygEAIApkAAChAQAwZQAAdQAQZgAAoQEAMGcBAI8BACFvQACUAQAhggEBAI8BACGDAQEAogEAIYQBAQCQAQAhhQEBAJEBACGGAQEAkQEAIQMAAAANACABAAB0ADAdAAB1ACADAAAADQAgAQAADgAwAgAADwAgAQAAABcAIAEAAAAXACADAAAAFQAgAQAAFgAwAgAAFwAgAwAAABUAIAEAABYAMAIAABcAIAMAAAAVACABAAAWADACAAAXACALAwAA0wEAIGcBAAAAAWgBAAAAAWkBAAAAAWoBAAAAAWsBAAAAAWwBAAAAAW0gAAAAAW6AAAAAAW9AAAAAAXBAAAAAAQERAAB9ACAKZwEAAAABaAEAAAABaQEAAAABagEAAAABawEAAAABbAEAAAABbSAAAAABboAAAAABb0AAAAABcEAAAAABAREAAH8AMAERAAB_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_AQAAAAGAAQEAAAABgQEBAAAAAQsJAACWAQAgHgAAnwEAIB8AAJ8BACBxAQAAAAFyAQAAAARzAQAAAAR0AQAAAAF1AQAAAAF2AQAAAAF3AQAAAAF4AQCgAQAhCmQAAKEBADBlAAB1ABBmAAChAQAwZwEAjwEAIW9AAJQBACGCAQEAjwEAIYMBAQCiAQAhhAEBAJABACGFAQEAkQEAIYYBAQCRAQAhCwkAAJwBACAeAACdAQAgHwAAnQEAIHEBAAAAAXIBAAAABXMBAAAABXQBAAAAAXUBAAAAAXYBAAAAAXcBAAAAAXgBAKMBACELCQAAnAEAIB4AAJ0BACAfAACdAQAgcQEAAAABcgEAAAAFcwEAAAAFdAEAAAABdQEAAAABdgEAAAABdwEAAAABeAEAowEAIRBkAACkAQAwZQAAXQAQZgAApAEAMGcBAI8BACFoAQCPAQAhb0AAlAEAIXBAAJQBACGHAQEAkAEAIYgBAQCPAQAhiQEBAJEBACGKAQEAkQEAIYsBAQCRAQAhjAEgAJIBACGNAQAAkwEAII4BAgClAQAhjwEBAJEBACENCQAAlgEAIB4AAJYBACAfAACWAQAgMAAApwEAIDEAAJYBACBxAgAAAAFyAgAAAARzAgAAAAR0AgAAAAF1AgAAAAF2AgAAAAF3AgAAAAF4AgCmAQAhDQkAAJYBACAeAACWAQAgHwAAlgEAIDAAAKcBACAxAACWAQAgcQIAAAABcgIAAAAEcwIAAAAEdAIAAAABdQIAAAABdgIAAAABdwIAAAABeAIApgEAIQhxCAAAAAFyCAAAAARzCAAAAAR0CAAAAAF1CAAAAAF2CAAAAAF3CAAAAAF4CACnAQAhEWQAAKgBADBlAABHABBmAACoAQAwZwEAjwEAIWgBAKIBACFvQACUAQAhkAEBAJABACGRAQEAkAEAIZIBAgCpAQAhkwECAKkBACGUAQEAkAEAIZUBAQCRAQAhlgEBAJEBACGXAQEAkQEAIZgBAQCRAQAhmQEBAJEBACGaAQEAkQEAIQ0JAACcAQAgHgAAnAEAIB8AAJwBACAwAACrAQAgMQAAnAEAIHECAAAAAXICAAAABXMCAAAABXQCAAAAAXUCAAAAAXYCAAAAAXcCAAAAAXgCAKoBACENCQAAnAEAIB4AAJwBACAfAACcAQAgMAAAqwEAIDEAAJwBACBxAgAAAAFyAgAAAAVzAgAAAAV0AgAAAAF1AgAAAAF2AgAAAAF3AgAAAAF4AgCqAQAhCHEIAAAAAXIIAAAABXMIAAAABXQIAAAAAXUIAAAAAXYIAAAAAXcIAAAAAXgIAKsBACELZAAArAEAMGUAAC8AEGYAAKwBADBnAQCPAQAhagEAkAEAIWsBAJEBACFvQACUAQAhcEAAlAEAIYsBAQCRAQAhjAEgAJIBACGbAQEAkQEAIQJoAQAAAAFpAQAAAAEOAwAAtQEAIGQAAK4BADBlAAAVABBmAACuAQAwZwEArwEAIWgBAK8BACFpAQCwAQAhagEAsAEAIWsBALEBACFsAQCxAQAhbSAAsgEAIW4AALMBACBvQAC0AQAhcEAAtAEAIQhxAQAAAAFyAQAAAARzAQAAAAR0AQAAAAF1AQAAAAF2AQAAAAF3AQAAAAF4AQC2AQAhC3EBAAAAAXIBAAAABHMBAAAABHQBAAAAAXUBAAAAAXYBAAAAAXcBAAAAAXgBAJ8BACF_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_AgAgGQAAxAIAIKYBAADAAgAgpwEAAMMCACCsAQAAAQAgCxgAAPABADAZAAD0AQAwpgEAAPEBADCnAQAA8gEAMKgBAADzAQAgqQEAAOgBADCqAQAA6AEAMKsBAADoAQAwrAEAAOgBADCtAQAA9QEAMK4BAADrAQAwCxgAAOQBADAZAADpAQAwpgEAAOUBADCnAQAA5gEAMKgBAADnAQAgqQEAAOgBADCqAQAA6AEAMKsBAADoAQAwrAEAAOgBADCtAQAA6gEAMK4BAADrAQAwBwUAANkBACBnAQAAAAFvQAAAAAGCAQEAAAABhAEBAAAAAYUBAQAAAAGGAQEAAAABAgAAAA8AIBgAAO8BACADAAAADwAgGAAA7wEAIBkAAO4BACABEQAAwgIAMAwFAAC5AQAgBgAAugEAIGQAALcBADBlAAANABBmAAC3AQAwZwEAAAABb0AAtAEAIYIBAQCvAQAhgwEBALgBACGEAQEAsAEAIYUBAQCxAQAhhgEBALEBACECAAAADwAgEQAA7gEAIAIAAADsAQAgEQAA7QEAIApkAADrAQAwZQAA7AEAEGYAAOsBADBnAQCvAQAhb0AAtAEAIYIBAQCvAQAhgwEBALgBACGEAQEAsAEAIYUBAQCxAQAhhgEBALEBACEKZAAA6wEAMGUAAOwBABBmAADrAQAwZwEArwEAIW9AALQBACGCAQEArwEAIYMBAQC4AQAhhAEBALABACGFAQEAsQEAIYYBAQCxAQAhBmcBAM4BACFvQADRAQAhggEBAM4BACGEAQEAzgEAIYUBAQDPAQAhhgEBAM8BACEHBQAA1wEAIGcBAM4BACFvQADRAQAhggEBAM4BACGEAQEAzgEAIYUBAQDPAQAhhgEBAM8BACEHBQAA2QEAIGcBAAAAAW9AAAAAAYIBAQAAAAGEAQEAAAABhQEBAAAAAYYBAQAAAAEHBgAA2gEAIGcBAAAAAW9AAAAAAYMBAQAAAAGEAQEAAAABhQEBAAAAAYYBAQAAAAECAAAADwAgGAAA-AEAIAMAAAAPACAYAAD4AQAgGQAA9wEAIAERAADBAgAwAgAAAA8AIBEAAPcBACACAAAA7AEAIBEAAPYBACAGZwEAzgEAIW9AANEBACGDAQEAzwEAIYQBAQDOAQAhhQEBAM8BACGGAQEAzwEAIQcGAADYAQAgZwEAzgEAIW9AANEBACGDAQEAzwEAIYQBAQDOAQAhhQEBAM8BACGGAQEAzwEAIQcGAADaAQAgZwEAAAABb0AAAAABgwEBAAAAAYQBAQAAAAGFAQEAAAABhgEBAAAAAQMYAAC_AgAgpgEAAMACACCsAQAAAQAgBBgAAPABADCmAQAA8QEAMKgBAADzAQAgrAEAAOgBADAEGAAA5AEAMKYBAADlAQAwqAEAAOcBACCsAQAA6AEAMAAAAAAABakBAgAAAAGvAQIAAAABsAECAAAAAbEBAgAAAAGyAQIAAAABBxgAALoCACAZAAC9AgAgpgEAALsCACCnAQAAvAIAIKoBAAAHACCrAQAABwAgrAEAAAEAIAMYAAC6AgAgpgEAALsCACCsAQAAAQAgAAAACxgAAKICADAZAACnAgAwpgEAAKMCADCnAQAApAIAMKgBAAClAgAgqQEAAKYCADCqAQAApgIAMKsBAACmAgAwrAEAAKYCADCtAQAAqAIAMK4BAACpAgAwCxgAAJYCADAZAACbAgAwpgEAAJcCADCnAQAAmAIAMKgBAACZAgAgqQEAAJoCADCqAQAAmgIAMKsBAACaAgAwrAEAAJoCADCtAQAAnAIAMK4BAACdAgAwCxgAAIoCADAZAACPAgAwpgEAAIsCADCnAQAAjAIAMKgBAACNAgAgqQEAAI4CADCqAQAAjgIAMKsBAACOAgAwrAEAAI4CADCtAQAAkAIAMK4BAACRAgAwCWcBAAAAAWkBAAAAAWoBAAAAAWsBAAAAAWwBAAAAAW0gAAAAAW6AAAAAAW9AAAAAAXBAAAAAAQIAAAAXACAYAACVAgAgAwAAABcAIBgAAJUCACAZAACUAgAgAREAALkCADAPAwAAtQEAIGQAAK4BADBlAAAVABBmAACuAQAwZwEAAAABaAEArwEAIWkBALABACFqAQCwAQAhawEAsQEAIWwBALEBACFtIACyAQAhbgAAswEAIG9AALQBACFwQAC0AQAhnAEAAK0BACACAAAAFwAgEQAAlAIAIAIAAACSAgAgEQAAkwIAIA1kAACRAgAwZQAAkgIAEGYAAJECADBnAQCvAQAhaAEArwEAIWkBALABACFqAQCwAQAhawEAsQEAIWwBALEBACFtIACyAQAhbgAAswEAIG9AALQBACFwQAC0AQAhDWQAAJECADBlAACSAgAQZgAAkQIAMGcBAK8BACFoAQCvAQAhaQEAsAEAIWoBALABACFrAQCxAQAhbAEAsQEAIW0gALIBACFuAACzAQAgb0AAtAEAIXBAALQBACEJZwEAzgEAIWkBAM4BACFqAQDOAQAhawEAzwEAIWwBAM8BACFtIADQAQAhboAAAAABb0AA0QEAIXBAANEBACEJZwEAzgEAIWkBAM4BACFqAQDOAQAhawEAzwEAIWwBAM8BACFtIADQAQAhboAAAAABb0AA0QEAIXBAANEBACEJZwEAAAABaQEAAAABagEAAAABawEAAAABbAEAAAABbSAAAAABboAAAAABb0AAAAABcEAAAAABDgcAAPoBACAIAAD7AQAgZwEAAAABb0AAAAABcEAAAAABhwEBAAAAAYgBAQAAAAGJAQEAAAABigEBAAAAAYsBAQAAAAGMASAAAAABjQGAAAAAAY4BAgAAAAGPAQEAAAABAgAAAAsAIBgAAKECACADAAAACwAgGAAAoQIAIBkAAKACACABEQAAuAIAMBcDAAC1AQAgBwAAwgEAIAgAAMIBACBkAADAAQAwZQAACQAQZgAAwAEAMGcBAAAAAWgBAK8BACFvQAC0AQAhcEAAtAEAIYcBAQCwAQAhiAEBAK8BACGJAQEAsQEAIYoBAQCxAQAhiwEBALEBACGMASAAsgEAIY0BAACzAQAgjgECAMEBACGPAQEAsQEAIZ0BAAC8AQAgngEAAL0BACCfAQAAvgEAIKABAAC_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_AgAgBmcBAAAAAW9AAAAAAYMBAQAAAAGEAQEAAAABhQEBAAAAAYYBAQAAAAEGZwEAAAABb0AAAAABggEBAAAAAYQBAQAAAAGFAQEAAAABhgEBAAAAAQMAAAAHACAYAAC_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"
+}
+&nbsp;
+async function <span class="fstat-no" title="function not covered" >decodeBase64AsWasm(</span>wasmBase64: string): Promise&lt;WebAssembly.Module&gt; {
+  const { Buffer } = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >await import('</span>node:buffer')</span>
+  const wasmArray = <span class="cstat-no" title="statement not covered" >Buffer.from(wasmBase64, 'base64')</span>
+<span class="cstat-no" title="statement not covered" >  return new WebAssembly.Module(wasmArray)</span>
+}
+&nbsp;
+config.compilerWasm = {
+  getRuntime: <span class="fstat-no" title="function not covered" >async </span>() =&gt; <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >await import("</span>@prisma/client/runtime/query_compiler_fast_bg.postgresql.js"),</span>
+&nbsp;
+  getQueryCompilerWasmModule: <span class="fstat-no" title="function not covered" >async </span>() =&gt; {
+    const { wasm } = <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >await import("</span>@prisma/client/runtime/query_compiler_fast_bg.postgresql.wasm-base64.js")</span>
+<span class="cstat-no" title="statement not covered" >    return await decodeBase64AsWasm(wasm)</span>
+  },
+&nbsp;
+  importName: "./query_compiler_fast_bg.js"
+}
+&nbsp;
+&nbsp;
+&nbsp;
+export type LogOptions&lt;ClientOptions extends Prisma.PrismaClientOptions&gt; =
+  'log' extends keyof ClientOptions ? ClientOptions['log'] extends Array&lt;Prisma.LogLevel | Prisma.LogDefinition&gt; ? Prisma.GetEvents&lt;ClientOptions['log']&gt; : never : never
+&nbsp;
+export interface PrismaClientConstructor {
+    /**
+   * ## Prisma Client
+   * 
+   * Type-safe database client for TypeScript
+   * @example
+   * ```
+   * const prisma = new PrismaClient()
+   * // Fetch zero or more Endpoints
+   * const endpoints = await prisma.endpoint.findMany()
+   * ```
+   * 
+   * Read more in our [docs](https://pris.ly/d/client).
+   */
+&nbsp;
+  new &lt;
+    Options extends Prisma.PrismaClientOptions = Prisma.PrismaClientOptions,
+    LogOpts extends LogOptions&lt;Options&gt; = LogOptions&lt;Options&gt;,
+    OmitOpts extends Prisma.PrismaClientOptions['omit'] = Options extends { omit: infer U } ? U : Prisma.PrismaClientOptions['omit'],
+    ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs
+  &gt;(options: Prisma.Subset&lt;Options, Prisma.PrismaClientOptions&gt; ): PrismaClient&lt;LogOpts, OmitOpts, ExtArgs&gt;
+}
+&nbsp;
+/**
+ * ## Prisma Client
+ * 
+ * Type-safe database client for TypeScript
+ * @example
+ * ```
+ * const prisma = new PrismaClient()
+ * // Fetch zero or more Endpoints
+ * const endpoints = await prisma.endpoint.findMany()
+ * ```
+ * 
+ * Read more in our [docs](https://pris.ly/d/client).
+ */
+&nbsp;
+export interface PrismaClient&lt;
+  in LogOpts extends Prisma.LogLevel = never,
+  in out OmitOpts extends Prisma.PrismaClientOptions['omit'] = undefined,
+  in out ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs
+&gt; {
+  [K: symbol]: { types: Prisma.TypeMap&lt;ExtArgs&gt;['other'] }
+&nbsp;
+  $on&lt;V extends LogOpts&gt;(eventType: V, callback: (event: V extends 'query' ? Prisma.QueryEvent : Prisma.LogEvent) =&gt; void): PrismaClient;
+&nbsp;
+  /**
+   * Connect with the database
+   */
+  $connect(): runtime.Types.Utils.JsPromise&lt;void&gt;;
+&nbsp;
+  /**
+   * Disconnect from the database
+   */
+  $disconnect(): runtime.Types.Utils.JsPromise&lt;void&gt;;
+&nbsp;
+/**
+   * Executes a prepared raw query and returns the number of affected rows.
+   * @example
+   * ```
+   * const result = await prisma.$executeRaw`UPDATE User SET cool = ${true} WHERE email = ${'user@email.com'};`
+   * ```
+   *
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
+   */
+  $executeRaw&lt;T = unknown&gt;(query: TemplateStringsArray | Prisma.Sql, ...values: any[]): Prisma.PrismaPromise&lt;number&gt;;
+&nbsp;
+  /**
+   * Executes a raw query and returns the number of affected rows.
+   * Susceptible to SQL injections, see documentation.
+   * @example
+   * ```
+   * const result = await prisma.$executeRawUnsafe('UPDATE User SET cool = $1 WHERE email = $2 ;', true, 'user@email.com')
+   * ```
+   *
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
+   */
+  $executeRawUnsafe&lt;T = unknown&gt;(query: string, ...values: any[]): Prisma.PrismaPromise&lt;number&gt;;
+&nbsp;
+  /**
+   * Performs a prepared raw query and returns the `SELECT` data.
+   * @example
+   * ```
+   * const result = await prisma.$queryRaw`SELECT * FROM User WHERE id = ${1} OR email = ${'user@email.com'};`
+   * ```
+   *
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
+   */
+  $queryRaw&lt;T = unknown&gt;(query: TemplateStringsArray | Prisma.Sql, ...values: any[]): Prisma.PrismaPromise&lt;T&gt;;
+&nbsp;
+  /**
+   * Performs a raw query and returns the `SELECT` data.
+   * Susceptible to SQL injections, see documentation.
+   * @example
+   * ```
+   * const result = await prisma.$queryRawUnsafe('SELECT * FROM User WHERE id = $1 OR email = $2;', 1, 'user@email.com')
+   * ```
+   *
+   * Read more in our [docs](https://pris.ly/d/raw-queries).
+   */
+  $queryRawUnsafe&lt;T = unknown&gt;(query: string, ...values: any[]): Prisma.PrismaPromise&lt;T&gt;;
+&nbsp;
+&nbsp;
+  /**
+   * Allows the running of a sequence of read/write operations that are guaranteed to either succeed or fail as a whole.
+   * @example
+   * ```
+   * const [george, bob, alice] = await prisma.$transaction([
+   *   prisma.user.create({ data: { name: 'George' } }),
+   *   prisma.user.create({ data: { name: 'Bob' } }),
+   *   prisma.user.create({ data: { name: 'Alice' } }),
+   * ])
+   * ```
+   * 
+   * Read more in our [docs](https://www.prisma.io/docs/concepts/components/prisma-client/transactions).
+   */
+  $transaction&lt;P extends Prisma.PrismaPromise&lt;any&gt;[]&gt;(arg: [...P], options?: { isolationLevel?: Prisma.TransactionIsolationLevel }): runtime.Types.Utils.JsPromise&lt;runtime.Types.Utils.UnwrapTuple&lt;P&gt;&gt;
+&nbsp;
+  $transaction&lt;R&gt;(fn: (prisma: Omit&lt;PrismaClient, runtime.ITXClientDenyList&gt;) =&gt; runtime.Types.Utils.JsPromise&lt;R&gt;, options?: { maxWait?: number, timeout?: number, isolationLevel?: Prisma.TransactionIsolationLevel }): runtime.Types.Utils.JsPromise&lt;R&gt;
+&nbsp;
+  $extends: runtime.Types.Extensions.ExtendsHook&lt;"extends", Prisma.TypeMapCb&lt;OmitOpts&gt;, ExtArgs, runtime.Types.Utils.Call&lt;Prisma.TypeMapCb&lt;OmitOpts&gt;, {
+    extArgs: ExtArgs
+  }&gt;&gt;
+&nbsp;
+      /**
+   * `prisma.endpoint`: Exposes CRUD operations for the **Endpoint** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Endpoints
+    * const endpoints = await prisma.endpoint.findMany()
+    * ```
+    */
+  get endpoint(): Prisma.EndpointDelegate&lt;ExtArgs, { omit: OmitOpts }&gt;;
+&nbsp;
+  /**
+   * `prisma.requestLog`: Exposes CRUD operations for the **RequestLog** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more RequestLogs
+    * const requestLogs = await prisma.requestLog.findMany()
+    * ```
+    */
+  get requestLog(): Prisma.RequestLogDelegate&lt;ExtArgs, { omit: OmitOpts }&gt;;
+&nbsp;
+  /**
+   * `prisma.scimResource`: Exposes CRUD operations for the **ScimResource** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ScimResources
+    * const scimResources = await prisma.scimResource.findMany()
+    * ```
+    */
+  get scimResource(): Prisma.ScimResourceDelegate&lt;ExtArgs, { omit: OmitOpts }&gt;;
+&nbsp;
+  /**
+   * `prisma.resourceMember`: Exposes CRUD operations for the **ResourceMember** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ResourceMembers
+    * const resourceMembers = await prisma.resourceMember.findMany()
+    * ```
+    */
+  get resourceMember(): Prisma.ResourceMemberDelegate&lt;ExtArgs, { omit: OmitOpts }&gt;;
+&nbsp;
+  /**
+   * `prisma.endpointSchema`: Exposes CRUD operations for the **EndpointSchema** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more EndpointSchemas
+    * const endpointSchemas = await prisma.endpointSchema.findMany()
+    * ```
+    */
+  get endpointSchema(): Prisma.EndpointSchemaDelegate&lt;ExtArgs, { omit: OmitOpts }&gt;;
+}
+&nbsp;
+export function getPrismaClientClass(): PrismaClientConstructor {
+  return runtime.getPrismaClient(config) as unknown as PrismaClientConstructor
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-02-24T02:10:51.971Z
+            </div>
+        <script src="../../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../../sorter.js"></script>
+        <script src="../../../block-navigation.js"></script>
+    </body>
+</html>
+    

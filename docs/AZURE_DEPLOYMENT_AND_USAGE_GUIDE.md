@@ -30,19 +30,23 @@
 │  (Provisioning)     │ ◀──────────────────────────  │   (SCIMServer)           │
 │                     │       JSON Responses         │                          │
 └─────────────────────┘                              └────────────┬─────────────┘
-                                                                  │
+                                                                  │ :5432
+                                                                  │ VNet private
                                                      ┌────────────▼─────────────┐
-                                                     │   SQLite (ephemeral)     │
-                                                     │   /tmp/local-data/scim.db│
-                                                     └────────────┬─────────────┘
-                                                                  │ periodic
-                                                                  │ snapshots
-                                                     ┌────────────▼─────────────┐
-                                                     │   Azure Blob Storage     │
-                                                     │   (Private Endpoint)     │
-                                                     │   SQLite backups         │
+                                                     │   Azure PG Flexible      │
+                                                     │   Server (B1ms)          │
+                                                     │   PostgreSQL 17          │
+                                                     │   Extensions:            │
+                                                     │    citext, pgcrypto,     │
+                                                     │    pg_trgm               │
+                                                     │   scimdb database        │
+                                                     │   sslmode=require        │
                                                      └──────────────────────────┘
 ```
+
+> **Phase 3 Change:** The SQLite ephemeral database + Blob Storage snapshot backup
+> architecture has been replaced by a managed Azure PG Flexible Server. Data is now
+> durable, backed up automatically (7-day PITR), and supports multi-replica scaling.
 
 ### Azure Resource Architecture
 
@@ -51,25 +55,65 @@ Resource Group (e.g. scimserver-rg)
 ├── Virtual Network (10.40.0.0/16)
 │   ├── aca-infra subnet        (10.40.0.0/21)   ← Container Apps Environment
 │   ├── aca-runtime subnet      (10.40.8.0/21)   ← Container workloads
-│   └── private-endpoints subnet(10.40.16.0/24)  ← Blob Storage PE
+│   └── private-endpoints subnet(10.40.16.0/24)  ← PG Flexible Server
 │
-├── Private DNS Zone (privatelink.blob.core.windows.net)
+├── Private DNS Zone (privatelink.postgres.database.azure.com)
 │   └── VNet Link → Virtual Network
+│
+├── Azure Database for PostgreSQL — Flexible Server
+│   ├── SKU: Burstable B1ms (1 vCore, 2 GB RAM)
+│   ├── Storage: 32 GB (auto-grow)
+│   ├── Version: PostgreSQL 17
+│   ├── Extensions: citext, pgcrypto, pg_trgm
+│   ├── Database: scimdb
+│   ├── VNet integration (private-endpoints subnet)
+│   ├── SSL/TLS enforced (sslmode=require)
+│   └── Automated backups (7-day retention, PITR)
 │
 ├── Container Apps Environment
 │   └── Container App (SCIMServer)
 │       ├── Image: ghcr.io/pranems/scimserver:latest
-│       ├── Secrets: SCIM token, JWT, OAuth
-│       ├── System-Assigned Managed Identity
+│       ├── Secrets: SCIM token, JWT, OAuth, DATABASE_URL
+│       ├── DATABASE_URL → PG Flexible Server (VNet private)
+│       ├── PERSISTENCE_BACKEND: prisma
+│       ├── Replicas: 1–3 (auto-scale)
 │       └── Ingress: HTTPS (auto TLS cert)
 │
-├── Storage Account (private, no public access)
-│   ├── Private Endpoint → private-endpoints subnet
-│   └── Blob Container: scimserver-backups
-│       └── SQLite snapshots (timestamped)
-│
 └── Log Analytics Workspace
-    └── Container App logs & metrics
+    └── Container App logs & PG metrics
+```
+
+### Data Flow Diagram
+
+```
+ ┌─────────────────┐        HTTPS          ┌────────────────────────────────┐
+ │  Entra ID /     │ ════════════════════▶  │  Azure Container Apps          │
+ │  SCIM Client    │                        │  ┌──────────────────────────┐  │
+ │                 │ ◀════════════════════  │  │  SCIMServer Container    │  │
+ └─────────────────┘   JSON Response        │  │                          │  │
+                                            │  │  NestJS 11 + Prisma 7    │  │
+                                            │  │  PrismaPg(pg.Pool)       │  │
+                                            │  │                          │  │
+                                            │  │  Entrypoint:             │  │
+                                            │  │  1. prisma migrate deploy│  │
+                                            │  │  2. node dist/main.js    │  │
+                                            │  └──────────┬───────────────┘  │
+                                            │             │ :5432            │
+                                            └─────────────┼──────────────────┘
+                                                          │ VNet private link
+                                            ┌─────────────▼──────────────────┐
+                                            │  PG Flexible Server             │
+                                            │                                │
+                                            │  scimdb                        │
+                                            │  ├── ScimResource (CITEXT,     │
+                                            │  │    JSONB, UUID, TIMESTAMPTZ)│
+                                            │  ├── ResourceMember            │
+                                            │  ├── Endpoint                  │
+                                            │  └── _prisma_migrations        │
+                                            │                                │
+                                            │  Backup: automated daily       │
+                                            │  Retention: 7 days (PITR)      │
+                                            └────────────────────────────────┘
 ```
 
 ### Container Image Build Pipeline
@@ -167,8 +211,10 @@ cd SCIMServer
 | `-ImageTag` | No | `latest` | Docker image tag |
 | `-JwtSecret` | No (auto-gen) | 64-char random | JWT signing secret |
 | `-OauthClientSecret` | No (auto-gen) | 64-char random | OAuth client secret |
-| `-BlobBackupAccount` | No | `<appname>backup` | Storage account name |
-| `-BlobBackupContainer` | No | `scimserver-backups` | Blob container name |
+| `-PgAdminLogin` | No | `scimadmin` | PostgreSQL administrator login |
+| `-PgAdminPassword` | No (auto-gen) | 32-char random | PostgreSQL administrator password |
+| `-PgSkuName` | No | `Standard_B1ms` | PG Flexible Server SKU |
+| `-PgStorageGB` | No | `32` | PG storage size in GB |
 
 ### What Happens During Deployment (6 Steps)
 
@@ -178,13 +224,15 @@ Step 1/6: Resource Group
 
 Step 2/6: Network & Private DNS
   ├── Creates VNet (10.40.0.0/16) with 3 subnets
-  ├── Creates Private DNS Zone (privatelink.blob.core.windows.net)
+  ├── Creates Private DNS Zone (privatelink.postgres.database.azure.com)
   └── Links DNS zone to VNet
 
-Step 3/6: Blob Storage (Private Endpoint)
-  ├── Creates Storage Account (public access disabled)
-  ├── Creates blob container for SQLite snapshots
-  └── Creates Private Endpoint in VNet
+Step 3/6: PostgreSQL Flexible Server
+  ├── Creates Azure PG Flexible Server (B1ms, PostgreSQL 17)
+  ├── Enables extensions: citext, pgcrypto, pg_trgm
+  ├── Creates database: scimdb
+  ├── Configures VNet integration (private-endpoints subnet)
+  └── Denies public network access
 
 Step 4/6: Container App Environment
   ├── Creates Log Analytics Workspace (30-day retention)
@@ -192,13 +240,15 @@ Step 4/6: Container App Environment
 
 Step 5/6: Container App
   ├── Pulls ghcr.io/pranems/scimserver:<tag>
+  ├── Configures secret: database-url (PG connection string)
   ├── Configures secrets (SCIM, JWT, OAuth)
-  ├── Sets environment variables
-  ├── Enables System-Assigned Managed Identity
+  ├── Sets environment: DATABASE_URL (from secret), PERSISTENCE_BACKEND=prisma
+  ├── Sets maxReplicas: 3 (multi-replica scaling enabled)
   └── Configures HTTPS ingress (auto TLS)
 
 Step 6/6: Finalize
-  ├── Assigns "Storage Blob Data Contributor" role to managed identity
+  ├── Verifies PG connectivity from Container App
+  ├── Confirms prisma migrate deploy ran successfully
   └── Prints deployment URL + all secrets
 ```
 
@@ -249,20 +299,35 @@ curl "https://<your-app-url>/scim/admin/log-config/download?format=json" -H "Aut
 |---|---|---|---|
 | **Resource Group** | `Microsoft.Resources/resourceGroups` | Container for all resources | Free |
 | **Virtual Network** | `Microsoft.Network/virtualNetworks` | Network isolation | Free |
-| **Private DNS Zone** | `Microsoft.Network/privateDnsZones` | Blob private endpoint DNS | ~$0.50/mo |
-| **Storage Account** | `Microsoft.Storage/storageAccounts` | SQLite snapshot backups | ~$0.20-0.50/mo |
-| **Private Endpoint** | `Microsoft.Network/privateEndpoints` | Secure blob access | ~$7.50/mo |
-| **Log Analytics** | `Microsoft.OperationalInsights/workspaces` | Container logs | ~$0-5/mo |
+| **Private DNS Zone** | `Microsoft.Network/privateDnsZones` | PG Flexible Server private DNS | ~$0.50/mo |
+| **PG Flexible Server** | `Microsoft.DBforPostgreSQL/flexibleServers` | Managed PostgreSQL 17 (B1ms) | ~$13–18/mo |
+| **PG Private Endpoint** | VNet-integrated subnet | Secure PG access within VNet | Included |
+| **Log Analytics** | `Microsoft.OperationalInsights/workspaces` | Container logs | ~$0–5/mo |
 | **Container Apps Env** | `Microsoft.App/managedEnvironments` | Hosting platform | Included |
-| **Container App** | `Microsoft.App/containerApps` | SCIMServer application | ~$5-15/mo |
+| **Container App** | `Microsoft.App/containerApps` | SCIMServer application | ~$5–15/mo |
 
 ### Container Configuration
 
 - **Image**: `ghcr.io/pranems/scimserver:latest`
 - **CPU**: 0.5 cores | **Memory**: 1 GiB
-- **Replicas**: 1 (fixed — SQLite requires single replica; increase after migrating to PostgreSQL)
+- **Replicas**: 1–3 (auto-scale — multi-replica enabled with PostgreSQL)
 - **Port**: 80 (internal) → HTTPS (external, auto TLS)
-- **Health check**: HTTP GET `/health` every 60s
+- **Health check**: HTTP GET `/` every 30s
+- **DATABASE_URL**: Injected from Container Apps secret (PG connection string)
+- **Entrypoint**: `prisma migrate deploy` → `node dist/main.js`
+
+### PostgreSQL Server Configuration
+
+| Setting | Value |
+|---|---|
+| **SKU** | Burstable B1ms (1 vCore, 2 GB RAM) |
+| **Storage** | 32 GB (auto-grow enabled) |
+| **Version** | PostgreSQL 17 |
+| **Extensions** | citext, pgcrypto, pg_trgm |
+| **Database** | scimdb |
+| **Backup** | Automated daily, 7-day retention, point-in-time restore |
+| **Network** | VNet-integrated (private access only) |
+| **TLS** | Enforced (sslmode=require) |
 
 ---
 
@@ -308,14 +373,14 @@ Entra Portal Flow:
 
 3. Admin Credentials:
    ┌────────────────────────────────────────────────────────┐
-   │ Tenant URL:    https://<your-app-url>/scim/v2          │
+   │ Endpoint URL:    https://<your-app-url>/scim/v2          │
    │                                                        │
    │ Secret Token:  <your-scim-secret>                      │
    └────────────────────────────────────────────────────────┘
 
    If using multi-endpoint mode:
    ┌────────────────────────────────────────────────────────┐
-   │ Tenant URL:    https://<your-app-url>/scim/endpoints/  │
+   │ Endpoint URL:    https://<your-app-url>/scim/endpoints/  │
    │                <endpoint-id>/                          │
    └────────────────────────────────────────────────────────┘
 
@@ -357,7 +422,6 @@ Features:
 - **Group Browser** — View groups and memberships
 - **Database Stats** — User/group counts and database info
 - **Endpoint Management** — Create/manage multiple SCIM endpoints
-- **Backup Status** — View blob snapshot backup health
 - **Log Configuration** — Adjust log levels dynamically
 - **Dark/Light Theme** — Toggle via UI
 
@@ -399,23 +463,34 @@ Features:
 | GET | `/scim/admin/database/users` | Browse users |
 | GET | `/scim/admin/database/groups` | Browse groups |
 | GET | `/scim/admin/logs` | View request logs |
-| GET | `/scim/admin/backup/stats` | Backup status |
-| POST | `/scim/admin/backup/trigger` | Trigger backup |
 | GET | `/scim/admin/version` | App version info |
 
-### Authentication
+### Authentication (3-Tier Fallback — v0.21.0)
 
-All SCIM and Admin requests require a Bearer token:
+SCIMServer uses a **3-tier authentication fallback chain**. Each incoming `Authorization: Bearer <token>` is evaluated in order:
 
-```
-Authorization: Bearer <your-scim-secret>
-```
+| Tier | Method | `req.authType` |
+|------|--------|-----------------|
+| 1 | **Per-endpoint bcrypt credential** (requires `PerEndpointCredentialsEnabled` flag) | `endpoint_credential` |
+| 2 | **OAuth 2.0 JWT** (via `/scim/oauth/token`) | `oauth` |
+| 3 | **Global shared secret** (`SCIM_SHARED_SECRET` env var) | `legacy` |
 
-Example:
+All tiers fail → `401 Unauthorized` with `WWW-Authenticate: Bearer realm="SCIM"`.
+
+**Using the global shared secret (simplest):**
 ```powershell
 $headers = @{ Authorization = "Bearer SCIM-12345-20260212" }
 Invoke-RestMethod -Uri "https://<your-app>/scim/admin/endpoints" -Headers $headers
 ```
+
+**Using per-endpoint credentials (recommended for multi-tenant):**
+1. Enable `PerEndpointCredentialsEnabled` on the target endpoint
+2. Create credential: `POST /scim/admin/endpoints/:id/credentials` (returns plaintext token once)
+3. Use: `Authorization: Bearer <per-endpoint-token>`
+
+**Credential management:**
+- List: `GET /scim/admin/endpoints/:id/credentials`
+- Revoke: `DELETE /scim/admin/endpoints/:id/credentials/:credentialId`
 
 ### OAuth Token Endpoint
 
@@ -475,14 +550,6 @@ az monitor log-analytics query `
   --analytics-query "ContainerAppConsoleLogs_CL | where ContainerAppName_s == 'scimserver-prod' | top 50 by TimeGenerated"
 ```
 
-### Trigger Manual Backup
-
-```powershell
-Invoke-RestMethod -Uri "https://<your-app>/scim/admin/backup/trigger" `
-  -Method POST `
-  -Headers @{ Authorization = "Bearer <your-secret>" }
-```
-
 ---
 
 ## 8. Troubleshooting
@@ -494,9 +561,15 @@ Invoke-RestMethod -Uri "https://<your-app>/scim/admin/backup/trigger" `
 | **Deploy script exits early** | Not authenticated | Run `az login` first |
 | **Container won't start** | Image pull or crash | Check `az containerapp logs show -n <app> -g <rg>` |
 | **Database errors (P2021)** | Migration not applied | Container entrypoint runs `prisma migrate deploy` automatically; check logs for errors |
-| **Blob backup failures** | Role not assigned | Verify managed identity has `Storage Blob Data Contributor` on the storage account |
+| **PG connection refused** | VNet misconfiguration | Verify PG Flexible Server is in the same VNet/subnet; check private DNS zone link |
+| **PG SSL error** | Missing sslmode | Ensure DATABASE_URL includes `?sslmode=require` |
+| **PG extension error** | Extensions not enabled | Run: `az postgres flexible-server parameter set --name azure.extensions --value "citext,pgcrypto,pg_trgm"` |
+| **PG out of storage** | Auto-grow may be off | Check storage usage in Azure Portal; enable storage auto-grow |
+| **Slow queries** | Missing indexes | Check `ScimResource` table has CITEXT unique indexes on `userName` and `displayName` |
 | **409 Conflict on user creation** | Duplicate userName/externalId | User already exists; Entra will PATCH instead |
 | **Slow first response** | Container cold start | First request after scale-to-zero takes ~5-10s; subsequent requests are fast |
+| **Multiple replicas out of sync** | Not a PG issue | All replicas share the same PG instance; data is always consistent |
+| **PG backup/restore** | Need point-in-time restore | Azure Portal → PG Flexible Server → Backups → Restore to point in time |
 
 ---
 
@@ -505,24 +578,30 @@ Invoke-RestMethod -Uri "https://<your-app>/scim/admin/backup/trigger" `
 | Resource | Monthly Cost |
 |---|---|
 | Container App (0.5 vCPU, 1 GiB) | ~$5–15 (scales to zero when idle) |
-| Blob Storage (snapshots) | ~$0.20–0.50 |
-| Private Endpoint | ~$7.50 |
+| PG Flexible Server (B1ms, 32 GB) | ~$13–18 |
 | Log Analytics | ~$0–5 (depends on volume) |
 | VNet / DNS | ~$0.50 |
-| **Total** | **~$13–28/month** |
+| **Total** | **~$19–38/month** |
 
-> Costs vary by region and usage. Scale-to-zero means minimal charges during idle periods.
+> **Phase 3 (v0.23.0):** Replaced Blob Storage + Private Endpoint with PG Flexible Server.
+> PostgreSQL WAL backup (daily full + 7-day PITR) is fully automated by Azure at no extra config.
+> Net cost vs SQLite era: ~$5–10/mo more, offset by zero data loss risk and multi-replica support.
+
+> Costs vary by region and usage. Container App scale-to-zero means minimal compute
+> charges during idle periods. PG Flexible Server runs 24/7.
 
 ---
 
 ## 10. Security Notes
 
 - **HTTPS only**: Auto-managed TLS certificate via Azure Container Apps
-- **No public blob access**: Storage account uses private endpoint only
-- **VNet isolation**: All inter-service traffic stays within the virtual network
-- **Managed Identity**: Container uses system-assigned identity for blob access (no storage keys)
-- **Secrets management**: SCIM, JWT, and OAuth secrets stored as Container Apps secrets (encrypted at rest)
-- **No hardcoded credentials**: All sensitive values are injected via environment variables
+- **No public database access**: PG Flexible Server uses VNet integration — accessible only from within the VNet
+- **VNet isolation**: All inter-service traffic (Container App ↔ PostgreSQL) stays within the virtual network
+- **TLS enforced on database**: `sslmode=require` — all PG connections encrypted in transit
+- **Secrets management**: DATABASE_URL, SCIM, JWT, and OAuth secrets stored as Container Apps secrets (encrypted at rest)
+- **No hardcoded credentials**: All sensitive values are injected via environment variables from secrets
+- **Automated backups**: PG Flexible Server provides daily automated backups with 7-day point-in-time restore
+- **No storage keys**: Eliminated Blob Storage and Managed Identity role assignments — all persistence through PG connection string
 
 ---
 
@@ -540,6 +619,11 @@ Invoke-RestMethod -Uri "https://<your-app>/scim/admin/backup/trigger" `
 │  Web Dashboard:  https://<your-app-url>/                 │
 │  SCIM Base:      https://<your-app-url>/scim/v2          │
 │  Auth Header:    Authorization: Bearer <secret>          │
+│                                                          │
+│  Database:       Azure PG Flexible Server (B1ms)         │
+│                  PostgreSQL 17 | VNet-private             │
+│                  Extensions: citext, pgcrypto, pg_trgm   │
+│                  Backup: automated daily, 7-day PITR     │
 │                                                          │
 │  Update:                                                 │
 │  iex (irm '...update-scimserver-func.ps1');              │

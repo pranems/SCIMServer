@@ -1,28 +1,25 @@
 ﻿import { Controller, Get, Header } from '@nestjs/common';
+import { ScimDiscoveryService } from '../discovery/scim-discovery.service';
+import { Public } from '../../auth/public.decorator';
 
-import { SCIM_SP_CONFIG_SCHEMA } from '../common/scim-constants';
-
+/**
+ * Root-level ServiceProviderConfig endpoint — returns global defaults.
+ *
+ * In a multi-tenant deployment, prefer the endpoint-scoped route
+ * `GET /scim/endpoints/{endpointId}/ServiceProviderConfig` which returns
+ * tenant-specific capabilities (e.g. `bulk.supported` reflecting per-endpoint
+ * `BulkOperationsEnabled` flag).
+ *
+ * RFC 7644 §4 — SHALL NOT require authentication.
+ */
+@Public()
 @Controller('ServiceProviderConfig')
 export class ServiceProviderConfigController {
+  constructor(private readonly discoveryService: ScimDiscoveryService) {}
+
   @Get()
   @Header('Content-Type', 'application/scim+json')
   getConfig() {
-    return {
-      schemas: [SCIM_SP_CONFIG_SCHEMA],
-      patch: { supported: true },
-      bulk: { supported: false },
-      filter: { supported: true, maxResults: 200 },
-      changePassword: { supported: false },
-      sort: { supported: false },
-      etag: { supported: true },
-      authenticationSchemes: [
-        {
-          type: 'oauthbearertoken',
-          name: 'OAuth Bearer Token',
-          description: 'Authentication scheme using the OAuth Bearer Token Standard',
-          specificationUrl: 'https://www.rfc-editor.org/info/rfc6750'
-        }
-      ]
-    };
+    return this.discoveryService.getServiceProviderConfig();
   }
 }

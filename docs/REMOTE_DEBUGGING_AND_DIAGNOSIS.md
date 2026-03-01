@@ -120,7 +120,7 @@ curl -N https://myapp.azurecontainerapps.io/scim/admin/log-config/stream?level=W
 | `TRACE` | 0 | Gray | Full request/response bodies, SQL queries, patch path resolution |
 | `DEBUG` | 1 | Cyan | Filter parsing, member resolution, config reads |
 | `INFO` | 2 | Green | Business events: user created, group patched, endpoint activated |
-| `WARN` | 3 | Yellow | Deprecated header, slow query (>2s), backup retry |
+| `WARN` | 3 | Yellow | Deprecated header, slow query (>2s) |
 | `ERROR` | 4 | Red | Auth failure, uniqueness violation, DB error |
 | `FATAL` | 5 | Magenta | DB connection lost, secret not configured |
 | `OFF` | 6 | — | Suppress all output |
@@ -148,7 +148,6 @@ Request arrives → check endpoint-level override
 | SCIM Discovery | `scim.discovery` | ServiceProviderConfig, Schemas, ResourceTypes |
 | Endpoint | `endpoint` | Endpoint management |
 | Database | `database` | Prisma/SQLite operations |
-| Backup | `backup` | Azure Blob backup/restore |
 | OAuth | `oauth` | Token generation/validation |
 | General | `general` | Uncategorized |
 
@@ -177,7 +176,7 @@ curl https://HOST/scim/admin/log-config
   "format": "json",
   "availableLevels": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"],
   "availableCategories": ["http", "auth", "scim.user", "scim.group", "scim.patch",
-    "scim.filter", "scim.discovery", "endpoint", "database", "backup", "oauth", "general"]
+    "scim.filter", "scim.discovery", "endpoint", "database", "oauth", "general"]
 }
 ```
 
@@ -211,7 +210,7 @@ curl -X PUT https://HOST/scim/admin/log-config \
     "format": "json",
     "availableLevels": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"],
     "availableCategories": ["http", "auth", "scim.user", "scim.group", "scim.patch",
-      "scim.filter", "scim.discovery", "endpoint", "database", "backup", "oauth", "general"]
+      "scim.filter", "scim.discovery", "endpoint", "database", "oauth", "general"]
   }
 }
 ```
@@ -721,9 +720,6 @@ curl -X PUT "$SCIM_URL/scim/admin/log-config/category/scim.patch/INFO"
 
 # 3. Look for database-related slowness
 .\scripts\remote-logs.ps1 -Mode recent -Category database -Level WARN -BaseUrl $SCIM_URL
-
-# 4. Check if backup operations are blocking
-.\scripts\remote-logs.ps1 -Mode recent -Category backup -BaseUrl $SCIM_URL
 ```
 
 ### Workflow 4: "Debug a specific request"

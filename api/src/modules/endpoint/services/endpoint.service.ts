@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, OnModuleInit, Logger } from '@nestjs/common';
 import type { Endpoint, Prisma } from '../../../generated/prisma/client';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { CreateEndpointDto } from '../dto/create-endpoint.dto';
 import type { UpdateEndpointDto } from '../dto/update-endpoint.dto';
@@ -19,9 +20,22 @@ export interface EndpointResponse {
   updatedAt: Date;
 }
 
+interface InMemoryEndpointRecord {
+  id: string;
+  name: string;
+  displayName: string | null;
+  description: string | null;
+  config: Record<string, unknown> | null;
+  active: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 @Injectable()
 export class EndpointService implements OnModuleInit {
   private readonly logger = new Logger(EndpointService.name);
+  private readonly isInMemoryBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() === 'inmemory';
+  private readonly inMemoryEndpoints = new Map<string, InMemoryEndpointRecord>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -34,6 +48,10 @@ export class EndpointService implements OnModuleInit {
    * is applied to ScimLogger after a server restart.
    */
   async onModuleInit(): Promise<void> {
+    if (this.isInMemoryBackend) {
+      return;
+    }
+
     try {
       const endpoints = await this.prisma.endpoint.findMany({
         where: { active: true },
@@ -81,6 +99,29 @@ export class EndpointService implements OnModuleInit {
     }
 
     // Check if endpoint already exists
+    if (this.isInMemoryBackend) {
+      const existing = Array.from(this.inMemoryEndpoints.values()).find((ep) => ep.name === dto.name);
+      if (existing) {
+        throw new BadRequestException(`Endpoint with name "${dto.name}" already exists`);
+      }
+
+      const now = new Date();
+      const endpoint: InMemoryEndpointRecord = {
+        id: randomUUID(),
+        name: dto.name,
+        displayName: dto.displayName ?? null,
+        description: dto.description ?? null,
+        config: dto.config ?? null,
+        active: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      this.inMemoryEndpoints.set(endpoint.id, endpoint);
+      this.syncEndpointLogLevel(endpoint.id, dto.config);
+      return this.toResponseInMemory(endpoint);
+    }
+
     const existing = await this.prisma.endpoint.findUnique({
       where: { name: dto.name }
     });
@@ -106,9 +147,23 @@ export class EndpointService implements OnModuleInit {
   }
 
   async getEndpoint(endpointId: string): Promise<EndpointResponse> {
-    const endpoint = await this.prisma.endpoint.findUnique({
-      where: { id: endpointId }
-    });
+    if (this.isInMemoryBackend) {
+      const endpoint = this.inMemoryEndpoints.get(endpointId);
+      if (!endpoint) {
+        throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
+      }
+      return this.toResponseInMemory(endpoint);
+    }
+
+    let endpoint: Endpoint | null;
+    try {
+      endpoint = await this.prisma.endpoint.findUnique({
+        where: { id: endpointId }
+      });
+    } catch {
+      // Prisma throws on invalid UUID format for @db.Uuid columns
+      throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
+    }
 
     if (!endpoint) {
       throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
@@ -118,6 +173,14 @@ export class EndpointService implements OnModuleInit {
   }
 
   async getEndpointByName(name: string): Promise<EndpointResponse> {
+    if (this.isInMemoryBackend) {
+      const endpoint = Array.from(this.inMemoryEndpoints.values()).find((ep) => ep.name === name);
+      if (!endpoint) {
+        throw new NotFoundException(`Endpoint with name "${name}" not found`);
+      }
+      return this.toResponseInMemory(endpoint);
+    }
+
     const endpoint = await this.prisma.endpoint.findUnique({
       where: { name }
     });
@@ -130,6 +193,13 @@ export class EndpointService implements OnModuleInit {
   }
 
   async listEndpoints(active?: boolean): Promise<EndpointResponse[]> {
+    if (this.isInMemoryBackend) {
+      const endpoints = Array.from(this.inMemoryEndpoints.values())
+        .filter((ep) => active === undefined || ep.active === active)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      return endpoints.map((e) => this.toResponseInMemory(e));
+    }
+
     const where: Prisma.EndpointWhereInput = {};
     if (active !== undefined) {
       where.active = active;
@@ -144,9 +214,43 @@ export class EndpointService implements OnModuleInit {
   }
 
   async updateEndpoint(endpointId: string, dto: UpdateEndpointDto): Promise<EndpointResponse> {
-    const endpoint = await this.prisma.endpoint.findUnique({
-      where: { id: endpointId }
-    });
+    if (this.isInMemoryBackend) {
+      const endpoint = this.inMemoryEndpoints.get(endpointId);
+      if (!endpoint) {
+        throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
+      }
+
+      try {
+        validateEndpointConfig(dto.config);
+      } catch (error) {
+        throw new BadRequestException((error as Error).message);
+      }
+
+      const updated: InMemoryEndpointRecord = {
+        ...endpoint,
+        displayName: dto.displayName !== undefined ? dto.displayName ?? null : endpoint.displayName,
+        description: dto.description !== undefined ? dto.description ?? null : endpoint.description,
+        config: dto.config !== undefined ? dto.config ?? null : endpoint.config,
+        active: dto.active !== undefined ? dto.active : endpoint.active,
+        updatedAt: new Date(),
+      };
+
+      this.inMemoryEndpoints.set(endpointId, updated);
+      if (dto.config !== undefined) {
+        this.syncEndpointLogLevel(endpointId, dto.config);
+      }
+
+      return this.toResponseInMemory(updated);
+    }
+
+    let endpoint: Endpoint | null;
+    try {
+      endpoint = await this.prisma.endpoint.findUnique({
+        where: { id: endpointId }
+      });
+    } catch {
+      throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
+    }
 
     if (!endpoint) {
       throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
@@ -178,9 +282,25 @@ export class EndpointService implements OnModuleInit {
   }
 
   async deleteEndpoint(endpointId: string): Promise<void> {
-    const endpoint = await this.prisma.endpoint.findUnique({
-      where: { id: endpointId }
-    });
+    if (this.isInMemoryBackend) {
+      const endpoint = this.inMemoryEndpoints.get(endpointId);
+      if (!endpoint) {
+        throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
+      }
+
+      this.inMemoryEndpoints.delete(endpointId);
+      this.scimLogger.clearEndpointLevel(endpointId);
+      return;
+    }
+
+    let endpoint: Endpoint | null;
+    try {
+      endpoint = await this.prisma.endpoint.findUnique({
+        where: { id: endpointId }
+      });
+    } catch {
+      throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
+    }
 
     if (!endpoint) {
       throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
@@ -201,18 +321,37 @@ export class EndpointService implements OnModuleInit {
     totalGroupMembers: number;
     requestLogCount: number;
   }> {
-    const endpoint = await this.prisma.endpoint.findUnique({
-      where: { id: endpointId }
-    });
+    if (this.isInMemoryBackend) {
+      const endpoint = this.inMemoryEndpoints.get(endpointId);
+      if (!endpoint) {
+        throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
+      }
+
+      return {
+        totalUsers: 0,
+        totalGroups: 0,
+        totalGroupMembers: 0,
+        requestLogCount: 0,
+      };
+    }
+
+    let endpoint: Endpoint | null;
+    try {
+      endpoint = await this.prisma.endpoint.findUnique({
+        where: { id: endpointId }
+      });
+    } catch {
+      throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
+    }
 
     if (!endpoint) {
       throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
     }
 
     const [totalUsers, totalGroups, totalGroupMembers, requestLogCount] = await Promise.all([
-      this.prisma.scimUser.count({ where: { endpointId } }),
-      this.prisma.scimGroup.count({ where: { endpointId } }),
-      this.prisma.groupMember.count({
+      this.prisma.scimResource.count({ where: { endpointId, resourceType: 'User' } }),
+      this.prisma.scimResource.count({ where: { endpointId, resourceType: 'Group' } }),
+      this.prisma.resourceMember.count({
         where: { group: { endpointId } }
       }),
       this.prisma.requestLog.count({ where: { endpointId } })
@@ -232,6 +371,20 @@ export class EndpointService implements OnModuleInit {
       scimEndpoint: `/scim/endpoints/${endpoint.id}`,
       createdAt: endpoint.createdAt,
       updatedAt: endpoint.updatedAt
+    };
+  }
+
+  private toResponseInMemory(endpoint: InMemoryEndpointRecord): EndpointResponse {
+    return {
+      id: endpoint.id,
+      name: endpoint.name,
+      displayName: endpoint.displayName || endpoint.name,
+      description: endpoint.description ?? undefined,
+      config: endpoint.config ?? undefined,
+      active: endpoint.active,
+      scimEndpoint: `/scim/endpoints/${endpoint.id}`,
+      createdAt: endpoint.createdAt,
+      updatedAt: endpoint.updatedAt,
     };
   }
 

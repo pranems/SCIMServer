@@ -1,102 +1,48 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
-// ⚠ SQLite provider — see docs/SQLITE_COMPROMISE_ANALYSIS.md for 28 documented
-//   compromises (no CITEXT, no JSONB, single-writer lock, no horizontal scaling).
-//   Migration target: PostgreSQL (provider = "postgresql").
+// Phase 3: PostgreSQL provider — CITEXT for case-insensitive columns, JSONB for
+// payload storage, row-level locking for concurrent writes, GIN indexes for
+// filter push-down. See docs/phases/PHASE_03_POSTGRESQL_MIGRATION.md
 datasource db {
-  provider = "sqlite"
+  provider   = "postgresql"
+  extensions = [citext, pgcrypto, pg_trgm]
 }
-
-// SQLite connection pool and timeout configuration
-// Applied via Prisma Client initialization in the code
 
 // Multi-endpoint support: Each endpoint has isolated SCIM resources
 model Endpoint {
-  id          String   @id @default(cuid())
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name        String   @unique
   displayName String?
   description String?
   config      String?  // JSON configuration for endpoint-specific settings
   active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @db.Timestamptz
+  updatedAt   DateTime @updatedAt     @db.Timestamptz
 
-  users   ScimUser[]
-  groups  ScimGroup[]
   logs    RequestLog[]
+
+  // Phase 2: Unified resource relation
+  resources ScimResource[]
+
+  // Phase 6: Per-endpoint schema extensions
+  schemaExtensions EndpointSchema[]
+
+  // Phase 8b: Per-endpoint custom resource type registrations
+  resourceTypes EndpointResourceType[]
+
+  // Phase 11: Per-endpoint credentials
+  credentials EndpointCredential[]
 
   @@index([active])
 }
 
-model ScimUser {
-  id            String   @id @default(cuid())
-  endpointId    String   // Foreign key to endpoint
-  scimId        String
-  externalId    String?
-  userName      String   // Original casing preserved for display
-  userNameLower String   // SQLite compromise: derived lowercase column for case-insensitive uniqueness (RFC 7643 §2.1).
-                         // PostgreSQL: replace with @db.Citext on userName and remove this column.
-  active        Boolean  @default(true)
-  rawPayload    String
-  meta          String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  endpoint Endpoint      @relation(fields: [endpointId], references: [id], onDelete: Cascade)
-  groups   GroupMember[]
-
-  // Composite unique constraint per endpoint (case-insensitive via userNameLower)
-  @@unique([endpointId, scimId])
-  @@unique([endpointId, userNameLower])
-  @@unique([endpointId, externalId])
-  @@index([endpointId])
-}
-
-model ScimGroup {
-  id               String   @id @default(cuid())
-  endpointId       String   // Foreign key to endpoint
-  scimId           String
-  externalId       String?  // Entra ID sends externalId for groups; first-class column for uniqueness & filtering
-  displayName      String
-  displayNameLower String   // SQLite compromise: derived lowercase column for case-insensitive filtering (RFC 7643 §2.1).
-                           // PostgreSQL: replace with @db.Citext on displayName and remove this column.
-  rawPayload       String
-  meta             String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  endpoint Endpoint      @relation(fields: [endpointId], references: [id], onDelete: Cascade)
-  members  GroupMember[]
-
-  // Composite unique constraint per endpoint
-  @@unique([endpointId, scimId])
-  @@unique([endpointId, externalId])
-  @@unique([endpointId, displayNameLower])
-  @@index([endpointId])
-}
-
-model GroupMember {
-  id        String    @id @default(cuid())
-  groupId   String
-  userId    String?
-  value     String
-  type      String?
-  display   String?
-  createdAt DateTime  @default(now())
-
-  group ScimGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  user  ScimUser? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([groupId])
-  @@index([userId])
-}
-
 model RequestLog {
-  id               String   @id @default(cuid())
-  endpointId       String?  // Optional - for system-wide logs
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  endpointId       String?  @db.Uuid
   method           String
   url              String
   status           Int?
@@ -107,8 +53,8 @@ model RequestLog {
   responseBody     String?
   errorMessage     String?
   errorStack       String?
-  identifier       String?  // Persisted lightweight identifier (userName/email/displayName/etc)
-  createdAt        DateTime @default(now())
+  identifier       String?
+  createdAt        DateTime @default(now()) @db.Timestamptz
 
   endpoint Endpoint? @relation(fields: [endpointId], references: [id], onDelete: SetNull)
 
@@ -116,4 +62,136 @@ model RequestLog {
   @@index([method])
   @@index([status])
   @@index([endpointId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 2 → Phase 3 — Unified scim_resource table (PostgreSQL-native)
+//
+// Polymorphic table: resourceType discriminator ("User" / "Group") determines
+// which columns are populated. CITEXT on userName/displayName eliminates the
+// need for helper lowercase columns. JSONB payload enables GIN-indexed queries.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model ScimResource {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  endpointId       String   @db.Uuid
+  resourceType     String   @db.VarChar(50)
+  scimId           String   @db.Uuid
+  externalId       String?  @db.Text          // TEXT — case-sensitive per RFC 7643 §3.1 (caseExact=true)
+  userName         String?  @db.Citext        // CITEXT — case-insensitive natively (Phase 3)
+  displayName      String?  @db.Citext        // CITEXT — case-insensitive natively (Phase 3)
+  active           Boolean  @default(true)
+  deletedAt        DateTime?                   @db.Timestamptz  // Soft-delete marker (DELETE sets this; PATCH active=false does NOT)
+  payload          Json                        // JSONB — replaces rawPayload String (Phase 3)
+  version          Int      @default(1)
+  meta             String?
+  createdAt        DateTime @default(now()) @db.Timestamptz
+  updatedAt        DateTime @updatedAt     @db.Timestamptz
+
+  endpoint         Endpoint         @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  membersAsGroup   ResourceMember[] @relation("GroupMembers")
+  membersAsMember  ResourceMember[] @relation("MemberResources")
+
+  // Composite unique constraints
+  @@unique([endpointId, scimId])
+  @@unique([endpointId, userName])                 // CITEXT handles case-insensitive uniqueness
+  @@unique([endpointId, displayName])              // CITEXT handles case-insensitive uniqueness
+  @@unique([endpointId, resourceType, externalId]) // Scoped per type to avoid collisions
+  @@index([endpointId, resourceType])
+}
+
+model ResourceMember {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  groupResourceId  String    @db.Uuid
+  memberResourceId String?   @db.Uuid
+  value            String
+  type             String?
+  display          String?
+  createdAt        DateTime  @default(now()) @db.Timestamptz
+
+  group  ScimResource  @relation("GroupMembers", fields: [groupResourceId], references: [id], onDelete: Cascade)
+  member ScimResource? @relation("MemberResources", fields: [memberResourceId], references: [id], onDelete: SetNull)
+
+  @@index([groupResourceId])
+  @@index([memberResourceId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 6 — Per-endpoint SCIM schema extensions
+//
+// Persists custom extension schemas registered per endpoint. On startup the
+// ScimSchemaRegistry loads these rows and hydrates its per-endpoint overlay.
+// Admin API allows CRUD on extensions without redeployment.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model EndpointSchema {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  endpointId      String   @db.Uuid
+  schemaUrn       String   @db.VarChar(512)    // Extension schema URN (e.g., "urn:example:custom:2.0:User")
+  name            String   @db.VarChar(255)
+  description     String?
+  resourceTypeId  String?  @db.VarChar(50)     // Resource type to attach to ("User", "Group", or null)
+  required        Boolean  @default(false)      // Whether extension is required on the resource type
+  attributes      Json                          // JSONB — array of ScimSchemaAttribute definitions
+  createdAt       DateTime @default(now()) @db.Timestamptz
+  updatedAt       DateTime @updatedAt     @db.Timestamptz
+
+  endpoint Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@unique([endpointId, schemaUrn])            // One schema URN per endpoint
+  @@index([endpointId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 8b — Per-endpoint custom resource type registrations
+//
+// Allows endpoints to register custom SCIM resource types beyond User/Group
+// (e.g., Device, Application). Each registration stores the resource type
+// metadata, core schema URN, and optional schema extensions. Resources are
+// stored in the polymorphic ScimResource table with a matching resourceType
+// discriminator. Gated behind the "CustomResourceTypesEnabled" config flag.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model EndpointResourceType {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  endpointId       String   @db.Uuid
+  name             String   @db.VarChar(50)     // Resource type name (e.g., "Device")
+  description      String?
+  schemaUri        String   @db.VarChar(512)    // Core schema URN for this resource type
+  endpoint         String   @db.VarChar(255)    // SCIM endpoint path (e.g., "/Devices")
+  schemaExtensions Json     @default("[]")      // Array of { schema: string, required: boolean }
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now()) @db.Timestamptz
+  updatedAt        DateTime @updatedAt     @db.Timestamptz
+
+  endpointRef Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@unique([endpointId, name])                  // One resource type name per endpoint
+  @@unique([endpointId, endpoint])              // One endpoint path per resource type per endpoint
+  @@index([endpointId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 11 — Per-endpoint credentials
+//
+// Stores bcrypt-hashed bearer tokens or OAuth client credentials scoped to a
+// specific endpoint. When the `PerEndpointCredentialsEnabled` config flag is
+// true for an endpoint, the SharedSecretGuard will validate incoming tokens
+// against this table instead of (or in addition to) the global shared secret.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model EndpointCredential {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  endpointId     String    @db.Uuid
+  credentialType String    @db.VarChar(50)   // "bearer" | "oauth_client"
+  credentialHash String    @db.VarChar(255)  // bcrypt hash of the token/secret
+  label          String?   @db.VarChar(255)  // Human-readable label for management
+  metadata       Json?                       // {clientId, scopes, ...} for OAuth
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now()) @db.Timestamptz
+  expiresAt      DateTime?                   @db.Timestamptz
+
+  endpoint Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([endpointId, active])
 }
