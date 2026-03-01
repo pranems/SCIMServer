@@ -32,7 +32,6 @@
 | **Auth** | JWT + Bearer token | @nestjs/jwt |
 | **Testing** | Jest | 30.x with ts-jest |
 | **Deployment** | Azure Container Apps | via Bicep IaC |
-| **Backup** | Azure Blob Storage | @azure/storage-blob |
 
 ---
 
@@ -76,7 +75,7 @@ api/src/modules/scim/controllers/
 api/src/modules/scim/common/
   scim-sort.util.ts                                      # sortBy/sortOrder mapping utility (v0.20.0)
 api/src/modules/endpoint/
-  endpoint-config.interface.ts                           # 12 boolean flags + logLevel + helpers (incl. getConfigBooleanWithDefault)
+  endpoint-config.interface.ts                           # 14 boolean flags + logLevel + helpers (incl. getConfigBooleanWithDefault)
   endpoint-context.storage.ts                            # AsyncLocalStorage for endpoint context
 api/src/modules/scim/filters/
   scim-filter-parser.ts                                  # Filter AST attribute path extraction
@@ -91,7 +90,6 @@ api/src/modules/logging/
 api/src/modules/endpoint/
   endpoint.controller.ts                                 # Admin CRUD for endpoints
   endpoint.service.ts                                    # Endpoint business logic (supports in-memory mode)
-api/src/modules/backup/backup.service.ts                 # Azure Blob snapshot backup (290 lines)
 api/src/modules/database/
   database.controller.ts                                 # Dashboard data APIs
   database.service.ts                                    # User/group/stats queries
@@ -122,9 +120,9 @@ web/vite.config.ts                                       # Dev proxy to :3000
 infra/containerapp.bicep                                 # Container App definition
 infra/containerapp-env.bicep                             # Environment (VNet-integrated)
 infra/acr.bicep                                          # Azure Container Registry
-infra/blob-storage.bicep                                 # Backup storage
-infra/networking.bicep                                   # VNet, subnets, private endpoints
-infra/storage.bicep                                      # Storage account
+infra/networking.bicep                                   # VNet, subnets (aca-infra, aca-runtime, private-endpoints)
+infra/postgres.bicep                                     # Azure PostgreSQL Flexible Server
+infra/storage.bicep                                      # Storage account (Azure Files)
 ```
 
 ### 3.4 Legacy Files
@@ -251,6 +249,16 @@ Four categories of PATCH paths, handled in order:
 3. **valuePath**: Bracket filter expression (`emails[type eq "work"].value`)
 4. **Extension URN**: Full URN prefix (`urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department`)
 
+### 5.8 ReadOnly Attribute Stripping (v0.22.0)
+
+POST/PUT payloads auto-strip `mutability:'readOnly'` attrs (`id`, `meta`, `groups`, custom readOnly) before business logic. PATCH ops targeting readOnly attrs are silently stripped when `StrictSchemaValidation` is OFF or `IgnoreReadOnlyAttributesInPatch` is ON. Warning URN (`urn:scimserver:api:messages:2.0:Warning`) attached when `IncludeWarningAboutIgnoredReadOnlyAttribute` enabled. Covers Users, Groups, AND Generic (custom) resource types.
+
+**Source files:**
+- Strip helpers: `api/src/modules/scim/common/scim-service-helpers.ts` (`stripReadOnlyAttributes()`, `stripReadOnlyPatchOps()`)
+- Warning accumulation: `api/src/modules/endpoint/endpoint-context.storage.ts` (`addWarnings()`, `getWarnings()`)
+- Middleware: `EndpointContextStorage.createMiddleware()` + `ScimModule.configure()` (Express middleware with `storage.run()`)
+- Feature doc: `docs/READONLY_ATTRIBUTE_STRIPPING_AND_WARNINGS.md`
+
 ---
 
 ## 6. Key Architectural Decisions
@@ -261,7 +269,7 @@ Four categories of PATCH paths, handled in order:
 | **payload as JSONB** | SCIM resources have arbitrary attributes; structured columns can't capture all; JSONB preserves fidelity with native query support |
 | **Derived columns** | Indexed VARCHAR/CITEXT columns for uniqueness constraints and efficient filtering |
 | **CITEXT columns** | RFC 7643 §2.1 requires case-insensitive userName uniqueness; PostgreSQL CITEXT handles this natively |
-| **AsyncLocalStorage** | Endpoint context propagation without threading endpoint ID through every method signature |
+| **AsyncLocalStorage** | Endpoint context propagation without threading endpoint ID through every method signature. Uses `storage.run()` via Express middleware (not `enterWith()`) to ensure context survives NestJS interceptor pipeline boundaries. |
 | **Repository Pattern** | `IUserRepository`/`IGroupRepository` interfaces with `PERSISTENCE_BACKEND` env toggle (prisma/inmemory) |
 | **Dual auth** | OAuth for production clients (Entra); legacy token for simple testing/debugging |
 | **Global prefix `/scim`** | All routes under `/scim/`; URL rewrite middleware supports `/scim/v2` for spec compliance |
@@ -300,8 +308,8 @@ Four categories of PATCH paths, handled in order:
 
 ## 8. Test Coverage (v0.22.0)
 
-- **Unit**: 2,521 passing / 2,521 total (73 suites) — **all passing (0 failures)**
-- **E2E**: 522 passing / 522 total (25 suites) — **all passing (0 failures)**
+- **Unit**: 2,532 passing / 2,532 total (73 suites) — **all passing (0 failures)**
+- **E2E**: 539 passing / 539 total (26 suites) — **all passing (0 failures)**
 - **Live integration**: 485 total (expected all passing after SchemaValidator id fix)
 - **SCIM Validator**: 25/25 required + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
@@ -353,11 +361,11 @@ Four categories of PATCH paths, handled in order:
 2. **payload is JSONB** — native JSON type in PostgreSQL; use Prisma's JSON operations for queries
 3. **PostgreSQL CITEXT** — userName and externalId use CITEXT for case-insensitive uniqueness; no derived `*Lower` columns needed
 4. **Filter push-down** — ALL 10 SCIM operators are pushed to PostgreSQL WHERE clauses; compound AND/OR supported. No in-memory post-fetch filtering.
-5. **Backup depends on Azure** — `BackupService` silently skips if `BLOB_BACKUP_ACCOUNT` isn't set (local dev). **Note:** This service is a SQLite-era relic flagged for removal; PostgreSQL uses standard backup mechanisms.
+5. **Blob backup removed (v0.23.0)** — `BackupService`, `BackupModule`, `blob-restore.ts`, and `infra/blob-storage.bicep` were deleted. PostgreSQL uses Azure-native WAL backup (configured via `backupRetentionDays` in `postgres.bicep`). `@azure/identity` and `@azure/storage-blob` npm packages also removed.
 6. **Auto-generated secrets** — In dev mode, `SCIM_SHARED_SECRET` and `OAUTH_CLIENT_SECRET` are auto-generated and logged to console. NEVER do this in production.
 7. **ValidationPipe whitelist: false** — We do NOT strip unknown properties, because SCIM resources have arbitrary attributes in extensions
 8. **The `/scim/v2` rewrite** — Express middleware in `main.ts` rewrites `/scim/v2/*` to `/scim/*` for spec compliance
-9. **SchemaValidator** — 950-line pure domain class for RFC 7643 payload validation. Gated behind `StrictSchemaValidation` config flag. Validates type, mutability (readOnly + immutable), required attrs, unknown attrs, sub-attributes, canonicalValues, size limits. New: `collectBooleanAttributeNames()` for schema-aware boolean coercion, `validateFilterAttributePaths()` for filter validation (V32).
+9. **SchemaValidator** — 950-line pure domain class for RFC 7643 payload validation. Gated behind `StrictSchemaValidation` config flag. Validates type, mutability (readOnly + immutable), required attrs, unknown attrs, sub-attributes, canonicalValues, size limits. New: `collectBooleanAttributeNames()` for schema-aware boolean coercion, `collectReadOnlyAttributes()` for readOnly stripping, `validateFilterAttributePaths()` for filter validation (V32).
 10. **Repository Pattern** — `IUserRepository`/`IGroupRepository` interfaces injected via tokens. `PERSISTENCE_BACKEND` env var toggles between `prisma` and `inmemory` implementations.
 11. **G2 is DONE + G17 RESOLVED (v0.20.0)** — Database uses a single unified `ScimResource` table. G17 service code deduplication completed: 13+ duplicate private methods extracted into `scim-service-helpers.ts` (`parseJson`, `ensureSchema`, `enforceIfMatch`, `sanitizeBooleanStrings`, `guardSoftDeleted`, `ScimSchemaHelpers`). All 27 migration gaps (G1–G20) are now closed.
 12. **3-tier auth guard** — `SharedSecretGuard` now implements 3-tier fallback: per-endpoint bcrypt credentials → OAuth JWT → global `SCIM_SHARED_SECRET`. Per-endpoint credentials use lazy-loaded native bcrypt (12 rounds, cached after first use). Active + non-expired credentials only.

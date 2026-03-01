@@ -280,14 +280,11 @@ SCIMServer is a **SCIM 2.0 provisioning visibility and monitoring tool** for Mic
 
 | ID | Requirement | Priority |
 |----|------------|----------|
-| FR-600 | SQLite database for all SCIM resources and logs | **P0** |
-| FR-601 | Automatic database migrations on startup | **P0** |
-| FR-602 | Azure Blob Storage backup (periodic snapshots every 5 minutes) | **P0** |
-| FR-603 | Blob snapshot restore on container startup | **P0** |
-| FR-604 | Snapshot retention (keep last 20) | **P1** |
-| FR-605 | Legacy Azure Files mount support | **P2** |
-| FR-606 | Backup status API (`GET /admin/backup/status`) | **P1** |
-| FR-607 | Manual backup trigger (`POST /admin/backup/trigger`) | **P1** |
+| FR-600 | PostgreSQL 17 database for all SCIM resources and logs | **P0** |
+| FR-601 | Automatic database migrations on startup (`prisma migrate deploy`) | **P0** |
+| FR-602 | Azure-managed WAL backup with 7-day point-in-time recovery (PG Flexible Server) | **P0** |
+| FR-603 | Connection string-based database configuration (`DATABASE_URL`) | **P0** |
+| FR-604 | In-memory backend for testing (`PERSISTENCE_BACKEND=inmemory`) | **P1** |
 
 ---
 
@@ -302,7 +299,6 @@ SCIMServer is a **SCIM 2.0 provisioning visibility and monitoring tool** for Mic
 | FR-704 | Scale-to-zero for cost optimization | **P1** |
 | FR-705 | Environment variable configuration (no hardcoded secrets) | **P0** |
 | FR-706 | Azure VNet integration for secure networking | **P2** |
-| FR-707 | Private endpoint for Blob Storage access | **P2** |
 
 ---
 
@@ -334,9 +330,9 @@ SCIMServer is a **SCIM 2.0 provisioning visibility and monitoring tool** for Mic
 
 | ID | Requirement | Target |
 |----|------------|--------|
-| NFR-010 | Data durability | Blob backup every 5 minutes |
+| NFR-010 | Data durability | PostgreSQL WAL + Azure-managed 7-day PITR backup |
 | NFR-011 | Crash recovery | Auto-restore from latest snapshot on restart |
-| NFR-012 | Container restart tolerance | Stateless API, ephemeral DB with blob-backed restore |
+| NFR-012 | Container restart tolerance | Stateless API + PostgreSQL — no data loss on restart |
 
 ### 10.3 Security
 

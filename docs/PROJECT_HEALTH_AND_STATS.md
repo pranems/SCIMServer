@@ -215,7 +215,6 @@
 | `PrismaModule` | Prisma client lifecycle management |
 | `RepositoryModule` | Dynamic repository registration (Prisma / InMemory) |
 | `LoggingModule` | Request logging + log access (SSE, NDJSON download) |
-| `BackupModule` | Scheduled backup operations |
 | `ActivityParserModule` | Activity feed parsing and aggregation |
 | `WebModule` | Static file serving (React SPA) |
 
@@ -236,7 +235,7 @@
 
 ### Services (Injectable, 25)
 
-Key services: `EndpointScimUsersService`, `EndpointScimGroupsService`, `ScimDiscoveryService`, `LoggingService`, `OAuthService`, `ScimMetadataService`, `BackupService`, `PrismaService`
+Key services: `EndpointScimUsersService`, `EndpointScimGroupsService`, `ScimDiscoveryService`, `LoggingService`, `OAuthService`, `ScimMetadataService`, `PrismaService`
 
 ### Domain Classes
 
@@ -408,8 +407,6 @@ graph TD
 | `dotenv` | ^17.2.4 | Environment variable loading |
 | `rxjs` | ^7.8.2 | Reactive programming (NestJS dep) |
 | `reflect-metadata` | ^0.2.2 | Decorator metadata (NestJS dep) |
-| `@azure/identity` | ^4.13.0 | Azure auth (optional) |
-| `@azure/storage-blob` | ^12.31.0 | Azure Blob Storage (optional) |
 
 ### Dev Dependencies (18)
 
@@ -522,9 +519,9 @@ graph TD
 | `infra/containerapp.bicep` | Azure Container App |
 | `infra/containerapp-env.bicep` | Container App Environment |
 | `infra/acr.bicep` | Azure Container Registry |
-| `infra/blob-storage.bicep` | Azure Blob Storage |
-| `infra/networking.bicep` | VNet + DNS zones |
-| `infra/storage.bicep` | Storage account |
+| `infra/networking.bicep` | VNet + subnets |
+| `infra/postgres.bicep` | Azure PostgreSQL Flexible Server |
+| `infra/storage.bicep` | Azure Files storage account |
 
 ### CI/CD
 
@@ -645,7 +642,6 @@ Key scripts: `setup.ps1`, `deploy.ps1`, `bootstrap.ps1`, `scripts/deploy-azure.p
 | `json-results-reporter.ts` type error (pre-existing) | 0.5 hr | LOW |
 | Hardcoded legacy bearer token in `scim-auth.guard.ts` | 1 hr | MEDIUM |
 | `console.log`/`console.error` in auth guard (should use Logger) | 0.5 hr | LOW |
-| `BackupService` flagged for removal post-SQLite migration | 2-4 hrs | LOW |
 | CORS `origin: true` (wildcard) in `main.ts` | 0.5 hr | MEDIUM |
 | `resultPayloadPlaceholder` variable names in User/Group services | 0.5 hr | LOW |
 

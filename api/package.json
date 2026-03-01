@@ -1,6 +1,6 @@
 {
   "name": "scimserver-api",
-  "version": "0.22.0",
+  "version": "0.23.0",
   "description": "SCIMServer backend service providing SCIM 2.0 endpoints and logging for troubleshooting.",
   "license": "MIT",
   "main": "dist/main.js",
@@ -29,8 +29,6 @@
     "prisma:migrate": "prisma migrate dev --name init"
   },
   "dependencies": {
-    "@azure/identity": "^4.13.0",
-    "@azure/storage-blob": "^12.31.0",
     "@nestjs/common": "^11.1.13",
     "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^11.1.13",

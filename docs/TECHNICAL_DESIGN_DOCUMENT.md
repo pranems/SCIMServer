@@ -1,9 +1,9 @@
 # SCIMServer — Technical Design Document (TDD)
 
-> **Version**: 1.1  
-> **Date**: February 13, 2026  
-> **Status**: Current as-built architecture  
-> **Tech Stack**: NestJS 11 · TypeScript 5 · Prisma 7 · SQLite · React 19 · Vite 7 · Azure Container Apps
+> **Version**: 1.2  
+> **Date**: March 1, 2026  
+> **Status**: Current as-built architecture (v0.23.0)  
+> **Tech Stack**: NestJS 11 · TypeScript 5 · Prisma 7 · PostgreSQL 17 · React 19 · Vite 7 · Azure Container Apps
 
 ---
 
@@ -35,20 +35,15 @@
 │  │  │              │  │  ├──────────────────────────────┤  │ │ │
 │  │  │              │  │  │         Services              │  │ │ │
 │  │  │              │  │  │  Users · Groups · Endpoint ·  │  │ │ │
-│  │  │              │  │  │  Auth · Backup · Logging · DB │  │ │ │
+│  │  │              │  │  │  Auth · Logging · DB │  │ │ │
 │  │  │              │  │  ├──────────────────────────────┤  │ │ │
-│  │  │              │  │  │     Prisma ORM + SQLite       │  │ │ │
+│  │  │              │  │  │     Prisma ORM + PostgreSQL     │  │ │ │
 │  │  └─────────────┘  │  └──────────────────────────────┘  │ │ │
 │  │                                                           │ │
 │  └───────────────────────────────────────────────────────────┘ │
 │                          │                                      │
 │  ┌───────────────────────▼─────────────────────────────────────┐│
-│  │  Azure Blob Storage (scimserver-backups)                      ││
-│  │  • 5-minute snapshot cron                                   ││
-│  │  • 20-snapshot retention                                    ││
-│  │  • Restore-on-startup                                       ││
-│  └─────────────────────────────────────────────────────────────┘│
-└───────────────────────────────────────────────────────────────┘
+
 ```
 
 ### 1.2 Project Directory Structure
@@ -76,7 +71,7 @@ api/
 │   │   ├── endpoint/            # Endpoint management (admin CRUD)
 │   │   ├── auth/                # SharedSecretGuard, @Public decorator
 │   │   ├── logging/             # ScimLogger, LogConfigController, RequestLoggingInterceptor, log-levels
-│   │   ├── backup/              # Azure Blob snapshot backup/restore
+
 │   │   ├── database/            # Dashboard data queries (users/groups/stats)
 │   │   ├── activity-parser/     # SCIM log → human-readable activity
 │   │   ├── prisma/              # PrismaService (global)
@@ -134,8 +129,6 @@ AppModule
 ├── EndpointModule
 │   ├── EndpointController
 │   └── EndpointService
-├── BackupModule
-│   └── BackupService → @Cron blob snapshots
 ├── DatabaseModule
 │   └── DatabaseController + DatabaseService
 ├── ActivityParserModule
@@ -154,7 +147,6 @@ AppModule
 | **ScimModule** | Core SCIM protocol | Controllers, services, interceptors, utilities |
 | **EndpointModule** | Multi-endpoint management | `EndpointController`, `EndpointService` |
 | **LoggingModule** | Structured logging, traceability, admin config | `ScimLogger` (global), `RequestLoggingInterceptor`, `LogConfigController`, `LoggingService` |
-| **BackupModule** | Blob snapshot backup | `BackupService` with cron scheduler |
 | **DatabaseModule** | Dashboard data | `DatabaseController`, `DatabaseService` |
 | **ActivityParserModule** | Activity feed | `ActivityParserService` (898 lines of parsing) |
 | **WebModule** | SPA serving | `WebController` — serves pre-built React app |
@@ -290,8 +282,6 @@ const config = ctx?.config;
 | `GET` | `/scim/admin/database/users/{id}` | `DatabaseController` | User detail |
 | `GET` | `/scim/admin/database/groups/{id}` | `DatabaseController` | Group detail |
 | `GET` | `/scim/admin/database/statistics` | `DatabaseController` | Dashboard stats |
-| `GET` | `/scim/admin/backup/status` | `BackupController` | Backup status |
-| `POST` | `/scim/admin/backup/trigger` | `BackupController` | Manual backup |
 | `GET` | `/scim/admin/info` | `AdminController` | App info |
 
 ### 4.4 OAuth Routes
@@ -367,28 +357,20 @@ CRUD for Endpoint management:
 - Validates config JSON structure via `validateEndpointConfig()`
 - Cascade delete removes all associated Users, Groups, Logs (via Prisma relations)
 
-### 5.5 BackupService (290 lines)
-
-**Lifecycle**:
-1. `OnModuleInit` — Attempt restore from Azure Blob snapshot (latest blob)
-2. `@Cron('*/5 * * * *')` — Every 5 minutes: upload SQLite DB as blob with ISO timestamp name
-3. Snapshot retention: keep last 20, delete oldest
-4. Fallback: Azure Files mount for legacy storage
-
-### 5.6 RequestLogService / LoggingService (481 lines)
+### 5.5 RequestLogService / LoggingService (481 lines)
 
 - Records every HTTP request/response in `RequestLog` table
 - Auto-derives `identifier` field from SCIM request paths/bodies (userName, displayName, externalId)
 - Async fire-and-forget (does not block response)
 
-### 5.7 ActivityParserService (898 lines)
+### 5.6 ActivityParserService (898 lines)
 
 Transforms raw `RequestLog` entries into human-readable activity feed items:
 - Parses SCIM JSON payloads to extract meaningful descriptions
 - Detects keepalive/probe requests and marks them
 - Groups related operations (create → patch → delete sequences)
 
-### 5.8 OAuthService (138 lines)
+### 5.7 OAuthService (138 lines)
 
 OAuth 2.0 `client_credentials` grant:
 - Reads `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET` from environment
@@ -705,18 +687,20 @@ npm run start:prod   # node dist/main.js
 Azure Resource Group
 ├── Container Apps Environment (containerapp-env.bicep)
 │   └── Container App (containerapp.bicep)
-│       ├── Image: <acr>.azurecr.io/scimserver:latest
+│       ├── Image: ghcr.io/pranems/scimserver:<tag>
 │       ├── Min replicas: 0 (scale-to-zero)
 │       ├── Max replicas: 1
 │       ├── CPU: 0.5, Memory: 1Gi
-│       └── Env vars: DATABASE_URL, SCIM_SHARED_SECRET, BLOB_BACKUP_*
+│       └── Env vars: DATABASE_URL, SCIM_SHARED_SECRET, JWT_SECRET, OAUTH_CLIENT_SECRET
 ├── Azure Container Registry (acr.bicep)
-├── Storage Account (blob-storage.bicep)
-│   └── Blob Container: scimserver-backups
+├── Azure PostgreSQL Flexible Server (postgres.bicep)
+│   ├── Sku: Standard_B1ms (Burstable)
+│   └── Built-in WAL backup (7-day PITR)
 ├── Virtual Network (networking.bicep)
-│   ├── infra-subnet → Container Apps Environment
-│   └── storage-subnet → Private Endpoint → Storage
-└── Private Endpoint → Storage Account
+│   ├── aca-infra-subnet → Container Apps Environment
+│   ├── aca-runtime-subnet → Container App workloads
+│   └── private-endpoints-subnet → future private endpoints
+└── Log Analytics Workspace
 ```
 
 ### 10.2 Docker Configuration
@@ -745,12 +729,9 @@ CMD ["node", "dist/main.js"]
 
 | Script | Purpose |
 |--------|---------|
-| `bootstrap.ps1` | One-click full deployment (ACR + Container App + Storage) |
+| `bootstrap.ps1` | One-click full deployment (VNet + PG + Container App) |
 | `deploy.ps1` | Container App update only |
-| `scripts/deploy-azure.ps1` | Full Azure resource provisioning |
-| `scripts/publish-acr.ps1` | Build + push Docker image to ACR |
-| `scripts/configure-hybrid-storage.ps1` | Setup Blob Storage backup configuration |
-| `scripts/repair-storage-mount.ps1` | Fix storage mount issues |
+| `scripts/deploy-azure.ps1` | Full Azure resource provisioning (5-step) |
 
 ---
 
@@ -761,7 +742,7 @@ CMD ["node", "dist/main.js"]
 - **Framework**: Jest 30 with `ts-jest` transform
 - **Test Location**: `api/test/` directory
 - **Test Pattern**: `*.spec.ts` and `*.test.ts`
-- **Current matrix**: 2,357 unit (69 suites) + 455 e2e (22 suites) + 444 live integration tests passing
+- **Current matrix**: 2,532 unit (73 suites) + 539 e2e (26 suites) + 485 live integration tests passing
 
 ### 11.2 Test Categories
 
@@ -804,14 +785,11 @@ CMD ["node", "dist/main.js"]
 |----------|---------|---------|
 | `PORT` | `3000` | HTTP server port |
 | `API_PREFIX` | `scim` | Global route prefix |
-| `DATABASE_URL` | `file:./dev.db` | SQLite database path |
+| `DATABASE_URL` | *(required)* | PostgreSQL connection string |
 | `SCIM_SHARED_SECRET` | Auto-generated | Legacy bearer auth token |
 | `OAUTH_CLIENT_ID` | Auto-generated | OAuth client identifier |
 | `OAUTH_CLIENT_SECRET` | Auto-generated | OAuth client secret |
 | `OAUTH_CLIENT_SCOPES` | `scim.read,scim.write,scim.manage` | Allowed OAuth scopes |
-| `BLOB_BACKUP_ACCOUNT` | — | Azure Storage account for backups |
-| `BLOB_BACKUP_CONTAINER` | `scimserver-backups` | Blob container name |
-| `BLOB_BACKUP_INTERVAL_MIN` | `5` | Backup interval in minutes |
 | `NODE_ENV` | `development` | Environment mode |
 
 ### 12.2 Per-Endpoint Configuration Flags

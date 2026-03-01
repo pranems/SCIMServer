@@ -111,6 +111,6 @@ USER scim
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
-    CMD node -e "require('http').get('http://127.0.0.1:8080/',r=>{process.exit(r.statusCode===200?0:1)}).on('error',()=>process.exit(1))"
+    CMD node -e "require('http').get('http://127.0.0.1:8080/health',r=>{let b='';r.on('data',d=>b+=d);r.on('end',()=>{try{const j=JSON.parse(b);process.exit(j.status==='ok'?0:1)}catch{process.exit(1)}})}).on('error',()=>process.exit(1))"
 
 CMD ["/app/docker-entrypoint.sh"]

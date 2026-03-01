@@ -26,6 +26,7 @@ import {
   ENDPOINT_CONFIG_FLAGS,
   type EndpointConfig,
 } from '../../endpoint/endpoint-config.interface';
+import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { createScimError } from '../common/scim-errors';
@@ -36,11 +37,17 @@ import {
   SCIM_LIST_RESPONSE_SCHEMA,
   SCIM_PATCH_SCHEMA,
 } from '../common/scim-constants';
+import {
+  stripReadOnlyAttributes,
+  stripReadOnlyPatchOps,
+} from '../common/scim-service-helpers';
 import { ScimMetadataService } from './scim-metadata.service';
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import type { ScimResourceType } from '../discovery/scim-schema-registry';
+import type { SchemaDefinition } from '../../../domain/validation';
 import { GenericPatchEngine } from '../../../domain/patch/generic-patch-engine';
 import { PatchError } from '../../../domain/patch/patch-error';
+import type { PatchOperation } from '../../../domain/patch/patch-types';
 
 interface ListGenericParams {
   filter?: string;
@@ -48,12 +55,6 @@ interface ListGenericParams {
   count?: number;
   sortBy?: string;
   sortOrder?: 'ascending' | 'descending';
-}
-
-interface PatchOperation {
-  op: string;
-  path?: string;
-  value?: unknown;
 }
 
 interface PatchDto {
@@ -71,7 +72,27 @@ export class EndpointScimGenericService {
     private readonly metadata: ScimMetadataService,
     private readonly scimLogger: ScimLogger,
     private readonly schemaRegistry: ScimSchemaRegistry,
+    private readonly endpointContext: EndpointContextStorage,
   ) {}
+
+  /**
+   * Build schema definitions for a dynamic resource type.
+   * Unlike Users/Groups which have fixed core URNs, generic resources
+   * resolve schemas from the registered resource type at runtime.
+   */
+  private getSchemaDefinitions(
+    resourceType: ScimResourceType,
+    endpointId: string,
+  ): SchemaDefinition[] {
+    const schemas: SchemaDefinition[] = [];
+    const coreDef = this.schemaRegistry.getSchema(resourceType.schema, endpointId);
+    if (coreDef) schemas.push(coreDef as SchemaDefinition);
+    for (const ext of resourceType.schemaExtensions) {
+      const extDef = this.schemaRegistry.getSchema(ext.schema, endpointId);
+      if (extDef) schemas.push(extDef as SchemaDefinition);
+    }
+    return schemas;
+  }
 
   // ─── CREATE ────────────────────────────────────────────────────────────
 
@@ -130,11 +151,18 @@ export class EndpointScimGenericService {
       version: 'W/"1"',
     };
 
-    // Build the full payload — strip schemas and meta (they're in envelope)
+    // Strip readOnly attributes using schema definitions (RFC 7643 §2.2)
+    // This replaces the hardcoded delete of schemas/meta/id with schema-driven stripping
     const payload: Record<string, unknown> = { ...body };
-    delete payload.schemas;
-    delete payload.meta;
-    delete payload.id;
+    delete payload.schemas; // structural key, never stored in payload
+    const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
+    const strippedAttrs = stripReadOnlyAttributes(payload, schemaDefs);
+    if (strippedAttrs.length > 0) {
+      this.scimLogger.warn(LogCategory.GENERAL, 'Stripped readOnly attributes from POST payload', {
+        method: 'POST', path: resourceType.endpoint, stripped: strippedAttrs, endpointId,
+      });
+      this.endpointContext.addWarnings(strippedAttrs);
+    }
 
     const input: GenericResourceCreateInput = {
       endpointId,
@@ -289,10 +317,17 @@ export class EndpointScimGenericService {
       version: `W/"${newVersion}"`,
     };
 
+    // Strip readOnly attributes using schema definitions (RFC 7643 §2.2)
     const payload: Record<string, unknown> = { ...body };
-    delete payload.schemas;
-    delete payload.meta;
-    delete payload.id;
+    delete payload.schemas; // structural key, never stored in payload
+    const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
+    const strippedAttrs = stripReadOnlyAttributes(payload, schemaDefs);
+    if (strippedAttrs.length > 0) {
+      this.scimLogger.warn(LogCategory.GENERAL, 'Stripped readOnly attributes from PUT payload', {
+        method: 'PUT', path: `${resourceType.endpoint}/${scimId}`, stripped: strippedAttrs, endpointId,
+      });
+      this.endpointContext.addWarnings(strippedAttrs);
+    }
 
     const updated = await this.genericRepo.update(existing.id, {
       externalId,
@@ -347,6 +382,24 @@ export class EndpointScimGenericService {
     }
 
     assertIfMatch(`W/"v${existing.version}"`, ifMatch);
+
+    // ReadOnly attribute stripping for PATCH operations (RFC 7643 §2.2)
+    // Matrix: strict OFF → strip; strict ON + IgnorePatchRO ON → strip; strict ON + IgnorePatchRO OFF → keep for G8c 400
+    const strictSchemaEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION);
+    const ignorePatchReadOnly = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH);
+    if (!strictSchemaEnabled || ignorePatchReadOnly) {
+      const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
+      const { filtered, stripped } = stripReadOnlyPatchOps(patchDto.Operations, schemaDefs);
+      if (stripped.length > 0) {
+        this.scimLogger.warn(LogCategory.GENERAL, 'Stripped readOnly PATCH operations', {
+          count: stripped.length, attributes: stripped,
+        });
+        this.endpointContext.addWarnings(
+          stripped.map(attr => `Attribute '${attr}' is readOnly and was ignored in PATCH`),
+        );
+        patchDto.Operations = filtered;
+      }
+    }
 
     // Apply patch operations to the payload
     let payload: Record<string, unknown>;

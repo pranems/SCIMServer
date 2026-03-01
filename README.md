@@ -20,8 +20,8 @@ Admin & observability endpoint family: `/scim/admin/*`
 - Full SCIM resource surface: Users, Groups, Schemas, ResourceTypes, ServiceProviderConfig
 - Entra-focused behavior and validator alignment (25/25 + 7 preview scenarios)
 - Built-in UI for activity feed, log inspection, endpoint management, and runtime status
-- Production operations support: log streaming/download, backup stats, version metadata
-- Cloud-ready deployment with Azure Container Apps and optional blob snapshot backup mode
+- Production operations support: log streaming/download, health endpoint, version metadata
+- Cloud-ready deployment with Azure Container Apps + PostgreSQL with auto-scale to zero
 
 ---
 
@@ -94,6 +94,8 @@ npm run dev
 
 > **3-tier auth (v0.21.0):** Incoming `Bearer` tokens are evaluated as: (1) per-endpoint bcrypt credential → (2) OAuth JWT → (3) global `SCIM_SHARED_SECRET`. Enable per-endpoint credentials via the `PerEndpointCredentialsEnabled` flag and the Admin Credential API.
 
+> **ReadOnly attribute stripping (v0.22.0):** POST/PUT payloads automatically strip `mutability:'readOnly'` attributes (`id`, `meta`, `groups`, custom readOnly) per RFC 7643 §2.2. PATCH ops targeting readOnly attrs are silently stripped (non-strict) or rejected (strict). Optional warning URN extension via `IncludeWarningAboutIgnoredReadOnlyAttribute` flag.
+
 ### Common optional variables
 
 | Variable | Default | Purpose |
@@ -136,7 +138,6 @@ flowchart LR
     Entra[Microsoft Entra ID\nProvisioning] -->|SCIM / HTTPS| App[SCIMServer\nAzure Container Apps]
     App --> UI[Built-in Web UI\n/admin + logs + activity]
     App --> DB[(PostgreSQL 17)]
-    App --> Blob[(Azure Blob snapshots\noptional backup mode)]
 ```
 
 Request shape:
@@ -155,7 +156,6 @@ Key admin endpoints:
 - `GET /scim/admin/log-config/recent?limit=25`
 - `GET /scim/admin/log-config/stream?level=INFO` (SSE)
 - `GET /scim/admin/log-config/download?format=json`
-- `GET /scim/admin/backup/stats`
 
 Remote log helper:
 
@@ -174,7 +174,6 @@ Operational docs:
 
 - [docs/LOGGING_AND_OBSERVABILITY.md](docs/LOGGING_AND_OBSERVABILITY.md)
 - [docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md](docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md)
-- [docs/STORAGE_AND_BACKUP.md](docs/STORAGE_AND_BACKUP.md)
 
 ---
 
@@ -197,9 +196,9 @@ Admin/release references:
 
 Latest validated matrix:
 
-- Unit tests: **2,357/2,357** (69 suites)
-- E2E tests: **455/455** (22 suites)
-- Live integration tests: **444/444** (local + Docker, includes in-memory instances)
+- Unit tests: **2,532/2,532** (73 suites)
+- E2E tests: **539/539** (26 suites)
+- Live integration tests: **485/485** (local + Docker, includes in-memory instances)
 - Microsoft SCIM Validator: **25/25 passed** (+ 7 preview scenarios)
 
 ### Per-Endpoint Config Flags
@@ -217,6 +216,9 @@ Latest validated matrix:
 | `AllowAndCoerceBooleanStrings` | `true` | Coerce boolean string values ("True"/"False") to native booleans before schema validation |
 | `CustomResourceTypesEnabled` | `false` | Enable custom resource type registration and generic SCIM CRUD beyond User/Group |
 | `BulkOperationsEnabled` | `false` | Enable `POST /Bulk` batch processing (RFC 7644 §3.7) |
+| `PerEndpointCredentialsEnabled` | `false` | Enable per-endpoint bcrypt bearer token credentials (3-tier auth) |
+| `IncludeWarningAboutIgnoredReadOnlyAttribute` | `false` | Attach warning URN to responses when readOnly attrs stripped (RFC 7643 §2.2) |
+| `IgnoreReadOnlyAttributesInPatch` | `false` | Override G8c strict PATCH rejection → strip+warn (requires StrictSchemaValidation ON) |
 
 ### Coverage scripts
 

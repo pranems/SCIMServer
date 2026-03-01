@@ -1,6 +1,6 @@
 # Endpoint Configuration Flags — Complete Reference
 
-> **Status:** Living document · **Last Updated:** 2026-02-27 · **Baseline:** v0.21.0
+> **Status:** Living document · **Last Updated:** 2026-02-28 · **Baseline:** v0.22.0
 >
 > Authoritative reference for all per-endpoint configuration flags in SCIMServer.
 > Covers flag definitions, defaults, type handling, precedence rules, applicability matrices,
@@ -26,7 +26,9 @@
    - 4.10 [CustomResourceTypesEnabled](#410-customresourcetypesenabled)
    - 4.11 [BulkOperationsEnabled](#411-bulkoperationsenabled)
    - 4.12 [PerEndpointCredentialsEnabled](#412-perendpointcredentialsenabled)
-   - 4.13 [logLevel](#413-loglevel)
+   - 4.13 [IncludeWarningAboutIgnoredReadOnlyAttribute](#413-includewarningaboutignoredreadonlyattribute)
+   - 4.14 [IgnoreReadOnlyAttributesInPatch](#414-ignorereadonlyattributesinpatch)
+   - 4.15 [logLevel](#415-loglevel)
 5. [Flag Applicability Matrix](#5-flag-applicability-matrix)
 6. [Flag Interaction & Precedence](#6-flag-interaction--precedence)
 7. [Flag Combination Examples](#7-flag-combination-examples)
@@ -38,7 +40,7 @@
 
 ## 1. Overview
 
-SCIMServer supports **12 per-endpoint configuration flags** (plus 1 per-endpoint log level override) that control SCIM protocol behavior. Flags are stored in the `config` JSON column of each endpoint record and are resolved at request time.
+SCIMServer supports **14 per-endpoint configuration flags** (plus 1 per-endpoint log level override) that control SCIM protocol behavior. Flags are stored in the `config` JSON column of each endpoint record and are resolved at request time.
 
 ### Key Concepts
 
@@ -73,9 +75,11 @@ api/src/modules/endpoint/endpoint-config.interface.ts
 | 10 | `CustomResourceTypesEnabled` | `CUSTOM_RESOURCE_TYPES_ENABLED` | `false` | boolean | Admin API, SCIM CRUD | Enable custom resource type registration and generic SCIM CRUD beyond User/Group |
 | 11 | `BulkOperationsEnabled` | `BULK_OPERATIONS_ENABLED` | `false` | boolean | POST /Bulk | Enable SCIM Bulk Operations (RFC 7644 §3.7) — batch processing of multiple operations |
 | 12 | `PerEndpointCredentialsEnabled` | `PER_ENDPOINT_CREDENTIALS_ENABLED` | `false` | boolean | Auth (all requests) | Enable per-endpoint bearer token credentials with bcrypt hashing and admin CRUD API |
-| 13 | `logLevel` | `LOG_LEVEL` | *(unset)* | string/number | All requests | Per-endpoint log level override |
+| 13 | `IncludeWarningAboutIgnoredReadOnlyAttribute` | `INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE` | `false` | boolean | POST, PUT, PATCH | Attach warning URN to responses when readOnly attributes were stripped (RFC 7643 §2.2) |
+| 14 | `IgnoreReadOnlyAttributesInPatch` | `IGNORE_READONLY_ATTRIBUTES_IN_PATCH` | `false` | boolean | PATCH | Override G8c strict rejection → strip+warn instead of 400 (requires StrictSchemaValidation ON) |
+| 15 | `logLevel` | `LOG_LEVEL` | *(unset)* | string/number | All requests | Per-endpoint log level override |
 
-> **Note:** Two flags default to `true`: `AllowAndCoerceBooleanStrings`, `PatchOpAllowRemoveAllMembers`. All others default to `false`. `ReprovisionOnConflictForSoftDeletedResource` has no effect unless `SoftDeleteEnabled` is also `true`.
+> **Note:** Two flags default to `true`: `AllowAndCoerceBooleanStrings`, `PatchOpAllowRemoveAllMembers`. All others default to `false`. `ReprovisionOnConflictForSoftDeletedResource` has no effect unless `SoftDeleteEnabled` is also `true`. `IgnoreReadOnlyAttributesInPatch` has no effect unless `StrictSchemaValidation` is also `true`.
 
 ---
 
@@ -806,7 +810,87 @@ Authorization: Bearer 1a2b3c4d...(plaintext token)
 
 ---
 
-### 4.13 logLevel
+### 4.13 IncludeWarningAboutIgnoredReadOnlyAttribute
+
+| Property | Value |
+|----------|-------|
+| **Config key** | `IncludeWarningAboutIgnoredReadOnlyAttribute` |
+| **Constant** | `ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE` |
+| **Default** | `false` |
+| **Helper** | `getConfigBoolean(config, key)` |
+| **Scope** | POST, PUT, PATCH |
+| **RFC** | RFC 7643 §2.2 (readOnly mutability) |
+| **Added** | v0.22.0 |
+
+**Purpose:** When enabled, attaches a `urn:scimserver:api:messages:2.0:Warning` extension to write responses whenever readOnly attributes (`id`, `meta`, `groups`, or custom readOnly attrs) were stripped from the client payload.
+
+**Key behaviors when enabled:**
+- Response `schemas[]` gains `urn:scimserver:api:messages:2.0:Warning`
+- Response body gains `urn:scimserver:api:messages:2.0:Warning: { detail: "The following readOnly attributes were ignored: groups, meta" }`
+- Works on POST, PUT, and PATCH responses
+- Only triggers when at least one readOnly attribute was actually stripped
+
+**Example — Flag ON + readOnly attrs present:**
+
+```json
+{
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "urn:scimserver:api:messages:2.0:Warning"
+  ],
+  "id": "abc-123",
+  "userName": "jdoe",
+  "urn:scimserver:api:messages:2.0:Warning": {
+    "detail": "The following readOnly attributes were ignored: groups, meta"
+  }
+}
+```
+
+**Example — Flag OFF (default):** readOnly attributes are still silently stripped, but no warning extension is added to the response. Stripping is logged server-side at WARN level.
+
+---
+
+### 4.14 IgnoreReadOnlyAttributesInPatch
+
+| Property | Value |
+|----------|-------|
+| **Config key** | `IgnoreReadOnlyAttributesInPatch` |
+| **Constant** | `ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH` |
+| **Default** | `false` |
+| **Helper** | `getConfigBoolean(config, key)` |
+| **Scope** | PATCH |
+| **RFC** | RFC 7643 §2.2 (readOnly mutability) / RFC 7644 §3.5.2 (PATCH) |
+| **Added** | v0.22.0 |
+
+**Purpose:** Override the G8c strict-mode PATCH rejection (400 error) for readOnly attributes. When both `StrictSchemaValidation` and `IgnoreReadOnlyAttributesInPatch` are ON, PATCH operations targeting readOnly attributes are silently stripped instead of rejected.
+
+**Interaction matrix:**
+
+| StrictSchemaValidation | IgnoreReadOnlyAttributesInPatch | PATCH readOnly behavior |
+|:---:|:---:|---|
+| OFF | *(any)* | Strip readOnly ops + optional warning (baseline) |
+| ON | OFF | 400 error (G8c hard-reject) |
+| ON | ON | Strip readOnly ops + optional warning (override) |
+
+**Special case:** PATCH targeting `id` always returns 400 regardless of any flags — `id` is never stripped to preserve RFC 7643 §3.1 semantics.
+
+**Example — Both strict + ignore flags ON:**
+
+```json
+{
+  "config": {
+    "StrictSchemaValidation": "True",
+    "IgnoreReadOnlyAttributesInPatch": "True",
+    "IncludeWarningAboutIgnoredReadOnlyAttribute": "True"
+  }
+}
+```
+
+With this config, a PATCH replacing `groups` will be silently stripped and a warning URN returned, instead of being rejected with a 400 error.
+
+---
+
+### 4.15 logLevel
 
 | Property | Value |
 |----------|-------|
@@ -849,6 +933,8 @@ Which flags affect which HTTP methods and resource types:
 | `CustomResourceTypesEnabled` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
 | `BulkOperationsEnabled` | ✅ | — | — | — | — | — | ✅ | ✅ |
 | `PerEndpointCredentialsEnabled` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `IncludeWarningAboutIgnored...` | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ |
+| `IgnoreReadOnlyAttributesInPatch` | — | — | ✅ | — | — | — | ✅ | ✅ |
 | `logLevel` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ---
@@ -957,6 +1043,26 @@ flowchart TD
     I -->|not reached| K[Continue processing]
     K --> L[Return BulkResponse 200]
     J --> L
+```
+
+### 6.7 StrictSchemaValidation × IgnoreReadOnlyAttributesInPatch × IncludeWarning
+
+```mermaid
+flowchart TD
+    A[PATCH request with<br>readOnly target attr] --> B{path targets 'id'?}
+    B -->|yes| C[400 Always<br>id is never stripped]
+    B -->|no| D{StrictSchemaValidation?}
+    D -->|OFF| E["Strip readOnly ops<br>(baseline safety)"]
+    D -->|ON| F{IgnoreReadOnlyAttributesInPatch?}
+    F -->|OFF| G["400 G8c hard-reject"]
+    F -->|ON| E
+    E --> H{Any ops stripped?}
+    H -->|yes| I{IncludeWarning flag ON?}
+    I -->|yes| J["Attach urn:scimserver:api:<br>messages:2.0:Warning"]
+    I -->|no| K["Silent strip<br>(server-side WARN log only)"]
+    H -->|no| L[Continue normally]
+    J --> L
+    K --> L
 ```
 
 ---
@@ -1277,6 +1383,8 @@ For production use with Microsoft Entra ID (Azure AD) provisioning, the recommen
     "StrictSchemaValidation": "True",
     "AllowAndCoerceBooleanStrings": "True",
     "BulkOperationsEnabled": "True",
+    "IgnoreReadOnlyAttributesInPatch": "True",
+    "IncludeWarningAboutIgnoredReadOnlyAttribute": "True",
     "logLevel": "INFO"
   }
 }
@@ -1295,6 +1403,8 @@ For production use with Microsoft Entra ID (Azure AD) provisioning, the recommen
 | `AllowAndCoerceBooleanStrings` = True | **Critical**: Entra sends `roles[].primary = "True"` (string), not `true` (boolean) |
 | `RequireIfMatch` = False (default) | Entra does NOT send If-Match headers — enabling would reject all writes |
 | `BulkOperationsEnabled` = True | Enables batch provisioning for large-scale initial syncs |
+| `IgnoreReadOnlyAttributesInPatch` = True | Entra may PATCH readOnly attrs — strip instead of 400 with strict ON |
+| `IncludeWarningAboutIgnored...` = True | Provides warning feedback when Entra sends readOnly attrs |
 
 > **SCIM Validator Score with this config:** 23/23 mandatory + 7/7 preview = **30/30 passed** ✅
 

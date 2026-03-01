@@ -64,6 +64,11 @@ Contents
   - `POST /admin/endpoints/:endpointId/credentials` — generate credential (returns token once)
   - `GET /admin/endpoints/:endpointId/credentials` — list credentials (hash masked)
   - `DELETE /admin/endpoints/:endpointId/credentials/:credentialId` — revoke credential
+- ReadOnly attribute stripping (RFC 7643 §2.2 — automatic)
+  - POST/PUT payloads auto-strip `mutability:'readOnly'` attributes (`id`, `meta`, `groups`, custom readOnly)
+  - PATCH ops targeting readOnly attrs silently stripped (non-strict mode) or rejected (strict mode)
+  - Optional warning URN (`urn:scimserver:api:messages:2.0:Warning`) when `IncludeWarningAboutIgnoredReadOnlyAttribute` enabled
+  - `IgnoreReadOnlyAttributesInPatch` flag overrides strict PATCH rejection → strip+warn
 - Admin endpoints (`/admin`)
   - `GET /admin/version` — version & deployment info
   - `GET /admin/logs` — list request logs (with filters)
@@ -72,9 +77,6 @@ Contents
   - `POST /admin/users/manual` — create manual user (admin convenience)
   - `POST /admin/groups/manual` — create manual group
   - `POST /admin/users/:id/delete` — delete user by identifier (204)
-- Backup endpoints (guarded)
-  - `GET /admin/backup/stats` — backup statistics
-  - `POST /admin/backup/trigger` — manually trigger backup
 - Log Configuration endpoints (guarded)
   - `GET /admin/log-config` — get current log configuration
   - `PUT /admin/log-config` — update log configuration (partial)
@@ -552,18 +554,6 @@ The guard extracts the `endpointId` from the URL, loads active non-expired crede
 
 ---
 
-Backup endpoints (guarded by shared secret / OAuth)
-
-1) GET /admin/backup/stats
-- Returns backup mode, counts, lastBackupTime, lastBackupSucceeded, restoredFromSnapshot, etc.
-- Example curl:
-```
-curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/admin/backup/stats"
-```
-
-2) POST /admin/backup/trigger
-- Manually trigger a backup (returns success + timestamp).
-
 ---
 
 OAuth endpoints
@@ -774,13 +764,6 @@ curl -i -X POST "${API_BASE}/scim/v2/admin/users/manual" \
   -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/scim+json" \
   -d '{"userName":"seed.user@example.com","externalId":"seed-001","displayName":"Seed User","givenName":"Seed","familyName":"User","email":"seed.user@example.com"}'
-```
-
-Backup examples:
-
-```sh
-curl -s -H "Authorization: Bearer ${TOKEN}" "${API_BASE}/scim/v2/admin/backup/stats" | jq .
-curl -i -X POST "${API_BASE}/scim/v2/admin/backup/trigger" -H "Authorization: Bearer ${TOKEN}"
 ```
 
 Log Configuration endpoints (runtime log management):

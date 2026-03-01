@@ -2271,7 +2271,7 @@ Test-Result -Success ($null -ne $logConfig.globalLevel) -Message "GET log-config
 Test-Result -Success ($null -ne $logConfig.availableLevels) -Message "GET log-config returns availableLevels"
 Test-Result -Success ($logConfig.availableLevels.Count -eq 7) -Message "availableLevels has 7 entries (TRACE..OFF)"
 Test-Result -Success ($null -ne $logConfig.availableCategories) -Message "GET log-config returns availableCategories"
-Test-Result -Success ($logConfig.availableCategories.Count -eq 12) -Message "availableCategories has 12 entries"
+Test-Result -Success ($logConfig.availableCategories.Count -eq 11) -Message "availableCategories has 11 entries"
 Test-Result -Success ($null -ne $logConfig.format) -Message "GET log-config returns format"
 Test-Result -Success ($null -ne $logConfig.categoryLevels) -Message "GET log-config returns categoryLevels"
 Test-Result -Success ($null -ne $logConfig.endpointLevels) -Message "GET log-config returns endpointLevels"
@@ -2322,7 +2322,7 @@ Test-Result -Success ($configAfterCat.categoryLevels.'http' -eq "TRACE") -Messag
 # Unknown category
 $badCatResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/category/nonexistent/DEBUG" -Method PUT -Headers $headers
 Test-Result -Success ($badCatResult.error -like "*Unknown category*") -Message "Unknown category returns error message"
-Test-Result -Success ($badCatResult.availableCategories.Count -eq 12) -Message "Unknown category response includes available categories"
+Test-Result -Success ($badCatResult.availableCategories.Count -eq 11) -Message "Unknown category response includes available categories"
 
 # --- PUT/DELETE endpoint level overrides ---
 Write-Host "`n--- Test: Endpoint Level Override ---" -ForegroundColor Cyan
@@ -4356,6 +4356,215 @@ try { $null = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$credEpId" -
 try { $null = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$disabledEpId" -Method DELETE -Headers $headers } catch {}
 
 Write-Host "`n--- 9s: Per-Endpoint Credentials Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9t: READONLY ATTRIBUTE STRIPPING (RFC 7643 §2.2)
+$script:currentSection = "9t"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9t: READONLY ATTRIBUTE STRIPPING (RFC 7643 S2.2)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Create a dedicated endpoint with warning flag enabled
+$roStripBody = @{
+    name = "readonly-strip-test-$(Get-Random)"
+    config = @{
+        IncludeWarningAboutIgnoredReadOnlyAttribute = $true
+    }
+} | ConvertTo-Json -Depth 3
+$roEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $roStripBody
+$roEpId = $roEndpoint.id
+$roScimBase = "$baseUrl/scim/endpoints/$roEpId"
+
+# 9t.1: POST /Users with client-supplied id — should be stripped, server UUID assigned
+Write-Host "`n--- 9t.1: POST /Users strips client id ---" -ForegroundColor Cyan
+$roUser1Body = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "readonly-test-$(Get-Random)@example.com"
+    id = "client-supplied-id-999"
+    displayName = "ReadOnly Strip Test"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$roUser1 = Invoke-RestMethod -Uri "$roScimBase/Users" -Method POST -Headers $headers -Body $roUser1Body -ContentType "application/scim+json"
+Test-Result -Success ($roUser1.id -ne "client-supplied-id-999") -Message "9t.1: Client-supplied id stripped, server UUID assigned"
+Test-Result -Success ($roUser1.displayName -eq "ReadOnly Strip Test") -Message "9t.1: readWrite attrs preserved"
+$roUserId = $roUser1.id
+
+# 9t.2: POST response includes warning URN when flag enabled
+Write-Host "`n--- 9t.2: Warning URN in POST response ---" -ForegroundColor Cyan
+Test-Result -Success ($roUser1.schemas -contains "urn:scimserver:api:messages:2.0:Warning") -Message "9t.2: Warning URN present in schemas when readOnly attrs stripped"
+$warningBlock = $roUser1.'urn:scimserver:api:messages:2.0:Warning'
+Test-Result -Success ($null -ne $warningBlock -and $warningBlock.warnings.Count -gt 0) -Message "9t.2: Warning block contains stripped attribute names"
+
+# 9t.3: PUT /Users strips readOnly attributes
+Write-Host "`n--- 9t.3: PUT /Users strips readOnly ---" -ForegroundColor Cyan
+$roPutBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $roUser1.userName
+    id = "overridden-id"
+    displayName = "PUT Updated"
+    groups = @(@{value = "injected-group"})
+    active = $true
+} | ConvertTo-Json -Depth 3
+$roPut = Invoke-RestMethod -Uri "$roScimBase/Users/$roUserId" -Method PUT -Headers $headers -Body $roPutBody -ContentType "application/scim+json"
+Test-Result -Success ($roPut.id -eq $roUserId) -Message "9t.3: PUT does not override server-assigned id"
+Test-Result -Success ($roPut.displayName -eq "PUT Updated") -Message "9t.3: readWrite attrs updated via PUT"
+Test-Result -Success ($roPut.schemas -contains "urn:scimserver:api:messages:2.0:Warning") -Message "9t.3: Warning URN in PUT response"
+
+# 9t.4: PATCH targeting readOnly attribute (path-based) — silently stripped
+Write-Host "`n--- 9t.4: PATCH readOnly attr stripped ---" -ForegroundColor Cyan
+$roPatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "replace"; path = "groups"; value = @(@{value = "fake-group"}) },
+        @{ op = "replace"; path = "displayName"; value = "PatchedName" }
+    )
+} | ConvertTo-Json -Depth 4
+$roPatch = Invoke-RestMethod -Uri "$roScimBase/Users/$roUserId" -Method PATCH -Headers $headers -Body $roPatchBody -ContentType "application/scim+json"
+Test-Result -Success ($roPatch.displayName -eq "PatchedName") -Message "9t.4: readWrite PATCH op applied"
+$groupCount = if ($roPatch.groups) { $roPatch.groups.Count } else { 0 }
+Test-Result -Success ($groupCount -eq 0) -Message "9t.4: readOnly groups PATCH op was silently stripped"
+
+# 9t.5: Warning absent when flag disabled
+Write-Host "`n--- 9t.5: No warning when flag disabled ---" -ForegroundColor Cyan
+$noWarnBody = @{
+    name = "no-warn-test-$(Get-Random)"
+    config = @{
+        IncludeWarningAboutIgnoredReadOnlyAttribute = $false
+    }
+} | ConvertTo-Json -Depth 3
+$noWarnEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $noWarnBody
+$noWarnBase = "$baseUrl/endpoints/$($noWarnEp.id)"
+$noWarnUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "nowarn-$(Get-Random)@example.com"
+    id = "should-strip-silently"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$noWarnUser = Invoke-RestMethod -Uri "$noWarnBase/Users" -Method POST -Headers $headers -Body $noWarnUserBody -ContentType "application/scim+json"
+Test-Result -Success ($noWarnUser.schemas -notcontains "urn:scimserver:api:messages:2.0:Warning") -Message "9t.5: No warning URN when flag disabled"
+Test-Result -Success ($noWarnUser.id -ne "should-strip-silently") -Message "9t.5: id still stripped even without warning"
+
+# 9t.6: PATCH id returns 400 (never stripped — G8c hard-reject)
+Write-Host "`n--- 9t.6: PATCH id returns 400 ---" -ForegroundColor Cyan
+$strictEpBody = @{
+    name = "strict-patch-id-$(Get-Random)"
+    config = @{
+        StrictSchemaValidation = $true
+    }
+} | ConvertTo-Json -Depth 3
+$strictEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $strictEpBody
+$strictBase = "$baseUrl/endpoints/$($strictEp.id)"
+$strictUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "strict-id-test-$(Get-Random)@example.com"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$strictUser = Invoke-RestMethod -Uri "$strictBase/Users" -Method POST -Headers $headers -Body $strictUserBody -ContentType "application/scim+json"
+$patchIdBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{ op = "replace"; path = "id"; value = "new-id" })
+} | ConvertTo-Json -Depth 3
+try {
+    $null = Invoke-RestMethod -Uri "$strictBase/Users/$($strictUser.id)" -Method PATCH -Headers $headers -Body $patchIdBody -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9t.6: PATCH id should return 400"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "9t.6: PATCH id returns 400 (G8c hard-reject)"
+}
+
+# 9t.7: POST /Groups with client id — server assigns UUID
+Write-Host "`n--- 9t.7: POST /Groups strips client id ---" -ForegroundColor Cyan
+$roGroupBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = "ReadOnly Group Test $(Get-Random)"
+    id = "client-group-id-999"
+} | ConvertTo-Json -Depth 3
+$roGroup = Invoke-RestMethod -Uri "$roScimBase/Groups" -Method POST -Headers $headers -Body $roGroupBody -ContentType "application/scim+json"
+Test-Result -Success ($roGroup.id -ne "client-group-id-999") -Message "9t.7: Groups client-supplied id stripped, server UUID assigned"
+Test-Result -Success ($roGroup.displayName -like "ReadOnly Group*") -Message "9t.7: Group displayName preserved"
+
+# 9t.8: Strict ON + IgnorePatchRO ON → strip and succeed
+Write-Host "`n--- 9t.8: Strict + IgnorePatchRO ON ---" -ForegroundColor Cyan
+$strictIgnoreBody = @{
+    name = "strict-ignore-ro-$(Get-Random)"
+    config = @{
+        StrictSchemaValidation = $true
+        IgnoreReadOnlyAttributesInPatch = $true
+        IncludeWarningAboutIgnoredReadOnlyAttribute = $true
+    }
+} | ConvertTo-Json -Depth 3
+$strictIgnoreEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $strictIgnoreBody
+$siBase = "$baseUrl/endpoints/$($strictIgnoreEp.id)"
+$siUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "strict-ignore-$(Get-Random)@example.com"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$siUser = Invoke-RestMethod -Uri "$siBase/Users" -Method POST -Headers $headers -Body $siUserBody -ContentType "application/scim+json"
+$siPatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "replace"; path = "groups"; value = @(@{value = "g1"}) },
+        @{ op = "replace"; path = "displayName"; value = "StrictIgnoreOK" }
+    )
+} | ConvertTo-Json -Depth 4
+$siPatch = Invoke-RestMethod -Uri "$siBase/Users/$($siUser.id)" -Method PATCH -Headers $headers -Body $siPatchBody -ContentType "application/scim+json"
+Test-Result -Success ($siPatch.displayName -eq "StrictIgnoreOK") -Message "9t.8: Strict+IgnorePatchRO: readWrite applied"
+$siGroupCount = if ($siPatch.groups) { $siPatch.groups.Count } else { 0 }
+Test-Result -Success ($siGroupCount -eq 0) -Message "9t.8: Strict+IgnorePatchRO: readOnly silently stripped"
+Test-Result -Success ($siPatch.schemas -contains "urn:scimserver:api:messages:2.0:Warning") -Message "9t.8: Warning URN present with IgnorePatchRO"
+
+# 9t.9: Strict ON + IgnorePatchRO OFF → 400 for readOnly PATCH
+Write-Host "`n--- 9t.9: Strict + IgnorePatchRO OFF ---" -ForegroundColor Cyan
+$strictKeepBody = @{
+    name = "strict-keep-ro-$(Get-Random)"
+    config = @{
+        StrictSchemaValidation = $true
+        IgnoreReadOnlyAttributesInPatch = $false
+    }
+} | ConvertTo-Json -Depth 3
+$strictKeepEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $strictKeepBody
+$skBase = "$baseUrl/endpoints/$($strictKeepEp.id)"
+$skUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "strict-keep-$(Get-Random)@example.com"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$skUser = Invoke-RestMethod -Uri "$skBase/Users" -Method POST -Headers $headers -Body $skUserBody -ContentType "application/scim+json"
+$skPatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{ op = "replace"; path = "groups"; value = @(@{value = "g1"}) })
+} | ConvertTo-Json -Depth 4
+try {
+    $null = Invoke-RestMethod -Uri "$skBase/Users/$($skUser.id)" -Method PATCH -Headers $headers -Body $skPatchBody -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9t.9: Strict+keepRO should 400 on readOnly PATCH"
+} catch {
+    $skStatus = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($skStatus -eq 400) -Message "9t.9: Strict+keepRO returns 400 for readOnly PATCH"
+}
+
+# 9t.10: No readOnly attrs in payload → no warning
+Write-Host "`n--- 9t.10: Clean payload, no warnings ---" -ForegroundColor Cyan
+$cleanUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "clean-user-$(Get-Random)@example.com"
+    displayName = "Clean User"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$cleanUser = Invoke-RestMethod -Uri "$roScimBase/Users" -Method POST -Headers $headers -Body $cleanUserBody -ContentType "application/scim+json"
+$hasWarning = $cleanUser.schemas -contains "urn:scimserver:api:messages:2.0:Warning"
+Test-Result -Success (-not $hasWarning) -Message "9t.10: No warning URN when payload has no readOnly attrs"
+
+# Cleanup
+Write-Host "`n--- 9t: Cleanup ---" -ForegroundColor Cyan
+try { $null = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$roEpId" -Method DELETE -Headers $headers } catch {}
+try { $null = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$($noWarnEp.id)" -Method DELETE -Headers $headers } catch {}
+try { $null = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$($strictEp.id)" -Method DELETE -Headers $headers } catch {}
+try { $null = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$($strictIgnoreEp.id)" -Method DELETE -Headers $headers } catch {}
+try { $null = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$($strictKeepEp.id)" -Method DELETE -Headers $headers } catch {}
+
+Write-Host "`n--- 9t: ReadOnly Attribute Stripping Tests Complete ---" -ForegroundColor Green
 
 # ============================================
 # TEST SECTION 10: DELETE OPERATIONS

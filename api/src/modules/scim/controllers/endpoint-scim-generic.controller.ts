@@ -43,6 +43,7 @@ import {
   ENDPOINT_CONFIG_FLAGS,
   type EndpointConfig,
 } from '../../endpoint/endpoint-config.interface';
+import { SCIM_WARNING_URN } from '../common/scim-service-helpers';
 import { EndpointScimGenericService } from '../services/endpoint-scim-generic.service';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { ScimSchemaRegistry, type ScimResourceType } from '../discovery/scim-schema-registry';
@@ -58,6 +59,27 @@ export class EndpointScimGenericController {
     private readonly genericService: EndpointScimGenericService,
     private readonly schemaRegistry: ScimSchemaRegistry,
   ) {}
+
+  /**
+   * Attach readOnly-stripping warnings to a write response when
+   * IncludeWarningAboutIgnoredReadOnlyAttribute is enabled.
+   */
+  private attachWarnings(result: Record<string, unknown>, config?: EndpointConfig): Record<string, unknown> {
+    const warnings = this.endpointContext.getWarnings();
+    if (warnings.length === 0) return result;
+    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE)) return result;
+
+    const schemas = [...((result.schemas as string[]) ?? [])];
+    if (!schemas.includes(SCIM_WARNING_URN)) {
+      schemas.push(SCIM_WARNING_URN);
+    }
+
+    return {
+      ...result,
+      schemas,
+      [SCIM_WARNING_URN]: { warnings },
+    };
+  }
 
   /**
    * Validate endpoint, check custom resource types flag, and resolve the resource type.
@@ -119,7 +141,8 @@ export class EndpointScimGenericController {
       resourceTypePath,
       req,
     );
-    return this.genericService.createResource(body, baseUrl, endpointId, resourceType, config);
+    const result = await this.genericService.createResource(body, baseUrl, endpointId, resourceType, config);
+    return this.attachWarnings(result, config);
   }
 
   /**
@@ -226,7 +249,7 @@ export class EndpointScimGenericController {
       req,
     );
     const ifMatch = req.headers['if-match'] as string | undefined;
-    return this.genericService.replaceResource(
+    const result = await this.genericService.replaceResource(
       id,
       body,
       baseUrl,
@@ -235,6 +258,7 @@ export class EndpointScimGenericController {
       config,
       ifMatch,
     );
+    return this.attachWarnings(result, config);
   }
 
   /**
@@ -255,7 +279,7 @@ export class EndpointScimGenericController {
       req,
     );
     const ifMatch = req.headers['if-match'] as string | undefined;
-    return this.genericService.patchResource(
+    const result = await this.genericService.patchResource(
       id,
       body,
       baseUrl,
@@ -264,6 +288,7 @@ export class EndpointScimGenericController {
       config,
       ifMatch,
     );
+    return this.attachWarnings(result, config);
   }
 
   /**

@@ -18,9 +18,6 @@ param workloadSubnetPrefix string = '10.40.8.0/21'
 @description('Subnet prefix dedicated to private endpoints such as Storage')
 param privateEndpointSubnetPrefix string = '10.40.16.0/24'
 
-@description('Private DNS zone name used for blob private endpoints')
-param privateDnsZoneName string = format('privatelink.blob.{0}', environment().suffixes.storage)
-
 var infrastructureSubnetName = 'aca-infra'
 var workloadSubnetName = 'aca-runtime'
 var privateEndpointSubnetName = 'private-endpoints'
@@ -83,29 +80,7 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-09-01' = {
   }
 }
 
-resource dnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
-  name: privateDnsZoneName
-  location: 'global'
-  tags: {
-    project: 'scimserver'
-    component: 'private-dns'
-  }
-}
-
-resource dnsLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
-  name: '${vnet.name}-link'
-  location: 'global'
-  parent: dnsZone
-  properties: {
-    registrationEnabled: false
-    virtualNetwork: {
-      id: vnet.id
-    }
-  }
-}
-
 output vnetId string = vnet.id
 output infrastructureSubnetId string = resourceId('Microsoft.Network/virtualNetworks/subnets', vnet.name, infrastructureSubnetName)
 output workloadSubnetId string = resourceId('Microsoft.Network/virtualNetworks/subnets', vnet.name, workloadSubnetName)
 output privateEndpointSubnetId string = resourceId('Microsoft.Network/virtualNetworks/subnets', vnet.name, privateEndpointSubnetName)
-output privateDnsZoneName string = dnsZone.name

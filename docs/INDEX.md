@@ -1,6 +1,6 @@
 # 📚 SCIMServer Documentation Index
 
-> Quick navigation to all project documentation. Updated February 27, 2026.
+> Quick navigation to all project documentation. Updated February 28, 2026.
 
 > Theme conventions: onboarding-first, current-state metadata, explicit historical-context labeling, and cross-linking to canonical sources.
 
@@ -52,7 +52,7 @@
 | [SCIM_CASE_INSENSITIVITY_REFERENCE.md](SCIM_CASE_INSENSITIVITY_REFERENCE.md) | Case-insensitivity rules per RFC 7643 §2.1 |
 | [SCIM_RFC_COMPLIANCE_LAYER.md](SCIM_RFC_COMPLIANCE_LAYER.md) | Comprehensive RFC compliance layer technical reference |
 | [MULTI_MEMBER_PATCH_CONFIG_FLAG.md](MULTI_MEMBER_PATCH_CONFIG_FLAG.md) | Multi-member PATCH config flags reference |
-| [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | **Complete flag reference** — All 12 boolean flags + logLevel with applicability, precedence, combinations, diagrams, JSON examples |
+| [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | **Complete flag reference** — All 14 boolean flags + logLevel with applicability, precedence, combinations, diagrams, JSON examples |
 | [FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md](FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md) | Soft delete, strict schema validation, custom extension URNs — feature docs with diagrams, examples, DB values |
 | [EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md](EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md) | externalId CITEXT→TEXT migration — RFC 7643 §3.1 caseExact compliance fix with sequence diagrams, DB diffs, filter examples, rollback strategy |
 | [G8C_PATCH_READONLY_PREVALIDATION.md](G8C_PATCH_READONLY_PREVALIDATION.md) | G8c — PATCH readOnly pre-validation: RFC 7643 §2.2 enforcement, architecture, test coverage |
@@ -64,7 +64,7 @@
 | [PHASE_10_ME_ENDPOINT.md](PHASE_10_ME_ENDPOINT.md) | Phase 10 — `/Me` Endpoint (RFC 7644 §3.11): JWT sub→userName identity resolution, full GET/PUT/PATCH/DELETE, attribute projection |
 | [PHASE_12_SORTING_AND_DEDUP.md](PHASE_12_SORTING_AND_DEDUP.md) | Phase 12 — Sorting (RFC 7644 §3.4.2.3): `sortBy`/`sortOrder` push-down, `sort.supported: true` in SPC, G17 service deduplication (`scim-service-helpers.ts`) |
 | [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) | G11 — Per-Endpoint Credentials: bcrypt-hashed credential storage, 3-tier auth fallback chain, `PerEndpointCredentialsEnabled` flag (12th boolean flag), Admin Credential API |
-| [READONLY_ATTRIBUTE_STRIPPING_AND_WARNINGS.md](READONLY_ATTRIBUTE_STRIPPING_AND_WARNINGS.md) | ReadOnly attribute stripping & warnings: RFC 7643 §2.2 enforcement, PATCH behavior matrix, warning URN extension, 2 new config flags |
+| [READONLY_ATTRIBUTE_STRIPPING_AND_WARNINGS.md](READONLY_ATTRIBUTE_STRIPPING_AND_WARNINGS.md) | ReadOnly Attribute Stripping & Warnings (v0.22.0): RFC 7643 §2.2 enforcement for Users/Groups/Generic, PATCH behavior matrix, warning URN extension, AsyncLocalStorage middleware, 2 new config flags, 17 E2E + 10 live tests |
 | [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](DISCOVERY_ENDPOINTS_RFC_AUDIT.md) | Discovery endpoints RFC audit — SPC/ResourceTypes/Schemas vs RFC 7643 §5–§7 + RFC 7644 §4: 6 gaps (D1–D6) identified and **all resolved** |
 
 ## Validation & Testing
@@ -125,6 +125,7 @@
 | [H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md](H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md) | H-1 (PATCH validation) & H-2 (immutable enforcement) — architecture analysis & implementation |
 | [PHASE_08_REMAINING_ANALYSIS.md](PHASE_08_REMAINING_ANALYSIS.md) | Phase 8 remaining adversarial validation gap analysis — 33 gaps, sub-phases 8.5–8.8, effort estimates |
 | [ATTRIBUTE_CHARACTERISTICS_GAPS.md](ATTRIBUTE_CHARACTERISTICS_GAPS.md) | RFC 7643 §2 attribute characteristics gaps, bugs, fixes — master tracking |
+| [RFC7643_ATTRIBUTE_CHARACTERISTICS_FULL_AUDIT.md](RFC7643_ATTRIBUTE_CHARACTERISTICS_FULL_AUDIT.md) | **RFC 7643 §2 full audit** — Every characteristic × every flow × every sub-attribute, DB storage, discovery, 20 remaining work items |
 | [IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md](IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md) | Ideal SCIM architecture v3 — N-tier, unified table, JSONB, data-driven discovery |
 | [INMEMORY_ARCHITECTURE_AND_PLAN_v1_2026-02-20.md](INMEMORY_ARCHITECTURE_AND_PLAN_v1_2026-02-20.md) | In-memory architecture & plan — Map-based repo implementation |
 | [MIGRATION_AUTOMATION_STRATEGY_v1_2026-02-20.md](MIGRATION_AUTOMATION_STRATEGY_v1_2026-02-20.md) | Migration automation strategy — AI-assisted effort reduction analysis |

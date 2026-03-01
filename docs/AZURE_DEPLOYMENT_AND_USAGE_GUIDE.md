@@ -422,7 +422,6 @@ Features:
 - **Group Browser** — View groups and memberships
 - **Database Stats** — User/group counts and database info
 - **Endpoint Management** — Create/manage multiple SCIM endpoints
-- **Backup Status** — View blob snapshot backup health
 - **Log Configuration** — Adjust log levels dynamically
 - **Dark/Light Theme** — Toggle via UI
 
@@ -464,8 +463,6 @@ Features:
 | GET | `/scim/admin/database/users` | Browse users |
 | GET | `/scim/admin/database/groups` | Browse groups |
 | GET | `/scim/admin/logs` | View request logs |
-| GET | `/scim/admin/backup/stats` | Backup status |
-| POST | `/scim/admin/backup/trigger` | Trigger backup |
 | GET | `/scim/admin/version` | App version info |
 
 ### Authentication (3-Tier Fallback — v0.21.0)
@@ -553,13 +550,6 @@ az monitor log-analytics query `
   --analytics-query "ContainerAppConsoleLogs_CL | where ContainerAppName_s == 'scimserver-prod' | top 50 by TimeGenerated"
 ```
 
-### Trigger Manual Backup
-
-> **Phase 3 note:** With PostgreSQL Flexible Server, backups are automated by Azure
-> (daily full + continuous WAL archiving, 7-day PITR). The legacy `backup/trigger`
-> endpoint is still available but performs no useful action in PostgreSQL mode.
-> Use Azure Portal → PG Flexible Server → Backups for restore operations.
-
 ---
 
 ## 8. Troubleshooting
@@ -593,9 +583,9 @@ az monitor log-analytics query `
 | VNet / DNS | ~$0.50 |
 | **Total** | **~$19–38/month** |
 
-> **Phase 3 change:** Replaced Blob Storage (~$0.50) + Private Endpoint (~$7.50) with
-> PG Flexible Server (~$13–18). Net increase ~$5–10/mo, offset by automated backups,
-> multi-replica support, and zero data loss risk.
+> **Phase 3 (v0.23.0):** Replaced Blob Storage + Private Endpoint with PG Flexible Server.
+> PostgreSQL WAL backup (daily full + 7-day PITR) is fully automated by Azure at no extra config.
+> Net cost vs SQLite era: ~$5–10/mo more, offset by zero data loss risk and multi-replica support.
 
 > Costs vary by region and usage. Container App scale-to-zero means minimal compute
 > charges during idle periods. PG Flexible Server runs 24/7.

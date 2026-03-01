@@ -1,4 +1,4 @@
-﻿import { Module } from '@nestjs/common';
+﻿import { Module, type NestModule, type MiddlewareConsumer } from '@nestjs/common';
 import { APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
 
 import { LoggingModule } from '../logging/logging.module';
@@ -72,4 +72,15 @@ import { ScimExceptionFilter } from './filters/scim-exception.filter';
     }
   ]
 })
-export class ScimModule {}
+export class ScimModule implements NestModule {
+  constructor(private readonly endpointContext: EndpointContextStorage) {}
+
+  /**
+   * Register the AsyncLocalStorage middleware on ALL routes so that
+   * EndpointContextStorage.setContext / addWarnings / getWarnings
+   * work reliably across NestJS guards, interceptors, and handlers.
+   */
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(this.endpointContext.createMiddleware()).forRoutes('*');
+  }
+}

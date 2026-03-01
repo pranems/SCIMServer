@@ -25,7 +25,19 @@
 | `/Me` Endpoint (RFC 7644 §3.11) | **100%** | JWT `sub` → `userName` identity resolution, full CRUD delegation, attribute projection (v0.20.0) |
 | Per-Endpoint Credentials (RFC 7643 §7) | **100%** | bcrypt-hashed per-endpoint tokens, admin CRUD API, 3-tier fallback chain, `PerEndpointCredentialsEnabled` flag (v0.21.0) |
 
-**Overall: 100% RFC 7643/7644 compliant** — All 27 migration gaps (G1–G20) fully resolved as of v0.21.0. All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. Full suite: **2,581 unit tests (77 suites), 522 E2E tests (25 suites), 485 live integration tests.**
+**Overall: 100% RFC 7643/7644 compliant** — All 27 migration gaps (G1–G20) fully resolved as of v0.22.0. All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. Full suite: **2,532 unit tests (73 suites), 539 E2E tests (26 suites), 485 live integration tests.**
+
+### New in v0.22.0
+
+| Feature | Description |
+|---------|-------------|
+| ReadOnly Attribute Stripping (RFC 7643 §2.2) | POST/PUT payloads auto-strip `mutability:'readOnly'` attributes (`id`, `meta`, `groups`, custom readOnly). PATCH readOnly ops silently stripped (behavior matrix: strict OFF → strip; strict ON + `IgnoreReadOnlyAttributesInPatch` → strip; strict ON without flag → G8c 400). Covers Users, Groups, AND Generic (custom) resource types. |
+| Warning URN Extension | `urn:scimserver:api:messages:2.0:Warning` in responses when `IncludeWarningAboutIgnoredReadOnlyAttribute` enabled. Industry-aligned (Okta, Ping, AWS SSO pattern). |
+| 2 New Config Flags | `IncludeWarningAboutIgnoredReadOnlyAttribute` (14th boolean flag, default: false) + `IgnoreReadOnlyAttributesInPatch` (15th boolean flag, default: false). |
+| AsyncLocalStorage Middleware | `EndpointContextStorage.createMiddleware()` wraps requests in `storage.run()` for reliable warning accumulation across NestJS interceptor pipeline. Critical fix: `enterWith()` context loss. |
+| Generic Service readOnly Support | Dynamic schema resolution via `getSchemaDefinitions()` for custom resource types. Full PATCH behavior matrix coverage. |
+| BF-1: Groups `id` Fix | Server-generates `randomUUID()` always — client `id` no longer accepted (RFC 7643 §3.1). |
+| Test Coverage | 13 unit (strip helpers) + 10 unit (EndpointContextStorage) + 17 E2E (readonly-stripping) + 10 live (section 9t). |
 
 ### New in v0.21.0
 

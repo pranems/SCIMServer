@@ -77,3 +77,8 @@ live-test-output.txt
 api/groups-test-output.txt
 docker-live-pipeline.txt
 docker-live-test-pipeline.txt
+api/ctx-test.txt
+api/debug-output.txt
+api/fail-detail.txt
+api/unit-check.json
+api/unit-check.json

@@ -1,6 +1,6 @@
 # SCIMServer Deployment Options
 
-> Version baseline: v0.17.1 · Updated: February 24, 2026 · Scope: production + local deployment paths
+> Version baseline: v0.21.0 · Updated: February 28, 2026 · Scope: production + local deployment paths
 
 This document covers all deployment methods for SCIMServer. For the quickest start, use the Azure deployment described in the main [README.md](./README.md). For the most comprehensive Azure guide with architecture diagrams, see [docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md).
 
@@ -14,7 +14,7 @@ This document covers all deployment methods for SCIMServer. For the quickest sta
 iex (iwr https://raw.githubusercontent.com/pranems/SCIMServer/master/bootstrap.ps1).Content
 ```
 
-Prompts for Resource Group, App Name, Region, and SCIM Secret. Provisions all Azure resources automatically (VNet, Blob Storage with private endpoint, Container Apps Environment, Container App, Log Analytics).
+Prompts for Resource Group, App Name, Region, and SCIM Secret. Provisions all Azure resources automatically (VNet, Container Apps Environment, Container App, Log Analytics, optional PostgreSQL Flexible Server).
 
 ### Scripted Deploy
 
@@ -26,7 +26,9 @@ Prompts for Resource Group, App Name, Region, and SCIM Secret. Provisions all Az
   -ScimSecret "your-secure-secret"
 ```
 
-Optional parameters: `-JwtSecret`, `-OauthClientSecret`, `-ImageTag`, `-BlobBackupAccount`, `-BlobBackupContainer`.
+Optional parameters: `-JwtSecret`, `-OauthClientSecret`, `-ImageTag`, `-DatabaseUrl` (BYO PostgreSQL connection string), `-ProvisionPostgres` (auto-provision Azure PostgreSQL Flexible Server).
+
+> **PostgreSQL required (Phase 3):** SCIMServer uses PostgreSQL as its persistence backend. Provide either `-DatabaseUrl "postgresql://..."` (existing server) or `-ProvisionPostgres` (the script will deploy an Azure Database for PostgreSQL Flexible Server via `infra/postgres.bicep`, ~$15-25/mo additional).
 
 > The deployment script prints three secrets at the end (SCIM bearer, JWT signing, OAuth client). **Store each value securely** — they are not stored anywhere else.
 
@@ -59,22 +61,19 @@ curl "https://<app-url>/scim/admin/log-config/download?format=json" -H "Authoriz
 | Step | Resource | Bicep Template |
 |------|----------|----------------|
 | 1 | Resource Group | `az group create` |
-| 2 | VNet + 3 subnets + Private DNS | `infra/networking.bicep` |
-| 3 | Storage Account + Private Endpoint | `infra/blob-storage.bicep` |
+| 2 | VNet + 3 subnets | `infra/networking.bicep` |
+| 3 | *(Optional)* Azure PostgreSQL Flexible Server | `infra/postgres.bicep` |
 | 4 | Container Apps Environment + Log Analytics | `infra/containerapp-env.bicep` |
 | 5 | Container App (SCIMServer) | `infra/containerapp.bicep` |
-| 6 | RBAC role assignment (Storage Blob Data Contributor) | `az role assignment create` |
 
 ### Benefits
 
 - **HTTPS**: Automatic TLS certificate management
 - **VNet Isolation**: All inter-service traffic stays within the virtual network
-- **Private Storage**: Blob storage accessible only via private endpoint
 - **Scale to Zero**: Minimal cost when idle
-- **Managed Identity**: No storage keys — system-assigned identity with RBAC
+- **Managed Identity**: No credentials in environment — system-assigned identity
 - **Log Analytics**: Centralized logging with 30-day retention
-
-> **Current baseline**: `deploy-azure.ps1` provisions an isolated virtual network, private DNS zone, and blob storage private endpoint so the snapshot container never requires public access.
+- **PostgreSQL WAL backup**: Azure-native automated backup (7-day retention via `backupRetentionDays`)
 
 ---
 
@@ -121,9 +120,9 @@ docker run -d -p 3000:8080 `
   -e PORT=8080 `
   -e SCIM_SHARED_SECRET=your-secret `
   -e JWT_SECRET=your-jwt-secret `
-  -e OAUTH_CLIENT_ID=scimserver-client `
   -e OAUTH_CLIENT_SECRET=your-oauth-client-secret `
-  -v scim-data:/app/data `
+  -e DATABASE_URL=postgresql://user:pass@your-pg-host:5432/scimdb `
+  -e PERSISTENCE_BACKEND=prisma `
   ghcr.io/pranems/scimserver:latest
 ```
 
@@ -243,7 +242,7 @@ npm run start:debug 2>&1 | Tee-Object -FilePath scimserver.log
 
 - **Registry**: GitHub Container Registry
 - **Image**: `ghcr.io/pranems/scimserver`
-- **Tags**: `latest`, version tags (e.g., `0.17.1`), test tags (`test-<branch>`)
+- **Tags**: `latest`, version tags (e.g., `0.21.0`), test tags (`test-<branch>`)
 - **Base**: `node:24-alpine`
 - **Size**: ~350 MB
 - **Port**: 8080 (internal)
@@ -262,10 +261,10 @@ npm run start:debug 2>&1 | Tee-Object -FilePath scimserver.log
 ```powershell
 # Auto-discovery update
 iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-func.ps1'); `
-  Update-SCIMServer -Version v0.17.1
+  Update-SCIMServer -Version v0.21.0
 
 # Or manual image update
-az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.17.1
+az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.21.0
 ```
 
 ---
@@ -278,7 +277,6 @@ az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/prane
 | SCIM connection fails | Verify URL ends with `/scim/v2` and secret token matches |
 | UI not loading | Check CORS configuration and API base URL |
 | Database errors | Container runs `prisma migrate deploy` on startup; check entrypoint logs |
-| Blob backup failures | Verify managed identity has `Storage Blob Data Contributor` role |
 
 ### Useful Commands
 

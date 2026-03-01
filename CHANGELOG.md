@@ -5,6 +5,46 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.23.0] - 2026-03-01
+
+### Removed — Blob/BackupService Dead Code Elimination
+- **`BackupModule` + `BackupService` deleted** — `api/src/modules/backup/` directory removed entirely. The SQLite-era blob snapshot backup/restore system is no longer needed now that the persistence layer is PostgreSQL 17 (Azure Managed Disks + Azure-managed PITR backup).
+- **`blob-restore.ts` deleted** — `api/src/bootstrap/blob-restore.ts` startup restore hook removed (was a no-op since PostgreSQL migration).
+- **`@azure/identity` uninstalled** — Azure SDK identity package removed from `api/package.json` (was only used by `BackupService`).
+- **`@azure/storage-blob` uninstalled** — Azure SDK blob storage package removed from `api/package.json`.
+- **`infra/blob-storage.bicep` deleted** — Azure Blob Storage + private endpoint Bicep module removed.
+- **`infra/networking.bicep`** — Removed blob storage DNS private zone and VNet link.
+- **`infra/containerapp.bicep`** — Removed `BLOB_BACKUP_ACCOUNT`, `BLOB_BACKUP_CONTAINER`, `BLOB_BACKUP_INTERVAL_MIN` environment variable injections.
+- **`docker-compose.yml`** — Removed all `BLOB_BACKUP_*` env vars from local dev compose file.
+- **`LogCategory.BACKUP` enum value deleted** — `api/src/modules/logging/log-levels.ts` no longer exports `BACKUP` log category; corresponding unit assertion removed.
+- **`AppModule`** — `BackupModule` import removed.
+
+### Changed
+- **`scripts/deploy-azure.ps1`** — Removed `-BlobBackupAccount`, `-BlobBackupContainer`, `-BlobBackupIntervalMin` parameters; removed step 4 (blob RBAC assignment); deployment now a clean 5-step flow: Resource Group → PostgreSQL → ACR → Container App Environment → Container App.
+- **`DATABASE_URL` env var default** — Changed from `file:./dev.db` to `*(required)*` in all docs/references; PostgreSQL connection string is now mandatory.
+- TypeScript compile: Exit 0, no type errors introduced by removal.
+
+### Documentation — Comprehensive Stale Reference Sweep
+All "living" reference docs updated to remove blob/backup content. Historical docs left intact (they are archives by design).
+
+- **`README.md`** — Removed "backup stats" from feature list; removed "optional blob snapshot backup mode"; removed `App --> Blob` Mermaid node; removed backup API link.
+- **`DEPLOYMENT.md`** — Removed `-BlobBackupAccount`/`-BlobBackupContainer` optional params; updated "What Gets Deployed" table (steps 1-5, no blob row); removed "Private Storage" bullet; updated troubleshooting table.
+- **`docs/CONTEXT_INSTRUCTIONS.md`** — Removed `Backup` row from tech table; removed `backup.service.ts` from file listings; replaced `infra/blob-storage.bicep` with `infra/postgres.bicep`; added blob-removed gotcha note at line 364.
+- **`docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md`** — Removed Backup Status UI item; removed backup admin API rows; removed "Trigger Manual Backup" section; updated cost note.
+- **`docs/COMPLETE_API_REFERENCE.md`** — Removed backup endpoints from ToC; removed backup endpoints section; removed backup curl examples.
+- **`docs/PROJECT_HEALTH_AND_STATS.md`** — Removed `BackupModule`/`BackupService` from module and service lists; removed azure SDK packages; replaced `blob-storage.bicep` with `postgres.bicep` in infra table; removed BackupService tech debt item.
+- **`docs/LOGGING_AND_OBSERVABILITY.md`** — Removed `BackupService` from architecture diagram; removed `backup` category from log categories table; removed `"backup"` from all 4 `availableCategories` JSON examples; removed section "8.6 Backup Operation".
+- **`docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md`** — Removed Backup log category row; removed `"backup"` from both `availableCategories` JSON responses; removed backup workflow step.
+- **`docs/TECHNICAL_DESIGN_DOCUMENT.md`** — Version 1.1→1.2; removed backup from architecture diagram and module graph; removed BackupModule from module responsibilities table; removed section "5.5 BackupService" (renumbered 5.6→5.5, 5.7→5.6, 5.8→5.7); removed backup env vars; updated Azure Resource Architecture to replace blob storage with PostgreSQL Flexible Server; updated tech stack SQLite→PostgreSQL 17.
+- **`docs/TECHNICAL_REQUIREMENTS_DOCUMENT.md`** — Replaced FR-600–FR-607 (SQLite + blob snapshot requirements) with new FR-600–FR-604 (PostgreSQL persistence requirements); removed FR-707 (blob storage private endpoint); updated NFR-010 and NFR-012 backup descriptions.
+- **`docs/DOCKER_GUIDE_AND_TEST_REPORT.md`** — Added "⚠️ PARTIAL HISTORICAL CONTENT" banner noting blob/backup/SQLite-era sections are historical.
+
+### Intentionally Untouched (Historical Archives)
+- `docs/STORAGE_AND_BACKUP.md` — Already marked `⚠️ HISTORICAL`, correct as-is.
+- `docs/SQLITE_COMPROMISE_ANALYSIS.md` — SQLite-era analysis document, historical context correct.
+- `docs/MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md` — Migration plan document, historical.
+- `docs/PERSISTENCE_PERFORMANCE_ANALYSIS.md` — Historical performance analysis.
+
 ## [0.22.0] - 2026-02-28
 
 ### Added — ReadOnly Attribute Stripping & Warnings (RFC 7643 §2.2)
@@ -17,16 +57,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`stripReadOnlyAttributes()` helper** — Strips readOnly top-level attributes from POST/PUT payloads with case-insensitive matching and extension URN block support.
 - **`stripReadOnlyPatchOps()` helper** — Filters PATCH operations, never stripping `id` (kept for G8c hard-reject), handles path-based, no-path, and extension URN ops.
 - **`SCIM_WARNING_URN` constant** — `urn:scimserver:api:messages:2.0:Warning` exported from `scim-service-helpers.ts`.
-- **Controller `attachWarnings()` method** — Private helper on Users/Groups controllers to annotate write responses with warning extension.
-- **13 new unit tests** — `stripReadOnlyAttributes` (5 tests) + `stripReadOnlyPatchOps` (7 tests) + `SCIM_WARNING_URN` (1 test).
+- **Controller `attachWarnings()` method** — Private helper on Users/Groups/Generic controllers to annotate write responses with warning extension.
+- **Generic service readOnly stripping** — `EndpointScimGenericService` now uses dynamic schema-driven readOnly stripping with `getSchemaDefinitions()` and the PATCH behavior matrix, covering custom resource types registered via Admin API.
+- **AsyncLocalStorage middleware** — `EndpointContextStorage.createMiddleware()` wraps each request in `storage.run()` to ensure warning accumulation works correctly across NestJS interceptors/guards/handlers. Registered in `ScimModule.configure()`.
+- **17 E2E tests** — New `readonly-stripping.e2e-spec.ts` covering POST/PUT/PATCH stripping, warning URN presence/absence, PATCH behavior matrix (strict ON/OFF, IgnorePatchRO ON/OFF).
+- **10 live test cases** — Section 9t in `live-test.ps1` covering readOnly stripping scenarios for local, Docker, and Azure deployments.
+- **10 new unit tests** — `EndpointContextStorage` addWarnings/getWarnings, createMiddleware, run() scope tests.
 
 ### Fixed
 - **BF-1: Groups `id` client-controlled** — POST /Groups previously accepted `dto.id` from the client payload. Now always server-generates via `randomUUID()` per RFC 7643 §2.2 (id is readOnly, server-assigned).
+- **AsyncLocalStorage context loss** — `enterWith()` didn't propagate through NestJS's interceptor pipeline. Fixed by introducing an Express middleware that creates the store via `storage.run()`, with `setContext()` mutating the existing store in-place.
 
 ### Changed
-- Total unit tests: 2508 → **2521** (13 new strip helper tests).
+- Total unit tests: 2508 → **2532** (13 strip helper + 10 context storage + others).
+- Total E2E tests: 522 → **539** (17 new readonly-stripping).
 - Config flags: 13 → **15** (2 new readOnly-related flags).
-- `EndpointContextStorage` — Added `addWarnings()`/`getWarnings()` API for request-scoped warning accumulation.
+- `EndpointContextStorage` — Added `addWarnings()`/`getWarnings()` API, `createMiddleware()`, mutating `setContext()` for request-scoped warning accumulation.
 - `ScimSchemaHelpers` — Added `stripReadOnlyAttributesFromPayload()` and `stripReadOnlyFromPatchOps()` convenience methods.
 
 ### Documentation

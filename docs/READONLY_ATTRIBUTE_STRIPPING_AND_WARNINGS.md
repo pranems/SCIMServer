@@ -205,7 +205,95 @@ export function stripReadOnlyPatchOps(
 
 The `EndpointContextStorage` gets `addWarnings()` and `getWarnings()` methods. Services call `addWarnings()` after stripping. Controllers check `getWarnings()` and attach the warning URN if the flag is ON.
 
-### 4. Controller Response Assembly
+#### AsyncLocalStorage Middleware (Critical Fix)
+
+**Problem**: The initial implementation used `AsyncLocalStorage.enterWith()` in the controller guard to set the endpoint context. However, NestJS's interceptor pipeline (`ScimContentTypeInterceptor`, `ScimEtagInterceptor` via `APP_INTERCEPTOR`) creates new async boundaries. `enterWith()` scopes the store to the current execution context only — child async operations spawned by interceptors lose the store reference.
+
+**Root Cause**: `storage.getStore()` returned `undefined` inside service methods because the interceptor pipeline broke the `enterWith()` continuation chain.
+
+**Solution**: Express middleware wrapping each request in `storage.run()`:
+
+```
+Request → Express Middleware (storage.run({...}))
+            ↓
+         NestJS Guards (setContext mutates store in-place)
+            ↓
+         NestJS Interceptors (same store reference ✅)
+            ↓
+         Controller + Service (addWarnings/getWarnings ✅)
+            ↓
+         Response
+```
+
+**Key design decisions:**
+
+1. **`createMiddleware()`** — `EndpointContextStorage` exposes a factory method returning Express middleware: `(req, res, next) => this.storage.run({ endpointId: '', baseUrl: '' }, next)`
+2. **`setContext()` mutates** — instead of replacing the store with `enterWith()`, it mutates the existing store object created by the middleware. This preserves the `storage.run()` scope chain.
+3. **`ScimModule.configure()`** — `ScimModule` implements `NestModule` and registers the middleware on `forRoutes('*')` via the NestJS `MiddlewareConsumer`.
+4. **Warnings survive `setContext()`** — `setContext()` does NOT reset the `warnings` array, so warnings accumulated before or after context setup are preserved.
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant ExpressMiddleware as Express Middleware<br>(storage.run)
+    participant Guard as SharedSecretGuard<br>(setContext)
+    participant Interceptor as ScimContentTypeInterceptor
+    participant Controller
+    participant Service
+
+    Client->>ExpressMiddleware: HTTP Request
+    ExpressMiddleware->>ExpressMiddleware: storage.run({ endpointId: '', baseUrl: '' }, next)
+    Note over ExpressMiddleware: Creates store scope
+    
+    ExpressMiddleware->>Guard: next()
+    Guard->>Guard: setContext() — mutates store.endpointId, store.baseUrl
+    
+    Guard->>Interceptor: passes through
+    Note over Interceptor: Same store reference ✅
+    
+    Interceptor->>Controller: handle()
+    Controller->>Service: create/replace/patch
+    Service->>Service: stripReadOnly → addWarnings()
+    Note over Service: store.warnings.push(...) ✅
+    
+    Service-->>Controller: result
+    Controller->>Controller: getWarnings() → attach URN
+    Note over Controller: store.warnings accessible ✅
+    
+    Controller-->>Client: Response with warning URN
+```
+
+### 4. Generic Service Dynamic Schema Resolution
+
+The Generic service (`EndpointScimGenericService`) handles custom resource types registered via the Admin API. Unlike Users/Groups which have hardcoded schema constants, Generic resources require dynamic schema lookup:
+
+```typescript
+private async getSchemaDefinitions(
+  resourceType: string,
+  endpointId: string,
+): Promise<SchemaDefinition[]> {
+  const registeredType = await this.resourceTypeRepo.findByName(endpointId, resourceType);
+  if (!registeredType?.schemaUrn) return [];
+  
+  const schemaDef = this.schemaRegistry.getSchemaByUrn(registeredType.schemaUrn);
+  if (!schemaDef) return [];
+  
+  const definitions: SchemaDefinition[] = [{ urn: registeredType.schemaUrn, attributes: schemaDef.attributes ?? [] }];
+  
+  // Add extension schemas
+  for (const ext of registeredType.schemaExtensions ?? []) {
+    const extDef = this.schemaRegistry.getSchemaByUrn(ext.schema);
+    if (extDef) {
+      definitions.push({ urn: ext.schema, attributes: extDef.attributes ?? [] });
+    }
+  }
+  return definitions;
+}
+```
+
+This enables readOnly attribute stripping for **any** custom schema with readOnly attributes, not just the built-in User/Group schemas.
+
+### 5. Controller Response Assembly
 
 ```typescript
 // In controller after service call:
@@ -309,18 +397,18 @@ graph LR
 | `ValidationWarning` type | ~2 | Interface shape; warnings array in ValidationResult |
 | Service integration | ~6 | Strip called in create/replace/patch for Users and Groups |
 
-### E2E Tests
+### E2E Tests (17 tests — `readonly-stripping.e2e-spec.ts`)
 
 | Test Area | Count | Description |
 |-----------|-------|-------------|
-| POST with readOnly attrs | ~4 | groups/meta stripped; response has no groups/meta; warning URN when flag ON |
-| PUT with readOnly attrs | ~3 | Same as POST |
-| PATCH readOnly (non-strict) | ~4 | Ops stripped; resource unchanged; warning URN |
-| PATCH readOnly (strict + ignore) | ~3 | Override G8c → strip instead of 400 |
-| PATCH `id` (all modes) | ~2 | Always 400 |
-| Groups `id` bug fix | ~2 | Client-supplied id ignored; server assigns UUID |
+| POST /Users strip | 4 | groups stripped; id stripped; meta stripped; preserved attrs unchanged |
+| PUT /Users strip | 1 | readOnly stripped on replace |
+| PATCH /Users strip | 3 | Ops targeting readOnly stripped; id rejection always 400; op count preserved |
+| POST /Groups strip | 1 | Client-supplied id ignored; server assigns UUID |
+| Warning URN | 5 | Warning present when flag ON; absent when OFF; correct shape; URN on PUT; URN on PATCH |
+| PATCH behavior matrix | 3 | strict OFF → strip; strict+ignore → strip; strict without ignore → G8c 400 |
 
-### Live Integration Tests (Planned — Section 9t)
+### Live Integration Tests (Section 9t — Implemented)
 
 | Test ID | Description |
 |---------|-------------|
@@ -347,10 +435,14 @@ graph LR
 | `api/src/domain/validation/schema-validator.ts` | ReadOnly → warning (optional), collect readOnly attribute sets |
 | `api/src/modules/scim/services/endpoint-scim-users.service.ts` | Call strip helpers in create + replace + patch |
 | `api/src/modules/scim/services/endpoint-scim-groups.service.ts` | Call strip helpers + fix `id` bug (line 143 → always randomUUID) + fix meta leak |
-| `api/src/modules/scim/services/endpoint-scim-generic.service.ts` | Call strip helpers in create + replace + patch |
+| `api/src/modules/scim/services/endpoint-scim-generic.service.ts` | Call strip helpers in create + replace + patch; dynamic schema resolution via `getSchemaDefinitions()` |
 | `api/src/modules/scim/controllers/endpoint-scim-users.controller.ts` | Attach warning URN to responses |
 | `api/src/modules/scim/controllers/endpoint-scim-groups.controller.ts` | Attach warning URN to responses |
-| `scripts/live-test.ps1` | Section 9t: 10+ live integration tests |
+| `api/src/modules/scim/controllers/endpoint-scim-generic.controller.ts` | Attach warning URN to POST/PUT/PATCH responses |
+| `api/src/modules/endpoint/endpoint-context.storage.ts` | Major rewrite: `createMiddleware()` with `storage.run()`, mutating `setContext()`, request-scoped warnings |
+| `api/src/modules/scim/scim.module.ts` | Implements `NestModule`; registers AsyncLocalStorage middleware on all routes |
+| `api/test/e2e/readonly-stripping.e2e-spec.ts` | 17 E2E tests: strip behavior + warning URN + PATCH behavior matrix |
+| `scripts/live-test.ps1` | Section 9t: 10 live integration tests |
 | `docs/READONLY_ATTRIBUTE_STRIPPING_AND_WARNINGS.md` | This document |
 
 ## Migration Plan Impact

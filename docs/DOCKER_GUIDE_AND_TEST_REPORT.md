@@ -1,12 +1,14 @@
 # 🐳 SCIMServer Docker Guide — Build, Deploy & Live Test Report
 
+> **⚠️ PARTIAL HISTORICAL CONTENT:** Sections describing Azure Files mounts, blob snapshot restore logic, and `BackupService` cron are SQLite-era (pre-v0.11.0) and no longer apply. The startup flow, environment variables, and test results are current.
+
 > **Date:** February 11, 2026  
 > **Image:** `scimserver:live-test` (496 MB, Alpine Linux)  
 > **Test Result (historical run):** ✅ **212/212 tests passed** in 4.9s  
-> **Current baseline:** ✅ **444/444 live integration tests passed** (local + Docker)  
+> **Current baseline:** ✅ **485/485 live integration tests passed** (local + Docker)  
 > **Database:** PostgreSQL 17 (docker postgres:17-alpine)  
 > **Base Image:** `node:24-alpine` (multi-stage build)
-> **Runtime note:** Current production image exposes and serves on `8080` (not `80`). Unit tests: **2,357/2,357** (69 suites). E2E tests: **455/455** (22 suites).
+> **Runtime note:** Current production image exposes and serves on `8080` (not `80`). Unit tests: **2,532/2,532** (73 suites). E2E tests: **539/539** (26 suites).
 
 ---
 

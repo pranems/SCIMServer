@@ -7,6 +7,7 @@ import { ScimLogger } from '../../logging/scim-logger.service';
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import type { ScimResourceType } from '../discovery/scim-schema-registry';
 import type { GenericResourceRecord } from '../../../domain/models/generic-resource.model';
+import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 
 describe('EndpointScimGenericService', () => {
@@ -90,6 +91,15 @@ describe('EndpointScimGenericService', () => {
             error: jest.fn(),
             fatal: jest.fn(),
             isEnabled: jest.fn().mockReturnValue(true),
+          },
+        },
+        {
+          provide: EndpointContextStorage,
+          useValue: {
+            addWarnings: jest.fn(),
+            getWarnings: jest.fn().mockReturnValue([]),
+            setContext: jest.fn(),
+            getContext: jest.fn(),
           },
         },
       ],
