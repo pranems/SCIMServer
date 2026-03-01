@@ -2711,6 +2711,10 @@ describe('EndpointScimGroupsService', () => {
           service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id)
         ).rejects.toThrow(HttpException);
 
+        // Re-mock for second call (mockResolvedValueOnce is consumed by first call)
+        mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
+        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(conflictGroup);
+
         try {
           await service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id);
         } catch (e: any) {

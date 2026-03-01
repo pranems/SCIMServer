@@ -2,7 +2,7 @@
 
 > RFC compliance status and Microsoft Entra ID provisioning compatibility for SCIMServer.
 
-**Last Updated:** February 26, 2026
+**Last Updated:** February 27, 2026
 
 ---
 
@@ -22,8 +22,24 @@
 | ETag / Conditional Requests (RFC 7644 §3.14) | **100%** | Version-based ETags `W/"v{N}"`, If-None-Match → 304, If-Match → 412, RequireIfMatch → 428 |
 | Sorting (RFC 7644 §3.4.2.3) | **100%** | `sortBy` / `sortOrder` on GET and POST `/.search` for Users, Groups, Generic. SPC: `sort.supported: true` (v0.20.0) |
 | Bulk Operations (RFC 7644 §3.7) | **100%** | `POST /Bulk` with sequential processing, `bulkId` cross-referencing, `failOnErrors` threshold, per-endpoint `BulkOperationsEnabled` flag (v0.19.0) |
+| `/Me` Endpoint (RFC 7644 §3.11) | **100%** | JWT `sub` → `userName` identity resolution, full CRUD delegation, attribute projection (v0.20.0) |
+| Per-Endpoint Credentials (RFC 7643 §7) | **100%** | bcrypt-hashed per-endpoint tokens, admin CRUD API, 3-tier fallback chain, `PerEndpointCredentialsEnabled` flag (v0.21.0) |
 
-**Overall: ~99% RFC 7643/7644 compliant** (remaining gap: G11 per-endpoint credentials — optional). All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. Discovery: 124 unit + 35 E2E tests. Full suite: 2,548+ unit tests (75 suites), 506+ E2E tests (24 suites), 463 live integration tests.
+**Overall: 100% RFC 7643/7644 compliant** — All 27 migration gaps (G1–G20) fully resolved as of v0.21.0. All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. Full suite: **2,581 unit tests (77 suites), 522 E2E tests (25 suites), 485 live integration tests.**
+
+### New in v0.21.0
+
+| Feature | Description |
+|---------|-------------|
+| G11 — Per-Endpoint Credentials | `EndpointCredential` Prisma model with bcrypt-hashed tokens. `PerEndpointCredentialsEnabled` flag (12th boolean flag). Admin API at `/admin/endpoints/{id}/credentials` (POST/GET/DELETE). 3-tier auth fallback: per-endpoint bcrypt → OAuth JWT → global secret. Lazy bcrypt loading. 33+16+22 new tests. Compliance: ~99%→**100%**. |
+
+### New in v0.20.0
+
+| Feature | Description |
+|---------|-------------|
+| Phase 10 — `/Me` Endpoint (RFC 7644 §3.11) | `ScimMeController` — resolves JWT `sub` → `userName`, delegates full CRUD. Attribute projection on all /Me operations. 11+10+15 new tests. |
+| Phase 12 — Sorting (RFC 7644 §3.4.2.3) | `scim-sort.util.ts`. `sortBy`/`sortOrder` on GET and POST `/.search`. `sort.supported: true` in SPC. 20+14+11 new tests. |
+| G17 — Service Deduplication | `scim-service-helpers.ts`: 13+ duplicate methods extracted from Users/Groups services. Users service −29% LoC, Groups service −28% LoC. 43 new unit tests. |
 
 ### New in v0.19.3
 

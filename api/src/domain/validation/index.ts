@@ -5,6 +5,7 @@ export { SchemaValidator } from './schema-validator';
 
 export type {
   ValidationError,
+  ValidationWarning,
   ValidationResult,
   SchemaAttributeDefinition,
   SchemaDefinition,

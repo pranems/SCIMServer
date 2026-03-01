@@ -18,6 +18,9 @@ import {
   sanitizeBooleanStrings,
   guardSoftDeleted,
   ScimSchemaHelpers,
+  stripReadOnlyAttributes,
+  stripReadOnlyPatchOps,
+  SCIM_WARNING_URN,
 } from './scim-service-helpers';
 
 // ─── parseJson ──────────────────────────────────────────────────────────────
@@ -381,5 +384,246 @@ describe('ScimSchemaHelpers', () => {
       // No throw — strict mode is off
       helpers.checkImmutableAttributes(existing, incoming, 'ep-1');
     });
+  });
+});
+
+// ─── SCIM_WARNING_URN constant ──────────────────────────────────────────────
+
+describe('SCIM_WARNING_URN', () => {
+  it('should be the expected string', () => {
+    expect(SCIM_WARNING_URN).toBe('urn:scimserver:api:messages:2.0:Warning');
+  });
+});
+
+// ─── stripReadOnlyAttributes ────────────────────────────────────────────────
+
+describe('stripReadOnlyAttributes', () => {
+  const coreSchema = {
+    id: 'urn:ietf:params:scim:schemas:core:2.0:User',
+    attributes: [
+      { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+      { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+      { name: 'groups', type: 'complex', multiValued: true, required: false, mutability: 'readOnly' },
+      { name: 'id', type: 'string', multiValued: false, required: true, mutability: 'readOnly' },
+      { name: 'meta', type: 'complex', multiValued: false, required: false, mutability: 'readOnly' },
+    ],
+  } as const;
+
+  const extensionSchema = {
+    id: 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User',
+    attributes: [
+      { name: 'department', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+      { name: 'computedScore', type: 'integer', multiValued: false, required: false, mutability: 'readOnly' },
+    ],
+  } as const;
+
+  it('should strip core readOnly attributes (id, meta, groups)', () => {
+    const payload: Record<string, unknown> = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+      id: 'client-supplied-id',
+      userName: 'alice@example.com',
+      groups: [{ value: 'g1' }],
+      meta: { resourceType: 'User' },
+    };
+
+    const stripped = stripReadOnlyAttributes(payload, [coreSchema]);
+
+    expect(stripped).toContain('id');
+    expect(stripped).toContain('groups');
+    expect(stripped).toContain('meta');
+    expect(payload).not.toHaveProperty('id');
+    expect(payload).not.toHaveProperty('groups');
+    expect(payload).not.toHaveProperty('meta');
+    // schemas is never stripped
+    expect(payload).toHaveProperty('schemas');
+    // readWrite attrs preserved
+    expect(payload).toHaveProperty('userName');
+  });
+
+  it('should not strip readWrite attributes', () => {
+    const payload: Record<string, unknown> = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+      userName: 'bob@example.com',
+      displayName: 'Bob',
+    };
+
+    const stripped = stripReadOnlyAttributes(payload, [coreSchema]);
+
+    expect(stripped).toHaveLength(0);
+    expect(payload.userName).toBe('bob@example.com');
+    expect(payload.displayName).toBe('Bob');
+  });
+
+  it('should strip readOnly attributes from extension URN blocks', () => {
+    const payload: Record<string, unknown> = {
+      schemas: [
+        'urn:ietf:params:scim:schemas:core:2.0:User',
+        'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User',
+      ],
+      userName: 'alice@example.com',
+      'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User': {
+        department: 'Engineering',
+        computedScore: 42,
+      },
+    };
+
+    const stripped = stripReadOnlyAttributes(payload, [coreSchema, extensionSchema]);
+
+    expect(stripped).toContain('urn:ietf:params:scim:schemas:extension:enterprise:2.0:User.computedScore');
+    const ext = payload['urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'] as Record<string, unknown>;
+    expect(ext).toHaveProperty('department');
+    expect(ext).not.toHaveProperty('computedScore');
+  });
+
+  it('should return empty array when no readOnly attributes present', () => {
+    const payload: Record<string, unknown> = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+      userName: 'carol@example.com',
+    };
+
+    const stripped = stripReadOnlyAttributes(payload, [coreSchema]);
+    expect(stripped).toHaveLength(0);
+  });
+
+  it('should perform case-insensitive matching', () => {
+    const payload: Record<string, unknown> = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+      ID: 'client-id',
+      Groups: [{ value: 'g1' }],
+      userName: 'alice@example.com',
+    };
+
+    const stripped = stripReadOnlyAttributes(payload, [coreSchema]);
+
+    expect(stripped).toContain('ID');
+    expect(stripped).toContain('Groups');
+    expect(payload).not.toHaveProperty('ID');
+    expect(payload).not.toHaveProperty('Groups');
+  });
+});
+
+// ─── stripReadOnlyPatchOps ──────────────────────────────────────────────────
+
+describe('stripReadOnlyPatchOps', () => {
+  const coreSchema = {
+    id: 'urn:ietf:params:scim:schemas:core:2.0:User',
+    attributes: [
+      { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+      { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+      { name: 'groups', type: 'complex', multiValued: true, required: false, mutability: 'readOnly' },
+      { name: 'id', type: 'string', multiValued: false, required: true, mutability: 'readOnly' },
+      { name: 'meta', type: 'complex', multiValued: false, required: false, mutability: 'readOnly' },
+    ],
+  } as const;
+
+  it('should strip path-based ops targeting readOnly attributes', () => {
+    const ops = [
+      { op: 'replace', path: 'groups', value: [{ value: 'g2' }] },
+      { op: 'replace', path: 'userName', value: 'alice@example.com' },
+    ];
+
+    const { filtered, stripped } = stripReadOnlyPatchOps(ops, [coreSchema]);
+
+    expect(stripped).toEqual(['groups']);
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].path).toBe('userName');
+  });
+
+  it('should NEVER strip ops targeting id (for G8c hard-reject)', () => {
+    const ops = [
+      { op: 'replace', path: 'id', value: 'new-id' },
+    ];
+
+    const { filtered, stripped } = stripReadOnlyPatchOps(ops, [coreSchema]);
+
+    expect(stripped).toHaveLength(0);
+    expect(filtered).toHaveLength(1);
+    expect(filtered[0].path).toBe('id');
+  });
+
+  it('should strip readOnly keys from no-path replace ops', () => {
+    const ops = [
+      {
+        op: 'replace',
+        value: {
+          userName: 'alice@example.com',
+          groups: [{ value: 'g2' }],
+          displayName: 'Alice',
+          meta: { resourceType: 'User' },
+        },
+      },
+    ];
+
+    const { filtered, stripped } = stripReadOnlyPatchOps(ops, [coreSchema]);
+
+    expect(stripped).toContain('groups');
+    expect(stripped).toContain('meta');
+    expect(filtered).toHaveLength(1);
+    const val = filtered[0].value as Record<string, unknown>;
+    expect(val).toHaveProperty('userName');
+    expect(val).toHaveProperty('displayName');
+    expect(val).not.toHaveProperty('groups');
+    expect(val).not.toHaveProperty('meta');
+  });
+
+  it('should keep id in no-path ops for G8c rejection', () => {
+    const ops = [
+      {
+        op: 'replace',
+        value: {
+          id: 'new-id',
+          userName: 'alice@example.com',
+        },
+      },
+    ];
+
+    const { filtered, stripped } = stripReadOnlyPatchOps(ops, [coreSchema]);
+
+    expect(stripped).toHaveLength(0);
+    expect(filtered).toHaveLength(1);
+    const val = filtered[0].value as Record<string, unknown>;
+    expect(val).toHaveProperty('id');
+    expect(val).toHaveProperty('userName');
+  });
+
+  it('should strip entire no-path op if all keys are readOnly', () => {
+    const ops = [
+      {
+        op: 'replace',
+        value: {
+          groups: [{ value: 'g2' }],
+          meta: { resourceType: 'User' },
+        },
+      },
+    ];
+
+    const { filtered, stripped } = stripReadOnlyPatchOps(ops, [coreSchema]);
+
+    expect(stripped).toContain('groups');
+    expect(stripped).toContain('meta');
+    expect(filtered).toHaveLength(0);
+  });
+
+  it('should pass through ops on readWrite attributes unchanged', () => {
+    const ops = [
+      { op: 'replace', path: 'userName', value: 'bob@example.com' },
+      { op: 'add', path: 'displayName', value: 'Bob' },
+    ];
+
+    const { filtered, stripped } = stripReadOnlyPatchOps(ops, [coreSchema]);
+
+    expect(stripped).toHaveLength(0);
+    expect(filtered).toHaveLength(2);
+  });
+
+  it('should pass through ops with array values unchanged', () => {
+    const ops = [
+      { op: 'add', value: ['some-value'] },
+    ];
+
+    const { filtered, stripped } = stripReadOnlyPatchOps(ops, [coreSchema]);
+
+    expect(stripped).toHaveLength(0);
+    expect(filtered).toHaveLength(1);
   });
 });

@@ -88,9 +88,11 @@ npm run dev
 
 | Variable | Purpose |
 |---|---|
-| `SCIM_SHARED_SECRET` | Entra provisioning bearer token for SCIM calls |
-| `JWT_SECRET` | OAuth/JWT signing key |
-| `OAUTH_CLIENT_SECRET` | OAuth client credential secret |
+| `SCIM_SHARED_SECRET` | Global shared secret bearer token — legacy fallback (tier 3 of 3-tier auth) |
+| `JWT_SECRET` | OAuth/JWT signing key (tier 2) |
+| `OAUTH_CLIENT_SECRET` | OAuth client credential secret (tier 2) |
+
+> **3-tier auth (v0.21.0):** Incoming `Bearer` tokens are evaluated as: (1) per-endpoint bcrypt credential → (2) OAuth JWT → (3) global `SCIM_SHARED_SECRET`. Enable per-endpoint credentials via the `PerEndpointCredentialsEnabled` flag and the Admin Credential API.
 
 ### Common optional variables
 
@@ -110,7 +112,12 @@ Security note: treat all secrets as sensitive and rotate after sharing/output ex
 Use these values in Enterprise Application provisioning:
 
 - Tenant URL: `https://<your-app-url>/scim/v2`
-- Secret Token: value of `SCIM_SHARED_SECRET`
+- Secret Token: value of `SCIM_SHARED_SECRET` **or** a per-endpoint credential token (recommended for multi-tenant isolation)
+
+To use a per-endpoint credential instead of the global secret:
+1. Enable `PerEndpointCredentialsEnabled` on the endpoint (`PATCH /scim/admin/endpoints/:id`)
+2. Create a credential via `POST /scim/admin/endpoints/:id/credentials`
+3. Copy the returned plaintext token (shown once) into the Entra "Secret Token" field
 
 Then test connection, configure mappings, assign users/groups, and enable provisioning.
 

@@ -594,9 +594,9 @@ CMD ["/app/docker-entrypoint.sh"]
 
 | Variable | Purpose | Example Value |
 |----------|---------|---------------|
-| `JWT_SECRET` | Signs OAuth 2.0 JWT tokens | `my-super-secret-jwt-key-123` |
-| `OAUTH_CLIENT_SECRET` | Client credentials grant password | `changeme-oauth` |
-| `SCIM_SHARED_SECRET` | Admin API bearer token authentication | `my-admin-secret` |
+| `JWT_SECRET` | Signs OAuth 2.0 JWT tokens (tier 2 auth) | `my-super-secret-jwt-key-123` |
+| `OAUTH_CLIENT_SECRET` | Client credentials grant password (tier 2 auth) | `changeme-oauth` |
+| `SCIM_SHARED_SECRET` | Global shared secret bearer token (tier 3 auth fallback) | `my-admin-secret` |
 
 ### Optional / Configurable
 
@@ -609,6 +609,18 @@ CMD ["/app/docker-entrypoint.sh"]
 | `BLOB_BACKUP_ACCOUNT` | _(empty)_ | Azure Blob storage account for snapshots |
 | `NODE_OPTIONS` | `--max_old_space_size=384` | Node.js heap limit |
 | `IMAGE_TAG` | `unknown` | Build-time arg written to `/app/.image-tag` |
+
+### Authentication Model (3-Tier Fallback — v0.21.0)
+
+All non-public routes are protected by `SharedSecretGuard` (global `APP_GUARD`). Each `Authorization: Bearer <token>` is evaluated in order:
+
+| Tier | Method | Env / Config Requirement | `req.authType` |
+|------|--------|--------------------------|----------------|
+| 1 | **Per-endpoint bcrypt credential** | `PerEndpointCredentialsEnabled` flag on endpoint + active credential | `endpoint_credential` |
+| 2 | **OAuth 2.0 JWT** | `JWT_SECRET` + `OAUTH_CLIENT_SECRET` | `oauth` |
+| 3 | **Global shared secret** | `SCIM_SHARED_SECRET` | `legacy` |
+
+All tiers fail → `401 Unauthorized` with `WWW-Authenticate: Bearer realm="SCIM"`. Per-endpoint credentials are managed via `POST/GET/DELETE /scim/admin/endpoints/:id/credentials` (requires `PerEndpointCredentialsEnabled` flag).
 
 ### Security Matrix
 

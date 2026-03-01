@@ -28,14 +28,19 @@ This document captures the current implementation reality after reading core rep
 
 ---
 
-## 3) Authentication Model
+## 3) Authentication Model (3-Tier Fallback — v0.21.0)
 
-- Shared bearer token (`SCIM_SHARED_SECRET`) is enforced by global guard on non-public routes.
-- OAuth token flow is available at `/scim/oauth/token` (`grant_type=client_credentials`).
+All non-public routes are protected by `SharedSecretGuard` (global `APP_GUARD`) with a 3-tier fallback chain:
+
+1. **Tier 1 — Per-endpoint bcrypt credentials**: If `PerEndpointCredentialsEnabled` is `true` on the endpoint and the endpoint has active, non-expired credentials, the bearer token is verified via `bcrypt.compare()`. Admin CRUD at `/scim/admin/endpoints/:id/credentials`.
+2. **Tier 2 — OAuth 2.0 JWT**: Token is decoded/verified via `OAuthService.validateAccessToken()`. OAuth token endpoint: `POST /scim/oauth/token` (`grant_type=client_credentials`).
+3. **Tier 3 — Global shared secret**: Direct comparison with `SCIM_SHARED_SECRET` env var.
+
+- All tiers fail → `401 Unauthorized`, `WWW-Authenticate: Bearer realm="SCIM"`.
 - In production:
-  - `SCIM_SHARED_SECRET` missing => auth hard-fail for protected endpoints.
-  - `JWT_SECRET` missing => startup error in OAuth module.
-  - `OAUTH_CLIENT_SECRET` missing => startup error in OAuth service.
+  - `SCIM_SHARED_SECRET` missing ⇒ auth hard-fail for protected endpoints.
+  - `JWT_SECRET` missing ⇒ startup error in OAuth module.
+  - `OAUTH_CLIENT_SECRET` missing ⇒ startup error in OAuth service.
 - In non-production, missing secrets are auto-generated with warnings.
 
 ---

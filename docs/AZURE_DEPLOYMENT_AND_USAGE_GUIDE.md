@@ -468,19 +468,32 @@ Features:
 | POST | `/scim/admin/backup/trigger` | Trigger backup |
 | GET | `/scim/admin/version` | App version info |
 
-### Authentication
+### Authentication (3-Tier Fallback — v0.21.0)
 
-All SCIM and Admin requests require a Bearer token:
+SCIMServer uses a **3-tier authentication fallback chain**. Each incoming `Authorization: Bearer <token>` is evaluated in order:
 
-```
-Authorization: Bearer <your-scim-secret>
-```
+| Tier | Method | `req.authType` |
+|------|--------|-----------------|
+| 1 | **Per-endpoint bcrypt credential** (requires `PerEndpointCredentialsEnabled` flag) | `endpoint_credential` |
+| 2 | **OAuth 2.0 JWT** (via `/scim/oauth/token`) | `oauth` |
+| 3 | **Global shared secret** (`SCIM_SHARED_SECRET` env var) | `legacy` |
 
-Example:
+All tiers fail → `401 Unauthorized` with `WWW-Authenticate: Bearer realm="SCIM"`.
+
+**Using the global shared secret (simplest):**
 ```powershell
 $headers = @{ Authorization = "Bearer SCIM-12345-20260212" }
 Invoke-RestMethod -Uri "https://<your-app>/scim/admin/endpoints" -Headers $headers
 ```
+
+**Using per-endpoint credentials (recommended for multi-tenant):**
+1. Enable `PerEndpointCredentialsEnabled` on the target endpoint
+2. Create credential: `POST /scim/admin/endpoints/:id/credentials` (returns plaintext token once)
+3. Use: `Authorization: Bearer <per-endpoint-token>`
+
+**Credential management:**
+- List: `GET /scim/admin/endpoints/:id/credentials`
+- Revoke: `DELETE /scim/admin/endpoints/:id/credentials/:credentialId`
 
 ### OAuth Token Endpoint
 

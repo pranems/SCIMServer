@@ -52,6 +52,8 @@ describe('EndpointScimUsersController', () => {
     run: jest.fn((endpointId: string, callback: () => any) => callback()),
     getEndpointId: jest.fn(),
     setContext: jest.fn(),
+    getWarnings: jest.fn().mockReturnValue([]),
+    addWarnings: jest.fn(),
   };
 
   beforeEach(async () => {

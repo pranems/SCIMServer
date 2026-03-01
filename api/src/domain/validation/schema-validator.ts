@@ -83,9 +83,15 @@ export class SchemaValidator {
     }
 
     // ── 1. Required attribute check (create/replace only) ──────────────
+    // RFC 7643 §2.2: readOnly attributes are server-assigned and MUST NOT be
+    // provided by clients — therefore they are exempt from the required check.
+    // Without this exemption, `id` (required:true + mutability:readOnly) would
+    // be impossible to satisfy: omitting it fails "required", including it fails
+    // "readOnly". The required check still enforces client-writable attributes
+    // like userName and displayName.
     if (options.mode !== 'patch') {
       for (const attr of coreAttributes.values()) {
-        if (attr.required && !(this.findKeyIgnoreCase(payload, attr.name))) {
+        if (attr.required && attr.mutability !== 'readOnly' && !(this.findKeyIgnoreCase(payload, attr.name))) {
           errors.push({
             path: attr.name,
             message: `Required attribute '${attr.name}' is missing.`,
@@ -101,7 +107,7 @@ export class SchemaValidator {
         // OR if the extension itself is marked as required on the resource type
         if (extPayload && typeof extPayload === 'object') {
           for (const attr of schema.attributes) {
-            if (attr.required && !(this.findKeyIgnoreCase(extPayload, attr.name))) {
+            if (attr.required && attr.mutability !== 'readOnly' && !(this.findKeyIgnoreCase(extPayload, attr.name))) {
               errors.push({
                 path: `${urn}.${attr.name}`,
                 message: `Required attribute '${attr.name}' is missing in extension '${urn}'.`,
@@ -1041,6 +1047,49 @@ export class SchemaValidator {
     }
 
     return { never, request };
+  }
+
+  // ─── ReadOnly attribute collection (for strip helpers) ────────────
+
+  /**
+   * Collect all top-level attribute names with `mutability: 'readOnly'`
+   * from core + extension schemas. Returns lowercase names grouped by
+   * schema (core attrs at top level, extension attrs keyed by URN).
+   *
+   * Used by `stripReadOnlyAttributes()` to remove client-supplied readOnly
+   * attributes before storage per RFC 7643 §2.2.
+   *
+   * @param schemas  Core + extension schema definitions
+   * @returns Object with `core` Set of lowercase readOnly core attr names
+   *          and `extensions` Map of URN → Set of lowercase readOnly attr names
+   */
+  static collectReadOnlyAttributes(
+    schemas: readonly SchemaDefinition[],
+  ): { core: Set<string>; extensions: Map<string, Set<string>> } {
+    const core = new Set<string>();
+    const extensions = new Map<string, Set<string>>();
+
+    for (const schema of schemas) {
+      if (schema.id.startsWith('urn:ietf:params:scim:schemas:core:')) {
+        for (const attr of schema.attributes) {
+          if (attr.mutability === 'readOnly') {
+            core.add(attr.name.toLowerCase());
+          }
+        }
+      } else {
+        const extSet = new Set<string>();
+        for (const attr of schema.attributes) {
+          if (attr.mutability === 'readOnly') {
+            extSet.add(attr.name.toLowerCase());
+          }
+        }
+        if (extSet.size > 0) {
+          extensions.set(schema.id, extSet);
+        }
+      }
+    }
+
+    return { core, extensions };
   }
 
   // ─── G8c: PATCH path utilities ────────────────────────────────────

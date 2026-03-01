@@ -180,8 +180,13 @@ Express Middleware (main.ts)
 SharedSecretGuard (global APP_GUARD)
   │  ├── Check @Public decorator → bypass if public
   │  ├── Extract Bearer token
-  │  ├── Try 1: OAuthService.validateAccessToken(jwt) → set req.oauth
-  │  ├── Try 2: Compare token === SCIM_SHARED_SECRET → legacy auth
+  │  ├── Try 1: Per-endpoint bcrypt credential (if PerEndpointCredentialsEnabled)
+  │  │   ├── extractEndpointId() from URL regex
+  │  │   ├── Load active, non-expired credentials from EndpointCredentialRepository
+  │  │   ├── bcrypt.compare(token, hash) for each credential
+  │  │   └── Match → set req.authType = 'endpoint_credential', req.authCredentialId
+  │  ├── Try 2: OAuthService.validateAccessToken(jwt) → set req.oauth, req.authType = 'oauth'
+  │  ├── Try 3: Compare token === SCIM_SHARED_SECRET → set req.authType = 'legacy'
   │  └── Reject: 401 with WWW-Authenticate: Bearer realm="SCIM"
   │
   ▼
@@ -512,26 +517,45 @@ OAuth 2.0 `client_credentials` grant:
 
 ## 7. Authentication Flow
 
-### 7.1 Dual-Strategy Authentication
+### 7.1 3-Tier Authentication (v0.21.0)
+
+The `SharedSecretGuard` (registered as global `APP_GUARD`) implements a 3-tier fallback chain. Each tier is tried in order; the first successful match authenticates the request.
 
 ```
 Incoming Request
   │
-  ├── Check @Public decorator → Skip auth
+  ├── Check @Public decorator → Skip auth (discovery endpoints, OAuth token, web UI)
   │
   ├── Extract: Authorization: Bearer <token>
   │
-  ├── Strategy 1: OAuth 2.0 JWT
+  ├── Tier 1: Per-Endpoint Bcrypt Credentials (v0.21.0)
+  │   ├── extractEndpointId() from URL regex: /\/endpoints\/([0-9a-f-]{36})\//i
+  │   ├── Check PerEndpointCredentialsEnabled flag for endpoint
+  │   ├── Load active, non-expired credentials via IEndpointCredentialRepository
+  │   ├── Lazy-load bcrypt (dynamic import, cached after first use)
+  │   ├── bcrypt.compare(token, credentialHash) for each credential
+  │   ├── Match → set req.authType = 'endpoint_credential', req.authCredentialId
+  │   └── No match / error → fall through to Tier 2
+  │
+  ├── Tier 2: OAuth 2.0 JWT
   │   ├── Decode JWT via JwtService
   │   ├── Verify signature, expiry, client_id
   │   ├── Set req.oauth = payload, req.authType = 'oauth'
   │   └── ✓ Authenticated
   │
-  └── Strategy 2: Legacy Shared Secret
+  └── Tier 3: Legacy Shared Secret
       ├── Compare token === env.SCIM_SHARED_SECRET
       ├── Set req.authType = 'legacy'
       └── ✓ Authenticated
+
+  All tiers fail → 401 Unauthorized + WWW-Authenticate: Bearer realm="SCIM"
 ```
+
+**Key design properties:**
+- **Graceful fallback**: Per-endpoint check errors (missing repo, bcrypt failure, etc.) silently fall through to OAuth/legacy. Valid tokens are never blocked.
+- **Lazy bcrypt loading**: The native `bcrypt` module is loaded via dynamic `import()` only on first use, then cached. Endpoints not using per-endpoint credentials incur zero bcrypt overhead.
+- **Optional injection**: `@Optional() @Inject(ENDPOINT_CREDENTIAL_REPOSITORY)` and `@Optional() @Inject(EndpointService)` — guard works correctly even when credential repo is unavailable.
+- **Request decoration**: `req.authType` is set to `'endpoint_credential'`, `'oauth'`, or `'legacy'` so downstream controllers can distinguish auth method. `req.authCredentialId` is set for per-endpoint credentials.
 
 ### 7.2 OAuth 2.0 Token Flow
 

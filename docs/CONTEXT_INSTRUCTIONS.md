@@ -1,7 +1,7 @@
 # SCIMServer — Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.  
-> **Last Updated**: February 26, 2026
+> **Last Updated**: February 27, 2026
 
 ---
 
@@ -50,10 +50,12 @@ api/src/modules/scim/controllers/
   endpoint-scim-bulk.controller.ts                       # Bulk Operations controller (RFC 7644 §3.7)
   endpoint-scim-discovery.controller.ts                  # SCIM discovery — PRIMARY endpoint-scoped (multi-tenant)
 api/src/modules/scim/services/
-  endpoint-scim-users.service.ts    (858 lines)          # Users business logic
-  endpoint-scim-groups.service.ts   (947 lines)          # Groups business logic
+  endpoint-scim-users.service.ts    (528 lines)          # Users business logic (G17 dedup: −29%)
+  endpoint-scim-groups.service.ts   (627 lines)          # Groups business logic (G17 dedup: −28%)
   bulk-processor.service.ts         (395 lines)          # Bulk operation processor with bulkId resolution
-  scim-metadata.service.ts          (13 lines)           # buildLocation, timestamp
+  scim-metadata.service.ts                               # buildLocation, timestamp
+api/src/modules/scim/common/
+  scim-service-helpers.ts           (353 lines)          # G17: parseJson, ensureSchema, enforceIfMatch, sanitizeBooleanStrings, guardSoftDeleted, ScimSchemaHelpers
 api/src/modules/scim/dto/
   bulk-request.dto.ts                                    # BulkRequest/Response DTOs (RFC 7644 §3.7)
   create-user.dto.ts                                     # User creation DTO
@@ -67,9 +69,15 @@ api/src/modules/scim/common/
   scim-errors.ts                                         # createScimError()
 api/src/modules/scim/utils/
   scim-patch-path.ts                                     # 9 exported patch path utilities
-  endpoint-config.interface.ts                           # 11 config flags + helpers (incl. getConfigBooleanWithDefault)
-  endpoint-context.storage.ts                            # AsyncLocalStorage for endpoint context
   base-url.util.ts                                       # buildBaseUrl() from request
+api/src/modules/scim/controllers/
+  scim-me.controller.ts                                  # /Me endpoint (RFC 7644 §3.11, v0.20.0)
+  admin-credential.controller.ts                         # Per-endpoint credential CRUD (v0.21.0)
+api/src/modules/scim/common/
+  scim-sort.util.ts                                      # sortBy/sortOrder mapping utility (v0.20.0)
+api/src/modules/endpoint/
+  endpoint-config.interface.ts                           # 12 boolean flags + logLevel + helpers (incl. getConfigBooleanWithDefault)
+  endpoint-context.storage.ts                            # AsyncLocalStorage for endpoint context
 api/src/modules/scim/filters/
   scim-filter-parser.ts                                  # Filter AST attribute path extraction
 api/src/modules/scim/interceptors/
@@ -94,7 +102,7 @@ api/src/oauth/
   oauth.service.ts                 (138 lines)           # JWT generation/validation
 api/src/modules/prisma/prisma.service.ts                 # Extended PrismaClient
 api/src/modules/web/web.controller.ts                    # SPA serving
-api/prisma/schema.prisma                                 # 5 models: Endpoint, RequestLog, ScimResource, ResourceMember, EndpointSchema
+api/prisma/schema.prisma                                 # 7 models: Endpoint, RequestLog, ScimResource, ResourceMember, EndpointSchema, EndpointResourceType, EndpointCredential
 ```
 
 ### 3.2 Frontend (React SPA)
@@ -208,10 +216,21 @@ All SCIM resources are scoped to an `endpointId`:
 
 ### 5.5 Authentication Pattern
 
-**Dual-strategy auth** via global `SharedSecretGuard`:
-1. OAuth 2.0 JWT (preferred) — `OAuthService.validateAccessToken()`
-2. Legacy bearer token — direct string comparison with `SCIM_SHARED_SECRET`
-3. Public routes exempted via `@Public()` decorator
+**3-tier fallback auth** via global `SharedSecretGuard` (v0.21.0, G11):
+1. **Per-endpoint bcrypt credentials** (if `PerEndpointCredentialsEnabled` + endpoint has active credentials) — `IEndpointCredentialRepository.findActive()` + bcrypt verify → `req.authType = 'endpoint_credential'`
+2. **OAuth 2.0 JWT** — `OAuthService.validateAccessToken()` (Bearer JWT) → `req.authType = 'oauth'`
+3. **Global shared secret** — direct string comparison with `SCIM_SHARED_SECRET` → `req.authType = 'legacy'`
+4. Public routes exempted via `@Public()` decorator
+
+**Credential Admin API** (requires `PerEndpointCredentialsEnabled` flag):
+- `POST /scim/admin/endpoints/:id/credentials` — Generate 32-byte base64url token, store bcrypt hash (12 rounds), return plaintext once
+- `GET /scim/admin/endpoints/:id/credentials` — List credentials (hash never returned)
+- `DELETE /scim/admin/endpoints/:id/credentials/:credentialId` — Revoke (deactivate)
+
+**Source files:**
+- Guard: `api/src/modules/auth/shared-secret.guard.ts`
+- Credential controller: `api/src/modules/scim/controllers/admin-credential.controller.ts`
+- Credential repository: `api/src/modules/scim/repositories/endpoint-credential/`
 
 ### 5.6 Error Handling Pattern
 
@@ -252,7 +271,7 @@ Four categories of PATCH paths, handled in order:
 
 ## 7. Current Compliance Status
 
-### 7.1 SCIM 2.0 Compliance (Current v0.19.3 Baseline)
+### 7.1 SCIM 2.0 Compliance (Current v0.22.0 Baseline)
 
 | Feature | Status |
 |---------|--------|
@@ -260,7 +279,7 @@ Four categories of PATCH paths, handled in order:
 | ✅ Groups CRUD (POST/GET/PUT/PATCH/DELETE) | Complete |
 | ✅ PATCH (add/replace/remove, valuePath, extension URNs, no-path merge) | Complete |
 | ✅ Case-insensitive behavior (RFC 7643 §2.1) | Complete |
-| ✅ Discovery endpoints | 100% — All 6 gaps (D1–D6) resolved. Two-tier multi-tenant architecture: root-level (global defaults) + endpoint-scoped (primary, per-tenant overlays). 23 multi-tenant tests. See [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](../docs/DISCOVERY_ENDPOINTS_RFC_AUDIT.md) |
+| ✅ Discovery endpoints | 100% — All 6 gaps (D1–D6) resolved. Two-tier multi-tenant architecture: root-level (global defaults) + endpoint-scoped (primary, per-tenant overlays). See [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](../docs/DISCOVERY_ENDPOINTS_RFC_AUDIT.md) |
 | ✅ Pagination (startIndex, count) | Complete |
 | ✅ Filtering operators (`eq`, `ne`, `co`, `sw`, `ew`, `gt`, `ge`, `lt`, `le`, `pr`) | Complete |
 | ✅ Attribute projection (`attributes`, `excludedAttributes`) | Complete |
@@ -268,7 +287,8 @@ Four categories of PATCH paths, handled in order:
 | ✅ Sorting (`sortBy`, `sortOrder`) | Complete (v0.20.0, `sort.supported=true`) |
 | ✅ Bulk operations (`/Bulk`) | Complete (v0.19.0, RFC 7644 §3.7, `BulkOperationsEnabled` flag) |
 | ✅ `/Me` endpoint | Complete (v0.20.0, JWT sub → userName identity resolution) |
-| ✅ Per-endpoint credentials | Complete (v0.21.0, `PerEndpointCredentialsEnabled` flag, bcrypt tokens, fallback chain) |
+| ✅ Per-endpoint credentials | Complete (v0.21.0, `PerEndpointCredentialsEnabled` flag, bcrypt tokens, 3-tier fallback) |
+| ✅ ReadOnly attribute stripping | Complete (v0.22.0, RFC 7643 §2.2, `IncludeWarningAboutIgnoredReadOnlyAttribute` + `IgnoreReadOnlyAttributesInPatch` flags, warning URN extension) |
 
 ### 7.2 Microsoft Entra ID Compatibility
 
@@ -278,11 +298,11 @@ Four categories of PATCH paths, handled in order:
 
 ---
 
-## 8. Test Coverage
+## 8. Test Coverage (v0.22.0)
 
-- **Unit**: 2,581 tests passing (77 suites)
-- **E2E**: 522 tests passing (25 suites)
-- **Live integration**: 485 tests passing (local + Docker)
+- **Unit**: 2,521 passing / 2,521 total (73 suites) — **all passing (0 failures)**
+- **E2E**: 522 passing / 522 total (25 suites) — **all passing (0 failures)**
+- **Live integration**: 485 total (expected all passing after SchemaValidator id fix)
 - **SCIM Validator**: 25/25 required + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
 - Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`
@@ -339,8 +359,8 @@ Four categories of PATCH paths, handled in order:
 8. **The `/scim/v2` rewrite** — Express middleware in `main.ts` rewrites `/scim/v2/*` to `/scim/*` for spec compliance
 9. **SchemaValidator** — 950-line pure domain class for RFC 7643 payload validation. Gated behind `StrictSchemaValidation` config flag. Validates type, mutability (readOnly + immutable), required attrs, unknown attrs, sub-attributes, canonicalValues, size limits. New: `collectBooleanAttributeNames()` for schema-aware boolean coercion, `validateFilterAttributePaths()` for filter validation (V32).
 10. **Repository Pattern** — `IUserRepository`/`IGroupRepository` interfaces injected via tokens. `PERSISTENCE_BACKEND` env var toggles between `prisma` and `inmemory` implementations.
-11. **G2 is DONE** — Despite two service files (`EndpointScimUsersService`/`EndpointScimGroupsService`), the database already uses a single unified `ScimResource` table with a `resourceType` discriminator. There are no separate User/Group tables. G17 (service code deduplication) remains open.
-12. **Legacy auth guard** — `scim-auth.guard.ts` contains a hardcoded legacy bearer token and uses `console.log`/`console.error` instead of NestJS Logger. Both should be cleaned up.
+11. **G2 is DONE + G17 RESOLVED (v0.20.0)** — Database uses a single unified `ScimResource` table. G17 service code deduplication completed: 13+ duplicate private methods extracted into `scim-service-helpers.ts` (`parseJson`, `ensureSchema`, `enforceIfMatch`, `sanitizeBooleanStrings`, `guardSoftDeleted`, `ScimSchemaHelpers`). All 27 migration gaps (G1–G20) are now closed.
+12. **3-tier auth guard** — `SharedSecretGuard` now implements 3-tier fallback: per-endpoint bcrypt credentials → OAuth JWT → global `SCIM_SHARED_SECRET`. Per-endpoint credentials use lazy-loaded native bcrypt (12 rounds, cached after first use). Active + non-expired credentials only.
 13. **CORS wildcard** — `main.ts` sets `origin: true` (accept all origins). Should be restricted for production deployments.
 
 ---

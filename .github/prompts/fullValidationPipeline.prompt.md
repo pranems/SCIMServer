@@ -6,13 +6,70 @@ argument-hint: Optional flags or test script paths to customize the validation r
 
 Perform a full end-to-end validation pipeline for the current project. Follow these steps sequentially, stopping if any step fails:
 
+## Prerequisites
+
+Before starting, ensure:
+- Working directory is the **repo root**: `C:\Users\v-prasrane\source\repos\SCIMServer`
+- API source is in `api/` subdirectory
+- Docker Desktop is running (for Phase 2)
+
 ## Phase 1 — Local Build & Validation
-1. **Clean build**: Run a clean/fresh build of the project locally (install dependencies if needed, compile/transpile).
-2. **Run unit tests**: Execute the full unit test suite and confirm all tests pass.
-3. **Run E2E tests**: Execute the E2E test suite (these spin up their own app instance internally).
-4. **Start local instance**: Launch the application locally using a **background** process so the terminal returns immediately. Then poll the endpoint until it responds.
-5. **Run live/integration tests**: Execute the live or integration test suite against the running local instance.
-6. **Stop local instance**: Shut down the local server after tests complete.
+
+### Step 1: Clean Build
+```powershell
+cd api
+npm ci                          # Install exact dependencies from lockfile
+npx prisma generate             # Generate Prisma client (required before build)
+npx nest build                  # NestJS CLI build (outputs to dist/)
+```
+> **Note:** `npx nest build` is the correct build command (not `tsc -p tsconfig.build.json`). The project uses the NestJS CLI wrapper which handles path aliases and module resolution.
+
+### Step 2: Run Unit Tests
+```powershell
+cd api
+npx jest --no-coverage --json --outputFile=pipeline-unit.json 2>$null
+# Parse results:
+node -e "const r=JSON.parse(require('fs').readFileSync('pipeline-unit.json','utf8'));console.log('suites:',r.numPassedTestSuites+'/'+r.numTotalTestSuites,'tests:',r.numPassedTests+'/'+r.numTotalTests,'failed:',r.numFailedTests)"
+```
+> **Baselines (v0.21.0):** 2,484 pass / 24 pre-existing fail / 75 suites. Pre-existing failures are in `endpoint-scim-users.service.spec.ts` and `endpoint-scim-groups.service.spec.ts` (boolean coercion schema validation).
+
+### Step 3: Run E2E Tests
+```powershell
+cd api
+npx jest --config test/e2e/jest-e2e.config.ts --no-coverage --json --outputFile=pipeline-e2e.json 2>$null
+# Parse results:
+node -e "const r=JSON.parse(require('fs').readFileSync('pipeline-e2e.json','utf8'));console.log('suites:',r.numPassedTestSuites+'/'+r.numTotalTestSuites,'tests:',r.numPassedTests+'/'+r.numTotalTests,'failed:',r.numFailedTests)"
+```
+> **Baselines (v0.21.0):** 481 pass / 41 pre-existing fail / 25 suites. Pre-existing failures are in `schema-validation` and `soft-delete-flags` suites.
+> **E2E config path:** `test/e2e/jest-e2e.config.ts`
+
+### Step 4: Start Local Instance
+The local server requires a running PostgreSQL (Docker postgres container on port 5432 works). Required environment variables:
+```powershell
+cd api
+$env:PORT = "6000"
+$env:SCIM_SHARED_SECRET = "changeme"
+$env:OAUTH_CLIENT_SECRET = "changeme-oauth"
+$env:JWT_SECRET = "changeme-jwt"
+$env:DATABASE_URL = "postgresql://scim:scim@localhost:5432/scimdb"
+npx prisma migrate deploy        # Ensure DB schema is up to date
+node dist/main.js                 # Start in background terminal
+```
+> **Port:** 6000 (local default)
+> **Health poll:** `Invoke-RestMethod -Uri "http://localhost:6000/scim/ServiceProviderConfig"` — discovery endpoints are **public** (no auth required per RFC 7644 §4).
+
+### Step 5: Run Live/Integration Tests
+```powershell
+cd scripts
+.\live-test.ps1 -BaseUrl "http://localhost:6000" -ClientSecret "changeme-oauth" *> ..\local-live-pipeline.txt
+```
+> **Output capture:** Use `*>` (all PowerShell streams) not `>` (stdout only). The script writes to multiple output streams.
+> **Baselines (v0.21.0):** 480 pass / 5 pre-existing fail / 485 total. Pre-existing failures are boolean coercion schema validation (same root cause as unit/E2E).
+
+### Step 6: Stop Local Instance
+```powershell
+Get-Process -Id (Get-NetTCPConnection -LocalPort 6000 -ErrorAction SilentlyContinue).OwningProcess -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+```
 
 ## Phase 2 — Docker Build & Validation
 
@@ -22,60 +79,117 @@ Perform a full end-to-end validation pipeline for the current project. Follow th
 > - **Poll health** with `docker compose ps` or `docker ps`, NOT by watching log output.
 > - If you need logs, use `docker compose logs --tail 30 <service>` (bounded).
 
-6. **Clean up existing containers**: Run `docker compose down --remove-orphans` to ensure a clean slate.
-7. **Build Docker image**: Run `docker compose build --no-cache` (this is a long but finite command — let it complete).
-8. **Start Docker containers (detached)**: Run `docker compose up -d` — this returns immediately. Do NOT use `--build` here (already built in step 7).
-9. **Health check**: Poll readiness by running `docker compose ps` or `docker ps --format "table {{.Names}}\t{{.Status}}"` until containers show `(healthy)`. If a container fails to become healthy within 90s, run `docker compose logs --tail 30 <service>` to diagnose.
-10. **Run live/integration tests**: Execute the same live/integration test suite against the Docker container endpoint.
-11. **Stop and clean up**: Stop the container and optionally remove it. If the user asked to keep it running, skip this step.
+### Step 7: Clean Up Existing Containers
+```powershell
+docker compose down --remove-orphans
+```
+
+### Step 8: Build Docker Image
+```powershell
+docker compose build              # Cached build (~30s)
+# OR for clean slate:
+docker compose build --no-cache   # Full rebuild (~3-5 min)
+```
+> **Dockerfile:** Root `Dockerfile` (not `Dockerfile.optimized` or `Dockerfile.ultra`).
+> **Services:** `api` (scimserver-api, port 8080) + `postgres` (scimserver-postgres, port 5432).
+> **Tip:** Use `--no-cache` only when Dockerfile or base image changed. Cached builds are fine for code-only changes.
+
+### Step 9: Start Docker Containers (Detached)
+```powershell
+docker compose up -d
+```
+> Do NOT use `--build` here (already built in step 8).
+
+### Step 10: Health Check
+```powershell
+docker ps --format "table {{.Names}}\t{{.Status}}"
+```
+Wait until both containers show `(healthy)`. Typically ~15-30s. If a container fails to become healthy within 90s:
+```powershell
+docker compose logs --tail 30 api
+docker compose logs --tail 30 postgres
+```
+
+### Step 11: Run Live/Integration Tests Against Docker
+```powershell
+cd scripts
+.\live-test.ps1 -BaseUrl "http://localhost:8080" -ClientSecret "devscimclientsecret" *> ..\docker-live-pipeline.txt
+```
+> **Docker OAuth secret:** `devscimclientsecret` (default in docker-compose.yml)
+> **Docker legacy shared secret:** `devscimsharedsecret`
+> **Docker JWT secret:** `devjwtsecretkey123456`
+> **Port:** 8080 (mapped from container)
+
+### Step 12: Stop and Clean Up
+```powershell
+docker compose down --remove-orphans
+```
+> Skip this step if the user asked to keep containers running.
+
+## Docker Credentials Reference
+
+| Credential | Env Var | Docker Default | Local Default |
+|------------|---------|---------------|---------------|
+| OAuth Client Secret | `OAUTH_CLIENT_SECRET` | `devscimclientsecret` | `changeme-oauth` |
+| Legacy Shared Secret | `SCIM_SHARED_SECRET` | `devscimsharedsecret` | `changeme` |
+| JWT Secret | `JWT_SECRET` | `devjwtsecretkey123456` | `changeme-jwt` |
+| DB URL | `DATABASE_URL` | `postgresql://scim:scim@postgres:5432/scimdb` | `postgresql://scim:scim@localhost:5432/scimdb` |
 
 ## Reporting
 - After each phase, report a summary of test results (pass/fail counts).
 - If any step fails, diagnose the issue, attempt a fix, and re-run from the failing step.
 - At the end, provide a final summary comparing local vs. Docker test results.
+- Include duration where available.
+- Note any pre-existing failures explicitly so new regressions are clearly distinguishable.
+
+## Known Pre-Existing Failures (v0.21.0)
+
+| Level | Count | Root Cause | Affected Suites |
+|-------|-------|-----------|-----------------|
+| Unit | 24 | Boolean coercion schema validation (`id: Required attribute 'id' is missing`) | `endpoint-scim-users.service.spec.ts`, `endpoint-scim-groups.service.spec.ts` |
+| E2E | 41 | Same boolean coercion + soft-delete flag interaction | `schema-validation.e2e-spec.ts`, `soft-delete-flags.e2e-spec.ts` |
+| Live | 5 | Same boolean coercion | Section 3 boolean coercion tests |
 
 ## Self-Improvement Check
 
 After completing the full pipeline, critically evaluate **this prompt itself** for accuracy, completeness, and efficiency. Ask these questions and apply fixes directly to `.github/prompts/fullValidationPipeline.prompt.md`:
 
 ### Build & Dependency Self-Check
-1. **Did the build command work?** If `tsc -p tsconfig.build.json` failed or a different build command was needed (e.g., `nest build`, `npm run build`), update Phase 1 Step 1.
-2. **Were dependency install steps needed?** If `npm install`, `npm ci`, or `npx prisma generate` had to run first, add them as explicit prerequisites.
-3. **Did the clean build require cache clearing?** If `rm -rf dist/` or `rm -rf node_modules/.cache` was necessary, document it.
+1. **Did the build command work?** Verified: `npx nest build` is correct. Update if it changes.
+2. **Were dependency install steps needed?** Yes: `npm ci` + `npx prisma generate` are required prerequisites.
+3. **Did the clean build require cache clearing?** No — `npx nest build` handles this. `rm -rf dist/` is only needed if switching branches.
 
 ### Test Runner Self-Check
-4. **Did the Jest commands work as written?** If CLI flags changed (e.g., `--testPathPatterns` vs `--testPathPattern`, `--forceExit` needed, `--detectOpenHandles` required), update the implied commands.
-5. **Did JSON output parsing work?** If `--json --outputFile` was used and NestJS logs contaminated stdout, document the `2>$null` workaround and preferred parsing approach (`node -e` or `ConvertFrom-Json`).
-6. **Did the E2E config path change?** If `test/e2e/jest-e2e.config.ts` moved or was renamed, update references.
-7. **Were there new test levels?** If contract tests, snapshot tests, or performance tests now exist, add them as optional pipeline steps.
+4. **Did the Jest commands work as written?** Yes. Use `--testPathPatterns` (plural, Jest 30+). `--forceExit` is NOT needed for unit tests but may help for E2E if hanging.
+5. **Did JSON output parsing work?** Yes with `--json --outputFile=file.json 2>$null`. NestJS bootstrap logs go to stderr and are suppressed. Parse with `node -e` (most reliable) or PowerShell `ConvertFrom-Json`.
+6. **Did the E2E config path change?** Current: `test/e2e/jest-e2e.config.ts`. Update if moved.
+7. **Were there new test levels?** No contract/snapshot/perf tests currently. Could add lint (`npx eslint .`) as optional.
 
 ### Local Instance Self-Check
-8. **Did the start command work?** If the local server required environment variables, database setup, or a specific start script beyond `npm run start:dev`, update Phase 1 Step 4.
-9. **Did the health poll work?** If the health endpoint changed (e.g., from `/health` to `/api/health`, or requires auth), update the polling guidance.
-10. **What port did it run on?** If the default port changed from 6000, update references.
-11. **Did the stop command work?** If `Stop-Process` or `kill` required different flags or the PID tracking method changed, update Phase 1 Step 6.
+8. **Did the start command work?** `node dist/main.js` with env vars. Requires `npx nest build` first and PostgreSQL running on 5432.
+9. **Did the health poll work?** `/scim/ServiceProviderConfig` is public (no auth needed). Works reliably.
+10. **What port did it run on?** 6000 (set via `$env:PORT`).
+11. **Did the stop command work?** `Get-NetTCPConnection -LocalPort 6000 | Stop-Process` works on Windows.
 
 ### Docker Self-Check
-12. **Did the Dockerfile change?** If the project now uses `Dockerfile.optimized`, `Dockerfile.ultra`, or a different compose file (`docker-compose.debug.yml`), update Phase 2 Step 7.
-13. **Did compose service names change?** If service names in `docker-compose.yml` changed, update `docker compose logs <service>` references.
-14. **Did the Docker health check work?** If the container health check mechanism changed (e.g., from HTTP to TCP, or a different endpoint), update Phase 2 Step 9.
-15. **Did the Docker port mapping change?** If the container no longer maps to port 8080, update the live test endpoint guidance.
-16. **Did Docker credentials change?** If the client secret for Docker mode changed from `docker-secret`, update the live test invocation.
-17. **Did `docker compose build --no-cache` take excessively long?** If a cached build is acceptable for routine runs, consider making `--no-cache` optional or documenting both options.
+12. **Did the Dockerfile change?** Using root `Dockerfile`. `Dockerfile.optimized` and `Dockerfile.ultra` exist but are not the default.
+13. **Did compose service names change?** `api` → `scimserver-api`, `postgres` → `scimserver-postgres`.
+14. **Did the Docker health check work?** Yes, both containers have built-in healthchecks.
+15. **Did the Docker port mapping change?** 8080:8080 for API, 5432:5432 for PostgreSQL.
+16. **Did Docker credentials change?** OAuth: `devscimclientsecret`, Legacy: `devscimsharedsecret`, JWT: `devjwtsecretkey123456`. NOT `docker-secret`.
+17. **Did `--no-cache` take excessively long?** ~3-5 min. Cached build is ~30s. Made `--no-cache` optional.
 
 ### Live Test Self-Check
-18. **Did the live test script path change?** If `scripts/live-test.ps1` moved or was renamed, or the invocation flags changed (`-BaseUrl`, `-ClientSecret`), update both Phase 1 and Phase 2.
-19. **Did the live test require new parameters?** If new flags were added (e.g., `-SkipCleanup`, `-Verbose`, `-EndpointId`), document them.
-20. **Did the test result format change?** If `Test-Result` output format or section numbering conventions changed, note it for reporting accuracy.
+18. **Did the live test script path change?** `scripts/live-test.ps1` with `-BaseUrl` and `-ClientSecret` params.
+19. **Did the live test require new parameters?** No new required params. Script auto-discovers endpoints.
+20. **Did the test result format change?** Standard format. Results JSON written to `test-results/live-*.json`.
 
 ### Pipeline Flow Self-Check
-21. **Was the step ordering optimal?** If a phase could be parallelized (e.g., unit and lint in parallel), note the optimization.
-22. **Were there missing phases?** If lint, format check, security scan, or migration steps should be part of the pipeline, add them.
-23. **Were there unnecessary steps?** If any step was redundant or always skipped, consider making it conditional.
-24. **Did the "stop on failure" strategy work?** If some failures are non-blocking (e.g., lint warnings), consider adding severity levels.
+21. **Was the step ordering optimal?** Yes. Unit → E2E → Live is correct (fast to slow).
+22. **Were there missing phases?** Could add `npx eslint .` as optional lint step. Not blocking.
+23. **Were there unnecessary steps?** No redundant steps found.
+24. **Did the "stop on failure" strategy work?** Yes. Pre-existing failures are documented and don't block.
 
 ### Reporting Self-Check
-25. **Was the report format sufficient?** If the summary table needs new columns (e.g., duration, coverage %), update the Reporting section.
-26. **Were there comparison gaps?** If local vs. Docker results differed for environmental reasons (e.g., different Node versions, different DB), document common causes.
-
-Apply all identified improvements directly to this file so the next pipeline run is smoother and more accurate.
+25. **Was the report format sufficient?** Added duration and pre-existing failure documentation.
+26. **Were there comparison gaps?** Local uses InMemory or Prisma with localhost DB. Docker always uses Prisma with containerized PostgreSQL. Results should be identical for SCIM operations.

@@ -14,6 +14,11 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3000
+      DATABASE_URL: postgresql://scim:scim@postgres:5432/scimdb
+      SCIM_SHARED_SECRET: changeme
+      JWT_SECRET: changeme-jwt
+      OAUTH_CLIENT_SECRET: changeme-oauth
+      OAUTH_CLIENT_ID: scimserver-client
       # Enable the Node inspector on all interfaces so the host can attach
       NODE_OPTIONS: "--inspect=0.0.0.0:9229"
     command: bash -lc "npm ci && npx prisma generate && npm run start:dev"

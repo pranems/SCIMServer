@@ -120,6 +120,25 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * @see Phase 11 — Per-Endpoint Credentials (RFC 7643 §7 multi-tenant isolation)
    */
   PER_ENDPOINT_CREDENTIALS_ENABLED: 'PerEndpointCredentialsEnabled',
+
+  /**
+   * When true, write responses include a warning extension URN listing any readOnly
+   * attributes that were silently stripped from the incoming payload.
+   * When false (default), stripping happens silently without response annotation.
+   *
+   * @see RFC 7643 §2.2 — readOnly mutability
+   */
+  INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE: 'IncludeWarningAboutIgnoredReadOnlyAttribute',
+
+  /**
+   * When true AND StrictSchemaValidation is ON, PATCH operations targeting readOnly
+   * attributes are silently stripped instead of producing a 400 error (G8c).
+   * When false (default) with strict schema on, readOnly PATCH ops still cause 400.
+   * Has no effect when StrictSchemaValidation is OFF (stripping always happens).
+   *
+   * @see RFC 7643 §2.2 — readOnly mutability
+   */
+  IGNORE_READONLY_ATTRIBUTES_IN_PATCH: 'IgnoreReadOnlyAttributesInPatch',
 } as const;
 
 /**
@@ -248,6 +267,24 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED]?: boolean | string;
 
   /**
+   * When true, responses for write operations that had readOnly attributes stripped
+   * include a warning extension URN (urn:scimserver:api:messages:2.0:Warning).
+   * When false (default), readOnly attributes are silently stripped.
+   *
+   * Example config: { "IncludeWarningAboutIgnoredReadOnlyAttribute": "True" }
+   */
+  [ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE]?: boolean | string;
+
+  /**
+   * When true AND StrictSchemaValidation is ON, PATCH ops targeting readOnly attrs
+   * are stripped+warned instead of rejected with 400 (overrides G8c).
+   * When false (default), strict mode rejects readOnly PATCH ops.
+   *
+   * Example config: { "IgnoreReadOnlyAttributesInPatch": "True" }
+   */
+  [ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH]?: boolean | string;
+
+  /**
    * Allow any additional configuration flags
    */
   [key: string]: unknown;
@@ -314,6 +351,8 @@ export const DEFAULT_ENDPOINT_CONFIG: EndpointConfig = {
   [ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED]: false,
   [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: false,
   [ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED]: false,
+  [ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE]: false,
+  [ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH]: false,
 };
 
 /**
@@ -372,6 +411,8 @@ export function validateEndpointConfig(config: Record<string, any> | undefined):
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED);
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED);
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH);
 
   // Validate logLevel
   const logLevelFlag = config[ENDPOINT_CONFIG_FLAGS.LOG_LEVEL];

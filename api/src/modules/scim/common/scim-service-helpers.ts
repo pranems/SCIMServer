@@ -20,9 +20,10 @@ import {
 } from '../../endpoint/endpoint-config.interface';
 import type { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import { SchemaValidator } from '../../../domain/validation';
-import type { SchemaDefinition } from '../../../domain/validation';
+import type { SchemaDefinition, SchemaAttributeDefinition } from '../../../domain/validation';
 import type { ScimLogger } from '../../logging/scim-logger.service';
 import type { LogCategory } from '../../logging/log-levels';
+import type { PatchOperation } from '../../../domain/patch/patch-types';
 
 // ─── Pure Utility Functions ─────────────────────────────────────────────────
 
@@ -140,6 +141,216 @@ export function guardSoftDeleted(
       detail: `Resource ${scimId} not found.`,
     });
   }
+}
+
+// ─── ReadOnly Attribute Stripping (RFC 7643 §2.2) ───────────────────────────
+
+/**
+ * Warning URN for readOnly attribute stripping notifications.
+ * Attached to responses when IncludeWarningAboutIgnoredReadOnlyAttribute is enabled.
+ */
+export const SCIM_WARNING_URN = 'urn:scimserver:api:messages:2.0:Warning';
+
+/**
+ * Strip readOnly top-level attributes from a POST/PUT payload.
+ *
+ * Walks core + extension schemas, finds attributes with `mutability: 'readOnly'`,
+ * and deletes matching keys from the payload using case-insensitive matching.
+ *
+ * Note: `id` and `meta` are also handled here (both are readOnly). `externalId` is
+ * readWrite and is never stripped. `schemas` is a reserved structural key and is
+ * also never stripped.
+ *
+ * Sub-attribute stripping (e.g. manager.displayName inside readWrite parent) is
+ * deferred to Phase 2.
+ *
+ * @param payload           - The request body (mutated in place)
+ * @param schemaDefinitions - Core + extension schema definitions
+ * @returns Array of stripped attribute names (for logging/warning)
+ *
+ * @see RFC 7643 §2.2 — readOnly attributes SHALL be ignored by the server
+ */
+export function stripReadOnlyAttributes(
+  payload: Record<string, unknown>,
+  schemaDefinitions: readonly SchemaDefinition[],
+): string[] {
+  const { core, extensions } = SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
+  const stripped: string[] = [];
+
+  // Strip core readOnly attributes (case-insensitive)
+  for (const key of Object.keys(payload)) {
+    // Never strip 'schemas' — it's structural, not a user attribute
+    if (key.toLowerCase() === 'schemas') continue;
+
+    if (core.has(key.toLowerCase())) {
+      delete payload[key];
+      stripped.push(key);
+    }
+  }
+
+  // Strip readOnly attributes inside extension URN blocks
+  for (const [urn, readOnlySet] of extensions) {
+    // Find the extension block in the payload (case-insensitive URN matching)
+    const urnKey = Object.keys(payload).find(k => k.toLowerCase() === urn.toLowerCase());
+    if (!urnKey) continue;
+
+    const extObj = payload[urnKey];
+    if (typeof extObj !== 'object' || extObj === null || Array.isArray(extObj)) continue;
+
+    for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
+      if (readOnlySet.has(extKey.toLowerCase())) {
+        delete (extObj as Record<string, unknown>)[extKey];
+        stripped.push(`${urnKey}.${extKey}`);
+      }
+    }
+  }
+
+  return stripped;
+}
+
+/**
+ * Filter PATCH operations that target readOnly attributes.
+ *
+ * Removes operations whose target attribute is `mutability: 'readOnly'`.
+ * Operations targeting `id` are NEVER stripped — they are kept so G8c can
+ * hard-reject them with 400 (id modification must always fail).
+ *
+ * Handles three PATCH operation forms:
+ * 1. Path-based ops (`path: "groups"`) — resolve path → check readOnly
+ * 2. No-path ops with object value — check each key in value object
+ * 3. Extension URN path ops (`path: "urn:...extensionAttr"`)
+ *
+ * @param operations        - Array of PATCH operations (not mutated)
+ * @param schemaDefinitions - Core + extension schema definitions
+ * @returns Object with `filtered` operations (readOnly removed) and `stripped` attribute names
+ */
+export function stripReadOnlyPatchOps(
+  operations: PatchOperation[],
+  schemaDefinitions: readonly SchemaDefinition[],
+): { filtered: PatchOperation[]; stripped: string[] } {
+  const { core, extensions } = SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
+  const stripped: string[] = [];
+  const filtered: PatchOperation[] = [];
+
+  // Build a combined lookup for extension URN resolution
+  const extensionSchemaMap = new Map<string, SchemaDefinition>();
+  for (const schema of schemaDefinitions) {
+    if (!schema.id.startsWith('urn:ietf:params:scim:schemas:core:')) {
+      extensionSchemaMap.set(schema.id.toLowerCase(), schema);
+    }
+  }
+
+  for (const op of operations) {
+    if (op.path) {
+      // Path-based operation — resolve the target attribute
+      const targetAttr = resolvePathToAttrName(op.path, extensionSchemaMap);
+
+      // NEVER strip operations targeting 'id' — let G8c hard-reject
+      if (targetAttr.toLowerCase() === 'id') {
+        filtered.push(op);
+        continue;
+      }
+
+      // Check if the target is a readOnly core attribute
+      if (core.has(targetAttr.toLowerCase())) {
+        stripped.push(targetAttr);
+        continue; // Skip this operation
+      }
+
+      // Check if the target is a readOnly extension attribute
+      let isReadOnly = false;
+      for (const [urn, readOnlySet] of extensions) {
+        // Extension path: "urn:...:attrName" or just "attrName" in extension block
+        if (op.path.toLowerCase().startsWith(urn.toLowerCase())) {
+          const remainder = op.path.slice(urn.length + 1).replace(/\[.*?\]/g, '').split('.')[0];
+          if (remainder && readOnlySet.has(remainder.toLowerCase())) {
+            stripped.push(`${urn}.${remainder}`);
+            isReadOnly = true;
+            break;
+          }
+        }
+      }
+
+      if (!isReadOnly) {
+        filtered.push(op);
+      }
+    } else if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
+      // No-path operation — check each key in the value object
+      const valueObj = { ...(op.value as Record<string, unknown>) };
+      let modified = false;
+
+      for (const key of Object.keys(valueObj)) {
+        // Never strip 'id' — let G8c reject
+        if (key.toLowerCase() === 'id') continue;
+
+        if (core.has(key.toLowerCase())) {
+          delete valueObj[key];
+          stripped.push(key);
+          modified = true;
+        }
+
+        // Check extension URN blocks in no-path value
+        if (key.startsWith('urn:')) {
+          for (const [urn, readOnlySet] of extensions) {
+            if (key.toLowerCase() === urn.toLowerCase()) {
+              const extVal = valueObj[key];
+              if (typeof extVal === 'object' && extVal !== null && !Array.isArray(extVal)) {
+                const extObj = { ...(extVal as Record<string, unknown>) };
+                for (const extKey of Object.keys(extObj)) {
+                  if (readOnlySet.has(extKey.toLowerCase())) {
+                    delete extObj[extKey];
+                    stripped.push(`${key}.${extKey}`);
+                    modified = true;
+                  }
+                }
+                if (Object.keys(extObj).length === 0) {
+                  delete valueObj[key];
+                } else {
+                  valueObj[key] = extObj;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Only include the operation if there are remaining keys
+      if (Object.keys(valueObj).length > 0) {
+        filtered.push(modified ? { ...op, value: valueObj } : op);
+      } else {
+        // All keys were readOnly — entire operation is stripped
+      }
+    } else {
+      // Non-object value or array value — keep as-is
+      filtered.push(op);
+    }
+  }
+
+  return { filtered, stripped };
+}
+
+/**
+ * Resolve a PATCH operation path to the root attribute name.
+ * Strips value filters and sub-attribute paths.
+ * Handles extension URN-prefixed paths.
+ */
+function resolvePathToAttrName(
+  path: string,
+  extensionSchemas: Map<string, SchemaDefinition>,
+): string {
+  // Strip value filters like [value eq "abc"]
+  const clean = path.replace(/\[.*?\]/g, '');
+
+  // Extension URN prefix
+  for (const [urnLower] of extensionSchemas) {
+    if (clean.toLowerCase().startsWith(urnLower + ':') || clean.toLowerCase().startsWith(urnLower + '.')) {
+      const remainder = clean.slice(urnLower.length + 1);
+      return remainder.split('.')[0] || clean;
+    }
+  }
+
+  // Core attribute — first segment
+  return clean.split('.')[0];
 }
 
 // ─── Schema-Aware Helpers (parameterized by core schema URN) ────────────────
@@ -321,6 +532,34 @@ export class ScimSchemaHelpers {
    */
   getExtensionUrns(endpointId?: string): readonly string[] {
     return this.schemaRegistry.getExtensionUrns(endpointId);
+  }
+
+  /**
+   * Strip readOnly attributes from a POST/PUT payload using the endpoint's
+   * registered schema definitions.
+   *
+   * @returns Array of stripped attribute names (for logging/warning)
+   */
+  stripReadOnlyAttributesFromPayload(
+    payload: Record<string, unknown>,
+    endpointId?: string,
+  ): string[] {
+    const schemas = this.getSchemaDefinitions(endpointId);
+    return stripReadOnlyAttributes(payload, schemas);
+  }
+
+  /**
+   * Filter PATCH operations targeting readOnly attributes using the endpoint's
+   * registered schema definitions.
+   *
+   * @returns Object with filtered operations and stripped attribute names
+   */
+  stripReadOnlyFromPatchOps(
+    operations: PatchOperation[],
+    endpointId?: string,
+  ): { filtered: PatchOperation[]; stripped: string[] } {
+    const schemas = this.getSchemaDefinitions(endpointId);
+    return stripReadOnlyPatchOps(operations, schemas);
   }
 
   /**

@@ -1,6 +1,6 @@
 # Endpoint Configuration Flags — Complete Reference
 
-> **Status:** Living document · **Last Updated:** 2026-02-26 · **Baseline:** v0.19.3
+> **Status:** Living document · **Last Updated:** 2026-02-27 · **Baseline:** v0.21.0
 >
 > Authoritative reference for all per-endpoint configuration flags in SCIMServer.
 > Covers flag definitions, defaults, type handling, precedence rules, applicability matrices,
@@ -25,7 +25,8 @@
    - 4.9 [ReprovisionOnConflictForSoftDeletedResource](#49-reprovisiononconflictforsoftdeletedresource)
    - 4.10 [CustomResourceTypesEnabled](#410-customresourcetypesenabled)
    - 4.11 [BulkOperationsEnabled](#411-bulkoperationsenabled)
-   - 4.12 [logLevel](#412-loglevel)
+   - 4.12 [PerEndpointCredentialsEnabled](#412-perendpointcredentialsenabled)
+   - 4.13 [logLevel](#413-loglevel)
 5. [Flag Applicability Matrix](#5-flag-applicability-matrix)
 6. [Flag Interaction & Precedence](#6-flag-interaction--precedence)
 7. [Flag Combination Examples](#7-flag-combination-examples)
@@ -752,7 +753,60 @@ When Bulk Operations is supported at the application level, `ServiceProviderConf
 
 ---
 
-### 4.12 logLevel
+### 4.12 PerEndpointCredentialsEnabled
+
+| Property | Value |
+|----------|-------|
+| **Config key** | `PerEndpointCredentialsEnabled` |
+| **Constant** | `ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED` |
+| **Default** | `false` |
+| **Helper** | `getConfigBoolean(config, key)` |
+| **Scope** | Auth (all requests to this endpoint) |
+| **RFC** | RFC 7643 §7 (multi-tenant isolation) |
+| **Added** | v0.21.0 |
+
+**Purpose:** Enables per-endpoint bearer token credentials for this endpoint. When ON, incoming bearer tokens are first checked against bcrypt-hashed credentials stored in the `EndpointCredential` table. If no matching credential is found, the guard falls back to OAuth JWT and then the global `SCIM_SHARED_SECRET` (3-tier fallback chain).
+
+**Key behaviors when enabled:**
+- **3-tier fallback**: Per-endpoint bcrypt → OAuth JWT → global `SCIM_SHARED_SECRET`
+- **Admin API**: `POST /admin/endpoints/:id/credentials` generates a 32-byte base64url token, stores bcrypt hash (12 rounds), returns plaintext **once**
+- **Listing**: `GET /admin/endpoints/:id/credentials` lists credentials (hash never returned)
+- **Revocation**: `DELETE /admin/endpoints/:id/credentials/:credentialId` deactivates credential
+- **Expiry**: Optional `expiresAt` (ISO datetime) — expired credentials are automatically filtered out
+- **Active state**: Inactive credentials (revoked) are ignored even if the hash matches
+
+**Example — Create per-endpoint credential:**
+
+```http
+POST /scim/admin/endpoints/42020f1f-.../credentials
+Content-Type: application/json
+Authorization: Bearer <admin-token>
+```
+
+Response (201):
+
+```json
+{
+  "id": "cred-uuid",
+  "token": "1a2b3c4d...(plaintext — shown once only)",
+  "createdAt": "2026-02-27T10:00:00Z",
+  "expiresAt": null,
+  "active": true
+}
+```
+
+**Example — Authenticate using per-endpoint credential:**
+
+```http
+GET /scim/endpoints/42020f1f-.../Users
+Authorization: Bearer 1a2b3c4d...(plaintext token)
+```
+
+**Example — Flag OFF (default):** All requests are validated against OAuth JWT or global shared secret only. Per-endpoint credential table is not consulted.
+
+---
+
+### 4.13 logLevel
 
 | Property | Value |
 |----------|-------|
@@ -794,6 +848,7 @@ Which flags affect which HTTP methods and resource types:
 | `RequireIfMatch` | — | ✅ | ✅ | ✅ | — | — | ✅ | ✅ |
 | `CustomResourceTypesEnabled` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
 | `BulkOperationsEnabled` | ✅ | — | — | — | — | — | ✅ | ✅ |
+| `PerEndpointCredentialsEnabled` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `logLevel` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ---

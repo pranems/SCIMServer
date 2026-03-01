@@ -18,11 +18,24 @@ export interface ValidationError {
 }
 
 /**
+ * A non-fatal validation warning (e.g. readOnly attribute silently ignored).
+ * @see RFC 7643 §2.2 — readOnly attributes MAY be sent but SHALL be ignored
+ */
+export interface ValidationWarning {
+  /** Dot-path to the attribute that triggered the warning */
+  path: string;
+  /** Human-readable description of the warning */
+  message: string;
+}
+
+/**
  * Result of schema validation.
  */
 export interface ValidationResult {
   valid: boolean;
   errors: ValidationError[];
+  /** Non-fatal warnings (e.g. readOnly attributes that were ignored) */
+  warnings?: ValidationWarning[];
 }
 
 /**

@@ -5,6 +5,33 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.22.0] - 2026-02-28
+
+### Added — ReadOnly Attribute Stripping & Warnings (RFC 7643 §2.2)
+- **ReadOnly attribute stripping** — POST/PUT payloads automatically strip `mutability: 'readOnly'` attributes (`id`, `meta`, `groups`, and any extension readOnly attrs) before processing. RFC 7643 §2.2: "the service provider SHALL ignore that attribute".
+- **PATCH readOnly op filtering** — PATCH operations targeting readOnly attributes are silently stripped (behavior matrix: strict OFF → strip; strict ON + `IgnoreReadOnlyAttributesInPatch` → strip; strict ON without flag → G8c 400).
+- **Warning URN extension** — When `IncludeWarningAboutIgnoredReadOnlyAttribute` is enabled, write responses include `urn:scimserver:api:messages:2.0:Warning` in `schemas[]` with a `warnings` array listing each stripped attribute.
+- **`IncludeWarningAboutIgnoredReadOnlyAttribute` config flag** — 14th boolean flag (default: false). Enables warning annotation in responses.
+- **`IgnoreReadOnlyAttributesInPatch` config flag** — 15th boolean flag (default: false). When true + strict schema ON, strips readOnly PATCH ops instead of G8c 400 error.
+- **`SchemaValidator.collectReadOnlyAttributes()`** — Static method collecting readOnly attribute names from schema definitions (core + per-extension-URN Sets).
+- **`stripReadOnlyAttributes()` helper** — Strips readOnly top-level attributes from POST/PUT payloads with case-insensitive matching and extension URN block support.
+- **`stripReadOnlyPatchOps()` helper** — Filters PATCH operations, never stripping `id` (kept for G8c hard-reject), handles path-based, no-path, and extension URN ops.
+- **`SCIM_WARNING_URN` constant** — `urn:scimserver:api:messages:2.0:Warning` exported from `scim-service-helpers.ts`.
+- **Controller `attachWarnings()` method** — Private helper on Users/Groups controllers to annotate write responses with warning extension.
+- **13 new unit tests** — `stripReadOnlyAttributes` (5 tests) + `stripReadOnlyPatchOps` (7 tests) + `SCIM_WARNING_URN` (1 test).
+
+### Fixed
+- **BF-1: Groups `id` client-controlled** — POST /Groups previously accepted `dto.id` from the client payload. Now always server-generates via `randomUUID()` per RFC 7643 §2.2 (id is readOnly, server-assigned).
+
+### Changed
+- Total unit tests: 2508 → **2521** (13 new strip helper tests).
+- Config flags: 13 → **15** (2 new readOnly-related flags).
+- `EndpointContextStorage` — Added `addWarnings()`/`getWarnings()` API for request-scoped warning accumulation.
+- `ScimSchemaHelpers` — Added `stripReadOnlyAttributesFromPayload()` and `stripReadOnlyFromPatchOps()` convenience methods.
+
+### Documentation
+- New: `docs/READONLY_ATTRIBUTE_STRIPPING_AND_WARNINGS.md` — Comprehensive feature doc with architecture diagrams, PATCH behavior matrix, config flag reference, Mermaid flow diagrams, test coverage tables.
+
 ## [0.21.0] - 2026-02-27
 
 ### Added — Phase 11: Per-Endpoint Credentials (G11)
@@ -29,10 +56,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Dependencies
 - Added `bcrypt` + `@types/bcrypt` for credential hashing.
 
+### Fixed
+- **SchemaValidator `id` required+readOnly catch-22 (59 failures):** `id` attribute was `required: true` + `mutability: 'readOnly'` — omitting `id` failed required check, including `id` failed readOnly check. Fixed by skipping readOnly attributes in required-attribute validation (RFC 7643 §2.2: server-assigned attributes). Applied to both core and extension attribute checks.
+- **G8f PUT uniqueness test mock drift (1 failure):** `replaceGroupForEndpoint` called twice in test but `findWithMembers` mocked only once — second call got `undefined` → 404 instead of 409. Added re-mock before second call.
+
 ### Verified
-- **77 suites / 2,581 tests** — Unit: 77 suites, 2,581 tests (2,557 pass, 24 pre-existing).
-- **25 E2E suites / 522 tests** — E2E: 25 suites, 522 tests (481 pass, 41 pre-existing).
-- **485 live integration tests** — 480 pass, 5 pre-existing failures (boolean coercion schema validation).
+- **73 suites / 2,508 tests** — Unit: 73 suites, 2,508 tests — **all passing (0 failures)**.
+- **25 E2E suites / 522 tests** — E2E: 25 suites, 522 tests — **all passing (0 failures)**.
+- **485 live integration tests** — previously 480 pass / 5 pre-existing (boolean coercion schema validation) — expected all 485 pass after fix.
 - Docker build + run: both containers healthy, all per-endpoint credential tests pass.
 
 ## [0.20.0] - 2026-02-27

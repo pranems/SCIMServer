@@ -1,6 +1,6 @@
 # 📚 SCIMServer Documentation Index
 
-> Quick navigation to all project documentation. Updated February 26, 2026.
+> Quick navigation to all project documentation. Updated February 27, 2026.
 
 > Theme conventions: onboarding-first, current-state metadata, explicit historical-context labeling, and cross-linking to canonical sources.
 
@@ -52,7 +52,7 @@
 | [SCIM_CASE_INSENSITIVITY_REFERENCE.md](SCIM_CASE_INSENSITIVITY_REFERENCE.md) | Case-insensitivity rules per RFC 7643 §2.1 |
 | [SCIM_RFC_COMPLIANCE_LAYER.md](SCIM_RFC_COMPLIANCE_LAYER.md) | Comprehensive RFC compliance layer technical reference |
 | [MULTI_MEMBER_PATCH_CONFIG_FLAG.md](MULTI_MEMBER_PATCH_CONFIG_FLAG.md) | Multi-member PATCH config flags reference |
-| [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | **Complete flag reference** — All 11 boolean flags + logLevel with applicability, precedence, combinations, diagrams, JSON examples |
+| [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | **Complete flag reference** — All 12 boolean flags + logLevel with applicability, precedence, combinations, diagrams, JSON examples |
 | [FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md](FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md) | Soft delete, strict schema validation, custom extension URNs — feature docs with diagrams, examples, DB values |
 | [EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md](EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md) | externalId CITEXT→TEXT migration — RFC 7643 §3.1 caseExact compliance fix with sequence diagrams, DB diffs, filter examples, rollback strategy |
 | [G8C_PATCH_READONLY_PREVALIDATION.md](G8C_PATCH_READONLY_PREVALIDATION.md) | G8c — PATCH readOnly pre-validation: RFC 7643 §2.2 enforcement, architecture, test coverage |
@@ -61,6 +61,10 @@
 | [G8F_GROUP_UNIQUENESS_PUT_PATCH.md](G8F_GROUP_UNIQUENESS_PUT_PATCH.md) | G8f — Group uniqueness enforcement on PUT/PATCH: `displayName`/`externalId` collision detection with self-exclusion, 409 Conflict responses |
 | [G8G_WRITE_RESPONSE_ATTRIBUTE_PROJECTION.md](G8G_WRITE_RESPONSE_ATTRIBUTE_PROJECTION.md) | G8g — Write-response `attributes`/`excludedAttributes` projection on POST/PUT/PATCH for RFC 7644 §3.9 compliance |
 | [PHASE_09_BULK_OPERATIONS.md](PHASE_09_BULK_OPERATIONS.md) | Phase 9 — Bulk Operations (RFC 7644 §3.7): Sequential batch processing, bulkId cross-referencing, failOnErrors, per-endpoint `BulkOperationsEnabled` flag gating |
+| [PHASE_10_ME_ENDPOINT.md](PHASE_10_ME_ENDPOINT.md) | Phase 10 — `/Me` Endpoint (RFC 7644 §3.11): JWT sub→userName identity resolution, full GET/PUT/PATCH/DELETE, attribute projection |
+| [PHASE_12_SORTING_AND_DEDUP.md](PHASE_12_SORTING_AND_DEDUP.md) | Phase 12 — Sorting (RFC 7644 §3.4.2.3): `sortBy`/`sortOrder` push-down, `sort.supported: true` in SPC, G17 service deduplication (`scim-service-helpers.ts`) |
+| [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) | G11 — Per-Endpoint Credentials: bcrypt-hashed credential storage, 3-tier auth fallback chain, `PerEndpointCredentialsEnabled` flag (12th boolean flag), Admin Credential API |
+| [READONLY_ATTRIBUTE_STRIPPING_AND_WARNINGS.md](READONLY_ATTRIBUTE_STRIPPING_AND_WARNINGS.md) | ReadOnly attribute stripping & warnings: RFC 7643 §2.2 enforcement, PATCH behavior matrix, warning URN extension, 2 new config flags |
 | [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](DISCOVERY_ENDPOINTS_RFC_AUDIT.md) | Discovery endpoints RFC audit — SPC/ResourceTypes/Schemas vs RFC 7643 §5–§7 + RFC 7644 §4: 6 gaps (D1–D6) identified and **all resolved** |
 
 ## Validation & Testing
@@ -76,7 +80,9 @@
 | [TESTING-WORKFLOW.md](TESTING-WORKFLOW.md) | Pre-release testing workflow (branches, CI, deploy) |
 | [COLLISION-TESTING-GUIDE.md](COLLISION-TESTING-GUIDE.md) | Entra collision (409) testing guide |
 | [ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md](ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md) | Issues, bugs & root cause analysis — 11 issues diagnosed with fixes and lessons learned |
+| [SCHEMA_VALIDATOR_READONLY_REQUIRED_FIX.md](SCHEMA_VALIDATOR_READONLY_REQUIRED_FIX.md) | SchemaValidator `id` readOnly+required catch-22 fix — root cause analysis, RFC justification, lifecycle diagrams (65 failures → 0) |
 | [LIVE_TEST_NORMS_AND_BEST_PRACTICES.md](LIVE_TEST_NORMS_AND_BEST_PRACTICES.md) | Live integration test norms, best practices & industry recommendations — local, Docker, Azure with PostgreSQL |
+| [SELF_IMPROVING_TEST_HEALTH_PROMPT.md](SELF_IMPROVING_TEST_HEALTH_PROMPT.md) | Reusable self-improving AI prompt for diagnosing and resolving test failures — pattern library grows with each use |
 
 ## Development
 
@@ -117,6 +123,7 @@
 | [MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md](MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md) | Master migration plan — 12+ phases, gap table, dependency graph, timeline |
 | [RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md](RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md) | RFC 7643/7644 attribute characteristics gap analysis — 15 gaps, sub-phases 8.1-8.5, remediation plans |
 | [H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md](H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md) | H-1 (PATCH validation) & H-2 (immutable enforcement) — architecture analysis & implementation |
+| [PHASE_08_REMAINING_ANALYSIS.md](PHASE_08_REMAINING_ANALYSIS.md) | Phase 8 remaining adversarial validation gap analysis — 33 gaps, sub-phases 8.5–8.8, effort estimates |
 | [ATTRIBUTE_CHARACTERISTICS_GAPS.md](ATTRIBUTE_CHARACTERISTICS_GAPS.md) | RFC 7643 §2 attribute characteristics gaps, bugs, fixes — master tracking |
 | [IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md](IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md) | Ideal SCIM architecture v3 — N-tier, unified table, JSONB, data-driven discovery |
 | [INMEMORY_ARCHITECTURE_AND_PLAN_v1_2026-02-20.md](INMEMORY_ARCHITECTURE_AND_PLAN_v1_2026-02-20.md) | In-memory architecture & plan — Map-based repo implementation |

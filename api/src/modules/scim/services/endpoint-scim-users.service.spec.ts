@@ -4,6 +4,7 @@ import { EndpointScimUsersService } from './endpoint-scim-users.service';
 import { USER_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { ScimMetadataService } from './scim-metadata.service';
 import { ScimLogger } from '../../logging/scim-logger.service';
+import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import type { CreateUserDto } from '../dto/create-user.dto';
 import type { PatchUserDto } from '../dto/patch-user.dto';
 import { ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
@@ -83,6 +84,16 @@ describe('EndpointScimUsersService', () => {
             error: jest.fn(),
             fatal: jest.fn(),
             isEnabled: jest.fn().mockReturnValue(true),
+          },
+        },
+        {
+          provide: EndpointContextStorage,
+          useValue: {
+            setContext: jest.fn(),
+            getEndpointId: jest.fn(),
+            getConfig: jest.fn(),
+            addWarnings: jest.fn(),
+            getWarnings: jest.fn().mockReturnValue([]),
           },
         },
       ],

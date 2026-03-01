@@ -1,6 +1,6 @@
 # SCIMServer — Complete REST API Reference
 
-> Version baseline: v0.19.3 · Updated: February 26, 2026 · Scope: SCIM + admin + OAuth + web routes
+> Version baseline: v0.21.0 · Updated: February 27, 2026 · Scope: SCIM + admin + OAuth + web routes
 
 This document enumerates all REST API endpoints and resources exposed by the SCIMServer application, with HTTP methods, purpose, common query parameters, expected request and response shapes, authentication notes, and `curl` examples for each operation.
 
@@ -10,10 +10,12 @@ Base path
 
 Authentication
 - Protected endpoints require `Authorization: Bearer <token>` header.
-- Two accepted token modes:
-  - OAuth 2.0 JWT issued by `POST /oauth/token` (client_credentials grant).
-  - Shared secret (value in `SCIM_SHARED_SECRET`) for legacy deployments.
-- Public endpoints are decorated with `@Public()` (static web UI and OAuth token endpoint).
+- **Three accepted token modes** (evaluated in order — first match wins):
+  1. **Per-endpoint credentials** (v0.21.0) — bcrypt-hashed tokens created via the Admin Credential API. Active only when `PerEndpointCredentialsEnabled` is `True` for the endpoint. Token is verified against stored bcrypt hashes for active, non-expired credentials. Sets `req.authType = 'endpoint_credential'`.
+  2. **OAuth 2.0 JWT** issued by `POST /oauth/token` (client_credentials grant). Verified via JWT signature + expiry. Sets `req.authType = 'oauth'`.
+  3. **Legacy shared secret** (value in `SCIM_SHARED_SECRET`) — direct string comparison. Sets `req.authType = 'legacy'`.
+- If all three tiers fail, the server responds with `401 Unauthorized` and `WWW-Authenticate: Bearer realm="SCIM"` header.
+- Public endpoints are decorated with `@Public()` — discovery endpoints (RFC 7644 §4), OAuth token endpoint, and static web UI.
 
 Content type
 - **Request:** Use `Content-Type: application/scim+json` or `application/json` for SCIM resource create/replace/patch operations.
@@ -58,6 +60,10 @@ Contents
   - `GET /admin/endpoints/:endpointId/resource-types/:name` — get by name
   - `DELETE /admin/endpoints/:endpointId/resource-types/:name` — delete by name
   - Generic SCIM CRUD: `POST/GET/PUT/PATCH/DELETE /:resourceType` for registered types
+- Per-endpoint credentials (requires `PerEndpointCredentialsEnabled` config flag)
+  - `POST /admin/endpoints/:endpointId/credentials` — generate credential (returns token once)
+  - `GET /admin/endpoints/:endpointId/credentials` — list credentials (hash masked)
+  - `DELETE /admin/endpoints/:endpointId/credentials/:credentialId` — revoke credential
 - Admin endpoints (`/admin`)
   - `GET /admin/version` — version & deployment info
   - `GET /admin/logs` — list request logs (with filters)
@@ -476,6 +482,73 @@ curl -X POST "https://<API_BASE>/scim/v2/admin/users/manual" \
 
 7) POST /admin/users/:id/delete
 - Admin convenience to delete by identifier; returns 204 or 404.
+
+---
+
+Per-Endpoint Credential Management (v0.21.0)
+
+> **Prerequisite:** The endpoint must have `PerEndpointCredentialsEnabled` set to `True` in its config. If disabled, credential routes return `403 Forbidden`.
+
+1) POST /admin/endpoints/:endpointId/credentials
+- Generate a new per-endpoint bearer token.
+- Auth: Required (OAuth JWT or global shared secret — admin access).
+- Request body:
+```json
+{
+  "credentialType": "bearer",         // "bearer" (default) | "oauth_client"
+  "label": "Production API Key",      // Optional human-readable label
+  "expiresAt": "2026-12-31T23:59:59Z" // Optional ISO 8601 expiry
+}
+```
+- Response (201 Created):
+```json
+{
+  "id": "a1b2c3d4-...",
+  "endpointId": "e5f6g7h8-...",
+  "credentialType": "bearer",
+  "label": "Production API Key",
+  "active": true,
+  "createdAt": "2026-02-27T01:00:00.000Z",
+  "expiresAt": "2026-12-31T23:59:59.000Z",
+  "token": "Kx7mN2pQ..."
+}
+```
+- **⚠️ The `token` field is returned ONCE only.** The server stores only the bcrypt hash (12 rounds). Save this value securely.
+- Example curl:
+```
+curl -X POST "https://<API_BASE>/scim/admin/endpoints/<EID>/credentials" \
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"credentialType":"bearer","label":"My Key"}'
+```
+
+2) GET /admin/endpoints/:endpointId/credentials
+- List all credentials for this endpoint. The `credentialHash` is **never** returned.
+- Auth: Required.
+- Response (200 OK): Array of credential objects (without `token` or `credentialHash`).
+- Example curl:
+```
+curl -H "Authorization: Bearer <TOKEN>" \
+  "https://<API_BASE>/scim/admin/endpoints/<EID>/credentials"
+```
+
+3) DELETE /admin/endpoints/:endpointId/credentials/:credentialId
+- Revoke (deactivate) a credential. The credential is soft-deactivated (`active: false`), not hard-deleted.
+- Auth: Required.
+- Response: 204 No Content.
+- Example curl:
+```
+curl -X DELETE "https://<API_BASE>/scim/admin/endpoints/<EID>/credentials/<CID>" \
+  -H "Authorization: Bearer <TOKEN>"
+```
+
+**Using a per-endpoint token:**
+Once created, use the token as a Bearer token for any SCIM operation on that endpoint:
+```
+curl -H "Authorization: Bearer <per-endpoint-token>" \
+  "https://<API_BASE>/scim/endpoints/<EID>/Users"
+```
+The guard extracts the `endpointId` from the URL, loads active non-expired credentials, and bcrypt-verifies the token. On mismatch, it falls through to OAuth and legacy auth.
 
 ---
 

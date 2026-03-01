@@ -21,6 +21,7 @@ import type { PatchUserDto } from '../dto/patch-user.dto';
 import { ScimMetadataService } from './scim-metadata.service';
 import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ENDPOINT_CONFIG_FLAGS, getConfigBoolean, getConfigBooleanWithDefault } from '../../endpoint/endpoint-config.interface';
+import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { buildUserFilter } from '../filters/apply-scim-filter';
 import { resolveUserSortParams } from '../common/scim-sort.util';
 import { UserPatchEngine } from '../../../domain/patch/user-patch-engine';
@@ -57,6 +58,7 @@ export class EndpointScimUsersService {
     private readonly metadata: ScimMetadataService,
     private readonly logger: ScimLogger,
     private readonly schemaRegistry: ScimSchemaRegistry,
+    private readonly endpointContext: EndpointContextStorage,
   ) {
     this.schemaHelpers = new ScimSchemaHelpers(schemaRegistry, SCIM_CORE_USER_SCHEMA);
   }
@@ -70,6 +72,15 @@ export class EndpointScimUsersService {
     this.schemaHelpers.coerceBooleanStringsIfEnabled(dto as Record<string, unknown>, endpointId, config);
 
     this.schemaHelpers.validatePayloadSchema(dto, endpointId, config, 'create');
+
+    // Strip readOnly attributes (RFC 7643 §2.2: server SHALL ignore client-supplied readOnly values)
+    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as Record<string, unknown>, endpointId);
+    if (strippedAttrs.length > 0) {
+      this.logger.warn(LogCategory.SCIM_USER, 'Stripped readOnly attributes from POST payload', {
+        method: 'POST', path: '/Users', stripped: strippedAttrs, endpointId,
+      });
+      this.endpointContext.addWarnings(strippedAttrs);
+    }
 
     this.logger.info(LogCategory.SCIM_USER, 'Creating user', { userName: dto.userName, endpointId });
     this.logger.trace(LogCategory.SCIM_USER, 'Create user payload', { body: dto as unknown as Record<string, unknown> });
@@ -249,6 +260,15 @@ export class EndpointScimUsersService {
 
     this.schemaHelpers.validatePayloadSchema(dto, endpointId, config, 'replace');
 
+    // Strip readOnly attributes (RFC 7643 §2.2: server SHALL ignore client-supplied readOnly values)
+    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as Record<string, unknown>, endpointId);
+    if (strippedAttrs.length > 0) {
+      this.logger.warn(LogCategory.SCIM_USER, 'Stripped readOnly attributes from PUT payload', {
+        method: 'PUT', path: `/Users/${scimId}`, stripped: strippedAttrs, endpointId,
+      });
+      this.endpointContext.addWarnings(strippedAttrs);
+    }
+
     this.logger.info(LogCategory.SCIM_USER, 'Replace user (PUT)', { scimId, userName: dto.userName, endpointId });
 
     const user = await this.userRepo.findByScimId(endpointId, scimId);
@@ -416,8 +436,26 @@ export class EndpointScimUsersService {
     const rawPayload = parseJson<Record<string, unknown>>(String(user.rawPayload ?? '{}'));
     const meta = parseJson<Record<string, unknown>>(String(user.meta ?? '{}'));
 
+    // ReadOnly attribute stripping for PATCH operations
+    // Matrix: strict OFF → strip; strict ON + IgnorePatchRO ON → strip; strict ON + IgnorePatchRO OFF → keep G8c 400
+    const strictSchemaEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION);
+    const ignorePatchReadOnly = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH);
+    if (!strictSchemaEnabled || ignorePatchReadOnly) {
+      const { filtered, stripped } = this.schemaHelpers.stripReadOnlyFromPatchOps(patchDto.Operations, endpointId);
+      if (stripped.length > 0) {
+        this.logger.warn(LogCategory.SCIM_USER, 'Stripped readOnly PATCH operations', {
+          count: stripped.length,
+          attributes: stripped,
+        });
+        this.endpointContext.addWarnings(
+          stripped.map(attr => `Attribute '${attr}' is readOnly and was ignored in PATCH`),
+        );
+        patchDto.Operations = filtered;
+      }
+    }
+
     // V2: Pre-PATCH validation — validate each operation value against its schema attribute
-    if (getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
+    if (strictSchemaEnabled) {
       const resultPayloadPlaceholder: Record<string, unknown> = {
         schemas: [SCIM_CORE_USER_SCHEMA],
       };

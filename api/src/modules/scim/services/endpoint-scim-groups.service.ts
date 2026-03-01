@@ -80,6 +80,17 @@ export class EndpointScimGroupsService {
 
     this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, config, 'create');
 
+    // Strip readOnly attributes from POST payload (RFC 7643 §2.2)
+    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as unknown as Record<string, unknown>, endpointId);
+    if (strippedAttrs.length > 0) {
+      this.logger.warn(LogCategory.SCIM_GROUP, 'Stripped readOnly attributes from POST payload', {
+        attributes: strippedAttrs,
+      });
+      this.endpointContext.addWarnings(
+        strippedAttrs.map(attr => `Attribute '${attr}' is readOnly and was ignored`),
+      );
+    }
+
     this.logger.info(LogCategory.SCIM_GROUP, 'Creating group', { displayName: dto.displayName, memberCount: dto.members?.length ?? 0, endpointId });
     this.logger.trace(LogCategory.SCIM_GROUP, 'Create group payload', { body: dto as unknown as Record<string, unknown> });
 
@@ -128,7 +139,8 @@ export class EndpointScimGroupsService {
     }
 
     const now = new Date();
-    const scimId = dto.id && typeof dto.id === 'string' ? dto.id : randomUUID();
+    // BF-1: Server MUST generate id (RFC 7643 §2.2 — id is readOnly, server-assigned)
+    const scimId = randomUUID();
 
     const sanitizedPayload = this.extractAdditionalAttributes(dto);
 
@@ -263,8 +275,26 @@ export class EndpointScimGroupsService {
 
     const extensionUrns = this.schemaHelpers.getExtensionUrns(endpointId);
 
+    // ReadOnly attribute stripping for PATCH operations
+    // Matrix: strict OFF → strip; strict ON + IgnorePatchRO ON → strip; strict ON + IgnorePatchRO OFF → keep G8c 400
+    const strictSchemaEnabled = getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION);
+    const ignorePatchReadOnly = getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH);
+    if (!strictSchemaEnabled || ignorePatchReadOnly) {
+      const { filtered, stripped } = this.schemaHelpers.stripReadOnlyFromPatchOps(dto.Operations, endpointId);
+      if (stripped.length > 0) {
+        this.logger.warn(LogCategory.SCIM_PATCH, 'Stripped readOnly PATCH operations on Group', {
+          count: stripped.length,
+          attributes: stripped,
+        });
+        this.endpointContext.addWarnings(
+          stripped.map(attr => `Attribute '${attr}' is readOnly and was ignored in PATCH`),
+        );
+        dto.Operations = filtered;
+      }
+    }
+
     // V2: Pre-PATCH validation — validate each operation value against schema definitions
-    if (getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
+    if (strictSchemaEnabled) {
       const resultPayloadPlaceholder: Record<string, unknown> = {
         schemas: [SCIM_CORE_GROUP_SCHEMA],
       };
@@ -403,6 +433,17 @@ export class EndpointScimGroupsService {
     this.schemaHelpers.coerceBooleanStringsIfEnabled(dto as unknown as Record<string, unknown>, endpointId, config);
 
     this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, config, 'replace');
+
+    // Strip readOnly attributes from PUT payload (RFC 7643 §2.2)
+    const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as unknown as Record<string, unknown>, endpointId);
+    if (strippedAttrs.length > 0) {
+      this.logger.warn(LogCategory.SCIM_GROUP, 'Stripped readOnly attributes from PUT payload', {
+        attributes: strippedAttrs,
+      });
+      this.endpointContext.addWarnings(
+        strippedAttrs.map(attr => `Attribute '${attr}' is readOnly and was ignored`),
+      );
+    }
 
     this.logger.info(LogCategory.SCIM_GROUP, 'Replace group (PUT)', { scimId, displayName: dto.displayName, endpointId });
 

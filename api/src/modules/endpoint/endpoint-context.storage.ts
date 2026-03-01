@@ -6,6 +6,8 @@ export interface EndpointContext {
   endpointId: string;
   baseUrl: string;
   config?: EndpointConfig;
+  /** Accumulated warnings for the current request (e.g. stripped readOnly attributes) */
+  warnings?: string[];
 }
 
 /**
@@ -52,5 +54,24 @@ export class EndpointContextStorage {
 
   getConfig(): EndpointConfig | undefined {
     return this.storage.getStore()?.config;
+  }
+
+  /**
+   * Append warnings to the current request context.
+   * Used by services to record stripped readOnly attributes.
+   */
+  addWarnings(warnings: string[]): void {
+    const store = this.storage.getStore();
+    if (!store || warnings.length === 0) return;
+    if (!store.warnings) store.warnings = [];
+    store.warnings.push(...warnings);
+  }
+
+  /**
+   * Get accumulated warnings for the current request.
+   * Used by controllers to decide whether to attach warning URN.
+   */
+  getWarnings(): string[] {
+    return this.storage.getStore()?.warnings ?? [];
   }
 }

@@ -14,7 +14,8 @@ import {
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
-import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import { SCIM_WARNING_URN } from '../common/scim-service-helpers';
 import { EndpointScimUsersService } from '../services/endpoint-scim-users.service';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { CreateUserDto } from '../dto/create-user.dto';
@@ -35,6 +36,27 @@ export class EndpointScimUsersController {
     private readonly endpointContext: EndpointContextStorage,
     private readonly usersService: EndpointScimUsersService
   ) {}
+
+  /**
+   * Attach readOnly-stripping warnings to a write response when
+   * IncludeWarningAboutIgnoredReadOnlyAttribute is enabled.
+   */
+  private attachWarnings(result: Record<string, unknown>, config?: EndpointConfig): Record<string, unknown> {
+    const warnings = this.endpointContext.getWarnings();
+    if (warnings.length === 0) return result;
+    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE)) return result;
+
+    const schemas = [...((result.schemas as string[]) ?? [])];
+    if (!schemas.includes(SCIM_WARNING_URN)) {
+      schemas.push(SCIM_WARNING_URN);
+    }
+
+    return {
+      ...result,
+      schemas,
+      [SCIM_WARNING_URN]: { warnings },
+    };
+  }
 
   /**
    * Validate endpoint exists, is active, and set endpoint context for all sub-routes.
@@ -73,7 +95,8 @@ export class EndpointScimUsersController {
     const result = await this.usersService.createUserForEndpoint(dto, baseUrl, endpointId, config);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
     const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
-    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs);
+    return this.attachWarnings(projected, config);
   }
 
   /**
@@ -222,7 +245,8 @@ export class EndpointScimUsersController {
     const result = await this.usersService.replaceUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
     const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
-    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs);
+    return this.attachWarnings(projected, config);
   }
 
   /**
@@ -243,7 +267,8 @@ export class EndpointScimUsersController {
     const result = await this.usersService.patchUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
     const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
-    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs);
+    return this.attachWarnings(projected, config);
   }
 
   /**

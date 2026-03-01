@@ -184,6 +184,40 @@ VITE_SCIM_TOKEN=changeme
 - **SCIM API**: http://localhost:3000/scim
 - **Web UI**: http://localhost:5173
 
+### Authentication (3-Tier Fallback — v0.21.0)
+
+SCIMServer uses a **3-tier authentication fallback chain** via `SharedSecretGuard` (global `APP_GUARD`). Each incoming `Authorization: Bearer <token>` is evaluated in order:
+
+| Tier | Method | Env / Config Requirement | `req.authType` |
+|------|--------|--------------------------|----------------|
+| 1 | **Per-endpoint bcrypt credential** | `PerEndpointCredentialsEnabled` = `true` on endpoint + active credential created via Admin API | `endpoint_credential` |
+| 2 | **OAuth 2.0 JWT** | `JWT_SECRET`, `OAUTH_CLIENT_SECRET`, `OAUTH_CLIENT_ID` | `oauth` |
+| 3 | **Global shared secret** | `SCIM_SHARED_SECRET` | `legacy` |
+
+- **Public routes** (discovery, OAuth token, web UI) bypass all tiers via `@Public()` decorator.
+- **Rejection**: All tiers fail → `401 Unauthorized` with `WWW-Authenticate: Bearer realm="SCIM"`.
+
+#### Per-Endpoint Credential Management (optional)
+
+Enable the `PerEndpointCredentialsEnabled` flag on an endpoint to allow credential CRUD:
+
+```powershell
+# Create credential (returns plaintext token ONCE — store it securely)
+Invoke-RestMethod -Method POST -Uri "http://localhost:3000/scim/admin/endpoints/<endpointId>/credentials" `
+  -Headers @{ Authorization = "Bearer changeme" } `
+  -ContentType "application/json"
+
+# List credentials (hash never returned)
+Invoke-RestMethod -Uri "http://localhost:3000/scim/admin/endpoints/<endpointId>/credentials" `
+  -Headers @{ Authorization = "Bearer changeme" }
+
+# Revoke credential
+Invoke-RestMethod -Method DELETE -Uri "http://localhost:3000/scim/admin/endpoints/<endpointId>/credentials/<credentialId>" `
+  -Headers @{ Authorization = "Bearer changeme" }
+```
+
+Use the returned plaintext token as a `Bearer` token for SCIM calls to that specific endpoint.
+
 ### Debug with Log File
 
 ```powershell
@@ -273,7 +307,7 @@ After deployment, configure Microsoft Entra provisioning:
 
 1. **Create Enterprise App** → Azure Portal → Entra ID → Enterprise Applications
 2. **Set Tenant URL** → `https://<your-app-url>/scim/v2`
-3. **Set Secret Token** → SCIM secret from deployment output
+3. **Set Secret Token** → Use `SCIM_SHARED_SECRET` (legacy) **or** a per-endpoint credential token (preferred for multi-tenant isolation)
 4. **Test Connection** → expect success
 5. **Turn Provisioning ON** → assign users/groups
 6. **Monitor** → open app URL in browser for real-time dashboard

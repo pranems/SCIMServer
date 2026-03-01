@@ -75,3 +75,5 @@ api/fix-check.json
 docker-live-test-output.txt
 live-test-output.txt
 api/groups-test-output.txt
+docker-live-pipeline.txt
+docker-live-test-pipeline.txt
