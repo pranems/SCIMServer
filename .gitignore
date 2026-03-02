@@ -43,13 +43,25 @@ logs/
 # Test results (generated per run)
 test-results/
 
-# Local test output files
-local-live-*.txt
+# Test output files (generated per run — never commit)
+*-live-output*.txt
+*-live-pipeline*.txt
+*-live-test-output*.txt
+live-test-output.txt
 api/e2e-*.txt
 api/e2e-*.json
 api/test-out*.txt
-api/unit-results.json
+api/unit-results*.json
 api/unit-test-output.txt
+api/unit-counts.json
+api/unit-check.json
+api/fix-check.json
+api/pipeline-*.json
+api/failed-tests.txt
+api/groups-test-output.txt
+api/ctx-test.txt
+api/debug-output.txt
+api/fail-detail.txt
 scripts/live-test-docker-output.txt
 
 # Temporary files
@@ -60,25 +72,8 @@ temp/
 .azure/
 
 # Docker
-Dockerfile.dockerignore# Version sync: Ensure image contains v0.4.8
+Dockerfile.dockerignore
 
+# Misc docs (local-only / may contain credentials)
 admin.md
 wiki.md
-api/unit-results3.json
-api/unit-results2.json
-api/failed-tests.txt
-api/unit-results-pipeline.json
-api/pipeline-e2e.json
-api/pipeline-unit.json
-api/unit-counts.json
-api/fix-check.json
-docker-live-test-output.txt
-live-test-output.txt
-api/groups-test-output.txt
-docker-live-pipeline.txt
-docker-live-test-pipeline.txt
-api/ctx-test.txt
-api/debug-output.txt
-api/fail-detail.txt
-api/unit-check.json
-api/unit-check.json

@@ -1,7 +1,7 @@
 # SCIM Group Operations — Performance & Failure Analysis
 
 > **Status**: Historical analysis with current-state annotations  
-> **Last Updated**: February 18, 2026  
+> **Last Updated**: March 1, 2026  
 > **Baseline**: SCIMServer v0.10.0
 
 > **✅ ALL ISSUES RESOLVED** — February 13, 2026 (fixes introduced in v0.9.1, retained in v0.10.0). All 3 failures fixed; 24/24 SCIM validator tests now pass.
@@ -580,4 +580,4 @@ AFTER (read before transaction):
 ### Actual Impact After Fixes
 
 All 3 previously-failing tests now pass. Group filter operations reduced from ~10,000ms to ~250ms.
-2,357 unit tests pass (69 suites). 25/25 SCIM validator tests pass.
+All unit tests pass. 25/25 SCIM validator tests pass. 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current counts.

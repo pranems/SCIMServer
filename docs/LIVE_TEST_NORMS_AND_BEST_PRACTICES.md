@@ -1,9 +1,9 @@
 # Live Integration Test — Norms, Best Practices & Industry Recommendations
 
-> **Last Updated**: February 26, 2026  
-> **Applies to**: SCIMServer v0.19.2+  
+> **Last Updated**: March 1, 2026  
+> **Applies to**: SCIMServer  
 > **Persistence**: PostgreSQL 17 (Prisma ORM)  
-> **Script**: `scripts/live-test.ps1` (3,176 lines, 444+ tests, 10+ sections)  
+> **Script**: `scripts/live-test.ps1` (3,500+ lines, 10+ sections) — 📊 see [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for counts  
 > **Targets**: Local (`:6000`), Docker Compose (`:8080`), Azure Container Apps
 
 ---
@@ -377,9 +377,9 @@ Every run produces `test-results/live-<timestamp>.json` + `test-results/live-res
 ```json
 {
   "testRunner": "Live Integration Tests (SCIMServer)",
-  "version": "0.17.4",
+  "version": "0.24.0",
   "target": "local | docker | azure",
-  "summary": { "totalTests": 361, "passed": 361, "failed": 0 },
+  "summary": { "totalTests": "<N>", "passed": "<N>", "failed": 0 },
   "sections": [...],
   "tests": [...],
   "flowSteps": [...]
@@ -588,7 +588,7 @@ npm run start:dev            # Auto-reload on file changes, port 3000
                     │   • Interceptor behavior  │
                     │   • Guard enforcement     │
                     ├───────────────────────────┤
-                    │     Unit Tests            │  2,357 tests, 69 suites
+                    │     Unit Tests            │  See PROJECT_HEALTH_AND_STATS.md
                     │  (Pure domain, no I/O)    │  npx jest
                     │                           │  Target: functions/classes
                     │  Uniquely covers:         │

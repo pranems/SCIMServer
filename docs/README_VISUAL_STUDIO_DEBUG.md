@@ -1,6 +1,6 @@
 # Visual Studio — Debugging Node (SCIMServer API) Quickstart
 
-> Updated: February 18, 2026 · Applies to: Node 24 / SCIMServer v0.10.0 baseline
+> Updated: March 1, 2026 · Applies to: Node 24 / SCIMServer
 
 This snippet shows exact Visual Studio 2022 menu steps and sample attach settings to debug the `api` Node process locally or inside Docker using the Node inspector (port 9229).
 

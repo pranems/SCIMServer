@@ -3,7 +3,7 @@
 > **Document Purpose**: Comprehensive audit of SCIM discovery endpoints (`/ServiceProviderConfig`, `/ResourceTypes`, `/Schemas`) against RFC 7643 §5–§7 and RFC 7644 §4 requirements.
 >
 > **Created**: February 26, 2026
-> **Version**: v0.19.3
+> **Version**: current
 > **RFC References**: RFC 7643 §5 (SPC), RFC 7643 §6 (ResourceTypes), RFC 7643 §7 (Schemas), RFC 7644 §4 (Discovery)
 
 ---

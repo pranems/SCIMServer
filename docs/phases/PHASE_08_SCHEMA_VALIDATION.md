@@ -866,14 +866,9 @@ validateSubAttributes() → directly calls validateSingleValue()
 
 ## 11. Full Validation Pipeline Results
 
-### Final Test Counts (v0.17.0 → current: v0.19.2)
+### Final Test Counts (v0.17.0 → current)
 
-| Level | Count | Suites | Status |
-|-------|-------|--------|---------|
-| **Unit tests** | 2,357 | 69 | ✅ All passing |
-| **E2E tests** | 455 | 22 | ✅ All passing |
-| **Live tests (local)** | 444 | — | ✅ All passing |
-| **Live tests (Docker)** | 444 | — | ✅ All passing |
+> 📊 See [PROJECT_HEALTH_AND_STATS.md](../PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
 
 ### Docker Container
 

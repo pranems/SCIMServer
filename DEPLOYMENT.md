@@ -1,6 +1,6 @@
 # SCIMServer Deployment Options
 
-> Version baseline: v0.21.0 · Updated: February 28, 2026 · Scope: production + local deployment paths
+> Updated: March 1, 2026 · Scope: production + local deployment paths
 
 This document covers all deployment methods for SCIMServer. For the quickest start, use the Azure deployment described in the main [README.md](./README.md). For the most comprehensive Azure guide with architecture diagrams, see [docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md).
 
@@ -261,10 +261,10 @@ npm run start:debug 2>&1 | Tee-Object -FilePath scimserver.log
 ```powershell
 # Auto-discovery update
 iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-func.ps1'); `
-  Update-SCIMServer -Version v0.21.0
+  Update-SCIMServer -Version v0.24.0
 
 # Or manual image update
-az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.21.0
+az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.24.0
 ```
 
 ---

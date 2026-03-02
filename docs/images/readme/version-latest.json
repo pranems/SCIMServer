@@ -1,5 +1,5 @@
 {
-  "version": "0.19.3",
+  "version": "0.24.0",
   "service": {
     "name": "SCIMServer API",
     "environment": "production",
@@ -57,6 +57,6 @@
     }
   },
   "deployment": {
-    "migratePhase": "Phase 9 — Bulk Operations + Discovery RFC Audit (v0.19.3)"
+    "migratePhase": "Phase 10 — P2 Attribute Characteristics + RFC Compliance (v0.24.0)"
   }
 }

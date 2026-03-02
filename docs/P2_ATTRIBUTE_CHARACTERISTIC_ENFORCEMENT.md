@@ -3,7 +3,7 @@
 ## Overview
 
 **Feature**: RFC 7643 §2 attribute characteristics — 6 behavioral gap fixes  
-**Version**: v0.24.0  
+**Version**: current  
 **Status**: ✅ Complete  
 **RFC Reference**: [RFC 7643 §2 — Attribute Characteristics](https://datatracker.ietf.org/doc/html/rfc7643#section-2)  
 **Predecessor**: G8e (v0.17.4), ReadOnly Stripping (v0.22.0), P1 Schema/Discovery (v0.23.0)
@@ -268,4 +268,4 @@ E2E coverage via existing attribute-projection, filter, and write-operation test
 
 ---
 
-*Document created 2026-03-01. Covers P2 Attribute Characteristic Enforcement for SCIMServer v0.24.0. 6/6 items complete. 2,573 unit + 558 E2E + 535 live tests all passing.*
+*Document created 2026-03-01. Covers P2 Attribute Characteristic Enforcement for SCIMServer v0.24.0. 6/6 items complete. All unit, E2E, and live tests passing. 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for counts.*

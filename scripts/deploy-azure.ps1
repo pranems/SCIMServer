@@ -102,7 +102,17 @@ function Ensure-AzProvider {
     return $true
 }
 
-if (-not $ImageTag -or $ImageTag -eq '') { $ImageTag = 'latest' }
+# Auto-read version from api/package.json when -ImageTag is omitted
+if (-not $ImageTag -or $ImageTag -eq '') {
+    $pkgJsonPath = Join-Path $PSScriptRoot '..' 'api' 'package.json'
+    if (Test-Path $pkgJsonPath) {
+        $ImageTag = (Get-Content $pkgJsonPath -Raw | ConvertFrom-Json).version
+        Write-Host "📦 ImageTag auto-read from api/package.json: $ImageTag" -ForegroundColor Cyan
+    } else {
+        $ImageTag = 'latest'
+        Write-Host "⚠️  api/package.json not found — defaulting to ImageTag='latest'" -ForegroundColor Yellow
+    }
+}
 
 # --- Interactive Fallback ----------------------------------------------------
 # Allow zero‑parameter one‑liner usage via: iex (irm <raw-url>/deploy-azure.ps1)
@@ -399,6 +409,7 @@ if ($GhcrPassword -and -not $GhcrUsername) {
     Stop-Deployment -Message "GHCR PAT provided without username." -Hint "Provide both -GhcrUsername and -GhcrPassword for private images."
 }
 
+# ImageTag already resolved above from package.json or parameter; final safety net
 if (-not $ImageTag) { $ImageTag = "latest" }
 
 Write-Host ""; Write-Host "Configuration Summary:" -ForegroundColor Cyan

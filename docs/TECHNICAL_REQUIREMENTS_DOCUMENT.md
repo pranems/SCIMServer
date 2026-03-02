@@ -1,7 +1,7 @@
 # SCIMServer — Technical Requirements Document (TRD)
 
-> **Version**: 1.0  
-> **Date**: February 9, 2026  
+> **Version**: 1.1  
+> **Date**: March 1, 2026  
 > **Status**: Living Document  
 > **Standards**: RFC 7643 (Core Schema), RFC 7644 (Protocol), RFC 7642 (Concepts)
 

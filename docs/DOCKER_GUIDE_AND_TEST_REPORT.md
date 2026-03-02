@@ -5,10 +5,10 @@
 > **Date:** February 11, 2026  
 > **Image:** `scimserver:live-test` (496 MB, Alpine Linux)  
 > **Test Result (historical run):** ✅ **212/212 tests passed** in 4.9s  
-> **Current baseline:** ✅ **535/535 live integration tests passed** (local + Docker + Azure)  
+> **Current baseline:** ✅ All live integration tests passed (local + Docker + Azure). 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current counts.  
 > **Database:** PostgreSQL 17 (docker postgres:17-alpine)  
 > **Base Image:** `node:24-alpine` (multi-stage build)
-> **Runtime note:** Current production image exposes and serves on `8080` (not `80`). Unit tests: **2,573/2,573** (73 suites). E2E tests: **558/558** (27 suites).
+> **Runtime note:** Current production image exposes and serves on `8080` (not `80`). All unit and E2E tests passing.
 
 ---
 
@@ -717,12 +717,12 @@ Features: Named volume for persistent backup, auto-restart, random secrets
 
 ```powershell
 # Tag and push to ACR
-docker tag scimserver:live-test myregistry.azurecr.io/scimserver:v0.10.0
-docker push myregistry.azurecr.io/scimserver:v0.10.0
+docker tag scimserver:live-test myregistry.azurecr.io/scimserver:v0.24.0
+docker push myregistry.azurecr.io/scimserver:v0.24.0
 
 # Deploy (see scripts/deploy-azure.ps1 for full automation)
 az containerapp update --name scimserver --resource-group my-rg \
-  --image myregistry.azurecr.io/scimserver:v0.10.0
+  --image myregistry.azurecr.io/scimserver:v0.24.0
 ```
 
 ### Health Check

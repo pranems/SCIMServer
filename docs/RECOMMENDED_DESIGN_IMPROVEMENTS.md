@@ -1254,7 +1254,7 @@ interface PaginatedResponse<T> {
 
 ### 17.1 RFC Compliance Gaps
 
-> **Phase 1 (Foundation — RFC Compliance Core) was completed Feb 2026.** Items marked ✅ below are now implemented and covered by 2,357 unit tests + 444 live integration tests.
+> **Phase 1 (Foundation — RFC Compliance Core) was completed Feb 2026.** Items marked ✅ below are now implemented. 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
 
 | RFC Requirement | RFC Section | Current State | Status |
 |----------------|-------------|---------------|--------|
@@ -1316,7 +1316,7 @@ interface PaginatedResponse<T> {
 
 **Goal**: Make the existing server truthfully RFC-compliant for the features it already supports.
 
-> **All 7 tasks completed.** 2,357 unit tests, 444 live integration tests, all 25 Microsoft SCIM Validator tests passing.
+> **All 7 tasks completed.** All unit, live integration, and Microsoft SCIM Validator tests passing. 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for counts.
 
 | # | Task | Status | Notes |
 |---|------|--------|-------|

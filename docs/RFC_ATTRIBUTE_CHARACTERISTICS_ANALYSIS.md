@@ -1,6 +1,6 @@
 # RFC 7643/7644 Attribute Characteristics — Full Analysis & Gap Assessment
 
-> **Date:** 2026-02-26 | **Project Version:** v0.19.3  
+> **Date:** 2026-03-01  
 > **Scope:** All 11 attribute characteristics × all 5 SCIM operations × core + extension + custom extension schemas  
 > **References:** RFC 7643 §2.1–§2.5, §3.1, §4, §7 | RFC 7644 §3.3–§3.12
 

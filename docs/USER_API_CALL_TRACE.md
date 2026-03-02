@@ -1,6 +1,6 @@
 # User API — Annotated Call Trace + Diagrams
 
-> Version baseline: v0.10.0 · Updated: February 18, 2026 · Flow reflects current RequestLoggingInterceptor + ScimLogger behavior
+> Updated: March 1, 2026 · Flow reflects current RequestLoggingInterceptor + ScimLogger behavior
 
 This document contains a concrete example payload for `POST /scim/v2/Users`, an end-to-end annotated call trace mapping to controller/service/Prisma actions and the expected DB rows and request log entry. It also includes additional Mermaid diagrams showing create, list, and get flows including database interactions.
 

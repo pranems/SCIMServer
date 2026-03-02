@@ -1,5 +1,5 @@
 ﻿import 'reflect-metadata';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import type { Request, Response, NextFunction } from 'express';
 import { NestFactory } from '@nestjs/core';
 import { json } from 'express';
@@ -51,9 +51,18 @@ async function bootstrap(): Promise<void> {
     index: false, // Don't serve index.html automatically
   });
 
+  // Serve the SPA index.html for all /admin* routes (client-side routing).
+  // Express middleware runs before NestJS routing, bypassing global prefix, guards, and filters.
+  const indexHtmlPath = join(__dirname, '..', 'public', 'index.html');
+  app.use('/admin', (_req: Request, res: Response) => {
+    res.sendFile(indexHtmlPath);
+  });
+
   const globalPrefix = process.env.API_PREFIX ?? 'scim'; // still mounting at /scim internally
   app.setGlobalPrefix(globalPrefix, {
-    exclude: ['/'] // Exclude root path from API prefix to serve web app
+    exclude: [
+      { path: '/', method: RequestMethod.ALL },
+    ]
   });
 
   app.useLogger(new Logger('SCIMEndpointServer'));

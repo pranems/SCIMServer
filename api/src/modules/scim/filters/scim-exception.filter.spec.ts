@@ -33,7 +33,7 @@ describe('ScimExceptionFilter', () => {
     mockHost = {
       switchToHttp: () => ({
         getResponse: () => mockResponse,
-        getRequest: () => ({}),
+        getRequest: () => ({ originalUrl: '/scim/Users', url: '/scim/Users' }),
       }),
     };
   });

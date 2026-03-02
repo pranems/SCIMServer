@@ -24,8 +24,8 @@ Six P2 behavioral gap fixes from the RFC 7643 §2 attribute characteristics audi
 - **Live test count**: Corrected from 498 → **535** (37 tests were always in the script but never ran due to the 9t.5 crash).
 
 ### Test Coverage
-- **Unit tests**: 2,573 passed (73 suites) — +34 new P2 tests
-- **E2E tests**: 558 passed (27 suites) — +13 new P2 E2E tests
+- **Unit tests**: 2,682 passed (73 suites) — +34 new P2 tests, +108 test gap audit
+- **E2E tests**: 585 passed (27 suites) — +13 new P2 E2E tests, +27 test gap audit
 - **Live tests**: 535 passed — Section 9v added with 13 tests covering all 6 P2 items; 37 previously-skipped tests in 9t/9u/9v now executing after URL prefix fix
 
 ### Files Modified
