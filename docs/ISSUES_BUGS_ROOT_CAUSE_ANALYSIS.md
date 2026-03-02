@@ -3,7 +3,7 @@
 > **Date**: February 23, 2026 (updated)
 > **Scope**: Full session — infrastructure fixes, feature implementation (soft delete, strict schema validation, custom extension URNs), comprehensive test expansion (unit + E2E for flag combinations, PATCH paths, soft-delete interactions), validation pipeline, Docker rebuild
 > **Environment**: Windows, NestJS + Prisma 7 + PostgreSQL 17, Docker Compose, Jest 30, PowerShell 7
-> **Note**: Test counts cited in fix results below (e.g., 318/318) are point-in-time snapshots. Current baseline (v0.19.2): 2,357 unit, 455 E2E, 444 live.
+> **Note**: Test counts cited in fix results below (e.g., 318/318) are point-in-time snapshots. See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) for current baseline.
 
 ---
 

@@ -23,9 +23,9 @@ Perform a comprehensive test gap audit across the entire project and add any mis
 
 Audit for missing tests in these categories:
 
-### A. Config Flag Coverage (11 boolean flags + logLevel)
+### A. Config Flag Coverage (15 boolean flags + logLevel)
 
-For each flag (`AllowAndCoerceBooleanStrings`, `StrictSchemaValidation`, `SoftDeleteEnabled`, `VerbosePatchSupported`, `MultiOpPatchRequestAddMultipleMembersToGroup`, `MultiOpPatchRequestRemoveMultipleMembersFromGroup`, `PatchOpAllowRemoveAllMembers`, `RequireIfMatch`, `ReprovisionOnConflictForSoftDeletedResource`, `CustomResourceTypesEnabled`, `BulkOperationsEnabled`):
+For each flag (`AllowAndCoerceBooleanStrings`, `StrictSchemaValidation`, `SoftDeleteEnabled`, `VerbosePatchSupported`, `MultiOpPatchRequestAddMultipleMembersToGroup`, `MultiOpPatchRequestRemoveMultipleMembersFromGroup`, `PatchOpAllowRemoveAllMembers`, `RequireIfMatch`, `ReprovisionOnConflictForSoftDeletedResource`, `CustomResourceTypesEnabled`, `BulkOperationsEnabled`, `PerEndpointCredentialsEnabled`, `IncludeWarningAboutIgnoredReadOnlyAttribute`, `IgnoreReadOnlyAttributesInPatch`):
 
 | Check | Unit | E2E | Live |
 |-------|------|-----|------|
@@ -50,6 +50,10 @@ Priority combinations to verify:
 | `StrictSchema + BooleanStrings` | Coercion happens before validation | Coerce first, then validate |
 | `MultiOpAdd + MultiOpRemove` | Both member flags together | Each controls its direction |
 | `Reprovision` WITHOUT `SoftDelete` | Edge: meaningless combo | Reprovision silently ignored |
+| `PerEndpointCredentials + RequireIfMatch` | Both affect request validation flow | Each validated independently |
+| `IncludeWarning + IgnoreReadOnly` | Both relate to readOnly handling | Warning emitted even when silently stripping |
+| `IgnoreReadOnly` WITHOUT `StrictSchema` | readOnly attributes stripped silently | Stripping happens regardless of strict mode |
+| `IncludeWarning` WITHOUT `IgnoreReadOnly` | Warning flag without stripping flag | Warning only when strict mode rejects |
 
 - Three-flag and higher combinations for interacting flags
 - Conflicting/edge combos (e.g., `ReprovisionOnConflict` without `SoftDeleteEnabled`)
@@ -479,14 +483,16 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 ## Step 4 — Verify
 
 1. Run unit tests: `cd api; npx jest --forceExit` — confirm all pass.
-2. Run E2E tests: `cd api; npx jest --config jest.config.ts --testPathPattern e2e --forceExit` — confirm all pass.
+2. Run E2E tests: `cd api; npx jest --config test/e2e/jest-e2e.config.ts --forceExit` — confirm all pass.
 3. Report added test counts in this format:
 
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
-| Unit  | ?      | ?     | +?    |
-| E2E   | ?      | ?     | +?    |
-| Live  | ?      | ?     | +?    |
+| Unit  | 2,682  | ?     | +?    |
+| E2E   | 585    | ?     | +?    |
+| Live  | 535    | ?     | +?    |
+
+> *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 
 4. Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts.
 

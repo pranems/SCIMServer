@@ -1,6 +1,6 @@
 # SCIMServer — Azure Deployment & Usage Guide
 
-> **Version**: 0.10.0 | **Repository**: [github.com/pranems/SCIMServer](https://github.com/pranems/SCIMServer) | **Registry**: `ghcr.io/pranems/scimserver`
+> **Repository**: [github.com/pranems/SCIMServer](https://github.com/pranems/SCIMServer) | **Registry**: `ghcr.io/pranems/scimserver`
 
 ---
 
@@ -517,10 +517,10 @@ When a new version notification appears in the web dashboard:
 ```powershell
 # Auto-discovery (finds your RG and App automatically)
 iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-func.ps1'); `
-  Update-SCIMServer -Version v0.10.0
+  Update-SCIMServer -Version v0.24.0
 
 # Explicit (if multiple deployments)
-Update-SCIMServer -Version v0.10.0 -ResourceGroup scimserver-rg -AppName scimserver-prod
+Update-SCIMServer -Version v0.24.0 -ResourceGroup scimserver-rg -AppName scimserver-prod
 ```
 
 ### Manual Image Update
@@ -529,7 +529,7 @@ Update-SCIMServer -Version v0.10.0 -ResourceGroup scimserver-rg -AppName scimser
 az containerapp update `
   -n scimserver-prod `
   -g scimserver-rg `
-  --image ghcr.io/pranems/scimserver:0.10.0
+  --image ghcr.io/pranems/scimserver:0.24.0
 ```
 
 ### View Logs
@@ -575,20 +575,16 @@ az monitor log-analytics query `
 
 ## 9. Cost Estimate
 
+> **Canonical source:** For detailed cost breakdowns by load scenario, scaling recommendations, and cost control commands, see [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md#azure-cost-breakdown--current-idlelight-use).
+
 | Resource | Monthly Cost |
 |---|---|
-| Container App (0.5 vCPU, 1 GiB) | ~$5–15 (scales to zero when idle) |
-| PG Flexible Server (B1ms, 32 GB) | ~$13–18 |
-| Log Analytics | ~$0–5 (depends on volume) |
-| VNet / DNS | ~$0.50 |
-| **Total** | **~$19–38/month** |
+| Container App (0.5 vCPU, 1 GiB) | ~$14–18 (always-on, 1 replica) |
+| PG Flexible Server (B1ms, 128 GB) | ~$40 |
+| Log Analytics | ~$1–3 (depends on volume) |
+| **Total** | **~$55–61/month** |
 
-> **Phase 3 (v0.24.0):** Replaced Blob Storage + Private Endpoint with PG Flexible Server.
-> PostgreSQL WAL backup (daily full + 7-day PITR) is fully automated by Azure at no extra config.
-> Net cost vs SQLite era: ~$5–10/mo more, offset by zero data loss risk and multi-replica support.
-
-> Costs vary by region and usage. Container App scale-to-zero means minimal compute
-> charges during idle periods. PG Flexible Server runs 24/7.
+> Costs vary by region and usage. See [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) for load-based cost projections and pause/resume commands.
 
 ---
 

@@ -25,6 +25,7 @@
 
 | Document | Description |
 |----------|-------------|
+| [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) | **Living document** — Instance connection info, credentials, Azure costs, load scenario projections, scaling recommendations |
 | [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) | End-to-end Azure deployment, configuration, and operations guide |
 | [LOGGING_AND_OBSERVABILITY.md](LOGGING_AND_OBSERVABILITY.md) | Structured logging, runtime log configuration, ring buffer, and SSE stream |
 | [REMOTE_DEBUGGING_AND_DIAGNOSIS.md](REMOTE_DEBUGGING_AND_DIAGNOSIS.md) | Remote diagnosis playbooks, log collection patterns, and troubleshooting workflows |
@@ -52,7 +53,7 @@
 | [SCIM_CASE_INSENSITIVITY_REFERENCE.md](SCIM_CASE_INSENSITIVITY_REFERENCE.md) | Case-insensitivity rules per RFC 7643 §2.1 |
 | [SCIM_RFC_COMPLIANCE_LAYER.md](SCIM_RFC_COMPLIANCE_LAYER.md) | Comprehensive RFC compliance layer technical reference |
 | [MULTI_MEMBER_PATCH_CONFIG_FLAG.md](MULTI_MEMBER_PATCH_CONFIG_FLAG.md) | Multi-member PATCH config flags reference |
-| [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | **Complete flag reference** — All 15 boolean flags + logLevel with applicability, precedence, combinations, diagrams, JSON examples |
+| [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | **Complete flag reference** — All 14 boolean flags + logLevel (15 total) with applicability, precedence, combinations, diagrams, JSON examples |
 | [FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md](FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md) | Soft delete, strict schema validation, custom extension URNs — feature docs with diagrams, examples, DB values |
 | [EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md](EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md) | externalId CITEXT→TEXT migration — RFC 7643 §3.1 caseExact compliance fix with sequence diagrams, DB diffs, filter examples, rollback strategy |
 | [G8C_PATCH_READONLY_PREVALIDATION.md](G8C_PATCH_READONLY_PREVALIDATION.md) | G8c — PATCH readOnly pre-validation: RFC 7643 §2.2 enforcement, architecture, test coverage |
@@ -83,6 +84,7 @@
 | [ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md](ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md) | Issues, bugs & root cause analysis — 11 issues diagnosed with fixes and lessons learned |
 | [SCHEMA_VALIDATOR_READONLY_REQUIRED_FIX.md](SCHEMA_VALIDATOR_READONLY_REQUIRED_FIX.md) | SchemaValidator `id` readOnly+required catch-22 fix — root cause analysis, RFC justification, lifecycle diagrams (65 failures → 0) |
 | [LIVE_TEST_NORMS_AND_BEST_PRACTICES.md](LIVE_TEST_NORMS_AND_BEST_PRACTICES.md) | Live integration test norms, best practices & industry recommendations — local, Docker, Azure with PostgreSQL |
+| [SCIM_VALIDATOR_RESULTS_26_ANALYSIS.md](SCIM_VALIDATOR_RESULTS_26_ANALYSIS.md) | Microsoft SCIM Validator 26-test analysis — detailed pass/fail review |
 | [SELF_IMPROVING_TEST_HEALTH_PROMPT.md](SELF_IMPROVING_TEST_HEALTH_PROMPT.md) | Reusable self-improving AI prompt for diagnosing and resolving test failures — pattern library grows with each use |
 
 ## Development
@@ -106,6 +108,14 @@
 | [RECOMMENDED_DESIGN_IMPROVEMENTS.md](RECOMMENDED_DESIGN_IMPROVEMENTS.md) | Aspirational RFC-first architecture recommendations |
 | [MULTI_ENDPOINT-API-BEHAVIOR-STRATEGIES.md](MULTI_ENDPOINT-API-BEHAVIOR-STRATEGIES.md) | Strategy/decorator/plugin pattern comparison |
 | [TECHNICAL_REQUIREMENTS_DOCUMENT.md](TECHNICAL_REQUIREMENTS_DOCUMENT.md) | Formal requirements matrix (FR-001–FR-700+) |
+| [COMPLETE_AGNOSTIC_SCIM_ARCHITECTURE.md](COMPLETE_AGNOSTIC_SCIM_ARCHITECTURE.md) | Agnostic SCIM architecture — persistence-neutral N-tier design exploration |
+| [CURRENT_STATE_AND_MIGRATION_PLAN.md](CURRENT_STATE_AND_MIGRATION_PLAN.md) | Current state assessment and initial migration considerations |
+| [DISCOVERY_AND_ENDPOINT_SCHEMAS.md](DISCOVERY_AND_ENDPOINT_SCHEMAS.md) | Discovery and endpoint schema design exploration |
+| [REPOSITORY_INTERFACE_ANALYSIS.md](REPOSITORY_INTERFACE_ANALYSIS.md) | Repository interface pattern analysis — abstraction layer evaluation |
+| [RFC_COMPLIANCE_AND_PROJECT_REQUIREMENTS_ANALYSIS.md](RFC_COMPLIANCE_AND_PROJECT_REQUIREMENTS_ANALYSIS.md) | RFC compliance vs project requirements gap analysis |
+| [scim-extensions-analysis.md](scim-extensions-analysis.md) | SCIM extensions analysis — custom extension URN patterns |
+| [SCIM_EXTENSIONS_DEEP_ANALYSIS.md](SCIM_EXTENSIONS_DEEP_ANALYSIS.md) | SCIM extensions deep analysis — enterprise extension attribute handling |
+| [UUID_ANALYSIS_AND_RFC_COMPLIANCE.md](UUID_ANALYSIS_AND_RFC_COMPLIANCE.md) | UUID format analysis and RFC compliance — id generation patterns |
 | [Release notes/](Release%20notes/) | Historical release notes (version-specific context retained as originally published) |
 
 ## API Artifacts
@@ -122,6 +132,9 @@
 | Document | Description |
 |----------|-------------|
 | [MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md](MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md) | Master migration plan — 12+ phases, gap table, dependency graph, timeline |
+| [CURRENT_TO_IDEAL_MIGRATION_PLAN_FRESH_2026-02-20.md](CURRENT_TO_IDEAL_MIGRATION_PLAN_FRESH_2026-02-20.md) | Fresh migration plan (2026-02-20) — updated current-to-ideal gap analysis |
+| [IDEAL_SCIM_ARCHITECTURE_RFC_FIRST.md](IDEAL_SCIM_ARCHITECTURE_RFC_FIRST.md) | Ideal RFC-first SCIM architecture — original exploration |
+| [IDEAL_SCIM_ARCHITECTURE_RFC_FIRST_FRESH_2026-02-20.md](IDEAL_SCIM_ARCHITECTURE_RFC_FIRST_FRESH_2026-02-20.md) | Ideal RFC-first SCIM architecture — refreshed 2026-02-20 |
 | [RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md](RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md) | RFC 7643/7644 attribute characteristics gap analysis — 15 gaps, sub-phases 8.1-8.5, remediation plans |
 | [H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md](H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md) | H-1 (PATCH validation) & H-2 (immutable enforcement) — architecture analysis & implementation |
 | [PHASE_08_REMAINING_ANALYSIS.md](PHASE_08_REMAINING_ANALYSIS.md) | Phase 8 remaining adversarial validation gap analysis — 33 gaps, sub-phases 8.5–8.8, effort estimates |
@@ -135,8 +148,11 @@
 
 | Document | Description |
 |----------|-------------|
+| [phases/PHASE_01_REPOSITORY_PATTERN.md](phases/PHASE_01_REPOSITORY_PATTERN.md) | Phase 1 — Repository Pattern (initial architecture) |
+| [phases/PHASE_02_UNIFIED_RESOURCE_TABLE.md](phases/PHASE_02_UNIFIED_RESOURCE_TABLE.md) | Phase 2 — Unified Resource Table |
+| [phases/PHASE_03_ISSUES_AND_RESOLUTIONS.md](phases/PHASE_03_ISSUES_AND_RESOLUTIONS.md) | Phase 3 — Issues and Resolutions |
 | [phases/PHASE_03_POSTGRESQL_MIGRATION.md](phases/PHASE_03_POSTGRESQL_MIGRATION.md) | Phase 3 — PostgreSQL Migration (v0.11.0) |
-| [phases/PHASE_04_FILTER_PUSHDOWN.md](phases/PHASE_04_FILTER_PUSHDOWN.md) | Phase 4 — Filter Push-Down Expansion (v0.12.0) |
+| [phases/PHASE_04_FILTER_PUSH_DOWN.md](phases/PHASE_04_FILTER_PUSH_DOWN.md) | Phase 4 — Filter Push-Down Expansion (v0.12.0) |
 | [phases/PHASE_05_PATCH_ENGINE.md](phases/PHASE_05_PATCH_ENGINE.md) | Phase 5 — Domain-Layer PATCH Engine (v0.13.0) |
 | [phases/PHASE_06_DATA_DRIVEN_DISCOVERY.md](phases/PHASE_06_DATA_DRIVEN_DISCOVERY.md) | Phase 6 — Data-Driven Discovery (v0.14.0) |
 | [phases/PHASE_07_ETAG_CONDITIONAL_REQUESTS.md](phases/PHASE_07_ETAG_CONDITIONAL_REQUESTS.md) | Phase 7 — ETag & Conditional Requests (v0.16.0) |

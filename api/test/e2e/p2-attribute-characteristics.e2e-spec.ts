@@ -334,4 +334,148 @@ describe('P2 Attribute Characteristics (E2E)', () => {
       expect(res.body.totalResults).toBeGreaterThanOrEqual(1);
     });
   });
+
+  // ───────────── Write-Response Projection ─────────────
+
+  describe('Write-response projection', () => {
+    it('POST with ?attributes= should project the 201 response', async () => {
+      const res = await scimPost(
+        app,
+        `${basePath}/Users?attributes=userName`,
+        token,
+        validUser({ displayName: 'Projection Post Test' }),
+      ).expect(201);
+
+      // Always-returned attrs must still be present
+      expect(res.body.id).toBeDefined();
+      expect(res.body.schemas).toBeDefined();
+      // Requested attribute present
+      expect(res.body.userName).toBeDefined();
+      // Non-requested default attribute absent
+      expect(res.body.displayName).toBeUndefined();
+    });
+
+    it('PUT with ?attributes= should project the 200 response', async () => {
+      const user = validUser();
+      const created = (await scimPost(app, `${basePath}/Users`, token, user).expect(201)).body;
+
+      const putBody = {
+        ...user,
+        id: created.id,
+        displayName: 'Put Projection Test',
+      };
+
+      const res = await scimPut(
+        app,
+        `${basePath}/Users/${created.id}?attributes=userName`,
+        token,
+        putBody,
+      ).expect(200);
+
+      expect(res.body.id).toBeDefined();
+      expect(res.body.userName).toBeDefined();
+      expect(res.body.displayName).toBeUndefined();
+    });
+
+    it('PATCH with ?attributes= should project the 200 response', async () => {
+      const created = (
+        await scimPost(app, `${basePath}/Users`, token, validUser({ displayName: 'Before Patch' })).expect(201)
+      ).body;
+
+      const res = await scimPatch(
+        app,
+        `${basePath}/Users/${created.id}?attributes=userName`,
+        token,
+        patchOp([{ op: 'replace', path: 'displayName', value: 'After Patch' }]),
+      ).expect(200);
+
+      expect(res.body.id).toBeDefined();
+      expect(res.body.userName).toBeDefined();
+      expect(res.body.displayName).toBeUndefined();
+    });
+
+    it('POST with ?excludedAttributes= should exclude from 201 response', async () => {
+      const res = await scimPost(
+        app,
+        `${basePath}/Users?excludedAttributes=displayName`,
+        token,
+        validUser({ displayName: 'Excluded Test' }),
+      ).expect(201);
+
+      expect(res.body.id).toBeDefined();
+      expect(res.body.userName).toBeDefined();
+      // displayName should be excluded from response
+      expect(res.body.displayName).toBeUndefined();
+    });
+  });
+
+  // ───────────── Attribute Projection Edge Cases ─────────────
+
+  describe('Attribute projection edge cases', () => {
+    it('?attributes=password should NOT return password (returned:never)', async () => {
+      const res = await scimPost(
+        app,
+        `${basePath}/Users?attributes=password`,
+        token,
+        validUser({ password: 'SecurePass123!' }),
+      ).expect(201);
+
+      expect(res.body.password).toBeUndefined();
+      // Always-returned fields still present
+      expect(res.body.id).toBeDefined();
+      expect(res.body.schemas).toBeDefined();
+    });
+
+    it('?excludedAttributes=id should NOT remove id (returned:always)', async () => {
+      const created = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Users/${created.id}?excludedAttributes=id`,
+        token,
+      ).expect(200);
+
+      // id has returned:always — cannot be excluded
+      expect(res.body.id).toBeDefined();
+    });
+
+    it('?excludedAttributes=schemas should NOT remove schemas (returned:always)', async () => {
+      const created = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Users/${created.id}?excludedAttributes=schemas`,
+        token,
+      ).expect(200);
+
+      expect(res.body.schemas).toBeDefined();
+      expect(Array.isArray(res.body.schemas)).toBe(true);
+    });
+
+    it('empty ?attributes= should return full response', async () => {
+      const created = (await scimPost(app, `${basePath}/Users`, token, validUser({ displayName: 'Full Test' })).expect(201)).body;
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Users/${created.id}?attributes=`,
+        token,
+      ).expect(200);
+
+      expect(res.body.id).toBeDefined();
+      expect(res.body.userName).toBeDefined();
+    });
+
+    it('mixed case ?attributes=UserName should work case-insensitively', async () => {
+      const created = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Users/${created.id}?attributes=UserName`,
+        token,
+      ).expect(200);
+
+      expect(res.body.userName).toBeDefined();
+      expect(res.body.id).toBeDefined();
+    });
+  });
 });

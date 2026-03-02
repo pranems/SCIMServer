@@ -5,6 +5,9 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 ### Recent Key Achievements (Chronological)
 | Date | Achievement |
 |------|-------------|
+| 2026-03-02 | 🧪 **Comprehensive Test Gap Audit (v0.24.0):** Per `addMissingTests.prompt.md` — 4-step audit: inventory, gap identification, implementation, verification. **New unit tests (+108):** 7 missing config flag validation blocks (flags 8, 10-15: RequireIfMatch, ReprovisionOnConflict, CustomResourceTypes, BulkOperations, PerEndpointCredentials, IncludeWarning, IgnoreReadOnly) with 14 tests each (accept bool/string variants, reject invalid types, error messages). All-flags-combined block (4 tests). DEFAULT_ENDPOINT_CONFIG block (2 tests). **New E2E tests (+27):** RFC 7644 §3.12 HTTP error status coverage (6 tests: unknown path, 401 no auth, 404 SCIM format, 400 missing fields). Content-Type acceptance (2 tests). SCIM status always string (3 tests). Write-response projection (4 tests: POST/PUT/PATCH + ?attributes=, POST + ?excludedAttributes=). Attribute projection edge cases (5 tests: password never, id/schemas always, empty attrs, mixed case). Flag combinations (7 tests: StrictSchema+BooleanStrings, MultiOp pairs, RequireIfMatch+VerbosePatch, Reprovision without SoftDelete, invalid config rejection). **2,682 unit (73 suites), 585 E2E (27 suites), 535 live — ALL PASSING.** |
+| 2026-03-02 | 📚 **Post-Test-Gap Documentation Freshness Audit (v0.24.0):** Per `auditAndUpdateDocs.prompt.md` — 6-step comprehensive audit after test gap audit bumped counts. Subagent-assisted scan found **59 stale items** across **28 files**. Fixed ALL: test counts propagated (2,682/585/535) to README, CHANGELOG, SCIM_COMPLIANCE, DOCKER_GUIDE, PROJECT_HEALTH_AND_STATS (+ ts-jest 29→30, flag names corrected to canonical), TESTING-WORKFLOW, TECHNICAL_DESIGN_DOCUMENT, SCIM_RFC_COMPLIANCE_LAYER, RFC7643_AUDIT, P2_ENFORCEMENT, COMPLETE_API_REFERENCE (v0.19.3→v0.24.0), ATTRIBUTE_CHARACTERISTICS_GAPS, DISCOVERY_ENDPOINTS_RFC_AUDIT, RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS, PHASE_08_REMAINING_ANALYSIS (4 locations), LIVE_TEST_NORMS (ASCII diagram + JSON version), SCIM_VALIDATION_GAP_ANALYSIS (baseline notes + header), SCIM_GROUP_PERFORMANCE_ANALYSIS, RUNTIME_UPGRADE_ANALYSIS, PHASE_08_SCHEMA_VALIDATION, USER_API_CALL_TRACE, README_VISUAL_STUDIO_DEBUG, AZURE_DEPLOYMENT_ISSUES_AND_FIXES, INMEMORY_ARCHITECTURE, ISSUES_BUGS_RCA, MIGRATION_AUTOMATION_STRATEGY, RECOMMENDED_DESIGN_IMPROVEMENTS (2 locations). INDEX.md: fixed broken link (PHASE_04_FILTER_PUSHDOWN→PUSH_DOWN), corrected flag count "15 boolean→14 boolean + logLevel", added 15 missing doc entries (COMPLETE_AGNOSTIC, CURRENT_STATE, DISCOVERY_SCHEMAS, REPOSITORY_INTERFACE, RFC_COMPLIANCE_REQS, scim-extensions (2), UUID, VALIDATOR_RESULTS_26, PHASE_01/02/03, IDEAL_SCIM (2), MIGRATION_PLAN_FRESH). Self-updated `auditAndUpdateDocs.prompt.md` (flag refs 11→14+logLevel, feature patterns expanded). Cross-consistency verified: zero remaining stale "2,357"/"2,573"/"558"/"ts-jest 29"/"15 boolean flags" references. |
+| 2026-03-01 | 📚 **Documentation Freshness Audit (v0.24.0):** Comprehensive audit of 20+ documentation files against ground truth. Fixed **50+ stale items** across **18 files**: version headers updated to v0.24.0 / March 2026 (README, DEPLOYMENT, TESTING-WORKFLOW, SCIM_COMPLIANCE, SCIM_RFC_COMPLIANCE_LAYER, LOGGING_AND_OBSERVABILITY, AZURE_DEPLOYMENT_AND_USAGE_GUIDE, SCIM_REFERENCE, TECHNICAL_REQUIREMENTS_DOCUMENT, REMOTE_DEBUGGING_AND_DIAGNOSIS, MULTI_ENDPOINT_GUIDE, COMPLETE_API_REFERENCE, H1_H2, PHASE_08, LIVE_TEST_NORMS). Content fixes: TECHNICAL_DESIGN_DOCUMENT (ER diagram rewrite ScimUser/ScimGroup→ScimResource, model count 5→7, CUID→UUID, rawPayload→payload JSONB, footer SQLite→Historical Note), SCIM_RFC_COMPLIANCE_LAYER (SQLite→PostgreSQL 17, userNameLower→CITEXT, filter push-down updated), SCIM_COMPLIANCE (Entra compat 95→100%, caseExact marked resolved), PROJECT_HEALTH_AND_STATS (test counts 3,517→3,666, flags 11→14+logLevel, models 5→7), CONTEXT_INSTRUCTIONS (DB models ScimUser→ScimResource, rawPayload→payload), REMOTE_DEBUGGING (4× SQLite→PostgreSQL, scimUser→scimResource), MULTI_ENDPOINT_GUIDE (diagram+Prisma block ScimUser/ScimGroup→ScimResource), DOCKER_GUIDE (example versions v0.10.0→v0.24.0), version-latest.json (v0.19.3→v0.24.0). Removed stale BackupService tech debt, updated RFC compliance to 100%. Cross-consistency verified: no stale ScimUser/ScimGroup/GroupMember/rawPayload/userNameLower/SQLite in any living doc. |
 | 2026-03-01 | ✅ **P2 Attribute Characteristics — 6 Behavioral Gap Fixes (v0.24.0):** RFC 7643 §2 full audit P2 items implemented with comprehensive tests at all 3 levels. **R-RET-1**: Schema-driven `returned:'always'` at projection level. **R-RET-2**: Group `active` always returned. **R-RET-3**: Sub-attribute `returned:'always'` enforcement (e.g., `emails.value`, `members.value`). **R-MUT-1**: `writeOnly` mutability → `returned:never` defense-in-depth. **R-MUT-2**: readOnly sub-attribute stripping within readWrite parents (core+ext, single+multi-valued). **R-CASE-1**: caseExact-aware in-memory filter evaluation. Modified: `schema-validator.ts`, `scim-attribute-projection.ts`, `scim-service-helpers.ts`, `scim-filter-parser.ts`, `apply-scim-filter.ts`, all 3 controllers, both services. New E2E: `p2-attribute-characteristics.e2e-spec.ts` (13 tests). New live: section 9v (13 tests). **2,573 unit (73 suites), 558 E2E (27 suites), 535 live — ALL PASSING.** |
 | 2026-03-01 | 🧹 **Blob/BackupService Dead Code Elimination (v0.23.0):** Complete removal of SQLite-era blob snapshot backup system. Deleted: `api/src/modules/backup/` (BackupModule + BackupService), `api/src/bootstrap/blob-restore.ts`, `infra/blob-storage.bicep`, `LogCategory.BACKUP` enum. Uninstalled `@azure/identity` + `@azure/storage-blob` npm packages. Removed all `BLOB_BACKUP_*` env vars from `infra/containerapp.bicep` + `docker-compose.yml`. Cleaned `AppModule` import. Updated `scripts/deploy-azure.ps1` to clean 5-step flow (no blob RBAC step). TypeScript compile Exit 0. **Comprehensive docs sweep: 9 active docs updated** — README.md (4 changes), DEPLOYMENT.md (5 changes), CONTEXT_INSTRUCTIONS.md, AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md, COMPLETE_API_REFERENCE.md, PROJECT_HEALTH_AND_STATS.md, LOGGING_AND_OBSERVABILITY.md, REMOTE_DEBUGGING_AND_DIAGNOSIS.md, TECHNICAL_DESIGN_DOCUMENT.md (version 1.1→1.2, PostgreSQL 17 tech stack), TECHNICAL_REQUIREMENTS_DOCUMENT.md (FR-600–FR-607 rewritten for PostgreSQL), DOCKER_GUIDE_AND_TEST_REPORT.md (historical banner added). Database persistence: PostgreSQL 17 with Azure-managed PITR backup (replaces blob snapshots). |
 | 2026-02-28 | ✅ **ReadOnly Attribute Stripping & Warnings — Full Coverage (v0.22.0):** RFC 7643 §2.2 enforcement for Users, Groups, AND Generic (custom) resource types. POST/PUT payloads automatically strip `mutability: 'readOnly'` attributes (`id`, `meta`, `groups`, custom readOnly). PATCH operations targeting readOnly attributes silently stripped (behavior matrix: strict OFF → strip; strict ON + `IgnoreReadOnlyAttributesInPatch` → strip; strict ON without flag → G8c 400). Warning URN extension (`urn:scimserver:api:messages:2.0:Warning`) on responses when `IncludeWarningAboutIgnoredReadOnlyAttribute` enabled. 2 new config flags (14th, 15th). Generic service wire-up with dynamic schema resolution via `getSchemaDefinitions()`. **Critical bug fix:** `AsyncLocalStorage.enterWith()` loses context across NestJS interceptor pipeline — replaced with Express middleware using `storage.run()` + mutating `setContext()`. `EndpointContextStorage.createMiddleware()` registered on all routes via `ScimModule.configure()`. 17 new E2E tests (`readonly-stripping.e2e-spec.ts`), 10 new live tests (section 9t), 21 `EndpointContextStorage` unit tests (expanded from 11). Bug fix BF-1: Groups `id` was client-controllable, now always `randomUUID()`. **2,532 unit (73 suites), 539 E2E (26 suites) — ALL PASSING.** |
@@ -136,12 +139,12 @@ This file intentionally trimmed for clarity. Full historic log kept in git histo
 | 2025-09-28 | PATCH Add operation fix (Entra compatibility) |
 | 2025-09-27 | v0.3.0: Full SCIM 2.0 compliance baseline |
 
-Current Version: v0.24.0 (Prisma 7 + PostgreSQL 17 + ESLint 10 + Jest 30 + React 19 + Vite 7 + Node 24 Docker)
+Current Version: **see [api/package.json](api/package.json)** (Prisma 7 + PostgreSQL 17 + ESLint 10 + Jest 30 + React 19 + Vite 7 + Node 24 Docker)
 
 ---
 
 ## Status
-Production Ready (v0.24.0) — **All 27 migration gaps (G1–G20) fully resolved. SCIM RFC 7643/7644 compliance: 100%.** v0.24.0: P2 attribute characteristics — 6 behavioral gap fixes from RFC 7643 §2 audit (R-RET-1 schema-driven always-returned, R-RET-2 Group active always-returned, R-RET-3 sub-attr always enforcement, R-MUT-1 writeOnly→never defense-in-depth, R-MUT-2 readOnly sub-attr stripping, R-CASE-1 caseExact-aware filtering). v0.23.0: Blob/BackupService dead code elimination. v0.22.0: ReadOnly attribute stripping & warning URN system. Per-endpoint config flags (15 total). SPC: `bulk.supported: true, sort.supported: true`. 3-tier auth: per-endpoint bcrypt → OAuth JWT → global secret. Parallel E2E (maxWorkers=4, ~22s). **2,573 unit tests (73 suites), 558 E2E tests (27 suites), 535 live integration tests** — **ALL PASSING (0 failures)**. 25 Microsoft SCIM Validator tests + 7 preview (0 false positives). Stack: Prisma 7, PostgreSQL 17, ESLint 10, Jest 30, React 19, Vite 7, Node 24. (Mar 2026).
+Production Ready (v0.24.0) — **All 27 migration gaps (G1–G20) fully resolved. SCIM RFC 7643/7644 compliance: 100%.** v0.24.0: P2 attribute characteristics — 6 behavioral gap fixes from RFC 7643 §2 audit (R-RET-1 schema-driven always-returned, R-RET-2 Group active always-returned, R-RET-3 sub-attr always enforcement, R-MUT-1 writeOnly→never defense-in-depth, R-MUT-2 readOnly sub-attr stripping, R-CASE-1 caseExact-aware filtering). v0.23.0: Blob/BackupService dead code elimination. v0.22.0: ReadOnly attribute stripping & warning URN system. Per-endpoint config flags (15 total). SPC: `bulk.supported: true, sort.supported: true`. 3-tier auth: per-endpoint bcrypt → OAuth JWT → global secret. Parallel E2E (maxWorkers=4, ~22s). **All unit, E2E, and live integration tests passing (0 failures)** — 📊 see [PROJECT_HEALTH_AND_STATS.md](docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for counts. 25 Microsoft SCIM Validator tests + 7 preview (0 false positives). Stack: Prisma 7, PostgreSQL 17, ESLint 10, Jest 30, React 19, Vite 7, Node 24. (Mar 2026).
 
 ## Quick Commands
 ```powershell
@@ -149,7 +152,7 @@ Production Ready (v0.24.0) — **All 27 migration gaps (G1–G20) fully resolved
 pwsh ./scripts/publish-acr.ps1 -Registry scimserverpublic -ResourceGroup scimserver-rg -Latest
 
 # Customer update to latest (example)
-iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-direct.ps1'); Update-SCIMServerDirect -Version v0.11.0 -ResourceGroup <rg> -AppName <app> -NoPrompt
+iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-direct.ps1'); Update-SCIMServerDirect -Version v0.24.0 -ResourceGroup <rg> -AppName <app> -NoPrompt
 
 > NOTE: Direct upgrade one‑liner integrated into UI copy button; user has not yet tested the copied command end‑to‑end.
 ```
@@ -226,12 +229,11 @@ Implemented TDD approach with comprehensive test coverage:
 ---
 
 ## Current Focus
-All 27 migration gaps fully resolved. P2 attribute characteristic behavioral fixes complete (v0.24.0). **0 open gaps. SCIM compliance: 100%.** Current version v0.24.0 with 2,573 unit (73 suites), 558 E2E (27 suites), 535 live tests — ALL PASSING (0 failures).
+All 27 migration gaps fully resolved. P2 attribute characteristic behavioral fixes complete (v0.24.0). **0 open gaps. SCIM compliance: 100%.** Current version v0.24.0 — all unit, E2E, and live tests passing (0 failures). 📊 See [PROJECT_HEALTH_AND_STATS.md](docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current counts.
 
 ### Known Technical Debt (from code audit)
 - **SECURITY:** Hardcoded legacy bearer token `S@g@r!2011` in `scim-auth.guard.ts` — should come from env only
 - **LOGGING:** 5 `console.log`/`console.error` calls in `scim-auth.guard.ts` — should use NestJS Logger
-- **LEGACY:** `BackupService` is a SQLite-era relic flagged for removal (PostgreSQL uses standard backups)
 - **CORS:** `origin: true` (wildcard) in `main.ts` — should be restricted for production
 - **NAMING:** `resultPayloadPlaceholder` variable names in User/Group services — minor cleanup
 - **TESTS:** Zero skipped tests, zero TODO/FIXME markers in source code
@@ -334,13 +336,13 @@ Deferred:
 ## Dev Quick Ref
 Backend: `cd api && npm run start:dev`
 Frontend: `cd web && npm run dev`
-Unit Tests: `cd api && npm test` (2,573 tests, 73 suites)
+Unit Tests: `cd api && npm test` — see [PROJECT_HEALTH_AND_STATS.md](docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for expected counts
 Unit Coverage: `cd api && npm run test:cov` → coverage/
-E2E Tests: `cd api && npm run test:e2e` (558 tests, 27 suites)
+E2E Tests: `cd api && npm run test:e2e` — see PROJECT_HEALTH_AND_STATS.md
 E2E Coverage: `cd api && npm run test:e2e:cov` → coverage-e2e/
 All Coverage: `cd api && npm run test:cov:all` (unit + E2E)
 Full Pipeline: `cd api && npm run test:all` (unit + E2E + smoke)
-Live Tests: `.\scripts\live-test.ps1` (535 assertions)
+Live Tests: `.\scripts\live-test.ps1` — see PROJECT_HEALTH_AND_STATS.md
 Live Tests (verbose): `.\scripts\live-test.ps1 -Verbose`
 
 ---
@@ -348,7 +350,7 @@ Live Tests (verbose): `.\scripts\live-test.ps1 -Verbose`
 *This file serves as persistent project memory for enhanced AI assistant session continuity with MCP server integration.*
 ## Key Features (Snapshot)
 
-**SCIM 2.0 Compliance (~96% RFC 7643/7644):**
+**SCIM 2.0 Compliance (100% RFC 7643/7644):**
 - Complete CRUD operations (POST, GET, PUT, PATCH, DELETE)
 - Microsoft Entra ID provisioning compatible (all 25 validator tests pass)
 - ServiceProviderConfig, Schemas, ResourceTypes discovery endpoints

@@ -23,7 +23,7 @@ Perform a comprehensive documentation freshness audit across the entire project.
 For every document listed in `docs/INDEX.md`, check:
 
 ### A. Feature & Phase Docs
-(e.g., `G8B_*.md`, `G8C_*.md`, `G8E_*.md`, `G8F_*.md`, `G8G_*.md`, `PHASE_09_*.md`, `phases/*.md`)
+(e.g., `G8B_*.md`, `G8C_*.md`, `G8E_*.md`, `G8F_*.md`, `G8G_*.md`, `G11_*.md`, `P2_*.md`, `READONLY_*.md`, `PHASE_09_*.md`, `PHASE_10_*.md`, `PHASE_12_*.md`, `phases/*.md`)
 
 | Check | What to verify |
 |-------|----------------|
@@ -169,7 +169,7 @@ After all updates, perform a final cross-check:
 
 1. **Version consistency**: `package.json` version matches all doc headers, `CHANGELOG.md`, `Session_starter.md`, and `CONTEXT_INSTRUCTIONS.md`.
 2. **Test count consistency**: Unit, E2E, and live counts match across all documents that reference them.
-3. **Flag count consistency**: All docs that reference "11 boolean flags" or list flag names are in sync with `endpoint-config.interface.ts`.
+3. **Flag count consistency**: All docs that reference "14 boolean flags" or list flag names are in sync with `endpoint-config.interface.ts` (currently 14 boolean + logLevel = 15 total config flags).
 4. **Link validation**: All `[text](path)` links in docs resolve to existing files.
 5. **Index completeness**: Every doc in `docs/` has an entry in `docs/INDEX.md`.
 
@@ -181,7 +181,7 @@ After completing the audit, review **this prompt itself** for freshness:
 
 1. **New document categories**: If new types of docs (e.g., performance benchmarks, security audit docs) were added to the project, add a new sub-section under Step 2.
 2. **New artifact directories**: If new artifact folders beyond `openapi/`, `postman/`, `insomnia/`, `examples/` were created, add them to Section E.
-3. **New config flags**: If the flag count changed from 11, update all references in this prompt.
+3. **New config flags**: If the flag count changed from 14 boolean + logLevel (15 total), update all references in this prompt.
 4. **New documentation norms**: If the team adopted new standards (e.g., ADR format, PlantUML, Swagger UI), add them to Step 3.
 5. **Retired docs**: If any docs listed in this prompt were deleted or merged, remove references.
 6. **New context files**: If new session/context files were introduced, add them to Section F.

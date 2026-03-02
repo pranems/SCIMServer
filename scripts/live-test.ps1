@@ -4908,7 +4908,7 @@ foreach ($group in $sectionGroups) {
 # Build the full results object
 $resultsObj = [ordered]@{
     testRunner        = "Live Integration Tests (SCIMServer)"
-    version           = "0.11.0"
+    version           = (Get-Content (Join-Path $PSScriptRoot '..\api\package.json') -Raw | ConvertFrom-Json).version
     runId             = $runId
     target            = $target
     baseUrl           = $baseUrl

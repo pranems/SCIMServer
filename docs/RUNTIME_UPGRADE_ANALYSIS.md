@@ -1,7 +1,7 @@
 # ✅ Runtime Upgrade Report — Completed
 
 > **Status**: Historical completion report (retained for auditability)  
-> **Last Updated**: February 18, 2026  
+> **Last Updated**: March 1, 2026  
 > **Baseline**: SCIMServer v0.10.0
 
 > **Original analysis**: February 11, 2026  
@@ -43,7 +43,7 @@
 
 ## 🧪 Validation Results
 
-> *Counts below are from the time of the runtime upgrade. Current baseline (v0.19.2): 2,357 unit (69 suites), 455 E2E (22 suites), 444 live.*
+> *Counts below are from the time of the runtime upgrade. See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) for current baseline.*
 
 | Test Tier | Count | Result |
 |-----------|-------|--------|

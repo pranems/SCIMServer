@@ -75,7 +75,7 @@ api/src/modules/scim/controllers/
 api/src/modules/scim/common/
   scim-sort.util.ts                                      # sortBy/sortOrder mapping utility (v0.20.0)
 api/src/modules/endpoint/
-  endpoint-config.interface.ts                           # 14 boolean flags + logLevel + helpers (incl. getConfigBooleanWithDefault)
+  endpoint-config.interface.ts                           # 14 boolean flags + logLevel + helpers (getConfigBooleanWithDefault, validateEndpointConfig)
   endpoint-context.storage.ts                            # AsyncLocalStorage for endpoint context
 api/src/modules/scim/filters/
   scim-filter-parser.ts                                  # Filter AST attribute path extraction
@@ -194,7 +194,7 @@ docker-compose up           # Full stack
 | Interfaces | `PascalCase` | `EndpointConfig`, `ScimUserResource` |
 | Files | `kebab-case` | `endpoint-scim-users.controller.ts` |
 | Routes | SCIM convention: `/Users`, `/Groups` (PascalCase resource names) |
-| DB Models | `PascalCase` | `ScimUser`, `ScimGroup`, `GroupMember` |
+| DB Models | `PascalCase` | `ScimResource`, `ResourceMember`, `Endpoint` |
 
 ### 5.3 Data Storage Pattern
 
@@ -299,7 +299,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 
 ## 7. Current Compliance Status
 
-### 7.1 SCIM 2.0 Compliance (Current v0.24.0 Baseline)
+### 7.1 SCIM 2.0 Compliance
 
 | Feature | Status |
 |---------|--------|
@@ -327,11 +327,11 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 
 ---
 
-## 8. Test Coverage (v0.24.0)
+## 8. Test Coverage
 
-- **Unit**: 2,573 passing / 2,573 total (73 suites) — **all passing (0 failures)**
-- **E2E**: 558 passing / 558 total (27 suites) — **all passing (0 failures)**
-- **Live integration**: 535 total (all passing)
+> 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
+
+- **Unit**, **E2E**, and **Live integration** — all passing (0 failures)
 - **SCIM Validator**: 25/25 required + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
 - Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`
@@ -397,7 +397,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 ## 11. Quick Reference — Creating New Features
 
 ### Adding a new SCIM attribute to Users:
-1. No schema change needed (stored in `rawPayload`)
+1. No schema change needed (stored in `payload` JSONB)
 2. If needed for queries/uniqueness: add derived column in `schema.prisma`
 3. Update `formatUserResponse()` if special handling needed
 4. Update `matchesFilter()` if it should be filterable

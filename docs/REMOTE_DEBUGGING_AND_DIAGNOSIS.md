@@ -1,6 +1,6 @@
 # SCIMServer — Remote Debugging & Diagnosis Guide
 
-> **Version**: 1.0 · **Date**: February 2026 · **Applies to**: SCIMServer v0.10.0+
+> **Version**: 1.0 · **Date**: March 2026 · **Applies to**: SCIMServer
 
 ---
 
@@ -89,7 +89,7 @@ curl -N https://myapp.azurecontainerapps.io/scim/admin/log-config/stream?level=W
 │  │  │  │ (live SSE) │  │  │  │     │     → GET /stream       │
 │  │  │  └────────────┘  │  │  │     │                         │
 │  │  └──────────────────┘  │  │     │  4. RequestLog DB table │
-│  │  ┌──────────────────┐  │  │     │     → SQLite data.db    │
+│  │  ┌──────────────────┐  │  │     │     → PostgreSQL        │
 │  │  │ LogConfigCtrl    │  │  │     │                         │
 │  │  │  /stream (SSE)   │  │  │     │  5. Azure Monitor       │
 │  │  │  /download       │  │  │     │     → Container insights│
@@ -147,7 +147,7 @@ Request arrives → check endpoint-level override
 | SCIM Filter | `scim.filter` | Filter parsing & evaluation |
 | SCIM Discovery | `scim.discovery` | ServiceProviderConfig, Schemas, ResourceTypes |
 | Endpoint | `endpoint` | Endpoint management |
-| Database | `database` | Prisma/SQLite operations |
+| Database | `database` | Prisma/PostgreSQL operations |
 | OAuth | `oauth` | Token generation/validation |
 | General | `general` | Uncategorized |
 
@@ -819,7 +819,7 @@ sequenceDiagram
     participant Guard as SharedSecretGuard
     participant Controller as ScimUsersController
     participant Service as ScimUsersService
-    participant DB as SQLite (Prisma)
+    participant DB as PostgreSQL (Prisma)
     participant Logger as ScimLogger
 
     Client->>Interceptor: POST /scim/v2/Users
@@ -829,7 +829,7 @@ sequenceDiagram
     Guard->>Logger: DEBUG auth "Shared secret valid"
     Guard-->>Controller: Authorized
     Controller->>Service: createUser(dto)
-    Service->>DB: prisma.scimUser.create(...)
+    Service->>DB: prisma.scimResource.create(...)
     DB-->>Service: Created user
     Service->>Logger: INFO scim.user "User created" {userName}
     Service-->>Controller: User resource
@@ -851,12 +851,12 @@ sequenceDiagram
     participant Client
     participant Interceptor
     participant Service as ScimUsersService
-    participant DB as SQLite
+    participant DB as PostgreSQL
     participant Logger
 
     Client->>Interceptor: POST /scim/v2/Users {userName: "existing@..."}
     Interceptor->>Logger: INFO http "→ POST /scim/v2/Users"
-    Service->>DB: prisma.scimUser.create(...)
+    Service->>DB: prisma.scimResource.create(...)
     DB-->>Service: ❌ Unique constraint
     Service->>Logger: ERROR scim.user "Uniqueness violation" {userName}
     Service-->>Interceptor: 409 Conflict

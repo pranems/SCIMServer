@@ -3,7 +3,7 @@
 > **Version**: 1.0 · **Date**: 2026-02-20
 > **Companion documents**: `IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md` (PostgreSQL) · `MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md`
 > **Scope**: In-memory `Map`-based repository implementation that fulfills the same `IResourceRepository` interface as the PostgreSQL path — for testing, dev, demo, and lightweight deployments.
-> **Note**: Test counts in this doc (e.g., 280 live) are the baseline at time of writing. Current baseline (v0.19.2): 2,357 unit, 455 E2E, 444 live.
+> **Note**: Test counts in this doc (e.g., 280 live) are the baseline at time of writing. See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) for current baseline.
 
 ---
 

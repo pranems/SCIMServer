@@ -2,7 +2,7 @@
 
 > **Version**: 1.2  
 > **Date**: March 1, 2026  
-> **Status**: Current as-built architecture (v0.24.0)  
+> **Status**: Current as-built architecture  
 > **Tech Stack**: NestJS 11 · TypeScript 5 · Prisma 7 · PostgreSQL 17 · React 19 · Vite 7 · Azure Container Apps
 
 ---
@@ -51,7 +51,7 @@
 ```
 api/
 ├── prisma/
-│   ├── schema.prisma            # Database schema definition (5 models)
+│   ├── schema.prisma            # Database schema definition (7 models)
 │   └── migrations/              # Prisma migration history
 ├── public/                      # Pre-built React SPA assets
 │   ├── index.html
@@ -311,7 +311,7 @@ const config = ctx?.config;
 
 | Method | Input | Output | Key Logic |
 |--------|-------|--------|-----------|
-| `createUser(endpointId, dto, baseUrl)` | CreateUserDto | ScimUserResource | Generate CUID scimId, validate userName uniqueness (case-insensitive via `userNameLower`), persist rawPayload as JSON string, create meta |
+| `createUser(endpointId, dto, baseUrl)` | CreateUserDto | ScimUserResource | Generate UUID scimId, validate userName uniqueness (case-insensitive via CITEXT column), persist payload as JSONB, create meta |
 | `listUsers(endpointId, baseUrl, filter?, startIndex?, count?)` | Query params | ScimListResponse | Parse filter string, case-insensitive attribute matching (`eq` operator), 1-based pagination, MAX_COUNT=200 |
 | `getUser(endpointId, id, baseUrl)` | scimId | ScimUserResource | Lookup by `endpointId + scimId`, parse rawPayload, build meta.location |
 | `updateUser(endpointId, id, dto, baseUrl)` | Full resource | ScimUserResource | Full PUT replace: re-validate userName uniqueness, update rawPayload + derived columns |
@@ -321,10 +321,9 @@ const config = ctx?.config;
 **Private Helpers**:
 - `validateCreatePayload()` — SCIM schema validation, required field checks
 - `matchesFilter()` — Case-insensitive property lookup for filter evaluation
-- `formatUserResponse()` — Parse rawPayload JSON → ScimUserResource with meta
+- `formatUserResponse()` — Parse payload JSONB → ScimUserResource with meta
 - `normalizeObjectKeys()` — Lowercase all keys for case-insensitive no-path PATCH merge
 - `isExtensionPath()` / `applyExtensionPatchOp()` — URN-based extension attribute handling
-- `buildUserNameLower()` — Lowercase userName for composite unique constraint
 
 ### 5.2 EndpointScimGroupsService (632 lines)
 
@@ -399,57 +398,50 @@ OAuth 2.0 `client_credentials` grant:
 │ updatedAt        │
 ├──────────────────┤
 │ has many →       │
-│  ScimUser        │──────┐
-│  ScimGroup       │──┐   │
+│  ScimResource    │──────┐
 │  RequestLog      │  │   │
+│  EndpointSchema  │  │   │
+│  EndpointResType │  │   │
+│  EndpointCred    │  │   │
 └──────────────────┘  │   │
                       │   │
 ┌─────────────────────┤   │
 │                     │   │
 │  ┌──────────────────▼───▼──────────────────┐
-│  │            ScimUser                      │
+│  │       ScimResource (unified table)       │
 │  │──────────────────────────────────────────│
-│  │ id              (PK)                     │
+│  │ id              (PK, UUID)               │
 │  │ endpointId      (FK → Endpoint)          │
-│  │ scimId          (SCIM resource id)       │
-│  │ externalId      (client-assigned)        │
-│  │ userName        (original case)          │
-│  │ userNameLower   (lowercase, for UQ)      │
-│  │ active          (Boolean)                │
-│  │ rawPayload      (full JSON text)         │
-│  │ meta            (JSON text)              │
+│  │ resourceType    (VARCHAR: 'User'/'Group')│
+│  │ scimId          (UUID)                   │
+│  │ externalId      (TEXT, caseExact)        │
+│  │ userName        (CITEXT, case-insensitive) │
+│  │ displayName     (CITEXT, case-insensitive) │
+│  │ active          (Boolean, default true)  │
+│  │ deletedAt       (Timestamptz, nullable)  │
+│  │ payload         (JSONB — full SCIM JSON) │
+│  │ version         (Int, monotonic ETag)    │
+│  │ meta            (text)                   │
 │  │ createdAt / updatedAt                    │
 │  │──────────────────────────────────────────│
 │  │ UQ: (endpointId, scimId)                 │
-│  │ UQ: (endpointId, userNameLower)          │
-│  │ UQ: (endpointId, externalId)             │
+│  │ UQ: (endpointId, userName) — CITEXT      │
+│  │ UQ: (endpointId, displayName) — CITEXT   │
+│  │ UQ: (endpointId, resourceType, externalId)│
+│  │ IDX: (endpointId, resourceType)          │
 │  └──────────────────────┬───────────────────┘
 │                         │ has many
 │                         ▼
 │  ┌──────────────────────────────────────────┐
-│  │            GroupMember                    │
+│  │         ResourceMember                    │
 │  │──────────────────────────────────────────│
-│  │ id        (PK)                           │
-│  │ groupId   (FK → ScimGroup, CASCADE)      │
-│  │ userId    (FK → ScimUser, SET NULL)      │
-│  │ value     (SCIM member value/reference)  │
-│  │ type      ("User" / "Group")             │
-│  │ display   (derived displayName)          │
+│  │ id               (PK, UUID)              │
+│  │ groupResourceId  (FK → ScimResource)     │
+│  │ memberResourceId (FK → ScimResource, nullable) │
+│  │ value            (SCIM member reference) │
+│  │ type             ("User" / "Group")      │
+│  │ display          (derived displayName)   │
 │  │ createdAt                                │
-│  └──────────────────────▲───────────────────┘
-│                         │ has many
-│  ┌──────────────────────┴───────────────────┐
-│  │            ScimGroup                     │
-│  │──────────────────────────────────────────│
-│  │ id              (PK)                     │
-│  │ endpointId      (FK → Endpoint)          │
-│  │ scimId          (SCIM resource id)       │
-│  │ displayName                              │
-│  │ rawPayload      (full JSON text)         │
-│  │ meta            (JSON text)              │
-│  │ createdAt / updatedAt                    │
-│  │──────────────────────────────────────────│
-│  │ UQ: (endpointId, scimId)                 │
 │  └──────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────┐
@@ -478,10 +470,10 @@ OAuth 2.0 `client_credentials` grant:
 
 | Aspect | Current Design |
 |--------|---------------|
-| **SCIM Attributes** | Stored as `rawPayload` (JSON string) — full SCIM resource JSON |
-| **Derived Columns** | `userName`, `userNameLower`, `active`, `externalId`, `displayName` extracted for queries |
-| **Meta** | Stored as separate `meta` column (JSON string) |
-| **Group Members** | Normalized into `GroupMember` junction table |
+| **SCIM Attributes** | Stored as `payload` (JSONB) — full SCIM resource JSON (native PostgreSQL JSON type) |
+| **Derived Columns** | `userName` (CITEXT), `active`, `externalId` (TEXT), `displayName` (CITEXT) extracted for queries |
+| **Meta** | Stored as separate `meta` column (text) |
+| **Group Members** | Normalized into `ResourceMember` junction table |
 | **Config** | Endpoint `config` column as JSON string |
 | **Request Logs** | Headers and bodies stored as JSON strings |
 
@@ -489,9 +481,10 @@ OAuth 2.0 `client_credentials` grant:
 
 | Scope | Constraint | Columns |
 |-------|-----------|---------|
-| Per-endpoint | ScimUser SCIM ID | `(endpointId, scimId)` |
-| Per-endpoint | ScimUser userName (case-insensitive) | `(endpointId, userNameLower)` |
-| Per-endpoint | ScimUser externalId | `(endpointId, externalId)` |
+| Per-endpoint | ScimResource SCIM ID | `(endpointId, scimId)` |
+| Per-endpoint | ScimResource userName (case-insensitive) | `(endpointId, userName)` CITEXT |
+| Per-endpoint | ScimResource externalId | `(endpointId, resourceType, externalId)` |
+| Per-endpoint | ScimResource displayName | `(endpointId, displayName)` CITEXT |
 | Per-endpoint | ScimGroup SCIM ID | `(endpointId, scimId)` |
 | Global | Endpoint name | `(name)` |
 
@@ -627,9 +620,8 @@ Database Row:                          SCIM Response:
 ┌─────────────────────┐               ┌─────────────────────────────┐
 │ scimId: "abc123"    │               │ {                           │
 │ userName: "john"    │   format()    │   "schemas": ["...User"],   │
-│ userNameLower: "john"│ ──────────►  │   "id": "abc123",           │
-│ active: true        │               │   "userName": "john",       │
-│ rawPayload: "{...}" │               │   "active": true,           │
+│ active: true        │ ──────────►  │   "id": "abc123",           │
+│ payload: {...}      │               │   "userName": "john",       │
 │ meta: "{...}"       │               │   "emails": [...],          │
 └─────────────────────┘               │   "name": {...},            │
                                       │   "meta": { ... }           │
@@ -742,7 +734,7 @@ CMD ["node", "dist/main.js"]
 - **Framework**: Jest 30 with `ts-jest` transform
 - **Test Location**: `api/test/` directory
 - **Test Pattern**: `*.spec.ts` and `*.test.ts`
-- **Current matrix**: 2,573 unit (73 suites) + 558 e2e (27 suites) + 535 live integration tests passing
+- **Current matrix**: See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts — all passing
 
 ### 11.2 Test Categories
 
@@ -810,9 +802,9 @@ CMD ["node", "dist/main.js"]
 
 ---
 
-> **SQLite Compromises**: This design incorporates 28 documented SQLite-specific compromises
+> **Historical Note:** This design originally used 28 documented SQLite-specific compromises
 > (single-writer lock, derived lowercase columns, buffered logging, ephemeral storage, etc.).
-> For a complete audit with migration recommendations, see
+> These were all resolved by the Phase 3 PostgreSQL migration (v0.11.0). For the historical audit, see
 > [SQLITE_COMPROMISE_ANALYSIS.md](SQLITE_COMPROMISE_ANALYSIS.md).
 
-*This document describes the as-built architecture of SCIMServer as of February 2026.*
+*This document describes the as-built architecture of SCIMServer as of March 2026.*

@@ -1,6 +1,6 @@
 # SCIMServer — Logging, Traceability & Observability Guide
 
-> **Version**: 1.2 · **Date**: February 2026 · **Applies to**: SCIMServer v0.10.0+
+> **Version**: 1.3 · **Date**: March 2026 · **Applies to**: SCIMServer
 
 ---
 
@@ -1216,7 +1216,7 @@ These endpoints are available from any HTTP client — no Azure CLI required:
 $url = "https://<fqdn>"
 $h = @{ Authorization = "Bearer <secret>" }
 
-# Paginated request logs (stored in SQLite)
+# Paginated request logs (stored in PostgreSQL)
 Invoke-RestMethod "$url/scim/admin/logs?pageSize=50" -Headers $h
 
 # In-memory ring buffer (last ~200 structured entries)

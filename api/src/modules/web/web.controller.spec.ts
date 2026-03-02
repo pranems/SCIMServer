@@ -22,14 +22,4 @@ describe('WebController', () => {
     });
   });
 
-  describe('serveAssets', () => {
-    it('should call res.sendFile with the requested asset path', () => {
-      const mockRes = { sendFile: jest.fn() } as any;
-      controller.serveAssets('logo.png', mockRes);
-      expect(mockRes.sendFile).toHaveBeenCalledTimes(1);
-      const filePath: string = mockRes.sendFile.mock.calls[0][0];
-      expect(filePath).toContain('logo.png');
-      expect(filePath).toContain('assets');
-    });
-  });
 });

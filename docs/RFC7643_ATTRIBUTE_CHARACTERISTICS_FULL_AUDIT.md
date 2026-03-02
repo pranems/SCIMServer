@@ -907,13 +907,9 @@ Nice-to-have enhancements for stricter compliance and cross-resource integrity.
 
 ## Test Coverage Context
 
-Audit performed against the v0.24.0 test baseline (P1+P2 complete):
+Audit performed against the v0.24.0 test baseline (P1+P2 complete).
 
-| Suite | Count | Status |
-|---|:---:|:---:|
-| Unit tests | 2,573 (73 suites) | ✅ All passing |
-| E2E tests | 558 (27 suites) | ✅ All passing |
-| Live integration tests | 535 | ✅ All passing |
+> 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
 
 Each P1/P2 work item when implemented should include:
 - Unit tests for the specific characteristic enforcement

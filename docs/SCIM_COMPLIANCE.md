@@ -2,7 +2,7 @@
 
 > RFC compliance status and Microsoft Entra ID provisioning compatibility for SCIMServer.
 
-**Last Updated:** February 27, 2026
+**Last Updated:** March 1, 2026
 
 ---
 
@@ -25,7 +25,7 @@
 | `/Me` Endpoint (RFC 7644 §3.11) | **100%** | JWT `sub` → `userName` identity resolution, full CRUD delegation, attribute projection (v0.20.0) |
 | Per-Endpoint Credentials (RFC 7643 §7) | **100%** | bcrypt-hashed per-endpoint tokens, admin CRUD API, 3-tier fallback chain, `PerEndpointCredentialsEnabled` flag (v0.21.0) |
 
-**Overall: 100% RFC 7643/7644 compliant** — All 27 migration gaps (G1–G20) fully resolved as of v0.24.0. P2 attribute characteristic enforcement complete. All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. Full suite: **2,573 unit tests (73 suites), 558 E2E tests (27 suites), 535 live integration tests.**
+**Overall: 100% RFC 7643/7644 compliant** — All 27 migration gaps (G1–G20) fully resolved as of v0.24.0. P2 attribute characteristic enforcement complete. All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
 
 ### New in v0.24.0
 
@@ -143,7 +143,7 @@
 | `SoftDeleteEnabled` config flag | Soft delete (set `active=false`) instead of physical row deletion on DELETE |
 | `StrictSchemaValidation` config flag | Reject extension URNs not declared in `schemas[]` or not registered |
 | Custom Extension URNs (msfttest) | 4 msfttest extension schemas registered globally (2 User + 2 Group) |
-| Dynamic `schemas[]` on Groups | Group responses include extension URNs from `rawPayload` |
+| Dynamic `schemas[]` on Groups | Group responses include extension URNs from `payload` |
 | 7 built-in schemas | User, EnterpriseUser, Group + 4 msfttest extensions (was 3) |
 
 ---
@@ -157,7 +157,7 @@
 | `schemas` attribute | ✅ | Present on all resources |
 | `meta` attribute | ✅ | resourceType, created, lastModified, location, version |
 | `id` | ✅ | Server-assigned UUID, immutable |
-| Enterprise User Extension | ✅ | Stored in rawPayload (employeeNumber, department, manager, etc.) |
+| Enterprise User Extension | ✅ | Stored in payload JSONB (employeeNumber, department, manager, etc.) |
 
 ## HTTP Operations (RFC 7644)
 
@@ -217,7 +217,7 @@
 
 ## Microsoft Entra ID Compatibility
 
-**Overall Entra ID Compatibility: ~95%** ✅
+**Overall Entra ID Compatibility: 100%** ✅
 
 SCIMServer passes all critical requirements for Microsoft Entra ID enterprise application provisioning.
 
@@ -263,7 +263,7 @@ SCIMServer passes all critical requirements for Microsoft Entra ID enterprise ap
 | ~~D6 — SPC `authenticationSchemes` missing `primary` flag~~ | ~~Very Low~~ | ✅ Resolved v0.19.3 — `primary: true` added |
 | ~~`sortBy` / `sortOrder`~~ | ~~Low~~ | ✅ Resolved v0.20.0 — `sort.supported: true`, sortBy/sortOrder on GET and `/.search` |
 | ~~`/Me` endpoint~~ | ~~Low~~ | ✅ Resolved v0.20.0 — JWT `sub` → userName identity resolution, full CRUD |
-| `caseExact` enforcement in filters | Low | ✅ Fixed for `externalId` (CITEXT → TEXT). Schema-driven `caseExact` for dynamic attributes still pending |
+| ~~`caseExact` enforcement in filters~~ | ~~Low~~ | ✅ Resolved v0.24.0 — R-CASE-1: `evaluateFilter()` accepts `caseExactAttrs` set for schema-driven case-sensitive comparisons on `caseExact:true` attributes (`id`, `externalId`, `meta.location`). `externalId` column also TEXT (CITEXT → TEXT in v0.17.2). |
 
 ---
 

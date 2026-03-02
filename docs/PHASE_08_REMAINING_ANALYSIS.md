@@ -1,6 +1,6 @@
 # Phase 8 — Schema Validation: Complete Remaining-Work Analysis
 
-> **Date:** 2026-02-26 | **Current Version:** v0.19.2  
+> **Date:** 2026-03-01  
 > **Author:** Copilot Session Analysis  
 > **Scope:** Phase 8 Part 1 (Schema Validation Engine) + Phase 8 Part 2 (Custom Resource Type Registration)
 
@@ -1027,7 +1027,7 @@ pie title Validation Gaps by Architectural Layer (28 remaining)
 
 #### Reanalysis Status (2026-02-24)
 
-> Reanalysis performed against latest codebase (2,357 unit tests, 69 suites — all passing).
+> Reanalysis performed against latest codebase (all unit tests passing). 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current counts.
 
 | Status | Count | Gaps |
 |--------|-------|------|
@@ -1359,14 +1359,9 @@ pie title "Domain Unit Test Distribution (178 tests)"
 | NOT reject in lenient mode | Flag OFF bypass |
 | Reject wrong type on replace | PUT validation |
 
-### 9.5 Full Suite Counts (v0.19.2)
+### 9.5 Full Suite Counts (v0.24.0)
 
-| Suite | Count | Suites | Status |
-|-------|-------|--------|--------|
-| Unit tests | 2,357 | 69 | ✅ All passing |
-| E2E tests | 455 | 22 | ✅ All passing |
-| Live tests (local) | 444 | — | ✅ All passing |
-| Live tests (Docker) | 444 | — | ✅ All passing |
+> 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
 
 ---
 
@@ -1400,11 +1395,11 @@ A  docs/phases/PHASE_08_SCHEMA_VALIDATION.md           ← NEW: 906 lines
 | Item | Status |
 |------|--------|
 | All files staged | ✅ |
-| Unit tests passing | ✅ 2,357/2,357 |
-| E2E tests passing | ✅ 455/455 |
-| Live tests passing (local) | ✅ 444/444 |
-| Live tests passing (Docker) | ✅ 444/444 |
-| CHANGELOG updated | ✅ v0.19.2 entry |
+| Unit tests passing | ✅ All passing |
+| E2E tests passing | ✅ All passing |
+| Live tests passing (local) | ✅ All passing |
+| Live tests passing (Docker) | ✅ All passing |
+| CHANGELOG updated | ✅ v0.24.0 entry |
 | Phase doc created | ✅ 906 lines |
 | **Committed** | ❌ **NOT YET** |
 

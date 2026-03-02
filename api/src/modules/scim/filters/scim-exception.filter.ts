@@ -35,6 +35,16 @@ export class ScimExceptionFilter implements ExceptionFilter {
     const status = exception.getStatus();
     const exceptionResponse = exception.getResponse();
 
+    const url = request?.originalUrl ?? request?.url ?? '';
+
+    // Non-SCIM routes (web UI, static assets): let NestJS default error handling apply
+    if (!url.startsWith('/scim')) {
+      response.status(status).json(
+        typeof exceptionResponse === 'object' ? exceptionResponse : { statusCode: status, message: exception.message }
+      );
+      return;
+    }
+
     // Log the exception
     if (status >= 500) {
       this.logger.error(LogCategory.HTTP, `Exception ${status} on ${request?.method} ${request?.originalUrl}`, exception, {

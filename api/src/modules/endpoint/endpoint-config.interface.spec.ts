@@ -26,6 +26,12 @@ describe('endpoint-config.interface', () => {
       expect(ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION).toBe('StrictSchemaValidation');
       expect(ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH).toBe('RequireIfMatch');
       expect(ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS).toBe('AllowAndCoerceBooleanStrings');
+      expect(ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED).toBe('ReprovisionOnConflictForSoftDeletedResource');
+      expect(ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED).toBe('CustomResourceTypesEnabled');
+      expect(ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED).toBe('BulkOperationsEnabled');
+      expect(ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED).toBe('PerEndpointCredentialsEnabled');
+      expect(ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE).toBe('IncludeWarningAboutIgnoredReadOnlyAttribute');
+      expect(ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH).toBe('IgnoreReadOnlyAttributesInPatch');
     });
   });
 
@@ -1020,6 +1026,576 @@ describe('endpoint-config.interface', () => {
       } catch (e) {
         expect((e as Error).message).toContain('AllowAndCoerceBooleanStrings');
       }
+    });
+  });
+
+  describe('RequireIfMatch validation', () => {
+    it('should accept boolean true', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: true })).not.toThrow();
+    });
+
+    it('should accept boolean false', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: false })).not.toThrow();
+    });
+
+    it('should accept string "True"', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: 'True' })).not.toThrow();
+    });
+
+    it('should accept string "true"', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: 'true' })).not.toThrow();
+    });
+
+    it('should accept string "False"', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: 'False' })).not.toThrow();
+    });
+
+    it('should accept string "false"', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: 'false' })).not.toThrow();
+    });
+
+    it('should accept string "1"', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: '1' })).not.toThrow();
+    });
+
+    it('should accept string "0"', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: '0' })).not.toThrow();
+    });
+
+    it('should throw for invalid string "Yes"', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: 'Yes' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for invalid string "enabled"', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: 'enabled' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for number value', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: 123 })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for object value', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: { enabled: true } })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for array value', () => {
+      expect(() => validateEndpointConfig({ RequireIfMatch: ['true'] })).toThrow(/Invalid type/);
+    });
+
+    it('should include flag name in error message', () => {
+      try {
+        validateEndpointConfig({ RequireIfMatch: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('RequireIfMatch');
+      }
+    });
+
+    it('should include allowed values in error message', () => {
+      try {
+        validateEndpointConfig({ RequireIfMatch: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('Allowed values');
+      }
+    });
+  });
+
+  describe('ReprovisionOnConflictForSoftDeletedResource validation', () => {
+    it('should accept boolean true', () => {
+      expect(() => validateEndpointConfig({ ReprovisionOnConflictForSoftDeletedResource: true })).not.toThrow();
+    });
+
+    it('should accept boolean false', () => {
+      expect(() => validateEndpointConfig({ ReprovisionOnConflictForSoftDeletedResource: false })).not.toThrow();
+    });
+
+    it('should accept string "True"', () => {
+      expect(() => validateEndpointConfig({ ReprovisionOnConflictForSoftDeletedResource: 'True' })).not.toThrow();
+    });
+
+    it('should accept string "true"', () => {
+      expect(() => validateEndpointConfig({ ReprovisionOnConflictForSoftDeletedResource: 'true' })).not.toThrow();
+    });
+
+    it('should accept string "False"', () => {
+      expect(() => validateEndpointConfig({ ReprovisionOnConflictForSoftDeletedResource: 'False' })).not.toThrow();
+    });
+
+    it('should accept string "false"', () => {
+      expect(() => validateEndpointConfig({ ReprovisionOnConflictForSoftDeletedResource: 'false' })).not.toThrow();
+    });
+
+    it('should accept string "1"', () => {
+      expect(() => validateEndpointConfig({ ReprovisionOnConflictForSoftDeletedResource: '1' })).not.toThrow();
+    });
+
+    it('should accept string "0"', () => {
+      expect(() => validateEndpointConfig({ ReprovisionOnConflictForSoftDeletedResource: '0' })).not.toThrow();
+    });
+
+    it('should throw for invalid string "Yes"', () => {
+      expect(() => validateEndpointConfig({ ReprovisionOnConflictForSoftDeletedResource: 'Yes' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for invalid string "enabled"', () => {
+      expect(() => validateEndpointConfig({ ReprovisionOnConflictForSoftDeletedResource: 'enabled' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for number value', () => {
+      expect(() => validateEndpointConfig({ ReprovisionOnConflictForSoftDeletedResource: 123 })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for object value', () => {
+      expect(() => validateEndpointConfig({ ReprovisionOnConflictForSoftDeletedResource: {} })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for array value', () => {
+      expect(() => validateEndpointConfig({ ReprovisionOnConflictForSoftDeletedResource: ['true'] })).toThrow(/Invalid type/);
+    });
+
+    it('should include flag name in error message', () => {
+      try {
+        validateEndpointConfig({ ReprovisionOnConflictForSoftDeletedResource: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('ReprovisionOnConflictForSoftDeletedResource');
+      }
+    });
+
+    it('should include allowed values in error message', () => {
+      try {
+        validateEndpointConfig({ ReprovisionOnConflictForSoftDeletedResource: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('Allowed values');
+      }
+    });
+  });
+
+  describe('CustomResourceTypesEnabled validation', () => {
+    it('should accept boolean true', () => {
+      expect(() => validateEndpointConfig({ CustomResourceTypesEnabled: true })).not.toThrow();
+    });
+
+    it('should accept boolean false', () => {
+      expect(() => validateEndpointConfig({ CustomResourceTypesEnabled: false })).not.toThrow();
+    });
+
+    it('should accept string "True"', () => {
+      expect(() => validateEndpointConfig({ CustomResourceTypesEnabled: 'True' })).not.toThrow();
+    });
+
+    it('should accept string "true"', () => {
+      expect(() => validateEndpointConfig({ CustomResourceTypesEnabled: 'true' })).not.toThrow();
+    });
+
+    it('should accept string "False"', () => {
+      expect(() => validateEndpointConfig({ CustomResourceTypesEnabled: 'False' })).not.toThrow();
+    });
+
+    it('should accept string "false"', () => {
+      expect(() => validateEndpointConfig({ CustomResourceTypesEnabled: 'false' })).not.toThrow();
+    });
+
+    it('should accept string "1"', () => {
+      expect(() => validateEndpointConfig({ CustomResourceTypesEnabled: '1' })).not.toThrow();
+    });
+
+    it('should accept string "0"', () => {
+      expect(() => validateEndpointConfig({ CustomResourceTypesEnabled: '0' })).not.toThrow();
+    });
+
+    it('should throw for invalid string "Yes"', () => {
+      expect(() => validateEndpointConfig({ CustomResourceTypesEnabled: 'Yes' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for invalid string "on"', () => {
+      expect(() => validateEndpointConfig({ CustomResourceTypesEnabled: 'on' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for number value', () => {
+      expect(() => validateEndpointConfig({ CustomResourceTypesEnabled: 123 })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for object value', () => {
+      expect(() => validateEndpointConfig({ CustomResourceTypesEnabled: { enabled: true } })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for array value', () => {
+      expect(() => validateEndpointConfig({ CustomResourceTypesEnabled: ['true'] })).toThrow(/Invalid type/);
+    });
+
+    it('should include flag name in error message', () => {
+      try {
+        validateEndpointConfig({ CustomResourceTypesEnabled: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('CustomResourceTypesEnabled');
+      }
+    });
+
+    it('should include allowed values in error message', () => {
+      try {
+        validateEndpointConfig({ CustomResourceTypesEnabled: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('Allowed values');
+      }
+    });
+  });
+
+  describe('BulkOperationsEnabled validation', () => {
+    it('should accept boolean true', () => {
+      expect(() => validateEndpointConfig({ BulkOperationsEnabled: true })).not.toThrow();
+    });
+
+    it('should accept boolean false', () => {
+      expect(() => validateEndpointConfig({ BulkOperationsEnabled: false })).not.toThrow();
+    });
+
+    it('should accept string "True"', () => {
+      expect(() => validateEndpointConfig({ BulkOperationsEnabled: 'True' })).not.toThrow();
+    });
+
+    it('should accept string "true"', () => {
+      expect(() => validateEndpointConfig({ BulkOperationsEnabled: 'true' })).not.toThrow();
+    });
+
+    it('should accept string "False"', () => {
+      expect(() => validateEndpointConfig({ BulkOperationsEnabled: 'False' })).not.toThrow();
+    });
+
+    it('should accept string "false"', () => {
+      expect(() => validateEndpointConfig({ BulkOperationsEnabled: 'false' })).not.toThrow();
+    });
+
+    it('should accept string "1"', () => {
+      expect(() => validateEndpointConfig({ BulkOperationsEnabled: '1' })).not.toThrow();
+    });
+
+    it('should accept string "0"', () => {
+      expect(() => validateEndpointConfig({ BulkOperationsEnabled: '0' })).not.toThrow();
+    });
+
+    it('should throw for invalid string "Yes"', () => {
+      expect(() => validateEndpointConfig({ BulkOperationsEnabled: 'Yes' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for invalid string "on"', () => {
+      expect(() => validateEndpointConfig({ BulkOperationsEnabled: 'on' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for number value', () => {
+      expect(() => validateEndpointConfig({ BulkOperationsEnabled: 123 })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for object value', () => {
+      expect(() => validateEndpointConfig({ BulkOperationsEnabled: {} })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for array value', () => {
+      expect(() => validateEndpointConfig({ BulkOperationsEnabled: ['true'] })).toThrow(/Invalid type/);
+    });
+
+    it('should include flag name in error message', () => {
+      try {
+        validateEndpointConfig({ BulkOperationsEnabled: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('BulkOperationsEnabled');
+      }
+    });
+
+    it('should include allowed values in error message', () => {
+      try {
+        validateEndpointConfig({ BulkOperationsEnabled: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('Allowed values');
+      }
+    });
+  });
+
+  describe('PerEndpointCredentialsEnabled validation', () => {
+    it('should accept boolean true', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: true })).not.toThrow();
+    });
+
+    it('should accept boolean false', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: false })).not.toThrow();
+    });
+
+    it('should accept string "True"', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: 'True' })).not.toThrow();
+    });
+
+    it('should accept string "true"', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: 'true' })).not.toThrow();
+    });
+
+    it('should accept string "False"', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: 'False' })).not.toThrow();
+    });
+
+    it('should accept string "false"', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: 'false' })).not.toThrow();
+    });
+
+    it('should accept string "1"', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: '1' })).not.toThrow();
+    });
+
+    it('should accept string "0"', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: '0' })).not.toThrow();
+    });
+
+    it('should throw for invalid string "Yes"', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: 'Yes' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for number value', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: 123 })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for object value', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: { key: true } })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for array value', () => {
+      expect(() => validateEndpointConfig({ PerEndpointCredentialsEnabled: ['true'] })).toThrow(/Invalid type/);
+    });
+
+    it('should include flag name in error message', () => {
+      try {
+        validateEndpointConfig({ PerEndpointCredentialsEnabled: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('PerEndpointCredentialsEnabled');
+      }
+    });
+
+    it('should include allowed values in error message', () => {
+      try {
+        validateEndpointConfig({ PerEndpointCredentialsEnabled: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('Allowed values');
+      }
+    });
+  });
+
+  describe('IncludeWarningAboutIgnoredReadOnlyAttribute validation', () => {
+    it('should accept boolean true', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: true })).not.toThrow();
+    });
+
+    it('should accept boolean false', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: false })).not.toThrow();
+    });
+
+    it('should accept string "True"', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: 'True' })).not.toThrow();
+    });
+
+    it('should accept string "true"', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: 'true' })).not.toThrow();
+    });
+
+    it('should accept string "False"', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: 'False' })).not.toThrow();
+    });
+
+    it('should accept string "false"', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: 'false' })).not.toThrow();
+    });
+
+    it('should accept string "1"', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: '1' })).not.toThrow();
+    });
+
+    it('should accept string "0"', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: '0' })).not.toThrow();
+    });
+
+    it('should throw for invalid string "Yes"', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: 'Yes' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for number value', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: 42 })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for object value', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: {} })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for array value', () => {
+      expect(() => validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: ['true'] })).toThrow(/Invalid type/);
+    });
+
+    it('should include flag name in error message', () => {
+      try {
+        validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('IncludeWarningAboutIgnoredReadOnlyAttribute');
+      }
+    });
+
+    it('should include allowed values in error message', () => {
+      try {
+        validateEndpointConfig({ IncludeWarningAboutIgnoredReadOnlyAttribute: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('Allowed values');
+      }
+    });
+  });
+
+  describe('IgnoreReadOnlyAttributesInPatch validation', () => {
+    it('should accept boolean true', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: true })).not.toThrow();
+    });
+
+    it('should accept boolean false', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: false })).not.toThrow();
+    });
+
+    it('should accept string "True"', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: 'True' })).not.toThrow();
+    });
+
+    it('should accept string "true"', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: 'true' })).not.toThrow();
+    });
+
+    it('should accept string "False"', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: 'False' })).not.toThrow();
+    });
+
+    it('should accept string "false"', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: 'false' })).not.toThrow();
+    });
+
+    it('should accept string "1"', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: '1' })).not.toThrow();
+    });
+
+    it('should accept string "0"', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: '0' })).not.toThrow();
+    });
+
+    it('should throw for invalid string "Yes"', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: 'Yes' })).toThrow(/Invalid value/);
+    });
+
+    it('should throw for number value', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: 123 })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for object value', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: {} })).toThrow(/Invalid type/);
+    });
+
+    it('should throw for array value', () => {
+      expect(() => validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: ['true'] })).toThrow(/Invalid type/);
+    });
+
+    it('should include flag name in error message', () => {
+      try {
+        validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('IgnoreReadOnlyAttributesInPatch');
+      }
+    });
+
+    it('should include allowed values in error message', () => {
+      try {
+        validateEndpointConfig({ IgnoreReadOnlyAttributesInPatch: 'invalid' });
+        fail('Expected error');
+      } catch (e) {
+        expect((e as Error).message).toContain('Allowed values');
+      }
+    });
+  });
+
+  describe('All flags combined validation', () => {
+    it('should accept all 14 boolean flags set to valid values', () => {
+      expect(() =>
+        validateEndpointConfig({
+          MultiOpPatchRequestAddMultipleMembersToGroup: 'True',
+          MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'True',
+          PatchOpAllowRemoveAllMembers: 'False',
+          VerbosePatchSupported: true,
+          SoftDeleteEnabled: 'True',
+          StrictSchemaValidation: 'True',
+          RequireIfMatch: 'True',
+          AllowAndCoerceBooleanStrings: 'False',
+          ReprovisionOnConflictForSoftDeletedResource: 'True',
+          CustomResourceTypesEnabled: true,
+          BulkOperationsEnabled: '1',
+          PerEndpointCredentialsEnabled: 'True',
+          IncludeWarningAboutIgnoredReadOnlyAttribute: true,
+          IgnoreReadOnlyAttributesInPatch: 'True',
+          logLevel: 'DEBUG',
+        })
+      ).not.toThrow();
+    });
+
+    it('should reject when any one flag is invalid among valid flags', () => {
+      expect(() =>
+        validateEndpointConfig({
+          MultiOpPatchRequestAddMultipleMembersToGroup: 'True',
+          RequireIfMatch: 'True',
+          BulkOperationsEnabled: 'invalid', // <-- invalid
+          PerEndpointCredentialsEnabled: 'True',
+        })
+      ).toThrow(/BulkOperationsEnabled/);
+    });
+
+    it('should validate ReprovisionOnConflict independently of SoftDeleteEnabled', () => {
+      // Reprovision without SoftDelete is valid config (semantically meaningless, but valid)
+      expect(() =>
+        validateEndpointConfig({
+          ReprovisionOnConflictForSoftDeletedResource: 'True',
+          SoftDeleteEnabled: 'False',
+        })
+      ).not.toThrow();
+    });
+
+    it('should validate IgnoreReadOnlyAttributesInPatch independently of StrictSchemaValidation', () => {
+      // IgnoreRO without Strict is valid config (has no runtime effect, but valid)
+      expect(() =>
+        validateEndpointConfig({
+          IgnoreReadOnlyAttributesInPatch: 'True',
+          StrictSchemaValidation: 'False',
+        })
+      ).not.toThrow();
+    });
+  });
+
+  describe('DEFAULT_ENDPOINT_CONFIG', () => {
+    it('should have the correct defaults for all 14 boolean flags', () => {
+      expect(DEFAULT_ENDPOINT_CONFIG.MultiOpPatchRequestAddMultipleMembersToGroup).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG.MultiOpPatchRequestRemoveMultipleMembersFromGroup).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG.PatchOpAllowRemoveAllMembers).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG.VerbosePatchSupported).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG.SoftDeleteEnabled).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG.StrictSchemaValidation).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG.RequireIfMatch).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG.AllowAndCoerceBooleanStrings).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG.ReprovisionOnConflictForSoftDeletedResource).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG.CustomResourceTypesEnabled).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG.BulkOperationsEnabled).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG.PerEndpointCredentialsEnabled).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG.IncludeWarningAboutIgnoredReadOnlyAttribute).toBe(false);
+      expect(DEFAULT_ENDPOINT_CONFIG.IgnoreReadOnlyAttributesInPatch).toBe(false);
+    });
+
+    it('should not have a logLevel default (undefined by default)', () => {
+      expect(DEFAULT_ENDPOINT_CONFIG.logLevel).toBeUndefined();
     });
   });
 });

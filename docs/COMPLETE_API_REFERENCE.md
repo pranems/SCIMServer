@@ -1,6 +1,6 @@
 # SCIMServer — Complete REST API Reference
 
-> Version baseline: v0.21.0 · Updated: February 27, 2026 · Scope: SCIM + admin + OAuth + web routes
+> Updated: March 1, 2026 · Scope: SCIM + admin + OAuth + web routes
 
 This document enumerates all REST API endpoints and resources exposed by the SCIMServer application, with HTTP methods, purpose, common query parameters, expected request and response shapes, authentication notes, and `curl` examples for each operation.
 
@@ -391,7 +391,7 @@ curl -H "Authorization: Bearer <TOKEN>" "https://<API_BASE>/scim/v2/admin/versio
 - Sample response (trimmed):
 ```
 {
-  "version": "0.19.3",
+  "version": "0.24.0",
   "service": {
     "environment": "production",
     "scimBasePath": "/scim/v2",
@@ -624,8 +624,8 @@ Examples — error responses
 ---
 
 Persistence & models
-- Prisma models of interest are in `api/prisma/schema.prisma` (`ScimUser`, `ScimGroup`, `GroupMember`, `RequestLog`).
-- `rawPayload` column stores request JSON for auditing; `meta` stores SCIM meta JSON string.
+- Prisma models of interest are in `api/prisma/schema.prisma` (`ScimResource`, `ResourceMember`, `RequestLog`, `Endpoint`, `EndpointSchema`, `EndpointResourceType`, `EndpointCredential`).
+- `payload` JSONB column stores the full SCIM resource; `meta` stores SCIM meta JSON string.
 
 ---
 

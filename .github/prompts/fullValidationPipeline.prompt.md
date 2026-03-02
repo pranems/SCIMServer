@@ -19,10 +19,11 @@ Before starting, ensure:
 ```powershell
 cd api
 npm ci                          # Install exact dependencies from lockfile
+# NOTE: If npm ci fails with permissions errors, use `npm install` as fallback
 npx prisma generate             # Generate Prisma client (required before build)
-npx nest build                  # NestJS CLI build (outputs to dist/)
+npm run build                   # TypeScript build via tsc (outputs to dist/)
 ```
-> **Note:** `npx nest build` is the correct build command (not `tsc -p tsconfig.build.json`). The project uses the NestJS CLI wrapper which handles path aliases and module resolution.
+> **Note:** `npm run build` runs `tsc -p tsconfig.build.json`. The NestJS CLI (`@nestjs/cli`) is NOT installed as a dependency — do NOT use `npx nest build`.
 
 ### Step 2: Run Unit Tests
 ```powershell
@@ -31,7 +32,8 @@ npx jest --no-coverage --json --outputFile=pipeline-unit.json 2>$null
 # Parse results:
 node -e "const r=JSON.parse(require('fs').readFileSync('pipeline-unit.json','utf8'));console.log('suites:',r.numPassedTestSuites+'/'+r.numTotalTestSuites,'tests:',r.numPassedTests+'/'+r.numTotalTests,'failed:',r.numFailedTests)"
 ```
-> **Baselines (v0.21.0):** 2,484 pass / 24 pre-existing fail / 75 suites. Pre-existing failures are in `endpoint-scim-users.service.spec.ts` and `endpoint-scim-groups.service.spec.ts` (boolean coercion schema validation).
+> **Baselines (v0.24.0):** 2,682 pass / 0 fail / 73 suites. All pre-existing failures from v0.21.0 have been fixed.
+> *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 
 ### Step 3: Run E2E Tests
 ```powershell
@@ -40,7 +42,8 @@ npx jest --config test/e2e/jest-e2e.config.ts --no-coverage --json --outputFile=
 # Parse results:
 node -e "const r=JSON.parse(require('fs').readFileSync('pipeline-e2e.json','utf8'));console.log('suites:',r.numPassedTestSuites+'/'+r.numTotalTestSuites,'tests:',r.numPassedTests+'/'+r.numTotalTests,'failed:',r.numFailedTests)"
 ```
-> **Baselines (v0.21.0):** 481 pass / 41 pre-existing fail / 25 suites. Pre-existing failures are in `schema-validation` and `soft-delete-flags` suites.
+> **Baselines (v0.24.0):** 585 pass / 0 fail / 27 suites. All pre-existing failures from v0.21.0 have been fixed.
+> *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 > **E2E config path:** `test/e2e/jest-e2e.config.ts`
 
 ### Step 4: Start Local Instance
@@ -64,7 +67,8 @@ cd scripts
 .\live-test.ps1 -BaseUrl "http://localhost:6000" -ClientSecret "changeme-oauth" *> ..\local-live-pipeline.txt
 ```
 > **Output capture:** Use `*>` (all PowerShell streams) not `>` (stdout only). The script writes to multiple output streams.
-> **Baselines (v0.21.0):** 480 pass / 5 pre-existing fail / 485 total. Pre-existing failures are boolean coercion schema validation (same root cause as unit/E2E).
+> **Baselines (v0.24.0):** 535 pass / 0 fail / 535 total. All pre-existing failures from v0.21.0 have been fixed.
+> *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 
 ### Step 6: Stop Local Instance
 ```powershell
@@ -142,22 +146,18 @@ docker compose down --remove-orphans
 - Include duration where available.
 - Note any pre-existing failures explicitly so new regressions are clearly distinguishable.
 
-## Known Pre-Existing Failures (v0.21.0)
+## Known Pre-Existing Failures (v0.24.0)
 
-| Level | Count | Root Cause | Affected Suites |
-|-------|-------|-----------|-----------------|
-| Unit | 24 | Boolean coercion schema validation (`id: Required attribute 'id' is missing`) | `endpoint-scim-users.service.spec.ts`, `endpoint-scim-groups.service.spec.ts` |
-| E2E | 41 | Same boolean coercion + soft-delete flag interaction | `schema-validation.e2e-spec.ts`, `soft-delete-flags.e2e-spec.ts` |
-| Live | 5 | Same boolean coercion | Section 3 boolean coercion tests |
+**None.** All pre-existing failures from v0.21.0 (24 unit, 41 E2E, 5 live — boolean coercion schema validation) have been fixed as of v0.24.0.
 
 ## Self-Improvement Check
 
 After completing the full pipeline, critically evaluate **this prompt itself** for accuracy, completeness, and efficiency. Ask these questions and apply fixes directly to `.github/prompts/fullValidationPipeline.prompt.md`:
 
 ### Build & Dependency Self-Check
-1. **Did the build command work?** Verified: `npx nest build` is correct. Update if it changes.
+1. **Did the build command work?** Verified: `npm run build` (runs `tsc -p tsconfig.build.json`). NestJS CLI is NOT installed — do NOT use `npx nest build`.
 2. **Were dependency install steps needed?** Yes: `npm ci` + `npx prisma generate` are required prerequisites.
-3. **Did the clean build require cache clearing?** No — `npx nest build` handles this. `rm -rf dist/` is only needed if switching branches.
+3. **Did the clean build require cache clearing?** No — `npm run build` handles this. `rm -rf dist/` is only needed if switching branches.
 
 ### Test Runner Self-Check
 4. **Did the Jest commands work as written?** Yes. Use `--testPathPatterns` (plural, Jest 30+). `--forceExit` is NOT needed for unit tests but may help for E2E if hanging.
@@ -166,7 +166,7 @@ After completing the full pipeline, critically evaluate **this prompt itself** f
 7. **Were there new test levels?** No contract/snapshot/perf tests currently. Could add lint (`npx eslint .`) as optional.
 
 ### Local Instance Self-Check
-8. **Did the start command work?** `node dist/main.js` with env vars. Requires `npx nest build` first and PostgreSQL running on 5432.
+8. **Did the start command work?** `node dist/main.js` with env vars. Requires `npm run build` first and PostgreSQL running on 5432.
 9. **Did the health poll work?** `/scim/ServiceProviderConfig` is public (no auth needed). Works reliably.
 10. **What port did it run on?** 6000 (set via `$env:PORT`).
 11. **Did the stop command work?** `Get-NetTCPConnection -LocalPort 6000 | Stop-Process` works on Windows.
@@ -174,7 +174,7 @@ After completing the full pipeline, critically evaluate **this prompt itself** f
 ### Docker Self-Check
 12. **Did the Dockerfile change?** Using root `Dockerfile`. `Dockerfile.optimized` and `Dockerfile.ultra` exist but are not the default.
 13. **Did compose service names change?** `api` → `scimserver-api`, `postgres` → `scimserver-postgres`.
-14. **Did the Docker health check work?** Yes, both containers have built-in healthchecks.
+14. **Did the Docker health check work?** Yes, both containers have built-in healthchecks. **Important:** The API healthcheck URL must be `/scim/health` (not `/health`) since the app uses `/scim` as the global prefix.
 15. **Did the Docker port mapping change?** 8080:8080 for API, 5432:5432 for PostgreSQL.
 16. **Did Docker credentials change?** OAuth: `devscimclientsecret`, Legacy: `devscimsharedsecret`, JWT: `devjwtsecretkey123456`. NOT `docker-secret`.
 17. **Did `--no-cache` take excessively long?** ~3-5 min. Cached build is ~30s. Made `--no-cache` optional.

@@ -1,8 +1,8 @@
 # Multi-Endpoint SCIM Guide
 
 > **Status**: Living architecture guide  
-> **Last Updated**: February 23, 2026  
-> **Baseline**: SCIMServer v0.15.0
+> **Last Updated**: March 1, 2026  
+> **Baseline**: SCIMServer (current release)
 
 > Consolidated reference for the multi-endpoint (multi-endpoint) SCIM architecture in SCIMServer.
 
@@ -56,9 +56,9 @@ SCIMServer supports **multi-endpoint isolation** — each endpoint gets a dedica
              ┌───────────────────────────┼───────────────────────────┐
              │                           │                           │
         ┌────▼────┐               ┌──────▼────┐              ┌──────▼──────┐
-        │Endpoint │◄──────────────│ ScimUser  │              │ ScimGroup   │
-        │ Model   │  endpointId   │ Model     │              │ Model       │
-        └─────────┘               └───────────┘              └─────────────┘
+        │Endpoint │◄──────────────│ScimResource│
+        │ Model   │  endpointId   │ (unified)  │
+        └─────────┘               └────────────┘
               Composite Unique Constraints:
               ├─ @@unique([endpointId, scimId])
               ├─ @@unique([endpointId, userName])
@@ -224,7 +224,7 @@ curl -X DELETE "http://localhost:6000/scim/admin/endpoints/$ENDPOINT_ID" \
 
 ```prisma
 model Endpoint {
-  id          String   @id @default(cuid())
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name        String   @unique
   displayName String?
   description String?
@@ -232,16 +232,17 @@ model Endpoint {
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  users       ScimUser[]
-  groups      ScimGroup[]
+  resources   ScimResource[]
   logs        RequestLog[]
 }
 
-// ScimUser and ScimGroup have:
-//   endpointId  String (required FK)
+// ScimResource has:
+//   endpointId    String (required FK)
+//   resourceType  String ('User' / 'Group')
 //   @@unique([endpointId, scimId])
-//   @@unique([endpointId, userName])     (Users only)
-//   @@unique([endpointId, externalId])   (Users only)
+//   @@unique([endpointId, userName])       (CITEXT, case-insensitive)
+//   @@unique([endpointId, displayName])    (CITEXT, case-insensitive)
+//   @@unique([endpointId, resourceType, externalId])
 ```
 
 ---
