@@ -1,7 +1,7 @@
 # SCIMServer — Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.  
-> **Last Updated**: February 27, 2026
+> **Last Updated**: March 1, 2026
 
 ---
 
@@ -259,6 +259,26 @@ POST/PUT payloads auto-strip `mutability:'readOnly'` attrs (`id`, `meta`, `group
 - Middleware: `EndpointContextStorage.createMiddleware()` + `ScimModule.configure()` (Express middleware with `storage.run()`)
 - Feature doc: `docs/READONLY_ATTRIBUTE_STRIPPING_AND_WARNINGS.md`
 
+### 5.9 P2 Attribute Characteristic Enforcement (v0.24.0)
+
+Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
+
+| Item | Description | Key Files |
+|------|-------------|----------|
+| R-RET-1 | Schema-driven `returned:'always'` at projection level — immune to `attributes=`/`excludedAttributes=` | `scim-attribute-projection.ts` |
+| R-RET-2 | Group `active` always returned | `scim-attribute-projection.ts` |
+| R-RET-3 | Sub-attribute `returned:'always'` enforcement (e.g., `emails.value`, `members.value`) | `scim-attribute-projection.ts`, `schema-validator.ts` |
+| R-MUT-1 | `writeOnly` mutability → `returned:never` defense-in-depth | `schema-validator.ts` |
+| R-MUT-2 | readOnly sub-attr stripping within readWrite parents (core+ext, single+multi-valued) | `scim-service-helpers.ts` |
+| R-CASE-1 | caseExact-aware in-memory filter evaluation (`caseExactAttrs` set) | `scim-filter-parser.ts`, `apply-scim-filter.ts` |
+
+**Source files:**
+- Projection: `api/src/modules/scim/common/scim-attribute-projection.ts` (`applyAttributeProjection()` with 6 params, `includeOnly()` with 4 params)
+- Collector: `api/src/domain/validation/schema-validator.ts` (`collectReturnedCharacteristics()` returns `alwaysSubs` map, `collectCaseExactAttributes()`, `collectReadOnlyAttributes()` returns `coreSubAttrs`/`extensionSubAttrs`)
+- Strip helpers: `api/src/modules/scim/common/scim-service-helpers.ts` (`getAlwaysReturnedAttributes()`, `getAlwaysReturnedSubAttrs()`, `getCaseExactAttributes()`)
+- Filter: `api/src/modules/scim/filters/scim-filter-parser.ts` (`compareValues()` with 4th param `caseExact`, `evaluateFilter()` with 3rd param `caseExactAttrs`)
+- Feature doc: `docs/P2_ATTRIBUTE_CHARACTERISTIC_ENFORCEMENT.md`
+
 ---
 
 ## 6. Key Architectural Decisions
@@ -279,7 +299,7 @@ POST/PUT payloads auto-strip `mutability:'readOnly'` attrs (`id`, `meta`, `group
 
 ## 7. Current Compliance Status
 
-### 7.1 SCIM 2.0 Compliance (Current v0.22.0 Baseline)
+### 7.1 SCIM 2.0 Compliance (Current v0.24.0 Baseline)
 
 | Feature | Status |
 |---------|--------|
@@ -297,6 +317,7 @@ POST/PUT payloads auto-strip `mutability:'readOnly'` attrs (`id`, `meta`, `group
 | ✅ `/Me` endpoint | Complete (v0.20.0, JWT sub → userName identity resolution) |
 | ✅ Per-endpoint credentials | Complete (v0.21.0, `PerEndpointCredentialsEnabled` flag, bcrypt tokens, 3-tier fallback) |
 | ✅ ReadOnly attribute stripping | Complete (v0.22.0, RFC 7643 §2.2, `IncludeWarningAboutIgnoredReadOnlyAttribute` + `IgnoreReadOnlyAttributesInPatch` flags, warning URN extension) |
+| ✅ P2 attribute characteristic enforcement | Complete (v0.24.0, 6 behavioral fixes: R-RET-1 schema-driven always-returned, R-RET-2 Group active always, R-RET-3 sub-attr always, R-MUT-1 writeOnly→never, R-MUT-2 readOnly sub-attr stripping, R-CASE-1 caseExact filter) |
 
 ### 7.2 Microsoft Entra ID Compatibility
 
@@ -306,11 +327,11 @@ POST/PUT payloads auto-strip `mutability:'readOnly'` attrs (`id`, `meta`, `group
 
 ---
 
-## 8. Test Coverage (v0.22.0)
+## 8. Test Coverage (v0.24.0)
 
-- **Unit**: 2,532 passing / 2,532 total (73 suites) — **all passing (0 failures)**
-- **E2E**: 539 passing / 539 total (26 suites) — **all passing (0 failures)**
-- **Live integration**: 485 total (expected all passing after SchemaValidator id fix)
+- **Unit**: 2,573 passing / 2,573 total (73 suites) — **all passing (0 failures)**
+- **E2E**: 558 passing / 558 total (27 suites) — **all passing (0 failures)**
+- **Live integration**: 535 total (all passing)
 - **SCIM Validator**: 25/25 required + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
 - Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`

@@ -898,22 +898,22 @@ Nice-to-have enhancements for stricter compliance and cross-resource integrity.
 
 | Priority | Items | Effort | Nature |
 |---|:---:|---|---|
-| P1 — Schema/Discovery | 4 | ~1 hr | Constants file updates |
-| P2 — Behavioral | 6 | ~12 hr | Code changes + tests |
-| P3 — Advanced | 10 | ~23 hr | New features + tests |
-| **Total** | **20** | **~36 hr** | |
+| P1 — Schema/Discovery | 4 | ~1 hr | Constants file updates | ✅ Complete (v0.23.0) |
+| P2 — Behavioral | 6 | ~12 hr | Code changes + tests | ✅ Complete (v0.24.0) |
+| P3 — Advanced | 10 | ~23 hr | New features + tests | Not started |
+| **Total** | **20** | **~36 hr** | | P1+P2 done |
 
 ---
 
 ## Test Coverage Context
 
-Audit performed against the v0.22.0 test baseline:
+Audit performed against the v0.24.0 test baseline (P1+P2 complete):
 
 | Suite | Count | Status |
 |---|:---:|:---:|
-| Unit tests | 2,532 (73 suites) | ✅ All passing |
-| E2E tests | 539 (26 suites) | ✅ All passing |
-| Live integration tests | 485 | ✅ All passing |
+| Unit tests | 2,573 (73 suites) | ✅ All passing |
+| E2E tests | 558 (27 suites) | ✅ All passing |
+| Live integration tests | 535 | ✅ All passing |
 
 Each P1/P2 work item when implemented should include:
 - Unit tests for the specific characteristic enforcement
@@ -954,8 +954,8 @@ Each P1/P2 work item when implemented should include:
 | **Okta** | Strip + warn | ✅ Strip password | Schema-driven | ❌ No | ✅ Yes |
 | **Ping Identity** | Strip + warn | ✅ Strip password | Schema-driven | ❌ No | ✅ Yes |
 | **AWS SSO** | Strip + ignore | ✅ Strip password | Partial | ❌ No | ❌ No |
-| **SCIMServer v0.22.0** | Strip + warn ✅ | ✅ Strip password | Column-type ⚠️ | ❌ No | ❌ No |
+| **SCIMServer v0.24.0** | Strip + warn ✅ | ✅ Strip password | Schema-driven ✅ | ❌ No | ❌ No |
 
 ---
 
-*Document created 2026-03-01, updated 2026-03-01. Covers RFC 7643 §2 attribute characteristics full audit for SCIMServer v0.22.0. Tracks 20 remaining work items for v0.23.0 planning.*
+*Document created 2026-03-01, updated 2026-03-01. Covers RFC 7643 §2 attribute characteristics full audit for SCIMServer v0.24.0. P1 items complete (v0.23.0), P2 behavioral fixes complete (v0.24.0). Tracks 10 remaining P3 work items.*

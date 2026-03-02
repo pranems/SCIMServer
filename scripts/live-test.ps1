@@ -4434,7 +4434,7 @@ $noWarnBody = @{
     }
 } | ConvertTo-Json -Depth 3
 $noWarnEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $noWarnBody
-$noWarnBase = "$baseUrl/endpoints/$($noWarnEp.id)"
+$noWarnBase = "$baseUrl/scim/endpoints/$($noWarnEp.id)"
 $noWarnUserBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
     userName = "nowarn-$(Get-Random)@example.com"
@@ -4454,7 +4454,7 @@ $strictEpBody = @{
     }
 } | ConvertTo-Json -Depth 3
 $strictEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $strictEpBody
-$strictBase = "$baseUrl/endpoints/$($strictEp.id)"
+$strictBase = "$baseUrl/scim/endpoints/$($strictEp.id)"
 $strictUserBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
     userName = "strict-id-test-$(Get-Random)@example.com"
@@ -4495,7 +4495,7 @@ $strictIgnoreBody = @{
     }
 } | ConvertTo-Json -Depth 3
 $strictIgnoreEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $strictIgnoreBody
-$siBase = "$baseUrl/endpoints/$($strictIgnoreEp.id)"
+$siBase = "$baseUrl/scim/endpoints/$($strictIgnoreEp.id)"
 $siUserBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
     userName = "strict-ignore-$(Get-Random)@example.com"
@@ -4525,7 +4525,7 @@ $strictKeepBody = @{
     }
 } | ConvertTo-Json -Depth 3
 $strictKeepEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $strictKeepBody
-$skBase = "$baseUrl/endpoints/$($strictKeepEp.id)"
+$skBase = "$baseUrl/scim/endpoints/$($strictKeepEp.id)"
 $skUserBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
     userName = "strict-keep-$(Get-Random)@example.com"
@@ -4565,6 +4565,235 @@ try { $null = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$($strictIgn
 try { $null = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$($strictKeepEp.id)" -Method DELETE -Headers $headers } catch {}
 
 Write-Host "`n--- 9t: ReadOnly Attribute Stripping Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9u: SCHEMA ATTRIBUTE CHARACTERISTICS (P1 / RFC 7643 §2)
+$script:currentSection = "9u: Schema Attr Characteristics"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9u: SCHEMA ATTRIBUTE CHARACTERISTICS (P1 / RFC 7643 S2)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Fetch User and Group schema definitions
+$userSchemaUri = "urn:ietf:params:scim:schemas:core:2.0:User"
+$groupSchemaUri = "urn:ietf:params:scim:schemas:core:2.0:Group"
+$userSchema = Invoke-RestMethod -Uri "$scimBase/Schemas/$userSchemaUri" -Method GET -Headers $headers
+$groupSchema = Invoke-RestMethod -Uri "$scimBase/Schemas/$groupSchemaUri" -Method GET -Headers $headers
+
+# --- R-SUB-1: caseExact:false on name sub-attributes ---
+Write-Host "`n--- R-SUB-1: caseExact on name sub-attributes ---" -ForegroundColor Cyan
+$nameAttr = $userSchema.attributes | Where-Object { $_.name -eq "name" }
+$nameSubs = @("formatted", "familyName", "givenName", "middleName", "honorificPrefix", "honorificSuffix")
+$allNameCaseExact = $true
+foreach ($subName in $nameSubs) {
+    $sub = $nameAttr.subAttributes | Where-Object { $_.name -eq $subName }
+    if (-not $sub -or $sub.caseExact -ne $false) { $allNameCaseExact = $false }
+}
+Test-Result -Success $allNameCaseExact -Message "9u.1: All name sub-attributes have caseExact:false (R-SUB-1)"
+
+# --- R-SUB-3: caseExact:false on addresses sub-attributes ---
+Write-Host "`n--- R-SUB-3: caseExact on addresses sub-attributes ---" -ForegroundColor Cyan
+$addrAttr = $userSchema.attributes | Where-Object { $_.name -eq "addresses" }
+$addrSubs = @("formatted", "streetAddress", "locality", "region", "postalCode", "country")
+$allAddrCaseExact = $true
+foreach ($subName in $addrSubs) {
+    $sub = $addrAttr.subAttributes | Where-Object { $_.name -eq $subName }
+    if (-not $sub -or $sub.caseExact -ne $false) { $allAddrCaseExact = $false }
+}
+Test-Result -Success $allAddrCaseExact -Message "9u.2: All addresses sub-attributes have caseExact:false (R-SUB-3)"
+
+# --- R-UNIQ-1: uniqueness on externalId and Group displayName ---
+Write-Host "`n--- R-UNIQ-1: uniqueness on key attributes ---" -ForegroundColor Cyan
+$userExtId = $userSchema.attributes | Where-Object { $_.name -eq "externalId" }
+Test-Result -Success ($userExtId.uniqueness -eq "none") -Message "9u.3: User externalId has uniqueness:none (R-UNIQ-1)"
+
+$groupExtId = $groupSchema.attributes | Where-Object { $_.name -eq "externalId" }
+Test-Result -Success ($groupExtId.uniqueness -eq "none") -Message "9u.4: Group externalId has uniqueness:none (R-UNIQ-1)"
+
+$groupDisplayName = $groupSchema.attributes | Where-Object { $_.name -eq "displayName" }
+Test-Result -Success ($groupDisplayName.uniqueness -eq "server") -Message "9u.5: Group displayName has uniqueness:server (R-UNIQ-1)"
+
+# --- R-REF-1: $ref sub-attribute on Group members ---
+Write-Host "`n--- R-REF-1: \$ref sub-attribute on Group members ---" -ForegroundColor Cyan
+$membersAttr = $groupSchema.attributes | Where-Object { $_.name -eq "members" }
+$refSub = $membersAttr.subAttributes | Where-Object { $_.name -eq '$ref' }
+Test-Result -Success ($null -ne $refSub) -Message "9u.6: Group members has \$ref sub-attribute (R-REF-1)"
+Test-Result -Success ($refSub.type -eq "reference") -Message "9u.7: Group members.\$ref type is reference (R-REF-1)"
+Test-Result -Success ($refSub.mutability -eq "immutable") -Message "9u.8: Group members.\$ref mutability is immutable (R-REF-1)"
+$hasUserRef = $refSub.referenceTypes -contains "User"
+$hasGroupRef = $refSub.referenceTypes -contains "Group"
+Test-Result -Success ($hasUserRef -and $hasGroupRef) -Message "9u.9: Group members.\$ref referenceTypes contains User and Group (R-REF-1)"
+
+# Verify total sub-attribute count on members
+$memberSubCount = $membersAttr.subAttributes.Count
+Test-Result -Success ($memberSubCount -eq 4) -Message "9u.10: Group members has 4 sub-attributes (value, \$ref, display, type) (R-REF-1)"
+
+Write-Host "`n--- 9u: Schema Attribute Characteristics Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9v: P2 ATTRIBUTE CHARACTERISTICS (RFC 7643 §2)
+$script:currentSection = "9v: P2 Attr Characteristics"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9v: P2 ATTRIBUTE CHARACTERISTICS (RFC 7643 S2)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# --- Create a test user with enterprise extension for P2 tests ---
+$p2UserPayload = @{
+    schemas = @(
+        "urn:ietf:params:scim:schemas:core:2.0:User",
+        "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+    )
+    userName = "p2-live-test-$(Get-Random)@example.com"
+    active = $true
+    displayName = "P2 Test User"
+    name = @{ givenName = "P2"; familyName = "Test" }
+    emails = @(
+        @{ value = "p2work@example.com"; type = "work"; primary = $true },
+        @{ value = "p2home@example.com"; type = "home"; primary = $false }
+    )
+    password = "P2SecretPassword1!"
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User" = @{
+        department = "Engineering"
+        manager = @{
+            value = "fake-mgr-id"
+            displayName = "Client Supplied Boss"
+        }
+    }
+} | ConvertTo-Json -Depth 5
+
+$p2User = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $p2UserPayload -ContentType "application/scim+json"
+$p2UserId = $p2User.id
+
+# --- R-MUT-1: writeOnly (password) never returned ---
+Write-Host "`n--- R-MUT-1: writeOnly attribute never in response ---" -ForegroundColor Cyan
+Test-Result -Success ($null -eq $p2User.password) -Message "9v.1: POST /Users response does not contain password (R-MUT-1)"
+
+$p2UserGet = Invoke-RestMethod -Uri "$scimBase/Users/$p2UserId" -Method GET -Headers $headers
+Test-Result -Success ($null -eq $p2UserGet.password) -Message "9v.2: GET /Users/:id does not contain password (R-MUT-1)"
+
+$p2UserListPwd = Invoke-RestMethod -Uri "$scimBase/Users?attributes=password,userName&count=1" -Method GET -Headers $headers
+$p2FirstUser = $p2UserListPwd.Resources | Select-Object -First 1
+Test-Result -Success ($null -eq $p2FirstUser.password) -Message "9v.3: GET /Users?attributes=password does not return password (R-MUT-1)"
+
+# --- R-MUT-2: readOnly sub-attr stripping (manager.displayName) ---
+Write-Host "`n--- R-MUT-2: readOnly sub-attr stripping ---" -ForegroundColor Cyan
+# The client supplied manager.displayName, but it should have been stripped
+$p2Ext = $p2UserGet."urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+$managerVal = if ($p2Ext -and $p2Ext.manager) { $p2Ext.manager.value } else { $null }
+$managerDispName = if ($p2Ext -and $p2Ext.manager) { $p2Ext.manager.displayName } else { $null }
+# manager.value should be preserved (readWrite), manager.displayName should be stripped (readOnly)
+Test-Result -Success ($null -ne $managerVal -or $null -eq $managerDispName) -Message "9v.4: manager.displayName (readOnly) stripped from POST, manager.value preserved (R-MUT-2)"
+
+# Test PATCH targeting readOnly sub-attr
+$p2PatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "replace"; path = "displayName"; value = "P2 Updated DisplayName" }
+    )
+} | ConvertTo-Json -Depth 4
+
+$p2PatchResult = Invoke-RestMethod -Uri "$scimBase/Users/$p2UserId" -Method PATCH -Headers $headers -Body $p2PatchBody -ContentType "application/scim+json"
+Test-Result -Success ($p2PatchResult.displayName -eq "P2 Updated DisplayName") -Message "9v.5: PATCH with readWrite path updates correctly (R-MUT-2)"
+
+# --- R-RET-2: Group active always returned ---
+Write-Host "`n--- R-RET-2: Group active always returned ---" -ForegroundColor Cyan
+$p2GroupPayload = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = "P2 Test Group $(Get-Random)"
+} | ConvertTo-Json -Depth 3
+
+$p2Group = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $p2GroupPayload -ContentType "application/scim+json"
+$p2GroupId = $p2Group.id
+
+# active should be present even with excludedAttributes
+$p2GroupExclude = Invoke-RestMethod -Uri "$scimBase/Groups/${p2GroupId}?excludedAttributes=active" -Method GET -Headers $headers
+Test-Result -Success ($null -ne $p2GroupExclude.active) -Message "9v.6: GET /Groups/:id?excludedAttributes=active still returns active (R-RET-2)"
+
+# active should be present with attributes= requesting only displayName
+$p2GroupAttrs = Invoke-RestMethod -Uri "$scimBase/Groups/${p2GroupId}?attributes=displayName" -Method GET -Headers $headers
+Test-Result -Success ($null -ne $p2GroupAttrs.active) -Message "9v.7: GET /Groups/:id?attributes=displayName still includes active (R-RET-2)"
+
+# --- R-RET-1: Schema-driven returned:always (Group displayName) ---
+Write-Host "`n--- R-RET-1: Schema-driven returned:always ---" -ForegroundColor Cyan
+$p2GroupAttrs2 = Invoke-RestMethod -Uri "$scimBase/Groups/${p2GroupId}?attributes=externalId" -Method GET -Headers $headers
+Test-Result -Success ($null -ne $p2GroupAttrs2.displayName) -Message "9v.8: GET /Groups/:id?attributes=externalId still includes displayName (returned:always) (R-RET-1)"
+
+$p2GroupExclude2 = Invoke-RestMethod -Uri "$scimBase/Groups/${p2GroupId}?excludedAttributes=displayName" -Method GET -Headers $headers
+Test-Result -Success ($null -ne $p2GroupExclude2.displayName) -Message "9v.9: GET /Groups/:id?excludedAttributes=displayName still includes displayName (returned:always) (R-RET-1)"
+
+# --- R-RET-3: Sub-attr returned:always (emails.value) ---
+Write-Host "`n--- R-RET-3: Sub-attr returned:always (emails.value) ---" -ForegroundColor Cyan
+$p2UserEmailsType = Invoke-RestMethod -Uri "$scimBase/Users/${p2UserId}?attributes=emails.type" -Method GET -Headers $headers
+$p2EmailItems = $p2UserEmailsType.emails
+$p2HasValue = $true
+if ($p2EmailItems) {
+    foreach ($e in $p2EmailItems) {
+        if ($null -eq $e.value) { $p2HasValue = $false }
+    }
+} else {
+    $p2HasValue = $false
+}
+Test-Result -Success $p2HasValue -Message "9v.10: GET /Users?attributes=emails.type still includes emails.value (returned:always) (R-RET-3)"
+
+# R-RET-3 for Group members.value
+$p2MemberUser = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body (@{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "p2-member-$(Get-Random)@example.com"
+    active = $true
+} | ConvertTo-Json -Depth 3) -ContentType "application/scim+json"
+$p2MemberUserId = $p2MemberUser.id
+
+# Add member to group
+$p2AddMemberBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "add"; path = "members"; value = @(@{ value = $p2MemberUserId }) }
+    )
+} | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Uri "$scimBase/Groups/$p2GroupId" -Method PATCH -Headers $headers -Body $p2AddMemberBody -ContentType "application/scim+json" | Out-Null
+
+$p2GroupMembersDisplay = Invoke-RestMethod -Uri "$scimBase/Groups/${p2GroupId}?attributes=members.display" -Method GET -Headers $headers
+$p2MemberItems = $p2GroupMembersDisplay.members
+$p2MemHasValue = $true
+if ($p2MemberItems) {
+    foreach ($m in $p2MemberItems) {
+        if ($null -eq $m.value) { $p2MemHasValue = $false }
+    }
+} else {
+    $p2MemHasValue = $false
+}
+Test-Result -Success $p2MemHasValue -Message "9v.11: GET /Groups?attributes=members.display still includes members.value (returned:always) (R-RET-3)"
+
+# --- R-CASE-1: caseExact filter behavior ---
+Write-Host "`n--- R-CASE-1: caseExact-aware filter evaluation ---" -ForegroundColor Cyan
+# userName (caseExact:false) should match case-insensitively
+$p2UserName = $p2User.userName
+$p2UpperName = $p2UserName.ToUpper()
+$p2FilterStr = [Uri]::EscapeDataString("userName eq ""$p2UpperName""")
+$p2FilterInsensitive = Invoke-RestMethod -Uri "$scimBase/Users?filter=$p2FilterStr" -Method GET -Headers $headers
+Test-Result -Success ($p2FilterInsensitive.totalResults -ge 1) -Message "9v.12: Filter on userName (caseExact:false) matches case-insensitively (R-CASE-1)"
+
+# externalId (caseExact:true) - create user with specific externalId
+$p2CaseUser = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body (@{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "p2-case-exact-$(Get-Random)@example.com"
+    externalId = "CaseSensitive-ID-ABC"
+    active = $true
+} | ConvertTo-Json -Depth 3) -ContentType "application/scim+json"
+
+$p2ExactFilterStr = [Uri]::EscapeDataString('externalId eq "CaseSensitive-ID-ABC"')
+$p2FilterExact = Invoke-RestMethod -Uri "$scimBase/Users?filter=$p2ExactFilterStr" -Method GET -Headers $headers
+Test-Result -Success ($p2FilterExact.totalResults -ge 1) -Message "9v.13: Filter on externalId (caseExact:true) matches exact case (R-CASE-1)"
+
+# Cleanup P2 test resources
+Write-Host "`n--- 9v: Cleaning up P2 test resources ---" -ForegroundColor Cyan
+try { Invoke-RestMethod -Uri "$scimBase/Users/$p2UserId" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$scimBase/Users/$p2MemberUserId" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$scimBase/Users/$($p2CaseUser.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$scimBase/Groups/$p2GroupId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+Write-Host "`n--- 9v: P2 Attribute Characteristics Tests Complete ---" -ForegroundColor Green
 
 # ============================================
 # TEST SECTION 10: DELETE OPERATIONS

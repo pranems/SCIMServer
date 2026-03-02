@@ -2,7 +2,7 @@
 
 > **Version**: 1.2  
 > **Date**: March 1, 2026  
-> **Status**: Current as-built architecture (v0.23.0)  
+> **Status**: Current as-built architecture (v0.24.0)  
 > **Tech Stack**: NestJS 11 · TypeScript 5 · Prisma 7 · PostgreSQL 17 · React 19 · Vite 7 · Azure Container Apps
 
 ---
@@ -742,7 +742,7 @@ CMD ["node", "dist/main.js"]
 - **Framework**: Jest 30 with `ts-jest` transform
 - **Test Location**: `api/test/` directory
 - **Test Pattern**: `*.spec.ts` and `*.test.ts`
-- **Current matrix**: 2,532 unit (73 suites) + 539 e2e (26 suites) + 485 live integration tests passing
+- **Current matrix**: 2,573 unit (73 suites) + 558 e2e (27 suites) + 535 live integration tests passing
 
 ### 11.2 Test Categories
 

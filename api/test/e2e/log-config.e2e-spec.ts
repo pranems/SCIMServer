@@ -77,7 +77,7 @@ describe('Log Configuration API (E2E)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(res.body.availableCategories).toHaveLength(12);
+      expect(res.body.availableCategories).toHaveLength(11);
       expect(res.body.availableCategories).toContain('http');
       expect(res.body.availableCategories).toContain('scim.user');
       expect(res.body.availableCategories).toContain('scim.patch');
@@ -183,7 +183,7 @@ describe('Log Configuration API (E2E)', () => {
         .expect(200);
 
       expect(res.body.error).toContain("Unknown category 'badcategory'");
-      expect(res.body.availableCategories).toHaveLength(12);
+      expect(res.body.availableCategories).toHaveLength(11);
     });
 
     it('should reflect the change in GET /admin/log-config', async () => {

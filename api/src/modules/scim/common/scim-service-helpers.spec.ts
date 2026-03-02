@@ -500,6 +500,130 @@ describe('stripReadOnlyAttributes', () => {
     expect(payload).not.toHaveProperty('ID');
     expect(payload).not.toHaveProperty('Groups');
   });
+
+  // ─── R-MUT-2: readOnly sub-attributes within readWrite parents ──────
+
+  describe('R-MUT-2: readOnly sub-attrs within readWrite parents', () => {
+    const schemaWithReadOnlySubs = {
+      id: 'urn:ietf:params:scim:schemas:core:2.0:User',
+      attributes: [
+        { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+        {
+          name: 'manager',
+          type: 'complex',
+          multiValued: false,
+          required: false,
+          mutability: 'readWrite',
+          subAttributes: [
+            { name: 'value', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+            { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readOnly' },
+            { name: '$ref', type: 'reference', multiValued: false, required: false, mutability: 'readOnly' },
+          ],
+        },
+        {
+          name: 'emails',
+          type: 'complex',
+          multiValued: true,
+          required: false,
+          mutability: 'readWrite',
+          subAttributes: [
+            { name: 'value', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+            { name: 'display', type: 'string', multiValued: false, required: false, mutability: 'readOnly' },
+            { name: 'type', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+          ],
+        },
+      ],
+    } as const;
+
+    it('should strip readOnly sub-attrs from single complex parent (manager.displayName)', () => {
+      const payload: Record<string, unknown> = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'alice@example.com',
+        manager: { value: 'mgr-1', displayName: 'Boss Man', $ref: 'https://example.com/Users/mgr-1' },
+      };
+
+      const stripped = stripReadOnlyAttributes(payload, [schemaWithReadOnlySubs]);
+
+      expect(stripped).toContain('manager.displayName');
+      expect(stripped).toContain('manager.$ref');
+      const mgr = payload.manager as Record<string, unknown>;
+      expect(mgr).toHaveProperty('value', 'mgr-1');
+      expect(mgr).not.toHaveProperty('displayName');
+      expect(mgr).not.toHaveProperty('$ref');
+    });
+
+    it('should strip readOnly sub-attrs from multi-valued complex parent (emails[].display)', () => {
+      const payload: Record<string, unknown> = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'alice@example.com',
+        emails: [
+          { value: 'a@work.com', type: 'work', display: 'Work Email' },
+          { value: 'a@home.com', type: 'home', display: 'Home Email' },
+        ],
+      };
+
+      const stripped = stripReadOnlyAttributes(payload, [schemaWithReadOnlySubs]);
+
+      expect(stripped).toContain('emails[].display');
+      const emails = payload.emails as Array<Record<string, unknown>>;
+      expect(emails[0]).not.toHaveProperty('display');
+      expect(emails[1]).not.toHaveProperty('display');
+      // readWrite sub-attrs preserved
+      expect(emails[0]).toHaveProperty('value', 'a@work.com');
+      expect(emails[0]).toHaveProperty('type', 'work');
+    });
+
+    it('should not strip readWrite sub-attrs', () => {
+      const payload: Record<string, unknown> = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'alice@example.com',
+        manager: { value: 'mgr-1' },
+      };
+
+      const stripped = stripReadOnlyAttributes(payload, [schemaWithReadOnlySubs]);
+
+      expect(stripped).toHaveLength(0);
+      expect((payload.manager as Record<string, unknown>).value).toBe('mgr-1');
+    });
+
+    const extensionWithReadOnlySubs = {
+      id: 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User',
+      attributes: [
+        {
+          name: 'orgUnit',
+          type: 'complex',
+          multiValued: false,
+          required: false,
+          mutability: 'readWrite',
+          subAttributes: [
+            { name: 'value', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+            { name: 'computedPath', type: 'string', multiValued: false, required: false, mutability: 'readOnly' },
+          ],
+        },
+      ],
+    } as const;
+
+    it('should strip readOnly sub-attrs from extension URN complex parent', () => {
+      const payload: Record<string, unknown> = {
+        schemas: [
+          'urn:ietf:params:scim:schemas:core:2.0:User',
+          'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User',
+        ],
+        userName: 'alice@example.com',
+        'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User': {
+          orgUnit: { value: 'eng-1', computedPath: '/org/eng' },
+        },
+      };
+
+      const stripped = stripReadOnlyAttributes(payload, [schemaWithReadOnlySubs, extensionWithReadOnlySubs]);
+
+      expect(stripped).toContain('urn:ietf:params:scim:schemas:extension:enterprise:2.0:User.orgUnit.computedPath');
+      const ext = payload['urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'] as Record<string, unknown>;
+      const orgUnit = ext.orgUnit as Record<string, unknown>;
+      expect(orgUnit).toHaveProperty('value', 'eng-1');
+      expect(orgUnit).not.toHaveProperty('computedPath');
+    });
+  });
 });
 
 // ─── stripReadOnlyPatchOps ──────────────────────────────────────────────────
@@ -625,5 +749,73 @@ describe('stripReadOnlyPatchOps', () => {
 
     expect(stripped).toHaveLength(0);
     expect(filtered).toHaveLength(1);
+  });
+
+  // ─── R-MUT-2: readOnly sub-attr stripping in PATCH ops ─────────────
+
+  describe('R-MUT-2: readOnly sub-attrs in PATCH ops', () => {
+    const schemaWithSubs = {
+      id: 'urn:ietf:params:scim:schemas:core:2.0:User',
+      attributes: [
+        { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+        {
+          name: 'manager',
+          type: 'complex',
+          multiValued: false,
+          required: false,
+          mutability: 'readWrite',
+          subAttributes: [
+            { name: 'value', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+            { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readOnly' },
+          ],
+        },
+        { name: 'id', type: 'string', multiValued: false, required: true, mutability: 'readOnly' },
+      ],
+    } as const;
+
+    it('should strip path-based ops targeting readOnly sub-attr (manager.displayName)', () => {
+      const ops = [
+        { op: 'replace', path: 'manager.displayName', value: 'New Boss' },
+        { op: 'replace', path: 'manager.value', value: 'mgr-2' },
+      ];
+
+      const { filtered, stripped } = stripReadOnlyPatchOps(ops, [schemaWithSubs]);
+
+      expect(stripped).toEqual(['manager.displayName']);
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0].path).toBe('manager.value');
+    });
+
+    it('should strip readOnly sub-attr keys from no-path replace ops with complex value', () => {
+      const ops = [
+        {
+          op: 'replace',
+          value: {
+            userName: 'alice@example.com',
+            manager: { value: 'mgr-2', displayName: 'New Boss' },
+          },
+        },
+      ];
+
+      const { filtered, stripped } = stripReadOnlyPatchOps(ops, [schemaWithSubs]);
+
+      expect(stripped).toContain('manager.displayName');
+      expect(filtered).toHaveLength(1);
+      const val = filtered[0].value as Record<string, unknown>;
+      const mgr = val.manager as Record<string, unknown>;
+      expect(mgr).toHaveProperty('value', 'mgr-2');
+      expect(mgr).not.toHaveProperty('displayName');
+    });
+
+    it('should pass through readWrite sub-attrs unchanged', () => {
+      const ops = [
+        { op: 'replace', path: 'manager.value', value: 'mgr-3' },
+      ];
+
+      const { filtered, stripped } = stripReadOnlyPatchOps(ops, [schemaWithSubs]);
+
+      expect(stripped).toHaveLength(0);
+      expect(filtered).toHaveLength(1);
+    });
   });
 });

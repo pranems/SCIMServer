@@ -73,7 +73,7 @@ export interface UserFilterResult {
  * columns and compound AND/OR expressions to the database. Only falls back
  * to in-memory for valuePath, not(), or un-mapped attribute paths.
  */
-export function buildUserFilter(filter?: string): UserFilterResult {
+export function buildUserFilter(filter?: string, caseExactAttrs?: Set<string>): UserFilterResult {
   if (!filter) {
     return { dbWhere: {}, fetchAll: false };
   }
@@ -85,7 +85,7 @@ export function buildUserFilter(filter?: string): UserFilterResult {
     throw new Error(`Invalid filter: ${filter}`);
   }
 
-  return buildFilterResult(ast, USER_DB_COLUMNS);
+  return buildFilterResult(ast, USER_DB_COLUMNS, caseExactAttrs);
 }
 
 // ─── Groups ──────────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ export interface GroupFilterResult {
   fetchAll: boolean;
 }
 
-export function buildGroupFilter(filter?: string): GroupFilterResult {
+export function buildGroupFilter(filter?: string, caseExactAttrs?: Set<string>): GroupFilterResult {
   if (!filter) {
     return { dbWhere: {}, fetchAll: false };
   }
@@ -121,7 +121,7 @@ export function buildGroupFilter(filter?: string): GroupFilterResult {
     throw new Error(`Invalid filter: ${filter}`);
   }
 
-  return buildFilterResult(ast, GROUP_DB_COLUMNS);
+  return buildFilterResult(ast, GROUP_DB_COLUMNS, caseExactAttrs);
 }
 
 // ─── Shared ──────────────────────────────────────────────────────────────────
@@ -133,6 +133,7 @@ export function buildGroupFilter(filter?: string): GroupFilterResult {
 function buildFilterResult(
   ast: FilterNode,
   columnMap: ColumnMap,
+  caseExactAttrs?: Set<string>,
 ): { dbWhere: Record<string, unknown>; inMemoryFilter?: (r: Record<string, unknown>) => boolean; fetchAll: boolean } {
   const dbClause = tryPushToDb(ast, columnMap);
   if (dbClause) {
@@ -143,7 +144,7 @@ function buildFilterResult(
   return {
     dbWhere: {},
     fetchAll: true,
-    inMemoryFilter: (resource) => evaluateFilter(ast, resource),
+    inMemoryFilter: (resource) => evaluateFilter(ast, resource, caseExactAttrs),
   };
 }
 

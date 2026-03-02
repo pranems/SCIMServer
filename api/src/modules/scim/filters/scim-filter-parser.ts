@@ -445,8 +445,9 @@ function resolveSimplePath(obj: Record<string, unknown>, path: string): unknown 
 /**
  * Compare two values according to SCIM comparison rules.
  * String comparisons are case-insensitive by default (caseExact=false per RFC 7643 §2.2).
+ * When caseExact=true, string comparisons are case-sensitive.
  */
-function compareValues(op: ScimCompareOp, actual: unknown, expected: unknown): boolean {
+function compareValues(op: ScimCompareOp, actual: unknown, expected: unknown, caseExact = false): boolean {
   // "pr" (presence) — attribute has a non-null, non-empty value
   if (op === 'pr') {
     if (actual === undefined || actual === null) return false;
@@ -455,9 +456,9 @@ function compareValues(op: ScimCompareOp, actual: unknown, expected: unknown): b
     return true;
   }
 
-  // Normalize strings for case-insensitive comparison (SCIM default)
-  const normActual = typeof actual === 'string' ? actual.toLowerCase() : actual;
-  const normExpected = typeof expected === 'string' ? expected.toLowerCase() : expected;
+  // Normalize strings for case-insensitive comparison (SCIM default), unless caseExact
+  const normActual = typeof actual === 'string' && !caseExact ? actual.toLowerCase() : actual;
+  const normExpected = typeof expected === 'string' && !caseExact ? expected.toLowerCase() : expected;
 
   switch (op) {
     case 'eq':
@@ -518,47 +519,50 @@ function compareValues(op: ScimCompareOp, actual: unknown, expected: unknown): b
  *
  * @param node — The root AST node from parseScimFilter()
  * @param resource — The SCIM resource to test
+ * @param caseExactAttrs — Optional set of lowercase attribute names/paths that are caseExact:true (R-CASE-1)
  * @returns true if the resource matches the filter
  *
  * @example
  *   const ast = parseScimFilter('userName eq "john" and active eq true');
  *   evaluateFilter(ast, { userName: 'John', active: true }); // → true
  */
-export function evaluateFilter(node: FilterNode, resource: Record<string, unknown>): boolean {
+export function evaluateFilter(
+  node: FilterNode,
+  resource: Record<string, unknown>,
+  caseExactAttrs?: Set<string>,
+): boolean {
   switch (node.type) {
     case 'compare': {
       const actual = resolveAttrPath(resource, node.attrPath);
+      // R-CASE-1: Check if this attribute is caseExact
+      const isCaseExact = caseExactAttrs?.has(node.attrPath.toLowerCase()) ?? false;
       // Multi-valued attributes: match if ANY element matches (RFC 7644 §3.4.2.2)
       if (Array.isArray(actual)) {
         return actual.some(item => {
           if (typeof item === 'object' && item !== null) {
-            // For complex multi-valued (e.g., emails), compare sub-attribute if path is simple
-            // If the comparison is on the array itself (e.g., "emails pr"), check presence
-            return compareValues(node.op, item, node.value);
+            return compareValues(node.op, item, node.value, isCaseExact);
           }
-          return compareValues(node.op, item, node.value);
+          return compareValues(node.op, item, node.value, isCaseExact);
         });
       }
-      return compareValues(node.op, actual, node.value);
+      return compareValues(node.op, actual, node.value, isCaseExact);
     }
 
     case 'logical':
       if (node.op === 'and') {
-        return evaluateFilter(node.left, resource) && evaluateFilter(node.right, resource);
+        return evaluateFilter(node.left, resource, caseExactAttrs) && evaluateFilter(node.right, resource, caseExactAttrs);
       }
-      return evaluateFilter(node.left, resource) || evaluateFilter(node.right, resource);
+      return evaluateFilter(node.left, resource, caseExactAttrs) || evaluateFilter(node.right, resource, caseExactAttrs);
 
     case 'not':
-      return !evaluateFilter(node.filter, resource);
+      return !evaluateFilter(node.filter, resource, caseExactAttrs);
 
     case 'valuePath': {
-      // attrPath[valFilter] — e.g., emails[type eq "work"]
-      // Resolve the multi-valued attribute, filter by sub-expression
       const array = resolveAttrPath(resource, node.attrPath);
       if (!Array.isArray(array)) return false;
       return array.some(item => {
         if (typeof item !== 'object' || item === null) return false;
-        return evaluateFilter(node.filter, item as Record<string, unknown>);
+        return evaluateFilter(node.filter, item as Record<string, unknown>, caseExactAttrs);
       });
     }
 

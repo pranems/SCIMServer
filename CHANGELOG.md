@@ -5,6 +5,37 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.24.0] - 2026-03-01
+
+### Added — P2 Attribute Characteristics (RFC 7643 §2)
+
+Six P2 behavioral gap fixes from the RFC 7643 §2 attribute characteristics audit:
+
+- **R-RET-1**: Schema-driven `returned:'always'` at projection level — attributes marked `returned:'always'` in schema definitions are now always included in responses, immune to `attributes=` filtering and `excludedAttributes=` exclusion.
+- **R-RET-2**: Group `active` always returned — the Group schema's `active` attribute (returned:'always') is now preserved in all Group responses regardless of projection parameters.
+- **R-RET-3**: Sub-attribute `returned:'always'` enforcement — sub-attributes like `emails.value` and `members.value` with returned:'always' are now included even when only sibling sub-attributes are requested (e.g., `?attributes=emails.type` now includes `emails.value`).
+- **R-MUT-1**: `writeOnly` mutability → `returned:never` defense-in-depth — attributes with `mutability:'writeOnly'` are now also added to the `never` set in `collectReturnedCharacteristics()`, ensuring they never appear in responses even if `returned` is not explicitly `'never'`.
+- **R-MUT-2**: readOnly sub-attribute stripping — `stripReadOnlyAttributes()` and `stripReadOnlyPatchOps()` now strip readOnly sub-attributes within readWrite parents (e.g., `manager.displayName`) on POST/PUT/PATCH, per RFC 7643 §2.2. Covers core and extension schemas, single-valued and multi-valued complex attributes.
+- **R-CASE-1**: caseExact-aware in-memory filter evaluation — `evaluateFilter()` now accepts an optional `caseExactAttrs` set and performs case-sensitive comparisons for attributes with `caseExact:true` (e.g., `id`, `externalId`, `meta.location`). Non-caseExact attributes remain case-insensitive per SCIM default.
+
+### Bug Fixes — Live Test Script
+- **URL prefix fix**: 4 test base URLs in section 9t (tests 9t.5–9t.9) used `$baseUrl/endpoints/$id` instead of `$baseUrl/scim/endpoints/$id`, causing a 404 crash that silently skipped all subsequent tests. Fixed by adding the `/scim/` prefix.
+- **PowerShell escaping fix**: Nested `[Uri]::EscapeDataString()` inside double-quoted strings in section 9v (tests 9v.12–9v.13) caused parser errors. Refactored to use intermediate variables.
+- **Live test count**: Corrected from 498 → **535** (37 tests were always in the script but never ran due to the 9t.5 crash).
+
+### Test Coverage
+- **Unit tests**: 2,573 passed (73 suites) — +34 new P2 tests
+- **E2E tests**: 558 passed (27 suites) — +13 new P2 E2E tests
+- **Live tests**: 535 passed — Section 9v added with 13 tests covering all 6 P2 items; 37 previously-skipped tests in 9t/9u/9v now executing after URL prefix fix
+
+### Files Modified
+- `schema-validator.ts` — R-MUT-1 (writeOnly→never), R-MUT-2 (collectReadOnlyAttributes sub-attrs), R-RET-3 (alwaysSubs), R-CASE-1 (collectCaseExactAttributes)
+- `scim-attribute-projection.ts` — R-RET-1 (schema always), R-RET-2 (Group active), R-RET-3 (sub-attr always in projection including multi-valued)
+- `scim-service-helpers.ts` — R-RET-1/R-RET-3 (expose always sets/maps), R-MUT-2 (strip readOnly sub-attrs on POST/PUT/PATCH), R-CASE-1 (getCaseExactAttributes)
+- `scim-filter-parser.ts` — R-CASE-1 (caseExact param in compareValues + evaluateFilter)
+- `apply-scim-filter.ts` — R-CASE-1 (caseExactAttrs pass-through)
+- All 3 controllers + 2 services — R-RET-1/R-RET-3 (pass always sets + alwaysSubs), R-CASE-1 (pass caseExactAttrs to filter)
+
 ## [0.23.0] - 2026-03-01
 
 ### Removed — Blob/BackupService Dead Code Elimination

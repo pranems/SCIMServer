@@ -1022,22 +1022,41 @@ export class SchemaValidator {
    */
   static collectReturnedCharacteristics(
     schemas: readonly SchemaDefinition[],
-  ): { never: Set<string>; request: Set<string> } {
+  ): { never: Set<string>; request: Set<string>; always: Set<string>; alwaysSubs: Map<string, Set<string>> } {
     const never = new Set<string>();
     const request = new Set<string>();
+    const always = new Set<string>();
+    // R-RET-3: Sub-attr returned:'always' — map of parentAttrLower → Set<subAttrNameLower>
+    const alwaysSubs = new Map<string, Set<string>>();
 
-    const collect = (attrs: readonly SchemaAttributeDefinition[]): void => {
+    const collect = (attrs: readonly SchemaAttributeDefinition[], parentName?: string): void => {
       for (const attr of attrs) {
         const returned = attr.returned?.toLowerCase();
+        const mutability = attr.mutability?.toLowerCase();
         if (returned === 'never') {
           never.add(attr.name.toLowerCase());
         } else if (returned === 'request') {
           request.add(attr.name.toLowerCase());
+        } else if (returned === 'always') {
+          if (parentName) {
+            // R-RET-3: Sub-attribute with returned:'always'
+            if (!alwaysSubs.has(parentName)) {
+              alwaysSubs.set(parentName, new Set());
+            }
+            alwaysSubs.get(parentName)!.add(attr.name.toLowerCase());
+          } else {
+            always.add(attr.name.toLowerCase());
+          }
+        }
+        // R-MUT-1: writeOnly mutability implies returned:never as defense-in-depth
+        // Even if returned is not explicitly 'never', writeOnly values MUST NOT appear in responses
+        if (mutability === 'writeonly') {
+          never.add(attr.name.toLowerCase());
         }
         // Sub-attributes inherit parent returned if not specified,
         // but individual sub-attrs can override — collect those too
         if (attr.subAttributes) {
-          collect(attr.subAttributes);
+          collect(attr.subAttributes, attr.name.toLowerCase());
         }
       }
     };
@@ -1046,7 +1065,43 @@ export class SchemaValidator {
       collect(schema.attributes);
     }
 
-    return { never, request };
+    return { never, request, always, alwaysSubs };
+  }
+
+  // ─── CaseExact attribute collection (R-CASE-1) ───────────────────
+
+  /**
+   * Collect all attribute names/paths with `caseExact: true` from the schemas.
+   * Returns a Set of lowercase attribute paths (e.g., 'id', 'meta.location', 'emails.value').
+   * Sub-attributes use dotted path notation: 'parentAttr.subAttr'.
+   *
+   * Used by in-memory filter evaluation to determine case-sensitive comparison.
+   *
+   * @param schemas  Core + extension schema definitions
+   * @returns Set of lowercase paths for caseExact:true attributes
+   */
+  static collectCaseExactAttributes(
+    schemas: readonly SchemaDefinition[],
+  ): Set<string> {
+    const result = new Set<string>();
+
+    const collect = (attrs: readonly SchemaAttributeDefinition[], prefix = ''): void => {
+      for (const attr of attrs) {
+        const fullPath = prefix ? `${prefix}.${attr.name.toLowerCase()}` : attr.name.toLowerCase();
+        if (attr.caseExact === true) {
+          result.add(fullPath);
+        }
+        if (attr.subAttributes) {
+          collect(attr.subAttributes, attr.name.toLowerCase());
+        }
+      }
+    };
+
+    for (const schema of schemas) {
+      collect(schema.attributes);
+    }
+
+    return result;
   }
 
   // ─── ReadOnly attribute collection (for strip helpers) ────────────
@@ -1065,31 +1120,59 @@ export class SchemaValidator {
    */
   static collectReadOnlyAttributes(
     schemas: readonly SchemaDefinition[],
-  ): { core: Set<string>; extensions: Map<string, Set<string>> } {
+  ): { core: Set<string>; extensions: Map<string, Set<string>>; coreSubAttrs: Map<string, Set<string>>; extensionSubAttrs: Map<string, Map<string, Set<string>>> } {
     const core = new Set<string>();
     const extensions = new Map<string, Set<string>>();
+    // R-MUT-2: readOnly sub-attrs within readWrite parents (dotted paths)
+    const coreSubAttrs = new Map<string, Set<string>>();
+    const extensionSubAttrs = new Map<string, Map<string, Set<string>>>();
 
     for (const schema of schemas) {
       if (schema.id.startsWith('urn:ietf:params:scim:schemas:core:')) {
         for (const attr of schema.attributes) {
           if (attr.mutability === 'readOnly') {
             core.add(attr.name.toLowerCase());
+          } else if (attr.subAttributes) {
+            // R-MUT-2: Collect readOnly sub-attrs within non-readOnly parents
+            for (const sub of attr.subAttributes) {
+              if (sub.mutability === 'readOnly') {
+                const parentKey = attr.name.toLowerCase();
+                if (!coreSubAttrs.has(parentKey)) {
+                  coreSubAttrs.set(parentKey, new Set());
+                }
+                coreSubAttrs.get(parentKey)!.add(sub.name.toLowerCase());
+              }
+            }
           }
         }
       } else {
         const extSet = new Set<string>();
+        const extSubMap = new Map<string, Set<string>>();
         for (const attr of schema.attributes) {
           if (attr.mutability === 'readOnly') {
             extSet.add(attr.name.toLowerCase());
+          } else if (attr.subAttributes) {
+            for (const sub of attr.subAttributes) {
+              if (sub.mutability === 'readOnly') {
+                const parentKey = attr.name.toLowerCase();
+                if (!extSubMap.has(parentKey)) {
+                  extSubMap.set(parentKey, new Set());
+                }
+                extSubMap.get(parentKey)!.add(sub.name.toLowerCase());
+              }
+            }
           }
         }
         if (extSet.size > 0) {
           extensions.set(schema.id, extSet);
         }
+        if (extSubMap.size > 0) {
+          extensionSubAttrs.set(schema.id, extSubMap);
+        }
       }
     }
 
-    return { core, extensions };
+    return { core, extensions, coreSubAttrs, extensionSubAttrs };
   }
 
   // ─── G8c: PATCH path utilities ────────────────────────────────────

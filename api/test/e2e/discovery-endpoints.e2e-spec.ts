@@ -92,6 +92,64 @@ describe('Discovery Endpoints (E2E)', () => {
       expect(res.body.totalResults).toBeGreaterThanOrEqual(3);
       expect(res.body.Resources.length).toBeGreaterThanOrEqual(3);
     });
+
+    // ─── P1: Schema attribute characteristics compliance ─────────────
+
+    it('should include caseExact:false on all User name sub-attributes (R-SUB-1)', async () => {
+      const res = await scimGet(app, `${basePath}/Schemas/urn:ietf:params:scim:schemas:core:2.0:User`, token).expect(200);
+      const nameAttr = res.body.attributes.find((a: any) => a.name === 'name');
+      expect(nameAttr).toBeDefined();
+      const expectedSubs = ['formatted', 'familyName', 'givenName', 'middleName', 'honorificPrefix', 'honorificSuffix'];
+      for (const subName of expectedSubs) {
+        const sub = nameAttr.subAttributes.find((s: any) => s.name === subName);
+        expect(sub).toBeDefined();
+        expect(sub.caseExact).toBe(false);
+      }
+    });
+
+    it('should include caseExact:false on all User addresses sub-attributes (R-SUB-3)', async () => {
+      const res = await scimGet(app, `${basePath}/Schemas/urn:ietf:params:scim:schemas:core:2.0:User`, token).expect(200);
+      const addrAttr = res.body.attributes.find((a: any) => a.name === 'addresses');
+      expect(addrAttr).toBeDefined();
+      const expectedSubs = ['formatted', 'streetAddress', 'locality', 'region', 'postalCode', 'country'];
+      for (const subName of expectedSubs) {
+        const sub = addrAttr.subAttributes.find((s: any) => s.name === subName);
+        expect(sub).toBeDefined();
+        expect(sub.caseExact).toBe(false);
+      }
+    });
+
+    it('should include uniqueness:none on User externalId (R-UNIQ-1)', async () => {
+      const res = await scimGet(app, `${basePath}/Schemas/urn:ietf:params:scim:schemas:core:2.0:User`, token).expect(200);
+      const extId = res.body.attributes.find((a: any) => a.name === 'externalId');
+      expect(extId).toBeDefined();
+      expect(extId.uniqueness).toBe('none');
+    });
+
+    it('should include $ref sub-attribute on Group members with referenceTypes (R-REF-1)', async () => {
+      const res = await scimGet(app, `${basePath}/Schemas/urn:ietf:params:scim:schemas:core:2.0:Group`, token).expect(200);
+      const membersAttr = res.body.attributes.find((a: any) => a.name === 'members');
+      expect(membersAttr).toBeDefined();
+      const refSub = membersAttr.subAttributes.find((s: any) => s.name === '$ref');
+      expect(refSub).toBeDefined();
+      expect(refSub.type).toBe('reference');
+      expect(refSub.mutability).toBe('immutable');
+      expect(refSub.referenceTypes).toEqual(['User', 'Group']);
+    });
+
+    it('should include uniqueness:server on Group displayName (R-UNIQ-1)', async () => {
+      const res = await scimGet(app, `${basePath}/Schemas/urn:ietf:params:scim:schemas:core:2.0:Group`, token).expect(200);
+      const displayName = res.body.attributes.find((a: any) => a.name === 'displayName');
+      expect(displayName).toBeDefined();
+      expect(displayName.uniqueness).toBe('server');
+    });
+
+    it('should include uniqueness:none on Group externalId (R-UNIQ-1)', async () => {
+      const res = await scimGet(app, `${basePath}/Schemas/urn:ietf:params:scim:schemas:core:2.0:Group`, token).expect(200);
+      const extId = res.body.attributes.find((a: any) => a.name === 'externalId');
+      expect(extId).toBeDefined();
+      expect(extId.uniqueness).toBe('none');
+    });
   });
 
   // ───────────── ResourceTypes ─────────────

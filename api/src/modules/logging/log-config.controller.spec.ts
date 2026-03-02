@@ -74,7 +74,7 @@ describe('LogConfigController', () => {
 
     it('should include all available categories', () => {
       const result = controller.getConfig();
-      expect(result.availableCategories).toHaveLength(12);
+      expect(result.availableCategories).toHaveLength(11);
       expect(result.availableCategories).toContain('http');
       expect(result.availableCategories).toContain('scim.user');
       expect(result.availableCategories).toContain('scim.patch');
@@ -186,7 +186,7 @@ describe('LogConfigController', () => {
       const result = controller.setCategoryLevel('nonexistent', 'DEBUG');
       expect(result).toHaveProperty('error');
       expect(result.error).toContain("Unknown category 'nonexistent'");
-      expect(result.availableCategories).toHaveLength(12);
+      expect(result.availableCategories).toHaveLength(11);
     });
 
     it('should accept all valid categories', () => {

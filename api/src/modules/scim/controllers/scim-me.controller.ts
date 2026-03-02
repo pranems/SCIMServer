@@ -163,7 +163,9 @@ export class ScimMeController {
     const scimId = await this.resolveAuthenticatedScimId(req as AuthenticatedRequest, endpointId, baseUrl, config);
     const result = await this.usersService.getUserForEndpoint(scimId, baseUrl, endpointId, config);
     const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
-    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs);
+    const alwaysReturnedAttrs = this.usersService.getAlwaysReturnedAttributes(endpointId);
+    const alwaysReturnedSubs = this.usersService.getAlwaysReturnedSubAttrs(endpointId);
+    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
   }
 
   /**
@@ -185,7 +187,9 @@ export class ScimMeController {
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.usersService.replaceUserForEndpoint(scimId, dto, baseUrl, endpointId, config, ifMatch);
     const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
-    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs);
+    const alwaysReturnedAttrs = this.usersService.getAlwaysReturnedAttributes(endpointId);
+    const alwaysReturnedSubs = this.usersService.getAlwaysReturnedSubAttrs(endpointId);
+    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
   }
 
   /**
@@ -207,7 +211,9 @@ export class ScimMeController {
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.usersService.patchUserForEndpoint(scimId, dto, baseUrl, endpointId, config, ifMatch);
     const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
-    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs);
+    const alwaysReturnedAttrs = this.usersService.getAlwaysReturnedAttributes(endpointId);
+    const alwaysReturnedSubs = this.usersService.getAlwaysReturnedSubAttrs(endpointId);
+    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
   }
 
   /**

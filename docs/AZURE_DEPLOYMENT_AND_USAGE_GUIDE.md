@@ -583,7 +583,7 @@ az monitor log-analytics query `
 | VNet / DNS | ~$0.50 |
 | **Total** | **~$19–38/month** |
 
-> **Phase 3 (v0.23.0):** Replaced Blob Storage + Private Endpoint with PG Flexible Server.
+> **Phase 3 (v0.24.0):** Replaced Blob Storage + Private Endpoint with PG Flexible Server.
 > PostgreSQL WAL backup (daily full + 7-day PITR) is fully automated by Azure at no extra config.
 > Net cost vs SQLite era: ~$5–10/mo more, offset by zero data loss risk and multi-replica support.
 
