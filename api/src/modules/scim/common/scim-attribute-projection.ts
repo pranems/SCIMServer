@@ -34,8 +34,18 @@
  */
 const ALWAYS_RETURNED_BASE = new Set(['schemas', 'id', 'meta', 'username']);
 
-function getAlwaysReturnedForResource(resource: Record<string, unknown>): Set<string> {
+function getAlwaysReturnedForResource(
+  resource: Record<string, unknown>,
+  schemaAlwaysReturned?: Set<string>,
+): Set<string> {
   const alwaysReturned = new Set(ALWAYS_RETURNED_BASE);
+
+  // Merge schema-driven always-returned attributes (R-RET-1)
+  if (schemaAlwaysReturned) {
+    for (const attr of schemaAlwaysReturned) {
+      alwaysReturned.add(attr);
+    }
+  }
 
   const meta = resource['meta'];
   const resourceType =
@@ -53,6 +63,7 @@ function getAlwaysReturnedForResource(resource: Record<string, unknown>): Set<st
 
   if (isGroupByMeta || isGroupBySchema) {
     alwaysReturned.add('displayname');
+    alwaysReturned.add('active');
   }
 
   return alwaysReturned;
@@ -65,6 +76,8 @@ function getAlwaysReturnedForResource(resource: Record<string, unknown>): Set<st
  * @param attributes  Comma-separated list of attribute names to include (undefined = all)
  * @param excludedAttributes  Comma-separated list of attribute names to exclude (undefined = none)
  * @param requestOnlyAttrs  Set of lowercase attribute names with returned:'request' — stripped unless in `attributes`
+ * @param schemaAlwaysReturned  Optional Set of lowercase attribute names with returned:'always' from schema definitions
+ * @param alwaysSubs  Optional Map of parent attr → Set of sub-attr names with returned:'always' (R-RET-3)
  * @returns A new object with only the requested attributes
  *
  * Per RFC 7644 §3.4.2.5: If both are specified, attributes takes precedence.
@@ -74,14 +87,16 @@ export function applyAttributeProjection(
   attributes?: string,
   excludedAttributes?: string,
   requestOnlyAttrs?: Set<string>,
+  schemaAlwaysReturned?: Set<string>,
+  alwaysSubs?: Map<string, Set<string>>,
 ): Record<string, unknown> {
   let result = resource;
 
   // "attributes" takes precedence over "excludedAttributes" per RFC
   if (attributes) {
-    result = includeOnly(resource, parseAttrList(attributes));
+    result = includeOnly(resource, parseAttrList(attributes), schemaAlwaysReturned, alwaysSubs);
   } else if (excludedAttributes) {
-    result = excludeAttrs(resource, parseAttrList(excludedAttributes));
+    result = excludeAttrs(resource, parseAttrList(excludedAttributes), schemaAlwaysReturned);
   }
 
   // Strip returned:'request' attributes (unless explicitly named in `attributes`)
@@ -101,12 +116,14 @@ export function applyAttributeProjectionToList<T extends Record<string, unknown>
   attributes?: string,
   excludedAttributes?: string,
   requestOnlyAttrs?: Set<string>,
+  schemaAlwaysReturned?: Set<string>,
+  alwaysSubs?: Map<string, Set<string>>,
 ): Record<string, unknown>[] {
   if (!attributes && !excludedAttributes && (!requestOnlyAttrs || requestOnlyAttrs.size === 0)) {
     return resources;
   }
 
-  return resources.map(r => applyAttributeProjection(r, attributes, excludedAttributes, requestOnlyAttrs));
+  return resources.map(r => applyAttributeProjection(r, attributes, excludedAttributes, requestOnlyAttrs, schemaAlwaysReturned, alwaysSubs));
 }
 
 /**
@@ -199,9 +216,11 @@ function parseAttrList(raw: string): Set<string> {
 function includeOnly(
   resource: Record<string, unknown>,
   attrs: Set<string>,
+  schemaAlwaysReturned?: Set<string>,
+  alwaysSubs?: Map<string, Set<string>>,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
-  const alwaysReturned = getAlwaysReturnedForResource(resource);
+  const alwaysReturned = getAlwaysReturnedForResource(resource, schemaAlwaysReturned);
 
   // Always include "always returned" attributes
   for (const key of alwaysReturned) {
@@ -240,15 +259,38 @@ function includeOnly(
     } else {
       // Include only sub-attributes
       const value = resource[key];
+
+      // R-RET-3: Merge in always-returned sub-attrs for this parent
+      const alwaysSubsForAttr = alwaysSubs?.get(attrLower);
+      const effectiveSubs = new Set(subs);
+      if (alwaysSubsForAttr) {
+        for (const alwaysSub of alwaysSubsForAttr) {
+          effectiveSubs.add(alwaysSub);
+        }
+      }
+
       if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
         const filtered: Record<string, unknown> = {};
-        for (const sub of subs) {
+        for (const sub of effectiveSubs) {
           const subKey = findKey(value as Record<string, unknown>, sub);
           if (subKey !== undefined) {
             filtered[subKey] = (value as Record<string, unknown>)[subKey];
           }
         }
         result[key] = filtered;
+      } else if (Array.isArray(value)) {
+        // R-RET-3: For multi-valued complex attrs (e.g., emails[]), filter each item
+        result[key] = value.map(item => {
+          if (typeof item !== 'object' || item === null) return item;
+          const filtered: Record<string, unknown> = {};
+          for (const sub of effectiveSubs) {
+            const subKey = findKey(item as Record<string, unknown>, sub);
+            if (subKey !== undefined) {
+              filtered[subKey] = (item as Record<string, unknown>)[subKey];
+            }
+          }
+          return filtered;
+        });
       } else {
         result[key] = value;
       }
@@ -265,9 +307,10 @@ function includeOnly(
 function excludeAttrs(
   resource: Record<string, unknown>,
   attrs: Set<string>,
+  schemaAlwaysReturned?: Set<string>,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = { ...resource };
-  const alwaysReturned = getAlwaysReturnedForResource(resource);
+  const alwaysReturned = getAlwaysReturnedForResource(resource, schemaAlwaysReturned);
 
   // Group by top-level
   const topLevel = new Map<string, Set<string> | null>();

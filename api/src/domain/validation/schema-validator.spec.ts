@@ -891,4 +891,226 @@ describe('SchemaValidator', () => {
       expect(result.errors).toHaveLength(1);
     });
   });
+
+  // ── P2 R-MUT-1: writeOnly → returned:never defense-in-depth ─────────
+
+  describe('collectReturnedCharacteristics — R-MUT-1 writeOnly', () => {
+    it('should add writeOnly mutability attrs to never set even without explicit returned:never', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'password', mutability: 'writeOnly', returned: 'default' }),
+        makeAttr({ name: 'userName', mutability: 'readWrite', returned: 'always' }),
+      ]);
+
+      const result = SchemaValidator.collectReturnedCharacteristics([schema]);
+
+      expect(result.never.has('password')).toBe(true);
+      expect(result.never.has('username')).toBe(false);
+      expect(result.always.has('username')).toBe(true);
+    });
+
+    it('should add writeOnly to never set even when returned is explicitly never', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'secret', mutability: 'writeOnly', returned: 'never' }),
+      ]);
+
+      const result = SchemaValidator.collectReturnedCharacteristics([schema]);
+
+      expect(result.never.has('secret')).toBe(true);
+    });
+
+    it('should not treat readWrite or readOnly attrs as never', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'displayName', mutability: 'readWrite', returned: 'default' }),
+        makeAttr({ name: 'groups', mutability: 'readOnly', returned: 'default' }),
+      ]);
+
+      const result = SchemaValidator.collectReturnedCharacteristics([schema]);
+
+      expect(result.never.has('displayname')).toBe(false);
+      expect(result.never.has('groups')).toBe(false);
+    });
+  });
+
+  // ── P2 R-RET-3: alwaysSubs collection ──────────────────────────────
+
+  describe('collectReturnedCharacteristics — R-RET-3 alwaysSubs', () => {
+    it('should collect sub-attrs with returned:always into alwaysSubs map', () => {
+      const schema = makeCoreSchema([
+        makeAttr({
+          name: 'emails',
+          type: 'complex',
+          multiValued: true,
+          subAttributes: [
+            makeAttr({ name: 'value', returned: 'always' }),
+            makeAttr({ name: 'type', returned: 'default' }),
+            makeAttr({ name: 'display', returned: 'request' }),
+          ],
+        }),
+      ]);
+
+      const result = SchemaValidator.collectReturnedCharacteristics([schema]);
+
+      expect(result.alwaysSubs.has('emails')).toBe(true);
+      expect(result.alwaysSubs.get('emails')!.has('value')).toBe(true);
+      expect(result.alwaysSubs.get('emails')!.has('type')).toBe(false);
+    });
+
+    it('should not add parent to alwaysSubs when no sub-attrs have returned:always', () => {
+      const schema = makeCoreSchema([
+        makeAttr({
+          name: 'name',
+          type: 'complex',
+          subAttributes: [
+            makeAttr({ name: 'givenName', returned: 'default' }),
+            makeAttr({ name: 'familyName', returned: 'default' }),
+          ],
+        }),
+      ]);
+
+      const result = SchemaValidator.collectReturnedCharacteristics([schema]);
+
+      expect(result.alwaysSubs.has('name')).toBe(false);
+    });
+  });
+
+  // ── P2 R-CASE-1: collectCaseExactAttributes ────────────────────────
+
+  describe('collectCaseExactAttributes — R-CASE-1', () => {
+    it('should collect top-level caseExact attributes as lowercase names', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'id', caseExact: true }),
+        makeAttr({ name: 'userName', caseExact: false }),
+        makeAttr({ name: 'externalId', caseExact: true }),
+      ]);
+
+      const result = SchemaValidator.collectCaseExactAttributes([schema]);
+
+      expect(result.has('id')).toBe(true);
+      expect(result.has('externalid')).toBe(true);
+      expect(result.has('username')).toBe(false);
+    });
+
+    it('should collect sub-attr caseExact as dotted path (parent.sub)', () => {
+      const schema = makeCoreSchema([
+        makeAttr({
+          name: 'meta',
+          type: 'complex',
+          caseExact: false,
+          subAttributes: [
+            makeAttr({ name: 'location', caseExact: true }),
+            makeAttr({ name: 'resourceType', caseExact: true }),
+            makeAttr({ name: 'created', caseExact: false }),
+          ],
+        }),
+      ]);
+
+      const result = SchemaValidator.collectCaseExactAttributes([schema]);
+
+      expect(result.has('meta.location')).toBe(true);
+      expect(result.has('meta.resourcetype')).toBe(true);
+      expect(result.has('meta.created')).toBe(false);
+      // Parent itself if not caseExact
+      expect(result.has('meta')).toBe(false);
+    });
+
+    it('should collect both parent and sub if both are caseExact', () => {
+      const schema = makeCoreSchema([
+        makeAttr({
+          name: 'identifier',
+          type: 'complex',
+          caseExact: true,
+          subAttributes: [
+            makeAttr({ name: 'value', caseExact: true }),
+          ],
+        }),
+      ]);
+
+      const result = SchemaValidator.collectCaseExactAttributes([schema]);
+
+      expect(result.has('identifier')).toBe(true);
+      expect(result.has('identifier.value')).toBe(true);
+    });
+
+    it('should return empty set when no caseExact attributes exist', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'displayName', caseExact: false }),
+        makeAttr({ name: 'title' }), // caseExact defaults to undefined/falsy
+      ]);
+
+      const result = SchemaValidator.collectCaseExactAttributes([schema]);
+
+      expect(result.size).toBe(0);
+    });
+  });
+
+  // ── P2: collectReadOnlyAttributes with sub-attrs ────────────────────
+
+  describe('collectReadOnlyAttributes — R-MUT-2 sub-attrs', () => {
+    it('should collect readOnly sub-attrs within readWrite parents into coreSubAttrs', () => {
+      const schema = makeCoreSchema([
+        makeAttr({
+          name: 'manager',
+          type: 'complex',
+          mutability: 'readWrite',
+          subAttributes: [
+            makeAttr({ name: 'value', mutability: 'readWrite' }),
+            makeAttr({ name: 'displayName', mutability: 'readOnly' }),
+            makeAttr({ name: '$ref', mutability: 'readOnly' }),
+          ],
+        }),
+      ]);
+
+      const result = SchemaValidator.collectReadOnlyAttributes([schema]);
+
+      // manager itself is NOT readOnly
+      expect(result.core.has('manager')).toBe(false);
+      // Sub-attrs are in coreSubAttrs
+      expect(result.coreSubAttrs.has('manager')).toBe(true);
+      expect(result.coreSubAttrs.get('manager')!.has('displayname')).toBe(true);
+      expect(result.coreSubAttrs.get('manager')!.has('$ref')).toBe(true);
+      expect(result.coreSubAttrs.get('manager')!.has('value')).toBe(false);
+    });
+
+    it('should collect extension readOnly sub-attrs into extensionSubAttrs', () => {
+      const schema = makeExtensionSchema([
+        makeAttr({
+          name: 'orgUnit',
+          type: 'complex',
+          mutability: 'readWrite',
+          subAttributes: [
+            makeAttr({ name: 'value', mutability: 'readWrite' }),
+            makeAttr({ name: 'computedPath', mutability: 'readOnly' }),
+          ],
+        }),
+      ]);
+
+      const result = SchemaValidator.collectReadOnlyAttributes([schema]);
+
+      expect(result.extensionSubAttrs.has(EXTENSION_SCHEMA_ID)).toBe(true);
+      const extSubs = result.extensionSubAttrs.get(EXTENSION_SCHEMA_ID)!;
+      expect(extSubs.has('orgunit')).toBe(true);
+      expect(extSubs.get('orgunit')!.has('computedpath')).toBe(true);
+    });
+
+    it('should NOT collect sub-attrs of readOnly parents (parent is already fully stripped)', () => {
+      const schema = makeCoreSchema([
+        makeAttr({
+          name: 'meta',
+          type: 'complex',
+          mutability: 'readOnly',
+          subAttributes: [
+            makeAttr({ name: 'created', mutability: 'readOnly' }),
+            makeAttr({ name: 'lastModified', mutability: 'readOnly' }),
+          ],
+        }),
+      ]);
+
+      const result = SchemaValidator.collectReadOnlyAttributes([schema]);
+
+      // meta is top-level readOnly — entire object is stripped
+      expect(result.core.has('meta')).toBe(true);
+      // No sub-attrs collected since parent is readOnly
+      expect(result.coreSubAttrs.has('meta')).toBe(false);
+    });
+  });
 });

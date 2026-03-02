@@ -1,8 +1,8 @@
 # Repo + API Understanding Baseline (Code-Verified)
 
 > **Status**: Living implementation baseline  
-> **Last Updated**: February 26, 2026  
-> **Baseline**: SCIMServer v0.19.2
+> **Last Updated**: March 1, 2026  
+> **Baseline**: SCIMServer v0.24.0
 
 This document captures the current implementation reality after reading core repo and API sources. It is intended to prevent documentation drift.
 

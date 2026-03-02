@@ -414,6 +414,71 @@ describe('evaluateFilter', () => {
       expect(evaluateFilter(ast, user)).toBe(true);
     });
   });
+
+  // ─── P2 R-CASE-1: caseExact-aware evaluateFilter ─────────────────
+
+  describe('R-CASE-1: caseExact-aware filtering', () => {
+    it('should perform case-sensitive eq when attr is caseExact', () => {
+      const caseExactAttrs = new Set(['id']);
+      const ast = parseScimFilter('id eq "123"');
+      // Exact case match → true
+      expect(evaluateFilter(ast, user, caseExactAttrs)).toBe(true);
+      // Wrong case → false (case-sensitive!)
+      const ast2 = parseScimFilter('id eq "ABC"');
+      const resource = { ...user, id: 'abc' };
+      expect(evaluateFilter(ast2, resource, caseExactAttrs)).toBe(false);
+    });
+
+    it('should remain case-insensitive for non-caseExact attrs', () => {
+      const caseExactAttrs = new Set(['id']);
+      const ast = parseScimFilter('userName eq "JOHN.DOE@EXAMPLE.COM"');
+      // userName is NOT caseExact, so case-insensitive match should work
+      expect(evaluateFilter(ast, user, caseExactAttrs)).toBe(true);
+    });
+
+    it('should perform case-sensitive co (contains) for caseExact attrs', () => {
+      const caseExactAttrs = new Set(['meta.location']);
+      const ast = parseScimFilter('meta.location co "Users"');
+      expect(evaluateFilter(ast, user, caseExactAttrs)).toBe(true);
+      const ast2 = parseScimFilter('meta.location co "users"');
+      // lowercase "users" should NOT match "Users" in the URL when caseExact
+      expect(evaluateFilter(ast2, user, caseExactAttrs)).toBe(false);
+    });
+
+    it('should perform case-sensitive sw (starts with) for caseExact attrs', () => {
+      const caseExactAttrs = new Set(['meta.location']);
+      const ast = parseScimFilter('meta.location sw "https://example"');
+      expect(evaluateFilter(ast, user, caseExactAttrs)).toBe(true);
+      const ast2 = parseScimFilter('meta.location sw "HTTPS://EXAMPLE"');
+      expect(evaluateFilter(ast2, user, caseExactAttrs)).toBe(false);
+    });
+
+    it('should remain case-insensitive when no caseExactAttrs provided', () => {
+      // Without caseExactAttrs, all comparisons should be case-insensitive (SCIM default)
+      const ast = parseScimFilter('id eq "ABC"');
+      const resource = { ...user, id: 'abc' };
+      expect(evaluateFilter(ast, resource)).toBe(true);
+    });
+
+    it('should propagate caseExactAttrs through AND/OR logical nodes', () => {
+      const caseExactAttrs = new Set(['id']);
+      const resource = { ...user, id: 'CaseSensitiveId' };
+      // id is caseExact: exact match + userName case-insensitive
+      const ast = parseScimFilter('id eq "CaseSensitiveId" and userName eq "JOHN.DOE@EXAMPLE.COM"');
+      expect(evaluateFilter(ast, resource, caseExactAttrs)).toBe(true);
+      // Wrong case for id → AND fails
+      const ast2 = parseScimFilter('id eq "casesensitiveid" and userName eq "JOHN.DOE@EXAMPLE.COM"');
+      expect(evaluateFilter(ast2, resource, caseExactAttrs)).toBe(false);
+    });
+
+    it('should propagate caseExactAttrs through NOT nodes', () => {
+      const caseExactAttrs = new Set(['id']);
+      const resource = { ...user, id: 'ABC' };
+      // not (id eq "abc") → "abc" ≠ "ABC" case-sensitively → inner is false → NOT makes it true
+      const ast = parseScimFilter('not (id eq "abc")');
+      expect(evaluateFilter(ast, resource, caseExactAttrs)).toBe(true);
+    });
+  });
 });
 
 // ─── resolveAttrPath Tests ───────────────────────────────────────────────────

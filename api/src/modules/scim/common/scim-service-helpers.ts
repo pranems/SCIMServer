@@ -174,7 +174,7 @@ export function stripReadOnlyAttributes(
   payload: Record<string, unknown>,
   schemaDefinitions: readonly SchemaDefinition[],
 ): string[] {
-  const { core, extensions } = SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
+  const { core, extensions, coreSubAttrs, extensionSubAttrs } = SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
   const stripped: string[] = [];
 
   // Strip core readOnly attributes (case-insensitive)
@@ -185,6 +185,40 @@ export function stripReadOnlyAttributes(
     if (core.has(key.toLowerCase())) {
       delete payload[key];
       stripped.push(key);
+    }
+  }
+
+  // R-MUT-2: Strip readOnly sub-attributes within readWrite core parents
+  for (const [parentLower, subSet] of coreSubAttrs) {
+    const parentKey = Object.keys(payload).find(k => k.toLowerCase() === parentLower);
+    if (!parentKey) continue;
+
+    const parentVal = payload[parentKey];
+    if (parentVal === null || parentVal === undefined) continue;
+
+    // Handle single complex object
+    if (typeof parentVal === 'object' && !Array.isArray(parentVal)) {
+      const obj = parentVal as Record<string, unknown>;
+      for (const subKey of Object.keys(obj)) {
+        if (subSet.has(subKey.toLowerCase())) {
+          delete obj[subKey];
+          stripped.push(`${parentKey}.${subKey}`);
+        }
+      }
+    }
+    // Handle multi-valued (array of complex objects)
+    if (Array.isArray(parentVal)) {
+      for (const item of parentVal) {
+        if (typeof item === 'object' && item !== null) {
+          const obj = item as Record<string, unknown>;
+          for (const subKey of Object.keys(obj)) {
+            if (subSet.has(subKey.toLowerCase())) {
+              delete obj[subKey];
+              stripped.push(`${parentKey}[].${subKey}`);
+            }
+          }
+        }
+      }
     }
   }
 
@@ -201,6 +235,46 @@ export function stripReadOnlyAttributes(
       if (readOnlySet.has(extKey.toLowerCase())) {
         delete (extObj as Record<string, unknown>)[extKey];
         stripped.push(`${urnKey}.${extKey}`);
+      }
+    }
+  }
+
+  // R-MUT-2: Strip readOnly sub-attrs within readWrite extension parents
+  for (const [urn, subMap] of extensionSubAttrs) {
+    const urnKey = Object.keys(payload).find(k => k.toLowerCase() === urn.toLowerCase());
+    if (!urnKey) continue;
+
+    const extObj = payload[urnKey];
+    if (typeof extObj !== 'object' || extObj === null || Array.isArray(extObj)) continue;
+
+    for (const [parentLower, subSet] of subMap) {
+      const parentKey = Object.keys(extObj as Record<string, unknown>).find(k => k.toLowerCase() === parentLower);
+      if (!parentKey) continue;
+
+      const parentVal = (extObj as Record<string, unknown>)[parentKey];
+      if (parentVal === null || parentVal === undefined) continue;
+
+      if (typeof parentVal === 'object' && !Array.isArray(parentVal)) {
+        const obj = parentVal as Record<string, unknown>;
+        for (const subKey of Object.keys(obj)) {
+          if (subSet.has(subKey.toLowerCase())) {
+            delete obj[subKey];
+            stripped.push(`${urnKey}.${parentKey}.${subKey}`);
+          }
+        }
+      }
+      if (Array.isArray(parentVal)) {
+        for (const item of parentVal) {
+          if (typeof item === 'object' && item !== null) {
+            const obj = item as Record<string, unknown>;
+            for (const subKey of Object.keys(obj)) {
+              if (subSet.has(subKey.toLowerCase())) {
+                delete obj[subKey];
+                stripped.push(`${urnKey}.${parentKey}[].${subKey}`);
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -228,7 +302,7 @@ export function stripReadOnlyPatchOps(
   operations: PatchOperation[],
   schemaDefinitions: readonly SchemaDefinition[],
 ): { filtered: PatchOperation[]; stripped: string[] } {
-  const { core, extensions } = SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
+  const { core, extensions, coreSubAttrs } = SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
   const stripped: string[] = [];
   const filtered: PatchOperation[] = [];
 
@@ -255,6 +329,19 @@ export function stripReadOnlyPatchOps(
       if (core.has(targetAttr.toLowerCase())) {
         stripped.push(targetAttr);
         continue; // Skip this operation
+      }
+
+      // R-MUT-2: Check if path targets a readOnly sub-attr (e.g., "manager.displayName")
+      const cleanPath = op.path.replace(/\[.*?\]/g, '');
+      const dotIdx = cleanPath.indexOf('.');
+      if (dotIdx !== -1) {
+        const parentName = cleanPath.substring(0, dotIdx).toLowerCase();
+        const subName = cleanPath.substring(dotIdx + 1).split('.')[0].toLowerCase();
+        const readOnlySubs = coreSubAttrs.get(parentName);
+        if (readOnlySubs && readOnlySubs.has(subName)) {
+          stripped.push(`${cleanPath.substring(0, dotIdx)}.${cleanPath.substring(dotIdx + 1).split('.')[0]}`);
+          continue;
+        }
       }
 
       // Check if the target is a readOnly extension attribute
@@ -287,6 +374,21 @@ export function stripReadOnlyPatchOps(
           delete valueObj[key];
           stripped.push(key);
           modified = true;
+          continue;
+        }
+
+        // R-MUT-2: Strip readOnly sub-attrs from complex values in no-path ops
+        const readOnlySubs = coreSubAttrs.get(key.toLowerCase());
+        if (readOnlySubs && typeof valueObj[key] === 'object' && valueObj[key] !== null && !Array.isArray(valueObj[key])) {
+          const subObj = { ...(valueObj[key] as Record<string, unknown>) };
+          for (const subKey of Object.keys(subObj)) {
+            if (readOnlySubs.has(subKey.toLowerCase())) {
+              delete subObj[subKey];
+              stripped.push(`${key}.${subKey}`);
+              modified = true;
+            }
+          }
+          valueObj[key] = subObj;
         }
 
         // Check extension URN blocks in no-path value
@@ -511,9 +613,9 @@ export class ScimSchemaHelpers {
   }
 
   /**
-   * Collect returned characteristic sets (never + request) for the resource's schemas.
+   * Collect returned characteristic sets (never + request + always + alwaysSubs) for the resource's schemas.
    */
-  getReturnedCharacteristics(endpointId?: string): { never: Set<string>; request: Set<string> } {
+  getReturnedCharacteristics(endpointId?: string): { never: Set<string>; request: Set<string>; always: Set<string>; alwaysSubs: Map<string, Set<string>> } {
     const schemas = this.getSchemaDefinitions(endpointId);
     return SchemaValidator.collectReturnedCharacteristics(schemas);
   }
@@ -525,6 +627,33 @@ export class ScimSchemaHelpers {
   getRequestOnlyAttributes(endpointId?: string): Set<string> {
     const { request } = this.getReturnedCharacteristics(endpointId);
     return request;
+  }
+
+  /**
+   * Get the returned:'always' attribute names from schema definitions.
+   * Used by controllers to pass schema-driven always-returned set to projection (R-RET-1).
+   */
+  getAlwaysReturnedAttributes(endpointId?: string): Set<string> {
+    const { always } = this.getReturnedCharacteristics(endpointId);
+    return always;
+  }
+
+  /**
+   * Get sub-attributes with returned:'always' grouped by parent attribute (R-RET-3).
+   * Map of parentAttrLower → Set<subAttrNameLower>.
+   */
+  getAlwaysReturnedSubAttrs(endpointId?: string): Map<string, Set<string>> {
+    const { alwaysSubs } = this.getReturnedCharacteristics(endpointId);
+    return alwaysSubs;
+  }
+
+  /**
+   * Get attribute names/paths with caseExact:true (R-CASE-1).
+   * Returns Set of lowercase dotted paths (e.g., 'id', 'meta.location').
+   */
+  getCaseExactAttributes(endpointId?: string): Set<string> {
+    const schemas = this.getSchemaDefinitions(endpointId);
+    return SchemaValidator.collectCaseExactAttributes(schemas);
   }
 
   /**

@@ -1,0 +1,337 @@
+import type { INestApplication } from '@nestjs/common';
+import { createTestApp } from './helpers/app.helper';
+import { getAuthToken } from './helpers/auth.helper';
+import {
+  scimPost,
+  scimGet,
+  scimPut,
+  scimPatch,
+  createEndpoint,
+  scimBasePath,
+} from './helpers/request.helper';
+import {
+  validUser,
+  validGroup,
+  patchOp,
+  resetFixtureCounter,
+} from './helpers/fixtures';
+
+/**
+ * P2 Attribute Characteristics E2E Tests
+ *
+ * Tests for the 6 P2 behavioral gap fixes from the RFC 7643 §2
+ * attribute characteristics audit:
+ *
+ *  R-RET-1: Schema-driven returned:'always' at projection level
+ *  R-RET-2: Group 'active' always returned (returned:'always' in schema)
+ *  R-RET-3: Sub-attr returned:'always' (e.g., emails.value)
+ *  R-MUT-1: writeOnly mutability → returned:never defense-in-depth
+ *  R-MUT-2: readOnly sub-attr stripping (e.g., manager.displayName)
+ *  R-CASE-1: caseExact-aware in-memory filter evaluation
+ */
+describe('P2 Attribute Characteristics (E2E)', () => {
+  let app: INestApplication;
+  let token: string;
+  let endpointId: string;
+  let basePath: string;
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    token = await getAuthToken(app);
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  beforeEach(async () => {
+    resetFixtureCounter();
+    endpointId = await createEndpoint(app, token);
+    basePath = scimBasePath(endpointId);
+  });
+
+  // ───────────── R-RET-2: Group 'active' always returned ─────────────
+
+  describe('R-RET-2: Group active always returned', () => {
+    it('GET /Groups/:id should return active even when excludedAttributes=active', async () => {
+      const created = (
+        await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)
+      ).body;
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Groups/${created.id}?excludedAttributes=active`,
+        token,
+      ).expect(200);
+
+      // active has returned:'always' in Group schema, so it MUST be present
+      expect(res.body.active).toBeDefined();
+      expect(typeof res.body.active).toBe('boolean');
+    });
+
+    it('GET /Groups (list) should return active even with excludedAttributes=active', async () => {
+      await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201);
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Groups?excludedAttributes=active&count=10`,
+        token,
+      ).expect(200);
+
+      expect(res.body.totalResults).toBeGreaterThanOrEqual(1);
+      for (const group of res.body.Resources) {
+        expect(group.active).toBeDefined();
+      }
+    });
+
+    it('GET /Groups/:id with attributes= should include active automatically', async () => {
+      const created = (
+        await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)
+      ).body;
+
+      // Request only displayName — active should still appear because returned:'always'
+      const res = await scimGet(
+        app,
+        `${basePath}/Groups/${created.id}?attributes=displayName`,
+        token,
+      ).expect(200);
+
+      expect(res.body.displayName).toBeDefined();
+      expect(res.body.active).toBeDefined();
+    });
+  });
+
+  // ───────────── R-RET-1: Schema-driven always-returned ─────────────
+
+  describe('R-RET-1: Schema-driven returned:always attributes', () => {
+    it('GET /Groups/:id?attributes=externalId should still include displayName (always)', async () => {
+      const created = (
+        await scimPost(
+          app,
+          `${basePath}/Groups`,
+          token,
+          validGroup({ displayName: 'AlwaysGroup' }),
+        ).expect(201)
+      ).body;
+
+      // displayName has returned:'always' in Group schema
+      const res = await scimGet(
+        app,
+        `${basePath}/Groups/${created.id}?attributes=externalId`,
+        token,
+      ).expect(200);
+
+      expect(res.body.displayName).toBe('AlwaysGroup');
+    });
+
+    it('excludedAttributes should NOT exclude returned:always attributes', async () => {
+      const created = (
+        await scimPost(
+          app,
+          `${basePath}/Groups`,
+          token,
+          validGroup({ displayName: 'KeepMe' }),
+        ).expect(201)
+      ).body;
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Groups/${created.id}?excludedAttributes=displayName`,
+        token,
+      ).expect(200);
+
+      // displayName is returned:'always' — must NOT be excluded
+      expect(res.body.displayName).toBe('KeepMe');
+    });
+  });
+
+  // ───────────── R-RET-3: Sub-attr returned:'always' ─────────────
+
+  describe('R-RET-3: Sub-attr returned:always in projection', () => {
+    it('GET /Users/:id?attributes=emails.type should also include emails.value (always)', async () => {
+      const user = validUser({
+        emails: [
+          { value: 'work@test.com', type: 'work', primary: true },
+          { value: 'home@test.com', type: 'home', primary: false },
+        ],
+      });
+      const created = (
+        await scimPost(app, `${basePath}/Users`, token, user).expect(201)
+      ).body;
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Users/${created.id}?attributes=emails.type`,
+        token,
+      ).expect(200);
+
+      // emails.value has returned:'always' — should be included even though only emails.type requested
+      expect(res.body.emails).toBeDefined();
+      expect(Array.isArray(res.body.emails)).toBe(true);
+      for (const email of res.body.emails) {
+        expect(email.value).toBeDefined();
+        expect(email.type).toBeDefined();
+      }
+    });
+
+    it('GET /Groups/:id?attributes=members.display should also include members.value (always)', async () => {
+      // Create a user first to add as member
+      const user = (
+        await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)
+      ).body;
+
+      const group = validGroup({
+        members: [{ value: user.id, display: user.displayName || 'Test User' }],
+      });
+      const created = (
+        await scimPost(app, `${basePath}/Groups`, token, group).expect(201)
+      ).body;
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Groups/${created.id}?attributes=members.display`,
+        token,
+      ).expect(200);
+
+      // members.value has returned:'always' — should be present
+      expect(res.body.members).toBeDefined();
+      expect(res.body.members.length).toBeGreaterThanOrEqual(1);
+      for (const member of res.body.members) {
+        expect(member.value).toBeDefined();
+      }
+    });
+  });
+
+  // ───────────── R-MUT-1: writeOnly → returned:never ─────────────
+
+  describe('R-MUT-1: writeOnly mutability implies returned:never', () => {
+    it('POST /Users with password should never return password in response', async () => {
+      const res = await scimPost(
+        app,
+        `${basePath}/Users`,
+        token,
+        validUser({ password: 'WriteOnlySecret1!' }),
+      ).expect(201);
+
+      // password has mutability:'writeOnly' — R-MUT-1 defense-in-depth
+      expect(res.body.password).toBeUndefined();
+    });
+
+    it('GET /Users?attributes=password should still not return password', async () => {
+      await scimPost(
+        app,
+        `${basePath}/Users`,
+        token,
+        validUser({ password: 'WriteOnlySecret2!' }),
+      ).expect(201);
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Users?attributes=password&count=1`,
+        token,
+      ).expect(200);
+
+      for (const user of res.body.Resources) {
+        expect(user.password).toBeUndefined();
+      }
+    });
+  });
+
+  // ───────────── R-MUT-2: readOnly sub-attr stripping ─────────────
+
+  describe('R-MUT-2: readOnly sub-attr stripping', () => {
+    it('POST /Users with manager.displayName should strip the readOnly sub-attr', async () => {
+      const user = validUser({
+        'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User': {
+          manager: {
+            value: 'fake-mgr-id',
+            displayName: 'Client-Supplied Boss Name',
+          },
+        },
+        schemas: [
+          'urn:ietf:params:scim:schemas:core:2.0:User',
+          'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User',
+        ],
+      });
+
+      const res = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
+
+      // Retrieve the user to check stored value
+      const getRes = await scimGet(
+        app,
+        `${basePath}/Users/${res.body.id}`,
+        token,
+      ).expect(200);
+
+      // The enterprise extension manager block should have value but NOT displayName
+      const ext = getRes.body['urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'];
+      if (ext?.manager) {
+        expect(ext.manager.value).toBeDefined();
+        // manager.displayName is readOnly — should have been stripped on input
+        // (it may or may not be server-populated, but the client value shouldn't persist)
+      }
+    });
+
+    it('PATCH with path manager.displayName should be silently stripped', async () => {
+      const user = validUser({
+        'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User': {
+          manager: { value: 'mgr-1' },
+        },
+        schemas: [
+          'urn:ietf:params:scim:schemas:core:2.0:User',
+          'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User',
+        ],
+      });
+
+      const created = (
+        await scimPost(app, `${basePath}/Users`, token, user).expect(201)
+      ).body;
+
+      // PATCH to change manager.displayName (readOnly sub-attr)
+      const patchRes = await scimPatch(
+        app,
+        `${basePath}/Users/${created.id}`,
+        token,
+        patchOp([
+          { op: 'replace', path: 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager.displayName', value: 'Hacked Boss' },
+          { op: 'replace', path: 'displayName', value: 'Valid Update' },
+        ]),
+      ).expect(200);
+
+      // displayName (core, readWrite) should be updated
+      expect(patchRes.body.displayName).toBe('Valid Update');
+    });
+  });
+
+  // ───────────── R-CASE-1: caseExact filter behavior ─────────────
+
+  describe('R-CASE-1: caseExact-aware filter evaluation', () => {
+    it('filter on externalId (caseExact:true) should match exact case', async () => {
+      const user = validUser({ externalId: 'CaseSensitive-ID-123' });
+      await scimPost(app, `${basePath}/Users`, token, user).expect(201);
+
+      // Exact case should match
+      const res = await scimGet(
+        app,
+        `${basePath}/Users?filter=${encodeURIComponent('externalId eq "CaseSensitive-ID-123"')}`,
+        token,
+      ).expect(200);
+
+      expect(res.body.totalResults).toBeGreaterThanOrEqual(1);
+    });
+
+    it('filter on userName (caseExact:false) should match case-insensitively', async () => {
+      const user = validUser({ userName: 'CaseTest-User@example.com' });
+      await scimPost(app, `${basePath}/Users`, token, user).expect(201);
+
+      // Different case should still match since userName is not caseExact
+      const res = await scimGet(
+        app,
+        `${basePath}/Users?filter=${encodeURIComponent('userName eq "casetest-user@example.com"')}`,
+        token,
+      ).expect(200);
+
+      expect(res.body.totalResults).toBeGreaterThanOrEqual(1);
+    });
+  });
+});

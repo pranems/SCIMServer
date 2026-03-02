@@ -100,6 +100,44 @@ describe('ScimDiscoveryService', () => {
       expect(subNames).toContain('formatted');
     });
 
+    // ─── P1: R-SUB-1 — caseExact:false on name sub-attributes ────────────
+
+    it('should have caseExact:false on all name sub-attributes (R-SUB-1, RFC 7643 §4.1.1)', () => {
+      const result = service.getSchemas();
+      const userSchema = result.Resources.find((r: any) => r.id === SCIM_CORE_USER_SCHEMA)! as any;
+      const nameAttr = userSchema.attributes.find((a: any) => a.name === 'name');
+      const expectedSubs = ['formatted', 'familyName', 'givenName', 'middleName', 'honorificPrefix', 'honorificSuffix'];
+      for (const subName of expectedSubs) {
+        const sub = nameAttr.subAttributes.find((s: any) => s.name === subName);
+        expect(sub).toBeDefined();
+        expect(sub.caseExact).toBe(false);
+      }
+    });
+
+    // ─── P1: R-SUB-3 — caseExact:false on addresses sub-attributes ───────
+
+    it('should have caseExact:false on all addresses sub-attributes (R-SUB-3, RFC 7643 §4.1.2)', () => {
+      const result = service.getSchemas();
+      const userSchema = result.Resources.find((r: any) => r.id === SCIM_CORE_USER_SCHEMA)! as any;
+      const addrAttr = userSchema.attributes.find((a: any) => a.name === 'addresses');
+      const expectedSubs = ['formatted', 'streetAddress', 'locality', 'region', 'postalCode', 'country'];
+      for (const subName of expectedSubs) {
+        const sub = addrAttr.subAttributes.find((s: any) => s.name === subName);
+        expect(sub).toBeDefined();
+        expect(sub.caseExact).toBe(false);
+      }
+    });
+
+    // ─── P1: R-UNIQ-1 — uniqueness on externalId attributes ──────────────
+
+    it('should have uniqueness:none on User externalId (R-UNIQ-1, RFC 7643 §3.1)', () => {
+      const result = service.getSchemas();
+      const userSchema = result.Resources.find((r: any) => r.id === SCIM_CORE_USER_SCHEMA)! as any;
+      const extId = userSchema.attributes.find((a: any) => a.name === 'externalId');
+      expect(extId).toBeDefined();
+      expect(extId.uniqueness).toBe('none');
+    });
+
     it('should include User schema userName attribute with uniqueness=server', () => {
       const result = service.getSchemas();
       const userSchema = result.Resources.find((r: any) => r.id === SCIM_CORE_USER_SCHEMA)! as any;
@@ -166,6 +204,46 @@ describe('ScimDiscoveryService', () => {
       expect(subNames).toContain('lastModified');
       expect(subNames).toContain('location');
       expect(subNames).toContain('version');
+    });
+
+    // ─── P1: R-REF-1 — $ref sub-attribute on Group members ───────────────
+
+    it('should include $ref sub-attribute on Group members with referenceTypes (R-REF-1, RFC 7643 §4.2)', () => {
+      const result = service.getSchemas();
+      const groupSchema = result.Resources.find((r: any) => r.id === SCIM_CORE_GROUP_SCHEMA)! as any;
+      const membersAttr = groupSchema.attributes.find((a: any) => a.name === 'members');
+      expect(membersAttr).toBeDefined();
+      const refSub = membersAttr.subAttributes.find((s: any) => s.name === '$ref');
+      expect(refSub).toBeDefined();
+      expect(refSub.type).toBe('reference');
+      expect(refSub.mutability).toBe('immutable');
+      expect(refSub.referenceTypes).toEqual(['User', 'Group']);
+    });
+
+    it('should have 4 sub-attributes on Group members: value, $ref, display, type (R-REF-1)', () => {
+      const result = service.getSchemas();
+      const groupSchema = result.Resources.find((r: any) => r.id === SCIM_CORE_GROUP_SCHEMA)! as any;
+      const membersAttr = groupSchema.attributes.find((a: any) => a.name === 'members');
+      const subNames = membersAttr.subAttributes.map((s: any) => s.name);
+      expect(subNames).toEqual(['value', '$ref', 'display', 'type']);
+    });
+
+    // ─── P1: R-UNIQ-1 — uniqueness on Group attributes ───────────────────
+
+    it('should have uniqueness:server on Group displayName (R-UNIQ-1, RFC 7643 §4.2)', () => {
+      const result = service.getSchemas();
+      const groupSchema = result.Resources.find((r: any) => r.id === SCIM_CORE_GROUP_SCHEMA)! as any;
+      const displayName = groupSchema.attributes.find((a: any) => a.name === 'displayName');
+      expect(displayName).toBeDefined();
+      expect(displayName.uniqueness).toBe('server');
+    });
+
+    it('should have uniqueness:none on Group externalId (R-UNIQ-1, RFC 7643 §3.1)', () => {
+      const result = service.getSchemas();
+      const groupSchema = result.Resources.find((r: any) => r.id === SCIM_CORE_GROUP_SCHEMA)! as any;
+      const extId = groupSchema.attributes.find((a: any) => a.name === 'externalId');
+      expect(extId).toBeDefined();
+      expect(extId.uniqueness).toBe('none');
     });
   });
 

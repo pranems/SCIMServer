@@ -294,6 +294,112 @@ describe('applyAttributeProjection with requestOnlyAttrs (G8e)', () => {
   });
 });
 
+// ─── P2: R-RET-1 Schema-driven always-returned ───────────────────────────────
+
+describe('P2 R-RET-1: schema-driven schemaAlwaysReturned', () => {
+  const user = {
+    schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+    id: 'u1',
+    userName: 'alice',
+    displayName: 'Alice',
+    active: true,
+    emails: [{ value: 'a@b.com', type: 'work' }],
+    meta: { resourceType: 'User' },
+  };
+
+  it('should keep schema-declared always-returned attrs when attributes param used', () => {
+    const schemaAlways = new Set(['displayname']);
+    const result = applyAttributeProjection(user, 'emails', undefined, undefined, schemaAlways);
+    expect(result.displayName).toBe('Alice');
+    expect(result.emails).toBeDefined();
+  });
+
+  it('should not exclude schema-declared always-returned attrs via excludedAttributes', () => {
+    const schemaAlways = new Set(['active']);
+    const result = applyAttributeProjection(user, undefined, 'active,displayName', undefined, schemaAlways);
+    expect(result.active).toBe(true);
+    expect(result.displayName).toBeUndefined();
+  });
+
+  it('should merge schema always set with base always set', () => {
+    const schemaAlways = new Set(['emails']);
+    const result = applyAttributeProjection(user, 'active', undefined, undefined, schemaAlways);
+    // Base always: id, schemas, meta, userName. Schema always: emails
+    expect(result.id).toBe('u1');
+    expect(result.userName).toBe('alice');
+    expect(result.emails).toBeDefined();
+    expect(result.active).toBe(true);
+  });
+});
+
+// ─── P2: R-RET-2 Group 'active' always-returned ──────────────────────────────
+
+describe('P2 R-RET-2: Group active always-returned', () => {
+  const group = {
+    schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+    id: 'g1',
+    displayName: 'Engineering',
+    active: true,
+    meta: { resourceType: 'Group' },
+  };
+
+  it('should not exclude active from Group via excludedAttributes', () => {
+    const result = applyAttributeProjection(group, undefined, 'active');
+    expect(result.active).toBe(true);
+  });
+
+  it('should always include active in Group when attributes param used', () => {
+    const result = applyAttributeProjection(group, 'members');
+    expect(result.active).toBe(true);
+    expect(result.displayName).toBe('Engineering');
+  });
+});
+
+// ─── P2: R-RET-3 Sub-attr always-returned in projection ──────────────────────
+
+describe('P2 R-RET-3: sub-attr returned:always in projection', () => {
+  const user = {
+    schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+    id: 'u1',
+    userName: 'alice',
+    emails: [
+      { value: 'a@b.com', type: 'work', primary: true },
+    ],
+    meta: { resourceType: 'User' },
+  };
+
+  it('should include always sub-attrs when only some sub-attrs are requested', () => {
+    const alwaysSubs = new Map([['emails', new Set(['value'])]]);
+    const result = applyAttributeProjection(user, 'emails.type', undefined, undefined, undefined, alwaysSubs);
+    const emails = result.emails as any[];
+    expect(emails[0].type).toBe('work');
+    expect(emails[0].value).toBe('a@b.com'); // returned:always sub-attr
+    expect(emails[0].primary).toBeUndefined(); // not returned:always
+  });
+
+  it('should include all sub-attrs when entire attr is requested (no sub filtering)', () => {
+    const alwaysSubs = new Map([['emails', new Set(['value'])]]);
+    const result = applyAttributeProjection(user, 'emails', undefined, undefined, undefined, alwaysSubs);
+    const emails = result.emails as any[];
+    expect(emails[0].type).toBe('work');
+    expect(emails[0].value).toBe('a@b.com');
+    expect(emails[0].primary).toBe(true);
+  });
+
+  it('should handle single-valued complex attrs with always sub-attrs', () => {
+    const userWithManager = {
+      ...user,
+      manager: { value: 'mgr-1', displayName: 'Boss', $ref: 'https://example.com/Users/mgr-1' },
+    };
+    const alwaysSubs = new Map([['manager', new Set(['value'])]]);
+    const result = applyAttributeProjection(userWithManager, 'manager.displayName', undefined, undefined, undefined, alwaysSubs);
+    const mgr = result.manager as Record<string, unknown>;
+    expect(mgr.displayName).toBe('Boss');
+    expect(mgr.value).toBe('mgr-1'); // always sub-attr
+    expect(mgr.$ref).toBeUndefined(); // not always
+  });
+});
+
 // ─── G8e: stripReturnedNever ──────────────────────────────────────────────────
 
 describe('stripReturnedNever (G8e)', () => {

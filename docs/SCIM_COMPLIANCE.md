@@ -25,7 +25,19 @@
 | `/Me` Endpoint (RFC 7644 §3.11) | **100%** | JWT `sub` → `userName` identity resolution, full CRUD delegation, attribute projection (v0.20.0) |
 | Per-Endpoint Credentials (RFC 7643 §7) | **100%** | bcrypt-hashed per-endpoint tokens, admin CRUD API, 3-tier fallback chain, `PerEndpointCredentialsEnabled` flag (v0.21.0) |
 
-**Overall: 100% RFC 7643/7644 compliant** — All 27 migration gaps (G1–G20) fully resolved as of v0.22.0. All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. Full suite: **2,532 unit tests (73 suites), 539 E2E tests (26 suites), 485 live integration tests.**
+**Overall: 100% RFC 7643/7644 compliant** — All 27 migration gaps (G1–G20) fully resolved as of v0.24.0. P2 attribute characteristic enforcement complete. All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. Full suite: **2,573 unit tests (73 suites), 558 E2E tests (27 suites), 535 live integration tests.**
+
+### New in v0.24.0
+
+| Feature | Description |
+|---------|-------------|
+| R-RET-1: Schema-driven always-returned | Attributes with `returned:'always'` in schema definitions are now immune to `attributes=` filtering and `excludedAttributes=` exclusion at the projection level. |
+| R-RET-2: Group `active` always returned | Group schema's `active` attribute (`returned:'always'`) is preserved in all Group responses regardless of projection parameters. |
+| R-RET-3: Sub-attr `returned:'always'` | Sub-attributes like `emails.value` and `members.value` with `returned:'always'` are included even when only sibling sub-attrs requested (e.g., `?attributes=emails.type` now includes `emails.value`). |
+| R-MUT-1: writeOnly → returned:never | Attributes with `mutability:'writeOnly'` are added to the `never` set, ensuring they never appear in responses even if `returned` is not explicitly `'never'`. |
+| R-MUT-2: readOnly sub-attr stripping | `stripReadOnlyAttributes()` and `stripReadOnlyPatchOps()` now strip readOnly sub-attributes within readWrite parents (e.g., `manager.displayName`) on POST/PUT/PATCH. |
+| R-CASE-1: caseExact-aware filtering | `evaluateFilter()` accepts `caseExactAttrs` set, performs case-sensitive comparisons for `caseExact:true` attributes (`id`, `externalId`, `meta.location`). |
+| Test Coverage | 34 new unit + 13 E2E + 13 live tests (section 9v). |
 
 ### New in v0.22.0
 

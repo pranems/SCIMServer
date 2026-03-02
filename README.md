@@ -96,6 +96,8 @@ npm run dev
 
 > **ReadOnly attribute stripping (v0.22.0):** POST/PUT payloads automatically strip `mutability:'readOnly'` attributes (`id`, `meta`, `groups`, custom readOnly) per RFC 7643 §2.2. PATCH ops targeting readOnly attrs are silently stripped (non-strict) or rejected (strict). Optional warning URN extension via `IncludeWarningAboutIgnoredReadOnlyAttribute` flag.
 
+> **P2 Attribute Characteristic Enforcement (v0.24.0):** Schema-driven `returned:"always"` enforcement (userName, displayName, Group active), `writeOnly→returned:"never"` stripping (password), readOnly sub-attribute stripping on mutation requests, and `caseExact`-aware SCIM filtering — all derived from schema definitions, not hardcoded.
+
 ### Common optional variables
 
 | Variable | Default | Purpose |
@@ -196,9 +198,9 @@ Admin/release references:
 
 Latest validated matrix:
 
-- Unit tests: **2,532/2,532** (73 suites)
-- E2E tests: **539/539** (26 suites)
-- Live integration tests: **485/485** (local + Docker, includes in-memory instances)
+- Unit tests: **2,573/2,573** (73 suites)
+- E2E tests: **558/558** (27 suites)
+- Live integration tests: **535/535** (local + Docker + Azure, includes in-memory instances)
 - Microsoft SCIM Validator: **25/25 passed** (+ 7 preview scenarios)
 
 ### Per-Endpoint Config Flags

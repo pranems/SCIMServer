@@ -1,6 +1,6 @@
 # Attribute Characteristics Gaps, Bugs & Issues
 
-> **Date:** 2026-02-26 | **Version:** v0.19.2  
+> **Date:** 2026-03-01 | **Version:** v0.24.0  
 > **Scope:** RFC 7643 §2 attribute characteristics across all flows + extension/custom extension handling
 
 ---
@@ -17,9 +17,9 @@
 | **description** | -- | -- | -- | -- | -- | ✅ |
 | **required** | ✅ | ✅ | ✅^2^ | -- | -- | ✅ |
 | **canonicalValues** | ❌ | ❌ | ❌ | -- | -- | ❌ |
-| **caseExact** | ❌ | ❌ | ❌ | -- | ❌ | ✅^3^ |
+| **caseExact** | ❌ | ❌ | ❌ | -- | ✅^7^ | ✅^3^ |
 | **mutability** | ✅^1^ | ✅^1,6^ | ✅^1^ | -- | -- | ✅ |
-| **returned** | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **returned** | ✅^8^ | ✅^8^ | ✅^8^ | ✅^8^ | ✅^8^ | ✅ |
 | **uniqueness** | ✅^4^ | ✅^4^ | ✅^4^ | -- | -- | ✅^5^ |
 | **referenceTypes** | ❌ | ❌ | ❌ | -- | -- | ✅ |
 | **subAttributes** | ✅^1^ | ✅^1^ | ✅^1^ | ✅ | ✅ | ✅ |
@@ -30,6 +30,8 @@
 ^4^ Hardcoded for userName, externalId, displayName — not schema-driven  
 ^5^ Missing from all extension attribute definitions  
 ^6^ Immutable enforcement via `SchemaValidator.checkImmutable()` (old-vs-new comparison)  
+^7^ Schema-driven caseExact-aware filtering via `apply-scim-filter.ts` column map (v0.24.0 R-CASE-1)  
+^8^ Schema-driven `returned` enforcement: always-returned, returned:never stripping, writeOnly→never (v0.24.0 R-RET-1/2/3, R-MUT-1)  
 
 ---
 

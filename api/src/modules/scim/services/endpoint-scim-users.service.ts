@@ -163,7 +163,7 @@ export class EndpointScimUsersService {
 
     let filterResult;
     try {
-      filterResult = buildUserFilter(filter);
+      filterResult = buildUserFilter(filter, this.schemaHelpers.getCaseExactAttributes(endpointId));
     } catch {
       throw createScimError({
         status: 400,
@@ -621,6 +621,20 @@ export class EndpointScimUsersService {
    */
   getRequestOnlyAttributes(endpointId?: string): Set<string> {
     return this.schemaHelpers.getRequestOnlyAttributes(endpointId);
+  }
+
+  /**
+   * Get the returned:'always' attribute names from schema definitions (R-RET-1).
+   */
+  getAlwaysReturnedAttributes(endpointId?: string): Set<string> {
+    return this.schemaHelpers.getAlwaysReturnedAttributes(endpointId);
+  }
+
+  /**
+   * Get sub-attributes with returned:'always' grouped by parent (R-RET-3).
+   */
+  getAlwaysReturnedSubAttrs(endpointId?: string): Map<string, Set<string>> {
+    return this.schemaHelpers.getAlwaysReturnedSubAttrs(endpointId);
   }
 
   private buildMeta(user: UserRecord, baseUrl: string) {

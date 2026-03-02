@@ -1,6 +1,6 @@
 # Endpoint Configuration Flags — Complete Reference
 
-> **Status:** Living document · **Last Updated:** 2026-02-28 · **Baseline:** v0.22.0
+> **Status:** Living document · **Last Updated:** 2026-03-01 · **Baseline:** v0.24.0
 >
 > Authoritative reference for all per-endpoint configuration flags in SCIMServer.
 > Covers flag definitions, defaults, type handling, precedence rules, applicability matrices,

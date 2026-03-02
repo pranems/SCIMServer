@@ -3,7 +3,7 @@
   "info": {
     "title": "SCIMServer API",
     "version": "2.0.0",
-    "description": "OpenAPI specification for SCIMServer SCIM 2.0 server (v0.19.3). Passes all 25 Microsoft SCIM Validator tests. Implements RFC 7644 §3.4.2.5 attribute projection, §3.4.3 POST /.search, §3.7 Bulk operations, §3.14 ETag/conditional requests, and full RFC 7643/7644 discovery endpoints."
+    "description": "OpenAPI specification for SCIMServer SCIM 2.0 server (v0.24.0). Passes all 25 Microsoft SCIM Validator tests. Implements RFC 7644 §3.4.2.5 attribute projection, §3.4.3 POST /.search, §3.7 Bulk operations, §3.14 ETag/conditional requests, and full RFC 7643/7644 discovery endpoints. P2 attribute characteristic enforcement: schema-driven always-returned, caseExact-aware filtering, readOnly sub-attr stripping."
   },
   "servers": [
     { "url": "http://localhost:6000/scim/v2", "description": "Root-level discovery (ServiceProviderConfig, Schemas, ResourceTypes)" },

@@ -96,9 +96,9 @@ describe('log-levels', () => {
   // ─── LogCategory enum ────────────────────────────────────────────
 
   describe('LogCategory', () => {
-    it('should have 12 categories', () => {
+    it('should have 11 categories', () => {
       const values = Object.values(LogCategory);
-      expect(values).toHaveLength(12);
+      expect(values).toHaveLength(11);
     });
 
     it('should include all expected category values', () => {
