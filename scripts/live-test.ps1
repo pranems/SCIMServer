@@ -3260,6 +3260,7 @@ $putExtData = $putExtUser."$customUserExtUrn"
 Test-Result -Success ($putExtData.badgeNumber -eq "BADGE-002" -and $putExtData.costCenter -eq "CC-ENGINEERING") -Message "9m-A.20 PUT updates extension data (badge=$($putExtData.badgeNumber))"
 
 # --- Test 9m-A.21: PATCH add extension attribute ---
+# internalCode has returned:request — not in default response; verify via GET ?attributes=
 Write-Host "`n--- Test 9m-A.21: PATCH add extension attribute ---" -ForegroundColor Cyan
 $patchAddBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
@@ -3267,9 +3268,12 @@ $patchAddBody = @{
         @{ op = "add"; path = "$($customUserExtUrn):internalCode"; value = 99 }
     )
 } | ConvertTo-Json -Depth 3
-$patchedExtUser = Invoke-RestMethod -Uri "$scimBaseSchExt/Users/$schExtUserId" -Method PATCH -Headers $headers -Body $patchAddBody -ContentType "application/scim+json"
-$patchedExtData = $patchedExtUser."$customUserExtUrn"
-Test-Result -Success ($patchedExtData.internalCode -eq 99) -Message "9m-A.21 PATCH add extension attribute (internalCode=99)"
+$null = Invoke-RestMethod -Uri "$scimBaseSchExt/Users/$schExtUserId" -Method PATCH -Headers $headers -Body $patchAddBody -ContentType "application/scim+json"
+# Fetch with ?attributes= to include returned:request attribute
+$encodedExtUrn = [System.Uri]::EscapeDataString("$($customUserExtUrn):internalCode")
+$verifyExtUser = Invoke-RestMethod -Uri "$scimBaseSchExt/Users/$schExtUserId`?attributes=$encodedExtUrn" -Method GET -Headers $headers
+$verifyExtData = $verifyExtUser."$customUserExtUrn"
+Test-Result -Success ($verifyExtData.internalCode -eq 99) -Message "9m-A.21 PATCH add extension attribute (internalCode=99)"
 
 # --- Test 9m-A.22: PATCH replace extension attribute ---
 Write-Host "`n--- Test 9m-A.22: PATCH replace extension attribute ---" -ForegroundColor Cyan

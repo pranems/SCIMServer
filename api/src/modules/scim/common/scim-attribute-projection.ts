@@ -188,10 +188,14 @@ function stripRequestOnlyAttrs(
     // Check inside extension URN objects
     const value = result[key];
     if (typeof key === 'string' && key.startsWith('urn:') && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      const keyLower = key.toLowerCase();
       const extCopy = { ...(value as Record<string, unknown>) };
       let changed = false;
       for (const extKey of Object.keys(extCopy)) {
-        if (requestOnlyAttrs.has(extKey.toLowerCase()) && !requestedAttrs.has(extKey.toLowerCase())) {
+        const extKeyLower = extKey.toLowerCase();
+        // Check both bare name and fully-qualified URN:attrName form
+        const fqn = `${keyLower}:${extKeyLower}`;
+        if (requestOnlyAttrs.has(extKeyLower) && !requestedAttrs.has(extKeyLower) && !requestedAttrs.has(fqn)) {
           delete extCopy[extKey];
           changed = true;
         }
@@ -233,6 +237,38 @@ function includeOnly(
   // Group requested attrs by top-level key
   const topLevel = new Map<string, Set<string> | null>(); // null means include full attribute
   for (const attr of attrs) {
+    // Handle URN-prefixed attributes FIRST (RFC 7644 §3.10)
+    // URN paths like "urn:ext:1.0" contain dots in version numbers, so we must
+    // resolve them against resource keys BEFORE dot-based splitting.
+    if (attr.startsWith('urn:')) {
+      // Check if exact match for a resource key (e.g., "urn:ext:1.0" → include all)
+      if (findKey(resource, attr) !== undefined) {
+        topLevel.set(attr, null);
+        continue;
+      }
+      // Check if a resource key is a prefix (e.g., "urn:ext:1.0:attrName" → sub-attr)
+      let urnHandled = false;
+      for (const resourceKey of Object.keys(resource)) {
+        const keyLower = resourceKey.toLowerCase();
+        if (!keyLower.startsWith('urn:')) continue;
+        if (attr.startsWith(keyLower + ':')) {
+          const subAttr = attr.substring(keyLower.length + 1);
+          if (subAttr) {
+            if (topLevel.has(keyLower) && topLevel.get(keyLower) === null) {
+              // Already including full extension — skip
+            } else {
+              if (!topLevel.has(keyLower)) topLevel.set(keyLower, new Set());
+              topLevel.get(keyLower)!.add(subAttr);
+            }
+            urnHandled = true;
+            break;
+          }
+        }
+      }
+      if (urnHandled) continue;
+      // Fall through to dot-based splitting for URNs not matching any resource key
+    }
+
     const dot = attr.indexOf('.');
     if (dot === -1) {
       topLevel.set(attr, null); // full attribute

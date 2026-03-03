@@ -7,16 +7,23 @@
  *   - Operates directly on the JSONB payload object
  *   - Supports add, replace, remove operations
  *   - Supports dot-notation path resolution for nested attributes
+ *   - Extension URN paths resolved via extensionUrns list (COLON separator)
  *   - No type-specific member management
  *   - No read-only pre-validation (custom types have no built-in schema constraints)
  *
  * @example
- *   const engine = new GenericPatchEngine(payload);
+ *   const engine = new GenericPatchEngine(payload, ['urn:example:ext:2.0']);
  *   engine.apply({ op: 'replace', path: 'displayName', value: 'New Name' });
- *   engine.apply({ op: 'add', path: 'customAttr', value: 'hello' });
+ *   engine.apply({ op: 'add', path: 'urn:example:ext:2.0:customAttr', value: 'hello' });
  *   const result = engine.getResult();
  */
 import { PatchError } from './patch-error';
+import {
+  isExtensionPath,
+  parseExtensionPath,
+  applyExtensionUpdate,
+  removeExtensionAttribute,
+} from '../../modules/scim/utils/scim-patch-path';
 
 interface PatchOperation {
   op: string;
@@ -26,10 +33,12 @@ interface PatchOperation {
 
 export class GenericPatchEngine {
   private payload: Record<string, unknown>;
+  private readonly extensionUrns: readonly string[];
 
-  constructor(payload: Record<string, unknown>) {
+  constructor(payload: Record<string, unknown>, extensionUrns?: readonly string[]) {
     // Deep clone to avoid mutating the original
     this.payload = JSON.parse(JSON.stringify(payload));
+    this.extensionUrns = extensionUrns ?? [];
   }
 
   /**
@@ -116,11 +125,21 @@ export class GenericPatchEngine {
   /**
    * Set a value at a dot-notation path (e.g., "name.givenName").
    * Creates intermediate objects as needed.
+   *
+   * Extension URN paths resolved via extensionUrns list first (COLON separator),
+   * then falls back to legacy DOT-separated regex.
    */
   private setAtPath(path: string, value: unknown, merge: boolean): void {
-    // Handle extension URN paths (contain colons, e.g., "urn:example:ext:2.0:Custom")
-    // Extension URN is a single key; handle "urn:...:..:field" as ext → field
-    // Regex allows dots inside version numbers (e.g., 2.0) by matching \.\d+ segments
+    // Priority 1: Extension URN paths resolved via extensionUrns list (COLON separator)
+    if (this.extensionUrns.length > 0 && isExtensionPath(path, this.extensionUrns)) {
+      const parsed = parseExtensionPath(path, this.extensionUrns);
+      if (parsed) {
+        this.payload = applyExtensionUpdate(this.payload, parsed, value);
+        return;
+      }
+    }
+
+    // Priority 2: Legacy DOT-separated URN paths (backward compatibility)
     const urnMatch = path.match(/^(urn:[^.]+(?:\.\d+)*(?::[^.]+)*)\.(.+)$/);
     if (urnMatch) {
       const [, urn, subPath] = urnMatch;
@@ -169,9 +188,21 @@ export class GenericPatchEngine {
 
   /**
    * Remove a value at a dot-notation path.
+   *
+   * Extension URN paths resolved via extensionUrns list first (COLON separator),
+   * then falls back to legacy DOT-separated regex.
    */
   private removeAtPath(path: string): void {
-    // Handle extension URN paths (allow dots in version numbers like 2.0)
+    // Priority 1: Extension URN paths resolved via extensionUrns list (COLON separator)
+    if (this.extensionUrns.length > 0 && isExtensionPath(path, this.extensionUrns)) {
+      const parsed = parseExtensionPath(path, this.extensionUrns);
+      if (parsed) {
+        this.payload = removeExtensionAttribute(this.payload, parsed);
+        return;
+      }
+    }
+
+    // Priority 2: Legacy DOT-separated URN paths (backward compatibility)
     const urnMatch = path.match(/^(urn:[^.]+(?:\.\d+)*(?::[^.]+)*)\.(.+)$/);
     if (urnMatch) {
       const [, urn, subPath] = urnMatch;

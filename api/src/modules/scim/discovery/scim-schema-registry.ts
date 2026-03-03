@@ -514,11 +514,23 @@ export class ScimSchemaRegistry implements OnModuleInit {
   /**
    * Get only the custom (per-endpoint) resource types for an endpoint.
    * Does NOT include built-in User/Group types.
+   * Extensions from overlay.extensionsByResourceType are merged.
    */
   getCustomResourceTypes(endpointId: string): ScimResourceType[] {
     const overlay = this.endpointOverlays.get(endpointId);
     if (!overlay) return [];
-    return [...overlay.resourceTypes.values()];
+    return [...overlay.resourceTypes.values()].map((rt) => {
+      const epExtensions = overlay.extensionsByResourceType.get(rt.id);
+      if (!epExtensions || epExtensions.size === 0) return rt;
+
+      const mergedExtensions = [...rt.schemaExtensions];
+      for (const urn of epExtensions) {
+        if (!mergedExtensions.some((e) => e.schema === urn)) {
+          mergedExtensions.push({ schema: urn, required: false });
+        }
+      }
+      return { ...rt, schemaExtensions: mergedExtensions };
+    });
   }
 
   /**
@@ -534,7 +546,19 @@ export class ScimSchemaRegistry implements OnModuleInit {
     if (!overlay) return undefined;
 
     for (const rt of overlay.resourceTypes.values()) {
-      if (rt.endpoint === endpointPath) return rt;
+      if (rt.endpoint === endpointPath) {
+        // Merge endpoint-specific extension URNs into the custom resource type
+        const epExtensions = overlay.extensionsByResourceType.get(rt.id);
+        if (!epExtensions || epExtensions.size === 0) return rt;
+
+        const mergedExtensions = [...rt.schemaExtensions];
+        for (const urn of epExtensions) {
+          if (!mergedExtensions.some((e) => e.schema === urn)) {
+            mergedExtensions.push({ schema: urn, required: false });
+          }
+        }
+        return { ...rt, schemaExtensions: mergedExtensions };
+      }
     }
     return undefined;
   }
@@ -596,10 +620,21 @@ export class ScimSchemaRegistry implements OnModuleInit {
       return { ...rt, schemaExtensions: mergedExtensions };
     });
 
-    // Append per-endpoint custom resource types (Phase 8b)
+    // Append per-endpoint custom resource types (Phase 8b) with extensions merged
     if (overlay) {
       for (const customRT of overlay.resourceTypes.values()) {
-        result.push(customRT);
+        const epExtensions = overlay.extensionsByResourceType.get(customRT.id);
+        if (!epExtensions || epExtensions.size === 0) {
+          result.push(customRT);
+        } else {
+          const mergedExtensions = [...customRT.schemaExtensions];
+          for (const urn of epExtensions) {
+            if (!mergedExtensions.some((e) => e.schema === urn)) {
+              mergedExtensions.push({ schema: urn, required: false });
+            }
+          }
+          result.push({ ...customRT, schemaExtensions: mergedExtensions });
+        }
       }
     }
 
@@ -613,7 +648,20 @@ export class ScimSchemaRegistry implements OnModuleInit {
     // Check per-endpoint custom resource types (Phase 8b)
     if (!rt && endpointId) {
       const overlay = this.endpointOverlays.get(endpointId);
-      return overlay?.resourceTypes.get(resourceTypeId);
+      const customRT = overlay?.resourceTypes.get(resourceTypeId);
+      if (!customRT) return undefined;
+
+      // Merge endpoint-specific extension URNs into the custom resource type
+      const epExtensions = overlay?.extensionsByResourceType.get(resourceTypeId);
+      if (!epExtensions || epExtensions.size === 0) return customRT;
+
+      const mergedExtensions = [...customRT.schemaExtensions];
+      for (const urn of epExtensions) {
+        if (!mergedExtensions.some((e) => e.schema === urn)) {
+          mergedExtensions.push({ schema: urn, required: false });
+        }
+      }
+      return { ...customRT, schemaExtensions: mergedExtensions };
     }
 
     if (!rt) return undefined;

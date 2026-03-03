@@ -141,9 +141,9 @@ describe('GenericPatchEngine', () => {
     });
   });
 
-  // ─── Extension URN paths ──────────────────────────────────────────
+  // ─── Extension URN paths (DOT separator — legacy) ──────────────────
 
-  describe('extension URN paths', () => {
+  describe('extension URN paths (DOT separator)', () => {
     const urn = 'urn:example:ext:device:2.0';
 
     it('should set a field inside an extension URN', () => {
@@ -173,6 +173,62 @@ describe('GenericPatchEngine', () => {
       const ext = engine.getResult()[urn] as Record<string, unknown>;
       expect(ext.color).toBeUndefined();
       expect(ext.firmware).toBe('v1.0');
+    });
+  });
+
+  // ─── Extension URN paths (COLON separator — RFC-compliant) ─────────
+
+  describe('extension URN paths (COLON separator with extensionUrns)', () => {
+    const urn = 'urn:ietf:params:scim:schemas:extension:custom:2.0:User';
+
+    it('should add a field using colon separator when extensionUrns provided', () => {
+      const engine = new GenericPatchEngine({ displayName: 'Dev' }, [urn]);
+      engine.apply({ op: 'add', path: `${urn}:badgeNumber`, value: 'B-001' });
+      const ext = engine.getResult()[urn] as Record<string, unknown>;
+      expect(ext.badgeNumber).toBe('B-001');
+    });
+
+    it('should replace a field using colon separator', () => {
+      const engine = new GenericPatchEngine({
+        displayName: 'Dev',
+        [urn]: { badgeNumber: 'B-001', costCenter: 'ENG' },
+      }, [urn]);
+      engine.apply({ op: 'replace', path: `${urn}:badgeNumber`, value: 'B-999' });
+      const ext = engine.getResult()[urn] as Record<string, unknown>;
+      expect(ext.badgeNumber).toBe('B-999');
+      expect(ext.costCenter).toBe('ENG');
+    });
+
+    it('should remove a field using colon separator', () => {
+      const engine = new GenericPatchEngine({
+        displayName: 'Dev',
+        [urn]: { badgeNumber: 'B-001', costCenter: 'ENG' },
+      }, [urn]);
+      engine.apply({ op: 'remove', path: `${urn}:costCenter` });
+      const ext = engine.getResult()[urn] as Record<string, unknown>;
+      expect(ext.costCenter).toBeUndefined();
+      expect(ext.badgeNumber).toBe('B-001');
+    });
+
+    it('should create extension object if it does not exist', () => {
+      const engine = new GenericPatchEngine({ displayName: 'Dev' }, [urn]);
+      engine.apply({ op: 'replace', path: `${urn}:location`, value: 'Building A' });
+      const ext = engine.getResult()[urn] as Record<string, unknown>;
+      expect(ext.location).toBe('Building A');
+    });
+
+    it('should prioritize colon separator over dot fallback when extensionUrns provided', () => {
+      const shortUrn = 'urn:example:ext:2.0';
+      const engine = new GenericPatchEngine({ displayName: 'Dev' }, [shortUrn]);
+      engine.apply({ op: 'add', path: `${shortUrn}:field`, value: 'colon-value' });
+      const ext = engine.getResult()[shortUrn] as Record<string, unknown>;
+      expect(ext.field).toBe('colon-value');
+    });
+
+    it('should still support dot separator for non-extension paths', () => {
+      const engine = new GenericPatchEngine(makePayload(), [urn]);
+      engine.apply({ op: 'replace', path: 'name.model', value: 'Gadget' });
+      expect((engine.getResult().name as Record<string, unknown>).model).toBe('Gadget');
     });
   });
 

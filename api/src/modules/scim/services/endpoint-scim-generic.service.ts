@@ -41,6 +41,8 @@ import {
   stripReadOnlyAttributes,
   stripReadOnlyPatchOps,
 } from '../common/scim-service-helpers';
+import { SchemaValidator } from '../../../domain/validation';
+import { stripReturnedNever } from '../common/scim-attribute-projection';
 import { ScimMetadataService } from './scim-metadata.service';
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import type { ScimResourceType } from '../discovery/scim-schema-registry';
@@ -384,13 +386,21 @@ export class EndpointScimGenericService {
     assertIfMatch(`W/"v${existing.version}"`, ifMatch);
 
     // ReadOnly attribute stripping for PATCH operations (RFC 7643 §2.2)
-    // Matrix: strict OFF → strip; strict ON + IgnorePatchRO ON → strip; strict ON + IgnorePatchRO OFF → keep for G8c 400
+    // Matrix: strict OFF → strip; strict ON + IgnorePatchRO ON → strip; strict ON + IgnorePatchRO OFF → reject 400
     const strictSchemaEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION);
     const ignorePatchReadOnly = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH);
-    if (!strictSchemaEnabled || ignorePatchReadOnly) {
+    {
       const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
       const { filtered, stripped } = stripReadOnlyPatchOps(patchDto.Operations, schemaDefs);
       if (stripped.length > 0) {
+        if (strictSchemaEnabled && !ignorePatchReadOnly) {
+          // G8c: Hard-reject readOnly writes on strict endpoints
+          throw createScimError({
+            status: 400,
+            scimType: 'mutability',
+            detail: `Attribute(s) [${stripped.join(', ')}] are readOnly and cannot be modified.`,
+          });
+        }
         this.scimLogger.warn(LogCategory.GENERAL, 'Stripped readOnly PATCH operations', {
           count: stripped.length, attributes: stripped,
         });
@@ -409,7 +419,8 @@ export class EndpointScimGenericService {
       payload = {};
     }
 
-    const patchEngine = new GenericPatchEngine(payload);
+    const extensionUrns = resourceType.schemaExtensions.map(e => e.schema);
+    const patchEngine = new GenericPatchEngine(payload, extensionUrns);
 
     try {
       for (const op of patchDto.Operations) {
@@ -520,6 +531,9 @@ export class EndpointScimGenericService {
 
   /**
    * Convert a GenericResourceRecord to a SCIM JSON response.
+   *
+   * Applies returned:never filtering (RFC 7643 §2.4) to strip attributes
+   * that must never appear in any response (e.g. writeOnly secrets).
    */
   private toScimResponse(
     record: GenericResourceRecord,
@@ -541,6 +555,14 @@ export class EndpointScimGenericService {
 
     // Ensure version is current
     meta.version = `W/"${record.version}"`;
+
+    // G8e: Strip returned:'never' attributes from payload (e.g. writeOnly secrets)
+    // Per RFC 7643 §2.4, these MUST NOT appear in any response.
+    const schemaDefs = this.getSchemaDefinitions(resourceType, record.endpointId);
+    const { never: neverAttrs } = SchemaValidator.collectReturnedCharacteristics(schemaDefs);
+    if (neverAttrs.size > 0) {
+      stripReturnedNever(payload, neverAttrs);
+    }
 
     // Build schemas array: core + extension URNs
     const schemas: string[] = [resourceType.schema];
