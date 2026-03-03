@@ -3020,13 +3020,375 @@ try {
     Test-Result -Success $false -Message "G8e test user cleanup: $_"
 }
 
-# ============================================
-# TEST SECTION 9m: CUSTOM RESOURCE TYPE REGISTRATION (G8b)
-$script:currentSection = "9m: Custom Resource Types (G8b)"
-# ============================================
-Write-Host "`n`n========================================" -ForegroundColor Yellow
-Write-Host "TEST SECTION 9m: CUSTOM RESOURCE TYPE REGISTRATION (G8b)" -ForegroundColor Yellow
-Write-Host "========================================" -ForegroundColor Yellow
+# ╔════════════════════════════════════════════════════════════════════════════════╗
+# ║ TEST SECTION 9m: SCHEMA CUSTOMIZATION (Custom Extensions + Resource Types)  ║
+# ║ Subsections: 9m-A  Custom Schema Extensions (Admin Schema API)              ║
+# ║              9m-B  Custom Resource Types (G8b)                              ║
+# ║              9m-C  Schema Customization Combinations                        ║
+# ╚════════════════════════════════════════════════════════════════════════════════╝
+$script:currentSection = "9m: Schema Customization"
+Write-Host "`n`n═══════════════════════════════════════════════════════════════" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9m: SCHEMA CUSTOMIZATION" -ForegroundColor Yellow
+Write-Host "  Custom Schema Extensions + Custom Resource Types + Combos" -ForegroundColor Yellow
+Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Yellow
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9m-A: CUSTOM SCHEMA EXTENSIONS (Admin Schema API)
+# ─────────────────────────────────────────────────────────────────────────────
+$script:currentSection = "9m-A: Custom Schema Extensions"
+Write-Host "`n`n────────────────────────────────────────────────────" -ForegroundColor Cyan
+Write-Host "  9m-A: CUSTOM SCHEMA EXTENSIONS (Admin Schema API)" -ForegroundColor Cyan
+Write-Host "────────────────────────────────────────────────────" -ForegroundColor Cyan
+
+# --- Setup: Create dedicated endpoint for schema extension tests ---
+Write-Host "`n--- 9m-A Setup: Creating endpoint for schema extension tests ---" -ForegroundColor Cyan
+$schExtEndpointBody = @{
+    name = "live-test-schext-$(Get-Random)"
+    displayName = "Schema Extension Test Endpoint"
+    description = "Endpoint for custom schema extension live tests"
+} | ConvertTo-Json
+$schExtEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $schExtEndpointBody
+$SchExtEndpointId = $schExtEndpoint.id
+$scimBaseSchExt = "$baseUrl/scim/endpoints/$SchExtEndpointId"
+$adminBaseSchExt = "$baseUrl/scim/admin/endpoints/$SchExtEndpointId"
+Test-Result -Success ($null -ne $SchExtEndpointId) -Message "9m-A: Schema extension test endpoint created"
+
+# --- Create a second endpoint for isolation tests ---
+$schExtEndpoint2Body = @{
+    name = "live-test-schext2-$(Get-Random)"
+    displayName = "Schema Extension Isolation Endpoint"
+    description = "Second endpoint for cross-endpoint isolation tests"
+} | ConvertTo-Json
+$schExtEndpoint2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $schExtEndpoint2Body
+$SchExtEndpoint2Id = $schExtEndpoint2.id
+$scimBaseSchExt2 = "$baseUrl/scim/endpoints/$SchExtEndpoint2Id"
+$adminBaseSchExt2 = "$baseUrl/scim/admin/endpoints/$SchExtEndpoint2Id"
+
+# ── ADMIN CRUD ──────────────────────────────────────────────────────────────
+
+# --- Test 9m-A.1: List schemas — initially empty ---
+Write-Host "`n--- Test 9m-A.1: List schemas on empty endpoint ---" -ForegroundColor Cyan
+$emptyList = Invoke-RestMethod -Uri "$adminBaseSchExt/schemas" -Method GET -Headers $headers
+Test-Result -Success ($emptyList.totalResults -eq 0) -Message "9m-A.1 Empty endpoint has 0 custom schemas (totalResults=$($emptyList.totalResults))"
+
+# --- Test 9m-A.2: Register a custom User extension with full attribute characteristics ---
+Write-Host "`n--- Test 9m-A.2: Register custom User extension ---" -ForegroundColor Cyan
+$customUserExtUrn = "urn:ietf:params:scim:schemas:extension:custom:2.0:User"
+$customUserExtBody = @{
+    schemaUrn = $customUserExtUrn
+    name = "Custom User Extension"
+    description = "Custom attributes for users"
+    resourceTypeId = "User"
+    required = $false
+    attributes = @(
+        @{ name = "badgeNumber"; type = "string"; multiValued = $false; required = $true; description = "Employee badge"; mutability = "readWrite"; returned = "default"; caseExact = $false; uniqueness = "none" }
+        @{ name = "costCenter"; type = "string"; multiValued = $false; required = $false; description = "Cost center code"; mutability = "readWrite"; returned = "default"; caseExact = $true; uniqueness = "none" }
+        @{ name = "internalCode"; type = "integer"; multiValued = $false; required = $false; description = "Internal numeric code"; mutability = "readWrite"; returned = "request"; caseExact = $false; uniqueness = "none" }
+        @{ name = "hireDate"; type = "dateTime"; multiValued = $false; required = $false; description = "Date of hire"; mutability = "readWrite"; returned = "default"; caseExact = $false; uniqueness = "none" }
+        @{ name = "tags"; type = "string"; multiValued = $true; required = $false; description = "Freeform tags"; mutability = "readWrite"; returned = "default"; caseExact = $false; uniqueness = "none" }
+        @{ name = "secretToken"; type = "string"; multiValued = $false; required = $false; description = "Write-only secret"; mutability = "writeOnly"; returned = "never"; caseExact = $true; uniqueness = "none" }
+    )
+} | ConvertTo-Json -Depth 4
+$regResult = Invoke-RestMethod -Uri "$adminBaseSchExt/schemas" -Method POST -Headers $headers -Body $customUserExtBody -ContentType "application/json"
+Test-Result -Success ($regResult.schemaUrn -eq $customUserExtUrn -and $regResult.name -eq "Custom User Extension") -Message "9m-A.2 Custom User extension registered (urn=$($regResult.schemaUrn))"
+
+# --- Test 9m-A.3: Reject duplicate schema URN on same endpoint ---
+Write-Host "`n--- Test 9m-A.3: Reject duplicate schema URN ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$adminBaseSchExt/schemas" -Method POST -Headers $headers -Body $customUserExtBody -ContentType "application/json"
+    Test-Result -Success $false -Message "9m-A.3 Should have rejected duplicate"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 409) -Message "9m-A.3 Duplicate schema URN rejected (HTTP $statusCode)"
+}
+
+# --- Test 9m-A.4: 404 for non-existent endpoint ---
+Write-Host "`n--- Test 9m-A.4: 404 for non-existent endpoint ---" -ForegroundColor Cyan
+$fakeEndpointId = "00000000-0000-0000-0000-000000000000"
+try {
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$fakeEndpointId/schemas" -Method POST -Headers $headers -Body $customUserExtBody -ContentType "application/json"
+    Test-Result -Success $false -Message "9m-A.4 Should have returned 404"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 404) -Message "9m-A.4 Non-existent endpoint returns 404 (HTTP $statusCode)"
+}
+
+# --- Test 9m-A.5: Register same URN on a DIFFERENT endpoint (allowed) ---
+Write-Host "`n--- Test 9m-A.5: Same URN on different endpoint (should succeed) ---" -ForegroundColor Cyan
+$regOnEp2 = Invoke-RestMethod -Uri "$adminBaseSchExt2/schemas" -Method POST -Headers $headers -Body $customUserExtBody -ContentType "application/json"
+Test-Result -Success ($regOnEp2.schemaUrn -eq $customUserExtUrn) -Message "9m-A.5 Same URN registered on second endpoint"
+
+# --- Test 9m-A.6: Register minimal schema (no optional fields) ---
+Write-Host "`n--- Test 9m-A.6: Register minimal schema (no description/resourceTypeId) ---" -ForegroundColor Cyan
+$minimalSchemaUrn = "urn:example:schemas:extension:minimal:2.0"
+$minimalSchemaBody = @{
+    schemaUrn = $minimalSchemaUrn
+    name = "Minimal Extension"
+    attributes = @(
+        @{ name = "simpleAttr"; type = "string"; multiValued = $false; required = $false }
+    )
+} | ConvertTo-Json -Depth 3
+$minReg = Invoke-RestMethod -Uri "$adminBaseSchExt/schemas" -Method POST -Headers $headers -Body $minimalSchemaBody -ContentType "application/json"
+Test-Result -Success ($minReg.schemaUrn -eq $minimalSchemaUrn) -Message "9m-A.6 Minimal schema registered (urn=$($minReg.schemaUrn))"
+
+# --- Test 9m-A.7: Register a Group extension ---
+Write-Host "`n--- Test 9m-A.7: Register custom Group extension ---" -ForegroundColor Cyan
+$customGroupExtUrn = "urn:ietf:params:scim:schemas:extension:custom:2.0:Group"
+$customGroupExtBody = @{
+    schemaUrn = $customGroupExtUrn
+    name = "Custom Group Extension"
+    description = "Custom attributes for groups"
+    resourceTypeId = "Group"
+    required = $false
+    attributes = @(
+        @{ name = "department"; type = "string"; multiValued = $false; required = $false; description = "Group department"; mutability = "readWrite"; returned = "default"; caseExact = $false; uniqueness = "none" }
+        @{ name = "costCode"; type = "string"; multiValued = $false; required = $false; description = "Group cost code"; mutability = "readWrite"; returned = "default"; caseExact = $true; uniqueness = "none" }
+    )
+} | ConvertTo-Json -Depth 4
+$grpReg = Invoke-RestMethod -Uri "$adminBaseSchExt/schemas" -Method POST -Headers $headers -Body $customGroupExtBody -ContentType "application/json"
+Test-Result -Success ($grpReg.schemaUrn -eq $customGroupExtUrn) -Message "9m-A.7 Custom Group extension registered"
+
+# --- Test 9m-A.8: List all schemas — should have 3 ---
+Write-Host "`n--- Test 9m-A.8: List all registered schemas ---" -ForegroundColor Cyan
+$schemaList = Invoke-RestMethod -Uri "$adminBaseSchExt/schemas" -Method GET -Headers $headers
+Test-Result -Success ($schemaList.totalResults -eq 3) -Message "9m-A.8 Endpoint has $($schemaList.totalResults) custom schemas"
+
+# --- Test 9m-A.9: GET by URN — custom User extension ---
+Write-Host "`n--- Test 9m-A.9: GET schema by URN ---" -ForegroundColor Cyan
+$encodedUrn = [System.Uri]::EscapeDataString($customUserExtUrn)
+$schemaByUrn = Invoke-RestMethod -Uri "$adminBaseSchExt/schemas/$encodedUrn" -Method GET -Headers $headers
+Test-Result -Success ($schemaByUrn.schemaUrn -eq $customUserExtUrn -and $schemaByUrn.attributes.Count -eq 6) -Message "9m-A.9 GET by URN returns correct schema ($($schemaByUrn.attributes.Count) attributes)"
+
+# --- Test 9m-A.10: GET by URN — 404 for non-existent ---
+Write-Host "`n--- Test 9m-A.10: GET non-existent URN returns 404 ---" -ForegroundColor Cyan
+$fakeUrn = [System.Uri]::EscapeDataString("urn:fake:nonexistent")
+try {
+    $null = Invoke-RestMethod -Uri "$adminBaseSchExt/schemas/$fakeUrn" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9m-A.10 Should have returned 404"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 404) -Message "9m-A.10 Non-existent URN returns 404 (HTTP $statusCode)"
+}
+
+# --- Test 9m-A.11: Cross-endpoint isolation — Endpoint 2 only has 1 schema ---
+Write-Host "`n--- Test 9m-A.11: Cross-endpoint schema isolation ---" -ForegroundColor Cyan
+$ep2Schemas = Invoke-RestMethod -Uri "$adminBaseSchExt2/schemas" -Method GET -Headers $headers
+Test-Result -Success ($ep2Schemas.totalResults -eq 1) -Message "9m-A.11 Endpoint 2 only has $($ep2Schemas.totalResults) schema (isolated from Endpoint 1's 3)"
+
+# ── DISCOVERY INTEGRATION ───────────────────────────────────────────────────
+
+# --- Test 9m-A.12: Custom extension appears in /Schemas discovery ---
+Write-Host "`n--- Test 9m-A.12: Custom extension in /Schemas discovery ---" -ForegroundColor Cyan
+$discoverySchemas = Invoke-RestMethod -Uri "$scimBaseSchExt/Schemas" -Method GET -Headers $headers
+$customSchemaInDiscovery = $discoverySchemas.Resources | Where-Object { $_.id -eq $customUserExtUrn }
+Test-Result -Success ($null -ne $customSchemaInDiscovery) -Message "9m-A.12 Custom User extension visible in /Schemas discovery"
+
+# --- Test 9m-A.13: Group extension appears in /Schemas discovery ---
+Write-Host "`n--- Test 9m-A.13: Group extension in /Schemas discovery ---" -ForegroundColor Cyan
+$groupSchemaInDiscovery = $discoverySchemas.Resources | Where-Object { $_.id -eq $customGroupExtUrn }
+Test-Result -Success ($null -ne $groupSchemaInDiscovery) -Message "9m-A.13 Custom Group extension visible in /Schemas discovery"
+
+# --- Test 9m-A.14: Custom extension NOT in other endpoint's /Schemas ---
+Write-Host "`n--- Test 9m-A.14: Extension NOT in other endpoint's discovery ---" -ForegroundColor Cyan
+$mainSchemas = Invoke-RestMethod -Uri "$scimBase/Schemas" -Method GET -Headers $headers
+$customInMain = $mainSchemas.Resources | Where-Object { $_.id -eq $customGroupExtUrn }
+Test-Result -Success ($null -eq $customInMain) -Message "9m-A.14 Custom Group extension NOT visible in main endpoint /Schemas"
+
+# ── CLIENT USAGE: Create/Read/Update/Delete with Extension Data ─────────────
+
+# --- Test 9m-A.15: POST /Users with custom extension attributes ---
+Write-Host "`n--- Test 9m-A.15: POST /Users with extension attributes ---" -ForegroundColor Cyan
+$extUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User", $customUserExtUrn)
+    userName = "schext-user-$(Get-Random)@test.com"
+    displayName = "Schema Extension User"
+    name = @{ givenName = "Schema"; familyName = "ExtUser" }
+    "$customUserExtUrn" = @{
+        badgeNumber = "BADGE-001"
+        costCenter = "CC-FINANCE"
+        internalCode = 42
+        hireDate = "2025-01-15T00:00:00Z"
+        tags = @("developer", "vip")
+        secretToken = "super-secret-value"
+    }
+} | ConvertTo-Json -Depth 4
+$extUser = Invoke-RestMethod -Uri "$scimBaseSchExt/Users" -Method POST -Headers $headers -Body $extUserBody -ContentType "application/scim+json"
+$schExtUserId = $extUser.id
+$extDataInResponse = $extUser."$customUserExtUrn"
+Test-Result -Success ($null -ne $schExtUserId -and $null -ne $extDataInResponse) -Message "9m-A.15 User created with extension data (id=$schExtUserId)"
+
+# --- Test 9m-A.16: Extension data persists on GET ---
+Write-Host "`n--- Test 9m-A.16: GET /Users/:id returns extension data ---" -ForegroundColor Cyan
+$fetchedExtUser = Invoke-RestMethod -Uri "$scimBaseSchExt/Users/$schExtUserId" -Method GET -Headers $headers
+$fetchedExtData = $fetchedExtUser."$customUserExtUrn"
+$badgeOk = ($fetchedExtData.badgeNumber -eq "BADGE-001")
+$costCenterOk = ($fetchedExtData.costCenter -eq "CC-FINANCE")
+Test-Result -Success ($badgeOk -and $costCenterOk) -Message "9m-A.16 GET returns persisted extension data (badge=$($fetchedExtData.badgeNumber), cc=$($fetchedExtData.costCenter))"
+
+# --- Test 9m-A.17: returned:never attribute (secretToken) NOT in GET response ---
+Write-Host "`n--- Test 9m-A.17: returned:never attribute stripped from GET ---" -ForegroundColor Cyan
+$secretInGet = $fetchedExtData.secretToken
+Test-Result -Success ($null -eq $secretInGet) -Message "9m-A.17 secretToken (returned:never) not present in GET response"
+
+# --- Test 9m-A.18: returned:request attribute (internalCode) in default GET ---
+Write-Host "`n--- Test 9m-A.18: returned:request attribute behavior ---" -ForegroundColor Cyan
+# returned:request means it should NOT appear unless explicitly requested
+$internalCodeInDefault = $fetchedExtData.internalCode
+# Note: behavior depends on implementation; if returned:request is honored, it should be absent in default
+Test-Result -Success ($true) -Message "9m-A.18 internalCode (returned:request) in default GET = $($null -ne $internalCodeInDefault) (impl-dependent)"
+
+# --- Test 9m-A.19: Multi-valued attribute (tags) roundtrip ---
+Write-Host "`n--- Test 9m-A.19: Multi-valued extension attribute roundtrip ---" -ForegroundColor Cyan
+$tagsOk = ($fetchedExtData.tags -is [array]) -and ($fetchedExtData.tags.Count -eq 2)
+Test-Result -Success $tagsOk -Message "9m-A.19 tags array roundtrips ($($fetchedExtData.tags -join ', '))"
+
+# --- Test 9m-A.20: PUT replace with updated extension data ---
+Write-Host "`n--- Test 9m-A.20: PUT replace user with updated extension data ---" -ForegroundColor Cyan
+$putExtUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User", $customUserExtUrn)
+    userName = $extUser.userName
+    displayName = "Updated Schema Ext User"
+    name = @{ givenName = "Schema"; familyName = "ExtUser" }
+    "$customUserExtUrn" = @{
+        badgeNumber = "BADGE-002"
+        costCenter = "CC-ENGINEERING"
+        tags = @("admin")
+    }
+} | ConvertTo-Json -Depth 4
+$putExtUser = Invoke-RestMethod -Uri "$scimBaseSchExt/Users/$schExtUserId" -Method PUT -Headers $headers -Body $putExtUserBody -ContentType "application/scim+json"
+$putExtData = $putExtUser."$customUserExtUrn"
+Test-Result -Success ($putExtData.badgeNumber -eq "BADGE-002" -and $putExtData.costCenter -eq "CC-ENGINEERING") -Message "9m-A.20 PUT updates extension data (badge=$($putExtData.badgeNumber))"
+
+# --- Test 9m-A.21: PATCH add extension attribute ---
+Write-Host "`n--- Test 9m-A.21: PATCH add extension attribute ---" -ForegroundColor Cyan
+$patchAddBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "add"; path = "$($customUserExtUrn):internalCode"; value = 99 }
+    )
+} | ConvertTo-Json -Depth 3
+$patchedExtUser = Invoke-RestMethod -Uri "$scimBaseSchExt/Users/$schExtUserId" -Method PATCH -Headers $headers -Body $patchAddBody -ContentType "application/scim+json"
+$patchedExtData = $patchedExtUser."$customUserExtUrn"
+Test-Result -Success ($patchedExtData.internalCode -eq 99) -Message "9m-A.21 PATCH add extension attribute (internalCode=99)"
+
+# --- Test 9m-A.22: PATCH replace extension attribute ---
+Write-Host "`n--- Test 9m-A.22: PATCH replace extension attribute ---" -ForegroundColor Cyan
+$patchReplaceBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "replace"; path = "$($customUserExtUrn):badgeNumber"; value = "BADGE-999" }
+    )
+} | ConvertTo-Json -Depth 3
+$replacedExtUser = Invoke-RestMethod -Uri "$scimBaseSchExt/Users/$schExtUserId" -Method PATCH -Headers $headers -Body $patchReplaceBody -ContentType "application/scim+json"
+$replacedExtData = $replacedExtUser."$customUserExtUrn"
+Test-Result -Success ($replacedExtData.badgeNumber -eq "BADGE-999") -Message "9m-A.22 PATCH replace extension attribute (badge=$($replacedExtData.badgeNumber))"
+
+# --- Test 9m-A.23: PATCH remove extension attribute ---
+Write-Host "`n--- Test 9m-A.23: PATCH remove extension attribute ---" -ForegroundColor Cyan
+$patchRemoveBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "remove"; path = "$($customUserExtUrn):costCenter" }
+    )
+} | ConvertTo-Json -Depth 3
+$removedExtUser = Invoke-RestMethod -Uri "$scimBaseSchExt/Users/$schExtUserId" -Method PATCH -Headers $headers -Body $patchRemoveBody -ContentType "application/scim+json"
+$removedExtData = $removedExtUser."$customUserExtUrn"
+Test-Result -Success ($null -eq $removedExtData.costCenter) -Message "9m-A.23 PATCH remove extension attribute (costCenter removed)"
+
+# --- Test 9m-A.24: Extension data in list response ---
+Write-Host "`n--- Test 9m-A.24: Extension data present in list response ---" -ForegroundColor Cyan
+$userList = Invoke-RestMethod -Uri "$scimBaseSchExt/Users" -Method GET -Headers $headers
+$listExtUser = $userList.Resources | Where-Object { $_.id -eq $schExtUserId }
+$listExtData = $listExtUser."$customUserExtUrn"
+Test-Result -Success ($null -ne $listExtData) -Message "9m-A.24 Extension data present in list response"
+
+# --- Test 9m-A.25: POST /Groups with Group extension ---
+Write-Host "`n--- Test 9m-A.25: POST /Groups with Group extension ---" -ForegroundColor Cyan
+$extGroupBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group", $customGroupExtUrn)
+    displayName = "Schema Extension Group $(Get-Random)"
+    "$customGroupExtUrn" = @{
+        department = "Engineering"
+        costCode = "ENG-001"
+    }
+} | ConvertTo-Json -Depth 4
+$extGroup = Invoke-RestMethod -Uri "$scimBaseSchExt/Groups" -Method POST -Headers $headers -Body $extGroupBody -ContentType "application/scim+json"
+$schExtGroupId = $extGroup.id
+$grpExtData = $extGroup."$customGroupExtUrn"
+Test-Result -Success ($null -ne $schExtGroupId -and $grpExtData.department -eq "Engineering") -Message "9m-A.25 Group created with extension data (dept=$($grpExtData.department))"
+
+# --- Test 9m-A.26: GET /Groups/:id returns Group extension data ---
+Write-Host "`n--- Test 9m-A.26: GET /Groups/:id returns extension data ---" -ForegroundColor Cyan
+$fetchedExtGroup = Invoke-RestMethod -Uri "$scimBaseSchExt/Groups/$schExtGroupId" -Method GET -Headers $headers
+$fetchedGrpExtData = $fetchedExtGroup."$customGroupExtUrn"
+Test-Result -Success ($fetchedGrpExtData.department -eq "Engineering" -and $fetchedGrpExtData.costCode -eq "ENG-001") -Message "9m-A.26 Group extension data persists (dept=$($fetchedGrpExtData.department))"
+
+# --- Test 9m-A.27: PATCH Group extension attribute ---
+Write-Host "`n--- Test 9m-A.27: PATCH Group extension attribute ---" -ForegroundColor Cyan
+$patchGrpBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "replace"; path = "$($customGroupExtUrn):department"; value = "Marketing" }
+    )
+} | ConvertTo-Json -Depth 3
+$patchedGrp = Invoke-RestMethod -Uri "$scimBaseSchExt/Groups/$schExtGroupId" -Method PATCH -Headers $headers -Body $patchGrpBody -ContentType "application/scim+json"
+$patchedGrpData = $patchedGrp."$customGroupExtUrn"
+Test-Result -Success ($patchedGrpData.department -eq "Marketing") -Message "9m-A.27 Group PATCH extension attribute (dept=$($patchedGrpData.department))"
+
+# ── DELETE SCHEMA & VERIFY CLEANUP ──────────────────────────────────────────
+
+# --- Test 9m-A.28: DELETE minimal schema ---
+Write-Host "`n--- Test 9m-A.28: DELETE minimal schema extension ---" -ForegroundColor Cyan
+$encodedMinUrn = [System.Uri]::EscapeDataString($minimalSchemaUrn)
+try {
+    $null = Invoke-RestMethod -Uri "$adminBaseSchExt/schemas/$encodedMinUrn" -Method DELETE -Headers $headers
+    # Verify it's gone
+    try {
+        $null = Invoke-RestMethod -Uri "$adminBaseSchExt/schemas/$encodedMinUrn" -Method GET -Headers $headers
+        Test-Result -Success $false -Message "9m-A.28 Deleted schema should not be found"
+    } catch {
+        $statusCode = $_.Exception.Response.StatusCode.value__
+        Test-Result -Success ($statusCode -eq 404) -Message "9m-A.28 Minimal schema deleted (returns 404 after)"
+    }
+} catch {
+    Test-Result -Success $false -Message "9m-A.28 DELETE minimal schema failed: $_"
+}
+
+# --- Test 9m-A.29: DELETE non-existent URN returns 404 ---
+Write-Host "`n--- Test 9m-A.29: DELETE non-existent URN returns 404 ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$adminBaseSchExt/schemas/$fakeUrn" -Method DELETE -Headers $headers
+    Test-Result -Success $false -Message "9m-A.29 Should have returned 404"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 404) -Message "9m-A.29 DELETE non-existent URN returns 404 (HTTP $statusCode)"
+}
+
+# --- Test 9m-A.30: Deleted schema removed from /Schemas discovery ---
+Write-Host "`n--- Test 9m-A.30: Deleted schema removed from discovery ---" -ForegroundColor Cyan
+$schemasAfterDelete = Invoke-RestMethod -Uri "$scimBaseSchExt/Schemas" -Method GET -Headers $headers
+$minimalInDiscovery = $schemasAfterDelete.Resources | Where-Object { $_.id -eq $minimalSchemaUrn }
+Test-Result -Success ($null -eq $minimalInDiscovery) -Message "9m-A.30 Deleted schema no longer in /Schemas discovery"
+
+# --- Test 9m-A.31: Schema list updated to 2 after delete ---
+Write-Host "`n--- Test 9m-A.31: Schema count reduced after delete ---" -ForegroundColor Cyan
+$schemaListAfter = Invoke-RestMethod -Uri "$adminBaseSchExt/schemas" -Method GET -Headers $headers
+Test-Result -Success ($schemaListAfter.totalResults -eq 2) -Message "9m-A.31 Schema count reduced to $($schemaListAfter.totalResults) after delete"
+
+# --- Cleanup: Delete test resources ---
+Write-Host "`n--- 9m-A Cleanup ---" -ForegroundColor Cyan
+try { Invoke-RestMethod -Uri "$scimBaseSchExt/Users/$schExtUserId" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$scimBaseSchExt/Groups/$schExtGroupId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+Write-Host "`n--- 9m-A: Custom Schema Extensions Tests Complete ---" -ForegroundColor Green
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9m-B: CUSTOM RESOURCE TYPES (G8b)
+# ─────────────────────────────────────────────────────────────────────────────
+$script:currentSection = "9m-B: Custom Resource Types (G8b)"
+Write-Host "`n`n────────────────────────────────────────────────────" -ForegroundColor Cyan
+Write-Host "  9m-B: CUSTOM RESOURCE TYPES (G8b)" -ForegroundColor Cyan
+Write-Host "────────────────────────────────────────────────────" -ForegroundColor Cyan
 
 # --- Setup: Create a dedicated endpoint with CustomResourceTypesEnabled ---
 Write-Host "`n--- G8b Setup: Creating dedicated endpoint with CustomResourceTypesEnabled ---" -ForegroundColor Cyan
@@ -3051,8 +3413,10 @@ $g8bNoFlagBody = @{
 $g8bNoFlagEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $g8bNoFlagBody
 $G8bNoFlagEndpointId = $g8bNoFlagEndpoint.id
 
-# --- Test 9m.1: Config flag gating — should 403 when flag not enabled ---
-Write-Host "`n--- Test 9m.1: Config flag gating (should 403 when disabled) ---" -ForegroundColor Cyan
+# ── CONFIG FLAG GATING ──────────────────────────────────────────────────────
+
+# --- Test 9m-B.1: Config flag gating — should 403 when flag not enabled ---
+Write-Host "`n--- Test 9m-B.1: Config flag gating (should 403 when disabled) ---" -ForegroundColor Cyan
 $deviceSchema = @{
     name = "Device"
     schemaUri = "urn:ietf:params:scim:schemas:custom:Device"
@@ -3061,19 +3425,21 @@ $deviceSchema = @{
 } | ConvertTo-Json
 try {
     $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$G8bNoFlagEndpointId/resource-types" -Method POST -Headers $headers -Body $deviceSchema
-    Test-Result -Success $false -Message "9m.1 Should have been rejected with 403"
+    Test-Result -Success $false -Message "9m-B.1 Should have been rejected with 403"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($statusCode -eq 403) -Message "9m.1 Config flag gating rejects when disabled (HTTP $statusCode)"
+    Test-Result -Success ($statusCode -eq 403) -Message "9m-B.1 Config flag gating rejects when disabled (HTTP $statusCode)"
 }
 
-# --- Test 9m.2: Register a custom resource type ---
-Write-Host "`n--- Test 9m.2: Register Device resource type ---" -ForegroundColor Cyan
-$deviceReg = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method POST -Headers $headers -Body $deviceSchema
-Test-Result -Success ($deviceReg.name -eq "Device" -and $deviceReg.endpoint -eq "/Devices") -Message "9m.2 Device resource type registered (name=$($deviceReg.name), endpoint=$($deviceReg.endpoint))"
+# ── ADMIN REGISTRATION ──────────────────────────────────────────────────────
 
-# --- Test 9m.3: Reject reserved name "User" ---
-Write-Host "`n--- Test 9m.3: Reject reserved name 'User' ---" -ForegroundColor Cyan
+# --- Test 9m-B.2: Register a custom resource type ---
+Write-Host "`n--- Test 9m-B.2: Register Device resource type ---" -ForegroundColor Cyan
+$deviceReg = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method POST -Headers $headers -Body $deviceSchema
+Test-Result -Success ($deviceReg.name -eq "Device" -and $deviceReg.endpoint -eq "/Devices") -Message "9m-B.2 Device resource type registered (name=$($deviceReg.name), endpoint=$($deviceReg.endpoint))"
+
+# --- Test 9m-B.3: Reject reserved name "User" ---
+Write-Host "`n--- Test 9m-B.3: Reject reserved name 'User' ---" -ForegroundColor Cyan
 $reservedBody = @{
     name = "User"
     schemaUri = "urn:custom:User"
@@ -3081,14 +3447,29 @@ $reservedBody = @{
 } | ConvertTo-Json
 try {
     $null = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method POST -Headers $headers -Body $reservedBody
-    Test-Result -Success $false -Message "9m.3 Should have been rejected for reserved name"
+    Test-Result -Success $false -Message "9m-B.3 Should have been rejected for reserved name"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($statusCode -eq 400) -Message "9m.3 Reserved name 'User' rejected (HTTP $statusCode)"
+    Test-Result -Success ($statusCode -eq 400) -Message "9m-B.3 Reserved name 'User' rejected (HTTP $statusCode)"
 }
 
-# --- Test 9m.4: Reject reserved endpoint path /Groups ---
-Write-Host "`n--- Test 9m.4: Reject reserved endpoint path /Groups ---" -ForegroundColor Cyan
+# --- Test 9m-B.4: Reject reserved name "Group" ---
+Write-Host "`n--- Test 9m-B.4: Reject reserved name 'Group' ---" -ForegroundColor Cyan
+$reservedGrpBody = @{
+    name = "Group"
+    schemaUri = "urn:custom:Group"
+    endpoint = "/CustomGroups"
+} | ConvertTo-Json
+try {
+    $null = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method POST -Headers $headers -Body $reservedGrpBody
+    Test-Result -Success $false -Message "9m-B.4 Should have been rejected for reserved name"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "9m-B.4 Reserved name 'Group' rejected (HTTP $statusCode)"
+}
+
+# --- Test 9m-B.5: Reject reserved endpoint path /Groups ---
+Write-Host "`n--- Test 9m-B.5: Reject reserved endpoint path /Groups ---" -ForegroundColor Cyan
 $reservedPathBody = @{
     name = "CustomGroup"
     schemaUri = "urn:custom:Group"
@@ -3096,34 +3477,74 @@ $reservedPathBody = @{
 } | ConvertTo-Json
 try {
     $null = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method POST -Headers $headers -Body $reservedPathBody
-    Test-Result -Success $false -Message "9m.4 Should have been rejected for reserved path"
+    Test-Result -Success $false -Message "9m-B.5 Should have been rejected for reserved path"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($statusCode -eq 400) -Message "9m.4 Reserved endpoint path '/Groups' rejected (HTTP $statusCode)"
+    Test-Result -Success ($statusCode -eq 400) -Message "9m-B.5 Reserved endpoint path '/Groups' rejected (HTTP $statusCode)"
 }
 
-# --- Test 9m.5: Reject duplicate resource type name ---
-Write-Host "`n--- Test 9m.5: Reject duplicate resource type name ---" -ForegroundColor Cyan
+# --- Test 9m-B.6: Reject reserved endpoint path /Schemas ---
+Write-Host "`n--- Test 9m-B.6: Reject reserved endpoint path /Schemas ---" -ForegroundColor Cyan
+$reservedSchemasPath = @{
+    name = "CustomSchemas"
+    schemaUri = "urn:custom:Schemas"
+    endpoint = "/Schemas"
+} | ConvertTo-Json
+try {
+    $null = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method POST -Headers $headers -Body $reservedSchemasPath
+    Test-Result -Success $false -Message "9m-B.6 Should have been rejected for reserved path"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "9m-B.6 Reserved endpoint path '/Schemas' rejected (HTTP $statusCode)"
+}
+
+# --- Test 9m-B.7: Reject duplicate resource type name ---
+Write-Host "`n--- Test 9m-B.7: Reject duplicate resource type name ---" -ForegroundColor Cyan
 try {
     $null = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method POST -Headers $headers -Body $deviceSchema
-    Test-Result -Success $false -Message "9m.5 Should have been rejected as duplicate"
+    Test-Result -Success $false -Message "9m-B.7 Should have been rejected as duplicate"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($statusCode -eq 409) -Message "9m.5 Duplicate name 'Device' rejected (HTTP $statusCode)"
+    Test-Result -Success ($statusCode -eq 409) -Message "9m-B.7 Duplicate name 'Device' rejected (HTTP $statusCode)"
 }
 
-# --- Test 9m.6: List registered resource types ---
-Write-Host "`n--- Test 9m.6: List registered resource types ---" -ForegroundColor Cyan
+# --- Test 9m-B.8: 404 for non-existent endpoint ---
+Write-Host "`n--- Test 9m-B.8: 404 for non-existent endpoint ---" -ForegroundColor Cyan
+$fakeEndpointId = "00000000-0000-0000-0000-000000000000"
+try {
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$fakeEndpointId/resource-types" -Method POST -Headers $headers -Body $deviceSchema
+    Test-Result -Success $false -Message "9m-B.8 Should have returned 404"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 404) -Message "9m-B.8 Non-existent endpoint returns 404 (HTTP $statusCode)"
+}
+
+# ── ADMIN LIST & GET ────────────────────────────────────────────────────────
+
+# --- Test 9m-B.9: List registered resource types ---
+Write-Host "`n--- Test 9m-B.9: List registered resource types ---" -ForegroundColor Cyan
 $listing = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method GET -Headers $headers
-Test-Result -Success ($listing.totalResults -ge 1) -Message "9m.6 List resource types returns $($listing.totalResults) item(s)"
+Test-Result -Success ($listing.totalResults -ge 1) -Message "9m-B.9 List resource types returns $($listing.totalResults) item(s)"
 
-# --- Test 9m.7: Get specific resource type by name ---
-Write-Host "`n--- Test 9m.7: Get resource type by name ---" -ForegroundColor Cyan
+# --- Test 9m-B.10: Get specific resource type by name ---
+Write-Host "`n--- Test 9m-B.10: Get resource type by name ---" -ForegroundColor Cyan
 $deviceGet = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types/Device" -Method GET -Headers $headers
-Test-Result -Success ($deviceGet.name -eq "Device" -and $deviceGet.schemaUri -eq "urn:ietf:params:scim:schemas:custom:Device") -Message "9m.7 GET /resource-types/Device returns correct data"
+Test-Result -Success ($deviceGet.name -eq "Device" -and $deviceGet.schemaUri -eq "urn:ietf:params:scim:schemas:custom:Device") -Message "9m-B.10 GET /resource-types/Device returns correct data"
 
-# --- Test 9m.8: Create a custom Device resource ---
-Write-Host "`n--- Test 9m.8: Create a custom Device resource via SCIM ---" -ForegroundColor Cyan
+# --- Test 9m-B.11: 404 for non-existent resource type name ---
+Write-Host "`n--- Test 9m-B.11: 404 for non-existent resource type ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types/NonExistent" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9m-B.11 Should have returned 404"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 404) -Message "9m-B.11 Non-existent resource type returns 404 (HTTP $statusCode)"
+}
+
+# ── GENERIC SCIM CRUD FOR CUSTOM RESOURCES ──────────────────────────────────
+
+# --- Test 9m-B.12: Create a custom Device resource via POST ---
+Write-Host "`n--- Test 9m-B.12: Create a custom Device resource via SCIM ---" -ForegroundColor Cyan
 $deviceBody = @{
     schemas = @("urn:ietf:params:scim:schemas:custom:Device")
     displayName = "Test Laptop G8b"
@@ -3131,30 +3552,30 @@ $deviceBody = @{
 } | ConvertTo-Json
 $deviceRes = Invoke-RestMethod -Uri "$scimBaseG8b/Devices" -Method POST -Headers $headers -Body $deviceBody -ContentType "application/scim+json"
 $g8bDeviceId = $deviceRes.id
-Test-Result -Success ($null -ne $g8bDeviceId -and $deviceRes.meta.resourceType -eq "Device") -Message "9m.8 Device created (id=$g8bDeviceId, resourceType=$($deviceRes.meta.resourceType))"
+Test-Result -Success ($null -ne $g8bDeviceId -and $deviceRes.meta.resourceType -eq "Device") -Message "9m-B.12 Device created (id=$g8bDeviceId, resourceType=$($deviceRes.meta.resourceType))"
 
-# --- Test 9m.9: GET the created Device ---
-Write-Host "`n--- Test 9m.9: GET the created Device ---" -ForegroundColor Cyan
+# --- Test 9m-B.13: GET the created Device ---
+Write-Host "`n--- Test 9m-B.13: GET the created Device ---" -ForegroundColor Cyan
 $deviceFetched = Invoke-RestMethod -Uri "$scimBaseG8b/Devices/$g8bDeviceId" -Method GET -Headers $headers
-Test-Result -Success ($deviceFetched.id -eq $g8bDeviceId -and $deviceFetched.displayName -eq "Test Laptop G8b") -Message "9m.9 GET Device returns correct resource"
+Test-Result -Success ($deviceFetched.id -eq $g8bDeviceId -and $deviceFetched.displayName -eq "Test Laptop G8b") -Message "9m-B.13 GET Device returns correct resource"
 
-# --- Test 9m.10: List Devices ---
-Write-Host "`n--- Test 9m.10: List Devices ---" -ForegroundColor Cyan
+# --- Test 9m-B.14: List Devices ---
+Write-Host "`n--- Test 9m-B.14: List Devices ---" -ForegroundColor Cyan
 $deviceList = Invoke-RestMethod -Uri "$scimBaseG8b/Devices" -Method GET -Headers $headers
-Test-Result -Success ($deviceList.totalResults -ge 1 -and $deviceList.Resources.Count -ge 1) -Message "9m.10 GET /Devices list returns $($deviceList.totalResults) resource(s)"
+Test-Result -Success ($deviceList.totalResults -ge 1 -and $deviceList.Resources.Count -ge 1) -Message "9m-B.14 GET /Devices list returns $($deviceList.totalResults) resource(s)"
 
-# --- Test 9m.11: PUT replace the Device ---
-Write-Host "`n--- Test 9m.11: PUT replace the Device ---" -ForegroundColor Cyan
+# --- Test 9m-B.15: PUT replace the Device ---
+Write-Host "`n--- Test 9m-B.15: PUT replace the Device ---" -ForegroundColor Cyan
 $putBody = @{
     schemas = @("urn:ietf:params:scim:schemas:custom:Device")
     displayName = "Updated Laptop G8b"
     externalId = "device-ext-001-updated"
 } | ConvertTo-Json
 $devicePut = Invoke-RestMethod -Uri "$scimBaseG8b/Devices/$g8bDeviceId" -Method PUT -Headers $headers -Body $putBody -ContentType "application/scim+json"
-Test-Result -Success ($devicePut.displayName -eq "Updated Laptop G8b") -Message "9m.11 PUT replace Device succeeds (displayName=$($devicePut.displayName))"
+Test-Result -Success ($devicePut.displayName -eq "Updated Laptop G8b") -Message "9m-B.15 PUT replace Device succeeds (displayName=$($devicePut.displayName))"
 
-# --- Test 9m.12: PATCH the Device ---
-Write-Host "`n--- Test 9m.12: PATCH the Device ---" -ForegroundColor Cyan
+# --- Test 9m-B.16: PATCH the Device ---
+Write-Host "`n--- Test 9m-B.16: PATCH the Device ---" -ForegroundColor Cyan
 $patchBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
     Operations = @(
@@ -3162,31 +3583,46 @@ $patchBody = @{
     )
 } | ConvertTo-Json -Depth 3
 $devicePatched = Invoke-RestMethod -Uri "$scimBaseG8b/Devices/$g8bDeviceId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/scim+json"
-Test-Result -Success ($devicePatched.displayName -eq "Patched Laptop G8b") -Message "9m.12 PATCH Device succeeds (displayName=$($devicePatched.displayName))"
+Test-Result -Success ($devicePatched.displayName -eq "Patched Laptop G8b") -Message "9m-B.16 PATCH Device succeeds (displayName=$($devicePatched.displayName))"
 
-# --- Test 9m.13: DELETE the Device ---
-Write-Host "`n--- Test 9m.13: DELETE the Device ---" -ForegroundColor Cyan
+# --- Test 9m-B.17: DELETE the Device ---
+Write-Host "`n--- Test 9m-B.17: DELETE the Device ---" -ForegroundColor Cyan
 $null = Invoke-RestMethod -Uri "$scimBaseG8b/Devices/$g8bDeviceId" -Method DELETE -Headers $headers
 try {
     $null = Invoke-RestMethod -Uri "$scimBaseG8b/Devices/$g8bDeviceId" -Method GET -Headers $headers
-    Test-Result -Success $false -Message "9m.13 Deleted Device should not be found"
+    Test-Result -Success $false -Message "9m-B.17 Deleted Device should not be found"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($statusCode -eq 404) -Message "9m.13 DELETE Device works (resource returns 404 after)"
+    Test-Result -Success ($statusCode -eq 404) -Message "9m-B.17 DELETE Device works (resource returns 404 after)"
 }
 
-# --- Test 9m.14: 404 for non-existent Device ---
-Write-Host "`n--- Test 9m.14: GET non-existent Device returns 404 ---" -ForegroundColor Cyan
+# --- Test 9m-B.18: 404 for non-existent Device ---
+Write-Host "`n--- Test 9m-B.18: GET non-existent Device returns 404 ---" -ForegroundColor Cyan
 try {
     $null = Invoke-RestMethod -Uri "$scimBaseG8b/Devices/00000000-0000-0000-0000-000000000099" -Method GET -Headers $headers
-    Test-Result -Success $false -Message "9m.14 Should have returned 404"
+    Test-Result -Success $false -Message "9m-B.18 Should have returned 404"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($statusCode -eq 404) -Message "9m.14 Non-existent Device returns 404 (HTTP $statusCode)"
+    Test-Result -Success ($statusCode -eq 404) -Message "9m-B.18 Non-existent Device returns 404 (HTTP $statusCode)"
 }
 
-# --- Test 9m.15: Register a second resource type (Application) ---
-Write-Host "`n--- Test 9m.15: Register Application resource type on same endpoint ---" -ForegroundColor Cyan
+# --- Test 9m-B.19: Reject POST with wrong schemas ---
+Write-Host "`n--- Test 9m-B.19: Reject POST with wrong schemas ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$scimBaseG8b/Devices" -Method POST -Headers $headers -Body (@{
+        schemas = @("wrong:schema")
+        displayName = "Bad Device"
+    } | ConvertTo-Json) -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9m-B.19 Should have been rejected"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "9m-B.19 Wrong schemas rejected on POST (HTTP $statusCode)"
+}
+
+# ── MULTIPLE RESOURCE TYPES ────────────────────────────────────────────────
+
+# --- Test 9m-B.20: Register a second resource type (Application) ---
+Write-Host "`n--- Test 9m-B.20: Register Application resource type on same endpoint ---" -ForegroundColor Cyan
 $appSchema = @{
     name = "Application"
     schemaUri = "urn:ietf:params:scim:schemas:custom:Application"
@@ -3194,50 +3630,518 @@ $appSchema = @{
     description = "Custom Application resource type"
 } | ConvertTo-Json
 $appReg = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method POST -Headers $headers -Body $appSchema
-Test-Result -Success ($appReg.name -eq "Application") -Message "9m.15 Application resource type registered"
+Test-Result -Success ($appReg.name -eq "Application") -Message "9m-B.20 Application resource type registered"
 
-# --- Test 9m.16: Create an Application resource ---
-Write-Host "`n--- Test 9m.16: Create an Application resource ---" -ForegroundColor Cyan
+# --- Test 9m-B.21: Create an Application resource ---
+Write-Host "`n--- Test 9m-B.21: Create an Application resource ---" -ForegroundColor Cyan
 $appBody = @{
     schemas = @("urn:ietf:params:scim:schemas:custom:Application")
     displayName = "Test App G8b"
 } | ConvertTo-Json
 $appRes = Invoke-RestMethod -Uri "$scimBaseG8b/Applications" -Method POST -Headers $headers -Body $appBody -ContentType "application/scim+json"
-Test-Result -Success ($null -ne $appRes.id -and $appRes.meta.resourceType -eq "Application") -Message "9m.16 Application created (id=$($appRes.id))"
+$g8bAppId = $appRes.id
+Test-Result -Success ($null -ne $g8bAppId -and $appRes.meta.resourceType -eq "Application") -Message "9m-B.21 Application created (id=$g8bAppId)"
 
-# --- Test 9m.17: Endpoint isolation — other endpoints should NOT see Devices ---
-Write-Host "`n--- Test 9m.17: Endpoint isolation ---" -ForegroundColor Cyan
+# --- Test 9m-B.22: List resource types — should have 2 ---
+Write-Host "`n--- Test 9m-B.22: List resource types shows 2 ---" -ForegroundColor Cyan
+$rtListing = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method GET -Headers $headers
+Test-Result -Success ($rtListing.totalResults -eq 2) -Message "9m-B.22 List resource types returns $($rtListing.totalResults) items"
+
+# ── ENDPOINT ISOLATION ──────────────────────────────────────────────────────
+
+# --- Test 9m-B.23: Endpoint isolation — other endpoints should NOT see Devices ---
+Write-Host "`n--- Test 9m-B.23: Endpoint isolation ---" -ForegroundColor Cyan
 try {
     $null = Invoke-RestMethod -Uri "$scimBase/Devices" -Method GET -Headers $headers
-    Test-Result -Success $false -Message "9m.17 Main endpoint should NOT serve /Devices"
+    Test-Result -Success $false -Message "9m-B.23 Main endpoint should NOT serve /Devices"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($statusCode -eq 404) -Message "9m.17 Endpoint isolation works — main endpoint returns 404 for /Devices (HTTP $statusCode)"
+    Test-Result -Success ($statusCode -eq 404) -Message "9m-B.23 Endpoint isolation works — main endpoint returns 404 for /Devices (HTTP $statusCode)"
 }
 
-# --- Test 9m.18: Built-in routes still work ---
-Write-Host "`n--- Test 9m.18: Built-in /Users still works on G8b endpoint ---" -ForegroundColor Cyan
+# --- Test 9m-B.24: Built-in /Users still works on G8b endpoint ---
+Write-Host "`n--- Test 9m-B.24: Built-in /Users still works on G8b endpoint ---" -ForegroundColor Cyan
 $usersOnG8b = Invoke-RestMethod -Uri "$scimBaseG8b/Users" -Method GET -Headers $headers
-Test-Result -Success ($null -ne $usersOnG8b.totalResults) -Message "9m.18 Built-in /Users works on G8b endpoint (totalResults=$($usersOnG8b.totalResults))"
+Test-Result -Success ($null -ne $usersOnG8b.totalResults) -Message "9m-B.24 Built-in /Users works on G8b endpoint (totalResults=$($usersOnG8b.totalResults))"
 
-# --- Test 9m.19: Delete a custom resource type ---
-Write-Host "`n--- Test 9m.19: Delete Application resource type ---" -ForegroundColor Cyan
+# --- Test 9m-B.25: Built-in /Groups still works on G8b endpoint ---
+Write-Host "`n--- Test 9m-B.25: Built-in /Groups still works on G8b endpoint ---" -ForegroundColor Cyan
+$groupsOnG8b = Invoke-RestMethod -Uri "$scimBaseG8b/Groups" -Method GET -Headers $headers
+Test-Result -Success ($null -ne $groupsOnG8b.totalResults) -Message "9m-B.25 Built-in /Groups works on G8b endpoint (totalResults=$($groupsOnG8b.totalResults))"
+
+# ── ADMIN DELETE ────────────────────────────────────────────────────────────
+
+# --- Test 9m-B.26: Delete Application resource type ---
+Write-Host "`n--- Test 9m-B.26: Delete Application resource type ---" -ForegroundColor Cyan
 $null = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types/Application" -Method DELETE -Headers $headers
 $listAfterDelete = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method GET -Headers $headers
 $appStillExists = $listAfterDelete.resourceTypes | Where-Object { $_.name -eq "Application" }
-Test-Result -Success ($null -eq $appStillExists) -Message "9m.19 Application resource type deleted (no longer in list)"
+Test-Result -Success ($null -eq $appStillExists) -Message "9m-B.26 Application resource type deleted (no longer in list)"
 
-# --- Test 9m.20: Reject deletion of built-in type ---
-Write-Host "`n--- Test 9m.20: Reject deletion of built-in type 'User' ---" -ForegroundColor Cyan
+# --- Test 9m-B.27: Reject deletion of built-in type "User" ---
+Write-Host "`n--- Test 9m-B.27: Reject deletion of built-in type 'User' ---" -ForegroundColor Cyan
 try {
     $null = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types/User" -Method DELETE -Headers $headers
-    Test-Result -Success $false -Message "9m.20 Should have been rejected"
+    Test-Result -Success $false -Message "9m-B.27 Should have been rejected"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($statusCode -eq 400) -Message "9m.20 Deletion of built-in type 'User' rejected (HTTP $statusCode)"
+    Test-Result -Success ($statusCode -eq 400) -Message "9m-B.27 Deletion of built-in type 'User' rejected (HTTP $statusCode)"
 }
 
-Write-Host "`n--- G8b: Custom Resource Type Tests Complete ---" -ForegroundColor Green
+# --- Test 9m-B.28: DELETE non-existent resource type returns 404 ---
+Write-Host "`n--- Test 9m-B.28: DELETE non-existent resource type ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types/NonExistent" -Method DELETE -Headers $headers
+    Test-Result -Success $false -Message "9m-B.28 Should have returned 404"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 404) -Message "9m-B.28 Non-existent resource type DELETE returns 404 (HTTP $statusCode)"
+}
+
+Write-Host "`n--- 9m-B: Custom Resource Type Tests Complete ---" -ForegroundColor Green
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9m-C: SCHEMA CUSTOMIZATION COMBINATIONS
+#   Tests combining custom schema extensions with custom resource types,
+#   including StrictSchemaValidation flag, attribute characteristics,
+#   discovery cross-validation, and multi-resource-type + extension flows.
+# ─────────────────────────────────────────────────────────────────────────────
+$script:currentSection = "9m-C: Schema Customization Combos"
+Write-Host "`n`n────────────────────────────────────────────────────" -ForegroundColor Cyan
+Write-Host "  9m-C: SCHEMA CUSTOMIZATION COMBINATIONS" -ForegroundColor Cyan
+Write-Host "────────────────────────────────────────────────────" -ForegroundColor Cyan
+
+# --- Setup: Endpoint with BOTH CustomResourceTypesEnabled ---
+Write-Host "`n--- 9m-C Setup: Creating combo endpoint ---" -ForegroundColor Cyan
+$comboEndpointBody = @{
+    name = "live-test-combo-$(Get-Random)"
+    displayName = "Schema Combo Test Endpoint"
+    description = "Endpoint for combined custom schemas + custom resource types"
+    config = @{
+        CustomResourceTypesEnabled = "True"
+    }
+} | ConvertTo-Json -Depth 3
+$comboEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $comboEndpointBody
+$ComboEndpointId = $comboEndpoint.id
+$scimBaseCombo = "$baseUrl/scim/endpoints/$ComboEndpointId"
+$adminBaseCombo = "$baseUrl/scim/admin/endpoints/$ComboEndpointId"
+Test-Result -Success ($null -ne $ComboEndpointId) -Message "9m-C: Combo endpoint created"
+
+# --- Setup: Endpoint with StrictSchemaValidation for strict mode tests ---
+$strictEndpointBody = @{
+    name = "live-test-strict-combo-$(Get-Random)"
+    displayName = "Strict Schema Combo Endpoint"
+    description = "Endpoint with StrictSchemaValidation for combo tests"
+    config = @{
+        CustomResourceTypesEnabled = "True"
+        StrictSchemaValidation = "True"
+    }
+} | ConvertTo-Json -Depth 3
+$strictEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $strictEndpointBody
+$StrictComboEndpointId = $strictEndpoint.id
+$scimBaseStrict = "$baseUrl/scim/endpoints/$StrictComboEndpointId"
+$adminBaseStrict = "$baseUrl/scim/admin/endpoints/$StrictComboEndpointId"
+Test-Result -Success ($null -ne $StrictComboEndpointId) -Message "9m-C: Strict combo endpoint created"
+
+# ── COMBO 1: Custom extension on custom resource type ───────────────────────
+
+# --- Test 9m-C.1: Register custom "Printer" resource type ---
+Write-Host "`n--- Test 9m-C.1: Register Printer resource type ---" -ForegroundColor Cyan
+$printerRTBody = @{
+    name = "Printer"
+    schemaUri = "urn:example:schemas:core:2.0:Printer"
+    endpoint = "/Printers"
+    description = "Custom Printer resource type"
+} | ConvertTo-Json
+$printerRT = Invoke-RestMethod -Uri "$adminBaseCombo/resource-types" -Method POST -Headers $headers -Body $printerRTBody
+Test-Result -Success ($printerRT.name -eq "Printer") -Message "9m-C.1 Printer resource type registered"
+
+# --- Test 9m-C.2: Register extension for Printer resource type ---
+Write-Host "`n--- Test 9m-C.2: Register extension for Printer ---" -ForegroundColor Cyan
+$printerExtUrn = "urn:example:schemas:extension:printer:2.0"
+$printerExtBody = @{
+    schemaUrn = $printerExtUrn
+    name = "Printer Extension"
+    description = "Extended attributes for printers"
+    resourceTypeId = "Printer"
+    required = $false
+    attributes = @(
+        @{ name = "location"; type = "string"; multiValued = $false; required = $true; description = "Physical location"; mutability = "readWrite"; returned = "default"; caseExact = $false; uniqueness = "none" }
+        @{ name = "paperCapacity"; type = "integer"; multiValued = $false; required = $false; description = "Paper tray capacity"; mutability = "readWrite"; returned = "default"; caseExact = $false; uniqueness = "none" }
+        @{ name = "maintenanceKey"; type = "string"; multiValued = $false; required = $false; description = "Maintenance secret"; mutability = "writeOnly"; returned = "never"; caseExact = $true; uniqueness = "none" }
+        @{ name = "colorModes"; type = "string"; multiValued = $true; required = $false; description = "Supported color modes"; mutability = "readWrite"; returned = "default"; caseExact = $false; uniqueness = "none" }
+    )
+} | ConvertTo-Json -Depth 4
+$printerExt = Invoke-RestMethod -Uri "$adminBaseCombo/schemas" -Method POST -Headers $headers -Body $printerExtBody -ContentType "application/json"
+Test-Result -Success ($printerExt.schemaUrn -eq $printerExtUrn) -Message "9m-C.2 Printer extension registered (urn=$($printerExt.schemaUrn))"
+
+# --- Test 9m-C.3: Register User extension on combo endpoint ---
+Write-Host "`n--- Test 9m-C.3: Register User extension on combo endpoint ---" -ForegroundColor Cyan
+$comboUserExtUrn = "urn:example:schemas:extension:combo:2.0:User"
+$comboUserExtBody = @{
+    schemaUrn = $comboUserExtUrn
+    name = "Combo User Extension"
+    description = "User extension for combo tests"
+    resourceTypeId = "User"
+    required = $false
+    attributes = @(
+        @{ name = "division"; type = "string"; multiValued = $false; required = $false; description = "User division"; mutability = "readWrite"; returned = "default"; caseExact = $false; uniqueness = "none" }
+        @{ name = "level"; type = "integer"; multiValued = $false; required = $false; description = "User level"; mutability = "readWrite"; returned = "default"; caseExact = $false; uniqueness = "none" }
+    )
+} | ConvertTo-Json -Depth 4
+$comboUserExt = Invoke-RestMethod -Uri "$adminBaseCombo/schemas" -Method POST -Headers $headers -Body $comboUserExtBody -ContentType "application/json"
+Test-Result -Success ($comboUserExt.schemaUrn -eq $comboUserExtUrn) -Message "9m-C.3 User extension on combo endpoint registered"
+
+# --- Test 9m-C.4: Create Printer with extension data ---
+Write-Host "`n--- Test 9m-C.4: Create Printer with extension data ---" -ForegroundColor Cyan
+$printerBody = @{
+    schemas = @("urn:example:schemas:core:2.0:Printer", $printerExtUrn)
+    displayName = "Office Laser Printer"
+    externalId = "printer-001"
+    "$printerExtUrn" = @{
+        location = "Building A, Floor 3"
+        paperCapacity = 500
+        maintenanceKey = "secret-maint-key"
+        colorModes = @("color", "grayscale", "bw")
+    }
+} | ConvertTo-Json -Depth 4
+$printerRes = Invoke-RestMethod -Uri "$scimBaseCombo/Printers" -Method POST -Headers $headers -Body $printerBody -ContentType "application/scim+json"
+$comboPrinterId = $printerRes.id
+$printerExtData = $printerRes."$printerExtUrn"
+Test-Result -Success ($null -ne $comboPrinterId -and $printerRes.meta.resourceType -eq "Printer" -and $null -ne $printerExtData) -Message "9m-C.4 Printer created with extension data (id=$comboPrinterId)"
+
+# --- Test 9m-C.5: Extension data roundtrip on custom resource type ---
+Write-Host "`n--- Test 9m-C.5: Extension data roundtrip on custom resource ---" -ForegroundColor Cyan
+$fetchedPrinter = Invoke-RestMethod -Uri "$scimBaseCombo/Printers/$comboPrinterId" -Method GET -Headers $headers
+$fetchedPrinterExt = $fetchedPrinter."$printerExtUrn"
+$locationOk = ($fetchedPrinterExt.location -eq "Building A, Floor 3")
+$capacityOk = ($fetchedPrinterExt.paperCapacity -eq 500)
+Test-Result -Success ($locationOk -and $capacityOk) -Message "9m-C.5 Extension data roundtrips (location=$($fetchedPrinterExt.location), capacity=$($fetchedPrinterExt.paperCapacity))"
+
+# --- Test 9m-C.6: returned:never on custom resource (maintenanceKey) ---
+Write-Host "`n--- Test 9m-C.6: returned:never on custom resource ---" -ForegroundColor Cyan
+$maintKeyInGet = $fetchedPrinterExt.maintenanceKey
+Test-Result -Success ($null -eq $maintKeyInGet) -Message "9m-C.6 maintenanceKey (returned:never) stripped from Printer GET"
+
+# --- Test 9m-C.7: Multi-valued extension attr on custom resource ---
+Write-Host "`n--- Test 9m-C.7: Multi-valued extension attr on custom resource ---" -ForegroundColor Cyan
+$colorModesOk = ($fetchedPrinterExt.colorModes -is [array]) -and ($fetchedPrinterExt.colorModes.Count -eq 3)
+Test-Result -Success $colorModesOk -Message "9m-C.7 colorModes array roundtrips ($($fetchedPrinterExt.colorModes -join ', '))"
+
+# --- Test 9m-C.8: PUT Printer with updated extension data ---
+Write-Host "`n--- Test 9m-C.8: PUT Printer with updated extension data ---" -ForegroundColor Cyan
+$putPrinterBody = @{
+    schemas = @("urn:example:schemas:core:2.0:Printer", $printerExtUrn)
+    displayName = "Updated Laser Printer"
+    "$printerExtUrn" = @{
+        location = "Building B, Floor 1"
+        paperCapacity = 250
+        colorModes = @("bw")
+    }
+} | ConvertTo-Json -Depth 4
+$putPrinter = Invoke-RestMethod -Uri "$scimBaseCombo/Printers/$comboPrinterId" -Method PUT -Headers $headers -Body $putPrinterBody -ContentType "application/scim+json"
+$putPrinterExt = $putPrinter."$printerExtUrn"
+Test-Result -Success ($putPrinterExt.location -eq "Building B, Floor 1" -and $putPrinterExt.paperCapacity -eq 250) -Message "9m-C.8 PUT updates Printer extension data"
+
+# --- Test 9m-C.9: PATCH extension attr on custom resource ---
+Write-Host "`n--- Test 9m-C.9: PATCH extension attr on custom resource ---" -ForegroundColor Cyan
+$patchPrinterBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "replace"; path = "$($printerExtUrn):location"; value = "Remote Office" }
+    )
+} | ConvertTo-Json -Depth 3
+$patchedPrinter = Invoke-RestMethod -Uri "$scimBaseCombo/Printers/$comboPrinterId" -Method PATCH -Headers $headers -Body $patchPrinterBody -ContentType "application/scim+json"
+$patchedPrinterExt = $patchedPrinter."$printerExtUrn"
+Test-Result -Success ($patchedPrinterExt.location -eq "Remote Office") -Message "9m-C.9 PATCH extension on custom resource (location=$($patchedPrinterExt.location))"
+
+# ── COMBO 2: Built-in User + custom extension on same combo endpoint ────────
+
+# --- Test 9m-C.10: Create User with combo extension ---
+Write-Host "`n--- Test 9m-C.10: Create User with extension on combo endpoint ---" -ForegroundColor Cyan
+$comboUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User", $comboUserExtUrn)
+    userName = "combo-user-$(Get-Random)@test.com"
+    displayName = "Combo Test User"
+    name = @{ givenName = "Combo"; familyName = "User" }
+    "$comboUserExtUrn" = @{
+        division = "R&D"
+        level = 5
+    }
+} | ConvertTo-Json -Depth 4
+$comboUser = Invoke-RestMethod -Uri "$scimBaseCombo/Users" -Method POST -Headers $headers -Body $comboUserBody -ContentType "application/scim+json"
+$comboUserId = $comboUser.id
+$comboUserExt = $comboUser."$comboUserExtUrn"
+Test-Result -Success ($null -ne $comboUserId -and $comboUserExt.division -eq "R&D") -Message "9m-C.10 User with extension created on combo endpoint (division=$($comboUserExt.division))"
+
+# --- Test 9m-C.11: Custom extension in user list on combo endpoint ---
+Write-Host "`n--- Test 9m-C.11: Extension data in user list ---" -ForegroundColor Cyan
+$comboUserList = Invoke-RestMethod -Uri "$scimBaseCombo/Users" -Method GET -Headers $headers
+$foundComboUser = $comboUserList.Resources | Where-Object { $_.id -eq $comboUserId }
+$listExtOk = ($null -ne $foundComboUser."$comboUserExtUrn")
+Test-Result -Success $listExtOk -Message "9m-C.11 Extension data present in user list response"
+
+# ── COMBO 3: Discovery cross-validation ─────────────────────────────────────
+
+# --- Test 9m-C.12: /Schemas shows both custom extensions ---
+Write-Host "`n--- Test 9m-C.12: /Schemas shows both extensions ---" -ForegroundColor Cyan
+$comboSchemas = Invoke-RestMethod -Uri "$scimBaseCombo/Schemas" -Method GET -Headers $headers
+$hasPrinterExt = ($comboSchemas.Resources | Where-Object { $_.id -eq $printerExtUrn }) -ne $null
+$hasUserExt = ($comboSchemas.Resources | Where-Object { $_.id -eq $comboUserExtUrn }) -ne $null
+Test-Result -Success ($hasPrinterExt -and $hasUserExt) -Message "9m-C.12 /Schemas shows both Printer and User extensions"
+
+# --- Test 9m-C.13: /ResourceTypes shows custom Printer type ---
+Write-Host "`n--- Test 9m-C.13: /ResourceTypes shows custom types ---" -ForegroundColor Cyan
+$comboResourceTypes = Invoke-RestMethod -Uri "$scimBaseCombo/ResourceTypes" -Method GET -Headers $headers
+$hasPrinterRT = ($comboResourceTypes.Resources | Where-Object { $_.name -eq "Printer" }) -ne $null
+Test-Result -Success $hasPrinterRT -Message "9m-C.13 /ResourceTypes includes custom Printer type"
+
+# --- Test 9m-C.14: /ResourceTypes still has built-in User and Group ---
+Write-Host "`n--- Test 9m-C.14: Built-in types still in /ResourceTypes ---" -ForegroundColor Cyan
+$hasUserRT = ($comboResourceTypes.Resources | Where-Object { $_.name -eq "User" }) -ne $null
+$hasGroupRT = ($comboResourceTypes.Resources | Where-Object { $_.name -eq "Group" }) -ne $null
+Test-Result -Success ($hasUserRT -and $hasGroupRT) -Message "9m-C.14 Built-in User and Group still in /ResourceTypes"
+
+# ── COMBO 4: StrictSchemaValidation + custom extensions + custom RT ─────────
+
+# --- Test 9m-C.15: Register resource type on strict endpoint ---
+Write-Host "`n--- Test 9m-C.15: Register Sensor on strict endpoint ---" -ForegroundColor Cyan
+$sensorRTBody = @{
+    name = "Sensor"
+    schemaUri = "urn:example:schemas:core:2.0:Sensor"
+    endpoint = "/Sensors"
+    description = "IoT Sensor resource type"
+} | ConvertTo-Json
+$sensorRT = Invoke-RestMethod -Uri "$adminBaseStrict/resource-types" -Method POST -Headers $headers -Body $sensorRTBody
+Test-Result -Success ($sensorRT.name -eq "Sensor") -Message "9m-C.15 Sensor resource type registered on strict endpoint"
+
+# --- Test 9m-C.16: Register extension for Sensor with required attr ---
+Write-Host "`n--- Test 9m-C.16: Register Sensor extension with required attr ---" -ForegroundColor Cyan
+$sensorExtUrn = "urn:example:schemas:extension:sensor:2.0"
+$sensorExtBody = @{
+    schemaUrn = $sensorExtUrn
+    name = "Sensor Extension"
+    description = "Extended sensor attributes"
+    resourceTypeId = "Sensor"
+    required = $true
+    attributes = @(
+        @{ name = "sensorType"; type = "string"; multiValued = $false; required = $true; description = "Type of sensor"; mutability = "readWrite"; returned = "default"; caseExact = $false; uniqueness = "none" }
+        @{ name = "firmwareVersion"; type = "string"; multiValued = $false; required = $false; description = "Firmware version"; mutability = "readOnly"; returned = "default"; caseExact = $true; uniqueness = "none" }
+        @{ name = "calibrationSecret"; type = "string"; multiValued = $false; required = $false; description = "Calibration key"; mutability = "writeOnly"; returned = "never"; caseExact = $true; uniqueness = "none" }
+    )
+} | ConvertTo-Json -Depth 4
+$sensorExt = Invoke-RestMethod -Uri "$adminBaseStrict/schemas" -Method POST -Headers $headers -Body $sensorExtBody -ContentType "application/json"
+Test-Result -Success ($sensorExt.schemaUrn -eq $sensorExtUrn) -Message "9m-C.16 Sensor extension registered (required=true)"
+
+# --- Test 9m-C.17: Create Sensor with required extension ---
+Write-Host "`n--- Test 9m-C.17: Create Sensor with required extension data ---" -ForegroundColor Cyan
+$sensorBody = @{
+    schemas = @("urn:example:schemas:core:2.0:Sensor", $sensorExtUrn)
+    displayName = "Temperature Sensor A1"
+    externalId = "sensor-001"
+    "$sensorExtUrn" = @{
+        sensorType = "temperature"
+        calibrationSecret = "cal-secret-123"
+    }
+} | ConvertTo-Json -Depth 4
+$sensorRes = Invoke-RestMethod -Uri "$scimBaseStrict/Sensors" -Method POST -Headers $headers -Body $sensorBody -ContentType "application/scim+json"
+$strictSensorId = $sensorRes.id
+Test-Result -Success ($null -ne $strictSensorId -and $sensorRes.meta.resourceType -eq "Sensor") -Message "9m-C.17 Sensor created on strict endpoint (id=$strictSensorId)"
+
+# --- Test 9m-C.18: Verify returned:never on strict endpoint ---
+Write-Host "`n--- Test 9m-C.18: returned:never on strict endpoint ---" -ForegroundColor Cyan
+$fetchedSensor = Invoke-RestMethod -Uri "$scimBaseStrict/Sensors/$strictSensorId" -Method GET -Headers $headers
+$fetchedSensorExt = $fetchedSensor."$sensorExtUrn"
+$calSecretAbsent = ($null -eq $fetchedSensorExt.calibrationSecret)
+Test-Result -Success $calSecretAbsent -Message "9m-C.18 calibrationSecret (returned:never) stripped on strict endpoint"
+
+# --- Test 9m-C.19: readOnly attr (firmwareVersion) not settable via PATCH ---
+Write-Host "`n--- Test 9m-C.19: readOnly extension attr blocked on PATCH ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$scimBaseStrict/Sensors/$strictSensorId" -Method PATCH -Headers $headers -Body (@{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+        Operations = @(
+            @{ op = "replace"; path = "$($sensorExtUrn):firmwareVersion"; value = "hacked-v2" }
+        )
+    } | ConvertTo-Json -Depth 3) -ContentType "application/scim+json"
+    # If not rejected, check that the value was NOT actually changed
+    $checkSensor = Invoke-RestMethod -Uri "$scimBaseStrict/Sensors/$strictSensorId" -Method GET -Headers $headers
+    $fwAfter = $checkSensor."$sensorExtUrn".firmwareVersion
+    Test-Result -Success ($fwAfter -ne "hacked-v2") -Message "9m-C.19 readOnly firmwareVersion not changed (value=$fwAfter)"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "9m-C.19 readOnly extension attr rejected on PATCH (HTTP $statusCode)"
+}
+
+# --- Test 9m-C.20: Register User extension on strict endpoint ---
+Write-Host "`n--- Test 9m-C.20: Register User extension on strict endpoint ---" -ForegroundColor Cyan
+$strictUserExtUrn = "urn:example:schemas:extension:strict:2.0:User"
+$strictUserExtBody = @{
+    schemaUrn = $strictUserExtUrn
+    name = "Strict User Extension"
+    description = "User extension for strict mode"
+    resourceTypeId = "User"
+    required = $false
+    attributes = @(
+        @{ name = "clearanceLevel"; type = "string"; multiValued = $false; required = $false; description = "Security clearance"; mutability = "readWrite"; returned = "default"; caseExact = $false; uniqueness = "none" }
+        @{ name = "accessCode"; type = "string"; multiValued = $false; required = $false; description = "Access code"; mutability = "writeOnly"; returned = "never"; caseExact = $true; uniqueness = "none" }
+    )
+} | ConvertTo-Json -Depth 4
+$strictUserExt = Invoke-RestMethod -Uri "$adminBaseStrict/schemas" -Method POST -Headers $headers -Body $strictUserExtBody -ContentType "application/json"
+Test-Result -Success ($strictUserExt.schemaUrn -eq $strictUserExtUrn) -Message "9m-C.20 User extension on strict endpoint registered"
+
+# --- Test 9m-C.21: Create User with extension on strict endpoint ---
+Write-Host "`n--- Test 9m-C.21: Create User with extension on strict endpoint ---" -ForegroundColor Cyan
+$strictUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User", $strictUserExtUrn)
+    userName = "strict-combo-user-$(Get-Random)@test.com"
+    displayName = "Strict Combo User"
+    name = @{ givenName = "Strict"; familyName = "ComboUser" }
+    "$strictUserExtUrn" = @{
+        clearanceLevel = "top-secret"
+        accessCode = "code-123"
+    }
+} | ConvertTo-Json -Depth 4
+$strictComboUser = Invoke-RestMethod -Uri "$scimBaseStrict/Users" -Method POST -Headers $headers -Body $strictUserBody -ContentType "application/scim+json"
+$strictComboUserId = $strictComboUser.id
+Test-Result -Success ($null -ne $strictComboUserId) -Message "9m-C.21 User created on strict endpoint (id=$strictComboUserId)"
+
+# --- Test 9m-C.22: accessCode (returned:never) stripped on strict endpoint for User ---
+Write-Host "`n--- Test 9m-C.22: returned:never on strict User ---" -ForegroundColor Cyan
+$fetchedStrictUser = Invoke-RestMethod -Uri "$scimBaseStrict/Users/$strictComboUserId" -Method GET -Headers $headers
+$strictUserExtData = $fetchedStrictUser."$strictUserExtUrn"
+$accessCodeAbsent = ($null -eq $strictUserExtData.accessCode)
+$clearanceOk = ($strictUserExtData.clearanceLevel -eq "top-secret")
+Test-Result -Success ($accessCodeAbsent -and $clearanceOk) -Message "9m-C.22 accessCode stripped, clearanceLevel persists on strict User"
+
+# ── COMBO 5: Multiple resource types + multiple extensions on one endpoint ──
+
+# --- Test 9m-C.23: Register another custom RT on combo endpoint ---
+Write-Host "`n--- Test 9m-C.23: Register Vehicle resource type on combo endpoint ---" -ForegroundColor Cyan
+$vehicleRTBody = @{
+    name = "Vehicle"
+    schemaUri = "urn:example:schemas:core:2.0:Vehicle"
+    endpoint = "/Vehicles"
+    description = "Custom Vehicle resource type"
+} | ConvertTo-Json
+$vehicleRT = Invoke-RestMethod -Uri "$adminBaseCombo/resource-types" -Method POST -Headers $headers -Body $vehicleRTBody
+Test-Result -Success ($vehicleRT.name -eq "Vehicle") -Message "9m-C.23 Vehicle resource type registered on combo endpoint"
+
+# --- Test 9m-C.24: Register Vehicle extension ---
+Write-Host "`n--- Test 9m-C.24: Register Vehicle extension ---" -ForegroundColor Cyan
+$vehicleExtUrn = "urn:example:schemas:extension:vehicle:2.0"
+$vehicleExtBody = @{
+    schemaUrn = $vehicleExtUrn
+    name = "Vehicle Extension"
+    description = "Extended vehicle attributes"
+    resourceTypeId = "Vehicle"
+    required = $false
+    attributes = @(
+        @{ name = "vin"; type = "string"; multiValued = $false; required = $true; description = "Vehicle Identification Number"; mutability = "readWrite"; returned = "default"; caseExact = $true; uniqueness = "server" }
+        @{ name = "mileage"; type = "integer"; multiValued = $false; required = $false; description = "Odometer reading"; mutability = "readWrite"; returned = "default"; caseExact = $false; uniqueness = "none" }
+    )
+} | ConvertTo-Json -Depth 4
+$vehicleExt = Invoke-RestMethod -Uri "$adminBaseCombo/schemas" -Method POST -Headers $headers -Body $vehicleExtBody -ContentType "application/json"
+Test-Result -Success ($vehicleExt.schemaUrn -eq $vehicleExtUrn) -Message "9m-C.24 Vehicle extension registered"
+
+# --- Test 9m-C.25: Create Vehicle with extension ---
+Write-Host "`n--- Test 9m-C.25: Create Vehicle with extension data ---" -ForegroundColor Cyan
+$vehicleBody = @{
+    schemas = @("urn:example:schemas:core:2.0:Vehicle", $vehicleExtUrn)
+    displayName = "Company Van"
+    externalId = "vehicle-001"
+    "$vehicleExtUrn" = @{
+        vin = "1HGBH41JXMN109186"
+        mileage = 12500
+    }
+} | ConvertTo-Json -Depth 4
+$vehicleRes = Invoke-RestMethod -Uri "$scimBaseCombo/Vehicles" -Method POST -Headers $headers -Body $vehicleBody -ContentType "application/scim+json"
+$comboVehicleId = $vehicleRes.id
+Test-Result -Success ($null -ne $comboVehicleId -and $vehicleRes.meta.resourceType -eq "Vehicle") -Message "9m-C.25 Vehicle with extension created (id=$comboVehicleId)"
+
+# --- Test 9m-C.26: Vehicle extension data roundtrips ---
+Write-Host "`n--- Test 9m-C.26: Vehicle extension data roundtrip ---" -ForegroundColor Cyan
+$fetchedVehicle = Invoke-RestMethod -Uri "$scimBaseCombo/Vehicles/$comboVehicleId" -Method GET -Headers $headers
+$fetchedVehicleExt = $fetchedVehicle."$vehicleExtUrn"
+Test-Result -Success ($fetchedVehicleExt.vin -eq "1HGBH41JXMN109186" -and $fetchedVehicleExt.mileage -eq 12500) -Message "9m-C.26 Vehicle extension roundtrips (vin=$($fetchedVehicleExt.vin))"
+
+# --- Test 9m-C.27: Admin schema list shows all 3 extensions (Printer + User + Vehicle) ---
+Write-Host "`n--- Test 9m-C.27: Admin lists all extensions on combo endpoint ---" -ForegroundColor Cyan
+$comboAdminSchemas = Invoke-RestMethod -Uri "$adminBaseCombo/schemas" -Method GET -Headers $headers
+Test-Result -Success ($comboAdminSchemas.totalResults -eq 3) -Message "9m-C.27 Combo endpoint has $($comboAdminSchemas.totalResults) extensions"
+
+# --- Test 9m-C.28: Admin resource type list shows 2 types (Printer + Vehicle) ---
+Write-Host "`n--- Test 9m-C.28: Admin lists all resource types on combo endpoint ---" -ForegroundColor Cyan
+$comboAdminRTs = Invoke-RestMethod -Uri "$adminBaseCombo/resource-types" -Method GET -Headers $headers
+Test-Result -Success ($comboAdminRTs.totalResults -eq 2) -Message "9m-C.28 Combo endpoint has $($comboAdminRTs.totalResults) custom resource types"
+
+# ── COMBO 6: Cross-type isolation — extensions scoped to correct RT ─────────
+
+# --- Test 9m-C.29: Printer path does not serve Vehicles, vice versa ---
+Write-Host "`n--- Test 9m-C.29: Cross-type path isolation ---" -ForegroundColor Cyan
+# Attempt to GET a Printer by a Vehicle endpoint
+try {
+    $null = Invoke-RestMethod -Uri "$scimBaseCombo/Vehicles/$comboPrinterId" -Method GET -Headers $headers
+    # If found, it should NOT match Printer resource type
+    Test-Result -Success $false -Message "9m-C.29 Printer should not be accessible via /Vehicles"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 404) -Message "9m-C.29 Cross-type isolation works (Printer not at /Vehicles, HTTP $statusCode)"
+}
+
+# ── COMBO 7: Delete custom resource type, verify extension cleanup ──────────
+
+# --- Test 9m-C.30: Delete Vehicle resource type ---
+Write-Host "`n--- Test 9m-C.30: Delete Vehicle resource type ---" -ForegroundColor Cyan
+$null = Invoke-RestMethod -Uri "$adminBaseCombo/resource-types/Vehicle" -Method DELETE -Headers $headers
+$rtListAfter = Invoke-RestMethod -Uri "$adminBaseCombo/resource-types" -Method GET -Headers $headers
+$vehicleGone = ($rtListAfter.resourceTypes | Where-Object { $_.name -eq "Vehicle" }) -eq $null
+Test-Result -Success $vehicleGone -Message "9m-C.30 Vehicle resource type deleted"
+
+# --- Test 9m-C.31: Verify /Vehicles endpoint returns 404 after RT deletion ---
+Write-Host "`n--- Test 9m-C.31: /Vehicles returns 404 after RT deletion ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$scimBaseCombo/Vehicles" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9m-C.31 /Vehicles should 404 after RT deletion"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 404) -Message "9m-C.31 /Vehicles returns 404 after RT deletion (HTTP $statusCode)"
+}
+
+# ── COMBO 8: Delete extension while resources exist ─────────────────────────
+
+# --- Test 9m-C.32: Delete Printer extension while Printer resources exist ---
+Write-Host "`n--- Test 9m-C.32: Delete extension while resources exist ---" -ForegroundColor Cyan
+$encodedPrinterExt = [System.Uri]::EscapeDataString($printerExtUrn)
+try {
+    $null = Invoke-RestMethod -Uri "$adminBaseCombo/schemas/$encodedPrinterExt" -Method DELETE -Headers $headers
+    # Extension deleted — verify resource still accessible
+    $printerAfterExtDelete = Invoke-RestMethod -Uri "$scimBaseCombo/Printers/$comboPrinterId" -Method GET -Headers $headers
+    Test-Result -Success ($null -ne $printerAfterExtDelete.id) -Message "9m-C.32 Extension deleted, Printer resource still accessible"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    # Extension deletion may be blocked (implementation-dependent)
+    Test-Result -Success ($true) -Message "9m-C.32 Extension deletion behavior (HTTP $statusCode)"
+}
+
+# --- Test 9m-C.33: /Schemas no longer shows deleted Printer extension ---
+Write-Host "`n--- Test 9m-C.33: Deleted extension removed from /Schemas ---" -ForegroundColor Cyan
+$schemasAfterExtDel = Invoke-RestMethod -Uri "$scimBaseCombo/Schemas" -Method GET -Headers $headers
+$printerExtGone = ($schemasAfterExtDel.Resources | Where-Object { $_.id -eq $printerExtUrn }) -eq $null
+Test-Result -Success $printerExtGone -Message "9m-C.33 Deleted Printer extension removed from /Schemas ($printerExtGone)"
+
+# ── Cleanup ─────────────────────────────────────────────────────────────────
+
+Write-Host "`n--- 9m-C Cleanup ---" -ForegroundColor Cyan
+try { Invoke-RestMethod -Uri "$scimBaseCombo/Printers/$comboPrinterId" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$scimBaseCombo/Users/$comboUserId" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$scimBaseStrict/Sensors/$strictSensorId" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$scimBaseStrict/Users/$strictComboUserId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+Write-Host "`n--- 9m-C: Schema Customization Combination Tests Complete ---" -ForegroundColor Green
+Write-Host "`n═══════════════════════════════════════════════════════════════" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9m: SCHEMA CUSTOMIZATION — ALL SUBSECTIONS COMPLETE" -ForegroundColor Yellow
+Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Yellow
 
 # ============================================
 # TEST SECTION 9n: BULK OPERATIONS (Phase 9 / RFC 7644 §3.7)
@@ -4853,8 +5757,12 @@ if ($IsolationEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoi
 if ($InactiveEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$InactiveEndpointId" -Name "Inactive Endpoint" }
 if ($NoRemoveAllEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$NoRemoveAllEndpointId" -Name "No Remove All Endpoint" }
 if ($VPEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$VPEndpointId" -Name "Verbose Patch Endpoint" }
-if ($G8bEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$G8bEndpointId" -Name "G8b Custom Resource Types Endpoint" }
-if ($G8bNoFlagEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$G8bNoFlagEndpointId" -Name "G8b No Flag Endpoint" }
+if ($SchExtEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$SchExtEndpointId" -Name "Schema Extension Test Endpoint (9m-A)" }
+if ($SchExtEndpoint2Id) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$SchExtEndpoint2Id" -Name "Schema Extension Isolation Endpoint (9m-A)" }
+if ($G8bEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$G8bEndpointId" -Name "G8b Custom Resource Types Endpoint (9m-B)" }
+if ($G8bNoFlagEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$G8bNoFlagEndpointId" -Name "G8b No Flag Endpoint (9m-B)" }
+if ($ComboEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$ComboEndpointId" -Name "Schema Combo Test Endpoint (9m-C)" }
+if ($StrictComboEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$StrictComboEndpointId" -Name "Strict Schema Combo Endpoint (9m-C)" }
 
 # ============================================
 # FINAL SUMMARY

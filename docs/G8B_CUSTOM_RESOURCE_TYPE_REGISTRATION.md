@@ -1,5 +1,7 @@
 # G8b — Custom Resource Type Registration
 
+> **Cross-reference**: For conceptual overview and operator guide, see [`SCHEMA_CUSTOMIZATION_GUIDE.md`](SCHEMA_CUSTOMIZATION_GUIDE.md) §Custom Resource Types. This document remains the canonical **implementation** reference (code-level files, test inventory).
+
 > **Version**: v0.18.0 | **Phase**: 8 Part 2 | **Status**: ✅ Complete  
 > **RFC References**: RFC 7643 §6, RFC 7644 §4  
 > **Branch**: `feat/torfc1stscimsvr`

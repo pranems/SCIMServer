@@ -1,7 +1,7 @@
 # SCIM Extensions Deep Analysis — Top 3 Recommendations
 
-> **⚠️ SUPERSEDED** — This v2 document (Feb 17) has been superseded by the v3 architecture docs (Feb 20, 2026). The three recommendations here (fix discovery, extension registry, filter push-down) are now covered in the 12-phase Migration Plan. **Retained for**: Three-Pillar RFC framework, per-endpoint isolation 4-layer audit (§2A), ServiceProviderConfig RFC compliance gaps (§2B), dead config flag inventory (§2C — 7 of 12 flags are dead code), and `schemas[]` array bug finding (§2.5).
-> **See**: [`IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md`](IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md) · [`MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md`](MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md)
+> **⚠️ SUPERSEDED** — This v2 document (Feb 17) has been superseded by the v3 architecture docs (Feb 20, 2026) and the comprehensive schema documentation suite (Mar 2026). The three recommendations here (fix discovery, extension registry, filter push-down) are now covered in the 12-phase Migration Plan. **Retained for**: Three-Pillar RFC framework, per-endpoint isolation 4-layer audit (§2A), ServiceProviderConfig RFC compliance gaps (§2B), dead config flag inventory (§2C — 7 of 12 flags are dead code), and `schemas[]` array bug finding (§2.5).
+> **See**: [`RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md`](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md) · [`SCHEMA_LIFECYCLE_AND_REGISTRY.md`](SCHEMA_LIFECYCLE_AND_REGISTRY.md) · [`SCHEMA_CUSTOMIZATION_GUIDE.md`](SCHEMA_CUSTOMIZATION_GUIDE.md) · [`SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md`](SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md)
 
 > **Date**: February 17, 2026 (v2)  
 > **Scope**: Holistic RFC-grounded analysis of enterprise & custom extension support, per-endpoint isolation, and discovery compliance  
