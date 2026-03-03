@@ -1,5 +1,7 @@
 # Feature Documentation: Soft Delete, Strict Schema Validation & Custom Extension URNs
 
+> **Cross-reference**: For strict schema validation internals and custom extension registration details, see [`SCHEMA_LIFECYCLE_AND_REGISTRY.md`](SCHEMA_LIFECYCLE_AND_REGISTRY.md) and [`SCHEMA_CUSTOMIZATION_GUIDE.md`](SCHEMA_CUSTOMIZATION_GUIDE.md). This document remains the canonical reference for the **Soft Delete** feature.
+
 > **Version**: 1.1  
 > **Date**: 2026-02-25  
 > **Status**: Implemented & Tested  

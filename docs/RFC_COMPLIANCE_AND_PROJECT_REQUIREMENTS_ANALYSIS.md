@@ -1,5 +1,7 @@
 # RFC Compliance & Project Requirements Analysis
 
+> **⚠️ OUTDATED** — Written at v0.14.0 (now v0.24.0). RFC compliance matrices and phase status are stale. For current schema/extension compliance, see [`RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md`](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md). **Retained for**: G1–G20 project goals, 12-phase roadmap, removed flags analysis (7 flags with RFC justification), and architecture evolution plan.
+
 > **Version**: 1.0 | **Date**: 2026-02-20 | **Project Version**: v0.14.0  
 > **Scope**: RFC 7643 (Core Schema) + RFC 7644 (Protocol) compliance mapping, 20 project goals (G1–G20), removed flags analysis, and per-endpoint extensibility roadmap
 

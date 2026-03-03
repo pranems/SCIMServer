@@ -1,5 +1,7 @@
 # RFC 7643/7644 Attribute Characteristics — Full Analysis & Gap Assessment
 
+> **Cross-reference**: For canonical RFC characteristic definitions, see [`RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md`](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md). For validation × config flag matrices, see [`SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md`](SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md). This document remains the canonical reference for the **gap analysis** (G1–G15), remediation plans, and implementation flow diagrams.
+
 > **Date:** 2026-03-01  
 > **Scope:** All 11 attribute characteristics × all 5 SCIM operations × core + extension + custom extension schemas  
 > **References:** RFC 7643 §2.1–§2.5, §3.1, §4, §7 | RFC 7644 §3.3–§3.12

@@ -43,6 +43,7 @@
 | [TECHNICAL_DESIGN_DOCUMENT.md](TECHNICAL_DESIGN_DOCUMENT.md) | Full as-built technical design (architecture, data model, pipelines) |
 | [RUNTIME_UPGRADE_ANALYSIS.md](RUNTIME_UPGRADE_ANALYSIS.md) | Completed runtime/dependency upgrade report (Node 24, Prisma 7, React 19, Vite 7) |
 | [SQLITE_COMPROMISE_ANALYSIS.md](SQLITE_COMPROMISE_ANALYSIS.md) | SQLite compromise audit (28 items), PostgreSQL migration roadmap, impact diagrams |
+| [SCHEMA_LIFECYCLE_AND_REGISTRY.md](SCHEMA_LIFECYCLE_AND_REGISTRY.md) | Schema system internals — ScimSchemaRegistry two-layer architecture, SchemaValidator, boot hydration, Admin controllers, persistence model, GenericPatchEngine, config flags |
 
 ## SCIM Protocol
 
@@ -68,6 +69,9 @@
 | [READONLY_ATTRIBUTE_STRIPPING_AND_WARNINGS.md](READONLY_ATTRIBUTE_STRIPPING_AND_WARNINGS.md) | ReadOnly Attribute Stripping & Warnings (v0.22.0): RFC 7643 §2.2 enforcement for Users/Groups/Generic, PATCH behavior matrix, warning URN extension, AsyncLocalStorage middleware, 2 new config flags, 17 E2E + 10 live tests |
 | [P2_ATTRIBUTE_CHARACTERISTIC_ENFORCEMENT.md](P2_ATTRIBUTE_CHARACTERISTIC_ENFORCEMENT.md) | P2 Attribute Characteristic Enforcement (v0.24.0): 6 behavioral fixes — R-RET-1 schema-driven always-returned, R-RET-2 Group active, R-RET-3 sub-attr always, R-MUT-1 writeOnly→never, R-MUT-2 readOnly sub-attr stripping, R-CASE-1 caseExact filter |
 | [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](DISCOVERY_ENDPOINTS_RFC_AUDIT.md) | Discovery endpoints RFC audit — SPC/ResourceTypes/Schemas vs RFC 7643 §5–§7 + RFC 7644 §4: 6 gaps (D1–D6) identified and **all resolved** |
+| [RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md) | **RFC 7642/7643/7644 schema & extensions reference** — Core schema immutability, extension rules, custom resource types, `schemas[]` enforcement, attribute characteristics deep dive, industry patterns |
+| [SCHEMA_CUSTOMIZATION_GUIDE.md](SCHEMA_CUSTOMIZATION_GUIDE.md) | Schema customization operator guide — Step-by-step extension registration, custom resource types, config profiles, PATCH operations, troubleshooting, quick reference card |
+| [SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md](SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md) | Schema extension behavior matrices — Registration flow outcomes, validation × config flags, discovery responses, `schemas[]` behavior, PATCH path resolution, boot hydration, error matrix |
 
 ## Validation & Testing
 
@@ -110,11 +114,11 @@
 | [TECHNICAL_REQUIREMENTS_DOCUMENT.md](TECHNICAL_REQUIREMENTS_DOCUMENT.md) | Formal requirements matrix (FR-001–FR-700+) |
 | [COMPLETE_AGNOSTIC_SCIM_ARCHITECTURE.md](COMPLETE_AGNOSTIC_SCIM_ARCHITECTURE.md) | Agnostic SCIM architecture — persistence-neutral N-tier design exploration |
 | [CURRENT_STATE_AND_MIGRATION_PLAN.md](CURRENT_STATE_AND_MIGRATION_PLAN.md) | Current state assessment and initial migration considerations |
-| [DISCOVERY_AND_ENDPOINT_SCHEMAS.md](DISCOVERY_AND_ENDPOINT_SCHEMAS.md) | Discovery and endpoint schema design exploration |
+| [DISCOVERY_AND_ENDPOINT_SCHEMAS.md](DISCOVERY_AND_ENDPOINT_SCHEMAS.md) | ⚠️ **Largely superseded** — Discovery & per-endpoint schema reference (see SCHEMA_LIFECYCLE_AND_REGISTRY.md + SCHEMA_CUSTOMIZATION_GUIDE.md). Retained for DTO rules, error catalog, repo layer |
 | [REPOSITORY_INTERFACE_ANALYSIS.md](REPOSITORY_INTERFACE_ANALYSIS.md) | Repository interface pattern analysis — abstraction layer evaluation |
 | [RFC_COMPLIANCE_AND_PROJECT_REQUIREMENTS_ANALYSIS.md](RFC_COMPLIANCE_AND_PROJECT_REQUIREMENTS_ANALYSIS.md) | RFC compliance vs project requirements gap analysis |
-| [scim-extensions-analysis.md](scim-extensions-analysis.md) | SCIM extensions analysis — custom extension URN patterns |
-| [SCIM_EXTENSIONS_DEEP_ANALYSIS.md](SCIM_EXTENSIONS_DEEP_ANALYSIS.md) | SCIM extensions deep analysis — enterprise extension attribute handling |
+| [scim-extensions-analysis.md](scim-extensions-analysis.md) | ⚠️ **Superseded** — SCIM extensions analysis v1 (see RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md + SCHEMA_LIFECYCLE_AND_REGISTRY.md + SCHEMA_CUSTOMIZATION_GUIDE.md + SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md) |
+| [SCIM_EXTENSIONS_DEEP_ANALYSIS.md](SCIM_EXTENSIONS_DEEP_ANALYSIS.md) | ⚠️ **Superseded** — SCIM extensions deep analysis v2 (see RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md + SCHEMA_LIFECYCLE_AND_REGISTRY.md + SCHEMA_CUSTOMIZATION_GUIDE.md + SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md) |
 | [UUID_ANALYSIS_AND_RFC_COMPLIANCE.md](UUID_ANALYSIS_AND_RFC_COMPLIANCE.md) | UUID format analysis and RFC compliance — id generation patterns |
 | [Release notes/](Release%20notes/) | Historical release notes (version-specific context retained as originally published) |
 

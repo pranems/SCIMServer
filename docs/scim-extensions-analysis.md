@@ -1,7 +1,7 @@
 # SCIM Extensions Analysis — Enterprise & Custom Extensions
 
-> **⚠️ SUPERSEDED** — This v1 document (Feb 16) has been superseded by the v3 architecture docs (Feb 20, 2026). The code-driven `IScimExtension` pattern described here was replaced by a data-driven `endpoint_schema` + `endpoint_resource_type` model. **Retained for**: concrete extension implementation examples, `IScimExtension` interface reference, hybrid storage analysis, and the new-extension checklist.
-> **See**: [`IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md`](IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md) · [`MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md`](MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md)
+> **⚠️ SUPERSEDED** — This v1 document (Feb 16) has been superseded by the v3 architecture docs (Feb 20, 2026) and the comprehensive schema documentation suite (Mar 2026). The code-driven `IScimExtension` pattern described here was replaced by a data-driven `endpoint_schema` + `endpoint_resource_type` model. **Retained for**: concrete extension implementation examples, `IScimExtension` interface reference, hybrid storage analysis, and the new-extension checklist.
+> **See**: [`RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md`](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md) · [`SCHEMA_LIFECYCLE_AND_REGISTRY.md`](SCHEMA_LIFECYCLE_AND_REGISTRY.md) · [`SCHEMA_CUSTOMIZATION_GUIDE.md`](SCHEMA_CUSTOMIZATION_GUIDE.md) · [`SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md`](SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md)
 
 > **Date**: February 16, 2026
 > **Scope**: Full analysis of SCIM extension support per RFCs and current SCIMServer project
