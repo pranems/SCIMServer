@@ -24,6 +24,7 @@ import type { SchemaDefinition, SchemaAttributeDefinition } from '../../../domai
 import type { ScimLogger } from '../../logging/scim-logger.service';
 import type { LogCategory } from '../../logging/log-levels';
 import type { PatchOperation } from '../../../domain/patch/patch-types';
+import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-parser';
 
 // ─── Pure Utility Functions ─────────────────────────────────────────────────
 
@@ -572,7 +573,7 @@ export class ScimSchemaHelpers {
     const coreSchema = this.schemaRegistry.getSchema(this.coreSchemaUrn, endpointId);
     const schemas: SchemaDefinition[] = [];
     if (coreSchema) {
-      schemas.push(coreSchema as SchemaDefinition);
+      schemas.push({ ...coreSchema, isCoreSchema: true } as SchemaDefinition);
     }
 
     const declaredSchemas = (dto.schemas as string[] | undefined) ?? [];
@@ -594,7 +595,7 @@ export class ScimSchemaHelpers {
   getSchemaDefinitions(endpointId?: string): SchemaDefinition[] {
     const coreSchema = this.schemaRegistry.getSchema(this.coreSchemaUrn, endpointId);
     const schemas: SchemaDefinition[] = [];
-    if (coreSchema) schemas.push(coreSchema as SchemaDefinition);
+    if (coreSchema) schemas.push({ ...coreSchema, isCoreSchema: true } as SchemaDefinition);
     const extUrns = this.schemaRegistry.getExtensionUrns(endpointId);
     for (const urn of extUrns) {
       const ext = this.schemaRegistry.getSchema(urn, endpointId);
@@ -654,6 +655,39 @@ export class ScimSchemaHelpers {
   getCaseExactAttributes(endpointId?: string): Set<string> {
     const schemas = this.getSchemaDefinitions(endpointId);
     return SchemaValidator.collectCaseExactAttributes(schemas);
+  }
+
+  /**
+   * Validate that attribute paths used in a SCIM filter are known to the
+   * schema definitions for this endpoint's resource type.
+   *
+   * Parses the filter string, extracts attribute paths, and validates them
+   * against registered schemas. Throws 400 invalidFilter if any path is
+   * unknown (RFC 7644 §3.4.2.2).
+   */
+  validateFilterPaths(filter: string, endpointId?: string): void {
+    const schemas = this.getSchemaDefinitions(endpointId);
+    if (schemas.length === 0) return;
+
+    let ast;
+    try {
+      ast = parseScimFilter(filter);
+    } catch {
+      // Syntax error already handled by buildUserFilter / buildGroupFilter
+      return;
+    }
+    const paths = extractFilterPaths(ast);
+    if (paths.length === 0) return;
+
+    const result = SchemaValidator.validateFilterAttributePaths(paths, schemas);
+    if (!result.valid) {
+      const details = result.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
+      throw createScimError({
+        status: 400,
+        scimType: 'invalidFilter',
+        detail: `Filter validation failed: ${details}`,
+      });
+    }
   }
 
   /**

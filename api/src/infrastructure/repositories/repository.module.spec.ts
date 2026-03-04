@@ -27,6 +27,8 @@ describe('RepositoryModule', () => {
     } else {
       process.env.PERSISTENCE_BACKEND = originalEnv;
     }
+    // Reset the module cache so each test starts fresh
+    RepositoryModule.resetCache();
   });
 
   describe('when PERSISTENCE_BACKEND is "inmemory"', () => {

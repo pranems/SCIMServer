@@ -232,7 +232,7 @@ Missing or malformed attribute definitions (no `type`, no `multiValued`) cause S
 
 | # | Issue | Reason |
 |---|-------|--------|
-| BUG-002 | `returned:"never"` stripping | No `returned:"never"` attributes currently exist; requires response builder refactor |
+| ~~BUG-002~~ | ~~`returned:"never"` stripping~~ | ✅ Fixed (v0.17.4 G8e) — schema-driven `returned:'never'` stripping in `stripReturnedNever()` for all responses |
 | ~~BUG-004~~ | ~~`immutable` mutability enforcement~~ | ✅ Fixed — `SchemaValidator.checkImmutable()` + service integration |
 | ~~BUG-005~~ | ~~PATCH mutability enforcement~~ | ✅ Fixed — post-PATCH `SchemaValidator.validate()` with mode:'patch' |
 | ~~BUG-006~~ | ~~`caseExact` in filter parser~~ | ✅ Fixed (v0.17.2) — externalId changed from CITEXT→TEXT, filter engine uses `'text'` column type for case-sensitive matching |
@@ -241,4 +241,4 @@ Missing or malformed attribute definitions (no `type`, no `multiValued`) cause S
 
 ---
 
-*Generated: 2026-02-24 | Updated: 2026-03-01*
+*Generated: 2026-02-24 | Updated: 2026-03-03*

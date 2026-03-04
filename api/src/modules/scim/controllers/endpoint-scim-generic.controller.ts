@@ -44,6 +44,7 @@ import {
   type EndpointConfig,
 } from '../../endpoint/endpoint-config.interface';
 import { SCIM_WARNING_URN } from '../common/scim-service-helpers';
+import { applyAttributeProjection, applyAttributeProjectionToList } from '../common/scim-attribute-projection';
 import { EndpointScimGenericService } from '../services/endpoint-scim-generic.service';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { ScimSchemaRegistry, type ScimResourceType } from '../discovery/scim-schema-registry';
@@ -135,6 +136,8 @@ export class EndpointScimGenericController {
     @Param('resourceType') resourceTypePath: string,
     @Body() body: Record<string, unknown>,
     @Req() req: Request,
+    @Query('attributes') attributes?: string,
+    @Query('excludedAttributes') excludedAttributes?: string,
   ) {
     const { baseUrl, config, resourceType } = await this.resolveContext(
       endpointId,
@@ -142,7 +145,12 @@ export class EndpointScimGenericController {
       req,
     );
     const result = await this.genericService.createResource(body, baseUrl, endpointId, resourceType, config);
-    return this.attachWarnings(result, config);
+    // GEN-05: Apply attribute projection on write-response (RFC 7644 §3.9)
+    const requestOnlyAttrs = this.genericService.getRequestOnlyAttributes(resourceType, endpointId);
+    const alwaysReturnedAttrs = this.genericService.getAlwaysReturnedAttributes(resourceType, endpointId);
+    const alwaysReturnedSubs = this.genericService.getAlwaysReturnedSubAttrs(resourceType, endpointId);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
+    return this.attachWarnings(projected, config);
   }
 
   /**
@@ -159,13 +167,15 @@ export class EndpointScimGenericController {
     @Query('count') count?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: 'ascending' | 'descending',
+    @Query('attributes') attributes?: string,
+    @Query('excludedAttributes') excludedAttributes?: string,
   ) {
     const { baseUrl, config, resourceType } = await this.resolveContext(
       endpointId,
       resourceTypePath,
       req,
     );
-    return this.genericService.listResources(
+    const result = await this.genericService.listResources(
       {
         filter,
         startIndex: startIndex ? parseInt(startIndex, 10) : undefined,
@@ -178,6 +188,40 @@ export class EndpointScimGenericController {
       resourceType,
       config,
     );
+
+    // GEN-06: Apply attribute projection on list responses
+    const alwaysReturnedAttrs = this.genericService.getAlwaysReturnedAttributes(resourceType, endpointId);
+    const alwaysReturnedSubs = this.genericService.getAlwaysReturnedSubAttrs(resourceType, endpointId);
+    if (attributes || excludedAttributes) {
+      const requestOnlyAttrs = this.genericService.getRequestOnlyAttributes(resourceType, endpointId);
+      return {
+        ...result,
+        Resources: applyAttributeProjectionToList(
+          result.Resources as Record<string, unknown>[],
+          attributes,
+          excludedAttributes,
+          requestOnlyAttrs,
+          alwaysReturnedAttrs,
+          alwaysReturnedSubs,
+        ),
+      };
+    }
+    // Even without projection params, strip returned:'request' attrs
+    const requestOnlyAttrs = this.genericService.getRequestOnlyAttributes(resourceType, endpointId);
+    if (requestOnlyAttrs.size > 0) {
+      return {
+        ...result,
+        Resources: applyAttributeProjectionToList(
+          result.Resources as Record<string, unknown>[],
+          undefined,
+          undefined,
+          requestOnlyAttrs,
+          alwaysReturnedAttrs,
+          alwaysReturnedSubs,
+        ),
+      };
+    }
+    return result;
   }
 
   /**
@@ -189,7 +233,7 @@ export class EndpointScimGenericController {
   async searchResources(
     @Param('endpointId') endpointId: string,
     @Param('resourceType') resourceTypePath: string,
-    @Body() body: { filter?: string; startIndex?: number; count?: number; sortBy?: string; sortOrder?: 'ascending' | 'descending' },
+    @Body() body: { filter?: string; startIndex?: number; count?: number; sortBy?: string; sortOrder?: 'ascending' | 'descending'; attributes?: string; excludedAttributes?: string },
     @Req() req: Request,
   ) {
     const { baseUrl, config, resourceType } = await this.resolveContext(
@@ -197,7 +241,7 @@ export class EndpointScimGenericController {
       resourceTypePath,
       req,
     );
-    return this.genericService.listResources(
+    const result = await this.genericService.listResources(
       {
         filter: body.filter,
         startIndex: body.startIndex,
@@ -210,6 +254,39 @@ export class EndpointScimGenericController {
       resourceType,
       config,
     );
+
+    // GEN-07: Apply attribute projection on .search responses
+    const alwaysReturnedAttrs = this.genericService.getAlwaysReturnedAttributes(resourceType, endpointId);
+    const alwaysReturnedSubs = this.genericService.getAlwaysReturnedSubAttrs(resourceType, endpointId);
+    if (body.attributes || body.excludedAttributes) {
+      const requestOnlyAttrs = this.genericService.getRequestOnlyAttributes(resourceType, endpointId);
+      return {
+        ...result,
+        Resources: applyAttributeProjectionToList(
+          result.Resources as Record<string, unknown>[],
+          body.attributes,
+          body.excludedAttributes,
+          requestOnlyAttrs,
+          alwaysReturnedAttrs,
+          alwaysReturnedSubs,
+        ),
+      };
+    }
+    const requestOnlyAttrs = this.genericService.getRequestOnlyAttributes(resourceType, endpointId);
+    if (requestOnlyAttrs.size > 0) {
+      return {
+        ...result,
+        Resources: applyAttributeProjectionToList(
+          result.Resources as Record<string, unknown>[],
+          undefined,
+          undefined,
+          requestOnlyAttrs,
+          alwaysReturnedAttrs,
+          alwaysReturnedSubs,
+        ),
+      };
+    }
+    return result;
   }
 
   /**
@@ -222,13 +299,20 @@ export class EndpointScimGenericController {
     @Param('resourceType') resourceTypePath: string,
     @Param('id') id: string,
     @Req() req: Request,
+    @Query('attributes') attributes?: string,
+    @Query('excludedAttributes') excludedAttributes?: string,
   ) {
     const { baseUrl, config, resourceType } = await this.resolveContext(
       endpointId,
       resourceTypePath,
       req,
     );
-    return this.genericService.getResource(id, baseUrl, endpointId, resourceType, config);
+    const result = await this.genericService.getResource(id, baseUrl, endpointId, resourceType, config);
+    // GEN-05: Apply attribute projection on single-resource response
+    const requestOnlyAttrs = this.genericService.getRequestOnlyAttributes(resourceType, endpointId);
+    const alwaysReturnedAttrs = this.genericService.getAlwaysReturnedAttributes(resourceType, endpointId);
+    const alwaysReturnedSubs = this.genericService.getAlwaysReturnedSubAttrs(resourceType, endpointId);
+    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
   }
 
   /**
@@ -242,6 +326,8 @@ export class EndpointScimGenericController {
     @Param('id') id: string,
     @Body() body: Record<string, unknown>,
     @Req() req: Request,
+    @Query('attributes') attributes?: string,
+    @Query('excludedAttributes') excludedAttributes?: string,
   ) {
     const { baseUrl, config, resourceType } = await this.resolveContext(
       endpointId,
@@ -258,7 +344,12 @@ export class EndpointScimGenericController {
       config,
       ifMatch,
     );
-    return this.attachWarnings(result, config);
+    // GEN-05: Apply attribute projection on write-response (RFC 7644 §3.9)
+    const requestOnlyAttrs = this.genericService.getRequestOnlyAttributes(resourceType, endpointId);
+    const alwaysReturnedAttrs = this.genericService.getAlwaysReturnedAttributes(resourceType, endpointId);
+    const alwaysReturnedSubs = this.genericService.getAlwaysReturnedSubAttrs(resourceType, endpointId);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
+    return this.attachWarnings(projected, config);
   }
 
   /**
@@ -272,6 +363,8 @@ export class EndpointScimGenericController {
     @Param('id') id: string,
     @Body() body: any,
     @Req() req: Request,
+    @Query('attributes') attributes?: string,
+    @Query('excludedAttributes') excludedAttributes?: string,
   ) {
     const { baseUrl, config, resourceType } = await this.resolveContext(
       endpointId,
@@ -288,7 +381,12 @@ export class EndpointScimGenericController {
       config,
       ifMatch,
     );
-    return this.attachWarnings(result, config);
+    // GEN-05: Apply attribute projection on write-response (RFC 7644 §3.9)
+    const requestOnlyAttrs = this.genericService.getRequestOnlyAttributes(resourceType, endpointId);
+    const alwaysReturnedAttrs = this.genericService.getAlwaysReturnedAttributes(resourceType, endpointId);
+    const alwaysReturnedSubs = this.genericService.getAlwaysReturnedSubAttrs(resourceType, endpointId);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
+    return this.attachWarnings(projected, config);
   }
 
   /**

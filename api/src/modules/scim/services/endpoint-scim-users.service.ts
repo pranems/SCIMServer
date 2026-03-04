@@ -172,6 +172,11 @@ export class EndpointScimUsersService {
       });
     }
 
+    // Validate filter attribute paths against schema definitions (RFC 7644 §3.4.2.2)
+    if (filter) {
+      this.schemaHelpers.validateFilterPaths(filter, endpointId);
+    }
+
     // Fetch users from DB (repository handles endpointId scoping)
     const sortParams = resolveUserSortParams(sortBy, sortOrder);
     const allDbUsers = await this.userRepo.findAll(

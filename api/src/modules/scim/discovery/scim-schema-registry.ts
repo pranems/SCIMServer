@@ -480,6 +480,32 @@ export class ScimSchemaRegistry implements OnModuleInit {
 
     const overlay = this.getOrCreateOverlay(endpointId);
     overlay.resourceTypes.set(rt.id, rt);
+
+    // Auto-create a stub core schema definition if one doesn't already exist.
+    // Custom resource types need a core schema with standard SCIM base attributes
+    // (id, externalId, displayName, active) so that strict schema validation can
+    // recognize the core URN and these common attributes.
+    if (!overlay.schemas.has(rt.schema) && !this.schemas.has(rt.schema)) {
+      const stubCoreSchema: ScimSchemaDefinition = {
+        schemas: [SCIM_SCHEMA_SCHEMA],
+        id: rt.schema,
+        name: `${rt.name} Core Schema`,
+        description: `Auto-generated core schema for custom resource type "${rt.name}". ` +
+          `Contains standard SCIM base attributes. Register additional attributes via the Admin Schema API.`,
+        attributes: [
+          { name: 'id', type: 'string', multiValued: false, required: false, description: 'Unique identifier', mutability: 'readOnly', returned: 'always', caseExact: true, uniqueness: 'server' },
+          { name: 'externalId', type: 'string', multiValued: false, required: false, description: 'External identifier', mutability: 'readWrite', returned: 'default', caseExact: true, uniqueness: 'none' },
+          { name: 'displayName', type: 'string', multiValued: false, required: false, description: 'Display name', mutability: 'readWrite', returned: 'default', caseExact: false, uniqueness: 'none' },
+          { name: 'active', type: 'boolean', multiValued: false, required: false, description: 'Active status', mutability: 'readWrite', returned: 'default' },
+        ],
+        meta: {
+          resourceType: 'Schema',
+          location: `/Schemas/${rt.schema}`,
+        },
+      };
+      overlay.schemas.set(rt.schema, stubCoreSchema);
+      this.logger.debug(`Auto-registered stub core schema for custom resource type "${rt.name}" (${rt.schema})`);
+    }
   }
 
   /**
@@ -493,9 +519,22 @@ export class ScimSchemaRegistry implements OnModuleInit {
     const overlay = this.endpointOverlays.get(endpointId);
     if (!overlay) return false;
 
+    // Get the resource type before deleting so we can clean up its core schema
+    const rt = overlay.resourceTypes.get(resourceTypeId);
     const existed = overlay.resourceTypes.delete(resourceTypeId);
     // Also remove any extensions keyed to this resource type
     overlay.extensionsByResourceType.delete(resourceTypeId);
+
+    // Clean up the auto-generated stub core schema if no other resource type uses it
+    if (rt) {
+      const schemaStillInUse = [...overlay.resourceTypes.values()].some(
+        (other) => other.schema === rt.schema,
+      );
+      if (!schemaStillInUse) {
+        overlay.schemas.delete(rt.schema);
+      }
+    }
+
     return existed;
   }
 
@@ -514,11 +553,23 @@ export class ScimSchemaRegistry implements OnModuleInit {
   /**
    * Get only the custom (per-endpoint) resource types for an endpoint.
    * Does NOT include built-in User/Group types.
+   * Extensions from overlay.extensionsByResourceType are merged.
    */
   getCustomResourceTypes(endpointId: string): ScimResourceType[] {
     const overlay = this.endpointOverlays.get(endpointId);
     if (!overlay) return [];
-    return [...overlay.resourceTypes.values()];
+    return [...overlay.resourceTypes.values()].map((rt) => {
+      const epExtensions = overlay.extensionsByResourceType.get(rt.id);
+      if (!epExtensions || epExtensions.size === 0) return rt;
+
+      const mergedExtensions = [...rt.schemaExtensions];
+      for (const urn of epExtensions) {
+        if (!mergedExtensions.some((e) => e.schema === urn)) {
+          mergedExtensions.push({ schema: urn, required: false });
+        }
+      }
+      return { ...rt, schemaExtensions: mergedExtensions };
+    });
   }
 
   /**
@@ -534,7 +585,19 @@ export class ScimSchemaRegistry implements OnModuleInit {
     if (!overlay) return undefined;
 
     for (const rt of overlay.resourceTypes.values()) {
-      if (rt.endpoint === endpointPath) return rt;
+      if (rt.endpoint === endpointPath) {
+        // Merge endpoint-specific extension URNs into the custom resource type
+        const epExtensions = overlay.extensionsByResourceType.get(rt.id);
+        if (!epExtensions || epExtensions.size === 0) return rt;
+
+        const mergedExtensions = [...rt.schemaExtensions];
+        for (const urn of epExtensions) {
+          if (!mergedExtensions.some((e) => e.schema === urn)) {
+            mergedExtensions.push({ schema: urn, required: false });
+          }
+        }
+        return { ...rt, schemaExtensions: mergedExtensions };
+      }
     }
     return undefined;
   }
@@ -596,10 +659,21 @@ export class ScimSchemaRegistry implements OnModuleInit {
       return { ...rt, schemaExtensions: mergedExtensions };
     });
 
-    // Append per-endpoint custom resource types (Phase 8b)
+    // Append per-endpoint custom resource types (Phase 8b) with extensions merged
     if (overlay) {
       for (const customRT of overlay.resourceTypes.values()) {
-        result.push(customRT);
+        const epExtensions = overlay.extensionsByResourceType.get(customRT.id);
+        if (!epExtensions || epExtensions.size === 0) {
+          result.push(customRT);
+        } else {
+          const mergedExtensions = [...customRT.schemaExtensions];
+          for (const urn of epExtensions) {
+            if (!mergedExtensions.some((e) => e.schema === urn)) {
+              mergedExtensions.push({ schema: urn, required: false });
+            }
+          }
+          result.push({ ...customRT, schemaExtensions: mergedExtensions });
+        }
       }
     }
 
@@ -613,7 +687,20 @@ export class ScimSchemaRegistry implements OnModuleInit {
     // Check per-endpoint custom resource types (Phase 8b)
     if (!rt && endpointId) {
       const overlay = this.endpointOverlays.get(endpointId);
-      return overlay?.resourceTypes.get(resourceTypeId);
+      const customRT = overlay?.resourceTypes.get(resourceTypeId);
+      if (!customRT) return undefined;
+
+      // Merge endpoint-specific extension URNs into the custom resource type
+      const epExtensions = overlay?.extensionsByResourceType.get(resourceTypeId);
+      if (!epExtensions || epExtensions.size === 0) return customRT;
+
+      const mergedExtensions = [...customRT.schemaExtensions];
+      for (const urn of epExtensions) {
+        if (!mergedExtensions.some((e) => e.schema === urn)) {
+          mergedExtensions.push({ schema: urn, required: false });
+        }
+      }
+      return { ...customRT, schemaExtensions: mergedExtensions };
     }
 
     if (!rt) return undefined;

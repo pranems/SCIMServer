@@ -40,6 +40,19 @@ const RESERVED_KEYS = new Set([
 ]);
 
 /**
+ * Determine whether a schema definition represents the core schema for a resource type.
+ * Core schema attributes live at the top level of the SCIM payload.
+ * Extension schema attributes live under the extension URN key.
+ *
+ * Uses explicit `isCoreSchema` flag when set (for custom resource types),
+ * otherwise falls back to the standard SCIM prefix convention.
+ */
+function isCoreSchema(schema: SchemaDefinition): boolean {
+  if (schema.isCoreSchema !== undefined) return schema.isCoreSchema;
+  return schema.id.startsWith('urn:ietf:params:scim:schemas:core:');
+}
+
+/**
  * xsd:dateTime regex (RFC 7643 §2.3.5).
  * Validates ISO 8601 / xsd:dateTime format:
  *   YYYY-MM-DDTHH:MM:SSZ  or  YYYY-MM-DDTHH:MM:SS.sss±HH:MM
@@ -71,7 +84,7 @@ export class SchemaValidator {
     const extensionSchemas = new Map<string, SchemaDefinition>();
 
     for (const schema of schemas) {
-      if (schema.id.startsWith('urn:ietf:params:scim:schemas:core:')) {
+      if (isCoreSchema(schema)) {
         // Core schema: attributes live at the top level of the payload
         for (const attr of schema.attributes) {
           coreAttributes.set(attr.name.toLowerCase(), attr);
@@ -475,7 +488,7 @@ export class SchemaValidator {
     const extensionSchemas = new Map<string, SchemaDefinition>();
 
     for (const schema of schemas) {
-      if (schema.id.startsWith('urn:ietf:params:scim:schemas:core:')) {
+      if (isCoreSchema(schema)) {
         for (const attr of schema.attributes) {
           coreAttributes.set(attr.name.toLowerCase(), attr);
         }
@@ -730,7 +743,7 @@ export class SchemaValidator {
     const coreAttributes = new Map<string, SchemaAttributeDefinition>();
     const extensionSchemas = new Map<string, SchemaDefinition>();
     for (const schema of schemas) {
-      if (schema.id.startsWith('urn:ietf:params:scim:schemas:core:')) {
+      if (isCoreSchema(schema)) {
         for (const attr of schema.attributes) {
           coreAttributes.set(attr.name.toLowerCase(), attr);
         }
@@ -781,6 +794,14 @@ export class SchemaValidator {
                 message: `Unknown attribute '${attrPath}' is not defined in extension schema '${urn}'.`,
                 scimType: 'invalidFilter',
               });
+            } else if (found.mutability === 'writeOnly') {
+              // CROSS-03: writeOnly attributes MUST NOT be used in filter expressions
+              // RFC 7643 §2.2: writeOnly attributes are meaningful only in write operations
+              errors.push({
+                path: attrPath,
+                message: `Attribute '${attrPath}' has mutability 'writeOnly' and cannot be used in filter expressions.`,
+                scimType: 'invalidFilter',
+              });
             }
           }
           resolved = true;
@@ -796,6 +817,13 @@ export class SchemaValidator {
         errors.push({
           path: attrPath,
           message: `Unknown attribute '${attrPath}' is not defined in the schema. Filter references an unrecognized attribute.`,
+          scimType: 'invalidFilter',
+        });
+      } else if (found.mutability === 'writeOnly') {
+        // CROSS-03: writeOnly attributes MUST NOT be used in filter expressions
+        errors.push({
+          path: attrPath,
+          message: `Attribute '${attrPath}' has mutability 'writeOnly' and cannot be used in filter expressions.`,
           scimType: 'invalidFilter',
         });
       }
@@ -834,7 +862,7 @@ export class SchemaValidator {
     const coreAttributes = new Map<string, SchemaAttributeDefinition>();
     const extensionSchemas = new Map<string, SchemaDefinition>();
     for (const schema of schemas) {
-      if (schema.id.startsWith('urn:ietf:params:scim:schemas:core:')) {
+      if (isCoreSchema(schema)) {
         for (const attr of schema.attributes) {
           coreAttributes.set(attr.name.toLowerCase(), attr);
         }
@@ -1128,7 +1156,7 @@ export class SchemaValidator {
     const extensionSubAttrs = new Map<string, Map<string, Set<string>>>();
 
     for (const schema of schemas) {
-      if (schema.id.startsWith('urn:ietf:params:scim:schemas:core:')) {
+      if (isCoreSchema(schema)) {
         for (const attr of schema.attributes) {
           if (attr.mutability === 'readOnly') {
             core.add(attr.name.toLowerCase());
