@@ -1436,6 +1436,20 @@ describe('EndpointScimGroupsService', () => {
         expect(result.totalResults).toBe(1);
         expect(result.Resources[0].externalId).toBe('EXT-ABC-123');
       });
+
+      it('should throw 400 invalidFilter for unknown attribute in filter', async () => {
+        try {
+          await service.listGroupsForEndpoint(
+            { filter: 'nonExistentAttr eq "test"', startIndex: 1, count: 10 },
+            'http://localhost:3000/scim',
+            mockEndpoint.id
+          );
+          fail('Expected 400 invalidFilter');
+        } catch (e: any) {
+          expect(e.getStatus()).toBe(400);
+          expect(e.getResponse().scimType).toBe('invalidFilter');
+        }
+      });
     });
 
     describe('case-insensitive schema URI validation', () => {

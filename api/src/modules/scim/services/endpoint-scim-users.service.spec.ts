@@ -1459,6 +1459,20 @@ describe('EndpointScimUsersService', () => {
           externalId: 'ext-123',
         }), expect.anything());
       });
+
+      it('should throw 400 invalidFilter for unknown attribute in filter', async () => {
+        try {
+          await service.listUsersForEndpoint(
+            { filter: 'nonExistentAttr eq "test"', startIndex: 1, count: 10 },
+            'http://localhost:3000/scim',
+            mockEndpoint.id
+          );
+          fail('Expected 400 invalidFilter');
+        } catch (e: any) {
+          expect(e.getStatus()).toBe(400);
+          expect(e.getResponse().scimType).toBe('invalidFilter');
+        }
+      });
     });
 
     describe('case-insensitive userName filter value', () => {

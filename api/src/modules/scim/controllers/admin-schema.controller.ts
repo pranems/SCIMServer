@@ -30,7 +30,7 @@ import type { EndpointSchemaCreateInput } from '../../../domain/models/endpoint-
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import type { ScimSchemaDefinition } from '../discovery/scim-schema-registry';
 import { CreateEndpointSchemaDto } from '../dto/create-endpoint-schema.dto';
-import { PrismaService } from '../../prisma/prisma.service';
+import { EndpointService } from '../../endpoint/services/endpoint.service';
 
 @Controller('admin/endpoints')
 export class AdminSchemaController {
@@ -40,8 +40,16 @@ export class AdminSchemaController {
     @Inject(ENDPOINT_SCHEMA_REPOSITORY)
     private readonly schemaRepo: IEndpointSchemaRepository,
     private readonly schemaRegistry: ScimSchemaRegistry,
-    private readonly prisma: PrismaService,
+    private readonly endpointService: EndpointService,
   ) {}
+
+  /**
+   * Safely fetch an endpoint, throwing 404 if not found or if the ID format
+   * is invalid. Works with both inmemory and Prisma backends.
+   */
+  private async requireEndpoint(endpointId: string) {
+    return this.endpointService.getEndpoint(endpointId);
+  }
 
   /**
    * POST /admin/endpoints/:endpointId/schemas
@@ -54,13 +62,8 @@ export class AdminSchemaController {
     @Param('endpointId') endpointId: string,
     @Body() dto: CreateEndpointSchemaDto,
   ) {
-    // Validate endpoint exists
-    const endpoint = await this.prisma.endpoint.findUnique({
-      where: { id: endpointId },
-    });
-    if (!endpoint) {
-      throw new NotFoundException(`Endpoint "${endpointId}" not found.`);
-    }
+    // Validate endpoint exists (works with both inmemory and Prisma backends)
+    await this.requireEndpoint(endpointId);
 
     // Check for duplicate
     const existing = await this.schemaRepo.findByEndpointAndUrn(endpointId, dto.schemaUrn);
@@ -127,13 +130,8 @@ export class AdminSchemaController {
    */
   @Get(':endpointId/schemas')
   async listSchemas(@Param('endpointId') endpointId: string) {
-    // Validate endpoint exists
-    const endpoint = await this.prisma.endpoint.findUnique({
-      where: { id: endpointId },
-    });
-    if (!endpoint) {
-      throw new NotFoundException(`Endpoint "${endpointId}" not found.`);
-    }
+    // Validate endpoint exists (works with both inmemory and Prisma backends)
+    await this.requireEndpoint(endpointId);
 
     const records = await this.schemaRepo.findByEndpointId(endpointId);
 

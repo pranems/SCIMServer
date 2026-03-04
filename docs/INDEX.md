@@ -1,6 +1,6 @@
 # 📚 SCIMServer Documentation Index
 
-> Quick navigation to all project documentation. Updated March 1, 2026.
+> Quick navigation to all project documentation. Updated March 3, 2026.
 
 > Theme conventions: onboarding-first, current-state metadata, explicit historical-context labeling, and cross-linking to canonical sources.
 
@@ -90,6 +90,7 @@
 | [LIVE_TEST_NORMS_AND_BEST_PRACTICES.md](LIVE_TEST_NORMS_AND_BEST_PRACTICES.md) | Live integration test norms, best practices & industry recommendations — local, Docker, Azure with PostgreSQL |
 | [SCIM_VALIDATOR_RESULTS_26_ANALYSIS.md](SCIM_VALIDATOR_RESULTS_26_ANALYSIS.md) | Microsoft SCIM Validator 26-test analysis — detailed pass/fail review |
 | [SELF_IMPROVING_TEST_HEALTH_PROMPT.md](SELF_IMPROVING_TEST_HEALTH_PROMPT.md) | Reusable self-improving AI prompt for diagnosing and resolving test failures — pattern library grows with each use |
+| [CL_V0.27.0_INMEMORY_BUGFIXES_AND_GENERIC_PARITY.md](CL_V0.27.0_INMEMORY_BUGFIXES_AND_GENERIC_PARITY.md) | **CL v0.27.0** — 4 inmemory backend bugs, 3 generic service parity P0 fixes, live test fix, doc audit; 4,051 total tests, 3-instance deployment validation |
 
 ## Development
 
@@ -144,6 +145,7 @@
 | [PHASE_08_REMAINING_ANALYSIS.md](PHASE_08_REMAINING_ANALYSIS.md) | Phase 8 remaining adversarial validation gap analysis — 33 gaps, sub-phases 8.5–8.8, effort estimates |
 | [ATTRIBUTE_CHARACTERISTICS_GAPS.md](ATTRIBUTE_CHARACTERISTICS_GAPS.md) | RFC 7643 §2 attribute characteristics gaps, bugs, fixes — master tracking |
 | [RFC7643_ATTRIBUTE_CHARACTERISTICS_FULL_AUDIT.md](RFC7643_ATTRIBUTE_CHARACTERISTICS_FULL_AUDIT.md) | **RFC 7643 §2 full audit** — Every characteristic × every flow × every sub-attribute, DB storage, discovery, 20 remaining work items |
+| [P3_REMAINING_ATTRIBUTE_CHARACTERISTIC_GAPS.md](P3_REMAINING_ATTRIBUTE_CHARACTERISTIC_GAPS.md) | **P3 Remaining Gaps** (v0.25.0) — 24 remaining items: Generic service parity (12), cross-cutting (5), advanced RFC (7). v0.25.0: 3 bug fixes, 32 E2E tests, 19 live tests, 2 unit tests added |
 | [IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md](IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md) | Ideal SCIM architecture v3 — N-tier, unified table, JSONB, data-driven discovery |
 | [INMEMORY_ARCHITECTURE_AND_PLAN_v1_2026-02-20.md](INMEMORY_ARCHITECTURE_AND_PLAN_v1_2026-02-20.md) | In-memory architecture & plan — Map-based repo implementation |
 | [MIGRATION_AUTOMATION_STRATEGY_v1_2026-02-20.md](MIGRATION_AUTOMATION_STRATEGY_v1_2026-02-20.md) | Migration automation strategy — AI-assisted effort reduction analysis |

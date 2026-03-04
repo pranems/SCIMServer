@@ -208,6 +208,11 @@ export class EndpointScimGroupsService {
       });
     }
 
+    // Validate filter attribute paths against schema definitions (RFC 7644 §3.4.2.2)
+    if (filter) {
+      this.schemaHelpers.validateFilterPaths(filter, endpointId);
+    }
+
     // Fetch groups from DB (repository handles endpointId scoping + member include)
     const sortParams = resolveGroupSortParams(sortBy, sortOrder);
     const allGroups = await this.groupRepo.findAllWithMembers(

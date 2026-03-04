@@ -354,6 +354,46 @@ function excludeAttrs(
     // Never allow excluding always-returned attributes
     if (alwaysReturned.has(attr.toLowerCase().split('.')[0])) continue;
 
+    // Handle URN-prefixed attributes (RFC 7644 §3.10)
+    // URN paths like "urn:ext:2.0:attrName" contain dots in version numbers,
+    // so we must resolve them against resource keys BEFORE dot-based splitting.
+    if (attr.startsWith('urn:')) {
+      // Exact match for a resource key — exclude entire extension
+      if (findKey(result, attr) !== undefined) {
+        // Never exclude always-returned URN extensions
+        if (!alwaysReturned.has(attr)) {
+          topLevel.set(attr, null);
+        }
+        continue;
+      }
+      // Check if a resource key is a prefix (e.g., "urn:ext:2.0:department" → sub-attr)
+      let urnHandled = false;
+      for (const resourceKey of Object.keys(result)) {
+        const keyLower = resourceKey.toLowerCase();
+        if (!keyLower.startsWith('urn:')) continue;
+        if (attr.startsWith(keyLower + ':')) {
+          const subAttr = attr.substring(keyLower.length + 1);
+          if (subAttr) {
+            // Never exclude always-returned sub-attributes (e.g., returned:always)
+            if (alwaysReturned.has(subAttr.toLowerCase())) {
+              urnHandled = true;
+              break;
+            }
+            if (topLevel.has(keyLower) && topLevel.get(keyLower) === null) {
+              // Already excluding full extension — skip
+            } else {
+              if (!topLevel.has(keyLower)) topLevel.set(keyLower, new Set());
+              topLevel.get(keyLower)!.add(subAttr);
+            }
+            urnHandled = true;
+            break;
+          }
+        }
+      }
+      if (urnHandled) continue;
+      // Fall through to dot-based splitting for URNs not matching any resource key
+    }
+
     const dot = attr.indexOf('.');
     if (dot === -1) {
       topLevel.set(attr, null);

@@ -4,16 +4,16 @@ import { AdminSchemaController } from './admin-schema.controller';
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import { ENDPOINT_SCHEMA_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { InMemoryEndpointSchemaRepository } from '../../../infrastructure/repositories/inmemory/inmemory-endpoint-schema.repository';
-import { PrismaService } from '../../prisma/prisma.service';
+import { EndpointService } from '../../endpoint/services/endpoint.service';
 import type { CreateEndpointSchemaDto } from '../dto/create-endpoint-schema.dto';
 
 describe('AdminSchemaController', () => {
   let controller: AdminSchemaController;
   let registry: ScimSchemaRegistry;
-  let mockPrisma: { endpoint: { findUnique: jest.Mock } };
+  let mockEndpointService: { getEndpoint: jest.Mock };
 
   const endpointId = 'ep-test-1';
-  const mockEndpoint = { id: endpointId, name: 'test', active: true };
+  const mockEndpoint = { id: endpointId, name: 'test', active: true, scimEndpoint: '/scim/endpoints/ep-test-1', createdAt: new Date(), updatedAt: new Date() };
 
   const sampleDto: CreateEndpointSchemaDto = {
     schemaUrn: 'urn:ietf:params:scim:schemas:extension:custom:2.0:User',
@@ -33,10 +33,8 @@ describe('AdminSchemaController', () => {
   };
 
   beforeEach(async () => {
-    mockPrisma = {
-      endpoint: {
-        findUnique: jest.fn().mockResolvedValue(mockEndpoint),
-      },
+    mockEndpointService = {
+      getEndpoint: jest.fn().mockResolvedValue(mockEndpoint),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -47,7 +45,7 @@ describe('AdminSchemaController', () => {
           useClass: InMemoryEndpointSchemaRepository,
         },
         ScimSchemaRegistry,
-        { provide: PrismaService, useValue: mockPrisma },
+        { provide: EndpointService, useValue: mockEndpointService },
       ],
     }).compile();
 
@@ -83,7 +81,9 @@ describe('AdminSchemaController', () => {
     });
 
     it('should throw NotFoundException for unknown endpoint', async () => {
-      mockPrisma.endpoint.findUnique.mockResolvedValue(null);
+      mockEndpointService.getEndpoint.mockRejectedValue(
+        new NotFoundException('Endpoint with ID "unknown" not found'),
+      );
 
       await expect(
         controller.registerSchema('unknown', sampleDto),
@@ -123,7 +123,9 @@ describe('AdminSchemaController', () => {
     });
 
     it('should throw NotFoundException for unknown endpoint', async () => {
-      mockPrisma.endpoint.findUnique.mockResolvedValue(null);
+      mockEndpointService.getEndpoint.mockRejectedValue(
+        new NotFoundException('Endpoint with ID "unknown" not found'),
+      );
 
       await expect(controller.listSchemas('unknown')).rejects.toThrow(
         NotFoundException,

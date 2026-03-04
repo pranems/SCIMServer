@@ -5704,6 +5704,651 @@ try { Invoke-RestMethod -Uri "$scimBase/Groups/$p2GroupId" -Method DELETE -Heade
 Write-Host "`n--- 9v: P2 Attribute Characteristics Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9w: HTTP ERROR CODES, IMMUTABLE ENFORCEMENT, RETURNED CHARACTERISTICS (P3)
+$script:currentSection = "9w: P3 HTTP Errors & Attr Char"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9w: HTTP ERROR CODES, IMMUTABLE ENFORCEMENT, RETURNED CHARACTERISTICS (P3)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# ─────────────── 9w.1–9w.4: HTTP 415 Unsupported Media Type ───────────────
+Write-Host "`n--- 9w: HTTP 415 Unsupported Media Type ---" -ForegroundColor Cyan
+
+# 9w.1: POST /Users with text/xml should fail
+try {
+    $resp415xml = Invoke-WebRequest -Uri "$scimBase/Users" -Method POST -Headers @{ Authorization = $headers.Authorization } `
+        -Body '{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"test415@example.com"}' `
+        -ContentType "text/xml" -ErrorAction Stop
+    Test-Result -Success $false -Message "9w.1: POST /Users with text/xml should return 415 (got $($resp415xml.StatusCode))"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 415) -Message "9w.1: POST /Users with text/xml returns 415 Unsupported Media Type"
+}
+
+# 9w.2: POST /Users with text/plain should fail
+try {
+    $resp415txt = Invoke-WebRequest -Uri "$scimBase/Users" -Method POST -Headers @{ Authorization = $headers.Authorization } `
+        -Body '{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"test415@example.com"}' `
+        -ContentType "text/plain" -ErrorAction Stop
+    Test-Result -Success $false -Message "9w.2: POST /Users with text/plain should return 415 (got $($resp415txt.StatusCode))"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 415) -Message "9w.2: POST /Users with text/plain returns 415"
+}
+
+# 9w.3: POST /Users with application/json should succeed
+$w3Body = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "test-9w3-$(Get-Random)@example.com"
+    displayName = "9w3 JSON Test"
+    active = $true
+} | ConvertTo-Json -Depth 3
+try {
+    $resp415json = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $w3Body -ContentType "application/json"
+    Test-Result -Success ($null -ne $resp415json.id) -Message "9w.3: POST /Users with application/json succeeds (201)"
+    # Cleanup
+    try { Invoke-RestMethod -Uri "$scimBase/Users/$($resp415json.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9w.3: POST /Users with application/json should succeed"
+}
+
+# 9w.4: POST /Users with application/scim+json should succeed
+try {
+    $resp415scim = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $w3Body -ContentType "application/scim+json"
+    Test-Result -Success ($null -ne $resp415scim.id) -Message "9w.4: POST /Users with application/scim+json succeeds (201)"
+    try { Invoke-RestMethod -Uri "$scimBase/Users/$($resp415scim.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+} catch {
+    Test-Result -Success $false -Message "9w.4: POST /Users with application/scim+json should succeed"
+}
+
+# ─────────────── 9w.5–9w.8: HTTP 405 Method Not Allowed ───────────────
+Write-Host "`n--- 9w: HTTP 405 Method Not Allowed ---" -ForegroundColor Cyan
+
+# 9w.5: PUT /Users (collection) should return 404 or 405
+try {
+    $resp405put = Invoke-WebRequest -Uri "$scimBase/Users" -Method PUT -Headers @{ Authorization = $headers.Authorization } `
+        -Body '{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"test@example.com"}' `
+        -ContentType "application/scim+json" -ErrorAction Stop
+    Test-Result -Success $false -Message "9w.5: PUT /Users (collection) should return 404 or 405 (got $($resp405put.StatusCode))"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 404 -or $statusCode -eq 405) -Message "9w.5: PUT /Users (collection) returns $statusCode (expected 404/405)"
+}
+
+# 9w.6: PATCH /Users (collection) should return 404 or 405
+try {
+    $resp405patch = Invoke-WebRequest -Uri "$scimBase/Users" -Method PATCH -Headers @{ Authorization = $headers.Authorization } `
+        -Body '{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[]}' `
+        -ContentType "application/scim+json" -ErrorAction Stop
+    Test-Result -Success $false -Message "9w.6: PATCH /Users (collection) should return 404 or 405 (got $($resp405patch.StatusCode))"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 404 -or $statusCode -eq 405) -Message "9w.6: PATCH /Users (collection) returns $statusCode"
+}
+
+# 9w.7: DELETE /Users (collection) should return 404 or 405
+try {
+    $resp405del = Invoke-WebRequest -Uri "$scimBase/Users" -Method DELETE -Headers @{ Authorization = $headers.Authorization } -ErrorAction Stop
+    Test-Result -Success $false -Message "9w.7: DELETE /Users (collection) should return 404 or 405 (got $($resp405del.StatusCode))"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 404 -or $statusCode -eq 405) -Message "9w.7: DELETE /Users (collection) returns $statusCode"
+}
+
+# 9w.8: DELETE /Groups (collection) should return 404 or 405
+try {
+    $resp405gdel = Invoke-WebRequest -Uri "$scimBase/Groups" -Method DELETE -Headers @{ Authorization = $headers.Authorization } -ErrorAction Stop
+    Test-Result -Success $false -Message "9w.8: DELETE /Groups (collection) should return 404 or 405 (got $($resp405gdel.StatusCode))"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 404 -or $statusCode -eq 405) -Message "9w.8: DELETE /Groups (collection) returns $statusCode"
+}
+
+# ─────────────── 9w.9–9w.14: Immutable Attribute Enforcement ───────────────
+Write-Host "`n--- 9w: Immutable Attribute Enforcement ---" -ForegroundColor Cyan
+
+# Create user with enterprise extension (employeeNumber is immutable)
+$w9UserName = "test-9w-immutable-$(Get-Random)@example.com"
+$w9UserBody = @{
+    schemas = @(
+        "urn:ietf:params:scim:schemas:core:2.0:User",
+        "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+    )
+    userName = $w9UserName
+    displayName = "Immutable Test User"
+    active = $true
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User" = @{
+        employeeNumber = "EMP-12345"
+        department = "Engineering"
+    }
+} | ConvertTo-Json -Depth 4
+$w9User = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $w9UserBody -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $w9User.id) -Message "9w.9: Create user with immutable employeeNumber for testing"
+
+# 9w.10: PUT changing employeeNumber should fail (400)
+$w9PutBody = @{
+    schemas = @(
+        "urn:ietf:params:scim:schemas:core:2.0:User",
+        "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+    )
+    userName = $w9UserName
+    displayName = "Immutable Test User Updated"
+    active = $true
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User" = @{
+        employeeNumber = "EMP-99999"
+        department = "Engineering"
+    }
+} | ConvertTo-Json -Depth 4
+try {
+    $w9PutResp = Invoke-WebRequest -Uri "$scimBase/Users/$($w9User.id)" -Method PUT `
+        -Headers @{ Authorization = $headers.Authorization } -Body $w9PutBody -ContentType "application/scim+json" -ErrorAction Stop
+    Test-Result -Success $false -Message "9w.10: PUT changing immutable employeeNumber should return 400 (got $($w9PutResp.StatusCode))"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "9w.10: PUT changing immutable employeeNumber returns 400"
+}
+
+# 9w.11: PUT with same employeeNumber should succeed (200)
+$w9PutSameBody = @{
+    schemas = @(
+        "urn:ietf:params:scim:schemas:core:2.0:User",
+        "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+    )
+    userName = $w9UserName
+    displayName = "Immutable Same Value"
+    active = $true
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User" = @{
+        employeeNumber = "EMP-12345"
+        department = "Sales"
+    }
+} | ConvertTo-Json -Depth 4
+$w9PutSame = Invoke-RestMethod -Uri "$scimBase/Users/$($w9User.id)" -Method PUT -Headers $headers -Body $w9PutSameBody -ContentType "application/scim+json"
+Test-Result -Success ($w9PutSame.displayName -eq "Immutable Same Value") -Message "9w.11: PUT with same immutable value succeeds (200)"
+
+# 9w.12: PATCH changing employeeNumber should fail (400)
+$w9PatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{
+            op = "replace"
+            path = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:employeeNumber"
+            value = "EMP-CHANGED"
+        }
+    )
+} | ConvertTo-Json -Depth 4
+try {
+    $w9PatchResp = Invoke-WebRequest -Uri "$scimBase/Users/$($w9User.id)" -Method PATCH `
+        -Headers @{ Authorization = $headers.Authorization } -Body $w9PatchBody -ContentType "application/scim+json" -ErrorAction Stop
+    Test-Result -Success $false -Message "9w.12: PATCH changing immutable employeeNumber should return 400 (got $($w9PatchResp.StatusCode))"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "9w.12: PATCH changing immutable employeeNumber returns 400"
+}
+
+# 9w.13: GET should still show original immutable value
+$w9Get = Invoke-RestMethod -Uri "$scimBase/Users/$($w9User.id)" -Method GET -Headers $headers
+$w9Ext = $w9Get."urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+Test-Result -Success ($w9Ext.employeeNumber -eq "EMP-12345") -Message "9w.13: GET returns original immutable employeeNumber value"
+
+# 9w.14: PATCH mutable attribute alongside immutable should succeed
+$w9PatchMutable = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{
+            op = "replace"
+            path = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department"
+            value = "Marketing"
+        }
+    )
+} | ConvertTo-Json -Depth 4
+$w9PatchMutableResp = Invoke-RestMethod -Uri "$scimBase/Users/$($w9User.id)" -Method PATCH -Headers $headers -Body $w9PatchMutable -ContentType "application/scim+json"
+$w9PatchExt = $w9PatchMutableResp."urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+Test-Result -Success ($w9PatchExt.department -eq "Marketing") -Message "9w.14: PATCH mutable department succeeds while employeeNumber preserved"
+
+# ─────────────── 9w.15–9w.18: returned:request & returned:default ───────────────
+Write-Host "`n--- 9w: returned:request and returned:default ---" -ForegroundColor Cyan
+
+# Verify schema definitions for returned characteristics
+$w9UserSchema = Invoke-RestMethod -Uri "$scimBase/Schemas/urn:ietf:params:scim:schemas:core:2.0:User" -Method GET -Headers $headers
+
+# 9w.15: password should not appear in GET response (returned:never)
+$w9GetUser = Invoke-RestMethod -Uri "$scimBase/Users/$($w9User.id)" -Method GET -Headers $headers
+Test-Result -Success ($null -eq $w9GetUser.password) -Message "9w.15: GET /Users/:id does not return password (returned:never)"
+
+# 9w.16: id is always returned
+Test-Result -Success ($null -ne $w9GetUser.id) -Message "9w.16: GET /Users/:id always returns id (returned:always)"
+
+# 9w.17: userName is always returned
+Test-Result -Success ($null -ne $w9GetUser.userName) -Message "9w.17: GET /Users/:id always returns userName (returned:always)"
+
+# 9w.18: excludedAttributes should strip displayName (returned:default)
+$w9ExclUrl = "$scimBase/Users/$($w9User.id)?excludedAttributes=displayName"
+$w9Excl = Invoke-RestMethod -Uri $w9ExclUrl -Method GET -Headers $headers
+Test-Result -Success ($null -eq $w9Excl.displayName) -Message "9w.18: excludedAttributes=displayName strips it from response (returned:default)"
+Test-Result -Success ($null -ne $w9Excl.userName) -Message "9w.19: excludedAttributes does not strip always-returned userName"
+
+# Cleanup 9w test resources
+Write-Host "`n--- 9w: Cleaning up 9w test resources ---" -ForegroundColor Cyan
+try { Invoke-RestMethod -Uri "$scimBase/Users/$($w9User.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+Write-Host "`n--- 9w: P3 HTTP Errors, Immutable, Returned Characteristics Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9x: USER UNIQUENESS ON PUT/PATCH, REQUIRED ON PUT, RETURNED CHARS ON .search/PATCH
+$script:currentSection = "9x: Uniqueness/Required/Search Returned"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9x: USER UNIQUENESS, REQUIRED ON PUT, RETURNED ON PATCH/.search" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# ─────────────── Setup: Create two users for uniqueness collision tests ───────────────
+$x9UserNameA = "test-9x-userA-$(Get-Random)@example.com"
+$x9UserBodyA = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $x9UserNameA
+    displayName = "9x User A"
+    externalId = "ext-9x-A-$(Get-Random)"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$x9UserA = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $x9UserBodyA -ContentType "application/scim+json"
+
+$x9UserNameB = "test-9x-userB-$(Get-Random)@example.com"
+$x9UserBodyB = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $x9UserNameB
+    displayName = "9x User B"
+    externalId = "ext-9x-B-$(Get-Random)"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$x9UserB = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $x9UserBodyB -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $x9UserA.id -and $null -ne $x9UserB.id) -Message "9x.0: Created two users for uniqueness collision tests"
+
+# ─────────────── 9x.1–9x.4: uniqueness:server — User PUT 409 ───────────────
+Write-Host "`n--- 9x: uniqueness:server — User PUT ---" -ForegroundColor Cyan
+
+# 9x.1: PUT User B with User A's userName → 409
+$x9PutConflictBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $x9UserNameA
+    displayName = "9x Conflict PUT"
+    active = $true
+} | ConvertTo-Json -Depth 3
+try {
+    $x9PutConflict = Invoke-WebRequest -Uri "$scimBase/Users/$($x9UserB.id)" -Method PUT `
+        -Headers @{ Authorization = $headers.Authorization } -Body $x9PutConflictBody -ContentType "application/scim+json" -ErrorAction Stop
+    Test-Result -Success $false -Message "9x.1: PUT userName collision should return 409 (got $($x9PutConflict.StatusCode))"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 409) -Message "9x.1: PUT userName collision returns 409 Conflict"
+}
+
+# 9x.2: PUT User B with User A's externalId → 409
+$x9PutExtConflictBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $x9UserNameB
+    externalId = $x9UserA.externalId
+    displayName = "9x ExtId Conflict PUT"
+    active = $true
+} | ConvertTo-Json -Depth 3
+try {
+    $x9PutExtConflict = Invoke-WebRequest -Uri "$scimBase/Users/$($x9UserB.id)" -Method PUT `
+        -Headers @{ Authorization = $headers.Authorization } -Body $x9PutExtConflictBody -ContentType "application/scim+json" -ErrorAction Stop
+    Test-Result -Success $false -Message "9x.2: PUT externalId collision should return 409 (got $($x9PutExtConflict.StatusCode))"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 409) -Message "9x.2: PUT externalId collision returns 409 Conflict"
+}
+
+# 9x.3: PUT User A with own userName → 200 (self-update allowed)
+$x9PutSelfBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $x9UserNameA
+    displayName = "9x Self Update OK"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$x9PutSelf = Invoke-RestMethod -Uri "$scimBase/Users/$($x9UserA.id)" -Method PUT -Headers $headers -Body $x9PutSelfBody -ContentType "application/scim+json"
+Test-Result -Success ($x9PutSelf.displayName -eq "9x Self Update OK") -Message "9x.3: PUT self-update with own userName succeeds (200)"
+
+# 9x.4: PUT case-insensitive userName collision → 409
+$x9PutCaseBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $x9UserNameA.ToUpper()
+    displayName = "9x Case Conflict"
+    active = $true
+} | ConvertTo-Json -Depth 3
+try {
+    $x9PutCase = Invoke-WebRequest -Uri "$scimBase/Users/$($x9UserB.id)" -Method PUT `
+        -Headers @{ Authorization = $headers.Authorization } -Body $x9PutCaseBody -ContentType "application/scim+json" -ErrorAction Stop
+    Test-Result -Success $false -Message "9x.4: PUT case-insensitive userName collision should return 409 (got $($x9PutCase.StatusCode))"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 409) -Message "9x.4: PUT case-insensitive userName collision returns 409"
+}
+
+# ─────────────── 9x.5–9x.7: uniqueness:server — User PATCH 409 ───────────────
+Write-Host "`n--- 9x: uniqueness:server — User PATCH ---" -ForegroundColor Cyan
+
+# 9x.5: PATCH User B replace userName → User A's userName → 409
+$x9PatchUserNameBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{
+            op = "replace"
+            path = "userName"
+            value = $x9UserNameA
+        }
+    )
+} | ConvertTo-Json -Depth 4
+try {
+    $x9PatchUN = Invoke-WebRequest -Uri "$scimBase/Users/$($x9UserB.id)" -Method PATCH `
+        -Headers @{ Authorization = $headers.Authorization } -Body $x9PatchUserNameBody -ContentType "application/scim+json" -ErrorAction Stop
+    Test-Result -Success $false -Message "9x.5: PATCH userName collision should return 409 (got $($x9PatchUN.StatusCode))"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 409) -Message "9x.5: PATCH userName collision returns 409 Conflict"
+}
+
+# 9x.6: PATCH User B replace externalId → User A's externalId → 409
+$x9PatchExtBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{
+            op = "replace"
+            path = "externalId"
+            value = $x9UserA.externalId
+        }
+    )
+} | ConvertTo-Json -Depth 4
+try {
+    $x9PatchExt = Invoke-WebRequest -Uri "$scimBase/Users/$($x9UserB.id)" -Method PATCH `
+        -Headers @{ Authorization = $headers.Authorization } -Body $x9PatchExtBody -ContentType "application/scim+json" -ErrorAction Stop
+    Test-Result -Success $false -Message "9x.6: PATCH externalId collision should return 409 (got $($x9PatchExt.StatusCode))"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 409) -Message "9x.6: PATCH externalId collision returns 409 Conflict"
+}
+
+# 9x.7: PATCH mutable field (displayName) → 200 (no conflict)
+$x9PatchOkBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{
+            op = "replace"
+            path = "displayName"
+            value = "9x Patched OK"
+        }
+    )
+} | ConvertTo-Json -Depth 4
+$x9PatchOk = Invoke-RestMethod -Uri "$scimBase/Users/$($x9UserB.id)" -Method PATCH -Headers $headers -Body $x9PatchOkBody -ContentType "application/scim+json"
+Test-Result -Success ($x9PatchOk.displayName -eq "9x Patched OK") -Message "9x.7: PATCH non-unique field succeeds (200)"
+
+# ─────────────── 9x.8–9x.9: required:true — PUT enforcement ───────────────
+Write-Host "`n--- 9x: required:true — PUT enforcement ---" -ForegroundColor Cyan
+
+# 9x.8: PUT missing required userName → 400
+$x9PutNoUserNameBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    displayName = "9x Missing Required"
+    active = $true
+} | ConvertTo-Json -Depth 3
+try {
+    $x9PutNoUN = Invoke-WebRequest -Uri "$scimBase/Users/$($x9UserA.id)" -Method PUT `
+        -Headers @{ Authorization = $headers.Authorization } -Body $x9PutNoUserNameBody -ContentType "application/scim+json" -ErrorAction Stop
+    Test-Result -Success $false -Message "9x.8: PUT missing required userName should return 400 (got $($x9PutNoUN.StatusCode))"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "9x.8: PUT missing required userName returns 400"
+}
+
+# 9x.9: PUT with all required fields present → 200
+$x9PutWithReqBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $x9UserNameA
+    displayName = "9x All Required Present"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$x9PutWithReq = Invoke-RestMethod -Uri "$scimBase/Users/$($x9UserA.id)" -Method PUT -Headers $headers -Body $x9PutWithReqBody -ContentType "application/scim+json"
+Test-Result -Success ($x9PutWithReq.userName -eq $x9UserNameA) -Message "9x.9: PUT with all required fields succeeds (200)"
+
+# ─────────────── 9x.10–9x.11: returned:never on PATCH response ───────────────
+Write-Host "`n--- 9x: returned:never on PATCH response ---" -ForegroundColor Cyan
+
+# 9x.10: PATCH response should not contain password (returned:never)
+$x9PatchRetBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{
+            op = "replace"
+            path = "displayName"
+            value = "9x PATCH Returned Test"
+        }
+    )
+} | ConvertTo-Json -Depth 4
+$x9PatchRet = Invoke-RestMethod -Uri "$scimBase/Users/$($x9UserA.id)" -Method PATCH -Headers $headers -Body $x9PatchRetBody -ContentType "application/scim+json"
+Test-Result -Success ($null -eq $x9PatchRet.password) -Message "9x.10: PATCH response does not include password (returned:never)"
+Test-Result -Success ($null -ne $x9PatchRet.id -and $null -ne $x9PatchRet.userName) -Message "9x.11: PATCH response includes id + userName (returned:always)"
+
+# ─────────────── 9x.12–9x.15: returned characteristics on .search ───────────────
+Write-Host "`n--- 9x: returned characteristics on .search ---" -ForegroundColor Cyan
+
+# 9x.12: .search should not return password (returned:never)
+$x9SearchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:SearchRequest")
+    filter = "userName eq `"$x9UserNameA`""
+} | ConvertTo-Json -Depth 3
+$x9Search = Invoke-RestMethod -Uri "$scimBase/Users/.search" -Method POST -Headers $headers -Body $x9SearchBody -ContentType "application/scim+json"
+$x9SearchFirst = $x9Search.Resources[0]
+Test-Result -Success ($null -eq $x9SearchFirst.password) -Message "9x.12: .search does not return password (returned:never)"
+
+# 9x.13: .search returns id and userName (returned:always)
+Test-Result -Success ($null -ne $x9SearchFirst.id) -Message "9x.13: .search returns id (returned:always)"
+Test-Result -Success ($null -ne $x9SearchFirst.userName) -Message "9x.14: .search returns userName (returned:always)"
+
+# 9x.15: .search with excludedAttributes=id should still return id (always-returned)
+$x9SearchExclBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:SearchRequest")
+    filter = "userName eq `"$x9UserNameA`""
+    excludedAttributes = "id"
+} | ConvertTo-Json -Depth 3
+$x9SearchExcl = Invoke-RestMethod -Uri "$scimBase/Users/.search" -Method POST -Headers $headers -Body $x9SearchExclBody -ContentType "application/scim+json"
+$x9SearchExclFirst = $x9SearchExcl.Resources[0]
+Test-Result -Success ($null -ne $x9SearchExclFirst.id) -Message "9x.15: .search excludedAttributes=id still returns id (always-returned protected)"
+
+# ─────────────── 9x Cleanup ───────────────
+Write-Host "`n--- 9x: Cleaning up test resources ---" -ForegroundColor Cyan
+try { Invoke-RestMethod -Uri "$scimBase/Users/$($x9UserA.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$scimBase/Users/$($x9UserB.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+Write-Host "`n--- 9x: User Uniqueness, Required PUT, Returned on PATCH/.search Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9y: GENERIC RESOURCE PARITY FIXES (RequireIfMatch 428 + invalidFilter)
+$script:currentSection = "9y: Generic Parity Fixes"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9y: GENERIC RESOURCE PARITY FIXES" -ForegroundColor Yellow
+Write-Host "  Fix #1: RequireIfMatch 428 on generic resources" -ForegroundColor Yellow
+Write-Host "  Fix #2: validateFilterAttributePaths wiring" -ForegroundColor Yellow
+Write-Host "  Fix #3: Generic filter 400 for unsupported expressions" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# --- Setup: Create endpoint with RequireIfMatch + CustomResourceTypesEnabled ---
+Write-Host "`n--- 9y Setup: Creating endpoint with RequireIfMatch + CustomResourceTypesEnabled ---" -ForegroundColor Cyan
+$y9EndpointBody = @{
+    name = "live-test-9y-$(Get-Random)"
+    displayName = "9y Generic Parity Endpoint"
+    description = "Endpoint for generic parity fix tests"
+    config = @{
+        CustomResourceTypesEnabled = "True"
+        RequireIfMatch = "True"
+    }
+} | ConvertTo-Json
+$y9Endpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $y9EndpointBody
+$Y9EndpointId = $y9Endpoint.id
+$scimBase9y = "$baseUrl/scim/endpoints/$Y9EndpointId"
+$adminBase9y = "$baseUrl/scim/admin/endpoints/$Y9EndpointId"
+Test-Result -Success ($null -ne $Y9EndpointId) -Message "9y.0: Setup endpoint created with RequireIfMatch + CustomResourceTypesEnabled"
+
+# Register Device resource type
+$y9DeviceSchema = @{
+    name = "Device"
+    schemaUri = "urn:ietf:params:scim:schemas:custom:Device9y"
+    endpoint = "/Devices"
+    description = "Device for 9y parity tests"
+} | ConvertTo-Json
+$y9DeviceReg = Invoke-RestMethod -Uri "$adminBase9y/resource-types" -Method POST -Headers $headers -Body $y9DeviceSchema
+Test-Result -Success ($y9DeviceReg.name -eq "Device") -Message "9y.0: Device resource type registered"
+
+# Create a test device (POST does not require If-Match)
+$y9DeviceBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:custom:Device9y")
+    displayName = "Parity Test Device"
+    externalId = "y9-ext-001"
+} | ConvertTo-Json -Depth 5
+$y9Device = Invoke-RestMethod -Uri "$scimBase9y/Devices" -Method POST -Headers $headers -Body $y9DeviceBody -ContentType "application/scim+json"
+$Y9DeviceId = $y9Device.id
+Test-Result -Success ($null -ne $Y9DeviceId) -Message "9y.0: Test device created (id=$Y9DeviceId)"
+
+# ── Fix #1: RequireIfMatch 428 on Generic PUT/PATCH/DELETE ─────────────
+
+# --- Test 9y.1: PUT without If-Match → 428 ---
+Write-Host "`n--- Test 9y.1: PUT without If-Match → 428 ---" -ForegroundColor Cyan
+$y9PutBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:custom:Device9y")
+    displayName = "Updated Device"
+} | ConvertTo-Json -Depth 5
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase9y/Devices/$Y9DeviceId" -Method PUT -Headers $headers -Body $y9PutBody -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9y.1: PUT without If-Match should have returned 428"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 428) -Message "9y.1: PUT without If-Match returns 428 (HTTP $statusCode)"
+}
+
+# --- Test 9y.2: PATCH without If-Match → 428 ---
+Write-Host "`n--- Test 9y.2: PATCH without If-Match → 428 ---" -ForegroundColor Cyan
+$y9PatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "replace"; path = "displayName"; value = "Patched Device" }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase9y/Devices/$Y9DeviceId" -Method PATCH -Headers $headers -Body $y9PatchBody -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9y.2: PATCH without If-Match should have returned 428"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 428) -Message "9y.2: PATCH without If-Match returns 428 (HTTP $statusCode)"
+}
+
+# --- Test 9y.3: DELETE without If-Match → 428 ---
+Write-Host "`n--- Test 9y.3: DELETE without If-Match → 428 ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase9y/Devices/$Y9DeviceId" -Method DELETE -Headers $headers
+    Test-Result -Success $false -Message "9y.3: DELETE without If-Match should have returned 428"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 428) -Message "9y.3: DELETE without If-Match returns 428 (HTTP $statusCode)"
+}
+
+# --- Test 9y.4: PUT with If-Match → 200 ---
+Write-Host "`n--- Test 9y.4: PUT with If-Match → 200 ---" -ForegroundColor Cyan
+$y9PutHeaders = @{} + $headers
+$y9PutHeaders["If-Match"] = 'W/"v1"'
+$y9PutResult = Invoke-RestMethod -Uri "$scimBase9y/Devices/$Y9DeviceId" -Method PUT -Headers $y9PutHeaders -Body $y9PutBody -ContentType "application/scim+json"
+Test-Result -Success ($y9PutResult.id -eq $Y9DeviceId) -Message "9y.4: PUT with If-Match succeeds (id=$($y9PutResult.id))"
+
+# --- Test 9y.5: PATCH with If-Match → 200 ---
+Write-Host "`n--- Test 9y.5: PATCH with If-Match → 200 ---" -ForegroundColor Cyan
+$y9PatchHeaders = @{} + $headers
+$y9PatchHeaders["If-Match"] = 'W/"v2"'
+$y9PatchResult = Invoke-RestMethod -Uri "$scimBase9y/Devices/$Y9DeviceId" -Method PATCH -Headers $y9PatchHeaders -Body $y9PatchBody -ContentType "application/scim+json"
+Test-Result -Success ($y9PatchResult.id -eq $Y9DeviceId) -Message "9y.5: PATCH with If-Match succeeds (id=$($y9PatchResult.id))"
+
+# ── Fix #3: Generic filter 400 for unsupported expressions ─────────────
+
+# Also create an endpoint WITHOUT RequireIfMatch for filter tests
+Write-Host "`n--- 9y Setup: Creating endpoint without RequireIfMatch for filter tests ---" -ForegroundColor Cyan
+$y9FilterEndpointBody = @{
+    name = "live-test-9y-filter-$(Get-Random)"
+    displayName = "9y Filter Test Endpoint"
+    description = "Endpoint for generic filter parity tests"
+    config = @{
+        CustomResourceTypesEnabled = "True"
+    }
+} | ConvertTo-Json
+$y9FilterEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $y9FilterEndpointBody
+$Y9FilterEndpointId = $y9FilterEndpoint.id
+$scimBase9yFilter = "$baseUrl/scim/endpoints/$Y9FilterEndpointId"
+$adminBase9yFilter = "$baseUrl/scim/admin/endpoints/$Y9FilterEndpointId"
+$y9DeviceReg2 = Invoke-RestMethod -Uri "$adminBase9yFilter/resource-types" -Method POST -Headers $headers -Body $y9DeviceSchema
+Test-Result -Success ($y9DeviceReg2.name -eq "Device") -Message "9y.6: Filter test endpoint setup complete"
+
+# Create a device for filter testing
+$y9FilterDeviceBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:custom:Device9y")
+    displayName = "FilterTarget"
+    externalId = "y9-filter-ext"
+} | ConvertTo-Json -Depth 5
+$y9FilterDevice = Invoke-RestMethod -Uri "$scimBase9yFilter/Devices" -Method POST -Headers $headers -Body $y9FilterDeviceBody -ContentType "application/scim+json"
+
+# --- Test 9y.7: Unsupported filter operator → 400 invalidFilter ---
+Write-Host "`n--- Test 9y.7: Unsupported filter operator → 400 invalidFilter ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase9yFilter/Devices?filter=displayName co `"test`"" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9y.7: Unsupported filter should have returned 400"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "9y.7: Unsupported filter operator returns 400 (HTTP $statusCode)"
+}
+
+# --- Test 9y.8: Unsupported attribute in eq filter → 400 ---
+Write-Host "`n--- Test 9y.8: Unsupported attribute in eq filter → 400 ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase9yFilter/Devices?filter=active eq true" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9y.8: Unsupported attribute should have returned 400"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "9y.8: Unsupported attribute in eq filter returns 400 (HTTP $statusCode)"
+}
+
+# --- Test 9y.9: Valid displayName eq filter still works → 200 ---
+Write-Host "`n--- Test 9y.9: Valid displayName eq filter → 200 ---" -ForegroundColor Cyan
+$y9FilterResult = Invoke-RestMethod -Uri "$scimBase9yFilter/Devices?filter=displayName eq `"FilterTarget`"" -Method GET -Headers $headers
+Test-Result -Success ($y9FilterResult.totalResults -ge 1) -Message "9y.9: displayName eq filter returns results (totalResults=$($y9FilterResult.totalResults))"
+
+# --- Test 9y.10: Valid externalId eq filter → 200 ---
+Write-Host "`n--- Test 9y.10: Valid externalId eq filter → 200 ---" -ForegroundColor Cyan
+$y9ExtIdResult = Invoke-RestMethod -Uri "$scimBase9yFilter/Devices?filter=externalId eq `"y9-filter-ext`"" -Method GET -Headers $headers
+Test-Result -Success ($y9ExtIdResult.totalResults -ge 1) -Message "9y.10: externalId eq filter returns results (totalResults=$($y9ExtIdResult.totalResults))"
+
+# ── Fix #2: Users filter with unknown attribute → 400 ──────────────────
+
+# --- Test 9y.11: Users filter with completely unknown attribute → 400 ---
+Write-Host "`n--- Test 9y.11: Users filter with unknown attribute → 400 ---" -ForegroundColor Cyan
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase9yFilter/Users?filter=nonExistentAttr eq `"test`"" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9y.11: Unknown attribute filter should have returned 400"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "9y.11: Users filter with unknown attribute returns 400 (HTTP $statusCode)"
+}
+
+# ─────────────── 9y Cleanup ───────────────
+Write-Host "`n--- 9y: Cleaning up test resources ---" -ForegroundColor Cyan
+# Delete via If-Match for the RequireIfMatch endpoint
+$y9DeleteHeaders = @{} + $headers
+$y9DeleteHeaders["If-Match"] = 'W/"v3"'
+try { Invoke-RestMethod -Uri "$scimBase9y/Devices/$Y9DeviceId" -Method DELETE -Headers $y9DeleteHeaders | Out-Null } catch {}
+# Delete on the filter endpoint (no RequireIfMatch)
+try { Invoke-RestMethod -Uri "$scimBase9yFilter/Devices/$($y9FilterDevice.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+# Delete endpoints  
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$Y9EndpointId" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$Y9FilterEndpointId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+Write-Host "`n--- 9y: Generic Resource Parity Fix Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

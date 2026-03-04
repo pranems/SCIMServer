@@ -72,9 +72,9 @@ For each characteristic, verify across all operations:
 | `mutability: readWrite` (displayName) | Accepted | N/A | N/A | N/A | Accepted | Accepted | N/A |
 | `mutability: writeOnly` (password) | Accepted, never returned | N/A | N/A | N/A | Accepted | Accepted | N/A |
 | `mutability: immutable` (userName) | Accepted on create | N/A | N/A | N/A | Rejected if changed | Rejected if changed | N/A |
-| `uniqueness: server` (userName, displayName) | 409 on conflict | N/A | N/A | N/A | 409 on conflict | 409 on conflict | N/A |
+| `uniqueness: server` (userName, displayName) | 409 on conflict | N/A | N/A | N/A | 409 on conflict (User+Group) | 409 on conflict (User+Group) | N/A |
 | `caseExact: false` (userName) | Case-insensitive uniqueness | N/A | Case-insensitive filter | Case-insensitive filter | Case-insensitive uniqueness | Case-insensitive uniqueness | N/A |
-| `required: true` (userName, schemas) | 400 if missing | N/A | N/A | N/A | 400 if missing | N/A | N/A |
+| `required: true` (userName, schemas) | 400 if missing | N/A | N/A | N/A | 400 if missing (User) | N/A | N/A |
 
 ### D. Operation × Projection × Characteristic Matrix
 
@@ -135,7 +135,7 @@ Specifically check:
 - Every E2E test scenario should have a corresponding live test in `scripts/live-test.ps1`
 - Live tests should cover both local (port 6000) and Docker (port 8080) scenarios
 - Verify all live test sections in `scripts/live-test.ps1` exist by grepping for `TEST SECTION`
-- Ensure new sections use the next available number (check current highest before `Section 10`)
+- Ensure new sections use the next available number (check current highest before `Section 10`; as of v0.26.0 the latest is **9x**)
 
 ### H. Resource-Type Symmetry
 
@@ -158,12 +158,12 @@ For every behavior tested on Users, verify the equivalent exists for Groups (and
 
 | Scenario | Expected | Tested? |
 |----------|----------|---------|
-| `Content-Type: application/scim+json` required | 415 if wrong | ? |
-| `Content-Type: application/json` accepted | 200 | ? |
+| `Content-Type: application/scim+json` required | 415 if wrong | ✅ E2E + Live |
+| `Content-Type: application/json` accepted | 200 | ✅ E2E + Live |
 | Missing `Authorization` header | 401 | ? |
 | Invalid bearer token | 401 | ? |
 | Unknown route | 404 | ? |
-| Method not allowed (e.g., DELETE /Users without id) | 405 | ? |
+| Method not allowed (e.g., DELETE /Users without id) | 405 | ✅ E2E + Live |
 | `Location` header on POST 201 | Present with resource URI | ? |
 | `ETag` header on all responses | Present when ETag enabled | ? |
 | `If-None-Match: *` on GET (304) | 304 Not Modified | ? |
@@ -488,11 +488,12 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
-| Unit  | 2,682  | ?     | +?    |
-| E2E   | 585    | ?     | +?    |
-| Live  | 535    | ?     | +?    |
+| Unit  | 2,741  | ?     | +?    |
+| E2E   | 651    | ?     | +?    |
+| Live  | 659    | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
+> *Last updated: v0.27.0 (2026-03-03)*
 
 4. Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts.
 

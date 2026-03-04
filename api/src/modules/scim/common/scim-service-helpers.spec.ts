@@ -293,7 +293,7 @@ describe('ScimSchemaHelpers', () => {
 
       const dto = { schemas: [CORE_URN, EXT_URN] };
       const result = helpers.buildSchemaDefinitions(dto, 'ep-1');
-      expect(result).toEqual([coreDef, extDef]);
+      expect(result).toEqual([{ ...coreDef, isCoreSchema: true }, extDef]);
     });
 
     it('should return empty array when no schemas registered', () => {
@@ -322,7 +322,7 @@ describe('ScimSchemaHelpers', () => {
       });
       mockRegistry.getExtensionUrns.mockReturnValue([EXT_URN]);
       const result = helpers.getSchemaDefinitions('ep-1');
-      expect(result).toEqual([coreDef, extDef]);
+      expect(result).toEqual([{ ...coreDef, isCoreSchema: true }, extDef]);
     });
   });
 
@@ -375,6 +375,44 @@ describe('ScimSchemaHelpers', () => {
       // No throw
       helpers.validatePayloadSchema(dto, 'ep-1', undefined, 'create');
     });
+
+    it('should throw 400 for unknown attribute when strict mode is on', () => {
+      const coreDef = {
+        id: CORE_URN,
+        name: 'User',
+        attributes: [
+          { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+        ],
+      };
+      mockRegistry.getSchema.mockReturnValue(coreDef);
+
+      const config = { StrictSchemaValidation: 'true' } as any;
+      const dto = { schemas: [CORE_URN], userName: 'alice', unknownField: 'bad' } as Record<string, unknown>;
+
+      expect(() => helpers.validatePayloadSchema(dto, 'ep-1', config, 'create')).toThrow();
+      try {
+        helpers.validatePayloadSchema(dto, 'ep-1', config, 'create');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+      }
+    });
+
+    it('should pass for valid payload when strict mode is on', () => {
+      const coreDef = {
+        id: CORE_URN,
+        name: 'User',
+        attributes: [
+          { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+          { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+        ],
+      };
+      mockRegistry.getSchema.mockReturnValue(coreDef);
+
+      const config = { StrictSchemaValidation: 'true' } as any;
+      const dto = { schemas: [CORE_URN], userName: 'alice', displayName: 'Alice' } as Record<string, unknown>;
+
+      expect(() => helpers.validatePayloadSchema(dto, 'ep-1', config, 'create')).not.toThrow();
+    });
   });
 
   describe('checkImmutableAttributes', () => {
@@ -383,6 +421,124 @@ describe('ScimSchemaHelpers', () => {
       const incoming = { displayName: 'Bob' };
       // No throw — strict mode is off
       helpers.checkImmutableAttributes(existing, incoming, 'ep-1');
+    });
+
+    it('should throw 400 when immutable attribute is changed with strict mode on', () => {
+      const coreDef = {
+        id: CORE_URN,
+        name: 'User',
+        attributes: [
+          { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'immutable' },
+          { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+        ],
+      };
+      mockRegistry.getSchema.mockReturnValue(coreDef);
+
+      const config = { StrictSchemaValidation: 'true' } as any;
+      const existing = { schemas: [CORE_URN], userName: 'alice' };
+      const incoming = { schemas: [CORE_URN], userName: 'bob' }; // changed immutable!
+
+      expect(() => helpers.checkImmutableAttributes(existing, incoming, 'ep-1', config)).toThrow();
+      try {
+        helpers.checkImmutableAttributes(existing, incoming, 'ep-1', config);
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+        expect(e.getResponse().scimType).toBe('mutability');
+      }
+    });
+
+    it('should not throw when immutable attribute is unchanged with strict mode on', () => {
+      const coreDef = {
+        id: CORE_URN,
+        name: 'User',
+        attributes: [
+          { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'immutable' },
+          { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+        ],
+      };
+      mockRegistry.getSchema.mockReturnValue(coreDef);
+
+      const config = { StrictSchemaValidation: 'true' } as any;
+      const existing = { schemas: [CORE_URN], userName: 'alice' };
+      const incoming = { schemas: [CORE_URN], userName: 'alice', displayName: 'Alice Updated' };
+
+      expect(() => helpers.checkImmutableAttributes(existing, incoming, 'ep-1', config)).not.toThrow();
+    });
+  });
+
+  describe('validateFilterPaths', () => {
+    it('should not throw when filter is empty or schemas are missing', () => {
+      mockRegistry.getSchema.mockReturnValue(null);
+      expect(() => helpers.validateFilterPaths('userName eq "test"', 'ep-1')).not.toThrow();
+    });
+
+    it('should not throw for valid core attribute paths', () => {
+      const coreDef = {
+        id: CORE_URN,
+        name: 'User',
+        attributes: [
+          { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+          { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+        ],
+      };
+      mockRegistry.getSchema.mockReturnValue(coreDef);
+      expect(() => helpers.validateFilterPaths('userName eq "test"', 'ep-1')).not.toThrow();
+    });
+
+    it('should throw 400 invalidFilter for unknown attribute paths', () => {
+      const coreDef = {
+        id: CORE_URN,
+        name: 'User',
+        attributes: [
+          { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+        ],
+      };
+      mockRegistry.getSchema.mockReturnValue(coreDef);
+      try {
+        helpers.validateFilterPaths('unknownAttr eq "test"', 'ep-1');
+        fail('Expected 400');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+        expect(e.getResponse().scimType).toBe('invalidFilter');
+      }
+    });
+
+    it('should not throw for malformed filter (syntax errors handled elsewhere)', () => {
+      const coreDef = {
+        id: CORE_URN,
+        name: 'User',
+        attributes: [
+          { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+        ],
+      };
+      mockRegistry.getSchema.mockReturnValue(coreDef);
+      // Malformed filter - parseScimFilter will throw, validateFilterPaths catches and returns
+      expect(() => helpers.validateFilterPaths('not a valid filter !!!', 'ep-1')).not.toThrow();
+    });
+
+    it('should allow reserved paths like id and externalId', () => {
+      const coreDef = {
+        id: CORE_URN,
+        name: 'User',
+        attributes: [
+          { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+        ],
+      };
+      mockRegistry.getSchema.mockReturnValue(coreDef);
+      expect(() => helpers.validateFilterPaths('id eq "abc"', 'ep-1')).not.toThrow();
+      expect(() => helpers.validateFilterPaths('externalId eq "ext-1"', 'ep-1')).not.toThrow();
+    });
+
+    it('should allow meta sub-attribute paths', () => {
+      const coreDef = {
+        id: CORE_URN,
+        name: 'User',
+        attributes: [
+          { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+        ],
+      };
+      mockRegistry.getSchema.mockReturnValue(coreDef);
+      expect(() => helpers.validateFilterPaths('meta.created gt "2025-01-01"', 'ep-1')).not.toThrow();
     });
   });
 });

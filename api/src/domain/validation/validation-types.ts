@@ -64,6 +64,13 @@ export interface SchemaDefinition {
   id: string;
   /** Attribute definitions for this schema */
   attributes: readonly SchemaAttributeDefinition[];
+  /**
+   * When true, this schema is treated as the core schema for the resource type.
+   * Core schema attributes live at the top level of the SCIM payload.
+   * When omitted, falls back to prefix-based detection (urn:ietf:params:scim:schemas:core:).
+   * Set explicitly for custom resource types whose URNs don't use the standard prefix.
+   */
+  isCoreSchema?: boolean;
 }
 
 /**

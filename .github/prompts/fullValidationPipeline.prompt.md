@@ -32,7 +32,7 @@ npx jest --no-coverage --json --outputFile=pipeline-unit.json 2>$null
 # Parse results:
 node -e "const r=JSON.parse(require('fs').readFileSync('pipeline-unit.json','utf8'));console.log('suites:',r.numPassedTestSuites+'/'+r.numTotalTestSuites,'tests:',r.numPassedTests+'/'+r.numTotalTests,'failed:',r.numFailedTests)"
 ```
-> **Baselines (v0.24.0):** 2,682 pass / 0 fail / 73 suites. All pre-existing failures from v0.21.0 have been fixed.
+> **Baselines (v0.27.0):** 2,741 pass / 0 fail / 73 suites.
 > *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 
 ### Step 3: Run E2E Tests
@@ -42,20 +42,19 @@ npx jest --config test/e2e/jest-e2e.config.ts --no-coverage --json --outputFile=
 # Parse results:
 node -e "const r=JSON.parse(require('fs').readFileSync('pipeline-e2e.json','utf8'));console.log('suites:',r.numPassedTestSuites+'/'+r.numTotalTestSuites,'tests:',r.numPassedTests+'/'+r.numTotalTests,'failed:',r.numFailedTests)"
 ```
-> **Baselines (v0.24.0):** 585 pass / 0 fail / 27 suites. All pre-existing failures from v0.21.0 have been fixed.
+> **Baselines (v0.27.0):** 651 pass / 0 fail / 32 suites.
 > *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 > **E2E config path:** `test/e2e/jest-e2e.config.ts`
 
 ### Step 4: Start Local Instance
-The local server requires a running PostgreSQL (Docker postgres container on port 5432 works). Required environment variables:
+The local server can run with inmemory backend or PostgreSQL. Required environment variables:
 ```powershell
 cd api
 $env:PORT = "6000"
-$env:SCIM_SHARED_SECRET = "changeme"
-$env:OAUTH_CLIENT_SECRET = "changeme-oauth"
-$env:JWT_SECRET = "changeme-jwt"
-$env:DATABASE_URL = "postgresql://scim:scim@localhost:5432/scimdb"
-npx prisma migrate deploy        # Ensure DB schema is up to date
+$env:PERSISTENCE_BACKEND = "inmemory"   # or omit for Prisma/PostgreSQL
+$env:SCIM_SHARED_SECRET = "local-secret"
+$env:OAUTH_CLIENT_SECRET = "localoauthsecret123"
+$env:JWT_SECRET = "localjwtsecret123"
 node dist/main.js                 # Start in background terminal
 ```
 > **Port:** 6000 (local default)
@@ -64,10 +63,10 @@ node dist/main.js                 # Start in background terminal
 ### Step 5: Run Live/Integration Tests
 ```powershell
 cd scripts
-.\live-test.ps1 -BaseUrl "http://localhost:6000" -ClientSecret "changeme-oauth" *> ..\local-live-pipeline.txt
+.\live-test.ps1 -BaseUrl "http://localhost:6000" -ClientSecret "localoauthsecret123" *> ..\local-live-pipeline.txt
 ```
 > **Output capture:** Use `*>` (all PowerShell streams) not `>` (stdout only). The script writes to multiple output streams.
-> **Baselines (v0.24.0):** 535 pass / 0 fail / 535 total. All pre-existing failures from v0.21.0 have been fixed.
+> **Baselines (v0.27.0):** 659 total (647 pass / 12 pre-existing feature gaps).
 > *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 
 ### Step 6: Stop Local Instance
@@ -134,10 +133,10 @@ docker compose down --remove-orphans
 
 | Credential | Env Var | Docker Default | Local Default |
 |------------|---------|---------------|---------------|
-| OAuth Client Secret | `OAUTH_CLIENT_SECRET` | `devscimclientsecret` | `changeme-oauth` |
-| Legacy Shared Secret | `SCIM_SHARED_SECRET` | `devscimsharedsecret` | `changeme` |
-| JWT Secret | `JWT_SECRET` | `devjwtsecretkey123456` | `changeme-jwt` |
-| DB URL | `DATABASE_URL` | `postgresql://scim:scim@postgres:5432/scimdb` | `postgresql://scim:scim@localhost:5432/scimdb` |
+| OAuth Client Secret | `OAUTH_CLIENT_SECRET` | `devscimclientsecret` | `localoauthsecret123` |
+| Legacy Shared Secret | `SCIM_SHARED_SECRET` | `devscimsharedsecret` | `local-secret` |
+| JWT Secret | `JWT_SECRET` | `devjwtsecretkey123456` | `localjwtsecret123` |
+| DB URL | `DATABASE_URL` | `postgresql://scim:scim@postgres:5432/scimdb` | N/A (inmemory) |
 
 ## Reporting
 - After each phase, report a summary of test results (pass/fail counts).

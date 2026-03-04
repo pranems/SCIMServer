@@ -5,6 +5,78 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.0] - 2026-03-03
+
+### Fixed — Generic Service Parity (3 P0 Gaps Resolved)
+
+Closed the top 3 remaining P0 gaps from the P3 re-audit delta, bringing Generic custom-resource service behavior in line with Users/Groups.
+
+- **Fix #1 — RequireIfMatch 428 parity**: Generic PUT/PATCH/DELETE now call `enforceIfMatch()` instead of `assertIfMatch()`, honoring the `RequireIfMatch` config flag to return 428 when the `If-Match` header is missing. Previously only Users/Groups enforced this.
+- **Fix #2 — Filter attribute path validation wired**: `SchemaValidator.validateFilterAttributePaths()` is now integrated into runtime filter paths for Users (`listUsersForEndpoint`), Groups (`listGroupsForEndpoint`), and Generic (`listResources`). Unknown filter attribute paths now return 400 `invalidFilter` instead of silently passing.
+- **Fix #3 — Generic filter 400 on unsupported expressions**: `parseSimpleFilter()` now throws 400 `invalidFilter` for unsupported filter operators/attributes instead of silently returning `undefined` (which caused unfiltered results to be returned).
+
+### Fixed — InMemory Backend Compatibility (4 Bugs)
+
+Discovered and fixed during live testing with `PERSISTENCE_BACKEND=inmemory`:
+
+- **Bug #1 — AdminSchemaController inmemory incompatibility**: Controller used `PrismaService.endpoint.findUnique()` directly, which returns null for inmemory. Fixed by switching to `EndpointService.getEndpoint()` with `requireEndpoint()` helper.
+- **Bug #2 — Custom resource types missing core schema definition**: Registering a custom resource type created no schema definition for the core schema URN. Fixed by auto-generating a stub core schema (id/externalId/displayName/active) in `ScimSchemaRegistry.registerResourceType()`.
+- **Bug #3 — SchemaValidator hardcoded core schema prefix**: `SchemaValidator` used `schema.id.startsWith('urn:ietf:params:scim:schemas:core:')` to classify core vs extension schemas. Custom resource types with non-standard URNs were misclassified as extensions, causing `displayName` at top level to be rejected. Fixed by adding `isCoreSchema?: boolean` flag to `SchemaDefinition` and a module-level `isCoreSchema()` helper function. 5 locations in `schema-validator.ts` updated.
+- **Bug #4 — RepositoryModule duplicate inmemory instances**: `RepositoryModule.register()` called from both `AuthModule` and `ScimModule` created separate `InMemoryEndpointCredentialRepository` instances with separate `Map` stores. Admin writes to one, guard reads from another. Fixed by adding static module caching with backend-aware cache invalidation.
+
+### Fixed — Live Test Script
+- **excludedAttributes type**: Test 9x.15 sent `excludedAttributes` as an array instead of a string, causing 400 error and script crash.
+
+### Test Coverage
+- **Unit tests**: 2,741 passed (73 suites) — +24 new (3 RequireIfMatch 428, 2 filter error, 6 validateFilterPaths, 9 generic service, 1 users service, 1 groups service, 2 scim-service-helpers[strict])
+- **E2E tests**: 651 passed (32 suites) — +15 new (10 generic-parity-fixes + 5 generic-parity-fixes[Groups filter, RequireIfMatch 428, DELETE If-Match])
+- **Live tests**: 659 total (647 passed, 12 failed) — +11 new in section 9y. 12 pre-existing feature gaps: content-type negotiation (415), collection methods (404/405), immutable enforcement, uniqueness collision (409), required field enforcement.
+- **Live test parity**: All 3 deployment types (local inmemory, Docker Prisma, Azure Prisma) produce identical results: 647/12/659.
+
+## [0.26.0] - 2026-03-03
+
+### Added — Attribute Characteristics E2E Gap Closure (19 new E2E + 16 new live)
+
+Comprehensive gap audit of all 31 E2E test files against RFC 7643 §2 attribute characteristics matrix. Identified and filled 6 specific coverage gaps across uniqueness, required, and returned characteristics.
+
+- **user-uniqueness-required.e2e-spec.ts** (10 tests): User `uniqueness:server` 409 on PUT (userName + externalId conflict + self-update allowed + case-insensitive collision), User `uniqueness:server` 409 on PATCH (userName + externalId + mutable field allowed), `required:true` on PUT (missing userName → 400, all required present → 200).
+- **returned-request.e2e-spec.ts** (+9 tests, 18 total): `returned:request` on PATCH response (stripped by default, included with `?attributes=`), returned characteristics on `.search` (returned:request stripped, returned:default present, returned:always present, attributes= includes returned:request, excludedAttributes cannot remove returned:always, excludedAttributes strips returned:default, excludedAttributes=id cannot remove id).
+- **Section 9x live tests** (16 tests): User PUT/PATCH uniqueness 409, required:true on PUT 400, returned:never on PATCH response, returned characteristics on `.search` (never/always/excludedAttributes protection).
+
+### Test Coverage
+- **Unit tests**: 2,717 passed (73 suites) — unchanged
+- **E2E tests**: 636 passed (31 suites) — +19 new (10 user-uniqueness-required + 9 returned-request)
+- **Live tests**: 570 passed — +16 new in section 9x
+
+## [0.25.0] - 2026-03-03
+
+### Bug Fixes — P3 Implementation & Projection
+
+- **findConflict soft-delete bug**: Fixed `findConflict()` in `endpoint-scim-generic.service.ts` — previously filtered out soft-deleted records with `!conflict.deletedAt`, making the reprovision code path unreachable. Fix: removed the filter from `findConflict()` (returns ALL conflicts), added `&& !conflict.deletedAt` guards to PUT/PATCH callers only. CREATE caller already handled both cases correctly.
+- **excludeAttrs URN handling**: Fixed `excludeAttrs()` in `scim-attribute-projection.ts` — lacked URN-prefixed attribute path handling (unlike `includeOnly()` which already had it). `excludedAttributes=urn:ext:2.0:department` broke on the dot in "2.0". Now correctly resolves URN resource keys as prefixes for sub-attribute exclusion, matching RFC 7644 §3.10.
+- **excludeAttrs always-returned sub-attrs**: Added `alwaysReturned.has(subAttr)` check in URN exclusion path to prevent stripping `returned:always` attributes from extension objects via `excludedAttributes`.
+
+### Added — P3 E2E Tests (32 new)
+
+Three new E2E test files covering previously-untested RFC compliance gaps:
+
+- **http-error-codes.e2e-spec.ts** (13 tests): HTTP 415 Unsupported Media Type (text/xml, text/plain, text/html, application/xml rejected; application/json and application/scim+json accepted), HTTP 405 Method Not Allowed (POST/PUT/PATCH/DELETE on collections or specific IDs where not allowed), SCIM error response format compliance.
+- **returned-request.e2e-spec.ts** (9 tests): `returned:request` attributes stripped from GET/LIST/POST/PUT default responses, included when explicitly requested via `?attributes=`. `returned:default` attributes excludable via `?excludedAttributes=` with URN prefix. `returned:always` attributes persist through `excludedAttributes`.
+- **immutable-enforcement.e2e-spec.ts** (10 tests): Immutable attribute enforcement on User extension (POST accepts, PUT rejects change, PUT allows same value, PATCH rejects change, PATCH allows mutable, GET verifies). Group `members.$ref` schema immutability. Custom resource type Device with immutable `serialNumber` (POST/PUT).
+
+### Added — P3 Live Tests (19 new)
+
+- **Section 9w**: HTTP 415 (4 tests), HTTP 405 (4 tests), Immutable enforcement via enterprise extension employeeNumber (6 tests), returned:never/always/default behavioral verification (5 tests).
+
+### Added — P3 Unit Tests (2 new)
+
+- **scim-attribute-projection.spec.ts**: URN-prefixed sub-attribute exclusion test, entire URN extension exclusion test.
+
+### Test Coverage
+- **Unit tests**: 2,717 passed (73 suites) — +2 new projection URN tests
+- **E2E tests**: 617 passed (30 suites) — +32 new (13 http-error-codes + 9 returned-request + 10 immutable-enforcement)
+- **Live tests**: 554 passed — +19 new in section 9w (HTTP 415/405, immutable enforcement, returned characteristics)
+
 ## [0.24.0] - 2026-03-01
 
 ### Added — P2 Attribute Characteristics (RFC 7643 §2)

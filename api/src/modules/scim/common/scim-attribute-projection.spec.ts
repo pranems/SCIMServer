@@ -162,6 +162,46 @@ describe('applyAttributeProjection', () => {
       expect(result.displayName).toBe('Alice Example');
       expect(result.userName).toBe('alice@example.com');
     });
+
+    it('should exclude URN-prefixed sub-attributes (RFC 7644 §3.10)', () => {
+      const resource = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        id: 'u1',
+        userName: 'alice',
+        meta: { resourceType: 'User' },
+        'urn:ietf:params:scim:schemas:extension:test:2.0:ReturnedTest': {
+          department: 'Marketing',
+          badgeNumber: 'B77777',
+          secretQuestion: 'Fav color?',
+        },
+      };
+      const result = applyAttributeProjection(
+        resource,
+        undefined,
+        'urn:ietf:params:scim:schemas:extension:test:2.0:ReturnedTest:department',
+      );
+      const ext = result['urn:ietf:params:scim:schemas:extension:test:2.0:ReturnedTest'] as Record<string, unknown>;
+      expect(ext).toBeDefined();
+      expect(ext.department).toBeUndefined();
+      expect(ext.badgeNumber).toBe('B77777');
+      expect(ext.secretQuestion).toBe('Fav color?');
+    });
+
+    it('should exclude entire URN extension when no sub-attr specified', () => {
+      const resource = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        id: 'u1',
+        userName: 'alice',
+        meta: { resourceType: 'User' },
+        'urn:ext:custom': {
+          department: 'Eng',
+          costCenter: 'CC-100',
+        },
+      };
+      const result = applyAttributeProjection(resource, undefined, 'urn:ext:custom');
+      expect(result['urn:ext:custom']).toBeUndefined();
+      expect(result.userName).toBe('alice');
+    });
   });
 
   // ─── precedence ─────────────────────────────────────────────────────────
