@@ -72,6 +72,7 @@
 | [RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md) | **RFC 7642/7643/7644 schema & extensions reference** — Core schema immutability, extension rules, custom resource types, `schemas[]` enforcement, attribute characteristics deep dive, industry patterns |
 | [SCHEMA_CUSTOMIZATION_GUIDE.md](SCHEMA_CUSTOMIZATION_GUIDE.md) | Schema customization operator guide — Step-by-step extension registration, custom resource types, config profiles, PATCH operations, troubleshooting, quick reference card |
 | [SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md](SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md) | Schema extension behavior matrices — Registration flow outcomes, validation × config flags, discovery responses, `schemas[]` behavior, PATCH path resolution, boot hydration, error matrix |
+| [SCHEMA_TEMPLATES_DESIGN.md](SCHEMA_TEMPLATES_DESIGN.md) | **📐 Design — All Decisions Finalized** — Endpoint Profile Configuration (v0.28.0): embedded profile JSONB on Endpoint, 5 named presets (entra-id default/entra-id-minimal/rfc-standard/minimal/user-only), RFC-native discovery format as config input, auto-expand + tighten-only validation engine, unified admin API replacing 2 controllers + 2 tables + 9 repo files, 7-phase implementation plan (~11–13 days) |
 
 ## Validation & Testing
 
@@ -91,6 +92,7 @@
 | [SCIM_VALIDATOR_RESULTS_26_ANALYSIS.md](SCIM_VALIDATOR_RESULTS_26_ANALYSIS.md) | Microsoft SCIM Validator 26-test analysis — detailed pass/fail review |
 | [SELF_IMPROVING_TEST_HEALTH_PROMPT.md](SELF_IMPROVING_TEST_HEALTH_PROMPT.md) | Reusable self-improving AI prompt for diagnosing and resolving test failures — pattern library grows with each use |
 | [CL_V0.27.0_INMEMORY_BUGFIXES_AND_GENERIC_PARITY.md](CL_V0.27.0_INMEMORY_BUGFIXES_AND_GENERIC_PARITY.md) | **CL v0.27.0** — 4 inmemory backend bugs, 3 generic service parity P0 fixes, live test fix, doc audit; 4,051 total tests, 3-instance deployment validation |
+| [NEXT_ITEMS_V0.28.0_ROADMAP.md](NEXT_ITEMS_V0.28.0_ROADMAP.md) | **v0.28.0 Roadmap** — 6 prioritized items to close all 12 live test failures: PS script fix, HTTP 415/405, immutable/required always-on, generic filter AST upgrade |
 
 ## Development
 
