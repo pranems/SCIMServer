@@ -9,3 +9,4 @@ export * from './built-in-presets';
 export * from './auto-expand.service';
 export * from './tighten-only-validator';
 export * from './endpoint-profile.service';
+export * from './preset.controller';
