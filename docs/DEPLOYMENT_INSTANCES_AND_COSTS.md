@@ -15,13 +15,13 @@
 
 | Phase | Scope | Passed | Failed | Total | Duration |
 |-------|-------|--------|--------|-------|----------|
-| Unit Tests | 73 suites | 2,741 | 0 | 2,741 | ~58s |
-| E2E Tests | 32 suites | 651 | 0 | 651 | ~38s |
+| Unit Tests | 73 suites | 2,867 | 0 | 2,867 | ~58s |
+| E2E Tests | 29 suites | 591 | 0 (+6 skipped) | 597 | ~38s |
 | Local Live | port 6000 | 647 | 12 | 659 | ~15s |
 | Docker Live | port 8080 | 647 | 12 | 659 | ~19s |
 | Azure Live | Azure Container App | 647 | 12 | 659 | ~54s |
 
-**Total: ~4,710 tests (4,039 passed + 12 pre-existing live test feature gaps per instance, triplicated across 3 deployment types).**
+**Total: ~4,782 tests (3,458 unit+E2E passed + 12 pre-existing live test feature gaps per instance, triplicated across 3 deployment types).**
 
 > **12 Live Test Failures** are pre-existing feature gaps (not regressions): content-type negotiation (9w.1–2), collection-level PUT/PATCH (9w.5–6), immutable enforcement (9w.10, 9w.12), uniqueness collision (9x.1–2, 9x.4–6), required field enforcement (9x.8).
 
