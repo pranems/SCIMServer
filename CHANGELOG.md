@@ -5,6 +5,60 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.28.0] - 2026-03-12
+
+### Added — Phase 13: Endpoint Profile Configuration
+
+Replaces the fragmented `Endpoint.config` + `EndpointSchema` + `EndpointResourceType` model with a unified `Endpoint.profile` JSONB column containing RFC-native SCIM discovery format (schemas, resourceTypes, serviceProviderConfig) plus project-specific settings.
+
+#### New Module: `src/modules/scim/endpoint-profile/`
+- **endpoint-profile.types.ts**: `EndpointProfile`, `ProfileSettings`, `ServiceProviderConfig`, `ShorthandProfileInput`, `BuiltInPreset` interfaces (7 types)
+- **rfc-baseline.ts**: RFC 7643 §4.1/§4.2/§4.3 attribute re-exports, O(1) lookup maps, required attribute lists, project auto-inject constants
+- **built-in-presets.ts**: 5 frozen presets (`entra-id` default, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`), `getBuiltInPreset()`, `getAllPresetMetadata()`
+- **auto-expand.service.ts**: `expandProfile()` — shorthand → full RFC expansion with `"attributes": "all"` support
+- **tighten-only-validator.ts**: `validateAttributeTightenOnly()` — rejects loosening of `required`, `mutability`, `uniqueness`, `type`, `multiValued`
+- **endpoint-profile.service.ts**: `validateAndExpandProfile()` — 6-step pipeline: auto-expand → auto-inject → tighten-only → SPC truthfulness → structural → result
+- **preset.controller.ts**: `GET /admin/profile-presets` (list), `GET /admin/profile-presets/:name` (detail) — read-only
+
+#### New API: Preset API
+- `GET /admin/profile-presets` — list all 5 built-in presets (name + description + default flag)
+- `GET /admin/profile-presets/:name` — full expanded EndpointProfile for a preset
+
+#### Endpoint Creation Changes
+- `POST /admin/endpoints` now accepts `profilePreset` (e.g., `"entra-id"`) or inline `profile` (mutually exclusive)
+- Default: `entra-id` preset when neither is provided (decision D5)
+- Backward compat: old `config` field maps to `profile.settings` with `validateEndpointConfig()` validation
+
+#### Prisma Schema Migration
+- `20260313_add_endpoint_profile`: DROP `config` column, ADD `profile` JSONB, DROP `EndpointSchema` + `EndpointResourceType` tables
+- Models: 7 → 5 (Endpoint, RequestLog, ScimResource, ResourceMember, EndpointCredential)
+
+### Removed
+- **AdminSchemaController**: `POST/GET/DELETE /admin/endpoints/:id/schemas` (3 routes) — schemas now inline in `profile.schemas[]`
+- **AdminResourceTypeController**: `POST/GET/DELETE /admin/endpoints/:id/resource-types` (3 routes) — resource types now inline in `profile.resourceTypes[]`
+- **EndpointSchema** Prisma model + DB table
+- **EndpointResourceType** Prisma model + DB table
+- **Repository layer**: `IEndpointSchemaRepository`, `IEndpointResourceTypeRepository` + 4 implementations (Prisma + InMemory) + specs
+- **DTOs**: `CreateEndpointSchemaDto`, `CreateEndpointResourceTypeDto` + specs
+- **Domain model**: `EndpointSchemaRecord`
+- **Repository tokens**: `ENDPOINT_SCHEMA_REPOSITORY`, `ENDPOINT_RESOURCE_TYPE_REPOSITORY`
+- **E2E tests**: `admin-schema.e2e-spec.ts`, `custom-resource-types.e2e-spec.ts`, `immutable-enforcement.e2e-spec.ts`, `returned-request.e2e-spec.ts`, `generic-parity-fixes.e2e-spec.ts` (tested removed APIs)
+
+### Changed
+- **ScimSchemaRegistry**: Removed constructor repo injection, simplified `onModuleInit` (no DB hydration — extensions now from Endpoint.profile)
+- **EndpointService**: `createEndpoint()` resolves profile from preset/inline/config/default; `updateEndpoint()` deep-merges settings; `toResponse()` maps `profile.settings` → `config` for backward compat
+- **repository.module.ts**: Removed EndpointSchema + EndpointResourceType providers/exports
+- **scim.module.ts**: Removed old admin controllers, added `PresetController`
+- **E2E helpers**: `global-teardown.ts`, `db.helper.ts` — removed `endpointSchema.deleteMany()`
+
+### Test Coverage
+- **Unit tests**: 2,867 passed (73 suites) — +196 new endpoint-profile tests (43 rfc-baseline, 98 built-in-presets, 32 tighten-only, 18 auto-expand, 36 endpoint-profile-service, 13 preset-controller), −114 removed (dead repo/controller specs)
+- **E2E tests**: 591 passed + 6 skipped (29 suites) — +37 new (20 endpoint-profile + 17 profile-flag-combos), −91 removed (5 dead E2E files for deleted APIs)
+- **Live tests**: 659 total (647 passed, 12 pre-existing failures unchanged)
+
+### Design Document
+- `docs/SCHEMA_TEMPLATES_DESIGN.md` recreated (2,349 lines, 47 code blocks, 19 Mermaid diagrams, 10 HTTP examples, 7-phase implementation plan)
+
 ## [0.27.0] - 2026-03-03
 
 ### Fixed — Generic Service Parity (3 P0 Gaps Resolved)

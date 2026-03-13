@@ -315,7 +315,7 @@ graph TD
 │  Persistence Layer                                        │
 │  ├─ Prisma Repositories (PostgreSQL)                      │
 │  ├─ InMemory Repositories (Map-based)                     │
-│  └─ Prisma Schema (7 models)                              │
+│  └─ Prisma Schema (5 models)                              │
 ├──────────────────────────────────────────────────────────┤
 │  Infrastructure                                           │
 │  ├─ PostgreSQL 17                                         │
@@ -332,8 +332,8 @@ graph TD
 
 | Level | Suites | Tests | Status | Lines |
 |---|---|---|---|---|
-| **Unit** | 73 | 2,741 | All Passing | ~27,900 |
-| **E2E** | 32 | 651 | All Passing | ~10,400 |
+| **Unit** | 73 | 2,867 | All Passing | ~27,900 |
+| **E2E** | 29 | 591 (+6 skipped) | All Passing | ~10,400 |
 | **Live Integration** | 1 | 659 | 647 Pass / 12 Fail | ~7,500 |
 | **TOTAL** | **106** | **~4,051** | **99.7% pass rate** | **~45,800** |
 
