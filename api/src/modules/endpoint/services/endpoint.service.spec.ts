@@ -14,7 +14,7 @@ describe('EndpointService', () => {
     name: 'test-endpoint',
     displayName: 'Test Endpoint',
     description: 'A test endpoint',
-    config: JSON.stringify({ MultiOpPatchRequestAddMultipleMembersToGroup: 'True' }),
+    profile: { settings: { MultiOpPatchRequestAddMultipleMembersToGroup: 'True' }, schemas: [], resourceTypes: [], serviceProviderConfig: {} },
     active: true,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -81,7 +81,7 @@ describe('EndpointService', () => {
         (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
         (prisma.endpoint.create as jest.Mock).mockResolvedValue({
           ...mockEndpoint,
-          config: JSON.stringify({ MultiOpPatchRequestAddMultipleMembersToGroup: 'False' }),
+          profile: { settings: { MultiOpPatchRequestAddMultipleMembersToGroup: 'False' }, schemas: [], resourceTypes: [], serviceProviderConfig: {} },
         });
 
         const result = await service.createEndpoint({
@@ -97,7 +97,7 @@ describe('EndpointService', () => {
         (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
         (prisma.endpoint.create as jest.Mock).mockResolvedValue({
           ...mockEndpoint,
-          config: JSON.stringify({ MultiOpPatchRequestAddMultipleMembersToGroup: true }),
+          profile: { settings: { MultiOpPatchRequestAddMultipleMembersToGroup: true }, schemas: [], resourceTypes: [], serviceProviderConfig: {} },
         });
 
         const result = await service.createEndpoint({
@@ -113,7 +113,7 @@ describe('EndpointService', () => {
         (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
         (prisma.endpoint.create as jest.Mock).mockResolvedValue({
           ...mockEndpoint,
-          config: JSON.stringify({ MultiOpPatchRequestAddMultipleMembersToGroup: false }),
+          profile: { settings: { MultiOpPatchRequestAddMultipleMembersToGroup: false }, schemas: [], resourceTypes: [], serviceProviderConfig: {} },
         });
 
         const result = await service.createEndpoint({
@@ -129,7 +129,7 @@ describe('EndpointService', () => {
         (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
         (prisma.endpoint.create as jest.Mock).mockResolvedValue({
           ...mockEndpoint,
-          config: JSON.stringify({ MultiOpPatchRequestAddMultipleMembersToGroup: 'true' }),
+          profile: { settings: { MultiOpPatchRequestAddMultipleMembersToGroup: 'true' }, schemas: [], resourceTypes: [], serviceProviderConfig: {} },
         });
 
         const result = await service.createEndpoint({
@@ -145,7 +145,7 @@ describe('EndpointService', () => {
         (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
         (prisma.endpoint.create as jest.Mock).mockResolvedValue({
           ...mockEndpoint,
-          config: JSON.stringify({ MultiOpPatchRequestAddMultipleMembersToGroup: '1' }),
+          profile: { settings: { MultiOpPatchRequestAddMultipleMembersToGroup: '1' }, schemas: [], resourceTypes: [], serviceProviderConfig: {} },
         });
 
         const result = await service.createEndpoint({
@@ -161,7 +161,7 @@ describe('EndpointService', () => {
         (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
         (prisma.endpoint.create as jest.Mock).mockResolvedValue({
           ...mockEndpoint,
-          config: JSON.stringify({ MultiOpPatchRequestAddMultipleMembersToGroup: '0' }),
+          profile: { settings: { MultiOpPatchRequestAddMultipleMembersToGroup: '0' }, schemas: [], resourceTypes: [], serviceProviderConfig: {} },
         });
 
         const result = await service.createEndpoint({
@@ -242,7 +242,7 @@ describe('EndpointService', () => {
         (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
         (prisma.endpoint.update as jest.Mock).mockResolvedValue({
           ...mockEndpoint,
-          config: JSON.stringify({ MultiOpPatchRequestAddMultipleMembersToGroup: 'True' }),
+          profile: { settings: { MultiOpPatchRequestAddMultipleMembersToGroup: 'True' }, schemas: [], resourceTypes: [], serviceProviderConfig: {} },
         });
 
         const result = await service.updateEndpoint('test-endpoint-id', {
@@ -364,7 +364,7 @@ describe('EndpointService', () => {
     it('should handle null config', async () => {
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue({
         ...mockEndpoint,
-        config: null,
+        profile: null,
       });
 
       const result = await service.getEndpoint('test-endpoint-id');
@@ -506,7 +506,7 @@ describe('EndpointService', () => {
         (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
         (prisma.endpoint.create as jest.Mock).mockResolvedValue({
           ...mockEndpoint,
-          config: JSON.stringify({ logLevel: 'DEBUG' }),
+          profile: { settings: { logLevel: 'DEBUG' } },
         });
 
         await service.createEndpoint({
@@ -536,7 +536,7 @@ describe('EndpointService', () => {
         (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
         (prisma.endpoint.create as jest.Mock).mockResolvedValue({
           ...mockEndpoint,
-          config: null,
+          profile: null,
         });
 
         await service.createEndpoint({ name: 'test-endpoint' });
@@ -629,12 +629,12 @@ describe('EndpointService', () => {
           {
             id: 'ep-1',
             name: 'endpoint-1',
-            config: JSON.stringify({ logLevel: 'DEBUG' }),
+            profile: { settings: { logLevel: 'DEBUG' } },
           },
           {
             id: 'ep-2',
             name: 'endpoint-2',
-            config: JSON.stringify({ logLevel: 'TRACE' }),
+            profile: { settings: { logLevel: 'TRACE' } },
           },
         ]);
 
@@ -650,7 +650,7 @@ describe('EndpointService', () => {
           {
             id: 'ep-1',
             name: 'endpoint-1',
-            config: JSON.stringify({ strictMode: true }),
+            profile: { settings: { strictMode: true } },
           },
         ]);
 
@@ -664,7 +664,7 @@ describe('EndpointService', () => {
           {
             id: 'ep-1',
             name: 'endpoint-1',
-            config: null,
+            profile: null,
           },
         ]);
 
@@ -697,7 +697,7 @@ describe('EndpointService', () => {
           {
             id: 'ep-2',
             name: 'endpoint-2',
-            config: JSON.stringify({ logLevel: 'INFO' }),
+            profile: { settings: { logLevel: 'INFO' } },
           },
         ]);
 

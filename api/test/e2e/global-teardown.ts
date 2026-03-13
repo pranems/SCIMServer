@@ -33,7 +33,6 @@ export default async function globalTeardown(): Promise<void> {
   try {
     await prisma.$transaction([
       prisma.requestLog.deleteMany(),
-      prisma.endpointSchema.deleteMany(),
       prisma.resourceMember.deleteMany(),
       prisma.scimResource.deleteMany(),
       prisma.endpoint.deleteMany(),
