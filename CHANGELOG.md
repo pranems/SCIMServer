@@ -55,12 +55,20 @@ Replaces the fragmented `Endpoint.config` + `EndpointSchema` + `EndpointResource
 - **E2E helpers**: `global-teardown.ts`, `db.helper.ts` — removed `endpointSchema.deleteMany()`
 
 ### Test Coverage
-- **Unit tests**: 2,879 passed (73 suites) — +208 new endpoint-profile + hydration tests (43 rfc-baseline, 98 built-in-presets, 32 tighten-only, 18 auto-expand, 36 endpoint-profile-service, 13 preset-controller, 12 registry-hydration), −114 removed (dead repo/controller specs)
-- **E2E tests**: 608 passed + 6 skipped (30 suites) — +37 new (20 endpoint-profile + 17 profile-flag-combos), −91 removed (5 dead E2E files for deleted APIs)
-- **Live tests**: 811 live assertions
+- **Unit tests**: 2,830 passed (73 suites)
+- **E2E tests**: 613 passed + 6 skipped (30 suites) — +5 new gap-audit tests (bulk+strict combo, user-only blocks Groups, cache invalidation)
+- **Live tests**: 832 assertions — +21 new (Section 9z: Endpoint Profiles & Preset Discovery)
+
+### Phase 14 — Profile-as-Cached-Runtime-Context
+- **ScimSchemaRegistry**: Gutted from 857→143 lines. Removed overlays, boot hydration, registration methods, global layer. Kept: root-level default preset expansion + type exports.
+- **EndpointService**: Unified `cacheById` + `cacheByName` Maps replace per-request DB queries. Cache warm on boot, write-through on CRUD.
+- **Discovery**: Endpoint-scoped controllers serve from `profile` directly (not registry overlays). Profile-based `getSchemasFromProfile`/`getResourceTypesFromProfile`/`getSpcFromProfile`.
+- **Derived flags**: `CustomResourceTypesEnabled` derived from `profile.resourceTypes` (D9). `BulkOperationsEnabled` derived from `profile.serviceProviderConfig.bulk.supported` (D8).
+- **ScimModule**: Removed `OnModuleInit` boot hydration + listener wiring — cache replaces this.
+- **Impact**: Zero DB calls per SCIM request, 3 caches → 1, ~500 net lines removed.
 
 ### Design Document
-- `docs/SCHEMA_TEMPLATES_DESIGN.md` recreated (2,349 lines, 47 code blocks, 19 Mermaid diagrams, 10 HTTP examples, 7-phase implementation plan)
+- `docs/SCHEMA_TEMPLATES_DESIGN.md` updated — §18 Phase 14 roadmap, registry simplification noted
 
 ## [0.27.0] - 2026-03-03
 

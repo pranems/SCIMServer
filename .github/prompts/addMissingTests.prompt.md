@@ -135,7 +135,7 @@ Specifically check:
 - Every E2E test scenario should have a corresponding live test in `scripts/live-test.ps1`
 - Live tests should cover both local (port 6000) and Docker (port 8080) scenarios
 - Verify all live test sections in `scripts/live-test.ps1` exist by grepping for `TEST SECTION`
-- Ensure new sections use the next available number (check current highest before `Section 10`; as of v0.28.0 the latest is **9y**)
+- Ensure new sections use the next available number (check current highest before `Section 10`; as of v0.28.0 Phase 14 the latest is **9z**)
 
 ### H. Resource-Type Symmetry
 
@@ -201,6 +201,22 @@ For every behavior tested on Users, verify the equivalent exists for Groups (and
 | `EndpointContext.profile` stored via `setContext()` | ✅ | implicit | ? |
 | `getProfile()` returns stored profile | ✅ | N/A | ? |
 | `getConfig()` compat shim returns `profile.settings` | ✅ | implicit | ? |
+
+### L. Registry Simplification + Derived Flags (Phase 14.2–14.4)
+
+| Scenario | Unit | E2E | Live |
+|----------|------|-----|------|
+| Minimal registry: `onModuleInit` expands rfc-standard preset | ✅ | N/A | ? |
+| Root-level /Schemas returns 3 schemas (rfc-standard) | ✅ | ✅ | ? |
+| Discovery controller serves from `profile` (not registry overlay) | implicit | ✅ | ✅ |
+| Bulk derived from `profile.serviceProviderConfig.bulk.supported` | implicit | ✅ | ? |
+| CustomResourceTypes derived from `profile.resourceTypes` | implicit | ✅ | ? |
+| Bulk + StrictSchema combo | ? | ✅ | ? |
+| user-only preset blocks Group CRUD | ? | ✅ | ✅ |
+| Profile PATCH → config change reflects in endpoint | ? | ✅ | ✅ |
+| Inline profile → discovery reflects it | ? | ✅ | ✅ |
+| Preset API (list 5 + detail + 404) | ✅ | ✅ | ✅ |
+| Per-preset discovery differentiation (schema count, SPC) | ✅ | ✅ | ✅ |
 
 ---
 
@@ -521,12 +537,12 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
-| Unit  | 2,892  | ?     | +?    |
-| E2E   | 608    | ?     | +?    |
-| Live  | 659    | ?     | +?    |
+| Unit  | 2,830  | ?     | +?    |
+| E2E   | 613    | ?     | +?    |
+| Live  | 832    | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
-> *Last updated: v0.28.0 (2026-03-13)*
+> *Last updated: v0.28.0 Phase 14 (2026-03-13)*
 
 4. Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts.
 

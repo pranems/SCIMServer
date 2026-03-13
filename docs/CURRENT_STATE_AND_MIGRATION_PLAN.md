@@ -1,5 +1,7 @@
 # SCIM Server: Current State Analysis & Ideal Architecture Migration Plan
 
+> **⚠️ Partially Superseded (v0.28.0)**: The `EndpointSchema` and `EndpointResourceType` models described in this document were removed in Phase 13. Schema and resource type data now lives in `Endpoint.profile` JSONB. See [SCHEMA_TEMPLATES_DESIGN.md](SCHEMA_TEMPLATES_DESIGN.md).
+
 This document provides a comprehensive analysis of the current state of the SCIM Server repository (specifically the `api` folder) compared against the ideal, RFC-first architecture defined in `IDEAL_SCIM_ARCHITECTURE_RFC_FIRST.md` and `COMPLETE_AGNOSTIC_SCIM_ARCHITECTURE.md`. 
 
 It outlines the gaps in the current implementation and provides a detailed, step-by-step migration plan to achieve the ideal state.

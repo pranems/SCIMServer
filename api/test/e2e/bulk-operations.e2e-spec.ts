@@ -48,8 +48,10 @@ describe('Bulk Operations (Phase 9) E2E', () => {
   // ─── Config flag gating ──────────────────────────────────────────────
 
   describe('Config flag gating', () => {
-    it('should return 403 when BulkOperationsEnabled is not set', async () => {
-      const disabledEp = await createEndpointWithConfig(app, token, {});
+    it('should return 403 when BulkOperationsEnabled is False', async () => {
+      const disabledEp = await createEndpointWithConfig(app, token, {
+        BulkOperationsEnabled: 'False',
+      });
 
       const res = await request(app.getHttpServer())
         .post(`${scimBasePath(disabledEp)}/Bulk`)

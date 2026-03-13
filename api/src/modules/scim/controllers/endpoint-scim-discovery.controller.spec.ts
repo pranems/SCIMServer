@@ -9,12 +9,42 @@ import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 describe('EndpointScimDiscoveryController', () => {
   let controller: EndpointScimDiscoveryController;
 
+  const rfcProfile = {
+    schemas: [
+      { id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', description: 'User Account', attributes: [] },
+      { id: 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User', name: 'EnterpriseUser', description: 'Enterprise User Extension', attributes: [] },
+      { id: 'urn:ietf:params:scim:schemas:core:2.0:Group', name: 'Group', description: 'Group', attributes: [] },
+    ],
+    resourceTypes: [
+      { id: 'User', name: 'User', endpoint: '/Users', description: 'User Account', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [{ schema: 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User', required: false }] },
+      { id: 'Group', name: 'Group', endpoint: '/Groups', description: 'Group', schema: 'urn:ietf:params:scim:schemas:core:2.0:Group', schemaExtensions: [] },
+    ],
+    serviceProviderConfig: {
+      patch: { supported: true },
+      bulk: { supported: true, maxOperations: 1000, maxPayloadSize: 1048576 },
+      filter: { supported: true, maxResults: 200 },
+      sort: { supported: true },
+      etag: { supported: true },
+      changePassword: { supported: false },
+    },
+    settings: {},
+  } as any;
+
+  const bulkDisabledProfile = {
+    ...rfcProfile,
+    serviceProviderConfig: {
+      ...rfcProfile.serviceProviderConfig,
+      bulk: { supported: false, maxOperations: 1000, maxPayloadSize: 1048576 },
+    },
+  };
+
   const mockEndpoint = {
     id: 'endpoint-1',
     name: 'test-endpoint',
     displayName: 'Test Endpoint',
     description: 'Test endpoint',
     config: {},
+    profile: rfcProfile,
     active: true,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -70,8 +100,8 @@ describe('EndpointScimDiscoveryController', () => {
       expect(result.schemas).toEqual([
         'urn:ietf:params:scim:api:messages:2.0:ListResponse',
       ]);
-      expect(result.totalResults).toBe(7);
-      expect(result.Resources).toHaveLength(7);
+      expect(result.totalResults).toBe(3);
+      expect(result.Resources).toHaveLength(3);
       expect(result.Resources[0].id).toBe(
         'urn:ietf:params:scim:schemas:core:2.0:User'
       );
@@ -139,7 +169,7 @@ describe('EndpointScimDiscoveryController', () => {
     it('should return bulk.supported=false when endpoint has BulkOperationsEnabled=false', async () => {
       const endpointWithBulkDisabled = {
         ...mockEndpoint,
-        config: { BulkOperationsEnabled: false },
+        profile: bulkDisabledProfile,
       };
       mockEndpointService.getEndpoint.mockResolvedValue(endpointWithBulkDisabled);
 
@@ -155,7 +185,6 @@ describe('EndpointScimDiscoveryController', () => {
     it('should return bulk.supported=true when endpoint has BulkOperationsEnabled=true', async () => {
       const endpointWithBulkEnabled = {
         ...mockEndpoint,
-        config: { BulkOperationsEnabled: true },
       };
       mockEndpointService.getEndpoint.mockResolvedValue(endpointWithBulkEnabled);
 
@@ -313,7 +342,7 @@ describe('EndpointScimDiscoveryController', () => {
     it('should pass endpoint config to SPC for per-tenant capability flags', async () => {
       const bulkDisabledEndpoint = {
         ...mockEndpoint,
-        config: { BulkOperationsEnabled: 'False' },
+        profile: bulkDisabledProfile,
       };
       mockEndpointService.getEndpoint.mockResolvedValue(bulkDisabledEndpoint);
 
@@ -327,12 +356,12 @@ describe('EndpointScimDiscoveryController', () => {
 
     it('different endpoints with different configs produce different SPCs', async () => {
       // Endpoint with bulk disabled
-      const epBulkOff = { ...mockEndpoint, id: 'ep-off', config: { BulkOperationsEnabled: 'False' } };
+      const epBulkOff = { ...mockEndpoint, id: 'ep-off', profile: bulkDisabledProfile };
       mockEndpointService.getEndpoint.mockResolvedValue(epBulkOff);
       const resultOff = await controller.getServiceProviderConfig('ep-off', mockRequest);
 
       // Endpoint with bulk enabled
-      const epBulkOn = { ...mockEndpoint, id: 'ep-on', config: { BulkOperationsEnabled: 'True' } };
+      const epBulkOn = { ...mockEndpoint, id: 'ep-on' };
       mockEndpointService.getEndpoint.mockResolvedValue(epBulkOn);
       const resultOn = await controller.getServiceProviderConfig('ep-on', mockRequest);
 

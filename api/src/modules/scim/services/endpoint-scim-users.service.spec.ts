@@ -99,6 +99,9 @@ describe('EndpointScimUsersService', () => {
       ],
     }).compile();
 
+    const registry = module.get<ScimSchemaRegistry>(ScimSchemaRegistry);
+    await registry.onModuleInit();
+
     service = module.get<EndpointScimUsersService>(EndpointScimUsersService);
     metadataService = module.get<ScimMetadataService>(ScimMetadataService);
   });

@@ -41,7 +41,7 @@ v0.27.0 closed all 15 Generic Service Parity gaps (GEN-01..GEN-12 + 3 P0 fixes) 
 
 Key insight: **6 of 12 failures are test script bugs, not server bugs.** The server correctly returns 409/400 but the PowerShell error handling extracts an empty status code. Fixing the test script alone resolves 50% of failures.
 
-**Proposed v0.28.0 scope**: 6 items = 1 test fix + 2 new middleware/routes + 2 always-on enforcement upgrades + 1 filter engine upgrade. Expected outcome: **0 live test failures** (all 659 pass).
+**Proposed v0.28.0 scope**: 6 items = 1 test fix + 2 new middleware/routes + 2 always-on enforcement upgrades + 1 filter engine upgrade. Expected outcome: **0 live test failures** (all 832 pass).
 
 ---
 
@@ -533,10 +533,10 @@ These items are tracked but not proposed for v0.28.0:
 
 | Suite | v0.27.0 | v0.28.0 (actual) | Delta |
 |---|:---:|:---:|---|
-| Unit | 2,741 | 2,879 (73 suites) | +138 |
-| E2E | 651 | 608 (30 suites, 6 skipped) | -43 |
-| Live | 647/12/659 | **811 assertions** | +152 |
-| **Total** | 4,051 | 4,298 | +247 |
+| Unit | 2,741 | 2,830 (73 suites) | +89 |
+| E2E | 651 | 613 (30 suites, 6 skipped) | -38 |
+| Live | 647/12/659 | **832 assertions** | +173 |
+| **Total** | 4,051 | 4,275 | +224 |
 
 ### Completion Criteria
 

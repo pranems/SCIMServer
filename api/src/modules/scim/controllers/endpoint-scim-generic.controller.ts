@@ -47,7 +47,7 @@ import { SCIM_WARNING_URN } from '../common/scim-service-helpers';
 import { applyAttributeProjection, applyAttributeProjectionToList } from '../common/scim-attribute-projection';
 import { EndpointScimGenericService } from '../services/endpoint-scim-generic.service';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
-import { ScimSchemaRegistry, type ScimResourceType } from '../discovery/scim-schema-registry';
+import type { ScimResourceType } from '../discovery/scim-schema-registry';
 import { buildBaseUrl } from '../common/base-url.util';
 
 @Controller('endpoints/:endpointId')
@@ -58,7 +58,6 @@ export class EndpointScimGenericController {
     private readonly endpointService: EndpointService,
     private readonly endpointContext: EndpointContextStorage,
     private readonly genericService: EndpointScimGenericService,
-    private readonly schemaRegistry: ScimSchemaRegistry,
   ) {}
 
   /**
@@ -103,17 +102,9 @@ export class EndpointScimGenericController {
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
     this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
 
-    // Check if custom resource types are enabled
-    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED)) {
-      throw new NotFoundException(
-        `Resource type at "/${resourceTypePath}" is not available. Custom resource types are not enabled for this endpoint.`,
-      );
-    }
-
-    // Resolve the custom resource type by endpoint path
-    const rt = this.schemaRegistry.findResourceTypeByEndpointPath(
-      `/${resourceTypePath}`,
-      endpointId,
+    // Derive custom resource type availability from profile.resourceTypes (D9)
+    const rt = endpoint.profile?.resourceTypes?.find(
+      r => r.endpoint === `/${resourceTypePath}` && r.name !== 'User' && r.name !== 'Group',
     );
 
     if (!rt) {

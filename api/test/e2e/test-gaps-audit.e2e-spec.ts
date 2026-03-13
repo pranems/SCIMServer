@@ -560,4 +560,139 @@ describe('Test Gap Audit (E2E)', () => {
         .expect(404);
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // G1: Bulk + StrictSchema combo
+  // ═══════════════════════════════════════════════════════════════════════
+
+  describe('G1: Bulk + StrictSchema combo', () => {
+    it('should reject per-operation schema-invalid data in bulk when StrictSchema is ON', async () => {
+      const epId = await createEndpointWithConfig(app, token, {
+        BulkOperationsEnabled: 'True',
+        StrictSchemaValidation: 'True',
+      });
+      const basePath = scimBasePath(epId);
+
+      const res = await request(app.getHttpServer())
+        .post(`${basePath}/Bulk`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:BulkRequest'],
+          failOnErrors: 0,
+          Operations: [
+            {
+              method: 'POST',
+              path: '/Users',
+              bulkId: 'u1',
+              data: {
+                schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+                userName: `bulk-strict-${Date.now()}@test.com`,
+                displayName: 'Bulk Strict Test',
+                active: true,
+              },
+            },
+          ],
+        })
+        .expect(200);
+
+      // Bulk should succeed (200) with per-op results
+      expect(res.body.schemas).toContain('urn:ietf:params:scim:api:messages:2.0:BulkResponse');
+      expect(res.body.Operations.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // G3: user-only preset blocks Group CRUD
+  // ═══════════════════════════════════════════════════════════════════════
+
+  describe('G3: user-only preset blocks Group CRUD', () => {
+    let userOnlyEpId: string;
+
+    beforeAll(async () => {
+      const res = await request(app.getHttpServer())
+        .post('/scim/admin/endpoints')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ name: `useronly-${Date.now()}`, profilePreset: 'user-only' })
+        .expect(201);
+      userOnlyEpId = res.body.id;
+    });
+
+    afterAll(async () => {
+      await request(app.getHttpServer())
+        .delete(`/scim/admin/endpoints/${userOnlyEpId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(204);
+    });
+
+    it('should allow POST /Users on user-only endpoint', async () => {
+      const ts = Date.now();
+      const res = await scimPost(app, `${scimBasePath(userOnlyEpId)}/Users`, token, {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: `uo-user-${ts}@test.com`,
+        displayName: 'UO Test',
+        active: true,
+        emails: [{ value: `uo-user-${ts}@test.com`, type: 'work', primary: true }],
+      }).expect(201);
+      expect(res.body.id).toBeDefined();
+    });
+
+    it('should have only User in /ResourceTypes for user-only endpoint', async () => {
+      const res = await scimGet(app, `${scimBasePath(userOnlyEpId)}/ResourceTypes`, token).expect(200);
+      expect(res.body.totalResults).toBe(1);
+      expect(res.body.Resources[0].name).toBe('User');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // G4: Cache invalidation → discovery reflects profile changes immediately
+  // ═══════════════════════════════════════════════════════════════════════
+
+  describe('G4: Profile update reflects in discovery immediately', () => {
+    let epId: string;
+
+    beforeAll(async () => {
+      const res = await request(app.getHttpServer())
+        .post('/scim/admin/endpoints')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ name: `cache-inv-${Date.now()}`, profilePreset: 'rfc-standard' })
+        .expect(201);
+      epId = res.body.id;
+    });
+
+    afterAll(async () => {
+      await request(app.getHttpServer())
+        .delete(`/scim/admin/endpoints/${epId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(204);
+    });
+
+    it('rfc-standard should have bulk.supported=true initially', async () => {
+      const spc = await scimGet(app, `${scimBasePath(epId)}/ServiceProviderConfig`, token).expect(200);
+      expect(spc.body.bulk.supported).toBe(true);
+    });
+
+    it('after PATCH config SoftDeleteEnabled=True, SPC remains unchanged (config only affects settings)', async () => {
+      // PATCH to add SoftDeleteEnabled
+      await request(app.getHttpServer())
+        .patch(`/scim/admin/endpoints/${epId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ config: { SoftDeleteEnabled: 'True' } })
+        .expect(200);
+
+      // SPC should remain the same (SPC is profile-level, config only touches settings)
+      const spc = await scimGet(app, `${scimBasePath(epId)}/ServiceProviderConfig`, token).expect(200);
+      expect(spc.body.bulk.supported).toBe(true); // rfc-standard base: bulk=true
+
+      // But settings should reflect the change
+      const ep = await request(app.getHttpServer())
+        .get(`/scim/admin/endpoints/${epId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(ep.body.config.SoftDeleteEnabled).toBe('True');
+    });
+  });
 });

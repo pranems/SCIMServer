@@ -1,5 +1,7 @@
 # Migration Plan: Current State → Ideal Architecture v3
 
+> **⚠️ Partially Superseded (v0.28.0)**: Some implementation patterns described here (e.g., `endpointOverlays`, `hydrateFromProfile`) were implemented in Phase 13 then simplified in Phase 14. Discovery now serves from `Endpoint.profile` cache directly.
+
 > **Version**: 3.0 · **Date**: 2026-02-20
 > **Companion document**: `IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md`
 > **Method**: 12 phases, each independently deployable. No big-bang rewrites.

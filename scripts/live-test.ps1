@@ -6349,6 +6349,102 @@ try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$Y9FilterEndpointId"
 Write-Host "`n--- 9y: Generic Resource Parity Fix Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z: ENDPOINT PROFILES & PRESET DISCOVERY (Phase 13/14)
+$script:currentSection = "9z: Endpoint Profiles"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z: ENDPOINT PROFILES & PRESET DISCOVERY" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# --- Setup: Create endpoints with different presets ---
+Write-Host "`n--- Setup: Create Endpoints with Presets ---" -ForegroundColor Cyan
+$entraBody = @{ name = "live-entra-$(Get-Random)"; profilePreset = "entra-id" } | ConvertTo-Json
+$minimalBody = @{ name = "live-minimal-$(Get-Random)"; profilePreset = "minimal" } | ConvertTo-Json
+$rfcBody = @{ name = "live-rfc-$(Get-Random)"; profilePreset = "rfc-standard" } | ConvertTo-Json
+$userOnlyBody = @{ name = "live-useronly-$(Get-Random)"; profilePreset = "user-only" } | ConvertTo-Json
+
+$entraEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $entraBody
+$minimalEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $minimalBody
+$rfcEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $rfcBody
+$userOnlyEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $userOnlyBody
+Test-Result -Success ($null -ne $entraEp.id) -Message "9z.setup: Created entra-id endpoint"
+Test-Result -Success ($null -ne $minimalEp.id) -Message "9z.setup: Created minimal endpoint"
+Test-Result -Success ($null -ne $rfcEp.id) -Message "9z.setup: Created rfc-standard endpoint"
+Test-Result -Success ($null -ne $userOnlyEp.id) -Message "9z.setup: Created user-only endpoint"
+
+# --- Test 9z.1: Schema count differs per preset ---
+Write-Host "`n--- Test 9z.1: Schema count differs per preset ---" -ForegroundColor Cyan
+$entraSchemas = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($entraEp.id)/Schemas" -Headers $headers
+$minimalSchemas = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($minimalEp.id)/Schemas" -Headers $headers
+$rfcSchemas = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($rfcEp.id)/Schemas" -Headers $headers
+Test-Result -Success ($entraSchemas.totalResults -eq 7) -Message "9z.1: entra-id has 7 schemas"
+Test-Result -Success ($minimalSchemas.totalResults -eq 2) -Message "9z.2: minimal has 2 schemas"
+Test-Result -Success ($rfcSchemas.totalResults -eq 3) -Message "9z.3: rfc-standard has 3 schemas"
+
+# --- Test 9z.4: SPC differs per preset ---
+Write-Host "`n--- Test 9z.4: SPC differs per preset ---" -ForegroundColor Cyan
+$minimalSpc = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($minimalEp.id)/ServiceProviderConfig" -Headers $headers
+$rfcSpc = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($rfcEp.id)/ServiceProviderConfig" -Headers $headers
+Test-Result -Success ($minimalSpc.bulk.supported -eq $false) -Message "9z.4: minimal bulk=false"
+Test-Result -Success ($minimalSpc.sort.supported -eq $false) -Message "9z.5: minimal sort=false"
+Test-Result -Success ($rfcSpc.bulk.supported -eq $true) -Message "9z.6: rfc-standard bulk=true"
+Test-Result -Success ($rfcSpc.sort.supported -eq $true) -Message "9z.7: rfc-standard sort=true"
+
+# --- Test 9z.8: user-only has 1 ResourceType ---
+Write-Host "`n--- Test 9z.8: user-only ResourceTypes ---" -ForegroundColor Cyan
+$userOnlyRts = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($userOnlyEp.id)/ResourceTypes" -Headers $headers
+Test-Result -Success ($userOnlyRts.totalResults -eq 1) -Message "9z.8: user-only has 1 resource type"
+Test-Result -Success ($userOnlyRts.Resources[0].name -eq "User") -Message "9z.9: user-only RT is User"
+
+# --- Test 9z.10: Preset API ---
+Write-Host "`n--- Test 9z.10: Preset API ---" -ForegroundColor Cyan
+$presets = Invoke-RestMethod -Uri "$baseUrl/scim/admin/profile-presets" -Headers $headers
+Test-Result -Success ($presets.Count -eq 5) -Message "9z.10: 5 presets available"
+$presetNames = $presets | ForEach-Object { $_.name }
+Test-Result -Success ($presetNames -contains "entra-id") -Message "9z.11: entra-id preset exists"
+Test-Result -Success ($presetNames -contains "rfc-standard") -Message "9z.12: rfc-standard preset exists"
+
+# --- Test 9z.13: PATCH deep-merge settings ---
+Write-Host "`n--- Test 9z.13: PATCH deep-merge settings ---" -ForegroundColor Cyan
+$patchBody = @{ config = @{ SoftDeleteEnabled = "True" } } | ConvertTo-Json
+$patchResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($rfcEp.id)" -Method PATCH -Headers $headers -Body $patchBody
+Test-Result -Success ($patchResult.config.SoftDeleteEnabled -eq "True") -Message "9z.13: PATCH added SoftDeleteEnabled"
+# Verify schemas untouched
+$rfcSchemasAfter = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($rfcEp.id)/Schemas" -Headers $headers
+Test-Result -Success ($rfcSchemasAfter.totalResults -eq 3) -Message "9z.14: schemas unchanged after settings PATCH"
+
+# --- Test 9z.15: Inline profile creation ---
+Write-Host "`n--- Test 9z.15: Inline profile creation ---" -ForegroundColor Cyan
+$inlineBody = @{
+    name = "live-inline-$(Get-Random)"
+    profile = @{
+        schemas = @(
+            @{ id = "urn:ietf:params:scim:schemas:core:2.0:User"; name = "User"; attributes = @(@{ name = "userName" }, @{ name = "active" }) }
+        )
+        resourceTypes = @(
+            @{ id = "User"; name = "User"; endpoint = "/Users"; description = "User"; schema = "urn:ietf:params:scim:schemas:core:2.0:User"; schemaExtensions = @() }
+        )
+        serviceProviderConfig = @{
+            patch = @{ supported = $true }; bulk = @{ supported = $false }; filter = @{ supported = $true; maxResults = 50 }
+            sort = @{ supported = $false }; etag = @{ supported = $false }; changePassword = @{ supported = $false }
+        }
+    }
+} | ConvertTo-Json -Depth 6
+$inlineEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $inlineBody
+Test-Result -Success ($null -ne $inlineEp.id) -Message "9z.15: Inline profile endpoint created"
+$inlineSchemas = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($inlineEp.id)/Schemas" -Headers $headers
+Test-Result -Success ($inlineSchemas.totalResults -eq 1) -Message "9z.16: Inline profile has 1 schema"
+
+# --- Cleanup ---
+Write-Host "`n--- Cleanup: Delete test endpoints ---" -ForegroundColor Cyan
+@($entraEp.id, $minimalEp.id, $rfcEp.id, $userOnlyEp.id, $inlineEp.id) | ForEach-Object {
+    try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$_" -Method DELETE -Headers $headers | Out-Null } catch {}
+}
+Test-Result -Success $true -Message "9z.cleanup: Deleted profile test endpoints"
+
+Write-Host "`n--- 9z: Profile & Preset Discovery Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

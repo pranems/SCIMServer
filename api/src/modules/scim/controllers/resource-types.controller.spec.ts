@@ -6,8 +6,9 @@ import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 describe('ResourceTypesController', () => {
   let controller: ResourceTypesController;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     const registry = new ScimSchemaRegistry();
+    await registry.onModuleInit();
     const discoveryService = new ScimDiscoveryService(registry);
     controller = new ResourceTypesController(discoveryService);
   });
@@ -42,7 +43,7 @@ describe('ResourceTypesController', () => {
     it('should include Enterprise User extension on User resource type', () => {
       const result = controller.getResourceTypes();
       const userType = result.Resources.find((r: any) => r.id === 'User');
-      expect(userType!.schemaExtensions).toHaveLength(3); // Enterprise + 2 msfttest User extensions
+      expect(userType!.schemaExtensions).toHaveLength(1); // EnterpriseUser
       expect(userType!.schemaExtensions[0].schema).toBe(
         'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User',
       );
@@ -56,7 +57,7 @@ describe('ResourceTypesController', () => {
       expect(groupType!.name).toBe('Group');
       expect(groupType!.endpoint).toBe('/Groups');
       expect(groupType!.schema).toBe('urn:ietf:params:scim:schemas:core:2.0:Group');
-      expect(groupType!.schemaExtensions).toHaveLength(2); // 2 msfttest Group extensions
+      expect(groupType!.schemaExtensions).toHaveLength(0); // no extensions
     });
 
     it('should have correct pagination metadata', () => {
@@ -122,7 +123,7 @@ describe('ResourceTypesController', () => {
 
     it('should include schema extensions on individually retrieved User resource type', () => {
       const result = controller.getResourceTypeById('User');
-      expect(result.schemaExtensions).toHaveLength(3); // Enterprise + 2 msfttest
+      expect(result.schemaExtensions).toHaveLength(1); // EnterpriseUser
       expect(result.schemaExtensions[0].schema).toBe(
         'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User',
       );

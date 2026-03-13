@@ -97,10 +97,10 @@ export class EndpointScimGenericService {
     endpointId: string,
   ): SchemaDefinition[] {
     const schemas: SchemaDefinition[] = [];
-    const coreDef = this.schemaRegistry.getSchema(resourceType.schema, endpointId);
+    const coreDef = this.schemaRegistry.getSchema(resourceType.schema);
     if (coreDef) schemas.push({ ...coreDef, isCoreSchema: true } as SchemaDefinition);
     for (const ext of resourceType.schemaExtensions) {
-      const extDef = this.schemaRegistry.getSchema(ext.schema, endpointId);
+      const extDef = this.schemaRegistry.getSchema(ext.schema);
       if (extDef) schemas.push(extDef as SchemaDefinition);
     }
     return schemas;
@@ -885,7 +885,7 @@ export class EndpointScimGenericService {
     resourceType: ScimResourceType,
     endpointId: string,
   ): SchemaDefinition[] {
-    const coreSchema = this.schemaRegistry.getSchema(resourceType.schema, endpointId);
+    const coreSchema = this.schemaRegistry.getSchema(resourceType.schema);
     const schemas: SchemaDefinition[] = [];
     if (coreSchema) {
       // Mark as core so SchemaValidator treats its attributes as top-level,
@@ -896,7 +896,7 @@ export class EndpointScimGenericService {
     const declaredSchemas = (dto.schemas as string[] | undefined) ?? [];
     for (const urn of declaredSchemas) {
       if (urn !== resourceType.schema) {
-        const extSchema = this.schemaRegistry.getSchema(urn, endpointId);
+        const extSchema = this.schemaRegistry.getSchema(urn);
         if (extSchema) {
           schemas.push(extSchema as SchemaDefinition);
         }

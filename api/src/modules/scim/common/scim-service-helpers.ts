@@ -493,7 +493,7 @@ export class ScimSchemaHelpers {
 
     const declaredSchemas = (dto.schemas as string[] | undefined) ?? [];
     const declaredLower = new Set(declaredSchemas.map((s) => s.toLowerCase()));
-    const registeredUrns = this.schemaRegistry.getExtensionUrns(endpointId);
+    const registeredUrns = this.schemaRegistry.getExtensionUrns();
     const registeredLower = new Set(registeredUrns.map((u) => u.toLowerCase()));
 
     for (const key of Object.keys(dto)) {
@@ -570,7 +570,7 @@ export class ScimSchemaHelpers {
     dto: Record<string, unknown>,
     endpointId: string,
   ): SchemaDefinition[] {
-    const coreSchema = this.schemaRegistry.getSchema(this.coreSchemaUrn, endpointId);
+    const coreSchema = this.schemaRegistry.getSchema(this.coreSchemaUrn);
     const schemas: SchemaDefinition[] = [];
     if (coreSchema) {
       schemas.push({ ...coreSchema, isCoreSchema: true } as SchemaDefinition);
@@ -579,7 +579,7 @@ export class ScimSchemaHelpers {
     const declaredSchemas = (dto.schemas as string[] | undefined) ?? [];
     for (const urn of declaredSchemas) {
       if (urn !== this.coreSchemaUrn) {
-        const extSchema = this.schemaRegistry.getSchema(urn, endpointId);
+        const extSchema = this.schemaRegistry.getSchema(urn);
         if (extSchema) {
           schemas.push(extSchema as SchemaDefinition);
         }
@@ -593,12 +593,12 @@ export class ScimSchemaHelpers {
    * Get all schema definitions (core + registered extensions) for the endpoint.
    */
   getSchemaDefinitions(endpointId?: string): SchemaDefinition[] {
-    const coreSchema = this.schemaRegistry.getSchema(this.coreSchemaUrn, endpointId);
+    const coreSchema = this.schemaRegistry.getSchema(this.coreSchemaUrn);
     const schemas: SchemaDefinition[] = [];
     if (coreSchema) schemas.push({ ...coreSchema, isCoreSchema: true } as SchemaDefinition);
-    const extUrns = this.schemaRegistry.getExtensionUrns(endpointId);
+    const extUrns = this.schemaRegistry.getExtensionUrns();
     for (const urn of extUrns) {
-      const ext = this.schemaRegistry.getSchema(urn, endpointId);
+      const ext = this.schemaRegistry.getSchema(urn);
       if (ext) schemas.push(ext as SchemaDefinition);
     }
     return schemas;
@@ -694,7 +694,7 @@ export class ScimSchemaHelpers {
    * Get the extension URNs registered for this endpoint.
    */
   getExtensionUrns(endpointId?: string): readonly string[] {
-    return this.schemaRegistry.getExtensionUrns(endpointId);
+    return this.schemaRegistry.getExtensionUrns();
   }
 
   /**

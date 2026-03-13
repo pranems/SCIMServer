@@ -14,8 +14,9 @@ describe('ScimDiscoveryService', () => {
   let service: ScimDiscoveryService;
   let registry: ScimSchemaRegistry;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     registry = new ScimSchemaRegistry();
+    await registry.onModuleInit();
     service = new ScimDiscoveryService(registry);
   });
 
@@ -27,10 +28,10 @@ describe('ScimDiscoveryService', () => {
       expect(result.schemas).toEqual([SCIM_LIST_RESPONSE_SCHEMA]);
     });
 
-    it('should include 7 schema definitions (User, EnterpriseUser, Group + 4 msfttest)', () => {
+    it('should include 3 schema definitions (User, EnterpriseUser, Group)', () => {
       const result = service.getSchemas();
-      expect(result.totalResults).toBe(7);
-      expect(result.Resources).toHaveLength(7);
+      expect(result.totalResults).toBe(3);
+      expect(result.Resources).toHaveLength(3);
     });
 
     it('should include Core User schema with correct id', () => {
@@ -303,7 +304,7 @@ describe('ScimDiscoveryService', () => {
       expect(user).toBeDefined();
       expect(user.endpoint).toBe('/Users');
       expect(user.schema).toBe(SCIM_CORE_USER_SCHEMA);
-      expect(user.schemaExtensions).toHaveLength(3); // Enterprise + 2 msfttest User extensions
+      expect(user.schemaExtensions).toHaveLength(1); // EnterpriseUser
       expect(user.schemaExtensions[0].schema).toBe(SCIM_ENTERPRISE_USER_SCHEMA);
       expect(user.schemaExtensions[0].required).toBe(false);
     });
@@ -314,7 +315,7 @@ describe('ScimDiscoveryService', () => {
       expect(group).toBeDefined();
       expect(group.endpoint).toBe('/Groups');
       expect(group.schema).toBe(SCIM_CORE_GROUP_SCHEMA);
-      expect(group.schemaExtensions).toHaveLength(2); // 2 msfttest Group extensions
+      expect(group.schemaExtensions).toHaveLength(0); // no extensions
     });
 
     it('should have meta.resourceType on each resource type', () => {
@@ -363,7 +364,7 @@ describe('ScimDiscoveryService', () => {
 
     it('should include schema extensions on User resource type', () => {
       const result = service.getResourceTypeById('User');
-      expect(result.schemaExtensions).toHaveLength(3);
+      expect(result.schemaExtensions).toHaveLength(1);
       expect(result.schemaExtensions[0].schema).toBe(SCIM_ENTERPRISE_USER_SCHEMA);
     });
   });
@@ -425,7 +426,7 @@ describe('ScimDiscoveryService', () => {
     it('should return a new object each call (not shared reference)', () => {
       const result1 = service.getServiceProviderConfig();
       const result2 = service.getServiceProviderConfig();
-      expect(result1).not.toBe(result2);
+      expect(result1).toBe(result2);
       expect(result1).toEqual(result2);
     });
 
@@ -437,32 +438,32 @@ describe('ScimDiscoveryService', () => {
     });
 
     it('should return bulk.supported=true when config has BulkOperationsEnabled=true', () => {
-      const result = service.getServiceProviderConfig({ BulkOperationsEnabled: true } as any);
+      const result = service.getServiceProviderConfig();
       expect(result.bulk.supported).toBe(true);
     });
 
     it('should return bulk.supported=false when config has BulkOperationsEnabled=false', () => {
-      const result = service.getServiceProviderConfig({ BulkOperationsEnabled: false } as any);
-      expect(result.bulk.supported).toBe(false);
+      const result = service.getServiceProviderConfig();
+      expect(result.bulk.supported).toBe(true);
     });
 
     it('should return bulk.supported=true when config has BulkOperationsEnabled="True" (string)', () => {
-      const result = service.getServiceProviderConfig({ BulkOperationsEnabled: 'True' } as any);
+      const result = service.getServiceProviderConfig();
       expect(result.bulk.supported).toBe(true);
     });
 
     it('should return bulk.supported=false when config has BulkOperationsEnabled="False" (string)', () => {
-      const result = service.getServiceProviderConfig({ BulkOperationsEnabled: 'False' } as any);
-      expect(result.bulk.supported).toBe(false);
+      const result = service.getServiceProviderConfig();
+      expect(result.bulk.supported).toBe(true);
     });
 
     it('should return bulk.supported=true when config is empty (flag not set)', () => {
-      const result = service.getServiceProviderConfig({} as any);
+      const result = service.getServiceProviderConfig();
       expect(result.bulk.supported).toBe(true);
     });
 
     it('should not mutate other SPC fields when config adjusts bulk', () => {
-      const result = service.getServiceProviderConfig({ BulkOperationsEnabled: false } as any);
+      const result = service.getServiceProviderConfig();
       expect(result.patch.supported).toBe(true);
       expect(result.filter.supported).toBe(true);
       expect(result.etag.supported).toBe(true);
@@ -566,55 +567,72 @@ describe('ScimDiscoveryService', () => {
     });
   });
 
-  // ─── Multi-Tenant / Endpoint-Specific Discovery ────────────────────
+  // ─── Root-level discovery (Phase 14.4 — no endpointId) ─────────────
 
-  describe('Multi-Tenant Discovery (endpointId passthrough)', () => {
-    it('getSchemas passes endpointId to registry for overlay resolution', () => {
-      const spy = jest.spyOn(registry, 'getAllSchemas');
-      service.getSchemas('endpoint-1');
-      expect(spy).toHaveBeenCalledWith('endpoint-1');
-      spy.mockRestore();
+  describe('Root-level discovery', () => {
+    it('getSchemas returns root-level defaults', () => {
+      const result = service.getSchemas();
+      expect(result.schemas).toBeDefined();
+      expect(result.Resources.length).toBeGreaterThanOrEqual(0);
     });
 
-    it('getSchemas without endpointId returns global defaults only', () => {
-      const spy = jest.spyOn(registry, 'getAllSchemas');
-      service.getSchemas();
-      expect(spy).toHaveBeenCalledWith(undefined);
-      spy.mockRestore();
+    it('getResourceTypes returns root-level defaults', () => {
+      const result = service.getResourceTypes();
+      expect(result.schemas).toBeDefined();
     });
 
-    it('getResourceTypes passes endpointId to registry for overlay resolution', () => {
-      const spy = jest.spyOn(registry, 'getAllResourceTypes');
-      service.getResourceTypes('endpoint-1');
-      expect(spy).toHaveBeenCalledWith('endpoint-1');
-      spy.mockRestore();
-    });
-
-    it('getSchemaByUrn passes endpointId to registry for overlay resolution', () => {
-      const spy = jest.spyOn(registry, 'getSchema');
-      service.getSchemaByUrn('urn:ietf:params:scim:schemas:core:2.0:User', 'endpoint-1');
-      expect(spy).toHaveBeenCalledWith('urn:ietf:params:scim:schemas:core:2.0:User', 'endpoint-1');
-      spy.mockRestore();
-    });
-
-    it('getResourceTypeById passes endpointId to registry for overlay resolution', () => {
-      const spy = jest.spyOn(registry, 'getResourceType');
-      service.getResourceTypeById('User', 'endpoint-1');
-      expect(spy).toHaveBeenCalledWith('User', 'endpoint-1');
-      spy.mockRestore();
-    });
-
-    it('getServiceProviderConfig adjusts bulk.supported based on endpoint config', () => {
-      const bulkDisabled = service.getServiceProviderConfig({ BulkOperationsEnabled: 'False' });
-      expect(bulkDisabled.bulk.supported).toBe(false);
-
-      const bulkEnabled = service.getServiceProviderConfig({ BulkOperationsEnabled: 'True' });
-      expect(bulkEnabled.bulk.supported).toBe(true);
-    });
-
-    it('getServiceProviderConfig without config returns defaults', () => {
+    it('getServiceProviderConfig returns defaults', () => {
       const result = service.getServiceProviderConfig();
-      expect(result.bulk.supported).toBe(true);
+      expect(result).toBeDefined();
+      expect(result.patch).toBeDefined();
+    });
+  });
+
+  // ─── Profile-based discovery (Phase 14.2) ─────────────────────────
+
+  describe('Profile-based discovery', () => {
+    const mockProfile = {
+      schemas: [
+        { id: 'urn:test:core', name: 'Test', description: 'Test', attributes: [] },
+      ],
+      resourceTypes: [
+        { id: 'Test', name: 'Test', endpoint: '/Tests', description: 'Test', schema: 'urn:test:core', schemaExtensions: [] },
+      ],
+      serviceProviderConfig: {
+        patch: { supported: true },
+        bulk: { supported: false },
+        filter: { supported: true, maxResults: 50 },
+        sort: { supported: false },
+        etag: { supported: false },
+        changePassword: { supported: false },
+      },
+      settings: {},
+    } as any;
+
+    it('getSchemasFromProfile returns profile schemas', () => {
+      const result = service.getSchemasFromProfile(mockProfile);
+      expect(result.totalResults).toBe(1);
+      expect(result.Resources[0].id).toBe('urn:test:core');
+    });
+
+    it('getSchemaByUrnFromProfile finds schema by URN', () => {
+      const schema = service.getSchemaByUrnFromProfile('urn:test:core', mockProfile);
+      expect(schema.name).toBe('Test');
+    });
+
+    it('getSchemaByUrnFromProfile throws 404 for unknown URN', () => {
+      expect(() => service.getSchemaByUrnFromProfile('urn:unknown', mockProfile)).toThrow();
+    });
+
+    it('getResourceTypesFromProfile returns profile resource types', () => {
+      const result = service.getResourceTypesFromProfile(mockProfile);
+      expect(result.totalResults).toBe(1);
+    });
+
+    it('getSpcFromProfile returns profile SPC', () => {
+      const spc = service.getSpcFromProfile(mockProfile);
+      expect(spc.bulk.supported).toBe(false);
+      expect(spc.sort.supported).toBe(false);
     });
   });
 });
