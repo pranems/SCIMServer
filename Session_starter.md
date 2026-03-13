@@ -149,7 +149,7 @@ Current Version: **see [api/package.json](api/package.json)** (Prisma 7 + Postgr
 ---
 
 ## Status
-Production Ready (v0.27.0) — **All 27 migration gaps (G1–G20) fully resolved. SCIM RFC 7643/7644 compliance: 100%.** v0.27.0: Generic service parity fixes (3 P0 gaps closed) + test gap closure (16 unit + 5 E2E). v0.26.0: Attribute characteristics E2E gap closure (19 E2E + 16 live). v0.25.0: P3 test gap audit — 3 bug fixes, 32 new E2E, 19 live, 2 unit. v0.24.0: P2 attribute characteristics — 6 behavioral gap fixes. v0.23.0: Blob/BackupService dead code elimination. v0.22.0: ReadOnly attribute stripping & warning URN system. Per-endpoint config flags (14 boolean + logLevel = 15 total). SPC: `bulk.supported: true, sort.supported: true`. 3-tier auth: per-endpoint bcrypt → OAuth JWT → global secret. Parallel E2E (maxWorkers=4, ~38s). **All unit (2,741), E2E (651) tests passing. Live tests: 659 total (647 passed, 12 pre-existing feature gaps)** — 📊 see [PROJECT_HEALTH_AND_STATS.md](docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for counts. 25 Microsoft SCIM Validator tests + 7 preview (0 false positives). Stack: Prisma 7, PostgreSQL 17, ESLint 10, Jest 30, React 19, Vite 7, Node 24. (Mar 2026).
+Production Ready (v0.28.0) — **All 27 migration gaps (G1–G20) fully resolved. SCIM RFC 7643/7644 compliance: 100%.** v0.28.0: Schema templates / endpoint profiles, Prisma 7→5 models, endpoint-profile module. v0.27.0: Generic service parity fixes (3 P0 gaps closed) + test gap closure (16 unit + 5 E2E). v0.26.0: Attribute characteristics E2E gap closure (19 E2E + 16 live). v0.25.0: P3 test gap audit — 3 bug fixes, 32 new E2E, 19 live, 2 unit. v0.24.0: P2 attribute characteristics — 6 behavioral gap fixes. v0.23.0: Blob/BackupService dead code elimination. v0.22.0: ReadOnly attribute stripping & warning URN system. Per-endpoint config flags (14 boolean + logLevel = 15 total). SPC: `bulk.supported: true, sort.supported: true`. 3-tier auth: per-endpoint bcrypt → OAuth JWT → global secret. Parallel E2E (maxWorkers=4, ~38s). **All unit (2,879 / 73 suites), E2E (608 / 30 suites, 6 skipped) tests passing. Live tests: 811 assertions** — 📊 see [PROJECT_HEALTH_AND_STATS.md](docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for counts. 25 Microsoft SCIM Validator tests + 7 preview (0 false positives). Stack: Prisma 5 models, PostgreSQL 17, ESLint 10, Jest 30, React 19, Vite 7, Node 24. (Mar 2026).
 
 ## Quick Commands
 ```powershell
@@ -157,7 +157,7 @@ Production Ready (v0.27.0) — **All 27 migration gaps (G1–G20) fully resolved
 pwsh ./scripts/publish-acr.ps1 -Registry scimserverpublic -ResourceGroup scimserver-rg -Latest
 
 # Customer update to latest (example)
-iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-direct.ps1'); Update-SCIMServerDirect -Version v0.27.0 -ResourceGroup <rg> -AppName <app> -NoPrompt
+iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-direct.ps1'); Update-SCIMServerDirect -Version v0.28.0 -ResourceGroup <rg> -AppName <app> -NoPrompt
 
 > NOTE: Direct upgrade one‑liner integrated into UI copy button; user has not yet tested the copied command end‑to‑end.
 ```
@@ -234,7 +234,7 @@ Implemented TDD approach with comprehensive test coverage:
 ---
 
 ## Current Focus
-All 27 migration gaps fully resolved. v0.27.0: Generic parity fixes (3 P0 gaps) + 4 inmemory backend bugs fixed (AdminSchemaController, stub core schema, isCoreSchema flag, RepositoryModule caching). Live test script bug fixed (excludedAttributes 9x.15). **Remaining P0 gaps:** legacy token backdoor in scim-auth.guard.ts, console.log statements, CORS origin:true, /scim/v2 rewrite middleware. Current version v0.27.0 — all unit (2,741), E2E (651) passing. Live: 659 total (647 passed, 12 pre-existing feature gaps across all 3 deployment types). 📊 See [PROJECT_HEALTH_AND_STATS.md](docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current counts.
+All 27 migration gaps fully resolved. v0.28.0: Schema templates / endpoint profiles, Prisma 7→5 models. v0.27.0: Generic parity fixes (3 P0 gaps) + 4 inmemory backend bugs fixed. **Remaining P0 gaps:** legacy token backdoor in scim-auth.guard.ts, console.log statements, CORS origin:true, /scim/v2 rewrite middleware. Current version v0.28.0 — all unit (2,879 / 73 suites), E2E (608 / 30 suites, 6 skipped) passing. Live: 811 assertions. 📊 See [PROJECT_HEALTH_AND_STATS.md](docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current counts.
 
 ### Known Technical Debt (from code audit)
 - **SECURITY:** Hardcoded legacy bearer token `S@g@r!2011` in `scim-auth.guard.ts` — should come from env only

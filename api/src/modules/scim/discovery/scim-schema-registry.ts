@@ -19,6 +19,7 @@ import {
 } from './scim-schemas.constants';
 import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ENDPOINT_CONFIG_FLAGS, getConfigBooleanWithDefault } from '../../endpoint/endpoint-config.interface';
+import type { EndpointProfile, ServiceProviderConfig as ProfileSPC } from '../endpoint-profile/endpoint-profile.types';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -81,6 +82,10 @@ interface EndpointOverlay {
   extensionsByResourceType: Map<string, Set<string>>;
   /** Custom resource types registered for this specific endpoint (Phase 8b) */
   resourceTypes: Map<string, ScimResourceType>;
+  /** When true, schemas/resourceTypes are the COMPLETE set from profile (not additions to global) */
+  isFullProfile?: boolean;
+  /** Profile-sourced ServiceProviderConfig — served directly when present */
+  serviceProviderConfig?: ProfileSPC;
 }
 
 /**
@@ -142,11 +147,89 @@ export class ScimSchemaRegistry implements OnModuleInit {
   }
 
   /**
-   * OnModuleInit — Schema hydration now happens from Endpoint.profile
-   * rather than from separate EndpointSchema/EndpointResourceType tables.
+   * OnModuleInit — now a no-op. Boot-time hydration is triggered by
+   * ScimModule after EndpointService is available (via bootHydrate()).
    */
   async onModuleInit(): Promise<void> {
-    this.logger.debug('ScimSchemaRegistry initialized — extensions now come from Endpoint.profile.');
+    this.logger.debug('ScimSchemaRegistry initialized — awaiting boot hydration from ScimModule.');
+  }
+
+  // ─── Profile Hydration (Phase 13 — Phase 4) ──────────────────────────────────
+
+  /**
+   * Boot-time hydration: populate per-endpoint overlays from pre-loaded
+   * endpoint data. Called by ScimModule after all services are initialised,
+   * using EndpointService as the data source (backend-agnostic).
+   */
+  bootHydrate(endpoints: { id: string; name?: string; profile?: EndpointProfile | null }[]): void {
+    let hydrated = 0;
+    for (const ep of endpoints) {
+      if (ep.profile) {
+        try {
+          this.hydrateFromProfile(ep.id, ep.profile);
+          hydrated++;
+        } catch (err) {
+          this.logger.warn(`Failed to hydrate profile for endpoint "${ep.name ?? ep.id}": ${(err as Error).message}`);
+        }
+      }
+    }
+    if (hydrated > 0) {
+      this.logger.log(`Hydrated ${hydrated} endpoint profile(s) into registry.`);
+    }
+  }
+
+  /**
+   * Hydrate the per-endpoint registry overlay from an EndpointProfile.
+   *
+   * The profile contains the COMPLETE set of schemas, resource types, and SPC
+   * for the endpoint. The overlay is marked as `isFullProfile=true` so that
+   * query methods return profile data directly instead of merging with globals.
+   */
+  hydrateFromProfile(endpointId: string, profile: EndpointProfile): void {
+    this.endpointOverlays.delete(endpointId);
+
+    const overlay: EndpointOverlay = {
+      schemas: new Map(),
+      extensionsByResourceType: new Map(),
+      resourceTypes: new Map(),
+      isFullProfile: true,
+      serviceProviderConfig: profile.serviceProviderConfig,
+    };
+
+    if (profile.schemas) {
+      for (const schema of profile.schemas) {
+        const def: ScimSchemaDefinition = {
+          ...schema,
+          schemas: (schema as any).schemas ?? [SCIM_SCHEMA_SCHEMA],
+          meta: (schema as any).meta ?? {
+            resourceType: 'Schema',
+            location: `/Schemas/${schema.id}`,
+          },
+        };
+        overlay.schemas.set(def.id, def);
+      }
+    }
+
+    if (profile.resourceTypes) {
+      for (const rt of profile.resourceTypes) {
+        const def: ScimResourceType = {
+          ...rt,
+          schemas: (rt as any).schemas ?? [SCIM_RESOURCE_TYPE_SCHEMA],
+          schemaExtensions: [...rt.schemaExtensions],
+          meta: (rt as any).meta ?? {
+            resourceType: 'ResourceType',
+            location: `/ResourceTypes/${rt.id}`,
+          },
+        };
+        overlay.resourceTypes.set(def.id, def);
+
+        for (const ext of def.schemaExtensions) {
+          this.getOrCreateOverlayExtensionSet(overlay, def.id).add(ext.schema);
+        }
+      }
+    }
+
+    this.endpointOverlays.set(endpointId, overlay);
   }
 
   // ─── Built-in initialization ────────────────────────────────────────────
@@ -516,22 +599,26 @@ export class ScimSchemaRegistry implements OnModuleInit {
 
   /**
    * All schema definitions visible to an endpoint (global + endpoint-specific).
+   * For profile-based endpoints, returns profile schemas directly.
    * If endpointId is omitted, returns only global schemas.
    */
   getAllSchemas(endpointId?: string): ScimSchemaDefinition[] {
-    const result = [...this.schemas.values()];
     if (endpointId) {
       const overlay = this.endpointOverlays.get(endpointId);
+      if (overlay?.isFullProfile) {
+        return [...overlay.schemas.values()];
+      }
       if (overlay) {
+        const result = [...this.schemas.values()];
         for (const [urn, schema] of overlay.schemas) {
-          // Endpoint-specific overrides global if same URN
           if (!this.schemas.has(urn)) {
             result.push(schema);
           }
         }
+        return result;
       }
     }
-    return result;
+    return [...this.schemas.values()];
   }
 
   /** Get a single schema by URN (checks endpoint overlay first, then global) */
@@ -540,17 +627,21 @@ export class ScimSchemaRegistry implements OnModuleInit {
       const overlay = this.endpointOverlays.get(endpointId);
       const epSchema = overlay?.schemas.get(schemaUrn);
       if (epSchema) return epSchema;
+      if (overlay?.isFullProfile) return undefined;
     }
     return this.schemas.get(schemaUrn);
   }
 
   /**
    * All resource types with merged schema extensions for an endpoint.
-   * Global resource types are deep-copied with endpoint-specific extensions appended.
-   * Per-endpoint custom resource types (Phase 8b) are included.
+   * For profile-based endpoints, returns profile resource types directly.
    */
   getAllResourceTypes(endpointId?: string): ScimResourceType[] {
     const overlay = endpointId ? this.endpointOverlays.get(endpointId) : undefined;
+
+    if (overlay?.isFullProfile) {
+      return [...overlay.resourceTypes.values()];
+    }
 
     // Start with global resource types (User, Group) with endpoint extensions merged
     const result = [...this.resourceTypes.values()].map((rt) => {
@@ -669,25 +760,35 @@ export class ScimSchemaRegistry implements OnModuleInit {
   }
 
   /**
-   * ServiceProviderConfig — dynamically adjusted per-endpoint.
+   * ServiceProviderConfig — per-endpoint or default.
    *
-   * When called without config, returns the default SPC (all capabilities
-   * as defined in the constant). When called with an EndpointConfig,
-   * adjusts capability flags based on the endpoint's configuration:
-   *  - bulk.supported reflects BulkOperationsEnabled flag
+   * For profile-based endpoints, returns the SPC from the stored profile.
+   * For legacy endpoints, returns the default SPC adjusted by config flags.
    *
-   * @param config - Optional per-endpoint configuration
+   * @param config - Optional per-endpoint configuration (legacy path)
+   * @param endpointId - Optional endpoint ID for profile-based SPC lookup
    * @see RFC 7644 §4
    */
-  getServiceProviderConfig(config?: EndpointConfig) {
+  getServiceProviderConfig(config?: EndpointConfig, endpointId?: string) {
+    if (endpointId) {
+      const overlay = this.endpointOverlays.get(endpointId);
+      if (overlay?.isFullProfile && overlay.serviceProviderConfig) {
+        return {
+          ...SCIM_SERVICE_PROVIDER_CONFIG,
+          ...overlay.serviceProviderConfig,
+          meta: SCIM_SERVICE_PROVIDER_CONFIG.meta,
+          schemas: SCIM_SERVICE_PROVIDER_CONFIG.schemas,
+          authenticationSchemes: SCIM_SERVICE_PROVIDER_CONFIG.authenticationSchemes,
+        };
+      }
+    }
+
     const spc = {
       ...SCIM_SERVICE_PROVIDER_CONFIG,
       bulk: { ...SCIM_SERVICE_PROVIDER_CONFIG.bulk },
     };
 
     if (config) {
-      // Adjust bulk.supported based on endpoint config flag
-      // Default is true (server supports bulk); set to false only if explicitly disabled
       const bulkEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED, true);
       spc.bulk.supported = bulkEnabled;
     }

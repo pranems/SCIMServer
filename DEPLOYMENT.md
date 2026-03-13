@@ -261,10 +261,10 @@ npm run start:debug 2>&1 | Tee-Object -FilePath scimserver.log
 ```powershell
 # Auto-discovery update
 iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-func.ps1'); `
-  Update-SCIMServer -Version v0.27.0
+  Update-SCIMServer -Version v0.28.0
 
 # Or manual image update
-az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.27.0
+az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.28.0
 ```
 
 ---

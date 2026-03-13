@@ -2,10 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { AsyncLocalStorage } from 'async_hooks';
 import type { Request, Response } from 'express';
 import type { EndpointConfig } from './endpoint-config.interface';
+import type { EndpointProfile } from '../scim/endpoint-profile/endpoint-profile.types';
 
 export interface EndpointContext {
   endpointId: string;
   baseUrl: string;
+  /** Full endpoint profile — the single runtime source of truth */
+  profile?: EndpointProfile;
+  /** @deprecated Use profile.settings — retained for backward compat */
   config?: EndpointConfig;
   /** Accumulated warnings for the current request (e.g. stripped readOnly attributes) */
   warnings?: string[];
@@ -61,10 +65,14 @@ export class EndpointContextStorage {
     if (existing) {
       existing.endpointId = context.endpointId;
       existing.baseUrl = context.baseUrl;
-      existing.config = context.config;
+      existing.profile = context.profile;
+      existing.config = context.config ?? context.profile?.settings as EndpointConfig;
       // Do NOT reset warnings — they may have been accumulated before setContext
     } else {
-      this.storage.enterWith(context);
+      this.storage.enterWith({
+        ...context,
+        config: context.config ?? context.profile?.settings as EndpointConfig,
+      });
     }
   }
 
@@ -82,6 +90,11 @@ export class EndpointContextStorage {
 
   getConfig(): EndpointConfig | undefined {
     return this.storage.getStore()?.config;
+  }
+
+  /** Get the full endpoint profile from context */
+  getProfile(): EndpointProfile | undefined {
+    return this.storage.getStore()?.profile;
   }
 
   /**

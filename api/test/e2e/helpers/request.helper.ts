@@ -200,7 +200,7 @@ export async function createEndpoint(
 ): Promise<string> {
   const wk = process.env.JEST_WORKER_ID ?? '0';
   const endpointName = name ?? `e2e-w${wk}-${Date.now()}`;
-  const requestBody = { name: endpointName };
+  const requestBody = { name: endpointName, profilePreset: 'rfc-standard' };
   const trace = beginE2eFlowStep({
     method: 'POST',
     url: '/scim/admin/endpoints',

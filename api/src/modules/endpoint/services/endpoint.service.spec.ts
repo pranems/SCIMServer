@@ -709,4 +709,117 @@ describe('EndpointService', () => {
       });
     });
   });
+
+  // ─── Endpoint Cache Behavior (Phase 14.1) ──────────────────────────
+
+  describe('Endpoint cache', () => {
+    const cachedEndpoint = {
+      id: 'cached-ep-1',
+      name: 'cached-test',
+      displayName: 'Cached Test',
+      description: null,
+      profile: {
+        schemas: [],
+        resourceTypes: [],
+        serviceProviderConfig: { patch: { supported: true }, bulk: { supported: false }, filter: { supported: true, maxResults: 100 }, sort: { supported: false }, etag: { supported: false }, changePassword: { supported: false } },
+        settings: {},
+      },
+      active: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('onModuleInit should populate cache from DB', async () => {
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([cachedEndpoint]);
+
+      await service.onModuleInit();
+
+      // Now getEndpoint should return from cache without hitting prisma.findUnique
+      (prisma.endpoint.findUnique as jest.Mock).mockClear();
+      const result = await service.getEndpoint('cached-ep-1');
+      expect(result.id).toBe('cached-ep-1');
+      expect(prisma.endpoint.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('onModuleInit should populate cacheByName', async () => {
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([cachedEndpoint]);
+
+      await service.onModuleInit();
+
+      (prisma.endpoint.findUnique as jest.Mock).mockClear();
+      const result = await service.getEndpointByName('cached-test');
+      expect(result.name).toBe('cached-test');
+      expect(prisma.endpoint.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('createEndpoint should cache the new endpoint', async () => {
+      const newEndpoint = { ...cachedEndpoint, id: 'new-ep-1', name: 'new-test' };
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.endpoint.create as jest.Mock).mockResolvedValue(newEndpoint);
+
+      await service.createEndpoint({ name: 'new-test', profilePreset: 'rfc-standard' });
+
+      // Subsequent get should use cache
+      (prisma.endpoint.findUnique as jest.Mock).mockClear();
+      const result = await service.getEndpoint('new-ep-1');
+      expect(result.id).toBe('new-ep-1');
+      expect(prisma.endpoint.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('deleteEndpoint should remove from cache', async () => {
+      // First populate cache
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([cachedEndpoint]);
+      await service.onModuleInit();
+
+      // Delete
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(cachedEndpoint);
+      (prisma.endpoint.delete as jest.Mock).mockResolvedValue(cachedEndpoint);
+      await service.deleteEndpoint('cached-ep-1');
+
+      // Now getEndpoint should fail (item removed from cache + DB)
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
+      await expect(service.getEndpoint('cached-ep-1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('updateEndpoint should update cache entry', async () => {
+      // Populate cache
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([cachedEndpoint]);
+      await service.onModuleInit();
+
+      // Update
+      const updated = { ...cachedEndpoint, displayName: 'Updated Name' };
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(cachedEndpoint);
+      (prisma.endpoint.update as jest.Mock).mockResolvedValue(updated);
+
+      const result = await service.updateEndpoint('cached-ep-1', { displayName: 'Updated Name' });
+      expect(result.displayName).toBe('Updated Name');
+
+      // Cache should be updated
+      (prisma.endpoint.findUnique as jest.Mock).mockClear();
+      const cached = await service.getEndpoint('cached-ep-1');
+      expect(cached.displayName).toBe('Updated Name');
+      expect(prisma.endpoint.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('listEndpoints should serve from cache when warmed', async () => {
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([cachedEndpoint]);
+      await service.onModuleInit();
+
+      (prisma.endpoint.findMany as jest.Mock).mockClear();
+      const list = await service.listEndpoints();
+      expect(list.length).toBeGreaterThanOrEqual(1);
+      // findMany should NOT be called again — served from cache
+      expect(prisma.endpoint.findMany).not.toHaveBeenCalled();
+    });
+
+    it('getEndpoint cache miss should fall back to DB', async () => {
+      // Don't warm cache — force a cache miss
+      const dbEndpoint = { ...cachedEndpoint, id: 'db-only-ep' };
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(dbEndpoint);
+
+      const result = await service.getEndpoint('db-only-ep');
+      expect(result.id).toBe('db-only-ep');
+      expect(prisma.endpoint.findUnique).toHaveBeenCalledWith({ where: { id: 'db-only-ep' } });
+    });
+  });
 });

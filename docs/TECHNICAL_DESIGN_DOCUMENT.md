@@ -51,7 +51,7 @@
 ```
 api/
 ├── prisma/
-│   ├── schema.prisma            # Database schema definition (7 models)
+│   ├── schema.prisma            # Database schema definition (5 models)
 │   └── migrations/              # Prisma migration history
 ├── public/                      # Pre-built React SPA assets
 │   ├── index.html

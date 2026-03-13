@@ -2,6 +2,8 @@
 
 > **Cross-reference**: For conceptual overview and operator guide, see [`SCHEMA_CUSTOMIZATION_GUIDE.md`](SCHEMA_CUSTOMIZATION_GUIDE.md) §Custom Resource Types. This document remains the canonical **implementation** reference (code-level files, test inventory).
 
+> **⚠️ Partially Superseded (v0.28.0)**: The `EndpointResourceType` table, `IEndpointResourceTypeRepository` interface, and the `POST/GET/DELETE /admin/endpoints/:id/resource-types` admin routes described here were **removed** in Phase 13. Custom resource type data is now consolidated into `Endpoint.profile` JSONB. See [SCHEMA_TEMPLATES_DESIGN.md](SCHEMA_TEMPLATES_DESIGN.md).
+
 > **Version**: v0.18.0 | **Phase**: 8 Part 2 | **Status**: ✅ Complete  
 > **RFC References**: RFC 7643 §6, RFC 7644 §4  
 > **Branch**: `feat/torfc1stscimsvr`

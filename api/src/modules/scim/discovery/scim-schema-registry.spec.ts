@@ -674,4 +674,182 @@ describe('ScimSchemaRegistry', () => {
       expect(found).toBeUndefined();
     });
   });
+
+  // ─── Profile Hydration (Phase 13 — Phase 4) ────────────────────────────
+
+  describe('hydrateFromProfile', () => {
+    const epId = 'profile-ep-1';
+
+    const testProfile = {
+      schemas: [
+        {
+          id: 'urn:ietf:params:scim:schemas:core:2.0:User',
+          name: 'User',
+          description: 'User Account',
+          attributes: [
+            { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite', returned: 'always', uniqueness: 'server', caseExact: false },
+            { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', caseExact: false },
+          ],
+        },
+        {
+          id: 'urn:ietf:params:scim:schemas:core:2.0:Group',
+          name: 'Group',
+          description: 'Group',
+          attributes: [
+            { name: 'displayName', type: 'string', multiValued: false, required: true, mutability: 'readWrite', returned: 'default', uniqueness: 'none', caseExact: false },
+          ],
+        },
+      ],
+      resourceTypes: [
+        {
+          id: 'User', name: 'User', endpoint: '/Users', description: 'User Account',
+          schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [],
+        },
+        {
+          id: 'Group', name: 'Group', endpoint: '/Groups', description: 'Group',
+          schema: 'urn:ietf:params:scim:schemas:core:2.0:Group', schemaExtensions: [],
+        },
+      ],
+      serviceProviderConfig: {
+        patch: { supported: true },
+        bulk: { supported: false },
+        filter: { supported: true, maxResults: 100 },
+        sort: { supported: false },
+        etag: { supported: true },
+        changePassword: { supported: false },
+      },
+      settings: { SoftDeleteEnabled: 'True' },
+    };
+
+    it('should replace global layer with profile schemas for hydrated endpoint', () => {
+      registry.hydrateFromProfile(epId, testProfile as any);
+      const schemas = registry.getAllSchemas(epId);
+      expect(schemas).toHaveLength(2);
+      expect(schemas.map(s => s.name)).toEqual(['User', 'Group']);
+    });
+
+    it('should return profile resourceTypes instead of global', () => {
+      registry.hydrateFromProfile(epId, testProfile as any);
+      const rts = registry.getAllResourceTypes(epId);
+      expect(rts).toHaveLength(2);
+      expect(rts[0].schemaExtensions).toHaveLength(0); // no extensions in profile
+    });
+
+    it('should serve profile SPC via getServiceProviderConfig with endpointId', () => {
+      registry.hydrateFromProfile(epId, testProfile as any);
+      const spc = registry.getServiceProviderConfig(undefined, epId);
+      expect(spc.bulk.supported).toBe(false);
+      expect(spc.sort.supported).toBe(false);
+      expect(spc.etag.supported).toBe(true);
+    });
+
+    it('should NOT affect other endpoints — they still see globals', () => {
+      registry.hydrateFromProfile(epId, testProfile as any);
+      const otherSchemas = registry.getAllSchemas('other-ep');
+      expect(otherSchemas).toHaveLength(7); // global layer unchanged
+    });
+
+    it('should NOT affect global layer when no endpointId given', () => {
+      registry.hydrateFromProfile(epId, testProfile as any);
+      const globalSchemas = registry.getAllSchemas();
+      expect(globalSchemas).toHaveLength(7);
+    });
+
+    it('should return profile schema via getSchema for hydrated endpoint', () => {
+      registry.hydrateFromProfile(epId, testProfile as any);
+      const user = registry.getSchema('urn:ietf:params:scim:schemas:core:2.0:User', epId);
+      expect(user).toBeDefined();
+      expect(user!.attributes).toHaveLength(2); // profile has 2 attrs, not full RFC set
+    });
+
+    it('should NOT return global schemas absent from profile for hydrated endpoint', () => {
+      registry.hydrateFromProfile(epId, testProfile as any);
+      const enterprise = registry.getSchema(SCIM_ENTERPRISE_USER_SCHEMA, epId);
+      expect(enterprise).toBeUndefined(); // not in profile
+    });
+
+    it('should clear and replace overlay when called again', () => {
+      registry.hydrateFromProfile(epId, testProfile as any);
+      expect(registry.getAllSchemas(epId)).toHaveLength(2);
+
+      // Re-hydrate with a single-schema profile
+      const minimalProfile = {
+        ...testProfile,
+        schemas: [testProfile.schemas[0]],
+        resourceTypes: [testProfile.resourceTypes[0]],
+      };
+      registry.hydrateFromProfile(epId, minimalProfile as any);
+      expect(registry.getAllSchemas(epId)).toHaveLength(1);
+    });
+
+    it('should clear overlay via clearEndpointOverlay', () => {
+      registry.hydrateFromProfile(epId, testProfile as any);
+      expect(registry.getAllSchemas(epId)).toHaveLength(2);
+      registry.clearEndpointOverlay(epId);
+      // Falls back to global
+      expect(registry.getAllSchemas(epId)).toHaveLength(7);
+    });
+  });
+
+  describe('bootHydrate', () => {
+    it('should hydrate multiple endpoints from a list', () => {
+      const endpoints = [
+        {
+          id: 'ep-boot-1',
+          name: 'boot1',
+          profile: {
+            schemas: [{ id: 'urn:boot:1', name: 'Boot1', description: 'Boot 1', attributes: [] }],
+            resourceTypes: [{ id: 'Boot1', name: 'Boot1', endpoint: '/Boot1', description: 'Boot 1', schema: 'urn:boot:1', schemaExtensions: [] }],
+            serviceProviderConfig: { patch: { supported: true }, bulk: { supported: false }, filter: { supported: true, maxResults: 50 }, sort: { supported: false }, etag: { supported: false }, changePassword: { supported: false } },
+            settings: {},
+          },
+        },
+        {
+          id: 'ep-boot-2',
+          name: 'boot2',
+          profile: {
+            schemas: [
+              { id: 'urn:boot:2a', name: 'Boot2a', description: 'Boot 2a', attributes: [] },
+              { id: 'urn:boot:2b', name: 'Boot2b', description: 'Boot 2b', attributes: [] },
+            ],
+            resourceTypes: [{ id: 'Boot2', name: 'Boot2', endpoint: '/Boot2', description: 'Boot 2', schema: 'urn:boot:2a', schemaExtensions: [] }],
+            serviceProviderConfig: { patch: { supported: true }, bulk: { supported: true, maxOperations: 100, maxPayloadSize: 1048576 }, filter: { supported: true, maxResults: 200 }, sort: { supported: true }, etag: { supported: true }, changePassword: { supported: false } },
+            settings: {},
+          },
+        },
+        { id: 'ep-boot-3', name: 'noprofile', profile: null },
+      ];
+
+      registry.bootHydrate(endpoints as any);
+
+      expect(registry.getAllSchemas('ep-boot-1')).toHaveLength(1);
+      expect(registry.getAllSchemas('ep-boot-2')).toHaveLength(2);
+      // ep-boot-3 has no profile — falls back to global
+      expect(registry.getAllSchemas('ep-boot-3')).toHaveLength(7);
+    });
+
+    it('should skip endpoints with null profile without error', () => {
+      expect(() =>
+        registry.bootHydrate([{ id: 'ep-null', name: 'null', profile: null }] as any),
+      ).not.toThrow();
+    });
+
+    it('should set isFullProfile flag so global schemas are hidden', () => {
+      const ep = {
+        id: 'ep-full',
+        name: 'fullProfile',
+        profile: {
+          schemas: [{ id: 'urn:custom:only', name: 'Custom', description: 'Custom', attributes: [] }],
+          resourceTypes: [{ id: 'Custom', name: 'Custom', endpoint: '/Custom', description: 'Custom', schema: 'urn:custom:only', schemaExtensions: [] }],
+          serviceProviderConfig: { patch: { supported: true }, bulk: { supported: false }, filter: { supported: true, maxResults: 50 }, sort: { supported: false }, etag: { supported: false }, changePassword: { supported: false } },
+          settings: {},
+        },
+      };
+
+      registry.bootHydrate([ep] as any);
+      // Should only see the single custom schema, not the 7 globals
+      expect(registry.getAllSchemas('ep-full')).toHaveLength(1);
+      expect(registry.getAllSchemas('ep-full')[0].id).toBe('urn:custom:only');
+    });
+  });
 });

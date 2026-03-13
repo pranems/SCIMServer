@@ -77,3 +77,8 @@ Dockerfile.dockerignore
 # Misc docs (local-only / may contain credentials)
 admin.md
 wiki.md
+api/combo-results.json
+api/ep-spec-results.json
+api/ep-spec2.json
+api/sd-results.json
+api/unit-final.json

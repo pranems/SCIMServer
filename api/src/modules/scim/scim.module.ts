@@ -1,9 +1,10 @@
-﻿import { Module, type NestModule, type MiddlewareConsumer } from '@nestjs/common';
+﻿import { Module, type NestModule, type MiddlewareConsumer, type OnModuleInit, Logger } from '@nestjs/common';
 import { APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
 
 import { LoggingModule } from '../logging/logging.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { EndpointModule } from '../endpoint/endpoint.module';
+import { EndpointService } from '../endpoint/services/endpoint.service';
 import { RepositoryModule } from '../../infrastructure/repositories/repository.module';
 import { AdminController } from './controllers/admin.controller';
 import { AdminCredentialController } from './controllers/admin-credential.controller';
@@ -70,8 +71,43 @@ import { ScimExceptionFilter } from './filters/scim-exception.filter';
     }
   ]
 })
-export class ScimModule implements NestModule {
-  constructor(private readonly endpointContext: EndpointContextStorage) {}
+export class ScimModule implements NestModule, OnModuleInit {
+  private readonly logger = new Logger(ScimModule.name);
+
+  constructor(
+    private readonly endpointContext: EndpointContextStorage,
+    private readonly endpointService: EndpointService,
+    private readonly schemaRegistry: ScimSchemaRegistry,
+  ) {}
+
+  /**
+   * Boot-time hydration: load all active endpoint profiles from EndpointService
+   * (backend-agnostic — works for both Prisma and InMemory) and populate the
+   * ScimSchemaRegistry overlay cache. Also wires a change listener for runtime
+   * create/update/delete operations.
+   */
+  async onModuleInit(): Promise<void> {
+    // Boot hydration — load existing endpoints
+    try {
+      const endpoints = await this.endpointService.listEndpoints();
+      this.schemaRegistry.bootHydrate(
+        endpoints.map(ep => ({ id: ep.id, name: ep.name, profile: ep.profile })),
+      );
+    } catch (err) {
+      this.logger.warn(`Boot hydration failed: ${(err as Error).message}`);
+    }
+
+    // Wire runtime listener so endpoint CRUD triggers registry rehydration
+    this.endpointService.setProfileChangeListener((endpointId, profile) => {
+      if (profile) {
+        this.schemaRegistry.hydrateFromProfile(endpointId, profile);
+        this.logger.debug(`Rehydrated registry for endpoint ${endpointId}`);
+      } else {
+        this.schemaRegistry.clearEndpointOverlay(endpointId);
+        this.logger.debug(`Cleared registry overlay for endpoint ${endpointId}`);
+      }
+    });
+  }
 
   /**
    * Register the AsyncLocalStorage middleware on ALL routes so that

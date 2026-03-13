@@ -98,9 +98,10 @@ export class EndpointScimGenericController {
       );
     }
 
+    const profile = endpoint.profile;
     const config: EndpointConfig = endpoint.config || {};
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
-    this.endpointContext.setContext({ endpointId, baseUrl, config });
+    this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
 
     // Check if custom resource types are enabled
     if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED)) {

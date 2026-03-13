@@ -102,15 +102,15 @@ export class ScimDiscoveryService {
 
   /**
    * Returns the ServiceProviderConfig for GET /ServiceProviderConfig.
-   * Includes meta object per RFC 7644 §4 SHOULD recommendation.
    *
-   * When called with an EndpointConfig, dynamically adjusts capability
-   * flags (e.g., bulk.supported) based on per-endpoint configuration.
+   * For profile-based endpoints, serves the SPC from the stored profile.
+   * For legacy endpoints, adjusts capability flags from config.
    *
-   * @param config - Optional per-endpoint configuration to reflect in SPC
+   * @param config - Optional per-endpoint configuration (legacy path)
+   * @param endpointId - Optional endpoint ID for profile-based SPC lookup
    */
-  getServiceProviderConfig(config?: EndpointConfig) {
-    return this.registry.getServiceProviderConfig(config);
+  getServiceProviderConfig(config?: EndpointConfig, endpointId?: string) {
+    return this.registry.getServiceProviderConfig(config, endpointId);
   }
 
   // ─── Dynamic schemas[] helper ───────────────────────────────────────────

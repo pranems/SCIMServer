@@ -64,9 +64,10 @@ export class EndpointScimDiscoveryController {
       );
     }
 
+    const profile = endpoint.profile;
     const config = endpoint.config || {};
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
-    this.endpointContext.setContext({ endpointId, baseUrl, config });
+    this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
   }
 
   // ===== Schemas =====
@@ -147,6 +148,6 @@ export class EndpointScimDiscoveryController {
   ) {
     await this.validateAndSetContext(endpointId, req);
     const endpoint = await this.endpointService.getEndpoint(endpointId);
-    return this.discoveryService.getServiceProviderConfig(endpoint.config);
+    return this.discoveryService.getServiceProviderConfig(endpoint.config, endpointId);
   }
 }

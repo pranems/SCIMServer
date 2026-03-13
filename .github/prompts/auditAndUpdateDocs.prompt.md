@@ -23,7 +23,7 @@ Perform a comprehensive documentation freshness audit across the entire project.
 For every document listed in `docs/INDEX.md`, check:
 
 ### A. Feature & Phase Docs
-(e.g., `G8B_*.md`, `G8C_*.md`, `G8E_*.md`, `G8F_*.md`, `G8G_*.md`, `G11_*.md`, `P2_*.md`, `READONLY_*.md`, `PHASE_09_*.md`, `PHASE_10_*.md`, `PHASE_12_*.md`, `phases/*.md`)
+(e.g., `G8B_*.md`, `G8C_*.md`, `G8E_*.md`, `G8F_*.md`, `G8G_*.md`, `G11_*.md`, `P2_*.md`, `READONLY_*.md`, `PHASE_09_*.md`, `PHASE_10_*.md`, `PHASE_12_*.md`, `SCHEMA_TEMPLATES_DESIGN.md`, `phases/*.md`)
 
 | Check | What to verify |
 |-------|----------------|

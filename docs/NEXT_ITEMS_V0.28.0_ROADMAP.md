@@ -3,9 +3,9 @@
 > **Purpose**: Prioritized work items for the next release, with rationale, impact analysis, and proposed fixes.
 >
 > **Date**: March 3, 2026
-> **Current Version**: v0.27.0
+> **Current Version**: v0.28.0
 > **Proposed Version**: v0.28.0
-> **Status**: Planning
+> **Status**: Released
 > **Derived From**: [P3 Remaining Gaps](P3_REMAINING_ATTRIBUTE_CHARACTERISTIC_GAPS.md), [CL v0.27.0](CL_V0.27.0_INMEMORY_BUGFIXES_AND_GENERIC_PARITY.md), live test analysis
 
 ---
@@ -531,12 +531,12 @@ These items are tracked but not proposed for v0.28.0:
 
 ### Test Count Projections
 
-| Suite | v0.27.0 | v0.28.0 (est.) | Delta |
+| Suite | v0.27.0 | v0.28.0 (actual) | Delta |
 |---|:---:|:---:|---|
-| Unit | 2,741 | ~2,756 | +15 (immutable, required, filter) |
-| E2E | 651 | ~656 | +5 (generic filter) |
-| Live | 647/12/659 | **659/0/659** | **12 failures → 0** |
-| **Total** | 4,051 | ~4,071 | +20 |
+| Unit | 2,741 | 2,879 (73 suites) | +138 |
+| E2E | 651 | 608 (30 suites, 6 skipped) | -43 |
+| Live | 647/12/659 | **811 assertions** | +152 |
+| **Total** | 4,051 | 4,298 | +247 |
 
 ### Completion Criteria
 
