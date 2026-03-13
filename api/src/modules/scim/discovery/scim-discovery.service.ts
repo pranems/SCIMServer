@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import {
   SCIM_LIST_RESPONSE_SCHEMA,
+  SCIM_SCHEMA_SCHEMA,
+  SCIM_RESOURCE_TYPE_SCHEMA,
 } from '../common/scim-constants';
 import { createScimError } from '../common/scim-errors';
 import { ScimSchemaRegistry } from './scim-schema-registry';
-import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import { SCIM_SERVICE_PROVIDER_CONFIG } from './scim-schemas.constants';
+import type { EndpointProfile } from '../endpoint-profile/endpoint-profile.types';
 
 /**
  * ScimDiscoveryService — Phase 6: Data-Driven Discovery
@@ -24,15 +27,12 @@ import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
 export class ScimDiscoveryService {
   constructor(private readonly registry: ScimSchemaRegistry) {}
 
-  // ─── Schemas ────────────────────────────────────────────────────────────
+  // ─── Root-level discovery (no endpointId) ───────────────────────────────
+  // Used by GET /scim/Schemas, /ResourceTypes, /ServiceProviderConfig (root)
 
-  /**
-   * Returns the full ListResponse for GET /Schemas.
-   * Includes all registered schemas (core + global extensions + endpoint-specific).
-   */
-  getSchemas(endpointId?: string) {
-    const resources = this.registry.getAllSchemas(endpointId);
-
+  /** Root-level GET /Schemas — from default rfc-standard preset */
+  getSchemas() {
+    const resources = this.registry.getAllSchemas();
     return {
       schemas: [SCIM_LIST_RESPONSE_SCHEMA],
       totalResults: resources.length,
@@ -42,34 +42,18 @@ export class ScimDiscoveryService {
     };
   }
 
-  /**
-   * Returns a single Schema by URN for GET /Schemas/{uri}.
-   * Throws a SCIM 404 error if the schema is not found.
-   *
-   * @param schemaUrn - The schema URN identifier (e.g. urn:ietf:params:scim:schemas:core:2.0:User)
-   * @param endpointId - Optional endpoint ID for endpoint-scoped lookups
-   * @see RFC 7644 §4 — An HTTP GET to retrieve an individual Schema
-   */
-  getSchemaByUrn(schemaUrn: string, endpointId?: string) {
-    const schema = this.registry.getSchema(schemaUrn, endpointId);
+  /** Root-level GET /Schemas/:uri */
+  getSchemaByUrn(schemaUrn: string) {
+    const schema = this.registry.getSchema(schemaUrn);
     if (!schema) {
-      throw createScimError({
-        status: 404,
-        detail: `Schema "${schemaUrn}" not found.`,
-      });
+      throw createScimError({ status: 404, detail: `Schema "${schemaUrn}" not found.` });
     }
     return schema;
   }
 
-  // ─── ResourceTypes ──────────────────────────────────────────────────────
-
-  /**
-   * Returns the full ListResponse for GET /ResourceTypes.
-   * Includes schema extensions registered via the registry (global + endpoint-specific).
-   */
-  getResourceTypes(endpointId?: string) {
-    const resources = this.registry.getAllResourceTypes(endpointId);
-
+  /** Root-level GET /ResourceTypes */
+  getResourceTypes() {
+    const resources = this.registry.getAllResourceTypes();
     return {
       schemas: [SCIM_LIST_RESPONSE_SCHEMA],
       totalResults: resources.length,
@@ -79,38 +63,95 @@ export class ScimDiscoveryService {
     };
   }
 
-  /**
-   * Returns a single ResourceType by id for GET /ResourceTypes/{id}.
-   * Throws a SCIM 404 error if the resource type is not found.
-   *
-   * @param resourceTypeId - The resource type id (e.g. "User", "Group")
-   * @param endpointId - Optional endpoint ID for endpoint-scoped lookups
-   * @see RFC 7644 §4 — An HTTP GET to retrieve an individual ResourceType
-   */
-  getResourceTypeById(resourceTypeId: string, endpointId?: string) {
-    const rt = this.registry.getResourceType(resourceTypeId, endpointId);
+  /** Root-level GET /ResourceTypes/:id */
+  getResourceTypeById(resourceTypeId: string) {
+    const rt = this.registry.getResourceType(resourceTypeId);
     if (!rt) {
-      throw createScimError({
-        status: 404,
-        detail: `ResourceType "${resourceTypeId}" not found.`,
-      });
+      throw createScimError({ status: 404, detail: `ResourceType "${resourceTypeId}" not found.` });
     }
     return rt;
   }
 
-  // ─── ServiceProviderConfig ──────────────────────────────────────────────
+  /** Root-level GET /ServiceProviderConfig */
+  getServiceProviderConfig() {
+    return this.registry.getServiceProviderConfig();
+  }
 
-  /**
-   * Returns the ServiceProviderConfig for GET /ServiceProviderConfig.
-   * Includes meta object per RFC 7644 §4 SHOULD recommendation.
-   *
-   * When called with an EndpointConfig, dynamically adjusts capability
-   * flags (e.g., bulk.supported) based on per-endpoint configuration.
-   *
-   * @param config - Optional per-endpoint configuration to reflect in SPC
-   */
-  getServiceProviderConfig(config?: EndpointConfig) {
-    return this.registry.getServiceProviderConfig(config);
+  // ─── Profile-based discovery (Phase 14.2) ────────────────────────────
+
+  /** Serve schemas directly from the endpoint's stored profile */
+  getSchemasFromProfile(profile?: EndpointProfile) {
+    const raw = profile?.schemas ?? [];
+    // Ensure each schema has the RFC-required schemas[] and meta fields
+    const resources = raw.map(s => ({
+      ...s,
+      schemas: (s as any).schemas ?? [SCIM_SCHEMA_SCHEMA],
+      meta: (s as any).meta ?? { resourceType: 'Schema', location: `/Schemas/${s.id}` },
+    }));
+    return {
+      schemas: [SCIM_LIST_RESPONSE_SCHEMA],
+      totalResults: resources.length,
+      startIndex: 1,
+      itemsPerPage: resources.length,
+      Resources: resources,
+    };
+  }
+
+  /** Find a single schema by URN from the endpoint's profile */
+  getSchemaByUrnFromProfile(schemaUrn: string, profile?: EndpointProfile) {
+    const schema = profile?.schemas?.find(s => s.id === schemaUrn);
+    if (!schema) {
+      throw createScimError({ status: 404, detail: `Schema "${schemaUrn}" not found.` });
+    }
+    return {
+      ...schema,
+      schemas: (schema as any).schemas ?? [SCIM_SCHEMA_SCHEMA],
+      meta: (schema as any).meta ?? { resourceType: 'Schema', location: `/Schemas/${schema.id}` },
+    };
+  }
+
+  /** Serve resource types directly from the endpoint's stored profile */
+  getResourceTypesFromProfile(profile?: EndpointProfile) {
+    const raw = profile?.resourceTypes ?? [];
+    const resources = raw.map(r => ({
+      ...r,
+      schemas: (r as any).schemas ?? [SCIM_RESOURCE_TYPE_SCHEMA],
+      meta: (r as any).meta ?? { resourceType: 'ResourceType', location: `/ResourceTypes/${r.id}` },
+    }));
+    return {
+      schemas: [SCIM_LIST_RESPONSE_SCHEMA],
+      totalResults: resources.length,
+      startIndex: 1,
+      itemsPerPage: resources.length,
+      Resources: resources,
+    };
+  }
+
+  /** Find a single resource type by id from the endpoint's profile */
+  getResourceTypeByIdFromProfile(resourceTypeId: string, profile?: EndpointProfile) {
+    const rt = profile?.resourceTypes?.find(r => r.id === resourceTypeId || r.name === resourceTypeId);
+    if (!rt) {
+      throw createScimError({ status: 404, detail: `ResourceType "${resourceTypeId}" not found.` });
+    }
+    return {
+      ...rt,
+      schemas: (rt as any).schemas ?? [SCIM_RESOURCE_TYPE_SCHEMA],
+      meta: (rt as any).meta ?? { resourceType: 'ResourceType', location: `/ResourceTypes/${rt.id}` },
+    };
+  }
+
+  /** Serve SPC directly from the endpoint's stored profile */
+  getSpcFromProfile(profile?: EndpointProfile) {
+    if (profile?.serviceProviderConfig) {
+      return {
+        ...SCIM_SERVICE_PROVIDER_CONFIG,
+        ...profile.serviceProviderConfig,
+        meta: SCIM_SERVICE_PROVIDER_CONFIG.meta,
+        schemas: SCIM_SERVICE_PROVIDER_CONFIG.schemas,
+        authenticationSchemes: SCIM_SERVICE_PROVIDER_CONFIG.authenticationSchemes,
+      };
+    }
+    return SCIM_SERVICE_PROVIDER_CONFIG;
   }
 
   // ─── Dynamic schemas[] helper ───────────────────────────────────────────
@@ -129,9 +170,8 @@ export class ScimDiscoveryService {
     payload: Record<string, unknown> | undefined,
     coreSchema: string,
     extensionUrns?: readonly string[],
-    endpointId?: string,
   ): string[] {
-    const urns = extensionUrns ?? this.registry.getExtensionUrns(endpointId);
+    const urns = extensionUrns ?? this.registry.getExtensionUrns();
     const schemas: string[] = [coreSchema];
 
     if (payload) {

@@ -332,10 +332,10 @@ graph TD
 
 | Level | Suites | Tests | Status | Lines |
 |---|---|---|---|---|
-| **Unit** | 73 | 2,867 | All Passing | ~27,900 |
-| **E2E** | 29 | 591 (+6 skipped) | All Passing | ~10,400 |
-| **Live Integration** | 1 | 659 | 647 Pass / 12 Fail | ~7,500 |
-| **TOTAL** | **106** | **~4,051** | **99.7% pass rate** | **~45,800** |
+| **Unit** | 73 | 2,830 | All Passing | ~27,900 |
+| **E2E** | 30 | 613 (+6 skipped) | All Passing | ~10,400 |
+| **Live Integration** | 1 | 832 | 832 Pass | ~7,500 |
+| **TOTAL** | **104** | **~4,275** | **100% pass rate** | **~45,800** |
 
 > **12 Live Test Failures** are pre-existing feature gaps (not regressions): content-type negotiation (415), collection-level methods (404/405), immutable enforcement, uniqueness collision (409), required field enforcement.
 

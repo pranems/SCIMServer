@@ -331,7 +331,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 
 > 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
 
-- **Unit** and **E2E** — all passing (0 failures). **Unit**: 2,867 (73 suites). **E2E**: 591 + 6 skipped (29 suites). **Live integration** — 647 pass, 12 pre-existing feature gaps (659 total)
+- **Unit** and **E2E** — all passing (0 failures). **Unit**: 2,830 (73 suites). **E2E**: 613 + 6 skipped (30 suites). **Live integration** — 832 live assertions
 - **SCIM Validator**: 25/25 required + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
 - Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`
@@ -347,7 +347,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 - 5 named presets (entra-id default, entra-id-minimal, rfc-standard, minimal, user-only)
 - RFC-native SCIM discovery format as configuration input with auto-expand + tighten-only validation
 - New API: `GET /admin/profile-presets` (read-only, 5 presets)
-- Prisma schema: 7 → 5 models (EndpointSchema + EndpointResourceType removed)
+- Prisma schema: 5 models (Endpoint, RequestLog, ScimResource, ResourceMember, EndpointCredential)
 - 28 files deleted (~4,800 lines removed), 13 new files created
 - Design doc: `SCHEMA_TEMPLATES_DESIGN.md` (2,349 lines, 47 code blocks, 19 Mermaid diagrams)
 

@@ -20,7 +20,6 @@ import {
 import type { Request } from 'express';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
-import { ENDPOINT_CONFIG_FLAGS, getConfigBoolean } from '../../endpoint/endpoint-config.interface';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { BulkProcessorService } from '../services/bulk-processor.service';
 import { BulkRequestDto, SCIM_BULK_REQUEST_SCHEMA, BULK_MAX_PAYLOAD_SIZE } from '../dto/bulk-request.dto';
@@ -53,9 +52,10 @@ export class EndpointScimBulkController {
       );
     }
 
+    const profile = endpoint.profile;
     const config: EndpointConfig = endpoint.config || {};
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
-    this.endpointContext.setContext({ endpointId, baseUrl, config });
+    this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
 
     return { baseUrl, config };
   }
@@ -78,11 +78,12 @@ export class EndpointScimBulkController {
   ): Promise<BulkResponse> {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
 
-    // ── Config flag gate ────────────────────────────────────────────────
-    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED)) {
+    // ── Derive bulk enablement from profile SPC (D8) ─────────────────────
+    const endpoint = await this.endpointService.getEndpoint(endpointId);
+    if (!endpoint.profile?.serviceProviderConfig?.bulk?.supported) {
       throw new ForbiddenException(
         'Bulk operations are not enabled for this endpoint. ' +
-        'Set the "BulkOperationsEnabled" config flag to "True" to enable.',
+        'Set bulk.supported=true in the endpoint profile serviceProviderConfig to enable.',
       );
     }
 

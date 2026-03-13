@@ -1,5 +1,7 @@
 # Schema Lifecycle & Registry — Technical Internals
 
+> **⚠️ Partially Superseded (v0.28.0)**: The `EndpointSchema` and `EndpointResourceType` tables/repos were removed in Phase 13. Schema data now lives in `Endpoint.profile` JSONB. See [SCHEMA_TEMPLATES_DESIGN.md](SCHEMA_TEMPLATES_DESIGN.md).
+
 ## Overview
 
 **Document Type**: Architecture & Design Blueprint  

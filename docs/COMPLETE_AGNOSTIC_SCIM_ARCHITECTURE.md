@@ -1,5 +1,7 @@
 # Complete Technology-Agnostic SCIM 2.0 Architecture
 
+> **⚠️ Partially Superseded (v0.28.0)**: References to `EndpointSchema` and `ISchemaRepository` in this doc were realized differently — schema data lives in `Endpoint.profile` JSONB, not separate tables. See [SCHEMA_TEMPLATES_DESIGN.md](SCHEMA_TEMPLATES_DESIGN.md).
+
 This document provides a comprehensive, technology-agnostic architectural blueprint for a multi-endpoint SCIM 2.0 server. It strictly adheres to **RFC 7642 (Concepts)**, **RFC 7643 (Core Schema)**, and **RFC 7644 (Protocol)** in their absolute entirety. 
 
 By utilizing an N-Tier architecture and the **Repository Pattern**, this design ensures that the core SCIM logic is completely decoupled from any specific database, programming language, or caching technology.

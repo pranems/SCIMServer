@@ -72,9 +72,10 @@ export class EndpointScimGroupsController {
       throw new ForbiddenException(`Endpoint "${endpoint.name}" is inactive. SCIM operations are not allowed.`);
     }
 
+    const profile = endpoint.profile;
     const config: EndpointConfig = endpoint.config || {};
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
-    this.endpointContext.setContext({ endpointId, baseUrl, config });
+    this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
 
     return { baseUrl, config };
   }

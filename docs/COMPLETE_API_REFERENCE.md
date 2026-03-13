@@ -55,10 +55,10 @@ Contents
 - Bulk Operations (RFC 7644 §3.7)
   - `POST /Bulk` — batch processing (requires `BulkOperationsEnabled` config flag)
 - Custom Resource Types (requires `CustomResourceTypesEnabled` config flag)
-  - `POST /admin/endpoints/:endpointId/resource-types` — register custom resource type
-  - `GET /admin/endpoints/:endpointId/resource-types` — list registered types
-  - `GET /admin/endpoints/:endpointId/resource-types/:name` — get by name
-  - `DELETE /admin/endpoints/:endpointId/resource-types/:name` — delete by name
+  - ~~`POST /admin/endpoints/:endpointId/resource-types`~~ — **removed in v0.28.0** (replaced by endpoint profiles)
+  - ~~`GET /admin/endpoints/:endpointId/resource-types`~~ — **removed in v0.28.0**
+  - ~~`GET /admin/endpoints/:endpointId/resource-types/:name`~~ — **removed in v0.28.0**
+  - ~~`DELETE /admin/endpoints/:endpointId/resource-types/:name`~~ — **removed in v0.28.0**
   - Generic SCIM CRUD: `POST/GET/PUT/PATCH/DELETE /:resourceType` for registered types
 - Per-endpoint credentials (requires `PerEndpointCredentialsEnabled` config flag)
   - `POST /admin/endpoints/:endpointId/credentials` — generate credential (returns token once)

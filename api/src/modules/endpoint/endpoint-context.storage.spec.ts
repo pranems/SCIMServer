@@ -202,4 +202,56 @@ describe('EndpointContextStorage', () => {
       });
     });
   });
+
+  // ─── Profile support (Phase 14.1) ──────────────────────────────────
+
+  describe('profile support', () => {
+    const mockProfile = {
+      schemas: [{ id: 'urn:test', name: 'Test', description: 'Test', attributes: [] }],
+      resourceTypes: [{ id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:test', schemaExtensions: [] }],
+      serviceProviderConfig: { patch: { supported: true }, bulk: { supported: false }, filter: { supported: true, maxResults: 100 }, sort: { supported: false }, etag: { supported: false }, changePassword: { supported: false } },
+      settings: { SoftDeleteEnabled: 'True', StrictSchemaValidation: 'False' },
+    } as any;
+
+    it('should store profile via setContext', () => {
+      storage.setContext({ endpointId: 'ep-1', baseUrl: 'http://x', profile: mockProfile });
+      expect(storage.getContext()?.profile).toBe(mockProfile);
+    });
+
+    it('getProfile() should return stored profile', () => {
+      storage.setContext({ endpointId: 'ep-1', baseUrl: 'http://x', profile: mockProfile });
+      expect(storage.getProfile()).toBe(mockProfile);
+    });
+
+    it('getProfile() should return undefined when no profile set', () => {
+      storage.setContext({ endpointId: 'ep-1', baseUrl: 'http://x' });
+      expect(storage.getProfile()).toBeUndefined();
+    });
+
+    it('getConfig() should fall back to profile.settings when config not provided', () => {
+      storage.setContext({ endpointId: 'ep-1', baseUrl: 'http://x', profile: mockProfile });
+      const config = storage.getConfig();
+      expect(config).toBeDefined();
+      expect((config as any).SoftDeleteEnabled).toBe('True');
+    });
+
+    it('getConfig() should prefer explicit config over profile.settings', () => {
+      const explicitConfig = { RequireIfMatch: 'True' };
+      storage.setContext({
+        endpointId: 'ep-1',
+        baseUrl: 'http://x',
+        profile: mockProfile,
+        config: explicitConfig as any,
+      });
+      expect(storage.getConfig()).toBe(explicitConfig);
+    });
+
+    it('should propagate profile through middleware → setContext flow', () => {
+      const middleware = storage.createMiddleware();
+      middleware({} as any, {} as any, () => {
+        storage.setContext({ endpointId: 'ep-m', baseUrl: 'http://x', profile: mockProfile });
+        expect(storage.getProfile()).toBe(mockProfile);
+      });
+    });
+  });
 });

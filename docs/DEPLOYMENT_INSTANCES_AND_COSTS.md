@@ -1,6 +1,6 @@
 # Deployment Instances, Costs & Load Analysis
 
-> **Last Updated:** 2026-03-03 | **Version:** 0.27.0 | **Branch:** `feat/torfc1stscimsvr`  
+> **Last Updated:** 2026-03-13 | **Version:** 0.28.0 | **Branch:** `feat/torfc1stscimsvr`  
 > **Status:** Living Document — Updated after each validation pipeline run
 
 ### Related Docs (avoid duplication — this doc is the canonical source for costs & load)
@@ -15,13 +15,13 @@
 
 | Phase | Scope | Passed | Failed | Total | Duration |
 |-------|-------|--------|--------|-------|----------|
-| Unit Tests | 73 suites | 2,867 | 0 | 2,867 | ~58s |
-| E2E Tests | 29 suites | 591 | 0 (+6 skipped) | 597 | ~38s |
-| Local Live | port 6000 | 647 | 12 | 659 | ~15s |
-| Docker Live | port 8080 | 647 | 12 | 659 | ~19s |
-| Azure Live | Azure Container App | 647 | 12 | 659 | ~54s |
+| Unit Tests | 73 suites | 2,830 | 0 | 2,830 | ~58s |
+| E2E Tests | 30 suites | 613 | 0 (+6 skipped) | 619 | ~38s |
+| Local Live | port 6000 | 832 | 0 | 832 | ~15s |
+| Docker Live | port 8080 | 832 | 0 | 832 | ~19s |
+| Azure Live | Azure Container App | 832 | 0 | 832 | ~54s |
 
-**Total: ~4,782 tests (3,458 unit+E2E passed + 12 pre-existing live test feature gaps per instance, triplicated across 3 deployment types).**
+**Total: ~5,939 tests (3,443 unit+E2E passed + 832 live assertions per instance, triplicated across 3 deployment types).**
 
 > **12 Live Test Failures** are pre-existing feature gaps (not regressions): content-type negotiation (9w.1–2), collection-level PUT/PATCH (9w.5–6), immutable enforcement (9w.10, 9w.12), uniqueness collision (9x.1–2, 9x.4–6), required field enforcement (9x.8).
 
@@ -79,7 +79,7 @@ docker compose up -d                     # Start
 | Base URL | `https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim` |
 | Health | `https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim/health` |
 | Discovery | `https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim/ServiceProviderConfig` |
-| Image | `ghcr.io/pranems/scimserver:0.27.0` |
+| Image | `ghcr.io/pranems/scimserver:0.28.0` |
 | Resource | `scimserver2` in `scimserver-rg` (East US) |
 | Persistence | Azure PostgreSQL (`scimserver2-pg.postgres.database.azure.com`) |
 | OAuth Secret | `changeme-oauth` |
@@ -246,9 +246,9 @@ az group delete -n scimserver-rg --yes --no-wait
 | Network (API calls) | ~$0 | ~$0.01 | ~$0.10 |
 | **Total test run cost** | **~$0.01** | **~$0.60** | **~$7.00** |
 
-### Cost of Running Live Test Suite (659 tests) at Each Data Scale
+### Cost of Running Live Test Suite (832 tests) at Each Data Scale
 
-> The live-test.ps1 suite (659 tests) creates/reads/updates/deletes resources.
+> The live-test.ps1 suite (832 tests) creates/reads/updates/deletes resources.
 > At higher data volumes, each test takes longer due to larger list responses and slower DB queries.
 
 | Metric | Small (loaded) | Medium (loaded) | Large (loaded) |

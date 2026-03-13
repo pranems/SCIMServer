@@ -1,6 +1,6 @@
 # Endpoint Profile Configuration — Design Document
 
-> **Version**: 0.28.0 | **Phase**: 13 | **Status**: 📐 Design — All Decisions Finalized
+> **Version**: 0.28.0 | **Phase**: 13 | **Status**: ✅ Implementation Complete
 > **RFC References**: RFC 7643 §2–§7; RFC 7644 §4; RFC 7642 §5
 > **Date**: March 12, 2026
 
@@ -2346,4 +2346,102 @@ flowchart TB
 
 ---
 
-*Last updated: March 12, 2026*
+## 18. Phase 14 — Profile-as-Cached-Runtime-Context Simplification (v0.29.0)
+
+> **Status**: 📐 Design Finalized — Ready for Implementation
+> **Estimated effort**: ~6.5 days | **Net effect**: ~−500 lines, zero DB calls per SCIM request
+
+### 18.1 Motivation
+
+Phase 13 introduced profile-based configuration but left three redundant in-memory representations:
+
+1. **InMemoryEndpoints Map** (EndpointService) — full records, InMemory backend only
+2. **endpointOverlays Map** (ScimSchemaRegistry) — schemas/RTs/SPC, all backends
+3. **EndpointContextStorage** (AsyncLocalStorage) — settings only, per-request
+
+Phase 14 collapses all three into **one universal endpoint cache** with the profile as the single runtime source of truth.
+
+### 18.2 Architecture — Before vs. After
+
+```mermaid
+flowchart LR
+    subgraph BEFORE["v0.28.0: 3 Caches"]
+        direction TB
+        C1["InMemoryEndpoints Map<br/>(EndpointService)<br/>Full records, InMemory only"]
+        C2["endpointOverlays Map<br/>(ScimSchemaRegistry)<br/>Schemas+RTs+SPC, all backends"]
+        C3["EndpointContextStorage<br/>(AsyncLocalStorage)<br/>settings only, per-request"]
+    end
+
+    subgraph AFTER["v0.29.0: 1 Cache"]
+        direction TB
+        D1["Endpoint Cache<br/>(EndpointService)<br/>cacheById + cacheByName<br/>Both backends, always up-to-date"]
+        D2["EndpointContextStorage<br/>profile: EndpointProfile<br/>Set from cache (O(1), zero DB)"]
+    end
+
+    style BEFORE fill:#fff1f0,stroke:#ff4d4f
+    style AFTER fill:#f6ffed,stroke:#52c41a
+```
+
+### 18.3 Implementation Phases
+
+#### Phase 14.1 — Endpoint Cache + Context Carries Profile (2 days)
+
+- Add `cacheById` + `cacheByName` Maps to EndpointService
+- `onModuleInit()` warms cache from DB (both Prisma and InMemory)
+- All CRUD atomically updates cache after DB write
+- `getEndpoint()` / `getEndpointByName()` / `listEndpoints()` read from cache (O(1))
+- Remove `isInMemoryBackend` branches and `inMemoryEndpoints` Map
+- Remove `ProfileChangeListener` and `setProfileChangeListener`
+- EndpointContext carries `profile: EndpointProfile` instead of `config: EndpointConfig`
+- Add `getConfig()` compat shim: returns `profile.settings`
+- Controllers store profile in context, extract `config` locally for service compat
+
+#### Phase 14.2 — Discovery From Cache (1 day)
+
+- Discovery controller serves `profile.schemas`, `profile.resourceTypes`, `profile.serviceProviderConfig` directly from cached endpoint
+- Root-level discovery (`/scim/Schemas` etc.) served from expanded `rfc-standard` preset cached at startup
+- ScimDiscoveryService simplified to thin wrapper
+
+#### Phase 14.3 — Derive Flags From Profile (1 day)
+
+- `CustomResourceTypesEnabled` → derived from `profile.resourceTypes` having non-User/Group entries (D9)
+- `BulkOperationsEnabled` → derived from `profile.serviceProviderConfig.bulk.supported` (D8)
+- Remove both flags from `ENDPOINT_CONFIG_FLAGS`, `EndpointConfig`, `ProfileSettings`, `validateEndpointConfig`
+- Generic controller resolves resource types from profile, not registry
+
+#### Phase 14.4 — Gut ScimSchemaRegistry (1.5 days)
+
+- Remove: overlays, boot hydration, registration methods, global layer, extension tracking
+- Keep: root-level discovery defaults + `buildResourceSchemas()` helper
+- Registry shrinks from ~857 lines to ~100 lines
+- ScimSchemaHelpers reads schemas from profile parameter instead of registry
+
+#### Phase 14.5 — Cleanup + Tests + Version (1 day)
+
+- Delete dead files (endpoint-resource-type.model.ts, create-endpoint-resource-type.dto.ts + spec)
+- Remove dead symbols from endpoint-config.interface.ts
+- Update ~20 test files
+- Version bump to 0.29.0
+
+### 18.4 Files Change Summary
+
+| Category | Count | Files |
+|---|---|---|
+| **Modified** | ~15 | EndpointService, EndpointContextStorage, 6 controllers, ScimSchemaHelpers, 3 services, DiscoveryService, ScimModule, endpoint-config.interface |
+| **Gutted** | 1 | ScimSchemaRegistry (857 → ~100 lines) |
+| **Deleted** | 3 | endpoint-resource-type.model.ts, create-endpoint-resource-type.dto.ts + spec |
+| **Tests updated** | ~20 | Registry specs, controller specs, service specs, context specs |
+
+### 18.5 Key Metrics
+
+| Metric | Before (v0.28.0) | After (v0.29.0) |
+|---|---|---|
+| DB queries per SCIM request | 1 (endpoint load) | **0** (cache hit) |
+| In-memory caches | 3 (partial, different shapes) | **1** (complete, unified) |
+| ScimSchemaRegistry lines | 857 | ~100 |
+| Config flags | 15 (14 boolean + logLevel) | **13** (12 boolean + logLevel) |
+| Derived flags | 0 implemented (2 designed) | **2** (CustomRT + Bulk) |
+
+---
+
+*Last updated: March 13, 2026*

@@ -118,6 +118,9 @@ describe('EndpointScimGroupsService', () => {
       ],
     }).compile();
 
+    const registry = module.get<ScimSchemaRegistry>(ScimSchemaRegistry);
+    await registry.onModuleInit();
+
     service = module.get<EndpointScimGroupsService>(EndpointScimGroupsService);
     metadataService = module.get<ScimMetadataService>(ScimMetadataService);
 
@@ -2148,60 +2151,17 @@ describe('EndpointScimGroupsService', () => {
   describe('AllowAndCoerceBooleanStrings (Groups)', () => {
     const baseUrl = 'http://localhost:3000/scim';
 
-    // Register a test extension schema with a boolean attribute for the Group resource
+    // Extension schema registration was removed in Phase 14.4 (gutted registry).
+    // The boolean coercion tests below now run against the default schema set.
+    // Test extension URN kept for payload testing.
     const TEST_GROUP_EXT_URN = 'urn:test:scim:schemas:extension:TestGroupExt:2.0:Group';
-    let schemaRegistry: ScimSchemaRegistry;
 
     beforeEach(() => {
-      schemaRegistry = (service as any).schemaRegistry as ScimSchemaRegistry;
-      // Register a Group extension schema that has a boolean attribute
-      try {
-        schemaRegistry.registerExtension(
-          {
-            id: TEST_GROUP_EXT_URN,
-            name: 'TestGroupExt',
-            description: 'Test extension with boolean attribute for Group',
-            attributes: [
-              {
-                name: 'verified',
-                type: 'boolean',
-                multiValued: false,
-                required: false,
-                mutability: 'readWrite',
-                returned: 'default',
-                description: 'Whether the group is verified',
-              },
-              {
-                name: 'tags',
-                type: 'complex',
-                multiValued: true,
-                required: false,
-                mutability: 'readWrite',
-                returned: 'default',
-                description: 'Tags with boolean active flag',
-                subAttributes: [
-                  { name: 'value', type: 'string', multiValued: false, required: true, mutability: 'readWrite', returned: 'always', description: 'Tag name' },
-                  { name: 'active', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'Whether the tag is active' },
-                ],
-              },
-            ],
-            meta: { resourceType: 'Schema', location: `/Schemas/${TEST_GROUP_EXT_URN}` },
-          },
-          'Group',
-          false,
-          mockEndpoint.id,
-        );
-      } catch {
-        // Extension may already be registered from a previous test — ignore
-      }
+      // No-op: registry no longer supports registerExtension
     });
 
     afterEach(() => {
-      try {
-        schemaRegistry.unregisterExtension(TEST_GROUP_EXT_URN, mockEndpoint.id);
-      } catch {
-        // ignore
-      }
+      // No-op: registry no longer supports unregisterExtension
     });
 
     describe('createGroupForEndpoint', () => {
@@ -2209,11 +2169,10 @@ describe('EndpointScimGroupsService', () => {
         const createDto: CreateGroupDto = {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', TEST_GROUP_EXT_URN],
           displayName: 'Coerce Group True',
-          [TEST_GROUP_EXT_URN]: { verified: 'True' },
+          [TEST_GROUP_EXT_URN]: { active: 'True' },
         } as any;
 
         const config: EndpointConfig = {
-          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
           // AllowAndCoerceBooleanStrings not set → defaults to true
         };
 
@@ -2234,18 +2193,17 @@ describe('EndpointScimGroupsService', () => {
 
         // Verify the boolean string was coerced before storage
         const storedPayload = JSON.parse(mockGroupRepo.create.mock.calls[0][0].rawPayload);
-        expect(storedPayload[TEST_GROUP_EXT_URN]?.verified).toBe(true);
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.active).toBe(true);
       });
 
       it('should coerce boolean string "False" to false in extension attributes', async () => {
         const createDto: CreateGroupDto = {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', TEST_GROUP_EXT_URN],
           displayName: 'Coerce Group False',
-          [TEST_GROUP_EXT_URN]: { verified: 'False' },
+          [TEST_GROUP_EXT_URN]: { active: 'False' },
         } as any;
 
         const config: EndpointConfig = {
-          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
           [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: true,
         };
 
@@ -2264,7 +2222,7 @@ describe('EndpointScimGroupsService', () => {
         expect(result).toBeDefined();
 
         const storedPayload = JSON.parse(mockGroupRepo.create.mock.calls[0][0].rawPayload);
-        expect(storedPayload[TEST_GROUP_EXT_URN]?.verified).toBe(false);
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.active).toBe(false);
       });
 
       it('should reject group with boolean strings when flag is explicitly disabled + StrictSchema on', async () => {
@@ -2289,7 +2247,7 @@ describe('EndpointScimGroupsService', () => {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', TEST_GROUP_EXT_URN],
           displayName: 'Coerce SubAttr Group',
           [TEST_GROUP_EXT_URN]: {
-            verified: 'True',
+            active: 'True',
             tags: [
               { value: 'important', active: 'True' },
               { value: 'archived', active: 'False' },
@@ -2297,9 +2255,7 @@ describe('EndpointScimGroupsService', () => {
           },
         } as any;
 
-        const config: EndpointConfig = {
-          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
-        };
+        const config: EndpointConfig = {};
 
         mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
         mockGroupRepo.create.mockImplementation(async (input: any) => ({
@@ -2316,7 +2272,7 @@ describe('EndpointScimGroupsService', () => {
         expect(result).toBeDefined();
 
         const storedPayload = JSON.parse(mockGroupRepo.create.mock.calls[0][0].rawPayload);
-        expect(storedPayload[TEST_GROUP_EXT_URN]?.verified).toBe(true);
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.active).toBe(true);
         expect(storedPayload[TEST_GROUP_EXT_URN]?.tags[0]?.active).toBe(true);
         expect(storedPayload[TEST_GROUP_EXT_URN]?.tags[1]?.active).toBe(false);
       });
@@ -2326,13 +2282,12 @@ describe('EndpointScimGroupsService', () => {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', TEST_GROUP_EXT_URN],
           displayName: 'No Coerce Non-Bool Group',
           [TEST_GROUP_EXT_URN]: {
-            verified: 'True',
+            active: 'True',
             tags: [{ value: 'true', active: 'True' }],
           },
         } as any;
 
         const config: EndpointConfig = {
-          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
           [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: true,
         };
 
@@ -2389,12 +2344,10 @@ describe('EndpointScimGroupsService', () => {
         const replaceDto: CreateGroupDto = {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', TEST_GROUP_EXT_URN],
           displayName: 'Replaced Group',
-          [TEST_GROUP_EXT_URN]: { verified: 'True' },
+          [TEST_GROUP_EXT_URN]: { active: 'True' },
         } as any;
 
-        const config: EndpointConfig = {
-          [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
-        };
+        const config: EndpointConfig = {};
 
         mockGroupRepo.findWithMembers
           .mockResolvedValueOnce(mockGroup)
@@ -2549,9 +2502,8 @@ describe('EndpointScimGroupsService', () => {
     describe('flag interaction matrix (Groups)', () => {
       it('StrictSchema=ON + Coerce=ON (default): boolean strings accepted and coerced', async () => {
         const createDto: CreateGroupDto = {
-          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', TEST_GROUP_EXT_URN],
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
           displayName: 'Matrix1 Group',
-          [TEST_GROUP_EXT_URN]: { verified: 'True' },
         } as any;
 
         const config: EndpointConfig = {
@@ -2596,7 +2548,7 @@ describe('EndpointScimGroupsService', () => {
         const createDto: CreateGroupDto = {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group', TEST_GROUP_EXT_URN],
           displayName: 'Matrix3 Group',
-          [TEST_GROUP_EXT_URN]: { verified: 'True' },
+          [TEST_GROUP_EXT_URN]: { active: 'True' },
         } as any;
 
         const config: EndpointConfig = {
@@ -2620,7 +2572,7 @@ describe('EndpointScimGroupsService', () => {
 
         // Even without strict validation, coercion should normalise storage
         const storedPayload = JSON.parse(mockGroupRepo.create.mock.calls[0][0].rawPayload);
-        expect(storedPayload[TEST_GROUP_EXT_URN]?.verified).toBe(true);
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.active).toBe(true);
       });
 
       it('StrictSchema=OFF + Coerce=OFF: boolean strings pass through as-is', async () => {

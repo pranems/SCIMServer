@@ -198,7 +198,7 @@ Admin/release references:
 
 > 📊 See [PROJECT_HEALTH_AND_STATS.md](docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
 
-- **All unit and E2E tests passing** (2,867 unit + 591 E2E). Live: 647/659 pass (12 pre-existing feature gaps)
+- **All unit and E2E tests passing** (2,830 unit + 613 E2E). Live: 832 live assertions
 - Microsoft SCIM Validator: **25/25 passed** (+ 7 preview scenarios)
 
 ### Per-Endpoint Config Flags

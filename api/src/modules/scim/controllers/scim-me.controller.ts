@@ -79,9 +79,10 @@ export class ScimMeController {
       );
     }
 
+    const profile = endpoint.profile;
     const config: EndpointConfig = endpoint.config || {};
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
-    this.endpointContext.setContext({ endpointId, baseUrl, config });
+    this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
 
     return { baseUrl, config };
   }

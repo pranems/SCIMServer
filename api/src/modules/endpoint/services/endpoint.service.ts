@@ -11,12 +11,15 @@ import { validateAndExpandProfile } from '../../scim/endpoint-profile/endpoint-p
 import { getBuiltInPreset, DEFAULT_PRESET_NAME } from '../../scim/endpoint-profile/built-in-presets';
 import type { EndpointProfile } from '../../scim/endpoint-profile/endpoint-profile.types';
 
+/** Callback type for profile change notifications (registry hydration) */
+export type ProfileChangeListener = (endpointId: string, profile: EndpointProfile | null) => void;
+
 export interface EndpointResponse {
   id: string;
   name: string;
   displayName?: string;
   description?: string;
-  /** @deprecated Use profile.settings — retained for backward compat in list views */
+  /** @deprecated Use profile.settings — retained for backward compat */
   config?: Record<string, any>;
   profile?: EndpointProfile;
   active: boolean;
@@ -25,22 +28,19 @@ export interface EndpointResponse {
   updatedAt: Date;
 }
 
-interface InMemoryEndpointRecord {
-  id: string;
-  name: string;
-  displayName: string | null;
-  description: string | null;
-  profile: Record<string, unknown> | null;
-  active: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
 @Injectable()
 export class EndpointService implements OnModuleInit {
   private readonly logger = new Logger(EndpointService.name);
   private readonly isInMemoryBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() === 'inmemory';
-  private readonly inMemoryEndpoints = new Map<string, InMemoryEndpointRecord>();
+
+  // ─── Unified Endpoint Cache ─────────────────────────────────────────
+  // Both Prisma and InMemory backends use these caches for reads.
+  // Writes go to DB first (Prisma) or directly (InMemory), then update cache.
+  private readonly cacheById = new Map<string, EndpointResponse>();
+  private readonly cacheByName = new Map<string, EndpointResponse>();
+
+  /** Callback for registry hydration on profile changes */
+  private profileChangeListener?: ProfileChangeListener;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -48,45 +48,57 @@ export class EndpointService implements OnModuleInit {
   ) {}
 
   /**
-   * On module init, restore per-endpoint log levels from the database.
-   * This ensures that any previously configured logLevel in endpoint configs
-   * is applied to ScimLogger after a server restart.
+   * Set a listener to be called when an endpoint's profile changes.
+   * Used by ScimModule to rehydrate registry overlays on create/update/delete.
+   */
+  setProfileChangeListener(listener: ProfileChangeListener): void {
+    this.profileChangeListener = listener;
+  }
+
+  /**
+   * On module init: warm the endpoint cache from the database and restore
+   * per-endpoint log levels. For InMemory backend, cache starts empty.
    */
   async onModuleInit(): Promise<void> {
     if (this.isInMemoryBackend) {
+      this.logger.debug('InMemory backend — endpoint cache starts empty.');
       return;
     }
 
     try {
       const endpoints = await this.prisma.endpoint.findMany({
-        where: { active: true },
-        select: { id: true, name: true, profile: true },
+        orderBy: { createdAt: 'desc' },
       });
 
-      let restored = 0;
       for (const ep of endpoints) {
-        if (!ep.profile) continue;
-        try {
-          const profile = ep.profile as Record<string, any>;
-          const settings = profile?.settings as Record<string, any> | undefined;
-          const logLevel = settings?.[ENDPOINT_CONFIG_FLAGS.LOG_LEVEL];
-          if (logLevel !== undefined) {
-            const level = typeof logLevel === 'number' ? logLevel : parseLogLevel(String(logLevel));
-            this.scimLogger.setEndpointLevel(ep.id, level);
-            restored++;
-            this.logger.log(`Restored log level ${logLevelName(level)} for endpoint "${ep.name}" (${ep.id})`);
-          }
-        } catch {
-          // Skip endpoints with malformed profile
+        const response = this.toResponse(ep);
+        this.cacheSet(response);
+
+        // Restore per-endpoint log levels
+        const settings = response.profile?.settings as Record<string, any> | undefined;
+        const logLevel = settings?.[ENDPOINT_CONFIG_FLAGS.LOG_LEVEL];
+        if (logLevel !== undefined) {
+          const level = typeof logLevel === 'number' ? logLevel : parseLogLevel(String(logLevel));
+          this.scimLogger.setEndpointLevel(ep.id, level);
         }
       }
 
-      if (restored > 0) {
-        this.logger.log(`Restored per-endpoint log levels for ${restored} endpoint(s)`);
-      }
+      this.logger.log(`Warmed endpoint cache with ${endpoints.length} endpoint(s).`);
     } catch (error) {
-      this.logger.warn(`Failed to restore endpoint log levels: ${(error as Error).message}`);
+      this.logger.warn(`Failed to warm endpoint cache: ${(error as Error).message}`);
     }
+  }
+
+  // ─── Cache helpers ──────────────────────────────────────────────────
+
+  private cacheSet(ep: EndpointResponse): void {
+    this.cacheById.set(ep.id, ep);
+    this.cacheByName.set(ep.name, ep);
+  }
+
+  private cacheDelete(ep: EndpointResponse): void {
+    this.cacheById.delete(ep.id);
+    this.cacheByName.delete(ep.name);
   }
 
   async createEndpoint(dto: CreateEndpointDto): Promise<EndpointResponse> {
@@ -137,28 +149,26 @@ export class EndpointService implements OnModuleInit {
       resolvedProfile = result.profile!;
     }
 
-    // Check if endpoint already exists
+    // Persist + cache
     if (this.isInMemoryBackend) {
-      const existing = Array.from(this.inMemoryEndpoints.values()).find((ep) => ep.name === dto.name);
-      if (existing) {
-        throw new BadRequestException(`Endpoint with name "${dto.name}" already exists`);
-      }
-
       const now = new Date();
-      const endpoint: InMemoryEndpointRecord = {
+      const response: EndpointResponse = {
         id: randomUUID(),
         name: dto.name,
-        displayName: dto.displayName ?? null,
-        description: dto.description ?? null,
-        profile: resolvedProfile as unknown as Record<string, unknown>,
+        displayName: dto.displayName ?? dto.name,
+        description: dto.description ?? undefined,
+        config: resolvedProfile.settings ?? undefined,
+        profile: resolvedProfile,
         active: true,
+        scimEndpoint: '',
         createdAt: now,
         updatedAt: now,
       };
-
-      this.inMemoryEndpoints.set(endpoint.id, endpoint);
-      this.syncEndpointLogLevel(endpoint.id, resolvedProfile.settings);
-      return this.toResponseInMemory(endpoint);
+      response.scimEndpoint = `/scim/endpoints/${response.id}`;
+      this.cacheSet(response);
+      this.syncEndpointLogLevel(response.id, resolvedProfile.settings);
+      this.profileChangeListener?.(response.id, resolvedProfile);
+      return response;
     }
 
     const existing = await this.prisma.endpoint.findUnique({
@@ -179,17 +189,20 @@ export class EndpointService implements OnModuleInit {
       }
     });
 
+    const response = this.toResponse(endpoint);
+    this.cacheSet(response);
     this.syncEndpointLogLevel(endpoint.id, resolvedProfile.settings);
-    return this.toResponse(endpoint);
+    this.profileChangeListener?.(endpoint.id, resolvedProfile);
+    return response;
   }
 
   async getEndpoint(endpointId: string): Promise<EndpointResponse> {
+    const cached = this.cacheById.get(endpointId);
+    if (cached) return cached;
+
+    // Cache miss — try DB (Prisma only; InMemory is always in cache)
     if (this.isInMemoryBackend) {
-      const endpoint = this.inMemoryEndpoints.get(endpointId);
-      if (!endpoint) {
-        throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
-      }
-      return this.toResponseInMemory(endpoint);
+      throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
     }
 
     let endpoint: Endpoint | null;
@@ -198,7 +211,6 @@ export class EndpointService implements OnModuleInit {
         where: { id: endpointId }
       });
     } catch {
-      // Prisma throws on invalid UUID format for @db.Uuid columns
       throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
     }
 
@@ -206,16 +218,17 @@ export class EndpointService implements OnModuleInit {
       throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
     }
 
-    return this.toResponse(endpoint);
+    const response = this.toResponse(endpoint);
+    this.cacheSet(response); // warm cache for next time
+    return response;
   }
 
   async getEndpointByName(name: string): Promise<EndpointResponse> {
+    const cached = this.cacheByName.get(name);
+    if (cached) return cached;
+
     if (this.isInMemoryBackend) {
-      const endpoint = Array.from(this.inMemoryEndpoints.values()).find((ep) => ep.name === name);
-      if (!endpoint) {
-        throw new NotFoundException(`Endpoint with name "${name}" not found`);
-      }
-      return this.toResponseInMemory(endpoint);
+      throw new NotFoundException(`Endpoint with name "${name}" not found`);
     }
 
     const endpoint = await this.prisma.endpoint.findUnique({
@@ -226,17 +239,20 @@ export class EndpointService implements OnModuleInit {
       throw new NotFoundException(`Endpoint with name "${name}" not found`);
     }
 
-    return this.toResponse(endpoint);
+    const response = this.toResponse(endpoint);
+    this.cacheSet(response);
+    return response;
   }
 
   async listEndpoints(active?: boolean): Promise<EndpointResponse[]> {
-    if (this.isInMemoryBackend) {
-      const endpoints = Array.from(this.inMemoryEndpoints.values())
-        .filter((ep) => active === undefined || ep.active === active)
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-      return endpoints.map((e) => this.toResponseInMemory(e));
+    // If cache is warmed, serve from cache
+    if (this.cacheById.size > 0 || this.isInMemoryBackend) {
+      const all = [...this.cacheById.values()];
+      const filtered = active === undefined ? all : all.filter(ep => ep.active === active);
+      return filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     }
 
+    // Fallback: load from DB (first call before cache is warmed)
     const where: Prisma.EndpointWhereInput = {};
     if (active !== undefined) {
       where.active = active;
@@ -247,42 +263,53 @@ export class EndpointService implements OnModuleInit {
       orderBy: { createdAt: 'desc' }
     });
 
-    return endpoints.map(e => this.toResponse(e));
+    return endpoints.map(e => {
+      const response = this.toResponse(e);
+      this.cacheSet(response);
+      return response;
+    });
   }
 
   async updateEndpoint(endpointId: string, dto: UpdateEndpointDto): Promise<EndpointResponse> {
+    const current = this.cacheById.get(endpointId);
+
     if (this.isInMemoryBackend) {
-      const endpoint = this.inMemoryEndpoints.get(endpointId);
-      if (!endpoint) {
+      if (!current) {
         throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
       }
 
       // Merge config into profile.settings for backward compat
-      let newProfile = endpoint.profile as Record<string, unknown> | null;
+      let newProfile = current.profile;
       if (dto.config) {
         try {
           validateEndpointConfig(dto.config);
         } catch (error) {
           throw new BadRequestException((error as Error).message);
         }
-        newProfile = { ...newProfile, settings: { ...(newProfile as any)?.settings, ...dto.config } };
+        newProfile = newProfile
+          ? { ...newProfile, settings: { ...newProfile.settings, ...dto.config } }
+          : undefined;
       }
 
-      const updated: InMemoryEndpointRecord = {
-        ...endpoint,
-        displayName: dto.displayName !== undefined ? dto.displayName ?? null : endpoint.displayName,
-        description: dto.description !== undefined ? dto.description ?? null : endpoint.description,
+      const updated: EndpointResponse = {
+        ...current,
+        displayName: dto.displayName !== undefined ? (dto.displayName ?? current.name) : current.displayName,
+        description: dto.description !== undefined ? (dto.description ?? undefined) : current.description,
+        config: (newProfile?.settings ?? current.config) as Record<string, any> | undefined,
         profile: newProfile,
-        active: dto.active !== undefined ? dto.active : endpoint.active,
+        active: dto.active !== undefined ? dto.active : current.active,
         updatedAt: new Date(),
       };
 
-      this.inMemoryEndpoints.set(endpointId, updated);
+      // Update cache (delete old name entry if name changed)
+      if (current.name !== updated.name) this.cacheByName.delete(current.name);
+      this.cacheSet(updated);
       if (dto.config !== undefined) {
         this.syncEndpointLogLevel(endpointId, dto.config);
       }
+      this.profileChangeListener?.(endpointId, updated.profile ?? null);
 
-      return this.toResponseInMemory(updated);
+      return updated;
     }
 
     let endpoint: Endpoint | null;
@@ -310,7 +337,7 @@ export class EndpointService implements OnModuleInit {
       profileUpdate = { ...currentProfile, settings: { ...currentProfile.settings, ...dto.config } };
     }
 
-    const updated = await this.prisma.endpoint.update({
+    const dbUpdated = await this.prisma.endpoint.update({
       where: { id: endpointId },
       data: {
         displayName: dto.displayName,
@@ -320,22 +347,29 @@ export class EndpointService implements OnModuleInit {
       }
     });
 
+    const response = this.toResponse(dbUpdated);
+    // Update cache (delete old name entry if name changed)
+    if (current && current.name !== response.name) this.cacheByName.delete(current.name);
+    this.cacheSet(response);
+
     if (dto.config !== undefined) {
       this.syncEndpointLogLevel(endpointId, dto.config);
     }
+    this.profileChangeListener?.(endpointId, response.profile ?? null);
 
-    return this.toResponse(updated);
+    return response;
   }
 
   async deleteEndpoint(endpointId: string): Promise<void> {
+    const cached = this.cacheById.get(endpointId);
+
     if (this.isInMemoryBackend) {
-      const endpoint = this.inMemoryEndpoints.get(endpointId);
-      if (!endpoint) {
+      if (!cached) {
         throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
       }
-
-      this.inMemoryEndpoints.delete(endpointId);
+      this.cacheDelete(cached);
       this.scimLogger.clearEndpointLevel(endpointId);
+      this.profileChangeListener?.(endpointId, null);
       return;
     }
 
@@ -352,13 +386,13 @@ export class EndpointService implements OnModuleInit {
       throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
     }
 
-    // Cascade delete: Prisma will handle deletion of associated users, groups, and logs
     await this.prisma.endpoint.delete({
       where: { id: endpointId }
     });
 
-    // Clean up per-endpoint log level override in ScimLogger
+    if (cached) this.cacheDelete(cached);
     this.scimLogger.clearEndpointLevel(endpointId);
+    this.profileChangeListener?.(endpointId, null);
   }
 
   async getEndpointStats(endpointId: string): Promise<{
@@ -367,39 +401,24 @@ export class EndpointService implements OnModuleInit {
     totalGroupMembers: number;
     requestLogCount: number;
   }> {
-    if (this.isInMemoryBackend) {
-      const endpoint = this.inMemoryEndpoints.get(endpointId);
-      if (!endpoint) {
+    // Verify endpoint exists (via cache)
+    if (!this.cacheById.has(endpointId)) {
+      if (this.isInMemoryBackend) {
         throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
       }
-
-      return {
-        totalUsers: 0,
-        totalGroups: 0,
-        totalGroupMembers: 0,
-        requestLogCount: 0,
-      };
+      // Try DB
+      const ep = await this.prisma.endpoint.findUnique({ where: { id: endpointId } });
+      if (!ep) throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
     }
 
-    let endpoint: Endpoint | null;
-    try {
-      endpoint = await this.prisma.endpoint.findUnique({
-        where: { id: endpointId }
-      });
-    } catch {
-      throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
-    }
-
-    if (!endpoint) {
-      throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
+    if (this.isInMemoryBackend) {
+      return { totalUsers: 0, totalGroups: 0, totalGroupMembers: 0, requestLogCount: 0 };
     }
 
     const [totalUsers, totalGroups, totalGroupMembers, requestLogCount] = await Promise.all([
       this.prisma.scimResource.count({ where: { endpointId, resourceType: 'User' } }),
       this.prisma.scimResource.count({ where: { endpointId, resourceType: 'Group' } }),
-      this.prisma.resourceMember.count({
-        where: { group: { endpointId } }
-      }),
+      this.prisma.resourceMember.count({ where: { group: { endpointId } } }),
       this.prisma.requestLog.count({ where: { endpointId } })
     ]);
 
@@ -422,27 +441,26 @@ export class EndpointService implements OnModuleInit {
     };
   }
 
-  private toResponseInMemory(endpoint: InMemoryEndpointRecord): EndpointResponse {
-    const profile = endpoint.profile as Record<string, any> | null;
-    return {
-      id: endpoint.id,
-      name: endpoint.name,
-      displayName: endpoint.displayName || endpoint.name,
-      description: endpoint.description ?? undefined,
-      config: profile?.settings ?? undefined,
-      profile: profile as EndpointProfile | undefined,
-      active: endpoint.active,
-      scimEndpoint: `/scim/endpoints/${endpoint.id}`,
-      createdAt: endpoint.createdAt,
-      updatedAt: endpoint.updatedAt,
-    };
-  }
-
-  /** Backward compat: wrap old config into a minimal profile with settings */
+  /** Backward compat: wrap old config into a profile with settings.
+   *  Uses rfc-standard as base since old config callers expect all capabilities.
+   *  Maps legacy config flags to profile SPC where applicable. */
   private configToProfile(config: Record<string, any>): EndpointProfile {
-    const preset = getBuiltInPreset(DEFAULT_PRESET_NAME);
+    const preset = getBuiltInPreset('rfc-standard');
     const result = validateAndExpandProfile(preset.profile);
     const profile = result.profile!;
+
+    // Map legacy BulkOperationsEnabled flag to SPC
+    const bulkFlag = config[ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED];
+    if (bulkFlag !== undefined) {
+      const bulkEnabled = typeof bulkFlag === 'boolean'
+        ? bulkFlag
+        : typeof bulkFlag === 'string' && (bulkFlag.toLowerCase() === 'true' || bulkFlag === '1');
+      profile.serviceProviderConfig = {
+        ...profile.serviceProviderConfig,
+        bulk: { ...profile.serviceProviderConfig.bulk, supported: bulkEnabled },
+      };
+    }
+
     return { ...profile, settings: { ...profile.settings, ...config } };
   }
 

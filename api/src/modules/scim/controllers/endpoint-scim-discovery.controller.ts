@@ -64,9 +64,10 @@ export class EndpointScimDiscoveryController {
       );
     }
 
+    const profile = endpoint.profile;
     const config = endpoint.config || {};
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
-    this.endpointContext.setContext({ endpointId, baseUrl, config });
+    this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
   }
 
   // ===== Schemas =====
@@ -82,7 +83,8 @@ export class EndpointScimDiscoveryController {
     @Req() req: Request
   ) {
     await this.validateAndSetContext(endpointId, req);
-    return this.discoveryService.getSchemas(endpointId);
+    const endpoint = await this.endpointService.getEndpoint(endpointId);
+    return this.discoveryService.getSchemasFromProfile(endpoint.profile);
   }
 
   /**
@@ -98,7 +100,8 @@ export class EndpointScimDiscoveryController {
     @Req() req: Request
   ) {
     await this.validateAndSetContext(endpointId, req);
-    return this.discoveryService.getSchemaByUrn(uri, endpointId);
+    const endpoint = await this.endpointService.getEndpoint(endpointId);
+    return this.discoveryService.getSchemaByUrnFromProfile(uri, endpoint.profile);
   }
 
   // ===== ResourceTypes =====
@@ -114,7 +117,8 @@ export class EndpointScimDiscoveryController {
     @Req() req: Request
   ) {
     await this.validateAndSetContext(endpointId, req);
-    return this.discoveryService.getResourceTypes(endpointId);
+    const endpoint = await this.endpointService.getEndpoint(endpointId);
+    return this.discoveryService.getResourceTypesFromProfile(endpoint.profile);
   }
 
   /**
@@ -130,7 +134,8 @@ export class EndpointScimDiscoveryController {
     @Req() req: Request
   ) {
     await this.validateAndSetContext(endpointId, req);
-    return this.discoveryService.getResourceTypeById(id, endpointId);
+    const endpoint = await this.endpointService.getEndpoint(endpointId);
+    return this.discoveryService.getResourceTypeByIdFromProfile(id, endpoint.profile);
   }
 
   // ===== ServiceProviderConfig =====
@@ -147,6 +152,6 @@ export class EndpointScimDiscoveryController {
   ) {
     await this.validateAndSetContext(endpointId, req);
     const endpoint = await this.endpointService.getEndpoint(endpointId);
-    return this.discoveryService.getServiceProviderConfig(endpoint.config);
+    return this.discoveryService.getSpcFromProfile(endpoint.profile);
   }
 }

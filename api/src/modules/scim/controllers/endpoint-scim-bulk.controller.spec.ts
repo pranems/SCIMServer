@@ -13,12 +13,21 @@ describe('EndpointScimBulkController', () => {
   let bulkProcessor: BulkProcessorService;
   let endpointService: EndpointService;
 
-  const makeEndpoint = (configOverrides: Record<string, unknown> = {}) => ({
+  const bulkEnabledProfile = {
+    serviceProviderConfig: { bulk: { supported: true, maxOperations: 1000, maxPayloadSize: 1048576 } },
+  } as any;
+
+  const bulkDisabledProfile = {
+    serviceProviderConfig: { bulk: { supported: false, maxOperations: 1000, maxPayloadSize: 1048576 } },
+  } as any;
+
+  const makeEndpoint = (configOverrides: Record<string, unknown> = {}, profile?: any) => ({
     id: 'ep-1',
     name: 'test-endpoint',
     displayName: 'Test Endpoint',
     description: 'Test',
     config: configOverrides,
+    profile,
     active: true,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -90,7 +99,7 @@ describe('EndpointScimBulkController', () => {
 
     it('should return 403 when BulkOperationsEnabled is "False"', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue(
-        makeEndpoint({ [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: 'False' }),
+        makeEndpoint({}, bulkDisabledProfile),
       );
 
       await expect(
@@ -101,7 +110,7 @@ describe('EndpointScimBulkController', () => {
 
     it('should return 403 when BulkOperationsEnabled is false (boolean)', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue(
-        makeEndpoint({ [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: false }),
+        makeEndpoint({}, bulkDisabledProfile),
       );
 
       await expect(
@@ -111,7 +120,7 @@ describe('EndpointScimBulkController', () => {
 
     it('should proceed when BulkOperationsEnabled is "True"', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue(
-        makeEndpoint({ [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: 'True' }),
+        makeEndpoint({ [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: 'True' }, bulkEnabledProfile),
       );
 
       const result = await controller.processBulk('ep-1', validDto, mockRequest);
@@ -121,7 +130,7 @@ describe('EndpointScimBulkController', () => {
 
     it('should proceed when BulkOperationsEnabled is true (boolean)', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue(
-        makeEndpoint({ [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: true }),
+        makeEndpoint({ [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: true }, bulkEnabledProfile),
       );
 
       const result = await controller.processBulk('ep-1', validDto, mockRequest);
@@ -130,7 +139,7 @@ describe('EndpointScimBulkController', () => {
 
     it('should proceed when BulkOperationsEnabled is "1"', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue(
-        makeEndpoint({ [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: '1' }),
+        makeEndpoint({ [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: '1' }, bulkEnabledProfile),
       );
 
       const result = await controller.processBulk('ep-1', validDto, mockRequest);
@@ -142,7 +151,7 @@ describe('EndpointScimBulkController', () => {
 
   describe('endpoint validation', () => {
     it('should return 403 when endpoint is inactive', async () => {
-      const inactiveEndpoint = { ...makeEndpoint({ [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: 'True' }), active: false };
+      const inactiveEndpoint = { ...makeEndpoint({ [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: 'True' }, bulkEnabledProfile), active: false };
       mockEndpointService.getEndpoint.mockResolvedValue(inactiveEndpoint);
 
       await expect(
@@ -156,7 +165,7 @@ describe('EndpointScimBulkController', () => {
   describe('schema validation', () => {
     it('should return 400 when BulkRequest schema is missing', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue(
-        makeEndpoint({ [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: 'True' }),
+        makeEndpoint({ [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: 'True' }, bulkEnabledProfile),
       );
 
       const badDto: BulkRequestDto = {
@@ -175,7 +184,7 @@ describe('EndpointScimBulkController', () => {
   describe('payload size guard', () => {
     it('should return 413 when content-length exceeds max payload size', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue(
-        makeEndpoint({ [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: 'True' }),
+        makeEndpoint({ [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: 'True' }, bulkEnabledProfile),
       );
 
       const largeReq = {
@@ -194,7 +203,7 @@ describe('EndpointScimBulkController', () => {
   describe('successful processing', () => {
     it('should delegate to BulkProcessorService with correct parameters', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue(
-        makeEndpoint({ [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: 'True' }),
+        makeEndpoint({ [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: 'True' }, bulkEnabledProfile),
       );
 
       const dtoWithFailOnErrors: BulkRequestDto = {
@@ -219,7 +228,7 @@ describe('EndpointScimBulkController', () => {
 
     it('should pass failOnErrors=0 when not specified in request', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue(
-        makeEndpoint({ [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: 'True' }),
+        makeEndpoint({ [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: 'True' }, bulkEnabledProfile),
       );
 
       await controller.processBulk('ep-1', validDto, mockRequest);

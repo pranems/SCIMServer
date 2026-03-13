@@ -45,19 +45,30 @@ Replaces the fragmented `Endpoint.config` + `EndpointSchema` + `EndpointResource
 - **E2E tests**: `admin-schema.e2e-spec.ts`, `custom-resource-types.e2e-spec.ts`, `immutable-enforcement.e2e-spec.ts`, `returned-request.e2e-spec.ts`, `generic-parity-fixes.e2e-spec.ts` (tested removed APIs)
 
 ### Changed
-- **ScimSchemaRegistry**: Removed constructor repo injection, simplified `onModuleInit` (no DB hydration — extensions now from Endpoint.profile)
-- **EndpointService**: `createEndpoint()` resolves profile from preset/inline/config/default; `updateEndpoint()` deep-merges settings; `toResponse()` maps `profile.settings` → `config` for backward compat
+- **ScimSchemaRegistry**: Profile hydration via `bootHydrate()` + `hydrateFromProfile()` — per-endpoint overlay with `isFullProfile` flag; query methods (`getAllSchemas`, `getAllResourceTypes`, `getSchema`, `getServiceProviderConfig`) return profile data directly for hydrated endpoints; no infrastructure dependencies (PrismaService-free)
+- **ScimModule**: `onModuleInit` performs boot hydration via `EndpointService.listEndpoints()` → `SchemaRegistry.bootHydrate()` and wires runtime change listener for endpoint CRUD
+- **EndpointService**: `setProfileChangeListener()` + `ProfileChangeListener` callback type; all create/update/delete operations notify listener for registry rehydration
+- **ScimDiscoveryService**: `getServiceProviderConfig()` now accepts optional `endpointId` for profile-based SPC lookup
+- **EndpointScimDiscoveryController**: passes `endpointId` to `getServiceProviderConfig()` for profile-aware SPC responses
 - **repository.module.ts**: Removed EndpointSchema + EndpointResourceType providers/exports
-- **scim.module.ts**: Removed old admin controllers, added `PresetController`
+- **scim.module.ts**: Removed old admin controllers, added `PresetController`, added `EndpointService` + `ScimSchemaRegistry` injection for boot hydration
 - **E2E helpers**: `global-teardown.ts`, `db.helper.ts` — removed `endpointSchema.deleteMany()`
 
 ### Test Coverage
-- **Unit tests**: 2,867 passed (73 suites) — +196 new endpoint-profile tests (43 rfc-baseline, 98 built-in-presets, 32 tighten-only, 18 auto-expand, 36 endpoint-profile-service, 13 preset-controller), −114 removed (dead repo/controller specs)
-- **E2E tests**: 591 passed + 6 skipped (29 suites) — +37 new (20 endpoint-profile + 17 profile-flag-combos), −91 removed (5 dead E2E files for deleted APIs)
-- **Live tests**: 659 total (647 passed, 12 pre-existing failures unchanged)
+- **Unit tests**: 2,830 passed (73 suites)
+- **E2E tests**: 613 passed + 6 skipped (30 suites) — +5 new gap-audit tests (bulk+strict combo, user-only blocks Groups, cache invalidation)
+- **Live tests**: 832 assertions — +21 new (Section 9z: Endpoint Profiles & Preset Discovery)
+
+### Phase 14 — Profile-as-Cached-Runtime-Context
+- **ScimSchemaRegistry**: Gutted from 857→143 lines. Removed overlays, boot hydration, registration methods, global layer. Kept: root-level default preset expansion + type exports.
+- **EndpointService**: Unified `cacheById` + `cacheByName` Maps replace per-request DB queries. Cache warm on boot, write-through on CRUD.
+- **Discovery**: Endpoint-scoped controllers serve from `profile` directly (not registry overlays). Profile-based `getSchemasFromProfile`/`getResourceTypesFromProfile`/`getSpcFromProfile`.
+- **Derived flags**: `CustomResourceTypesEnabled` derived from `profile.resourceTypes` (D9). `BulkOperationsEnabled` derived from `profile.serviceProviderConfig.bulk.supported` (D8).
+- **ScimModule**: Removed `OnModuleInit` boot hydration + listener wiring — cache replaces this.
+- **Impact**: Zero DB calls per SCIM request, 3 caches → 1, ~500 net lines removed.
 
 ### Design Document
-- `docs/SCHEMA_TEMPLATES_DESIGN.md` recreated (2,349 lines, 47 code blocks, 19 Mermaid diagrams, 10 HTTP examples, 7-phase implementation plan)
+- `docs/SCHEMA_TEMPLATES_DESIGN.md` updated — §18 Phase 14 roadmap, registry simplification noted
 
 ## [0.27.0] - 2026-03-03
 

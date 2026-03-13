@@ -1,6 +1,9 @@
 # SCIM Discovery & Per-Endpoint Schema Extensions — Comprehensive Reference
 
-> **⚠️ LARGELY SUPERSEDED** — The registry architecture, admin API flows, startup hydration, registration/unregistration lifecycle, discovery merging, and CRUD examples in this document are now covered by the comprehensive schema documentation suite (Mar 2026). **Retained for**: DTO validation rules (`CreateEndpointSchemaDto`, `SchemaAttributeDto`), error response catalog (401/404/409/403/400 with exact JSON), and repository layer implementation details (`IEndpointSchemaRepository`, Prisma vs InMemory).
+> **⚠️ LARGELY SUPERSEDED** — The registry architecture, admin API flows, startup hydration, registration/unregistration lifecycle, discovery merging, and CRUD examples in this document are now covered by the comprehensive schema documentation suite (Mar 2026). **Retained for**: DTO validation rules (`CreateEndpointSchemaDto`, `SchemaAttributeDto`) and error response catalog (401/404/409/403/400 with exact JSON).
+>
+> **v0.28.0 Note**: The `EndpointSchema` / `EndpointResourceType` tables, `IEndpointSchemaRepository` / `IEndpointResourceTypeRepository` interfaces, and the `POST/GET/DELETE /admin/endpoints/:id/schemas` & `/resource-types` admin routes referenced here were **deleted** in Phase 13. Schema data now lives in `Endpoint.profile` JSONB. See [SCHEMA_TEMPLATES_DESIGN.md](SCHEMA_TEMPLATES_DESIGN.md).
+>
 > **See**: [`SCHEMA_LIFECYCLE_AND_REGISTRY.md`](SCHEMA_LIFECYCLE_AND_REGISTRY.md) · [`SCHEMA_CUSTOMIZATION_GUIDE.md`](SCHEMA_CUSTOMIZATION_GUIDE.md) · [`SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md`](SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md) · [`RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md`](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md)
 
 > **Phase 6 — Data-Driven Discovery**
