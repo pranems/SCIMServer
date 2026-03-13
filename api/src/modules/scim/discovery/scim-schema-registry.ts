@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, Inject, Logger, type OnModuleInit, Optional } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger, type OnModuleInit } from '@nestjs/common';
 import {
   SCIM_CORE_USER_SCHEMA,
   SCIM_CORE_GROUP_SCHEMA,
@@ -19,10 +19,6 @@ import {
 } from './scim-schemas.constants';
 import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ENDPOINT_CONFIG_FLAGS, getConfigBooleanWithDefault } from '../../endpoint/endpoint-config.interface';
-import { ENDPOINT_SCHEMA_REPOSITORY } from '../../../domain/repositories/repository.tokens';
-import { ENDPOINT_RESOURCE_TYPE_REPOSITORY } from '../../../domain/repositories/repository.tokens';
-import type { IEndpointSchemaRepository } from '../../../domain/repositories/endpoint-schema.repository.interface';
-import type { IEndpointResourceTypeRepository } from '../../../domain/repositories/endpoint-resource-type.repository.interface';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -141,102 +137,16 @@ export class ScimSchemaRegistry implements OnModuleInit {
   /** Per-endpoint extension overlays */
   private readonly endpointOverlays = new Map<string, EndpointOverlay>();
 
-  constructor(
-    @Optional()
-    @Inject(ENDPOINT_SCHEMA_REPOSITORY)
-    private readonly schemaRepo?: IEndpointSchemaRepository,
-    @Optional()
-    @Inject(ENDPOINT_RESOURCE_TYPE_REPOSITORY)
-    private readonly resourceTypeRepo?: IEndpointResourceTypeRepository,
-  ) {
+  constructor() {
     this.loadBuiltInSchemas();
   }
 
   /**
-   * OnModuleInit — Load persisted per-endpoint schema extensions from the
-   * database and hydrate the in-memory registry. This ensures that all
-   * previously registered extensions are available immediately on startup.
+   * OnModuleInit — Schema hydration now happens from Endpoint.profile
+   * rather than from separate EndpointSchema/EndpointResourceType tables.
    */
   async onModuleInit(): Promise<void> {
-    // ─── Hydrate persisted schema extensions ──────────────────────────
-
-    if (this.schemaRepo) {
-      try {
-        const rows = await this.schemaRepo.findAll();
-        let count = 0;
-
-        for (const row of rows) {
-          const definition: ScimSchemaDefinition = {
-            schemas: [SCIM_SCHEMA_SCHEMA],
-            id: row.schemaUrn,
-            name: row.name,
-            description: row.description ?? '',
-            attributes: Array.isArray(row.attributes)
-              ? (row.attributes as ScimSchemaAttribute[])
-              : [],
-            meta: {
-              resourceType: 'Schema',
-              location: `/Schemas/${row.schemaUrn}`,
-            },
-          };
-
-          this.registerExtension(
-            definition,
-            row.resourceTypeId ?? undefined,
-            row.required,
-            row.endpointId,
-          );
-          count++;
-        }
-
-        if (count > 0) {
-          this.logger.log(`Hydrated ${count} persisted schema extension(s) from database.`);
-        }
-      } catch (error) {
-        this.logger.error('Failed to hydrate schema extensions from database', error);
-      }
-    } else {
-      this.logger.debug('No EndpointSchema repository injected — skipping schema DB hydration.');
-    }
-
-    // ─── Hydrate persisted custom resource types (Phase 8b) ───────────
-
-    if (this.resourceTypeRepo) {
-      try {
-        const rows = await this.resourceTypeRepo.findAll();
-        let count = 0;
-
-        for (const row of rows) {
-          const extensions = Array.isArray(row.schemaExtensions)
-            ? row.schemaExtensions.map((e) => ({
-                schema: e.schema,
-                required: e.required,
-              }))
-            : [];
-
-          this.registerResourceType(
-            {
-              id: row.name,
-              name: row.name,
-              endpoint: row.endpoint,
-              description: row.description ?? `Custom resource type: ${row.name}`,
-              schema: row.schemaUri,
-              schemaExtensions: extensions,
-            },
-            row.endpointId,
-          );
-          count++;
-        }
-
-        if (count > 0) {
-          this.logger.log(`Hydrated ${count} persisted custom resource type(s) from database.`);
-        }
-      } catch (error) {
-        this.logger.error('Failed to hydrate custom resource types from database', error);
-      }
-    } else {
-      this.logger.debug('No EndpointResourceType repository injected — skipping resource type DB hydration.');
-    }
+    this.logger.debug('ScimSchemaRegistry initialized — extensions now come from Endpoint.profile.');
   }
 
   // ─── Built-in initialization ────────────────────────────────────────────

@@ -6,9 +6,8 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { EndpointModule } from '../endpoint/endpoint.module';
 import { RepositoryModule } from '../../infrastructure/repositories/repository.module';
 import { AdminController } from './controllers/admin.controller';
-import { AdminSchemaController } from './controllers/admin-schema.controller';
-import { AdminResourceTypeController } from './controllers/admin-resource-type.controller';
 import { AdminCredentialController } from './controllers/admin-credential.controller';
+import { PresetController } from './endpoint-profile/preset.controller';
 import { ResourceTypesController } from './controllers/resource-types.controller';
 import { SchemasController } from './controllers/schemas.controller';
 import { ServiceProviderConfigController } from './controllers/service-provider-config.controller';
@@ -37,9 +36,8 @@ import { ScimExceptionFilter } from './filters/scim-exception.filter';
     ResourceTypesController,
     SchemasController,
     AdminController,
-    AdminSchemaController,
-    AdminResourceTypeController,
     AdminCredentialController,
+    PresetController,
     EndpointScimUsersController,
     EndpointScimGroupsController,
     EndpointScimBulkController,

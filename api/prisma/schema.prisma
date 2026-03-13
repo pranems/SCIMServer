@@ -18,7 +18,7 @@ model Endpoint {
   name        String   @unique
   displayName String?
   description String?
-  config      String?  // JSON configuration for endpoint-specific settings
+  profile     Json?    // JSONB — { schemas, resourceTypes, serviceProviderConfig, settings }
   active      Boolean  @default(true)
   createdAt   DateTime @default(now()) @db.Timestamptz
   updatedAt   DateTime @updatedAt     @db.Timestamptz
@@ -27,12 +27,6 @@ model Endpoint {
 
   // Phase 2: Unified resource relation
   resources ScimResource[]
-
-  // Phase 6: Per-endpoint schema extensions
-  schemaExtensions EndpointSchema[]
-
-  // Phase 8b: Per-endpoint custom resource type registrations
-  resourceTypes EndpointResourceType[]
 
   // Phase 11: Per-endpoint credentials
   credentials EndpointCredential[]
@@ -114,61 +108,6 @@ model ResourceMember {
 
   @@index([groupResourceId])
   @@index([memberResourceId])
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Phase 6 — Per-endpoint SCIM schema extensions
-//
-// Persists custom extension schemas registered per endpoint. On startup the
-// ScimSchemaRegistry loads these rows and hydrates its per-endpoint overlay.
-// Admin API allows CRUD on extensions without redeployment.
-// ═══════════════════════════════════════════════════════════════════════════════
-
-model EndpointSchema {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  endpointId      String   @db.Uuid
-  schemaUrn       String   @db.VarChar(512)    // Extension schema URN (e.g., "urn:example:custom:2.0:User")
-  name            String   @db.VarChar(255)
-  description     String?
-  resourceTypeId  String?  @db.VarChar(50)     // Resource type to attach to ("User", "Group", or null)
-  required        Boolean  @default(false)      // Whether extension is required on the resource type
-  attributes      Json                          // JSONB — array of ScimSchemaAttribute definitions
-  createdAt       DateTime @default(now()) @db.Timestamptz
-  updatedAt       DateTime @updatedAt     @db.Timestamptz
-
-  endpoint Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
-
-  @@unique([endpointId, schemaUrn])            // One schema URN per endpoint
-  @@index([endpointId])
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Phase 8b — Per-endpoint custom resource type registrations
-//
-// Allows endpoints to register custom SCIM resource types beyond User/Group
-// (e.g., Device, Application). Each registration stores the resource type
-// metadata, core schema URN, and optional schema extensions. Resources are
-// stored in the polymorphic ScimResource table with a matching resourceType
-// discriminator. Gated behind the "CustomResourceTypesEnabled" config flag.
-// ═══════════════════════════════════════════════════════════════════════════════
-
-model EndpointResourceType {
-  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  endpointId       String   @db.Uuid
-  name             String   @db.VarChar(50)     // Resource type name (e.g., "Device")
-  description      String?
-  schemaUri        String   @db.VarChar(512)    // Core schema URN for this resource type
-  endpoint         String   @db.VarChar(255)    // SCIM endpoint path (e.g., "/Devices")
-  schemaExtensions Json     @default("[]")      // Array of { schema: string, required: boolean }
-  active           Boolean  @default(true)
-  createdAt        DateTime @default(now()) @db.Timestamptz
-  updatedAt        DateTime @updatedAt     @db.Timestamptz
-
-  endpointRef Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
-
-  @@unique([endpointId, name])                  // One resource type name per endpoint
-  @@unique([endpointId, endpoint])              // One endpoint path per resource type per endpoint
-  @@index([endpointId])
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

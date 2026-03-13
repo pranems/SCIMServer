@@ -1,15 +1,12 @@
 import { Test } from '@nestjs/testing';
 import { RepositoryModule } from './repository.module';
-import { USER_REPOSITORY, GROUP_REPOSITORY, ENDPOINT_SCHEMA_REPOSITORY } from '../../domain/repositories/repository.tokens';
+import { USER_REPOSITORY, GROUP_REPOSITORY } from '../../domain/repositories/repository.tokens';
 import type { IUserRepository } from '../../domain/repositories/user.repository.interface';
 import type { IGroupRepository } from '../../domain/repositories/group.repository.interface';
-import type { IEndpointSchemaRepository } from '../../domain/repositories/endpoint-schema.repository.interface';
 import { InMemoryUserRepository } from './inmemory/inmemory-user.repository';
 import { InMemoryGroupRepository } from './inmemory/inmemory-group.repository';
-import { InMemoryEndpointSchemaRepository } from './inmemory/inmemory-endpoint-schema.repository';
 import { PrismaUserRepository } from './prisma/prisma-user.repository';
 import { PrismaGroupRepository } from './prisma/prisma-group.repository';
-import { PrismaEndpointSchemaRepository } from './prisma/prisma-endpoint-schema.repository';
 
 /**
  * RepositoryModule.register() wiring tests.
@@ -55,16 +52,6 @@ describe('RepositoryModule', () => {
       expect(groupRepo).toBeInstanceOf(InMemoryGroupRepository);
       await module.close();
     });
-
-    it('should provide InMemoryEndpointSchemaRepository for ENDPOINT_SCHEMA_REPOSITORY', async () => {
-      const module = await Test.createTestingModule({
-        imports: [RepositoryModule.register()],
-      }).compile();
-
-      const schemaRepo = module.get<IEndpointSchemaRepository>(ENDPOINT_SCHEMA_REPOSITORY);
-      expect(schemaRepo).toBeInstanceOf(InMemoryEndpointSchemaRepository);
-      await module.close();
-    });
   });
 
   describe('when PERSISTENCE_BACKEND is "INMEMORY" (case-insensitive)', () => {
@@ -107,16 +94,6 @@ describe('RepositoryModule', () => {
       expect(groupRepo).toBeInstanceOf(PrismaGroupRepository);
       await module.close();
     });
-
-    it('should provide PrismaEndpointSchemaRepository for ENDPOINT_SCHEMA_REPOSITORY', async () => {
-      const module = await Test.createTestingModule({
-        imports: [RepositoryModule.register()],
-      }).compile();
-
-      const schemaRepo = module.get<IEndpointSchemaRepository>(ENDPOINT_SCHEMA_REPOSITORY);
-      expect(schemaRepo).toBeInstanceOf(PrismaEndpointSchemaRepository);
-      await module.close();
-    });
   });
 
   describe('when PERSISTENCE_BACKEND is unset (default)', () => {
@@ -146,7 +123,6 @@ describe('RepositoryModule', () => {
       expect(dynModule.module).toBe(RepositoryModule);
       expect(dynModule.exports).toContain(USER_REPOSITORY);
       expect(dynModule.exports).toContain(GROUP_REPOSITORY);
-      expect(dynModule.exports).toContain(ENDPOINT_SCHEMA_REPOSITORY);
     });
 
     it('should set global: true on prisma module', () => {
@@ -157,7 +133,6 @@ describe('RepositoryModule', () => {
       expect(dynModule.module).toBe(RepositoryModule);
       expect(dynModule.exports).toContain(USER_REPOSITORY);
       expect(dynModule.exports).toContain(GROUP_REPOSITORY);
-      expect(dynModule.exports).toContain(ENDPOINT_SCHEMA_REPOSITORY);
     });
 
     it('should not include PrismaModule import for inmemory backend', () => {
