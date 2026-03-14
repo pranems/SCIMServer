@@ -1,6 +1,6 @@
 # 📚 SCIMServer Documentation Index
 
-> Quick navigation to all project documentation. Updated March 3, 2026.
+> Quick navigation to all project documentation. Updated March 13, 2026 (v0.28.0).
 
 > Theme conventions: onboarding-first, current-state metadata, explicit historical-context labeling, and cross-linking to canonical sources.
 
@@ -16,7 +16,7 @@
 
 | Document | Description |
 |----------|-------------|
-| [README.md](../README.md) | Project overview, 5-minute deploy, Entra configuration |
+| [README.md](../README.md) | Project overview, 4 deployment options, SCIM compliance matrix, architecture, Entra setup, config reference |
 | [DEPLOYMENT.md](../DEPLOYMENT.md) | Deployment options (Azure, Docker, local) |
 | [admin.md](../admin.md) | Release/admin workflow (versioning, tagging, publish, update) |
 | [CHANGELOG.md](../CHANGELOG.md) | Version history |
@@ -54,7 +54,7 @@
 | [SCIM_CASE_INSENSITIVITY_REFERENCE.md](SCIM_CASE_INSENSITIVITY_REFERENCE.md) | Case-insensitivity rules per RFC 7643 §2.1 |
 | [SCIM_RFC_COMPLIANCE_LAYER.md](SCIM_RFC_COMPLIANCE_LAYER.md) | Comprehensive RFC compliance layer technical reference |
 | [MULTI_MEMBER_PATCH_CONFIG_FLAG.md](MULTI_MEMBER_PATCH_CONFIG_FLAG.md) | Multi-member PATCH config flags reference |
-| [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | **Complete flag reference** — All 14 boolean flags + logLevel (15 total) with applicability, precedence, combinations, diagrams, JSON examples |
+| [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | **Complete flag reference** — 12 persisted boolean settings + 2 derived capabilities + logLevel with applicability, precedence, combinations, diagrams, JSON examples |
 | [FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md](FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md) | Soft delete, strict schema validation, custom extension URNs — feature docs with diagrams, examples, DB values |
 | [EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md](EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md) | externalId CITEXT→TEXT migration — RFC 7643 §3.1 caseExact compliance fix with sequence diagrams, DB diffs, filter examples, rollback strategy |
 | [G8C_PATCH_READONLY_PREVALIDATION.md](G8C_PATCH_READONLY_PREVALIDATION.md) | G8c — PATCH readOnly pre-validation: RFC 7643 §2.2 enforcement, architecture, test coverage |

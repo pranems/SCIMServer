@@ -624,7 +624,7 @@ Examples — error responses
 ---
 
 Persistence & models
-- Prisma models of interest are in `api/prisma/schema.prisma` (`ScimResource`, `ResourceMember`, `RequestLog`, `Endpoint`, `EndpointSchema`, `EndpointResourceType`, `EndpointCredential`).
+- Prisma models of interest are in `api/prisma/schema.prisma` (`Endpoint`, `ScimResource`, `ResourceMember`, `RequestLog`, `EndpointCredential` — 5 models total as of v0.28.0).
 - `payload` JSONB column stores the full SCIM resource; `meta` stores SCIM meta JSON string.
 
 ---

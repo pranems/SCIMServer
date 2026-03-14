@@ -271,6 +271,11 @@ export class EndpointService implements OnModuleInit {
   }
 
   async updateEndpoint(endpointId: string, dto: UpdateEndpointDto): Promise<EndpointResponse> {
+    // Mutual exclusivity: config and profile are disjoint update paths
+    if (dto.config && dto.profile) {
+      throw new BadRequestException('Cannot specify both "config" and "profile" in the same update. Use "profile.settings" instead.');
+    }
+
     const current = this.cacheById.get(endpointId);
 
     if (this.isInMemoryBackend) {
@@ -278,8 +283,14 @@ export class EndpointService implements OnModuleInit {
         throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
       }
 
-      // Merge config into profile.settings for backward compat
       let newProfile = current.profile;
+
+      // Partial profile update: settings deep-merged, schemas/RTs/SPC replaced
+      if (dto.profile) {
+        newProfile = this.mergeProfilePartial(newProfile, dto.profile);
+      }
+
+      // Legacy config merge into profile.settings for backward compat
       if (dto.config) {
         try {
           validateEndpointConfig(dto.config);
@@ -307,6 +318,9 @@ export class EndpointService implements OnModuleInit {
       if (dto.config !== undefined) {
         this.syncEndpointLogLevel(endpointId, dto.config);
       }
+      if (dto.profile?.settings) {
+        this.syncEndpointLogLevel(endpointId, dto.profile.settings as Record<string, any>);
+      }
       this.profileChangeListener?.(endpointId, updated.profile ?? null);
 
       return updated;
@@ -325,15 +339,23 @@ export class EndpointService implements OnModuleInit {
       throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
     }
 
-    // Build profile update: merge config into settings for backward compat
+    // Build profile update
     let profileUpdate: any = undefined;
+
+    // Partial profile update: settings deep-merged, schemas/RTs/SPC replaced
+    if (dto.profile) {
+      const currentProfile = (endpoint.profile as EndpointProfile | null) ?? undefined;
+      profileUpdate = this.mergeProfilePartial(currentProfile, dto.profile);
+    }
+
+    // Legacy config merge into profile.settings for backward compat
     if (dto.config) {
       try {
         validateEndpointConfig(dto.config);
       } catch (error) {
         throw new BadRequestException((error as Error).message);
       }
-      const currentProfile = (endpoint.profile as Record<string, any>) ?? {};
+      const currentProfile = profileUpdate ?? (endpoint.profile as Record<string, any>) ?? {};
       profileUpdate = { ...currentProfile, settings: { ...currentProfile.settings, ...dto.config } };
     }
 
@@ -355,9 +377,60 @@ export class EndpointService implements OnModuleInit {
     if (dto.config !== undefined) {
       this.syncEndpointLogLevel(endpointId, dto.config);
     }
+    if (dto.profile?.settings) {
+      this.syncEndpointLogLevel(endpointId, dto.profile.settings as Record<string, any>);
+    }
     this.profileChangeListener?.(endpointId, response.profile ?? null);
 
     return response;
+  }
+
+  /**
+   * Merge a partial profile update into the current endpoint profile.
+   * - `settings` — deep-merged (additive, individual keys can be overwritten)
+   * - `schemas`, `resourceTypes`, `serviceProviderConfig` — replaced wholesale
+   *
+   * If `schemas` or `resourceTypes` are provided they are validated & expanded.
+   */
+  private mergeProfilePartial(
+    current: EndpointProfile | undefined,
+    partial: Partial<import('../../scim/endpoint-profile/endpoint-profile.types').ShorthandProfileInput>,
+  ): EndpointProfile | undefined {
+    if (!current) {
+      // No existing profile — validate the partial as a full profile
+      const result = validateAndExpandProfile(partial);
+      if (!result.valid) {
+        throw new BadRequestException(`Profile validation failed: ${result.errors.map((e: any) => e.detail).join('; ')}`);
+      }
+      return result.profile!;
+    }
+
+    // Build merged profile: start from current
+    const merged: any = { ...current };
+
+    // Replace schemas if provided
+    if (partial.schemas !== undefined) {
+      merged.schemas = partial.schemas;
+    }
+    // Replace resourceTypes if provided
+    if (partial.resourceTypes !== undefined) {
+      merged.resourceTypes = partial.resourceTypes;
+    }
+    // Replace SPC if provided
+    if (partial.serviceProviderConfig !== undefined) {
+      merged.serviceProviderConfig = { ...current.serviceProviderConfig, ...partial.serviceProviderConfig };
+    }
+    // Deep-merge settings (additive)
+    if (partial.settings !== undefined) {
+      merged.settings = { ...current.settings, ...partial.settings };
+    }
+
+    // Validate & expand the merged profile
+    const result = validateAndExpandProfile(merged);
+    if (!result.valid) {
+      throw new BadRequestException(`Profile validation failed: ${result.errors.map((e: any) => e.detail).join('; ')}`);
+    }
+    return result.profile!;
   }
 
   async deleteEndpoint(endpointId: string): Promise<void> {

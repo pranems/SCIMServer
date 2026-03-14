@@ -398,4 +398,28 @@ describe('endpoint-profile.service (orchestrator)', () => {
       expect(result.errors.some(e => e.code === 'EXPAND_ERROR')).toBe(true);
     });
   });
+
+  describe('orphan extension schema', () => {
+    it('should accept profile with extension schema not referenced by any RT', () => {
+      // An extension exists in schemas[] but no RT references it — allowed (not all schemas must be bound)
+      const input: ShorthandProfileInput = {
+        schemas: [
+          { id: SCIM_CORE_USER_SCHEMA, name: 'User', attributes: [{ name: 'userName' }] },
+          { id: 'urn:test:orphan:ext', name: 'OrphanExt', description: 'Unreferenced extension',
+            attributes: [{ name: 'orphanAttr', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default' }] },
+        ],
+        resourceTypes: [
+          { id: 'User', name: 'User', endpoint: '/Users', description: 'User',
+            schema: SCIM_CORE_USER_SCHEMA, schemaExtensions: [] },
+        ],
+        serviceProviderConfig: { patch: { supported: true }, bulk: { supported: false },
+          filter: { supported: true, maxResults: 100 }, sort: { supported: false },
+          etag: { supported: false }, changePassword: { supported: false } },
+      };
+      const result = validateAndExpandProfile(input);
+      // Orphan extension is allowed — just not advertised on any RT
+      expect(result.valid).toBe(true);
+      expect(result.profile!.schemas.length).toBe(2);
+    });
+  });
 });

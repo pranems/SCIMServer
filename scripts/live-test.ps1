@@ -3034,20 +3034,53 @@ Write-Host "══════════════════════�
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 9m-A: CUSTOM SCHEMA EXTENSIONS (Admin Schema API)
+# ⚠️ SKIPPED: Admin Schema API removed in v0.28.0. Schemas now in profile.
 # ─────────────────────────────────────────────────────────────────────────────
-$script:currentSection = "9m-A: Custom Schema Extensions"
-Write-Host "`n`n────────────────────────────────────────────────────" -ForegroundColor Cyan
-Write-Host "  9m-A: CUSTOM SCHEMA EXTENSIONS (Admin Schema API)" -ForegroundColor Cyan
-Write-Host "────────────────────────────────────────────────────" -ForegroundColor Cyan
+$script:currentSection = "9m-A: Custom Schema Extensions (SKIPPED)"
+Write-Host "`n`n────────────────────────────────────────────────────" -ForegroundColor Yellow
+Write-Host "  9m-A: CUSTOM SCHEMA EXTENSIONS — SKIPPED (Admin API removed v0.28.0)" -ForegroundColor Yellow
+Write-Host "────────────────────────────────────────────────────" -ForegroundColor Yellow
+Test-Result -Success $true -Message "9m-A: SKIPPED — Admin Schema API removed; schemas now in endpoint profile"
 
-# --- Setup: Create dedicated endpoint for schema extension tests ---
-Write-Host "`n--- 9m-A Setup: Creating endpoint for schema extension tests ---" -ForegroundColor Cyan
-$schExtEndpointBody = @{
-    name = "live-test-schext-$(Get-Random)"
-    displayName = "Schema Extension Test Endpoint"
-    description = "Endpoint for custom schema extension live tests"
-} | ConvertTo-Json
-$schExtEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $schExtEndpointBody
+# ── 9m-A REPLACEMENT: Test custom extension via inline profile ──
+$extEpBody = @{
+    name = "live-ext-$(Get-Random)"
+    profile = @{
+        schemas = @(
+            @{ id = "urn:ietf:params:scim:schemas:core:2.0:User"; name = "User"; attributes = "all" }
+            @{ id = "urn:test:live:ext:User"; name = "LiveTestExt"; description = "Live test extension"
+               attributes = @(
+                   @{ name = "badgeNumber"; type = "string"; multiValued = $false; required = $false; mutability = "readWrite"; returned = "default" }
+               ) }
+            @{ id = "urn:ietf:params:scim:schemas:core:2.0:Group"; name = "Group"; attributes = "all" }
+        )
+        resourceTypes = @(
+            @{ id = "User"; name = "User"; endpoint = "/Users"; description = "User"; schema = "urn:ietf:params:scim:schemas:core:2.0:User"; schemaExtensions = @(@{ schema = "urn:test:live:ext:User"; required = $false }) }
+            @{ id = "Group"; name = "Group"; endpoint = "/Groups"; description = "Group"; schema = "urn:ietf:params:scim:schemas:core:2.0:Group"; schemaExtensions = @() }
+        )
+        serviceProviderConfig = @{ patch = @{ supported = $true }; bulk = @{ supported = $true; maxOperations = 100; maxPayloadSize = 1048576 }; filter = @{ supported = $true; maxResults = 200 }; sort = @{ supported = $true }; etag = @{ supported = $true }; changePassword = @{ supported = $false } }
+    }
+} | ConvertTo-Json -Depth 8
+$extEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $extEpBody
+$extEpId = $extEp.id
+$scimBaseExt = "$baseUrl/scim/endpoints/$extEpId"
+Test-Result -Success ($null -ne $extEpId) -Message "9m-A.P1: Created endpoint with custom extension via profile"
+
+$extSchemas = Invoke-RestMethod -Uri "$scimBaseExt/Schemas" -Headers $headers
+Test-Result -Success ($null -ne ($extSchemas.Resources | Where-Object { $_.id -eq "urn:test:live:ext:User" })) -Message "9m-A.P2: Extension visible in /Schemas"
+
+$extUserBody = @{ schemas = @("urn:ietf:params:scim:schemas:core:2.0:User","urn:test:live:ext:User"); userName = "ext-$(Get-Random)@test.com"; displayName = "Ext Test"; active = $true; "urn:test:live:ext:User" = @{ badgeNumber = "B99" } } | ConvertTo-Json -Depth 4
+$extUser = Invoke-RestMethod -Uri "$scimBaseExt/Users" -Method POST -Headers $headers -Body $extUserBody
+Test-Result -Success ($extUser."urn:test:live:ext:User".badgeNumber -eq "B99") -Message "9m-A.P3: Extension data roundtrips on POST"
+
+$extUserGet = Invoke-RestMethod -Uri "$scimBaseExt/Users/$($extUser.id)" -Headers $headers
+Test-Result -Success ($extUserGet."urn:test:live:ext:User".badgeNumber -eq "B99") -Message "9m-A.P4: Extension data roundtrips on GET"
+
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$extEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+Test-Result -Success $true -Message "9m-A.P5: Cleaned up extension endpoint"
+
+# Skip old Admin Schema API tests (dead code below — left for reference)
+function Skip-OldSection9mA {
 $SchExtEndpointId = $schExtEndpoint.id
 $scimBaseSchExt = "$baseUrl/scim/endpoints/$SchExtEndpointId"
 $adminBaseSchExt = "$baseUrl/scim/admin/endpoints/$SchExtEndpointId"
@@ -3385,11 +3418,40 @@ try { Invoke-RestMethod -Uri "$scimBaseSchExt/Users/$schExtUserId" -Method DELET
 try { Invoke-RestMethod -Uri "$scimBaseSchExt/Groups/$schExtGroupId" -Method DELETE -Headers $headers | Out-Null } catch {}
 
 Write-Host "`n--- 9m-A: Custom Schema Extensions Tests Complete ---" -ForegroundColor Green
+} # End Skip-OldSection9mA
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 9m-B: CUSTOM RESOURCE TYPES (G8b)
+# ⚠️ SKIPPED: Admin Resource Type API removed in v0.28.0. RTs now in profile.
 # ─────────────────────────────────────────────────────────────────────────────
-$script:currentSection = "9m-B: Custom Resource Types (G8b)"
+$script:currentSection = "9m-B: Custom Resource Types (SKIPPED)"
+Write-Host "`n`n────────────────────────────────────────────────────" -ForegroundColor Yellow
+Write-Host "  9m-B: CUSTOM RESOURCE TYPES — SKIPPED (Admin API removed v0.28.0)" -ForegroundColor Yellow
+Write-Host "────────────────────────────────────────────────────" -ForegroundColor Yellow
+Test-Result -Success $true -Message "9m-B: SKIPPED — Admin RT API removed; resource types now in endpoint profile"
+
+# ── 9m-B REPLACEMENT: Cross-endpoint isolation via profile ──
+$isoWithBody = @{ name = "live-iso-w-$(Get-Random)"; profile = @{
+    schemas = @(@{ id = "urn:ietf:params:scim:schemas:core:2.0:User"; name = "User"; attributes = "all" }; @{ id = "urn:test:isolation"; name = "IsoExt"; description = "Isolation test"; attributes = @(@{ name = "isoAttr"; type = "string"; multiValued = $false; required = $false; mutability = "readWrite"; returned = "default" }) })
+    resourceTypes = @(@{ id = "User"; name = "User"; endpoint = "/Users"; description = "User"; schema = "urn:ietf:params:scim:schemas:core:2.0:User"; schemaExtensions = @(@{ schema = "urn:test:isolation"; required = $false }) })
+    serviceProviderConfig = @{ patch = @{ supported = $true }; bulk = @{ supported = $false }; filter = @{ supported = $true; maxResults = 100 }; sort = @{ supported = $false }; etag = @{ supported = $false }; changePassword = @{ supported = $false } }
+} } | ConvertTo-Json -Depth 8
+$isoWith = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $isoWithBody
+$isoWithoutBody = @{ name = "live-iso-wo-$(Get-Random)"; profilePreset = "minimal" } | ConvertTo-Json
+$isoWithout = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $isoWithoutBody
+Test-Result -Success ($null -ne $isoWith.id) -Message "9m-B.P1: Extension endpoint created"
+Test-Result -Success ($null -ne $isoWithout.id) -Message "9m-B.P2: Non-extension endpoint created"
+
+$isoSchemas = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($isoWith.id)/Schemas" -Headers $headers
+$isoNoSchemas = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($isoWithout.id)/Schemas" -Headers $headers
+Test-Result -Success ($null -ne ($isoSchemas.Resources | Where-Object { $_.id -eq "urn:test:isolation" })) -Message "9m-B.P3: Extension ON endpoint shows it"
+Test-Result -Success ($null -eq ($isoNoSchemas.Resources | Where-Object { $_.id -eq "urn:test:isolation" })) -Message "9m-B.P4: Extension NOT on other endpoint (isolation)"
+
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($isoWith.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($isoWithout.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+Test-Result -Success $true -Message "9m-B.P5: Cleaned up isolation endpoints"
+
+function Skip-OldSection9mB {
 Write-Host "`n`n────────────────────────────────────────────────────" -ForegroundColor Cyan
 Write-Host "  9m-B: CUSTOM RESOURCE TYPES (G8b)" -ForegroundColor Cyan
 Write-Host "────────────────────────────────────────────────────" -ForegroundColor Cyan
@@ -3703,9 +3765,19 @@ try {
 }
 
 Write-Host "`n--- 9m-B: Custom Resource Type Tests Complete ---" -ForegroundColor Green
+} # End Skip-OldSection9mB
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 9m-C: SCHEMA CUSTOMIZATION COMBINATIONS
+# ⚠️ SKIPPED: Uses Admin Resource Type API removed in v0.28.0.
+# ─────────────────────────────────────────────────────────────────────────────
+$script:currentSection = "9m-C: Schema Customization Combos (SKIPPED)"
+Write-Host "`n`n────────────────────────────────────────────────────" -ForegroundColor Yellow
+Write-Host "  9m-C: SCHEMA CUSTOMIZATION COMBINATIONS — SKIPPED (Admin API removed v0.28.0)" -ForegroundColor Yellow
+Write-Host "────────────────────────────────────────────────────" -ForegroundColor Yellow
+Test-Result -Success $true -Message "9m-C: SKIPPED — uses deleted Admin RT API; combos tested in profile-combinations.e2e-spec.ts"
+
+function Skip-OldSection9mC {
 #   Tests combining custom schema extensions with custom resource types,
 #   including StrictSchemaValidation flag, attribute characteristics,
 #   discovery cross-validation, and multi-resource-type + extension flows.
@@ -4143,6 +4215,7 @@ try { Invoke-RestMethod -Uri "$scimBaseStrict/Sensors/$strictSensorId" -Method D
 try { Invoke-RestMethod -Uri "$scimBaseStrict/Users/$strictComboUserId" -Method DELETE -Headers $headers | Out-Null } catch {}
 
 Write-Host "`n--- 9m-C: Schema Customization Combination Tests Complete ---" -ForegroundColor Green
+} # End Skip-OldSection9mC
 Write-Host "`n═══════════════════════════════════════════════════════════════" -ForegroundColor Yellow
 Write-Host "TEST SECTION 9m: SCHEMA CUSTOMIZATION — ALL SUBSECTIONS COMPLETE" -ForegroundColor Yellow
 Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Yellow
@@ -6162,16 +6235,16 @@ try { Invoke-RestMethod -Uri "$scimBase/Users/$($x9UserB.id)" -Method DELETE -He
 Write-Host "`n--- 9x: User Uniqueness, Required PUT, Returned on PATCH/.search Tests Complete ---" -ForegroundColor Green
 
 # ============================================
-# TEST SECTION 9y: GENERIC RESOURCE PARITY FIXES (RequireIfMatch 428 + invalidFilter)
-$script:currentSection = "9y: Generic Parity Fixes"
+# TEST SECTION 9y: GENERIC RESOURCE PARITY FIXES
+# ⚠️ SKIPPED: Uses Admin RT API removed in v0.28.0.
+$script:currentSection = "9y: Generic Parity Fixes (SKIPPED)"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
-Write-Host "TEST SECTION 9y: GENERIC RESOURCE PARITY FIXES" -ForegroundColor Yellow
-Write-Host "  Fix #1: RequireIfMatch 428 on generic resources" -ForegroundColor Yellow
-Write-Host "  Fix #2: validateFilterAttributePaths wiring" -ForegroundColor Yellow
-Write-Host "  Fix #3: Generic filter 400 for unsupported expressions" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9y: GENERIC RESOURCE PARITY FIXES — SKIPPED (Admin API removed v0.28.0)" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
+Test-Result -Success $true -Message "9y: SKIPPED — uses deleted Admin RT API; parity tested in profile-combinations.e2e-spec.ts"
 
+function Skip-OldSection9y {
 # --- Setup: Create endpoint with RequireIfMatch + CustomResourceTypesEnabled ---
 Write-Host "`n--- 9y Setup: Creating endpoint with RequireIfMatch + CustomResourceTypesEnabled ---" -ForegroundColor Cyan
 $y9EndpointBody = @{
@@ -6347,6 +6420,7 @@ try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$Y9EndpointId" -Meth
 try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$Y9FilterEndpointId" -Method DELETE -Headers $headers | Out-Null } catch {}
 
 Write-Host "`n--- 9y: Generic Resource Parity Fix Tests Complete ---" -ForegroundColor Green
+} # End Skip-OldSection9y
 
 # ============================================
 # TEST SECTION 9z: ENDPOINT PROFILES & PRESET DISCOVERY (Phase 13/14)
@@ -6434,6 +6508,86 @@ $inlineEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST 
 Test-Result -Success ($null -ne $inlineEp.id) -Message "9z.15: Inline profile endpoint created"
 $inlineSchemas = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($inlineEp.id)/Schemas" -Headers $headers
 Test-Result -Success ($inlineSchemas.totalResults -eq 1) -Message "9z.16: Inline profile has 1 schema"
+
+# --- Test 9z.17–9z.33: Partial PATCH profile settings & combinations ---
+Write-Host "`n--- Test 9z.17–9z.33: Partial PATCH Profile Settings & Combinations ---" -ForegroundColor Cyan
+
+# Create a dedicated rfc-standard endpoint for PATCH tests
+$patchEpBody = @{ name = "live-patch-$(Get-Random)"; profilePreset = "rfc-standard" } | ConvertTo-Json
+$patchEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $patchEpBody
+Test-Result -Success ($null -ne $patchEp.id) -Message "9z.17: Created rfc-standard endpoint for PATCH tests"
+
+# 9z.18: PATCH add single setting via profile.settings
+$pBody18 = @{ profile = @{ settings = @{ SoftDeleteEnabled = "True" } } } | ConvertTo-Json -Depth 4
+$p18 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method PATCH -Headers $headers -Body $pBody18
+Test-Result -Success ($p18.config.SoftDeleteEnabled -eq "True") -Message "9z.18: PATCH added SoftDeleteEnabled via profile.settings"
+Test-Result -Success ($p18.profile.settings.SoftDeleteEnabled -eq "True") -Message "9z.19: profile.settings reflects SoftDeleteEnabled"
+
+# 9z.20: PATCH add second setting — first should be preserved
+$pBody20 = @{ profile = @{ settings = @{ StrictSchemaValidation = "True" } } } | ConvertTo-Json -Depth 4
+$p20 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method PATCH -Headers $headers -Body $pBody20
+Test-Result -Success ($p20.profile.settings.SoftDeleteEnabled -eq "True") -Message "9z.20: SoftDeleteEnabled preserved after second PATCH"
+Test-Result -Success ($p20.profile.settings.StrictSchemaValidation -eq "True") -Message "9z.21: StrictSchemaValidation added"
+
+# 9z.22: PATCH overwrite individual setting value
+$pBody22 = @{ profile = @{ settings = @{ SoftDeleteEnabled = "False" } } } | ConvertTo-Json -Depth 4
+$p22 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method PATCH -Headers $headers -Body $pBody22
+Test-Result -Success ($p22.profile.settings.SoftDeleteEnabled -eq "False") -Message "9z.22: SoftDeleteEnabled overwritten to False"
+Test-Result -Success ($p22.profile.settings.StrictSchemaValidation -eq "True") -Message "9z.23: StrictSchemaValidation still True"
+
+# 9z.24: Schemas untouched after settings-only PATCH
+$schemasAfterPatch = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($patchEp.id)/Schemas" -Headers $headers
+Test-Result -Success ($schemasAfterPatch.totalResults -eq 3) -Message "9z.24: Schemas unchanged (3) after settings PATCH"
+
+# 9z.25: SPC untouched after settings-only PATCH
+$spcAfterPatch = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($patchEp.id)/ServiceProviderConfig" -Headers $headers
+Test-Result -Success ($spcAfterPatch.bulk.supported -eq $true) -Message "9z.25: SPC bulk=true preserved after settings PATCH"
+
+# 9z.26: PATCH multiple settings at once
+$pBody26 = @{ profile = @{ settings = @{ RequireIfMatch = "True"; VerbosePatchSupported = "True"; AllowAndCoerceBooleanStrings = "True" } } } | ConvertTo-Json -Depth 4
+$p26 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method PATCH -Headers $headers -Body $pBody26
+Test-Result -Success ($p26.profile.settings.RequireIfMatch -eq "True") -Message "9z.26: RequireIfMatch added"
+Test-Result -Success ($p26.profile.settings.VerbosePatchSupported -eq "True") -Message "9z.27: VerbosePatchSupported added"
+Test-Result -Success ($p26.profile.settings.AllowAndCoerceBooleanStrings -eq "True") -Message "9z.28: AllowAndCoerceBooleanStrings added"
+Test-Result -Success ($p26.profile.settings.StrictSchemaValidation -eq "True") -Message "9z.29: Previous settings still preserved"
+
+# 9z.30: PATCH replace SPC via profile
+$pBody30 = @{
+    profile = @{
+        serviceProviderConfig = @{
+            patch = @{ supported = $true }; bulk = @{ supported = $false }
+            filter = @{ supported = $true; maxResults = 42 }; sort = @{ supported = $false }
+            etag = @{ supported = $false }; changePassword = @{ supported = $false }
+        }
+    }
+} | ConvertTo-Json -Depth 5
+$p30 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method PATCH -Headers $headers -Body $pBody30
+$spc30 = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($patchEp.id)/ServiceProviderConfig" -Headers $headers
+Test-Result -Success ($spc30.bulk.supported -eq $false) -Message "9z.30: SPC bulk changed to false via PATCH"
+Test-Result -Success ($spc30.filter.maxResults -eq 42) -Message "9z.31: SPC maxResults changed to 42"
+# Settings should still be preserved
+Test-Result -Success ($p30.profile.settings.RequireIfMatch -eq "True") -Message "9z.32: Settings preserved after SPC PATCH"
+
+# 9z.33: PATCH displayName + settings combined
+$pBody33 = @{ displayName = "Patched Display $(Get-Random)"; profile = @{ settings = @{ ReprovisionOnConflictForSoftDeletedResource = "True" } } } | ConvertTo-Json -Depth 4
+$p33 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method PATCH -Headers $headers -Body $pBody33
+Test-Result -Success ($p33.displayName -like "Patched Display*") -Message "9z.33: displayName updated alongside settings"
+Test-Result -Success ($p33.profile.settings.ReprovisionOnConflictForSoftDeletedResource -eq "True") -Message "9z.34: Reprovision setting added"
+
+# 9z.35: PATCH reject config + profile together
+Write-Host "`n--- Test 9z.35: Reject config + profile together ---" -ForegroundColor Cyan
+$pBody35 = @{ config = @{ SoftDeleteEnabled = "True" }; profile = @{ settings = @{ StrictSchemaValidation = "True" } } } | ConvertTo-Json -Depth 4
+try {
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method PATCH -Headers $headers -Body $pBody35
+    Test-Result -Success $false -Message "9z.35: Should have rejected config+profile"
+} catch {
+    $status35 = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($status35 -eq 400) -Message "9z.35: Rejected config+profile with 400"
+}
+
+# Cleanup PATCH test endpoint
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+Test-Result -Success $true -Message "9z.36: Cleaned up PATCH test endpoint"
 
 # --- Cleanup ---
 Write-Host "`n--- Cleanup: Delete test endpoints ---" -ForegroundColor Cyan

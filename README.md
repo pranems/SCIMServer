@@ -1,255 +1,456 @@
-# ✨ SCIMServer
+# SCIMServer
 
-Production-ready SCIM 2.0 server with a built-in observability UI for Microsoft Entra ID provisioning.
+Production-ready, multi-tenant SCIM 2.0 server purpose-built for Microsoft Entra ID provisioning — with a built-in observability UI, 100% RFC compliance, and three deployment options.
 
-| Key | Value |
+| | |
 |---|---|
-| Version | [`v0.28.0`](https://github.com/pranems/SCIMServer/releases/latest) |
-| Protocol | [SCIM 2.0](https://scim.cloud/) |
-| Target Platform | [Microsoft Entra ID](https://entra.microsoft.com/) |
-| Runtime | Node.js 24 |
-| License | [MIT](LICENSE) |
+| **Version** | `0.28.0` |
+| **Protocol** | SCIM 2.0 ([RFC 7643](https://datatracker.ietf.org/doc/html/rfc7643) / [RFC 7644](https://datatracker.ietf.org/doc/html/rfc7644)) |
+| **Target IdP** | [Microsoft Entra ID](https://entra.microsoft.com/) |
+| **Runtime** | Node.js 24 &middot; NestJS 11 &middot; TypeScript 5.9 |
+| **Persistence** | PostgreSQL 17 (Prisma 7) **or** in-memory |
+| **Registry** | `ghcr.io/pranems/scimserver` (public, anonymous pull) |
+| **License** | MIT |
 
-SCIM endpoint: `/scim/v2`  
-Admin & observability endpoint family: `/scim/admin/*`
+---
+
+## Table of Contents
+
+- [Why SCIMServer](#why-scimserver)
+- [Quick Start](#quick-start)
+- [Architecture](#architecture)
+- [SCIM Compliance](#scim-compliance)
+- [Authentication](#authentication)
+- [Per-Endpoint Configuration](#per-endpoint-configuration)
+- [Configuration Reference](#configuration-reference)
+- [Microsoft Entra ID Setup](#microsoft-entra-id-setup)
+- [Operations & Observability](#operations--observability)
+- [Testing](#testing)
+- [Repository Structure](#repository-structure)
+- [Documentation Index](#documentation-index)
+- [Technology Stack](#technology-stack)
+- [CI/CD](#cicd)
+- [Prerequisites](#prerequisites)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
 ## Why SCIMServer
 
-- Full SCIM resource surface: Users, Groups, Schemas, ResourceTypes, ServiceProviderConfig
-- Entra-focused behavior and validator alignment (25/25 + 7 preview scenarios)
-- Built-in UI for activity feed, log inspection, endpoint management, and runtime status
-- Production operations support: log streaming/download, health endpoint, version metadata
-- Cloud-ready deployment with Azure Container Apps + PostgreSQL with auto-scale to zero
+| Capability | Detail |
+|---|---|
+| **Full SCIM surface** | Users, Groups, custom resource types, Schemas, ResourceTypes, ServiceProviderConfig, Bulk, /Me |
+| **Entra-validated** | 25/25 Microsoft SCIM Validator tests + 7 preview pass with 0 false positives |
+| **Multi-tenant isolation** | Each endpoint has its own resources, schemas, config flags, and optional dedicated credentials |
+| **Endpoint profiles** | 5 built-in presets (`entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`) with tighten-only validation |
+| **Schema-driven validation** | RFC 7643 §2 attribute characteristics enforcement — type, required, mutability, returned, uniqueness, caseExact, canonicalValues |
+| **Built-in observability UI** | Real-time activity feed, searchable log viewer, endpoint management, runtime status dashboard |
+| **3-tier auth** | Per-endpoint bcrypt credential → OAuth 2.0 JWT → global shared secret fallback chain |
+| **Cloud-ready** | Azure Container Apps with scale-to-zero, Docker Compose, or local dev — all first-class |
 
 ---
 
 ## Quick Start
 
-### Option A — Azure (recommended)
+### Option A — Azure (recommended for production)
 
 ```powershell
 iex (iwr https://raw.githubusercontent.com/pranems/SCIMServer/master/bootstrap.ps1).Content
 ```
 
-The bootstrap flow provisions resources, deploys the app, and prints required secrets/URLs.
+Provisions all Azure resources, deploys the app, and prints the required secrets and URLs. Takes ~5 minutes.
 
-### Option B — Docker (fast local smoke test)
+### Option B — Docker Compose (self-hosted)
 
-```powershell
-docker build -t scimserver:latest -f Dockerfile .
-docker run --rm -p 8080:8080 `
-  -e PORT=8080 `
-  -e SCIM_SHARED_SECRET=local-scim-secret `
-  -e JWT_SECRET=local-jwt-secret `
-  -e OAUTH_CLIENT_ID=scimserver-client `
-  -e OAUTH_CLIENT_SECRET=local-oauth-secret `
-  scimserver:latest
+```yaml
+# docker-compose.yml
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: scim
+      POSTGRES_PASSWORD: scim
+      POSTGRES_DB: scimdb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  scimserver:
+    image: ghcr.io/pranems/scimserver:latest
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      SCIM_SHARED_SECRET: your-scim-secret
+      JWT_SECRET: your-jwt-secret
+      OAUTH_CLIENT_SECRET: your-oauth-secret
+      DATABASE_URL: postgresql://scim:scim@postgres:5432/scimdb
+    depends_on:
+      - postgres
+
+volumes:
+  pgdata:
 ```
 
-- UI: `http://localhost:8080/`
-- SCIM base: `http://localhost:8080/scim/v2`
-- Health: `http://localhost:8080/health`
+```powershell
+docker compose up -d
+```
 
-### Option C — Local dev (API + web)
+| Endpoint | URL |
+|---|---|
+| Web UI | `http://localhost:8080/` |
+| SCIM base | `http://localhost:8080/scim/v2` |
+| Health | `http://localhost:8080/health` |
+
+### Option C — Local development
 
 ```powershell
 git clone https://github.com/pranems/SCIMServer.git
 cd SCIMServer
 
-# API terminal
+# API (terminal 1)
 cd api
 npm install
 npx prisma generate
 npx prisma migrate deploy
-npm run start:dev
+npm run start:dev          # http://localhost:3000/scim
 
-# Web terminal
-cd ..\web
+# Web UI (terminal 2)
+cd web
 npm install
-npm run dev
+npm run dev                # http://localhost:5173
 ```
 
----
+### Option D — In-memory (no database required)
 
-## Prerequisites
+```powershell
+cd api
+npm install && npm run build
+$env:PERSISTENCE_BACKEND = "inmemory"
+$env:SCIM_SHARED_SECRET = "local-secret"
+$env:JWT_SECRET = "local-jwt"
+$env:OAUTH_CLIENT_SECRET = "local-oauth"
+$env:PORT = "6000"
+node dist/main.js          # http://localhost:6000/scim
+```
 
-- Node.js 24+
-- npm 10+
-- Docker Desktop (optional, for container workflow)
-- Azure CLI + PowerShell 7 (optional, for Azure deployment scripts)
-
----
-
-## Configuration
-
-### Required in production
-
-| Variable | Purpose |
-|---|---|
-| `SCIM_SHARED_SECRET` | Global shared secret bearer token — legacy fallback (tier 3 of 3-tier auth) |
-| `JWT_SECRET` | OAuth/JWT signing key (tier 2) |
-| `OAUTH_CLIENT_SECRET` | OAuth client credential secret (tier 2) |
-
-> **3-tier auth (v0.21.0):** Incoming `Bearer` tokens are evaluated as: (1) per-endpoint bcrypt credential → (2) OAuth JWT → (3) global `SCIM_SHARED_SECRET`. Enable per-endpoint credentials via the `PerEndpointCredentialsEnabled` flag and the Admin Credential API.
-
-> **ReadOnly attribute stripping (v0.22.0):** POST/PUT payloads automatically strip `mutability:'readOnly'` attributes (`id`, `meta`, `groups`, custom readOnly) per RFC 7643 §2.2. PATCH ops targeting readOnly attrs are silently stripped (non-strict) or rejected (strict). Optional warning URN extension via `IncludeWarningAboutIgnoredReadOnlyAttribute` flag.
-
-> **P2 Attribute Characteristic Enforcement (v0.24.0):** Schema-driven `returned:"always"` enforcement (userName, displayName, Group active), `writeOnly→returned:"never"` stripping (password), readOnly sub-attribute stripping on mutation requests, and `caseExact`-aware SCIM filtering — all derived from schema definitions, not hardcoded.
-
-### Common optional variables
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `PORT` | `8080` | API/web runtime port |
-| `OAUTH_CLIENT_ID` | `scimserver-client` | OAuth client identifier |
-| `DATABASE_URL` | `postgresql://scim:scim@localhost:5432/scimdb` | PostgreSQL connection string |
-| `NODE_ENV` | `production` (container) | Runtime mode |
-
-Security note: treat all secrets as sensitive and rotate after sharing/output exposure.
-
----
-
-## Configure Microsoft Entra Provisioning
-
-Use these values in Enterprise Application provisioning:
-
-- Tenant URL: `https://<your-app-url>/scim/v2`
-- Secret Token: value of `SCIM_SHARED_SECRET` **or** a per-endpoint credential token (recommended for multi-tenant isolation)
-
-To use a per-endpoint credential instead of the global secret:
-1. Enable `PerEndpointCredentialsEnabled` on the endpoint (`PATCH /scim/admin/endpoints/:id`)
-2. Create a credential via `POST /scim/admin/endpoints/:id/credentials`
-3. Copy the returned plaintext token (shown once) into the Entra "Secret Token" field
-
-Then test connection, configure mappings, assign users/groups, and enable provisioning.
-
-References:
-
-- [docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md)
-- [docs/SCIM_REFERENCE.md](docs/SCIM_REFERENCE.md)
-- [docs/SCIM_COMPLIANCE.md](docs/SCIM_COMPLIANCE.md)
+All data lives in memory — ideal for demos, CI/CD pipelines, and integration testing.
 
 ---
 
 ## Architecture
 
 ```mermaid
-flowchart LR
-    Entra[Microsoft Entra ID\nProvisioning] -->|SCIM / HTTPS| App[SCIMServer\nAzure Container Apps]
-    App --> UI[Built-in Web UI\n/admin + logs + activity]
-    App --> DB[(PostgreSQL 17)]
+flowchart TB
+    subgraph Clients
+        Entra[Microsoft Entra ID]
+        Admin[Admin / API Consumer]
+    end
+
+    subgraph SCIMServer["SCIMServer (Node.js 24)"]
+        Auth[3-Tier Auth Guard]
+        SCIM[SCIM Controllers<br/>Users · Groups · Generic · Bulk · /Me]
+        Discovery[Discovery<br/>Schemas · ResourceTypes · SPC]
+        AdminAPI[Admin APIs<br/>Endpoints · Credentials · Logs · Profiles]
+        UI[React SPA<br/>Activity · Logs · Status]
+        Domain[Domain Layer<br/>SchemaValidator · PatchEngines · Helpers]
+        Repo[Repository Layer<br/>Prisma + InMemory]
+    end
+
+    subgraph Storage
+        PG[(PostgreSQL 17)]
+        MEM[(In-Memory Maps)]
+    end
+
+    Entra -->|SCIM / HTTPS| Auth
+    Admin -->|REST / Bearer| Auth
+    Auth --> SCIM
+    Auth --> AdminAPI
+    SCIM --> Domain
+    Domain --> Repo
+    Repo -->|prisma| PG
+    Repo -->|inmemory| MEM
+    AdminAPI --> Repo
+    UI -.->|static| SCIMServer
 ```
 
-Request shape:
+### Data Model (Prisma — 5 models)
 
-- SCIM API: `https://<host>/scim/v2`
-- Admin APIs: `https://<host>/scim/admin/*`
-- Web UI: `https://<host>/`
+| Model | Purpose |
+|---|---|
+| `Endpoint` | Tenant container — name, profile (JSONB: schemas, resourceTypes, SPC, settings), active flag |
+| `ScimResource` | Polymorphic SCIM resource — `resourceType` discriminator (User / Group / custom), JSONB payload, CITEXT columns, version-based ETags |
+| `ResourceMember` | Group membership join table with display and type |
+| `RequestLog` | Per-request audit log (method, URL, status, headers, bodies, duration) |
+| `EndpointCredential` | Per-endpoint bcrypt-hashed bearer tokens with optional expiry |
+
+### Request Flow
+
+```
+Incoming HTTP
+  → /scim/v2 → /scim rewrite middleware
+  → Express JSON parser (5 MB, application/scim+json + application/json)
+  → NestJS global prefix (/scim)
+  → SharedSecretGuard (3-tier auth)
+  → Controller (validation, projection params)
+  → Service (business logic, schema validation, uniqueness, ETag)
+  → Repository (Prisma SQL or InMemory Map)
+  → Response (SCIM JSON + ETag header + application/scim+json)
+```
 
 ---
 
-## Operations
+## SCIM Compliance
 
-Key admin endpoints:
+**RFC 7643 / 7644 compliance: 100%**
 
-- `GET /scim/admin/version`
-- `GET /scim/admin/log-config/recent?limit=25`
-- `GET /scim/admin/log-config/stream?level=INFO` (SSE)
-- `GET /scim/admin/log-config/download?format=json`
+| Feature | Status | RFC Reference |
+|---|---|---|
+| **CRUD** — POST, GET, PUT, PATCH, DELETE | ✅ | 7644 §3.2–§3.6 |
+| **Filtering** — 10 operators + and/or/not + grouping | ✅ | 7644 §3.4.2.2 |
+| **Pagination** — startIndex + count | ✅ | 7644 §3.4.2.4 |
+| **Sorting** — sortBy + sortOrder | ✅ | 7644 §3.4.2.3 |
+| **Attribute projection** — attributes / excludedAttributes | ✅ | 7644 §3.4.2.5, §3.9 |
+| **POST /.search** — for Users, Groups, custom types | ✅ | 7644 §3.4.3 |
+| **Bulk operations** — POST /Bulk with bulkId cross-referencing | ✅ | 7644 §3.7 |
+| **/Me** — JWT sub → identity resolution | ✅ | 7644 §3.11 |
+| **ETag & conditional requests** — W/"vN" + If-Match + If-None-Match | ✅ | 7644 §3.14 |
+| **Discovery endpoints** — SPC, Schemas, ResourceTypes (public) | ✅ | 7643 §5–§7, 7644 §4 |
+| **Schema validation** — type, required, mutability, returned, uniqueness, caseExact, canonicalValues | ✅ | 7643 §2 |
+| **Attribute characteristics** — returned:always/default/request/never enforcement | ✅ | 7643 §2.4 |
+| **ReadOnly stripping** — auto-strip on POST/PUT, silent strip or 400 on PATCH | ✅ | 7643 §2.2 |
+| **Immutable enforcement** — reject value changes on PUT/PATCH | ✅ | 7643 §2.2 |
+| **Custom resource types** — data-driven registration beyond User/Group | ✅ | 7643 §6 |
+| **Enterprise User extension** — urn:ietf:params:scim:schemas:extension:enterprise:2.0:User | ✅ | 7643 §4.3 |
+| **SCIM error format** — application/scim+json on all errors | ✅ | 7644 §3.12 |
+| **Content-Type** — application/scim+json on all responses | ✅ | 7644 §3.1 |
 
-Remote log helper:
+---
+
+## Authentication
+
+SCIMServer uses a **3-tier authentication fallback chain**. Each incoming `Authorization: Bearer <token>` is evaluated in order:
+
+| Tier | Method | Requirement | `req.authType` |
+|---|---|---|---|
+| 1 | Per-endpoint bcrypt credential | `PerEndpointCredentialsEnabled` flag + active credential via Admin API | `endpoint_credential` |
+| 2 | OAuth 2.0 JWT | `JWT_SECRET` + `OAUTH_CLIENT_SECRET` env vars | `oauth` |
+| 3 | Global shared secret | `SCIM_SHARED_SECRET` env var | `legacy` |
+
+**Public routes** (discovery endpoints, `POST /oauth/token`, web UI) bypass all tiers via `@Public()` decorator.
+
+### Per-Endpoint Credentials (optional)
 
 ```powershell
-.\scripts\remote-logs.ps1 -Mode recent -BaseUrl https://<your-app-url>
-.\scripts\remote-logs.ps1 -Mode tail -BaseUrl https://<your-app-url>
-.\scripts\remote-logs.ps1 -Mode download -BaseUrl https://<your-app-url> -Format json
+# Enable on an endpoint
+Invoke-RestMethod -Method PATCH `
+  -Uri "http://localhost:8080/scim/admin/endpoints/<id>" `
+  -Headers @{ Authorization = "Bearer $secret" } `
+  -ContentType "application/json" `
+  -Body '{"config":{"PerEndpointCredentialsEnabled":"True"}}'
+
+# Create credential (returns plaintext token ONCE)
+Invoke-RestMethod -Method POST `
+  -Uri "http://localhost:8080/scim/admin/endpoints/<id>/credentials" `
+  -Headers @{ Authorization = "Bearer $secret" }
+
+# List / Revoke
+GET  /scim/admin/endpoints/<id>/credentials
+DELETE /scim/admin/endpoints/<id>/credentials/<credentialId>
 ```
-
-Live sample payloads:
-
-- [docs/images/readme/version-latest.json](docs/images/readme/version-latest.json)
-- [docs/images/readme/recent-logs-latest.json](docs/images/readme/recent-logs-latest.json)
-
-Operational docs:
-
-- [docs/LOGGING_AND_OBSERVABILITY.md](docs/LOGGING_AND_OBSERVABILITY.md)
-- [docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md](docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md)
 
 ---
 
-## Update / Upgrade
+## Per-Endpoint Configuration
 
-```powershell
-iex (irm https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-func.ps1)
-Update-SCIMServer -Version v0.28.0 -ResourceGroup <rg> -AppName <app>
-```
+Each endpoint has **12 persisted boolean settings + logLevel** stored in `profile.settings`, plus **2 capabilities derived from the profile structure** (v0.28.0).
 
-Admin/release references:
+### Persisted Settings (`profile.settings`)
 
-- [admin.md](admin.md)
-- [CHANGELOG.md](CHANGELOG.md)
-- [DEPLOYMENT.md](DEPLOYMENT.md)
-
----
-
-## Quality Status
-
-> 📊 See [PROJECT_HEALTH_AND_STATS.md](docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
-
-- **All unit and E2E tests passing** (2,830 unit + 613 E2E). Live: 832 live assertions
-- Microsoft SCIM Validator: **25/25 passed** (+ 7 preview scenarios)
-
-### Per-Endpoint Config Flags
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `SoftDeleteEnabled` | `false` | Soft delete (set `active=false` + `deletedAt`) instead of physical row deletion |
-| `ReprovisionOnConflictForSoftDeletedResource` | `false` | Re-activate soft-deleted resource on POST conflict instead of 409 (requires SoftDeleteEnabled) |
-| `StrictSchemaValidation` | `false` | Reject extension URNs not declared in `schemas[]` or not registered |
+| Flag | Default | Purpose |
+|---|---|---|
+| `SoftDeleteEnabled` | `false` | Soft delete (`active=false` + `deletedAt`) instead of physical deletion |
+| `ReprovisionOnConflictForSoftDeletedResource` | `false` | Re-activate soft-deleted resource on POST conflict (requires SoftDeleteEnabled) |
+| `StrictSchemaValidation` | `false` | Full RFC 7643 §2 attribute validation on all write paths |
+| `AllowAndCoerceBooleanStrings` | `true` | Coerce `"True"`/`"False"` to native booleans (Entra compatibility) |
 | `MultiOpPatchRequestAddMultipleMembersToGroup` | `false` | Allow multi-member add in single PATCH |
 | `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | `false` | Allow multi-member remove in single PATCH |
 | `VerbosePatchSupported` | `false` | Dot-notation PATCH path resolution |
-| `PatchOpAllowRemoveAllMembers` | `true` | Allow removing all members via `path=members` |
-| `RequireIfMatch` | `false` | Require If-Match header on mutating requests (428 if missing) |
-| `AllowAndCoerceBooleanStrings` | `true` | Coerce boolean string values ("True"/"False") to native booleans before schema validation |
-| `CustomResourceTypesEnabled` | `false` | Enable custom resource type registration and generic SCIM CRUD beyond User/Group |
-| `BulkOperationsEnabled` | `false` | Enable `POST /Bulk` batch processing (RFC 7644 §3.7) |
-| `PerEndpointCredentialsEnabled` | `false` | Enable per-endpoint bcrypt bearer token credentials (3-tier auth) |
-| `IncludeWarningAboutIgnoredReadOnlyAttribute` | `false` | Attach warning URN to responses when readOnly attrs stripped (RFC 7643 §2.2) |
-| `IgnoreReadOnlyAttributesInPatch` | `false` | Override G8c strict PATCH rejection → strip+warn (requires StrictSchemaValidation ON) |
+| `PatchOpAllowRemoveAllMembers` | `true` | Allow removing all group members via `path=members` |
+| `RequireIfMatch` | `false` | Require `If-Match` header on mutating requests (428 if missing) |
+| `PerEndpointCredentialsEnabled` | `false` | Enable per-endpoint bcrypt bearer token credentials |
+| `IncludeWarningAboutIgnoredReadOnlyAttribute` | `false` | Warning URN extension when readOnly attrs stripped |
+| `IgnoreReadOnlyAttributesInPatch` | `false` | Strip+warn instead of 400 on readOnly PATCH (requires StrictSchemaValidation) |
 
-### Coverage scripts
+### Derived Capabilities (from profile structure)
+
+| Capability | Derived From | Purpose |
+|---|---|---|
+| Custom resource types | `profile.resourceTypes` entries beyond User/Group | Enable custom resource type CRUD (D9) |
+| Bulk operations | `profile.serviceProviderConfig.bulk.supported` | Enable `POST /Bulk` batch processing (D8) |
+
+> The `EndpointConfig` interface in source still defines all 14 boolean flags + logLevel for backward compatibility. The two derived capabilities were previously standalone flags (`CustomResourceTypesEnabled`, `BulkOperationsEnabled`) and are now implied by the profile.
+
+Full reference: [docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md)
+
+### Endpoint Profiles (v0.28.0)
+
+Endpoints are created with a **profile** — an RFC-native JSONB document containing schemas, resourceTypes, serviceProviderConfig, and settings.
+
+5 built-in presets:
+
+| Preset | Description |
+|---|---|
+| `entra-id` | Default — full User + Group + Enterprise extension, Entra-compatible flags |
+| `entra-id-minimal` | Minimal Entra-compatible surface |
+| `rfc-standard` | Strict RFC 7643/7644 defaults |
+| `minimal` | Bare minimum User-only endpoint |
+| `user-only` | User CRUD only, no Groups |
 
 ```powershell
-cd api
-npm run test:cov          # Unit test coverage → coverage/
-npm run test:e2e:cov      # E2E test coverage  → coverage-e2e/
-npm run test:cov:all      # Both unit + E2E coverage
-npm run test:all          # Unit + E2E + live smoke tests
+# Create endpoint with preset
+POST /scim/admin/endpoints
+{ "name": "my-tenant", "profilePreset": "entra-id" }
+
+# List available presets
+GET /scim/admin/profile-presets
 ```
-
-Testing references:
-
-- [docs/TESTING-WORKFLOW.md](docs/TESTING-WORKFLOW.md)
-- [docs/SCIM_VALIDATION_GAP_ANALYSIS.md](docs/SCIM_VALIDATION_GAP_ANALYSIS.md)
-- [docs/SCIM_GROUP_PERFORMANCE_ANALYSIS.md](docs/SCIM_GROUP_PERFORMANCE_ANALYSIS.md)
-- [docs/PERSISTENCE_PERFORMANCE_ANALYSIS.md](docs/PERSISTENCE_PERFORMANCE_ANALYSIS.md)
 
 ---
 
-## Documentation Index
+## Configuration Reference
 
-Start here: [docs/INDEX.md](docs/INDEX.md)
+### Required Environment Variables
 
-High-value paths:
+| Variable | Purpose |
+|---|---|
+| `SCIM_SHARED_SECRET` | Global shared secret bearer token (auth tier 3) |
+| `JWT_SECRET` | OAuth / JWT signing key (auth tier 2) |
+| `OAUTH_CLIENT_SECRET` | OAuth client credential secret (auth tier 2) |
 
-- Deploy and operate: [docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md), [DEPLOYMENT.md](DEPLOYMENT.md)
-- API and collections: [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md), [docs/openapi/](docs/openapi/), [docs/postman/](docs/postman/), [docs/insomnia/](docs/insomnia/)
-- SCIM protocol: [docs/SCIM_REFERENCE.md](docs/SCIM_REFERENCE.md), [docs/SCIM_RFC_COMPLIANCE_LAYER.md](docs/SCIM_RFC_COMPLIANCE_LAYER.md)
-- Observability: [docs/LOGGING_AND_OBSERVABILITY.md](docs/LOGGING_AND_OBSERVABILITY.md), [docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md](docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md)
-- Design context: [docs/TECHNICAL_DESIGN_DOCUMENT.md](docs/TECHNICAL_DESIGN_DOCUMENT.md), [docs/SQLITE_COMPROMISE_ANALYSIS.md](docs/SQLITE_COMPROMISE_ANALYSIS.md) (historical, pre-PostgreSQL)
+### Optional Environment Variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `3000` (dev) / `8080` (container) | HTTP listen port |
+| `DATABASE_URL` | `postgresql://scim:scim@localhost:5432/scimdb` | PostgreSQL connection string |
+| `PERSISTENCE_BACKEND` | `prisma` | `prisma` for PostgreSQL, `inmemory` for Map-based storage |
+| `OAUTH_CLIENT_ID` | `scimserver-client` | OAuth client identifier |
+| `NODE_ENV` | `production` (container) | Runtime mode |
+| `API_PREFIX` | `scim` | Global route prefix |
+
+> **Security:** Treat all secrets as sensitive. Rotate immediately after sharing or log exposure.
+
+---
+
+## Microsoft Entra ID Setup
+
+1. **Create an Enterprise Application** in [Azure Portal](https://portal.azure.com) → Entra ID → Enterprise Applications
+2. **Configure provisioning:**
+   - **Tenant URL:** `https://<your-app-url>/scim/v2`
+   - **Secret Token:** value of `SCIM_SHARED_SECRET` or a per-endpoint credential token
+3. **Test connection** — expect success
+4. **Configure attribute mappings** (defaults work for User + Group)
+5. **Assign users/groups** to the Enterprise App
+6. **Turn provisioning ON**
+7. **Monitor** — open your app URL in a browser for the real-time dashboard
+
+> For per-endpoint credentials (recommended for multi-tenant isolation): enable `PerEndpointCredentialsEnabled`, create a credential via `POST /scim/admin/endpoints/:id/credentials`, and use the returned token as the Entra Secret Token.
+
+Detailed guide: [docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md)
+
+---
+
+## Operations & Observability
+
+### Key Admin Endpoints
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /scim/admin/version` | Runtime metadata (version, uptime, memory, auth config, storage) |
+| `GET /scim/admin/log-config/recent?limit=25` | Recent ring-buffer logs |
+| `GET /scim/admin/log-config/stream?level=INFO` | Live SSE log stream |
+| `GET /scim/admin/log-config/download?format=json` | Download logs as JSON or NDJSON |
+| `GET /scim/admin/endpoints` | List all endpoints |
+| `POST /scim/admin/endpoints` | Create a new endpoint |
+| `GET /scim/admin/profile-presets` | List available endpoint profile presets |
+| `GET /health` | Health check |
+
+### Remote Log Access
+
+```powershell
+# PowerShell helper script
+.\scripts\remote-logs.ps1 -Mode recent -BaseUrl https://<app-url>
+.\scripts\remote-logs.ps1 -Mode tail -BaseUrl https://<app-url>
+.\scripts\remote-logs.ps1 -Mode download -BaseUrl https://<app-url> -Format json
+```
+
+```bash
+# curl examples
+curl "https://<app-url>/scim/admin/log-config/recent?limit=25" \
+  -H "Authorization: Bearer <SCIM_SECRET>"
+
+curl -N "https://<app-url>/scim/admin/log-config/stream?level=INFO" \
+  -H "Authorization: Bearer <SCIM_SECRET>"
+```
+
+### Web UI
+
+The built-in React SPA (served at `/`) provides:
+
+- **Activity feed** — real-time provisioning event stream with identifier extraction
+- **Log viewer** — searchable, filterable request/response inspection with detail modal
+- **Endpoint management** — create, configure, and monitor endpoints
+- **Runtime status** — version, uptime, memory, auth mode, storage info
+- **Theme support** — light and dark modes
+
+---
+
+## Testing
+
+### Test Suite Summary
+
+| Level | Tests | Suites | Tool |
+|---|---|---|---|
+| **Unit** | 2,830 | 73 | Jest 30 + ts-jest |
+| **E2E** | 613 + 6 skipped | 30 | Jest + Supertest |
+| **Live integration** | 832 assertions | — | PowerShell (`live-test.ps1`) |
+| **Microsoft Validator** | 25/25 + 7 preview | — | [SCIM Validator](https://scimvalidator.microsoft.com/) |
+
+### Running Tests
+
+```powershell
+cd api
+
+# Unit tests
+npm test
+
+# E2E tests (requires PostgreSQL)
+npm run test:e2e
+
+# Coverage reports
+npm run test:cov          # Unit → coverage/
+npm run test:e2e:cov      # E2E → coverage-e2e/
+npm run test:cov:all      # Both
+
+# Live integration tests (requires running server)
+..\scripts\live-test.ps1                                                        # local on port 6000
+..\scripts\live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "secret"  # Docker
+..\scripts\live-test.ps1 -Verbose                                               # full request/response tracing
+
+# Full pipeline (unit + E2E + live)
+npm run test:all
+```
+
+### Deployment Verification Matrix
+
+All three deployment modes produce identical test results:
+
+| Mode | Backend | Live Assertions |
+|---|---|---|
+| Local (port 6000) | In-Memory | 832 |
+| Docker (port 8080) | PostgreSQL | 832 |
+| Azure Container Apps | PostgreSQL | 832 |
 
 ---
 
@@ -257,16 +458,140 @@ High-value paths:
 
 ```text
 SCIMServer/
-├── api/                  # NestJS SCIM API + admin APIs + Prisma
-├── web/                  # React/Vite frontend
-├── docs/                 # Protocol, operations, and product docs
-├── infra/                # Bicep infrastructure templates
-├── scripts/              # Deploy, test, and operations automation
-├── Dockerfile            # Unified production image (web + api)
-├── bootstrap.ps1         # One-liner bootstrap entrypoint
-├── setup.ps1             # Local/deploy helper wrapper
-└── deploy.ps1            # Deployment entrypoint wrapper
+├── api/                          # NestJS SCIM API
+│   ├── src/
+│   │   ├── main.ts               # Bootstrap, middleware, global config
+│   │   ├── auth/                  # SharedSecretGuard, ScimAuthGuard
+│   │   ├── domain/               # Pure domain: models, patch engines, validation, repos
+│   │   ├── infrastructure/       # Prisma repository implementations
+│   │   ├── modules/
+│   │   │   ├── scim/             # SCIM protocol layer
+│   │   │   │   ├── controllers/  # Users, Groups, Generic, Bulk, /Me, Discovery, Admin
+│   │   │   │   ├── services/     # Business logic (Users, Groups, Generic, Bulk)
+│   │   │   │   ├── discovery/    # SchemaRegistry, DiscoveryService, schema constants
+│   │   │   │   ├── endpoint-profile/ # Profile presets, auto-expand, tighten-only validation
+│   │   │   │   ├── dto/          # Request/response DTOs with class-validator
+│   │   │   │   ├── filters/      # SCIM filter parser + applicator
+│   │   │   │   ├── interceptors/ # ETag, request logging, context storage
+│   │   │   │   └── utils/        # PATCH path parser
+│   │   │   ├── endpoint/         # Endpoint CRUD + admin API
+│   │   │   ├── logging/          # Structured logging, SSE stream, download
+│   │   │   ├── oauth/            # OAuth 2.0 token issuance
+│   │   │   └── ...               # health, database, web, activity-parser
+│   │   └── generated/            # Prisma client (auto-generated)
+│   ├── prisma/
+│   │   └── schema.prisma         # 5 models
+│   └── test/e2e/                 # 30+ E2E spec files
+├── web/                          # React 19 + Vite 7 frontend SPA
+├── docs/                         # 80+ protocol, operations, and design docs
+├── infra/                        # Bicep IaC templates (Container Apps, PostgreSQL, networking)
+├── scripts/                      # Deploy, test, and operations automation (PowerShell)
+├── Dockerfile                    # Unified production image (web + api)
+├── docker-compose.yml            # Local dev stack (PostgreSQL + SCIMServer)
+├── bootstrap.ps1                 # One-liner Azure bootstrap
+├── setup.ps1                     # Local / deploy helper
+└── deploy.ps1                    # Deployment entrypoint wrapper
 ```
+
+---
+
+## Documentation Index
+
+Full index: [docs/INDEX.md](docs/INDEX.md)
+
+### Core Guides
+
+| Document | Description |
+|---|---|
+| [DEPLOYMENT.md](DEPLOYMENT.md) | All deployment methods with comparison table |
+| [docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) | End-to-end Azure deployment with architecture diagrams |
+| [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md) | Complete REST API reference with curl examples |
+| [docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | 12 persisted settings + 2 derived capabilities + logLevel — examples and diagrams |
+| [docs/SCHEMA_CUSTOMIZATION_GUIDE.md](docs/SCHEMA_CUSTOMIZATION_GUIDE.md) | Custom schema extensions and resource type registration |
+
+### Protocol & Compliance
+
+| Document | Description |
+|---|---|
+| [docs/SCIM_REFERENCE.md](docs/SCIM_REFERENCE.md) | SCIM v2 API reference with example payloads |
+| [docs/SCIM_COMPLIANCE.md](docs/SCIM_COMPLIANCE.md) | RFC 7643/7644 compliance matrix + Entra compatibility |
+| [docs/SCIM_RFC_COMPLIANCE_LAYER.md](docs/SCIM_RFC_COMPLIANCE_LAYER.md) | Technical implementation of RFC compliance |
+
+### Operations
+
+| Document | Description |
+|---|---|
+| [docs/LOGGING_AND_OBSERVABILITY.md](docs/LOGGING_AND_OBSERVABILITY.md) | Structured logging, ring buffer, SSE stream |
+| [docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md](docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md) | Remote diagnosis playbooks and log collection |
+| [docs/DOCKER_GUIDE_AND_TEST_REPORT.md](docs/DOCKER_GUIDE_AND_TEST_REPORT.md) | Docker build/run guide and test report |
+
+### Design & Architecture
+
+| Document | Description |
+|---|---|
+| [docs/TECHNICAL_DESIGN_DOCUMENT.md](docs/TECHNICAL_DESIGN_DOCUMENT.md) | Full as-built technical design |
+| [docs/SCHEMA_TEMPLATES_DESIGN.md](docs/SCHEMA_TEMPLATES_DESIGN.md) | Endpoint profile system design (v0.28.0) |
+| [docs/PROJECT_HEALTH_AND_STATS.md](docs/PROJECT_HEALTH_AND_STATS.md) | Codebase statistics, test counts, architecture metrics |
+
+### API Collections
+
+| Format | Location |
+|---|---|
+| OpenAPI v3 | [docs/openapi/](docs/openapi/) |
+| Postman | [docs/postman/](docs/postman/) |
+| Insomnia | [docs/insomnia/](docs/insomnia/) |
+
+---
+
+## Technology Stack
+
+| Component | Technology | Version |
+|---|---|---|
+| Runtime | Node.js | 24 |
+| Language | TypeScript | 5.9 |
+| Framework | NestJS | 11 |
+| ORM | Prisma | 7 |
+| Database | PostgreSQL | 17 |
+| Frontend | React + Vite | 19 + 7 |
+| Test Runner | Jest + ts-jest | 30 |
+| Linting | ESLint (flat config) | 10 |
+| Container | Docker (`node:24-alpine`) | — |
+| IaC | Bicep | — |
+| CI/CD | GitHub Actions | — |
+| Registry | GitHub Container Registry | — |
+
+---
+
+## CI/CD
+
+| Workflow | Trigger | Purpose |
+|---|---|---|
+| `build-test.yml` | Push to `test/**`, `dev/**`, `feature/**` | Build + test + push `test-<branch>` image |
+| `publish-ghcr.yml` | Manual dispatch | Build + push versioned + `latest` image |
+
+Container image: `ghcr.io/pranems/scimserver` — `node:24-alpine` base, ~350 MB, port 8080.
+
+### Updating a Deployment
+
+```powershell
+# Auto-discovery update
+iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-func.ps1')
+Update-SCIMServer -Version v0.28.0 -ResourceGroup <rg> -AppName <app>
+
+# Or manual
+az containerapp update -n <app> -g <rg> --image ghcr.io/pranems/scimserver:0.28.0
+```
+
+---
+
+## Prerequisites
+
+| Requirement | For |
+|---|---|
+| Node.js 24+ / npm 10+ | Local development |
+| PostgreSQL 17 | Database (or use `PERSISTENCE_BACKEND=inmemory`) |
+| Docker Desktop | Container workflow |
+| Azure CLI + PowerShell 7 | Azure deployment scripts |
 
 ---
 

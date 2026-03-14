@@ -23,9 +23,9 @@ Perform a comprehensive test gap audit across the entire project and add any mis
 
 Audit for missing tests in these categories:
 
-### A. Config Flag Coverage (15 boolean flags + logLevel)
+### A. Config Flag Coverage (14 boolean flags in EndpointConfig interface + logLevel; 12 persisted in ProfileSettings, 2 derived)
 
-For each flag (`AllowAndCoerceBooleanStrings`, `StrictSchemaValidation`, `SoftDeleteEnabled`, `VerbosePatchSupported`, `MultiOpPatchRequestAddMultipleMembersToGroup`, `MultiOpPatchRequestRemoveMultipleMembersFromGroup`, `PatchOpAllowRemoveAllMembers`, `RequireIfMatch`, `ReprovisionOnConflictForSoftDeletedResource`, `CustomResourceTypesEnabled`, `BulkOperationsEnabled`, `PerEndpointCredentialsEnabled`, `IncludeWarningAboutIgnoredReadOnlyAttribute`, `IgnoreReadOnlyAttributesInPatch`):
+For each flag (`AllowAndCoerceBooleanStrings`, `StrictSchemaValidation`, `SoftDeleteEnabled`, `VerbosePatchSupported`, `MultiOpPatchRequestAddMultipleMembersToGroup`, `MultiOpPatchRequestRemoveMultipleMembersFromGroup`, `PatchOpAllowRemoveAllMembers`, `RequireIfMatch`, `ReprovisionOnConflictForSoftDeletedResource`, `CustomResourceTypesEnabled` *(derived from profile.resourceTypes in v0.28.0)*, `BulkOperationsEnabled` *(derived from profile SPC in v0.28.0)*, `PerEndpointCredentialsEnabled`, `IncludeWarningAboutIgnoredReadOnlyAttribute`, `IgnoreReadOnlyAttributesInPatch`):
 
 | Check | Unit | E2E | Live |
 |-------|------|-----|------|

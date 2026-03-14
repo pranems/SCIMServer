@@ -1,7 +1,7 @@
 # SCIMServer — Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.  
-> **Last Updated**: March 12, 2026
+> **Last Updated**: March 13, 2026
 
 ---
 
@@ -75,7 +75,7 @@ api/src/modules/scim/controllers/
 api/src/modules/scim/common/
   scim-sort.util.ts                                      # sortBy/sortOrder mapping utility (v0.20.0)
 api/src/modules/endpoint/
-  endpoint-config.interface.ts                           # 14 boolean flags + logLevel + helpers (getConfigBooleanWithDefault, validateEndpointConfig)
+  endpoint-config.interface.ts                           # 14 boolean flags + logLevel in interface (12 persisted in profile.settings, 2 derived from profile structure) + helpers
   endpoint-context.storage.ts                            # AsyncLocalStorage for endpoint context
 api/src/modules/scim/filters/
   scim-filter-parser.ts                                  # Filter AST attribute path extraction
