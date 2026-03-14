@@ -1,6 +1,6 @@
 # SCIMServer Deployment Options
 
-> Updated: March 1, 2026 · Scope: production + local deployment paths
+> Updated: March 13, 2026 · v0.28.0 · Scope: production + local deployment paths
 
 This document covers all deployment methods for SCIMServer. For the quickest start, use the Azure deployment described in the main [README.md](./README.md). For the most comprehensive Azure guide with architecture diagrams, see [docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md).
 
@@ -234,7 +234,25 @@ npm run start:debug 2>&1 | Tee-Object -FilePath scimserver.log
 | **Azure Container Apps** | 5 min | ~$13-28 | Auto | Minimal | Production |
 | **Docker Compose** | 10 min | Infra cost | Manual | Medium | Self-hosted |
 | **Standalone Docker** | 5 min | Infra cost | Manual | Medium | Quick test |
+| **In-Memory** | 2 min | Free | Single | None | Demos, CI/CD, integration testing |
 | **Local Development** | 15 min | Free | Single | High | Development |
+
+---
+
+## In-Memory Mode (No Database)
+
+```powershell
+cd api
+npm install && npm run build
+$env:PERSISTENCE_BACKEND = "inmemory"
+$env:SCIM_SHARED_SECRET = "local-secret"
+$env:JWT_SECRET = "local-jwt"
+$env:OAUTH_CLIENT_SECRET = "local-oauth"
+$env:PORT = "6000"
+node dist/main.js
+```
+
+All data lives in `Map`-based in-memory stores. No PostgreSQL required. Data is lost on restart. Ideal for demos, CI/CD pipelines, and integration testing. Produces identical live test results to the PostgreSQL-backed deployments.
 
 ---
 
@@ -242,7 +260,7 @@ npm run start:debug 2>&1 | Tee-Object -FilePath scimserver.log
 
 - **Registry**: GitHub Container Registry
 - **Image**: `ghcr.io/pranems/scimserver`
-- **Tags**: `latest`, version tags (e.g., `0.21.0`), test tags (`test-<branch>`)
+- **Tags**: `latest`, version tags (e.g., `0.28.0`), test tags (`test-<branch>`)
 - **Base**: `node:24-alpine`
 - **Size**: ~350 MB
 - **Port**: 8080 (internal)

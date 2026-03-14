@@ -16,14 +16,18 @@ echo ""
 echo "DATABASE_URL: ${DATABASE_URL:-(not set)}"
 echo ""
 
-echo "Running database migrations..."
-npx prisma migrate deploy
-
-if [ $? -eq 0 ]; then
-    echo "✓ Migrations completed successfully"
+if [ "$PERSISTENCE_BACKEND" = "inmemory" ]; then
+    echo "⚡ PERSISTENCE_BACKEND=inmemory — skipping database migrations"
 else
-    echo "✗ Migrations failed"
-    exit 1
+    echo "Running database migrations..."
+    npx prisma migrate deploy
+
+    if [ $? -eq 0 ]; then
+        echo "✓ Migrations completed successfully"
+    else
+        echo "✗ Migrations failed"
+        exit 1
+    fi
 fi
 
 echo ""

@@ -40,7 +40,13 @@
 
 ## 1. Overview
 
-SCIMServer supports **14 per-endpoint configuration flags** (plus 1 per-endpoint log level override) that control SCIM protocol behavior. Flags are stored in the `config` JSON column of each endpoint record and are resolved at request time.
+SCIMServer supports **14 per-endpoint configuration flags** (plus 1 per-endpoint log level override) that control SCIM protocol behavior.
+
+> **v0.28.0 Profile Model:** Of the 14 flags, **12 boolean settings + logLevel** are persisted in `profile.settings` (the `EndpointProfile.settings` JSONB). Two capabilities are **derived at runtime** from the profile structure:
+> - **`CustomResourceTypesEnabled`** → derived from `profile.resourceTypes` entries beyond User/Group (decision D9)
+> - **`BulkOperationsEnabled`** → derived from `profile.serviceProviderConfig.bulk.supported` (decision D8)
+>
+> The `EndpointConfig` interface and `validateEndpointConfig()` still accept all 14 flags for backward compatibility with the legacy `config` JSON path.
 
 ### Key Concepts
 
@@ -72,8 +78,8 @@ api/src/modules/endpoint/endpoint-config.interface.ts
 | 7 | `PatchOpAllowRemoveAllMembers` | `PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS` | **`true`** | boolean | PATCH (Groups) | Allow removing all members via `path=members` |
 | 8 | `RequireIfMatch` | `REQUIRE_IF_MATCH` | `false` | boolean | PUT, PATCH, DELETE | Require If-Match header (428 if missing) |
 | 9 | `ReprovisionOnConflictForSoftDeletedResource` | `REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED` | `false` | boolean | POST | Re-activate soft-deleted resource on POST conflict instead of 409 (requires SoftDeleteEnabled) |
-| 10 | `CustomResourceTypesEnabled` | `CUSTOM_RESOURCE_TYPES_ENABLED` | `false` | boolean | Admin API, SCIM CRUD | Enable custom resource type registration and generic SCIM CRUD beyond User/Group |
-| 11 | `BulkOperationsEnabled` | `BULK_OPERATIONS_ENABLED` | `false` | boolean | POST /Bulk | Enable SCIM Bulk Operations (RFC 7644 §3.7) — batch processing of multiple operations |
+| 10 | `CustomResourceTypesEnabled` | `CUSTOM_RESOURCE_TYPES_ENABLED` | `false` | boolean | Admin API, SCIM CRUD | **Derived (v0.28.0):** Implied by custom entries in `profile.resourceTypes`. Legacy: explicit config flag. Enable custom resource type registration and generic SCIM CRUD beyond User/Group |
+| 11 | `BulkOperationsEnabled` | `BULK_OPERATIONS_ENABLED` | `false` | boolean | POST /Bulk | **Derived (v0.28.0):** Implied by `profile.serviceProviderConfig.bulk.supported`. Legacy: explicit config flag. Enable SCIM Bulk Operations (RFC 7644 §3.7) — batch processing of multiple operations |
 | 12 | `PerEndpointCredentialsEnabled` | `PER_ENDPOINT_CREDENTIALS_ENABLED` | `false` | boolean | Auth (all requests) | Enable per-endpoint bearer token credentials with bcrypt hashing and admin CRUD API |
 | 13 | `IncludeWarningAboutIgnoredReadOnlyAttribute` | `INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE` | `false` | boolean | POST, PUT, PATCH | Attach warning URN to responses when readOnly attributes were stripped (RFC 7643 §2.2) |
 | 14 | `IgnoreReadOnlyAttributesInPatch` | `IGNORE_READONLY_ATTRIBUTES_IN_PATCH` | `false` | boolean | PATCH | Override G8c strict rejection → strip+warn instead of 400 (requires StrictSchemaValidation ON) |
@@ -586,6 +592,8 @@ Response (200): Success, version incremented to `W/"v4"`.
 
 ### 4.10 CustomResourceTypesEnabled
 
+> **v0.28.0:** This capability is now **derived** from the endpoint `profile.resourceTypes` array. If `profile.resourceTypes` contains entries beyond `User` and `Group`, custom resource type CRUD is automatically available (decision D9). The legacy `CustomResourceTypesEnabled` config flag is still accepted for backward compatibility but is no longer required when using the profile model.
+
 | Property | Value |
 |----------|-------|
 | **Config key** | `CustomResourceTypesEnabled` |
@@ -640,6 +648,8 @@ Response (201):
 ---
 
 ### 4.11 BulkOperationsEnabled
+
+> **v0.28.0:** This capability is now **derived** from `profile.serviceProviderConfig.bulk.supported`. If the profile's SPC advertises `bulk.supported: true`, the `/Bulk` endpoint is automatically enabled (decision D8). The legacy `BulkOperationsEnabled` config flag is still accepted for backward compatibility but is no longer required when using the profile model.
 
 | Property | Value |
 |----------|-------|

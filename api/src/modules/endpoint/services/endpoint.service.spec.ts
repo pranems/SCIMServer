@@ -821,5 +821,278 @@ describe('EndpointService', () => {
       expect(result.id).toBe('db-only-ep');
       expect(prisma.endpoint.findUnique).toHaveBeenCalledWith({ where: { id: 'db-only-ep' } });
     });
+
+    it('listEndpoints with active=true filter should work from cache', async () => {
+      const activeEp = { ...cachedEndpoint, id: 'active-ep', name: 'active-test', active: true };
+      const inactiveEp = { ...cachedEndpoint, id: 'inactive-ep', name: 'inactive-test', active: false };
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([activeEp, inactiveEp]);
+
+      await service.onModuleInit();
+      (prisma.endpoint.findMany as jest.Mock).mockClear();
+
+      const activeList = await service.listEndpoints(true);
+      expect(activeList.length).toBe(1);
+      expect(activeList[0].id).toBe('active-ep');
+      expect(prisma.endpoint.findMany).not.toHaveBeenCalled(); // served from cache
+    });
+
+    it('listEndpoints with active=false filter should work from cache', async () => {
+      const activeEp = { ...cachedEndpoint, id: 'active-ep2', name: 'active-test2', active: true };
+      const inactiveEp = { ...cachedEndpoint, id: 'inactive-ep2', name: 'inactive-test2', active: false };
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([activeEp, inactiveEp]);
+
+      await service.onModuleInit();
+      (prisma.endpoint.findMany as jest.Mock).mockClear();
+
+      const inactiveList = await service.listEndpoints(false);
+      expect(inactiveList.length).toBe(1);
+      expect(inactiveList[0].id).toBe('inactive-ep2');
+      expect(prisma.endpoint.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── Partial Profile PATCH (Phase 14) ──────────────────────────────
+
+  describe('updateEndpoint — partial profile PATCH', () => {
+    const profileEndpoint = {
+      id: 'patch-ep-1',
+      name: 'patch-test',
+      displayName: 'Patch Test',
+      description: null,
+      profile: {
+        schemas: [
+          { id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributes: 'all' },
+          { id: 'urn:ietf:params:scim:schemas:core:2.0:Group', name: 'Group', attributes: 'all' },
+        ],
+        resourceTypes: [
+          { id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] },
+          { id: 'Group', name: 'Group', endpoint: '/Groups', description: 'Group', schema: 'urn:ietf:params:scim:schemas:core:2.0:Group', schemaExtensions: [] },
+        ],
+        serviceProviderConfig: {
+          patch: { supported: true }, bulk: { supported: true, maxOperations: 100, maxPayloadSize: 1048576 },
+          filter: { supported: true, maxResults: 200 }, sort: { supported: true },
+          etag: { supported: true }, changePassword: { supported: false },
+        },
+        settings: { SoftDeleteEnabled: 'True' },
+      },
+      active: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    it('should deep-merge settings without replacing other profile sections', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(profileEndpoint);
+      (prisma.endpoint.update as jest.Mock).mockImplementation((_args: any) => {
+        // Return the merged profile as the DB would
+        return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
+      });
+
+      const result = await service.updateEndpoint('patch-ep-1', {
+        profile: { settings: { StrictSchemaValidation: 'True' } },
+      });
+
+      // Original settings should be preserved + new one added
+      expect(result.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(result.profile?.settings?.StrictSchemaValidation).toBe('True');
+      // Schemas should still exist
+      expect(result.profile?.schemas?.length).toBeGreaterThanOrEqual(2);
+      // SPC should still exist
+      expect(result.profile?.serviceProviderConfig?.bulk?.supported).toBe(true);
+    });
+
+    it('should overwrite individual setting value via deep-merge', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(profileEndpoint);
+      (prisma.endpoint.update as jest.Mock).mockImplementation((_args: any) => {
+        return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
+      });
+
+      const result = await service.updateEndpoint('patch-ep-1', {
+        profile: { settings: { SoftDeleteEnabled: 'False' } },
+      });
+
+      expect(result.profile?.settings?.SoftDeleteEnabled).toBe('False');
+    });
+
+    it('should replace SPC when provided in partial profile', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(profileEndpoint);
+      (prisma.endpoint.update as jest.Mock).mockImplementation((_args: any) => {
+        return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
+      });
+
+      const result = await service.updateEndpoint('patch-ep-1', {
+        profile: {
+          serviceProviderConfig: {
+            patch: { supported: true }, bulk: { supported: false },
+            filter: { supported: true, maxResults: 50 }, sort: { supported: false },
+            etag: { supported: false }, changePassword: { supported: false },
+          },
+        },
+      });
+
+      expect(result.profile?.serviceProviderConfig?.bulk?.supported).toBe(false);
+      expect(result.profile?.serviceProviderConfig?.sort?.supported).toBe(false);
+      expect(result.profile?.serviceProviderConfig?.filter?.maxResults).toBe(50);
+      // Settings should be preserved
+      expect(result.profile?.settings?.SoftDeleteEnabled).toBe('True');
+    });
+
+    it('should replace schemas when provided in partial profile', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(profileEndpoint);
+      (prisma.endpoint.update as jest.Mock).mockImplementation((_args: any) => {
+        return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
+      });
+
+      const result = await service.updateEndpoint('patch-ep-1', {
+        profile: {
+          schemas: [
+            { id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributes: 'all' },
+          ],
+          resourceTypes: [
+            { id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] },
+          ],
+        },
+      });
+
+      // Only User schema should remain
+      expect(result.profile?.schemas?.length).toBe(1);
+      expect(result.profile?.schemas?.[0]?.id).toBe('urn:ietf:params:scim:schemas:core:2.0:User');
+      expect(result.profile?.resourceTypes?.length).toBe(1);
+    });
+
+    it('should replace resourceTypes when provided in partial profile', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(profileEndpoint);
+      (prisma.endpoint.update as jest.Mock).mockImplementation((_args: any) => {
+        return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
+      });
+
+      const result = await service.updateEndpoint('patch-ep-1', {
+        profile: {
+          resourceTypes: [
+            { id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] },
+          ],
+        },
+      });
+
+      expect(result.profile?.resourceTypes?.length).toBe(1);
+      expect(result.profile?.resourceTypes?.[0]?.name).toBe('User');
+    });
+
+    it('should combine settings + SPC update in one PATCH', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(profileEndpoint);
+      (prisma.endpoint.update as jest.Mock).mockImplementation((_args: any) => {
+        return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
+      });
+
+      const result = await service.updateEndpoint('patch-ep-1', {
+        profile: {
+          settings: { RequireIfMatch: 'True' },
+          serviceProviderConfig: {
+            patch: { supported: true }, bulk: { supported: false },
+            filter: { supported: false }, sort: { supported: false },
+            etag: { supported: false }, changePassword: { supported: false },
+          },
+        },
+      });
+
+      expect(result.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(result.profile?.settings?.RequireIfMatch).toBe('True');
+      expect(result.profile?.serviceProviderConfig?.bulk?.supported).toBe(false);
+    });
+
+    it('should reject sending both config and profile', async () => {
+      await expect(
+        service.updateEndpoint('patch-ep-1', {
+          config: { SoftDeleteEnabled: 'True' },
+          profile: { settings: { StrictSchemaValidation: 'True' } },
+        })
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should fire profile change listener on profile PATCH', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(profileEndpoint);
+      (prisma.endpoint.update as jest.Mock).mockImplementation((_args: any) => {
+        return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
+      });
+
+      const listener = jest.fn();
+      service.setProfileChangeListener(listener);
+
+      await service.updateEndpoint('patch-ep-1', {
+        profile: { settings: { VerbosePatchSupported: 'True' } },
+      });
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith('patch-ep-1', expect.objectContaining({
+        settings: expect.objectContaining({ VerbosePatchSupported: 'True' }),
+      }));
+    });
+
+    it('should update cache on profile PATCH', async () => {
+      // Populate cache
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([profileEndpoint]);
+      await service.onModuleInit();
+
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(profileEndpoint);
+      (prisma.endpoint.update as jest.Mock).mockImplementation((_args: any) => {
+        return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
+      });
+
+      await service.updateEndpoint('patch-ep-1', {
+        profile: { settings: { AllowAndCoerceBooleanStrings: 'True' } },
+      });
+
+      // Verify cache was updated
+      (prisma.endpoint.findUnique as jest.Mock).mockClear();
+      const cached = await service.getEndpoint('patch-ep-1');
+      expect(cached.profile?.settings?.AllowAndCoerceBooleanStrings).toBe('True');
+      expect(prisma.endpoint.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('should preserve profile.settings when only displayName is updated', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(profileEndpoint);
+      (prisma.endpoint.update as jest.Mock).mockResolvedValue({
+        ...profileEndpoint, displayName: 'New Name',
+      });
+
+      const result = await service.updateEndpoint('patch-ep-1', { displayName: 'New Name' });
+      expect(result.displayName).toBe('New Name');
+      expect(result.profile?.settings?.SoftDeleteEnabled).toBe('True');
+    });
+
+    it('should handle multiple settings additions in sequence', async () => {
+      // Populate cache
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([profileEndpoint]);
+      await service.onModuleInit();
+
+      // First PATCH: add StrictSchemaValidation
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(profileEndpoint);
+      (prisma.endpoint.update as jest.Mock).mockImplementation((_args: any) => {
+        return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
+      });
+
+      const result1 = await service.updateEndpoint('patch-ep-1', {
+        profile: { settings: { StrictSchemaValidation: 'True' } },
+      });
+
+      expect(result1.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(result1.profile?.settings?.StrictSchemaValidation).toBe('True');
+
+      // Second PATCH: add RequireIfMatch — should keep both previous settings
+      // Now the cached endpoint has the updated profile from PATCH 1
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue({
+        ...profileEndpoint, profile: result1.profile,
+      });
+      (prisma.endpoint.update as jest.Mock).mockImplementation((_args: any) => {
+        return Promise.resolve({ ...profileEndpoint, profile: _args.data.profile });
+      });
+
+      const result2 = await service.updateEndpoint('patch-ep-1', {
+        profile: { settings: { RequireIfMatch: 'True' } },
+      });
+
+      expect(result2.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(result2.profile?.settings?.StrictSchemaValidation).toBe('True');
+      expect(result2.profile?.settings?.RequireIfMatch).toBe('True');
+    });
   });
 });
