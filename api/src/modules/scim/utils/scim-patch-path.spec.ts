@@ -715,15 +715,39 @@ describe('scim-patch-path utilities', () => {
       expect(ext?.customAttr).toBe('custom-val');
     });
 
-    it('should NOT resolve custom URN keys without extensionUrns — key is mangled by dot-notation', () => {
+    it('should store URN keys with dots atomically — not split as dot-notation', () => {
       const CUSTOM_URN = 'urn:example:custom:2.0:User';
       const payload: Record<string, unknown> = {};
+      // Without extensionUrns, the URN:attr path is not parsed as an extension path,
+      // but the URN key itself must NOT be split on the dot in "2.0".
+      // The full key "urn:example:custom:2.0:User:customAttr" is stored as-is.
       const result = resolveNoPathValue(payload, {
         [`${CUSTOM_URN}:customAttr`]: 'custom-val',
       });
-      // Without extensionUrns, the URN contains "2.0" which triggers dot-notation splitting.
-      // The key is NOT correctly stored — this demonstrates why extensionUrns is needed.
-      expect(result[CUSTOM_URN]).toBeUndefined();
+      expect(result[`${CUSTOM_URN}:customAttr`]).toBe('custom-val');
+    });
+
+    it('should merge URN extension object into existing extension namespace', () => {
+      const CUSTOM_URN = 'urn:test:scim:extension:hr:2.0:User';
+      const payload: Record<string, unknown> = {
+        [CUSTOM_URN]: { badgeNumber: 'B12345', costCenter: 'Engineering' },
+      };
+      const result = resolveNoPathValue(payload, {
+        [CUSTOM_URN]: { badgeNumber: 'B99999' },
+      });
+      const ext = result[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext.badgeNumber).toBe('B99999');
+      expect(ext.costCenter).toBe('Engineering');
+    });
+
+    it('should set URN extension object when none exists', () => {
+      const CUSTOM_URN = 'urn:test:scim:extension:hr:2.0:User';
+      const payload: Record<string, unknown> = {};
+      const result = resolveNoPathValue(payload, {
+        [CUSTOM_URN]: { department: 'Sales' },
+      });
+      const ext = result[CUSTOM_URN] as Record<string, unknown>;
+      expect(ext.department).toBe('Sales');
     });
   });
 });

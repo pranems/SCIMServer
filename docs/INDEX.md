@@ -93,6 +93,8 @@
 | [SELF_IMPROVING_TEST_HEALTH_PROMPT.md](SELF_IMPROVING_TEST_HEALTH_PROMPT.md) | Reusable self-improving AI prompt for diagnosing and resolving test failures — pattern library grows with each use |
 | [CL_V0.27.0_INMEMORY_BUGFIXES_AND_GENERIC_PARITY.md](CL_V0.27.0_INMEMORY_BUGFIXES_AND_GENERIC_PARITY.md) | **CL v0.27.0** — 4 inmemory backend bugs, 3 generic service parity P0 fixes, live test fix, doc audit; 4,051 total tests, 3-instance deployment validation |
 | [NEXT_ITEMS_V0.28.0_ROADMAP.md](NEXT_ITEMS_V0.28.0_ROADMAP.md) | **v0.28.0 Roadmap** — 6 prioritized items to close all 12 live test failures: PS script fix, HTTP 415/405, immutable/required always-on, generic filter AST upgrade |
+| [TEST_FAILURE_ANALYSIS.md](TEST_FAILURE_ANALYSIS.md) | **v0.28.0 Test Failure Analysis** — 19 failures (6 E2E + 13 live) across 8 root causes with Mermaid diagrams, per-failure root cause, and prioritized fix plan |
+| [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md) | **Endpoint Profile Architecture** — Complete flow reference: creation (4 input paths), update (merge semantics), expansion pipeline, validation pipeline, runtime usage, discovery, presets, combination matrix, error catalog |
 
 ## Development
 
