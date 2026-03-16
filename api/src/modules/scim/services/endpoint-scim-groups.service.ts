@@ -68,7 +68,7 @@ export class EndpointScimGroupsService {
     private readonly logger: ScimLogger,
     private readonly schemaRegistry: ScimSchemaRegistry,
   ) {
-    this.schemaHelpers = new ScimSchemaHelpers(schemaRegistry, SCIM_CORE_GROUP_SCHEMA);
+    this.schemaHelpers = new ScimSchemaHelpers(schemaRegistry, SCIM_CORE_GROUP_SCHEMA, endpointContext);
   }
 
   async createGroupForEndpoint(dto: CreateGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimGroupResource> {

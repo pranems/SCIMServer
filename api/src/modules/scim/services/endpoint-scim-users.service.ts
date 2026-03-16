@@ -60,7 +60,7 @@ export class EndpointScimUsersService {
     private readonly schemaRegistry: ScimSchemaRegistry,
     private readonly endpointContext: EndpointContextStorage,
   ) {
-    this.schemaHelpers = new ScimSchemaHelpers(schemaRegistry, SCIM_CORE_USER_SCHEMA);
+    this.schemaHelpers = new ScimSchemaHelpers(schemaRegistry, SCIM_CORE_USER_SCHEMA, endpointContext);
   }
 
   async createUserForEndpoint(dto: CreateUserDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimUserResource> {

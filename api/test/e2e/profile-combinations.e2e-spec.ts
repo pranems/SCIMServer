@@ -822,6 +822,10 @@ describe('Profile Configuration Combinations (E2E)', () => {
     });
 
     it('should replace schemas via partial profile PATCH', async () => {
+      // When replacing schemas, resourceTypes must also be provided to maintain
+      // structural integrity (every RT.schema and RT.schemaExtensions[].schema
+      // must exist in the schemas array). This is intentional — prevents
+      // accidental removal of resource types by forgetting a schema.
       await request(app.getHttpServer())
         .patch(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
@@ -830,6 +834,13 @@ describe('Profile Configuration Combinations (E2E)', () => {
           profile: {
             schemas: [
               { id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributes: 'all' },
+            ],
+            resourceTypes: [
+              {
+                id: 'User', name: 'User', endpoint: '/Users', description: 'User',
+                schema: 'urn:ietf:params:scim:schemas:core:2.0:User',
+                schemaExtensions: [],
+              },
             ],
           },
         })
@@ -894,6 +905,8 @@ describe('Profile Configuration Combinations (E2E)', () => {
     });
 
     it('should update schemas + settings in one PATCH', async () => {
+      // When replacing schemas, resourceTypes must also be provided to maintain
+      // structural integrity — prevents accidental RT removal.
       await request(app.getHttpServer())
         .patch(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
@@ -903,6 +916,18 @@ describe('Profile Configuration Combinations (E2E)', () => {
             schemas: [
               { id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributes: 'all' },
               { id: 'urn:ietf:params:scim:schemas:core:2.0:Group', name: 'Group', attributes: 'all' },
+            ],
+            resourceTypes: [
+              {
+                id: 'User', name: 'User', endpoint: '/Users', description: 'User',
+                schema: 'urn:ietf:params:scim:schemas:core:2.0:User',
+                schemaExtensions: [],
+              },
+              {
+                id: 'Group', name: 'Group', endpoint: '/Groups', description: 'Group',
+                schema: 'urn:ietf:params:scim:schemas:core:2.0:Group',
+                schemaExtensions: [],
+              },
             ],
             settings: { VerbosePatchSupported: 'True' },
           },

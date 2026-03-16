@@ -55,7 +55,7 @@ import { stripReturnedNever } from '../common/scim-attribute-projection';
 import { ScimMetadataService } from './scim-metadata.service';
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import type { ScimResourceType } from '../discovery/scim-schema-registry';
-import type { SchemaDefinition } from '../../../domain/validation';
+import type { SchemaDefinition, SchemaAttributeDefinition } from '../../../domain/validation';
 import { GenericPatchEngine } from '../../../domain/patch/generic-patch-engine';
 import { PatchError } from '../../../domain/patch/patch-error';
 import type { PatchOperation } from '../../../domain/patch/patch-types';
@@ -91,18 +91,51 @@ export class EndpointScimGenericService {
    * Build schema definitions for a dynamic resource type.
    * Unlike Users/Groups which have fixed core URNs, generic resources
    * resolve schemas from the registered resource type at runtime.
+   *
+   * Profile-aware: when a profile is set in context, profile schemas are
+   * preferred (they include custom extension attribute characteristics).
    */
   private getSchemaDefinitions(
     resourceType: ScimResourceType,
     endpointId: string,
   ): SchemaDefinition[] {
-    const schemas: SchemaDefinition[] = [];
-    const coreDef = this.schemaRegistry.getSchema(resourceType.schema);
-    if (coreDef) schemas.push({ ...coreDef, isCoreSchema: true } as SchemaDefinition);
-    for (const ext of resourceType.schemaExtensions) {
-      const extDef = this.schemaRegistry.getSchema(ext.schema);
-      if (extDef) schemas.push(extDef as SchemaDefinition);
+    const profile = this.endpointContext.getProfile?.();
+    const profileSchemaMap = new Map<string, any>();
+    if (profile?.schemas) {
+      for (const ps of profile.schemas) {
+        if (ps.id) profileSchemaMap.set(ps.id, ps);
+      }
     }
+
+    const schemas: SchemaDefinition[] = [];
+
+    // Core schema: prefer profile version, fall back to global registry
+    const profileCore = profileSchemaMap.get(resourceType.schema);
+    if (profileCore && Array.isArray(profileCore.attributes)) {
+      schemas.push({
+        id: profileCore.id,
+        attributes: profileCore.attributes as unknown as SchemaAttributeDefinition[],
+        isCoreSchema: true,
+      });
+    } else {
+      const coreDef = this.schemaRegistry.getSchema(resourceType.schema);
+      if (coreDef) schemas.push({ ...coreDef, isCoreSchema: true } as SchemaDefinition);
+    }
+
+    // Extension schemas from the resource type
+    for (const ext of resourceType.schemaExtensions) {
+      const profileExt = profileSchemaMap.get(ext.schema);
+      if (profileExt && Array.isArray(profileExt.attributes)) {
+        schemas.push({
+          id: profileExt.id,
+          attributes: profileExt.attributes as unknown as SchemaAttributeDefinition[],
+        });
+      } else {
+        const extDef = this.schemaRegistry.getSchema(ext.schema);
+        if (extDef) schemas.push(extDef as SchemaDefinition);
+      }
+    }
+
     return schemas;
   }
 

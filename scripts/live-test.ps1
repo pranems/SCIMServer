@@ -191,6 +191,7 @@ function Invoke-WebRequest {
         [string]$Method,
         [System.Collections.IDictionary]$Headers,
         [object]$Body,
+        [string]$ContentType,
         [switch]$SkipHttpErrorCheck
     )
     $requestStart = Get-Date
@@ -2544,8 +2545,8 @@ $logConfigAfterUpdate = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" 
 $epLevelAfterUpdate = $logConfigAfterUpdate.endpointLevels.$logLevelEndpointId
 Test-Result -Success ($epLevelAfterUpdate -ne $null) -Message "Endpoint level updated in log-config after PATCH"
 
-# --- Update endpoint config without logLevel (should clear endpoint level) ---
-Write-Host "`n--- Remove logLevel from Endpoint Config ---" -ForegroundColor Cyan
+# --- Update endpoint config without logLevel (should preserve it — settings merge is additive) ---
+Write-Host "`n--- PATCH config without logLevel (additive merge) ---" -ForegroundColor Cyan
 $removeLogLevelBody = @{
     config = @{
         strictMode = $true
@@ -2553,7 +2554,9 @@ $removeLogLevelBody = @{
 } | ConvertTo-Json -Depth 3
 
 $clearedEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$logLevelEndpointId" -Method PATCH -Headers $headers -Body $removeLogLevelBody
-Test-Result -Success ($clearedEndpoint.config.logLevel -eq $null) -Message "Endpoint config no longer has logLevel"
+# Settings merge is additive (shallow merge) — omitting logLevel does NOT clear it.
+# The logLevel should still be TRACE from the previous PATCH.
+Test-Result -Success ($clearedEndpoint.config.logLevel -eq "TRACE") -Message "Endpoint config preserves logLevel (additive merge)"
 Test-Result -Success ($clearedEndpoint.config.strictMode -eq $true) -Message "Other config flags preserved"
 
 # --- Verify log-config no longer has endpoint level ---
@@ -5880,7 +5883,36 @@ try {
 # ─────────────── 9w.9–9w.14: Immutable Attribute Enforcement ───────────────
 Write-Host "`n--- 9w: Immutable Attribute Enforcement ---" -ForegroundColor Cyan
 
-# Create user with enterprise extension (employeeNumber is immutable)
+# NOTE: RFC 7643 §4.3 defines employeeNumber as 'readWrite' (NOT immutable).
+# To test immutable enforcement, we create an endpoint with StrictSchemaValidation
+# and a custom profile where employeeNumber IS marked as 'immutable'.
+$w9EpBody = @{
+    name = "test-9w-immutable-$(Get-Random)"
+    profile = @{
+        schemas = @(
+            @{ id = "urn:ietf:params:scim:schemas:core:2.0:User"; name = "User"; attributes = "all" }
+            @{
+                id = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+                name = "EnterpriseUser"
+                attributes = @(
+                    @{ name = "employeeNumber"; type = "string"; multiValued = $false; required = $false; mutability = "immutable"; returned = "default" }
+                    @{ name = "department"; type = "string"; multiValued = $false; required = $false; mutability = "readWrite"; returned = "default" }
+                )
+            }
+            @{ id = "urn:ietf:params:scim:schemas:core:2.0:Group"; name = "Group"; attributes = "all" }
+        )
+        resourceTypes = @(
+            @{ id = "User"; name = "User"; endpoint = "/Users"; description = "User"; schema = "urn:ietf:params:scim:schemas:core:2.0:User"; schemaExtensions = @(@{ schema = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"; required = $false }) }
+            @{ id = "Group"; name = "Group"; endpoint = "/Groups"; description = "Group"; schema = "urn:ietf:params:scim:schemas:core:2.0:Group"; schemaExtensions = @() }
+        )
+        serviceProviderConfig = @{ patch = @{ supported = $true }; bulk = @{ supported = $false }; filter = @{ supported = $true; maxResults = 200 }; sort = @{ supported = $true }; etag = @{ supported = $true }; changePassword = @{ supported = $false } }
+        settings = @{ StrictSchemaValidation = "True" }
+    }
+} | ConvertTo-Json -Depth 10
+$w9Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $w9EpBody -ContentType "application/json"
+$w9ScimBase = "$baseUrl/scim/endpoints/$($w9Ep.id)"
+
+# Create user with enterprise extension (employeeNumber is immutable in custom profile)
 $w9UserName = "test-9w-immutable-$(Get-Random)@example.com"
 $w9UserBody = @{
     schemas = @(
@@ -5895,7 +5927,7 @@ $w9UserBody = @{
         department = "Engineering"
     }
 } | ConvertTo-Json -Depth 4
-$w9User = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $w9UserBody -ContentType "application/scim+json"
+$w9User = Invoke-RestMethod -Uri "$w9ScimBase/Users" -Method POST -Headers $headers -Body $w9UserBody -ContentType "application/scim+json"
 Test-Result -Success ($null -ne $w9User.id) -Message "9w.9: Create user with immutable employeeNumber for testing"
 
 # 9w.10: PUT changing employeeNumber should fail (400)
@@ -5913,7 +5945,7 @@ $w9PutBody = @{
     }
 } | ConvertTo-Json -Depth 4
 try {
-    $w9PutResp = Invoke-WebRequest -Uri "$scimBase/Users/$($w9User.id)" -Method PUT `
+    $w9PutResp = Invoke-WebRequest -Uri "$w9ScimBase/Users/$($w9User.id)" -Method PUT `
         -Headers @{ Authorization = $headers.Authorization } -Body $w9PutBody -ContentType "application/scim+json" -ErrorAction Stop
     Test-Result -Success $false -Message "9w.10: PUT changing immutable employeeNumber should return 400 (got $($w9PutResp.StatusCode))"
 } catch {
@@ -5935,7 +5967,7 @@ $w9PutSameBody = @{
         department = "Sales"
     }
 } | ConvertTo-Json -Depth 4
-$w9PutSame = Invoke-RestMethod -Uri "$scimBase/Users/$($w9User.id)" -Method PUT -Headers $headers -Body $w9PutSameBody -ContentType "application/scim+json"
+$w9PutSame = Invoke-RestMethod -Uri "$w9ScimBase/Users/$($w9User.id)" -Method PUT -Headers $headers -Body $w9PutSameBody -ContentType "application/scim+json"
 Test-Result -Success ($w9PutSame.displayName -eq "Immutable Same Value") -Message "9w.11: PUT with same immutable value succeeds (200)"
 
 # 9w.12: PATCH changing employeeNumber should fail (400)
@@ -5950,7 +5982,7 @@ $w9PatchBody = @{
     )
 } | ConvertTo-Json -Depth 4
 try {
-    $w9PatchResp = Invoke-WebRequest -Uri "$scimBase/Users/$($w9User.id)" -Method PATCH `
+    $w9PatchResp = Invoke-WebRequest -Uri "$w9ScimBase/Users/$($w9User.id)" -Method PATCH `
         -Headers @{ Authorization = $headers.Authorization } -Body $w9PatchBody -ContentType "application/scim+json" -ErrorAction Stop
     Test-Result -Success $false -Message "9w.12: PATCH changing immutable employeeNumber should return 400 (got $($w9PatchResp.StatusCode))"
 } catch {
@@ -5959,7 +5991,7 @@ try {
 }
 
 # 9w.13: GET should still show original immutable value
-$w9Get = Invoke-RestMethod -Uri "$scimBase/Users/$($w9User.id)" -Method GET -Headers $headers
+$w9Get = Invoke-RestMethod -Uri "$w9ScimBase/Users/$($w9User.id)" -Method GET -Headers $headers
 $w9Ext = $w9Get."urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
 Test-Result -Success ($w9Ext.employeeNumber -eq "EMP-12345") -Message "9w.13: GET returns original immutable employeeNumber value"
 
@@ -5974,7 +6006,7 @@ $w9PatchMutable = @{
         }
     )
 } | ConvertTo-Json -Depth 4
-$w9PatchMutableResp = Invoke-RestMethod -Uri "$scimBase/Users/$($w9User.id)" -Method PATCH -Headers $headers -Body $w9PatchMutable -ContentType "application/scim+json"
+$w9PatchMutableResp = Invoke-RestMethod -Uri "$w9ScimBase/Users/$($w9User.id)" -Method PATCH -Headers $headers -Body $w9PatchMutable -ContentType "application/scim+json"
 $w9PatchExt = $w9PatchMutableResp."urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
 Test-Result -Success ($w9PatchExt.department -eq "Marketing") -Message "9w.14: PATCH mutable department succeeds while employeeNumber preserved"
 
@@ -5982,10 +6014,10 @@ Test-Result -Success ($w9PatchExt.department -eq "Marketing") -Message "9w.14: P
 Write-Host "`n--- 9w: returned:request and returned:default ---" -ForegroundColor Cyan
 
 # Verify schema definitions for returned characteristics
-$w9UserSchema = Invoke-RestMethod -Uri "$scimBase/Schemas/urn:ietf:params:scim:schemas:core:2.0:User" -Method GET -Headers $headers
+$w9UserSchema = Invoke-RestMethod -Uri "$w9ScimBase/Schemas/urn:ietf:params:scim:schemas:core:2.0:User" -Method GET -Headers $headers
 
 # 9w.15: password should not appear in GET response (returned:never)
-$w9GetUser = Invoke-RestMethod -Uri "$scimBase/Users/$($w9User.id)" -Method GET -Headers $headers
+$w9GetUser = Invoke-RestMethod -Uri "$w9ScimBase/Users/$($w9User.id)" -Method GET -Headers $headers
 Test-Result -Success ($null -eq $w9GetUser.password) -Message "9w.15: GET /Users/:id does not return password (returned:never)"
 
 # 9w.16: id is always returned
@@ -5995,14 +6027,15 @@ Test-Result -Success ($null -ne $w9GetUser.id) -Message "9w.16: GET /Users/:id a
 Test-Result -Success ($null -ne $w9GetUser.userName) -Message "9w.17: GET /Users/:id always returns userName (returned:always)"
 
 # 9w.18: excludedAttributes should strip displayName (returned:default)
-$w9ExclUrl = "$scimBase/Users/$($w9User.id)?excludedAttributes=displayName"
+$w9ExclUrl = "$w9ScimBase/Users/$($w9User.id)?excludedAttributes=displayName"
 $w9Excl = Invoke-RestMethod -Uri $w9ExclUrl -Method GET -Headers $headers
 Test-Result -Success ($null -eq $w9Excl.displayName) -Message "9w.18: excludedAttributes=displayName strips it from response (returned:default)"
 Test-Result -Success ($null -ne $w9Excl.userName) -Message "9w.19: excludedAttributes does not strip always-returned userName"
 
 # Cleanup 9w test resources
 Write-Host "`n--- 9w: Cleaning up 9w test resources ---" -ForegroundColor Cyan
-try { Invoke-RestMethod -Uri "$scimBase/Users/$($w9User.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$w9ScimBase/Users/$($w9User.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($w9Ep.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
 
 Write-Host "`n--- 9w: P3 HTTP Errors, Immutable, Returned Characteristics Tests Complete ---" -ForegroundColor Green
 
@@ -6077,6 +6110,7 @@ $x9PutSelfBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
     userName = $x9UserNameA
     displayName = "9x Self Update OK"
+    externalId = $x9UserA.externalId
     active = $true
 } | ConvertTo-Json -Depth 3
 $x9PutSelf = Invoke-RestMethod -Uri "$scimBase/Users/$($x9UserA.id)" -Method PUT -Headers $headers -Body $x9PutSelfBody -ContentType "application/scim+json"

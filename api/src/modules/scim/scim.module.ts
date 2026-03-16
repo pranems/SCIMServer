@@ -28,6 +28,7 @@ import { EndpointContextStorage } from '../endpoint/endpoint-context.storage';
 import { ScimContentTypeInterceptor } from './interceptors/scim-content-type.interceptor';
 import { ScimEtagInterceptor } from './interceptors/scim-etag.interceptor';
 import { ScimExceptionFilter } from './filters/scim-exception.filter';
+import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-type-validation.middleware';
 
 @Module({
   imports: [PrismaModule, LoggingModule, EndpointModule, RepositoryModule.register()],
@@ -74,11 +75,12 @@ export class ScimModule implements NestModule {
   constructor(private readonly endpointContext: EndpointContextStorage) {}
 
   /**
-   * Register the AsyncLocalStorage middleware on ALL routes so that
-   * EndpointContextStorage.setContext / addWarnings / getWarnings
-   * work reliably across NestJS guards, interceptors, and handlers.
+   * Register middleware on ALL routes:
+   * 1. AsyncLocalStorage middleware — ensures endpoint context is isolated per request
+   * 2. Content-Type validation — rejects non-JSON Content-Types on SCIM endpoint routes (RFC 7644 §3.1)
    */
   configure(consumer: MiddlewareConsumer): void {
     consumer.apply(this.endpointContext.createMiddleware()).forRoutes('*');
+    consumer.apply(ScimContentTypeValidationMiddleware).forRoutes('endpoints/*');
   }
 }

@@ -18,13 +18,14 @@ import {
   ENDPOINT_CONFIG_FLAGS,
   type EndpointConfig,
 } from '../../endpoint/endpoint-config.interface';
-import type { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
+import type { ScimSchemaRegistry, ScimSchemaDefinition } from '../discovery/scim-schema-registry';
 import { SchemaValidator } from '../../../domain/validation';
 import type { SchemaDefinition, SchemaAttributeDefinition } from '../../../domain/validation';
 import type { ScimLogger } from '../../logging/scim-logger.service';
 import type { LogCategory } from '../../logging/log-levels';
 import type { PatchOperation } from '../../../domain/patch/patch-types';
 import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-parser';
+import type { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 
 // ─── Pure Utility Functions ─────────────────────────────────────────────────
 
@@ -464,14 +465,96 @@ function resolvePathToAttrName(
  *
  * Instantiate once per service in the constructor:
  * ```ts
- * this.schemaHelpers = new ScimSchemaHelpers(schemaRegistry, SCIM_CORE_USER_SCHEMA);
+ * this.schemaHelpers = new ScimSchemaHelpers(schemaRegistry, SCIM_CORE_USER_SCHEMA, endpointContext);
  * ```
  */
 export class ScimSchemaHelpers {
   constructor(
     private readonly schemaRegistry: ScimSchemaRegistry,
     private readonly coreSchemaUrn: string,
+    private readonly endpointContextStorage?: EndpointContextStorage,
   ) {}
+
+  /**
+   * Convert profile schemas (from EndpointProfile) to SchemaDefinition[] suitable
+   * for SchemaValidator calls. Profile schemas carry the full expanded attribute
+   * definitions including custom extensions with their `returned`, `mutability`,
+   * `caseExact`, `uniqueness` characteristics.
+   *
+   * Only includes schemas relevant to this service's resource type:
+   * - The core schema matching this.coreSchemaUrn
+   * - Extension schemas declared on resource types that use this core schema
+   *
+   * Merges profile schemas with global registry schemas. Profile schemas take
+   * precedence when the same schema ID exists in both (profile is more specific).
+   */
+  private getProfileAwareSchemaDefinitions(): SchemaDefinition[] {
+    const profile = this.endpointContextStorage?.getProfile?.();
+    if (!profile?.schemas || profile.schemas.length === 0) {
+      // No profile or no profile schemas — fall back to global registry only
+      return this.getGlobalSchemaDefinitions();
+    }
+
+    // Build the set of schema URNs relevant to this resource type:
+    // core + extensions declared on RTs that use this core schema.
+    const relevantUrns = new Set<string>([this.coreSchemaUrn]);
+    if (profile.resourceTypes) {
+      for (const rt of profile.resourceTypes) {
+        if (rt.schema === this.coreSchemaUrn) {
+          for (const ext of rt.schemaExtensions) {
+            relevantUrns.add(ext.schema);
+          }
+        }
+      }
+    }
+
+    const profileSchemaMap = new Map<string, ScimSchemaDefinition>();
+    for (const ps of profile.schemas) {
+      if (ps.id) profileSchemaMap.set(ps.id, ps);
+    }
+
+    const schemas: SchemaDefinition[] = [];
+    const seenIds = new Set<string>();
+
+    // Include only relevant profile schemas
+    for (const urn of relevantUrns) {
+      const ps = profileSchemaMap.get(urn);
+      if (ps && ps.attributes && Array.isArray(ps.attributes)) {
+        seenIds.add(ps.id);
+        schemas.push({
+          id: ps.id,
+          attributes: ps.attributes as unknown as SchemaAttributeDefinition[],
+          isCoreSchema: ps.id === this.coreSchemaUrn,
+        });
+      }
+    }
+
+    // Fill in any relevant schemas from the global registry not already covered
+    const globalSchemas = this.getGlobalSchemaDefinitions();
+    for (const gs of globalSchemas) {
+      if (!seenIds.has(gs.id) && relevantUrns.has(gs.id)) {
+        schemas.push(gs);
+      }
+    }
+
+    return schemas;
+  }
+
+  /**
+   * Get schema definitions from the global ScimSchemaRegistry only.
+   * This is the original behavior before profile-awareness was added.
+   */
+  private getGlobalSchemaDefinitions(): SchemaDefinition[] {
+    const coreSchema = this.schemaRegistry.getSchema(this.coreSchemaUrn);
+    const schemas: SchemaDefinition[] = [];
+    if (coreSchema) schemas.push({ ...coreSchema, isCoreSchema: true } as SchemaDefinition);
+    const extUrns = this.schemaRegistry.getExtensionUrns();
+    for (const urn of extUrns) {
+      const ext = this.schemaRegistry.getSchema(urn);
+      if (ext) schemas.push(ext as SchemaDefinition);
+    }
+    return schemas;
+  }
 
   /**
    * Strict Schema Validation — when StrictSchemaValidation is enabled, reject
@@ -565,23 +648,51 @@ export class ScimSchemaHelpers {
   /**
    * Build schema definitions from the registry for a given payload.
    * Includes the core schema + any extension URNs declared in schemas[].
+   *
+   * Profile-aware: when a profile is set in context, profile schemas for
+   * declared URNs are used (with full attribute characteristics including
+   * custom extensions). Falls back to global registry for unknown URNs.
    */
   buildSchemaDefinitions(
     dto: Record<string, unknown>,
     endpointId: string,
   ): SchemaDefinition[] {
-    const coreSchema = this.schemaRegistry.getSchema(this.coreSchemaUrn);
-    const schemas: SchemaDefinition[] = [];
-    if (coreSchema) {
-      schemas.push({ ...coreSchema, isCoreSchema: true } as SchemaDefinition);
+    const profile = this.endpointContextStorage?.getProfile?.();
+    const profileSchemaMap = new Map<string, ScimSchemaDefinition>();
+    if (profile?.schemas) {
+      for (const ps of profile.schemas) {
+        if (ps.id) profileSchemaMap.set(ps.id, ps);
+      }
     }
 
+    const schemas: SchemaDefinition[] = [];
+
+    // Core schema: prefer profile version, fall back to global
+    const profileCore = profileSchemaMap.get(this.coreSchemaUrn);
+    if (profileCore && Array.isArray(profileCore.attributes)) {
+      schemas.push({
+        id: profileCore.id,
+        attributes: profileCore.attributes as unknown as SchemaAttributeDefinition[],
+        isCoreSchema: true,
+      });
+    } else {
+      const globalCore = this.schemaRegistry.getSchema(this.coreSchemaUrn);
+      if (globalCore) schemas.push({ ...globalCore, isCoreSchema: true } as SchemaDefinition);
+    }
+
+    // Extension schemas declared in payload's schemas[]
     const declaredSchemas = (dto.schemas as string[] | undefined) ?? [];
     for (const urn of declaredSchemas) {
       if (urn !== this.coreSchemaUrn) {
-        const extSchema = this.schemaRegistry.getSchema(urn);
-        if (extSchema) {
-          schemas.push(extSchema as SchemaDefinition);
+        const profileExt = profileSchemaMap.get(urn);
+        if (profileExt && Array.isArray(profileExt.attributes)) {
+          schemas.push({
+            id: profileExt.id,
+            attributes: profileExt.attributes as unknown as SchemaAttributeDefinition[],
+          });
+        } else {
+          const globalExt = this.schemaRegistry.getSchema(urn);
+          if (globalExt) schemas.push(globalExt as SchemaDefinition);
         }
       }
     }
@@ -591,17 +702,13 @@ export class ScimSchemaHelpers {
 
   /**
    * Get all schema definitions (core + registered extensions) for the endpoint.
+   *
+   * When an EndpointContextStorage is available and has a profile set,
+   * profile schemas are used (they include custom extensions with full
+   * attribute characteristics). Falls back to the global ScimSchemaRegistry.
    */
   getSchemaDefinitions(endpointId?: string): SchemaDefinition[] {
-    const coreSchema = this.schemaRegistry.getSchema(this.coreSchemaUrn);
-    const schemas: SchemaDefinition[] = [];
-    if (coreSchema) schemas.push({ ...coreSchema, isCoreSchema: true } as SchemaDefinition);
-    const extUrns = this.schemaRegistry.getExtensionUrns();
-    for (const urn of extUrns) {
-      const ext = this.schemaRegistry.getSchema(urn);
-      if (ext) schemas.push(ext as SchemaDefinition);
-    }
-    return schemas;
+    return this.getProfileAwareSchemaDefinitions();
   }
 
   /**
@@ -692,9 +799,23 @@ export class ScimSchemaHelpers {
 
   /**
    * Get the extension URNs registered for this endpoint.
+   *
+   * When an EndpointContextStorage is available with a profile, includes
+   * extension URNs from the profile's resourceTypes (which may define custom
+   * extensions not in the global registry).
    */
   getExtensionUrns(endpointId?: string): readonly string[] {
-    return this.schemaRegistry.getExtensionUrns();
+    const globalUrns = this.schemaRegistry.getExtensionUrns();
+    const profile = this.endpointContextStorage?.getProfile?.();
+    if (!profile?.resourceTypes) return globalUrns;
+
+    const allUrns = new Set<string>(globalUrns);
+    for (const rt of profile.resourceTypes) {
+      for (const ext of rt.schemaExtensions) {
+        allUrns.add(ext.schema);
+      }
+    }
+    return [...allUrns];
   }
 
   /**

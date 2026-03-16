@@ -332,12 +332,14 @@ graph TD
 
 | Level | Suites | Tests | Status | Lines |
 |---|---|---|---|---|
-| **Unit** | 73 | 2,830 | All Passing | ~27,900 |
-| **E2E** | 30 | 613 (+6 skipped) | All Passing | ~10,400 |
-| **Live Integration** | 1 | 832 | 832 Pass | ~7,500 |
-| **TOTAL** | **104** | **~4,275** | **100% pass rate** | **~45,800** |
+| **Unit** | 73 | 2,844 | All Passing | ~27,900 |
+| **E2E** | 31 | 677 (6 skipped) | 665 Pass / 6 Fail | ~10,400 |
+| **Live Integration** | 1 | 604 | 591 Pass / 13 Fail | ~7,500 |
+| **TOTAL** | **105** | **~4,125** | **4,100 pass** | **~45,800** |
 
-> **12 Live Test Failures** are pre-existing feature gaps (not regressions): content-type negotiation (415), collection-level methods (404/405), immutable enforcement, uniqueness collision (409), required field enforcement.
+> **6 E2E Failures**: Custom extension returned:never filtering (2), PATCH URN dot-split corruption (2), admin PATCH schema/RT mismatch (2). All in `profile-combinations.e2e-spec.ts`.
+>
+> **13 Live Test Failures** are pre-existing feature gaps (not regressions): logLevel clearing (1), content-type negotiation/415 (2), collection-level methods/404/405 (2), immutable enforcement (2), uniqueness collision/409 (5), required field enforcement (1). See [TEST_FAILURE_ANALYSIS.md](TEST_FAILURE_ANALYSIS.md) for full root-cause analysis.
 
 ### Test-to-Source Line Ratio
 

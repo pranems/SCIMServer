@@ -410,6 +410,21 @@ export function resolveNoPathValue(
       } else {
         rawPayload[key] = value;
       }
+    } else if (key.startsWith('urn:')) {
+      // URN key (e.g. "urn:example:custom:2.0:User") — store as-is.
+      // URNs may contain dots (version segments like "2.0") which are NOT
+      // JSON path separators. RFC 2141 URN syntax must be preserved atomically.
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        // Merge with existing extension object if present
+        const existing = rawPayload[key];
+        if (typeof existing === 'object' && existing !== null && !Array.isArray(existing)) {
+          rawPayload[key] = { ...(existing as Record<string, unknown>), ...(value as Record<string, unknown>) };
+        } else {
+          rawPayload[key] = value;
+        }
+      } else {
+        rawPayload[key] = value;
+      }
     } else if (key.includes('.')) {
       // Dot-notation: name.givenName → update nested object
       const dotIndex = key.indexOf('.');
