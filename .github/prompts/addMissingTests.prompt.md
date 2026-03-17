@@ -25,7 +25,7 @@ Audit for missing tests in these categories:
 
 ### A. Config Flag Coverage (14 boolean flags in EndpointConfig interface + logLevel; 12 persisted in ProfileSettings, 2 derived)
 
-For each flag (`AllowAndCoerceBooleanStrings`, `StrictSchemaValidation`, `SoftDeleteEnabled`, `VerbosePatchSupported`, `MultiOpPatchRequestAddMultipleMembersToGroup`, `MultiOpPatchRequestRemoveMultipleMembersFromGroup`, `PatchOpAllowRemoveAllMembers`, `RequireIfMatch`, `ReprovisionOnConflictForSoftDeletedResource`, `CustomResourceTypesEnabled` *(derived from profile.resourceTypes in v0.28.0)*, `BulkOperationsEnabled` *(derived from profile SPC in v0.28.0)*, `PerEndpointCredentialsEnabled`, `IncludeWarningAboutIgnoredReadOnlyAttribute`, `IgnoreReadOnlyAttributesInPatch`):
+For each flag (`AllowAndCoerceBooleanStrings`, `StrictSchemaValidation`, `SoftDeleteEnabled`, `VerbosePatchSupported`, `MultiOpPatchRequestAddMultipleMembersToGroup`, `MultiOpPatchRequestRemoveMultipleMembersFromGroup`, `PatchOpAllowRemoveAllMembers`, `RequireIfMatch`, `ReprovisionOnConflictForSoftDeletedResource`, `CustomResourceTypesEnabled` *(derived from profile.resourceTypes)*, `BulkOperationsEnabled` *(derived from profile SPC)*, `PerEndpointCredentialsEnabled`, `IncludeWarningAboutIgnoredReadOnlyAttribute`, `IgnoreReadOnlyAttributesInPatch`):
 
 | Check | Unit | E2E | Live |
 |-------|------|-----|------|
@@ -135,7 +135,7 @@ Specifically check:
 - Every E2E test scenario should have a corresponding live test in `scripts/live-test.ps1`
 - Live tests should cover both local (port 6000) and Docker (port 8080) scenarios
 - Verify all live test sections in `scripts/live-test.ps1` exist by grepping for `TEST SECTION`
-- Ensure new sections use the next available number (check current highest before `Section 10`; as of v0.28.0 Phase 14 the latest is **9z**)
+- Ensure new sections use the next available number (check current highest before `Section 10`; as of v0.29.0 the latest is **9z**)
 
 ### H. Resource-Type Symmetry
 
@@ -183,7 +183,7 @@ For every behavior tested on Users, verify the equivalent exists for Groups (and
 | Profile hydration on boot (registry) | ✅ | N/A | ? |
 | Profile change listener (registry rehydration) | ✅ | implicit | ? |
 | Preset API (list + detail + 404) | ✅ | ✅ | ? |
-| `configToProfile` backward compat (BulkOperationsEnabled→SPC) | N/A (removed in v0.28.0) | N/A | N/A |
+| `configToProfile` backward compat (BulkOperationsEnabled→SPC) | N/A (removed in v0.29.0) | N/A | N/A |
 | Mutually exclusive profilePreset + profile → 400 | ✅ | ✅ | ✅ |
 
 ### K. Endpoint Cache + Context (Phase 14.1)
@@ -541,11 +541,11 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
 | Unit  | 2,832  | ?     | +?    |
-| E2E   | 666    | ?     | +?    |
+| E2E   | 687    | ?     | +?    |
 | Live  | 605    | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
-> *Last updated: v0.28.0 Phase 14.4 — legacy config removal (2026-03-16)*
+> *Last updated: v0.29.0 — doc rewrite + version sweep (2026-03-16)*
 
 4. Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts.
 

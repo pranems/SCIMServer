@@ -169,7 +169,7 @@ After all updates, perform a final cross-check:
 
 1. **Version consistency**: `package.json` version matches all doc headers, `CHANGELOG.md`, `Session_starter.md`, and `CONTEXT_INSTRUCTIONS.md`.
 2. **Test count consistency**: Unit, E2E, and live counts match across all documents that reference them.
-3. **Flag count consistency**: All docs that reference flag counts or list flag names are in sync with `endpoint-config.interface.ts` (14 boolean flags + logLevel in the interface; 12 persisted in `ProfileSettings` + 2 derived from profile structure in v0.28.0).
+3. **Flag count consistency**: All docs that reference flag counts or list flag names are in sync with `endpoint-config.interface.ts` (14 boolean flags + logLevel in the interface; 12 persisted in `ProfileSettings` + 2 derived from profile structure).
 4. **Link validation**: All `[text](path)` links in docs resolve to existing files.
 5. **Index completeness**: Every doc in `docs/` has an entry in `docs/INDEX.md`.
 

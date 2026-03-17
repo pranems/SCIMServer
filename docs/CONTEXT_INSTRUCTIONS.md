@@ -331,7 +331,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 
 > 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
 
-- **Unit** and **E2E** — all passing (0 failures). **Unit**: 2,830 (73 suites). **E2E**: 613 + 6 skipped (30 suites). **Live integration** — 832 live assertions
+- **Unit** and **E2E** — all passing (0 failures). **Unit**: 2,832 (73 suites). **E2E**: 687 (31 suites). **Live integration** — 605 live assertions
 - **SCIM Validator**: 25/25 required + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
 - Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`
@@ -342,7 +342,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 
 ## 9. Session History & Completed Work
 
-### Phase 13: Endpoint Profile Configuration (v0.28.0)
+### Phase 13: Endpoint Profile Configuration (v0.28.0) → Phase 14: Legacy Removal (v0.29.0)
 - Unified `Endpoint.profile` JSONB replaces fragmented `config` + `EndpointSchema` + `EndpointResourceType`
 - 5 named presets (entra-id default, entra-id-minimal, rfc-standard, minimal, user-only)
 - RFC-native SCIM discovery format as configuration input with auto-expand + tighten-only validation
