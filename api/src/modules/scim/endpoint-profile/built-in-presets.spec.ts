@@ -165,16 +165,18 @@ describe('built-in-presets', () => {
       expect((userSchema!.attributes as any[]).length).toBe(20);
     });
 
-    it('should have EnterpriseUser with "all" shorthand', () => {
+    it('should have EnterpriseUser with fully expanded attributes (6 attrs from JSON)', () => {
       const eu = profile.schemas!.find(s => s.id === SCIM_ENTERPRISE_USER_SCHEMA);
       expect(eu).toBeDefined();
-      expect(eu!.attributes).toBe('all');
+      expect(Array.isArray(eu!.attributes)).toBe(true);
+      expect((eu!.attributes as any[]).length).toBe(6);
     });
 
-    it('should have Group with "all" shorthand', () => {
+    it('should have Group with fully expanded attributes (loaded from JSON)', () => {
       const group = profile.schemas!.find(s => s.id === SCIM_CORE_GROUP_SCHEMA);
       expect(group).toBeDefined();
-      expect(group!.attributes).toBe('all');
+      expect(Array.isArray(group!.attributes)).toBe(true);
+      expect((group!.attributes as any[]).length).toBe(6);
     });
 
     it('should include all 4 msfttest extension schemas (decision D10)', () => {
@@ -300,9 +302,10 @@ describe('built-in-presets', () => {
       expect(ids).not.toContain(MSFTTEST_IETF_USER_SCHEMA);
     });
 
-    it('should have all schemas with "all" shorthand', () => {
+    it('should have all schemas with fully expanded attributes (loaded from JSON)', () => {
       for (const schema of profile.schemas!) {
-        expect(schema.attributes).toBe('all');
+        expect(Array.isArray(schema.attributes)).toBe(true);
+        expect((schema.attributes as any[]).length).toBeGreaterThan(0);
       }
     });
 

@@ -1,19 +1,23 @@
 /**
- * Profile Preset Controller — Phase 13, Step 3.5
+ * Profile Preset Controller — Phase 13, Step 3.5 + JSON reload
  *
- * Read-only API for listing and retrieving built-in profile presets.
- * No POST/PUT/DELETE — presets are code constants (decision D4).
+ * API for listing, retrieving, and reloading profile presets.
+ * Presets are loaded from JSON files in `api/presets/` at startup.
  *
  * Routes:
- *   GET /admin/profile-presets           — List all 5 presets (name + description)
- *   GET /admin/profile-presets/:name     — Get full expanded profile for a preset
+ *   GET  /admin/profile-presets           — List all presets (name + description)
+ *   GET  /admin/profile-presets/:name     — Get full expanded profile for a preset
+ *   POST /admin/profile-presets/reload    — Reload all presets from JSON files on disk
  *
+ * @see api/presets/*.json — source-of-truth preset definitions
  * @see docs/SCHEMA_TEMPLATES_DESIGN.md §6.1
  */
-import { Controller, Get, Param, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Param, NotFoundException } from '@nestjs/common';
 import {
   BUILT_IN_PRESETS,
   getAllPresetMetadata,
+  reloadPresetsFromDisk,
+  getLastLoadResult,
 } from './built-in-presets';
 import { validateAndExpandProfile } from './endpoint-profile.service';
 import type { PresetMetadata } from './endpoint-profile.types';
@@ -22,11 +26,31 @@ import type { PresetMetadata } from './endpoint-profile.types';
 export class PresetController {
   /**
    * GET /admin/profile-presets
-   * List all built-in presets with metadata (name, description, default flag).
+   * List all presets with metadata (name, description, default flag).
    */
   @Get()
   listPresets(): PresetMetadata[] {
     return getAllPresetMetadata();
+  }
+
+  /**
+   * POST /admin/profile-presets/reload
+   * Re-read all preset JSON files from disk and refresh the in-memory registry.
+   * Use this after editing JSON files to apply changes without restarting the server.
+   *
+   * Must be registered BEFORE the `:name` param route to avoid matching "reload" as a preset name.
+   */
+  @Post('reload')
+  reloadPresets() {
+    const result = reloadPresetsFromDisk();
+    return {
+      message: 'Presets reloaded from disk',
+      dir: result.dir,
+      loaded: result.loaded,
+      fallback: result.fallback,
+      custom: result.custom,
+      totalPresets: result.loaded.length + result.fallback.length + result.custom.length,
+    };
   }
 
   /**
