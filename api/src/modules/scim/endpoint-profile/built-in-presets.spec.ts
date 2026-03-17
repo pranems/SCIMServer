@@ -159,19 +159,24 @@ describe('built-in-presets', () => {
       const userSchema = profile.schemas!.find(s => s.id === SCIM_CORE_USER_SCHEMA);
       expect(userSchema).toBeDefined();
       expect(Array.isArray(userSchema!.attributes)).toBe(true);
-      expect((userSchema!.attributes as any[]).length).toBe(14);
+      // 20 attributes: userName, name, displayName, nickName, profileUrl, title, userType,
+      // emails, active, externalId, addresses, phoneNumbers, ims, photos, roles, entitlements,
+      // preferredLanguage, locale, timezone, password
+      expect((userSchema!.attributes as any[]).length).toBe(20);
     });
 
-    it('should have EnterpriseUser with "all" shorthand', () => {
+    it('should have EnterpriseUser with fully expanded attributes (6 attrs from JSON)', () => {
       const eu = profile.schemas!.find(s => s.id === SCIM_ENTERPRISE_USER_SCHEMA);
       expect(eu).toBeDefined();
-      expect(eu!.attributes).toBe('all');
+      expect(Array.isArray(eu!.attributes)).toBe(true);
+      expect((eu!.attributes as any[]).length).toBe(6);
     });
 
-    it('should have Group with "all" shorthand', () => {
+    it('should have Group with fully expanded attributes (loaded from JSON)', () => {
       const group = profile.schemas!.find(s => s.id === SCIM_CORE_GROUP_SCHEMA);
       expect(group).toBeDefined();
-      expect(group!.attributes).toBe('all');
+      expect(Array.isArray(group!.attributes)).toBe(true);
+      expect((group!.attributes as any[]).length).toBe(6);
     });
 
     it('should include all 4 msfttest extension schemas (decision D10)', () => {
@@ -228,6 +233,25 @@ describe('built-in-presets', () => {
     it('should have AllowAndCoerceBooleanStrings=True in settings', () => {
       expect(profile.settings!.AllowAndCoerceBooleanStrings).toBe('True');
     });
+
+    it('should have Entra-compatible PATCH settings', () => {
+      expect(profile.settings!.MultiOpPatchRequestAddMultipleMembersToGroup).toBe('True');
+      expect(profile.settings!.MultiOpPatchRequestRemoveMultipleMembersFromGroup).toBe('True');
+      expect(profile.settings!.PatchOpAllowRemoveAllMembers).toBe('True');
+      expect(profile.settings!.VerbosePatchSupported).toBe('True');
+    });
+
+    it('should have StrictSchemaValidation=True', () => {
+      expect(profile.settings!.StrictSchemaValidation).toBe('True');
+    });
+
+    it('should have SoftDeleteEnabled=True', () => {
+      expect(profile.settings!.SoftDeleteEnabled).toBe('True');
+    });
+
+    it('should have 7 settings total', () => {
+      expect(Object.keys(profile.settings!)).toHaveLength(7);
+    });
   });
 
   // ─── entra-id-minimal Preset ──────────────────────────────────────────
@@ -278,9 +302,10 @@ describe('built-in-presets', () => {
       expect(ids).not.toContain(MSFTTEST_IETF_USER_SCHEMA);
     });
 
-    it('should have all schemas with "all" shorthand', () => {
+    it('should have all schemas with fully expanded attributes (loaded from JSON)', () => {
       for (const schema of profile.schemas!) {
-        expect(schema.attributes).toBe('all');
+        expect(Array.isArray(schema.attributes)).toBe(true);
+        expect((schema.attributes as any[]).length).toBeGreaterThan(0);
       }
     });
 
@@ -455,5 +480,121 @@ describe('built-in-presets', () => {
         });
       });
     }
+  });
+
+  // ─── entra-id User attribute completeness (SCIM Validator compat) ─────
+
+  describe('entra-id User schema — SCIM Validator attribute completeness', () => {
+    const profile = getBuiltInPreset('entra-id').profile;
+    const userSchema = profile.schemas!.find(s => s.id === SCIM_CORE_USER_SCHEMA);
+    const attrNames = (userSchema!.attributes as any[]).map((a: any) => a.name);
+
+    // These are all attributes the Microsoft SCIM Validator sends on POST /Users
+    const validatorAttributes = [
+      'userName', 'displayName', 'title', 'emails', 'preferredLanguage',
+      'name', 'addresses', 'phoneNumbers', 'roles', 'userType', 'nickName',
+      'locale', 'timezone', 'profileUrl', 'active',
+    ];
+
+    for (const attr of validatorAttributes) {
+      it(`should include '${attr}' (sent by Microsoft SCIM Validator)`, () => {
+        expect(attrNames).toContain(attr);
+      });
+    }
+
+    // Additional RFC 7643 §4.1 attributes for completeness
+    const additionalRfcAttributes = ['ims', 'photos', 'entitlements', 'password'];
+    for (const attr of additionalRfcAttributes) {
+      it(`should include '${attr}' (RFC 7643 §4.1)`, () => {
+        expect(attrNames).toContain(attr);
+      });
+    }
+  });
+
+  // ─── Preset settings differentiation ──────────────────────────────────
+
+  describe('preset settings differentiation', () => {
+    it('entra-id should have 7 non-empty settings (Entra-compatible defaults)', () => {
+      const { settings } = getBuiltInPreset('entra-id').profile;
+      expect(Object.keys(settings!).length).toBe(7);
+      // Verify all are string "True" (Entra sends boolean strings)
+      for (const [key, value] of Object.entries(settings!)) {
+        if (key !== 'logLevel') {
+          expect(typeof value).toBe('string');
+        }
+      }
+    });
+
+    it('entra-id-minimal should have AllowAndCoerceBooleanStrings only', () => {
+      const { settings } = getBuiltInPreset('entra-id-minimal').profile;
+      expect(Object.keys(settings!)).toEqual(['AllowAndCoerceBooleanStrings']);
+    });
+
+    it('rfc-standard should have empty settings (pure RFC defaults)', () => {
+      const { settings } = getBuiltInPreset('rfc-standard').profile;
+      expect(Object.keys(settings!)).toHaveLength(0);
+    });
+
+    it('minimal should have empty settings', () => {
+      const { settings } = getBuiltInPreset('minimal').profile;
+      expect(Object.keys(settings!)).toHaveLength(0);
+    });
+
+    it('user-only should have empty settings', () => {
+      const { settings } = getBuiltInPreset('user-only').profile;
+      expect(Object.keys(settings!)).toHaveLength(0);
+    });
+  });
+
+  // ─── SPC capability matrix ────────────────────────────────────────────
+
+  describe('SPC capability matrix across presets', () => {
+    const matrix: Record<string, { patch: boolean; bulk: boolean; filter: boolean; sort: boolean; etag: boolean }> = {
+      'entra-id':         { patch: true, bulk: false, filter: true, sort: false, etag: true },
+      'entra-id-minimal': { patch: true, bulk: false, filter: true, sort: false, etag: true },
+      'rfc-standard':     { patch: true, bulk: true,  filter: true, sort: true,  etag: true },
+      'minimal':          { patch: true, bulk: false, filter: true, sort: false, etag: false },
+      'user-only':        { patch: true, bulk: false, filter: true, sort: true,  etag: true },
+    };
+
+    for (const [presetName, expected] of Object.entries(matrix)) {
+      it(`${presetName} SPC capabilities: patch=${expected.patch}, bulk=${expected.bulk}, sort=${expected.sort}, etag=${expected.etag}`, () => {
+        const spc = getBuiltInPreset(presetName).profile.serviceProviderConfig!;
+        expect(spc.patch!.supported).toBe(expected.patch);
+        expect(spc.bulk!.supported).toBe(expected.bulk);
+        expect(spc.filter!.supported).toBe(expected.filter);
+        expect(spc.sort!.supported).toBe(expected.sort);
+        expect(spc.etag!.supported).toBe(expected.etag);
+      });
+    }
+  });
+
+  // ─── Resource type matrix ─────────────────────────────────────────────
+
+  describe('resource type matrix across presets', () => {
+    it('entra-id should have User + Group', () => {
+      const rts = getBuiltInPreset('entra-id').profile.resourceTypes!.map(rt => rt.name);
+      expect(rts).toEqual(['User', 'Group']);
+    });
+
+    it('entra-id-minimal should have User + Group', () => {
+      const rts = getBuiltInPreset('entra-id-minimal').profile.resourceTypes!.map(rt => rt.name);
+      expect(rts).toEqual(['User', 'Group']);
+    });
+
+    it('rfc-standard should have User + Group', () => {
+      const rts = getBuiltInPreset('rfc-standard').profile.resourceTypes!.map(rt => rt.name);
+      expect(rts).toEqual(['User', 'Group']);
+    });
+
+    it('minimal should have User + Group', () => {
+      const rts = getBuiltInPreset('minimal').profile.resourceTypes!.map(rt => rt.name);
+      expect(rts).toEqual(['User', 'Group']);
+    });
+
+    it('user-only should have User only (no Group)', () => {
+      const rts = getBuiltInPreset('user-only').profile.resourceTypes!.map(rt => rt.name);
+      expect(rts).toEqual(['User']);
+    });
   });
 });
