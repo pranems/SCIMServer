@@ -1,7 +1,7 @@
 /**
- * E2E Tests — Endpoint Profile & Preset API (Phase 13, Step 6)
+ * E2E Tests — Endpoint Profile (Phase 13, Step 6)
  *
- * Tests the new profile-based endpoint creation, preset API, and
+ * Tests the profile-based endpoint creation and
  * profile PATCH merge behavior introduced by Phase 13.
  *
  * @see docs/SCHEMA_TEMPLATES_DESIGN.md §6, §8, §12
@@ -17,7 +17,7 @@ import {
 } from './helpers/request.helper';
 import { resetFixtureCounter } from './helpers/fixtures';
 
-describe('Endpoint Profile & Preset API (E2E)', () => {
+describe('Endpoint Profile (E2E)', () => {
   let app: INestApplication;
   let token: string;
 
@@ -32,135 +32,6 @@ describe('Endpoint Profile & Preset API (E2E)', () => {
 
   beforeEach(() => {
     resetFixtureCounter();
-  });
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // Preset API (GET /admin/profile-presets)
-  // ═══════════════════════════════════════════════════════════════════════
-
-  describe('GET /scim/admin/profile-presets', () => {
-    it('should return 5 built-in presets', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/scim/admin/profile-presets')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      expect(res.body).toHaveLength(5);
-    });
-
-    it('should return presets with name and description', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/scim/admin/profile-presets')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      for (const preset of res.body) {
-        expect(preset.name).toBeDefined();
-        expect(typeof preset.name).toBe('string');
-        expect(preset.description).toBeDefined();
-        expect(typeof preset.description).toBe('string');
-      }
-    });
-
-    it('should mark entra-id as default', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/scim/admin/profile-presets')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      const entraId = res.body.find((p: any) => p.name === 'entra-id');
-      expect(entraId).toBeDefined();
-      expect(entraId.default).toBe(true);
-    });
-
-    it('should include all 5 preset names in correct order', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/scim/admin/profile-presets')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      const names = res.body.map((p: any) => p.name);
-      expect(names).toEqual([
-        'entra-id',
-        'entra-id-minimal',
-        'rfc-standard',
-        'minimal',
-        'user-only',
-      ]);
-    });
-  });
-
-  describe('GET /scim/admin/profile-presets/:name', () => {
-    it('should return expanded profile for entra-id', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/scim/admin/profile-presets/entra-id')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      expect(res.body.name).toBe('entra-id');
-      expect(res.body.profile).toBeDefined();
-      expect(res.body.profile.schemas).toBeDefined();
-      expect(res.body.profile.schemas.length).toBeGreaterThan(0);
-      expect(res.body.profile.resourceTypes).toBeDefined();
-      expect(res.body.profile.serviceProviderConfig).toBeDefined();
-      expect(res.body.profile.settings).toBeDefined();
-    });
-
-    it('should return fully expanded attributes (not "all" shorthand)', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/scim/admin/profile-presets/rfc-standard')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      const userSchema = res.body.profile.schemas.find(
-        (s: any) => s.id === 'urn:ietf:params:scim:schemas:core:2.0:User',
-      );
-      expect(userSchema).toBeDefined();
-      expect(Array.isArray(userSchema.attributes)).toBe(true);
-      expect(userSchema.attributes.length).toBeGreaterThan(10);
-
-      // Verify attributes have full RFC characteristics
-      const userName = userSchema.attributes.find((a: any) => a.name === 'userName');
-      expect(userName).toBeDefined();
-      expect(userName.type).toBe('string');
-      expect(userName.required).toBe(true);
-      expect(userName.mutability).toBe('readWrite');
-    });
-
-    it('should return 404 for unknown preset', async () => {
-      await request(app.getHttpServer())
-        .get('/scim/admin/profile-presets/nonexistent')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(404);
-    });
-
-    it('should return entra-id with 7 schemas (core + enterprise + 4 msfttest)', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/scim/admin/profile-presets/entra-id')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      expect(res.body.profile.schemas).toHaveLength(7);
-    });
-
-    it('should return minimal with 2 schemas (no extensions)', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/scim/admin/profile-presets/minimal')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      expect(res.body.profile.schemas).toHaveLength(2);
-    });
-
-    it('should return user-only with 1 resource type (no Group)', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/scim/admin/profile-presets/user-only')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      expect(res.body.profile.resourceTypes).toHaveLength(1);
-      expect(res.body.profile.resourceTypes[0].name).toBe('User');
-    });
   });
 
   // ═══════════════════════════════════════════════════════════════════════

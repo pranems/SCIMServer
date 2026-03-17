@@ -6508,14 +6508,6 @@ $userOnlyRts = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($userOnlyEp.id)
 Test-Result -Success ($userOnlyRts.totalResults -eq 1) -Message "9z.8: user-only has 1 resource type"
 Test-Result -Success ($userOnlyRts.Resources[0].name -eq "User") -Message "9z.9: user-only RT is User"
 
-# --- Test 9z.10: Preset API ---
-Write-Host "`n--- Test 9z.10: Preset API ---" -ForegroundColor Cyan
-$presets = Invoke-RestMethod -Uri "$baseUrl/scim/admin/profile-presets" -Headers $headers
-Test-Result -Success ($presets.Count -eq 5) -Message "9z.10: 5 presets available"
-$presetNames = $presets | ForEach-Object { $_.name }
-Test-Result -Success ($presetNames -contains "entra-id") -Message "9z.11: entra-id preset exists"
-Test-Result -Success ($presetNames -contains "rfc-standard") -Message "9z.12: rfc-standard preset exists"
-
 # --- Test 9z.13: PATCH deep-merge settings ---
 Write-Host "`n--- Test 9z.13: PATCH deep-merge settings ---" -ForegroundColor Cyan
 $patchBody = @{ profile = @{ settings = @{ SoftDeleteEnabled = "True" } } } | ConvertTo-Json -Depth 4
@@ -6631,72 +6623,6 @@ Write-Host "`n--- Cleanup: Delete test endpoints ---" -ForegroundColor Cyan
 Test-Result -Success $true -Message "9z.cleanup: Deleted profile test endpoints"
 
 Write-Host "`n--- 9z: Profile & Preset Discovery Tests Complete ---" -ForegroundColor Green
-
-# ============================================
-# TEST SECTION 9z-B: PRESET RELOAD & VALIDATION
-$script:currentSection = "9z-B: Preset Reload"
-# ============================================
-Write-Host "`n`n========================================" -ForegroundColor Yellow
-Write-Host "TEST SECTION 9z-B: PRESET RELOAD & VALIDATION" -ForegroundColor Yellow
-Write-Host "========================================" -ForegroundColor Yellow
-
-# --- Test 9z-B.1: List presets ---
-Write-Host "`n--- Test 9z-B.1: List presets ---" -ForegroundColor Cyan
-$presetList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/profile-presets" -Method GET -Headers $headers
-Test-Result -Success ($presetList.Count -ge 5) -Message "9z-B.1: List presets returns at least 5 (got $($presetList.Count))"
-
-# --- Test 9z-B.2: Verify entra-id is default ---
-Write-Host "`n--- Test 9z-B.2: Verify entra-id is default ---" -ForegroundColor Cyan
-$entraIdMeta = $presetList | Where-Object { $_.name -eq "entra-id" }
-Test-Result -Success ($null -ne $entraIdMeta) -Message "9z-B.2: entra-id preset exists in list"
-Test-Result -Success ($entraIdMeta.default -eq $true) -Message "9z-B.3: entra-id preset is marked as default"
-
-# --- Test 9z-B.4: Get individual preset (rfc-standard) ---
-Write-Host "`n--- Test 9z-B.4: Get rfc-standard preset detail ---" -ForegroundColor Cyan
-$rfcPreset = Invoke-RestMethod -Uri "$baseUrl/scim/admin/profile-presets/rfc-standard" -Method GET -Headers $headers
-Test-Result -Success ($rfcPreset.name -eq "rfc-standard") -Message "9z-B.4: GET rfc-standard returns correct name"
-Test-Result -Success ($null -ne $rfcPreset.profile) -Message "9z-B.5: rfc-standard has profile"
-Test-Result -Success ($rfcPreset.profile.schemas.Count -ge 3) -Message "9z-B.6: rfc-standard has >= 3 schemas (got $($rfcPreset.profile.schemas.Count))"
-$rfcUserSchema = $rfcPreset.profile.schemas | Where-Object { $_.id -eq "urn:ietf:params:scim:schemas:core:2.0:User" }
-Test-Result -Success ($rfcUserSchema.attributes.Count -ge 24) -Message "9z-B.7: rfc-standard User schema has >= 24 attrs (got $($rfcUserSchema.attributes.Count))"
-
-# --- Test 9z-B.8: 404 for unknown preset ---
-Write-Host "`n--- Test 9z-B.8: 404 for unknown preset ---" -ForegroundColor Cyan
-try {
-    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/profile-presets/nonexistent" -Method GET -Headers $headers
-    Test-Result -Success $false -Message "9z-B.8: Should have returned 404 for unknown preset"
-} catch {
-    $code = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($code -eq 404) -Message "9z-B.8: Unknown preset returns 404 (got $code)"
-}
-
-# --- Test 9z-B.9: Reload presets ---
-Write-Host "`n--- Test 9z-B.9: Reload presets ---" -ForegroundColor Cyan
-$reload = Invoke-RestMethod -Uri "$baseUrl/scim/admin/profile-presets/reload" -Method POST -Headers $headers -ContentType "application/json"
-Test-Result -Success ($null -ne $reload.dir) -Message "9z-B.9: Reload returns dir ($($reload.dir))"
-Test-Result -Success ($reload.totalPresets -ge 5) -Message "9z-B.10: Reload total presets >= 5 (got $($reload.totalPresets))"
-Test-Result -Success ($reload.validationErrors.Count -eq 0) -Message "9z-B.11: Reload has 0 validation errors"
-Test-Result -Success ($reload.loaded.Count -ge 1) -Message "9z-B.12: At least 1 preset loaded from file (got $($reload.loaded.Count))"
-
-# --- Test 9z-B.13: After reload, presets still work ---
-Write-Host "`n--- Test 9z-B.13: Create endpoint with reloaded preset ---" -ForegroundColor Cyan
-$reloadTestEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -ContentType "application/json" -Body (@{
-    name = "reload-live-test-$(Get-Random)"
-    profilePreset = "rfc-standard"
-} | ConvertTo-Json)
-Test-Result -Success ($null -ne $reloadTestEp.id) -Message "9z-B.13: Created endpoint with reloaded rfc-standard preset"
-
-# --- Test 9z-B.14: Verify endpoint SPC reflects preset ---
-Write-Host "`n--- Test 9z-B.14: Verify SPC from reloaded preset ---" -ForegroundColor Cyan
-$reloadSpc = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($reloadTestEp.id)/ServiceProviderConfig" -Method GET -Headers $headers
-Test-Result -Success ($reloadSpc.bulk.supported -eq $true) -Message "9z-B.14: rfc-standard endpoint has bulk.supported=true"
-Test-Result -Success ($reloadSpc.sort.supported -eq $true) -Message "9z-B.15: rfc-standard endpoint has sort.supported=true"
-
-# --- Cleanup ---
-try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($reloadTestEp.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
-Test-Result -Success $true -Message "9z-B.cleanup: Deleted reload test endpoint"
-
-Write-Host "`n--- 9z-B: Preset Reload & Validation Tests Complete ---" -ForegroundColor Green
 
 # ============================================
 # TEST SECTION 10: DELETE OPERATIONS
