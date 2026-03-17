@@ -559,7 +559,11 @@ export class ScimSchemaHelpers {
   /**
    * Strict Schema Validation — when StrictSchemaValidation is enabled, reject
    * any request body that contains extension URN keys not listed in the
-   * request's `schemas[]` array or not registered in the schema registry.
+   * request's `schemas[]` array or not registered for this endpoint.
+   *
+   * Uses the endpoint's profile resourceTypes to determine registered extensions
+   * (per-endpoint, not global defaults). Falls back to the global schema registry
+   * if no profile is available.
    *
    * RFC 7643 §3.1: "The 'schemas' attribute is a REQUIRED attribute and is an
    * array of Strings containing URIs that are used to indicate the namespaces
@@ -576,7 +580,10 @@ export class ScimSchemaHelpers {
 
     const declaredSchemas = (dto.schemas as string[] | undefined) ?? [];
     const declaredLower = new Set(declaredSchemas.map((s) => s.toLowerCase()));
-    const registeredUrns = this.schemaRegistry.getExtensionUrns();
+
+    // Get registered extension URNs from the endpoint's profile (per-endpoint)
+    // Falls back to global registry defaults if no profile is available
+    const registeredUrns = this.getEndpointExtensionUrns();
     const registeredLower = new Set(registeredUrns.map((u) => u.toLowerCase()));
 
     for (const key of Object.keys(dto)) {
@@ -602,6 +609,29 @@ export class ScimSchemaHelpers {
         }
       }
     }
+  }
+
+  /**
+   * Get all extension URNs registered for the current endpoint.
+   * Uses the endpoint's profile resourceTypes (per-endpoint, profile-aware).
+   * Falls back to the global schema registry if no profile is available.
+   */
+  private getEndpointExtensionUrns(): string[] {
+    // Try profile-based resolution first (per-endpoint)
+    const profile = this.endpointContextStorage?.getProfile?.();
+    if (profile?.resourceTypes && profile.resourceTypes.length > 0) {
+      const urns = new Set<string>();
+      for (const rt of profile.resourceTypes) {
+        if (rt.schemaExtensions) {
+          for (const ext of rt.schemaExtensions) {
+            urns.add(ext.schema);
+          }
+        }
+      }
+      return [...urns];
+    }
+    // Fallback: global registry defaults
+    return [...this.schemaRegistry.getExtensionUrns()];
   }
 
   /**
