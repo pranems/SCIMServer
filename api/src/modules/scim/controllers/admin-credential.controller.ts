@@ -31,7 +31,7 @@ import * as bcrypt from 'bcrypt';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
-import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS } from '../../endpoint/endpoint-config.interface';
+import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 
 const BCRYPT_SALT_ROUNDS = 12;
 
@@ -65,7 +65,7 @@ export class AdminCredentialController {
     const endpoint = await this.requireEndpoint(endpointId);
 
     // Validate that per-endpoint credentials are enabled
-    const config = endpoint.config ?? {};
+    const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
     if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED)) {
       throw new ForbiddenException(
         `Per-endpoint credentials are not enabled for endpoint "${endpointId}". ` +

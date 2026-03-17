@@ -91,7 +91,7 @@ describe('SharedSecretGuard', () => {
       getEndpoint: jest.fn().mockResolvedValue({
         id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         name: 'test',
-        config: {},
+        profile: { settings: {} },
         active: true,
       }),
     };
@@ -224,7 +224,7 @@ describe('SharedSecretGuard', () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         id: endpointId,
         name: 'test',
-        config: { PerEndpointCredentialsEnabled: false },
+        profile: { settings: { PerEndpointCredentialsEnabled: false } },
         active: true,
       });
 
@@ -243,7 +243,7 @@ describe('SharedSecretGuard', () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         id: endpointId,
         name: 'test',
-        config: { PerEndpointCredentialsEnabled: true },
+        profile: { settings: { PerEndpointCredentialsEnabled: true } },
         active: true,
       });
       mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([
@@ -270,7 +270,7 @@ describe('SharedSecretGuard', () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         id: endpointId,
         name: 'test',
-        config: { PerEndpointCredentialsEnabled: true },
+        profile: { settings: { PerEndpointCredentialsEnabled: true } },
         active: true,
       });
       mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([
@@ -296,7 +296,7 @@ describe('SharedSecretGuard', () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         id: endpointId,
         name: 'test',
-        config: { PerEndpointCredentialsEnabled: true },
+        profile: { settings: { PerEndpointCredentialsEnabled: true } },
         active: true,
       });
       mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([]);
@@ -311,7 +311,7 @@ describe('SharedSecretGuard', () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         id: endpointId,
         name: 'test',
-        config: { PerEndpointCredentialsEnabled: true },
+        profile: { settings: { PerEndpointCredentialsEnabled: true } },
         active: true,
       });
       mockCredentialRepo.findActiveByEndpoint.mockResolvedValue([]);

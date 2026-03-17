@@ -104,10 +104,12 @@ curl -X POST http://localhost:6000/scim/admin/endpoints \
   -d '{
     "name": "acme-corp",
     "displayName": "ACME Corporation",
-    "config": {
-      "MultiOpPatchRequestAddMultipleMembersToGroup": "true",
-      "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "true",
-      "VerbosePatchSupported": "true"
+    "profile": {
+      "settings": {
+        "MultiOpPatchRequestAddMultipleMembersToGroup": "true",
+        "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "true",
+        "VerbosePatchSupported": "true"
+      }
     }
   }'
 ```
@@ -120,7 +122,7 @@ curl -X POST http://localhost:6000/scim/admin/endpoints \
   "displayName": "ACME Corporation",
   "scimEndpoint": "/scim/endpoints/clx123abc456def",
   "active": true,
-  "config": { ... },
+  "profile": { "settings": { ... }, ... },
   "createdAt": "2026-02-11T...",
   "updatedAt": "2026-02-11T..."
 }

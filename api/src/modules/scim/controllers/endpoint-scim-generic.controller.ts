@@ -98,7 +98,7 @@ export class EndpointScimGenericController {
     }
 
     const profile = endpoint.profile;
-    const config: EndpointConfig = endpoint.config || {};
+    const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
     this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
 

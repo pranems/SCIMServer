@@ -9,7 +9,7 @@ export interface EndpointContext {
   baseUrl: string;
   /** Full endpoint profile — the single runtime source of truth */
   profile?: EndpointProfile;
-  /** @deprecated Use profile.settings — retained for backward compat */
+  /** Runtime config flags — derived from profile.settings at context setup time */
   config?: EndpointConfig;
   /** Accumulated warnings for the current request (e.g. stripped readOnly attributes) */
   warnings?: string[];

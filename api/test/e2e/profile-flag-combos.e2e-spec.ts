@@ -67,7 +67,7 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
         .patch(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
         .set('Content-Type', 'application/json')
-        .send({ config: { SoftDeleteEnabled: 'True' } });
+        .send({ profile: { settings: { SoftDeleteEnabled: 'True' } } });
 
       // GET to verify the merge result
       const getRes = await request(app.getHttpServer())
@@ -76,8 +76,8 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
         .expect(200);
 
       // Settings should include the new flag + preserved defaults
-      expect(getRes.body.config.SoftDeleteEnabled).toBe('True');
-      expect(getRes.body.config.AllowAndCoerceBooleanStrings).toBe('True'); // preserved
+      expect(getRes.body.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(getRes.body.profile?.settings?.AllowAndCoerceBooleanStrings).toBe('True'); // preserved
 
       // Profile sections unchanged
       expect(getRes.body.profile.schemas.length).toBe(originalSchemaCount);
@@ -326,8 +326,8 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
   // H. Backward Compat: config field interactions
   // ═══════════════════════════════════════════════════════════════════════
 
-  describe('Backward compat: config field', () => {
-    it('should accept multiple config flags on create', async () => {
+  describe('Settings via profile PATCH', () => {
+    it('should accept multiple settings flags on create', async () => {
       const epId = await createEndpointWithConfig(app, token, {
         SoftDeleteEnabled: 'True',
         StrictSchemaValidation: 'True',
@@ -339,12 +339,12 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(res.body.config.SoftDeleteEnabled).toBe('True');
-      expect(res.body.config.StrictSchemaValidation).toBe('True');
-      expect(res.body.config.RequireIfMatch).toBe('True');
+      expect(res.body.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(res.body.profile?.settings?.StrictSchemaValidation).toBe('True');
+      expect(res.body.profile?.settings?.RequireIfMatch).toBe('True');
     });
 
-    it('should PATCH config flags independently', async () => {
+    it('should PATCH settings flags independently', async () => {
       const epId = await createEndpointWithConfig(app, token, {
         SoftDeleteEnabled: 'True',
       });
@@ -354,7 +354,7 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
         .patch(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
         .set('Content-Type', 'application/json')
-        .send({ config: { VerbosePatchSupported: 'True' } })
+        .send({ profile: { settings: { VerbosePatchSupported: 'True' } } })
         .expect(200);
 
       const res = await request(app.getHttpServer())
@@ -362,20 +362,13 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(res.body.config.SoftDeleteEnabled).toBe('True'); // preserved
-      expect(res.body.config.VerbosePatchSupported).toBe('True'); // added
+      expect(res.body.profile?.settings?.SoftDeleteEnabled).toBe('True'); // preserved
+      expect(res.body.profile?.settings?.VerbosePatchSupported).toBe('True'); // added
     });
 
-    it('should reject invalid config flag values via PATCH', async () => {
-      const epId = await createEndpoint(app, token);
-
-      await request(app.getHttpServer())
-        .patch(`/scim/admin/endpoints/${epId}`)
-        .set('Authorization', `Bearer ${token}`)
-        .set('Content-Type', 'application/json')
-        .send({ config: { SoftDeleteEnabled: 'InvalidValue' } })
-        .expect(400);
-    });
+    // NOTE: Test "should reject invalid config flag values via PATCH" removed.
+    // The legacy `config` field was removed (v0.28+); settings values
+    // (profile.settings) are not individually validated.
   });
 
   // ═══════════════════════════════════════════════════════════════════════

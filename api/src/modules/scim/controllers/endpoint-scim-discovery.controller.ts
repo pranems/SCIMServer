@@ -9,6 +9,7 @@ import {
 import type { Request } from 'express';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
+import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimDiscoveryService } from '../discovery/scim-discovery.service';
 import { buildBaseUrl } from '../common/base-url.util';
 import { Public } from '../../auth/public.decorator';
@@ -65,7 +66,7 @@ export class EndpointScimDiscoveryController {
     }
 
     const profile = endpoint.profile;
-    const config = endpoint.config || {};
+    const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
     this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
   }
