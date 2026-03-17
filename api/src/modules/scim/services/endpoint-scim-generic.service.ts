@@ -910,28 +910,57 @@ export class EndpointScimGenericService {
   }
 
   /**
-   * Build schema definitions from the registry for a given payload's declared schemas[].
-   * Dynamic equivalent of ScimSchemaHelpers.buildSchemaDefinitions().
+   * Build schema definitions for a given payload's declared schemas[].
+   * Profile-aware: uses the endpoint's profile schemas when available,
+   * falling back to the global registry only when the profile doesn't
+   * contain the required schema.
    */
   private buildSchemaDefinitionsFromPayload(
     dto: Record<string, unknown>,
     resourceType: ScimResourceType,
     endpointId: string,
   ): SchemaDefinition[] {
-    const coreSchema = this.schemaRegistry.getSchema(resourceType.schema);
-    const schemas: SchemaDefinition[] = [];
-    if (coreSchema) {
-      // Mark as core so SchemaValidator treats its attributes as top-level,
-      // even if the URN doesn't use the standard urn:ietf:params:scim:schemas:core: prefix.
-      schemas.push({ ...coreSchema, isCoreSchema: true } as SchemaDefinition);
+    // Build profile schema lookup map
+    const profile = this.endpointContext.getProfile?.();
+    const profileSchemaMap = new Map<string, any>();
+    if (profile?.schemas) {
+      for (const ps of profile.schemas) {
+        if (ps.id) profileSchemaMap.set(ps.id, ps);
+      }
     }
 
+    const schemas: SchemaDefinition[] = [];
+
+    // Core schema: prefer profile version, fall back to global registry
+    const profileCore = profileSchemaMap.get(resourceType.schema);
+    if (profileCore && Array.isArray(profileCore.attributes)) {
+      schemas.push({
+        id: profileCore.id,
+        attributes: profileCore.attributes as unknown as SchemaAttributeDefinition[],
+        isCoreSchema: true,
+      });
+    } else {
+      const coreSchema = this.schemaRegistry.getSchema(resourceType.schema);
+      if (coreSchema) {
+        schemas.push({ ...coreSchema, isCoreSchema: true } as SchemaDefinition);
+      }
+    }
+
+    // Extension schemas declared in the payload's schemas[]
     const declaredSchemas = (dto.schemas as string[] | undefined) ?? [];
     for (const urn of declaredSchemas) {
       if (urn !== resourceType.schema) {
-        const extSchema = this.schemaRegistry.getSchema(urn);
-        if (extSchema) {
-          schemas.push(extSchema as SchemaDefinition);
+        const profileExt = profileSchemaMap.get(urn);
+        if (profileExt && Array.isArray(profileExt.attributes)) {
+          schemas.push({
+            id: profileExt.id,
+            attributes: profileExt.attributes as unknown as SchemaAttributeDefinition[],
+          });
+        } else {
+          const extSchema = this.schemaRegistry.getSchema(urn);
+          if (extSchema) {
+            schemas.push(extSchema as SchemaDefinition);
+          }
         }
       }
     }

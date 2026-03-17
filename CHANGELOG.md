@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.29.0] - 2026-03-17
 
+### Added — Lexmark ISV Endpoint Profile
+
+- **Lexmark preset** (`lexmark.json`): User-only provisioning with EnterpriseUser (required, costCenter/department) and CustomUser (optional, badgeCode/pin — writeOnly/returned:never)
+- **Lexmark E2E tests** (`lexmark-isv.e2e-spec.ts`): 46 tests covering endpoint creation, discovery, CRUD, extensions, writeOnly filtering, PATCH, PUT, filtering, user-only isolation, edge cases
+- **Lexmark live tests** (`scripts/lexmark-live-test.ps1`): 112 tests across 13 sections — standalone ISV-specific live test script
+- **Built-in presets**: 5 → 6 (added `lexmark`)
+- **Unit test updates**: built-in-presets.spec.ts updated with 9 new Lexmark tests, preset count/matrix assertions
+
+### Documentation — Full Refresh
+
+- **README.md**: Complete rewrite with architecture diagrams (Mermaid ER + sequence), compliance matrix, quick start (4 options), environment variables, testing section, repo structure
+- **COMPLETE_API_REFERENCE.md**: Recreated with every endpoint, request/response examples, error codes, query parameters, headers
+- **INDEX.md**: Updated with accurate test counts (72 unit/2,884, 34 E2E/743, live/621, Lexmark/112)
+- **PROJECT_HEALTH_AND_STATS.md**: Fresh LoC metrics (58,891 source, 12,711 test), architecture diagram, full preset table
+- **Example JSONs**: Recreated `user.json`, `group.json`, `serviceproviderconfig.json`, `patch-operations.json`, `search-request.json`; added `bulk-request.json`, `error-responses.json`, `endpoint/create-endpoint.json`
+
 ### Fixed — 19 Test Failures (URN dot-split, profile-aware schema, Content-Type 415 middleware)
 
 Resolved all remaining test failures from the v0.28.0 profile migration:

@@ -1,19 +1,28 @@
 {
   "schemas": ["urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"],
+  "documentationUri": "https://github.com/pranems/SCIMServer",
   "patch": { "supported": true },
-  "bulk": { "supported": true, "maxOperations": 1000, "maxPayloadSize": 1048576 },
-  "filter": { "supported": true, "maxResults": 200 },
+  "bulk": {
+    "supported": true,
+    "maxOperations": 100,
+    "maxPayloadSize": 1048576
+  },
+  "filter": {
+    "supported": true,
+    "maxResults": 200
+  },
   "changePassword": { "supported": false },
-  "sort": { "supported": false },
+  "sort": { "supported": true },
   "etag": { "supported": true },
   "authenticationSchemes": [
     {
       "type": "oauthbearertoken",
       "name": "OAuth Bearer Token",
-      "description": "Authorization using the OAuth 2.0 Bearer Token Standard",
-      "specUri": "https://tools.ietf.org/html/rfc6750",
-      "documentationUri": "https://example.com/docs/auth",
-      "primary": true
+      "description": "Authentication via OAuth 2.0 Bearer Token (client_credentials grant)"
     }
-  ]
+  ],
+  "meta": {
+    "resourceType": "ServiceProviderConfig",
+    "location": "/scim/endpoints/{endpointId}/ServiceProviderConfig"
+  }
 }

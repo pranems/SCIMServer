@@ -1,4 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
+import request from 'supertest';
 import { createTestApp } from './helpers/app.helper';
 import { getAuthToken } from './helpers/auth.helper';
 import {
@@ -803,58 +804,55 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
     // Group-specific boolean coercion tests
     // ───────────────────────────────────────────────────────
 
-    // SKIPPED: These tests register extension schemas via the removed Admin Schema API
-    // TODO: Rewrite to use the new profile-based extension registration (Phase 13)
-    describe.skip('Groups with extension boolean attributes', () => {
+    // Rewritten for Phase 13 profile-based extension registration (was: Admin Schema API)
+    describe('Groups with extension boolean attributes', () => {
       const GROUP_EXT_URN = 'urn:test:scim:schemas:extension:BoolGroup:2.0:Group';
 
-      /** Register a Group extension schema with a boolean attribute on the endpoint */
-      async function registerGroupBoolExtension(endpointId: string): Promise<void> {
-        const ext = {
-          schemaUrn: GROUP_EXT_URN,
-          name: 'BoolGroup',
-          description: 'Test extension with boolean attribute for Group E2E',
-          resourceTypeId: 'Group',
-          required: false,
-          attributes: [
-            {
-              name: 'verified',
-              type: 'boolean',
-              multiValued: false,
-              required: false,
-              mutability: 'readWrite',
-              returned: 'default',
-              description: 'Whether the group is verified',
-            },
-            {
-              name: 'tags',
-              type: 'complex',
-              multiValued: true,
-              required: false,
-              mutability: 'readWrite',
-              returned: 'default',
-              description: 'Tags with boolean active flag',
-              subAttributes: [
-                { name: 'value', type: 'string', multiValued: false, required: true, mutability: 'readWrite', returned: 'always', description: 'Tag name' },
-                { name: 'active', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'Whether the tag is active' },
-              ],
-            },
-          ],
-        };
-        const req = (await import('supertest')).default;
-        await req(app.getHttpServer())
-          .post(`/scim/admin/endpoints/${endpointId}/schemas`)
+      /** Create an endpoint with the BoolGroup extension schema via inline profile */
+      async function createEndpointWithGroupBoolExt(settings: Record<string, string>): Promise<string> {
+        const wk = process.env.JEST_WORKER_ID ?? '0';
+        const res = await request(app.getHttpServer())
+          .post('/scim/admin/endpoints')
           .set('Authorization', `Bearer ${token}`)
           .set('Content-Type', 'application/json')
-          .send(ext)
+          .send({
+            name: `bool-grp-ext-w${wk}-${Date.now()}`,
+            profile: {
+              schemas: [
+                { id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributes: 'all' },
+                { id: 'urn:ietf:params:scim:schemas:core:2.0:Group', name: 'Group', attributes: 'all' },
+                {
+                  id: GROUP_EXT_URN, name: 'BoolGroup', description: 'Test extension with boolean attribute for Group E2E',
+                  attributes: [
+                    { name: 'verified', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'Whether the group is verified' },
+                    { name: 'tags', type: 'complex', multiValued: true, required: false, mutability: 'readWrite', returned: 'default', description: 'Tags with boolean active flag',
+                      subAttributes: [
+                        { name: 'value', type: 'string', multiValued: false, required: true, mutability: 'readWrite', returned: 'always', description: 'Tag name' },
+                        { name: 'active', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'Whether the tag is active' },
+                      ],
+                    },
+                  ],
+                },
+              ],
+              resourceTypes: [
+                { id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] },
+                { id: 'Group', name: 'Group', endpoint: '/Groups', description: 'Group', schema: 'urn:ietf:params:scim:schemas:core:2.0:Group',
+                  schemaExtensions: [{ schema: GROUP_EXT_URN, required: false }] },
+              ],
+              serviceProviderConfig: {
+                patch: { supported: true }, bulk: { supported: false },
+                filter: { supported: true, maxResults: 200 }, sort: { supported: false },
+                etag: { supported: true }, changePassword: { supported: false },
+              },
+              settings,
+            },
+          })
           .expect(201);
+        return res.body.id;
       }
 
       it('should coerce Group extension boolean string "True" on POST (default: flag on)', async () => {
-        const endpointId = await createEndpointWithConfig(app, token, {
-          StrictSchemaValidation: 'True',
-        });
-        await registerGroupBoolExtension(endpointId);
+        const endpointId = await createEndpointWithGroupBoolExt({ StrictSchemaValidation: 'True' });
         const basePath = scimBasePath(endpointId);
 
         const res = await scimPost(app, `${basePath}/Groups`, token, {
@@ -867,11 +865,10 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       });
 
       it('should coerce Group extension boolean string "False" on POST', async () => {
-        const endpointId = await createEndpointWithConfig(app, token, {
+        const endpointId = await createEndpointWithGroupBoolExt({
           StrictSchemaValidation: 'True',
           AllowAndCoerceBooleanStrings: 'True',
         });
-        await registerGroupBoolExtension(endpointId);
         const basePath = scimBasePath(endpointId);
 
         const res = await scimPost(app, `${basePath}/Groups`, token, {
@@ -884,11 +881,10 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       });
 
       it('should reject Group extension boolean string when flag is OFF + StrictSchema ON', async () => {
-        const endpointId = await createEndpointWithConfig(app, token, {
+        const endpointId = await createEndpointWithGroupBoolExt({
           StrictSchemaValidation: 'True',
           AllowAndCoerceBooleanStrings: 'False',
         });
-        await registerGroupBoolExtension(endpointId);
         const basePath = scimBasePath(endpointId);
 
         const res = await scimPost(app, `${basePath}/Groups`, token, {
@@ -901,10 +897,7 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       });
 
       it('should coerce Group extension boolean strings on PUT', async () => {
-        const endpointId = await createEndpointWithConfig(app, token, {
-          StrictSchemaValidation: 'True',
-        });
-        await registerGroupBoolExtension(endpointId);
+        const endpointId = await createEndpointWithGroupBoolExt({ StrictSchemaValidation: 'True' });
         const basePath = scimBasePath(endpointId);
 
         // Create group without extension data
@@ -922,10 +915,7 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       });
 
       it('should coerce Group extension boolean strings in PATCH replace value', async () => {
-        const endpointId = await createEndpointWithConfig(app, token, {
-          StrictSchemaValidation: 'True',
-        });
-        await registerGroupBoolExtension(endpointId);
+        const endpointId = await createEndpointWithGroupBoolExt({ StrictSchemaValidation: 'True' });
         const basePath = scimBasePath(endpointId);
 
         // Create group WITH extension boolean data (using native boolean)
@@ -949,10 +939,7 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       });
 
       it('should coerce complex multi-valued sub-attribute booleans in Group extension', async () => {
-        const endpointId = await createEndpointWithConfig(app, token, {
-          StrictSchemaValidation: 'True',
-        });
-        await registerGroupBoolExtension(endpointId);
+        const endpointId = await createEndpointWithGroupBoolExt({ StrictSchemaValidation: 'True' });
         const basePath = scimBasePath(endpointId);
 
         const res = await scimPost(app, `${basePath}/Groups`, token, {
