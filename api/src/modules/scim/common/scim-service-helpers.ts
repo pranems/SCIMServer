@@ -830,22 +830,26 @@ export class ScimSchemaHelpers {
   /**
    * Get the extension URNs registered for this endpoint.
    *
-   * When an EndpointContextStorage is available with a profile, includes
-   * extension URNs from the profile's resourceTypes (which may define custom
-   * extensions not in the global registry).
+   * Profile-first: when the endpoint has a profile with resourceTypes,
+   * returns ONLY the profile's extension URNs (the profile is the sole
+   * source of truth for that endpoint). Falls back to global registry
+   * only when no profile is available.
    */
   getExtensionUrns(endpointId?: string): readonly string[] {
-    const globalUrns = this.schemaRegistry.getExtensionUrns();
     const profile = this.endpointContextStorage?.getProfile?.();
-    if (!profile?.resourceTypes) return globalUrns;
-
-    const allUrns = new Set<string>(globalUrns);
-    for (const rt of profile.resourceTypes) {
-      for (const ext of rt.schemaExtensions) {
-        allUrns.add(ext.schema);
+    if (profile?.resourceTypes && profile.resourceTypes.length > 0) {
+      const urns = new Set<string>();
+      for (const rt of profile.resourceTypes) {
+        if (rt.schemaExtensions) {
+          for (const ext of rt.schemaExtensions) {
+            urns.add(ext.schema);
+          }
+        }
       }
+      return [...urns];
     }
-    return [...allUrns];
+    // Fallback: global registry defaults (no profile available)
+    return [...this.schemaRegistry.getExtensionUrns()];
   }
 
   /**
