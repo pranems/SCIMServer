@@ -16,6 +16,11 @@ import {
   PRESET_NAMES,
   getBuiltInPreset,
   getAllPresetMetadata,
+  loadPresetsFromDisk,
+  reloadPresetsFromDisk,
+  getLastLoadResult,
+  getPresetsDir,
+  validatePreset,
 } from './built-in-presets';
 import {
   SCIM_CORE_USER_SCHEMA,
@@ -596,5 +601,269 @@ describe('built-in-presets', () => {
       const rts = getBuiltInPreset('user-only').profile.resourceTypes!.map(rt => rt.name);
       expect(rts).toEqual(['User']);
     });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // JSON Load, Validate, and Reload flows
+  // ═══════════════════════════════════════════════════════════════════════
+
+  describe('validatePreset()', () => {
+    it('should return empty array for a valid minimal preset', () => {
+      const valid = {
+        metadata: { name: 'test', description: 'Test preset' },
+        profile: {
+          schemas: [{
+            id: 'urn:test:schema', name: 'Test',
+            attributes: [{
+              name: 'userName', type: 'string', multiValued: false, required: true,
+              mutability: 'readWrite', returned: 'always', description: 'The user name.',
+            }],
+          }],
+          resourceTypes: [{
+            id: 'User', name: 'User', endpoint: '/Users', description: 'User Account',
+            schema: 'urn:test:schema', schemaExtensions: [],
+          }],
+          serviceProviderConfig: {
+            patch: { supported: true }, bulk: { supported: false },
+            filter: { supported: true, maxResults: 100 }, sort: { supported: false },
+            etag: { supported: false }, changePassword: { supported: false },
+          },
+          settings: {},
+        },
+      };
+      expect(validatePreset(valid, 'test.json')).toHaveLength(0);
+    });
+
+    it('should reject null input', () => {
+      const errors = validatePreset(null, 'bad.json');
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0]).toContain('Not a valid JSON object');
+    });
+
+    it('should reject missing metadata.name', () => {
+      const errors = validatePreset({ metadata: {}, profile: {} }, 'bad.json');
+      expect(errors.some(e => e.includes('metadata.name'))).toBe(true);
+    });
+
+    it('should reject missing metadata.description', () => {
+      const errors = validatePreset({ metadata: { name: 'x' }, profile: {} }, 'bad.json');
+      expect(errors.some(e => e.includes('metadata.description'))).toBe(true);
+    });
+
+    it('should reject missing profile', () => {
+      const errors = validatePreset({ metadata: { name: 'x', description: 'y' } }, 'bad.json');
+      expect(errors.some(e => e.includes('profile is missing'))).toBe(true);
+    });
+
+    it('should reject empty schemas array', () => {
+      const errors = validatePreset({
+        metadata: { name: 'x', description: 'y' },
+        profile: { schemas: [], resourceTypes: [{ id: 'U', name: 'U', endpoint: '/U', description: 'U', schema: 'x', schemaExtensions: [] }], serviceProviderConfig: { patch: { supported: true }, bulk: { supported: false }, filter: { supported: true, maxResults: 100 }, sort: { supported: false }, etag: { supported: false }, changePassword: { supported: false } } },
+      }, 'bad.json');
+      expect(errors.some(e => e.includes('non-empty array'))).toBe(true);
+    });
+
+    it('should reject "all" abbreviation in attributes', () => {
+      const errors = validatePreset({
+        metadata: { name: 'x', description: 'y' },
+        profile: {
+          schemas: [{ id: 'urn:test', name: 'Test', attributes: 'all' }],
+          resourceTypes: [{ id: 'U', name: 'U', endpoint: '/U', description: 'U', schema: 'urn:test', schemaExtensions: [] }],
+          serviceProviderConfig: { patch: { supported: true }, bulk: { supported: false }, filter: { supported: true, maxResults: 100 }, sort: { supported: false }, etag: { supported: false }, changePassword: { supported: false } },
+        },
+      }, 'bad.json');
+      expect(errors.some(e => e.includes('"all" abbreviation'))).toBe(true);
+    });
+
+    it('should reject attribute missing required fields', () => {
+      const errors = validatePreset({
+        metadata: { name: 'x', description: 'y' },
+        profile: {
+          schemas: [{ id: 'urn:test', name: 'Test', attributes: [{ name: 'foo' }] }],
+          resourceTypes: [{ id: 'U', name: 'U', endpoint: '/U', description: 'U', schema: 'urn:test', schemaExtensions: [] }],
+          serviceProviderConfig: { patch: { supported: true }, bulk: { supported: false }, filter: { supported: true, maxResults: 100 }, sort: { supported: false }, etag: { supported: false }, changePassword: { supported: false } },
+        },
+      }, 'bad.json');
+      expect(errors.some(e => e.includes('missing type'))).toBe(true);
+      expect(errors.some(e => e.includes('missing multiValued'))).toBe(true);
+      expect(errors.some(e => e.includes('missing required'))).toBe(true);
+      expect(errors.some(e => e.includes('missing mutability'))).toBe(true);
+      expect(errors.some(e => e.includes('missing returned'))).toBe(true);
+      expect(errors.some(e => e.includes('missing description'))).toBe(true);
+    });
+
+    it('should reject complex attribute without subAttributes', () => {
+      const errors = validatePreset({
+        metadata: { name: 'x', description: 'y' },
+        profile: {
+          schemas: [{ id: 'urn:test', name: 'Test', attributes: [{
+            name: 'name', type: 'complex', multiValued: false, required: false,
+            mutability: 'readWrite', returned: 'default', description: 'A name.',
+          }] }],
+          resourceTypes: [{ id: 'U', name: 'U', endpoint: '/U', description: 'U', schema: 'urn:test', schemaExtensions: [] }],
+          serviceProviderConfig: { patch: { supported: true }, bulk: { supported: false }, filter: { supported: true, maxResults: 100 }, sort: { supported: false }, etag: { supported: false }, changePassword: { supported: false } },
+        },
+      }, 'bad.json');
+      expect(errors.some(e => e.includes('complex but missing subAttributes'))).toBe(true);
+    });
+
+    it('should reject resourceType referencing missing schema', () => {
+      const errors = validatePreset({
+        metadata: { name: 'x', description: 'y' },
+        profile: {
+          schemas: [{ id: 'urn:test', name: 'Test', attributes: [{ name: 'a', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'd' }] }],
+          resourceTypes: [{ id: 'U', name: 'U', endpoint: '/U', description: 'U', schema: 'urn:missing', schemaExtensions: [] }],
+          serviceProviderConfig: { patch: { supported: true }, bulk: { supported: false }, filter: { supported: true, maxResults: 100 }, sort: { supported: false }, etag: { supported: false }, changePassword: { supported: false } },
+        },
+      }, 'bad.json');
+      expect(errors.some(e => e.includes('not found in schemas array'))).toBe(true);
+    });
+
+    it('should reject missing SPC capability', () => {
+      const errors = validatePreset({
+        metadata: { name: 'x', description: 'y' },
+        profile: {
+          schemas: [{ id: 'urn:test', name: 'Test', attributes: [{ name: 'a', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'd' }] }],
+          resourceTypes: [{ id: 'U', name: 'U', endpoint: '/U', description: 'U', schema: 'urn:test', schemaExtensions: [] }],
+          serviceProviderConfig: { patch: { supported: true } },
+        },
+      }, 'bad.json');
+      expect(errors.some(e => e.includes('bulk'))).toBe(true);
+      expect(errors.some(e => e.includes('filter'))).toBe(true);
+      expect(errors.some(e => e.includes('sort'))).toBe(true);
+    });
+
+    it('should reject filter.supported=true without maxResults', () => {
+      const errors = validatePreset({
+        metadata: { name: 'x', description: 'y' },
+        profile: {
+          schemas: [{ id: 'urn:test', name: 'Test', attributes: [{ name: 'a', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'd' }] }],
+          resourceTypes: [{ id: 'U', name: 'U', endpoint: '/U', description: 'U', schema: 'urn:test', schemaExtensions: [] }],
+          serviceProviderConfig: { patch: { supported: true }, bulk: { supported: false }, filter: { supported: true }, sort: { supported: false }, etag: { supported: false }, changePassword: { supported: false } },
+        },
+      }, 'bad.json');
+      expect(errors.some(e => e.includes('maxResults'))).toBe(true);
+    });
+  });
+
+  describe('loadPresetsFromDisk()', () => {
+    it('should load presets and return a result object', () => {
+      const result = loadPresetsFromDisk();
+      expect(result).toBeDefined();
+      expect(result.dir).toBeDefined();
+      expect(Array.isArray(result.loaded)).toBe(true);
+      expect(Array.isArray(result.fallback)).toBe(true);
+      expect(Array.isArray(result.custom)).toBe(true);
+      expect(Array.isArray(result.validationErrors)).toBe(true);
+    });
+
+    it('should have all 5 built-in presets after load (from file or fallback)', () => {
+      const result = loadPresetsFromDisk();
+      const total = result.loaded.length + result.fallback.length;
+      expect(total).toBe(5);
+    });
+
+    it('should have zero validation errors when JSON files are valid', () => {
+      const result = loadPresetsFromDisk();
+      if (result.loaded.length === 5) {
+        // All loaded from valid JSON files
+        expect(result.validationErrors).toHaveLength(0);
+      }
+    });
+
+    it('should populate BUILT_IN_PRESETS after load', () => {
+      loadPresetsFromDisk();
+      expect(BUILT_IN_PRESETS.size).toBeGreaterThanOrEqual(5);
+      for (const name of PRESET_NAMES) {
+        expect(BUILT_IN_PRESETS.has(name)).toBe(true);
+      }
+    });
+  });
+
+  describe('reloadPresetsFromDisk()', () => {
+    it('should return the same structure as loadPresetsFromDisk', () => {
+      const result = reloadPresetsFromDisk();
+      expect(result.dir).toBeDefined();
+      expect(Array.isArray(result.loaded)).toBe(true);
+      expect(Array.isArray(result.fallback)).toBe(true);
+      expect(Array.isArray(result.validationErrors)).toBe(true);
+    });
+
+    it('should still have all presets after reload', () => {
+      reloadPresetsFromDisk();
+      for (const name of PRESET_NAMES) {
+        expect(BUILT_IN_PRESETS.has(name)).toBe(true);
+        const p = getBuiltInPreset(name);
+        expect(p.metadata.name).toBe(name);
+        expect(p.profile).toBeDefined();
+      }
+    });
+  });
+
+  describe('getLastLoadResult()', () => {
+    it('should return the result of the last load', () => {
+      loadPresetsFromDisk();
+      const result = getLastLoadResult();
+      expect(result).toBeDefined();
+      expect(result!.dir).toBeDefined();
+      expect(result!.loaded.length + result!.fallback.length).toBe(5);
+    });
+  });
+
+  describe('getPresetsDir()', () => {
+    it('should return a string path', () => {
+      const dir = getPresetsDir();
+      expect(typeof dir).toBe('string');
+      expect(dir.length).toBeGreaterThan(0);
+    });
+
+    it('should respect PRESETS_DIR env var', () => {
+      const orig = process.env.PRESETS_DIR;
+      try {
+        process.env.PRESETS_DIR = '/tmp/custom-presets';
+        const dir = getPresetsDir();
+        expect(dir).toContain('custom-presets');
+      } finally {
+        if (orig) process.env.PRESETS_DIR = orig;
+        else delete process.env.PRESETS_DIR;
+      }
+    });
+  });
+
+  // ─── JSON completeness check across all loaded presets ────────────────
+
+  describe('all loaded presets — JSON completeness (no abbreviations)', () => {
+    for (const presetName of PRESET_NAMES) {
+      describe(`${presetName}`, () => {
+        const preset = getBuiltInPreset(presetName);
+
+        it('should have attributes as arrays (not "all" shorthand)', () => {
+          for (const schema of preset.profile.schemas!) {
+            if (schema.attributes !== undefined) {
+              expect(Array.isArray(schema.attributes)).toBe(true);
+            }
+          }
+        });
+
+        it('should have complete attribute definitions (name + type + description)', () => {
+          for (const schema of preset.profile.schemas!) {
+            if (Array.isArray(schema.attributes)) {
+              for (const attr of schema.attributes as any[]) {
+                expect(attr.name).toBeDefined();
+                expect(attr.type).toBeDefined();
+                expect(attr.description).toBeDefined();
+              }
+            }
+          }
+        });
+
+        it('should pass full validatePreset() with zero errors', () => {
+          const errors = validatePreset(preset, `${presetName}.json`);
+          if (errors.length > 0) {
+            fail(`validatePreset failed for ${presetName}: ${errors.join('; ')}`);
+          }
+        });
+      });
+    }
   });
 });

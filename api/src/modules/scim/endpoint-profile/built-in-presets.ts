@@ -79,8 +79,9 @@ export function getPresetsDir(): string {
 /**
  * Validate a parsed preset JSON deeply.
  * Returns an array of human-readable error strings. Empty = valid.
+ * Exported for unit testing.
  */
-function validatePreset(preset: any, fileName: string): string[] {
+export function validatePreset(preset: any, fileName: string): string[] {
   const errors: string[] = [];
   const ctx = `[${fileName}]`;
 
