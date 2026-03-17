@@ -332,10 +332,10 @@ graph TD
 
 | Level | Suites | Tests | Status | Lines |
 |---|---|---|---|---|
-| **Unit** | 73 | 2,844 | All Passing | ~27,900 |
-| **E2E** | 31 | 677 (6 skipped) | 665 Pass / 6 Fail | ~10,400 |
-| **Live Integration** | 1 | 604 | 591 Pass / 13 Fail | ~7,500 |
-| **TOTAL** | **105** | **~4,125** | **4,100 pass** | **~45,800** |
+| **Unit** | 73 | 2,832 | All Passing | ~27,900 |
+| **E2E** | 31 | 687 | All Passing | ~10,400 |
+| **Live Integration** | 1 | 605 | All Passing | ~7,500 |
+| **TOTAL** | **105** | **~4,124** | **All pass** | **~45,800** |
 
 > **6 E2E Failures**: Custom extension returned:never filtering (2), PATCH URN dot-split corruption (2), admin PATCH schema/RT mismatch (2). All in `profile-combinations.e2e-spec.ts`.
 >
@@ -610,6 +610,7 @@ Key scripts: `setup.ps1`, `deploy.ps1`, `bootstrap.ps1`, `scripts/deploy-azure.p
 | Phase 18 | Attribute Characteristics E2E Gap Closure | ✅ Complete | v0.26.0 |
 | Phase 19 | Generic Service Parity + InMemory Fixes | ✅ Complete | v0.27.0 |
 | Phase 20 | Endpoint Profile Configuration | ✅ Complete | v0.28.0 |
+| Phase 21 | Legacy Config Removal + Test Fixes | ✅ Complete | v0.29.0 |
 
 ### Validation Gaps Remaining (from 33 total)
 
@@ -762,7 +763,7 @@ Key scripts: `setup.ps1`, `deploy.ps1`, `bootstrap.ps1`, `scripts/deploy-azure.p
 | ESLint errors | 0 | Clean |
 | ESLint warnings | 74 | Acceptable (intentional) |
 | TypeScript strict mode | Yes | Enabled |
-| All tests passing | Yes (3,802/3,802) | All passing |
+| All tests passing | Yes (4,124/4,124) | All passing |
 | CI/CD | Active | Automated build + test + publish |
 | Dependency freshness | Current | All deps at latest majors (Mar 2026) |
 

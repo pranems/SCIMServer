@@ -1,6 +1,6 @@
 # 📚 SCIMServer Documentation Index
 
-> Quick navigation to all project documentation. Updated March 13, 2026 (v0.28.0).
+> Quick navigation to all project documentation. Updated March 16, 2026 (v0.29.0).
 
 > Theme conventions: onboarding-first, current-state metadata, explicit historical-context labeling, and cross-linking to canonical sources.
 
@@ -72,7 +72,7 @@
 | [RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md) | **RFC 7642/7643/7644 schema & extensions reference** — Core schema immutability, extension rules, custom resource types, `schemas[]` enforcement, attribute characteristics deep dive, industry patterns |
 | [SCHEMA_CUSTOMIZATION_GUIDE.md](SCHEMA_CUSTOMIZATION_GUIDE.md) | Schema customization operator guide — Step-by-step extension registration, custom resource types, config profiles, PATCH operations, troubleshooting, quick reference card |
 | [SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md](SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md) | Schema extension behavior matrices — Registration flow outcomes, validation × config flags, discovery responses, `schemas[]` behavior, PATCH path resolution, boot hydration, error matrix |
-| [SCHEMA_TEMPLATES_DESIGN.md](SCHEMA_TEMPLATES_DESIGN.md) | **✅ Implementation Complete** — Endpoint Profile Configuration (v0.28.0): embedded profile JSONB on Endpoint, 5 named presets (entra-id default/entra-id-minimal/rfc-standard/minimal/user-only), RFC-native discovery format as config input, auto-expand + tighten-only validation engine, unified admin API replacing 2 controllers + 2 tables + 9 repo files, profile-based discovery hydration with per-endpoint SPC/schemas/resourceTypes |
+| [SCHEMA_TEMPLATES_DESIGN.md](SCHEMA_TEMPLATES_DESIGN.md) | **✅ Implementation Complete** — Endpoint Profile Configuration (v0.28.0→v0.29.0): embedded profile JSONB on Endpoint, 5 named presets, RFC-native discovery format, auto-expand + tighten-only validation, unified admin API, profile-based discovery hydration. Legacy `config` field removed in v0.29.0 |
 
 ## Validation & Testing
 
@@ -93,7 +93,7 @@
 | [SELF_IMPROVING_TEST_HEALTH_PROMPT.md](SELF_IMPROVING_TEST_HEALTH_PROMPT.md) | Reusable self-improving AI prompt for diagnosing and resolving test failures — pattern library grows with each use |
 | [CL_V0.27.0_INMEMORY_BUGFIXES_AND_GENERIC_PARITY.md](CL_V0.27.0_INMEMORY_BUGFIXES_AND_GENERIC_PARITY.md) | **CL v0.27.0** — 4 inmemory backend bugs, 3 generic service parity P0 fixes, live test fix, doc audit; 4,051 total tests, 3-instance deployment validation |
 | [NEXT_ITEMS_V0.28.0_ROADMAP.md](NEXT_ITEMS_V0.28.0_ROADMAP.md) | **v0.28.0 Roadmap** — 6 prioritized items to close all 12 live test failures: PS script fix, HTTP 415/405, immutable/required always-on, generic filter AST upgrade |
-| [TEST_FAILURE_ANALYSIS.md](TEST_FAILURE_ANALYSIS.md) | **v0.28.0 Test Failure Analysis** — 19 failures (6 E2E + 13 live) across 8 root causes with Mermaid diagrams, per-failure root cause, and prioritized fix plan |
+| [TEST_FAILURE_ANALYSIS.md](TEST_FAILURE_ANALYSIS.md) | **v0.28.0→v0.29.0 Test Failure Analysis** — 19 failures (6 E2E + 13 live) across 8 root causes — **all resolved in v0.29.0** |
 | [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md) | **Endpoint Profile Architecture** — Complete flow reference: creation (4 input paths), update (merge semantics), expansion pipeline, validation pipeline, runtime usage, discovery, presets, combination matrix, error catalog |
 
 ## Development

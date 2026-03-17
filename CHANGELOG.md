@@ -5,6 +5,42 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.29.0] - 2026-03-16
+
+### Fixed — 19 Test Failures (URN dot-split, profile-aware schema, Content-Type 415 middleware)
+
+Resolved all remaining test failures from the v0.28.0 profile migration:
+
+- **URN dot-split fix**: Schema URN parsing now correctly handles dot-notation attribute paths within URN-scoped PATCH operations
+- **Profile-aware schema validation**: `SchemaValidator` and discovery controllers serve per-endpoint schema definitions from the cached `EndpointProfile` (not stale registry overlays)
+- **Content-Type 415 middleware**: Added global middleware that rejects unsupported `Content-Type` headers with proper SCIM 415 error responses
+
+### Removed — Legacy `endpoint.config` Admin API Field
+
+- The `config` field on endpoint create/update API payloads has been **permanently removed**
+- `profile: { settings: { ... } }` is the sole input for per-endpoint boolean flags
+- `BulkOperationsEnabled` is dead in settings — derived from `profile.serviceProviderConfig.bulk.supported`
+- `CustomResourceTypesEnabled` is dead in settings — derived from `profile.resourceTypes`
+
+### Added — Multi-Endpoint Isolation E2E Tests
+
+- New `multi-endpoint-isolation.e2e-spec.ts` — 4 endpoint profiles, 21 assertions
+- Validates that endpoints with different presets (entra-id, rfc-standard, minimal, user-only) have properly isolated resources, schemas, and discovery responses
+- Confirms per-endpoint SPC reflects profile-specific capabilities (bulk, sort, patch, filter, etc.)
+
+### Changed — Documentation
+
+- `ENDPOINT_PROFILE_ARCHITECTURE.md` updated for v0.29.0 with legacy config removal notes
+- Version sweep: all docs, prompts, and artifacts updated from 0.28.0 → 0.29.0
+- Test counts updated across all documentation
+
+### Test Coverage
+- **Unit tests**: 2,832 passed (73 suites)
+- **E2E tests**: 687 passed (31 suites)
+- **Live tests**: 605 assertions (local + Docker both pass)
+
+---
+
 ## [0.28.0] - 2026-03-12
 
 ### Added — Phase 13: Endpoint Profile Configuration

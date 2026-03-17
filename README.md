@@ -4,7 +4,7 @@ Production-ready, multi-tenant SCIM 2.0 server purpose-built for Microsoft Entra
 
 | | |
 |---|---|
-| **Version** | `0.28.0` |
+| **Version** | `0.29.0` |
 | **Protocol** | SCIM 2.0 ([RFC 7643](https://datatracker.ietf.org/doc/html/rfc7643) / [RFC 7644](https://datatracker.ietf.org/doc/html/rfc7644)) |
 | **Target IdP** | [Microsoft Entra ID](https://entra.microsoft.com/) |
 | **Runtime** | Node.js 24 &middot; NestJS 11 &middot; TypeScript 5.9 |
@@ -263,7 +263,7 @@ DELETE /scim/admin/endpoints/<id>/credentials/<credentialId>
 
 ## Per-Endpoint Configuration
 
-Each endpoint has **12 persisted boolean settings + logLevel** stored in `profile.settings`, plus **2 capabilities derived from the profile structure** (v0.28.0).
+Each endpoint has **12 persisted boolean settings + logLevel** stored in `profile.settings`, plus **2 capabilities derived from the profile structure**.
 
 ### Persisted Settings (`profile.settings`)
 
@@ -293,7 +293,7 @@ Each endpoint has **12 persisted boolean settings + logLevel** stored in `profil
 
 Full reference: [docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md)
 
-### Endpoint Profiles (v0.28.0)
+### Endpoint Profiles
 
 Endpoints are created with a **profile** — an RFC-native JSONB document containing schemas, resourceTypes, serviceProviderConfig, and settings.
 
@@ -412,9 +412,9 @@ The built-in React SPA (served at `/`) provides:
 
 | Level | Tests | Suites | Tool |
 |---|---|---|---|
-| **Unit** | 2,830 | 73 | Jest 30 + ts-jest |
-| **E2E** | 613 + 6 skipped | 30 | Jest + Supertest |
-| **Live integration** | 832 assertions | — | PowerShell (`live-test.ps1`) |
+| **Unit** | 2,832 | 73 | Jest 30 + ts-jest |
+| **E2E** | 687 | 31 | Jest + Supertest |
+| **Live integration** | 605 assertions | — | PowerShell (`live-test.ps1`) |
 | **Microsoft Validator** | 25/25 + 7 preview | — | [SCIM Validator](https://scimvalidator.microsoft.com/) |
 
 ### Running Tests
@@ -448,9 +448,9 @@ All three deployment modes produce identical test results:
 
 | Mode | Backend | Live Assertions |
 |---|---|---|
-| Local (port 6000) | In-Memory | 832 |
-| Docker (port 8080) | PostgreSQL | 832 |
-| Azure Container Apps | PostgreSQL | 832 |
+| Local (port 6000) | In-Memory | 605 |
+| Docker (port 8080) | PostgreSQL | 605 |
+| Azure Container Apps | PostgreSQL | 605 |
 
 ---
 
@@ -576,10 +576,10 @@ Container image: `ghcr.io/pranems/scimserver` — `node:24-alpine` base, ~350 MB
 ```powershell
 # Auto-discovery update
 iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-func.ps1')
-Update-SCIMServer -Version v0.28.0 -ResourceGroup <rg> -AppName <app>
+Update-SCIMServer -Version v0.29.0 -ResourceGroup <rg> -AppName <app>
 
 # Or manual
-az containerapp update -n <app> -g <rg> --image ghcr.io/pranems/scimserver:0.28.0
+az containerapp update -n <app> -g <rg> --image ghcr.io/pranems/scimserver:0.29.0
 ```
 
 ---
