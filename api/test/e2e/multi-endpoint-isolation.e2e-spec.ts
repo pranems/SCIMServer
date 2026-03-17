@@ -99,7 +99,7 @@ describe('Multi-Endpoint Isolation (E2E)', () => {
       .expect(201);
     epC = resC.body.id;
 
-    // EP-D: entra-id (default preset — scoped 14 User attrs, MSFT extensions, no bulk)
+    // EP-D: entra-id (default preset — scoped 20 User attrs, MSFT extensions, no bulk, strict + soft-delete)
     const resD = await request(app.getHttpServer())
       .post('/scim/admin/endpoints')
       .set('Authorization', `Bearer ${token}`)
@@ -349,6 +349,7 @@ describe('Multi-Endpoint Isolation (E2E)', () => {
         scimPost(app, `${scimBasePath(epD)}/Users`, token, {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
           userName: `conc-d-${ts}@test.com`, displayName: 'ConcD', active: true,
+          emails: [{ value: `conc-d-${ts}@test.com`, type: 'work', primary: true }],
         }).expect(201),
       ]);
 

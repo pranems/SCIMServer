@@ -115,13 +115,19 @@ const ENTRA_ID_PROFILE: ShorthandProfileInput = {
   },
   settings: {
     AllowAndCoerceBooleanStrings: 'True',
+    MultiOpPatchRequestAddMultipleMembersToGroup: 'True',
+    MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'True',
+    PatchOpAllowRemoveAllMembers: 'True',
+    VerbosePatchSupported: 'True',
+    SoftDeleteEnabled: 'True',
+    StrictSchemaValidation: 'True',
   },
 };
 
 const ENTRA_ID_PRESET: BuiltInPreset = {
   metadata: {
     name: PRESET_ENTRA_ID,
-    description: 'Entra ID provisioning. Scoped attributes, msfttest extensions, EnterpriseUser.',
+    description: 'Entra ID provisioning. Full RFC attributes, msfttest extensions, EnterpriseUser, strict validation.',
     default: true,
   },
   profile: ENTRA_ID_PROFILE,
