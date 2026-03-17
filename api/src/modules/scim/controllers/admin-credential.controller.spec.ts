@@ -17,7 +17,7 @@ describe('AdminCredentialController', () => {
   const mockEndpoint = {
     id: '11111111-1111-1111-1111-111111111111',
     name: 'test-endpoint',
-    config: { PerEndpointCredentialsEnabled: true },
+    profile: { settings: { PerEndpointCredentialsEnabled: true } },
     active: true,
     scimEndpoint: '/endpoints/11111111-1111-1111-1111-111111111111',
     createdAt: new Date(),
@@ -80,7 +80,7 @@ describe('AdminCredentialController', () => {
     it('should reject when PerEndpointCredentialsEnabled is false', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         ...mockEndpoint,
-        config: { PerEndpointCredentialsEnabled: false },
+        profile: { settings: { PerEndpointCredentialsEnabled: false } },
       });
 
       await expect(
@@ -91,7 +91,7 @@ describe('AdminCredentialController', () => {
     it('should reject when config is empty', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue({
         ...mockEndpoint,
-        config: {},
+        profile: { settings: {} },
       });
 
       await expect(

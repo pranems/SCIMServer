@@ -309,7 +309,7 @@ describe('Profile Configuration Combinations (E2E)', () => {
   // D. Settings Combinations
   // ═══════════════════════════════════════════════════════════════════
 
-  describe('Settings combinations via config', () => {
+  describe('Settings combinations via profile', () => {
     it('SoftDelete + StrictSchema: both enforced independently', async () => {
       const { createEndpointWithConfig } = await import('./helpers/request.helper');
       const epId = await createEndpointWithConfig(app, token, {
@@ -321,8 +321,8 @@ describe('Profile Configuration Combinations (E2E)', () => {
         .get(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      expect(ep.body.config.SoftDeleteEnabled).toBe('True');
-      expect(ep.body.config.StrictSchemaValidation).toBe('True');
+      expect(ep.body.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(ep.body.profile?.settings?.StrictSchemaValidation).toBe('True');
     });
 
     it('RequireIfMatch + VerbosePatch: both in settings', async () => {
@@ -335,8 +335,8 @@ describe('Profile Configuration Combinations (E2E)', () => {
         .get(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      expect(ep.body.config.RequireIfMatch).toBe('True');
-      expect(ep.body.config.VerbosePatchSupported).toBe('True');
+      expect(ep.body.profile?.settings?.RequireIfMatch).toBe('True');
+      expect(ep.body.profile?.settings?.VerbosePatchSupported).toBe('True');
     });
 
     it('all flags set: SoftDelete + Strict + RequireIfMatch + BooleanStrings + Reprovision + PerEndpointCreds', async () => {
@@ -353,7 +353,7 @@ describe('Profile Configuration Combinations (E2E)', () => {
         .get(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      expect(Object.keys(ep.body.config).length).toBeGreaterThanOrEqual(6);
+      expect(Object.keys(ep.body.profile?.settings ?? {}).length).toBeGreaterThanOrEqual(6);
     });
   });
 
@@ -690,7 +690,7 @@ describe('Profile Configuration Combinations (E2E)', () => {
         .set('Content-Type', 'application/json')
         .send({ profile: { settings: { SoftDeleteEnabled: 'True' } } })
         .expect(200);
-      expect(res.body.config?.SoftDeleteEnabled).toBe('True');
+      expect(res.body.profile?.settings?.SoftDeleteEnabled).toBe('True');
       expect(res.body.profile?.settings?.SoftDeleteEnabled).toBe('True');
     });
 
@@ -946,17 +946,9 @@ describe('Profile Configuration Combinations (E2E)', () => {
       expect(ep.body.profile?.settings?.VerbosePatchSupported).toBe('True');
     });
 
-    it('should reject sending both config and profile in PATCH', async () => {
-      await request(app.getHttpServer())
-        .patch(`/scim/admin/endpoints/${epId}`)
-        .set('Authorization', `Bearer ${token}`)
-        .set('Content-Type', 'application/json')
-        .send({
-          config: { SoftDeleteEnabled: 'True' },
-          profile: { settings: { StrictSchemaValidation: 'True' } },
-        })
-        .expect(400);
-    });
+    // NOTE: Test "should reject sending both config and profile in PATCH" removed.
+    // The legacy `config` field was removed from UpdateEndpointDto (v0.28+).
+    // Mutual exclusivity between config and profile no longer applies.
   });
 
   // ═══════════════════════════════════════════════════════════════════

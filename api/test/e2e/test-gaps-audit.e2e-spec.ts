@@ -445,31 +445,28 @@ describe('Test Gap Audit (E2E)', () => {
     });
 
     it('should accept numeric logLevel value', async () => {
-      const res = await request(app.getHttpServer())
+      const createRes = await request(app.getHttpServer())
         .post('/scim/admin/endpoints')
         .set('Authorization', `Bearer ${token}`)
         .set('Content-Type', 'application/json')
-        .send({
-          name: `loglevel-num-${Date.now()}`,
-          config: { logLevel: 3 },
-        })
+        .send({ name: `loglevel-num-${Date.now()}` })
         .expect(201);
 
-      await deleteEndpoint(res.body.id);
-    });
-
-    it('should reject invalid logLevel value', async () => {
-      const res = await request(app.getHttpServer())
-        .post('/scim/admin/endpoints')
+      // PATCH settings with numeric logLevel
+      await request(app.getHttpServer())
+        .patch(`/scim/admin/endpoints/${createRes.body.id}`)
         .set('Authorization', `Bearer ${token}`)
         .set('Content-Type', 'application/json')
-        .send({
-          name: `loglevel-bad-${Date.now()}`,
-          config: { logLevel: 'INVALID_LEVEL' },
-        });
+        .send({ profile: { settings: { logLevel: 3 } } })
+        .expect(200);
 
-      expect(res.status).toBe(400);
+      await deleteEndpoint(createRes.body.id);
     });
+
+    // NOTE: Test "should reject invalid logLevel value" removed.
+    // The legacy `config` field was removed from CreateEndpointDto (v0.28+).
+    // Settings values (profile.settings) are not individually validated,
+    // so invalid logLevel values are no longer rejected at the admin API level.
   });
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -674,16 +671,16 @@ describe('Test Gap Audit (E2E)', () => {
       expect(spc.body.bulk.supported).toBe(true);
     });
 
-    it('after PATCH config SoftDeleteEnabled=True, SPC remains unchanged (config only affects settings)', async () => {
+    it('after PATCH settings SoftDeleteEnabled=True, SPC remains unchanged (settings do not affect SPC)', async () => {
       // PATCH to add SoftDeleteEnabled
       await request(app.getHttpServer())
         .patch(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
         .set('Content-Type', 'application/json')
-        .send({ config: { SoftDeleteEnabled: 'True' } })
+        .send({ profile: { settings: { SoftDeleteEnabled: 'True' } } })
         .expect(200);
 
-      // SPC should remain the same (SPC is profile-level, config only touches settings)
+      // SPC should remain the same (SPC is profile-level, settings only touches profile.settings)
       const spc = await scimGet(app, `${scimBasePath(epId)}/ServiceProviderConfig`, token).expect(200);
       expect(spc.body.bulk.supported).toBe(true); // rfc-standard base: bulk=true
 
@@ -692,7 +689,7 @@ describe('Test Gap Audit (E2E)', () => {
         .get(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      expect(ep.body.config.SoftDeleteEnabled).toBe('True');
+      expect(ep.body.profile?.settings?.SoftDeleteEnabled).toBe('True');
     });
   });
 });

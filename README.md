@@ -247,7 +247,7 @@ Invoke-RestMethod -Method PATCH `
   -Uri "http://localhost:8080/scim/admin/endpoints/<id>" `
   -Headers @{ Authorization = "Bearer $secret" } `
   -ContentType "application/json" `
-  -Body '{"config":{"PerEndpointCredentialsEnabled":"True"}}'
+  -Body '{"profile":{"settings":{"PerEndpointCredentialsEnabled":"True"}}}'
 
 # Create credential (returns plaintext token ONCE)
 Invoke-RestMethod -Method POST `

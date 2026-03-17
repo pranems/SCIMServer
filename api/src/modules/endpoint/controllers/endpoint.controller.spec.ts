@@ -12,7 +12,7 @@ describe('EndpointController', () => {
     name: 'test-endpoint',
     displayName: 'Test Endpoint',
     description: 'A test endpoint',
-    config: { MultiOpPatchRequestAddMultipleMembersToGroup: 'True' },
+    profile: { settings: { MultiOpPatchRequestAddMultipleMembersToGroup: 'True' }, schemas: [], resourceTypes: [], serviceProviderConfig: {} },
     active: true,
     scimEndpoint: '/scim/endpoints/endpoint-1',
     createdAt: new Date(),
@@ -55,14 +55,14 @@ describe('EndpointController', () => {
       const result = await controller.createEndpoint({
         name: 'test-endpoint',
         displayName: 'Test Endpoint',
-        config: { MultiOpPatchRequestAddMultipleMembersToGroup: 'True' },
+        profile: { settings: { MultiOpPatchRequestAddMultipleMembersToGroup: 'True' } },
       });
 
       expect(result).toEqual(mockEndpointResponse);
       expect(mockEndpointService.createEndpoint).toHaveBeenCalledWith({
         name: 'test-endpoint',
         displayName: 'Test Endpoint',
-        config: { MultiOpPatchRequestAddMultipleMembersToGroup: 'True' },
+        profile: { settings: { MultiOpPatchRequestAddMultipleMembersToGroup: 'True' } },
       });
     });
 
@@ -176,14 +176,14 @@ describe('EndpointController', () => {
       });
     });
 
-    it('should update endpoint config', async () => {
-      const newConfig = { MultiOpPatchRequestAddMultipleMembersToGroup: 'False' };
-      const updatedEndpoint = { ...mockEndpointResponse, config: newConfig };
+    it('should update endpoint profile settings', async () => {
+      const newSettings = { MultiOpPatchRequestAddMultipleMembersToGroup: 'False' };
+      const updatedEndpoint = { ...mockEndpointResponse, profile: { settings: newSettings, schemas: [], resourceTypes: [], serviceProviderConfig: {} } };
       mockEndpointService.updateEndpoint.mockResolvedValue(updatedEndpoint);
 
-      const result = await controller.updateEndpoint('endpoint-1', { config: newConfig });
+      const result = await controller.updateEndpoint('endpoint-1', { profile: { settings: newSettings } });
 
-      expect(result.config).toEqual(newConfig);
+      expect(result.profile?.settings).toEqual(newSettings);
     });
 
     it('should update endpoint active status', async () => {
@@ -212,7 +212,7 @@ describe('EndpointController', () => {
 
       await expect(
         controller.updateEndpoint('endpoint-1', {
-          config: { MultiOpPatchRequestAddMultipleMembersToGroup: 'invalid' },
+          profile: { settings: { MultiOpPatchRequestAddMultipleMembersToGroup: 'invalid' } },
         })
       ).rejects.toThrow(BadRequestException);
     });

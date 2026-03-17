@@ -8,6 +8,18 @@
 
 ---
 
+> **⚠️ v0.28.0 Migration Notice:** The legacy `"config": { ... }` field has been **removed** from the admin endpoint API. All per-endpoint settings are now managed through `"profile": { "settings": { ... } }`. The JSON examples in Sections 4, 7, 9, and 10 of this document may still show the legacy `"config"` format for historical reference — when using these examples, replace:
+> ```json
+> { "config": { "FlagName": "True" } }
+> ```
+> with:
+> ```json
+> { "profile": { "settings": { "FlagName": "True" } } }
+> ```
+> Capabilities like `BulkOperationsEnabled` and `CustomResourceTypesEnabled` are now **derived** from the profile structure (see sections 4.10 and 4.11).
+
+---
+
 ## Table of Contents
 
 1. [Overview](#1-overview)
@@ -1084,17 +1096,21 @@ flowchart TD
 ```json
 {
   "name": "entra-production",
-  "config": {
-    "MultiOpPatchRequestAddMultipleMembersToGroup": "True",
-    "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True",
-    "PatchOpAllowRemoveAllMembers": "True",
-    "VerbosePatchSupported": "True",
-    "SoftDeleteEnabled": "True",
-    "StrictSchemaValidation": "True",
-    "AllowAndCoerceBooleanStrings": "True",
-    "RequireIfMatch": "False",
-    "BulkOperationsEnabled": "True",
-    "logLevel": "INFO"
+  "profile": {
+    "settings": {
+      "MultiOpPatchRequestAddMultipleMembersToGroup": "True",
+      "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True",
+      "PatchOpAllowRemoveAllMembers": "True",
+      "VerbosePatchSupported": "True",
+      "SoftDeleteEnabled": "True",
+      "StrictSchemaValidation": "True",
+      "AllowAndCoerceBooleanStrings": "True",
+      "RequireIfMatch": "False",
+      "logLevel": "INFO"
+    },
+    "serviceProviderConfig": {
+      "bulk": { "supported": true }
+    }
   }
 }
 ```
@@ -1292,7 +1308,9 @@ flowchart TD
 
 ## 9. Admin API — Setting Flags
 
-### 9.1 Create Endpoint with Config
+> **v0.28.0:** Use `profile.settings` instead of the removed `config` field.
+
+### 9.1 Create Endpoint with Settings
 
 ```http
 POST /scim/admin/endpoints
@@ -1304,19 +1322,23 @@ Authorization: Bearer <admin-token>
 {
   "name": "my-endpoint",
   "displayName": "My SCIM Endpoint",
-  "config": {
-    "StrictSchemaValidation": "True",
-    "AllowAndCoerceBooleanStrings": "True",
-    "SoftDeleteEnabled": "True",
-    "VerbosePatchSupported": "True",
-    "MultiOpPatchRequestAddMultipleMembersToGroup": "True",
-    "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True",
-    "BulkOperationsEnabled": "True"
+  "profile": {
+    "settings": {
+      "StrictSchemaValidation": "True",
+      "AllowAndCoerceBooleanStrings": "True",
+      "SoftDeleteEnabled": "True",
+      "VerbosePatchSupported": "True",
+      "MultiOpPatchRequestAddMultipleMembersToGroup": "True",
+      "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True"
+    },
+    "serviceProviderConfig": {
+      "bulk": { "supported": true }
+    }
   }
 }
 ```
 
-### 9.2 Update Endpoint Config
+### 9.2 Update Endpoint Settings
 
 ```http
 PATCH /scim/admin/endpoints/{id}
@@ -1326,16 +1348,18 @@ Authorization: Bearer <admin-token>
 
 ```json
 {
-  "config": {
-    "RequireIfMatch": "True",
-    "AllowAndCoerceBooleanStrings": "False"
+  "profile": {
+    "settings": {
+      "RequireIfMatch": "True",
+      "AllowAndCoerceBooleanStrings": "False"
+    }
   }
 }
 ```
 
-> **Note:** PATCH merges config — only specified flags are changed. Unspecified flags retain their current values.
+> **Note:** PATCH merges `profile.settings` — only specified flags are changed. Unspecified flags retain their current values.
 
-### 9.3 Get Endpoint (includes config)
+### 9.3 Get Endpoint (includes profile)
 
 ```http
 GET /scim/admin/endpoints/{id}
@@ -1349,14 +1373,19 @@ Response:
   "id": "42020f1f-...",
   "name": "my-endpoint",
   "displayName": "My SCIM Endpoint",
-  "config": {
-    "StrictSchemaValidation": "True",
-    "AllowAndCoerceBooleanStrings": "True",
-    "SoftDeleteEnabled": "True",
-    "VerbosePatchSupported": "True",
-    "MultiOpPatchRequestAddMultipleMembersToGroup": "True",
-    "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True",
-    "RequireIfMatch": "True"
+  "profile": {
+    "settings": {
+      "StrictSchemaValidation": "True",
+      "AllowAndCoerceBooleanStrings": "True",
+      "SoftDeleteEnabled": "True",
+      "VerbosePatchSupported": "True",
+      "MultiOpPatchRequestAddMultipleMembersToGroup": "True",
+      "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True",
+      "RequireIfMatch": "True"
+    },
+    "serviceProviderConfig": { "..." : "..." },
+    "schemas": ["..."],
+    "resourceTypes": ["..."]
   },
   "createdAt": "2026-02-25T10:00:00.000Z",
   "updatedAt": "2026-02-25T12:00:00.000Z"
@@ -1384,18 +1413,22 @@ For production use with Microsoft Entra ID (Azure AD) provisioning, the recommen
 {
   "name": "entra-production",
   "displayName": "Microsoft Entra ID Production",
-  "config": {
-    "MultiOpPatchRequestAddMultipleMembersToGroup": "True",
-    "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True",
-    "PatchOpAllowRemoveAllMembers": "True",
-    "VerbosePatchSupported": "True",
-    "SoftDeleteEnabled": "True",
-    "StrictSchemaValidation": "True",
-    "AllowAndCoerceBooleanStrings": "True",
-    "BulkOperationsEnabled": "True",
-    "IgnoreReadOnlyAttributesInPatch": "True",
-    "IncludeWarningAboutIgnoredReadOnlyAttribute": "True",
-    "logLevel": "INFO"
+  "profile": {
+    "settings": {
+      "MultiOpPatchRequestAddMultipleMembersToGroup": "True",
+      "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True",
+      "PatchOpAllowRemoveAllMembers": "True",
+      "VerbosePatchSupported": "True",
+      "SoftDeleteEnabled": "True",
+      "StrictSchemaValidation": "True",
+      "AllowAndCoerceBooleanStrings": "True",
+      "IgnoreReadOnlyAttributesInPatch": "True",
+      "IncludeWarningAboutIgnoredReadOnlyAttribute": "True",
+      "logLevel": "INFO"
+    },
+    "serviceProviderConfig": {
+      "bulk": { "supported": true }
+    }
   }
 }
 ```

@@ -194,12 +194,21 @@ POST /scim/admin/endpoints
 ```
 Result: `entra-id` preset — scoped User attributes, MSFT test extensions, no bulk.
 
-**Example 4: Legacy config creation**
+**Example 4: Settings-based creation**
+
+> **v0.28.0**: The legacy `config` field has been removed. Use `profile.settings` for boolean flags and `profile.serviceProviderConfig` for capabilities.
+
 ```json
 POST /scim/admin/endpoints
-{ "name": "legacy", "config": { "SoftDeleteEnabled": "True", "BulkOperationsEnabled": "True" } }
+{
+  "name": "custom-settings",
+  "profile": {
+    "settings": { "SoftDeleteEnabled": "True" },
+    "serviceProviderConfig": { "bulk": { "supported": true } }
+  }
+}
 ```
-Result: `rfc-standard` base + `BulkOperationsEnabled` mapped to SPC `bulk.supported=true` + other config flags in `settings`.
+Result: `rfc-standard` base + `bulk.supported=true` in SPC + `SoftDeleteEnabled` in `settings`.
 
 ---
 
@@ -207,20 +216,16 @@ Result: `rfc-standard` base + `BulkOperationsEnabled` mapped to SPC `bulk.suppor
 
 ### `PATCH /scim/admin/endpoints/:id`
 
+> **v0.28.0**: The legacy `config` field has been removed from PATCH. Use `profile` exclusively.
+
 ```mermaid
 flowchart TD
-    Start[PATCH body] --> MutExcl{config AND<br/>profile both?}
-    MutExcl -->|Both| E400[400: Cannot specify both]
-    MutExcl -->|OK| HasProfile{profile in body?}
+    Start[PATCH body] --> HasProfile{profile in body?}
 
     HasProfile -->|Yes| Merge[mergeProfilePartial]
-    HasProfile -->|No| HasConfig{config in body?}
-
-    HasConfig -->|Yes| LegacyMerge[validateConfig → merge<br/>into profile.settings]
-    HasConfig -->|No| OtherFields[displayName/description/<br/>active only]
+    HasProfile -->|No| OtherFields[displayName/description/<br/>active only]
 
     Merge --> Validate[validateAndExpandProfile]
-    LegacyMerge --> Update
     OtherFields --> Update
 
     Validate -->|Invalid| E400b[400: Validation failed]

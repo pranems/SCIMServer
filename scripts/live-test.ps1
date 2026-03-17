@@ -1,4 +1,4 @@
-﻿# Live Test Script for All Endpoint Flows
+# Live Test Script for All Endpoint Flows
 # This script tests endpoint CRUD, SCIM operations, config validation, and isolation
 #
 # Usage:
@@ -292,10 +292,12 @@ $endpointBody = @{
     name = "live-test-endpoint-$(Get-Random)"
     displayName = "Live Test Endpoint"
     description = "Created by live-test.ps1"
-    config = @{ MultiOpPatchRequestAddMultipleMembersToGroup = "True" }
-} | ConvertTo-Json
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
 $endpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $endpointBody
 $EndpointId = $endpoint.id
+$patchBody = @{ profile = @{ settings = @{ MultiOpPatchRequestAddMultipleMembersToGroup = "True" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 Test-Result -Success ($null -ne $EndpointId) -Message "Create endpoint returned ID: $EndpointId"
 Test-Result -Success ($endpoint.active -eq $true) -Message "New endpoint is active by default"
 Test-Result -Success ($endpoint.scimEndpoint -like "*/scim/endpoints/$EndpointId") -Message "scimEndpoint URL is correct"
@@ -338,7 +340,7 @@ Write-Host "========================================" -ForegroundColor Yellow
 
 # Test: Invalid config value rejected on create
 Write-Host "`n--- Test: Invalid Config Value Rejected on Create ---" -ForegroundColor Cyan
-$invalidConfigBody = '{"name":"invalid-config-test","config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"Yes"}}'
+$invalidConfigBody = '{"name":"invalid-config-test","profile":{"settings":{"MultiOpPatchRequestAddMultipleMembersToGroup":"Yes"}}}'
 try {
     $result = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $invalidConfigBody
     Test-Result -Success $false -Message "Invalid config 'Yes' should be rejected"
@@ -349,7 +351,7 @@ try {
 
 # Test: Invalid config value rejected on update
 Write-Host "`n--- Test: Invalid Config Value Rejected on Update ---" -ForegroundColor Cyan
-$invalidUpdateBody = '{"config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"enabled"}}'
+$invalidUpdateBody = '{"profile":{"settings":{"MultiOpPatchRequestAddMultipleMembersToGroup":"enabled"}}}'
 try {
     $result = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $invalidUpdateBody
     Test-Result -Success $false -Message "Invalid config 'enabled' should be rejected on update"
@@ -360,18 +362,18 @@ try {
 
 # Test: Valid config values accepted
 Write-Host "`n--- Test: Valid Config Values Accepted ---" -ForegroundColor Cyan
-$validConfigBody = '{"config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"False"}}'
+$validConfigBody = '{"profile":{"settings":{"MultiOpPatchRequestAddMultipleMembersToGroup":"False"}}}'
 $validResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $validConfigBody
-Test-Result -Success ($validResult.config.MultiOpPatchRequestAddMultipleMembersToGroup -eq "False") -Message "Valid config 'False' accepted"
+Test-Result -Success ($validResult.profile.settings.MultiOpPatchRequestAddMultipleMembersToGroup -eq "False") -Message "Valid settings 'False' accepted"
 
 # Test: Boolean true also valid
-$boolConfigBody = '{"config":{"MultiOpPatchRequestAddMultipleMembersToGroup":true}}'
+$boolConfigBody = '{"profile":{"settings":{"MultiOpPatchRequestAddMultipleMembersToGroup":true}}}'
 $boolResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $boolConfigBody
-Test-Result -Success ($boolResult.config.MultiOpPatchRequestAddMultipleMembersToGroup -eq $true) -Message "Boolean true accepted as config value"
+Test-Result -Success ($boolResult.profile.settings.MultiOpPatchRequestAddMultipleMembersToGroup -eq $true) -Message "Boolean true accepted as settings value"
 
 # Test: Invalid REMOVE config value rejected on create
 Write-Host "`n--- Test: Invalid Remove Config Value Rejected on Create ---" -ForegroundColor Cyan
-$invalidRemoveConfigBody = '{"name":"invalid-remove-config-test","config":{"MultiOpPatchRequestRemoveMultipleMembersFromGroup":"Yes"}}'
+$invalidRemoveConfigBody = '{"name":"invalid-remove-config-test","profile":{"settings":{"MultiOpPatchRequestRemoveMultipleMembersFromGroup":"Yes"}}}'
 try {
     $result = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $invalidRemoveConfigBody
     Test-Result -Success $false -Message "Invalid remove config 'Yes' should be rejected"
@@ -382,7 +384,7 @@ try {
 
 # Test: Invalid REMOVE config value rejected on update
 Write-Host "`n--- Test: Invalid Remove Config Value Rejected on Update ---" -ForegroundColor Cyan
-$invalidRemoveUpdateBody = '{"config":{"MultiOpPatchRequestRemoveMultipleMembersFromGroup":"enabled"}}'
+$invalidRemoveUpdateBody = '{"profile":{"settings":{"MultiOpPatchRequestRemoveMultipleMembersFromGroup":"enabled"}}}'
 try {
     $result = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $invalidRemoveUpdateBody
     Test-Result -Success $false -Message "Invalid remove config 'enabled' should be rejected on update"
@@ -393,20 +395,20 @@ try {
 
 # Test: Valid REMOVE config values accepted
 Write-Host "`n--- Test: Valid Remove Config Values Accepted ---" -ForegroundColor Cyan
-$validRemoveConfigBody = '{"config":{"MultiOpPatchRequestRemoveMultipleMembersFromGroup":"False"}}'
+$validRemoveConfigBody = '{"profile":{"settings":{"MultiOpPatchRequestRemoveMultipleMembersFromGroup":"False"}}}'
 $validRemoveResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $validRemoveConfigBody
-Test-Result -Success ($validRemoveResult.config.MultiOpPatchRequestRemoveMultipleMembersFromGroup -eq "False") -Message "Valid remove config 'False' accepted"
+Test-Result -Success ($validRemoveResult.profile.settings.MultiOpPatchRequestRemoveMultipleMembersFromGroup -eq "False") -Message "Valid remove settings 'False' accepted"
 
 # Test: Both flags can be set together
 Write-Host "`n--- Test: Both Config Flags Set Together ---" -ForegroundColor Cyan
-$bothFlagsBody = '{"config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"True","MultiOpPatchRequestRemoveMultipleMembersFromGroup":"True"}}'
+$bothFlagsBody = '{"profile":{"settings":{"MultiOpPatchRequestAddMultipleMembersToGroup":"True","MultiOpPatchRequestRemoveMultipleMembersFromGroup":"True"}}}'
 $bothResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $bothFlagsBody
-$bothValid = ($bothResult.config.MultiOpPatchRequestAddMultipleMembersToGroup -eq "True") -and ($bothResult.config.MultiOpPatchRequestRemoveMultipleMembersFromGroup -eq "True")
+$bothValid = ($bothResult.profile.settings.MultiOpPatchRequestAddMultipleMembersToGroup -eq "True") -and ($bothResult.profile.settings.MultiOpPatchRequestRemoveMultipleMembersFromGroup -eq "True")
 Test-Result -Success $bothValid -Message "Both add and remove config flags set together"
 
 # Test: Invalid VerbosePatchSupported config value rejected
 Write-Host "`n--- Test: Invalid VerbosePatchSupported Config Value Rejected ---" -ForegroundColor Cyan
-$invalidVerboseBody = '{"config":{"VerbosePatchSupported":"Yes"}}'
+$invalidVerboseBody = '{"profile":{"settings":{"VerbosePatchSupported":"Yes"}}}'
 try {
     $result = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $invalidVerboseBody
     Test-Result -Success $false -Message "Invalid VerbosePatchSupported 'Yes' should be rejected"
@@ -417,15 +419,15 @@ try {
 
 # Test: Valid VerbosePatchSupported config value accepted
 Write-Host "`n--- Test: Valid VerbosePatchSupported Config Value Accepted ---" -ForegroundColor Cyan
-$validVerboseBody = '{"config":{"VerbosePatchSupported":true}}'
+$validVerboseBody = '{"profile":{"settings":{"VerbosePatchSupported":true}}}'
 $validVerboseResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $validVerboseBody
-Test-Result -Success ($validVerboseResult.config.VerbosePatchSupported -eq $true) -Message "VerbosePatchSupported boolean true accepted"
+Test-Result -Success ($validVerboseResult.profile.settings.VerbosePatchSupported -eq $true) -Message "VerbosePatchSupported boolean true accepted"
 
 # Test: All three flags can be set together
 Write-Host "`n--- Test: All Three Config Flags Set Together ---" -ForegroundColor Cyan
-$allFlagsBody = '{"config":{"MultiOpPatchRequestAddMultipleMembersToGroup":"True","MultiOpPatchRequestRemoveMultipleMembersFromGroup":"True","VerbosePatchSupported":true}}'
+$allFlagsBody = '{"profile":{"settings":{"MultiOpPatchRequestAddMultipleMembersToGroup":"True","MultiOpPatchRequestRemoveMultipleMembersFromGroup":"True","VerbosePatchSupported":true}}}'
 $allResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $allFlagsBody
-$allValid = ($allResult.config.MultiOpPatchRequestAddMultipleMembersToGroup -eq "True") -and ($allResult.config.MultiOpPatchRequestRemoveMultipleMembersFromGroup -eq "True") -and ($allResult.config.VerbosePatchSupported -eq $true)
+$allValid = ($allResult.profile.settings.MultiOpPatchRequestAddMultipleMembersToGroup -eq "True") -and ($allResult.profile.settings.MultiOpPatchRequestRemoveMultipleMembersFromGroup -eq "True") -and ($allResult.profile.settings.VerbosePatchSupported -eq $true)
 Test-Result -Success $allValid -Message "All three config flags set together"
 
 # ============================================
@@ -1272,10 +1274,12 @@ Write-Host "`n--- Test: Multi-Member REMOVE with Flag=True ---" -ForegroundColor
 $removeEnabledBody = @{
     name = "live-test-remove-flag-$(Get-Random)"
     displayName = "Remove Flag Endpoint"
-    config = @{ MultiOpPatchRequestRemoveMultipleMembersFromGroup = "True" }
-} | ConvertTo-Json
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
 $removeEnabledEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $removeEnabledBody
 $RemoveFlagEndpointId = $removeEnabledEndpoint.id
+$patchBody = @{ profile = @{ settings = @{ MultiOpPatchRequestRemoveMultipleMembersFromGroup = "True" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$RemoveFlagEndpointId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $scimBase3 = "$baseUrl/scim/endpoints/$RemoveFlagEndpointId"
 
 # Create users and group in remove-flag endpoint
@@ -1995,10 +1999,12 @@ Write-Host "`n--- Setup: Endpoint with PatchOpAllowRemoveAllMembers=False ---" -
 $noRemoveAllBody = @{
     name = "live-test-noremoveall-$(Get-Random)"
     displayName = "No Remove All Endpoint"
-    config = @{ PatchOpAllowRemoveAllMembers = "False" }
-} | ConvertTo-Json
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
 $noRemoveAllEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $noRemoveAllBody
 $NoRemoveAllEndpointId = $noRemoveAllEndpoint.id
+$patchBody = @{ profile = @{ settings = @{ PatchOpAllowRemoveAllMembers = "False" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$NoRemoveAllEndpointId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $scimBaseNoRemoveAll = "$baseUrl/scim/endpoints/$NoRemoveAllEndpointId"
 
 # Create users and group in the no-remove-all endpoint
@@ -2197,10 +2203,12 @@ Write-Host "`n--- Setup: Endpoint with VerbosePatchSupported=True ---" -Foregrou
 $vpEndpointBody = @{
     name = "live-test-verbose-patch-$(Get-Random)"
     displayName = "Verbose Patch Endpoint"
-    config = @{ VerbosePatchSupported = $true }
-} | ConvertTo-Json
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
 $vpEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $vpEndpointBody
 $VPEndpointId = $vpEndpoint.id
+$patchBody = @{ profile = @{ settings = @{ VerbosePatchSupported = $true } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$VPEndpointId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $scimBaseVP = "$baseUrl/scim/endpoints/$VPEndpointId"
 
 # Create user in verbose-patch endpoint
@@ -2509,15 +2517,15 @@ Write-Host "`n--- Create Endpoint with logLevel Config ---" -ForegroundColor Cya
 $logLevelEndpointBody = @{
     name = "log-level-test-ep"
     displayName = "Log Level Test Endpoint"
-    description = "Endpoint to test per-endpoint logLevel via config"
-    config = @{
-        logLevel = "DEBUG"
-    }
-} | ConvertTo-Json -Depth 3
+    description = "Endpoint to test per-endpoint logLevel via profile.settings"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
 
 $logLevelEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $logLevelEndpointBody
 $logLevelEndpointId = $logLevelEndpoint.id
-Test-Result -Success ($logLevelEndpoint.config.logLevel -eq "DEBUG") -Message "Created endpoint with logLevel=DEBUG in config"
+$patchBody = @{ profile = @{ settings = @{ logLevel = "DEBUG" } } } | ConvertTo-Json -Depth 4
+$logLevelEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$logLevelEndpointId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json"
+Test-Result -Success ($logLevelEndpoint.profile.settings.logLevel -eq "DEBUG") -Message "Created endpoint with logLevel=DEBUG in profile.settings"
 Test-Result -Success ($logLevelEndpointId -ne $null) -Message "Endpoint ID is present: $logLevelEndpointId"
 
 # --- Verify log-config reflects the endpoint level ---
@@ -2527,18 +2535,18 @@ Test-Result -Success ($epLevelAfterCreate -ne $null) -Message "Endpoint level ap
 
 # --- Get endpoint and verify config roundtrips ---
 $getEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$logLevelEndpointId" -Method GET -Headers $headers
-Test-Result -Success ($getEndpoint.config.logLevel -eq "DEBUG") -Message "GET endpoint returns logLevel=DEBUG in config"
+Test-Result -Success ($getEndpoint.profile.settings.logLevel -eq "DEBUG") -Message "GET endpoint returns logLevel=DEBUG in profile.settings"
 
 # --- Update endpoint to change logLevel ---
 Write-Host "`n--- Update Endpoint logLevel Config ---" -ForegroundColor Cyan
 $updateBody = @{
-    config = @{
+    profile = @{ settings = @{
         logLevel = "TRACE"
-    }
-} | ConvertTo-Json -Depth 3
+    } }
+} | ConvertTo-Json -Depth 4
 
 $updatedEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$logLevelEndpointId" -Method PATCH -Headers $headers -Body $updateBody
-Test-Result -Success ($updatedEndpoint.config.logLevel -eq "TRACE") -Message "Updated endpoint logLevel to TRACE"
+Test-Result -Success ($updatedEndpoint.profile.settings.logLevel -eq "TRACE") -Message "Updated endpoint logLevel to TRACE"
 
 # --- Verify log-config reflects updated level ---
 $logConfigAfterUpdate = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method GET -Headers $headers
@@ -2548,16 +2556,16 @@ Test-Result -Success ($epLevelAfterUpdate -ne $null) -Message "Endpoint level up
 # --- Update endpoint config without logLevel (should preserve it — settings merge is additive) ---
 Write-Host "`n--- PATCH config without logLevel (additive merge) ---" -ForegroundColor Cyan
 $removeLogLevelBody = @{
-    config = @{
+    profile = @{ settings = @{
         strictMode = $true
-    }
-} | ConvertTo-Json -Depth 3
+    } }
+} | ConvertTo-Json -Depth 4
 
 $clearedEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$logLevelEndpointId" -Method PATCH -Headers $headers -Body $removeLogLevelBody
 # Settings merge is additive (shallow merge) — omitting logLevel does NOT clear it.
 # The logLevel should still be TRACE from the previous PATCH.
-Test-Result -Success ($clearedEndpoint.config.logLevel -eq "TRACE") -Message "Endpoint config preserves logLevel (additive merge)"
-Test-Result -Success ($clearedEndpoint.config.strictMode -eq $true) -Message "Other config flags preserved"
+Test-Result -Success ($clearedEndpoint.profile.settings.logLevel -eq "TRACE") -Message "Endpoint profile.settings preserves logLevel (additive merge)"
+Test-Result -Success ($clearedEndpoint.profile.settings.strictMode -eq $true) -Message "Other settings flags preserved"
 
 # --- Verify log-config no longer has endpoint level ---
 $logConfigAfterClear = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method GET -Headers $headers
@@ -2569,29 +2577,29 @@ Write-Host "`n--- Create Endpoint with Mixed Config ---" -ForegroundColor Cyan
 $mixedConfigBody = @{
     name = "log-level-mixed-ep"
     displayName = "Mixed Config Endpoint"
-    config = @{
-        logLevel = "WARN"
-        VerbosePatchSupported = "True"
-        strictMode = $true
-    }
-} | ConvertTo-Json -Depth 3
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
 
 $mixedEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $mixedConfigBody
 $mixedEndpointId = $mixedEndpoint.id
-Test-Result -Success ($mixedEndpoint.config.logLevel -eq "WARN") -Message "Mixed config: logLevel=WARN"
-Test-Result -Success ($mixedEndpoint.config.VerbosePatchSupported -eq "True") -Message "Mixed config: VerbosePatchSupported=True"
-Test-Result -Success ($mixedEndpoint.config.strictMode -eq $true) -Message "Mixed config: strictMode=true"
+$patchBody = @{ profile = @{ settings = @{ logLevel = "WARN"; VerbosePatchSupported = "True"; strictMode = $true } } } | ConvertTo-Json -Depth 4
+$mixedEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$mixedEndpointId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json"
+Test-Result -Success ($mixedEndpoint.profile.settings.logLevel -eq "WARN") -Message "Mixed settings: logLevel=WARN"
+Test-Result -Success ($mixedEndpoint.profile.settings.VerbosePatchSupported -eq "True") -Message "Mixed settings: VerbosePatchSupported=True"
+Test-Result -Success ($mixedEndpoint.profile.settings.strictMode -eq $true) -Message "Mixed settings: strictMode=true"
 
 # --- Validate log-config for mixed endpoint ---
 $logConfigMixed = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" -Method GET -Headers $headers
 $mixedEpLevel = $logConfigMixed.endpointLevels.$mixedEndpointId
 Test-Result -Success ($mixedEpLevel -ne $null) -Message "Mixed endpoint level in log-config"
 
-# --- Validation: reject invalid logLevel ---
+# --- Validation: reject invalid logLevel via PATCH ---
 Write-Host "`n--- Validation: Invalid logLevel Values ---" -ForegroundColor Cyan
+# Create a temp endpoint, then try to PATCH invalid logLevel
+$tempLogEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{ name = "bad-log-ep-$(Get-Random)"; profilePreset = "rfc-standard" } | ConvertTo-Json)
 try {
-    $badBody = @{ name = "bad-log-ep"; config = @{ logLevel = "VERBOSE" } } | ConvertTo-Json -Depth 3
-    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $badBody
+    $badPatch = @{ profile = @{ settings = @{ logLevel = "VERBOSE" } } } | ConvertTo-Json -Depth 4
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($tempLogEp.id)" -Method PATCH -Headers $headers -Body $badPatch -ContentType "application/json"
     Test-Result -Success $false -Message "Should reject invalid logLevel 'VERBOSE'"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
@@ -2599,22 +2607,25 @@ try {
 }
 
 try {
-    $badBody2 = @{ name = "bad-log-ep2"; config = @{ logLevel = "high" } } | ConvertTo-Json -Depth 3
-    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $badBody2
+    $badPatch2 = @{ profile = @{ settings = @{ logLevel = "high" } } } | ConvertTo-Json -Depth 4
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($tempLogEp.id)" -Method PATCH -Headers $headers -Body $badPatch2 -ContentType "application/json"
     Test-Result -Success $false -Message "Should reject invalid logLevel 'high'"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
     Test-Result -Success ($statusCode -eq 400) -Message "Rejects invalid logLevel 'high' with 400"
 }
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($tempLogEp.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
 
 # --- Accept case-insensitive logLevel ---
 $ciBody = @{
     name = "log-ci-ep"
-    config = @{ logLevel = "debug" }
-} | ConvertTo-Json -Depth 3
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
 $ciEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $ciBody
 $ciEndpointId = $ciEndpoint.id
-Test-Result -Success ($ciEndpoint.config.logLevel -eq "debug") -Message "Accepts lowercase logLevel 'debug'"
+$patchBody = @{ profile = @{ settings = @{ logLevel = "debug" } } } | ConvertTo-Json -Depth 4
+$ciEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ciEndpointId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json"
+Test-Result -Success ($ciEndpoint.profile.settings.logLevel -eq "debug") -Message "Accepts lowercase logLevel 'debug'"
 
 # --- Cleanup: delete test endpoints ---
 Write-Host "`n--- Cleanup: Delete Log Level Test Endpoints ---" -ForegroundColor Cyan
@@ -2660,13 +2671,12 @@ $boolCoerceEndpointBody = @{
     name = "bool-coerce-ep-$(Get-Random)"
     displayName = "Boolean Coercion Test Endpoint"
     description = "Endpoint for AllowAndCoerceBooleanStrings tests"
-    config = @{
-        StrictSchemaValidation = "True"
-        # AllowAndCoerceBooleanStrings defaults to true
-    }
-} | ConvertTo-Json
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
 $boolCoerceEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $boolCoerceEndpointBody
 $boolCoerceEndpointId = $boolCoerceEndpoint.id
+$patchBody = @{ profile = @{ settings = @{ StrictSchemaValidation = "True" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$boolCoerceEndpointId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $boolCoerceScimBase = "$baseUrl/scim/endpoints/$boolCoerceEndpointId"
 Test-Result -Success ($null -ne $boolCoerceEndpointId) -Message "Created bool-coerce endpoint: $boolCoerceEndpointId"
 
@@ -2761,13 +2771,12 @@ Write-Host "`n--- Test 9f.5: Reject boolean string when flag is OFF ---" -Foregr
 $rejectEndpointBody = @{
     name = "bool-reject-ep-$(Get-Random)"
     displayName = "Boolean Reject Test Endpoint"
-    config = @{
-        StrictSchemaValidation = "True"
-        AllowAndCoerceBooleanStrings = "False"
-    }
-} | ConvertTo-Json
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
 $rejectEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $rejectEndpointBody
 $rejectEndpointId = $rejectEndpoint.id
+$patchBody = @{ profile = @{ settings = @{ StrictSchemaValidation = "True"; AllowAndCoerceBooleanStrings = "False" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$rejectEndpointId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $rejectScimBase = "$baseUrl/scim/endpoints/$rejectEndpointId"
 
 $rejectUserBody = @{
@@ -3465,7 +3474,6 @@ $g8bEndpointBody = @{
     name = "live-test-g8b-$(Get-Random)"
     displayName = "G8b Custom Resource Types Endpoint"
     description = "Endpoint for G8b live integration tests"
-    config = @{ CustomResourceTypesEnabled = "True" }
 } | ConvertTo-Json
 $g8bEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $g8bEndpointBody
 $G8bEndpointId = $g8bEndpoint.id
@@ -3796,9 +3804,6 @@ $comboEndpointBody = @{
     name = "live-test-combo-$(Get-Random)"
     displayName = "Schema Combo Test Endpoint"
     description = "Endpoint for combined custom schemas + custom resource types"
-    config = @{
-        CustomResourceTypesEnabled = "True"
-    }
 } | ConvertTo-Json -Depth 3
 $comboEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $comboEndpointBody
 $ComboEndpointId = $comboEndpoint.id
@@ -3811,13 +3816,12 @@ $strictEndpointBody = @{
     name = "live-test-strict-combo-$(Get-Random)"
     displayName = "Strict Schema Combo Endpoint"
     description = "Endpoint with StrictSchemaValidation for combo tests"
-    config = @{
-        CustomResourceTypesEnabled = "True"
-        StrictSchemaValidation = "True"
-    }
-} | ConvertTo-Json -Depth 3
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
 $strictEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $strictEndpointBody
 $StrictComboEndpointId = $strictEndpoint.id
+$patchBody = @{ profile = @{ settings = @{ StrictSchemaValidation = "True" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$StrictComboEndpointId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $scimBaseStrict = "$baseUrl/scim/endpoints/$StrictComboEndpointId"
 $adminBaseStrict = "$baseUrl/scim/admin/endpoints/$StrictComboEndpointId"
 Test-Result -Success ($null -ne $StrictComboEndpointId) -Message "9m-C: Strict combo endpoint created"
@@ -4237,10 +4241,12 @@ $bulkEndpointBody = @{
     name = "live-test-bulk-$(Get-Random)"
     displayName = "Bulk Operations Test Endpoint"
     description = "Endpoint for Phase 9 Bulk Operations live tests"
-    config = @{ BulkOperationsEnabled = "True" }
-} | ConvertTo-Json
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 6
 $bulkEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $bulkEndpointBody
 $BulkEndpointId = $bulkEndpoint.id
+$patchBody = @{ profile = @{ serviceProviderConfig = @{ bulk = @{ supported = $true; maxOperations = 100; maxPayloadSize = 1048576 } } } } | ConvertTo-Json -Depth 6
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$BulkEndpointId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $scimBaseBulk = "$baseUrl/scim/endpoints/$BulkEndpointId"
 Test-Result -Success ($null -ne $BulkEndpointId) -Message "Bulk endpoint created with BulkOperationsEnabled"
 
@@ -4584,7 +4590,7 @@ try {
 Write-Host "`n--- Test 9n.14: SPC advertises bulk.supported=true ---" -ForegroundColor Cyan
 try {
     $spc = Invoke-RestMethod -Uri "$scimBaseBulk/ServiceProviderConfig" -Method GET -Headers $headers
-    Test-Result -Success ($spc.bulk.supported -eq $true -and $spc.bulk.maxOperations -eq 1000) -Message "9n.14 SPC bulk.supported=$($spc.bulk.supported), maxOperations=$($spc.bulk.maxOperations)"
+    Test-Result -Success ($spc.bulk.supported -eq $true -and $spc.bulk.maxOperations -eq 100) -Message "9n.14 SPC bulk.supported=$($spc.bulk.supported), maxOperations=$($spc.bulk.maxOperations)"
 } catch {
     Test-Result -Success $false -Message "9n.14 SPC check failed: $_"
 }
@@ -5211,10 +5217,12 @@ Write-Host "========================================" -ForegroundColor Yellow
 Write-Host "`n--- Setup: Create Cred-Enabled Endpoint ---" -ForegroundColor Cyan
 $credEpBody = @{
     name = "per-cred-test-$(Get-Date -Format 'HHmmss')"
-    config = @{ PerEndpointCredentialsEnabled = "True" }
-} | ConvertTo-Json -Depth 3
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
 $credEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $credEpBody
 $credEpId = $credEp.id
+$patchBody = @{ profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$credEpId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $credScimBase = "$baseUrl/scim/endpoints/$credEpId"
 Write-Host "  Created endpoint: $credEpId"
 Test-Result -Success ($null -ne $credEpId) -Message "9s setup: per-cred endpoint created"
@@ -5305,10 +5313,12 @@ try {
 Write-Host "`n--- Test 9s.8: Reject cred creation when flag disabled ---" -ForegroundColor Cyan
 $disabledEpBody = @{
     name = "no-cred-test-$(Get-Date -Format 'HHmmss')"
-    config = @{ PerEndpointCredentialsEnabled = "False" }
-} | ConvertTo-Json -Depth 3
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
 $disabledEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $disabledEpBody
 $disabledEpId = $disabledEp.id
+$patchBody = @{ profile = @{ settings = @{ PerEndpointCredentialsEnabled = "False" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$disabledEpId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 try {
     $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$disabledEpId/credentials" -Method POST -Headers $headers -Body $credCreateBody
     Test-Result -Success $false -Message "9s.8: should reject when flag disabled"
@@ -5352,12 +5362,12 @@ Write-Host "========================================" -ForegroundColor Yellow
 # Create a dedicated endpoint with warning flag enabled
 $roStripBody = @{
     name = "readonly-strip-test-$(Get-Random)"
-    config = @{
-        IncludeWarningAboutIgnoredReadOnlyAttribute = $true
-    }
-} | ConvertTo-Json -Depth 3
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
 $roEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $roStripBody
 $roEpId = $roEndpoint.id
+$patchBody = @{ profile = @{ settings = @{ IncludeWarningAboutIgnoredReadOnlyAttribute = $true } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$roEpId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $roScimBase = "$baseUrl/scim/endpoints/$roEpId"
 
 # 9t.1: POST /Users with client-supplied id — should be stripped, server UUID assigned
@@ -5413,11 +5423,11 @@ Test-Result -Success ($groupCount -eq 0) -Message "9t.4: readOnly groups PATCH o
 Write-Host "`n--- 9t.5: No warning when flag disabled ---" -ForegroundColor Cyan
 $noWarnBody = @{
     name = "no-warn-test-$(Get-Random)"
-    config = @{
-        IncludeWarningAboutIgnoredReadOnlyAttribute = $false
-    }
-} | ConvertTo-Json -Depth 3
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
 $noWarnEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $noWarnBody
+$patchBody = @{ profile = @{ settings = @{ IncludeWarningAboutIgnoredReadOnlyAttribute = $false } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($noWarnEp.id)" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $noWarnBase = "$baseUrl/scim/endpoints/$($noWarnEp.id)"
 $noWarnUserBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
@@ -5433,11 +5443,11 @@ Test-Result -Success ($noWarnUser.id -ne "should-strip-silently") -Message "9t.5
 Write-Host "`n--- 9t.6: PATCH id returns 400 ---" -ForegroundColor Cyan
 $strictEpBody = @{
     name = "strict-patch-id-$(Get-Random)"
-    config = @{
-        StrictSchemaValidation = $true
-    }
-} | ConvertTo-Json -Depth 3
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
 $strictEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $strictEpBody
+$patchBody = @{ profile = @{ settings = @{ StrictSchemaValidation = $true } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($strictEp.id)" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $strictBase = "$baseUrl/scim/endpoints/$($strictEp.id)"
 $strictUserBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
@@ -5472,13 +5482,11 @@ Test-Result -Success ($roGroup.displayName -like "ReadOnly Group*") -Message "9t
 Write-Host "`n--- 9t.8: Strict + IgnorePatchRO ON ---" -ForegroundColor Cyan
 $strictIgnoreBody = @{
     name = "strict-ignore-ro-$(Get-Random)"
-    config = @{
-        StrictSchemaValidation = $true
-        IgnoreReadOnlyAttributesInPatch = $true
-        IncludeWarningAboutIgnoredReadOnlyAttribute = $true
-    }
-} | ConvertTo-Json -Depth 3
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
 $strictIgnoreEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $strictIgnoreBody
+$patchBody = @{ profile = @{ settings = @{ StrictSchemaValidation = $true; IgnoreReadOnlyAttributesInPatch = $true; IncludeWarningAboutIgnoredReadOnlyAttribute = $true } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($strictIgnoreEp.id)" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $siBase = "$baseUrl/scim/endpoints/$($strictIgnoreEp.id)"
 $siUserBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
@@ -5503,12 +5511,11 @@ Test-Result -Success ($siPatch.schemas -contains "urn:scimserver:api:messages:2.
 Write-Host "`n--- 9t.9: Strict + IgnorePatchRO OFF ---" -ForegroundColor Cyan
 $strictKeepBody = @{
     name = "strict-keep-ro-$(Get-Random)"
-    config = @{
-        StrictSchemaValidation = $true
-        IgnoreReadOnlyAttributesInPatch = $false
-    }
-} | ConvertTo-Json -Depth 3
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
 $strictKeepEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $strictKeepBody
+$patchBody = @{ profile = @{ settings = @{ StrictSchemaValidation = $true; IgnoreReadOnlyAttributesInPatch = $false } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($strictKeepEp.id)" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $skBase = "$baseUrl/scim/endpoints/$($strictKeepEp.id)"
 $skUserBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
@@ -6285,13 +6292,12 @@ $y9EndpointBody = @{
     name = "live-test-9y-$(Get-Random)"
     displayName = "9y Generic Parity Endpoint"
     description = "Endpoint for generic parity fix tests"
-    config = @{
-        CustomResourceTypesEnabled = "True"
-        RequireIfMatch = "True"
-    }
-} | ConvertTo-Json
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json -Depth 4
 $y9Endpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $y9EndpointBody
 $Y9EndpointId = $y9Endpoint.id
+$patchBody = @{ profile = @{ settings = @{ RequireIfMatch = "True" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$Y9EndpointId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $scimBase9y = "$baseUrl/scim/endpoints/$Y9EndpointId"
 $adminBase9y = "$baseUrl/scim/admin/endpoints/$Y9EndpointId"
 Test-Result -Success ($null -ne $Y9EndpointId) -Message "9y.0: Setup endpoint created with RequireIfMatch + CustomResourceTypesEnabled"
@@ -6380,9 +6386,6 @@ $y9FilterEndpointBody = @{
     name = "live-test-9y-filter-$(Get-Random)"
     displayName = "9y Filter Test Endpoint"
     description = "Endpoint for generic filter parity tests"
-    config = @{
-        CustomResourceTypesEnabled = "True"
-    }
 } | ConvertTo-Json
 $y9FilterEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $y9FilterEndpointBody
 $Y9FilterEndpointId = $y9FilterEndpoint.id
@@ -6514,9 +6517,9 @@ Test-Result -Success ($presetNames -contains "rfc-standard") -Message "9z.12: rf
 
 # --- Test 9z.13: PATCH deep-merge settings ---
 Write-Host "`n--- Test 9z.13: PATCH deep-merge settings ---" -ForegroundColor Cyan
-$patchBody = @{ config = @{ SoftDeleteEnabled = "True" } } | ConvertTo-Json
+$patchBody = @{ profile = @{ settings = @{ SoftDeleteEnabled = "True" } } } | ConvertTo-Json -Depth 4
 $patchResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($rfcEp.id)" -Method PATCH -Headers $headers -Body $patchBody
-Test-Result -Success ($patchResult.config.SoftDeleteEnabled -eq "True") -Message "9z.13: PATCH added SoftDeleteEnabled"
+Test-Result -Success ($patchResult.profile.settings.SoftDeleteEnabled -eq "True") -Message "9z.13: PATCH added SoftDeleteEnabled"
 # Verify schemas untouched
 $rfcSchemasAfter = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($rfcEp.id)/Schemas" -Headers $headers
 Test-Result -Success ($rfcSchemasAfter.totalResults -eq 3) -Message "9z.14: schemas unchanged after settings PATCH"
@@ -6554,7 +6557,7 @@ Test-Result -Success ($null -ne $patchEp.id) -Message "9z.17: Created rfc-standa
 # 9z.18: PATCH add single setting via profile.settings
 $pBody18 = @{ profile = @{ settings = @{ SoftDeleteEnabled = "True" } } } | ConvertTo-Json -Depth 4
 $p18 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method PATCH -Headers $headers -Body $pBody18
-Test-Result -Success ($p18.config.SoftDeleteEnabled -eq "True") -Message "9z.18: PATCH added SoftDeleteEnabled via profile.settings"
+Test-Result -Success ($p18.profile.settings.SoftDeleteEnabled -eq "True") -Message "9z.18: PATCH added SoftDeleteEnabled via profile.settings"
 Test-Result -Success ($p18.profile.settings.SoftDeleteEnabled -eq "True") -Message "9z.19: profile.settings reflects SoftDeleteEnabled"
 
 # 9z.20: PATCH add second setting — first should be preserved
@@ -6608,16 +6611,12 @@ $p33 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Me
 Test-Result -Success ($p33.displayName -like "Patched Display*") -Message "9z.33: displayName updated alongside settings"
 Test-Result -Success ($p33.profile.settings.ReprovisionOnConflictForSoftDeletedResource -eq "True") -Message "9z.34: Reprovision setting added"
 
-# 9z.35: PATCH reject config + profile together
-Write-Host "`n--- Test 9z.35: Reject config + profile together ---" -ForegroundColor Cyan
-$pBody35 = @{ config = @{ SoftDeleteEnabled = "True" }; profile = @{ settings = @{ StrictSchemaValidation = "True" } } } | ConvertTo-Json -Depth 4
-try {
-    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method PATCH -Headers $headers -Body $pBody35
-    Test-Result -Success $false -Message "9z.35: Should have rejected config+profile"
-} catch {
-    $status35 = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($status35 -eq 400) -Message "9z.35: Rejected config+profile with 400"
-}
+# 9z.35: PATCH with merged settings via profile
+Write-Host "`n--- Test 9z.35: PATCH with merged settings via profile ---" -ForegroundColor Cyan
+$pBody35 = @{ profile = @{ settings = @{ SoftDeleteEnabled = "True"; StrictSchemaValidation = "True" } } } | ConvertTo-Json -Depth 4
+$p35 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method PATCH -Headers $headers -Body $pBody35
+Test-Result -Success ($p35.profile.settings.SoftDeleteEnabled -eq "True") -Message "9z.35: SoftDeleteEnabled present after merged PATCH"
+Test-Result -Success ($p35.profile.settings.StrictSchemaValidation -eq "True") -Message "9z.35: StrictSchemaValidation present after merged PATCH"
 
 # Cleanup PATCH test endpoint
 try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method DELETE -Headers $headers | Out-Null } catch {}

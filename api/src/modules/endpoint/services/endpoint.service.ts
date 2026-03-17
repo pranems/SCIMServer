@@ -19,8 +19,6 @@ export interface EndpointResponse {
   name: string;
   displayName?: string;
   description?: string;
-  /** @deprecated Use profile.settings — retained for backward compat */
-  config?: Record<string, any>;
   profile?: EndpointProfile;
   active: boolean;
   scimEndpoint: string;
@@ -129,19 +127,19 @@ export class EndpointService implements OnModuleInit {
         throw new BadRequestException(e.message);
       }
     } else if (dto.profile) {
+      // Validate settings values if provided (rejects invalid flag values like 'Yes', 123, etc.)
+      if (dto.profile.settings) {
+        try {
+          validateEndpointConfig(dto.profile.settings as Record<string, any>);
+        } catch (error) {
+          throw new BadRequestException((error as Error).message);
+        }
+      }
       const result = validateAndExpandProfile(dto.profile);
       if (!result.valid) {
         throw new BadRequestException(`Profile validation failed: ${result.errors.map(e => e.detail).join('; ')}`);
       }
       resolvedProfile = result.profile!;
-    } else if (dto.config) {
-      // Backward compatibility: validate old config flags, then wrap into profile
-      try {
-        validateEndpointConfig(dto.config);
-      } catch (error) {
-        throw new BadRequestException((error as Error).message);
-      }
-      resolvedProfile = this.configToProfile(dto.config);
     } else {
       // Default: entra-id preset
       const preset = getBuiltInPreset(DEFAULT_PRESET_NAME);
@@ -157,7 +155,6 @@ export class EndpointService implements OnModuleInit {
         name: dto.name,
         displayName: dto.displayName ?? dto.name,
         description: dto.description ?? undefined,
-        config: resolvedProfile.settings ?? undefined,
         profile: resolvedProfile,
         active: true,
         scimEndpoint: '',
@@ -271,11 +268,6 @@ export class EndpointService implements OnModuleInit {
   }
 
   async updateEndpoint(endpointId: string, dto: UpdateEndpointDto): Promise<EndpointResponse> {
-    // Mutual exclusivity: config and profile are disjoint update paths
-    if (dto.config && dto.profile) {
-      throw new BadRequestException('Cannot specify both "config" and "profile" in the same update. Use "profile.settings" instead.');
-    }
-
     const current = this.cacheById.get(endpointId);
 
     if (this.isInMemoryBackend) {
@@ -291,22 +283,10 @@ export class EndpointService implements OnModuleInit {
       }
 
       // Legacy config merge into profile.settings for backward compat
-      if (dto.config) {
-        try {
-          validateEndpointConfig(dto.config);
-        } catch (error) {
-          throw new BadRequestException((error as Error).message);
-        }
-        newProfile = newProfile
-          ? { ...newProfile, settings: { ...newProfile.settings, ...dto.config } }
-          : undefined;
-      }
-
       const updated: EndpointResponse = {
         ...current,
         displayName: dto.displayName !== undefined ? (dto.displayName ?? current.name) : current.displayName,
         description: dto.description !== undefined ? (dto.description ?? undefined) : current.description,
-        config: (newProfile?.settings ?? current.config) as Record<string, any> | undefined,
         profile: newProfile,
         active: dto.active !== undefined ? dto.active : current.active,
         updatedAt: new Date(),
@@ -315,9 +295,6 @@ export class EndpointService implements OnModuleInit {
       // Update cache (delete old name entry if name changed)
       if (current.name !== updated.name) this.cacheByName.delete(current.name);
       this.cacheSet(updated);
-      if (dto.config !== undefined) {
-        this.syncEndpointLogLevel(endpointId, dto.config);
-      }
       if (dto.profile?.settings) {
         this.syncEndpointLogLevel(endpointId, dto.profile.settings as Record<string, any>);
       }
@@ -348,17 +325,6 @@ export class EndpointService implements OnModuleInit {
       profileUpdate = this.mergeProfilePartial(currentProfile, dto.profile);
     }
 
-    // Legacy config merge into profile.settings for backward compat
-    if (dto.config) {
-      try {
-        validateEndpointConfig(dto.config);
-      } catch (error) {
-        throw new BadRequestException((error as Error).message);
-      }
-      const currentProfile = profileUpdate ?? (endpoint.profile as Record<string, any>) ?? {};
-      profileUpdate = { ...currentProfile, settings: { ...currentProfile.settings, ...dto.config } };
-    }
-
     const dbUpdated = await this.prisma.endpoint.update({
       where: { id: endpointId },
       data: {
@@ -374,9 +340,6 @@ export class EndpointService implements OnModuleInit {
     if (current && current.name !== response.name) this.cacheByName.delete(current.name);
     this.cacheSet(response);
 
-    if (dto.config !== undefined) {
-      this.syncEndpointLogLevel(endpointId, dto.config);
-    }
     if (dto.profile?.settings) {
       this.syncEndpointLogLevel(endpointId, dto.profile.settings as Record<string, any>);
     }
@@ -422,6 +385,12 @@ export class EndpointService implements OnModuleInit {
     }
     // Deep-merge settings (additive)
     if (partial.settings !== undefined) {
+      // Validate individual settings values before merging
+      try {
+        validateEndpointConfig(partial.settings as Record<string, any>);
+      } catch (error) {
+        throw new BadRequestException((error as Error).message);
+      }
       merged.settings = { ...current.settings, ...partial.settings };
     }
 
@@ -505,36 +474,12 @@ export class EndpointService implements OnModuleInit {
       name: endpoint.name,
       displayName: endpoint.displayName || endpoint.name,
       description: endpoint.description ?? undefined,
-      config: profile?.settings ?? undefined,
       profile: profile as EndpointProfile | undefined,
       active: endpoint.active,
       scimEndpoint: `/scim/endpoints/${endpoint.id}`,
       createdAt: endpoint.createdAt,
       updatedAt: endpoint.updatedAt
     };
-  }
-
-  /** Backward compat: wrap old config into a profile with settings.
-   *  Uses rfc-standard as base since old config callers expect all capabilities.
-   *  Maps legacy config flags to profile SPC where applicable. */
-  private configToProfile(config: Record<string, any>): EndpointProfile {
-    const preset = getBuiltInPreset('rfc-standard');
-    const result = validateAndExpandProfile(preset.profile);
-    const profile = result.profile!;
-
-    // Map legacy BulkOperationsEnabled flag to SPC
-    const bulkFlag = config[ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED];
-    if (bulkFlag !== undefined) {
-      const bulkEnabled = typeof bulkFlag === 'boolean'
-        ? bulkFlag
-        : typeof bulkFlag === 'string' && (bulkFlag.toLowerCase() === 'true' || bulkFlag === '1');
-      profile.serviceProviderConfig = {
-        ...profile.serviceProviderConfig,
-        bulk: { ...profile.serviceProviderConfig.bulk, supported: bulkEnabled },
-      };
-    }
-
-    return { ...profile, settings: { ...profile.settings, ...config } };
   }
 
   /**

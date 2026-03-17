@@ -245,33 +245,38 @@ describe('Endpoint Profile & Preset API (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════
-  // Backward Compatibility (config field)
+  // Profile settings on create
   // ═══════════════════════════════════════════════════════════════════════
 
-  describe('POST /scim/admin/endpoints (backward compat: config field)', () => {
-    it('should accept old config field and map to profile.settings', async () => {
-      const name = `e2e-compat-${Date.now()}`;
-      const res = await request(app.getHttpServer())
+  describe('POST /scim/admin/endpoints (profile.settings on create)', () => {
+    it('should accept profile.settings and persist them', async () => {
+      const name = `e2e-settings-${Date.now()}`;
+      // Create with preset first (profile alone requires schemas+RTs)
+      const createRes = await request(app.getHttpServer())
         .post('/scim/admin/endpoints')
         .set('Authorization', `Bearer ${token}`)
         .set('Content-Type', 'application/json')
-        .send({ name, config: { SoftDeleteEnabled: 'True' } })
+        .send({ name, profilePreset: 'rfc-standard' })
         .expect(201);
 
-      // config maps to profile.settings
-      expect(res.body.config).toBeDefined();
-      expect(res.body.config.SoftDeleteEnabled).toBe('True');
-    });
+      const epId = createRes.body.id;
 
-    it('should reject invalid config flag values', async () => {
-      const name = `e2e-badconfig-${Date.now()}`;
-      await request(app.getHttpServer())
-        .post('/scim/admin/endpoints')
+      // PATCH settings onto the endpoint
+      const res = await request(app.getHttpServer())
+        .patch(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
         .set('Content-Type', 'application/json')
-        .send({ name, config: { SoftDeleteEnabled: 'InvalidValue' } })
-        .expect(400);
+        .send({ profile: { settings: { SoftDeleteEnabled: 'True' } } })
+        .expect(200);
+
+      // settings are stored in profile.settings
+      expect(res.body.profile?.settings).toBeDefined();
+      expect(res.body.profile.settings.SoftDeleteEnabled).toBe('True');
     });
+
+    // NOTE: Test "should reject invalid config flag values" removed.
+    // The legacy `config` field was removed from CreateEndpointDto (v0.28+).
+    // Settings values (profile.settings) are not individually validated.
   });
 
   // ═══════════════════════════════════════════════════════════════════════

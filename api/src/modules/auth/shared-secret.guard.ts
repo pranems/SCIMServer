@@ -19,7 +19,7 @@ import { LogCategory } from '../logging/log-levels';
 import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../domain/repositories/repository.tokens';
 import type { IEndpointCredentialRepository } from '../../domain/repositories/endpoint-credential.repository.interface';
 import { EndpointService } from '../endpoint/services/endpoint.service';
-import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS } from '../endpoint/endpoint-config.interface';
+import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../endpoint/endpoint-config.interface';
 
 // bcrypt is heavy — lazy-load via dynamic import cached on first use
 let bcryptCompare: (data: string, hash: string) => Promise<boolean>;
@@ -164,7 +164,7 @@ export class SharedSecretGuard implements CanActivate {
     try {
       // Check if the endpoint has per-endpoint credentials enabled
       const endpoint = await this.endpointService!.getEndpoint(endpointId);
-      const config = endpoint.config ?? {};
+      const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
       const perEndpointEnabled = getConfigBoolean(
         config,
         ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED,

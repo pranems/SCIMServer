@@ -431,16 +431,9 @@ describe('Config Flags (E2E)', () => {
       expect(res.body.status).toBe('409');
     });
 
-    it('Endpoint config invalid value rejection via admin API', async () => {
-      const res = await request(app.getHttpServer())
-        .post('/scim/admin/endpoints')
-        .set('Authorization', `Bearer ${token}`)
-        .set('Content-Type', 'application/json')
-        .send({
-          name: `e2e-invalid-cfg-${Date.now()}`,
-          config: { BulkOperationsEnabled: 'invalid' },
-        });
-      expect(res.status).toBe(400);
-    });
+    // NOTE: Test "Endpoint config invalid value rejection" removed.
+    // The legacy `config` field was removed from CreateEndpointDto (v0.28+).
+    // Settings values (profile.settings) are not individually validated,
+    // so invalid flag values are no longer rejected at the admin API level.
   });
 });

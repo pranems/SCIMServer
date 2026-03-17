@@ -21,13 +21,16 @@ describe('EndpointScimBulkController', () => {
     serviceProviderConfig: { bulk: { supported: false, maxOperations: 1000, maxPayloadSize: 1048576 } },
   } as any;
 
-  const makeEndpoint = (configOverrides: Record<string, unknown> = {}, profile?: any) => ({
+  const makeEndpoint = (settingsOverrides: Record<string, unknown> = {}, profile?: any) => ({
     id: 'ep-1',
     name: 'test-endpoint',
     displayName: 'Test Endpoint',
     description: 'Test',
-    config: configOverrides,
-    profile,
+    profile: profile
+      ? { ...profile, settings: { ...settingsOverrides } }
+      : Object.keys(settingsOverrides).length > 0
+        ? { settings: settingsOverrides }
+        : undefined,
     active: true,
     createdAt: new Date(),
     updatedAt: new Date(),

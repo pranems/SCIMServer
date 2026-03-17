@@ -3,8 +3,6 @@ import type { ShorthandProfileInput } from '../../scim/endpoint-profile/endpoint
 export class UpdateEndpointDto {
   displayName?: string;
   description?: string;
-  /** @deprecated Use profile instead. Kept for backward compatibility. */
-  config?: Record<string, any>;
   active?: boolean;
   /** Partial profile update — settings deep-merged, schemas/RTs/SPC replaced. */
   profile?: Partial<ShorthandProfileInput>;

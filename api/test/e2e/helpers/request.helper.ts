@@ -239,30 +239,66 @@ export async function createEndpointWithConfig(
 ): Promise<string> {
   const wk = process.env.JEST_WORKER_ID ?? '0';
   const endpointName = name ?? `e2e-cfg-w${wk}-${Date.now()}`;
-  const requestBody = { name: endpointName, config };
-  const trace = beginE2eFlowStep({
+  // v0.28.0: Create with rfc-standard preset, then PATCH settings.
+  // profilePreset and profile are mutually exclusive, so we need two calls.
+  const createBody = { name: endpointName, profilePreset: 'rfc-standard' };
+  const createTrace = beginE2eFlowStep({
     method: 'POST',
     url: '/scim/admin/endpoints',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: requestBody,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: createBody,
   });
-  const res: Response = await request(app.getHttpServer())
+  const createRes: Response = await request(app.getHttpServer())
     .post('/scim/admin/endpoints')
     .set('Authorization', `Bearer ${token}`)
     .set('Content-Type', 'application/json')
-    .send(requestBody)
+    .send(createBody)
     .expect(201);
-
-  finishE2eFlowStep(trace, {
-    status: res.status,
-    headers: res.headers as Record<string, string | string[]>,
-    body: res.body,
+  finishE2eFlowStep(createTrace, {
+    status: createRes.status,
+    headers: createRes.headers as Record<string, string | string[]>,
+    body: createRes.body,
   });
 
-  return res.body.id as string;
+  const endpointId = createRes.body.id as string;
+
+  // PATCH settings onto the new endpoint
+  if (Object.keys(config).length > 0) {
+    const patchBody = { profile: { settings: config } };
+    const patchTrace = beginE2eFlowStep({
+      method: 'PATCH',
+      url: `/scim/admin/endpoints/${endpointId}`,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: patchBody,
+    });
+    const patchRes: Response = await request(app.getHttpServer())
+      .patch(`/scim/admin/endpoints/${endpointId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send(patchBody)
+      .expect(200);
+    finishE2eFlowStep(patchTrace, {
+      status: patchRes.status,
+      headers: patchRes.headers as Record<string, string | string[]>,
+      body: patchRes.body,
+    });
+  }
+
+  // Sync BulkOperationsEnabled to profile.serviceProviderConfig.bulk.supported
+  // Only PATCH when disabling — rfc-standard preset already has bulk=true with maxOps/maxPayload
+  if (config['BulkOperationsEnabled'] !== undefined) {
+    const bulkSupported = String(config['BulkOperationsEnabled']).toLowerCase() === 'true';
+    if (!bulkSupported) {
+      await request(app.getHttpServer())
+        .patch(`/scim/admin/endpoints/${endpointId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ profile: { serviceProviderConfig: { bulk: { supported: false } } } })
+        .expect(200);
+    }
+  }
+
+  return endpointId;
 }
 
 /**

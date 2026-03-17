@@ -90,22 +90,16 @@ export const ENDPOINT_CONFIG_FLAGS = {
   REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED: 'ReprovisionOnConflictForSoftDeletedResource',
 
   /**
-   * When true, enables registration and use of custom resource types beyond
-   * the built-in User and Group types for this endpoint. Custom resource types
-   * are registered via the Admin API and stored in the EndpointResourceType table.
-   * When false (default), only the built-in User and Group types are available.
-   *
-   * @see Phase 8b — Custom Resource Type Registration
+   * @deprecated DERIVED — Custom resource types are now enabled by adding
+   * entries to profile.resourceTypes beyond User/Group. This flag is no longer
+   * read at runtime. Kept for backward-compatible settings validation only.
    */
   CUSTOM_RESOURCE_TYPES_ENABLED: 'CustomResourceTypesEnabled',
 
   /**
-   * When true, enables SCIM Bulk Operations (RFC 7644 §3.7) for this endpoint.
-   * Clients can POST to /Bulk with multiple operations in a single request.
-   * When false (default), POST /Bulk returns 403 Forbidden for this endpoint.
-   *
-   * @see Phase 9 — Bulk Operations
-   * @see https://datatracker.ietf.org/doc/html/rfc7644#section-3.7
+   * @deprecated DERIVED — Bulk operations are now controlled by
+   * profile.serviceProviderConfig.bulk.supported. This flag is no longer
+   * read at runtime. Kept for backward-compatible settings validation only.
    */
   BULK_OPERATIONS_ENABLED: 'BulkOperationsEnabled',
 
@@ -241,20 +235,10 @@ export interface EndpointConfig {
    */
   [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]?: boolean | string;
 
-  /**
-   * When true, enables registration and use of custom resource types beyond
-   * User and Group for this endpoint. When false (default), only built-in types.
-   *
-   * Example config: { "CustomResourceTypesEnabled": "True" }
-   */
+  /** @deprecated DERIVED — use profile.resourceTypes instead */
   [ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED]?: boolean | string;
 
-  /**
-   * When true, enables SCIM Bulk Operations (RFC 7644 §3.7) for this endpoint.
-   * When false (default), POST /Bulk returns 403 Forbidden.
-   *
-   * Example config: { "BulkOperationsEnabled": "True" }
-   */
+  /** @deprecated DERIVED — use profile.serviceProviderConfig.bulk.supported instead */
   [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]?: boolean | string;
 
   /**
