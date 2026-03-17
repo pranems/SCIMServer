@@ -43,13 +43,17 @@ export class PresetController {
   @Post('reload')
   reloadPresets() {
     const result = reloadPresetsFromDisk();
+    const hasErrors = result.validationErrors.length > 0;
     return {
-      message: 'Presets reloaded from disk',
+      message: hasErrors
+        ? `Presets reloaded with ${result.validationErrors.length} validation error(s) — affected presets fell back to hardcoded defaults`
+        : 'Presets reloaded successfully from disk',
       dir: result.dir,
       loaded: result.loaded,
       fallback: result.fallback,
       custom: result.custom,
       totalPresets: result.loaded.length + result.fallback.length + result.custom.length,
+      validationErrors: result.validationErrors,
     };
   }
 
