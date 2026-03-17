@@ -1,0 +1,42 @@
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
+  "Operations": [
+    {
+      "method": "POST",
+      "path": "/Users",
+      "bulkId": "user-1",
+      "data": {
+        "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        "userName": "alice@example.com",
+        "displayName": "Alice Smith",
+        "active": true,
+        "emails": [{ "value": "alice@example.com", "type": "work", "primary": true }]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/Users",
+      "bulkId": "user-2",
+      "data": {
+        "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+        "userName": "bob@example.com",
+        "displayName": "Bob Jones",
+        "active": true
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/Users/existing-user-uuid",
+      "data": {
+        "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+        "Operations": [
+          { "op": "replace", "path": "active", "value": false }
+        ]
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/Users/user-to-delete-uuid"
+    }
+  ]
+}

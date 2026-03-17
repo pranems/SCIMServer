@@ -3,76 +3,55 @@
     "urn:ietf:params:scim:schemas:core:2.0:User",
     "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
   ],
-  "id": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
-  "externalId": "ext-000123",
-  "userName": "alice.example@example.com",
+  "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+  "externalId": "ext-001",
+  "userName": "jdoe@example.com",
   "name": {
-    "formatted": "Alice L Example",
-    "familyName": "Example",
-    "givenName": "Alice",
-    "middleName": "L",
-    "honorificPrefix": "Ms.",
-    "honorificSuffix": "PhD"
+    "formatted": "John Doe",
+    "familyName": "Doe",
+    "givenName": "John"
   },
-  "displayName": "Alice Example",
-  "nickName": "Ally",
-  "profileUrl": "https://profiles.example.com/alice",
-  "title": "Senior Engineer",
+  "displayName": "John Doe",
+  "nickName": "johnd",
+  "title": "Software Engineer",
   "userType": "Employee",
   "preferredLanguage": "en-US",
-  "locale": "en_US",
-  "timezone": "America/Los_Angeles",
+  "locale": "en-US",
+  "timezone": "America/New_York",
   "active": true,
-  "password": "REDACTED_FOR_SECURITY",
   "emails": [
-    { "value": "alice.work@example.com", "type": "work", "primary": true },
-    { "value": "alice.home@example.net", "type": "home" }
+    { "value": "jdoe@example.com", "type": "work", "primary": true }
   ],
   "phoneNumbers": [
-    { "value": "+1-425-555-0101", "type": "work" },
-    { "value": "+1-425-555-0199", "type": "mobile", "primary": false }
-  ],
-  "ims": [
-    { "value": "alice_skype", "type": "skype" }
-  ],
-  "photos": [
-    { "value": "https://cdn.example.com/photos/alice.jpg", "type": "photo" }
+    { "value": "+1-555-0100", "type": "work" }
   ],
   "addresses": [
     {
-      "streetAddress": "1 Microsoft Way",
-      "locality": "Redmond",
-      "region": "WA",
-      "postalCode": "98052",
-      "country": "USA",
+      "streetAddress": "100 Main St",
+      "locality": "New York",
+      "region": "NY",
+      "postalCode": "10001",
+      "country": "US",
       "type": "work",
-      "formatted": "1 Microsoft Way\nRedmond, WA 98052"
+      "primary": true
     }
   ],
-  "entitlements": [
-    { "value": "enterprise-admin", "primary": true }
-  ],
-  "roles": [
-    { "value": "engineering:senior", "display": "Senior Engineer", "primary": true }
-  ],
-  "x509Certificates": [],
-  "groups": [
-    { "value": "g-1111111111111", "display": "Engineering" }
-  ],
-
   "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
-    "employeeNumber": "EMP-000123",
-    "costCenter": "CC-1000",
-    "organization": "ExampleCorp",
-    "division": "Platform",
+    "employeeNumber": "E-001",
+    "costCenter": "CC-100",
+    "organization": "Acme Corp",
+    "division": "Technology",
     "department": "Engineering",
-    "manager": { "value": "mngr-0001", "displayName": "Bob Manager" }
+    "manager": {
+      "value": "a1b2c3d4-...",
+      "displayName": "Jane Manager"
+    }
   },
-
   "meta": {
     "resourceType": "User",
-    "created": "2025-01-10T15:23:45Z",
-    "lastModified": "2025-01-12T09:17:30Z",
-    "location": "http://localhost:3000/scim/v2/Users/a1b2c3d4-e5f6-7890-abcd-1234567890ab"
+    "created": "2026-03-17T10:00:00.000Z",
+    "lastModified": "2026-03-17T10:30:00.000Z",
+    "location": "/scim/endpoints/a1b2c3d4-e5f6.../Users/b2c3d4e5-f6a7...",
+    "version": "W/\"2\""
   }
 }

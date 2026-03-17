@@ -1,5 +1,0 @@
-{
-  "displayName": "ACME Corporation - Disabled",
-  "description": "Endpoint is disabled. All SCIM operations will return 403 Forbidden.",
-  "active": false
-}

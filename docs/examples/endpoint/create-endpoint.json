@@ -1,9 +1,88 @@
 {
-  "name": "acme-corp",
-  "displayName": "ACME Corporation",
-  "description": "Production endpoint for ACME Corp users and groups",
-  "config": {
-    "MultiOpPatchRequestAddMultipleMembersToGroup": "true",
-    "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "true"
+  "_comment": "Endpoint creation examples for all 6 built-in presets",
+
+  "create_with_entra_id_preset": {
+    "name": "production-entra",
+    "displayName": "Production Entra ID",
+    "description": "Main production endpoint for Entra ID provisioning",
+    "profilePreset": "entra-id"
+  },
+
+  "create_with_rfc_standard_preset": {
+    "name": "rfc-testing",
+    "displayName": "RFC Standard Testing",
+    "profilePreset": "rfc-standard"
+  },
+
+  "create_with_lexmark_preset": {
+    "name": "lexmark-production",
+    "displayName": "Lexmark Cloud Print",
+    "description": "Lexmark Cloud Print Management with custom extension (badgeCode, pin)",
+    "profilePreset": "lexmark"
+  },
+
+  "create_with_inline_profile": {
+    "name": "custom-vendor",
+    "displayName": "Custom Vendor Endpoint",
+    "profile": {
+      "schemas": [
+        {
+          "id": "urn:ietf:params:scim:schemas:core:2.0:User",
+          "name": "User",
+          "attributes": "all"
+        },
+        {
+          "id": "urn:vendor:custom:2.0:User",
+          "name": "VendorExtension",
+          "description": "Vendor-specific attributes",
+          "attributes": [
+            {
+              "name": "employeeBadge",
+              "type": "string",
+              "multiValued": false,
+              "required": false,
+              "mutability": "readWrite",
+              "returned": "default",
+              "caseExact": true,
+              "uniqueness": "none"
+            }
+          ]
+        }
+      ],
+      "resourceTypes": [
+        {
+          "id": "User",
+          "name": "User",
+          "endpoint": "/Users",
+          "description": "User Account",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+          "schemaExtensions": [
+            { "schema": "urn:vendor:custom:2.0:User", "required": false }
+          ]
+        }
+      ],
+      "serviceProviderConfig": {
+        "patch": { "supported": true },
+        "bulk": { "supported": false },
+        "filter": { "supported": true, "maxResults": 100 },
+        "sort": { "supported": false },
+        "etag": { "supported": false },
+        "changePassword": { "supported": false }
+      },
+      "settings": {
+        "AllowAndCoerceBooleanStrings": "True"
+      }
+    }
+  },
+
+  "patch_endpoint_settings": {
+    "_comment": "PATCH /scim/admin/endpoints/{id} — deep-merges settings",
+    "profile": {
+      "settings": {
+        "SoftDeleteEnabled": "True",
+        "RequireIfMatch": "True",
+        "StrictSchemaValidation": "True"
+      }
+    }
   }
 }

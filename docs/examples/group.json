@@ -1,16 +1,17 @@
 {
   "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
-  "id": "g-1111111111111",
+  "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+  "externalId": "ext-group-001",
   "displayName": "Engineering",
-  "externalId": "group-ext-001",
   "members": [
-    { "value": "a1b2c3d4-e5f6-7890-abcd-1234567890ab", "display": "Alice Example", "type": "User" },
-    { "value": "u-22222222-3333-4444-5555-666666666666", "display": "Carol Contributor", "type": "User" }
+    { "value": "b2c3d4e5-f6a7-8901-bcde-f12345678901", "display": "John Doe", "$ref": "/scim/endpoints/.../Users/b2c3d4e5..." },
+    { "value": "d4e5f6a7-b8c9-0123-def0-234567890123", "display": "Jane Smith", "$ref": "/scim/endpoints/.../Users/d4e5f6a7..." }
   ],
   "meta": {
     "resourceType": "Group",
-    "created": "2025-01-10T15:50:00Z",
-    "lastModified": "2025-01-11T10:00:00Z",
-    "location": "http://localhost:3000/scim/v2/Groups/g-1111111111111"
+    "created": "2026-03-17T10:00:00.000Z",
+    "lastModified": "2026-03-17T10:15:00.000Z",
+    "location": "/scim/endpoints/a1b2.../Groups/c3d4...",
+    "version": "W/\"3\""
   }
 }
