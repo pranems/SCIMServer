@@ -183,8 +183,8 @@ For every behavior tested on Users, verify the equivalent exists for Groups (and
 | Profile hydration on boot (registry) | ✅ | N/A | ? |
 | Profile change listener (registry rehydration) | ✅ | implicit | ? |
 | Preset API (list + detail + 404) | ✅ | ✅ | ? |
-| `configToProfile` backward compat (BulkOperationsEnabled→SPC) | ✅ | ✅ | ? |
-| Mutually exclusive profilePreset + profile → 400 | ✅ | ✅ | ? |
+| `configToProfile` backward compat (BulkOperationsEnabled→SPC) | N/A (removed in v0.28.0) | N/A | N/A |
+| Mutually exclusive profilePreset + profile → 400 | ✅ | ✅ | ✅ |
 
 ### K. Endpoint Cache + Context (Phase 14.1)
 
@@ -353,10 +353,13 @@ Write-Host "`n--- Setup: Endpoint with FlagName=True ---" -ForegroundColor Cyan
 $flagEndpointBody = @{
     name = "live-test-flagname-$(Get-Random)"
     displayName = "Flag Test Endpoint"
-    config = @{ FlagName = "True" }
+    profilePreset = "rfc-standard"
 } | ConvertTo-Json
 $flagEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $flagEndpointBody
 $FlagEndpointId = $flagEndpoint.id
+# PATCH settings onto the new endpoint
+$settingsBody = @{ profile = @{ settings = @{ FlagName = "True" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$FlagEndpointId" -Method PATCH -Headers $headers -Body $settingsBody -ContentType "application/json" | Out-Null
 $scimBaseFlag = "$baseUrl/scim/endpoints/$FlagEndpointId"
 Test-Result -Success ($null -ne $FlagEndpointId) -Message "9x.setup: Created endpoint with FlagName=True"
 
@@ -407,14 +410,14 @@ try {
 }
 
 # --- Test: Expected 400 Bad Request ---
-Write-Host "`n--- Test 9x.4: Invalid config value → 400 ---" -ForegroundColor Cyan
-$invalidBody = '{"config":{"SomeFlag":"invalid-value"}}'
+Write-Host "`n--- Test 9x.4: Invalid settings value → 400 ---" -ForegroundColor Cyan
+$invalidBody = @{ profile = @{ settings = @{ SomeFlag = "invalid-value" } } } | ConvertTo-Json -Depth 4
 try {
-    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $invalidBody
-    Test-Result -Success $false -Message "Invalid config value should be rejected"
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $invalidBody -ContentType "application/json"
+    Test-Result -Success $false -Message "Invalid settings value should be rejected"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($statusCode -eq 400) -Message "Invalid config value rejected with 400 (got $statusCode)"
+    Test-Result -Success ($statusCode -eq 400) -Message "Invalid settings value rejected with 400 (got $statusCode)"
 }
 ```
 
@@ -537,12 +540,12 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
-| Unit  | 2,830  | ?     | +?    |
-| E2E   | 613    | ?     | +?    |
-| Live  | 832    | ?     | +?    |
+| Unit  | 2,832  | ?     | +?    |
+| E2E   | 666    | ?     | +?    |
+| Live  | 605    | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
-> *Last updated: v0.28.0 Phase 14 (2026-03-13)*
+> *Last updated: v0.28.0 Phase 14.4 — legacy config removal (2026-03-16)*
 
 4. Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts.
 
