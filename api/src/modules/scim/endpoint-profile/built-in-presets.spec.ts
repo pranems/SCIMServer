@@ -159,7 +159,10 @@ describe('built-in-presets', () => {
       const userSchema = profile.schemas!.find(s => s.id === SCIM_CORE_USER_SCHEMA);
       expect(userSchema).toBeDefined();
       expect(Array.isArray(userSchema!.attributes)).toBe(true);
-      expect((userSchema!.attributes as any[]).length).toBe(14);
+      // 20 attributes: userName, name, displayName, nickName, profileUrl, title, userType,
+      // emails, active, externalId, addresses, phoneNumbers, ims, photos, roles, entitlements,
+      // preferredLanguage, locale, timezone, password
+      expect((userSchema!.attributes as any[]).length).toBe(20);
     });
 
     it('should have EnterpriseUser with "all" shorthand', () => {
