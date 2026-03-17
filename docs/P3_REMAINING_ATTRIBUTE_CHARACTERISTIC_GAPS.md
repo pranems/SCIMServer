@@ -6,7 +6,7 @@
 **Version**: v0.29.0  
 **Date**: 2026-03-16  
 **Status**: Re-audited against source code (sole source of truth) — all GEN-01..GEN-12 resolved; 10 remaining gaps identified  
-**Test Counts**: 2,832 unit (73 suites) · 687 E2E (31 suites) · 605 live assertions · 4,124 total
+**Test Counts**: 2,906 unit (73 suites) · 698 E2E (33 suites) · 621 live assertions · 4,225 total
 
 **RFC References**:
 - [RFC 7643 §2 — Attribute Characteristics](https://datatracker.ietf.org/doc/html/rfc7643#section-2)
@@ -334,9 +334,9 @@ Legend: Green = fully enforced across all services · Orange = partial/strict-mo
 
 | Suite | Count | Suites |
 |---|:---:|:---:|
-| Unit | 2,832 | 73 |
-| E2E | 687 | 31 |
-| **Total** | **3,519** | **104** |
+| Unit | 2,906 | 73 |
+| E2E | 698 | 31 |
+| **Total** | **3,604** | **104** |
 
 ---
 

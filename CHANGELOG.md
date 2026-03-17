@@ -5,7 +5,7 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.29.0] - 2026-03-16
+## [0.29.0] - 2026-03-17
 
 ### Fixed — 19 Test Failures (URN dot-split, profile-aware schema, Content-Type 415 middleware)
 
@@ -15,29 +15,51 @@ Resolved all remaining test failures from the v0.28.0 profile migration:
 - **Profile-aware schema validation**: `SchemaValidator` and discovery controllers serve per-endpoint schema definitions from the cached `EndpointProfile` (not stale registry overlays)
 - **Content-Type 415 middleware**: Added global middleware that rejects unsupported `Content-Type` headers with proper SCIM 415 error responses
 
+### Fixed — RFC 7643 §4.1 Schema Completeness
+
+- Added 4 missing attributes to `USER_SCHEMA_ATTRIBUTES`: `ims`, `photos`, `entitlements`, `x509Certificates` (20→24, now 100% RFC §4.1)
+- Added 6 missing attributes to entra-id User schema: `nickName`, `profileUrl`, `userType`, `ims`, `photos`, `entitlements`
+- Microsoft SCIM Validator now passes 25/25 required + 7/7 preview with `StrictSchemaValidation=True`
+
 ### Removed — Legacy `endpoint.config` Admin API Field
 
 - The `config` field on endpoint create/update API payloads has been **permanently removed**
 - `profile: { settings: { ... } }` is the sole input for per-endpoint boolean flags
-- `BulkOperationsEnabled` is dead in settings — derived from `profile.serviceProviderConfig.bulk.supported`
-- `CustomResourceTypesEnabled` is dead in settings — derived from `profile.resourceTypes`
 
-### Added — Multi-Endpoint Isolation E2E Tests
+### Added — JSON File-Backed Presets with Hot-Reload
 
-- New `multi-endpoint-isolation.e2e-spec.ts` — 4 endpoint profiles, 21 assertions
-- Validates that endpoints with different presets (entra-id, rfc-standard, minimal, user-only) have properly isolated resources, schemas, and discovery responses
-- Confirms per-endpoint SPC reflects profile-specific capabilities (bulk, sort, patch, filter, etc.)
+- 5 preset JSON files in `api/presets/` with fully expanded RFC attribute definitions (no abbreviations)
+- `POST /admin/profile-presets/reload` endpoint for hot-reloading presets without server restart
+- Deep validation of JSON presets at load/reload (20+ checks per preset)
+- Hardcoded fallback when JSON files are missing or invalid
+- `PRESETS_DIR` env var override for custom preset locations
+- Custom preset auto-discovery (drop `*.json` in presets folder)
 
-### Changed — Documentation
+### Added — Entra-ID Preset Default Settings
 
-- `ENDPOINT_PROFILE_ARCHITECTURE.md` updated for v0.29.0 with legacy config removal notes
-- Version sweep: all docs, prompts, and artifacts updated from 0.28.0 → 0.29.0
-- Test counts updated across all documentation
+- entra-id preset now includes 5 Entra-compatible settings: `AllowAndCoerceBooleanStrings`, `MultiOpPatchRequestAddMultipleMembersToGroup/RemoveMultipleMembersFromGroup`, `PatchOpAllowRemoveAllMembers`, `VerbosePatchSupported`
+- `StrictSchemaValidation` and `SoftDeleteEnabled` are opt-in per-endpoint (not default)
+
+### Added — Comprehensive Preset Tests
+
+- 36 unit tests for `validatePreset()`, `loadPresetsFromDisk()`, `reloadPresetsFromDisk()`, `getPresetsDir()`, JSON completeness
+- 11 E2E tests for preset list, detail, 404, reload, and endpoint creation after reload
+- 15 live tests (section 9z-B) for preset reload API
+
+### Changed — Documentation Rewrite
+
+- Reorganized docs: 51 active docs + 35 archived to `docs/archive/`
+- Moved 22 stale test JSON artifacts to `api/test-artifacts/`
+- Rewrote `docs/INDEX.md` with categorized sections
+- Version sweep: 0.28.0→0.29.0 across all docs and prompts
+- Dockerfile now includes `presets/` directory in production image
+- GHCR image: `ghcr.io/pranems/scimserver:0.29.0`
 
 ### Test Coverage
-- **Unit tests**: 2,832 passed (73 suites)
-- **E2E tests**: 687 passed (31 suites)
-- **Live tests**: 605 assertions (local + Docker both pass)
+- **Unit tests**: 2,906 passed (73 suites)
+- **E2E tests**: 698 passed (33 suites)
+- **Live tests**: 621 assertions
+- **Deployment verification**: Local (15.5s) + Docker (18.6s) + Azure (38s) — all 621/621
 
 ---
 
@@ -146,7 +168,7 @@ Comprehensive gap audit of all 31 E2E test files against RFC 7643 §2 attribute 
 
 ### Test Coverage
 - **Unit tests**: 2,717 passed (73 suites) — unchanged
-- **E2E tests**: 636 passed (31 suites) — +19 new (10 user-uniqueness-required + 9 returned-request)
+- **E2E tests**: 636 passed (33 suites) — +19 new (10 user-uniqueness-required + 9 returned-request)
 - **Live tests**: 570 passed — +16 new in section 9x
 
 ## [0.25.0] - 2026-03-03
