@@ -1,6 +1,6 @@
 # Endpoint Profile Architecture — Complete Flow Reference
 
-> **Version**: v0.28.0  
+> **Version**: v0.29.0  
 > **Date**: 2026-03-16  
 > **Status**: Source-of-truth documentation  
 > **Scope**: All endpoint profile creation, update, validation, expansion, runtime, and discovery flows
@@ -30,10 +30,9 @@ resource type declarations, server capability advertisement, and behavioral sett
 
 ```mermaid
 graph LR
-    subgraph "Input Sources"
+    subgraph "Input Sources (v0.29.0)"
         A[profilePreset<br/>'entra-id']
         B[profile<br/>inline JSON]
-        C[config<br/>legacy flags]
         D[none<br/>default]
     end
 
@@ -54,12 +53,16 @@ graph LR
 
     A --> E
     B --> E
-    C -->|configToProfile| E
     D -->|entra-id preset| E
 
     E --> F --> G --> H --> I
     I --> J & K & L & M
 ```
+
+> **v0.29.0**: The legacy `config` admin API field has been removed.
+> All endpoint behavioral settings go through `profile.settings`.
+> Bulk operations are controlled by `profile.serviceProviderConfig.bulk.supported`.
+> Custom resource types are enabled by adding entries to `profile.resourceTypes`.
 
 **Key principle**: The profile is expanded from API inputs using RFC baselines as merge defaults.
 Custom schemas and extensions carry exactly the attributes the operator provides — no global
@@ -119,13 +122,11 @@ flowchart TD
     LookupPreset -->|Found| Expand
 
     HasPreset -->|No| HasProfile{profile?}
-    HasProfile -->|Yes| Expand
+    HasProfile -->|Yes| ValidateSettings{settings valid?}
+    ValidateSettings -->|No| E400s[400: Invalid flag value]
+    ValidateSettings -->|Yes| Expand
 
-    HasProfile -->|No| HasConfig{config?}
-    HasConfig -->|Yes| ConfigToProfile[configToProfile<br/>base: rfc-standard]
-    ConfigToProfile --> Expand
-
-    HasConfig -->|No| Default[getBuiltInPreset<br/>'entra-id']
+    HasProfile -->|No| Default[getBuiltInPreset<br/>'entra-id']
     Default --> Expand
 
     Expand[validateAndExpandProfile] -->|Invalid| E400d[400: Validation failed]
@@ -139,8 +140,7 @@ flowchart TD
 |---|-----------|---------------|------------|
 | 1 | `profilePreset` set | Named preset's shorthand input | Named preset |
 | 2 | `profile` set | Inline shorthand input | N/A — input IS the profile |
-| 3 | `config` set (legacy) | `rfc-standard` + config flags merged into settings | `rfc-standard` |
-| 4 | None provided | `entra-id` preset default | `entra-id` |
+| 3 | None provided | `entra-id` preset default | `entra-id` |
 
 ### Examples
 
@@ -504,25 +504,20 @@ graph TD
 
 ### Creation input combinations
 
-| `profilePreset` | `profile` | `config` | Result |
-|:---------------:|:---------:|:--------:|--------|
-| Set | — | — | Named preset expanded |
-| Set | Set | — | **400**: Cannot specify both |
-| Set | — | Set | Preset expanded (config **ignored** — preset wins) |
-| — | Set | — | Inline profile expanded |
-| — | Set | Set | Inline profile expanded (config **ignored** — profile wins) |
-| — | — | Set | `rfc-standard` base + config mapped to settings |
-| — | — | — | `entra-id` default preset |
+| `profilePreset` | `profile` | Result |
+|:---------------:|:---------:|--------|
+| Set | — | Named preset expanded |
+| Set | Set | **400**: Cannot specify both |
+| — | Set | Inline profile expanded |
+| — | — | `entra-id` default preset |
 
 ### Update (PATCH) combinations
 
-| `profile` | `config` | `displayName`/`active`/etc | Result |
-|:---------:|:--------:|:--------------------------:|--------|
-| Set | — | Optional | Profile merged + fields updated |
-| — | Set | Optional | Config merged into settings + fields updated |
-| Set | Set | — | **400**: Cannot specify both |
-| — | — | Set | Only metadata fields updated, profile unchanged |
-| — | — | — | No-op (200 with unchanged endpoint) |
+| `profile` | `displayName`/`active`/etc | Result |
+|:---------:|:--------------------------:|--------|
+| Set | Optional | Profile merged + fields updated |
+| — | Set | Only metadata fields updated, profile unchanged |
+| — | — | No-op (200 with unchanged endpoint) |
 
 ### Profile section update combinations
 
@@ -566,9 +561,73 @@ graph TD
 |-----------|:-----------:|--------|
 | Invalid endpoint name | 400 | Name must match `[a-zA-Z0-9_-]+` |
 | `profilePreset` + `profile` both set | 400 | Cannot specify both |
-| `config` + `profile` both set (PATCH) | 400 | Cannot specify both |
 | Unknown preset name | 400 | Unknown preset "X". Valid: entra-id, ... |
 | Duplicate endpoint name | 400 | Endpoint "X" already exists |
+| Invalid settings value | 400 | Invalid value "Yes" for flag "X". Allowed: True/False/1/0 |
+
+---
+
+## 12. Database Storage
+
+### Prisma Schema
+
+The `Endpoint` model stores the profile as a JSONB column:
+
+```prisma
+model Endpoint {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  displayName String?
+  description String?
+  profile     Json?    // Full EndpointProfile stored as JSONB
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+```
+
+### Stored Profile JSON (example from DB)
+
+```json
+{
+  "schemas": [
+    {
+      "id": "urn:ietf:params:scim:schemas:core:2.0:User",
+      "name": "User",
+      "description": "User Account",
+      "attributes": [
+        { "name": "id", "type": "string", "multiValued": false, "required": true,
+          "mutability": "readOnly", "returned": "always", "caseExact": true, "uniqueness": "server" },
+        { "name": "userName", "type": "string", "multiValued": false, "required": true,
+          "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "server" },
+        "... (20+ attributes)"
+      ]
+    },
+    { "id": "urn:...:Group", "name": "Group", "attributes": ["..."] }
+  ],
+  "resourceTypes": [
+    { "id": "User", "name": "User", "endpoint": "/Users",
+      "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+      "schemaExtensions": [] }
+  ],
+  "serviceProviderConfig": {
+    "patch": { "supported": true },
+    "bulk": { "supported": false },
+    "filter": { "supported": true, "maxResults": 200 },
+    "sort": { "supported": false },
+    "etag": { "supported": true },
+    "changePassword": { "supported": false }
+  },
+  "settings": {
+    "AllowAndCoerceBooleanStrings": "True"
+  }
+}
+```
+
+### InMemory Storage
+
+When `PERSISTENCE_BACKEND=inmemory`, endpoints are stored in a `Map<string, EndpointResponse>`
+keyed by endpoint ID. The profile is the same JSON structure, held in memory.
 
 ---
 
@@ -576,4 +635,5 @@ graph TD
 
 | Date | Change |
 |------|--------|
+| 2026-03-16 | v0.29.0 — Remove legacy config references, add DB storage section, update combination matrices |
 | 2026-03-16 | Initial — comprehensive profile flow documentation from source code audit |
