@@ -98,6 +98,7 @@ COPY --from=api-build --chown=scim:nodejs /app/public ./public
 COPY --from=api-build --chown=scim:nodejs /app/prisma ./prisma
 COPY --from=api-build --chown=scim:nodejs /app/prisma.config.ts ./prisma.config.ts
 COPY --from=api-build --chown=scim:nodejs /app/package.json ./package.json
+COPY --from=api-build --chown=scim:nodejs /app/presets ./presets
 
 # Write image tag to file at build time
 ARG IMAGE_TAG=unknown

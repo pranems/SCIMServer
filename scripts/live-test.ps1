@@ -1170,11 +1170,12 @@ try {
     Test-Result -Success $false -Message "Multi-member PATCH should succeed with flag=True"
 }
 
-# Create endpoint WITHOUT the flag
+# Create endpoint WITHOUT the flag (use rfc-standard which has empty settings)
 Write-Host "`n--- Create Endpoint Without Flag ---" -ForegroundColor Cyan
 $noFlagBody = @{
     name = "live-test-no-flag-$(Get-Random)"
     displayName = "No Flag Endpoint"
+    profilePreset = "rfc-standard"
 } | ConvertTo-Json
 $noFlagEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $noFlagBody
 $NoFlagEndpointId = $noFlagEndpoint.id

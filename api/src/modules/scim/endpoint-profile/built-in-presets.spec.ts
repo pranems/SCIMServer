@@ -246,16 +246,16 @@ describe('built-in-presets', () => {
       expect(profile.settings!.VerbosePatchSupported).toBe('True');
     });
 
-    it('should have StrictSchemaValidation=True', () => {
-      expect(profile.settings!.StrictSchemaValidation).toBe('True');
+    it('should NOT have StrictSchemaValidation in default preset (opt-in per-endpoint)', () => {
+      expect(profile.settings!.StrictSchemaValidation).toBeUndefined();
     });
 
-    it('should have SoftDeleteEnabled=True', () => {
-      expect(profile.settings!.SoftDeleteEnabled).toBe('True');
+    it('should NOT have SoftDeleteEnabled in default preset (opt-in per-endpoint)', () => {
+      expect(profile.settings!.SoftDeleteEnabled).toBeUndefined();
     });
 
-    it('should have 7 settings total', () => {
-      expect(Object.keys(profile.settings!)).toHaveLength(7);
+    it('should have 5 settings total', () => {
+      expect(Object.keys(profile.settings!)).toHaveLength(5);
     });
   });
 
@@ -519,9 +519,9 @@ describe('built-in-presets', () => {
   // ─── Preset settings differentiation ──────────────────────────────────
 
   describe('preset settings differentiation', () => {
-    it('entra-id should have 7 non-empty settings (Entra-compatible defaults)', () => {
+    it('entra-id should have 5 non-empty settings (Entra-compatible defaults)', () => {
       const { settings } = getBuiltInPreset('entra-id').profile;
-      expect(Object.keys(settings!).length).toBe(7);
+      expect(Object.keys(settings!).length).toBe(5);
       // Verify all are string "True" (Entra sends boolean strings)
       for (const [key, value] of Object.entries(settings!)) {
         if (key !== 'logLevel') {

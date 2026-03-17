@@ -99,7 +99,7 @@ describe('Multi-Endpoint Isolation (E2E)', () => {
       .expect(201);
     epC = resC.body.id;
 
-    // EP-D: entra-id (default preset — scoped 20 User attrs, MSFT extensions, no bulk, strict + soft-delete)
+    // EP-D: entra-id (default preset — scoped 20 User attrs, MSFT extensions, no bulk, Entra PATCH flags)
     const resD = await request(app.getHttpServer())
       .post('/scim/admin/endpoints')
       .set('Authorization', `Bearer ${token}`)

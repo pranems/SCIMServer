@@ -276,7 +276,7 @@ function buildFallbackPreset(name: string): BuiltInPreset {
             { id: 'Group', name: 'Group', description: 'Group', endpoint: '/Groups', schema: CORE_GROUP, schemaExtensions: [] },
           ],
           serviceProviderConfig: baseSpc,
-          settings: { AllowAndCoerceBooleanStrings: 'True', StrictSchemaValidation: 'True', SoftDeleteEnabled: 'True', VerbosePatchSupported: 'True' },
+          settings: { AllowAndCoerceBooleanStrings: 'True', VerbosePatchSupported: 'True', MultiOpPatchRequestAddMultipleMembersToGroup: 'True', MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'True', PatchOpAllowRemoveAllMembers: 'True' },
         },
       };
     case PRESET_RFC_STANDARD:
