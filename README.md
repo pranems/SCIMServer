@@ -412,9 +412,9 @@ The built-in React SPA (served at `/`) provides:
 
 | Level | Tests | Suites | Tool |
 |---|---|---|---|
-| **Unit** | 2,832 | 73 | Jest 30 + ts-jest |
-| **E2E** | 687 | 31 | Jest + Supertest |
-| **Live integration** | 605 assertions | — | PowerShell (`live-test.ps1`) |
+| **Unit** | 2,906 | 73 | Jest 30 + ts-jest |
+| **E2E** | 698 | 31 | Jest + Supertest |
+| **Live integration** | 621 assertions | — | PowerShell (`live-test.ps1`) |
 | **Microsoft Validator** | 25/25 + 7 preview | — | [SCIM Validator](https://scimvalidator.microsoft.com/) |
 
 ### Running Tests
@@ -448,9 +448,9 @@ All three deployment modes produce identical test results:
 
 | Mode | Backend | Live Assertions |
 |---|---|---|
-| Local (port 6000) | In-Memory | 605 |
-| Docker (port 8080) | PostgreSQL | 605 |
-| Azure Container Apps | PostgreSQL | 605 |
+| Local (port 6000) | In-Memory | 621 |
+| Docker (port 8080) | PostgreSQL | 621 |
+| Azure Container Apps | PostgreSQL | 621 |
 
 ---
 

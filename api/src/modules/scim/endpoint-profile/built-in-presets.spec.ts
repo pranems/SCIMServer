@@ -1,5 +1,5 @@
 /**
- * Unit Tests — Built-in Profile Presets (Phase 13, Step 1.4)
+ * Unit Tests — Built-in Profile Presets (compile-time embedded)
  *
  * Validates all 5 built-in presets have correct structure, the lookup
  * functions work, the default preset is entra-id, and each preset's
@@ -11,11 +11,11 @@ import {
   PRESET_RFC_STANDARD,
   PRESET_MINIMAL,
   PRESET_USER_ONLY,
+  PRESET_LEXMARK,
   DEFAULT_PRESET_NAME,
   BUILT_IN_PRESETS,
   PRESET_NAMES,
   getBuiltInPreset,
-  getAllPresetMetadata,
 } from './built-in-presets';
 import {
   SCIM_CORE_USER_SCHEMA,
@@ -37,6 +37,7 @@ describe('built-in-presets', () => {
       expect(PRESET_RFC_STANDARD).toBe('rfc-standard');
       expect(PRESET_MINIMAL).toBe('minimal');
       expect(PRESET_USER_ONLY).toBe('user-only');
+      expect(PRESET_LEXMARK).toBe('lexmark');
     });
 
     it('should default to entra-id (decision D5)', () => {
@@ -47,8 +48,8 @@ describe('built-in-presets', () => {
   // ─── BUILT_IN_PRESETS Map ─────────────────────────────────────────────
 
   describe('BUILT_IN_PRESETS', () => {
-    it('should contain exactly 5 presets', () => {
-      expect(BUILT_IN_PRESETS.size).toBe(5);
+    it('should contain exactly 6 presets', () => {
+      expect(BUILT_IN_PRESETS.size).toBe(6);
     });
 
     it('should contain all named presets', () => {
@@ -57,6 +58,7 @@ describe('built-in-presets', () => {
       expect(BUILT_IN_PRESETS.has(PRESET_RFC_STANDARD)).toBe(true);
       expect(BUILT_IN_PRESETS.has(PRESET_MINIMAL)).toBe(true);
       expect(BUILT_IN_PRESETS.has(PRESET_USER_ONLY)).toBe(true);
+      expect(BUILT_IN_PRESETS.has(PRESET_LEXMARK)).toBe(true);
     });
 
     it('should not contain "custom" (decision D13 — dropped)', () => {
@@ -73,8 +75,8 @@ describe('built-in-presets', () => {
   });
 
   describe('PRESET_NAMES', () => {
-    it('should have 5 entries in display order', () => {
-      expect(PRESET_NAMES).toHaveLength(5);
+    it('should have 6 entries in display order', () => {
+      expect(PRESET_NAMES).toHaveLength(6);
       expect(PRESET_NAMES[0]).toBe(PRESET_ENTRA_ID);
       expect(PRESET_NAMES[1]).toBe(PRESET_ENTRA_ID_MINIMAL);
     });
@@ -110,41 +112,6 @@ describe('built-in-presets', () => {
     });
   });
 
-  // ─── getAllPresetMetadata() ────────────────────────────────────────────
-
-  describe('getAllPresetMetadata()', () => {
-    it('should return 5 metadata entries', () => {
-      const metadata = getAllPresetMetadata();
-      expect(metadata).toHaveLength(5);
-    });
-
-    it('should have name and description on each entry', () => {
-      const metadata = getAllPresetMetadata();
-      for (const m of metadata) {
-        expect(m.name).toBeDefined();
-        expect(typeof m.name).toBe('string');
-        expect(m.description).toBeDefined();
-        expect(typeof m.description).toBe('string');
-        expect(m.description.length).toBeGreaterThan(0);
-      }
-    });
-
-    it('should mark entra-id as default', () => {
-      const metadata = getAllPresetMetadata();
-      const entraId = metadata.find(m => m.name === 'entra-id');
-      expect(entraId).toBeDefined();
-      expect(entraId!.default).toBe(true);
-    });
-
-    it('should not mark other presets as default', () => {
-      const metadata = getAllPresetMetadata();
-      const nonDefault = metadata.filter(m => m.name !== 'entra-id');
-      for (const m of nonDefault) {
-        expect(m.default).toBeFalsy();
-      }
-    });
-  });
-
   // ─── entra-id Preset Structure ────────────────────────────────────────
 
   describe('entra-id preset', () => {
@@ -159,9 +126,6 @@ describe('built-in-presets', () => {
       const userSchema = profile.schemas!.find(s => s.id === SCIM_CORE_USER_SCHEMA);
       expect(userSchema).toBeDefined();
       expect(Array.isArray(userSchema!.attributes)).toBe(true);
-      // 20 attributes: userName, name, displayName, nickName, profileUrl, title, userType,
-      // emails, active, externalId, addresses, phoneNumbers, ims, photos, roles, entitlements,
-      // preferredLanguage, locale, timezone, password
       expect((userSchema!.attributes as any[]).length).toBe(20);
     });
 
@@ -241,16 +205,16 @@ describe('built-in-presets', () => {
       expect(profile.settings!.VerbosePatchSupported).toBe('True');
     });
 
-    it('should have StrictSchemaValidation=True', () => {
-      expect(profile.settings!.StrictSchemaValidation).toBe('True');
+    it('should NOT have StrictSchemaValidation in default preset (opt-in per-endpoint)', () => {
+      expect(profile.settings!.StrictSchemaValidation).toBeUndefined();
     });
 
-    it('should have SoftDeleteEnabled=True', () => {
-      expect(profile.settings!.SoftDeleteEnabled).toBe('True');
+    it('should NOT have SoftDeleteEnabled in default preset (opt-in per-endpoint)', () => {
+      expect(profile.settings!.SoftDeleteEnabled).toBeUndefined();
     });
 
-    it('should have 7 settings total', () => {
-      expect(Object.keys(profile.settings!)).toHaveLength(7);
+    it('should have 5 settings total', () => {
+      expect(Object.keys(profile.settings!)).toHaveLength(5);
     });
   });
 
@@ -302,7 +266,7 @@ describe('built-in-presets', () => {
       expect(ids).not.toContain(MSFTTEST_IETF_USER_SCHEMA);
     });
 
-    it('should have all schemas with fully expanded attributes (loaded from JSON)', () => {
+    it('should have all schemas with fully expanded attributes', () => {
       for (const schema of profile.schemas!) {
         expect(Array.isArray(schema.attributes)).toBe(true);
         expect((schema.attributes as any[]).length).toBeGreaterThan(0);
@@ -410,6 +374,68 @@ describe('built-in-presets', () => {
 
   // ─── Cross-preset structural validity ─────────────────────────────────
 
+  describe('lexmark preset', () => {
+    const preset = getBuiltInPreset('lexmark');
+    const { profile } = preset;
+
+    it('should have 3 schemas (User + EnterpriseUser + CustomUser)', () => {
+      expect(profile.schemas).toHaveLength(3);
+      const ids = profile.schemas!.map(s => s.id);
+      expect(ids).toContain(SCIM_CORE_USER_SCHEMA);
+      expect(ids).toContain(SCIM_ENTERPRISE_USER_SCHEMA);
+      expect(ids).toContain('urn:ietf:params:scim:schemas:extension:custom:2.0:User');
+      expect(ids).not.toContain(SCIM_CORE_GROUP_SCHEMA);
+    });
+
+    it('should have only 1 resource type (User — no Group)', () => {
+      expect(profile.resourceTypes).toHaveLength(1);
+      expect(profile.resourceTypes![0].name).toBe('User');
+    });
+
+    it('should have EnterpriseUser as required extension', () => {
+      const rt = profile.resourceTypes![0];
+      const entExt = rt.schemaExtensions!.find(
+        (e: any) => e.schema === SCIM_ENTERPRISE_USER_SCHEMA,
+      );
+      expect(entExt).toBeDefined();
+      expect(entExt!.required).toBe(true);
+    });
+
+    it('should have CustomUser as optional extension', () => {
+      const rt = profile.resourceTypes![0];
+      const customExt = rt.schemaExtensions!.find(
+        (e: any) => e.schema === 'urn:ietf:params:scim:schemas:extension:custom:2.0:User',
+      );
+      expect(customExt).toBeDefined();
+      expect(customExt!.required).toBe(false);
+    });
+
+    it('should have SPC with patch=true, bulk=false, sort=true, etag=false', () => {
+      expect(profile.serviceProviderConfig!.patch!.supported).toBe(true);
+      expect(profile.serviceProviderConfig!.bulk!.supported).toBe(false);
+      expect(profile.serviceProviderConfig!.sort!.supported).toBe(true);
+      expect(profile.serviceProviderConfig!.etag!.supported).toBe(false);
+    });
+
+    it('should have empty settings', () => {
+      expect(Object.keys(profile.settings!)).toHaveLength(0);
+    });
+
+    it('should have CustomUser writeOnly/never attributes', () => {
+      const customSchema = profile.schemas!.find(
+        s => s.id === 'urn:ietf:params:scim:schemas:extension:custom:2.0:User',
+      );
+      expect(customSchema).toBeDefined();
+      const attrs = customSchema!.attributes as any[];
+      const badge = attrs.find((a: any) => a.name === 'badgeCode');
+      expect(badge.mutability).toBe('writeOnly');
+      expect(badge.returned).toBe('never');
+      const pin = attrs.find((a: any) => a.name === 'pin');
+      expect(pin.mutability).toBe('writeOnly');
+      expect(pin.returned).toBe('never');
+    });
+  });
+
   describe('all presets — structural validity', () => {
     for (const presetName of PRESET_NAMES) {
       describe(`${presetName}`, () => {
@@ -478,6 +504,26 @@ describe('built-in-presets', () => {
         it('should have SPC filter.maxResults > 0', () => {
           expect(profile.serviceProviderConfig!.filter!.maxResults).toBeGreaterThan(0);
         });
+
+        it('should have attributes as arrays (not "all" shorthand)', () => {
+          for (const schema of profile.schemas!) {
+            if (schema.attributes !== undefined) {
+              expect(Array.isArray(schema.attributes)).toBe(true);
+            }
+          }
+        });
+
+        it('should have complete attribute definitions (name + type + description)', () => {
+          for (const schema of profile.schemas!) {
+            if (Array.isArray(schema.attributes)) {
+              for (const attr of schema.attributes as any[]) {
+                expect(attr.name).toBeDefined();
+                expect(attr.type).toBeDefined();
+                expect(attr.description).toBeDefined();
+              }
+            }
+          }
+        });
       });
     }
   });
@@ -489,7 +535,6 @@ describe('built-in-presets', () => {
     const userSchema = profile.schemas!.find(s => s.id === SCIM_CORE_USER_SCHEMA);
     const attrNames = (userSchema!.attributes as any[]).map((a: any) => a.name);
 
-    // These are all attributes the Microsoft SCIM Validator sends on POST /Users
     const validatorAttributes = [
       'userName', 'displayName', 'title', 'emails', 'preferredLanguage',
       'name', 'addresses', 'phoneNumbers', 'roles', 'userType', 'nickName',
@@ -502,7 +547,6 @@ describe('built-in-presets', () => {
       });
     }
 
-    // Additional RFC 7643 §4.1 attributes for completeness
     const additionalRfcAttributes = ['ims', 'photos', 'entitlements', 'password'];
     for (const attr of additionalRfcAttributes) {
       it(`should include '${attr}' (RFC 7643 §4.1)`, () => {
@@ -514,10 +558,9 @@ describe('built-in-presets', () => {
   // ─── Preset settings differentiation ──────────────────────────────────
 
   describe('preset settings differentiation', () => {
-    it('entra-id should have 7 non-empty settings (Entra-compatible defaults)', () => {
+    it('entra-id should have 5 non-empty settings (Entra-compatible defaults)', () => {
       const { settings } = getBuiltInPreset('entra-id').profile;
-      expect(Object.keys(settings!).length).toBe(7);
-      // Verify all are string "True" (Entra sends boolean strings)
+      expect(Object.keys(settings!).length).toBe(5);
       for (const [key, value] of Object.entries(settings!)) {
         if (key !== 'logLevel') {
           expect(typeof value).toBe('string');
@@ -555,6 +598,7 @@ describe('built-in-presets', () => {
       'rfc-standard':     { patch: true, bulk: true,  filter: true, sort: true,  etag: true },
       'minimal':          { patch: true, bulk: false, filter: true, sort: false, etag: false },
       'user-only':        { patch: true, bulk: false, filter: true, sort: true,  etag: true },
+      'lexmark':          { patch: true, bulk: false, filter: true, sort: true,  etag: false },
     };
 
     for (const [presetName, expected] of Object.entries(matrix)) {
@@ -594,6 +638,11 @@ describe('built-in-presets', () => {
 
     it('user-only should have User only (no Group)', () => {
       const rts = getBuiltInPreset('user-only').profile.resourceTypes!.map(rt => rt.name);
+      expect(rts).toEqual(['User']);
+    });
+
+    it('lexmark should have User only (no Group)', () => {
+      const rts = getBuiltInPreset('lexmark').profile.resourceTypes!.map(rt => rt.name);
       expect(rts).toEqual(['User']);
     });
   });

@@ -1,7 +1,7 @@
 {
   "metadata": {
     "name": "entra-id",
-    "description": "Entra ID provisioning. Full RFC attributes, msfttest extensions, EnterpriseUser, strict validation.",
+    "description": "Entra ID provisioning. Full RFC attributes, msfttest extensions, EnterpriseUser, Entra-compatible PATCH flags.",
     "default": true
   },
   "profile": {
@@ -940,9 +940,7 @@
       "MultiOpPatchRequestAddMultipleMembersToGroup": "True",
       "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True",
       "PatchOpAllowRemoveAllMembers": "True",
-      "VerbosePatchSupported": "True",
-      "SoftDeleteEnabled": "True",
-      "StrictSchemaValidation": "True"
+      "VerbosePatchSupported": "True"
     }
   }
 }

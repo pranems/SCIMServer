@@ -7,7 +7,6 @@ import { EndpointModule } from '../endpoint/endpoint.module';
 import { RepositoryModule } from '../../infrastructure/repositories/repository.module';
 import { AdminController } from './controllers/admin.controller';
 import { AdminCredentialController } from './controllers/admin-credential.controller';
-import { PresetController } from './endpoint-profile/preset.controller';
 import { ResourceTypesController } from './controllers/resource-types.controller';
 import { SchemasController } from './controllers/schemas.controller';
 import { ServiceProviderConfigController } from './controllers/service-provider-config.controller';
@@ -38,7 +37,6 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     SchemasController,
     AdminController,
     AdminCredentialController,
-    PresetController,
     EndpointScimUsersController,
     EndpointScimGroupsController,
     EndpointScimBulkController,

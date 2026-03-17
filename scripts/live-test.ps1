@@ -1170,11 +1170,12 @@ try {
     Test-Result -Success $false -Message "Multi-member PATCH should succeed with flag=True"
 }
 
-# Create endpoint WITHOUT the flag
+# Create endpoint WITHOUT the flag (use rfc-standard which has empty settings)
 Write-Host "`n--- Create Endpoint Without Flag ---" -ForegroundColor Cyan
 $noFlagBody = @{
     name = "live-test-no-flag-$(Get-Random)"
     displayName = "No Flag Endpoint"
+    profilePreset = "rfc-standard"
 } | ConvertTo-Json
 $noFlagEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $noFlagBody
 $NoFlagEndpointId = $noFlagEndpoint.id
@@ -6506,14 +6507,6 @@ Write-Host "`n--- Test 9z.8: user-only ResourceTypes ---" -ForegroundColor Cyan
 $userOnlyRts = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($userOnlyEp.id)/ResourceTypes" -Headers $headers
 Test-Result -Success ($userOnlyRts.totalResults -eq 1) -Message "9z.8: user-only has 1 resource type"
 Test-Result -Success ($userOnlyRts.Resources[0].name -eq "User") -Message "9z.9: user-only RT is User"
-
-# --- Test 9z.10: Preset API ---
-Write-Host "`n--- Test 9z.10: Preset API ---" -ForegroundColor Cyan
-$presets = Invoke-RestMethod -Uri "$baseUrl/scim/admin/profile-presets" -Headers $headers
-Test-Result -Success ($presets.Count -eq 5) -Message "9z.10: 5 presets available"
-$presetNames = $presets | ForEach-Object { $_.name }
-Test-Result -Success ($presetNames -contains "entra-id") -Message "9z.11: entra-id preset exists"
-Test-Result -Success ($presetNames -contains "rfc-standard") -Message "9z.12: rfc-standard preset exists"
 
 # --- Test 9z.13: PATCH deep-merge settings ---
 Write-Host "`n--- Test 9z.13: PATCH deep-merge settings ---" -ForegroundColor Cyan

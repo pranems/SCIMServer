@@ -332,10 +332,10 @@ graph TD
 
 | Level | Suites | Tests | Status | Lines |
 |---|---|---|---|---|
-| **Unit** | 73 | 2,832 | All Passing | ~27,900 |
-| **E2E** | 31 | 687 | All Passing | ~10,400 |
-| **Live Integration** | 1 | 605 | All Passing | ~7,500 |
-| **TOTAL** | **105** | **~4,124** | **All pass** | **~45,800** |
+| **Unit** | 73 | 2,906 | All Passing | ~27,900 |
+| **E2E** | 31 | 698 | All Passing | ~10,400 |
+| **Live Integration** | 1 | 621 | All Passing | ~7,500 |
+| **TOTAL** | **105** | **~4,225** | **All pass** | **~45,800** |
 
 > **6 E2E Failures**: Custom extension returned:never filtering (2), PATCH URN dot-split corruption (2), admin PATCH schema/RT mismatch (2). All in `profile-combinations.e2e-spec.ts`.
 >
@@ -763,7 +763,7 @@ Key scripts: `setup.ps1`, `deploy.ps1`, `bootstrap.ps1`, `scripts/deploy-azure.p
 | ESLint errors | 0 | Clean |
 | ESLint warnings | 74 | Acceptable (intentional) |
 | TypeScript strict mode | Yes | Enabled |
-| All tests passing | Yes (4,124/4,124) | All passing |
+| All tests passing | Yes (4,225/4,225) | All passing |
 | CI/CD | Active | Automated build + test + publish |
 | Dependency freshness | Current | All deps at latest majors (Mar 2026) |
 

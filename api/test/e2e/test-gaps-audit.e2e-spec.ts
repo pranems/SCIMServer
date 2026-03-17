@@ -519,40 +519,21 @@ describe('Test Gap Audit (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════
-  // Preset API completeness
+  // Preset API — removed (presets are now compile-time embedded)
+  // Preset list/detail/reload routes no longer exist.
   // ═══════════════════════════════════════════════════════════════════════
 
-  describe('Preset API', () => {
-    it('should list all 5 built-in presets', async () => {
-      const res = await request(app.getHttpServer())
+  describe('Preset API (removed)', () => {
+    it('should return 404 for removed preset list route', async () => {
+      await request(app.getHttpServer())
         .get('/scim/admin/profile-presets')
         .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      expect(res.body).toHaveLength(5);
-      const names = res.body.map((p: any) => p.name);
-      expect(names).toContain('entra-id');
-      expect(names).toContain('entra-id-minimal');
-      expect(names).toContain('rfc-standard');
-      expect(names).toContain('minimal');
-      expect(names).toContain('user-only');
+        .expect(404);
     });
 
-    it('should return full expanded profile for individual preset', async () => {
-      const res = await request(app.getHttpServer())
-        .get('/scim/admin/profile-presets/rfc-standard')
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
-
-      expect(res.body.profile).toBeDefined();
-      expect(res.body.profile.schemas.length).toBeGreaterThan(0);
-      expect(res.body.profile.resourceTypes.length).toBeGreaterThan(0);
-      expect(res.body.profile.serviceProviderConfig).toBeDefined();
-    });
-
-    it('should return 404 for non-existent preset', async () => {
+    it('should return 404 for removed individual preset route', async () => {
       await request(app.getHttpServer())
-        .get('/scim/admin/profile-presets/does-not-exist')
+        .get('/scim/admin/profile-presets/rfc-standard')
         .set('Authorization', `Bearer ${token}`)
         .expect(404);
     });

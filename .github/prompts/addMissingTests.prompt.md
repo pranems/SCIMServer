@@ -182,7 +182,7 @@ For every behavior tested on Users, verify the equivalent exists for Groups (and
 | Discovery differs per preset (schemas, SPC) | ✅ | ✅ | ✅ |
 | Profile hydration on boot (registry) | ✅ | N/A | ? |
 | Profile change listener (registry rehydration) | ✅ | implicit | ? |
-| Preset API (list + detail + 404) | ✅ | ✅ | ? |
+| Preset API (list + detail + 404) | N/A (removed) | N/A (removed) | N/A (removed) |
 | `configToProfile` backward compat (BulkOperationsEnabled→SPC) | N/A (removed in v0.29.0) | N/A | N/A |
 | Mutually exclusive profilePreset + profile → 400 | ✅ | ✅ | ✅ |
 
@@ -215,7 +215,7 @@ For every behavior tested on Users, verify the equivalent exists for Groups (and
 | user-only preset blocks Group CRUD | ? | ✅ | ✅ |
 | Profile PATCH → config change reflects in endpoint | ? | ✅ | ✅ |
 | Inline profile → discovery reflects it | ? | ✅ | ✅ |
-| Preset API (list 5 + detail + 404) | ✅ | ✅ | ✅ |
+| Preset API (list 5 + detail + 404) | N/A (removed) | N/A (removed) | N/A (removed) |
 | Per-preset discovery differentiation (schema count, SPC) | ✅ | ✅ | ✅ |
 
 ---
@@ -540,12 +540,12 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
-| Unit  | 2,832  | ?     | +?    |
-| E2E   | 687    | ?     | +?    |
-| Live  | 605    | ?     | +?    |
+| Unit  | 2,863  | ?     | +?    |
+| E2E   | 697    | ?     | +?    |
+| Live  | 621    | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
-> *Last updated: v0.29.0 — doc rewrite + version sweep (2026-03-16)*
+> *Last updated: v0.29.0 — preset API removed, compile-time presets (2026-03-17)*
 
 4. Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts.
 

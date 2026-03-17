@@ -43,6 +43,9 @@ logs/
 # Test results (generated per run)
 test-results/
 
+# Test artifacts (historical JSON snapshots — never commit)
+api/test-artifacts/
+
 # Test output files (generated per run — never commit)
 *-live-output*.txt
 *-live-pipeline*.txt
