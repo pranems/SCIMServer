@@ -40,6 +40,7 @@ import {
   sanitizeBooleanStrings,
   guardSoftDeleted,
   ScimSchemaHelpers,
+  assertSchemaUniqueness,
 } from '../common/scim-service-helpers';
 
 interface ListGroupsParams {
@@ -141,6 +142,13 @@ export class EndpointScimGroupsService {
     const now = new Date();
     // BF-1: Server MUST generate id (RFC 7643 §2.2 — id is readOnly, server-assigned)
     const scimId = randomUUID();
+
+    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
+    const uniqueAttrs = this.schemaHelpers.getUniqueAttributes(endpointId);
+    if (uniqueAttrs.length > 0) {
+      const allGroups = await this.groupRepo.findAllWithMembers(endpointId, {});
+      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrs, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload, deletedAt: g.deletedAt })));
+    }
 
     const sanitizedPayload = this.extractAdditionalAttributes(dto);
 
@@ -390,6 +398,13 @@ export class EndpointScimGroupsService {
       await this.assertUniqueExternalId(externalId, endpointId, scimId);
     }
 
+    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
+    const uniqueAttrsPatch = this.schemaHelpers.getUniqueAttributes(endpointId);
+    if (uniqueAttrsPatch.length > 0) {
+      const allGroups = await this.groupRepo.findAllWithMembers(endpointId, {});
+      assertSchemaUniqueness(endpointId, resultPayload, uniqueAttrsPatch, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload, deletedAt: g.deletedAt })), scimId);
+    }
+
     // Pre-resolve member user IDs OUTSIDE the transaction to minimise lock hold time.
     const memberInputs = memberDtos.length > 0
       ? await this.resolveMemberInputs(memberDtos, endpointId)
@@ -473,6 +488,13 @@ export class EndpointScimGroupsService {
       : null;
     if (newExternalId) {
       await this.assertUniqueExternalId(newExternalId, endpointId, scimId);
+    }
+
+    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
+    const uniqueAttrsPut = this.schemaHelpers.getUniqueAttributes(endpointId);
+    if (uniqueAttrsPut.length > 0) {
+      const allGroups = await this.groupRepo.findAllWithMembers(endpointId, {});
+      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrsPut, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload, deletedAt: g.deletedAt })), scimId);
     }
 
     const now = new Date();

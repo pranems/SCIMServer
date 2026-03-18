@@ -34,6 +34,7 @@ import {
   sanitizeBooleanStrings,
   guardSoftDeleted,
   ScimSchemaHelpers,
+  assertSchemaUniqueness,
 } from '../common/scim-service-helpers';
 
 interface ListUsersParams {
@@ -107,6 +108,13 @@ export class EndpointScimUsersService {
         scimType: 'uniqueness',
         detail: `A resource with ${reason} already exists.`,
       });
+    }
+
+    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
+    const uniqueAttrs = this.schemaHelpers.getUniqueAttributes(endpointId);
+    if (uniqueAttrs.length > 0) {
+      const allUsers = await this.userRepo.findAll(endpointId, {});
+      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrs, allUsers.map(u => ({ scimId: u.scimId, rawPayload: u.rawPayload, deletedAt: u.deletedAt })));
     }
 
     const now = new Date();
@@ -292,6 +300,13 @@ export class EndpointScimUsersService {
     this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(user), dto, endpointId, config);
 
     await this.assertUniqueIdentifiersForEndpoint(dto.userName, dto.externalId ?? undefined, endpointId, scimId);
+
+    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
+    const uniqueAttrs = this.schemaHelpers.getUniqueAttributes(endpointId);
+    if (uniqueAttrs.length > 0) {
+      const allUsers = await this.userRepo.findAll(endpointId, {});
+      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrs, allUsers.map(u => ({ scimId: u.scimId, rawPayload: u.rawPayload, deletedAt: u.deletedAt })), scimId);
+    }
 
     const now = new Date();
     const sanitizedPayload = this.extractAdditionalAttributes(dto);
@@ -554,6 +569,13 @@ export class EndpointScimUsersService {
       endpointId,
       user.scimId,
     );
+
+    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
+    const uniqueAttrs = this.schemaHelpers.getUniqueAttributes(endpointId);
+    if (uniqueAttrs.length > 0) {
+      const allUsers = await this.userRepo.findAll(endpointId, {});
+      assertSchemaUniqueness(endpointId, resultPayload, uniqueAttrs, allUsers.map(u => ({ scimId: u.scimId, rawPayload: u.rawPayload, deletedAt: u.deletedAt })), user.scimId);
+    }
 
     return {
       userName: extractedFields.userName,

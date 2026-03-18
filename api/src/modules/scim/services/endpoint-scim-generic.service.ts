@@ -49,6 +49,7 @@ import {
   guardSoftDeleted,
   stripReadOnlyAttributes,
   stripReadOnlyPatchOps,
+  assertSchemaUniqueness,
 } from '../common/scim-service-helpers';
 import { SchemaValidator } from '../../../domain/validation';
 import { stripReturnedNever } from '../common/scim-attribute-projection';
@@ -202,6 +203,15 @@ export class EndpointScimGenericService {
     }
 
     const scimId = randomUUID();
+
+    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
+    const schemaDefs2 = this.getSchemaDefinitions(resourceType, endpointId);
+    const uniqueAttrs = SchemaValidator.collectUniqueAttributes(schemaDefs2);
+    if (uniqueAttrs.length > 0) {
+      const allResources = await this.genericRepo.findAll(endpointId, resourceType.name);
+      assertSchemaUniqueness(endpointId, body, uniqueAttrs, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload, deletedAt: r.deletedAt })));
+    }
+
     const now = this.metadata.currentIsoTimestamp();
     const location = this.metadata.buildLocation(
       baseUrl,
@@ -411,6 +421,14 @@ export class EndpointScimGenericService {
       });
     }
 
+    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
+    const schemaDefsPut = this.getSchemaDefinitions(resourceType, endpointId);
+    const uniqueAttrsPut = SchemaValidator.collectUniqueAttributes(schemaDefsPut);
+    if (uniqueAttrsPut.length > 0) {
+      const allResources = await this.genericRepo.findAll(endpointId, resourceType.name);
+      assertSchemaUniqueness(endpointId, body, uniqueAttrsPut, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload, deletedAt: r.deletedAt })), scimId);
+    }
+
     const now = this.metadata.currentIsoTimestamp();
     const location = this.metadata.buildLocation(
       baseUrl,
@@ -610,6 +628,16 @@ export class EndpointScimGenericService {
         scimType: 'uniqueness',
         detail: `A ${resourceType.name} with ${reason} already exists.`,
       });
+    }
+
+    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
+    {
+      const schemaDefsPatch = this.getSchemaDefinitions(resourceType, endpointId);
+      const uniqueAttrsPatch = SchemaValidator.collectUniqueAttributes(schemaDefsPatch);
+      if (uniqueAttrsPatch.length > 0) {
+        const allResources = await this.genericRepo.findAll(endpointId, resourceType.name);
+        assertSchemaUniqueness(endpointId, patchedPayload, uniqueAttrsPatch, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload, deletedAt: r.deletedAt })), scimId);
+      }
     }
 
     const now = this.metadata.currentIsoTimestamp();
