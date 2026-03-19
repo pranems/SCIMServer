@@ -328,6 +328,7 @@ describe('Lexmark ISV Endpoint Profile (E2E)', () => {
 
   describe('Custom extension writeOnly/returned:never behavior', () => {
     let userId: string;
+    let postResponseBody: any;
 
     beforeAll(async () => {
       const t = ts();
@@ -346,32 +347,53 @@ describe('Lexmark ISV Endpoint Profile (E2E)', () => {
         },
       }).expect(201);
       userId = res.body.id;
+      postResponseBody = res.body;
     });
 
     afterAll(async () => {
       if (userId) await scimDelete(app, `${scimBasePath(epId)}/Users/${userId}`, token);
     });
 
-    it('should NOT return badgeCode in POST response (returned:never)', async () => {
+    it('should NOT return badgeCode in the POST 201 response body (returned:never)', () => {
+      // Verify the actual POST 201 response — not a follow-up GET
+      expect(postResponseBody.id).toBeDefined();
+      expect(postResponseBody[CUSTOM_URN]?.badgeCode).toBeUndefined();
+    });
+
+    it('should NOT return pin in the POST 201 response body (returned:never)', () => {
+      expect(postResponseBody[CUSTOM_URN]?.pin).toBeUndefined();
+    });
+
+    it('should omit custom extension URN from schemas[] when all attrs are returned:never (FP-1)', () => {
+      // After FP-1 fix: extension with only writeOnly/never attrs should not appear
+      expect(postResponseBody.schemas).not.toContain(CUSTOM_URN);
+      expect(postResponseBody[CUSTOM_URN]).toBeUndefined();
+    });
+
+    it('should NOT return badgeCode in GET response (returned:never)', async () => {
       const res = await scimGet(app, `${scimBasePath(epId)}/Users/${userId}`, token).expect(200);
-      // Custom extension attributes with returned:never should not appear
       expect(res.body[CUSTOM_URN]?.badgeCode).toBeUndefined();
     });
 
-    it('should NOT return pin in POST response (returned:never)', async () => {
+    it('should NOT return pin in GET response (returned:never)', async () => {
       const res = await scimGet(app, `${scimBasePath(epId)}/Users/${userId}`, token).expect(200);
       expect(res.body[CUSTOM_URN]?.pin).toBeUndefined();
+    });
+
+    it('should omit custom extension URN from GET response entirely (FP-1)', async () => {
+      const res = await scimGet(app, `${scimBasePath(epId)}/Users/${userId}`, token).expect(200);
+      // Extension key itself should be absent — not present as {}
+      expect(res.body[CUSTOM_URN]).toBeUndefined();
+      expect(res.body.schemas).not.toContain(CUSTOM_URN);
     });
 
     it('should NOT return custom extension data in list response', async () => {
       const res = await scimGet(app, `${scimBasePath(epId)}/Users`, token).expect(200);
       const user = res.body.Resources.find((u: any) => u.id === userId);
       expect(user).toBeDefined();
-      // returned:never attributes should be absent even in list
-      if (user[CUSTOM_URN]) {
-        expect(user[CUSTOM_URN].badgeCode).toBeUndefined();
-        expect(user[CUSTOM_URN].pin).toBeUndefined();
-      }
+      // FP-1: Extension key itself should be absent when all attrs are returned:never
+      expect(user[CUSTOM_URN]).toBeUndefined();
+      expect(user.schemas).not.toContain(CUSTOM_URN);
     });
 
     it('should NOT return writeOnly attrs even with ?attributes= request', async () => {
@@ -382,6 +404,8 @@ describe('Lexmark ISV Endpoint Profile (E2E)', () => {
       ).expect(200);
       // returned:never overrides attributes request
       expect(res.body[CUSTOM_URN]?.badgeCode).toBeUndefined();
+      // FP-1: extension should not appear in schemas or body
+      expect(res.body[CUSTOM_URN]).toBeUndefined();
     });
 
     it('should accept PATCH with writeOnly custom extension attributes', async () => {
@@ -392,9 +416,9 @@ describe('Lexmark ISV Endpoint Profile (E2E)', () => {
           value: { [CUSTOM_URN]: { badgeCode: 'BADGE-99999', pin: '1111' } },
         }],
       }).expect(200);
-      // Updated but still not returned
-      expect(res.body[CUSTOM_URN]?.badgeCode).toBeUndefined();
-      expect(res.body[CUSTOM_URN]?.pin).toBeUndefined();
+      // Updated but still not returned — FP-1: extension key itself absent
+      expect(res.body[CUSTOM_URN]).toBeUndefined();
+      expect(res.body.schemas).not.toContain(CUSTOM_URN);
     });
   });
 

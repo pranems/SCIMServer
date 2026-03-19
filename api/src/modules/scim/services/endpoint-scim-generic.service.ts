@@ -766,8 +766,7 @@ export class EndpointScimGenericService {
     const schemas: string[] = [resourceType.schema];
     for (const ext of resourceType.schemaExtensions) {
       if (payload[ext.schema]) {
-        schemas.push(ext.schema);
-        // Also strip never-returned attrs inside extension objects
+        // Strip never-returned attrs inside extension objects
         const extObj = payload[ext.schema];
         if (typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
           for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
@@ -775,9 +774,19 @@ export class EndpointScimGenericService {
               delete (extObj as Record<string, unknown>)[extKey];
             }
           }
+          // FP-1 fix: If extension is now empty after stripping, remove it entirely
+          // (RFC 7643 §3.1: don't advertise an extension URN with zero visible attributes)
+          if (Object.keys(extObj as Record<string, unknown>).length === 0) {
+            delete payload[ext.schema];
+            continue;
+          }
         }
+        schemas.push(ext.schema);
       }
     }
+
+    // Remove schemas from payload — we built it dynamically above (G19 / FP-1)
+    delete payload.schemas;
 
     return {
       schemas,

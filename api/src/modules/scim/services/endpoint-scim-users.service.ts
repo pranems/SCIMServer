@@ -614,8 +614,7 @@ export class EndpointScimUsersService {
     const schemas: [string, ...string[]] = [SCIM_CORE_USER_SCHEMA];
     for (const urn of extensionUrns) {
       if (urn in rawPayload) {
-        schemas.push(urn);
-        // Also strip never-returned attrs inside extension objects
+        // Strip never-returned attrs inside extension objects
         const extObj = rawPayload[urn];
         if (typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
           for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
@@ -623,13 +622,22 @@ export class EndpointScimUsersService {
               delete (extObj as Record<string, unknown>)[extKey];
             }
           }
+          // FP-1 fix: If extension is now empty after stripping, remove it entirely
+          // (RFC 7643 §3.1: don't advertise an extension URN with zero visible attributes)
+          if (Object.keys(extObj as Record<string, unknown>).length === 0) {
+            delete rawPayload[urn];
+            continue;
+          }
         }
+        schemas.push(urn);
       }
     }
 
     // Remove reserved server-assigned attributes from rawPayload to prevent overwriting
     // (e.g., a client-supplied "id" in the POST body must never override scimId)
     delete rawPayload.id;
+    // Remove schemas from rawPayload — we built it dynamically above (G19 / FP-1)
+    delete rawPayload.schemas;
 
     return {
       schemas,
