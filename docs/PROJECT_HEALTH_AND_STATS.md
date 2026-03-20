@@ -1,6 +1,6 @@
 # Project Health & Stats
 
-> **Version:** 0.29.0 · **Updated:** March 17, 2026 · **Status:** Production-ready
+> **Version:** 0.29.0 · **Updated:** March 19, 2026 · **Status:** Production-ready
 
 ---
 
@@ -20,11 +20,11 @@
 
 | Layer | Suites | Tests | Skip | Status |
 |-------|--------|-------|------|--------|
-| **Unit** | 72 | 2,884 | 0 | ✅ All pass |
-| **E2E** | 34 | 743 | 6 | ✅ All pass |
+| **Unit** | 72 | 2,887 | 0 | ✅ All pass |
+| **E2E** | 35 | 763 | 0 | ✅ All pass |
 | **Live (main)** | 42 sections | ~621 | 0 | ✅ All pass |
 | **Live (Lexmark ISV)** | 13 sections | 112 | 0 | ✅ All pass |
-| **Total** | ~160 | ~4,360 | 6 | ✅ All pass |
+| **Total** | ~160 | ~4,383 | 0 | ✅ All pass |
 
 ### Unit Test Suites (72)
 
@@ -33,9 +33,9 @@
 **Auth/OAuth (3):** auth guard, OAuth controller, OAuth service  
 **Modules (51):** controllers, services, DTOs, filters, interceptors, endpoint-profile, discovery, logging, database, web
 
-### E2E Test Suites (34)
+### E2E Test Suites (35)
 
-`admin-version`, `advanced-patch`, `attribute-projection`, `authentication`, `bulk-operations`, `config-flags`, `discovery-endpoints`, `edge-cases`, `endpoint-isolation`, `endpoint-profile`, `etag-conditional`, `filter-operators`, `group-lifecycle`, `group-parity-gaps`, `http-error-codes`, `lexmark-isv`, `log-config`, `me-endpoint`, `multi-endpoint-isolation`, `p2-attribute-characteristics`, `per-endpoint-credentials`, `profile-combinations`, `profile-flag-combos`, `readonly-stripping`, `returned-characteristic`, `rfc-compliance`, `schema-validation`, `scim-validator-compliance`, `search-endpoint`, `soft-delete-flags`, `sorting`, `test-gaps-audit`, `user-lifecycle`, `user-uniqueness-required`
+`admin-version`, `advanced-patch`, `attribute-projection`, `authentication`, `bulk-operations`, `config-flags`, `discovery-endpoints`, `edge-cases`, `endpoint-isolation`, `endpoint-profile`, `etag-conditional`, `filter-operators`, `group-lifecycle`, `group-parity-gaps`, `http-error-codes`, `lexmark-isv`, `log-config`, `me-endpoint`, `multi-endpoint-isolation`, `p2-attribute-characteristics`, `per-endpoint-credentials`, `profile-combinations`, `profile-flag-combos`, `readonly-stripping`, `returned-characteristic`, `rfc-compliance`, `schema-driven-uniqueness`, `schema-validation`, `scim-validator-compliance`, `search-endpoint`, `soft-delete-flags`, `sorting`, `test-gaps-audit`, `user-lifecycle`, `user-uniqueness-required`
 
 ## Architecture Overview
 

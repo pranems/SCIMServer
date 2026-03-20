@@ -40,6 +40,7 @@ import {
   sanitizeBooleanStrings,
   guardSoftDeleted,
   ScimSchemaHelpers,
+  assertSchemaUniqueness,
 } from '../common/scim-service-helpers';
 
 interface ListGroupsParams {
@@ -141,6 +142,13 @@ export class EndpointScimGroupsService {
     const now = new Date();
     // BF-1: Server MUST generate id (RFC 7643 §2.2 — id is readOnly, server-assigned)
     const scimId = randomUUID();
+
+    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
+    const uniqueAttrs = this.schemaHelpers.getUniqueAttributes(endpointId);
+    if (uniqueAttrs.length > 0) {
+      const allGroups = await this.groupRepo.findAllWithMembers(endpointId, {});
+      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrs, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload, deletedAt: g.deletedAt })));
+    }
 
     const sanitizedPayload = this.extractAdditionalAttributes(dto);
 
@@ -390,6 +398,13 @@ export class EndpointScimGroupsService {
       await this.assertUniqueExternalId(externalId, endpointId, scimId);
     }
 
+    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
+    const uniqueAttrsPatch = this.schemaHelpers.getUniqueAttributes(endpointId);
+    if (uniqueAttrsPatch.length > 0) {
+      const allGroups = await this.groupRepo.findAllWithMembers(endpointId, {});
+      assertSchemaUniqueness(endpointId, resultPayload, uniqueAttrsPatch, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload, deletedAt: g.deletedAt })), scimId);
+    }
+
     // Pre-resolve member user IDs OUTSIDE the transaction to minimise lock hold time.
     const memberInputs = memberDtos.length > 0
       ? await this.resolveMemberInputs(memberDtos, endpointId)
@@ -473,6 +488,13 @@ export class EndpointScimGroupsService {
       : null;
     if (newExternalId) {
       await this.assertUniqueExternalId(newExternalId, endpointId, scimId);
+    }
+
+    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
+    const uniqueAttrsPut = this.schemaHelpers.getUniqueAttributes(endpointId);
+    if (uniqueAttrsPut.length > 0) {
+      const allGroups = await this.groupRepo.findAllWithMembers(endpointId, {});
+      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrsPut, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload, deletedAt: g.deletedAt })), scimId);
     }
 
     const now = new Date();
@@ -693,6 +715,8 @@ export class EndpointScimGroupsService {
     delete rawPayload.externalId;
     delete rawPayload.active;
     delete rawPayload.id;  // RFC 7643 §3.1: id is server-assigned — never let rawPayload override
+    // Remove schemas from rawPayload — we build it dynamically below (G19 / FP-1)
+    delete rawPayload.schemas;
 
     // G8e: Strip returned:'never' attributes from rawPayload
     // Per RFC 7643 §2.4, these MUST NOT appear in any response.
@@ -708,8 +732,7 @@ export class EndpointScimGroupsService {
     const schemas: [string, ...string[]] = [SCIM_CORE_GROUP_SCHEMA];
     for (const urn of extensionUrns) {
       if (urn in rawPayload) {
-        schemas.push(urn);
-        // Also strip never-returned attrs inside extension objects
+        // Strip never-returned attrs inside extension objects
         const extObj = rawPayload[urn];
         if (typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
           for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
@@ -717,7 +740,14 @@ export class EndpointScimGroupsService {
               delete (extObj as Record<string, unknown>)[extKey];
             }
           }
+          // FP-1 fix: If extension is now empty after stripping, remove it entirely
+          // (RFC 7643 §3.1: don't advertise an extension URN with zero visible attributes)
+          if (Object.keys(extObj as Record<string, unknown>).length === 0) {
+            delete rawPayload[urn];
+            continue;
+          }
         }
+        schemas.push(urn);
       }
     }
 

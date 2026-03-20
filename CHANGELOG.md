@@ -72,8 +72,8 @@ Resolved all remaining test failures from the v0.28.0 profile migration:
 - GHCR image: `ghcr.io/pranems/scimserver:0.29.0`
 
 ### Test Coverage
-- **Unit tests**: 2,906 passed (73 suites)
-- **E2E tests**: 698 passed (33 suites)
+- **Unit tests**: 2,887 passed (72 suites)
+- **E2E tests**: 763 passed (35 suites)
 - **Live tests**: 621 assertions
 - **Deployment verification**: Local (15.5s) + Docker (18.6s) + Azure (38s) — all 621/621
 

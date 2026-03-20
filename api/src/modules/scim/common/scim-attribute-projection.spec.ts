@@ -514,4 +514,56 @@ describe('stripReturnedNever (G8e)', () => {
     expect(result).toBe(resource); // same reference
     expect(resource.password).toBeUndefined();
   });
+
+  it('should remove extension URN key entirely when all its children are returned:never (FP-1)', () => {
+    const resource: Record<string, unknown> = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+      id: 'u1',
+      userName: 'alice',
+      'urn:ext:custom:2.0:User': {
+        badgeCode: 'BADGE-123',
+        pin: '9999',
+      },
+    };
+    const neverAttrs = new Set(['badgecode', 'pin']);
+    const result = stripReturnedNever(resource, neverAttrs);
+    // Extension key itself should be deleted — not left as {}
+    expect(result['urn:ext:custom:2.0:User']).toBeUndefined();
+    expect(result.userName).toBe('alice');
+  });
+
+  it('should keep extension URN key when some children remain after stripping', () => {
+    const resource: Record<string, unknown> = {
+      schemas: ['s1'],
+      id: 'u1',
+      'urn:ext:enterprise:2.0:User': {
+        costCenter: 'CC-100',
+        secretKey: 'hidden',
+      },
+    };
+    const neverAttrs = new Set(['secretkey']);
+    const result = stripReturnedNever(resource, neverAttrs);
+    const ext = result['urn:ext:enterprise:2.0:User'] as Record<string, unknown>;
+    expect(ext).toBeDefined();
+    expect(ext.costCenter).toBe('CC-100');
+    expect(ext.secretKey).toBeUndefined();
+  });
+
+  it('should remove multiple extension URN keys when all children are stripped (FP-1)', () => {
+    const resource: Record<string, unknown> = {
+      schemas: ['s1'],
+      id: 'u1',
+      'urn:ext:a': { secret1: 'hidden' },
+      'urn:ext:b': { secret2: 'hidden' },
+      'urn:ext:c': { visible: 'keep', secret3: 'hidden' },
+    };
+    const neverAttrs = new Set(['secret1', 'secret2', 'secret3']);
+    const result = stripReturnedNever(resource, neverAttrs);
+    expect(result['urn:ext:a']).toBeUndefined();
+    expect(result['urn:ext:b']).toBeUndefined();
+    // urn:ext:c keeps 'visible'
+    const extC = result['urn:ext:c'] as Record<string, unknown>;
+    expect(extC).toBeDefined();
+    expect(extC.visible).toBe('keep');
+  });
 });

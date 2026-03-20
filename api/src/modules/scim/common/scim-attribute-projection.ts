@@ -159,6 +159,10 @@ export function stripReturnedNever(
           delete extObj[extKey];
         }
       }
+      // FP-1 fix: If extension is now empty after stripping, remove the entire extension
+      if (Object.keys(extObj).length === 0) {
+        delete resource[key];
+      }
     }
   }
 

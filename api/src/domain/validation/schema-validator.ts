@@ -1132,6 +1132,56 @@ export class SchemaValidator {
     return result;
   }
 
+  // ─── Uniqueness attribute collection (RFC 7643 §2.1) ───────────────
+
+  /**
+   * Collect all top-level, non-multiValued, non-complex attributes with
+   * `uniqueness: 'server'` from the schema definitions.
+   *
+   * Only collects attributes that can reasonably be checked for uniqueness:
+   * - Top-level (not sub-attributes — those would require JSONB unnesting)
+   * - Non-multiValued (arrays have ambiguous uniqueness semantics)
+   * - Non-complex (complex attrs would need deep comparison)
+   *
+   * Returns an array of `{ schemaId, attrName, caseExact }` descriptors.
+   * For core schemas, `schemaId` is `null` (attr lives at top level of payload).
+   * For extension schemas, `schemaId` is the extension URN.
+   *
+   * @param schemas  Core + extension schema definitions
+   */
+  static collectUniqueAttributes(
+    schemas: readonly SchemaDefinition[],
+  ): Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }> {
+    const result: Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }> = [];
+
+    for (const schema of schemas) {
+      const isCore = isCoreSchema(schema);
+
+      for (const attr of schema.attributes) {
+        if (
+          attr.uniqueness?.toLowerCase() === 'server' &&
+          !attr.multiValued &&
+          attr.type !== 'complex'
+        ) {
+          // Skip column-promoted attributes — they're already handled
+          // by the hardcoded uniqueness checks (userName, externalId, displayName)
+          const lowerName = attr.name.toLowerCase();
+          if (lowerName === 'username' || lowerName === 'externalid' || lowerName === 'displayname' || lowerName === 'id') {
+            continue;
+          }
+
+          result.push({
+            schemaUrn: isCore ? null : schema.id,
+            attrName: attr.name,
+            caseExact: attr.caseExact ?? false,
+          });
+        }
+      }
+    }
+
+    return result;
+  }
+
   // ─── ReadOnly attribute collection (for strip helpers) ────────────
 
   /**

@@ -49,6 +49,7 @@ import {
   guardSoftDeleted,
   stripReadOnlyAttributes,
   stripReadOnlyPatchOps,
+  assertSchemaUniqueness,
 } from '../common/scim-service-helpers';
 import { SchemaValidator } from '../../../domain/validation';
 import { stripReturnedNever } from '../common/scim-attribute-projection';
@@ -202,6 +203,15 @@ export class EndpointScimGenericService {
     }
 
     const scimId = randomUUID();
+
+    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
+    const schemaDefs2 = this.getSchemaDefinitions(resourceType, endpointId);
+    const uniqueAttrs = SchemaValidator.collectUniqueAttributes(schemaDefs2);
+    if (uniqueAttrs.length > 0) {
+      const allResources = await this.genericRepo.findAll(endpointId, resourceType.name);
+      assertSchemaUniqueness(endpointId, body, uniqueAttrs, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload, deletedAt: r.deletedAt })));
+    }
+
     const now = this.metadata.currentIsoTimestamp();
     const location = this.metadata.buildLocation(
       baseUrl,
@@ -411,6 +421,14 @@ export class EndpointScimGenericService {
       });
     }
 
+    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
+    const schemaDefsPut = this.getSchemaDefinitions(resourceType, endpointId);
+    const uniqueAttrsPut = SchemaValidator.collectUniqueAttributes(schemaDefsPut);
+    if (uniqueAttrsPut.length > 0) {
+      const allResources = await this.genericRepo.findAll(endpointId, resourceType.name);
+      assertSchemaUniqueness(endpointId, body, uniqueAttrsPut, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload, deletedAt: r.deletedAt })), scimId);
+    }
+
     const now = this.metadata.currentIsoTimestamp();
     const location = this.metadata.buildLocation(
       baseUrl,
@@ -612,6 +630,16 @@ export class EndpointScimGenericService {
       });
     }
 
+    // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
+    {
+      const schemaDefsPatch = this.getSchemaDefinitions(resourceType, endpointId);
+      const uniqueAttrsPatch = SchemaValidator.collectUniqueAttributes(schemaDefsPatch);
+      if (uniqueAttrsPatch.length > 0) {
+        const allResources = await this.genericRepo.findAll(endpointId, resourceType.name);
+        assertSchemaUniqueness(endpointId, patchedPayload, uniqueAttrsPatch, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload, deletedAt: r.deletedAt })), scimId);
+      }
+    }
+
     const now = this.metadata.currentIsoTimestamp();
     const location = this.metadata.buildLocation(
       baseUrl,
@@ -738,8 +766,7 @@ export class EndpointScimGenericService {
     const schemas: string[] = [resourceType.schema];
     for (const ext of resourceType.schemaExtensions) {
       if (payload[ext.schema]) {
-        schemas.push(ext.schema);
-        // Also strip never-returned attrs inside extension objects
+        // Strip never-returned attrs inside extension objects
         const extObj = payload[ext.schema];
         if (typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
           for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
@@ -747,9 +774,19 @@ export class EndpointScimGenericService {
               delete (extObj as Record<string, unknown>)[extKey];
             }
           }
+          // FP-1 fix: If extension is now empty after stripping, remove it entirely
+          // (RFC 7643 §3.1: don't advertise an extension URN with zero visible attributes)
+          if (Object.keys(extObj as Record<string, unknown>).length === 0) {
+            delete payload[ext.schema];
+            continue;
+          }
         }
+        schemas.push(ext.schema);
       }
     }
+
+    // Remove schemas from payload — we built it dynamically above (G19 / FP-1)
+    delete payload.schemas;
 
     return {
       schemas,

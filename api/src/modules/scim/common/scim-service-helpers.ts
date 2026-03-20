@@ -939,4 +939,145 @@ export class ScimSchemaHelpers {
       });
     }
   }
+
+  /**
+   * Collect schema attributes with `uniqueness: 'server'` that are not
+   * already handled by hardcoded column-based checks (userName, externalId, displayName).
+   *
+   * Returns descriptors for custom extension attributes that need JSONB-level
+   * uniqueness enforcement. Each descriptor includes the schema URN (for extension
+   * attribute location) and the caseExact flag for comparison mode.
+   *
+   * @see RFC 7643 §2.1 — `uniqueness: 'server'` SHOULD be unique within the endpoint
+   */
+  getUniqueAttributes(endpointId?: string): Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }> {
+    const schemas = this.getSchemaDefinitions(endpointId);
+    return SchemaValidator.collectUniqueAttributes(schemas);
+  }
+}
+
+// ─── Schema-Driven Uniqueness Enforcement (RFC 7643 §2.1) ──────────────────
+
+/**
+ * Extract a value from a SCIM payload for a given schema attribute descriptor.
+ *
+ * For core schema attrs (schemaUrn=null): looks up `payload[attrName]`
+ * For extension attrs: looks up `payload[schemaUrn][attrName]`
+ *
+ * Returns undefined if the attribute is not present in the payload.
+ */
+export function extractPayloadValue(
+  payload: Record<string, unknown>,
+  desc: { schemaUrn: string | null; attrName: string },
+): unknown {
+  if (desc.schemaUrn === null) {
+    // Core attribute — look up at top level (case-insensitive key match)
+    for (const key of Object.keys(payload)) {
+      if (key.toLowerCase() === desc.attrName.toLowerCase()) {
+        return payload[key];
+      }
+    }
+    return undefined;
+  }
+
+  // Extension attribute — find the extension URN block first
+  for (const key of Object.keys(payload)) {
+    if (key.toLowerCase() === desc.schemaUrn.toLowerCase()) {
+      const extBlock = payload[key];
+      if (extBlock && typeof extBlock === 'object') {
+        const block = extBlock as Record<string, unknown>;
+        for (const extKey of Object.keys(block)) {
+          if (extKey.toLowerCase() === desc.attrName.toLowerCase()) {
+            return block[extKey];
+          }
+        }
+      }
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Compare two string values using caseExact semantics.
+ * Returns true if values match.
+ */
+function uniquenessValuesMatch(a: unknown, b: unknown, caseExact: boolean): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') {
+    return a === b;
+  }
+  return caseExact ? a === b : a.toLowerCase() === b.toLowerCase();
+}
+
+/**
+ * Extract a value from a raw JSON payload string (as stored in the DB).
+ */
+function extractFromRawPayload(
+  rawPayload: string | Record<string, unknown>,
+  desc: { schemaUrn: string | null; attrName: string },
+): unknown {
+  let parsed: Record<string, unknown>;
+  if (typeof rawPayload === 'string') {
+    try { parsed = JSON.parse(rawPayload) as Record<string, unknown>; }
+    catch { return undefined; }
+  } else {
+    parsed = rawPayload;
+  }
+  return extractPayloadValue(parsed, desc);
+}
+
+/**
+ * Schema-driven uniqueness enforcement for custom extension attributes.
+ *
+ * Scans all schema attributes where `uniqueness === 'server'` (excluding
+ * hardcoded column attrs: userName, externalId, displayName, id), extracts
+ * the incoming value from the payload, and checks all existing resources
+ * in the same endpoint for conflicts.
+ *
+ * Uses the attribute's `caseExact` characteristic to decide comparison mode:
+ * - caseExact: true → exact string comparison
+ * - caseExact: false → case-insensitive comparison
+ *
+ * @param endpointId      The endpoint to scope uniqueness within
+ * @param payload         The incoming SCIM request payload
+ * @param uniqueAttrs     Array of unique attribute descriptors from SchemaValidator.collectUniqueAttributes()
+ * @param existingResources  All existing resources from the repository (as raw records with rawPayload)
+ * @param excludeScimId   Exclude this resource from conflict detection (for PUT/PATCH self-exclusion)
+ *
+ * @throws 409 uniqueness error if a conflict is found
+ */
+export function assertSchemaUniqueness(
+  endpointId: string,
+  payload: Record<string, unknown>,
+  uniqueAttrs: Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }>,
+  existingResources: Array<{ scimId: string; rawPayload: string | Record<string, unknown>; deletedAt?: Date | null }>,
+  excludeScimId?: string,
+): void {
+  if (uniqueAttrs.length === 0) return;
+
+  for (const desc of uniqueAttrs) {
+    const incomingValue = extractPayloadValue(payload, desc);
+    if (incomingValue === undefined || incomingValue === null) continue;
+
+    for (const existing of existingResources) {
+      // Skip self (for PUT/PATCH)
+      if (excludeScimId && existing.scimId === excludeScimId) continue;
+      // Skip soft-deleted resources
+      if (existing.deletedAt != null) continue;
+
+      const existingValue = extractFromRawPayload(existing.rawPayload, desc);
+      if (existingValue === undefined || existingValue === null) continue;
+
+      if (uniquenessValuesMatch(incomingValue, existingValue, desc.caseExact)) {
+        const attrPath = desc.schemaUrn
+          ? `${desc.schemaUrn}:${desc.attrName}`
+          : desc.attrName;
+        throw createScimError({
+          status: 409,
+          scimType: 'uniqueness',
+          detail: `Attribute '${attrPath}' value '${String(incomingValue)}' must be unique within the endpoint.`,
+        });
+      }
+    }
+  }
 }

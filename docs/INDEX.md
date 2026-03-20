@@ -1,7 +1,7 @@
 # 📚 SCIMServer Documentation Index
 
-> **Version:** 0.29.0 · **Updated:** March 17, 2026  
-> 52 active docs in `docs/` · 34 E2E suites (743 pass) · 72 unit suites (2,884 pass) · 6 built-in presets
+> **Version:** 0.29.0 · **Updated:** March 19, 2026  
+> 54 active docs in `docs/` · 35 E2E suites (763 pass) · 72 unit suites (2,887 pass) · 6 built-in presets
 
 ---
 
@@ -87,6 +87,8 @@
 
 | Document | Description |
 |----------|-------------|
+| [SCIM_VALIDATOR_RESULTS_32_LEXMARK_ANALYSIS.md](SCIM_VALIDATOR_RESULTS_32_LEXMARK_ANALYSIS.md) | SCIM Validator #32 — Lexmark schema analysis (2 false positives, full compliance) |
+| [VALIDATOR_RUN32_FALSE_POSITIVE_ANALYSIS.md](VALIDATOR_RUN32_FALSE_POSITIVE_ANALYSIS.md) | Successful false positive analysis — validator missed issues in passing tests |
 | [TESTING-WORKFLOW.md](TESTING-WORKFLOW.md) | Test pyramid — unit, E2E, live, and ISV-specific tests |
 | [LIVE_TEST_NORMS_AND_BEST_PRACTICES.md](LIVE_TEST_NORMS_AND_BEST_PRACTICES.md) | Live test conventions — section naming, result tracking |
 | [TEST_INVENTORY.md](TEST_INVENTORY.md) | Test file inventory with coverage scope |
@@ -136,8 +138,8 @@
 
 | Suite | Suites | Tests | Status |
 |-------|--------|-------|--------|
-| Unit | 72 | 2,884 | ✅ All pass |
-| E2E | 34 | 743 pass + 6 skipped | ✅ All pass |
+| Unit | 72 | 2,887 | ✅ All pass |
+| E2E | 35 | 763 | ✅ All pass |
 | Live (main) | 42 sections | ~621 | ✅ All pass |
 | Live (Lexmark ISV) | 13 sections | 112 | ✅ All pass |
-| **Total** | **~160** | **~4,360** | **✅ All pass** |
+| **Total** | **~160** | **~4,383** | **✅ All pass** |
