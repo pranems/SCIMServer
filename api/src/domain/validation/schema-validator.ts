@@ -1372,6 +1372,66 @@ export class SchemaValidator {
       walkAttrs(schema.attributes, topParent, true);
     }
 
+    // ─── Build readOnlyCollected from readOnlyByParent ───────────────
+    // Categorize into the {core, extensions, coreSubAttrs, extensionSubAttrs}
+    // shape expected by stripReadOnlyAttributes / stripReadOnlyPatchOps.
+    const roCore = new Set<string>();
+    const roExtensions = new Map<string, Set<string>>();
+    const roCoreSubAttrs = new Map<string, Set<string>>();
+    const roExtensionSubAttrs = new Map<string, Map<string, Set<string>>>();
+
+    // Collect all extension URN lowercase keys for fast lookup
+    const extUrnLowerSet = new Set<string>();
+    for (const schema of schemas) {
+      if (!isCoreSchema(schema)) {
+        extUrnLowerSet.add(schema.id.toLowerCase());
+      }
+    }
+
+    for (const [parentKey, children] of readOnlyByParent) {
+      if (parentKey === SCHEMA_CACHE_TOP_LEVEL) {
+        // Core top-level readOnly attrs
+        for (const child of children) roCore.add(child);
+      } else if (extUrnLowerSet.has(parentKey)) {
+        // Extension top-level readOnly attrs
+        // Find the original-case URN for this lowercase key
+        let originalUrn = parentKey;
+        for (const schema of schemas) {
+          if (schema.id.toLowerCase() === parentKey) { originalUrn = schema.id; break; }
+        }
+        let extSet = roExtensions.get(originalUrn.toLowerCase());
+        if (!extSet) { extSet = new Set(); roExtensions.set(originalUrn.toLowerCase(), extSet); }
+        for (const child of children) extSet.add(child);
+      } else {
+        // Sub-attribute readOnly: parentKey is the parent attribute name.
+        // Determine whether this parent belongs to core or an extension schema.
+        // Check if any extension schema has a top-level attribute matching parentKey.
+        let belongsToExt: string | null = null;
+        for (const schema of schemas) {
+          if (!isCoreSchema(schema)) {
+            for (const attr of schema.attributes) {
+              if (attr.name.toLowerCase() === parentKey) {
+                belongsToExt = schema.id.toLowerCase();
+                break;
+              }
+            }
+          }
+          if (belongsToExt) break;
+        }
+
+        if (belongsToExt) {
+          // Extension sub-attribute readOnly
+          if (!roExtensionSubAttrs.has(belongsToExt)) {
+            roExtensionSubAttrs.set(belongsToExt, new Map());
+          }
+          roExtensionSubAttrs.get(belongsToExt)!.set(parentKey, children);
+        } else {
+          // Core sub-attribute readOnly
+          roCoreSubAttrs.set(parentKey, children);
+        }
+      }
+    }
+
     return {
       booleansByParent,
       neverReturnedByParent,
@@ -1383,6 +1443,12 @@ export class SchemaValidator {
       alwaysReturnedSubs,
       uniqueAttrs,
       extensionUrns,
+      readOnlyCollected: {
+        core: roCore,
+        extensions: roExtensions,
+        coreSubAttrs: roCoreSubAttrs,
+        extensionSubAttrs: roExtensionSubAttrs,
+      },
     };
   }
 

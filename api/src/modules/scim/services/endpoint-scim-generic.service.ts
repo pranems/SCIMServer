@@ -50,13 +50,14 @@ import {
   stripReadOnlyAttributes,
   stripReadOnlyPatchOps,
   assertSchemaUniqueness,
+  flattenParentChildMap,
 } from '../common/scim-service-helpers';
 import { SchemaValidator, SCHEMA_CACHE_TOP_LEVEL } from '../../../domain/validation';
 import { stripReturnedNever } from '../common/scim-attribute-projection';
 import { ScimMetadataService } from './scim-metadata.service';
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import type { ScimResourceType } from '../discovery/scim-schema-registry';
-import type { SchemaDefinition, SchemaAttributeDefinition } from '../../../domain/validation';
+import type { SchemaDefinition, SchemaAttributeDefinition, SchemaCharacteristicsCache } from '../../../domain/validation';
 import { GenericPatchEngine } from '../../../domain/patch/generic-patch-engine';
 import { PatchError } from '../../../domain/patch/patch-error';
 import type { PatchOperation } from '../../../domain/patch/patch-types';
@@ -205,8 +206,7 @@ export class EndpointScimGenericService {
     const scimId = randomUUID();
 
     // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    const schemaDefs2 = this.getSchemaDefinitions(resourceType, endpointId);
-    const uniqueAttrs = SchemaValidator.collectUniqueAttributes(schemaDefs2);
+    const uniqueAttrs = this.getSchemaCacheForRT(resourceType, endpointId)?.uniqueAttrs ?? [];
     if (uniqueAttrs.length > 0) {
       const allResources = await this.genericRepo.findAll(endpointId, resourceType.name);
       assertSchemaUniqueness(endpointId, body, uniqueAttrs, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload, deletedAt: r.deletedAt })));
@@ -422,8 +422,7 @@ export class EndpointScimGenericService {
     }
 
     // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
-    const schemaDefsPut = this.getSchemaDefinitions(resourceType, endpointId);
-    const uniqueAttrsPut = SchemaValidator.collectUniqueAttributes(schemaDefsPut);
+    const uniqueAttrsPut = this.getSchemaCacheForRT(resourceType, endpointId)?.uniqueAttrs ?? [];
     if (uniqueAttrsPut.length > 0) {
       const allResources = await this.genericRepo.findAll(endpointId, resourceType.name);
       assertSchemaUniqueness(endpointId, body, uniqueAttrsPut, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload, deletedAt: r.deletedAt })), scimId);
@@ -632,8 +631,7 @@ export class EndpointScimGenericService {
 
     // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
     {
-      const schemaDefsPatch = this.getSchemaDefinitions(resourceType, endpointId);
-      const uniqueAttrsPatch = SchemaValidator.collectUniqueAttributes(schemaDefsPatch);
+      const uniqueAttrsPatch = this.getSchemaCacheForRT(resourceType, endpointId)?.uniqueAttrs ?? [];
       if (uniqueAttrsPatch.length > 0) {
         const allResources = await this.genericRepo.findAll(endpointId, resourceType.name);
         assertSchemaUniqueness(endpointId, patchedPayload, uniqueAttrsPatch, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload, deletedAt: r.deletedAt })), scimId);
@@ -756,8 +754,10 @@ export class EndpointScimGenericService {
 
     // G8e: Strip returned:'never' attributes from payload (e.g. writeOnly secrets)
     // Per RFC 7643 §2.4, these MUST NOT appear in any response.
-    const schemaDefs = this.getSchemaDefinitions(resourceType, record.endpointId);
-    const { never: neverAttrs } = SchemaValidator.collectReturnedCharacteristics(schemaDefs);
+    const cache = this.getSchemaCacheForRT(resourceType, record.endpointId);
+    const neverAttrs = cache
+      ? flattenParentChildMap(cache.neverReturnedByParent)
+      : SchemaValidator.collectReturnedCharacteristics(this.getSchemaDefinitions(resourceType, record.endpointId)).never;
     if (neverAttrs.size > 0) {
       stripReturnedNever(payload, neverAttrs);
     }
@@ -898,20 +898,36 @@ export class EndpointScimGenericService {
   }
 
   /**
+   * Get the precomputed cache for a resource type, or build one on the fly.
+   * Mirrors the pattern used by ScimSchemaHelpers.getSchemaCache().
+   */
+  private getSchemaCacheForRT(
+    resourceType: ScimResourceType,
+    endpointId: string,
+  ): SchemaCharacteristicsCache | undefined {
+    const profile = this.endpointContext.getProfile?.();
+    if (profile?._schemaCache?.booleansByParent instanceof Map) {
+      return profile._schemaCache;
+    }
+    // Fallback: build from schema definitions
+    const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
+    if (schemaDefs.length === 0) return undefined;
+    const cache = SchemaValidator.buildCharacteristicsCache(schemaDefs);
+    // Attach to profile for next access within this request
+    if (profile) {
+      profile._schemaCache = cache;
+    }
+    return cache;
+  }
+
+  /**
    * Get booleansByParent map from profile cache or build from schema definitions.
    */
   private getBooleansByParentForRT(
     resourceType: ScimResourceType,
     endpointId: string,
   ): Map<string, Set<string>> {
-    const profile = this.endpointContext.getProfile?.();
-    if (profile?._schemaCache?.booleansByParent instanceof Map) {
-      return profile._schemaCache.booleansByParent;
-    }
-    // Fallback: build from schema definitions
-    const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-    const cache = SchemaValidator.buildCharacteristicsCache(schemaDefs);
-    return cache.booleansByParent;
+    return this.getSchemaCacheForRT(resourceType, endpointId)?.booleansByParent ?? new Map();
   }
 
   /**
@@ -1105,12 +1121,14 @@ export class EndpointScimGenericService {
 
   /**
    * Get the returned:'request' attribute names for a resource type.
-   * Used by controllers to filter response attributes per RFC 7643 §2.4.
+   * Uses precomputed cache when available.
    */
   getRequestOnlyAttributes(
     resourceType: ScimResourceType,
     endpointId: string,
   ): Set<string> {
+    const cache = this.getSchemaCacheForRT(resourceType, endpointId);
+    if (cache) return flattenParentChildMap(cache.requestReturnedByParent);
     const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
     const { request } = SchemaValidator.collectReturnedCharacteristics(schemaDefs);
     return request;
@@ -1118,11 +1136,14 @@ export class EndpointScimGenericService {
 
   /**
    * Get the returned:'always' attribute names from schema definitions (R-RET-1).
+   * Uses precomputed cache when available.
    */
   getAlwaysReturnedAttributes(
     resourceType: ScimResourceType,
     endpointId: string,
   ): Set<string> {
+    const cache = this.getSchemaCacheForRT(resourceType, endpointId);
+    if (cache) return flattenParentChildMap(cache.alwaysReturnedByParent);
     const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
     const { always } = SchemaValidator.collectReturnedCharacteristics(schemaDefs);
     return always;
@@ -1130,11 +1151,14 @@ export class EndpointScimGenericService {
 
   /**
    * Get sub-attributes with returned:'always' grouped by parent (R-RET-3).
+   * Uses precomputed cache when available.
    */
   getAlwaysReturnedSubAttrs(
     resourceType: ScimResourceType,
     endpointId: string,
   ): Map<string, Set<string>> {
+    const cache = this.getSchemaCacheForRT(resourceType, endpointId);
+    if (cache) return cache.alwaysReturnedSubs;
     const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
     const { alwaysSubs } = SchemaValidator.collectReturnedCharacteristics(schemaDefs);
     return alwaysSubs;

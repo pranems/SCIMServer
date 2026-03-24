@@ -28,6 +28,45 @@ import type { PatchOperation } from '../../../domain/patch/patch-types';
 import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-parser';
 import type { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 
+// ─── Cache Flatten Helpers ──────────────────────────────────────────────────
+
+/**
+ * Flatten a Parent→Children map into a flat Set of all child names.
+ * Unions all children across all parent keys (ignoring parent context).
+ *
+ * Used to convert the precomputed cache's Parent→Children maps back into
+ * the flat Set<string> shape expected by existing consumers
+ * (e.g., `getReturnedCharacteristics()` return type).
+ */
+export function flattenParentChildMap(map: Map<string, Set<string>>): Set<string> {
+  const flat = new Set<string>();
+  for (const children of map.values()) {
+    for (const child of children) {
+      flat.add(child);
+    }
+  }
+  return flat;
+}
+
+/**
+ * Flatten a Parent→Children map into dotted paths (e.g., 'meta.location').
+ * Top-level attributes (parent = __top__ or extension URN) produce bare names.
+ * Sub-attributes (parent = attribute name) produce 'parent.child' paths.
+ *
+ * Used to convert `caseExactByParent` cache into the dotted-path Set
+ * expected by `collectCaseExactAttributes()` consumers.
+ */
+function flattenParentChildMapToDottedPaths(map: Map<string, Set<string>>): Set<string> {
+  const result = new Set<string>();
+  for (const [parent, children] of map) {
+    const isTopLevel = parent === SCHEMA_CACHE_TOP_LEVEL || parent.startsWith('urn:');
+    for (const child of children) {
+      result.add(isTopLevel ? child : `${parent}.${child}`);
+    }
+  }
+  return result;
+}
+
 // ─── Pure Utility Functions ─────────────────────────────────────────────────
 
 /**
@@ -218,8 +257,9 @@ export const SCIM_WARNING_URN = 'urn:scimserver:api:messages:2.0:Warning';
 export function stripReadOnlyAttributes(
   payload: Record<string, unknown>,
   schemaDefinitions: readonly SchemaDefinition[],
+  preCollected?: { core: Set<string>; extensions: Map<string, Set<string>>; coreSubAttrs: Map<string, Set<string>>; extensionSubAttrs: Map<string, Map<string, Set<string>>> },
 ): string[] {
-  const { core, extensions, coreSubAttrs, extensionSubAttrs } = SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
+  const { core, extensions, coreSubAttrs, extensionSubAttrs } = preCollected ?? SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
   const stripped: string[] = [];
 
   // Strip core readOnly attributes (case-insensitive)
@@ -346,8 +386,9 @@ export function stripReadOnlyAttributes(
 export function stripReadOnlyPatchOps(
   operations: PatchOperation[],
   schemaDefinitions: readonly SchemaDefinition[],
+  preCollected?: { core: Set<string>; extensions: Map<string, Set<string>>; coreSubAttrs: Map<string, Set<string>> },
 ): { filtered: PatchOperation[]; stripped: string[] } {
-  const { core, extensions, coreSubAttrs } = SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
+  const { core, extensions, coreSubAttrs } = preCollected ?? SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
   const stripped: string[] = [];
   const filtered: PatchOperation[] = [];
 
@@ -880,8 +921,22 @@ export class ScimSchemaHelpers {
 
   /**
    * Collect returned characteristic sets (never + request + always + alwaysSubs) for the resource's schemas.
+   *
+   * Uses the precomputed cache when available — flattens Parent→Children maps
+   * into flat Sets by unioning all children across all parent keys.
+   * Falls back to SchemaValidator.collectReturnedCharacteristics() if no cache.
    */
   getReturnedCharacteristics(endpointId?: string): { never: Set<string>; request: Set<string>; always: Set<string>; alwaysSubs: Map<string, Set<string>> } {
+    const cache = this.getSchemaCache(endpointId);
+    if (cache) {
+      return {
+        never: flattenParentChildMap(cache.neverReturnedByParent),
+        request: flattenParentChildMap(cache.requestReturnedByParent),
+        always: flattenParentChildMap(cache.alwaysReturnedByParent),
+        alwaysSubs: cache.alwaysReturnedSubs,
+      };
+    }
+    // Fallback: no cache available (no schemas)
     const schemas = this.getSchemaDefinitions(endpointId);
     return SchemaValidator.collectReturnedCharacteristics(schemas);
   }
@@ -916,8 +971,15 @@ export class ScimSchemaHelpers {
   /**
    * Get attribute names/paths with caseExact:true (R-CASE-1).
    * Returns Set of lowercase dotted paths (e.g., 'id', 'meta.location').
+   *
+   * Uses the precomputed cache when available — reconstructs dotted paths
+   * from Parent→Children maps. Falls back to collectCaseExactAttributes().
    */
   getCaseExactAttributes(endpointId?: string): Set<string> {
+    const cache = this.getSchemaCache(endpointId);
+    if (cache) {
+      return flattenParentChildMapToDottedPaths(cache.caseExactByParent);
+    }
     const schemas = this.getSchemaDefinitions(endpointId);
     return SchemaValidator.collectCaseExactAttributes(schemas);
   }
@@ -984,12 +1046,18 @@ export class ScimSchemaHelpers {
    * Strip readOnly attributes from a POST/PUT payload using the endpoint's
    * registered schema definitions.
    *
+   * Uses the precomputed cache when available to avoid per-request tree walks.
+   *
    * @returns Array of stripped attribute names (for logging/warning)
    */
   stripReadOnlyAttributesFromPayload(
     payload: Record<string, unknown>,
     endpointId?: string,
   ): string[] {
+    const cache = this.getSchemaCache(endpointId);
+    if (cache) {
+      return stripReadOnlyAttributes(payload, [], cache.readOnlyCollected);
+    }
     const schemas = this.getSchemaDefinitions(endpointId);
     return stripReadOnlyAttributes(payload, schemas);
   }
@@ -998,12 +1066,18 @@ export class ScimSchemaHelpers {
    * Filter PATCH operations targeting readOnly attributes using the endpoint's
    * registered schema definitions.
    *
+   * Uses the precomputed cache when available to avoid per-request tree walks.
+   *
    * @returns Object with filtered operations and stripped attribute names
    */
   stripReadOnlyFromPatchOps(
     operations: PatchOperation[],
     endpointId?: string,
   ): { filtered: PatchOperation[]; stripped: string[] } {
+    const cache = this.getSchemaCache(endpointId);
+    if (cache) {
+      return stripReadOnlyPatchOps(operations, [], cache.readOnlyCollected);
+    }
     const schemas = this.getSchemaDefinitions(endpointId);
     return stripReadOnlyPatchOps(operations, schemas);
   }
@@ -1011,11 +1085,9 @@ export class ScimSchemaHelpers {
   /**
    * Coerce boolean-typed string values to native booleans on write payloads.
    *
-   * Gated by AllowAndCoerceBooleanStrings (default: true). When enabled, converts
-   * attributes like primary = "True" → true before schema validation,
-   * preventing StrictSchemaValidation from rejecting valid-intent payloads.
-   *
-   * @see RFC 7644 §3.12 — "Be liberal in what you accept" (Postel's Law)
+   * @deprecated Use coerceBooleansByParentIfEnabled() for parent-context-aware coercion.
+   * This method uses the flat getBooleanKeys() which cannot distinguish
+   * core `active` (boolean) from extension `active` (string).
    */
   coerceBooleanStringsIfEnabled(
     dto: Record<string, unknown>,
@@ -1076,9 +1148,15 @@ export class ScimSchemaHelpers {
    * uniqueness enforcement. Each descriptor includes the schema URN (for extension
    * attribute location) and the caseExact flag for comparison mode.
    *
+   * Uses the precomputed cache when available. Falls back to collectUniqueAttributes().
+   *
    * @see RFC 7643 §2.1 — `uniqueness: 'server'` SHOULD be unique within the endpoint
    */
   getUniqueAttributes(endpointId?: string): Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }> {
+    const cache = this.getSchemaCache(endpointId);
+    if (cache) {
+      return cache.uniqueAttrs;
+    }
     const schemas = this.getSchemaDefinitions(endpointId);
     return SchemaValidator.collectUniqueAttributes(schemas);
   }

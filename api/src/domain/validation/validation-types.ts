@@ -77,6 +77,13 @@ export interface SchemaCharacteristicsCache {
   uniqueAttrs: Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }>;
   /** Extension schema URNs declared on this endpoint's resource types */
   extensionUrns: readonly string[];
+  /** Precomputed readOnly attribute sets — same shape as collectReadOnlyAttributes() */
+  readOnlyCollected: {
+    core: Set<string>;
+    extensions: Map<string, Set<string>>;
+    coreSubAttrs: Map<string, Set<string>>;
+    extensionSubAttrs: Map<string, Map<string, Set<string>>>;
+  };
 }
 
 /** Sentinel key for top-level attributes in Parent→Children maps */
