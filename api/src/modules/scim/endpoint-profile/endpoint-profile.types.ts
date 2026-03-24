@@ -11,6 +11,7 @@
  * @see RFC 7644 §4
  */
 import type { ScimSchemaDefinition, ScimResourceType, ScimSchemaAttribute } from '../discovery/scim-schema-registry';
+import type { SchemaCharacteristicsCache } from '../../../domain/validation/validation-types';
 
 // ─── ServiceProviderConfig ─────────────────────────────────────────────────
 
@@ -119,6 +120,14 @@ export interface EndpointProfile {
 
   /** Project-specific behavioral flags (13 persisted + extensible) */
   settings: ProfileSettings;
+
+  /**
+   * Precomputed Parent→Children maps for schema attribute characteristics.
+   * Built at profile load time, consumed at zero cost per request.
+   * Prefixed with _ to indicate it's a runtime-only field (not persisted to DB).
+   * @see SchemaCharacteristicsCache
+   */
+  _schemaCache?: SchemaCharacteristicsCache;
 }
 
 // ─── Shorthand Types ───────────────────────────────────────────────────────

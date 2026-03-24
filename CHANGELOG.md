@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.29.0] - 2026-03-17
 
+### Added — Precomputed Schema Characteristics Cache (2026-03-20)
+
+- **`SchemaCharacteristicsCache` interface** (`validation-types.ts`): 10 Parent→Children `Map<string, Set<string>>` maps for zero per-request schema tree recomputation
+- **`SchemaValidator.buildCharacteristicsCache()`**: Single tree walk produces all 10 maps (~25 µs). Eliminates 2–9 redundant tree walks per request (40–180 µs saved per request)
+- **`sanitizeBooleanStringsByParent()`**: Parent-context-aware boolean string coercion. Prevents name-collision false positives (e.g., core `active` boolean vs extension `active` string)
+- **`ScimSchemaHelpers` cache accessors**: `getBooleansByParent()`, `getNeverReturnedByParent()`, `getReadOnlyByParent()`, `getUniqueAttributesCached()`, `coerceBooleansByParentIfEnabled()`
+- **Lazy cache builder**: `getSchemaCache()` builds from schema definitions on first access per endpoint, attaches to profile for subsequent O(1) reads
+- **25 cache builder unit tests** (`schema-validator-cache.spec.ts`): Name-collision disambiguation, extension URN handling, all 10 map types, empty schemas
+- **11 parent-aware sanitizer tests** (`scim-service-helpers.spec.ts`): Parent-key coercion, extension URN isolation, array recursion
+- **Analysis document**: [SCHEMA_AND_RESOURCETYPE_DATA_STRUCTURE_ANALYSIS.md](docs/SCHEMA_AND_RESOURCETYPE_DATA_STRUCTURE_ANALYSIS.md) — 6 data structure options, benchmarks, industry norms, recommendation
+- **12 production files changed** (+527/−57 lines): validation-types.ts, schema-validator.ts, index.ts, endpoint.service.ts, scim-service-helpers.ts, endpoint-profile.service.ts, endpoint-profile.types.ts, endpoint-scim-users.service.ts, endpoint-scim-groups.service.ts, endpoint-scim-generic.service.ts
+- **Test results**: 2,923 unit (73 suites) / 763 E2E (35 suites) / 602 live + 112 Lexmark — all passing
+
 ### Added — Lexmark ISV Endpoint Profile
 
 - **Lexmark preset** (`lexmark.json`): User-only provisioning with EnterpriseUser (required, costCenter/department) and CustomUser (optional, badgeCode/pin — writeOnly/returned:never)

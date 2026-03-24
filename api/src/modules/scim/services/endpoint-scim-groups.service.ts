@@ -37,11 +37,12 @@ import {
   parseJson,
   ensureSchema,
   enforceIfMatch,
-  sanitizeBooleanStrings,
+  sanitizeBooleanStringsByParent,
   guardSoftDeleted,
   ScimSchemaHelpers,
   assertSchemaUniqueness,
 } from '../common/scim-service-helpers';
+import { SCHEMA_CACHE_TOP_LEVEL } from '../../../domain/validation';
 
 interface ListGroupsParams {
   filter?: string;
@@ -76,8 +77,8 @@ export class EndpointScimGroupsService {
     ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
     this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
 
-    // Coerce boolean strings ("True"/"False") to native booleans before schema validation
-    this.schemaHelpers.coerceBooleanStringsIfEnabled(dto as unknown as Record<string, unknown>, endpointId, config);
+    // Coerce boolean strings ("True"/"False") to native booleans before schema validation (parent-aware)
+    this.schemaHelpers.coerceBooleansByParentIfEnabled(dto as unknown as Record<string, unknown>, endpointId, config);
 
     this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, config, 'create');
 
@@ -316,17 +317,17 @@ export class EndpointScimGroupsService {
       }
       const schemaDefs = this.schemaHelpers.buildSchemaDefinitions(resultPayloadPlaceholder, endpointId);
 
-      // Coerce boolean strings in PATCH operation values before validation
+      // Coerce boolean strings in PATCH operation values before validation (parent-aware)
       const coerceEnabled = getConfigBooleanWithDefault(endpointConfig, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS, true);
       if (coerceEnabled) {
-        const booleanKeys = this.schemaHelpers.getBooleanKeys(endpointId);
+        const boolMap = this.schemaHelpers.getBooleansByParent(endpointId);
         for (const op of dto.Operations) {
           if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
-            sanitizeBooleanStrings(op.value as Record<string, unknown>, booleanKeys);
+            sanitizeBooleanStringsByParent(op.value as Record<string, unknown>, boolMap, SCHEMA_CACHE_TOP_LEVEL);
           } else if (Array.isArray(op.value)) {
             for (const item of op.value) {
               if (typeof item === 'object' && item !== null) {
-                sanitizeBooleanStrings(item as Record<string, unknown>, booleanKeys);
+                sanitizeBooleanStringsByParent(item as Record<string, unknown>, boolMap, SCHEMA_CACHE_TOP_LEVEL);
               }
             }
           }
@@ -384,8 +385,8 @@ export class EndpointScimGroupsService {
       }
     }
 
-    // Coerce boolean strings in post-PATCH payload before schema validation
-    this.schemaHelpers.coerceBooleanStringsIfEnabled(resultPayload, endpointId, config);
+    // Coerce boolean strings in post-PATCH payload before schema validation (parent-aware)
+    this.schemaHelpers.coerceBooleansByParentIfEnabled(resultPayload, endpointId, config);
 
     this.schemaHelpers.validatePayloadSchema(resultPayload, endpointId, config, 'patch');
 
@@ -449,8 +450,8 @@ export class EndpointScimGroupsService {
     ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
     this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
 
-    // Coerce boolean strings before schema validation (same as create path)
-    this.schemaHelpers.coerceBooleanStringsIfEnabled(dto as unknown as Record<string, unknown>, endpointId, config);
+    // Coerce boolean strings before schema validation (same as create path — parent-aware)
+    this.schemaHelpers.coerceBooleansByParentIfEnabled(dto as unknown as Record<string, unknown>, endpointId, config);
 
     this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, config, 'replace');
 
@@ -703,10 +704,9 @@ export class EndpointScimGroupsService {
     const meta = this.buildMeta(group, baseUrl);
     const rawPayload = parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}'));
 
-    // V17 fix: Schema-aware boolean sanitization for Groups (parity with Users V16 fix).
-    // Only convert attributes whose schema type is "boolean" (e.g. extension sub-attrs).
-    const booleanKeys = this.schemaHelpers.getBooleanKeys(endpointId);
-    sanitizeBooleanStrings(rawPayload, booleanKeys);
+    // Parent-context-aware boolean sanitization for Groups (uses precomputed cache)
+    const boolMap = this.schemaHelpers.getBooleansByParent(endpointId);
+    sanitizeBooleanStringsByParent(rawPayload, boolMap);
 
     // Remove attributes that have first-class DB columns to prevent stale overrides.
     // displayName is managed via the DB column; rawPayload may hold the original creation value.

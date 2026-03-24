@@ -13,7 +13,7 @@
  *   - externalId + displayName uniqueness enforcement
  *   - Reprovision-on-conflict for soft-deleted resources
  *   - Config-aware soft-delete guard
- *   - sanitizeBooleanStrings on output
+ *   - sanitizeBooleanStringsByParent on output
  *   - returned:never stripping on output
  */
 import { Inject, Injectable, Logger } from '@nestjs/common';
@@ -45,13 +45,13 @@ import {
   parseJson,
   ensureSchema,
   enforceIfMatch,
-  sanitizeBooleanStrings,
+  sanitizeBooleanStringsByParent,
   guardSoftDeleted,
   stripReadOnlyAttributes,
   stripReadOnlyPatchOps,
   assertSchemaUniqueness,
 } from '../common/scim-service-helpers';
-import { SchemaValidator } from '../../../domain/validation';
+import { SchemaValidator, SCHEMA_CACHE_TOP_LEVEL } from '../../../domain/validation';
 import { stripReturnedNever } from '../common/scim-attribute-projection';
 import { ScimMetadataService } from './scim-metadata.service';
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
@@ -525,18 +525,18 @@ export class EndpointScimGenericService {
     // GEN-03/04: Pre-PATCH boolean coercion + validation for strict mode
     if (strictSchemaEnabled) {
       const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-      const booleanKeys = SchemaValidator.collectBooleanAttributeNames(schemaDefs);
 
-      // Coerce boolean strings in PATCH operation values before validation
+      // Coerce boolean strings in PATCH operation values before validation (parent-aware)
       const coerceEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS, true);
       if (coerceEnabled) {
+        const boolMap = this.getBooleansByParentForRT(resourceType, endpointId);
         for (const op of patchDto.Operations) {
           if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
-            sanitizeBooleanStrings(op.value as Record<string, unknown>, booleanKeys);
+            sanitizeBooleanStringsByParent(op.value as Record<string, unknown>, boolMap, SCHEMA_CACHE_TOP_LEVEL);
           } else if (Array.isArray(op.value)) {
             for (const item of op.value) {
               if (typeof item === 'object' && item !== null) {
-                sanitizeBooleanStrings(item as Record<string, unknown>, booleanKeys);
+                sanitizeBooleanStringsByParent(item as Record<string, unknown>, boolMap, SCHEMA_CACHE_TOP_LEVEL);
               }
             }
           }
@@ -726,7 +726,7 @@ export class EndpointScimGenericService {
    * Convert a GenericResourceRecord to a SCIM JSON response.
    *
    * Applies:
-   * - GEN-04: sanitizeBooleanStrings on output
+   * - GEN-04: sanitizeBooleanStringsByParent on output
    * - G8e: returned:never filtering (RFC 7643 §2.4)
    */
   private toScimResponse(
@@ -750,13 +750,13 @@ export class EndpointScimGenericService {
     // Ensure version is current
     meta.version = `W/"${record.version}"`;
 
-    // GEN-04: Schema-aware boolean sanitization on output
-    const schemaDefs = this.getSchemaDefinitions(resourceType, record.endpointId);
-    const booleanKeys = SchemaValidator.collectBooleanAttributeNames(schemaDefs);
-    sanitizeBooleanStrings(payload, booleanKeys);
+    // GEN-04: Parent-context-aware boolean sanitization on output
+    const boolMap = this.getBooleansByParentForRT(resourceType, record.endpointId);
+    sanitizeBooleanStringsByParent(payload, boolMap);
 
     // G8e: Strip returned:'never' attributes from payload (e.g. writeOnly secrets)
     // Per RFC 7643 §2.4, these MUST NOT appear in any response.
+    const schemaDefs = this.getSchemaDefinitions(resourceType, record.endpointId);
     const { never: neverAttrs } = SchemaValidator.collectReturnedCharacteristics(schemaDefs);
     if (neverAttrs.size > 0) {
       stripReturnedNever(payload, neverAttrs);
@@ -878,7 +878,7 @@ export class EndpointScimGenericService {
 
   /**
    * GEN-03: Coerce boolean strings ("True"/"False") to native booleans before validation.
-   * Dynamic-URN equivalent of ScimSchemaHelpers.coerceBooleanStringsIfEnabled().
+   * Uses parent-context-aware maps from the precomputed cache for precision.
    */
   private coerceBooleanStringsIfEnabled(
     dto: Record<string, unknown>,
@@ -893,9 +893,25 @@ export class EndpointScimGenericService {
     );
     if (!coerceEnabled) return;
 
+    const boolMap = this.getBooleansByParentForRT(resourceType, endpointId);
+    sanitizeBooleanStringsByParent(dto, boolMap);
+  }
+
+  /**
+   * Get booleansByParent map from profile cache or build from schema definitions.
+   */
+  private getBooleansByParentForRT(
+    resourceType: ScimResourceType,
+    endpointId: string,
+  ): Map<string, Set<string>> {
+    const profile = this.endpointContext.getProfile?.();
+    if (profile?._schemaCache?.booleansByParent instanceof Map) {
+      return profile._schemaCache.booleansByParent;
+    }
+    // Fallback: build from schema definitions
     const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-    const booleanKeys = SchemaValidator.collectBooleanAttributeNames(schemaDefs);
-    sanitizeBooleanStrings(dto, booleanKeys);
+    const cache = SchemaValidator.buildCharacteristicsCache(schemaDefs);
+    return cache.booleansByParent;
   }
 
   /**

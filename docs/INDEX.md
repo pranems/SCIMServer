@@ -1,7 +1,7 @@
 # 📚 SCIMServer Documentation Index
 
-> **Version:** 0.29.0 · **Updated:** March 19, 2026  
-> 54 active docs in `docs/` · 35 E2E suites (763 pass) · 72 unit suites (2,887 pass) · 6 built-in presets
+> **Version:** 0.29.0 · **Updated:** March 20, 2026  
+> 55 active docs in `docs/` · 35 E2E suites (763 pass) · 73 unit suites (2,923 pass) · 6 built-in presets
 
 ---
 

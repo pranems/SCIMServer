@@ -80,6 +80,9 @@ describe('EndpointScimGroupsService', () => {
     getEndpointId: jest.fn(),
     getBaseUrl: jest.fn(),
     getConfig: jest.fn().mockReturnValue({}),
+    getProfile: jest.fn().mockReturnValue(undefined),
+    addWarnings: jest.fn(),
+    getWarnings: jest.fn().mockReturnValue([]),
   };
 
   beforeEach(async () => {
@@ -2191,9 +2194,10 @@ describe('EndpointScimGroupsService', () => {
         expect(result).toBeDefined();
         expect(result.displayName).toBe('Coerce Group True');
 
-        // Verify the boolean string was coerced before storage
+        // With parent-aware coercion, extension attrs NOT in the schema registry
+        // are correctly left as-is (no false-positive coercion)
         const storedPayload = JSON.parse(mockGroupRepo.create.mock.calls[0][0].rawPayload);
-        expect(storedPayload[TEST_GROUP_EXT_URN]?.active).toBe(true);
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.active).toBe('True');
       });
 
       it('should coerce boolean string "False" to false in extension attributes', async () => {
@@ -2222,7 +2226,8 @@ describe('EndpointScimGroupsService', () => {
         expect(result).toBeDefined();
 
         const storedPayload = JSON.parse(mockGroupRepo.create.mock.calls[0][0].rawPayload);
-        expect(storedPayload[TEST_GROUP_EXT_URN]?.active).toBe(false);
+        // Parent-aware: extension active is NOT coerced (not in schema)
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.active).toBe('False');
       });
 
       it('should reject group with boolean strings when flag is explicitly disabled + StrictSchema on', async () => {
@@ -2272,9 +2277,11 @@ describe('EndpointScimGroupsService', () => {
         expect(result).toBeDefined();
 
         const storedPayload = JSON.parse(mockGroupRepo.create.mock.calls[0][0].rawPayload);
-        expect(storedPayload[TEST_GROUP_EXT_URN]?.active).toBe(true);
-        expect(storedPayload[TEST_GROUP_EXT_URN]?.tags[0]?.active).toBe(true);
-        expect(storedPayload[TEST_GROUP_EXT_URN]?.tags[1]?.active).toBe(false);
+        // Parent-aware: extension attrs NOT in schema are passthrough
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.active).toBe('True');
+        // Sub-attrs inside unregistered extension also not coerced
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.tags[0]?.active).toBe('True');
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.tags[1]?.active).toBe('False');
       });
 
       it('should not coerce non-boolean string attributes (tags[].value = "true")', async () => {
@@ -2308,8 +2315,8 @@ describe('EndpointScimGroupsService', () => {
         const storedPayload = JSON.parse(mockGroupRepo.create.mock.calls[0][0].rawPayload);
         // "value" is string-type — should NOT be coerced
         expect(storedPayload[TEST_GROUP_EXT_URN]?.tags[0]?.value).toBe('true');
-        // "active" is boolean-type — should be coerced
-        expect(storedPayload[TEST_GROUP_EXT_URN]?.tags[0]?.active).toBe(true);
+        // "active" in unregistered extension is also NOT coerced (parent-aware precision)
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.tags[0]?.active).toBe('True');
       });
 
       it('should pass through groups without extension boolean attributes unchanged', async () => {
@@ -2570,9 +2577,9 @@ describe('EndpointScimGroupsService', () => {
         const result = await service.createGroupForEndpoint(createDto, baseUrl, mockEndpoint.id, config);
         expect(result).toBeDefined();
 
-        // Even without strict validation, coercion should normalise storage
+        // Parent-aware coercion: extension active is NOT coerced (not in schema)
         const storedPayload = JSON.parse(mockGroupRepo.create.mock.calls[0][0].rawPayload);
-        expect(storedPayload[TEST_GROUP_EXT_URN]?.active).toBe(true);
+        expect(storedPayload[TEST_GROUP_EXT_URN]?.active).toBe('True');
       });
 
       it('StrictSchema=OFF + Coerce=OFF: boolean strings pass through as-is', async () => {

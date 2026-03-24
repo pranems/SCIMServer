@@ -22,11 +22,13 @@
 
 import type {
   SchemaAttributeDefinition,
+  SchemaCharacteristicsCache,
   SchemaDefinition,
   ValidationError,
   ValidationOptions,
   ValidationResult,
 } from './validation-types';
+import { SCHEMA_CACHE_TOP_LEVEL } from './validation-types';
 
 /**
  * Reserved top-level SCIM keys that are never user-defined attributes.
@@ -1251,6 +1253,137 @@ export class SchemaValidator {
     }
 
     return { core, extensions, coreSubAttrs, extensionSubAttrs };
+  }
+
+  // ─── Schema Characteristics Cache Builder ─────────────────────────
+
+  /**
+   * Build a precomputed `SchemaCharacteristicsCache` from schema definitions
+   * in a single tree walk. Produces Parent→Children maps for all characteristics.
+   *
+   * The parent key is:
+   * - `SCHEMA_CACHE_TOP_LEVEL` ("__top__") for core schema top-level attributes
+   * - The extension schema URN (lowercase) for extension top-level attributes
+   * - The parent attribute name (lowercase) for sub-attributes of complex types
+   *
+   * Called once at profile load / endpoint create / profile PATCH.
+   * The returned cache is attached to the profile and consumed by all
+   * service-layer operations with zero per-request recomputation.
+   *
+   * @param schemas        Schema definitions (core + extension)
+   * @param extensionUrns  Extension URNs from resource type declarations
+   * @returns Precomputed cache with all Parent→Children maps
+   */
+  static buildCharacteristicsCache(
+    schemas: readonly SchemaDefinition[],
+    extensionUrns: readonly string[] = [],
+  ): SchemaCharacteristicsCache {
+    const booleansByParent = new Map<string, Set<string>>();
+    const neverReturnedByParent = new Map<string, Set<string>>();
+    const alwaysReturnedByParent = new Map<string, Set<string>>();
+    const requestReturnedByParent = new Map<string, Set<string>>();
+    const readOnlyByParent = new Map<string, Set<string>>();
+    const immutableByParent = new Map<string, Set<string>>();
+    const caseExactByParent = new Map<string, Set<string>>();
+    const alwaysReturnedSubs = new Map<string, Set<string>>();
+    const uniqueAttrs: Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }> = [];
+
+    // Helper: ensure a key exists in a Map<string, Set<string>>
+    const addTo = (map: Map<string, Set<string>>, parent: string, child: string): void => {
+      let set = map.get(parent);
+      if (!set) { set = new Set(); map.set(parent, set); }
+      set.add(child);
+    };
+
+    for (const schema of schemas) {
+      const isCore = isCoreSchema(schema);
+      // Top-level parent key: __top__ for core, extension URN (lowercase) for extensions
+      const topParent = isCore ? SCHEMA_CACHE_TOP_LEVEL : schema.id.toLowerCase();
+
+      const walkAttrs = (
+        attrs: readonly SchemaAttributeDefinition[],
+        parentKey: string,
+        isTopLevel: boolean,
+      ): void => {
+        for (const attr of attrs) {
+          const nameLower = attr.name.toLowerCase();
+          const returned = attr.returned?.toLowerCase();
+          const mutability = attr.mutability?.toLowerCase();
+
+          // ─── Boolean ───
+          if (attr.type === 'boolean') {
+            addTo(booleansByParent, parentKey, nameLower);
+          }
+
+          // ─── Returned characteristics ───
+          if (returned === 'never' || mutability === 'writeonly') {
+            addTo(neverReturnedByParent, parentKey, nameLower);
+          }
+          if (returned === 'always') {
+            if (isTopLevel) {
+              addTo(alwaysReturnedByParent, parentKey, nameLower);
+            } else {
+              // R-RET-3: Sub-attribute with returned:'always'
+              addTo(alwaysReturnedSubs, parentKey, nameLower);
+            }
+          }
+          if (returned === 'request') {
+            addTo(requestReturnedByParent, parentKey, nameLower);
+          }
+
+          // ─── Mutability ───
+          if (mutability === 'readonly') {
+            addTo(readOnlyByParent, parentKey, nameLower);
+          }
+          if (mutability === 'immutable') {
+            addTo(immutableByParent, parentKey, nameLower);
+          }
+
+          // ─── CaseExact ───
+          if (attr.caseExact === true) {
+            addTo(caseExactByParent, parentKey, nameLower);
+          }
+
+          // ─── Uniqueness (top-level only, non-complex, non-multiValued) ───
+          if (
+            isTopLevel &&
+            attr.uniqueness?.toLowerCase() === 'server' &&
+            !attr.multiValued &&
+            attr.type !== 'complex'
+          ) {
+            const skip = nameLower === 'username' || nameLower === 'externalid' ||
+                         nameLower === 'displayname' || nameLower === 'id';
+            if (!skip) {
+              uniqueAttrs.push({
+                schemaUrn: isCore ? null : schema.id,
+                attrName: attr.name,
+                caseExact: attr.caseExact ?? false,
+              });
+            }
+          }
+
+          // ─── Recurse into sub-attributes ───
+          if (attr.subAttributes) {
+            walkAttrs(attr.subAttributes, nameLower, false);
+          }
+        }
+      };
+
+      walkAttrs(schema.attributes, topParent, true);
+    }
+
+    return {
+      booleansByParent,
+      neverReturnedByParent,
+      alwaysReturnedByParent,
+      requestReturnedByParent,
+      readOnlyByParent,
+      immutableByParent,
+      caseExactByParent,
+      alwaysReturnedSubs,
+      uniqueAttrs,
+      extensionUrns,
+    };
   }
 
   // ─── G8c: PATCH path utilities ────────────────────────────────────
