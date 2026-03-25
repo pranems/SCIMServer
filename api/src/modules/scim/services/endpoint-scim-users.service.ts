@@ -31,11 +31,12 @@ import {
   parseJson,
   ensureSchema,
   enforceIfMatch,
-  sanitizeBooleanStrings,
+  sanitizeBooleanStringsByParent,
   guardSoftDeleted,
   ScimSchemaHelpers,
   assertSchemaUniqueness,
 } from '../common/scim-service-helpers';
+import { SCHEMA_CACHE_TOP_LEVEL } from '../../../domain/validation';
 
 interface ListUsersParams {
   filter?: string;
@@ -69,8 +70,8 @@ export class EndpointScimUsersService {
     this.schemaHelpers.enforceStrictSchemaValidation(dto, endpointId, config);
 
     // Coerce boolean strings ("True"/"False") to native booleans before schema validation.
-    // Supersedes StrictSchemaValidation boolean type rejections when enabled.
-    this.schemaHelpers.coerceBooleanStringsIfEnabled(dto as Record<string, unknown>, endpointId, config);
+    // Uses parent-context-aware maps for precision (prevents name-collision false positives).
+    this.schemaHelpers.coerceBooleansByParentIfEnabled(dto as Record<string, unknown>, endpointId, config);
 
     this.schemaHelpers.validatePayloadSchema(dto, endpointId, config, 'create');
 
@@ -268,8 +269,8 @@ export class EndpointScimUsersService {
     ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
     this.schemaHelpers.enforceStrictSchemaValidation(dto, endpointId, config);
 
-    // Coerce boolean strings before schema validation (same as create path)
-    this.schemaHelpers.coerceBooleanStringsIfEnabled(dto as Record<string, unknown>, endpointId, config);
+    // Coerce boolean strings before schema validation (same as create path — parent-aware)
+    this.schemaHelpers.coerceBooleansByParentIfEnabled(dto as Record<string, unknown>, endpointId, config);
 
     this.schemaHelpers.validatePayloadSchema(dto, endpointId, config, 'replace');
 
@@ -484,17 +485,17 @@ export class EndpointScimUsersService {
       }
       const schemaDefs = this.schemaHelpers.buildSchemaDefinitions(resultPayloadPlaceholder, endpointId);
 
-      // Coerce boolean strings in PATCH operation values before validation
+      // Coerce boolean strings in PATCH operation values before validation (parent-aware)
       const coerceEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS, true);
       if (coerceEnabled) {
-        const booleanKeys = this.schemaHelpers.getBooleanKeys(endpointId);
+        const boolMap = this.schemaHelpers.getBooleansByParent(endpointId);
         for (const op of patchDto.Operations) {
           if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
-            sanitizeBooleanStrings(op.value as Record<string, unknown>, booleanKeys);
+            sanitizeBooleanStringsByParent(op.value as Record<string, unknown>, boolMap, SCHEMA_CACHE_TOP_LEVEL);
           } else if (Array.isArray(op.value)) {
             for (const item of op.value) {
               if (typeof item === 'object' && item !== null) {
-                sanitizeBooleanStrings(item as Record<string, unknown>, booleanKeys);
+                sanitizeBooleanStringsByParent(item as Record<string, unknown>, boolMap, SCHEMA_CACHE_TOP_LEVEL);
               }
             }
           }
@@ -556,7 +557,7 @@ export class EndpointScimUsersService {
     // Coerce boolean strings in post-PATCH payload before schema validation.
     // PATCH filter expressions like roles[primary eq "True"] can materialise string
     // literals into the result payload — this converts them to native booleans.
-    this.schemaHelpers.coerceBooleanStringsIfEnabled(resultPayload, endpointId, config);
+    this.schemaHelpers.coerceBooleansByParentIfEnabled(resultPayload, endpointId, config);
 
     this.schemaHelpers.validatePayloadSchema(resultPayload, endpointId, config, 'patch');
 
@@ -594,11 +595,11 @@ export class EndpointScimUsersService {
     const meta = this.buildMeta(user, baseUrl);
     const rawPayload = parseJson<Record<string, unknown>>(String(user.rawPayload ?? '{}'));
 
-    // V16 fix: Schema-aware boolean sanitization — only convert attributes whose schema
-    // type is "boolean" (e.g. active, emails[].primary). Prevents corruption of string
-    // attributes like roles[].value = "true" which is a legitimate string value.
-    const booleanKeys = this.schemaHelpers.getBooleanKeys(endpointId);
-    sanitizeBooleanStrings(rawPayload, booleanKeys);
+    // Parent-context-aware boolean sanitization — uses precomputed Parent→Children maps
+    // for precision. Prevents name-collision false positives (e.g., core `active` boolean
+    // vs extension `active` string). Also prevents corruption of string attributes.
+    const boolMap = this.schemaHelpers.getBooleansByParent(endpointId);
+    sanitizeBooleanStringsByParent(rawPayload, boolMap);
 
     // G8e: Strip returned:'never' attributes from rawPayload (e.g. password)
     // Per RFC 7643 §2.4, these MUST NOT appear in any response.

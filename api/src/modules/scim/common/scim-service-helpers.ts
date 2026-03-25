@@ -20,12 +20,52 @@ import {
 } from '../../endpoint/endpoint-config.interface';
 import type { ScimSchemaRegistry, ScimSchemaDefinition } from '../discovery/scim-schema-registry';
 import { SchemaValidator } from '../../../domain/validation';
-import type { SchemaDefinition, SchemaAttributeDefinition } from '../../../domain/validation';
+import type { SchemaDefinition, SchemaAttributeDefinition, SchemaCharacteristicsCache } from '../../../domain/validation';
+import { SCHEMA_CACHE_TOP_LEVEL } from '../../../domain/validation';
 import type { ScimLogger } from '../../logging/scim-logger.service';
 import type { LogCategory } from '../../logging/log-levels';
 import type { PatchOperation } from '../../../domain/patch/patch-types';
 import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-parser';
 import type { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
+
+// ─── Cache Flatten Helpers ──────────────────────────────────────────────────
+
+/**
+ * Flatten a Parent→Children map into a flat Set of all child names.
+ * Unions all children across all parent keys (ignoring parent context).
+ *
+ * Used to convert the precomputed cache's Parent→Children maps back into
+ * the flat Set<string> shape expected by existing consumers
+ * (e.g., `getReturnedCharacteristics()` return type).
+ */
+export function flattenParentChildMap(map: Map<string, Set<string>>): Set<string> {
+  const flat = new Set<string>();
+  for (const children of map.values()) {
+    for (const child of children) {
+      flat.add(child);
+    }
+  }
+  return flat;
+}
+
+/**
+ * Flatten a Parent→Children map into dotted paths (e.g., 'meta.location').
+ * Top-level attributes (parent = __top__ or extension URN) produce bare names.
+ * Sub-attributes (parent = attribute name) produce 'parent.child' paths.
+ *
+ * Used to convert `caseExactByParent` cache into the dotted-path Set
+ * expected by `collectCaseExactAttributes()` consumers.
+ */
+function flattenParentChildMapToDottedPaths(map: Map<string, Set<string>>): Set<string> {
+  const result = new Set<string>();
+  for (const [parent, children] of map) {
+    const isTopLevel = parent === SCHEMA_CACHE_TOP_LEVEL || parent.startsWith('urn:');
+    for (const child of children) {
+      result.add(isTopLevel ? child : `${parent}.${child}`);
+    }
+  }
+  return result;
+}
 
 // ─── Pure Utility Functions ─────────────────────────────────────────────────
 
@@ -121,6 +161,48 @@ export function sanitizeBooleanStrings(
 }
 
 /**
+ * Parent-context-aware boolean string sanitizer.
+ *
+ * Recursively walks a SCIM payload and coerces string "True"/"False" to native
+ * booleans, using a Parent→Children Map for precision. This prevents name-collision
+ * false positives (e.g., core `active` is boolean but extension `active` is string).
+ *
+ * Parent key convention:
+ * - `SCHEMA_CACHE_TOP_LEVEL` ("__top__") — top-level core attributes
+ * - Extension URN (lowercase) — top-level extension attributes
+ * - Attribute name (lowercase) — sub-attributes of complex/array parents
+ *
+ * @param obj         - The object to sanitize (mutated in place)
+ * @param boolMap     - Parent→Children map of boolean attribute names
+ * @param parentKey   - Current parent context (default: __top__)
+ */
+export function sanitizeBooleanStringsByParent(
+  obj: Record<string, unknown>,
+  boolMap: Map<string, Set<string>>,
+  parentKey: string = SCHEMA_CACHE_TOP_LEVEL,
+): void {
+  const boolChildren = boolMap.get(parentKey);
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (typeof item === 'object' && item !== null) {
+          // Array elements: parent context becomes the array attribute name
+          sanitizeBooleanStringsByParent(item as Record<string, unknown>, boolMap, key.toLowerCase());
+        }
+      }
+    } else if (typeof value === 'object' && value !== null) {
+      // Nested object: could be extension URN object or complex attribute
+      sanitizeBooleanStringsByParent(value as Record<string, unknown>, boolMap, key.toLowerCase());
+    } else if (typeof value === 'string' && boolChildren?.has(key.toLowerCase())) {
+      const lower = value.toLowerCase();
+      if (lower === 'true') obj[key] = true;
+      else if (lower === 'false') obj[key] = false;
+    }
+  }
+}
+
+/**
  * RFC 7644 §3.6: Guard against operations on soft-deleted resources.
  *
  * When SoftDeleteEnabled is active, a resource with deletedAt set is considered
@@ -175,8 +257,9 @@ export const SCIM_WARNING_URN = 'urn:scimserver:api:messages:2.0:Warning';
 export function stripReadOnlyAttributes(
   payload: Record<string, unknown>,
   schemaDefinitions: readonly SchemaDefinition[],
+  preCollected?: { core: Set<string>; extensions: Map<string, Set<string>>; coreSubAttrs: Map<string, Set<string>>; extensionSubAttrs: Map<string, Map<string, Set<string>>> },
 ): string[] {
-  const { core, extensions, coreSubAttrs, extensionSubAttrs } = SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
+  const { core, extensions, coreSubAttrs, extensionSubAttrs } = preCollected ?? SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
   const stripped: string[] = [];
 
   // Strip core readOnly attributes (case-insensitive)
@@ -303,8 +386,9 @@ export function stripReadOnlyAttributes(
 export function stripReadOnlyPatchOps(
   operations: PatchOperation[],
   schemaDefinitions: readonly SchemaDefinition[],
+  preCollected?: { core: Set<string>; extensions: Map<string, Set<string>>; coreSubAttrs: Map<string, Set<string>> },
 ): { filtered: PatchOperation[]; stripped: string[] } {
-  const { core, extensions, coreSubAttrs } = SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
+  const { core, extensions, coreSubAttrs } = preCollected ?? SchemaValidator.collectReadOnlyAttributes(schemaDefinitions);
   const stripped: string[] = [];
   const filtered: PatchOperation[] = [];
 
@@ -744,16 +828,115 @@ export class ScimSchemaHelpers {
   /**
    * Build the set of boolean attribute names for the resource's schema.
    * Collects names from core + extension schemas.
+   * @deprecated Use getBooleansByParent() for parent-context-aware coercion
    */
   getBooleanKeys(endpointId?: string): Set<string> {
     const schemas = this.getSchemaDefinitions(endpointId);
     return SchemaValidator.collectBooleanAttributeNames(schemas);
   }
 
+  // ─── Precomputed Cache Accessors (Parent→Children Maps) ───────────
+
+  /**
+   * Get the precomputed SchemaCharacteristicsCache from the endpoint profile.
+   * Falls back to building one from schema definitions if the profile doesn't
+   * have a cache yet (legacy data loaded from DB before cache was introduced).
+   *
+   * @returns SchemaCharacteristicsCache or undefined if no schemas available
+   */
+  private getSchemaCache(endpointId?: string): SchemaCharacteristicsCache | undefined {
+    const profile = this.endpointContextStorage?.getProfile?.();
+
+    // Validate that the cache has real Map instances (not a JSON-serialized artifact)
+    if (profile?._schemaCache?.booleansByParent instanceof Map) {
+      return profile._schemaCache;
+    }
+
+    // Fallback: build cache from schema definitions (legacy data / no profile)
+    const schemas = this.getSchemaDefinitions(endpointId);
+    if (schemas.length === 0) return undefined;
+
+    const extensionUrns = this.getExtensionUrns(endpointId);
+    const cache = SchemaValidator.buildCharacteristicsCache(schemas, extensionUrns);
+
+    // Attach to profile for next access within this request
+    if (profile) {
+      profile._schemaCache = cache;
+    }
+
+    return cache;
+  }
+
+  /**
+   * Get the Parent→Children boolean map from the precomputed cache.
+   * Used by sanitizeBooleanStringsByParent() for parent-context-aware coercion.
+   */
+  getBooleansByParent(endpointId?: string): Map<string, Set<string>> {
+    return this.getSchemaCache(endpointId)?.booleansByParent ?? new Map();
+  }
+
+  /**
+   * Get the Parent→Children never-returned map from the precomputed cache.
+   * Includes returned:'never' AND mutability:'writeOnly' attributes.
+   */
+  getNeverReturnedByParent(endpointId?: string): Map<string, Set<string>> {
+    return this.getSchemaCache(endpointId)?.neverReturnedByParent ?? new Map();
+  }
+
+  /**
+   * Get the Parent→Children readOnly map from the precomputed cache.
+   */
+  getReadOnlyByParent(endpointId?: string): Map<string, Set<string>> {
+    return this.getSchemaCache(endpointId)?.readOnlyByParent ?? new Map();
+  }
+
+  /**
+   * Get unique attributes from the precomputed cache.
+   */
+  getUniqueAttributesCached(endpointId?: string): Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }> {
+    return this.getSchemaCache(endpointId)?.uniqueAttrs ?? [];
+  }
+
+  /**
+   * Coerce boolean-typed string values to native booleans using parent-context-aware maps.
+   *
+   * Gated by AllowAndCoerceBooleanStrings (default: true). Uses the precomputed
+   * booleansByParent cache for zero-recomputation coercion with parent-key precision.
+   */
+  coerceBooleansByParentIfEnabled(
+    dto: Record<string, unknown>,
+    endpointId: string,
+    config?: EndpointConfig,
+  ): void {
+    const coerceEnabled = getConfigBooleanWithDefault(
+      config,
+      ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS,
+      true,
+    );
+    if (!coerceEnabled) return;
+
+    const boolMap = this.getBooleansByParent(endpointId);
+    sanitizeBooleanStringsByParent(dto, boolMap);
+  }
+
   /**
    * Collect returned characteristic sets (never + request + always + alwaysSubs) for the resource's schemas.
+   *
+   * Uses the precomputed cache when available — flattens Parent→Children maps
+   * into flat Sets by unioning all children across all parent keys.
+   * Falls back to SchemaValidator.collectReturnedCharacteristics() if no cache.
    */
   getReturnedCharacteristics(endpointId?: string): { never: Set<string>; request: Set<string>; always: Set<string>; alwaysSubs: Map<string, Set<string>> } {
+    const cache = this.getSchemaCache(endpointId);
+    if (cache) {
+      return {
+        never: flattenParentChildMap(cache.neverReturnedByParent),
+        request: flattenParentChildMap(cache.requestReturnedByParent),
+        always: flattenParentChildMap(cache.alwaysReturnedByParent),
+        alwaysSubs: cache.alwaysReturnedSubs,
+      };
+    }
+    // Fallback: no cache available (no schemas)
     const schemas = this.getSchemaDefinitions(endpointId);
     return SchemaValidator.collectReturnedCharacteristics(schemas);
   }
@@ -788,8 +971,15 @@ export class ScimSchemaHelpers {
   /**
    * Get attribute names/paths with caseExact:true (R-CASE-1).
    * Returns Set of lowercase dotted paths (e.g., 'id', 'meta.location').
+   *
+   * Uses the precomputed cache when available — reconstructs dotted paths
+   * from Parent→Children maps. Falls back to collectCaseExactAttributes().
    */
   getCaseExactAttributes(endpointId?: string): Set<string> {
+    const cache = this.getSchemaCache(endpointId);
+    if (cache) {
+      return flattenParentChildMapToDottedPaths(cache.caseExactByParent);
+    }
     const schemas = this.getSchemaDefinitions(endpointId);
     return SchemaValidator.collectCaseExactAttributes(schemas);
   }
@@ -856,12 +1046,18 @@ export class ScimSchemaHelpers {
    * Strip readOnly attributes from a POST/PUT payload using the endpoint's
    * registered schema definitions.
    *
+   * Uses the precomputed cache when available to avoid per-request tree walks.
+   *
    * @returns Array of stripped attribute names (for logging/warning)
    */
   stripReadOnlyAttributesFromPayload(
     payload: Record<string, unknown>,
     endpointId?: string,
   ): string[] {
+    const cache = this.getSchemaCache(endpointId);
+    if (cache) {
+      return stripReadOnlyAttributes(payload, [], cache.readOnlyCollected);
+    }
     const schemas = this.getSchemaDefinitions(endpointId);
     return stripReadOnlyAttributes(payload, schemas);
   }
@@ -870,12 +1066,18 @@ export class ScimSchemaHelpers {
    * Filter PATCH operations targeting readOnly attributes using the endpoint's
    * registered schema definitions.
    *
+   * Uses the precomputed cache when available to avoid per-request tree walks.
+   *
    * @returns Object with filtered operations and stripped attribute names
    */
   stripReadOnlyFromPatchOps(
     operations: PatchOperation[],
     endpointId?: string,
   ): { filtered: PatchOperation[]; stripped: string[] } {
+    const cache = this.getSchemaCache(endpointId);
+    if (cache) {
+      return stripReadOnlyPatchOps(operations, [], cache.readOnlyCollected);
+    }
     const schemas = this.getSchemaDefinitions(endpointId);
     return stripReadOnlyPatchOps(operations, schemas);
   }
@@ -883,11 +1085,9 @@ export class ScimSchemaHelpers {
   /**
    * Coerce boolean-typed string values to native booleans on write payloads.
    *
-   * Gated by AllowAndCoerceBooleanStrings (default: true). When enabled, converts
-   * attributes like primary = "True" → true before schema validation,
-   * preventing StrictSchemaValidation from rejecting valid-intent payloads.
-   *
-   * @see RFC 7644 §3.12 — "Be liberal in what you accept" (Postel's Law)
+   * @deprecated Use coerceBooleansByParentIfEnabled() for parent-context-aware coercion.
+   * This method uses the flat getBooleanKeys() which cannot distinguish
+   * core `active` (boolean) from extension `active` (string).
    */
   coerceBooleanStringsIfEnabled(
     dto: Record<string, unknown>,
@@ -948,9 +1148,15 @@ export class ScimSchemaHelpers {
    * uniqueness enforcement. Each descriptor includes the schema URN (for extension
    * attribute location) and the caseExact flag for comparison mode.
    *
+   * Uses the precomputed cache when available. Falls back to collectUniqueAttributes().
+   *
    * @see RFC 7643 §2.1 — `uniqueness: 'server'` SHOULD be unique within the endpoint
    */
   getUniqueAttributes(endpointId?: string): Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }> {
+    const cache = this.getSchemaCache(endpointId);
+    if (cache) {
+      return cache.uniqueAttrs;
+    }
     const schemas = this.getSchemaDefinitions(endpointId);
     return SchemaValidator.collectUniqueAttributes(schemas);
   }

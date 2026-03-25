@@ -469,12 +469,20 @@ export class EndpointService implements OnModuleInit {
 
   private toResponse(endpoint: Endpoint): EndpointResponse {
     const profile = endpoint.profile as Record<string, any> | null;
+    const typedProfile = profile as EndpointProfile | undefined;
+
+    // Strip any serialized _schemaCache artifact from DB (plain object, not Map).
+    // The cache is built lazily by getSchemaCache() on first request access.
+    if (typedProfile?._schemaCache) {
+      delete typedProfile._schemaCache;
+    }
+
     return {
       id: endpoint.id,
       name: endpoint.name,
       displayName: endpoint.displayName || endpoint.name,
       description: endpoint.description ?? undefined,
-      profile: profile as EndpointProfile | undefined,
+      profile: typedProfile,
       active: endpoint.active,
       scimEndpoint: `/scim/endpoints/${endpoint.id}`,
       createdAt: endpoint.createdAt,

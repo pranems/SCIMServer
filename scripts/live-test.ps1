@@ -6625,6 +6625,195 @@ Test-Result -Success $true -Message "9z.cleanup: Deleted profile test endpoints"
 Write-Host "`n--- 9z: Profile & Preset Discovery Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-C: SCHEMA CHARACTERISTICS CACHE (Precomputed Cache Validation)
+$script:currentSection = "9z-C: Schema Cache"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-C: SCHEMA CHARACTERISTICS CACHE" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Create a dedicated endpoint with extension that has name-collision attributes
+$cacheEpName = "cache-live-$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())"
+$cacheExtUrn = "urn:test:cache:2.0:User"
+$cacheProfile = @{
+    schemas = @(
+        @{ id = "urn:ietf:params:scim:schemas:core:2.0:User"; name = "User"; attributes = "all" }
+        @{
+            id = $cacheExtUrn
+            name = "CacheTestExt"
+            description = "Extension with name-collision attrs for cache testing"
+            attributes = @(
+                @{ name = "department"; type = "string"; multiValued = $false; required = $false; mutability = "readWrite"; returned = "default" }
+                @{ name = "badge"; type = "string"; multiValued = $false; required = $false; mutability = "readWrite"; returned = "never"; description = "writeOnly badge" }
+                @{ name = "active"; type = "string"; multiValued = $false; required = $false; mutability = "readWrite"; returned = "default"; description = "String active NOT boolean" }
+            )
+        }
+    )
+    resourceTypes = @(
+        @{
+            id = "User"; name = "User"; endpoint = "/Users"; description = "User"
+            schema = "urn:ietf:params:scim:schemas:core:2.0:User"
+            schemaExtensions = @(@{ schema = $cacheExtUrn; required = $false })
+        }
+    )
+    settings = @{ AllowAndCoerceBooleanStrings = "True" }
+} | ConvertTo-Json -Depth 10
+
+$cacheEpBody = @{ name = $cacheEpName; profile = ($cacheProfile | ConvertFrom-Json) } | ConvertTo-Json -Depth 10
+try {
+    $cacheEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $cacheEpBody -ContentType "application/json"
+    $cacheEpId = $cacheEp.id
+    $cacheSBase = "$baseUrl/scim/endpoints/$cacheEpId"
+    Test-Result -Success $true -Message "9z-C.1: Created cache test endpoint with name-collision extension"
+} catch {
+    Test-Result -Success $false -Message "9z-C.1: Failed to create cache test endpoint: $_"
+    $cacheEpId = $null
+}
+
+if ($cacheEpId) {
+    # 9z-C.2: POST with core active="True" → should be coerced to boolean true
+    $cacheUser1 = @{
+        schemas = @("urn:ietf:params:scim:schemas:core:2.0:User", $cacheExtUrn)
+        userName = "cache-user1-$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())@example.com"
+        active = "True"
+        $cacheExtUrn = @{ department = "Engineering"; badge = "SECRET-123"; active = "True" }
+    } | ConvertTo-Json -Depth 5
+    try {
+        $cu1 = Invoke-RestMethod -Uri "$cacheSBase/Users" -Method POST -Headers $headers -Body $cacheUser1 -ContentType "application/scim+json"
+        $cu1Id = $cu1.id
+        # Core active should be boolean true (coerced)
+        $coreActiveOk = $cu1.active -eq $true -and $cu1.active -is [bool]
+        Test-Result -Success $coreActiveOk -Message "9z-C.2: POST coerces core active='True' to boolean true"
+    } catch {
+        Test-Result -Success $false -Message "9z-C.2: POST failed: $_"
+        $cu1Id = $null
+    }
+
+    # 9z-C.3: Extension active should remain string "True" (NOT coerced — parent-aware precision)
+    if ($cu1Id) {
+        $extBlock = $cu1.$cacheExtUrn
+        $extActiveOk = $extBlock.active -eq "True" -and $extBlock.active -is [string]
+        Test-Result -Success $extActiveOk -Message "9z-C.3: Extension active remains string 'True' (not coerced)"
+    }
+
+    # 9z-C.4: returned:never attr (badge) should NOT appear in POST response
+    if ($cu1Id) {
+        $extBlock = $cu1.$cacheExtUrn
+        $badgeMissing = $null -eq $extBlock.badge
+        Test-Result -Success $badgeMissing -Message "9z-C.4: returned:never attr 'badge' stripped from POST response"
+    }
+
+    # 9z-C.5: GET should also strip returned:never badge
+    if ($cu1Id) {
+        try {
+            $getRes = Invoke-RestMethod -Uri "$cacheSBase/Users/$cu1Id" -Method GET -Headers $headers
+            $getBadgeMissing = $null -eq $getRes.$cacheExtUrn.badge
+            $getDeptPresent = $getRes.$cacheExtUrn.department -eq "Engineering"
+            Test-Result -Success ($getBadgeMissing -and $getDeptPresent) -Message "9z-C.5: GET strips badge (never), keeps department (default)"
+        } catch {
+            Test-Result -Success $false -Message "9z-C.5: GET failed: $_"
+        }
+    }
+
+    # 9z-C.6: LIST should also strip returned:never badge
+    if ($cu1Id) {
+        try {
+            $userName = $cu1.userName
+            $encodedFilter = [Uri]::EscapeDataString("userName eq `"$userName`"")
+            $listRes = Invoke-RestMethod -Uri "$cacheSBase/Users?filter=$encodedFilter" -Method GET -Headers $headers
+            $listUser = $listRes.Resources | Where-Object { $_.id -eq $cu1Id } | Select-Object -First 1
+            $listBadgeMissing = $null -eq $listUser.$cacheExtUrn.badge
+            Test-Result -Success $listBadgeMissing -Message "9z-C.6: LIST strips returned:never badge"
+        } catch {
+            Test-Result -Success $false -Message "9z-C.6: LIST failed: $_"
+        }
+    }
+
+    # 9z-C.7: PUT should strip returned:never from response + preserve coercion
+    if ($cu1Id) {
+        try {
+            $putBody = @{
+                schemas = @("urn:ietf:params:scim:schemas:core:2.0:User", $cacheExtUrn)
+                userName = $cu1.userName
+                active = "False"
+                $cacheExtUrn = @{ department = "NewDept"; badge = "PUT-SECRET"; active = "False" }
+            } | ConvertTo-Json -Depth 5
+            $putRes = Invoke-RestMethod -Uri "$cacheSBase/Users/$cu1Id" -Method PUT -Headers $headers -Body $putBody -ContentType "application/scim+json"
+            $putCoreOk = $putRes.active -eq $false -and $putRes.active -is [bool]
+            $putBadgeMissing = $null -eq $putRes.$cacheExtUrn.badge
+            $putExtActiveStr = $putRes.$cacheExtUrn.active -eq "False" -and $putRes.$cacheExtUrn.active -is [string]
+            Test-Result -Success ($putCoreOk -and $putBadgeMissing -and $putExtActiveStr) -Message "9z-C.7: PUT coerces core, strips badge, preserves ext string"
+        } catch {
+            Test-Result -Success $false -Message "9z-C.7: PUT failed: $_"
+        }
+    }
+
+    # 9z-C.8: PATCH should strip returned:never from response
+    if ($cu1Id) {
+        try {
+            $patchBody = @{
+                schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+                Operations = @(
+                    @{ op = "replace"; path = "$($cacheExtUrn):department"; value = "PatchedDept" }
+                )
+            } | ConvertTo-Json -Depth 5
+            $patchRes = Invoke-RestMethod -Uri "$cacheSBase/Users/$cu1Id" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/scim+json"
+            $patchBadgeMissing = $null -eq $patchRes.$cacheExtUrn.badge
+            $patchDeptOk = $patchRes.$cacheExtUrn.department -eq "PatchedDept"
+            Test-Result -Success ($patchBadgeMissing -and $patchDeptOk) -Message "9z-C.8: PATCH strips badge, applies dept change"
+        } catch {
+            Test-Result -Success $false -Message "9z-C.8: PATCH failed: $_"
+        }
+    }
+
+    # 9z-C.9: Consistency — 3 rapid POSTs should all show same cache behavior
+    $consistencyOk = $true
+    for ($i = 1; $i -le 3; $i++) {
+        try {
+            $rapidUser = @{
+                schemas = @("urn:ietf:params:scim:schemas:core:2.0:User", $cacheExtUrn)
+                userName = "cache-rapid-$i-$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())@example.com"
+                active = "True"
+                $cacheExtUrn = @{ department = "Dept-$i"; badge = "B-$i"; active = "True" }
+            } | ConvertTo-Json -Depth 5
+            $rapidRes = Invoke-RestMethod -Uri "$cacheSBase/Users" -Method POST -Headers $headers -Body $rapidUser -ContentType "application/scim+json"
+            if ($rapidRes.active -ne $true) { $consistencyOk = $false }
+            if ($null -ne $rapidRes.$cacheExtUrn.badge) { $consistencyOk = $false }
+            if ($rapidRes.$cacheExtUrn.active -ne "True") { $consistencyOk = $false }
+        } catch {
+            $consistencyOk = $false
+        }
+    }
+    Test-Result -Success $consistencyOk -Message "9z-C.9: 3 rapid POSTs show consistent cache behavior"
+
+    # 9z-C.10: readOnly id/meta stripped from POST input
+    try {
+        $roUser = @{
+            schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+            userName = "cache-ro-$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())@example.com"
+            id = "client-supplied-id"
+            meta = @{ resourceType = "FAKE" }
+        } | ConvertTo-Json -Depth 5
+        $roRes = Invoke-RestMethod -Uri "$cacheSBase/Users" -Method POST -Headers $headers -Body $roUser -ContentType "application/scim+json"
+        $idOk = $roRes.id -ne "client-supplied-id"
+        $metaOk = $roRes.meta.resourceType -eq "User"
+        Test-Result -Success ($idOk -and $metaOk) -Message "9z-C.10: readOnly id/meta stripped from POST via cache"
+    } catch {
+        Test-Result -Success $false -Message "9z-C.10: readOnly stripping POST failed: $_"
+    }
+
+    # Cleanup: delete the cache test endpoint
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cacheEpId" -Method DELETE -Headers $headers | Out-Null
+        Test-Result -Success $true -Message "9z-C.cleanup: Deleted cache test endpoint"
+    } catch {
+        Test-Result -Success $false -Message "9z-C.cleanup: Failed to delete cache test endpoint: $_"
+    }
+}
+
+Write-Host "`n--- 9z-C: Schema Cache Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

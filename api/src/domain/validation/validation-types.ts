@@ -38,6 +38,57 @@ export interface ValidationResult {
   warnings?: ValidationWarning[];
 }
 
+// ─── Schema Characteristics Cache ──────────────────────────────────────────
+
+/**
+ * Precomputed Parent→Children maps for schema attribute characteristics.
+ *
+ * Built once at profile load time via `SchemaValidator.buildCharacteristicsCache()`.
+ * Each map is keyed by lowercase parent attribute name (or `__top__` for top-level
+ * attributes, or the full extension URN for extension schema top-level attributes).
+ * Values are Sets of lowercase child attribute names matching the characteristic.
+ *
+ * This structure provides:
+ * - **Precision**: Distinguishes `core:active` (boolean) from `ext:active` (string)
+ * - **Zero per-request cost**: Precomputed once, O(1) lookups at runtime
+ * - **Parent-context recursion**: Consumer passes `parentKey` through JSON tree walk
+ *
+ * @see RFC 7643 §2 — Attribute Characteristics
+ * @see docs/SCHEMA_AND_RESOURCETYPE_DATA_STRUCTURE_ANALYSIS.md
+ */
+export interface SchemaCharacteristicsCache {
+  /** Parent → Set of boolean-typed child attribute names */
+  booleansByParent: Map<string, Set<string>>;
+  /** Parent → Set of returned:'never' or writeOnly child attribute names */
+  neverReturnedByParent: Map<string, Set<string>>;
+  /** Parent → Set of returned:'always' child attribute names */
+  alwaysReturnedByParent: Map<string, Set<string>>;
+  /** Parent → Set of returned:'request' child attribute names */
+  requestReturnedByParent: Map<string, Set<string>>;
+  /** Parent → Set of mutability:'readOnly' child attribute names */
+  readOnlyByParent: Map<string, Set<string>>;
+  /** Parent → Set of mutability:'immutable' child attribute names */
+  immutableByParent: Map<string, Set<string>>;
+  /** Parent → Set of caseExact:true child attribute names */
+  caseExactByParent: Map<string, Set<string>>;
+  /** Sub-attributes with returned:'always' grouped by parent (R-RET-3) */
+  alwaysReturnedSubs: Map<string, Set<string>>;
+  /** Unique-server attributes with schema URN context (for JSONB uniqueness) */
+  uniqueAttrs: Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }>;
+  /** Extension schema URNs declared on this endpoint's resource types */
+  extensionUrns: readonly string[];
+  /** Precomputed readOnly attribute sets — same shape as collectReadOnlyAttributes() */
+  readOnlyCollected: {
+    core: Set<string>;
+    extensions: Map<string, Set<string>>;
+    coreSubAttrs: Map<string, Set<string>>;
+    extensionSubAttrs: Map<string, Map<string, Set<string>>>;
+  };
+}
+
+/** Sentinel key for top-level attributes in Parent→Children maps */
+export const SCHEMA_CACHE_TOP_LEVEL = '__top__';
+
 /**
  * Attribute definition shape (mirrors ScimSchemaAttribute from registry).
  * Redefined here to keep the domain layer framework-free.

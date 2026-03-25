@@ -4,6 +4,12 @@ import { EndpointService } from './endpoint.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ScimLogger } from '../../logging/scim-logger.service';
 
+// Force Prisma backend for unit tests — these tests mock PrismaService,
+// not the in-memory cache. The inmemory path uses a different code flow.
+const originalBackend = process.env.PERSISTENCE_BACKEND;
+beforeAll(() => { process.env.PERSISTENCE_BACKEND = 'prisma'; });
+afterAll(() => { process.env.PERSISTENCE_BACKEND = originalBackend; });
+
 describe('EndpointService', () => {
   let service: EndpointService;
   let prisma: PrismaService;
