@@ -61,23 +61,29 @@ export interface SchemaCharacteristicsCache {
   booleansByParent: Map<string, Set<string>>;
   /** Parent → Set of returned:'never' or writeOnly child attribute names */
   neverReturnedByParent: Map<string, Set<string>>;
-  /** Parent → Set of returned:'always' child attribute names */
+  /** Parent → Set of returned:'always' child attribute names (top-level only) */
   alwaysReturnedByParent: Map<string, Set<string>>;
   /** Parent → Set of returned:'request' child attribute names */
   requestReturnedByParent: Map<string, Set<string>>;
-  /** Parent → Set of mutability:'readOnly' child attribute names */
-  readOnlyByParent: Map<string, Set<string>>;
   /** Parent → Set of mutability:'immutable' child attribute names */
   immutableByParent: Map<string, Set<string>>;
   /** Parent → Set of caseExact:true child attribute names */
   caseExactByParent: Map<string, Set<string>>;
+  /** Pre-flattened set of caseExact:true attribute paths (lowercase, dotted for sub-attrs) — consumer convenience */
+  caseExactPaths: Set<string>;
   /** Sub-attributes with returned:'always' grouped by parent (R-RET-3) */
   alwaysReturnedSubs: Map<string, Set<string>>;
   /** Unique-server attributes with schema URN context (for JSONB uniqueness) */
   uniqueAttrs: Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }>;
   /** Extension schema URNs declared on this endpoint's resource types */
   extensionUrns: readonly string[];
-  /** Precomputed readOnly attribute sets — same shape as collectReadOnlyAttributes() */
+  /** Precomputed core attribute lookup: lowercase name → SchemaAttributeDefinition */
+  coreAttrMap: Map<string, SchemaAttributeDefinition>;
+  /** Precomputed extension schema lookup: URN → SchemaDefinition */
+  extensionSchemaMap: Map<string, SchemaDefinition>;
+  /** Parent → Set of mutability:'readOnly' child attribute names */
+  readOnlyByParent: Map<string, Set<string>>;
+  /** Precomputed readOnly attribute sets — structured shape for stripReadOnlyAttributes */
   readOnlyCollected: {
     core: Set<string>;
     extensions: Map<string, Set<string>>;

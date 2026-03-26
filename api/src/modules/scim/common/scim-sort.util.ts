@@ -41,56 +41,66 @@ const DEFAULT_SORT_FIELD = 'createdAt';
 export interface SortParams {
   field: string;
   direction: 'asc' | 'desc';
+  /** Whether the sort attribute is caseExact per schema. When false, sort uses case-insensitive comparison. */
+  caseExact: boolean;
 }
 
 /**
  * Resolve a SCIM sortBy + sortOrder into a database-level sort specification for Users.
  *
- * @param sortBy     SCIM attribute path (e.g. "userName", "meta.created"). Case-insensitive.
- * @param sortOrder  "ascending" | "descending" — defaults to "ascending" per RFC 7644.
- * @returns          Database-level sort params, or null if sortBy is invalid.
+ * @param sortBy          SCIM attribute path (e.g. "userName", "meta.created"). Case-insensitive.
+ * @param sortOrder       "ascending" | "descending" — defaults to "ascending" per RFC 7644.
+ * @param caseExactPaths  Optional set of caseExact attribute paths from schema cache.
+ * @returns               Database-level sort params with caseExact flag.
  */
 export function resolveUserSortParams(
   sortBy?: string,
   sortOrder?: 'ascending' | 'descending',
+  caseExactPaths?: Set<string>,
 ): SortParams {
   const direction: 'asc' | 'desc' =
     sortOrder === 'descending' ? 'desc' : DEFAULT_SORT_DIRECTION;
 
   if (!sortBy) {
-    return { field: DEFAULT_SORT_FIELD, direction };
+    return { field: DEFAULT_SORT_FIELD, direction, caseExact: true };
   }
 
-  const dbField = USER_SORT_ATTRIBUTE_MAP[sortBy.toLowerCase()];
+  const sortByLower = sortBy.toLowerCase();
+  const dbField = USER_SORT_ATTRIBUTE_MAP[sortByLower];
   if (!dbField) {
-    return { field: DEFAULT_SORT_FIELD, direction };
+    return { field: DEFAULT_SORT_FIELD, direction, caseExact: true };
   }
 
-  return { field: dbField, direction };
+  const caseExact = caseExactPaths ? caseExactPaths.has(sortByLower) : false;
+  return { field: dbField, direction, caseExact };
 }
 
 /**
  * Resolve a SCIM sortBy + sortOrder into a database-level sort specification for Groups.
  *
- * @param sortBy     SCIM attribute path (e.g. "displayName", "meta.created"). Case-insensitive.
- * @param sortOrder  "ascending" | "descending" — defaults to "ascending" per RFC 7644.
- * @returns          Database-level sort params, or null if sortBy is invalid.
+ * @param sortBy          SCIM attribute path (e.g. "displayName", "meta.created"). Case-insensitive.
+ * @param sortOrder       "ascending" | "descending" — defaults to "ascending" per RFC 7644.
+ * @param caseExactPaths  Optional set of caseExact attribute paths from schema cache.
+ * @returns               Database-level sort params with caseExact flag.
  */
 export function resolveGroupSortParams(
   sortBy?: string,
   sortOrder?: 'ascending' | 'descending',
+  caseExactPaths?: Set<string>,
 ): SortParams {
   const direction: 'asc' | 'desc' =
     sortOrder === 'descending' ? 'desc' : DEFAULT_SORT_DIRECTION;
 
   if (!sortBy) {
-    return { field: DEFAULT_SORT_FIELD, direction };
+    return { field: DEFAULT_SORT_FIELD, direction, caseExact: true };
   }
 
-  const dbField = GROUP_SORT_ATTRIBUTE_MAP[sortBy.toLowerCase()];
+  const sortByLower = sortBy.toLowerCase();
+  const dbField = GROUP_SORT_ATTRIBUTE_MAP[sortByLower];
   if (!dbField) {
-    return { field: DEFAULT_SORT_FIELD, direction };
+    return { field: DEFAULT_SORT_FIELD, direction, caseExact: true };
   }
 
-  return { field: dbField, direction };
+  const caseExact = caseExactPaths ? caseExactPaths.has(sortByLower) : false;
+  return { field: dbField, direction, caseExact };
 }

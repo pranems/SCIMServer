@@ -1,9 +1,8 @@
 /**
- * Phase 8 Next — V16 (Boolean sanitization), V32 (Filter attribute validation),
+ * Phase 8 Next — V32 (Filter attribute validation),
  *                G8e (collectReturnedCharacteristics)
  *
  * Tests for:
- *  - SchemaValidator.collectBooleanAttributeNames()     (V16)
  *  - SchemaValidator.validateFilterAttributePaths()      (V32)
  *  - SchemaValidator.collectReturnedCharacteristics()    (G8e)
  */
@@ -100,81 +99,6 @@ const GROUP_SCHEMA: SchemaDefinition = {
     },
   ] as SchemaAttributeDefinition[],
 };
-
-// ─── V16: collectBooleanAttributeNames ────────────────────────────────────────
-
-describe('SchemaValidator.collectBooleanAttributeNames (V16)', () => {
-  it('should collect top-level boolean attributes', () => {
-    const result = SchemaValidator.collectBooleanAttributeNames([USER_SCHEMA]);
-    expect(result.has('active')).toBe(true);
-  });
-
-  it('should collect sub-attribute boolean attributes', () => {
-    const result = SchemaValidator.collectBooleanAttributeNames([USER_SCHEMA]);
-    expect(result.has('primary')).toBe(true);
-  });
-
-  it('should NOT include string attributes', () => {
-    const result = SchemaValidator.collectBooleanAttributeNames([USER_SCHEMA]);
-    expect(result.has('username')).toBe(false);
-    expect(result.has('displayname')).toBe(false);
-    expect(result.has('value')).toBe(false);
-    expect(result.has('type')).toBe(false);
-  });
-
-  it('should collect boolean attributes from extension schemas', () => {
-    const result = SchemaValidator.collectBooleanAttributeNames([USER_SCHEMA, ENTERPRISE_SCHEMA]);
-    expect(result.has('iscontractor')).toBe(true);
-  });
-
-  it('should return lowercase attribute names', () => {
-    const result = SchemaValidator.collectBooleanAttributeNames([USER_SCHEMA]);
-    // All names should be lowercase
-    for (const name of result) {
-      expect(name).toBe(name.toLowerCase());
-    }
-  });
-
-  it('should return empty set for schema with no booleans', () => {
-    const result = SchemaValidator.collectBooleanAttributeNames([GROUP_SCHEMA]);
-    expect(result.size).toBe(0);
-  });
-
-  it('should handle multiple schemas and deduplicate names', () => {
-    // Both User and Enterprise schemas have boolean attributes
-    const result = SchemaValidator.collectBooleanAttributeNames([USER_SCHEMA, ENTERPRISE_SCHEMA]);
-    // "active" from User, "primary" from User sub-attrs, "iscontractor" from Enterprise
-    expect(result.has('active')).toBe(true);
-    expect(result.has('primary')).toBe(true);
-    expect(result.has('iscontractor')).toBe(true);
-    expect(result.size).toBe(3);
-  });
-
-  it('should handle empty schema list', () => {
-    const result = SchemaValidator.collectBooleanAttributeNames([]);
-    expect(result.size).toBe(0);
-  });
-
-  it('should not collect complex or integer types as boolean', () => {
-    const schemaWithTypes: SchemaDefinition = {
-      id: 'urn:test',
-      attributes: [
-        { name: 'count', type: 'integer', multiValued: false, required: false },
-        { name: 'ratio', type: 'decimal', multiValued: false, required: false },
-        { name: 'nested', type: 'complex', multiValued: false, required: false,
-          subAttributes: [
-            { name: 'flag', type: 'boolean', multiValued: false, required: false },
-          ] },
-      ] as SchemaAttributeDefinition[],
-    };
-    const result = SchemaValidator.collectBooleanAttributeNames([schemaWithTypes]);
-    expect(result.has('count')).toBe(false);
-    expect(result.has('ratio')).toBe(false);
-    expect(result.has('nested')).toBe(false);
-    expect(result.has('flag')).toBe(true);
-    expect(result.size).toBe(1);
-  });
-});
 
 // ─── V32: validateFilterAttributePaths ────────────────────────────────────────
 

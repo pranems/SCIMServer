@@ -1123,7 +1123,7 @@ describe('EndpointScimGenericService', () => {
   // ─── Filter parsing in LIST ───────────────────────────────────────────
 
   describe('listResources — filter parsing', () => {
-    it('should pass displayName eq filter to repository', async () => {
+    it('should pass displayName eq filter to repository as Prisma-style where', async () => {
       mockGenericRepo.findAll.mockResolvedValue([]);
 
       await service.listResources(
@@ -1136,7 +1136,7 @@ describe('EndpointScimGenericService', () => {
       expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
         endpointId,
         'Device',
-        { displayName: 'TestDevice' },
+        { displayName: { equals: 'TestDevice', mode: 'insensitive' } },
       );
     });
 
@@ -1157,29 +1157,48 @@ describe('EndpointScimGenericService', () => {
       );
     });
 
-    it('should throw 400 invalidFilter for unsupported filter expressions', async () => {
+    it('should support active eq filter via in-memory evaluation', async () => {
       mockGenericRepo.findAll.mockResolvedValue([]);
 
-      try {
-        await service.listResources(
-          { filter: 'active eq true' },
-          baseUrl,
-          endpointId,
-          deviceResourceType,
-        );
-        fail('Expected 400');
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(400);
-        expect(e.getResponse().scimType).toBe('invalidFilter');
-      }
+      // active eq true now triggers in-memory filter (not DB push, since active not in GENERIC_DB_COLUMNS)
+      const result = await service.listResources(
+        { filter: 'active eq true' },
+        baseUrl,
+        endpointId,
+        deviceResourceType,
+      );
+      expect(result.totalResults).toBe(0);
+      // fetchAll: repo called without dbFilter
+      expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
+        endpointId,
+        'Device',
+        undefined,
+      );
     });
 
-    it('should throw 400 invalidFilter for complex unsupported operators', async () => {
+    it('should support co operator via DB push-down', async () => {
+      mockGenericRepo.findAll.mockResolvedValue([]);
+
+      const result = await service.listResources(
+        { filter: 'displayName co "test"' },
+        baseUrl,
+        endpointId,
+        deviceResourceType,
+      );
+      expect(result.totalResults).toBe(0);
+      expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
+        endpointId,
+        'Device',
+        { displayName: { contains: 'test', mode: 'insensitive' } },
+      );
+    });
+
+    it('should throw 400 invalidFilter for syntactically invalid filter', async () => {
       mockGenericRepo.findAll.mockResolvedValue([]);
 
       try {
         await service.listResources(
-          { filter: 'displayName co "test"' },
+          { filter: '(((' },
           baseUrl,
           endpointId,
           deviceResourceType,

@@ -6802,6 +6802,24 @@ if ($cacheEpId) {
         Test-Result -Success $false -Message "9z-C.10: readOnly stripping POST failed: $_"
     }
 
+    # 9z-C.11: Verify returned:always attrs (id, userName) always present
+    if ($cu1Id) {
+        try {
+            $alwaysRes = Invoke-RestMethod -Uri "$cacheSBase/Users/$cu1Id" -Method GET -Headers $headers
+            $hasId = $null -ne $alwaysRes.id -and $alwaysRes.id.Length -gt 0
+            $hasUserName = $null -ne $alwaysRes.userName -and $alwaysRes.userName.Length -gt 0
+            Test-Result -Success ($hasId -and $hasUserName) -Message "9z-C.11: returned:always attrs (id, userName) present in GET"
+        } catch {
+            Test-Result -Success $false -Message "9z-C.11: returned:always check failed: $_"
+        }
+    }
+
+    # 9z-C.12: Verify returned:default attrs (department) present by default
+    if ($cu1Id) {
+        $getDeptPresent = $null -ne $alwaysRes.$cacheExtUrn.department
+        Test-Result -Success $getDeptPresent -Message "9z-C.12: returned:default attr (department) present by default"
+    }
+
     # Cleanup: delete the cache test endpoint
     try {
         Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$cacheEpId" -Method DELETE -Headers $headers | Out-Null

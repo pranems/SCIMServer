@@ -20,13 +20,13 @@
 
 | Layer | Suites | Tests | Skip | Status |
 |-------|--------|-------|------|--------|
-| **Unit** | 72 | 2,887 | 0 | ✅ All pass |
-| **E2E** | 35 | 763 | 0 | ✅ All pass |
-| **Live (main)** | 42 sections | ~621 | 0 | ✅ All pass |
+| **Unit** | 74 | 3,043 | 0 | ✅ All pass |
+| **E2E** | 36 | 791 | 0 | ✅ All pass |
+| **Live (main)** | 42 sections | ~615 | 0 | ✅ All pass |
 | **Live (Lexmark ISV)** | 13 sections | 112 | 0 | ✅ All pass |
-| **Total** | ~160 | ~4,383 | 0 | ✅ All pass |
+| **Total** | **~165** | **~4,561** | 0 | ✅ All pass |
 
-### Unit Test Suites (72)
+### Unit Test Suites (74)
 
 **Domain layer (11):** patch engines (6), schema validators (5)  
 **Infrastructure (7):** repositories (inmemory 3, prisma 3, module 1)  

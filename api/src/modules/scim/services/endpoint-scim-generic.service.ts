@@ -164,9 +164,10 @@ export class EndpointScimGenericService {
     // GEN-01: Attribute-level payload validation against schema definitions
     this.validatePayloadSchema(body, resourceType, endpointId, config, 'create');
 
-    // Strip readOnly attributes using schema definitions (RFC 7643 §2.2)
+    // Strip readOnly attributes using precomputed cache (RFC 7643 §2.2)
+    const readOnlyCache = this.getSchemaCacheForRT(resourceType, endpointId)?.readOnlyCollected;
     const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-    const strippedAttrs = stripReadOnlyAttributes(body, schemaDefs);
+    const strippedAttrs = stripReadOnlyAttributes(body, schemaDefs, readOnlyCache);
     if (strippedAttrs.length > 0) {
       this.scimLogger.warn(LogCategory.GENERAL, 'Stripped readOnly attributes from POST payload', {
         method: 'POST', path: resourceType.endpoint, stripped: strippedAttrs, endpointId,
@@ -394,9 +395,10 @@ export class EndpointScimGenericService {
     // GEN-02: Immutable attribute enforcement — compare existing with incoming
     this.checkImmutableAttributes(existing, body, resourceType, endpointId, config);
 
-    // Strip readOnly attributes using schema definitions (RFC 7643 §2.2)
+    // Strip readOnly attributes using precomputed cache (RFC 7643 §2.2)
+    const readOnlyCachePut = this.getSchemaCacheForRT(resourceType, endpointId)?.readOnlyCollected;
     const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-    const strippedAttrs = stripReadOnlyAttributes(body, schemaDefs);
+    const strippedAttrs = stripReadOnlyAttributes(body, schemaDefs, readOnlyCachePut);
     if (strippedAttrs.length > 0) {
       this.scimLogger.warn(LogCategory.GENERAL, 'Stripped readOnly attributes from PUT payload', {
         method: 'PUT', path: `${resourceType.endpoint}/${scimId}`, stripped: strippedAttrs, endpointId,
@@ -501,7 +503,8 @@ export class EndpointScimGenericService {
     const ignorePatchReadOnly = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH);
     {
       const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-      const { filtered, stripped } = stripReadOnlyPatchOps(patchDto.Operations, schemaDefs);
+      const readOnlyCachePatch = this.getSchemaCacheForRT(resourceType, endpointId)?.readOnlyCollected;
+      const { filtered, stripped } = stripReadOnlyPatchOps(patchDto.Operations, schemaDefs, readOnlyCachePatch);
       if (stripped.length > 0) {
         if (strictSchemaEnabled && !ignorePatchReadOnly) {
           // G8c: Hard-reject readOnly writes on strict endpoints
@@ -546,6 +549,7 @@ export class EndpointScimGenericService {
       for (const op of patchDto.Operations) {
         const preResult = SchemaValidator.validatePatchOperationValue(
           op.op, op.path, op.value, schemaDefs,
+          this.getAttrMapsForRT(resourceType, endpointId),
         );
         if (!preResult.valid) {
           const messages = preResult.errors.map(e => e.message).join('; ');
@@ -754,23 +758,24 @@ export class EndpointScimGenericService {
 
     // G8e: Strip returned:'never' attributes from payload (e.g. writeOnly secrets)
     // Per RFC 7643 §2.4, these MUST NOT appear in any response.
+    // Uses parent-context-aware ByParent map to avoid name-collision false positives.
     const cache = this.getSchemaCacheForRT(resourceType, record.endpointId);
-    const neverAttrs = cache
-      ? flattenParentChildMap(cache.neverReturnedByParent)
-      : SchemaValidator.collectReturnedCharacteristics(this.getSchemaDefinitions(resourceType, record.endpointId)).never;
-    if (neverAttrs.size > 0) {
-      stripReturnedNever(payload, neverAttrs);
+    const neverByParent = cache?.neverReturnedByParent;
+    const coreNever = neverByParent?.get(SCHEMA_CACHE_TOP_LEVEL);
+    if (coreNever && coreNever.size > 0) {
+      stripReturnedNever(payload, coreNever);
     }
 
     // Build schemas array: core + extension URNs
     const schemas: string[] = [resourceType.schema];
     for (const ext of resourceType.schemaExtensions) {
       if (payload[ext.schema]) {
-        // Strip never-returned attrs inside extension objects
+        // Strip never-returned attrs inside extension objects (parent-context-aware)
+        const extNever = neverByParent?.get(ext.schema.toLowerCase());
         const extObj = payload[ext.schema];
-        if (typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
+        if (extNever && typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
           for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
-            if (neverAttrs.has(extKey.toLowerCase())) {
+            if (extNever.has(extKey.toLowerCase())) {
               delete (extObj as Record<string, unknown>)[extKey];
             }
           }
@@ -864,7 +869,7 @@ export class EndpointScimGenericService {
     const result = SchemaValidator.validate(dto, schemas, {
       strictMode: true,
       mode,
-    });
+    }, this.getAttrMapsForRT(resourceType, endpointId));
 
     if (!result.valid) {
       const details = result.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
@@ -912,7 +917,8 @@ export class EndpointScimGenericService {
     // Fallback: build from schema definitions
     const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
     if (schemaDefs.length === 0) return undefined;
-    const cache = SchemaValidator.buildCharacteristicsCache(schemaDefs);
+    const extensionUrns = resourceType.schemaExtensions?.map(e => e.schema) ?? [];
+    const cache = SchemaValidator.buildCharacteristicsCache(schemaDefs, extensionUrns);
     // Attach to profile for next access within this request
     if (profile) {
       profile._schemaCache = cache;
@@ -928,6 +934,17 @@ export class EndpointScimGenericService {
     endpointId: string,
   ): Map<string, Set<string>> {
     return this.getSchemaCacheForRT(resourceType, endpointId)?.booleansByParent ?? new Map();
+  }
+
+  /**
+   * Get precomputed attribute definition maps from cache.
+   */
+  private getAttrMapsForRT(
+    resourceType: ScimResourceType,
+    endpointId: string,
+  ): { coreAttrMap: Map<string, SchemaAttributeDefinition>; extensionSchemaMap: Map<string, SchemaDefinition> } | undefined {
+    const cache = this.getSchemaCacheForRT(resourceType, endpointId);
+    return cache ? { coreAttrMap: cache.coreAttrMap, extensionSchemaMap: cache.extensionSchemaMap } : undefined;
   }
 
   /**
@@ -949,7 +966,14 @@ export class EndpointScimGenericService {
     const schemas = this.buildSchemaDefinitionsFromPayload(incomingDto, resourceType, endpointId);
     if (schemas.length === 0) return;
 
-    const result = SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas);
+    // Use precomputed maps from cache when available
+    const cache = this.getSchemaCacheForRT(resourceType, endpointId);
+    const result = cache
+      ? SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas, {
+          coreAttrMap: cache.coreAttrMap,
+          extensionSchemaMap: cache.extensionSchemaMap,
+        })
+      : SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas);
 
     if (!result.valid) {
       const details = result.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
@@ -1186,7 +1210,9 @@ export class EndpointScimGenericService {
     const paths = extractFilterPaths(ast);
     if (paths.length === 0) return;
 
-    const result = SchemaValidator.validateFilterAttributePaths(paths, schemaDefs);
+    const result = SchemaValidator.validateFilterAttributePaths(paths, schemaDefs,
+      this.getAttrMapsForRT(resourceType, endpointId),
+    );
     if (!result.valid) {
       const details = result.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
       throw createScimError({

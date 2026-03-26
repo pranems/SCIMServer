@@ -16,6 +16,7 @@ import { AsyncLocalStorage } from 'async_hooks';
 import { SchemaValidator } from './schema-validator';
 import { SCHEMA_CACHE_TOP_LEVEL } from './validation-types';
 import type { SchemaDefinition, SchemaCharacteristicsCache } from './validation-types';
+import { flattenParentChildMap } from '../../modules/scim/common/scim-service-helpers';
 import type { EndpointProfile } from '../../modules/scim/endpoint-profile/endpoint-profile.types';
 
 // ─── Test Fixtures ────────────────────────────────────────────────────
@@ -92,7 +93,7 @@ describe('Level 1: buildCharacteristicsCache idempotency', () => {
       expect([...set1].sort()).toEqual([...set2!].sort());
     }
 
-    expect([...cache1.neverReturnedByParent.keys()].sort()).toEqual([...cache2.neverReturnedByParent.keys()].sort());
+    expect([...flattenParentChildMap(cache1.neverReturnedByParent)].sort()).toEqual([...flattenParentChildMap(cache2.neverReturnedByParent)].sort());
     expect(cache1.uniqueAttrs).toEqual(cache2.uniqueAttrs);
     expect(cache1.extensionUrns).toEqual(cache2.extensionUrns);
   });
@@ -104,7 +105,7 @@ describe('Level 1: buildCharacteristicsCache idempotency', () => {
     // Verify they are different object references
     expect(cache1.booleansByParent).not.toBe(cache2.booleansByParent);
     expect(cache1.neverReturnedByParent).not.toBe(cache2.neverReturnedByParent);
-    expect(cache1.readOnlyByParent).not.toBe(cache2.readOnlyByParent);
+    expect(cache1.readOnlyCollected.core).not.toBe(cache2.readOnlyCollected.core);
 
     // Mutating one does not affect the other
     cache1.booleansByParent.set('__test__', new Set(['testAttr']));
@@ -119,22 +120,11 @@ describe('Level 1: buildCharacteristicsCache idempotency', () => {
     expect(cache.readOnlyCollected.core.has('meta')).toBe(true);
     // readWrite attrs should NOT be in core readOnly
     expect(cache.readOnlyCollected.core.has('username')).toBe(false);
-
-    // readOnlyCollected should match readOnlyByParent content
-    const topLevelReadOnly = cache.readOnlyByParent.get(SCHEMA_CACHE_TOP_LEVEL);
-    if (topLevelReadOnly) {
-      for (const attr of topLevelReadOnly) {
-        expect(cache.readOnlyCollected.core.has(attr)).toBe(true);
-      }
-    }
   });
 
-  it('readOnlyCollected extension sub-attrs should match readOnlyByParent', () => {
+  it('readOnlyCollected extension sub-attrs should match expected shape', () => {
     const cache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
 
-    // manager.displayName is readOnly — should appear in extension sub-attrs
-    const hasExtSubAttr = cache.readOnlyCollected.extensionSubAttrs.size > 0 ||
-                          cache.readOnlyCollected.coreSubAttrs.size > 0;
     // At minimum, meta sub-attrs (readOnly) should be in coreSubAttrs
     expect(cache.readOnlyCollected.coreSubAttrs.has('meta')).toBe(true);
     const metaSubs = cache.readOnlyCollected.coreSubAttrs.get('meta');
@@ -499,9 +489,8 @@ describe('Level 6: instanceof Map serialization guard', () => {
     const cache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
     expect(cache.booleansByParent instanceof Map).toBe(true);
     expect(cache.neverReturnedByParent instanceof Map).toBe(true);
-    expect(cache.readOnlyByParent instanceof Map).toBe(true);
     expect(cache.alwaysReturnedByParent instanceof Map).toBe(true);
-    expect(cache.caseExactByParent instanceof Map).toBe(true);
+    expect(cache.caseExactPaths instanceof Set).toBe(true);
     expect(cache.alwaysReturnedSubs instanceof Map).toBe(true);
     expect(cache.readOnlyCollected.core instanceof Set).toBe(true);
     expect(cache.readOnlyCollected.extensions instanceof Map).toBe(true);
@@ -560,23 +549,13 @@ describe('Level 7: readOnlyCollected vs collectReadOnlyAttributes consistency', 
     const cache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
     const legacy = SchemaValidator.collectReturnedCharacteristics(ALL_SCHEMAS);
 
-    // Flatten cache maps and compare
-    const cacheNever = new Set<string>();
-    for (const children of cache.neverReturnedByParent.values()) {
-      for (const c of children) cacheNever.add(c);
-    }
-    expect([...cacheNever].sort()).toEqual([...legacy.never].sort());
+    // Compare flat sets directly
+    expect([...flattenParentChildMap(cache.neverReturnedByParent)].sort()).toEqual([...legacy.never].sort());
 
-    const cacheAlways = new Set<string>();
-    for (const children of cache.alwaysReturnedByParent.values()) {
-      for (const c of children) cacheAlways.add(c);
-    }
+    const cacheAlways = flattenParentChildMap(cache.alwaysReturnedByParent);
     expect([...cacheAlways].sort()).toEqual([...legacy.always].sort());
 
-    const cacheRequest = new Set<string>();
-    for (const children of cache.requestReturnedByParent.values()) {
-      for (const c of children) cacheRequest.add(c);
-    }
+    const cacheRequest = flattenParentChildMap(cache.requestReturnedByParent);
     expect([...cacheRequest].sort()).toEqual([...legacy.request].sort());
   });
 
@@ -584,14 +563,8 @@ describe('Level 7: readOnlyCollected vs collectReadOnlyAttributes consistency', 
     const cache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
     const legacy = SchemaValidator.collectCaseExactAttributes(ALL_SCHEMAS);
 
-    // Flatten caseExactByParent to dotted paths
-    const cachePaths = new Set<string>();
-    for (const [parent, children] of cache.caseExactByParent) {
-      const isTopLevel = parent === SCHEMA_CACHE_TOP_LEVEL || parent.startsWith('urn:');
-      for (const child of children) {
-        cachePaths.add(isTopLevel ? child : `${parent}.${child}`);
-      }
-    }
+    // caseExactPaths is already pre-flattened as dotted paths
+    const cachePaths = cache.caseExactPaths;
     expect([...cachePaths].sort()).toEqual([...legacy].sort());
   });
 

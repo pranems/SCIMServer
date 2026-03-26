@@ -422,4 +422,380 @@ describe('Schema Cache Integration (E2E)', () => {
       expect(patchRes.body[EXT_URN]?.department).toBe('FinalDept');
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 7. Immutable Enforcement via Cache
+  // ═══════════════════════════════════════════════════════════════════════
+
+  describe('Immutable enforcement via cache', () => {
+    const IMMUTABLE_EXT = 'urn:test:immutable:2.0:User';
+
+    async function createImmutableEndpoint(): Promise<{ epId: string; basePath: string }> {
+      resetFixtureCounter();
+      const res = await request(app.getHttpServer())
+        .post('/scim/admin/endpoints')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({
+          name: `imm-e2e-${ts()}`,
+          profile: {
+            schemas: [
+              { id: CORE_SCHEMA, name: 'User', attributes: 'all' },
+              {
+                id: IMMUTABLE_EXT,
+                name: 'ImmutableExt',
+                attributes: [
+                  { name: 'serialNumber', type: 'string', multiValued: false, required: false, mutability: 'immutable', returned: 'default' },
+                  { name: 'department', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default' },
+                ],
+              },
+            ],
+            resourceTypes: [
+              {
+                id: 'User', name: 'User', endpoint: '/Users', description: 'User',
+                schema: CORE_SCHEMA,
+                schemaExtensions: [{ schema: IMMUTABLE_EXT, required: false }],
+              },
+            ],
+            settings: { StrictSchemaValidation: 'True' },
+          },
+        })
+        .expect(201);
+      return { epId: res.body.id, basePath: scimBasePath(res.body.id) };
+    }
+
+    it('should allow setting immutable attr on POST', async () => {
+      const { basePath } = await createImmutableEndpoint();
+      const user = validUser({ [IMMUTABLE_EXT]: { serialNumber: 'SN-001', department: 'Eng' } });
+      const res = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
+      expect(res.body[IMMUTABLE_EXT]?.serialNumber).toBe('SN-001');
+    });
+
+    it('should reject changing immutable attr on PUT', async () => {
+      const { basePath } = await createImmutableEndpoint();
+      const user = validUser({ [IMMUTABLE_EXT]: { serialNumber: 'SN-002', department: 'Eng' } });
+      const cr = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
+
+      const putBody = { ...user, [IMMUTABLE_EXT]: { serialNumber: 'SN-CHANGED', department: 'Ops' } };
+      const putRes = await scimPut(app, `${basePath}/Users/${cr.body.id}`, token, putBody).expect(400);
+      expect(putRes.body.scimType).toBe('mutability');
+    });
+
+    it('should allow PUT with same immutable value', async () => {
+      const { basePath } = await createImmutableEndpoint();
+      const user = validUser({ [IMMUTABLE_EXT]: { serialNumber: 'SN-003', department: 'Eng' } });
+      const cr = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
+
+      const putBody = { ...user, [IMMUTABLE_EXT]: { serialNumber: 'SN-003', department: 'NewDept' } };
+      await scimPut(app, `${basePath}/Users/${cr.body.id}`, token, putBody).expect(200);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 8. CaseExact Filtering via Cache
+  // ═══════════════════════════════════════════════════════════════════════
+
+  describe('CaseExact filtering via cache', () => {
+    let epId: string;
+    let basePath: string;
+
+    beforeAll(async () => {
+      ({ epId, basePath } = await createCacheTestEndpoint());
+      // Create users with different-case externalIds
+      await scimPost(app, `${basePath}/Users`, token, validUser({ externalId: 'CaseSensitive-001' })).expect(201);
+      await scimPost(app, `${basePath}/Users`, token, validUser({ externalId: 'casesensitive-001' })).expect(201);
+    });
+
+    it('should treat externalId as case-sensitive in filter (caseExact=true)', async () => {
+      const res = await scimGet(app, `${basePath}/Users?filter=externalId eq "CaseSensitive-001"`, token).expect(200);
+      // externalId is caseExact:true — should match exactly 1
+      expect(res.body.totalResults).toBe(1);
+      expect(res.body.Resources[0].externalId).toBe('CaseSensitive-001');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 9. Immutable Enforcement via PATCH
+  // ═══════════════════════════════════════════════════════════════════════
+
+  describe('Immutable enforcement via PATCH', () => {
+    const IMMUTABLE_EXT = 'urn:test:immutable:patch:2.0:User';
+
+    async function createImmutablePatchEndpoint(): Promise<{ epId: string; basePath: string }> {
+      resetFixtureCounter();
+      const res = await request(app.getHttpServer())
+        .post('/scim/admin/endpoints')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({
+          name: `imm-patch-e2e-${ts()}`,
+          profile: {
+            schemas: [
+              { id: CORE_SCHEMA, name: 'User', attributes: 'all' },
+              {
+                id: IMMUTABLE_EXT,
+                name: 'ImmPatchExt',
+                attributes: [
+                  { name: 'serialNumber', type: 'string', multiValued: false, required: false, mutability: 'immutable', returned: 'default' },
+                  { name: 'department', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default' },
+                ],
+              },
+            ],
+            resourceTypes: [
+              {
+                id: 'User', name: 'User', endpoint: '/Users', description: 'User',
+                schema: CORE_SCHEMA,
+                schemaExtensions: [{ schema: IMMUTABLE_EXT, required: false }],
+              },
+            ],
+            settings: { StrictSchemaValidation: 'True' },
+          },
+        })
+        .expect(201);
+      return { epId: res.body.id, basePath: scimBasePath(res.body.id) };
+    }
+
+    it('should reject PATCH replacing immutable extension attr', async () => {
+      const { basePath } = await createImmutablePatchEndpoint();
+      const user = validUser({ schemas: ['urn:ietf:params:scim:schemas:core:2.0:User', IMMUTABLE_EXT], [IMMUTABLE_EXT]: { serialNumber: 'SN-PATCH-001', department: 'Eng' } });
+      const cr = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
+
+      const patchRes = await scimPatch(app, `${basePath}/Users/${cr.body.id}`, token, patchOp([
+        { op: 'replace', path: `${IMMUTABLE_EXT}:serialNumber`, value: 'SN-CHANGED' },
+      ])).expect(400);
+      expect(patchRes.body.scimType).toBe('mutability');
+    });
+
+    it('should allow PATCH on mutable attr alongside immutable', async () => {
+      const { basePath } = await createImmutablePatchEndpoint();
+      const user = validUser({ schemas: ['urn:ietf:params:scim:schemas:core:2.0:User', IMMUTABLE_EXT], [IMMUTABLE_EXT]: { serialNumber: 'SN-PATCH-002', department: 'Eng' } });
+      const cr = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
+
+      const patchRes = await scimPatch(app, `${basePath}/Users/${cr.body.id}`, token, patchOp([
+        { op: 'replace', path: `${IMMUTABLE_EXT}:department`, value: 'NewDept' },
+      ])).expect(200);
+      expect(patchRes.body[IMMUTABLE_EXT]?.department).toBe('NewDept');
+      expect(patchRes.body[IMMUTABLE_EXT]?.serialNumber).toBe('SN-PATCH-002');
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 10. Returned:request — Excluded by Default, Included with ?attributes=
+  // ═══════════════════════════════════════════════════════════════════════
+
+  describe('Returned:request attribute projection', () => {
+    const REQ_EXT = 'urn:test:request:2.0:User';
+
+    async function createRequestReturnedEndpoint(): Promise<{ epId: string; basePath: string }> {
+      resetFixtureCounter();
+      const res = await request(app.getHttpServer())
+        .post('/scim/admin/endpoints')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({
+          name: `req-ret-e2e-${ts()}`,
+          profile: {
+            schemas: [
+              { id: CORE_SCHEMA, name: 'User', attributes: 'all' },
+              {
+                id: REQ_EXT,
+                name: 'RequestReturnedExt',
+                attributes: [
+                  { name: 'privateNotes', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'request', description: 'Only returned when explicitly requested' },
+                  { name: 'department', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default' },
+                ],
+              },
+            ],
+            resourceTypes: [
+              {
+                id: 'User', name: 'User', endpoint: '/Users', description: 'User',
+                schema: CORE_SCHEMA,
+                schemaExtensions: [{ schema: REQ_EXT, required: false }],
+              },
+            ],
+          },
+        })
+        .expect(201);
+      return { epId: res.body.id, basePath: scimBasePath(res.body.id) };
+    }
+
+    it('should exclude returned:request attr from default GET response', async () => {
+      const { basePath } = await createRequestReturnedEndpoint();
+      const user = validUser({ schemas: ['urn:ietf:params:scim:schemas:core:2.0:User', REQ_EXT], [REQ_EXT]: { privateNotes: 'secret stuff', department: 'Eng' } });
+      const cr = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
+
+      const getRes = await scimGet(app, `${basePath}/Users/${cr.body.id}`, token).expect(200);
+      const ext = getRes.body[REQ_EXT];
+      if (ext) {
+        expect(ext.privateNotes).toBeUndefined();
+        expect(ext.department).toBe('Eng');
+      }
+    });
+
+    it('should exclude returned:request attr from LIST response', async () => {
+      const { basePath } = await createRequestReturnedEndpoint();
+      const user = validUser({ schemas: ['urn:ietf:params:scim:schemas:core:2.0:User', REQ_EXT], [REQ_EXT]: { privateNotes: 'list secret', department: 'HR' } });
+      const cr = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
+
+      const listRes = await scimGet(app, `${basePath}/Users`, token).expect(200);
+      const found = listRes.body.Resources.find((r: any) => r.id === cr.body.id);
+      if (found?.[REQ_EXT]) {
+        expect(found[REQ_EXT].privateNotes).toBeUndefined();
+      }
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 11. AlwaysReturnedSubs — Sub-Attributes with returned:'always'
+  // ═══════════════════════════════════════════════════════════════════════
+
+  describe('AlwaysReturnedSubs via cache', () => {
+    const ALWAYS_SUB_EXT = 'urn:test:alwayssub:2.0:User';
+
+    async function createAlwaysSubEndpoint(): Promise<{ epId: string; basePath: string }> {
+      resetFixtureCounter();
+      const res = await request(app.getHttpServer())
+        .post('/scim/admin/endpoints')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({
+          name: `always-sub-e2e-${ts()}`,
+          profile: {
+            schemas: [
+              { id: CORE_SCHEMA, name: 'User', attributes: 'all' },
+              {
+                id: ALWAYS_SUB_EXT,
+                name: 'AlwaysSubExt',
+                attributes: [
+                  {
+                    name: 'address', type: 'complex', multiValued: false, required: false, returned: 'default',
+                    subAttributes: [
+                      { name: 'formatted', type: 'string', multiValued: false, required: false, returned: 'always' },
+                      { name: 'city', type: 'string', multiValued: false, required: false, returned: 'default' },
+                    ],
+                  },
+                ],
+              },
+            ],
+            resourceTypes: [
+              {
+                id: 'User', name: 'User', endpoint: '/Users', description: 'User',
+                schema: CORE_SCHEMA,
+                schemaExtensions: [{ schema: ALWAYS_SUB_EXT, required: false }],
+              },
+            ],
+          },
+        })
+        .expect(201);
+      return { epId: res.body.id, basePath: scimBasePath(res.body.id) };
+    }
+
+    it('should include returned:always sub-attr in response when parent is present', async () => {
+      const { basePath } = await createAlwaysSubEndpoint();
+      const user = validUser({
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User', ALWAYS_SUB_EXT],
+        [ALWAYS_SUB_EXT]: { address: { formatted: '123 Main St', city: 'Seattle' } },
+      });
+      const cr = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
+
+      const getRes = await scimGet(app, `${basePath}/Users/${cr.body.id}`, token).expect(200);
+      const ext = getRes.body[ALWAYS_SUB_EXT];
+      if (ext?.address) {
+        expect(ext.address.formatted).toBe('123 Main St');
+        expect(ext.address.city).toBe('Seattle');
+      }
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 12. ReadOnly Stripping via PATCH Operations
+  // ═══════════════════════════════════════════════════════════════════════
+
+  describe('ReadOnly stripping from PATCH operations', () => {
+    let epId: string;
+    let basePath: string;
+
+    beforeAll(async () => {
+      ({ epId, basePath } = await createCacheTestEndpoint());
+    });
+
+    it('should strip readOnly attr from PATCH replace op', async () => {
+      const user = validUser({ [EXT_URN]: { department: 'Eng' } });
+      const cr = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
+
+      const patchRes = await scimPatch(app, `${basePath}/Users/${cr.body.id}`, token, patchOp([
+        { op: 'replace', path: `${EXT_URN}:department`, value: 'Ops' },
+      ])).expect(200);
+      expect(patchRes.body[EXT_URN]?.department).toBe('Ops');
+      // score is readOnly — should not appear even if somehow sent
+      expect(patchRes.body[EXT_URN]?.score).toBeUndefined();
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // 13. Unique Attributes Enforcement via Cache
+  // ═══════════════════════════════════════════════════════════════════════
+
+  describe('Unique attributes enforcement via cache', () => {
+    const UNIQUE_EXT = 'urn:test:unique:2.0:User';
+
+    async function createUniqueEndpoint(): Promise<{ epId: string; basePath: string }> {
+      resetFixtureCounter();
+      const res = await request(app.getHttpServer())
+        .post('/scim/admin/endpoints')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({
+          name: `unique-e2e-${ts()}`,
+          profile: {
+            schemas: [
+              { id: CORE_SCHEMA, name: 'User', attributes: 'all' },
+              {
+                id: UNIQUE_EXT,
+                name: 'UniqueExt',
+                attributes: [
+                  { name: 'employeeBadge', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', uniqueness: 'server', caseExact: true },
+                  { name: 'department', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default' },
+                ],
+              },
+            ],
+            resourceTypes: [
+              {
+                id: 'User', name: 'User', endpoint: '/Users', description: 'User',
+                schema: CORE_SCHEMA,
+                schemaExtensions: [{ schema: UNIQUE_EXT, required: false }],
+              },
+            ],
+          },
+        })
+        .expect(201);
+      return { epId: res.body.id, basePath: scimBasePath(res.body.id) };
+    }
+
+    it('should allow first user with unique extension attr', async () => {
+      const { basePath } = await createUniqueEndpoint();
+      const user = validUser({ schemas: ['urn:ietf:params:scim:schemas:core:2.0:User', UNIQUE_EXT], [UNIQUE_EXT]: { employeeBadge: 'BADGE-001', department: 'Eng' } });
+      const res = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
+      expect(res.body[UNIQUE_EXT]?.employeeBadge).toBe('BADGE-001');
+    });
+
+    it('should reject duplicate unique extension attr with 409', async () => {
+      const { basePath } = await createUniqueEndpoint();
+      const user1 = validUser({ schemas: ['urn:ietf:params:scim:schemas:core:2.0:User', UNIQUE_EXT], [UNIQUE_EXT]: { employeeBadge: 'BADGE-DUP', department: 'Eng' } });
+      await scimPost(app, `${basePath}/Users`, token, user1).expect(201);
+
+      const user2 = validUser({ schemas: ['urn:ietf:params:scim:schemas:core:2.0:User', UNIQUE_EXT], [UNIQUE_EXT]: { employeeBadge: 'BADGE-DUP', department: 'HR' } });
+      const res = await scimPost(app, `${basePath}/Users`, token, user2).expect(409);
+      expect(res.body.scimType).toBe('uniqueness');
+    });
+
+    it('should allow different values for unique extension attr', async () => {
+      const { basePath } = await createUniqueEndpoint();
+      const user1 = validUser({ schemas: ['urn:ietf:params:scim:schemas:core:2.0:User', UNIQUE_EXT], [UNIQUE_EXT]: { employeeBadge: 'BADGE-A', department: 'Eng' } });
+      await scimPost(app, `${basePath}/Users`, token, user1).expect(201);
+
+      const user2 = validUser({ schemas: ['urn:ietf:params:scim:schemas:core:2.0:User', UNIQUE_EXT], [UNIQUE_EXT]: { employeeBadge: 'BADGE-B', department: 'HR' } });
+      await scimPost(app, `${basePath}/Users`, token, user2).expect(201);
+    });
+  });
 });

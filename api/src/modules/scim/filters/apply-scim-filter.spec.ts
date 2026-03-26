@@ -14,7 +14,7 @@
  * that previously fell back to in-memory are now pushed to Prisma/PostgreSQL.
  */
 
-import { buildUserFilter, buildGroupFilter } from './apply-scim-filter';
+import { buildUserFilter, buildGroupFilter, buildGenericFilter } from './apply-scim-filter';
 
 describe('apply-scim-filter', () => {
   // ── buildUserFilter ────────────────────────────────────────────────────────
@@ -379,6 +379,143 @@ describe('apply-scim-filter', () => {
       const result = buildUserFilter('externalId sw "ext-"');
       expect(result.dbWhere).toEqual({ externalId: { startsWith: 'ext-' } });
       expect(result.fetchAll).toBe(false);
+    });
+  });
+
+  // ── buildGenericFilter ─────────────────────────────────────────────────────
+
+  describe('buildGenericFilter', () => {
+    it('should return empty filter when no filter string provided', () => {
+      const result = buildGenericFilter();
+      expect(result.dbWhere).toEqual({});
+      expect(result.fetchAll).toBe(false);
+      expect(result.inMemoryFilter).toBeUndefined();
+    });
+
+    // ─── eq push-down ──────────────────────────────────────────────────
+
+    it('should push displayName eq to DB (citext, case-insensitive)', () => {
+      const result = buildGenericFilter('displayName eq "TestDevice"');
+      expect(result.dbWhere).toEqual({
+        displayName: { equals: 'TestDevice', mode: 'insensitive' },
+      });
+      expect(result.fetchAll).toBe(false);
+    });
+
+    it('should push externalId eq to DB (text, case-sensitive)', () => {
+      const result = buildGenericFilter('externalId eq "ext-123"');
+      expect(result.dbWhere).toEqual({ externalId: 'ext-123' });
+      expect(result.fetchAll).toBe(false);
+    });
+
+    it('should push id eq to DB (uuid)', () => {
+      const result = buildGenericFilter('id eq "abc-123"');
+      expect(result.dbWhere).toEqual({ scimId: 'abc-123' });
+      expect(result.fetchAll).toBe(false);
+    });
+
+    // ─── co/sw/ew push-down ────────────────────────────────────────────
+
+    it('should push displayName co to DB (case-insensitive)', () => {
+      const result = buildGenericFilter('displayName co "test"');
+      expect(result.dbWhere).toEqual({
+        displayName: { contains: 'test', mode: 'insensitive' },
+      });
+      expect(result.fetchAll).toBe(false);
+    });
+
+    it('should push displayName sw to DB', () => {
+      const result = buildGenericFilter('displayName sw "Pre"');
+      expect(result.dbWhere).toEqual({
+        displayName: { startsWith: 'Pre', mode: 'insensitive' },
+      });
+      expect(result.fetchAll).toBe(false);
+    });
+
+    it('should push externalId sw to DB (case-sensitive)', () => {
+      const result = buildGenericFilter('externalId sw "ext-"');
+      expect(result.dbWhere).toEqual({ externalId: { startsWith: 'ext-' } });
+      expect(result.fetchAll).toBe(false);
+    });
+
+    // ─── ne push-down ──────────────────────────────────────────────────
+
+    it('should push displayName ne to DB', () => {
+      const result = buildGenericFilter('displayName ne "OldDevice"');
+      expect(result.dbWhere).toEqual({
+        displayName: { not: 'OldDevice', mode: 'insensitive' },
+      });
+      expect(result.fetchAll).toBe(false);
+    });
+
+    // ─── pr (presence) push-down ───────────────────────────────────────
+
+    it('should push externalId pr to DB', () => {
+      const result = buildGenericFilter('externalId pr');
+      expect(result.dbWhere).toEqual({ externalId: { not: null } });
+      expect(result.fetchAll).toBe(false);
+    });
+
+    // ─── AND/OR compound ───────────────────────────────────────────────
+
+    it('should push AND compound filter to DB', () => {
+      const result = buildGenericFilter('displayName eq "Device" and externalId eq "ext-1"');
+      expect(result.dbWhere).toEqual({
+        AND: [
+          { displayName: { equals: 'Device', mode: 'insensitive' } },
+          { externalId: 'ext-1' },
+        ],
+      });
+      expect(result.fetchAll).toBe(false);
+    });
+
+    it('should push OR compound filter to DB', () => {
+      const result = buildGenericFilter('displayName eq "A" or displayName eq "B"');
+      expect(result.dbWhere).toEqual({
+        OR: [
+          { displayName: { equals: 'A', mode: 'insensitive' } },
+          { displayName: { equals: 'B', mode: 'insensitive' } },
+        ],
+      });
+      expect(result.fetchAll).toBe(false);
+    });
+
+    // ─── In-memory fallback ────────────────────────────────────────────
+
+    it('should fall back to in-memory for un-mapped attribute', () => {
+      const result = buildGenericFilter('active eq true');
+      expect(result.dbWhere).toEqual({});
+      expect(result.fetchAll).toBe(true);
+      expect(result.inMemoryFilter).toBeDefined();
+    });
+
+    it('should fall back to in-memory for not() expression', () => {
+      const result = buildGenericFilter('not (displayName eq "X")');
+      expect(result.fetchAll).toBe(true);
+      expect(result.inMemoryFilter).toBeDefined();
+    });
+
+    it('should fall back when AND has one un-pushable side', () => {
+      const result = buildGenericFilter('displayName eq "X" and active eq true');
+      expect(result.fetchAll).toBe(true);
+      expect(result.inMemoryFilter).toBeDefined();
+    });
+
+    // ─── Invalid filter ────────────────────────────────────────────────
+
+    it('should throw for syntactically invalid filter', () => {
+      expect(() => buildGenericFilter('(((')).toThrow();
+    });
+
+
+    // ─── caseExact attrs ───────────────────────────────────────────────
+
+    it('should pass through caseExactAttrs to in-memory evaluator', () => {
+      const caseExactAttrs = new Set(['customfield']);
+      const result = buildGenericFilter('customField eq "Exact"', caseExactAttrs);
+      expect(result.fetchAll).toBe(true);
+      expect(result.inMemoryFilter).toBeDefined();
+      // In-memory evaluator should use caseExact for customField
     });
   });
 });

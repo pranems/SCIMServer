@@ -72,7 +72,7 @@ export class PrismaUserRepository implements IUserRepository {
   async findAll(
     endpointId: string,
     dbFilter?: Record<string, unknown>,
-    orderBy?: { field: string; direction: 'asc' | 'desc' },
+    orderBy?: { field: string; direction: 'asc' | 'desc'; caseExact?: boolean },
   ): Promise<UserRecord[]> {
     const where: Prisma.ScimResourceWhereInput = {
       ...(dbFilter as Prisma.ScimResourceWhereInput),

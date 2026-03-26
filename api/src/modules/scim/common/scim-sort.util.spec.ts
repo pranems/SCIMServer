@@ -8,94 +8,140 @@ import {
 
 describe('scim-sort.util', () => {
   describe('resolveUserSortParams', () => {
-    it('should default to createdAt ascending when no sortBy', () => {
+    it('should default to createdAt ascending caseExact when no sortBy', () => {
       const result = resolveUserSortParams();
-      expect(result).toEqual({ field: 'createdAt', direction: 'asc' });
+      expect(result).toEqual({ field: 'createdAt', direction: 'asc', caseExact: true });
     });
 
     it('should default to ascending when sortOrder not specified', () => {
       const result = resolveUserSortParams('userName');
-      expect(result).toEqual({ field: 'userName', direction: 'asc' });
+      expect(result.direction).toBe('asc');
     });
 
     it('should map userName to userName (case-insensitive)', () => {
-      expect(resolveUserSortParams('userName')).toEqual({ field: 'userName', direction: 'asc' });
-      expect(resolveUserSortParams('USERNAME')).toEqual({ field: 'userName', direction: 'asc' });
-      expect(resolveUserSortParams('UserName')).toEqual({ field: 'userName', direction: 'asc' });
+      expect(resolveUserSortParams('userName').field).toBe('userName');
+      expect(resolveUserSortParams('USERNAME').field).toBe('userName');
+      expect(resolveUserSortParams('UserName').field).toBe('userName');
     });
 
     it('should map id to scimId', () => {
-      expect(resolveUserSortParams('id')).toEqual({ field: 'scimId', direction: 'asc' });
+      expect(resolveUserSortParams('id').field).toBe('scimId');
     });
 
     it('should map externalId to externalId (case-insensitive)', () => {
-      expect(resolveUserSortParams('externalId')).toEqual({ field: 'externalId', direction: 'asc' });
-      expect(resolveUserSortParams('EXTERNALID')).toEqual({ field: 'externalId', direction: 'asc' });
+      expect(resolveUserSortParams('externalId').field).toBe('externalId');
+      expect(resolveUserSortParams('EXTERNALID').field).toBe('externalId');
     });
 
     it('should map displayName to displayName', () => {
-      expect(resolveUserSortParams('displayName')).toEqual({ field: 'displayName', direction: 'asc' });
+      expect(resolveUserSortParams('displayName').field).toBe('displayName');
     });
 
     it('should map meta.created to createdAt', () => {
-      expect(resolveUserSortParams('meta.created')).toEqual({ field: 'createdAt', direction: 'asc' });
+      expect(resolveUserSortParams('meta.created').field).toBe('createdAt');
     });
 
     it('should map meta.lastModified to updatedAt (case-insensitive)', () => {
-      expect(resolveUserSortParams('meta.lastModified')).toEqual({ field: 'updatedAt', direction: 'asc' });
-      expect(resolveUserSortParams('meta.lastmodified')).toEqual({ field: 'updatedAt', direction: 'asc' });
+      expect(resolveUserSortParams('meta.lastModified').field).toBe('updatedAt');
+      expect(resolveUserSortParams('meta.lastmodified').field).toBe('updatedAt');
     });
 
     it('should handle descending sort order', () => {
-      expect(resolveUserSortParams('userName', 'descending')).toEqual({ field: 'userName', direction: 'desc' });
+      expect(resolveUserSortParams('userName', 'descending').direction).toBe('desc');
     });
 
     it('should handle ascending sort order explicitly', () => {
-      expect(resolveUserSortParams('userName', 'ascending')).toEqual({ field: 'userName', direction: 'asc' });
+      expect(resolveUserSortParams('userName', 'ascending').direction).toBe('asc');
     });
 
     it('should fall back to createdAt for unknown attribute', () => {
-      expect(resolveUserSortParams('unknownAttribute')).toEqual({ field: 'createdAt', direction: 'asc' });
+      expect(resolveUserSortParams('unknownAttribute').field).toBe('createdAt');
     });
 
     it('should fall back to createdAt descending for unknown attribute with descending', () => {
-      expect(resolveUserSortParams('noSuchField', 'descending')).toEqual({ field: 'createdAt', direction: 'desc' });
+      const result = resolveUserSortParams('noSuchField', 'descending');
+      expect(result).toEqual({ field: 'createdAt', direction: 'desc', caseExact: true });
     });
 
     it('should map active attribute', () => {
-      expect(resolveUserSortParams('active')).toEqual({ field: 'active', direction: 'asc' });
+      expect(resolveUserSortParams('active').field).toBe('active');
+    });
+
+    // ─── caseExact-aware sorting ────────────────────────────────
+
+    it('should set caseExact=false when sortBy attr is not in caseExactPaths', () => {
+      const caseExactPaths = new Set(['id', 'externalid']);
+      const result = resolveUserSortParams('userName', undefined, caseExactPaths);
+      expect(result.caseExact).toBe(false);
+    });
+
+    it('should set caseExact=true when sortBy attr IS in caseExactPaths', () => {
+      const caseExactPaths = new Set(['id', 'externalid']);
+      const result = resolveUserSortParams('externalId', undefined, caseExactPaths);
+      expect(result.caseExact).toBe(true);
+    });
+
+    it('should set caseExact=false when no caseExactPaths provided', () => {
+      const result = resolveUserSortParams('userName');
+      expect(result.caseExact).toBe(false);
+    });
+
+    it('should set caseExact=true for fallback field when sortBy is unknown', () => {
+      const caseExactPaths = new Set(['id']);
+      const result = resolveUserSortParams('badField', undefined, caseExactPaths);
+      expect(result.caseExact).toBe(true); // createdAt fallback is always caseExact
+    });
+
+    it('should set caseExact=true for id sort', () => {
+      const caseExactPaths = new Set(['id']);
+      const result = resolveUserSortParams('id', undefined, caseExactPaths);
+      expect(result.caseExact).toBe(true);
     });
   });
 
   describe('resolveGroupSortParams', () => {
-    it('should default to createdAt ascending when no sortBy', () => {
+    it('should default to createdAt ascending caseExact when no sortBy', () => {
       const result = resolveGroupSortParams();
-      expect(result).toEqual({ field: 'createdAt', direction: 'asc' });
+      expect(result).toEqual({ field: 'createdAt', direction: 'asc', caseExact: true });
     });
 
     it('should map displayName to displayName', () => {
-      expect(resolveGroupSortParams('displayName')).toEqual({ field: 'displayName', direction: 'asc' });
+      expect(resolveGroupSortParams('displayName').field).toBe('displayName');
     });
 
     it('should map id to scimId', () => {
-      expect(resolveGroupSortParams('id')).toEqual({ field: 'scimId', direction: 'asc' });
+      expect(resolveGroupSortParams('id').field).toBe('scimId');
     });
 
     it('should map meta.created to createdAt', () => {
-      expect(resolveGroupSortParams('meta.created')).toEqual({ field: 'createdAt', direction: 'asc' });
+      expect(resolveGroupSortParams('meta.created').field).toBe('createdAt');
     });
 
     it('should handle descending sort order', () => {
-      expect(resolveGroupSortParams('displayName', 'descending')).toEqual({ field: 'displayName', direction: 'desc' });
+      expect(resolveGroupSortParams('displayName', 'descending').direction).toBe('desc');
     });
 
     it('should fall back to createdAt for unknown attribute', () => {
-      expect(resolveGroupSortParams('members')).toEqual({ field: 'createdAt', direction: 'asc' });
+      expect(resolveGroupSortParams('members').field).toBe('createdAt');
     });
 
     it('should be case-insensitive for attribute names', () => {
-      expect(resolveGroupSortParams('DISPLAYNAME')).toEqual({ field: 'displayName', direction: 'asc' });
-      expect(resolveGroupSortParams('Meta.Created')).toEqual({ field: 'createdAt', direction: 'asc' });
+      expect(resolveGroupSortParams('DISPLAYNAME').field).toBe('displayName');
+      expect(resolveGroupSortParams('Meta.Created').field).toBe('createdAt');
+    });
+
+    // ─── caseExact-aware sorting ────────────────────────────────
+
+    it('should set caseExact=true when sortBy attr is in caseExactPaths', () => {
+      const caseExactPaths = new Set(['id', 'externalid']);
+      const result = resolveGroupSortParams('externalId', undefined, caseExactPaths);
+      expect(result.caseExact).toBe(true);
+    });
+
+    it('should set caseExact=false for displayName when not in caseExactPaths', () => {
+      const caseExactPaths = new Set(['id']);
+      const result = resolveGroupSortParams('displayName', undefined, caseExactPaths);
+      expect(result.caseExact).toBe(false);
     });
   });
 });
