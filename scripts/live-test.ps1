@@ -6837,6 +6837,138 @@ if ($cacheEpId) {
 Write-Host "`n--- 9z-C: Schema Cache Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-D: ADMIN ENDPOINT API IMPROVEMENTS
+$script:currentSection = "9z-D: Admin Endpoint API"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-D: ADMIN ENDPOINT API IMPROVEMENTS" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# --- Test 9z-D.1: List endpoints returns envelope ---
+Write-Host "`n--- Test 9z-D.1: Envelope Response ---" -ForegroundColor Cyan
+$listResponse = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method GET -Headers $headers
+Test-Result -Success ($null -ne $listResponse.totalResults) -Message "9z-D.1: List response has totalResults"
+Test-Result -Success ($null -ne $listResponse.endpoints) -Message "9z-D.2: List response has endpoints array"
+Test-Result -Success ($listResponse.totalResults -ge 1) -Message "9z-D.3: totalResults >= 1"
+Test-Result -Success ($listResponse.endpoints.Count -eq $listResponse.totalResults) -Message "9z-D.4: endpoints.Count matches totalResults"
+
+# --- Test 9z-D.2: Summary view (list default) ---
+Write-Host "`n--- Test 9z-D.2: Summary View ---" -ForegroundColor Cyan
+$summaryList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints?view=summary" -Method GET -Headers $headers
+$firstEp = $summaryList.endpoints[0]
+Test-Result -Success ($null -ne $firstEp.profileSummary) -Message "9z-D.5: Summary view includes profileSummary"
+Test-Result -Success ($null -eq $firstEp.profile) -Message "9z-D.6: Summary view omits full profile"
+
+# --- Test 9z-D.3: Full view ---
+Write-Host "`n--- Test 9z-D.3: Full View ---" -ForegroundColor Cyan
+$fullList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints?view=full" -Method GET -Headers $headers
+$firstFull = $fullList.endpoints[0]
+Test-Result -Success ($null -ne $firstFull.profile) -Message "9z-D.7: Full view includes profile"
+Test-Result -Success ($null -eq $firstFull.profileSummary) -Message "9z-D.8: Full view omits profileSummary"
+
+# --- Test 9z-D.4: Single-get defaults to full ---
+Write-Host "`n--- Test 9z-D.4: Single-Get Views ---" -ForegroundColor Cyan
+$singleFull = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method GET -Headers $headers
+Test-Result -Success ($null -ne $singleFull.profile) -Message "9z-D.9: Single-get defaults to full view"
+$singleSummary = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId`?view=summary" -Method GET -Headers $headers
+Test-Result -Success ($null -ne $singleSummary.profileSummary) -Message "9z-D.10: Single-get with view=summary returns profileSummary"
+Test-Result -Success ($null -eq $singleSummary.profile) -Message "9z-D.11: Single-get with view=summary omits profile"
+
+# --- Test 9z-D.5: _links (HATEOAS) ---
+Write-Host "`n--- Test 9z-D.5: HATEOAS _links ---" -ForegroundColor Cyan
+Test-Result -Success ($null -ne $singleFull._links) -Message "9z-D.12: Response includes _links"
+Test-Result -Success ($singleFull._links.self -like "*/admin/endpoints/$EndpointId") -Message "9z-D.13: _links.self is correct"
+Test-Result -Success ($singleFull._links.stats -like "*/admin/endpoints/$EndpointId/stats") -Message "9z-D.14: _links.stats is correct"
+Test-Result -Success ($singleFull._links.credentials -like "*/admin/endpoints/$EndpointId/credentials") -Message "9z-D.15: _links.credentials is correct"
+Test-Result -Success ($singleFull._links.scim -like "*/scim/endpoints/$EndpointId") -Message "9z-D.16: _links.scim is correct"
+
+# --- Test 9z-D.6: ISO 8601 timestamps ---
+Write-Host "`n--- Test 9z-D.6: ISO Timestamps ---" -ForegroundColor Cyan
+Test-Result -Success ($singleFull.createdAt -is [string]) -Message "9z-D.17: createdAt is a string"
+Test-Result -Success ($singleFull.updatedAt -is [string]) -Message "9z-D.18: updatedAt is a string"
+Test-Result -Success ($singleFull.createdAt -match '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}') -Message "9z-D.19: createdAt is ISO 8601 format"
+Test-Result -Success ($singleFull.updatedAt -match '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}') -Message "9z-D.20: updatedAt is ISO 8601 format"
+
+# --- Test 9z-D.7: ProfileSummary content ---
+Write-Host "`n--- Test 9z-D.7: ProfileSummary Content ---" -ForegroundColor Cyan
+$ps = $singleSummary.profileSummary
+Test-Result -Success ($null -ne $ps.schemaCount -and $ps.schemaCount -gt 0) -Message "9z-D.21: schemaCount > 0"
+Test-Result -Success ($null -ne $ps.schemas -and $ps.schemas.Count -eq $ps.schemaCount) -Message "9z-D.22: schemas count matches schemaCount"
+Test-Result -Success ($null -ne $ps.resourceTypeCount) -Message "9z-D.23: resourceTypeCount present"
+Test-Result -Success ($null -ne $ps.resourceTypes -and $ps.resourceTypes.Count -eq $ps.resourceTypeCount) -Message "9z-D.24: resourceTypes count matches"
+Test-Result -Success ($null -ne $ps.serviceProviderConfig) -Message "9z-D.25: serviceProviderConfig present"
+Test-Result -Success ($null -ne $ps.activeSettings) -Message "9z-D.26: activeSettings present"
+
+# Check schema summary has attributeCount
+$firstSchema = $ps.schemas[0]
+Test-Result -Success ($null -ne $firstSchema.id) -Message "9z-D.27: Schema summary has id"
+Test-Result -Success ($null -ne $firstSchema.name) -Message "9z-D.28: Schema summary has name"
+Test-Result -Success ($null -ne $firstSchema.attributeCount -and $firstSchema.attributeCount -gt 0) -Message "9z-D.29: Schema summary has attributeCount"
+
+# --- Test 9z-D.8: Presets API ---
+Write-Host "`n--- Test 9z-D.8: Presets API ---" -ForegroundColor Cyan
+$presetsResponse = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/presets" -Method GET -Headers $headers
+Test-Result -Success ($null -ne $presetsResponse.totalResults) -Message "9z-D.30: Presets list has totalResults"
+Test-Result -Success ($presetsResponse.totalResults -ge 5) -Message "9z-D.31: At least 5 presets"
+Test-Result -Success ($null -ne $presetsResponse.presets) -Message "9z-D.32: Presets list has presets array"
+
+# Check preset names
+$presetNames = $presetsResponse.presets | ForEach-Object { $_.name }
+Test-Result -Success ($presetNames -contains "entra-id") -Message "9z-D.33: Contains entra-id preset"
+Test-Result -Success ($presetNames -contains "rfc-standard") -Message "9z-D.34: Contains rfc-standard preset"
+Test-Result -Success ($presetNames -contains "minimal") -Message "9z-D.35: Contains minimal preset"
+
+# Check default flag
+$defaults = $presetsResponse.presets | Where-Object { $_.default -eq $true }
+Test-Result -Success ($defaults.Count -eq 1) -Message "9z-D.36: Exactly one default preset"
+Test-Result -Success ($defaults[0].name -eq "entra-id") -Message "9z-D.37: Default preset is entra-id"
+
+# Check preset summary structure
+$presetSummary = $presetsResponse.presets[0].summary
+Test-Result -Success ($null -ne $presetSummary.schemaCount) -Message "9z-D.38: Preset summary has schemaCount"
+Test-Result -Success ($null -ne $presetSummary.serviceProviderConfig) -Message "9z-D.39: Preset summary has serviceProviderConfig"
+
+# --- Test 9z-D.9: Get single preset by name ---
+Write-Host "`n--- Test 9z-D.9: Get Preset by Name ---" -ForegroundColor Cyan
+$entraPreset = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/presets/entra-id" -Method GET -Headers $headers
+Test-Result -Success ($entraPreset.metadata.name -eq "entra-id") -Message "9z-D.40: Preset detail name is entra-id"
+Test-Result -Success ($entraPreset.metadata.default -eq $true) -Message "9z-D.41: Preset detail default flag is true"
+Test-Result -Success ($null -ne $entraPreset.profile) -Message "9z-D.42: Preset detail has full profile"
+Test-Result -Success ($entraPreset.profile.schemas.Count -gt 0) -Message "9z-D.43: Preset has schemas"
+Test-Result -Success ($entraPreset.profile.resourceTypes.Count -gt 0) -Message "9z-D.44: Preset has resourceTypes"
+
+# Test unknown preset returns 404
+try {
+    $null = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/presets/does-not-exist" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9z-D.45: Unknown preset should return 404"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 404) -Message "9z-D.45: Unknown preset returns 404 (got $statusCode)"
+}
+
+# --- Test 9z-D.10: Nested stats ---
+Write-Host "`n--- Test 9z-D.10: Nested Stats ---" -ForegroundColor Cyan
+$stats = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId/stats" -Method GET -Headers $headers
+Test-Result -Success ($null -ne $stats.users) -Message "9z-D.46: Stats has users object"
+Test-Result -Success ($null -ne $stats.users.total) -Message "9z-D.47: users has total"
+Test-Result -Success ($null -ne $stats.users.active) -Message "9z-D.48: users has active"
+Test-Result -Success ($null -ne $stats.users.softDeleted) -Message "9z-D.49: users has softDeleted"
+Test-Result -Success ($null -ne $stats.groups) -Message "9z-D.50: Stats has groups object"
+Test-Result -Success ($null -ne $stats.groups.total) -Message "9z-D.51: groups has total"
+Test-Result -Success ($null -ne $stats.groups.active) -Message "9z-D.52: groups has active"
+Test-Result -Success ($null -ne $stats.groups.softDeleted) -Message "9z-D.53: groups has softDeleted"
+Test-Result -Success ($null -ne $stats.groupMembers) -Message "9z-D.54: Stats has groupMembers"
+Test-Result -Success ($null -ne $stats.groupMembers.total) -Message "9z-D.55: groupMembers has total"
+Test-Result -Success ($null -ne $stats.requestLogs) -Message "9z-D.56: Stats has requestLogs"
+Test-Result -Success ($null -ne $stats.requestLogs.total) -Message "9z-D.57: requestLogs has total"
+
+# Old format should NOT exist
+Test-Result -Success ($null -eq $stats.totalUsers) -Message "9z-D.58: Old totalUsers field absent"
+Test-Result -Success ($null -eq $stats.totalGroups) -Message "9z-D.59: Old totalGroups field absent"
+
+Write-Host "`n--- 9z-D: Admin Endpoint API Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
