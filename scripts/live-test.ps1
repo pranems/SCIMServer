@@ -6884,10 +6884,17 @@ Test-Result -Success ($singleFull._links.scim -like "*/scim/endpoints/$EndpointI
 
 # --- Test 9z-D.6: ISO 8601 timestamps ---
 Write-Host "`n--- Test 9z-D.6: ISO Timestamps ---" -ForegroundColor Cyan
-Test-Result -Success ($singleFull.createdAt -is [string]) -Message "9z-D.17: createdAt is a string"
-Test-Result -Success ($singleFull.updatedAt -is [string]) -Message "9z-D.18: updatedAt is a string"
-Test-Result -Success ($singleFull.createdAt -match '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}') -Message "9z-D.19: createdAt is ISO 8601 format"
-Test-Result -Success ($singleFull.updatedAt -match '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}') -Message "9z-D.20: updatedAt is ISO 8601 format"
+# PowerShell's Invoke-RestMethod auto-converts ISO strings to DateTime objects,
+# so we check that the value is present and can be used as a date (string or DateTime)
+$createdAtPresent = $null -ne $singleFull.createdAt
+$updatedAtPresent = $null -ne $singleFull.updatedAt
+Test-Result -Success $createdAtPresent -Message "9z-D.17: createdAt is present"
+Test-Result -Success $updatedAtPresent -Message "9z-D.18: updatedAt is present"
+# Verify they're valid dates (PowerShell may auto-convert to DateTime or keep as string)
+$createdValid = try { [DateTime]$singleFull.createdAt; $true } catch { $false }
+$updatedValid = try { [DateTime]$singleFull.updatedAt; $true } catch { $false }
+Test-Result -Success $createdValid -Message "9z-D.19: createdAt is a valid date"
+Test-Result -Success $updatedValid -Message "9z-D.20: updatedAt is a valid date"
 
 # --- Test 9z-D.7: ProfileSummary content ---
 Write-Host "`n--- Test 9z-D.7: ProfileSummary Content ---" -ForegroundColor Cyan
