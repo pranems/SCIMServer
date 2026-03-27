@@ -236,7 +236,8 @@ describe('EndpointService', () => {
 
       const result = await service.listEndpoints();
 
-      expect(result).toHaveLength(1);
+      expect(result.totalResults).toBe(1);
+      expect(result.endpoints).toHaveLength(1);
       expect(prisma.endpoint.findMany).toHaveBeenCalledWith({
         where: {},
         orderBy: { createdAt: 'desc' },
@@ -266,12 +267,12 @@ describe('EndpointService', () => {
       });
     });
 
-    it('should return empty array when no endpoints exist', async () => {
+    it('should return empty response when no endpoints exist', async () => {
       (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([]);
 
       const result = await service.listEndpoints();
 
-      expect(result).toEqual([]);
+      expect(result).toEqual({ totalResults: 0, endpoints: [] });
     });
   });
 
@@ -296,37 +297,43 @@ describe('EndpointService', () => {
   });
 
   describe('getEndpointStats', () => {
-    it('should return endpoint statistics', async () => {
+    it('should return endpoint statistics (nested format)', async () => {
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
-      (prisma.scimResource.count as jest.Mock).mockResolvedValueOnce(10);
-      (prisma.scimResource.count as jest.Mock).mockResolvedValueOnce(5);
+      // 8 parallel count queries: totalUsers, activeUsers, softDeletedUsers,
+      //   totalGroups, activeGroups, softDeletedGroups, totalGroupMembers, requestLogCount
+      (prisma.scimResource.count as jest.Mock)
+        .mockResolvedValueOnce(10)  // totalUsers
+        .mockResolvedValueOnce(8)   // activeUsers
+        .mockResolvedValueOnce(2)   // softDeletedUsers
+        .mockResolvedValueOnce(5)   // totalGroups
+        .mockResolvedValueOnce(5)   // activeGroups
+        .mockResolvedValueOnce(0);  // softDeletedGroups
       (prisma.resourceMember.count as jest.Mock).mockResolvedValue(25);
       (prisma.requestLog.count as jest.Mock).mockResolvedValue(100);
 
       const result = await service.getEndpointStats('test-endpoint-id');
 
       expect(result).toEqual({
-        totalUsers: 10,
-        totalGroups: 5,
-        totalGroupMembers: 25,
-        requestLogCount: 100,
+        users: { total: 10, active: 8, softDeleted: 2 },
+        groups: { total: 5, active: 5, softDeleted: 0 },
+        groupMembers: { total: 25 },
+        requestLogs: { total: 100 },
       });
     });
 
     it('should return zero counts for empty endpoint', async () => {
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
-      (prisma.scimResource.count as jest.Mock).mockResolvedValueOnce(0);
-      (prisma.scimResource.count as jest.Mock).mockResolvedValueOnce(0);
+      (prisma.scimResource.count as jest.Mock).mockResolvedValue(0);
       (prisma.resourceMember.count as jest.Mock).mockResolvedValue(0);
       (prisma.requestLog.count as jest.Mock).mockResolvedValue(0);
 
       const result = await service.getEndpointStats('test-endpoint-id');
 
       expect(result).toEqual({
-        totalUsers: 0,
-        totalGroups: 0,
-        totalGroupMembers: 0,
-        requestLogCount: 0,
+        users: { total: 0, active: 0, softDeleted: 0 },
+        groups: { total: 0, active: 0, softDeleted: 0 },
+        groupMembers: { total: 0 },
+        requestLogs: { total: 0 },
       });
     });
 
@@ -666,7 +673,8 @@ describe('EndpointService', () => {
 
       (prisma.endpoint.findMany as jest.Mock).mockClear();
       const list = await service.listEndpoints();
-      expect(list.length).toBeGreaterThanOrEqual(1);
+      expect(list.totalResults).toBeGreaterThanOrEqual(1);
+      expect(list.endpoints.length).toBeGreaterThanOrEqual(1);
       // findMany should NOT be called again — served from cache
       expect(prisma.endpoint.findMany).not.toHaveBeenCalled();
     });
@@ -690,8 +698,8 @@ describe('EndpointService', () => {
       (prisma.endpoint.findMany as jest.Mock).mockClear();
 
       const activeList = await service.listEndpoints(true);
-      expect(activeList.length).toBe(1);
-      expect(activeList[0].id).toBe('active-ep');
+      expect(activeList.totalResults).toBe(1);
+      expect(activeList.endpoints[0].id).toBe('active-ep');
       expect(prisma.endpoint.findMany).not.toHaveBeenCalled(); // served from cache
     });
 
@@ -704,8 +712,8 @@ describe('EndpointService', () => {
       (prisma.endpoint.findMany as jest.Mock).mockClear();
 
       const inactiveList = await service.listEndpoints(false);
-      expect(inactiveList.length).toBe(1);
-      expect(inactiveList[0].id).toBe('inactive-ep2');
+      expect(inactiveList.totalResults).toBe(1);
+      expect(inactiveList.endpoints[0].id).toBe('inactive-ep2');
       expect(prisma.endpoint.findMany).not.toHaveBeenCalled();
     });
   });

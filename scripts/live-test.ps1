@@ -300,7 +300,9 @@ $patchBody = @{ profile = @{ settings = @{ MultiOpPatchRequestAddMultipleMembers
 Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 Test-Result -Success ($null -ne $EndpointId) -Message "Create endpoint returned ID: $EndpointId"
 Test-Result -Success ($endpoint.active -eq $true) -Message "New endpoint is active by default"
-Test-Result -Success ($endpoint.scimEndpoint -like "*/scim/endpoints/$EndpointId") -Message "scimEndpoint URL is correct"
+Test-Result -Success ($endpoint.scimBasePath -like "*/scim/endpoints/$EndpointId") -Message "scimBasePath URL is correct"
+Test-Result -Success ($null -ne $endpoint._links.self) -Message "Response includes _links.self"
+Test-Result -Success ($null -ne $endpoint._links.scim) -Message "Response includes _links.scim"
 
 # Test: Get endpoint by ID
 Write-Host "`n--- Test: Get Endpoint by ID ---" -ForegroundColor Cyan
@@ -314,8 +316,9 @@ Test-Result -Success ($fetchedByName.id -eq $EndpointId) -Message "Get endpoint 
 
 # Test: List endpoints
 Write-Host "`n--- Test: List Endpoints ---" -ForegroundColor Cyan
-$allEndpoints = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method GET -Headers $headers
-Test-Result -Success ($allEndpoints.Count -gt 0) -Message "List endpoints returns array with items"
+$allEndpointsResponse = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method GET -Headers $headers
+Test-Result -Success ($allEndpointsResponse.totalResults -gt 0) -Message "List endpoints returns envelope with totalResults > 0"
+Test-Result -Success ($allEndpointsResponse.endpoints.Count -gt 0) -Message "List endpoints returns endpoints array with items"
 
 # Test: Update endpoint
 Write-Host "`n--- Test: Update Endpoint ---" -ForegroundColor Cyan
@@ -327,8 +330,10 @@ Test-Result -Success ($updatedEndpoint.description -eq "Updated description") -M
 # Test: Get endpoint stats
 Write-Host "`n--- Test: Get Endpoint Stats ---" -ForegroundColor Cyan
 $stats = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId/stats" -Method GET -Headers $headers
-Test-Result -Success ($null -ne $stats.totalUsers) -Message "Stats includes totalUsers"
-Test-Result -Success ($null -ne $stats.totalGroups) -Message "Stats includes totalGroups"
+Test-Result -Success ($null -ne $stats.users) -Message "Stats includes users object"
+Test-Result -Success ($null -ne $stats.users.total) -Message "Stats users includes total count"
+Test-Result -Success ($null -ne $stats.groups) -Message "Stats includes groups object"
+Test-Result -Success ($null -ne $stats.groups.total) -Message "Stats groups includes total count"
 
 # ============================================
 # TEST SECTION 2: CONFIG VALIDATION

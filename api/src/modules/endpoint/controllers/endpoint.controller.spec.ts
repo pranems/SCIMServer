@@ -14,9 +14,15 @@ describe('EndpointController', () => {
     description: 'A test endpoint',
     profile: { settings: { MultiOpPatchRequestAddMultipleMembersToGroup: 'True' }, schemas: [], resourceTypes: [], serviceProviderConfig: {} },
     active: true,
-    scimEndpoint: '/scim/endpoints/endpoint-1',
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    scimBasePath: '/scim/endpoints/endpoint-1',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    _links: {
+      self: '/admin/endpoints/endpoint-1',
+      stats: '/admin/endpoints/endpoint-1/stats',
+      credentials: '/admin/endpoints/endpoint-1/credentials',
+      scim: '/scim/endpoints/endpoint-1',
+    },
   };
 
   const mockEndpointService = {
@@ -27,6 +33,8 @@ describe('EndpointController', () => {
     updateEndpoint: jest.fn(),
     deleteEndpoint: jest.fn(),
     getEndpointStats: jest.fn(),
+    listPresets: jest.fn(),
+    getPreset: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -89,50 +97,71 @@ describe('EndpointController', () => {
 
   describe('listEndpoints', () => {
     it('should list all endpoints when no filter provided', async () => {
-      mockEndpointService.listEndpoints.mockResolvedValue([mockEndpointResponse]);
+      const mockListResponse = { totalResults: 1, endpoints: [mockEndpointResponse] };
+      mockEndpointService.listEndpoints.mockResolvedValue(mockListResponse);
 
       const result = await controller.listEndpoints();
 
-      expect(result).toEqual([mockEndpointResponse]);
-      expect(mockEndpointService.listEndpoints).toHaveBeenCalledWith(undefined);
+      expect(result).toEqual(mockListResponse);
+      expect(mockEndpointService.listEndpoints).toHaveBeenCalledWith(undefined, 'summary');
     });
 
     it('should list active endpoints when active=true', async () => {
-      mockEndpointService.listEndpoints.mockResolvedValue([mockEndpointResponse]);
+      const mockListResponse = { totalResults: 1, endpoints: [mockEndpointResponse] };
+      mockEndpointService.listEndpoints.mockResolvedValue(mockListResponse);
 
       const result = await controller.listEndpoints('true');
 
-      expect(result).toEqual([mockEndpointResponse]);
-      expect(mockEndpointService.listEndpoints).toHaveBeenCalledWith(true);
+      expect(result).toEqual(mockListResponse);
+      expect(mockEndpointService.listEndpoints).toHaveBeenCalledWith(true, 'summary');
     });
 
     it('should list inactive endpoints when active=false', async () => {
       const inactiveEndpoint = { ...mockEndpointResponse, active: false };
-      mockEndpointService.listEndpoints.mockResolvedValue([inactiveEndpoint]);
+      const mockListResponse = { totalResults: 1, endpoints: [inactiveEndpoint] };
+      mockEndpointService.listEndpoints.mockResolvedValue(mockListResponse);
 
       const result = await controller.listEndpoints('false');
 
-      expect(result).toEqual([inactiveEndpoint]);
-      expect(mockEndpointService.listEndpoints).toHaveBeenCalledWith(false);
+      expect(result).toEqual(mockListResponse);
+      expect(mockEndpointService.listEndpoints).toHaveBeenCalledWith(false, 'summary');
     });
 
-    it('should return empty array when no endpoints exist', async () => {
-      mockEndpointService.listEndpoints.mockResolvedValue([]);
+    it('should return empty list when no endpoints exist', async () => {
+      const mockListResponse = { totalResults: 0, endpoints: [] };
+      mockEndpointService.listEndpoints.mockResolvedValue(mockListResponse);
 
       const result = await controller.listEndpoints();
 
-      expect(result).toEqual([]);
+      expect(result).toEqual(mockListResponse);
+    });
+
+    it('should pass view=full when requested', async () => {
+      const mockListResponse = { totalResults: 1, endpoints: [mockEndpointResponse] };
+      mockEndpointService.listEndpoints.mockResolvedValue(mockListResponse);
+
+      await controller.listEndpoints(undefined, 'full');
+
+      expect(mockEndpointService.listEndpoints).toHaveBeenCalledWith(undefined, 'full');
     });
   });
 
   describe('getEndpoint', () => {
-    it('should get an endpoint by ID', async () => {
+    it('should get an endpoint by ID (default full view)', async () => {
       mockEndpointService.getEndpoint.mockResolvedValue(mockEndpointResponse);
 
       const result = await controller.getEndpoint('endpoint-1');
 
       expect(result).toEqual(mockEndpointResponse);
-      expect(mockEndpointService.getEndpoint).toHaveBeenCalledWith('endpoint-1');
+      expect(mockEndpointService.getEndpoint).toHaveBeenCalledWith('endpoint-1', 'full');
+    });
+
+    it('should pass view=summary when requested', async () => {
+      mockEndpointService.getEndpoint.mockResolvedValue(mockEndpointResponse);
+
+      await controller.getEndpoint('endpoint-1', 'summary');
+
+      expect(mockEndpointService.getEndpoint).toHaveBeenCalledWith('endpoint-1', 'summary');
     });
 
     it('should propagate NotFoundException for non-existent endpoint', async () => {
@@ -145,13 +174,13 @@ describe('EndpointController', () => {
   });
 
   describe('getEndpointByName', () => {
-    it('should get an endpoint by name', async () => {
+    it('should get an endpoint by name (default full view)', async () => {
       mockEndpointService.getEndpointByName.mockResolvedValue(mockEndpointResponse);
 
       const result = await controller.getEndpointByName('test-endpoint');
 
       expect(result).toEqual(mockEndpointResponse);
-      expect(mockEndpointService.getEndpointByName).toHaveBeenCalledWith('test-endpoint');
+      expect(mockEndpointService.getEndpointByName).toHaveBeenCalledWith('test-endpoint', 'full');
     });
 
     it('should propagate NotFoundException for non-existent endpoint', async () => {
@@ -238,27 +267,30 @@ describe('EndpointController', () => {
   });
 
   describe('getEndpointStats', () => {
-    it('should get endpoint statistics', async () => {
+    it('should get endpoint statistics (nested format)', async () => {
       const mockStats = {
-        totalUsers: 10,
-        totalGroups: 5,
-        totalGroupMembers: 25,
-        requestLogCount: 100,
+        users: { total: 10, active: 8, softDeleted: 2 },
+        groups: { total: 5, active: 5, softDeleted: 0 },
+        groupMembers: { total: 25 },
+        requestLogs: { total: 100 },
       };
       mockEndpointService.getEndpointStats.mockResolvedValue(mockStats);
 
       const result = await controller.getEndpointStats('endpoint-1');
 
       expect(result).toEqual(mockStats);
+      expect(result.users.total).toBe(10);
+      expect(result.users.active).toBe(8);
+      expect(result.users.softDeleted).toBe(2);
       expect(mockEndpointService.getEndpointStats).toHaveBeenCalledWith('endpoint-1');
     });
 
     it('should return zero counts for empty endpoint', async () => {
       const emptyStats = {
-        totalUsers: 0,
-        totalGroups: 0,
-        totalGroupMembers: 0,
-        requestLogCount: 0,
+        users: { total: 0, active: 0, softDeleted: 0 },
+        groups: { total: 0, active: 0, softDeleted: 0 },
+        groupMembers: { total: 0 },
+        requestLogs: { total: 0 },
       };
       mockEndpointService.getEndpointStats.mockResolvedValue(emptyStats);
 
@@ -273,6 +305,34 @@ describe('EndpointController', () => {
       );
 
       await expect(controller.getEndpointStats('non-existent')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('presets', () => {
+    it('should list built-in presets', () => {
+      const mockPresets = {
+        totalResults: 2,
+        presets: [
+          { name: 'entra-id', description: 'Entra ID', default: true, summary: {} },
+          { name: 'minimal', description: 'Minimal', default: false, summary: {} },
+        ],
+      };
+      mockEndpointService.listPresets.mockReturnValue(mockPresets);
+
+      const result = controller.listPresets();
+
+      expect(result).toEqual(mockPresets);
+      expect(result.totalResults).toBe(2);
+    });
+
+    it('should get a single preset by name', () => {
+      const mockPreset = { metadata: { name: 'entra-id', description: 'Entra ID', default: true }, profile: {} };
+      mockEndpointService.getPreset.mockReturnValue(mockPreset);
+
+      const result = controller.getPreset('entra-id');
+
+      expect(result).toEqual(mockPreset);
+      expect(mockEndpointService.getPreset).toHaveBeenCalledWith('entra-id');
     });
   });
 });
