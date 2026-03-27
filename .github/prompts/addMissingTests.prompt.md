@@ -135,7 +135,7 @@ Specifically check:
 - Every E2E test scenario should have a corresponding live test in `scripts/live-test.ps1`
 - Live tests should cover both local (port 6000) and Docker (port 8080) scenarios
 - Verify all live test sections in `scripts/live-test.ps1` exist by grepping for `TEST SECTION`
-- Ensure new sections use the next available number (check current highest before `Section 10`; as of v0.29.0 the latest is **9z**)
+- Ensure new sections use the next available number (check current highest before `Section 10`; as of v0.30.0 the latest is **9z-D**)
 
 ### H. Resource-Type Symmetry
 
@@ -182,7 +182,7 @@ For every behavior tested on Users, verify the equivalent exists for Groups (and
 | Discovery differs per preset (schemas, SPC) | ✅ | ✅ | ✅ |
 | Profile hydration on boot (registry) | ✅ | N/A | ? |
 | Profile change listener (registry rehydration) | ✅ | implicit | ? |
-| Preset API (list + detail + 404) | N/A (removed) | N/A (removed) | N/A (removed) |
+| Preset API (list + detail + 404) | ✅ | ✅ | ✅ |
 | `configToProfile` backward compat (BulkOperationsEnabled→SPC) | N/A (removed in v0.29.0) | N/A | N/A |
 | Mutually exclusive profilePreset + profile → 400 | ✅ | ✅ | ✅ |
 
@@ -215,8 +215,29 @@ For every behavior tested on Users, verify the equivalent exists for Groups (and
 | user-only preset blocks Group CRUD | ? | ✅ | ✅ |
 | Profile PATCH → config change reflects in endpoint | ? | ✅ | ✅ |
 | Inline profile → discovery reflects it | ? | ✅ | ✅ |
-| Preset API (list 5 + detail + 404) | N/A (removed) | N/A (removed) | N/A (removed) |
+| Preset API (list 6 + detail + 404) | ✅ | ✅ | ✅ |
 | Per-preset discovery differentiation (schema count, SPC) | ✅ | ✅ | ✅ |
+
+### M. Admin Endpoint API (v0.30.0)
+
+| Scenario | Unit | E2E | Live |
+|----------|------|-----|------|
+| List endpoint returns envelope `{ totalResults, endpoints[] }` | ✅ | ✅ | ✅ |
+| `?view=summary` returns `profileSummary`, no `profile` | ✅ | ✅ | ✅ |
+| `?view=full` returns `profile`, no `profileSummary` | ✅ | ✅ | ✅ |
+| List defaults to summary, single-get defaults to full | ✅ | ✅ | ✅ |
+| `scimBasePath` field (renamed from `scimEndpoint`) | ✅ | ✅ | ✅ |
+| `_links` (self, stats, credentials, scim) on all responses | ✅ | ✅ | ✅ |
+| ISO 8601 string timestamps (`createdAt`, `updatedAt`) | ✅ | ✅ | ✅ |
+| `GET /admin/endpoints/presets` — list with summaries | ✅ | ✅ | ✅ |
+| `GET /admin/endpoints/presets/:name` — full profile | ✅ | ✅ | ✅ |
+| Unknown preset → 404 | ✅ | ✅ | ✅ |
+| Nested stats: `users.{total,active,softDeleted}`, groups, etc. | ✅ | ✅ | ✅ |
+| Old flat stats format absent (`totalUsers`, etc.) | ✅ | ✅ | ✅ |
+| `ProfileSummary`: schemaCount, schemas[], resourceTypeCount, resourceTypes[] | ✅ | ✅ | ✅ |
+| `ProfileSummary`: serviceProviderConfig boolean flags | ✅ | ✅ | ✅ |
+| `ProfileSummary`: activeSettings (non-default only) | ✅ | ✅ | ✅ |
+| `buildProfileSummary` handles empty/extension schemas | ✅ | N/A | N/A |
 
 ---
 
@@ -545,7 +566,7 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 | Live  | 621    | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
-> *Last updated: v0.29.0 — preset API removed, compile-time presets (2026-03-17)*
+> *Last updated: v0.30.0 — admin endpoint API improvements, preset API restored (2026-03-26)*
 
 4. Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts.
 
