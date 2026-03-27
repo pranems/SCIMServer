@@ -5,7 +5,21 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.30.0] - 2026-03-25
+## [0.30.0] - 2026-03-26
+
+### Added — Admin Endpoint API Improvements
+
+- **Envelope response**: `GET /admin/endpoints` returns `{ totalResults, endpoints[] }` instead of bare array
+- **`?view=summary|full` query param**: summary (default for list) shows `profileSummary` digest; full (default for single-get) returns complete `profile`
+- **`ProfileSummary` digest**: includes `schemaCount`, `schemas[]` (id, name, attributeCount), `resourceTypeCount`, `resourceTypes[]` (name, schema, extensions, extensionCount), `serviceProviderConfig` (boolean flags), `activeSettings` (non-default settings only)
+- **`_links` (HATEOAS)**: every endpoint response includes `self`, `stats`, `credentials`, `scim` navigation links
+- **`GET /admin/endpoints/presets`**: list all built-in presets with profile summaries
+- **`GET /admin/endpoints/presets/:name`**: get full expanded preset profile (404 for unknown)
+- **Nested stats format**: `users: { total, active, softDeleted }`, `groups: { total, active, softDeleted }`, `groupMembers: { total }`, `requestLogs: { total }` — replaces flat `totalUsers`/`totalGroups`/`totalGroupMembers`/`requestLogCount`
+- **ISO 8601 string timestamps**: `createdAt`/`updatedAt` now explicit ISO 8601 strings (not Date objects)
+- **`scimBasePath`**: renamed from `scimEndpoint` for clarity
+- **Internal `CachedEndpoint` type**: separates internal cache (Date objects) from API response (ISO strings)
+- **Static `buildProfileSummary()`**: reusable across endpoint & preset responses
 
 ### Added — Schema Cache Optimization + caseExact + Generic Filter Parity
 
@@ -38,10 +52,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Test Results
 
-- **Unit tests**: 3,043 passed (74 suites)
-- **E2E tests**: 791 (36 suites)
-- **Live tests**: 615 assertions (local) / 614 (Azure)
-- **Total**: ~4,561 tests
+- **Unit tests**: 3,061 passed (74 suites)
+- **E2E tests**: 817 (37 suites)
+- **Live tests**: ~951 assertions (main) + 112 Lexmark
+- **Total**: ~4,941 tests
 
 ## [0.29.0] - 2026-03-17
 

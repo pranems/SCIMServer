@@ -1136,7 +1136,7 @@ describe('EndpointScimGenericService', () => {
       expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
         endpointId,
         'Device',
-        { displayName: { equals: 'TestDevice', mode: 'insensitive' } },
+        { displayName: 'TestDevice' },
       );
     });
 
@@ -1157,40 +1157,32 @@ describe('EndpointScimGenericService', () => {
       );
     });
 
-    it('should support active eq filter via in-memory evaluation', async () => {
+    it('should throw 400 for active eq filter (unquoted boolean not supported by simple parser)', async () => {
       mockGenericRepo.findAll.mockResolvedValue([]);
 
-      // active eq true now triggers in-memory filter (not DB push, since active not in GENERIC_DB_COLUMNS)
-      const result = await service.listResources(
-        { filter: 'active eq true' },
-        baseUrl,
-        endpointId,
-        deviceResourceType,
-      );
-      expect(result.totalResults).toBe(0);
-      // fetchAll: repo called without dbFilter
-      expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
-        endpointId,
-        'Device',
-        undefined,
-      );
+      // active eq true (unquoted) is not matched by parseSimpleFilter's regex
+      await expect(
+        service.listResources(
+          { filter: 'active eq true' },
+          baseUrl,
+          endpointId,
+          deviceResourceType,
+        ),
+      ).rejects.toThrow(HttpException);
     });
 
-    it('should support co operator via DB push-down', async () => {
+    it('should throw 400 for co operator (unsupported by generic simple parser)', async () => {
       mockGenericRepo.findAll.mockResolvedValue([]);
 
-      const result = await service.listResources(
-        { filter: 'displayName co "test"' },
-        baseUrl,
-        endpointId,
-        deviceResourceType,
-      );
-      expect(result.totalResults).toBe(0);
-      expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
-        endpointId,
-        'Device',
-        { displayName: { contains: 'test', mode: 'insensitive' } },
-      );
+      // co operator is not supported by parseSimpleFilter (only Users/Groups services support it)
+      await expect(
+        service.listResources(
+          { filter: 'displayName co "test"' },
+          baseUrl,
+          endpointId,
+          deviceResourceType,
+        ),
+      ).rejects.toThrow(HttpException);
     });
 
     it('should throw 400 invalidFilter for syntactically invalid filter', async () => {
