@@ -466,14 +466,14 @@ describe('Schema Cache Integration (E2E)', () => {
 
     it('should allow setting immutable attr on POST', async () => {
       const { basePath } = await createImmutableEndpoint();
-      const user = validUser({ [IMMUTABLE_EXT]: { serialNumber: 'SN-001', department: 'Eng' } });
+      const user = validUser({ schemas: [CORE_SCHEMA, IMMUTABLE_EXT], [IMMUTABLE_EXT]: { serialNumber: 'SN-001', department: 'Eng' } });
       const res = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
       expect(res.body[IMMUTABLE_EXT]?.serialNumber).toBe('SN-001');
     });
 
     it('should reject changing immutable attr on PUT', async () => {
       const { basePath } = await createImmutableEndpoint();
-      const user = validUser({ [IMMUTABLE_EXT]: { serialNumber: 'SN-002', department: 'Eng' } });
+      const user = validUser({ schemas: [CORE_SCHEMA, IMMUTABLE_EXT], [IMMUTABLE_EXT]: { serialNumber: 'SN-002', department: 'Eng' } });
       const cr = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
 
       const putBody = { ...user, [IMMUTABLE_EXT]: { serialNumber: 'SN-CHANGED', department: 'Ops' } };
@@ -483,7 +483,7 @@ describe('Schema Cache Integration (E2E)', () => {
 
     it('should allow PUT with same immutable value', async () => {
       const { basePath } = await createImmutableEndpoint();
-      const user = validUser({ [IMMUTABLE_EXT]: { serialNumber: 'SN-003', department: 'Eng' } });
+      const user = validUser({ schemas: [CORE_SCHEMA, IMMUTABLE_EXT], [IMMUTABLE_EXT]: { serialNumber: 'SN-003', department: 'Eng' } });
       const cr = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
 
       const putBody = { ...user, [IMMUTABLE_EXT]: { serialNumber: 'SN-003', department: 'NewDept' } };
