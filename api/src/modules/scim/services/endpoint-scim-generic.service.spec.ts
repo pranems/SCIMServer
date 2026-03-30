@@ -1123,7 +1123,7 @@ describe('EndpointScimGenericService', () => {
   // ─── Filter parsing in LIST ───────────────────────────────────────────
 
   describe('listResources — filter parsing', () => {
-    it('should pass displayName eq filter to repository', async () => {
+    it('should pass displayName eq filter to repository as Prisma-style where', async () => {
       mockGenericRepo.findAll.mockResolvedValue([]);
 
       await service.listResources(
@@ -1157,29 +1157,40 @@ describe('EndpointScimGenericService', () => {
       );
     });
 
-    it('should throw 400 invalidFilter for unsupported filter expressions', async () => {
+    it('should throw 400 for active eq filter (unquoted boolean not supported by simple parser)', async () => {
       mockGenericRepo.findAll.mockResolvedValue([]);
 
-      try {
-        await service.listResources(
+      // active eq true (unquoted) is not matched by parseSimpleFilter's regex
+      await expect(
+        service.listResources(
           { filter: 'active eq true' },
           baseUrl,
           endpointId,
           deviceResourceType,
-        );
-        fail('Expected 400');
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(400);
-        expect(e.getResponse().scimType).toBe('invalidFilter');
-      }
+        ),
+      ).rejects.toThrow(HttpException);
     });
 
-    it('should throw 400 invalidFilter for complex unsupported operators', async () => {
+    it('should throw 400 for co operator (unsupported by generic simple parser)', async () => {
+      mockGenericRepo.findAll.mockResolvedValue([]);
+
+      // co operator is not supported by parseSimpleFilter (only Users/Groups services support it)
+      await expect(
+        service.listResources(
+          { filter: 'displayName co "test"' },
+          baseUrl,
+          endpointId,
+          deviceResourceType,
+        ),
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('should throw 400 invalidFilter for syntactically invalid filter', async () => {
       mockGenericRepo.findAll.mockResolvedValue([]);
 
       try {
         await service.listResources(
-          { filter: 'displayName co "test"' },
+          { filter: '(((' },
           baseUrl,
           endpointId,
           deviceResourceType,

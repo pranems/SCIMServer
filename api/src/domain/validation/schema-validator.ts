@@ -76,24 +76,29 @@ export class SchemaValidator {
     payload: Record<string, unknown>,
     schemas: readonly SchemaDefinition[],
     options: ValidationOptions,
+    preBuiltMaps?: { coreAttrMap: Map<string, SchemaAttributeDefinition>; extensionSchemaMap: Map<string, SchemaDefinition> },
   ): ValidationResult {
     const errors: ValidationError[] = [];
 
-    // Build a unified lookup of attribute name → definition, keyed by lowercase name.
-    // Core schema attributes are merged at top level.
-    // Extension schema attributes are available under their URN key.
-    const coreAttributes = new Map<string, SchemaAttributeDefinition>();
-    const extensionSchemas = new Map<string, SchemaDefinition>();
+    // Use precomputed maps when available, otherwise build from schemas
+    let coreAttributes: Map<string, SchemaAttributeDefinition>;
+    let extensionSchemas: Map<string, SchemaDefinition>;
 
-    for (const schema of schemas) {
-      if (isCoreSchema(schema)) {
-        // Core schema: attributes live at the top level of the payload
-        for (const attr of schema.attributes) {
-          coreAttributes.set(attr.name.toLowerCase(), attr);
+    if (preBuiltMaps) {
+      coreAttributes = preBuiltMaps.coreAttrMap;
+      extensionSchemas = preBuiltMaps.extensionSchemaMap;
+    } else {
+      coreAttributes = new Map<string, SchemaAttributeDefinition>();
+      extensionSchemas = new Map<string, SchemaDefinition>();
+
+      for (const schema of schemas) {
+        if (isCoreSchema(schema)) {
+          for (const attr of schema.attributes) {
+            coreAttributes.set(attr.name.toLowerCase(), attr);
+          }
+        } else {
+          extensionSchemas.set(schema.id, schema);
         }
-      } else {
-        // Extension schema: attributes live under the URN key
-        extensionSchemas.set(schema.id, schema);
       }
     }
 
@@ -483,19 +488,28 @@ export class SchemaValidator {
     existing: Record<string, unknown>,
     incoming: Record<string, unknown>,
     schemas: readonly SchemaDefinition[],
+    preBuiltMaps?: { coreAttrMap: Map<string, SchemaAttributeDefinition>; extensionSchemaMap: Map<string, SchemaDefinition> },
   ): ValidationResult {
     const errors: ValidationError[] = [];
 
-    const coreAttributes = new Map<string, SchemaAttributeDefinition>();
-    const extensionSchemas = new Map<string, SchemaDefinition>();
+    let coreAttributes: Map<string, SchemaAttributeDefinition>;
+    let extensionSchemas: Map<string, SchemaDefinition>;
 
-    for (const schema of schemas) {
-      if (isCoreSchema(schema)) {
-        for (const attr of schema.attributes) {
-          coreAttributes.set(attr.name.toLowerCase(), attr);
+    if (preBuiltMaps) {
+      coreAttributes = preBuiltMaps.coreAttrMap;
+      extensionSchemas = preBuiltMaps.extensionSchemaMap;
+    } else {
+      coreAttributes = new Map<string, SchemaAttributeDefinition>();
+      extensionSchemas = new Map<string, SchemaDefinition>();
+
+      for (const schema of schemas) {
+        if (isCoreSchema(schema)) {
+          for (const attr of schema.attributes) {
+            coreAttributes.set(attr.name.toLowerCase(), attr);
+          }
+        } else {
+          extensionSchemas.set(schema.id, schema);
         }
-      } else {
-        extensionSchemas.set(schema.id, schema);
       }
     }
 
@@ -738,19 +752,28 @@ export class SchemaValidator {
   static validateFilterAttributePaths(
     filterPaths: readonly string[],
     schemas: readonly SchemaDefinition[],
+    preBuiltMaps?: { coreAttrMap: Map<string, SchemaAttributeDefinition>; extensionSchemaMap: Map<string, SchemaDefinition> },
   ): ValidationResult {
     const errors: ValidationError[] = [];
 
-    // Build attribute lookup
-    const coreAttributes = new Map<string, SchemaAttributeDefinition>();
-    const extensionSchemas = new Map<string, SchemaDefinition>();
-    for (const schema of schemas) {
-      if (isCoreSchema(schema)) {
-        for (const attr of schema.attributes) {
-          coreAttributes.set(attr.name.toLowerCase(), attr);
+    // Use precomputed maps when available
+    let coreAttributes: Map<string, SchemaAttributeDefinition>;
+    let extensionSchemas: Map<string, SchemaDefinition>;
+
+    if (preBuiltMaps) {
+      coreAttributes = preBuiltMaps.coreAttrMap;
+      extensionSchemas = preBuiltMaps.extensionSchemaMap;
+    } else {
+      coreAttributes = new Map<string, SchemaAttributeDefinition>();
+      extensionSchemas = new Map<string, SchemaDefinition>();
+      for (const schema of schemas) {
+        if (isCoreSchema(schema)) {
+          for (const attr of schema.attributes) {
+            coreAttributes.set(attr.name.toLowerCase(), attr);
+          }
+        } else {
+          extensionSchemas.set(schema.id, schema);
         }
-      } else {
-        extensionSchemas.set(schema.id, schema);
       }
     }
 
@@ -857,19 +880,28 @@ export class SchemaValidator {
     path: string | undefined,
     value: unknown,
     schemas: readonly SchemaDefinition[],
+    preBuiltMaps?: { coreAttrMap: Map<string, SchemaAttributeDefinition>; extensionSchemaMap: Map<string, SchemaDefinition> },
   ): ValidationResult {
     const errors: ValidationError[] = [];
 
-    // Build attribute index
-    const coreAttributes = new Map<string, SchemaAttributeDefinition>();
-    const extensionSchemas = new Map<string, SchemaDefinition>();
-    for (const schema of schemas) {
-      if (isCoreSchema(schema)) {
-        for (const attr of schema.attributes) {
-          coreAttributes.set(attr.name.toLowerCase(), attr);
+    // Use precomputed maps when available
+    let coreAttributes: Map<string, SchemaAttributeDefinition>;
+    let extensionSchemas: Map<string, SchemaDefinition>;
+
+    if (preBuiltMaps) {
+      coreAttributes = preBuiltMaps.coreAttrMap;
+      extensionSchemas = preBuiltMaps.extensionSchemaMap;
+    } else {
+      coreAttributes = new Map<string, SchemaAttributeDefinition>();
+      extensionSchemas = new Map<string, SchemaDefinition>();
+      for (const schema of schemas) {
+        if (isCoreSchema(schema)) {
+          for (const attr of schema.attributes) {
+            coreAttributes.set(attr.name.toLowerCase(), attr);
+          }
+        } else {
+          extensionSchemas.set(schema.id, schema);
         }
-      } else {
-        extensionSchemas.set(schema.id, schema);
       }
     }
 
@@ -1285,8 +1317,13 @@ export class SchemaValidator {
     const readOnlyByParent = new Map<string, Set<string>>();
     const immutableByParent = new Map<string, Set<string>>();
     const caseExactByParent = new Map<string, Set<string>>();
+    const caseExactPaths = new Set<string>();
     const alwaysReturnedSubs = new Map<string, Set<string>>();
     const uniqueAttrs: Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }> = [];
+
+    // Precomputed attribute definition lookup maps
+    const coreAttrMap = new Map<string, SchemaAttributeDefinition>();
+    const extensionSchemaMap = new Map<string, SchemaDefinition>();
 
     // Helper: ensure a key exists in a Map<string, Set<string>>
     const addTo = (map: Map<string, Set<string>>, parent: string, child: string): void => {
@@ -1299,6 +1336,15 @@ export class SchemaValidator {
       const isCore = isCoreSchema(schema);
       // Top-level parent key: __top__ for core, extension URN (lowercase) for extensions
       const topParent = isCore ? SCHEMA_CACHE_TOP_LEVEL : schema.id.toLowerCase();
+
+      // Build attribute definition lookups
+      if (isCore) {
+        for (const attr of schema.attributes) {
+          coreAttrMap.set(attr.name.toLowerCase(), attr);
+        }
+      } else {
+        extensionSchemaMap.set(schema.id, schema);
+      }
 
       const walkAttrs = (
         attrs: readonly SchemaAttributeDefinition[],
@@ -1342,6 +1388,9 @@ export class SchemaValidator {
           // ─── CaseExact ───
           if (attr.caseExact === true) {
             addTo(caseExactByParent, parentKey, nameLower);
+            // Also build dotted path for filter consumer convenience
+            const isTop = parentKey === SCHEMA_CACHE_TOP_LEVEL || parentKey.startsWith('urn:');
+            caseExactPaths.add(isTop ? nameLower : `${parentKey}.${nameLower}`);
           }
 
           // ─── Uniqueness (top-level only, non-complex, non-multiValued) ───
@@ -1437,12 +1486,15 @@ export class SchemaValidator {
       neverReturnedByParent,
       alwaysReturnedByParent,
       requestReturnedByParent,
-      readOnlyByParent,
       immutableByParent,
       caseExactByParent,
+      caseExactPaths,
       alwaysReturnedSubs,
       uniqueAttrs,
       extensionUrns,
+      coreAttrMap,
+      extensionSchemaMap,
+      readOnlyByParent,
       readOnlyCollected: {
         core: roCore,
         extensions: roExtensions,

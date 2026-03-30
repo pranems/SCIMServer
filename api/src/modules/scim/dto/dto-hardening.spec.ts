@@ -342,7 +342,9 @@ describe('CreateUserDto — additional validators', () => {
     expect(schemaErrors[0].constraints?.arrayNotEmpty).toBeDefined();
   });
 
-  it('should reject non-boolean active (@IsBoolean)', async () => {
+  it('should accept non-boolean active (DTO accepts any, schema layer validates)', async () => {
+    // active is typed as `unknown` to prevent class-transformer Boolean("False")→true.
+    // Schema-level validation (coerceBooleansByParentIfEnabled) handles type coercion.
     const dto = plainToInstance(CreateUserDto, {
       schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
       userName: 'alice@example.com',
@@ -350,8 +352,7 @@ describe('CreateUserDto — additional validators', () => {
     });
     const errors = await validate(dto);
     const activeErrors = errors.filter(e => e.property === 'active');
-    expect(activeErrors.length).toBeGreaterThan(0);
-    expect(activeErrors[0].constraints?.isBoolean).toBeDefined();
+    expect(activeErrors.length).toBe(0); // no DTO-level rejection — schema layer handles this
   });
 
   it('should accept boolean active', async () => {

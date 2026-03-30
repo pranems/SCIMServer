@@ -199,7 +199,7 @@ export function validateAndExpandProfile(input: ShorthandProfileInput): ProfileV
     return { valid: false, errors: allErrors };
   }
 
-  // Note: _schemaCache is NOT built here intentionally.
+  // Note: _schemaCaches is NOT built here intentionally.
   // The cache is built lazily in toResponse() (endpoint.service.ts) and
   // getSchemaCache() (scim-service-helpers.ts) at first access.
   // This keeps the profile clean for JSON serialization (Maps don't survive

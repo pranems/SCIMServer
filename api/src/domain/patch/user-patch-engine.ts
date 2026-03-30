@@ -218,9 +218,12 @@ export class UserPatchEngine {
     if (originalPath && isValuePath(originalPath)) {
       const vpParsed = parseValuePath(originalPath);
       if (vpParsed) {
+        // Resolve caseExact for the filter attribute from schema cache
+        const filterPath = `${vpParsed.attribute.toLowerCase()}.${vpParsed.filterAttribute.toLowerCase()}`;
+        const caseExact = config.caseExactPaths?.has(filterPath) ?? false;
         rawPayload = op === 'add'
-          ? addValuePathEntry(rawPayload, vpParsed, value)
-          : applyValuePathUpdate(rawPayload, vpParsed, value);
+          ? addValuePathEntry(rawPayload, vpParsed, value, caseExact)
+          : applyValuePathUpdate(rawPayload, vpParsed, value, caseExact);
       }
       return { userName, displayName, externalId, active, rawPayload };
     }
@@ -291,7 +294,9 @@ export class UserPatchEngine {
     if (originalPath && isValuePath(originalPath)) {
       const vpParsed = parseValuePath(originalPath);
       if (vpParsed) {
-        rawPayload = removeValuePathEntry(rawPayload, vpParsed);
+        const filterPath = `${vpParsed.attribute.toLowerCase()}.${vpParsed.filterAttribute.toLowerCase()}`;
+        const caseExact = config.caseExactPaths?.has(filterPath) ?? false;
+        rawPayload = removeValuePathEntry(rawPayload, vpParsed, caseExact);
       }
       return { active, rawPayload };
     }

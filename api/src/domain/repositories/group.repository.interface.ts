@@ -36,7 +36,7 @@ export interface IGroupRepository {
   findAllWithMembers(
     endpointId: string,
     dbFilter?: Record<string, unknown>,
-    orderBy?: { field: string; direction: 'asc' | 'desc' },
+    orderBy?: { field: string; direction: 'asc' | 'desc'; caseExact?: boolean },
   ): Promise<GroupWithMembers[]>;
 
   /** Update a group by its internal storage ID. */

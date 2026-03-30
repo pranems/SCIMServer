@@ -4,7 +4,7 @@ Production-ready, multi-tenant SCIM 2.0 server purpose-built for Microsoft Entra
 
 | | |
 |---|---|
-| **Version** | `0.29.0` |
+| **Version** | `0.30.0` |
 | **Protocol** | SCIM 2.0 ([RFC 7643](https://datatracker.ietf.org/doc/html/rfc7643) / [RFC 7644](https://datatracker.ietf.org/doc/html/rfc7644)) |
 | **Target IdP** | [Microsoft Entra ID](https://entra.microsoft.com/) |
 | **Runtime** | Node.js 24 · NestJS 11 · TypeScript 5.9 |
@@ -470,9 +470,9 @@ Content-Type: application/json
 
 | Layer | Suites | Tests | Framework |
 |-------|--------|-------|-----------|
-| **Unit** | 72 | 2,884 | Jest + ts-jest |
-| **E2E** | 34 | 743 pass + 6 skipped | Jest + supertest + NestJS testing |
-| **Live Integration** | 42 sections | ~621 | PowerShell (live-test.ps1) |
+| **Unit** | 74 | 3,061 | Jest + ts-jest |
+| **E2E** | 37 | 817 | Jest + supertest + NestJS testing |
+| **Live Integration** | 43 sections | ~951 | PowerShell (live-test.ps1) |
 | **ISV Live (Lexmark)** | 13 sections | 112 | PowerShell (lexmark-live-test.ps1) |
 | **Total** | **~160** | **~4,360** | — |
 
@@ -531,7 +531,7 @@ SCIMServer/
 │   └── test/
 │       └── e2e/                 # 34 E2E spec files + helpers
 ├── scripts/
-│   ├── live-test.ps1            # Main live test suite (42 sections, ~621 tests)
+│   ├── live-test.ps1            # Main live test suite (43 sections, ~951 tests)
 │   ├── lexmark-live-test.ps1    # Lexmark ISV live tests (13 sections, 112 tests)
 │   ├── deploy-azure.ps1         # Azure deployment
 │   └── ...                      # 20+ automation scripts

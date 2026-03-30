@@ -738,12 +738,12 @@ describe('Schema Validation (E2E)', () => {
     // These tests document the ValidationPipe's enableImplicitConversion behavior.
     // DTO-declared properties (active, userName) are coerced before schema validation.
 
-    it('should accept active as truthy string (coerced to boolean by ValidationPipe)', async () => {
+    it('should accept active as "True" string (coerced to boolean by service-layer coercion)', async () => {
       const { basePath } = await strictEndpoint();
 
-      // ValidationPipe with enableImplicitConversion: true coerces strings to boolean
+      // Service-layer coerceBooleansByParentIfEnabled coerces "True"/"False" to boolean
       const res = await scimPost(app, `${basePath}/Users`, token, validUser({
-        active: 'yes' as any,
+        active: 'True' as any,
       })).expect(201);
 
       // The value has been coerced to true

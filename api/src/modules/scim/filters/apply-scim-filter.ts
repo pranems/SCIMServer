@@ -124,6 +124,52 @@ export function buildGroupFilter(filter?: string, caseExactAttrs?: Set<string>):
   return buildFilterResult(ast, GROUP_DB_COLUMNS, caseExactAttrs);
 }
 
+// ─── Generic Resources ───────────────────────────────────────────────────────
+
+/**
+ * DB-pushable column map for Generic (custom) resource types.
+ *
+ * Generic resources store most data in a JSONB payload column, so only
+ * standard promoted columns can be pushed to the DB. Everything else falls
+ * back to in-memory evaluation via the full AST evaluator.
+ */
+const GENERIC_DB_COLUMNS: ColumnMap = {
+  displayname: { column: 'displayName', type: 'citext' },
+  externalid:  { column: 'externalId',  type: 'text' },    // caseExact=true per RFC 7643
+  id:          { column: 'scimId',      type: 'uuid' },
+};
+
+export interface GenericFilterResult {
+  /** DB-level key-value filter for promoted columns (simple equality). */
+  dbWhere: Record<string, unknown>;
+  /** If set, the in-memory filter fn to apply after DB fetch on SCIM-formatted resources */
+  inMemoryFilter?: (resource: Record<string, unknown>) => boolean;
+  /** When true, the DB fetch should return all records (filter is in-memory only) */
+  fetchAll: boolean;
+}
+
+/**
+ * Parse a SCIM filter string and determine how to apply it for Generic resources.
+ *
+ * Supports all RFC 7644 §3.4.2.2 operators: eq, ne, co, sw, ew, gt, ge, lt, le, pr
+ * plus AND/OR compound expressions. Pushes displayName, externalId, and id to the
+ * DB; falls back to in-memory evaluation for custom/extension attributes.
+ */
+export function buildGenericFilter(filter?: string, caseExactAttrs?: Set<string>): GenericFilterResult {
+  if (!filter) {
+    return { dbWhere: {}, fetchAll: false };
+  }
+
+  let ast: FilterNode;
+  try {
+    ast = parseScimFilter(filter);
+  } catch {
+    throw new Error(`Invalid filter: ${filter}`);
+  }
+
+  return buildFilterResult(ast, GENERIC_DB_COLUMNS, caseExactAttrs);
+}
+
 // ─── Shared ──────────────────────────────────────────────────────────────────
 
 /**

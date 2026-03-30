@@ -66,7 +66,7 @@ export class InMemoryGroupRepository implements IGroupRepository {
   async findAllWithMembers(
     endpointId: string,
     dbFilter?: Record<string, unknown>,
-    orderBy?: { field: string; direction: 'asc' | 'desc' },
+    orderBy?: { field: string; direction: 'asc' | 'desc'; caseExact?: boolean },
   ): Promise<GroupWithMembers[]> {
     let results = Array.from(this.groups.values()).filter(
       (g) => g.endpointId === endpointId,
@@ -80,9 +80,11 @@ export class InMemoryGroupRepository implements IGroupRepository {
 
     const sortField = orderBy?.field ?? 'createdAt';
     const sortDir = orderBy?.direction ?? 'asc';
+    const sortCaseExact = orderBy?.caseExact ?? true;
     results.sort((a, b) => {
-      const aVal = String((a as unknown as Record<string, unknown>)[sortField] ?? '');
-      const bVal = String((b as unknown as Record<string, unknown>)[sortField] ?? '');
+      let aVal = String((a as unknown as Record<string, unknown>)[sortField] ?? '');
+      let bVal = String((b as unknown as Record<string, unknown>)[sortField] ?? '');
+      if (!sortCaseExact) { aVal = aVal.toLowerCase(); bVal = bVal.toLowerCase(); }
       if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
       return 0;

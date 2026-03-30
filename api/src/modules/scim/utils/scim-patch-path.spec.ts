@@ -276,6 +276,31 @@ describe('scim-patch-path utilities', () => {
       expect(matchesFilter({ primary: true }, 'primary', 'sw', 'True')).toBe(true);
       expect(matchesFilter({ primary: false }, 'primary', 'sw', 'false')).toBe(true);
     });
+
+    // ─── caseExact-aware filtering (RFC 7643 §2.2) ──────────────────
+
+    it('should match case-insensitively when caseExact=false (default)', () => {
+      expect(matchesFilter({ type: 'Work' }, 'type', 'eq', 'work')).toBe(true);
+      expect(matchesFilter({ type: 'work' }, 'type', 'eq', 'WORK')).toBe(true);
+    });
+
+    it('should match case-sensitively when caseExact=true', () => {
+      expect(matchesFilter({ value: 'Work@Example.com' }, 'value', 'eq', 'Work@Example.com', true)).toBe(true);
+    });
+
+    it('should NOT match different-case strings when caseExact=true', () => {
+      expect(matchesFilter({ value: 'Work@Example.com' }, 'value', 'eq', 'work@example.com', true)).toBe(false);
+    });
+
+    it('should still match booleans case-insensitively even when caseExact=true', () => {
+      // Boolean matching is always case-insensitive (True/true/TRUE all match boolean true)
+      expect(matchesFilter({ primary: true }, 'primary', 'eq', 'True', true)).toBe(true);
+      expect(matchesFilter({ primary: false }, 'primary', 'eq', 'false', true)).toBe(true);
+    });
+
+    it('should match same-case strings when caseExact=true', () => {
+      expect(matchesFilter({ type: 'work' }, 'type', 'eq', 'work', true)).toBe(true);
+    });
   });
 
   // ─── applyValuePathUpdate ────────────────────────────────────────────

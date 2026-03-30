@@ -128,7 +128,7 @@ export class EndpointScimUsersService {
       externalId: dto.externalId ?? null,
       userName: dto.userName,
       displayName: typeof dto.displayName === 'string' ? dto.displayName : null,
-      active: dto.active ?? true,
+      active: (dto.active as boolean) ?? true,
       rawPayload: JSON.stringify(sanitizedPayload),
       meta: JSON.stringify({
         resourceType: 'User',
@@ -317,7 +317,7 @@ export class EndpointScimUsersService {
       externalId: dto.externalId ?? null,
       userName: dto.userName,
       displayName: typeof dto.displayName === 'string' ? dto.displayName : null,
-      active: dto.active ?? true,
+      active: (dto.active as boolean) ?? true,
       rawPayload: JSON.stringify(sanitizedPayload),
       meta: JSON.stringify({
         ...meta,
@@ -387,7 +387,7 @@ export class EndpointScimUsersService {
       userName: dto.userName,
       externalId: dto.externalId ?? null,
       displayName: typeof dto.displayName === 'string' ? dto.displayName : null,
-      active: dto.active ?? true,
+      active: (dto.active as boolean) ?? true,
       deletedAt: null,  // Clear soft-delete marker on re-provisioning
       rawPayload: JSON.stringify(sanitizedPayload),
       meta: JSON.stringify({
@@ -505,6 +505,7 @@ export class EndpointScimUsersService {
       for (const op of patchDto.Operations) {
         const preResult = SchemaValidator.validatePatchOperationValue(
           op.op, op.path, op.value, schemaDefs,
+          this.schemaHelpers.getAttrMaps(endpointId),
         );
         if (!preResult.valid) {
           const messages = preResult.errors.map(e => e.message).join('; ');
@@ -603,10 +604,14 @@ export class EndpointScimUsersService {
 
     // G8e: Strip returned:'never' attributes from rawPayload (e.g. password)
     // Per RFC 7643 §2.4, these MUST NOT appear in any response.
-    const { never: neverAttrs } = this.schemaHelpers.getReturnedCharacteristics(endpointId);
-    for (const key of Object.keys(rawPayload)) {
-      if (neverAttrs.has(key.toLowerCase())) {
-        delete rawPayload[key];
+    // Uses parent-context-aware ByParent map to avoid name-collision false positives.
+    const neverByParent = this.schemaHelpers.getNeverReturnedByParent(endpointId);
+    const coreNever = neverByParent.get(SCHEMA_CACHE_TOP_LEVEL);
+    if (coreNever) {
+      for (const key of Object.keys(rawPayload)) {
+        if (coreNever.has(key.toLowerCase())) {
+          delete rawPayload[key];
+        }
       }
     }
 
@@ -615,11 +620,12 @@ export class EndpointScimUsersService {
     const schemas: [string, ...string[]] = [SCIM_CORE_USER_SCHEMA];
     for (const urn of extensionUrns) {
       if (urn in rawPayload) {
-        // Strip never-returned attrs inside extension objects
+        // Strip never-returned attrs inside extension objects (parent-context-aware)
+        const extNever = neverByParent.get(urn.toLowerCase());
         const extObj = rawPayload[urn];
-        if (typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
+        if (extNever && typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
           for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
-            if (neverAttrs.has(extKey.toLowerCase())) {
+            if (extNever.has(extKey.toLowerCase())) {
               delete (extObj as Record<string, unknown>)[extKey];
             }
           }

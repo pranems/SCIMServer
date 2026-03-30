@@ -167,6 +167,41 @@ describe('InMemoryGroupRepository', () => {
       expect(results.map((g) => g.displayName)).toEqual(['Zeta', 'Alpha']);
     });
 
+    it('should sort case-insensitively when caseExact=false', async () => {
+      const repo2 = new (repo.constructor as any)();
+      const base = { endpointId, createdAt: new Date(), updatedAt: new Date(), version: 1 };
+      await repo2.create({ ...base, scimId: 'g1', displayName: 'alpha', externalId: null, active: true });
+      await repo2.create({ ...base, scimId: 'g2', displayName: 'Beta', externalId: null, active: true });
+      await repo2.create({ ...base, scimId: 'g3', displayName: 'GAMMA', externalId: null, active: true });
+
+      const results = await repo2.findAllWithMembers(endpointId, undefined, {
+        field: 'displayName',
+        direction: 'asc',
+        caseExact: false,
+      });
+      const names = results.map((g: any) => g.displayName);
+      expect(names).toEqual(['alpha', 'Beta', 'GAMMA']);
+    });
+
+    it('should sort case-sensitively when caseExact=true', async () => {
+      const repo2 = new (repo.constructor as any)();
+      const base = { endpointId, createdAt: new Date(), updatedAt: new Date(), version: 1 };
+      await repo2.create({ ...base, scimId: 'g1', displayName: 'alpha', externalId: null, active: true });
+      await repo2.create({ ...base, scimId: 'g2', displayName: 'Beta', externalId: null, active: true });
+      await repo2.create({ ...base, scimId: 'g3', displayName: 'GAMMA', externalId: null, active: true });
+
+      const results = await repo2.findAllWithMembers(endpointId, undefined, {
+        field: 'displayName',
+        direction: 'asc',
+        caseExact: true,
+      });
+      const names = results.map((g: any) => g.displayName);
+      // ASCII order: B < G < a
+      expect(names[0]).toBe('Beta');
+      expect(names[1]).toBe('GAMMA');
+      expect(names[2]).toBe('alpha');
+    });
+
     it('should apply a key-value filter', async () => {
       // CITEXT-style: use { equals, mode: 'insensitive' } to match case-insensitively
       const results = await repo.findAllWithMembers(endpointId, { displayName: { equals: 'alpha', mode: 'insensitive' } });

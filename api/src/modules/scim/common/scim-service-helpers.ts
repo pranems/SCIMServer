@@ -48,25 +48,6 @@ export function flattenParentChildMap(map: Map<string, Set<string>>): Set<string
   return flat;
 }
 
-/**
- * Flatten a Parent→Children map into dotted paths (e.g., 'meta.location').
- * Top-level attributes (parent = __top__ or extension URN) produce bare names.
- * Sub-attributes (parent = attribute name) produce 'parent.child' paths.
- *
- * Used to convert `caseExactByParent` cache into the dotted-path Set
- * expected by `collectCaseExactAttributes()` consumers.
- */
-function flattenParentChildMapToDottedPaths(map: Map<string, Set<string>>): Set<string> {
-  const result = new Set<string>();
-  for (const [parent, children] of map) {
-    const isTopLevel = parent === SCHEMA_CACHE_TOP_LEVEL || parent.startsWith('urn:');
-    for (const child of children) {
-      result.add(isTopLevel ? child : `${parent}.${child}`);
-    }
-  }
-  return result;
-}
-
 // ─── Pure Utility Functions ─────────────────────────────────────────────────
 
 /**
@@ -666,8 +647,8 @@ export class ScimSchemaHelpers {
     const declaredLower = new Set(declaredSchemas.map((s) => s.toLowerCase()));
 
     // Get registered extension URNs from the endpoint's profile (per-endpoint)
-    // Falls back to global registry defaults if no profile is available
-    const registeredUrns = this.getEndpointExtensionUrns();
+    // Uses precomputed cache when available; falls back to profile scan, then global registry
+    const registeredUrns = this.getExtensionUrns();
     const registeredLower = new Set(registeredUrns.map((u) => u.toLowerCase()));
 
     for (const key of Object.keys(dto)) {
@@ -696,29 +677,6 @@ export class ScimSchemaHelpers {
   }
 
   /**
-   * Get all extension URNs registered for the current endpoint.
-   * Uses the endpoint's profile resourceTypes (per-endpoint, profile-aware).
-   * Falls back to the global schema registry if no profile is available.
-   */
-  private getEndpointExtensionUrns(): string[] {
-    // Try profile-based resolution first (per-endpoint)
-    const profile = this.endpointContextStorage?.getProfile?.();
-    if (profile?.resourceTypes && profile.resourceTypes.length > 0) {
-      const urns = new Set<string>();
-      for (const rt of profile.resourceTypes) {
-        if (rt.schemaExtensions) {
-          for (const ext of rt.schemaExtensions) {
-            urns.add(ext.schema);
-          }
-        }
-      }
-      return [...urns];
-    }
-    // Fallback: global registry defaults
-    return [...this.schemaRegistry.getExtensionUrns()];
-  }
-
-  /**
    * Phase 8: Attribute-level payload validation against schema definitions.
    *
    * When StrictSchemaValidation is enabled, validates:
@@ -744,10 +702,11 @@ export class ScimSchemaHelpers {
     const schemas = this.buildSchemaDefinitions(dto, endpointId);
     if (schemas.length === 0) return;
 
+    const cache = this.getSchemaCache(endpointId);
     const result = SchemaValidator.validate(dto, schemas, {
       strictMode: true,
       mode,
-    });
+    }, cache ? { coreAttrMap: cache.coreAttrMap, extensionSchemaMap: cache.extensionSchemaMap } : undefined);
 
     if (!result.valid) {
       const details = result.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
@@ -825,16 +784,6 @@ export class ScimSchemaHelpers {
     return this.getProfileAwareSchemaDefinitions();
   }
 
-  /**
-   * Build the set of boolean attribute names for the resource's schema.
-   * Collects names from core + extension schemas.
-   * @deprecated Use getBooleansByParent() for parent-context-aware coercion
-   */
-  getBooleanKeys(endpointId?: string): Set<string> {
-    const schemas = this.getSchemaDefinitions(endpointId);
-    return SchemaValidator.collectBooleanAttributeNames(schemas);
-  }
-
   // ─── Precomputed Cache Accessors (Parent→Children Maps) ───────────
 
   /**
@@ -846,13 +795,14 @@ export class ScimSchemaHelpers {
    */
   private getSchemaCache(endpointId?: string): SchemaCharacteristicsCache | undefined {
     const profile = this.endpointContextStorage?.getProfile?.();
+    const cacheKey = this.coreSchemaUrn;
 
-    // Validate that the cache has real Map instances (not a JSON-serialized artifact)
-    if (profile?._schemaCache?.booleansByParent instanceof Map) {
-      return profile._schemaCache;
+    // Check for existing cache for THIS resource type
+    if (profile?._schemaCaches?.[cacheKey]?.booleansByParent instanceof Map) {
+      return profile._schemaCaches[cacheKey];
     }
 
-    // Fallback: build cache from schema definitions (legacy data / no profile)
+    // Fallback: build cache from schema definitions
     const schemas = this.getSchemaDefinitions(endpointId);
     if (schemas.length === 0) return undefined;
 
@@ -861,7 +811,8 @@ export class ScimSchemaHelpers {
 
     // Attach to profile for next access within this request
     if (profile) {
-      profile._schemaCache = cache;
+      if (!profile._schemaCaches) profile._schemaCaches = {};
+      profile._schemaCaches[cacheKey] = cache;
     }
 
     return cache;
@@ -884,17 +835,19 @@ export class ScimSchemaHelpers {
   }
 
   /**
-   * Get the Parent→Children readOnly map from the precomputed cache.
-   */
-  getReadOnlyByParent(endpointId?: string): Map<string, Set<string>> {
-    return this.getSchemaCache(endpointId)?.readOnlyByParent ?? new Map();
-  }
-
-  /**
    * Get unique attributes from the precomputed cache.
    */
   getUniqueAttributesCached(endpointId?: string): Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }> {
     return this.getSchemaCache(endpointId)?.uniqueAttrs ?? [];
+  }
+
+  /**
+   * Get precomputed attribute definition maps from cache.
+   * Used by services for passing to SchemaValidator.validate/validatePatchOperationValue.
+   */
+  getAttrMaps(endpointId?: string): { coreAttrMap: Map<string, SchemaAttributeDefinition>; extensionSchemaMap: Map<string, SchemaDefinition> } | undefined {
+    const cache = this.getSchemaCache(endpointId);
+    return cache ? { coreAttrMap: cache.coreAttrMap, extensionSchemaMap: cache.extensionSchemaMap } : undefined;
   }
 
   /**
@@ -923,7 +876,7 @@ export class ScimSchemaHelpers {
    * Collect returned characteristic sets (never + request + always + alwaysSubs) for the resource's schemas.
    *
    * Uses the precomputed cache when available — flattens Parent→Children maps
-   * into flat Sets by unioning all children across all parent keys.
+   * into flat Sets for backward compatibility with projection consumers.
    * Falls back to SchemaValidator.collectReturnedCharacteristics() if no cache.
    */
   getReturnedCharacteristics(endpointId?: string): { never: Set<string>; request: Set<string>; always: Set<string>; alwaysSubs: Map<string, Set<string>> } {
@@ -978,7 +931,7 @@ export class ScimSchemaHelpers {
   getCaseExactAttributes(endpointId?: string): Set<string> {
     const cache = this.getSchemaCache(endpointId);
     if (cache) {
-      return flattenParentChildMapToDottedPaths(cache.caseExactByParent);
+      return cache.caseExactPaths;
     }
     const schemas = this.getSchemaDefinitions(endpointId);
     return SchemaValidator.collectCaseExactAttributes(schemas);
@@ -1006,7 +959,10 @@ export class ScimSchemaHelpers {
     const paths = extractFilterPaths(ast);
     if (paths.length === 0) return;
 
-    const result = SchemaValidator.validateFilterAttributePaths(paths, schemas);
+    const cache = this.getSchemaCache(endpointId);
+    const result = SchemaValidator.validateFilterAttributePaths(paths, schemas,
+      cache ? { coreAttrMap: cache.coreAttrMap, extensionSchemaMap: cache.extensionSchemaMap } : undefined,
+    );
     if (!result.valid) {
       const details = result.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
       throw createScimError({
@@ -1020,13 +976,21 @@ export class ScimSchemaHelpers {
   /**
    * Get the extension URNs registered for this endpoint.
    *
-   * Profile-first: when the endpoint has a profile with resourceTypes,
-   * returns ONLY the profile's extension URNs (the profile is the sole
-   * source of truth for that endpoint). Falls back to global registry
-   * only when no profile is available.
+   * Checks the precomputed cache first (zero-allocation O(1) return).
+   * Falls back to profile.resourceTypes scan, then global registry.
+   *
+   * Note: reads _schemaCaches directly (not via getSchemaCache()) to avoid
+   * circular calls — getSchemaCache() calls getExtensionUrns() during build.
    */
   getExtensionUrns(endpointId?: string): readonly string[] {
+    // Check cache directly — avoid getSchemaCache() to prevent circular call
     const profile = this.endpointContextStorage?.getProfile?.();
+    const cacheKey = this.coreSchemaUrn;
+    if (profile?._schemaCaches?.[cacheKey]?.booleansByParent instanceof Map) {
+      return profile._schemaCaches[cacheKey].extensionUrns;
+    }
+
+    // Fallback: compute from profile resourceTypes
     if (profile?.resourceTypes && profile.resourceTypes.length > 0) {
       const urns = new Set<string>();
       for (const rt of profile.resourceTypes) {
@@ -1083,29 +1047,6 @@ export class ScimSchemaHelpers {
   }
 
   /**
-   * Coerce boolean-typed string values to native booleans on write payloads.
-   *
-   * @deprecated Use coerceBooleansByParentIfEnabled() for parent-context-aware coercion.
-   * This method uses the flat getBooleanKeys() which cannot distinguish
-   * core `active` (boolean) from extension `active` (string).
-   */
-  coerceBooleanStringsIfEnabled(
-    dto: Record<string, unknown>,
-    endpointId: string,
-    config?: EndpointConfig,
-  ): void {
-    const coerceEnabled = getConfigBooleanWithDefault(
-      config,
-      ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS,
-      true,
-    );
-    if (!coerceEnabled) return;
-
-    const booleanKeys = this.getBooleanKeys(endpointId);
-    sanitizeBooleanStrings(dto, booleanKeys);
-  }
-
-  /**
    * H-2: Immutable attribute enforcement (RFC 7643 §2.2).
    *
    * Compares the existing resource state with the incoming payload
@@ -1125,10 +1066,21 @@ export class ScimSchemaHelpers {
       return;
     }
 
-    const schemas = this.buildSchemaDefinitions(incomingDto, endpointId);
-    if (schemas.length === 0) return;
+    const cache = this.getSchemaCache(endpointId);
+    let result;
 
-    const result = SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas);
+    if (cache) {
+      // Use precomputed maps from cache — skip per-call map building
+      const schemas = this.buildSchemaDefinitions(incomingDto, endpointId);
+      result = SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas, {
+        coreAttrMap: cache.coreAttrMap,
+        extensionSchemaMap: cache.extensionSchemaMap,
+      });
+    } else {
+      const schemas = this.buildSchemaDefinitions(incomingDto, endpointId);
+      if (schemas.length === 0) return;
+      result = SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas);
+    }
 
     if (!result.valid) {
       const details = result.errors.map((e) => `${e.path}: ${e.message}`).join('; ');

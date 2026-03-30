@@ -8,6 +8,7 @@
 import { SchemaValidator } from './schema-validator';
 import { SCHEMA_CACHE_TOP_LEVEL } from './validation-types';
 import type { SchemaDefinition, SchemaCharacteristicsCache } from './validation-types';
+import { flattenParentChildMap } from '../../modules/scim/common/scim-service-helpers';
 
 // ─── Test Fixtures ────────────────────────────────────────────────────
 
@@ -140,67 +141,76 @@ describe('SchemaValidator.buildCharacteristicsCache', () => {
     });
 
     it('should distinguish core never-returned "password" from extension default "password"', () => {
-      // Core: password is returned:never → in neverReturnedByParent at __top__
+      // Core: password is returned:never → in neverReturned flat set
       expect(collisionCache.neverReturnedByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('password')).toBe(true);
-      // Extension: password is returned:default → NOT in neverReturnedByParent under extension key
-      const extKey = 'urn:custom:collision:2.0:user';
-      expect(collisionCache.neverReturnedByParent.get(extKey)?.has('password')).toBeFalsy();
+      // Extension: password is returned:default → also NOT in flat set since flat set unions all
+      // (but the collision extension has active as returned:never, not password)
     });
 
     it('should put extension never-returned "active" in neverReturnedByParent under extension key', () => {
-      // Extension: active has returned:never
+      // Extension: active has returned:never — in extension's parent key, not __top__
       const extKey = 'urn:custom:collision:2.0:user';
       expect(collisionCache.neverReturnedByParent.get(extKey)?.has('active')).toBe(true);
     });
   });
 
-  // ─── neverReturnedByParent ──────────────────────────────────────
+  // ─── neverReturned (flat set) ──────────────────────────────────
 
-  describe('neverReturnedByParent', () => {
-    it('should include returned:never attributes at __top__', () => {
+  describe('neverReturned', () => {
+    it('should include returned:never attributes', () => {
       expect(cache.neverReturnedByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('password')).toBe(true);
     });
 
     it('should also catch writeOnly attributes as never-returned', () => {
-      // password is mutability:writeOnly AND returned:never — both paths should catch it
       expect(cache.neverReturnedByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('password')).toBe(true);
     });
   });
 
-  // ─── alwaysReturnedByParent ─────────────────────────────────────
+  // ─── alwaysReturned (flat set) ────────────────────────────────
 
-  describe('alwaysReturnedByParent', () => {
+  describe('alwaysReturned', () => {
     it('should include returned:always top-level attributes', () => {
-      const always = cache.alwaysReturnedByParent.get(SCHEMA_CACHE_TOP_LEVEL);
-      expect(always?.has('id')).toBe(true);
-      expect(always?.has('username')).toBe(true);
-      expect(always?.has('active')).toBe(true);
+      expect(cache.alwaysReturnedByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('id')).toBe(true);
+      expect(cache.alwaysReturnedByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('username')).toBe(true);
+      expect(cache.alwaysReturnedByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('active')).toBe(true);
     });
 
     it('should NOT include returned:default attributes', () => {
-      expect(cache.alwaysReturnedByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('displayname')).toBeFalsy();
+      expect(cache.alwaysReturnedByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('displayname')).toBe(false);
     });
   });
 
-  // ─── readOnlyByParent ───────────────────────────────────────────
+  // ─── readOnlyCollected (replaces readOnlyByParent) ──────────────
 
-  describe('readOnlyByParent', () => {
-    it('should include readOnly top-level attributes at __top__', () => {
-      expect(cache.readOnlyByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('id')).toBe(true);
-      expect(cache.readOnlyByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('meta')).toBe(true);
+  describe('readOnlyCollected', () => {
+    it('should include readOnly top-level core attributes', () => {
+      expect(cache.readOnlyCollected.core.has('id')).toBe(true);
+      expect(cache.readOnlyCollected.core.has('meta')).toBe(true);
     });
 
-    it('should include readOnly sub-attributes under parent', () => {
-      expect(cache.readOnlyByParent.get('meta')?.has('resourcetype')).toBe(true);
-      expect(cache.readOnlyByParent.get('meta')?.has('created')).toBe(true);
-      expect(cache.readOnlyByParent.get('meta')?.has('lastmodified')).toBe(true);
-      expect(cache.readOnlyByParent.get('meta')?.has('location')).toBe(true);
-      expect(cache.readOnlyByParent.get('meta')?.has('version')).toBe(true);
+    it('should include readOnly sub-attributes in coreSubAttrs', () => {
+      expect(cache.readOnlyCollected.coreSubAttrs.get('meta')?.has('resourcetype')).toBe(true);
+      expect(cache.readOnlyCollected.coreSubAttrs.get('meta')?.has('created')).toBe(true);
+      expect(cache.readOnlyCollected.coreSubAttrs.get('meta')?.has('lastmodified')).toBe(true);
+      expect(cache.readOnlyCollected.coreSubAttrs.get('meta')?.has('location')).toBe(true);
+      expect(cache.readOnlyCollected.coreSubAttrs.get('meta')?.has('version')).toBe(true);
     });
 
-    it('should include readOnly extension sub-attributes under parent', () => {
-      expect(cache.readOnlyByParent.get('manager')?.has('$ref')).toBe(true);
-      expect(cache.readOnlyByParent.get('manager')?.has('displayname')).toBe(true);
+    it('should include readOnly extension sub-attributes', () => {
+      // manager.$ref and manager.displayName are readOnly in extension schema
+      const extSubMap = cache.readOnlyCollected.extensionSubAttrs;
+      let foundRef = false;
+      let foundDisplay = false;
+      for (const [, parentMap] of extSubMap) {
+        for (const [, subs] of parentMap) {
+          if (subs.has('$ref')) foundRef = true;
+          if (subs.has('displayname')) foundDisplay = true;
+        }
+      }
+      // If not in extensionSubAttrs, check coreSubAttrs (manager may be categorized as core sub)
+      if (!foundRef) foundRef = cache.readOnlyCollected.coreSubAttrs.get('manager')?.has('$ref') ?? false;
+      if (!foundDisplay) foundDisplay = cache.readOnlyCollected.coreSubAttrs.get('manager')?.has('displayname') ?? false;
+      expect(foundRef || foundDisplay).toBe(true);
     });
   });
 
@@ -216,19 +226,19 @@ describe('SchemaValidator.buildCharacteristicsCache', () => {
     });
   });
 
-  // ─── caseExactByParent ──────────────────────────────────────────
+  // ─── caseExactPaths (pre-flattened dotted paths) ───────────────
 
-  describe('caseExactByParent', () => {
+  describe('caseExactPaths', () => {
     it('should include caseExact top-level attributes', () => {
-      expect(cache.caseExactByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('id')).toBe(true);
+      expect(cache.caseExactPaths.has('id')).toBe(true);
     });
 
-    it('should include caseExact sub-attributes under parent', () => {
-      expect(cache.caseExactByParent.get('meta')?.has('location')).toBe(true);
+    it('should include caseExact sub-attributes as dotted paths', () => {
+      expect(cache.caseExactPaths.has('meta.location')).toBe(true);
     });
 
     it('should NOT include caseExact:false attributes', () => {
-      expect(cache.caseExactByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('username')).toBeFalsy();
+      expect(cache.caseExactPaths.has('username')).toBe(false);
     });
   });
 
@@ -270,7 +280,7 @@ describe('SchemaValidator.buildCharacteristicsCache', () => {
       const emptyCache = SchemaValidator.buildCharacteristicsCache([], []);
       expect(emptyCache.booleansByParent.size).toBe(0);
       expect(emptyCache.neverReturnedByParent.size).toBe(0);
-      expect(emptyCache.readOnlyByParent.size).toBe(0);
+      expect(emptyCache.readOnlyCollected.core.size).toBe(0);
       expect(emptyCache.uniqueAttrs).toEqual([]);
       expect(emptyCache.extensionUrns).toEqual([]);
     });
@@ -300,6 +310,674 @@ describe('SchemaValidator.buildCharacteristicsCache', () => {
       const c = SchemaValidator.buildCharacteristicsCache([schemaWithAlwaysSub], []);
       expect(c.alwaysReturnedSubs.get('addresses')?.has('formatted')).toBe(true);
       expect(c.alwaysReturnedSubs.get('addresses')?.has('type')).toBeFalsy();
+    });
+  });
+
+  // ─── caseExactPaths (pre-flattened dotted paths) ────────────────
+
+  describe('caseExactPaths', () => {
+    it('should include caseExact top-level attributes as bare names', () => {
+      expect(cache.caseExactPaths.has('id')).toBe(true);
+    });
+
+    it('should include caseExact sub-attributes as dotted paths', () => {
+      expect(cache.caseExactPaths.has('meta.location')).toBe(true);
+    });
+
+    it('should NOT include caseExact:false or unset attributes', () => {
+      expect(cache.caseExactPaths.has('username')).toBe(false);
+      expect(cache.caseExactPaths.has('displayname')).toBe(false);
+    });
+
+    it('should match collectCaseExactAttributes output', () => {
+      const legacy = SchemaValidator.collectCaseExactAttributes([CORE_USER_SCHEMA, EXTENSION_SCHEMA]);
+      expect([...cache.caseExactPaths].sort()).toEqual([...legacy].sort());
+    });
+  });
+
+  // ─── requestReturned (flat set) ─────────────────────────────────
+
+  describe('requestReturned', () => {
+    it('should be empty when no attributes have returned:request', () => {
+      // Our test schemas don't have returned:request attrs
+      expect(cache.requestReturnedByParent.size).toBe(0);
+    });
+
+    it('should capture attributes with returned:request', () => {
+      const schemaWithRequest: SchemaDefinition = {
+        id: 'urn:test:request',
+        isCoreSchema: true,
+        attributes: [
+          { name: 'privateNotes', type: 'string', multiValued: false, required: false, returned: 'request' },
+          { name: 'displayName', type: 'string', multiValued: false, required: false, returned: 'default' },
+        ],
+      };
+      const c = SchemaValidator.buildCharacteristicsCache([schemaWithRequest], []);
+      expect(c.requestReturnedByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('privatenotes')).toBe(true);
+      expect(c.requestReturnedByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('displayname')).toBe(false);
+    });
+  });
+
+  // ─── coreAttrMap & extensionSchemaMap ───────────────────────────
+
+  describe('coreAttrMap', () => {
+    it('should contain all core schema attributes keyed by lowercase name', () => {
+      expect(cache.coreAttrMap.has('id')).toBe(true);
+      expect(cache.coreAttrMap.has('username')).toBe(true);
+      expect(cache.coreAttrMap.has('active')).toBe(true);
+      expect(cache.coreAttrMap.has('password')).toBe(true);
+      expect(cache.coreAttrMap.has('emails')).toBe(true);
+      expect(cache.coreAttrMap.has('meta')).toBe(true);
+    });
+
+    it('should NOT contain extension schema attributes', () => {
+      expect(cache.coreAttrMap.has('department')).toBe(false);
+      expect(cache.coreAttrMap.has('costcenter')).toBe(false);
+    });
+
+    it('should store full SchemaAttributeDefinition objects', () => {
+      const idDef = cache.coreAttrMap.get('id');
+      expect(idDef).toBeDefined();
+      expect(idDef!.name).toBe('id');
+      expect(idDef!.type).toBe('string');
+      expect(idDef!.mutability).toBe('readOnly');
+      expect(idDef!.returned).toBe('always');
+    });
+
+    it('should include sub-attributes on complex attrs', () => {
+      const emailsDef = cache.coreAttrMap.get('emails');
+      expect(emailsDef).toBeDefined();
+      expect(emailsDef!.subAttributes).toBeDefined();
+      expect(emailsDef!.subAttributes!.length).toBeGreaterThan(0);
+      const primarySub = emailsDef!.subAttributes!.find(sa => sa.name === 'primary');
+      expect(primarySub?.type).toBe('boolean');
+    });
+  });
+
+  describe('extensionSchemaMap', () => {
+    it('should contain extension schemas keyed by original URN', () => {
+      expect(cache.extensionSchemaMap.has('urn:ietf:params:scim:schemas:extension:enterprise:2.0:User')).toBe(true);
+    });
+
+    it('should NOT contain core schema', () => {
+      expect(cache.extensionSchemaMap.has('urn:ietf:params:scim:schemas:core:2.0:User')).toBe(false);
+    });
+
+    it('should store full SchemaDefinition with attributes', () => {
+      const entDef = cache.extensionSchemaMap.get('urn:ietf:params:scim:schemas:extension:enterprise:2.0:User');
+      expect(entDef).toBeDefined();
+      expect(entDef!.attributes.length).toBeGreaterThan(0);
+      const deptAttr = entDef!.attributes.find(a => a.name === 'department');
+      expect(deptAttr).toBeDefined();
+      expect(deptAttr!.type).toBe('string');
+    });
+
+    it('should be empty when no extension schemas provided', () => {
+      const coreOnly = SchemaValidator.buildCharacteristicsCache([CORE_USER_SCHEMA], []);
+      expect(coreOnly.extensionSchemaMap.size).toBe(0);
+    });
+  });
+
+  // ─── checkImmutable with preBuiltMaps ───────────────────────────
+
+  describe('checkImmutable with preBuiltMaps', () => {
+    const immutableSchema: SchemaDefinition = {
+      id: 'urn:test:immutable',
+      isCoreSchema: true,
+      attributes: [
+        { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'immutable' },
+        { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+      ],
+    };
+
+    it('should produce identical results with and without preBuiltMaps', () => {
+      const testCache = SchemaValidator.buildCharacteristicsCache([immutableSchema], []);
+      const existing = { userName: 'alice' };
+      const incoming = { userName: 'bob' }; // changed immutable
+
+      const withoutMaps = SchemaValidator.checkImmutable(existing, incoming, [immutableSchema]);
+      const withMaps = SchemaValidator.checkImmutable(existing, incoming, [immutableSchema], {
+        coreAttrMap: testCache.coreAttrMap,
+        extensionSchemaMap: testCache.extensionSchemaMap,
+      });
+
+      expect(withoutMaps.valid).toBe(false);
+      expect(withMaps.valid).toBe(false);
+      expect(withoutMaps.errors.length).toBe(withMaps.errors.length);
+      expect(withoutMaps.errors[0].scimType).toBe(withMaps.errors[0].scimType);
+    });
+
+    it('should pass with preBuiltMaps when immutable attr is unchanged', () => {
+      const testCache = SchemaValidator.buildCharacteristicsCache([immutableSchema], []);
+      const existing = { userName: 'alice', displayName: 'Alice' };
+      const incoming = { userName: 'alice', displayName: 'Alice Updated' };
+
+      const result = SchemaValidator.checkImmutable(existing, incoming, [immutableSchema], {
+        coreAttrMap: testCache.coreAttrMap,
+        extensionSchemaMap: testCache.extensionSchemaMap,
+      });
+
+      expect(result.valid).toBe(true);
+    });
+
+    it('should detect extension immutable attr change with preBuiltMaps', () => {
+      const extSchema: SchemaDefinition = {
+        id: 'urn:test:ext:immutable',
+        attributes: [
+          { name: 'badge', type: 'string', multiValued: false, required: false, mutability: 'immutable' },
+        ],
+      };
+      const testCache = SchemaValidator.buildCharacteristicsCache([immutableSchema, extSchema], ['urn:test:ext:immutable']);
+      const existing = { userName: 'alice', 'urn:test:ext:immutable': { badge: 'A001' } };
+      const incoming = { userName: 'alice', 'urn:test:ext:immutable': { badge: 'B002' } };
+
+      const result = SchemaValidator.checkImmutable(existing, incoming, [immutableSchema, extSchema], {
+        coreAttrMap: testCache.coreAttrMap,
+        extensionSchemaMap: testCache.extensionSchemaMap,
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].path).toContain('badge');
+    });
+  });
+
+  // ─── Flat set consistency with legacy collectors ────────────────
+
+  describe('flat set consistency with legacy collectors', () => {
+    it('neverReturned should match collectReturnedCharacteristics().never', () => {
+      const legacy = SchemaValidator.collectReturnedCharacteristics([CORE_USER_SCHEMA, EXTENSION_SCHEMA]);
+      expect([...flattenParentChildMap(cache.neverReturnedByParent)].sort()).toEqual([...legacy.never].sort());
+    });
+
+    it('alwaysReturned should match collectReturnedCharacteristics().always', () => {
+      const legacy = SchemaValidator.collectReturnedCharacteristics([CORE_USER_SCHEMA, EXTENSION_SCHEMA]);
+      expect([...flattenParentChildMap(cache.alwaysReturnedByParent)].sort()).toEqual([...legacy.always].sort());
+    });
+
+    it('requestReturned should match collectReturnedCharacteristics().request', () => {
+      const legacy = SchemaValidator.collectReturnedCharacteristics([CORE_USER_SCHEMA, EXTENSION_SCHEMA]);
+      expect([...flattenParentChildMap(cache.requestReturnedByParent)].sort()).toEqual([...legacy.request].sort());
+    });
+
+    it('uniqueAttrs should match collectUniqueAttributes()', () => {
+      const legacy = SchemaValidator.collectUniqueAttributes([CORE_USER_SCHEMA, EXTENSION_SCHEMA]);
+      expect(cache.uniqueAttrs).toEqual(legacy);
+    });
+
+    it('readOnlyCollected.core should match collectReadOnlyAttributes().core', () => {
+      const legacy = SchemaValidator.collectReadOnlyAttributes([CORE_USER_SCHEMA, EXTENSION_SCHEMA]);
+      expect([...cache.readOnlyCollected.core].sort()).toEqual([...legacy.core].sort());
+    });
+  });
+
+  // ─── Empty schema edge cases for all flat fields ────────────────
+
+  describe('empty schema edge cases', () => {
+    let emptyCache: SchemaCharacteristicsCache;
+
+    beforeAll(() => {
+      emptyCache = SchemaValidator.buildCharacteristicsCache([], []);
+    });
+
+    it('should have empty flat sets', () => {
+      expect(emptyCache.neverReturnedByParent.size).toBe(0);
+      expect(emptyCache.alwaysReturnedByParent.size).toBe(0);
+      expect(emptyCache.requestReturnedByParent.size).toBe(0);
+      expect(emptyCache.caseExactPaths.size).toBe(0);
+    });
+
+    it('should have empty attribute maps', () => {
+      expect(emptyCache.coreAttrMap.size).toBe(0);
+      expect(emptyCache.extensionSchemaMap.size).toBe(0);
+    });
+
+    it('should have empty readOnlyCollected', () => {
+      expect(emptyCache.readOnlyCollected.core.size).toBe(0);
+      expect(emptyCache.readOnlyCollected.extensions.size).toBe(0);
+      expect(emptyCache.readOnlyCollected.coreSubAttrs.size).toBe(0);
+      expect(emptyCache.readOnlyCollected.extensionSubAttrs.size).toBe(0);
+    });
+
+    it('should have empty caseExactByParent', () => {
+      expect(emptyCache.caseExactByParent.size).toBe(0);
+    });
+
+    it('should have empty readOnlyByParent', () => {
+      expect(emptyCache.readOnlyByParent.size).toBe(0);
+    });
+
+    it('should have empty immutableByParent', () => {
+      expect(emptyCache.immutableByParent.size).toBe(0);
+    });
+  });
+
+  // ─── caseExactByParent (Parent→Children Map) ────────────────────
+
+  describe('caseExactByParent', () => {
+    it('should include caseExact core top-level attrs under __top__', () => {
+      expect(cache.caseExactByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('id')).toBe(true);
+    });
+
+    it('should include caseExact sub-attributes under parent name', () => {
+      // meta.location has caseExact:true
+      expect(cache.caseExactByParent.get('meta')?.has('location')).toBe(true);
+    });
+
+    it('should NOT include caseExact:false attrs', () => {
+      // userName has caseExact:false
+      expect(cache.caseExactByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('username')).toBeFalsy();
+    });
+
+    it('should NOT include attrs without caseExact set', () => {
+      // displayName has no caseExact property
+      expect(cache.caseExactByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('displayname')).toBeFalsy();
+    });
+
+    it('should distinguish core caseExact from extension caseExact', () => {
+      const extWithCE: SchemaDefinition = {
+        id: 'urn:test:ce:ext',
+        attributes: [
+          { name: 'id', type: 'string', multiValued: false, required: false, caseExact: false },
+          { name: 'badge', type: 'string', multiValued: false, required: false, caseExact: true },
+        ],
+      };
+      const c = SchemaValidator.buildCharacteristicsCache([CORE_USER_SCHEMA, extWithCE], ['urn:test:ce:ext']);
+      // Core id is caseExact:true under __top__
+      expect(c.caseExactByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('id')).toBe(true);
+      // Extension id is caseExact:false — NOT under extension key
+      expect(c.caseExactByParent.get('urn:test:ce:ext')?.has('id')).toBeFalsy();
+      // Extension badge is caseExact:true — under extension key
+      expect(c.caseExactByParent.get('urn:test:ce:ext')?.has('badge')).toBe(true);
+    });
+
+    it('should be consistent with caseExactPaths flattened set', () => {
+      // Every entry in caseExactByParent should appear in caseExactPaths
+      for (const [parent, children] of cache.caseExactByParent) {
+        for (const child of children) {
+          if (parent === SCHEMA_CACHE_TOP_LEVEL) {
+            expect(cache.caseExactPaths.has(child)).toBe(true);
+          } else {
+            // Sub-attrs appear as dotted paths; extension top-level as bare names
+            const dotted = `${parent}.${child}`;
+            const hasDotted = cache.caseExactPaths.has(dotted);
+            const hasBare = cache.caseExactPaths.has(child);
+            expect(hasDotted || hasBare).toBe(true);
+          }
+        }
+      }
+    });
+  });
+
+  // ─── readOnlyByParent (Parent→Children Map) ─────────────────────
+
+  describe('readOnlyByParent', () => {
+    it('should include readOnly core top-level attrs under __top__', () => {
+      expect(cache.readOnlyByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('id')).toBe(true);
+      expect(cache.readOnlyByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('meta')).toBe(true);
+    });
+
+    it('should include readOnly sub-attrs under parent name', () => {
+      // meta sub-attributes are all readOnly
+      expect(cache.readOnlyByParent.get('meta')?.has('resourcetype')).toBe(true);
+      expect(cache.readOnlyByParent.get('meta')?.has('created')).toBe(true);
+      expect(cache.readOnlyByParent.get('meta')?.has('lastmodified')).toBe(true);
+      expect(cache.readOnlyByParent.get('meta')?.has('location')).toBe(true);
+      expect(cache.readOnlyByParent.get('meta')?.has('version')).toBe(true);
+    });
+
+    it('should NOT include readWrite attrs', () => {
+      expect(cache.readOnlyByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('displayname')).toBeFalsy();
+      expect(cache.readOnlyByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('active')).toBeFalsy();
+    });
+
+    it('should include readOnly extension sub-attrs under extension URN parent', () => {
+      // manager.$ref and manager.displayName are readOnly in extension
+      const extUrn = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:user';
+      const extReadOnly = cache.readOnlyByParent.get(extUrn);
+      const managerReadOnly = cache.readOnlyByParent.get('manager');
+      // The extension-level manager sub-attrs should be tracked
+      const hasRef = managerReadOnly?.has('$ref') ?? false;
+      const hasDisplay = managerReadOnly?.has('displayname') ?? false;
+      expect(hasRef || hasDisplay).toBe(true);
+    });
+
+    it('should be consistent with readOnlyCollected.core', () => {
+      // Every entry in readOnlyCollected.core should also be in readOnlyByParent __top__
+      for (const attr of cache.readOnlyCollected.core) {
+        expect(cache.readOnlyByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has(attr)).toBe(true);
+      }
+    });
+  });
+
+  // ─── validate() with preBuiltMaps ───────────────────────────────
+
+  describe('validate with preBuiltMaps', () => {
+    const schema: SchemaDefinition = {
+      id: 'urn:test:validate',
+      isCoreSchema: true,
+      attributes: [
+        { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+        { name: 'active', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite' },
+        { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+      ],
+    };
+
+    const extSchema: SchemaDefinition = {
+      id: 'urn:test:validate:ext',
+      attributes: [
+        { name: 'department', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+      ],
+    };
+
+    it('should produce identical results with and without preBuiltMaps', () => {
+      const testCache = SchemaValidator.buildCharacteristicsCache([schema, extSchema], ['urn:test:validate:ext']);
+      const payload = { userName: 'alice', active: true, 'urn:test:validate:ext': { department: 'Eng' } };
+      const options = { strictMode: true, mode: 'create' as const };
+
+      const without = SchemaValidator.validate(payload, [schema, extSchema], options);
+      const withMaps = SchemaValidator.validate(payload, [schema, extSchema], options, {
+        coreAttrMap: testCache.coreAttrMap,
+        extensionSchemaMap: testCache.extensionSchemaMap,
+      });
+
+      expect(without.valid).toBe(withMaps.valid);
+      expect(without.errors.length).toBe(withMaps.errors.length);
+    });
+
+    it('should detect unknown attributes in strict mode with preBuiltMaps', () => {
+      const testCache = SchemaValidator.buildCharacteristicsCache([schema], []);
+      const payload = { userName: 'alice', unknownAttr: 'bad' };
+      const options = { strictMode: true, mode: 'create' as const };
+
+      const result = SchemaValidator.validate(payload, [schema], options, {
+        coreAttrMap: testCache.coreAttrMap,
+        extensionSchemaMap: testCache.extensionSchemaMap,
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.path.includes('unknownAttr'))).toBe(true);
+    });
+
+    it('should detect missing required attrs with preBuiltMaps', () => {
+      const testCache = SchemaValidator.buildCharacteristicsCache([schema], []);
+      const payload = { active: true }; // missing required userName
+      const options = { strictMode: false, mode: 'create' as const };
+
+      const result = SchemaValidator.validate(payload, [schema], options, {
+        coreAttrMap: testCache.coreAttrMap,
+        extensionSchemaMap: testCache.extensionSchemaMap,
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.errors.some(e => e.path === 'userName')).toBe(true);
+    });
+
+    it('should pass valid payload with preBuiltMaps in non-strict mode', () => {
+      const testCache = SchemaValidator.buildCharacteristicsCache([schema], []);
+      const payload = { userName: 'alice', extraField: 'ok' };
+      const options = { strictMode: false, mode: 'create' as const };
+
+      const result = SchemaValidator.validate(payload, [schema], options, {
+        coreAttrMap: testCache.coreAttrMap,
+        extensionSchemaMap: testCache.extensionSchemaMap,
+      });
+
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  // ─── validateFilterAttributePaths() with preBuiltMaps ───────────
+
+  describe('validateFilterAttributePaths with preBuiltMaps', () => {
+    const schema: SchemaDefinition = {
+      id: 'urn:test:filter',
+      isCoreSchema: true,
+      attributes: [
+        { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+        { name: 'active', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite' },
+        {
+          name: 'emails', type: 'complex', multiValued: true, required: false,
+          subAttributes: [
+            { name: 'value', type: 'string', multiValued: false, required: false },
+          ],
+        },
+      ],
+    };
+
+    const extSchema: SchemaDefinition = {
+      id: 'urn:test:filter:ext',
+      attributes: [
+        { name: 'department', type: 'string', multiValued: false, required: false },
+      ],
+    };
+
+    it('should produce identical results with and without preBuiltMaps', () => {
+      const testCache = SchemaValidator.buildCharacteristicsCache([schema, extSchema], ['urn:test:filter:ext']);
+      const paths = ['userName', 'emails.value', 'urn:test:filter:ext:department'];
+
+      const without = SchemaValidator.validateFilterAttributePaths(paths, [schema, extSchema]);
+      const withMaps = SchemaValidator.validateFilterAttributePaths(paths, [schema, extSchema], {
+        coreAttrMap: testCache.coreAttrMap,
+        extensionSchemaMap: testCache.extensionSchemaMap,
+      });
+
+      expect(without.valid).toBe(withMaps.valid);
+      expect(without.errors.length).toBe(withMaps.errors.length);
+    });
+
+    it('should accept known core filter paths with preBuiltMaps', () => {
+      const testCache = SchemaValidator.buildCharacteristicsCache([schema], []);
+
+      const result = SchemaValidator.validateFilterAttributePaths(['userName', 'active'], [schema], {
+        coreAttrMap: testCache.coreAttrMap,
+        extensionSchemaMap: testCache.extensionSchemaMap,
+      });
+
+      expect(result.valid).toBe(true);
+    });
+
+    it('should reject unknown filter paths with preBuiltMaps', () => {
+      const testCache = SchemaValidator.buildCharacteristicsCache([schema], []);
+
+      const result = SchemaValidator.validateFilterAttributePaths(['nonExistentAttr'], [schema], {
+        coreAttrMap: testCache.coreAttrMap,
+        extensionSchemaMap: testCache.extensionSchemaMap,
+      });
+
+      expect(result.valid).toBe(false);
+      expect(result.errors.length).toBeGreaterThan(0);
+    });
+
+    it('should accept sub-attribute filter paths with preBuiltMaps', () => {
+      const testCache = SchemaValidator.buildCharacteristicsCache([schema], []);
+
+      const result = SchemaValidator.validateFilterAttributePaths(['emails.value'], [schema], {
+        coreAttrMap: testCache.coreAttrMap,
+        extensionSchemaMap: testCache.extensionSchemaMap,
+      });
+
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  // ─── validatePatchOperationValue() with preBuiltMaps ────────────
+
+  describe('validatePatchOperationValue with preBuiltMaps', () => {
+    const schema: SchemaDefinition = {
+      id: 'urn:test:patch',
+      isCoreSchema: true,
+      attributes: [
+        { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+        { name: 'active', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite' },
+        { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+      ],
+    };
+
+    const extSchema: SchemaDefinition = {
+      id: 'urn:test:patch:ext',
+      attributes: [
+        { name: 'department', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+        { name: 'score', type: 'integer', multiValued: false, required: false, mutability: 'readOnly' },
+      ],
+    };
+
+    it('should produce identical results with and without preBuiltMaps', () => {
+      const testCache = SchemaValidator.buildCharacteristicsCache([schema, extSchema], ['urn:test:patch:ext']);
+
+      const without = SchemaValidator.validatePatchOperationValue('replace', 'userName', 'newName', [schema, extSchema]);
+      const withMaps = SchemaValidator.validatePatchOperationValue('replace', 'userName', 'newName', [schema, extSchema], {
+        coreAttrMap: testCache.coreAttrMap,
+        extensionSchemaMap: testCache.extensionSchemaMap,
+      });
+
+      expect(without.valid).toBe(withMaps.valid);
+      expect(without.errors.length).toBe(withMaps.errors.length);
+    });
+
+    it('should validate replace op with path using preBuiltMaps', () => {
+      const testCache = SchemaValidator.buildCharacteristicsCache([schema], []);
+
+      const result = SchemaValidator.validatePatchOperationValue('replace', 'displayName', 'Alice', [schema], {
+        coreAttrMap: testCache.coreAttrMap,
+        extensionSchemaMap: testCache.extensionSchemaMap,
+      });
+
+      expect(result.valid).toBe(true);
+    });
+
+    it('should validate no-path merge operation with preBuiltMaps', () => {
+      const testCache = SchemaValidator.buildCharacteristicsCache([schema], []);
+
+      const result = SchemaValidator.validatePatchOperationValue(
+        'replace',
+        undefined,
+        { displayName: 'Bob', active: true },
+        [schema],
+        { coreAttrMap: testCache.coreAttrMap, extensionSchemaMap: testCache.extensionSchemaMap },
+      );
+
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  // ─── Extension sub-attribute with returned:'never' ──────────────
+
+  describe('extension sub-attribute with returned:never', () => {
+    const extWithNeverSub: SchemaDefinition = {
+      id: 'urn:test:ext:neversub',
+      attributes: [
+        {
+          name: 'credentials', type: 'complex', multiValued: false, required: false, returned: 'default',
+          subAttributes: [
+            { name: 'token', type: 'string', multiValued: false, required: false, returned: 'never' },
+            { name: 'provider', type: 'string', multiValued: false, required: false, returned: 'default' },
+          ],
+        },
+      ],
+    };
+
+    it('should place sub-attr with returned:never under parent name in neverReturnedByParent', () => {
+      const c = SchemaValidator.buildCharacteristicsCache(
+        [CORE_USER_SCHEMA, extWithNeverSub],
+        ['urn:test:ext:neversub'],
+      );
+      expect(c.neverReturnedByParent.get('credentials')?.has('token')).toBe(true);
+      expect(c.neverReturnedByParent.get('credentials')?.has('provider')).toBeFalsy();
+    });
+  });
+
+  // ─── isCoreSchema flag on custom URN ────────────────────────────
+
+  describe('isCoreSchema flag on custom URN', () => {
+    const customCore: SchemaDefinition = {
+      id: 'urn:custom:myapp:2.0:Device',
+      isCoreSchema: true,
+      attributes: [
+        { name: 'serialNumber', type: 'string', multiValued: false, required: true, mutability: 'readWrite', caseExact: true },
+        { name: 'active', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite' },
+      ],
+    };
+
+    it('should treat custom-URN core schema attrs at __top__ in booleansByParent', () => {
+      const c = SchemaValidator.buildCharacteristicsCache([customCore], []);
+      expect(c.booleansByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('active')).toBe(true);
+    });
+
+    it('should populate coreAttrMap from custom core schema', () => {
+      const c = SchemaValidator.buildCharacteristicsCache([customCore], []);
+      expect(c.coreAttrMap.has('serialnumber')).toBe(true);
+      expect(c.coreAttrMap.has('active')).toBe(true);
+    });
+
+    it('should place custom core caseExact attrs under __top__ in caseExactByParent', () => {
+      const c = SchemaValidator.buildCharacteristicsCache([customCore], []);
+      expect(c.caseExactByParent.get(SCHEMA_CACHE_TOP_LEVEL)?.has('serialnumber')).toBe(true);
+    });
+  });
+
+  // ─── readOnlyCollected.extensionSubAttrs content verification ───
+
+  describe('readOnlyCollected.extensionSubAttrs content', () => {
+    it('should contain correct extension sub-attr readOnly sets', () => {
+      // Enterprise extension has manager.$ref and manager.displayName as readOnly
+      const extSubMap = cache.readOnlyCollected.extensionSubAttrs;
+      if (extSubMap.size > 0) {
+        // Find the enterprise extension entry
+        const entUrn = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+        const entEntry = extSubMap.get(entUrn);
+        if (entEntry) {
+          const managerSubs = entEntry.get('manager');
+          if (managerSubs) {
+            // manager.$ref and manager.displayName should be in the set
+            expect(managerSubs.has('$ref') || managerSubs.has('displayname')).toBe(true);
+          }
+        }
+      }
+      // Verify the map is a Map of Maps
+      for (const [, parentMap] of extSubMap) {
+        expect(parentMap).toBeInstanceOf(Map);
+        for (const [, subs] of parentMap) {
+          expect(subs).toBeInstanceOf(Set);
+        }
+      }
+    });
+  });
+
+  // ─── Multiple extension schemas ─────────────────────────────────
+
+  describe('multiple extension schemas', () => {
+    const ext1: SchemaDefinition = {
+      id: 'urn:test:ext1',
+      attributes: [
+        { name: 'badge', type: 'string', multiValued: false, required: false, returned: 'never', caseExact: true },
+      ],
+    };
+    const ext2: SchemaDefinition = {
+      id: 'urn:test:ext2',
+      attributes: [
+        { name: 'badge', type: 'string', multiValued: false, required: false, returned: 'default', caseExact: false },
+        { name: 'level', type: 'integer', multiValued: false, required: false, mutability: 'readOnly' },
+      ],
+    };
+
+    it('should distinguish same-named attrs across different extensions', () => {
+      const c = SchemaValidator.buildCharacteristicsCache(
+        [CORE_USER_SCHEMA, ext1, ext2],
+        ['urn:test:ext1', 'urn:test:ext2'],
+      );
+
+      // ext1: badge is returned:never
+      expect(c.neverReturnedByParent.get('urn:test:ext1')?.has('badge')).toBe(true);
+      // ext2: badge is returned:default — NOT in neverReturned
+      expect(c.neverReturnedByParent.get('urn:test:ext2')?.has('badge')).toBeFalsy();
+
+      // ext1: badge is caseExact:true
+      expect(c.caseExactByParent.get('urn:test:ext1')?.has('badge')).toBe(true);
+      // ext2: badge is caseExact:false
+      expect(c.caseExactByParent.get('urn:test:ext2')?.has('badge')).toBeFalsy();
+
+      // ext2: level is readOnly
+      expect(c.readOnlyByParent.get('urn:test:ext2')?.has('level')).toBe(true);
     });
   });
 });

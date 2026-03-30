@@ -22,6 +22,7 @@ import {
   stripReadOnlyAttributes,
   stripReadOnlyPatchOps,
   SCIM_WARNING_URN,
+  flattenParentChildMap,
 } from './scim-service-helpers';
 import { SCHEMA_CACHE_TOP_LEVEL } from '../../../domain/validation';
 
@@ -328,13 +329,6 @@ describe('ScimSchemaHelpers', () => {
     });
   });
 
-  describe('getBooleanKeys', () => {
-    it('should return empty set when no schemas registered', () => {
-      mockRegistry.getSchema.mockReturnValue(null);
-      expect(helpers.getBooleanKeys('ep-1').size).toBe(0);
-    });
-  });
-
   describe('getReturnedCharacteristics', () => {
     it('should return never and request sets', () => {
       mockRegistry.getSchema.mockReturnValue(null);
@@ -351,23 +345,6 @@ describe('ScimSchemaHelpers', () => {
       mockRegistry.getSchema.mockReturnValue(null);
       const result = helpers.getRequestOnlyAttributes('ep-1');
       expect(result).toBeInstanceOf(Set);
-    });
-  });
-
-  describe('coerceBooleanStringsIfEnabled', () => {
-    it('should coerce when default (flag not set = true)', () => {
-      // Default is true via getConfigBooleanWithDefault
-      const dto: Record<string, unknown> = {};
-      // No boolean keys from empty registry so no mutations
-      helpers.coerceBooleanStringsIfEnabled(dto, 'ep-1');
-      // No error
-    });
-
-    it('should skip when flag is explicitly false', () => {
-      const config = { AllowAndCoerceBooleanStrings: 'false' } as any;
-      const dto: Record<string, unknown> = { active: 'True' };
-      helpers.coerceBooleanStringsIfEnabled(dto, 'ep-1', config);
-      expect(dto.active).toBe('True'); // Not coerced
     });
   });
 
@@ -1088,5 +1065,71 @@ describe('sanitizeBooleanStringsByParent', () => {
     sanitizeBooleanStringsByParent(obj, boolMap);
     expect((obj.addresses as any[])[0].primary).toBe(true);
     expect((obj.addresses as any[])[0].formatted).toBe('addr');
+  });
+});
+
+// ─── flattenParentChildMap ──────────────────────────────────────────────
+
+describe('flattenParentChildMap', () => {
+  it('should union all children across parent keys into flat set', () => {
+    const map = new Map<string, Set<string>>([
+      ['__top__', new Set(['active', 'password'])],
+      ['emails', new Set(['primary'])],
+    ]);
+    const flat = flattenParentChildMap(map);
+    expect(flat.has('active')).toBe(true);
+    expect(flat.has('password')).toBe(true);
+    expect(flat.has('primary')).toBe(true);
+    expect(flat.size).toBe(3);
+  });
+
+  it('should return empty set for empty map', () => {
+    const flat = flattenParentChildMap(new Map());
+    expect(flat.size).toBe(0);
+  });
+
+  it('should handle duplicate names across parents (union semantics)', () => {
+    const map = new Map<string, Set<string>>([
+      ['__top__', new Set(['active'])],
+      ['urn:ext:schema', new Set(['active'])], // same name, different parent
+    ]);
+    const flat = flattenParentChildMap(map);
+    expect(flat.has('active')).toBe(true);
+    expect(flat.size).toBe(1); // union — no duplicates
+  });
+
+  it('should handle single parent with multiple children', () => {
+    const map = new Map<string, Set<string>>([
+      ['meta', new Set(['resourcetype', 'created', 'lastmodified', 'location', 'version'])],
+    ]);
+    const flat = flattenParentChildMap(map);
+    expect(flat.size).toBe(5);
+  });
+});
+
+// ─── stripReadOnlyAttributes with preCollected ──────────────────────────
+
+describe('stripReadOnlyAttributes with preCollected', () => {
+  const coreSchema = {
+    id: 'urn:ietf:params:scim:schemas:core:2.0:User',
+    attributes: [
+      { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+      { name: 'id', type: 'string', multiValued: false, required: true, mutability: 'readOnly' },
+      { name: 'meta', type: 'complex', multiValued: false, required: false, mutability: 'readOnly' },
+    ],
+  } as const;
+
+  it('should produce identical results with and without preCollected', () => {
+    const payload1 = { schemas: ['core'], id: 'x', userName: 'alice', meta: { resourceType: 'User' } } as Record<string, unknown>;
+    const payload2 = { ...payload1 };
+
+    // Without preCollected
+    const stripped1 = stripReadOnlyAttributes(payload1, [coreSchema]);
+
+    // With preCollected
+    const { core, extensions, coreSubAttrs, extensionSubAttrs } = require('../../../domain/validation').SchemaValidator.collectReadOnlyAttributes([coreSchema]);
+    const stripped2 = stripReadOnlyAttributes(payload2, [coreSchema], { core, extensions, coreSubAttrs, extensionSubAttrs });
+
+    expect(stripped1.sort()).toEqual(stripped2.sort());
   });
 });

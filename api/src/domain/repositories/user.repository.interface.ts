@@ -33,7 +33,7 @@ export interface IUserRepository {
   findAll(
     endpointId: string,
     dbFilter?: Record<string, unknown>,
-    orderBy?: { field: string; direction: 'asc' | 'desc' },
+    orderBy?: { field: string; direction: 'asc' | 'desc'; caseExact?: boolean },
   ): Promise<UserRecord[]>;
 
   /** Update a user by its internal storage ID. */

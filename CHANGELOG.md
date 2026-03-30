@@ -5,6 +5,58 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.30.0] - 2026-03-26
+
+### Added — Admin Endpoint API Improvements
+
+- **Envelope response**: `GET /admin/endpoints` returns `{ totalResults, endpoints[] }` instead of bare array
+- **`?view=summary|full` query param**: summary (default for list) shows `profileSummary` digest; full (default for single-get) returns complete `profile`
+- **`ProfileSummary` digest**: includes `schemaCount`, `schemas[]` (id, name, attributeCount), `resourceTypeCount`, `resourceTypes[]` (name, schema, extensions, extensionCount), `serviceProviderConfig` (boolean flags), `activeSettings` (non-default settings only)
+- **`_links` (HATEOAS)**: every endpoint response includes `self`, `stats`, `credentials`, `scim` navigation links
+- **`GET /admin/endpoints/presets`**: list all built-in presets with profile summaries
+- **`GET /admin/endpoints/presets/:name`**: get full expanded preset profile (404 for unknown)
+- **Nested stats format**: `users: { total, active, softDeleted }`, `groups: { total, active, softDeleted }`, `groupMembers: { total }`, `requestLogs: { total }` — replaces flat `totalUsers`/`totalGroups`/`totalGroupMembers`/`requestLogCount`
+- **ISO 8601 string timestamps**: `createdAt`/`updatedAt` now explicit ISO 8601 strings (not Date objects)
+- **`scimBasePath`**: renamed from `scimEndpoint` for clarity
+- **Internal `CachedEndpoint` type**: separates internal cache (Date objects) from API response (ISO strings)
+- **Static `buildProfileSummary()`**: reusable across endpoint & preset responses
+
+### Added — Schema Cache Optimization + caseExact + Generic Filter Parity
+
+- **Pre-flattened returned characteristic Sets** (`neverReturnedFlat`, `alwaysReturnedFlat`, `requestReturnedFlat`): Built once at cache time. Eliminates 9 redundant `flattenParentChildMap()` calls + Set allocations per request
+- **Sub-attribute collision maps** (`neverReturnedSubs`, `requestReturnedSubs`): Parent-context-aware maps for sub-attrs with `returned:never`/`returned:request`. Prevents false positives when same-named sub-attrs across different parents have different returned values
+- **caseExact-aware in-memory sorting** (GAP-CASEEXACT-1): `SortParams.caseExact` flag threaded through sort resolve functions, repo interfaces, and all 3 in-memory repo sort comparators. Case-insensitive sort when `caseExact=false`, ordinal when `true`
+- **caseExact-aware PATCH value filter** (GAP-CASEEXACT-2): `matchesFilter()` accepts `caseExact` param. `UserPatchEngine` resolves caseExact from `PatchConfig.caseExactPaths` for value filter matching
+- **Generic resource full filter operators** (G6): Replaced regex `eq`-only `parseSimpleFilter()` with `buildGenericFilter()` using full AST-based parser. All 10 SCIM operators (eq/ne/co/sw/ew/gt/ge/lt/le/pr) + AND/OR compounds. DB push-down for `displayName`/`externalId`/`id`; in-memory fallback for custom attributes
+- **Generic service readOnly cache wiring** (C2): `stripReadOnlyAttributes`/`stripReadOnlyPatchOps` pass `preCollected` from cache. Eliminates per-request `collectReadOnlyAttributes()` tree walk
+- **Generic service extensionUrns fix** (C1): `getSchemaCacheForRT()` passes `resourceType.schemaExtensions` to `buildCharacteristicsCache()`
+- **Consolidated `getExtensionUrns()`** (M1): Removed redundant `getEndpointExtensionUrns()`. `enforceStrictSchemaValidation` now uses cache-first `getExtensionUrns()`
+
+### Removed
+
+- **`getBooleanKeys()`** — deprecated flat boolean collector on `ScimSchemaHelpers` (superseded by `getBooleansByParent()`)
+- **`coerceBooleanStringsIfEnabled()`** — deprecated flat coercer on `ScimSchemaHelpers` (superseded by `coerceBooleansByParentIfEnabled()`)
+- **`sanitizeBooleanStrings()`** — flat exported function (superseded by `sanitizeBooleanStringsByParent()`)
+- **`collectBooleanAttributeNames()`** — static method on `SchemaValidator` (superseded by `booleansByParent` cache field)
+- **`parseSimpleFilter()`** — regex-based eq-only filter parser on generic service (replaced by `buildGenericFilter()`)
+
+### Changed
+
+- **`SchemaCharacteristicsCache`**: 14 → 19 fields. Added 5 new: `neverReturnedSubs`, `requestReturnedSubs`, `neverReturnedFlat`, `alwaysReturnedFlat`, `requestReturnedFlat`
+- **`PatchConfig`**: New `caseExactPaths?: Set<string>` field for caseExact value filter matching
+- **`SortParams`**: New `caseExact: boolean` field for schema-driven sort comparison
+- **Repository interfaces**: `orderBy` parameter gains `caseExact?: boolean`
+- **In-memory generic repo**: Uses `matchesPrismaFilter()` instead of manual key-value loop
+- **Generic `listResources`**: Converts all records to SCIM resources before in-memory filter, supporting full attribute-path evaluation
+- **`getReturnedCharacteristics()`**: Returns pre-built flat Sets from cache + `neverSubs`/`requestSubs` maps
+
+### Test Results
+
+- **Unit tests**: 3,061 passed (74 suites)
+- **E2E tests**: 817 (37 suites)
+- **Live tests**: ~951 assertions (main) + 112 Lexmark
+- **Total**: ~4,941 tests
+
 ## [0.29.0] - 2026-03-17
 
 ### Added — Precomputed Schema Characteristics Cache (2026-03-20)

@@ -1,6 +1,6 @@
 # Complete API Reference
 
-> **Version:** 0.29.0 · **Updated:** March 17, 2026  
+> **Version:** 0.30.0 · **Updated:** March 26, 2026  
 > **Base URL:** `http://localhost:{PORT}/scim` (default port: 3000, Docker: 8080)  
 > **Content-Type:** `application/scim+json` for SCIM operations, `application/json` for admin
 

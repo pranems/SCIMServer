@@ -1,4 +1,4 @@
-﻿import { ArrayNotEmpty, IsArray, IsBoolean, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+﻿import { ArrayNotEmpty, IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class CreateUserDto {
   @IsArray()
@@ -13,9 +13,16 @@ export class CreateUserDto {
   @IsString()
   externalId?: string;
 
+  /**
+   * Active status. Accepts boolean or string ("True"/"False") — coerced
+   * to native boolean by sanitizeBooleanStringsByParent() in the service layer.
+   *
+   * Typed as `unknown` to prevent class-transformer's enableImplicitConversion
+   * from calling Boolean("False") → true (any non-empty string is truthy in JS).
+   * @see sanitizeBooleanStringsByParent
+   */
   @IsOptional()
-  @IsBoolean()
-  active?: boolean;
+  active?: unknown;
 
   [key: string]: unknown;
 }

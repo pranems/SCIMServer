@@ -19,9 +19,15 @@ describe('AdminCredentialController', () => {
     name: 'test-endpoint',
     profile: { settings: { PerEndpointCredentialsEnabled: true } },
     active: true,
-    scimEndpoint: '/endpoints/11111111-1111-1111-1111-111111111111',
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    scimBasePath: '/scim/endpoints/11111111-1111-1111-1111-111111111111',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    _links: {
+      self: '/admin/endpoints/11111111-1111-1111-1111-111111111111',
+      stats: '/admin/endpoints/11111111-1111-1111-1111-111111111111/stats',
+      credentials: '/admin/endpoints/11111111-1111-1111-1111-111111111111/credentials',
+      scim: '/scim/endpoints/11111111-1111-1111-1111-111111111111',
+    },
   };
 
   const mockCredential = {

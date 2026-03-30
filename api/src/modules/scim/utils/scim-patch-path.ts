@@ -110,19 +110,23 @@ export function parseExtensionPath(path: string, extensionUrns?: readonly string
 
 /**
  * Checks whether a single record matches a simple SCIM filter expression.
- * Only `eq` is fully supported (case-insensitive string comparison).
+ * Only `eq` is fully supported. String comparison respects `caseExact`:
+ * when `caseExact` is true, comparison is case-sensitive; otherwise case-insensitive.
  *
  * Boolean-aware: When comparing a boolean actual value against a string filter
  * value (e.g., `primary eq "True"`), the comparison coerces the boolean to
  * its string representation for a case-insensitive match. This handles the
  * common case where SCIM clients use filter expressions like
  * `roles[primary eq "True"]` against boolean attributes.
+ *
+ * @param caseExact  When true, string comparison is case-sensitive per RFC 7643 §2.2.
  */
 export function matchesFilter(
   item: Record<string, unknown>,
   filterAttribute: string,
   filterOperator: string,
-  filterValue: string
+  filterValue: string,
+  caseExact = false,
 ): boolean {
   // RFC 7643 §2.1: attribute names are case-insensitive — find the key regardless of casing
   const lowerAttr = filterAttribute.toLowerCase();
@@ -131,7 +135,9 @@ export function matchesFilter(
   switch (filterOperator) {
     case 'eq': {
       if (typeof actual === 'string' && typeof filterValue === 'string') {
-        return actual.toLowerCase() === filterValue.toLowerCase();
+        return caseExact
+          ? actual === filterValue
+          : actual.toLowerCase() === filterValue.toLowerCase();
       }
       // Boolean-to-string comparison: `true` eq "True" → match
       if (typeof actual === 'boolean') {
@@ -159,7 +165,8 @@ export function matchesFilter(
 export function applyValuePathUpdate(
   rawPayload: Record<string, unknown>,
   parsed: ValuePathExpression,
-  value: unknown
+  value: unknown,
+  caseExact = false,
 ): Record<string, unknown> {
   const arr = rawPayload[parsed.attribute];
 
@@ -175,7 +182,8 @@ export function applyValuePathUpdate(
       item as Record<string, unknown>,
       parsed.filterAttribute,
       parsed.filterOperator,
-      parsed.filterValue
+      parsed.filterValue,
+      caseExact,
     );
   });
 
@@ -200,7 +208,8 @@ export function applyValuePathUpdate(
  */
 export function removeValuePathEntry(
   rawPayload: Record<string, unknown>,
-  parsed: ValuePathExpression
+  parsed: ValuePathExpression,
+  caseExact = false,
 ): Record<string, unknown> {
   const arr = rawPayload[parsed.attribute];
   if (!Array.isArray(arr)) {
@@ -215,7 +224,8 @@ export function removeValuePathEntry(
         item as Record<string, unknown>,
         parsed.filterAttribute,
         parsed.filterOperator,
-        parsed.filterValue
+        parsed.filterValue,
+        caseExact,
       );
     });
     if (matchIdx >= 0) {
@@ -232,7 +242,8 @@ export function removeValuePathEntry(
         item as Record<string, unknown>,
         parsed.filterAttribute,
         parsed.filterOperator,
-        parsed.filterValue
+        parsed.filterValue,
+        caseExact,
       );
     });
   }
@@ -252,7 +263,8 @@ export function removeValuePathEntry(
 export function addValuePathEntry(
   rawPayload: Record<string, unknown>,
   parsed: ValuePathExpression,
-  value: unknown
+  value: unknown,
+  caseExact = false,
 ): Record<string, unknown> {
   let arr = rawPayload[parsed.attribute] as unknown[] | undefined;
 
@@ -266,7 +278,8 @@ export function addValuePathEntry(
       item as Record<string, unknown>,
       parsed.filterAttribute,
       parsed.filterOperator,
-      parsed.filterValue
+      parsed.filterValue,
+      caseExact,
     );
   });
 

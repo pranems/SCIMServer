@@ -8,20 +8,123 @@ import { ENDPOINT_CONFIG_FLAGS, validateEndpointConfig } from '../endpoint-confi
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { parseLogLevel, logLevelName } from '../../logging/log-levels';
 import { validateAndExpandProfile } from '../../scim/endpoint-profile/endpoint-profile.service';
-import { getBuiltInPreset, DEFAULT_PRESET_NAME } from '../../scim/endpoint-profile/built-in-presets';
-import type { EndpointProfile } from '../../scim/endpoint-profile/endpoint-profile.types';
+import { getBuiltInPreset, DEFAULT_PRESET_NAME, BUILT_IN_PRESETS, PRESET_NAMES } from '../../scim/endpoint-profile/built-in-presets';
+import type { EndpointProfile, ServiceProviderConfig } from '../../scim/endpoint-profile/endpoint-profile.types';
 
 /** Callback type for profile change notifications (registry hydration) */
 export type ProfileChangeListener = (endpointId: string, profile: EndpointProfile | null) => void;
+
+// ─── Profile Summary Types ────────────────────────────────────────────────
+
+/** Per-schema digest in the profile summary */
+export interface SchemaSummary {
+  id: string;
+  name: string;
+  attributeCount: number;
+}
+
+/** Per-resourceType digest in the profile summary */
+export interface ResourceTypeSummary {
+  name: string;
+  schema: string;
+  extensions: string[];
+  extensionCount: number;
+}
+
+/** SPC capability flags summary — mirrors ServiceProviderConfig.supported booleans */
+export interface ServiceProviderConfigSummary {
+  patch: boolean;
+  bulk: boolean;
+  filter: boolean;
+  changePassword: boolean;
+  sort: boolean;
+  etag: boolean;
+}
+
+/** Digest of an EndpointProfile for the summary view */
+export interface ProfileSummary {
+  schemaCount: number;
+  schemas: SchemaSummary[];
+  resourceTypeCount: number;
+  resourceTypes: ResourceTypeSummary[];
+  serviceProviderConfig: ServiceProviderConfigSummary;
+  activeSettings: Record<string, unknown>;
+}
+
+// ─── _links ─────────────────────────────────────────────────────────────────
+
+export interface EndpointLinks {
+  self: string;
+  stats: string;
+  credentials: string;
+  scim: string;
+}
+
+// ─── EndpointResponse ───────────────────────────────────────────────────────
 
 export interface EndpointResponse {
   id: string;
   name: string;
   displayName?: string;
   description?: string;
+  /** Full profile — included when view=full (single-endpoint GET default) */
+  profile?: EndpointProfile;
+  /** Profile digest — included when view=summary (list default) */
+  profileSummary?: ProfileSummary;
+  active: boolean;
+  scimBasePath: string;
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
+  _links: EndpointLinks;
+}
+
+// ─── List Envelope ────────────────────────────────────────────────────────
+
+export interface EndpointListResponse {
+  totalResults: number;
+  endpoints: EndpointResponse[];
+}
+
+// ─── Presets ──────────────────────────────────────────────────────────────
+
+export interface PresetSummaryResponse {
+  name: string;
+  description: string;
+  default: boolean;
+  summary: ProfileSummary;
+}
+
+export interface PresetListResponse {
+  totalResults: number;
+  presets: PresetSummaryResponse[];
+}
+
+// ─── Stats ────────────────────────────────────────────────────────────────
+
+export interface ResourceStats {
+  total: number;
+  active: number;
+  softDeleted: number;
+}
+
+export interface EndpointStatsResponse {
+  users: ResourceStats;
+  groups: ResourceStats;
+  groupMembers: { total: number };
+  requestLogs: { total: number };
+}
+
+// ─── Internal Cache Type ──────────────────────────────────────────────────
+
+/** Internal cache representation — keeps Date objects and full profile for fast access */
+interface CachedEndpoint {
+  id: string;
+  name: string;
+  displayName?: string;
+  description?: string;
   profile?: EndpointProfile;
   active: boolean;
-  scimEndpoint: string;
+  scimBasePath: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -34,8 +137,8 @@ export class EndpointService implements OnModuleInit {
   // ─── Unified Endpoint Cache ─────────────────────────────────────────
   // Both Prisma and InMemory backends use these caches for reads.
   // Writes go to DB first (Prisma) or directly (InMemory), then update cache.
-  private readonly cacheById = new Map<string, EndpointResponse>();
-  private readonly cacheByName = new Map<string, EndpointResponse>();
+  private readonly cacheById = new Map<string, CachedEndpoint>();
+  private readonly cacheByName = new Map<string, CachedEndpoint>();
 
   /** Callback for registry hydration on profile changes */
   private profileChangeListener?: ProfileChangeListener;
@@ -69,11 +172,11 @@ export class EndpointService implements OnModuleInit {
       });
 
       for (const ep of endpoints) {
-        const response = this.toResponse(ep);
-        this.cacheSet(response);
+        const cached = this.toCached(ep);
+        this.cacheSet(cached);
 
         // Restore per-endpoint log levels
-        const settings = response.profile?.settings as Record<string, any> | undefined;
+        const settings = cached.profile?.settings as Record<string, any> | undefined;
         const logLevel = settings?.[ENDPOINT_CONFIG_FLAGS.LOG_LEVEL];
         if (logLevel !== undefined) {
           const level = typeof logLevel === 'number' ? logLevel : parseLogLevel(String(logLevel));
@@ -89,14 +192,121 @@ export class EndpointService implements OnModuleInit {
 
   // ─── Cache helpers ──────────────────────────────────────────────────
 
-  private cacheSet(ep: EndpointResponse): void {
+  private cacheSet(ep: CachedEndpoint): void {
     this.cacheById.set(ep.id, ep);
     this.cacheByName.set(ep.name, ep);
   }
 
-  private cacheDelete(ep: EndpointResponse): void {
+  private cacheDelete(ep: CachedEndpoint): void {
     this.cacheById.delete(ep.id);
     this.cacheByName.delete(ep.name);
+  }
+
+  // ─── Profile Summary Builder ────────────────────────────────────────
+
+  /**
+   * Build a profile summary (schema-digest level) from a full EndpointProfile.
+   */
+  static buildProfileSummary(profile: EndpointProfile): ProfileSummary {
+    const schemas: SchemaSummary[] = (profile.schemas ?? []).map(s => ({
+      id: s.id,
+      name: s.name,
+      attributeCount: s.attributes?.length ?? 0,
+    }));
+
+    const resourceTypes: ResourceTypeSummary[] = (profile.resourceTypes ?? []).map(rt => ({
+      name: rt.name,
+      schema: rt.schema,
+      extensions: rt.schemaExtensions?.map(e => e.schema) ?? [],
+      extensionCount: rt.schemaExtensions?.length ?? 0,
+    }));
+
+    const spc = profile.serviceProviderConfig;
+    const serviceProviderConfig: ServiceProviderConfigSummary = {
+      patch: spc?.patch?.supported ?? false,
+      bulk: spc?.bulk?.supported ?? false,
+      filter: spc?.filter?.supported ?? false,
+      changePassword: spc?.changePassword?.supported ?? false,
+      sort: spc?.sort?.supported ?? false,
+      etag: spc?.etag?.supported ?? false,
+    };
+
+    // Only include non-empty / non-false settings
+    const activeSettings: Record<string, unknown> = {};
+    if (profile.settings) {
+      for (const [key, value] of Object.entries(profile.settings)) {
+        if (value !== undefined && value !== null && value !== '' && value !== false && value !== 'False') {
+          activeSettings[key] = value;
+        }
+      }
+    }
+
+    return {
+      schemaCount: schemas.length,
+      schemas,
+      resourceTypeCount: resourceTypes.length,
+      resourceTypes,
+      serviceProviderConfig,
+      activeSettings,
+    };
+  }
+
+  // ─── Response Builders ──────────────────────────────────────────────
+
+  private buildLinks(id: string): EndpointLinks {
+    return {
+      self: `/admin/endpoints/${id}`,
+      stats: `/admin/endpoints/${id}/stats`,
+      credentials: `/admin/endpoints/${id}/credentials`,
+      scim: `/scim/endpoints/${id}`,
+    };
+  }
+
+  /**
+   * Convert CachedEndpoint → full EndpointResponse (view=full).
+   * Includes full profile, no profileSummary.
+   */
+  private toFullResponse(cached: CachedEndpoint): EndpointResponse {
+    return {
+      id: cached.id,
+      name: cached.name,
+      displayName: cached.displayName,
+      description: cached.description,
+      profile: cached.profile,
+      active: cached.active,
+      scimBasePath: cached.scimBasePath,
+      createdAt: cached.createdAt.toISOString(),
+      updatedAt: cached.updatedAt.toISOString(),
+      _links: this.buildLinks(cached.id),
+    };
+  }
+
+  /**
+   * Convert CachedEndpoint → summary EndpointResponse (view=summary).
+   * Includes profileSummary, no full profile.
+   */
+  private toSummaryResponse(cached: CachedEndpoint): EndpointResponse {
+    return {
+      id: cached.id,
+      name: cached.name,
+      displayName: cached.displayName,
+      description: cached.description,
+      profileSummary: cached.profile
+        ? EndpointService.buildProfileSummary(cached.profile)
+        : undefined,
+      active: cached.active,
+      scimBasePath: cached.scimBasePath,
+      createdAt: cached.createdAt.toISOString(),
+      updatedAt: cached.updatedAt.toISOString(),
+      _links: this.buildLinks(cached.id),
+    };
+  }
+
+  /**
+   * Convert CachedEndpoint → EndpointResponse for the given view.
+   */
+  toResponse(cached: CachedEndpoint, view: 'full' | 'summary' = 'full'): EndpointResponse {
+    return view === 'summary' ? this.toSummaryResponse(cached) : this.toFullResponse(cached);
   }
 
   async createEndpoint(dto: CreateEndpointDto): Promise<EndpointResponse> {
@@ -150,22 +360,22 @@ export class EndpointService implements OnModuleInit {
     // Persist + cache
     if (this.isInMemoryBackend) {
       const now = new Date();
-      const response: EndpointResponse = {
-        id: randomUUID(),
+      const id = randomUUID();
+      const cached: CachedEndpoint = {
+        id,
         name: dto.name,
         displayName: dto.displayName ?? dto.name,
         description: dto.description ?? undefined,
         profile: resolvedProfile,
         active: true,
-        scimEndpoint: '',
+        scimBasePath: `/scim/endpoints/${id}`,
         createdAt: now,
         updatedAt: now,
       };
-      response.scimEndpoint = `/scim/endpoints/${response.id}`;
-      this.cacheSet(response);
-      this.syncEndpointLogLevel(response.id, resolvedProfile.settings);
-      this.profileChangeListener?.(response.id, resolvedProfile);
-      return response;
+      this.cacheSet(cached);
+      this.syncEndpointLogLevel(cached.id, resolvedProfile.settings);
+      this.profileChangeListener?.(cached.id, resolvedProfile);
+      return this.toFullResponse(cached);
     }
 
     const existing = await this.prisma.endpoint.findUnique({
@@ -186,16 +396,16 @@ export class EndpointService implements OnModuleInit {
       }
     });
 
-    const response = this.toResponse(endpoint);
-    this.cacheSet(response);
+    const cached = this.toCached(endpoint);
+    this.cacheSet(cached);
     this.syncEndpointLogLevel(endpoint.id, resolvedProfile.settings);
     this.profileChangeListener?.(endpoint.id, resolvedProfile);
-    return response;
+    return this.toFullResponse(cached);
   }
 
-  async getEndpoint(endpointId: string): Promise<EndpointResponse> {
+  async getEndpoint(endpointId: string, view: 'full' | 'summary' = 'full'): Promise<EndpointResponse> {
     const cached = this.cacheById.get(endpointId);
-    if (cached) return cached;
+    if (cached) return this.toResponse(cached, view);
 
     // Cache miss — try DB (Prisma only; InMemory is always in cache)
     if (this.isInMemoryBackend) {
@@ -215,14 +425,14 @@ export class EndpointService implements OnModuleInit {
       throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
     }
 
-    const response = this.toResponse(endpoint);
-    this.cacheSet(response); // warm cache for next time
-    return response;
+    const ce = this.toCached(endpoint);
+    this.cacheSet(ce); // warm cache for next time
+    return this.toResponse(ce, view);
   }
 
-  async getEndpointByName(name: string): Promise<EndpointResponse> {
+  async getEndpointByName(name: string, view: 'full' | 'summary' = 'full'): Promise<EndpointResponse> {
     const cached = this.cacheByName.get(name);
-    if (cached) return cached;
+    if (cached) return this.toResponse(cached, view);
 
     if (this.isInMemoryBackend) {
       throw new NotFoundException(`Endpoint with name "${name}" not found`);
@@ -236,35 +446,42 @@ export class EndpointService implements OnModuleInit {
       throw new NotFoundException(`Endpoint with name "${name}" not found`);
     }
 
-    const response = this.toResponse(endpoint);
-    this.cacheSet(response);
-    return response;
+    const ce = this.toCached(endpoint);
+    this.cacheSet(ce);
+    return this.toResponse(ce, view);
   }
 
-  async listEndpoints(active?: boolean): Promise<EndpointResponse[]> {
+  async listEndpoints(active?: boolean, view: 'full' | 'summary' = 'summary'): Promise<EndpointListResponse> {
+    let items: CachedEndpoint[];
+
     // If cache is warmed, serve from cache
     if (this.cacheById.size > 0 || this.isInMemoryBackend) {
       const all = [...this.cacheById.values()];
-      const filtered = active === undefined ? all : all.filter(ep => ep.active === active);
-      return filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      items = active === undefined ? all : all.filter(ep => ep.active === active);
+      items = items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    } else {
+      // Fallback: load from DB (first call before cache is warmed)
+      const where: Prisma.EndpointWhereInput = {};
+      if (active !== undefined) {
+        where.active = active;
+      }
+
+      const endpoints = await this.prisma.endpoint.findMany({
+        where,
+        orderBy: { createdAt: 'desc' }
+      });
+
+      items = endpoints.map(e => {
+        const ce = this.toCached(e);
+        this.cacheSet(ce);
+        return ce;
+      });
     }
 
-    // Fallback: load from DB (first call before cache is warmed)
-    const where: Prisma.EndpointWhereInput = {};
-    if (active !== undefined) {
-      where.active = active;
-    }
-
-    const endpoints = await this.prisma.endpoint.findMany({
-      where,
-      orderBy: { createdAt: 'desc' }
-    });
-
-    return endpoints.map(e => {
-      const response = this.toResponse(e);
-      this.cacheSet(response);
-      return response;
-    });
+    return {
+      totalResults: items.length,
+      endpoints: items.map(ep => this.toResponse(ep, view)),
+    };
   }
 
   async updateEndpoint(endpointId: string, dto: UpdateEndpointDto): Promise<EndpointResponse> {
@@ -283,7 +500,7 @@ export class EndpointService implements OnModuleInit {
       }
 
       // Legacy config merge into profile.settings for backward compat
-      const updated: EndpointResponse = {
+      const updated: CachedEndpoint = {
         ...current,
         displayName: dto.displayName !== undefined ? (dto.displayName ?? current.name) : current.displayName,
         description: dto.description !== undefined ? (dto.description ?? undefined) : current.description,
@@ -300,7 +517,7 @@ export class EndpointService implements OnModuleInit {
       }
       this.profileChangeListener?.(endpointId, updated.profile ?? null);
 
-      return updated;
+      return this.toFullResponse(updated);
     }
 
     let endpoint: Endpoint | null;
@@ -335,17 +552,17 @@ export class EndpointService implements OnModuleInit {
       }
     });
 
-    const response = this.toResponse(dbUpdated);
+    const cached = this.toCached(dbUpdated);
     // Update cache (delete old name entry if name changed)
-    if (current && current.name !== response.name) this.cacheByName.delete(current.name);
-    this.cacheSet(response);
+    if (current && current.name !== cached.name) this.cacheByName.delete(current.name);
+    this.cacheSet(cached);
 
     if (dto.profile?.settings) {
       this.syncEndpointLogLevel(endpointId, dto.profile.settings as Record<string, any>);
     }
-    this.profileChangeListener?.(endpointId, response.profile ?? null);
+    this.profileChangeListener?.(endpointId, cached.profile ?? null);
 
-    return response;
+    return this.toFullResponse(cached);
   }
 
   /**
@@ -437,12 +654,7 @@ export class EndpointService implements OnModuleInit {
     this.profileChangeListener?.(endpointId, null);
   }
 
-  async getEndpointStats(endpointId: string): Promise<{
-    totalUsers: number;
-    totalGroups: number;
-    totalGroupMembers: number;
-    requestLogCount: number;
-  }> {
+  async getEndpointStats(endpointId: string): Promise<EndpointStatsResponse> {
     // Verify endpoint exists (via cache)
     if (!this.cacheById.has(endpointId)) {
       if (this.isInMemoryBackend) {
@@ -454,27 +666,106 @@ export class EndpointService implements OnModuleInit {
     }
 
     if (this.isInMemoryBackend) {
-      return { totalUsers: 0, totalGroups: 0, totalGroupMembers: 0, requestLogCount: 0 };
+      return {
+        users: { total: 0, active: 0, softDeleted: 0 },
+        groups: { total: 0, active: 0, softDeleted: 0 },
+        groupMembers: { total: 0 },
+        requestLogs: { total: 0 },
+      };
     }
 
-    const [totalUsers, totalGroups, totalGroupMembers, requestLogCount] = await Promise.all([
+    const [totalUsers, activeUsers, softDeletedUsers,
+           totalGroups, activeGroups, softDeletedGroups,
+           totalGroupMembers, requestLogCount] = await Promise.all([
       this.prisma.scimResource.count({ where: { endpointId, resourceType: 'User' } }),
+      this.prisma.scimResource.count({ where: { endpointId, resourceType: 'User', active: true } }),
+      this.prisma.scimResource.count({ where: { endpointId, resourceType: 'User', active: false } }),
       this.prisma.scimResource.count({ where: { endpointId, resourceType: 'Group' } }),
+      this.prisma.scimResource.count({ where: { endpointId, resourceType: 'Group', active: true } }),
+      this.prisma.scimResource.count({ where: { endpointId, resourceType: 'Group', active: false } }),
       this.prisma.resourceMember.count({ where: { group: { endpointId } } }),
       this.prisma.requestLog.count({ where: { endpointId } })
     ]);
 
-    return { totalUsers, totalGroups, totalGroupMembers, requestLogCount };
+    return {
+      users: { total: totalUsers, active: activeUsers, softDeleted: softDeletedUsers },
+      groups: { total: totalGroups, active: activeGroups, softDeleted: softDeletedGroups },
+      groupMembers: { total: totalGroupMembers },
+      requestLogs: { total: requestLogCount },
+    };
   }
 
-  private toResponse(endpoint: Endpoint): EndpointResponse {
+  // ─── Presets ────────────────────────────────────────────────────────
+
+  /**
+   * List all built-in presets with their profile summaries.
+   */
+  listPresets(): PresetListResponse {
+    const presets: PresetSummaryResponse[] = [];
+
+    for (const name of PRESET_NAMES) {
+      const preset = BUILT_IN_PRESETS.get(name);
+      if (!preset) continue;
+
+      // Expand the preset profile to get full attribute data for summary
+      const expanded = validateAndExpandProfile(preset.profile);
+      const profile = expanded.profile;
+
+      presets.push({
+        name: preset.metadata.name,
+        description: preset.metadata.description,
+        default: preset.metadata.default ?? false,
+        summary: profile
+          ? EndpointService.buildProfileSummary(profile)
+          : {
+              schemaCount: 0,
+              schemas: [],
+              resourceTypeCount: 0,
+              resourceTypes: [],
+              serviceProviderConfig: { patch: false, bulk: false, filter: false, changePassword: false, sort: false, etag: false },
+              activeSettings: {},
+            },
+      });
+    }
+
+    return { totalResults: presets.length, presets };
+  }
+
+  /**
+   * Get a single built-in preset by name with its full expanded profile.
+   */
+  getPreset(name: string): { metadata: { name: string; description: string; default: boolean }; profile: EndpointProfile } {
+    const preset = BUILT_IN_PRESETS.get(name);
+    if (!preset) {
+      const validNames = [...BUILT_IN_PRESETS.keys()].join(', ');
+      throw new NotFoundException(`Unknown preset "${name}". Valid presets: ${validNames}`);
+    }
+
+    const expanded = validateAndExpandProfile(preset.profile);
+    if (!expanded.profile) {
+      throw new BadRequestException(`Failed to expand preset "${name}"`);
+    }
+
+    return {
+      metadata: {
+        name: preset.metadata.name,
+        description: preset.metadata.description,
+        default: preset.metadata.default ?? false,
+      },
+      profile: expanded.profile,
+    };
+  }
+
+  // ─── Internal Helpers ───────────────────────────────────────────────
+
+  private toCached(endpoint: Endpoint): CachedEndpoint {
     const profile = endpoint.profile as Record<string, any> | null;
     const typedProfile = profile as EndpointProfile | undefined;
 
-    // Strip any serialized _schemaCache artifact from DB (plain object, not Map).
+    // Strip any serialized _schemaCaches artifact from DB (plain object, not Map).
     // The cache is built lazily by getSchemaCache() on first request access.
-    if (typedProfile?._schemaCache) {
-      delete typedProfile._schemaCache;
+    if (typedProfile?._schemaCaches) {
+      delete typedProfile._schemaCaches;
     }
 
     return {
@@ -484,7 +775,7 @@ export class EndpointService implements OnModuleInit {
       description: endpoint.description ?? undefined,
       profile: typedProfile,
       active: endpoint.active,
-      scimEndpoint: `/scim/endpoints/${endpoint.id}`,
+      scimBasePath: `/scim/endpoints/${endpoint.id}`,
       createdAt: endpoint.createdAt,
       updatedAt: endpoint.updatedAt
     };

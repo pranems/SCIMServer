@@ -28,6 +28,8 @@ export interface PatchConfig {
   verbosePatch: boolean;
   /** Extension URNs registered for this endpoint (for PATCH path resolution) */
   extensionUrns?: readonly string[];
+  /** Set of caseExact attribute paths from schema cache (for value filter comparison) */
+  caseExactPaths?: Set<string>;
 }
 
 /** Configuration flags for group member PATCH behavior */

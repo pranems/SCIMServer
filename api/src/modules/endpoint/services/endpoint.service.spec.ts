@@ -236,7 +236,8 @@ describe('EndpointService', () => {
 
       const result = await service.listEndpoints();
 
-      expect(result).toHaveLength(1);
+      expect(result.totalResults).toBe(1);
+      expect(result.endpoints).toHaveLength(1);
       expect(prisma.endpoint.findMany).toHaveBeenCalledWith({
         where: {},
         orderBy: { createdAt: 'desc' },
@@ -266,12 +267,12 @@ describe('EndpointService', () => {
       });
     });
 
-    it('should return empty array when no endpoints exist', async () => {
+    it('should return empty response when no endpoints exist', async () => {
       (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([]);
 
       const result = await service.listEndpoints();
 
-      expect(result).toEqual([]);
+      expect(result).toEqual({ totalResults: 0, endpoints: [] });
     });
   });
 
@@ -296,37 +297,43 @@ describe('EndpointService', () => {
   });
 
   describe('getEndpointStats', () => {
-    it('should return endpoint statistics', async () => {
+    it('should return endpoint statistics (nested format)', async () => {
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
-      (prisma.scimResource.count as jest.Mock).mockResolvedValueOnce(10);
-      (prisma.scimResource.count as jest.Mock).mockResolvedValueOnce(5);
+      // 8 parallel count queries: totalUsers, activeUsers, softDeletedUsers,
+      //   totalGroups, activeGroups, softDeletedGroups, totalGroupMembers, requestLogCount
+      (prisma.scimResource.count as jest.Mock)
+        .mockResolvedValueOnce(10)  // totalUsers
+        .mockResolvedValueOnce(8)   // activeUsers
+        .mockResolvedValueOnce(2)   // softDeletedUsers
+        .mockResolvedValueOnce(5)   // totalGroups
+        .mockResolvedValueOnce(5)   // activeGroups
+        .mockResolvedValueOnce(0);  // softDeletedGroups
       (prisma.resourceMember.count as jest.Mock).mockResolvedValue(25);
       (prisma.requestLog.count as jest.Mock).mockResolvedValue(100);
 
       const result = await service.getEndpointStats('test-endpoint-id');
 
       expect(result).toEqual({
-        totalUsers: 10,
-        totalGroups: 5,
-        totalGroupMembers: 25,
-        requestLogCount: 100,
+        users: { total: 10, active: 8, softDeleted: 2 },
+        groups: { total: 5, active: 5, softDeleted: 0 },
+        groupMembers: { total: 25 },
+        requestLogs: { total: 100 },
       });
     });
 
     it('should return zero counts for empty endpoint', async () => {
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
-      (prisma.scimResource.count as jest.Mock).mockResolvedValueOnce(0);
-      (prisma.scimResource.count as jest.Mock).mockResolvedValueOnce(0);
+      (prisma.scimResource.count as jest.Mock).mockResolvedValue(0);
       (prisma.resourceMember.count as jest.Mock).mockResolvedValue(0);
       (prisma.requestLog.count as jest.Mock).mockResolvedValue(0);
 
       const result = await service.getEndpointStats('test-endpoint-id');
 
       expect(result).toEqual({
-        totalUsers: 0,
-        totalGroups: 0,
-        totalGroupMembers: 0,
-        requestLogCount: 0,
+        users: { total: 0, active: 0, softDeleted: 0 },
+        groups: { total: 0, active: 0, softDeleted: 0 },
+        groupMembers: { total: 0 },
+        requestLogs: { total: 0 },
       });
     });
 
@@ -666,7 +673,8 @@ describe('EndpointService', () => {
 
       (prisma.endpoint.findMany as jest.Mock).mockClear();
       const list = await service.listEndpoints();
-      expect(list.length).toBeGreaterThanOrEqual(1);
+      expect(list.totalResults).toBeGreaterThanOrEqual(1);
+      expect(list.endpoints.length).toBeGreaterThanOrEqual(1);
       // findMany should NOT be called again — served from cache
       expect(prisma.endpoint.findMany).not.toHaveBeenCalled();
     });
@@ -690,8 +698,8 @@ describe('EndpointService', () => {
       (prisma.endpoint.findMany as jest.Mock).mockClear();
 
       const activeList = await service.listEndpoints(true);
-      expect(activeList.length).toBe(1);
-      expect(activeList[0].id).toBe('active-ep');
+      expect(activeList.totalResults).toBe(1);
+      expect(activeList.endpoints[0].id).toBe('active-ep');
       expect(prisma.endpoint.findMany).not.toHaveBeenCalled(); // served from cache
     });
 
@@ -704,8 +712,8 @@ describe('EndpointService', () => {
       (prisma.endpoint.findMany as jest.Mock).mockClear();
 
       const inactiveList = await service.listEndpoints(false);
-      expect(inactiveList.length).toBe(1);
-      expect(inactiveList[0].id).toBe('inactive-ep2');
+      expect(inactiveList.totalResults).toBe(1);
+      expect(inactiveList.endpoints[0].id).toBe('inactive-ep2');
       expect(prisma.endpoint.findMany).not.toHaveBeenCalled();
     });
   });
@@ -943,6 +951,309 @@ describe('EndpointService', () => {
       expect(result2.profile?.settings?.SoftDeleteEnabled).toBe('True');
       expect(result2.profile?.settings?.StrictSchemaValidation).toBe('True');
       expect(result2.profile?.settings?.RequireIfMatch).toBe('True');
+    });
+  });
+
+  // ─── ProfileSummary Builder ──────────────────────────────────────────
+
+  describe('buildProfileSummary (static)', () => {
+    it('should produce correct schema digest with attribute counts', () => {
+      const profile = {
+        schemas: [
+          { id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributes: [{ name: 'userName' }, { name: 'displayName' }] },
+          { id: 'urn:ietf:params:scim:schemas:core:2.0:Group', name: 'Group', attributes: [{ name: 'displayName' }] },
+        ],
+        resourceTypes: [
+          { id: 'User', name: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', endpoint: '/Users', description: 'User', schemaExtensions: [{ schema: 'urn:ext', required: false }] },
+        ],
+        serviceProviderConfig: {
+          patch: { supported: true },
+          bulk: { supported: false },
+          filter: { supported: true },
+          changePassword: { supported: false },
+          sort: { supported: true },
+          etag: { supported: true },
+        },
+        settings: { SoftDeleteEnabled: 'True', logLevel: 'DEBUG' },
+      } as any;
+
+      const summary = EndpointService.buildProfileSummary(profile);
+
+      // Schema counts
+      expect(summary.schemaCount).toBe(2);
+      expect(summary.schemas).toHaveLength(2);
+      expect(summary.schemas[0]).toEqual({ id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributeCount: 2 });
+      expect(summary.schemas[1]).toEqual({ id: 'urn:ietf:params:scim:schemas:core:2.0:Group', name: 'Group', attributeCount: 1 });
+
+      // ResourceType counts
+      expect(summary.resourceTypeCount).toBe(1);
+      expect(summary.resourceTypes[0]).toEqual({
+        name: 'User',
+        schema: 'urn:ietf:params:scim:schemas:core:2.0:User',
+        extensions: ['urn:ext'],
+        extensionCount: 1,
+      });
+
+      // ServiceProviderConfig
+      expect(summary.serviceProviderConfig).toEqual({
+        patch: true,
+        bulk: false,
+        filter: true,
+        changePassword: false,
+        sort: true,
+        etag: true,
+      });
+
+      // Active settings (only non-empty, non-false values)
+      expect(summary.activeSettings).toEqual({ SoftDeleteEnabled: 'True', logLevel: 'DEBUG' });
+    });
+
+    it('should handle empty profile with no schemas, resourceTypes, or settings', () => {
+      const profile = {
+        schemas: [],
+        resourceTypes: [],
+        serviceProviderConfig: {
+          patch: { supported: false },
+          bulk: { supported: false },
+          filter: { supported: false },
+          changePassword: { supported: false },
+          sort: { supported: false },
+          etag: { supported: false },
+        },
+        settings: {},
+      } as any;
+
+      const summary = EndpointService.buildProfileSummary(profile);
+
+      expect(summary.schemaCount).toBe(0);
+      expect(summary.schemas).toEqual([]);
+      expect(summary.resourceTypeCount).toBe(0);
+      expect(summary.resourceTypes).toEqual([]);
+      expect(summary.serviceProviderConfig).toEqual({
+        patch: false, bulk: false, filter: false, changePassword: false, sort: false, etag: false,
+      });
+      expect(summary.activeSettings).toEqual({});
+    });
+
+    it('should exclude "False" and false values from activeSettings', () => {
+      const profile = {
+        schemas: [],
+        resourceTypes: [],
+        serviceProviderConfig: {
+          patch: { supported: false }, bulk: { supported: false }, filter: { supported: false },
+          changePassword: { supported: false }, sort: { supported: false }, etag: { supported: false },
+        },
+        settings: {
+          SoftDeleteEnabled: 'False',
+          StrictSchemaValidation: false,
+          VerbosePatchSupported: 'True',
+          logLevel: '',
+        },
+      } as any;
+
+      const summary = EndpointService.buildProfileSummary(profile);
+      expect(summary.activeSettings).toEqual({ VerbosePatchSupported: 'True' });
+    });
+
+    it('should handle schema with no attributes (extension schema)', () => {
+      const profile = {
+        schemas: [
+          { id: 'urn:ext:schema', name: 'ExtSchema' /* no attributes */ },
+        ],
+        resourceTypes: [],
+        serviceProviderConfig: {
+          patch: { supported: false }, bulk: { supported: false }, filter: { supported: false },
+          changePassword: { supported: false }, sort: { supported: false }, etag: { supported: false },
+        },
+        settings: {},
+      } as any;
+
+      const summary = EndpointService.buildProfileSummary(profile);
+      expect(summary.schemas[0].attributeCount).toBe(0);
+    });
+  });
+
+  // ─── View Param (summary vs full) ───────────────────────────────────
+
+  describe('toResponse — view param', () => {
+    it('full view should include profile and not profileSummary', async () => {
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([mockEndpoint]);
+      await service.onModuleInit();
+
+      const result = await service.getEndpoint('test-endpoint-id', 'full');
+      expect(result.profile).toBeDefined();
+      expect(result.profileSummary).toBeUndefined();
+    });
+
+    it('summary view should include profileSummary and not profile', async () => {
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([mockEndpoint]);
+      await service.onModuleInit();
+
+      const result = await service.getEndpoint('test-endpoint-id', 'summary');
+      expect(result.profileSummary).toBeDefined();
+      expect(result.profile).toBeUndefined();
+    });
+
+    it('listEndpoints should default to summary view', async () => {
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([mockEndpoint]);
+      await service.onModuleInit();
+
+      const listResult = await service.listEndpoints();
+      expect(listResult.endpoints[0].profileSummary).toBeDefined();
+      expect(listResult.endpoints[0].profile).toBeUndefined();
+    });
+
+    it('listEndpoints with view=full should include profile', async () => {
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([mockEndpoint]);
+      await service.onModuleInit();
+
+      const listResult = await service.listEndpoints(undefined, 'full');
+      expect(listResult.endpoints[0].profile).toBeDefined();
+      expect(listResult.endpoints[0].profileSummary).toBeUndefined();
+    });
+
+    it('getEndpointByName supports view param', async () => {
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([mockEndpoint]);
+      await service.onModuleInit();
+
+      const summaryResult = await service.getEndpointByName('test-endpoint', 'summary');
+      expect(summaryResult.profileSummary).toBeDefined();
+      expect(summaryResult.profile).toBeUndefined();
+
+      const fullResult = await service.getEndpointByName('test-endpoint', 'full');
+      expect(fullResult.profile).toBeDefined();
+      expect(fullResult.profileSummary).toBeUndefined();
+    });
+  });
+
+  // ─── Response Shape: _links, scimBasePath, ISO timestamps ──────────
+
+  describe('response shape', () => {
+    beforeEach(async () => {
+      (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([mockEndpoint]);
+      await service.onModuleInit();
+    });
+
+    it('should include _links with self, stats, credentials, scim', async () => {
+      const result = await service.getEndpoint('test-endpoint-id');
+      expect(result._links).toBeDefined();
+      expect(result._links.self).toBe('/admin/endpoints/test-endpoint-id');
+      expect(result._links.stats).toBe('/admin/endpoints/test-endpoint-id/stats');
+      expect(result._links.credentials).toBe('/admin/endpoints/test-endpoint-id/credentials');
+      expect(result._links.scim).toBe('/scim/endpoints/test-endpoint-id');
+    });
+
+    it('should return scimBasePath instead of scimEndpoint', async () => {
+      const result = await service.getEndpoint('test-endpoint-id');
+      expect(result.scimBasePath).toBe('/scim/endpoints/test-endpoint-id');
+      expect((result as any).scimEndpoint).toBeUndefined();
+    });
+
+    it('should return ISO 8601 string timestamps', async () => {
+      const result = await service.getEndpoint('test-endpoint-id');
+      expect(typeof result.createdAt).toBe('string');
+      expect(typeof result.updatedAt).toBe('string');
+      // Verify ISO 8601 format (basic check)
+      expect(() => new Date(result.createdAt)).not.toThrow();
+      expect(new Date(result.createdAt).toISOString()).toBe(result.createdAt);
+    });
+
+    it('createEndpoint should return full view with _links and ISO timestamps', async () => {
+      const createPayload = { ...mockEndpoint, id: 'new-ep' };
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.endpoint.create as jest.Mock).mockResolvedValue(createPayload);
+
+      const result = await service.createEndpoint({ name: 'new-endpoint' });
+      expect(result._links).toBeDefined();
+      expect(result.scimBasePath).toContain('/scim/endpoints/');
+      expect(typeof result.createdAt).toBe('string');
+    });
+
+    it('updateEndpoint should return full view with _links and ISO timestamps', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
+      (prisma.endpoint.update as jest.Mock).mockResolvedValue({ ...mockEndpoint, displayName: 'Updated' });
+
+      const result = await service.updateEndpoint('test-endpoint-id', { displayName: 'Updated' });
+      expect(result._links).toBeDefined();
+      expect(typeof result.createdAt).toBe('string');
+    });
+  });
+
+  // ─── Presets API ────────────────────────────────────────────────────
+
+  describe('listPresets', () => {
+    it('should return all built-in presets with summaries', () => {
+      const result = service.listPresets();
+      expect(result.totalResults).toBeGreaterThanOrEqual(5);
+      expect(result.presets).toHaveLength(result.totalResults);
+
+      // Each preset should have metadata + summary
+      for (const preset of result.presets) {
+        expect(preset.name).toBeDefined();
+        expect(preset.description).toBeDefined();
+        expect(typeof preset.default).toBe('boolean');
+        expect(preset.summary).toBeDefined();
+        expect(preset.summary.schemaCount).toBeGreaterThanOrEqual(0);
+        expect(preset.summary.schemas).toBeDefined();
+        expect(preset.summary.resourceTypeCount).toBeGreaterThanOrEqual(0);
+        expect(preset.summary.resourceTypes).toBeDefined();
+        expect(preset.summary.serviceProviderConfig).toBeDefined();
+        expect(preset.summary.activeSettings).toBeDefined();
+      }
+    });
+
+    it('should mark exactly one preset as default', () => {
+      const result = service.listPresets();
+      const defaults = result.presets.filter(p => p.default);
+      expect(defaults).toHaveLength(1);
+      expect(defaults[0].name).toBe('entra-id');
+    });
+
+    it('should include known preset names', () => {
+      const result = service.listPresets();
+      const names = result.presets.map(p => p.name);
+      expect(names).toContain('entra-id');
+      expect(names).toContain('rfc-standard');
+      expect(names).toContain('minimal');
+    });
+
+    it('preset summaries should have correct schema counts per preset', () => {
+      const result = service.listPresets();
+      const entraId = result.presets.find(p => p.name === 'entra-id');
+      const minimal = result.presets.find(p => p.name === 'minimal');
+
+      // entra-id has more schemas than minimal
+      expect(entraId!.summary.schemaCount).toBeGreaterThan(minimal!.summary.schemaCount);
+    });
+  });
+
+  describe('getPreset', () => {
+    it('should return full expanded profile for a valid preset name', () => {
+      const result = service.getPreset('entra-id');
+      expect(result.metadata.name).toBe('entra-id');
+      expect(result.metadata.description).toBeDefined();
+      expect(result.metadata.default).toBe(true);
+      expect(result.profile).toBeDefined();
+      expect(result.profile.schemas).toBeDefined();
+      expect(result.profile.schemas.length).toBeGreaterThan(0);
+      expect(result.profile.resourceTypes).toBeDefined();
+      expect(result.profile.serviceProviderConfig).toBeDefined();
+    });
+
+    it('should throw NotFoundException for unknown preset', () => {
+      expect(() => service.getPreset('non-existent')).toThrow(NotFoundException);
+    });
+
+    it('should return different profiles for different presets', () => {
+      const entraId = service.getPreset('entra-id');
+      const minimal = service.getPreset('minimal');
+      expect(entraId.profile.schemas.length).toBeGreaterThan(minimal.profile.schemas.length);
+    });
+
+    it('rfc-standard preset should have full capabilities', () => {
+      const rfc = service.getPreset('rfc-standard');
+      expect(rfc.profile.serviceProviderConfig.patch.supported).toBe(true);
+      expect(rfc.profile.serviceProviderConfig.filter.supported).toBe(true);
     });
   });
 });

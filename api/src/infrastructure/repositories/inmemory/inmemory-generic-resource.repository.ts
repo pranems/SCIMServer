@@ -12,6 +12,7 @@ import type {
   GenericResourceCreateInput,
   GenericResourceUpdateInput,
 } from '../../../domain/models/generic-resource.model';
+import { matchesPrismaFilter } from './prisma-filter-evaluator';
 
 @Injectable()
 export class InMemoryGenericResourceRepository implements IGenericResourceRepository {
@@ -59,16 +60,10 @@ export class InMemoryGenericResourceRepository implements IGenericResourceReposi
     let results = Array.from(this.resources.values())
       .filter((r) => r.endpointId === endpointId && r.resourceType === resourceType);
 
-    if (dbFilter) {
-      for (const [key, value] of Object.entries(dbFilter)) {
-        results = results.filter((r) => {
-          const recordValue = (r as unknown as Record<string, unknown>)[key];
-          if (typeof value === 'string' && typeof recordValue === 'string') {
-            return recordValue.toLowerCase() === value.toLowerCase();
-          }
-          return recordValue === value;
-        });
-      }
+    if (dbFilter && Object.keys(dbFilter).length > 0) {
+      results = results.filter((r) =>
+        matchesPrismaFilter(r as unknown as Record<string, unknown>, dbFilter),
+      );
     }
 
     return results

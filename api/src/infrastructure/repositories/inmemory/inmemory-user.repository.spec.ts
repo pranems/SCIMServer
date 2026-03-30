@@ -136,6 +136,43 @@ describe('InMemoryUserRepository', () => {
       expect(names).toEqual(['Charlie', 'Bob', 'Alice']);
     });
 
+    it('should sort case-insensitively when caseExact=false', async () => {
+      // Create users with mixed case to test ordering
+      const repo2 = new (repo.constructor as any)();
+      const base = { endpointId, rawPayload: '{}', createdAt: new Date(), updatedAt: new Date(), version: 1 };
+      await repo2.create({ ...base, scimId: 's1', userName: 'alice', displayName: 'D1', externalId: null, active: true });
+      await repo2.create({ ...base, scimId: 's2', userName: 'Bob', displayName: 'D2', externalId: null, active: true });
+      await repo2.create({ ...base, scimId: 's3', userName: 'CHARLIE', displayName: 'D3', externalId: null, active: true });
+
+      const results = await repo2.findAll(endpointId, undefined, {
+        field: 'userName',
+        direction: 'asc',
+        caseExact: false,
+      });
+      // Case-insensitive sort: alice < Bob < CHARLIE
+      const names = results.map((u: any) => u.userName);
+      expect(names).toEqual(['alice', 'Bob', 'CHARLIE']);
+    });
+
+    it('should sort case-sensitively when caseExact=true', async () => {
+      const repo2 = new (repo.constructor as any)();
+      const base = { endpointId, rawPayload: '{}', createdAt: new Date(), updatedAt: new Date(), version: 1 };
+      await repo2.create({ ...base, scimId: 's1', userName: 'alice', displayName: 'D1', externalId: null, active: true });
+      await repo2.create({ ...base, scimId: 's2', userName: 'Bob', displayName: 'D2', externalId: null, active: true });
+      await repo2.create({ ...base, scimId: 's3', userName: 'CHARLIE', displayName: 'D3', externalId: null, active: true });
+
+      const results = await repo2.findAll(endpointId, undefined, {
+        field: 'userName',
+        direction: 'asc',
+        caseExact: true,
+      });
+      // Case-sensitive sort: uppercase letters < lowercase in JS (B < C < a)
+      const names = results.map((u: any) => u.userName);
+      expect(names[0]).toBe('Bob'); // 'B' < 'C' < 'a' in ASCII
+      expect(names[1]).toBe('CHARLIE');
+      expect(names[2]).toBe('alice');
+    });
+
     it('should apply a simple key-value filter', async () => {
       // CITEXT-style: use { equals, mode: 'insensitive' } to match case-insensitively
       const results = await repo.findAll(endpointId, { userName: { equals: 'alice', mode: 'insensitive' } });
