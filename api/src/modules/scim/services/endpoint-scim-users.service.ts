@@ -128,7 +128,7 @@ export class EndpointScimUsersService {
       externalId: dto.externalId ?? null,
       userName: dto.userName,
       displayName: typeof dto.displayName === 'string' ? dto.displayName : null,
-      active: dto.active ?? true,
+      active: (dto.active as boolean) ?? true,
       rawPayload: JSON.stringify(sanitizedPayload),
       meta: JSON.stringify({
         resourceType: 'User',
@@ -317,7 +317,7 @@ export class EndpointScimUsersService {
       externalId: dto.externalId ?? null,
       userName: dto.userName,
       displayName: typeof dto.displayName === 'string' ? dto.displayName : null,
-      active: dto.active ?? true,
+      active: (dto.active as boolean) ?? true,
       rawPayload: JSON.stringify(sanitizedPayload),
       meta: JSON.stringify({
         ...meta,
@@ -387,7 +387,7 @@ export class EndpointScimUsersService {
       userName: dto.userName,
       externalId: dto.externalId ?? null,
       displayName: typeof dto.displayName === 'string' ? dto.displayName : null,
-      active: dto.active ?? true,
+      active: (dto.active as boolean) ?? true,
       deletedAt: null,  // Clear soft-delete marker on re-provisioning
       rawPayload: JSON.stringify(sanitizedPayload),
       meta: JSON.stringify({

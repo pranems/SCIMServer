@@ -762,10 +762,10 @@ export class EndpointService implements OnModuleInit {
     const profile = endpoint.profile as Record<string, any> | null;
     const typedProfile = profile as EndpointProfile | undefined;
 
-    // Strip any serialized _schemaCache artifact from DB (plain object, not Map).
+    // Strip any serialized _schemaCaches artifact from DB (plain object, not Map).
     // The cache is built lazily by getSchemaCache() on first request access.
-    if (typedProfile?._schemaCache) {
-      delete typedProfile._schemaCache;
+    if (typedProfile?._schemaCaches) {
+      delete typedProfile._schemaCaches;
     }
 
     return {

@@ -911,8 +911,9 @@ export class EndpointScimGenericService {
     endpointId: string,
   ): SchemaCharacteristicsCache | undefined {
     const profile = this.endpointContext.getProfile?.();
-    if (profile?._schemaCache?.booleansByParent instanceof Map) {
-      return profile._schemaCache;
+    const cacheKey = resourceType.schema;
+    if (profile?._schemaCaches?.[cacheKey]?.booleansByParent instanceof Map) {
+      return profile._schemaCaches[cacheKey];
     }
     // Fallback: build from schema definitions
     const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
@@ -921,7 +922,8 @@ export class EndpointScimGenericService {
     const cache = SchemaValidator.buildCharacteristicsCache(schemaDefs, extensionUrns);
     // Attach to profile for next access within this request
     if (profile) {
-      profile._schemaCache = cache;
+      if (!profile._schemaCaches) profile._schemaCaches = {};
+      profile._schemaCaches[cacheKey] = cache;
     }
     return cache;
   }

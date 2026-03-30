@@ -795,13 +795,14 @@ export class ScimSchemaHelpers {
    */
   private getSchemaCache(endpointId?: string): SchemaCharacteristicsCache | undefined {
     const profile = this.endpointContextStorage?.getProfile?.();
+    const cacheKey = this.coreSchemaUrn;
 
-    // Validate that the cache has real Map instances (not a JSON-serialized artifact)
-    if (profile?._schemaCache?.booleansByParent instanceof Map) {
-      return profile._schemaCache;
+    // Check for existing cache for THIS resource type
+    if (profile?._schemaCaches?.[cacheKey]?.booleansByParent instanceof Map) {
+      return profile._schemaCaches[cacheKey];
     }
 
-    // Fallback: build cache from schema definitions (legacy data / no profile)
+    // Fallback: build cache from schema definitions
     const schemas = this.getSchemaDefinitions(endpointId);
     if (schemas.length === 0) return undefined;
 
@@ -810,7 +811,8 @@ export class ScimSchemaHelpers {
 
     // Attach to profile for next access within this request
     if (profile) {
-      profile._schemaCache = cache;
+      if (!profile._schemaCaches) profile._schemaCaches = {};
+      profile._schemaCaches[cacheKey] = cache;
     }
 
     return cache;
@@ -977,14 +979,15 @@ export class ScimSchemaHelpers {
    * Checks the precomputed cache first (zero-allocation O(1) return).
    * Falls back to profile.resourceTypes scan, then global registry.
    *
-   * Note: reads _schemaCache directly (not via getSchemaCache()) to avoid
+   * Note: reads _schemaCaches directly (not via getSchemaCache()) to avoid
    * circular calls — getSchemaCache() calls getExtensionUrns() during build.
    */
   getExtensionUrns(endpointId?: string): readonly string[] {
     // Check cache directly — avoid getSchemaCache() to prevent circular call
     const profile = this.endpointContextStorage?.getProfile?.();
-    if (profile?._schemaCache?.booleansByParent instanceof Map) {
-      return profile._schemaCache.extensionUrns;
+    const cacheKey = this.coreSchemaUrn;
+    if (profile?._schemaCaches?.[cacheKey]?.booleansByParent instanceof Map) {
+      return profile._schemaCaches[cacheKey].extensionUrns;
     }
 
     // Fallback: compute from profile resourceTypes

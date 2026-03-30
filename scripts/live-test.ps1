@@ -1424,7 +1424,7 @@ try {
 
 # Verify endpoint in inactive listing
 $inactiveList = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints?active=false" -Method GET -Headers $headers
-$foundInactive = $inactiveList | Where-Object { $_.id -eq $InactiveEndpointId }
+$foundInactive = $inactiveList.endpoints | Where-Object { $_.id -eq $InactiveEndpointId }
 Test-Result -Success ($null -ne $foundInactive) -Message "Inactive endpoint appears in active=false filter"
 
 # Reactivate and verify operations work again

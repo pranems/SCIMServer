@@ -1,7 +1,7 @@
 /**
  * Schema Characteristics Cache — Concurrency & Isolation Tests
  *
- * Validates that the _schemaCache on EndpointProfile is safe under all
+ * Validates that the _schemaCaches on EndpointProfile is safe under all
  * concurrent access patterns:
  *
  * Level 1 — Pure function: buildCharacteristicsCache idempotency
@@ -18,6 +18,20 @@ import { SCHEMA_CACHE_TOP_LEVEL } from './validation-types';
 import type { SchemaDefinition, SchemaCharacteristicsCache } from './validation-types';
 import { flattenParentChildMap } from '../../modules/scim/common/scim-service-helpers';
 import type { EndpointProfile } from '../../modules/scim/endpoint-profile/endpoint-profile.types';
+
+// Test cache key — simulates the coreSchemaUrn used in production
+const TEST_KEY = 'urn:ietf:params:scim:schemas:core:2.0:User';
+
+/** Helper: set cache on profile under the test key */
+function setProfileCache(profile: EndpointProfile, cache: SchemaCharacteristicsCache, key = TEST_KEY): void {
+  if (!profile._schemaCaches) profile._schemaCaches = {};
+  profile._schemaCaches[key] = cache;
+}
+
+/** Helper: get cache from profile under the test key */
+function getProfileCache(profile: EndpointProfile, key = TEST_KEY): SchemaCharacteristicsCache | undefined {
+  return profile._schemaCaches?.[key];
+}
 
 // ─── Test Fixtures ────────────────────────────────────────────────────
 
@@ -138,52 +152,73 @@ describe('Level 1: buildCharacteristicsCache idempotency', () => {
 // ═══════════════════════════════════════════════════════════════════════
 
 describe('Level 2: lazy cache write on shared profile object', () => {
-  it('should attach _schemaCache to profile on first access', () => {
+  it('should attach _schemaCaches to profile on first access', () => {
     const profile = buildMockProfile();
-    expect(profile._schemaCache).toBeUndefined();
+    expect(getProfileCache(profile)).toBeUndefined();
 
     // Simulate getSchemaCache() behavior
     const cache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
-    profile._schemaCache = cache;
+    setProfileCache(profile, cache);
 
-    expect(profile._schemaCache).toBeDefined();
-    expect(profile._schemaCache!.booleansByParent instanceof Map).toBe(true);
+    expect(getProfileCache(profile)).toBeDefined();
+    expect(getProfileCache(profile)!.booleansByParent instanceof Map).toBe(true);
   });
 
   it('should reuse attached cache on subsequent accesses', () => {
     const profile = buildMockProfile();
     const cache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
-    profile._schemaCache = cache;
+    setProfileCache(profile, cache);
 
     // Simulate second getSchemaCache() call — should return same reference
-    const cachedRef = profile._schemaCache;
+    const cachedRef = getProfileCache(profile);
     expect(cachedRef).toBe(cache);
     expect(cachedRef!.booleansByParent).toBe(cache.booleansByParent);
   });
 
-  it('should allow overwrite of _schemaCache (last-write-wins)', () => {
+  it('should allow overwrite of _schemaCaches entry (last-write-wins)', () => {
     const profile = buildMockProfile();
     const cache1 = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
     const cache2 = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
-    profile._schemaCache = cache1;
-    profile._schemaCache = cache2;
+    setProfileCache(profile, cache1);
+    setProfileCache(profile, cache2);
 
     // Last write wins — cache2 is the current value
-    expect(profile._schemaCache).toBe(cache2);
-    expect(profile._schemaCache).not.toBe(cache1);
+    expect(getProfileCache(profile)).toBe(cache2);
+    expect(getProfileCache(profile)).not.toBe(cache1);
     // Both caches have identical content — no data loss
     expect([...cache1.booleansByParent.keys()].sort()).toEqual([...cache2.booleansByParent.keys()].sort());
   });
 
-  it('should not share _schemaCache between different profile objects', () => {
+  it('should not share _schemaCaches between different profile objects', () => {
     const profile1 = buildMockProfile();
     const profile2 = buildMockProfile();
     const cache1 = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
 
-    profile1._schemaCache = cache1;
+    setProfileCache(profile1, cache1);
 
-    expect(profile1._schemaCache).toBeDefined();
-    expect(profile2._schemaCache).toBeUndefined();
+    expect(getProfileCache(profile1)).toBeDefined();
+    expect(getProfileCache(profile2)).toBeUndefined();
+  });
+
+  it('should isolate caches for different resource types on same profile', () => {
+    const profile = buildMockProfile();
+    const userCache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
+    const groupCache = SchemaValidator.buildCharacteristicsCache([CORE_SCHEMA], []);
+
+    const USER_KEY = 'urn:ietf:params:scim:schemas:core:2.0:User';
+    const GROUP_KEY = 'urn:ietf:params:scim:schemas:core:2.0:Group';
+
+    setProfileCache(profile, userCache, USER_KEY);
+    setProfileCache(profile, groupCache, GROUP_KEY);
+
+    // Each key returns its own cache
+    expect(getProfileCache(profile, USER_KEY)).toBe(userCache);
+    expect(getProfileCache(profile, GROUP_KEY)).toBe(groupCache);
+    expect(getProfileCache(profile, USER_KEY)).not.toBe(getProfileCache(profile, GROUP_KEY));
+
+    // User cache has extensions, Group cache does not
+    expect(getProfileCache(profile, USER_KEY)!.extensionUrns.length).toBeGreaterThan(0);
+    expect(getProfileCache(profile, GROUP_KEY)!.extensionUrns.length).toBe(0);
   });
 });
 
@@ -229,20 +264,20 @@ describe('Level 3: AsyncLocalStorage per-request isolation', () => {
     expect(refs[0]).not.toBe(refs[1]);
   });
 
-  it('should preserve _schemaCache written during request within that request context', () => {
+  it('should preserve _schemaCaches written during request within that request context', () => {
     const profile = buildMockProfile();
 
     als.run({ profile }, () => {
       const ctx = als.getStore()!;
-      expect(ctx.profile._schemaCache).toBeUndefined();
+      expect(getProfileCache(ctx.profile)).toBeUndefined();
 
       // Simulate lazy cache build
       const cache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
-      ctx.profile._schemaCache = cache;
+      setProfileCache(ctx.profile, cache);
 
       // Within same context, cache is visible
-      expect(ctx.profile._schemaCache).toBe(cache);
-      expect(ctx.profile._schemaCache!.booleansByParent instanceof Map).toBe(true);
+      expect(getProfileCache(ctx.profile)).toBe(cache);
+      expect(getProfileCache(ctx.profile)!.booleansByParent instanceof Map).toBe(true);
     });
   });
 
@@ -252,13 +287,13 @@ describe('Level 3: AsyncLocalStorage per-request isolation', () => {
     // Request 1: writes cache
     als.run({ profile: sharedProfile }, () => {
       const cache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
-      als.getStore()!.profile._schemaCache = cache;
+      setProfileCache(als.getStore()!.profile, cache);
     });
 
     // Request 2: same profile ref → sees the cache
     als.run({ profile: sharedProfile }, () => {
-      expect(als.getStore()!.profile._schemaCache).toBeDefined();
-      expect(als.getStore()!.profile._schemaCache!.booleansByParent instanceof Map).toBe(true);
+      expect(getProfileCache(als.getStore()!.profile)).toBeDefined();
+      expect(getProfileCache(als.getStore()!.profile)!.booleansByParent instanceof Map).toBe(true);
     });
   });
 
@@ -268,12 +303,12 @@ describe('Level 3: AsyncLocalStorage per-request isolation', () => {
 
     // Request 1: writes cache on profile1
     als.run({ profile: profile1 }, () => {
-      profile1._schemaCache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
+      setProfileCache(profile1, SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS));
     });
 
     // Request 2: uses profile2 → no cache
     als.run({ profile: profile2 }, () => {
-      expect(als.getStore()!.profile._schemaCache).toBeUndefined();
+      expect(getProfileCache(als.getStore()!.profile)).toBeUndefined();
     });
   });
 });
@@ -295,7 +330,7 @@ describe('Level 4: interleaved async requests on shared profile', () => {
         const ctx = als.getStore()!;
         // Build cache (simulates first access)
         const cache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
-        ctx.profile._schemaCache = cache;
+        setProfileCache(ctx.profile, cache);
         results.push(cache);
         resolve();
       });
@@ -306,7 +341,7 @@ describe('Level 4: interleaved async requests on shared profile', () => {
         const ctx = als.getStore()!;
         // Build another cache (simulates concurrent first access)
         const cache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
-        ctx.profile._schemaCache = cache;
+        setProfileCache(ctx.profile, cache);
         results.push(cache);
         resolve();
       });
@@ -320,9 +355,9 @@ describe('Level 4: interleaved async requests on shared profile', () => {
     expect([...c1.booleansByParent.keys()].sort()).toEqual([...c2.booleansByParent.keys()].sort());
     expect(c1.uniqueAttrs).toEqual(c2.uniqueAttrs);
 
-    // The profile's _schemaCache is one of the two (last-write-wins)
-    expect(sharedProfile._schemaCache).toBeDefined();
-    expect(sharedProfile._schemaCache!.booleansByParent instanceof Map).toBe(true);
+    // The profile's _schemaCaches has an entry for the test key (last-write-wins)
+    expect(getProfileCache(sharedProfile)).toBeDefined();
+    expect(getProfileCache(sharedProfile)!.booleansByParent instanceof Map).toBe(true);
   });
 
   it('should keep requestId isolated per ALS context even with shared profile', async () => {
@@ -363,7 +398,7 @@ describe('Level 5: profile update during active requests', () => {
   it('should not affect in-flight request when endpoint cache is replaced', async () => {
     const profileV1 = buildMockProfile();
     const cacheV1 = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
-    profileV1._schemaCache = cacheV1;
+    setProfileCache(profileV1, cacheV1);
 
     // Simulated endpoint cache (like EndpointService.cacheById)
     const endpointCache = { current: profileV1 };
@@ -386,9 +421,9 @@ describe('Level 5: profile update during active requests', () => {
         await new Promise(r => setTimeout(r, 10)); // more work
 
         // The in-flight request still sees profileV1 via ALS
-        inFlightCacheRef = als.getStore()!.profile._schemaCache;
+        inFlightCacheRef = getProfileCache(als.getStore()!.profile);
         expect(als.getStore()!.profile).toBe(profileV1); // same ref
-        expect(als.getStore()!.profile._schemaCache).toBe(cacheV1); // unchanged
+        expect(getProfileCache(als.getStore()!.profile)).toBe(cacheV1); // unchanged
 
         resolve();
       });
@@ -397,34 +432,33 @@ describe('Level 5: profile update during active requests', () => {
     await scimRequest;
 
     // After request completes:
-    // - endpoint cache points to profileV2 (no _schemaCache)
+    // - endpoint cache points to profileV2 (no _schemaCaches)
     expect(endpointCache.current).not.toBe(profileV1);
-    expect(endpointCache.current._schemaCache).toBeUndefined();
+    expect(getProfileCache(endpointCache.current)).toBeUndefined();
     // - in-flight request used cacheV1 consistently
     expect(inFlightCacheRef).toBe(cacheV1);
   });
 
   it('next request after profile update should build fresh cache', () => {
     const profileV1 = buildMockProfile();
-    profileV1._schemaCache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
+    setProfileCache(profileV1, SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS));
 
-    // Admin replaces profile with new object (no _schemaCache)
+    // Admin replaces profile with new object (no _schemaCaches)
     const profileV2 = buildMockProfile();
-    // profileV2._schemaCache is undefined
 
     als.run({ profile: profileV2 }, () => {
       const ctx = als.getStore()!;
-      // Cache check should miss (no _schemaCache on new profile)
-      expect(ctx.profile._schemaCache).toBeUndefined();
+      // Cache check should miss (no _schemaCaches on new profile)
+      expect(getProfileCache(ctx.profile)).toBeUndefined();
 
       // Build fresh cache for new profile
       const cache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
-      ctx.profile._schemaCache = cache;
-      expect(ctx.profile._schemaCache!.booleansByParent instanceof Map).toBe(true);
+      setProfileCache(ctx.profile, cache);
+      expect(getProfileCache(ctx.profile)!.booleansByParent instanceof Map).toBe(true);
     });
 
     // Original profileV1 cache is untouched
-    expect(profileV1._schemaCache!.booleansByParent instanceof Map).toBe(true);
+    expect(getProfileCache(profileV1)!.booleansByParent instanceof Map).toBe(true);
   });
 
   it('should handle rapid sequential profile updates without stale cache', () => {
@@ -435,14 +469,14 @@ describe('Level 5: profile update during active requests', () => {
 
     // Each profile should be independent
     for (let i = 0; i < 5; i++) {
-      expect(profiles[i]._schemaCache).toBeUndefined();
-      profiles[i]._schemaCache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
-      expect(profiles[i]._schemaCache!.booleansByParent instanceof Map).toBe(true);
+      expect(getProfileCache(profiles[i])).toBeUndefined();
+      setProfileCache(profiles[i], SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS));
+      expect(getProfileCache(profiles[i])!.booleansByParent instanceof Map).toBe(true);
     }
 
     // Each has its own cache instance
     for (let i = 1; i < 5; i++) {
-      expect(profiles[i]._schemaCache).not.toBe(profiles[i - 1]._schemaCache);
+      expect(getProfileCache(profiles[i])).not.toBe(getProfileCache(profiles[i - 1]));
     }
   });
 });
@@ -455,34 +489,36 @@ describe('Level 6: instanceof Map serialization guard', () => {
   it('should reject JSON.parse-d cache (plain objects, not Maps)', () => {
     const cache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
     const profile = buildMockProfile();
-    profile._schemaCache = cache;
+    setProfileCache(profile, cache);
 
     // Simulate DB round-trip: JSON.stringify → JSON.parse
     const serialized = JSON.stringify(profile);
     const deserialized = JSON.parse(serialized) as EndpointProfile;
 
-    // The deserialized _schemaCache has plain objects, not Maps
-    expect(deserialized._schemaCache).toBeDefined();
-    expect(deserialized._schemaCache!.booleansByParent instanceof Map).toBe(false);
-    expect(typeof deserialized._schemaCache!.booleansByParent).toBe('object');
+    // The deserialized _schemaCaches has plain objects, not Maps
+    expect(deserialized._schemaCaches).toBeDefined();
+    const deserializedCache = deserialized._schemaCaches?.[TEST_KEY] as any;
+    expect(deserializedCache).toBeDefined();
+    expect(deserializedCache.booleansByParent instanceof Map).toBe(false);
   });
 
   it('should trigger rebuild when instanceof Map check fails on deserialized data', () => {
     const cache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
     const profile = buildMockProfile();
-    profile._schemaCache = cache;
+    setProfileCache(profile, cache);
 
     // Roundtrip
     const deserialized = JSON.parse(JSON.stringify(profile)) as EndpointProfile;
 
     // Simulate getSchemaCache() guard
-    const isValidCache = deserialized._schemaCache?.booleansByParent instanceof Map;
+    const deserializedCache = deserialized._schemaCaches?.[TEST_KEY] as any;
+    const isValidCache = deserializedCache?.booleansByParent instanceof Map;
     expect(isValidCache).toBe(false);
 
     // Rebuild should produce valid cache
     const freshCache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
-    deserialized._schemaCache = freshCache;
-    expect(deserialized._schemaCache!.booleansByParent instanceof Map).toBe(true);
+    setProfileCache(deserialized, freshCache);
+    expect(getProfileCache(deserialized)!.booleansByParent instanceof Map).toBe(true);
   });
 
   it('should correctly identify valid cache with instanceof Map', () => {
@@ -496,16 +532,16 @@ describe('Level 6: instanceof Map serialization guard', () => {
     expect(cache.readOnlyCollected.extensions instanceof Map).toBe(true);
   });
 
-  it('should strip _schemaCache via delete (simulates toResponse)', () => {
+  it('should strip _schemaCaches via delete (simulates toResponse)', () => {
     const profile = buildMockProfile();
-    profile._schemaCache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
-    expect(profile._schemaCache).toBeDefined();
+    setProfileCache(profile, SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS));
+    expect(getProfileCache(profile)).toBeDefined();
 
     // Simulate toResponse() stripping
-    if (profile._schemaCache) {
-      delete profile._schemaCache;
+    if (profile._schemaCaches) {
+      delete profile._schemaCaches;
     }
-    expect(profile._schemaCache).toBeUndefined();
+    expect(getProfileCache(profile)).toBeUndefined();
   });
 });
 
@@ -592,7 +628,7 @@ describe('Level 8: multi-endpoint cache isolation', () => {
     const reqA = new Promise<void>((resolve) => {
       als.run({ profile: profileA, endpointId: 'ep-A' }, () => {
         const cache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
-        als.getStore()!.profile._schemaCache = cache;
+        setProfileCache(als.getStore()!.profile, cache);
         caches.set('ep-A', cache);
         resolve();
       });
@@ -601,7 +637,7 @@ describe('Level 8: multi-endpoint cache isolation', () => {
     const reqB = new Promise<void>((resolve) => {
       als.run({ profile: profileB, endpointId: 'ep-B' }, () => {
         const cache = SchemaValidator.buildCharacteristicsCache([CORE_SCHEMA], []);
-        als.getStore()!.profile._schemaCache = cache;
+        setProfileCache(als.getStore()!.profile, cache);
         caches.set('ep-B', cache);
         resolve();
       });
@@ -617,7 +653,7 @@ describe('Level 8: multi-endpoint cache isolation', () => {
     expect(cacheB.extensionUrns.length).toBe(0);
 
     // Profile objects are independent
-    expect(profileA._schemaCache).not.toBe(profileB._schemaCache);
+    expect(getProfileCache(profileA)).not.toBe(getProfileCache(profileB));
   });
 
   it('should not cross-contaminate caches between endpoints via ALS', async () => {
@@ -628,7 +664,7 @@ describe('Level 8: multi-endpoint cache isolation', () => {
 
     const reqA = new Promise<void>((resolve) => {
       als.run({ profile: profileA, endpointId: 'ep-1' }, async () => {
-        profileA._schemaCache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
+        setProfileCache(profileA, SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS));
         await new Promise(r => setTimeout(r, 5)); // yield
         seenProfiles.push(als.getStore()!.endpointId);
         // Should still see ep-1's profile, not ep-2's
@@ -639,7 +675,7 @@ describe('Level 8: multi-endpoint cache isolation', () => {
 
     const reqB = new Promise<void>((resolve) => {
       als.run({ profile: profileB, endpointId: 'ep-2' }, async () => {
-        profileB._schemaCache = SchemaValidator.buildCharacteristicsCache([CORE_SCHEMA], []);
+        setProfileCache(profileB, SchemaValidator.buildCharacteristicsCache([CORE_SCHEMA], []));
         await new Promise(r => setTimeout(r, 2)); // yield
         seenProfiles.push(als.getStore()!.endpointId);
         expect(als.getStore()!.profile).toBe(profileB);

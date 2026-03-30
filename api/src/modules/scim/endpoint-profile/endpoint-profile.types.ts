@@ -123,11 +123,11 @@ export interface EndpointProfile {
 
   /**
    * Precomputed Parent→Children maps for schema attribute characteristics.
-   * Built at profile load time, consumed at zero cost per request.
+   * Built lazily per resource type (keyed by core schema URN) at first access.
    * Prefixed with _ to indicate it's a runtime-only field (not persisted to DB).
    * @see SchemaCharacteristicsCache
    */
-  _schemaCache?: SchemaCharacteristicsCache;
+  _schemaCaches?: Record<string, SchemaCharacteristicsCache>;
 }
 
 // ─── Shorthand Types ───────────────────────────────────────────────────────
