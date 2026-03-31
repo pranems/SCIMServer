@@ -6,6 +6,8 @@
  *  - ensureSchema: schema URN validation
  *  - enforceIfMatch: ETag/If-Match enforcement
  *  - guardSoftDeleted: soft-delete guard
+ *  - coercePatchOpBooleans: PATCH operation boolean coercion
+ *  - stripNeverReturnedFromPayload: never-returned attribute stripping
  *  - ScimSchemaHelpers: parameterized schema-aware methods
  */
 
@@ -15,6 +17,8 @@ import {
   ensureSchema,
   enforceIfMatch,
   sanitizeBooleanStringsByParent,
+  coercePatchOpBooleans,
+  stripNeverReturnedFromPayload,
   guardSoftDeleted,
   ScimSchemaHelpers,
   stripReadOnlyAttributes,
@@ -989,6 +993,213 @@ describe('sanitizeBooleanStringsByParent', () => {
     sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect((obj.addresses as any[])[0].primary).toBe(true);
     expect((obj.addresses as any[])[0].formatted).toBe('addr');
+  });
+});
+
+// ─── coercePatchOpBooleans ──────────────────────────────────────────────
+
+describe('coercePatchOpBooleans', () => {
+  const CORE_URN = 'urn:ietf:params:scim:schemas:core:2.0:user';
+  const boolMap = new Map<string, Set<string>>([
+    [CORE_URN, new Set(['active'])],
+    [`${CORE_URN}.emails`, new Set(['primary'])],
+  ]);
+
+  it('should coerce boolean strings in object value (no-path replace)', () => {
+    const ops = [{ op: 'replace', value: { active: 'True', displayName: 'Test' } }];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect((ops[0].value as any).active).toBe(true);
+    expect((ops[0].value as any).displayName).toBe('Test');
+  });
+
+  it('should coerce boolean strings in array value', () => {
+    const ops = [{ op: 'add', value: [{ active: 'False' }, { active: 'True' }] }];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect((ops[0].value as any[])[0].active).toBe(false);
+    expect((ops[0].value as any[])[1].active).toBe(true);
+  });
+
+  it('should NOT coerce scalar values', () => {
+    const ops = [{ op: 'replace', path: 'displayName', value: 'True' }];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect(ops[0].value).toBe('True');
+  });
+
+  it('should handle null/undefined values gracefully', () => {
+    const ops = [
+      { op: 'remove', path: 'displayName', value: undefined },
+      { op: 'remove', path: 'active' },
+    ];
+    expect(() => coercePatchOpBooleans(ops, boolMap, CORE_URN)).not.toThrow();
+  });
+
+  it('should coerce nested complex attrs in object value', () => {
+    const ops = [{
+      op: 'replace',
+      value: { emails: [{ value: 'a@b.com', primary: 'True' }] },
+    }];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect(((ops[0].value as any).emails as any[])[0].primary).toBe(true);
+  });
+
+  it('should process multiple operations independently', () => {
+    const ops = [
+      { op: 'replace', value: { active: 'True' } },
+      { op: 'replace', value: { active: 'False' } },
+    ];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect((ops[0].value as any).active).toBe(true);
+    expect((ops[1].value as any).active).toBe(false);
+  });
+
+  it('should not coerce non-boolean attribute strings', () => {
+    const ops = [{ op: 'replace', value: { displayName: 'true', active: 'True' } }];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect((ops[0].value as any).displayName).toBe('true');
+    expect((ops[0].value as any).active).toBe(true);
+  });
+
+  it('should handle empty operations array', () => {
+    const ops: Array<{ op: string; value?: unknown }> = [];
+    expect(() => coercePatchOpBooleans(ops, boolMap, CORE_URN)).not.toThrow();
+  });
+});
+
+// ─── stripNeverReturnedFromPayload ──────────────────────────────────────
+
+describe('stripNeverReturnedFromPayload', () => {
+  const CORE_URN = 'urn:ietf:params:scim:schemas:core:2.0:user';
+  const EXT_URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+
+  it('should strip core top-level returned:never attributes', () => {
+    const neverByParent = new Map<string, Set<string>>([
+      [CORE_URN, new Set(['password'])],
+    ]);
+    const payload: Record<string, unknown> = {
+      userName: 'alice',
+      password: 'secret',
+      active: true,
+    };
+    const visible = stripNeverReturnedFromPayload(payload, neverByParent, CORE_URN, []);
+    expect(payload.password).toBeUndefined();
+    expect(payload.userName).toBe('alice');
+    expect(payload.active).toBe(true);
+    expect(visible).toEqual([]);
+  });
+
+  it('should strip core sub-attrs within complex parents', () => {
+    const neverByParent = new Map<string, Set<string>>([
+      [CORE_URN, new Set(['password'])],  // core top-level entry enables the core block
+      [`${CORE_URN}.name`, new Set(['secrethash'])],
+    ]);
+    const payload: Record<string, unknown> = {
+      userName: 'alice',
+      name: { givenName: 'Alice', secretHash: 'abc123' },
+    };
+    stripNeverReturnedFromPayload(payload, neverByParent, CORE_URN, []);
+    expect((payload.name as any).givenName).toBe('Alice');
+    expect((payload.name as any).secretHash).toBeUndefined();
+  });
+
+  it('should strip core sub-attrs within multi-valued complex parents', () => {
+    const neverByParent = new Map<string, Set<string>>([
+      [CORE_URN, new Set(['password'])],  // core top-level entry enables the core block
+      [`${CORE_URN}.emails`, new Set(['internalid'])],
+    ]);
+    const payload: Record<string, unknown> = {
+      userName: 'alice',
+      emails: [
+        { value: 'a@b.com', internalId: 'hidden1' },
+        { value: 'c@d.com', internalId: 'hidden2' },
+      ],
+    };
+    stripNeverReturnedFromPayload(payload, neverByParent, CORE_URN, []);
+    const emails = payload.emails as any[];
+    expect(emails[0].value).toBe('a@b.com');
+    expect(emails[0].internalId).toBeUndefined();
+    expect(emails[1].internalId).toBeUndefined();
+  });
+
+  it('should strip extension top-level returned:never attributes', () => {
+    const neverByParent = new Map<string, Set<string>>([
+      [EXT_URN.toLowerCase(), new Set(['badge'])],
+    ]);
+    const payload: Record<string, unknown> = {
+      userName: 'alice',
+      [EXT_URN]: { department: 'Engineering', badge: 'secret-badge' },
+    };
+    const visible = stripNeverReturnedFromPayload(payload, neverByParent, CORE_URN, [EXT_URN]);
+    expect((payload[EXT_URN] as any).department).toBe('Engineering');
+    expect((payload[EXT_URN] as any).badge).toBeUndefined();
+    expect(visible).toEqual([EXT_URN]);
+  });
+
+  it('should strip extension sub-attrs when top-level never entry also exists', () => {
+    const extUrn = 'urn:test:ext:neversub';
+    const neverByParent = new Map<string, Set<string>>([
+      [extUrn, new Set(['topsecret'])],  // top-level never entry enables extension block
+      [`${extUrn}.credentials`, new Set(['token'])],
+    ]);
+    const payload: Record<string, unknown> = {
+      [extUrn]: { credentials: { token: 'secret', provider: 'oauth' }, topsecret: 'x' },
+    };
+    const visible = stripNeverReturnedFromPayload(payload, neverByParent, CORE_URN, [extUrn]);
+    expect((payload[extUrn] as any).credentials.token).toBeUndefined();
+    expect((payload[extUrn] as any).credentials.provider).toBe('oauth');
+    expect((payload[extUrn] as any).topsecret).toBeUndefined();
+    expect(visible).toEqual([extUrn]);
+  });
+
+  it('should remove extension entirely if all attrs are stripped (FP-1)', () => {
+    const neverByParent = new Map<string, Set<string>>([
+      [EXT_URN.toLowerCase(), new Set(['onlyattr'])],
+    ]);
+    const payload: Record<string, unknown> = {
+      userName: 'alice',
+      [EXT_URN]: { onlyattr: 'value' },  // use lowercase to match the Set entry
+    };
+    const visible = stripNeverReturnedFromPayload(payload, neverByParent, CORE_URN, [EXT_URN]);
+    expect(payload[EXT_URN]).toBeUndefined();
+    // FP-1: removed extension should NOT appear in visible URNs
+    expect(visible).toEqual([]);
+  });
+
+  it('should return extension URNs present in payload that have visible attrs', () => {
+    const ext1 = 'urn:test:ext1';
+    const ext2 = 'urn:test:ext2';
+    const neverByParent = new Map<string, Set<string>>();
+    const payload: Record<string, unknown> = {
+      [ext1]: { department: 'Eng' },
+      // ext2 is NOT in payload
+    };
+    const visible = stripNeverReturnedFromPayload(payload, neverByParent, CORE_URN, [ext1, ext2]);
+    expect(visible).toEqual([ext1]);
+  });
+
+  it('should handle empty neverByParent map', () => {
+    const payload: Record<string, unknown> = {
+      userName: 'alice',
+      password: 'secret',
+    };
+    stripNeverReturnedFromPayload(payload, new Map(), CORE_URN, []);
+    expect(payload.password).toBe('secret'); // not in map → not stripped
+  });
+
+  it('should handle combined core + extension stripping', () => {
+    const neverByParent = new Map<string, Set<string>>([
+      [CORE_URN, new Set(['password'])],
+      [EXT_URN.toLowerCase(), new Set(['badge'])],
+    ]);
+    const payload: Record<string, unknown> = {
+      userName: 'alice',
+      password: 'secret',
+      [EXT_URN]: { department: 'Eng', badge: 'hidden' },
+    };
+    const visible = stripNeverReturnedFromPayload(payload, neverByParent, CORE_URN, [EXT_URN]);
+    expect(payload.password).toBeUndefined();
+    expect((payload[EXT_URN] as any).badge).toBeUndefined();
+    expect((payload[EXT_URN] as any).department).toBe('Eng');
+    expect(visible).toEqual([EXT_URN]);
   });
 });
 
