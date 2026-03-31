@@ -933,7 +933,7 @@ if (-not $secretEcho -and $env:SCIM_SHARED_SECRET) { $secretEcho = $env:SCIM_SHA
 if ($secretEcho) { Write-Host "   SCIM Shared Secret: $secretEcho" -ForegroundColor Yellow }
 Write-Host "   JWT Secret: $JwtSecret" -ForegroundColor Yellow
 Write-Host "   OAuth Client Secret: $OauthClientSecret" -ForegroundColor Yellow
-Write-Host "   Persistence: PostgreSQL (primary) | Blob: $BlobBackupAccount (optional app-level backups)" -ForegroundColor Green
+Write-Host "   Persistence: PostgreSQL (managed or BYO)" -ForegroundColor Green
 Write-Host ""
 
 Write-Host "✅ Verified Runtime (/scim/admin/version):" -ForegroundColor Cyan
@@ -962,26 +962,9 @@ if ($versionInfo) {
 }
 Write-Host ""
 
-Write-Host "💾 Blob Backup / Storage:" -ForegroundColor Cyan
-Write-Host "   Account: $BlobBackupAccount" -ForegroundColor White
-Write-Host "   Container: $BlobBackupContainer" -ForegroundColor White
+Write-Host "💾 Persistence:" -ForegroundColor Cyan
 Write-Host "   Database: PostgreSQL (persistence managed by Azure Database / external PG)" -ForegroundColor White
-Write-Host "   Blob storage: available for application-level backups / blob backup module" -ForegroundColor Gray
-Write-Host ""
-
-# Assign role to container app system identity (after app exists)
-Write-Host "🔐 Assigning Storage Blob Data Contributor role" -ForegroundColor Cyan
-$principalId = az containerapp show -n $AppName -g $ResourceGroup --query identity.principalId -o tsv 2>$null
-if ($principalId) {
-    $scope = "/subscriptions/$((az account show --query id -o tsv))/resourceGroups/$ResourceGroup/providers/Microsoft.Storage/storageAccounts/$BlobBackupAccount"
-    $existingRole = az role assignment list --assignee $principalId --scope $scope --query "[?roleDefinitionName=='Storage Blob Data Contributor'].id" -o tsv 2>$null
-    if (-not $existingRole) {
-        az role assignment create --assignee $principalId --role "Storage Blob Data Contributor" --scope $scope -o none 2>$null
-        if ($LASTEXITCODE -eq 0) { Write-Host "   ✅ Role assigned" -ForegroundColor Green } else { Write-Host "   ⚠️  Failed to assign role (manual intervention may be required)" -ForegroundColor Yellow }
-    } else { Write-Host "   ✅ Role already assigned" -ForegroundColor Green }
-} else {
-    Write-Host "   ⚠️  Could not fetch principalId for container app (role assignment skipped)" -ForegroundColor Yellow
-}
+Write-Host "   Backup: Azure-managed daily backup with 7-day point-in-time restore (PG Flexible Server)" -ForegroundColor White
 Write-Host ""
 
 Write-Host "📝 Next Steps:" -ForegroundColor Cyan
@@ -1025,7 +1008,6 @@ Write-Host ""
 
 Write-Host "💰 Estimated Monthly Cost:" -ForegroundColor Cyan
 Write-Host '   Container App: ~$5-15 (scales to zero when idle)' -ForegroundColor White
-Write-Host '   Blob Storage: ~$0.20-0.50' -ForegroundColor White
 Write-Host '   Log Analytics: ~$0-5 (depends on log volume)' -ForegroundColor White
 Write-Host '   PostgreSQL Flexible Server (B1ms): ~$15-25/mo (if provisioned via -ProvisionPostgres)' -ForegroundColor White
 Write-Host '   BYO PostgreSQL: depends on your provider / existing tier' -ForegroundColor White

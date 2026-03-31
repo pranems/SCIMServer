@@ -79,7 +79,8 @@ cd scripts
 ./deploy-azure.ps1            # Deploys to Azure Container Apps with PostgreSQL Flexible Server
 ```
 
-See [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) for detailed setup.
+See [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) for detailed setup.  
+For sovereign/gov clouds (Azure Gov, BLEU France, China): see [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md).
 
 ### Option D — Pre-built Docker Image
 
@@ -89,7 +90,7 @@ docker run -d -p 8080:8080 \
   -e JWT_SECRET=changeme \
   -e SCIM_SHARED_SECRET=changeme \
   -e OAUTH_CLIENT_SECRET=changeme \
-  ghcr.io/pranems/scimserver:0.31.0
+  ghcr.io/pranems/scimserver:latest
 ```
 
 ### Verify It Works
@@ -568,7 +569,9 @@ Full documentation is in the [`docs/`](docs/) directory. Key documents:
 |----------|-------------|
 | [docs/INDEX.md](docs/INDEX.md) | Complete documentation index |
 | [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md) | Full API reference with examples |
+| [docs/ENDPOINT_LIFECYCLE_AND_USAGE.md](docs/ENDPOINT_LIFECYCLE_AND_USAGE.md) | Endpoint lifecycle & usage quick start |
 | [docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | Configuration flags reference |
+| [docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) | Azure Gov, BLEU (France), China deployment |
 | [docs/SCIM_COMPLIANCE.md](docs/SCIM_COMPLIANCE.md) | RFC compliance matrix |
 | [docs/TECHNICAL_DESIGN_DOCUMENT.md](docs/TECHNICAL_DESIGN_DOCUMENT.md) | Architecture & design |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |

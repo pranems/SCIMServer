@@ -739,12 +739,14 @@ Since `externalId` is `caseExact: true`, the value comparison MUST be case-sensi
 
 ### Value Comparison
 
-- [x] `caseExact: false` attributes compared case-insensitively for filtering (in-code `.toLowerCase()` — SQLite compatible)
-- [x] `caseExact: false` attributes compared case-insensitively for uniqueness (`userNameLower` unique constraint for Users, `assertUniqueDisplayName()` for Groups)
+- [x] `caseExact: false` attributes compared case-insensitively for filtering (PostgreSQL CITEXT columns + Prisma `mode: 'insensitive'`)
+- [x] `caseExact: false` attributes compared case-insensitively for uniqueness (CITEXT unique constraint for Users, `assertUniqueDisplayName()` for Groups)
 - [x] `caseExact: true` attributes (`id`, `externalId`, `password`) compared case-sensitively
 - [x] `members[].value` compared case-sensitively (references `id`)
 
 ### Database Changes
+
+> **Note (v0.17.0+):** The `ScimUser`/`ScimGroup` models and `userNameLower`/`displayNameLower` columns described below were superseded by the unified `ScimResource` model (Phase 3, v0.17.0). Case-insensitive uniqueness is now handled by PostgreSQL CITEXT column type on `userName` and `displayName`. The items below are preserved for historical context.
 
 - [x] Added `userNameLower` column to `ScimUser` model (Prisma schema)
 - [x] Unique constraint moved from `[endpointId, userName]` to `[endpointId, userNameLower]`
@@ -757,7 +759,7 @@ Since `externalId` is `caseExact: true`, the value comparison MUST be case-sensi
 - [x] Group filter `displayName eq` now uses DB push-down via `displayNameLower` column (no longer in-memory scan) — introduced in v0.9.1, current in v0.10.0
 - [x] `assertUniqueDisplayName` refactored from `findMany` O(N) to `findFirst` O(1) using `displayNameLower` index — introduced in v0.9.1, current in v0.10.0
 - [x] ServiceProviderConfig: `sort.supported` set to `false`
-- [x] In-code filtering for case-insensitive userName/displayName (SQLite doesn't support Prisma `mode: 'insensitive'`)
+- [x] In-code filtering for case-insensitive userName/displayName (PostgreSQL CITEXT column type handles case-insensitive matching natively)
 - [x] `externalId` column changed from `@db.Citext` to `@db.Text` — case-sensitive per RFC 7643 §3.1 (`caseExact: true`). Migration: `20260225181836_externalid_citext_to_text`. See `EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md`.
 - [x] Filter engine `ColumnType` expanded: `'text'` type added — `co`/`sw`/`ew` operators on `text` columns omit `mode: 'insensitive'` (case-sensitive matching)
 

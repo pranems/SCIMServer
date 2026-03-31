@@ -44,9 +44,9 @@
                                                      └──────────────────────────┘
 ```
 
-> **Phase 3 Change:** The SQLite ephemeral database + Blob Storage snapshot backup
-> architecture has been replaced by a managed Azure PG Flexible Server. Data is now
-> durable, backed up automatically (7-day PITR), and supports multi-replica scaling.
+> **Note:** SCIMServer uses PostgreSQL 17 as its persistence backend with Azure-managed
+> automated daily backups (7-day PITR). For sovereign/gov cloud deployments, see
+> [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md).
 
 ### Azure Resource Architecture
 
@@ -517,10 +517,10 @@ When a new version notification appears in the web dashboard:
 ```powershell
 # Auto-discovery (finds your RG and App automatically)
 iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-func.ps1'); `
-  Update-SCIMServer -Version v0.24.0
+  Update-SCIMServer -Version v0.31.0
 
 # Explicit (if multiple deployments)
-Update-SCIMServer -Version v0.24.0 -ResourceGroup scimserver-rg -AppName scimserver-prod
+Update-SCIMServer -Version v0.31.0 -ResourceGroup scimserver-rg -AppName scimserver-prod
 ```
 
 ### Manual Image Update
@@ -529,7 +529,7 @@ Update-SCIMServer -Version v0.24.0 -ResourceGroup scimserver-rg -AppName scimser
 az containerapp update `
   -n scimserver-prod `
   -g scimserver-rg `
-  --image ghcr.io/pranems/scimserver:0.24.0
+  --image ghcr.io/pranems/scimserver:latest
 ```
 
 ### View Logs
