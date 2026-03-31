@@ -1,5 +1,6 @@
 {
   "schemas": ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
+  "failOnErrors": 5,
   "Operations": [
     {
       "method": "POST",

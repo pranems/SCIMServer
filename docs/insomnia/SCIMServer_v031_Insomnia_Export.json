@@ -1,0 +1,143 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-03-31T00:00:00.000Z",
+  "__export_source": "SCIMServer docs generator v0.31.0",
+  "resources": [
+    {
+      "_id": "wrk_scimserver",
+      "_type": "workspace",
+      "name": "SCIMServer v0.31.0 — Complete API",
+      "description": "All 76 endpoints across 18 controllers. Set base_url, token, endpoint_id, user_id, group_id in environment.",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_local",
+      "_type": "environment",
+      "parentId": "wrk_scimserver",
+      "name": "Local (port 6000)",
+      "data": {
+        "base_url": "http://localhost:6000/scim",
+        "token": "local-secret",
+        "oauth_client_secret": "localoauthsecret123",
+        "endpoint_id": "",
+        "user_id": "",
+        "group_id": "",
+        "credential_id": ""
+      }
+    },
+    {
+      "_id": "env_docker",
+      "_type": "environment",
+      "parentId": "wrk_scimserver",
+      "name": "Docker (port 8080)",
+      "data": {
+        "base_url": "http://localhost:8080/scim",
+        "token": "docker-secret",
+        "oauth_client_secret": "localoauthsecret123",
+        "endpoint_id": "",
+        "user_id": "",
+        "group_id": "",
+        "credential_id": ""
+      }
+    },
+    { "_id": "fld_health", "_type": "request_group", "parentId": "wrk_scimserver", "name": "01 — Health & OAuth" },
+    { "_id": "fld_endpoints", "_type": "request_group", "parentId": "wrk_scimserver", "name": "02 — Admin Endpoints" },
+    { "_id": "fld_creds", "_type": "request_group", "parentId": "wrk_scimserver", "name": "03 — Admin Credentials" },
+    { "_id": "fld_disc_root", "_type": "request_group", "parentId": "wrk_scimserver", "name": "04 — Discovery (Root)" },
+    { "_id": "fld_disc_ep", "_type": "request_group", "parentId": "wrk_scimserver", "name": "05 — Discovery (Endpoint)" },
+    { "_id": "fld_users", "_type": "request_group", "parentId": "wrk_scimserver", "name": "06 — SCIM Users" },
+    { "_id": "fld_groups", "_type": "request_group", "parentId": "wrk_scimserver", "name": "07 — SCIM Groups" },
+    { "_id": "fld_me", "_type": "request_group", "parentId": "wrk_scimserver", "name": "08 — SCIM /Me" },
+    { "_id": "fld_bulk", "_type": "request_group", "parentId": "wrk_scimserver", "name": "09 — SCIM Bulk" },
+    { "_id": "fld_admin_gen", "_type": "request_group", "parentId": "wrk_scimserver", "name": "10 — Admin General" },
+    { "_id": "fld_log_config", "_type": "request_group", "parentId": "wrk_scimserver", "name": "11 — Log Config" },
+    { "_id": "fld_database", "_type": "request_group", "parentId": "wrk_scimserver", "name": "12 — Database Browser" },
+    { "_id": "fld_activity", "_type": "request_group", "parentId": "wrk_scimserver", "name": "13 — Activity Feed" },
+
+    { "_id": "req_health", "_type": "request", "parentId": "fld_health", "name": "GET Health", "method": "GET", "url": "{{ _.base_url }}/health", "authentication": {} },
+    { "_id": "req_oauth_test", "_type": "request", "parentId": "fld_health", "name": "GET OAuth Test", "method": "GET", "url": "{{ _.base_url }}/oauth/test", "authentication": {} },
+    { "_id": "req_oauth_token", "_type": "request", "parentId": "fld_health", "name": "POST OAuth Token", "method": "POST", "url": "{{ _.base_url }}/oauth/token", "authentication": {}, "headers": [{ "name": "Content-Type", "value": "application/json" }], "body": { "mimeType": "application/json", "text": "{\n  \"grant_type\": \"client_credentials\",\n  \"client_id\": \"scimserver-client\",\n  \"client_secret\": \"{{ _.oauth_client_secret }}\",\n  \"scope\": \"scim\"\n}" } },
+
+    { "_id": "req_ep_create", "_type": "request", "parentId": "fld_endpoints", "name": "POST Create Endpoint", "method": "POST", "url": "{{ _.base_url }}/admin/endpoints", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/json" }], "body": { "mimeType": "application/json", "text": "{\n  \"name\": \"test-endpoint\",\n  \"displayName\": \"Test Endpoint\",\n  \"profilePreset\": \"entra-id\"\n}" } },
+    { "_id": "req_ep_list", "_type": "request", "parentId": "fld_endpoints", "name": "GET List Endpoints", "method": "GET", "url": "{{ _.base_url }}/admin/endpoints?view=summary", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_ep_presets", "_type": "request", "parentId": "fld_endpoints", "name": "GET List Presets", "method": "GET", "url": "{{ _.base_url }}/admin/endpoints/presets", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_ep_preset_detail", "_type": "request", "parentId": "fld_endpoints", "name": "GET Preset (entra-id)", "method": "GET", "url": "{{ _.base_url }}/admin/endpoints/presets/entra-id", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_ep_get", "_type": "request", "parentId": "fld_endpoints", "name": "GET Endpoint by ID", "method": "GET", "url": "{{ _.base_url }}/admin/endpoints/{{ _.endpoint_id }}?view=full", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_ep_byname", "_type": "request", "parentId": "fld_endpoints", "name": "GET Endpoint by Name", "method": "GET", "url": "{{ _.base_url }}/admin/endpoints/by-name/test-endpoint", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_ep_patch", "_type": "request", "parentId": "fld_endpoints", "name": "PATCH Update Endpoint", "method": "PATCH", "url": "{{ _.base_url }}/admin/endpoints/{{ _.endpoint_id }}", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/json" }], "body": { "mimeType": "application/json", "text": "{\n  \"displayName\": \"Updated\",\n  \"profile\": { \"settings\": { \"SoftDeleteEnabled\": \"True\" } }\n}" } },
+    { "_id": "req_ep_stats", "_type": "request", "parentId": "fld_endpoints", "name": "GET Endpoint Stats", "method": "GET", "url": "{{ _.base_url }}/admin/endpoints/{{ _.endpoint_id }}/stats", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_ep_delete", "_type": "request", "parentId": "fld_endpoints", "name": "DELETE Endpoint", "method": "DELETE", "url": "{{ _.base_url }}/admin/endpoints/{{ _.endpoint_id }}", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+
+    { "_id": "req_cred_create", "_type": "request", "parentId": "fld_creds", "name": "POST Create Credential", "method": "POST", "url": "{{ _.base_url }}/admin/endpoints/{{ _.endpoint_id }}/credentials", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/json" }], "body": { "mimeType": "application/json", "text": "{\n  \"label\": \"Test credential\",\n  \"credentialType\": \"bearer\"\n}" } },
+    { "_id": "req_cred_list", "_type": "request", "parentId": "fld_creds", "name": "GET List Credentials", "method": "GET", "url": "{{ _.base_url }}/admin/endpoints/{{ _.endpoint_id }}/credentials", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_cred_revoke", "_type": "request", "parentId": "fld_creds", "name": "DELETE Revoke Credential", "method": "DELETE", "url": "{{ _.base_url }}/admin/endpoints/{{ _.endpoint_id }}/credentials/{{ _.credential_id }}", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+
+    { "_id": "req_dr_spc", "_type": "request", "parentId": "fld_disc_root", "name": "GET ServiceProviderConfig", "method": "GET", "url": "{{ _.base_url }}/ServiceProviderConfig", "authentication": {} },
+    { "_id": "req_dr_schemas", "_type": "request", "parentId": "fld_disc_root", "name": "GET Schemas", "method": "GET", "url": "{{ _.base_url }}/Schemas", "authentication": {} },
+    { "_id": "req_dr_schema", "_type": "request", "parentId": "fld_disc_root", "name": "GET Schema (User)", "method": "GET", "url": "{{ _.base_url }}/Schemas/urn:ietf:params:scim:schemas:core:2.0:User", "authentication": {} },
+    { "_id": "req_dr_rts", "_type": "request", "parentId": "fld_disc_root", "name": "GET ResourceTypes", "method": "GET", "url": "{{ _.base_url }}/ResourceTypes", "authentication": {} },
+    { "_id": "req_dr_rt", "_type": "request", "parentId": "fld_disc_root", "name": "GET ResourceType (User)", "method": "GET", "url": "{{ _.base_url }}/ResourceTypes/User", "authentication": {} },
+
+    { "_id": "req_de_spc", "_type": "request", "parentId": "fld_disc_ep", "name": "GET Endpoint SPC", "method": "GET", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/ServiceProviderConfig", "authentication": {} },
+    { "_id": "req_de_schemas", "_type": "request", "parentId": "fld_disc_ep", "name": "GET Endpoint Schemas", "method": "GET", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Schemas", "authentication": {} },
+    { "_id": "req_de_schema", "_type": "request", "parentId": "fld_disc_ep", "name": "GET Endpoint Schema by URN", "method": "GET", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Schemas/urn:ietf:params:scim:schemas:core:2.0:User", "authentication": {} },
+    { "_id": "req_de_rts", "_type": "request", "parentId": "fld_disc_ep", "name": "GET Endpoint ResourceTypes", "method": "GET", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/ResourceTypes", "authentication": {} },
+    { "_id": "req_de_rt", "_type": "request", "parentId": "fld_disc_ep", "name": "GET Endpoint ResourceType", "method": "GET", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/ResourceTypes/User", "authentication": {} },
+
+    { "_id": "req_u_create", "_type": "request", "parentId": "fld_users", "name": "POST Create User", "method": "POST", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Users", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/scim+json" }], "body": { "mimeType": "application/json", "text": "{\n  \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:User\"],\n  \"userName\": \"jdoe@example.com\",\n  \"externalId\": \"ext-001\",\n  \"name\": { \"givenName\": \"John\", \"familyName\": \"Doe\" },\n  \"displayName\": \"John Doe\",\n  \"emails\": [{ \"value\": \"jdoe@example.com\", \"type\": \"work\", \"primary\": true }],\n  \"active\": true\n}" } },
+    { "_id": "req_u_list", "_type": "request", "parentId": "fld_users", "name": "GET List Users", "method": "GET", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Users?startIndex=1&count=10", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_u_filter", "_type": "request", "parentId": "fld_users", "name": "GET Filter Users", "method": "GET", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Users?filter=userName eq \"jdoe@example.com\"", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_u_attrs", "_type": "request", "parentId": "fld_users", "name": "GET Users (attributes)", "method": "GET", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Users?attributes=userName,displayName", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_u_sort", "_type": "request", "parentId": "fld_users", "name": "GET Users (sorted)", "method": "GET", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Users?sortBy=userName&sortOrder=ascending", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_u_search", "_type": "request", "parentId": "fld_users", "name": "POST Search Users", "method": "POST", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Users/.search", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/scim+json" }], "body": { "mimeType": "application/json", "text": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:SearchRequest\"],\n  \"filter\": \"displayName co \\\"John\\\"\",\n  \"startIndex\": 1,\n  \"count\": 25\n}" } },
+    { "_id": "req_u_get", "_type": "request", "parentId": "fld_users", "name": "GET User by ID", "method": "GET", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Users/{{ _.user_id }}", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_u_put", "_type": "request", "parentId": "fld_users", "name": "PUT Replace User", "method": "PUT", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Users/{{ _.user_id }}", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/scim+json" }, { "name": "If-Match", "value": "W/\"1\"" }], "body": { "mimeType": "application/json", "text": "{\n  \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:User\"],\n  \"userName\": \"jdoe@example.com\",\n  \"displayName\": \"John Updated\",\n  \"active\": true\n}" } },
+    { "_id": "req_u_patch", "_type": "request", "parentId": "fld_users", "name": "PATCH User", "method": "PATCH", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Users/{{ _.user_id }}", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/scim+json" }], "body": { "mimeType": "application/json", "text": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\n  \"Operations\": [\n    { \"op\": \"replace\", \"path\": \"displayName\", \"value\": \"Jane Doe\" }\n  ]\n}" } },
+    { "_id": "req_u_delete", "_type": "request", "parentId": "fld_users", "name": "DELETE User", "method": "DELETE", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Users/{{ _.user_id }}", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+
+    { "_id": "req_g_create", "_type": "request", "parentId": "fld_groups", "name": "POST Create Group", "method": "POST", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Groups", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/scim+json" }], "body": { "mimeType": "application/json", "text": "{\n  \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:Group\"],\n  \"displayName\": \"Engineering\",\n  \"members\": []\n}" } },
+    { "_id": "req_g_list", "_type": "request", "parentId": "fld_groups", "name": "GET List Groups", "method": "GET", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Groups?startIndex=1&count=10", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_g_search", "_type": "request", "parentId": "fld_groups", "name": "POST Search Groups", "method": "POST", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Groups/.search", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/scim+json" }], "body": { "mimeType": "application/json", "text": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:SearchRequest\"],\n  \"filter\": \"displayName eq \\\"Engineering\\\"\"\n}" } },
+    { "_id": "req_g_get", "_type": "request", "parentId": "fld_groups", "name": "GET Group by ID", "method": "GET", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Groups/{{ _.group_id }}", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_g_put", "_type": "request", "parentId": "fld_groups", "name": "PUT Replace Group", "method": "PUT", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Groups/{{ _.group_id }}", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/scim+json" }, { "name": "If-Match", "value": "W/\"1\"" }], "body": { "mimeType": "application/json", "text": "{\n  \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:Group\"],\n  \"displayName\": \"Engineering Updated\"\n}" } },
+    { "_id": "req_g_patch_add", "_type": "request", "parentId": "fld_groups", "name": "PATCH Add Members", "method": "PATCH", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Groups/{{ _.group_id }}", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/scim+json" }], "body": { "mimeType": "application/json", "text": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\n  \"Operations\": [\n    { \"op\": \"add\", \"path\": \"members\", \"value\": [{ \"value\": \"{{ _.user_id }}\" }] }\n  ]\n}" } },
+    { "_id": "req_g_patch_rm", "_type": "request", "parentId": "fld_groups", "name": "PATCH Remove Member", "method": "PATCH", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Groups/{{ _.group_id }}", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/scim+json" }], "body": { "mimeType": "application/json", "text": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\n  \"Operations\": [\n    { \"op\": \"remove\", \"path\": \"members[value eq \\\"{{ _.user_id }}\\\"]\" }\n  ]\n}" } },
+    { "_id": "req_g_delete", "_type": "request", "parentId": "fld_groups", "name": "DELETE Group", "method": "DELETE", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Groups/{{ _.group_id }}", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+
+    { "_id": "req_me_get", "_type": "request", "parentId": "fld_me", "name": "GET /Me", "method": "GET", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Me", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "description": "Requires OAuth JWT with sub claim" },
+    { "_id": "req_me_put", "_type": "request", "parentId": "fld_me", "name": "PUT /Me", "method": "PUT", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Me", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/scim+json" }], "body": { "mimeType": "application/json", "text": "{\n  \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:User\"],\n  \"userName\": \"me@example.com\",\n  \"displayName\": \"Updated Me\"\n}" } },
+    { "_id": "req_me_patch", "_type": "request", "parentId": "fld_me", "name": "PATCH /Me", "method": "PATCH", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Me", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/scim+json" }], "body": { "mimeType": "application/json", "text": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\n  \"Operations\": [{ \"op\": \"replace\", \"path\": \"displayName\", \"value\": \"New Me\" }]\n}" } },
+    { "_id": "req_me_delete", "_type": "request", "parentId": "fld_me", "name": "DELETE /Me", "method": "DELETE", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Me", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+
+    { "_id": "req_bulk", "_type": "request", "parentId": "fld_bulk", "name": "POST Bulk Operations", "method": "POST", "url": "{{ _.base_url }}/endpoints/{{ _.endpoint_id }}/Bulk", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/scim+json" }], "body": { "mimeType": "application/json", "text": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:BulkRequest\"],\n  \"failOnErrors\": 5,\n  \"Operations\": [\n    {\n      \"method\": \"POST\",\n      \"path\": \"/Users\",\n      \"bulkId\": \"user-1\",\n      \"data\": {\n        \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:User\"],\n        \"userName\": \"bulk1@example.com\",\n        \"displayName\": \"Bulk User 1\"\n      }\n    }\n  ]\n}" } },
+
+    { "_id": "req_version", "_type": "request", "parentId": "fld_admin_gen", "name": "GET Version", "method": "GET", "url": "{{ _.base_url }}/admin/version", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_logs", "_type": "request", "parentId": "fld_admin_gen", "name": "GET Logs", "method": "GET", "url": "{{ _.base_url }}/admin/logs?page=1&pageSize=20&hideKeepalive=true", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_log_entry", "_type": "request", "parentId": "fld_admin_gen", "name": "GET Log Entry", "method": "GET", "url": "{{ _.base_url }}/admin/logs/1", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_logs_clear", "_type": "request", "parentId": "fld_admin_gen", "name": "POST Clear Logs", "method": "POST", "url": "{{ _.base_url }}/admin/logs/clear", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_manual_user", "_type": "request", "parentId": "fld_admin_gen", "name": "POST Manual User", "method": "POST", "url": "{{ _.base_url }}/admin/users/manual", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/json" }], "body": { "mimeType": "application/json", "text": "{\n  \"userName\": \"manual@example.com\",\n  \"displayName\": \"Manual User\",\n  \"email\": \"manual@example.com\",\n  \"active\": true\n}" } },
+    { "_id": "req_manual_group", "_type": "request", "parentId": "fld_admin_gen", "name": "POST Manual Group", "method": "POST", "url": "{{ _.base_url }}/admin/groups/manual", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/json" }], "body": { "mimeType": "application/json", "text": "{\n  \"displayName\": \"Manual Group\"\n}" } },
+    { "_id": "req_admin_del_user", "_type": "request", "parentId": "fld_admin_gen", "name": "POST Delete User (admin)", "method": "POST", "url": "{{ _.base_url }}/admin/users/{{ _.user_id }}/delete", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+
+    { "_id": "req_lc_get", "_type": "request", "parentId": "fld_log_config", "name": "GET Log Config", "method": "GET", "url": "{{ _.base_url }}/admin/log-config", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_lc_put", "_type": "request", "parentId": "fld_log_config", "name": "PUT Update Config", "method": "PUT", "url": "{{ _.base_url }}/admin/log-config", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/json" }], "body": { "mimeType": "application/json", "text": "{\n  \"globalLevel\": \"DEBUG\",\n  \"includePayloads\": true\n}" } },
+    { "_id": "req_lc_level", "_type": "request", "parentId": "fld_log_config", "name": "PUT Set Global Level", "method": "PUT", "url": "{{ _.base_url }}/admin/log-config/level/INFO", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_lc_cat", "_type": "request", "parentId": "fld_log_config", "name": "PUT Set Category Level", "method": "PUT", "url": "{{ _.base_url }}/admin/log-config/category/scim.patch/DEBUG", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_lc_ep_set", "_type": "request", "parentId": "fld_log_config", "name": "PUT Set Endpoint Level", "method": "PUT", "url": "{{ _.base_url }}/admin/log-config/endpoint/{{ _.endpoint_id }}/TRACE", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_lc_ep_del", "_type": "request", "parentId": "fld_log_config", "name": "DELETE Clear Endpoint Level", "method": "DELETE", "url": "{{ _.base_url }}/admin/log-config/endpoint/{{ _.endpoint_id }}", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_lc_recent", "_type": "request", "parentId": "fld_log_config", "name": "GET Recent Logs", "method": "GET", "url": "{{ _.base_url }}/admin/log-config/recent?limit=50", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_lc_recent_del", "_type": "request", "parentId": "fld_log_config", "name": "DELETE Clear Buffer", "method": "DELETE", "url": "{{ _.base_url }}/admin/log-config/recent", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_lc_stream", "_type": "request", "parentId": "fld_log_config", "name": "GET Stream (SSE)", "method": "GET", "url": "{{ _.base_url }}/admin/log-config/stream?level=INFO", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_lc_download", "_type": "request", "parentId": "fld_log_config", "name": "GET Download (JSON)", "method": "GET", "url": "{{ _.base_url }}/admin/log-config/download?format=json&limit=100", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+
+    { "_id": "req_db_users", "_type": "request", "parentId": "fld_database", "name": "GET Browse Users", "method": "GET", "url": "{{ _.base_url }}/admin/database/users?page=1&limit=50", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_db_user", "_type": "request", "parentId": "fld_database", "name": "GET User Detail", "method": "GET", "url": "{{ _.base_url }}/admin/database/users/{{ _.user_id }}", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_db_groups", "_type": "request", "parentId": "fld_database", "name": "GET Browse Groups", "method": "GET", "url": "{{ _.base_url }}/admin/database/groups?page=1&limit=50", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_db_group", "_type": "request", "parentId": "fld_database", "name": "GET Group Detail", "method": "GET", "url": "{{ _.base_url }}/admin/database/groups/{{ _.group_id }}", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_db_stats", "_type": "request", "parentId": "fld_database", "name": "GET Database Statistics", "method": "GET", "url": "{{ _.base_url }}/admin/database/statistics", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+
+    { "_id": "req_act_list", "_type": "request", "parentId": "fld_activity", "name": "GET Activities", "method": "GET", "url": "{{ _.base_url }}/admin/activity?page=1&limit=50&hideKeepalive=true", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
+    { "_id": "req_act_summary", "_type": "request", "parentId": "fld_activity", "name": "GET Activity Summary", "method": "GET", "url": "{{ _.base_url }}/admin/activity/summary", "authentication": { "type": "bearer", "token": "{{ _.token }}" } }
+  ]
+}

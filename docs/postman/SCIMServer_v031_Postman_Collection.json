@@ -1,0 +1,248 @@
+{
+  "info": {
+    "name": "SCIMServer v0.31.0 — Complete API Collection",
+    "_postman_id": "scimserver-v031-complete",
+    "description": "Complete Postman collection for SCIMServer v0.31.0 — all 76 endpoints across 18 controllers.\n\nSet collection variables:\n- baseUrl: http://localhost:6000/scim\n- token: your bearer token or shared secret\n- endpointId: UUID of target endpoint\n- userId: UUID of target user\n- groupId: UUID of target group",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:6000/scim", "type": "string" },
+    { "key": "token", "value": "local-secret", "type": "string" },
+    { "key": "endpointId", "value": "", "type": "string" },
+    { "key": "userId", "value": "", "type": "string" },
+    { "key": "groupId", "value": "", "type": "string" },
+    { "key": "credentialId", "value": "", "type": "string" },
+    { "key": "oauthClientSecret", "value": "localoauthsecret123", "type": "string" }
+  ],
+  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+  "item": [
+    {
+      "name": "01 — Health & OAuth",
+      "item": [
+        {
+          "name": "GET Health Check",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] }, "auth": { "type": "noauth" } }
+        },
+        {
+          "name": "GET OAuth Test",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/oauth/test", "host": ["{{baseUrl}}"], "path": ["oauth", "test"] }, "auth": { "type": "noauth" } }
+        },
+        {
+          "name": "POST OAuth Token",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/oauth/token", "host": ["{{baseUrl}}"], "path": ["oauth", "token"] },
+            "auth": { "type": "noauth" },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"grant_type\": \"client_credentials\",\n  \"client_id\": \"scimserver-client\",\n  \"client_secret\": \"{{oauthClientSecret}}\",\n  \"scope\": \"scim\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 — Admin Endpoint Management",
+      "item": [
+        {
+          "name": "POST Create Endpoint",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/admin/endpoints", "host": ["{{baseUrl}}"], "path": ["admin", "endpoints"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"test-endpoint\",\n  \"displayName\": \"Test Endpoint\",\n  \"description\": \"Created via Postman\",\n  \"profilePreset\": \"entra-id\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["var json = pm.response.json();", "if (json.id) pm.collectionVariables.set('endpointId', json.id);"] } }]
+        },
+        {
+          "name": "GET List Endpoints",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/endpoints?view=summary", "host": ["{{baseUrl}}"], "path": ["admin", "endpoints"], "query": [{ "key": "view", "value": "summary" }] } }
+        },
+        {
+          "name": "GET List Endpoints (active only)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/endpoints?active=true&view=summary", "host": ["{{baseUrl}}"], "path": ["admin", "endpoints"], "query": [{ "key": "active", "value": "true" }, { "key": "view", "value": "summary" }] } }
+        },
+        {
+          "name": "GET List Presets",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/endpoints/presets", "host": ["{{baseUrl}}"], "path": ["admin", "endpoints", "presets"] } }
+        },
+        {
+          "name": "GET Preset Detail (entra-id)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/endpoints/presets/entra-id", "host": ["{{baseUrl}}"], "path": ["admin", "endpoints", "presets", "entra-id"] } }
+        },
+        {
+          "name": "GET Endpoint by ID",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/endpoints/{{endpointId}}?view=full", "host": ["{{baseUrl}}"], "path": ["admin", "endpoints", "{{endpointId}}"], "query": [{ "key": "view", "value": "full" }] } }
+        },
+        {
+          "name": "GET Endpoint by Name",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/endpoints/by-name/test-endpoint", "host": ["{{baseUrl}}"], "path": ["admin", "endpoints", "by-name", "test-endpoint"] } }
+        },
+        {
+          "name": "PATCH Update Endpoint",
+          "request": {
+            "method": "PATCH",
+            "url": { "raw": "{{baseUrl}}/admin/endpoints/{{endpointId}}", "host": ["{{baseUrl}}"], "path": ["admin", "endpoints", "{{endpointId}}"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"displayName\": \"Updated Endpoint\",\n  \"profile\": {\n    \"settings\": {\n      \"SoftDeleteEnabled\": \"True\"\n    }\n  }\n}" }
+          }
+        },
+        {
+          "name": "GET Endpoint Stats",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/endpoints/{{endpointId}}/stats", "host": ["{{baseUrl}}"], "path": ["admin", "endpoints", "{{endpointId}}", "stats"] } }
+        },
+        {
+          "name": "DELETE Endpoint",
+          "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/admin/endpoints/{{endpointId}}", "host": ["{{baseUrl}}"], "path": ["admin", "endpoints", "{{endpointId}}"] } }
+        }
+      ]
+    },
+    {
+      "name": "03 — Admin Credentials",
+      "item": [
+        {
+          "name": "POST Create Credential",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/admin/endpoints/{{endpointId}}/credentials", "host": ["{{baseUrl}}"], "path": ["admin", "endpoints", "{{endpointId}}", "credentials"] },
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"label\": \"Postman test credential\",\n  \"credentialType\": \"bearer\"\n}" }
+          },
+          "event": [{ "listen": "test", "script": { "exec": ["var json = pm.response.json();", "if (json.id) pm.collectionVariables.set('credentialId', json.id);", "if (json.token) console.log('Save this token:', json.token);"] } }]
+        },
+        {
+          "name": "GET List Credentials",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/endpoints/{{endpointId}}/credentials", "host": ["{{baseUrl}}"], "path": ["admin", "endpoints", "{{endpointId}}", "credentials"] } }
+        },
+        {
+          "name": "DELETE Revoke Credential",
+          "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/admin/endpoints/{{endpointId}}/credentials/{{credentialId}}", "host": ["{{baseUrl}}"], "path": ["admin", "endpoints", "{{endpointId}}", "credentials", "{{credentialId}}"] } }
+        }
+      ]
+    },
+    {
+      "name": "04 — Discovery (Root)",
+      "item": [
+        { "name": "GET ServiceProviderConfig", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/ServiceProviderConfig", "host": ["{{baseUrl}}"], "path": ["ServiceProviderConfig"] }, "auth": { "type": "noauth" } } },
+        { "name": "GET Schemas", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/Schemas", "host": ["{{baseUrl}}"], "path": ["Schemas"] }, "auth": { "type": "noauth" } } },
+        { "name": "GET Schema (User)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/Schemas/urn:ietf:params:scim:schemas:core:2.0:User", "host": ["{{baseUrl}}"], "path": ["Schemas", "urn:ietf:params:scim:schemas:core:2.0:User"] }, "auth": { "type": "noauth" } } },
+        { "name": "GET ResourceTypes", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/ResourceTypes", "host": ["{{baseUrl}}"], "path": ["ResourceTypes"] }, "auth": { "type": "noauth" } } },
+        { "name": "GET ResourceType (User)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/ResourceTypes/User", "host": ["{{baseUrl}}"], "path": ["ResourceTypes", "User"] }, "auth": { "type": "noauth" } } }
+      ]
+    },
+    {
+      "name": "05 — Discovery (Endpoint-Scoped)",
+      "item": [
+        { "name": "GET Endpoint SPC", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/ServiceProviderConfig", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "ServiceProviderConfig"] }, "auth": { "type": "noauth" } } },
+        { "name": "GET Endpoint Schemas", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Schemas", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Schemas"] }, "auth": { "type": "noauth" } } },
+        { "name": "GET Endpoint Schema by URN", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Schemas/urn:ietf:params:scim:schemas:core:2.0:User", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Schemas", "urn:ietf:params:scim:schemas:core:2.0:User"] }, "auth": { "type": "noauth" } } },
+        { "name": "GET Endpoint ResourceTypes", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/ResourceTypes", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "ResourceTypes"] }, "auth": { "type": "noauth" } } },
+        { "name": "GET Endpoint ResourceType by ID", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/ResourceTypes/User", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "ResourceTypes", "User"] }, "auth": { "type": "noauth" } } }
+      ]
+    },
+    {
+      "name": "06 — SCIM Users",
+      "item": [
+        {
+          "name": "POST Create User",
+          "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Users", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Users"] }, "header": [{ "key": "Content-Type", "value": "application/scim+json" }], "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:User\"],\n  \"userName\": \"jdoe@example.com\",\n  \"externalId\": \"ext-001\",\n  \"name\": { \"givenName\": \"John\", \"familyName\": \"Doe\" },\n  \"displayName\": \"John Doe\",\n  \"emails\": [{ \"value\": \"jdoe@example.com\", \"type\": \"work\", \"primary\": true }],\n  \"active\": true\n}" } },
+          "event": [{ "listen": "test", "script": { "exec": ["var json = pm.response.json();", "if (json.id) pm.collectionVariables.set('userId', json.id);"] } }]
+        },
+        { "name": "GET List Users", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Users?startIndex=1&count=10", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Users"], "query": [{ "key": "startIndex", "value": "1" }, { "key": "count", "value": "10" }] } } },
+        { "name": "GET List Users (filter)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Users?filter=userName eq \"jdoe@example.com\"", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Users"], "query": [{ "key": "filter", "value": "userName eq \"jdoe@example.com\"" }] } } },
+        { "name": "GET List Users (attributes)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Users?attributes=userName,displayName,emails", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Users"], "query": [{ "key": "attributes", "value": "userName,displayName,emails" }] } } },
+        { "name": "GET List Users (sortBy)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Users?sortBy=userName&sortOrder=ascending", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Users"], "query": [{ "key": "sortBy", "value": "userName" }, { "key": "sortOrder", "value": "ascending" }] } } },
+        { "name": "POST Search Users", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Users/.search", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Users", ".search"] }, "header": [{ "key": "Content-Type", "value": "application/scim+json" }], "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:SearchRequest\"],\n  \"filter\": \"displayName co \\\"John\\\"\",\n  \"startIndex\": 1,\n  \"count\": 25,\n  \"attributes\": \"userName,displayName\"\n}" } } },
+        { "name": "GET User by ID", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Users", "{{userId}}"] } } },
+        { "name": "GET User (ETag)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Users", "{{userId}}"] }, "header": [{ "key": "If-None-Match", "value": "W/\"1\"" }] } },
+        { "name": "PUT Replace User", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Users", "{{userId}}"] }, "header": [{ "key": "Content-Type", "value": "application/scim+json" }, { "key": "If-Match", "value": "W/\"1\"" }], "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:User\"],\n  \"userName\": \"jdoe@example.com\",\n  \"displayName\": \"John Updated\",\n  \"active\": true\n}" } } },
+        { "name": "PATCH User (replace)", "request": { "method": "PATCH", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Users", "{{userId}}"] }, "header": [{ "key": "Content-Type", "value": "application/scim+json" }], "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\n  \"Operations\": [\n    { \"op\": \"replace\", \"path\": \"displayName\", \"value\": \"Jane Doe\" },\n    { \"op\": \"replace\", \"path\": \"active\", \"value\": false }\n  ]\n}" } } },
+        { "name": "PATCH User (add extension)", "request": { "method": "PATCH", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Users", "{{userId}}"] }, "header": [{ "key": "Content-Type", "value": "application/scim+json" }], "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\n  \"Operations\": [\n    { \"op\": \"add\", \"value\": { \"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User\": { \"department\": \"Engineering\" } } }\n  ]\n}" } } },
+        { "name": "DELETE User", "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Users", "{{userId}}"] } } }
+      ]
+    },
+    {
+      "name": "07 — SCIM Groups",
+      "item": [
+        {
+          "name": "POST Create Group",
+          "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Groups", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Groups"] }, "header": [{ "key": "Content-Type", "value": "application/scim+json" }], "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:Group\"],\n  \"displayName\": \"Engineering\",\n  \"members\": []\n}" } },
+          "event": [{ "listen": "test", "script": { "exec": ["var json = pm.response.json();", "if (json.id) pm.collectionVariables.set('groupId', json.id);"] } }]
+        },
+        { "name": "GET List Groups", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Groups?startIndex=1&count=10", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Groups"], "query": [{ "key": "startIndex", "value": "1" }, { "key": "count", "value": "10" }] } } },
+        { "name": "GET List Groups (filter)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Groups?filter=displayName eq \"Engineering\"", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Groups"], "query": [{ "key": "filter", "value": "displayName eq \"Engineering\"" }] } } },
+        { "name": "POST Search Groups", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Groups/.search", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Groups", ".search"] }, "header": [{ "key": "Content-Type", "value": "application/scim+json" }], "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:SearchRequest\"],\n  \"filter\": \"displayName co \\\"Eng\\\"\",\n  \"startIndex\": 1,\n  \"count\": 25\n}" } } },
+        { "name": "GET Group by ID", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Groups/{{groupId}}", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Groups", "{{groupId}}"] } } },
+        { "name": "PUT Replace Group", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Groups/{{groupId}}", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Groups", "{{groupId}}"] }, "header": [{ "key": "Content-Type", "value": "application/scim+json" }, { "key": "If-Match", "value": "W/\"1\"" }], "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:Group\"],\n  \"displayName\": \"Engineering Updated\",\n  \"members\": [{ \"value\": \"{{userId}}\" }]\n}" } } },
+        { "name": "PATCH Group (add members)", "request": { "method": "PATCH", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Groups/{{groupId}}", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Groups", "{{groupId}}"] }, "header": [{ "key": "Content-Type", "value": "application/scim+json" }], "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\n  \"Operations\": [\n    { \"op\": \"add\", \"path\": \"members\", \"value\": [{ \"value\": \"{{userId}}\" }] }\n  ]\n}" } } },
+        { "name": "PATCH Group (remove member)", "request": { "method": "PATCH", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Groups/{{groupId}}", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Groups", "{{groupId}}"] }, "header": [{ "key": "Content-Type", "value": "application/scim+json" }], "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\n  \"Operations\": [\n    { \"op\": \"remove\", \"path\": \"members[value eq \\\"{{userId}}\\\"]\" }\n  ]\n}" } } },
+        { "name": "DELETE Group", "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Groups/{{groupId}}", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Groups", "{{groupId}}"] } } }
+      ]
+    },
+    {
+      "name": "08 — SCIM /Me",
+      "item": [
+        { "name": "GET /Me", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Me", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Me"] }, "description": "Requires OAuth JWT with sub claim matching a userName" } },
+        { "name": "PUT /Me", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Me", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Me"] }, "header": [{ "key": "Content-Type", "value": "application/scim+json" }], "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:User\"],\n  \"userName\": \"me@example.com\",\n  \"displayName\": \"Updated Me\"\n}" } } },
+        { "name": "PATCH /Me", "request": { "method": "PATCH", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Me", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Me"] }, "header": [{ "key": "Content-Type", "value": "application/scim+json" }], "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:PatchOp\"],\n  \"Operations\": [{ \"op\": \"replace\", \"path\": \"displayName\", \"value\": \"New Name\" }]\n}" } } },
+        { "name": "DELETE /Me", "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Me", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Me"] } } }
+      ]
+    },
+    {
+      "name": "09 — SCIM Bulk",
+      "item": [
+        {
+          "name": "POST Bulk Operations",
+          "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Bulk", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Bulk"] }, "header": [{ "key": "Content-Type", "value": "application/scim+json" }], "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:api:messages:2.0:BulkRequest\"],\n  \"failOnErrors\": 5,\n  \"Operations\": [\n    {\n      \"method\": \"POST\",\n      \"path\": \"/Users\",\n      \"bulkId\": \"user-1\",\n      \"data\": {\n        \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:User\"],\n        \"userName\": \"bulk1@example.com\",\n        \"displayName\": \"Bulk User 1\"\n      }\n    },\n    {\n      \"method\": \"POST\",\n      \"path\": \"/Users\",\n      \"bulkId\": \"user-2\",\n      \"data\": {\n        \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:User\"],\n        \"userName\": \"bulk2@example.com\",\n        \"displayName\": \"Bulk User 2\"\n      }\n    }\n  ]\n}" } }
+        }
+      ]
+    },
+    {
+      "name": "10 — Admin General",
+      "item": [
+        { "name": "GET Version", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/version", "host": ["{{baseUrl}}"], "path": ["admin", "version"] } } },
+        { "name": "GET Logs", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/logs?page=1&pageSize=20&hideKeepalive=true", "host": ["{{baseUrl}}"], "path": ["admin", "logs"], "query": [{ "key": "page", "value": "1" }, { "key": "pageSize", "value": "20" }, { "key": "hideKeepalive", "value": "true" }] } } },
+        { "name": "GET Logs (filtered)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/logs?method=POST&status=201", "host": ["{{baseUrl}}"], "path": ["admin", "logs"], "query": [{ "key": "method", "value": "POST" }, { "key": "status", "value": "201" }] } } },
+        { "name": "GET Log by ID", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/logs/1", "host": ["{{baseUrl}}"], "path": ["admin", "logs", "1"] } } },
+        { "name": "POST Clear Logs", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/admin/logs/clear", "host": ["{{baseUrl}}"], "path": ["admin", "logs", "clear"] } } },
+        { "name": "POST Manual User", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/admin/users/manual", "host": ["{{baseUrl}}"], "path": ["admin", "users", "manual"] }, "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"userName\": \"manual@example.com\",\n  \"displayName\": \"Manual User\",\n  \"givenName\": \"Manual\",\n  \"familyName\": \"User\",\n  \"email\": \"manual@example.com\",\n  \"active\": true\n}" } } },
+        { "name": "POST Manual Group", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/admin/groups/manual", "host": ["{{baseUrl}}"], "path": ["admin", "groups", "manual"] }, "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"displayName\": \"Manual Group\",\n  \"memberIds\": []\n}" } } },
+        { "name": "POST Delete User (admin)", "request": { "method": "POST", "url": { "raw": "{{baseUrl}}/admin/users/{{userId}}/delete", "host": ["{{baseUrl}}"], "path": ["admin", "users", "{{userId}}", "delete"] } } }
+      ]
+    },
+    {
+      "name": "11 — Log Config",
+      "item": [
+        { "name": "GET Log Config", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/log-config", "host": ["{{baseUrl}}"], "path": ["admin", "log-config"] } } },
+        { "name": "PUT Update Log Config", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/admin/log-config", "host": ["{{baseUrl}}"], "path": ["admin", "log-config"] }, "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"globalLevel\": \"DEBUG\",\n  \"includePayloads\": true,\n  \"includeStackTraces\": false\n}" } } },
+        { "name": "PUT Set Global Level", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/admin/log-config/level/INFO", "host": ["{{baseUrl}}"], "path": ["admin", "log-config", "level", "INFO"] } } },
+        { "name": "PUT Set Category Level", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/admin/log-config/category/scim.patch/DEBUG", "host": ["{{baseUrl}}"], "path": ["admin", "log-config", "category", "scim.patch", "DEBUG"] } } },
+        { "name": "PUT Set Endpoint Level", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/admin/log-config/endpoint/{{endpointId}}/TRACE", "host": ["{{baseUrl}}"], "path": ["admin", "log-config", "endpoint", "{{endpointId}}", "TRACE"] } } },
+        { "name": "DELETE Clear Endpoint Level", "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/admin/log-config/endpoint/{{endpointId}}", "host": ["{{baseUrl}}"], "path": ["admin", "log-config", "endpoint", "{{endpointId}}"] } } },
+        { "name": "GET Recent Logs", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/log-config/recent?limit=50", "host": ["{{baseUrl}}"], "path": ["admin", "log-config", "recent"], "query": [{ "key": "limit", "value": "50" }] } } },
+        { "name": "GET Recent Logs (filtered)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/log-config/recent?level=ERROR&category=scim.user", "host": ["{{baseUrl}}"], "path": ["admin", "log-config", "recent"], "query": [{ "key": "level", "value": "ERROR" }, { "key": "category", "value": "scim.user" }] } } },
+        { "name": "DELETE Clear Log Buffer", "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/admin/log-config/recent", "host": ["{{baseUrl}}"], "path": ["admin", "log-config", "recent"] } } },
+        { "name": "GET Log Stream (SSE)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/log-config/stream?level=INFO", "host": ["{{baseUrl}}"], "path": ["admin", "log-config", "stream"], "query": [{ "key": "level", "value": "INFO" }] }, "description": "Server-Sent Events — keep connection open" } },
+        { "name": "GET Download Logs (JSON)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/log-config/download?format=json&limit=100", "host": ["{{baseUrl}}"], "path": ["admin", "log-config", "download"], "query": [{ "key": "format", "value": "json" }, { "key": "limit", "value": "100" }] } } },
+        { "name": "GET Download Logs (NDJSON)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/log-config/download?format=ndjson&limit=500", "host": ["{{baseUrl}}"], "path": ["admin", "log-config", "download"], "query": [{ "key": "format", "value": "ndjson" }, { "key": "limit", "value": "500" }] } } }
+      ]
+    },
+    {
+      "name": "12 — Database Browser",
+      "item": [
+        { "name": "GET Browse Users", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/database/users?page=1&limit=50", "host": ["{{baseUrl}}"], "path": ["admin", "database", "users"], "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "50" }] } } },
+        { "name": "GET Browse Users (search)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/database/users?search=john&active=true", "host": ["{{baseUrl}}"], "path": ["admin", "database", "users"], "query": [{ "key": "search", "value": "john" }, { "key": "active", "value": "true" }] } } },
+        { "name": "GET User Detail", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/database/users/{{userId}}", "host": ["{{baseUrl}}"], "path": ["admin", "database", "users", "{{userId}}"] } } },
+        { "name": "GET Browse Groups", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/database/groups?page=1&limit=50", "host": ["{{baseUrl}}"], "path": ["admin", "database", "groups"], "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "50" }] } } },
+        { "name": "GET Group Detail", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/database/groups/{{groupId}}", "host": ["{{baseUrl}}"], "path": ["admin", "database", "groups", "{{groupId}}"] } } },
+        { "name": "GET Database Statistics", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/database/statistics", "host": ["{{baseUrl}}"], "path": ["admin", "database", "statistics"] } } }
+      ]
+    },
+    {
+      "name": "13 — Activity Feed",
+      "item": [
+        { "name": "GET Activities", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/activity?page=1&limit=50&hideKeepalive=true", "host": ["{{baseUrl}}"], "path": ["admin", "activity"], "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "50" }, { "key": "hideKeepalive", "value": "true" }] } } },
+        { "name": "GET Activities (filtered)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/activity?type=user&severity=error", "host": ["{{baseUrl}}"], "path": ["admin", "activity"], "query": [{ "key": "type", "value": "user" }, { "key": "severity", "value": "error" }] } } },
+        { "name": "GET Activity Summary", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/activity/summary", "host": ["{{baseUrl}}"], "path": ["admin", "activity", "summary"] } } }
+      ]
+    }
+  ]
+}

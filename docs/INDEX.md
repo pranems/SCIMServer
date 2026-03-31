@@ -122,13 +122,13 @@
 
 | Artifact | Location | Description |
 |----------|----------|-------------|
-| OpenAPI Spec | [openapi/](openapi/) | OpenAPI 3.0 definitions (~37% coverage — SCIM + log-config endpoints) |
-| Postman Collection | [postman/](postman/) | Importable Postman collection (~35% coverage — SCIM + log-config) |
-| Insomnia Collection | [insomnia/](insomnia/) | Importable Insomnia workspace (~39% coverage — SCIM + log-config) |
+| OpenAPI Spec | [openapi/](openapi/) | OpenAPI 3.0 spec — all 76 endpoints, full schemas |
+| Postman Collection | [postman/](postman/) | Importable Postman collection — all 76 endpoints, 13 folders |
+| Insomnia Collection | [insomnia/](insomnia/) | Importable Insomnia workspace — all 76 endpoints, 13 folders |
 | Example JSONs | [examples/](examples/) | Request/response samples for all resource types |
 | Mermaid Diagrams | [create-user-sequence.mmd](create-user-sequence.mmd), [list-get-user-sequence.mmd](list-get-user-sequence.mmd) | Sequence diagrams |
 
-> **Note:** The OpenAPI spec, Postman, and Insomnia collections predate the multi-tenant endpoint architecture. They cover core SCIM operations and log-config but are missing admin endpoint management, per-endpoint credentials, /Me, custom resource types, database browser, and activity feed endpoints. See [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) for the definitive 76-endpoint reference.
+> **Note:** All collections were regenerated for v0.31.0 with full 76-endpoint coverage including multi-tenant endpoint architecture, admin management, per-endpoint credentials, /Me, custom resource types, database browser, activity feed, and structured logging.
 
 ## Archived Documentation
 
