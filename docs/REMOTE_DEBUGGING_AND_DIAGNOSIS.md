@@ -614,8 +614,6 @@ az containerapp exec \
   --command sh
 
 # Inside the container:
-# Check database
-ls -la /app/data.db
 # Check node process
 ps aux
 # Check memory

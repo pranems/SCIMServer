@@ -122,7 +122,6 @@ infra/containerapp-env.bicep                             # Environment (VNet-int
 infra/acr.bicep                                          # Azure Container Registry
 infra/networking.bicep                                   # VNet, subnets (aca-infra, aca-runtime, private-endpoints)
 infra/postgres.bicep                                     # Azure PostgreSQL Flexible Server
-infra/storage.bicep                                      # Storage account (Azure Files)
 ```
 
 ### 3.4 Legacy Files

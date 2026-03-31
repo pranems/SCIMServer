@@ -1,6 +1,6 @@
 # SCIMServer Deployment Options
 
-> Updated: March 13, 2026 · v0.28.0 · Scope: production + local deployment paths
+> Updated: March 31, 2026 · v0.31.0 · Scope: production + local deployment paths
 
 This document covers all deployment methods for SCIMServer. For the quickest start, use the Azure deployment described in the main [README.md](./README.md). For the most comprehensive Azure guide with architecture diagrams, see [docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md).
 
@@ -260,7 +260,7 @@ All data lives in `Map`-based in-memory stores. No PostgreSQL required. Data is 
 
 - **Registry**: GitHub Container Registry
 - **Image**: `ghcr.io/pranems/scimserver`
-- **Tags**: `latest`, version tags (e.g., `0.28.0`), test tags (`test-<branch>`)
+- **Tags**: `latest`, version tags (e.g., `0.31.0`), test tags (`test-<branch>`)
 - **Base**: `node:24-alpine`
 - **Size**: ~350 MB
 - **Port**: 8080 (internal)
@@ -279,10 +279,10 @@ All data lives in `Map`-based in-memory stores. No PostgreSQL required. Data is 
 ```powershell
 # Auto-discovery update
 iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/update-scimserver-func.ps1'); `
-  Update-SCIMServer -Version v0.28.0
+  Update-SCIMServer -Version v0.31.0
 
 # Or manual image update
-az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:0.28.0
+az containerapp update -n scimserver-prod -g scimserver-rg --image ghcr.io/pranems/scimserver:latest
 ```
 
 ---
@@ -328,4 +328,12 @@ After deployment, configure Microsoft Entra provisioning:
 5. **Turn Provisioning ON** → assign users/groups
 6. **Monitor** → open app URL in browser for real-time dashboard
 
-For the complete walkthrough with screenshots: [docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md)
+For the complete walkthrough: [docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md)
+
+### Additional Guides
+
+| Guide | Description |
+|-------|-------------|
+| [docs/ENDPOINT_LIFECYCLE_AND_USAGE.md](docs/ENDPOINT_LIFECYCLE_AND_USAGE.md) | Hands-on endpoint lifecycle, API recipes, common operations |
+| [docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) | Azure Government, BLEU (France), China — sovereign cloud deployment |
+| [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md) | Full REST API reference with curl/PowerShell examples |

@@ -28,8 +28,8 @@ param skuName string = 'Standard_B1ms'
 param storageSizeMB int = 32768
 
 @description('PostgreSQL version')
-@allowed(['14', '15', '16'])
-param postgresVersion string = '16'
+@allowed(['14', '15', '16', '17'])
+param postgresVersion string = '17'
 
 @description('Backup retention days (7–35)')
 param backupRetentionDays int = 7
