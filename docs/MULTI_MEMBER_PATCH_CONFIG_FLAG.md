@@ -82,8 +82,10 @@ Content-Type: application/json
   "id": "cml73w21n0005tcragsxs6ejq",
   "name": "azure-ad-integration",
   "displayName": "Azure AD Integration",
-  "config": {
-    "MultiOpPatchRequestAddMultipleMembersToGroup": "True"
+  "profile": {
+    "settings": {
+      "MultiOpPatchRequestAddMultipleMembersToGroup": "True"
+    }
   },
   "active": true,
   "scimEndpoint": "/scim/endpoints/cml73w21n0005tcragsxs6ejq",

@@ -8,10 +8,31 @@
     "profilePreset": "entra-id"
   },
 
+  "create_with_entra_id_minimal_preset": {
+    "name": "entra-minimal",
+    "displayName": "Entra ID Minimal",
+    "description": "Lightweight Entra ID preset without Enterprise extension",
+    "profilePreset": "entra-id-minimal"
+  },
+
   "create_with_rfc_standard_preset": {
     "name": "rfc-testing",
     "displayName": "RFC Standard Testing",
     "profilePreset": "rfc-standard"
+  },
+
+  "create_with_minimal_preset": {
+    "name": "minimal-testing",
+    "displayName": "Minimal Endpoint",
+    "description": "Bare-minimum user+group endpoint",
+    "profilePreset": "minimal"
+  },
+
+  "create_with_user_only_preset": {
+    "name": "user-only-endpoint",
+    "displayName": "User Only",
+    "description": "Users only — no groups support",
+    "profilePreset": "user-only"
   },
 
   "create_with_lexmark_preset": {

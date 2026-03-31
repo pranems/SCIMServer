@@ -68,14 +68,14 @@ curl -X POST http://localhost:6000/scim/admin/endpoints \
   -d '{
     "name": "my-endpoint",
     "displayName": "My Endpoint",
-    "config": { "CustomResourceTypesEnabled": "True" }
+    "profile": { "settings": { "CustomResourceTypesEnabled": "True" } }
   }'
 
 # Or update existing endpoint
 curl -X PATCH http://localhost:6000/scim/admin/endpoints/<endpointId> \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -d '{ "config": { "CustomResourceTypesEnabled": "True" } }'
+  -d '{ "profile": { "settings": { "CustomResourceTypesEnabled": "True" } } }'
 ```
 
 ### Flag Behavior

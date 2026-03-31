@@ -61,6 +61,39 @@ Same as the standard deployment, plus:
 | **Cloud-specific subscription** | Active subscription in the target sovereign cloud |
 | **Appropriate clearance** | Gov/BLEU clouds require organizational approval |
 | **Container image** | `ghcr.io/pranems/scimserver` (or mirrored to an accessible registry) |
+| **Repo clone** | Clone SCIMServer from a machine with GitHub access (see below) |
+
+### Why One-Liners Don't Work in Sovereign Clouds
+
+The standard deployment one-liners (`bootstrap.ps1`, `deploy.ps1`) download scripts from `raw.githubusercontent.com` at runtime. In sovereign/gov clouds, this domain is typically **blocked or unreachable**:
+
+| Cloud | `raw.githubusercontent.com` | `ghcr.io` | One-liners work? |
+|-------|---------------------------|-----------|------------------|
+| Azure Public | ✅ | ✅ | ✅ Yes |
+| Azure Government | Usually ✅ | Usually ✅ | Likely yes |
+| Azure China (21Vianet) | ❌ Blocked | ❌ Blocked | ❌ No |
+| Azure BLEU (France) | ❌ Likely blocked | ❌ Likely blocked | ❌ No |
+| Air-gapped | ❌ No internet | ❌ No internet | ❌ No |
+
+### Recommended: Clone + Direct Deploy
+
+```powershell
+# From a machine with GitHub access:
+git clone https://github.com/pranems/SCIMServer.git
+
+# Transfer the cloned folder to your sovereign cloud machine, then:
+cd SCIMServer
+az cloud set --name AzureUSGovernment   # or AzureChinaCloud, etc.
+az login
+
+.\scripts\deploy-azure.ps1 `
+  -ResourceGroup "scimserver-rg" `
+  -AppName "scimserver" `
+  -Location "usgovvirginia" `
+  -ProvisionPostgres
+```
+
+> No `pranems` credentials or GitHub access tokens are needed. The repo is public (MIT licensed). The deploy script auto-reads the image tag from `api/package.json` and pulls from `ghcr.io`. If `ghcr.io` is blocked, mirror the image to ACR first (see [Section 10](#10-container-registry-considerations)).
 
 ### Verify Azure CLI Cloud Support
 

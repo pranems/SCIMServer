@@ -516,12 +516,15 @@ $allUsers.Resources | ConvertTo-Json -Depth 10 | Out-File users-export.json
 │  Authorization: Bearer <shared-secret | oauth-jwt | cred>  │
 │                                                            │
 │  ENDPOINT MGMT (Admin API):                                │
-│  POST   /scim/admin/endpoints          Create              │
-│  GET    /scim/admin/endpoints          List                 │
-│  GET    /scim/admin/endpoints/:id      Get (with stats)     │
-│  PATCH  /scim/admin/endpoints/:id      Update settings      │
-│  DELETE /scim/admin/endpoints/:id      Delete (cascade!)    │
-│  GET    /scim/admin/endpoints/presets  List presets          │
+│  POST   /scim/admin/endpoints              Create           │
+│  GET    /scim/admin/endpoints              List (?view,act) │
+│  GET    /scim/admin/endpoints/:id          Get (?view)      │
+│  GET    /scim/admin/endpoints/by-name/:n   Get by name      │
+│  PATCH  /scim/admin/endpoints/:id          Update settings  │
+│  DELETE /scim/admin/endpoints/:id          Delete (cascade!)│
+│  GET    /scim/admin/endpoints/:id/stats    Endpoint stats   │
+│  GET    /scim/admin/endpoints/presets      List presets     │
+│  GET    /scim/admin/endpoints/presets/:n   Get preset detail│
 │                                                            │
 │  SCIM OPERATIONS:                                          │
 │  POST   /scim/endpoints/:id/Users           Create user    │

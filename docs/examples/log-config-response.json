@@ -31,7 +31,6 @@
     "scim.discovery",
     "endpoint",
     "database",
-    "backup",
     "oauth",
     "general"
   ]

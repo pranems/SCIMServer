@@ -84,10 +84,12 @@ This ensures complete data isolation between concurrent requests to different en
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/scim/admin/endpoints` | Create endpoint |
-| `GET` | `/scim/admin/endpoints` | List endpoints (optional `?active=true\|false`) |
-| `GET` | `/scim/admin/endpoints/{id}` | Get endpoint by ID |
-| `GET` | `/scim/admin/endpoints/by-name/{name}` | Get endpoint by name |
-| `PATCH` | `/scim/admin/endpoints/{id}` | Update endpoint (displayName, description, config, active) |
+| `GET` | `/scim/admin/endpoints` | List endpoints (optional `?active=true|false&view=summary|full`) |
+| `GET` | `/scim/admin/endpoints/{id}` | Get endpoint by ID (`?view=full|summary`) |
+| `GET` | `/scim/admin/endpoints/by-name/{name}` | Get endpoint by name (`?view=full|summary`) |
+| `GET` | `/scim/admin/endpoints/presets` | List built-in profile presets |
+| `GET` | `/scim/admin/endpoints/presets/{name}` | Get preset full profile |
+| `PATCH` | `/scim/admin/endpoints/{id}` | Update endpoint (displayName, description, profile, active) |
 | `DELETE` | `/scim/admin/endpoints/{id}` | Delete endpoint + cascade all data |
 | `GET` | `/scim/admin/endpoints/{id}/stats` | Get user/group counts |
 
@@ -146,6 +148,8 @@ curl -X POST http://localhost:6000/scim/admin/endpoints \
 | `PUT` | `/Groups/{id}` | Replace group |
 | `PATCH` | `/Groups/{id}` | Partial update group |
 | `DELETE` | `/Groups/{id}` | Delete group |
+| `GET/PUT/PATCH/DELETE` | `/Me` | Current user operations (requires OAuth JWT) |
+| `POST` | `/Bulk` | Bulk operations (requires `bulk.supported = true`) |
 | `GET` | `/Schemas` | SCIM schema definitions |
 | `GET` | `/ResourceTypes` | Resource type definitions |
 | `GET` | `/ServiceProviderConfig` | Server capability advertisement |
@@ -238,12 +242,13 @@ model Endpoint {
   name        String   @unique
   displayName String?
   description String?
-  config      String?                   // JSON config flags
+  profile     Json?                     // JSONB profile (schemas, resourceTypes, SPC, settings)
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   resources   ScimResource[]
   logs        RequestLog[]
+  credentials EndpointCredential[]
 }
 
 // ScimResource has:

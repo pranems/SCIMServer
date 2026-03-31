@@ -176,12 +176,14 @@ iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/scripts/up
 - ✅ Dev tunnel integration for public HTTPS
 - ✅ Microsoft Entra provisioning compatible
 
-## Single Entry Point
+## Deployment Entry Points
 
-**Main Script:** `setup.ps1`
-- Test local: `.\setup.ps1 -TestLocal`
-- Start tunnel: `.\setup.ps1 -StartTunnel`
-- Clear instructions for Azure Portal setup
+| Entry Point | Usage |
+|-------------|-------|
+| `bootstrap.ps1` → `setup.ps1` | `iex (iwr .../bootstrap.ps1).Content` — downloads scripts from GitHub, provisions Azure resources |
+| `deploy.ps1` | `iex (irm .../deploy.ps1)` — one-click wrapper, prompts for config, auto-provisions PostgreSQL |
+| `scripts/deploy-azure.ps1` | Core engine — full parameter control (`-ProvisionPostgres` or `-DatabaseUrl`) |
+| Local dev | `cd api && PERSISTENCE_BACKEND=inmemory npm run start:dev` |
 
 **Core Technologies:**
 - Node.js 24 & TypeScript 5.9

@@ -721,9 +721,10 @@ CMD ["node", "dist/main.js"]
 
 | Script | Purpose |
 |--------|---------|
-| `bootstrap.ps1` | One-click full deployment (VNet + PG + Container App) |
-| `deploy.ps1` | Container App update only |
-| `scripts/deploy-azure.ps1` | Full Azure resource provisioning (5-step) |
+| `bootstrap.ps1` | No-clone one-liner — downloads `setup.ps1` from GitHub, provisions full Azure stack |
+| `setup.ps1` | Interactive Azure deploy — prompts for config, downloads Bicep templates, calls `deploy-azure.ps1 -ProvisionPostgres` |
+| `deploy.ps1` | Alternative one-liner — prompts for config, downloads repo ZIP or uses local scripts, calls `deploy-azure.ps1 -ProvisionPostgres` |
+| `scripts/deploy-azure.ps1` | Core 5-step Azure provisioning (RG → Network → PG → Environment → Container App) |
 
 ---
 

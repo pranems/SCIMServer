@@ -30,7 +30,7 @@ The logging subsystem is built on four pillars:
 | **LogLevel / LogCategory** | `log-levels.ts` | Enum definitions, env-var parsing, config interface |
 | **ScimLogger** | `scim-logger.service.ts` | Singleton structured logger with AsyncLocalStorage correlation, ring buffer, level filtering, secret redaction |
 | **RequestLoggingInterceptor** | `request-logging.interceptor.ts` | NestJS global interceptor — generates/propagates `X-Request-Id`, wraps every request in a correlation context |
-| **LogConfigController** | `log-config.controller.ts` | REST admin API for runtime log management (8 endpoints) |
+| **LogConfigController** | `log-config.controller.ts` | REST admin API for runtime log management (10 endpoints) |
 
 ### Architecture Diagram
 
@@ -171,7 +171,6 @@ Each log statement belongs to a functional category for targeted filtering:
 | `scim.discovery` | `LogCategory.SCIM_DISCOVERY` | ServiceProviderConfig, ResourceTypes, Schemas |
 | `endpoint` | `LogCategory.ENDPOINT` | Endpoint management (create, activate, deactivate) |
 | `database` | `LogCategory.DATABASE` | Database / Prisma operations |
-| `backup` | `LogCategory.BACKUP` | Backup & restore operations |
 | `oauth` | `LogCategory.OAUTH` | OAuth token issuance and validation |
 | `general` | `LogCategory.GENERAL` | Uncategorized / general-purpose |
 

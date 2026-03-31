@@ -4,7 +4,7 @@
   "patch": { "supported": true },
   "bulk": {
     "supported": true,
-    "maxOperations": 100,
+    "maxOperations": 1000,
     "maxPayloadSize": 1048576
   },
   "filter": {
@@ -18,7 +18,10 @@
     {
       "type": "oauthbearertoken",
       "name": "OAuth Bearer Token",
-      "description": "Authentication via OAuth 2.0 Bearer Token (client_credentials grant)"
+      "description": "Authentication scheme using the OAuth Bearer Token Standard",
+      "specUri": "https://www.rfc-editor.org/info/rfc6750",
+      "documentationUri": "https://github.com/pranems/SCIMServer",
+      "primary": true
     }
   ],
   "meta": {

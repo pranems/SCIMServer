@@ -28,6 +28,10 @@ iex (iwr https://raw.githubusercontent.com/pranems/SCIMServer/master/bootstrap.p
 
 Prompts for Resource Group, App Name, Region, and SCIM Secret. Provisions all Azure resources automatically (VNet, Container Apps Environment, Container App, Log Analytics, PostgreSQL Flexible Server).
 
+> **How it works:** `bootstrap.ps1` downloads `setup.ps1` from GitHub → `setup.ps1` downloads `deploy-azure.ps1` + Bicep templates → calls `deploy-azure.ps1 -ProvisionPostgres`. No local repo clone needed — no credentials beyond your Azure subscription required. The container image (`ghcr.io/pranems/scimserver:latest`) is public and pulls anonymously.
+
+> **Sovereign/gov cloud users:** The one-liners download scripts from `raw.githubusercontent.com` which may be blocked in BLEU, Azure China, or air-gapped environments. Clone the repo from a machine with internet access, then run `scripts/deploy-azure.ps1` directly. See [docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md).
+
 ### Alternative One-Liner
 
 ```powershell

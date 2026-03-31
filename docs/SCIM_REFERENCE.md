@@ -1,7 +1,7 @@
 # SCIM v2 Reference & Examples
 
 > **Status**: Living reference  
-> **Last Updated**: March 1, 2026  
+> **Last Updated**: March 31, 2026  
 > **Baseline**: SCIMServer (current release)
 
 > Implementation-agnostic SCIM 2.0 API reference with runnable example payloads.
@@ -40,6 +40,11 @@
 | `PUT` | `/Groups/{id}` | Replace group |
 | `PATCH` | `/Groups/{id}` | Partial update group |
 | `DELETE` | `/Groups/{id}` | Delete group (204). Hard-delete by default; set `SoftDeleteEnabled=True` for soft-delete |
+| `POST` | `/Bulk` | Bulk operations (RFC 7644 §3.7) — requires `bulk.supported = true` |
+| `GET` | `/Me` | Get current authenticated user (requires OAuth JWT with `sub` claim) |
+| `PUT` | `/Me` | Replace current user |
+| `PATCH` | `/Me` | Partial update current user |
+| `DELETE` | `/Me` | Delete current user |
 
 ---
 
@@ -139,6 +144,8 @@
 | `count` | Page size | `count=25` |
 | `attributes` | Return only these attributes | `attributes=userName,displayName` |
 | `excludedAttributes` | Exclude these attributes | `excludedAttributes=emails,members` |
+| `sortBy` | Sort by attribute | `sortBy=userName` |
+| `sortOrder` | Sort direction | `sortOrder=ascending` or `sortOrder=descending` |
 
 ### Operators
 
@@ -152,7 +159,7 @@
 | `pr` | Present (has value) | `externalId pr` |
 | `and` / `or` / `not` | Logical operators | `userName eq "a" and active eq true` |
 
-> **SCIMServer note:** `eq` is fully implemented with case-insensitive matching. Other operators have limited support.
+> **SCIMServer note:** All filter operators (`eq`, `ne`, `co`, `sw`, `ew`, `pr`, `gt`, `ge`, `lt`, `le`) are fully implemented with case-insensitive matching per RFC 7643 §2.1. Logical operators `and`, `or`, `not` are also supported.
 
 ---
 
