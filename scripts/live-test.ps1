@@ -6976,6 +6976,198 @@ Test-Result -Success ($null -eq $stats.totalGroups) -Message "9z-D.59: Old total
 Write-Host "`n--- 9z-D: Admin Endpoint API Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-E: URN DOT-PATH CACHE + PATCH COERCION + FP-1 (v0.31.0)
+$script:currentSection = "9z-E: URN Dot-Path Cache"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-E: URN DOT-PATH CACHE + PATCH COERCION + FP-1" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Create endpoint with extension that has:
+# - returned:never top-level attr (pin) → should be stripped
+# - returned:never is ONLY attr → extension removed (FP-1)
+# - boolean active in core vs string active in extension (collision)
+$dpEpName = "dotpath-cache-$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())"
+$dpExtUrn = "urn:test:dotpath:2.0:Ext"
+$dpSecretUrn = "urn:test:dotpath:2.0:SecretOnly"
+$dpProfile = @{
+    schemas = @(
+        @{ id = "urn:ietf:params:scim:schemas:core:2.0:User"; name = "User"; attributes = "all" }
+        @{
+            id = $dpExtUrn; name = "DotPathExt"
+            attributes = @(
+                @{ name = "department"; type = "string"; multiValued = $false; required = $false; mutability = "readWrite"; returned = "default" }
+                @{ name = "pin"; type = "string"; multiValued = $false; required = $false; mutability = "writeOnly"; returned = "never" }
+                @{ name = "active"; type = "string"; multiValued = $false; required = $false; mutability = "readWrite"; returned = "default" }
+            )
+        }
+        @{
+            id = $dpSecretUrn; name = "SecretOnlyExt"
+            attributes = @(
+                @{ name = "secretToken"; type = "string"; multiValued = $false; required = $false; mutability = "writeOnly"; returned = "never" }
+            )
+        }
+    )
+    resourceTypes = @(
+        @{
+            id = "User"; name = "User"; endpoint = "/Users"
+            schema = "urn:ietf:params:scim:schemas:core:2.0:User"
+            schemaExtensions = @(
+                @{ schema = $dpExtUrn; required = $false }
+                @{ schema = $dpSecretUrn; required = $false }
+            )
+        }
+    )
+    settings = @{ AllowAndCoerceBooleanStrings = "True" }
+} | ConvertTo-Json -Depth 10
+
+$dpEpBody = @{ name = $dpEpName; profile = ($dpProfile | ConvertFrom-Json) } | ConvertTo-Json -Depth 10
+try {
+    $dpEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $dpEpBody -ContentType "application/json"
+    $dpEpId = $dpEp.id
+    $dpSBase = "$baseUrl/scim/endpoints/$dpEpId"
+    Test-Result -Success $true -Message "9z-E.1: Created dot-path cache test endpoint"
+} catch {
+    Test-Result -Success $false -Message "9z-E.1: Failed to create endpoint: $_"
+    $dpEpId = $null
+}
+
+if ($dpEpId) {
+    # --- 9z-E.2: POST with both extensions — pin stripped, secretToken ext removed entirely (FP-1) ---
+    Write-Host "`n--- PATCH Coercion + FP-1 Tests ---" -ForegroundColor Cyan
+    $dpUserBody = @{
+        schemas = @("urn:ietf:params:scim:schemas:core:2.0:User", $dpExtUrn, $dpSecretUrn)
+        userName = "dotpath-user-$(Get-Random)@test.com"
+        active = "True"
+        displayName = "DotPath Test"
+        $dpExtUrn = @{ department = "Eng"; pin = "1234"; active = "StringVal" }
+        $dpSecretUrn = @{ secretToken = "super-secret-token" }
+    } | ConvertTo-Json -Depth 5
+    try {
+        $dpUser = Invoke-RestMethod -Uri "$dpSBase/Users" -Method POST -Headers $headers -Body $dpUserBody -ContentType "application/scim+json"
+        $dpUserId = $dpUser.id
+        # Core active coerced to boolean
+        Test-Result -Success ($dpUser.active -eq $true -and $dpUser.active -is [bool]) -Message "9z-E.2: Core active coerced to boolean true"
+    } catch {
+        Test-Result -Success $false -Message "9z-E.2: POST failed: $_"
+        $dpUserId = $null
+    }
+
+    # 9z-E.3: Extension active remains string (collision precision)
+    if ($dpUserId) {
+        $extBlock = $dpUser.$dpExtUrn
+        Test-Result -Success ($extBlock.active -eq "StringVal" -and $extBlock.active -is [string]) -Message "9z-E.3: Extension active remains string (collision precision)"
+    }
+
+    # 9z-E.4: Extension pin (returned:never) stripped from response
+    if ($dpUserId) {
+        $extBlock = $dpUser.$dpExtUrn
+        Test-Result -Success ($null -eq $extBlock.pin) -Message "9z-E.4: Extension pin (returned:never) stripped from POST response"
+    }
+
+    # 9z-E.5: SecretOnly extension removed entirely (FP-1 — all attrs are returned:never)
+    if ($dpUserId) {
+        $secretExtPresent = $null -ne $dpUser.$dpSecretUrn
+        Test-Result -Success (-not $secretExtPresent) -Message "9z-E.5: FP-1 — SecretOnly extension removed entirely (all attrs returned:never)"
+    }
+
+    # 9z-E.6: schemas[] should NOT include SecretOnly URN (removed by FP-1)
+    if ($dpUserId) {
+        $schemasHasSecret = $dpUser.schemas -contains $dpSecretUrn
+        Test-Result -Success (-not $schemasHasSecret) -Message "9z-E.6: schemas[] does not include FP-1 removed extension URN"
+    }
+
+    # 9z-E.7: schemas[] SHOULD include DotPathExt URN (has visible attrs)
+    if ($dpUserId) {
+        $schemasHasDp = $dpUser.schemas -contains $dpExtUrn
+        Test-Result -Success $schemasHasDp -Message "9z-E.7: schemas[] includes extension with visible attrs"
+    }
+
+    # --- 9z-E.8–10: PATCH boolean coercion in operation values ---
+    Write-Host "`n--- PATCH Operation Value Boolean Coercion ---" -ForegroundColor Cyan
+    if ($dpUserId) {
+        # 9z-E.8: PATCH replace with no-path object value — active="False" coerced
+        $patchBody = @{
+            schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+            Operations = @(@{
+                op = "replace"
+                value = @{ active = "False"; displayName = "Patched" }
+            })
+        } | ConvertTo-Json -Depth 4
+        try {
+            $patchRes = Invoke-RestMethod -Uri "$dpSBase/Users/$dpUserId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/scim+json"
+            Test-Result -Success ($patchRes.active -eq $false -and $patchRes.active -is [bool]) -Message "9z-E.8: PATCH no-path coerces active='False' to boolean false"
+            Test-Result -Success ($patchRes.displayName -eq "Patched") -Message "9z-E.9: PATCH no-path string value preserved"
+        } catch {
+            Test-Result -Success $false -Message "9z-E.8: PATCH no-path failed: $_"
+        }
+
+        # 9z-E.10: PATCH with path — active="True" coerced
+        $patchPathBody = @{
+            schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+            Operations = @(@{
+                op = "replace"
+                path = "active"
+                value = "True"
+            })
+        } | ConvertTo-Json -Depth 4
+        try {
+            $patchPathRes = Invoke-RestMethod -Uri "$dpSBase/Users/$dpUserId" -Method PATCH -Headers $headers -Body $patchPathBody -ContentType "application/scim+json"
+            Test-Result -Success ($patchPathRes.active -eq $true -and $patchPathRes.active -is [bool]) -Message "9z-E.10: PATCH with path coerces active='True' to boolean true"
+        } catch {
+            Test-Result -Success $false -Message "9z-E.10: PATCH with path failed: $_"
+        }
+    }
+
+    # --- 9z-E.11–12: GET/LIST verify stripping persists ---
+    Write-Host "`n--- GET/LIST Verify Stripping ---" -ForegroundColor Cyan
+    if ($dpUserId) {
+        try {
+            $getRes = Invoke-RestMethod -Uri "$dpSBase/Users/$dpUserId" -Method GET -Headers $headers
+            Test-Result -Success ($null -eq $getRes.$dpExtUrn.pin) -Message "9z-E.11: GET strips returned:never pin"
+            $secretExtInGet = $null -ne $getRes.$dpSecretUrn
+            Test-Result -Success (-not $secretExtInGet) -Message "9z-E.12: GET does not include FP-1 removed extension"
+        } catch {
+            Test-Result -Success $false -Message "9z-E.11: GET failed: $_"
+        }
+    }
+
+    # --- 9z-E.13–14: Write-response projection + returned:never interaction ---
+    Write-Host "`n--- Write-Response Projection ---" -ForegroundColor Cyan
+    $projUserBody = @{
+        schemas = @("urn:ietf:params:scim:schemas:core:2.0:User", $dpExtUrn, $dpSecretUrn)
+        userName = "dotpath-proj-$(Get-Random)@test.com"
+        active = "True"
+        displayName = "Proj Test"
+        $dpExtUrn = @{ department = "QA"; pin = "5678"; active = "ProjStr" }
+        $dpSecretUrn = @{ secretToken = "proj-secret" }
+    } | ConvertTo-Json -Depth 5
+    try {
+        $projRes = Invoke-RestMethod -Uri "$dpSBase/Users?attributes=userName,displayName" -Method POST -Headers $headers -Body $projUserBody -ContentType "application/scim+json"
+        # Always-returned: id, schemas, meta should be present
+        Test-Result -Success ($null -ne $projRes.id) -Message "9z-E.13: POST+attributes= always-returned id present"
+        # Requested: userName, displayName present
+        Test-Result -Success ($null -ne $projRes.userName -and $null -ne $projRes.displayName) -Message "9z-E.14: POST+attributes= requested attrs present"
+        # Cleanup
+        if ($projRes.id) {
+            try { Invoke-RestMethod -Uri "$dpSBase/Users/$($projRes.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+        }
+    } catch {
+        Test-Result -Success $false -Message "9z-E.13: POST+attributes= failed: $_"
+    }
+
+    # Cleanup: delete test endpoint
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$dpEpId" -Method DELETE -Headers $headers | Out-Null
+        Test-Result -Success $true -Message "9z-E.cleanup: Deleted dot-path cache test endpoint"
+    } catch {
+        Test-Result -Success $false -Message "9z-E.cleanup: Failed to delete endpoint: $_"
+    }
+}
+
+Write-Host "`n--- 9z-E: URN Dot-Path Cache Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

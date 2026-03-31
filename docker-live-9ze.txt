@@ -1,0 +1,1654 @@
+
+=== STEP 1: Get OAuth Token ===
+✅ Token obtained: eyJhbGciOiJIUzI1NiIsInR5cCI6Ik...
+
+
+========================================
+TEST SECTION 1: ENDPOINT CRUD OPERATIONS
+========================================
+
+--- Test: Create Endpoint ---
+PASS: Create endpoint returned ID: 9f0b921a-5084-4bb1-8805-4ff965f233ec
+PASS: New endpoint is active by default
+PASS: scimBasePath URL is correct
+PASS: Response includes _links.self
+PASS: Response includes _links.scim
+
+--- Test: Get Endpoint by ID ---
+PASS: Get endpoint by ID returns correct data
+
+--- Test: Get Endpoint by Name ---
+PASS: Get endpoint by name returns correct data
+
+--- Test: List Endpoints ---
+PASS: List endpoints returns envelope with totalResults > 0
+PASS: List endpoints returns endpoints array with items
+
+--- Test: Update Endpoint ---
+PASS: Update endpoint displayName works
+PASS: Update endpoint description works
+
+--- Test: Get Endpoint Stats ---
+PASS: Stats includes users object
+PASS: Stats users includes total count
+PASS: Stats includes groups object
+PASS: Stats groups includes total count
+
+
+========================================
+TEST SECTION 2: CONFIG VALIDATION
+========================================
+
+--- Test: Invalid Config Value Rejected on Create ---
+PASS: Invalid config 'Yes' rejected with 400 Bad Request
+
+--- Test: Invalid Config Value Rejected on Update ---
+PASS: Invalid config 'enabled' rejected with 400 Bad Request
+
+--- Test: Valid Config Values Accepted ---
+PASS: Valid settings 'False' accepted
+PASS: Boolean true accepted as settings value
+
+--- Test: Invalid Remove Config Value Rejected on Create ---
+PASS: Invalid remove config 'Yes' rejected with 400 Bad Request
+
+--- Test: Invalid Remove Config Value Rejected on Update ---
+PASS: Invalid remove config 'enabled' rejected with 400 Bad Request
+
+--- Test: Valid Remove Config Values Accepted ---
+PASS: Valid remove settings 'False' accepted
+
+--- Test: Both Config Flags Set Together ---
+PASS: Both add and remove config flags set together
+
+--- Test: Invalid VerbosePatchSupported Config Value Rejected ---
+PASS: Invalid VerbosePatchSupported 'Yes' rejected with 400 Bad Request
+
+--- Test: Valid VerbosePatchSupported Config Value Accepted ---
+PASS: VerbosePatchSupported boolean true accepted
+
+--- Test: All Three Config Flags Set Together ---
+PASS: All three config flags set together
+
+
+========================================
+TEST SECTION 3: SCIM USER OPERATIONS
+========================================
+
+--- Test: Create User ---
+PASS: Create user returned ID: 225cf61f-2193-4d9d-ba78-5346a0ee8b9a
+PASS: User userName is correct
+PASS: User meta.resourceType is 'User'
+PASS: User meta.location is present
+PASS: User meta.location contains correct path
+PASS: User meta.created is present
+PASS: User meta.lastModified is present
+
+--- Test: Get User by ID ---
+PASS: Get user by ID returns correct data
+
+--- Test: List Users ---
+PASS: List users returns at least 1 user
+PASS: List users has correct schema
+
+--- Test: Filter Users by userName ---
+PASS: Filter by userName returns exactly 1 user
+
+--- Test: PATCH User ---
+PASS: PATCH user displayName works
+
+--- Test: PUT User (Replace) ---
+PASS: PUT user (replace) works
+
+--- Test: Deactivate User (Soft Delete) ---
+PASS: Deactivate user (active=false) works
+
+
+========================================
+TEST SECTION 3b: CASE-INSENSITIVITY (RFC 7643)
+========================================
+
+--- Test: Case-Insensitive userName Uniqueness ---
+PASS: UPPERCASE duplicate userName returns 409 (case-insensitive uniqueness)
+PASS: Mixed-case duplicate userName returns 409
+
+--- Test: Case-Insensitive Filter Attribute Names ---
+PASS: Filter with 'USERNAME' (uppercase) finds user
+PASS: Filter with 'UserName' (PascalCase) finds user
+
+--- Test: Case-Insensitive Filter Value (userName) ---
+PASS: Filter with UPPERCASE value finds user (case-insensitive)
+
+--- Test: PascalCase PATCH op Values ---
+PASS: PATCH with 'Replace' (PascalCase op) works
+PASS: PATCH with 'Add' (PascalCase op) works
+
+
+========================================
+TEST SECTION 3c: ADVANCED PATCH OPERATIONS
+========================================
+
+--- Test: PATCH with No Path (Merge) ---
+PASS: PATCH with no path merges displayName
+PASS: PATCH with no path merges active
+
+--- Test: No-Path PATCH with Case-Insensitive Keys ---
+PASS: No-path PATCH with 'DisplayName' (PascalCase key) works
+
+--- Test: PATCH with valuePath ---
+PASS: PATCH with valuePath updates emails[type eq work].value
+PASS: valuePath PATCH does not affect other email entries
+
+--- Test: PATCH with Extension URN Path ---
+PASS: PATCH with extension URN path sets department
+PASS: PATCH with extension URN replace updates department
+
+--- Test: Manager Empty-Value Removal (RFC 7644 S3.5.2.3) ---
+PASS: Manager set successfully via extension URN
+PASS: Manager removed when value is empty string (RFC 7644 S3.5.2.3)
+
+--- Test: Multiple Operations in Single PATCH ---
+PASS: Multi-op PATCH: displayName updated
+PASS: Multi-op PATCH: active set to false
+PASS: Multi-op PATCH: title added
+
+
+========================================
+TEST SECTION 3d: PAGINATION & ADVANCED FILTERING
+========================================
+
+--- Setup: Create Users for Pagination ---
+  Created pagination user 1 : a443bd26-9259-43ea-83b3-9ba09ad92f5c
+  Created pagination user 2 : 0aaef8be-7e18-4db6-b5fe-d3a384c05cea
+  Created pagination user 3 : 6b867a12-a20a-43bc-9e25-296d62215f3c
+
+--- Test: Pagination with count ---
+PASS: Pagination: itemsPerPage matches count=2
+PASS: Pagination: totalResults >= 4 (all users)
+PASS: Pagination: Resources array has 2 items
+
+--- Test: Pagination with startIndex ---
+PASS: Pagination: startIndex=2 reflected in response
+PASS: Pagination: startIndex+count returns correct page size
+
+--- Test: Filter by externalId ---
+PASS: Filter by externalId returns exactly 1 user
+PASS: Filtered user has correct externalId
+PASS: Filter with 'EXTERNALID' (uppercase attr) finds user
+
+--- Test: externalId Uniqueness ---
+PASS: Duplicate externalId returns 409 Conflict
+
+
+========================================
+TEST SECTION 3e: SCIM ID LEAK PREVENTION (Issue 16)
+========================================
+
+--- Test: POST with Client-Supplied id (Must Be Ignored) ---
+PASS: Server assigned an id: 121304c3-f588-4ad6-8e06-5a9ad3284eee
+PASS: Server-assigned id is NOT the client-supplied id
+PASS: meta.location uses server-assigned id
+PASS: meta.location does NOT use client-supplied id
+
+--- Test: GET by Server-Assigned ID ---
+PASS: GET by server-assigned id returns correct user
+
+--- Test: GET by Client-Supplied ID (Must Return 404) ---
+PASS: GET by client-supplied id returns 404 (server ignores client id)
+
+--- Test: PATCH with id in No-Path Value (Must Not Override) ---
+PASS: PATCH id remains server-assigned (not attacker value)
+PASS: PATCH does not allow id override via no-path replace
+PASS: PATCH displayName applied despite id in value
+PASS: meta.location unchanged after PATCH with id injection
+
+--- Test: PUT with Client-Supplied id (Must Be Ignored) ---
+PASS: PUT id remains server-assigned (not client value)
+PASS: PUT does not allow id override
+PASS: PUT body applied correctly despite client id
+  Cleaned up ID leak test user: 121304c3-f588-4ad6-8e06-5a9ad3284eee
+
+
+========================================
+TEST SECTION 4: SCIM GROUP OPERATIONS
+========================================
+
+--- Test: Create Group ---
+PASS: Create group returned ID: b46483da-12e9-47d9-b626-d282be528a72
+PASS: Group displayName is correct
+PASS: Group meta.resourceType is 'Group'
+PASS: Group meta.location is present
+PASS: Group meta.location contains correct path
+PASS: Group meta.created is present
+
+--- Test: Get Group by ID ---
+PASS: Get group by ID returns correct data
+
+--- Test: List Groups ---
+PASS: List groups returns at least 1 group
+
+--- Test: PATCH Group (Add Member) ---
+PASS: Group PATCH returns response body (not 204)
+PASS: PATCH add member works
+
+--- Test: PATCH Group (Remove Member) ---
+PASS: Group PATCH remove returns response body
+PASS: PATCH remove member works
+
+--- Test: PUT Group (Replace) ---
+PASS: PUT group (replace) works
+
+--- Test: Group externalId Support ---
+PASS: Group created with externalId
+PASS: Filter groups by externalId returns exactly 1 group
+
+--- Test: Group externalId Case-Sensitive Filter (RFC 7643 §3.1 caseExact=true) ---
+PASS: Filter group with UPPERCASE externalId does NOT match (TEXT case-sensitive)
+PASS: Filter group with MixedCase externalId does NOT match (TEXT case-sensitive)
+PASS: Filter with 'EXTERNALID' (uppercase attr) on Groups finds group
+PASS: Filter for non-existing group externalId returns 0
+
+--- Test: PATCH Group externalId Update ---
+PASS: PATCH group externalId update works
+
+--- Test: Group externalId Case-Exact Uniqueness ---
+PASS: Case-variant group externalId allowed (caseExact=true)
+PASS: Duplicate group externalId returns 409 Conflict
+
+
+========================================
+TEST SECTION 4b: SCIM VALIDATOR MULTI-OP PATCH
+========================================
+
+--- Test: Multi-Op PATCH User (different attributes) ---
+PASS: Multi-op PATCH: add displayName works
+PASS: Multi-op PATCH: replace title works
+
+--- Test: Multi-Op PATCH User (same attribute) ---
+PASS: Multi-op PATCH: sequential ops on same attr gives final value
+
+--- Test: DELETE Non-Existent User (Preview Test) ---
+PASS: DELETE non-existent user returns 404
+
+--- Test: DELETE Same User Twice (Preview Test) ---
+PASS: Second DELETE of same user returns 404
+
+--- Test: Multi-Op PATCH Group (add+remove member) ---
+PASS: Multi-op PATCH group: add+remove member results in 0 members
+
+--- Test: DELETE Non-Existent Group (Preview Test) ---
+PASS: DELETE non-existent group returns 404
+
+--- Test: DELETE Same Group Twice (Preview Test) ---
+PASS: Second DELETE of same group returns 404
+
+--- Test: User externalId Case-Sensitive Filter ---
+PASS: Filter user with exact-case externalId finds user (TEXT)
+PASS: Filter user with UPPERCASE externalId does NOT match (TEXT case-sensitive)
+
+
+========================================
+TEST SECTION 5: MULTI-MEMBER PATCH CONFIG FLAG
+========================================
+
+--- Create Additional Users for Multi-Member Test ---
+Created user 2 : a60dfd2f-7497-4879-bb1c-11937a62097f
+Created user 3 : 29292aa8-0dc5-4bf1-8a36-5cc2cb37cf27
+
+--- Test: Multi-Member PATCH with Flag=True ---
+PASS: Multi-member PATCH with flag=True accepted (3 members added)
+
+--- Create Endpoint Without Flag ---
+
+--- Test: Multi-Member ADD PATCH without Flag (Should Fail) ---
+PASS: Multi-member ADD without flag rejected with 400 Bad Request
+
+
+========================================
+TEST SECTION 5b: MULTI-MEMBER REMOVE CONFIG FLAG
+========================================
+
+--- Setup: Add Members Individually for Remove Test ---
+Group has 3 members before remove test
+
+--- Test: Multi-Member REMOVE without Flag (Should Fail) ---
+PASS: Multi-member REMOVE without flag rejected with 400 Bad Request
+
+--- Test: Multi-Member REMOVE with Flag=True ---
+PASS: Multi-member REMOVE with flag=True accepted (removed 2 members)
+
+
+========================================
+TEST SECTION 6: ENDPOINT ISOLATION
+========================================
+
+--- Create Second Endpoint for Isolation Test ---
+
+--- Test: Same userName in Different Endpoints ---
+PASS: Same userName created in different endpoint (isolation works)
+
+--- Test: Endpoint Data Isolation ---
+PASS: Endpoints have isolated user data
+
+
+========================================
+TEST SECTION 7: INACTIVE ENDPOINT BLOCKING
+========================================
+
+--- Create Endpoint for Inactive Testing ---
+Created test user: 60b4bd8c-1bcc-49b4-ab1a-89803fae8b9f
+
+--- Deactivate Endpoint ---
+PASS: Endpoint deactivated successfully
+
+--- Test: SCIM Operations Return 403 on Inactive Endpoint ---
+PASS: GET User returns 403 on inactive endpoint
+PASS: POST User returns 403 on inactive endpoint
+PASS: GET Groups returns 403 on inactive endpoint
+PASS: Inactive endpoint appears in active=false filter
+
+--- Test: Reactivate Endpoint ---
+PASS: Endpoint reactivated successfully
+PASS: GET User works after reactivation
+
+
+========================================
+TEST SECTION 8: SCIM DISCOVERY ENDPOINTS
+========================================
+
+--- Test: ServiceProviderConfig ---
+PASS: ServiceProviderConfig has correct schema
+
+--- Test: Schemas ---
+PASS: Schemas endpoint returns schemas
+
+--- Test: ResourceTypes ---
+PASS: ResourceTypes endpoint returns resource types
+
+
+========================================
+TEST SECTION 8b: CONTENT-TYPE & AUTH VERIFICATION
+========================================
+
+--- Test: Response Content-Type Header ---
+PASS: Response Content-Type is application/scim+json (application/scim+json; charset=utf-8)
+PASS: POST response Content-Type is application/scim+json
+PASS: POST response status code is 201 Created
+
+--- Test: Missing Auth Token → 401 ---
+PASS: Missing Authorization header returns 401
+
+--- Test: Invalid Auth Token → 401 ---
+PASS: Invalid Bearer token returns 401
+
+--- Test: Token Without Bearer Prefix → 401 ---
+PASS: Token without 'Bearer ' prefix returns 401
+
+
+========================================
+TEST SECTION 9: ERROR HANDLING
+========================================
+
+--- Test: 404 for Non-Existent User ---
+PASS: Non-existent user returns 404
+
+--- Test: 404 for Non-Existent Group ---
+PASS: Non-existent group returns 404
+
+--- Test: 404 for Non-Existent Endpoint ---
+PASS: Non-existent endpoint returns 404
+
+--- Test: PUT 404 for Non-Existent User ---
+PASS: PUT non-existent user returns 404
+
+--- Test: PATCH 404 for Non-Existent User ---
+PASS: PATCH non-existent user returns 404
+
+--- Test: DELETE 404 for Non-Existent User ---
+PASS: DELETE non-existent user returns 404
+
+--- Test: PUT 404 for Non-Existent Group ---
+PASS: PUT non-existent group returns 404
+
+--- Test: PATCH 404 for Non-Existent Group ---
+PASS: PATCH non-existent group returns 404
+
+--- Test: DELETE 404 for Non-Existent Group ---
+PASS: DELETE non-existent group returns 404
+
+--- Test: DELETE Idempotent (Second Delete → 404) ---
+PASS: DELETE idempotent -- second delete returns 404
+
+--- Test: Non-UUID ID Returns 404 (UUID Guard) ---
+PASS: Non-UUID user ID returns 404 (not 500)
+PASS: Non-UUID group ID returns 404 (not 500)
+
+--- Test: 400 for Invalid Endpoint Name ---
+PASS: Invalid endpoint name returns 400 Bad Request
+
+
+========================================
+TEST SECTION 9b: RFC 7644 COMPLIANCE CHECKS
+========================================
+
+--- Test: Location Header on POST /Users (RFC 7644 S3.1) ---
+PASS: POST /Users returns 201 Created
+PASS: POST /Users includes Location header
+PASS: Location header matches meta.location
+
+--- Test: Location Header on POST /Groups (RFC 7644 S3.1) ---
+PASS: POST /Groups returns 201 Created
+PASS: POST /Groups includes Location header
+PASS: Location header matches meta.location
+
+--- Test: Error Response Format (RFC 7644 S3.12) ---
+PASS: Error returns 404 status code
+PASS: Error Content-Type is application/scim+json
+PASS: Error has SCIM Error schema
+PASS: Error status is string type: '404'
+PASS: Error status value is '404'
+PASS: Error includes detail message
+
+--- Test: 409 Error Response Format ---
+PASS: Duplicate returns 409
+PASS: 409 error Content-Type is application/scim+json
+PASS: 409 error status is string '409'
+
+--- Test: PATCH Updates meta.lastModified ---
+PASS: PATCH updates meta.lastModified timestamp
+PASS: GET does not change meta.lastModified
+
+
+========================================
+TEST SECTION 9c: POST /.search (RFC 7644 S3.4.3)
+========================================
+
+--- Test: POST /Users/.search Basic ---
+PASS: POST /Users/.search returns ListResponse schema
+PASS: POST /Users/.search finds user via filter
+PASS: POST /Users/.search includes startIndex
+PASS: POST /Users/.search includes itemsPerPage
+
+--- Test: POST /Users/.search Returns HTTP 200 ---
+PASS: POST /Users/.search returns HTTP 200 (not 201)
+PASS: POST /Users/.search Content-Type is application/scim+json
+
+--- Test: POST /Users/.search with Attributes ---
+PASS: POST /.search with attributes includes userName
+PASS: POST /.search always returns id (always-returned)
+PASS: POST /.search always returns schemas (always-returned)
+PASS: POST /.search with attributes excludes non-requested attrs (emails)
+
+--- Test: POST /Users/.search with excludedAttributes ---
+PASS: POST /.search with excludedAttributes keeps userName
+PASS: POST /.search with excludedAttributes removes emails
+
+--- Test: POST /Users/.search Without Filter ---
+PASS: POST /Users/.search without filter lists users
+PASS: POST /Users/.search respects count parameter
+
+--- Test: POST /Groups/.search Basic ---
+PASS: POST /Groups/.search returns ListResponse schema
+PASS: POST /Groups/.search finds group via filter
+
+--- Test: POST /Groups/.search with excludedAttributes ---
+PASS: POST /Groups/.search excludedAttributes removes members
+PASS: POST /Groups/.search excludedAttributes keeps displayName
+
+
+========================================
+TEST SECTION 9d: ATTRIBUTE PROJECTION (RFC 7644 S3.4.2.5)
+========================================
+
+--- Test: GET /Users with attributes Param ---
+PASS: GET /Users?attributes works
+PASS: attributes param includes userName
+PASS: attributes param always returns id
+PASS: attributes param always returns schemas
+PASS: attributes param excludes non-requested emails
+PASS: attributes param excludes non-requested active
+
+--- Test: GET /Users/:id with attributes Param ---
+PASS: GET User by ID with attributes includes userName
+PASS: GET User by ID with attributes always returns id
+PASS: GET User by ID with attributes always returns meta
+PASS: GET User by ID with attributes excludes displayName
+
+--- Test: GET /Users with excludedAttributes Param ---
+PASS: excludedAttributes keeps userName
+PASS: excludedAttributes always keeps id
+PASS: excludedAttributes removes emails
+PASS: excludedAttributes removes phoneNumbers
+
+--- Test: GET /Users/:id with excludedAttributes ---
+PASS: GET User excludedAttributes keeps userName
+PASS: GET User excludedAttributes removes name
+PASS: GET User excludedAttributes removes emails
+PASS: GET User excludedAttributes always keeps id (never excluded)
+PASS: GET User excludedAttributes always keeps schemas (never excluded)
+
+--- Test: GET /Groups with attributes Param ---
+PASS: GET /Groups attributes includes displayName
+PASS: GET /Groups attributes always returns id
+PASS: GET /Groups attributes excludes non-requested members
+
+--- Test: GET /Groups/:id with excludedAttributes ---
+PASS: GET Group excludedAttributes keeps displayName
+PASS: GET Group excludedAttributes removes members
+
+--- Test: attributes Precedence Over excludedAttributes ---
+PASS: Precedence test: attributes includes userName
+PASS: Precedence test: attributes wins -- displayName included despite excludedAttributes
+
+
+========================================
+TEST SECTION 9e: ETag & CONDITIONAL REQUESTS (RFC 7644 S3.14)
+========================================
+
+--- Test: ETag Header on GET /Users/:id ---
+PASS: GET /Users/:id includes ETag header
+PASS: ETag is a weak ETag (W/"...") format: W/"v17"
+PASS: meta.version matches ETag header value
+
+--- Test: ETag Header on GET /Groups/:id ---
+PASS: GET /Groups/:id includes ETag header
+PASS: Group ETag is weak ETag format
+
+--- Test: If-None-Match → 304 Not Modified ---
+PASS: If-None-Match with matching ETag returns 304 Not Modified
+
+--- Test: If-None-Match with Stale ETag → 200 ---
+PASS: If-None-Match with stale ETag returns 200 with full resource
+
+--- Test: ETag Changes After PATCH ---
+PASS: PATCH response includes ETag header
+PASS: ETag changed after PATCH (before: W/"v17", after: W/"v18")
+
+--- Test: Old ETag After Modification → 200 ---
+PASS: Old ETag after modification returns 200 (resource changed)
+
+--- Test: POST /Users Includes ETag ---
+PASS: POST /Users response includes ETag header
+PASS: POST /Users returns 201 with ETag
+
+--- Test: PUT /Users Includes ETag ---
+PASS: PUT /Users response includes ETag header
+
+--- Test: ServiceProviderConfig etag.supported ---
+PASS: ServiceProviderConfig etag.supported = true
+
+
+========================================
+TEST SECTION 9f: PatchOpAllowRemoveAllMembers FLAG
+========================================
+
+--- Setup: Endpoint with PatchOpAllowRemoveAllMembers=False ---
+
+--- Test: Blanket Remove All Members Blocked (Flag=False) ---
+PASS: Blanket remove all members blocked with 400 when PatchOpAllowRemoveAllMembers=False
+PASS: Members still intact after blocked blanket remove (2 members)
+
+--- Test: Targeted Remove Still Works (Flag=False) ---
+PASS: Targeted remove with filter works when flag=False (1 member left)
+
+--- Test: Default Behavior (Flag Not Set → Allow Blanket Remove) ---
+PASS: Blanket remove allowed by default (PatchOpAllowRemoveAllMembers defaults to true)
+
+
+========================================
+TEST SECTION 9g: FILTER OPERATORS (co, sw, pr, and)
+========================================
+
+--- Test: Filter 'co' (contains) Operator ---
+PASS: Filter 'co' (contains) finds users with 'livetest' in userName (found 3)
+PASS: Filter 'co' is case-insensitive (LIVETEST finds same users)
+
+--- Test: Filter 'sw' (startsWith) Operator ---
+PASS: Filter 'sw' (startsWith) finds users starting with 'pagination' (found 3)
+PASS: Filter 'sw' returns 0 results for non-matching prefix
+
+--- Test: Filter 'pr' (presence) Operator ---
+PASS: Filter 'pr' (presence) finds users with externalId present (found 4)
+PASS: Filter 'pr' on displayName finds users with displayName present
+
+--- Test: Compound 'and' Filter ---
+PASS: Compound 'and' filter works (userName sw + active eq true, found 3)
+PASS: Compound 'and' filter returns 0 when second condition fails (active=false)
+
+--- Test: Group displayName Filter with 'co' ---
+PASS: Group displayName 'co' filter finds groups containing 'Test' (found 3)
+
+
+========================================
+TEST SECTION 9h: EDGE CASES
+========================================
+
+--- Test: PATCH with Empty Operations Array ---
+PASS: PATCH with empty Operations array returns 400 (strict validation)
+
+--- Test: Remove Non-Existent Attribute (Silent Success) ---
+PASS: Remove non-existent attribute (nickName) succeeds silently
+
+--- Test: PATCH 'add' with No Path (Merge) ---
+PASS: PATCH 'add' with no path merges displayName
+PASS: PATCH 'add' with no path merges title
+
+--- Test: Filter on Non-Existent Attribute ---
+PASS: Filter on non-existent attribute value returns 0 results
+
+--- Test: ServiceProviderConfig Detail Validation ---
+PASS: ServiceProviderConfig includes patch capability
+PASS: ServiceProviderConfig patch.supported = true
+PASS: ServiceProviderConfig includes filter capability
+PASS: ServiceProviderConfig filter.supported = true
+PASS: ServiceProviderConfig includes bulk capability
+PASS: ServiceProviderConfig includes changePassword capability
+PASS: ServiceProviderConfig includes sort capability
+
+
+========================================
+TEST SECTION 9i: VerbosePatchSupported DOT-NOTATION
+========================================
+
+--- Setup: Endpoint with VerbosePatchSupported=True ---
+
+--- Test: Dot-Notation PATCH (name.givenName) ---
+PASS: Dot-notation PATCH name.givenName resolves to nested object
+PASS: Dot-notation PATCH does not affect sibling property (familyName unchanged)
+
+--- Test: Dot-Notation PATCH 'add' (name.middleName) ---
+PASS: Dot-notation 'add' sets name.middleName in nested object
+
+--- Test: Dot-Notation PATCH 'remove' (name.middleName) ---
+PASS: Dot-notation 'remove' deletes name.middleName from nested object
+
+--- Test: Known SCIM Complex Attribute Paths Work Without Flag ---
+PASS: Standard SCIM complex attribute paths (name.givenName) work without VerbosePatchSupported
+
+
+========================================
+TEST SECTION 9j: LOG CONFIGURATION API
+========================================
+
+--- Test: Get Log Configuration ---
+PASS: GET log-config returns globalLevel
+PASS: GET log-config returns availableLevels
+PASS: availableLevels has 7 entries (TRACE..OFF)
+PASS: GET log-config returns availableCategories
+PASS: availableCategories has 11 entries
+PASS: GET log-config returns format
+PASS: GET log-config returns categoryLevels
+PASS: GET log-config returns endpointLevels
+
+--- Test: Update Log Configuration ---
+PASS: PUT log-config returns success message
+PASS: PUT log-config updates globalLevel to WARN
+PASS: PUT log-config updates includePayloads to false
+
+--- Test: Update Multiple Config Fields ---
+PASS: Multi-update sets globalLevel to DEBUG
+PASS: Multi-update sets format to json
+PASS: Multi-update sets scim.patch category to TRACE
+PASS: Multi-update sets auth category to WARN
+
+--- Test: Set Global Level Shortcut ---
+PASS: Level shortcut sets global level to ERROR
+PASS: Level shortcut returns confirmation message
+PASS: Level shortcut accepts case-insensitive level names
+
+--- Test: Set Category Log Level ---
+PASS: Category level set for 'http' to TRACE
+PASS: Category override reflected in GET config
+PASS: Unknown category returns error message
+PASS: Unknown category response includes available categories
+
+--- Test: Endpoint Level Override ---
+PASS: Endpoint level override set
+PASS: Endpoint override reflected in GET config
+PASS: DELETE endpoint override returns 204
+PASS: Endpoint override removed after DELETE
+
+--- Test: Recent Logs (Ring Buffer) ---
+PASS: Recent logs returns count
+PASS: Recent logs returns entries array
+PASS: Ring buffer has entries from previous test operations
+PASS: Recent logs respects limit=3
+PASS: Recent logs level filter returns only ERROR+ entries (count: 20)
+PASS: Recent logs category filter returns only 'http' entries (count: 100)
+
+--- Test: Clear Ring Buffer ---
+PASS: DELETE recent logs returns 204
+PASS: Ring buffer nearly empty after clear (only self-request entries)
+
+--- Test: X-Request-Id Correlation ---
+PASS: X-Request-Id echoed back in response: live-test-correlation-1308475783
+PASS: X-Request-Id auto-generated when not provided: a817238b-a05a-4d97-9ec5-046bfc93f5cb
+
+--- Test: Filter Recent Logs by Request ID ---
+PASS: Recent logs requestId filter returns matching entries (count: 3)
+
+--- Test: Download Logs (NDJSON/JSON) ---
+PASS: Download NDJSON returns application/x-ndjson content type
+PASS: Download NDJSON returns attachment filename header
+PASS: Download NDJSON returns at least one log line
+PASS: Download NDJSON contains valid JSON log entries
+PASS: Download JSON returns application/json content type
+PASS: Download JSON returns a JSON array
+PASS: Download logs requestId filter returns matching entries (count: 3)
+
+--- Test: Stream Logs (SSE) ---
+PASS: SSE stream returns connected event
+
+--- Test: Log Config Requires Authentication ---
+PASS: GET log-config returns 401 without auth
+
+--- Cleanup: Restore Original Log Level ---
+PASS: Restored globalLevel to INFO
+PASS: Restored format to pretty
+
+
+========================================
+TEST SECTION 9k: PER-ENDPOINT LOG LEVEL VIA ENDPOINT CONFIG
+========================================
+
+--- Create Endpoint with logLevel Config ---
+PASS: Created endpoint with logLevel=DEBUG in profile.settings
+PASS: Endpoint ID is present: f4f3c0f4-3b8c-4da3-bdd1-208bc577b5aa
+PASS: Endpoint level appears in log-config after create
+PASS: GET endpoint returns logLevel=DEBUG in profile.settings
+
+--- Update Endpoint logLevel Config ---
+PASS: Updated endpoint logLevel to TRACE
+PASS: Endpoint level updated in log-config after PATCH
+
+--- PATCH config without logLevel (additive merge) ---
+PASS: Endpoint profile.settings preserves logLevel (additive merge)
+PASS: Other settings flags preserved
+PASS: Endpoint level cleared from log-config
+
+--- Create Endpoint with Mixed Config ---
+PASS: Mixed settings: logLevel=WARN
+PASS: Mixed settings: VerbosePatchSupported=True
+PASS: Mixed settings: strictMode=true
+PASS: Mixed endpoint level in log-config
+
+--- Validation: Invalid logLevel Values ---
+PASS: Rejects invalid logLevel 'VERBOSE' with 400
+PASS: Rejects invalid logLevel 'high' with 400
+PASS: Accepts lowercase logLevel 'debug'
+
+--- Cleanup: Delete Log Level Test Endpoints ---
+PASS: Deleted log-level-test-ep
+PASS: Deleted log-level-mixed-ep
+PASS: Deleted log-ci-ep
+PASS: All endpoint levels cleaned from log-config after delete
+
+
+========================================
+TEST SECTION 9f: AllowAndCoerceBooleanStrings
+========================================
+
+--- Setup: Create coercion test endpoint ---
+PASS: Created bool-coerce endpoint: 2522f354-3e26-4602-b6d2-a6659694b174
+
+--- Test 9f.1: POST User with boolean string 'True' in roles[].primary ---
+PASS: POST user: roles[].primary 'True' coerced to boolean true (got: True, type: Boolean)
+
+--- Test 9f.2: POST User with boolean string 'False' in emails[].primary ---
+PASS: POST user: emails[work].primary 'True' → true
+PASS: POST user: emails[home].primary 'False' → false
+
+--- Test 9f.3: PUT User with boolean string coercion ---
+PASS: PUT user: roles[].primary 'True' coerced to true
+
+--- Test 9f.4: PATCH User with boolean string coercion ---
+PASS: PATCH user: roles[].primary 'True' coerced to true
+
+--- Test 9f.5: Reject boolean string when flag is OFF ---
+PASS: Boolean string rejected with 400 when AllowAndCoerceBooleanStrings=False (got: 400)
+
+--- Test 9f.6: Multi-attribute boolean coercion ---
+PASS: Multi-attr: emails[work].primary → true
+PASS: Multi-attr: emails[home].primary → false
+PASS: Multi-attr: phoneNumbers[work].primary → true
+PASS: Multi-attr: roles[admin].primary → true
+PASS: Multi-attr: roles[user].primary → false
+
+--- Test 9f.7: Non-boolean string attrs preserved ---
+PASS: Non-boolean string attr roles[].value preserved as 'true'
+PASS: Boolean attr roles[].primary coerced to true
+
+--- Test 9f.8: Group POST with coercion pipeline (core schema, no boolean attrs) ---
+PASS: Group POST with coercion pipeline succeeds (no boolean attrs in core Group schema)
+
+--- Cleanup: Boolean coercion test resources ---
+PASS: Boolean coercion test endpoints cleaned up
+
+
+========================================
+TEST SECTION 9l: RETURNED CHARACTERISTIC FILTERING (G8e / RFC 7643 S2.4)
+========================================
+
+--- Setup: Create User with Password for G8e Tests ---
+
+--- Test 9l.1: POST /Users with password — password stripped from response ---
+PASS: POST /Users with password returns ID: c2f9750a-08f3-4543-9c79-1bb645b42e56
+PASS: POST /Users response does NOT contain password (returned:never)
+PASS: POST /Users response still contains userName
+PASS: POST /Users response still contains displayName
+
+--- Test 9l.2: GET /Users/:id — password stripped ---
+PASS: GET /Users/:id does NOT return password
+PASS: GET /Users/:id returns userName correctly
+
+--- Test 9l.3: GET /Users list — password stripped from all resources ---
+PASS: GET /Users list — no resource contains password
+PASS: GET /Users list found g8e test user
+
+--- Test 9l.4: PUT /Users with password — password stripped from response ---
+PASS: PUT /Users response does NOT contain password (returned:never)
+PASS: PUT /Users response shows updated displayName
+
+--- Test 9l.5: PATCH /Users — password stripped from response ---
+PASS: PATCH /Users response does NOT contain password (returned:never)
+PASS: PATCH /Users response shows updated displayName
+
+--- Test 9l.6: POST /Users/.search — password stripped from results ---
+PASS: POST /Users/.search — no resource contains password
+PASS: POST /Users/.search found g8e test user
+
+--- Test 9l.7: GET /Users?attributes=password — returned:never overrides explicit request ---
+PASS: GET /Users/:id?attributes=password — password NOT returned (returned:never wins)
+PASS: GET /Users/:id?attributes=password — id still returned (always-returned)
+PASS: GET /Users/:id?attributes=password — schemas still returned (always-returned)
+
+--- Test 9l.8: GET /Users?attributes=password,userName — mixed request ---
+PASS: GET ?attributes=password,userName — password not returned
+PASS: GET ?attributes=password,userName — userName IS returned
+
+--- Test 9l.9: GET /Schemas — password attribute metadata ---
+PASS: Schemas endpoint returns User schema
+PASS: User schema contains password attribute definition
+PASS: password attribute returned=never in schema
+PASS: password attribute mutability=writeOnly in schema
+PASS: password attribute type=string in schema
+
+--- Test 9l.10: POST /.search with attributes=password — returned:never wins ---
+PASS: POST /.search attributes=password — password NOT returned (never wins)
+PASS: POST /.search attributes=password,userName — userName IS returned
+
+--- Cleanup: G8e test user ---
+PASS: G8e test user cleaned up
+
+
+═══════════════════════════════════════════════════════════════
+TEST SECTION 9m: SCHEMA CUSTOMIZATION
+  Custom Schema Extensions + Custom Resource Types + Combos
+═══════════════════════════════════════════════════════════════
+
+
+────────────────────────────────────────────────────
+  9m-A: CUSTOM SCHEMA EXTENSIONS — SKIPPED (Admin API removed v0.28.0)
+────────────────────────────────────────────────────
+PASS: 9m-A: SKIPPED — Admin Schema API removed; schemas now in endpoint profile
+PASS: 9m-A.P1: Created endpoint with custom extension via profile
+PASS: 9m-A.P2: Extension visible in /Schemas
+PASS: 9m-A.P3: Extension data roundtrips on POST
+PASS: 9m-A.P4: Extension data roundtrips on GET
+PASS: 9m-A.P5: Cleaned up extension endpoint
+
+
+────────────────────────────────────────────────────
+  9m-B: CUSTOM RESOURCE TYPES — SKIPPED (Admin API removed v0.28.0)
+────────────────────────────────────────────────────
+PASS: 9m-B: SKIPPED — Admin RT API removed; resource types now in endpoint profile
+PASS: 9m-B.P1: Extension endpoint created
+PASS: 9m-B.P2: Non-extension endpoint created
+PASS: 9m-B.P3: Extension ON endpoint shows it
+PASS: 9m-B.P4: Extension NOT on other endpoint (isolation)
+PASS: 9m-B.P5: Cleaned up isolation endpoints
+
+
+────────────────────────────────────────────────────
+  9m-C: SCHEMA CUSTOMIZATION COMBINATIONS — SKIPPED (Admin API removed v0.28.0)
+────────────────────────────────────────────────────
+PASS: 9m-C: SKIPPED — uses deleted Admin RT API; combos tested in profile-combinations.e2e-spec.ts
+
+═══════════════════════════════════════════════════════════════
+TEST SECTION 9m: SCHEMA CUSTOMIZATION — ALL SUBSECTIONS COMPLETE
+═══════════════════════════════════════════════════════════════
+
+
+========================================
+TEST SECTION 9n: BULK OPERATIONS (Phase 9 / RFC 7644 S3.7)
+========================================
+
+--- Bulk Setup: Creating endpoint with BulkOperationsEnabled ---
+PASS: Bulk endpoint created with BulkOperationsEnabled
+
+--- Test 9n.1: Config flag gating (should 403 when disabled) ---
+PASS: 9n.1 Config flag gating rejects when disabled (HTTP 403)
+
+--- Test 9n.2: Config flag gating (should succeed when enabled) ---
+PASS: 9n.2 Bulk request succeeds when enabled (schemas=urn:ietf:params:scim:api:messages:2.0:BulkResponse)
+
+--- Test 9n.3: POST user via bulk ---
+PASS: 9n.3 POST user via bulk (status=201, id=e6891995-9249-4e0b-a4c2-fdc7386f5f27)
+
+--- Test 9n.4: PUT user via bulk ---
+PASS: 9n.4 PUT user via bulk (status=200)
+
+--- Test 9n.5: PATCH user via bulk ---
+PASS: 9n.5 PATCH user via bulk (status=200)
+
+--- Test 9n.6: DELETE user via bulk ---
+PASS: 9n.6 DELETE user via bulk (status=204)
+
+--- Test 9n.7: POST group via bulk ---
+PASS: 9n.7 POST group via bulk (status=201, id=29f8d0eb-3aec-4e83-bf3b-500f16bb63ff)
+
+--- Test 9n.8: DELETE group via bulk ---
+PASS: 9n.8 DELETE group via bulk (status=204)
+
+--- Test 9n.9: bulkId cross-referencing (POST + PATCH) ---
+PASS: 9n.9 bulkId cross-ref: POST=201, PATCH=200
+
+--- Test 9n.10: failOnErrors threshold ---
+PASS: 9n.10 failOnErrors=1 stopped processing early (ops returned=1)
+
+--- Test 9n.11: Missing schema validation ---
+PASS: 9n.11 Missing BulkRequest schema rejected (HTTP 400)
+
+--- Test 9n.12: Unsupported resource type ---
+PASS: 9n.12 Unsupported resource type returns 400 in-band (status=400)
+
+--- Test 9n.13: Mixed user + group operations ---
+PASS: 9n.13 Mixed ops: User=201, Group=201
+
+--- Test 9n.14: SPC advertises bulk.supported=true ---
+PASS: 9n.14 SPC bulk.supported=True, maxOperations=100
+
+--- Test 9n.15: Response includes BulkResponse schema ---
+PASS: 9n.15 Response has BulkResponse schema=True, bulkId echo=True
+
+--- Test 9n.16: Uniqueness collision ---
+PASS: 9n.16 Uniqueness: first=201, duplicate=409
+
+--- Bulk Cleanup: Deleting test endpoints ---
+PASS: Bulk enabled endpoint cleaned up
+PASS: Bulk no-flag endpoint cleaned up
+
+--- Phase 9: Bulk Operations Tests Complete ---
+
+
+========================================
+TEST SECTION 9o: GROUP UNIQUENESS ON PUT/PATCH (G8f)
+========================================
+
+--- Setup: Create Groups for G8f Uniqueness Tests ---
+PASS: G8f setup: Created GroupA (id=fdb15d01-a9e8-4625-a06c-b6800512ca66)
+PASS: G8f setup: Created GroupB (id=7c22ba6f-2cc0-4e92-9b87-0abecfd102d9)
+
+--- Test 9o.1: PUT GroupB with GroupA's displayName → 409 ---
+PASS: PUT with conflicting displayName returns 409 (got 409)
+
+--- Test 9o.2: PUT GroupA keeping own displayName → 200 ---
+PASS: PUT self-update with same displayName succeeds
+
+--- Test 9o.3: PUT GroupB with GroupA's externalId → 409 ---
+PASS: PUT with conflicting externalId returns 409 (got 409)
+
+--- Test 9o.4: PATCH GroupB with GroupA's displayName → 409 ---
+PASS: PATCH with conflicting displayName returns 409 (got 409)
+
+--- Test 9o.5: PATCH GroupB with unique displayName → 200 ---
+PASS: PATCH with unique displayName succeeds
+
+--- Test 9o.6: PATCH GroupB with GroupA's externalId → 409 ---
+PASS: PATCH with conflicting externalId returns 409 (got 409)
+
+--- G8f Cleanup: Deleting test groups ---
+PASS: G8f GroupA cleaned up
+PASS: G8f GroupB cleaned up
+
+--- G8f: Group Uniqueness on PUT/PATCH Tests Complete ---
+
+
+========================================
+TEST SECTION 9p: WRITE-RESPONSE ATTRIBUTE PROJECTION (G8g)
+========================================
+
+--- Setup: Create User for G8g Projection Tests ---
+
+--- Test 9p.1: POST /Users?attributes=userName --- projection on create ---
+PASS: POST with ?attributes=userName returns id (always-returned)
+PASS: POST with ?attributes=userName returns userName (requested)
+PASS: POST with ?attributes=userName returns schemas (always-returned)
+PASS: POST with ?attributes=userName omits displayName (not requested)
+PASS: POST with ?attributes=userName omits emails (not requested)
+
+--- Test 9p.2: PUT /Users?attributes=displayName --- projection on replace ---
+PASS: PUT ?attributes=displayName returns displayName (requested)
+PASS: PUT ?attributes=displayName returns id (always-returned)
+PASS: PUT ?attributes=displayName omits emails (not requested)
+
+--- Test 9p.3: PATCH /Users?excludedAttributes=name,emails --- omit specified ---
+PASS: PATCH ?excludedAttributes=name,emails returns displayName (not excluded)
+PASS: PATCH ?excludedAttributes=name,emails returns userName (not excluded)
+PASS: PATCH ?excludedAttributes=name,emails omits name (excluded)
+PASS: PATCH ?excludedAttributes=name,emails omits emails (excluded)
+
+--- Test 9p.4: POST /Groups?attributes=displayName --- projection on group create ---
+PASS: POST Groups ?attributes=displayName returns id (always-returned)
+PASS: POST Groups ?attributes=displayName returns displayName (requested)
+PASS: POST Groups ?attributes=displayName omits members (not requested)
+
+--- Test 9p.5: PUT /Groups?excludedAttributes=members --- omit members ---
+PASS: PUT Groups ?excludedAttributes=members returns displayName (not excluded)
+PASS: PUT Groups ?excludedAttributes=members omits members (excluded)
+
+--- Test 9p.6: PATCH /Groups?attributes=displayName --- projection on group patch ---
+PASS: PATCH Groups ?attributes=displayName returns displayName (requested)
+PASS: PATCH Groups ?attributes=displayName returns id (always-returned)
+PASS: PATCH Groups ?attributes=displayName omits members (not requested)
+
+--- Test 9p.7: POST /Users with BOTH params --- attributes takes precedence ---
+PASS: Both params: attributes wins — userName present (requested)
+PASS: Both params: attributes wins — displayName present (in attributes list)
+PASS: Both params: id present (always-returned)
+PASS: Both params: emails absent (not in attributes list)
+
+--- Test 9p.8: excludedAttributes=id,schemas,meta --- always-returned protection ---
+PASS: Always-returned protection: id present (cannot be excluded)
+PASS: Always-returned protection: schemas present (cannot be excluded)
+PASS: Always-returned protection: meta present (cannot be excluded)
+PASS: Always-returned protection: userName present (always-returned for User)
+
+--- Test 9p.9: PUT /Users?excludedAttributes=emails,name --- omit specified on replace ---
+PASS: PUT ?excludedAttributes=emails,name returns displayName (not excluded)
+PASS: PUT ?excludedAttributes=emails,name returns userName (always-returned)
+PASS: PUT ?excludedAttributes=emails,name omits emails (excluded)
+PASS: PUT ?excludedAttributes=emails,name omits name (excluded)
+
+--- G8g Extended Cleanup: Deleting additional test resources ---
+PASS: G8g extended test users cleaned up
+
+--- G8g Cleanup: Deleting test resources ---
+PASS: G8g test user cleaned up
+PASS: G8g test group cleaned up
+
+--- G8g: Write-Response Projection Tests Complete ---
+
+
+========================================
+TEST SECTION 9q: SORTING (Phase 12 / RFC 7644 S3.4.2.3)
+========================================
+
+--- Setup: Create Users for Sorting Tests ---
+  Created sort test user: alpha-sort@test.com (c67f8405-9861-4eeb-8930-6010aea0167d)
+  Created sort test user: charlie-sort@test.com (85947cf5-131c-42a6-943e-b56fcf3e709e)
+  Created sort test user: bravo-sort@test.com (1377c82a-9cf3-4da2-aa01-4c0a4f7e0782)
+
+--- Test 9q.1: GET /Users?sortBy=userName&sortOrder=ascending ---
+PASS: Sort ascending: returned >= 3 sort users
+PASS: Sort ascending: userNames are in ascending order
+
+--- Test 9q.2: GET /Users?sortBy=userName&sortOrder=descending ---
+PASS: Sort descending: userNames are in descending order
+
+--- Test 9q.3: Default sortOrder is ascending ---
+PASS: Default sortOrder: ascending when sortBy specified without sortOrder
+
+--- Test 9q.4: POST /.search with sorting ---
+PASS: POST /.search: sorting works in search body (descending)
+
+--- Test 9q.5: Sorting with pagination ---
+PASS: Sorting with pagination: respects count=2
+PASS: Sorting with pagination: totalResults reflects all matching
+
+--- Test 9q.6: Sort Groups by displayName ---
+  Created sort test group: Zebra-Sort-Group (3aea960c-e699-475a-9f20-07ea6dbe02ae)
+  Created sort test group: Alpha-Sort-Group (ff997412-c486-48a3-b368-73186a94253c)
+  Created sort test group: Mango-Sort-Group (5bc6ec93-2e97-4e80-97de-dd6e5ce21bd7)
+PASS: Sort Groups by displayName ascending: correct order
+
+--- Test 9q.7: SPC sort.supported ---
+PASS: ServiceProviderConfig: sort.supported is true
+
+--- 9q Cleanup: Deleting sort test resources ---
+PASS: Sort test resources cleaned up
+
+--- 9q: Sorting Tests Complete ---
+
+
+========================================
+TEST SECTION 9r: /Me ENDPOINT (Phase 10 / RFC 7644 S3.11)
+========================================
+
+--- Setup: Create User matching JWT sub claim (scimserver-client) ---
+  Created /Me test user: scimserver-client (055a8d2f-7891-45a0-ab5a-8e7dba8f237d)
+PASS: /Me setup: user created with userName=scimserver-client
+
+--- Test 9r.1: GET /Me ---
+PASS: GET /Me: returns correct user id
+PASS: GET /Me: userName matches JWT sub
+PASS: GET /Me: includes meta
+
+--- Test 9r.2: GET /Me?attributes=userName ---
+PASS: GET /Me?attributes=userName: userName present
+PASS: GET /Me?attributes=userName: displayName omitted
+
+--- Test 9r.3: PATCH /Me ---
+PASS: PATCH /Me: displayName updated
+PASS: PATCH /Me: same user id
+
+--- Test 9r.4: Verify PATCH /Me persisted ---
+PASS: GET /Me after PATCH: displayName persisted
+
+--- Test 9r.5: PUT /Me ---
+PASS: PUT /Me: displayName replaced
+PASS: PUT /Me: same user id
+
+--- Test 9r.6: Cross-validate /Me vs /Users/{id} ---
+PASS: Cross-validate: /Me and /Users/{id} return same userName
+PASS: Cross-validate: /Me and /Users/{id} return same displayName
+
+--- Test 9r.7: DELETE /Me ---
+PASS: DELETE /Me: returns 404 after deletion
+
+--- Test 9r.8: GET /Me with no matching user ---
+PASS: /Me no matching user: returns 404
+
+--- 9r: /Me Endpoint Tests Complete ---
+
+
+========================================
+TEST SECTION 9s: PER-ENDPOINT CREDENTIALS (Phase 11 / G11)
+========================================
+
+--- Setup: Create Cred-Enabled Endpoint ---
+  Created endpoint: 873e657d-0f0b-418a-8ac0-e6567886afbc
+PASS: 9s setup: per-cred endpoint created
+
+--- Test 9s.1: Create per-endpoint credential ---
+PASS: 9s.1: credential id returned
+PASS: 9s.1: plaintext token returned (length 43)
+PASS: 9s.1: credentialType is 'bearer'
+PASS: 9s.1: credential is active
+PASS: 9s.1: hash not exposed in response
+
+--- Test 9s.2: List credentials ---
+PASS: 9s.2: at least 1 credential listed
+PASS: 9s.2: credentialHash not in list response
+PASS: 9s.2: credential id matches
+
+--- Test 9s.3: Authenticate with per-endpoint token ---
+PASS: 9s.3: per-endpoint token auth → ListResponse
+PASS: 9s.3: totalResults present
+
+--- Test 9s.4: Create user with per-endpoint token ---
+PASS: 9s.4: user created via per-endpoint token
+PASS: 9s.4: user readable via per-endpoint token
+PASS: 9s.4: user deleted via per-endpoint token
+
+--- Test 9s.5: OAuth/legacy fallback ---
+PASS: 9s.5: OAuth token still works on cred-enabled endpoint
+
+--- Test 9s.6: Reject invalid token ---
+PASS: 9s.6: invalid token → 401
+
+--- Test 9s.7: Revoke credential ---
+PASS: 9s.7: credential revoked (HTTP 204)
+PASS: 9s.7: revoked token → 401
+
+--- Test 9s.8: Reject cred creation when flag disabled ---
+PASS: 9s.8: cred creation blocked → 403 (flag disabled)
+
+--- Test 9s.9: Credential with expiry ---
+PASS: 9s.9: credential created with expiresAt
+PASS: 9s.9: token returned for expiring credential
+PASS: 9s.9: expiring credential authenticates successfully
+
+--- 9s: Cleanup ---
+
+--- 9s: Per-Endpoint Credentials Tests Complete ---
+
+
+========================================
+TEST SECTION 9t: READONLY ATTRIBUTE STRIPPING (RFC 7643 S2.2)
+========================================
+
+--- 9t.1: POST /Users strips client id ---
+PASS: 9t.1: Client-supplied id stripped, server UUID assigned
+PASS: 9t.1: readWrite attrs preserved
+
+--- 9t.2: Warning URN in POST response ---
+PASS: 9t.2: Warning URN present in schemas when readOnly attrs stripped
+PASS: 9t.2: Warning block contains stripped attribute names
+
+--- 9t.3: PUT /Users strips readOnly ---
+PASS: 9t.3: PUT does not override server-assigned id
+PASS: 9t.3: readWrite attrs updated via PUT
+PASS: 9t.3: Warning URN in PUT response
+
+--- 9t.4: PATCH readOnly attr stripped ---
+PASS: 9t.4: readWrite PATCH op applied
+PASS: 9t.4: readOnly groups PATCH op was silently stripped
+
+--- 9t.5: No warning when flag disabled ---
+PASS: 9t.5: No warning URN when flag disabled
+PASS: 9t.5: id still stripped even without warning
+
+--- 9t.6: PATCH id returns 400 ---
+PASS: 9t.6: PATCH id returns 400 (G8c hard-reject)
+
+--- 9t.7: POST /Groups strips client id ---
+PASS: 9t.7: Groups client-supplied id stripped, server UUID assigned
+PASS: 9t.7: Group displayName preserved
+
+--- 9t.8: Strict + IgnorePatchRO ON ---
+PASS: 9t.8: Strict+IgnorePatchRO: readWrite applied
+PASS: 9t.8: Strict+IgnorePatchRO: readOnly silently stripped
+PASS: 9t.8: Warning URN present with IgnorePatchRO
+
+--- 9t.9: Strict + IgnorePatchRO OFF ---
+PASS: 9t.9: Strict+keepRO returns 400 for readOnly PATCH
+
+--- 9t.10: Clean payload, no warnings ---
+PASS: 9t.10: No warning URN when payload has no readOnly attrs
+
+--- 9t: Cleanup ---
+
+--- 9t: ReadOnly Attribute Stripping Tests Complete ---
+
+
+========================================
+TEST SECTION 9u: SCHEMA ATTRIBUTE CHARACTERISTICS (P1 / RFC 7643 S2)
+========================================
+
+--- R-SUB-1: caseExact on name sub-attributes ---
+PASS: 9u.1: All name sub-attributes have caseExact:false (R-SUB-1)
+
+--- R-SUB-3: caseExact on addresses sub-attributes ---
+PASS: 9u.2: All addresses sub-attributes have caseExact:false (R-SUB-3)
+
+--- R-UNIQ-1: uniqueness on key attributes ---
+PASS: 9u.3: User externalId has uniqueness:none (R-UNIQ-1)
+PASS: 9u.4: Group externalId has uniqueness:none (R-UNIQ-1)
+PASS: 9u.5: Group displayName has uniqueness:server (R-UNIQ-1)
+
+--- R-REF-1: \ sub-attribute on Group members ---
+PASS: 9u.6: Group members has \ sub-attribute (R-REF-1)
+PASS: 9u.7: Group members.\ type is reference (R-REF-1)
+PASS: 9u.8: Group members.\ mutability is immutable (R-REF-1)
+PASS: 9u.9: Group members.\ referenceTypes contains User and Group (R-REF-1)
+PASS: 9u.10: Group members has 4 sub-attributes (value, \, display, type) (R-REF-1)
+
+--- 9u: Schema Attribute Characteristics Tests Complete ---
+
+
+========================================
+TEST SECTION 9v: P2 ATTRIBUTE CHARACTERISTICS (RFC 7643 S2)
+========================================
+
+--- R-MUT-1: writeOnly attribute never in response ---
+PASS: 9v.1: POST /Users response does not contain password (R-MUT-1)
+PASS: 9v.2: GET /Users/:id does not contain password (R-MUT-1)
+PASS: 9v.3: GET /Users?attributes=password does not return password (R-MUT-1)
+
+--- R-MUT-2: readOnly sub-attr stripping ---
+PASS: 9v.4: manager.displayName (readOnly) stripped from POST, manager.value preserved (R-MUT-2)
+PASS: 9v.5: PATCH with readWrite path updates correctly (R-MUT-2)
+
+--- R-RET-2: Group active always returned ---
+PASS: 9v.6: GET /Groups/:id?excludedAttributes=active still returns active (R-RET-2)
+PASS: 9v.7: GET /Groups/:id?attributes=displayName still includes active (R-RET-2)
+
+--- R-RET-1: Schema-driven returned:always ---
+PASS: 9v.8: GET /Groups/:id?attributes=externalId still includes displayName (returned:always) (R-RET-1)
+PASS: 9v.9: GET /Groups/:id?excludedAttributes=displayName still includes displayName (returned:always) (R-RET-1)
+
+--- R-RET-3: Sub-attr returned:always (emails.value) ---
+PASS: 9v.10: GET /Users?attributes=emails.type still includes emails.value (returned:always) (R-RET-3)
+PASS: 9v.11: GET /Groups?attributes=members.display still includes members.value (returned:always) (R-RET-3)
+
+--- R-CASE-1: caseExact-aware filter evaluation ---
+PASS: 9v.12: Filter on userName (caseExact:false) matches case-insensitively (R-CASE-1)
+PASS: 9v.13: Filter on externalId (caseExact:true) matches exact case (R-CASE-1)
+
+--- 9v: Cleaning up P2 test resources ---
+
+--- 9v: P2 Attribute Characteristics Tests Complete ---
+
+
+========================================
+TEST SECTION 9w: HTTP ERROR CODES, IMMUTABLE ENFORCEMENT, RETURNED CHARACTERISTICS (P3)
+========================================
+
+--- 9w: HTTP 415 Unsupported Media Type ---
+PASS: 9w.1: POST /Users with text/xml returns 415 Unsupported Media Type
+PASS: 9w.2: POST /Users with text/plain returns 415
+PASS: 9w.3: POST /Users with application/json succeeds (201)
+PASS: 9w.4: POST /Users with application/scim+json succeeds (201)
+
+--- 9w: HTTP 405 Method Not Allowed ---
+PASS: 9w.5: PUT /Users (collection) returns 404 (expected 404/405)
+PASS: 9w.6: PATCH /Users (collection) returns 404
+PASS: 9w.7: DELETE /Users (collection) returns 404
+PASS: 9w.8: DELETE /Groups (collection) returns 404
+
+--- 9w: Immutable Attribute Enforcement ---
+PASS: 9w.9: Create user with immutable employeeNumber for testing
+PASS: 9w.10: PUT changing immutable employeeNumber returns 400
+PASS: 9w.11: PUT with same immutable value succeeds (200)
+PASS: 9w.12: PATCH changing immutable employeeNumber returns 400
+PASS: 9w.13: GET returns original immutable employeeNumber value
+PASS: 9w.14: PATCH mutable department succeeds while employeeNumber preserved
+
+--- 9w: returned:request and returned:default ---
+PASS: 9w.15: GET /Users/:id does not return password (returned:never)
+PASS: 9w.16: GET /Users/:id always returns id (returned:always)
+PASS: 9w.17: GET /Users/:id always returns userName (returned:always)
+PASS: 9w.18: excludedAttributes=displayName strips it from response (returned:default)
+PASS: 9w.19: excludedAttributes does not strip always-returned userName
+
+--- 9w: Cleaning up 9w test resources ---
+
+--- 9w: P3 HTTP Errors, Immutable, Returned Characteristics Tests Complete ---
+
+
+========================================
+TEST SECTION 9x: USER UNIQUENESS, REQUIRED ON PUT, RETURNED ON PATCH/.search
+========================================
+PASS: 9x.0: Created two users for uniqueness collision tests
+
+--- 9x: uniqueness:server — User PUT ---
+PASS: 9x.1: PUT userName collision returns 409 Conflict
+PASS: 9x.2: PUT externalId collision returns 409 Conflict
+PASS: 9x.3: PUT self-update with own userName succeeds (200)
+PASS: 9x.4: PUT case-insensitive userName collision returns 409
+
+--- 9x: uniqueness:server — User PATCH ---
+PASS: 9x.5: PATCH userName collision returns 409 Conflict
+PASS: 9x.6: PATCH externalId collision returns 409 Conflict
+PASS: 9x.7: PATCH non-unique field succeeds (200)
+
+--- 9x: required:true — PUT enforcement ---
+PASS: 9x.8: PUT missing required userName returns 400
+PASS: 9x.9: PUT with all required fields succeeds (200)
+
+--- 9x: returned:never on PATCH response ---
+PASS: 9x.10: PATCH response does not include password (returned:never)
+PASS: 9x.11: PATCH response includes id + userName (returned:always)
+
+--- 9x: returned characteristics on .search ---
+PASS: 9x.12: .search does not return password (returned:never)
+PASS: 9x.13: .search returns id (returned:always)
+PASS: 9x.14: .search returns userName (returned:always)
+PASS: 9x.15: .search excludedAttributes=id still returns id (always-returned protected)
+
+--- 9x: Cleaning up test resources ---
+
+--- 9x: User Uniqueness, Required PUT, Returned on PATCH/.search Tests Complete ---
+
+
+========================================
+TEST SECTION 9y: GENERIC RESOURCE PARITY FIXES — SKIPPED (Admin API removed v0.28.0)
+========================================
+PASS: 9y: SKIPPED — uses deleted Admin RT API; parity tested in profile-combinations.e2e-spec.ts
+
+
+========================================
+TEST SECTION 9z: ENDPOINT PROFILES & PRESET DISCOVERY
+========================================
+
+--- Setup: Create Endpoints with Presets ---
+PASS: 9z.setup: Created entra-id endpoint
+PASS: 9z.setup: Created minimal endpoint
+PASS: 9z.setup: Created rfc-standard endpoint
+PASS: 9z.setup: Created user-only endpoint
+
+--- Test 9z.1: Schema count differs per preset ---
+PASS: 9z.1: entra-id has 7 schemas
+PASS: 9z.2: minimal has 2 schemas
+PASS: 9z.3: rfc-standard has 3 schemas
+
+--- Test 9z.4: SPC differs per preset ---
+PASS: 9z.4: minimal bulk=false
+PASS: 9z.5: minimal sort=false
+PASS: 9z.6: rfc-standard bulk=true
+PASS: 9z.7: rfc-standard sort=true
+
+--- Test 9z.8: user-only ResourceTypes ---
+PASS: 9z.8: user-only has 1 resource type
+PASS: 9z.9: user-only RT is User
+
+--- Test 9z.13: PATCH deep-merge settings ---
+PASS: 9z.13: PATCH added SoftDeleteEnabled
+PASS: 9z.14: schemas unchanged after settings PATCH
+
+--- Test 9z.15: Inline profile creation ---
+PASS: 9z.15: Inline profile endpoint created
+PASS: 9z.16: Inline profile has 1 schema
+
+--- Test 9z.17–9z.33: Partial PATCH Profile Settings & Combinations ---
+PASS: 9z.17: Created rfc-standard endpoint for PATCH tests
+PASS: 9z.18: PATCH added SoftDeleteEnabled via profile.settings
+PASS: 9z.19: profile.settings reflects SoftDeleteEnabled
+PASS: 9z.20: SoftDeleteEnabled preserved after second PATCH
+PASS: 9z.21: StrictSchemaValidation added
+PASS: 9z.22: SoftDeleteEnabled overwritten to False
+PASS: 9z.23: StrictSchemaValidation still True
+PASS: 9z.24: Schemas unchanged (3) after settings PATCH
+PASS: 9z.25: SPC bulk=true preserved after settings PATCH
+PASS: 9z.26: RequireIfMatch added
+PASS: 9z.27: VerbosePatchSupported added
+PASS: 9z.28: AllowAndCoerceBooleanStrings added
+PASS: 9z.29: Previous settings still preserved
+PASS: 9z.30: SPC bulk changed to false via PATCH
+PASS: 9z.31: SPC maxResults changed to 42
+PASS: 9z.32: Settings preserved after SPC PATCH
+PASS: 9z.33: displayName updated alongside settings
+PASS: 9z.34: Reprovision setting added
+
+--- Test 9z.35: PATCH with merged settings via profile ---
+PASS: 9z.35: SoftDeleteEnabled present after merged PATCH
+PASS: 9z.35: StrictSchemaValidation present after merged PATCH
+PASS: 9z.36: Cleaned up PATCH test endpoint
+
+--- Cleanup: Delete test endpoints ---
+PASS: 9z.cleanup: Deleted profile test endpoints
+
+--- 9z: Profile & Preset Discovery Tests Complete ---
+
+
+========================================
+TEST SECTION 9z-C: SCHEMA CHARACTERISTICS CACHE
+========================================
+PASS: 9z-C.1: Created cache test endpoint with name-collision extension
+PASS: 9z-C.2: POST coerces core active='True' to boolean true
+PASS: 9z-C.3: Extension active remains string 'True' (not coerced)
+PASS: 9z-C.4: returned:never attr 'badge' stripped from POST response
+PASS: 9z-C.5: GET strips badge (never), keeps department (default)
+PASS: 9z-C.6: LIST strips returned:never badge
+PASS: 9z-C.7: PUT coerces core, strips badge, preserves ext string
+PASS: 9z-C.8: PATCH strips badge, applies dept change
+PASS: 9z-C.9: 3 rapid POSTs show consistent cache behavior
+PASS: 9z-C.10: readOnly id/meta stripped from POST via cache
+PASS: 9z-C.11: returned:always attrs (id, userName) present in GET
+PASS: 9z-C.12: returned:default attr (department) present by default
+PASS: 9z-C.cleanup: Deleted cache test endpoint
+
+--- 9z-C: Schema Cache Tests Complete ---
+
+
+========================================
+TEST SECTION 9z-D: ADMIN ENDPOINT API IMPROVEMENTS
+========================================
+
+--- Test 9z-D.1: Envelope Response ---
+PASS: 9z-D.1: List response has totalResults
+PASS: 9z-D.2: List response has endpoints array
+PASS: 9z-D.3: totalResults >= 1
+PASS: 9z-D.4: endpoints.Count matches totalResults
+
+--- Test 9z-D.2: Summary View ---
+PASS: 9z-D.5: Summary view includes profileSummary
+PASS: 9z-D.6: Summary view omits full profile
+
+--- Test 9z-D.3: Full View ---
+PASS: 9z-D.7: Full view includes profile
+PASS: 9z-D.8: Full view omits profileSummary
+
+--- Test 9z-D.4: Single-Get Views ---
+PASS: 9z-D.9: Single-get defaults to full view
+PASS: 9z-D.10: Single-get with view=summary returns profileSummary
+PASS: 9z-D.11: Single-get with view=summary omits profile
+
+--- Test 9z-D.5: HATEOAS _links ---
+PASS: 9z-D.12: Response includes _links
+PASS: 9z-D.13: _links.self is correct
+PASS: 9z-D.14: _links.stats is correct
+PASS: 9z-D.15: _links.credentials is correct
+PASS: 9z-D.16: _links.scim is correct
+
+--- Test 9z-D.6: ISO Timestamps ---
+PASS: 9z-D.17: createdAt is present
+PASS: 9z-D.18: updatedAt is present
+Test-Result: C:\Users\v-prasrane\source\repos\SCIMServer\scripts\live-test.ps1:6896:22
+Line |
+6896 |  Test-Result -Success $createdValid -Message "9z-D.19: createdAt is a  …
+     |                       ~~~~~~~~~~~~~
+     | Cannot process argument transformation on parameter 'Success'. Cannot convert value
+     | "System.Object[]" to type "System.Boolean". Boolean parameters accept only Boolean values
+     | and numbers, such as $True, $False, 1 or 0.
+
+Test-Result: C:\Users\v-prasrane\source\repos\SCIMServer\scripts\live-test.ps1:6897:22
+Line |
+6897 |  Test-Result -Success $updatedValid -Message "9z-D.20: updatedAt is a  …
+     |                       ~~~~~~~~~~~~~
+     | Cannot process argument transformation on parameter 'Success'. Cannot convert value
+     | "System.Object[]" to type "System.Boolean". Boolean parameters accept only Boolean values
+     | and numbers, such as $True, $False, 1 or 0.
+
+
+--- Test 9z-D.7: ProfileSummary Content ---
+PASS: 9z-D.21: schemaCount > 0
+PASS: 9z-D.22: schemas count matches schemaCount
+PASS: 9z-D.23: resourceTypeCount present
+PASS: 9z-D.24: resourceTypes count matches
+PASS: 9z-D.25: serviceProviderConfig present
+PASS: 9z-D.26: activeSettings present
+PASS: 9z-D.27: Schema summary has id
+PASS: 9z-D.28: Schema summary has name
+PASS: 9z-D.29: Schema summary has attributeCount
+
+--- Test 9z-D.8: Presets API ---
+PASS: 9z-D.30: Presets list has totalResults
+PASS: 9z-D.31: At least 5 presets
+PASS: 9z-D.32: Presets list has presets array
+PASS: 9z-D.33: Contains entra-id preset
+PASS: 9z-D.34: Contains rfc-standard preset
+PASS: 9z-D.35: Contains minimal preset
+PASS: 9z-D.36: Exactly one default preset
+PASS: 9z-D.37: Default preset is entra-id
+PASS: 9z-D.38: Preset summary has schemaCount
+PASS: 9z-D.39: Preset summary has serviceProviderConfig
+
+--- Test 9z-D.9: Get Preset by Name ---
+PASS: 9z-D.40: Preset detail name is entra-id
+PASS: 9z-D.41: Preset detail default flag is true
+PASS: 9z-D.42: Preset detail has full profile
+PASS: 9z-D.43: Preset has schemas
+PASS: 9z-D.44: Preset has resourceTypes
+PASS: 9z-D.45: Unknown preset returns 404 (got 404)
+
+--- Test 9z-D.10: Nested Stats ---
+PASS: 9z-D.46: Stats has users object
+PASS: 9z-D.47: users has total
+PASS: 9z-D.48: users has active
+PASS: 9z-D.49: users has softDeleted
+PASS: 9z-D.50: Stats has groups object
+PASS: 9z-D.51: groups has total
+PASS: 9z-D.52: groups has active
+PASS: 9z-D.53: groups has softDeleted
+PASS: 9z-D.54: Stats has groupMembers
+PASS: 9z-D.55: groupMembers has total
+PASS: 9z-D.56: Stats has requestLogs
+PASS: 9z-D.57: requestLogs has total
+PASS: 9z-D.58: Old totalUsers field absent
+PASS: 9z-D.59: Old totalGroups field absent
+
+--- 9z-D: Admin Endpoint API Tests Complete ---
+
+
+========================================
+TEST SECTION 9z-E: URN DOT-PATH CACHE + PATCH COERCION + FP-1
+========================================
+PASS: 9z-E.1: Created dot-path cache test endpoint
+
+--- PATCH Coercion + FP-1 Tests ---
+PASS: 9z-E.2: Core active coerced to boolean true
+PASS: 9z-E.3: Extension active remains string (collision precision)
+PASS: 9z-E.4: Extension pin (returned:never) stripped from POST response
+PASS: 9z-E.5: FP-1 — SecretOnly extension removed entirely (all attrs returned:never)
+PASS: 9z-E.6: schemas[] does not include FP-1 removed extension URN
+PASS: 9z-E.7: schemas[] includes extension with visible attrs
+
+--- PATCH Operation Value Boolean Coercion ---
+PASS: 9z-E.8: PATCH no-path coerces active='False' to boolean false
+PASS: 9z-E.9: PATCH no-path string value preserved
+PASS: 9z-E.10: PATCH with path coerces active='True' to boolean true
+
+--- GET/LIST Verify Stripping ---
+PASS: 9z-E.11: GET strips returned:never pin
+PASS: 9z-E.12: GET does not include FP-1 removed extension
+
+--- Write-Response Projection ---
+PASS: 9z-E.13: POST+attributes= always-returned id present
+PASS: 9z-E.14: POST+attributes= requested attrs present
+PASS: 9z-E.cleanup: Deleted dot-path cache test endpoint
+
+--- 9z-E: URN Dot-Path Cache Tests Complete ---
+
+
+========================================
+TEST SECTION 10: DELETE OPERATIONS
+========================================
+
+--- Test: Delete User ---
+PASS: DELETE user works (returns 204, user not found after)
+
+--- Test: Delete Group ---
+PASS: DELETE group works
+
+
+========================================
+CLEANUP: Removing Test Endpoints
+========================================
+
+--- Deleting Test Endpoints (Cascade Delete) ---
+  ✅ Deleted Main Test Endpoint
+  ✅ Deleted No Flag Endpoint
+  ✅ Deleted Remove Flag Endpoint
+  ✅ Deleted Isolation Endpoint
+  ✅ Deleted Inactive Endpoint
+  ✅ Deleted No Remove All Endpoint
+  ✅ Deleted Verbose Patch Endpoint
+
+
+========================================
+FINAL TEST SUMMARY
+========================================
+Tests Passed: 692
+Tests Failed: 0
+Total Tests:  692
+Duration:     17.7s
+
+🎉 ALL TESTS PASSED!
+Resulting JSON is truncated as serialization has exceeded the set depth of 10.
+
+📊 Live test results JSON written to: test-results/live-2026-03-31_11-46-25.json
+
+========================================
+
