@@ -344,6 +344,13 @@ Content-Type: application/json
 
 Every endpoint is created with a **profile** — a unified JSONB document containing schemas, resource types, service provider config, and behavioral settings.
 
+Endpoints can be referenced by **ID (UUID) or name** in all SCIM URLs:
+
+```
+/scim/endpoints/{endpoint-id}/Users     ← by UUID
+/scim/endpoints/my-tenant/Users          ← by name
+```
+
 ### 6 Built-in Presets
 
 | Preset | Schemas | Resource Types | Bulk | Sort | ETag | Use Case |

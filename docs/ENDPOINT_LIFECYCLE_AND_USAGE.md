@@ -33,6 +33,13 @@ An **endpoint** in SCIMServer is an isolated tenant — a completely separate SC
 - Optional per-endpoint credentials
 - Request logs
 
+Endpoints can be referenced by **UUID or name** in all URLs:
+
+```
+/scim/endpoints/a1b2c3d4-e5f6-7890-abcd-ef1234567890/Users   ← by ID
+/scim/endpoints/my-tenant/Users                               ← by name
+```
+
 Think of each endpoint as a separate SCIM server instance running within a single SCIMServer deployment.
 
 ```

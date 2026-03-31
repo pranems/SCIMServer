@@ -29,7 +29,7 @@
 
 | Document | Description |
 |----------|-------------|
-| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** — every endpoint, request/response, status codes, curl examples |
+| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** — all 76 endpoints, request/response, status codes, summary table |
 | [ENDPOINT_LIFECYCLE_AND_USAGE.md](ENDPOINT_LIFECYCLE_AND_USAGE.md) | **Quick start** — endpoint lifecycle, usage recipes, common operations |
 | [TECHNICAL_DESIGN_DOCUMENT.md](TECHNICAL_DESIGN_DOCUMENT.md) | As-built architecture — layers, modules, data flow, Prisma schema |
 | [USER_API_CALL_TRACE.md](USER_API_CALL_TRACE.md) | Annotated end-to-end POST /Users call trace |
@@ -122,11 +122,13 @@
 
 | Artifact | Location | Description |
 |----------|----------|-------------|
-| OpenAPI Spec | [openapi/](openapi/) | Full OpenAPI 3.0 JSON definitions |
-| Postman Collection | [postman/](postman/) | Importable Postman collection |
-| Insomnia Collection | [insomnia/](insomnia/) | Importable Insomnia workspace |
+| OpenAPI Spec | [openapi/](openapi/) | OpenAPI 3.0 definitions (~37% coverage — SCIM + log-config endpoints) |
+| Postman Collection | [postman/](postman/) | Importable Postman collection (~35% coverage — SCIM + log-config) |
+| Insomnia Collection | [insomnia/](insomnia/) | Importable Insomnia workspace (~39% coverage — SCIM + log-config) |
 | Example JSONs | [examples/](examples/) | Request/response samples for all resource types |
 | Mermaid Diagrams | [create-user-sequence.mmd](create-user-sequence.mmd), [list-get-user-sequence.mmd](list-get-user-sequence.mmd) | Sequence diagrams |
+
+> **Note:** The OpenAPI spec, Postman, and Insomnia collections predate the multi-tenant endpoint architecture. They cover core SCIM operations and log-config but are missing admin endpoint management, per-endpoint credentials, /Me, custom resource types, database browser, and activity feed endpoints. See [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) for the definitive 76-endpoint reference.
 
 ## Archived Documentation
 
