@@ -144,6 +144,8 @@ Content-Type: application/json
 
 Settings are **deep-merged**: existing settings are preserved, only specified keys are added/overwritten. Schemas and SPC are replaced if provided.
 
+**Default behavior (no settings):** When an endpoint is created without explicit settings, the `entra-id` preset is applied automatically. Two flags default to `true` (`AllowAndCoerceBooleanStrings`, `PatchOpAllowRemoveAllMembers`). All others default to `false`. The `entra-id` preset additionally sets `VerbosePatchSupported`, `MultiOp…Add`, and `MultiOp…Remove` to `True`. See [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md#21-default-behavior--what-happens-out-of-the-box) for the full default matrix.
+
 ### DELETE /scim/admin/endpoints/:id
 
 Delete endpoint (**cascades** — deletes all users, groups, logs, credentials).

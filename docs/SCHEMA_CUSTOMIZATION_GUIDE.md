@@ -228,16 +228,20 @@ A custom resource type lets you manage resources beyond the built-in User and Gr
 
 ### 3.2 Prerequisites
 
-The `CustomResourceTypesEnabled` flag must be enabled for the endpoint:
+The `CustomResourceTypesEnabled` capability is automatically derived when your profile includes custom resource types beyond User and Group (v0.28.0+). Alternatively, you can define custom resource types in the inline profile:
 
 ```bash
-# Enable custom resource types for an endpoint
-curl -X PATCH "http://localhost:6000/admin/endpoints/${ENDPOINT_ID}" \
+# Create an endpoint with a custom resource type in the profile
+curl -X POST "http://localhost:6000/scim/admin/endpoints" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "config": {
-      "CustomResourceTypesEnabled": true
+    "name": "custom-endpoint",
+    "profile": {
+      "resourceTypes": [
+        { "id": "User", "name": "User", "endpoint": "/Users", "schema": "urn:ietf:params:scim:schemas:core:2.0:User" },
+        { "id": "Device", "name": "Device", "endpoint": "/Devices", "schema": "urn:custom:schemas:2.0:Device" }
+      ]
     }
   }'
 ```

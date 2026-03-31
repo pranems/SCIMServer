@@ -153,7 +153,18 @@ echo "Endpoint: $ENDPOINT_ID"
 
 ## Step 3: Configure the Endpoint
 
-Endpoints are created with sensible defaults. You can customize behavior per-endpoint:
+Endpoints are created with sensible defaults from the selected preset. **If you create an endpoint with no explicit settings** (or use the default `entra-id` preset), the following behavior applies out of the box:
+
+- **DELETE is hard-delete** — resources permanently removed
+- **Schema validation is lenient** — extension data accepted without strict URN checks
+- **`If-Match` is optional** — ETags validated when provided, but not required
+- **ReadOnly attributes silently stripped** — no error, no warning
+- **Boolean coercion ON** — `"True"`/`"False"` strings auto-converted to booleans (Entra compatibility)
+- **Dot-notation PATCH ON** — `name.givenName` paths resolved correctly (Entra compatibility)
+
+For the complete default-by-default behavior matrix and true/false effect of each flag, see [ENDPOINT_CONFIG_FLAGS_REFERENCE.md §2.1–2.2](ENDPOINT_CONFIG_FLAGS_REFERENCE.md#21-default-behavior--what-happens-out-of-the-box).
+
+You can customize behavior per-endpoint by PATCHing settings:
 
 ### Enable Common Flags
 

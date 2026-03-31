@@ -393,23 +393,28 @@ Content-Type: application/json
 
 ## Per-Endpoint Configuration Flags
 
-All flags are stored in `profile.settings` and can be PATCHed per-endpoint:
+All flags are stored in `profile.settings` and can be PATCHed per-endpoint. When you create an endpoint with no explicit settings (or use the default `entra-id` preset), sensible defaults are applied automatically.
 
-| Flag | Type | Default | Description |
-|------|------|---------|-------------|
-| `MultiOpPatchRequestAddMultipleMembersToGroup` | bool/string | — | Allow multi-member PATCH add |
-| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | bool/string | — | Allow multi-member PATCH remove |
-| `PatchOpAllowRemoveAllMembers` | bool/string | — | Allow remove-all-members via `path=members` |
-| `VerbosePatchSupported` | bool/string | — | Enable dot-notation PATCH paths |
-| `SoftDeleteEnabled` | bool/string | — | DELETE → soft-delete (set active=false) |
-| `StrictSchemaValidation` | bool/string | — | Require extension URNs in `schemas[]` |
-| `RequireIfMatch` | bool/string | — | Require `If-Match` header on PUT/PATCH/DELETE |
-| `AllowAndCoerceBooleanStrings` | bool/string | — | Coerce `"True"`/`"False"` to booleans |
-| `ReprovisionOnConflictForSoftDeletedResource` | bool/string | — | Re-activate soft-deleted on 409 |
-| `PerEndpointCredentialsEnabled` | bool/string | — | Enable per-endpoint credential validation |
-| `IncludeWarningAboutIgnoredReadOnlyAttribute` | bool/string | — | Add warning header for readOnly stripping |
-| `IgnoreReadOnlyAttributesInPatch` | bool/string | — | Strip (don't error) readOnly PATCH ops |
-| `logLevel` | string/number | — | Per-endpoint log level override |
+> **Two flags default to `true`:** `AllowAndCoerceBooleanStrings` and `PatchOpAllowRemoveAllMembers`. All others default to `false`.
+> The `entra-id` preset additionally sets `VerbosePatchSupported`, `MultiOp…Add`, and `MultiOp…Remove` to `True`.
+
+| Flag | Default | When `true` | When `false` |
+|------|---------|-------------|--------------|
+| `AllowAndCoerceBooleanStrings` | **`true`** | `"True"`/`"False"` strings auto-converted to booleans | Strings pass through as-is |
+| `VerbosePatchSupported` | `false` | Dot-notation PATCH paths (`name.givenName`) resolved | Dot paths stored as literal keys |
+| `SoftDeleteEnabled` | `false` | DELETE → soft-delete (`active=false` + `deletedAt`) | DELETE permanently removes resource |
+| `StrictSchemaValidation` | `false` | Extension URNs required in `schemas[]`; readOnly PATCH → 400 | Lenient — extensions accepted without URN match |
+| `RequireIfMatch` | `false` | `If-Match` required on writes (428 if missing) | `If-Match` optional (validated when present) |
+| `ReprovisionOnConflictForSoftDeletedResource` | `false` | Re-activate soft-deleted on POST conflict | 409 Conflict on collision |
+| `PerEndpointCredentialsEnabled` | `false` | Per-endpoint bearer tokens (bcrypt) | Global shared secret / OAuth JWT only |
+| `IncludeWarningAboutIgnoredReadOnlyAttribute` | `false` | Warning header on readOnly stripping | Silent stripping |
+| `IgnoreReadOnlyAttributesInPatch` | `false` | Strip readOnly PATCH ops (don't error) when strict is on | 400 on readOnly PATCH ops when strict is on |
+| `MultiOpPatchRequestAddMultipleMembersToGroup` | `false` | Multi-member PATCH add | One member per op |
+| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | `false` | Multi-member PATCH remove | One member per op |
+| `PatchOpAllowRemoveAllMembers` | **`true`** | `path=members` removes all | Must specify member IDs |
+| `logLevel` | *(unset)* | Per-endpoint log level override | Global `LOG_LEVEL` used |
+
+For the complete flag reference with interaction rules: [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md)
 
 ### PATCH Settings
 
