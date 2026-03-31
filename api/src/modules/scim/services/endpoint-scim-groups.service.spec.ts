@@ -2640,12 +2640,12 @@ describe('EndpointScimGroupsService', () => {
       });
     });
 
-    describe('getRequestOnlyAttributes', () => {
+    describe('getRequestReturnedByParent', () => {
       it('should return a Set of request-only attribute names', () => {
-        const requestOnlyAttrs = service.getRequestOnlyAttributes(mockEndpoint.id);
+        const requestOnlyAttrs = service.getRequestReturnedByParent(mockEndpoint.id);
 
         // The default Group schema has no request-only attributes
-        expect(requestOnlyAttrs).toBeInstanceOf(Set);
+        expect(requestOnlyAttrs).toBeInstanceOf(Map);
         expect(requestOnlyAttrs.size).toBe(0);
       });
     });

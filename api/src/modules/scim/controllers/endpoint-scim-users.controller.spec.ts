@@ -41,9 +41,11 @@ describe('EndpointScimUsersController', () => {
     patchUserForEndpoint: jest.fn(),
     replaceUserForEndpoint: jest.fn(),
     deleteUserForEndpoint: jest.fn(),
-    getRequestOnlyAttributes: jest.fn().mockReturnValue(new Set<string>()),
-    getAlwaysReturnedAttributes: jest.fn().mockReturnValue(new Set<string>()),
-    getAlwaysReturnedSubAttrs: jest.fn().mockReturnValue(new Map<string, Set<string>>()),
+    
+    
+    
+    getAlwaysReturnedByParent: jest.fn().mockReturnValue(new Map<string, Set<string>>()),
+    getRequestReturnedByParent: jest.fn().mockReturnValue(new Map<string, Set<string>>()),
   };
 
   const mockEndpointService = {
@@ -487,7 +489,7 @@ describe('EndpointScimUsersController', () => {
       mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
       mockUsersService.createUserForEndpoint.mockResolvedValue(mockUserWithRequestAttr);
       // Simulate a request-only attribute
-      mockUsersService.getRequestOnlyAttributes.mockReturnValue(new Set(['secretquestion']));
+      mockUsersService.getRequestReturnedByParent.mockReturnValue(new Map([['urn:ietf:params:scim:schemas:core:2.0:user', new Set(['secretquestion'])]]));
 
       const result = await controller.createUser('endpoint-1', createDto, mockRequest);
 
@@ -509,7 +511,7 @@ describe('EndpointScimUsersController', () => {
 
       mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
       mockUsersService.listUsersForEndpoint.mockResolvedValue(mockListResponse);
-      mockUsersService.getRequestOnlyAttributes.mockReturnValue(new Set(['secretquestion']));
+      mockUsersService.getRequestReturnedByParent.mockReturnValue(new Map([['urn:ietf:params:scim:schemas:core:2.0:user', new Set(['secretquestion'])]]));
 
       const result = await controller.listUsers('endpoint-1', mockRequest);
 
@@ -530,7 +532,7 @@ describe('EndpointScimUsersController', () => {
 
       mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
       mockUsersService.getUserForEndpoint.mockResolvedValue(fullUser);
-      mockUsersService.getRequestOnlyAttributes.mockReturnValue(new Set(['secretquestion']));
+      mockUsersService.getRequestReturnedByParent.mockReturnValue(new Map([['urn:ietf:params:scim:schemas:core:2.0:user', new Set(['secretquestion'])]]));
 
       const result = await controller.getUser('endpoint-1', 'scim-g8e-get', mockRequest);
 
@@ -557,7 +559,7 @@ describe('EndpointScimUsersController', () => {
 
       mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
       mockUsersService.replaceUserForEndpoint.mockResolvedValue(mockUserResult);
-      mockUsersService.getRequestOnlyAttributes.mockReturnValue(new Set(['secretquestion']));
+      mockUsersService.getRequestReturnedByParent.mockReturnValue(new Map([['urn:ietf:params:scim:schemas:core:2.0:user', new Set(['secretquestion'])]]));
 
       const result = await controller.replaceUser('endpoint-1', 'scim-g8e-put', replaceDto, mockRequest);
 
@@ -581,7 +583,7 @@ describe('EndpointScimUsersController', () => {
 
     beforeEach(() => {
       mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
-      mockUsersService.getRequestOnlyAttributes.mockReturnValue(new Set<string>());
+      mockUsersService.getRequestReturnedByParent.mockReturnValue(new Map<string, Set<string>>());
     });
 
     it('POST createUser with ?attributes= should only return requested attributes', async () => {
@@ -741,7 +743,7 @@ describe('EndpointScimUsersController', () => {
         secretQuestion: 'What is your pet?',
       };
       mockUsersService.createUserForEndpoint.mockResolvedValue({ ...userWithRequestAttr });
-      mockUsersService.getRequestOnlyAttributes.mockReturnValue(new Set(['secretquestion']));
+      mockUsersService.getRequestReturnedByParent.mockReturnValue(new Map([['urn:ietf:params:scim:schemas:core:2.0:user', new Set(['secretquestion'])]]));
 
       const result = await controller.createUser(
         'endpoint-1',
@@ -762,7 +764,7 @@ describe('EndpointScimUsersController', () => {
         secretQuestion: 'What is your pet?',
       };
       mockUsersService.createUserForEndpoint.mockResolvedValue({ ...userWithRequestAttr });
-      mockUsersService.getRequestOnlyAttributes.mockReturnValue(new Set(['secretquestion']));
+      mockUsersService.getRequestReturnedByParent.mockReturnValue(new Map([['urn:ietf:params:scim:schemas:core:2.0:user', new Set(['secretquestion'])]]));
 
       const result = await controller.createUser(
         'endpoint-1',

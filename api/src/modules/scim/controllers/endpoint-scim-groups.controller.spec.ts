@@ -41,9 +41,11 @@ describe('EndpointScimGroupsController', () => {
     patchGroupForEndpoint: jest.fn(),
     replaceGroupForEndpoint: jest.fn(),
     deleteGroupForEndpoint: jest.fn(),
-    getRequestOnlyAttributes: jest.fn().mockReturnValue(new Set<string>()),
-    getAlwaysReturnedAttributes: jest.fn().mockReturnValue(new Set<string>()),
-    getAlwaysReturnedSubAttrs: jest.fn().mockReturnValue(new Map<string, Set<string>>()),
+    
+    
+    
+    getAlwaysReturnedByParent: jest.fn().mockReturnValue(new Map<string, Set<string>>()),
+    getRequestReturnedByParent: jest.fn().mockReturnValue(new Map<string, Set<string>>()),
   };
 
   const mockEndpointService = {
@@ -465,7 +467,7 @@ describe('EndpointScimGroupsController', () => {
 
       mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
       mockGroupsService.createGroupForEndpoint.mockResolvedValue(mockGroupWithRequestAttr);
-      mockGroupsService.getRequestOnlyAttributes.mockReturnValue(new Set(['secrettag']));
+      mockGroupsService.getRequestReturnedByParent.mockReturnValue(new Map([['urn:ietf:params:scim:schemas:core:2.0:group', new Set(['secrettag'])]]));
 
       const result = await controller.createGroup('endpoint-1', createDto, mockRequest);
 
@@ -486,7 +488,7 @@ describe('EndpointScimGroupsController', () => {
 
       mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
       mockGroupsService.listGroupsForEndpoint.mockResolvedValue(mockListResponse);
-      mockGroupsService.getRequestOnlyAttributes.mockReturnValue(new Set(['secrettag']));
+      mockGroupsService.getRequestReturnedByParent.mockReturnValue(new Map([['urn:ietf:params:scim:schemas:core:2.0:group', new Set(['secrettag'])]]));
 
       const result = await controller.listGroups('endpoint-1', mockRequest);
 
@@ -506,7 +508,7 @@ describe('EndpointScimGroupsController', () => {
 
       mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
       mockGroupsService.getGroupForEndpoint.mockResolvedValue(fullGroup);
-      mockGroupsService.getRequestOnlyAttributes.mockReturnValue(new Set(['secrettag']));
+      mockGroupsService.getRequestReturnedByParent.mockReturnValue(new Map([['urn:ietf:params:scim:schemas:core:2.0:group', new Set(['secrettag'])]]));
 
       const result = await controller.getGroup('endpoint-1', 'scim-grp-g8e-get', mockRequest);
 
@@ -531,7 +533,7 @@ describe('EndpointScimGroupsController', () => {
 
       mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
       mockGroupsService.replaceGroupForEndpoint.mockResolvedValue(mockGroupResult);
-      mockGroupsService.getRequestOnlyAttributes.mockReturnValue(new Set(['secrettag']));
+      mockGroupsService.getRequestReturnedByParent.mockReturnValue(new Map([['urn:ietf:params:scim:schemas:core:2.0:group', new Set(['secrettag'])]]));
 
       const result = await controller.replaceGroup('endpoint-1', 'scim-grp-g8e-put', replaceDto, mockRequest);
 
@@ -554,7 +556,7 @@ describe('EndpointScimGroupsController', () => {
 
     beforeEach(() => {
       mockEndpointService.getEndpoint.mockResolvedValue(mockEndpoint);
-      mockGroupsService.getRequestOnlyAttributes.mockReturnValue(new Set<string>());
+      mockGroupsService.getRequestReturnedByParent.mockReturnValue(new Map<string, Set<string>>());
     });
 
     it('POST createGroup with ?attributes= should only return requested attributes', async () => {
@@ -710,7 +712,7 @@ describe('EndpointScimGroupsController', () => {
         secretTag: 'internal-only',
       };
       mockGroupsService.createGroupForEndpoint.mockResolvedValue({ ...groupWithRequestAttr });
-      mockGroupsService.getRequestOnlyAttributes.mockReturnValue(new Set(['secrettag']));
+      mockGroupsService.getRequestReturnedByParent.mockReturnValue(new Map([['urn:ietf:params:scim:schemas:core:2.0:group', new Set(['secrettag'])]]));
 
       const result = await controller.createGroup(
         'endpoint-1',
@@ -731,7 +733,7 @@ describe('EndpointScimGroupsController', () => {
         secretTag: 'internal-only',
       };
       mockGroupsService.createGroupForEndpoint.mockResolvedValue({ ...groupWithRequestAttr });
-      mockGroupsService.getRequestOnlyAttributes.mockReturnValue(new Set(['secrettag']));
+      mockGroupsService.getRequestReturnedByParent.mockReturnValue(new Map([['urn:ietf:params:scim:schemas:core:2.0:group', new Set(['secrettag'])]]));
 
       const result = await controller.createGroup(
         'endpoint-1',

@@ -24,7 +24,6 @@ import {
   SCIM_WARNING_URN,
   flattenParentChildMap,
 } from './scim-service-helpers';
-import { SCHEMA_CACHE_TOP_LEVEL } from '../../../domain/validation';
 
 // ─── parseJson ──────────────────────────────────────────────────────────────
 
@@ -340,11 +339,11 @@ describe('ScimSchemaHelpers', () => {
     });
   });
 
-  describe('getRequestOnlyAttributes', () => {
+  describe('getRequestReturnedByParent', () => {
     it('should return the request set from characteristics', () => {
       mockRegistry.getSchema.mockReturnValue(null);
-      const result = helpers.getRequestOnlyAttributes('ep-1');
-      expect(result).toBeInstanceOf(Set);
+      const result = helpers.getRequestReturnedByParent('ep-1');
+      expect(result).toBeInstanceOf(Map);
     });
   });
 
@@ -958,19 +957,19 @@ describe('stripReadOnlyPatchOps', () => {
 // ─── sanitizeBooleanStringsByParent — Parent-context-aware coercion ─────────
 
 describe('sanitizeBooleanStringsByParent', () => {
-  const TOP = SCHEMA_CACHE_TOP_LEVEL;
+  const CORE_URN = 'urn:ietf:params:scim:schemas:core:2.0:user';
 
   // Simulates rfc-standard schema: active (boolean) at top, primary (boolean) in emails/roles
   const boolMap = new Map<string, Set<string>>([
-    [TOP, new Set(['active'])],
-    ['emails', new Set(['primary'])],
-    ['roles', new Set(['primary'])],
-    ['addresses', new Set(['primary'])],
+    [CORE_URN, new Set(['active'])],
+    [`${CORE_URN}.emails`, new Set(['primary'])],
+    [`${CORE_URN}.roles`, new Set(['primary'])],
+    [`${CORE_URN}.addresses`, new Set(['primary'])],
   ]);
 
   it('should coerce top-level boolean string', () => {
     const obj: Record<string, unknown> = { active: 'True', userName: 'jdoe@test.com' };
-    sanitizeBooleanStringsByParent(obj, boolMap);
+    sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect(obj.active).toBe(true);
     expect(obj.userName).toBe('jdoe@test.com');
   });
@@ -982,7 +981,7 @@ describe('sanitizeBooleanStringsByParent', () => {
         { value: 'c@d.com', primary: 'False' },
       ],
     };
-    sanitizeBooleanStringsByParent(obj, boolMap);
+    sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect((obj.emails as any[])[0].primary).toBe(true);
     expect((obj.emails as any[])[1].primary).toBe(false);
   });
@@ -991,7 +990,7 @@ describe('sanitizeBooleanStringsByParent', () => {
     const obj: Record<string, unknown> = {
       roles: [{ value: 'admin', primary: 'True', type: 'work' }],
     };
-    sanitizeBooleanStringsByParent(obj, boolMap);
+    sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect((obj.roles as any[])[0].primary).toBe(true);
   });
 
@@ -1000,7 +999,7 @@ describe('sanitizeBooleanStringsByParent', () => {
     const obj: Record<string, unknown> = {
       roles: [{ value: 'true', primary: 'True' }],
     };
-    sanitizeBooleanStringsByParent(obj, boolMap);
+    sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect((obj.roles as any[])[0].value).toBe('true'); // string preserved
     expect((obj.roles as any[])[0].primary).toBe(true); // boolean coerced
   });
@@ -1011,28 +1010,28 @@ describe('sanitizeBooleanStringsByParent', () => {
       active: 'True',
       'urn:custom:ext': { active: 'True' },
     };
-    sanitizeBooleanStringsByParent(obj, boolMap);
+    sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect(obj.active).toBe(true); // core: coerced
     expect((obj['urn:custom:ext'] as any).active).toBe('True'); // extension: NOT coerced (no entry in boolMap for this parent)
   });
 
   it('should coerce extension boolean when extension key IS in map', () => {
     const extMap = new Map<string, Set<string>>([
-      [TOP, new Set(['active'])],
+      [CORE_URN, new Set(['active'])],
       ['urn:ext:2.0:user', new Set(['enabled'])],
     ]);
     const obj: Record<string, unknown> = {
       active: 'False',
       'urn:ext:2.0:User': { enabled: 'True' },
     };
-    sanitizeBooleanStringsByParent(obj, extMap);
+    sanitizeBooleanStringsByParent(obj, extMap, CORE_URN);
     expect(obj.active).toBe(false);
     expect((obj['urn:ext:2.0:User'] as any).enabled).toBe(true);
   });
 
   it('should handle empty boolMap (no coercion)', () => {
     const obj: Record<string, unknown> = { active: 'True' };
-    sanitizeBooleanStringsByParent(obj, new Map());
+    sanitizeBooleanStringsByParent(obj, new Map(), CORE_URN);
     expect(obj.active).toBe('True'); // not coerced
   });
 
@@ -1041,20 +1040,20 @@ describe('sanitizeBooleanStringsByParent', () => {
       name: { formatted: 'John', givenName: 'John' },
       emails: [{ value: 'a@b.com', primary: 'true' }],
     };
-    sanitizeBooleanStringsByParent(obj, boolMap);
+    sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect((obj.name as any).formatted).toBe('John'); // untouched
     expect((obj.emails as any[])[0].primary).toBe(true); // coerced
   });
 
   it('should handle case-insensitive "false"/"FALSE"', () => {
     const obj: Record<string, unknown> = { active: 'FALSE' };
-    sanitizeBooleanStringsByParent(obj, boolMap);
+    sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect(obj.active).toBe(false);
   });
 
   it('should not coerce non-true/false string values', () => {
     const obj: Record<string, unknown> = { active: 'yes' };
-    sanitizeBooleanStringsByParent(obj, boolMap);
+    sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect(obj.active).toBe('yes'); // not "true"/"false" — untouched
   });
 
@@ -1062,7 +1061,7 @@ describe('sanitizeBooleanStringsByParent', () => {
     const obj: Record<string, unknown> = {
       addresses: [{ type: 'work', primary: 'True', formatted: 'addr' }],
     };
-    sanitizeBooleanStringsByParent(obj, boolMap);
+    sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect((obj.addresses as any[])[0].primary).toBe(true);
     expect((obj.addresses as any[])[0].formatted).toBe('addr');
   });

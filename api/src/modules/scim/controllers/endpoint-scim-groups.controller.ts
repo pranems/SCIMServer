@@ -97,10 +97,9 @@ export class EndpointScimGroupsController {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const result = await this.groupsService.createGroupForEndpoint(dto, baseUrl, endpointId, config);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
-    const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
-    const alwaysReturnedAttrs = this.groupsService.getAlwaysReturnedAttributes(endpointId);
-    const alwaysReturnedSubs = this.groupsService.getAlwaysReturnedSubAttrs(endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
+    const alwaysByParent = this.groupsService.getAlwaysReturnedByParent(endpointId);
+    const requestByParent = this.groupsService.getRequestReturnedByParent(endpointId);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
     return this.attachWarnings(projected, config);
   }
 
@@ -134,33 +133,30 @@ export class EndpointScimGroupsController {
       config,
     );
 
-    const alwaysReturnedAttrs = this.groupsService.getAlwaysReturnedAttributes(endpointId);
-    const alwaysReturnedSubs = this.groupsService.getAlwaysReturnedSubAttrs(endpointId);
+    const alwaysByParent = this.groupsService.getAlwaysReturnedByParent(endpointId);
     if (attributes || excludedAttributes) {
-      const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
+      const requestByParent = this.groupsService.getRequestReturnedByParent(endpointId);
       return {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources,
           attributes,
           excludedAttributes,
-          requestOnlyAttrs,
-          alwaysReturnedAttrs,
-          alwaysReturnedSubs
+          alwaysByParent,
+          requestByParent
         )
       };
     }
-    const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
-    if (requestOnlyAttrs.size > 0) {
+    const requestByParent = this.groupsService.getRequestReturnedByParent(endpointId);
+    if (requestByParent.size > 0) {
       return {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources,
           undefined,
           undefined,
-          requestOnlyAttrs,
-          alwaysReturnedAttrs,
-          alwaysReturnedSubs
+          alwaysByParent,
+          requestByParent
         )
       };
     }
@@ -192,33 +188,30 @@ export class EndpointScimGroupsController {
       config,
     );
 
-    const alwaysReturnedAttrs = this.groupsService.getAlwaysReturnedAttributes(endpointId);
-    const alwaysReturnedSubs = this.groupsService.getAlwaysReturnedSubAttrs(endpointId);
+    const alwaysByParent = this.groupsService.getAlwaysReturnedByParent(endpointId);
     if (dto.attributes || dto.excludedAttributes) {
-      const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
+      const requestByParent = this.groupsService.getRequestReturnedByParent(endpointId);
       return {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources,
           dto.attributes,
           dto.excludedAttributes,
-          requestOnlyAttrs,
-          alwaysReturnedAttrs,
-          alwaysReturnedSubs
+          alwaysByParent,
+          requestByParent
         )
       };
     }
-    const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
-    if (requestOnlyAttrs.size > 0) {
+    const requestByParent = this.groupsService.getRequestReturnedByParent(endpointId);
+    if (requestByParent.size > 0) {
       return {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources,
           undefined,
           undefined,
-          requestOnlyAttrs,
-          alwaysReturnedAttrs,
-          alwaysReturnedSubs
+          alwaysByParent,
+          requestByParent
         )
       };
     }
@@ -239,10 +232,9 @@ export class EndpointScimGroupsController {
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const result = await this.groupsService.getGroupForEndpoint(id, baseUrl, endpointId, config);
-    const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
-    const alwaysReturnedAttrs = this.groupsService.getAlwaysReturnedAttributes(endpointId);
-    const alwaysReturnedSubs = this.groupsService.getAlwaysReturnedSubAttrs(endpointId);
-    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
+    const alwaysByParent = this.groupsService.getAlwaysReturnedByParent(endpointId);
+    const requestByParent = this.groupsService.getRequestReturnedByParent(endpointId);
+    return applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
   }
 
   /**
@@ -262,10 +254,9 @@ export class EndpointScimGroupsController {
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.groupsService.replaceGroupForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
-    const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
-    const alwaysReturnedAttrs = this.groupsService.getAlwaysReturnedAttributes(endpointId);
-    const alwaysReturnedSubs = this.groupsService.getAlwaysReturnedSubAttrs(endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
+    const alwaysByParent = this.groupsService.getAlwaysReturnedByParent(endpointId);
+    const requestByParent = this.groupsService.getRequestReturnedByParent(endpointId);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
     return this.attachWarnings(projected, config);
   }
 
@@ -286,10 +277,9 @@ export class EndpointScimGroupsController {
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.groupsService.patchGroupForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
-    const requestOnlyAttrs = this.groupsService.getRequestOnlyAttributes(endpointId);
-    const alwaysReturnedAttrs = this.groupsService.getAlwaysReturnedAttributes(endpointId);
-    const alwaysReturnedSubs = this.groupsService.getAlwaysReturnedSubAttrs(endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
+    const alwaysByParent = this.groupsService.getAlwaysReturnedByParent(endpointId);
+    const requestByParent = this.groupsService.getRequestReturnedByParent(endpointId);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
     return this.attachWarnings(projected, config);
   }
 

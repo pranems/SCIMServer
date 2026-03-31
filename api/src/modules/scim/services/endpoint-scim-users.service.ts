@@ -36,7 +36,6 @@ import {
   ScimSchemaHelpers,
   assertSchemaUniqueness,
 } from '../common/scim-service-helpers';
-import { SCHEMA_CACHE_TOP_LEVEL } from '../../../domain/validation';
 
 interface ListUsersParams {
   filter?: string;
@@ -489,13 +488,14 @@ export class EndpointScimUsersService {
       const coerceEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS, true);
       if (coerceEnabled) {
         const boolMap = this.schemaHelpers.getBooleansByParent(endpointId);
+        const coreUrnLower = this.schemaHelpers.getCoreSchemaUrnLower(endpointId);
         for (const op of patchDto.Operations) {
           if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
-            sanitizeBooleanStringsByParent(op.value as Record<string, unknown>, boolMap, SCHEMA_CACHE_TOP_LEVEL);
+            sanitizeBooleanStringsByParent(op.value as Record<string, unknown>, boolMap, coreUrnLower);
           } else if (Array.isArray(op.value)) {
             for (const item of op.value) {
               if (typeof item === 'object' && item !== null) {
-                sanitizeBooleanStringsByParent(item as Record<string, unknown>, boolMap, SCHEMA_CACHE_TOP_LEVEL);
+                sanitizeBooleanStringsByParent(item as Record<string, unknown>, boolMap, coreUrnLower);
               }
             }
           }
@@ -600,17 +600,42 @@ export class EndpointScimUsersService {
     // for precision. Prevents name-collision false positives (e.g., core `active` boolean
     // vs extension `active` string). Also prevents corruption of string attributes.
     const boolMap = this.schemaHelpers.getBooleansByParent(endpointId);
-    sanitizeBooleanStringsByParent(rawPayload, boolMap);
+    const coreUrnLower = this.schemaHelpers.getCoreSchemaUrnLower(endpointId);
+    sanitizeBooleanStringsByParent(rawPayload, boolMap, coreUrnLower);
 
     // G8e: Strip returned:'never' attributes from rawPayload (e.g. password)
     // Per RFC 7643 §2.4, these MUST NOT appear in any response.
-    // Uses parent-context-aware ByParent map to avoid name-collision false positives.
+    // Uses URN-dot-path ByParent map for collision-free stripping.
+    // AUDIT-1: Also strips returned:never sub-attrs within complex parents.
     const neverByParent = this.schemaHelpers.getNeverReturnedByParent(endpointId);
-    const coreNever = neverByParent.get(SCHEMA_CACHE_TOP_LEVEL);
+    const coreNever = neverByParent.get(coreUrnLower);
     if (coreNever) {
       for (const key of Object.keys(rawPayload)) {
         if (coreNever.has(key.toLowerCase())) {
           delete rawPayload[key];
+          continue;
+        }
+        // AUDIT-1: Strip returned:never sub-attrs within complex/multi-valued parents
+        const subNever = neverByParent.get(`${coreUrnLower}.${key.toLowerCase()}`);
+        if (subNever && subNever.size > 0) {
+          const val = rawPayload[key];
+          if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
+            for (const subKey of Object.keys(val as Record<string, unknown>)) {
+              if (subNever.has(subKey.toLowerCase())) {
+                delete (val as Record<string, unknown>)[subKey];
+              }
+            }
+          } else if (Array.isArray(val)) {
+            for (const item of val) {
+              if (typeof item === 'object' && item !== null) {
+                for (const subKey of Object.keys(item as Record<string, unknown>)) {
+                  if (subNever.has(subKey.toLowerCase())) {
+                    delete (item as Record<string, unknown>)[subKey];
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -620,13 +645,37 @@ export class EndpointScimUsersService {
     const schemas: [string, ...string[]] = [SCIM_CORE_USER_SCHEMA];
     for (const urn of extensionUrns) {
       if (urn in rawPayload) {
-        // Strip never-returned attrs inside extension objects (parent-context-aware)
-        const extNever = neverByParent.get(urn.toLowerCase());
+        // Strip never-returned attrs inside extension objects (URN-dot-path aware)
+        const urnLower = urn.toLowerCase();
+        const extNever = neverByParent.get(urnLower);
         const extObj = rawPayload[urn];
         if (extNever && typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
           for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
             if (extNever.has(extKey.toLowerCase())) {
               delete (extObj as Record<string, unknown>)[extKey];
+              continue;
+            }
+            // AUDIT-1: Strip returned:never sub-attrs within extension complex parents
+            const extSubNever = neverByParent.get(`${urnLower}.${extKey.toLowerCase()}`);
+            if (extSubNever && extSubNever.size > 0) {
+              const extVal = (extObj as Record<string, unknown>)[extKey];
+              if (typeof extVal === 'object' && extVal !== null && !Array.isArray(extVal)) {
+                for (const subKey of Object.keys(extVal as Record<string, unknown>)) {
+                  if (extSubNever.has(subKey.toLowerCase())) {
+                    delete (extVal as Record<string, unknown>)[subKey];
+                  }
+                }
+              } else if (Array.isArray(extVal)) {
+                for (const item of extVal) {
+                  if (typeof item === 'object' && item !== null) {
+                    for (const subKey of Object.keys(item as Record<string, unknown>)) {
+                      if (extSubNever.has(subKey.toLowerCase())) {
+                        delete (item as Record<string, unknown>)[subKey];
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
           // FP-1 fix: If extension is now empty after stripping, remove it entirely
@@ -658,25 +707,17 @@ export class EndpointScimUsersService {
   }
 
   /**
-   * Get the returned:'request' attribute names for User resources.
-   * Used by controllers to filter response attributes per RFC 7643 §2.4.
+   * Get the returned:'always' ByParent map for projection.
    */
-  getRequestOnlyAttributes(endpointId?: string): Set<string> {
-    return this.schemaHelpers.getRequestOnlyAttributes(endpointId);
+  getAlwaysReturnedByParent(endpointId?: string): Map<string, Set<string>> {
+    return this.schemaHelpers.getAlwaysReturnedByParent(endpointId);
   }
 
   /**
-   * Get the returned:'always' attribute names from schema definitions (R-RET-1).
+   * Get the returned:'request' ByParent map for projection.
    */
-  getAlwaysReturnedAttributes(endpointId?: string): Set<string> {
-    return this.schemaHelpers.getAlwaysReturnedAttributes(endpointId);
-  }
-
-  /**
-   * Get sub-attributes with returned:'always' grouped by parent (R-RET-3).
-   */
-  getAlwaysReturnedSubAttrs(endpointId?: string): Map<string, Set<string>> {
-    return this.schemaHelpers.getAlwaysReturnedSubAttrs(endpointId);
+  getRequestReturnedByParent(endpointId?: string): Map<string, Set<string>> {
+    return this.schemaHelpers.getRequestReturnedByParent(endpointId);
   }
 
   private buildMeta(user: UserRecord, baseUrl: string) {

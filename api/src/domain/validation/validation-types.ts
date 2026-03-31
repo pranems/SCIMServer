@@ -41,17 +41,29 @@ export interface ValidationResult {
 // ─── Schema Characteristics Cache ──────────────────────────────────────────
 
 /**
- * Precomputed Parent→Children maps for schema attribute characteristics.
+ * Precomputed URN-qualified dot-path maps for schema attribute characteristics.
  *
  * Built once at profile load time via `SchemaValidator.buildCharacteristicsCache()`.
- * Each map is keyed by lowercase parent attribute name (or `__top__` for top-level
- * attributes, or the full extension URN for extension schema top-level attributes).
+ * Each map is keyed by a **URN-qualified dot-path** (lowercase) that encodes the
+ * full ancestry of the attribute's parent, eliminating name-collision ambiguity:
+ *
+ * - **Top-level core attrs**:  `urn:ietf:params:scim:schemas:core:2.0:user`
+ * - **Top-level ext attrs**:   `urn:ietf:params:scim:schemas:extension:enterprise:2.0:user`
+ * - **Core sub-attrs**:        `urn:...:core:2.0:user.emails`  (children: `primary`, `value`, ...)
+ * - **Extension sub-attrs**:   `urn:...:enterprise:2.0:user.manager`  (children: `$ref`, `displayname`, ...)
+ * - **Deeper nesting**:        `urn:...:core:2.0:user.name.honorificprefix` (if ever complex)
+ *
  * Values are Sets of lowercase child attribute names matching the characteristic.
  *
  * This structure provides:
- * - **Precision**: Distinguishes `core:active` (boolean) from `ext:active` (string)
+ * - **Zero collisions**: Core `manager` vs extension `manager` have distinct keys
  * - **Zero per-request cost**: Precomputed once, O(1) lookups at runtime
- * - **Parent-context recursion**: Consumer passes `parentKey` through JSON tree walk
+ * - **Parent-context recursion**: Consumer builds `parentPath` through JSON tree walk
+ * - **Arbitrary depth**: Dot-path extends naturally for any nesting level
+ *
+ * At runtime, the walker starts with `coreSchemaUrn` as the initial parentPath.
+ * When it encounters a key starting with `urn:`, it switches to that URN as the
+ * new parentPath.  For all other keys, it appends `.${key}` to the current path.
  *
  * @see RFC 7643 §2 — Attribute Characteristics
  * @see docs/SCHEMA_AND_RESOURCETYPE_DATA_STRUCTURE_ANALYSIS.md
@@ -61,7 +73,7 @@ export interface SchemaCharacteristicsCache {
   booleansByParent: Map<string, Set<string>>;
   /** Parent → Set of returned:'never' or writeOnly child attribute names */
   neverReturnedByParent: Map<string, Set<string>>;
-  /** Parent → Set of returned:'always' child attribute names (top-level only) */
+  /** Parent → Set of returned:'always' child attribute names */
   alwaysReturnedByParent: Map<string, Set<string>>;
   /** Parent → Set of returned:'request' child attribute names */
   requestReturnedByParent: Map<string, Set<string>>;
@@ -71,12 +83,14 @@ export interface SchemaCharacteristicsCache {
   caseExactByParent: Map<string, Set<string>>;
   /** Pre-flattened set of caseExact:true attribute paths (lowercase, dotted for sub-attrs) — consumer convenience */
   caseExactPaths: Set<string>;
-  /** Sub-attributes with returned:'always' grouped by parent (R-RET-3) */
-  alwaysReturnedSubs: Map<string, Set<string>>;
   /** Unique-server attributes with schema URN context (for JSONB uniqueness) */
   uniqueAttrs: Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }>;
   /** Extension schema URNs declared on this endpoint's resource types */
   extensionUrns: readonly string[];
+  /** The lowercase core schema URN used as the root key in all *ByParent maps */
+  coreSchemaUrn: string;
+  /** Set of all schema URNs (lowercase) present in the cache for top-level key identification */
+  schemaUrnSet: ReadonlySet<string>;
   /** Precomputed core attribute lookup: lowercase name → SchemaAttributeDefinition */
   coreAttrMap: Map<string, SchemaAttributeDefinition>;
   /** Precomputed extension schema lookup: URN → SchemaDefinition */
@@ -92,7 +106,10 @@ export interface SchemaCharacteristicsCache {
   };
 }
 
-/** Sentinel key for top-level attributes in Parent→Children maps */
+/**
+ * @deprecated Use `cache.coreSchemaUrn` instead. Kept temporarily for migration.
+ * Sentinel key for top-level attributes in Parent→Children maps (legacy).
+ */
 export const SCHEMA_CACHE_TOP_LEVEL = '__top__';
 
 /**

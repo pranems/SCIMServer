@@ -2913,12 +2913,12 @@ describe('EndpointScimUsersService', () => {
       });
     });
 
-    describe('getRequestOnlyAttributes', () => {
+    describe('getRequestReturnedByParent', () => {
       it('should return a Set of request-only attribute names', () => {
-        const requestOnlyAttrs = service.getRequestOnlyAttributes(mockEndpoint.id);
+        const requestOnlyAttrs = service.getRequestReturnedByParent(mockEndpoint.id);
 
         // The default User schema has no request-only attributes, so the set should be empty
-        expect(requestOnlyAttrs).toBeInstanceOf(Set);
+        expect(requestOnlyAttrs).toBeInstanceOf(Map);
         expect(requestOnlyAttrs.size).toBe(0);
       });
     });

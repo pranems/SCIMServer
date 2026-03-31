@@ -95,10 +95,9 @@ export class EndpointScimUsersController {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const result = await this.usersService.createUserForEndpoint(dto, baseUrl, endpointId, config);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
-    const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
-    const alwaysReturnedAttrs = this.usersService.getAlwaysReturnedAttributes(endpointId);
-    const alwaysReturnedSubs = this.usersService.getAlwaysReturnedSubAttrs(endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
+    const alwaysByParent = this.usersService.getAlwaysReturnedByParent(endpointId);
+    const requestByParent = this.usersService.getRequestReturnedByParent(endpointId);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
     return this.attachWarnings(projected, config);
   }
 
@@ -132,34 +131,31 @@ export class EndpointScimUsersController {
       config,
     );
 
-    const alwaysReturnedAttrs = this.usersService.getAlwaysReturnedAttributes(endpointId);
-    const alwaysReturnedSubs = this.usersService.getAlwaysReturnedSubAttrs(endpointId);
+    const alwaysByParent = this.usersService.getAlwaysReturnedByParent(endpointId);
     if (attributes || excludedAttributes) {
-      const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
+      const requestByParent = this.usersService.getRequestReturnedByParent(endpointId);
       return {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources,
           attributes,
           excludedAttributes,
-          requestOnlyAttrs,
-          alwaysReturnedAttrs,
-          alwaysReturnedSubs
+          alwaysByParent,
+          requestByParent
         )
       };
     }
     // G8e: Even without projection params, strip returned:'request' attrs
-    const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
-    if (requestOnlyAttrs.size > 0) {
+    const requestByParent = this.usersService.getRequestReturnedByParent(endpointId);
+    if (requestByParent.size > 0) {
       return {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources,
           undefined,
           undefined,
-          requestOnlyAttrs,
-          alwaysReturnedAttrs,
-          alwaysReturnedSubs
+          alwaysByParent,
+          requestByParent
         )
       };
     }
@@ -191,33 +187,30 @@ export class EndpointScimUsersController {
       config,
     );
 
-    const alwaysReturnedAttrs = this.usersService.getAlwaysReturnedAttributes(endpointId);
-    const alwaysReturnedSubs = this.usersService.getAlwaysReturnedSubAttrs(endpointId);
+    const alwaysByParent = this.usersService.getAlwaysReturnedByParent(endpointId);
     if (dto.attributes || dto.excludedAttributes) {
-      const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
+      const requestByParent = this.usersService.getRequestReturnedByParent(endpointId);
       return {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources,
           dto.attributes,
           dto.excludedAttributes,
-          requestOnlyAttrs,
-          alwaysReturnedAttrs,
-          alwaysReturnedSubs
+          alwaysByParent,
+          requestByParent
         )
       };
     }
-    const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
-    if (requestOnlyAttrs.size > 0) {
+    const requestByParent = this.usersService.getRequestReturnedByParent(endpointId);
+    if (requestByParent.size > 0) {
       return {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources,
           undefined,
           undefined,
-          requestOnlyAttrs,
-          alwaysReturnedAttrs,
-          alwaysReturnedSubs
+          alwaysByParent,
+          requestByParent
         )
       };
     }
@@ -238,10 +231,9 @@ export class EndpointScimUsersController {
   ) {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const result = await this.usersService.getUserForEndpoint(id, baseUrl, endpointId, config);
-    const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
-    const alwaysReturnedAttrs = this.usersService.getAlwaysReturnedAttributes(endpointId);
-    const alwaysReturnedSubs = this.usersService.getAlwaysReturnedSubAttrs(endpointId);
-    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
+    const alwaysByParent = this.usersService.getAlwaysReturnedByParent(endpointId);
+    const requestByParent = this.usersService.getRequestReturnedByParent(endpointId);
+    return applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
   }
 
   /**
@@ -261,10 +253,9 @@ export class EndpointScimUsersController {
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.usersService.replaceUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
-    const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
-    const alwaysReturnedAttrs = this.usersService.getAlwaysReturnedAttributes(endpointId);
-    const alwaysReturnedSubs = this.usersService.getAlwaysReturnedSubAttrs(endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
+    const alwaysByParent = this.usersService.getAlwaysReturnedByParent(endpointId);
+    const requestByParent = this.usersService.getRequestReturnedByParent(endpointId);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
     return this.attachWarnings(projected, config);
   }
 
@@ -285,10 +276,9 @@ export class EndpointScimUsersController {
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.usersService.patchUserForEndpoint(id, dto, baseUrl, endpointId, config, ifMatch);
     // G8g: Apply attribute projection on write-response (RFC 7644 §3.9)
-    const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
-    const alwaysReturnedAttrs = this.usersService.getAlwaysReturnedAttributes(endpointId);
-    const alwaysReturnedSubs = this.usersService.getAlwaysReturnedSubAttrs(endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
+    const alwaysByParent = this.usersService.getAlwaysReturnedByParent(endpointId);
+    const requestByParent = this.usersService.getRequestReturnedByParent(endpointId);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
     return this.attachWarnings(projected, config);
   }
 

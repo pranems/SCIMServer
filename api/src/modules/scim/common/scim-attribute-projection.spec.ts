@@ -251,7 +251,7 @@ describe('applyAttributeProjectionToList', () => {
 
   it('should strip request-only attrs from all resources when passed', () => {
     const requestOnly = new Set(['active']);
-    const result = applyAttributeProjectionToList(resources, undefined, undefined, requestOnly);
+    const result = applyAttributeProjectionToList(resources, undefined, undefined, undefined, new Map([['urn:ietf:params:scim:schemas:core:2.0:user', requestOnly]]));
     expect(result).toHaveLength(2);
     expect(result[0].active).toBeUndefined();
     expect(result[1].active).toBeUndefined();
@@ -261,7 +261,7 @@ describe('applyAttributeProjectionToList', () => {
 
 // ─── G8e: returned:'request' filtering ────────────────────────────────────────
 
-describe('applyAttributeProjection with requestOnlyAttrs (G8e)', () => {
+describe('applyAttributeProjection with requestReturnedByParent (G8e)', () => {
   const user = {
     schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
     id: 'u1',
@@ -274,7 +274,7 @@ describe('applyAttributeProjection with requestOnlyAttrs (G8e)', () => {
 
   it('should strip request-only attrs when no attributes param specified', () => {
     const requestOnly = new Set(['costcenter', 'secretfield']);
-    const result = applyAttributeProjection(user, undefined, undefined, requestOnly);
+    const result = applyAttributeProjection(user, undefined, undefined, undefined, new Map([['urn:ietf:params:scim:schemas:core:2.0:user', requestOnly]]));
     expect(result.costCenter).toBeUndefined();
     expect(result.secretField).toBeUndefined();
     expect(result.userName).toBe('alice');
@@ -283,7 +283,7 @@ describe('applyAttributeProjection with requestOnlyAttrs (G8e)', () => {
 
   it('should include request-only attrs when explicitly in attributes param', () => {
     const requestOnly = new Set(['costcenter']);
-    const result = applyAttributeProjection(user, 'costCenter,userName', undefined, requestOnly);
+    const result = applyAttributeProjection(user, 'costCenter,userName', undefined, undefined, new Map([['urn:ietf:params:scim:schemas:core:2.0:user', requestOnly]]));
     expect(result.costCenter).toBe('CC-100');
     expect(result.userName).toBe('alice');
     expect(result.displayName).toBeUndefined();
@@ -291,19 +291,19 @@ describe('applyAttributeProjection with requestOnlyAttrs (G8e)', () => {
 
   it('should strip request-only attrs when using excludedAttributes', () => {
     const requestOnly = new Set(['costcenter']);
-    const result = applyAttributeProjection(user, undefined, 'displayName', requestOnly);
+    const result = applyAttributeProjection(user, undefined, 'displayName', undefined, new Map([['urn:ietf:params:scim:schemas:core:2.0:user', requestOnly]]));
     expect(result.costCenter).toBeUndefined();
     expect(result.displayName).toBeUndefined();
     expect(result.userName).toBe('alice');
   });
 
-  it('should not strip if requestOnlyAttrs is empty', () => {
-    const result = applyAttributeProjection(user, undefined, undefined, new Set());
+  it('should not strip if requestReturnedByParent is empty', () => {
+    const result = applyAttributeProjection(user, undefined, undefined, undefined, new Map());
     expect(result.costCenter).toBe('CC-100');
     expect(result.secretField).toBe('hidden-value');
   });
 
-  it('should not strip if requestOnlyAttrs is undefined', () => {
+  it('should not strip if requestReturnedByParent is undefined', () => {
     const result = applyAttributeProjection(user, undefined, undefined, undefined);
     expect(result).toBe(user); // reference identity — no-op
   });
@@ -317,7 +317,11 @@ describe('applyAttributeProjection with requestOnlyAttrs (G8e)', () => {
       },
     };
     const requestOnly = new Set(['costcenter']);
-    const result = applyAttributeProjection(userWithExt, undefined, undefined, requestOnly);
+    const urnLower = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:user';
+    const result = applyAttributeProjection(userWithExt, undefined, undefined, undefined, new Map([
+      ['urn:ietf:params:scim:schemas:core:2.0:user', requestOnly],
+      [urnLower, requestOnly],
+    ]));
     expect(result.costCenter).toBeUndefined();
     const ext = result['urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'] as Record<string, unknown>;
     expect(ext.costCenter).toBeUndefined();
@@ -328,7 +332,7 @@ describe('applyAttributeProjection with requestOnlyAttrs (G8e)', () => {
     const requestOnly = new Set(['costcenter']);
     const result = applyAttributeProjection(
       { ...user, CostCenter: 'CC-300' },
-      undefined, undefined, requestOnly,
+      undefined, undefined, undefined, new Map([['urn:ietf:params:scim:schemas:core:2.0:user', requestOnly]]),
     );
     expect(result.CostCenter).toBeUndefined();
   });
@@ -349,21 +353,21 @@ describe('P2 R-RET-1: schema-driven schemaAlwaysReturned', () => {
 
   it('should keep schema-declared always-returned attrs when attributes param used', () => {
     const schemaAlways = new Set(['displayname']);
-    const result = applyAttributeProjection(user, 'emails', undefined, undefined, schemaAlways);
+    const result = applyAttributeProjection(user, 'emails', undefined, new Map([['urn:ietf:params:scim:schemas:core:2.0:user', schemaAlways]]));
     expect(result.displayName).toBe('Alice');
     expect(result.emails).toBeDefined();
   });
 
   it('should not exclude schema-declared always-returned attrs via excludedAttributes', () => {
     const schemaAlways = new Set(['active']);
-    const result = applyAttributeProjection(user, undefined, 'active,displayName', undefined, schemaAlways);
+    const result = applyAttributeProjection(user, undefined, 'active,displayName', new Map([['urn:ietf:params:scim:schemas:core:2.0:user', schemaAlways]]));
     expect(result.active).toBe(true);
     expect(result.displayName).toBeUndefined();
   });
 
   it('should merge schema always set with base always set', () => {
     const schemaAlways = new Set(['emails']);
-    const result = applyAttributeProjection(user, 'active', undefined, undefined, schemaAlways);
+    const result = applyAttributeProjection(user, 'active', undefined, new Map([['urn:ietf:params:scim:schemas:core:2.0:user', schemaAlways]]));
     // Base always: id, schemas, meta, userName. Schema always: emails
     expect(result.id).toBe('u1');
     expect(result.userName).toBe('alice');
@@ -409,8 +413,8 @@ describe('P2 R-RET-3: sub-attr returned:always in projection', () => {
   };
 
   it('should include always sub-attrs when only some sub-attrs are requested', () => {
-    const alwaysSubs = new Map([['emails', new Set(['value'])]]);
-    const result = applyAttributeProjection(user, 'emails.type', undefined, undefined, undefined, alwaysSubs);
+    const alwaysSubs = new Map([['urn:ietf:params:scim:schemas:core:2.0:user.emails', new Set(['value'])]]);
+    const result = applyAttributeProjection(user, 'emails.type', undefined, alwaysSubs);
     const emails = result.emails as any[];
     expect(emails[0].type).toBe('work');
     expect(emails[0].value).toBe('a@b.com'); // returned:always sub-attr
@@ -418,8 +422,8 @@ describe('P2 R-RET-3: sub-attr returned:always in projection', () => {
   });
 
   it('should include all sub-attrs when entire attr is requested (no sub filtering)', () => {
-    const alwaysSubs = new Map([['emails', new Set(['value'])]]);
-    const result = applyAttributeProjection(user, 'emails', undefined, undefined, undefined, alwaysSubs);
+    const alwaysSubs = new Map([['urn:ietf:params:scim:schemas:core:2.0:user.emails', new Set(['value'])]]);
+    const result = applyAttributeProjection(user, 'emails', undefined, alwaysSubs);
     const emails = result.emails as any[];
     expect(emails[0].type).toBe('work');
     expect(emails[0].value).toBe('a@b.com');
@@ -431,12 +435,90 @@ describe('P2 R-RET-3: sub-attr returned:always in projection', () => {
       ...user,
       manager: { value: 'mgr-1', displayName: 'Boss', $ref: 'https://example.com/Users/mgr-1' },
     };
-    const alwaysSubs = new Map([['manager', new Set(['value'])]]);
-    const result = applyAttributeProjection(userWithManager, 'manager.displayName', undefined, undefined, undefined, alwaysSubs);
+    const alwaysSubs = new Map([['urn:ietf:params:scim:schemas:core:2.0:user.manager', new Set(['value'])]]);
+    const result = applyAttributeProjection(userWithManager, 'manager.displayName', undefined, alwaysSubs);
     const mgr = result.manager as Record<string, unknown>;
     expect(mgr.displayName).toBe('Boss');
     expect(mgr.value).toBe('mgr-1'); // always sub-attr
     expect(mgr.$ref).toBeUndefined(); // not always
+  });
+});
+
+// ─── AUDIT-2: returned:request sub-attribute stripping ────────────────────────
+
+describe('AUDIT-2: returned:request sub-attr stripping', () => {
+  const user = {
+    schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+    id: 'u1',
+    userName: 'alice',
+    name: {
+      givenName: 'Alice',
+      familyName: 'Example',
+      middleName: 'Marie',
+    },
+    emails: [
+      { value: 'a@b.com', type: 'work', internalId: 'int-1' },
+      { value: 'a@c.com', type: 'home', internalId: 'int-2' },
+    ],
+    meta: { resourceType: 'User' },
+  };
+
+  it('should strip returned:request sub-attrs from single-valued complex parent', () => {
+    const requestSubs = new Map([['urn:ietf:params:scim:schemas:core:2.0:user.name', new Set(['middlename'])]]);
+    const result = applyAttributeProjection(user, undefined, undefined, undefined, requestSubs);
+    const name = result.name as Record<string, unknown>;
+    expect(name.givenName).toBe('Alice');
+    expect(name.familyName).toBe('Example');
+    expect(name.middleName).toBeUndefined();
+  });
+
+  it('should strip returned:request sub-attrs from multi-valued complex parent', () => {
+    const requestSubs = new Map([['urn:ietf:params:scim:schemas:core:2.0:user.emails', new Set(['internalid'])]]);
+    const result = applyAttributeProjection(user, undefined, undefined, undefined, requestSubs);
+    const emails = result.emails as Array<Record<string, unknown>>;
+    expect(emails[0].value).toBe('a@b.com');
+    expect(emails[0].internalId).toBeUndefined();
+    expect(emails[1].value).toBe('a@c.com');
+    expect(emails[1].internalId).toBeUndefined();
+  });
+
+  it('should NOT strip returned:request sub-attrs when explicitly in attributes param', () => {
+    const requestSubs = new Map([['urn:ietf:params:scim:schemas:core:2.0:user.name', new Set(['middlename'])]]);
+    const result = applyAttributeProjection(user, 'name.middleName', undefined, undefined, requestSubs);
+    const name = result.name as Record<string, unknown>;
+    expect(name.middleName).toBe('Marie');
+  });
+
+  it('should strip returned:request sub-attrs even when no top-level requestReturnedByParent', () => {
+    const requestSubs = new Map([['urn:ietf:params:scim:schemas:core:2.0:user.name', new Set(['middlename'])]]);
+    const result = applyAttributeProjection(user, undefined, undefined, undefined, requestSubs);
+    const name = result.name as Record<string, unknown>;
+    expect(name.middleName).toBeUndefined();
+    expect(name.givenName).toBe('Alice');
+  });
+
+  it('should handle requestReturnedByParent=undefined gracefully', () => {
+    const result = applyAttributeProjection(user, undefined, undefined, undefined, undefined);
+    const name = result.name as Record<string, unknown>;
+    expect(name.middleName).toBe('Marie'); // not stripped without requestReturnedByParent
+  });
+
+  it('should strip returned:request sub-attrs inside extension URN objects', () => {
+    const resource = {
+      schemas: ['s1'],
+      id: 'u1',
+      'urn:ext:custom': {
+        department: 'Eng',
+        details: { internalCode: 'IC-123', label: 'Engineering' },
+      },
+      meta: { resourceType: 'User' },
+    };
+    const requestSubs = new Map([['urn:ietf:params:scim:schemas:core:2.0:user.details', new Set(['internalcode'])]]);
+    const result = applyAttributeProjection(resource, undefined, undefined, undefined, requestSubs);
+    const ext = result['urn:ext:custom'] as Record<string, unknown>;
+    const details = ext.details as Record<string, unknown>;
+    expect(details.label).toBe('Engineering');
+    expect(details.internalCode).toBeUndefined();
   });
 });
 
@@ -566,4 +648,82 @@ describe('stripReturnedNever (G8e)', () => {
     expect(extC).toBeDefined();
     expect(extC.visible).toBe('keep');
   });
+
+  // ─── AUDIT-1: returned:never sub-attribute stripping ─────────────────
+
+  it('should strip returned:never sub-attrs within complex parents (AUDIT-1)', () => {
+    const resource: Record<string, unknown> = {
+      schemas: ['s1'],
+      id: 'u1',
+      name: {
+        givenName: 'Alice',
+        familyName: 'Example',
+        secretHash: 'abc123',
+      },
+    };
+    const neverAttrs = new Set<string>(); // no top-level never attrs
+    const neverByParent = new Map<string, Set<string>>([
+      ['urn:ietf:params:scim:schemas:core:2.0:user.name', new Set(['secrethash'])],
+    ]);
+    const result = stripReturnedNever(resource, neverAttrs, neverByParent);
+    const name = result.name as Record<string, unknown>;
+    expect(name.givenName).toBe('Alice');
+    expect(name.familyName).toBe('Example');
+    expect(name.secretHash).toBeUndefined();
+  });
+
+  it('should strip returned:never sub-attrs from multi-valued complex (AUDIT-1)', () => {
+    const resource: Record<string, unknown> = {
+      schemas: ['s1'],
+      id: 'u1',
+      emails: [
+        { value: 'alice@work.com', type: 'work', internalKey: 'hidden' },
+        { value: 'alice@home.com', type: 'home', internalKey: 'hidden2' },
+      ],
+    };
+    const neverAttrs = new Set<string>();
+    const neverByParent = new Map<string, Set<string>>([
+      ['urn:ietf:params:scim:schemas:core:2.0:user.emails', new Set(['internalkey'])],
+    ]);
+    const result = stripReturnedNever(resource, neverAttrs, neverByParent);
+    const emails = result.emails as Array<Record<string, unknown>>;
+    expect(emails[0].value).toBe('alice@work.com');
+    expect(emails[0].internalKey).toBeUndefined();
+    expect(emails[1].value).toBe('alice@home.com');
+    expect(emails[1].internalKey).toBeUndefined();
+  });
+
+  it('should NOT recurse into extension URN blocks for sub-attrs (handled separately)', () => {
+    const resource: Record<string, unknown> = {
+      schemas: ['s1'],
+      id: 'u1',
+      'urn:ext:custom': {
+        department: 'Eng',
+        complexAttr: { subSecret: 'hidden' },
+      },
+    };
+    const neverAttrs = new Set<string>();
+    const neverByParent = new Map<string, Set<string>>([
+      ['complexattr', new Set(['subsecret'])],
+    ]);
+    // Extension block sub-attrs are NOT recursed into here — they are handled
+    // by the service-layer extension block loop. stripReturnedNever skips urn: keys.
+    const result = stripReturnedNever(resource, neverAttrs, neverByParent);
+    const ext = result['urn:ext:custom'] as Record<string, unknown>;
+    const complex = ext.complexAttr as Record<string, unknown>;
+    // The sub-attr should still be present since urn: keys are excluded from recursion
+    expect(complex.subSecret).toBe('hidden');
+  });
+
+  it('should handle neverByParent=undefined gracefully (AUDIT-1)', () => {
+    const resource: Record<string, unknown> = {
+      schemas: ['s1'],
+      id: 'u1',
+      name: { givenName: 'Alice', secretHash: 'abc' },
+    };
+    const result = stripReturnedNever(resource, new Set(), undefined);
+    const name = result.name as Record<string, unknown>;
+    expect(name.secretHash).toBe('abc'); // not stripped without neverByParent
+  });
 });
+

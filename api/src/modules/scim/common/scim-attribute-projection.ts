@@ -34,16 +34,29 @@
  */
 const ALWAYS_RETURNED_BASE = new Set(['schemas', 'id', 'meta', 'username']);
 
+/**
+ * Check if a URN dot-path key represents a sub-attribute entry (not a top-level URN).
+ * A key is a sub-attr key iff it contains a '.' AFTER the last ':' in the URN.
+ * This handles URNs with dots in version numbers (e.g., `urn:...:2.0:User`).
+ */
+function isSubAttrKey(key: string): boolean {
+  const lastColon = key.lastIndexOf(':');
+  return key.indexOf('.', lastColon) !== -1;
+}
+
 function getAlwaysReturnedForResource(
   resource: Record<string, unknown>,
-  schemaAlwaysReturned?: Set<string>,
+  alwaysReturnedByParent?: Map<string, Set<string>>,
 ): Set<string> {
   const alwaysReturned = new Set(ALWAYS_RETURNED_BASE);
 
-  // Merge schema-driven always-returned attributes (R-RET-1)
-  if (schemaAlwaysReturned) {
-    for (const attr of schemaAlwaysReturned) {
-      alwaysReturned.add(attr);
+  // Merge schema-driven always-returned top-level attributes from the ByParent map.
+  // With URN dot-path keys, top-level entries are bare URNs (no dot after last colon).
+  if (alwaysReturnedByParent) {
+    for (const [parent, children] of alwaysReturnedByParent) {
+      if (!isSubAttrKey(parent)) {
+        for (const attr of children) alwaysReturned.add(attr);
+      }
     }
   }
 
@@ -75,9 +88,8 @@ function getAlwaysReturnedForResource(
  * @param resource  The full SCIM resource object
  * @param attributes  Comma-separated list of attribute names to include (undefined = all)
  * @param excludedAttributes  Comma-separated list of attribute names to exclude (undefined = none)
- * @param requestOnlyAttrs  Set of lowercase attribute names with returned:'request' — stripped unless in `attributes`
- * @param schemaAlwaysReturned  Optional Set of lowercase attribute names with returned:'always' from schema definitions
- * @param alwaysSubs  Optional Map of parent attr → Set of sub-attr names with returned:'always' (R-RET-3)
+ * @param alwaysReturnedByParent  Parent→Children map for returned:'always' from schema cache
+ * @param requestReturnedByParent  Parent→Children map for returned:'request' from schema cache
  * @returns A new object with only the requested attributes
  *
  * Per RFC 7644 §3.4.2.5: If both are specified, attributes takes precedence.
@@ -86,23 +98,22 @@ export function applyAttributeProjection(
   resource: Record<string, unknown>,
   attributes?: string,
   excludedAttributes?: string,
-  requestOnlyAttrs?: Set<string>,
-  schemaAlwaysReturned?: Set<string>,
-  alwaysSubs?: Map<string, Set<string>>,
+  alwaysReturnedByParent?: Map<string, Set<string>>,
+  requestReturnedByParent?: Map<string, Set<string>>,
 ): Record<string, unknown> {
   let result = resource;
 
   // "attributes" takes precedence over "excludedAttributes" per RFC
   if (attributes) {
-    result = includeOnly(resource, parseAttrList(attributes), schemaAlwaysReturned, alwaysSubs);
+    result = includeOnly(resource, parseAttrList(attributes), alwaysReturnedByParent);
   } else if (excludedAttributes) {
-    result = excludeAttrs(resource, parseAttrList(excludedAttributes), schemaAlwaysReturned);
+    result = excludeAttrs(resource, parseAttrList(excludedAttributes), alwaysReturnedByParent);
   }
 
   // Strip returned:'request' attributes (unless explicitly named in `attributes`)
-  if (requestOnlyAttrs && requestOnlyAttrs.size > 0) {
+  if (requestReturnedByParent && requestReturnedByParent.size > 0) {
     const requestedSet = attributes ? parseAttrList(attributes) : new Set<string>();
-    result = stripRequestOnlyAttrs(result, requestOnlyAttrs, requestedSet);
+    result = stripRequestOnlyAttrs(result, requestReturnedByParent, requestedSet);
   }
 
   return result;
@@ -115,15 +126,14 @@ export function applyAttributeProjectionToList<T extends Record<string, unknown>
   resources: T[],
   attributes?: string,
   excludedAttributes?: string,
-  requestOnlyAttrs?: Set<string>,
-  schemaAlwaysReturned?: Set<string>,
-  alwaysSubs?: Map<string, Set<string>>,
+  alwaysReturnedByParent?: Map<string, Set<string>>,
+  requestReturnedByParent?: Map<string, Set<string>>,
 ): Record<string, unknown>[] {
-  if (!attributes && !excludedAttributes && (!requestOnlyAttrs || requestOnlyAttrs.size === 0)) {
+  if (!attributes && !excludedAttributes && (!requestReturnedByParent || requestReturnedByParent.size === 0)) {
     return resources;
   }
 
-  return resources.map(r => applyAttributeProjection(r, attributes, excludedAttributes, requestOnlyAttrs, schemaAlwaysReturned, alwaysSubs));
+  return resources.map(r => applyAttributeProjection(r, attributes, excludedAttributes, alwaysReturnedByParent, requestReturnedByParent));
 }
 
 /**
@@ -135,15 +145,35 @@ export function applyAttributeProjectionToList<T extends Record<string, unknown>
  *
  * Handles both top-level attributes and attributes within extension URN objects.
  *
- * @param resource   The SCIM resource to filter (mutated in place for performance)
- * @param neverAttrs Set of lowercase attribute names with returned:'never'
+ * @param resource       The SCIM resource to filter (mutated in place for performance)
+ * @param neverAttrs     Set of lowercase attribute names with returned:'never' (top-level)
+ * @param neverByParent  URN-dot-path→Children map for sub-attr stripping
  * @returns The resource with never-returned attributes removed
  */
 export function stripReturnedNever(
   resource: Record<string, unknown>,
   neverAttrs: Set<string>,
+  neverByParent?: Map<string, Set<string>>,
 ): Record<string, unknown> {
-  if (!neverAttrs || neverAttrs.size === 0) return resource;
+  const hasTopLevel = neverAttrs && neverAttrs.size > 0;
+  const hasSubs = neverByParent && neverByParent.size > 0;
+  if (!hasTopLevel && !hasSubs) return resource;
+
+  // Build a sub-attr lookup map keyed by last path segment (attr name) for O(1) lookup
+  // e.g., 'urn:...:core:2.0:user.emails' → 'emails' → Set<string>
+  let subNeverByAttrName: Map<string, Set<string>> | undefined;
+  if (hasSubs) {
+    subNeverByAttrName = new Map();
+    for (const [parent, children] of neverByParent!) {
+      if (isSubAttrKey(parent)) {
+        const dotIdx = parent.lastIndexOf('.');
+        const attrName = parent.substring(dotIdx + 1);
+        let existing = subNeverByAttrName.get(attrName);
+        if (!existing) { existing = new Set(); subNeverByAttrName.set(attrName, existing); }
+        for (const c of children) existing.add(c);
+      }
+    }
+  }
 
   for (const key of Object.keys(resource)) {
     if (neverAttrs.has(key.toLowerCase())) {
@@ -164,6 +194,34 @@ export function stripReturnedNever(
         delete resource[key];
       }
     }
+
+    // AUDIT-1: Recursively strip returned:never sub-attributes within complex parents.
+    // e.g. name.secretHash where secretHash has returned:never but name is readWrite.
+    if (subNeverByAttrName && value !== null && value !== undefined && !key.startsWith('urn:')) {
+      const subNever = subNeverByAttrName.get(key.toLowerCase());
+      if (subNever && subNever.size > 0) {
+        if (typeof value === 'object' && !Array.isArray(value)) {
+          const obj = value as Record<string, unknown>;
+          for (const subKey of Object.keys(obj)) {
+            if (subNever.has(subKey.toLowerCase())) {
+              delete obj[subKey];
+            }
+          }
+        } else if (Array.isArray(value)) {
+          // Multi-valued complex: strip from each element
+          for (const item of value) {
+            if (typeof item === 'object' && item !== null) {
+              const obj = item as Record<string, unknown>;
+              for (const subKey of Object.keys(obj)) {
+                if (subNever.has(subKey.toLowerCase())) {
+                  delete obj[subKey];
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   return resource;
@@ -173,38 +231,122 @@ export function stripReturnedNever(
 
 /**
  * Strip returned:'request' attributes from a resource.
- * These should only appear when explicitly requested via `attributes` param.
+ * Uses the full requestReturnedByParent map with URN dot-path keys:
+ * - Keys without '.' (bare URNs) → top-level request-only attributes
+ * - Keys with '.' (urn.attrName) → sub-attrs within complex parents
  */
 function stripRequestOnlyAttrs(
   resource: Record<string, unknown>,
-  requestOnlyAttrs: Set<string>,
+  requestByParent: Map<string, Set<string>>,
   requestedAttrs: Set<string>,
 ): Record<string, unknown> {
   const result = { ...resource };
 
+  // Collect all top-level request-only attrs from bare-URN keys
+  const topLevelRequest = new Set<string>();
+  for (const [parent, children] of requestByParent) {
+    if (!isSubAttrKey(parent)) {
+      for (const child of children) topLevelRequest.add(child);
+    }
+  }
+
+  // Build a sub-attr request map keyed by last segment (attr name) for O(1) lookup
+  const subReqByAttrName = new Map<string, Set<string>>();
+  for (const [parent, children] of requestByParent) {
+    if (isSubAttrKey(parent)) {
+      const dotIdx = parent.lastIndexOf('.');
+      const attrName = parent.substring(dotIdx + 1);
+      let existing = subReqByAttrName.get(attrName);
+      if (!existing) { existing = new Set(); subReqByAttrName.set(attrName, existing); }
+      for (const c of children) existing.add(c);
+    }
+  }
+
   for (const key of Object.keys(result)) {
     const keyLower = key.toLowerCase();
-    // Only strip if it's in request-only set AND not explicitly requested
-    if (requestOnlyAttrs.has(keyLower) && !requestedAttrs.has(keyLower)) {
+
+    // Top-level: strip if in request-only set AND not explicitly requested
+    if (topLevelRequest.has(keyLower) && !requestedAttrs.has(keyLower)) {
       delete result[key];
       continue;
     }
-    // Check inside extension URN objects
+
     const value = result[key];
+
+    // Extension URN objects: check extension-keyed + sub-attr entries
     if (typeof key === 'string' && key.startsWith('urn:') && typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      const keyLower = key.toLowerCase();
+      const urnLower = key.toLowerCase();
       const extCopy = { ...(value as Record<string, unknown>) };
       let changed = false;
       for (const extKey of Object.keys(extCopy)) {
         const extKeyLower = extKey.toLowerCase();
-        // Check both bare name and fully-qualified URN:attrName form
-        const fqn = `${keyLower}:${extKeyLower}`;
-        if (requestOnlyAttrs.has(extKeyLower) && !requestedAttrs.has(extKeyLower) && !requestedAttrs.has(fqn)) {
+        const fqn = `${urnLower}:${extKeyLower}`;
+        // Top-level extension attr with returned:request
+        if (topLevelRequest.has(extKeyLower) && !requestedAttrs.has(extKeyLower) && !requestedAttrs.has(fqn)) {
           delete extCopy[extKey];
           changed = true;
+          continue;
+        }
+        // Sub-attrs within extension complex parents
+        const extSubReq = subReqByAttrName.get(extKeyLower);
+        if (extSubReq && extSubReq.size > 0) {
+          const extVal = extCopy[extKey];
+          if (typeof extVal === 'object' && extVal !== null && !Array.isArray(extVal)) {
+            const subCopy = { ...(extVal as Record<string, unknown>) };
+            let subChanged = false;
+            for (const subKey of Object.keys(subCopy)) {
+              if (extSubReq.has(subKey.toLowerCase()) && !requestedAttrs.has(`${extKeyLower}.${subKey.toLowerCase()}`)) {
+                delete subCopy[subKey];
+                subChanged = true;
+              }
+            }
+            if (subChanged) { extCopy[extKey] = subCopy; changed = true; }
+          } else if (Array.isArray(extVal)) {
+            extCopy[extKey] = extVal.map(item => {
+              if (typeof item !== 'object' || item === null) return item;
+              const itemCopy = { ...(item as Record<string, unknown>) };
+              for (const subKey of Object.keys(itemCopy)) {
+                if (extSubReq.has(subKey.toLowerCase()) && !requestedAttrs.has(`${extKeyLower}.${subKey.toLowerCase()}`)) {
+                  delete itemCopy[subKey];
+                }
+              }
+              return itemCopy;
+            });
+            changed = true;
+          }
         }
       }
       if (changed) result[key] = extCopy;
+      continue;
+    }
+
+    // Core sub-attrs within complex/multi-valued parents
+    if (value !== null && value !== undefined) {
+      const subReq = subReqByAttrName.get(keyLower);
+      if (subReq && subReq.size > 0) {
+        if (typeof value === 'object' && !Array.isArray(value)) {
+          const subCopy = { ...(value as Record<string, unknown>) };
+          let subChanged = false;
+          for (const subKey of Object.keys(subCopy)) {
+            if (subReq.has(subKey.toLowerCase()) && !requestedAttrs.has(subKey.toLowerCase()) && !requestedAttrs.has(`${keyLower}.${subKey.toLowerCase()}`)) {
+              delete subCopy[subKey];
+              subChanged = true;
+            }
+          }
+          if (subChanged) result[key] = subCopy;
+        } else if (Array.isArray(value)) {
+          result[key] = value.map(item => {
+            if (typeof item !== 'object' || item === null) return item;
+            const itemCopy = { ...(item as Record<string, unknown>) };
+            for (const subKey of Object.keys(itemCopy)) {
+              if (subReq.has(subKey.toLowerCase()) && !requestedAttrs.has(subKey.toLowerCase()) && !requestedAttrs.has(`${keyLower}.${subKey.toLowerCase()}`)) {
+                delete itemCopy[subKey];
+              }
+            }
+            return itemCopy;
+          });
+        }
+      }
     }
   }
 
@@ -224,11 +366,26 @@ function parseAttrList(raw: string): Set<string> {
 function includeOnly(
   resource: Record<string, unknown>,
   attrs: Set<string>,
-  schemaAlwaysReturned?: Set<string>,
-  alwaysSubs?: Map<string, Set<string>>,
+  alwaysByParent?: Map<string, Set<string>>,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
-  const alwaysReturned = getAlwaysReturnedForResource(resource, schemaAlwaysReturned);
+  const alwaysReturned = getAlwaysReturnedForResource(resource, alwaysByParent);
+
+  // Build sub-attr always-returned lookup keyed by last path segment
+  // e.g., 'urn:...:core:2.0:user.emails' → 'emails' → Set<string>
+  let alwaysSubsByAttrName: Map<string, Set<string>> | undefined;
+  if (alwaysByParent) {
+    alwaysSubsByAttrName = new Map();
+    for (const [parent, children] of alwaysByParent) {
+      if (isSubAttrKey(parent)) {
+        const dotIdx = parent.lastIndexOf('.');
+        const attrName = parent.substring(dotIdx + 1);
+        let existing = alwaysSubsByAttrName.get(attrName);
+        if (!existing) { existing = new Set(); alwaysSubsByAttrName.set(attrName, existing); }
+        for (const c of children) existing.add(c);
+      }
+    }
+  }
 
   // Always include "always returned" attributes
   for (const key of alwaysReturned) {
@@ -301,7 +458,7 @@ function includeOnly(
       const value = resource[key];
 
       // R-RET-3: Merge in always-returned sub-attrs for this parent
-      const alwaysSubsForAttr = alwaysSubs?.get(attrLower);
+      const alwaysSubsForAttr = alwaysSubsByAttrName?.get(attrLower);
       const effectiveSubs = new Set(subs);
       if (alwaysSubsForAttr) {
         for (const alwaysSub of alwaysSubsForAttr) {
@@ -347,10 +504,10 @@ function includeOnly(
 function excludeAttrs(
   resource: Record<string, unknown>,
   attrs: Set<string>,
-  schemaAlwaysReturned?: Set<string>,
+  alwaysByParent?: Map<string, Set<string>>,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = { ...resource };
-  const alwaysReturned = getAlwaysReturnedForResource(resource, schemaAlwaysReturned);
+  const alwaysReturned = getAlwaysReturnedForResource(resource, alwaysByParent);
 
   // Group by top-level
   const topLevel = new Map<string, Set<string> | null>();

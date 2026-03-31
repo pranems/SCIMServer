@@ -14,7 +14,6 @@
  */
 import { AsyncLocalStorage } from 'async_hooks';
 import { SchemaValidator } from './schema-validator';
-import { SCHEMA_CACHE_TOP_LEVEL } from './validation-types';
 import type { SchemaDefinition, SchemaCharacteristicsCache } from './validation-types';
 import { flattenParentChildMap } from '../../modules/scim/common/scim-service-helpers';
 import type { EndpointProfile } from '../../modules/scim/endpoint-profile/endpoint-profile.types';
@@ -527,7 +526,6 @@ describe('Level 6: instanceof Map serialization guard', () => {
     expect(cache.neverReturnedByParent instanceof Map).toBe(true);
     expect(cache.alwaysReturnedByParent instanceof Map).toBe(true);
     expect(cache.caseExactPaths instanceof Set).toBe(true);
-    expect(cache.alwaysReturnedSubs instanceof Map).toBe(true);
     expect(cache.readOnlyCollected.core instanceof Set).toBe(true);
     expect(cache.readOnlyCollected.extensions instanceof Map).toBe(true);
   });

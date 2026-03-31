@@ -50,14 +50,13 @@ import {
   stripReadOnlyAttributes,
   stripReadOnlyPatchOps,
   assertSchemaUniqueness,
-  flattenParentChildMap,
 } from '../common/scim-service-helpers';
-import { SchemaValidator, SCHEMA_CACHE_TOP_LEVEL } from '../../../domain/validation';
+import { SchemaValidator } from '../../../domain/validation';
+import type { SchemaDefinition, SchemaAttributeDefinition, SchemaCharacteristicsCache } from '../../../domain/validation';
 import { stripReturnedNever } from '../common/scim-attribute-projection';
 import { ScimMetadataService } from './scim-metadata.service';
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import type { ScimResourceType } from '../discovery/scim-schema-registry';
-import type { SchemaDefinition, SchemaAttributeDefinition, SchemaCharacteristicsCache } from '../../../domain/validation';
 import { GenericPatchEngine } from '../../../domain/patch/generic-patch-engine';
 import { PatchError } from '../../../domain/patch/patch-error';
 import type { PatchOperation } from '../../../domain/patch/patch-types';
@@ -497,23 +496,16 @@ export class EndpointScimGenericService {
 
     enforceIfMatch(existing.version, ifMatch, config);
 
-    // ReadOnly attribute stripping for PATCH operations (RFC 7643 §2.2)
+    // AUDIT-4: ReadOnly attribute stripping for PATCH operations (RFC 7643 §2.2)
     // Matrix: strict OFF → strip; strict ON + IgnorePatchRO ON → strip; strict ON + IgnorePatchRO OFF → reject 400
+    // Sequencing aligned with Users/Groups: gate the strip, then conditionally reject or apply.
     const strictSchemaEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION);
     const ignorePatchReadOnly = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH);
-    {
+    if (!strictSchemaEnabled || ignorePatchReadOnly) {
       const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
       const readOnlyCachePatch = this.getSchemaCacheForRT(resourceType, endpointId)?.readOnlyCollected;
       const { filtered, stripped } = stripReadOnlyPatchOps(patchDto.Operations, schemaDefs, readOnlyCachePatch);
       if (stripped.length > 0) {
-        if (strictSchemaEnabled && !ignorePatchReadOnly) {
-          // G8c: Hard-reject readOnly writes on strict endpoints
-          throw createScimError({
-            status: 400,
-            scimType: 'mutability',
-            detail: `Attribute(s) [${stripped.join(', ')}] are readOnly and cannot be modified.`,
-          });
-        }
         this.scimLogger.warn(LogCategory.GENERAL, 'Stripped readOnly PATCH operations', {
           count: stripped.length, attributes: stripped,
         });
@@ -532,13 +524,14 @@ export class EndpointScimGenericService {
       const coerceEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS, true);
       if (coerceEnabled) {
         const boolMap = this.getBooleansByParentForRT(resourceType, endpointId);
+        const coreUrnLower = this.getSchemaCacheForRT(resourceType, endpointId)?.coreSchemaUrn ?? resourceType.schema.toLowerCase();
         for (const op of patchDto.Operations) {
           if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
-            sanitizeBooleanStringsByParent(op.value as Record<string, unknown>, boolMap, SCHEMA_CACHE_TOP_LEVEL);
+            sanitizeBooleanStringsByParent(op.value as Record<string, unknown>, boolMap, coreUrnLower);
           } else if (Array.isArray(op.value)) {
             for (const item of op.value) {
               if (typeof item === 'object' && item !== null) {
-                sanitizeBooleanStringsByParent(item as Record<string, unknown>, boolMap, SCHEMA_CACHE_TOP_LEVEL);
+                sanitizeBooleanStringsByParent(item as Record<string, unknown>, boolMap, coreUrnLower);
               }
             }
           }
@@ -753,30 +746,56 @@ export class EndpointScimGenericService {
     meta.version = `W/"${record.version}"`;
 
     // GEN-04: Parent-context-aware boolean sanitization on output
+    const cache = this.getSchemaCacheForRT(resourceType, record.endpointId);
+    const coreUrnLower = cache?.coreSchemaUrn ?? resourceType.schema.toLowerCase();
     const boolMap = this.getBooleansByParentForRT(resourceType, record.endpointId);
-    sanitizeBooleanStringsByParent(payload, boolMap);
+    sanitizeBooleanStringsByParent(payload, boolMap, coreUrnLower);
 
     // G8e: Strip returned:'never' attributes from payload (e.g. writeOnly secrets)
     // Per RFC 7643 §2.4, these MUST NOT appear in any response.
-    // Uses parent-context-aware ByParent map to avoid name-collision false positives.
-    const cache = this.getSchemaCacheForRT(resourceType, record.endpointId);
+    // Uses URN-dot-path ByParent map for collision-free stripping.
+    // AUDIT-1: Also strips returned:never sub-attrs within complex parents.
     const neverByParent = cache?.neverReturnedByParent;
-    const coreNever = neverByParent?.get(SCHEMA_CACHE_TOP_LEVEL);
+    const coreNever = neverByParent?.get(coreUrnLower);
     if (coreNever && coreNever.size > 0) {
-      stripReturnedNever(payload, coreNever);
+      stripReturnedNever(payload, coreNever, neverByParent);
     }
 
     // Build schemas array: core + extension URNs
     const schemas: string[] = [resourceType.schema];
     for (const ext of resourceType.schemaExtensions) {
       if (payload[ext.schema]) {
-        // Strip never-returned attrs inside extension objects (parent-context-aware)
-        const extNever = neverByParent?.get(ext.schema.toLowerCase());
+        // Strip never-returned attrs inside extension objects (URN-dot-path aware)
+        const extUrnLower = ext.schema.toLowerCase();
+        const extNever = neverByParent?.get(extUrnLower);
         const extObj = payload[ext.schema];
         if (extNever && typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
           for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
             if (extNever.has(extKey.toLowerCase())) {
               delete (extObj as Record<string, unknown>)[extKey];
+              continue;
+            }
+            // AUDIT-1: Strip returned:never sub-attrs within extension complex parents
+            const extSubNever = neverByParent?.get(`${extUrnLower}.${extKey.toLowerCase()}`);
+            if (extSubNever && extSubNever.size > 0) {
+              const extVal = (extObj as Record<string, unknown>)[extKey];
+              if (typeof extVal === 'object' && extVal !== null && !Array.isArray(extVal)) {
+                for (const subKey of Object.keys(extVal as Record<string, unknown>)) {
+                  if (extSubNever.has(subKey.toLowerCase())) {
+                    delete (extVal as Record<string, unknown>)[subKey];
+                  }
+                }
+              } else if (Array.isArray(extVal)) {
+                for (const item of extVal) {
+                  if (typeof item === 'object' && item !== null) {
+                    for (const subKey of Object.keys(item as Record<string, unknown>)) {
+                      if (extSubNever.has(subKey.toLowerCase())) {
+                        delete (item as Record<string, unknown>)[subKey];
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
           // FP-1 fix: If extension is now empty after stripping, remove it entirely
@@ -899,7 +918,8 @@ export class EndpointScimGenericService {
     if (!coerceEnabled) return;
 
     const boolMap = this.getBooleansByParentForRT(resourceType, endpointId);
-    sanitizeBooleanStringsByParent(dto, boolMap);
+    const coreUrnLower = this.getSchemaCacheForRT(resourceType, endpointId)?.coreSchemaUrn ?? resourceType.schema.toLowerCase();
+    sanitizeBooleanStringsByParent(dto, boolMap, coreUrnLower);
   }
 
   /**
@@ -1146,48 +1166,23 @@ export class EndpointScimGenericService {
   // ─── Public Accessors for Controller Attribute Projection (GEN-05/06/07) ──
 
   /**
-   * Get the returned:'request' attribute names for a resource type.
-   * Uses precomputed cache when available.
+   * Get the returned:'always' ByParent map for projection.
    */
-  getRequestOnlyAttributes(
-    resourceType: ScimResourceType,
-    endpointId: string,
-  ): Set<string> {
-    const cache = this.getSchemaCacheForRT(resourceType, endpointId);
-    if (cache) return flattenParentChildMap(cache.requestReturnedByParent);
-    const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-    const { request } = SchemaValidator.collectReturnedCharacteristics(schemaDefs);
-    return request;
-  }
-
-  /**
-   * Get the returned:'always' attribute names from schema definitions (R-RET-1).
-   * Uses precomputed cache when available.
-   */
-  getAlwaysReturnedAttributes(
-    resourceType: ScimResourceType,
-    endpointId: string,
-  ): Set<string> {
-    const cache = this.getSchemaCacheForRT(resourceType, endpointId);
-    if (cache) return flattenParentChildMap(cache.alwaysReturnedByParent);
-    const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-    const { always } = SchemaValidator.collectReturnedCharacteristics(schemaDefs);
-    return always;
-  }
-
-  /**
-   * Get sub-attributes with returned:'always' grouped by parent (R-RET-3).
-   * Uses precomputed cache when available.
-   */
-  getAlwaysReturnedSubAttrs(
+  getAlwaysReturnedByParent(
     resourceType: ScimResourceType,
     endpointId: string,
   ): Map<string, Set<string>> {
-    const cache = this.getSchemaCacheForRT(resourceType, endpointId);
-    if (cache) return cache.alwaysReturnedSubs;
-    const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
-    const { alwaysSubs } = SchemaValidator.collectReturnedCharacteristics(schemaDefs);
-    return alwaysSubs;
+    return this.getSchemaCacheForRT(resourceType, endpointId)?.alwaysReturnedByParent ?? new Map();
+  }
+
+  /**
+   * Get the returned:'request' ByParent map for projection.
+   */
+  getRequestReturnedByParent(
+    resourceType: ScimResourceType,
+    endpointId: string,
+  ): Map<string, Set<string>> {
+    return this.getSchemaCacheForRT(resourceType, endpointId)?.requestReturnedByParent ?? new Map();
   }
 
   /**
