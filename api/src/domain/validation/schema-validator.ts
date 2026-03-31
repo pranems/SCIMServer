@@ -28,7 +28,6 @@ import type {
   ValidationOptions,
   ValidationResult,
 } from './validation-types';
-import { SCHEMA_CACHE_TOP_LEVEL } from './validation-types';
 
 /**
  * Reserved top-level SCIM keys that are never user-defined attributes.
@@ -1084,12 +1083,14 @@ export class SchemaValidator {
    */
   static collectReturnedCharacteristics(
     schemas: readonly SchemaDefinition[],
-  ): { never: Set<string>; request: Set<string>; always: Set<string>; alwaysSubs: Map<string, Set<string>> } {
+  ): { never: Set<string>; request: Set<string>; always: Set<string>; alwaysSubs: Map<string, Set<string>>; requestSubs: Map<string, Set<string>> } {
     const never = new Set<string>();
     const request = new Set<string>();
     const always = new Set<string>();
     // R-RET-3: Sub-attr returned:'always' — map of parentAttrLower → Set<subAttrNameLower>
     const alwaysSubs = new Map<string, Set<string>>();
+    // AUDIT-2: Sub-attr returned:'request' — map of parentAttrLower → Set<subAttrNameLower>
+    const requestSubs = new Map<string, Set<string>>();
 
     const collect = (attrs: readonly SchemaAttributeDefinition[], parentName?: string): void => {
       for (const attr of attrs) {
@@ -1099,6 +1100,13 @@ export class SchemaValidator {
           never.add(attr.name.toLowerCase());
         } else if (returned === 'request') {
           request.add(attr.name.toLowerCase());
+          // AUDIT-2: Sub-attribute with returned:'request'
+          if (parentName) {
+            if (!requestSubs.has(parentName)) {
+              requestSubs.set(parentName, new Set());
+            }
+            requestSubs.get(parentName)!.add(attr.name.toLowerCase());
+          }
         } else if (returned === 'always') {
           if (parentName) {
             // R-RET-3: Sub-attribute with returned:'always'
@@ -1127,7 +1135,7 @@ export class SchemaValidator {
       collect(schema.attributes);
     }
 
-    return { never, request, always, alwaysSubs };
+    return { never, request, always, alwaysSubs, requestSubs };
   }
 
   // ─── CaseExact attribute collection (R-CASE-1) ───────────────────
@@ -1291,12 +1299,15 @@ export class SchemaValidator {
 
   /**
    * Build a precomputed `SchemaCharacteristicsCache` from schema definitions
-   * in a single tree walk. Produces Parent→Children maps for all characteristics.
+   * in a single tree walk. Produces URN-qualified dot-path maps for all characteristics.
    *
-   * The parent key is:
-   * - `SCHEMA_CACHE_TOP_LEVEL` ("__top__") for core schema top-level attributes
-   * - The extension schema URN (lowercase) for extension top-level attributes
-   * - The parent attribute name (lowercase) for sub-attributes of complex types
+   * The parent key is a URN-qualified dot-path (lowercase):
+   * - `urn:...:core:2.0:user`               — core schema top-level attributes
+   * - `urn:...:enterprise:2.0:user`          — extension schema top-level attributes
+   * - `urn:...:core:2.0:user.emails`         — sub-attributes within core complex parent
+   * - `urn:...:enterprise:2.0:user.manager`  — sub-attributes within extension complex parent
+   *
+   * This eliminates name-collision ambiguity at any nesting depth.
    *
    * Called once at profile load / endpoint create / profile PATCH.
    * The returned cache is attached to the profile and consumed by all
@@ -1304,7 +1315,7 @@ export class SchemaValidator {
    *
    * @param schemas        Schema definitions (core + extension)
    * @param extensionUrns  Extension URNs from resource type declarations
-   * @returns Precomputed cache with all Parent→Children maps
+   * @returns Precomputed cache with all URN-qualified dot-path maps
    */
   static buildCharacteristicsCache(
     schemas: readonly SchemaDefinition[],
@@ -1318,8 +1329,11 @@ export class SchemaValidator {
     const immutableByParent = new Map<string, Set<string>>();
     const caseExactByParent = new Map<string, Set<string>>();
     const caseExactPaths = new Set<string>();
-    const alwaysReturnedSubs = new Map<string, Set<string>>();
     const uniqueAttrs: Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }> = [];
+
+    // Track core schema URN and all schema URNs for the cache
+    let coreUrn = '';
+    const allSchemaUrns = new Set<string>();
 
     // Precomputed attribute definition lookup maps
     const coreAttrMap = new Map<string, SchemaAttributeDefinition>();
@@ -1334,8 +1348,14 @@ export class SchemaValidator {
 
     for (const schema of schemas) {
       const isCore = isCoreSchema(schema);
-      // Top-level parent key: __top__ for core, extension URN (lowercase) for extensions
-      const topParent = isCore ? SCHEMA_CACHE_TOP_LEVEL : schema.id.toLowerCase();
+      // Top-level parent key: always the schema URN (lowercase)
+      const topParent = schema.id.toLowerCase();
+
+      // Track core schema URN (first core schema wins)
+      if (isCore && !coreUrn) {
+        coreUrn = topParent;
+      }
+      allSchemaUrns.add(topParent);
 
       // Build attribute definition lookups
       if (isCore) {
@@ -1366,12 +1386,7 @@ export class SchemaValidator {
             addTo(neverReturnedByParent, parentKey, nameLower);
           }
           if (returned === 'always') {
-            if (isTopLevel) {
-              addTo(alwaysReturnedByParent, parentKey, nameLower);
-            } else {
-              // R-RET-3: Sub-attribute with returned:'always'
-              addTo(alwaysReturnedSubs, parentKey, nameLower);
-            }
+            addTo(alwaysReturnedByParent, parentKey, nameLower);
           }
           if (returned === 'request') {
             addTo(requestReturnedByParent, parentKey, nameLower);
@@ -1389,8 +1404,20 @@ export class SchemaValidator {
           if (attr.caseExact === true) {
             addTo(caseExactByParent, parentKey, nameLower);
             // Also build dotted path for filter consumer convenience
-            const isTop = parentKey === SCHEMA_CACHE_TOP_LEVEL || parentKey.startsWith('urn:');
-            caseExactPaths.add(isTop ? nameLower : `${parentKey}.${nameLower}`);
+            // Strip the leading URN prefix for the flat caseExactPaths set
+            if (allSchemaUrns.has(parentKey)) {
+              // Top-level attribute: just the name
+              caseExactPaths.add(nameLower);
+            } else {
+              // Sub-attribute: find the URN prefix and extract attr path after it
+              // e.g. 'urn:...:core:2.0:user.emails' → 'emails', then 'emails.value'
+              let urnPrefix = '';
+              for (const urn of allSchemaUrns) {
+                if (parentKey.startsWith(urn + '.')) { urnPrefix = urn; break; }
+              }
+              const pathAfterUrn = urnPrefix ? parentKey.substring(urnPrefix.length + 1) : parentKey;
+              caseExactPaths.add(`${pathAfterUrn}.${nameLower}`);
+            }
           }
 
           // ─── Uniqueness (top-level only, non-complex, non-multiValued) ───
@@ -1411,9 +1438,9 @@ export class SchemaValidator {
             }
           }
 
-          // ─── Recurse into sub-attributes ───
+          // ─── Recurse into sub-attributes (URN dot-path) ───
           if (attr.subAttributes) {
-            walkAttrs(attr.subAttributes, nameLower, false);
+            walkAttrs(attr.subAttributes, `${parentKey}.${nameLower}`, false);
           }
         }
       };
@@ -1424,6 +1451,11 @@ export class SchemaValidator {
     // ─── Build readOnlyCollected from readOnlyByParent ───────────────
     // Categorize into the {core, extensions, coreSubAttrs, extensionSubAttrs}
     // shape expected by stripReadOnlyAttributes / stripReadOnlyPatchOps.
+    // With URN dot-path keys, categorization is deterministic:
+    // - key === coreUrn → core top-level
+    // - key is in extUrnLowerSet → extension top-level
+    // - key starts with coreUrn + '.' → core sub-attrs
+    // - key starts with any ext URN + '.' → extension sub-attrs
     const roCore = new Set<string>();
     const roExtensions = new Map<string, Set<string>>();
     const roCoreSubAttrs = new Map<string, Set<string>>();
@@ -1438,45 +1470,33 @@ export class SchemaValidator {
     }
 
     for (const [parentKey, children] of readOnlyByParent) {
-      if (parentKey === SCHEMA_CACHE_TOP_LEVEL) {
+      if (parentKey === coreUrn) {
         // Core top-level readOnly attrs
         for (const child of children) roCore.add(child);
       } else if (extUrnLowerSet.has(parentKey)) {
         // Extension top-level readOnly attrs
-        // Find the original-case URN for this lowercase key
-        let originalUrn = parentKey;
-        for (const schema of schemas) {
-          if (schema.id.toLowerCase() === parentKey) { originalUrn = schema.id; break; }
-        }
-        let extSet = roExtensions.get(originalUrn.toLowerCase());
-        if (!extSet) { extSet = new Set(); roExtensions.set(originalUrn.toLowerCase(), extSet); }
+        let extSet = roExtensions.get(parentKey);
+        if (!extSet) { extSet = new Set(); roExtensions.set(parentKey, extSet); }
         for (const child of children) extSet.add(child);
+      } else if (coreUrn && parentKey.startsWith(coreUrn + '.')) {
+        // Core sub-attribute readOnly: extract the parent attr name after the URN
+        const attrName = parentKey.substring(coreUrn.length + 1);
+        roCoreSubAttrs.set(attrName, children);
       } else {
-        // Sub-attribute readOnly: parentKey is the parent attribute name.
-        // Determine whether this parent belongs to core or an extension schema.
-        // Check if any extension schema has a top-level attribute matching parentKey.
+        // Extension sub-attribute readOnly: find which extension URN this belongs to
         let belongsToExt: string | null = null;
-        for (const schema of schemas) {
-          if (!isCoreSchema(schema)) {
-            for (const attr of schema.attributes) {
-              if (attr.name.toLowerCase() === parentKey) {
-                belongsToExt = schema.id.toLowerCase();
-                break;
-              }
-            }
+        for (const extUrn of extUrnLowerSet) {
+          if (parentKey.startsWith(extUrn + '.')) {
+            belongsToExt = extUrn;
+            break;
           }
-          if (belongsToExt) break;
         }
-
         if (belongsToExt) {
-          // Extension sub-attribute readOnly
           if (!roExtensionSubAttrs.has(belongsToExt)) {
             roExtensionSubAttrs.set(belongsToExt, new Map());
           }
-          roExtensionSubAttrs.get(belongsToExt)!.set(parentKey, children);
-        } else {
-          // Core sub-attribute readOnly
-          roCoreSubAttrs.set(parentKey, children);
+          const attrName = parentKey.substring(belongsToExt.length + 1);
+          roExtensionSubAttrs.get(belongsToExt)!.set(attrName, children);
         }
       }
     }
@@ -1489,9 +1509,10 @@ export class SchemaValidator {
       immutableByParent,
       caseExactByParent,
       caseExactPaths,
-      alwaysReturnedSubs,
       uniqueAttrs,
       extensionUrns,
+      coreSchemaUrn: coreUrn,
+      schemaUrnSet: allSchemaUrns,
       coreAttrMap,
       extensionSchemaMap,
       readOnlyByParent,

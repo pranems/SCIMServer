@@ -4,7 +4,7 @@ Production-ready, multi-tenant SCIM 2.0 server purpose-built for Microsoft Entra
 
 | | |
 |---|---|
-| **Version** | `0.30.0` |
+| **Version** | `0.31.0` |
 | **Protocol** | SCIM 2.0 ([RFC 7643](https://datatracker.ietf.org/doc/html/rfc7643) / [RFC 7644](https://datatracker.ietf.org/doc/html/rfc7644)) |
 | **Target IdP** | [Microsoft Entra ID](https://entra.microsoft.com/) |
 | **Runtime** | Node.js 24 · NestJS 11 · TypeScript 5.9 |
@@ -41,7 +41,7 @@ Production-ready, multi-tenant SCIM 2.0 server purpose-built for Microsoft Entra
 | **Entra-validated** | 25/25 Microsoft SCIM Validator tests pass with 0 false positives |
 | **Multi-tenant isolation** | Each endpoint owns its schemas, resources, config flags, and optional dedicated credentials |
 | **6 endpoint presets** | `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `lexmark` — with tighten-only validation |
-| **Schema-driven validation** | RFC 7643 §2 attribute characteristics — type, required, mutability, returned, uniqueness, caseExact |
+| **Schema-driven validation** | RFC 7643 §2 attribute characteristics — type, required, mutability, returned, uniqueness, caseExact. Pre-computed URN-dot-path cache with zero per-request tree walks |
 | **Built-in observability UI** | Real-time activity feed, searchable log viewer, endpoint management dashboard |
 | **3-tier auth** | Per-endpoint bcrypt → OAuth 2.0 JWT → global shared secret fallback chain |
 | **ISV profiles** | Vendor-specific presets (Lexmark) with custom extensions + writeOnly/returned:never support |
@@ -89,7 +89,7 @@ docker run -d -p 8080:8080 \
   -e JWT_SECRET=changeme \
   -e SCIM_SHARED_SECRET=changeme \
   -e OAUTH_CLIENT_SECRET=changeme \
-  ghcr.io/pranems/scimserver:latest
+  ghcr.io/pranems/scimserver:0.31.0
 ```
 
 ### Verify It Works
@@ -97,8 +97,8 @@ docker run -d -p 8080:8080 \
 ```bash
 # 1. Get an OAuth token
 TOKEN=$(curl -s -X POST http://localhost:8080/scim/oauth/token \
-  -H "Content-Type: application/json" \
-  -d '{"grant_type":"client_credentials","client_id":"scimserver-client","client_secret":"changeme"}' \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d 'grant_type=client_credentials&client_id=scimserver-client&client_secret=changeme' \
   | jq -r .access_token)
 
 # 2. Create an endpoint
@@ -289,13 +289,9 @@ flowchart TD
 
 ```http
 POST /scim/oauth/token
-Content-Type: application/json
+Content-Type: application/x-www-form-urlencoded
 
-{
-  "grant_type": "client_credentials",
-  "client_id": "scimserver-client",
-  "client_secret": "<OAUTH_CLIENT_SECRET>"
-}
+grant_type=client_credentials&client_id=scimserver-client&client_secret=<OAUTH_CLIENT_SECRET>
 ```
 
 Response:
@@ -470,11 +466,11 @@ Content-Type: application/json
 
 | Layer | Suites | Tests | Framework |
 |-------|--------|-------|-----------|
-| **Unit** | 74 | 3,061 | Jest + ts-jest |
+| **Unit** | 74 | 3,090 | Jest + ts-jest |
 | **E2E** | 37 | 817 | Jest + supertest + NestJS testing |
 | **Live Integration** | 43 sections | ~951 | PowerShell (live-test.ps1) |
 | **ISV Live (Lexmark)** | 13 sections | 112 | PowerShell (lexmark-live-test.ps1) |
-| **Total** | **~160** | **~4,360** | — |
+| **Total** | **~167** | **~4,970** | — |
 
 ### Run Tests
 
@@ -529,7 +525,7 @@ SCIMServer/
 │   ├── prisma/
 │   │   └── schema.prisma        # 5 models (Endpoint, ScimResource, etc.)
 │   └── test/
-│       └── e2e/                 # 34 E2E spec files + helpers
+│       └── e2e/                 # 37 E2E spec files + helpers
 ├── scripts/
 │   ├── live-test.ps1            # Main live test suite (43 sections, ~951 tests)
 │   ├── lexmark-live-test.ps1    # Lexmark ISV live tests (13 sections, 112 tests)

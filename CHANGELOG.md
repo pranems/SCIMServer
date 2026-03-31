@@ -5,6 +5,46 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.31.0] - 2026-03-31
+
+### Added — URN-Qualified Dot-Path Schema Cache Keys
+
+- **URN dot-path cache keys**: All `*ByParent` maps now keyed by URN-qualified dot-paths (e.g., `urn:...:core:2.0:user.emails`) instead of `__top__` sentinel + plain names. Eliminates name-collision vulnerability at any nesting depth
+- **`coreSchemaUrn` cache field**: Lowercase core schema URN stored in cache for runtime walk seeding
+- **`schemaUrnSet` cache field**: Set of all schema URNs for top-level key identification
+- **`isSubAttrKey()` utility**: Exported function to classify URN dot-path keys (dot after last colon = sub-attr)
+- **`coercePatchOpBooleans()` shared helper**: Extracted from 3 identical PATCH loops in Users/Groups/Generic services
+- **`stripNeverReturnedFromPayload()` shared helper**: Extracted from 3 identical 40-line blocks in `toScimResource` methods. Handles core + extension top-level + sub-attr stripping + FP-1 cleanup. Returns visible extension URNs for dynamic `schemas[]` building
+- **13 new cache unit tests**: `isSubAttrKey` helpers (5), `coreSchemaUrn`/`schemaUrnSet` fields (7), sub-attr collision disambiguation (2) — all in schema-validator-cache.spec.ts
+- **17 new helper unit tests**: `coercePatchOpBooleans` (8) + `stripNeverReturnedFromPayload` (9) — in scim-service-helpers.spec.ts
+
+### Removed
+
+- **`SCHEMA_CACHE_TOP_LEVEL`** (`'__top__'`) constant + barrel export — zero consumers after URN dot-path refactor
+- **`sanitizeBooleanStrings()`** — flat exported function (superseded by `sanitizeBooleanStringsByParent()`)
+- **`getReturnedCharacteristics()`** method on `ScimSchemaHelpers` — zero production callers (controllers use direct `*ByParent` accessors)
+- **`flattenTopLevelFromByParent()` / `extractSubsFromByParent()`** — only called by dead `getReturnedCharacteristics()`
+- **`collectBooleanAttributeNames()`** — static method on SchemaValidator, zero callers
+- **13 dead tests** removed: `sanitizeBooleanStrings` (8), `getReturnedCharacteristics` (1), `flattenParentChildMap` (4)
+
+### Changed
+
+- **`SchemaCharacteristicsCache`**: Added `coreSchemaUrn: string`, `schemaUrnSet: ReadonlySet<string>`. All `*ByParent` maps now use URN dot-path keys
+- **`sanitizeBooleanStringsByParent()`**: Now requires `parentPath` argument (URN for root, auto-built during walk)
+- **`buildCharacteristicsCache()`**: Sub-attr recursion uses `${parentKey}.${nameLower}` (URN dot-path), `readOnlyCollected` derivation uses URN prefix matching
+- **Projection functions**: `stripRequestOnlyAttrs`, `stripReturnedNever`, `includeOnly`, `getAlwaysReturnedForResource` — build local attr-name-keyed lookups from URN dot-path maps via `isSubAttrKey()`
+- **Service never-returned stripping**: 3 services now call `stripNeverReturnedFromPayload()` instead of inline 40-line blocks
+- **PATCH boolean coercion**: 3 services now call `coercePatchOpBooleans()` instead of inline 12-line loops
+- **`coerceBooleansByParentIfEnabled()`**: Single `getSchemaCache()` call (was double)
+- **`getCaseExactAttributes()` / `getUniqueAttributes()`**: Direct cache read, no `collect*` fallback branches
+
+### Test Results
+
+- **Unit tests**: 3,090 passed (74 suites) — +29 net from v0.30.0
+- **E2E tests**: 817 (37 suites)
+- **Live tests**: ~951 assertions (main) + 112 Lexmark
+- **Total**: ~4,970 tests
+
 ## [0.30.0] - 2026-03-26
 
 ### Added — Admin Endpoint API Improvements

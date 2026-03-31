@@ -138,10 +138,9 @@ export class EndpointScimGenericController {
     );
     const result = await this.genericService.createResource(body, baseUrl, endpointId, resourceType, config);
     // GEN-05: Apply attribute projection on write-response (RFC 7644 §3.9)
-    const requestOnlyAttrs = this.genericService.getRequestOnlyAttributes(resourceType, endpointId);
-    const alwaysReturnedAttrs = this.genericService.getAlwaysReturnedAttributes(resourceType, endpointId);
-    const alwaysReturnedSubs = this.genericService.getAlwaysReturnedSubAttrs(resourceType, endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
+    const alwaysByParent = this.genericService.getAlwaysReturnedByParent(resourceType, endpointId);
+    const requestByParent = this.genericService.getRequestReturnedByParent(resourceType, endpointId);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
     return this.attachWarnings(projected, config);
   }
 
@@ -182,34 +181,30 @@ export class EndpointScimGenericController {
     );
 
     // GEN-06: Apply attribute projection on list responses
-    const alwaysReturnedAttrs = this.genericService.getAlwaysReturnedAttributes(resourceType, endpointId);
-    const alwaysReturnedSubs = this.genericService.getAlwaysReturnedSubAttrs(resourceType, endpointId);
+    const alwaysByParent = this.genericService.getAlwaysReturnedByParent(resourceType, endpointId);
+    const requestByParent = this.genericService.getRequestReturnedByParent(resourceType, endpointId);
     if (attributes || excludedAttributes) {
-      const requestOnlyAttrs = this.genericService.getRequestOnlyAttributes(resourceType, endpointId);
-      return {
+            return {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources as Record<string, unknown>[],
           attributes,
           excludedAttributes,
-          requestOnlyAttrs,
-          alwaysReturnedAttrs,
-          alwaysReturnedSubs,
+          alwaysByParent,
+          requestByParent,
         ),
       };
     }
     // Even without projection params, strip returned:'request' attrs
-    const requestOnlyAttrs = this.genericService.getRequestOnlyAttributes(resourceType, endpointId);
-    if (requestOnlyAttrs.size > 0) {
+        if (requestByParent.size > 0) {
       return {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources as Record<string, unknown>[],
           undefined,
           undefined,
-          requestOnlyAttrs,
-          alwaysReturnedAttrs,
-          alwaysReturnedSubs,
+          alwaysByParent,
+          requestByParent,
         ),
       };
     }
@@ -248,33 +243,29 @@ export class EndpointScimGenericController {
     );
 
     // GEN-07: Apply attribute projection on .search responses
-    const alwaysReturnedAttrs = this.genericService.getAlwaysReturnedAttributes(resourceType, endpointId);
-    const alwaysReturnedSubs = this.genericService.getAlwaysReturnedSubAttrs(resourceType, endpointId);
+    const alwaysByParent = this.genericService.getAlwaysReturnedByParent(resourceType, endpointId);
+    const requestByParent = this.genericService.getRequestReturnedByParent(resourceType, endpointId);
     if (body.attributes || body.excludedAttributes) {
-      const requestOnlyAttrs = this.genericService.getRequestOnlyAttributes(resourceType, endpointId);
-      return {
+            return {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources as Record<string, unknown>[],
           body.attributes,
           body.excludedAttributes,
-          requestOnlyAttrs,
-          alwaysReturnedAttrs,
-          alwaysReturnedSubs,
+          alwaysByParent,
+          requestByParent,
         ),
       };
     }
-    const requestOnlyAttrs = this.genericService.getRequestOnlyAttributes(resourceType, endpointId);
-    if (requestOnlyAttrs.size > 0) {
+        if (requestByParent.size > 0) {
       return {
         ...result,
         Resources: applyAttributeProjectionToList(
           result.Resources as Record<string, unknown>[],
           undefined,
           undefined,
-          requestOnlyAttrs,
-          alwaysReturnedAttrs,
-          alwaysReturnedSubs,
+          alwaysByParent,
+          requestByParent,
         ),
       };
     }
@@ -301,10 +292,9 @@ export class EndpointScimGenericController {
     );
     const result = await this.genericService.getResource(id, baseUrl, endpointId, resourceType, config);
     // GEN-05: Apply attribute projection on single-resource response
-    const requestOnlyAttrs = this.genericService.getRequestOnlyAttributes(resourceType, endpointId);
-    const alwaysReturnedAttrs = this.genericService.getAlwaysReturnedAttributes(resourceType, endpointId);
-    const alwaysReturnedSubs = this.genericService.getAlwaysReturnedSubAttrs(resourceType, endpointId);
-    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
+    const alwaysByParent = this.genericService.getAlwaysReturnedByParent(resourceType, endpointId);
+    const requestByParent = this.genericService.getRequestReturnedByParent(resourceType, endpointId);
+    return applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
   }
 
   /**
@@ -337,10 +327,9 @@ export class EndpointScimGenericController {
       ifMatch,
     );
     // GEN-05: Apply attribute projection on write-response (RFC 7644 §3.9)
-    const requestOnlyAttrs = this.genericService.getRequestOnlyAttributes(resourceType, endpointId);
-    const alwaysReturnedAttrs = this.genericService.getAlwaysReturnedAttributes(resourceType, endpointId);
-    const alwaysReturnedSubs = this.genericService.getAlwaysReturnedSubAttrs(resourceType, endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
+    const alwaysByParent = this.genericService.getAlwaysReturnedByParent(resourceType, endpointId);
+    const requestByParent = this.genericService.getRequestReturnedByParent(resourceType, endpointId);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
     return this.attachWarnings(projected, config);
   }
 
@@ -374,10 +363,9 @@ export class EndpointScimGenericController {
       ifMatch,
     );
     // GEN-05: Apply attribute projection on write-response (RFC 7644 §3.9)
-    const requestOnlyAttrs = this.genericService.getRequestOnlyAttributes(resourceType, endpointId);
-    const alwaysReturnedAttrs = this.genericService.getAlwaysReturnedAttributes(resourceType, endpointId);
-    const alwaysReturnedSubs = this.genericService.getAlwaysReturnedSubAttrs(resourceType, endpointId);
-    const projected = applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
+    const alwaysByParent = this.genericService.getAlwaysReturnedByParent(resourceType, endpointId);
+    const requestByParent = this.genericService.getRequestReturnedByParent(resourceType, endpointId);
+    const projected = applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
     return this.attachWarnings(projected, config);
   }
 

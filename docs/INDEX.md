@@ -134,12 +134,12 @@
 
 ---
 
-## Current Test Counts (v0.29.0)
+## Current Test Counts (v0.31.0)
 
 | Suite | Suites | Tests | Status |
 |-------|--------|-------|--------|
-| Unit | 74 | 3,061 | ✅ All pass |
+| Unit | 74 | 3,090 | ✅ All pass |
 | E2E | 37 | 817 | ✅ All pass |
 | Live (main) | 43 sections | ~951 | ✅ All pass |
 | Live (Lexmark ISV) | 13 sections | 112 | ✅ All pass |
-| **Total** | **~167** | **~4,941** | **✅ All pass** |
+| **Total** | **~167** | **~4,970** | **✅ All pass** |

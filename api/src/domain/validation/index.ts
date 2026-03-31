@@ -12,5 +12,3 @@ export type {
   SchemaCharacteristicsCache,
   ValidationOptions,
 } from './validation-types';
-
-export { SCHEMA_CACHE_TOP_LEVEL } from './validation-types';

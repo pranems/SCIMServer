@@ -64,9 +64,8 @@ describe('ScimMeController', () => {
       replaceUserForEndpoint: jest.fn(),
       patchUserForEndpoint: jest.fn(),
       deleteUserForEndpoint: jest.fn(),
-      getRequestOnlyAttributes: jest.fn().mockReturnValue(new Set()),
-      getAlwaysReturnedAttributes: jest.fn().mockReturnValue(new Set<string>()),
-      getAlwaysReturnedSubAttrs: jest.fn().mockReturnValue(new Map<string, Set<string>>()),
+      getAlwaysReturnedByParent: jest.fn().mockReturnValue(new Map<string, Set<string>>()),
+      getRequestReturnedByParent: jest.fn().mockReturnValue(new Map<string, Set<string>>()),
     };
 
     const mockEndpointService = {

@@ -163,10 +163,9 @@ export class ScimMeController {
     const { baseUrl, config } = await this.validateAndSetContext(endpointId, req);
     const scimId = await this.resolveAuthenticatedScimId(req as AuthenticatedRequest, endpointId, baseUrl, config);
     const result = await this.usersService.getUserForEndpoint(scimId, baseUrl, endpointId, config);
-    const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
-    const alwaysReturnedAttrs = this.usersService.getAlwaysReturnedAttributes(endpointId);
-    const alwaysReturnedSubs = this.usersService.getAlwaysReturnedSubAttrs(endpointId);
-    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
+    const alwaysByParent = this.usersService.getAlwaysReturnedByParent(endpointId);
+    const requestByParent = this.usersService.getRequestReturnedByParent(endpointId);
+    return applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
   }
 
   /**
@@ -187,10 +186,9 @@ export class ScimMeController {
     const scimId = await this.resolveAuthenticatedScimId(req as AuthenticatedRequest, endpointId, baseUrl, config);
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.usersService.replaceUserForEndpoint(scimId, dto, baseUrl, endpointId, config, ifMatch);
-    const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
-    const alwaysReturnedAttrs = this.usersService.getAlwaysReturnedAttributes(endpointId);
-    const alwaysReturnedSubs = this.usersService.getAlwaysReturnedSubAttrs(endpointId);
-    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
+    const alwaysByParent = this.usersService.getAlwaysReturnedByParent(endpointId);
+    const requestByParent = this.usersService.getRequestReturnedByParent(endpointId);
+    return applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
   }
 
   /**
@@ -211,10 +209,9 @@ export class ScimMeController {
     const scimId = await this.resolveAuthenticatedScimId(req as AuthenticatedRequest, endpointId, baseUrl, config);
     const ifMatch = req.headers['if-match'] as string | undefined;
     const result = await this.usersService.patchUserForEndpoint(scimId, dto, baseUrl, endpointId, config, ifMatch);
-    const requestOnlyAttrs = this.usersService.getRequestOnlyAttributes(endpointId);
-    const alwaysReturnedAttrs = this.usersService.getAlwaysReturnedAttributes(endpointId);
-    const alwaysReturnedSubs = this.usersService.getAlwaysReturnedSubAttrs(endpointId);
-    return applyAttributeProjection(result, attributes, excludedAttributes, requestOnlyAttrs, alwaysReturnedAttrs, alwaysReturnedSubs);
+    const alwaysByParent = this.usersService.getAlwaysReturnedByParent(endpointId);
+    const requestByParent = this.usersService.getRequestReturnedByParent(endpointId);
+    return applyAttributeProjection(result, attributes, excludedAttributes, alwaysByParent, requestByParent);
   }
 
   /**

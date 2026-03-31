@@ -5,8 +5,9 @@
  *  - parseJson: safe JSON parsing with fallback
  *  - ensureSchema: schema URN validation
  *  - enforceIfMatch: ETag/If-Match enforcement
- *  - sanitizeBooleanStrings: boolean coercion
  *  - guardSoftDeleted: soft-delete guard
+ *  - coercePatchOpBooleans: PATCH operation boolean coercion
+ *  - stripNeverReturnedFromPayload: never-returned attribute stripping
  *  - ScimSchemaHelpers: parameterized schema-aware methods
  */
 
@@ -15,8 +16,9 @@ import {
   parseJson,
   ensureSchema,
   enforceIfMatch,
-  sanitizeBooleanStrings,
   sanitizeBooleanStringsByParent,
+  coercePatchOpBooleans,
+  stripNeverReturnedFromPayload,
   guardSoftDeleted,
   ScimSchemaHelpers,
   stripReadOnlyAttributes,
@@ -24,7 +26,6 @@ import {
   SCIM_WARNING_URN,
   flattenParentChildMap,
 } from './scim-service-helpers';
-import { SCHEMA_CACHE_TOP_LEVEL } from '../../../domain/validation';
 
 // ─── parseJson ──────────────────────────────────────────────────────────────
 
@@ -117,68 +118,6 @@ describe('enforceIfMatch', () => {
   it('should not throw 428 when RequireIfMatch is false and no If-Match', () => {
     const config = { RequireIfMatch: 'false' } as any;
     expect(() => enforceIfMatch(3, undefined, config)).not.toThrow();
-  });
-});
-
-// ─── sanitizeBooleanStrings ─────────────────────────────────────────────────
-
-describe('sanitizeBooleanStrings', () => {
-  const boolKeys = new Set(['active', 'primary']);
-
-  it('should convert "True" to true for boolean keys', () => {
-    const obj: Record<string, unknown> = { active: 'True' };
-    sanitizeBooleanStrings(obj, boolKeys);
-    expect(obj.active).toBe(true);
-  });
-
-  it('should convert "False" to false for boolean keys', () => {
-    const obj: Record<string, unknown> = { primary: 'False' };
-    sanitizeBooleanStrings(obj, boolKeys);
-    expect(obj.primary).toBe(false);
-  });
-
-  it('should be case-insensitive for values', () => {
-    const obj: Record<string, unknown> = { active: 'TRUE', primary: 'false' };
-    sanitizeBooleanStrings(obj, boolKeys);
-    expect(obj.active).toBe(true);
-    expect(obj.primary).toBe(false);
-  });
-
-  it('should not convert non-boolean keys', () => {
-    const obj: Record<string, unknown> = { name: 'True' };
-    sanitizeBooleanStrings(obj, boolKeys);
-    expect(obj.name).toBe('True');
-  });
-
-  it('should handle nested objects', () => {
-    const obj: Record<string, unknown> = {
-      nested: { active: 'True' },
-    };
-    sanitizeBooleanStrings(obj, boolKeys);
-    expect((obj.nested as Record<string, unknown>).active).toBe(true);
-  });
-
-  it('should handle arrays of objects', () => {
-    const obj: Record<string, unknown> = {
-      items: [{ primary: 'True' }, { primary: 'False' }],
-    };
-    sanitizeBooleanStrings(obj, boolKeys);
-    const items = obj.items as Record<string, unknown>[];
-    expect(items[0].primary).toBe(true);
-    expect(items[1].primary).toBe(false);
-  });
-
-  it('should not modify non-string values', () => {
-    const obj: Record<string, unknown> = { active: true, primary: 42 };
-    sanitizeBooleanStrings(obj, boolKeys);
-    expect(obj.active).toBe(true);
-    expect(obj.primary).toBe(42);
-  });
-
-  it('should handle empty booleanKeys set', () => {
-    const obj: Record<string, unknown> = { active: 'True' };
-    sanitizeBooleanStrings(obj, new Set());
-    expect(obj.active).toBe('True');
   });
 });
 
@@ -329,22 +268,11 @@ describe('ScimSchemaHelpers', () => {
     });
   });
 
-  describe('getReturnedCharacteristics', () => {
-    it('should return never and request sets', () => {
-      mockRegistry.getSchema.mockReturnValue(null);
-      const result = helpers.getReturnedCharacteristics('ep-1');
-      expect(result).toHaveProperty('never');
-      expect(result).toHaveProperty('request');
-      expect(result.never).toBeInstanceOf(Set);
-      expect(result.request).toBeInstanceOf(Set);
-    });
-  });
-
-  describe('getRequestOnlyAttributes', () => {
+  describe('getRequestReturnedByParent', () => {
     it('should return the request set from characteristics', () => {
       mockRegistry.getSchema.mockReturnValue(null);
-      const result = helpers.getRequestOnlyAttributes('ep-1');
-      expect(result).toBeInstanceOf(Set);
+      const result = helpers.getRequestReturnedByParent('ep-1');
+      expect(result).toBeInstanceOf(Map);
     });
   });
 
@@ -958,19 +886,19 @@ describe('stripReadOnlyPatchOps', () => {
 // ─── sanitizeBooleanStringsByParent — Parent-context-aware coercion ─────────
 
 describe('sanitizeBooleanStringsByParent', () => {
-  const TOP = SCHEMA_CACHE_TOP_LEVEL;
+  const CORE_URN = 'urn:ietf:params:scim:schemas:core:2.0:user';
 
   // Simulates rfc-standard schema: active (boolean) at top, primary (boolean) in emails/roles
   const boolMap = new Map<string, Set<string>>([
-    [TOP, new Set(['active'])],
-    ['emails', new Set(['primary'])],
-    ['roles', new Set(['primary'])],
-    ['addresses', new Set(['primary'])],
+    [CORE_URN, new Set(['active'])],
+    [`${CORE_URN}.emails`, new Set(['primary'])],
+    [`${CORE_URN}.roles`, new Set(['primary'])],
+    [`${CORE_URN}.addresses`, new Set(['primary'])],
   ]);
 
   it('should coerce top-level boolean string', () => {
     const obj: Record<string, unknown> = { active: 'True', userName: 'jdoe@test.com' };
-    sanitizeBooleanStringsByParent(obj, boolMap);
+    sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect(obj.active).toBe(true);
     expect(obj.userName).toBe('jdoe@test.com');
   });
@@ -982,7 +910,7 @@ describe('sanitizeBooleanStringsByParent', () => {
         { value: 'c@d.com', primary: 'False' },
       ],
     };
-    sanitizeBooleanStringsByParent(obj, boolMap);
+    sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect((obj.emails as any[])[0].primary).toBe(true);
     expect((obj.emails as any[])[1].primary).toBe(false);
   });
@@ -991,7 +919,7 @@ describe('sanitizeBooleanStringsByParent', () => {
     const obj: Record<string, unknown> = {
       roles: [{ value: 'admin', primary: 'True', type: 'work' }],
     };
-    sanitizeBooleanStringsByParent(obj, boolMap);
+    sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect((obj.roles as any[])[0].primary).toBe(true);
   });
 
@@ -1000,7 +928,7 @@ describe('sanitizeBooleanStringsByParent', () => {
     const obj: Record<string, unknown> = {
       roles: [{ value: 'true', primary: 'True' }],
     };
-    sanitizeBooleanStringsByParent(obj, boolMap);
+    sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect((obj.roles as any[])[0].value).toBe('true'); // string preserved
     expect((obj.roles as any[])[0].primary).toBe(true); // boolean coerced
   });
@@ -1011,28 +939,28 @@ describe('sanitizeBooleanStringsByParent', () => {
       active: 'True',
       'urn:custom:ext': { active: 'True' },
     };
-    sanitizeBooleanStringsByParent(obj, boolMap);
+    sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect(obj.active).toBe(true); // core: coerced
     expect((obj['urn:custom:ext'] as any).active).toBe('True'); // extension: NOT coerced (no entry in boolMap for this parent)
   });
 
   it('should coerce extension boolean when extension key IS in map', () => {
     const extMap = new Map<string, Set<string>>([
-      [TOP, new Set(['active'])],
+      [CORE_URN, new Set(['active'])],
       ['urn:ext:2.0:user', new Set(['enabled'])],
     ]);
     const obj: Record<string, unknown> = {
       active: 'False',
       'urn:ext:2.0:User': { enabled: 'True' },
     };
-    sanitizeBooleanStringsByParent(obj, extMap);
+    sanitizeBooleanStringsByParent(obj, extMap, CORE_URN);
     expect(obj.active).toBe(false);
     expect((obj['urn:ext:2.0:User'] as any).enabled).toBe(true);
   });
 
   it('should handle empty boolMap (no coercion)', () => {
     const obj: Record<string, unknown> = { active: 'True' };
-    sanitizeBooleanStringsByParent(obj, new Map());
+    sanitizeBooleanStringsByParent(obj, new Map(), CORE_URN);
     expect(obj.active).toBe('True'); // not coerced
   });
 
@@ -1041,20 +969,20 @@ describe('sanitizeBooleanStringsByParent', () => {
       name: { formatted: 'John', givenName: 'John' },
       emails: [{ value: 'a@b.com', primary: 'true' }],
     };
-    sanitizeBooleanStringsByParent(obj, boolMap);
+    sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect((obj.name as any).formatted).toBe('John'); // untouched
     expect((obj.emails as any[])[0].primary).toBe(true); // coerced
   });
 
   it('should handle case-insensitive "false"/"FALSE"', () => {
     const obj: Record<string, unknown> = { active: 'FALSE' };
-    sanitizeBooleanStringsByParent(obj, boolMap);
+    sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect(obj.active).toBe(false);
   });
 
   it('should not coerce non-true/false string values', () => {
     const obj: Record<string, unknown> = { active: 'yes' };
-    sanitizeBooleanStringsByParent(obj, boolMap);
+    sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect(obj.active).toBe('yes'); // not "true"/"false" — untouched
   });
 
@@ -1062,48 +990,216 @@ describe('sanitizeBooleanStringsByParent', () => {
     const obj: Record<string, unknown> = {
       addresses: [{ type: 'work', primary: 'True', formatted: 'addr' }],
     };
-    sanitizeBooleanStringsByParent(obj, boolMap);
+    sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect((obj.addresses as any[])[0].primary).toBe(true);
     expect((obj.addresses as any[])[0].formatted).toBe('addr');
   });
 });
 
-// ─── flattenParentChildMap ──────────────────────────────────────────────
+// ─── coercePatchOpBooleans ──────────────────────────────────────────────
 
-describe('flattenParentChildMap', () => {
-  it('should union all children across parent keys into flat set', () => {
-    const map = new Map<string, Set<string>>([
-      ['__top__', new Set(['active', 'password'])],
-      ['emails', new Set(['primary'])],
-    ]);
-    const flat = flattenParentChildMap(map);
-    expect(flat.has('active')).toBe(true);
-    expect(flat.has('password')).toBe(true);
-    expect(flat.has('primary')).toBe(true);
-    expect(flat.size).toBe(3);
+describe('coercePatchOpBooleans', () => {
+  const CORE_URN = 'urn:ietf:params:scim:schemas:core:2.0:user';
+  const boolMap = new Map<string, Set<string>>([
+    [CORE_URN, new Set(['active'])],
+    [`${CORE_URN}.emails`, new Set(['primary'])],
+  ]);
+
+  it('should coerce boolean strings in object value (no-path replace)', () => {
+    const ops = [{ op: 'replace', value: { active: 'True', displayName: 'Test' } }];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect((ops[0].value as any).active).toBe(true);
+    expect((ops[0].value as any).displayName).toBe('Test');
   });
 
-  it('should return empty set for empty map', () => {
-    const flat = flattenParentChildMap(new Map());
-    expect(flat.size).toBe(0);
+  it('should coerce boolean strings in array value', () => {
+    const ops = [{ op: 'add', value: [{ active: 'False' }, { active: 'True' }] }];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect((ops[0].value as any[])[0].active).toBe(false);
+    expect((ops[0].value as any[])[1].active).toBe(true);
   });
 
-  it('should handle duplicate names across parents (union semantics)', () => {
-    const map = new Map<string, Set<string>>([
-      ['__top__', new Set(['active'])],
-      ['urn:ext:schema', new Set(['active'])], // same name, different parent
-    ]);
-    const flat = flattenParentChildMap(map);
-    expect(flat.has('active')).toBe(true);
-    expect(flat.size).toBe(1); // union — no duplicates
+  it('should NOT coerce scalar values', () => {
+    const ops = [{ op: 'replace', path: 'displayName', value: 'True' }];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect(ops[0].value).toBe('True');
   });
 
-  it('should handle single parent with multiple children', () => {
-    const map = new Map<string, Set<string>>([
-      ['meta', new Set(['resourcetype', 'created', 'lastmodified', 'location', 'version'])],
+  it('should handle null/undefined values gracefully', () => {
+    const ops = [
+      { op: 'remove', path: 'displayName', value: undefined },
+      { op: 'remove', path: 'active' },
+    ];
+    expect(() => coercePatchOpBooleans(ops, boolMap, CORE_URN)).not.toThrow();
+  });
+
+  it('should coerce nested complex attrs in object value', () => {
+    const ops = [{
+      op: 'replace',
+      value: { emails: [{ value: 'a@b.com', primary: 'True' }] },
+    }];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect(((ops[0].value as any).emails as any[])[0].primary).toBe(true);
+  });
+
+  it('should process multiple operations independently', () => {
+    const ops = [
+      { op: 'replace', value: { active: 'True' } },
+      { op: 'replace', value: { active: 'False' } },
+    ];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect((ops[0].value as any).active).toBe(true);
+    expect((ops[1].value as any).active).toBe(false);
+  });
+
+  it('should not coerce non-boolean attribute strings', () => {
+    const ops = [{ op: 'replace', value: { displayName: 'true', active: 'True' } }];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect((ops[0].value as any).displayName).toBe('true');
+    expect((ops[0].value as any).active).toBe(true);
+  });
+
+  it('should handle empty operations array', () => {
+    const ops: Array<{ op: string; value?: unknown }> = [];
+    expect(() => coercePatchOpBooleans(ops, boolMap, CORE_URN)).not.toThrow();
+  });
+});
+
+// ─── stripNeverReturnedFromPayload ──────────────────────────────────────
+
+describe('stripNeverReturnedFromPayload', () => {
+  const CORE_URN = 'urn:ietf:params:scim:schemas:core:2.0:user';
+  const EXT_URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+
+  it('should strip core top-level returned:never attributes', () => {
+    const neverByParent = new Map<string, Set<string>>([
+      [CORE_URN, new Set(['password'])],
     ]);
-    const flat = flattenParentChildMap(map);
-    expect(flat.size).toBe(5);
+    const payload: Record<string, unknown> = {
+      userName: 'alice',
+      password: 'secret',
+      active: true,
+    };
+    const visible = stripNeverReturnedFromPayload(payload, neverByParent, CORE_URN, []);
+    expect(payload.password).toBeUndefined();
+    expect(payload.userName).toBe('alice');
+    expect(payload.active).toBe(true);
+    expect(visible).toEqual([]);
+  });
+
+  it('should strip core sub-attrs within complex parents', () => {
+    const neverByParent = new Map<string, Set<string>>([
+      [CORE_URN, new Set(['password'])],  // core top-level entry enables the core block
+      [`${CORE_URN}.name`, new Set(['secrethash'])],
+    ]);
+    const payload: Record<string, unknown> = {
+      userName: 'alice',
+      name: { givenName: 'Alice', secretHash: 'abc123' },
+    };
+    stripNeverReturnedFromPayload(payload, neverByParent, CORE_URN, []);
+    expect((payload.name as any).givenName).toBe('Alice');
+    expect((payload.name as any).secretHash).toBeUndefined();
+  });
+
+  it('should strip core sub-attrs within multi-valued complex parents', () => {
+    const neverByParent = new Map<string, Set<string>>([
+      [CORE_URN, new Set(['password'])],  // core top-level entry enables the core block
+      [`${CORE_URN}.emails`, new Set(['internalid'])],
+    ]);
+    const payload: Record<string, unknown> = {
+      userName: 'alice',
+      emails: [
+        { value: 'a@b.com', internalId: 'hidden1' },
+        { value: 'c@d.com', internalId: 'hidden2' },
+      ],
+    };
+    stripNeverReturnedFromPayload(payload, neverByParent, CORE_URN, []);
+    const emails = payload.emails as any[];
+    expect(emails[0].value).toBe('a@b.com');
+    expect(emails[0].internalId).toBeUndefined();
+    expect(emails[1].internalId).toBeUndefined();
+  });
+
+  it('should strip extension top-level returned:never attributes', () => {
+    const neverByParent = new Map<string, Set<string>>([
+      [EXT_URN.toLowerCase(), new Set(['badge'])],
+    ]);
+    const payload: Record<string, unknown> = {
+      userName: 'alice',
+      [EXT_URN]: { department: 'Engineering', badge: 'secret-badge' },
+    };
+    const visible = stripNeverReturnedFromPayload(payload, neverByParent, CORE_URN, [EXT_URN]);
+    expect((payload[EXT_URN] as any).department).toBe('Engineering');
+    expect((payload[EXT_URN] as any).badge).toBeUndefined();
+    expect(visible).toEqual([EXT_URN]);
+  });
+
+  it('should strip extension sub-attrs when top-level never entry also exists', () => {
+    const extUrn = 'urn:test:ext:neversub';
+    const neverByParent = new Map<string, Set<string>>([
+      [extUrn, new Set(['topsecret'])],  // top-level never entry enables extension block
+      [`${extUrn}.credentials`, new Set(['token'])],
+    ]);
+    const payload: Record<string, unknown> = {
+      [extUrn]: { credentials: { token: 'secret', provider: 'oauth' }, topsecret: 'x' },
+    };
+    const visible = stripNeverReturnedFromPayload(payload, neverByParent, CORE_URN, [extUrn]);
+    expect((payload[extUrn] as any).credentials.token).toBeUndefined();
+    expect((payload[extUrn] as any).credentials.provider).toBe('oauth');
+    expect((payload[extUrn] as any).topsecret).toBeUndefined();
+    expect(visible).toEqual([extUrn]);
+  });
+
+  it('should remove extension entirely if all attrs are stripped (FP-1)', () => {
+    const neverByParent = new Map<string, Set<string>>([
+      [EXT_URN.toLowerCase(), new Set(['onlyattr'])],
+    ]);
+    const payload: Record<string, unknown> = {
+      userName: 'alice',
+      [EXT_URN]: { onlyattr: 'value' },  // use lowercase to match the Set entry
+    };
+    const visible = stripNeverReturnedFromPayload(payload, neverByParent, CORE_URN, [EXT_URN]);
+    expect(payload[EXT_URN]).toBeUndefined();
+    // FP-1: removed extension should NOT appear in visible URNs
+    expect(visible).toEqual([]);
+  });
+
+  it('should return extension URNs present in payload that have visible attrs', () => {
+    const ext1 = 'urn:test:ext1';
+    const ext2 = 'urn:test:ext2';
+    const neverByParent = new Map<string, Set<string>>();
+    const payload: Record<string, unknown> = {
+      [ext1]: { department: 'Eng' },
+      // ext2 is NOT in payload
+    };
+    const visible = stripNeverReturnedFromPayload(payload, neverByParent, CORE_URN, [ext1, ext2]);
+    expect(visible).toEqual([ext1]);
+  });
+
+  it('should handle empty neverByParent map', () => {
+    const payload: Record<string, unknown> = {
+      userName: 'alice',
+      password: 'secret',
+    };
+    stripNeverReturnedFromPayload(payload, new Map(), CORE_URN, []);
+    expect(payload.password).toBe('secret'); // not in map → not stripped
+  });
+
+  it('should handle combined core + extension stripping', () => {
+    const neverByParent = new Map<string, Set<string>>([
+      [CORE_URN, new Set(['password'])],
+      [EXT_URN.toLowerCase(), new Set(['badge'])],
+    ]);
+    const payload: Record<string, unknown> = {
+      userName: 'alice',
+      password: 'secret',
+      [EXT_URN]: { department: 'Eng', badge: 'hidden' },
+    };
+    const visible = stripNeverReturnedFromPayload(payload, neverByParent, CORE_URN, [EXT_URN]);
+    expect(payload.password).toBeUndefined();
+    expect((payload[EXT_URN] as any).badge).toBeUndefined();
+    expect((payload[EXT_URN] as any).department).toBe('Eng');
+    expect(visible).toEqual([EXT_URN]);
   });
 });
 

@@ -38,11 +38,12 @@ import {
   ensureSchema,
   enforceIfMatch,
   sanitizeBooleanStringsByParent,
+  coercePatchOpBooleans,
+  stripNeverReturnedFromPayload,
   guardSoftDeleted,
   ScimSchemaHelpers,
   assertSchemaUniqueness,
 } from '../common/scim-service-helpers';
-import { SCHEMA_CACHE_TOP_LEVEL } from '../../../domain/validation';
 
 interface ListGroupsParams {
   filter?: string;
@@ -321,17 +322,8 @@ export class EndpointScimGroupsService {
       const coerceEnabled = getConfigBooleanWithDefault(endpointConfig, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS, true);
       if (coerceEnabled) {
         const boolMap = this.schemaHelpers.getBooleansByParent(endpointId);
-        for (const op of dto.Operations) {
-          if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
-            sanitizeBooleanStringsByParent(op.value as Record<string, unknown>, boolMap, SCHEMA_CACHE_TOP_LEVEL);
-          } else if (Array.isArray(op.value)) {
-            for (const item of op.value) {
-              if (typeof item === 'object' && item !== null) {
-                sanitizeBooleanStringsByParent(item as Record<string, unknown>, boolMap, SCHEMA_CACHE_TOP_LEVEL);
-              }
-            }
-          }
-        }
+        const coreUrnLower = this.schemaHelpers.getCoreSchemaUrnLower(endpointId);
+        coercePatchOpBooleans(dto.Operations, boolMap, coreUrnLower);
       }
 
       for (const op of dto.Operations) {
@@ -707,7 +699,8 @@ export class EndpointScimGroupsService {
 
     // Parent-context-aware boolean sanitization for Groups (uses precomputed cache)
     const boolMap = this.schemaHelpers.getBooleansByParent(endpointId);
-    sanitizeBooleanStringsByParent(rawPayload, boolMap);
+    const coreUrnLower = this.schemaHelpers.getCoreSchemaUrnLower(endpointId);
+    sanitizeBooleanStringsByParent(rawPayload, boolMap, coreUrnLower);
 
     // Remove attributes that have first-class DB columns to prevent stale overrides.
     // displayName is managed via the DB column; rawPayload may hold the original creation value.
@@ -719,43 +712,11 @@ export class EndpointScimGroupsService {
     // Remove schemas from rawPayload — we build it dynamically below (G19 / FP-1)
     delete rawPayload.schemas;
 
-    // G8e: Strip returned:'never' attributes from rawPayload
-    // Per RFC 7643 §2.4, these MUST NOT appear in any response.
-    // Uses parent-context-aware ByParent map to avoid name-collision false positives.
+    // G8e: Strip returned:'never' attributes + build schemas[] dynamically (G19 / FP-1)
     const neverByParent = this.schemaHelpers.getNeverReturnedByParent(endpointId);
-    const coreNever = neverByParent.get(SCHEMA_CACHE_TOP_LEVEL);
-    if (coreNever) {
-      for (const key of Object.keys(rawPayload)) {
-        if (coreNever.has(key.toLowerCase())) {
-          delete rawPayload[key];
-        }
-      }
-    }
-
-    // Build schemas[] dynamically — include extension URNs present in payload
     const extensionUrns = this.schemaHelpers.getExtensionUrns(endpointId);
-    const schemas: [string, ...string[]] = [SCIM_CORE_GROUP_SCHEMA];
-    for (const urn of extensionUrns) {
-      if (urn in rawPayload) {
-        // Strip never-returned attrs inside extension objects (parent-context-aware)
-        const extNever = neverByParent.get(urn.toLowerCase());
-        const extObj = rawPayload[urn];
-        if (extNever && typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
-          for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
-            if (extNever.has(extKey.toLowerCase())) {
-              delete (extObj as Record<string, unknown>)[extKey];
-            }
-          }
-          // FP-1 fix: If extension is now empty after stripping, remove it entirely
-          // (RFC 7643 §3.1: don't advertise an extension URN with zero visible attributes)
-          if (Object.keys(extObj as Record<string, unknown>).length === 0) {
-            delete rawPayload[urn];
-            continue;
-          }
-        }
-        schemas.push(urn);
-      }
-    }
+    const visibleExtUrns = stripNeverReturnedFromPayload(rawPayload, neverByParent, coreUrnLower, extensionUrns);
+    const schemas: [string, ...string[]] = [SCIM_CORE_GROUP_SCHEMA, ...visibleExtUrns];
 
     return {
       schemas,
@@ -798,24 +759,16 @@ export class EndpointScimGroupsService {
   }
 
   /**
-   * Get the returned:'request' attribute names for Group resources.
-   * Used by controllers to filter response attributes per RFC 7643 §2.4.
+   * Get the returned:'always' ByParent map for projection.
    */
-  getRequestOnlyAttributes(endpointId?: string): Set<string> {
-    return this.schemaHelpers.getRequestOnlyAttributes(endpointId);
+  getAlwaysReturnedByParent(endpointId?: string): Map<string, Set<string>> {
+    return this.schemaHelpers.getAlwaysReturnedByParent(endpointId);
   }
 
   /**
-   * Get the returned:'always' attribute names from schema definitions (R-RET-1).
+   * Get the returned:'request' ByParent map for projection.
    */
-  getAlwaysReturnedAttributes(endpointId?: string): Set<string> {
-    return this.schemaHelpers.getAlwaysReturnedAttributes(endpointId);
-  }
-
-  /**
-   * Get sub-attributes with returned:'always' grouped by parent (R-RET-3).
-   */
-  getAlwaysReturnedSubAttrs(endpointId?: string): Map<string, Set<string>> {
-    return this.schemaHelpers.getAlwaysReturnedSubAttrs(endpointId);
+  getRequestReturnedByParent(endpointId?: string): Map<string, Set<string>> {
+    return this.schemaHelpers.getRequestReturnedByParent(endpointId);
   }
 }

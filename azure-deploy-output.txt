@@ -1,0 +1,1 @@
+WARNING: A new Bicep release is available: v0.41.2. Upgrade now by running "az bicep upgrade".

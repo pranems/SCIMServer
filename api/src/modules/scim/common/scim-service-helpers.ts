@@ -21,22 +21,20 @@ import {
 import type { ScimSchemaRegistry, ScimSchemaDefinition } from '../discovery/scim-schema-registry';
 import { SchemaValidator } from '../../../domain/validation';
 import type { SchemaDefinition, SchemaAttributeDefinition, SchemaCharacteristicsCache } from '../../../domain/validation';
-import { SCHEMA_CACHE_TOP_LEVEL } from '../../../domain/validation';
 import type { ScimLogger } from '../../logging/scim-logger.service';
 import type { LogCategory } from '../../logging/log-levels';
 import type { PatchOperation } from '../../../domain/patch/patch-types';
 import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-parser';
 import type { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 
-// ─── Cache Flatten Helpers ──────────────────────────────────────────────────
+// ─── Cache Helpers ──────────────────────────────────────────────────────────
 
 /**
  * Flatten a Parent→Children map into a flat Set of all child names.
  * Unions all children across all parent keys (ignoring parent context).
  *
- * Used to convert the precomputed cache's Parent→Children maps back into
- * the flat Set<string> shape expected by existing consumers
- * (e.g., `getReturnedCharacteristics()` return type).
+ * Used by legacy consistency tests to compare cache-built maps
+ * against old flat collectors.
  */
 export function flattenParentChildMap(map: Map<string, Set<string>>): Set<string> {
   const flat = new Set<string>();
@@ -46,6 +44,16 @@ export function flattenParentChildMap(map: Map<string, Set<string>>): Set<string
     }
   }
   return flat;
+}
+
+/**
+ * Check if a URN dot-path key represents a sub-attribute entry.
+ * A key is a sub-attr key iff it contains a '.' AFTER the last ':' in the URN.
+ * Handles URNs with dots in version numbers (e.g., `urn:...:2.0:User`).
+ */
+export function isSubAttrKey(key: string): boolean {
+  const lastColon = key.lastIndexOf(':');
+  return key.indexOf('.', lastColon) !== -1;
 }
 
 // ─── Pure Utility Functions ─────────────────────────────────────────────────
@@ -109,31 +117,49 @@ export function enforceIfMatch(
 }
 
 /**
- * Recursively sanitize boolean-like string values ("True"/"False") to actual booleans,
- * but ONLY for attributes whose schema type is "boolean".
+ * Parent-context-aware boolean string sanitizer (URN dot-path keys).
  *
- * V16/V17 fix: Only converts declared boolean attribute names (e.g. "active", "primary")
- * to prevent corrupting string attributes like roles[].value = "true".
+ * Recursively walks a SCIM payload and coerces string "True"/"False" to native
+ * booleans, using a URN-dot-path→Children Map for precision. This prevents
+ * name-collision false positives (e.g., core `active` is boolean but extension
+ * `active` is string).
  *
- * Microsoft Entra ID sends primary as string "True" but the SCIM spec expects boolean true.
+ * Parent path convention (URN-qualified dot-paths):
+ * - `urn:...:core:2.0:user`           — core schema top-level attributes
+ * - `urn:...:enterprise:2.0:user`     — extension top-level attributes
+ * - `urn:...:core:2.0:user.emails`    — sub-attributes of core complex parent
  *
- * @param obj          - The object to sanitize (mutated in place)
- * @param booleanKeys  - Set of lowercase attribute names that are type "boolean"
+ * At runtime:
+ * - When encountering a key starting with `urn:`, switch parentPath to that URN
+ * - For all other keys, append `.${key.toLowerCase()}` to the current parentPath
+ *
+ * @param obj         - The object to sanitize (mutated in place)
+ * @param boolMap     - URN-dot-path→Children map of boolean attribute names
+ * @param parentPath  - Current URN-qualified parent path (e.g. the coreSchemaUrn)
  */
-export function sanitizeBooleanStrings(
+export function sanitizeBooleanStringsByParent(
   obj: Record<string, unknown>,
-  booleanKeys: Set<string>,
+  boolMap: Map<string, Set<string>>,
+  parentPath: string = '',
 ): void {
+  const boolChildren = boolMap.get(parentPath);
+
   for (const [key, value] of Object.entries(obj)) {
+    const keyLower = key.toLowerCase();
+
     if (Array.isArray(value)) {
+      // Array elements: parent context becomes parentPath.arrayAttrName
+      const childPath = keyLower.startsWith('urn:') ? keyLower : `${parentPath}.${keyLower}`;
       for (const item of value) {
         if (typeof item === 'object' && item !== null) {
-          sanitizeBooleanStrings(item as Record<string, unknown>, booleanKeys);
+          sanitizeBooleanStringsByParent(item as Record<string, unknown>, boolMap, childPath);
         }
       }
     } else if (typeof value === 'object' && value !== null) {
-      sanitizeBooleanStrings(value as Record<string, unknown>, booleanKeys);
-    } else if (typeof value === 'string' && booleanKeys.has(key.toLowerCase())) {
+      // Nested object: URN key → switch to that URN; otherwise append to path
+      const childPath = keyLower.startsWith('urn:') ? keyLower : `${parentPath}.${keyLower}`;
+      sanitizeBooleanStringsByParent(value as Record<string, unknown>, boolMap, childPath);
+    } else if (typeof value === 'string' && boolChildren?.has(keyLower)) {
       const lower = value.toLowerCase();
       if (lower === 'true') obj[key] = true;
       else if (lower === 'false') obj[key] = false;
@@ -142,43 +168,121 @@ export function sanitizeBooleanStrings(
 }
 
 /**
- * Parent-context-aware boolean string sanitizer.
+ * Coerce boolean strings ("True"/"False") inside PATCH operation values
+ * using parent-context-aware URN-dot-path maps.
  *
- * Recursively walks a SCIM payload and coerces string "True"/"False" to native
- * booleans, using a Parent→Children Map for precision. This prevents name-collision
- * false positives (e.g., core `active` is boolean but extension `active` is string).
+ * Extracted from the identical loop in Users/Groups/Generic PATCH flows.
+ * Walks each operation's value and coerces string booleans to native booleans.
  *
- * Parent key convention:
- * - `SCHEMA_CACHE_TOP_LEVEL` ("__top__") — top-level core attributes
- * - Extension URN (lowercase) — top-level extension attributes
- * - Attribute name (lowercase) — sub-attributes of complex/array parents
- *
- * @param obj         - The object to sanitize (mutated in place)
- * @param boolMap     - Parent→Children map of boolean attribute names
- * @param parentKey   - Current parent context (default: __top__)
+ * @param operations  The PATCH operations array
+ * @param boolMap     URN-dot-path→Children map of boolean attribute names
+ * @param coreUrnLower  The lowercase core schema URN for root parentPath
  */
-export function sanitizeBooleanStringsByParent(
-  obj: Record<string, unknown>,
+export function coercePatchOpBooleans(
+  operations: Array<{ op: string; path?: string; value?: unknown }>,
   boolMap: Map<string, Set<string>>,
-  parentKey: string = SCHEMA_CACHE_TOP_LEVEL,
+  coreUrnLower: string,
 ): void {
-  const boolChildren = boolMap.get(parentKey);
-
-  for (const [key, value] of Object.entries(obj)) {
-    if (Array.isArray(value)) {
-      for (const item of value) {
+  for (const op of operations) {
+    if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
+      sanitizeBooleanStringsByParent(op.value as Record<string, unknown>, boolMap, coreUrnLower);
+    } else if (Array.isArray(op.value)) {
+      for (const item of op.value) {
         if (typeof item === 'object' && item !== null) {
-          // Array elements: parent context becomes the array attribute name
-          sanitizeBooleanStringsByParent(item as Record<string, unknown>, boolMap, key.toLowerCase());
+          sanitizeBooleanStringsByParent(item as Record<string, unknown>, boolMap, coreUrnLower);
         }
       }
-    } else if (typeof value === 'object' && value !== null) {
-      // Nested object: could be extension URN object or complex attribute
-      sanitizeBooleanStringsByParent(value as Record<string, unknown>, boolMap, key.toLowerCase());
-    } else if (typeof value === 'string' && boolChildren?.has(key.toLowerCase())) {
-      const lower = value.toLowerCase();
-      if (lower === 'true') obj[key] = true;
-      else if (lower === 'false') obj[key] = false;
+    }
+  }
+}
+
+/**
+ * Strip returned:'never' attributes from a SCIM payload and its extension URN objects.
+ *
+ * Handles: core top-level, core sub-attrs, extension top-level, extension sub-attrs,
+ * and FP-1 empty-extension cleanup. Uses URN-dot-path ByParent map for zero-collision
+ * stripping.
+ *
+ * Extracted from the identical logic in toScimUserResource / toScimGroupResource / toScimResponse.
+ *
+ * @param payload        The rawPayload object (mutated in place)
+ * @param neverByParent  URN-dot-path→Children map of never-returned attrs
+ * @param coreUrnLower   Lowercase core schema URN
+ * @param extensionUrns  Extension URNs to check (original-case)
+ * @returns Array of extension URNs that have visible (non-empty) attributes in the payload
+ */
+export function stripNeverReturnedFromPayload(
+  payload: Record<string, unknown>,
+  neverByParent: Map<string, Set<string>>,
+  coreUrnLower: string,
+  extensionUrns: readonly string[],
+): string[] {
+  // ─── Core top-level + sub-attr stripping ───
+  const coreNever = neverByParent.get(coreUrnLower);
+  if (coreNever) {
+    for (const key of Object.keys(payload)) {
+      if (coreNever.has(key.toLowerCase())) {
+        delete payload[key];
+        continue;
+      }
+      // Sub-attrs within complex/multi-valued parents
+      const subNever = neverByParent.get(`${coreUrnLower}.${key.toLowerCase()}`);
+      if (subNever && subNever.size > 0) {
+        stripSubAttrs(payload[key], subNever);
+      }
+    }
+  }
+
+  // ─── Extension stripping + visible URN collection ───
+  const visibleExtUrns: string[] = [];
+  for (const urn of extensionUrns) {
+    if (!(urn in payload)) continue;
+    const urnLower = urn.toLowerCase();
+    const extNever = neverByParent.get(urnLower);
+    const extObj = payload[urn];
+    if (extNever && typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
+      for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
+        if (extNever.has(extKey.toLowerCase())) {
+          delete (extObj as Record<string, unknown>)[extKey];
+          continue;
+        }
+        // Extension sub-attr stripping
+        const extSubNever = neverByParent.get(`${urnLower}.${extKey.toLowerCase()}`);
+        if (extSubNever && extSubNever.size > 0) {
+          stripSubAttrs((extObj as Record<string, unknown>)[extKey], extSubNever);
+        }
+      }
+      // FP-1: If extension is now empty, remove it entirely
+      if (Object.keys(extObj as Record<string, unknown>).length === 0) {
+        delete payload[urn];
+        continue;
+      }
+    }
+    visibleExtUrns.push(urn);
+  }
+  return visibleExtUrns;
+}
+
+/**
+ * Strip sub-attributes from a complex/multi-valued attribute value.
+ * @internal Used by stripNeverReturnedFromPayload.
+ */
+function stripSubAttrs(value: unknown, subNever: Set<string>): void {
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    for (const subKey of Object.keys(value as Record<string, unknown>)) {
+      if (subNever.has(subKey.toLowerCase())) {
+        delete (value as Record<string, unknown>)[subKey];
+      }
+    }
+  } else if (Array.isArray(value)) {
+    for (const item of value) {
+      if (typeof item === 'object' && item !== null) {
+        for (const subKey of Object.keys(item as Record<string, unknown>)) {
+          if (subNever.has(subKey.toLowerCase())) {
+            delete (item as Record<string, unknown>)[subKey];
+          }
+        }
+      }
     }
   }
 }
@@ -868,73 +972,44 @@ export class ScimSchemaHelpers {
     );
     if (!coerceEnabled) return;
 
-    const boolMap = this.getBooleansByParent(endpointId);
-    sanitizeBooleanStringsByParent(dto, boolMap);
-  }
-
-  /**
-   * Collect returned characteristic sets (never + request + always + alwaysSubs) for the resource's schemas.
-   *
-   * Uses the precomputed cache when available — flattens Parent→Children maps
-   * into flat Sets for backward compatibility with projection consumers.
-   * Falls back to SchemaValidator.collectReturnedCharacteristics() if no cache.
-   */
-  getReturnedCharacteristics(endpointId?: string): { never: Set<string>; request: Set<string>; always: Set<string>; alwaysSubs: Map<string, Set<string>> } {
     const cache = this.getSchemaCache(endpointId);
-    if (cache) {
-      return {
-        never: flattenParentChildMap(cache.neverReturnedByParent),
-        request: flattenParentChildMap(cache.requestReturnedByParent),
-        always: flattenParentChildMap(cache.alwaysReturnedByParent),
-        alwaysSubs: cache.alwaysReturnedSubs,
-      };
-    }
-    // Fallback: no cache available (no schemas)
-    const schemas = this.getSchemaDefinitions(endpointId);
-    return SchemaValidator.collectReturnedCharacteristics(schemas);
+    sanitizeBooleanStringsByParent(
+      dto,
+      cache?.booleansByParent ?? new Map(),
+      cache?.coreSchemaUrn ?? this.coreSchemaUrn.toLowerCase(),
+    );
   }
 
   /**
-   * Get the returned:'request' attribute names for the resource type.
-   * Used by controllers to filter response attributes per RFC 7643 §2.4.
+   * Get the returned:'always' ByParent map from the cache.
+   * Used by controllers to pass directly to projection functions.
    */
-  getRequestOnlyAttributes(endpointId?: string): Set<string> {
-    const { request } = this.getReturnedCharacteristics(endpointId);
-    return request;
+  getAlwaysReturnedByParent(endpointId?: string): Map<string, Set<string>> {
+    return this.getSchemaCache(endpointId)?.alwaysReturnedByParent ?? new Map();
   }
 
   /**
-   * Get the returned:'always' attribute names from schema definitions.
-   * Used by controllers to pass schema-driven always-returned set to projection (R-RET-1).
+   * Get the lowercase core schema URN for this resource type from the cache.
+   * Used as the root parentPath for URN-dot-path cache lookups at runtime.
    */
-  getAlwaysReturnedAttributes(endpointId?: string): Set<string> {
-    const { always } = this.getReturnedCharacteristics(endpointId);
-    return always;
+  getCoreSchemaUrnLower(endpointId?: string): string {
+    return this.getSchemaCache(endpointId)?.coreSchemaUrn ?? this.coreSchemaUrn.toLowerCase();
   }
 
   /**
-   * Get sub-attributes with returned:'always' grouped by parent attribute (R-RET-3).
-   * Map of parentAttrLower → Set<subAttrNameLower>.
+   * Get the returned:'request' ByParent map from the cache.
+   * Used by controllers to pass directly to projection functions.
    */
-  getAlwaysReturnedSubAttrs(endpointId?: string): Map<string, Set<string>> {
-    const { alwaysSubs } = this.getReturnedCharacteristics(endpointId);
-    return alwaysSubs;
+  getRequestReturnedByParent(endpointId?: string): Map<string, Set<string>> {
+    return this.getSchemaCache(endpointId)?.requestReturnedByParent ?? new Map();
   }
 
   /**
    * Get attribute names/paths with caseExact:true (R-CASE-1).
    * Returns Set of lowercase dotted paths (e.g., 'id', 'meta.location').
-   *
-   * Uses the precomputed cache when available — reconstructs dotted paths
-   * from Parent→Children maps. Falls back to collectCaseExactAttributes().
    */
   getCaseExactAttributes(endpointId?: string): Set<string> {
-    const cache = this.getSchemaCache(endpointId);
-    if (cache) {
-      return cache.caseExactPaths;
-    }
-    const schemas = this.getSchemaDefinitions(endpointId);
-    return SchemaValidator.collectCaseExactAttributes(schemas);
+    return this.getSchemaCache(endpointId)?.caseExactPaths ?? new Set();
   }
 
   /**
@@ -1093,24 +1168,12 @@ export class ScimSchemaHelpers {
   }
 
   /**
-   * Collect schema attributes with `uniqueness: 'server'` that are not
-   * already handled by hardcoded column-based checks (userName, externalId, displayName).
-   *
-   * Returns descriptors for custom extension attributes that need JSONB-level
-   * uniqueness enforcement. Each descriptor includes the schema URN (for extension
-   * attribute location) and the caseExact flag for comparison mode.
-   *
-   * Uses the precomputed cache when available. Falls back to collectUniqueAttributes().
+   * Get custom extension attributes with uniqueness:'server'.
    *
    * @see RFC 7643 §2.1 — `uniqueness: 'server'` SHOULD be unique within the endpoint
    */
   getUniqueAttributes(endpointId?: string): Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }> {
-    const cache = this.getSchemaCache(endpointId);
-    if (cache) {
-      return cache.uniqueAttrs;
-    }
-    const schemas = this.getSchemaDefinitions(endpointId);
-    return SchemaValidator.collectUniqueAttributes(schemas);
+    return this.getSchemaCache(endpointId)?.uniqueAttrs ?? [];
   }
 }
 
