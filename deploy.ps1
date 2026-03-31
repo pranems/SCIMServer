@@ -246,10 +246,11 @@ try {
     Write-Host ""
 
     # Use local deploy script when available, otherwise use downloaded project script
+    # -ProvisionPostgres auto-provisions Azure PostgreSQL Flexible Server for persistence
     if ($UseLocalDeployScript) {
-        $deployResult = & $LocalDeployScript -ResourceGroup $ResourceGroup -AppName $AppName -ScimSecret $ScimSecret -Location $Location -JwtSecret $JwtSecret -OauthClientSecret $OauthClientSecret
+        $deployResult = & $LocalDeployScript -ResourceGroup $ResourceGroup -AppName $AppName -ScimSecret $ScimSecret -Location $Location -JwtSecret $JwtSecret -OauthClientSecret $OauthClientSecret -ProvisionPostgres
     } else {
-        $deployResult = .\scripts\deploy-azure.ps1 -ResourceGroup $ResourceGroup -AppName $AppName -ScimSecret $ScimSecret -Location $Location -JwtSecret $JwtSecret -OauthClientSecret $OauthClientSecret
+        $deployResult = .\scripts\deploy-azure.ps1 -ResourceGroup $ResourceGroup -AppName $AppName -ScimSecret $ScimSecret -Location $Location -JwtSecret $JwtSecret -OauthClientSecret $OauthClientSecret -ProvisionPostgres
     }
     $result = $deployResult
 

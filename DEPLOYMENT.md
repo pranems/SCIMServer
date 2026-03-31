@@ -8,15 +8,35 @@ This document covers all deployment methods for SCIMServer. For the quickest sta
 
 ## Azure Container Apps (Recommended for Production)
 
-### One-Liner Bootstrap
+### Deployment Entry Points
+
+SCIMServer provides 3 ways to deploy to Azure — all ultimately call `scripts/deploy-azure.ps1`:
+
+| Entry Point | Usage | What It Does |
+|-------------|-------|-------------|
+| **`bootstrap.ps1`** → `setup.ps1` | `iex (iwr .../bootstrap.ps1).Content` | Downloads `setup.ps1`, prompts for all config, auto-provisions PostgreSQL |
+| **`deploy.ps1`** | `iex (irm .../deploy.ps1)` | One-click wrapper — prompts for config, downloads repo ZIP (or uses local), auto-provisions PostgreSQL |
+| **`scripts/deploy-azure.ps1`** | `.\scripts\deploy-azure.ps1 -ProvisionPostgres` | Core engine — full parameter control, supports BYO PostgreSQL via `-DatabaseUrl` |
+
+All three auto-generate secrets (SCIM, JWT, OAuth) if not provided, and deploy a VNet-isolated Container App with PostgreSQL Flexible Server.
+
+### One-Liner Bootstrap (No Git Clone Needed)
 
 ```powershell
 iex (iwr https://raw.githubusercontent.com/pranems/SCIMServer/master/bootstrap.ps1).Content
 ```
 
-Prompts for Resource Group, App Name, Region, and SCIM Secret. Provisions all Azure resources automatically (VNet, Container Apps Environment, Container App, Log Analytics, optional PostgreSQL Flexible Server).
+Prompts for Resource Group, App Name, Region, and SCIM Secret. Provisions all Azure resources automatically (VNet, Container Apps Environment, Container App, Log Analytics, PostgreSQL Flexible Server).
 
-### Scripted Deploy
+### Alternative One-Liner
+
+```powershell
+iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/deploy.ps1')
+```
+
+Same result — interactive prompts for all configuration. If run from within a cloned repo, it uses the local `scripts/deploy-azure.ps1` instead of downloading.
+
+### Scripted Deploy (From Cloned Repo)
 
 ```powershell
 .\scripts\deploy-azure.ps1 `
