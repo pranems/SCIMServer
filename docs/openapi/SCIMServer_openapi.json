@@ -2,503 +2,408 @@
   "openapi": "3.0.3",
   "info": {
     "title": "SCIMServer API",
-    "version": "2.0.0",
-    "description": "OpenAPI specification for SCIMServer SCIM 2.0 server (v0.24.0). Passes all 25 Microsoft SCIM Validator tests. Implements RFC 7644 §3.4.2.5 attribute projection, §3.4.3 POST /.search, §3.7 Bulk operations, §3.14 ETag/conditional requests, and full RFC 7643/7644 discovery endpoints. P2 attribute characteristic enforcement: schema-driven always-returned, caseExact-aware filtering, readOnly sub-attr stripping."
+    "version": "0.31.0",
+    "description": "Complete SCIM 2.0 Server — 76 endpoints across 18 controllers.\n\nMulti-tenant endpoint architecture, OAuth 2.0, per-endpoint credentials, bulk operations, /Me endpoint, custom resource types, database browser, activity feed, structured logging.\n\nAll SCIM paths are scoped under /endpoints/{endpointId}. Admin paths are under /admin.\nGlobal prefix: /scim (configurable via API_PREFIX). URL rewriting: /scim/v2/* → /scim/*.",
+    "contact": { "name": "SCIMServer", "url": "https://github.com/pranems/SCIMServer" },
+    "license": { "name": "MIT", "url": "https://opensource.org/licenses/MIT" }
   },
   "servers": [
-    { "url": "http://localhost:6000/scim/v2", "description": "Root-level discovery (ServiceProviderConfig, Schemas, ResourceTypes)" },
-    { "url": "http://localhost:6000/scim/endpoints/{endpointId}", "description": "Endpoint-scoped SCIM operations" }
+    { "url": "http://localhost:3000/scim", "description": "Local development (default)" },
+    { "url": "http://localhost:6000/scim", "description": "Local (port 6000)" },
+    { "url": "http://localhost:8080/scim", "description": "Docker" }
   ],
-  "paths": {
-    "/ServiceProviderConfig": {
-      "get": {
-        "summary": "Service Provider Configuration (RFC 7643 §5)",
-        "description": "Public — no authentication required per RFC 7644 §4. Returns server capabilities.",
-        "tags": ["SCIM - Discovery"],
-        "responses": { "200": { "description": "ServiceProviderConfig", "content": { "application/scim+json": {} } } }
-      }
-    },
-    "/Schemas": {
-      "get": {
-        "summary": "List all schemas (RFC 7643 §7)",
-        "description": "Public — no authentication required. Returns all SCIM schema definitions.",
-        "tags": ["SCIM - Discovery"],
-        "responses": { "200": { "description": "ListResponse of SchemaDefinitions", "content": { "application/scim+json": {} } } }
-      }
-    },
-    "/Schemas/{uri}": {
-      "get": {
-        "summary": "Get schema by URN (RFC 7644 §4)",
-        "description": "Public — no authentication required. Returns a single schema definition.",
-        "tags": ["SCIM - Discovery"],
-        "parameters": [{ "name": "uri", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Schema URN (e.g. urn:ietf:params:scim:schemas:core:2.0:User)" }],
-        "responses": {
-          "200": { "description": "Schema definition", "content": { "application/scim+json": {} } },
-          "404": { "description": "Not found — SCIM error response", "content": { "application/scim+json": {} } }
-        }
-      }
-    },
-    "/ResourceTypes": {
-      "get": {
-        "summary": "List all resource types (RFC 7643 §6)",
-        "description": "Public — no authentication required. Returns all SCIM resource type definitions.",
-        "tags": ["SCIM - Discovery"],
-        "responses": { "200": { "description": "ListResponse of ResourceTypes", "content": { "application/scim+json": {} } } }
-      }
-    },
-    "/ResourceTypes/{id}": {
-      "get": {
-        "summary": "Get resource type by ID (RFC 7644 §4)",
-        "description": "Public — no authentication required. Returns a single resource type definition.",
-        "tags": ["SCIM - Discovery"],
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "ResourceType id (e.g. User, Group)" }],
-        "responses": {
-          "200": { "description": "ResourceType", "content": { "application/scim+json": {} } },
-          "404": { "description": "Not found — SCIM error response", "content": { "application/scim+json": {} } }
-        }
-      }
-    },
-    "/Users": {
-      "post": {
-        "summary": "Create SCIM User",
-        "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "type": "object" } } } },
-        "responses": {
-          "201": { "description": "Created", "headers": { "ETag": { "schema": { "type": "string" }, "description": "Resource version for conditional requests" } } },
-          "409": { "description": "Conflict — duplicate userName" }
-        }
-      },
-      "get": {
-        "summary": "List / Filter Users",
-        "description": "Supports full ABNF filter parser (RFC 7644 §3.4.2.2), case-insensitive matching, attribute projection (§3.4.2.5)",
-        "parameters": [
-          { "name": "filter", "in": "query", "schema": { "type": "string" }, "description": "e.g. userName eq \"alice@example.com\" (case-insensitive)" },
-          { "name": "startIndex", "in": "query", "schema": { "type": "integer", "default": 1 } },
-          { "name": "count", "in": "query", "schema": { "type": "integer", "default": 100 } },
-          { "name": "attributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to include (RFC 7644 §3.4.2.5), e.g. userName,displayName" },
-          { "name": "excludedAttributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to exclude, e.g. emails,phoneNumbers" }
-        ],
-        "responses": { "200": { "description": "ListResponse" } }
-      }
-    },
-    "/Users/.search": {
-      "post": {
-        "summary": "Search Users via POST (RFC 7644 §3.4.3)",
-        "description": "POST-based search as an alternative to GET with query params. Accepts SearchRequest body.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/scim+json": {
-              "schema": { "$ref": "#/components/schemas/SearchRequest" },
-              "example": {
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:SearchRequest"],
-                "filter": "userName eq \"alice@example.com\"",
-                "startIndex": 1,
-                "count": 10,
-                "attributes": "userName,displayName"
-              }
-            }
-          }
-        },
-        "responses": { "200": { "description": "ListResponse" } }
-      }
-    },
-    "/Users/{id}": {
-      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-      "get": {
-        "summary": "Get User",
-        "parameters": [
-          { "name": "attributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to include" },
-          { "name": "excludedAttributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to exclude" }
-        ],
-        "responses": {
-          "200": { "description": "User resource", "headers": { "ETag": { "schema": { "type": "string" }, "description": "Resource version (meta.version)" } } },
-          "304": { "description": "Not Modified — returned when If-None-Match matches current ETag" },
-          "404": { "description": "Not found" }
-        }
-      },
-      "put": {
-        "summary": "Replace User",
-        "parameters": [
-          { "name": "If-Match", "in": "header", "schema": { "type": "string" }, "description": "ETag for conditional replace (returns 412 on mismatch)" }
-        ],
-        "responses": {
-          "200": { "description": "Updated", "headers": { "ETag": { "schema": { "type": "string" } } } },
-          "412": { "description": "Precondition Failed — If-Match ETag mismatch" }
-        }
-      },
-      "patch": {
-        "summary": "Patch User",
-        "description": "Supports valuePath filters, extension URN paths, no-path object merges",
-        "parameters": [
-          { "name": "If-Match", "in": "header", "schema": { "type": "string" }, "description": "ETag for conditional patch" }
-        ],
-        "responses": {
-          "200": { "description": "Patched", "headers": { "ETag": { "schema": { "type": "string" } } } },
-          "412": { "description": "Precondition Failed" }
-        }
-      },
-      "delete": { "summary": "Delete User", "responses": { "204": { "description": "No content" } } }
-    },
-    "/Groups": {
-      "post": {
-        "summary": "Create Group",
-        "responses": {
-          "201": { "description": "Created", "headers": { "ETag": { "schema": { "type": "string" } } } },
-          "409": { "description": "Conflict — duplicate displayName" }
-        }
-      },
-      "get": {
-        "summary": "List / Filter Groups",
-        "parameters": [
-          { "name": "filter", "in": "query", "schema": { "type": "string" }, "description": "e.g. displayName eq \"Engineering\" (case-insensitive)" },
-          { "name": "startIndex", "in": "query", "schema": { "type": "integer" } },
-          { "name": "count", "in": "query", "schema": { "type": "integer" } },
-          { "name": "attributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to include" },
-          { "name": "excludedAttributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to exclude, e.g. members" }
-        ],
-        "responses": { "200": { "description": "ListResponse" } }
-      }
-    },
-    "/Groups/.search": {
-      "post": {
-        "summary": "Search Groups via POST (RFC 7644 §3.4.3)",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/scim+json": {
-              "schema": { "$ref": "#/components/schemas/SearchRequest" },
-              "example": {
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:SearchRequest"],
-                "filter": "displayName eq \"Engineering\"",
-                "startIndex": 1,
-                "count": 10
-              }
-            }
-          }
-        },
-        "responses": { "200": { "description": "ListResponse" } }
-      }
-    },
-    "/Groups/{id}": {
-      "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-      "get": {
-        "summary": "Get Group",
-        "parameters": [
-          { "name": "attributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to include" },
-          { "name": "excludedAttributes", "in": "query", "schema": { "type": "string" }, "description": "e.g. members" }
-        ],
-        "responses": {
-          "200": { "description": "Group resource", "headers": { "ETag": { "schema": { "type": "string" } } } },
-          "304": { "description": "Not Modified" },
-          "404": { "description": "Not found" }
-        }
-      },
-      "put": { "summary": "Replace Group", "responses": { "200": { "description": "Updated", "headers": { "ETag": { "schema": { "type": "string" } } } } } },
-      "patch": { "summary": "Patch Group", "responses": { "200": { "description": "Patched", "headers": { "ETag": { "schema": { "type": "string" } } } } } },
-      "delete": { "summary": "Delete Group", "responses": { "204": { "description": "No content" } } }
-    },
-    "/Bulk": {
-      "post": {
-        "summary": "Bulk Operations (RFC 7644 §3.7)",
-        "description": "Process multiple SCIM operations in a single HTTP request. Supports POST (Create), PUT (Replace), PATCH (Update), and DELETE with bulkId cross-referencing. Max 1000 operations, max 1MB payload.",
-        "tags": ["SCIM - Bulk"],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/scim+json": {
-              "schema": { "$ref": "#/components/schemas/BulkRequest" },
-              "example": {
-                "schemas": ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
-                "failOnErrors": 2,
-                "Operations": [
-                  { "method": "POST", "path": "/Users", "bulkId": "user-1", "data": { "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "userName": "bulk-user@example.com" } },
-                  { "method": "PATCH", "path": "/Users/abc-123", "data": { "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"], "Operations": [{ "op": "replace", "path": "active", "value": false }] } },
-                  { "method": "DELETE", "path": "/Groups/def-456" }
-                ]
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Bulk response with per-operation results",
-            "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/BulkResponse" } } }
-          },
-          "413": { "description": "Payload too large — exceeds maxPayloadSize (1048576 bytes)" }
-        }
-      }
-    },
-    "/admin/log-config": {
-      "get": {
-        "summary": "Get log configuration",
-        "description": "Returns the current runtime log configuration including global level, category overrides, endpoint overrides, and available levels/categories.",
-        "tags": ["Admin - Logging"],
-        "responses": {
-          "200": {
-            "description": "Current log configuration",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/LogConfigResponse" }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "summary": "Update log configuration",
-        "description": "Partial update of runtime log configuration. Only include fields you want to change.",
-        "tags": ["Admin - Logging"],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": { "$ref": "#/components/schemas/LogConfigUpdate" },
-              "example": {
-                "globalLevel": "INFO",
-                "includePayloads": false,
-                "format": "json",
-                "categoryLevels": { "scim.patch": "DEBUG", "auth": "WARN" }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Configuration updated",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "message": { "type": "string" },
-                    "config": { "$ref": "#/components/schemas/LogConfigResponse" }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/admin/log-config/level/{level}": {
-      "put": {
-        "summary": "Set global log level",
-        "description": "Quick shortcut to change the global minimum log level.",
-        "tags": ["Admin - Logging"],
-        "parameters": [
-          { "name": "level", "in": "path", "required": true, "schema": { "type": "string", "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"] } }
-        ],
-        "responses": {
-          "200": {
-            "description": "Global level updated",
-            "content": {
-              "application/json": {
-                "example": { "message": "Global log level set to TRACE", "globalLevel": "TRACE" }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/admin/log-config/category/{category}/{level}": {
-      "put": {
-        "summary": "Set category log level",
-        "description": "Set or override the log level for a specific log category.",
-        "tags": ["Admin - Logging"],
-        "parameters": [
-          { "name": "category", "in": "path", "required": true, "schema": { "type": "string", "enum": ["http", "auth", "scim.user", "scim.group", "scim.patch", "scim.filter", "scim.discovery", "endpoint", "database", "backup", "oauth", "general"] } },
-          { "name": "level", "in": "path", "required": true, "schema": { "type": "string", "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"] } }
-        ],
-        "responses": {
-          "200": {
-            "description": "Category level updated",
-            "content": { "application/json": { "example": { "message": "Category 'scim.patch' log level set to TRACE" } } }
-          }
-        }
-      }
-    },
-    "/admin/log-config/endpoint/{endpointId}/{level}": {
-      "put": {
-        "summary": "Set endpoint log level override",
-        "description": "Set a log level override for a specific SCIM endpoint. This takes highest priority in the 3-tier cascade.",
-        "tags": ["Admin - Logging"],
-        "parameters": [
-          { "name": "endpointId", "in": "path", "required": true, "schema": { "type": "string" } },
-          { "name": "level", "in": "path", "required": true, "schema": { "type": "string", "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"] } }
-        ],
-        "responses": {
-          "200": {
-            "description": "Endpoint level override set",
-            "content": { "application/json": { "example": { "message": "Endpoint 'ep-abc123' log level set to TRACE" } } }
-          }
-        }
-      }
-    },
-    "/admin/log-config/endpoint/{endpointId}": {
-      "delete": {
-        "summary": "Remove endpoint log level override",
-        "description": "Remove the log level override for a specific SCIM endpoint, reverting to category or global level.",
-        "tags": ["Admin - Logging"],
-        "parameters": [
-          { "name": "endpointId", "in": "path", "required": true, "schema": { "type": "string" } }
-        ],
-        "responses": {
-          "204": { "description": "Endpoint override removed" }
-        }
-      }
-    },
-    "/admin/log-config/recent": {
-      "get": {
-        "summary": "Query recent log entries",
-        "description": "Retrieve entries from the in-memory ring buffer (last 500 entries). Supports filtering by level, category, requestId, and endpointId.",
-        "tags": ["Admin - Logging"],
-        "parameters": [
-          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 100 }, "description": "Max entries to return" },
-          { "name": "level", "in": "query", "schema": { "type": "string", "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"] }, "description": "Minimum severity filter" },
-          { "name": "category", "in": "query", "schema": { "type": "string" }, "description": "Filter by log category" },
-          { "name": "requestId", "in": "query", "schema": { "type": "string" }, "description": "Filter by correlation request ID" },
-          { "name": "endpointId", "in": "query", "schema": { "type": "string" }, "description": "Filter by SCIM endpoint ID" }
-        ],
-        "responses": {
-          "200": {
-            "description": "Recent log entries",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "count": { "type": "integer" },
-                    "entries": { "type": "array", "items": { "$ref": "#/components/schemas/StructuredLogEntry" } }
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "summary": "Clear recent log buffer",
-        "description": "Clear the in-memory ring buffer of recent log entries.",
-        "tags": ["Admin - Logging"],
-        "responses": {
-          "204": { "description": "Ring buffer cleared" }
-        }
-      }
-    }
-  },
+  "tags": [
+    { "name": "Health", "description": "Health check (no auth)" },
+    { "name": "OAuth", "description": "OAuth 2.0 token endpoints (no auth)" },
+    { "name": "Discovery (Root)", "description": "Root-level SCIM discovery (no auth, RFC 7644 §4)" },
+    { "name": "Discovery (Endpoint)", "description": "Endpoint-scoped SCIM discovery (no auth, RFC 7644 §4)" },
+    { "name": "Users", "description": "SCIM User CRUD (endpoint-scoped)" },
+    { "name": "Groups", "description": "SCIM Group CRUD (endpoint-scoped)" },
+    { "name": "Me", "description": "SCIM /Me — current user (OAuth JWT required)" },
+    { "name": "Bulk", "description": "SCIM Bulk operations (RFC 7644 §3.7)" },
+    { "name": "Custom Resources", "description": "Generic SCIM CRUD for registered custom types" },
+    { "name": "Admin — Endpoints", "description": "Endpoint (tenant) management" },
+    { "name": "Admin — Credentials", "description": "Per-endpoint credential management" },
+    { "name": "Admin — General", "description": "Logs, manual operations, version" },
+    { "name": "Admin — Log Config", "description": "Runtime log configuration & streaming" },
+    { "name": "Admin — Database", "description": "Database browser & statistics" },
+    { "name": "Admin — Activity", "description": "Parsed SCIM activity feed" }
+  ],
   "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "description": "Shared secret, per-endpoint credential, or OAuth JWT" },
+      "oauthJwt": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT", "description": "OAuth 2.0 JWT with sub claim — required for /Me" }
+    },
     "schemas": {
+      "ScimMeta": {
+        "type": "object",
+        "properties": {
+          "resourceType": { "type": "string", "example": "User" },
+          "created": { "type": "string", "format": "date-time" },
+          "lastModified": { "type": "string", "format": "date-time" },
+          "location": { "type": "string" },
+          "version": { "type": "string", "example": "W/\"1\"" }
+        }
+      },
+      "ScimUser": {
+        "type": "object",
+        "required": ["schemas", "userName"],
+        "properties": {
+          "schemas": { "type": "array", "items": { "type": "string" } },
+          "id": { "type": "string", "format": "uuid", "readOnly": true },
+          "userName": { "type": "string" },
+          "externalId": { "type": "string" },
+          "active": { "type": "boolean" },
+          "name": { "type": "object", "properties": { "givenName": { "type": "string" }, "familyName": { "type": "string" }, "formatted": { "type": "string" } } },
+          "displayName": { "type": "string" },
+          "nickName": { "type": "string" },
+          "title": { "type": "string" },
+          "userType": { "type": "string" },
+          "preferredLanguage": { "type": "string" },
+          "locale": { "type": "string" },
+          "timezone": { "type": "string" },
+          "emails": { "type": "array", "items": { "type": "object", "properties": { "value": { "type": "string" }, "type": { "type": "string" }, "primary": { "type": "boolean" } } } },
+          "phoneNumbers": { "type": "array", "items": { "type": "object", "properties": { "value": { "type": "string" }, "type": { "type": "string" } } } },
+          "addresses": { "type": "array", "items": { "type": "object", "properties": { "streetAddress": { "type": "string" }, "locality": { "type": "string" }, "region": { "type": "string" }, "postalCode": { "type": "string" }, "country": { "type": "string" }, "type": { "type": "string" }, "primary": { "type": "boolean" } } } },
+          "groups": { "type": "array", "readOnly": true, "items": { "type": "object", "properties": { "value": { "type": "string" }, "display": { "type": "string" } } } },
+          "meta": { "$ref": "#/components/schemas/ScimMeta" }
+        },
+        "additionalProperties": true
+      },
+      "ScimGroup": {
+        "type": "object",
+        "required": ["schemas", "displayName"],
+        "properties": {
+          "schemas": { "type": "array", "items": { "type": "string" } },
+          "id": { "type": "string", "format": "uuid", "readOnly": true },
+          "displayName": { "type": "string" },
+          "externalId": { "type": "string" },
+          "members": { "type": "array", "items": { "type": "object", "properties": { "value": { "type": "string" }, "display": { "type": "string" }, "type": { "type": "string" } } } },
+          "meta": { "$ref": "#/components/schemas/ScimMeta" }
+        },
+        "additionalProperties": true
+      },
+      "ScimListResponse": {
+        "type": "object",
+        "properties": {
+          "schemas": { "type": "array", "items": { "type": "string" } },
+          "totalResults": { "type": "integer" },
+          "startIndex": { "type": "integer", "minimum": 1 },
+          "itemsPerPage": { "type": "integer" },
+          "Resources": { "type": "array", "items": { "type": "object" } }
+        }
+      },
+      "ScimError": {
+        "type": "object",
+        "properties": {
+          "schemas": { "type": "array", "items": { "type": "string" } },
+          "status": { "type": "string" },
+          "scimType": { "type": "string", "enum": ["invalidSyntax", "invalidValue", "invalidFilter", "invalidPath", "mutability", "uniqueness", "tooLarge", "noTarget"] },
+          "detail": { "type": "string" }
+        }
+      },
+      "PatchOp": {
+        "type": "object",
+        "required": ["schemas", "Operations"],
+        "properties": {
+          "schemas": { "type": "array", "items": { "type": "string" } },
+          "Operations": { "type": "array", "maxItems": 1000, "items": { "type": "object", "required": ["op"], "properties": { "op": { "type": "string", "enum": ["add", "replace", "remove"] }, "path": { "type": "string" }, "value": {} } } }
+        }
+      },
       "SearchRequest": {
         "type": "object",
-        "description": "RFC 7644 §3.4.3 SearchRequest for POST /.search",
         "properties": {
-          "schemas": { "type": "array", "items": { "type": "string" }, "example": ["urn:ietf:params:scim:api:messages:2.0:SearchRequest"] },
-          "filter": { "type": "string", "description": "SCIM filter expression" },
-          "startIndex": { "type": "integer", "default": 1 },
-          "count": { "type": "integer", "default": 100 },
-          "attributes": { "type": "string", "description": "Comma-separated list of attributes to include" },
-          "excludedAttributes": { "type": "string", "description": "Comma-separated list of attributes to exclude" },
+          "schemas": { "type": "array", "items": { "type": "string" } },
+          "filter": { "type": "string", "maxLength": 10000 },
+          "startIndex": { "type": "integer", "minimum": 1 },
+          "count": { "type": "integer", "minimum": 0, "maximum": 10000 },
           "sortBy": { "type": "string" },
-          "sortOrder": { "type": "string", "enum": ["ascending", "descending"] }
+          "sortOrder": { "type": "string", "enum": ["ascending", "descending"] },
+          "attributes": { "type": "string", "description": "Comma-separated" },
+          "excludedAttributes": { "type": "string", "description": "Comma-separated" }
         }
       },
       "BulkRequest": {
         "type": "object",
-        "description": "RFC 7644 §3.7 BulkRequest for POST /Bulk",
         "required": ["schemas", "Operations"],
         "properties": {
           "schemas": { "type": "array", "items": { "type": "string" } },
-          "failOnErrors": { "type": "integer", "description": "Stop processing after this many errors" },
-          "Operations": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "required": ["method", "path"],
-              "properties": {
-                "method": { "type": "string", "enum": ["POST", "PUT", "PATCH", "DELETE"] },
-                "bulkId": { "type": "string" },
-                "path": { "type": "string" },
-                "data": { "type": "object" }
-              }
-            }
-          }
+          "failOnErrors": { "type": "integer", "minimum": 0, "maximum": 1000 },
+          "Operations": { "type": "array", "maxItems": 1000, "items": { "type": "object", "required": ["method", "path"], "properties": { "method": { "type": "string", "enum": ["POST", "PUT", "PATCH", "DELETE"] }, "path": { "type": "string" }, "bulkId": { "type": "string" }, "version": { "type": "string" }, "data": { "type": "object" } } } }
         }
       },
       "BulkResponse": {
         "type": "object",
-        "description": "RFC 7644 §3.7 BulkResponse",
         "properties": {
           "schemas": { "type": "array", "items": { "type": "string" } },
-          "Operations": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "method": { "type": "string" },
-                "bulkId": { "type": "string" },
-                "location": { "type": "string", "format": "uri" },
-                "status": { "type": "string" },
-                "response": { "type": "object" }
-              }
-            }
-          }
+          "Operations": { "type": "array", "items": { "type": "object", "properties": { "method": { "type": "string" }, "bulkId": { "type": "string" }, "location": { "type": "string" }, "status": { "type": "string" }, "response": { "type": "object" } } } }
         }
       },
-      "LogConfigResponse": {
+      "ServiceProviderConfig": {
         "type": "object",
-        "description": "Runtime log configuration response from GET /admin/log-config",
         "properties": {
-          "globalLevel": { "type": "string", "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"], "description": "Current global minimum log level" },
-          "categoryLevels": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Per-category level overrides" },
-          "endpointLevels": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Per-endpoint level overrides" },
-          "includePayloads": { "type": "boolean", "description": "Whether request/response bodies are logged at TRACE/DEBUG" },
-          "includeStackTraces": { "type": "boolean", "description": "Whether stack traces are included in ERROR/FATAL output" },
-          "maxPayloadSizeBytes": { "type": "integer", "description": "Maximum payload size to log in bytes" },
-          "format": { "type": "string", "enum": ["json", "pretty"], "description": "Output format" },
-          "availableLevels": { "type": "array", "items": { "type": "string" }, "description": "All valid log level names" },
-          "availableCategories": { "type": "array", "items": { "type": "string" }, "description": "All valid log category names" }
+          "schemas": { "type": "array", "items": { "type": "string" } },
+          "documentationUri": { "type": "string" },
+          "patch": { "type": "object", "properties": { "supported": { "type": "boolean" } } },
+          "bulk": { "type": "object", "properties": { "supported": { "type": "boolean" }, "maxOperations": { "type": "integer" }, "maxPayloadSize": { "type": "integer" } } },
+          "filter": { "type": "object", "properties": { "supported": { "type": "boolean" }, "maxResults": { "type": "integer" } } },
+          "changePassword": { "type": "object", "properties": { "supported": { "type": "boolean" } } },
+          "sort": { "type": "object", "properties": { "supported": { "type": "boolean" } } },
+          "etag": { "type": "object", "properties": { "supported": { "type": "boolean" } } },
+          "authenticationSchemes": { "type": "array", "items": { "type": "object", "properties": { "type": { "type": "string" }, "name": { "type": "string" }, "description": { "type": "string" }, "specUri": { "type": "string" }, "documentationUri": { "type": "string" }, "primary": { "type": "boolean" } } } },
+          "meta": { "type": "object", "properties": { "resourceType": { "type": "string" }, "location": { "type": "string" } } }
         }
       },
-      "LogConfigUpdate": {
+      "ScimSchema": {
         "type": "object",
-        "description": "Partial update body for PUT /admin/log-config",
         "properties": {
-          "globalLevel": { "type": "string", "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"] },
-          "includePayloads": { "type": "boolean" },
-          "includeStackTraces": { "type": "boolean" },
-          "maxPayloadSizeBytes": { "type": "integer" },
-          "format": { "type": "string", "enum": ["json", "pretty"] },
-          "categoryLevels": { "type": "object", "additionalProperties": { "type": "string" }, "description": "Category name → level overrides" }
+          "schemas": { "type": "array", "items": { "type": "string" } },
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "attributes": { "type": "array", "items": { "type": "object" } },
+          "meta": { "type": "object" }
         }
       },
-      "StructuredLogEntry": {
+      "ResourceType": {
         "type": "object",
-        "description": "A single structured log entry from the ring buffer",
         "properties": {
-          "timestamp": { "type": "string", "format": "date-time", "description": "ISO-8601 timestamp" },
-          "level": { "type": "string", "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"], "description": "Log severity" },
-          "category": { "type": "string", "description": "Functional category (e.g. scim.user, http, auth)" },
-          "message": { "type": "string", "description": "Human-readable log message" },
-          "requestId": { "type": "string", "description": "Correlation request ID (UUID)" },
-          "endpointId": { "type": "string", "description": "SCIM endpoint ID" },
-          "method": { "type": "string", "description": "HTTP method" },
-          "path": { "type": "string", "description": "Request URL path" },
-          "durationMs": { "type": "integer", "description": "Elapsed time since request start in ms" },
-          "error": {
-            "type": "object",
-            "properties": {
-              "message": { "type": "string" },
-              "name": { "type": "string" },
-              "stack": { "type": "string" }
-            }
-          },
-          "data": { "type": "object", "additionalProperties": true, "description": "Additional structured data" }
+          "schemas": { "type": "array", "items": { "type": "string" } },
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "endpoint": { "type": "string" },
+          "description": { "type": "string" },
+          "schema": { "type": "string" },
+          "schemaExtensions": { "type": "array", "items": { "type": "object", "properties": { "schema": { "type": "string" }, "required": { "type": "boolean" } } } },
+          "meta": { "type": "object" }
         }
-      }
+      },
+      "Endpoint": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "displayName": { "type": "string" },
+          "description": { "type": "string" },
+          "active": { "type": "boolean" },
+          "profile": { "type": "object", "description": "Full profile (view=full)" },
+          "profileSummary": { "type": "object", "description": "Profile summary (view=summary)" },
+          "scimBasePath": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "_links": { "type": "object", "properties": { "self": { "type": "string" }, "stats": { "type": "string" }, "credentials": { "type": "string" }, "scim": { "type": "string" } } }
+        }
+      },
+      "CreateEndpoint": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string" }, "displayName": { "type": "string" }, "description": { "type": "string" }, "profilePreset": { "type": "string", "enum": ["entra-id", "entra-id-minimal", "rfc-standard", "minimal", "user-only", "lexmark"] }, "profile": { "type": "object" } } },
+      "UpdateEndpoint": { "type": "object", "properties": { "displayName": { "type": "string" }, "description": { "type": "string" }, "active": { "type": "boolean" }, "profile": { "type": "object" } } },
+      "EndpointStats": { "type": "object", "properties": { "users": { "type": "object", "properties": { "total": { "type": "integer" }, "active": { "type": "integer" }, "softDeleted": { "type": "integer" } } }, "groups": { "type": "object", "properties": { "total": { "type": "integer" }, "active": { "type": "integer" }, "softDeleted": { "type": "integer" } } }, "groupMembers": { "type": "object", "properties": { "total": { "type": "integer" } } }, "requestLogs": { "type": "object", "properties": { "total": { "type": "integer" } } } } },
+      "Credential": { "type": "object", "properties": { "id": { "type": "string", "format": "uuid" }, "endpointId": { "type": "string", "format": "uuid" }, "credentialType": { "type": "string", "enum": ["bearer", "oauth_client"] }, "label": { "type": "string" }, "active": { "type": "boolean" }, "createdAt": { "type": "string", "format": "date-time" }, "expiresAt": { "type": "string", "format": "date-time" }, "token": { "type": "string", "description": "Plaintext token — returned only on creation" } } },
+      "CreateCredential": { "type": "object", "properties": { "label": { "type": "string" }, "credentialType": { "type": "string", "enum": ["bearer", "oauth_client"], "default": "bearer" }, "expiresAt": { "type": "string", "format": "date-time" } } },
+      "ManualUser": { "type": "object", "required": ["userName"], "properties": { "userName": { "type": "string" }, "externalId": { "type": "string" }, "displayName": { "type": "string" }, "givenName": { "type": "string" }, "familyName": { "type": "string" }, "email": { "type": "string", "format": "email" }, "phoneNumber": { "type": "string" }, "department": { "type": "string" }, "active": { "type": "boolean" } } },
+      "ManualGroup": { "type": "object", "required": ["displayName"], "properties": { "displayName": { "type": "string" }, "scimId": { "type": "string" }, "memberIds": { "type": "array", "items": { "type": "string" } } } },
+      "LogConfig": { "type": "object", "properties": { "globalLevel": { "type": "string", "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"] }, "categoryLevels": { "type": "object" }, "endpointLevels": { "type": "object" }, "includePayloads": { "type": "boolean" }, "includeStackTraces": { "type": "boolean" }, "maxPayloadSizeBytes": { "type": "integer" }, "format": { "type": "string" }, "availableLevels": { "type": "array", "items": { "type": "string" } }, "availableCategories": { "type": "array", "items": { "type": "string" } } } },
+      "TokenRequest": { "type": "object", "required": ["grant_type", "client_id", "client_secret"], "properties": { "grant_type": { "type": "string", "enum": ["client_credentials"] }, "client_id": { "type": "string" }, "client_secret": { "type": "string" }, "scope": { "type": "string" } } },
+      "TokenResponse": { "type": "object", "properties": { "access_token": { "type": "string" }, "token_type": { "type": "string", "example": "Bearer" }, "expires_in": { "type": "integer", "example": 3600 }, "scope": { "type": "string" } } },
+      "HealthResponse": { "type": "object", "properties": { "status": { "type": "string", "example": "ok" }, "uptime": { "type": "number" }, "timestamp": { "type": "string", "format": "date-time" } } },
+      "VersionInfo": { "type": "object", "properties": { "version": { "type": "string" }, "service": { "type": "object" }, "runtime": { "type": "object" }, "auth": { "type": "object" }, "storage": { "type": "object" }, "container": { "type": "object" }, "deployment": { "type": "object" } } }
     },
-    "securitySchemes": {
-      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    "parameters": {
+      "endpointId": { "name": "endpointId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" }, "description": "Endpoint (tenant) UUID" },
+      "resourceId": { "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "SCIM resource ID" },
+      "attributes": { "name": "attributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to include" },
+      "excludedAttributes": { "name": "excludedAttributes", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated attributes to exclude" },
+      "filter": { "name": "filter", "in": "query", "schema": { "type": "string" }, "description": "SCIM filter expression" },
+      "startIndex": { "name": "startIndex", "in": "query", "schema": { "type": "integer", "minimum": 1, "default": 1 } },
+      "count": { "name": "count", "in": "query", "schema": { "type": "integer", "minimum": 1 } },
+      "sortBy": { "name": "sortBy", "in": "query", "schema": { "type": "string" } },
+      "sortOrder": { "name": "sortOrder", "in": "query", "schema": { "type": "string", "enum": ["ascending", "descending"] } },
+      "ifMatch": { "name": "If-Match", "in": "header", "schema": { "type": "string" }, "description": "ETag for conditional write" },
+      "view": { "name": "view", "in": "query", "schema": { "type": "string", "enum": ["summary", "full"] } }
     }
   },
-  "security": [{ "bearerAuth": [] }]
+  "paths": {
+    "/health": {
+      "get": { "tags": ["Health"], "summary": "Health check", "operationId": "healthCheck", "responses": { "200": { "description": "Healthy", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/HealthResponse" } } } } } }
+    },
+    "/oauth/test": {
+      "get": { "tags": ["OAuth"], "summary": "Test OAuth module", "operationId": "oauthTest", "responses": { "200": { "description": "OAuth module loaded" } } }
+    },
+    "/oauth/token": {
+      "post": { "tags": ["OAuth"], "summary": "Generate OAuth 2.0 access token", "operationId": "createToken", "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TokenRequest" } } } }, "responses": { "201": { "description": "Token issued", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/TokenResponse" } } } }, "400": { "description": "Unsupported grant_type or missing fields" }, "401": { "description": "Invalid credentials" } } }
+    },
+    "/ServiceProviderConfig": {
+      "get": { "tags": ["Discovery (Root)"], "summary": "Global ServiceProviderConfig", "operationId": "getGlobalSPC", "responses": { "200": { "description": "SPC", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ServiceProviderConfig" } } } } } }
+    },
+    "/Schemas": {
+      "get": { "tags": ["Discovery (Root)"], "summary": "List all global schemas", "operationId": "listGlobalSchemas", "responses": { "200": { "description": "Schemas", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimListResponse" } } } } } }
+    },
+    "/Schemas/{uri}": {
+      "get": { "tags": ["Discovery (Root)"], "summary": "Get global schema by URN", "operationId": "getGlobalSchema", "parameters": [{ "name": "uri", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "Schema", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimSchema" } } } }, "404": { "description": "Not found" } } }
+    },
+    "/ResourceTypes": {
+      "get": { "tags": ["Discovery (Root)"], "summary": "List all global resource types", "operationId": "listGlobalResourceTypes", "responses": { "200": { "description": "Resource types", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimListResponse" } } } } } }
+    },
+    "/ResourceTypes/{id}": {
+      "get": { "tags": ["Discovery (Root)"], "summary": "Get global resource type", "operationId": "getGlobalResourceType", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "Resource type", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ResourceType" } } } }, "404": { "description": "Not found" } } }
+    },
+    "/endpoints/{endpointId}/ServiceProviderConfig": {
+      "get": { "tags": ["Discovery (Endpoint)"], "summary": "Endpoint-specific ServiceProviderConfig", "operationId": "getEndpointSPC", "parameters": [{ "$ref": "#/components/parameters/endpointId" }], "responses": { "200": { "description": "SPC", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ServiceProviderConfig" } } } } } }
+    },
+    "/endpoints/{endpointId}/Schemas": {
+      "get": { "tags": ["Discovery (Endpoint)"], "summary": "Endpoint schemas (inc. custom extensions)", "operationId": "listEndpointSchemas", "parameters": [{ "$ref": "#/components/parameters/endpointId" }], "responses": { "200": { "description": "Schemas", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimListResponse" } } } } } }
+    },
+    "/endpoints/{endpointId}/Schemas/{uri}": {
+      "get": { "tags": ["Discovery (Endpoint)"], "summary": "Endpoint schema by URN", "operationId": "getEndpointSchema", "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "name": "uri", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "Schema" }, "404": { "description": "Not found" } } }
+    },
+    "/endpoints/{endpointId}/ResourceTypes": {
+      "get": { "tags": ["Discovery (Endpoint)"], "summary": "Endpoint resource types", "operationId": "listEndpointResourceTypes", "parameters": [{ "$ref": "#/components/parameters/endpointId" }], "responses": { "200": { "description": "Resource types" } } }
+    },
+    "/endpoints/{endpointId}/ResourceTypes/{id}": {
+      "get": { "tags": ["Discovery (Endpoint)"], "summary": "Endpoint resource type by ID", "operationId": "getEndpointResourceType", "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "Resource type" }, "404": { "description": "Not found" } } }
+    },
+    "/endpoints/{endpointId}/Users": {
+      "post": { "tags": ["Users"], "summary": "Create User", "operationId": "createUser", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "$ref": "#/components/parameters/attributes" }, { "$ref": "#/components/parameters/excludedAttributes" }], "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimUser" } } } }, "responses": { "201": { "description": "Created", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimUser" } } }, "headers": { "Location": { "schema": { "type": "string" } }, "ETag": { "schema": { "type": "string" } } } }, "400": { "description": "Invalid request", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimError" } } } }, "409": { "description": "Uniqueness violation" } } },
+      "get": { "tags": ["Users"], "summary": "List / Filter Users", "operationId": "listUsers", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "$ref": "#/components/parameters/filter" }, { "$ref": "#/components/parameters/startIndex" }, { "$ref": "#/components/parameters/count" }, { "$ref": "#/components/parameters/sortBy" }, { "$ref": "#/components/parameters/sortOrder" }, { "$ref": "#/components/parameters/attributes" }, { "$ref": "#/components/parameters/excludedAttributes" }], "responses": { "200": { "description": "User list", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimListResponse" } } } } } }
+    },
+    "/endpoints/{endpointId}/Users/.search": {
+      "post": { "tags": ["Users"], "summary": "Search Users (POST)", "operationId": "searchUsers", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }], "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/SearchRequest" } } } }, "responses": { "200": { "description": "Search results", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimListResponse" } } } } } }
+    },
+    "/endpoints/{endpointId}/Users/{id}": {
+      "get": { "tags": ["Users"], "summary": "Get User", "operationId": "getUser", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "$ref": "#/components/parameters/resourceId" }, { "$ref": "#/components/parameters/attributes" }, { "$ref": "#/components/parameters/excludedAttributes" }], "responses": { "200": { "description": "User", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimUser" } } } }, "404": { "description": "Not found" } } },
+      "put": { "tags": ["Users"], "summary": "Replace User", "operationId": "replaceUser", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "$ref": "#/components/parameters/resourceId" }, { "$ref": "#/components/parameters/ifMatch" }, { "$ref": "#/components/parameters/attributes" }, { "$ref": "#/components/parameters/excludedAttributes" }], "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimUser" } } } }, "responses": { "200": { "description": "Replaced" }, "404": { "description": "Not found" }, "409": { "description": "Uniqueness" }, "412": { "description": "ETag mismatch" }, "428": { "description": "If-Match required" } } },
+      "patch": { "tags": ["Users"], "summary": "Patch User", "operationId": "patchUser", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "$ref": "#/components/parameters/resourceId" }, { "$ref": "#/components/parameters/ifMatch" }, { "$ref": "#/components/parameters/attributes" }, { "$ref": "#/components/parameters/excludedAttributes" }], "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/PatchOp" } } } }, "responses": { "200": { "description": "Patched" }, "400": { "description": "Invalid op" }, "404": { "description": "Not found" }, "412": { "description": "ETag mismatch" } } },
+      "delete": { "tags": ["Users"], "summary": "Delete User", "operationId": "deleteUser", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "$ref": "#/components/parameters/resourceId" }, { "$ref": "#/components/parameters/ifMatch" }], "responses": { "204": { "description": "Deleted" }, "404": { "description": "Not found" } } }
+    },
+    "/endpoints/{endpointId}/Groups": {
+      "post": { "tags": ["Groups"], "summary": "Create Group", "operationId": "createGroup", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "$ref": "#/components/parameters/attributes" }, { "$ref": "#/components/parameters/excludedAttributes" }], "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimGroup" } } } }, "responses": { "201": { "description": "Created", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimGroup" } } }, "headers": { "Location": { "schema": { "type": "string" } }, "ETag": { "schema": { "type": "string" } } } }, "409": { "description": "Uniqueness" } } },
+      "get": { "tags": ["Groups"], "summary": "List / Filter Groups", "operationId": "listGroups", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "$ref": "#/components/parameters/filter" }, { "$ref": "#/components/parameters/startIndex" }, { "$ref": "#/components/parameters/count" }, { "$ref": "#/components/parameters/sortBy" }, { "$ref": "#/components/parameters/sortOrder" }, { "$ref": "#/components/parameters/attributes" }, { "$ref": "#/components/parameters/excludedAttributes" }], "responses": { "200": { "description": "Group list", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimListResponse" } } } } } }
+    },
+    "/endpoints/{endpointId}/Groups/.search": {
+      "post": { "tags": ["Groups"], "summary": "Search Groups (POST)", "operationId": "searchGroups", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }], "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/SearchRequest" } } } }, "responses": { "200": { "description": "Search results" } } }
+    },
+    "/endpoints/{endpointId}/Groups/{id}": {
+      "get": { "tags": ["Groups"], "summary": "Get Group", "operationId": "getGroup", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "$ref": "#/components/parameters/resourceId" }, { "$ref": "#/components/parameters/attributes" }, { "$ref": "#/components/parameters/excludedAttributes" }], "responses": { "200": { "description": "Group" }, "404": { "description": "Not found" } } },
+      "put": { "tags": ["Groups"], "summary": "Replace Group", "operationId": "replaceGroup", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "$ref": "#/components/parameters/resourceId" }, { "$ref": "#/components/parameters/ifMatch" }, { "$ref": "#/components/parameters/attributes" }, { "$ref": "#/components/parameters/excludedAttributes" }], "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimGroup" } } } }, "responses": { "200": { "description": "Replaced" }, "404": { "description": "Not found" }, "409": { "description": "Uniqueness" }, "412": { "description": "ETag mismatch" } } },
+      "patch": { "tags": ["Groups"], "summary": "Patch Group", "operationId": "patchGroup", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "$ref": "#/components/parameters/resourceId" }, { "$ref": "#/components/parameters/ifMatch" }, { "$ref": "#/components/parameters/attributes" }, { "$ref": "#/components/parameters/excludedAttributes" }], "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/PatchOp" } } } }, "responses": { "200": { "description": "Patched" }, "400": { "description": "Invalid op" }, "404": { "description": "Not found" } } },
+      "delete": { "tags": ["Groups"], "summary": "Delete Group", "operationId": "deleteGroup", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "$ref": "#/components/parameters/resourceId" }, { "$ref": "#/components/parameters/ifMatch" }], "responses": { "204": { "description": "Deleted" }, "404": { "description": "Not found" } } }
+    },
+    "/endpoints/{endpointId}/Me": {
+      "get": { "tags": ["Me"], "summary": "Get current user", "operationId": "getMe", "description": "Requires OAuth JWT with sub claim matching a userName", "security": [{ "oauthJwt": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "$ref": "#/components/parameters/attributes" }, { "$ref": "#/components/parameters/excludedAttributes" }], "responses": { "200": { "description": "Current user" }, "401": { "description": "Not OAuth" }, "404": { "description": "No matching user" } } },
+      "put": { "tags": ["Me"], "summary": "Replace current user", "operationId": "replaceMe", "security": [{ "oauthJwt": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "$ref": "#/components/parameters/attributes" }, { "$ref": "#/components/parameters/excludedAttributes" }], "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimUser" } } } }, "responses": { "200": { "description": "Replaced" }, "401": { "description": "Not OAuth" }, "404": { "description": "Not found" } } },
+      "patch": { "tags": ["Me"], "summary": "Patch current user", "operationId": "patchMe", "security": [{ "oauthJwt": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "$ref": "#/components/parameters/attributes" }, { "$ref": "#/components/parameters/excludedAttributes" }], "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/PatchOp" } } } }, "responses": { "200": { "description": "Patched" }, "401": { "description": "Not OAuth" } } },
+      "delete": { "tags": ["Me"], "summary": "Delete current user", "operationId": "deleteMe", "security": [{ "oauthJwt": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }], "responses": { "204": { "description": "Deleted" }, "401": { "description": "Not OAuth" } } }
+    },
+    "/endpoints/{endpointId}/Bulk": {
+      "post": { "tags": ["Bulk"], "summary": "Bulk operations (RFC 7644 §3.7)", "operationId": "bulkOps", "description": "Requires bulk.supported=true in endpoint SPC", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }], "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/BulkRequest" } } } }, "responses": { "200": { "description": "Bulk results", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/BulkResponse" } } } }, "413": { "description": "Payload too large" } } }
+    },
+    "/endpoints/{endpointId}/{resourceType}": {
+      "post": { "tags": ["Custom Resources"], "summary": "Create custom resource", "operationId": "createCustomResource", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "name": "resourceType", "in": "path", "required": true, "schema": { "type": "string" } }, { "$ref": "#/components/parameters/attributes" }, { "$ref": "#/components/parameters/excludedAttributes" }], "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "type": "object" } } } }, "responses": { "201": { "description": "Created" }, "404": { "description": "Type not registered" } } },
+      "get": { "tags": ["Custom Resources"], "summary": "List custom resources", "operationId": "listCustomResources", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "name": "resourceType", "in": "path", "required": true, "schema": { "type": "string" } }, { "$ref": "#/components/parameters/filter" }, { "$ref": "#/components/parameters/startIndex" }, { "$ref": "#/components/parameters/count" }, { "$ref": "#/components/parameters/sortBy" }, { "$ref": "#/components/parameters/sortOrder" }, { "$ref": "#/components/parameters/attributes" }, { "$ref": "#/components/parameters/excludedAttributes" }], "responses": { "200": { "description": "List" } } }
+    },
+    "/endpoints/{endpointId}/{resourceType}/.search": {
+      "post": { "tags": ["Custom Resources"], "summary": "Search custom resources (POST)", "operationId": "searchCustomResources", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "name": "resourceType", "in": "path", "required": true, "schema": { "type": "string" } }], "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/SearchRequest" } } } }, "responses": { "200": { "description": "Results" } } }
+    },
+    "/endpoints/{endpointId}/{resourceType}/{id}": {
+      "get": { "tags": ["Custom Resources"], "summary": "Get custom resource", "operationId": "getCustomResource", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "name": "resourceType", "in": "path", "required": true, "schema": { "type": "string" } }, { "$ref": "#/components/parameters/resourceId" }, { "$ref": "#/components/parameters/attributes" }, { "$ref": "#/components/parameters/excludedAttributes" }], "responses": { "200": { "description": "Resource" }, "404": { "description": "Not found" } } },
+      "put": { "tags": ["Custom Resources"], "summary": "Replace custom resource", "operationId": "replaceCustomResource", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "name": "resourceType", "in": "path", "required": true, "schema": { "type": "string" } }, { "$ref": "#/components/parameters/resourceId" }, { "$ref": "#/components/parameters/ifMatch" }], "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "type": "object" } } } }, "responses": { "200": { "description": "Replaced" }, "404": { "description": "Not found" } } },
+      "patch": { "tags": ["Custom Resources"], "summary": "Patch custom resource", "operationId": "patchCustomResource", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "name": "resourceType", "in": "path", "required": true, "schema": { "type": "string" } }, { "$ref": "#/components/parameters/resourceId" }, { "$ref": "#/components/parameters/ifMatch" }], "requestBody": { "required": true, "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/PatchOp" } } } }, "responses": { "200": { "description": "Patched" }, "404": { "description": "Not found" } } },
+      "delete": { "tags": ["Custom Resources"], "summary": "Delete custom resource", "operationId": "deleteCustomResource", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "name": "resourceType", "in": "path", "required": true, "schema": { "type": "string" } }, { "$ref": "#/components/parameters/resourceId" }, { "$ref": "#/components/parameters/ifMatch" }], "responses": { "204": { "description": "Deleted" }, "404": { "description": "Not found" } } }
+    },
+    "/admin/endpoints": {
+      "post": { "tags": ["Admin — Endpoints"], "summary": "Create endpoint", "operationId": "createEndpoint", "security": [{ "bearerAuth": [] }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateEndpoint" } } } }, "responses": { "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Endpoint" } } } }, "409": { "description": "Name exists" } } },
+      "get": { "tags": ["Admin — Endpoints"], "summary": "List endpoints", "operationId": "listEndpoints", "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "active", "in": "query", "schema": { "type": "boolean" } }, { "$ref": "#/components/parameters/view" }], "responses": { "200": { "description": "Endpoint list" } } }
+    },
+    "/admin/endpoints/presets": {
+      "get": { "tags": ["Admin — Endpoints"], "summary": "List profile presets", "operationId": "listPresets", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Preset list" } } }
+    },
+    "/admin/endpoints/presets/{name}": {
+      "get": { "tags": ["Admin — Endpoints"], "summary": "Get preset profile", "operationId": "getPreset", "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "name", "in": "path", "required": true, "schema": { "type": "string", "enum": ["entra-id", "entra-id-minimal", "rfc-standard", "minimal", "user-only", "lexmark"] } }], "responses": { "200": { "description": "Preset profile" }, "404": { "description": "Not found" } } }
+    },
+    "/admin/endpoints/{endpointId}": {
+      "get": { "tags": ["Admin — Endpoints"], "summary": "Get endpoint by ID", "operationId": "getEndpoint", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "$ref": "#/components/parameters/view" }], "responses": { "200": { "description": "Endpoint", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Endpoint" } } } }, "404": { "description": "Not found" } } },
+      "patch": { "tags": ["Admin — Endpoints"], "summary": "Update endpoint (deep-merges settings)", "operationId": "updateEndpoint", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateEndpoint" } } } }, "responses": { "200": { "description": "Updated" }, "404": { "description": "Not found" } } },
+      "delete": { "tags": ["Admin — Endpoints"], "summary": "Delete endpoint (cascades all data)", "operationId": "deleteEndpoint", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }], "responses": { "204": { "description": "Deleted" }, "404": { "description": "Not found" } } }
+    },
+    "/admin/endpoints/by-name/{name}": {
+      "get": { "tags": ["Admin — Endpoints"], "summary": "Get endpoint by name", "operationId": "getEndpointByName", "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "name", "in": "path", "required": true, "schema": { "type": "string" } }, { "$ref": "#/components/parameters/view" }], "responses": { "200": { "description": "Endpoint" }, "404": { "description": "Not found" } } }
+    },
+    "/admin/endpoints/{endpointId}/stats": {
+      "get": { "tags": ["Admin — Endpoints"], "summary": "Endpoint statistics", "operationId": "getEndpointStats", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }], "responses": { "200": { "description": "Stats", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EndpointStats" } } } } } }
+    },
+    "/admin/endpoints/{endpointId}/credentials": {
+      "post": { "tags": ["Admin — Credentials"], "summary": "Create credential (server-generated token)", "operationId": "createCredential", "description": "Requires PerEndpointCredentialsEnabled", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateCredential" } } } }, "responses": { "201": { "description": "Created (save token — cannot be retrieved again)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Credential" } } } }, "400": { "description": "Invalid input" }, "403": { "description": "Feature not enabled" } } },
+      "get": { "tags": ["Admin — Credentials"], "summary": "List credentials (no tokens/hashes)", "operationId": "listCredentials", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }], "responses": { "200": { "description": "Credential list" } } }
+    },
+    "/admin/endpoints/{endpointId}/credentials/{credentialId}": {
+      "delete": { "tags": ["Admin — Credentials"], "summary": "Revoke credential", "operationId": "revokeCredential", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "name": "credentialId", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "204": { "description": "Revoked" }, "404": { "description": "Not found" } } }
+    },
+    "/admin/version": {
+      "get": { "tags": ["Admin — General"], "summary": "Server version & runtime info", "operationId": "getVersion", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Version info", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/VersionInfo" } } } } } }
+    },
+    "/admin/logs": {
+      "get": { "tags": ["Admin — General"], "summary": "List request logs", "operationId": "listLogs", "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "page", "in": "query", "schema": { "type": "integer" } }, { "name": "pageSize", "in": "query", "schema": { "type": "integer" } }, { "name": "method", "in": "query", "schema": { "type": "string" } }, { "name": "status", "in": "query", "schema": { "type": "string" } }, { "name": "hasError", "in": "query", "schema": { "type": "boolean" } }, { "name": "urlContains", "in": "query", "schema": { "type": "string" } }, { "name": "since", "in": "query", "schema": { "type": "string", "format": "date-time" } }, { "name": "until", "in": "query", "schema": { "type": "string", "format": "date-time" } }, { "name": "search", "in": "query", "schema": { "type": "string" } }, { "name": "includeAdmin", "in": "query", "schema": { "type": "boolean" } }, { "name": "hideKeepalive", "in": "query", "schema": { "type": "boolean" } }], "responses": { "200": { "description": "Paginated logs" } } }
+    },
+    "/admin/logs/{id}": {
+      "get": { "tags": ["Admin — General"], "summary": "Get log entry", "operationId": "getLogEntry", "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "Log entry" }, "404": { "description": "Not found" } } }
+    },
+    "/admin/logs/clear": {
+      "post": { "tags": ["Admin — General"], "summary": "Clear all logs", "operationId": "clearLogs", "security": [{ "bearerAuth": [] }], "responses": { "204": { "description": "Cleared" } } }
+    },
+    "/admin/users/manual": {
+      "post": { "tags": ["Admin — General"], "summary": "Create user (simplified form)", "operationId": "createManualUser", "security": [{ "bearerAuth": [] }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ManualUser" } } } }, "responses": { "201": { "description": "Created", "content": { "application/scim+json": { "schema": { "$ref": "#/components/schemas/ScimUser" } } } } } }
+    },
+    "/admin/groups/manual": {
+      "post": { "tags": ["Admin — General"], "summary": "Create group (simplified form)", "operationId": "createManualGroup", "security": [{ "bearerAuth": [] }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ManualGroup" } } } }, "responses": { "201": { "description": "Created" } } }
+    },
+    "/admin/users/{id}/delete": {
+      "post": { "tags": ["Admin — General"], "summary": "Delete user by PK or SCIM ID", "operationId": "adminDeleteUser", "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "204": { "description": "Deleted" }, "404": { "description": "Not found" } } }
+    },
+    "/admin/log-config": {
+      "get": { "tags": ["Admin — Log Config"], "summary": "Get log configuration", "operationId": "getLogConfig", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Config", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LogConfig" } } } } } },
+      "put": { "tags": ["Admin — Log Config"], "summary": "Update log configuration", "operationId": "updateLogConfig", "security": [{ "bearerAuth": [] }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "properties": { "globalLevel": { "type": "string" }, "includePayloads": { "type": "boolean" }, "includeStackTraces": { "type": "boolean" }, "maxPayloadSizeBytes": { "type": "integer" }, "format": { "type": "string" }, "categoryLevels": { "type": "object" } } } } } }, "responses": { "200": { "description": "Updated" } } }
+    },
+    "/admin/log-config/level/{level}": {
+      "put": { "tags": ["Admin — Log Config"], "summary": "Quick-set global log level", "operationId": "setGlobalLogLevel", "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "level", "in": "path", "required": true, "schema": { "type": "string", "enum": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"] } }], "responses": { "200": { "description": "Level set" } } }
+    },
+    "/admin/log-config/category/{category}/{level}": {
+      "put": { "tags": ["Admin — Log Config"], "summary": "Set category log level", "operationId": "setCategoryLogLevel", "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "category", "in": "path", "required": true, "schema": { "type": "string", "enum": ["http", "auth", "scim.user", "scim.group", "scim.patch", "scim.filter", "scim.discovery", "endpoint", "database", "oauth", "general"] } }, { "name": "level", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "Set" } } }
+    },
+    "/admin/log-config/endpoint/{endpointId}/{level}": {
+      "put": { "tags": ["Admin — Log Config"], "summary": "Set endpoint log level", "operationId": "setEndpointLogLevel", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }, { "name": "level", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "Set" } } }
+    },
+    "/admin/log-config/endpoint/{endpointId}": {
+      "delete": { "tags": ["Admin — Log Config"], "summary": "Clear endpoint log level override", "operationId": "clearEndpointLogLevel", "security": [{ "bearerAuth": [] }], "parameters": [{ "$ref": "#/components/parameters/endpointId" }], "responses": { "204": { "description": "Cleared" } } }
+    },
+    "/admin/log-config/recent": {
+      "get": { "tags": ["Admin — Log Config"], "summary": "Get recent in-memory logs", "operationId": "getRecentLogs", "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "limit", "in": "query", "schema": { "type": "integer" } }, { "name": "level", "in": "query", "schema": { "type": "string" } }, { "name": "category", "in": "query", "schema": { "type": "string" } }, { "name": "requestId", "in": "query", "schema": { "type": "string" } }, { "name": "endpointId", "in": "query", "schema": { "type": "string" } }], "responses": { "200": { "description": "Recent logs" } } },
+      "delete": { "tags": ["Admin — Log Config"], "summary": "Clear log buffer", "operationId": "clearRecentLogs", "security": [{ "bearerAuth": [] }], "responses": { "204": { "description": "Cleared" } } }
+    },
+    "/admin/log-config/stream": {
+      "get": { "tags": ["Admin — Log Config"], "summary": "Real-time log stream (SSE)", "operationId": "streamLogs", "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "level", "in": "query", "schema": { "type": "string" } }, { "name": "category", "in": "query", "schema": { "type": "string" } }, { "name": "endpointId", "in": "query", "schema": { "type": "string" } }], "responses": { "200": { "description": "SSE stream", "content": { "text/event-stream": { "schema": { "type": "string" } } } } } }
+    },
+    "/admin/log-config/download": {
+      "get": { "tags": ["Admin — Log Config"], "summary": "Download logs as file", "operationId": "downloadLogs", "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "ndjson"] } }, { "name": "limit", "in": "query", "schema": { "type": "integer" } }, { "name": "level", "in": "query", "schema": { "type": "string" } }, { "name": "category", "in": "query", "schema": { "type": "string" } }, { "name": "requestId", "in": "query", "schema": { "type": "string" } }, { "name": "endpointId", "in": "query", "schema": { "type": "string" } }], "responses": { "200": { "description": "Log file" } } }
+    },
+    "/admin/database/users": {
+      "get": { "tags": ["Admin — Database"], "summary": "Browse users", "operationId": "browseUsers", "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } }, { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } }, { "name": "search", "in": "query", "schema": { "type": "string" } }, { "name": "active", "in": "query", "schema": { "type": "boolean" } }], "responses": { "200": { "description": "Paginated users" } } }
+    },
+    "/admin/database/users/{id}": {
+      "get": { "tags": ["Admin — Database"], "summary": "User detail", "operationId": "getUserDetail", "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "User detail" }, "404": { "description": "Not found" } } }
+    },
+    "/admin/database/groups": {
+      "get": { "tags": ["Admin — Database"], "summary": "Browse groups", "operationId": "browseGroups", "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } }, { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } }, { "name": "search", "in": "query", "schema": { "type": "string" } }], "responses": { "200": { "description": "Paginated groups" } } }
+    },
+    "/admin/database/groups/{id}": {
+      "get": { "tags": ["Admin — Database"], "summary": "Group detail", "operationId": "getGroupDetail", "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "Group detail" }, "404": { "description": "Not found" } } }
+    },
+    "/admin/database/statistics": {
+      "get": { "tags": ["Admin — Database"], "summary": "Database statistics", "operationId": "getDatabaseStats", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Statistics", "content": { "application/json": { "schema": { "type": "object", "properties": { "users": { "type": "object", "properties": { "total": { "type": "integer" }, "active": { "type": "integer" }, "inactive": { "type": "integer" } } }, "groups": { "type": "object", "properties": { "total": { "type": "integer" } } }, "activity": { "type": "object", "properties": { "totalRequests": { "type": "integer" }, "last24Hours": { "type": "integer" } } } } } } } } } }
+    },
+    "/admin/activity": {
+      "get": { "tags": ["Admin — Activity"], "summary": "List SCIM activities", "operationId": "listActivities", "security": [{ "bearerAuth": [] }], "parameters": [{ "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } }, { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } }, { "name": "type", "in": "query", "schema": { "type": "string", "enum": ["user", "group", "system", "error"] } }, { "name": "severity", "in": "query", "schema": { "type": "string", "enum": ["info", "success", "warning", "error"] } }, { "name": "search", "in": "query", "schema": { "type": "string" } }, { "name": "hideKeepalive", "in": "query", "schema": { "type": "boolean" } }], "responses": { "200": { "description": "Activity list" } } }
+    },
+    "/admin/activity/summary": {
+      "get": { "tags": ["Admin — Activity"], "summary": "Activity summary (24h/7d counts)", "operationId": "getActivitySummary", "security": [{ "bearerAuth": [] }], "responses": { "200": { "description": "Summary" } } }
+    }
+  }
 }
