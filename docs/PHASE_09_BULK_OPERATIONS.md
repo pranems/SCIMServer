@@ -161,7 +161,8 @@ Process a batch of SCIM operations.
 Enable via Admin API:
 ```bash
 curl -X PATCH .../admin/endpoints/{id} \
-  -d '{"config": {"BulkOperationsEnabled": "True"}}'
+  -H 'Content-Type: application/json' \
+  -d '{"profile": {"serviceProviderConfig": {"bulk": {"supported": true, "maxOperations": 1000, "maxPayloadSize": 1048576}}}}'
 ```
 
 ### ServiceProviderConfig

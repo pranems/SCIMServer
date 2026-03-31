@@ -51,7 +51,17 @@ Production-ready, multi-tenant SCIM 2.0 server purpose-built for Microsoft Entra
 
 ## Quick Start
 
-### Option A — Docker Compose (recommended)
+### Option A — One-Liner Azure Deploy (No Clone Needed)
+
+```powershell
+iex (iwr https://raw.githubusercontent.com/pranems/SCIMServer/master/bootstrap.ps1).Content
+```
+
+Prompts for Resource Group, App Name, Region, and secrets. Provisions VNet + PostgreSQL + Container App automatically. Works from any machine with Azure CLI and PowerShell.
+
+> **Sovereign/gov clouds (BLEU, Azure Gov, China):** The one-liner downloads scripts from `github.com` which may be blocked. Clone the repo first, then run `scripts/deploy-azure.ps1` directly. See [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md).
+
+### Option B — Docker Compose (recommended for self-hosted)
 
 ```bash
 git clone https://github.com/pranems/SCIMServer.git
@@ -61,7 +71,7 @@ docker compose up -d          # PostgreSQL 17 + API on port 8080
 
 Open http://localhost:8080/admin for the observability UI.
 
-### Option B — Local Development
+### Option C — Local Development
 
 ```bash
 cd api
@@ -72,17 +82,17 @@ PERSISTENCE_BACKEND=inmemory JWT_SECRET=dev SCIM_SHARED_SECRET=dev OAUTH_CLIENT_
 
 Server starts on http://localhost:3000. Set `PORT=6000` to use port 6000.
 
-### Option C — Azure Container Apps
+### Option D — Azure Container Apps (from cloned repo)
 
 ```bash
 cd scripts
-./deploy-azure.ps1            # Deploys to Azure Container Apps with PostgreSQL Flexible Server
+./deploy-azure.ps1 -ProvisionPostgres   # Deploys to Azure Container Apps with PostgreSQL Flexible Server
 ```
 
 See [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) for detailed setup.  
 For sovereign/gov clouds (Azure Gov, BLEU France, China): see [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md).
 
-### Option D — Pre-built Docker Image
+### Option E — Pre-built Docker Image
 
 ```bash
 docker run -d -p 8080:8080 \
@@ -333,6 +343,13 @@ Content-Type: application/json
 ## Endpoint Profiles & Presets
 
 Every endpoint is created with a **profile** — a unified JSONB document containing schemas, resource types, service provider config, and behavioral settings.
+
+Endpoints can be referenced by **ID (UUID) or name** in all SCIM URLs:
+
+```
+/scim/endpoints/{endpoint-id}/Users     ← by UUID
+/scim/endpoints/my-tenant/Users          ← by name
+```
 
 ### 6 Built-in Presets
 

@@ -65,11 +65,16 @@ Content-Type: application/json
 {
   "name": "azure-ad-integration",
   "displayName": "Azure AD Integration",
-  "config": {
-    "MultiOpPatchRequestAddMultipleMembersToGroup": "True"
+  "profilePreset": "entra-id",
+  "profile": {
+    "settings": {
+      "MultiOpPatchRequestAddMultipleMembersToGroup": "True"
+    }
   }
 }
 ```
+
+> **Note:** The `entra-id` preset already sets this flag to `True` by default, so you only need to specify it explicitly if using a different preset.
 
 **Response (201 Created):**
 ```json
@@ -77,8 +82,10 @@ Content-Type: application/json
   "id": "cml73w21n0005tcragsxs6ejq",
   "name": "azure-ad-integration",
   "displayName": "Azure AD Integration",
-  "config": {
-    "MultiOpPatchRequestAddMultipleMembersToGroup": "True"
+  "profile": {
+    "settings": {
+      "MultiOpPatchRequestAddMultipleMembersToGroup": "True"
+    }
   },
   "active": true,
   "scimEndpoint": "/scim/endpoints/cml73w21n0005tcragsxs6ejq",

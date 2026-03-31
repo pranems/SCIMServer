@@ -30,7 +30,7 @@ The logging subsystem is built on four pillars:
 | **LogLevel / LogCategory** | `log-levels.ts` | Enum definitions, env-var parsing, config interface |
 | **ScimLogger** | `scim-logger.service.ts` | Singleton structured logger with AsyncLocalStorage correlation, ring buffer, level filtering, secret redaction |
 | **RequestLoggingInterceptor** | `request-logging.interceptor.ts` | NestJS global interceptor — generates/propagates `X-Request-Id`, wraps every request in a correlation context |
-| **LogConfigController** | `log-config.controller.ts` | REST admin API for runtime log management (8 endpoints) |
+| **LogConfigController** | `log-config.controller.ts` | REST admin API for runtime log management (10 endpoints) |
 
 ### Architecture Diagram
 
@@ -171,7 +171,6 @@ Each log statement belongs to a functional category for targeted filtering:
 | `scim.discovery` | `LogCategory.SCIM_DISCOVERY` | ServiceProviderConfig, ResourceTypes, Schemas |
 | `endpoint` | `LogCategory.ENDPOINT` | Endpoint management (create, activate, deactivate) |
 | `database` | `LogCategory.DATABASE` | Database / Prisma operations |
-| `backup` | `LogCategory.BACKUP` | Backup & restore operations |
 | `oauth` | `LogCategory.OAUTH` | OAuth token issuance and validation |
 | `general` | `LogCategory.GENERAL` | Uncategorized / general-purpose |
 
@@ -465,7 +464,7 @@ curl -s -X DELETE -H "Authorization: Bearer $TOKEN" \
 
 ### 6.7 Per-Endpoint Log Level via Endpoint Config (Alternative)
 
-In addition to the dedicated log-config endpoints (6.5/6.6), you can set per-endpoint log levels directly in the endpoint's `config` object when creating or updating an endpoint via the admin CRUD API. This is often more convenient because the log level is stored alongside other endpoint behavior flags and persists across server restarts.
+In addition to the dedicated log-config endpoints (6.5/6.6), you can set per-endpoint log levels directly in the endpoint's `profile.settings` when creating or updating an endpoint via the admin CRUD API. This is often more convenient because the log level is stored alongside other endpoint behavior flags and persists across server restarts.
 
 **Create endpoint with logLevel:**
 ```bash
@@ -473,9 +472,12 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "name": "debug-endpoint",
-    "config": {
-      "logLevel": "DEBUG",
-      "VerbosePatchSupported": "True"
+    "profilePreset": "entra-id",
+    "profile": {
+      "settings": {
+        "logLevel": "DEBUG",
+        "VerbosePatchSupported": "True"
+      }
     }
   }' \
   http://localhost:6000/scim/admin/endpoints | jq
@@ -485,15 +487,15 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" \
 ```bash
 curl -s -X PATCH -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"config": {"logLevel": "TRACE"}}' \
+  -d '{"profile": {"settings": {"logLevel": "TRACE"}}}' \
   http://localhost:6000/scim/admin/endpoints/<endpointId> | jq
 ```
 
-**Remove endpoint logLevel** (omit `logLevel` from config):
+**Remove endpoint logLevel** (set to empty string or omit):
 ```bash
 curl -s -X PATCH -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"config": {"strictMode": true}}' \
+  -d '{"profile": {"settings": {"logLevel": ""}}}' \
   http://localhost:6000/scim/admin/endpoints/<endpointId> | jq
 ```
 

@@ -170,8 +170,13 @@ iex (iwr https://raw.githubusercontent.com/pranems/SCIMServer/master/bootstrap.p
 This will:
 1. Download `setup.ps1` from GitHub
 2. Prompt for Resource Group, App Name, Region, and Secrets
-3. Call `deploy-azure.ps1` internally
-4. Print the deployment URL and all secrets
+3. Download Bicep templates and `deploy-azure.ps1`
+4. Auto-provision PostgreSQL Flexible Server + Container App
+5. Print the deployment URL and all secrets
+
+> **No credentials needed:** The one-liner downloads from the public GitHub repo and pulls the container image from `ghcr.io/pranems/scimserver:latest` (public, anonymous pull). Only your Azure CLI login is required.
+
+> **Sovereign/gov clouds:** If `raw.githubusercontent.com` or `ghcr.io` is blocked (BLEU, Azure China, air-gapped), clone the repo from a machine with internet access, then use Option B or C. See [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md).
 
 ### Option B: Direct Script with Parameters
 

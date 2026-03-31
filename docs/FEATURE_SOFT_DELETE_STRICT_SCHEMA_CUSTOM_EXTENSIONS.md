@@ -474,9 +474,11 @@ Content-Type: application/json
 Authorization: Bearer <admin-token>
 
 {
-  "config": {
-    "SoftDeleteEnabled": "True",
-    "StrictSchemaValidation": "True"
+  "profile": {
+    "settings": {
+      "SoftDeleteEnabled": "True",
+      "StrictSchemaValidation": "True"
+    }
   }
 }
 ```

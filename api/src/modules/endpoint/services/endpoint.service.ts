@@ -404,25 +404,39 @@ export class EndpointService implements OnModuleInit {
   }
 
   async getEndpoint(endpointId: string, view: 'full' | 'summary' = 'full'): Promise<EndpointResponse> {
-    const cached = this.cacheById.get(endpointId);
+    // Try cache by ID first, then by name
+    const cached = this.cacheById.get(endpointId) ?? this.cacheByName.get(endpointId);
     if (cached) return this.toResponse(cached, view);
 
     // Cache miss — try DB (Prisma only; InMemory is always in cache)
     if (this.isInMemoryBackend) {
-      throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
+      throw new NotFoundException(`Endpoint "${endpointId}" not found`);
     }
 
-    let endpoint: Endpoint | null;
+    let endpoint: Endpoint | null = null;
+
+    // Try by ID first (UUID format)
     try {
       endpoint = await this.prisma.endpoint.findUnique({
         where: { id: endpointId }
       });
     } catch {
-      throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
+      // ID lookup failed (e.g., invalid UUID) — will try by name below
+    }
+
+    // Fallback: try by name (allows using endpoint name in SCIM URLs)
+    if (!endpoint) {
+      try {
+        endpoint = await this.prisma.endpoint.findUnique({
+          where: { name: endpointId }
+        });
+      } catch {
+        // Name lookup also failed
+      }
     }
 
     if (!endpoint) {
-      throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
+      throw new NotFoundException(`Endpoint "${endpointId}" not found`);
     }
 
     const ce = this.toCached(endpoint);

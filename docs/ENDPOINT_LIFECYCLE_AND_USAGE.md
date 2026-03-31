@@ -33,6 +33,13 @@ An **endpoint** in SCIMServer is an isolated tenant — a completely separate SC
 - Optional per-endpoint credentials
 - Request logs
 
+Endpoints can be referenced by **UUID or name** in all URLs:
+
+```
+/scim/endpoints/a1b2c3d4-e5f6-7890-abcd-ef1234567890/Users   ← by ID
+/scim/endpoints/my-tenant/Users                               ← by name
+```
+
 Think of each endpoint as a separate SCIM server instance running within a single SCIMServer deployment.
 
 ```
@@ -516,12 +523,15 @@ $allUsers.Resources | ConvertTo-Json -Depth 10 | Out-File users-export.json
 │  Authorization: Bearer <shared-secret | oauth-jwt | cred>  │
 │                                                            │
 │  ENDPOINT MGMT (Admin API):                                │
-│  POST   /scim/admin/endpoints          Create              │
-│  GET    /scim/admin/endpoints          List                 │
-│  GET    /scim/admin/endpoints/:id      Get (with stats)     │
-│  PATCH  /scim/admin/endpoints/:id      Update settings      │
-│  DELETE /scim/admin/endpoints/:id      Delete (cascade!)    │
-│  GET    /scim/admin/endpoints/presets  List presets          │
+│  POST   /scim/admin/endpoints              Create           │
+│  GET    /scim/admin/endpoints              List (?view,act) │
+│  GET    /scim/admin/endpoints/:id          Get (?view)      │
+│  GET    /scim/admin/endpoints/by-name/:n   Get by name      │
+│  PATCH  /scim/admin/endpoints/:id          Update settings  │
+│  DELETE /scim/admin/endpoints/:id          Delete (cascade!)│
+│  GET    /scim/admin/endpoints/:id/stats    Endpoint stats   │
+│  GET    /scim/admin/endpoints/presets      List presets     │
+│  GET    /scim/admin/endpoints/presets/:n   Get preset detail│
 │                                                            │
 │  SCIM OPERATIONS:                                          │
 │  POST   /scim/endpoints/:id/Users           Create user    │

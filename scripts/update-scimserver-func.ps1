@@ -251,42 +251,37 @@ Some other warning line
         }
     }
 
-    $blobAccount = $envMap['BLOB_BACKUP_ACCOUNT']
-    $blobContainer = $envMap['BLOB_BACKUP_CONTAINER']
     $scimRgEnv = $envMap['SCIM_RG']
     $scimAppEnv = $envMap['SCIM_APP']
 
     if (-not $ResourceGroup -and $scimRgEnv) { $ResourceGroup = $scimRgEnv }
     if (-not $AppName -and $scimAppEnv) { $AppName = $scimAppEnv }
 
-    $backupMode = if ($hasVolumes) { 'azureFiles' } elseif ($blobAccount) { 'blob' } else { 'none' }
+    # Check persistence mode from env vars
+    $persistenceBackend = $envMap['PERSISTENCE_BACKEND']
+    $hasDatabaseUrl = -not [string]::IsNullOrWhiteSpace($envMap['DATABASE_URL'])
+    $persistenceMode = if ($persistenceBackend -eq 'prisma' -or $hasDatabaseUrl) { 'postgresql' } elseif ($persistenceBackend -eq 'inmemory') { 'inmemory' } else { 'unknown' }
 
     Write-Log "RG=$ResourceGroup App=$AppName NewImage=$imageRef" 'INFO' Cyan
 
-    switch ($backupMode) {
-        'azureFiles' { Write-Log 'Persistent storage detected (Azure Files volume)' 'OK' Green }
-        'blob' {
-            $blobSummary = if ($blobContainer) { "account: $blobAccount / container: $blobContainer" } else { "account: $blobAccount" }
-            Write-Log "Blob snapshot backups detected ($blobSummary)" 'OK' Green
-        }
-        default { Write-Log 'No persistent storage (data ephemeral)' 'WARN' Yellow }
+    switch ($persistenceMode) {
+        'postgresql' { Write-Log 'Persistence: PostgreSQL (data durable)' 'OK' Green }
+        'inmemory'   { Write-Log 'Persistence: In-memory (data lost on restart)' 'WARN' Yellow }
+        default      { Write-Log 'Persistence: Unknown (check PERSISTENCE_BACKEND env var)' 'WARN' Yellow }
     }
 
     $updateCommand = "az containerapp update -n '$AppName' -g '$ResourceGroup' --image '$imageRef'"
     if (-not $Quiet) { Write-Host $updateCommand -ForegroundColor Yellow }
 
-    if ($backupMode -eq 'none') {
-        Write-Log "DATA WARNING: Existing data will be lost (no volume/snapshot)" 'WARN' Yellow
-        if (-not $Quiet) { Write-Host "Add storage: scripts/add-persistent-storage.ps1" -ForegroundColor Gray }
-    } elseif ($backupMode -eq 'blob' -and -not $Quiet) {
-        Write-Host "Blob snapshot mode active – ensure retention meets your requirements." -ForegroundColor Gray
+    if ($persistenceMode -eq 'inmemory') {
+        Write-Log "NOTE: In-memory mode — data will be lost on container restart" 'WARN' Yellow
     }
 
     if ($DryRun -or $SelfTest) { Write-Log "DryRun/SelfTest: exiting before execution" 'INFO' Cyan; return }
 
     if (-not $NoPrompt) {
-        if ($backupMode -eq 'none') {
-            $confirm = Read-Host "Proceed (data loss) [y/N]"
+        if ($persistenceMode -eq 'inmemory') {
+            $confirm = Read-Host "Proceed (in-memory, data lost on restart) [y/N]"
             if ($confirm -notmatch '^[Yy]$') { Write-Log "Cancelled" 'CANCEL' Yellow; return }
         } else {
             $confirm = Read-Host "Proceed update? [Y/n]"

@@ -503,12 +503,14 @@ Controls whether the server validates inbound payloads against registered schema
 
 ```bash
 # Enable strict validation
-curl -X PATCH "http://localhost:6000/admin/endpoints/${ENDPOINT_ID}" \
+curl -X PATCH "http://localhost:6000/scim/admin/endpoints/${ENDPOINT_ID}" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "config": {
-      "StrictSchemaValidation": true
+    "profile": {
+      "settings": {
+        "StrictSchemaValidation": "True"
+      }
     }
   }'
 ```
@@ -581,43 +583,50 @@ Controls whether a warning is included when readOnly attributes are stripped:
 
 ```json
 {
-  "config": {
-    "StrictSchemaValidation": false,
-    "AllowAndCoerceBooleanStrings": true,
-    "CustomResourceTypesEnabled": false,
-    "IgnoreReadOnlyAttributesInPatch": false,
-    "IncludeWarningAboutIgnoredReadOnlyAttribute": false
+  "profile": {
+    "settings": {
+      "StrictSchemaValidation": "False",
+      "AllowAndCoerceBooleanStrings": "True",
+      "IgnoreReadOnlyAttributesInPatch": "False",
+      "IncludeWarningAboutIgnoredReadOnlyAttribute": "False"
+    }
   }
 }
 ```
+
+> **Tip:** The `entra-id` preset already applies these defaults. You don't need to set them explicitly.
 
 #### Profile: Strict RFC Compliant
 
 ```json
 {
-  "config": {
-    "StrictSchemaValidation": true,
-    "AllowAndCoerceBooleanStrings": false,
-    "CustomResourceTypesEnabled": false,
-    "IgnoreReadOnlyAttributesInPatch": false,
-    "IncludeWarningAboutIgnoredReadOnlyAttribute": true
+  "profile": {
+    "settings": {
+      "StrictSchemaValidation": "True",
+      "AllowAndCoerceBooleanStrings": "False",
+      "IgnoreReadOnlyAttributesInPatch": "False",
+      "IncludeWarningAboutIgnoredReadOnlyAttribute": "True"
+    }
   }
 }
 ```
 
-#### Profile: Full-Featured (Extensions + Custom Types + Strict)
+#### Profile: Full-Featured (Extensions + Strict)
 
 ```json
 {
-  "config": {
-    "StrictSchemaValidation": true,
-    "AllowAndCoerceBooleanStrings": true,
-    "CustomResourceTypesEnabled": true,
-    "IgnoreReadOnlyAttributesInPatch": true,
-    "IncludeWarningAboutIgnoredReadOnlyAttribute": true
+  "profile": {
+    "settings": {
+      "StrictSchemaValidation": "True",
+      "AllowAndCoerceBooleanStrings": "True",
+      "IgnoreReadOnlyAttributesInPatch": "True",
+      "IncludeWarningAboutIgnoredReadOnlyAttribute": "True"
+    }
   }
 }
 ```
+
+> **Note:** `CustomResourceTypesEnabled` is now derived from the profile's `resourceTypes` array (v0.28.0+). Include custom resource types in your profile to enable this capability.
 
 ---
 

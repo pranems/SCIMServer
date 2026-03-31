@@ -218,11 +218,11 @@ Response (JSON with application/scim+json Content-Type)
 The `EndpointContextStorage` uses Node.js `AsyncLocalStorage` to propagate per-request endpoint context through the call stack without explicit parameter passing:
 
 ```typescript
-// Controller sets context
+// Middleware sets context via AsyncLocalStorage
 this.endpointContextStorage.setContext({
   endpointId: endpoint.id,
   baseUrl: buildBaseUrl(request),
-  config: JSON.parse(endpoint.config ?? '{}')
+  profile: endpoint.profile
 });
 
 // Any downstream service can read it
@@ -313,10 +313,10 @@ const config = ctx?.config;
 |--------|-------|--------|-----------|
 | `createUser(endpointId, dto, baseUrl)` | CreateUserDto | ScimUserResource | Generate UUID scimId, validate userName uniqueness (case-insensitive via CITEXT column), persist payload as JSONB, create meta |
 | `listUsers(endpointId, baseUrl, filter?, startIndex?, count?)` | Query params | ScimListResponse | Parse filter string, case-insensitive attribute matching (`eq` operator), 1-based pagination, MAX_COUNT=200 |
-| `getUser(endpointId, id, baseUrl)` | scimId | ScimUserResource | Lookup by `endpointId + scimId`, parse rawPayload, build meta.location |
-| `updateUser(endpointId, id, dto, baseUrl)` | Full resource | ScimUserResource | Full PUT replace: re-validate userName uniqueness, update rawPayload + derived columns |
+| `getUser(endpointId, id, baseUrl)` | scimId | ScimUserResource | Lookup by `endpointId + scimId`, parse payload, build meta.location |
+| `updateUser(endpointId, id, dto, baseUrl)` | Full resource | ScimUserResource | Full PUT replace: re-validate userName uniqueness, update payload + derived columns |
 | `patchUser(endpointId, id, patchDto, baseUrl)` | PatchOp[] | ScimUserResource | Process each op sequentially: `add`, `replace`, `remove` with support for no-path, simple path, valuePath, extension URN path |
-| `deleteUser(endpointId, id)` | scimId | void | Delete ScimUser + cascade GroupMember cleanup |
+| `deleteUser(endpointId, id)` | scimId | void | Delete ScimResource + cascade ResourceMember cleanup |
 
 **Private Helpers**:
 - `validateCreatePayload()` — SCIM schema validation, required field checks
@@ -339,7 +339,7 @@ const config = ctx?.config;
 
 **Member Management**:
 - `GroupMember` records linked by `groupId` + `userId` (nullable for unresolved references)
-- Member `value` field = ScimUser.scimId (resolved) or external reference
+- Member `value` field = ScimResource.scimId (resolved) or external reference
 - Member `display` derived from user's displayName or userName
 - Cascade delete on group deletion
 
@@ -485,7 +485,7 @@ OAuth 2.0 `client_credentials` grant:
 | Per-endpoint | ScimResource userName (case-insensitive) | `(endpointId, userName)` CITEXT |
 | Per-endpoint | ScimResource externalId | `(endpointId, resourceType, externalId)` |
 | Per-endpoint | ScimResource displayName | `(endpointId, displayName)` CITEXT |
-| Per-endpoint | ScimGroup SCIM ID | `(endpointId, scimId)` |
+| Per-endpoint | ScimResource SCIM ID | `(endpointId, scimId)` |
 | Global | Endpoint name | `(name)` |
 
 ---
@@ -721,9 +721,10 @@ CMD ["node", "dist/main.js"]
 
 | Script | Purpose |
 |--------|---------|
-| `bootstrap.ps1` | One-click full deployment (VNet + PG + Container App) |
-| `deploy.ps1` | Container App update only |
-| `scripts/deploy-azure.ps1` | Full Azure resource provisioning (5-step) |
+| `bootstrap.ps1` | No-clone one-liner — downloads `setup.ps1` from GitHub, provisions full Azure stack |
+| `setup.ps1` | Interactive Azure deploy — prompts for config, downloads Bicep templates, calls `deploy-azure.ps1 -ProvisionPostgres` |
+| `deploy.ps1` | Alternative one-liner — prompts for config, downloads repo ZIP or uses local scripts, calls `deploy-azure.ps1 -ProvisionPostgres` |
+| `scripts/deploy-azure.ps1` | Core 5-step Azure provisioning (RG → Network → PG → Environment → Container App) |
 
 ---
 
