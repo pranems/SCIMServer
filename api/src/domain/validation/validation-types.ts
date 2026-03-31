@@ -107,12 +107,6 @@ export interface SchemaCharacteristicsCache {
 }
 
 /**
- * @deprecated Use `cache.coreSchemaUrn` instead. Kept temporarily for migration.
- * Sentinel key for top-level attributes in Parent→Children maps (legacy).
- */
-export const SCHEMA_CACHE_TOP_LEVEL = '__top__';
-
-/**
  * Attribute definition shape (mirrors ScimSchemaAttribute from registry).
  * Redefined here to keep the domain layer framework-free.
  */

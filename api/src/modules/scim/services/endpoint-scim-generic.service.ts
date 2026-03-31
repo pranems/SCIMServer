@@ -46,6 +46,8 @@ import {
   ensureSchema,
   enforceIfMatch,
   sanitizeBooleanStringsByParent,
+  coercePatchOpBooleans,
+  stripNeverReturnedFromPayload,
   guardSoftDeleted,
   stripReadOnlyAttributes,
   stripReadOnlyPatchOps,
@@ -53,7 +55,6 @@ import {
 } from '../common/scim-service-helpers';
 import { SchemaValidator } from '../../../domain/validation';
 import type { SchemaDefinition, SchemaAttributeDefinition, SchemaCharacteristicsCache } from '../../../domain/validation';
-import { stripReturnedNever } from '../common/scim-attribute-projection';
 import { ScimMetadataService } from './scim-metadata.service';
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
 import type { ScimResourceType } from '../discovery/scim-schema-registry';
@@ -525,17 +526,7 @@ export class EndpointScimGenericService {
       if (coerceEnabled) {
         const boolMap = this.getBooleansByParentForRT(resourceType, endpointId);
         const coreUrnLower = this.getSchemaCacheForRT(resourceType, endpointId)?.coreSchemaUrn ?? resourceType.schema.toLowerCase();
-        for (const op of patchDto.Operations) {
-          if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
-            sanitizeBooleanStringsByParent(op.value as Record<string, unknown>, boolMap, coreUrnLower);
-          } else if (Array.isArray(op.value)) {
-            for (const item of op.value) {
-              if (typeof item === 'object' && item !== null) {
-                sanitizeBooleanStringsByParent(item as Record<string, unknown>, boolMap, coreUrnLower);
-              }
-            }
-          }
-        }
+        coercePatchOpBooleans(patchDto.Operations, boolMap, coreUrnLower);
       }
 
       // GEN-01: Pre-PATCH validation — validate each operation value against schema
@@ -751,63 +742,11 @@ export class EndpointScimGenericService {
     const boolMap = this.getBooleansByParentForRT(resourceType, record.endpointId);
     sanitizeBooleanStringsByParent(payload, boolMap, coreUrnLower);
 
-    // G8e: Strip returned:'never' attributes from payload (e.g. writeOnly secrets)
-    // Per RFC 7643 §2.4, these MUST NOT appear in any response.
-    // Uses URN-dot-path ByParent map for collision-free stripping.
-    // AUDIT-1: Also strips returned:never sub-attrs within complex parents.
-    const neverByParent = cache?.neverReturnedByParent;
-    const coreNever = neverByParent?.get(coreUrnLower);
-    if (coreNever && coreNever.size > 0) {
-      stripReturnedNever(payload, coreNever, neverByParent);
-    }
-
-    // Build schemas array: core + extension URNs
-    const schemas: string[] = [resourceType.schema];
-    for (const ext of resourceType.schemaExtensions) {
-      if (payload[ext.schema]) {
-        // Strip never-returned attrs inside extension objects (URN-dot-path aware)
-        const extUrnLower = ext.schema.toLowerCase();
-        const extNever = neverByParent?.get(extUrnLower);
-        const extObj = payload[ext.schema];
-        if (extNever && typeof extObj === 'object' && extObj !== null && !Array.isArray(extObj)) {
-          for (const extKey of Object.keys(extObj as Record<string, unknown>)) {
-            if (extNever.has(extKey.toLowerCase())) {
-              delete (extObj as Record<string, unknown>)[extKey];
-              continue;
-            }
-            // AUDIT-1: Strip returned:never sub-attrs within extension complex parents
-            const extSubNever = neverByParent?.get(`${extUrnLower}.${extKey.toLowerCase()}`);
-            if (extSubNever && extSubNever.size > 0) {
-              const extVal = (extObj as Record<string, unknown>)[extKey];
-              if (typeof extVal === 'object' && extVal !== null && !Array.isArray(extVal)) {
-                for (const subKey of Object.keys(extVal as Record<string, unknown>)) {
-                  if (extSubNever.has(subKey.toLowerCase())) {
-                    delete (extVal as Record<string, unknown>)[subKey];
-                  }
-                }
-              } else if (Array.isArray(extVal)) {
-                for (const item of extVal) {
-                  if (typeof item === 'object' && item !== null) {
-                    for (const subKey of Object.keys(item as Record<string, unknown>)) {
-                      if (extSubNever.has(subKey.toLowerCase())) {
-                        delete (item as Record<string, unknown>)[subKey];
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-          // FP-1 fix: If extension is now empty after stripping, remove it entirely
-          // (RFC 7643 §3.1: don't advertise an extension URN with zero visible attributes)
-          if (Object.keys(extObj as Record<string, unknown>).length === 0) {
-            delete payload[ext.schema];
-            continue;
-          }
-        }
-        schemas.push(ext.schema);
-      }
-    }
+    // G8e: Strip returned:'never' attributes + build schemas[] dynamically (G19 / FP-1)
+    const neverByParent = cache?.neverReturnedByParent ?? new Map();
+    const extSchemaUrns = resourceType.schemaExtensions.map(e => e.schema);
+    const visibleExtUrns = stripNeverReturnedFromPayload(payload, neverByParent, coreUrnLower, extSchemaUrns);
+    const schemas: string[] = [resourceType.schema, ...visibleExtUrns];
 
     // Remove schemas from payload — we built it dynamically above (G19 / FP-1)
     delete payload.schemas;

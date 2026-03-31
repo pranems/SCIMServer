@@ -34,15 +34,7 @@
  */
 const ALWAYS_RETURNED_BASE = new Set(['schemas', 'id', 'meta', 'username']);
 
-/**
- * Check if a URN dot-path key represents a sub-attribute entry (not a top-level URN).
- * A key is a sub-attr key iff it contains a '.' AFTER the last ':' in the URN.
- * This handles URNs with dots in version numbers (e.g., `urn:...:2.0:User`).
- */
-function isSubAttrKey(key: string): boolean {
-  const lastColon = key.lastIndexOf(':');
-  return key.indexOf('.', lastColon) !== -1;
-}
+import { isSubAttrKey } from './scim-service-helpers';
 
 function getAlwaysReturnedForResource(
   resource: Record<string, unknown>,

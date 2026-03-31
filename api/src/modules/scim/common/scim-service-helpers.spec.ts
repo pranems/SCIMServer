@@ -5,7 +5,6 @@
  *  - parseJson: safe JSON parsing with fallback
  *  - ensureSchema: schema URN validation
  *  - enforceIfMatch: ETag/If-Match enforcement
- *  - sanitizeBooleanStrings: boolean coercion
  *  - guardSoftDeleted: soft-delete guard
  *  - ScimSchemaHelpers: parameterized schema-aware methods
  */
@@ -15,7 +14,6 @@ import {
   parseJson,
   ensureSchema,
   enforceIfMatch,
-  sanitizeBooleanStrings,
   sanitizeBooleanStringsByParent,
   guardSoftDeleted,
   ScimSchemaHelpers,
@@ -116,68 +114,6 @@ describe('enforceIfMatch', () => {
   it('should not throw 428 when RequireIfMatch is false and no If-Match', () => {
     const config = { RequireIfMatch: 'false' } as any;
     expect(() => enforceIfMatch(3, undefined, config)).not.toThrow();
-  });
-});
-
-// ─── sanitizeBooleanStrings ─────────────────────────────────────────────────
-
-describe('sanitizeBooleanStrings', () => {
-  const boolKeys = new Set(['active', 'primary']);
-
-  it('should convert "True" to true for boolean keys', () => {
-    const obj: Record<string, unknown> = { active: 'True' };
-    sanitizeBooleanStrings(obj, boolKeys);
-    expect(obj.active).toBe(true);
-  });
-
-  it('should convert "False" to false for boolean keys', () => {
-    const obj: Record<string, unknown> = { primary: 'False' };
-    sanitizeBooleanStrings(obj, boolKeys);
-    expect(obj.primary).toBe(false);
-  });
-
-  it('should be case-insensitive for values', () => {
-    const obj: Record<string, unknown> = { active: 'TRUE', primary: 'false' };
-    sanitizeBooleanStrings(obj, boolKeys);
-    expect(obj.active).toBe(true);
-    expect(obj.primary).toBe(false);
-  });
-
-  it('should not convert non-boolean keys', () => {
-    const obj: Record<string, unknown> = { name: 'True' };
-    sanitizeBooleanStrings(obj, boolKeys);
-    expect(obj.name).toBe('True');
-  });
-
-  it('should handle nested objects', () => {
-    const obj: Record<string, unknown> = {
-      nested: { active: 'True' },
-    };
-    sanitizeBooleanStrings(obj, boolKeys);
-    expect((obj.nested as Record<string, unknown>).active).toBe(true);
-  });
-
-  it('should handle arrays of objects', () => {
-    const obj: Record<string, unknown> = {
-      items: [{ primary: 'True' }, { primary: 'False' }],
-    };
-    sanitizeBooleanStrings(obj, boolKeys);
-    const items = obj.items as Record<string, unknown>[];
-    expect(items[0].primary).toBe(true);
-    expect(items[1].primary).toBe(false);
-  });
-
-  it('should not modify non-string values', () => {
-    const obj: Record<string, unknown> = { active: true, primary: 42 };
-    sanitizeBooleanStrings(obj, boolKeys);
-    expect(obj.active).toBe(true);
-    expect(obj.primary).toBe(42);
-  });
-
-  it('should handle empty booleanKeys set', () => {
-    const obj: Record<string, unknown> = { active: 'True' };
-    sanitizeBooleanStrings(obj, new Set());
-    expect(obj.active).toBe('True');
   });
 });
 
@@ -325,17 +261,6 @@ describe('ScimSchemaHelpers', () => {
       mockRegistry.getExtensionUrns.mockReturnValue([EXT_URN]);
       const result = helpers.getSchemaDefinitions('ep-1');
       expect(result).toEqual([{ ...coreDef, isCoreSchema: true }, extDef]);
-    });
-  });
-
-  describe('getReturnedCharacteristics', () => {
-    it('should return never and request sets', () => {
-      mockRegistry.getSchema.mockReturnValue(null);
-      const result = helpers.getReturnedCharacteristics('ep-1');
-      expect(result).toHaveProperty('never');
-      expect(result).toHaveProperty('request');
-      expect(result.never).toBeInstanceOf(Set);
-      expect(result.request).toBeInstanceOf(Set);
     });
   });
 
@@ -1064,45 +989,6 @@ describe('sanitizeBooleanStringsByParent', () => {
     sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
     expect((obj.addresses as any[])[0].primary).toBe(true);
     expect((obj.addresses as any[])[0].formatted).toBe('addr');
-  });
-});
-
-// ─── flattenParentChildMap ──────────────────────────────────────────────
-
-describe('flattenParentChildMap', () => {
-  it('should union all children across parent keys into flat set', () => {
-    const map = new Map<string, Set<string>>([
-      ['__top__', new Set(['active', 'password'])],
-      ['emails', new Set(['primary'])],
-    ]);
-    const flat = flattenParentChildMap(map);
-    expect(flat.has('active')).toBe(true);
-    expect(flat.has('password')).toBe(true);
-    expect(flat.has('primary')).toBe(true);
-    expect(flat.size).toBe(3);
-  });
-
-  it('should return empty set for empty map', () => {
-    const flat = flattenParentChildMap(new Map());
-    expect(flat.size).toBe(0);
-  });
-
-  it('should handle duplicate names across parents (union semantics)', () => {
-    const map = new Map<string, Set<string>>([
-      ['__top__', new Set(['active'])],
-      ['urn:ext:schema', new Set(['active'])], // same name, different parent
-    ]);
-    const flat = flattenParentChildMap(map);
-    expect(flat.has('active')).toBe(true);
-    expect(flat.size).toBe(1); // union — no duplicates
-  });
-
-  it('should handle single parent with multiple children', () => {
-    const map = new Map<string, Set<string>>([
-      ['meta', new Set(['resourcetype', 'created', 'lastmodified', 'location', 'version'])],
-    ]);
-    const flat = flattenParentChildMap(map);
-    expect(flat.size).toBe(5);
   });
 });
 

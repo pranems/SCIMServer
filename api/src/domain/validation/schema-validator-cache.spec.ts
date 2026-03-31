@@ -7,15 +7,10 @@
  */
 import { SchemaValidator } from './schema-validator';
 import type { SchemaDefinition, SchemaCharacteristicsCache } from './validation-types';
+import { flattenParentChildMap, isSubAttrKey } from '../../modules/scim/common/scim-service-helpers';
 
 /** Lowercase core User schema URN used in test fixtures */
 const CORE_USER_URN = 'urn:ietf:params:scim:schemas:core:2.0:user';
-
-/** Helper: check if a URN dot-path key is a sub-attr key (has '.' after last ':') */
-function isSubAttrKey(key: string): boolean {
-  const lastColon = key.lastIndexOf(':');
-  return key.indexOf('.', lastColon) !== -1;
-}
 
 /** Helper: extract sub-attr entries (keys with URN.attr dot pattern) from a ByParent map */
 function extractSubs(map: Map<string, Set<string>>): Map<string, Set<string>> {
@@ -30,7 +25,6 @@ function extractSubs(map: Map<string, Set<string>>): Map<string, Set<string>> {
   }
   return result;
 }
-import { flattenParentChildMap } from '../../modules/scim/common/scim-service-helpers';
 
 // ─── Test Fixtures ────────────────────────────────────────────────────
 
