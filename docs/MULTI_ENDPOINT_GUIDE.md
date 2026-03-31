@@ -71,7 +71,7 @@ SCIMServer supports **multi-endpoint isolation** — each endpoint gets a dedica
 Each request flows through `EndpointContextStorage` (AsyncLocalStorage-based) which binds:
 - `endpointId` — the endpoint being accessed
 - `baseUrl` — the SCIM base for `meta.location` generation
-- `config` — endpoint-specific configuration flags
+- `profile` — endpoint profile with schemas, resource types, SPC, and settings (behavioral flags)
 
 This ensures complete data isolation between concurrent requests to different endpoints.
 
@@ -154,21 +154,29 @@ curl -X POST http://localhost:6000/scim/admin/endpoints \
 
 ## Configuration Flags
 
-Per-endpoint config flags control PATCH behavior. Set via the `config` JSON object on endpoint create/update.
+Per-endpoint config flags control SCIM behavior. Set via `profile.settings` on endpoint create/update (PATCH).
 
-| Flag | Values | Default | Description |
-|------|--------|---------|-------------|
-| `MultiOpPatchRequestAddMultipleMembersToGroup` | `"true"` / `"false"` | `"false"` | Allow adding multiple group members in a single PATCH operation |
-| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | `"true"` / `"false"` | `"false"` | Allow removing multiple group members in a single PATCH operation |
-| `VerbosePatchSupported` | `"true"` / `"false"` | `"false"` | Enable dot-notation PATCH path resolution (e.g., `name.givenName`) |
-| `SoftDeleteEnabled` | `"true"` / `"false"` | `"false"` | Soft delete (set `active=false` + `deletedAt`) instead of physical row deletion on DELETE |
-| `ReprovisionOnConflictForSoftDeletedResource` | `"true"` / `"false"` | `"false"` | Re-activate soft-deleted resource on POST conflict instead of 409 (requires SoftDeleteEnabled) |
-| `StrictSchemaValidation` | `"true"` / `"false"` | `"false"` | Reject extension URNs not declared in `schemas[]` or not registered in schema registry |
-| `PatchOpAllowRemoveAllMembers` | `"true"` / `"false"` | `"true"` | Allow removing all members via `path=members` PATCH operation |
-| `RequireIfMatch` | `"true"` / `"false"` | `"false"` | Require If-Match header on PUT/PATCH/DELETE (428 if missing) |
-| `AllowAndCoerceBooleanStrings` | `"true"` / `"false"` | `"true"` | Coerce boolean string values ("True"/"False") to native booleans before schema validation |
+> **Default behavior:** When no settings are provided, the `entra-id` preset is used automatically. It sets `AllowAndCoerceBooleanStrings`, `VerbosePatchSupported`, `MultiOp…Add`, `MultiOp…Remove`, and `PatchOpAllowRemoveAllMembers` to `True`. All other flags default to `false`.
 
-**Enable for Microsoft Entra ID:** Set both multi-member flags to `"true"` since Entra sends multi-member PATCH operations.
+| Flag | Default | When `true` | When `false` |
+|------|---------|-------------|--------------|
+| `AllowAndCoerceBooleanStrings` | **`true`** | `"True"`/`"False"` auto-converted to booleans | Strings pass through as-is |
+| `VerbosePatchSupported` | `false` | Dot-notation PATCH paths resolved | Dot paths stored as literal keys |
+| `SoftDeleteEnabled` | `false` | DELETE → soft-delete | DELETE permanently removes resource |
+| `StrictSchemaValidation` | `false` | Extension URNs required in `schemas[]` | Lenient mode |
+| `RequireIfMatch` | `false` | `If-Match` required (428 if missing) | Optional (validated when present) |
+| `ReprovisionOnConflictForSoftDeletedResource` | `false` | Re-activate soft-deleted on conflict | 409 Conflict |
+| `PerEndpointCredentialsEnabled` | `false` | Per-endpoint bearer tokens | Global auth only |
+| `IncludeWarningAboutIgnoredReadOnlyAttribute` | `false` | Warning header on readOnly stripping | Silent stripping |
+| `IgnoreReadOnlyAttributesInPatch` | `false` | Strip readOnly PATCH ops when strict is on | 400 on readOnly PATCH ops when strict is on |
+| `MultiOpPatchRequestAddMultipleMembersToGroup` | `false` | Multi-member PATCH add | One member per op |
+| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | `false` | Multi-member PATCH remove | One member per op |
+| `PatchOpAllowRemoveAllMembers` | **`true`** | `path=members` removes all | Must specify member IDs |
+| `logLevel` | *(unset)* | Per-endpoint log level override | Global `LOG_LEVEL` used |
+
+**Enable for Microsoft Entra ID:** The `entra-id` preset (default) already sets both multi-member flags, `VerbosePatchSupported`, and `AllowAndCoerceBooleanStrings` to `True`.
+
+For the full reference: [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md)
 
 ---
 

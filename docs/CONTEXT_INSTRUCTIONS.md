@@ -414,9 +414,12 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 ### Adding a new endpoint config flag:
 1. Add to `ENDPOINT_CONFIG_FLAGS` in `endpoint-config.interface.ts`
 2. Add to `EndpointConfig` interface
-3. Read via `getConfigBoolean()` or `getConfigString()` in service
+3. Read via `getConfigBoolean()` (defaults absent → `false`) or `getConfigBooleanWithDefault()` (custom default — used for `AllowAndCoerceBooleanStrings` which defaults to `true`)
 4. Update `validateEndpointConfig()` if needed
 5. Add tests
+6. Update [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) — flag summary table (§2), defaults matrix (§2.1), and true/false behavior (§2.2)
+
+> **Flag defaults quick ref:** `AllowAndCoerceBooleanStrings` and `PatchOpAllowRemoveAllMembers` default to `true`. All other boolean flags default to `false`. When no profile/preset is specified on endpoint creation, the `entra-id` preset is applied (sets 5 flags to `True`).
 
 ### Adding a new admin API route:
 1. Add method to appropriate controller (`AdminController`, `DatabaseController`, etc.)

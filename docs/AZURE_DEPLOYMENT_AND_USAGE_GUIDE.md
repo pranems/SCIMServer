@@ -358,6 +358,8 @@ Invoke-RestMethod -Uri "$appUrl/scim/admin/endpoints" `
 
 The response includes an `id` (e.g., `cmlfuqaft0002i30tlv47pq1f`) — this becomes part of your SCIM URL.
 
+> **Default behavior:** Without specifying a `profilePreset`, the `entra-id` preset is applied automatically. This enables boolean string coercion, dot-notation PATCH, multi-member operations, and remove-all-members — all needed for Entra ID. DELETE is hard-delete, schema validation is lenient, and `If-Match` is optional. Customize via `PATCH /admin/endpoints/:id` with `profile.settings`. See [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md#21-default-behavior--what-happens-out-of-the-box) for all defaults.
+
 ### Step 3: Configure Microsoft Entra ID
 
 ```

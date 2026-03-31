@@ -101,6 +101,64 @@ api/src/modules/endpoint/endpoint-config.interface.ts
 
 ---
 
+## 2.1 Default Behavior — What Happens Out of the Box
+
+**When you create an endpoint with no explicit settings** (e.g., `POST /admin/endpoints` with just `{ "name": "my-tenant" }` or with `{ "name": "my-tenant", "profilePreset": "entra-id" }`), the server applies the **`entra-id` preset** as the default profile. This preset explicitly sets 5 flags:
+
+| Flag | Value in `entra-id` preset | Why |
+|------|----------------------------|-----|
+| `AllowAndCoerceBooleanStrings` | `True` | Entra sends `"True"`/`"False"` strings for boolean attributes |
+| `VerbosePatchSupported` | `True` | Entra uses dot-notation PATCH paths like `name.givenName` |
+| `MultiOpPatchRequestAddMultipleMembersToGroup` | `True` | Entra sends multi-member add operations |
+| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | `True` | Entra sends multi-member remove operations |
+| `PatchOpAllowRemoveAllMembers` | `True` | Entra can issue `path=members` without value |
+
+All other flags resolve to their defaults (all `false`). This means **out of the box**:
+
+- ✅ **DELETE is hard-delete** (SoftDeleteEnabled = false) — resources are permanently removed
+- ✅ **Schema validation is lenient** (StrictSchemaValidation = false) — extension data accepted without matching `schemas[]`
+- ✅ **`If-Match` is optional** (RequireIfMatch = false) — ETag validated when present but not required
+- ✅ **ReadOnly attributes silently stripped** — no warning headers, no 400 errors
+- ✅ **Only global auth** (PerEndpointCredentialsEnabled = false) — shared secret / OAuth JWT only
+- ✅ **409 on conflicts** (ReprovisionOnConflict = false) — soft-deleted resources are not auto-reactivated
+- ✅ **No Bulk operations** — disabled unless profile SPC says `bulk.supported: true`
+
+### Per-Preset Default Comparison
+
+| Flag | `entra-id` (default) | `rfc-standard` | `minimal` | `lexmark` |
+|------|---------------------|----------------|-----------|-----------|
+| AllowAndCoerceBooleanStrings | **True** | *true (default)* | *true (default)* | *true (default)* |
+| VerbosePatchSupported | **True** | false | false | false |
+| MultiOpPatchRequest…Add | **True** | false | false | false |
+| MultiOpPatchRequest…Remove | **True** | false | false | false |
+| PatchOpAllowRemoveAllMembers | **True** | *true (default)* | *true (default)* | *true (default)* |
+| SoftDeleteEnabled | false | false | false | false |
+| StrictSchemaValidation | false | false | false | false |
+| RequireIfMatch | false | false | false | false |
+| All others | false | false | false | false |
+
+> **Bold** = explicitly set in the preset's `settings` block. *Italic* = not set, resolved from code default.
+
+## 2.2 True vs False — Every Flag's Effect
+
+| # | Flag | When `true` | When `false` (or absent) |
+|---|------|-----------|------------------------|
+| 1 | **AllowAndCoerceBooleanStrings** | `"True"`/`"False"` strings in request bodies are silently converted to native `true`/`false` before schema validation. Prevents Entra rejections. | String boolean values pass through as-is. If `StrictSchemaValidation` is on, they fail type validation. |
+| 2 | **StrictSchemaValidation** | POST/PUT bodies must include all extension URNs in `schemas[]`. Unknown attributes rejected. ReadOnly PATCH ops → 400. Full RFC 7643 §2 enforcement. | Extension data accepted without matching URNs. Unknown attributes stored as-is. ReadOnly attributes silently stripped. Lenient mode. |
+| 3 | **SoftDeleteEnabled** | DELETE sets `active=false` + records `deletedAt`. Resource hidden from GET/LIST but record preserved in database. | DELETE permanently removes the resource from the database. |
+| 4 | **VerbosePatchSupported** | Dot-notation PATCH paths (e.g., `name.givenName`) resolved into nested object updates. Required for Entra ID compatibility. | Dot-notation paths stored as literal top-level attribute names (not nested). |
+| 5 | **MultiOpPatchRequest…Add** | A single PATCH operation can add multiple group members at once (array in `value`). | Each member addition requires a separate PATCH operation. |
+| 6 | **MultiOpPatchRequest…Remove** | A single PATCH operation can remove multiple group members at once. | Each member removal requires a separate PATCH operation. |
+| 7 | **PatchOpAllowRemoveAllMembers** | `PATCH /Groups/{id}` with `op:remove, path:members` (no `value`) removes ALL members. | Must provide explicit member IDs in the `value` array or use a value filter in the path. |
+| 8 | **RequireIfMatch** | PUT/PATCH/DELETE **require** an `If-Match` header. Missing → **428 Precondition Required**. Matched → proceed. Mismatch → **412 Precondition Failed**. | `If-Match` is optional. If provided, it's still validated (412 on mismatch), but omission is allowed. |
+| 9 | **ReprovisionOnConflict…** | POST that collides with a soft-deleted resource **re-activates** it: clears `deletedAt`, sets `active=true`, replaces payload. Requires `SoftDeleteEnabled=true`. | Collision → 409 Conflict (even if the existing resource is soft-deleted). |
+| 10 | **PerEndpointCredentialsEnabled** | Bearer tokens checked against per-endpoint credential table (bcrypt). Falls back to OAuth JWT → global shared secret if no match. | Only global shared secret and OAuth JWT are evaluated. Per-endpoint credential table ignored. |
+| 11 | **IncludeWarningAboutIgnoredReadOnlyAttribute** | Write responses include `urn:scimserver:api:messages:2.0:Warning` extension listing readOnly attributes that were stripped. | ReadOnly attributes stripped silently — no indication in the response. |
+| 12 | **IgnoreReadOnlyAttributesInPatch** | When `StrictSchemaValidation` is ON: PATCH ops targeting readOnly attributes are **stripped + warned** instead of rejected. No effect when strict is OFF. | With strict schema ON: PATCH ops on readOnly attributes → **400 Bad Request** (`mutability` error). |
+| 13 | **logLevel** | *(string, not boolean)* — Overrides the global `LOG_LEVEL` for this endpoint. Values: `error`, `warn`, `info`, `debug`, `verbose`. | Global `LOG_LEVEL` is used (default: `info`). |
+
+---
+
 ## 3. Flag Resolution Logic
 
 ### 3.1 `getConfigBoolean(config, key)` — Default: `false`

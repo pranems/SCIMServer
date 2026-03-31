@@ -142,6 +142,8 @@ flowchart TD
 | 2 | `profile` set | Inline shorthand input | N/A — input IS the profile |
 | 3 | None provided | `entra-id` preset default | `entra-id` |
 
+> **What this means for settings:** When no profile or preset is specified, the `entra-id` preset sets 5 behavioral flags to `True` (`AllowAndCoerceBooleanStrings`, `VerbosePatchSupported`, `MultiOp…Add`, `MultiOp…Remove`, `PatchOpAllowRemoveAllMembers`). All other flags default to `false`. DELETE is hard-delete, schema validation is lenient, `If-Match` is optional. See [ENDPOINT_CONFIG_FLAGS_REFERENCE.md §2.1](ENDPOINT_CONFIG_FLAGS_REFERENCE.md#21-default-behavior--what-happens-out-of-the-box) for the complete matrix.
+
 ### Examples
 
 **Example 1: Preset creation**
