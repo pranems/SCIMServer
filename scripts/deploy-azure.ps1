@@ -8,7 +8,6 @@ param(
     [string]$OauthClientSecret,
     [string]$GhcrUsername,
     [string]$GhcrPassword,
-    [switch]$EnablePersistentStorage,
     # PostgreSQL: provide an existing connection string OR let the script provision a new Flexible Server
     [string]$DatabaseUrl,
     [switch]$ProvisionPostgres,

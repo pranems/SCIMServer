@@ -26,9 +26,11 @@ Internal doc for you (the author) – not end-user facing. This captures the exa
 ## Detailed Flow
 
 ### 1. Local Development
-Run backend & frontend locally (your existing `setup.ps1` helpers):
+Run backend locally:
 ```powershell
-pwsh .\setup.ps1 -TestLocal   # or your preferred dev script
+cd api
+npm install
+PERSISTENCE_BACKEND=inmemory JWT_SECRET=dev SCIM_SHARED_SECRET=dev OAUTH_CLIENT_SECRET=dev npm run start:dev
 ```
 Validate new functionality & log capture.
 

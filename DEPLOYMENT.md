@@ -160,8 +160,10 @@ docker run -d -p 3000:8080 `
 
 ```powershell
 git clone https://github.com/pranems/SCIMServer.git
-cd SCIMServer
-.\setup.ps1 -TestLocal
+cd SCIMServer/api
+npm install
+# In-memory mode (no database required):
+PERSISTENCE_BACKEND=inmemory JWT_SECRET=dev SCIM_SHARED_SECRET=dev OAUTH_CLIENT_SECRET=dev npm run start:dev
 ```
 
 ### Manual Setup
