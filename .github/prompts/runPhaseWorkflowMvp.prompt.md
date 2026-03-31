@@ -70,7 +70,7 @@ After MVP validation is complete:
    - `CHANGELOG.md` — version bump with feature summary
    - `docs/CONTEXT_INSTRUCTIONS.md` — new gotchas or constraints discovered
    - `docs/INDEX.md` — add references to any new phase docs
-   - `docs/CURRENT_STATE_AND_MIGRATION_PLAN.md` — mark phase complete, update counts
+   - `docs/PROJECT_HEALTH_AND_STATS.md` — update test counts and phase status
    - `package.json` — bump version number
 2. **Review this prompt template** for improvements:
    - Were any steps missing or unnecessary?

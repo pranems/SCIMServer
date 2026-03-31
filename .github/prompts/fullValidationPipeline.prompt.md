@@ -32,7 +32,7 @@ npx jest --no-coverage --json --outputFile=pipeline-unit.json 2>$null
 # Parse results:
 node -e "const r=JSON.parse(require('fs').readFileSync('pipeline-unit.json','utf8'));console.log('suites:',r.numPassedTestSuites+'/'+r.numTotalTestSuites,'tests:',r.numPassedTests+'/'+r.numTotalTests,'failed:',r.numFailedTests)"
 ```
-> **Baselines (v0.29.0):** 2,906 pass / 0 fail / 73 suites.
+> **Baselines (v0.31.0):** 3,090 pass / 0 fail / 74 suites.
 > *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 
 ### Step 3: Run E2E Tests
@@ -42,7 +42,7 @@ npx jest --config test/e2e/jest-e2e.config.ts --no-coverage --json --outputFile=
 # Parse results:
 node -e "const r=JSON.parse(require('fs').readFileSync('pipeline-e2e.json','utf8'));console.log('suites:',r.numPassedTestSuites+'/'+r.numTotalTestSuites,'tests:',r.numPassedTests+'/'+r.numTotalTests,'failed:',r.numFailedTests)"
 ```
-> **Baselines (v0.29.0):** 698 pass / 0 fail / 33 suites.
+> **Baselines (v0.31.0):** 817 pass / 0 fail / 37 suites.
 > *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 > **E2E config path:** `test/e2e/jest-e2e.config.ts`
 
@@ -66,7 +66,7 @@ cd scripts
 .\live-test.ps1 -BaseUrl "http://localhost:6000" -ClientSecret "localoauthsecret123" *> ..\local-live-pipeline.txt
 ```
 > **Output capture:** Use `*>` (all PowerShell streams) not `>` (stdout only). The script writes to multiple output streams.
-> **Baselines (v0.29.0):** 621 assertions.
+> **Baselines (v0.31.0):** ~951 assertions.
 > *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 
 ### Step 6: Stop Local Instance
@@ -145,9 +145,9 @@ docker compose down --remove-orphans
 - Include duration where available.
 - Note any pre-existing failures explicitly so new regressions are clearly distinguishable.
 
-## Known Pre-Existing Failures (v0.24.0)
+## Known Pre-Existing Failures (v0.31.0)
 
-**None.** All pre-existing failures from v0.21.0 (24 unit, 41 E2E, 5 live — boolean coercion schema validation) have been fixed as of v0.24.0.
+**None.** All pre-existing failures from v0.21.0 (24 unit, 41 E2E, 5 live — boolean coercion schema validation) have been fixed as of v0.24.0. No new failures introduced through v0.31.0.
 
 ## Self-Improvement Check
 
