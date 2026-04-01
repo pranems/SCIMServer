@@ -1123,7 +1123,7 @@ describe('EndpointScimGenericService', () => {
   // ─── Filter parsing in LIST ───────────────────────────────────────────
 
   describe('listResources — filter parsing', () => {
-    it('should pass displayName eq filter to repository as Prisma-style where', async () => {
+    it('should pass displayName eq filter to repository with Prisma case-insensitive match', async () => {
       mockGenericRepo.findAll.mockResolvedValue([]);
 
       await service.listResources(
@@ -1133,14 +1133,15 @@ describe('EndpointScimGenericService', () => {
         deviceResourceType,
       );
 
+      // buildGenericFilter uses GENERIC_DB_COLUMNS where displayName is citext → case-insensitive
       expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
         endpointId,
         'Device',
-        { displayName: 'TestDevice' },
+        { displayName: { equals: 'TestDevice', mode: 'insensitive' } },
       );
     });
 
-    it('should pass externalId eq filter to repository', async () => {
+    it('should pass externalId eq filter to repository with exact match (caseExact)', async () => {
       mockGenericRepo.findAll.mockResolvedValue([]);
 
       await service.listResources(
@@ -1150,6 +1151,7 @@ describe('EndpointScimGenericService', () => {
         deviceResourceType,
       );
 
+      // externalId is 'text' type → case-sensitive exact match
       expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
         endpointId,
         'Device',
@@ -1157,32 +1159,165 @@ describe('EndpointScimGenericService', () => {
       );
     });
 
-    it('should throw 400 for active eq filter (unquoted boolean not supported by simple parser)', async () => {
+    it('should push displayName co (contains) to DB', async () => {
       mockGenericRepo.findAll.mockResolvedValue([]);
 
-      // active eq true (unquoted) is not matched by parseSimpleFilter's regex
-      await expect(
-        service.listResources(
-          { filter: 'active eq true' },
-          baseUrl,
-          endpointId,
-          deviceResourceType,
-        ),
-      ).rejects.toThrow(HttpException);
+      await service.listResources(
+        { filter: 'displayName co "test"' },
+        baseUrl,
+        endpointId,
+        deviceResourceType,
+      );
+
+      expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
+        endpointId,
+        'Device',
+        { displayName: { contains: 'test', mode: 'insensitive' } },
+      );
     });
 
-    it('should throw 400 for co operator (unsupported by generic simple parser)', async () => {
+    it('should push displayName sw (startsWith) to DB', async () => {
       mockGenericRepo.findAll.mockResolvedValue([]);
 
-      // co operator is not supported by parseSimpleFilter (only Users/Groups services support it)
-      await expect(
-        service.listResources(
-          { filter: 'displayName co "test"' },
-          baseUrl,
-          endpointId,
-          deviceResourceType,
-        ),
-      ).rejects.toThrow(HttpException);
+      await service.listResources(
+        { filter: 'displayName sw "Test"' },
+        baseUrl,
+        endpointId,
+        deviceResourceType,
+      );
+
+      expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
+        endpointId,
+        'Device',
+        { displayName: { startsWith: 'Test', mode: 'insensitive' } },
+      );
+    });
+
+    it('should push displayName ew (endsWith) to DB', async () => {
+      mockGenericRepo.findAll.mockResolvedValue([]);
+
+      await service.listResources(
+        { filter: 'displayName ew "vice"' },
+        baseUrl,
+        endpointId,
+        deviceResourceType,
+      );
+
+      expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
+        endpointId,
+        'Device',
+        { displayName: { endsWith: 'vice', mode: 'insensitive' } },
+      );
+    });
+
+    it('should push externalId ne (not equal, case-sensitive) to DB', async () => {
+      mockGenericRepo.findAll.mockResolvedValue([]);
+
+      await service.listResources(
+        { filter: 'externalId ne "ext-999"' },
+        baseUrl,
+        endpointId,
+        deviceResourceType,
+      );
+
+      expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
+        endpointId,
+        'Device',
+        { externalId: { not: 'ext-999' } },
+      );
+    });
+
+    it('should push id pr (presence) to DB', async () => {
+      mockGenericRepo.findAll.mockResolvedValue([]);
+
+      await service.listResources(
+        { filter: 'id pr' },
+        baseUrl,
+        endpointId,
+        deviceResourceType,
+      );
+
+      expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
+        endpointId,
+        'Device',
+        { scimId: { not: null } },
+      );
+    });
+
+    it('should push compound AND on promotable columns to DB', async () => {
+      mockGenericRepo.findAll.mockResolvedValue([]);
+
+      await service.listResources(
+        { filter: 'displayName eq "Foo" and externalId eq "bar"' },
+        baseUrl,
+        endpointId,
+        deviceResourceType,
+      );
+
+      expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
+        endpointId,
+        'Device',
+        {
+          AND: [
+            { displayName: { equals: 'Foo', mode: 'insensitive' } },
+            { externalId: 'bar' },
+          ],
+        },
+      );
+    });
+
+    it('should push compound OR on promotable columns to DB', async () => {
+      mockGenericRepo.findAll.mockResolvedValue([]);
+
+      await service.listResources(
+        { filter: 'displayName eq "A" or displayName eq "B"' },
+        baseUrl,
+        endpointId,
+        deviceResourceType,
+      );
+
+      expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
+        endpointId,
+        'Device',
+        {
+          OR: [
+            { displayName: { equals: 'A', mode: 'insensitive' } },
+            { displayName: { equals: 'B', mode: 'insensitive' } },
+          ],
+        },
+      );
+    });
+
+    it('should fetchAll and apply in-memory filter for un-mapped custom attributes', async () => {
+      const matchingRecord = {
+        ...mockGenericRecord,
+        scimId: 'match-1',
+        rawPayload: JSON.stringify({ displayName: 'Match', serialNumber: 'SN-MATCH' }),
+      };
+      const nonMatchingRecord = {
+        ...mockGenericRecord,
+        id: 'rec-2',
+        scimId: 'nomatch-1',
+        rawPayload: JSON.stringify({ displayName: 'NoMatch', serialNumber: 'SN-OTHER' }),
+      };
+      mockGenericRepo.findAll.mockResolvedValue([matchingRecord, nonMatchingRecord]);
+
+      const result = await service.listResources(
+        { filter: 'serialNumber eq "SN-MATCH"' },
+        baseUrl,
+        endpointId,
+        deviceResourceType,
+      );
+
+      // fetchAll = true → repository called with no dbFilter
+      expect(mockGenericRepo.findAll).toHaveBeenCalledWith(
+        endpointId,
+        'Device',
+        undefined,
+      );
+      // In-memory filter applied on SCIM representation
+      expect(result.totalResults).toBe(1);
+      expect((result.Resources as Record<string, unknown>[])[0]).toHaveProperty('serialNumber', 'SN-MATCH');
     });
 
     it('should throw 400 invalidFilter for syntactically invalid filter', async () => {

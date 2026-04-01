@@ -7168,6 +7168,168 @@ if ($dpEpId) {
 Write-Host "`n--- 9z-E: URN Dot-Path Cache Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-F: GENERIC RESOURCE FILTER OPERATORS (G6 — RFC 7644 §3.4.2.2) (v0.32.0)
+$script:currentSection = "9z-F: Generic Filter Operators"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-F: GENERIC RESOURCE FILTER OPERATORS (G6)" -ForegroundColor Yellow
+Write-Host "  All 10 RFC 7644 filter operators + AND/OR on custom resources" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# --- Setup: Create endpoint with custom Sensor resource type ---
+Write-Host "`n--- Setup: Create endpoint with custom Sensor resource type ---" -ForegroundColor Cyan
+$gfSensorUrn = "urn:test:gfilter:2.0:Sensor"
+$gfProfile = @{
+    schemas = @(
+        @{ id = "urn:ietf:params:scim:schemas:core:2.0:User"; name = "User"; attributes = "all" }
+        @{ id = "urn:ietf:params:scim:schemas:core:2.0:Group"; name = "Group"; attributes = "all" }
+        @{
+            id = $gfSensorUrn; name = "Sensor"
+            attributes = @(
+                @{ name = "displayName"; type = "string"; multiValued = $false; required = $false; mutability = "readWrite"; returned = "default"; caseExact = $false; uniqueness = "server" }
+                @{ name = "externalId"; type = "string"; multiValued = $false; required = $false; mutability = "readWrite"; returned = "default"; caseExact = $true; uniqueness = "none" }
+                @{ name = "sensorName"; type = "string"; multiValued = $false; required = $true; mutability = "readWrite"; returned = "default"; caseExact = $false; uniqueness = "none" }
+                @{ name = "location"; type = "string"; multiValued = $false; required = $false; mutability = "readWrite"; returned = "default"; caseExact = $true; uniqueness = "none" }
+            )
+        }
+    )
+    resourceTypes = @(
+        @{ id = "User"; name = "User"; endpoint = "/Users"; description = "User"; schema = "urn:ietf:params:scim:schemas:core:2.0:User"; schemaExtensions = @() }
+        @{ id = "Group"; name = "Group"; endpoint = "/Groups"; description = "Group"; schema = "urn:ietf:params:scim:schemas:core:2.0:Group"; schemaExtensions = @() }
+        @{ id = "Sensor"; name = "Sensor"; endpoint = "/Sensors"; description = "Sensor"; schema = $gfSensorUrn; schemaExtensions = @() }
+    )
+    serviceProviderConfig = @{
+        patch = @{ supported = $true }; bulk = @{ supported = $false }
+        filter = @{ supported = $true; maxResults = 200 }
+        sort = @{ supported = $true }; etag = @{ supported = $true }
+        changePassword = @{ supported = $false }
+    }
+    settings = @{}
+}
+$gfEpBody = @{ name = "gfilter-$(Get-Random)"; displayName = "Generic Filter Test"; profile = $gfProfile } | ConvertTo-Json -Depth 8
+$gfEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $gfEpBody -ContentType "application/json"
+$gfEpId = $gfEp.id
+$gfBase = "$baseUrl/scim/endpoints/$gfEpId/Sensors"
+Test-Result -Success ($null -ne $gfEpId) -Message "9z-F.setup: Created endpoint with custom Sensor resource type"
+
+# Seed 4 test Sensors
+$gfSensors = @(
+    @{ schemas = @($gfSensorUrn); displayName = "Alpha Sensor"; externalId = "ext-alpha"; sensorName = "alpha"; location = "Building-A" }
+    @{ schemas = @($gfSensorUrn); displayName = "Beta Sensor"; externalId = "ext-beta"; sensorName = "beta"; location = "Building-B" }
+    @{ schemas = @($gfSensorUrn); displayName = "Gamma Sensor"; externalId = "ext-gamma"; sensorName = "gamma"; location = "Building-A" }
+    @{ schemas = @($gfSensorUrn); displayName = "Delta Probe"; externalId = "ext-delta"; sensorName = "delta"; location = "Building-C" }
+)
+$gfCreatedIds = @()
+foreach ($s in $gfSensors) {
+    $sBody = $s | ConvertTo-Json -Depth 4
+    $created = Invoke-RestMethod -Uri $gfBase -Method POST -Headers $headers -Body $sBody -ContentType "application/scim+json"
+    $gfCreatedIds += $created.id
+}
+Test-Result -Success ($gfCreatedIds.Count -eq 4) -Message "9z-F.setup: Seeded 4 Sensor resources"
+
+# --- Test 9z-F.1: eq on displayName (DB push-down, case-insensitive) ---
+Write-Host "`n--- Test 9z-F.1: eq on displayName ---" -ForegroundColor Cyan
+$eqRes = Invoke-RestMethod -Uri "$gfBase`?filter=displayName%20eq%20%22Alpha%20Sensor%22" -Headers $headers
+Test-Result -Success ($eqRes.totalResults -eq 1) -Message "9z-F.1: displayName eq returns 1 result"
+Test-Result -Success ($eqRes.Resources[0].displayName -eq "Alpha Sensor") -Message "9z-F.2: displayName eq value matches"
+
+# --- Test 9z-F.3: ne on displayName ---
+Write-Host "`n--- Test 9z-F.3: ne on displayName ---" -ForegroundColor Cyan
+$neRes = Invoke-RestMethod -Uri "$gfBase`?filter=displayName%20ne%20%22Delta%20Probe%22" -Headers $headers
+Test-Result -Success ($neRes.totalResults -eq 3) -Message "9z-F.3: displayName ne excludes 1, returns 3"
+
+# --- Test 9z-F.4: co (contains) on displayName ---
+Write-Host "`n--- Test 9z-F.4: co on displayName ---" -ForegroundColor Cyan
+$coRes = Invoke-RestMethod -Uri "$gfBase`?filter=displayName%20co%20%22Sensor%22" -Headers $headers
+Test-Result -Success ($coRes.totalResults -eq 3) -Message "9z-F.4: displayName co 'Sensor' returns 3 (Alpha/Beta/Gamma)"
+
+# --- Test 9z-F.5: sw (startsWith) on displayName ---
+Write-Host "`n--- Test 9z-F.5: sw on displayName ---" -ForegroundColor Cyan
+$swRes = Invoke-RestMethod -Uri "$gfBase`?filter=displayName%20sw%20%22Beta%22" -Headers $headers
+Test-Result -Success ($swRes.totalResults -eq 1) -Message "9z-F.5: displayName sw 'Beta' returns 1"
+Test-Result -Success ($swRes.Resources[0].displayName -eq "Beta Sensor") -Message "9z-F.6: sw result is Beta Sensor"
+
+# --- Test 9z-F.7: ew (endsWith) on displayName ---
+Write-Host "`n--- Test 9z-F.7: ew on displayName ---" -ForegroundColor Cyan
+$ewRes = Invoke-RestMethod -Uri "$gfBase`?filter=displayName%20ew%20%22Probe%22" -Headers $headers
+Test-Result -Success ($ewRes.totalResults -eq 1) -Message "9z-F.7: displayName ew 'Probe' returns 1"
+Test-Result -Success ($ewRes.Resources[0].displayName -eq "Delta Probe") -Message "9z-F.8: ew result is Delta Probe"
+
+# --- Test 9z-F.9: pr (presence) on externalId ---
+Write-Host "`n--- Test 9z-F.9: pr on externalId ---" -ForegroundColor Cyan
+$prRes = Invoke-RestMethod -Uri "$gfBase`?filter=externalId%20pr" -Headers $headers
+Test-Result -Success ($prRes.totalResults -eq 4) -Message "9z-F.9: externalId pr returns all 4"
+
+# --- Test 9z-F.10: eq on externalId (case-sensitive) ---
+Write-Host "`n--- Test 9z-F.10: eq on externalId ---" -ForegroundColor Cyan
+$exIdRes = Invoke-RestMethod -Uri "$gfBase`?filter=externalId%20eq%20%22ext-gamma%22" -Headers $headers
+Test-Result -Success ($exIdRes.totalResults -eq 1) -Message "9z-F.10: externalId eq 'ext-gamma' returns 1"
+
+# --- Test 9z-F.11: AND compound ---
+Write-Host "`n--- Test 9z-F.11: AND compound ---" -ForegroundColor Cyan
+$andFilter = [System.Uri]::EscapeDataString('displayName co "Sensor" and externalId eq "ext-gamma"')
+$andRes = Invoke-RestMethod -Uri "$gfBase`?filter=$andFilter" -Headers $headers
+Test-Result -Success ($andRes.totalResults -eq 1) -Message "9z-F.11: AND compound returns 1"
+Test-Result -Success ($andRes.Resources[0].displayName -eq "Gamma Sensor") -Message "9z-F.12: AND result is Gamma Sensor"
+
+# --- Test 9z-F.13: OR compound ---
+Write-Host "`n--- Test 9z-F.13: OR compound ---" -ForegroundColor Cyan
+$orFilter = [System.Uri]::EscapeDataString('displayName eq "Alpha Sensor" or displayName eq "Delta Probe"')
+$orRes = Invoke-RestMethod -Uri "$gfBase`?filter=$orFilter" -Headers $headers
+Test-Result -Success ($orRes.totalResults -eq 2) -Message "9z-F.13: OR compound returns 2"
+
+# --- Test 9z-F.14: In-memory fallback for custom attribute (sensorName eq) ---
+Write-Host "`n--- Test 9z-F.14: In-memory custom attr filter ---" -ForegroundColor Cyan
+$customRes = Invoke-RestMethod -Uri "$gfBase`?filter=sensorName%20eq%20%22gamma%22" -Headers $headers
+Test-Result -Success ($customRes.totalResults -eq 1) -Message "9z-F.14: sensorName eq 'gamma' (in-memory) returns 1"
+Test-Result -Success ($customRes.Resources[0].sensorName -eq "gamma") -Message "9z-F.15: In-memory filter value matches"
+
+# --- Test 9z-F.16: In-memory co on custom attribute (location co) ---
+Write-Host "`n--- Test 9z-F.16: In-memory co on custom attr ---" -ForegroundColor Cyan
+$locRes = Invoke-RestMethod -Uri "$gfBase`?filter=location%20co%20%22Building%22" -Headers $headers
+Test-Result -Success ($locRes.totalResults -eq 4) -Message "9z-F.16: location co 'Building' returns all 4"
+
+# --- Test 9z-F.17: POST /.search with filter ---
+Write-Host "`n--- Test 9z-F.17: POST /.search with filter ---" -ForegroundColor Cyan
+$searchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:SearchRequest")
+    filter = 'displayName sw "Alpha"'
+    startIndex = 1; count = 10
+} | ConvertTo-Json -Depth 4
+$searchRes = Invoke-RestMethod -Uri "$gfBase/.search" -Method POST -Headers $headers -Body $searchBody -ContentType "application/scim+json"
+Test-Result -Success ($searchRes.totalResults -eq 1) -Message "9z-F.17: POST .search with filter returns 1"
+Test-Result -Success ($searchRes.Resources[0].displayName -eq "Alpha Sensor") -Message "9z-F.18: .search result is Alpha Sensor"
+
+# --- Test 9z-F.19: 400 invalidFilter for syntax error ---
+Write-Host "`n--- Test 9z-F.19: 400 for invalid filter syntax ---" -ForegroundColor Cyan
+try {
+    Invoke-RestMethod -Uri "$gfBase`?filter=(((" -Headers $headers -ErrorAction Stop
+    Test-Result -Success $false -Message "9z-F.19: Expected 400 for invalid filter"
+} catch {
+    $errStatus = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($errStatus -eq 400) -Message "9z-F.19: Invalid filter returns 400"
+}
+
+# --- Test 9z-F.20: Empty results for no-match filter ---
+Write-Host "`n--- Test 9z-F.20: Empty results for no-match ---" -ForegroundColor Cyan
+$noMatchRes = Invoke-RestMethod -Uri "$gfBase`?filter=displayName%20eq%20%22NonExistent%22" -Headers $headers
+Test-Result -Success ($noMatchRes.totalResults -eq 0) -Message "9z-F.20: No-match filter returns 0 totalResults"
+Test-Result -Success ($noMatchRes.Resources.Count -eq 0) -Message "9z-F.21: No-match filter returns empty Resources"
+
+# --- Cleanup ---
+Write-Host "`n--- 9z-F Cleanup ---" -ForegroundColor Cyan
+if ($gfEpId) {
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$gfEpId" -Method DELETE -Headers $headers | Out-Null
+        Test-Result -Success $true -Message "9z-F.cleanup: Deleted generic filter test endpoint"
+    } catch {
+        Test-Result -Success $false -Message "9z-F.cleanup: Failed to delete endpoint: $_"
+    }
+}
+
+Write-Host "`n--- 9z-F: Generic Filter Operator Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
