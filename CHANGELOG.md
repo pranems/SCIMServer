@@ -5,6 +5,31 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.32.0] - 2026-04-01
+
+### Fixed — Generic Resource Filter Wiring (Gap G6)
+
+- **`buildGenericFilter()` wired into generic service**: Replaced regex-based `parseSimpleFilter()` (eq-only on displayName/externalId) with the full AST-based `buildGenericFilter()` from `apply-scim-filter.ts`. Custom resource types now support all 10 RFC 7644 §3.4.2.2 filter operators (eq/ne/co/sw/ew/gt/ge/lt/le/pr) plus AND/OR compound expressions
+- **DB push-down for promoted columns**: `displayName` (citext, case-insensitive), `externalId` (text, case-sensitive), and `id` (uuid) filters pushed to PostgreSQL. All other attribute filters fall back to in-memory evaluation on SCIM-formatted resources
+- **In-memory sort on SCIM representation**: Sort now operates on SCIM-formatted resources (after `toScimResponse()`) with dotted-path resolution (e.g., `meta.created`), instead of raw DB record field names
+- **`resolveNestedValue()` helper**: Private method for dotted-path value resolution in sorted SCIM resources
+- **CHANGELOG v0.30.0 correction**: The v0.30.0 entry incorrectly claimed `parseSimpleFilter()` was replaced and removed — it was not. This version actually performs the replacement
+
+### Changed
+
+- **`/scim/v2` middleware comment**: Updated from "TEMP/Compatibility" to accurate permanent documentation — this middleware is intentional infrastructure, not a temporary stopgap
+
+### Removed
+
+- **`parseSimpleFilter()`** — regex-based eq-only filter parser on generic service (now actually replaced by `buildGenericFilter()`)
+
+### Test Results
+
+- **Unit tests**: 3,096 passed (74 suites) — +6 net from v0.31.0 (11 new filter tests, replaced 5 old)
+- **E2E tests**: 862 (40 suites) — +14 new (generic-filter-operators.e2e-spec.ts)
+- **Live tests**: ~973 assertions (main) + 112 Lexmark — +22 new (section 9z-F)
+- **Total**: ~5,043 tests
+
 ## [0.31.0] - 2026-03-31
 
 ### Added — URN-Qualified Dot-Path Schema Cache Keys
@@ -78,7 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`coerceBooleanStringsIfEnabled()`** — deprecated flat coercer on `ScimSchemaHelpers` (superseded by `coerceBooleansByParentIfEnabled()`)
 - **`sanitizeBooleanStrings()`** — flat exported function (superseded by `sanitizeBooleanStringsByParent()`)
 - **`collectBooleanAttributeNames()`** — static method on `SchemaValidator` (superseded by `booleansByParent` cache field)
-- **`parseSimpleFilter()`** — regex-based eq-only filter parser on generic service (replaced by `buildGenericFilter()`)
+- **`parseSimpleFilter()`** — regex-based eq-only filter parser on generic service (NOTE: v0.30.0 incorrectly claimed this was replaced by `buildGenericFilter()` — the replacement was not wired in until v0.32.0)
 
 ### Changed
 

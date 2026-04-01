@@ -62,6 +62,7 @@ import { GenericPatchEngine } from '../../../domain/patch/generic-patch-engine';
 import { PatchError } from '../../../domain/patch/patch-error';
 import type { PatchOperation } from '../../../domain/patch/patch-types';
 import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-parser';
+import { buildGenericFilter } from '../filters/apply-scim-filter';
 
 interface ListGenericParams {
   filter?: string;
@@ -298,13 +299,23 @@ export class EndpointScimGenericService {
       this.validateFilterAttributePaths(params.filter, resourceType, endpointId);
     }
 
-    // Simple filter support: displayName eq "value" or externalId eq "value"
-    const dbFilter = this.parseSimpleFilter(params.filter);
+    // RFC 7644 §3.4.2.2: Full AST-based filter with DB push-down + in-memory fallback
+    const caseExactAttrs = this.getSchemaCacheForRT(resourceType, endpointId)?.caseExactByParent;
+    let filterResult: ReturnType<typeof buildGenericFilter>;
+    try {
+      filterResult = buildGenericFilter(params.filter);
+    } catch {
+      throw createScimError({
+        status: 400,
+        scimType: 'invalidFilter',
+        detail: `Invalid or unsupported filter expression: '${params.filter}'.`,
+      });
+    }
 
     let records = await this.genericRepo.findAll(
       endpointId,
       resourceType.name,
-      dbFilter,
+      filterResult.fetchAll ? undefined : filterResult.dbWhere,
     );
 
     // GEN-12: Config-aware soft-delete filtering (RFC 7644 §3.6)
@@ -313,39 +324,43 @@ export class EndpointScimGenericService {
       records = records.filter((r) => !r.deletedAt);
     }
 
+    // Convert to SCIM representation for in-memory filtering + response
+    let resources = records.map((r) => this.toScimResponse(r, resourceType));
+
+    // Apply in-memory filter when the filter couldn't be fully pushed to DB
+    if (filterResult.inMemoryFilter) {
+      resources = resources.filter(filterResult.inMemoryFilter);
+    }
+
     // In-memory sort for generic resources (RFC 7644 §3.4.2.3)
     if (params.sortBy) {
       const sortField = params.sortBy.toLowerCase();
       const direction = params.sortOrder === 'descending' ? -1 : 1;
       // Map SCIM attribute names to record fields
       const fieldMap: Record<string, string> = {
-        id: 'scimId',
+        id: 'id',
         externalid: 'externalId',
         displayname: 'displayName',
-        'meta.created': 'createdAt',
-        'meta.lastmodified': 'updatedAt',
+        'meta.created': 'meta.created',
+        'meta.lastmodified': 'meta.lastModified',
       };
-      const dbField = fieldMap[sortField];
-      if (dbField) {
-        records.sort((a, b) => {
-          const va = String((a as unknown as Record<string, unknown>)[dbField] ?? '');
-          const vb = String((b as unknown as Record<string, unknown>)[dbField] ?? '');
-          return va.localeCompare(vb) * direction;
-        });
-      }
+      const mappedField = fieldMap[sortField] ?? sortField;
+      resources.sort((a, b) => {
+        const va = String(this.resolveNestedValue(a, mappedField) ?? '');
+        const vb = String(this.resolveNestedValue(b, mappedField) ?? '');
+        return va.localeCompare(vb) * direction;
+      });
     }
 
-    const totalResults = records.length;
-    const pageRecords = records.slice(startIndex - 1, startIndex - 1 + count);
-
-    const resources = pageRecords.map((r) => this.toScimResponse(r, resourceType));
+    const totalResults = resources.length;
+    const pageResources = resources.slice(startIndex - 1, startIndex - 1 + count);
 
     return {
       schemas: [SCIM_LIST_RESPONSE_SCHEMA],
       totalResults,
       startIndex,
-      itemsPerPage: pageRecords.length,
-      Resources: resources,
+      itemsPerPage: pageResources.length,
+      Resources: pageResources,
     };
   }
 
@@ -1140,7 +1155,7 @@ export class EndpointScimGenericService {
     try {
       ast = parseScimFilter(filter);
     } catch {
-      // Syntax errors handled by parseSimpleFilter
+      // Syntax errors are handled by buildGenericFilter in the caller
       return;
     }
     const paths = extractFilterPaths(ast);
@@ -1160,34 +1175,16 @@ export class EndpointScimGenericService {
   }
 
   /**
-   * Parse a simple SCIM filter into a DB-level filter object.
-   * Supports: displayName eq "value", externalId eq "value"
-   * Throws 400 invalidFilter for any unsupported filter expression (RFC 7644 §3.4.2.2).
+   * Resolve a potentially nested dotted path on an object.
+   * E.g. resolveNestedValue(obj, 'meta.created') → obj.meta.created
    */
-  private parseSimpleFilter(
-    filter?: string,
-  ): Record<string, unknown> | undefined {
-    if (!filter) return undefined;
-
-    const eqMatch = filter.match(
-      /^(\w+)\s+eq\s+"([^"]*)"$/i,
-    );
-    if (eqMatch) {
-      const [, attr, value] = eqMatch;
-      const attrLower = attr.toLowerCase();
-      if (attrLower === 'displayname') {
-        return { displayName: value };
-      }
-      if (attrLower === 'externalid') {
-        return { externalId: value };
-      }
+  private resolveNestedValue(obj: Record<string, unknown>, path: string): unknown {
+    const parts = path.split('.');
+    let current: unknown = obj;
+    for (const part of parts) {
+      if (current == null || typeof current !== 'object') return undefined;
+      current = (current as Record<string, unknown>)[part];
     }
-
-    // RFC 7644 §3.4.2.2: MUST return 400 invalidFilter for unsupported expressions
-    throw createScimError({
-      status: 400,
-      scimType: 'invalidFilter',
-      detail: `Unsupported or invalid filter expression: '${filter}'.`,
-    });
+    return current;
   }
 }

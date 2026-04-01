@@ -3,10 +3,10 @@
 ## Overview
 
 **Feature**: Comprehensive audit of ALL RFC 7643 §2 attribute characteristic enforcement across every service, operation, and config combination  
-**Version**: v0.29.0  
-**Date**: 2026-03-16  
-**Status**: Re-audited against source code (sole source of truth) — all GEN-01..GEN-12 resolved; 10 remaining gaps identified  
-**Test Counts**: 2,906 unit (73 suites) · 698 E2E (33 suites) · 621 live assertions · 4,225 total
+**Version**: v0.32.0  
+**Date**: 2026-04-01  
+**Status**: Re-audited against source code (sole source of truth) — all GEN-01..GEN-12 resolved; G6 resolved in v0.32.0; 9 remaining gaps  
+**Test Counts**: 3,096 unit (74 suites) · 862 E2E (40 suites) · ~973 live assertions · ~5,043 total
 
 **RFC References**:
 - [RFC 7643 §2 — Attribute Characteristics](https://datatracker.ietf.org/doc/html/rfc7643#section-2)
@@ -121,13 +121,13 @@ All data below is derived directly from source code inspection. No doc-to-doc as
 
 | Capability | Generic | Users | Groups |
 |---|:---:|:---:|:---:|
-| Engine type | Simple `eq`-only parser | AST-based + DB push-down | AST-based + DB push-down |
-| Supported operators | `eq` only | eq, ne, co, sw, ew, gt, ge, lt, le, pr | eq, ne, co, sw, ew, gt, ge, lt, le, pr |
-| DB-pushable columns | displayName, externalId | userName, displayName, externalId, id, active | displayName, externalId, id, active |
-| In-memory fallback | ❌ (400 on unsupported) | ✅ (`evaluateFilter`) | ✅ (`evaluateFilter`) |
-| AND/OR compound | ❌ | ✅ | ✅ |
-| valuePath (`attr[filter]`) | ❌ | ✅ (in-memory) | ✅ (in-memory) |
-| caseExact-aware | ❌ | ✅ (in-memory) | ✅ (in-memory) |
+| Engine type | AST-based + DB push-down + in-memory fallback | AST-based + DB push-down | AST-based + DB push-down |
+| Supported operators | eq, ne, co, sw, ew, gt, ge, lt, le, pr | eq, ne, co, sw, ew, gt, ge, lt, le, pr | eq, ne, co, sw, ew, gt, ge, lt, le, pr |
+| DB-pushable columns | displayName, externalId, id | userName, displayName, externalId, id, active | displayName, externalId, id, active |
+| In-memory fallback | ✅ (`evaluateFilter`) | ✅ (`evaluateFilter`) | ✅ (`evaluateFilter`) |
+| AND/OR compound | ✅ | ✅ | ✅ |
+| valuePath (`attr[filter]`) | ✅ (in-memory) | ✅ (in-memory) | ✅ (in-memory) |
+| caseExact-aware | ✅ (in-memory) | ✅ (in-memory) | ✅ (in-memory) |
 | Filter path validation | ✅ | ✅ | ✅ |
 | writeOnly filter blocking | ✅ (strict) | ✅ (strict) | ✅ (strict) |
 | 400 for unsupported filter | ✅ | ✅ | ✅ |
@@ -181,7 +181,7 @@ All 12 items from the original Generic Service Parity audit are now confirmed re
 
 ---
 
-## Remaining Gaps (10 items)
+## Remaining Gaps (9 items)
 
 ### Gap G1 — Immutable enforcement only active in strict mode
 - **Severity**: Medium
@@ -218,12 +218,8 @@ All 12 items from the original Generic Service Parity audit are now confirmed re
 - **Current**: `$ref` URIs are not generated from schema `referenceTypes` declarations.
 - **Impact**: Clients cannot follow `$ref` links to resolve referenced resources.
 
-### Gap G6 — Generic filter engine limited to eq only
-- **Severity**: Medium
-- **Scope**: Generic service only
-- **RFC**: §3.4.2.2 — Filtering SHOULD support all comparison operators
-- **Current**: `parseSimpleFilter()` supports only `eq` on `displayName` and `externalId`. All other operators (co, sw, ew, gt, ge, lt, le, pr) and compound expressions (AND/OR) return 400.
-- **Impact**: Generic custom resources cannot use advanced filter queries.
+### ~~Gap G6 — Generic filter engine limited to eq only~~ ✅ RESOLVED (v0.32.0)
+- **Resolution**: Wired `buildGenericFilter()` from `apply-scim-filter.ts` into `endpoint-scim-generic.service.ts`, replacing the regex-based `parseSimpleFilter()`. All 10 RFC 7644 operators + AND/OR compound expressions now supported with DB push-down for displayName/externalId/id and in-memory fallback for custom attributes.
 
 ### Gap G7 — Generic sorting is in-memory
 - **Severity**: Low
@@ -334,9 +330,9 @@ Legend: Green = fully enforced across all services · Orange = partial/strict-mo
 
 | Suite | Count | Suites |
 |---|:---:|:---:|
-| Unit | 2,906 | 73 |
-| E2E | 698 | 31 |
-| **Total** | **3,604** | **104** |
+| Unit | 3,096 | 74 |
+| E2E | 862 | 40 |
+| **Total** | **3,958** | **114** |
 
 ---
 
@@ -344,10 +340,10 @@ Legend: Green = fully enforced across all services · Orange = partial/strict-mo
 
 | Priority | Gaps | Rationale |
 |---|---|---|
-| **P1 — Should Fix** | G1, G2, G6 | Core RFC compliance; immutable/required should be enforced even without strict mode; filter parity affects usability |
+| **P1 — Should Fix** | G1, G2 | Core RFC compliance; immutable/required should be enforced even without strict mode |
 | **P2 — Nice to Have** | G3, G7, G9 | Uniqueness on custom attrs, sorting performance, type coercion beyond booleans |
 | **P3 — Low Priority** | G4, G5, G8, G10 | referenceTypes, $ref, caseExact edge cases — minimal real-world impact |
 
 ---
 
-*Document generated from source code audit on 2026-03-03. Source files are the single source of truth — not this document.*
+*Document updated 2026-04-01 (G6 resolved in v0.32.0). Source files are the single source of truth — not this document.*

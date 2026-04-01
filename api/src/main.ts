@@ -21,11 +21,12 @@ async function bootstrap(): Promise<void> {
   // Enable NestJS lifecycle hooks so OnModuleDestroy (e.g. Prisma $disconnect) fires on SIGTERM/SIGINT
   app.enableShutdownHooks();
 
-  // TEMP/Compatibility: Support both /scim/* (legacy) and /scim/v2/* (spec-aligned) paths.
-  // Current controllers are mounted under the global prefix (default 'scim').
-  // We rewrite any incoming /scim/v2/* request to /scim/* so that the setup script's
-  // printed SCIM Endpoint (which uses /scim/v2) works without changing all controllers yet.
-  // Later we can flip the global prefix to 'scim/v2' and optionally redirect the old path.
+  // RFC 7644 §1.3 URL rewrite: SCIM endpoints are published at /scim/v2/* (spec-aligned)
+  // but controllers are mounted at the /scim global prefix. This middleware rewrites
+  // incoming /scim/v2/* → /scim/* so that both URL forms work. This is intentional
+  // permanent behavior — Entra ID, setup scripts, and live tests all use /scim/v2 URLs.
+  // Changing the global prefix to 'scim/v2' is not feasible because it would break
+  // admin routes (/scim/admin/*) and endpoint routes (/scim/endpoints/*).
   app.use((req: Request, _res: Response, next: NextFunction) => {
     // Normalize double slashes just in case
     if (req.url.startsWith('//')) {
