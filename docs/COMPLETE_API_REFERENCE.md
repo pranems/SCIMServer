@@ -46,6 +46,7 @@ The server supports a 3-tier authentication chain, evaluated in order:
 | `SCIM_SHARED_SECRET` | Global shared secret for legacy bearer auth |
 | `OAUTH_CLIENT_ID` | OAuth client ID (default: `scimserver-client`) |
 | `OAUTH_CLIENT_SECRET` | OAuth client secret for token generation |
+| `OAUTH_CLIENT_SCOPES` | Comma-separated OAuth scopes (default: `scim.read,scim.write,scim.manage`) |
 | `JWT_SECRET` | JWT signing secret |
 
 ---
@@ -1186,9 +1187,9 @@ Test endpoint to verify OAuth module is loaded.
 
 ```json
 {
-  "message": "OAuth endpoint is working",
+  "message": "OAuth controller is working!",
   "timestamp": "2026-03-31T10:00:00.000Z",
-  "version": "1.0"
+  "version": "1.1"
 }
 ```
 
@@ -1204,24 +1205,24 @@ Content-Type: application/json
   "grant_type": "client_credentials",
   "client_id": "scimserver-client",
   "client_secret": "<OAUTH_CLIENT_SECRET>",
-  "scope": "scim"
+  "scope": "scim.read scim.write scim.manage"
 }
 ```
 
-**Response: 201 Created**
+**Response: 200 OK**
 
 ```json
 {
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "token_type": "Bearer",
   "expires_in": 3600,
-  "scope": "scim"
+  "scope": "scim.read scim.write scim.manage"
 }
 ```
 
 | Status | Condition |
 |--------|-----------|
-| 201 | Token issued |
+| 200 | Token issued |
 | 400 | Unsupported `grant_type` or missing required fields |
 | 401 | Invalid `client_id` or `client_secret` |
 

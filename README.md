@@ -51,17 +51,7 @@ Production-ready, multi-tenant SCIM 2.0 server purpose-built for Microsoft Entra
 
 ## Quick Start
 
-### Option A — One-Liner Azure Deploy (No Clone Needed)
-
-```powershell
-iex (iwr https://raw.githubusercontent.com/pranems/SCIMServer/master/bootstrap.ps1).Content
-```
-
-Prompts for Resource Group, App Name, Region, and secrets. Provisions VNet + PostgreSQL + Container App automatically. Works from any machine with Azure CLI and PowerShell.
-
-> **Sovereign/gov clouds (BLEU, Azure Gov, China):** The one-liner downloads scripts from `github.com` which may be blocked. Clone the repo first, then run `scripts/deploy-azure.ps1` directly. See [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md).
-
-### Option B — Docker Compose (recommended for self-hosted)
+### Option A — Docker Compose (recommended)
 
 ```bash
 git clone https://github.com/pranems/SCIMServer.git
@@ -71,7 +61,7 @@ docker compose up -d          # PostgreSQL 17 + API on port 8080
 
 Open http://localhost:8080/admin for the observability UI.
 
-### Option C — Local Development
+### Option B — Local Development
 
 ```bash
 cd api
@@ -82,17 +72,17 @@ PERSISTENCE_BACKEND=inmemory JWT_SECRET=dev SCIM_SHARED_SECRET=dev OAUTH_CLIENT_
 
 Server starts on http://localhost:3000. Set `PORT=6000` to use port 6000.
 
-### Option D — Azure Container Apps (from cloned repo)
+### Option C — Azure Container Apps
 
 ```bash
 cd scripts
-./deploy-azure.ps1 -ProvisionPostgres   # Deploys to Azure Container Apps with PostgreSQL Flexible Server
+./deploy-azure.ps1            # Deploys to Azure Container Apps with PostgreSQL Flexible Server
 ```
 
 See [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) for detailed setup.  
 For sovereign/gov clouds (Azure Gov, BLEU France, China): see [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md).
 
-### Option E — Pre-built Docker Image
+### Option D — Pre-built Docker Image
 
 ```bash
 docker run -d -p 8080:8080 \
@@ -344,13 +334,6 @@ Content-Type: application/json
 
 Every endpoint is created with a **profile** — a unified JSONB document containing schemas, resource types, service provider config, and behavioral settings.
 
-Endpoints can be referenced by **ID (UUID) or name** in all SCIM URLs:
-
-```
-/scim/endpoints/{endpoint-id}/Users     ← by UUID
-/scim/endpoints/my-tenant/Users          ← by name
-```
-
 ### 6 Built-in Presets
 
 | Preset | Schemas | Resource Types | Bulk | Sort | ETag | Use Case |
@@ -410,28 +393,23 @@ Content-Type: application/json
 
 ## Per-Endpoint Configuration Flags
 
-All flags are stored in `profile.settings` and can be PATCHed per-endpoint. When you create an endpoint with no explicit settings (or use the default `entra-id` preset), sensible defaults are applied automatically.
+All flags are stored in `profile.settings` and can be PATCHed per-endpoint:
 
-> **Two flags default to `true`:** `AllowAndCoerceBooleanStrings` and `PatchOpAllowRemoveAllMembers`. All others default to `false`.
-> The `entra-id` preset additionally sets `VerbosePatchSupported`, `MultiOp…Add`, and `MultiOp…Remove` to `True`.
-
-| Flag | Default | When `true` | When `false` |
-|------|---------|-------------|--------------|
-| `AllowAndCoerceBooleanStrings` | **`true`** | `"True"`/`"False"` strings auto-converted to booleans | Strings pass through as-is |
-| `VerbosePatchSupported` | `false` | Dot-notation PATCH paths (`name.givenName`) resolved | Dot paths stored as literal keys |
-| `SoftDeleteEnabled` | `false` | DELETE → soft-delete (`active=false` + `deletedAt`) | DELETE permanently removes resource |
-| `StrictSchemaValidation` | `false` | Extension URNs required in `schemas[]`; readOnly PATCH → 400 | Lenient — extensions accepted without URN match |
-| `RequireIfMatch` | `false` | `If-Match` required on writes (428 if missing) | `If-Match` optional (validated when present) |
-| `ReprovisionOnConflictForSoftDeletedResource` | `false` | Re-activate soft-deleted on POST conflict | 409 Conflict on collision |
-| `PerEndpointCredentialsEnabled` | `false` | Per-endpoint bearer tokens (bcrypt) | Global shared secret / OAuth JWT only |
-| `IncludeWarningAboutIgnoredReadOnlyAttribute` | `false` | Warning header on readOnly stripping | Silent stripping |
-| `IgnoreReadOnlyAttributesInPatch` | `false` | Strip readOnly PATCH ops (don't error) when strict is on | 400 on readOnly PATCH ops when strict is on |
-| `MultiOpPatchRequestAddMultipleMembersToGroup` | `false` | Multi-member PATCH add | One member per op |
-| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | `false` | Multi-member PATCH remove | One member per op |
-| `PatchOpAllowRemoveAllMembers` | **`true`** | `path=members` removes all | Must specify member IDs |
-| `logLevel` | *(unset)* | Per-endpoint log level override | Global `LOG_LEVEL` used |
-
-For the complete flag reference with interaction rules: [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md)
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `MultiOpPatchRequestAddMultipleMembersToGroup` | bool/string | — | Allow multi-member PATCH add |
+| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | bool/string | — | Allow multi-member PATCH remove |
+| `PatchOpAllowRemoveAllMembers` | bool/string | — | Allow remove-all-members via `path=members` |
+| `VerbosePatchSupported` | bool/string | — | Enable dot-notation PATCH paths |
+| `SoftDeleteEnabled` | bool/string | — | DELETE → soft-delete (set active=false) |
+| `StrictSchemaValidation` | bool/string | — | Require extension URNs in `schemas[]` |
+| `RequireIfMatch` | bool/string | — | Require `If-Match` header on PUT/PATCH/DELETE |
+| `AllowAndCoerceBooleanStrings` | bool/string | — | Coerce `"True"`/`"False"` to booleans |
+| `ReprovisionOnConflictForSoftDeletedResource` | bool/string | — | Re-activate soft-deleted on 409 |
+| `PerEndpointCredentialsEnabled` | bool/string | — | Enable per-endpoint credential validation |
+| `IncludeWarningAboutIgnoredReadOnlyAttribute` | bool/string | — | Add warning header for readOnly stripping |
+| `IgnoreReadOnlyAttributesInPatch` | bool/string | — | Strip (don't error) readOnly PATCH ops |
+| `logLevel` | string/number | — | Per-endpoint log level override |
 
 ### PATCH Settings
 
@@ -477,6 +455,7 @@ Content-Type: application/json
 | `SCIM_SHARED_SECRET` | Yes | — | Global bearer token for shared-secret auth |
 | `OAUTH_CLIENT_SECRET` | Yes | — | OAuth client credentials secret |
 | `OAUTH_CLIENT_ID` | No | `scimserver-client` | OAuth client ID |
+| `OAUTH_CLIENT_SCOPES` | No | `scim.read,scim.write,scim.manage` | Comma-separated OAuth scopes |
 | `API_PREFIX` | No | `scim` | URL prefix for all routes |
 | `NODE_ENV` | No | — | `production`, `development`, `test` |
 | `LOG_LEVEL` | No | `info` | Global log level (error/warn/info/debug/verbose) |
