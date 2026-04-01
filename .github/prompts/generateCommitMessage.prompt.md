@@ -72,7 +72,7 @@ Follow this format:
 ### Rules
 
 1. **Subject line**: Imperative mood ("add", "fix", "refactor"), max 72 characters, no period at end.
-2. **Scope**: The primary module or feature affected (e.g., `scim`, `bulk`, `projection`, `G8g`, `etag`, `admin`, `config`, `tests`, `docs`).
+3. **Scope**: The primary module or feature affected (e.g., `scim`, `bulk`, `projection`, `G8g`, `etag`, `admin`, `config`, `tests`, `docs`, `log-config`, `credentials`, `me`, `activity`, `database`).
 3. **Body**: Organized by priority category. Lead with code changes. Use bullet points. Keep each bullet to one line.
 4. **Code changes first**: Always list source code changes before test changes, and test changes before doc changes.
 5. **Test counts**: If tests were added/changed, include delta counts: `Tests: +X unit, +Y E2E, +Z live`.

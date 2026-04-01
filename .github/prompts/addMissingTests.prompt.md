@@ -11,7 +11,7 @@ Perform a comprehensive test gap audit across the entire project and add any mis
 ## Step 1 — Inventory Current Coverage
 
 1. **Read project context**: Read `Session_starter.md`, `docs/CONTEXT_INSTRUCTIONS.md`, `docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md`, and `CHANGELOG.md` to understand the full feature set, all config flags, attribute characteristics, and current version.
-2. **Read implementation source of truth**: Read `api/src/modules/endpoint/endpoint-config.interface.ts` for the canonical flag list with constants, defaults, and validation rules.
+2. **Read implementation source of truth**: Read `api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts` for the `ProfileSettings` interface — the canonical flag list with types and defaults. Also read `api/src/modules/endpoint/services/endpoint.service.ts` for derived flags.
 3. **List all test files**: Enumerate all `*.spec.ts` (unit), `*.e2e-spec.ts` (E2E), and `scripts/live-test.ps1` sections to catalog what is already tested.
 4. **Collect test names**: For each spec file, run `grep -n 'describe\|it(' <file>` to build a complete test inventory.
 5. **Map features to tests**: For each implemented feature/flag/characteristic, verify that corresponding tests exist at all three levels (unit, E2E, live).
@@ -23,7 +23,7 @@ Perform a comprehensive test gap audit across the entire project and add any mis
 
 Audit for missing tests in these categories:
 
-### A. Config Flag Coverage (14 boolean flags in EndpointConfig interface + logLevel; 12 persisted in ProfileSettings, 2 derived)
+### A. Config Flag Coverage (14 boolean flags in ProfileSettings + logLevel; 12 persisted, 2 derived)
 
 For each flag (`AllowAndCoerceBooleanStrings`, `StrictSchemaValidation`, `SoftDeleteEnabled`, `VerbosePatchSupported`, `MultiOpPatchRequestAddMultipleMembersToGroup`, `MultiOpPatchRequestRemoveMultipleMembersFromGroup`, `PatchOpAllowRemoveAllMembers`, `RequireIfMatch`, `ReprovisionOnConflictForSoftDeletedResource`, `CustomResourceTypesEnabled` *(derived from profile.resourceTypes)*, `BulkOperationsEnabled` *(derived from profile SPC)*, `PerEndpointCredentialsEnabled`, `IncludeWarningAboutIgnoredReadOnlyAttribute`, `IgnoreReadOnlyAttributesInPatch`):
 
@@ -135,7 +135,7 @@ Specifically check:
 - Every E2E test scenario should have a corresponding live test in `scripts/live-test.ps1`
 - Live tests should cover both local (port 6000) and Docker (port 8080) scenarios
 - Verify all live test sections in `scripts/live-test.ps1` exist by grepping for `TEST SECTION`
-- Ensure new sections use the next available number (check current highest before `Section 10`; as of v0.30.0 the latest is **9z-D**)
+- Ensure new sections use the next available number (check current highest before `Section 10`; as of v0.31.0 the latest is **9z-D**)
 
 ### H. Resource-Type Symmetry
 
@@ -259,7 +259,7 @@ describe('featureName', () => {
     beforeEach(() => {
       mockEndpointRepo.findOne.mockResolvedValue({
         ...baseEndpoint,
-        config: { FlagName: true },
+        profile: { settings: { FlagName: 'True' } },
       });
     });
 
@@ -561,12 +561,12 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
-| Unit  | 2,863  | ?     | +?    |
-| E2E   | 697    | ?     | +?    |
-| Live  | 621    | ?     | +?    |
+| Unit  | 3,090  | ?     | +?    |
+| E2E   | 817    | ?     | +?    |
+| Live  | ~951   | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
-> *Last updated: v0.30.0 — admin endpoint API improvements, preset API restored (2026-03-26)*
+> *Last updated: v0.31.0 — URN dot-path cache keys, shared helpers (2026-03-31)*
 
 4. Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts.
 
@@ -601,4 +601,4 @@ If any updates are needed, apply them directly to this file (`.github/prompts/ad
 - Every test must clean up its own resources (create → test → delete).
 - Test both the happy path AND the error path for every feature.
 - Use `toMatchObject()` for partial JSON matching, `toHaveProperty()` for field presence.
-- Live tests must work with `-BaseUrl http://localhost:8080 -ClientSecret "docker-secret"` (Docker mode).
+- Live tests must work with `-BaseUrl http://localhost:8080 -ClientSecret "devscimclientsecret"` (Docker mode).

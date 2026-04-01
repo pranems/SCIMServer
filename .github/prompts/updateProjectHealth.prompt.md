@@ -41,7 +41,7 @@ Count lines for each category by piping file lists to `Get-Content | Measure-Obj
 - Identify key domain classes with line counts
 
 ### 4. Test Coverage & Quality
-- Read latest test results from `api/unit-results.json` and `api/e2e-results.json`
+- Read latest test results from `api/pipeline-unit.json` and `api/pipeline-e2e.json`
 - Count live test assertions from `scripts/live-test.ps1`
 - Calculate test-to-source ratios
 - Identify test gaps (areas with no or low coverage)

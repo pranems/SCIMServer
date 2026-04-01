@@ -96,9 +96,8 @@ After all validation gates pass:
    - `CHANGELOG.md` — version bump entry with full test counts and feature summary
    - `docs/CONTEXT_INSTRUCTIONS.md` — new gotchas, constraints, or architectural decisions
    - `docs/INDEX.md` — add references to any new phase docs created
-   - `docs/CURRENT_STATE_AND_MIGRATION_PLAN.md` — mark phase complete, update heat map and counts
-   - `docs/PROJECT_HEALTH_REPORT.md` — update tech debt, test counts, and phase status
-   - `docs/SCIM_COMPLIANCE_MATRIX.md` — update compliance status for affected RFC sections
+   - `docs/PROJECT_HEALTH_AND_STATS.md` — update test counts, codebase metrics, and phase status
+   - `docs/SCIM_COMPLIANCE.md` — update compliance status for affected RFC sections
    - `package.json` — bump version number
 2. **Review this prompt template** for lessons learned:
    - Did any step prove unnecessary or missing?
