@@ -25,6 +25,8 @@ import type {
   BulkResponse,
 } from '../dto/bulk-request.dto';
 import { SCIM_BULK_RESPONSE_SCHEMA, BULK_MAX_OPERATIONS } from '../dto/bulk-request.dto';
+import { ScimLogger } from '../../logging/scim-logger.service';
+import { LogCategory } from '../../logging/log-levels';
 
 /** Regex to match "bulkId:<identifier>" references in JSON string values */
 const BULK_ID_REF_PATTERN = /bulkId:([^\s"]+)/g;
@@ -58,6 +60,7 @@ export class BulkProcessorService {
   constructor(
     private readonly usersService: EndpointScimUsersService,
     private readonly groupsService: EndpointScimGroupsService,
+    private readonly logger: ScimLogger,
   ) {}
 
   /**
@@ -81,21 +84,55 @@ export class BulkProcessorService {
     const results: BulkOperationResult[] = [];
     let errorCount = 0;
 
-    for (const op of operations) {
+    this.logger.info(LogCategory.SCIM_BULK, 'Bulk request started', {
+      opCount: operations.length,
+      failOnErrors,
+      endpointId,
+    });
+
+    for (let i = 0; i < operations.length; i++) {
+      const op = operations[i];
+
       // Check failOnErrors threshold
       if (failOnErrors > 0 && errorCount >= failOnErrors) {
         // RFC 7644 §3.7: "the server stops processing and returns"
         break;
       }
 
+      // Set bulk correlation context for this sub-operation
+      this.logger.enrichContext({
+        bulkOperationIndex: i,
+        bulkId: op.bulkId,
+        operation: op.method.toLowerCase(),
+      });
+
       try {
         const result = await this.executeOperation(op, endpointId, baseUrl, config, bulkIdMap);
         results.push(result);
       } catch (error) {
         errorCount++;
+        this.logger.warn(LogCategory.SCIM_BULK, `Bulk operation ${i} failed`, {
+          bulkIndex: i,
+          bulkId: op.bulkId,
+          method: op.method,
+          path: op.path,
+          status: error instanceof HttpException ? error.getStatus() : 500,
+        });
         results.push(this.buildErrorResult(op, error));
       }
     }
+
+    const processed = results.length;
+    const stopped = failOnErrors > 0 && errorCount >= failOnErrors;
+
+    this.logger.info(LogCategory.SCIM_BULK, 'Bulk request completed', {
+      total: operations.length,
+      processed,
+      success: processed - errorCount,
+      errors: errorCount,
+      stopped,
+      endpointId,
+    });
 
     return {
       schemas: [SCIM_BULK_RESPONSE_SCHEMA],

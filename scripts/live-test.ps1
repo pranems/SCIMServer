@@ -7445,6 +7445,74 @@ try {
 Write-Host "`n--- 9z-G: SCIM Error Format Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-H: BULK OPERATION LOGGING (Phase C Step 8)
+$script:currentSection = "9z-H: Bulk Logging"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-H: BULK OPERATION LOGGING" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Create a test endpoint for bulk
+Write-Host "`n--- Setting up bulk logging test endpoint ---" -ForegroundColor Cyan
+$bulkEpBody = @{name="bulk-log-test-$(Get-Random)"; profilePreset="entra-id"} | ConvertTo-Json
+try {
+    $bulkEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $bulkEpBody
+    $bulkEpId = $bulkEp.id
+    $bulkScimBase = "$baseUrl/scim/endpoints/$bulkEpId"
+} catch {
+    Test-Result -Success $false -Message "9z-H.setup: Failed to create bulk test endpoint: $_"
+    $bulkEpId = $null
+}
+
+if ($bulkEpId) {
+    # Execute a bulk request with one success and one failure
+    Write-Host "`n--- Test: Bulk Request with Mixed Results ---" -ForegroundColor Cyan
+    $bulkBody = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+        Operations = @(
+            @{ method="POST"; path="/Users"; bulkId="u1"; data=@{schemas=@("urn:ietf:params:scim:schemas:core:2.0:User"); userName="bulk-alice-$(Get-Random)@test.com"; active=$true} }
+            @{ method="POST"; path="/Users"; bulkId="u2"; data=@{schemas=@("urn:ietf:params:scim:schemas:core:2.0:User"); userName="bulk-bob-$(Get-Random)@test.com"; active=$true} }
+        )
+    } | ConvertTo-Json -Depth 5
+
+    try {
+        $bulkResult = Invoke-RestMethod -Uri "$bulkScimBase/Bulk" -Method POST -Headers $headers -Body $bulkBody
+        $allOk = ($bulkResult.Operations | Where-Object { $_.status -eq "201" }).Count -eq 2
+        Test-Result -Success $allOk -Message "9z-H.1: Bulk request completed with 2 successful operations"
+    } catch {
+        Test-Result -Success $false -Message "9z-H.1: Bulk request failed: $_"
+    }
+
+    # Check ring buffer for bulk logging entries
+    Write-Host "`n--- Test: Ring Buffer Contains Bulk Logs ---" -ForegroundColor Cyan
+    try {
+        $recentLogs = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent?category=scim.bulk&limit=10" -Headers $headers
+        $hasBulkStarted = $recentLogs.entries | Where-Object { $_.message -match "Bulk request started" }
+        $hasBulkCompleted = $recentLogs.entries | Where-Object { $_.message -match "Bulk request completed" }
+
+        Test-Result -Success ($null -ne $hasBulkStarted) -Message "9z-H.2: Ring buffer has 'Bulk request started' entry (scim.bulk category)"
+        Test-Result -Success ($null -ne $hasBulkCompleted) -Message "9z-H.3: Ring buffer has 'Bulk request completed' entry"
+
+        if ($hasBulkCompleted) {
+            $completedData = $hasBulkCompleted[0].data
+            $hasTotal = $completedData.total -ge 2
+            $hasSuccess = $completedData.success -ge 2
+            Test-Result -Success $hasTotal -Message "9z-H.4: Completed log has total count"
+            Test-Result -Success $hasSuccess -Message "9z-H.5: Completed log has success count"
+        }
+    } catch {
+        Test-Result -Success $false -Message "9z-H.2: Failed to query ring buffer: $_"
+    }
+
+    # Cleanup bulk test endpoint
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bulkEpId" -Method DELETE -Headers $headers | Out-Null
+    } catch { }
+}
+
+Write-Host "`n--- 9z-H: Bulk Logging Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
