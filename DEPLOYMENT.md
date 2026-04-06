@@ -243,6 +243,10 @@ Invoke-RestMethod -Method DELETE -Uri "http://localhost:3000/scim/admin/endpoint
 
 Use the returned plaintext token as a `Bearer` token for SCIM calls to that specific endpoint.
 
+### Per-Endpoint Configuration Flags
+
+Each endpoint has 13 boolean config flags (+ `logLevel`) that control SCIM behavior. Set via `profile.settings` on endpoint create or PATCH. See [docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md) for the complete reference.
+
 ### Debug with Log File
 
 ```powershell
