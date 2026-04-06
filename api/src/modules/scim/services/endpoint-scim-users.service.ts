@@ -37,6 +37,7 @@ import {
   guardSoftDeleted,
   ScimSchemaHelpers,
   assertSchemaUniqueness,
+  handleRepositoryError,
 } from '../common/scim-service-helpers';
 
 interface ListUsersParams {
@@ -138,7 +139,12 @@ export class EndpointScimUsersService {
       }),
     };
 
-    const created = await this.userRepo.create(input);
+    let created: UserRecord;
+    try {
+      created = await this.userRepo.create(input);
+    } catch (error) {
+      handleRepositoryError(error, 'create user', this.logger, LogCategory.SCIM_USER, { userName: dto.userName, endpointId });
+    }
 
     this.logger.info(LogCategory.SCIM_USER, 'User created', { scimId, userName: dto.userName, endpointId });
     return this.toScimUserResource(created, baseUrl, endpointId);
@@ -253,7 +259,12 @@ export class EndpointScimUsersService {
 
     const updatedData = await this.applyPatchOperationsForEndpoint(user, patchDto, endpointId, config);
 
-    const updatedUser = await this.userRepo.update(user.id, updatedData);
+    let updatedUser: UserRecord;
+    try {
+      updatedUser = await this.userRepo.update(user.id, updatedData);
+    } catch (error) {
+      handleRepositoryError(error, 'patch user', this.logger, LogCategory.SCIM_PATCH, { scimId, endpointId });
+    }
 
     this.logger.info(LogCategory.SCIM_PATCH, 'User patched', { scimId, endpointId });
     return this.toScimUserResource(updatedUser, baseUrl, endpointId);
@@ -326,7 +337,12 @@ export class EndpointScimUsersService {
       })
     };
 
-    const updatedUser = await this.userRepo.update(user.id, data);
+    let updatedUser: UserRecord;
+    try {
+      updatedUser = await this.userRepo.update(user.id, data);
+    } catch (error) {
+      handleRepositoryError(error, 'replace user', this.logger, LogCategory.SCIM_USER, { scimId, endpointId });
+    }
 
     return this.toScimUserResource(updatedUser, baseUrl, endpointId);
   }
@@ -350,10 +366,18 @@ export class EndpointScimUsersService {
 
     if (softDelete) {
       this.logger.info(LogCategory.SCIM_USER, 'Soft-deleting user (setting active=false + deletedAt)', { scimId, endpointId });
-      await this.userRepo.update(user.id, { active: false, deletedAt: new Date() });
+      try {
+        await this.userRepo.update(user.id, { active: false, deletedAt: new Date() });
+      } catch (error) {
+        handleRepositoryError(error, 'soft-delete user', this.logger, LogCategory.SCIM_USER, { scimId, endpointId });
+      }
       this.logger.info(LogCategory.SCIM_USER, 'User soft-deleted', { scimId, endpointId });
     } else {
-      await this.userRepo.delete(user.id);
+      try {
+        await this.userRepo.delete(user.id);
+      } catch (error) {
+        handleRepositoryError(error, 'delete user', this.logger, LogCategory.SCIM_USER, { scimId, endpointId });
+      }
       this.logger.info(LogCategory.SCIM_USER, 'User hard-deleted', { scimId, endpointId });
     }
   }
@@ -398,7 +422,12 @@ export class EndpointScimUsersService {
       }),
     };
 
-    const updated = await this.userRepo.update(existing.id, updateData);
+    let updated: UserRecord;
+    try {
+      updated = await this.userRepo.update(existing.id, updateData);
+    } catch (error) {
+      handleRepositoryError(error, 'reprovision user', this.logger, LogCategory.SCIM_USER, { scimId: existingScimId, endpointId });
+    }
     this.logger.info(LogCategory.SCIM_USER, 'User re-provisioned (soft-deleted resource reactivated)', {
       scimId: existingScimId, userName: dto.userName, endpointId,
     });

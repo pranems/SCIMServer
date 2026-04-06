@@ -52,6 +52,7 @@ import {
   stripReadOnlyAttributes,
   stripReadOnlyPatchOps,
   assertSchemaUniqueness,
+  handleRepositoryError,
 } from '../common/scim-service-helpers';
 import { SchemaValidator } from '../../../domain/validation';
 import type { SchemaDefinition, SchemaAttributeDefinition, SchemaCharacteristicsCache } from '../../../domain/validation';
@@ -243,7 +244,12 @@ export class EndpointScimGenericService {
       meta: JSON.stringify(metaObj),
     };
 
-    const record = await this.genericRepo.create(input);
+    let record;
+    try {
+      record = await this.genericRepo.create(input);
+    } catch (error) {
+      handleRepositoryError(error, `create ${resourceType.name}`, this.scimLogger, LogCategory.GENERAL, { scimId, endpointId });
+    }
 
     this.scimLogger.info(LogCategory.GENERAL, `Created ${resourceType.name}`, {
       scimId,
@@ -464,13 +470,18 @@ export class EndpointScimGenericService {
     const payload: Record<string, unknown> = { ...body };
     delete payload.schemas; // structural key, never stored in payload
 
-    const updated = await this.genericRepo.update(existing.id, {
-      externalId,
-      displayName,
-      active,
-      rawPayload: JSON.stringify(payload),
-      meta: JSON.stringify(metaObj),
-    });
+    let updated;
+    try {
+      updated = await this.genericRepo.update(existing.id, {
+        externalId,
+        displayName,
+        active,
+        rawPayload: JSON.stringify(payload),
+        meta: JSON.stringify(metaObj),
+      });
+    } catch (error) {
+      handleRepositoryError(error, `replace ${resourceType.name}`, this.scimLogger, LogCategory.GENERAL, { scimId, endpointId });
+    }
 
     this.scimLogger.info(LogCategory.GENERAL, `Replaced ${resourceType.name}`, {
       scimId,
@@ -657,13 +668,18 @@ export class EndpointScimGenericService {
       version: `W/"${newVersion}"`,
     };
 
-    const updated = await this.genericRepo.update(existing.id, {
-      externalId,
-      displayName,
-      active,
-      rawPayload: JSON.stringify(patchedPayload),
-      meta: JSON.stringify(metaObj),
-    });
+    let updated;
+    try {
+      updated = await this.genericRepo.update(existing.id, {
+        externalId,
+        displayName,
+        active,
+        rawPayload: JSON.stringify(patchedPayload),
+        meta: JSON.stringify(metaObj),
+      });
+    } catch (error) {
+      handleRepositoryError(error, `patch ${resourceType.name}`, this.scimLogger, LogCategory.GENERAL, { scimId, endpointId });
+    }
 
     this.scimLogger.info(LogCategory.GENERAL, `Patched ${resourceType.name}`, {
       scimId,
@@ -704,16 +720,24 @@ export class EndpointScimGenericService {
     const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
 
     if (softDelete) {
-      await this.genericRepo.update(existing.id, {
-        deletedAt: new Date(),
-        active: false,
-      });
+      try {
+        await this.genericRepo.update(existing.id, {
+          deletedAt: new Date(),
+          active: false,
+        });
+      } catch (error) {
+        handleRepositoryError(error, `soft-delete ${resourceType.name}`, this.scimLogger, LogCategory.GENERAL, { scimId, endpointId });
+      }
       this.scimLogger.info(LogCategory.GENERAL, `Soft-deleted ${resourceType.name}`, {
         scimId,
         endpointId,
       });
     } else {
-      await this.genericRepo.delete(existing.id);
+      try {
+        await this.genericRepo.delete(existing.id);
+      } catch (error) {
+        handleRepositoryError(error, `delete ${resourceType.name}`, this.scimLogger, LogCategory.GENERAL, { scimId, endpointId });
+      }
       this.scimLogger.info(LogCategory.GENERAL, `Deleted ${resourceType.name}`, {
         scimId,
         endpointId,
@@ -1101,14 +1125,19 @@ export class EndpointScimGenericService {
     const displayName = typeof body.displayName === 'string' ? body.displayName : null;
     const active = body.active !== false;
 
-    const updated = await this.genericRepo.update(existing.id, {
-      externalId,
-      displayName,
-      active,
-      deletedAt: null, // Clear soft-delete marker
-      rawPayload: JSON.stringify(payload),
-      meta: JSON.stringify(metaObj),
-    });
+    let updated;
+    try {
+      updated = await this.genericRepo.update(existing.id, {
+        externalId,
+        displayName,
+        active,
+        deletedAt: null, // Clear soft-delete marker
+        rawPayload: JSON.stringify(payload),
+        meta: JSON.stringify(metaObj),
+      });
+    } catch (error) {
+      handleRepositoryError(error, `reprovision ${resourceType.name}`, this.scimLogger, LogCategory.GENERAL, { scimId: existing.scimId, endpointId });
+    }
 
     this.scimLogger.info(LogCategory.GENERAL, `Re-provisioned soft-deleted ${resourceType.name}`, {
       scimId: existing.scimId, endpointId,

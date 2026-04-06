@@ -26,6 +26,47 @@ import type { LogCategory } from '../../logging/log-levels';
 import type { PatchOperation } from '../../../domain/patch/patch-types';
 import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-parser';
 import type { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
+import { RepositoryError, repositoryErrorToHttpStatus } from '../../../domain/errors/repository-error';
+
+// ─── Repository Error Handling ──────────────────────────────────────────────
+
+/**
+ * Handle a RepositoryError from a write operation: log at ERROR and re-throw
+ * as a SCIM-compliant HttpException.
+ *
+ * This is the central bridge between the domain error boundary (RepositoryError)
+ * and the SCIM error format. All three SCIM services use this for create/update/delete.
+ *
+ * If the error is NOT a RepositoryError (unexpected), it is re-thrown as-is
+ * and will be caught by the GlobalExceptionFilter (Step 1).
+ *
+ * @param error        The caught error from a repository call
+ * @param operation    Human-readable operation description (e.g., 'create user')
+ * @param logger       ScimLogger instance
+ * @param logCategory  LogCategory for the error entry (SCIM_USER, SCIM_GROUP, etc.)
+ * @param context      Additional structured data for the error log
+ */
+export function handleRepositoryError(
+  error: unknown,
+  operation: string,
+  logger: ScimLogger,
+  logCategory: LogCategory,
+  context: Record<string, unknown> = {},
+): never {
+  if (error instanceof RepositoryError) {
+    logger.error(logCategory, `Repository failure: ${operation}`, error.cause ?? error, {
+      operation,
+      errorCode: error.code,
+      ...context,
+    });
+    throw createScimError({
+      status: repositoryErrorToHttpStatus(error.code),
+      detail: `Failed to ${operation}: ${error.message}`,
+    });
+  }
+  // Non-RepositoryError — re-throw for GlobalExceptionFilter
+  throw error;
+}
 
 // ─── Cache Helpers ──────────────────────────────────────────────────────────
 
