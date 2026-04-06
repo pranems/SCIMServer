@@ -20,7 +20,6 @@ import {
   Get,
   HttpCode,
   Inject,
-  Logger,
   NotFoundException,
   Param,
   Post,
@@ -32,6 +31,8 @@ import { ENDPOINT_CREDENTIAL_REPOSITORY } from '../../../domain/repositories/rep
 import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import { ScimLogger } from '../../logging/scim-logger.service';
+import { LogCategory } from '../../logging/log-levels';
 
 const BCRYPT_SALT_ROUNDS = 12;
 
@@ -43,12 +44,12 @@ interface CreateCredentialDto {
 
 @Controller('admin/endpoints')
 export class AdminCredentialController {
-  private readonly logger = new Logger(AdminCredentialController.name);
 
   constructor(
     @Inject(ENDPOINT_CREDENTIAL_REPOSITORY)
     private readonly credentialRepo: IEndpointCredentialRepository,
     private readonly endpointService: EndpointService,
+    private readonly logger: ScimLogger,
   ) {}
 
   /**
@@ -106,7 +107,7 @@ export class AdminCredentialController {
       expiresAt,
     });
 
-    this.logger.log(`Created per-endpoint credential "${credential.id}" for endpoint "${endpointId}"`);
+    this.logger.info(LogCategory.AUTH, `Created per-endpoint credential "${credential.id}" for endpoint "${endpointId}"`);
 
     return {
       id: credential.id,
@@ -164,7 +165,7 @@ export class AdminCredentialController {
     }
 
     await this.credentialRepo.deactivate(credentialId);
-    this.logger.log(`Revoked credential "${credentialId}" for endpoint "${endpointId}"`);
+    this.logger.info(LogCategory.AUTH, `Revoked credential "${credentialId}" for endpoint "${endpointId}"`);
   }
 
   private async requireEndpoint(endpointId: string) {

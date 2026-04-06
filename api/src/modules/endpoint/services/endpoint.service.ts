@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, OnModuleInit, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, OnModuleInit } from '@nestjs/common';
 import type { Endpoint, Prisma } from '../../../generated/prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -6,6 +6,7 @@ import type { CreateEndpointDto } from '../dto/create-endpoint.dto';
 import type { UpdateEndpointDto } from '../dto/update-endpoint.dto';
 import { ENDPOINT_CONFIG_FLAGS, validateEndpointConfig } from '../endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
+import { LogCategory } from '../../logging/log-levels';
 import { parseLogLevel, logLevelName } from '../../logging/log-levels';
 import { validateAndExpandProfile } from '../../scim/endpoint-profile/endpoint-profile.service';
 import { getBuiltInPreset, DEFAULT_PRESET_NAME, BUILT_IN_PRESETS, PRESET_NAMES } from '../../scim/endpoint-profile/built-in-presets';
@@ -131,7 +132,6 @@ interface CachedEndpoint {
 
 @Injectable()
 export class EndpointService implements OnModuleInit {
-  private readonly logger = new Logger(EndpointService.name);
   private readonly isInMemoryBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() === 'inmemory';
 
   // ─── Unified Endpoint Cache ─────────────────────────────────────────
@@ -162,7 +162,7 @@ export class EndpointService implements OnModuleInit {
    */
   async onModuleInit(): Promise<void> {
     if (this.isInMemoryBackend) {
-      this.logger.debug('InMemory backend — endpoint cache starts empty.');
+      this.scimLogger.debug(LogCategory.ENDPOINT, 'InMemory backend — endpoint cache starts empty.');
       return;
     }
 
@@ -184,9 +184,9 @@ export class EndpointService implements OnModuleInit {
         }
       }
 
-      this.logger.log(`Warmed endpoint cache with ${endpoints.length} endpoint(s).`);
+      this.scimLogger.info(LogCategory.ENDPOINT, `Warmed endpoint cache with ${endpoints.length} endpoint(s).`);
     } catch (error) {
-      this.logger.warn(`Failed to warm endpoint cache: ${(error as Error).message}`);
+      this.scimLogger.warn(LogCategory.ENDPOINT, `Failed to warm endpoint cache: ${(error as Error).message}`);
     }
   }
 
@@ -805,7 +805,7 @@ export class EndpointService implements OnModuleInit {
         ? logLevelValue
         : parseLogLevel(String(logLevelValue));
       this.scimLogger.setEndpointLevel(endpointId, level);
-      this.logger.log(`Set log level ${logLevelName(level)} for endpoint ${endpointId}`);
+      this.scimLogger.info(LogCategory.ENDPOINT, `Set log level ${logLevelName(level)} for endpoint ${endpointId}`);
     } else {
       this.scimLogger.clearEndpointLevel(endpointId);
     }

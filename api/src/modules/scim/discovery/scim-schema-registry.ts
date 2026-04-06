@@ -1,4 +1,4 @@
-import { Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { Injectable, type OnModuleInit } from '@nestjs/common';
 import {
   SCIM_SERVICE_PROVIDER_CONFIG,
 } from './scim-schemas.constants';
@@ -72,9 +72,13 @@ export interface ScimResourceType {
  * 1. Expands a default preset at startup for root-level discovery
  * 2. Provides extension URN lookup for buildResourceSchemas()
  */
+import { ScimLogger } from '../../logging/scim-logger.service';
+import { LogCategory } from '../../logging/log-levels';
+
 @Injectable()
 export class ScimSchemaRegistry implements OnModuleInit {
-  private readonly logger = new Logger(ScimSchemaRegistry.name);
+
+  constructor(private readonly logger: ScimLogger) {}
 
   private defaultSchemas: ScimSchemaDefinition[] = [];
   private defaultResourceTypes: ScimResourceType[] = [];
@@ -103,9 +107,9 @@ export class ScimSchemaRegistry implements OnModuleInit {
           authenticationSchemes: SCIM_SERVICE_PROVIDER_CONFIG.authenticationSchemes,
         };
       }
-      this.logger.debug('ScimSchemaRegistry initialized -- root-level defaults from rfc-standard preset.');
+      this.logger.debug(LogCategory.SCIM_DISCOVERY, 'ScimSchemaRegistry initialized -- root-level defaults from rfc-standard preset.');
     } catch (err) {
-      this.logger.warn(`Failed to expand default preset: ${(err as Error).message}`);
+      this.logger.warn(LogCategory.SCIM_DISCOVERY, `Failed to expand default preset: ${(err as Error).message}`);
     }
   }
 

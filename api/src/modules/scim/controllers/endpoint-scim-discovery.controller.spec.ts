@@ -5,6 +5,7 @@ import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { ScimDiscoveryService } from '../discovery/scim-discovery.service';
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
+import { ScimLogger } from '../../logging/scim-logger.service';
 
 describe('EndpointScimDiscoveryController', () => {
   let controller: EndpointScimDiscoveryController;
@@ -75,6 +76,22 @@ describe('EndpointScimDiscoveryController', () => {
       providers: [
         { provide: EndpointService, useValue: mockEndpointService },
         { provide: EndpointContextStorage, useValue: mockEndpointContext },
+        {
+          provide: ScimLogger,
+          useValue: {
+            trace: jest.fn(),
+            debug: jest.fn(),
+            info: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+            fatal: jest.fn(),
+            isEnabled: jest.fn().mockReturnValue(true),
+            getConfig: jest.fn().mockReturnValue({}),
+            runWithContext: jest.fn((ctx, fn) => fn()),
+            getContext: jest.fn(),
+            enrichContext: jest.fn(),
+          },
+        },
         ScimSchemaRegistry,
         ScimDiscoveryService,
       ],

@@ -16,7 +16,7 @@
  *   - sanitizeBooleanStringsByParent on output
  *   - returned:never stripping on output
  */
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { IGenericResourceRepository } from '../../../domain/repositories/generic-resource.repository.interface';
 import type {
@@ -80,7 +80,6 @@ interface PatchDto {
 
 @Injectable()
 export class EndpointScimGenericService {
-  private readonly logger2 = new Logger(EndpointScimGenericService.name);
 
   constructor(
     @Inject(GENERIC_RESOURCE_REPOSITORY)
