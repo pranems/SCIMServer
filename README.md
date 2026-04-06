@@ -397,19 +397,21 @@ All flags are stored in `profile.settings` and can be PATCHed per-endpoint:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `MultiOpPatchRequestAddMultipleMembersToGroup` | bool/string | — | Allow multi-member PATCH add |
-| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | bool/string | — | Allow multi-member PATCH remove |
-| `PatchOpAllowRemoveAllMembers` | bool/string | — | Allow remove-all-members via `path=members` |
-| `VerbosePatchSupported` | bool/string | — | Enable dot-notation PATCH paths |
-| `SoftDeleteEnabled` | bool/string | — | DELETE → soft-delete (set active=false) |
-| `StrictSchemaValidation` | bool/string | — | Require extension URNs in `schemas[]` |
-| `RequireIfMatch` | bool/string | — | Require `If-Match` header on PUT/PATCH/DELETE |
-| `AllowAndCoerceBooleanStrings` | bool/string | — | Coerce `"True"`/`"False"` to booleans |
-| `ReprovisionOnConflictForSoftDeletedResource` | bool/string | — | Re-activate soft-deleted on 409 |
-| `PerEndpointCredentialsEnabled` | bool/string | — | Enable per-endpoint credential validation |
-| `IncludeWarningAboutIgnoredReadOnlyAttribute` | bool/string | — | Add warning header for readOnly stripping |
-| `IgnoreReadOnlyAttributesInPatch` | bool/string | — | Strip (don't error) readOnly PATCH ops |
-| `logLevel` | string/number | — | Per-endpoint log level override |
+| `AllowAndCoerceBooleanStrings` | bool/string | **`true`** | Coerce `"True"`/`"False"` to native booleans |
+| `VerbosePatchSupported` | bool/string | `false` | Enable dot-notation PATCH paths |
+| `SoftDeleteEnabled` | bool/string | `false` | DELETE → soft-delete (set active=false) |
+| `StrictSchemaValidation` | bool/string | `false` | Enforce extension URNs in `schemas[]`, attribute types, mutability |
+| `RequireIfMatch` | bool/string | `false` | Require `If-Match` header on PUT/PATCH/DELETE (428 if missing) |
+| `ReprovisionOnConflictForSoftDeletedResource` | bool/string | `false` | Re-activate soft-deleted on 409 (requires `SoftDeleteEnabled`) |
+| `PerEndpointCredentialsEnabled` | bool/string | `false` | Enable per-endpoint credential validation |
+| `IncludeWarningAboutIgnoredReadOnlyAttribute` | bool/string | `false` | Add warning extension in write responses for readOnly stripping |
+| `IgnoreReadOnlyAttributesInPatch` | bool/string | `false` | Strip (don't error) readOnly PATCH ops when strict is on |
+| `MultiOpPatchRequestAddMultipleMembersToGroup` | bool/string | `false` | Allow multi-member PATCH add |
+| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | bool/string | `false` | Allow multi-member PATCH remove |
+| `PatchOpAllowRemoveAllMembers` | bool/string | **`true`** | Allow remove-all-members via `path=members` |
+| `logLevel` | string/number | *(unset)* | Per-endpoint log level override (TRACE/DEBUG/INFO/WARN/ERROR/FATAL/OFF) |
+
+> For the full reference with flag interactions, Mermaid diagrams, and examples, see [docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md).
 
 ### PATCH Settings
 
