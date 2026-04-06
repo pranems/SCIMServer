@@ -17,6 +17,7 @@ import type {
 } from '../../../domain/models/user.model';
 import type { Prisma } from '../../../generated/prisma/client';
 import { isValidUuid } from './uuid-guard';
+import { wrapPrismaError } from './prisma-error.util';
 
 /** Maps a ScimResource row (with JSONB payload) to the UserRecord domain type. */
 function toUserRecord(resource: Record<string, unknown>): UserRecord {
@@ -100,15 +101,23 @@ export class PrismaUserRepository implements IUserRepository {
     }
     // Phase 7: Atomically increment version for ETag-based concurrency control
     prismaData.version = { increment: 1 };
-    const updated = await this.prisma.scimResource.update({
-      where: { id },
-      data: prismaData as Prisma.ScimResourceUpdateInput,
-    });
-    return toUserRecord(updated as unknown as Record<string, unknown>);
+    try {
+      const updated = await this.prisma.scimResource.update({
+        where: { id },
+        data: prismaData as Prisma.ScimResourceUpdateInput,
+      });
+      return toUserRecord(updated as unknown as Record<string, unknown>);
+    } catch (error) {
+      throw wrapPrismaError(error, `User update(${id})`);
+    }
   }
 
   async delete(id: string): Promise<void> {
-    await this.prisma.scimResource.delete({ where: { id } });
+    try {
+      await this.prisma.scimResource.delete({ where: { id } });
+    } catch (error) {
+      throw wrapPrismaError(error, `User delete(${id})`);
+    }
   }
 
   async findConflict(

@@ -13,6 +13,7 @@ import type {
   GenericResourceUpdateInput,
 } from '../../../domain/models/generic-resource.model';
 import { matchesPrismaFilter } from './prisma-filter-evaluator';
+import { RepositoryError } from '../../../domain/errors/repository-error';
 
 @Injectable()
 export class InMemoryGenericResourceRepository implements IGenericResourceRepository {
@@ -74,7 +75,7 @@ export class InMemoryGenericResourceRepository implements IGenericResourceReposi
   async update(id: string, data: GenericResourceUpdateInput): Promise<GenericResourceRecord> {
     const existing = this.resources.get(id);
     if (!existing) {
-      throw new Error(`GenericResource with id "${id}" not found.`);
+      throw new RepositoryError('NOT_FOUND', `GenericResource with id "${id}" not found.`);
     }
 
     const updated: GenericResourceRecord = {
@@ -89,6 +90,9 @@ export class InMemoryGenericResourceRepository implements IGenericResourceReposi
   }
 
   async delete(id: string): Promise<void> {
+    if (!this.resources.has(id)) {
+      throw new RepositoryError('NOT_FOUND', `GenericResource with id "${id}" not found.`);
+    }
     this.resources.delete(id);
   }
 

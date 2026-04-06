@@ -264,8 +264,8 @@ describe('InMemoryGroupRepository', () => {
       expect(await repo.findByScimId(endpointId, group.scimId)).toBeNull();
     });
 
-    it('should be idempotent (no error on nonexistent id)', async () => {
-      await expect(repo.delete('nonexistent')).resolves.toBeUndefined();
+    it('should throw RepositoryError when deleting nonexistent id', async () => {
+      await expect(repo.delete('nonexistent')).rejects.toThrow('Group with id nonexistent not found');
     });
   });
 

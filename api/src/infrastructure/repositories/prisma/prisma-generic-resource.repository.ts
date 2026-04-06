@@ -14,6 +14,7 @@ import type {
 } from '../../../domain/models/generic-resource.model';
 import type { Prisma } from '../../../generated/prisma/client';
 import { isValidUuid } from './uuid-guard';
+import { wrapPrismaError } from './prisma-error.util';
 
 /** Maps a ScimResource row to the GenericResourceRecord domain type. */
 function toGenericRecord(resource: Record<string, unknown>): GenericResourceRecord {
@@ -92,15 +93,23 @@ export class PrismaGenericResourceRepository implements IGenericResourceReposito
       delete prismaData.rawPayload;
     }
     prismaData.version = { increment: 1 };
-    const updated = await this.prisma.scimResource.update({
-      where: { id },
-      data: prismaData as Prisma.ScimResourceUpdateInput,
-    });
-    return toGenericRecord(updated as unknown as Record<string, unknown>);
+    try {
+      const updated = await this.prisma.scimResource.update({
+        where: { id },
+        data: prismaData as Prisma.ScimResourceUpdateInput,
+      });
+      return toGenericRecord(updated as unknown as Record<string, unknown>);
+    } catch (error) {
+      throw wrapPrismaError(error, `GenericResource update(${id})`);
+    }
   }
 
   async delete(id: string): Promise<void> {
-    await this.prisma.scimResource.delete({ where: { id } });
+    try {
+      await this.prisma.scimResource.delete({ where: { id } });
+    } catch (error) {
+      throw wrapPrismaError(error, `GenericResource delete(${id})`);
+    }
   }
 
   async findByExternalId(

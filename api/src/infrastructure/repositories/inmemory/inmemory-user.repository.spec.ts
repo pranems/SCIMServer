@@ -240,8 +240,8 @@ describe('InMemoryUserRepository', () => {
       expect(found).toBeNull();
     });
 
-    it('should be idempotent (no error when deleting nonexistent id)', async () => {
-      await expect(repo.delete('nonexistent-id')).resolves.toBeUndefined();
+    it('should throw RepositoryError when deleting nonexistent id', async () => {
+      await expect(repo.delete('nonexistent-id')).rejects.toThrow('User with id nonexistent-id not found');
     });
   });
 

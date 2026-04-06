@@ -18,6 +18,7 @@ import type {
   MemberRecord,
 } from '../../../domain/models/group.model';
 import type { Prisma } from '../../../generated/prisma/client';
+import { wrapPrismaError } from './prisma-error.util';
 import { isValidUuid } from './uuid-guard';
 
 /** Maps a ScimResource row (with JSONB payload) to the GroupRecord domain type. */
@@ -131,15 +132,23 @@ export class PrismaGroupRepository implements IGroupRepository {
     }
     // Phase 7: Atomically increment version for ETag-based concurrency control
     prismaData.version = { increment: 1 };
-    const updated = await this.prisma.scimResource.update({
-      where: { id },
-      data: prismaData as Prisma.ScimResourceUpdateInput,
-    });
-    return toGroupRecord(updated as unknown as Record<string, unknown>);
+    try {
+      const updated = await this.prisma.scimResource.update({
+        where: { id },
+        data: prismaData as Prisma.ScimResourceUpdateInput,
+      });
+      return toGroupRecord(updated as unknown as Record<string, unknown>);
+    } catch (error) {
+      throw wrapPrismaError(error, `Group update(${id})`);
+    }
   }
 
   async delete(id: string): Promise<void> {
-    await this.prisma.scimResource.delete({ where: { id } });
+    try {
+      await this.prisma.scimResource.delete({ where: { id } });
+    } catch (error) {
+      throw wrapPrismaError(error, `Group delete(${id})`);
+    }
   }
 
   async findByDisplayName(
@@ -235,6 +244,8 @@ export class PrismaGroupRepository implements IGroupRepository {
         }
       },
       { maxWait: 10000, timeout: 30000 },
-    );
+    ).catch((error) => {
+      throw wrapPrismaError(error, `Group updateGroupWithMembers(${groupId})`);
+    });
   }
 }

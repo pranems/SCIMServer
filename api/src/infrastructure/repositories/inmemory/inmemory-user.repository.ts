@@ -17,6 +17,7 @@ import type {
   UserConflictResult,
 } from '../../../domain/models/user.model';
 import { matchesPrismaFilter } from './prisma-filter-evaluator';
+import { RepositoryError } from '../../../domain/errors/repository-error';
 
 @Injectable()
 export class InMemoryUserRepository implements IUserRepository {
@@ -85,7 +86,7 @@ export class InMemoryUserRepository implements IUserRepository {
   async update(id: string, data: UserUpdateInput): Promise<UserRecord> {
     const existing = this.users.get(id);
     if (!existing) {
-      throw new Error(`User with id ${id} not found`);
+      throw new RepositoryError('NOT_FOUND', `User with id ${id} not found`);
     }
     // Phase 7: Increment version for ETag-based concurrency control
     const updated: UserRecord = {
@@ -99,6 +100,9 @@ export class InMemoryUserRepository implements IUserRepository {
   }
 
   async delete(id: string): Promise<void> {
+    if (!this.users.has(id)) {
+      throw new RepositoryError('NOT_FOUND', `User with id ${id} not found`);
+    }
     this.users.delete(id);
   }
 
