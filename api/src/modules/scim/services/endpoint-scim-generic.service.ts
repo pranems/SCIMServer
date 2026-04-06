@@ -575,7 +575,10 @@ export class EndpointScimGenericService {
     let payload: Record<string, unknown>;
     try {
       payload = JSON.parse(existing.rawPayload);
-    } catch {
+    } catch (e) {
+      this.scimLogger.warn(LogCategory.GENERAL, 'Corrupt rawPayload in PATCH — using empty object', {
+        scimId: existing.scimId, endpointId, error: (e as Error).message,
+      });
       payload = {};
     }
 
@@ -760,14 +763,20 @@ export class EndpointScimGenericService {
     let payload: Record<string, unknown>;
     try {
       payload = JSON.parse(record.rawPayload);
-    } catch {
+    } catch (e) {
+      this.scimLogger.warn(LogCategory.GENERAL, 'Corrupt rawPayload in toScimResponse — using empty object', {
+        scimId: record.scimId, endpointId: record.endpointId, error: (e as Error).message,
+      });
       payload = {};
     }
 
     let meta: Record<string, unknown>;
     try {
       meta = record.meta ? JSON.parse(record.meta) : {};
-    } catch {
+    } catch (e) {
+      this.scimLogger.warn(LogCategory.GENERAL, 'Corrupt meta in toScimResponse — using empty object', {
+        scimId: record.scimId, endpointId: record.endpointId, error: (e as Error).message,
+      });
       meta = {};
     }
 

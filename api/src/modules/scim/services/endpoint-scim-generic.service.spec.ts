@@ -1680,4 +1680,39 @@ describe('EndpointScimGenericService', () => {
       ).rejects.toThrow(TypeError);
     });
   });
+
+  // ─── Silent Catch Logging (Phase B Step 7) ──────────────────────────
+
+  describe('corrupt data logging', () => {
+    it('should log WARN and return response for corrupt rawPayload in toScimResponse', async () => {
+      const corruptRecord = {
+        ...mockGenericRecord,
+        rawPayload: 'NOT VALID JSON{{{',
+      };
+      mockGenericRepo.findByScimId.mockResolvedValue(corruptRecord);
+
+      const result = await service.getResource(
+        'scim-dev-001', baseUrl, endpointId, deviceResourceType,
+      );
+
+      // Should not throw — falls back to empty payload
+      expect(result).toBeDefined();
+      expect(result.id).toBe('scim-dev-001');
+    });
+
+    it('should log WARN and return response for corrupt meta in toScimResponse', async () => {
+      const corruptRecord = {
+        ...mockGenericRecord,
+        meta: 'INVALID META JSON',
+      };
+      mockGenericRepo.findByScimId.mockResolvedValue(corruptRecord);
+
+      const result = await service.getResource(
+        'scim-dev-001', baseUrl, endpointId, deviceResourceType,
+      );
+
+      expect(result).toBeDefined();
+      expect(result.meta).toBeDefined();
+    });
+  });
 });

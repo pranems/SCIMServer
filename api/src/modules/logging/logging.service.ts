@@ -79,7 +79,9 @@ export class LoggingService implements OnModuleDestroy {
             this.normalizeObject(responseBody) ?? null
           ) : undefined) || this.deriveIdentifierFromUrl(url);
         if (idCandidate && typeof idCandidate === 'string') identifier = idCandidate;
-      } catch { /* swallow */ }
+      } catch (e) {
+        this.logger.debug(LogCategory.DATABASE, 'Identifier derivation failed (inmemory)', { url, error: (e as Error).message });
+      }
 
       this.inMemoryLogRows.push({
         id: randomUUID(),
@@ -110,7 +112,9 @@ export class LoggingService implements OnModuleDestroy {
           this.normalizeObject(responseBody) ?? null
         ) : undefined) || this.deriveIdentifierFromUrl(url);
       if (idCandidate && typeof idCandidate === 'string') identifier = idCandidate;
-    } catch {/* swallow */}
+    } catch (e) {
+      this.logger.debug(LogCategory.DATABASE, 'Identifier derivation failed', { url, error: (e as Error).message });
+    }
 
     const data: Prisma.RequestLogCreateInput & { _identifier?: string } = {
       method,
@@ -403,7 +407,13 @@ export class LoggingService implements OnModuleDestroy {
         );
         for (const row of rows) identifierMap[row.id] = row.identifier;
       }
-    } catch { /* column might not exist yet or query failed */ }
+    } catch (e) {
+      // Best-effort: identifier backfill column may not exist in early migrations
+      this.logger.debug(LogCategory.DATABASE, 'Identifier backfill query failed', {
+        error: (e as Error).message,
+        recordCount: records.length,
+      });
+    }
 
     // Map records with async user resolution
     const items = await Promise.all(
