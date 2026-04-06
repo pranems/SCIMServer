@@ -525,6 +525,7 @@ export class EndpointScimGroupsService {
       throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.' });
     }
 
+    this.logger.info(LogCategory.SCIM_GROUP, 'Group replaced', { scimId, displayName: dto.displayName, endpointId });
     return this.toScimGroupResource(updatedGroup, baseUrl, endpointId);
   }
 

@@ -344,6 +344,7 @@ export class EndpointScimUsersService {
       handleRepositoryError(error, 'replace user', this.logger, LogCategory.SCIM_USER, { scimId, endpointId });
     }
 
+    this.logger.info(LogCategory.SCIM_USER, 'User replaced', { scimId, userName: dto.userName, endpointId });
     return this.toScimUserResource(updatedUser, baseUrl, endpointId);
   }
 

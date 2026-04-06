@@ -45,8 +45,8 @@ export class RequestLoggingInterceptor implements NestInterceptor {
           startTime: startedAt,
         },
         () => {
-          // Log incoming request
-          this.scimLogger.info(LogCategory.HTTP, `→ ${request.method} ${request.originalUrl ?? request.url}`, {
+          // Log incoming request (DEBUG — operational detail, not business event)
+          this.scimLogger.debug(LogCategory.HTTP, `→ ${request.method} ${request.originalUrl ?? request.url}`, {
             userAgent: request.headers['user-agent'] as string,
             contentType: request.headers['content-type'] as string,
             ip: request.ip || request.socket?.remoteAddress,
@@ -63,8 +63,8 @@ export class RequestLoggingInterceptor implements NestInterceptor {
             tap((responseBody: unknown) => {
               const durationMs = Date.now() - startedAt;
 
-              // Structured response log
-              this.scimLogger.info(LogCategory.HTTP, `← ${response.statusCode} ${request.method} ${request.originalUrl ?? request.url}`, {
+              // Structured response log (DEBUG — operational detail)
+              this.scimLogger.debug(LogCategory.HTTP, `← ${response.statusCode} ${request.method} ${request.originalUrl ?? request.url}`, {
                 status: response.statusCode,
                 durationMs,
               });

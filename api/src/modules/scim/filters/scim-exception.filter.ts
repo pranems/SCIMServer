@@ -45,13 +45,27 @@ export class ScimExceptionFilter implements ExceptionFilter {
       return;
     }
 
-    // Log the exception
+    // Log the exception — level varies by status class:
+    //   5xx → ERROR (server fault, operator should investigate)
+    //   401/403 → WARN (potential security event)
+    //   404 → DEBUG (routine probe, especially from Entra ID)
+    //   other 4xx → INFO (client error, logged for traceability)
     if (status >= 500) {
       this.logger.error(LogCategory.HTTP, `Exception ${status} on ${request?.method} ${request?.originalUrl}`, exception, {
         status,
       });
+    } else if (status === 401 || status === 403) {
+      this.logger.warn(LogCategory.HTTP, `Auth error ${status} on ${request?.method} ${request?.originalUrl}`, {
+        status,
+        detail: typeof exceptionResponse === 'object' ? (exceptionResponse as Record<string, unknown>).detail : exceptionResponse,
+      });
+    } else if (status === 404) {
+      this.logger.debug(LogCategory.HTTP, `Not found ${status} on ${request?.method} ${request?.originalUrl}`, {
+        status,
+        detail: typeof exceptionResponse === 'object' ? (exceptionResponse as Record<string, unknown>).detail : exceptionResponse,
+      });
     } else if (status >= 400) {
-      this.logger.warn(LogCategory.HTTP, `Client error ${status} on ${request?.method} ${request?.originalUrl}`, {
+      this.logger.info(LogCategory.HTTP, `Client error ${status} on ${request?.method} ${request?.originalUrl}`, {
         status,
         detail: typeof exceptionResponse === 'object' ? (exceptionResponse as Record<string, unknown>).detail : exceptionResponse,
       });
