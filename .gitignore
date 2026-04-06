@@ -85,3 +85,5 @@ api/ep-spec-results.json
 api/ep-spec2.json
 api/sd-results.json
 api/unit-final.json
+SCIMServer-standalone.zip
+standalone/

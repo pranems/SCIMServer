@@ -25,6 +25,9 @@
     "test:smoke": "pwsh ../scripts/live-test.ps1",
     "test:all": "npm test && npm run test:e2e && npm run test:smoke",
     "test:ci": "npm test && npm run test:e2e",
+    "build:standalone": "pwsh ../scripts/build-standalone.ps1",
+    "build:standalone:zip": "pwsh ../scripts/build-standalone.ps1 -Zip",
+    "build:standalone:full": "pwsh ../scripts/build-standalone.ps1 -IncludeNode -Zip",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init"
   },
