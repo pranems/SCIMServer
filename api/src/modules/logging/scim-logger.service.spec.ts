@@ -646,4 +646,99 @@ describe('ScimLogger', () => {
       unsub();
     });
   });
+
+  // ─── Enriched Context (Phase B Step 6) ────────────────────────────
+
+  describe('enriched correlation context', () => {
+    it('should include authType in log entries when enriched', () => {
+      const entries: StructuredLogEntry[] = [];
+      const unsub = logger.subscribe(e => entries.push(e));
+
+      logger.runWithContext({ requestId: 'req-auth-1' }, () => {
+        logger.enrichContext({ authType: 'oauth', authClientId: 'client-1' });
+        logger.info(LogCategory.AUTH, 'Auth test');
+      });
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].authType).toBe('oauth');
+      unsub();
+    });
+
+    it('should include resourceType and resourceId when enriched', () => {
+      const entries: StructuredLogEntry[] = [];
+      const unsub = logger.subscribe(e => entries.push(e));
+
+      logger.runWithContext({ requestId: 'req-res-1' }, () => {
+        logger.enrichContext({ resourceType: 'User', resourceId: 'usr-123', operation: 'create' });
+        logger.info(LogCategory.SCIM_USER, 'User created');
+      });
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].resourceType).toBe('User');
+      expect(entries[0].resourceId).toBe('usr-123');
+      expect(entries[0].operation).toBe('create');
+      unsub();
+    });
+
+    it('should include bulkOperationIndex when enriched', () => {
+      const entries: StructuredLogEntry[] = [];
+      const unsub = logger.subscribe(e => entries.push(e));
+
+      logger.runWithContext({ requestId: 'req-bulk-1' }, () => {
+        logger.enrichContext({ bulkOperationIndex: 5, bulkId: 'u3' });
+        logger.info(LogCategory.HTTP, 'Bulk op');
+      });
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].bulkOperationIndex).toBe(5);
+      unsub();
+    });
+
+    it('should accumulate context across multiple enrichContext calls', () => {
+      const entries: StructuredLogEntry[] = [];
+      const unsub = logger.subscribe(e => entries.push(e));
+
+      logger.runWithContext({ requestId: 'req-accum-1', endpointId: 'ep-1' }, () => {
+        logger.enrichContext({ authType: 'legacy' });
+        logger.enrichContext({ resourceType: 'Group', operation: 'patch' });
+        logger.info(LogCategory.SCIM_GROUP, 'Group patched');
+      });
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].requestId).toBe('req-accum-1');
+      expect(entries[0].endpointId).toBe('ep-1');
+      expect(entries[0].authType).toBe('legacy');
+      expect(entries[0].resourceType).toBe('Group');
+      expect(entries[0].operation).toBe('patch');
+      unsub();
+    });
+
+    it('should include enriched context in JSON output', () => {
+      logger.updateConfig({ format: 'json' });
+      logger.runWithContext({ requestId: 'req-json-ctx' }, () => {
+        logger.enrichContext({ authType: 'oauth', resourceType: 'User' });
+        logger.info(LogCategory.SCIM_USER, 'JSON context test');
+      });
+
+      const output = stdoutSpy.mock.calls[0][0] as string;
+      const parsed = JSON.parse(output);
+      expect(parsed.authType).toBe('oauth');
+      expect(parsed.resourceType).toBe('User');
+    });
+
+    it('should not include undefined enriched fields in entries', () => {
+      const entries: StructuredLogEntry[] = [];
+      const unsub = logger.subscribe(e => entries.push(e));
+
+      logger.runWithContext({ requestId: 'req-undef' }, () => {
+        // No enrichContext calls — fields should be undefined
+        logger.info(LogCategory.HTTP, 'No enrichment');
+      });
+
+      expect(entries[0].authType).toBeUndefined();
+      expect(entries[0].resourceType).toBeUndefined();
+      expect(entries[0].bulkOperationIndex).toBeUndefined();
+      unsub();
+    });
+  });
 });

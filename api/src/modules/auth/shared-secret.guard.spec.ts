@@ -76,6 +76,7 @@ describe('SharedSecretGuard', () => {
       warn: jest.fn(),
       error: jest.fn(),
       fatal: jest.fn(),
+      enrichContext: jest.fn(),
     };
 
     mockCredentialRepo = {

@@ -12,6 +12,11 @@ import {
 
 /**
  * Correlation context attached to every log entry within a single request.
+ * Enriched incrementally by each layer:
+ *   - Interceptor: requestId, method, path, endpointId, startTime
+ *   - Guard: authType, authClientId, authCredentialId
+ *   - Service: resourceType, resourceId, operation
+ *   - BulkProcessor: bulkOperationIndex, bulkId
  */
 export interface CorrelationContext {
   /** Unique request ID (UUID). Propagated from X-Request-Id header or auto-generated. */
@@ -22,12 +27,30 @@ export interface CorrelationContext {
   path?: string;
   /** SCIM endpoint ID (if applicable) */
   endpointId?: string;
-  /** Auth type used for the request */
-  authType?: 'oauth' | 'legacy' | 'public';
-  /** OAuth client_id if authenticated via OAuth */
-  clientId?: string;
   /** Start timestamp for duration tracking */
   startTime?: number;
+
+  // ── Auth layer (set by SharedSecretGuard after authentication) ─────
+  /** Auth type used for the request */
+  authType?: 'oauth' | 'legacy' | 'endpoint_credential' | 'public';
+  /** OAuth client_id if authenticated via OAuth */
+  authClientId?: string;
+  /** Per-endpoint credential ID if authenticated via endpoint credential */
+  authCredentialId?: string;
+
+  // ── Operation layer (set by service method) ────────────────────────
+  /** SCIM resource type being operated on */
+  resourceType?: string;
+  /** SCIM resource ID being operated on */
+  resourceId?: string;
+  /** SCIM operation: create, get, list, patch, put, delete */
+  operation?: string;
+
+  // ── Bulk layer (set by BulkProcessorService) ───────────────────────
+  /** Index of the current operation within a bulk request */
+  bulkOperationIndex?: number;
+  /** Client-assigned bulkId for cross-referencing */
+  bulkId?: string;
 }
 
 /**
@@ -53,6 +76,16 @@ export interface StructuredLogEntry {
   path?: string;
   /** Duration in ms (for timing entries) */
   durationMs?: number;
+  /** Auth type (enriched by guard) */
+  authType?: string;
+  /** SCIM resource type (enriched by service) */
+  resourceType?: string;
+  /** SCIM resource ID (enriched by service) */
+  resourceId?: string;
+  /** SCIM operation (enriched by service) */
+  operation?: string;
+  /** Bulk operation index (enriched by bulk processor) */
+  bulkOperationIndex?: number;
   /** Error information */
   error?: {
     message: string;
@@ -263,6 +296,12 @@ export class ScimLogger {
       endpointId: ctx?.endpointId,
       method: ctx?.method,
       path: ctx?.path,
+      // Enriched context fields (populated by guard/service/bulk processor)
+      authType: ctx?.authType,
+      resourceType: ctx?.resourceType,
+      resourceId: ctx?.resourceId,
+      operation: ctx?.operation,
+      bulkOperationIndex: ctx?.bulkOperationIndex,
     };
 
     if (ctx?.startTime) {
