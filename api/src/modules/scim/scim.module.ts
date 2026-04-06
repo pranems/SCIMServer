@@ -27,6 +27,7 @@ import { EndpointContextStorage } from '../endpoint/endpoint-context.storage';
 import { ScimContentTypeInterceptor } from './interceptors/scim-content-type.interceptor';
 import { ScimEtagInterceptor } from './interceptors/scim-etag.interceptor';
 import { ScimExceptionFilter } from './filters/scim-exception.filter';
+import { GlobalExceptionFilter } from './filters/global-exception.filter';
 import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-type-validation.middleware';
 
 @Module({
@@ -55,6 +56,14 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     EndpointScimGenericService,
     BulkProcessorService,
     EndpointContextStorage,
+    // Exception filters: NestJS applies APP_FILTERs in reverse order (last registered = runs first).
+    // GlobalExceptionFilter catches non-HttpException errors (raw Error, TypeError, PrismaError).
+    // ScimExceptionFilter catches HttpException and formats as SCIM error.
+    // Registration order: Global first, then Scim — so Scim runs first, Global is the fallback.
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter
+    },
     {
       provide: APP_FILTER,
       useClass: ScimExceptionFilter
