@@ -1,12 +1,16 @@
-﻿import { Injectable, OnModuleDestroy, OnModuleInit, Logger } from '@nestjs/common';
+﻿import { Injectable, OnModuleDestroy, OnModuleInit, Inject, Optional } from '@nestjs/common';
 import { PrismaClient } from '../../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
+import { ScimLogger } from '../logging/scim-logger.service';
+import { LogCategory } from '../logging/log-levels';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(PrismaService.name);
   private readonly pool: pg.Pool;
+
+  @Optional() @Inject(ScimLogger)
+  private readonly scimLogger?: ScimLogger;
 
   constructor() {
     // Phase 3: PostgreSQL via @prisma/adapter-pg (Prisma 7 requires driver adapter).
@@ -35,12 +39,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     // When using InMemory backend, PostgreSQL may not be available — skip connection
     const backend = process.env.PERSISTENCE_BACKEND?.toLowerCase();
     if (backend === 'inmemory') {
-      this.logger.warn('PERSISTENCE_BACKEND=inmemory — skipping PostgreSQL connection');
+      this.scimLogger?.warn(LogCategory.DATABASE, 'PERSISTENCE_BACKEND=inmemory — skipping PostgreSQL connection');
       return;
     }
     await this.$connect();
-    this.logger.log('PostgreSQL connected successfully');
-    this.logger.log(`Using database: ${process.env.DATABASE_URL || 'postgresql://scim:scim@localhost:5432/scimdb (fallback)'}`);
+    this.scimLogger?.info(LogCategory.DATABASE, 'PostgreSQL connected successfully');
+    this.scimLogger?.info(LogCategory.DATABASE, `Using database: ${process.env.DATABASE_URL || 'postgresql://scim:scim@localhost:5432/scimdb (fallback)'}`);
   }
 
   async onModuleDestroy(): Promise<void> {

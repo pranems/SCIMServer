@@ -119,6 +119,7 @@ export class SharedSecretGuard implements CanActivate {
         request.oauth = payload;
         request.authType = 'oauth';
 
+        this.logger.enrichContext({ authType: 'oauth', authClientId: payload.client_id });
         this.logger.info(LogCategory.AUTH, 'OAuth 2.0 authentication successful', {
           clientId: payload.client_id,
         });
@@ -133,6 +134,7 @@ export class SharedSecretGuard implements CanActivate {
     if (token === expectedSecret) {
       this.logger.info(LogCategory.AUTH, 'Legacy bearer token authentication successful');
       request.authType = 'legacy';
+      this.logger.enrichContext({ authType: 'legacy' });
       return true;
     }
 
@@ -189,6 +191,7 @@ export class SharedSecretGuard implements CanActivate {
         if (isMatch) {
           request.authType = 'endpoint_credential';
           request.authCredentialId = cred.id;
+          this.logger.enrichContext({ authType: 'endpoint_credential', authCredentialId: cred.id });
           this.logger.info(LogCategory.AUTH, 'Per-endpoint credential authentication successful', {
             endpointId,
             credentialId: cred.id,

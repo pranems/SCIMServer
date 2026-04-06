@@ -137,9 +137,8 @@ describe('InMemoryGenericResourceRepository', () => {
       expect(found).toBeNull();
     });
 
-    it('should no-op for non-existent id (void return)', async () => {
-      // delete returns void per interface contract
-      await expect(repo.delete('non-existent')).resolves.toBeUndefined();
+    it('should throw RepositoryError when deleting non-existent id', async () => {
+      await expect(repo.delete('non-existent')).rejects.toThrow('GenericResource with id "non-existent" not found.');
     });
   });
 

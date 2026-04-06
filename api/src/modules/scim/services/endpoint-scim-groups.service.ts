@@ -43,6 +43,7 @@ import {
   guardSoftDeleted,
   ScimSchemaHelpers,
   assertSchemaUniqueness,
+  handleRepositoryError,
 } from '../common/scim-service-helpers';
 
 interface ListGroupsParams {
@@ -168,12 +169,21 @@ export class EndpointScimGroupsService {
       }),
     };
 
-    const group = await this.groupRepo.create(input);
+    let group;
+    try {
+      group = await this.groupRepo.create(input);
+    } catch (error) {
+      handleRepositoryError(error, 'create group', this.logger, LogCategory.SCIM_GROUP, { displayName: dto.displayName, endpointId });
+    }
 
     const members = dto.members ?? [];
     if (members.length > 0) {
       const memberInputs = await this.resolveMemberInputs(members, endpointId);
-      await this.groupRepo.addMembers(String(group.id), memberInputs);
+      try {
+        await this.groupRepo.addMembers(String(group.id), memberInputs);
+      } catch (error) {
+        handleRepositoryError(error, 'add members to group', this.logger, LogCategory.SCIM_GROUP, { scimId, endpointId });
+      }
     }
 
     const withMembers = await this.groupRepo.findWithMembers(endpointId, String(group.scimId));
@@ -415,11 +425,7 @@ export class EndpointScimGroupsService {
         })
       }, memberInputs);
     } catch (error) {
-      this.logger.error(LogCategory.SCIM_PATCH, 'Transaction failed during group patch', { scimId, endpointId, error: String(error) });
-      throw createScimError({
-        status: 500,
-        detail: `Failed to update group: ${error instanceof Error ? error.message : 'transaction error'}`,
-      });
+      handleRepositoryError(error, 'patch group (transaction)', this.logger, LogCategory.SCIM_PATCH, { scimId, endpointId });
     }
 
     // RFC 7644 §3.5.2: Return the updated resource with 200 OK
@@ -510,11 +516,7 @@ export class EndpointScimGroupsService {
         })
       }, replaceMemberInputs);
     } catch (error) {
-      this.logger.error(LogCategory.SCIM_GROUP, 'Transaction failed during group replace', { scimId, endpointId, error: String(error) });
-      throw createScimError({
-        status: 500,
-        detail: `Failed to replace group: ${error instanceof Error ? error.message : 'transaction error'}`,
-      });
+      handleRepositoryError(error, 'replace group (transaction)', this.logger, LogCategory.SCIM_GROUP, { scimId, endpointId });
     }
 
     // Return updated group
@@ -545,10 +547,18 @@ export class EndpointScimGroupsService {
 
     if (softDelete) {
       this.logger.info(LogCategory.SCIM_GROUP, 'Soft-deleting group (setting active=false + deletedAt)', { scimId, endpointId });
-      await this.groupRepo.update(group.id, { active: false, deletedAt: new Date() });
+      try {
+        await this.groupRepo.update(group.id, { active: false, deletedAt: new Date() });
+      } catch (error) {
+        handleRepositoryError(error, 'soft-delete group', this.logger, LogCategory.SCIM_GROUP, { scimId, endpointId });
+      }
       this.logger.info(LogCategory.SCIM_GROUP, 'Group soft-deleted', { scimId, endpointId });
     } else {
-      await this.groupRepo.delete(group.id);
+      try {
+        await this.groupRepo.delete(group.id);
+      } catch (error) {
+        handleRepositoryError(error, 'delete group', this.logger, LogCategory.SCIM_GROUP, { scimId, endpointId });
+      }
       this.logger.info(LogCategory.SCIM_GROUP, 'Group hard-deleted', { scimId, endpointId });
     }
   }
@@ -585,18 +595,22 @@ export class EndpointScimGroupsService {
       : [];
 
     // Update group fields + replace members atomically
-    await this.groupRepo.updateGroupWithMembers(existing.id, {
-      displayName: dto.displayName,
-      externalId,
-      active: true,
-      deletedAt: null,  // Clear soft-delete marker on re-provisioning
-      rawPayload: JSON.stringify(sanitizedPayload),
-      meta: JSON.stringify({
-        resourceType: 'Group',
-        created: (existingMeta.created as string) ?? now.toISOString(),
-        lastModified: now.toISOString(),
-      }),
-    }, memberInputs);
+    try {
+      await this.groupRepo.updateGroupWithMembers(existing.id, {
+        displayName: dto.displayName,
+        externalId,
+        active: true,
+        deletedAt: null,  // Clear soft-delete marker on re-provisioning
+        rawPayload: JSON.stringify(sanitizedPayload),
+        meta: JSON.stringify({
+          resourceType: 'Group',
+          created: (existingMeta.created as string) ?? now.toISOString(),
+          lastModified: now.toISOString(),
+        }),
+      }, memberInputs);
+    } catch (error) {
+      handleRepositoryError(error, 'reprovision group', this.logger, LogCategory.SCIM_GROUP, { scimId: existingScimId, endpointId });
+    }
 
     const withMembers = await this.groupRepo.findWithMembers(endpointId, existingScimId);
     this.logger.info(LogCategory.SCIM_GROUP, 'Group re-provisioned (soft-deleted resource reactivated)', {

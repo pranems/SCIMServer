@@ -1,6 +1,7 @@
 import { HttpException } from '@nestjs/common';
 import { ScimDiscoveryService } from './scim-discovery.service';
 import { ScimSchemaRegistry } from './scim-schema-registry';
+import { ScimLogger } from '../../logging/scim-logger.service';
 import {
   SCIM_CORE_USER_SCHEMA,
   SCIM_CORE_GROUP_SCHEMA,
@@ -10,12 +11,26 @@ import {
   KNOWN_EXTENSION_URNS,
 } from '../common/scim-constants';
 
+const mockScimLogger = {
+  trace: jest.fn(),
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  fatal: jest.fn(),
+  isEnabled: jest.fn().mockReturnValue(true),
+  getConfig: jest.fn().mockReturnValue({}),
+  runWithContext: jest.fn((ctx, fn) => fn()),
+  getContext: jest.fn(),
+  enrichContext: jest.fn(),
+} as unknown as ScimLogger;
+
 describe('ScimDiscoveryService', () => {
   let service: ScimDiscoveryService;
   let registry: ScimSchemaRegistry;
 
   beforeEach(async () => {
-    registry = new ScimSchemaRegistry();
+    registry = new ScimSchemaRegistry(mockScimLogger);
     await registry.onModuleInit();
     service = new ScimDiscoveryService(registry);
   });

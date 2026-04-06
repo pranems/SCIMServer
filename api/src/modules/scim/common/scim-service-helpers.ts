@@ -26,6 +26,48 @@ import type { LogCategory } from '../../logging/log-levels';
 import type { PatchOperation } from '../../../domain/patch/patch-types';
 import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-parser';
 import type { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
+import { RepositoryError, repositoryErrorToHttpStatus } from '../../../domain/errors/repository-error';
+
+// ─── Repository Error Handling ──────────────────────────────────────────────
+
+/**
+ * Handle a RepositoryError from a write operation: log at ERROR and re-throw
+ * as a SCIM-compliant HttpException.
+ *
+ * This is the central bridge between the domain error boundary (RepositoryError)
+ * and the SCIM error format. All three SCIM services use this for create/update/delete.
+ *
+ * If the error is NOT a RepositoryError (unexpected), it is re-thrown as-is
+ * and will be caught by the GlobalExceptionFilter (Step 1).
+ *
+ * @param error        The caught error from a repository call
+ * @param operation    Human-readable operation description (e.g., 'create user')
+ * @param logger       ScimLogger instance
+ * @param logCategory  LogCategory for the error entry (SCIM_USER, SCIM_GROUP, etc.)
+ * @param context      Additional structured data for the error log
+ */
+export function handleRepositoryError(
+  error: unknown,
+  operation: string,
+  logger: ScimLogger,
+  logCategory: LogCategory,
+  context: Record<string, unknown> = {},
+): never {
+  if (error instanceof RepositoryError) {
+    logger.error(logCategory, `Repository failure: ${operation}`, error.cause ?? error, {
+      operation,
+      errorCode: error.code,
+      ...context,
+    });
+    throw createScimError({
+      status: repositoryErrorToHttpStatus(error.code),
+      detail: `Failed to ${operation}: ${error.message}`,
+      diagnostics: { triggeredBy: 'database' },
+    });
+  }
+  // Non-RepositoryError — re-throw for GlobalExceptionFilter
+  throw error;
+}
 
 // ─── Cache Helpers ──────────────────────────────────────────────────────────
 
@@ -107,6 +149,7 @@ export function enforceIfMatch(
         status: 428,
         detail:
           'If-Match header is required for this operation. Include the resource ETag (e.g., If-Match: W/"v1").',
+        diagnostics: { triggeredBy: 'RequireIfMatch' },
       });
     }
     return;
@@ -765,6 +808,7 @@ export class ScimSchemaHelpers {
             detail:
               `Extension URN "${key}" found in request body but not declared in schemas[]. ` +
               `When StrictSchemaValidation is enabled, all extension URNs must be listed in the schemas array.`,
+            diagnostics: { triggeredBy: 'StrictSchemaValidation' },
           });
         }
         if (!registeredLower.has(keyLower)) {
@@ -774,6 +818,7 @@ export class ScimSchemaHelpers {
             detail:
               `Extension URN "${key}" is not a registered extension schema for this endpoint. ` +
               `Registered extensions: [${registeredUrns.join(', ')}].`,
+            diagnostics: { triggeredBy: 'StrictSchemaValidation' },
           });
         }
       }
@@ -818,6 +863,7 @@ export class ScimSchemaHelpers {
         status: 400,
         scimType: result.errors[0]?.scimType ?? 'invalidValue',
         detail: `Schema validation failed: ${details}`,
+        diagnostics: { triggeredBy: 'StrictSchemaValidation' },
       });
     }
   }
@@ -1044,6 +1090,7 @@ export class ScimSchemaHelpers {
         status: 400,
         scimType: 'invalidFilter',
         detail: `Filter validation failed: ${details}`,
+        diagnostics: { triggeredBy: 'StrictSchemaValidation' },
       });
     }
   }
@@ -1163,6 +1210,7 @@ export class ScimSchemaHelpers {
         status: 400,
         scimType: 'mutability',
         detail: `Immutable attribute violation: ${details}`,
+        diagnostics: { triggeredBy: 'StrictSchemaValidation' },
       });
     }
   }

@@ -3,6 +3,7 @@
  */
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { AdminCredentialController } from './admin-credential.controller';
+import { ScimLogger } from '../../logging/scim-logger.service';
 
 // Mock bcrypt
 jest.mock('bcrypt', () => ({
@@ -58,9 +59,24 @@ describe('AdminCredentialController', () => {
       getEndpoint: jest.fn().mockResolvedValue(mockEndpoint),
     };
 
+    const mockScimLogger = {
+      trace: jest.fn(),
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      fatal: jest.fn(),
+      isEnabled: jest.fn().mockReturnValue(true),
+      getConfig: jest.fn().mockReturnValue({}),
+      runWithContext: jest.fn((ctx, fn) => fn()),
+      getContext: jest.fn(),
+      enrichContext: jest.fn(),
+    } as unknown as ScimLogger;
+
     controller = new AdminCredentialController(
       mockCredentialRepo as any,
       mockEndpointService as any,
+      mockScimLogger,
     );
   });
 

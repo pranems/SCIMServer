@@ -2,12 +2,27 @@ import { HttpException } from '@nestjs/common';
 import { SchemasController } from './schemas.controller';
 import { ScimDiscoveryService } from '../discovery/scim-discovery.service';
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
+import { ScimLogger } from '../../logging/scim-logger.service';
+
+const mockScimLogger = {
+  trace: jest.fn(),
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  fatal: jest.fn(),
+  isEnabled: jest.fn().mockReturnValue(true),
+  getConfig: jest.fn().mockReturnValue({}),
+  runWithContext: jest.fn((ctx, fn) => fn()),
+  getContext: jest.fn(),
+  enrichContext: jest.fn(),
+} as unknown as ScimLogger;
 
 describe('SchemasController', () => {
   let controller: SchemasController;
 
   beforeEach(async () => {
-    const registry = new ScimSchemaRegistry();
+    const registry = new ScimSchemaRegistry(mockScimLogger);
     await registry.onModuleInit();
     const discoveryService = new ScimDiscoveryService(registry);
     controller = new SchemasController(discoveryService);

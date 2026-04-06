@@ -1617,4 +1617,102 @@ describe('EndpointScimGenericService', () => {
       }
     });
   });
+
+  // ─── Repository Error Handling (Phase A Step 3) ─────────────────────────
+
+  describe('RepositoryError handling', () => {
+    const { RepositoryError } = require('../../../domain/errors/repository-error');
+
+    const validBody = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:Device'],
+      displayName: 'New Device',
+      serialNumber: 'SN-002',
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockGenericRepo.findByExternalId.mockResolvedValue(null);
+      mockGenericRepo.findByDisplayName.mockResolvedValue(null);
+    });
+
+    it('should convert RepositoryError CONNECTION to 503 on create', async () => {
+      mockGenericRepo.create.mockRejectedValue(new RepositoryError('CONNECTION', 'DB timeout'));
+
+      try {
+        await service.createResource(validBody, baseUrl, endpointId, deviceResourceType);
+        fail('Expected HttpException');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(503);
+        expect(e.getResponse().detail).toContain('create Device');
+      }
+    });
+
+    it('should convert RepositoryError NOT_FOUND to 404 on update', async () => {
+      mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
+      mockGenericRepo.update.mockRejectedValue(new RepositoryError('NOT_FOUND', 'not found'));
+
+      try {
+        await service.replaceResource('scim-dev-001', validBody, baseUrl, endpointId, deviceResourceType);
+        fail('Expected HttpException');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(404);
+      }
+    });
+
+    it('should convert RepositoryError NOT_FOUND to 404 on delete', async () => {
+      mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
+      mockGenericRepo.delete.mockRejectedValue(new RepositoryError('NOT_FOUND', 'not found'));
+
+      try {
+        await service.deleteResource('scim-dev-001', endpointId, deviceResourceType);
+        fail('Expected HttpException');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(404);
+      }
+    });
+
+    it('should re-throw non-RepositoryError (for GlobalExceptionFilter)', async () => {
+      mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
+      mockGenericRepo.update.mockRejectedValue(new TypeError('unexpected'));
+
+      await expect(
+        service.replaceResource('scim-dev-001', validBody, baseUrl, endpointId, deviceResourceType),
+      ).rejects.toThrow(TypeError);
+    });
+  });
+
+  // ─── Silent Catch Logging (Phase B Step 7) ──────────────────────────
+
+  describe('corrupt data logging', () => {
+    it('should log WARN and return response for corrupt rawPayload in toScimResponse', async () => {
+      const corruptRecord = {
+        ...mockGenericRecord,
+        rawPayload: 'NOT VALID JSON{{{',
+      };
+      mockGenericRepo.findByScimId.mockResolvedValue(corruptRecord);
+
+      const result = await service.getResource(
+        'scim-dev-001', baseUrl, endpointId, deviceResourceType,
+      );
+
+      // Should not throw — falls back to empty payload
+      expect(result).toBeDefined();
+      expect(result.id).toBe('scim-dev-001');
+    });
+
+    it('should log WARN and return response for corrupt meta in toScimResponse', async () => {
+      const corruptRecord = {
+        ...mockGenericRecord,
+        meta: 'INVALID META JSON',
+      };
+      mockGenericRepo.findByScimId.mockResolvedValue(corruptRecord);
+
+      const result = await service.getResource(
+        'scim-dev-001', baseUrl, endpointId, deviceResourceType,
+      );
+
+      expect(result).toBeDefined();
+      expect(result.meta).toBeDefined();
+    });
+  });
 });

@@ -7330,6 +7330,121 @@ if ($gfEpId) {
 Write-Host "`n--- 9z-F: Generic Filter Operator Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-G: SCIM ERROR FORMAT COMPLIANCE (Phase A)
+$script:currentSection = "9z-G: Error Format"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-G: SCIM ERROR FORMAT COMPLIANCE" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Test: 404 error body has SCIM Error schema
+Write-Host "`n--- Test: 404 Error Body Format ---" -ForegroundColor Cyan
+try {
+    Invoke-RestMethod -Uri "$scimBase/Users/00000000-0000-0000-0000-000000099999" -Method GET -Headers $headers | Out-Null
+    Test-Result -Success $false -Message "9z-G.1: Should have returned 404"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    $rawBody = $_.ErrorDetails.Message
+    $errOk = $code -eq 404
+    $hasSchema = $false
+    $statusIsString = $false
+    $hasDetail = $false
+    try {
+        $body = $rawBody | ConvertFrom-Json
+        $hasSchema = $body.schemas -contains "urn:ietf:params:scim:api:messages:2.0:Error"
+        $statusIsString = $body.status -is [string] -and $body.status -eq "404"
+        $hasDetail = -not [string]::IsNullOrWhiteSpace($body.detail)
+    } catch { }
+    Test-Result -Success ($errOk -and $hasSchema) -Message "9z-G.1: 404 includes SCIM Error schema"
+    Test-Result -Success $statusIsString -Message "9z-G.2: status field is string '404' (RFC 7644 S3.12)"
+    Test-Result -Success $hasDetail -Message "9z-G.3: error body has detail field"
+}
+
+# Test: 409 uniqueness error has scimType
+Write-Host "`n--- Test: 409 Uniqueness Error Format ---" -ForegroundColor Cyan
+$dupUserName = "error-format-test-$(Get-Random)@test.com"
+$dupUserBody = @{schemas=@("urn:ietf:params:scim:schemas:core:2.0:User"); userName=$dupUserName; active=$true} | ConvertTo-Json
+try {
+    Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $dupUserBody | Out-Null
+} catch { }
+try {
+    Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $dupUserBody | Out-Null
+    Test-Result -Success $false -Message "9z-G.4: Should have returned 409"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    $rawBody = $_.ErrorDetails.Message
+    $hasScimType = $false
+    $scimTypeCorrect = $false
+    try {
+        $body = $rawBody | ConvertFrom-Json
+        $hasScimType = -not [string]::IsNullOrWhiteSpace($body.scimType)
+        $scimTypeCorrect = $body.scimType -eq "uniqueness"
+    } catch { }
+    Test-Result -Success ($code -eq 409 -and $hasScimType) -Message "9z-G.4: 409 has scimType field"
+    Test-Result -Success $scimTypeCorrect -Message "9z-G.5: scimType is 'uniqueness' for duplicate"
+}
+
+# Test: Error response Content-Type is application/scim+json
+Write-Host "`n--- Test: Error Content-Type ---" -ForegroundColor Cyan
+try {
+    Invoke-RestMethod -Uri "$scimBase/Users/00000000-0000-0000-0000-000000099999" -Method GET -Headers $headers | Out-Null
+    Test-Result -Success $false -Message "9z-G.6: Should have returned 404"
+} catch {
+    $ct = $_.Exception.Response.Content.Headers.ContentType.MediaType
+    $isScimJson = $ct -eq "application/scim+json"
+    Test-Result -Success $isScimJson -Message "9z-G.6: Error Content-Type is application/scim+json"
+}
+
+# Test: X-Request-Id is present on error responses
+Write-Host "`n--- Test: X-Request-Id on Errors ---" -ForegroundColor Cyan
+try {
+    $resp = Invoke-WebRequest -Uri "$scimBase/Users/00000000-0000-0000-0000-000000099999" -Method GET -Headers $headers -ErrorAction Stop
+    Test-Result -Success $false -Message "9z-G.7: Should have returned 404"
+} catch {
+    $hasReqId = $false
+    try {
+        $respHeaders = $_.Exception.Response.Headers
+        # Check for X-Request-Id in response headers
+        $reqId = $null
+        foreach ($key in $respHeaders.GetEnumerator()) {
+            if ($key.Key -eq "X-Request-Id") { $reqId = $key.Value; break }
+        }
+        $hasReqId = -not [string]::IsNullOrWhiteSpace($reqId)
+    } catch { }
+    Test-Result -Success $hasReqId -Message "9z-G.7: X-Request-Id header present on error responses"
+}
+
+# Test: Diagnostics extension in error responses
+Write-Host "`n--- Test: Diagnostics Extension in Error Body ---" -ForegroundColor Cyan
+try {
+    Invoke-RestMethod -Uri "$scimBase/Users/00000000-0000-0000-0000-000000099999" -Method GET -Headers $headers | Out-Null
+    Test-Result -Success $false -Message "9z-G.8: Should have returned 404"
+} catch {
+    $rawBody = $_.ErrorDetails.Message
+    $hasDiag = $false
+    $diagHasRequestId = $false
+    $diagHasEndpointId = $false
+    $diagHasLogsUrl = $false
+    try {
+        $body = $rawBody | ConvertFrom-Json
+        $diagUrn = "urn:scimserver:api:messages:2.0:Diagnostics"
+        $diag = $body.$diagUrn
+        $hasDiag = $null -ne $diag
+        if ($hasDiag) {
+            $diagHasRequestId = -not [string]::IsNullOrWhiteSpace($diag.requestId)
+            $diagHasEndpointId = -not [string]::IsNullOrWhiteSpace($diag.endpointId)
+            $diagHasLogsUrl = -not [string]::IsNullOrWhiteSpace($diag.logsUrl)
+        }
+    } catch { }
+    Test-Result -Success $hasDiag -Message "9z-G.8: Error body includes Diagnostics extension URN"
+    Test-Result -Success $diagHasRequestId -Message "9z-G.9: Diagnostics has requestId"
+    Test-Result -Success $diagHasEndpointId -Message "9z-G.10: Diagnostics has endpointId"
+    Test-Result -Success $diagHasLogsUrl -Message "9z-G.11: Diagnostics has logsUrl"
+}
+
+Write-Host "`n--- 9z-G: SCIM Error Format Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

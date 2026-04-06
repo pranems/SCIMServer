@@ -2952,4 +2952,86 @@ describe('EndpointScimGroupsService', () => {
       });
     });
   });
+
+  // ─── Repository Error Handling (Phase A Step 3) ─────────────────────────
+
+  describe('RepositoryError handling', () => {
+    const { RepositoryError } = require('../../../domain/errors/repository-error');
+    const baseUrl = 'https://example.com/scim/endpoints/endpoint-1';
+    const endpointId = 'endpoint-1';
+
+    const validGroupDto = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+      displayName: 'Test Group',
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockGroupRepo.findByDisplayName.mockResolvedValue(null);
+      mockGroupRepo.findByExternalId.mockResolvedValue(null);
+    });
+
+    it('should convert RepositoryError NOT_FOUND to 404 on delete', async () => {
+      mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+      mockGroupRepo.delete.mockRejectedValue(new RepositoryError('NOT_FOUND', 'Group not found'));
+
+      await expect(
+        service.deleteGroupForEndpoint(mockGroup.scimId, endpointId),
+      ).rejects.toThrow(HttpException);
+
+      try {
+        await service.deleteGroupForEndpoint(mockGroup.scimId, endpointId);
+      } catch (e) {
+        expect((e as HttpException).getStatus()).toBe(404);
+      }
+    });
+
+    it('should convert RepositoryError CONNECTION to 503 on create', async () => {
+      mockGroupRepo.create.mockRejectedValue(new RepositoryError('CONNECTION', 'DB timeout'));
+
+      await expect(
+        service.createGroupForEndpoint(validGroupDto as any, baseUrl, endpointId),
+      ).rejects.toThrow(HttpException);
+
+      try {
+        await service.createGroupForEndpoint(validGroupDto as any, baseUrl, endpointId);
+      } catch (e) {
+        expect((e as HttpException).getStatus()).toBe(503);
+      }
+    });
+
+    it('should convert RepositoryError on updateGroupWithMembers during PATCH', async () => {
+      const patchDto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', value: { displayName: 'Patched' } }],
+      };
+
+      mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
+      mockGroupRepo.findByDisplayName.mockResolvedValue(null);
+      mockGroupRepo.updateGroupWithMembers.mockRejectedValue(
+        new RepositoryError('UNKNOWN', 'transaction rollback'),
+      );
+
+      await expect(
+        service.patchGroupForEndpoint(mockGroup.scimId, patchDto as any, baseUrl, endpointId),
+      ).rejects.toThrow(HttpException);
+
+      try {
+        await service.patchGroupForEndpoint(mockGroup.scimId, patchDto as any, baseUrl, endpointId);
+      } catch (e) {
+        expect((e as HttpException).getStatus()).toBe(500);
+        const body = (e as HttpException).getResponse() as Record<string, unknown>;
+        expect(body.detail).toContain('patch group');
+      }
+    });
+
+    it('should re-throw non-RepositoryError (for GlobalExceptionFilter)', async () => {
+      mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+      mockGroupRepo.delete.mockRejectedValue(new TypeError('unexpected'));
+
+      await expect(
+        service.deleteGroupForEndpoint(mockGroup.scimId, endpointId),
+      ).rejects.toThrow(TypeError);
+    });
+  });
 });

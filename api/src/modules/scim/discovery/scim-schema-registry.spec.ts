@@ -1,10 +1,25 @@
 import { ScimSchemaRegistry } from './scim-schema-registry';
+import { ScimLogger } from '../../logging/scim-logger.service';
+
+const mockScimLogger = {
+  trace: jest.fn(),
+  debug: jest.fn(),
+  info: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn(),
+  fatal: jest.fn(),
+  isEnabled: jest.fn().mockReturnValue(true),
+  getConfig: jest.fn().mockReturnValue({}),
+  runWithContext: jest.fn((ctx, fn) => fn()),
+  getContext: jest.fn(),
+  enrichContext: jest.fn(),
+} as unknown as ScimLogger;
 
 describe('ScimSchemaRegistry (minimal - Phase 14.4)', () => {
   let registry: ScimSchemaRegistry;
 
   beforeEach(() => {
-    registry = new ScimSchemaRegistry();
+    registry = new ScimSchemaRegistry(mockScimLogger);
   });
 
   describe('before onModuleInit', () => {

@@ -1,8 +1,10 @@
-﻿import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+﻿import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import type { Prisma } from '../../generated/prisma/client';
 import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../prisma/prisma.service';
+import { ScimLogger } from './scim-logger.service';
+import { LogCategory } from './log-levels';
 
 export interface CreateRequestLogOptions {
   method: string;
@@ -18,7 +20,6 @@ export interface CreateRequestLogOptions {
 
 @Injectable()
 export class LoggingService implements OnModuleDestroy {
-  private readonly logger = new Logger(LoggingService.name);
   private readonly isInMemoryBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() === 'inmemory';
 
   // ── Buffered logging for performance ──
@@ -47,7 +48,10 @@ export class LoggingService implements OnModuleDestroy {
     identifier: string | null;
   }> = [];
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly logger: ScimLogger,
+  ) {}
 
   /**
    * Buffer a request log entry. The entry is written to the DB asynchronously
@@ -75,7 +79,9 @@ export class LoggingService implements OnModuleDestroy {
             this.normalizeObject(responseBody) ?? null
           ) : undefined) || this.deriveIdentifierFromUrl(url);
         if (idCandidate && typeof idCandidate === 'string') identifier = idCandidate;
-      } catch { /* swallow */ }
+      } catch (e) {
+        this.logger.debug(LogCategory.DATABASE, 'Identifier derivation failed (inmemory)', { url, error: (e as Error).message });
+      }
 
       this.inMemoryLogRows.push({
         id: randomUUID(),
@@ -106,7 +112,9 @@ export class LoggingService implements OnModuleDestroy {
           this.normalizeObject(responseBody) ?? null
         ) : undefined) || this.deriveIdentifierFromUrl(url);
       if (idCandidate && typeof idCandidate === 'string') identifier = idCandidate;
-    } catch {/* swallow */}
+    } catch (e) {
+      this.logger.debug(LogCategory.DATABASE, 'Identifier derivation failed', { url, error: (e as Error).message });
+    }
 
     const data: Prisma.RequestLogCreateInput & { _identifier?: string } = {
       method,
@@ -189,7 +197,7 @@ export class LoggingService implements OnModuleDestroy {
         }
       }
     } catch (persistError) {
-      this.logger.error('Failed to flush request log batch', persistError as Error);
+      this.logger.error(LogCategory.DATABASE, 'Failed to flush request log batch', persistError as Error);
     } finally {
       this.flushInProgress = false;
     }
@@ -341,7 +349,7 @@ export class LoggingService implements OnModuleDestroy {
     if (isInvalidDate(filters.since) || isInvalidDate(filters.until)) {
       const sinceStr = filters.since ? String(filters.since) : 'undefined';
       const untilStr = filters.until ? String(filters.until) : 'undefined';
-      this.logger.warn(`Ignoring invalid date filter(s): since='${sinceStr}' until='${untilStr}'`);
+      this.logger.warn(LogCategory.DATABASE, `Ignoring invalid date filter(s): since='${sinceStr}' until='${untilStr}'`);
       if (where.createdAt && Object.keys(where.createdAt as object).length === 0) {
         delete where.createdAt; // remove empty date filter
       }
@@ -380,9 +388,10 @@ export class LoggingService implements OnModuleDestroy {
       ]);
     } catch (err) {
       this.logger.error(
+        LogCategory.DATABASE,
         'requestLog.findMany failed',
         err as Error,
-        JSON.stringify({ where, page, pageSize })
+        { where: JSON.stringify(where), page, pageSize },
       );
       throw err; // rethrow for controller to handle
     }
@@ -398,7 +407,13 @@ export class LoggingService implements OnModuleDestroy {
         );
         for (const row of rows) identifierMap[row.id] = row.identifier;
       }
-    } catch { /* column might not exist yet or query failed */ }
+    } catch (e) {
+      // Best-effort: identifier backfill column may not exist in early migrations
+      this.logger.debug(LogCategory.DATABASE, 'Identifier backfill query failed', {
+        error: (e as Error).message,
+        recordCount: records.length,
+      });
+    }
 
     // Map records with async user resolution
     const items = await Promise.all(
@@ -641,7 +656,7 @@ export class LoggingService implements OnModuleDestroy {
     try {
       return JSON.stringify(value);
     } catch (error) {
-      this.logger.warn('Failed to stringify log value', error as Error);
+      this.logger.warn(LogCategory.DATABASE, 'Failed to stringify log value', { error: (error as Error).message });
       return null;
     }
   }

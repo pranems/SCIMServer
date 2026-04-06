@@ -1,6 +1,5 @@
 # Phase 3: PostgreSQL-backed SCIMServer
 # Usage: docker compose up --build
-version: '3.8'
 
 services:
   postgres:

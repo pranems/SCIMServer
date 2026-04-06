@@ -2923,4 +2923,75 @@ describe('EndpointScimUsersService', () => {
       });
     });
   });
+
+  // ─── Repository Error Handling (Phase A Step 3) ─────────────────────────
+
+  describe('RepositoryError handling', () => {
+    const { RepositoryError } = require('../../../domain/errors/repository-error');
+    const baseUrl = 'https://example.com/scim/endpoints/endpoint-1';
+    const endpointId = 'endpoint-1';
+
+    const validCreateDto = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+      userName: 'alice@example.com',
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockUserRepo.findConflict.mockResolvedValue(null);
+    });
+
+    it('should convert RepositoryError NOT_FOUND to 404 on update', async () => {
+      mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+      mockUserRepo.update.mockRejectedValue(new RepositoryError('NOT_FOUND', 'User not found'));
+
+      await expect(
+        service.replaceUserForEndpoint('scim-123', validCreateDto as any, baseUrl, endpointId),
+      ).rejects.toThrow(HttpException);
+
+      try {
+        await service.replaceUserForEndpoint('scim-123', validCreateDto as any, baseUrl, endpointId);
+      } catch (e) {
+        expect((e as HttpException).getStatus()).toBe(404);
+      }
+    });
+
+    it('should convert RepositoryError CONNECTION to 503 on create', async () => {
+      mockUserRepo.create.mockRejectedValue(new RepositoryError('CONNECTION', 'DB timeout'));
+
+      await expect(
+        service.createUserForEndpoint(validCreateDto as any, baseUrl, endpointId),
+      ).rejects.toThrow(HttpException);
+
+      try {
+        await service.createUserForEndpoint(validCreateDto as any, baseUrl, endpointId);
+      } catch (e) {
+        expect((e as HttpException).getStatus()).toBe(503);
+      }
+    });
+
+    it('should convert RepositoryError NOT_FOUND to 404 on delete', async () => {
+      mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+      mockUserRepo.delete.mockRejectedValue(new RepositoryError('NOT_FOUND', 'User not found'));
+
+      await expect(
+        service.deleteUserForEndpoint('scim-123', endpointId),
+      ).rejects.toThrow(HttpException);
+
+      try {
+        await service.deleteUserForEndpoint('scim-123', endpointId);
+      } catch (e) {
+        expect((e as HttpException).getStatus()).toBe(404);
+      }
+    });
+
+    it('should re-throw non-RepositoryError (for GlobalExceptionFilter)', async () => {
+      mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+      mockUserRepo.update.mockRejectedValue(new TypeError('unexpected'));
+
+      await expect(
+        service.replaceUserForEndpoint('scim-123', validCreateDto as any, baseUrl, endpointId),
+      ).rejects.toThrow(TypeError);
+    });
+  });
 });

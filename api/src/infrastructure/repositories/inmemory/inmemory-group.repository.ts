@@ -19,6 +19,7 @@ import type {
   MemberRecord,
 } from '../../../domain/models/group.model';
 import { matchesPrismaFilter } from './prisma-filter-evaluator';
+import { RepositoryError } from '../../../domain/errors/repository-error';
 
 @Injectable()
 export class InMemoryGroupRepository implements IGroupRepository {
@@ -99,7 +100,7 @@ export class InMemoryGroupRepository implements IGroupRepository {
   async update(id: string, data: GroupUpdateInput): Promise<GroupRecord> {
     const existing = this.groups.get(id);
     if (!existing) {
-      throw new Error(`Group with id ${id} not found`);
+      throw new RepositoryError('NOT_FOUND', `Group with id ${id} not found`);
     }
     // Phase 7: Increment version for ETag-based concurrency control
     const updated: GroupRecord = {
@@ -113,6 +114,9 @@ export class InMemoryGroupRepository implements IGroupRepository {
   }
 
   async delete(id: string): Promise<void> {
+    if (!this.groups.has(id)) {
+      throw new RepositoryError('NOT_FOUND', `Group with id ${id} not found`);
+    }
     this.groups.delete(id);
     // Cascade: remove associated members
     for (const [memberId, member] of this.members) {

@@ -1229,3 +1229,124 @@ describe('stripReadOnlyAttributes with preCollected', () => {
     expect(stripped1.sort()).toEqual(stripped2.sort());
   });
 });
+
+// ─── handleRepositoryError ──────────────────────────────────────────────────
+
+import { handleRepositoryError } from './scim-service-helpers';
+import { RepositoryError } from '../../../domain/errors/repository-error';
+
+describe('handleRepositoryError', () => {
+  const mockLogger = {
+    trace: jest.fn(),
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    fatal: jest.fn(),
+  } as any;
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('should log at ERROR and throw HttpException for RepositoryError NOT_FOUND', () => {
+    const repoError = new RepositoryError('NOT_FOUND', 'User with id abc not found');
+
+    expect(() => handleRepositoryError(
+      repoError, 'create user', mockLogger, 'scim.user' as any, { endpointId: 'ep-1' },
+    )).toThrow(HttpException);
+
+    expect(mockLogger.error).toHaveBeenCalledTimes(1);
+    const [category, message, , data] = mockLogger.error.mock.calls[0];
+    expect(category).toBe('scim.user');
+    expect(message).toContain('Repository failure');
+    expect(message).toContain('create user');
+    expect(data.errorCode).toBe('NOT_FOUND');
+    expect(data.endpointId).toBe('ep-1');
+  });
+
+  it('should map NOT_FOUND to 404', () => {
+    const repoError = new RepositoryError('NOT_FOUND', 'not found');
+    try {
+      handleRepositoryError(repoError, 'delete user', mockLogger, 'scim.user' as any);
+    } catch (e) {
+      expect((e as HttpException).getStatus()).toBe(404);
+      const body = (e as HttpException).getResponse() as Record<string, unknown>;
+      expect(body.detail).toContain('Failed to delete user');
+    }
+  });
+
+  it('should map CONFLICT to 409', () => {
+    const repoError = new RepositoryError('CONFLICT', 'unique violation');
+    try {
+      handleRepositoryError(repoError, 'create user', mockLogger, 'scim.user' as any);
+    } catch (e) {
+      expect((e as HttpException).getStatus()).toBe(409);
+    }
+  });
+
+  it('should map CONNECTION to 503', () => {
+    const repoError = new RepositoryError('CONNECTION', 'DB timeout');
+    try {
+      handleRepositoryError(repoError, 'update user', mockLogger, 'scim.user' as any);
+    } catch (e) {
+      expect((e as HttpException).getStatus()).toBe(503);
+    }
+  });
+
+  it('should map UNKNOWN to 500', () => {
+    const repoError = new RepositoryError('UNKNOWN', 'unexpected');
+    try {
+      handleRepositoryError(repoError, 'patch user', mockLogger, 'scim.user' as any);
+    } catch (e) {
+      expect((e as HttpException).getStatus()).toBe(500);
+    }
+  });
+
+  it('should include operation context in the error detail', () => {
+    const repoError = new RepositoryError('NOT_FOUND', 'record not found');
+    try {
+      handleRepositoryError(repoError, 'soft-delete group', mockLogger, 'scim.group' as any, { scimId: 'grp-1' });
+    } catch (e) {
+      const body = (e as HttpException).getResponse() as Record<string, unknown>;
+      expect(body.detail).toContain('Failed to soft-delete group');
+      expect(body.detail).toContain('record not found');
+    }
+  });
+
+  it('should pass cause error to logger when available', () => {
+    const cause = new Error('P2025: Record to delete does not exist.');
+    const repoError = new RepositoryError('NOT_FOUND', 'not found', cause);
+
+    try {
+      handleRepositoryError(repoError, 'delete user', mockLogger, 'scim.user' as any);
+    } catch { /* expected */ }
+
+    const errorArg = mockLogger.error.mock.calls[0][2];
+    expect(errorArg).toBe(cause);
+  });
+
+  it('should re-throw non-RepositoryError without logging', () => {
+    const rawError = new TypeError('Cannot read properties of undefined');
+
+    expect(() => handleRepositoryError(
+      rawError, 'create user', mockLogger, 'scim.user' as any,
+    )).toThrow(TypeError);
+
+    // Should NOT log — let GlobalExceptionFilter handle it
+    expect(mockLogger.error).not.toHaveBeenCalled();
+  });
+
+  it('should include additional context in error log data', () => {
+    const repoError = new RepositoryError('UNKNOWN', 'fail');
+    try {
+      handleRepositoryError(repoError, 'create user', mockLogger, 'scim.user' as any, {
+        userName: 'alice', endpointId: 'ep-1',
+      });
+    } catch { /* expected */ }
+
+    const data = mockLogger.error.mock.calls[0][3];
+    expect(data.userName).toBe('alice');
+    expect(data.endpointId).toBe('ep-1');
+    expect(data.operation).toBe('create user');
+    expect(data.errorCode).toBe('UNKNOWN');
+  });
+});

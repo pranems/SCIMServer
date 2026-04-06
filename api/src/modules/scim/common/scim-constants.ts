@@ -9,6 +9,14 @@ export const SCIM_SCHEMA_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:Schema'
 export const SCIM_RESOURCE_TYPE_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:ResourceType';
 export const SCIM_SEARCH_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:SearchRequest';
 
+/**
+ * Custom diagnostics extension URN for SCIM error responses.
+ * Added to error bodies to enable self-service RCA — contains
+ * requestId, endpointId, triggeredBy, and logsUrl.
+ * RFC 7644 §3.12 does not prohibit additional fields in error responses.
+ */
+export const SCIM_DIAGNOSTICS_URN = 'urn:scimserver:api:messages:2.0:Diagnostics';
+
 // ─── Custom Microsoft Test Extension URNs ───────────────────────────────────
 // Hardcoded extension schemas for Microsoft SCIM testing compliance.
 export const MSFTTEST_CUSTOM_USER_SCHEMA = 'urn:msfttest:cloud:scim:schemas:extension:custom:2.0:User';
