@@ -7414,6 +7414,34 @@ try {
     Test-Result -Success $hasReqId -Message "9z-G.7: X-Request-Id header present on error responses"
 }
 
+# Test: Diagnostics extension in error responses
+Write-Host "`n--- Test: Diagnostics Extension in Error Body ---" -ForegroundColor Cyan
+try {
+    Invoke-RestMethod -Uri "$scimBase/Users/00000000-0000-0000-0000-000000099999" -Method GET -Headers $headers | Out-Null
+    Test-Result -Success $false -Message "9z-G.8: Should have returned 404"
+} catch {
+    $rawBody = $_.ErrorDetails.Message
+    $hasDiag = $false
+    $diagHasRequestId = $false
+    $diagHasEndpointId = $false
+    $diagHasLogsUrl = $false
+    try {
+        $body = $rawBody | ConvertFrom-Json
+        $diagUrn = "urn:scimserver:api:messages:2.0:Diagnostics"
+        $diag = $body.$diagUrn
+        $hasDiag = $null -ne $diag
+        if ($hasDiag) {
+            $diagHasRequestId = -not [string]::IsNullOrWhiteSpace($diag.requestId)
+            $diagHasEndpointId = -not [string]::IsNullOrWhiteSpace($diag.endpointId)
+            $diagHasLogsUrl = -not [string]::IsNullOrWhiteSpace($diag.logsUrl)
+        }
+    } catch { }
+    Test-Result -Success $hasDiag -Message "9z-G.8: Error body includes Diagnostics extension URN"
+    Test-Result -Success $diagHasRequestId -Message "9z-G.9: Diagnostics has requestId"
+    Test-Result -Success $diagHasEndpointId -Message "9z-G.10: Diagnostics has endpointId"
+    Test-Result -Success $diagHasLogsUrl -Message "9z-G.11: Diagnostics has logsUrl"
+}
+
 Write-Host "`n--- 9z-G: SCIM Error Format Tests Complete ---" -ForegroundColor Green
 
 # ============================================

@@ -208,4 +208,69 @@ describe('Error Handling & SCIM Error Format (E2E)', () => {
       expect(res.headers['x-request-id']).toBe(clientRequestId);
     });
   });
+
+  // ─── Diagnostics Extension (Phase A Step 4) ──────────────────────
+
+  describe('Diagnostics extension in error responses', () => {
+    const DIAGNOSTICS_URN = 'urn:scimserver:api:messages:2.0:Diagnostics';
+
+    it('404 should include diagnostics extension with requestId and endpointId', async () => {
+      const res = await scimGet(app, `${basePath}/Users/00000000-0000-0000-0000-000000000000`, token);
+
+      expect(res.status).toBe(404);
+      const diag = res.body[DIAGNOSTICS_URN];
+      expect(diag).toBeDefined();
+      expect(diag.requestId).toBeDefined();
+      expect(typeof diag.requestId).toBe('string');
+      expect(diag.requestId.length).toBeGreaterThan(0);
+      expect(diag.endpointId).toBe(endpointId);
+      expect(diag.logsUrl).toBeDefined();
+      expect(diag.logsUrl).toContain(diag.requestId);
+    });
+
+    it('409 uniqueness error should include diagnostics extension', async () => {
+      const user = validUser();
+      await scimPost(app, `${basePath}/Users`, token, user).expect(201);
+      const res = await scimPost(app, `${basePath}/Users`, token, user);
+
+      expect(res.status).toBe(409);
+      const diag = res.body[DIAGNOSTICS_URN];
+      expect(diag).toBeDefined();
+      expect(diag.requestId).toBeDefined();
+      expect(diag.endpointId).toBe(endpointId);
+    });
+
+    it('diagnostics logsUrl should point to endpoint-scoped path', async () => {
+      const res = await scimGet(app, `${basePath}/Users/00000000-0000-0000-0000-000000000000`, token);
+
+      expect(res.status).toBe(404);
+      const diag = res.body[DIAGNOSTICS_URN];
+      expect(diag.logsUrl).toContain(`/scim/endpoints/${endpointId}/logs/recent`);
+    });
+
+    it('diagnostics requestId should match X-Request-Id header', async () => {
+      const clientReqId = 'diag-test-req-id-99999';
+      const res = await request(app.getHttpServer())
+        .get(`${basePath}/Users/00000000-0000-0000-0000-000000000000`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('X-Request-Id', clientReqId);
+
+      expect(res.status).toBe(404);
+      const diag = res.body[DIAGNOSTICS_URN];
+      expect(diag.requestId).toBe(clientReqId);
+      expect(res.headers['x-request-id']).toBe(clientReqId);
+    });
+
+    it('standard SCIM error fields should be preserved alongside diagnostics', async () => {
+      const res = await scimGet(app, `${basePath}/Users/00000000-0000-0000-0000-000000000000`, token);
+
+      expect(res.status).toBe(404);
+      // Standard fields
+      expect(res.body.schemas).toEqual([SCIM_ERROR_SCHEMA]);
+      expect(res.body.status).toBe('404');
+      expect(res.body.detail).toBeDefined();
+      // Diagnostics alongside
+      expect(res.body[DIAGNOSTICS_URN]).toBeDefined();
+    });
+  });
 });

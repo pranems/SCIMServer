@@ -61,4 +61,117 @@ describe('createScimError', () => {
       expect(body.status).toBe(String(status));
     }
   });
+
+  // ─── Diagnostics Extension (Phase A Step 4) ────────────────────────────
+
+  describe('diagnostics extension', () => {
+    const DIAGNOSTICS_URN = 'urn:scimserver:api:messages:2.0:Diagnostics';
+
+    it('should include diagnostics extension when triggeredBy is provided', () => {
+      const err = createScimError({
+        status: 400,
+        detail: 'Schema validation failed',
+        diagnostics: { triggeredBy: 'StrictSchemaValidation' },
+      });
+      const body = err.getResponse() as Record<string, unknown>;
+      const diag = body[DIAGNOSTICS_URN] as Record<string, unknown>;
+      expect(diag).toBeDefined();
+      expect(diag.triggeredBy).toBe('StrictSchemaValidation');
+    });
+
+    it('should not include diagnostics extension when no context and no diagnostics', () => {
+      // Outside request scope — no correlation context
+      const err = createScimError({ status: 400, detail: 'test' });
+      const body = err.getResponse() as Record<string, unknown>;
+      expect(body[DIAGNOSTICS_URN]).toBeUndefined();
+    });
+
+    it('should include extra fields in diagnostics', () => {
+      const err = createScimError({
+        status: 500,
+        detail: 'DB error',
+        diagnostics: { triggeredBy: 'database', extra: { errorCode: 'CONNECTION' } },
+      });
+      const body = err.getResponse() as Record<string, unknown>;
+      const diag = body[DIAGNOSTICS_URN] as Record<string, unknown>;
+      expect(diag).toBeDefined();
+      expect(diag.triggeredBy).toBe('database');
+      expect(diag.errorCode).toBe('CONNECTION');
+    });
+
+    it('should auto-enrich with requestId and endpointId from correlation context', () => {
+      // Simulate being inside a request scope
+      const { AsyncLocalStorage } = require('async_hooks');
+      const { getCorrelationContext } = require('../../logging/scim-logger.service');
+
+      // We need to use ScimLogger's runWithContext — but since createScimError reads
+      // the module-level correlationStorage directly via getCorrelationContext(),
+      // we verify it works by calling within a ScimLogger context.
+      const ScimLoggerModule = require('../../logging/scim-logger.service');
+      const logger = new ScimLoggerModule.ScimLogger();
+
+      let body: Record<string, unknown> | undefined;
+      logger.runWithContext(
+        { requestId: 'test-req-id', endpointId: 'ep-test-123' },
+        () => {
+          const err = createScimError({
+            status: 400,
+            detail: 'Schema validation failed',
+            diagnostics: { triggeredBy: 'StrictSchemaValidation' },
+          });
+          body = err.getResponse() as Record<string, unknown>;
+        },
+      );
+
+      const diag = body![DIAGNOSTICS_URN] as Record<string, unknown>;
+      expect(diag).toBeDefined();
+      expect(diag.requestId).toBe('test-req-id');
+      expect(diag.endpointId).toBe('ep-test-123');
+      expect(diag.triggeredBy).toBe('StrictSchemaValidation');
+      expect(diag.logsUrl).toContain('/scim/endpoints/ep-test-123/logs/recent?requestId=test-req-id');
+    });
+
+    it('should fallback to admin logsUrl when endpointId is not available', () => {
+      const ScimLoggerModule = require('../../logging/scim-logger.service');
+      const logger = new ScimLoggerModule.ScimLogger();
+
+      let body: Record<string, unknown> | undefined;
+      logger.runWithContext(
+        { requestId: 'test-req-no-ep' },
+        () => {
+          const err = createScimError({
+            status: 400,
+            detail: 'test',
+            diagnostics: { triggeredBy: 'test' },
+          });
+          body = err.getResponse() as Record<string, unknown>;
+        },
+      );
+
+      const diag = body![DIAGNOSTICS_URN] as Record<string, unknown>;
+      expect(diag.logsUrl).toContain('/scim/admin/log-config/recent?requestId=test-req-no-ep');
+      expect(diag.logsUrl).not.toContain('/endpoints/');
+    });
+
+    it('should preserve standard SCIM error fields alongside diagnostics', () => {
+      const err = createScimError({
+        status: 409,
+        detail: 'Duplicate userName',
+        scimType: 'uniqueness',
+        diagnostics: { triggeredBy: 'uniqueness-check' },
+      });
+      const body = err.getResponse() as Record<string, unknown>;
+
+      // Standard fields preserved
+      expect(body.schemas).toEqual(['urn:ietf:params:scim:api:messages:2.0:Error']);
+      expect(body.detail).toBe('Duplicate userName');
+      expect(body.scimType).toBe('uniqueness');
+      expect(body.status).toBe('409');
+
+      // Diagnostics added alongside
+      const diag = body[DIAGNOSTICS_URN] as Record<string, unknown>;
+      expect(diag).toBeDefined();
+      expect(diag.triggeredBy).toBe('uniqueness-check');
+    });
+  });
 });

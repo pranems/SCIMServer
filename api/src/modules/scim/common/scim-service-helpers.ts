@@ -62,6 +62,7 @@ export function handleRepositoryError(
     throw createScimError({
       status: repositoryErrorToHttpStatus(error.code),
       detail: `Failed to ${operation}: ${error.message}`,
+      diagnostics: { triggeredBy: 'database' },
     });
   }
   // Non-RepositoryError — re-throw for GlobalExceptionFilter
@@ -148,6 +149,7 @@ export function enforceIfMatch(
         status: 428,
         detail:
           'If-Match header is required for this operation. Include the resource ETag (e.g., If-Match: W/"v1").',
+        diagnostics: { triggeredBy: 'RequireIfMatch' },
       });
     }
     return;
@@ -806,6 +808,7 @@ export class ScimSchemaHelpers {
             detail:
               `Extension URN "${key}" found in request body but not declared in schemas[]. ` +
               `When StrictSchemaValidation is enabled, all extension URNs must be listed in the schemas array.`,
+            diagnostics: { triggeredBy: 'StrictSchemaValidation' },
           });
         }
         if (!registeredLower.has(keyLower)) {
@@ -815,6 +818,7 @@ export class ScimSchemaHelpers {
             detail:
               `Extension URN "${key}" is not a registered extension schema for this endpoint. ` +
               `Registered extensions: [${registeredUrns.join(', ')}].`,
+            diagnostics: { triggeredBy: 'StrictSchemaValidation' },
           });
         }
       }
@@ -859,6 +863,7 @@ export class ScimSchemaHelpers {
         status: 400,
         scimType: result.errors[0]?.scimType ?? 'invalidValue',
         detail: `Schema validation failed: ${details}`,
+        diagnostics: { triggeredBy: 'StrictSchemaValidation' },
       });
     }
   }
@@ -1085,6 +1090,7 @@ export class ScimSchemaHelpers {
         status: 400,
         scimType: 'invalidFilter',
         detail: `Filter validation failed: ${details}`,
+        diagnostics: { triggeredBy: 'StrictSchemaValidation' },
       });
     }
   }
@@ -1204,6 +1210,7 @@ export class ScimSchemaHelpers {
         status: 400,
         scimType: 'mutability',
         detail: `Immutable attribute violation: ${details}`,
+        diagnostics: { triggeredBy: 'StrictSchemaValidation' },
       });
     }
   }

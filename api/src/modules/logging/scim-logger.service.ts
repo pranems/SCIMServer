@@ -67,6 +67,15 @@ export interface StructuredLogEntry {
 const correlationStorage = new AsyncLocalStorage<CorrelationContext>();
 
 /**
+ * Access the correlation context from outside the ScimLogger class.
+ * Used by createScimError() to auto-enrich SCIM error responses with
+ * requestId and endpointId without requiring DI injection.
+ */
+export function getCorrelationContext(): CorrelationContext | undefined {
+  return correlationStorage.getStore();
+}
+
+/**
  * ScimLogger — Structured, leveled, correlation-aware logger for SCIMServer.
  *
  * Features:
