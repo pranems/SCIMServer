@@ -389,6 +389,21 @@ Content-Type: application/json
 }
 ```
 
+### ServiceProviderConfig Capabilities (RFC 7644 §4)
+
+Each endpoint's `profile.serviceProviderConfig` advertises SCIM capabilities. Set on create or PATCH.
+
+| Capability | Default | Options | Description |
+|------------|---------|---------|-------------|
+| `patch` | **`supported: true`** | `true` / `false` | PATCH operations on resources |
+| `bulk` | `supported: false` | `supported`, `maxOperations`, `maxPayloadSize` | Bulk operations via `/Bulk` endpoint |
+| `filter` | **`supported: true`** | `supported`, `maxResults` (default: 200) | Filter expressions on LIST queries |
+| `changePassword` | `supported: false` | `true` / `false` | Password change via `/Me` |
+| `sort` | `supported: false` | `true` / `false` | Sort parameter on LIST responses |
+| `etag` | `supported: false` | `true` / `false` | ETag-based versioning and `If-Match` support |
+
+> Discovery: `GET /scim/endpoints/{id}/ServiceProviderConfig` (no auth required)
+
 ---
 
 ## Per-Endpoint Configuration Flags
