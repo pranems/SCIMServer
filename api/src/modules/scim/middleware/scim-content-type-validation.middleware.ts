@@ -15,8 +15,9 @@
  *
  * @see https://datatracker.ietf.org/doc/html/rfc7644#section-3.1
  */
-import { Injectable, NestMiddleware, HttpException } from '@nestjs/common';
+import { Injectable, NestMiddleware } from '@nestjs/common';
 import type { Request, Response, NextFunction } from 'express';
+import { createScimError } from '../common/scim-errors';
 
 /** HTTP methods that carry a request body and require Content-Type validation */
 const BODY_METHODS = new Set(['POST', 'PUT', 'PATCH']);
@@ -47,15 +48,11 @@ export class ScimContentTypeValidationMiddleware implements NestMiddleware {
     }
 
     // Reject with 415 Unsupported Media Type (RFC 7644 §3.1)
-    throw new HttpException(
-      {
-        schemas: ['urn:ietf:params:scim:api:messages:2.0:Error'],
-        detail: `Unsupported Media Type: "${req.headers['content-type'] ?? '(none)'}". ` +
-                `SCIM requests MUST use Content-Type "application/scim+json" or "application/json" (RFC 7644 §3.1).`,
-        scimType: 'invalidValue',
-        status: '415',
-      },
-      415,
-    );
+    throw createScimError({
+      status: 415,
+      detail: `Unsupported Media Type: "${req.headers['content-type'] ?? '(none)'}"` +
+              `. SCIM requests MUST use Content-Type "application/scim+json" or "application/json" (RFC 7644 \u00a73.1).`,
+      scimType: 'invalidValue',
+    });
   }
 }

@@ -130,15 +130,25 @@ export class ScimLogger {
 
   /** In-memory ring buffer of recent log entries for admin API access */
   private readonly ringBuffer: StructuredLogEntry[] = [];
-  private readonly maxRingBufferSize = 500;
+  private readonly maxRingBufferSize: number;
+
+  /** Slow request threshold in milliseconds (configurable via LOG_SLOW_REQUEST_MS env var) */
+  static readonly DEFAULT_RING_BUFFER_SIZE = 500;
+  static readonly DEFAULT_SLOW_REQUEST_MS = 2000;
 
   /** EventEmitter for real-time log streaming (SSE subscribers) */
   private readonly emitter = new EventEmitter();
 
   constructor() {
     this.config = buildDefaultLogConfig();
+    this.maxRingBufferSize = Number(process.env.LOG_RING_BUFFER_SIZE) || ScimLogger.DEFAULT_RING_BUFFER_SIZE;
     // Allow many SSE subscribers without warning
     this.emitter.setMaxListeners(50);
+  }
+
+  /** Get the configured slow request threshold in ms */
+  static getSlowRequestThresholdMs(): number {
+    return Number(process.env.LOG_SLOW_REQUEST_MS) || ScimLogger.DEFAULT_SLOW_REQUEST_MS;
   }
 
   // ─── Live Stream (SSE) ────────────────────────────────────────────

@@ -7,6 +7,7 @@ import {
   Param,
   Query,
   HttpCode,
+  HttpException,
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
@@ -127,10 +128,10 @@ export class LogConfigController {
     @Param('level') level: string,
   ) {
     if (!Object.values(LogCategory).includes(category as LogCategory)) {
-      return {
+      throw new HttpException({
         error: `Unknown category '${category}'`,
         availableCategories: Object.values(LogCategory),
-      };
+      }, 400);
     }
     this.scimLogger.setCategoryLevel(category as LogCategory, level);
     this.scimLogger.info(LogCategory.ENDPOINT, `Category '${category}' log level changed to ${level.toUpperCase()}`);

@@ -77,7 +77,7 @@ export class RequestLoggingInterceptor implements NestInterceptor {
               }
 
               // Log slow requests as warnings
-              if (durationMs > 2000) {
+              if (durationMs > ScimLogger.getSlowRequestThresholdMs()) {
                 this.scimLogger.warn(LogCategory.HTTP, `Slow request: ${durationMs}ms`, {
                   status: response.statusCode,
                   durationMs,

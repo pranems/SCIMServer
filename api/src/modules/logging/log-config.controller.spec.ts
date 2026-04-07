@@ -182,11 +182,16 @@ describe('LogConfigController', () => {
       expect(result.message).toBe("Category 'scim.patch' log level set to TRACE");
     });
 
-    it('should return error for unknown category', () => {
-      const result = controller.setCategoryLevel('nonexistent', 'DEBUG');
-      expect(result).toHaveProperty('error');
-      expect(result.error).toContain("Unknown category 'nonexistent'");
-      expect(result.availableCategories).toHaveLength(13);
+    it('should throw 400 for unknown category', () => {
+      expect(() => controller.setCategoryLevel('nonexistent', 'DEBUG')).toThrow();
+      try {
+        controller.setCategoryLevel('nonexistent', 'DEBUG');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+        const body = e.getResponse();
+        expect(body.error).toContain("Unknown category 'nonexistent'");
+        expect(body.availableCategories).toHaveLength(13);
+      }
     });
 
     it('should accept all valid categories', () => {
