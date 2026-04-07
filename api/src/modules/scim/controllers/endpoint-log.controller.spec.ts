@@ -214,5 +214,97 @@ describe('EndpointLogController', () => {
       );
       expect(dispositionCall[1]).toContain('ep-dl');
     });
+
+    it('should support level filter on download', () => {
+      const mockRes = { setHeader: jest.fn(), send: jest.fn() } as any;
+      controller.downloadLogs('ep-dl', undefined, undefined, 'WARN', undefined, undefined, mockRes);
+      const content = mockRes.send.mock.calls[0][0] as string;
+      // All entries should be WARN+ (ep-dl only has INFO, so empty)
+      expect(content.trim()).toBe('');
+    });
+  });
+
+  // ─── Additional filter coverage (gap audit) ─────────────────────────
+
+  describe('method filter on getRecentLogs', () => {
+    beforeEach(() => {
+      scimLogger.runWithContext({ requestId: 'r1', endpointId: 'ep-mf', method: 'POST' }, () => {
+        scimLogger.info(LogCategory.SCIM_USER, 'POST entry');
+      });
+      scimLogger.runWithContext({ requestId: 'r2', endpointId: 'ep-mf', method: 'GET' }, () => {
+        scimLogger.info(LogCategory.SCIM_USER, 'GET entry');
+      });
+    });
+
+    it('should filter by HTTP method', () => {
+      const result = controller.getRecentLogs('ep-mf', undefined, undefined, undefined, undefined, 'POST');
+      expect(result.count).toBe(1);
+      expect(result.entries[0].method).toBe('POST');
+    });
+
+    it('should be case-insensitive for method filter', () => {
+      const result = controller.getRecentLogs('ep-mf', undefined, undefined, undefined, undefined, 'get');
+      expect(result.count).toBe(1);
+      expect(result.entries[0].method).toBe('GET');
+    });
+  });
+
+  describe('SSE stream filters', () => {
+    it('should filter SSE events by level', (done) => {
+      const written: string[] = [];
+      const mockRes = {
+        setHeader: jest.fn(),
+        flushHeaders: jest.fn(),
+        write: jest.fn((data: string) => written.push(data)),
+        on: jest.fn(),
+        end: jest.fn(),
+      } as any;
+
+      controller.streamLogs('ep-lvl-test', 'WARN', undefined, mockRes);
+
+      // Emit INFO (should be filtered out) and WARN (should pass)
+      scimLogger.runWithContext({ requestId: 'r1', endpointId: 'ep-lvl-test' }, () => {
+        scimLogger.info(LogCategory.HTTP, 'Should be filtered');
+        scimLogger.warn(LogCategory.HTTP, 'Should arrive');
+      });
+
+      setTimeout(() => {
+        const dataLines = written.filter(w => w.startsWith('data:') && !w.includes('connected'));
+        expect(dataLines.length).toBe(1);
+        expect(dataLines[0]).toContain('Should arrive');
+
+        const closeHandler = mockRes.on.mock.calls.find((c: any[]) => c[0] === 'close')?.[1];
+        if (closeHandler) closeHandler();
+        done();
+      }, 50);
+    });
+
+    it('should filter SSE events by category', (done) => {
+      const written: string[] = [];
+      const mockRes = {
+        setHeader: jest.fn(),
+        flushHeaders: jest.fn(),
+        write: jest.fn((data: string) => written.push(data)),
+        on: jest.fn(),
+        end: jest.fn(),
+      } as any;
+
+      controller.streamLogs('ep-cat-test', undefined, 'scim.user', mockRes);
+
+      scimLogger.runWithContext({ requestId: 'r1', endpointId: 'ep-cat-test' }, () => {
+        scimLogger.info(LogCategory.HTTP, 'Wrong category');
+        scimLogger.info(LogCategory.SCIM_USER, 'Right category');
+      });
+
+      setTimeout(() => {
+        const dataLines = written.filter(w => w.startsWith('data:') && !w.includes('connected'));
+        expect(dataLines.length).toBe(1);
+        expect(dataLines[0]).toContain('Right category');
+
+        const closeHandler = mockRes.on.mock.calls.find((c: any[]) => c[0] === 'close')?.[1];
+        if (closeHandler) closeHandler();
+        done();
+      }, 50);
+    });
   });
 });

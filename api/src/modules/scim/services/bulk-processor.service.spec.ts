@@ -619,5 +619,22 @@ describe('BulkProcessorService', () => {
       const startCall = mockLogger.info.mock.calls.find((c: any[]) => c[1]?.includes('started'));
       expect(startCall[2].endpointId).toBe('ep1');
     });
+
+    it('should log status 500 for non-HttpException errors in bulk ops', async () => {
+      mockUsersService.createUserForEndpoint!.mockRejectedValue(
+        new TypeError('Cannot read properties of undefined'),
+      );
+
+      const ops: BulkOperationDto[] = [
+        { method: 'POST', path: '/Users', bulkId: 'u1', data: { userName: 'fail' } },
+      ];
+
+      await service.process(endpointId, ops, baseUrl, config);
+
+      const warnCalls = mockLogger.warn.mock.calls;
+      const failCall = warnCalls.find((c: any[]) => c[1]?.includes('failed'));
+      expect(failCall).toBeDefined();
+      expect(failCall[2].status).toBe(500); // fallback for non-HttpException
+    });
   });
 });

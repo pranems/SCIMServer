@@ -741,4 +741,56 @@ describe('ScimLogger', () => {
       unsub();
     });
   });
+
+  // ─── Configurable thresholds (gap audit) ──────────────────────────
+
+  describe('configurable thresholds', () => {
+    it('getSlowRequestThresholdMs should return default 2000', () => {
+      delete process.env.LOG_SLOW_REQUEST_MS;
+      expect(ScimLogger.getSlowRequestThresholdMs()).toBe(2000);
+    });
+
+    it('getSlowRequestThresholdMs should use LOG_SLOW_REQUEST_MS env var', () => {
+      process.env.LOG_SLOW_REQUEST_MS = '5000';
+      expect(ScimLogger.getSlowRequestThresholdMs()).toBe(5000);
+      delete process.env.LOG_SLOW_REQUEST_MS;
+    });
+
+    it('should use LOG_RING_BUFFER_SIZE env var for buffer capacity', () => {
+      process.env.LOG_RING_BUFFER_SIZE = '3';
+      const smallLogger = new ScimLogger();
+      smallLogger.updateConfig({ format: 'json' });
+
+      // Add 5 entries — only last 3 should survive
+      for (let i = 0; i < 5; i++) {
+        smallLogger.info(LogCategory.HTTP, `entry-${i}`);
+      }
+
+      const entries = smallLogger.getRecentLogs({ limit: 10 });
+      expect(entries.length).toBe(3);
+      expect(entries[0].message).toBe('entry-2'); // oldest surviving
+      expect(entries[2].message).toBe('entry-4'); // newest
+
+      delete process.env.LOG_RING_BUFFER_SIZE;
+    });
+  });
+
+  // ─── getRecentLogs combined filters (gap audit) ───────────────────
+
+  describe('combined ring buffer filters', () => {
+    it('should support endpointId + level combined filter', () => {
+      logger.runWithContext({ requestId: 'r1', endpointId: 'ep-combo' }, () => {
+        logger.info(LogCategory.HTTP, 'info entry');
+        logger.warn(LogCategory.HTTP, 'warn entry');
+      });
+      logger.runWithContext({ requestId: 'r2', endpointId: 'ep-other' }, () => {
+        logger.warn(LogCategory.HTTP, 'other endpoint');
+      });
+
+      const entries = logger.getRecentLogs({ endpointId: 'ep-combo', level: LogLevel.WARN });
+      expect(entries.length).toBe(1);
+      expect(entries[0].message).toBe('warn entry');
+      expect(entries[0].endpointId).toBe('ep-combo');
+    });
+  });
 });

@@ -210,4 +210,40 @@ describe('GlobalExceptionFilter', () => {
       expect(data.errorMessage).toBe('Record to delete does not exist.');
     });
   });
+
+  // ─── Edge cases (gap audit) ───────────────────────────────────────
+
+  describe('edge cases', () => {
+    it('should handle non-Error thrown on non-SCIM route with generic message', () => {
+      const host = createHost('/admin/dashboard');
+
+      filter.catch(42, host);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(500);
+      const body = mockResponse.json.mock.calls[0][0];
+      // Non-SCIM route: NestJS-style error, message falls back to 'Internal Server Error'
+      expect(body.statusCode).toBe(500);
+      expect(body.message).toBe('Internal Server Error');
+    });
+
+    it('should handle request with missing originalUrl', () => {
+      const host = {
+        switchToHttp: () => ({
+          getResponse: () => mockResponse,
+          getRequest: () => ({ url: '/scim/fallback', method: 'GET' }),
+        }),
+        getArgs: () => [],
+        getArgByIndex: () => undefined,
+        switchToRpc: () => ({}),
+        switchToWs: () => ({}),
+        getType: () => 'http',
+      } as any;
+
+      filter.catch(new Error('test'), host);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(500);
+      // Should not crash even without originalUrl
+      expect(mockScimLogger.error).toHaveBeenCalled();
+    });
+  });
 });

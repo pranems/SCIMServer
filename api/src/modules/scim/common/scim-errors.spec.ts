@@ -173,5 +173,45 @@ describe('createScimError', () => {
       expect(diag).toBeDefined();
       expect(diag.triggeredBy).toBe('uniqueness-check');
     });
+
+    it('should auto-enrich with context even when diagnostics param is omitted', () => {
+      const ScimLoggerModule = require('../../logging/scim-logger.service');
+      const logger = new ScimLoggerModule.ScimLogger();
+
+      let body: Record<string, unknown> | undefined;
+      logger.runWithContext(
+        { requestId: 'auto-enrich-req', endpointId: 'ep-auto' },
+        () => {
+          const err = createScimError({
+            status: 404,
+            detail: 'Not found',
+            scimType: 'noTarget',
+            // NO diagnostics param — should still auto-enrich from context
+          });
+          body = err.getResponse() as Record<string, unknown>;
+        },
+      );
+
+      const diag = body![DIAGNOSTICS_URN] as Record<string, unknown>;
+      expect(diag).toBeDefined();
+      expect(diag.requestId).toBe('auto-enrich-req');
+      expect(diag.endpointId).toBe('ep-auto');
+      expect(diag.triggeredBy).toBeUndefined(); // no triggeredBy since no diagnostics param
+      expect(diag.logsUrl).toContain('ep-auto');
+    });
+
+    it('should include extra fields without triggeredBy', () => {
+      const err = createScimError({
+        status: 500,
+        detail: 'DB error',
+        diagnostics: { extra: { errorCode: 'CONNECTION', operation: 'create' } },
+      });
+      const body = err.getResponse() as Record<string, unknown>;
+      const diag = body[DIAGNOSTICS_URN] as Record<string, unknown>;
+      expect(diag).toBeDefined();
+      expect(diag.errorCode).toBe('CONNECTION');
+      expect(diag.operation).toBe('create');
+      expect(diag.triggeredBy).toBeUndefined();
+    });
   });
 });
