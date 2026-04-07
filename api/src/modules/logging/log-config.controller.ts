@@ -7,6 +7,7 @@ import {
   Param,
   Query,
   HttpCode,
+  HttpException,
   Res,
 } from '@nestjs/common';
 import type { Response } from 'express';
@@ -93,6 +94,10 @@ export class LogConfigController {
 
     this.scimLogger.updateConfig(updates);
 
+    this.scimLogger.info(LogCategory.ENDPOINT, 'Log configuration updated', {
+      changes: Object.keys(updates),
+    });
+
     return {
       message: 'Log configuration updated',
       config: this.getConfig(),
@@ -106,6 +111,7 @@ export class LogConfigController {
   @Put('level/:level')
   setGlobalLevel(@Param('level') level: string) {
     this.scimLogger.setGlobalLevel(level);
+    this.scimLogger.info(LogCategory.ENDPOINT, `Global log level changed to ${level.toUpperCase()}`);
     return {
       message: `Global log level set to ${level.toUpperCase()}`,
       globalLevel: logLevelName(this.scimLogger.getConfig().globalLevel),
@@ -122,12 +128,13 @@ export class LogConfigController {
     @Param('level') level: string,
   ) {
     if (!Object.values(LogCategory).includes(category as LogCategory)) {
-      return {
+      throw new HttpException({
         error: `Unknown category '${category}'`,
         availableCategories: Object.values(LogCategory),
-      };
+      }, 400);
     }
     this.scimLogger.setCategoryLevel(category as LogCategory, level);
+    this.scimLogger.info(LogCategory.ENDPOINT, `Category '${category}' log level changed to ${level.toUpperCase()}`);
     return {
       message: `Category '${category}' log level set to ${level.toUpperCase()}`,
     };
@@ -143,6 +150,7 @@ export class LogConfigController {
     @Param('level') level: string,
   ) {
     this.scimLogger.setEndpointLevel(endpointId, level);
+    this.scimLogger.info(LogCategory.ENDPOINT, `Endpoint '${endpointId}' log level changed to ${level.toUpperCase()}`);
     return {
       message: `Endpoint '${endpointId}' log level set to ${level.toUpperCase()}`,
     };
@@ -156,6 +164,7 @@ export class LogConfigController {
   @HttpCode(204)
   clearEndpointLevel(@Param('endpointId') endpointId: string) {
     this.scimLogger.clearEndpointLevel(endpointId);
+    this.scimLogger.info(LogCategory.ENDPOINT, `Endpoint '${endpointId}' log level override removed`);
   }
 
   /**

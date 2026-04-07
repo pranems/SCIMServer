@@ -77,7 +77,7 @@ describe('Log Configuration API (E2E)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(res.body.availableCategories).toHaveLength(11);
+      expect(res.body.availableCategories).toHaveLength(13);
       expect(res.body.availableCategories).toContain('http');
       expect(res.body.availableCategories).toContain('scim.user');
       expect(res.body.availableCategories).toContain('scim.patch');
@@ -176,14 +176,14 @@ describe('Log Configuration API (E2E)', () => {
       expect(res.body.message).toContain('TRACE');
     });
 
-    it('should return error for unknown category', async () => {
+    it('should return 400 for unknown category', async () => {
       const res = await request(app.getHttpServer())
         .put('/scim/admin/log-config/category/badcategory/DEBUG')
         .set('Authorization', `Bearer ${token}`)
-        .expect(200);
+        .expect(400);
 
-      expect(res.body.error).toContain("Unknown category 'badcategory'");
-      expect(res.body.availableCategories).toHaveLength(11);
+      // The error is wrapped in SCIM format by ScimExceptionFilter
+      expect(res.body.status).toBe('400');
     });
 
     it('should reflect the change in GET /admin/log-config', async () => {

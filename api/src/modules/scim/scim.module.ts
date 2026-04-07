@@ -28,6 +28,7 @@ import { ScimContentTypeInterceptor } from './interceptors/scim-content-type.int
 import { ScimEtagInterceptor } from './interceptors/scim-etag.interceptor';
 import { ScimExceptionFilter } from './filters/scim-exception.filter';
 import { GlobalExceptionFilter } from './filters/global-exception.filter';
+import { EndpointLogController } from './controllers/endpoint-log.controller';
 import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-type-validation.middleware';
 
 @Module({
@@ -43,6 +44,7 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     EndpointScimBulkController,
     EndpointScimDiscoveryController,
     ScimMeController,
+    EndpointLogController,
     // Generic controller MUST be registered LAST — its wildcard :resourceType
     // param would otherwise shadow built-in routes like /Users, /Groups, etc.
     EndpointScimGenericController,

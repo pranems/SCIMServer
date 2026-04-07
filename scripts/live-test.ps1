@@ -7513,6 +7513,132 @@ if ($bulkEpId) {
 Write-Host "`n--- 9z-H: Bulk Logging Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-I: ADMIN AUDIT TRAIL (Phase C Step 10)
+$script:currentSection = "9z-I: Audit Trail"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-I: ADMIN AUDIT TRAIL" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Test: Log level change produces audit entry in ring buffer
+Write-Host "`n--- Test: Config Change Audit ---" -ForegroundColor Cyan
+try {
+    # Change level to DEBUG, then check ring buffer
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/level/DEBUG" -Method PUT -Headers $headers | Out-Null
+    Start-Sleep -Milliseconds 200
+
+    $recentLogs = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent?category=endpoint&limit=10" -Headers $headers
+    $hasLevelChange = $recentLogs.entries | Where-Object { $_.message -match "Global log level changed" }
+    Test-Result -Success ($null -ne $hasLevelChange) -Message "9z-I.1: Log level change produces audit entry"
+
+    # Restore level
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/level/INFO" -Method PUT -Headers $headers | Out-Null
+} catch {
+    Test-Result -Success $false -Message "9z-I.1: Failed: $_"
+}
+
+# Test: Endpoint create produces audit entry
+Write-Host "`n--- Test: Endpoint Create Audit ---" -ForegroundColor Cyan
+$auditEpName = "audit-test-$(Get-Random)"
+$auditEpBody = @{name=$auditEpName; profilePreset="minimal"} | ConvertTo-Json
+try {
+    $auditEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $auditEpBody
+    Start-Sleep -Milliseconds 200
+
+    $recentLogs = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent?category=endpoint&limit=10" -Headers $headers
+    $hasCreateAudit = $recentLogs.entries | Where-Object { $_.message -match "Endpoint created" -and $_.data.name -eq $auditEpName }
+    Test-Result -Success ($null -ne $hasCreateAudit) -Message "9z-I.2: Endpoint create produces audit entry with name"
+
+    # Cleanup
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($auditEp.id)" -Method DELETE -Headers $headers | Out-Null
+    Start-Sleep -Milliseconds 200
+
+    $recentLogs2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent?category=endpoint&limit=10" -Headers $headers
+    $hasDeleteAudit = $recentLogs2.entries | Where-Object { $_.message -match "Endpoint deleted" }
+    Test-Result -Success ($null -ne $hasDeleteAudit) -Message "9z-I.3: Endpoint delete produces audit entry"
+} catch {
+    Test-Result -Success $false -Message "9z-I.2: Failed: $_"
+}
+
+Write-Host "`n--- 9z-I: Admin Audit Trail Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-J: ENDPOINT-SCOPED LOG ACCESS (Phase D Step 11)
+$script:currentSection = "9z-J: Endpoint Logs"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-J: ENDPOINT-SCOPED LOG ACCESS" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Create test endpoint and generate activity
+Write-Host "`n--- Setup: Create endpoint + activity ---" -ForegroundColor Cyan
+$epLogName = "eplog-test-$(Get-Random)"
+$epLogBody = @{name=$epLogName; profilePreset="entra-id"} | ConvertTo-Json
+try {
+    $epLog = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $epLogBody
+    $epLogId = $epLog.id
+    $epLogScimBase = "$baseUrl/scim/endpoints/$epLogId"
+
+    # Create a user on this endpoint to generate log entries
+    $logTestUser = @{schemas=@("urn:ietf:params:scim:schemas:core:2.0:User"); userName="eplog-user-$(Get-Random)@test.com"; active=$true} | ConvertTo-Json
+    Invoke-RestMethod -Uri "$epLogScimBase/Users" -Method POST -Headers $headers -Body $logTestUser | Out-Null
+    Start-Sleep -Milliseconds 300
+} catch {
+    Test-Result -Success $false -Message "9z-J.setup: Failed: $_"
+    $epLogId = $null
+}
+
+if ($epLogId) {
+    # Test: GET /endpoints/:id/logs/recent
+    Write-Host "`n--- Test: Endpoint-Scoped Recent Logs ---" -ForegroundColor Cyan
+    try {
+        $epLogs = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$epLogId/logs/recent?limit=10" -Headers $headers
+        $hasEndpointId = $epLogs.endpointId -eq $epLogId
+        $hasEntries = $epLogs.count -ge 0
+        Test-Result -Success ($hasEndpointId -and $hasEntries) -Message "9z-J.1: GET /endpoints/:id/logs/recent returns scoped response"
+
+        # Verify entries are scoped
+        $wrongEndpoint = $epLogs.entries | Where-Object { $_.endpointId -and $_.endpointId -ne $epLogId }
+        Test-Result -Success ($null -eq $wrongEndpoint) -Message "9z-J.2: All entries scoped to correct endpointId"
+    } catch {
+        Test-Result -Success $false -Message "9z-J.1: Failed: $_"
+    }
+
+    # Test: GET /endpoints/:id/logs/recent with level filter
+    Write-Host "`n--- Test: Level Filter ---" -ForegroundColor Cyan
+    try {
+        $warnLogs = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$epLogId/logs/recent?level=WARN" -Headers $headers
+        $allWarnOrAbove = $true
+        foreach ($entry in $warnLogs.entries) {
+            if ($entry.level -notin @("WARN","ERROR","FATAL")) { $allWarnOrAbove = $false; break }
+        }
+        Test-Result -Success $allWarnOrAbove -Message "9z-J.3: Level filter returns only WARN+ entries"
+    } catch {
+        Test-Result -Success $false -Message "9z-J.3: Failed: $_"
+    }
+
+    # Test: GET /endpoints/:id/logs/download
+    Write-Host "`n--- Test: Endpoint-Scoped Download ---" -ForegroundColor Cyan
+    try {
+        $dlResp = Invoke-WebRequest -Uri "$baseUrl/scim/endpoints/$epLogId/logs/download" -Headers $headers
+        $ct = $dlResp.Headers.'Content-Type'
+        $cd = $dlResp.Headers.'Content-Disposition'
+        $isNdjson = $ct -match "ndjson"
+        $hasFilename = $cd -match "attachment"
+        Test-Result -Success ($isNdjson -and $hasFilename) -Message "9z-J.4: Download returns NDJSON with attachment header"
+    } catch {
+        Test-Result -Success $false -Message "9z-J.4: Failed: $_"
+    }
+
+    # Cleanup
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$epLogId" -Method DELETE -Headers $headers | Out-Null
+    } catch { }
+}
+
+Write-Host "`n--- 9z-J: Endpoint-Scoped Log Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

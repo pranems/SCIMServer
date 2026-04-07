@@ -400,6 +400,9 @@ export class EndpointService implements OnModuleInit {
     this.cacheSet(cached);
     this.syncEndpointLogLevel(endpoint.id, resolvedProfile.settings);
     this.profileChangeListener?.(endpoint.id, resolvedProfile);
+    this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint created', {
+      endpointId: endpoint.id, name: dto.name, preset: dto.profilePreset ?? 'custom',
+    });
     return this.toFullResponse(cached);
   }
 
@@ -576,6 +579,10 @@ export class EndpointService implements OnModuleInit {
     }
     this.profileChangeListener?.(endpointId, cached.profile ?? null);
 
+    this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint updated', {
+      endpointId, name: cached.name,
+    });
+
     return this.toFullResponse(cached);
   }
 
@@ -643,6 +650,7 @@ export class EndpointService implements OnModuleInit {
       this.cacheDelete(cached);
       this.scimLogger.clearEndpointLevel(endpointId);
       this.profileChangeListener?.(endpointId, null);
+      this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint deleted', { endpointId, name: cached.name });
       return;
     }
 
@@ -666,6 +674,7 @@ export class EndpointService implements OnModuleInit {
     if (cached) this.cacheDelete(cached);
     this.scimLogger.clearEndpointLevel(endpointId);
     this.profileChangeListener?.(endpointId, null);
+    this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint deleted', { endpointId, name: endpoint.name });
   }
 
   async getEndpointStats(endpointId: string): Promise<EndpointStatsResponse> {
