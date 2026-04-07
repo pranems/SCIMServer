@@ -524,4 +524,68 @@ describe('LogConfigController', () => {
       expect(lines).toHaveLength(2);
     });
   });
+
+  // ─── Admin Audit Trail (Phase C Step 10) ────────────────────────────
+
+  describe('admin audit trail logging', () => {
+    let infoSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      infoSpy = jest.spyOn(scimLogger, 'info');
+    });
+
+    afterEach(() => {
+      infoSpy.mockRestore();
+    });
+
+    it('updateConfig should log INFO with changed field keys', () => {
+      controller.updateConfig({ globalLevel: 'WARN', includePayloads: false });
+
+      const auditCall = infoSpy.mock.calls.find(
+        (c: any[]) => c[0] === LogCategory.ENDPOINT && c[1]?.includes('configuration updated'),
+      );
+      expect(auditCall).toBeDefined();
+      expect(auditCall[2].changes).toEqual(expect.arrayContaining(['globalLevel', 'includePayloads']));
+    });
+
+    it('setGlobalLevel should log INFO with new level', () => {
+      controller.setGlobalLevel('ERROR');
+
+      const auditCall = infoSpy.mock.calls.find(
+        (c: any[]) => c[0] === LogCategory.ENDPOINT && c[1]?.includes('Global log level changed'),
+      );
+      expect(auditCall).toBeDefined();
+      expect(auditCall[1]).toContain('ERROR');
+    });
+
+    it('setCategoryLevel should log INFO with category and level', () => {
+      controller.setCategoryLevel('auth', 'WARN');
+
+      const auditCall = infoSpy.mock.calls.find(
+        (c: any[]) => c[0] === LogCategory.ENDPOINT && c[1]?.includes("Category 'auth'"),
+      );
+      expect(auditCall).toBeDefined();
+      expect(auditCall[1]).toContain('WARN');
+    });
+
+    it('setEndpointLevel should log INFO with endpointId and level', () => {
+      controller.setEndpointLevel('ep-audit-1', 'TRACE');
+
+      const auditCall = infoSpy.mock.calls.find(
+        (c: any[]) => c[0] === LogCategory.ENDPOINT && c[1]?.includes("Endpoint 'ep-audit-1'"),
+      );
+      expect(auditCall).toBeDefined();
+      expect(auditCall[1]).toContain('TRACE');
+    });
+
+    it('clearEndpointLevel should log INFO with endpointId', () => {
+      scimLogger.setEndpointLevel('ep-audit-2', LogLevel.DEBUG);
+      controller.clearEndpointLevel('ep-audit-2');
+
+      const auditCall = infoSpy.mock.calls.find(
+        (c: any[]) => c[0] === LogCategory.ENDPOINT && c[1]?.includes("Endpoint 'ep-audit-2'") && c[1]?.includes('removed'),
+      );
+      expect(auditCall).toBeDefined();
+    });
+  });
 });

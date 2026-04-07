@@ -7513,6 +7513,56 @@ if ($bulkEpId) {
 Write-Host "`n--- 9z-H: Bulk Logging Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-I: ADMIN AUDIT TRAIL (Phase C Step 10)
+$script:currentSection = "9z-I: Audit Trail"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-I: ADMIN AUDIT TRAIL" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Test: Log level change produces audit entry in ring buffer
+Write-Host "`n--- Test: Config Change Audit ---" -ForegroundColor Cyan
+try {
+    # Change level to DEBUG, then check ring buffer
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/level/DEBUG" -Method PUT -Headers $headers | Out-Null
+    Start-Sleep -Milliseconds 200
+
+    $recentLogs = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent?category=endpoint&limit=10" -Headers $headers
+    $hasLevelChange = $recentLogs.entries | Where-Object { $_.message -match "Global log level changed" }
+    Test-Result -Success ($null -ne $hasLevelChange) -Message "9z-I.1: Log level change produces audit entry"
+
+    # Restore level
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/level/INFO" -Method PUT -Headers $headers | Out-Null
+} catch {
+    Test-Result -Success $false -Message "9z-I.1: Failed: $_"
+}
+
+# Test: Endpoint create produces audit entry
+Write-Host "`n--- Test: Endpoint Create Audit ---" -ForegroundColor Cyan
+$auditEpName = "audit-test-$(Get-Random)"
+$auditEpBody = @{name=$auditEpName; profilePreset="minimal"} | ConvertTo-Json
+try {
+    $auditEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $auditEpBody
+    Start-Sleep -Milliseconds 200
+
+    $recentLogs = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent?category=endpoint&limit=10" -Headers $headers
+    $hasCreateAudit = $recentLogs.entries | Where-Object { $_.message -match "Endpoint created" -and $_.data.name -eq $auditEpName }
+    Test-Result -Success ($null -ne $hasCreateAudit) -Message "9z-I.2: Endpoint create produces audit entry with name"
+
+    # Cleanup
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($auditEp.id)" -Method DELETE -Headers $headers | Out-Null
+    Start-Sleep -Milliseconds 200
+
+    $recentLogs2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/recent?category=endpoint&limit=10" -Headers $headers
+    $hasDeleteAudit = $recentLogs2.entries | Where-Object { $_.message -match "Endpoint deleted" }
+    Test-Result -Success ($null -ne $hasDeleteAudit) -Message "9z-I.3: Endpoint delete produces audit entry"
+} catch {
+    Test-Result -Success $false -Message "9z-I.2: Failed: $_"
+}
+
+Write-Host "`n--- 9z-I: Admin Audit Trail Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
