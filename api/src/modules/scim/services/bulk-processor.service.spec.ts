@@ -36,6 +36,7 @@ describe('BulkProcessorService', () => {
   let service: BulkProcessorService;
   let mockUsersService: Record<string, jest.Mock>;
   let mockGroupsService: Record<string, jest.Mock>;
+  let mockLogger: any;
   const config: EndpointConfig = {};
   const baseUrl = 'http://localhost:3000/scim/endpoints/ep1';
   const endpointId = 'ep1';
@@ -57,9 +58,21 @@ describe('BulkProcessorService', () => {
       deleteGroupForEndpoint: jest.fn(),
     };
 
+    mockLogger = {
+      trace: jest.fn(),
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      fatal: jest.fn(),
+      enrichContext: jest.fn(),
+      isEnabled: jest.fn().mockReturnValue(true),
+    };
+
     service = new BulkProcessorService(
       mockUsersService as unknown as EndpointScimUsersService,
       mockGroupsService as unknown as EndpointScimGroupsService,
+      mockLogger,
     );
   });
 
@@ -508,6 +521,103 @@ describe('BulkProcessorService', () => {
       expect(result.Operations[0].status).toBe('201');
       expect(result.Operations[1].status).toBe('201');
       expect(result.Operations[2].status).toBe('204');
+    });
+  });
+
+  // ─── Bulk Logging (Phase C Step 8) ──────────────────────────────────
+
+  describe('bulk operation logging', () => {
+    it('should log INFO at start and completion of bulk request', async () => {
+      mockUsersService.createUserForEndpoint!.mockResolvedValue({ id: 'u1', meta: { version: 'W/"v1"' } });
+
+      const ops: BulkOperationDto[] = [
+        { method: 'POST', path: '/Users', bulkId: 'u1', data: { userName: 'alice' } },
+      ];
+
+      await service.process(endpointId, ops, baseUrl, config);
+
+      // Should have 2 INFO calls: start + complete
+      const infoCalls = mockLogger.info.mock.calls;
+      const startCall = infoCalls.find((c: any[]) => c[1]?.includes('started'));
+      const completeCall = infoCalls.find((c: any[]) => c[1]?.includes('completed'));
+
+      expect(startCall).toBeDefined();
+      expect(startCall[0]).toBe('scim.bulk');
+      expect(startCall[2].opCount).toBe(1);
+
+      expect(completeCall).toBeDefined();
+      expect(completeCall[2].total).toBe(1);
+      expect(completeCall[2].success).toBe(1);
+      expect(completeCall[2].errors).toBe(0);
+      expect(completeCall[2].stopped).toBe(false);
+    });
+
+    it('should log WARN for failed bulk operations with bulkIndex', async () => {
+      mockUsersService.createUserForEndpoint!.mockRejectedValue(
+        new HttpException({ detail: 'Conflict', scimType: 'uniqueness', status: '409', schemas: ['urn:ietf:params:scim:api:messages:2.0:Error'] }, 409),
+      );
+
+      const ops: BulkOperationDto[] = [
+        { method: 'POST', path: '/Users', bulkId: 'u1', data: { userName: 'dup' } },
+      ];
+
+      await service.process(endpointId, ops, baseUrl, config);
+
+      const warnCalls = mockLogger.warn.mock.calls;
+      expect(warnCalls.length).toBeGreaterThanOrEqual(1);
+      const failCall = warnCalls.find((c: any[]) => c[1]?.includes('failed'));
+      expect(failCall).toBeDefined();
+      expect(failCall[0]).toBe('scim.bulk');
+      expect(failCall[2].bulkIndex).toBe(0);
+      expect(failCall[2].bulkId).toBe('u1');
+      expect(failCall[2].status).toBe(409);
+    });
+
+    it('should enrichContext with bulkOperationIndex per operation', async () => {
+      mockUsersService.createUserForEndpoint!.mockResolvedValue({ id: 'u1', meta: { version: 'W/"v1"' } });
+      mockGroupsService.createGroupForEndpoint!.mockResolvedValue({ id: 'g1', meta: { version: 'W/"v1"' } });
+
+      const ops: BulkOperationDto[] = [
+        { method: 'POST', path: '/Users', bulkId: 'u1', data: { userName: 'alice' } },
+        { method: 'POST', path: '/Groups', bulkId: 'g1', data: { displayName: 'Team' } },
+      ];
+
+      await service.process(endpointId, ops, baseUrl, config);
+
+      const enrichCalls = mockLogger.enrichContext.mock.calls;
+      expect(enrichCalls.length).toBeGreaterThanOrEqual(2);
+      expect(enrichCalls[0][0].bulkOperationIndex).toBe(0);
+      expect(enrichCalls[0][0].bulkId).toBe('u1');
+      expect(enrichCalls[1][0].bulkOperationIndex).toBe(1);
+      expect(enrichCalls[1][0].bulkId).toBe('g1');
+    });
+
+    it('should log stopped=true when failOnErrors threshold reached', async () => {
+      mockUsersService.createUserForEndpoint!
+        .mockRejectedValueOnce(new HttpException('Error', 400))
+        .mockRejectedValueOnce(new HttpException('Error', 400));
+
+      const ops: BulkOperationDto[] = [
+        { method: 'POST', path: '/Users', data: { userName: 'a' } },
+        { method: 'POST', path: '/Users', data: { userName: 'b' } },
+        { method: 'POST', path: '/Users', data: { userName: 'c' } },
+      ];
+
+      await service.process(endpointId, ops, baseUrl, config, 2);
+
+      const completeCall = mockLogger.info.mock.calls.find((c: any[]) => c[1]?.includes('completed'));
+      expect(completeCall[2].stopped).toBe(true);
+      expect(completeCall[2].errors).toBe(2);
+      expect(completeCall[2].processed).toBeLessThan(3);
+    });
+
+    it('should include endpointId in start and complete logs', async () => {
+      mockUsersService.createUserForEndpoint!.mockResolvedValue({ id: 'u1', meta: { version: 'W/"v1"' } });
+
+      await service.process(endpointId, [{ method: 'POST', path: '/Users', data: { userName: 'a' } }], baseUrl, config);
+
+      const startCall = mockLogger.info.mock.calls.find((c: any[]) => c[1]?.includes('started'));
+      expect(startCall[2].endpointId).toBe('ep1');
     });
   });
 });

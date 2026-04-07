@@ -170,7 +170,7 @@ export class EndpointScimGenericService {
     const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
     const strippedAttrs = stripReadOnlyAttributes(body, schemaDefs, readOnlyCache);
     if (strippedAttrs.length > 0) {
-      this.scimLogger.warn(LogCategory.GENERAL, 'Stripped readOnly attributes from POST payload', {
+      this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Stripped readOnly attributes from POST payload', {
         method: 'POST', path: resourceType.endpoint, stripped: strippedAttrs, endpointId,
       });
       this.endpointContext.addWarnings(strippedAttrs);
@@ -188,7 +188,7 @@ export class EndpointScimGenericService {
 
       // GEN-10: Reprovision soft-deleted resource instead of 409
       if (softDelete && reprovision && conflict.deletedAt != null) {
-        this.scimLogger.info(LogCategory.GENERAL, `Re-provisioning soft-deleted ${resourceType.name}`, {
+        this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Re-provisioning soft-deleted ${resourceType.name}`, {
           scimId: conflict.scimId, endpointId,
         });
         return this.reprovisionResource(conflict, body, baseUrl, endpointId, resourceType, config);
@@ -247,10 +247,10 @@ export class EndpointScimGenericService {
     try {
       record = await this.genericRepo.create(input);
     } catch (error) {
-      handleRepositoryError(error, `create ${resourceType.name}`, this.scimLogger, LogCategory.GENERAL, { scimId, endpointId });
+      handleRepositoryError(error, `create ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
     }
 
-    this.scimLogger.info(LogCategory.GENERAL, `Created ${resourceType.name}`, {
+    this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Created ${resourceType.name}`, {
       scimId,
       endpointId,
       resourceType: resourceType.name,
@@ -282,7 +282,7 @@ export class EndpointScimGenericService {
     }
 
     // GEN-12: Config-aware soft-delete guard (RFC 7644 §3.6)
-    guardSoftDeleted(record, config, scimId, this.scimLogger, LogCategory.GENERAL);
+    guardSoftDeleted(record, config, scimId, this.scimLogger, LogCategory.SCIM_RESOURCE);
 
     return this.toScimResponse(record, resourceType);
   }
@@ -408,7 +408,7 @@ export class EndpointScimGenericService {
     }
 
     // GEN-12: Config-aware soft-delete guard
-    guardSoftDeleted(existing, config, scimId, this.scimLogger, LogCategory.GENERAL);
+    guardSoftDeleted(existing, config, scimId, this.scimLogger, LogCategory.SCIM_RESOURCE);
 
     enforceIfMatch(existing.version, ifMatch, config);
 
@@ -420,7 +420,7 @@ export class EndpointScimGenericService {
     const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
     const strippedAttrs = stripReadOnlyAttributes(body, schemaDefs, readOnlyCachePut);
     if (strippedAttrs.length > 0) {
-      this.scimLogger.warn(LogCategory.GENERAL, 'Stripped readOnly attributes from PUT payload', {
+      this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Stripped readOnly attributes from PUT payload', {
         method: 'PUT', path: `${resourceType.endpoint}/${scimId}`, stripped: strippedAttrs, endpointId,
       });
       this.endpointContext.addWarnings(strippedAttrs);
@@ -479,10 +479,10 @@ export class EndpointScimGenericService {
         meta: JSON.stringify(metaObj),
       });
     } catch (error) {
-      handleRepositoryError(error, `replace ${resourceType.name}`, this.scimLogger, LogCategory.GENERAL, { scimId, endpointId });
+      handleRepositoryError(error, `replace ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
     }
 
-    this.scimLogger.info(LogCategory.GENERAL, `Replaced ${resourceType.name}`, {
+    this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Replaced ${resourceType.name}`, {
       scimId,
       endpointId,
     });
@@ -518,7 +518,7 @@ export class EndpointScimGenericService {
     }
 
     // GEN-12: Config-aware soft-delete guard
-    guardSoftDeleted(existing, config, scimId, this.scimLogger, LogCategory.GENERAL);
+    guardSoftDeleted(existing, config, scimId, this.scimLogger, LogCategory.SCIM_RESOURCE);
 
     enforceIfMatch(existing.version, ifMatch, config);
 
@@ -532,7 +532,7 @@ export class EndpointScimGenericService {
       const readOnlyCachePatch = this.getSchemaCacheForRT(resourceType, endpointId)?.readOnlyCollected;
       const { filtered, stripped } = stripReadOnlyPatchOps(patchDto.Operations, schemaDefs, readOnlyCachePatch);
       if (stripped.length > 0) {
-        this.scimLogger.warn(LogCategory.GENERAL, 'Stripped readOnly PATCH operations', {
+        this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Stripped readOnly PATCH operations', {
           count: stripped.length, attributes: stripped,
         });
         this.endpointContext.addWarnings(
@@ -576,7 +576,7 @@ export class EndpointScimGenericService {
     try {
       payload = JSON.parse(existing.rawPayload);
     } catch (e) {
-      this.scimLogger.warn(LogCategory.GENERAL, 'Corrupt rawPayload in PATCH — using empty object', {
+      this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Corrupt rawPayload in PATCH — using empty object', {
         scimId: existing.scimId, endpointId, error: (e as Error).message,
       });
       payload = {};
@@ -680,10 +680,10 @@ export class EndpointScimGenericService {
         meta: JSON.stringify(metaObj),
       });
     } catch (error) {
-      handleRepositoryError(error, `patch ${resourceType.name}`, this.scimLogger, LogCategory.GENERAL, { scimId, endpointId });
+      handleRepositoryError(error, `patch ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
     }
 
-    this.scimLogger.info(LogCategory.GENERAL, `Patched ${resourceType.name}`, {
+    this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Patched ${resourceType.name}`, {
       scimId,
       endpointId,
       operations: patchDto.Operations.length,
@@ -715,7 +715,7 @@ export class EndpointScimGenericService {
     }
 
     // GEN-12: Config-aware soft-delete guard (double-delete → 404)
-    guardSoftDeleted(existing, config, scimId, this.scimLogger, LogCategory.GENERAL);
+    guardSoftDeleted(existing, config, scimId, this.scimLogger, LogCategory.SCIM_RESOURCE);
 
     enforceIfMatch(existing.version, ifMatch, config);
 
@@ -728,9 +728,9 @@ export class EndpointScimGenericService {
           active: false,
         });
       } catch (error) {
-        handleRepositoryError(error, `soft-delete ${resourceType.name}`, this.scimLogger, LogCategory.GENERAL, { scimId, endpointId });
+        handleRepositoryError(error, `soft-delete ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
       }
-      this.scimLogger.info(LogCategory.GENERAL, `Soft-deleted ${resourceType.name}`, {
+      this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Soft-deleted ${resourceType.name}`, {
         scimId,
         endpointId,
       });
@@ -738,9 +738,9 @@ export class EndpointScimGenericService {
       try {
         await this.genericRepo.delete(existing.id);
       } catch (error) {
-        handleRepositoryError(error, `delete ${resourceType.name}`, this.scimLogger, LogCategory.GENERAL, { scimId, endpointId });
+        handleRepositoryError(error, `delete ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
       }
-      this.scimLogger.info(LogCategory.GENERAL, `Deleted ${resourceType.name}`, {
+      this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Deleted ${resourceType.name}`, {
         scimId,
         endpointId,
       });
@@ -764,7 +764,7 @@ export class EndpointScimGenericService {
     try {
       payload = JSON.parse(record.rawPayload);
     } catch (e) {
-      this.scimLogger.warn(LogCategory.GENERAL, 'Corrupt rawPayload in toScimResponse — using empty object', {
+      this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Corrupt rawPayload in toScimResponse — using empty object', {
         scimId: record.scimId, endpointId: record.endpointId, error: (e as Error).message,
       });
       payload = {};
@@ -774,7 +774,7 @@ export class EndpointScimGenericService {
     try {
       meta = record.meta ? JSON.parse(record.meta) : {};
     } catch (e) {
-      this.scimLogger.warn(LogCategory.GENERAL, 'Corrupt meta in toScimResponse — using empty object', {
+      this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Corrupt meta in toScimResponse — using empty object', {
         scimId: record.scimId, endpointId: record.endpointId, error: (e as Error).message,
       });
       meta = {};
@@ -1144,10 +1144,10 @@ export class EndpointScimGenericService {
         meta: JSON.stringify(metaObj),
       });
     } catch (error) {
-      handleRepositoryError(error, `reprovision ${resourceType.name}`, this.scimLogger, LogCategory.GENERAL, { scimId: existing.scimId, endpointId });
+      handleRepositoryError(error, `reprovision ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId: existing.scimId, endpointId });
     }
 
-    this.scimLogger.info(LogCategory.GENERAL, `Re-provisioned soft-deleted ${resourceType.name}`, {
+    this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Re-provisioned soft-deleted ${resourceType.name}`, {
       scimId: existing.scimId, endpointId,
     });
 

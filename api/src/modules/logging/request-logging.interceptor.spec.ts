@@ -93,7 +93,7 @@ describe('RequestLoggingInterceptor', () => {
 
     interceptor.intercept(context, handler).subscribe({
       complete: () => {
-        expect(mockScimLogger.info).toHaveBeenCalledWith(
+        expect(mockScimLogger.debug).toHaveBeenCalledWith(
           expect.any(String),
           expect.stringContaining('POST /scim/Users'),
           expect.any(Object),
@@ -110,7 +110,7 @@ describe('RequestLoggingInterceptor', () => {
     interceptor.intercept(context, handler).subscribe({
       complete: () => {
         // Look for the response log (← prefix)
-        const responseLogs = mockScimLogger.info.mock.calls.filter(
+        const responseLogs = mockScimLogger.debug.mock.calls.filter(
           (c: any[]) => typeof c[1] === 'string' && c[1].includes('←'),
         );
         expect(responseLogs.length).toBeGreaterThan(0);

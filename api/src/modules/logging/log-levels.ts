@@ -66,6 +66,10 @@ export enum LogCategory {
   DATABASE = 'database',
   /** OAuth token operations */
   OAUTH = 'oauth',
+  /** SCIM Bulk operations (RFC 7644 §3.7) */
+  SCIM_BULK = 'scim.bulk',
+  /** SCIM custom resource type operations */
+  SCIM_RESOURCE = 'scim.resource',
   /** General / uncategorized */
   GENERAL = 'general',
 }
