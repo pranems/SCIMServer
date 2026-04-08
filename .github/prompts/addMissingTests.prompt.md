@@ -561,12 +561,12 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
-| Unit  | 3,201  | ?     | +?    |
-| E2E   | 913    | ?     | +?    |
+| Unit  | 3,220  | ?     | +?    |
+| E2E   | 918    | ?     | +?    |
 | Live  | ~980   | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
-> *Last updated: v0.32.0 — Test gap audit #2 (2026-04-08)*
+> *Last updated: v0.32.0 - Logging & RCA diagnostics enrichment (2026-04-08)*
 
 4. Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts.
 
