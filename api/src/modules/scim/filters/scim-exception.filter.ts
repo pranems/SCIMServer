@@ -6,8 +6,8 @@ import {
 } from '@nestjs/common';
 import type { Response, Request } from 'express';
 
-import { SCIM_ERROR_SCHEMA } from '../common/scim-constants';
-import { ScimLogger } from '../../logging/scim-logger.service';
+import { SCIM_ERROR_SCHEMA, SCIM_DIAGNOSTICS_URN } from '../common/scim-constants';
+import { ScimLogger, getCorrelationContext } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 
 /**
@@ -99,6 +99,24 @@ export class ScimExceptionFilter implements ExceptionFilter {
     // Ensure "status" is always a string per RFC 7644 §3.12
     if (body.status !== undefined && typeof body.status !== 'string') {
       body.status = String(body.status);
+    }
+
+    // G.4: Auto-enrich with diagnostics extension when not already present
+    if (!body[SCIM_DIAGNOSTICS_URN]) {
+      const ctx = getCorrelationContext();
+      if (ctx) {
+        const diag: Record<string, unknown> = {};
+        if (ctx.requestId) diag.requestId = ctx.requestId;
+        if (ctx.endpointId) diag.endpointId = ctx.endpointId;
+        if (ctx.requestId) {
+          diag.logsUrl = ctx.endpointId
+            ? `/scim/endpoints/${ctx.endpointId}/logs/recent?requestId=${ctx.requestId}`
+            : `/scim/admin/log-config/recent?requestId=${ctx.requestId}`;
+        }
+        if (Object.keys(diag).length > 0) {
+          body[SCIM_DIAGNOSTICS_URN] = diag;
+        }
+      }
     }
 
     response

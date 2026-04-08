@@ -360,6 +360,7 @@ export class BulkProcessorService {
           scimType: SCIM_ERROR_TYPE.INVALID_VALUE,
         });
       }
+      this.logger.debug(LogCategory.SCIM_BULK, 'Resolved bulkId reference', { bulkId: id, resolvedId: resolved });
       return resolved;
     });
   }

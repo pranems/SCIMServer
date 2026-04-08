@@ -375,6 +375,9 @@ export class EndpointService implements OnModuleInit {
       this.cacheSet(cached);
       this.syncEndpointLogLevel(cached.id, resolvedProfile.settings);
       this.profileChangeListener?.(cached.id, resolvedProfile);
+      this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint created', {
+        endpointId: cached.id, name: dto.name, preset: dto.profilePreset ?? 'custom',
+      });
       return this.toFullResponse(cached);
     }
 
@@ -533,6 +536,9 @@ export class EndpointService implements OnModuleInit {
         this.syncEndpointLogLevel(endpointId, dto.profile.settings as Record<string, any>);
       }
       this.profileChangeListener?.(endpointId, updated.profile ?? null);
+      this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint updated', {
+        endpointId, name: updated.name,
+      });
 
       return this.toFullResponse(updated);
     }

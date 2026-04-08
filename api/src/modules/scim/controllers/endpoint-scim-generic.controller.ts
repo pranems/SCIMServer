@@ -27,7 +27,6 @@ import {
   ForbiddenException,
   Get,
   HttpCode,
-  Logger,
   NotFoundException,
   Param,
   Patch,
@@ -52,8 +51,6 @@ import { buildBaseUrl } from '../common/base-url.util';
 
 @Controller('endpoints/:endpointId')
 export class EndpointScimGenericController {
-  private readonly logger = new Logger(EndpointScimGenericController.name);
-
   constructor(
     private readonly endpointService: EndpointService,
     private readonly endpointContext: EndpointContextStorage,

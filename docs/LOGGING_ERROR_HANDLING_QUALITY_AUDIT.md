@@ -60,7 +60,7 @@ Systematic analysis across all flows, 13 config flag combinations, 6 schema pres
 
 | Component | File | Purpose |
 |---|---|---|
-| **LogLevel / LogCategory** | `log-levels.ts` | 7 levels (TRACE→OFF, RFC 5424-aligned), 11 categories, env-var parsing |
+| **LogLevel / LogCategory** | `log-levels.ts` | 7 levels (TRACE→OFF, RFC 5424-aligned), 14 categories, env-var parsing |
 | **ScimLogger** | `scim-logger.service.ts` | Singleton: `AsyncLocalStorage` correlation, ring buffer (500), level filtering, secret redaction, SSE |
 | **RequestLoggingInterceptor** | `request-logging.interceptor.ts` | Global interceptor: `X-Request-Id` propagation, HTTP bookend logs, body capture at TRACE |
 | **LogConfigController** | `log-config.controller.ts` | REST admin API: 10 endpoints for runtime log management |

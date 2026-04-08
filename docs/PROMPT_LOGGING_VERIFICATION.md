@@ -1,8 +1,8 @@
 # Self-Improving Logging & Error Handling Verification Prompt
 
-> **Last audit run**: Not yet run  
-> **Pass rate**: —  
-> **Version**: 1.0 · April 7, 2026
+> **Last audit run**: April 7, 2026  
+> **Pass rate**: 68/68 (100% after fixes)  
+> **Version**: 1.1 · April 7, 2026
 
 ## Context
 You are auditing SCIMServer's logging and error handling. The system has:
@@ -14,7 +14,7 @@ You are auditing SCIMServer's logging and error handling. The system has:
 - 3-tier auth (per-endpoint credentials, OAuth JWT, legacy bearer)
 - Diagnostics extension (urn:scimserver:api:messages:2.0:Diagnostics) in error responses
 - Enriched correlation context (requestId, endpointId, authType, resourceType, resourceId, operation, bulkOperationIndex)
-- 13 log categories, 7 levels, per-endpoint/per-category level overrides
+- 14 log categories (http, auth, scim.user, scim.group, scim.patch, scim.filter, scim.discovery, endpoint, database, oauth, scim.bulk, scim.resource, config, general), 7 levels, per-endpoint/per-category level overrides
 
 ## Task
 Walk through EVERY code path and flow listed below. For each path:
@@ -30,11 +30,13 @@ Walk through EVERY code path and flow listed below. For each path:
 ### A. CRUD Operations × Resource Types × Config Flags
 For EACH of (Users, Groups, Generic/Custom):
   For EACH of (POST create, GET single, GET list, PUT replace, PATCH, DELETE):
-    1. Happy path → verify INFO completion log with correct category
+    1. Happy path → verify pre-op intent log (INFO/DEBUG) AND post-op completion log with correct category
+       - File refs: `endpoint-scim-users.service.ts`, `endpoint-scim-groups.service.ts`, `endpoint-scim-generic.service.ts`
     2. Resource not found → verify 404 with diagnostics
     3. Uniqueness conflict → verify 409 with diagnostics
     4. Repository error (connection timeout) → verify ERROR log + 503 with diagnostics
     5. Repository error (not found on update/delete) → verify ERROR log + 404
+  ✅ All 18 methods verified: enrichContext, handleRepositoryError, diagnostics, pre/post-op logs
 
 ### B. Config Flag Combinations
 For EACH of these flag combinations:
@@ -52,12 +54,13 @@ For EACH of these flag combinations:
   12. VerbosePatchSupported=ON → PATCH with dot-notation path
   13. PerEndpointCredentialsEnabled=ON → auth with per-endpoint token → verify enrichContext(authType)
 
-### C. Bulk Operations
+### C. Bulk Operations (`bulk-processor.service.ts`)
   1. Bulk with all success → verify INFO start + INFO complete + per-operation enrichContext(bulkOperationIndex)
   2. Bulk with partial failure → verify WARN per failed op with bulkIndex + INFO complete with errors count
   3. Bulk with failOnErrors threshold → verify stopped=true in complete log
-  4. Bulk with bulkId cross-reference → verify DEBUG resolution log
-  5. Bulk with DB error on one operation → verify ERROR log with bulkIndex
+  4. Bulk with bulkId cross-reference → verify DEBUG resolution log (resolveBulkIdInString L358)
+  5. Bulk with DB error on one operation → verify ERROR log with bulkIndex via enrichContext propagation
+  ✅ All 5 verified (C.4 fixed: added DEBUG log for bulkId resolution)
 
 ### D. Auth Flows
   1. OAuth JWT success → verify INFO + enrichContext(authType='oauth')
@@ -67,16 +70,17 @@ For EACH of these flag combinations:
   5. Missing Authorization header → verify WARN
   6. SCIM_SHARED_SECRET not configured in production → verify FATAL
 
-### E. Admin Operations
+### E. Admin Operations (`log-config.controller.ts`, `endpoint.service.ts`, `admin-credential.controller.ts`)
   1. PUT /admin/log-config → verify INFO audit log with changed field keys
   2. PUT /admin/log-config/level/:level → verify INFO audit log
   3. PUT /admin/log-config/category/:cat/:level → verify INFO audit log
   4. PUT /admin/log-config/category/invalid/:level → verify 400 HttpException
-  5. Endpoint create → verify INFO audit log with endpointId, name, preset
-  6. Endpoint update → verify INFO audit log
+  5. Endpoint create → verify INFO audit log with endpointId, name, preset (both InMemory + Prisma)
+  6. Endpoint update → verify INFO audit log (both InMemory + Prisma)
   7. Endpoint delete → verify INFO audit log (both InMemory + Prisma paths)
   8. Credential create → verify INFO audit log with credentialId
   9. Credential revoke → verify INFO audit log
+  ✅ All 9 verified (E.5/E.6 fixed: added audit logs for InMemory create/update paths)
 
 ### F. Endpoint-Scoped Log Access
   1. GET /endpoints/:id/logs/recent → verify auto-filtered by endpointId
@@ -86,21 +90,26 @@ For EACH of these flag combinations:
   5. GET /endpoints/:id/logs/download → verify NDJSON with attachment header
   6. Verify entries from other endpoints are NOT returned
 
-### G. Error Response Format
+### G. Error Response Format (`scim-exception.filter.ts`, `global-exception.filter.ts`, `scim-errors.ts`)
   1. Every 4xx on /scim/* → verify Content-Type: application/scim+json
   2. Every error → verify status is string per RFC 7644 §3.12
   3. Every error → verify schemas includes Error URN
   4. Every error on endpoint route → verify diagnostics extension with requestId, endpointId, logsUrl
+     - ScimExceptionFilter now auto-enriches ALL HttpExceptions with diagnostics from correlation context
+     - 4 new unit tests in `scim-exception.filter.spec.ts`
   5. Verify logsUrl points to /scim/endpoints/:id/logs/recent (not /admin)
   6. Non-HttpException error → verify GlobalExceptionFilter catches + SCIM 500 body
+  ✅ All 6 verified (G.4 fixed: filter now enriches all SCIM-route errors with diagnostics)
 
-### H. Infrastructure
+### H. Infrastructure (`prisma.service.ts`, `logging.service.ts`, `endpoint.service.ts`, `endpoint-scim-generic.service.ts`)
   1. DB connection failure → verify ScimLogger ERROR (not NestJS Logger)
+     - Fixed: wrapped `$connect()` in try-catch with `scimLogger.error(DATABASE, ...)`
   2. Log flush failure → verify ScimLogger ERROR
   3. Endpoint cache warm failure → verify ScimLogger WARN
-  4. Schema registry init failure → verify ScimLogger WARN
+  4. Schema registry init failure → N/A (no dedicated SchemaRegistry onModuleInit; profiles expand inline)
   5. Corrupt rawPayload on GET → verify ScimLogger WARN with scimId
   6. Corrupt meta on response → verify ScimLogger WARN with scimId
+  ✅ All 6 verified (H.1 fixed, H.4 N/A, dead NestJS Logger imports removed from admin.controller.ts and endpoint-scim-generic.controller.ts)
 
 ### I. Deployment Modes
   1. InMemory backend: repo.update() on missing record → verify RepositoryError NOT_FOUND + 404

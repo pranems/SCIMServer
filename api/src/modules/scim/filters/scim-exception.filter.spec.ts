@@ -1,8 +1,9 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { ScimExceptionFilter } from './scim-exception.filter';
 import { createScimError } from '../common/scim-errors';
-import { SCIM_ERROR_SCHEMA } from '../common/scim-constants';
+import { SCIM_ERROR_SCHEMA, SCIM_DIAGNOSTICS_URN } from '../common/scim-constants';
 import { ScimLogger } from '../../logging/scim-logger.service';
+import * as scimLoggerModule from '../../logging/scim-logger.service';
 
 describe('ScimExceptionFilter', () => {
   let filter: ScimExceptionFilter;
@@ -161,6 +162,72 @@ describe('ScimExceptionFilter', () => {
 
       const body = mockResponse.json.mock.calls[0][0];
       expect(body.detail).toBe('Not Acceptable');
+    });
+  });
+
+  describe('Diagnostics enrichment (G.4)', () => {
+    let getCtxSpy: jest.SpyInstance;
+
+    afterEach(() => {
+      getCtxSpy?.mockRestore();
+    });
+
+    it('should add diagnostics extension to non-createScimError HttpExceptions when correlation context exists', () => {
+      getCtxSpy = jest.spyOn(scimLoggerModule, 'getCorrelationContext').mockReturnValue({
+        requestId: 'req-abc',
+        endpointId: 'ep-123',
+      } as any);
+
+      const exception = new HttpException('Not Found', HttpStatus.NOT_FOUND);
+      filter.catch(exception, mockHost);
+
+      const body = mockResponse.json.mock.calls[0][0];
+      expect(body[SCIM_DIAGNOSTICS_URN]).toBeDefined();
+      expect(body[SCIM_DIAGNOSTICS_URN].requestId).toBe('req-abc');
+      expect(body[SCIM_DIAGNOSTICS_URN].endpointId).toBe('ep-123');
+      expect(body[SCIM_DIAGNOSTICS_URN].logsUrl).toBe('/scim/endpoints/ep-123/logs/recent?requestId=req-abc');
+    });
+
+    it('should use admin logsUrl when no endpointId in correlation context', () => {
+      getCtxSpy = jest.spyOn(scimLoggerModule, 'getCorrelationContext').mockReturnValue({
+        requestId: 'req-xyz',
+      } as any);
+
+      const exception = new HttpException('Bad Request', HttpStatus.BAD_REQUEST);
+      filter.catch(exception, mockHost);
+
+      const body = mockResponse.json.mock.calls[0][0];
+      expect(body[SCIM_DIAGNOSTICS_URN]).toBeDefined();
+      expect(body[SCIM_DIAGNOSTICS_URN].requestId).toBe('req-xyz');
+      expect(body[SCIM_DIAGNOSTICS_URN].logsUrl).toBe('/scim/admin/log-config/recent?requestId=req-xyz');
+    });
+
+    it('should NOT add diagnostics when no correlation context', () => {
+      getCtxSpy = jest.spyOn(scimLoggerModule, 'getCorrelationContext').mockReturnValue(undefined);
+
+      const exception = new HttpException('Server Error', HttpStatus.INTERNAL_SERVER_ERROR);
+      filter.catch(exception, mockHost);
+
+      const body = mockResponse.json.mock.calls[0][0];
+      expect(body[SCIM_DIAGNOSTICS_URN]).toBeUndefined();
+    });
+
+    it('should NOT overwrite existing diagnostics from createScimError', () => {
+      getCtxSpy = jest.spyOn(scimLoggerModule, 'getCorrelationContext').mockReturnValue({
+        requestId: 'req-222',
+        endpointId: 'ep-333',
+      } as any);
+
+      const exception = createScimError({
+        status: 400,
+        detail: 'Schema validation failed',
+        diagnostics: { triggeredBy: 'StrictSchemaValidation' },
+      });
+      filter.catch(exception, mockHost);
+
+      const body = mockResponse.json.mock.calls[0][0];
+      // Diagnostics should come from createScimError, not the filter
+      expect(body[SCIM_DIAGNOSTICS_URN].triggeredBy).toBe('StrictSchemaValidation');
     });
   });
 });

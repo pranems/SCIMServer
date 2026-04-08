@@ -9,7 +9,6 @@
   Param,
   NotFoundException,
   Req,
-  Logger
 } from '@nestjs/common';
 import type { Request } from 'express';
 import os from 'node:os';
@@ -101,7 +100,6 @@ const serviceBootTime = new Date();
 
 @Controller('admin')
 export class AdminController {
-  private readonly logger = new Logger(AdminController.name);
   constructor(
     private readonly loggingService: LoggingService,
     private readonly prisma: PrismaService,

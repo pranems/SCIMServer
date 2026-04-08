@@ -152,6 +152,7 @@ export class EndpointScimGenericService {
     config?: EndpointConfig,
   ): Promise<Record<string, unknown>> {
     this.scimLogger.enrichContext({ resourceType: resourceType.name, operation: 'create' });
+    this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Creating ${resourceType.name}`, { endpointId });
     const coreSchema = resourceType.schema;
 
     // GEN-11: Validate schemas array includes the core schema (same as ensureSchema)
@@ -270,6 +271,7 @@ export class EndpointScimGenericService {
     config?: EndpointConfig,
   ): Promise<Record<string, unknown>> {
     this.scimLogger.enrichContext({ resourceType: resourceType.name, resourceId: scimId, operation: 'get' });
+    this.scimLogger.debug(LogCategory.SCIM_RESOURCE, `Get ${resourceType.name}`, { scimId, endpointId });
     const record = await this.genericRepo.findByScimId(
       endpointId,
       resourceType.name,
@@ -299,6 +301,7 @@ export class EndpointScimGenericService {
     config?: EndpointConfig,
   ): Promise<Record<string, unknown>> {
     this.scimLogger.enrichContext({ resourceType: resourceType.name, operation: 'list' });
+    this.scimLogger.info(LogCategory.SCIM_RESOURCE, `List ${resourceType.name}`, { endpointId, filter: params.filter });
     const startIndex = Math.max(params.startIndex ?? 1, 1);
     const count = Math.min(Math.max(params.count ?? DEFAULT_COUNT, 0), MAX_COUNT);
 
@@ -384,6 +387,7 @@ export class EndpointScimGenericService {
     ifMatch?: string,
   ): Promise<Record<string, unknown>> {
     this.scimLogger.enrichContext({ resourceType: resourceType.name, resourceId: scimId, operation: 'replace' });
+    this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Replace ${resourceType.name} (PUT)`, { scimId, endpointId });
     const coreSchema = resourceType.schema;
 
     // GEN-11: Validate schemas array includes the core schema
@@ -506,6 +510,7 @@ export class EndpointScimGenericService {
     ifMatch?: string,
   ): Promise<Record<string, unknown>> {
     this.scimLogger.enrichContext({ resourceType: resourceType.name, resourceId: scimId, operation: 'patch' });
+    this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Patch ${resourceType.name}`, { scimId, endpointId });
     // Validate PATCH schema
     ensureSchema(patchDto.schemas, SCIM_PATCH_SCHEMA);
 
@@ -707,6 +712,7 @@ export class EndpointScimGenericService {
     ifMatch?: string,
   ): Promise<void> {
     this.scimLogger.enrichContext({ resourceType: resourceType.name, resourceId: scimId, operation: 'delete' });
+    this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Delete ${resourceType.name}`, { scimId, endpointId });
     const existing = await this.genericRepo.findByScimId(
       endpointId,
       resourceType.name,
