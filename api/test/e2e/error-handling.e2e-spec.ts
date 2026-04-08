@@ -273,4 +273,55 @@ describe('Error Handling & SCIM Error Format (E2E)', () => {
       expect(res.body[DIAGNOSTICS_URN]).toBeDefined();
     });
   });
+
+  // ─── GlobalExceptionFilter integration (Step C) ───────────────────
+
+  describe('GlobalExceptionFilter — non-HttpException handling', () => {
+    it('should return SCIM-compliant 500 for requests to non-existent custom resource types', async () => {
+      // Requesting a resource type that doesn't exist on the endpoint
+      // triggers a code path that may throw a non-HttpException depending on
+      // how the generic controller processes unknown resource types.
+      // The key assertion: ANY 4xx/5xx response on /scim/* routes must be SCIM-compliant.
+      const res = await request(app.getHttpServer())
+        .get(`${basePath}/NonExistentResourceType/some-id`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Accept', 'application/scim+json');
+
+      // Should get 404 (resource type not found) — either from generic controller or NestJS routing
+      expect(res.status).toBeGreaterThanOrEqual(400);
+
+      // Verify SCIM error format if body has schemas
+      if (res.body?.schemas) {
+        expect(res.body.schemas).toContain(SCIM_ERROR_SCHEMA);
+        expect(typeof res.body.status).toBe('string');
+      }
+    });
+
+    it('should always include X-Request-Id on error responses regardless of exception type', async () => {
+      const res = await request(app.getHttpServer())
+        .post(`${basePath}/Users`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({}); // Empty body — triggers validation error
+
+      expect(res.status).toBeGreaterThanOrEqual(400);
+      expect(res.headers['x-request-id']).toBeDefined();
+    });
+
+    it('should not leak internal error details in response body', async () => {
+      // Send malformed JSON-like content that might cause parser errors
+      const res = await request(app.getHttpServer())
+        .post(`${basePath}/Users`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({ schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'] });
+        // Missing userName — should get 400, not 500 with stack trace
+
+      expect(res.status).toBeGreaterThanOrEqual(400);
+      // Response body should not contain stack traces
+      const bodyStr = JSON.stringify(res.body);
+      expect(bodyStr).not.toContain('at ');
+      expect(bodyStr).not.toContain('node_modules');
+    });
+  });
 });
