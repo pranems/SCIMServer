@@ -294,6 +294,7 @@ export class EndpointScimGenericService {
       throw createScimError({
         status: 404,
         detail: `${resourceType.name} "${scimId}" not found.`,
+        diagnostics: {},
       });
     }
 
@@ -327,11 +328,12 @@ export class EndpointScimGenericService {
     let filterResult: ReturnType<typeof buildGenericFilter>;
     try {
       filterResult = buildGenericFilter(params.filter);
-    } catch {
+    } catch (e) {
       throw createScimError({
         status: 400,
         scimType: 'invalidFilter',
         detail: `Invalid or unsupported filter expression: '${params.filter}'.`,
+        diagnostics: { parseError: (e as Error).message },
       });
     }
 
@@ -424,6 +426,7 @@ export class EndpointScimGenericService {
       throw createScimError({
         status: 404,
         detail: `${resourceType.name} "${scimId}" not found.`,
+        diagnostics: {},
       });
     }
 
@@ -545,6 +548,7 @@ export class EndpointScimGenericService {
       throw createScimError({
         status: 404,
         detail: `${resourceType.name} "${scimId}" not found.`,
+        diagnostics: {},
       });
     }
 
@@ -597,6 +601,7 @@ export class EndpointScimGenericService {
             status: 400,
             scimType: preResult.errors[0]?.scimType ?? 'invalidValue',
             detail: `PATCH operation value validation failed: ${messages}`,
+            diagnostics: {},
           });
         }
       }
@@ -754,6 +759,7 @@ export class EndpointScimGenericService {
       throw createScimError({
         status: 404,
         detail: `${resourceType.name} "${scimId}" not found.`,
+        diagnostics: {},
       });
     }
 
@@ -881,6 +887,7 @@ export class EndpointScimGenericService {
             detail:
               `Extension URN "${key}" found in request body but not declared in schemas[]. ` +
               `When StrictSchemaValidation is enabled, all extension URNs must be listed in the schemas array.`,
+            diagnostics: {},
           });
         }
         if (keyLower !== resourceType.schema.toLowerCase() && !registeredLower.has(keyLower)) {
@@ -890,6 +897,7 @@ export class EndpointScimGenericService {
             detail:
               `Extension URN "${key}" is not a registered extension schema for this resource type. ` +
               `Registered extensions: [${registeredUrns.join(', ')}].`,
+            diagnostics: {},
           });
         }
       }
@@ -925,6 +933,7 @@ export class EndpointScimGenericService {
         status: 400,
         scimType: result.errors[0]?.scimType ?? 'invalidValue',
         detail: `Schema validation failed: ${details}`,
+        diagnostics: {},
       });
     }
   }
@@ -1032,6 +1041,7 @@ export class EndpointScimGenericService {
         status: 400,
         scimType: 'mutability',
         detail: `Immutable attribute violation: ${details}`,
+        diagnostics: {},
       });
     }
   }
@@ -1250,6 +1260,7 @@ export class EndpointScimGenericService {
         status: 400,
         scimType: 'invalidFilter',
         detail: `Filter validation failed: ${details}`,
+        diagnostics: {},
       });
     }
   }

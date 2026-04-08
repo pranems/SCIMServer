@@ -169,7 +169,7 @@ export class EndpointScimUsersService {
     
     if (!user) {
       this.logger.debug(LogCategory.SCIM_USER, 'User not found', { scimId, endpointId });
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: {} });
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
@@ -194,11 +194,12 @@ export class EndpointScimUsersService {
     let filterResult;
     try {
       filterResult = buildUserFilter(filter, this.schemaHelpers.getCaseExactAttributes(endpointId));
-    } catch {
+    } catch (e) {
       throw createScimError({
         status: 400,
         scimType: 'invalidFilter',
-        detail: `Unsupported or invalid filter expression: '${filter}'.`
+        detail: `Unsupported or invalid filter expression: '${filter}'.`,
+        diagnostics: { parseError: (e as Error).message },
       });
     }
 
@@ -263,7 +264,7 @@ export class EndpointScimUsersService {
     const user = await this.userRepo.findByScimId(endpointId, scimId);
     
     if (!user) {
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: {} });
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
@@ -316,7 +317,7 @@ export class EndpointScimUsersService {
     const user = await this.userRepo.findByScimId(endpointId, scimId);
     
     if (!user) {
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: {} });
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
@@ -371,7 +372,7 @@ export class EndpointScimUsersService {
 
     if (!user) {
       this.logger.debug(LogCategory.SCIM_USER, 'Delete target not found', { scimId, endpointId });
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: {} });
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations (double-delete)
@@ -423,7 +424,7 @@ export class EndpointScimUsersService {
       this.logger.warn(LogCategory.SCIM_USER, 'Reprovision target vanished between conflict check and fetch', {
         scimId: existingScimId, endpointId,
       });
-      throw createScimError({ status: 500, detail: 'Failed to locate soft-deleted resource for re-provisioning.' });
+      throw createScimError({ status: 500, detail: 'Failed to locate soft-deleted resource for re-provisioning.', diagnostics: {} });
     }
 
     const now = new Date();
@@ -566,6 +567,7 @@ export class EndpointScimUsersService {
             status: 400,
             scimType: preResult.errors[0]?.scimType ?? 'invalidValue',
             detail: `PATCH operation value validation failed: ${messages}`,
+            diagnostics: {},
           });
         }
       }

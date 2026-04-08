@@ -216,7 +216,7 @@ export class EndpointScimGroupsService {
     const group = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!group) {
       this.logger.debug(LogCategory.SCIM_GROUP, 'Group not found', { scimId, endpointId });
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: {} });
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
@@ -242,11 +242,12 @@ export class EndpointScimGroupsService {
     let filterResult;
     try {
       filterResult = buildGroupFilter(filter, this.schemaHelpers.getCaseExactAttributes(endpointId));
-    } catch {
+    } catch (e) {
       throw createScimError({
         status: 400,
         scimType: 'invalidFilter',
-        detail: `Unsupported or invalid filter expression: '${filter}'.`
+        detail: `Unsupported or invalid filter expression: '${filter}'.`,
+        diagnostics: { parseError: (e as Error).message },
       });
     }
 
@@ -303,7 +304,7 @@ export class EndpointScimGroupsService {
 
     const group = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!group) {
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: {} });
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
@@ -370,6 +371,7 @@ export class EndpointScimGroupsService {
             status: 400,
             scimType: preResult.errors[0]?.scimType ?? 'invalidValue',
             detail: `PATCH operation value validation failed: ${messages}`,
+            diagnostics: {},
           });
         }
       }
@@ -454,7 +456,7 @@ export class EndpointScimGroupsService {
     // RFC 7644 §3.5.2: Return the updated resource with 200 OK
     const updatedGroup = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!updatedGroup) {
-      throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.' });
+      throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.', diagnostics: {} });
     }
 
     this.logger.info(LogCategory.SCIM_PATCH, 'Group patched', { scimId, endpointId });
@@ -493,7 +495,7 @@ export class EndpointScimGroupsService {
 
     const group = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!group) {
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: {} });
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
@@ -546,7 +548,7 @@ export class EndpointScimGroupsService {
     // Return updated group
     const updatedGroup = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!updatedGroup) {
-      throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.' });
+      throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.', diagnostics: {} });
     }
 
     this.logger.info(LogCategory.SCIM_GROUP, 'Group replaced', { scimId, displayName: dto.displayName, endpointId });
@@ -560,7 +562,7 @@ export class EndpointScimGroupsService {
 
     if (!group) {
       this.logger.debug(LogCategory.SCIM_GROUP, 'Delete target group not found', { scimId, endpointId });
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: {} });
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations (double-delete)
@@ -610,7 +612,7 @@ export class EndpointScimGroupsService {
       this.logger.warn(LogCategory.SCIM_GROUP, 'Reprovision target vanished between conflict check and fetch', {
         scimId: existingScimId, endpointId,
       });
-      throw createScimError({ status: 500, detail: 'Failed to locate soft-deleted group for re-provisioning.' });
+      throw createScimError({ status: 500, detail: 'Failed to locate soft-deleted group for re-provisioning.', diagnostics: {} });
     }
 
     const now = new Date();
@@ -752,7 +754,7 @@ export class EndpointScimGroupsService {
 
   private toScimGroupResource(group: GroupWithMembers | null, baseUrl: string, endpointId?: string): ScimGroupResource {
     if (!group) {
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: 'Resource not found.' });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: 'Resource not found.', diagnostics: {} });
     }
 
     const meta = this.buildMeta(group, baseUrl);
