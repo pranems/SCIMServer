@@ -374,6 +374,7 @@ export class EndpointService implements OnModuleInit {
       };
       this.cacheSet(cached);
       this.syncEndpointLogLevel(cached.id, resolvedProfile.settings);
+      this.syncEndpointFileLogging(cached.id, dto.name, resolvedProfile.settings);
       this.profileChangeListener?.(cached.id, resolvedProfile);
       this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint created', {
         endpointId: cached.id, name: dto.name, preset: dto.profilePreset ?? 'custom',
@@ -402,6 +403,7 @@ export class EndpointService implements OnModuleInit {
     const cached = this.toCached(endpoint);
     this.cacheSet(cached);
     this.syncEndpointLogLevel(endpoint.id, resolvedProfile.settings);
+    this.syncEndpointFileLogging(endpoint.id, dto.name, resolvedProfile.settings);
     this.profileChangeListener?.(endpoint.id, resolvedProfile);
     this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint created', {
       endpointId: endpoint.id, name: dto.name, preset: dto.profilePreset ?? 'custom',
@@ -534,6 +536,7 @@ export class EndpointService implements OnModuleInit {
       this.cacheSet(updated);
       if (dto.profile?.settings) {
         this.syncEndpointLogLevel(endpointId, dto.profile.settings as Record<string, any>);
+        this.syncEndpointFileLogging(endpointId, updated.name, dto.profile.settings as Record<string, any>);
       }
       this.profileChangeListener?.(endpointId, updated.profile ?? null);
       this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint updated', {
@@ -582,6 +585,7 @@ export class EndpointService implements OnModuleInit {
 
     if (dto.profile?.settings) {
       this.syncEndpointLogLevel(endpointId, dto.profile.settings as Record<string, any>);
+      this.syncEndpointFileLogging(endpointId, cached.name, dto.profile.settings as Record<string, any>);
     }
     this.profileChangeListener?.(endpointId, cached.profile ?? null);
 
@@ -823,6 +827,16 @@ export class EndpointService implements OnModuleInit {
       this.scimLogger.info(LogCategory.ENDPOINT, `Set log level ${logLevelName(level)} for endpoint ${endpointId}`);
     } else {
       this.scimLogger.clearEndpointLevel(endpointId);
+    }
+  }
+
+  /** Sync per-endpoint file logging based on logFileEnabled setting. */
+  private syncEndpointFileLogging(endpointId: string, endpointName: string, settings?: Record<string, any> | null): void {
+    const enabled = settings?.logFileEnabled;
+    if (enabled === true || enabled === 'True' || enabled === 'true') {
+      this.scimLogger.enableEndpointFileLogging(endpointId, endpointName);
+    } else {
+      this.scimLogger.disableEndpointFileLogging(endpointId);
     }
   }
 }

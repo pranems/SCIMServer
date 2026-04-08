@@ -91,6 +91,8 @@ export interface ProfileSettings {
   IncludeWarningAboutIgnoredReadOnlyAttribute?: boolean | string;
   /** Strip (don't reject) readOnly PATCH ops */
   IgnoreReadOnlyAttributesInPatch?: boolean | string;
+  /** Enable per-endpoint log file under logs/endpoints/ */
+  logFileEnabled?: boolean | string;
   /** Allow any additional settings */
   [key: string]: unknown;
 }

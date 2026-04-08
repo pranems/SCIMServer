@@ -67,6 +67,8 @@ describe('EndpointService', () => {
             enrichContext: jest.fn(),
             setEndpointLevel: jest.fn(),
             clearEndpointLevel: jest.fn(),
+            enableEndpointFileLogging: jest.fn(),
+            disableEndpointFileLogging: jest.fn(),
           },
         },
       ],
