@@ -77,7 +77,7 @@ describe('Log Configuration API (E2E)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(res.body.availableCategories).toHaveLength(13);
+      expect(res.body.availableCategories).toHaveLength(14);
       expect(res.body.availableCategories).toContain('http');
       expect(res.body.availableCategories).toContain('scim.user');
       expect(res.body.availableCategories).toContain('scim.patch');

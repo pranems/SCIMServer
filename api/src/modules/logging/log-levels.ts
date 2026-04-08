@@ -70,6 +70,8 @@ export enum LogCategory {
   SCIM_BULK = 'scim.bulk',
   /** SCIM custom resource type operations */
   SCIM_RESOURCE = 'scim.resource',
+  /** Admin configuration changes (log levels, settings) */
+  CONFIG = 'config',
   /** General / uncategorized */
   GENERAL = 'general',
 }
