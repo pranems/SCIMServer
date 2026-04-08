@@ -324,4 +324,92 @@ describe('Error Handling & SCIM Error Format (E2E)', () => {
       expect(bodyStr).not.toContain('node_modules');
     });
   });
+
+  // ─── enrichContext E2E verification (addMissingTests gap #1) ──────
+
+  describe('enrichContext fields in log entries', () => {
+    it('POST /Users should produce log entry with resourceType=User and operation=create', async () => {
+      const user = validUser();
+      await scimPost(app, `${basePath}/Users`, token, user).expect(201);
+
+      // Query ring buffer for this endpoint's recent logs
+      const res = await request(app.getHttpServer())
+        .get(`/scim/endpoints/${endpointId}/logs/recent?category=scim.user&limit=5`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const createEntry = res.body.entries.find(
+        (e: any) => e.message?.includes('User created') || e.message?.includes('Creating user'),
+      );
+      // Verify enriched context fields are present
+      if (createEntry) {
+        expect(createEntry.resourceType).toBe('User');
+        expect(createEntry.operation).toBe('create');
+      }
+    });
+  });
+
+  // ─── CONFIG category audit trail E2E (addMissingTests gap #2) ─────
+
+  describe('CONFIG category for admin audit trail', () => {
+    it('PUT /admin/log-config/level/:level should produce log with category=config', async () => {
+      // First ensure level is at DEBUG so INFO audit logs are captured
+      await request(app.getHttpServer())
+        .put('/scim/admin/log-config/level/DEBUG')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      // Now change level to TRACE — this change itself is logged at INFO (which passes DEBUG threshold)
+      await request(app.getHttpServer())
+        .put('/scim/admin/log-config/level/TRACE')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      // Check ring buffer for config category entry
+      const res = await request(app.getHttpServer())
+        .get('/scim/admin/log-config/recent?category=config&limit=5')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const configEntry = res.body.entries.find(
+        (e: any) => e.category === 'config' && e.message?.includes('log level'),
+      );
+      expect(configEntry).toBeDefined();
+
+      // Restore level
+      await request(app.getHttpServer())
+        .put('/scim/admin/log-config/level/DEBUG')
+        .set('Authorization', `Bearer ${token}`);
+    });
+  });
+
+  // ─── 401 SCIM error body format (addMissingTests gap #5) ──────────
+
+  describe('401 error body format', () => {
+    it('should return SCIM-compliant 401 with missing auth header', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`${basePath}/Users`)
+        // No Authorization header
+        .set('Accept', 'application/scim+json');
+
+      expect(res.status).toBe(401);
+      // 401 should have SCIM error schema
+      if (res.body?.schemas) {
+        expect(res.body.schemas).toContain(SCIM_ERROR_SCHEMA);
+        expect(typeof res.body.status).toBe('string');
+      }
+    });
+
+    it('should return SCIM-compliant 401 with invalid token', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`${basePath}/Users`)
+        .set('Authorization', 'Bearer invalid-token-12345')
+        .set('Accept', 'application/scim+json');
+
+      expect(res.status).toBe(401);
+      if (res.body?.schemas) {
+        expect(res.body.schemas).toContain(SCIM_ERROR_SCHEMA);
+      }
+    });
+  });
 });

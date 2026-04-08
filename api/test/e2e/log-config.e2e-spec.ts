@@ -71,7 +71,7 @@ describe('Log Configuration API (E2E)', () => {
       );
     });
 
-    it('should include all 12 available categories', async () => {
+    it('should include all 14 available categories', async () => {
       const res = await request(app.getHttpServer())
         .get('/scim/admin/log-config')
         .set('Authorization', `Bearer ${token}`)
