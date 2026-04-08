@@ -133,7 +133,7 @@ export class ScimLogger {
   private readonly maxRingBufferSize: number;
 
   /** Slow request threshold in milliseconds (configurable via LOG_SLOW_REQUEST_MS env var) */
-  static readonly DEFAULT_RING_BUFFER_SIZE = 500;
+  static readonly DEFAULT_RING_BUFFER_SIZE = 2000;
   static readonly DEFAULT_SLOW_REQUEST_MS = 2000;
 
   /** EventEmitter for real-time log streaming (SSE subscribers) */

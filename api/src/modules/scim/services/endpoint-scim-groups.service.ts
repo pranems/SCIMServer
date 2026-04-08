@@ -76,6 +76,7 @@ export class EndpointScimGroupsService {
   }
 
   async createGroupForEndpoint(dto: CreateGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimGroupResource> {
+    this.logger.enrichContext({ resourceType: 'Group', operation: 'create' });
     ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
     this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
 
@@ -115,10 +116,19 @@ export class EndpointScimGroupsService {
         return this.reprovisionGroup(displayNameConflict.scimId, dto, externalId, baseUrl, endpointId);
       }
 
+      this.logger.info(LogCategory.SCIM_GROUP, `Uniqueness conflict on POST: displayName '${dto.displayName}'`, {
+        endpointId, conflictScimId: displayNameConflict.scimId,
+      });
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
         detail: `A group with displayName '${dto.displayName}' already exists.`,
+        diagnostics: {
+          operation: 'create',
+          conflictingResourceId: displayNameConflict.scimId,
+          conflictingAttribute: 'displayName',
+          incomingValue: dto.displayName,
+        },
       });
     }
 
@@ -134,10 +144,19 @@ export class EndpointScimGroupsService {
           return this.reprovisionGroup(externalIdConflict.scimId, dto, externalId, baseUrl, endpointId);
         }
 
+        this.logger.info(LogCategory.SCIM_GROUP, `Uniqueness conflict on POST: externalId '${externalId}'`, {
+          endpointId, conflictScimId: externalIdConflict.scimId,
+        });
         throw createScimError({
           status: 409,
           scimType: 'uniqueness',
           detail: `A group with externalId '${externalId}' already exists.`,
+          diagnostics: {
+            operation: 'create',
+            conflictingResourceId: externalIdConflict.scimId,
+            conflictingAttribute: 'externalId',
+            incomingValue: externalId,
+          },
         });
       }
     }
@@ -192,11 +211,12 @@ export class EndpointScimGroupsService {
   }
 
   async getGroupForEndpoint(scimId: string, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimGroupResource> {
+    this.logger.enrichContext({ resourceType: 'Group', resourceId: scimId, operation: 'get' });
     this.logger.debug(LogCategory.SCIM_GROUP, 'Get group', { scimId, endpointId });
     const group = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!group) {
       this.logger.debug(LogCategory.SCIM_GROUP, 'Group not found', { scimId, endpointId });
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: {} });
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
@@ -211,6 +231,8 @@ export class EndpointScimGroupsService {
     endpointId: string,
     config?: EndpointConfig,
   ): Promise<ScimListResponse<ScimGroupResource>> {
+    this.logger.enrichContext({ resourceType: 'Group', operation: 'list' });
+
     if (count > MAX_COUNT) {
       count = MAX_COUNT;
     }
@@ -220,11 +242,12 @@ export class EndpointScimGroupsService {
     let filterResult;
     try {
       filterResult = buildGroupFilter(filter, this.schemaHelpers.getCaseExactAttributes(endpointId));
-    } catch {
+    } catch (e) {
       throw createScimError({
         status: 400,
         scimType: 'invalidFilter',
-        detail: `Unsupported or invalid filter expression: '${filter}'.`
+        detail: `Unsupported or invalid filter expression: '${filter}'.`,
+        diagnostics: { parseError: (e as Error).message },
       });
     }
 
@@ -270,6 +293,7 @@ export class EndpointScimGroupsService {
   }
 
   async patchGroupForEndpoint(scimId: string, dto: PatchGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig, ifMatch?: string): Promise<ScimGroupResource> {
+    this.logger.enrichContext({ resourceType: 'Group', resourceId: scimId, operation: 'patch' });
     ensureSchema(dto.schemas, SCIM_PATCH_SCHEMA);
 
     this.logger.info(LogCategory.SCIM_PATCH, 'Patch group', { scimId, endpointId, opCount: dto.Operations?.length });
@@ -280,7 +304,7 @@ export class EndpointScimGroupsService {
 
     const group = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!group) {
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: {} });
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
@@ -347,6 +371,7 @@ export class EndpointScimGroupsService {
             status: 400,
             scimType: preResult.errors[0]?.scimType ?? 'invalidValue',
             detail: `PATCH operation value validation failed: ${messages}`,
+            diagnostics: {},
           });
         }
       }
@@ -366,7 +391,7 @@ export class EndpointScimGroupsService {
       );
     } catch (err) {
       if (err instanceof PatchError) {
-        throw createScimError({ status: err.status, scimType: err.scimType, detail: err.message });
+        throw createScimError({ status: err.status, scimType: err.scimType, detail: err.message, diagnostics: { triggeredBy: 'PatchEngine' } });
       }
       throw err;
     }
@@ -431,7 +456,7 @@ export class EndpointScimGroupsService {
     // RFC 7644 §3.5.2: Return the updated resource with 200 OK
     const updatedGroup = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!updatedGroup) {
-      throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.' });
+      throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.', diagnostics: {} });
     }
 
     this.logger.info(LogCategory.SCIM_PATCH, 'Group patched', { scimId, endpointId });
@@ -446,6 +471,7 @@ export class EndpointScimGroupsService {
     config?: EndpointConfig,
     ifMatch?: string,
   ): Promise<ScimGroupResource> {
+    this.logger.enrichContext({ resourceType: 'Group', resourceId: scimId, operation: 'replace' });
     ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
     this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
 
@@ -469,7 +495,7 @@ export class EndpointScimGroupsService {
 
     const group = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!group) {
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: {} });
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
@@ -522,7 +548,7 @@ export class EndpointScimGroupsService {
     // Return updated group
     const updatedGroup = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!updatedGroup) {
-      throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.' });
+      throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.', diagnostics: {} });
     }
 
     this.logger.info(LogCategory.SCIM_GROUP, 'Group replaced', { scimId, displayName: dto.displayName, endpointId });
@@ -530,12 +556,13 @@ export class EndpointScimGroupsService {
   }
 
   async deleteGroupForEndpoint(scimId: string, endpointId: string, config?: EndpointConfig, ifMatch?: string): Promise<void> {
+    this.logger.enrichContext({ resourceType: 'Group', resourceId: scimId, operation: 'delete' });
     this.logger.info(LogCategory.SCIM_GROUP, 'Delete group', { scimId, endpointId });
     const group = await this.groupRepo.findByScimId(endpointId, scimId);
 
     if (!group) {
       this.logger.debug(LogCategory.SCIM_GROUP, 'Delete target group not found', { scimId, endpointId });
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: {} });
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations (double-delete)
@@ -582,7 +609,10 @@ export class EndpointScimGroupsService {
   ): Promise<ScimGroupResource> {
     const existing = await this.groupRepo.findWithMembers(endpointId, existingScimId);
     if (!existing) {
-      throw createScimError({ status: 500, detail: 'Failed to locate soft-deleted group for re-provisioning.' });
+      this.logger.warn(LogCategory.SCIM_GROUP, 'Reprovision target vanished between conflict check and fetch', {
+        scimId: existingScimId, endpointId,
+      });
+      throw createScimError({ status: 500, detail: 'Failed to locate soft-deleted group for re-provisioning.', diagnostics: {} });
     }
 
     const now = new Date();
@@ -633,10 +663,19 @@ export class EndpointScimGroupsService {
     const conflict = await this.groupRepo.findByDisplayName(endpointId, displayName, excludeScimId);
 
     if (conflict) {
+      this.logger.info(LogCategory.SCIM_GROUP, `Uniqueness conflict on PUT/PATCH: displayName '${displayName}'`, {
+        endpointId, conflictScimId: conflict.scimId,
+      });
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
-        detail: `A group with displayName '${displayName}' already exists.`
+        detail: `A group with displayName '${displayName}' already exists.`,
+        diagnostics: {
+          operation: 'replace',
+          conflictingResourceId: conflict.scimId,
+          conflictingAttribute: 'displayName',
+          incomingValue: displayName,
+        },
       });
     }
   }
@@ -652,10 +691,19 @@ export class EndpointScimGroupsService {
   ): Promise<void> {
     const existing = await this.groupRepo.findByExternalId(endpointId, externalId, excludeScimId);
     if (existing) {
+      this.logger.info(LogCategory.SCIM_GROUP, `Uniqueness conflict on PUT/PATCH: externalId '${externalId}'`, {
+        endpointId, conflictScimId: existing.scimId,
+      });
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
-        detail: `A group with externalId '${externalId}' already exists.`
+        detail: `A group with externalId '${externalId}' already exists.`,
+        diagnostics: {
+          operation: 'replace',
+          conflictingResourceId: existing.scimId,
+          conflictingAttribute: 'externalId',
+          incomingValue: externalId,
+        },
       });
     }
   }
@@ -706,7 +754,7 @@ export class EndpointScimGroupsService {
 
   private toScimGroupResource(group: GroupWithMembers | null, baseUrl: string, endpointId?: string): ScimGroupResource {
     if (!group) {
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: 'Resource not found.' });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: 'Resource not found.', diagnostics: {} });
     }
 
     const meta = this.buildMeta(group, baseUrl);

@@ -74,7 +74,7 @@ describe('LogConfigController', () => {
 
     it('should include all available categories', () => {
       const result = controller.getConfig();
-      expect(result.availableCategories).toHaveLength(13);
+      expect(result.availableCategories).toHaveLength(14);
       expect(result.availableCategories).toContain('http');
       expect(result.availableCategories).toContain('scim.user');
       expect(result.availableCategories).toContain('scim.patch');
@@ -190,7 +190,7 @@ describe('LogConfigController', () => {
         expect(e.getStatus()).toBe(400);
         const body = e.getResponse();
         expect(body.error).toContain("Unknown category 'nonexistent'");
-        expect(body.availableCategories).toHaveLength(13);
+        expect(body.availableCategories).toHaveLength(14);
       }
     });
 
@@ -305,6 +305,13 @@ describe('LogConfigController', () => {
       const result = controller.getRecentLogs(undefined, 'FATAL');
       expect(result.count).toBe(0);
       expect(result.entries).toHaveLength(0);
+    });
+
+    it('should include hint when ring buffer returns empty with requestId filter (P8)', () => {
+      const result = controller.getRecentLogs(undefined, undefined, undefined, 'nonexistent-req-id') as any;
+      expect(result.count).toBe(0);
+      expect(result.hint).toBeDefined();
+      expect(result.hint).toContain('/scim/admin/logs');
     });
   });
 
@@ -547,17 +554,36 @@ describe('LogConfigController', () => {
       controller.updateConfig({ globalLevel: 'WARN', includePayloads: false });
 
       const auditCall = infoSpy.mock.calls.find(
-        (c: any[]) => c[0] === LogCategory.ENDPOINT && c[1]?.includes('configuration updated'),
+        (c: any[]) => c[0] === LogCategory.CONFIG && c[1]?.includes('configuration updated'),
       );
       expect(auditCall).toBeDefined();
-      expect(auditCall[2].changes).toEqual(expect.arrayContaining(['globalLevel', 'includePayloads']));
+      expect(auditCall[2].changes).toHaveProperty('globalLevel');
+      expect(auditCall[2].changes).toHaveProperty('includePayloads');
+    });
+
+    it('updateConfig should log before/after values for changed fields (P8)', () => {
+      // Set initial state
+      controller.updateConfig({ globalLevel: 'INFO' });
+      infoSpy.mockClear();
+
+      // Change to WARN
+      controller.updateConfig({ globalLevel: 'WARN' });
+
+      const auditCall = infoSpy.mock.calls.find(
+        (c: any[]) => c[0] === LogCategory.CONFIG && c[1]?.includes('configuration updated'),
+      );
+      expect(auditCall).toBeDefined();
+      // Should have before/after values, not just key names
+      expect(auditCall[2].changes).toHaveProperty('globalLevel');
+      expect(auditCall[2].changes.globalLevel).toHaveProperty('from');
+      expect(auditCall[2].changes.globalLevel).toHaveProperty('to');
     });
 
     it('setGlobalLevel should log INFO with new level', () => {
       controller.setGlobalLevel('ERROR');
 
       const auditCall = infoSpy.mock.calls.find(
-        (c: any[]) => c[0] === LogCategory.ENDPOINT && c[1]?.includes('Global log level changed'),
+        (c: any[]) => c[0] === LogCategory.CONFIG && c[1]?.includes('Global log level changed'),
       );
       expect(auditCall).toBeDefined();
       expect(auditCall[1]).toContain('ERROR');
@@ -567,7 +593,7 @@ describe('LogConfigController', () => {
       controller.setCategoryLevel('auth', 'WARN');
 
       const auditCall = infoSpy.mock.calls.find(
-        (c: any[]) => c[0] === LogCategory.ENDPOINT && c[1]?.includes("Category 'auth'"),
+        (c: any[]) => c[0] === LogCategory.CONFIG && c[1]?.includes("Category 'auth'"),
       );
       expect(auditCall).toBeDefined();
       expect(auditCall[1]).toContain('WARN');
@@ -577,7 +603,7 @@ describe('LogConfigController', () => {
       controller.setEndpointLevel('ep-audit-1', 'TRACE');
 
       const auditCall = infoSpy.mock.calls.find(
-        (c: any[]) => c[0] === LogCategory.ENDPOINT && c[1]?.includes("Endpoint 'ep-audit-1'"),
+        (c: any[]) => c[0] === LogCategory.CONFIG && c[1]?.includes("Endpoint 'ep-audit-1'"),
       );
       expect(auditCall).toBeDefined();
       expect(auditCall[1]).toContain('TRACE');
@@ -588,7 +614,7 @@ describe('LogConfigController', () => {
       controller.clearEndpointLevel('ep-audit-2');
 
       const auditCall = infoSpy.mock.calls.find(
-        (c: any[]) => c[0] === LogCategory.ENDPOINT && c[1]?.includes("Endpoint 'ep-audit-2'") && c[1]?.includes('removed'),
+        (c: any[]) => c[0] === LogCategory.CONFIG && c[1]?.includes("Endpoint 'ep-audit-2'") && c[1]?.includes('removed'),
       );
       expect(auditCall).toBeDefined();
     });

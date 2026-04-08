@@ -192,8 +192,8 @@ export class LoggingService implements OnModuleDestroy {
               );
             }
           }
-        } catch {
-          // Best-effort: identifier backfill is non-critical
+        } catch (e) {
+          this.logger.debug(LogCategory.DATABASE, 'Identifier backfill failed (non-critical)', { error: (e as Error).message });
         }
       }
     } catch (persistError) {
@@ -564,6 +564,7 @@ export class LoggingService implements OnModuleDestroy {
       }
       return undefined;
     } catch {
+      this.logger.trace(LogCategory.DATABASE, 'deriveReportableIdentifier failed — returning undefined');
       return undefined;
     }
   }
@@ -608,12 +609,12 @@ export class LoggingService implements OnModuleDestroy {
             }
           }
         } catch (e) {
-          // Fall back to userName if payload parsing fails
+          this.logger.debug(LogCategory.DATABASE, 'Payload parsing failed in resolveUserDisplayName', { error: (e as Error).message });
         }
         return user.userName;
       }
     } catch (e) {
-      // If lookup fails, return null to use original identifier
+      this.logger.debug(LogCategory.DATABASE, 'User lookup failed in resolveUserDisplayName', { error: (e as Error).message });
     }
     return null;
   }
@@ -636,7 +637,7 @@ export class LoggingService implements OnModuleDestroy {
     if (typeof value === 'object') return value as Record<string, unknown>;
     try {
       return JSON.parse(String(value));
-    } catch { return undefined; }
+    } catch { this.logger.trace(LogCategory.DATABASE, 'normalizeObject JSON.parse failed'); return undefined; }
   }
 
   private safeParse(value: string | null): unknown {
@@ -644,6 +645,7 @@ export class LoggingService implements OnModuleDestroy {
     try {
       return JSON.parse(value);
     } catch {
+      this.logger.trace(LogCategory.DATABASE, 'safeParse JSON.parse failed');
       return undefined;
     }
   }

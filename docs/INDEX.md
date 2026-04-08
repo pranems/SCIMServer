@@ -1,7 +1,7 @@
 # 📚 SCIMServer Documentation Index
 
-> **Version:** 0.31.0 · **Updated:** March 31, 2026  
-> 55 active docs in `docs/` · 37 E2E suites (817 pass) · 74 unit suites (3,090 pass) · 6 built-in presets
+> **Version:** 0.32.0 · **Updated:** April 7, 2026  
+> 61 active docs in `docs/` · 42 E2E suites (889 pass) · 78 unit suites (3,197 pass) · 6 built-in presets
 
 ---
 
@@ -11,7 +11,7 @@
 |----------|-------------|
 | [README.md](../README.md) | Overview, quick start, architecture, compliance, deployment |
 | [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) | Living stats — LoC, test counts, dependency versions, architecture |
-| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 → v0.31.0 |
+| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 → v0.32.0 |
 | [admin.md](../admin.md) | Release workflow (version, tag, publish, update) |
 
 ## Deployment Guides
@@ -130,7 +130,7 @@
 | Example JSONs | [examples/](examples/) | Request/response samples for all resource types |
 | Mermaid Diagrams | [create-user-sequence.mmd](create-user-sequence.mmd), [list-get-user-sequence.mmd](list-get-user-sequence.mmd) | Sequence diagrams |
 
-> **Note:** All collections were regenerated for v0.31.0 with full 76-endpoint coverage including multi-tenant endpoint architecture, admin management, per-endpoint credentials, /Me, custom resource types, database browser, activity feed, and structured logging.
+> **Note:** All collections were regenerated for v0.32.0 with full 76-endpoint coverage including multi-tenant endpoint architecture, admin management, per-endpoint credentials, /Me, custom resource types, database browser, activity feed, and structured logging.
 
 ## Archived Documentation
 
@@ -140,12 +140,12 @@
 
 ---
 
-## Current Test Counts (v0.31.0)
+## Current Test Counts (v0.32.0)
 
 | Suite | Suites | Tests | Status |
 |-------|--------|-------|--------|
-| Unit | 74 | 3,090 | ✅ All pass |
-| E2E | 37 | 817 | ✅ All pass |
+| Unit | 78 | 3,197 | ✅ All pass |
+| E2E | 42 | 889 | ✅ All pass |
 | Live (main) | 43 sections | ~951 | ✅ All pass |
 | Live (Lexmark ISV) | 13 sections | 112 | ✅ All pass |
-| **Total** | **~167** | **~4,970** | **✅ All pass** |
+| **Total** | **~176** | **~5,149** | **✅ All pass** |

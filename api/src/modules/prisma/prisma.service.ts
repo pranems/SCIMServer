@@ -42,7 +42,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       this.scimLogger?.warn(LogCategory.DATABASE, 'PERSISTENCE_BACKEND=inmemory — skipping PostgreSQL connection');
       return;
     }
-    await this.$connect();
+    try {
+      await this.$connect();
+    } catch (error) {
+      this.scimLogger?.error(LogCategory.DATABASE, 'PostgreSQL connection failed', error as Error);
+      throw error;
+    }
     this.scimLogger?.info(LogCategory.DATABASE, 'PostgreSQL connected successfully');
     this.scimLogger?.info(LogCategory.DATABASE, `Using database: ${process.env.DATABASE_URL || 'postgresql://scim:scim@localhost:5432/scimdb (fallback)'}`);
   }

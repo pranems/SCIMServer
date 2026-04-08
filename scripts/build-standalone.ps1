@@ -31,6 +31,16 @@
     Node.js version to bundle when -IncludeNode is set.
     If omitted, auto-detects from the currently running node (e.g. "24.0.0").
 
+.PARAMETER IncludePostgres
+    Download and include portable PostgreSQL binaries in the package.
+    Auto-detects the latest PostgreSQL 17 version unless -PostgresVersion
+    is explicitly specified. Generates launcher scripts that initialize
+    and start PostgreSQL automatically.
+
+.PARAMETER PostgresVersion
+    PostgreSQL version to bundle when -IncludePostgres is set (default: 17.4-1).
+    Must match an EDB binary distribution version.
+
 .PARAMETER Port
     Default port for the launcher scripts (default: 8080).
     Users can always override at runtime via -Port or the PORT env var.
@@ -43,11 +53,14 @@
     .\build-standalone.ps1 -IncludeNode -Zip
     .\build-standalone.ps1 -Port 6000 -IncludeNode -Zip
     .\build-standalone.ps1 -IncludeNode -NodeVersion "22.12.0" -Zip
+    .\build-standalone.ps1 -IncludeNode -IncludePostgres -Zip
 #>
 param(
     [string]$OutputDir = "standalone",
     [switch]$IncludeNode,
     [string]$NodeVersion,
+    [switch]$IncludePostgres,
+    [string]$PostgresVersion = "17.4-1",
     [int]$Port = 8080,
     [switch]$Zip
 )
@@ -89,6 +102,9 @@ Write-Host "Port:     $Port (configurable at runtime)" -ForegroundColor Gray
 if ($IncludeNode) {
     Write-Host "Node.js:  v$NodeVersion (will be bundled)" -ForegroundColor Gray
 }
+if ($IncludePostgres) {
+    Write-Host "Postgres: v$PostgresVersion (will be bundled)" -ForegroundColor Gray
+}
 Write-Host ""
 
 # ── Step 1: Clean previous output ──
@@ -102,8 +118,13 @@ New-Item -ItemType Directory -Path $OutPath -Force | Out-Null
 Write-Host "[2/7] Installing API dependencies..." -ForegroundColor Yellow
 Push-Location $ApiDir
 try {
+    # Try npm ci first; fall back to npm install if file locks prevent clean install
     npm ci --no-audit --no-fund 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "npm ci failed" }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "       npm ci failed (file lock?), retrying with npm install..." -ForegroundColor Yellow
+        npm install --no-audit --no-fund 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
+    }
 } finally { Pop-Location }
 
 # ── Step 3: Generate Prisma client & build TypeScript ──
@@ -361,6 +382,25 @@ All settings can be configured via environment variables *before* running:
 
     set DATABASE_URL=postgresql://user:pass@host:5432/dbname
     start-postgres.bat
+$( if ($IncludePostgres) { @"
+
+## Bundled PostgreSQL (Fully Airgapped)
+
+Double-click **start-bundled-postgres.bat** — it will:
+1. Initialize a local PostgreSQL instance (first run only)
+2. Start PostgreSQL on port 5432
+3. Create the ``scimdb`` database
+4. Run Prisma migrations
+5. Start SCIMServer on port $Port
+
+PowerShell version with options:
+
+    .\start-bundled-postgres.ps1                       # defaults
+    .\start-bundled-postgres.ps1 -Port 6000            # custom SCIM port
+    .\start-bundled-postgres.ps1 -PgPort 5433          # custom PG port
+
+To stop PostgreSQL separately: ``stop-postgres.bat``
+"@ } )
 
 ## Requirements
 
@@ -376,7 +416,7 @@ All settings can be configured via environment variables *before* running:
     prisma/            Database schema & migrations (for PostgreSQL mode)
     start.bat          One-click launcher (in-memory mode)
     start.ps1          PowerShell launcher (configurable)
-    start-postgres.bat PostgreSQL launcher$( if ($IncludeNode) { "`n    node/              Bundled Node.js v$NodeVersion" } )
+    start-postgres.bat PostgreSQL launcher$( if ($IncludeNode) { "`n    node/              Bundled Node.js v$NodeVersion" } )$( if ($IncludePostgres) { "`n    pgsql/             Bundled PostgreSQL v$PostgresVersion`n    pgdata/            PostgreSQL data directory (auto-initialized)`n    start-bundled-postgres.bat   One-click PostgreSQL + SCIMServer`n    start-bundled-postgres.ps1   PowerShell PostgreSQL + SCIMServer`n    stop-postgres.bat            Stop bundled PostgreSQL" } )
 "@ | Set-Content -Path (Join-Path $OutPath "README.md") -Encoding UTF8
 
 # ── Step 6b: Optionally download portable Node.js ──
@@ -403,6 +443,238 @@ if ($IncludeNode) {
     }
 }
 
+# ── Step 6c: Optionally download portable PostgreSQL ──
+if ($IncludePostgres) {
+    Write-Host "[6c]   Downloading portable PostgreSQL v$PostgresVersion..." -ForegroundColor Yellow
+    $pgDir = Join-Path $OutPath "pgsql"
+    $pgDataDir = Join-Path $OutPath "pgdata"
+    New-Item -ItemType Directory -Path $pgDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $pgDataDir -Force | Out-Null
+    
+    # EDB provides ZIP binaries for Windows
+    $pgZipUrl = "https://get.enterprisedb.com/postgresql/postgresql-$PostgresVersion-windows-x64-binaries.zip"
+    $pgZipPath = Join-Path $env:TEMP "postgresql-portable.zip"
+    
+    try {
+        Write-Host "       Downloading from $pgZipUrl" -ForegroundColor Gray
+        Invoke-WebRequest -Uri $pgZipUrl -OutFile $pgZipPath -UseBasicParsing
+        Write-Host "       Extracting PostgreSQL binaries..." -ForegroundColor Gray
+        Expand-Archive -Path $pgZipPath -DestinationPath $OutPath -Force
+        Remove-Item -Force $pgZipPath -ErrorAction SilentlyContinue
+        Write-Host "       Portable PostgreSQL included at pgsql/" -ForegroundColor Green
+    } catch {
+        Write-Warning "Could not download PostgreSQL: `$_"
+        Write-Warning "You can manually download the ZIP binaries from https://www.enterprisedb.com/download-postgresql-binaries"
+        Write-Warning "Extract to $pgDir and the bundled launcher scripts will work."
+        $IncludePostgres = $false
+    }
+
+    if ($IncludePostgres) {
+        # --- start-bundled-postgres.bat ---
+        @"
+@echo off
+REM ============================================
+REM  SCIMServer v$ProjectVersion — Bundled PostgreSQL
+REM  Initializes and starts a local PostgreSQL,
+REM  then launches SCIMServer connected to it.
+REM ============================================
+
+set PGDIR=%~dp0pgsql
+set PGDATA=%~dp0pgdata
+set PGPORT=5432
+set PGUSER=scim
+set PGDATABASE=scimdb
+
+REM --- Configurable settings (override via env vars) ---
+if "%PORT%"==""                 set PORT=$Port
+if "%JWT_SECRET%"==""          set JWT_SECRET=changeme-jwt
+if "%SCIM_SHARED_SECRET%"==""  set SCIM_SHARED_SECRET=changeme
+if "%OAUTH_CLIENT_SECRET%"=="" set OAUTH_CLIENT_SECRET=changeme-oauth
+
+set PERSISTENCE_BACKEND=prisma
+set DATABASE_URL=postgresql://%PGUSER%@localhost:%PGPORT%/%PGDATABASE%
+set NODE_ENV=production
+
+REM --- Initialize PostgreSQL data directory if empty ---
+if not exist "%PGDATA%\PG_VERSION" (
+    echo.
+    echo  Initializing PostgreSQL data directory...
+    "%PGDIR%\bin\initdb.exe" -D "%PGDATA%" -U %PGUSER% -E UTF8 --no-locale -A trust
+    if errorlevel 1 (
+        echo  ERROR: PostgreSQL initialization failed.
+        pause
+        exit /b 1
+    )
+    echo  PostgreSQL initialized.
+)
+
+REM --- Start PostgreSQL ---
+echo.
+echo  Starting PostgreSQL on port %PGPORT%...
+"%PGDIR%\bin\pg_ctl.exe" start -D "%PGDATA%" -l "%~dp0pgdata\postgresql.log" -w -o "-p %PGPORT%"
+if errorlevel 1 (
+    echo  ERROR: PostgreSQL failed to start. Check pgdata\postgresql.log
+    pause
+    exit /b 1
+)
+
+REM --- Create database if it doesn't exist ---
+"%PGDIR%\bin\psql.exe" -U %PGUSER% -p %PGPORT% -tc "SELECT 1 FROM pg_database WHERE datname='%PGDATABASE%'" postgres | findstr /C:"1" >nul 2>&1
+if errorlevel 1 (
+    echo  Creating database '%PGDATABASE%'...
+    "%PGDIR%\bin\createdb.exe" -U %PGUSER% -p %PGPORT% %PGDATABASE%
+)
+
+REM --- Run Prisma migrations ---
+echo.
+echo  Running database migrations...
+if exist "%~dp0node\node.exe" (
+    "%~dp0node\node.exe" "%~dp0node_modules\prisma\build\index.js" migrate deploy --schema "%~dp0prisma\schema.prisma"
+) else (
+    npx prisma migrate deploy --schema "%~dp0prisma\schema.prisma"
+)
+
+REM --- Start SCIMServer ---
+echo.
+echo  SCIMServer v$ProjectVersion
+echo  Port: %PORT%  Mode: PostgreSQL ^(bundled^)
+echo  DB:   %DATABASE_URL%
+echo  Press Ctrl+C to stop.
+echo.
+
+if exist "%~dp0node\node.exe" (
+    "%~dp0node\node.exe" "%~dp0dist\main.js"
+) else (
+    node "%~dp0dist\main.js"
+)
+
+REM --- Stop PostgreSQL on exit ---
+echo.
+echo  Stopping PostgreSQL...
+"%PGDIR%\bin\pg_ctl.exe" stop -D "%PGDATA%" -m fast
+"@ | Set-Content -Path (Join-Path $OutPath "start-bundled-postgres.bat") -Encoding ASCII
+
+        # --- stop-postgres.bat ---
+        @"
+@echo off
+REM Stops the bundled PostgreSQL instance
+set PGDIR=%~dp0pgsql
+set PGDATA=%~dp0pgdata
+if exist "%PGDATA%\postmaster.pid" (
+    echo Stopping PostgreSQL...
+    "%PGDIR%\bin\pg_ctl.exe" stop -D "%PGDATA%" -m fast
+    echo PostgreSQL stopped.
+) else (
+    echo PostgreSQL is not running.
+)
+"@ | Set-Content -Path (Join-Path $OutPath "stop-postgres.bat") -Encoding ASCII
+
+        # --- start-bundled-postgres.ps1 ---
+        @"
+<#
+.SYNOPSIS
+    Start SCIMServer v$ProjectVersion with bundled PostgreSQL.
+.DESCRIPTION
+    Initializes a local PostgreSQL instance (if needed), starts it,
+    runs migrations, and launches SCIMServer — all from bundled binaries.
+    No internet, no Docker, no external database required.
+.PARAMETER Port
+    SCIMServer port (default: $Port)
+.PARAMETER PgPort
+    PostgreSQL port (default: 5432)
+.PARAMETER SharedSecret
+    SCIM bearer token secret (default: changeme)
+#>
+param(
+    [int]`$Port = (`$env:PORT -as [int]) -bor $Port,
+    [int]`$PgPort = 5432,
+    [string]`$SharedSecret = (`$env:SCIM_SHARED_SECRET, 'changeme' | Where-Object { `$_ } | Select-Object -First 1)
+)
+
+`$pgDir = Join-Path `$PSScriptRoot "pgsql"
+`$pgData = Join-Path `$PSScriptRoot "pgdata"
+`$pgUser = "scim"
+`$pgDb = "scimdb"
+
+# Resolve Node.js executable
+`$nodeExe = Join-Path `$PSScriptRoot "node" "node.exe"
+if (-not (Test-Path `$nodeExe)) { `$nodeExe = "node" }
+
+# Resolve PostgreSQL binaries
+`$initdb  = Join-Path `$pgDir "bin" "initdb.exe"
+`$pg_ctl  = Join-Path `$pgDir "bin" "pg_ctl.exe"
+`$psqlExe = Join-Path `$pgDir "bin" "psql.exe"
+`$createdb = Join-Path `$pgDir "bin" "createdb.exe"
+
+if (-not (Test-Path `$initdb)) {
+    Write-Host "ERROR: Bundled PostgreSQL not found at `$pgDir" -ForegroundColor Red
+    Write-Host "Re-run build-standalone.ps1 with -IncludePostgres" -ForegroundColor Yellow
+    exit 1
+}
+
+# Initialize data directory if needed
+if (-not (Test-Path (Join-Path `$pgData "PG_VERSION"))) {
+    Write-Host "Initializing PostgreSQL data directory..." -ForegroundColor Yellow
+    & `$initdb -D `$pgData -U `$pgUser -E UTF8 --no-locale -A trust
+    if (`$LASTEXITCODE -ne 0) { throw "initdb failed" }
+}
+
+# Start PostgreSQL
+Write-Host "Starting PostgreSQL on port `$PgPort..." -ForegroundColor Yellow
+`$pgLog = Join-Path `$pgData "postgresql.log"
+& `$pg_ctl start -D `$pgData -l `$pgLog -w -o "-p `$PgPort"
+if (`$LASTEXITCODE -ne 0) {
+    Write-Host "PostgreSQL failed to start. Check `$pgLog" -ForegroundColor Red
+    exit 1
+}
+
+# Ensure cleanup on exit
+`$null = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action {
+    `$pg_ctl = Join-Path `$PSScriptRoot "pgsql" "bin" "pg_ctl.exe"
+    `$pgData = Join-Path `$PSScriptRoot "pgdata"
+    if (Test-Path `$pg_ctl) { & `$pg_ctl stop -D `$pgData -m fast 2>`$null }
+}
+
+try {
+    # Create database if needed
+    `$dbExists = & `$psqlExe -U `$pgUser -p `$PgPort -tc "SELECT 1 FROM pg_database WHERE datname='`$pgDb'" postgres 2>`$null
+    if (`$dbExists -notmatch '1') {
+        Write-Host "Creating database '`$pgDb'..." -ForegroundColor Yellow
+        & `$createdb -U `$pgUser -p `$PgPort `$pgDb
+    }
+
+    # Set environment
+    `$env:PORT = `$Port
+    `$env:PERSISTENCE_BACKEND = "prisma"
+    `$env:DATABASE_URL = "postgresql://`${pgUser}@localhost:`${PgPort}/`${pgDb}"
+    `$env:JWT_SECRET = (`$env:JWT_SECRET, 'changeme-jwt' | Where-Object { `$_ } | Select-Object -First 1)
+    `$env:SCIM_SHARED_SECRET = `$SharedSecret
+    `$env:OAUTH_CLIENT_SECRET = (`$env:OAUTH_CLIENT_SECRET, `$SharedSecret | Where-Object { `$_ } | Select-Object -First 1)
+    `$env:NODE_ENV = "production"
+
+    # Run migrations
+    Write-Host "Running database migrations..." -ForegroundColor Yellow
+    `$schemaPath = Join-Path `$PSScriptRoot "prisma" "schema.prisma"
+    & `$nodeExe (Join-Path `$PSScriptRoot "node_modules" "prisma" "build" "index.js") migrate deploy --schema `$schemaPath
+
+    Write-Host ""
+    Write-Host "SCIMServer v$ProjectVersion" -ForegroundColor Cyan
+    Write-Host "  Port:     `$Port" -ForegroundColor White
+    Write-Host "  Mode:     PostgreSQL (bundled)" -ForegroundColor White
+    Write-Host "  DB:       `$(`$env:DATABASE_URL)" -ForegroundColor White
+    Write-Host "  PG Log:   `$pgLog" -ForegroundColor White
+    Write-Host "  Press Ctrl+C to stop.`n" -ForegroundColor Gray
+
+    & `$nodeExe (Join-Path `$PSScriptRoot "dist" "main.js")
+} finally {
+    Write-Host "`nStopping PostgreSQL..." -ForegroundColor Yellow
+    & `$pg_ctl stop -D `$pgData -m fast 2>`$null
+    Write-Host "PostgreSQL stopped." -ForegroundColor Green
+}
+"@ | Set-Content -Path (Join-Path $OutPath "start-bundled-postgres.ps1") -Encoding UTF8
+    }
+}
+
 # ── Step 7: Optionally create zip ──
 if ($Zip) {
     Write-Host "[7/7] Creating ZIP archive..." -ForegroundColor Yellow
@@ -424,10 +696,16 @@ Write-Host "Standalone package: $OutPath ($folderSizeMB MB)" -ForegroundColor Wh
 if ($IncludeNode) {
     Write-Host "Bundled Node.js:   v$NodeVersion" -ForegroundColor White
 }
+if ($IncludePostgres) {
+    Write-Host "Bundled Postgres:  v$PostgresVersion" -ForegroundColor White
+}
 Write-Host ""
 Write-Host "To run:" -ForegroundColor White
 Write-Host "  cd $OutputDir" -ForegroundColor Gray
 Write-Host "  start.bat                              # in-memory on port $Port" -ForegroundColor Gray
 Write-Host "  .\start.ps1 -Port 6000                 # custom port" -ForegroundColor Gray
 Write-Host "  .\start.ps1 -SharedSecret `"my-token`"   # custom bearer token" -ForegroundColor Gray
+if ($IncludePostgres) {
+    Write-Host "  start-bundled-postgres.bat              # PostgreSQL + SCIMServer" -ForegroundColor Gray
+}
 Write-Host ""

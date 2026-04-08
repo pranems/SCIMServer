@@ -125,6 +125,7 @@ export function ensureSchema(schemas: string[] | undefined, requiredSchema: stri
       status: 400,
       scimType: 'invalidSyntax',
       detail: `Missing required schema '${requiredSchema}'.`,
+      diagnostics: {},
     });
   }
 }
@@ -145,11 +146,12 @@ export function enforceIfMatch(
 
   if (!ifMatch) {
     if (requireIfMatch) {
+      const currentETag = `W/"v${currentVersion}"`;
       throw createScimError({
         status: 428,
         detail:
-          'If-Match header is required for this operation. Include the resource ETag (e.g., If-Match: W/"v1").',
-        diagnostics: { triggeredBy: 'RequireIfMatch' },
+          `If-Match header is required for this operation. Current ETag: ${currentETag}`,
+        diagnostics: { triggeredBy: 'RequireIfMatch', currentETag },
       });
     }
     return;
@@ -351,6 +353,7 @@ export function guardSoftDeleted(
       status: 404,
       scimType: 'noTarget',
       detail: `Resource ${scimId} not found.`,
+      diagnostics: { triggeredBy: 'SoftDeleteEnabled' },
     });
   }
 }
@@ -1345,6 +1348,7 @@ export function assertSchemaUniqueness(
           status: 409,
           scimType: 'uniqueness',
           detail: `Attribute '${attrPath}' value '${String(incomingValue)}' must be unique within the endpoint.`,
+          diagnostics: { triggeredBy: 'SchemaUniqueness' },
         });
       }
     }

@@ -19,6 +19,7 @@ describe('RequestLoggingInterceptor', () => {
       debug: jest.fn(),
       trace: jest.fn(),
       runWithContext: jest.fn((ctx: any, fn: () => void) => fn()),
+      getConfig: jest.fn().mockReturnValue({ slowRequestThresholdMs: 2000 }),
     };
 
     interceptor = new RequestLoggingInterceptor(mockLoggingService, mockScimLogger);
@@ -154,6 +155,83 @@ describe('RequestLoggingInterceptor', () => {
         );
         done();
       },
+    });
+  });
+
+  describe('catchError log level should match status code (P9)', () => {
+    function createHttpError(status: number): Error & { status: number; getStatus?: () => number } {
+      const err = new Error(`HTTP ${status}`) as Error & { status: number; getStatus?: () => number };
+      err.status = status;
+      err.getStatus = () => status;
+      return err;
+    }
+
+    it('should log 404 at DEBUG, not ERROR', (done) => {
+      const { context } = createMockContext({ method: 'GET', url: '/scim/Users/nonexistent' });
+      const handler: CallHandler = { handle: () => throwError(() => createHttpError(404)) };
+
+      interceptor.intercept(context, handler).subscribe({
+        error: () => {
+          expect(mockScimLogger.debug).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.stringContaining('404'),
+            expect.any(Object),
+          );
+          expect(mockScimLogger.error).not.toHaveBeenCalled();
+          done();
+        },
+      });
+    });
+
+    it('should log 401 at WARN, not ERROR', (done) => {
+      const { context } = createMockContext({ method: 'GET', url: '/scim/Users' });
+      const handler: CallHandler = { handle: () => throwError(() => createHttpError(401)) };
+
+      interceptor.intercept(context, handler).subscribe({
+        error: () => {
+          expect(mockScimLogger.warn).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.stringContaining('401'),
+            expect.any(Object),
+          );
+          expect(mockScimLogger.error).not.toHaveBeenCalled();
+          done();
+        },
+      });
+    });
+
+    it('should log 400 at INFO, not ERROR', (done) => {
+      const { context } = createMockContext({ method: 'POST', url: '/scim/Users' });
+      const handler: CallHandler = { handle: () => throwError(() => createHttpError(400)) };
+
+      interceptor.intercept(context, handler).subscribe({
+        error: () => {
+          expect(mockScimLogger.info).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.stringContaining('400'),
+            expect.any(Object),
+          );
+          expect(mockScimLogger.error).not.toHaveBeenCalled();
+          done();
+        },
+      });
+    });
+
+    it('should log 500 at ERROR', (done) => {
+      const { context } = createMockContext({ method: 'POST', url: '/scim/Users' });
+      const handler: CallHandler = { handle: () => throwError(() => createHttpError(500)) };
+
+      interceptor.intercept(context, handler).subscribe({
+        error: () => {
+          expect(mockScimLogger.error).toHaveBeenCalledWith(
+            expect.any(String),
+            expect.stringContaining('500'),
+            expect.any(Object),
+            expect.any(Object),
+          );
+          done();
+        },
+      });
     });
   });
 

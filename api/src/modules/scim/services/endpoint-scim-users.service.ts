@@ -68,6 +68,7 @@ export class EndpointScimUsersService {
   }
 
   async createUserForEndpoint(dto: CreateUserDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimUserResource> {
+    this.logger.enrichContext({ resourceType: 'User', operation: 'create' });
     ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
     this.schemaHelpers.enforceStrictSchemaValidation(dto, endpointId, config);
 
@@ -101,15 +102,26 @@ export class EndpointScimUsersService {
         return this.reprovisionUser(conflict.scimId, dto, baseUrl, endpointId, config);
       }
 
-      // Normal conflict — throw 409
-      const reason =
-        conflict.userName.toLowerCase() === dto.userName.toLowerCase()
-          ? `userName '${dto.userName}'`
-          : `externalId '${dto.externalId}'`;
+      // Normal conflict - throw 409
+      const isUserName = conflict.userName.toLowerCase() === dto.userName.toLowerCase();
+      const conflictingAttribute = isUserName ? 'userName' : 'externalId';
+      const incomingValue = isUserName ? dto.userName : dto.externalId ?? '';
+      const reason = isUserName
+        ? `userName '${dto.userName}'`
+        : `externalId '${dto.externalId}'`;
+      this.logger.info(LogCategory.SCIM_USER, `Uniqueness conflict on POST: ${reason}`, {
+        endpointId, conflictScimId: conflict.scimId,
+      });
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
         detail: `A resource with ${reason} already exists.`,
+        diagnostics: {
+          operation: 'create',
+          conflictingResourceId: conflict.scimId,
+          conflictingAttribute,
+          incomingValue,
+        },
       });
     }
 
@@ -151,12 +163,13 @@ export class EndpointScimUsersService {
   }
 
   async getUserForEndpoint(scimId: string, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimUserResource> {
+    this.logger.enrichContext({ resourceType: 'User', resourceId: scimId, operation: 'get' });
     this.logger.debug(LogCategory.SCIM_USER, 'Get user', { scimId, endpointId });
     const user = await this.userRepo.findByScimId(endpointId, scimId);
     
     if (!user) {
       this.logger.debug(LogCategory.SCIM_USER, 'User not found', { scimId, endpointId });
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: {} });
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
@@ -171,6 +184,7 @@ export class EndpointScimUsersService {
     endpointId: string,
     config?: EndpointConfig,
   ): Promise<ScimListResponse<ScimUserResource>> {
+    this.logger.enrichContext({ resourceType: 'User', operation: 'list' });
     if (count > MAX_COUNT) {
       count = MAX_COUNT;
     }
@@ -180,11 +194,12 @@ export class EndpointScimUsersService {
     let filterResult;
     try {
       filterResult = buildUserFilter(filter, this.schemaHelpers.getCaseExactAttributes(endpointId));
-    } catch {
+    } catch (e) {
       throw createScimError({
         status: 400,
         scimType: 'invalidFilter',
-        detail: `Unsupported or invalid filter expression: '${filter}'.`
+        detail: `Unsupported or invalid filter expression: '${filter}'.`,
+        diagnostics: { parseError: (e as Error).message },
       });
     }
 
@@ -237,6 +252,7 @@ export class EndpointScimUsersService {
     config?: EndpointConfig,
     ifMatch?: string,
   ): Promise<ScimUserResource> {
+    this.logger.enrichContext({ resourceType: 'User', resourceId: scimId, operation: 'patch' });
     ensureSchema(patchDto.schemas, SCIM_PATCH_SCHEMA);
 
     this.logger.info(LogCategory.SCIM_PATCH, 'Patch user', { scimId, endpointId, opCount: patchDto.Operations?.length });
@@ -248,7 +264,7 @@ export class EndpointScimUsersService {
     const user = await this.userRepo.findByScimId(endpointId, scimId);
     
     if (!user) {
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: {} });
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
@@ -278,6 +294,7 @@ export class EndpointScimUsersService {
     config?: EndpointConfig,
     ifMatch?: string,
   ): Promise<ScimUserResource> {
+    this.logger.enrichContext({ resourceType: 'User', resourceId: scimId, operation: 'replace' });
     ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
     this.schemaHelpers.enforceStrictSchemaValidation(dto, endpointId, config);
 
@@ -300,7 +317,7 @@ export class EndpointScimUsersService {
     const user = await this.userRepo.findByScimId(endpointId, scimId);
     
     if (!user) {
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: {} });
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
@@ -349,12 +366,13 @@ export class EndpointScimUsersService {
   }
 
   async deleteUserForEndpoint(scimId: string, endpointId: string, config?: EndpointConfig, ifMatch?: string): Promise<void> {
+    this.logger.enrichContext({ resourceType: 'User', resourceId: scimId, operation: 'delete' });
     this.logger.info(LogCategory.SCIM_USER, 'Delete user', { scimId, endpointId });
     const user = await this.userRepo.findByScimId(endpointId, scimId);
 
     if (!user) {
       this.logger.debug(LogCategory.SCIM_USER, 'Delete target not found', { scimId, endpointId });
-      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.` });
+      throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: {} });
     }
 
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations (double-delete)
@@ -403,7 +421,10 @@ export class EndpointScimUsersService {
   ): Promise<ScimUserResource> {
     const existing = await this.userRepo.findByScimId(endpointId, existingScimId);
     if (!existing) {
-      throw createScimError({ status: 500, detail: 'Failed to locate soft-deleted resource for re-provisioning.' });
+      this.logger.warn(LogCategory.SCIM_USER, 'Reprovision target vanished between conflict check and fetch', {
+        scimId: existingScimId, endpointId,
+      });
+      throw createScimError({ status: 500, detail: 'Failed to locate soft-deleted resource for re-provisioning.', diagnostics: {} });
     }
 
     const now = new Date();
@@ -464,15 +485,26 @@ export class EndpointScimUsersService {
     );
 
     if (conflict) {
-      const reason =
-        conflict.userName.toLowerCase() === userName.toLowerCase()
-          ? `userName '${userName}'`
-          : `externalId '${externalId}'`;
+      const isUserName = conflict.userName.toLowerCase() === userName.toLowerCase();
+      const conflictingAttribute = isUserName ? 'userName' : 'externalId';
+      const incomingValue = isUserName ? userName : (externalId ?? '');
+      const reason = isUserName
+        ? `userName '${userName}'`
+        : `externalId '${externalId}'`;
 
+      this.logger.info(LogCategory.SCIM_USER, `Uniqueness conflict on PUT/PATCH: ${reason}`, {
+        endpointId, conflictScimId: conflict.scimId,
+      });
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
-        detail: `A resource with ${reason} already exists.`
+        detail: `A resource with ${reason} already exists.`,
+        diagnostics: {
+          operation: 'replace',
+          conflictingResourceId: conflict.scimId,
+          conflictingAttribute,
+          incomingValue,
+        },
       });
     }
   }
@@ -535,6 +567,7 @@ export class EndpointScimUsersService {
             status: 400,
             scimType: preResult.errors[0]?.scimType ?? 'invalidValue',
             detail: `PATCH operation value validation failed: ${messages}`,
+            diagnostics: {},
           });
         }
       }
@@ -555,7 +588,7 @@ export class EndpointScimUsersService {
       );
     } catch (err) {
       if (err instanceof PatchError) {
-        throw createScimError({ status: err.status, scimType: err.scimType, detail: err.message });
+        throw createScimError({ status: err.status, scimType: err.scimType, detail: err.message, diagnostics: { triggeredBy: 'PatchEngine' } });
       }
       throw err;
     }

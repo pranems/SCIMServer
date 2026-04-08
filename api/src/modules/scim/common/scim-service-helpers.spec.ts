@@ -25,7 +25,9 @@ import {
   stripReadOnlyPatchOps,
   SCIM_WARNING_URN,
   flattenParentChildMap,
+  assertSchemaUniqueness,
 } from './scim-service-helpers';
+import { SCIM_DIAGNOSTICS_URN } from './scim-constants';
 
 // ─── parseJson ──────────────────────────────────────────────────────────────
 
@@ -157,6 +159,19 @@ describe('guardSoftDeleted', () => {
       fail('should have thrown');
     } catch (e: any) {
       expect(e.getStatus()).toBe(404);
+    }
+  });
+
+  it('should include triggeredBy SoftDeleteEnabled in diagnostics (P5)', () => {
+    const config = { SoftDeleteEnabled: 'true' } as any;
+    const record = { deletedAt: new Date() };
+    try {
+      guardSoftDeleted(record, config, 'id-1', mockLogger, logCategory);
+      fail('should have thrown');
+    } catch (e: any) {
+      const body = e.getResponse();
+      expect(body[SCIM_DIAGNOSTICS_URN]).toBeDefined();
+      expect(body[SCIM_DIAGNOSTICS_URN].triggeredBy).toBe('SoftDeleteEnabled');
     }
   });
 });
@@ -1348,5 +1363,27 @@ describe('handleRepositoryError', () => {
     expect(data.endpointId).toBe('ep-1');
     expect(data.operation).toBe('create user');
     expect(data.errorCode).toBe('UNKNOWN');
+  });
+});
+
+// ─── assertSchemaUniqueness: triggeredBy (P5) ─────────────────────────────
+
+describe('assertSchemaUniqueness triggeredBy (P5)', () => {
+  it('should include triggeredBy SchemaUniqueness in diagnostics', () => {
+    const uniqueAttrs = [{ schemaUrn: null, attrName: 'employeeId', caseExact: true }];
+    const payload = { employeeId: 'EMP-001' };
+    const existing = [
+      { scimId: 'existing-1', rawPayload: JSON.stringify({ employeeId: 'EMP-001' }), deletedAt: null },
+    ];
+
+    try {
+      assertSchemaUniqueness('ep-1', payload, uniqueAttrs, existing);
+      fail('should have thrown');
+    } catch (e: any) {
+      expect(e.getStatus()).toBe(409);
+      const body = e.getResponse();
+      expect(body[SCIM_DIAGNOSTICS_URN]).toBeDefined();
+      expect(body[SCIM_DIAGNOSTICS_URN].triggeredBy).toBe('SchemaUniqueness');
+    }
   });
 });

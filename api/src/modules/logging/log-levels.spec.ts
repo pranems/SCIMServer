@@ -96,9 +96,9 @@ describe('log-levels', () => {
   // ─── LogCategory enum ────────────────────────────────────────────
 
   describe('LogCategory', () => {
-    it('should have 13 categories', () => {
+    it('should have 14 categories', () => {
       const values = Object.values(LogCategory);
-      expect(values).toHaveLength(13);
+      expect(values).toHaveLength(14);
     });
 
     it('should include all expected category values', () => {
@@ -114,6 +114,7 @@ describe('log-levels', () => {
       expect(LogCategory.OAUTH).toBe('oauth');
       expect(LogCategory.SCIM_BULK).toBe('scim.bulk');
       expect(LogCategory.SCIM_RESOURCE).toBe('scim.resource');
+      expect(LogCategory.CONFIG).toBe('config');
       expect(LogCategory.GENERAL).toBe('general');
     });
   });

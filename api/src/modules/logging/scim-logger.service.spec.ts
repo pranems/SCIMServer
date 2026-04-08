@@ -106,6 +106,7 @@ describe('ScimLogger', () => {
         includeStackTraces: false,
         maxPayloadSizeBytes: 1024,
         format: 'pretty',
+        slowRequestThresholdMs: 3000,
       };
       logger.setConfig(newConfig);
       const config = logger.getConfig();
@@ -492,14 +493,14 @@ describe('ScimLogger', () => {
     });
 
     it('should evict oldest entries when buffer is full', () => {
-      // The maxRingBufferSize is 500, let's push 510 entries
-      for (let i = 0; i < 510; i++) {
+      // The maxRingBufferSize is 2000, let's push 2010 entries
+      for (let i = 0; i < 2010; i++) {
         logger.info(LogCategory.HTTP, `entry ${i}`);
       }
 
-      const logs = logger.getRecentLogs({ limit: 510 });
-      // Should have at most 500 entries
-      expect(logs.length).toBeLessThanOrEqual(500);
+      const logs = logger.getRecentLogs({ limit: 2010 });
+      // Should have at most 2000 entries
+      expect(logs.length).toBeLessThanOrEqual(2000);
       // First entry should be entry 10 (0-9 evicted)
       expect(logs[0].message).toBe('entry 10');
     });
@@ -739,6 +740,68 @@ describe('ScimLogger', () => {
       expect(entries[0].resourceType).toBeUndefined();
       expect(entries[0].bulkOperationIndex).toBeUndefined();
       unsub();
+    });
+  });
+
+  // ─── Configurable thresholds (gap audit) ──────────────────────────
+
+  describe('configurable thresholds', () => {
+    it('getSlowRequestThresholdMs should return default 2000', () => {
+      delete process.env.LOG_SLOW_REQUEST_MS;
+      expect(ScimLogger.getSlowRequestThresholdMs()).toBe(2000);
+    });
+
+    it('getSlowRequestThresholdMs should use LOG_SLOW_REQUEST_MS env var', () => {
+      process.env.LOG_SLOW_REQUEST_MS = '5000';
+      expect(ScimLogger.getSlowRequestThresholdMs()).toBe(5000);
+      delete process.env.LOG_SLOW_REQUEST_MS;
+    });
+
+    it('slowRequestThresholdMs should be runtime-configurable via updateConfig (Step 2.4)', () => {
+      const testLogger = new ScimLogger();
+      // Default is 2000
+      expect(testLogger.getConfig().slowRequestThresholdMs).toBe(2000);
+
+      // Update at runtime
+      testLogger.updateConfig({ slowRequestThresholdMs: 500 });
+      expect(testLogger.getConfig().slowRequestThresholdMs).toBe(500);
+    });
+
+    it('should use LOG_RING_BUFFER_SIZE env var for buffer capacity', () => {
+      process.env.LOG_RING_BUFFER_SIZE = '3';
+      const smallLogger = new ScimLogger();
+      smallLogger.updateConfig({ format: 'json' });
+
+      // Add 5 entries — only last 3 should survive
+      for (let i = 0; i < 5; i++) {
+        smallLogger.info(LogCategory.HTTP, `entry-${i}`);
+      }
+
+      const entries = smallLogger.getRecentLogs({ limit: 10 });
+      expect(entries.length).toBe(3);
+      expect(entries[0].message).toBe('entry-2'); // oldest surviving
+      expect(entries[2].message).toBe('entry-4'); // newest
+
+      delete process.env.LOG_RING_BUFFER_SIZE;
+    });
+  });
+
+  // ─── getRecentLogs combined filters (gap audit) ───────────────────
+
+  describe('combined ring buffer filters', () => {
+    it('should support endpointId + level combined filter', () => {
+      logger.runWithContext({ requestId: 'r1', endpointId: 'ep-combo' }, () => {
+        logger.info(LogCategory.HTTP, 'info entry');
+        logger.warn(LogCategory.HTTP, 'warn entry');
+      });
+      logger.runWithContext({ requestId: 'r2', endpointId: 'ep-other' }, () => {
+        logger.warn(LogCategory.HTTP, 'other endpoint');
+      });
+
+      const entries = logger.getRecentLogs({ endpointId: 'ep-combo', level: LogLevel.WARN });
+      expect(entries.length).toBe(1);
+      expect(entries[0].message).toBe('warn entry');
+      expect(entries[0].endpointId).toBe('ep-combo');
     });
   });
 });

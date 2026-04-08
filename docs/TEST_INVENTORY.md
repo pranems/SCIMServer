@@ -247,7 +247,7 @@
 ### 1.33 `src/modules/logging/log-levels.spec.ts`
 - **parseLogLevel**: undefined/empty → INFO, parse TRACE/DEBUG/INFO/WARN/ERROR/FATAL/OFF (case-insensitive), whitespace, numeric strings, out-of-range, unknown
 - **logLevelName**: string name for each level, UNKNOWN for invalid
-- **LogCategory**: 11 categories, all expected values
+- **LogCategory**: 14 categories, all expected values
 - **buildDefaultLogConfig**: default INFO, respect LOG_LEVEL, json in production, LOG_FORMAT, payloads in prod/dev, stacks, max payload size, category levels, invalid/malformed category levels
 
 ### 1.34 `src/modules/logging/request-logging.interceptor.spec.ts`

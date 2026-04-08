@@ -151,6 +151,8 @@ export class EndpointScimGenericService {
     resourceType: ScimResourceType,
     config?: EndpointConfig,
   ): Promise<Record<string, unknown>> {
+    this.scimLogger.enrichContext({ resourceType: resourceType.name, operation: 'create' });
+    this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Creating ${resourceType.name}`, { endpointId });
     const coreSchema = resourceType.schema;
 
     // GEN-11: Validate schemas array includes the core schema (same as ensureSchema)
@@ -194,14 +196,26 @@ export class EndpointScimGenericService {
         return this.reprovisionResource(conflict, body, baseUrl, endpointId, resourceType, config);
       }
 
-      // Normal conflict — throw 409
-      const reason = externalId && conflict.externalId === externalId
+      // Normal conflict - throw 409
+      const isExtId = externalId && conflict.externalId === externalId;
+      const conflictingAttribute = isExtId ? 'externalId' : 'displayName';
+      const incomingValue = isExtId ? externalId : (displayName ?? '');
+      const reason = isExtId
         ? `externalId "${externalId}"`
         : `displayName "${displayName}"`;
+      this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Uniqueness conflict on POST ${resourceType.name}: ${reason}`, {
+        endpointId, conflictScimId: conflict.scimId,
+      });
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
         detail: `A ${resourceType.name} with ${reason} already exists.`,
+        diagnostics: {
+          operation: 'create',
+          conflictingResourceId: conflict.scimId,
+          conflictingAttribute,
+          incomingValue,
+        },
       });
     }
 
@@ -268,6 +282,8 @@ export class EndpointScimGenericService {
     resourceType: ScimResourceType,
     config?: EndpointConfig,
   ): Promise<Record<string, unknown>> {
+    this.scimLogger.enrichContext({ resourceType: resourceType.name, resourceId: scimId, operation: 'get' });
+    this.scimLogger.debug(LogCategory.SCIM_RESOURCE, `Get ${resourceType.name}`, { scimId, endpointId });
     const record = await this.genericRepo.findByScimId(
       endpointId,
       resourceType.name,
@@ -278,6 +294,7 @@ export class EndpointScimGenericService {
       throw createScimError({
         status: 404,
         detail: `${resourceType.name} "${scimId}" not found.`,
+        diagnostics: {},
       });
     }
 
@@ -296,6 +313,8 @@ export class EndpointScimGenericService {
     resourceType: ScimResourceType,
     config?: EndpointConfig,
   ): Promise<Record<string, unknown>> {
+    this.scimLogger.enrichContext({ resourceType: resourceType.name, operation: 'list' });
+    this.scimLogger.info(LogCategory.SCIM_RESOURCE, `List ${resourceType.name}`, { endpointId, filter: params.filter });
     const startIndex = Math.max(params.startIndex ?? 1, 1);
     const count = Math.min(Math.max(params.count ?? DEFAULT_COUNT, 0), MAX_COUNT);
 
@@ -309,11 +328,12 @@ export class EndpointScimGenericService {
     let filterResult: ReturnType<typeof buildGenericFilter>;
     try {
       filterResult = buildGenericFilter(params.filter);
-    } catch {
+    } catch (e) {
       throw createScimError({
         status: 400,
         scimType: 'invalidFilter',
         detail: `Invalid or unsupported filter expression: '${params.filter}'.`,
+        diagnostics: { parseError: (e as Error).message },
       });
     }
 
@@ -380,6 +400,8 @@ export class EndpointScimGenericService {
     config?: EndpointConfig,
     ifMatch?: string,
   ): Promise<Record<string, unknown>> {
+    this.scimLogger.enrichContext({ resourceType: resourceType.name, resourceId: scimId, operation: 'replace' });
+    this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Replace ${resourceType.name} (PUT)`, { scimId, endpointId });
     const coreSchema = resourceType.schema;
 
     // GEN-11: Validate schemas array includes the core schema
@@ -404,6 +426,7 @@ export class EndpointScimGenericService {
       throw createScimError({
         status: 404,
         detail: `${resourceType.name} "${scimId}" not found.`,
+        diagnostics: {},
       });
     }
 
@@ -436,10 +459,19 @@ export class EndpointScimGenericService {
       const reason = externalId && conflict.externalId === externalId
         ? `externalId "${externalId}"`
         : `displayName "${displayName}"`;
+      this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Uniqueness conflict on PUT ${resourceType.name}: ${reason}`, {
+        endpointId, scimId, conflictScimId: conflict.scimId,
+      });
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
         detail: `A ${resourceType.name} with ${reason} already exists.`,
+        diagnostics: {
+          operation: 'replace',
+          conflictingResourceId: conflict.scimId,
+          conflictingAttribute: (externalId && conflict.externalId === externalId) ? 'externalId' : 'displayName',
+          incomingValue: (externalId && conflict.externalId === externalId) ? externalId : (displayName ?? ''),
+        },
       });
     }
 
@@ -501,6 +533,8 @@ export class EndpointScimGenericService {
     config?: EndpointConfig,
     ifMatch?: string,
   ): Promise<Record<string, unknown>> {
+    this.scimLogger.enrichContext({ resourceType: resourceType.name, resourceId: scimId, operation: 'patch' });
+    this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Patch ${resourceType.name}`, { scimId, endpointId });
     // Validate PATCH schema
     ensureSchema(patchDto.schemas, SCIM_PATCH_SCHEMA);
 
@@ -514,6 +548,7 @@ export class EndpointScimGenericService {
       throw createScimError({
         status: 404,
         detail: `${resourceType.name} "${scimId}" not found.`,
+        diagnostics: {},
       });
     }
 
@@ -566,6 +601,7 @@ export class EndpointScimGenericService {
             status: 400,
             scimType: preResult.errors[0]?.scimType ?? 'invalidValue',
             detail: `PATCH operation value validation failed: ${messages}`,
+            diagnostics: {},
           });
         }
       }
@@ -595,6 +631,7 @@ export class EndpointScimGenericService {
           status: 400,
           scimType: 'invalidValue',
           detail: error.message,
+          diagnostics: { triggeredBy: 'PatchEngine' },
         });
       }
       throw error;
@@ -638,10 +675,19 @@ export class EndpointScimGenericService {
       const reason = externalId && conflict.externalId === externalId
         ? `externalId "${externalId}"`
         : `displayName "${displayName}"`;
+      this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Uniqueness conflict on PATCH ${resourceType.name}: ${reason}`, {
+        endpointId, scimId, conflictScimId: conflict.scimId,
+      });
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
         detail: `A ${resourceType.name} with ${reason} already exists.`,
+        diagnostics: {
+          operation: 'patch',
+          conflictingResourceId: conflict.scimId,
+          conflictingAttribute: (externalId && conflict.externalId === externalId) ? 'externalId' : 'displayName',
+          incomingValue: (externalId && conflict.externalId === externalId) ? externalId : (displayName ?? ''),
+        },
       });
     }
 
@@ -701,6 +747,8 @@ export class EndpointScimGenericService {
     config?: EndpointConfig,
     ifMatch?: string,
   ): Promise<void> {
+    this.scimLogger.enrichContext({ resourceType: resourceType.name, resourceId: scimId, operation: 'delete' });
+    this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Delete ${resourceType.name}`, { scimId, endpointId });
     const existing = await this.genericRepo.findByScimId(
       endpointId,
       resourceType.name,
@@ -711,6 +759,7 @@ export class EndpointScimGenericService {
       throw createScimError({
         status: 404,
         detail: `${resourceType.name} "${scimId}" not found.`,
+        diagnostics: {},
       });
     }
 
@@ -838,6 +887,7 @@ export class EndpointScimGenericService {
             detail:
               `Extension URN "${key}" found in request body but not declared in schemas[]. ` +
               `When StrictSchemaValidation is enabled, all extension URNs must be listed in the schemas array.`,
+            diagnostics: {},
           });
         }
         if (keyLower !== resourceType.schema.toLowerCase() && !registeredLower.has(keyLower)) {
@@ -847,6 +897,7 @@ export class EndpointScimGenericService {
             detail:
               `Extension URN "${key}" is not a registered extension schema for this resource type. ` +
               `Registered extensions: [${registeredUrns.join(', ')}].`,
+            diagnostics: {},
           });
         }
       }
@@ -882,6 +933,7 @@ export class EndpointScimGenericService {
         status: 400,
         scimType: result.errors[0]?.scimType ?? 'invalidValue',
         detail: `Schema validation failed: ${details}`,
+        diagnostics: {},
       });
     }
   }
@@ -989,6 +1041,7 @@ export class EndpointScimGenericService {
         status: 400,
         scimType: 'mutability',
         detail: `Immutable attribute violation: ${details}`,
+        diagnostics: {},
       });
     }
   }
@@ -1207,6 +1260,7 @@ export class EndpointScimGenericService {
         status: 400,
         scimType: 'invalidFilter',
         detail: `Filter validation failed: ${details}`,
+        diagnostics: {},
       });
     }
   }

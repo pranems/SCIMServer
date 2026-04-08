@@ -172,6 +172,9 @@ Each log statement belongs to a functional category for targeted filtering:
 | `endpoint` | `LogCategory.ENDPOINT` | Endpoint management (create, activate, deactivate) |
 | `database` | `LogCategory.DATABASE` | Database / Prisma operations |
 | `oauth` | `LogCategory.OAUTH` | OAuth token issuance and validation |
+| `scim.bulk` | `LogCategory.SCIM_BULK` | SCIM Bulk operations (RFC 7644 §3.7) |
+| `scim.resource` | `LogCategory.SCIM_RESOURCE` | SCIM custom resource type operations |
+| `config` | `LogCategory.CONFIG` | Admin configuration changes (log levels, settings) |
 | `general` | `LogCategory.GENERAL` | Uncategorized / general-purpose |
 
 ---

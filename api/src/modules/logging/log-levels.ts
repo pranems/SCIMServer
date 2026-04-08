@@ -70,6 +70,8 @@ export enum LogCategory {
   SCIM_BULK = 'scim.bulk',
   /** SCIM custom resource type operations */
   SCIM_RESOURCE = 'scim.resource',
+  /** Admin configuration changes (log levels, settings) */
+  CONFIG = 'config',
   /** General / uncategorized */
   GENERAL = 'general',
 }
@@ -106,6 +108,9 @@ export interface LogConfig {
 
   /** Output format: 'json' for structured (production), 'pretty' for human-readable (dev). */
   format: 'json' | 'pretty';
+
+  /** Slow request threshold in ms. Requests exceeding this emit a WARN log. Default: 2000. */
+  slowRequestThresholdMs: number;
 }
 
 /** Build default log configuration from environment variables. */
@@ -119,6 +124,7 @@ export function buildDefaultLogConfig(): LogConfig {
     includeStackTraces: process.env.LOG_INCLUDE_STACKS !== 'false',
     maxPayloadSizeBytes: Number(process.env.LOG_MAX_PAYLOAD_SIZE) || 8192,
     format: isProd ? 'json' : ((process.env.LOG_FORMAT as 'json' | 'pretty') || 'pretty'),
+    slowRequestThresholdMs: Number(process.env.LOG_SLOW_REQUEST_MS) || 2000,
   };
 }
 

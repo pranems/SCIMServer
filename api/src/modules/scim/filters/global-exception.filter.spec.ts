@@ -1,7 +1,8 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { GlobalExceptionFilter } from './global-exception.filter';
-import { SCIM_ERROR_SCHEMA } from '../common/scim-constants';
+import { SCIM_ERROR_SCHEMA, SCIM_DIAGNOSTICS_URN } from '../common/scim-constants';
 import { ScimLogger } from '../../logging/scim-logger.service';
+import * as scimLoggerModule from '../../logging/scim-logger.service';
 
 describe('GlobalExceptionFilter', () => {
   let filter: GlobalExceptionFilter;
@@ -208,6 +209,95 @@ describe('GlobalExceptionFilter', () => {
       expect(message).toContain('PrismaClientKnownRequestError');
       expect(data.errorType).toBe('PrismaClientKnownRequestError');
       expect(data.errorMessage).toBe('Record to delete does not exist.');
+    });
+  });
+
+  // ─── Edge cases (gap audit) ───────────────────────────────────────
+
+  describe('edge cases', () => {
+    it('should handle non-Error thrown on non-SCIM route with generic message', () => {
+      const host = createHost('/admin/dashboard');
+
+      filter.catch(42, host);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(500);
+      const body = mockResponse.json.mock.calls[0][0];
+      // Non-SCIM route: NestJS-style error, message falls back to 'Internal Server Error'
+      expect(body.statusCode).toBe(500);
+      expect(body.message).toBe('Internal Server Error');
+    });
+
+    it('should handle request with missing originalUrl', () => {
+      const host = {
+        switchToHttp: () => ({
+          getResponse: () => mockResponse,
+          getRequest: () => ({ url: '/scim/fallback', method: 'GET' }),
+        }),
+        getArgs: () => [],
+        getArgByIndex: () => undefined,
+        switchToRpc: () => ({}),
+        switchToWs: () => ({}),
+        getType: () => 'http',
+      } as any;
+
+      filter.catch(new Error('test'), host);
+
+      expect(mockResponse.status).toHaveBeenCalledWith(500);
+      // Should not crash even without originalUrl
+      expect(mockScimLogger.error).toHaveBeenCalled();
+    });
+  });
+
+  // ─── P2: Diagnostics extension on 500 responses ──────────────────
+
+  describe('Diagnostics extension on 500 (P2)', () => {
+    let getCtxSpy: jest.SpyInstance;
+
+    afterEach(() => {
+      getCtxSpy?.mockRestore();
+    });
+
+    it('should include diagnostics extension with requestId and logsUrl when correlation context exists', () => {
+      getCtxSpy = jest.spyOn(scimLoggerModule, 'getCorrelationContext').mockReturnValue({
+        requestId: 'req-500-abc',
+        endpointId: 'ep-500-xyz',
+      } as any);
+
+      const error = new Error('Unexpected null reference');
+      const host = createHost('/scim/endpoints/ep-500-xyz/Users');
+
+      filter.catch(error, host);
+
+      const body = mockResponse.json.mock.calls[0][0];
+      expect(body[SCIM_DIAGNOSTICS_URN]).toBeDefined();
+      expect(body[SCIM_DIAGNOSTICS_URN].requestId).toBe('req-500-abc');
+      expect(body[SCIM_DIAGNOSTICS_URN].endpointId).toBe('ep-500-xyz');
+      expect(body[SCIM_DIAGNOSTICS_URN].logsUrl).toBe(
+        '/scim/endpoints/ep-500-xyz/logs/recent?requestId=req-500-abc',
+      );
+    });
+
+    it('should use admin logsUrl when no endpointId in context', () => {
+      getCtxSpy = jest.spyOn(scimLoggerModule, 'getCorrelationContext').mockReturnValue({
+        requestId: 'req-no-ep',
+      } as any);
+
+      filter.catch(new Error('crash'), createHost('/scim/ServiceProviderConfig'));
+
+      const body = mockResponse.json.mock.calls[0][0];
+      expect(body[SCIM_DIAGNOSTICS_URN]).toBeDefined();
+      expect(body[SCIM_DIAGNOSTICS_URN].logsUrl).toBe(
+        '/scim/admin/log-config/recent?requestId=req-no-ep',
+      );
+    });
+
+    it('should NOT include diagnostics when no correlation context', () => {
+      getCtxSpy = jest.spyOn(scimLoggerModule, 'getCorrelationContext').mockReturnValue(undefined);
+
+      filter.catch(new Error('early crash'), createHost('/scim/Users'));
+
+      const body = mockResponse.json.mock.calls[0][0];
+      expect(body[SCIM_DIAGNOSTICS_URN]).toBeUndefined();
     });
   });
 });

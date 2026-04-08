@@ -79,6 +79,9 @@ export class LogConfigController {
     if (typeof body.maxPayloadSizeBytes === 'number') {
       updates.maxPayloadSizeBytes = body.maxPayloadSizeBytes;
     }
+    if (typeof body.slowRequestThresholdMs === 'number' && body.slowRequestThresholdMs > 0) {
+      updates.slowRequestThresholdMs = body.slowRequestThresholdMs;
+    }
     if (body.format === 'json' || body.format === 'pretty') {
       updates.format = body.format;
     }
@@ -92,10 +95,17 @@ export class LogConfigController {
       updates.categoryLevels = catLevels;
     }
 
+    // Capture before values for audit log
+    const before = this.scimLogger.getConfig();
+    const changeDetails: Record<string, { from: unknown; to: unknown }> = {};
+    for (const key of Object.keys(updates) as Array<keyof LogConfig>) {
+      changeDetails[key] = { from: before[key], to: updates[key] };
+    }
+
     this.scimLogger.updateConfig(updates);
 
-    this.scimLogger.info(LogCategory.ENDPOINT, 'Log configuration updated', {
-      changes: Object.keys(updates),
+    this.scimLogger.info(LogCategory.CONFIG, 'Log configuration updated', {
+      changes: changeDetails,
     });
 
     return {
@@ -111,7 +121,7 @@ export class LogConfigController {
   @Put('level/:level')
   setGlobalLevel(@Param('level') level: string) {
     this.scimLogger.setGlobalLevel(level);
-    this.scimLogger.info(LogCategory.ENDPOINT, `Global log level changed to ${level.toUpperCase()}`);
+    this.scimLogger.info(LogCategory.CONFIG, `Global log level changed to ${level.toUpperCase()}`);
     return {
       message: `Global log level set to ${level.toUpperCase()}`,
       globalLevel: logLevelName(this.scimLogger.getConfig().globalLevel),
@@ -134,7 +144,7 @@ export class LogConfigController {
       }, 400);
     }
     this.scimLogger.setCategoryLevel(category as LogCategory, level);
-    this.scimLogger.info(LogCategory.ENDPOINT, `Category '${category}' log level changed to ${level.toUpperCase()}`);
+    this.scimLogger.info(LogCategory.CONFIG, `Category '${category}' log level changed to ${level.toUpperCase()}`);
     return {
       message: `Category '${category}' log level set to ${level.toUpperCase()}`,
     };
@@ -150,7 +160,7 @@ export class LogConfigController {
     @Param('level') level: string,
   ) {
     this.scimLogger.setEndpointLevel(endpointId, level);
-    this.scimLogger.info(LogCategory.ENDPOINT, `Endpoint '${endpointId}' log level changed to ${level.toUpperCase()}`);
+    this.scimLogger.info(LogCategory.CONFIG, `Endpoint '${endpointId}' log level changed to ${level.toUpperCase()}`);
     return {
       message: `Endpoint '${endpointId}' log level set to ${level.toUpperCase()}`,
     };
@@ -164,7 +174,7 @@ export class LogConfigController {
   @HttpCode(204)
   clearEndpointLevel(@Param('endpointId') endpointId: string) {
     this.scimLogger.clearEndpointLevel(endpointId);
-    this.scimLogger.info(LogCategory.ENDPOINT, `Endpoint '${endpointId}' log level override removed`);
+    this.scimLogger.info(LogCategory.CONFIG, `Endpoint '${endpointId}' log level override removed`);
   }
 
   /**
@@ -187,10 +197,18 @@ export class LogConfigController {
       requestId: requestId || undefined,
       endpointId: endpointId || undefined,
     });
-    return {
+
+    const response: { count: number; entries: typeof entries; hint?: string } = {
       count: entries.length,
       entries,
     };
+
+    // When filtered by requestId and nothing found, hint the operator to try persistent DB logs
+    if (entries.length === 0 && requestId) {
+      response.hint = `No entries in ring buffer for requestId '${requestId}'. Try persistent logs: GET /scim/admin/logs?search=${requestId}`;
+    }
+
+    return response;
   }
 
   /**
