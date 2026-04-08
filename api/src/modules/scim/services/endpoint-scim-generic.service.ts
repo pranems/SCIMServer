@@ -605,6 +605,7 @@ export class EndpointScimGenericService {
           status: 400,
           scimType: 'invalidValue',
           detail: error.message,
+          diagnostics: { triggeredBy: 'PatchEngine' },
         });
       }
       throw error;

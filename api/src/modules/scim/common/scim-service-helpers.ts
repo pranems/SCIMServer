@@ -351,6 +351,7 @@ export function guardSoftDeleted(
       status: 404,
       scimType: 'noTarget',
       detail: `Resource ${scimId} not found.`,
+      diagnostics: { triggeredBy: 'SoftDeleteEnabled' },
     });
   }
 }
@@ -1345,6 +1346,7 @@ export function assertSchemaUniqueness(
           status: 409,
           scimType: 'uniqueness',
           detail: `Attribute '${attrPath}' value '${String(incomingValue)}' must be unique within the endpoint.`,
+          diagnostics: { triggeredBy: 'SchemaUniqueness' },
         });
       }
     }

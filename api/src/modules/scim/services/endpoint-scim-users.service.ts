@@ -561,7 +561,7 @@ export class EndpointScimUsersService {
       );
     } catch (err) {
       if (err instanceof PatchError) {
-        throw createScimError({ status: err.status, scimType: err.scimType, detail: err.message });
+        throw createScimError({ status: err.status, scimType: err.scimType, detail: err.message, diagnostics: { triggeredBy: 'PatchEngine' } });
       }
       throw err;
     }
