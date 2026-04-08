@@ -622,16 +622,31 @@ export class EndpointScimGenericService {
     const patchEngine = new GenericPatchEngine(payload, extensionUrns);
 
     try {
-      for (const op of patchDto.Operations) {
-        patchEngine.apply(op);
+      for (let i = 0; i < patchDto.Operations.length; i++) {
+        const op = patchDto.Operations[i];
+        try {
+          patchEngine.apply(op);
+        } catch (err) {
+          if (err instanceof PatchError && err.operationIndex === undefined) {
+            throw new PatchError(err.status, err.message, err.scimType, {
+              operationIndex: i, path: op.path, op: op.op,
+            });
+          }
+          throw err;
+        }
       }
     } catch (error) {
       if (error instanceof PatchError) {
         throw createScimError({
-          status: 400,
-          scimType: 'invalidValue',
+          status: error.status,
+          scimType: error.scimType,
           detail: error.message,
-          diagnostics: { triggeredBy: 'PatchEngine' },
+          diagnostics: {
+            triggeredBy: 'PatchEngine',
+            failedOperationIndex: error.operationIndex,
+            failedPath: error.failedPath,
+            failedOp: error.failedOp,
+          },
         });
       }
       throw error;

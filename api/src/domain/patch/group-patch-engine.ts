@@ -69,53 +69,64 @@ export class GroupPatchEngine {
     let members = [...state.members];
     let rawPayload = { ...state.rawPayload };
 
-    for (const operation of operations) {
+    for (let i = 0; i < operations.length; i++) {
+      const operation = operations[i];
       const op = operation.op?.toLowerCase();
       if (!op || !['add', 'replace', 'remove'].includes(op)) {
         throw new PatchError(
           400,
           `Patch operation '${operation.op}' is not supported.`,
           'invalidValue',
+          { operationIndex: i, path: operation.path, op: operation.op },
         );
       }
 
-      switch (op) {
-        case 'replace': {
-          const result = GroupPatchEngine.handleReplace(
-            operation, displayName, externalId, members, rawPayload, config,
-          );
-          displayName = result.displayName;
-          externalId = result.externalId;
-          members = result.members;
-          rawPayload = result.rawPayload;
-          break;
+      try {
+        switch (op) {
+          case 'replace': {
+            const result = GroupPatchEngine.handleReplace(
+              operation, displayName, externalId, members, rawPayload, config,
+            );
+            displayName = result.displayName;
+            externalId = result.externalId;
+            members = result.members;
+            rawPayload = result.rawPayload;
+            break;
+          }
+          case 'add':
+            // Check for extension path first; otherwise delegate to member-only handler
+            if (operation.path && isExtensionPath(operation.path, config.extensionUrns)) {
+              const extParsed = parseExtensionPath(operation.path, config.extensionUrns);
+              if (extParsed) {
+                rawPayload = applyExtensionUpdate({ ...rawPayload }, extParsed, operation.value);
+                break;
+              }
+            }
+            members = GroupPatchEngine.handleAdd(
+              operation, members, config.allowMultiMemberAdd,
+            );
+            break;
+          case 'remove':
+            // Check for extension path first; otherwise delegate to member-only handler
+            if (operation.path && isExtensionPath(operation.path, config.extensionUrns)) {
+              const extParsed = parseExtensionPath(operation.path, config.extensionUrns);
+              if (extParsed) {
+                rawPayload = removeExtensionAttribute({ ...rawPayload }, extParsed);
+                break;
+              }
+            }
+            members = GroupPatchEngine.handleRemove(
+              operation, members, config.allowMultiMemberRemove, config.allowRemoveAllMembers,
+            );
+            break;
         }
-        case 'add':
-          // Check for extension path first; otherwise delegate to member-only handler
-          if (operation.path && isExtensionPath(operation.path, config.extensionUrns)) {
-            const extParsed = parseExtensionPath(operation.path, config.extensionUrns);
-            if (extParsed) {
-              rawPayload = applyExtensionUpdate({ ...rawPayload }, extParsed, operation.value);
-              break;
-            }
-          }
-          members = GroupPatchEngine.handleAdd(
-            operation, members, config.allowMultiMemberAdd,
-          );
-          break;
-        case 'remove':
-          // Check for extension path first; otherwise delegate to member-only handler
-          if (operation.path && isExtensionPath(operation.path, config.extensionUrns)) {
-            const extParsed = parseExtensionPath(operation.path, config.extensionUrns);
-            if (extParsed) {
-              rawPayload = removeExtensionAttribute({ ...rawPayload }, extParsed);
-              break;
-            }
-          }
-          members = GroupPatchEngine.handleRemove(
-            operation, members, config.allowMultiMemberRemove, config.allowRemoveAllMembers,
-          );
-          break;
+      } catch (err) {
+        if (err instanceof PatchError && err.operationIndex === undefined) {
+          throw new PatchError(err.status, err.message, err.scimType, {
+            operationIndex: i, path: operation.path, op: operation.op,
+          });
+        }
+        throw err;
       }
     }
 
