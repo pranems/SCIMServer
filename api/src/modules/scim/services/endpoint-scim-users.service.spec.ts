@@ -14,6 +14,17 @@ describe('EndpointScimUsersService', () => {
   let service: EndpointScimUsersService;
   let metadataService: ScimMetadataService;
 
+  const mockScimLogger = {
+    trace: jest.fn(),
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    fatal: jest.fn(),
+    isEnabled: jest.fn().mockReturnValue(true),
+    enrichContext: jest.fn(),
+  };
+
   const mockEndpoint = {
     id: 'endpoint-1',
     name: 'test-endpoint',
@@ -76,16 +87,7 @@ describe('EndpointScimUsersService', () => {
         },
         {
           provide: ScimLogger,
-          useValue: {
-            trace: jest.fn(),
-            debug: jest.fn(),
-            info: jest.fn(),
-            warn: jest.fn(),
-            error: jest.fn(),
-            fatal: jest.fn(),
-            isEnabled: jest.fn().mockReturnValue(true),
-            enrichContext: jest.fn(),
-          },
+          useValue: mockScimLogger,
         },
         {
           provide: EndpointContextStorage,
@@ -339,6 +341,53 @@ describe('EndpointScimUsersService', () => {
         expect(result.active).toBe(true);
         expect(mockUserRepo.update).toHaveBeenCalled();
         expect(mockUserRepo.create).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('P8: uniqueness conflict diagnostic logging', () => {
+      it('should log INFO with conflicting attribute before throwing 409 on userName conflict', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'duplicate@example.com',
+          active: true,
+        };
+
+        mockUserRepo.findConflict.mockResolvedValue(mockUser);
+
+        await expect(
+          service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id)
+        ).rejects.toThrow(HttpException);
+
+        expect(mockScimLogger.info).toHaveBeenCalledWith(
+          'scim.user',
+          expect.stringContaining('Uniqueness conflict'),
+          expect.objectContaining({
+            endpointId: mockEndpoint.id,
+          }),
+        );
+      });
+
+      it('should log INFO before throwing 409 on reprovision 500 (user vanished)', async () => {
+        const reprovisionConfig: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
+          [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: true,
+        };
+        const softDeletedConflict2 = { ...mockUser, deletedAt: new Date('2023-06-15T10:00:00.000Z') };
+        mockUserRepo.findConflict.mockResolvedValue(softDeletedConflict2);
+        mockUserRepo.findByScimId.mockResolvedValue(null); // vanished
+
+        await expect(
+          service.createUserForEndpoint(
+            { schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'], userName: 'x@x.com', active: true },
+            'http://localhost:3000/scim', mockEndpoint.id, reprovisionConfig,
+          ),
+        ).rejects.toThrow(HttpException);
+
+        expect(mockScimLogger.warn).toHaveBeenCalledWith(
+          'scim.user',
+          expect.stringContaining('vanished'),
+          expect.objectContaining({ scimId: softDeletedConflict2.scimId }),
+        );
       });
     });
   });

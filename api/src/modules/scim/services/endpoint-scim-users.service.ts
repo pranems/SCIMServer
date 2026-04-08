@@ -107,6 +107,9 @@ export class EndpointScimUsersService {
         conflict.userName.toLowerCase() === dto.userName.toLowerCase()
           ? `userName '${dto.userName}'`
           : `externalId '${dto.externalId}'`;
+      this.logger.info(LogCategory.SCIM_USER, `Uniqueness conflict on POST: ${reason}`, {
+        endpointId, conflictScimId: conflict.scimId,
+      });
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
@@ -409,6 +412,9 @@ export class EndpointScimUsersService {
   ): Promise<ScimUserResource> {
     const existing = await this.userRepo.findByScimId(endpointId, existingScimId);
     if (!existing) {
+      this.logger.warn(LogCategory.SCIM_USER, 'Reprovision target vanished between conflict check and fetch', {
+        scimId: existingScimId, endpointId,
+      });
       throw createScimError({ status: 500, detail: 'Failed to locate soft-deleted resource for re-provisioning.' });
     }
 
@@ -475,6 +481,9 @@ export class EndpointScimUsersService {
           ? `userName '${userName}'`
           : `externalId '${externalId}'`;
 
+      this.logger.info(LogCategory.SCIM_USER, `Uniqueness conflict on PUT/PATCH: ${reason}`, {
+        endpointId, conflictScimId: conflict.scimId,
+      });
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',

@@ -116,6 +116,9 @@ export class EndpointScimGroupsService {
         return this.reprovisionGroup(displayNameConflict.scimId, dto, externalId, baseUrl, endpointId);
       }
 
+      this.logger.info(LogCategory.SCIM_GROUP, `Uniqueness conflict on POST: displayName '${dto.displayName}'`, {
+        endpointId, conflictScimId: displayNameConflict.scimId,
+      });
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
@@ -135,6 +138,9 @@ export class EndpointScimGroupsService {
           return this.reprovisionGroup(externalIdConflict.scimId, dto, externalId, baseUrl, endpointId);
         }
 
+        this.logger.info(LogCategory.SCIM_GROUP, `Uniqueness conflict on POST: externalId '${externalId}'`, {
+          endpointId, conflictScimId: externalIdConflict.scimId,
+        });
         throw createScimError({
           status: 409,
           scimType: 'uniqueness',
@@ -589,6 +595,9 @@ export class EndpointScimGroupsService {
   ): Promise<ScimGroupResource> {
     const existing = await this.groupRepo.findWithMembers(endpointId, existingScimId);
     if (!existing) {
+      this.logger.warn(LogCategory.SCIM_GROUP, 'Reprovision target vanished between conflict check and fetch', {
+        scimId: existingScimId, endpointId,
+      });
       throw createScimError({ status: 500, detail: 'Failed to locate soft-deleted group for re-provisioning.' });
     }
 
@@ -640,6 +649,9 @@ export class EndpointScimGroupsService {
     const conflict = await this.groupRepo.findByDisplayName(endpointId, displayName, excludeScimId);
 
     if (conflict) {
+      this.logger.info(LogCategory.SCIM_GROUP, `Uniqueness conflict on PUT/PATCH: displayName '${displayName}'`, {
+        endpointId, conflictScimId: conflict.scimId,
+      });
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
@@ -659,6 +671,9 @@ export class EndpointScimGroupsService {
   ): Promise<void> {
     const existing = await this.groupRepo.findByExternalId(endpointId, externalId, excludeScimId);
     if (existing) {
+      this.logger.info(LogCategory.SCIM_GROUP, `Uniqueness conflict on PUT/PATCH: externalId '${externalId}'`, {
+        endpointId, conflictScimId: existing.scimId,
+      });
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',

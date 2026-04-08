@@ -14,6 +14,17 @@ describe('EndpointScimGroupsService', () => {
   let service: EndpointScimGroupsService;
   let metadataService: ScimMetadataService;
 
+  const mockScimLogger = {
+    trace: jest.fn(),
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    fatal: jest.fn(),
+    isEnabled: jest.fn().mockReturnValue(true),
+    enrichContext: jest.fn(),
+  };
+
   const mockEndpoint = {
     id: 'endpoint-1',
     name: 'test-endpoint',
@@ -108,16 +119,7 @@ describe('EndpointScimGroupsService', () => {
         },
         {
           provide: ScimLogger,
-          useValue: {
-            trace: jest.fn(),
-            debug: jest.fn(),
-            info: jest.fn(),
-            warn: jest.fn(),
-            error: jest.fn(),
-            fatal: jest.fn(),
-            isEnabled: jest.fn().mockReturnValue(true),
-            enrichContext: jest.fn(),
-          },
+          useValue: mockScimLogger,
         },
       ],
     }).compile();
@@ -391,6 +393,26 @@ describe('EndpointScimGroupsService', () => {
         ).rejects.toThrow(HttpException);
 
         expect(mockGroupRepo.updateGroupWithMembers).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('P8: uniqueness conflict diagnostic logging', () => {
+      it('should log INFO before throwing 409 on displayName conflict', async () => {
+        const dto: CreateGroupDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'Duplicate Group',
+        };
+        mockGroupRepo.findByDisplayName.mockResolvedValue({ scimId: 'existing-1', active: true, deletedAt: null });
+
+        await expect(
+          service.createGroupForEndpoint(dto, 'http://localhost:3000/scim', mockEndpoint.id),
+        ).rejects.toThrow(HttpException);
+
+        expect(mockScimLogger.info).toHaveBeenCalledWith(
+          'scim.group',
+          expect.stringContaining('Uniqueness conflict'),
+          expect.objectContaining({ endpointId: mockEndpoint.id }),
+        );
       });
     });
   });

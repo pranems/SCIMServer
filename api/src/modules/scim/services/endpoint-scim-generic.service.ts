@@ -200,6 +200,9 @@ export class EndpointScimGenericService {
       const reason = externalId && conflict.externalId === externalId
         ? `externalId "${externalId}"`
         : `displayName "${displayName}"`;
+      this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Uniqueness conflict on POST ${resourceType.name}: ${reason}`, {
+        endpointId, conflictScimId: conflict.scimId,
+      });
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
@@ -444,6 +447,9 @@ export class EndpointScimGenericService {
       const reason = externalId && conflict.externalId === externalId
         ? `externalId "${externalId}"`
         : `displayName "${displayName}"`;
+      this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Uniqueness conflict on PUT ${resourceType.name}: ${reason}`, {
+        endpointId, scimId, conflictScimId: conflict.scimId,
+      });
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
@@ -649,6 +655,9 @@ export class EndpointScimGenericService {
       const reason = externalId && conflict.externalId === externalId
         ? `externalId "${externalId}"`
         : `displayName "${displayName}"`;
+      this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Uniqueness conflict on PATCH ${resourceType.name}: ${reason}`, {
+        endpointId, scimId, conflictScimId: conflict.scimId,
+      });
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
