@@ -1,5 +1,7 @@
-﻿import { Injectable } from '@nestjs/common';
+﻿import { Injectable, Optional, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ScimLogger } from '../logging/scim-logger.service';
+import { LogCategory } from '../logging/log-levels';
 
 export interface ActivitySummary {
   id: string;
@@ -25,7 +27,10 @@ interface ScimPatchOperation {
 
 @Injectable()
 export class ActivityParserService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Optional() @Inject(ScimLogger) private readonly logger?: ScimLogger,
+  ) {}
 
   /**
    * Parse a SCIM request log into a human-readable activity summary
@@ -54,7 +59,7 @@ export class ActivityParserService {
         requestData = JSON.parse(log.requestBody);
       }
     } catch (e) {
-      // Ignore parsing errors
+      this.logger?.trace(LogCategory.DATABASE, 'Activity parser: requestBody JSON.parse failed');
     }
 
     try {
@@ -62,7 +67,7 @@ export class ActivityParserService {
         responseData = JSON.parse(log.responseBody);
       }
     } catch (e) {
-      // Ignore parsing errors
+      this.logger?.trace(LogCategory.DATABASE, 'Activity parser: responseBody JSON.parse failed');
     }
 
     // Determine if this is a Users or Groups operation
@@ -635,6 +640,7 @@ export class ActivityParserService {
     try {
       paramsObj = new URLSearchParams(query);
     } catch {
+      this.logger?.trace(LogCategory.DATABASE, 'isGuidBasedFilter: URLSearchParams parse failed');
       return false;
     }
     const rawFilter = paramsObj.get('filter') ?? paramsObj.get('Filter') ?? paramsObj.get('FILTER');
@@ -644,7 +650,7 @@ export class ActivityParserService {
     try {
       decoded = decodeURIComponent(withSpaces);
     } catch {
-      // continue with original string if decoding fails
+      this.logger?.trace(LogCategory.DATABASE, 'isGuidBasedFilter: decodeURIComponent failed');
     }
     const match = decoded.match(/userName\s+eq\s+"?([^"\\]+)"?/i);
     if (!match) return false;
@@ -767,12 +773,12 @@ export class ActivityParserService {
             }
           }
         } catch (e) {
-          // Fall back to userName if payload parsing fails
+          this.logger?.debug(LogCategory.DATABASE, 'resolveUserName: payload parsing failed', { error: (e as Error).message });
         }
         return user.userName ?? userId;
       }
     } catch (e) {
-      // If lookup fails, return the original ID
+      this.logger?.debug(LogCategory.DATABASE, 'resolveUserName: user lookup failed', { error: (e as Error).message });
     }
     return userId;
   }
@@ -791,7 +797,7 @@ export class ActivityParserService {
         return group.displayName;
       }
     } catch (e) {
-      // If lookup fails, return the original ID
+      this.logger?.debug(LogCategory.DATABASE, 'resolveGroupName: group lookup failed', { error: (e as Error).message });
     }
     return groupId;
   }
@@ -885,7 +891,7 @@ export class ActivityParserService {
           }
         }
       } catch (e) {
-        // Ignore parsing errors for individual operations
+        this.logger?.debug(LogCategory.DATABASE, 'parsePatchOperations: op parsing failed', { error: (e as Error).message });
       }
     }
 
