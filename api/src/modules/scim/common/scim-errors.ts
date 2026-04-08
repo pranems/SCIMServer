@@ -11,7 +11,45 @@ import { getCorrelationContext } from '../../logging/scim-logger.service';
 export interface ScimErrorDiagnostics {
   /** Which config flag activated this validation path (e.g., 'StrictSchemaValidation') */
   triggeredBy?: string;
-  /** Additional diagnostic context */
+
+  // ── Attribute-level RCA context ────────────────────────────────────
+
+  /** SCIM operation that triggered the error: create, replace, patch, delete */
+  operation?: string;
+  /** Attribute path (dot-notation or URN-qualified) that caused the error */
+  attributePath?: string;
+  /** Schema URN where the failing attribute is defined */
+  schemaUrn?: string;
+
+  // ── Uniqueness conflict context ───────────────────────────────────
+
+  /** scimId of the existing resource that conflicts */
+  conflictingResourceId?: string;
+  /** Which attribute caused the conflict (e.g., 'userName', 'externalId') */
+  conflictingAttribute?: string;
+  /** The incoming value that collided */
+  incomingValue?: string;
+
+  // ── PATCH operation context ───────────────────────────────────────
+
+  /** Zero-based index of the failing operation in the PATCH request */
+  failedOperationIndex?: number;
+  /** The path from the failing PATCH operation */
+  failedPath?: string;
+  /** The op type from the failing operation (add/replace/remove) */
+  failedOp?: string;
+
+  // ── ETag context ──────────────────────────────────────────────────
+
+  /** Current server-side ETag value (for 428 responses) */
+  currentETag?: string;
+
+  // ── Filter context ────────────────────────────────────────────────
+
+  /** Original parse error detail (for invalidFilter) */
+  parseError?: string;
+
+  /** Additional diagnostic context (catch-all) */
   extra?: Record<string, unknown>;
 }
 
@@ -57,6 +95,25 @@ export function createScimError({ status, detail, scimType, diagnostics }: ScimE
         ? `/scim/endpoints/${ctx.endpointId}/logs/recent?requestId=${ctx.requestId}`
         : `/scim/admin/log-config/recent?requestId=${ctx.requestId}`;
     }
+
+    // Attribute-level RCA context
+    if (diagnostics?.operation) diag.operation = diagnostics.operation;
+    if (diagnostics?.attributePath) diag.attributePath = diagnostics.attributePath;
+    if (diagnostics?.schemaUrn) diag.schemaUrn = diagnostics.schemaUrn;
+
+    // Uniqueness conflict context
+    if (diagnostics?.conflictingResourceId) diag.conflictingResourceId = diagnostics.conflictingResourceId;
+    if (diagnostics?.conflictingAttribute) diag.conflictingAttribute = diagnostics.conflictingAttribute;
+    if (diagnostics?.incomingValue) diag.incomingValue = diagnostics.incomingValue;
+
+    // PATCH operation context
+    if (diagnostics?.failedOperationIndex !== undefined) diag.failedOperationIndex = diagnostics.failedOperationIndex;
+    if (diagnostics?.failedPath) diag.failedPath = diagnostics.failedPath;
+    if (diagnostics?.failedOp) diag.failedOp = diagnostics.failedOp;
+
+    // ETag / filter context
+    if (diagnostics?.currentETag) diag.currentETag = diagnostics.currentETag;
+    if (diagnostics?.parseError) diag.parseError = diagnostics.parseError;
 
     if (diagnostics?.extra) {
       Object.assign(diag, diagnostics.extra);

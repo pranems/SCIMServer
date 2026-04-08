@@ -306,6 +306,13 @@ describe('LogConfigController', () => {
       expect(result.count).toBe(0);
       expect(result.entries).toHaveLength(0);
     });
+
+    it('should include hint when ring buffer returns empty with requestId filter (P8)', () => {
+      const result = controller.getRecentLogs(undefined, undefined, undefined, 'nonexistent-req-id') as any;
+      expect(result.count).toBe(0);
+      expect(result.hint).toBeDefined();
+      expect(result.hint).toContain('/scim/admin/logs');
+    });
   });
 
   // ─── DELETE /admin/log-config/recent ──────────────────────────────
@@ -550,7 +557,26 @@ describe('LogConfigController', () => {
         (c: any[]) => c[0] === LogCategory.CONFIG && c[1]?.includes('configuration updated'),
       );
       expect(auditCall).toBeDefined();
-      expect(auditCall[2].changes).toEqual(expect.arrayContaining(['globalLevel', 'includePayloads']));
+      expect(auditCall[2].changes).toHaveProperty('globalLevel');
+      expect(auditCall[2].changes).toHaveProperty('includePayloads');
+    });
+
+    it('updateConfig should log before/after values for changed fields (P8)', () => {
+      // Set initial state
+      controller.updateConfig({ globalLevel: 'INFO' });
+      infoSpy.mockClear();
+
+      // Change to WARN
+      controller.updateConfig({ globalLevel: 'WARN' });
+
+      const auditCall = infoSpy.mock.calls.find(
+        (c: any[]) => c[0] === LogCategory.CONFIG && c[1]?.includes('configuration updated'),
+      );
+      expect(auditCall).toBeDefined();
+      // Should have before/after values, not just key names
+      expect(auditCall[2].changes).toHaveProperty('globalLevel');
+      expect(auditCall[2].changes.globalLevel).toHaveProperty('from');
+      expect(auditCall[2].changes.globalLevel).toHaveProperty('to');
     });
 
     it('setGlobalLevel should log INFO with new level', () => {

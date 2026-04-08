@@ -492,14 +492,14 @@ describe('ScimLogger', () => {
     });
 
     it('should evict oldest entries when buffer is full', () => {
-      // The maxRingBufferSize is 500, let's push 510 entries
-      for (let i = 0; i < 510; i++) {
+      // The maxRingBufferSize is 2000, let's push 2010 entries
+      for (let i = 0; i < 2010; i++) {
         logger.info(LogCategory.HTTP, `entry ${i}`);
       }
 
-      const logs = logger.getRecentLogs({ limit: 510 });
-      // Should have at most 500 entries
-      expect(logs.length).toBeLessThanOrEqual(500);
+      const logs = logger.getRecentLogs({ limit: 2010 });
+      // Should have at most 2000 entries
+      expect(logs.length).toBeLessThanOrEqual(2000);
       // First entry should be entry 10 (0-9 evicted)
       expect(logs[0].message).toBe('entry 10');
     });

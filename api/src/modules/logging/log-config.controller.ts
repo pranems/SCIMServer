@@ -92,10 +92,17 @@ export class LogConfigController {
       updates.categoryLevels = catLevels;
     }
 
+    // Capture before values for audit log
+    const before = this.scimLogger.getConfig();
+    const changeDetails: Record<string, { from: unknown; to: unknown }> = {};
+    for (const key of Object.keys(updates) as Array<keyof LogConfig>) {
+      changeDetails[key] = { from: before[key], to: updates[key] };
+    }
+
     this.scimLogger.updateConfig(updates);
 
     this.scimLogger.info(LogCategory.CONFIG, 'Log configuration updated', {
-      changes: Object.keys(updates),
+      changes: changeDetails,
     });
 
     return {
@@ -187,10 +194,18 @@ export class LogConfigController {
       requestId: requestId || undefined,
       endpointId: endpointId || undefined,
     });
-    return {
+
+    const response: { count: number; entries: typeof entries; hint?: string } = {
       count: entries.length,
       entries,
     };
+
+    // When filtered by requestId and nothing found, hint the operator to try persistent DB logs
+    if (entries.length === 0 && requestId) {
+      response.hint = `No entries in ring buffer for requestId '${requestId}'. Try persistent logs: GET /scim/admin/logs?search=${requestId}`;
+    }
+
+    return response;
   }
 
   /**
