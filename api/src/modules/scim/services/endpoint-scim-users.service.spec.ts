@@ -9,6 +9,7 @@ import type { CreateUserDto } from '../dto/create-user.dto';
 import type { PatchUserDto } from '../dto/patch-user.dto';
 import { ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimSchemaRegistry } from '../discovery/scim-schema-registry';
+import { SCIM_DIAGNOSTICS_URN } from '../common/scim-constants';
 
 describe('EndpointScimUsersService', () => {
   let service: EndpointScimUsersService;
@@ -365,6 +366,28 @@ describe('EndpointScimUsersService', () => {
             endpointId: mockEndpoint.id,
           }),
         );
+      });
+
+      it('should include conflictingResourceId in 409 error response diagnostics (RCA-1)', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'test@example.com', // matches mockUser.userName
+          active: true,
+        };
+
+        mockUserRepo.findConflict.mockResolvedValue(mockUser);
+
+        try {
+          await service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id);
+          fail('should have thrown');
+        } catch (e: any) {
+          expect(e.getStatus()).toBe(409);
+          const body = e.getResponse();
+          expect(body[SCIM_DIAGNOSTICS_URN]).toBeDefined();
+          expect(body[SCIM_DIAGNOSTICS_URN].conflictingResourceId).toBe(mockUser.scimId);
+          expect(body[SCIM_DIAGNOSTICS_URN].conflictingAttribute).toBe('userName');
+          expect(body[SCIM_DIAGNOSTICS_URN].incomingValue).toBe('test@example.com');
+        }
       });
 
       it('should log INFO before throwing 409 on reprovision 500 (user vanished)', async () => {

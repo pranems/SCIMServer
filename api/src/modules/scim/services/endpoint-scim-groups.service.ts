@@ -123,6 +123,12 @@ export class EndpointScimGroupsService {
         status: 409,
         scimType: 'uniqueness',
         detail: `A group with displayName '${dto.displayName}' already exists.`,
+        diagnostics: {
+          operation: 'create',
+          conflictingResourceId: displayNameConflict.scimId,
+          conflictingAttribute: 'displayName',
+          incomingValue: dto.displayName,
+        },
       });
     }
 
@@ -145,6 +151,12 @@ export class EndpointScimGroupsService {
           status: 409,
           scimType: 'uniqueness',
           detail: `A group with externalId '${externalId}' already exists.`,
+          diagnostics: {
+            operation: 'create',
+            conflictingResourceId: externalIdConflict.scimId,
+            conflictingAttribute: 'externalId',
+            incomingValue: externalId,
+          },
         });
       }
     }
@@ -655,7 +667,13 @@ export class EndpointScimGroupsService {
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
-        detail: `A group with displayName '${displayName}' already exists.`
+        detail: `A group with displayName '${displayName}' already exists.`,
+        diagnostics: {
+          operation: 'replace',
+          conflictingResourceId: conflict.scimId,
+          conflictingAttribute: 'displayName',
+          incomingValue: displayName,
+        },
       });
     }
   }
@@ -677,7 +695,13 @@ export class EndpointScimGroupsService {
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
-        detail: `A group with externalId '${externalId}' already exists.`
+        detail: `A group with externalId '${externalId}' already exists.`,
+        diagnostics: {
+          operation: 'replace',
+          conflictingResourceId: existing.scimId,
+          conflictingAttribute: 'externalId',
+          incomingValue: externalId,
+        },
       });
     }
   }

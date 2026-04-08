@@ -102,11 +102,13 @@ export class EndpointScimUsersService {
         return this.reprovisionUser(conflict.scimId, dto, baseUrl, endpointId, config);
       }
 
-      // Normal conflict — throw 409
-      const reason =
-        conflict.userName.toLowerCase() === dto.userName.toLowerCase()
-          ? `userName '${dto.userName}'`
-          : `externalId '${dto.externalId}'`;
+      // Normal conflict - throw 409
+      const isUserName = conflict.userName.toLowerCase() === dto.userName.toLowerCase();
+      const conflictingAttribute = isUserName ? 'userName' : 'externalId';
+      const incomingValue = isUserName ? dto.userName : dto.externalId ?? '';
+      const reason = isUserName
+        ? `userName '${dto.userName}'`
+        : `externalId '${dto.externalId}'`;
       this.logger.info(LogCategory.SCIM_USER, `Uniqueness conflict on POST: ${reason}`, {
         endpointId, conflictScimId: conflict.scimId,
       });
@@ -114,6 +116,12 @@ export class EndpointScimUsersService {
         status: 409,
         scimType: 'uniqueness',
         detail: `A resource with ${reason} already exists.`,
+        diagnostics: {
+          operation: 'create',
+          conflictingResourceId: conflict.scimId,
+          conflictingAttribute,
+          incomingValue,
+        },
       });
     }
 
@@ -476,10 +484,12 @@ export class EndpointScimUsersService {
     );
 
     if (conflict) {
-      const reason =
-        conflict.userName.toLowerCase() === userName.toLowerCase()
-          ? `userName '${userName}'`
-          : `externalId '${externalId}'`;
+      const isUserName = conflict.userName.toLowerCase() === userName.toLowerCase();
+      const conflictingAttribute = isUserName ? 'userName' : 'externalId';
+      const incomingValue = isUserName ? userName : (externalId ?? '');
+      const reason = isUserName
+        ? `userName '${userName}'`
+        : `externalId '${externalId}'`;
 
       this.logger.info(LogCategory.SCIM_USER, `Uniqueness conflict on PUT/PATCH: ${reason}`, {
         endpointId, conflictScimId: conflict.scimId,
@@ -487,7 +497,13 @@ export class EndpointScimUsersService {
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
-        detail: `A resource with ${reason} already exists.`
+        detail: `A resource with ${reason} already exists.`,
+        diagnostics: {
+          operation: 'replace',
+          conflictingResourceId: conflict.scimId,
+          conflictingAttribute,
+          incomingValue,
+        },
       });
     }
   }

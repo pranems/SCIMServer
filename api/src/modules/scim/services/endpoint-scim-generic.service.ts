@@ -196,8 +196,11 @@ export class EndpointScimGenericService {
         return this.reprovisionResource(conflict, body, baseUrl, endpointId, resourceType, config);
       }
 
-      // Normal conflict — throw 409
-      const reason = externalId && conflict.externalId === externalId
+      // Normal conflict - throw 409
+      const isExtId = externalId && conflict.externalId === externalId;
+      const conflictingAttribute = isExtId ? 'externalId' : 'displayName';
+      const incomingValue = isExtId ? externalId : (displayName ?? '');
+      const reason = isExtId
         ? `externalId "${externalId}"`
         : `displayName "${displayName}"`;
       this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Uniqueness conflict on POST ${resourceType.name}: ${reason}`, {
@@ -207,6 +210,12 @@ export class EndpointScimGenericService {
         status: 409,
         scimType: 'uniqueness',
         detail: `A ${resourceType.name} with ${reason} already exists.`,
+        diagnostics: {
+          operation: 'create',
+          conflictingResourceId: conflict.scimId,
+          conflictingAttribute,
+          incomingValue,
+        },
       });
     }
 
@@ -454,6 +463,12 @@ export class EndpointScimGenericService {
         status: 409,
         scimType: 'uniqueness',
         detail: `A ${resourceType.name} with ${reason} already exists.`,
+        diagnostics: {
+          operation: 'replace',
+          conflictingResourceId: conflict.scimId,
+          conflictingAttribute: (externalId && conflict.externalId === externalId) ? 'externalId' : 'displayName',
+          incomingValue: (externalId && conflict.externalId === externalId) ? externalId : (displayName ?? ''),
+        },
       });
     }
 
@@ -662,6 +677,12 @@ export class EndpointScimGenericService {
         status: 409,
         scimType: 'uniqueness',
         detail: `A ${resourceType.name} with ${reason} already exists.`,
+        diagnostics: {
+          operation: 'patch',
+          conflictingResourceId: conflict.scimId,
+          conflictingAttribute: (externalId && conflict.externalId === externalId) ? 'externalId' : 'displayName',
+          incomingValue: (externalId && conflict.externalId === externalId) ? externalId : (displayName ?? ''),
+        },
       });
     }
 
