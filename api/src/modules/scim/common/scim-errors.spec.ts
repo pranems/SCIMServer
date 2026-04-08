@@ -213,5 +213,27 @@ describe('createScimError', () => {
       expect(diag.operation).toBe('create');
       expect(diag.triggeredBy).toBeUndefined();
     });
+
+    it('should auto-read operation from correlation context when not in diagnostics (Step 3.3)', () => {
+      const ScimLoggerModule = require('../../logging/scim-logger.service');
+      const logger = new ScimLoggerModule.ScimLogger();
+
+      let body: Record<string, unknown> | undefined;
+      logger.runWithContext(
+        { requestId: 'op-test-req', endpointId: 'ep-op', operation: 'replace' },
+        () => {
+          const err = createScimError({
+            status: 400,
+            detail: 'Schema validation failed',
+            diagnostics: { triggeredBy: 'StrictSchemaValidation' },
+          });
+          body = err.getResponse() as Record<string, unknown>;
+        },
+      );
+
+      const diag = body![DIAGNOSTICS_URN] as Record<string, unknown>;
+      expect(diag).toBeDefined();
+      expect(diag.operation).toBe('replace');
+    });
   });
 });

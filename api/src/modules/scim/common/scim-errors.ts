@@ -98,6 +98,7 @@ export function createScimError({ status, detail, scimType, diagnostics }: ScimE
 
     // Attribute-level RCA context
     if (diagnostics?.operation) diag.operation = diagnostics.operation;
+    else if (ctx?.operation) diag.operation = ctx.operation;
     if (diagnostics?.attributePath) diag.attributePath = diagnostics.attributePath;
     if (diagnostics?.schemaUrn) diag.schemaUrn = diagnostics.schemaUrn;
 
