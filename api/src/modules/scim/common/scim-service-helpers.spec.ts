@@ -117,6 +117,19 @@ describe('enforceIfMatch', () => {
     }
   });
 
+  it('should include currentETag in 428 diagnostics', () => {
+    const config = { RequireIfMatch: 'true' } as any;
+    try {
+      enforceIfMatch(5, undefined, config);
+      fail('should have thrown');
+    } catch (e: any) {
+      const body = e.getResponse();
+      expect(body[SCIM_DIAGNOSTICS_URN]).toBeDefined();
+      expect(body[SCIM_DIAGNOSTICS_URN].currentETag).toBe('W/"v5"');
+      expect(body[SCIM_DIAGNOSTICS_URN].triggeredBy).toBe('RequireIfMatch');
+    }
+  });
+
   it('should not throw 428 when RequireIfMatch is false and no If-Match', () => {
     const config = { RequireIfMatch: 'false' } as any;
     expect(() => enforceIfMatch(3, undefined, config)).not.toThrow();
