@@ -1,7 +1,8 @@
 # Logging & Error Handling — Quality Audit
 
-> **Version**: 1.1 · **Date**: April 6, 2026 · **Scope**: Full codebase audit across all flows, configs, deployment modes  
-> **Applies to**: SCIMServer v0.31.0 · NestJS + Prisma 7 + PostgreSQL 17  
+> **Version**: 1.2 · **Date**: April 7, 2026 · **Scope**: Full codebase audit across all flows, configs, deployment modes  
+> **Applies to**: SCIMServer v0.32.0 · NestJS + Prisma 7 + PostgreSQL 17  
+> **Status**: 22 of 29 gaps resolved (Steps 1-12 + Step A). 7 deferred (P2/P3).  
 > **Companion**: [LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md](LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md) — the redesign proposal  
 > **See also**: [LOGGING_AND_OBSERVABILITY.md](LOGGING_AND_OBSERVABILITY.md) — current operator-facing documentation
 
@@ -446,37 +447,37 @@ At 100 req/s → 400 INFO lines/s. HTTP bookends and intent logs are redundant.
 
 ## 14. Gap Register
 
-| # | Gap | Severity | Dimension |
-|---|---|---|---|
-| **G1** | InMemory repos throw raw `Error` → non-SCIM 500 responses | **Critical** | Deployment × Error |
-| **G2** | InMemory `delete()` silently no-ops on missing records | **High** | Deployment × Error |
-| **G3** | BulkProcessor has zero logging, no per-op correlation | **High** | Feature × Logging |
-| **G4** | Generic service uses `LogCategory.GENERAL` | **High** | Schema × Logging |
-| **G5** | `guardSoftDeleted()` logs at DEBUG — invisible in production | **High** | Config × Deployment |
-| **G6** | Users service has no database error wrapping | **High** | Error × Consistency |
-| **G7** | `ScimExceptionFilter` only catches `HttpException` — non-SCIM 500 for raw errors | **High** | Error |
-| **G8** | Only 6 `logger.error()` calls — most 5xx have no service-level ERROR log | **High** | Error × Logging |
-| **G9** | Config changes (log level, endpoints, credentials) not logged | **High** | Admin × Audit |
-| **G10** | `LoggingService` flush failure drops data permanently | **Medium** | Logging × Deployment |
-| **G11** | Two logger systems (ScimLogger vs NestJS Logger) | **Medium** | Logging × Architecture |
-| **G12** | Error details don't mention gating config flag | **Medium** | Config × Error |
-| **G13** | No preset name in errors or logs | **Medium** | Schema × Error |
-| **G14** | Silent `JSON.parse` catches (9 sites) | **Medium** | Error × Data |
-| **G15** | InMemory log store (LoggingService) has no size limit | **Medium** | Deployment × Memory |
-| **G16** | InMemory has no transaction support for groups | **Medium** | Deployment × Error |
-| **G17** | HTTP bookends at INFO — too noisy for production | **Medium** | Logging × Performance |
-| **G18** | PUT operations have no completion log | **Low** | Consistency |
-| **G19** | Invalid category `PUT /admin/log-config/category/invalid/TRACE` returns 200 | **Low** | Admin API |
-| **G20** | Content-type middleware uses manual `HttpException` not `createScimError` | **Low** | Consistency |
-| **G21** | WARN conflates routine 4xx with operational concerns | **Low** | Logging × Levels |
-| **G22** | Ring buffer size (500), slow threshold (2000ms) hardcoded | **Low** | Architecture |
-| **G23** | No log file on disk — development loses logs on terminal close | **Low** | Deployment |
-| **G24** | Docker compose has no log rotation config | **Low** | Deployment |
-| **G25** | PII in TRACE payloads — no data privacy policy | **Medium** | Security × Compliance |
-| **G26** | No metrics/counters — can't build dashboards | **Medium** | Observability |
-| **G27** | No health check depth (DB, memory, pool) | **Medium** | Operations |
-| **G28** | Multi-instance: ring buffer per-instance, config changes per-instance | **Medium** | Scaling |
-| **G29** | Per-endpoint credentials can access ALL endpoints' logs via admin API — no tenant-scoped enforcement | **High** | Security × Tenant Isolation |
+| # | Gap | Severity | Status | Resolution |
+|---|---|---|---|---|
+| **G1** | InMemory repos throw raw `Error` → non-SCIM 500 | **Critical** | ✅ Resolved | Step 2: RepositoryError domain boundary |
+| **G2** | InMemory `delete()` silently no-ops | **High** | ✅ Resolved | Step 2: RepositoryError with NOT_FOUND on delete |
+| **G3** | BulkProcessor zero logging | **High** | ✅ Resolved | Step 8: SCIM_BULK category + start/complete/error logs |
+| **G4** | Generic service uses `GENERAL` category | **High** | ✅ Resolved | Step 8: Replaced with SCIM_RESOURCE |
+| **G5** | `guardSoftDeleted` invisible in production | **High** | ✅ Resolved | Step 6: Enriched context carries activeFlags |
+| **G6** | Users service no DB error wrapping | **High** | ✅ Resolved | Step 3: handleRepositoryError in all services |
+| **G7** | `ScimExceptionFilter` only catches `HttpException` | **High** | ✅ Resolved | Step 1: GlobalExceptionFilter @Catch() |
+| **G8** | Only 6 `logger.error()` calls | **High** | ✅ Resolved | Step 3: ERROR before every 5xx throw |
+| **G9** | Config changes not logged | **High** | ✅ Resolved | Step 10: Admin audit trail (8 INFO entries) |
+| **G10** | LoggingService flush drops data | **Medium** | ⏳ Deferred | P2: Needs retry/circuit breaker design |
+| **G11** | Two logger systems | **Medium** | ✅ Resolved | Step 5: All NestJS Logger → ScimLogger |
+| **G12** | Error details don't mention config flag | **Medium** | ✅ Resolved | Step 4: diagnostics.triggeredBy |
+| **G13** | No endpoint context in errors | **Medium** | ✅ Resolved | Step 4: diagnostics.endpointId + logsUrl |
+| **G14** | Silent JSON.parse catches | **Medium** | ✅ Resolved | Step 7: WARN/DEBUG at 5+ catch sites |
+| **G15** | InMemory log store unbounded | **Medium** | ⏳ Deferred | P2: Dev/test only; needs eviction policy |
+| **G16** | InMemory no transaction parity | **Medium** | ✅ Resolved | Step 2: RepositoryError consistent errors |
+| **G17** | HTTP bookends too noisy at INFO | **Medium** | ✅ Resolved | Step 9: Demoted to DEBUG |
+| **G18** | PUT no completion log | **Low** | ✅ Resolved | Step 9: Added 'User/Group replaced' INFO |
+| **G19** | Invalid category returns 200 | **Low** | ✅ Resolved | Step 12: Returns 400 HttpException |
+| **G20** | Content-type middleware manual HttpException | **Low** | ✅ Resolved | Step 12: Uses createScimError() |
+| **G21** | 4xx conflated with WARN | **Low** | ✅ Resolved | Step 9: 404→DEBUG, 400/409→INFO, 401/403→WARN |
+| **G22** | Ring buffer/slow threshold hardcoded | **Low** | ✅ Resolved | Step 12: LOG_RING_BUFFER_SIZE, LOG_SLOW_REQUEST_MS |
+| **G23** | No log file on disk | **Low** | ⏳ Deferred | P3: stdout-only correct per 12-factor |
+| **G24** | Docker no log rotation | **Low** | ✅ Resolved | Step 12: max-size 10m, max-file 3 |
+| **G25** | PII in TRACE payloads | **Medium** | ⏳ Deferred | P2: TRACE off in prod; needs GDPR analysis |
+| **G26** | No metrics/counters | **Medium** | ⏳ Deferred | P2: Separate Prometheus/OTEL workstream |
+| **G27** | No health check depth | **Medium** | ⏳ Deferred | P2: Needs DB/memory/pool probes |
+| **G28** | Multi-instance ring buffer | **Medium** | ⏳ Deferred | P3: Single-instance today |
+| **G29** | Per-endpoint creds access all logs | **High** | ✅ Resolved | Step 11: Endpoint-scoped log endpoints |
 
 ---
 
