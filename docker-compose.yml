@@ -39,6 +39,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
     logging:
       driver: json-file
       options:
