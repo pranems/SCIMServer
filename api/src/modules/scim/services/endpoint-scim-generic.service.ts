@@ -151,6 +151,7 @@ export class EndpointScimGenericService {
     resourceType: ScimResourceType,
     config?: EndpointConfig,
   ): Promise<Record<string, unknown>> {
+    this.scimLogger.enrichContext({ resourceType: resourceType.name, operation: 'create' });
     const coreSchema = resourceType.schema;
 
     // GEN-11: Validate schemas array includes the core schema (same as ensureSchema)
@@ -268,6 +269,7 @@ export class EndpointScimGenericService {
     resourceType: ScimResourceType,
     config?: EndpointConfig,
   ): Promise<Record<string, unknown>> {
+    this.scimLogger.enrichContext({ resourceType: resourceType.name, resourceId: scimId, operation: 'get' });
     const record = await this.genericRepo.findByScimId(
       endpointId,
       resourceType.name,
@@ -296,6 +298,7 @@ export class EndpointScimGenericService {
     resourceType: ScimResourceType,
     config?: EndpointConfig,
   ): Promise<Record<string, unknown>> {
+    this.scimLogger.enrichContext({ resourceType: resourceType.name, operation: 'list' });
     const startIndex = Math.max(params.startIndex ?? 1, 1);
     const count = Math.min(Math.max(params.count ?? DEFAULT_COUNT, 0), MAX_COUNT);
 
@@ -380,6 +383,7 @@ export class EndpointScimGenericService {
     config?: EndpointConfig,
     ifMatch?: string,
   ): Promise<Record<string, unknown>> {
+    this.scimLogger.enrichContext({ resourceType: resourceType.name, resourceId: scimId, operation: 'replace' });
     const coreSchema = resourceType.schema;
 
     // GEN-11: Validate schemas array includes the core schema
@@ -501,6 +505,7 @@ export class EndpointScimGenericService {
     config?: EndpointConfig,
     ifMatch?: string,
   ): Promise<Record<string, unknown>> {
+    this.scimLogger.enrichContext({ resourceType: resourceType.name, resourceId: scimId, operation: 'patch' });
     // Validate PATCH schema
     ensureSchema(patchDto.schemas, SCIM_PATCH_SCHEMA);
 
@@ -701,6 +706,7 @@ export class EndpointScimGenericService {
     config?: EndpointConfig,
     ifMatch?: string,
   ): Promise<void> {
+    this.scimLogger.enrichContext({ resourceType: resourceType.name, resourceId: scimId, operation: 'delete' });
     const existing = await this.genericRepo.findByScimId(
       endpointId,
       resourceType.name,

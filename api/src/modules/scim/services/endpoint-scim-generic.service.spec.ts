@@ -91,6 +91,7 @@ describe('EndpointScimGenericService', () => {
             error: jest.fn(),
             fatal: jest.fn(),
             isEnabled: jest.fn().mockReturnValue(true),
+            enrichContext: jest.fn(),
           },
         },
         {

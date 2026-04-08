@@ -76,6 +76,7 @@ export class EndpointScimGroupsService {
   }
 
   async createGroupForEndpoint(dto: CreateGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimGroupResource> {
+    this.logger.enrichContext({ resourceType: 'Group', operation: 'create' });
     ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
     this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
 
@@ -192,6 +193,7 @@ export class EndpointScimGroupsService {
   }
 
   async getGroupForEndpoint(scimId: string, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimGroupResource> {
+    this.logger.enrichContext({ resourceType: 'Group', resourceId: scimId, operation: 'get' });
     this.logger.debug(LogCategory.SCIM_GROUP, 'Get group', { scimId, endpointId });
     const group = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!group) {
@@ -211,6 +213,8 @@ export class EndpointScimGroupsService {
     endpointId: string,
     config?: EndpointConfig,
   ): Promise<ScimListResponse<ScimGroupResource>> {
+    this.logger.enrichContext({ resourceType: 'Group', operation: 'list' });
+
     if (count > MAX_COUNT) {
       count = MAX_COUNT;
     }
@@ -270,6 +274,7 @@ export class EndpointScimGroupsService {
   }
 
   async patchGroupForEndpoint(scimId: string, dto: PatchGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig, ifMatch?: string): Promise<ScimGroupResource> {
+    this.logger.enrichContext({ resourceType: 'Group', resourceId: scimId, operation: 'patch' });
     ensureSchema(dto.schemas, SCIM_PATCH_SCHEMA);
 
     this.logger.info(LogCategory.SCIM_PATCH, 'Patch group', { scimId, endpointId, opCount: dto.Operations?.length });
@@ -446,6 +451,7 @@ export class EndpointScimGroupsService {
     config?: EndpointConfig,
     ifMatch?: string,
   ): Promise<ScimGroupResource> {
+    this.logger.enrichContext({ resourceType: 'Group', resourceId: scimId, operation: 'replace' });
     ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
     this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
 
@@ -530,6 +536,7 @@ export class EndpointScimGroupsService {
   }
 
   async deleteGroupForEndpoint(scimId: string, endpointId: string, config?: EndpointConfig, ifMatch?: string): Promise<void> {
+    this.logger.enrichContext({ resourceType: 'Group', resourceId: scimId, operation: 'delete' });
     this.logger.info(LogCategory.SCIM_GROUP, 'Delete group', { scimId, endpointId });
     const group = await this.groupRepo.findByScimId(endpointId, scimId);
 

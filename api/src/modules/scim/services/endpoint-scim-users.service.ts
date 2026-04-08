@@ -68,6 +68,7 @@ export class EndpointScimUsersService {
   }
 
   async createUserForEndpoint(dto: CreateUserDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimUserResource> {
+    this.logger.enrichContext({ resourceType: 'User', operation: 'create' });
     ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
     this.schemaHelpers.enforceStrictSchemaValidation(dto, endpointId, config);
 
@@ -151,6 +152,7 @@ export class EndpointScimUsersService {
   }
 
   async getUserForEndpoint(scimId: string, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimUserResource> {
+    this.logger.enrichContext({ resourceType: 'User', resourceId: scimId, operation: 'get' });
     this.logger.debug(LogCategory.SCIM_USER, 'Get user', { scimId, endpointId });
     const user = await this.userRepo.findByScimId(endpointId, scimId);
     
@@ -171,6 +173,7 @@ export class EndpointScimUsersService {
     endpointId: string,
     config?: EndpointConfig,
   ): Promise<ScimListResponse<ScimUserResource>> {
+    this.logger.enrichContext({ resourceType: 'User', operation: 'list' });
     if (count > MAX_COUNT) {
       count = MAX_COUNT;
     }
@@ -237,6 +240,7 @@ export class EndpointScimUsersService {
     config?: EndpointConfig,
     ifMatch?: string,
   ): Promise<ScimUserResource> {
+    this.logger.enrichContext({ resourceType: 'User', resourceId: scimId, operation: 'patch' });
     ensureSchema(patchDto.schemas, SCIM_PATCH_SCHEMA);
 
     this.logger.info(LogCategory.SCIM_PATCH, 'Patch user', { scimId, endpointId, opCount: patchDto.Operations?.length });
@@ -278,6 +282,7 @@ export class EndpointScimUsersService {
     config?: EndpointConfig,
     ifMatch?: string,
   ): Promise<ScimUserResource> {
+    this.logger.enrichContext({ resourceType: 'User', resourceId: scimId, operation: 'replace' });
     ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
     this.schemaHelpers.enforceStrictSchemaValidation(dto, endpointId, config);
 
@@ -349,6 +354,7 @@ export class EndpointScimUsersService {
   }
 
   async deleteUserForEndpoint(scimId: string, endpointId: string, config?: EndpointConfig, ifMatch?: string): Promise<void> {
+    this.logger.enrichContext({ resourceType: 'User', resourceId: scimId, operation: 'delete' });
     this.logger.info(LogCategory.SCIM_USER, 'Delete user', { scimId, endpointId });
     const user = await this.userRepo.findByScimId(endpointId, scimId);
 
