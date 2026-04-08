@@ -79,6 +79,9 @@ export class LogConfigController {
     if (typeof body.maxPayloadSizeBytes === 'number') {
       updates.maxPayloadSizeBytes = body.maxPayloadSizeBytes;
     }
+    if (typeof body.slowRequestThresholdMs === 'number' && body.slowRequestThresholdMs > 0) {
+      updates.slowRequestThresholdMs = body.slowRequestThresholdMs;
+    }
     if (body.format === 'json' || body.format === 'pretty') {
       updates.format = body.format;
     }

@@ -19,6 +19,7 @@ describe('RequestLoggingInterceptor', () => {
       debug: jest.fn(),
       trace: jest.fn(),
       runWithContext: jest.fn((ctx: any, fn: () => void) => fn()),
+      getConfig: jest.fn().mockReturnValue({ slowRequestThresholdMs: 2000 }),
     };
 
     interceptor = new RequestLoggingInterceptor(mockLoggingService, mockScimLogger);

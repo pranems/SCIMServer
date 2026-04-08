@@ -106,6 +106,7 @@ describe('ScimLogger', () => {
         includeStackTraces: false,
         maxPayloadSizeBytes: 1024,
         format: 'pretty',
+        slowRequestThresholdMs: 3000,
       };
       logger.setConfig(newConfig);
       const config = logger.getConfig();
@@ -754,6 +755,16 @@ describe('ScimLogger', () => {
       process.env.LOG_SLOW_REQUEST_MS = '5000';
       expect(ScimLogger.getSlowRequestThresholdMs()).toBe(5000);
       delete process.env.LOG_SLOW_REQUEST_MS;
+    });
+
+    it('slowRequestThresholdMs should be runtime-configurable via updateConfig (Step 2.4)', () => {
+      const testLogger = new ScimLogger();
+      // Default is 2000
+      expect(testLogger.getConfig().slowRequestThresholdMs).toBe(2000);
+
+      // Update at runtime
+      testLogger.updateConfig({ slowRequestThresholdMs: 500 });
+      expect(testLogger.getConfig().slowRequestThresholdMs).toBe(500);
     });
 
     it('should use LOG_RING_BUFFER_SIZE env var for buffer capacity', () => {
