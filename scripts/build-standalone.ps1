@@ -118,8 +118,13 @@ New-Item -ItemType Directory -Path $OutPath -Force | Out-Null
 Write-Host "[2/7] Installing API dependencies..." -ForegroundColor Yellow
 Push-Location $ApiDir
 try {
+    # Try npm ci first; fall back to npm install if file locks prevent clean install
     npm ci --no-audit --no-fund 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "npm ci failed" }
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "       npm ci failed (file lock?), retrying with npm install..." -ForegroundColor Yellow
+        npm install --no-audit --no-fund 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw "npm install failed" }
+    }
 } finally { Pop-Location }
 
 # ── Step 3: Generate Prisma client & build TypeScript ──

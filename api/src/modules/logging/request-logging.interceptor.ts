@@ -99,14 +99,22 @@ export class RequestLoggingInterceptor implements NestInterceptor {
             catchError((error: unknown) => {
               const durationMs = Date.now() - startedAt;
               const status = this.extractStatusCode(error, response);
+              const msg = `← ${status} ${request.method} ${request.originalUrl ?? request.url}`;
+              const data = { status, durationMs };
 
-              // Structured error log
-              this.scimLogger.error(
-                LogCategory.HTTP,
-                `← ${status} ${request.method} ${request.originalUrl ?? request.url}`,
-                error,
-                { status, durationMs },
-              );
+              // Tiered log level matching ScimExceptionFilter (P9):
+              //   5xx → ERROR, 401/403 → WARN, 404 → DEBUG, other 4xx → INFO, unknown → ERROR
+              if (status && status >= 500) {
+                this.scimLogger.error(LogCategory.HTTP, msg, error, data);
+              } else if (status === 401 || status === 403) {
+                this.scimLogger.warn(LogCategory.HTTP, msg, data);
+              } else if (status === 404) {
+                this.scimLogger.debug(LogCategory.HTTP, msg, data);
+              } else if (status && status >= 400) {
+                this.scimLogger.info(LogCategory.HTTP, msg, data);
+              } else {
+                this.scimLogger.error(LogCategory.HTTP, msg, error, data);
+              }
 
               // Persist to database
               void this.loggingService.recordRequest({
