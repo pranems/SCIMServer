@@ -619,4 +619,21 @@ describe('LogConfigController', () => {
       expect(auditCall).toBeDefined();
     });
   });
+
+  describe('getAuditLog (Step 4.3)', () => {
+    it('should return ring buffer entries filtered to audit categories', () => {
+      // Generate some audit and non-audit entries
+      scimLogger.info(LogCategory.CONFIG, 'Level changed', { changes: {} });
+      scimLogger.info(LogCategory.ENDPOINT, 'Endpoint created', { endpointId: 'ep-1' });
+      scimLogger.info(LogCategory.AUTH, 'Credential created', { credentialId: 'c-1' });
+      scimLogger.info(LogCategory.SCIM_USER, 'User created', { scimId: 'u-1' }); // NOT audit
+
+      const result = controller.getAuditLog();
+      expect(result.count).toBeGreaterThanOrEqual(3);
+      // All returned entries should be in audit categories
+      for (const entry of result.entries) {
+        expect(['config', 'endpoint', 'auth']).toContain(entry.category);
+      }
+    });
+  });
 });

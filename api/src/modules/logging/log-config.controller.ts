@@ -212,6 +212,25 @@ export class LogConfigController {
   }
 
   /**
+   * GET /scim/admin/log-config/audit
+   * Retrieve audit trail entries (config changes, endpoint CRUD, credential CRUD).
+   * Filters ring buffer to CONFIG, ENDPOINT, and AUTH categories.
+   */
+  @Get('audit')
+  getAuditLog(
+    @Query('limit') limit?: string,
+  ) {
+    const auditCategories = [LogCategory.CONFIG, LogCategory.ENDPOINT, LogCategory.AUTH];
+    const allEntries = this.scimLogger.getRecentLogs({
+      limit: limit ? parseInt(limit, 10) : 200,
+    });
+    const entries = allEntries.filter(e =>
+      auditCategories.includes(e.category as LogCategory),
+    );
+    return { count: entries.length, entries };
+  }
+
+  /**
    * DELETE /scim/admin/log-config/recent
    * Clear the in-memory ring buffer.
    */
