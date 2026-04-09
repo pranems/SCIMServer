@@ -201,7 +201,7 @@ describe('Config Flags (E2E)', () => {
       expect(groupRes.body.members).toHaveLength(1);
     });
 
-    it('should allow blanket remove by default (flag not set)', async () => {
+    it('should reject blanket remove by default (v7: PatchOpAllowRemoveAllMembers=false)', async () => {
       const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
 
@@ -210,16 +210,13 @@ describe('Config Flags (E2E)', () => {
 
       await scimPatch(app, `${basePath}/Groups/${group.id}`, token, addMemberPatch(user.id)).expect(200);
 
-      // Blanket remove should succeed (default = allow)
+      // Blanket remove should be rejected (v7 default = false)
       await scimPatch(
         app,
         `${basePath}/Groups/${group.id}`,
         token,
         removeAllMembersPatch(),
-      ).expect(200);
-
-      const groupRes = await scimGet(app, `${basePath}/Groups/${group.id}`, token).expect(200);
-      expect(groupRes.body.members ?? []).toHaveLength(0);
+      ).expect(400);
     });
   });
 

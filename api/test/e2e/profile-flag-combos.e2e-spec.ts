@@ -128,10 +128,9 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
       expect(user2.body.displayName).toBe('Reprovisioned');
     });
 
-    it('should get 409 when Reprovision OFF but SoftDelete ON', async () => {
+    it('should 201 when re-POSTing after hard-delete (v7: no reprovision, userName freed)', async () => {
       const epId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
-        ReprovisionOnConflictForSoftDeletedResource: 'False',
+        UserHardDeleteEnabled: 'True',
       });
       const basePath = scimBasePath(epId);
 
@@ -142,19 +141,19 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
         active: true,
       }).expect(201);
 
-      // Soft-delete
+      // Hard-delete
       await request(app.getHttpServer())
         .delete(`${basePath}/Users/${user.body.id}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(204);
 
-      // Re-create → 409
+      // Re-create → 201 (userName freed by hard-delete)
       await scimPost(app, `${basePath}/Users`, token, {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
         userName: user.body.userName,
-        displayName: 'Conflict',
+        displayName: 'New User',
         active: true,
-      }).expect(409);
+      }).expect(201);
     });
   });
 
