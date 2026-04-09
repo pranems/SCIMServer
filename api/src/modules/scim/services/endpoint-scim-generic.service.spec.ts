@@ -9,6 +9,7 @@ import type { ScimResourceType } from '../discovery/scim-schema-registry';
 import type { GenericResourceRecord } from '../../../domain/models/generic-resource.model';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import { SCIM_DIAGNOSTICS_URN } from '../common/scim-constants';
 
 describe('EndpointScimGenericService', () => {
   let service: EndpointScimGenericService;
@@ -1703,6 +1704,34 @@ describe('EndpointScimGenericService', () => {
 
       expect(result).toBeDefined();
       expect(result.meta).toBeDefined();
+    });
+  });
+
+  describe('triggeredBy StrictSchemaValidation on validation errors (B.1-B.4)', () => {
+    it('should include triggeredBy in schema validation 400 diagnostics', async () => {
+      const config: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+      };
+
+      mockGenericRepo.findAll.mockResolvedValue([]);
+
+      try {
+        // POST with unregistered extension URN should fail with triggeredBy
+        await service.createResource(
+          {
+            schemas: ['urn:ietf:params:scim:schemas:core:2.0:Device', 'urn:unknown:fake:extension'],
+            'urn:unknown:fake:extension': { field: 'value' },
+          },
+          baseUrl, endpointId, deviceResourceType, config,
+        );
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+        const body = e.getResponse();
+        expect(body[SCIM_DIAGNOSTICS_URN]).toBeDefined();
+        expect(body[SCIM_DIAGNOSTICS_URN].triggeredBy).toBe('StrictSchemaValidation');
+        expect(body[SCIM_DIAGNOSTICS_URN].errorCode).toBe('VALIDATION_SCHEMA');
+      }
     });
   });
 });
