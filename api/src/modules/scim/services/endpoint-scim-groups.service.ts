@@ -287,12 +287,12 @@ export class EndpointScimGroupsService {
 
     // Get endpoint config for behavior flags (use passed config or fallback to context)
     const endpointConfig = config ?? this.endpointContext.getConfig();
-    const allowMultiMemberAdd = getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP);
-    const allowMultiMemberRemove = getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP);
-    // PatchOpAllowRemoveAllMembers defaults to true if not explicitly set
-    const allowRemoveAllMembers = endpointConfig?.[ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS] === undefined 
-      ? true 
-      : getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS);
+    // Settings v7: Single flag replaces MultiOpPatchRequestAdd/RemoveMultipleMembersToGroup
+    const allowMultiMember = getConfigBooleanWithDefault(endpointConfig, ENDPOINT_CONFIG_FLAGS.MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED, true);
+    const allowMultiMemberAdd = allowMultiMember;
+    const allowMultiMemberRemove = allowMultiMember;
+    // Settings v7: PatchOpAllowRemoveAllMembers defaults to false
+    const allowRemoveAllMembers = getConfigBooleanWithDefault(endpointConfig, ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS, false);
 
     const extensionUrns = this.schemaHelpers.getExtensionUrns(endpointId);
 

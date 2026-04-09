@@ -482,8 +482,8 @@ describe('EndpointScimGroupsService', () => {
       expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
     });
 
-    describe('MultiOpPatchRequestAddMultipleMembersToGroup config flag', () => {
-      it('should reject adding multiple members when flag is false (default)', async () => {
+    describe('MultiMemberPatchOpForGroupEnabled config flag (settings v7)', () => {
+      it('should reject adding multiple members when flag is explicitly false', async () => {
         const patchDto: PatchGroupDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
           Operations: [
@@ -500,8 +500,8 @@ describe('EndpointScimGroupsService', () => {
         };
 
         mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
-        // Default config returns empty object (flag is false)
-        mockEndpointContext.getConfig.mockReturnValue({});
+        // Settings v7: must explicitly disable the flag
+        mockEndpointContext.getConfig.mockReturnValue({ MultiMemberPatchOpForGroupEnabled: false });
 
         await expect(
           service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id)
@@ -623,7 +623,7 @@ describe('EndpointScimGroupsService', () => {
       });
     });
 
-    describe('MultiOpPatchRequestRemoveMultipleMembersFromGroup config flag', () => {
+    describe('MultiMemberPatchOpForGroupEnabled — remove operations (settings v7)', () => {
       const groupWithMultipleMembers = {
         ...mockGroup,
         members: [
@@ -633,7 +633,7 @@ describe('EndpointScimGroupsService', () => {
         ],
       };
 
-      it('should reject removing multiple members via value array when flag is false', async () => {
+      it('should reject removing multiple members via value array when flag is explicitly false', async () => {
         const patchDto: PatchGroupDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
           Operations: [
@@ -649,8 +649,8 @@ describe('EndpointScimGroupsService', () => {
         };
 
         mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
-        // Default config returns empty object (flag is false)
-        mockEndpointContext.getConfig.mockReturnValue({});
+        // Settings v7: must explicitly disable the flag
+        mockEndpointContext.getConfig.mockReturnValue({ MultiMemberPatchOpForGroupEnabled: false });
 
         await expect(
           service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id)
@@ -787,7 +787,7 @@ describe('EndpointScimGroupsService', () => {
         expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
       });
 
-      it('should allow removing via path=members without value array when PatchOpAllowRemoveAllMembers is true (default)', async () => {
+      it('should allow removing via path=members without value array when PatchOpAllowRemoveAllMembers is explicitly true', async () => {
         const patchDto: PatchGroupDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
           Operations: [
@@ -800,8 +800,8 @@ describe('EndpointScimGroupsService', () => {
 
         mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
         mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
-        // Default config - PatchOpAllowRemoveAllMembers defaults to true
-        mockEndpointContext.getConfig.mockReturnValue({});
+        // Settings v7: PatchOpAllowRemoveAllMembers defaults to false — must explicitly enable
+        mockEndpointContext.getConfig.mockReturnValue({ PatchOpAllowRemoveAllMembers: true });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
