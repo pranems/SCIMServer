@@ -758,11 +758,11 @@ Write-Host "`n`n========================================" -ForegroundColor Yello
 Write-Host "SECTION 12: PROFILE SETTINGS PATCHING" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
 
-# PATCH add SoftDeleteEnabled
-Write-Host "`n--- PATCH SoftDeleteEnabled setting ---" -ForegroundColor Cyan
-$settingsPatch = @{ profile = @{ settings = @{ SoftDeleteEnabled = "True" } } } | ConvertTo-Json -Depth 4
+# PATCH add UserSoftDeleteEnabled
+Write-Host "`n--- PATCH UserSoftDeleteEnabled setting ---" -ForegroundColor Cyan
+$settingsPatch = @{ profile = @{ settings = @{ UserSoftDeleteEnabled = "True" } } } | ConvertTo-Json -Depth 4
 $settingsResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$LexmarkEndpointId" -Method PATCH -Headers $headers -Body $settingsPatch
-Test-Result -Success ($settingsResult.profile.settings.SoftDeleteEnabled -eq "True") -Message "12.1: SoftDeleteEnabled added via settings PATCH"
+Test-Result -Success ($settingsResult.profile.settings.UserSoftDeleteEnabled -eq "True") -Message "12.1: UserSoftDeleteEnabled added via settings PATCH"
 
 # Schemas should be unchanged
 $schemasAfter = Invoke-RestMethod -Uri "$scimBase/Schemas" -Headers $headers

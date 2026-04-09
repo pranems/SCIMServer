@@ -296,7 +296,7 @@ $endpointBody = @{
 } | ConvertTo-Json -Depth 4
 $endpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $endpointBody
 $EndpointId = $endpoint.id
-$patchBody = @{ profile = @{ settings = @{ MultiOpPatchRequestAddMultipleMembersToGroup = "True" } } } | ConvertTo-Json -Depth 4
+$patchBody = @{ profile = @{ settings = @{ MultiMemberPatchOpForGroupEnabled = "True" } } } | ConvertTo-Json -Depth 4
 Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 Test-Result -Success ($null -ne $EndpointId) -Message "Create endpoint returned ID: $EndpointId"
 Test-Result -Success ($endpoint.active -eq $true) -Message "New endpoint is active by default"
@@ -345,7 +345,7 @@ Write-Host "========================================" -ForegroundColor Yellow
 
 # Test: Invalid config value rejected on create
 Write-Host "`n--- Test: Invalid Config Value Rejected on Create ---" -ForegroundColor Cyan
-$invalidConfigBody = '{"name":"invalid-config-test","profile":{"settings":{"MultiOpPatchRequestAddMultipleMembersToGroup":"Yes"}}}'
+$invalidConfigBody = '{"name":"invalid-config-test","profile":{"settings":{"StrictSchemaValidation":"Yes"}}}'
 try {
     $result = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $invalidConfigBody
     Test-Result -Success $false -Message "Invalid config 'Yes' should be rejected"
@@ -356,7 +356,7 @@ try {
 
 # Test: Invalid config value rejected on update
 Write-Host "`n--- Test: Invalid Config Value Rejected on Update ---" -ForegroundColor Cyan
-$invalidUpdateBody = '{"profile":{"settings":{"MultiOpPatchRequestAddMultipleMembersToGroup":"enabled"}}}'
+$invalidUpdateBody = '{"profile":{"settings":{"StrictSchemaValidation":"enabled"}}}'
 try {
     $result = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $invalidUpdateBody
     Test-Result -Success $false -Message "Invalid config 'enabled' should be rejected on update"
@@ -367,18 +367,18 @@ try {
 
 # Test: Valid config values accepted
 Write-Host "`n--- Test: Valid Config Values Accepted ---" -ForegroundColor Cyan
-$validConfigBody = '{"profile":{"settings":{"MultiOpPatchRequestAddMultipleMembersToGroup":"False"}}}'
+$validConfigBody = '{"profile":{"settings":{"StrictSchemaValidation":"False"}}}'
 $validResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $validConfigBody
-Test-Result -Success ($validResult.profile.settings.MultiOpPatchRequestAddMultipleMembersToGroup -eq "False") -Message "Valid settings 'False' accepted"
+Test-Result -Success ($validResult.profile.settings.StrictSchemaValidation -eq "False") -Message "Valid settings 'False' accepted"
 
 # Test: Boolean true also valid
-$boolConfigBody = '{"profile":{"settings":{"MultiOpPatchRequestAddMultipleMembersToGroup":true}}}'
+$boolConfigBody = '{"profile":{"settings":{"StrictSchemaValidation":true}}}'
 $boolResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $boolConfigBody
-Test-Result -Success ($boolResult.profile.settings.MultiOpPatchRequestAddMultipleMembersToGroup -eq $true) -Message "Boolean true accepted as settings value"
+Test-Result -Success ($boolResult.profile.settings.StrictSchemaValidation -eq $true) -Message "Boolean true accepted as settings value"
 
 # Test: Invalid REMOVE config value rejected on create
 Write-Host "`n--- Test: Invalid Remove Config Value Rejected on Create ---" -ForegroundColor Cyan
-$invalidRemoveConfigBody = '{"name":"invalid-remove-config-test","profile":{"settings":{"MultiOpPatchRequestRemoveMultipleMembersFromGroup":"Yes"}}}'
+$invalidRemoveConfigBody = '{"name":"invalid-remove-config-test","profile":{"settings":{"RequireIfMatch":"Yes"}}}'
 try {
     $result = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $invalidRemoveConfigBody
     Test-Result -Success $false -Message "Invalid remove config 'Yes' should be rejected"
@@ -389,7 +389,7 @@ try {
 
 # Test: Invalid REMOVE config value rejected on update
 Write-Host "`n--- Test: Invalid Remove Config Value Rejected on Update ---" -ForegroundColor Cyan
-$invalidRemoveUpdateBody = '{"profile":{"settings":{"MultiOpPatchRequestRemoveMultipleMembersFromGroup":"enabled"}}}'
+$invalidRemoveUpdateBody = '{"profile":{"settings":{"RequireIfMatch":"enabled"}}}'
 try {
     $result = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $invalidRemoveUpdateBody
     Test-Result -Success $false -Message "Invalid remove config 'enabled' should be rejected on update"
@@ -400,16 +400,16 @@ try {
 
 # Test: Valid REMOVE config values accepted
 Write-Host "`n--- Test: Valid Remove Config Values Accepted ---" -ForegroundColor Cyan
-$validRemoveConfigBody = '{"profile":{"settings":{"MultiOpPatchRequestRemoveMultipleMembersFromGroup":"False"}}}'
+$validRemoveConfigBody = '{"profile":{"settings":{"RequireIfMatch":"False"}}}'
 $validRemoveResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $validRemoveConfigBody
-Test-Result -Success ($validRemoveResult.profile.settings.MultiOpPatchRequestRemoveMultipleMembersFromGroup -eq "False") -Message "Valid remove settings 'False' accepted"
+Test-Result -Success ($validRemoveResult.profile.settings.RequireIfMatch -eq "False") -Message "Valid RequireIfMatch settings 'False' accepted"
 
 # Test: Both flags can be set together
 Write-Host "`n--- Test: Both Config Flags Set Together ---" -ForegroundColor Cyan
-$bothFlagsBody = '{"profile":{"settings":{"MultiOpPatchRequestAddMultipleMembersToGroup":"True","MultiOpPatchRequestRemoveMultipleMembersFromGroup":"True"}}}'
+$bothFlagsBody = '{"profile":{"settings":{"StrictSchemaValidation":"True","RequireIfMatch":"True"}}}'
 $bothResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $bothFlagsBody
-$bothValid = ($bothResult.profile.settings.MultiOpPatchRequestAddMultipleMembersToGroup -eq "True") -and ($bothResult.profile.settings.MultiOpPatchRequestRemoveMultipleMembersFromGroup -eq "True")
-Test-Result -Success $bothValid -Message "Both add and remove config flags set together"
+$bothValid = ($bothResult.profile.settings.StrictSchemaValidation -eq "True") -and ($bothResult.profile.settings.RequireIfMatch -eq "True")
+Test-Result -Success $bothValid -Message "Both StrictSchemaValidation and RequireIfMatch config flags set together"
 
 # Test: Invalid VerbosePatchSupported config value rejected
 Write-Host "`n--- Test: Invalid VerbosePatchSupported Config Value Rejected ---" -ForegroundColor Cyan
@@ -430,9 +430,9 @@ Test-Result -Success ($validVerboseResult.profile.settings.VerbosePatchSupported
 
 # Test: All three flags can be set together
 Write-Host "`n--- Test: All Three Config Flags Set Together ---" -ForegroundColor Cyan
-$allFlagsBody = '{"profile":{"settings":{"MultiOpPatchRequestAddMultipleMembersToGroup":"True","MultiOpPatchRequestRemoveMultipleMembersFromGroup":"True","VerbosePatchSupported":true}}}'
+$allFlagsBody = '{"profile":{"settings":{"StrictSchemaValidation":"True","RequireIfMatch":"True","VerbosePatchSupported":true}}}'
 $allResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $allFlagsBody
-$allValid = ($allResult.profile.settings.MultiOpPatchRequestAddMultipleMembersToGroup -eq "True") -and ($allResult.profile.settings.MultiOpPatchRequestRemoveMultipleMembersFromGroup -eq "True") -and ($allResult.profile.settings.VerbosePatchSupported -eq $true)
+$allValid = ($allResult.profile.settings.StrictSchemaValidation -eq "True") -and ($allResult.profile.settings.RequireIfMatch -eq "True") -and ($allResult.profile.settings.VerbosePatchSupported -eq $true)
 Test-Result -Success $allValid -Message "All three config flags set together"
 
 # ============================================
@@ -1284,7 +1284,7 @@ $removeEnabledBody = @{
 } | ConvertTo-Json -Depth 4
 $removeEnabledEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $removeEnabledBody
 $RemoveFlagEndpointId = $removeEnabledEndpoint.id
-$patchBody = @{ profile = @{ settings = @{ MultiOpPatchRequestRemoveMultipleMembersFromGroup = "True" } } } | ConvertTo-Json -Depth 4
+$patchBody = @{ profile = @{ settings = @{ MultiMemberPatchOpForGroupEnabled = "True" } } } | ConvertTo-Json -Depth 4
 Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$RemoveFlagEndpointId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $scimBase3 = "$baseUrl/scim/endpoints/$RemoveFlagEndpointId"
 
@@ -3474,8 +3474,8 @@ Write-Host "`n`n─────────────────────�
 Write-Host "  9m-B: CUSTOM RESOURCE TYPES (G8b)" -ForegroundColor Cyan
 Write-Host "────────────────────────────────────────────────────" -ForegroundColor Cyan
 
-# --- Setup: Create a dedicated endpoint with CustomResourceTypesEnabled ---
-Write-Host "`n--- G8b Setup: Creating dedicated endpoint with CustomResourceTypesEnabled ---" -ForegroundColor Cyan
+# --- Setup: Create a dedicated endpoint (custom resource types derived from profile.resourceTypes) ---
+Write-Host "`n--- G8b Setup: Creating dedicated endpoint (custom resource types via profile) ---" -ForegroundColor Cyan
 $g8bEndpointBody = @{
     name = "live-test-g8b-$(Get-Random)"
     displayName = "G8b Custom Resource Types Endpoint"
@@ -3485,13 +3485,13 @@ $g8bEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method PO
 $G8bEndpointId = $g8bEndpoint.id
 $scimBaseG8b = "$baseUrl/scim/endpoints/$G8bEndpointId"
 $adminBaseG8b = "$baseUrl/scim/admin/endpoints/$G8bEndpointId"
-Test-Result -Success ($null -ne $G8bEndpointId) -Message "G8b endpoint created with CustomResourceTypesEnabled"
+Test-Result -Success ($null -ne $G8bEndpointId) -Message "G8b endpoint created (custom resource types via profile.resourceTypes)"
 
 # --- Also create an endpoint WITHOUT the flag for gating tests ---
 $g8bNoFlagBody = @{
     name = "live-test-g8b-noflag-$(Get-Random)"
     displayName = "G8b No Flag Endpoint"
-    description = "Endpoint WITHOUT CustomResourceTypesEnabled for gating tests"
+    description = "Endpoint WITHOUT custom resource types for gating tests"
 } | ConvertTo-Json
 $g8bNoFlagEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $g8bNoFlagBody
 $G8bNoFlagEndpointId = $g8bNoFlagEndpoint.id
@@ -3804,7 +3804,7 @@ Write-Host "`n`n─────────────────────�
 Write-Host "  9m-C: SCHEMA CUSTOMIZATION COMBINATIONS" -ForegroundColor Cyan
 Write-Host "────────────────────────────────────────────────────" -ForegroundColor Cyan
 
-# --- Setup: Endpoint with BOTH CustomResourceTypesEnabled ---
+# --- Setup: Endpoint with custom resource types (derived from profile.resourceTypes) ---
 Write-Host "`n--- 9m-C Setup: Creating combo endpoint ---" -ForegroundColor Cyan
 $comboEndpointBody = @{
     name = "live-test-combo-$(Get-Random)"
@@ -4241,8 +4241,8 @@ Write-Host "`n`n========================================" -ForegroundColor Yello
 Write-Host "TEST SECTION 9n: BULK OPERATIONS (Phase 9 / RFC 7644 S3.7)" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
 
-# --- Setup: Create endpoint WITH BulkOperationsEnabled ---
-Write-Host "`n--- Bulk Setup: Creating endpoint with BulkOperationsEnabled ---" -ForegroundColor Cyan
+# --- Setup: Create endpoint WITH bulk.supported = true ---
+Write-Host "`n--- Bulk Setup: Creating endpoint with bulk.supported = true ---" -ForegroundColor Cyan
 $bulkEndpointBody = @{
     name = "live-test-bulk-$(Get-Random)"
     displayName = "Bulk Operations Test Endpoint"
@@ -4254,13 +4254,13 @@ $BulkEndpointId = $bulkEndpoint.id
 $patchBody = @{ profile = @{ serviceProviderConfig = @{ bulk = @{ supported = $true; maxOperations = 100; maxPayloadSize = 1048576 } } } } | ConvertTo-Json -Depth 6
 Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$BulkEndpointId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $scimBaseBulk = "$baseUrl/scim/endpoints/$BulkEndpointId"
-Test-Result -Success ($null -ne $BulkEndpointId) -Message "Bulk endpoint created with BulkOperationsEnabled"
+Test-Result -Success ($null -ne $BulkEndpointId) -Message "Bulk endpoint created with bulk.supported = true"
 
 # --- Also create endpoint WITHOUT the flag ---
 $bulkNoFlagBody = @{
     name = "live-test-bulk-noflag-$(Get-Random)"
     displayName = "Bulk No Flag Endpoint"
-    description = "Endpoint WITHOUT BulkOperationsEnabled"
+    description = "Endpoint WITHOUT bulk operations (bulk.supported = false)"
 } | ConvertTo-Json
 $bulkNoFlagEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $bulkNoFlagBody
 $BulkNoFlagEndpointId = $bulkNoFlagEndpoint.id
@@ -6292,8 +6292,8 @@ Write-Host "========================================" -ForegroundColor Yellow
 Test-Result -Success $true -Message "9y: SKIPPED — uses deleted Admin RT API; parity tested in profile-combinations.e2e-spec.ts"
 
 function Skip-OldSection9y {
-# --- Setup: Create endpoint with RequireIfMatch + CustomResourceTypesEnabled ---
-Write-Host "`n--- 9y Setup: Creating endpoint with RequireIfMatch + CustomResourceTypesEnabled ---" -ForegroundColor Cyan
+# --- Setup: Create endpoint with RequireIfMatch (custom resource types derived from profile) ---
+Write-Host "`n--- 9y Setup: Creating endpoint with RequireIfMatch (custom resource types via profile) ---" -ForegroundColor Cyan
 $y9EndpointBody = @{
     name = "live-test-9y-$(Get-Random)"
     displayName = "9y Generic Parity Endpoint"
@@ -6306,7 +6306,7 @@ $patchBody = @{ profile = @{ settings = @{ RequireIfMatch = "True" } } } | Conve
 Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$Y9EndpointId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $scimBase9y = "$baseUrl/scim/endpoints/$Y9EndpointId"
 $adminBase9y = "$baseUrl/scim/admin/endpoints/$Y9EndpointId"
-Test-Result -Success ($null -ne $Y9EndpointId) -Message "9y.0: Setup endpoint created with RequireIfMatch + CustomResourceTypesEnabled"
+Test-Result -Success ($null -ne $Y9EndpointId) -Message "9y.0: Setup endpoint created with RequireIfMatch (custom resource types via profile)"
 
 # Register Device resource type
 $y9DeviceSchema = @{
@@ -6515,9 +6515,9 @@ Test-Result -Success ($userOnlyRts.Resources[0].name -eq "User") -Message "9z.9:
 
 # --- Test 9z.13: PATCH deep-merge settings ---
 Write-Host "`n--- Test 9z.13: PATCH deep-merge settings ---" -ForegroundColor Cyan
-$patchBody = @{ profile = @{ settings = @{ SoftDeleteEnabled = "True" } } } | ConvertTo-Json -Depth 4
+$patchBody = @{ profile = @{ settings = @{ UserSoftDeleteEnabled = "True" } } } | ConvertTo-Json -Depth 4
 $patchResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($rfcEp.id)" -Method PATCH -Headers $headers -Body $patchBody
-Test-Result -Success ($patchResult.profile.settings.SoftDeleteEnabled -eq "True") -Message "9z.13: PATCH added SoftDeleteEnabled"
+Test-Result -Success ($patchResult.profile.settings.UserSoftDeleteEnabled -eq "True") -Message "9z.13: PATCH added UserSoftDeleteEnabled"
 # Verify schemas untouched
 $rfcSchemasAfter = Invoke-RestMethod -Uri "$baseUrl/scim/endpoints/$($rfcEp.id)/Schemas" -Headers $headers
 Test-Result -Success ($rfcSchemasAfter.totalResults -eq 3) -Message "9z.14: schemas unchanged after settings PATCH"
@@ -6553,21 +6553,21 @@ $patchEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -
 Test-Result -Success ($null -ne $patchEp.id) -Message "9z.17: Created rfc-standard endpoint for PATCH tests"
 
 # 9z.18: PATCH add single setting via profile.settings
-$pBody18 = @{ profile = @{ settings = @{ SoftDeleteEnabled = "True" } } } | ConvertTo-Json -Depth 4
+$pBody18 = @{ profile = @{ settings = @{ UserSoftDeleteEnabled = "True" } } } | ConvertTo-Json -Depth 4
 $p18 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method PATCH -Headers $headers -Body $pBody18
-Test-Result -Success ($p18.profile.settings.SoftDeleteEnabled -eq "True") -Message "9z.18: PATCH added SoftDeleteEnabled via profile.settings"
-Test-Result -Success ($p18.profile.settings.SoftDeleteEnabled -eq "True") -Message "9z.19: profile.settings reflects SoftDeleteEnabled"
+Test-Result -Success ($p18.profile.settings.UserSoftDeleteEnabled -eq "True") -Message "9z.18: PATCH added UserSoftDeleteEnabled via profile.settings"
+Test-Result -Success ($p18.profile.settings.UserSoftDeleteEnabled -eq "True") -Message "9z.19: profile.settings reflects UserSoftDeleteEnabled"
 
 # 9z.20: PATCH add second setting — first should be preserved
 $pBody20 = @{ profile = @{ settings = @{ StrictSchemaValidation = "True" } } } | ConvertTo-Json -Depth 4
 $p20 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method PATCH -Headers $headers -Body $pBody20
-Test-Result -Success ($p20.profile.settings.SoftDeleteEnabled -eq "True") -Message "9z.20: SoftDeleteEnabled preserved after second PATCH"
+Test-Result -Success ($p20.profile.settings.UserSoftDeleteEnabled -eq "True") -Message "9z.20: UserSoftDeleteEnabled preserved after second PATCH"
 Test-Result -Success ($p20.profile.settings.StrictSchemaValidation -eq "True") -Message "9z.21: StrictSchemaValidation added"
 
 # 9z.22: PATCH overwrite individual setting value
-$pBody22 = @{ profile = @{ settings = @{ SoftDeleteEnabled = "False" } } } | ConvertTo-Json -Depth 4
+$pBody22 = @{ profile = @{ settings = @{ UserSoftDeleteEnabled = "False" } } } | ConvertTo-Json -Depth 4
 $p22 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method PATCH -Headers $headers -Body $pBody22
-Test-Result -Success ($p22.profile.settings.SoftDeleteEnabled -eq "False") -Message "9z.22: SoftDeleteEnabled overwritten to False"
+Test-Result -Success ($p22.profile.settings.UserSoftDeleteEnabled -eq "False") -Message "9z.22: UserSoftDeleteEnabled overwritten to False"
 Test-Result -Success ($p22.profile.settings.StrictSchemaValidation -eq "True") -Message "9z.23: StrictSchemaValidation still True"
 
 # 9z.24: Schemas untouched after settings-only PATCH
@@ -6604,16 +6604,16 @@ Test-Result -Success ($spc30.filter.maxResults -eq 42) -Message "9z.31: SPC maxR
 Test-Result -Success ($p30.profile.settings.RequireIfMatch -eq "True") -Message "9z.32: Settings preserved after SPC PATCH"
 
 # 9z.33: PATCH displayName + settings combined
-$pBody33 = @{ displayName = "Patched Display $(Get-Random)"; profile = @{ settings = @{ ReprovisionOnConflictForSoftDeletedResource = "True" } } } | ConvertTo-Json -Depth 4
+$pBody33 = @{ displayName = "Patched Display $(Get-Random)"; profile = @{ settings = @{ RequireIfMatch = "True" } } } | ConvertTo-Json -Depth 4
 $p33 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method PATCH -Headers $headers -Body $pBody33
 Test-Result -Success ($p33.displayName -like "Patched Display*") -Message "9z.33: displayName updated alongside settings"
-Test-Result -Success ($p33.profile.settings.ReprovisionOnConflictForSoftDeletedResource -eq "True") -Message "9z.34: Reprovision setting added"
+Test-Result -Success ($p33.profile.settings.RequireIfMatch -eq "True") -Message "9z.34: RequireIfMatch setting added"
 
 # 9z.35: PATCH with merged settings via profile
 Write-Host "`n--- Test 9z.35: PATCH with merged settings via profile ---" -ForegroundColor Cyan
-$pBody35 = @{ profile = @{ settings = @{ SoftDeleteEnabled = "True"; StrictSchemaValidation = "True" } } } | ConvertTo-Json -Depth 4
+$pBody35 = @{ profile = @{ settings = @{ UserSoftDeleteEnabled = "True"; StrictSchemaValidation = "True" } } } | ConvertTo-Json -Depth 4
 $p35 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method PATCH -Headers $headers -Body $pBody35
-Test-Result -Success ($p35.profile.settings.SoftDeleteEnabled -eq "True") -Message "9z.35: SoftDeleteEnabled present after merged PATCH"
+Test-Result -Success ($p35.profile.settings.UserSoftDeleteEnabled -eq "True") -Message "9z.35: UserSoftDeleteEnabled present after merged PATCH"
 Test-Result -Success ($p35.profile.settings.StrictSchemaValidation -eq "True") -Message "9z.35: StrictSchemaValidation present after merged PATCH"
 
 # Cleanup PATCH test endpoint
