@@ -25,7 +25,7 @@ Audit for missing tests in these categories:
 
 ### A. Config Flag Coverage (14 boolean flags in ProfileSettings + logLevel; 12 persisted, 2 derived)
 
-For each flag (`AllowAndCoerceBooleanStrings`, `StrictSchemaValidation`, `SoftDeleteEnabled`, `VerbosePatchSupported`, `MultiOpPatchRequestAddMultipleMembersToGroup`, `MultiOpPatchRequestRemoveMultipleMembersFromGroup`, `PatchOpAllowRemoveAllMembers`, `RequireIfMatch`, `ReprovisionOnConflictForSoftDeletedResource`, `CustomResourceTypesEnabled` *(derived from profile.resourceTypes)*, `BulkOperationsEnabled` *(derived from profile SPC)*, `PerEndpointCredentialsEnabled`, `IncludeWarningAboutIgnoredReadOnlyAttribute`, `IgnoreReadOnlyAttributesInPatch`):
+For each flag (`AllowAndCoerceBooleanStrings`, `StrictSchemaValidation`, `SoftDeleteEnabled`, `VerbosePatchSupported`, `MultiOpPatchRequestAddMultipleMembersToGroup`, `MultiOpPatchRequestRemoveMultipleMembersFromGroup`, `PatchOpAllowRemoveAllMembers`, `RequireIfMatch`, `ReprovisionOnConflictForSoftDeletedResource`, `CustomResourceTypesEnabled` *(derived from profile.resourceTypes)*, `BulkOperationsEnabled` *(derived from profile SPC)*, `PerEndpointCredentialsEnabled`, `IncludeWarningAboutIgnoredReadOnlyAttribute`, `IgnoreReadOnlyAttributesInPatch`, `logFileEnabled`):
 
 | Check | Unit | E2E | Live |
 |-------|------|-----|------|
@@ -239,9 +239,55 @@ For every behavior tested on Users, verify the equivalent exists for Groups (and
 | `ProfileSummary`: activeSettings (non-default only) | ✅ | ✅ | ✅ |
 | `buildProfileSummary` handles empty/extension schemas | ✅ | N/A | N/A |
 
+### N. Logging & Error Handling (v0.32.0 overhaul)
+
+| Scenario | Unit | E2E | Live |
+|----------|------|-----|------|
+| Interceptor tiered log levels (5xx->ERROR, 401->WARN, 404->DEBUG, 4xx->INFO) | ✅ | ? | ? |
+| GlobalExceptionFilter diagnostics on 500 (requestId/endpointId/logsUrl) | ✅ | ? | ? |
+| triggeredBy on guardSoftDeleted, assertSchemaUniqueness, PatchError catches | ✅ | ? | ? |
+| Service-level diagnostic logs before uniqueness/reprovision throws | ✅ | ? | ? |
+| Silent catches have TRACE/DEBUG logs (15 catches in logging/activity-parser) | ✅ | N/A | N/A |
+| Ring buffer default 2000 (was 500) | ✅ | ? | ? |
+| Config change audit with before/after values | ✅ | ? | ? |
+| Empty ring buffer hint when requestId returns 0 entries | ✅ | ✅ | ? |
+| slowRequestThresholdMs runtime-configurable | ✅ | ? | ? |
+| 409 conflictingResourceId/conflictingAttribute/incomingValue in diagnostics | ✅ | ✅ | ? |
+| PATCH failedOperationIndex/failedPath/failedOp in diagnostics | ✅ | ✅ | ? |
+| Filter parseError in invalidFilter diagnostics | ✅ | ✅ | ? |
+| 428 currentETag in diagnostics | ✅ | ✅ | ? |
+| operation auto-read from correlation context in diagnostics | ✅ | ? | ? |
+| errorCode enum in ALL diagnostics (48 sites) | ✅ | ? | ? |
+| All 50 createScimError calls have diagnostics (100%) | implicit | ✅ | ? |
+
+### O. File Logging (Phase 1)
+
+| Scenario | Unit | E2E | Live |
+|----------|------|-----|------|
+| RotatingFileWriter size-based rotation | ✅ | N/A | ? |
+| RotatingFileWriter creates parent directories | ✅ | N/A | ? |
+| RotatingFileWriter maxFiles limit | ✅ | N/A | ? |
+| FileLogTransport main file write (LOG_FILE) | ✅ | N/A | ? |
+| FileLogTransport LOG_FILE="" disables main file | ✅ | N/A | ? |
+| FileLogTransport per-endpoint file when logFileEnabled=True | ✅ | N/A | ? |
+| FileLogTransport endpoint name sanitization | ✅ | N/A | ? |
+| FileLogTransport disableEndpointFile closes handle | ✅ | N/A | ? |
+| logFileEnabled profile setting wired to endpoint create/update | implicit | ? | ? |
+| Docker volume mount for logs/ | N/A | N/A | ? |
+
+### P. Operational Logging (Phase 4)
+
+| Scenario | Unit | E2E | Live |
+|----------|------|-----|------|
+| GET /admin/logs?minDurationMs=5000 filters by duration | ✅ | ? | ? |
+| GET /endpoints/:id/logs/history queries DB filtered by endpoint | ✅ | ? | ? |
+| GET /admin/log-config/audit returns config/endpoint/auth entries | ✅ | ? | ? |
+| POST /admin/logs/prune?retentionDays=30 deletes old entries | ✅ | ? | ? |
+| errorCode UNIQUENESS_USERNAME in 409 diagnostics | ✅ | ? | ? |
+
 ---
 
-## Step 3 — Implement Missing Tests
+## Step 3 - Implement Missing Tests
 
 For each identified gap:
 
@@ -561,12 +607,12 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
-| Unit  | 3,220  | ?     | +?    |
-| E2E   | 918    | ?     | +?    |
+| Unit  | 3,242  | ?     | +?    |
+| E2E   | 923    | ?     | +?    |
 | Live  | ~980   | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
-> *Last updated: v0.32.0 - Logging & RCA diagnostics enrichment (2026-04-08)*
+> *Last updated: v0.32.0 - Logging overhaul complete (Phases 0-4) (2026-04-08)*
 
 4. Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts.
 
