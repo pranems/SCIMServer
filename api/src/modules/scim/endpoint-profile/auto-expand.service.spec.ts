@@ -232,7 +232,7 @@ describe('auto-expand.service', () => {
       expect(names).toContain('meta');
     });
 
-    it('should auto-inject active on Group (decision D7)', () => {
+    it('should NOT auto-inject active on Group (settings v7: D7 removed)', () => {
       const input: ShorthandProfileInput = {
         schemas: [{
           id: SCIM_CORE_GROUP_SCHEMA,
@@ -243,7 +243,7 @@ describe('auto-expand.service', () => {
       };
       const result = expandProfile(input);
       const names = result.schemas[0].attributes.map(a => a.name);
-      expect(names).toContain('active');
+      expect(names).not.toContain('active');
     });
 
     it('should NOT auto-inject on unknown/custom schemas', () => {

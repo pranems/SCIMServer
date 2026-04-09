@@ -5,7 +5,7 @@
  * 1. Resolves "attributes": "all" → full RFC attribute list
  * 2. For known RFC attributes, fills missing fields from baseline
  * 3. Auto-injects required structural attributes (id, userName, etc.)
- * 4. Auto-injects project defaults (externalId, meta, Group active)
+ * 4. Auto-injects project defaults (externalId, meta)
  *
  * @see docs/SCHEMA_TEMPLATES_DESIGN.md §5.6 (Auto-Expand), §5.7 steps 1-2
  */
@@ -16,9 +16,8 @@ import {
   RFC_SCHEMA_ALL_ATTRIBUTES,
   RFC_REQUIRED_ATTRIBUTES,
   PROJECT_AUTO_INJECT_ATTRIBUTES,
-  GROUP_ALWAYS_INCLUDE_ATTRIBUTES,
 } from './rfc-baseline';
-import { SCIM_CORE_GROUP_SCHEMA } from '../common/scim-constants';
+// Settings v7: SCIM_CORE_GROUP_SCHEMA import removed (D7 Group active removed)
 
 // ─── Expand a single attribute ──────────────────────────────────────────
 
@@ -133,18 +132,7 @@ function autoInjectAttributes(schema: ScimSchemaDefinition): ScimSchemaDefinitio
     }
   }
 
-  // 3. Group-specific: always include `active` (decision D7)
-  if (schema.id === SCIM_CORE_GROUP_SCHEMA && attrMap) {
-    for (const name of GROUP_ALWAYS_INCLUDE_ATTRIBUTES) {
-      if (!existingNames.has(name.toLowerCase())) {
-        const baseline = attrMap.get(name.toLowerCase());
-        if (baseline) {
-          toInject.push(baseline);
-          existingNames.add(name.toLowerCase());
-        }
-      }
-    }
-  }
+  // 3. (D7 removed in settings v7 — Groups no longer have active)
 
   if (toInject.length === 0) return schema;
 
