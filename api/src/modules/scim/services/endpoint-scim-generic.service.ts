@@ -10,9 +10,8 @@
  *   - Immutable attribute enforcement on PUT/PATCH
  *   - Boolean string coercion (AllowAndCoerceBooleanStrings)
  *   - Attribute projection (attributes/excludedAttributes query params)
- *   - externalId + displayName uniqueness enforcement
- *   - Reprovision-on-conflict for soft-deleted resources
- *   - Config-aware soft-delete guard
+ *   - externalId + displayName uniqueness enforcement (always 409 on conflict)
+ *   - UserSoftDeleteEnabled / UserHardDeleteEnabled / GroupHardDeleteEnabled gates
  *   - sanitizeBooleanStringsByParent on output
  *   - returned:never stripping on output
  */

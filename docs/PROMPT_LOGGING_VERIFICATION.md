@@ -1,13 +1,13 @@
 # Self-Improving Logging & Error Handling Verification Prompt
 
-> **Last audit run**: April 8, 2026  
-> **Pass rate**: 96/104 PASS, 7 PARTIAL, 1 FAIL (LOG_FILE default - design decision)  
-> **Version**: 2.1 - April 8, 2026
+> **Last audit run**: April 9, 2026  
+> **Pass rate**: 97/104 PASS, 6 PARTIAL, 1 FAIL (LOG_FILE default - design decision)  
+> **Version**: 2.2 - April 9, 2026 (Settings v7 alignment)
 
 ## Context
 You are auditing SCIMServer's logging and error handling. The system has:
-- 14 config flags per endpoint (StrictSchemaValidation, SoftDeleteEnabled, VerbosePatchSupported, RequireIfMatch, logFileEnabled, etc.)
-- 6 profile presets (entra-id, entra-id-minimal, rfc-standard, minimal, user-only, lexmark)
+- 14 config flags per endpoint (UserSoftDeleteEnabled, UserHardDeleteEnabled, GroupHardDeleteEnabled, MultiMemberPatchOpForGroupEnabled, SchemaDiscoveryEnabled, StrictSchemaValidation, VerbosePatchSupported, RequireIfMatch, logFileEnabled, etc.)
+- 6 profile presets (entra-id, entra-id-minimal, rfc-standard, minimal, user-only, user-only-with-custom-ext)
 - 2 persistence backends (Prisma/PostgreSQL, InMemory)
 - 3 SCIM services (Users, Groups, Generic/Custom)
 - Bulk operations (RFC 7644 S3.7)
@@ -29,7 +29,7 @@ You are auditing SCIMServer's logging and error handling. The system has:
 - Log retention: POST /admin/logs/prune?retentionDays=30
 - Endpoint DB logs: GET /endpoints/:id/logs/history (persistent request log access for tenants)
 - Duration filter: GET /admin/logs?minDurationMs=5000
-- All 50 createScimError calls have diagnostics with errorCode (100% coverage)
+- All 80 createScimError calls have diagnostics; 51 have errorCode (64%); 29 in bulk-processor/discovery/Me/bulk-controller lack errorCode
 - 0 silent catches in SCIM core (15 utility catches have TRACE/DEBUG logs)
 
 ## Task
@@ -62,9 +62,10 @@ For EACH of these flag combinations:
   4. StrictSchemaValidation=ON → POST with unregistered extension URN → verify triggeredBy
   5. StrictSchemaValidation=ON + IgnoreReadOnlyAttributesInPatch=ON → PATCH readOnly attr → verify WARN strip log
   6. StrictSchemaValidation=ON + IgnoreReadOnlyAttributesInPatch=OFF → PATCH readOnly attr → verify 400
-  7. SoftDeleteEnabled=ON → DELETE → verify INFO soft-delete log
-  8. SoftDeleteEnabled=ON → GET deleted resource → verify DEBUG guardSoftDeleted + 404
-  9. SoftDeleteEnabled=ON + ReprovisionOnConflict=ON → POST duplicate of soft-deleted → verify INFO reprovision
+  7. UserHardDeleteEnabled=OFF → DELETE User → verify 400 with diagnostics.triggeredBy="UserHardDeleteEnabled", errorCode="HARD_DELETE_DISABLED"
+  7b. GroupHardDeleteEnabled=OFF → DELETE Group → verify 400 with diagnostics.triggeredBy="GroupHardDeleteEnabled", errorCode="DELETE_DISABLED"
+  8. UserSoftDeleteEnabled=ON (default) → GET soft-deleted resource → verify DEBUG guardSoftDeleted + 404 with diagnostics.triggeredBy="UserSoftDeleteEnabled"
+  9. POST duplicate of soft-deleted resource → verify 409 UNIQUENESS (reprovision removed in v7; old flags ignored)
   10. RequireIfMatch=ON → PUT without If-Match → verify 428 with diagnostics.triggeredBy="RequireIfMatch"
   11. RequireIfMatch=ON → PUT with wrong ETag → verify 412
   12. VerbosePatchSupported=ON → PATCH with dot-notation path
@@ -142,7 +143,7 @@ For EACH of these flag combinations:
   6. slowRequestThresholdMs runtime-configurable via PUT /admin/log-config
 
 ### K. Diagnostics Enrichment (`scim-errors.ts`)
-  1. All 50 createScimError calls have diagnostics -> verify no bare calls
+  1. All 80 createScimError calls have diagnostics -> verify 51 have errorCode (64%); 29 in bulk/discovery/Me lack errorCode
   2. 409 uniqueness -> verify conflictingResourceId, conflictingAttribute, incomingValue, errorCode
   3. PATCH 400 -> verify failedOperationIndex, failedPath, failedOp (via PatchError context)
   4. Filter 400 -> verify parseError field with original parser error message
