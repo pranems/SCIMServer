@@ -4,15 +4,19 @@ import {
   Header,
   Param,
   Req,
-  ForbiddenException
+  ForbiddenException,
+  NotFoundException
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import { ENDPOINT_CONFIG_FLAGS, getConfigBooleanWithDefault } from '../../endpoint/endpoint-config.interface';
 import { ScimDiscoveryService } from '../discovery/scim-discovery.service';
 import { buildBaseUrl } from '../common/base-url.util';
 import { Public } from '../../auth/public.decorator';
+import { ScimLogger } from '../../logging/scim-logger.service';
+import { LogCategory } from '../../logging/log-levels';
 
 /**
  * Endpoint-specific SCIM Discovery Controller — **PRIMARY** for multi-tenant use.
@@ -46,12 +50,14 @@ export class EndpointScimDiscoveryController {
   constructor(
     private readonly endpointService: EndpointService,
     private readonly endpointContext: EndpointContextStorage,
-    private readonly discoveryService: ScimDiscoveryService
+    private readonly discoveryService: ScimDiscoveryService,
+    private readonly logger: ScimLogger,
   ) {}
 
   /**
-   * Validate endpoint exists, is active, and set endpoint context.
+   * Validate endpoint exists, is active, schema discovery is enabled, and set endpoint context.
    * Throws ForbiddenException if endpoint is inactive.
+   * Throws NotFoundException if SchemaDiscoveryEnabled is false (settings v7).
    */
   private async validateAndSetContext(
     endpointId: string,
@@ -65,8 +71,15 @@ export class EndpointScimDiscoveryController {
       );
     }
 
-    const profile = endpoint.profile;
+    // Settings v7: SchemaDiscoveryEnabled gate (default: true)
     const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
+    const discoveryEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.SCHEMA_DISCOVERY_ENABLED, true);
+    if (!discoveryEnabled) {
+      this.logger.warn(LogCategory.SCIM_DISCOVERY, 'Schema discovery disabled for endpoint', { endpointId });
+      throw new NotFoundException(`Resource not found.`);
+    }
+
+    const profile = endpoint.profile;
     const baseUrl = `${buildBaseUrl(req)}/endpoints/${endpointId}`;
     this.endpointContext.setContext({ endpointId, baseUrl, profile, config });
   }
