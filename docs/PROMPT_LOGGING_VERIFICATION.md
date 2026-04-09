@@ -1,8 +1,8 @@
 # Self-Improving Logging & Error Handling Verification Prompt
 
 > **Last audit run**: April 8, 2026  
-> **Pass rate**: 85/85 (100% after fixes)  
-> **Version**: 2.0 - April 8, 2026
+> **Pass rate**: 96/104 PASS, 7 PARTIAL, 1 FAIL (LOG_FILE default - design decision)  
+> **Version**: 2.1 - April 8, 2026
 
 ## Context
 You are auditing SCIMServer's logging and error handling. The system has:
