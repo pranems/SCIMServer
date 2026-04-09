@@ -73,8 +73,10 @@ describe('Config Flags (E2E)', () => {
       expect(res.body.members.length).toBeGreaterThanOrEqual(2);
     });
 
-    it('should reject multi-member ADD when flag is not set', async () => {
-      const endpointId = await createEndpoint(app, token);
+    it('should reject multi-member ADD when flag is explicitly false', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        MultiMemberPatchOpForGroupEnabled: 'False',
+      });
       const basePath = scimBasePath(endpointId);
 
       const user1 = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
@@ -120,8 +122,10 @@ describe('Config Flags (E2E)', () => {
       expect(res.body.members ?? []).toHaveLength(0);
     });
 
-    it('should reject multi-member REMOVE when flag is not set', async () => {
-      const endpointId = await createEndpoint(app, token);
+    it('should reject multi-member REMOVE when flag is explicitly false', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        MultiMemberPatchOpForGroupEnabled: 'False',
+      });
       const basePath = scimBasePath(endpointId);
 
       const user1 = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;

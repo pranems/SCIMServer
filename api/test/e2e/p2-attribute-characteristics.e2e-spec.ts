@@ -50,46 +50,44 @@ describe('P2 Attribute Characteristics (E2E)', () => {
     basePath = scimBasePath(endpointId);
   });
 
-  // ───────────── R-RET-2: Group 'active' always returned ─────────────
+  // ───────────── R-RET-2: Group does NOT return active (settings v7) ─────────────
 
-  describe('R-RET-2: Group active always returned', () => {
-    it('GET /Groups/:id should return active even when excludedAttributes=active', async () => {
+  describe('R-RET-2: Group does NOT return active (settings v7)', () => {
+    it('GET /Groups/:id should NOT include active', async () => {
       const created = (
         await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)
       ).body;
 
       const res = await scimGet(
         app,
-        `${basePath}/Groups/${created.id}?excludedAttributes=active`,
+        `${basePath}/Groups/${created.id}`,
         token,
       ).expect(200);
 
-      // active has returned:'always' in Group schema, so it MUST be present
-      expect(res.body.active).toBeDefined();
-      expect(typeof res.body.active).toBe('boolean');
+      // In settings v7, Groups no longer have an 'active' attribute
+      expect(res.body).not.toHaveProperty('active');
     });
 
-    it('GET /Groups (list) should return active even with excludedAttributes=active', async () => {
+    it('GET /Groups (list) should NOT include active on any resource', async () => {
       await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201);
 
       const res = await scimGet(
         app,
-        `${basePath}/Groups?excludedAttributes=active&count=10`,
+        `${basePath}/Groups?count=10`,
         token,
       ).expect(200);
 
       expect(res.body.totalResults).toBeGreaterThanOrEqual(1);
       for (const group of res.body.Resources) {
-        expect(group.active).toBeDefined();
+        expect(group).not.toHaveProperty('active');
       }
     });
 
-    it('GET /Groups/:id with attributes= should include active automatically', async () => {
+    it('GET /Groups/:id with attributes=displayName should NOT include active', async () => {
       const created = (
         await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)
       ).body;
 
-      // Request only displayName — active should still appear because returned:'always'
       const res = await scimGet(
         app,
         `${basePath}/Groups/${created.id}?attributes=displayName`,
@@ -97,7 +95,7 @@ describe('P2 Attribute Characteristics (E2E)', () => {
       ).expect(200);
 
       expect(res.body.displayName).toBeDefined();
-      expect(res.body.active).toBeDefined();
+      expect(res.body).not.toHaveProperty('active');
     });
   });
 
