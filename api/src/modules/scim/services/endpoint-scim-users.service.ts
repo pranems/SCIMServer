@@ -90,18 +90,9 @@ export class EndpointScimUsersService {
     this.logger.info(LogCategory.SCIM_USER, 'Creating user', { userName: dto.userName, endpointId });
     this.logger.trace(LogCategory.SCIM_USER, 'Create user payload', { body: dto as unknown as Record<string, unknown> });
 
-    // Check uniqueness — if conflict is with a soft-deleted resource and
-    // ReprovisionOnConflictForSoftDeletedResource is enabled, re-activate it instead of 409.
+    // Check uniqueness — settings v7: always 409 on conflict (no re-provisioning)
     const conflict = await this.userRepo.findConflict(endpointId, dto.userName, dto.externalId ?? undefined);
     if (conflict) {
-      const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
-      const reprovision = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED);
-
-      if (softDelete && reprovision && conflict.deletedAt != null) {
-        this.logger.info(LogCategory.SCIM_USER, 'Re-provisioning soft-deleted user', { scimId: conflict.scimId, userName: dto.userName, endpointId });
-        return this.reprovisionUser(conflict.scimId, dto, baseUrl, endpointId, config);
-      }
-
       // Normal conflict - throw 409
       const isUserName = conflict.userName.toLowerCase() === dto.userName.toLowerCase();
       const conflictingAttribute = isUserName ? 'userName' : 'externalId';
@@ -219,8 +210,8 @@ export class EndpointScimUsersService {
 
     // Build SCIM resources and apply in-memory filter if needed
     // RFC 7644 §3.6: Soft-deleted resources (deletedAt set) MUST be omitted from future query results
-    const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
-    const filteredDbUsers = softDelete
+    const userSoftDelete = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED, true);
+    const filteredDbUsers = userSoftDelete
       ? allDbUsers.filter((u) => u.deletedAt == null)
       : allDbUsers;
     let resources = filteredDbUsers.map((user) => this.toScimUserResource(user, baseUrl, endpointId));
@@ -379,27 +370,27 @@ export class EndpointScimUsersService {
     // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations (double-delete)
     guardSoftDeleted(user, config, scimId, this.logger, LogCategory.SCIM_USER);
 
+    // Settings v7: Gate hard delete behind UserHardDeleteEnabled (default: true)
+    const hardDeleteEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED, true);
+    if (!hardDeleteEnabled) {
+      this.logger.info(LogCategory.SCIM_USER, 'Hard delete disabled for users', { scimId, endpointId });
+      throw createScimError({
+        status: 400,
+        scimType: 'invalidValue',
+        detail: 'User hard delete is not enabled for this endpoint.',
+        diagnostics: { errorCode: 'HARD_DELETE_DISABLED' },
+      });
+    }
+
     // Phase 7: Pre-write If-Match enforcement
     enforceIfMatch(user.version, ifMatch, config);
 
-    const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
-
-    if (softDelete) {
-      this.logger.info(LogCategory.SCIM_USER, 'Soft-deleting user (setting active=false + deletedAt)', { scimId, endpointId });
-      try {
-        await this.userRepo.update(user.id, { active: false, deletedAt: new Date() });
-      } catch (error) {
-        handleRepositoryError(error, 'soft-delete user', this.logger, LogCategory.SCIM_USER, { scimId, endpointId });
-      }
-      this.logger.info(LogCategory.SCIM_USER, 'User soft-deleted', { scimId, endpointId });
-    } else {
-      try {
-        await this.userRepo.delete(user.id);
-      } catch (error) {
-        handleRepositoryError(error, 'delete user', this.logger, LogCategory.SCIM_USER, { scimId, endpointId });
-      }
-      this.logger.info(LogCategory.SCIM_USER, 'User hard-deleted', { scimId, endpointId });
+    try {
+      await this.userRepo.delete(user.id);
+    } catch (error) {
+      handleRepositoryError(error, 'delete user', this.logger, LogCategory.SCIM_USER, { scimId, endpointId });
     }
+    this.logger.info(LogCategory.SCIM_USER, 'User hard-deleted', { scimId, endpointId });
   }
 
   // ===== Private Helper Methods =====
@@ -407,55 +398,6 @@ export class EndpointScimUsersService {
   // ===== Private Helper Methods =====
   // G17: Most helpers extracted to ../common/scim-service-helpers.ts
   // Only User-specific methods remain here.
-
-  /**
-   * Re-provision a soft-deleted user: reactivate with new payload data.
-   * Called when ReprovisionOnConflictForSoftDeletedResource is enabled and
-   * a POST conflicts with a soft-deleted user.
-   */
-  private async reprovisionUser(
-    existingScimId: string,
-    dto: CreateUserDto,
-    baseUrl: string,
-    endpointId: string,
-    config?: EndpointConfig,
-  ): Promise<ScimUserResource> {
-    const existing = await this.userRepo.findByScimId(endpointId, existingScimId);
-    if (!existing) {
-      this.logger.warn(LogCategory.SCIM_USER, 'Reprovision target vanished between conflict check and fetch', {
-        scimId: existingScimId, endpointId,
-      });
-      throw createScimError({ status: 500, detail: 'Failed to locate soft-deleted resource for re-provisioning.', diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
-    }
-
-    const now = new Date();
-    const sanitizedPayload = this.extractAdditionalAttributes(dto);
-
-    const updateData: UserUpdateInput = {
-      userName: dto.userName,
-      externalId: dto.externalId ?? null,
-      displayName: typeof dto.displayName === 'string' ? dto.displayName : null,
-      active: (dto.active as boolean) ?? true,
-      deletedAt: null,  // Clear soft-delete marker on re-provisioning
-      rawPayload: JSON.stringify(sanitizedPayload),
-      meta: JSON.stringify({
-        resourceType: 'User',
-        created: (parseJson<Record<string, unknown>>(String(existing.meta ?? '{}')) as Record<string, unknown>).created ?? now.toISOString(),
-        lastModified: now.toISOString(),
-      }),
-    };
-
-    let updated: UserRecord;
-    try {
-      updated = await this.userRepo.update(existing.id, updateData);
-    } catch (error) {
-      handleRepositoryError(error, 'reprovision user', this.logger, LogCategory.SCIM_USER, { scimId: existingScimId, endpointId });
-    }
-    this.logger.info(LogCategory.SCIM_USER, 'User re-provisioned (soft-deleted resource reactivated)', {
-      scimId: existingScimId, userName: dto.userName, endpointId,
-    });
-    return this.toScimUserResource(updated, baseUrl, endpointId);
-  }
 
   /**
    * Reconstruct the existing DB record as a SCIM payload object (data only, no meta/location).

@@ -335,9 +335,11 @@ function stripSubAttrs(value: unknown, subNever: Set<string>): void {
 /**
  * RFC 7644 §3.6: Guard against operations on soft-deleted resources.
  *
- * When SoftDeleteEnabled is active, a resource with deletedAt set is considered
+ * When UserSoftDeleteEnabled is active, a resource with deletedAt set is considered
  * deleted and MUST return 404 for all subsequent operations (GET, PATCH, PUT, DELETE).
  * Note: A resource disabled via PATCH (active=false) is NOT soft-deleted — only DELETE sets deletedAt.
+ *
+ * Settings v7: Uses USER_SOFT_DELETE_ENABLED (default: true) instead of old SOFT_DELETE_ENABLED.
  */
 export function guardSoftDeleted(
   record: { deletedAt?: Date | null },
@@ -346,14 +348,14 @@ export function guardSoftDeleted(
   logger: ScimLogger,
   logCategory: LogCategory,
 ): void {
-  const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
+  const softDelete = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED, true);
   if (softDelete && record.deletedAt != null) {
     logger.debug(logCategory, 'Soft-deleted resource accessed — returning 404', { scimId });
     throw createScimError({
       status: 404,
       scimType: 'noTarget',
       detail: `Resource ${scimId} not found.`,
-      diagnostics: { errorCode: 'RESOURCE_SOFT_DELETED', triggeredBy: 'SoftDeleteEnabled' },
+      diagnostics: { errorCode: 'RESOURCE_SOFT_DELETED', triggeredBy: 'UserSoftDeleteEnabled' },
     });
   }
 }
