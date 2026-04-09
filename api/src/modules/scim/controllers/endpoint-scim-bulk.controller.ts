@@ -96,6 +96,7 @@ export class EndpointScimBulkController {
         status: 400,
         detail: `Request must include schema "${SCIM_BULK_REQUEST_SCHEMA}" in the schemas array.`,
         scimType: SCIM_ERROR_TYPE.INVALID_VALUE,
+        diagnostics: { errorCode: 'BULK_INVALID_OPERATION' },
       });
     }
 
@@ -106,6 +107,7 @@ export class EndpointScimBulkController {
         status: 413,
         detail: `Bulk request payload (${contentLength} bytes) exceeds maximum allowed size (${BULK_MAX_PAYLOAD_SIZE} bytes).`,
         scimType: SCIM_ERROR_TYPE.TOO_LARGE,
+        diagnostics: { errorCode: 'BULK_PAYLOAD_TOO_LARGE' },
       });
     }
 
