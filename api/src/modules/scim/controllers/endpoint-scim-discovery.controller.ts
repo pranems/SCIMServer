@@ -11,7 +11,7 @@ import type { Request } from 'express';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { EndpointService } from '../../endpoint/services/endpoint.service';
 import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
-import { ENDPOINT_CONFIG_FLAGS, getConfigBooleanWithDefault } from '../../endpoint/endpoint-config.interface';
+import { ENDPOINT_CONFIG_FLAGS, getConfigBoolean } from '../../endpoint/endpoint-config.interface';
 import { ScimDiscoveryService } from '../discovery/scim-discovery.service';
 import { buildBaseUrl } from '../common/base-url.util';
 import { Public } from '../../auth/public.decorator';
@@ -73,7 +73,7 @@ export class EndpointScimDiscoveryController {
 
     // Settings v7: SchemaDiscoveryEnabled gate (default: true)
     const config = (endpoint.profile?.settings ?? {}) as EndpointConfig;
-    const discoveryEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.SCHEMA_DISCOVERY_ENABLED, true);
+    const discoveryEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SCHEMA_DISCOVERY_ENABLED);
     if (!discoveryEnabled) {
       this.logger.warn(LogCategory.SCIM_DISCOVERY, 'Schema discovery disabled for endpoint', { endpointId });
       throw new NotFoundException(`Resource not found.`);

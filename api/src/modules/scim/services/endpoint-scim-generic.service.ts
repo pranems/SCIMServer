@@ -25,7 +25,6 @@ import type {
 import { GENERIC_RESOURCE_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import {
   getConfigBoolean,
-  getConfigBooleanWithDefault,
   ENDPOINT_CONFIG_FLAGS,
   type EndpointConfig,
 } from '../../endpoint/endpoint-config.interface';
@@ -334,7 +333,7 @@ export class EndpointScimGenericService {
     );
 
     // GEN-12: Config-aware soft-delete filtering (settings v7: USER_SOFT_DELETE_ENABLED)
-    const softDeleteEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED, true);
+    const softDeleteEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED);
     if (softDeleteEnabled) {
       records = records.filter((r) => !r.deletedAt);
     }
@@ -573,7 +572,7 @@ export class EndpointScimGenericService {
       const schemaDefs = this.getSchemaDefinitions(resourceType, endpointId);
 
       // Coerce boolean strings in PATCH operation values before validation (parent-aware)
-      const coerceEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS, true);
+      const coerceEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS);
       if (coerceEnabled) {
         const boolMap = this.getBooleansByParentForRT(resourceType, endpointId);
         const coreUrnLower = this.getSchemaCacheForRT(resourceType, endpointId)?.coreSchemaUrn ?? resourceType.schema.toLowerCase();
@@ -777,7 +776,7 @@ export class EndpointScimGenericService {
     enforceIfMatch(existing.version, ifMatch, config);
 
     // Settings v7: Gate hard delete behind USER_HARD_DELETE_ENABLED (default: true)
-    const hardDeleteEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED, true);
+    const hardDeleteEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED);
     if (!hardDeleteEnabled) {
       this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Hard delete disabled for ${resourceType.name}`, { scimId, endpointId });
       throw createScimError({
@@ -950,10 +949,9 @@ export class EndpointScimGenericService {
     endpointId: string,
     config?: EndpointConfig,
   ): void {
-    const coerceEnabled = getConfigBooleanWithDefault(
+    const coerceEnabled = getConfigBoolean(
       config,
       ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS,
-      true,
     );
     if (!coerceEnabled) return;
 

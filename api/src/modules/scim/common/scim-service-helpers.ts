@@ -14,7 +14,6 @@ import { createScimError } from './scim-errors';
 import { assertIfMatch } from '../interceptors/scim-etag.interceptor';
 import {
   getConfigBoolean,
-  getConfigBooleanWithDefault,
   ENDPOINT_CONFIG_FLAGS,
   type EndpointConfig,
 } from '../../endpoint/endpoint-config.interface';
@@ -348,7 +347,7 @@ export function guardSoftDeleted(
   logger: ScimLogger,
   logCategory: LogCategory,
 ): void {
-  const softDelete = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED, true);
+  const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED);
   if (softDelete && record.deletedAt != null) {
     logger.debug(logCategory, 'Soft-deleted resource accessed — returning 404', { scimId });
     throw createScimError({
@@ -1016,10 +1015,9 @@ export class ScimSchemaHelpers {
     endpointId: string,
     config?: EndpointConfig,
   ): void {
-    const coerceEnabled = getConfigBooleanWithDefault(
+    const coerceEnabled = getConfigBoolean(
       config,
       ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS,
-      true,
     );
     if (!coerceEnabled) return;
 

@@ -20,7 +20,7 @@ import type { CreateUserDto } from '../dto/create-user.dto';
 import type { PatchUserDto } from '../dto/patch-user.dto';
 import { ScimMetadataService } from './scim-metadata.service';
 import type { EndpointConfig } from '../../endpoint/endpoint-config.interface';
-import { ENDPOINT_CONFIG_FLAGS, getConfigBoolean, getConfigBooleanWithDefault } from '../../endpoint/endpoint-config.interface';
+import { ENDPOINT_CONFIG_FLAGS, getConfigBoolean } from '../../endpoint/endpoint-config.interface';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
 import { buildUserFilter } from '../filters/apply-scim-filter';
 import { resolveUserSortParams } from '../common/scim-sort.util';
@@ -210,7 +210,7 @@ export class EndpointScimUsersService {
 
     // Build SCIM resources and apply in-memory filter if needed
     // RFC 7644 §3.6: Soft-deleted resources (deletedAt set) MUST be omitted from future query results
-    const userSoftDelete = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED, true);
+    const userSoftDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED);
     const filteredDbUsers = userSoftDelete
       ? allDbUsers.filter((u) => u.deletedAt == null)
       : allDbUsers;
@@ -371,7 +371,7 @@ export class EndpointScimUsersService {
     guardSoftDeleted(user, config, scimId, this.logger, LogCategory.SCIM_USER);
 
     // Settings v7: Gate hard delete behind UserHardDeleteEnabled (default: true)
-    const hardDeleteEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED, true);
+    const hardDeleteEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED);
     if (!hardDeleteEnabled) {
       this.logger.info(LogCategory.SCIM_USER, 'Hard delete disabled for users', { scimId, endpointId });
       throw createScimError({
@@ -493,7 +493,7 @@ export class EndpointScimUsersService {
       const schemaDefs = this.schemaHelpers.buildSchemaDefinitions(resultPayloadPlaceholder, endpointId);
 
       // Coerce boolean strings in PATCH operation values before validation (parent-aware)
-      const coerceEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS, true);
+      const coerceEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS);
       if (coerceEnabled) {
         const boolMap = this.schemaHelpers.getBooleansByParent(endpointId);
         const coreUrnLower = this.schemaHelpers.getCoreSchemaUrnLower(endpointId);

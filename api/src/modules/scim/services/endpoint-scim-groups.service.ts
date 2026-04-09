@@ -12,7 +12,7 @@ import type {
 } from '../../../domain/models/group.model';
 import { USER_REPOSITORY, GROUP_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { EndpointContextStorage } from '../../endpoint/endpoint-context.storage';
-import { getConfigBoolean, getConfigBooleanWithDefault, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
+import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../../endpoint/endpoint-config.interface';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 import { createScimError } from '../common/scim-errors';
@@ -77,12 +77,16 @@ export class EndpointScimGroupsService {
   async createGroupForEndpoint(dto: CreateGroupDto, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimGroupResource> {
     this.logger.enrichContext({ resourceType: 'Group', operation: 'create' });
     ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
-    this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
+
+    // Resolve config: use passed config or fall back to endpoint context
+    const endpointConfig = config ?? this.endpointContext.getConfig();
+
+    this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
     // Coerce boolean strings ("True"/"False") to native booleans before schema validation (parent-aware)
-    this.schemaHelpers.coerceBooleansByParentIfEnabled(dto as unknown as Record<string, unknown>, endpointId, config);
+    this.schemaHelpers.coerceBooleansByParentIfEnabled(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
-    this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, config, 'create');
+    this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, endpointConfig, 'create');
 
     // Strip readOnly attributes from POST payload (RFC 7643 §2.2)
     const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as unknown as Record<string, unknown>, endpointId);
@@ -288,11 +292,11 @@ export class EndpointScimGroupsService {
     // Get endpoint config for behavior flags (use passed config or fallback to context)
     const endpointConfig = config ?? this.endpointContext.getConfig();
     // Settings v7: Single flag replaces MultiOpPatchRequestAdd/RemoveMultipleMembersToGroup
-    const allowMultiMember = getConfigBooleanWithDefault(endpointConfig, ENDPOINT_CONFIG_FLAGS.MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED, true);
+    const allowMultiMember = getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED);
     const allowMultiMemberAdd = allowMultiMember;
     const allowMultiMemberRemove = allowMultiMember;
     // Settings v7: PatchOpAllowRemoveAllMembers defaults to false
-    const allowRemoveAllMembers = getConfigBooleanWithDefault(endpointConfig, ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS, false);
+    const allowRemoveAllMembers = getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS);
 
     const extensionUrns = this.schemaHelpers.getExtensionUrns(endpointId);
 
@@ -325,7 +329,7 @@ export class EndpointScimGroupsService {
       const schemaDefs = this.schemaHelpers.buildSchemaDefinitions(resultPayloadPlaceholder, endpointId);
 
       // Coerce boolean strings in PATCH operation values before validation (parent-aware)
-      const coerceEnabled = getConfigBooleanWithDefault(endpointConfig, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS, true);
+      const coerceEnabled = getConfigBoolean(endpointConfig, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS);
       if (coerceEnabled) {
         const boolMap = this.schemaHelpers.getBooleansByParent(endpointId);
         const coreUrnLower = this.schemaHelpers.getCoreSchemaUrnLower(endpointId);
@@ -386,12 +390,12 @@ export class EndpointScimGroupsService {
     }
 
     // Coerce boolean strings in post-PATCH payload before schema validation (parent-aware)
-    this.schemaHelpers.coerceBooleansByParentIfEnabled(resultPayload, endpointId, config);
+    this.schemaHelpers.coerceBooleansByParentIfEnabled(resultPayload, endpointId, endpointConfig);
 
-    this.schemaHelpers.validatePayloadSchema(resultPayload, endpointId, config, 'patch');
+    this.schemaHelpers.validatePayloadSchema(resultPayload, endpointId, endpointConfig, 'patch');
 
     // H-2: Immutable attribute enforcement — compare existing state with PATCH result
-    this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(group), resultPayload, endpointId, config);
+    this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(group), resultPayload, endpointId, endpointConfig);
 
     // G8f: Uniqueness enforcement on PATCH — displayName and externalId must remain unique
     await this.assertUniqueDisplayName(displayName, endpointId, scimId);
@@ -445,12 +449,16 @@ export class EndpointScimGroupsService {
   ): Promise<ScimGroupResource> {
     this.logger.enrichContext({ resourceType: 'Group', resourceId: scimId, operation: 'replace' });
     ensureSchema(dto.schemas, SCIM_CORE_GROUP_SCHEMA);
-    this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, config);
+
+    // Resolve config: use passed config or fall back to endpoint context
+    const endpointConfig = config ?? this.endpointContext.getConfig();
+
+    this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
     // Coerce boolean strings before schema validation (same as create path — parent-aware)
-    this.schemaHelpers.coerceBooleansByParentIfEnabled(dto as unknown as Record<string, unknown>, endpointId, config);
+    this.schemaHelpers.coerceBooleansByParentIfEnabled(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
-    this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, config, 'replace');
+    this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, endpointConfig, 'replace');
 
     // Strip readOnly attributes from PUT payload (RFC 7643 §2.2)
     const strippedAttrs = this.schemaHelpers.stripReadOnlyAttributesFromPayload(dto as unknown as Record<string, unknown>, endpointId);
@@ -471,10 +479,10 @@ export class EndpointScimGroupsService {
     }
 
     // Phase 7: Pre-write If-Match enforcement
-    enforceIfMatch(group.version, ifMatch, config);
+    enforceIfMatch(group.version, ifMatch, endpointConfig);
 
     // H-2: Immutable attribute enforcement — compare existing resource with incoming payload
-    this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(group), dto as unknown as Record<string, unknown>, endpointId, config);
+    this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(group), dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
     // G8f: Uniqueness enforcement on PUT — displayName and externalId must remain unique
     await this.assertUniqueDisplayName(dto.displayName, endpointId, scimId);
@@ -538,7 +546,7 @@ export class EndpointScimGroupsService {
     enforceIfMatch(group.version, ifMatch, config);
 
     // Settings v7: Gate hard delete behind GroupHardDeleteEnabled (default: true)
-    const hardDeleteEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED, true);
+    const hardDeleteEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED);
     if (!hardDeleteEnabled) {
       this.logger.info(LogCategory.SCIM_GROUP, 'Group hard-delete disabled by configuration', { scimId, endpointId });
       throw createScimError({

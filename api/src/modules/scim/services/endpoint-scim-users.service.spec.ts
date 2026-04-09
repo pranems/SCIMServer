@@ -95,7 +95,9 @@ describe('EndpointScimUsersService', () => {
           useValue: {
             setContext: jest.fn(),
             getEndpointId: jest.fn(),
-            getConfig: jest.fn(),
+            // Default: StrictSchemaValidation OFF for non-schema tests.
+            // Tests that explicitly test strict validation pass their own config.
+            getConfig: jest.fn().mockReturnValue({ StrictSchemaValidation: 'False' }),
             addWarnings: jest.fn(),
             getWarnings: jest.fn().mockReturnValue([]),
           },
@@ -217,8 +219,7 @@ describe('EndpointScimUsersService', () => {
         mockUserRepo.findConflict.mockResolvedValue(softDeletedConflict);
 
         const config: EndpointConfig = {
-          [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
-          [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: true,
+          [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
         };
         await expect(
           service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, config),
@@ -1048,12 +1049,14 @@ describe('EndpointScimUsersService', () => {
           rawPayload: data.rawPayload,
         }));
 
-        // No config (flag defaults to false)
+        // No config for VerbosePatch (flag defaults to false), but explicit StrictSchemaValidation OFF
+        const config: EndpointConfig = { StrictSchemaValidation: 'False' };
         await service.patchUserForEndpoint(
           mockUser.scimId,
           patchDto,
           'http://localhost:3000/scim',
-          mockEndpoint.id
+          mockEndpoint.id,
+          config
         );
 
         const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
@@ -1562,10 +1565,12 @@ describe('EndpointScimUsersService', () => {
         });
 
         // Should not throw despite different casing
+        const config: EndpointConfig = { StrictSchemaValidation: 'False' };
         const result = await service.createUserForEndpoint(
           createDto,
           'http://localhost:3000/scim',
-          mockEndpoint.id
+          mockEndpoint.id,
+          config
         );
 
         expect(result.userName).toBe(createDto.userName);
@@ -1894,10 +1899,29 @@ describe('EndpointScimUsersService', () => {
         expect(mockUserRepo.create).toHaveBeenCalled();
       });
 
-      it('should allow extension URN in body when config is undefined (default lenient)', async () => {
+      it('should reject undeclared extension URN when config is undefined (default strict)', async () => {
+        // Settings v8: StrictSchemaValidation defaults to true, so undefined config → strict mode
         const createDto: CreateUserDto = {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
           userName: 'default@example.com',
+          active: true,
+          [ENTERPRISE_USER_URN]: { department: 'Engineering' },
+        } as any;
+
+        mockUserRepo.findConflict.mockResolvedValue(null);
+
+        // Enterprise URN is in the body but NOT declared in schemas[] → strict rejects
+        await expect(
+          service.createUserForEndpoint(
+            createDto, 'http://localhost:3000/scim', mockEndpoint.id, undefined
+          )
+        ).rejects.toThrow(HttpException);
+      });
+
+      it('should allow undeclared extension URN when StrictSchemaValidation is explicitly false', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'lenient@example.com',
           active: true,
           [ENTERPRISE_USER_URN]: { department: 'Engineering' },
         } as any;
@@ -1909,8 +1933,9 @@ describe('EndpointScimUsersService', () => {
           rawPayload: JSON.stringify({ schemas: createDto.schemas }),
         });
 
+        const lenientConfig: EndpointConfig = { StrictSchemaValidation: 'False' };
         const result = await service.createUserForEndpoint(
-          createDto, 'http://localhost:3000/scim', mockEndpoint.id, undefined
+          createDto, 'http://localhost:3000/scim', mockEndpoint.id, lenientConfig
         );
 
         expect(result.userName).toBe(createDto.userName);
@@ -2367,7 +2392,7 @@ describe('EndpointScimUsersService', () => {
       mockUserRepo.findConflict.mockResolvedValue(null);
 
       const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
+        [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
         [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
       };
 
@@ -2391,7 +2416,7 @@ describe('EndpointScimUsersService', () => {
 
     it('should reject unknown extension on CREATE when StrictSchemaValidation=true, SoftDeleteEnabled=true', async () => {
       const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
+        [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
         [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
       };
 
@@ -2411,7 +2436,7 @@ describe('EndpointScimUsersService', () => {
 
     it('should allow valid extension on CREATE with all flags enabled', async () => {
       const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
+        [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
         [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
       };
 

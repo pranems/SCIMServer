@@ -87,7 +87,7 @@ describe('EndpointService', () => {
           service.createEndpoint({
             name: 'test-settings-val',
             profile: {
-              settings: { MultiOpPatchRequestAddMultipleMembersToGroup: 'Yes' } as any,
+              settings: { StrictSchemaValidation: 'Yes' } as any,
               schemas: [{ id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributes: 'all' }],
               resourceTypes: [{ id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] }],
             },

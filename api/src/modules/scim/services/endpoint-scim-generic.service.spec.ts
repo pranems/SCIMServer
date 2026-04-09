@@ -233,7 +233,7 @@ describe('EndpointScimGenericService', () => {
       });
 
       const softDeleteConfig: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
+        [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
       };
 
       try {
@@ -499,7 +499,7 @@ describe('EndpointScimGenericService', () => {
       });
 
       const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
+        [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
       };
 
       try {
@@ -521,7 +521,7 @@ describe('EndpointScimGenericService', () => {
       });
 
       const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
+        [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
       };
 
       try {
@@ -550,7 +550,7 @@ describe('EndpointScimGenericService', () => {
       });
 
       const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
+        [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
       };
 
       try {
@@ -581,7 +581,7 @@ describe('EndpointScimGenericService', () => {
       mockGenericRepo.findAll.mockResolvedValue([activeRecord, deletedRecord]);
 
       const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
+        [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
       };
 
       const result = await service.listResources(
@@ -772,8 +772,7 @@ describe('EndpointScimGenericService', () => {
       mockGenericRepo.findByExternalId.mockResolvedValue(softDeletedRecord);
 
       const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
-        [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: true,
+        [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
       };
 
       try {
@@ -804,8 +803,7 @@ describe('EndpointScimGenericService', () => {
       mockGenericRepo.findByExternalId.mockResolvedValue(softDeletedRecord);
 
       const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
-        [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: false,
+        [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
       };
 
       try {
@@ -829,10 +827,7 @@ describe('EndpointScimGenericService', () => {
     it('should return 409 when Reprovision is ON but SoftDelete is OFF', async () => {
       mockGenericRepo.findByExternalId.mockResolvedValue(mockGenericRecord); // active, not soft-deleted
 
-      const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: true,
-        // SoftDeleteEnabled not set = false
-      };
+      const config: EndpointConfig = {};
 
       try {
         await service.createResource(
