@@ -18,7 +18,7 @@ import entraIdMinimalJson from './presets/entra-id-minimal.json';
 import rfcStandardJson from './presets/rfc-standard.json';
 import minimalJson from './presets/minimal.json';
 import userOnlyJson from './presets/user-only.json';
-import lexmarkJson from './presets/lexmark.json';
+import userOnlyWithCustomExtJson from './presets/user-only-with-custom-ext.json';
 
 // ─── Preset Name Constants ─────────────────────────────────────────────────
 
@@ -27,7 +27,9 @@ export const PRESET_ENTRA_ID_MINIMAL = 'entra-id-minimal';
 export const PRESET_RFC_STANDARD = 'rfc-standard';
 export const PRESET_MINIMAL = 'minimal';
 export const PRESET_USER_ONLY = 'user-only';
-export const PRESET_LEXMARK = 'lexmark';
+/** @deprecated Renamed in settings v7. Use PRESET_USER_ONLY_WITH_CUSTOM_EXT. */
+export const PRESET_LEXMARK = 'user-only-with-custom-ext';
+export const PRESET_USER_ONLY_WITH_CUSTOM_EXT = 'user-only-with-custom-ext';
 
 /** The default preset applied when neither profilePreset nor profile is provided */
 export const DEFAULT_PRESET_NAME = PRESET_ENTRA_ID;
@@ -39,7 +41,7 @@ export const PRESET_NAMES: readonly string[] = [
   PRESET_RFC_STANDARD,
   PRESET_MINIMAL,
   PRESET_USER_ONLY,
-  PRESET_LEXMARK,
+  PRESET_USER_ONLY_WITH_CUSTOM_EXT,
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -52,7 +54,7 @@ const presetMap = new Map<string, BuiltInPreset>([
   [PRESET_RFC_STANDARD, rfcStandardJson as unknown as BuiltInPreset],
   [PRESET_MINIMAL, minimalJson as unknown as BuiltInPreset],
   [PRESET_USER_ONLY, userOnlyJson as unknown as BuiltInPreset],
-  [PRESET_LEXMARK, lexmarkJson as unknown as BuiltInPreset],
+  [PRESET_USER_ONLY_WITH_CUSTOM_EXT, userOnlyWithCustomExtJson as unknown as BuiltInPreset],
 ]);
 
 // ═══════════════════════════════════════════════════════════════════════════════

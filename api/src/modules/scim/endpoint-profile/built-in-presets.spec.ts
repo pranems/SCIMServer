@@ -12,6 +12,7 @@ import {
   PRESET_MINIMAL,
   PRESET_USER_ONLY,
   PRESET_LEXMARK,
+  PRESET_USER_ONLY_WITH_CUSTOM_EXT,
   DEFAULT_PRESET_NAME,
   BUILT_IN_PRESETS,
   PRESET_NAMES,
@@ -37,7 +38,8 @@ describe('built-in-presets', () => {
       expect(PRESET_RFC_STANDARD).toBe('rfc-standard');
       expect(PRESET_MINIMAL).toBe('minimal');
       expect(PRESET_USER_ONLY).toBe('user-only');
-      expect(PRESET_LEXMARK).toBe('lexmark');
+      expect(PRESET_LEXMARK).toBe('user-only-with-custom-ext');
+      expect(PRESET_USER_ONLY_WITH_CUSTOM_EXT).toBe('user-only-with-custom-ext');
     });
 
     it('should default to entra-id (decision D5)', () => {
@@ -58,7 +60,7 @@ describe('built-in-presets', () => {
       expect(BUILT_IN_PRESETS.has(PRESET_RFC_STANDARD)).toBe(true);
       expect(BUILT_IN_PRESETS.has(PRESET_MINIMAL)).toBe(true);
       expect(BUILT_IN_PRESETS.has(PRESET_USER_ONLY)).toBe(true);
-      expect(BUILT_IN_PRESETS.has(PRESET_LEXMARK)).toBe(true);
+      expect(BUILT_IN_PRESETS.has(PRESET_USER_ONLY_WITH_CUSTOM_EXT)).toBe(true);
     });
 
     it('should not contain "custom" (decision D13 — dropped)', () => {
@@ -198,18 +200,19 @@ describe('built-in-presets', () => {
       expect(profile.settings!.AllowAndCoerceBooleanStrings).toBe('True');
     });
 
-    it('should have Entra-compatible PATCH settings', () => {
-      expect(profile.settings!.MultiOpPatchRequestAddMultipleMembersToGroup).toBe('True');
-      expect(profile.settings!.MultiOpPatchRequestRemoveMultipleMembersFromGroup).toBe('True');
+    it('should have Entra-compatible PATCH settings (settings v7)', () => {
+      expect(profile.settings!.MultiMemberPatchOpForGroupEnabled).toBe('True');
       expect(profile.settings!.PatchOpAllowRemoveAllMembers).toBe('True');
       expect(profile.settings!.VerbosePatchSupported).toBe('True');
     });
 
-    it('should NOT have StrictSchemaValidation in default preset (opt-in per-endpoint)', () => {
-      expect(profile.settings!.StrictSchemaValidation).toBeUndefined();
+    it('should have StrictSchemaValidation in entra-id preset (settings v7)', () => {
+      expect(profile.settings!.StrictSchemaValidation).toBe('True');
     });
 
-    it('should NOT have SoftDeleteEnabled in default preset (opt-in per-endpoint)', () => {
+    it('should NOT have old flag names in settings (settings v7 clean break)', () => {
+      expect(profile.settings!.MultiOpPatchRequestAddMultipleMembersToGroup).toBeUndefined();
+      expect(profile.settings!.MultiOpPatchRequestRemoveMultipleMembersFromGroup).toBeUndefined();
       expect(profile.settings!.SoftDeleteEnabled).toBeUndefined();
     });
 
@@ -290,8 +293,9 @@ describe('built-in-presets', () => {
       expect(profile.serviceProviderConfig!.etag!.supported).toBe(true);
     });
 
-    it('should have empty settings', () => {
-      expect(Object.keys(profile.settings!)).toHaveLength(0);
+    it('should have StrictSchemaValidation in settings (settings v7)', () => {
+      expect(profile.settings!.StrictSchemaValidation).toBe('True');
+      expect(Object.keys(profile.settings!)).toHaveLength(1);
     });
   });
 
@@ -374,8 +378,8 @@ describe('built-in-presets', () => {
 
   // ─── Cross-preset structural validity ─────────────────────────────────
 
-  describe('lexmark preset', () => {
-    const preset = getBuiltInPreset('lexmark');
+  describe('user-only-with-custom-ext preset', () => {
+    const preset = getBuiltInPreset('user-only-with-custom-ext');
     const { profile } = preset;
 
     it('should have 3 schemas (User + EnterpriseUser + CustomUser)', () => {
@@ -558,7 +562,7 @@ describe('built-in-presets', () => {
   // ─── Preset settings differentiation ──────────────────────────────────
 
   describe('preset settings differentiation', () => {
-    it('entra-id should have 5 non-empty settings (Entra-compatible defaults)', () => {
+    it('entra-id should have 5 non-empty settings (settings v7)', () => {
       const { settings } = getBuiltInPreset('entra-id').profile;
       expect(Object.keys(settings!).length).toBe(5);
       for (const [key, value] of Object.entries(settings!)) {
@@ -568,14 +572,15 @@ describe('built-in-presets', () => {
       }
     });
 
-    it('entra-id-minimal should have AllowAndCoerceBooleanStrings only', () => {
+    it('entra-id-minimal should have AllowAndCoerceBooleanStrings + StrictSchemaValidation', () => {
       const { settings } = getBuiltInPreset('entra-id-minimal').profile;
-      expect(Object.keys(settings!)).toEqual(['AllowAndCoerceBooleanStrings']);
+      expect(Object.keys(settings!)).toEqual(expect.arrayContaining(['AllowAndCoerceBooleanStrings', 'StrictSchemaValidation']));
+      expect(Object.keys(settings!)).toHaveLength(2);
     });
 
-    it('rfc-standard should have empty settings (pure RFC defaults)', () => {
+    it('rfc-standard should have StrictSchemaValidation only (settings v7)', () => {
       const { settings } = getBuiltInPreset('rfc-standard').profile;
-      expect(Object.keys(settings!)).toHaveLength(0);
+      expect(Object.keys(settings!)).toEqual(['StrictSchemaValidation']);
     });
 
     it('minimal should have empty settings', () => {
@@ -598,7 +603,7 @@ describe('built-in-presets', () => {
       'rfc-standard':     { patch: true, bulk: true,  filter: true, sort: true,  etag: true },
       'minimal':          { patch: true, bulk: false, filter: true, sort: false, etag: false },
       'user-only':        { patch: true, bulk: false, filter: true, sort: true,  etag: true },
-      'lexmark':          { patch: true, bulk: false, filter: true, sort: true,  etag: false },
+      'user-only-with-custom-ext': { patch: true, bulk: false, filter: true, sort: true,  etag: false },
     };
 
     for (const [presetName, expected] of Object.entries(matrix)) {
@@ -641,8 +646,8 @@ describe('built-in-presets', () => {
       expect(rts).toEqual(['User']);
     });
 
-    it('lexmark should have User only (no Group)', () => {
-      const rts = getBuiltInPreset('lexmark').profile.resourceTypes!.map(rt => rt.name);
+    it('user-only-with-custom-ext should have User only (no Group)', () => {
+      const rts = getBuiltInPreset('user-only-with-custom-ext').profile.resourceTypes!.map(rt => rt.name);
       expect(rts).toEqual(['User']);
     });
   });

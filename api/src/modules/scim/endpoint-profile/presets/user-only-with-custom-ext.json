@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "name": "lexmark",
-    "description": "Lexmark Cloud Print Management. User-only provisioning with EnterpriseUser (costCenter, department) and custom extension (badgeCode, pin — writeOnly/never). No Groups."
+    "name": "user-only-with-custom-ext",
+    "description": "User-only provisioning with EnterpriseUser and custom extension (writeOnly/never attrs). No Groups."
   },
   "profile": {
     "schemas": [

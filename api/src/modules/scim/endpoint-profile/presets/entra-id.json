@@ -937,10 +937,10 @@
     },
     "settings": {
       "AllowAndCoerceBooleanStrings": "True",
-      "MultiOpPatchRequestAddMultipleMembersToGroup": "True",
-      "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True",
+      "MultiMemberPatchOpForGroupEnabled": "True",
       "PatchOpAllowRemoveAllMembers": "True",
-      "VerbosePatchSupported": "True"
+      "VerbosePatchSupported": "True",
+      "StrictSchemaValidation": "True"
     }
   }
 }
