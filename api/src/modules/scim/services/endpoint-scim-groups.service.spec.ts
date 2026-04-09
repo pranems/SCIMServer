@@ -1189,6 +1189,29 @@ describe('EndpointScimGroupsService', () => {
         expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
         expect(mockGroupRepo.update).not.toHaveBeenCalled();
       });
+
+      it('should error when GroupHardDeleteEnabled is false (settings v7)', async () => {
+        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED]: false };
+        await expect(
+          service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+
+        expect(mockGroupRepo.delete).not.toHaveBeenCalled();
+        expect(mockGroupRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('should error when GroupHardDeleteEnabled is "False" (string)', async () => {
+        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED]: 'False' };
+        await expect(
+          service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+
+        expect(mockGroupRepo.delete).not.toHaveBeenCalled();
+      });
     });
   });
 

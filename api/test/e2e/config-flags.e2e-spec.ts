@@ -6,6 +6,7 @@ import {
   scimPost,
   scimGet,
   scimPatch,
+  scimDelete,
   createEndpoint,
   createEndpointWithConfig,
   scimBasePath,
@@ -436,5 +437,76 @@ describe('Config Flags (E2E)', () => {
     // The legacy `config` field was removed from CreateEndpointDto (v0.28+).
     // Settings values (profile.settings) are not individually validated,
     // so invalid flag values are no longer rejected at the admin API level.
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Settings v7: UserHardDeleteEnabled
+  // ═══════════════════════════════════════════════════════════
+
+  describe('UserHardDeleteEnabled (settings v7)', () => {
+    it('should block DELETE when UserHardDeleteEnabled=False', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        UserHardDeleteEnabled: 'False',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+      // DELETE should be blocked
+      await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(400);
+
+      // User should still exist
+      await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(200);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Settings v7: GroupHardDeleteEnabled
+  // ═══════════════════════════════════════════════════════════
+
+  describe('GroupHardDeleteEnabled (settings v7)', () => {
+    it('should block DELETE when GroupHardDeleteEnabled=False', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        GroupHardDeleteEnabled: 'False',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const group = (await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)).body;
+
+      // DELETE should be blocked
+      await scimDelete(app, `${basePath}/Groups/${group.id}`, token).expect(400);
+
+      // Group should still exist
+      await scimGet(app, `${basePath}/Groups/${group.id}`, token).expect(200);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Settings v7: SchemaDiscoveryEnabled
+  // ═══════════════════════════════════════════════════════════
+
+  describe('SchemaDiscoveryEnabled (settings v7)', () => {
+    it('should return 404 for all discovery endpoints when SchemaDiscoveryEnabled=False', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        SchemaDiscoveryEnabled: 'False',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      // All 3 discovery endpoints should return 404
+      await request(app.getHttpServer()).get(`${basePath}/Schemas`).expect(404);
+      await request(app.getHttpServer()).get(`${basePath}/ResourceTypes`).expect(404);
+      await request(app.getHttpServer()).get(`${basePath}/ServiceProviderConfig`).expect(404);
+    });
+
+    it('should return 200 for discovery endpoints when SchemaDiscoveryEnabled=True', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        SchemaDiscoveryEnabled: 'True',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      await request(app.getHttpServer()).get(`${basePath}/Schemas`).expect(200);
+      await request(app.getHttpServer()).get(`${basePath}/ResourceTypes`).expect(200);
+      await request(app.getHttpServer()).get(`${basePath}/ServiceProviderConfig`).expect(200);
+    });
   });
 });

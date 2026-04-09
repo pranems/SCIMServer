@@ -1662,5 +1662,73 @@ describe('endpoint-config.interface', () => {
         logLevel: 'INFO',
       })).not.toThrow();
     });
+
+    it('should reject when any one new flag is invalid among valid flags', () => {
+      expect(() => validateEndpointConfig({
+        UserSoftDeleteEnabled: 'True',
+        UserHardDeleteEnabled: 'invalid',
+      })).toThrow(/UserHardDeleteEnabled/);
+    });
   });
+
+  // ─── Settings v7: Dedicated validation blocks for each new flag ────────
+
+  // Helper: standard 14-test validation battery for a boolean flag
+  function describeBooleanFlagValidation(flagName: string) {
+    describe(`${flagName} validation (settings v7)`, () => {
+      it('should accept boolean true', () => {
+        expect(() => validateEndpointConfig({ [flagName]: true })).not.toThrow();
+      });
+      it('should accept boolean false', () => {
+        expect(() => validateEndpointConfig({ [flagName]: false })).not.toThrow();
+      });
+      it('should accept string "True"', () => {
+        expect(() => validateEndpointConfig({ [flagName]: 'True' })).not.toThrow();
+      });
+      it('should accept string "true"', () => {
+        expect(() => validateEndpointConfig({ [flagName]: 'true' })).not.toThrow();
+      });
+      it('should accept string "False"', () => {
+        expect(() => validateEndpointConfig({ [flagName]: 'False' })).not.toThrow();
+      });
+      it('should accept string "false"', () => {
+        expect(() => validateEndpointConfig({ [flagName]: 'false' })).not.toThrow();
+      });
+      it('should accept string "1"', () => {
+        expect(() => validateEndpointConfig({ [flagName]: '1' })).not.toThrow();
+      });
+      it('should accept string "0"', () => {
+        expect(() => validateEndpointConfig({ [flagName]: '0' })).not.toThrow();
+      });
+      it('should throw for invalid string "Yes"', () => {
+        expect(() => validateEndpointConfig({ [flagName]: 'Yes' })).toThrow(/Invalid value/);
+      });
+      it('should throw for invalid string "No"', () => {
+        expect(() => validateEndpointConfig({ [flagName]: 'No' })).toThrow(/Invalid value/);
+      });
+      it('should throw for number value', () => {
+        expect(() => validateEndpointConfig({ [flagName]: 123 })).toThrow(/Invalid type/);
+      });
+      it('should throw for object value', () => {
+        expect(() => validateEndpointConfig({ [flagName]: { enabled: true } })).toThrow(/Invalid type/);
+      });
+      it('should throw for array value', () => {
+        expect(() => validateEndpointConfig({ [flagName]: ['true'] })).toThrow(/Invalid type/);
+      });
+      it('should include flag name in error message', () => {
+        try {
+          validateEndpointConfig({ [flagName]: 'invalid' });
+          fail('Expected error');
+        } catch (e) {
+          expect((e as Error).message).toContain(flagName);
+        }
+      });
+    });
+  }
+
+  describeBooleanFlagValidation('UserSoftDeleteEnabled');
+  describeBooleanFlagValidation('UserHardDeleteEnabled');
+  describeBooleanFlagValidation('GroupHardDeleteEnabled');
+  describeBooleanFlagValidation('MultiMemberPatchOpForGroupEnabled');
+  describeBooleanFlagValidation('SchemaDiscoveryEnabled');
 });
