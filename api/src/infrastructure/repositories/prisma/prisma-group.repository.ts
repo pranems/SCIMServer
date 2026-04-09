@@ -74,7 +74,7 @@ export class PrismaGroupRepository implements IGroupRepository {
         scimId: input.scimId,
         externalId: input.externalId,
         displayName: input.displayName,
-        active: input.active,
+        active: input.active ?? true,  // Settings v7: Groups default active=true
         payload: JSON.parse(input.rawPayload),   // domain string → JSONB
         meta: input.meta,
         endpoint: { connect: { id: input.endpointId } },

@@ -34,7 +34,7 @@ export class InMemoryGroupRepository implements IGroupRepository {
       scimId: input.scimId,
       externalId: input.externalId,
       displayName: input.displayName,
-      active: input.active,
+      active: input.active ?? true,  // Settings v7: Groups don't use active; default true
       deletedAt: null,
       rawPayload: input.rawPayload,
       version: 1,

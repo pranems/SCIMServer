@@ -153,19 +153,30 @@ describe('guardSoftDeleted', () => {
 
   afterEach(() => jest.clearAllMocks());
 
-  it('should not throw when SoftDeleteEnabled is off', () => {
+  it('should not throw when UserSoftDeleteEnabled is explicitly false', () => {
     const record = { deletedAt: new Date() };
-    expect(() => guardSoftDeleted(record, undefined, 'id-1', mockLogger, logCategory)).not.toThrow();
+    const config = { UserSoftDeleteEnabled: false } as any;
+    expect(() => guardSoftDeleted(record, config, 'id-1', mockLogger, logCategory)).not.toThrow();
   });
 
-  it('should not throw when SoftDeleteEnabled is on but deletedAt is null', () => {
-    const config = { SoftDeleteEnabled: 'true' } as any;
+  it('should throw when config is undefined (default UserSoftDeleteEnabled = true) and deletedAt is set', () => {
+    const record = { deletedAt: new Date() };
+    try {
+      guardSoftDeleted(record, undefined, 'id-1', mockLogger, logCategory);
+      fail('should have thrown');
+    } catch (e: any) {
+      expect(e.getStatus()).toBe(404);
+    }
+  });
+
+  it('should not throw when UserSoftDeleteEnabled is on but deletedAt is null', () => {
+    const config = { UserSoftDeleteEnabled: 'true' } as any;
     const record = { deletedAt: null };
     expect(() => guardSoftDeleted(record, config, 'id-1', mockLogger, logCategory)).not.toThrow();
   });
 
-  it('should throw 404 when SoftDeleteEnabled is on and deletedAt is set', () => {
-    const config = { SoftDeleteEnabled: 'true' } as any;
+  it('should throw 404 when UserSoftDeleteEnabled is on and deletedAt is set', () => {
+    const config = { UserSoftDeleteEnabled: 'true' } as any;
     const record = { deletedAt: new Date() };
     try {
       guardSoftDeleted(record, config, 'id-1', mockLogger, logCategory);
@@ -175,8 +186,8 @@ describe('guardSoftDeleted', () => {
     }
   });
 
-  it('should include triggeredBy SoftDeleteEnabled in diagnostics (P5)', () => {
-    const config = { SoftDeleteEnabled: 'true' } as any;
+  it('should include triggeredBy UserSoftDeleteEnabled in diagnostics (settings v7)', () => {
+    const config = { UserSoftDeleteEnabled: 'true' } as any;
     const record = { deletedAt: new Date() };
     try {
       guardSoftDeleted(record, config, 'id-1', mockLogger, logCategory);
@@ -184,7 +195,7 @@ describe('guardSoftDeleted', () => {
     } catch (e: any) {
       const body = e.getResponse();
       expect(body[SCIM_DIAGNOSTICS_URN]).toBeDefined();
-      expect(body[SCIM_DIAGNOSTICS_URN].triggeredBy).toBe('SoftDeleteEnabled');
+      expect(body[SCIM_DIAGNOSTICS_URN].triggeredBy).toBe('UserSoftDeleteEnabled');
     }
   });
 });
