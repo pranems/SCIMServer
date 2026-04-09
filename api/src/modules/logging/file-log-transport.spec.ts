@@ -49,6 +49,24 @@ describe('FileLogTransport', () => {
     expect(parsed.level).toBe('INFO');
   });
 
+  it('should default to logs/scimserver.log when LOG_FILE is unset (L.5)', () => {
+    delete process.env.LOG_FILE;
+
+    const transport = new FileLogTransport();
+    transport.write(makeEntry({ message: 'default file test' }));
+    transport.close();
+
+    // Should have created a file at the default path
+    const defaultPath = path.resolve('logs', 'scimserver.log');
+    expect(fs.existsSync(defaultPath)).toBe(true);
+
+    const content = fs.readFileSync(defaultPath, 'utf-8').trim();
+    expect(content).toContain('default file test');
+
+    // Cleanup
+    fs.rmSync(path.resolve('logs'), { recursive: true, force: true });
+  });
+
   it('should not create main file when LOG_FILE is empty string', () => {
     process.env.LOG_FILE = '';
 

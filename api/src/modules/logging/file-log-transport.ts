@@ -29,14 +29,14 @@ export class FileLogTransport {
 
     const logFile = process.env.LOG_FILE;
 
-    // Main file: LOG_FILE env var. Empty string = disabled.
-    if (logFile !== undefined && logFile !== '') {
-      const resolvedPath = path.resolve(logFile);
+    // Main file: LOG_FILE env var. Default: logs/scimserver.log. Empty string = disabled.
+    if (logFile === '') {
+      // Explicitly disabled
+      this.endpointBaseDir = endpointBaseDirOverride ?? path.resolve('logs', 'endpoints');
+    } else {
+      const resolvedPath = path.resolve(logFile ?? path.join('logs', 'scimserver.log'));
       this.mainWriter = new RotatingFileWriter(resolvedPath, this.maxBytes, this.maxFiles);
       this.endpointBaseDir = endpointBaseDirOverride ?? path.join(path.dirname(resolvedPath), 'endpoints');
-    } else {
-      // No main file, but endpoint files may still work
-      this.endpointBaseDir = endpointBaseDirOverride ?? path.resolve('logs', 'endpoints');
     }
   }
 
