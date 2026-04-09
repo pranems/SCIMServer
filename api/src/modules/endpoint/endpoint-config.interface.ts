@@ -6,20 +6,20 @@
  */
 export const ENDPOINT_CONFIG_FLAGS = {
   /**
-   * When true, allows a single PATCH operation to add multiple members to a group.
-   * When false (default), each member addition requires a separate PATCH operation.
+   * @deprecated Replaced by MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED in settings v7.
+   * Kept for DB migration reference only — not read at runtime.
    */
   MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP: 'MultiOpPatchRequestAddMultipleMembersToGroup',
   
   /**
-   * When true, allows a single PATCH operation to remove multiple members from a group.
-   * When false (default), each member removal requires a separate PATCH operation.
+   * @deprecated Replaced by MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED in settings v7.
+   * Kept for DB migration reference only — not read at runtime.
    */
   MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP: 'MultiOpPatchRequestRemoveMultipleMembersFromGroup',
   
   /**
-   * When true (default), allows removing all members from a group via path=members without value array.
-   * When false, requires explicit member specification in value array or path filter.
+   * When true, allows removing all members from a group via path=members without value array.
+   * When false (default), requires explicit member specification in value array or path filter.
    */
   PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS: 'PatchOpAllowRemoveAllMembers',
 
@@ -39,9 +39,8 @@ export const ENDPOINT_CONFIG_FLAGS = {
   LOG_LEVEL: 'logLevel',
 
   /**
-   * When true, DELETE operations set `active=false` instead of physically removing the resource.
-   * Soft-deleted resources are excluded from GET/LIST responses.
-   * When false (default), DELETE permanently removes the resource from the database.
+   * @deprecated Replaced by USER_SOFT_DELETE_ENABLED + USER_HARD_DELETE_ENABLED in settings v7.
+   * Kept for DB migration reference only — not read at runtime.
    */
   SOFT_DELETE_ENABLED: 'SoftDeleteEnabled',
 
@@ -77,15 +76,8 @@ export const ENDPOINT_CONFIG_FLAGS = {
    */
   ALLOW_AND_COERCE_BOOLEAN_STRINGS: 'AllowAndCoerceBooleanStrings',
   /**
-   * When true, POST (create) operations that collide with a soft-deleted resource
-   * (same userName/externalId for Users, same displayName/externalId for Groups)
-   * will re-activate the existing resource with the new payload instead of returning 409.
-   * Requires SoftDeleteEnabled to also be true — has no effect with hard-delete.
-   * When false (default), uniqueness collisions with soft-deleted resources return
-   * 409 Conflict like any other duplicate.
-   *
-   * @see RFC 7644 §3.3 — Creating Resources (uniqueness)
-   * @see RFC 7644 §3.6 — Deleting Resources (soft-delete)
+   * @deprecated Removed in settings v7. POST collision with soft-deleted user always returns 409.
+   * Kept for DB migration reference only — not read at runtime.
    */
   REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED: 'ReprovisionOnConflictForSoftDeletedResource',
 
@@ -133,6 +125,43 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * @see RFC 7643 §2.2 — readOnly mutability
    */
   IGNORE_READONLY_ATTRIBUTES_IN_PATCH: 'IgnoreReadOnlyAttributesInPatch',
+
+  // ─── Settings v7: New flags ────────────────────────────────────────
+
+  /**
+   * When true (default), PATCH /Users/{id} with {active:false} deactivates the user.
+   * Soft-deleted user retains all uniqueness:server attribute values.
+   * POST with matching unique attr → 409. Must hard-delete to free unique values.
+   * When false, PATCH {active:false} → error.
+   */
+  USER_SOFT_DELETE_ENABLED: 'UserSoftDeleteEnabled',
+
+  /**
+   * When true (default), DELETE /Users/{id} permanently removes the user.
+   * When false, DELETE → error.
+   */
+  USER_HARD_DELETE_ENABLED: 'UserHardDeleteEnabled',
+
+  /**
+   * When true (default), DELETE /Groups/{id} permanently removes the group.
+   * When false, DELETE → error.
+   */
+  GROUP_HARD_DELETE_ENABLED: 'GroupHardDeleteEnabled',
+
+  /**
+   * When true (default), a single PATCH operation can add/remove multiple members
+   * on a Group: value: [{value:"id1"},{value:"id2"}].
+   * When false, only one member per PATCH op.
+   * Replaces MultiOpPatchRequestAdd/RemoveMultipleMembersToGroup.
+   */
+  MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED: 'MultiMemberPatchOpForGroupEnabled',
+
+  /**
+   * When true (default), endpoint-scoped /ServiceProviderConfig, /Schemas,
+   * /ResourceTypes discovery endpoints respond normally.
+   * When false, discovery endpoints return 404 + server WARN log.
+   */
+  SCHEMA_DISCOVERY_ENABLED: 'SchemaDiscoveryEnabled',
 } as const;
 
 /**
@@ -268,6 +297,23 @@ export interface EndpointConfig {
    */
   [ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH]?: boolean | string;
 
+  // ─── Settings v7: New flags ─────────────────────────────────────────
+
+  /** When true (default), PATCH {active:false} deactivates user. false → error. */
+  [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]?: boolean | string;
+
+  /** When true (default), DELETE /Users/{id} permanently removes user. false → error. */
+  [ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED]?: boolean | string;
+
+  /** When true (default), DELETE /Groups/{id} permanently removes group. false → error. */
+  [ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED]?: boolean | string;
+
+  /** When true (default), single PATCH op can add/remove multiple group members. */
+  [ENDPOINT_CONFIG_FLAGS.MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED]?: boolean | string;
+
+  /** When true (default), endpoint-scoped discovery endpoints respond. false → 404. */
+  [ENDPOINT_CONFIG_FLAGS.SCHEMA_DISCOVERY_ENABLED]?: boolean | string;
+
   /**
    * Allow any additional configuration flags
    */
@@ -323,17 +369,19 @@ export function getConfigString(config: EndpointConfig | undefined, key: string)
  * Default configuration values
  */
 export const DEFAULT_ENDPOINT_CONFIG: EndpointConfig = {
-  [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP]: false,
-  [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP]: false,
-  [ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS]: true,
+  // Settings v7: New flags
+  [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
+  [ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED]: true,
+  [ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED]: true,
+  [ENDPOINT_CONFIG_FLAGS.MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED]: true,
+  [ENDPOINT_CONFIG_FLAGS.SCHEMA_DISCOVERY_ENABLED]: true,
+  // Settings v7: Changed defaults
+  [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+  [ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS]: false,
+  // Unchanged flags
   [ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED]: false,
-  [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: false,
-  [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: false,
   [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: false,
   [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: true,
-  [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: false,
-  [ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED]: false,
-  [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: false,
   [ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED]: false,
   [ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE]: false,
   [ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH]: false,
@@ -383,20 +431,28 @@ export function validateEndpointConfig(config: Record<string, any> | undefined):
   if (!config) return;
 
   // Validate boolean flags
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED);
+  // Settings v7: New flags
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.SCHEMA_DISCOVERY_ENABLED);
+  // Unchanged flags
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED);
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION);
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH);
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED);
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED);
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE);
   validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH);
+  // Deprecated flags — still validate if present (backward compat for existing profiles)
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED);
+  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED);
 
   // Validate logLevel
   const logLevelFlag = config[ENDPOINT_CONFIG_FLAGS.LOG_LEVEL];

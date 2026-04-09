@@ -714,13 +714,15 @@ describe('endpoint-config.interface', () => {
   });
 
   describe('DEFAULT_ENDPOINT_CONFIG', () => {
-    it('should have expected default values', () => {
-      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP]).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP]).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS]).toBe(true);
+    it('should have expected default values (settings v7)', () => {
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED]).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED]).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED]).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.SCHEMA_DISCOVERY_ENABLED]).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS]).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED]).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG[ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]).toBe(true);
     });
@@ -1577,25 +1579,88 @@ describe('endpoint-config.interface', () => {
   });
 
   describe('DEFAULT_ENDPOINT_CONFIG', () => {
-    it('should have the correct defaults for all 14 boolean flags', () => {
-      expect(DEFAULT_ENDPOINT_CONFIG.MultiOpPatchRequestAddMultipleMembersToGroup).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG.MultiOpPatchRequestRemoveMultipleMembersFromGroup).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG.PatchOpAllowRemoveAllMembers).toBe(true);
+    it('should have the correct defaults for all 13 boolean flags (settings v7)', () => {
+      // New flags (settings v7)
+      expect(DEFAULT_ENDPOINT_CONFIG.UserSoftDeleteEnabled).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG.UserHardDeleteEnabled).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG.GroupHardDeleteEnabled).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG.MultiMemberPatchOpForGroupEnabled).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG.SchemaDiscoveryEnabled).toBe(true);
+      // Changed defaults (settings v7)
+      expect(DEFAULT_ENDPOINT_CONFIG.StrictSchemaValidation).toBe(true);
+      expect(DEFAULT_ENDPOINT_CONFIG.PatchOpAllowRemoveAllMembers).toBe(false);
+      // Unchanged flags
       expect(DEFAULT_ENDPOINT_CONFIG.VerbosePatchSupported).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG.SoftDeleteEnabled).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG.StrictSchemaValidation).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG.RequireIfMatch).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG.AllowAndCoerceBooleanStrings).toBe(true);
-      expect(DEFAULT_ENDPOINT_CONFIG.ReprovisionOnConflictForSoftDeletedResource).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG.CustomResourceTypesEnabled).toBe(false);
-      expect(DEFAULT_ENDPOINT_CONFIG.BulkOperationsEnabled).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG.PerEndpointCredentialsEnabled).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG.IncludeWarningAboutIgnoredReadOnlyAttribute).toBe(false);
       expect(DEFAULT_ENDPOINT_CONFIG.IgnoreReadOnlyAttributesInPatch).toBe(false);
     });
 
+    it('should NOT have removed flags in defaults (settings v7 clean break)', () => {
+      expect(DEFAULT_ENDPOINT_CONFIG.SoftDeleteEnabled).toBeUndefined();
+      expect(DEFAULT_ENDPOINT_CONFIG.ReprovisionOnConflictForSoftDeletedResource).toBeUndefined();
+      expect(DEFAULT_ENDPOINT_CONFIG.MultiOpPatchRequestAddMultipleMembersToGroup).toBeUndefined();
+      expect(DEFAULT_ENDPOINT_CONFIG.MultiOpPatchRequestRemoveMultipleMembersFromGroup).toBeUndefined();
+    });
+
     it('should not have a logLevel default (undefined by default)', () => {
       expect(DEFAULT_ENDPOINT_CONFIG.logLevel).toBeUndefined();
+    });
+  });
+
+  // ─── Settings v7: New flag constants ──────────────────────────────────
+
+  describe('Settings v7 — new flag constants', () => {
+    it('should have USER_SOFT_DELETE_ENABLED constant', () => {
+      expect(ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED).toBe('UserSoftDeleteEnabled');
+    });
+
+    it('should have USER_HARD_DELETE_ENABLED constant', () => {
+      expect(ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED).toBe('UserHardDeleteEnabled');
+    });
+
+    it('should have GROUP_HARD_DELETE_ENABLED constant', () => {
+      expect(ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED).toBe('GroupHardDeleteEnabled');
+    });
+
+    it('should have MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED constant', () => {
+      expect(ENDPOINT_CONFIG_FLAGS.MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED).toBe('MultiMemberPatchOpForGroupEnabled');
+    });
+
+    it('should have SCHEMA_DISCOVERY_ENABLED constant', () => {
+      expect(ENDPOINT_CONFIG_FLAGS.SCHEMA_DISCOVERY_ENABLED).toBe('SchemaDiscoveryEnabled');
+    });
+
+    it('should validate new boolean flags', () => {
+      expect(() => validateEndpointConfig({ UserSoftDeleteEnabled: true })).not.toThrow();
+      expect(() => validateEndpointConfig({ UserSoftDeleteEnabled: 'True' })).not.toThrow();
+      expect(() => validateEndpointConfig({ UserSoftDeleteEnabled: 'invalid' })).toThrow(/Invalid value/);
+      expect(() => validateEndpointConfig({ UserHardDeleteEnabled: true })).not.toThrow();
+      expect(() => validateEndpointConfig({ UserHardDeleteEnabled: 123 })).toThrow(/Invalid type/);
+      expect(() => validateEndpointConfig({ GroupHardDeleteEnabled: 'False' })).not.toThrow();
+      expect(() => validateEndpointConfig({ MultiMemberPatchOpForGroupEnabled: false })).not.toThrow();
+      expect(() => validateEndpointConfig({ SchemaDiscoveryEnabled: '1' })).not.toThrow();
+    });
+
+    it('should accept all new flags together', () => {
+      expect(() => validateEndpointConfig({
+        UserSoftDeleteEnabled: 'True',
+        UserHardDeleteEnabled: 'True',
+        GroupHardDeleteEnabled: 'True',
+        MultiMemberPatchOpForGroupEnabled: 'True',
+        SchemaDiscoveryEnabled: 'True',
+        StrictSchemaValidation: 'True',
+        PatchOpAllowRemoveAllMembers: 'False',
+        VerbosePatchSupported: 'True',
+        AllowAndCoerceBooleanStrings: 'True',
+        RequireIfMatch: 'False',
+        PerEndpointCredentialsEnabled: 'False',
+        IncludeWarningAboutIgnoredReadOnlyAttribute: 'False',
+        IgnoreReadOnlyAttributesInPatch: 'False',
+        logLevel: 'INFO',
+      })).not.toThrow();
     });
   });
 });
