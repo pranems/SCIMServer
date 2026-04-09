@@ -127,6 +127,16 @@ export class AdminController {
     await this.loggingService.clearLogs();
   }
 
+  @Post('logs/prune')
+  async pruneLogs(
+    @Query('retentionDays') retentionDays?: string,
+  ) {
+    const days = retentionDays ? Number(retentionDays)
+      : Number(process.env.LOG_RETENTION_DAYS) || 30;
+    const pruned = await this.loggingService.pruneOldLogs(days);
+    return { pruned };
+  }
+
   @Get('logs')
   async listLogs(
     @Query('page') page?: string,

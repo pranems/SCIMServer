@@ -223,6 +223,23 @@ export class LoggingService implements OnModuleDestroy {
     return result.count;
   }
 
+  /** Delete log entries older than the given number of days. */
+  async pruneOldLogs(retentionDays: number): Promise<number> {
+    if (this.isInMemoryBackend) {
+      const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+      const before = this.inMemoryLogRows.length;
+      this.inMemoryLogRows = this.inMemoryLogRows.filter(r => r.createdAt >= cutoff);
+      return before - this.inMemoryLogRows.length;
+    }
+
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
+    const result = await this.prisma.requestLog.deleteMany({
+      where: { createdAt: { lt: cutoff } },
+    });
+    this.logger.info(LogCategory.DATABASE, `Pruned ${result.count} log entries older than ${retentionDays} days`);
+    return result.count;
+  }
+
   async listLogs(filters: {
     page?: number;
     pageSize?: number;

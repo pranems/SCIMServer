@@ -21,6 +21,7 @@ describe('AdminController', () => {
       clearLogs: jest.fn().mockResolvedValue(undefined),
       listLogs: jest.fn().mockResolvedValue({ data: [], total: 0 }),
       getLog: jest.fn(),
+      pruneOldLogs: jest.fn().mockResolvedValue(5),
     };
 
     mockPrisma = {
@@ -260,6 +261,19 @@ describe('AdminController', () => {
         if (orig) process.env.APP_VERSION = orig;
         else delete process.env.APP_VERSION;
       }
+    });
+  });
+
+  describe('pruneLogs (Step 4.4)', () => {
+    it('should call loggingService.pruneOldLogs with retention days', async () => {
+      const result = await controller.pruneLogs('30');
+      expect(mockLoggingService.pruneOldLogs).toHaveBeenCalledWith(30);
+      expect(result).toEqual({ pruned: 5 });
+    });
+
+    it('should default to LOG_RETENTION_DAYS env or 30 when no param', async () => {
+      await controller.pruneLogs();
+      expect(mockLoggingService.pruneOldLogs).toHaveBeenCalledWith(30);
     });
   });
 });
