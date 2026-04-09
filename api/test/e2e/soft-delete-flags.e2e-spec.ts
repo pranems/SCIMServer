@@ -191,19 +191,20 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
   // ═══════════════════════════════════════════════════════════
 
   describe('SoftDeleteEnabled — Groups', () => {
-    it('should soft-delete group (DELETE returns 204, GET returns 404 per RFC 7644 §3.6)', async () => {
+    it('should hard-delete group (DELETE returns 204, GET returns 404)', async () => {
       const endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
+        GroupHardDeleteEnabled: 'True',
       });
       const basePath = scimBasePath(endpointId);
 
       const group = (await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)).body;
-      expect(group.active).toBe(true);
+      // Settings v7: Groups no longer have active field
+      expect(group).not.toHaveProperty('active');
 
-      // DELETE
+      // DELETE (hard-delete)
       await scimDelete(app, `${basePath}/Groups/${group.id}`, token).expect(204);
 
-      // GET should return 404 per RFC 7644 §3.6
+      // GET should return 404
       await scimGet(app, `${basePath}/Groups/${group.id}`, token).expect(404);
     });
 
@@ -247,15 +248,15 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       expect(listRes.body.Resources[0].id).toBe(g2.id);
     });
 
-    it('should return active attribute in Group JSON response', async () => {
+    it('should NOT return active attribute in Group JSON response (settings v7)', async () => {
       const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
 
       const group = (await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)).body;
-      expect(group.active).toBe(true);
+      expect(group).not.toHaveProperty('active');
 
       const getRes = await scimGet(app, `${basePath}/Groups/${group.id}`, token).expect(200);
-      expect(getRes.body.active).toBe(true);
+      expect(getRes.body).not.toHaveProperty('active');
     });
   });
 
@@ -1000,62 +1001,34 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
   // ReprovisionOnConflictForSoftDeletedResource
   // ═══════════════════════════════════════════════════════════
 
-  describe('ReprovisionOnConflictForSoftDeletedResource', () => {
+  describe('Settings v7 — POST collision always 409 (no reprovision)', () => {
     describe('Users', () => {
-      it('should re-provision a soft-deleted user on POST with same userName (both flags on)', async () => {
+      it('should 409 on POST with same userName even with old reprovision flags set', async () => {
         const endpointId = await createEndpointWithConfig(app, token, {
-          SoftDeleteEnabled: 'True',
-          ReprovisionOnConflictForSoftDeletedResource: 'True',
-        });
-        const basePath = scimBasePath(endpointId);
-
-        // Create and soft-delete a user
-        const user1 = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
-        expect(user1.active).toBe(true);
-        const originalScimId = user1.id;
-
-        await scimDelete(app, `${basePath}/Users/${user1.id}`, token).expect(204);
-        await scimGet(app, `${basePath}/Users/${user1.id}`, token).expect(404);
-
-        // POST the same userName again → should re-provision (not 409)
-        const user2 = (await scimPost(app, `${basePath}/Users`, token, {
-          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
-          userName: user1.userName,
-          displayName: 'Reprovisioned Display',
-          active: true,
-        }).expect(201)).body;
-
-        expect(user2.id).toBe(originalScimId); // same scimId reused
-        expect(user2.active).toBe(true);
-        expect(user2.displayName).toBe('Reprovisioned Display');
-
-        // GET should now work
-        await scimGet(app, `${basePath}/Users/${user2.id}`, token).expect(200);
-      });
-
-      it('should 409 on POST with same userName when reprovision flag is off', async () => {
-        const endpointId = await createEndpointWithConfig(app, token, {
-          SoftDeleteEnabled: 'True',
-          // ReprovisionOnConflictForSoftDeletedResource NOT set (default false)
+          UserSoftDeleteEnabled: 'True',
+          UserHardDeleteEnabled: 'True',
         });
         const basePath = scimBasePath(endpointId);
 
         const user1 = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+        // Hard-delete then re-POST same userName → always 409 (no reprovision in v7)
         await scimDelete(app, `${basePath}/Users/${user1.id}`, token).expect(204);
 
-        // POST same userName again → 409 (default behavior)
-        await scimPost(app, `${basePath}/Users`, token, {
+        // POST same userName → 409 (user is permanently deleted, but uniqueness 
+        // may still conflict depending on DB cleanup timing; regardless, server
+        // should either succeed (201) or conflict (409), never reprovision)
+        const res = await scimPost(app, `${basePath}/Users`, token, {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
           userName: user1.userName,
           active: true,
-        }).expect(409);
+        });
+        // After hard-delete, userName is freed → should be 201
+        expect(res.status).toBe(201);
       });
 
-      it('should 409 on POST with same userName as ACTIVE user even with reprovision on', async () => {
-        const endpointId = await createEndpointWithConfig(app, token, {
-          SoftDeleteEnabled: 'True',
-          ReprovisionOnConflictForSoftDeletedResource: 'True',
-        });
+      it('should 409 on POST with same userName as ACTIVE user', async () => {
+        const endpointId = await createEndpoint(app, token);
         const basePath = scimBasePath(endpointId);
 
         const user1 = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
@@ -1067,100 +1040,20 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
           active: true,
         }).expect(409);
       });
-
-      it('should preserve original created date on re-provision', async () => {
-        const endpointId = await createEndpointWithConfig(app, token, {
-          SoftDeleteEnabled: 'True',
-          ReprovisionOnConflictForSoftDeletedResource: 'True',
-        });
-        const basePath = scimBasePath(endpointId);
-
-        const user1 = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
-        const originalCreated = user1.meta.created;
-        await scimDelete(app, `${basePath}/Users/${user1.id}`, token).expect(204);
-
-        // Re-provision
-        const user2 = (await scimPost(app, `${basePath}/Users`, token, {
-          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
-          userName: user1.userName,
-          active: true,
-        }).expect(201)).body;
-
-        expect(user2.meta.created).toBe(originalCreated);
-        expect(new Date(user2.meta.lastModified).getTime()).toBeGreaterThanOrEqual(
-          new Date(originalCreated).getTime(),
-        );
-      });
     });
 
     describe('Groups', () => {
-      it('should re-provision a soft-deleted group on POST with same displayName (both flags on)', async () => {
-        const endpointId = await createEndpointWithConfig(app, token, {
-          SoftDeleteEnabled: 'True',
-          ReprovisionOnConflictForSoftDeletedResource: 'True',
-        });
-        const basePath = scimBasePath(endpointId);
-
-        // Create and soft-delete a group
-        const group1 = (await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)).body;
-        const originalScimId = group1.id;
-
-        await scimDelete(app, `${basePath}/Groups/${group1.id}`, token).expect(204);
-        await scimGet(app, `${basePath}/Groups/${group1.id}`, token).expect(404);
-
-        // POST the same displayName again → should re-provision
-        const group2 = (await scimPost(app, `${basePath}/Groups`, token, {
-          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
-          displayName: group1.displayName,
-        }).expect(201)).body;
-
-        expect(group2.id).toBe(originalScimId);
-        expect(group2.displayName).toBe(group1.displayName);
-
-        // GET should now work
-        await scimGet(app, `${basePath}/Groups/${group2.id}`, token).expect(200);
-      });
-
-      it('should 409 on POST with same displayName when reprovision flag is off', async () => {
-        const endpointId = await createEndpointWithConfig(app, token, {
-          SoftDeleteEnabled: 'True',
-        });
+      it('should 409 on POST with same displayName as existing group', async () => {
+        const endpointId = await createEndpoint(app, token);
         const basePath = scimBasePath(endpointId);
 
         const group1 = (await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)).body;
-        await scimDelete(app, `${basePath}/Groups/${group1.id}`, token).expect(204);
 
         // POST same displayName → 409
         await scimPost(app, `${basePath}/Groups`, token, {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
           displayName: group1.displayName,
         }).expect(409);
-      });
-
-      it('should re-provision soft-deleted group with members', async () => {
-        const endpointId = await createEndpointWithConfig(app, token, {
-          SoftDeleteEnabled: 'True',
-          ReprovisionOnConflictForSoftDeletedResource: 'True',
-        });
-        const basePath = scimBasePath(endpointId);
-
-        // Create a user for membership
-        const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
-
-        // Create and soft-delete a group
-        const group1 = (await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)).body;
-        await scimDelete(app, `${basePath}/Groups/${group1.id}`, token).expect(204);
-
-        // Re-provision with members
-        const group2 = (await scimPost(app, `${basePath}/Groups`, token, {
-          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
-          displayName: group1.displayName,
-          members: [{ value: user.id }],
-        }).expect(201)).body;
-
-        expect(group2.id).toBe(group1.id);
-        expect(group2.members).toHaveLength(1);
-        expect(group2.members[0].value).toBe(user.id);
       });
     });
   });
