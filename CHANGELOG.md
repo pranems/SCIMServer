@@ -5,6 +5,58 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.33.0] - 2026-04-09
+
+### Settings v7 — Endpoint Configuration Redesign
+
+**Breaking changes** — 4 flags removed, 5 added, 2 defaults changed:
+
+#### New Flags
+- **`UserSoftDeleteEnabled`** (default: `true`) — PATCH `{active:false}` deactivates user. When false, PATCH active=false → error.
+- **`UserHardDeleteEnabled`** (default: `true`) — DELETE /Users/{id} permanently removes. When false → 400 error.
+- **`GroupHardDeleteEnabled`** (default: `true`) — DELETE /Groups/{id} permanently removes. When false → 400 error.
+- **`MultiMemberPatchOpForGroupEnabled`** (default: `true`) — Multi-member add/remove in single PATCH op. Replaces two old flags.
+- **`SchemaDiscoveryEnabled`** (default: `true`) — When false, endpoint-scoped discovery (/ServiceProviderConfig, /Schemas, /ResourceTypes) returns 404 + server WARN log.
+
+#### Changed Defaults
+- **`StrictSchemaValidation`** default: `false` → **`true`** — Extension URNs now required in schemas[], types enforced by default.
+- **`PatchOpAllowRemoveAllMembers`** default: `true` → **`false`** — Blanket member removal now blocked by default.
+
+#### Removed (clean break — old names ignored in API)
+- `SoftDeleteEnabled` → replaced by `UserSoftDeleteEnabled` + `UserHardDeleteEnabled`
+- `ReprovisionOnConflictForSoftDeletedResource` → removed entirely (POST collision always 409)
+- `MultiOpPatchRequestAddMultipleMembersToGroup` → replaced by `MultiMemberPatchOpForGroupEnabled`
+- `MultiOpPatchRequestRemoveMultipleMembersFromGroup` → replaced by `MultiMemberPatchOpForGroupEnabled`
+
+#### Group Active Field Removed
+- Groups no longer have `active` attribute in responses (not in RFC 7643 §4.2)
+- Removed from: schema constants, auto-expand injection (D7), projection always-returned set, preset JSONs
+- No soft-delete concept for Groups — DELETE always hard-deletes
+
+#### Preset Updates
+- `lexmark` renamed to `user-only-with-custom-ext` (backward compat alias kept)
+- `entra-id`: replaced old MultiOp flags with `MultiMemberPatchOpForGroupEnabled`, added `StrictSchemaValidation: "True"`
+- `entra-id-minimal`: added `StrictSchemaValidation: "True"`
+- `rfc-standard`: added `StrictSchemaValidation: "True"`
+
+### Logging & Observability (Phase C-D)
+- 14 log categories (added `scim.bulk`, `scim.resource`, `config`)
+- Bulk operation logging: INFO start/complete, WARN on failures with `bulkOperationIndex`
+- HTTP bookends demoted from INFO → DEBUG (~75% volume reduction at INFO level)
+- 4xx error reclassification: 401/403→WARN, 404→DEBUG, other 4xx→INFO
+- Admin audit trail: config changes, endpoint CRUD, credential management logged at INFO
+- Silent catch elimination: 5 WARN/DEBUG logs at previously-silent JSON.parse catches
+- Ring buffer configurable via `LOG_RING_BUFFER_SIZE` (default 500)
+- Slow request threshold configurable via `LOG_SLOW_REQUEST_MS` (default 2000ms)
+- Docker log rotation: max-size 10m, max-file 3
+
+### Test Coverage
+- **Unit tests**: 3,299 passed (80 suites) — +73 new tests for v7 flag validation
+- **E2E tests**: 918 passed (44 suites) — +4 new v7 E2E tests, 84 updated for v7 behavior
+- **Logging audit**: 97/104 checkpoints pass (v2.2)
+
+---
+
 ## [0.32.0] - 2026-04-01
 
 ### Fixed — Generic Resource Filter Wiring (Gap G6)

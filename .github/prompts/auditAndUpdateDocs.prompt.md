@@ -47,9 +47,9 @@ Check `docs/openapi/`, `docs/postman/`, `docs/insomnia/`, `docs/examples/`, `doc
 Read `api/prisma/schema.prisma` for current data model, models, fields (especially `profile Json?` vs legacy `config String?`), and relationships.
 
 ### 1G. Read Constants & Enums
-- `api/src/modules/logging/log-levels.ts` — LogCategory enum (currently 11 categories: http, auth, scim.user, scim.group, scim.patch, scim.filter, scim.discovery, endpoint, database, oauth, general)
+- `api/src/modules/logging/log-levels.ts` — LogCategory enum (currently 14 categories: http, auth, scim.user, scim.group, scim.patch, scim.filter, scim.discovery, endpoint, database, oauth, scim.bulk, scim.resource, config, general)
 - `api/src/modules/scim/dto/bulk-request.dto.ts` — BULK_MAX_OPERATIONS (1000), BULK_MAX_PAYLOAD_SIZE (1048576)
-- Profile presets — currently 6: `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `lexmark`
+- Profile presets — currently 6: `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `user-only-with-custom-ext`
 
 ---
 
@@ -263,12 +263,12 @@ After all updates, perform a final cross-check:
 
 1. **Version consistency**: `package.json` version matches all doc headers, `CHANGELOG.md`, `Session_starter.md`, `CONTEXT_INSTRUCTIONS.md`, and `PROJECT_HEALTH_AND_STATS.md`.
 2. **Test count consistency**: Unit, E2E, and live counts match across all documents that reference them.
-3. **Flag count consistency**: All docs that reference flag counts or list flag names are in sync with `ProfileSettings` interface (14 boolean flags + logLevel; 12 persisted in `ProfileSettings` + 2 derived from profile structure).
+3. **Flag count consistency**: All docs that reference flag counts or list flag names are in sync with `ProfileSettings` interface (13 boolean flags + logLevel; settings v7).
 4. **Endpoint count consistency**: All docs that mention endpoint counts say "76 endpoints across 18 controllers" (or the updated number if features were added).
 5. **Link validation**: All `[text](path)` links in docs resolve to existing files. Check for renamed/deleted targets.
 6. **Index completeness**: Every doc in `docs/` has an entry in `docs/INDEX.md`.
-7. **Preset count**: All docs that list presets include all 6: `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `lexmark`.
-8. **Log category count**: All docs listing log categories show exactly 11 (no phantom `backup`).
+7. **Preset count**: All docs that list presets include all 6: `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `user-only-with-custom-ext`.
+8. **Log category count**: All docs listing log categories show exactly 14 (not 11 — added scim.bulk, scim.resource, config in v0.33.0).
 9. **Date header freshness**: No doc has a "Last Updated" date older than the current version's release date.
 10. **API collection coverage**: OpenAPI/Postman/Insomnia collections cover 100% of endpoints. INDEX.md description reflects actual coverage.
 11. **Format migration completeness**: No remaining `"config": {` patterns in active docs (outside archive/ and intentional migration notes).

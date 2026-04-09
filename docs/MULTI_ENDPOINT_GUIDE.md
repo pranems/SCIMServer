@@ -108,8 +108,7 @@ curl -X POST http://localhost:6000/scim/admin/endpoints \
     "displayName": "ACME Corporation",
     "profile": {
       "settings": {
-        "MultiOpPatchRequestAddMultipleMembersToGroup": "true",
-        "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "true",
+        "MultiMemberPatchOpForGroupEnabled": "true",
         "VerbosePatchSupported": "true"
       }
     }

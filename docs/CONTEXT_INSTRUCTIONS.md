@@ -75,7 +75,7 @@ api/src/modules/scim/controllers/
 api/src/modules/scim/common/
   scim-sort.util.ts                                      # sortBy/sortOrder mapping utility (v0.20.0)
 api/src/modules/endpoint/
-  endpoint-config.interface.ts                           # 14 boolean flags + logLevel in interface (12 persisted in profile.settings, 2 derived from profile structure) + helpers
+  endpoint-config.interface.ts                           # 13 boolean flags + logLevel (settings v7) + helpers
   endpoint-context.storage.ts                            # AsyncLocalStorage for endpoint context
 api/src/modules/scim/filters/
   scim-filter-parser.ts                                  # Filter AST attribute path extraction
@@ -330,7 +330,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 
 > 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
 
-- **Unit** and **E2E** — all passing (0 failures). **Unit**: 3,090 (74 suites). **E2E**: 817 (37 suites). **Live integration** — ~951 assertions + 112 Lexmark
+- **Unit** and **E2E** — all passing (0 failures). **Unit**: 3,299 (80 suites). **E2E**: 918 (44 suites). **Live integration** — ~980 assertions
 - **SCIM Validator**: 10/12 mandatory (2 FP on Lexmark returned:never), 25/25 on standard profile + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
 - Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`
@@ -343,7 +343,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 
 ### Phase 13: Endpoint Profile Configuration (v0.28.0) → Phase 14: Legacy Removal (v0.29.0)
 - Unified `Endpoint.profile` JSONB replaces fragmented `config` + `EndpointSchema` + `EndpointResourceType`
-- 5 named presets (entra-id default, entra-id-minimal, rfc-standard, minimal, user-only)
+- 6 named presets (entra-id default, entra-id-minimal, rfc-standard, minimal, user-only, user-only-with-custom-ext)
 - RFC-native SCIM discovery format as configuration input with auto-expand + tighten-only validation
 - New API: `GET /admin/profile-presets` (read-only, 5 presets)
 - Prisma schema: 5 models (Endpoint, RequestLog, ScimResource, ResourceMember, EndpointCredential)

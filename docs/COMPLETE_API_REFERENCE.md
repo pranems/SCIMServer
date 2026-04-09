@@ -121,7 +121,7 @@ Content-Type: application/json
 | `name` | string (required) | Unique endpoint name |
 | `displayName` | string | Human-readable label |
 | `description` | string | Description |
-| `profilePreset` | string | One of: `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `lexmark` |
+| `profilePreset` | string | One of: `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `user-only-with-custom-ext` |
 | `profile` | object | Inline profile (schemas, resourceTypes, serviceProviderConfig, settings) — mutually exclusive with `profilePreset` |
 
 ### GET /scim/admin/endpoints
@@ -201,7 +201,7 @@ Content-Type: application/json
   "displayName": "Updated Name",
   "profile": {
     "settings": {
-      "SoftDeleteEnabled": "True",
+      "UserHardDeleteEnabled": "True",
       "RequireIfMatch": "True"
     }
   }
@@ -944,7 +944,7 @@ Authorization: Bearer <token>
 If-Match: W/"1"
 ```
 
-**Response: 204 No Content** (or soft-delete with `active: false` if `SoftDeleteEnabled` is on)
+**Response: 204 No Content** (hard-delete by default; blocked with 400 if `UserHardDeleteEnabled` / `GroupHardDeleteEnabled` is off)
 
 ---
 
@@ -1026,7 +1026,7 @@ Content-Type: application/scim+json
 }
 ```
 
-> **Note:** Multi-member add/remove requires `MultiOpPatchRequestAddMultipleMembersToGroup` / `MultiOpPatchRequestRemoveMultipleMembersFromGroup` to be enabled in endpoint settings.
+> **Note:** Multi-member add/remove requires `MultiMemberPatchOpForGroupEnabled` to be enabled in endpoint settings (default: enabled).
 
 ### DELETE — Delete Group
 
