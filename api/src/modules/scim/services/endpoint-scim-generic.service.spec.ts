@@ -460,28 +460,24 @@ describe('EndpointScimGenericService', () => {
       expect(mockGenericRepo.delete).toHaveBeenCalledWith(mockGenericRecord.id);
     });
 
-    it('should soft-delete when SoftDeleteEnabled is true', async () => {
+    it('should error when UserHardDeleteEnabled is false (settings v7)', async () => {
       mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
-      mockGenericRepo.update.mockResolvedValue({
-        ...mockGenericRecord,
-        deletedAt: new Date(),
-      });
 
       const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: 'True',
+        [ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED]: false,
       };
 
-      await service.deleteResource(
-        'scim-dev-001',
-        endpointId,
-        deviceResourceType,
-        config,
-      );
-
-      expect(mockGenericRepo.update).toHaveBeenCalledWith(
-        mockGenericRecord.id,
-        expect.objectContaining({ deletedAt: expect.any(Date) }),
-      );
+      try {
+        await service.deleteResource(
+          'scim-dev-001',
+          endpointId,
+          deviceResourceType,
+          config,
+        );
+        fail('Expected 400');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+      }
     });
 
     it('should throw 404 for non-existent resource on delete', async () => {
@@ -600,7 +596,7 @@ describe('EndpointScimGenericService', () => {
       expect((result.Resources as any[])[0].id).toBe('scim-active');
     });
 
-    it('should include soft-deleted resources in LIST when SoftDeleteEnabled is false', async () => {
+    it('should include soft-deleted resources in LIST when UserSoftDeleteEnabled is false', async () => {
       const activeRecord = { ...mockGenericRecord, id: 'rec-active', scimId: 'scim-active', deletedAt: null };
       const deletedRecord = { ...mockGenericRecord, id: 'rec-del', scimId: 'scim-del', deletedAt: new Date() };
       mockGenericRepo.findAll.mockResolvedValue([activeRecord, deletedRecord]);
@@ -610,7 +606,8 @@ describe('EndpointScimGenericService', () => {
         baseUrl,
         endpointId,
         deviceResourceType,
-        // No config = SoftDeleteEnabled defaults to false
+        // Settings v7: UserSoftDeleteEnabled must be explicitly false to include deleted
+        { [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: false } as EndpointConfig,
       );
 
       expect(result.totalResults).toBe(2);
@@ -764,45 +761,37 @@ describe('EndpointScimGenericService', () => {
 
   // ─── Reprovision on conflict ──────────────────────────────────────────
 
-  describe('createResource — reprovision soft-deleted resource', () => {
-    it('should re-provision a soft-deleted resource when Reprovision flag is ON', async () => {
+  describe('createResource — settings v7: POST collision always 409 (no reprovision)', () => {
+    it('should throw 409 even with old reprovision flags set (settings v7)', async () => {
       const softDeletedRecord: GenericResourceRecord = {
         ...mockGenericRecord,
         deletedAt: new Date(),
         active: false,
       };
       mockGenericRepo.findByExternalId.mockResolvedValue(softDeletedRecord);
-      mockGenericRepo.update.mockResolvedValue({
-        ...softDeletedRecord,
-        deletedAt: null,
-        active: true,
-        displayName: 'Re-provisioned Device',
-        rawPayload: JSON.stringify({ displayName: 'Re-provisioned Device' }),
-        version: 2,
-      });
 
       const config: EndpointConfig = {
         [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
         [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: true,
       };
 
-      const result = await service.createResource(
-        {
-          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Device'],
-          displayName: 'Re-provisioned Device',
-          externalId: 'ext-001',
-        },
-        baseUrl,
-        endpointId,
-        deviceResourceType,
-        config,
-      );
-
-      expect(result.id).toBe('scim-dev-001');
-      expect(mockGenericRepo.update).toHaveBeenCalledWith(
-        softDeletedRecord.id,
-        expect.objectContaining({ deletedAt: null, active: true }),
-      );
+      try {
+        await service.createResource(
+          {
+            schemas: ['urn:ietf:params:scim:schemas:core:2.0:Device'],
+            displayName: 'Re-provisioned Device',
+            externalId: 'ext-001',
+          },
+          baseUrl,
+          endpointId,
+          deviceResourceType,
+          config,
+        );
+        fail('Expected 409');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(409);
+      }
+      expect(mockGenericRepo.update).not.toHaveBeenCalled();
     });
 
     it('should return 409 when Reprovision is OFF even if conflict is soft-deleted', async () => {

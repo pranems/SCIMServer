@@ -183,19 +183,9 @@ export class EndpointScimGenericService {
     const active = body.active !== false;
 
     // GEN-08/09: Check for externalId + displayName uniqueness conflict
+    // Settings v7: POST collision always → 409 (no reprovision)
     const conflict = await this.findConflict(endpointId, resourceType.name, externalId, displayName);
     if (conflict) {
-      const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
-      const reprovision = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED);
-
-      // GEN-10: Reprovision soft-deleted resource instead of 409
-      if (softDelete && reprovision && conflict.deletedAt != null) {
-        this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Re-provisioning soft-deleted ${resourceType.name}`, {
-          scimId: conflict.scimId, endpointId,
-        });
-        return this.reprovisionResource(conflict, body, baseUrl, endpointId, resourceType, config);
-      }
-
       // Normal conflict - throw 409
       const isExtId = externalId && conflict.externalId === externalId;
       const conflictingAttribute = isExtId ? 'externalId' : 'displayName';
@@ -344,9 +334,9 @@ export class EndpointScimGenericService {
       filterResult.fetchAll ? undefined : filterResult.dbWhere,
     );
 
-    // GEN-12: Config-aware soft-delete filtering (RFC 7644 §3.6)
-    const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
-    if (softDelete) {
+    // GEN-12: Config-aware soft-delete filtering (settings v7: USER_SOFT_DELETE_ENABLED)
+    const softDeleteEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED, true);
+    if (softDeleteEnabled) {
       records = records.filter((r) => !r.deletedAt);
     }
 
@@ -787,32 +777,26 @@ export class EndpointScimGenericService {
 
     enforceIfMatch(existing.version, ifMatch, config);
 
-    const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
-
-    if (softDelete) {
-      try {
-        await this.genericRepo.update(existing.id, {
-          deletedAt: new Date(),
-          active: false,
-        });
-      } catch (error) {
-        handleRepositoryError(error, `soft-delete ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
-      }
-      this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Soft-deleted ${resourceType.name}`, {
-        scimId,
-        endpointId,
-      });
-    } else {
-      try {
-        await this.genericRepo.delete(existing.id);
-      } catch (error) {
-        handleRepositoryError(error, `delete ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
-      }
-      this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Deleted ${resourceType.name}`, {
-        scimId,
-        endpointId,
+    // Settings v7: Gate hard delete behind USER_HARD_DELETE_ENABLED (default: true)
+    const hardDeleteEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED, true);
+    if (!hardDeleteEnabled) {
+      this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Hard delete disabled for ${resourceType.name}`, { scimId, endpointId });
+      throw createScimError({
+        status: 400,
+        detail: `Delete is not enabled for this endpoint.`,
+        diagnostics: { errorCode: 'DELETE_DISABLED', triggeredBy: 'UserHardDeleteEnabled' },
       });
     }
+
+    try {
+      await this.genericRepo.delete(existing.id);
+    } catch (error) {
+      handleRepositoryError(error, `delete ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId, endpointId });
+    }
+    this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Deleted ${resourceType.name}`, {
+      scimId,
+      endpointId,
+    });
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────────
@@ -1167,63 +1151,6 @@ export class EndpointScimGenericService {
       }
     }
     return null;
-  }
-
-  /**
-   * GEN-10: Re-provision a soft-deleted resource with new payload data.
-   * Called when ReprovisionOnConflictForSoftDeletedResource is enabled.
-   */
-  private async reprovisionResource(
-    existing: GenericResourceRecord,
-    body: Record<string, unknown>,
-    baseUrl: string,
-    endpointId: string,
-    resourceType: ScimResourceType,
-    config?: EndpointConfig,
-  ): Promise<Record<string, unknown>> {
-    const now = this.metadata.currentIsoTimestamp();
-    const location = this.metadata.buildLocation(
-      baseUrl,
-      resourceType.endpoint.replace(/^\//, ''),
-      existing.scimId,
-    );
-
-    const existingMeta = parseJson<Record<string, unknown>>(existing.meta ?? '{}');
-
-    const metaObj = {
-      resourceType: resourceType.name,
-      created: existingMeta.created ?? now,
-      lastModified: now,
-      location,
-      version: `W/"${existing.version + 1}"`,
-    };
-
-    const payload: Record<string, unknown> = { ...body };
-    delete payload.schemas;
-
-    const externalId = typeof body.externalId === 'string' ? body.externalId : null;
-    const displayName = typeof body.displayName === 'string' ? body.displayName : null;
-    const active = body.active !== false;
-
-    let updated;
-    try {
-      updated = await this.genericRepo.update(existing.id, {
-        externalId,
-        displayName,
-        active,
-        deletedAt: null, // Clear soft-delete marker
-        rawPayload: JSON.stringify(payload),
-        meta: JSON.stringify(metaObj),
-      });
-    } catch (error) {
-      handleRepositoryError(error, `reprovision ${resourceType.name}`, this.scimLogger, LogCategory.SCIM_RESOURCE, { scimId: existing.scimId, endpointId });
-    }
-
-    this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Re-provisioned soft-deleted ${resourceType.name}`, {
-      scimId: existing.scimId, endpointId,
-    });
-
-    return this.toScimResponse(updated, resourceType);
   }
 
   // ─── Public Accessors for Controller Attribute Projection (GEN-05/06/07) ──
