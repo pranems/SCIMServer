@@ -59,38 +59,54 @@ export interface ServiceProviderConfig {
 
 /**
  * Project-specific behavioral flags stored in `profile.settings`.
- * 13 persisted settings — see docs/SCHEMA_TEMPLATES_DESIGN.md §9.1.
+ * Settings v7: 13 boolean flags + logLevel.
  *
  * All values use string|boolean to match the existing endpoint config
  * convention (Entra ID sends "True"/"False" strings).
  */
 export interface ProfileSettings {
-  /** Allow multi-member PATCH add to group */
-  MultiOpPatchRequestAddMultipleMembersToGroup?: boolean | string;
-  /** Allow multi-member PATCH remove from group */
-  MultiOpPatchRequestRemoveMultipleMembersFromGroup?: boolean | string;
-  /** Allow remove-all-members via path=members */
+  // ─── Settings v7: New flags ──────────────────────────────────────
+  /** PATCH {active:false} deactivates user (default true) */
+  UserSoftDeleteEnabled?: boolean | string;
+  /** DELETE /Users/{id} permanently removes user (default true) */
+  UserHardDeleteEnabled?: boolean | string;
+  /** DELETE /Groups/{id} permanently removes group (default true) */
+  GroupHardDeleteEnabled?: boolean | string;
+  /** Multi-member add/remove in single PATCH op on Group (default true) */
+  MultiMemberPatchOpForGroupEnabled?: boolean | string;
+  /** Endpoint-scoped discovery endpoints respond (default true) */
+  SchemaDiscoveryEnabled?: boolean | string;
+
+  // ─── Unchanged flags ─────────────────────────────────────────────
+  /** Allow remove-all-members via path=members (default false) */
   PatchOpAllowRemoveAllMembers?: boolean | string;
   /** Enable dot-notation path resolution in PATCH */
   VerbosePatchSupported?: boolean | string;
   /** Per-endpoint log level override */
   logLevel?: string | number;
-  /** DELETE → soft-delete (active=false) */
-  SoftDeleteEnabled?: boolean | string;
-  /** Require extension URNs in schemas[] */
+  /** Require extension URNs in schemas[] (default true) */
   StrictSchemaValidation?: boolean | string;
   /** Mandatory ETag on PUT/PATCH/DELETE */
   RequireIfMatch?: boolean | string;
-  /** Coerce "True"/"False" strings to booleans */
+  /** Coerce "True"/"False" strings to booleans (default true) */
   AllowAndCoerceBooleanStrings?: boolean | string;
-  /** Re-activate soft-deleted on conflict */
-  ReprovisionOnConflictForSoftDeletedResource?: boolean | string;
   /** Enable per-endpoint bearer token validation */
   PerEndpointCredentialsEnabled?: boolean | string;
   /** Warn on readOnly attribute stripping */
   IncludeWarningAboutIgnoredReadOnlyAttribute?: boolean | string;
   /** Strip (don't reject) readOnly PATCH ops */
   IgnoreReadOnlyAttributesInPatch?: boolean | string;
+
+  // ─── Deprecated (settings v7 clean break) ────────────────────────
+  /** @deprecated Replaced by UserSoftDeleteEnabled + UserHardDeleteEnabled */
+  SoftDeleteEnabled?: boolean | string;
+  /** @deprecated Replaced by MultiMemberPatchOpForGroupEnabled */
+  MultiOpPatchRequestAddMultipleMembersToGroup?: boolean | string;
+  /** @deprecated Replaced by MultiMemberPatchOpForGroupEnabled */
+  MultiOpPatchRequestRemoveMultipleMembersFromGroup?: boolean | string;
+  /** @deprecated Removed — POST collision always 409 */
+  ReprovisionOnConflictForSoftDeletedResource?: boolean | string;
+
   /** Enable per-endpoint log file under logs/endpoints/ */
   logFileEnabled?: boolean | string;
   /** Allow any additional settings */
