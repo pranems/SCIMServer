@@ -1317,6 +1317,68 @@ describe('EndpointScimUsersService', () => {
         service.deleteUserForEndpoint(softDeletedUser.scimId, mockEndpoint.id, config)
       ).rejects.toThrow(HttpException);
     });
+
+    // ─── Settings v7: Delete behavior matrix ───────────────────────────
+
+    describe('Delete behavior matrix (UserSoftDelete × UserHardDelete)', () => {
+      it('SoftDelete=true + HardDelete=false → DELETE blocked with 400', async () => {
+        mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
+          [ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED]: false,
+        };
+        await expect(
+          service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+
+        expect(mockUserRepo.delete).not.toHaveBeenCalled();
+        expect(mockUserRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('SoftDelete=false + HardDelete=true → hard-delete succeeds', async () => {
+        mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+        mockUserRepo.delete.mockResolvedValue(mockUser);
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: false,
+          [ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED]: true,
+        };
+        await service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, config);
+
+        expect(mockUserRepo.delete).toHaveBeenCalledWith(mockUser.id);
+      });
+
+      it('SoftDelete=false + HardDelete=false → DELETE blocked with 400', async () => {
+        mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: false,
+          [ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED]: false,
+        };
+        await expect(
+          service.deleteUserForEndpoint(mockUser.scimId, mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+
+        expect(mockUserRepo.delete).not.toHaveBeenCalled();
+      });
+
+      it('SoftDelete=false + HardDelete=true → soft-deleted user NOT guarded (no filter)', async () => {
+        // When SoftDelete is false, guardSoftDeleted defaults to false → no 404 for deletedAt
+        const softDeletedUser = { ...mockUser, deletedAt: new Date(), active: false };
+        mockUserRepo.findByScimId.mockResolvedValue(softDeletedUser);
+        mockUserRepo.delete.mockResolvedValue(softDeletedUser);
+
+        const config: EndpointConfig = {
+          [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: false,
+          [ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED]: true,
+        };
+        await service.deleteUserForEndpoint(softDeletedUser.scimId, mockEndpoint.id, config);
+
+        // Should succeed — no guardSoftDeleted check when SoftDelete=false
+        expect(mockUserRepo.delete).toHaveBeenCalledWith(softDeletedUser.id);
+      });
+    });
   });
 
   describe('endpoint isolation', () => {

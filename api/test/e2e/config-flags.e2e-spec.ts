@@ -509,4 +509,60 @@ describe('Config Flags (E2E)', () => {
       await request(app.getHttpServer()).get(`${basePath}/ServiceProviderConfig`).expect(200);
     });
   });
+
+  // ═══════════════════════════════════════════════════════════
+  // Settings v7: Delete Behavior Matrix (UserSoftDelete × UserHardDelete)
+  // ═══════════════════════════════════════════════════════════
+
+  describe('Delete Behavior Matrix (settings v7)', () => {
+    it('SoftDelete=true + HardDelete=true → DELETE hard-deletes, GET returns 404', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        UserSoftDeleteEnabled: 'True',
+        UserHardDeleteEnabled: 'True',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+      await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(204);
+      await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(404);
+    });
+
+    it('SoftDelete=true + HardDelete=false → DELETE blocked with 400', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        UserSoftDeleteEnabled: 'True',
+        UserHardDeleteEnabled: 'False',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+      await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(400);
+      // User still exists
+      await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(200);
+    });
+
+    it('SoftDelete=false + HardDelete=true → DELETE hard-deletes', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        UserSoftDeleteEnabled: 'False',
+        UserHardDeleteEnabled: 'True',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+      await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(204);
+      await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(404);
+    });
+
+    it('SoftDelete=false + HardDelete=false → DELETE blocked with 400', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        UserSoftDeleteEnabled: 'False',
+        UserHardDeleteEnabled: 'False',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+      await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(400);
+      // User still exists
+      await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(200);
+    });
+  });
 });
