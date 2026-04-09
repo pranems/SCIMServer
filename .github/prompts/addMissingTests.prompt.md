@@ -23,9 +23,12 @@ Perform a comprehensive test gap audit across the entire project and add any mis
 
 Audit for missing tests in these categories:
 
-### A. Config Flag Coverage (14 boolean flags in ProfileSettings + logLevel; 12 persisted, 2 derived)
+### A. Config Flag Coverage (13 boolean flags in ProfileSettings + logLevel; settings v7)
 
-For each flag (`AllowAndCoerceBooleanStrings`, `StrictSchemaValidation`, `SoftDeleteEnabled`, `VerbosePatchSupported`, `MultiOpPatchRequestAddMultipleMembersToGroup`, `MultiOpPatchRequestRemoveMultipleMembersFromGroup`, `PatchOpAllowRemoveAllMembers`, `RequireIfMatch`, `ReprovisionOnConflictForSoftDeletedResource`, `CustomResourceTypesEnabled` *(derived from profile.resourceTypes)*, `BulkOperationsEnabled` *(derived from profile SPC)*, `PerEndpointCredentialsEnabled`, `IncludeWarningAboutIgnoredReadOnlyAttribute`, `IgnoreReadOnlyAttributesInPatch`, `logFileEnabled`):
+For each flag (`UserSoftDeleteEnabled`, `UserHardDeleteEnabled`, `GroupHardDeleteEnabled`, `MultiMemberPatchOpForGroupEnabled`, `SchemaDiscoveryEnabled`, `AllowAndCoerceBooleanStrings`, `StrictSchemaValidation`, `VerbosePatchSupported`, `PatchOpAllowRemoveAllMembers`, `RequireIfMatch`, `PerEndpointCredentialsEnabled`, `IncludeWarningAboutIgnoredReadOnlyAttribute`, `IgnoreReadOnlyAttributesInPatch`, `logFileEnabled`):
+
+**Deprecated flags (settings v7 clean break):** `SoftDeleteEnabled`, `ReprovisionOnConflictForSoftDeletedResource`, `MultiOpPatchRequestAddMultipleMembersToGroup`, `MultiOpPatchRequestRemoveMultipleMembersFromGroup`.
+**Derived flags:** `CustomResourceTypesEnabled` (from profile.resourceTypes), `BulkOperationsEnabled` (from profile SPC).
 
 | Check | Unit | E2E | Live |
 |-------|------|-----|------|
@@ -41,15 +44,16 @@ Priority combinations to verify:
 
 | Combo | Why it matters | Expected interaction |
 |-------|----------------|---------------------|
-| `SoftDelete + StrictSchema` | Strict rejects bad payloads even on soft-deleted resources | Both enforced independently |
-| `SoftDelete + RequireIfMatch` | Soft-deleted resource has ETag but returns 404 | 404 before 428 check |
-| `SoftDelete + Reprovision` | Reprovision only works when SoftDelete is ON | Reprovision no-op without SoftDelete |
+| `UserSoftDelete + StrictSchema` | Strict rejects bad payloads even when user is deactivated | Both enforced independently |
+| `UserSoftDelete + RequireIfMatch` | Soft-deleted user returns 404 before ETag check | 404 before 428 check |
+| `UserHardDelete false + UserSoftDelete true` | Only soft-delete allowed, hard-delete blocked | DELETE → 400, PATCH active=false allowed |
 | `RequireIfMatch + VerbosePatch` | Both affect PATCH behavior | Independent; both enforced |
 | `Bulk + StrictSchema` | Bulk operations should still validate schemas | Per-operation validation |
 | `Bulk + CustomResourceTypes` | Bulk should work with custom resource CRUD | Custom type paths in Bulk |
 | `StrictSchema + BooleanStrings` | Coercion happens before validation | Coerce first, then validate |
-| `MultiOpAdd + MultiOpRemove` | Both member flags together | Each controls its direction |
-| `Reprovision` WITHOUT `SoftDelete` | Edge: meaningless combo | Reprovision silently ignored |
+| `MultiMemberPatchOp + PatchOpAllowRemoveAll` | Both control group member PATCH behavior | Independent; each controls its scope |
+| `SchemaDiscovery false` | Discovery endpoints return 404 | All 3 discovery endpoints gated |
+| `GroupHardDelete false` | DELETE Groups blocked | 400 on DELETE |
 | `PerEndpointCredentials + RequireIfMatch` | Both affect request validation flow | Each validated independently |
 | `IncludeWarning + IgnoreReadOnly` | Both relate to readOnly handling | Warning emitted even when silently stripping |
 | `IgnoreReadOnly` WITHOUT `StrictSchema` | readOnly attributes stripped silently | Stripping happens regardless of strict mode |
@@ -607,12 +611,12 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
-| Unit  | 3,242  | ?     | +?    |
-| E2E   | 923    | ?     | +?    |
+| Unit  | 3,226  | ?     | +?    |
+| E2E   | 914    | ?     | +?    |
 | Live  | ~980   | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
-> *Last updated: v0.32.0 - Logging overhaul complete (Phases 0-4) (2026-04-08)*
+> *Last updated: v0.33.0 - Settings v7 (2026-04-09)*
 
 4. Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts.
 
