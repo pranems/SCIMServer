@@ -68,7 +68,7 @@ function getAlwaysReturnedForResource(
 
   if (isGroupByMeta || isGroupBySchema) {
     alwaysReturned.add('displayname');
-    alwaysReturned.add('active');
+    // Settings v7: Group active removed (not in RFC 7643 §4.2)
   }
 
   return alwaysReturned;
