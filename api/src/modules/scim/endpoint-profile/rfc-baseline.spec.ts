@@ -114,10 +114,9 @@ describe('rfc-baseline', () => {
       expect(members!.multiValued).toBe(true);
     });
 
-    it('should contain active (project addition for soft-delete)', () => {
+    it('should NOT contain active (settings v7: D7 removed)', () => {
       const active = (RFC_GROUP_ATTRIBUTES as readonly any[]).find((a: any) => a.name === 'active');
-      expect(active).toBeDefined();
-      expect(active!.type).toBe('boolean');
+      expect(active).toBeUndefined();
     });
   });
 

@@ -138,11 +138,11 @@ describe('built-in-presets', () => {
       expect((eu!.attributes as any[]).length).toBe(6);
     });
 
-    it('should have Group with fully expanded attributes (loaded from JSON)', () => {
+    it('should have Group with fully expanded attributes (settings v7: no active)', () => {
       const group = profile.schemas!.find(s => s.id === SCIM_CORE_GROUP_SCHEMA);
       expect(group).toBeDefined();
       expect(Array.isArray(group!.attributes)).toBe(true);
-      expect((group!.attributes as any[]).length).toBe(6);
+      expect((group!.attributes as any[]).length).toBe(5);
     });
 
     it('should include all 4 msfttest extension schemas (decision D10)', () => {
