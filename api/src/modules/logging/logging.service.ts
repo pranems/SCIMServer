@@ -235,6 +235,7 @@ export class LoggingService implements OnModuleDestroy {
     search?: string;
     includeAdmin?: boolean;
     hideKeepalive?: boolean;
+    minDurationMs?: number;
   } = {}) {
     if (this.isInMemoryBackend) {
       const pageSize = Math.min(Math.max(filters.pageSize ?? 50, 1), 200);
@@ -321,6 +322,9 @@ export class LoggingService implements OnModuleDestroy {
       where.createdAt = {};
       if (filters.since) where.createdAt.gte = filters.since;
       if (filters.until) where.createdAt.lte = filters.until;
+    }
+    if (filters.minDurationMs !== undefined && filters.minDurationMs > 0) {
+      where.durationMs = { gte: filters.minDurationMs };
     }
     if (filters.search) {
       const s = filters.search;

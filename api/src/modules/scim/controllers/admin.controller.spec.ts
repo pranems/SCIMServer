@@ -94,6 +94,18 @@ describe('AdminController', () => {
         }),
       );
     });
+
+    it('should pass minDurationMs filter to LoggingService (Step 4.1)', async () => {
+      await controller.listLogs(
+        undefined, undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined, undefined, undefined, undefined, '5000',
+      );
+      expect(mockLoggingService.listLogs).toHaveBeenCalledWith(
+        expect.objectContaining({
+          minDurationMs: 5000,
+        }),
+      );
+    });
   });
 
   // ── getLog ─────────────────────────────────────────────────────────
