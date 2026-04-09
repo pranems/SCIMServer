@@ -40,11 +40,11 @@ Production-ready, multi-tenant SCIM 2.0 server purpose-built for Microsoft Entra
 | **Full SCIM surface** | Users, Groups, custom resource types, Schemas, ResourceTypes, ServiceProviderConfig, Bulk, /Me, .search |
 | **Entra-validated** | 25/25 Microsoft SCIM Validator tests pass with 0 false positives |
 | **Multi-tenant isolation** | Each endpoint owns its schemas, resources, config flags, and optional dedicated credentials |
-| **6 endpoint presets** | `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `lexmark` — with tighten-only validation |
+| **6 endpoint presets** | `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `user-only-with-custom-ext` — with tighten-only validation |
 | **Schema-driven validation** | RFC 7643 §2 attribute characteristics — type, required, mutability, returned, uniqueness, caseExact. Pre-computed URN-dot-path cache with zero per-request tree walks |
 | **Built-in observability UI** | Real-time activity feed, searchable log viewer, endpoint management dashboard |
 | **3-tier auth** | Per-endpoint bcrypt → OAuth 2.0 JWT → global shared secret fallback chain |
-| **ISV profiles** | Vendor-specific presets (Lexmark) with custom extensions + writeOnly/returned:never support |
+| **ISV profiles** | Vendor-specific presets with custom extensions + writeOnly/returned:never support |
 | **Cloud-ready** | Azure Container Apps with scale-to-zero, Docker Compose, or local dev — all first-class |
 
 ---
@@ -343,7 +343,7 @@ Every endpoint is created with a **profile** — a unified JSONB document contai
 | `rfc-standard` | 3 (User, Group, Enterprise) | User + Group | ✅ | ✅ | ✅ | Pure RFC compliance testing |
 | `minimal` | 2 (User, Group) | User + Group | ❌ | ❌ | ❌ | Bare minimum testing |
 | `user-only` | 2 (User, Enterprise) | User | ❌ | ✅ | ✅ | User-only provisioning |
-| `lexmark` | 3 (User, Enterprise, Custom) | User | ❌ | ✅ | ❌ | Lexmark Cloud Print Management |
+| `user-only-with-custom-ext` | 3 (User, Enterprise, Custom) | User | ❌ | ✅ | ❌ | User-only with custom extension |
 
 ### Create an Endpoint
 
@@ -412,18 +412,19 @@ All flags are stored in `profile.settings` and can be PATCHed per-endpoint:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
+| `UserSoftDeleteEnabled` | bool/string | **`true`** | PATCH `{active:false}` deactivates user; `false` → error |
+| `UserHardDeleteEnabled` | bool/string | **`true`** | DELETE /Users/{id} permanently removes user; `false` → error |
+| `GroupHardDeleteEnabled` | bool/string | **`true`** | DELETE /Groups/{id} permanently removes group; `false` → error |
+| `MultiMemberPatchOpForGroupEnabled` | bool/string | **`true`** | Multi-member add/remove in single PATCH op on Group |
+| `SchemaDiscoveryEnabled` | bool/string | **`true`** | Endpoint-scoped discovery endpoints respond; `false` → 404 |
+| `StrictSchemaValidation` | bool/string | **`true`** | Enforce extension URNs in `schemas[]`, types, mutability |
 | `AllowAndCoerceBooleanStrings` | bool/string | **`true`** | Coerce `"True"`/`"False"` to native booleans |
+| `PatchOpAllowRemoveAllMembers` | bool/string | `false` | Allow remove-all-members via `path=members` without value array |
 | `VerbosePatchSupported` | bool/string | `false` | Enable dot-notation PATCH paths |
-| `SoftDeleteEnabled` | bool/string | `false` | DELETE → soft-delete (set active=false) |
-| `StrictSchemaValidation` | bool/string | `false` | Enforce extension URNs in `schemas[]`, attribute types, mutability |
 | `RequireIfMatch` | bool/string | `false` | Require `If-Match` header on PUT/PATCH/DELETE (428 if missing) |
-| `ReprovisionOnConflictForSoftDeletedResource` | bool/string | `false` | Re-activate soft-deleted on 409 (requires `SoftDeleteEnabled`) |
 | `PerEndpointCredentialsEnabled` | bool/string | `false` | Enable per-endpoint credential validation |
-| `IncludeWarningAboutIgnoredReadOnlyAttribute` | bool/string | `false` | Add warning extension in write responses for readOnly stripping |
+| `IncludeWarningAboutIgnoredReadOnlyAttribute` | bool/string | `false` | Add warning in write responses for readOnly stripping |
 | `IgnoreReadOnlyAttributesInPatch` | bool/string | `false` | Strip (don't error) readOnly PATCH ops when strict is on |
-| `MultiOpPatchRequestAddMultipleMembersToGroup` | bool/string | `false` | Allow multi-member PATCH add |
-| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | bool/string | `false` | Allow multi-member PATCH remove |
-| `PatchOpAllowRemoveAllMembers` | bool/string | **`true`** | Allow remove-all-members via `path=members` |
 | `logLevel` | string/number | *(unset)* | Per-endpoint log level override (TRACE/DEBUG/INFO/WARN/ERROR/FATAL/OFF) |
 
 > For the full reference with flag interactions, Mermaid diagrams, and examples, see [docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md](docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md).
@@ -437,7 +438,7 @@ Content-Type: application/json
 {
   "profile": {
     "settings": {
-      "SoftDeleteEnabled": "True",
+      "UserHardDeleteEnabled": "True",
       "RequireIfMatch": "True"
     }
   }

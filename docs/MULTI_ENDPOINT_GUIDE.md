@@ -160,25 +160,26 @@ curl -X POST http://localhost:6000/scim/admin/endpoints \
 
 Per-endpoint config flags control SCIM behavior. Set via `profile.settings` on endpoint create/update (PATCH).
 
-> **Default behavior:** When no settings are provided, the `entra-id` preset is used automatically. It sets `AllowAndCoerceBooleanStrings`, `VerbosePatchSupported`, `MultiOp…Add`, `MultiOp…Remove`, and `PatchOpAllowRemoveAllMembers` to `True`. All other flags default to `false`.
+> **Default behavior:** When no settings are provided, the `entra-id` preset is used automatically. It sets `AllowAndCoerceBooleanStrings`, `VerbosePatchSupported`, `MultiMemberPatchOpForGroupEnabled`, `PatchOpAllowRemoveAllMembers`, and `StrictSchemaValidation` to `True`. Delete flags default to `true`.
 
 | Flag | Default | When `true` | When `false` |
 |------|---------|-------------|--------------|
+| `UserSoftDeleteEnabled` | **`true`** | PATCH `{active:false}` deactivates user | PATCH `{active:false}` → error |
+| `UserHardDeleteEnabled` | **`true`** | DELETE /Users/{id} permanently removes | DELETE → error |
+| `GroupHardDeleteEnabled` | **`true`** | DELETE /Groups/{id} permanently removes | DELETE → error |
+| `MultiMemberPatchOpForGroupEnabled` | **`true`** | Multi-member add/remove in single op | One member per op |
+| `SchemaDiscoveryEnabled` | **`true`** | Discovery endpoints respond normally | Discovery endpoints → 404 |
+| `StrictSchemaValidation` | **`true`** | Extension URNs required in `schemas[]` | Lenient mode |
 | `AllowAndCoerceBooleanStrings` | **`true`** | `"True"`/`"False"` auto-converted to booleans | Strings pass through as-is |
+| `PatchOpAllowRemoveAllMembers` | `false` | `path=members` removes all | Must specify member IDs |
 | `VerbosePatchSupported` | `false` | Dot-notation PATCH paths resolved | Dot paths stored as literal keys |
-| `SoftDeleteEnabled` | `false` | DELETE → soft-delete | DELETE permanently removes resource |
-| `StrictSchemaValidation` | `false` | Extension URNs required in `schemas[]` | Lenient mode |
 | `RequireIfMatch` | `false` | `If-Match` required (428 if missing) | Optional (validated when present) |
-| `ReprovisionOnConflictForSoftDeletedResource` | `false` | Re-activate soft-deleted on conflict | 409 Conflict |
 | `PerEndpointCredentialsEnabled` | `false` | Per-endpoint bearer tokens | Global auth only |
 | `IncludeWarningAboutIgnoredReadOnlyAttribute` | `false` | Warning header on readOnly stripping | Silent stripping |
-| `IgnoreReadOnlyAttributesInPatch` | `false` | Strip readOnly PATCH ops when strict is on | 400 on readOnly PATCH ops when strict is on |
-| `MultiOpPatchRequestAddMultipleMembersToGroup` | `false` | Multi-member PATCH add | One member per op |
-| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | `false` | Multi-member PATCH remove | One member per op |
-| `PatchOpAllowRemoveAllMembers` | **`true`** | `path=members` removes all | Must specify member IDs |
+| `IgnoreReadOnlyAttributesInPatch` | `false` | Strip readOnly PATCH ops when strict is on | 400 on readOnly PATCH ops |
 | `logLevel` | *(unset)* | Per-endpoint log level override | Global `LOG_LEVEL` used |
 
-**Enable for Microsoft Entra ID:** The `entra-id` preset (default) already sets both multi-member flags, `VerbosePatchSupported`, and `AllowAndCoerceBooleanStrings` to `True`.
+**Enable for Microsoft Entra ID:** The `entra-id` preset (default) sets `MultiMemberPatchOpForGroupEnabled`, `VerbosePatchSupported`, `AllowAndCoerceBooleanStrings`, `PatchOpAllowRemoveAllMembers`, and `StrictSchemaValidation` to `True`.
 
 For the full reference: [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md)
 
