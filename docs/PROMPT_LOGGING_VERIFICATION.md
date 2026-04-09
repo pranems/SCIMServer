@@ -1,20 +1,36 @@
 # Self-Improving Logging & Error Handling Verification Prompt
 
-> **Last audit run**: April 7, 2026  
-> **Pass rate**: 68/68 (100% after fixes)  
-> **Version**: 1.1 · April 7, 2026
+> **Last audit run**: April 8, 2026  
+> **Pass rate**: 85/85 (100% after fixes)  
+> **Version**: 2.0 - April 8, 2026
 
 ## Context
 You are auditing SCIMServer's logging and error handling. The system has:
-- 13 config flags per endpoint (StrictSchemaValidation, SoftDeleteEnabled, VerbosePatchSupported, RequireIfMatch, etc.)
+- 14 config flags per endpoint (StrictSchemaValidation, SoftDeleteEnabled, VerbosePatchSupported, RequireIfMatch, logFileEnabled, etc.)
 - 6 profile presets (entra-id, entra-id-minimal, rfc-standard, minimal, user-only, lexmark)
 - 2 persistence backends (Prisma/PostgreSQL, InMemory)
 - 3 SCIM services (Users, Groups, Generic/Custom)
-- Bulk operations (RFC 7644 §3.7)
+- Bulk operations (RFC 7644 S3.7)
 - 3-tier auth (per-endpoint credentials, OAuth JWT, legacy bearer)
-- Diagnostics extension (urn:scimserver:api:messages:2.0:Diagnostics) in error responses
+- Diagnostics extension (urn:scimserver:api:messages:2.0:Diagnostics) in ALL error responses with:
+  - requestId, endpointId, logsUrl (auto-enriched from correlation context)
+  - errorCode (machine-readable: UNIQUENESS_USERNAME, VALIDATION_SCHEMA, FILTER_INVALID, etc.)
+  - triggeredBy (config flag that activated the validation path)
+  - operation (auto-read from correlation context: create/replace/patch/delete)
+  - conflictingResourceId, conflictingAttribute, incomingValue (409 uniqueness errors)
+  - failedOperationIndex, failedPath, failedOp (PATCH errors)
+  - parseError (filter syntax errors), currentETag (428 precondition errors)
 - Enriched correlation context (requestId, endpointId, authType, resourceType, resourceId, operation, bulkOperationIndex)
-- 14 log categories (http, auth, scim.user, scim.group, scim.patch, scim.filter, scim.discovery, endpoint, database, oauth, scim.bulk, scim.resource, config, general), 7 levels, per-endpoint/per-category level overrides
+- 14 log categories, 7 levels, per-endpoint/per-category level overrides, runtime-configurable slowRequestThresholdMs
+- File logging: RotatingFileWriter + FileLogTransport (main logs/scimserver.log + per-endpoint files via logFileEnabled)
+- Ring buffer: 2000 entries default (configurable via LOG_RING_BUFFER_SIZE)
+- Interceptor: tiered log levels in catchError (5xx->ERROR, 401/403->WARN, 404->DEBUG, 4xx->INFO)
+- Config change audit: before/after values logged, GET /admin/log-config/audit endpoint
+- Log retention: POST /admin/logs/prune?retentionDays=30
+- Endpoint DB logs: GET /endpoints/:id/logs/history (persistent request log access for tenants)
+- Duration filter: GET /admin/logs?minDurationMs=5000
+- All 50 createScimError calls have diagnostics with errorCode (100% coverage)
+- 0 silent catches in SCIM core (15 utility catches have TRACE/DEBUG logs)
 
 ## Task
 Walk through EVERY code path and flow listed below. For each path:
@@ -117,7 +133,48 @@ For EACH of these flag combinations:
   3. Prisma backend: P2025 → verify RepositoryError NOT_FOUND
   4. Prisma backend: P2002 → verify RepositoryError CONFLICT + 409
   5. Prisma backend: connection timeout → verify RepositoryError CONNECTION + 503
+### J. Interceptor Log Levels (`request-logging.interceptor.ts`)
+  1. 5xx error in catchError -> verify logged at ERROR level
+  2. 401/403 error in catchError -> verify logged at WARN level
+  3. 404 error in catchError -> verify logged at DEBUG level
+  4. Other 4xx error in catchError -> verify logged at INFO level
+  5. Slow request (durationMs > threshold) -> verify WARN slow-request log
+  6. slowRequestThresholdMs runtime-configurable via PUT /admin/log-config
 
+### K. Diagnostics Enrichment (`scim-errors.ts`)
+  1. All 50 createScimError calls have diagnostics -> verify no bare calls
+  2. 409 uniqueness -> verify conflictingResourceId, conflictingAttribute, incomingValue, errorCode
+  3. PATCH 400 -> verify failedOperationIndex, failedPath, failedOp (via PatchError context)
+  4. Filter 400 -> verify parseError field with original parser error message
+  5. 428 precondition -> verify currentETag in diagnostics
+  6. operation field -> verify auto-read from correlation context when not explicit
+  7. errorCode -> verify present on ALL error paths (UNIQUENESS_USERNAME, VALIDATION_SCHEMA, etc.)
+  8. GlobalExceptionFilter 500 -> verify diagnostics with requestId/logsUrl
+
+### L. File Logging (`rotating-file-writer.ts`, `file-log-transport.ts`)
+  1. LOG_FILE default -> verify logs/scimserver.log created
+  2. LOG_FILE="" -> verify no main file created
+  3. logFileEnabled=True on endpoint -> verify logs/endpoints/<name>_ep-<id8>/<name>_ep-<id8>.log
+  4. logFileEnabled=False (default) -> verify no endpoint file
+  5. File rotation -> verify at LOG_FILE_MAX_SIZE (10MB default)
+  6. Max rotated files -> verify at LOG_FILE_MAX_COUNT (3 default)
+  7. Name sanitization -> verify [^a-zA-Z0-9_-] replaced, truncated to 50 chars
+  8. disableEndpointFile -> verify file handle closed, no more writes
+
+### M. Operational (`log-config.controller.ts`, `logging.service.ts`, `admin.controller.ts`)
+  1. Ring buffer default 2000 -> verify via getRecentLogs capacity
+  2. Config change audit -> verify before/after values: { changes: { globalLevel: { from, to } } }
+  3. Empty ring buffer hint -> verify hint field when requestId returns 0 entries
+  4. GET /admin/log-config/audit -> verify filters to config/endpoint/auth categories
+  5. POST /admin/logs/prune?retentionDays=30 -> verify deletes old entries
+  6. GET /admin/logs?minDurationMs=5000 -> verify filters by duration
+  7. GET /endpoints/:id/logs/history -> verify queries DB filtered by endpoint URL pattern
+
+### N. Silent Catch Audit
+  1. logging.service.ts -> verify 7 catches have TRACE/DEBUG (identifier backfill, deriveIdentifier, resolveUserDisplayName x2, normalizeObject, safeParse)
+  2. activity-parser.service.ts -> verify 8 catches have TRACE/DEBUG (requestBody/responseBody parse, URLSearchParams, decodeURIComponent, resolveUserName x2, resolveGroupName, parsePatchOperations)
+  3. scim-service-helpers.ts parseJson -> standalone pure function, no logger (acceptable)
+  4. Verify 0 silent catches in SCIM core (services, controllers, guards, filters)
 ## Output Format
 For each flow, report:
 - ✅ PASS: log present at correct level, correct category, SCIM response properly formatted
