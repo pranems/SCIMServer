@@ -211,6 +211,7 @@ export class EndpointScimGenericService {
         scimType: 'uniqueness',
         detail: `A ${resourceType.name} with ${reason} already exists.`,
         diagnostics: {
+          errorCode: isExtId ? 'UNIQUENESS_EXTERNAL_ID' : 'UNIQUENESS_DISPLAY_NAME',
           operation: 'create',
           conflictingResourceId: conflict.scimId,
           conflictingAttribute,
@@ -294,7 +295,7 @@ export class EndpointScimGenericService {
       throw createScimError({
         status: 404,
         detail: `${resourceType.name} "${scimId}" not found.`,
-        diagnostics: {},
+        diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' },
       });
     }
 
@@ -333,7 +334,7 @@ export class EndpointScimGenericService {
         status: 400,
         scimType: 'invalidFilter',
         detail: `Invalid or unsupported filter expression: '${params.filter}'.`,
-        diagnostics: { parseError: (e as Error).message },
+        diagnostics: { errorCode: 'FILTER_INVALID', parseError: (e as Error).message },
       });
     }
 
@@ -426,7 +427,7 @@ export class EndpointScimGenericService {
       throw createScimError({
         status: 404,
         detail: `${resourceType.name} "${scimId}" not found.`,
-        diagnostics: {},
+        diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' },
       });
     }
 
@@ -467,6 +468,7 @@ export class EndpointScimGenericService {
         scimType: 'uniqueness',
         detail: `A ${resourceType.name} with ${reason} already exists.`,
         diagnostics: {
+          errorCode: (externalId && conflict.externalId === externalId) ? 'UNIQUENESS_EXTERNAL_ID' : 'UNIQUENESS_DISPLAY_NAME',
           operation: 'replace',
           conflictingResourceId: conflict.scimId,
           conflictingAttribute: (externalId && conflict.externalId === externalId) ? 'externalId' : 'displayName',
@@ -548,7 +550,7 @@ export class EndpointScimGenericService {
       throw createScimError({
         status: 404,
         detail: `${resourceType.name} "${scimId}" not found.`,
-        diagnostics: {},
+        diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' },
       });
     }
 
@@ -601,7 +603,7 @@ export class EndpointScimGenericService {
             status: 400,
             scimType: preResult.errors[0]?.scimType ?? 'invalidValue',
             detail: `PATCH operation value validation failed: ${messages}`,
-            diagnostics: {},
+            diagnostics: { errorCode: 'VALIDATION_SCHEMA' },
           });
         }
       }
@@ -642,6 +644,7 @@ export class EndpointScimGenericService {
           scimType: error.scimType,
           detail: error.message,
           diagnostics: {
+            errorCode: 'VALIDATION_PATCH',
             triggeredBy: 'PatchEngine',
             failedOperationIndex: error.operationIndex,
             failedPath: error.failedPath,
@@ -698,6 +701,7 @@ export class EndpointScimGenericService {
         scimType: 'uniqueness',
         detail: `A ${resourceType.name} with ${reason} already exists.`,
         diagnostics: {
+          errorCode: (externalId && conflict.externalId === externalId) ? 'UNIQUENESS_EXTERNAL_ID' : 'UNIQUENESS_DISPLAY_NAME',
           operation: 'patch',
           conflictingResourceId: conflict.scimId,
           conflictingAttribute: (externalId && conflict.externalId === externalId) ? 'externalId' : 'displayName',
@@ -774,7 +778,7 @@ export class EndpointScimGenericService {
       throw createScimError({
         status: 404,
         detail: `${resourceType.name} "${scimId}" not found.`,
-        diagnostics: {},
+        diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' },
       });
     }
 
@@ -902,7 +906,7 @@ export class EndpointScimGenericService {
             detail:
               `Extension URN "${key}" found in request body but not declared in schemas[]. ` +
               `When StrictSchemaValidation is enabled, all extension URNs must be listed in the schemas array.`,
-            diagnostics: {},
+            diagnostics: { errorCode: 'VALIDATION_SCHEMA' },
           });
         }
         if (keyLower !== resourceType.schema.toLowerCase() && !registeredLower.has(keyLower)) {
@@ -912,7 +916,7 @@ export class EndpointScimGenericService {
             detail:
               `Extension URN "${key}" is not a registered extension schema for this resource type. ` +
               `Registered extensions: [${registeredUrns.join(', ')}].`,
-            diagnostics: {},
+            diagnostics: { errorCode: 'VALIDATION_SCHEMA' },
           });
         }
       }
@@ -948,7 +952,7 @@ export class EndpointScimGenericService {
         status: 400,
         scimType: result.errors[0]?.scimType ?? 'invalidValue',
         detail: `Schema validation failed: ${details}`,
-        diagnostics: {},
+        diagnostics: { errorCode: 'VALIDATION_SCHEMA' },
       });
     }
   }
@@ -1056,7 +1060,7 @@ export class EndpointScimGenericService {
         status: 400,
         scimType: 'mutability',
         detail: `Immutable attribute violation: ${details}`,
-        diagnostics: {},
+        diagnostics: { errorCode: 'VALIDATION_IMMUTABLE' },
       });
     }
   }
@@ -1275,7 +1279,7 @@ export class EndpointScimGenericService {
         status: 400,
         scimType: 'invalidFilter',
         detail: `Filter validation failed: ${details}`,
-        diagnostics: {},
+        diagnostics: { errorCode: 'VALIDATION_FILTER' },
       });
     }
   }

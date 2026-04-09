@@ -62,7 +62,7 @@ export function handleRepositoryError(
     throw createScimError({
       status: repositoryErrorToHttpStatus(error.code),
       detail: `Failed to ${operation}: ${error.message}`,
-      diagnostics: { triggeredBy: 'database' },
+      diagnostics: { errorCode: 'DATABASE_ERROR', triggeredBy: 'database' },
     });
   }
   // Non-RepositoryError — re-throw for GlobalExceptionFilter
@@ -125,7 +125,7 @@ export function ensureSchema(schemas: string[] | undefined, requiredSchema: stri
       status: 400,
       scimType: 'invalidSyntax',
       detail: `Missing required schema '${requiredSchema}'.`,
-      diagnostics: {},
+      diagnostics: { errorCode: 'VALIDATION_REQUIRED' },
     });
   }
 }
@@ -151,7 +151,7 @@ export function enforceIfMatch(
         status: 428,
         detail:
           `If-Match header is required for this operation. Current ETag: ${currentETag}`,
-        diagnostics: { triggeredBy: 'RequireIfMatch', currentETag },
+        diagnostics: { errorCode: 'PRECONDITION_IF_MATCH', triggeredBy: 'RequireIfMatch', currentETag },
       });
     }
     return;
@@ -353,7 +353,7 @@ export function guardSoftDeleted(
       status: 404,
       scimType: 'noTarget',
       detail: `Resource ${scimId} not found.`,
-      diagnostics: { triggeredBy: 'SoftDeleteEnabled' },
+      diagnostics: { errorCode: 'RESOURCE_SOFT_DELETED', triggeredBy: 'SoftDeleteEnabled' },
     });
   }
 }
@@ -811,7 +811,7 @@ export class ScimSchemaHelpers {
             detail:
               `Extension URN "${key}" found in request body but not declared in schemas[]. ` +
               `When StrictSchemaValidation is enabled, all extension URNs must be listed in the schemas array.`,
-            diagnostics: { triggeredBy: 'StrictSchemaValidation' },
+            diagnostics: { errorCode: 'VALIDATION_SCHEMA', triggeredBy: 'StrictSchemaValidation' },
           });
         }
         if (!registeredLower.has(keyLower)) {
@@ -821,7 +821,7 @@ export class ScimSchemaHelpers {
             detail:
               `Extension URN "${key}" is not a registered extension schema for this endpoint. ` +
               `Registered extensions: [${registeredUrns.join(', ')}].`,
-            diagnostics: { triggeredBy: 'StrictSchemaValidation' },
+            diagnostics: { errorCode: 'VALIDATION_SCHEMA', triggeredBy: 'StrictSchemaValidation' },
           });
         }
       }
@@ -866,7 +866,7 @@ export class ScimSchemaHelpers {
         status: 400,
         scimType: result.errors[0]?.scimType ?? 'invalidValue',
         detail: `Schema validation failed: ${details}`,
-        diagnostics: { triggeredBy: 'StrictSchemaValidation' },
+        diagnostics: { errorCode: 'VALIDATION_SCHEMA', triggeredBy: 'StrictSchemaValidation' },
       });
     }
   }
@@ -1093,7 +1093,7 @@ export class ScimSchemaHelpers {
         status: 400,
         scimType: 'invalidFilter',
         detail: `Filter validation failed: ${details}`,
-        diagnostics: { triggeredBy: 'StrictSchemaValidation' },
+        diagnostics: { errorCode: 'VALIDATION_FILTER', triggeredBy: 'StrictSchemaValidation' },
       });
     }
   }
@@ -1213,7 +1213,7 @@ export class ScimSchemaHelpers {
         status: 400,
         scimType: 'mutability',
         detail: `Immutable attribute violation: ${details}`,
-        diagnostics: { triggeredBy: 'StrictSchemaValidation' },
+        diagnostics: { errorCode: 'VALIDATION_IMMUTABLE', triggeredBy: 'StrictSchemaValidation' },
       });
     }
   }
@@ -1348,7 +1348,7 @@ export function assertSchemaUniqueness(
           status: 409,
           scimType: 'uniqueness',
           detail: `Attribute '${attrPath}' value '${String(incomingValue)}' must be unique within the endpoint.`,
-          diagnostics: { triggeredBy: 'SchemaUniqueness' },
+          diagnostics: { errorCode: 'UNIQUENESS_SCHEMA_ATTR', triggeredBy: 'SchemaUniqueness' },
         });
       }
     }

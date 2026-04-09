@@ -390,6 +390,24 @@ describe('EndpointScimUsersService', () => {
         }
       });
 
+      it('should include errorCode UNIQUENESS_USERNAME in 409 diagnostics (Step 4.5)', async () => {
+        const createDto: CreateUserDto = {
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: 'test@example.com',
+          active: true,
+        };
+
+        mockUserRepo.findConflict.mockResolvedValue(mockUser);
+
+        try {
+          await service.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id);
+          fail('should have thrown');
+        } catch (e: any) {
+          const body = e.getResponse();
+          expect(body[SCIM_DIAGNOSTICS_URN].errorCode).toBe('UNIQUENESS_USERNAME');
+        }
+      });
+
       it('should log INFO before throwing 409 on reprovision 500 (user vanished)', async () => {
         const reprovisionConfig: EndpointConfig = {
           [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
