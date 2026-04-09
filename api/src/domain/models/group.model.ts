@@ -39,7 +39,7 @@ export interface GroupCreateInput {
   scimId: string;
   externalId: string | null;
   displayName: string;
-  active: boolean;
+  active?: boolean;  // Settings v7: Groups no longer have active; defaults to true in DB
   rawPayload: string;
   meta: string;
 }

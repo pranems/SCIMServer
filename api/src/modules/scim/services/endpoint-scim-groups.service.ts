@@ -40,7 +40,6 @@ import {
   sanitizeBooleanStringsByParent,
   coercePatchOpBooleans,
   stripNeverReturnedFromPayload,
-  guardSoftDeleted,
   ScimSchemaHelpers,
   assertSchemaUniqueness,
   handleRepositoryError,
@@ -104,18 +103,9 @@ export class EndpointScimGroupsService {
       ? (dto as Record<string, unknown>).externalId as string
       : null;
 
-    // Check for duplicate displayName — if conflict is with a soft-deleted resource and
-    // ReprovisionOnConflictForSoftDeletedResource is enabled, re-activate it instead of 409.
+    // Check for duplicate displayName — always throw 409 on conflict
     const displayNameConflict = await this.groupRepo.findByDisplayName(endpointId, dto.displayName);
     if (displayNameConflict) {
-      const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
-      const reprovision = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED);
-
-      if (softDelete && reprovision && displayNameConflict.deletedAt != null) {
-        this.logger.info(LogCategory.SCIM_GROUP, 'Re-provisioning soft-deleted group', { scimId: displayNameConflict.scimId, displayName: dto.displayName, endpointId });
-        return this.reprovisionGroup(displayNameConflict.scimId, dto, externalId, baseUrl, endpointId);
-      }
-
       this.logger.info(LogCategory.SCIM_GROUP, `Uniqueness conflict on POST: displayName '${dto.displayName}'`, {
         endpointId, conflictScimId: displayNameConflict.scimId,
       });
@@ -137,14 +127,6 @@ export class EndpointScimGroupsService {
     if (externalId) {
       const externalIdConflict = await this.groupRepo.findByExternalId(endpointId, externalId);
       if (externalIdConflict) {
-        const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
-        const reprovision = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED);
-
-        if (softDelete && reprovision && externalIdConflict.deletedAt != null) {
-          this.logger.info(LogCategory.SCIM_GROUP, 'Re-provisioning soft-deleted group (externalId match)', { scimId: externalIdConflict.scimId, externalId, endpointId });
-          return this.reprovisionGroup(externalIdConflict.scimId, dto, externalId, baseUrl, endpointId);
-        }
-
         this.logger.info(LogCategory.SCIM_GROUP, `Uniqueness conflict on POST: externalId '${externalId}'`, {
           endpointId, conflictScimId: externalIdConflict.scimId,
         });
@@ -181,7 +163,6 @@ export class EndpointScimGroupsService {
       scimId,
       externalId,
       displayName: dto.displayName,
-      active: true,
       rawPayload: JSON.stringify(sanitizedPayload),
       meta: JSON.stringify({
         resourceType: 'Group',
@@ -220,9 +201,6 @@ export class EndpointScimGroupsService {
       this.logger.debug(LogCategory.SCIM_GROUP, 'Group not found', { scimId, endpointId });
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
-
-    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
-    guardSoftDeleted(group, config, scimId, this.logger, LogCategory.SCIM_GROUP);
 
     return this.toScimGroupResource(group, baseUrl, endpointId);
   }
@@ -267,12 +245,7 @@ export class EndpointScimGroupsService {
     );
 
     // Build SCIM resources and apply in-memory filter if needed
-    // RFC 7644 §3.6: Soft-deleted resources (deletedAt set) MUST be omitted from future query results
-    const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
-    const filteredGroups = softDelete
-      ? allGroups.filter((g) => g.deletedAt == null)
-      : allGroups;
-    let resources = filteredGroups.map((g) => this.toScimGroupResource(g, baseUrl, endpointId));
+    let resources = allGroups.map((g) => this.toScimGroupResource(g, baseUrl, endpointId));
 
     if (filterResult.inMemoryFilter) {
       resources = resources.filter(filterResult.inMemoryFilter);
@@ -308,9 +281,6 @@ export class EndpointScimGroupsService {
     if (!group) {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
-
-    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
-    guardSoftDeleted(group, config, scimId, this.logger, LogCategory.SCIM_GROUP);
 
     // Phase 7: Pre-write If-Match enforcement
     enforceIfMatch(group.version, ifMatch, config);
@@ -500,9 +470,6 @@ export class EndpointScimGroupsService {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
 
-    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
-    guardSoftDeleted(group, config, scimId, this.logger, LogCategory.SCIM_GROUP);
-
     // Phase 7: Pre-write If-Match enforcement
     enforceIfMatch(group.version, ifMatch, config);
 
@@ -567,90 +534,31 @@ export class EndpointScimGroupsService {
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
 
-    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations (double-delete)
-    guardSoftDeleted(group, config, scimId, this.logger, LogCategory.SCIM_GROUP);
-
     // Phase 7: Pre-write If-Match enforcement
     enforceIfMatch(group.version, ifMatch, config);
 
-    const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
-
-    if (softDelete) {
-      this.logger.info(LogCategory.SCIM_GROUP, 'Soft-deleting group (setting active=false + deletedAt)', { scimId, endpointId });
-      try {
-        await this.groupRepo.update(group.id, { active: false, deletedAt: new Date() });
-      } catch (error) {
-        handleRepositoryError(error, 'soft-delete group', this.logger, LogCategory.SCIM_GROUP, { scimId, endpointId });
-      }
-      this.logger.info(LogCategory.SCIM_GROUP, 'Group soft-deleted', { scimId, endpointId });
-    } else {
-      try {
-        await this.groupRepo.delete(group.id);
-      } catch (error) {
-        handleRepositoryError(error, 'delete group', this.logger, LogCategory.SCIM_GROUP, { scimId, endpointId });
-      }
-      this.logger.info(LogCategory.SCIM_GROUP, 'Group hard-deleted', { scimId, endpointId });
+    // Settings v7: Gate hard delete behind GroupHardDeleteEnabled (default: true)
+    const hardDeleteEnabled = getConfigBooleanWithDefault(config, ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED, true);
+    if (!hardDeleteEnabled) {
+      this.logger.info(LogCategory.SCIM_GROUP, 'Group hard-delete disabled by configuration', { scimId, endpointId });
+      throw createScimError({
+        status: 400,
+        detail: 'Group deletion is disabled for this endpoint.',
+        diagnostics: { errorCode: 'DELETE_DISABLED', triggeredBy: 'GroupHardDeleteEnabled' },
+      });
     }
+
+    try {
+      await this.groupRepo.delete(group.id);
+    } catch (error) {
+      handleRepositoryError(error, 'delete group', this.logger, LogCategory.SCIM_GROUP, { scimId, endpointId });
+    }
+    this.logger.info(LogCategory.SCIM_GROUP, 'Group hard-deleted', { scimId, endpointId });
   }
 
   // ===== Private Helper Methods =====
   // G17: Most helpers extracted to ../common/scim-service-helpers.ts
   // Only Group-specific methods remain here.
-
-  /**
-   * Re-provision a soft-deleted group: reactivate with new payload data and members.
-   * Called when ReprovisionOnConflictForSoftDeletedResource is enabled and
-   * a POST conflicts with a soft-deleted group.
-   */
-  private async reprovisionGroup(
-    existingScimId: string,
-    dto: CreateGroupDto,
-    externalId: string | null,
-    baseUrl: string,
-    endpointId: string,
-  ): Promise<ScimGroupResource> {
-    const existing = await this.groupRepo.findWithMembers(endpointId, existingScimId);
-    if (!existing) {
-      this.logger.warn(LogCategory.SCIM_GROUP, 'Reprovision target vanished between conflict check and fetch', {
-        scimId: existingScimId, endpointId,
-      });
-      throw createScimError({ status: 500, detail: 'Failed to locate soft-deleted group for re-provisioning.', diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
-    }
-
-    const now = new Date();
-    const sanitizedPayload = this.extractAdditionalAttributes(dto);
-    const existingMeta = parseJson<Record<string, unknown>>(String(existing.meta ?? '{}'));
-
-    // Resolve incoming members
-    const members = dto.members ?? [];
-    const memberInputs = members.length > 0
-      ? await this.resolveMemberInputs(members, endpointId)
-      : [];
-
-    // Update group fields + replace members atomically
-    try {
-      await this.groupRepo.updateGroupWithMembers(existing.id, {
-        displayName: dto.displayName,
-        externalId,
-        active: true,
-        deletedAt: null,  // Clear soft-delete marker on re-provisioning
-        rawPayload: JSON.stringify(sanitizedPayload),
-        meta: JSON.stringify({
-          resourceType: 'Group',
-          created: (existingMeta.created as string) ?? now.toISOString(),
-          lastModified: now.toISOString(),
-        }),
-      }, memberInputs);
-    } catch (error) {
-      handleRepositoryError(error, 'reprovision group', this.logger, LogCategory.SCIM_GROUP, { scimId: existingScimId, endpointId });
-    }
-
-    const withMembers = await this.groupRepo.findWithMembers(endpointId, existingScimId);
-    this.logger.info(LogCategory.SCIM_GROUP, 'Group re-provisioned (soft-deleted resource reactivated)', {
-      scimId: existingScimId, displayName: dto.displayName, endpointId,
-    });
-    return this.toScimGroupResource(withMembers, baseUrl, endpointId);
-  }
 
   /**
    * Assert displayName uniqueness within the endpoint (case-insensitive).
@@ -774,7 +682,6 @@ export class EndpointScimGroupsService {
     delete rawPayload.displayName;
     delete rawPayload.members;
     delete rawPayload.externalId;
-    delete rawPayload.active;
     delete rawPayload.id;  // RFC 7643 §3.1: id is server-assigned — never let rawPayload override
     // Remove schemas from rawPayload — we build it dynamically below (G19 / FP-1)
     delete rawPayload.schemas;
@@ -791,7 +698,6 @@ export class EndpointScimGroupsService {
       id: group.scimId,
       externalId: group.externalId ?? undefined,
       displayName: group.displayName,
-      active: group.active,
       members: group.members.map((member) => ({
         value: member.value,
         display: member.display ?? undefined,

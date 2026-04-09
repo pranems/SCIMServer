@@ -378,7 +378,7 @@ export class EndpointScimUsersService {
         status: 400,
         scimType: 'invalidValue',
         detail: 'User hard delete is not enabled for this endpoint.',
-        diagnostics: { errorCode: 'HARD_DELETE_DISABLED' },
+        diagnostics: { errorCode: 'HARD_DELETE_DISABLED', triggeredBy: 'UserHardDeleteEnabled' },
       });
     }
 
