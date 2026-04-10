@@ -46,7 +46,6 @@ import {
   sanitizeBooleanStringsByParent,
   coercePatchOpBooleans,
   stripNeverReturnedFromPayload,
-  guardSoftDeleted,
   stripReadOnlyAttributes,
   stripReadOnlyPatchOps,
   assertSchemaUniqueness,
@@ -180,33 +179,7 @@ export class EndpointScimGenericService {
     const displayName = typeof body.displayName === 'string' ? body.displayName : null;
     const active = body.active !== false;
 
-    // GEN-08/09: Check for externalId + displayName uniqueness conflict
-    // Settings v7: POST collision always → 409 (no reprovision)
-    const conflict = await this.findConflict(endpointId, resourceType.name, externalId, displayName);
-    if (conflict) {
-      // Normal conflict - throw 409
-      const isExtId = externalId && conflict.externalId === externalId;
-      const conflictingAttribute = isExtId ? 'externalId' : 'displayName';
-      const incomingValue = isExtId ? externalId : (displayName ?? '');
-      const reason = isExtId
-        ? `externalId "${externalId}"`
-        : `displayName "${displayName}"`;
-      this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Uniqueness conflict on POST ${resourceType.name}: ${reason}`, {
-        endpointId, conflictScimId: conflict.scimId,
-      });
-      throw createScimError({
-        status: 409,
-        scimType: 'uniqueness',
-        detail: `A ${resourceType.name} with ${reason} already exists.`,
-        diagnostics: {
-          errorCode: isExtId ? 'UNIQUENESS_EXTERNAL_ID' : 'UNIQUENESS_DISPLAY_NAME',
-          operation: 'create',
-          conflictingResourceId: conflict.scimId,
-          conflictingAttribute,
-          incomingValue,
-        },
-      });
-    }
+    // externalId and displayName are NOT checked for uniqueness — saved as received per RFC 7643.
 
     const scimId = randomUUID();
 
@@ -214,7 +187,7 @@ export class EndpointScimGenericService {
     const uniqueAttrs = this.getSchemaCacheForRT(resourceType, endpointId)?.uniqueAttrs ?? [];
     if (uniqueAttrs.length > 0) {
       const allResources = await this.genericRepo.findAll(endpointId, resourceType.name);
-      assertSchemaUniqueness(endpointId, body, uniqueAttrs, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload, deletedAt: r.deletedAt })));
+      assertSchemaUniqueness(endpointId, body, uniqueAttrs, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload })));
     }
 
     const now = this.metadata.currentIsoTimestamp();
@@ -280,6 +253,7 @@ export class EndpointScimGenericService {
     );
 
     if (!record) {
+      this.scimLogger.debug(LogCategory.SCIM_RESOURCE, `${resourceType.name} not found`, { scimId, endpointId });
       throw createScimError({
         status: 404,
         detail: `${resourceType.name} "${scimId}" not found.`,
@@ -288,7 +262,7 @@ export class EndpointScimGenericService {
     }
 
     // GEN-12: Config-aware soft-delete guard (RFC 7644 §3.6)
-    guardSoftDeleted(record, config, scimId, this.scimLogger, LogCategory.SCIM_RESOURCE);
+    // [Removed in Settings v7: deletedAt no longer exists — DELETE always hard-deletes]
 
     return this.toScimResponse(record, resourceType);
   }
@@ -331,12 +305,6 @@ export class EndpointScimGenericService {
       resourceType.name,
       filterResult.fetchAll ? undefined : filterResult.dbWhere,
     );
-
-    // GEN-12: Config-aware soft-delete filtering (settings v7: USER_SOFT_DELETE_ENABLED)
-    const softDeleteEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED);
-    if (softDeleteEnabled) {
-      records = records.filter((r) => !r.deletedAt);
-    }
 
     // Convert to SCIM representation for in-memory filtering + response
     let resources = records.map((r) => this.toScimResponse(r, resourceType));
@@ -412,6 +380,7 @@ export class EndpointScimGenericService {
     );
 
     if (!existing) {
+      this.scimLogger.debug(LogCategory.SCIM_RESOURCE, `Replace target ${resourceType.name} not found`, { scimId, endpointId });
       throw createScimError({
         status: 404,
         detail: `${resourceType.name} "${scimId}" not found.`,
@@ -420,7 +389,7 @@ export class EndpointScimGenericService {
     }
 
     // GEN-12: Config-aware soft-delete guard
-    guardSoftDeleted(existing, config, scimId, this.scimLogger, LogCategory.SCIM_RESOURCE);
+    // [Removed in Settings v7: deletedAt no longer exists — DELETE always hard-deletes]
 
     enforceIfMatch(existing.version, ifMatch, config);
 
@@ -442,34 +411,13 @@ export class EndpointScimGenericService {
     const displayName = typeof body.displayName === 'string' ? body.displayName : null;
     const active = body.active !== false;
 
-    // GEN-08/09: Uniqueness check on PUT (exclude current resource, skip soft-deleted)
-    const conflict = await this.findConflict(endpointId, resourceType.name, externalId, displayName, scimId);
-    if (conflict && !conflict.deletedAt) {
-      const reason = externalId && conflict.externalId === externalId
-        ? `externalId "${externalId}"`
-        : `displayName "${displayName}"`;
-      this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Uniqueness conflict on PUT ${resourceType.name}: ${reason}`, {
-        endpointId, scimId, conflictScimId: conflict.scimId,
-      });
-      throw createScimError({
-        status: 409,
-        scimType: 'uniqueness',
-        detail: `A ${resourceType.name} with ${reason} already exists.`,
-        diagnostics: {
-          errorCode: (externalId && conflict.externalId === externalId) ? 'UNIQUENESS_EXTERNAL_ID' : 'UNIQUENESS_DISPLAY_NAME',
-          operation: 'replace',
-          conflictingResourceId: conflict.scimId,
-          conflictingAttribute: (externalId && conflict.externalId === externalId) ? 'externalId' : 'displayName',
-          incomingValue: (externalId && conflict.externalId === externalId) ? externalId : (displayName ?? ''),
-        },
-      });
-    }
+    // externalId and displayName are NOT checked for uniqueness — saved as received per RFC 7643.
 
     // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
     const uniqueAttrsPut = this.getSchemaCacheForRT(resourceType, endpointId)?.uniqueAttrs ?? [];
     if (uniqueAttrsPut.length > 0) {
       const allResources = await this.genericRepo.findAll(endpointId, resourceType.name);
-      assertSchemaUniqueness(endpointId, body, uniqueAttrsPut, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload, deletedAt: r.deletedAt })), scimId);
+      assertSchemaUniqueness(endpointId, body, uniqueAttrsPut, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload })), scimId);
     }
 
     const now = this.metadata.currentIsoTimestamp();
@@ -535,6 +483,7 @@ export class EndpointScimGenericService {
     );
 
     if (!existing) {
+      this.scimLogger.debug(LogCategory.SCIM_RESOURCE, `Patch target ${resourceType.name} not found`, { scimId, endpointId });
       throw createScimError({
         status: 404,
         detail: `${resourceType.name} "${scimId}" not found.`,
@@ -543,7 +492,7 @@ export class EndpointScimGenericService {
     }
 
     // GEN-12: Config-aware soft-delete guard
-    guardSoftDeleted(existing, config, scimId, this.scimLogger, LogCategory.SCIM_RESOURCE);
+    // [Removed in Settings v7: deletedAt no longer exists — DELETE always hard-deletes]
 
     enforceIfMatch(existing.version, ifMatch, config);
 
@@ -675,35 +624,14 @@ export class EndpointScimGenericService {
       this.checkImmutableAttributes(existing, resultPayload, resourceType, endpointId, config);
     }
 
-    // GEN-08/09: Post-patch uniqueness check (skip soft-deleted)
-    const conflict = await this.findConflict(endpointId, resourceType.name, externalId, displayName, scimId);
-    if (conflict && !conflict.deletedAt) {
-      const reason = externalId && conflict.externalId === externalId
-        ? `externalId "${externalId}"`
-        : `displayName "${displayName}"`;
-      this.scimLogger.info(LogCategory.SCIM_RESOURCE, `Uniqueness conflict on PATCH ${resourceType.name}: ${reason}`, {
-        endpointId, scimId, conflictScimId: conflict.scimId,
-      });
-      throw createScimError({
-        status: 409,
-        scimType: 'uniqueness',
-        detail: `A ${resourceType.name} with ${reason} already exists.`,
-        diagnostics: {
-          errorCode: (externalId && conflict.externalId === externalId) ? 'UNIQUENESS_EXTERNAL_ID' : 'UNIQUENESS_DISPLAY_NAME',
-          operation: 'patch',
-          conflictingResourceId: conflict.scimId,
-          conflictingAttribute: (externalId && conflict.externalId === externalId) ? 'externalId' : 'displayName',
-          incomingValue: (externalId && conflict.externalId === externalId) ? externalId : (displayName ?? ''),
-        },
-      });
-    }
+    // externalId and displayName are NOT checked for uniqueness — saved as received per RFC 7643.
 
     // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
     {
       const uniqueAttrsPatch = this.getSchemaCacheForRT(resourceType, endpointId)?.uniqueAttrs ?? [];
       if (uniqueAttrsPatch.length > 0) {
         const allResources = await this.genericRepo.findAll(endpointId, resourceType.name);
-        assertSchemaUniqueness(endpointId, patchedPayload, uniqueAttrsPatch, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload, deletedAt: r.deletedAt })), scimId);
+        assertSchemaUniqueness(endpointId, patchedPayload, uniqueAttrsPatch, allResources.map(r => ({ scimId: r.scimId, rawPayload: r.rawPayload })), scimId);
       }
     }
 
@@ -763,6 +691,7 @@ export class EndpointScimGenericService {
     );
 
     if (!existing) {
+      this.scimLogger.debug(LogCategory.SCIM_RESOURCE, `Delete target ${resourceType.name} not found`, { scimId, endpointId });
       throw createScimError({
         status: 404,
         detail: `${resourceType.name} "${scimId}" not found.`,
@@ -771,7 +700,7 @@ export class EndpointScimGenericService {
     }
 
     // GEN-12: Config-aware soft-delete guard (double-delete → 404)
-    guardSoftDeleted(existing, config, scimId, this.scimLogger, LogCategory.SCIM_RESOURCE);
+    // [Removed in Settings v7: deletedAt no longer exists — DELETE always hard-deletes]
 
     enforceIfMatch(existing.version, ifMatch, config);
 
@@ -1120,34 +1049,6 @@ export class EndpointScimGenericService {
     }
 
     return schemas;
-  }
-
-  /**
-   * GEN-08/09: Find a conflicting resource by externalId or displayName.
-   * Excludes the resource with the given scimId (for PUT/PATCH updates).
-   * Returns the conflict regardless of soft-delete status — callers decide
-   * whether to reprovision (CREATE) or 409 (PUT/PATCH).
-   */
-  private async findConflict(
-    endpointId: string,
-    resourceTypeName: string,
-    externalId: string | null,
-    displayName: string | null,
-    excludeScimId?: string,
-  ): Promise<GenericResourceRecord | null> {
-    if (externalId) {
-      const conflict = await this.genericRepo.findByExternalId(endpointId, resourceTypeName, externalId);
-      if (conflict && (!excludeScimId || conflict.scimId !== excludeScimId)) {
-        return conflict;
-      }
-    }
-    if (displayName) {
-      const conflict = await this.genericRepo.findByDisplayName(endpointId, resourceTypeName, displayName);
-      if (conflict && (!excludeScimId || conflict.scimId !== excludeScimId)) {
-        return conflict;
-      }
-    }
-    return null;
   }
 
   // ─── Public Accessors for Controller Attribute Projection (GEN-05/06/07) ──

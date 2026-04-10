@@ -60,7 +60,6 @@ Priority combinations to verify:
 | `IncludeWarning` WITHOUT `IgnoreReadOnly` | Warning flag without stripping flag | Warning only when strict mode rejects |
 
 - Three-flag and higher combinations for interacting flags
-- Conflicting/edge combos (e.g., `ReprovisionOnConflict` without `SoftDeleteEnabled`)
 
 ### C. Attribute Characteristics (RFC 7643 §2.4)
 
@@ -76,7 +75,8 @@ For each characteristic, verify across all operations:
 | `mutability: readWrite` (displayName) | Accepted | N/A | N/A | N/A | Accepted | Accepted | N/A |
 | `mutability: writeOnly` (password) | Accepted, never returned | N/A | N/A | N/A | Accepted | Accepted | N/A |
 | `mutability: immutable` (userName) | Accepted on create | N/A | N/A | N/A | Rejected if changed | Rejected if changed | N/A |
-| `uniqueness: server` (userName, displayName) | 409 on conflict | N/A | N/A | N/A | 409 on conflict (User+Group) | 409 on conflict (User+Group) | N/A |
+| `uniqueness: server` (User.userName, Group.displayName) | 409 on conflict | N/A | N/A | N/A | 409 on conflict | 409 on conflict | N/A |
+| `uniqueness: none` (externalId, User.displayName) | Duplicates allowed (201) | N/A | N/A | N/A | Duplicates allowed (200) | Duplicates allowed (200) | N/A |
 | `caseExact: false` (userName) | Case-insensitive uniqueness | N/A | Case-insensitive filter | Case-insensitive filter | Case-insensitive uniqueness | Case-insensitive uniqueness | N/A |
 | `required: true` (userName, schemas) | 400 if missing | N/A | N/A | N/A | 400 if missing (User) | N/A | N/A |
 
@@ -611,8 +611,8 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
-| Unit  | 3,303  | ?     | +?    |
-| E2E   | 922    | ?     | +?    |
+| Unit  | 3,191  | ?     | +?    |
+| E2E   | 926    | ?     | +?    |
 | Live  | ~980   | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*

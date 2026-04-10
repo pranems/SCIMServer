@@ -28,7 +28,6 @@ function toGenericRecord(resource: Record<string, unknown>): GenericResourceReco
     externalId: (resource.externalId as string) ?? null,
     displayName: (resource.displayName as string) ?? null,
     active: resource.active as boolean,
-    deletedAt: (resource.deletedAt as Date) ?? null,
     rawPayload,
     version: (resource.version as number) ?? 1,
     meta: (resource.meta as string) ?? null,

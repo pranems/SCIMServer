@@ -532,7 +532,7 @@ Every log statement is classifiable into one of **7 event types**:
 | Service | ReadOnly stripped | WARN | WARN | VALIDATION |
 | Service | Schema validation passed | *(none)* | **DEBUG** | VALIDATION |
 | Service | Boolean coercion applied | *(none)* | **DEBUG** | VALIDATION |
-| Service | Soft-delete guard 404 | DEBUG | **INFO** | LIFECYCLE |
+
 | Service | JSON.parse failure | *(none/silent)* | **WARN** | SYSTEM |
 | Service | DB error (RepositoryError) | *(none/Groups only)* | **ERROR** | SYSTEM |
 | Bulk | Bulk started | *(none)* | **INFO** | LIFECYCLE |
@@ -1127,7 +1127,7 @@ flowchart TD
 - Edit: `api/src/modules/scim/controllers/endpoint-scim-generic.controller.ts`
 - Edit: 3 service files (add `enrichContext` for resourceType/resourceId/operation)
 
-**Result**: Log entries carry full request context. `guardSoftDeleted()` DEBUG log now shows `activeFlags.softDelete=true`.
+**Result**: Log entries carry full request context.
 
 **Gaps resolved**: G5
 

@@ -38,7 +38,7 @@
 │        schemaExtensions[{schema, required}]}                        │
 │                                                                     │
 │  profile.settings: EndpointConfig                                   │
-│    └─ {StrictSchemaValidation, SoftDeleteEnabled, logLevel, ...}    │
+│    └─ {StrictSchemaValidation, UserSoftDeleteEnabled, logLevel, ...}    │
 │                                                                     │
 │  profile.serviceProviderConfig: ServiceProviderConfig               │
 │    └─ {patch, bulk, filter, sort, etag, changePassword}             │

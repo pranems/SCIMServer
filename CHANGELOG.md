@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.33.0] - 2026-04-09
 
+### Uniqueness Enforcement Alignment with RFC 7643 §2.4
+
+**Breaking behavior change** — `externalId` and `User.displayName` no longer enforce uniqueness:
+
+| Attribute | Before | After (v0.33.0) |
+|-----------|--------|------------------|
+| `User.externalId` | 409 on duplicate | Saved as received (uniqueness: "none") |
+| `User.displayName` | 409 via DB constraint | Saved as received (uniqueness: "none") |
+| `Group.externalId` | 409 on duplicate | Saved as received (uniqueness: "none") |
+| `User.userName` | 409 on duplicate | **Unchanged** (uniqueness: "server") |
+| `Group.displayName` | 409 on duplicate | **Unchanged** (uniqueness: "server") |
+
+#### Database
+- Dropped `@@unique([endpointId, displayName])` — replaced with `@@index`
+- Dropped `@@unique([endpointId, resourceType, externalId])` — replaced with `@@index`
+- New Prisma migration: `remove_uniqueness_displayname_externalid`
+
+#### Service Layer
+- User service: `findConflict()` now checks only `userName` (removed `externalId` param)
+- Group service: Removed `assertUniqueExternalId()` method and all callers
+- Generic service: Removed `findConflict()` private method (no externalId/displayName uniqueness for custom types)
+- User repository interface: `findConflict(endpointId, userName, excludeScimId?)` — 3rd param changed from `externalId` to `excludeScimId`
+
+#### Tests Updated
+- Unit tests: externalId uniqueness tests removed/updated across 5 spec files
+- E2E tests: duplicate externalId now expects 200 instead of 409
+- Live tests: 6 tests updated across sections 3d, 4, 9o, 9x
+
 ### Settings v7 — Endpoint Configuration Redesign
 
 **Breaking changes** — 4 flags removed, 5 added, 2 defaults changed:

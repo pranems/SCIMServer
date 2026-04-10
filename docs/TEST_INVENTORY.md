@@ -42,7 +42,7 @@
 - **Empty value removal in extension attributes**: remove when null, remove when empty string
 - **Complex extension attribute values**: store complex object, store array, replace existing, handle boolean and number values
 - **GroupPatchEngine — extension + flag combination flows**: add extension + single member, fail on multi-member add but succeed on extension op, replace extension + displayName + remove member
-- **Soft-deleted user + extension attribute operations**: add/remove extension on inactive user, reactivate + add extension + dot-notation
+- **Inactive user + extension attribute operations**: add/remove extension on inactive user, reactivate + add extension + dot-notation
 - **Multiple extension blocks in rawPayload** (User + Group): independently update two extension blocks, add to one ext and remove from another
 
 ### 1.3 `src/domain/patch/generic-patch-engine.spec.ts`
@@ -91,7 +91,7 @@
   - **error handling**: unsupported op, non-string userName, non-boolean active, correct status/scimType
   - **normalizeObjectKeys**: map known SCIM attrs, preserve unknown keys
   - **stripReservedAttributes**: remove server-managed keys
-  - **PATCH on soft-deleted state**: replace displayName, re-activate, valuePath/extension on inactive, multiple ops with reactivation
+  - **PATCH on inactive state**: replace displayName, re-activate, valuePath/extension on inactive, multiple ops with reactivation
   - **additional valuePath patterns**: phoneNumbers, replace specific, remove specific, create array
   - **dot-notation + valuePath combinations**: handle both in sequence, extension URN + dot-notation
   - **custom extension URN support**: replace/add/remove custom extension, resolve in no-path, NOT resolve without config
@@ -222,7 +222,7 @@
 - **ENDPOINT_CONFIG_FLAGS**: all expected keys
 - **getConfigBoolean**: undefined/non-existent/boolean true/false/strings "true"/"True"/"TRUE"/"false"/"False"/"1"/"0"/other/number/object, MultiOpPatch flag
 - **getConfigString**: undefined/non-existent/string/boolean/number/object/custom flags
-- **validateEndpointConfig**: undefined/empty config; validation for each of 14+ flags (MultiOpPatchAdd/Remove, PatchOpAllowRemoveAllMembers, VerbosePatchSupported, logLevel, SoftDeleteEnabled, StrictSchemaValidation, AllowAndCoerceBooleanStrings, RequireIfMatch, ReprovisionOnConflict, CustomResourceTypesEnabled, BulkOperationsEnabled, PerEndpointCredentialsEnabled, IncludeWarningAboutIgnoredReadOnlyAttribute, IgnoreReadOnlyAttributesInPatch) — each with boolean/string/invalid/error message tests
+- **validateEndpointConfig**: undefined/empty config; validation for each of 14+ flags (MultiOpPatchAdd/Remove, PatchOpAllowRemoveAllMembers, VerbosePatchSupported, logLevel, UserSoftDeleteEnabled, StrictSchemaValidation, AllowAndCoerceBooleanStrings, RequireIfMatch, ReprovisionOnConflict, CustomResourceTypesEnabled, BulkOperationsEnabled, PerEndpointCredentialsEnabled, IncludeWarningAboutIgnoredReadOnlyAttribute, IgnoreReadOnlyAttributesInPatch) — each with boolean/string/invalid/error message tests
 - **DEFAULT_ENDPOINT_CONFIG**: expected defaults, logLevel undefined
 - **getConfigBooleanWithDefault**: undefined/missing/actual/parse strings/default for AllowAndCoerceBooleanStrings
 
@@ -282,7 +282,6 @@
 - **ensureSchema**: pass when present, case-insensitive, throw 400 when missing/undefined/empty
 - **enforceIfMatch**: pass match, throw 412 mismatch, pass wildcard, pass not provided not required, throw 428 RequireIfMatch, not throw RequireIfMatch=false
 - **sanitizeBooleanStrings**: convert "True"/"False", case-insensitive, not convert non-boolean keys, nested objects, arrays, non-string values, empty booleanKeys
-- **guardSoftDeleted**: not throw when off, not throw when deletedAt null, throw 404 when SoftDeleteEnabled + deletedAt set
 - **ScimSchemaHelpers**: enforceStrictSchemaValidation (nothing when off, pass valid, throw undeclared, throw unregistered); buildSchemaDefinitions (core + extension, empty); getExtensionUrns; getSchemaDefinitions; getBooleanKeys; getReturnedCharacteristics (never/request); getRequestOnlyAttributes; coerceBooleanStringsIfEnabled (coerce default, skip when false); validatePayloadSchema; checkImmutableAttributes
 - **SCIM_WARNING_URN**: expected string
 - **stripReadOnlyAttributes**: strip core readOnly (id, meta, groups), not strip readWrite, strip extension readOnly, empty when none, case-insensitive; R-MUT-2 readOnly sub-attrs (manager.displayName, emails[].display, not strip readWrite sub-attrs, extension URN complex)
@@ -376,22 +375,22 @@
 - **BulkProcessorService**: POST Users (create/fail no data/reject with ID); PUT Users (replace/reject without ID/data); PATCH Users (patch); DELETE Users (delete/reject without ID); Group operations (POST/PUT/PATCH/DELETE); Unsupported resource type; bulkId cross-referencing (resolve in path, in data, error on unresolved); failOnErrors (stop after threshold, process all when 0); error handling (HttpException details, generic Error, unknown error types); version pass-through (PUT If-Match, DELETE If-Match); response schema (BulkResponse schema URN); mixed operations (multiple across Users and Groups)
 
 ### 1.65 `src/modules/scim/services/endpoint-scim-generic.service.spec.ts`
-- **EndpointScimGenericService**: createResource (create + return, throw 400 missing schema, throw 409 duplicate externalId, allow without externalId); getResource (return by scimId, throw 404, throw 404 soft-deleted); listResources (return ListResponse, empty list, apply pagination); replaceResource (replace + return, throw 404); patchResource (apply + return, throw 400 missing PatchOp schema, throw 404, return 400 invalid PATCH); deleteResource (hard-delete, soft-delete when SoftDeleteEnabled, throw 404)
+- **EndpointScimGenericService**: createResource (create + return, throw 400 missing schema); getResource (return by scimId, throw 404); listResources (return ListResponse, empty list, apply pagination); replaceResource (replace + return, throw 404, allow duplicate externalId); patchResource (apply + return, throw 400 missing PatchOp schema, throw 404, return 400 invalid PATCH, allow duplicate displayName); deleteResource (hard-delete, throw 404)
 
 ### 1.66 `src/modules/scim/services/endpoint-scim-groups.service.spec.ts`
 - **EndpointScimGroupsService**: ~170+ tests covering:
-  - **createGroupForEndpoint**: create, create with members; ReprovisionOnConflictForSoftDeletedResource (re-provision via displayName/externalId, preserve created date, re-provision with members, throw 409 active group/flags off/no config, handle string flags, throw 500 not found during re-provision)
+  - **createGroupForEndpoint**: create, create with members
   - **getGroupForEndpoint**: retrieve by scimId, throw 404
   - **listGroupsForEndpoint**: list, filter by displayName
   - **patchGroupForEndpoint**: update displayName, return 200 OK, add/remove members; MultiOpPatch flags (reject/allow multi-member add/remove, always allow single, multiple separate ops, PatchOpAllowRemoveAllMembers); no-path replace (displayName object, externalId, combined, path replace, string value, members array, invalid type, unsupported path); 404 not found, unsupported patch op
   - **replaceGroupForEndpoint**: replace
-  - **deleteGroupForEndpoint**: delete, 404; soft delete (boolean true, string "True", false, "False", undefined, no key)
+  - **deleteGroupForEndpoint**: delete, 404; hard delete (gated by GroupHardDeleteEnabled)
   - **endpoint isolation**: cross-endpoint access, same displayName cross-endpoint, members from same endpoint
   - **case-insensitivity (RFC 7643)**: filter attribute names (mixed case, all caps), externalId filter, case-sensitive externalId; case-insensitive schema URI
   - **externalId column support**: store on create, return in response, omit when null, reject duplicate, update via PATCH replace/no-path
   - **strict schema validation**: create (reject undeclared extension strict, allow when OFF/undefined); replace (reject undeclared); schema attribute type validation (reject wrong type/unknown/non-array, accept valid, error detail, NOT reject when OFF); replace wrong type; dynamic schemas[] in response (include/not include extension URNs)
-  - **soft delete + GET/LIST interactions**: soft-delete GET 404, GET without config returns, double-delete 404, hard-delete GET 404, exclude from LIST, include when off, active attribute, PATCH/PUT on soft-deleted 404
-  - **config flag combinations**: SoftDelete + StrictSchema, SoftDelete + MultiOpPatch, hard-delete despite other flags, reject unknown extension
+  - **DELETE + GET/LIST interactions (Groups)**: hard-delete GET 404, double-delete 404, exclude from LIST, active attribute, PATCH/PUT on deleted 404
+  - **config flag combinations**: StrictSchema, hard-delete despite other flags, reject unknown extension
   - **ETag & Conditional Requests**: patchGroup (match/mismatch/428 no header/wildcard), replaceGroup (match/mismatch/428), deleteGroup (match/mismatch/428), ETag format W/"v{N}"
   - **AllowAndCoerceBooleanStrings**: create (coerce "True"/"False", reject when disabled, coerce complex sub-attrs, not coerce non-boolean, pass through without extension); replace (coerce/reject); patch (coerce in replace value/post-PATCH/add); flag interaction matrix (StrictSchema×Coerce combinations)
   - **G8e — returned characteristic filtering**: strip returned:never, getRequestOnlyAttributes
@@ -399,18 +398,18 @@
 
 ### 1.67 `src/modules/scim/services/endpoint-scim-users.service.spec.ts`
 - **EndpointScimUsersService**: ~150+ tests covering:
-  - **createUserForEndpoint**: create, enforce unique userName/externalId; ReprovisionOnConflictForSoftDeletedResource (re-provision, preserve created, throw 409 active/flags off/no config, handle string flags, throw 500, re-provision externalId conflict)
+  - **createUserForEndpoint**: create, enforce unique userName; Schema-driven uniqueness for custom extensions
   - **getUserForEndpoint**: retrieve, 404
   - **listUsersForEndpoint**: list, filter by userName, pagination
   - **patchUserForEndpoint**: update active, update userName (uniqueness, no-path replace, externalId+active via no-path), valuePath emails, enterprise extension URN (add/remove/replace), remove manager empty value, remove valuePath entry, throw no path/unsupported op/404, multiple operations, add non-reserved, update externalId via path, remove simple attribute, strip reserved from rawPayload; dot-notation (name.givenName verbose/disabled, create nested, not clobber siblings, remove, all name sub-attrs)
   - **replaceUserForEndpoint**: replace
-  - **deleteUserForEndpoint**: delete, 404; soft delete (boolean true, string "True", false, "False", undefined, no key)
+  - **deleteUserForEndpoint**: delete, 404; deactivation via PATCH active=false (gated by UserSoftDeleteEnabled), hard-delete via DELETE
   - **endpoint isolation**: cross-endpoint, same userName cross-endpoint
   - **case-insensitivity (RFC 7643)**: filter attribute names (mixed case, all caps, EXTERNALID), case-insensitive userName filter value, case-insensitive userName uniqueness (reject case diff, query case-insensitive), case-insensitive schema URI, no-path key normalization (mixed case, DISPLAYNAME)
   - **SCIM ID leak prevention**: create (not leak client-supplied id, strip from rawPayload), toScimUserResource (use scimId, include in meta.location), PATCH strip id from no-path replace
   - **strict schema validation**: create (allow declared+registered, reject undeclared, reject unregistered, allow when OFF/undefined); replace (reject undeclared, allow valid); schema attribute type validation (reject boolean/name/unknown core attrs, error detail, NOT reject when OFF, reject on replace, accept valid with all core types, reject wrong sub-attr email/non-array email, validate enterprise extension)
-  - **soft delete + GET/LIST/filter interactions**: 404 for soft-deleted, return when off, exclude/include in LIST, filter active eq false/true, re-activate via PATCH, PATCH displayName on inactive, soft-delete then GET 404, GET without config, double-delete 404, PATCH/PUT on soft-deleted 404, hard-delete 404, compound filter active+userName
-  - **config flag combinations**: SoftDelete + StrictSchema both true, enforce strict PATCH with SoftDelete, reject unknown extension, allow valid extension with all flags
+  - **deactivation + GET/LIST/filter interactions**: 404 for inactive user, return when off, exclude/include in LIST, filter active eq false/true, re-activate via PATCH, PATCH displayName on inactive, deactivate then GET 404, GET without config, double-delete 404, PATCH/PUT on inactive 404, hard-delete 404, compound filter active+userName
+  - **config flag combinations**: UserSoftDeleteEnabled + StrictSchema both true, enforce strict PATCH with deactivation, reject unknown extension, allow valid extension with all flags
   - **ETag & Conditional Requests**: patchUser (match/mismatch/428/RequireIfMatch=false/wildcard), replaceUser (match/mismatch/428), deleteUser (match/mismatch/428), ETag format W/"v{N}", W/"v1" for new resources
   - **AllowAndCoerceBooleanStrings**: create (coerce "True"/"False", reject when disabled, not coerce non-boolean); replace (coerce/reject); flag interaction matrix (StrictSchema×Coerce combinations)
   - **G8e — returned characteristic filtering**: strip password from response/create, preserve non-password, getRequestOnlyAttributes
@@ -457,7 +456,7 @@
 - **Bulk Operations (Phase 9) E2E**: Config flag gating (403 not set/False, succeed True); User CRUD via Bulk (POST/PUT/PATCH/DELETE); Group CRUD via Bulk (POST/DELETE); bulkId cross-referencing (resolve in path/data, error unresolved); failOnErrors (stop after threshold, process all 0); Request validation (reject POST with ID, DELETE without ID, unsupported resource); Mixed operations; ServiceProviderConfig (bulk.supported=true); Response format (BulkResponse schema, bulkId echo, version ETag, SCIM error details); Uniqueness collision (409 duplicate userName)
 
 ### 2.7 `test/e2e/config-flags.e2e-spec.ts`
-- **Config Flags (E2E)**: MultiOpPatchAdd (accept/reject multi-member); MultiOpPatchRemove (accept/reject multi-member); PatchOpAllowRemoveAllMembers (block/allow blanket remove, allow targeted); VerbosePatchSupported dot-notation (name.givenName/middleName add/remove, standard paths); Flag Combinations (StrictSchema+BooleanStrings, StrictSchema+BooleanStrings OFF, MultiOp both, RequireIfMatch+VerbosePatch, ReprovisionOnConflict WITHOUT SoftDelete, invalid config rejection)
+- **Config Flags (E2E)**: MultiOpPatchAdd (accept/reject multi-member); MultiOpPatchRemove (accept/reject multi-member); PatchOpAllowRemoveAllMembers (block/allow blanket remove, allow targeted); VerbosePatchSupported dot-notation (name.givenName/middleName add/remove, standard paths); Flag Combinations (StrictSchema+BooleanStrings, StrictSchema+BooleanStrings OFF, MultiOp both, RequireIfMatch+VerbosePatch, UserSoftDeleteEnabled+deactivation, invalid config rejection)
 
 ### 2.8 `test/e2e/custom-resource-types.e2e-spec.ts`
 - **Custom Resource Types (G8b) E2E**: Config flag gating; Admin API (register 201, reject reserved User/Group/paths, reject duplicate, reject invalid name/endpoint format, 404 non-existent endpoint, require auth); Admin list/get (list all, get by name, 404); Admin delete (delete 204, reject built-in, 404); Generic SCIM CRUD (POST/GET/list/PUT/PATCH/DELETE, 404, reject wrong schemas); Endpoint isolation; Built-in routes protection (Users/Groups still work); Multiple custom resource types on one endpoint
@@ -478,7 +477,7 @@
 - **Filter Operators (E2E)**: co (contains substring, case-insensitive); sw (matching/non-matching prefix); pr (externalId/displayName present); Compound and (both conditions, second fails); Group filters (displayName co, externalId eq)
 
 ### 2.14 `test/e2e/group-lifecycle.e2e-spec.ts`
-- **Group Lifecycle (E2E)**: POST (create 201, with members, 409 duplicate displayName); GET by id (retrieve, 404); GET list (list response, filter displayName eq); PUT (replace preserving id, 404, 409 displayName conflict, allow self-update, 409 externalId conflict); PATCH membership (add/remove member, replace displayName, 404, 409 displayName/externalId conflict, allow unique displayName); DELETE (delete 204, 404, idempotent 404)
+- **Group Lifecycle (E2E)**: POST (create 201, with members, 409 duplicate displayName); GET by id (retrieve, 404); GET list (list response, filter displayName eq); PUT (replace preserving id, 404, 409 displayName conflict, allow self-update, allow duplicate externalId uniqueness:none); PATCH membership (add/remove member, replace displayName, 404, 409 displayName conflict, allow duplicate externalId uniqueness:none, allow unique displayName); DELETE (delete 204, 404, idempotent 404)
 
 ### 2.15 `test/e2e/log-config.e2e-spec.ts`
 - **Log Configuration API (E2E)**: GET log-config (200, string levels, 7 available levels, 12 categories, require auth); PUT log-config (update global/multiple fields, persist changes); PUT level/:level (set, case-insensitive); PUT category/:category/:level (set, unknown category error, reflect in GET); PUT endpoint/:endpointId/:level (set, reflect in config); DELETE endpoint/:endpointId (remove 204); GET recent (entries, limit, filter by level/category); DELETE recent (clear 204); GET download (NDJSON default, JSON format, requestId filter, require auth); GET stream (require auth); X-Request-Id correlation (echo back, generate when none)
@@ -511,7 +510,7 @@
 - **POST /.search (E2E)**: POST Users/.search (ListResponse schema, HTTP 200, application/scim+json, attributes projection, excludedAttributes, list all, respect count); POST Groups/.search (ListResponse, excludedAttributes=members)
 
 ### 2.25 `test/e2e/soft-delete-flags.e2e-spec.ts`
-- **Soft Delete, Flag Combinations & PATCH Paths (E2E)**: SoftDeleteEnabled Users (soft-delete 204+404, double-delete 404, hard-delete default, exclude from LIST, filter active eq false/true, 404 PATCH re-activate); SoftDeleteEnabled Groups (soft-delete, double-delete, hard-delete, exclude from LIST, active attribute); PATCH on soft-deleted users (404 displayName/valuePath/extension URN/dot-notation); Config flag combinations (SoftDelete+StrictSchema, SoftDelete+MultiOpPatch, SoftDelete=False+StrictSchema=True, SoftDelete+VerbosePatch+RemoveAll=False, all flags enabled); StrictSchemaValidation (reject/allow unknown extension); PATCH path patterns (valuePath phoneNumber replace/add, valuePath address remove, chain valuePath+extension+no-path); AllowAndCoerceBooleanStrings (accept "True"/"False", reject when OFF+Strict, coerce on PUT/PATCH, PATCH filter roles, StrictSchema×Coerce matrix, preserve non-boolean, Groups extension boolean strings); ReprovisionOnConflictForSoftDeletedResource (Users: re-provision/409 off/409 active/preserve created; Groups: re-provision/409 off/with members)
+- **Delete Lifecycle, Flag Combinations & PATCH Paths (E2E)**: Hard Delete — Users (hard-delete 204+404, double-delete 404, exclude from LIST, filter active eq false/true, 404 PATCH re-activate); Hard Delete — Groups (hard-delete, double-delete, exclude from LIST, active attribute); PATCH on hard-deleted users (404 displayName/valuePath/extension URN/dot-notation); Config flag combinations (UserSoftDeleteEnabled+StrictSchema, UserSoftDeleteEnabled+MultiOpPatch, UserSoftDeleteEnabled=False+StrictSchema=True, UserSoftDeleteEnabled+VerbosePatch+RemoveAll=False, all flags enabled); StrictSchemaValidation (reject/allow unknown extension); PATCH path patterns (valuePath phoneNumber replace/add, valuePath address remove, chain valuePath+extension+no-path); AllowAndCoerceBooleanStrings (accept "True"/"False", reject when OFF+Strict, coerce on PUT/PATCH, PATCH filter roles, StrictSchema×Coerce matrix, preserve non-boolean, Groups extension boolean strings); Settings v7 — POST collision always 409 (no reprovision) (Users/Groups)
 
 ### 2.26 `test/e2e/sorting.e2e-spec.ts`
 - **Sorting (RFC 7644 §3.4.2.3) E2E**: ServiceProviderConfig (sort supported); GET Users with sortBy (userName asc default/desc, displayName asc, fall back unknown, case-insensitive, combine with pagination/filter); POST Users/.search (sortBy asc/desc); GET Groups with sortBy (displayName asc/desc); POST Groups/.search (asc/desc)

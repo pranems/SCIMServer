@@ -5,7 +5,6 @@
  *  - parseJson: safe JSON parsing with fallback
  *  - ensureSchema: schema URN validation
  *  - enforceIfMatch: ETag/If-Match enforcement
- *  - guardSoftDeleted: soft-delete guard
  *  - coercePatchOpBooleans: PATCH operation boolean coercion
  *  - stripNeverReturnedFromPayload: never-returned attribute stripping
  *  - ScimSchemaHelpers: parameterized schema-aware methods
@@ -19,7 +18,6 @@ import {
   sanitizeBooleanStringsByParent,
   coercePatchOpBooleans,
   stripNeverReturnedFromPayload,
-  guardSoftDeleted,
   ScimSchemaHelpers,
   stripReadOnlyAttributes,
   stripReadOnlyPatchOps,
@@ -133,70 +131,6 @@ describe('enforceIfMatch', () => {
   it('should not throw 428 when RequireIfMatch is false and no If-Match', () => {
     const config = { RequireIfMatch: 'false' } as any;
     expect(() => enforceIfMatch(3, undefined, config)).not.toThrow();
-  });
-});
-
-// ─── guardSoftDeleted ───────────────────────────────────────────────────────
-
-describe('guardSoftDeleted', () => {
-  const mockLogger = {
-    trace: jest.fn(),
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    fatal: jest.fn(),
-    isEnabled: jest.fn().mockReturnValue(true),
-  } as any;
-
-  const logCategory = 'SCIM_USER' as any;
-
-  afterEach(() => jest.clearAllMocks());
-
-  it('should not throw when UserSoftDeleteEnabled is explicitly false', () => {
-    const record = { deletedAt: new Date() };
-    const config = { UserSoftDeleteEnabled: false } as any;
-    expect(() => guardSoftDeleted(record, config, 'id-1', mockLogger, logCategory)).not.toThrow();
-  });
-
-  it('should throw when config is undefined (default UserSoftDeleteEnabled = true) and deletedAt is set', () => {
-    const record = { deletedAt: new Date() };
-    try {
-      guardSoftDeleted(record, undefined, 'id-1', mockLogger, logCategory);
-      fail('should have thrown');
-    } catch (e: any) {
-      expect(e.getStatus()).toBe(404);
-    }
-  });
-
-  it('should not throw when UserSoftDeleteEnabled is on but deletedAt is null', () => {
-    const config = { UserSoftDeleteEnabled: 'true' } as any;
-    const record = { deletedAt: null };
-    expect(() => guardSoftDeleted(record, config, 'id-1', mockLogger, logCategory)).not.toThrow();
-  });
-
-  it('should throw 404 when UserSoftDeleteEnabled is on and deletedAt is set', () => {
-    const config = { UserSoftDeleteEnabled: 'true' } as any;
-    const record = { deletedAt: new Date() };
-    try {
-      guardSoftDeleted(record, config, 'id-1', mockLogger, logCategory);
-      fail('should have thrown');
-    } catch (e: any) {
-      expect(e.getStatus()).toBe(404);
-    }
-  });
-
-  it('should include triggeredBy UserSoftDeleteEnabled in diagnostics (settings v7)', () => {
-    const config = { UserSoftDeleteEnabled: 'true' } as any;
-    const record = { deletedAt: new Date() };
-    try {
-      guardSoftDeleted(record, config, 'id-1', mockLogger, logCategory);
-      fail('should have thrown');
-    } catch (e: any) {
-      const body = e.getResponse();
-      expect(body[SCIM_DIAGNOSTICS_URN]).toBeDefined();
-      expect(body[SCIM_DIAGNOSTICS_URN].triggeredBy).toBe('UserSoftDeleteEnabled');
-    }
   });
 });
 
@@ -1397,7 +1331,7 @@ describe('assertSchemaUniqueness triggeredBy (P5)', () => {
     const uniqueAttrs = [{ schemaUrn: null, attrName: 'employeeId', caseExact: true }];
     const payload = { employeeId: 'EMP-001' };
     const existing = [
-      { scimId: 'existing-1', rawPayload: JSON.stringify({ employeeId: 'EMP-001' }), deletedAt: null },
+      { scimId: 'existing-1', rawPayload: JSON.stringify({ employeeId: 'EMP-001' }) },
     ];
 
     try {

@@ -163,7 +163,7 @@ Per-endpoint config flags control SCIM behavior. Set via `profile.settings` on e
 
 | Flag | Default | When `true` | When `false` |
 |------|---------|-------------|--------------|
-| `UserSoftDeleteEnabled` | **`true`** | PATCH `{active:false}` deactivates user | PATCH `{active:false}` → error |
+| `UserSoftDeleteEnabled` | **`true`** | PATCH `{active:false}` allowed (user deactivation) | PATCH `{active:false}` → 400 error |
 | `UserHardDeleteEnabled` | **`true`** | DELETE /Users/{id} permanently removes | DELETE → error |
 | `GroupHardDeleteEnabled` | **`true`** | DELETE /Groups/{id} permanently removes | DELETE → error |
 | `MultiMemberPatchOpForGroupEnabled` | **`true`** | Multi-member add/remove in single op | One member per op |

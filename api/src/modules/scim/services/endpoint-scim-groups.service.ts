@@ -127,27 +127,7 @@ export class EndpointScimGroupsService {
       });
     }
 
-    // Check for duplicate externalId within the endpoint
-    if (externalId) {
-      const externalIdConflict = await this.groupRepo.findByExternalId(endpointId, externalId);
-      if (externalIdConflict) {
-        this.logger.info(LogCategory.SCIM_GROUP, `Uniqueness conflict on POST: externalId '${externalId}'`, {
-          endpointId, conflictScimId: externalIdConflict.scimId,
-        });
-        throw createScimError({
-          status: 409,
-          scimType: 'uniqueness',
-          detail: `A group with externalId '${externalId}' already exists.`,
-          diagnostics: {
-            errorCode: 'UNIQUENESS_EXTERNAL_ID',
-            operation: 'create',
-            conflictingResourceId: externalIdConflict.scimId,
-            conflictingAttribute: 'externalId',
-            incomingValue: externalId,
-          },
-        });
-      }
-    }
+    // Note: externalId is NOT checked for uniqueness — saved as received per RFC 7643.
 
     const now = new Date();
     // BF-1: Server MUST generate id (RFC 7643 §2.2 — id is readOnly, server-assigned)
@@ -157,7 +137,7 @@ export class EndpointScimGroupsService {
     const uniqueAttrs = this.schemaHelpers.getUniqueAttributes(endpointId);
     if (uniqueAttrs.length > 0) {
       const allGroups = await this.groupRepo.findAllWithMembers(endpointId, {});
-      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrs, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload, deletedAt: g.deletedAt })));
+      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrs, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload })));
     }
 
     const sanitizedPayload = this.extractAdditionalAttributes(dto);
@@ -397,17 +377,15 @@ export class EndpointScimGroupsService {
     // H-2: Immutable attribute enforcement — compare existing state with PATCH result
     this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(group), resultPayload, endpointId, endpointConfig);
 
-    // G8f: Uniqueness enforcement on PATCH — displayName and externalId must remain unique
+    // G8f: Uniqueness enforcement on PATCH — only displayName must remain unique
+    // externalId is NOT checked — saved as received per RFC 7643.
     await this.assertUniqueDisplayName(displayName, endpointId, scimId);
-    if (externalId) {
-      await this.assertUniqueExternalId(externalId, endpointId, scimId);
-    }
 
     // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
     const uniqueAttrsPatch = this.schemaHelpers.getUniqueAttributes(endpointId);
     if (uniqueAttrsPatch.length > 0) {
       const allGroups = await this.groupRepo.findAllWithMembers(endpointId, {});
-      assertSchemaUniqueness(endpointId, resultPayload, uniqueAttrsPatch, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload, deletedAt: g.deletedAt })), scimId);
+      assertSchemaUniqueness(endpointId, resultPayload, uniqueAttrsPatch, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload })), scimId);
     }
 
     // Pre-resolve member user IDs OUTSIDE the transaction to minimise lock hold time.
@@ -484,20 +462,18 @@ export class EndpointScimGroupsService {
     // H-2: Immutable attribute enforcement — compare existing resource with incoming payload
     this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(group), dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
-    // G8f: Uniqueness enforcement on PUT — displayName and externalId must remain unique
+    // G8f: Uniqueness enforcement on PUT — only displayName must remain unique
+    // externalId is NOT checked — saved as received per RFC 7643.
     await this.assertUniqueDisplayName(dto.displayName, endpointId, scimId);
     const newExternalId = typeof (dto as Record<string, unknown>).externalId === 'string'
       ? (dto as Record<string, unknown>).externalId as string
       : null;
-    if (newExternalId) {
-      await this.assertUniqueExternalId(newExternalId, endpointId, scimId);
-    }
 
     // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
     const uniqueAttrsPut = this.schemaHelpers.getUniqueAttributes(endpointId);
     if (uniqueAttrsPut.length > 0) {
       const allGroups = await this.groupRepo.findAllWithMembers(endpointId, {});
-      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrsPut, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload, deletedAt: g.deletedAt })), scimId);
+      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrsPut, allGroups.map(g => ({ scimId: g.scimId, rawPayload: g.rawPayload })), scimId);
     }
 
     const now = new Date();
@@ -594,35 +570,6 @@ export class EndpointScimGroupsService {
           conflictingResourceId: conflict.scimId,
           conflictingAttribute: 'displayName',
           incomingValue: displayName,
-        },
-      });
-    }
-  }
-
-  /**
-   * Assert externalId uniqueness within the endpoint.
-   * Per SCIM spec, duplicate externalId should be rejected with 409 Conflict.
-   */
-  private async assertUniqueExternalId(
-    externalId: string,
-    endpointId: string,
-    excludeScimId?: string
-  ): Promise<void> {
-    const existing = await this.groupRepo.findByExternalId(endpointId, externalId, excludeScimId);
-    if (existing) {
-      this.logger.info(LogCategory.SCIM_GROUP, `Uniqueness conflict on PUT/PATCH: externalId '${externalId}'`, {
-        endpointId, conflictScimId: existing.scimId,
-      });
-      throw createScimError({
-        status: 409,
-        scimType: 'uniqueness',
-        detail: `A group with externalId '${externalId}' already exists.`,
-        diagnostics: {
-          errorCode: 'UNIQUENESS_EXTERNAL_ID',
-          operation: 'replace',
-          conflictingResourceId: existing.scimId,
-          conflictingAttribute: 'externalId',
-          incomingValue: externalId,
         },
       });
     }

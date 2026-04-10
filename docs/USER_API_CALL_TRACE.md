@@ -80,7 +80,6 @@ model ScimResource {
   active        Boolean  @default(true)
   payload       Json     @db.JsonB
   version       Int      @default(1)
-  deletedAt     DateTime? @db.Timestamptz
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   endpoint      Endpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
@@ -101,7 +100,6 @@ Example inserted row (JSON representation):
   "active": true,
   "payload": { "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "userName": "alice@example.com", "name": { "givenName": "Alice", "familyName": "Smith" } },
   "version": 1,
-  "deletedAt": null,
   "createdAt": "2026-02-18T12:34:56.000Z",
   "updatedAt": "2026-02-18T12:34:56.000Z"
 }

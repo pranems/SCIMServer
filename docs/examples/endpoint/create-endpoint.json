@@ -100,7 +100,7 @@
     "_comment": "PATCH /scim/admin/endpoints/{id} — deep-merges settings",
     "profile": {
       "settings": {
-        "SoftDeleteEnabled": "True",
+        "UserSoftDeleteEnabled": "True",
         "RequireIfMatch": "True",
         "StrictSchemaValidation": "True"
       }

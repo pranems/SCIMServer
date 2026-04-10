@@ -511,11 +511,11 @@ describe('Config Flags (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════
-  // Settings v7: Delete Behavior Matrix (UserSoftDelete × UserHardDelete)
+  // Settings v7: Delete Behavior Matrix (UserDeactivation × UserHardDelete)
   // ═══════════════════════════════════════════════════════════
 
   describe('Delete Behavior Matrix (settings v7)', () => {
-    it('SoftDelete=true + HardDelete=true → DELETE hard-deletes, GET returns 404', async () => {
+    it('Deactivation=true + HardDelete=true → DELETE hard-deletes, GET returns 404', async () => {
       const endpointId = await createEndpointWithConfig(app, token, {
         UserSoftDeleteEnabled: 'True',
         UserHardDeleteEnabled: 'True',
@@ -527,7 +527,7 @@ describe('Config Flags (E2E)', () => {
       await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(404);
     });
 
-    it('SoftDelete=true + HardDelete=false → DELETE blocked with 400', async () => {
+    it('Deactivation=true + HardDelete=false → DELETE blocked with 400', async () => {
       const endpointId = await createEndpointWithConfig(app, token, {
         UserSoftDeleteEnabled: 'True',
         UserHardDeleteEnabled: 'False',
@@ -540,7 +540,7 @@ describe('Config Flags (E2E)', () => {
       await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(200);
     });
 
-    it('SoftDelete=false + HardDelete=true → DELETE hard-deletes', async () => {
+    it('Deactivation=false + HardDelete=true → DELETE hard-deletes', async () => {
       const endpointId = await createEndpointWithConfig(app, token, {
         UserSoftDeleteEnabled: 'False',
         UserHardDeleteEnabled: 'True',
@@ -552,7 +552,7 @@ describe('Config Flags (E2E)', () => {
       await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(404);
     });
 
-    it('SoftDelete=false + HardDelete=false → DELETE blocked with 400', async () => {
+    it('Deactivation=false + HardDelete=false → DELETE blocked with 400', async () => {
       const endpointId = await createEndpointWithConfig(app, token, {
         UserSoftDeleteEnabled: 'False',
         UserHardDeleteEnabled: 'False',
@@ -563,6 +563,56 @@ describe('Config Flags (E2E)', () => {
       await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(400);
       // User still exists
       await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(200);
+    });
+
+    it('Deactivation=true + HardDelete=false → PATCH active=false deactivates user', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        UserSoftDeleteEnabled: 'True',
+        UserHardDeleteEnabled: 'False',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+      // DELETE is blocked
+      await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(400);
+
+      // But PATCH active=false should work as soft-delete
+      const patch = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', path: 'active', value: false }],
+      };
+      const res = await scimPatch(app, `${basePath}/Users/${user.id}`, token, patch).expect(200);
+      expect(res.body.active).toBe(false);
+
+      // User still exists but is deactivated
+      const getRes = await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(200);
+      expect(getRes.body.active).toBe(false);
+    });
+
+    it('Deactivation=false → PATCH active=false blocked with 400', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        UserSoftDeleteEnabled: 'False',
+        UserHardDeleteEnabled: 'True',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+      // PATCH active=false should be blocked
+      const patch = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', path: 'active', value: false }],
+      };
+      const res = await scimPatch(app, `${basePath}/Users/${user.id}`, token, patch).expect(400);
+      expect(res.body.detail).toContain('soft-delete');
+      expect(res.body.scimType).toBe('invalidValue');
+
+      // Verify diagnostics extension
+      const diag = res.body['urn:scimserver:api:messages:2.0:Diagnostics'];
+      expect(diag).toBeDefined();
+      expect(diag.errorCode).toBe('SOFT_DELETE_DISABLED');
+      expect(diag.triggeredBy).toBe('UserSoftDeleteEnabled');
     });
   });
 });

@@ -857,12 +857,58 @@
       {
         "id": "urn:ietf:params:scim:schemas:extension:msfttest:User",
         "name": "MsftTestIetfUser",
-        "description": "Microsoft SCIM Validator IETF User extension"
+        "description": "Microsoft SCIM Validator IETF User extension",
+        "attributes": [
+          {
+            "name": "immutableId",
+            "type": "string",
+            "multiValued": false,
+            "required": false,
+            "caseExact": true,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "Immutable identifier for directory sync."
+          },
+          {
+            "name": "costCenter",
+            "type": "string",
+            "multiValued": false,
+            "required": false,
+            "caseExact": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "Cost center code."
+          }
+        ]
       },
       {
         "id": "urn:ietf:params:scim:schemas:extension:msfttest:Group",
         "name": "MsftTestIetfGroup",
-        "description": "Microsoft SCIM Validator IETF Group extension"
+        "description": "Microsoft SCIM Validator IETF Group extension",
+        "attributes": [
+          {
+            "name": "description",
+            "type": "string",
+            "multiValued": false,
+            "required": false,
+            "caseExact": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "uniqueness": "none",
+            "description": "Extended group description."
+          },
+          {
+            "name": "securityEnabled",
+            "type": "boolean",
+            "multiValued": false,
+            "required": false,
+            "mutability": "readWrite",
+            "returned": "default",
+            "description": "Whether the group is security-enabled."
+          }
+        ]
       }
     ],
     "resourceTypes": [

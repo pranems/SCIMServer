@@ -39,7 +39,6 @@ describe('InMemoryGenericResourceRepository', () => {
       expect(record.externalId).toBe('ext-001');
       expect(record.displayName).toBe('Test Device');
       expect(record.active).toBe(true);
-      expect(record.deletedAt).toBeNull();
       expect(record.version).toBe(1);
       expect(record.createdAt).toBeInstanceOf(Date);
     });

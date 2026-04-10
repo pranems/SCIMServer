@@ -13,7 +13,6 @@ export interface UserRecord {
   userName: string;
   displayName: string | null;
   active: boolean;
-  deletedAt: Date | null;
   rawPayload: string;
   version: number;
   meta: string | null;
@@ -37,7 +36,6 @@ export interface UserUpdateInput {
   userName?: string;
   displayName?: string | null;
   active?: boolean;
-  deletedAt?: Date | null;
   rawPayload?: string;
   meta?: string;
 }
@@ -47,5 +45,4 @@ export interface UserConflictResult {
   userName: string;
   externalId: string | null;
   active: boolean;
-  deletedAt: Date | null;
 }

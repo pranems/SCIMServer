@@ -41,7 +41,6 @@ function fakeScimResource(overrides: Record<string, unknown> = {}) {
     userName: 'alice',
     displayName: null,
     active: true,
-    deletedAt: null,
     payload: {},
     version: 1,
     meta: '{"resourceType":"User"}',
@@ -267,19 +266,15 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
       );
     });
 
-    it('should check userName and externalId conflicts', async () => {
+    it('should check only userName for uniqueness (externalId is uniqueness:none)', async () => {
       (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(null);
 
-      await repo.findConflict('ep-1', 'alice', 'ext-1');
+      await repo.findConflict('ep-1', 'alice');
 
       const call = (prisma.scimResource.findFirst as jest.Mock).mock.calls[0][0];
-      const orClause = call.where.AND.find(
-        (c: Record<string, unknown>) => c.OR,
-      );
-      expect(orClause.OR).toEqual(
+      expect(call.where.AND).toEqual(
         expect.arrayContaining([
           { userName: 'alice' },
-          { externalId: 'ext-1' },
         ]),
       );
     });
@@ -287,7 +282,7 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
     it('should exclude specific scimId', async () => {
       (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(null);
 
-      await repo.findConflict('ep-1', 'alice', undefined, SCIM_ID_EXCLUDE);
+      await repo.findConflict('ep-1', 'alice', SCIM_ID_EXCLUDE);
 
       const call = (prisma.scimResource.findFirst as jest.Mock).mock.calls[0][0];
       expect(call.where.AND).toEqual(
@@ -303,7 +298,6 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
         userName: 'alice',
         externalId: 'ext-1',
         active: true,
-        deletedAt: null,
       });
 
       const result = await repo.findConflict('ep-1', 'alice');
@@ -312,7 +306,6 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
         userName: 'alice',
         externalId: 'ext-1',
         active: true,
-        deletedAt: null,
       });
     });
 

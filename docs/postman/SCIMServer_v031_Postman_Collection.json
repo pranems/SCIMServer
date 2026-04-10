@@ -82,7 +82,7 @@
             "method": "PATCH",
             "url": { "raw": "{{baseUrl}}/admin/endpoints/{{endpointId}}", "host": ["{{baseUrl}}"], "path": ["admin", "endpoints", "{{endpointId}}"] },
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"displayName\": \"Updated Endpoint\",\n  \"profile\": {\n    \"settings\": {\n      \"SoftDeleteEnabled\": \"True\"\n    }\n  }\n}" }
+            "body": { "mode": "raw", "raw": "{\n  \"displayName\": \"Updated Endpoint\",\n  \"profile\": {\n    \"settings\": {\n      \"UserSoftDeleteEnabled\": \"True\"\n    }\n  }\n}" }
           }
         },
         {

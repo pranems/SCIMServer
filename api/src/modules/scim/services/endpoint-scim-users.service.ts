@@ -34,7 +34,6 @@ import {
   sanitizeBooleanStringsByParent,
   coercePatchOpBooleans,
   stripNeverReturnedFromPayload,
-  guardSoftDeleted,
   ScimSchemaHelpers,
   assertSchemaUniqueness,
   handleRepositoryError,
@@ -90,29 +89,23 @@ export class EndpointScimUsersService {
     this.logger.info(LogCategory.SCIM_USER, 'Creating user', { userName: dto.userName, endpointId });
     this.logger.trace(LogCategory.SCIM_USER, 'Create user payload', { body: dto as unknown as Record<string, unknown> });
 
-    // Check uniqueness — settings v7: always 409 on conflict (no re-provisioning)
-    const conflict = await this.userRepo.findConflict(endpointId, dto.userName, dto.externalId ?? undefined);
+    // Check userName uniqueness — always 409 on conflict
+    // Note: externalId and displayName are NOT checked — saved as received per RFC 7643.
+    const conflict = await this.userRepo.findConflict(endpointId, dto.userName);
     if (conflict) {
-      // Normal conflict - throw 409
-      const isUserName = conflict.userName.toLowerCase() === dto.userName.toLowerCase();
-      const conflictingAttribute = isUserName ? 'userName' : 'externalId';
-      const incomingValue = isUserName ? dto.userName : dto.externalId ?? '';
-      const reason = isUserName
-        ? `userName '${dto.userName}'`
-        : `externalId '${dto.externalId}'`;
-      this.logger.info(LogCategory.SCIM_USER, `Uniqueness conflict on POST: ${reason}`, {
+      this.logger.info(LogCategory.SCIM_USER, `Uniqueness conflict on POST: userName '${dto.userName}'`, {
         endpointId, conflictScimId: conflict.scimId,
       });
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
-        detail: `A resource with ${reason} already exists.`,
+        detail: `A resource with userName '${dto.userName}' already exists.`,
         diagnostics: {
-          errorCode: isUserName ? 'UNIQUENESS_USERNAME' : 'UNIQUENESS_EXTERNAL_ID',
+          errorCode: 'UNIQUENESS_USERNAME',
           operation: 'create',
           conflictingResourceId: conflict.scimId,
-          conflictingAttribute,
-          incomingValue,
+          conflictingAttribute: 'userName',
+          incomingValue: dto.userName,
         },
       });
     }
@@ -121,7 +114,7 @@ export class EndpointScimUsersService {
     const uniqueAttrs = this.schemaHelpers.getUniqueAttributes(endpointId);
     if (uniqueAttrs.length > 0) {
       const allUsers = await this.userRepo.findAll(endpointId, {});
-      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrs, allUsers.map(u => ({ scimId: u.scimId, rawPayload: u.rawPayload, deletedAt: u.deletedAt })));
+      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrs, allUsers.map(u => ({ scimId: u.scimId, rawPayload: u.rawPayload })));
     }
 
     const now = new Date();
@@ -163,9 +156,6 @@ export class EndpointScimUsersService {
       this.logger.debug(LogCategory.SCIM_USER, 'User not found', { scimId, endpointId });
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
-
-    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
-    guardSoftDeleted(user, config, scimId, this.logger, LogCategory.SCIM_USER);
 
     return this.toScimUserResource(user, baseUrl, endpointId);
   }
@@ -209,12 +199,7 @@ export class EndpointScimUsersService {
     );
 
     // Build SCIM resources and apply in-memory filter if needed
-    // RFC 7644 §3.6: Soft-deleted resources (deletedAt set) MUST be omitted from future query results
-    const userSoftDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED);
-    const filteredDbUsers = userSoftDelete
-      ? allDbUsers.filter((u) => u.deletedAt == null)
-      : allDbUsers;
-    let resources = filteredDbUsers.map((user) => this.toScimUserResource(user, baseUrl, endpointId));
+    let resources = allDbUsers.map((user) => this.toScimUserResource(user, baseUrl, endpointId));
 
     if (filterResult.inMemoryFilter) {
       resources = resources.filter(filterResult.inMemoryFilter);
@@ -256,11 +241,9 @@ export class EndpointScimUsersService {
     const user = await this.userRepo.findByScimId(endpointId, scimId);
     
     if (!user) {
+      this.logger.debug(LogCategory.SCIM_PATCH, 'Patch target not found', { scimId, endpointId });
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
-
-    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
-    guardSoftDeleted(user, config, scimId, this.logger, LogCategory.SCIM_USER);
 
     // Phase 7: Pre-write If-Match enforcement
     enforceIfMatch(user.version, ifMatch, config);
@@ -309,11 +292,9 @@ export class EndpointScimUsersService {
     const user = await this.userRepo.findByScimId(endpointId, scimId);
     
     if (!user) {
+      this.logger.debug(LogCategory.SCIM_USER, 'Replace target not found', { scimId, endpointId });
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
-
-    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations
-    guardSoftDeleted(user, config, scimId, this.logger, LogCategory.SCIM_USER);
 
     // Phase 7: Pre-write If-Match enforcement
     enforceIfMatch(user.version, ifMatch, config);
@@ -321,13 +302,13 @@ export class EndpointScimUsersService {
     // H-2: Immutable attribute enforcement — compare existing resource with incoming payload
     this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(user), dto, endpointId, config);
 
-    await this.assertUniqueIdentifiersForEndpoint(dto.userName, dto.externalId ?? undefined, endpointId, scimId);
+    await this.assertUniqueUserNameForEndpoint(dto.userName, endpointId, scimId);
 
     // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
     const uniqueAttrs = this.schemaHelpers.getUniqueAttributes(endpointId);
     if (uniqueAttrs.length > 0) {
       const allUsers = await this.userRepo.findAll(endpointId, {});
-      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrs, allUsers.map(u => ({ scimId: u.scimId, rawPayload: u.rawPayload, deletedAt: u.deletedAt })), scimId);
+      assertSchemaUniqueness(endpointId, dto as unknown as Record<string, unknown>, uniqueAttrs, allUsers.map(u => ({ scimId: u.scimId, rawPayload: u.rawPayload })), scimId);
     }
 
     const now = new Date();
@@ -366,9 +347,6 @@ export class EndpointScimUsersService {
       this.logger.debug(LogCategory.SCIM_USER, 'Delete target not found', { scimId, endpointId });
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
-
-    // RFC 7644 §3.6: Soft-deleted resources MUST return 404 for all operations (double-delete)
-    guardSoftDeleted(user, config, scimId, this.logger, LogCategory.SCIM_USER);
 
     // Settings v7: Gate hard delete behind UserHardDeleteEnabled (default: true)
     const hardDeleteEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED);
@@ -414,40 +392,35 @@ export class EndpointScimUsersService {
     };
   }
 
-  private async assertUniqueIdentifiersForEndpoint(
+  /**
+   * Assert userName uniqueness within the endpoint (case-insensitive).
+   * externalId and displayName are NOT checked — saved as received per RFC 7643.
+   */
+  private async assertUniqueUserNameForEndpoint(
     userName: string,
-    externalId: string | undefined,
     endpointId: string,
     excludeScimId?: string
   ): Promise<void> {
     const conflict = await this.userRepo.findConflict(
       endpointId,
       userName,
-      externalId,
       excludeScimId,
     );
 
     if (conflict) {
-      const isUserName = conflict.userName.toLowerCase() === userName.toLowerCase();
-      const conflictingAttribute = isUserName ? 'userName' : 'externalId';
-      const incomingValue = isUserName ? userName : (externalId ?? '');
-      const reason = isUserName
-        ? `userName '${userName}'`
-        : `externalId '${externalId}'`;
-
-      this.logger.info(LogCategory.SCIM_USER, `Uniqueness conflict on PUT/PATCH: ${reason}`, {
+      this.logger.info(LogCategory.SCIM_USER, `Uniqueness conflict on PUT/PATCH: userName '${userName}'`, {
         endpointId, conflictScimId: conflict.scimId,
       });
       throw createScimError({
         status: 409,
         scimType: 'uniqueness',
-        detail: `A resource with ${reason} already exists.`,
+        detail: `A resource with userName '${userName}' already exists.`,
         diagnostics: {
-          errorCode: isUserName ? 'UNIQUENESS_USERNAME' : 'UNIQUENESS_EXTERNAL_ID',
+          errorCode: 'UNIQUENESS_USERNAME',
           operation: 'replace',
           conflictingResourceId: conflict.scimId,
-          conflictingAttribute,
-          incomingValue,
+          conflictingAttribute: 'userName',
+          incomingValue: userName,
         },
       });
     }
@@ -539,6 +512,20 @@ export class EndpointScimUsersService {
 
     const { extractedFields, payload } = result;
 
+    // Settings v7: Gate soft-delete behind UserSoftDeleteEnabled (default: true)
+    if (extractedFields.active === false) {
+      const softDeleteEnabled = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED);
+      if (!softDeleteEnabled) {
+        this.logger.info(LogCategory.SCIM_PATCH, 'Soft-delete (deactivation) disabled for users', { scimId: user.scimId, endpointId });
+        throw createScimError({
+          status: 400,
+          scimType: 'invalidValue',
+          detail: 'User soft-delete (active=false) is not enabled for this endpoint.',
+          diagnostics: { errorCode: 'SOFT_DELETE_DISABLED', triggeredBy: 'UserSoftDeleteEnabled' },
+        });
+      }
+    }
+
     // H-1: Post-PATCH schema validation — validate the resulting payload
     const resultPayload: Record<string, unknown> = {
       schemas: [SCIM_CORE_USER_SCHEMA],
@@ -564,9 +551,8 @@ export class EndpointScimUsersService {
     // H-2: Immutable attribute enforcement — compare existing state with PATCH result
     this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(user), resultPayload, endpointId, config);
 
-    await this.assertUniqueIdentifiersForEndpoint(
+    await this.assertUniqueUserNameForEndpoint(
       extractedFields.userName ?? user.userName,
-      extractedFields.externalId ?? undefined,
       endpointId,
       user.scimId,
     );
@@ -575,7 +561,7 @@ export class EndpointScimUsersService {
     const uniqueAttrs = this.schemaHelpers.getUniqueAttributes(endpointId);
     if (uniqueAttrs.length > 0) {
       const allUsers = await this.userRepo.findAll(endpointId, {});
-      assertSchemaUniqueness(endpointId, resultPayload, uniqueAttrs, allUsers.map(u => ({ scimId: u.scimId, rawPayload: u.rawPayload, deletedAt: u.deletedAt })), user.scimId);
+      assertSchemaUniqueness(endpointId, resultPayload, uniqueAttrs, allUsers.map(u => ({ scimId: u.scimId, rawPayload: u.rawPayload })), user.scimId);
     }
 
     return {

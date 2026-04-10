@@ -870,7 +870,7 @@ HEALTHCHECK --interval=60s --timeout=3s --start-period=10s --retries=2 \
 | 58 | Filter by externalId returns exactly 1 | ✅ |
 | 59 | Filtered user has correct externalId | ✅ |
 | 60 | Filter with 'EXTERNALID' (uppercase) finds user | ✅ |
-| 61 | Duplicate externalId → 409 Conflict | ✅ |
+| 61 | Duplicate externalId → accepted (uniqueness:none) | ✅ |
 
 ### Section 4: SCIM Group Operations (14 ✅)
 
@@ -890,7 +890,7 @@ HEALTHCHECK --interval=60s --timeout=3s --start-period=10s --retries=2 \
 | 73 | PUT group (replace) works | ✅ |
 | 74 | Group with externalId created | ✅ |
 | 75 | Filter groups by externalId works | ✅ |
-| 76 | Duplicate group externalId → 409 | ✅ |
+| 76 | Duplicate group externalId → accepted (uniqueness:none) | ✅ |
 
 ### Section 5: Multi-Member PATCH Config Flag (4 ✅)
 

@@ -435,6 +435,10 @@ $allResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" 
 $allValid = ($allResult.profile.settings.StrictSchemaValidation -eq "True") -and ($allResult.profile.settings.RequireIfMatch -eq "True") -and ($allResult.profile.settings.VerbosePatchSupported -eq $true)
 Test-Result -Success $allValid -Message "All three config flags set together"
 
+# Reset RequireIfMatch to false so subsequent sections don't get 428 errors
+$resetBody = '{"profile":{"settings":{"RequireIfMatch":"False"}}}'
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $resetBody -ContentType "application/json" | Out-Null
+
 # ============================================
 # TEST SECTION 3: SCIM USER OPERATIONS
 # ============================================
@@ -501,8 +505,8 @@ $putUserBody = @{
 $replacedUser = Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method PUT -Headers $headers -Body $putUserBody
 Test-Result -Success ($replacedUser.displayName -eq "Replaced Display Name") -Message "PUT user (replace) works"
 
-# Test: Deactivate user (soft delete)
-Write-Host "`n--- Test: Deactivate User (Soft Delete) ---" -ForegroundColor Cyan
+# Test: Deactivate user
+Write-Host "`n--- Test: Deactivate User ---" -ForegroundColor Cyan
 $deactivateBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
     Operations = @(@{ op = "replace"; path = "active"; value = $false })
@@ -773,20 +777,20 @@ Test-Result -Success ($extIdFilter.Resources[0].externalId -eq "ext-pag-1") -Mes
 $extIdFilterCI = Invoke-RestMethod -Uri "$scimBase/Users?filter=EXTERNALID eq `"ext-pag-2`"" -Method GET -Headers $headers
 Test-Result -Success ($extIdFilterCI.totalResults -eq 1) -Message "Filter with 'EXTERNALID' (uppercase attr) finds user"
 
-# Test: externalId uniqueness (same externalId → 409)
-Write-Host "`n--- Test: externalId Uniqueness ---" -ForegroundColor Cyan
+# Test: externalId is saved as received, NOT checked for uniqueness (uniqueness:none per RFC 7643)
+Write-Host "`n--- Test: externalId NOT Unique (Saved as Received) ---" -ForegroundColor Cyan
 $dupExtBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
     userName = "dup-ext-test@test.com"
-    externalId = "ext-pag-1"  # Already exists
+    externalId = "ext-pag-1"  # Same externalId as another user — allowed
     active = $true
 } | ConvertTo-Json
 try {
-    Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $dupExtBody | Out-Null
-    Test-Result -Success $false -Message "Duplicate externalId should return 409"
+    $dupExtResult = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $dupExtBody
+    Test-Result -Success ($dupExtResult.externalId -eq "ext-pag-1") -Message "Duplicate externalId accepted (uniqueness:none) — 201"
 } catch {
     $code = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($code -eq 409) -Message "Duplicate externalId returns 409 Conflict"
+    Test-Result -Success $false -Message "Duplicate externalId should be accepted (uniqueness:none), got $code"
 }
 
 # ============================================
@@ -985,18 +989,18 @@ try {
     Test-Result -Success $false -Message "Case-variant group externalId should be allowed (caseExact=true)"
 }
 
-# Test: Duplicate group externalId → 409
+# Test: Duplicate group externalId → allowed (uniqueness:none per RFC 7643)
 $dupExtGroupBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
     displayName = "Dup ExternalId Group"
     externalId = "updated-ext-789"
 } | ConvertTo-Json
 try {
-    Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $dupExtGroupBody | Out-Null
-    Test-Result -Success $false -Message "Duplicate group externalId should return 409"
+    $dupExtGroupResult = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $dupExtGroupBody
+    Test-Result -Success ($dupExtGroupResult.externalId -eq "updated-ext-789") -Message "Duplicate group externalId accepted (uniqueness:none) — 201"
 } catch {
     $code = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($code -eq 409) -Message "Duplicate group externalId returns 409 Conflict"
+    Test-Result -Success $false -Message "Duplicate group externalId should be accepted (uniqueness:none), got $code"
 }
 
 # ============================================
@@ -1175,8 +1179,8 @@ try {
     Test-Result -Success $false -Message "Multi-member PATCH should succeed with flag=True"
 }
 
-# Create endpoint WITHOUT the flag (use rfc-standard which has empty settings)
-Write-Host "`n--- Create Endpoint Without Flag ---" -ForegroundColor Cyan
+# Create endpoint WITHOUT the multi-member flag (settings v7: explicitly disable since default is now True)
+Write-Host "`n--- Create Endpoint Without Multi-Member Flag ---" -ForegroundColor Cyan
 $noFlagBody = @{
     name = "live-test-no-flag-$(Get-Random)"
     displayName = "No Flag Endpoint"
@@ -1184,6 +1188,9 @@ $noFlagBody = @{
 } | ConvertTo-Json
 $noFlagEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $noFlagBody
 $NoFlagEndpointId = $noFlagEndpoint.id
+# Explicitly disable multi-member patch for this endpoint
+$disableMultiBody = '{"profile":{"settings":{"MultiMemberPatchOpForGroupEnabled":"False"}}}'
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$NoFlagEndpointId" -Method PATCH -Headers $headers -Body $disableMultiBody -ContentType "application/json" | Out-Null
 $scimBase2 = "$baseUrl/scim/endpoints/$NoFlagEndpointId"
 
 # Create users in no-flag endpoint
@@ -1345,14 +1352,18 @@ Write-Host "`n--- Test: Same userName in Different Endpoints ---" -ForegroundCol
 $sameUserBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
     userName = "livetest-user@test.com"  # Same as in first endpoint
+    displayName = "Isolation Test User"
+    emails = @(@{ value = "livetest-user@test.com"; type = "work"; primary = $true })
     active = $true
-} | ConvertTo-Json
+} | ConvertTo-Json -Depth 3
 try {
     $sameUser = Invoke-RestMethod -Uri "$scimBaseIsolation/Users" -Method POST -Headers $headers -Body $sameUserBody
     $IsolationUserId = $sameUser.id
     Test-Result -Success ($null -ne $IsolationUserId) -Message "Same userName created in different endpoint (isolation works)"
 } catch {
-    Test-Result -Success $false -Message "Should allow same userName in different endpoints"
+    $errCode = $_.Exception.Response.StatusCode.value__
+    $errBody = $_.ErrorDetails.Message
+    Test-Result -Success $false -Message "Should allow same userName in different endpoints (got HTTP $errCode)"
 }
 
 # Test: Users from one endpoint not visible in another
@@ -4744,19 +4755,19 @@ try {
     Test-Result -Success $false -Message "PUT self-update should succeed: $_"
 }
 
-# Test 9o.3: PUT — changing externalId to GroupA's externalId → 409
-Write-Host "`n--- Test 9o.3: PUT GroupB with GroupA's externalId → 409 ---" -ForegroundColor Cyan
+# Test 9o.3: PUT — duplicate externalId allowed (uniqueness:none per RFC 7643)
+Write-Host "`n--- Test 9o.3: PUT GroupB with GroupA's externalId → 200 (allowed) ---" -ForegroundColor Cyan
 $g8fPutExtConflictBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
     displayName = $g8fGroupB.displayName
     externalId = $g8fGroupA.externalId
 } | ConvertTo-Json
 try {
-    $null = Invoke-RestMethod -Uri "$scimBase/Groups/$g8fGroupBId" -Method PUT -Headers $headers -Body $g8fPutExtConflictBody
-    Test-Result -Success $false -Message "PUT with conflicting externalId should return 409"
+    $g8fPutExtResult = Invoke-RestMethod -Uri "$scimBase/Groups/$g8fGroupBId" -Method PUT -Headers $headers -Body $g8fPutExtConflictBody
+    Test-Result -Success ($g8fPutExtResult.externalId -eq $g8fGroupA.externalId) -Message "PUT with duplicate externalId accepted (uniqueness:none)"
 } catch {
     $status = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($status -eq 409) -Message "PUT with conflicting externalId returns 409 (got $status)"
+    Test-Result -Success $false -Message "PUT with duplicate externalId should succeed (uniqueness:none), got $status"
 }
 
 # Test 9o.4: PATCH — changing displayName to GroupA's name → 409
@@ -4793,8 +4804,8 @@ try {
     Test-Result -Success $false -Message "PATCH with unique displayName should succeed: $_"
 }
 
-# Test 9o.6: PATCH — changing externalId to GroupA's externalId → 409
-Write-Host "`n--- Test 9o.6: PATCH GroupB with GroupA's externalId → 409 ---" -ForegroundColor Cyan
+# Test 9o.6: PATCH — duplicate externalId allowed (uniqueness:none per RFC 7643)
+Write-Host "`n--- Test 9o.6: PATCH GroupB with GroupA's externalId → 200 (allowed) ---" -ForegroundColor Cyan
 $g8fPatchExtConflictBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
     Operations = @(@{
@@ -4803,11 +4814,11 @@ $g8fPatchExtConflictBody = @{
     })
 } | ConvertTo-Json -Depth 4
 try {
-    $null = Invoke-RestMethod -Uri "$scimBase/Groups/$g8fGroupBId" -Method PATCH -Headers $headers -Body $g8fPatchExtConflictBody
-    Test-Result -Success $false -Message "PATCH with conflicting externalId should return 409"
+    $g8fPatchExtResult = Invoke-RestMethod -Uri "$scimBase/Groups/$g8fGroupBId" -Method PATCH -Headers $headers -Body $g8fPatchExtConflictBody
+    Test-Result -Success ($g8fPatchExtResult.externalId -eq $g8fGroupA.externalId) -Message "PATCH with duplicate externalId accepted (uniqueness:none)"
 } catch {
     $status = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($status -eq 409) -Message "PATCH with conflicting externalId returns 409 (got $status)"
+    Test-Result -Success $false -Message "PATCH with duplicate externalId should succeed (uniqueness:none), got $status"
 }
 
 # --- G8f Cleanup ---
@@ -6101,21 +6112,20 @@ try {
     Test-Result -Success ($statusCode -eq 409) -Message "9x.1: PUT userName collision returns 409 Conflict"
 }
 
-# 9x.2: PUT User B with User A's externalId → 409
+# 9x.2: PUT User B with User A's externalId → 200 (externalId uniqueness:none per RFC 7643)
 $x9PutExtConflictBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
     userName = $x9UserNameB
     externalId = $x9UserA.externalId
-    displayName = "9x ExtId Conflict PUT"
+    displayName = "9x ExtId Duplicate PUT"
     active = $true
 } | ConvertTo-Json -Depth 3
 try {
-    $x9PutExtConflict = Invoke-WebRequest -Uri "$scimBase/Users/$($x9UserB.id)" -Method PUT `
-        -Headers @{ Authorization = $headers.Authorization } -Body $x9PutExtConflictBody -ContentType "application/scim+json" -ErrorAction Stop
-    Test-Result -Success $false -Message "9x.2: PUT externalId collision should return 409 (got $($x9PutExtConflict.StatusCode))"
+    $x9PutExtResult = Invoke-RestMethod -Uri "$scimBase/Users/$($x9UserB.id)" -Method PUT -Headers $headers -Body $x9PutExtConflictBody -ContentType "application/scim+json"
+    Test-Result -Success ($x9PutExtResult.externalId -eq $x9UserA.externalId) -Message "9x.2: PUT with duplicate externalId accepted (uniqueness:none)"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($statusCode -eq 409) -Message "9x.2: PUT externalId collision returns 409 Conflict"
+    Test-Result -Success $false -Message "9x.2: PUT with duplicate externalId should succeed (uniqueness:none), got $statusCode"
 }
 
 # 9x.3: PUT User A with own userName → 200 (self-update allowed)
@@ -6168,7 +6178,7 @@ try {
     Test-Result -Success ($statusCode -eq 409) -Message "9x.5: PATCH userName collision returns 409 Conflict"
 }
 
-# 9x.6: PATCH User B replace externalId → User A's externalId → 409
+# 9x.6: PATCH User B replace externalId → User A's externalId → 200 (uniqueness:none per RFC 7643)
 $x9PatchExtBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
     Operations = @(
@@ -6180,12 +6190,11 @@ $x9PatchExtBody = @{
     )
 } | ConvertTo-Json -Depth 4
 try {
-    $x9PatchExt = Invoke-WebRequest -Uri "$scimBase/Users/$($x9UserB.id)" -Method PATCH `
-        -Headers @{ Authorization = $headers.Authorization } -Body $x9PatchExtBody -ContentType "application/scim+json" -ErrorAction Stop
-    Test-Result -Success $false -Message "9x.6: PATCH externalId collision should return 409 (got $($x9PatchExt.StatusCode))"
+    $x9PatchExtResult = Invoke-RestMethod -Uri "$scimBase/Users/$($x9UserB.id)" -Method PATCH -Headers $headers -Body $x9PatchExtBody -ContentType "application/scim+json"
+    Test-Result -Success ($x9PatchExtResult.externalId -eq $x9UserA.externalId) -Message "9x.6: PATCH with duplicate externalId accepted (uniqueness:none)"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($statusCode -eq 409) -Message "9x.6: PATCH externalId collision returns 409 Conflict"
+    Test-Result -Success $false -Message "9x.6: PATCH with duplicate externalId should succeed (uniqueness:none), got $statusCode"
 }
 
 # 9x.7: PATCH mutable field (displayName) → 200 (no conflict)
@@ -6959,11 +6968,11 @@ $stats = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId/stats
 Test-Result -Success ($null -ne $stats.users) -Message "9z-D.46: Stats has users object"
 Test-Result -Success ($null -ne $stats.users.total) -Message "9z-D.47: users has total"
 Test-Result -Success ($null -ne $stats.users.active) -Message "9z-D.48: users has active"
-Test-Result -Success ($null -ne $stats.users.softDeleted) -Message "9z-D.49: users has softDeleted"
+Test-Result -Success ($null -ne $stats.users.inactive) -Message "9z-D.49: users has inactive"
 Test-Result -Success ($null -ne $stats.groups) -Message "9z-D.50: Stats has groups object"
 Test-Result -Success ($null -ne $stats.groups.total) -Message "9z-D.51: groups has total"
 Test-Result -Success ($null -ne $stats.groups.active) -Message "9z-D.52: groups has active"
-Test-Result -Success ($null -ne $stats.groups.softDeleted) -Message "9z-D.53: groups has softDeleted"
+Test-Result -Success ($null -ne $stats.groups.inactive) -Message "9z-D.53: groups has inactive"
 Test-Result -Success ($null -ne $stats.groupMembers) -Message "9z-D.54: Stats has groupMembers"
 Test-Result -Success ($null -ne $stats.groupMembers.total) -Message "9z-D.55: groupMembers has total"
 Test-Result -Success ($null -ne $stats.requestLogs) -Message "9z-D.56: Stats has requestLogs"

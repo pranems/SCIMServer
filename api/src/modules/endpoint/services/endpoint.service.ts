@@ -105,7 +105,7 @@ export interface PresetListResponse {
 export interface ResourceStats {
   total: number;
   active: number;
-  softDeleted: number;
+  inactive: number;
 }
 
 export interface EndpointStatsResponse {
@@ -700,15 +700,15 @@ export class EndpointService implements OnModuleInit {
 
     if (this.isInMemoryBackend) {
       return {
-        users: { total: 0, active: 0, softDeleted: 0 },
-        groups: { total: 0, active: 0, softDeleted: 0 },
+        users: { total: 0, active: 0, inactive: 0 },
+        groups: { total: 0, active: 0, inactive: 0 },
         groupMembers: { total: 0 },
         requestLogs: { total: 0 },
       };
     }
 
-    const [totalUsers, activeUsers, softDeletedUsers,
-           totalGroups, activeGroups, softDeletedGroups,
+    const [totalUsers, activeUsers, inactiveUsers,
+           totalGroups, activeGroups, inactiveGroups,
            totalGroupMembers, requestLogCount] = await Promise.all([
       this.prisma.scimResource.count({ where: { endpointId, resourceType: 'User' } }),
       this.prisma.scimResource.count({ where: { endpointId, resourceType: 'User', active: true } }),
@@ -721,8 +721,8 @@ export class EndpointService implements OnModuleInit {
     ]);
 
     return {
-      users: { total: totalUsers, active: activeUsers, softDeleted: softDeletedUsers },
-      groups: { total: totalGroups, active: activeGroups, softDeleted: softDeletedGroups },
+      users: { total: totalUsers, active: activeUsers, inactive: inactiveUsers },
+      groups: { total: totalGroups, active: activeGroups, inactive: inactiveGroups },
       groupMembers: { total: totalGroupMembers },
       requestLogs: { total: requestLogCount },
     };

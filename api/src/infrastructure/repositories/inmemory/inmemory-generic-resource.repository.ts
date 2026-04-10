@@ -29,7 +29,6 @@ export class InMemoryGenericResourceRepository implements IGenericResourceReposi
       externalId: input.externalId,
       displayName: input.displayName,
       active: input.active,
-      deletedAt: null,
       rawPayload: input.rawPayload,
       version: 1,
       meta: input.meta,

@@ -1,45 +1,28 @@
 # G8f — Group Uniqueness Enforcement on PUT/PATCH
 
-> **Document Purpose**: Feature reference for the G8f gap closure — `displayName` and `externalId` uniqueness enforcement on Group PUT and PATCH operations.
+> **Document Purpose**: Feature reference for the G8f gap closure — `displayName` uniqueness enforcement on Group PUT and PATCH operations.
 >
-> **Created**: February 26, 2026
-> **Version**: v0.19.1
+> **Created**: February 26, 2026  
+> **Updated**: April 9, 2026 (v0.33.0 — externalId uniqueness removed)  
+> **Version**: v0.33.0  
 > **RFC Reference**: RFC 7644 §3.5.1 (Replacing with PUT), RFC 7644 §3.5.2 (Modifying with PATCH), RFC 7643 §2.4 (uniqueness)
 
 ---
 
 ## Overview
 
-**Gap G8f** in the [MIGRATION_PLAN_CURRENT_TO_IDEAL_v3](MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md) identified a data integrity bug: the `assertUniqueDisplayName()` and `assertUniqueExternalId()` methods existed in `EndpointScimGroupsService` but were only called during POST (create) operations. PUT (replace) and PATCH (modify) operations bypassed uniqueness validation entirely, allowing clients to silently create duplicate `displayName` or `externalId` values within the same endpoint.
+**Gap G8f** identified a data integrity bug: `assertUniqueDisplayName()` existed in `EndpointScimGroupsService` but was only called during POST (create) operations. PUT (replace) and PATCH (modify) operations bypassed displayName uniqueness validation entirely.
 
-### Problem Statement
+### v0.33.0 Update — externalId Uniqueness Removed
 
-Before v0.19.1, the Groups service had these uniqueness helper methods defined:
+As of v0.33.0, `externalId` uniqueness enforcement has been **completely removed** for both Users and Groups. This aligns with RFC 7643 §2.4 which declares `externalId` as `uniqueness: "none"`. The `assertUniqueExternalId()` method has been deleted from the Group service. Only `displayName` uniqueness (`uniqueness: "server"`) is enforced.
 
-```typescript
-private async assertUniqueDisplayName(displayName, endpointId, excludeScimId?)
-private async assertUniqueExternalId(externalId, endpointId, excludeScimId?)
-```
+### Current Uniqueness Enforcement (v0.33.0+)
 
-Both methods accept an optional `excludeScimId` parameter specifically designed for PUT/PATCH self-exclusion. However, neither was called from:
-
-- `replaceGroupForEndpoint()` (PUT) — could replace a group's `displayName` / `externalId` with values already used by another group
-- `patchGroupForEndpoint()` (PATCH) — same issue via PATCH `replace` or `add` operations
-
-This created a **genuine data integrity bug** where:
-
-1. `PUT /Groups/:idB` with `{ displayName: "Same As Group A" }` → **200** (should be **409**)
-2. `PATCH /Groups/:idB` with `replace displayName "Same As Group A"` → **200** (should be **409**)
-3. Duplicate groups could accumulate, causing undefined behavior in SCIM provisioning
-
-### Solution
-
-Added `assertUniqueDisplayName()` and `assertUniqueExternalId()` calls to both PUT and PATCH code paths, passing the target resource's `scimId` as `excludeScimId` to prevent false self-conflicts:
-
-1. **PUT path** (`replaceGroupForEndpoint`): After `checkImmutableAttributes`, before the database update
-2. **PATCH path** (`patchGroupForEndpoint`): After `checkImmutableAttributes`, before member resolution
-
-Both paths now produce **HTTP 409 Conflict** with `scimType: 'uniqueness'` when a collision is detected.
+| Attribute | `uniqueness` | Enforced? | Method |
+|-----------|-------------|-----------|--------|
+| Group `displayName` | `"server"` | ✅ Yes (POST/PUT/PATCH) | `assertUniqueDisplayName()` |
+| Group `externalId` | `"none"` | ❌ No — saved as received | *(removed in v0.33.0)* |
 
 ---
 

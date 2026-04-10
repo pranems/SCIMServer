@@ -418,7 +418,6 @@ OAuth 2.0 `client_credentials` grant:
 │  │ userName        (CITEXT, case-insensitive) │
 │  │ displayName     (CITEXT, case-insensitive) │
 │  │ active          (Boolean, default true)  │
-│  │ deletedAt       (Timestamptz, nullable)  │
 │  │ payload         (JSONB — full SCIM JSON) │
 │  │ version         (Int, monotonic ETag)    │
 │  │ meta            (text)                   │

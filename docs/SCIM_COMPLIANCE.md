@@ -82,7 +82,7 @@
 
 | Feature | Description |
 |---------|-------------|
-| G8f — Group Uniqueness on PUT/PATCH | `assertUniqueDisplayName()` and `assertUniqueExternalId()` now called on PUT/PATCH paths with `excludeScimId` self-exclusion. 10+6+10 new tests. |
+| G8f — Group Uniqueness on PUT/PATCH | `assertUniqueDisplayName()` called on PUT/PATCH paths with `excludeScimId` self-exclusion. `assertUniqueExternalId()` removed in v0.33.0 (externalId has uniqueness:none per RFC 7643). |
 
 ### New in v0.19.0
 
@@ -113,10 +113,7 @@
 | Feature | Description |
 |---------|-------------|
 | `AllowAndCoerceBooleanStrings` flag | Coerces `"True"`/`"False"` strings to native booleans before schema validation (default on). Schema-aware: only coerces attributes whose schema type is `"boolean"` (V16/V17 fix). |
-| `ReprovisionOnConflictForSoftDeletedResource` flag | Re-activates soft-deleted resources on POST conflict (clears `deletedAt`, sets `active=true`) instead of 409 (requires SoftDeleteEnabled). 10th boolean flag. |
-| Soft-delete `deletedAt` tracking | Soft-delete now sets `deletedAt` timestamp + `active=false`. Guard uses `deletedAt != null` (not `active`) to distinguish from PATCH-disabled resources. New Prisma column: `deletedAt DateTime? @db.Timestamptz`. |
 | Group `active` field | Groups now include `active: boolean` in domain models and SCIM responses. Created with `active: true`. |
-| Reprovision (re-activation) | Soft-deleted Users and Groups can be re-activated on POST conflict when `ReprovisionOnConflictForSoftDeletedResource` is enabled. |
 | In-memory EndpointService/LoggingService | Both services support `PERSISTENCE_BACKEND=inmemory` for fully Prisma-free operation |
 | Resource-type-aware projection | `displayName` always-returned only for Groups (RFC 7643); excludable for Users |
 | `getConfigBooleanWithDefault()` | Config helper for flags defaulting to `true` |
@@ -140,7 +137,7 @@
 
 | Feature | Description |
 |---------|-------------|
-| `SoftDeleteEnabled` config flag | Soft delete (set `active=false`) instead of physical row deletion on DELETE |
+| `UserSoftDeleteEnabled` config flag | Controls whether PATCH `active=false` is allowed (deprecated name — no longer related to soft-delete; DELETE always hard-deletes) |
 | `StrictSchemaValidation` config flag | Reject extension URNs not declared in `schemas[]` or not registered |
 | Custom Extension URNs (msfttest) | 4 msfttest extension schemas registered globally (2 User + 2 Group) |
 | Dynamic `schemas[]` on Groups | Group responses include extension URNs from `payload` |
@@ -169,7 +166,7 @@
 | POST (Search) | `/Users/.search`, `/Groups/.search` | ✅ 200 + ListResponse |
 | PUT (Replace) | `/Users/{id}`, `/Groups/{id}` | ✅ Full resource replacement |
 | PATCH (Update) | `/Users/{id}`, `/Groups/{id}` | ✅ PatchOp with add/replace/remove |
-| DELETE | `/Users/{id}`, `/Groups/{id}` | ✅ 204 No Content (supports `SoftDeleteEnabled` for soft delete) |
+| DELETE | `/Users/{id}`, `/Groups/{id}` | ✅ 204 No Content (hard-delete, row physically removed) |
 
 ## PATCH Operations (RFC 7644 §3.5.2)
 
@@ -232,10 +229,10 @@ SCIMServer passes all critical requirements for Microsoft Entra ID enterprise ap
 | Case-insensitive PATCH ops (`Add`/`Replace`/`Remove`) | ✅ | Entra sends capitalized op values |
 | `filter=externalId eq "..."` | ✅ | Entra's primary lookup method |
 | `filter=userName eq "..."` | ✅ | Secondary lookup |
-| Multi-member PATCH (add) | ✅ | Via `MultiOpPatchRequestAddMultipleMembersToGroup` flag |
-| Multi-member PATCH (remove) | ✅ | Via `MultiOpPatchRequestRemoveMultipleMembersFromGroup` flag |
-| Soft delete (`active=false`) | ✅ | User remains queryable |
-| 409 Conflict for duplicates | ✅ | userName and externalId uniqueness per endpoint |
+| Multi-member PATCH (add) | ✅ | Via `MultiMemberPatchOpForGroupEnabled` flag |
+| Multi-member PATCH (remove) | ✅ | Via `MultiMemberPatchOpForGroupEnabled` flag |
+| PATCH `active=false` (deactivation) | ✅ | User deactivated, remains queryable |
+| 409 Conflict for duplicates | ✅ | User.userName and Group.displayName uniqueness per endpoint (v0.33.0: externalId no longer enforced) |
 | `application/scim+json` Content-Type | ✅ | On all success and error responses |
 | Discovery endpoints | ✅ | Schemas, ResourceTypes, ServiceProviderConfig |
 | ListResponse for empty results | ✅ | Returns `{"totalResults": 0, "Resources": []}` |

@@ -22,6 +22,7 @@
 | 9 | [Discovery E2E Schema Count Assertions Stale](#9-discovery-e2e-schema-count-assertions-stale) | **High** | Test Failures |
 | 10 | [`package.json` Version Stale in Docker Image](#10-packagejson-version-stale-in-docker-image) | Medium | Configuration |
 | 11 | [Live Test Parameter Name Mismatch](#11-live-test-parameter-name-mismatch) | Medium | Test Infrastructure |
+| 12 | [Uniqueness Over-Enforcement on externalId/displayName](#12-uniqueness-over-enforcement-on-externaliddisplayname) | **High** | RFC Non-Compliance |
 
 ---
 
@@ -110,7 +111,7 @@ TypeScript compilation failed after adding soft-delete logic to `endpoint-scim-g
 1. Added soft-delete logic to `deleteGroupForEndpoint()`: instead of hard-deleting, call `groupRepo.update(group.id, { active: false })`.
 2. TypeScript immediately flagged `active` as not a valid property on `GroupUpdateInput`.
 3. Checked `api/src/domain/models/group.model.ts` — the `GroupUpdateInput` interface had `displayName`, `externalId`, and `members` but **no `active` field**.
-4. Confirmed that `UserUpdateInput` already had `active?: boolean` (users already supported activation/deactivation).
+4. Confirmed that `UserUpdateInput` already had `active?: boolean` (users already supported activation/soft-delete).
 
 ### Root Cause
 
@@ -533,6 +534,53 @@ pwsh -File scripts/live-test.ps1 -BaseUrl "http://localhost:8080" `
 
 ---
 
+## 12. Uniqueness Over-Enforcement on externalId/displayName
+
+### Symptoms
+
+`POST /Users`, `PUT /Users`, `PATCH /Users` returned `409 Conflict` when a duplicate `externalId` was provided. Similarly, `POST /Groups`, `PUT /Groups`, `PATCH /Groups` returned `409` on duplicate `externalId`. `User.displayName` had a DB unique constraint preventing duplicates even though no service-level check existed.
+
+### Diagnosis
+
+1. Checked RFC 7643 §2.4 attribute characteristic definitions:
+   - `User.externalId` — `uniqueness: "none"`, `caseExact: true`
+   - `User.displayName` — no `uniqueness` field declared (implicit `"none"`)
+   - `Group.externalId` — `uniqueness: "none"`, `caseExact: true`
+2. Checked the schema metadata in `rfc-standard.json` — confirmed all three are `uniqueness: "none"` or undeclared.
+3. Found enforcement at **three layers** despite schema saying "none":
+   - **DB**: `@@unique([endpointId, displayName])` and `@@unique([endpointId, resourceType, externalId])` in Prisma schema
+   - **User service**: `findConflict()` checks both `userName` AND `externalId` via `OR` condition
+   - **Group service**: Hardcoded `assertUniqueExternalId()` called on POST/PUT/PATCH
+   - **Generic service**: `findConflict()` checks both `externalId` AND `displayName`
+
+### Root Cause
+
+**Code over-enforced uniqueness beyond what RFC 7643 declares.** The original implementation treated `externalId` as a joining key (matching Entra ID behavior) and added uniqueness constraints at both DB and service levels. This was a pragmatic decision for Entra provisioning but violated the RFC specification:
+
+- RFC 7643 §2.4: `uniqueness: "none"` means "the attribute value has no uniqueness constraints"
+- Only `uniqueness: "server"` should trigger 409 Conflict
+- `User.userName` (`uniqueness: "server"`) and `Group.displayName` (`uniqueness: "server"`) are the only attributes that should enforce uniqueness
+
+### Fix Applied
+
+1. **Database**: Dropped `@@unique` constraints on `displayName` and `externalId`, replaced with `@@index` for query performance
+2. **User service**: Removed `externalId` from `findConflict()` — now only checks `userName`
+3. **User repository**: `findConflict()` signature changed from `(endpointId, userName, externalId?, excludeScimId?)` to `(endpointId, userName, excludeScimId?)`
+4. **Group service**: Deleted `assertUniqueExternalId()` method and all callers
+5. **Generic service**: Deleted entire `findConflict()` method and all callers (no uniqueness enforcement for custom resource types)
+6. **Tests**: Updated 5 unit spec files, 1 E2E spec, 6 live test sections
+
+**Result**: All unit tests passing. `externalId` and `User.displayName` duplicates accepted. `User.userName` and `Group.displayName` uniqueness preserved.
+
+### Why This Fix
+
+- Aligns with RFC 7643 §2.4 specification — `uniqueness: "none"` means no constraints
+- `externalId` is described in RFC 7643 §3.1 as "an identifier for the resource as defined by the provisioning client" — it is not server-managed
+- Multiple provisioning systems may assign the same `externalId` values without conflict
+- `Group.displayName` remains unique because the schema declares `uniqueness: "server"`
+
+---
+
 ## Summary Matrix
 
 | # | Issue | Category | Severity | Root Cause Type | Resolution |
@@ -548,6 +596,7 @@ pwsh -File scripts/live-test.ps1 -BaseUrl "http://localhost:8080" `
 | 9 | Discovery E2E assertions | Test Failures | High | Hardcoded counts not updated (E2E) | Updated to `>=` checks + `find()` lookup |
 | 10 | package.json version stale | Configuration | Medium | Manual version bump missed | Updated to `0.15.0` + Docker rebuild |
 | 11 | PS parameter name mismatch | Test Infra | Medium | Silent param drop in `-File` mode | Used correct `-ClientSecret` param name |
+| 12 | Uniqueness over-enforcement | RFC Non-Compliance | High | Code enforced `uniqueness:server` on `uniqueness:none` attrs | Removed externalId/displayName uniqueness checks + DB constraints |
 
 ---
 
@@ -570,3 +619,5 @@ pwsh -File scripts/live-test.ps1 -BaseUrl "http://localhost:8080" `
 8. **Version bumps are easy to miss**: When a feature spans multiple sessions, the `package.json` version bump may be done in docs but not in the actual manifest. Consider CI validation that `package.json` version matches the latest CHANGELOG heading.
 
 9. **PowerShell `-File` silently drops unknown params**: Unlike `-Command`, PowerShell's `-File` invocation mode ignores unrecognized parameter names without error. Always verify parameter names against the script's `param()` block. Adding `[CmdletBinding()]` to scripts enables stricter parameter binding and better error messages.
+
+10. **Schema metadata is the source of truth for behavior**: When attribute characteristics like `uniqueness` are declared in schema metadata, the enforcement code must match exactly. Over-enforcing beyond schema declarations creates silent RFC non-compliance that only surfaces when real-world clients send valid data that gets rejected.

@@ -102,7 +102,7 @@ export const ENDPOINT_CONFIG_FLAGS = {
 
   /**
    * When true (default), PATCH /Users/{id} with {active:false} deactivates the user.
-   * Soft-deleted user retains all uniqueness:server attribute values (userName, externalId).
+   * Deactivated user retains all uniqueness:server attribute values (userName).
    * POST with matching unique attr → 409 Conflict. Must hard-delete to free unique values.
    * When false, PATCH {active:false} → 400 error (soft-delete disabled).
    * In practice: keep true for standard SCIM provisioning workflows.
@@ -268,7 +268,7 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     default: true,
     description:
       'When true (default), PATCH /Users/{id} with {active:false} deactivates the user. ' +
-      'Soft-deleted user retains all uniqueness:server attribute values (userName, externalId). ' +
+      'Deactivated user retains all uniqueness:server attribute values (userName). ' +
       'POST with matching unique attr → 409. Must hard-delete to free unique values. ' +
       'When false, PATCH {active:false} → 400 error.',
   },

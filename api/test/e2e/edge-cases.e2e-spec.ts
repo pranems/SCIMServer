@@ -151,12 +151,13 @@ describe('Edge Cases (E2E)', () => {
   // ───────────── Concurrent Uniqueness ─────────────
 
   describe('Uniqueness enforcement', () => {
-    it('should reject duplicate externalId within same endpoint', async () => {
+    it('should allow duplicate externalId within same endpoint (uniqueness:none)', async () => {
       const user1 = validUser({ externalId: 'dup-ext-id' });
       const user2 = validUser({ externalId: 'dup-ext-id' });
 
       await scimPost(app, `${basePath}/Users`, token, user1).expect(201);
-      await scimPost(app, `${basePath}/Users`, token, user2).expect(409);
+      const res = await scimPost(app, `${basePath}/Users`, token, user2).expect(201);
+      expect(res.body.externalId).toBe('dup-ext-id');
     });
 
     it('should reject case-insensitive duplicate userName', async () => {

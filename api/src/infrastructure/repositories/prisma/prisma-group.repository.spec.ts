@@ -53,7 +53,6 @@ function fakeGroupResource(overrides: Record<string, unknown> = {}) {
     userName: null,
     displayName: 'Engineering',
     active: true,
-    deletedAt: null,
     payload: {},
     version: 1,
     meta: '{"resourceType":"Group"}',
@@ -324,7 +323,7 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
           resourceType: 'Group',
           displayName: 'engineering',
         }),
-        select: { scimId: true, active: true, deletedAt: true },
+        select: { scimId: true, active: true },
       });
     });
 

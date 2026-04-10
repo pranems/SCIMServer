@@ -4,7 +4,7 @@ Production-ready, multi-tenant SCIM 2.0 server purpose-built for Microsoft Entra
 
 | | |
 |---|---|
-| **Version** | `0.31.0` |
+| **Version** | `0.33.0` |
 | **Protocol** | SCIM 2.0 ([RFC 7643](https://datatracker.ietf.org/doc/html/rfc7643) / [RFC 7644](https://datatracker.ietf.org/doc/html/rfc7644)) |
 | **Target IdP** | [Microsoft Entra ID](https://entra.microsoft.com/) |
 | **Runtime** | Node.js 24 · NestJS 11 · TypeScript 5.9 |
@@ -185,7 +185,6 @@ erDiagram
         boolean active
         jsonb payload
         int version
-        datetime deletedAt
     }
     ResourceMember {
         uuid id PK
@@ -267,7 +266,6 @@ sequenceDiagram
 | **7644 §3.12** | Error responses (SCIM Error format) | ✅ Full |
 | **Custom** | Extension schemas (Enterprise, Custom) | ✅ Full |
 | **Custom** | Multi-endpoint isolation | ✅ Full |
-| **Custom** | Soft-delete (flag-controlled) | ✅ Full |
 
 ---
 
@@ -412,7 +410,7 @@ All flags are stored in `profile.settings` and can be PATCHed per-endpoint:
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `UserSoftDeleteEnabled` | bool/string | **`true`** | PATCH `{active:false}` deactivates user; `false` → error |
+| `UserSoftDeleteEnabled` | bool/string | **`true`** | PATCH `{active:false}` deactivates user; `false` → 400 error |
 | `UserHardDeleteEnabled` | bool/string | **`true`** | DELETE /Users/{id} permanently removes user; `false` → error |
 | `GroupHardDeleteEnabled` | bool/string | **`true`** | DELETE /Groups/{id} permanently removes group; `false` → error |
 | `MultiMemberPatchOpForGroupEnabled` | bool/string | **`true`** | Multi-member add/remove in single PATCH op on Group |

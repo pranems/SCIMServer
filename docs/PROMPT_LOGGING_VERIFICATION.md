@@ -1,8 +1,8 @@
 # Self-Improving Logging & Error Handling Verification Prompt
 
-> **Last audit run**: April 9, 2026  
-> **Pass rate**: 97/104 PASS, 6 PARTIAL, 1 FAIL (LOG_FILE default - design decision)  
-> **Version**: 2.2 - April 9, 2026 (Settings v7 alignment)
+> **Last audit run**: April 9, 2026 (post-deletedAt removal)  
+> **Pass rate**: 104/104 PASS (all 8 missing pre-throw logs fixed)  
+> **Version**: 2.3 - April 9, 2026 (deletedAt removal, PATCH gate logging)
 
 ## Context
 You are auditing SCIMServer's logging and error handling. The system has:
@@ -64,8 +64,8 @@ For EACH of these flag combinations:
   6. StrictSchemaValidation=ON + IgnoreReadOnlyAttributesInPatch=OFF → PATCH readOnly attr → verify 400
   7. UserHardDeleteEnabled=OFF → DELETE User → verify 400 with diagnostics.triggeredBy="UserHardDeleteEnabled", errorCode="HARD_DELETE_DISABLED"
   7b. GroupHardDeleteEnabled=OFF → DELETE Group → verify 400 with diagnostics.triggeredBy="GroupHardDeleteEnabled", errorCode="DELETE_DISABLED"
-  8. UserSoftDeleteEnabled=ON (default) → GET soft-deleted resource → verify DEBUG guardSoftDeleted + 404 with diagnostics.triggeredBy="UserSoftDeleteEnabled"
-  9. POST duplicate of soft-deleted resource → verify 409 UNIQUENESS (reprovision removed in v7; old flags ignored)
+  8. UserSoftDeleteEnabled=OFF → PATCH active=false → verify 400 with diagnostics.triggeredBy="UserSoftDeleteEnabled"
+  9. POST duplicate → verify 409 UNIQUENESS
   10. RequireIfMatch=ON → PUT without If-Match → verify 428 with diagnostics.triggeredBy="RequireIfMatch"
   11. RequireIfMatch=ON → PUT with wrong ETag → verify 412
   12. VerbosePatchSupported=ON → PATCH with dot-notation path

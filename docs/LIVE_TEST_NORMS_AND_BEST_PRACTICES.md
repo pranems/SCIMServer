@@ -127,7 +127,7 @@ $endpointId = "hardcoded-endpoint-id"
 ### 3.2 Cleanup Is Mandatory
 
 With PostgreSQL persistence, abandoned test data causes:
-- `409 Conflict` on re-runs (unique constraint violations on `userName`/`externalId`)
+- `409 Conflict` on re-runs (unique constraint violations on `userName` for Users, `displayName` for Groups)
 - Database bloat over time
 - False negatives from stale state
 
@@ -197,7 +197,7 @@ PostgreSQL enforces uniqueness at the DB level:
 | Constraint | Scope | Behavior |
 |-----------|-------|----------|
 | `userName` per `endpointId` | Composite unique | 409 Conflict on duplicate |
-| `externalId` per `endpointId` | Composite unique (case-sensitive) | 409 Conflict on duplicate |
+| `externalId` per `endpointId` | Non-unique index (case-sensitive) | Saved as received (uniqueness:none) |
 | Resource `id` | Globally unique (server-assigned UUID) | Never client-assignable |
 
 ### 4.4 Transaction Isolation
@@ -262,7 +262,7 @@ $myFeatureEndpointBody = @{
     name = "live-test-myfeature-$(Get-Random)"
     displayName = "My Feature Test Endpoint"
     config = @{
-        SoftDeleteEnabled = "True"
+        UserSoftDeleteEnabled = "True"
         StrictSchemaValidation = "True"
     }
 } | ConvertTo-Json
@@ -646,7 +646,7 @@ Add live test sections when:
 # ✅ Section-specific endpoint with specific config
 $myEndpointBody = @{
     name = "live-test-myfeature-$(Get-Random)"
-    config = @{ StrictSchemaValidation = "True"; SoftDeleteEnabled = "True" }
+    config = @{ StrictSchemaValidation = "True"; UserSoftDeleteEnabled = "True" }
 } | ConvertTo-Json
 $myEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $myEndpointBody
 $myBase = "$baseUrl/scim/endpoints/$($myEndpoint.id)"

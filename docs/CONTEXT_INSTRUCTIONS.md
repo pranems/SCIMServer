@@ -1,7 +1,7 @@
 # SCIMServer — Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.  
-> **Last Updated**: March 31, 2026
+> **Last Updated**: April 9, 2026
 
 ---
 
@@ -54,7 +54,7 @@ api/src/modules/scim/services/
   bulk-processor.service.ts         (395 lines)          # Bulk operation processor with bulkId resolution
   scim-metadata.service.ts                               # buildLocation, timestamp
 api/src/modules/scim/common/
-  scim-service-helpers.ts           (353 lines)          # G17: parseJson, ensureSchema, enforceIfMatch, sanitizeBooleanStrings, guardSoftDeleted, ScimSchemaHelpers
+  scim-service-helpers.ts           (353 lines)          # G17: parseJson, ensureSchema, enforceIfMatch, sanitizeBooleanStrings, ScimSchemaHelpers
 api/src/modules/scim/dto/
   bulk-request.dto.ts                                    # BulkRequest/Response DTOs (RFC 7644 §3.7)
   create-user.dto.ts                                     # User creation DTO
@@ -396,7 +396,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 8. **The `/scim/v2` rewrite** — Express middleware in `main.ts` rewrites `/scim/v2/*` to `/scim/*` for spec compliance
 9. **SchemaValidator** — 950-line pure domain class for RFC 7643 payload validation. Gated behind `StrictSchemaValidation` config flag. Validates type, mutability (readOnly + immutable), required attrs, unknown attrs, sub-attributes, canonicalValues, size limits. New: `collectBooleanAttributeNames()` for schema-aware boolean coercion, `collectReadOnlyAttributes()` for readOnly stripping, `validateFilterAttributePaths()` for filter validation (V32).
 10. **Repository Pattern** — `IUserRepository`/`IGroupRepository` interfaces injected via tokens. `PERSISTENCE_BACKEND` env var toggles between `prisma` and `inmemory` implementations.
-11. **G2 is DONE + G17 RESOLVED (v0.20.0)** — Database uses a single unified `ScimResource` table. G17 service code deduplication completed: 13+ duplicate private methods extracted into `scim-service-helpers.ts` (`parseJson`, `ensureSchema`, `enforceIfMatch`, `sanitizeBooleanStrings`, `guardSoftDeleted`, `ScimSchemaHelpers`). All 27 migration gaps (G1–G20) are now closed.
+11. **G2 is DONE + G17 RESOLVED (v0.20.0)** — Database uses a single unified `ScimResource` table. G17 service code deduplication completed: 13+ duplicate private methods extracted into `scim-service-helpers.ts` (`parseJson`, `ensureSchema`, `enforceIfMatch`, `sanitizeBooleanStrings`, `ScimSchemaHelpers`). All 27 migration gaps (G1–G20) are now closed.
 12. **3-tier auth guard** — `SharedSecretGuard` now implements 3-tier fallback: per-endpoint bcrypt credentials → OAuth JWT → global `SCIM_SHARED_SECRET`. Per-endpoint credentials use lazy-loaded native bcrypt (12 rounds, cached after first use). Active + non-expired credentials only.
 13. **CORS wildcard** — `main.ts` sets `origin: true` (accept all origins). Should be restricted for production deployments.
 

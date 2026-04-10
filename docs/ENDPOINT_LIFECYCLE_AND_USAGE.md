@@ -28,7 +28,7 @@
 
 An **endpoint** in SCIMServer is an isolated tenant — a completely separate SCIM namespace with its own:
 - Users and Groups (no cross-contamination between endpoints)
-- Configuration flags (soft-delete, strict schema, boolean coercion, etc.)
+- Configuration flags (deactivation control, strict schema, boolean coercion, etc.)
 - Schema profile (which SCIM attributes are exposed)
 - Optional per-endpoint credentials
 - Request logs
@@ -179,7 +179,7 @@ You can customize behavior per-endpoint by PATCHing settings:
 $settings = @{
     profile = @{
         settings = @{
-            SoftDeleteEnabled                        = "True"   # DELETE → soft-delete
+            UserSoftDeleteEnabled                    = "True"   # Allow PATCH active=false
             StrictSchemaValidation                   = "True"   # Require correct schemas[]
             RequireIfMatch                           = "True"   # Require ETag on PUT/PATCH/DELETE
             AllowAndCoerceBooleanStrings             = "True"   # Accept "True"/"False" strings
@@ -197,10 +197,9 @@ Invoke-RestMethod -Uri "$BASE/scim/admin/endpoints/$ENDPOINT_ID" -Method PATCH -
 |------|---------|-------------|
 | `AllowAndCoerceBooleanStrings` | True | Coerce `"True"`/`"False"` to booleans |
 | `VerbosePatchSupported` | — | Enable dot-notation PATCH paths |
-| `SoftDeleteEnabled` | — | DELETE sets `active=false` instead of hard delete |
+| `UserSoftDeleteEnabled` | — | Allow PATCH `active=false` (user deactivation) |
 | `StrictSchemaValidation` | — | Require extension URNs in `schemas[]` |
 | `RequireIfMatch` | — | Require `If-Match` header on writes |
-| `ReprovisionOnConflictForSoftDeletedResource` | — | Re-activate soft-deleted resources on 409 |
 | `PerEndpointCredentialsEnabled` | — | Enable per-endpoint credentials |
 | `IncludeWarningAboutIgnoredReadOnlyAttribute` | — | Warning header for readOnly stripping |
 | `IgnoreReadOnlyAttributesInPatch` | — | Strip readOnly PATCH ops (don't error) |
@@ -376,9 +375,7 @@ Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Users/$USER_ID" -Metho
 # Returns 204 No Content
 ```
 
-### Soft Delete (When Enabled)
-
-With `SoftDeleteEnabled = True`, DELETE sets `active = false` and records `deletedAt`. The user is hidden from LIST but can be re-provisioned.
+DELETE always hard-deletes — the row is physically removed from the database. There is no soft-delete concept. To deactivate a user without deleting, use PATCH to set `active = false` (requires `UserSoftDeleteEnabled = True`, which is the default).
 
 ---
 

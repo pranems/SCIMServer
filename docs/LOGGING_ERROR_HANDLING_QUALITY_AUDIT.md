@@ -205,7 +205,6 @@ LoggingService                    ← DB persistence (fire-and-forget batch)
 | `validatePayloadSchema()` | Attribute path + type | **No** | No |
 | `checkImmutableAttributes()` | Old/new values | **No** | No |
 | `enforceIfMatch()` | Expected vs current ETag | **No** | No |
-| `guardSoftDeleted()` | "not found" (intentionally vague per RFC) | N/A | No |
 | `assertSchemaUniqueness()` | Attribute path + value | No | No |
 | Bulk `buildErrorResult()` | Passes through inner error | No | No |
 
@@ -256,17 +255,6 @@ LoggingService                    ← DB persistence (fire-and-forget batch)
 | ON | + `IgnoreReadOnlyAttributesInPatch=True` | Strip + WARN | WARN | No |
 | ON | immutability violation | 400/mutability | No service log | **No** |
 
-### SoftDeleteEnabled × ReprovisionOnConflict
-
-| SoftDelete | Reprovision | POST Duplicate | Log |
-|---|---|---|---|
-| OFF | any | 409/uniqueness | WARN (filter) |
-| ON | OFF | 409 (even soft-deleted) | WARN |
-| ON | ON + soft-deleted | 201 re-provision | **INFO** |
-| ON | ON + active | 409 | WARN |
-
-**guardSoftDeleted()** logs at **DEBUG only** → invisible in production (default INFO).
-
 ### RequireIfMatch × ETag
 
 | RequireIfMatch | If-Match | Result | Any Log? |
@@ -295,7 +283,7 @@ LoggingService                    ← DB persistence (fire-and-forget batch)
 |---|---|---|
 | Log format | `pretty` (colorized) | `json` (structured) |
 | Default level | DEBUG | INFO |
-| `guardSoftDeleted()` | Visible (DEBUG) | **Invisible** (below INFO) |
+
 | Auth secret | Auto-generated + WARN | FATAL if not configured |
 
 ---
@@ -404,7 +392,7 @@ At 100 req/s → 400 INFO lines/s. HTTP bookends and intent logs are redundant.
 | DB connection timeout on POST | **4/10** | No service ERROR log, raw Prisma error |
 | Bulk request with 30 ops, #17 fails | **3/10** | Zero bulk logging, no per-op index |
 | Auth failure for specific endpoint | **9/10** | Best-logged flow — every step logged |
-| Soft-delete 404 vs real 404 | **5/10** | `guardSoftDeleted` at DEBUG — invisible in production |
+
 | Schema validation error — which preset? | **5/10** | No preset name in error or log |
 | Who changed log level to TRACE? | **0/10** | Config changes not logged at all |
 
@@ -453,7 +441,7 @@ At 100 req/s → 400 INFO lines/s. HTTP bookends and intent logs are redundant.
 | **G2** | InMemory `delete()` silently no-ops | **High** | ✅ Resolved | Step 2: RepositoryError with NOT_FOUND on delete |
 | **G3** | BulkProcessor zero logging | **High** | ✅ Resolved | Step 8: SCIM_BULK category + start/complete/error logs |
 | **G4** | Generic service uses `GENERAL` category | **High** | ✅ Resolved | Step 8: Replaced with SCIM_RESOURCE |
-| **G5** | `guardSoftDeleted` invisible in production | **High** | ✅ Resolved | Step 6: Enriched context carries activeFlags |
+| **G5** | *(removed — soft-delete feature removed in v7)* | — | — | — |
 | **G6** | Users service no DB error wrapping | **High** | ✅ Resolved | Step 3: handleRepositoryError in all services |
 | **G7** | `ScimExceptionFilter` only catches `HttpException` | **High** | ✅ Resolved | Step 1: GlobalExceptionFilter @Catch() |
 | **G8** | Only 6 `logger.error()` calls | **High** | ✅ Resolved | Step 3: ERROR before every 5xx throw |

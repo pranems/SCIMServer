@@ -23,21 +23,21 @@ import {
 } from './helpers/fixtures';
 
 /**
- * Soft Delete, Config Flag Combinations, and PATCH Path Patterns (E2E).
+ * Delete Lifecycle, Config Flag Combinations, and PATCH Path Patterns (E2E).
  *
- * RFC 7644 §3.6 compliance: soft-deleted resources MUST return 404 on
- * GET/PATCH/PUT/DELETE and MUST be omitted from LIST/query results.
+ * Settings v7: No soft-delete concept — DELETE always hard-deletes (row removed).
+ * UserSoftDeleteEnabled gates PATCH active=false (soft-delete).
  *
  * Tests:
- * - SoftDeleteEnabled: DELETE sets active=false, subsequent GET/PATCH/PUT/DELETE returns 404
+ * - Hard delete: DELETE removes user/group, subsequent GET returns 404
  * - Double-delete returns 404
- * - LIST excludes soft-deleted resources
- * - PATCH on soft-deleted users returns 404 (valuePath, extension URN, dot-notation)
- * - Config flag combinations (SoftDelete + StrictSchema, SoftDelete + MultiOp, etc.)
+ * - LIST excludes hard-deleted resources (row gone)
+ * - UserSoftDeleteEnabled gates PATCH active=false
+ * - Config flag combinations (Deactivation + StrictSchema, etc.)
  * - StrictSchemaValidation E2E
  * - AllowAndCoerceBooleanStrings E2E
  */
-describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
+describe('Delete Lifecycle, Flag Combinations & PATCH Paths (E2E)', () => {
   let app: INestApplication;
   let token: string;
 
@@ -55,14 +55,12 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════
-  // SoftDeleteEnabled — Users
+  // Hard Delete — Users (settings v7: DELETE always removes row)
   // ═══════════════════════════════════════════════════════════
 
-  describe('SoftDeleteEnabled — Users', () => {
-    it('should soft-delete user (DELETE returns 204, GET returns 404 per RFC 7644 §3.6)', async () => {
-      const endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
-      });
+  describe('Hard Delete — Users', () => {
+    it('should hard-delete user (DELETE returns 204, GET returns 404)', async () => {
+      const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
 
       const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
@@ -71,14 +69,12 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       // DELETE should return 204
       await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(204);
 
-      // GET should return 404 per RFC 7644 §3.6
+      // GET should return 404 (row physically removed)
       await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(404);
     });
 
-    it('should double-delete soft-deleted user returns 404 (RFC 7644 §3.6)', async () => {
-      const endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
-      });
+    it('should double-delete returns 404 (row already gone)', async () => {
+      const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
 
       const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
@@ -90,7 +86,7 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(404);
     });
 
-    it('should hard-delete user when SoftDeleteEnabled is not set (default)', async () => {
+    it('should hard-delete user with default config', async () => {
       const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
 
@@ -103,38 +99,34 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(404);
     });
 
-    it('should exclude soft-deleted users from LIST response (RFC 7644 §3.6)', async () => {
-      const endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
-      });
+    it('should exclude hard-deleted users from LIST response', async () => {
+      const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
 
       const user1 = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
       const user2 = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
 
-      // Soft-delete user1
+      // Hard-delete user1
       await scimDelete(app, `${basePath}/Users/${user1.id}`, token).expect(204);
 
-      // LIST should return only the active user
+      // LIST should return only the remaining user
       const listRes = await scimGet(app, `${basePath}/Users`, token).expect(200);
       expect(listRes.body.totalResults).toBe(1);
       expect(listRes.body.Resources[0].id).toBe(user2.id);
       expect(listRes.body.Resources[0].active).toBe(true);
     });
 
-    it('should filter soft-deleted users — active eq false returns 0 results (excluded from list)', async () => {
-      const endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
-      });
+    it('should return empty list when filtering for hard-deleted users (active eq false)', async () => {
+      const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
 
       const user1 = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
       await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201);
 
-      // Soft-delete user1
+      // Hard-delete user1
       await scimDelete(app, `${basePath}/Users/${user1.id}`, token).expect(204);
 
-      // Filter for inactive users — soft-deleted are excluded per RFC 7644 §3.6
+      // Filter for inactive users — hard-deleted row is gone, no active=false records exist
       const res = await scimGet(
         app,
         `${basePath}/Users?filter=active eq false`,
@@ -144,15 +136,13 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
     });
 
     it('should filter active-only users with active eq true', async () => {
-      const endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
-      });
+      const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
 
       const user1 = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
       const user2 = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
 
-      // Soft-delete user1
+      // Hard-delete user1
       await scimDelete(app, `${basePath}/Users/${user1.id}`, token).expect(204);
 
       // Filter for active users only
@@ -166,35 +156,31 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       expect(res.body.Resources[0].id).toBe(user2.id);
     });
 
-    it('should return 404 when trying to PATCH (re-activate) soft-deleted user', async () => {
-      const endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
-      });
+    it('should return 404 when trying to PATCH a hard-deleted user', async () => {
+      const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
 
       const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
 
-      // Soft-delete
+      // Hard-delete
       await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(204);
 
       // GET returns 404
       await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(404);
 
-      // PATCH (re-activate attempt) returns 404 per RFC 7644 §3.6
+      // PATCH (re-activate attempt) returns 404 — row is gone
       const patch = patchOp([{ op: 'replace', path: 'active', value: true }]);
       await scimPatch(app, `${basePath}/Users/${user.id}`, token, patch).expect(404);
     });
   });
 
   // ═══════════════════════════════════════════════════════════
-  // SoftDeleteEnabled — Groups
+  // Hard Delete — Groups (settings v7: DELETE always removes row)
   // ═══════════════════════════════════════════════════════════
 
-  describe('SoftDeleteEnabled — Groups', () => {
+  describe('Hard Delete — Groups', () => {
     it('should hard-delete group (DELETE returns 204, GET returns 404)', async () => {
-      const endpointId = await createEndpointWithConfig(app, token, {
-        GroupHardDeleteEnabled: 'True',
-      });
+      const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
 
       const group = (await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)).body;
@@ -208,10 +194,8 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       await scimGet(app, `${basePath}/Groups/${group.id}`, token).expect(404);
     });
 
-    it('should double-delete soft-deleted group returns 404 (RFC 7644 §3.6)', async () => {
-      const endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
-      });
+    it('should double-delete group returns 404', async () => {
+      const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
 
       const group = (await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)).body;
@@ -220,7 +204,7 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       await scimDelete(app, `${basePath}/Groups/${group.id}`, token).expect(404);
     });
 
-    it('should hard-delete group when SoftDeleteEnabled is not set', async () => {
+    it('should hard-delete group with default config', async () => {
       const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
 
@@ -230,19 +214,17 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       await scimGet(app, `${basePath}/Groups/${group.id}`, token).expect(404);
     });
 
-    it('should exclude soft-deleted groups from LIST (RFC 7644 §3.6)', async () => {
-      const endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
-      });
+    it('should exclude hard-deleted groups from LIST', async () => {
+      const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
 
       const g1 = (await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)).body;
       const g2 = (await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)).body;
 
-      // Soft-delete g1
+      // Hard-delete g1
       await scimDelete(app, `${basePath}/Groups/${g1.id}`, token).expect(204);
 
-      // LIST returns only active group
+      // LIST returns only remaining group
       const listRes = await scimGet(app, `${basePath}/Groups`, token).expect(200);
       expect(listRes.body.totalResults).toBe(1);
       expect(listRes.body.Resources[0].id).toBe(g2.id);
@@ -261,38 +243,34 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════
-  // PATCH on soft-deleted users (various paths)
+  // PATCH on hard-deleted users (various paths)
   // ═══════════════════════════════════════════════════════════
 
-  describe('PATCH on soft-deleted users', () => {
-    it('should return 404 when PATCHing displayName on soft-deleted user', async () => {
-      const endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
-      });
+  describe('PATCH on hard-deleted users', () => {
+    it('should return 404 when PATCHing displayName on hard-deleted user', async () => {
+      const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
 
       const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
       await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(204);
 
-      // PATCH displayName on inactive user — returns 404 per RFC 7644 §3.6
+      // PATCH displayName on deleted user — returns 404
       const patch = patchOp([{ op: 'replace', path: 'displayName', value: 'Inactive Updated' }]);
       await scimPatch(app, `${basePath}/Users/${user.id}`, token, patch).expect(404);
     });
 
-    it('should return 404 when PATCHing valuePath emails on soft-deleted user', async () => {
-      const endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
-      });
+    it('should return 404 when PATCHing valuePath emails on hard-deleted user', async () => {
+      const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
 
       const user = (await scimPost(app, `${basePath}/Users`, token, validUser({
         emails: [{ value: 'original@work.com', type: 'work', primary: true }],
       })).expect(201)).body;
 
-      // Soft-delete
+      // Hard-delete
       await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(204);
 
-      // PATCH email via valuePath on inactive user — returns 404 per RFC 7644 §3.6
+      // PATCH email via valuePath on deleted user — returns 404
       const patch = patchOp([{
         op: 'replace',
         path: 'emails[type eq "work"].value',
@@ -301,10 +279,8 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       await scimPatch(app, `${basePath}/Users/${user.id}`, token, patch).expect(404);
     });
 
-    it('should return 404 when PATCHing extension URN on soft-deleted user', async () => {
-      const endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
-      });
+    it('should return 404 when PATCHing extension URN on hard-deleted user', async () => {
+      const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
       const ENTERPRISE = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
 
@@ -313,10 +289,10 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
         [ENTERPRISE]: { department: 'Engineering' },
       })).expect(201)).body;
 
-      // Soft-delete
+      // Hard-delete
       await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(204);
 
-      // PATCH extension attribute on inactive user — returns 404 per RFC 7644 §3.6
+      // PATCH extension attribute on deleted user — returns 404
       const patch = patchOp([{
         op: 'replace',
         path: `${ENTERPRISE}:department`,
@@ -325,9 +301,8 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       await scimPatch(app, `${basePath}/Users/${user.id}`, token, patch).expect(404);
     });
 
-    it('should return 404 when PATCHing dot-notation on soft-deleted user (VerbosePatch)', async () => {
+    it('should return 404 when PATCHing dot-notation on hard-deleted user (VerbosePatch)', async () => {
       const endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
         VerbosePatchSupported: 'true',
       });
       const basePath = scimBasePath(endpointId);
@@ -336,10 +311,10 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
         name: { givenName: 'OldGiven', familyName: 'Family' },
       })).expect(201)).body;
 
-      // Soft-delete
+      // Hard-delete
       await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(204);
 
-      // PATCH name.givenName with dot-notation — returns 404 per RFC 7644 §3.6
+      // PATCH name.givenName with dot-notation — returns 404
       const patch = patchOp([{ op: 'replace', path: 'name.givenName', value: 'NewGiven' }]);
       await scimPatch(app, `${basePath}/Users/${user.id}`, token, patch).expect(404);
     });
@@ -350,9 +325,8 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
   // ═══════════════════════════════════════════════════════════
 
   describe('Config flag combinations', () => {
-    it('SoftDeleteEnabled + StrictSchemaValidation: soft delete works, unknown extension rejected', async () => {
+    it('Hard Delete + StrictSchemaValidation: delete removes row, unknown extension rejected', async () => {
       const endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
         StrictSchemaValidation: 'True',
       });
       const basePath = scimBasePath(endpointId);
@@ -360,7 +334,7 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       // Create user with valid schema
       const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
 
-      // Soft-delete works — GET returns 404 per RFC 7644 §3.6
+      // Hard-delete removes row — GET returns 404
       await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(204);
       await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(404);
 
@@ -371,10 +345,9 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       } as any)).expect(400);
     });
 
-    it('SoftDeleteEnabled + MultiOpPatch: soft delete + multi-member add', async () => {
+    it('Hard Delete + MultiMemberPatchOp: hard delete + multi-member add', async () => {
       const endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
-        MultiOpPatchRequestAddMultipleMembersToGroup: 'True',
+        MultiMemberPatchOpForGroupEnabled: 'True',
       });
       const basePath = scimBasePath(endpointId);
 
@@ -391,14 +364,13 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       ).expect(200);
       expect(res.body.members.length).toBeGreaterThanOrEqual(2);
 
-      // Soft-delete the group — GET returns 404 per RFC 7644 §3.6
+      // Hard-delete removes row — GET returns 404
       await scimDelete(app, `${basePath}/Groups/${group.id}`, token).expect(204);
       await scimGet(app, `${basePath}/Groups/${group.id}`, token).expect(404);
     });
 
-    it('SoftDeleteEnabled=False + StrictSchemaValidation=True: hard delete + strict schema', async () => {
+    it('StrictSchemaValidation=True: hard delete + strict schema', async () => {
       const endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'False',
         StrictSchemaValidation: 'True',
       });
       const basePath = scimBasePath(endpointId);
@@ -416,9 +388,8 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       } as any)).expect(400);
     });
 
-    it('SoftDeleteEnabled + VerbosePatch + RemoveAllMembers=False: all three flags', async () => {
+    it('VerbosePatch + RemoveAllMembers=False: both flags with hard delete', async () => {
       const endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
         VerbosePatchSupported: 'true',
         PatchOpAllowRemoveAllMembers: 'False',
       });
@@ -437,18 +408,16 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       await scimPatch(app, `${basePath}/Groups/${group.id}`, token, addMemberPatch(user.id)).expect(200);
       await scimPatch(app, `${basePath}/Groups/${group.id}`, token, removeAllMembersPatch()).expect(400);
 
-      // Soft-delete works — GET returns 404 per RFC 7644 §3.6
+      // Hard-delete removes row — GET returns 404
       await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(204);
       await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(404);
     });
 
-    it('All flags enabled: SoftDelete + Strict + Verbose + MultiOp + RemoveAll', async () => {
+    it('All flags enabled: Strict + Verbose + MultiMemberPatchOp + RemoveAll', async () => {
       const endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
         StrictSchemaValidation: 'True',
         VerbosePatchSupported: 'true',
-        MultiOpPatchRequestAddMultipleMembersToGroup: 'True',
-        MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'True',
+        MultiMemberPatchOpForGroupEnabled: 'True',
         PatchOpAllowRemoveAllMembers: 'True',
       });
       const basePath = scimBasePath(endpointId);
@@ -477,7 +446,7 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       // Remove-all members allowed
       await scimPatch(app, `${basePath}/Groups/${group.id}`, token, removeAllMembersPatch()).expect(200);
 
-      // Soft-delete user — GET returns 404 per RFC 7644 §3.6
+      // Hard-delete removes row — GET returns 404
       await scimDelete(app, `${basePath}/Users/${user1.id}`, token).expect(204);
       await scimGet(app, `${basePath}/Users/${user1.id}`, token).expect(404);
 
@@ -1006,7 +975,6 @@ describe('Soft Delete, Flag Combinations & PATCH Paths (E2E)', () => {
       it('should 409 on POST with same userName even with old reprovision flags set', async () => {
         const endpointId = await createEndpointWithConfig(app, token, {
           UserSoftDeleteEnabled: 'True',
-          UserHardDeleteEnabled: 'True',
         });
         const basePath = scimBasePath(endpointId);
 

@@ -683,7 +683,6 @@ model ScimResource {
   active       Boolean?  @default(true)
   payload      Json      @default("{}")    // JSONB -- all non-indexed attrs
   version      Int       @default(1)
-  deletedAt    DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 }

@@ -130,7 +130,7 @@ export class EndpointController {
   /**
    * Get endpoint statistics (nested format)
    * GET /admin/endpoints/{endpointId}/stats
-   * Returns: { users: { total, active, softDeleted }, groups: { ... }, groupMembers, requestLogs }
+   * Returns: { users: { total, active, inactive }, groups: { ... }, groupMembers, requestLogs }
    */
   @Get(':endpointId/stats')
   async getEndpointStats(

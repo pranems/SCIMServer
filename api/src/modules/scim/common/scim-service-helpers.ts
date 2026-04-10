@@ -7,7 +7,6 @@
  *
  * @see RFC 7643 §2.1 — Attribute Characteristics
  * @see RFC 7644 §3.14 — ETag/If-Match
- * @see RFC 7644 §3.6 — Soft Delete Guard
  */
 
 import { createScimError } from './scim-errors';
@@ -328,34 +327,6 @@ function stripSubAttrs(value: unknown, subNever: Set<string>): void {
         }
       }
     }
-  }
-}
-
-/**
- * RFC 7644 §3.6: Guard against operations on soft-deleted resources.
- *
- * When UserSoftDeleteEnabled is active, a resource with deletedAt set is considered
- * deleted and MUST return 404 for all subsequent operations (GET, PATCH, PUT, DELETE).
- * Note: A resource disabled via PATCH (active=false) is NOT soft-deleted — only DELETE sets deletedAt.
- *
- * Settings v7: Uses USER_SOFT_DELETE_ENABLED (default: true) instead of old SOFT_DELETE_ENABLED.
- */
-export function guardSoftDeleted(
-  record: { deletedAt?: Date | null },
-  config: EndpointConfig | undefined,
-  scimId: string,
-  logger: ScimLogger,
-  logCategory: LogCategory,
-): void {
-  const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED);
-  if (softDelete && record.deletedAt != null) {
-    logger.debug(logCategory, 'Soft-deleted resource accessed — returning 404', { scimId });
-    throw createScimError({
-      status: 404,
-      scimType: 'noTarget',
-      detail: `Resource ${scimId} not found.`,
-      diagnostics: { errorCode: 'RESOURCE_SOFT_DELETED', triggeredBy: 'UserSoftDeleteEnabled' },
-    });
   }
 }
 
@@ -1322,7 +1293,7 @@ export function assertSchemaUniqueness(
   endpointId: string,
   payload: Record<string, unknown>,
   uniqueAttrs: Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }>,
-  existingResources: Array<{ scimId: string; rawPayload: string | Record<string, unknown>; deletedAt?: Date | null }>,
+  existingResources: Array<{ scimId: string; rawPayload: string | Record<string, unknown> }>,
   excludeScimId?: string,
 ): void {
   if (uniqueAttrs.length === 0) return;
@@ -1334,8 +1305,6 @@ export function assertSchemaUniqueness(
     for (const existing of existingResources) {
       // Skip self (for PUT/PATCH)
       if (excludeScimId && existing.scimId === excludeScimId) continue;
-      // Skip soft-deleted resources
-      if (existing.deletedAt != null) continue;
 
       const existingValue = extractFromRawPayload(existing.rawPayload, desc);
       if (existingValue === undefined || existingValue === null) continue;

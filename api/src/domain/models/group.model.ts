@@ -12,7 +12,6 @@ export interface GroupRecord {
   externalId: string | null;
   displayName: string;
   active: boolean;
-  deletedAt: Date | null;
   rawPayload: string;
   version: number;
   meta: string | null;
@@ -48,7 +47,6 @@ export interface GroupUpdateInput {
   displayName?: string;
   externalId?: string | null;
   active?: boolean;
-  deletedAt?: Date | null;
   rawPayload?: string;
   meta?: string;
 }

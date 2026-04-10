@@ -1,7 +1,7 @@
 # 📚 SCIMServer Documentation Index
 
-> **Version:** 0.32.0 · **Updated:** April 7, 2026  
-> 61 active docs in `docs/` · 42 E2E suites (889 pass) · 78 unit suites (3,197 pass) · 6 built-in presets
+> **Version:** 0.33.0 · **Updated:** April 9, 2026  
+> 61 active docs in `docs/` · 44 E2E suites (926 pass) · 80 unit suites (3,191 pass) · 6 built-in presets
 
 ---
 
@@ -11,7 +11,7 @@
 |----------|-------------|
 | [README.md](../README.md) | Overview, quick start, architecture, compliance, deployment |
 | [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) | Living stats — LoC, test counts, dependency versions, architecture |
-| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 → v0.32.0 |
+| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 → v0.33.0 |
 | [admin.md](../admin.md) | Release workflow (version, tag, publish, update) |
 
 ## Deployment Guides
@@ -130,7 +130,7 @@
 | Example JSONs | [examples/](examples/) | Request/response samples for all resource types |
 | Mermaid Diagrams | [create-user-sequence.mmd](create-user-sequence.mmd), [list-get-user-sequence.mmd](list-get-user-sequence.mmd) | Sequence diagrams |
 
-> **Note:** All collections were regenerated for v0.32.0 with full 76-endpoint coverage including multi-tenant endpoint architecture, admin management, per-endpoint credentials, /Me, custom resource types, database browser, activity feed, and structured logging.
+> **Note:** All collections were regenerated for v0.33.0 with full 76-endpoint coverage including multi-tenant endpoint architecture, admin management, per-endpoint credentials, /Me, custom resource types, database browser, activity feed, and structured logging.
 
 ## Archived Documentation
 
@@ -140,7 +140,7 @@
 
 ---
 
-## Current Test Counts (v0.32.0)
+## Current Test Counts (v0.33.0)
 
 | Suite | Suites | Tests | Status |
 |-------|--------|-------|--------|

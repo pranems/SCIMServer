@@ -368,10 +368,10 @@ endpoint-specific extension attribute characteristics.
 | # | Test Name | Section |
 |---|-----------|---------|
 | H1 | `9x.1: PUT userName collision returns 409` | 9x |
-| H2 | `9x.2: PUT externalId collision returns 409` | 9x |
+| H2 | `9x.2: PUT with duplicate externalId accepted (uniqueness:none)` | 9x |
 | H3 | `9x.4: PUT case-insensitive userName collision returns 409` | 9x |
 | H4 | `9x.5: PATCH userName collision returns 409` | 9x |
-| H5 | `9x.6: PATCH externalId collision returns 409` | 9x |
+| H5 | `9x.6: PATCH with duplicate externalId accepted (uniqueness:none)` | 9x |
 | H6 | `9x.8: PUT missing required userName returns 400` | 9x |
 
 ### Symptom

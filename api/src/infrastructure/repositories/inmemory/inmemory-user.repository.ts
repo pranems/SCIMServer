@@ -33,7 +33,6 @@ export class InMemoryUserRepository implements IUserRepository {
       userName: input.userName,
       displayName: input.displayName,
       active: input.active,
-      deletedAt: null,
       rawPayload: input.rawPayload,
       version: 1,
       meta: input.meta,
@@ -109,9 +108,9 @@ export class InMemoryUserRepository implements IUserRepository {
   async findConflict(
     endpointId: string,
     userName: string,
-    externalId?: string,
     excludeScimId?: string,
   ): Promise<UserConflictResult | null> {
+    // Only userName is checked — externalId/displayName are NOT unique per RFC 7643.
     const lowerName = userName.toLowerCase();
     for (const user of this.users.values()) {
       if (user.endpointId !== endpointId) continue;
@@ -123,16 +122,6 @@ export class InMemoryUserRepository implements IUserRepository {
           userName: user.userName,
           externalId: user.externalId,
           active: user.active,
-          deletedAt: user.deletedAt,
-        };
-      }
-      if (externalId && user.externalId === externalId) {
-        return {
-          scimId: user.scimId,
-          userName: user.userName,
-          externalId: user.externalId,
-          active: user.active,
-          deletedAt: user.deletedAt,
         };
       }
     }

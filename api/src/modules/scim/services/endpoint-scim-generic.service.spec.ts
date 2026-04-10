@@ -34,7 +34,6 @@ describe('EndpointScimGenericService', () => {
     externalId: 'ext-001',
     displayName: 'Test Device',
     active: true,
-    deletedAt: null,
     rawPayload: JSON.stringify({
       displayName: 'Test Device',
       serialNumber: 'SN-001',
@@ -118,7 +117,6 @@ describe('EndpointScimGenericService', () => {
 
   describe('createResource', () => {
     it('should create a generic resource and return SCIM response', async () => {
-      mockGenericRepo.findByExternalId.mockResolvedValue(null);
       mockGenericRepo.create.mockResolvedValue(mockGenericRecord);
 
       const body = {
@@ -155,23 +153,6 @@ describe('EndpointScimGenericService', () => {
         await service.createResource(body, baseUrl, endpointId, deviceResourceType);
       } catch (e: any) {
         expect(e.getStatus()).toBe(400);
-      }
-    });
-
-    it('should throw 409 for duplicate externalId', async () => {
-      mockGenericRepo.findByExternalId.mockResolvedValue(mockGenericRecord);
-
-      const body = {
-        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Device'],
-        displayName: 'Duplicate',
-        externalId: 'ext-001',
-      };
-
-      try {
-        await service.createResource(body, baseUrl, endpointId, deviceResourceType);
-        fail('Expected 409');
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(409);
       }
     });
 
@@ -220,24 +201,6 @@ describe('EndpointScimGenericService', () => {
 
       try {
         await service.getResource('bad-id', baseUrl, endpointId, deviceResourceType);
-        fail('Expected 404');
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(404);
-      }
-    });
-
-    it('should throw 404 for soft-deleted resource', async () => {
-      mockGenericRepo.findByScimId.mockResolvedValue({
-        ...mockGenericRecord,
-        deletedAt: new Date(),
-      });
-
-      const softDeleteConfig: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
-      };
-
-      try {
-        await service.getResource('scim-dev-001', baseUrl, endpointId, deviceResourceType, softDeleteConfig);
         fail('Expected 404');
       } catch (e: any) {
         expect(e.getStatus()).toBe(404);
@@ -491,194 +454,16 @@ describe('EndpointScimGenericService', () => {
         expect(e.getStatus()).toBe(404);
       }
     });
-
-    it('should throw 404 when double-deleting a soft-deleted resource', async () => {
-      mockGenericRepo.findByScimId.mockResolvedValue({
-        ...mockGenericRecord,
-        deletedAt: new Date(),
-      });
-
-      const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
-      };
-
-      try {
-        await service.deleteResource('scim-dev-001', endpointId, deviceResourceType, config);
-        fail('Expected 404');
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(404);
-      }
-    });
-  });
-
-  // ─── guardSoftDeleted on PUT ─────────────────────────────────────────
-
-  describe('replaceResource — soft-delete guard', () => {
-    it('should throw 404 when replacing a soft-deleted resource', async () => {
-      mockGenericRepo.findByScimId.mockResolvedValue({
-        ...mockGenericRecord,
-        deletedAt: new Date(),
-      });
-
-      const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
-      };
-
-      try {
-        await service.replaceResource(
-          'scim-dev-001',
-          { schemas: ['urn:ietf:params:scim:schemas:core:2.0:Device'], displayName: 'X' },
-          baseUrl,
-          endpointId,
-          deviceResourceType,
-          config,
-        );
-        fail('Expected 404');
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(404);
-      }
-    });
-  });
-
-  // ─── guardSoftDeleted on PATCH ────────────────────────────────────────
-
-  describe('patchResource — soft-delete guard', () => {
-    it('should throw 404 when patching a soft-deleted resource', async () => {
-      mockGenericRepo.findByScimId.mockResolvedValue({
-        ...mockGenericRecord,
-        deletedAt: new Date(),
-      });
-
-      const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
-      };
-
-      try {
-        await service.patchResource(
-          'scim-dev-001',
-          {
-            schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
-            Operations: [{ op: 'replace', path: 'displayName', value: 'X' }],
-          },
-          baseUrl,
-          endpointId,
-          deviceResourceType,
-          config,
-        );
-        fail('Expected 404');
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(404);
-      }
-    });
-  });
-
-  // ─── listResources — soft-delete filtering ────────────────────────────
-
-  describe('listResources — soft-delete filtering', () => {
-    it('should exclude soft-deleted resources from LIST when SoftDeleteEnabled', async () => {
-      const activeRecord = { ...mockGenericRecord, id: 'rec-active', scimId: 'scim-active', deletedAt: null };
-      const deletedRecord = { ...mockGenericRecord, id: 'rec-del', scimId: 'scim-del', deletedAt: new Date() };
-      mockGenericRepo.findAll.mockResolvedValue([activeRecord, deletedRecord]);
-
-      const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
-      };
-
-      const result = await service.listResources(
-        {},
-        baseUrl,
-        endpointId,
-        deviceResourceType,
-        config,
-      );
-
-      expect(result.totalResults).toBe(1);
-      expect(result.Resources).toHaveLength(1);
-      expect((result.Resources as any[])[0].id).toBe('scim-active');
-    });
-
-    it('should include soft-deleted resources in LIST when UserSoftDeleteEnabled is false', async () => {
-      const activeRecord = { ...mockGenericRecord, id: 'rec-active', scimId: 'scim-active', deletedAt: null };
-      const deletedRecord = { ...mockGenericRecord, id: 'rec-del', scimId: 'scim-del', deletedAt: new Date() };
-      mockGenericRepo.findAll.mockResolvedValue([activeRecord, deletedRecord]);
-
-      const result = await service.listResources(
-        {},
-        baseUrl,
-        endpointId,
-        deviceResourceType,
-        // Settings v7: UserSoftDeleteEnabled must be explicitly false to include deleted
-        { [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: false } as EndpointConfig,
-      );
-
-      expect(result.totalResults).toBe(2);
-      expect(result.Resources).toHaveLength(2);
-    });
   });
 
   // ─── Uniqueness on PUT ────────────────────────────────────────────────
 
-  describe('replaceResource — uniqueness conflict', () => {
-    it('should throw 409 when PUT causes externalId conflict', async () => {
+  // externalId and displayName are no longer checked for uniqueness on custom resource types.
+  // These tests verify PUT/PATCH succeed when there are no schema-driven uniqueness constraints.
+
+  describe('replaceResource — no externalId/displayName uniqueness', () => {
+    it('should allow PUT even when another resource has the same externalId', async () => {
       mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
-      // findConflict: another resource has the same externalId
-      mockGenericRepo.findByExternalId.mockResolvedValue({
-        ...mockGenericRecord,
-        id: 'rec-other',
-        scimId: 'scim-other',
-        externalId: 'ext-conflict',
-      });
-
-      try {
-        await service.replaceResource(
-          'scim-dev-001',
-          {
-            schemas: ['urn:ietf:params:scim:schemas:core:2.0:Device'],
-            displayName: 'Updated',
-            externalId: 'ext-conflict',
-          },
-          baseUrl,
-          endpointId,
-          deviceResourceType,
-        );
-        fail('Expected 409');
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(409);
-      }
-    });
-
-    it('should throw 409 when PUT causes displayName conflict', async () => {
-      mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
-      mockGenericRepo.findByExternalId.mockResolvedValue(null);
-      mockGenericRepo.findByDisplayName.mockResolvedValue({
-        ...mockGenericRecord,
-        id: 'rec-other',
-        scimId: 'scim-other',
-        displayName: 'Duplicate Name',
-      });
-
-      try {
-        await service.replaceResource(
-          'scim-dev-001',
-          {
-            schemas: ['urn:ietf:params:scim:schemas:core:2.0:Device'],
-            displayName: 'Duplicate Name',
-          },
-          baseUrl,
-          endpointId,
-          deviceResourceType,
-        );
-        fail('Expected 409');
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(409);
-      }
-    });
-
-    it('should allow PUT when externalId belongs to itself', async () => {
-      mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
-      // findConflict returns the SAME resource (same scimId) — not a conflict
-      mockGenericRepo.findByExternalId.mockResolvedValue(mockGenericRecord);
-      mockGenericRepo.findByDisplayName.mockResolvedValue(null);
       mockGenericRepo.update.mockResolvedValue({
         ...mockGenericRecord,
         version: 2,
@@ -688,8 +473,8 @@ describe('EndpointScimGenericService', () => {
         'scim-dev-001',
         {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:Device'],
-          displayName: 'Updated Self',
-          externalId: 'ext-001',
+          displayName: 'Updated',
+          externalId: 'ext-conflict',
         },
         baseUrl,
         endpointId,
@@ -703,148 +488,27 @@ describe('EndpointScimGenericService', () => {
 
   // ─── Uniqueness on PATCH ──────────────────────────────────────────────
 
-  describe('patchResource — uniqueness conflict', () => {
-    it('should throw 409 when PATCH causes displayName conflict', async () => {
+  describe('patchResource — no externalId/displayName uniqueness', () => {
+    it('should allow PATCH even when displayName collides (no uniqueness enforcement)', async () => {
       mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
-      // After patch, findConflict detects displayName collision
-      mockGenericRepo.findByExternalId.mockResolvedValue(null);
-      mockGenericRepo.findByDisplayName.mockResolvedValue({
+      mockGenericRepo.update.mockResolvedValue({
         ...mockGenericRecord,
-        id: 'rec-other',
-        scimId: 'scim-other',
         displayName: 'Conflicting Name',
+        version: 2,
       });
 
-      try {
-        await service.patchResource(
-          'scim-dev-001',
-          {
-            schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
-            Operations: [{ op: 'replace', path: 'displayName', value: 'Conflicting Name' }],
-          },
-          baseUrl,
-          endpointId,
-          deviceResourceType,
-        );
-        fail('Expected 409');
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(409);
-      }
-    });
-  });
+      const result = await service.patchResource(
+        'scim-dev-001',
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'displayName', value: 'Conflicting Name' }],
+        },
+        baseUrl,
+        endpointId,
+        deviceResourceType,
+      );
 
-  // ─── displayName uniqueness on CREATE ─────────────────────────────────
-
-  describe('createResource — displayName uniqueness', () => {
-    it('should throw 409 for duplicate displayName', async () => {
-      mockGenericRepo.findByExternalId.mockResolvedValue(null);
-      mockGenericRepo.findByDisplayName.mockResolvedValue({
-        ...mockGenericRecord,
-        displayName: 'Duplicate Device',
-      });
-
-      try {
-        await service.createResource(
-          {
-            schemas: ['urn:ietf:params:scim:schemas:core:2.0:Device'],
-            displayName: 'Duplicate Device',
-          },
-          baseUrl,
-          endpointId,
-          deviceResourceType,
-        );
-        fail('Expected 409');
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(409);
-      }
-    });
-  });
-
-  // ─── Reprovision on conflict ──────────────────────────────────────────
-
-  describe('createResource — settings v7: POST collision always 409 (no reprovision)', () => {
-    it('should throw 409 even with old reprovision flags set (settings v7)', async () => {
-      const softDeletedRecord: GenericResourceRecord = {
-        ...mockGenericRecord,
-        deletedAt: new Date(),
-        active: false,
-      };
-      mockGenericRepo.findByExternalId.mockResolvedValue(softDeletedRecord);
-
-      const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
-      };
-
-      try {
-        await service.createResource(
-          {
-            schemas: ['urn:ietf:params:scim:schemas:core:2.0:Device'],
-            displayName: 'Re-provisioned Device',
-            externalId: 'ext-001',
-          },
-          baseUrl,
-          endpointId,
-          deviceResourceType,
-          config,
-        );
-        fail('Expected 409');
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(409);
-      }
-      expect(mockGenericRepo.update).not.toHaveBeenCalled();
-    });
-
-    it('should return 409 when Reprovision is OFF even if conflict is soft-deleted', async () => {
-      const softDeletedRecord: GenericResourceRecord = {
-        ...mockGenericRecord,
-        deletedAt: new Date(),
-        active: false,
-      };
-      mockGenericRepo.findByExternalId.mockResolvedValue(softDeletedRecord);
-
-      const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]: true,
-      };
-
-      try {
-        await service.createResource(
-          {
-            schemas: ['urn:ietf:params:scim:schemas:core:2.0:Device'],
-            displayName: 'Test',
-            externalId: 'ext-001',
-          },
-          baseUrl,
-          endpointId,
-          deviceResourceType,
-          config,
-        );
-        fail('Expected 409');
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(409);
-      }
-    });
-
-    it('should return 409 when Reprovision is ON but SoftDelete is OFF', async () => {
-      mockGenericRepo.findByExternalId.mockResolvedValue(mockGenericRecord); // active, not soft-deleted
-
-      const config: EndpointConfig = {};
-
-      try {
-        await service.createResource(
-          {
-            schemas: ['urn:ietf:params:scim:schemas:core:2.0:Device'],
-            displayName: 'Test',
-            externalId: 'ext-001',
-          },
-          baseUrl,
-          endpointId,
-          deviceResourceType,
-          config,
-        );
-        fail('Expected 409');
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(409);
-      }
+      expect(result.id).toBe('scim-dev-001');
     });
   });
 
@@ -852,8 +516,6 @@ describe('EndpointScimGenericService', () => {
 
   describe('createResource — readOnly attribute stripping', () => {
     it('should strip readOnly attributes from POST body without error', async () => {
-      mockGenericRepo.findByExternalId.mockResolvedValue(null);
-      mockGenericRepo.findByDisplayName.mockResolvedValue(null);
       mockGenericRepo.create.mockResolvedValue(mockGenericRecord);
 
       // id and meta are readOnly but ensured at the service layer, not stored in payload
@@ -1469,32 +1131,26 @@ describe('EndpointScimGenericService', () => {
   // ─── Post-PATCH uniqueness enforcement ──────────────────────────────
 
   describe('patchResource — post-PATCH uniqueness', () => {
-    it('should throw 409 when PATCH causes displayName conflict', async () => {
-      const conflictRecord = { ...mockGenericRecord, id: 'rec-2', scimId: 'scim-dev-002' };
+    it('should allow PATCH when displayName collides (no uniqueness enforcement)', async () => {
       mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
-      mockGenericRepo.findByExternalId.mockResolvedValue(null);
-      mockGenericRepo.findByDisplayName.mockResolvedValue(conflictRecord);
       mockGenericRepo.update.mockResolvedValue({
         ...mockGenericRecord,
         rawPayload: JSON.stringify({ displayName: 'Conflict Name' }),
         version: 2,
       });
 
-      try {
-        await service.patchResource(
-          'scim-dev-001',
-          {
-            schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
-            Operations: [{ op: 'replace', path: 'displayName', value: 'Conflict Name' }],
-          },
-          baseUrl,
-          endpointId,
-          deviceResourceType,
-        );
-        fail('Expected 409');
-      } catch (e: any) {
-        expect(e.getStatus()).toBe(409);
-      }
+      const result = await service.patchResource(
+        'scim-dev-001',
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', path: 'displayName', value: 'Conflict Name' }],
+        },
+        baseUrl,
+        endpointId,
+        deviceResourceType,
+      );
+
+      expect(result.id).toBe('scim-dev-001');
     });
   });
 
