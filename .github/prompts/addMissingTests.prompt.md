@@ -612,7 +612,7 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
 | Unit  | 3,193  | ?     | +?    |
-| E2E   | 895    | ?     | +?    |
+| E2E   | 939    | ?     | +?    |
 | Live  | ~980   | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*

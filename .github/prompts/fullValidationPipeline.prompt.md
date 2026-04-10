@@ -42,9 +42,7 @@ npx jest --config test/e2e/jest-e2e.config.ts --no-coverage --json --outputFile=
 # Parse results:
 node -e "const r=JSON.parse(require('fs').readFileSync('pipeline-e2e.json','utf8'));console.log('suites:',r.numPassedTestSuites+'/'+r.numTotalTestSuites,'tests:',r.numPassedTests+'/'+r.numTotalTests,'failed:',r.numFailedTests)"
 ```
-> **Baselines (v0.34.0):** 928 pass / 0 fail (11 pre-existing admin inmemory failures) / 45 suites.
-> **Pre-existing:** `admin-api-coverage` (10 failures) + `admin-endpoint-api` (1 failure) — both fail in inmemory mode only. Not new regressions.
-> **To exclude them:** `--testPathIgnorePatterns="admin-api-coverage|admin-endpoint-api"`
+> **Baselines (v0.34.0):** 939 pass / 0 fail / 45 suites.
 > *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 > **E2E config path:** `test/e2e/jest-e2e.config.ts`
 
@@ -316,12 +314,7 @@ if ($endpoints.totalResults -gt 0) {
 
 ## Known Pre-Existing Failures (v0.34.0)
 
-| Suite | Failures | Mode | Root Cause |
-|-------|----------|------|------------|
-| `admin-api-coverage.e2e-spec.ts` | 10 | InMemory E2E only | Admin DB browser endpoints require PostgreSQL; inmemory has no `prisma:error` handling |
-| `admin-endpoint-api.e2e-spec.ts` | 1 | InMemory E2E only | Nested stats format expects `softDeleted` (renamed to `inactive` in v0.34.0) |
-
-All other tests pass: **3,193 unit** (80 suites), **928 E2E** (43/45 suites), **739 live** (all targets).
+**None.** All tests pass: **3,193 unit** (80 suites), **939 E2E** (45 suites), **739 live**.
 
 ## Entra ID Provisioning Configuration
 

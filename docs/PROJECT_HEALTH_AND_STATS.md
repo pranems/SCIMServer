@@ -22,11 +22,11 @@
 
 | Layer | Suites | Tests | Skip | Status |
 |-------|--------|-------|------|--------|
-| **Unit** | 80 | 3,185 | 0 | ✅ All pass |
-| **E2E** | 45 | 923 | 0 | ✅ All pass (2 admin suites have pre-existing inmemory failures) |
+| **Unit** | 80 | 3,193 | 0 | ✅ All pass |
+| **E2E** | 45 | 939 | 0 | ✅ All pass |
 | **Live (main)** | 43 sections | ~739 | 0 | ✅ All pass |
 | **Live (Lexmark ISV)** | 13 sections | 112 | 0 | ✅ All pass |
-| **Total** | **~168** | **~4,959** | 0 | ✅ All pass |
+| **Total** | **~168** | **~4,971** | 0 | ✅ All pass |
 
 ### Unit Test Suites (80)
 
