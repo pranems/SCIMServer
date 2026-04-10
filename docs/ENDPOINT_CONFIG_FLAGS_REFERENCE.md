@@ -359,7 +359,7 @@ When `AllowAndCoerceBooleanStrings` is `true`, the filter `primary eq "True"` co
 |----------|-------|
 | **Config key** | `StrictSchemaValidation` |
 | **Constant** | `ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION` |
-| **Default** | `false` |
+| **Default** | `true` |
 | **Helper** | `getConfigBoolean(config, key)` |
 | **Scope** | POST, PUT, PATCH |
 | **RFC** | RFC 7643 §8.7 (extension registration) |
@@ -368,10 +368,15 @@ When `AllowAndCoerceBooleanStrings` is `true`, the filter `primary eq "True"` co
 **Purpose:** Enforces full schema validation on write operations:
 1. **Extension URN validation**: All extension URNs in the body must be declared in `schemas[]` and registered in the schema registry.
 2. **Type checking**: Attribute types must match schema definitions (string, boolean, integer, etc.).
-3. **Immutability enforcement** (H-2): Immutable attributes cannot be changed after creation.
-4. **Post-PATCH validation** (H-1): PATCH results are validated after assembly.
+3. **Post-PATCH validation** (H-1): PATCH results are validated after assembly.
+4. **Unknown attribute rejection**: Unrecognized attributes → 400.
+5. **Canonical value enforcement**: Values must match schema-declared canonical values.
 
-**When OFF (default):** `validatePayloadSchema()` returns immediately. Extension data is silently accepted. No type checking.
+> **Note (P4 v0.34.0):** Two checks are now **unconditional** regardless of this flag:
+> - **Required attributes** (RFC 7643 §2.4): Missing required attributes on POST/PUT always return 400.
+> - **Immutable enforcement** (RFC 7643 §2.2): Changed immutable attributes on PUT/PATCH always return 400.
+
+**When OFF:** Extension data is silently accepted. No type checking, unknown attribute rejection, or canonical value enforcement. Required and immutable checks still run.
 
 **Example — Strict ON, unregistered extension rejected:**
 

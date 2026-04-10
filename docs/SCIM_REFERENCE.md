@@ -1,7 +1,7 @@
 # SCIM v2 Reference & Examples
 
 > **Status**: Living reference  
-> **Last Updated**: March 31, 2026  
+> **Last Updated**: April 10, 2026  
 > **Baseline**: SCIMServer (current release)
 
 > Implementation-agnostic SCIM 2.0 API reference with runnable example payloads.

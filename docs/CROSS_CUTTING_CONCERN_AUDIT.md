@@ -3,7 +3,7 @@
 **Status:** Current | **Last Updated:** 2026-04-01 | **Baseline:** v0.31.0  
 **Scope:** mutability, returned, uniqueness, required, caseExact — all flows, all resource types, all config combinations  
 **RFC References:** RFC 7643 §2 (Attribute Characteristics), RFC 7644 §3 (Protocol Operations)  
-**Test Baseline:** 3,090 unit (74 suites) · 848 E2E (39 suites) · ~951 live + 112 Lexmark — ALL PASSING
+**Test Baseline:** 3,185 unit (80 suites) · 923 E2E (45 suites) · ~739 live + 112 Lexmark — ALL PASSING
 
 ---
 

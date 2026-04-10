@@ -1,6 +1,6 @@
 # Project Health & Stats
 
-> **Version:** 0.34.0 · **Updated:** April 9, 2026 · **Status:** Production-ready
+> **Version:** 0.34.0 · **Updated:** April 10, 2026 · **Status:** Production-ready
 
 ---
 
@@ -12,7 +12,7 @@
 | **Source LoC** | 29,837 |
 | **Unit test files** (`api/src/**/*.spec.ts`) | 80 |
 | **Unit test LoC** | 32,776 |
-| **E2E test files** (`api/test/e2e/**/*.e2e-spec.ts`) | 44 |
+| **E2E test files** (`api/test/e2e/**/*.e2e-spec.ts`) | 45 |
 | **E2E test LoC** | 13,020 |
 | **Documentation files** (`docs/**/*.md`) | 108 (52 active + 56 archived) |
 | **Scripts** (`scripts/*.ps1`) | 18 |
@@ -22,11 +22,11 @@
 
 | Layer | Suites | Tests | Skip | Status |
 |-------|--------|-------|------|--------|
-| **Unit** | 80 | 3,171 | 0 | ✅ All pass |
-| **E2E** | 44 | 926 | 0 | ✅ All pass |
+| **Unit** | 80 | 3,185 | 0 | ✅ All pass |
+| **E2E** | 45 | 923 | 0 | ✅ All pass (2 admin suites have pre-existing inmemory failures) |
 | **Live (main)** | 43 sections | ~739 | 0 | ✅ All pass |
 | **Live (Lexmark ISV)** | 13 sections | 112 | 0 | ✅ All pass |
-| **Total** | **~167** | **~4,948** | 0 | ✅ All pass |
+| **Total** | **~168** | **~4,959** | 0 | ✅ All pass |
 
 ### Unit Test Suites (80)
 
@@ -35,9 +35,9 @@
 **Auth/OAuth (3):** auth guard, OAuth controller, OAuth service  
 **Modules (59):** controllers, services, DTOs, filters, interceptors, endpoint-profile, discovery, logging, database, web
 
-### E2E Test Suites (44)
+### E2E Test Suites (45)
 
-`admin-api-coverage`, `admin-endpoint-api`, `admin-version`, `advanced-patch`, `attribute-projection`, `authentication`, `bulk-operations`, `config-flags`, `custom-resource-types`, `discovery-endpoints`, `edge-cases`, `endpoint-isolation`, `endpoint-profile`, `endpoint-scoped-logs`, `error-handling`, `etag-conditional`, `filter-operators`, `generic-filter-operators`, `group-lifecycle`, `group-parity-gaps`, `http-error-codes`, `lexmark-isv`, `log-config`, `me-endpoint`, `multi-endpoint-isolation`, `p2-attribute-characteristics`, `per-endpoint-credentials`, `profile-combinations`, `profile-flag-combos`, `rca-diagnostics`, `readonly-stripping`, `returned-characteristic`, `rfc-compliance`, `schema-cache-integration`, `schema-driven-uniqueness`, `schema-validation`, `scim-validator-compliance`, `search-endpoint`, `soft-delete-flags`, `sorting`, `test-gaps-audit`, `test-gaps-audit-2`, `user-lifecycle`, `user-uniqueness-required`
+`admin-api-coverage`, `admin-endpoint-api`, `admin-version`, `advanced-patch`, `attribute-projection`, `authentication`, `bulk-operations`, `config-flags`, `custom-resource-types`, `discovery-endpoints`, `edge-cases`, `endpoint-isolation`, `endpoint-profile`, `endpoint-scoped-logs`, `error-handling`, `etag-conditional`, `filter-operators`, `generic-filter-operators`, `group-lifecycle`, `group-parity-gaps`, `http-error-codes`, `lexmark-isv`, `log-config`, `me-endpoint`, `multi-endpoint-isolation`, `p2-attribute-characteristics`, `p4-attribute-fixes`, `per-endpoint-credentials`, `profile-combinations`, `profile-flag-combos`, `rca-diagnostics`, `readonly-stripping`, `returned-characteristic`, `rfc-compliance`, `schema-cache-integration`, `schema-driven-uniqueness`, `schema-validation`, `scim-validator-compliance`, `search-endpoint`, `soft-delete-flags`, `sorting`, `test-gaps-audit`, `test-gaps-audit-2`, `user-lifecycle`, `user-uniqueness-required`
 
 ## Architecture Overview
 
@@ -84,7 +84,7 @@ NestJS Application (11 modules)
 | `rfc-standard` | 3 | 2 | ✅ | ✅ | ✅ | Pure RFC testing |
 | `minimal` | 2 | 2 | ❌ | ❌ | ❌ | Bare minimum |
 | `user-only` | 2 | 1 | ❌ | ✅ | ✅ | User-only |
-| `lexmark` | 3 | 1 | ❌ | ✅ | ❌ | Lexmark Cloud Print |
+| `lexmark` / `user-only-with-custom-ext` | 3 | 1 | ❌ | ✅ | ❌ | Lexmark Cloud Print |
 
 ## Technology Stack
 

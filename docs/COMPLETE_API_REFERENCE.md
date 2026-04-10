@@ -1,10 +1,10 @@
 # Complete API Reference
 
-> **Version:** 0.31.0 · **Updated:** March 31, 2026  
+> **Version:** 0.34.0 · **Updated:** April 10, 2026  
 > **Base URL:** `http://localhost:{PORT}/scim` (default port: 3000, Docker: 8080)  
 > **Content-Type:** `application/scim+json` for SCIM operations, `application/json` for admin  
 > **URL Rewriting:** `/scim/v2/*` is automatically rewritten to `/scim/*`  
-> **Total Endpoints:** 76 across 18 controllers
+> **Total Endpoints:** 82 across 19 controllers
 
 ---
 
@@ -328,7 +328,7 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "version": "0.31.0",
+  "version": "0.34.0",
   "node": "v24.x.x",
   "uptime": 3600,
   "persistence": "inmemory",

@@ -611,7 +611,7 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
-| Unit  | 3,171  | ?     | +?    |
+| Unit  | 3,185  | ?     | +?    |
 | E2E   | 926    | ?     | +?    |
 | Live  | ~980   | ?     | +?    |
 

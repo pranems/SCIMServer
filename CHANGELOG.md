@@ -5,7 +5,31 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.34.0] - 2026-04-09
+## [0.34.0] - 2026-04-10
+
+### P4 — Attribute Characteristic Schema Validation Fixes (SEC-1, G1, G2, G3)
+
+**Security:**
+- SEC-1: Add `DANGEROUS_KEYS` prototype pollution guard to `GenericPatchEngine` (matching User/Group pattern)
+- Guards `setNested()`, `setAtPath()`, `removeAtPath()` for path-based ops
+- Strips `__proto__`/`constructor`/`prototype` from no-path add/replace value objects
+
+**RFC Compliance (G1/G2 — unconditional immutable + required enforcement):**
+- G1: Remove `StrictSchemaValidation` gate from `checkImmutableAttributes()` — runs unconditionally (RFC 7643 §2.2 "SHALL NOT")
+- G2: Add `SchemaValidator.validateRequired()` for unconditional required checks on create/replace (RFC 7643 §2.4 "MUST")
+- Type/unknown/canonical validation remains strict-gated for Entra ID backward compat
+
+**Functional (G3 — Generic filter caseExact):**
+- Pass `caseExactPaths` to `buildGenericFilter()` — was captured but never passed (one-line fix)
+- Generic resources now correctly use case-sensitive filtering for `caseExact:true` attributes
+
+**Tests (80 unit suites, 3,185 tests — 45 E2E suites, 923 tests):**
+- +14 unit tests (11 SEC-1 prototype pollution, 1 G1 immutable, 3 G2 required)
+- +7 E2E tests (4 SEC-1 PATCH rejection, 3 G3 caseExact filtering)
+
+**Documentation:**
+- P4 deep analysis document: `docs/P4_ATTRIBUTE_CHARACTERISTIC_DEEP_ANALYSIS.md`
+- Updated all docs with correct endpoint count (82 across 19 controllers)
 
 ### Remove deletedAt + Implement UserSoftDeleteEnabled PATCH Gate
 

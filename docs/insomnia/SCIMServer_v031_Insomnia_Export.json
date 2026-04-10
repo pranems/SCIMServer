@@ -8,7 +8,7 @@
       "_id": "wrk_scimserver",
       "_type": "workspace",
       "name": "SCIMServer v0.31.0 — Complete API",
-      "description": "All 76 endpoints across 18 controllers. Set base_url, token, endpoint_id, user_id, group_id in environment.",
+      "description": "All 82 endpoints across 19 controllers. Set base_url, token, endpoint_id, user_id, group_id in environment.",
       "scope": "collection"
     },
     {

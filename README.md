@@ -4,7 +4,7 @@ Production-ready, multi-tenant SCIM 2.0 server purpose-built for Microsoft Entra
 
 | | |
 |---|---|
-| **Version** | `0.33.0` |
+| **Version** | `0.34.0` |
 | **Protocol** | SCIM 2.0 ([RFC 7643](https://datatracker.ietf.org/doc/html/rfc7643) / [RFC 7644](https://datatracker.ietf.org/doc/html/rfc7644)) |
 | **Target IdP** | [Microsoft Entra ID](https://entra.microsoft.com/) |
 | **Runtime** | Node.js 24 · NestJS 11 · TypeScript 5.9 |
@@ -484,11 +484,11 @@ Content-Type: application/json
 
 | Layer | Suites | Tests | Framework |
 |-------|--------|-------|-----------|
-| **Unit** | 74 | 3,090 | Jest + ts-jest |
-| **E2E** | 37 | 817 | Jest + supertest + NestJS testing |
-| **Live Integration** | 43 sections | ~951 | PowerShell (live-test.ps1) |
+| **Unit** | 80 | 3,185 | Jest + ts-jest |
+| **E2E** | 45 | 923 | Jest + supertest + NestJS testing |
+| **Live Integration** | 43 sections | ~739 | PowerShell (live-test.ps1) |
 | **ISV Live (Lexmark)** | 13 sections | 112 | PowerShell (lexmark-live-test.ps1) |
-| **Total** | **~167** | **~4,970** | — |
+| **Total** | **~181** | **~4,959** | — |
 
 ### Run Tests
 

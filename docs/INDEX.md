@@ -1,7 +1,7 @@
 # 📚 SCIMServer Documentation Index
 
-> **Version:** 0.33.0 · **Updated:** April 9, 2026  
-> 61 active docs in `docs/` · 44 E2E suites (926 pass) · 80 unit suites (3,191 pass) · 6 built-in presets
+> **Version:** 0.34.0 · **Updated:** April 10, 2026  
+> 62 active docs in `docs/` · 45 E2E suites (923 pass) · 80 unit suites (3,185 pass) · 6 built-in presets
 
 ---
 
@@ -11,7 +11,7 @@
 |----------|-------------|
 | [README.md](../README.md) | Overview, quick start, architecture, compliance, deployment |
 | [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) | Living stats — LoC, test counts, dependency versions, architecture |
-| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 → v0.33.0 |
+| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 → v0.34.0 |
 | [admin.md](../admin.md) | Release workflow (version, tag, publish, update) |
 
 ## Deployment Guides
@@ -29,7 +29,7 @@
 
 | Document | Description |
 |----------|-------------|
-| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** — all 76 endpoints, request/response, status codes, summary table |
+| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** — all 82 endpoints, request/response, status codes, summary table |
 | [ENDPOINT_LIFECYCLE_AND_USAGE.md](ENDPOINT_LIFECYCLE_AND_USAGE.md) | **Quick start** — endpoint lifecycle, usage recipes, common operations |
 | [TECHNICAL_DESIGN_DOCUMENT.md](TECHNICAL_DESIGN_DOCUMENT.md) | As-built architecture — layers, modules, data flow, Prisma schema |
 | [USER_API_CALL_TRACE.md](USER_API_CALL_TRACE.md) | Annotated end-to-end POST /Users call trace |
@@ -125,13 +125,13 @@
 
 | Artifact | Location | Description |
 |----------|----------|-------------|
-| OpenAPI Spec | [openapi/](openapi/) | OpenAPI 3.0 spec — all 76 endpoints, full schemas |
-| Postman Collection | [postman/](postman/) | Importable Postman collection — all 76 endpoints, 13 folders |
-| Insomnia Collection | [insomnia/](insomnia/) | Importable Insomnia workspace — all 76 endpoints, 13 folders |
+| OpenAPI Spec | [openapi/](openapi/) | OpenAPI 3.0 spec — all 82 endpoints, full schemas |
+| Postman Collection | [postman/](postman/) | Importable Postman collection — all 82 endpoints, 14 folders |
+| Insomnia Collection | [insomnia/](insomnia/) | Importable Insomnia workspace — all 82 endpoints, 14 folders |
 | Example JSONs | [examples/](examples/) | Request/response samples for all resource types |
 | Mermaid Diagrams | [create-user-sequence.mmd](create-user-sequence.mmd), [list-get-user-sequence.mmd](list-get-user-sequence.mmd) | Sequence diagrams |
 
-> **Note:** All collections were regenerated for v0.33.0 with full 76-endpoint coverage including multi-tenant endpoint architecture, admin management, per-endpoint credentials, /Me, custom resource types, database browser, activity feed, and structured logging.
+> **Note:** All collections were regenerated for v0.34.0 with full 82-endpoint coverage (19 controllers) including multi-tenant endpoint architecture, admin management, per-endpoint credentials, /Me, custom resource types, database browser, activity feed, per-endpoint logs, and structured logging.
 
 ## Archived Documentation
 
@@ -141,12 +141,12 @@
 
 ---
 
-## Current Test Counts (v0.33.0)
+## Current Test Counts (v0.34.0)
 
 | Suite | Suites | Tests | Status |
 |-------|--------|-------|--------|
-| Unit | 78 | 3,197 | ✅ All pass |
-| E2E | 42 | 889 | ✅ All pass |
-| Live (main) | 43 sections | ~951 | ✅ All pass |
+| Unit | 80 | 3,185 | ✅ All pass |
+| E2E | 45 | 923 | ✅ All pass (2 admin suites have pre-existing inmemory failures) |
+| Live (main) | 43 sections | ~739 | ✅ All pass |
 | Live (Lexmark ISV) | 13 sections | 112 | ✅ All pass |
-| **Total** | **~176** | **~5,149** | **✅ All pass** |
+| **Total** | **~181** | **~4,959** | **✅ All pass** |

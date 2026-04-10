@@ -7,7 +7,7 @@
 **Date**: 2026-04-10  
 **Status**: Source-code-verified gap analysis — 19 gaps catalogued, 3 actionable fixes identified  
 **Methodology**: Full RFC re-read → all prior audit docs re-read → source code inspection (sole source of truth)  
-**Test Baseline**: 3,171 unit (80 suites) · 926 E2E (44 suites) · ~973 live assertions · ~5,070 total  
+**Test Baseline**: 3,185 unit (80 suites) · 923 E2E (45 suites) · ~739 live assertions · ~4,959 total  
 **Predecessor**: P3 (v0.32.0), P2 (v0.24.0), Cross-Cutting Concern Audit (v0.31.0), RFC7643 Full Audit (v0.22.0)
 
 **RFC References**:
