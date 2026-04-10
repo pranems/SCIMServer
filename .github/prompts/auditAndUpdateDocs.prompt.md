@@ -186,7 +186,7 @@ Search across ALL docs for stale data formats that have been superseded:
 | `"config": { "FlagName": "True" }` | `"profile": { "settings": { "FlagName": "True" } }` | `grep -r '"config":' docs/` (exclude archive/, REMOTE_DEBUGGING, ENDPOINT_CONFIG_FLAGS migration notes) |
 | `config String?` (Prisma) | `profile Json?` | Search for `config` in schema blocks |
 | `maxOperations: 100` | `maxOperations: 1000` | Search for `maxOperations` |
-| `"backup"` log category | Remove — only 11 categories exist | Search for `backup` in log category lists |
+| `"backup"` log category | Remove — only 14 categories exist | Search for `backup` in log category lists |
 | `mutability: "ReadWrite"` | `mutability: "readWrite"` (lowercase per RFC 7643) | Search for PascalCase mutability values |
 | Root-level SCIM paths `/Users` | Endpoint-scoped `/endpoints/{eid}/Users` | Ensure all operational examples use multi-tenant paths |
 | `"8 endpoints"` (LogConfigController) | `"10 endpoints"` | Search for endpoint count near log-config |
@@ -284,7 +284,7 @@ After completing the audit, review **this prompt itself** for freshness:
 2. **New document categories**: If new types of docs (e.g., performance benchmarks, security audit docs, ADRs) were added, add a new sub-section under Step 2.
 3. **New artifact directories**: If new artifact folders beyond `openapi/`, `postman/`, `insomnia/`, `examples/`, `images/readme/` were created, add them to Section E.
 4. **New config flags**: If the flag count changed from 14 boolean + logLevel (12 persisted in ProfileSettings + 2 derived), update all references.
-5. **New log categories**: If `LogCategory` enum changed from 11 entries, update Section 1G and the format migration table.
+5. **New log categories**: If `LogCategory` enum changed from 14 entries, update Section 1G and the format migration table.
 6. **New presets**: If presets beyond the current 6 were added, update Section 1G and cross-consistency checks.
 7. **New bulk/SPC constants**: If `BULK_MAX_OPERATIONS`, `BULK_MAX_PAYLOAD_SIZE`, or `maxResults` changed, update format migration table.
 8. **New documentation norms**: If the team adopted new standards (e.g., ADR format, PlantUML, Swagger UI), add them to Step 3.
@@ -322,6 +322,7 @@ Apply updates directly to this file (`.github/prompts/auditAndUpdateDocs.prompt.
 |------|---------|-------|-------------------|-------------|
 | 2026-03-02 | v0.24.0 | Full audit | 59 across 28 files | Test count propagation, flag name corrections, broken links |
 | 2026-03-31 | v0.31.0 | Full audit + JSON recreation | ~25 across 14 files + 3 collections | Format migration (`config`→`profile.settings`), phantom log categories, API collection coverage gap (35-40%→100%), stale constants (maxOperations), RFC casing violations, missing routes in quick ref cards, stale filter operator notes |
+| 2026-04-10 | v0.34.0 | Post-deletedAt removal audit | ~8 across 5 files | Stale `deletedAt`/`guardSoftDeleted`/`softDeleted` in 30+ docs (fixed in prior session), stale category counts (11→14 in 3 files), stale test counts (3,191→3,171), stale live test assertions (~951→~739 after dead soft-delete tests removed) |
 
 ### Common Staleness Patterns Discovered
 

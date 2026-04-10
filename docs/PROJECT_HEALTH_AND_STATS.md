@@ -1,6 +1,6 @@
 # Project Health & Stats
 
-> **Version:** 0.33.0 · **Updated:** April 9, 2026 · **Status:** Production-ready
+> **Version:** 0.34.0 · **Updated:** April 9, 2026 · **Status:** Production-ready
 
 ---
 
@@ -22,11 +22,11 @@
 
 | Layer | Suites | Tests | Skip | Status |
 |-------|--------|-------|------|--------|
-| **Unit** | 80 | 3,191 | 0 | ✅ All pass |
+| **Unit** | 80 | 3,171 | 0 | ✅ All pass |
 | **E2E** | 44 | 926 | 0 | ✅ All pass |
-| **Live (main)** | 43 sections | ~951 | 0 | ✅ All pass |
+| **Live (main)** | 43 sections | ~739 | 0 | ✅ All pass |
 | **Live (Lexmark ISV)** | 13 sections | 112 | 0 | ✅ All pass |
-| **Total** | **~167** | **~4,970** | 0 | ✅ All pass |
+| **Total** | **~167** | **~4,948** | 0 | ✅ All pass |
 
 ### Unit Test Suites (80)
 

@@ -611,12 +611,12 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
-| Unit  | 3,191  | ?     | +?    |
+| Unit  | 3,171  | ?     | +?    |
 | E2E   | 926    | ?     | +?    |
 | Live  | ~980   | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
-> *Last updated: v0.33.0 - Settings v7 (2026-04-09)*
+> *Last updated: v0.34.0 - Settings v7 (2026-04-09)*
 
 4. Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts.
 

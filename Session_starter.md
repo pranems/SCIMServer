@@ -241,7 +241,7 @@ Implemented TDD approach with comprehensive test coverage:
 ---
 
 ## Current Focus
-All 27 migration gaps (G1–G20) fully resolved. v0.33.0 codebase direction remains strong: centralized endpoint-config definitions/defaults, shared helper reuse across Users/Groups/Generic, precomputed schema characteristics cache, caseExact-aware filtering/sorting, and schema-driven uniqueness enforcement. **Highest-value hardening work now:** remove legacy token + console logging from auth path, restrict CORS, reconsider `/scim/v2` rewrite strategy, eliminate version/document drift, and simplify overlapping CI/container publish workflows. README/package/session counts and versions need a fresh synchronization pass.
+All 27 migration gaps (G1–G20) fully resolved. v0.34.0 codebase direction remains strong: centralized endpoint-config definitions/defaults, shared helper reuse across Users/Groups/Generic, precomputed schema characteristics cache, caseExact-aware filtering/sorting, and schema-driven uniqueness enforcement. **Highest-value hardening work now:** remove legacy token + console logging from auth path, restrict CORS, reconsider `/scim/v2` rewrite strategy, eliminate version/document drift, and simplify overlapping CI/container publish workflows. README/package/session counts and versions need a fresh synchronization pass.
 
 ### Known Technical Debt (from code audit)
 - **SECURITY:** Hardcoded legacy bearer token `S@g@r!2011` in `scim-auth.guard.ts` — should come from env only

@@ -301,7 +301,7 @@ curl -s -H "Authorization: Bearer $TOKEN" \
   "availableCategories": [
     "http", "auth", "scim.user", "scim.group", "scim.patch",
     "scim.filter", "scim.discovery", "endpoint", "database",
-    "oauth", "general"
+    "oauth", "scim.bulk", "scim.resource", "config", "general"
   ]
 }
 ```
@@ -354,7 +354,7 @@ curl -s -X PUT -H "Authorization: Bearer $TOKEN" \
     "maxPayloadSizeBytes": 4096,
     "format": "json",
     "availableLevels": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"],
-    "availableCategories": ["http", "auth", "scim.user", "scim.group", "scim.patch", "scim.filter", "scim.discovery", "endpoint", "database", "oauth", "general"]
+    "availableCategories": ["http", "auth", "scim.user", "scim.group", "scim.patch", "scim.filter", "scim.discovery", "endpoint", "database", "oauth", "scim.bulk", "scim.resource", "config", "general"]
   }
 }
 ```
@@ -415,7 +415,7 @@ curl -s -X PUT -H "Authorization: Bearer $TOKEN" \
   "availableCategories": [
     "http", "auth", "scim.user", "scim.group", "scim.patch",
     "scim.filter", "scim.discovery", "endpoint", "database",
-    "oauth", "general"
+    "oauth", "scim.bulk", "scim.resource", "config", "general"
   ]
 }
 ```

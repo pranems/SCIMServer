@@ -5,6 +5,37 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.34.0] - 2026-04-09
+
+### Remove deletedAt + Implement UserSoftDeleteEnabled PATCH Gate
+
+**Schema & Models:**
+- Drop `deletedAt` column from Prisma ScimResource model
+- Remove `deletedAt` from all domain models (UserRecord, GroupRecord, GenericResourceRecord, *UpdateInput, UserConflictResult)
+- Remove `deletedAt` from repository interfaces and implementations
+
+**Service Layer:**
+- Delete `guardSoftDeleted()` function (was dead code — never triggered)
+- Remove 9 `guardSoftDeleted()` calls across Users/Generic services
+- Remove LIST `deletedAt` filtering (Users + Generic services)
+- Simplify `assertSchemaUniqueness()` — remove `deletedAt` param and skip logic
+- Implement PATCH `active=false` gate: `UserSoftDeleteEnabled=false` → 400 `SOFT_DELETE_DISABLED`
+- Add pre-throw debug/info logs for all 404 not-found and config-gated error paths
+
+**Stats Endpoint:**
+- Rename `ResourceStats.softDeleted` → `inactive` (accurately reflects `active=false` count)
+
+**Tests (80 unit suites, 3171 tests — 44 E2E suites, 926 tests):**
+- +7 new unit tests (PATCH gate diagnostics, flag combos)
+- +1 enhanced E2E test (diagnostics verification)
+- Remove ~20 dead soft-delete/guardSoftDeleted tests
+- Rewrite soft-delete-flags E2E as hard-delete lifecycle tests
+
+**Documentation:**
+- Update 30+ docs to remove deletedAt/guardSoftDeleted/soft-delete references
+- Update all API artifacts (OpenAPI, Postman, Insomnia)
+- Update live-test scripts with correct flag names and stats fields
+
 ## [0.33.0] - 2026-04-09
 
 ### Uniqueness Enforcement Alignment with RFC 7643 §2.4

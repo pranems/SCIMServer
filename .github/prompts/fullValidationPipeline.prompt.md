@@ -32,7 +32,7 @@ npx jest --no-coverage --json --outputFile=pipeline-unit.json 2>$null
 # Parse results:
 node -e "const r=JSON.parse(require('fs').readFileSync('pipeline-unit.json','utf8'));console.log('suites:',r.numPassedTestSuites+'/'+r.numTotalTestSuites,'tests:',r.numPassedTests+'/'+r.numTotalTests,'failed:',r.numFailedTests)"
 ```
-> **Baselines (v0.33.0):** 3,299 pass / 0 fail / 80 suites.
+> **Baselines (v0.34.0):** 3,299 pass / 0 fail / 80 suites.
 > *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 
 ### Step 3: Run E2E Tests
@@ -42,7 +42,7 @@ npx jest --config test/e2e/jest-e2e.config.ts --no-coverage --json --outputFile=
 # Parse results:
 node -e "const r=JSON.parse(require('fs').readFileSync('pipeline-e2e.json','utf8'));console.log('suites:',r.numPassedTestSuites+'/'+r.numTotalTestSuites,'tests:',r.numPassedTests+'/'+r.numTotalTests,'failed:',r.numFailedTests)"
 ```
-> **Baselines (v0.33.0):** 918 pass / 0 fail / 44 suites.
+> **Baselines (v0.34.0):** 918 pass / 0 fail / 44 suites.
 > *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 > **E2E config path:** `test/e2e/jest-e2e.config.ts`
 
@@ -66,7 +66,7 @@ cd scripts
 .\live-test.ps1 -BaseUrl "http://localhost:6000" -ClientSecret "localoauthsecret123" *> ..\local-live-pipeline.txt
 ```
 > **Output capture:** Use `*>` (all PowerShell streams) not `>` (stdout only). The script writes to multiple output streams.
-> **Baselines (v0.33.0):** ~980 assertions.
+> **Baselines (v0.34.0):** ~980 assertions.
 > *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 
 ### Step 6: Stop Local Instance
@@ -291,7 +291,7 @@ if ($endpoints.totalResults -gt 0) {
 - Note any pre-existing failures explicitly so new regressions are clearly distinguishable.
 - For Azure, explicitly verify existing endpoints/data survived the deployment.
 
-## Known Pre-Existing Failures (v0.33.0)
+## Known Pre-Existing Failures (v0.34.0)
 
 **None.** All tests pass: 3,299 unit (80 suites), 918 E2E (44 suites).
 
