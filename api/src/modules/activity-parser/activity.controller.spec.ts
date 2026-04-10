@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ActivityController } from './activity.controller';
 import { PrismaService } from '../prisma/prisma.service';
+import { LoggingService } from '../logging/logging.service';
 import { ActivityParserService } from './activity-parser.service';
 
 describe('ActivityController', () => {
@@ -77,6 +78,12 @@ describe('ActivityController', () => {
           useValue: {
             parseActivity: jest.fn(),
             isKeepaliveLog: jest.fn(),
+          },
+        },
+        {
+          provide: LoggingService,
+          useValue: {
+            listLogs: jest.fn().mockResolvedValue({ items: [], total: 0 }),
           },
         },
       ],

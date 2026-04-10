@@ -377,17 +377,17 @@ describe('Admin Endpoint API (E2E)', () => {
       // Nested structure
       expect(res.body.users).toHaveProperty('total');
       expect(res.body.users).toHaveProperty('active');
-      expect(res.body.users).toHaveProperty('softDeleted');
+      expect(res.body.users).toHaveProperty('inactive');
       expect(res.body.groups).toHaveProperty('total');
       expect(res.body.groups).toHaveProperty('active');
-      expect(res.body.groups).toHaveProperty('softDeleted');
+      expect(res.body.groups).toHaveProperty('inactive');
       expect(res.body.groupMembers).toHaveProperty('total');
       expect(res.body.requestLogs).toHaveProperty('total');
 
       // Types
       expect(typeof res.body.users.total).toBe('number');
       expect(typeof res.body.users.active).toBe('number');
-      expect(typeof res.body.groups.softDeleted).toBe('number');
+      expect(typeof res.body.groups.inactive).toBe('number');
     });
 
     it('should NOT have old flat stats format', async () => {

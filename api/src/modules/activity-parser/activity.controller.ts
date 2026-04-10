@@ -1,12 +1,16 @@
 ﻿import { Controller, Get, Query } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { LoggingService } from '../logging/logging.service';
 import { ActivityParserService, ActivitySummary } from './activity-parser.service';
 
 @Controller('admin/activity')
 export class ActivityController {
+  private readonly isInMemoryBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() === 'inmemory';
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly activityParser: ActivityParserService,
+    private readonly loggingService: LoggingService,
   ) {}
 
   @Get()
@@ -20,6 +24,11 @@ export class ActivityController {
   ) {
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
+
+    if (this.isInMemoryBackend) {
+      return this.getActivitiesInMemory(pageNum, limitNum, type, severity, search, hideKeepalive === 'true');
+    }
+
     const skip = (pageNum - 1) * limitNum;
     const shouldHideKeepalive = hideKeepalive === 'true';
 
@@ -149,6 +158,17 @@ export class ActivityController {
 
   @Get('summary')
   async getActivitySummary() {
+    if (this.isInMemoryBackend) {
+      // InMemory mode: return zeroed summary (no persistent request logs)
+      return {
+        summary: {
+          last24Hours: 0,
+          lastWeek: 0,
+          operations: { users: 0, groups: 0, system: 0 },
+        },
+      };
+    }
+
     // Get recent activity counts
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -210,6 +230,54 @@ export class ActivityController {
           groups: groupOperations,
           system: systemOperations,
         },
+      },
+    };
+  }
+
+  // ─── InMemory fallback ──────────────────────────────────────────
+
+  private async getActivitiesInMemory(
+    page: number, limit: number,
+    type?: string, severity?: string, search?: string, hideKeepalive?: boolean,
+  ) {
+    // Use LoggingService.listLogs which already has inmemory support
+    const logResult = await this.loggingService.listLogs({
+      page,
+      pageSize: limit,
+      urlContains: search || undefined,
+      hideKeepalive,
+    });
+
+    const logs = logResult.items ?? [];
+    let activities: ActivitySummary[] = await Promise.all(
+      logs.map(async (log: any) =>
+        await this.activityParser.parseActivity({
+          id: log.id ?? `inmem-${Date.now()}-${Math.random()}`,
+          method: log.method,
+          url: log.url,
+          status: log.status || undefined,
+          requestBody: log.requestBody || undefined,
+          responseBody: log.responseBody || undefined,
+          createdAt: log.createdAt ? new Date(log.createdAt).toISOString() : new Date().toISOString(),
+          identifier: log.reportableIdentifier || undefined,
+        })
+      )
+    );
+
+    if (type) activities = activities.filter(a => a.type === type);
+    if (severity) activities = activities.filter(a => a.severity === severity);
+
+    return {
+      activities,
+      pagination: {
+        page,
+        limit,
+        total: logResult.total ?? logs.length,
+        pages: Math.ceil((logResult.total ?? logs.length) / limit),
+      },
+      filters: {
+        types: ['user', 'group', 'system'],
+        severities: ['info', 'success', 'warning', 'error'],
       },
     };
   }

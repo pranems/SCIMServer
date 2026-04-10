@@ -3,6 +3,7 @@ import { NotFoundException } from '@nestjs/common';
 import { AdminController } from './admin.controller';
 import { LoggingService } from '../../logging/logging.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { EndpointScimUsersService } from '../services/endpoint-scim-users.service';
 import { EndpointScimGroupsService } from '../services/endpoint-scim-groups.service';
 
@@ -15,6 +16,7 @@ describe('AdminController', () => {
   };
   let mockUsersService: Record<string, jest.Mock>;
   let mockGroupsService: Record<string, jest.Mock>;
+  let mockEndpointService: Record<string, jest.Mock>;
 
   beforeEach(async () => {
     mockLoggingService = {
@@ -37,10 +39,16 @@ describe('AdminController', () => {
 
     mockUsersService = {
       createUserForEndpoint: jest.fn().mockResolvedValue({ id: 'u1', userName: 'test' }),
+      deleteUserForEndpoint: jest.fn().mockResolvedValue(undefined),
     };
 
     mockGroupsService = {
       createGroupForEndpoint: jest.fn().mockResolvedValue({ id: 'g1', displayName: 'grp' }),
+    };
+
+    mockEndpointService = {
+      listEndpoints: jest.fn().mockResolvedValue({ endpoints: [{ id: 'ep-1', name: 'default' }] }),
+      createEndpoint: jest.fn().mockResolvedValue({ id: 'ep-new', name: 'default' }),
     };
 
     const module = await Test.createTestingModule({
@@ -48,6 +56,7 @@ describe('AdminController', () => {
       providers: [
         { provide: LoggingService, useValue: mockLoggingService },
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: EndpointService, useValue: mockEndpointService },
         { provide: EndpointScimUsersService, useValue: mockUsersService },
         { provide: EndpointScimGroupsService, useValue: mockGroupsService },
       ],
@@ -126,14 +135,14 @@ describe('AdminController', () => {
 
   // ── deleteUser ─────────────────────────────────────────────────────
   describe('deleteUser', () => {
-    it('should delete user by Prisma id or scimId', async () => {
-      mockPrisma.scimResource.findFirst.mockResolvedValue({ id: 'pk-1' });
-      await controller.deleteUser('pk-1');
-      expect(mockPrisma.scimResource.delete).toHaveBeenCalledWith({ where: { id: 'pk-1' } });
+    it('should delete user via usersService across endpoints', async () => {
+      mockUsersService.deleteUserForEndpoint.mockResolvedValue(undefined);
+      await controller.deleteUser('scim-id-1');
+      expect(mockUsersService.deleteUserForEndpoint).toHaveBeenCalledWith('scim-id-1', 'ep-1');
     });
 
-    it('should throw NotFoundException when user not found', async () => {
-      mockPrisma.scimResource.findFirst.mockResolvedValue(null);
+    it('should throw NotFoundException when user not found in any endpoint', async () => {
+      mockUsersService.deleteUserForEndpoint.mockRejectedValue(new NotFoundException());
       await expect(controller.deleteUser('missing')).rejects.toThrow(NotFoundException);
     });
   });

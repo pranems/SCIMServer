@@ -10,6 +10,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DatabaseService } from './database.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { USER_REPOSITORY, GROUP_REPOSITORY } from '../../domain/repositories/repository.tokens';
+import { EndpointService } from '../endpoint/services/endpoint.service';
+import { LoggingService } from '../logging/logging.service';
 
 describe('DatabaseService', () => {
   let service: DatabaseService;
@@ -23,6 +26,9 @@ describe('DatabaseService', () => {
       count: jest.Mock;
     };
   };
+
+  const mockUserRepo = { findAll: jest.fn().mockResolvedValue([]), findByScimId: jest.fn() };
+  const mockGroupRepo = { findAllWithMembers: jest.fn().mockResolvedValue([]), findWithMembers: jest.fn() };
 
   beforeEach(async () => {
     prisma = {
@@ -40,6 +46,10 @@ describe('DatabaseService', () => {
       providers: [
         DatabaseService,
         { provide: PrismaService, useValue: prisma },
+        { provide: USER_REPOSITORY, useValue: mockUserRepo },
+        { provide: GROUP_REPOSITORY, useValue: mockGroupRepo },
+        { provide: EndpointService, useValue: { listEndpoints: jest.fn().mockResolvedValue({ endpoints: [] }) } },
+        { provide: LoggingService, useValue: { listLogs: jest.fn().mockResolvedValue({ items: [], total: 0 }) } },
       ],
     }).compile();
 
