@@ -1113,4 +1113,114 @@ describe('SchemaValidator', () => {
       expect(result.coreSubAttrs.has('meta')).toBe(false);
     });
   });
+
+  // ── validateRequired — G2 unconditional required-only validation ──────
+
+  describe('validateRequired', () => {
+    it('should detect missing required attribute on create', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'userName', required: true, mutability: 'readWrite' }),
+        makeAttr({ name: 'displayName', required: false, mutability: 'readWrite' }),
+      ]);
+      const payload = { displayName: 'Alice' };
+      const result = SchemaValidator.validateRequired(payload, [schema], 'create');
+      expect(result.valid).toBe(false);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].path).toBe('userName');
+      expect(result.errors[0].message).toContain("'userName' is missing");
+    });
+
+    it('should pass when all required attributes are present on create', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'userName', required: true, mutability: 'readWrite' }),
+        makeAttr({ name: 'displayName', required: false, mutability: 'readWrite' }),
+      ]);
+      const payload = { userName: 'alice' };
+      const result = SchemaValidator.validateRequired(payload, [schema], 'create');
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should skip required check on patch mode', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'userName', required: true, mutability: 'readWrite' }),
+      ]);
+      const payload = {}; // missing userName, but patch should skip
+      const result = SchemaValidator.validateRequired(payload, [schema], 'patch');
+      expect(result.valid).toBe(true);
+    });
+
+    it('should detect missing required on replace', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'userName', required: true, mutability: 'readWrite' }),
+      ]);
+      const payload = { displayName: 'Bob' };
+      const result = SchemaValidator.validateRequired(payload, [schema], 'replace');
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].path).toBe('userName');
+    });
+
+    it('should exempt readOnly attributes from required check', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'id', required: true, mutability: 'readOnly' }),
+        makeAttr({ name: 'userName', required: true, mutability: 'readWrite' }),
+      ]);
+      // id is missing but readOnly → exempt; userName is present
+      const payload = { userName: 'alice' };
+      const result = SchemaValidator.validateRequired(payload, [schema], 'create');
+      expect(result.valid).toBe(true);
+    });
+
+    it('should NOT check type/multiValued/unknown (required only)', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'userName', required: true, mutability: 'readWrite', type: 'string' }),
+        makeAttr({ name: 'active', required: false, mutability: 'readWrite', type: 'boolean' }),
+      ]);
+      // userName present (required satisfied), active="yes" is wrong type but should NOT be checked
+      const payload = { userName: 'alice', active: 'yes', unknownField: 'ignored' };
+      const result = SchemaValidator.validateRequired(payload, [schema], 'create');
+      expect(result.valid).toBe(true); // required-only check; type/unknown not validated
+    });
+
+    it('should check required extension attributes when extension block present', () => {
+      const extUrn = 'urn:test:ext:2.0';
+      const coreSchema = makeCoreSchema([
+        makeAttr({ name: 'userName', required: true, mutability: 'readWrite' }),
+      ]);
+      const extSchema = {
+        id: extUrn,
+        name: 'TestExt',
+        attributes: [
+          makeAttr({ name: 'department', required: true, mutability: 'readWrite' }),
+          makeAttr({ name: 'costCenter', required: false, mutability: 'readWrite' }),
+        ],
+      };
+      const payload = {
+        userName: 'alice',
+        [extUrn]: { costCenter: 'ENG' }, // missing required 'department'
+      };
+      const result = SchemaValidator.validateRequired(payload, [coreSchema, extSchema], 'create');
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].path).toBe(`${extUrn}.department`);
+    });
+
+    it('should use preBuiltMaps when provided', () => {
+      const schema = makeCoreSchema([
+        makeAttr({ name: 'userName', required: true, mutability: 'readWrite' }),
+      ]);
+      // Build maps manually
+      const coreAttrMap = new Map();
+      for (const attr of schema.attributes) {
+        coreAttrMap.set(attr.name.toLowerCase(), attr);
+      }
+      const extensionSchemaMap = new Map();
+      const payload = { displayName: 'Alice' }; // missing userName
+      const result = SchemaValidator.validateRequired(payload, [schema], 'create', {
+        coreAttrMap,
+        extensionSchemaMap,
+      });
+      expect(result.valid).toBe(false);
+      expect(result.errors[0].path).toBe('userName');
+    });
+  });
 });

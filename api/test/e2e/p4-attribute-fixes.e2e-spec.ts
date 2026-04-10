@@ -45,7 +45,7 @@ describe('P4 — Attribute Characteristic Fixes (E2E)', () => {
               description: 'Custom device resource for P4 tests',
               attributes: [
                 { name: 'deviceName', type: 'string', multiValued: false, required: true, mutability: 'readWrite', returned: 'default', caseExact: false, uniqueness: 'none' },
-                { name: 'serialNumber', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', caseExact: true, uniqueness: 'none' },
+                { name: 'serialNumber', type: 'string', multiValued: false, required: false, mutability: 'immutable', returned: 'default', caseExact: true, uniqueness: 'none' },
                 { name: 'status', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', caseExact: false, uniqueness: 'none' },
               ],
             },
@@ -63,7 +63,7 @@ describe('P4 — Attribute Characteristic Fixes (E2E)', () => {
             sort: { supported: true },
             etag: { supported: true },
           },
-          settings: {},
+          settings: { StrictSchemaValidation: 'False' },
         },
       })
       .expect(201);
@@ -237,6 +237,142 @@ describe('P4 — Attribute Characteristic Fixes (E2E)', () => {
         .expect(200);
 
       expect(res.body.totalResults).toBe(2);
+    });
+  });
+
+  // ─── G1: Immutable enforcement with strict=false (unconditional) ───
+
+  describe('G1 — Immutable enforcement with StrictSchemaValidation=False', () => {
+    let deviceId: string;
+    const originalSerial = 'SN-IMMUTABLE-001';
+
+    beforeAll(async () => {
+      // Create a device with an immutable serialNumber
+      const res = await request(app.getHttpServer())
+        .post(basePath)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: [SCHEMA_URN],
+          deviceName: 'Immutable Test Device',
+          serialNumber: originalSerial,
+          status: 'active',
+        })
+        .expect(201);
+      deviceId = res.body.id;
+    });
+
+    afterAll(async () => {
+      if (deviceId) {
+        await request(app.getHttpServer())
+          .delete(`${basePath}/${deviceId}`)
+          .set('Authorization', `Bearer ${token}`);
+      }
+    });
+
+    it('should reject PUT changing immutable serialNumber even with strict=false (G1)', async () => {
+      const res = await request(app.getHttpServer())
+        .put(`${basePath}/${deviceId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: [SCHEMA_URN],
+          deviceName: 'Updated Device',
+          serialNumber: 'SN-CHANGED', // immutable! should be rejected
+          status: 'active',
+        })
+        .expect(400);
+
+      expect(res.body.scimType).toBe('mutability');
+      expect(res.body.detail).toContain('mmutable');
+    });
+
+    it('should allow PUT with unchanged immutable serialNumber when strict=false (G1)', async () => {
+      const res = await request(app.getHttpServer())
+        .put(`${basePath}/${deviceId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: [SCHEMA_URN],
+          deviceName: 'Updated Name OK',
+          serialNumber: originalSerial, // same → OK
+          status: 'active',
+        })
+        .expect(200);
+
+      expect(res.body.deviceName).toBe('Updated Name OK');
+    });
+  });
+
+  // ─── G2: Required enforcement with strict=false (unconditional) ────
+
+  describe('G2 — Required enforcement with StrictSchemaValidation=False', () => {
+    it('should reject POST custom resource without required deviceName even with strict=false (G2)', async () => {
+      const res = await request(app.getHttpServer())
+        .post(basePath)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: [SCHEMA_URN],
+          serialNumber: 'SN-NO-NAME-001', // missing required deviceName
+          status: 'active',
+        })
+        .expect(400);
+
+      expect(res.body.detail).toContain("'deviceName' is missing");
+    });
+
+    it('should allow POST with wrong types when strict=false (type check still gated)', async () => {
+      const res = await request(app.getHttpServer())
+        .post(basePath)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: [SCHEMA_URN],
+          deviceName: 'Type Test Device',
+          status: 12345, // wrong type (string expected), but strict=false skips type validation
+        })
+        .expect(201);
+
+      // Cleanup
+      if (res.body.id) {
+        await request(app.getHttpServer())
+          .delete(`${basePath}/${res.body.id}`)
+          .set('Authorization', `Bearer ${token}`);
+      }
+    });
+
+    it('should reject PUT custom resource without required deviceName even with strict=false (G2)', async () => {
+      // First create a valid device
+      const createRes = await request(app.getHttpServer())
+        .post(basePath)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: [SCHEMA_URN],
+          deviceName: 'G2 Put Test Device',
+          serialNumber: 'SN-G2-PUT',
+        })
+        .expect(201);
+
+      // PUT without required deviceName
+      const res = await request(app.getHttpServer())
+        .put(`${basePath}/${createRes.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: [SCHEMA_URN],
+          serialNumber: 'SN-G2-PUT', // missing required deviceName
+          status: 'retired',
+        })
+        .expect(400);
+
+      expect(res.body.detail).toContain("'deviceName' is missing");
+
+      // Cleanup
+      await request(app.getHttpServer())
+        .delete(`${basePath}/${createRes.body.id}`)
+        .set('Authorization', `Bearer ${token}`);
     });
   });
 });
