@@ -363,4 +363,84 @@ describe('DatabaseService', () => {
       });
     });
   });
+
+  // ── InMemory fallback paths ───────────────────────────────────────────────
+
+  describe('InMemory backend fallback', () => {
+    let inmemService: DatabaseService;
+    let inmemUserRepo: { findAll: jest.Mock; findByScimId: jest.Mock };
+    let inmemGroupRepo: { findAllWithMembers: jest.Mock; findWithMembers: jest.Mock };
+    let inmemEndpointService: { listEndpoints: jest.Mock };
+
+    beforeEach(async () => {
+      const savedEnv = process.env.PERSISTENCE_BACKEND;
+      process.env.PERSISTENCE_BACKEND = 'inmemory';
+
+      inmemUserRepo = {
+        findAll: jest.fn().mockResolvedValue([
+          { scimId: 'u1', userName: 'alice', active: true, rawPayload: '{}', createdAt: new Date() },
+          { scimId: 'u2', userName: 'bob', active: false, rawPayload: '{}', createdAt: new Date() },
+        ]),
+        findByScimId: jest.fn(),
+      };
+      inmemGroupRepo = {
+        findAllWithMembers: jest.fn().mockResolvedValue([
+          { scimId: 'g1', displayName: 'Group1', rawPayload: '{}', members: [], createdAt: new Date() },
+        ]),
+        findWithMembers: jest.fn(),
+      };
+      inmemEndpointService = {
+        listEndpoints: jest.fn().mockResolvedValue({ endpoints: [{ id: 'ep-1' }] }),
+      };
+
+      const module = await Test.createTestingModule({
+        providers: [
+          DatabaseService,
+          { provide: PrismaService, useValue: prisma },
+          { provide: USER_REPOSITORY, useValue: inmemUserRepo },
+          { provide: GROUP_REPOSITORY, useValue: inmemGroupRepo },
+          { provide: EndpointService, useValue: inmemEndpointService },
+          { provide: LoggingService, useValue: { listLogs: jest.fn().mockResolvedValue({ items: [], total: 0 }) } },
+        ],
+      }).compile();
+
+      inmemService = module.get<DatabaseService>(DatabaseService);
+      process.env.PERSISTENCE_BACKEND = savedEnv;
+    });
+
+    it('should use userRepo.findAll for getUsers in inmemory mode', async () => {
+      const result = await inmemService.getUsers({ page: 1, limit: 10 });
+      expect(inmemUserRepo.findAll).toHaveBeenCalledWith('ep-1');
+      expect(result.users).toHaveLength(2);
+      expect(result.pagination.total).toBe(2);
+      // Prisma should NOT be called
+      expect(prisma.scimResource.findMany).not.toHaveBeenCalled();
+    });
+
+    it('should use groupRepo.findAllWithMembers for getGroups in inmemory mode', async () => {
+      const result = await inmemService.getGroups({ page: 1, limit: 10 });
+      expect(inmemGroupRepo.findAllWithMembers).toHaveBeenCalledWith('ep-1');
+      expect(result.groups).toHaveLength(1);
+      expect(prisma.scimResource.findMany).not.toHaveBeenCalled();
+    });
+
+    it('should return counts from repos for getStatistics in inmemory mode', async () => {
+      const result = await inmemService.getStatistics();
+      expect(result.users.total).toBe(2);
+      expect(result.users.active).toBe(1);
+      expect(result.users.inactive).toBe(1);
+      expect(result.groups.total).toBe(1);
+      expect(result.activity).toEqual({ totalRequests: 0, last24Hours: 0 });
+    });
+
+    it('should filter users by search term in inmemory mode', async () => {
+      const result = await inmemService.getUsers({ page: 1, limit: 10, search: 'alice' });
+      expect(result.users).toHaveLength(1);
+    });
+
+    it('should filter users by active status in inmemory mode', async () => {
+      const result = await inmemService.getUsers({ page: 1, limit: 10, active: false });
+      expect(result.users).toHaveLength(1);
+    });
+  });
 });

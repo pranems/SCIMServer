@@ -359,4 +359,51 @@ describe('ActivityController', () => {
       expect(Array.isArray(whereClause.AND)).toBe(true);
     });
   });
+
+  // ── InMemory fallback paths ───────────────────────────────────────────────
+
+  describe('InMemory backend fallback', () => {
+    let inmemController: ActivityController;
+    let mockLogging: { listLogs: jest.Mock };
+
+    beforeEach(async () => {
+      const savedEnv = process.env.PERSISTENCE_BACKEND;
+      process.env.PERSISTENCE_BACKEND = 'inmemory';
+
+      mockLogging = {
+        listLogs: jest.fn().mockResolvedValue({
+          items: [
+            { id: 'log-1', method: 'POST', url: '/scim/v2/Users', status: 201, createdAt: new Date(), reportableIdentifier: 'u1' },
+          ],
+          total: 1,
+        }),
+      };
+
+      const module = await Test.createTestingModule({
+        controllers: [ActivityController],
+        providers: [
+          { provide: PrismaService, useValue: { requestLog: { findMany: jest.fn(), count: jest.fn() } } },
+          { provide: ActivityParserService, useValue: { parseActivity: jest.fn().mockResolvedValue({ id: 'log-1', type: 'user', severity: 'success', timestamp: new Date(), icon: '👤', message: 'Created', details: '', isKeepalive: false }), isKeepaliveLog: jest.fn() } },
+          { provide: LoggingService, useValue: mockLogging },
+        ],
+      }).compile();
+
+      inmemController = module.get<ActivityController>(ActivityController);
+      process.env.PERSISTENCE_BACKEND = savedEnv;
+    });
+
+    it('should use LoggingService.listLogs for getActivities in inmemory mode', async () => {
+      const result = await inmemController.getActivities('1', '50');
+      expect(mockLogging.listLogs).toHaveBeenCalled();
+      expect(result.activities).toHaveLength(1);
+      expect(result.pagination.total).toBe(1);
+    });
+
+    it('should return zeroed summary for getActivitySummary in inmemory mode', async () => {
+      const result = await inmemController.getActivitySummary();
+      expect(result.summary.last24Hours).toBe(0);
+      expect(result.summary.lastWeek).toBe(0);
+      expect(result.summary.operations).toEqual({ users: 0, groups: 0, system: 0 });
+    });
+  });
 });
