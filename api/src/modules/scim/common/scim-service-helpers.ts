@@ -1206,7 +1206,7 @@ export class ScimSchemaHelpers {
         status: 400,
         scimType: 'mutability',
         detail: `Immutable attribute violation: ${details}`,
-        diagnostics: { errorCode: 'VALIDATION_IMMUTABLE', triggeredBy: 'StrictSchemaValidation' },
+        diagnostics: { errorCode: 'VALIDATION_IMMUTABLE' },
       });
     }
   }

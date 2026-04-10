@@ -1,8 +1,8 @@
 # Self-Improving Logging & Error Handling Verification Prompt
 
-> **Last audit run**: April 9, 2026 (post-deletedAt removal)  
-> **Pass rate**: 104/104 PASS (all 8 missing pre-throw logs fixed)  
-> **Version**: 2.3 - April 9, 2026 (deletedAt removal, PATCH gate logging)
+> **Last audit run**: April 10, 2026 (post-P4 fixes: SEC-1, G1/G2/G3)  
+> **Pass rate**: 106/110 PASS, 4 NOTED (auth guard console.log legacy - tracked, not blocking)  
+> **Version**: 2.4 - April 10, 2026 (P4 immutable triggeredBy fix, Groups pre-throw log fixes)
 
 ## Context
 You are auditing SCIMServer's logging and error handling. The system has:
@@ -151,6 +151,9 @@ For EACH of these flag combinations:
   6. operation field -> verify auto-read from correlation context when not explicit
   7. errorCode -> verify present on ALL error paths (UNIQUENESS_USERNAME, VALIDATION_SCHEMA, etc.)
   8. GlobalExceptionFilter 500 -> verify diagnostics with requestId/logsUrl
+  9. P4 fix: immutable error diagnostics no longer include stale `triggeredBy: 'StrictSchemaValidation'` (G1 made immutable unconditional)
+  10. P4 fix: Users/Groups PATCH pre-validation errors now include `triggeredBy: 'StrictSchemaValidation'` (was missing)
+  \u2705 K.1-K.8 verified, K.9-K.10 fixed April 10
 
 ### L. File Logging (`rotating-file-writer.ts`, `file-log-transport.ts`)
   1. LOG_FILE default -> verify logs/scimserver.log created

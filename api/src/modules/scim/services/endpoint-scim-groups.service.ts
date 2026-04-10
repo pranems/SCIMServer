@@ -327,7 +327,7 @@ export class EndpointScimGroupsService {
             status: 400,
             scimType: preResult.errors[0]?.scimType ?? 'invalidValue',
             detail: `PATCH operation value validation failed: ${messages}`,
-            diagnostics: { errorCode: 'VALIDATION_SCHEMA' },
+            diagnostics: { errorCode: 'VALIDATION_SCHEMA', triggeredBy: 'StrictSchemaValidation' },
           });
         }
       }
@@ -410,6 +410,7 @@ export class EndpointScimGroupsService {
     // RFC 7644 §3.5.2: Return the updated resource with 200 OK
     const updatedGroup = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!updatedGroup) {
+      this.logger.error(LogCategory.SCIM_PATCH, 'Failed to retrieve group after PATCH', { scimId, endpointId });
       throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.', diagnostics: { errorCode: 'DATABASE_ERROR' } });
     }
 
@@ -453,6 +454,7 @@ export class EndpointScimGroupsService {
 
     const group = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!group) {
+      this.logger.debug(LogCategory.SCIM_GROUP, 'Group not found for PUT', { scimId, endpointId });
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
 
@@ -501,6 +503,7 @@ export class EndpointScimGroupsService {
     // Return updated group
     const updatedGroup = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!updatedGroup) {
+      this.logger.error(LogCategory.SCIM_GROUP, 'Failed to retrieve group after PUT', { scimId, endpointId });
       throw createScimError({ status: 500, detail: 'Failed to retrieve updated group.', diagnostics: { errorCode: 'DATABASE_ERROR' } });
     }
 
