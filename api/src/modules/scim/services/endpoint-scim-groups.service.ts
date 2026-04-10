@@ -263,6 +263,7 @@ export class EndpointScimGroupsService {
 
     const group = await this.groupRepo.findWithMembers(endpointId, scimId);
     if (!group) {
+      this.logger.debug(LogCategory.SCIM_PATCH, 'Group not found for PATCH', { scimId, endpointId });
       throw createScimError({ status: 404, scimType: 'noTarget', detail: `Resource ${scimId} not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
 
