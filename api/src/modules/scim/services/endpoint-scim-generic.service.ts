@@ -287,10 +287,10 @@ export class EndpointScimGenericService {
     }
 
     // RFC 7644 §3.4.2.2: Full AST-based filter with DB push-down + in-memory fallback
-    const caseExactAttrs = this.getSchemaCacheForRT(resourceType, endpointId)?.caseExactByParent;
+    const caseExactAttrs = this.getSchemaCacheForRT(resourceType, endpointId)?.caseExactPaths;
     let filterResult: ReturnType<typeof buildGenericFilter>;
     try {
-      filterResult = buildGenericFilter(params.filter);
+      filterResult = buildGenericFilter(params.filter, caseExactAttrs);
     } catch (e) {
       throw createScimError({
         status: 400,
@@ -837,6 +837,7 @@ export class EndpointScimGenericService {
   /**
    * GEN-01: Attribute-level payload validation against schema definitions.
    * Dynamic-URN equivalent of ScimSchemaHelpers.validatePayloadSchema().
+   * G2 fix: Required checks run unconditionally on create/replace (RFC 7643 §2.4 "MUST").
    */
   private validatePayloadSchema(
     dto: Record<string, unknown>,
@@ -845,7 +846,24 @@ export class EndpointScimGenericService {
     config: EndpointConfig | undefined,
     mode: 'create' | 'replace' | 'patch',
   ): void {
-    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
+    const isStrict = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION);
+
+    if (!isStrict) {
+      // G2: Required checks run unconditionally for create/replace (RFC 7643 §2.4 "MUST")
+      if (mode === 'patch') return;
+      const schemas = this.buildSchemaDefinitionsFromPayload(dto, resourceType, endpointId);
+      if (schemas.length === 0) return;
+      const result = SchemaValidator.validateRequired(dto, schemas, mode,
+        this.getAttrMapsForRT(resourceType, endpointId));
+      if (!result.valid) {
+        const details = result.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
+        throw createScimError({
+          status: 400,
+          scimType: result.errors[0]?.scimType ?? 'invalidValue',
+          detail: `Schema validation failed: ${details}`,
+          diagnostics: { errorCode: 'VALIDATION_SCHEMA', triggeredBy: 'RequiredAttributeCheck' },
+        });
+      }
       return;
     }
 
@@ -939,6 +957,7 @@ export class EndpointScimGenericService {
   /**
    * GEN-02: Immutable attribute enforcement (RFC 7643 §2.2).
    * Dynamic-URN equivalent of ScimSchemaHelpers.checkImmutableAttributes().
+   * G1 fix: Runs unconditionally (RFC 7643 §2.2 "SHALL NOT").
    */
   private checkImmutableAttributes(
     existing: GenericResourceRecord,
@@ -947,9 +966,8 @@ export class EndpointScimGenericService {
     endpointId: string,
     config?: EndpointConfig,
   ): void {
-    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
-      return;
-    }
+    // G1: Immutable enforcement runs unconditionally (RFC 7643 §2.2 "SHALL NOT")
+    // Previously gated by StrictSchemaValidation — removed per P4 analysis
 
     const existingPayload = this.buildExistingPayload(existing, resourceType);
     const schemas = this.buildSchemaDefinitionsFromPayload(incomingDto, resourceType, endpointId);

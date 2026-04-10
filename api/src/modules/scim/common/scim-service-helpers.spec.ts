@@ -250,10 +250,51 @@ describe('ScimSchemaHelpers', () => {
   });
 
   describe('validatePayloadSchema', () => {
-    it('should do nothing when strict mode is off', () => {
+    it('should enforce required attrs even when StrictSchemaValidation is explicitly false on create (G2)', () => {
+      const coreDef = {
+        id: CORE_URN,
+        name: 'User',
+        attributes: [
+          { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+          { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+        ],
+      };
+      mockRegistry.getSchema.mockReturnValue(coreDef);
+
+      const config = { StrictSchemaValidation: 'false' } as any;
+      const dto = { schemas: [CORE_URN], displayName: 'Alice' } as Record<string, unknown>; // missing userName
+
+      // G2: required should be enforced unconditionally (RFC 7643 §2.4 "MUST")
+      expect(() => helpers.validatePayloadSchema(dto, 'ep-1', config, 'create')).toThrow();
+      try {
+        helpers.validatePayloadSchema(dto, 'ep-1', config, 'create');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+        expect(e.getResponse().detail).toContain("'userName' is missing");
+      }
+    });
+
+    it('should allow unknown attrs when strict is off (type/unknown remains gated)', () => {
+      const coreDef = {
+        id: CORE_URN,
+        name: 'User',
+        attributes: [
+          { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+        ],
+      };
+      mockRegistry.getSchema.mockReturnValue(coreDef);
+
+      const config = { StrictSchemaValidation: 'false' } as any;
+      const dto = { schemas: [CORE_URN], userName: 'alice', unknownField: 'bad' } as Record<string, unknown>;
+
+      // Unknown attrs should NOT throw when strict is off — only required is enforced
+      expect(() => helpers.validatePayloadSchema(dto, 'ep-1', config, 'create')).not.toThrow();
+    });
+
+    it('should skip validation entirely for PATCH when strict is off', () => {
       const dto = { schemas: [CORE_URN] };
-      // No throw
-      helpers.validatePayloadSchema(dto, 'ep-1', undefined, 'create');
+      // No throw — PATCH with strict OFF skips everything
+      helpers.validatePayloadSchema(dto, 'ep-1', { StrictSchemaValidation: 'false' } as any, 'patch');
     });
 
     it('should throw 400 for unknown attribute when strict mode is on', () => {
@@ -296,10 +337,35 @@ describe('ScimSchemaHelpers', () => {
   });
 
   describe('checkImmutableAttributes', () => {
-    it('should do nothing when strict mode is off', () => {
+    it('should enforce immutable even when StrictSchemaValidation is explicitly false (G1)', () => {
+      const coreDef = {
+        id: CORE_URN,
+        name: 'User',
+        attributes: [
+          { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'immutable' },
+          { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+        ],
+      };
+      mockRegistry.getSchema.mockReturnValue(coreDef);
+
+      const config = { StrictSchemaValidation: 'false' } as any;
+      const existing = { schemas: [CORE_URN], userName: 'alice' };
+      const incoming = { schemas: [CORE_URN], userName: 'bob' };
+      // G1: immutable should be enforced unconditionally (RFC 7643 §2.2 "SHALL NOT")
+      // Even when StrictSchemaValidation is explicitly false
+      expect(() => helpers.checkImmutableAttributes(existing, incoming, 'ep-1', config)).toThrow();
+      try {
+        helpers.checkImmutableAttributes(existing, incoming, 'ep-1', config);
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+        expect(e.getResponse().scimType).toBe('mutability');
+      }
+    });
+
+    it('should not throw when no schemas in payload (no-op fallback)', () => {
       const existing = { displayName: 'Alice' };
       const incoming = { displayName: 'Bob' };
-      // No throw — strict mode is off
+      // No schemas[] → can't resolve schema → no-op
       helpers.checkImmutableAttributes(existing, incoming, 'ep-1');
     });
 

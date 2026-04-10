@@ -811,6 +811,9 @@ export class ScimSchemaHelpers {
    *  - Multi-valued / single-valued enforcement
    *  - Sub-attribute validation for complex types
    *
+   * G2 fix: Required attribute checks now run unconditionally on create/replace
+   * (RFC 7643 §2.4 "MUST"). Type/unknown validation remains strict-gated.
+   *
    * @see RFC 7643 §2.1 — Attribute Characteristics
    */
   validatePayloadSchema(
@@ -819,7 +822,26 @@ export class ScimSchemaHelpers {
     config: EndpointConfig | undefined,
     mode: 'create' | 'replace' | 'patch',
   ): void {
-    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
+    const isStrict = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION);
+
+    if (!isStrict) {
+      // G2: Required checks run unconditionally for create/replace (RFC 7643 §2.4 "MUST")
+      // Type/unknown/canonical validation remains strict-gated
+      if (mode === 'patch') return; // PATCH with strict OFF has no required check per RFC 7644 §3.5.2
+      const schemas = this.buildSchemaDefinitions(dto, endpointId);
+      if (schemas.length === 0) return;
+      const cache = this.getSchemaCache(endpointId);
+      const result = SchemaValidator.validateRequired(dto, schemas, mode,
+        cache ? { coreAttrMap: cache.coreAttrMap, extensionSchemaMap: cache.extensionSchemaMap } : undefined);
+      if (!result.valid) {
+        const details = result.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
+        throw createScimError({
+          status: 400,
+          scimType: result.errors[0]?.scimType ?? 'invalidValue',
+          detail: `Schema validation failed: ${details}`,
+          diagnostics: { errorCode: 'VALIDATION_SCHEMA', triggeredBy: 'RequiredAttributeCheck' },
+        });
+      }
       return;
     }
 
@@ -1148,6 +1170,7 @@ export class ScimSchemaHelpers {
    * Compares the existing resource state with the incoming payload
    * and rejects changes to attributes declared as immutable.
    * Only runs when StrictSchemaValidation is enabled.
+   * G1 fix: Immutable enforcement now runs unconditionally (RFC 7643 §2.2 "SHALL NOT").
    *
    * @param existingPayload - Reconstructed existing resource payload (caller builds this)
    * @param incomingDto     - Incoming request payload
@@ -1158,9 +1181,8 @@ export class ScimSchemaHelpers {
     endpointId: string,
     config?: EndpointConfig,
   ): void {
-    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
-      return;
-    }
+    // G1: Immutable enforcement runs unconditionally (RFC 7643 §2.2 "SHALL NOT")
+    // Previously gated by StrictSchemaValidation — removed per P4 analysis
 
     const cache = this.getSchemaCache(endpointId);
     let result;
