@@ -328,7 +328,7 @@ Revoke (deactivate) a credential.
 
 ### GET /scim/admin/version
 
-Server version, runtime, auth status, and storage configuration.
+Server version, runtime diagnostics, auth status, storage, and deployment info.
 
 ```http
 GET /scim/admin/version
@@ -340,10 +340,42 @@ Authorization: Bearer <token>
 ```json
 {
   "version": "0.34.0",
-  "node": "v24.x.x",
-  "uptime": 3600,
-  "persistence": "inmemory",
-  "auth": { "oauth": true, "legacy": true }
+  "service": {
+    "name": "scimserver-api",
+    "environment": "production",
+    "apiPrefix": "scim",
+    "now": "2026-04-13T10:30:45.123Z",
+    "startedAt": "2026-04-12T00:00:00.000Z",
+    "uptimeSeconds": 124245,
+    "timezone": "UTC"
+  },
+  "runtime": {
+    "node": "v24.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "cpus": 2,
+    "containerized": true,
+    "memory": {
+      "rss": 98304000,
+      "heapTotal": 52428800,
+      "heapUsed": 41943040
+    }
+  },
+  "auth": {
+    "oauthClientId": "scimserver-client",
+    "oauthClientSecretConfigured": true,
+    "jwtSecretConfigured": true,
+    "scimSharedSecretConfigured": true
+  },
+  "storage": {
+    "databaseProvider": "postgresql",
+    "persistenceBackend": "prisma"
+  },
+  "deployment": {
+    "resourceGroup": "scimserver-rg",
+    "containerApp": "scimserver2",
+    "currentImage": "ghcr.io/pranems/scimserver:0.34.0"
+  }
 }
 ```
 
@@ -369,6 +401,7 @@ Authorization: Bearer <token>
 | `search` | string | Full-text search |
 | `includeAdmin` | boolean | Include admin API logs |
 | `hideKeepalive` | boolean | Exclude health-check/keepalive requests |
+| `minDurationMs` | number | Only requests taking >= N milliseconds |
 
 **Response: 200 OK** — Paginated log entries.
 
@@ -383,6 +416,27 @@ Get a single log entry by ID.
 Clear all request logs.
 
 **Response: 204 No Content**
+
+### POST /scim/admin/logs/prune
+
+Delete request logs older than a specified number of days.
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `retentionDays` | int (query) | `LOG_RETENTION_DAYS` env or 30 | Days of logs to retain |
+
+```http
+POST /scim/admin/logs/prune?retentionDays=7 HTTP/1.1
+Authorization: Bearer <token>
+```
+
+**Response: 200 OK**
+
+```json
+{
+  "pruned": 142
+}
+```
 
 ### POST /scim/admin/users/manual
 
@@ -1335,7 +1389,8 @@ All errors follow the SCIM error format (RFC 7644 §3.12):
 | 54 | Admin | GET | `/scim/admin/logs` | 200 | Bearer |
 | 55 | Admin | GET | `/scim/admin/logs/:id` | 200 | Bearer |
 | 56 | Admin | POST | `/scim/admin/logs/clear` | 204 | Bearer |
-| 57 | Admin | POST | `/scim/admin/users/manual` | 201 | Bearer |
+| 57 | Admin | POST | `/scim/admin/logs/prune` | 200 | Bearer |
+| 58 | Admin | POST | `/scim/admin/users/manual` | 201 | Bearer |
 | 58 | Admin | POST | `/scim/admin/groups/manual` | 201 | Bearer |
 | 59 | Admin | POST | `/scim/admin/users/:id/delete` | 204 | Bearer |
 | 60 | LogCfg | GET | `/scim/admin/log-config` | 200 | Bearer |
@@ -1348,7 +1403,12 @@ All errors follow the SCIM error format (RFC 7644 §3.12):
 | 67 | LogCfg | DELETE | `/scim/admin/log-config/recent` | 204 | Bearer |
 | 68 | LogCfg | GET | `/scim/admin/log-config/stream` | SSE | Bearer |
 | 69 | LogCfg | GET | `/scim/admin/log-config/download` | File | Bearer |
-| 70 | DB | GET | `/scim/admin/database/users` | 200 | Bearer |
+| 70 | LogCfg | GET | `/scim/admin/log-config/audit` | 200 | Bearer |
+| 71 | EpLogs | GET | `/scim/endpoints/:eid/logs/recent` | 200 | Bearer |
+| 72 | EpLogs | GET | `/scim/endpoints/:eid/logs/stream` | SSE | Bearer |
+| 73 | EpLogs | GET | `/scim/endpoints/:eid/logs/download` | File | Bearer |
+| 74 | EpLogs | GET | `/scim/endpoints/:eid/logs/history` | 200 | Bearer |
+| 75 | DB | GET | `/scim/admin/database/users` | 200 | Bearer |
 | 71 | DB | GET | `/scim/admin/database/users/:id` | 200 | Bearer |
 | 72 | DB | GET | `/scim/admin/database/groups` | 200 | Bearer |
 | 73 | DB | GET | `/scim/admin/database/groups/:id` | 200 | Bearer |
