@@ -443,6 +443,48 @@ This provides **tenant-safe log access** — per-endpoint credential holders can
 
 The controller delegates to `LogQueryService` for shared ring buffer query, SSE stream setup, and file download logic.
 
+### Per-Endpoint Log Query Parameters
+
+**`/logs/recent`:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `limit` | int | Max entries to return |
+| `level` | string | Minimum level filter (TRACE/DEBUG/INFO/WARN/ERROR/FATAL) |
+| `category` | string | Category filter (http, auth, scim.user, etc.) |
+| `requestId` | UUID | Filter by correlation request ID |
+| `method` | string | Filter by HTTP method (GET, POST, PATCH, etc.) — *unique to per-endpoint, not on admin /recent* |
+
+**`/logs/stream`:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `level` | string | Minimum level filter |
+| `category` | string | Category filter |
+
+**`/logs/download`:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `format` | string | `ndjson` (default) or `json` |
+| `limit` | int | Max entries |
+| `level` | string | Minimum level filter |
+| `category` | string | Category filter |
+| `requestId` | UUID | Filter by request ID |
+
+**`/logs/history`:** (persistent DB logs)
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `page` | int | Page number |
+| `pageSize` | int | Results per page |
+| `method` | string | HTTP method filter |
+| `status` | int | HTTP status code filter |
+| `search` | string | Full-text search |
+| `since` | ISO 8601 | Logs after this timestamp |
+| `until` | ISO 8601 | Logs before this timestamp |
+| `minDurationMs` | int | Only requests >= N ms |
+
 ---
 
 ## 11. Persistent Request Logging (DB)
@@ -480,6 +522,23 @@ The `LoggingService` derives a human-readable identifier for each log entry:
 
 ### Query API
 
+All query parameters for `GET /scim/admin/logs`:
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `page` | int | Page number (default: 1) |
+| `pageSize` | int | Results per page (default: 50, max: 200) |
+| `method` | string | Filter by HTTP method (`POST`, `PATCH`, `GET`, etc.) |
+| `status` | int | Filter by HTTP status code (`409`, `201`, etc.) |
+| `hasError` | boolean | `true` = only entries with errors; `false` = only successful |
+| `urlContains` | string | Filter by URL substring (e.g., `/Users`, `/Groups`) |
+| `since` | ISO 8601 | Logs after this timestamp |
+| `until` | ISO 8601 | Logs before this timestamp |
+| `search` | string | Full-text search across URL, headers, bodies, error messages |
+| `includeAdmin` | boolean | Include `/admin/*` API logs (excluded by default) |
+| `hideKeepalive` | boolean | Exclude Entra ID keepalive probes (GET /Users?filter=userName eq UUID) |
+| `minDurationMs` | int | Only requests taking >= N milliseconds |
+
 ```bash
 # List logs (paginated, filtered)
 GET /scim/admin/logs?page=1&pageSize=50&method=POST&status=409
@@ -492,6 +551,12 @@ GET /scim/admin/logs?since=2026-04-01T00:00:00Z&until=2026-04-13T23:59:59Z
 
 # Show slow requests only
 GET /scim/admin/logs?minDurationMs=1000
+
+# Only error responses
+GET /scim/admin/logs?hasError=true
+
+# Only requests to /Users
+GET /scim/admin/logs?urlContains=/Users
 
 # Include admin endpoints (excluded by default)
 GET /scim/admin/logs?includeAdmin=true
@@ -871,6 +936,102 @@ environment:
   - LOG_SLOW_REQUEST_MS=3000
 volumes:
   - ./logs:/app/logs
+```
+
+### Startup Log Messages
+
+On boot, the server prints these log lines to console (useful for verifying configuration):
+
+```
+🚀 SCIM Endpoint Server API is running on http://localhost:6000/scim
+🔎 Log API quick access: http://localhost:6000/scim/admin/log-config/recent?limit=25
+🔎 Log stream (SSE): http://localhost:6000/scim/admin/log-config/stream?level=INFO
+🔎 Log download (JSON): http://localhost:6000/scim/admin/log-config/download?format=json
+✅ StrictSchemaValidation is ON by default for all endpoints...
+```
+
+These URLs are clickable in most terminals and provide instant access to the log infrastructure.
+
+### Runtime Version & Diagnostics Endpoint
+
+The `GET /scim/admin/version` endpoint returns comprehensive runtime observability data including uptime, memory usage, container detection, auth status, and deployment info.
+
+| Property | Value |
+|----------|-------|
+| **Method** | `GET` |
+| **URL** | `/scim/admin/version` |
+| **Headers** | `Authorization: Bearer <token>` |
+
+**Request:**
+
+```http
+GET /scim/admin/version HTTP/1.1
+Authorization: Bearer changeme-scim
+```
+
+**Response: `200 OK`**
+
+```json
+{
+  "version": "0.34.0",
+  "service": {
+    "name": "scimserver-api",
+    "environment": "production",
+    "apiPrefix": "scim",
+    "scimBasePath": "/scim",
+    "now": "2026-04-13T10:30:45.123Z",
+    "startedAt": "2026-04-12T00:00:00.000Z",
+    "uptimeSeconds": 124245,
+    "timezone": "UTC",
+    "utcOffset": "+00:00"
+  },
+  "runtime": {
+    "node": "v24.0.0",
+    "platform": "linux",
+    "arch": "x64",
+    "pid": 1,
+    "hostname": "scimserver2-abc123",
+    "cpus": 2,
+    "containerized": true,
+    "memory": {
+      "rss": 98304000,
+      "heapTotal": 52428800,
+      "heapUsed": 41943040,
+      "external": 2097152,
+      "arrayBuffers": 524288
+    }
+  },
+  "auth": {
+    "oauthClientId": "scimserver-client",
+    "oauthClientSecretConfigured": true,
+    "jwtSecretConfigured": true,
+    "scimSharedSecretConfigured": true
+  },
+  "storage": {
+    "databaseProvider": "postgresql",
+    "persistenceBackend": "prisma"
+  },
+  "container": {
+    "app": {
+      "name": "scimserver2",
+      "image": "ghcr.io/pranems/scimserver:0.34.0",
+      "runtime": "node",
+      "platform": "linux/amd64"
+    }
+  },
+  "deployment": {
+    "resourceGroup": "scimserver-rg",
+    "containerApp": "scimserver2",
+    "registry": "ghcr.io/pranems",
+    "currentImage": "ghcr.io/pranems/scimserver:0.34.0"
+  }
+}
+```
+
+**PowerShell:**
+
+```powershell
+Invoke-RestMethod "$base/scim/admin/version" -Headers $h | ConvertTo-Json -Depth 5
 ```
 
 ---
