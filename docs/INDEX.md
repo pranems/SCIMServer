@@ -102,6 +102,7 @@
 
 | Document | Description |
 |----------|-------------|
+| [DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md](DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md) | **v0.34.0 deep analysis** — security, SOLID, DRY, DTO, data integrity, RFC gaps, 25-item roadmap |
 | [LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md](LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md) | **Deep audit v1.1** — 28-gap register across all flows, levels, error paths, deployment modes |
 | [LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md](LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md) | **Ideal design v2.0** — 9 principles, event taxonomy, level redesign, error classification, Mermaid diagrams |
 | [ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md](ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md) | Historical bug log with RCA and resolution |
