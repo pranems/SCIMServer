@@ -31,6 +31,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Section counts synced across INDEX.md, Session_starter.md
 - DEPLOYMENT.md version: v0.31.0 → v0.34.0
 
+**Doc gap fixes** (17 gaps across all logging/error docs):
+- Gap 1 (Critical): Route `DELETE /admin/logs` → `POST /admin/logs/clear` (3 files)
+- Gap 2: `POST /admin/logs/prune` + `LOG_RETENTION_DAYS` env var documented
+- Gap 3: Activity feed (`/admin/activity` + `/summary`) — 904-line feature documented
+- Gap 4: Web UI admin dashboard at `/admin` documented
+- Gap 5: `/health` endpoint (public, no auth) documented
+- Gaps 6-8: Log buffering caveat, PERSISTENCE_BACKEND effects, 5 missing test files
+- Gaps 9-17: COMPLETE_API_REFERENCE.md — prune route, 4 endpoint log routes, audit in route table, version response (5→30+ fields), minDurationMs/hasError/urlContains params; LOGGING_AND_OBSERVABILITY.md — full query param table, startup logs, version endpoint, per-endpoint log query params
+
+**E2E test gap closure** (+11 tests, 939 → 950):
+- PATCH failedOperationIndex/failedPath/failedOp diagnostics (fixed existing test)
+- Audit trail endpoint (2 tests), log pruning (2 tests), minDurationMs filter
+- slowRequestThresholdMs runtime config, per-endpoint logs/history (3 tests)
+
 ### logFileEnabled default changed to true
 
 **Breaking Change (minor):**
