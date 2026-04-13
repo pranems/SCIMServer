@@ -42,6 +42,8 @@ export interface GroupMemberPatchConfig {
   allowRemoveAllMembers: boolean;
   /** Extension URNs registered for this endpoint (for PATCH path resolution) */
   extensionUrns?: readonly string[];
+  /** Set of caseExact attribute paths from schema cache (G7: for valuePath filter matching) */
+  caseExactPaths?: Set<string>;
 }
 
 // ─── PATCH Result ────────────────────────────────────────────────────────────

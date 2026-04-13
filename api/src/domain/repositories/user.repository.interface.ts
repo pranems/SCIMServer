@@ -43,19 +43,20 @@ export interface IUserRepository {
   delete(id: string): Promise<void>;
 
   /**
-   * Check for uniqueness violations within an endpoint.
+   * Check for userName uniqueness within an endpoint.
    *
    * Searches for any existing user whose `userName` matches
-   * case-insensitively (via CITEXT or toLowerCase) OR whose
-   * `externalId` matches `externalId`.
+   * case-insensitively (via CITEXT or toLowerCase).
    * Optionally excludes a record with the given `scimId` (for PUT/PATCH).
+   *
+   * Note: externalId and displayName are NOT checked for uniqueness —
+   * they are saved as received per RFC 7643.
    *
    * @returns The conflicting record's identifiers, or `null` if unique.
    */
   findConflict(
     endpointId: string,
     userName: string,
-    externalId?: string,
     excludeScimId?: string,
   ): Promise<UserConflictResult | null>;
 

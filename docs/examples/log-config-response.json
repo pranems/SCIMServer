@@ -32,6 +32,9 @@
     "endpoint",
     "database",
     "oauth",
+    "scim.bulk",
+    "scim.resource",
+    "config",
     "general"
   ]
 }

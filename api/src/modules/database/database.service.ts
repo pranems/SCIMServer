@@ -1,5 +1,10 @@
-﻿import { Injectable } from '@nestjs/common';
+﻿import { Inject, Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import type { IUserRepository } from '../../domain/repositories/user.repository.interface';
+import type { IGroupRepository } from '../../domain/repositories/group.repository.interface';
+import { USER_REPOSITORY, GROUP_REPOSITORY } from '../../domain/repositories/repository.tokens';
+import { EndpointService } from '../endpoint/services/endpoint.service';
+import { LoggingService } from '../logging/logging.service';
 
 interface UserQuery {
   page: number;
@@ -16,9 +21,20 @@ interface GroupQuery {
 
 @Injectable()
 export class DatabaseService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly isInMemoryBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() === 'inmemory';
+
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(USER_REPOSITORY) private readonly userRepo: IUserRepository,
+    @Inject(GROUP_REPOSITORY) private readonly groupRepo: IGroupRepository,
+    @Optional() private readonly endpointService?: EndpointService,
+    @Optional() private readonly loggingService?: LoggingService,
+  ) {}
 
   async getUsers(query: UserQuery) {
+    if (this.isInMemoryBackend) {
+      return this.getUsersInMemory(query);
+    }
     const { page, limit, search, active } = query;
     const skip = (page - 1) * limit;
 
@@ -90,6 +106,9 @@ export class DatabaseService {
   }
 
   async getGroups(query: GroupQuery) {
+    if (this.isInMemoryBackend) {
+      return this.getGroupsInMemory(query);
+    }
     const { page, limit, search } = query;
     const skip = (page - 1) * limit;
 
@@ -145,6 +164,18 @@ export class DatabaseService {
   }
 
   async getUserDetails(id: string) {
+    if (this.isInMemoryBackend) {
+      // In inmemory mode, search across all endpoints
+      const endpointIds = await this.getEndpointIds();
+      for (const epId of endpointIds) {
+        const user = await this.userRepo.findByScimId(epId, id);
+        if (user) {
+          const payload = typeof user.rawPayload === 'string' ? JSON.parse(user.rawPayload || '{}') : (user.rawPayload ?? {});
+          return { ...user, ...payload, groups: [] };
+        }
+      }
+      throw new Error('User not found');
+    }
     const user = await this.prisma.scimResource.findFirst({
       where: { id, resourceType: 'User' },
       include: {
@@ -172,6 +203,17 @@ export class DatabaseService {
   }
 
   async getGroupDetails(id: string) {
+    if (this.isInMemoryBackend) {
+      const endpointIds = await this.getEndpointIds();
+      for (const epId of endpointIds) {
+        const group = await this.groupRepo.findWithMembers(epId, id);
+        if (group) {
+          const payload = typeof group.rawPayload === 'string' ? JSON.parse(group.rawPayload || '{}') : (group.rawPayload ?? {});
+          return { ...group, ...payload, members: group.members ?? [] };
+        }
+      }
+      throw new Error('Group not found');
+    }
     const group = await this.prisma.scimResource.findFirst({
       where: { id, resourceType: 'Group' },
       include: {
@@ -200,6 +242,9 @@ export class DatabaseService {
   }
 
   async getStatistics() {
+    if (this.isInMemoryBackend) {
+      return this.getStatisticsInMemory();
+    }
     const [
       totalUsers,
       activeUsers,
@@ -233,6 +278,107 @@ export class DatabaseService {
         totalRequests: totalLogs,
         last24Hours: recentActivity,
       },
+    };
+  }
+
+  // ─── InMemory fallback methods ────────────────────────────────────
+
+  private async getEndpointIds(): Promise<string[]> {
+    if (this.endpointService) {
+      const result = await this.endpointService.listEndpoints();
+      return result.endpoints.map((e: any) => e.id);
+    }
+    return [];
+  }
+
+  private async getUsersInMemory(query: UserQuery) {
+    const { page, limit, search, active } = query;
+    const endpointIds = await this.getEndpointIds();
+
+    let allUsers: any[] = [];
+    for (const epId of endpointIds) {
+      const users = await this.userRepo.findAll(epId);
+      allUsers.push(...users);
+    }
+
+    // Apply filters
+    if (search) {
+      const s = search.toLowerCase();
+      allUsers = allUsers.filter(u =>
+        (u.userName?.toLowerCase().includes(s)) ||
+        (u.scimId?.toLowerCase().includes(s)) ||
+        (u.externalId?.toLowerCase().includes(s))
+      );
+    }
+    if (active !== undefined) {
+      allUsers = allUsers.filter(u => u.active === active);
+    }
+
+    // Sort by creation date descending
+    allUsers.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const total = allUsers.length;
+    const skip = (page - 1) * limit;
+    const paged = allUsers.slice(skip, skip + limit);
+
+    return {
+      users: paged.map(u => {
+        const payload = typeof u.rawPayload === 'string' ? JSON.parse(u.rawPayload || '{}') : (u.rawPayload ?? {});
+        return { ...u, ...payload, groups: [] };
+      }),
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    };
+  }
+
+  private async getGroupsInMemory(query: GroupQuery) {
+    const { page, limit, search } = query;
+    const endpointIds = await this.getEndpointIds();
+
+    let allGroups: any[] = [];
+    for (const epId of endpointIds) {
+      const groups = await this.groupRepo.findAllWithMembers(epId);
+      allGroups.push(...groups);
+    }
+
+    if (search) {
+      const s = search.toLowerCase();
+      allGroups = allGroups.filter(g => g.displayName?.toLowerCase().includes(s));
+    }
+
+    allGroups.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const total = allGroups.length;
+    const skip = (page - 1) * limit;
+    const paged = allGroups.slice(skip, skip + limit);
+
+    return {
+      groups: paged.map(g => {
+        const payload = typeof g.rawPayload === 'string' ? JSON.parse(g.rawPayload || '{}') : (g.rawPayload ?? {});
+        return { ...g, ...payload, memberCount: g.members?.length ?? 0 };
+      }),
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    };
+  }
+
+  private async getStatisticsInMemory() {
+    const endpointIds = await this.getEndpointIds();
+
+    let totalUsers = 0;
+    let activeUsers = 0;
+    let totalGroups = 0;
+
+    for (const epId of endpointIds) {
+      const users = await this.userRepo.findAll(epId);
+      totalUsers += users.length;
+      activeUsers += users.filter(u => u.active).length;
+      const groups = await this.groupRepo.findAllWithMembers(epId);
+      totalGroups += groups.length;
+    }
+
+    return {
+      users: { total: totalUsers, active: activeUsers, inactive: totalUsers - activeUsers },
+      groups: { total: totalGroups },
+      activity: { totalRequests: 0, last24Hours: 0 },
     };
   }
 }

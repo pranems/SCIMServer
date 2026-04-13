@@ -1,6 +1,6 @@
 # Deployment Instances, Costs & Load Analysis
 
-> **Last Updated:** 2026-03-31 | **Version:** 0.31.0 | **Branch:** `feat/torfc1stscimsvr`  
+> **Last Updated:** 2026-04-10 | **Version:** 0.34.0 | **Branch:** `feat/torfc1stscimsvr`  
 > **Status:** Living Document — Updated after each validation pipeline run
 
 ### Related Docs (avoid duplication — this doc is the canonical source for costs & load)

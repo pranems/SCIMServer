@@ -455,15 +455,7 @@ export const GROUP_SCHEMA_ATTRIBUTES = [
     uniqueness: 'none',
     description: 'An identifier for the Group as defined by the Service Consumer.',
   },
-  {
-    name: 'active',
-    type: 'boolean',
-    multiValued: false,
-    required: false,
-    mutability: 'readWrite',
-    returned: 'always',
-    description: 'A Boolean value indicating the Group\'s administrative status. When soft-delete is enabled, a deleted Group has active set to false.',
-  },
+  // Settings v7: Group active attribute removed (not in RFC 7643 §4.2)
   {
     name: 'meta',
     type: 'complex',

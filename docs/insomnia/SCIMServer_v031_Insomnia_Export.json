@@ -8,7 +8,7 @@
       "_id": "wrk_scimserver",
       "_type": "workspace",
       "name": "SCIMServer v0.31.0 — Complete API",
-      "description": "All 76 endpoints across 18 controllers. Set base_url, token, endpoint_id, user_id, group_id in environment.",
+      "description": "All 82 endpoints across 19 controllers. Set base_url, token, endpoint_id, user_id, group_id in environment.",
       "scope": "collection"
     },
     {
@@ -65,7 +65,7 @@
     { "_id": "req_ep_preset_detail", "_type": "request", "parentId": "fld_endpoints", "name": "GET Preset (entra-id)", "method": "GET", "url": "{{ _.base_url }}/admin/endpoints/presets/entra-id", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
     { "_id": "req_ep_get", "_type": "request", "parentId": "fld_endpoints", "name": "GET Endpoint by ID", "method": "GET", "url": "{{ _.base_url }}/admin/endpoints/{{ _.endpoint_id }}?view=full", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
     { "_id": "req_ep_byname", "_type": "request", "parentId": "fld_endpoints", "name": "GET Endpoint by Name", "method": "GET", "url": "{{ _.base_url }}/admin/endpoints/by-name/test-endpoint", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
-    { "_id": "req_ep_patch", "_type": "request", "parentId": "fld_endpoints", "name": "PATCH Update Endpoint", "method": "PATCH", "url": "{{ _.base_url }}/admin/endpoints/{{ _.endpoint_id }}", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/json" }], "body": { "mimeType": "application/json", "text": "{\n  \"displayName\": \"Updated\",\n  \"profile\": { \"settings\": { \"SoftDeleteEnabled\": \"True\" } }\n}" } },
+    { "_id": "req_ep_patch", "_type": "request", "parentId": "fld_endpoints", "name": "PATCH Update Endpoint", "method": "PATCH", "url": "{{ _.base_url }}/admin/endpoints/{{ _.endpoint_id }}", "authentication": { "type": "bearer", "token": "{{ _.token }}" }, "headers": [{ "name": "Content-Type", "value": "application/json" }], "body": { "mimeType": "application/json", "text": "{\n  \"displayName\": \"Updated\",\n  \"profile\": { \"settings\": { \"UserSoftDeleteEnabled\": \"True\" } }\n}" } },
     { "_id": "req_ep_stats", "_type": "request", "parentId": "fld_endpoints", "name": "GET Endpoint Stats", "method": "GET", "url": "{{ _.base_url }}/admin/endpoints/{{ _.endpoint_id }}/stats", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
     { "_id": "req_ep_delete", "_type": "request", "parentId": "fld_endpoints", "name": "DELETE Endpoint", "method": "DELETE", "url": "{{ _.base_url }}/admin/endpoints/{{ _.endpoint_id }}", "authentication": { "type": "bearer", "token": "{{ _.token }}" } },
 

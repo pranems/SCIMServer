@@ -376,26 +376,25 @@ describe('P2 R-RET-1: schema-driven schemaAlwaysReturned', () => {
   });
 });
 
-// ─── P2: R-RET-2 Group 'active' always-returned ──────────────────────────────
+// ─── P2: R-RET-2 Group 'active' NOT always-returned (settings v7) ─────────────
 
-describe('P2 R-RET-2: Group active always-returned', () => {
+describe('P2 R-RET-2: Group does NOT return active (settings v7)', () => {
   const group = {
     schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
     id: 'g1',
     displayName: 'Engineering',
-    active: true,
     meta: { resourceType: 'Group' },
   };
 
-  it('should not exclude active from Group via excludedAttributes', () => {
-    const result = applyAttributeProjection(group, undefined, 'active');
-    expect(result.active).toBe(true);
+  it('should not include active in Group always-returned set', () => {
+    const result = applyAttributeProjection(group, 'displayName');
+    expect(result).not.toHaveProperty('active');
+    expect(result.displayName).toBe('Engineering');
   });
 
-  it('should always include active in Group when attributes param used', () => {
-    const result = applyAttributeProjection(group, 'members');
-    expect(result.active).toBe(true);
-    expect(result.displayName).toBe('Engineering');
+  it('should not inject active even without projection', () => {
+    const result = applyAttributeProjection(group);
+    expect(result).not.toHaveProperty('active');
   });
 });
 

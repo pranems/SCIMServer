@@ -232,6 +232,103 @@ describe('GenericPatchEngine', () => {
     });
   });
 
+  // ─── V19: Prototype pollution guard ─────────────────────────────
+
+  describe('V19 — prototype pollution guard', () => {
+    it('should reject add op with __proto__ in path', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() =>
+        engine.apply({ op: 'add', path: '__proto__.polluted', value: true }),
+      ).toThrow(PatchError);
+    });
+
+    it('should reject replace op with constructor in path', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() =>
+        engine.apply({ op: 'replace', path: 'constructor.name', value: 'Evil' }),
+      ).toThrow(PatchError);
+    });
+
+    it('should reject replace op with prototype in path', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() =>
+        engine.apply({ op: 'replace', path: 'prototype.isAdmin', value: true }),
+      ).toThrow(PatchError);
+    });
+
+    it('should reject remove op with __proto__ in path', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() =>
+        engine.apply({ op: 'remove', path: '__proto__.polluted' }),
+      ).toThrow(PatchError);
+    });
+
+    it('should reject __proto__ as a simple (non-dot) path', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() =>
+        engine.apply({ op: 'replace', path: '__proto__', value: { polluted: true } }),
+      ).toThrow(PatchError);
+    });
+
+    it('should reject deeply nested __proto__ in dot-notation path', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() =>
+        engine.apply({ op: 'add', path: 'name.__proto__.polluted', value: true }),
+      ).toThrow(PatchError);
+    });
+
+    it('should reject constructor in second segment of dot-notation', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      expect(() =>
+        engine.apply({ op: 'replace', path: 'x.constructor.y', value: true }),
+      ).toThrow(PatchError);
+    });
+
+    it('should strip dangerous keys from no-path add value objects', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({
+        op: 'add',
+        value: {
+          displayName: 'Updated',
+          __proto__: { polluted: true },
+          constructor: { polluted: true },
+        },
+      });
+      const result = engine.getResult();
+      expect(result.displayName).toBe('Updated');
+      expect(Object.getOwnPropertyNames(result).includes('__proto__')).toBe(false);
+      expect(Object.getOwnPropertyNames(result).includes('constructor')).toBe(false);
+    });
+
+    it('should strip dangerous keys from no-path replace value objects', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({
+        op: 'replace',
+        value: {
+          displayName: 'Replaced',
+          prototype: { polluted: true },
+        },
+      });
+      const result = engine.getResult();
+      expect(result.displayName).toBe('Replaced');
+      expect(Object.getOwnPropertyNames(result).includes('prototype')).toBe(false);
+    });
+
+    it('should allow normal dot-notation paths', () => {
+      const engine = new GenericPatchEngine(makePayload());
+      engine.apply({ op: 'replace', path: 'name.model', value: 'Safe' });
+      expect((engine.getResult().name as Record<string, unknown>).model).toBe('Safe');
+    });
+
+    it('should reject __proto__ in legacy URN dot-notation path', () => {
+      const urn = 'urn:example:ext:2.0';
+      const engine = new GenericPatchEngine({ displayName: 'Dev' });
+      expect(() =>
+        engine.apply({ op: 'add', path: `${urn}.__proto__`, value: true }),
+      ).toThrow(PatchError);
+    });
+  });
+
   // ─── Error handling ───────────────────────────────────────────────
 
   describe('error handling', () => {

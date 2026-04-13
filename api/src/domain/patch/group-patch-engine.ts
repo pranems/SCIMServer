@@ -69,53 +69,64 @@ export class GroupPatchEngine {
     let members = [...state.members];
     let rawPayload = { ...state.rawPayload };
 
-    for (const operation of operations) {
+    for (let i = 0; i < operations.length; i++) {
+      const operation = operations[i];
       const op = operation.op?.toLowerCase();
       if (!op || !['add', 'replace', 'remove'].includes(op)) {
         throw new PatchError(
           400,
           `Patch operation '${operation.op}' is not supported.`,
           'invalidValue',
+          { operationIndex: i, path: operation.path, op: operation.op },
         );
       }
 
-      switch (op) {
-        case 'replace': {
-          const result = GroupPatchEngine.handleReplace(
-            operation, displayName, externalId, members, rawPayload, config,
-          );
-          displayName = result.displayName;
-          externalId = result.externalId;
-          members = result.members;
-          rawPayload = result.rawPayload;
-          break;
+      try {
+        switch (op) {
+          case 'replace': {
+            const result = GroupPatchEngine.handleReplace(
+              operation, displayName, externalId, members, rawPayload, config,
+            );
+            displayName = result.displayName;
+            externalId = result.externalId;
+            members = result.members;
+            rawPayload = result.rawPayload;
+            break;
+          }
+          case 'add':
+            // Check for extension path first; otherwise delegate to member-only handler
+            if (operation.path && isExtensionPath(operation.path, config.extensionUrns)) {
+              const extParsed = parseExtensionPath(operation.path, config.extensionUrns);
+              if (extParsed) {
+                rawPayload = applyExtensionUpdate({ ...rawPayload }, extParsed, operation.value);
+                break;
+              }
+            }
+            members = GroupPatchEngine.handleAdd(
+              operation, members, config.allowMultiMemberAdd,
+            );
+            break;
+          case 'remove':
+            // Check for extension path first; otherwise delegate to member-only handler
+            if (operation.path && isExtensionPath(operation.path, config.extensionUrns)) {
+              const extParsed = parseExtensionPath(operation.path, config.extensionUrns);
+              if (extParsed) {
+                rawPayload = removeExtensionAttribute({ ...rawPayload }, extParsed);
+                break;
+              }
+            }
+            members = GroupPatchEngine.handleRemove(
+              operation, members, config.allowMultiMemberRemove, config.allowRemoveAllMembers, config.caseExactPaths,
+            );
+            break;
         }
-        case 'add':
-          // Check for extension path first; otherwise delegate to member-only handler
-          if (operation.path && isExtensionPath(operation.path, config.extensionUrns)) {
-            const extParsed = parseExtensionPath(operation.path, config.extensionUrns);
-            if (extParsed) {
-              rawPayload = applyExtensionUpdate({ ...rawPayload }, extParsed, operation.value);
-              break;
-            }
-          }
-          members = GroupPatchEngine.handleAdd(
-            operation, members, config.allowMultiMemberAdd,
-          );
-          break;
-        case 'remove':
-          // Check for extension path first; otherwise delegate to member-only handler
-          if (operation.path && isExtensionPath(operation.path, config.extensionUrns)) {
-            const extParsed = parseExtensionPath(operation.path, config.extensionUrns);
-            if (extParsed) {
-              rawPayload = removeExtensionAttribute({ ...rawPayload }, extParsed);
-              break;
-            }
-          }
-          members = GroupPatchEngine.handleRemove(
-            operation, members, config.allowMultiMemberRemove, config.allowRemoveAllMembers,
-          );
-          break;
+      } catch (err) {
+        if (err instanceof PatchError && err.operationIndex === undefined) {
+          throw new PatchError(err.status, err.message, err.scimType, {
+            operationIndex: i, path: operation.path, op: operation.op,
+          });
+        }
+        throw err;
       }
     }
 
@@ -272,6 +283,7 @@ export class GroupPatchEngine {
     members: GroupMemberDto[],
     allowMultiMemberRemove: boolean,
     allowRemoveAllMembers: boolean,
+    caseExactPaths?: Set<string>,
   ): GroupMemberDto[] {
     const path = operation.path?.toLowerCase();
 
@@ -297,10 +309,17 @@ export class GroupPatchEngine {
     }
 
     // Targeted removal: members[value eq "user-id"]
-    const memberPathMatch = path?.match(/^members\[value\s+eq\s+"?([^"]+)"?\]$/i);
+    // Use original path (not lowercased) to preserve filter value casing for G7 caseExact
+    const memberPathMatch = operation.path?.match(/^members\[value\s+eq\s+"?([^"]+)"?\]$/i);
     if (memberPathMatch) {
       const valueToRemove = memberPathMatch[1];
-      return members.filter(m => m.value !== valueToRemove);
+      // G7: Use caseExact from schema cache for value comparison
+      // members[].value has no explicit caseExact → defaults to case-insensitive
+      const isCaseExact = caseExactPaths?.has('value') ?? false;
+      if (isCaseExact) {
+        return members.filter(m => m.value !== valueToRemove);
+      }
+      return members.filter(m => m.value.toLowerCase() !== valueToRemove.toLowerCase());
     }
 
     // path=members without value — remove all members

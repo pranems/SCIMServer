@@ -24,7 +24,7 @@ Read **every** `*.controller.ts` file in `api/src/modules/` to build an authorit
 - Query parameters via `@Query()` decorators
 - Guard and interceptor registrations
 
-**Baseline**: The server has **76 endpoints across 18 controllers** — verify this count after any feature additions.
+**Baseline**: The server has **82 endpoints across 19 controllers** — verify this count after any feature additions.
 
 ### 1C. DTO & Response Shape Verification
 Read all `*.dto.ts` files and key interfaces to verify documented request/response shapes:
@@ -47,9 +47,9 @@ Check `docs/openapi/`, `docs/postman/`, `docs/insomnia/`, `docs/examples/`, `doc
 Read `api/prisma/schema.prisma` for current data model, models, fields (especially `profile Json?` vs legacy `config String?`), and relationships.
 
 ### 1G. Read Constants & Enums
-- `api/src/modules/logging/log-levels.ts` — LogCategory enum (currently 11 categories: http, auth, scim.user, scim.group, scim.patch, scim.filter, scim.discovery, endpoint, database, oauth, general)
+- `api/src/modules/logging/log-levels.ts` — LogCategory enum (currently 14 categories: http, auth, scim.user, scim.group, scim.patch, scim.filter, scim.discovery, endpoint, database, oauth, scim.bulk, scim.resource, config, general)
 - `api/src/modules/scim/dto/bulk-request.dto.ts` — BULK_MAX_OPERATIONS (1000), BULK_MAX_PAYLOAD_SIZE (1048576)
-- Profile presets — currently 6: `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `lexmark`
+- Profile presets — currently 6: `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `user-only-with-custom-ext`
 
 ---
 
@@ -81,7 +81,7 @@ For every document listed in `docs/INDEX.md`, check:
 | **Flag interaction table** | Are all known flag combinations documented? |
 | **Request/response examples** | Headers, URLs, bodies, status codes accurate? |
 | **Entra ID recommended config** | Still valid for latest features? |
-| **Endpoint count** | Does "76 endpoints" / "18 controllers" match actual count? |
+| **Endpoint count** | Does "82 endpoints" / "19 controllers" match actual count? |
 | **Filter operator support** | All operators listed as fully supported (`eq`, `ne`, `co`, `sw`, `ew`, `pr`, `gt`, `ge`, `lt`, `le`, `and`, `or`, `not`) — no stale "limited support" notes |
 | **Query parameter completeness** | `sortBy`, `sortOrder`, `attributes`, `excludedAttributes` documented on all list/get endpoints |
 | **Bulk/Me/Custom resources** | All three listed in core endpoint tables |
@@ -118,7 +118,7 @@ For every document listed in `docs/INDEX.md`, check:
 
 | Check | What to verify |
 |-------|----------------|
-| **Endpoint coverage** | Does the collection cover all 76 endpoints (18 controllers)? Calculate coverage % |
+| **Endpoint coverage** | Does the collection cover all 82 endpoints (19 controllers)? Calculate coverage % |
 | **Multi-tenant path structure** | All SCIM paths use `/endpoints/{endpointId}/...` (not root `/Users`, `/Groups`) |
 | **Route accuracy** | Every path in the collection matches an actual controller route |
 | **Query parameters** | All `?view`, `?active`, `?filter`, `?sortBy`, `?sortOrder`, `?attributes`, `?excludedAttributes`, `?startIndex`, `?count` params documented |
@@ -164,7 +164,7 @@ For every document listed in `docs/INDEX.md`, check:
 | **Feature list** | All implemented features/phases listed |
 | **Open gaps** | Remaining gaps list is current |
 | **Stack versions** | Node, NestJS, Prisma, TS, Jest versions current |
-| **Endpoint count** | 76 endpoints / 18 controllers (or updated if changed) |
+| **Endpoint count** | 82 endpoints / 19 controllers (or updated if changed) |
 | **Doc count** | Total active docs in `docs/` matches INDEX.md header |
 
 ### G. Deployment & Infra Docs
@@ -186,7 +186,7 @@ Search across ALL docs for stale data formats that have been superseded:
 | `"config": { "FlagName": "True" }` | `"profile": { "settings": { "FlagName": "True" } }` | `grep -r '"config":' docs/` (exclude archive/, REMOTE_DEBUGGING, ENDPOINT_CONFIG_FLAGS migration notes) |
 | `config String?` (Prisma) | `profile Json?` | Search for `config` in schema blocks |
 | `maxOperations: 100` | `maxOperations: 1000` | Search for `maxOperations` |
-| `"backup"` log category | Remove — only 11 categories exist | Search for `backup` in log category lists |
+| `"backup"` log category | Remove — only 14 categories exist | Search for `backup` in log category lists |
 | `mutability: "ReadWrite"` | `mutability: "readWrite"` (lowercase per RFC 7643) | Search for PascalCase mutability values |
 | Root-level SCIM paths `/Users` | Endpoint-scoped `/endpoints/{eid}/Users` | Ensure all operational examples use multi-tenant paths |
 | `"8 endpoints"` (LogConfigController) | `"10 endpoints"` | Search for endpoint count near log-config |
@@ -263,12 +263,12 @@ After all updates, perform a final cross-check:
 
 1. **Version consistency**: `package.json` version matches all doc headers, `CHANGELOG.md`, `Session_starter.md`, `CONTEXT_INSTRUCTIONS.md`, and `PROJECT_HEALTH_AND_STATS.md`.
 2. **Test count consistency**: Unit, E2E, and live counts match across all documents that reference them.
-3. **Flag count consistency**: All docs that reference flag counts or list flag names are in sync with `ProfileSettings` interface (14 boolean flags + logLevel; 12 persisted in `ProfileSettings` + 2 derived from profile structure).
-4. **Endpoint count consistency**: All docs that mention endpoint counts say "76 endpoints across 18 controllers" (or the updated number if features were added).
+3. **Flag count consistency**: All docs that reference flag counts or list flag names are in sync with `ProfileSettings` interface (13 boolean flags + logLevel; settings v7).
+4. **Endpoint count consistency**: All docs that mention endpoint counts say "82 endpoints across 19 controllers" (or the updated number if features were added).
 5. **Link validation**: All `[text](path)` links in docs resolve to existing files. Check for renamed/deleted targets.
 6. **Index completeness**: Every doc in `docs/` has an entry in `docs/INDEX.md`.
-7. **Preset count**: All docs that list presets include all 6: `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `lexmark`.
-8. **Log category count**: All docs listing log categories show exactly 11 (no phantom `backup`).
+7. **Preset count**: All docs that list presets include all 6: `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `user-only-with-custom-ext`.
+8. **Log category count**: All docs listing log categories show exactly 14 (not 11 — added scim.bulk, scim.resource, config in v0.33.0).
 9. **Date header freshness**: No doc has a "Last Updated" date older than the current version's release date.
 10. **API collection coverage**: OpenAPI/Postman/Insomnia collections cover 100% of endpoints. INDEX.md description reflects actual coverage.
 11. **Format migration completeness**: No remaining `"config": {` patterns in active docs (outside archive/ and intentional migration notes).
@@ -284,7 +284,7 @@ After completing the audit, review **this prompt itself** for freshness:
 2. **New document categories**: If new types of docs (e.g., performance benchmarks, security audit docs, ADRs) were added, add a new sub-section under Step 2.
 3. **New artifact directories**: If new artifact folders beyond `openapi/`, `postman/`, `insomnia/`, `examples/`, `images/readme/` were created, add them to Section E.
 4. **New config flags**: If the flag count changed from 14 boolean + logLevel (12 persisted in ProfileSettings + 2 derived), update all references.
-5. **New log categories**: If `LogCategory` enum changed from 11 entries, update Section 1G and the format migration table.
+5. **New log categories**: If `LogCategory` enum changed from 14 entries, update Section 1G and the format migration table.
 6. **New presets**: If presets beyond the current 6 were added, update Section 1G and cross-consistency checks.
 7. **New bulk/SPC constants**: If `BULK_MAX_OPERATIONS`, `BULK_MAX_PAYLOAD_SIZE`, or `maxResults` changed, update format migration table.
 8. **New documentation norms**: If the team adopted new standards (e.g., ADR format, PlantUML, Swagger UI), add them to Step 3.
@@ -322,6 +322,8 @@ Apply updates directly to this file (`.github/prompts/auditAndUpdateDocs.prompt.
 |------|---------|-------|-------------------|-------------|
 | 2026-03-02 | v0.24.0 | Full audit | 59 across 28 files | Test count propagation, flag name corrections, broken links |
 | 2026-03-31 | v0.31.0 | Full audit + JSON recreation | ~25 across 14 files + 3 collections | Format migration (`config`→`profile.settings`), phantom log categories, API collection coverage gap (35-40%→100%), stale constants (maxOperations), RFC casing violations, missing routes in quick ref cards, stale filter operator notes |
+| 2026-04-10 | v0.34.0 | Post-deletedAt removal audit | ~8 across 5 files | Stale `deletedAt`/`guardSoftDeleted`/`softDeleted` in 30+ docs (fixed in prior session), stale category counts (11→14 in 3 files), stale test counts (3,191→3,171), stale live test assertions (~951→~739 after dead soft-delete tests removed) |
+| 2026-04-10 | v0.34.0 | Post-P4 fixes full audit | ~20 across 16 files | Endpoint count 76→82 (19 controllers), test counts propagation (3,185 unit/923 E2E/45 suites), version headers 0.31.0→0.34.0 in 8 docs, StrictSchema default documented as false (actual: true), P4 immutable/required now unconditional |
 
 ### Common Staleness Patterns Discovered
 

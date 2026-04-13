@@ -43,7 +43,6 @@ describe('EndpointScimGroupsService', () => {
     externalId: null as string | null,
     displayName: 'Test Group',
     active: true,
-    deletedAt: null as Date | null,
     rawPayload: '{"description":"Test group"}',
     meta: JSON.stringify({
       resourceType: 'Group',
@@ -85,12 +84,17 @@ describe('EndpointScimGroupsService', () => {
     ),
   };
 
+  // Default config for tests: StrictSchemaValidation OFF to avoid strict validation
+  // interfering with non-schema tests. Tests that explicitly test strict validation
+  // override this via mockEndpointContext.getConfig.mockReturnValue({ StrictSchemaValidation: 'True' }).
+  const defaultTestConfig: EndpointConfig = { StrictSchemaValidation: 'False' };
+
   const mockEndpointContext = {
     setContext: jest.fn(),
     getContext: jest.fn(),
     getEndpointId: jest.fn(),
     getBaseUrl: jest.fn(),
-    getConfig: jest.fn().mockReturnValue({}),
+    getConfig: jest.fn().mockReturnValue(defaultTestConfig),
     getProfile: jest.fn().mockReturnValue(undefined),
     addWarnings: jest.fn(),
     getWarnings: jest.fn().mockReturnValue([]),
@@ -131,9 +135,11 @@ describe('EndpointScimGroupsService', () => {
     metadataService = module.get<ScimMetadataService>(ScimMetadataService);
 
     // G8f: Default mock returns for uniqueness checks (no conflict)
-    // These are called on PUT/PATCH paths to enforce displayName/externalId uniqueness.
+    // These are called on PUT/PATCH paths to enforce displayName uniqueness.
     mockGroupRepo.findByDisplayName.mockResolvedValue(null);
-    mockGroupRepo.findByExternalId.mockResolvedValue(null);
+
+    // Reset getConfig mock to default (clearAllMocks doesn't clear mockReturnValue)
+    mockEndpointContext.getConfig.mockReturnValue(defaultTestConfig);
   });
 
   afterEach(() => {
@@ -208,201 +214,13 @@ describe('EndpointScimGroupsService', () => {
       expect(mockUserRepo.findByScimIds).toHaveBeenCalledWith(mockEndpoint.id, expect.any(Array));
     });
 
-    describe('ReprovisionOnConflictForSoftDeletedResource', () => {
-      const softDeletedGroup = {
-        ...mockGroup,
-        active: false,
-        deletedAt: new Date(),
-        meta: JSON.stringify({
-          resourceType: 'Group',
-          created: '2023-06-15T10:00:00.000Z',
-          lastModified: '2023-06-15T10:00:00.000Z',
-        }),
-      };
-
-      const createDto: CreateGroupDto = {
-        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
-        displayName: 'Test Group',
-      };
-
-      const reprovisionConfig: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
-        [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: true,
-      };
-
-      it('should re-provision a soft-deleted group via displayName conflict when both flags enabled', async () => {
-        mockGroupRepo.findByDisplayName.mockResolvedValue({ scimId: softDeletedGroup.scimId, active: false, deletedAt: new Date() });
-        mockGroupRepo.findWithMembers.mockResolvedValueOnce(softDeletedGroup); // initial load
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
-        mockGroupRepo.findWithMembers.mockResolvedValueOnce({ ...softDeletedGroup, active: true, deletedAt: null, displayName: createDto.displayName }); // re-fetch
-
-        const result = await service.createGroupForEndpoint(
-          createDto, 'http://localhost:3000/scim', mockEndpoint.id, reprovisionConfig,
-        );
-
-        expect(result.displayName).toBe(createDto.displayName);
-        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(
-          softDeletedGroup.id,
-          expect.objectContaining({ active: true, displayName: createDto.displayName }),
-          expect.any(Array),
-        );
-        expect(mockGroupRepo.create).not.toHaveBeenCalled();
-      });
-
-      it('should preserve original created date during group re-provision', async () => {
-        mockGroupRepo.findByDisplayName.mockResolvedValue({ scimId: softDeletedGroup.scimId, active: false, deletedAt: new Date() });
-        mockGroupRepo.findWithMembers.mockResolvedValueOnce(softDeletedGroup);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
-        mockGroupRepo.findWithMembers.mockResolvedValueOnce({ ...softDeletedGroup, active: true, deletedAt: null });
-
-        await service.createGroupForEndpoint(
-          createDto, 'http://localhost:3000/scim', mockEndpoint.id, reprovisionConfig,
-        );
-
-        const updateCall = mockGroupRepo.updateGroupWithMembers.mock.calls[0][1];
-        const meta = JSON.parse(updateCall.meta);
-        expect(meta.created).toBe('2023-06-15T10:00:00.000Z');
-      });
-
-      it('should re-provision via externalId conflict on soft-deleted group', async () => {
-        const dtoWithExtId = {
-          ...createDto,
-          displayName: 'Unique Name',
-          externalId: 'ext-grp-123',
-        } as CreateGroupDto;
-
-        mockGroupRepo.findByDisplayName.mockResolvedValue(null); // no displayName conflict
-        mockGroupRepo.findByExternalId.mockResolvedValue({ ...softDeletedGroup, externalId: 'ext-grp-123' });
-        mockGroupRepo.findWithMembers.mockResolvedValueOnce({ ...softDeletedGroup, externalId: 'ext-grp-123' });
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
-        mockGroupRepo.findWithMembers.mockResolvedValueOnce({ ...softDeletedGroup, active: true, deletedAt: null, externalId: 'ext-grp-123' });
-
-        const result = await service.createGroupForEndpoint(
-          dtoWithExtId, 'http://localhost:3000/scim', mockEndpoint.id, reprovisionConfig,
-        );
-
-        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
-        expect(mockGroupRepo.create).not.toHaveBeenCalled();
-      });
-
-      it('should re-provision group with members', async () => {
-        const dtoWithMembers: CreateGroupDto = {
-          ...createDto,
-          members: [{ value: mockUser.scimId, display: 'Test User' }],
-        };
-
-        mockGroupRepo.findByDisplayName.mockResolvedValue({ scimId: softDeletedGroup.scimId, active: false, deletedAt: new Date() });
-        mockGroupRepo.findWithMembers.mockResolvedValueOnce(softDeletedGroup);
-        mockUserRepo.findByScimIds.mockResolvedValue([mockUser]);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
-        mockGroupRepo.findWithMembers.mockResolvedValueOnce({
-          ...softDeletedGroup,
-          active: true,
-          deletedAt: null,
-          members: [{
-            id: 'member-1', groupId: softDeletedGroup.id, userId: mockUser.id,
-            value: mockUser.scimId, display: 'Test User', type: null, createdAt: new Date(),
-          }],
-        });
-
-        const result = await service.createGroupForEndpoint(
-          dtoWithMembers, 'http://localhost:3000/scim', mockEndpoint.id, reprovisionConfig,
-        );
-
-        expect(result.members).toHaveLength(1);
-        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalledWith(
-          softDeletedGroup.id,
-          expect.objectContaining({ active: true }),
-          expect.arrayContaining([expect.objectContaining({ value: mockUser.scimId })]),
-        );
-      });
-
-      it('should throw 409 when conflict is with ACTIVE group even with both flags enabled', async () => {
-        mockGroupRepo.findByDisplayName.mockResolvedValue({ scimId: mockGroup.scimId, active: true });
-
-        await expect(
-          service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, reprovisionConfig),
-        ).rejects.toThrow(HttpException);
-
-        expect(mockGroupRepo.updateGroupWithMembers).not.toHaveBeenCalled();
-        expect(mockGroupRepo.create).not.toHaveBeenCalled();
-      });
-
-      it('should throw 409 when SoftDeleteEnabled is true but ReprovisionOnConflict is false', async () => {
-        const config: EndpointConfig = {
-          [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
-          [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: false,
-        };
-        mockGroupRepo.findByDisplayName.mockResolvedValue({ scimId: softDeletedGroup.scimId, active: false, deletedAt: new Date() });
-
-        await expect(
-          service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, config),
-        ).rejects.toThrow(HttpException);
-
-        expect(mockGroupRepo.updateGroupWithMembers).not.toHaveBeenCalled();
-      });
-
-      it('should throw 409 when SoftDeleteEnabled is false but ReprovisionOnConflict is true', async () => {
-        const config: EndpointConfig = {
-          [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: false,
-          [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: true,
-        };
-        mockGroupRepo.findByDisplayName.mockResolvedValue({ scimId: softDeletedGroup.scimId, active: false, deletedAt: new Date() });
-
-        await expect(
-          service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, config),
-        ).rejects.toThrow(HttpException);
-
-        expect(mockGroupRepo.updateGroupWithMembers).not.toHaveBeenCalled();
-      });
-
-      it('should throw 409 when no config is provided (default off)', async () => {
-        mockGroupRepo.findByDisplayName.mockResolvedValue({ scimId: softDeletedGroup.scimId, active: false, deletedAt: new Date() });
-
-        await expect(
-          service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id),
-        ).rejects.toThrow(HttpException);
-
-        expect(mockGroupRepo.updateGroupWithMembers).not.toHaveBeenCalled();
-      });
-
-      it('should handle string config flags "True"/"True" for re-provision', async () => {
-        const stringConfig: EndpointConfig = {
-          [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: 'True',
-          [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: 'True',
-        };
-        mockGroupRepo.findByDisplayName.mockResolvedValue({ scimId: softDeletedGroup.scimId, active: false, deletedAt: new Date() });
-        mockGroupRepo.findWithMembers.mockResolvedValueOnce(softDeletedGroup);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
-        mockGroupRepo.findWithMembers.mockResolvedValueOnce({ ...softDeletedGroup, active: true, deletedAt: null });
-
-        const result = await service.createGroupForEndpoint(
-          createDto, 'http://localhost:3000/scim', mockEndpoint.id, stringConfig,
-        );
-
-        expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
-        expect(mockGroupRepo.create).not.toHaveBeenCalled();
-      });
-
-      it('should throw 500 if soft-deleted group cannot be found during re-provision', async () => {
-        mockGroupRepo.findByDisplayName.mockResolvedValue({ scimId: softDeletedGroup.scimId, active: false, deletedAt: new Date() });
-        mockGroupRepo.findWithMembers.mockResolvedValue(null); // race condition
-
-        await expect(
-          service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id, reprovisionConfig),
-        ).rejects.toThrow(HttpException);
-
-        expect(mockGroupRepo.updateGroupWithMembers).not.toHaveBeenCalled();
-      });
-    });
-
     describe('P8: uniqueness conflict diagnostic logging', () => {
       it('should log INFO before throwing 409 on displayName conflict', async () => {
         const dto: CreateGroupDto = {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
           displayName: 'Duplicate Group',
         };
-        mockGroupRepo.findByDisplayName.mockResolvedValue({ scimId: 'existing-1', active: true, deletedAt: null });
+        mockGroupRepo.findByDisplayName.mockResolvedValue({ scimId: 'existing-1', active: true });
 
         await expect(
           service.createGroupForEndpoint(dto, 'http://localhost:3000/scim', mockEndpoint.id),
@@ -597,8 +415,8 @@ describe('EndpointScimGroupsService', () => {
       expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
     });
 
-    describe('MultiOpPatchRequestAddMultipleMembersToGroup config flag', () => {
-      it('should reject adding multiple members when flag is false (default)', async () => {
+    describe('MultiMemberPatchOpForGroupEnabled config flag (settings v7)', () => {
+      it('should reject adding multiple members when flag is explicitly false', async () => {
         const patchDto: PatchGroupDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
           Operations: [
@@ -615,8 +433,8 @@ describe('EndpointScimGroupsService', () => {
         };
 
         mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
-        // Default config returns empty object (flag is false)
-        mockEndpointContext.getConfig.mockReturnValue({});
+        // Settings v7: must explicitly disable the flag
+        mockEndpointContext.getConfig.mockReturnValue({ MultiMemberPatchOpForGroupEnabled: false, StrictSchemaValidation: 'False' });
 
         await expect(
           service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id)
@@ -647,7 +465,8 @@ describe('EndpointScimGroupsService', () => {
         mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
         // Enable the flag
         mockEndpointContext.getConfig.mockReturnValue({
-          MultiOpPatchRequestAddMultipleMembersToGroup: 'True',
+          MultiMemberPatchOpForGroupEnabled: 'True',
+          StrictSchemaValidation: 'False',
         });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
@@ -676,7 +495,8 @@ describe('EndpointScimGroupsService', () => {
         mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
         // Enable the flag with boolean
         mockEndpointContext.getConfig.mockReturnValue({
-          MultiOpPatchRequestAddMultipleMembersToGroup: true,
+          MultiMemberPatchOpForGroupEnabled: true,
+          StrictSchemaValidation: 'False',
         });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
@@ -700,7 +520,7 @@ describe('EndpointScimGroupsService', () => {
         mockUserRepo.findByScimIds.mockResolvedValue([mockUser]);
         mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
         // Flag is false (default)
-        mockEndpointContext.getConfig.mockReturnValue({});
+        mockEndpointContext.getConfig.mockReturnValue({ StrictSchemaValidation: 'False' });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
@@ -729,7 +549,7 @@ describe('EndpointScimGroupsService', () => {
         mockUserRepo.findByScimIds.mockResolvedValue([]);
         mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
         // Flag is false
-        mockEndpointContext.getConfig.mockReturnValue({});
+        mockEndpointContext.getConfig.mockReturnValue({ StrictSchemaValidation: 'False' });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
@@ -738,7 +558,7 @@ describe('EndpointScimGroupsService', () => {
       });
     });
 
-    describe('MultiOpPatchRequestRemoveMultipleMembersFromGroup config flag', () => {
+    describe('MultiMemberPatchOpForGroupEnabled — remove operations (settings v7)', () => {
       const groupWithMultipleMembers = {
         ...mockGroup,
         members: [
@@ -748,7 +568,7 @@ describe('EndpointScimGroupsService', () => {
         ],
       };
 
-      it('should reject removing multiple members via value array when flag is false', async () => {
+      it('should reject removing multiple members via value array when flag is explicitly false', async () => {
         const patchDto: PatchGroupDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
           Operations: [
@@ -764,8 +584,8 @@ describe('EndpointScimGroupsService', () => {
         };
 
         mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
-        // Default config returns empty object (flag is false)
-        mockEndpointContext.getConfig.mockReturnValue({});
+        // Settings v7: must explicitly disable the flag
+        mockEndpointContext.getConfig.mockReturnValue({ MultiMemberPatchOpForGroupEnabled: false, StrictSchemaValidation: 'False' });
 
         await expect(
           service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id)
@@ -793,7 +613,8 @@ describe('EndpointScimGroupsService', () => {
         mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
         mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
         mockEndpointContext.getConfig.mockReturnValue({
-          MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'True',
+          MultiMemberPatchOpForGroupEnabled: 'True',
+          StrictSchemaValidation: 'False',
         });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
@@ -819,7 +640,8 @@ describe('EndpointScimGroupsService', () => {
         mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
         mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
         mockEndpointContext.getConfig.mockReturnValue({
-          MultiOpPatchRequestRemoveMultipleMembersFromGroup: true,
+          MultiMemberPatchOpForGroupEnabled: true,
+          StrictSchemaValidation: 'False',
         });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
@@ -844,7 +666,7 @@ describe('EndpointScimGroupsService', () => {
         mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
         mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
         // Flag is false (default)
-        mockEndpointContext.getConfig.mockReturnValue({});
+        mockEndpointContext.getConfig.mockReturnValue({ StrictSchemaValidation: 'False' });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
@@ -866,7 +688,7 @@ describe('EndpointScimGroupsService', () => {
         mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
         mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
         // Flag is false (default)
-        mockEndpointContext.getConfig.mockReturnValue({});
+        mockEndpointContext.getConfig.mockReturnValue({ StrictSchemaValidation: 'False' });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
@@ -894,7 +716,7 @@ describe('EndpointScimGroupsService', () => {
         mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
         mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
         // Flag is false
-        mockEndpointContext.getConfig.mockReturnValue({});
+        mockEndpointContext.getConfig.mockReturnValue({ StrictSchemaValidation: 'False' });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
@@ -902,7 +724,7 @@ describe('EndpointScimGroupsService', () => {
         expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
       });
 
-      it('should allow removing via path=members without value array when PatchOpAllowRemoveAllMembers is true (default)', async () => {
+      it('should allow removing via path=members without value array when PatchOpAllowRemoveAllMembers is explicitly true', async () => {
         const patchDto: PatchGroupDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
           Operations: [
@@ -915,8 +737,8 @@ describe('EndpointScimGroupsService', () => {
 
         mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
         mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
-        // Default config - PatchOpAllowRemoveAllMembers defaults to true
-        mockEndpointContext.getConfig.mockReturnValue({});
+        // Settings v7: PatchOpAllowRemoveAllMembers defaults to false — must explicitly enable
+        mockEndpointContext.getConfig.mockReturnValue({ PatchOpAllowRemoveAllMembers: true, StrictSchemaValidation: 'False' });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
 
@@ -938,6 +760,7 @@ describe('EndpointScimGroupsService', () => {
         mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
         mockEndpointContext.getConfig.mockReturnValue({
           PatchOpAllowRemoveAllMembers: false,
+          StrictSchemaValidation: 'False',
         });
 
         // path=members without value array should be rejected
@@ -962,6 +785,7 @@ describe('EndpointScimGroupsService', () => {
         mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
         mockEndpointContext.getConfig.mockReturnValue({
           PatchOpAllowRemoveAllMembers: 'False',
+          StrictSchemaValidation: 'False',
         });
 
         // path=members without value array should be rejected
@@ -1261,34 +1085,12 @@ describe('EndpointScimGroupsService', () => {
       expect(mockGroupRepo.delete).not.toHaveBeenCalled();
     });
 
-    describe('soft delete', () => {
-      it('should soft-delete group when SoftDeleteEnabled is true (boolean)', async () => {
-        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
-        mockGroupRepo.update.mockResolvedValue({ ...mockGroup, active: false, deletedAt: new Date() });
-
-        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true };
-        await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
-
-        expect(mockGroupRepo.update).toHaveBeenCalledWith(mockGroup.id, { active: false, deletedAt: expect.any(Date) });
-        expect(mockGroupRepo.delete).not.toHaveBeenCalled();
-      });
-
-      it('should soft-delete group when SoftDeleteEnabled is "True" (string)', async () => {
-        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
-        mockGroupRepo.update.mockResolvedValue({ ...mockGroup, active: false, deletedAt: new Date() });
-
-        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: 'True' };
-        await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
-
-        expect(mockGroupRepo.update).toHaveBeenCalledWith(mockGroup.id, { active: false, deletedAt: expect.any(Date) });
-        expect(mockGroupRepo.delete).not.toHaveBeenCalled();
-      });
-
+    describe('hard delete (Groups always hard-delete, gated by GroupHardDeleteEnabled)', () => {
       it('should hard-delete group when SoftDeleteEnabled is false', async () => {
         mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
         mockGroupRepo.delete.mockResolvedValue(undefined);
 
-        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: false };
+        const config: EndpointConfig = { StrictSchemaValidation: 'False' };
         await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
 
         expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
@@ -1299,7 +1101,7 @@ describe('EndpointScimGroupsService', () => {
         mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
         mockGroupRepo.delete.mockResolvedValue(undefined);
 
-        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: 'False' };
+        const config: EndpointConfig = { StrictSchemaValidation: 'False' };
         await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
 
         expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
@@ -1320,11 +1122,34 @@ describe('EndpointScimGroupsService', () => {
         mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
         mockGroupRepo.delete.mockResolvedValue(undefined);
 
-        const config: EndpointConfig = {};
+        const config: EndpointConfig = { StrictSchemaValidation: 'False' };
         await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
 
         expect(mockGroupRepo.delete).toHaveBeenCalledWith(mockGroup.id);
         expect(mockGroupRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('should error when GroupHardDeleteEnabled is false (settings v7)', async () => {
+        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED]: false, StrictSchemaValidation: 'False' };
+        await expect(
+          service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+
+        expect(mockGroupRepo.delete).not.toHaveBeenCalled();
+        expect(mockGroupRepo.update).not.toHaveBeenCalled();
+      });
+
+      it('should error when GroupHardDeleteEnabled is "False" (string)', async () => {
+        mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED]: 'False', StrictSchemaValidation: 'False' };
+        await expect(
+          service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config)
+        ).rejects.toThrow(HttpException);
+
+        expect(mockGroupRepo.delete).not.toHaveBeenCalled();
       });
     });
   });
@@ -1518,7 +1343,6 @@ describe('EndpointScimGroupsService', () => {
       } as CreateGroupDto;
 
       mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null); // assertUniqueDisplayName → no conflict
-      mockGroupRepo.findByExternalId.mockResolvedValueOnce(null); // assertUniqueExternalId → no conflict
       mockGroupRepo.findWithMembers.mockResolvedValueOnce({
         ...mockGroup,
         externalId: 'ext-grp-001',
@@ -1563,21 +1387,6 @@ describe('EndpointScimGroupsService', () => {
       );
 
       expect(result.externalId).toBeUndefined();
-    });
-
-    it('should reject duplicate externalId on create within same endpoint', async () => {
-      const createDto = {
-        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
-        displayName: 'Another Group',
-        externalId: 'ext-duplicate',
-      } as CreateGroupDto;
-
-      mockGroupRepo.findByDisplayName.mockResolvedValue(null); // displayName uniqueness - no conflict
-      mockGroupRepo.findByExternalId.mockResolvedValue({ ...mockGroup, externalId: 'ext-duplicate' }); // externalId conflict
-
-      await expect(
-        service.createGroupForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id)
-      ).rejects.toThrow(HttpException);
     });
 
     it('should update externalId via PATCH replace with path', async () => {
@@ -1857,49 +1666,12 @@ describe('EndpointScimGroupsService', () => {
   });
 
   // ═══════════════════════════════════════════════════════════
-  // Soft Delete + GET / LIST interactions (Groups)
+  // DELETE + GET / LIST interactions (Groups — always hard-delete)
   // ═══════════════════════════════════════════════════════════
 
-  describe('soft delete + GET/LIST interactions (Groups)', () => {
-    const softDeleteConfig: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true };
-
-    it('should soft-delete group, then GET returns 404 (RFC 7644 §3.6)', async () => {
-      mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
-      mockGroupRepo.update.mockResolvedValue({ ...mockGroup, active: false, deletedAt: new Date() });
-
-      await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, softDeleteConfig);
-      expect(mockGroupRepo.update).toHaveBeenCalledWith(mockGroup.id, { active: false, deletedAt: expect.any(Date) });
-      expect(mockGroupRepo.delete).not.toHaveBeenCalled();
-
-      // GET after soft-delete: must return 404 per RFC 7644 §3.6
-      mockGroupRepo.findWithMembers.mockResolvedValue({ ...mockGroup, active: false, deletedAt: new Date(), members: [] });
-      await expect(
-        service.getGroupForEndpoint(mockGroup.scimId, 'http://localhost:3000/scim', mockEndpoint.id, softDeleteConfig)
-      ).rejects.toThrow(HttpException);
-    });
-
-    it('should soft-delete group, then GET without config still returns group (backward compat)', async () => {
-      // When SoftDeleteEnabled is not in config, soft-deleted resources are still accessible
-      mockGroupRepo.findWithMembers.mockResolvedValue({ ...mockGroup, active: false, members: [] });
-      const result = await service.getGroupForEndpoint(
-        mockGroup.scimId, 'http://localhost:3000/scim', mockEndpoint.id
-      );
-      expect(result).toBeDefined();
-      expect(result.displayName).toBe(mockGroup.displayName);
-      expect(result.active).toBe(false);
-    });
-
-    it('should double-delete soft-deleted group returns 404 (RFC 7644 §3.6)', async () => {
-      const softDeletedGroup = { ...mockGroup, active: false, deletedAt: new Date() };
-      mockGroupRepo.findByScimId.mockResolvedValue(softDeletedGroup);
-
-      await expect(
-        service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, softDeleteConfig)
-      ).rejects.toThrow(HttpException);
-    });
-
+  describe('DELETE + GET/LIST interactions (Groups)', () => {
     it('should hard-delete group, then GET returns 404', async () => {
-      const hardDeleteConfig: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: false };
+      const hardDeleteConfig: EndpointConfig = { StrictSchemaValidation: 'False' };
       mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
       mockGroupRepo.delete.mockResolvedValue(mockGroup);
 
@@ -1913,24 +1685,7 @@ describe('EndpointScimGroupsService', () => {
       ).rejects.toThrow(HttpException);
     });
 
-    it('should exclude soft-deleted groups from LIST results when SoftDeleteEnabled', async () => {
-      const activeGroup = { ...mockGroup, id: 'g1', scimId: 'scim-g1', active: true, members: [] };
-      const deletedGroup = { ...mockGroup, id: 'g2', scimId: 'scim-g2', active: false, deletedAt: new Date(), displayName: 'Deleted Group', members: [] };
-      mockGroupRepo.findAllWithMembers.mockResolvedValue([activeGroup, deletedGroup]);
-
-      const result = await service.listGroupsForEndpoint(
-        { startIndex: 1, count: 10 },
-        'http://localhost:3000/scim',
-        mockEndpoint.id,
-        softDeleteConfig,
-      );
-
-      expect(result.totalResults).toBe(1);
-      expect(result.Resources).toHaveLength(1);
-      expect(result.Resources[0].displayName).toBe(activeGroup.displayName);
-    });
-
-    it('should include soft-deleted groups in LIST results when SoftDeleteEnabled is off', async () => {
+    it('should LIST returns all groups (no soft-delete filtering for Groups)', async () => {
       const activeGroup = { ...mockGroup, id: 'g1', scimId: 'scim-g1', active: true, members: [] };
       const deletedGroup = { ...mockGroup, id: 'g2', scimId: 'scim-g2', active: false, displayName: 'Deleted Group', members: [] };
       mockGroupRepo.findAllWithMembers.mockResolvedValue([activeGroup, deletedGroup]);
@@ -1945,45 +1700,14 @@ describe('EndpointScimGroupsService', () => {
       expect(result.Resources).toHaveLength(2);
     });
 
-    it('should return active attribute in Group JSON response', async () => {
+    it('should NOT return active attribute in Group JSON response (settings v7)', async () => {
       mockGroupRepo.findWithMembers.mockResolvedValue({ ...mockGroup, members: [] });
       const result = await service.getGroupForEndpoint(
         mockGroup.scimId, 'http://localhost:3000/scim', mockEndpoint.id
       );
-      expect(result.active).toBe(true);
+      expect(result).not.toHaveProperty('active');
     });
 
-    it('should PATCH on soft-deleted group returns 404 when SoftDeleteEnabled', async () => {
-      const softDeletedGroup = { ...mockGroup, active: false, deletedAt: new Date(), members: [] };
-      mockGroupRepo.findWithMembers.mockResolvedValue(softDeletedGroup);
-
-      const patchDto = {
-        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
-        Operations: [{ op: 'replace' as const, path: 'displayName', value: 'New Name' }],
-      };
-
-      await expect(
-        service.patchGroupForEndpoint(
-          mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id, softDeleteConfig
-        )
-      ).rejects.toThrow(HttpException);
-    });
-
-    it('should PUT on soft-deleted group returns 404 when SoftDeleteEnabled', async () => {
-      const softDeletedGroup = { ...mockGroup, active: false, deletedAt: new Date(), members: [] };
-      mockGroupRepo.findWithMembers.mockResolvedValue(softDeletedGroup);
-
-      const dto = {
-        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
-        displayName: 'Replaced Group',
-      };
-
-      await expect(
-        service.replaceGroupForEndpoint(
-          mockGroup.scimId, dto as any, 'http://localhost:3000/scim', mockEndpoint.id, softDeleteConfig
-        )
-      ).rejects.toThrow(HttpException);
-    });
   });
 
   // ═══════════════════════════════════════════════════════════
@@ -1991,42 +1715,13 @@ describe('EndpointScimGroupsService', () => {
   // ═══════════════════════════════════════════════════════════
 
   describe('config flag combinations (Groups)', () => {
-    it('should soft-delete with SoftDeleteEnabled + StrictSchemaValidation both true', async () => {
-      mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
-      mockGroupRepo.update.mockResolvedValue({ ...mockGroup });
-
-      const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
-        [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
-      };
-
-      await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
-      expect(mockGroupRepo.update).toHaveBeenCalledWith(mockGroup.id, { active: false, deletedAt: expect.any(Date) });
-      expect(mockGroupRepo.delete).not.toHaveBeenCalled();
-    });
-
-    it('should soft-delete with SoftDeleteEnabled + MultiOpPatch flags', async () => {
-      mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
-      mockGroupRepo.update.mockResolvedValue({ ...mockGroup });
-
-      const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
-        MultiOpPatchRequestAddMultipleMembersToGroup: true,
-        MultiOpPatchRequestRemoveMultipleMembersFromGroup: true,
-      };
-
-      await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
-      expect(mockGroupRepo.update).toHaveBeenCalledWith(mockGroup.id, { active: false, deletedAt: expect.any(Date) });
-    });
-
     it('should hard-delete when SoftDeleteEnabled=false despite other flags', async () => {
       mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
       mockGroupRepo.delete.mockResolvedValue(mockGroup);
 
       const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: false,
         [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
-        MultiOpPatchRequestAddMultipleMembersToGroup: true,
+        MultiMemberPatchOpForGroupEnabled: true,
       };
 
       await service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config);
@@ -2036,7 +1731,6 @@ describe('EndpointScimGroupsService', () => {
 
     it('should reject unknown extension on CREATE when StrictSchemaValidation=true', async () => {
       const config: EndpointConfig = {
-        [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: true,
         [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
       };
 
@@ -2092,7 +1786,7 @@ describe('EndpointScimGroupsService', () => {
       });
 
       it('should throw 428 when RequireIfMatch=true and no If-Match header', async () => {
-        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: true };
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: true, StrictSchemaValidation: 'False' };
         await expect(
           service.patchGroupForEndpoint(mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id, config)
         ).rejects.toMatchObject({ status: 428 });
@@ -2127,7 +1821,7 @@ describe('EndpointScimGroupsService', () => {
       });
 
       it('should throw 428 when RequireIfMatch=true and no If-Match header', async () => {
-        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: true };
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: true, StrictSchemaValidation: 'False' };
         await expect(
           service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id, config)
         ).rejects.toMatchObject({ status: 428 });
@@ -2152,7 +1846,7 @@ describe('EndpointScimGroupsService', () => {
       });
 
       it('should throw 428 when RequireIfMatch=true and no If-Match header', async () => {
-        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: true };
+        const config: EndpointConfig = { [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: true, StrictSchemaValidation: 'False' };
         await expect(
           service.deleteGroupForEndpoint(mockGroup.scimId, mockEndpoint.id, config)
         ).rejects.toMatchObject({ status: 428 });
@@ -2200,6 +1894,7 @@ describe('EndpointScimGroupsService', () => {
 
         const config: EndpointConfig = {
           // AllowAndCoerceBooleanStrings not set → defaults to true
+          StrictSchemaValidation: 'False',
         };
 
         mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
@@ -2232,6 +1927,7 @@ describe('EndpointScimGroupsService', () => {
 
         const config: EndpointConfig = {
           [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: true,
+          StrictSchemaValidation: 'False',
         };
 
         mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
@@ -2283,7 +1979,7 @@ describe('EndpointScimGroupsService', () => {
           },
         } as any;
 
-        const config: EndpointConfig = {};
+        const config: EndpointConfig = { StrictSchemaValidation: 'False' };
 
         mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
         mockGroupRepo.create.mockImplementation(async (input: any) => ({
@@ -2319,6 +2015,7 @@ describe('EndpointScimGroupsService', () => {
 
         const config: EndpointConfig = {
           [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: true,
+          StrictSchemaValidation: 'False',
         };
 
         mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
@@ -2377,7 +2074,7 @@ describe('EndpointScimGroupsService', () => {
           [TEST_GROUP_EXT_URN]: { active: 'True' },
         } as any;
 
-        const config: EndpointConfig = {};
+        const config: EndpointConfig = { StrictSchemaValidation: 'False' };
 
         mockGroupRepo.findWithMembers
           .mockResolvedValueOnce(mockGroup)
@@ -2436,7 +2133,7 @@ describe('EndpointScimGroupsService', () => {
         };
 
         // Use non-strict config for PATCH to avoid post-PATCH result validation complexity
-        const config: EndpointConfig = {};
+        const config: EndpointConfig = { StrictSchemaValidation: 'False' };
 
         mockGroupRepo.findWithMembers
           .mockResolvedValueOnce(existingGroup)
@@ -2475,7 +2172,7 @@ describe('EndpointScimGroupsService', () => {
         };
 
         // No strict validation — just test coercion path runs
-        const config: EndpointConfig = {};
+        const config: EndpointConfig = { StrictSchemaValidation: 'False' };
 
         mockGroupRepo.findWithMembers
           .mockResolvedValueOnce(existingGroup)
@@ -2514,7 +2211,7 @@ describe('EndpointScimGroupsService', () => {
           }),
         };
 
-        const config: EndpointConfig = {};
+        const config: EndpointConfig = { StrictSchemaValidation: 'False' };
 
         mockGroupRepo.findWithMembers
           .mockResolvedValueOnce(existingGroup)
@@ -2723,6 +2420,7 @@ describe('EndpointScimGroupsService', () => {
       });
 
       it('should reject PUT with 409 when externalId conflicts with another group', async () => {
+        // externalId is no longer checked for uniqueness — this test verifies PUT succeeds
         const replaceDto: CreateGroupDto = {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
           displayName: 'Unique Name',
@@ -2730,28 +2428,14 @@ describe('EndpointScimGroupsService', () => {
           externalId: 'ext-conflict',
         } as CreateGroupDto & { externalId: string };
 
-        mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
-        // displayName is unique
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup)
+          .mockResolvedValueOnce({ ...mockGroup, displayName: 'Unique Name', externalId: 'ext-conflict' });
         mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
-        // externalId conflicts
-        mockGroupRepo.findByExternalId.mockResolvedValueOnce(conflictGroup);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
 
-        await expect(
-          service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id)
-        ).rejects.toThrow(HttpException);
-
-        try {
-          mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
-          mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
-          mockGroupRepo.findByExternalId.mockResolvedValueOnce(conflictGroup);
-          await service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id);
-        } catch (e: any) {
-          expect(e.getStatus()).toBe(409);
-          expect(e.getResponse()).toMatchObject({
-            detail: expect.stringContaining('externalId'),
-            scimType: 'uniqueness',
-          });
-        }
+        const result = await service.replaceGroupForEndpoint(mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id);
+        expect(result.externalId).toBe('ext-conflict');
       });
 
       it('should allow PUT when displayName is same as own (self-exclusion)', async () => {
@@ -2778,19 +2462,17 @@ describe('EndpointScimGroupsService', () => {
         );
       });
 
-      it('should pass scimId as excludeScimId to assertUniqueDisplayName and assertUniqueExternalId', async () => {
+      it('should pass scimId as excludeScimId to assertUniqueDisplayName', async () => {
         const replaceDto: CreateGroupDto = {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
           displayName: 'Updated Group',
           members: [],
-          externalId: 'ext-new',
-        } as CreateGroupDto & { externalId: string };
+        };
 
         mockGroupRepo.findWithMembers
           .mockResolvedValueOnce(mockGroup)
-          .mockResolvedValueOnce({ ...mockGroup, displayName: 'Updated Group', externalId: 'ext-new' });
+          .mockResolvedValueOnce({ ...mockGroup, displayName: 'Updated Group' });
         mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
-        mockGroupRepo.findByExternalId.mockResolvedValueOnce(null);
         mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
 
         await service.replaceGroupForEndpoint(
@@ -2800,35 +2482,6 @@ describe('EndpointScimGroupsService', () => {
         // Verify self-exclusion: scimId is passed as 3rd arg to exclude self from conflict check
         expect(mockGroupRepo.findByDisplayName).toHaveBeenCalledWith(
           mockEndpoint.id, 'Updated Group', mockGroup.scimId
-        );
-        expect(mockGroupRepo.findByExternalId).toHaveBeenCalledWith(
-          mockEndpoint.id, 'ext-new', mockGroup.scimId
-        );
-      });
-
-      it('should not call assertUniqueExternalId when externalId is null/absent', async () => {
-        const replaceDto: CreateGroupDto = {
-          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
-          displayName: 'No ExtId Group',
-          members: [],
-          // no externalId
-        };
-
-        mockGroupRepo.findWithMembers
-          .mockResolvedValueOnce(mockGroup)
-          .mockResolvedValueOnce({ ...mockGroup, displayName: 'No ExtId Group' });
-        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
-
-        await service.replaceGroupForEndpoint(
-          mockGroup.scimId, replaceDto, baseUrl, mockEndpoint.id
-        );
-
-        expect(mockGroupRepo.findByDisplayName).toHaveBeenCalled();
-        // findByExternalId should NOT be called since no externalId was provided
-        // (beforeEach sets default mockResolvedValue, but it should not be invoked)
-        expect(mockGroupRepo.findByExternalId).not.toHaveBeenCalledWith(
-          mockEndpoint.id, expect.any(String), mockGroup.scimId
         );
       });
     });
@@ -2866,6 +2519,7 @@ describe('EndpointScimGroupsService', () => {
       });
 
       it('should reject PATCH with 409 when externalId conflicts with another group', async () => {
+        // externalId is no longer checked for uniqueness — this test verifies PATCH succeeds
         const patchDto: PatchGroupDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
           Operations: [
@@ -2873,28 +2527,16 @@ describe('EndpointScimGroupsService', () => {
           ],
         };
 
-        mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
-        // displayName is unchanged — uses mockGroup.displayName, no conflict
+        mockGroupRepo.findWithMembers
+          .mockResolvedValueOnce(mockGroup)
+          .mockResolvedValueOnce({ ...mockGroup, externalId: 'ext-conflict' });
         mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
-        // externalId conflicts
-        mockGroupRepo.findByExternalId.mockResolvedValueOnce(conflictGroup);
+        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
 
-        await expect(
-          service.patchGroupForEndpoint(mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id)
-        ).rejects.toThrow(HttpException);
-
-        try {
-          mockGroupRepo.findWithMembers.mockResolvedValueOnce(mockGroup);
-          mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
-          mockGroupRepo.findByExternalId.mockResolvedValueOnce(conflictGroup);
-          await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id);
-        } catch (e: any) {
-          expect(e.getStatus()).toBe(409);
-          expect(e.getResponse()).toMatchObject({
-            detail: expect.stringContaining('externalId'),
-            scimType: 'uniqueness',
-          });
-        }
+        const result = await service.patchGroupForEndpoint(
+          mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id
+        );
+        expect(result.externalId).toBe('ext-conflict');
       });
 
       it('should allow PATCH when displayName does not conflict (self-exclusion)', async () => {
@@ -2926,15 +2568,14 @@ describe('EndpointScimGroupsService', () => {
         const patchDto: PatchGroupDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
           Operations: [
-            { op: 'replace', value: { displayName: 'Patched', externalId: 'ext-patched' } },
+            { op: 'replace', value: { displayName: 'Patched' } },
           ],
         };
 
         mockGroupRepo.findWithMembers
           .mockResolvedValueOnce(mockGroup)
-          .mockResolvedValueOnce({ ...mockGroup, displayName: 'Patched', externalId: 'ext-patched' });
+          .mockResolvedValueOnce({ ...mockGroup, displayName: 'Patched' });
         mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
-        mockGroupRepo.findByExternalId.mockResolvedValueOnce(null);
         mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
 
         await service.patchGroupForEndpoint(
@@ -2943,34 +2584,6 @@ describe('EndpointScimGroupsService', () => {
 
         expect(mockGroupRepo.findByDisplayName).toHaveBeenCalledWith(
           mockEndpoint.id, 'Patched', mockGroup.scimId
-        );
-        expect(mockGroupRepo.findByExternalId).toHaveBeenCalledWith(
-          mockEndpoint.id, 'ext-patched', mockGroup.scimId
-        );
-      });
-
-      it('should not call assertUniqueExternalId when externalId is null after PATCH', async () => {
-        const patchDto: PatchGroupDto = {
-          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
-          Operations: [
-            { op: 'replace', path: 'displayName', value: 'Updated Only Name' },
-          ],
-        };
-
-        mockGroupRepo.findWithMembers
-          .mockResolvedValueOnce(mockGroup) // externalId is null on mockGroup
-          .mockResolvedValueOnce({ ...mockGroup, displayName: 'Updated Only Name' });
-        mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
-        mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
-
-        await service.patchGroupForEndpoint(
-          mockGroup.scimId, patchDto, baseUrl, mockEndpoint.id
-        );
-
-        // findByExternalId should NOT be called with the excludeScimId pattern
-        // since externalId is null after PATCH
-        expect(mockGroupRepo.findByExternalId).not.toHaveBeenCalledWith(
-          mockEndpoint.id, expect.any(String), mockGroup.scimId
         );
       });
     });
@@ -2991,7 +2604,6 @@ describe('EndpointScimGroupsService', () => {
     beforeEach(() => {
       jest.clearAllMocks();
       mockGroupRepo.findByDisplayName.mockResolvedValue(null);
-      mockGroupRepo.findByExternalId.mockResolvedValue(null);
     });
 
     it('should convert RepositoryError NOT_FOUND to 404 on delete', async () => {

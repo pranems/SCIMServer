@@ -75,7 +75,6 @@ model ScimResource {
   userName         String?  @db.Citext        // CITEXT — case-insensitive natively (Phase 3)
   displayName      String?  @db.Citext        // CITEXT — case-insensitive natively (Phase 3)
   active           Boolean  @default(true)
-  deletedAt        DateTime?                   @db.Timestamptz  // Soft-delete marker (DELETE sets this; PATCH active=false does NOT)
   payload          Json                        // JSONB — replaces rawPayload String (Phase 3)
   version          Int      @default(1)
   meta             String?
@@ -89,8 +88,10 @@ model ScimResource {
   // Composite unique constraints
   @@unique([endpointId, scimId])
   @@unique([endpointId, userName])                 // CITEXT handles case-insensitive uniqueness
-  @@unique([endpointId, displayName])              // CITEXT handles case-insensitive uniqueness
-  @@unique([endpointId, resourceType, externalId]) // Scoped per type to avoid collisions
+  // displayName + externalId: NOT unique — saved as received per RFC 7643.
+  // Group.displayName uniqueness is enforced at service level only.
+  @@index([endpointId, displayName])               // Non-unique index for query perf
+  @@index([endpointId, resourceType, externalId])  // Non-unique index for query perf
   @@index([endpointId, resourceType])
 }
 

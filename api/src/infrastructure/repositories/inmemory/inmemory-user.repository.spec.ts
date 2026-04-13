@@ -263,14 +263,8 @@ describe('InMemoryUserRepository', () => {
       expect(conflict!.userName).toBe('ExistingUser');
     });
 
-    it('should detect an externalId conflict', async () => {
-      const conflict = await repo.findConflict(endpointId, 'brand-new-name', 'ext-existing');
-      expect(conflict).not.toBeNull();
-      expect(conflict!.externalId).toBe('ext-existing');
-    });
-
     it('should return null when no conflict exists', async () => {
-      const conflict = await repo.findConflict(endpointId, 'UniqueUser', 'unique-ext');
+      const conflict = await repo.findConflict(endpointId, 'UniqueUser');
       expect(conflict).toBeNull();
     });
 
@@ -278,7 +272,6 @@ describe('InMemoryUserRepository', () => {
       const conflict = await repo.findConflict(
         endpointId,
         'ExistingUser',
-        undefined,
         'existing-1',
       );
       expect(conflict).toBeNull();
@@ -289,18 +282,7 @@ describe('InMemoryUserRepository', () => {
       expect(conflict).toBeNull();
     });
 
-    it('should prioritize userName match over externalId', async () => {
-      // Both match the same record — should still return that record
-      const conflict = await repo.findConflict(
-        endpointId,
-        'ExistingUser',
-        'ext-existing',
-      );
-      expect(conflict).not.toBeNull();
-      expect(conflict!.scimId).toBe('existing-1');
-    });
-
-    it('should handle missing externalId gracefully', async () => {
+    it('should handle no match gracefully', async () => {
       const conflict = await repo.findConflict(endpointId, 'NoMatch');
       expect(conflict).toBeNull();
     });

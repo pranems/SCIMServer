@@ -16,7 +16,6 @@ export interface GenericResourceRecord {
   externalId: string | null;
   displayName: string | null;
   active: boolean;
-  deletedAt: Date | null;
   rawPayload: string;
   version: number;
   meta: string | null;
@@ -41,7 +40,6 @@ export interface GenericResourceUpdateInput {
   externalId?: string | null;
   displayName?: string | null;
   active?: boolean;
-  deletedAt?: Date | null;
   rawPayload?: string;
   meta?: string;
 }

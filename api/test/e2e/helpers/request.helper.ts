@@ -223,7 +223,18 @@ export async function createEndpoint(
     body: res.body,
   });
 
-  return res.body.id as string;
+  const endpointId = res.body.id as string;
+
+  // Settings v7: rfc-standard preset defaults StrictSchemaValidation=True.
+  // Existing E2E tests expect lenient mode. Override for backward compat.
+  await request(app.getHttpServer())
+    .patch(`/scim/admin/endpoints/${endpointId}`)
+    .set('Authorization', `Bearer ${token}`)
+    .set('Content-Type', 'application/json')
+    .send({ profile: { settings: { StrictSchemaValidation: 'False' } } })
+    .expect(200);
+
+  return endpointId;
 }
 
 /**
@@ -263,8 +274,14 @@ export async function createEndpointWithConfig(
   const endpointId = createRes.body.id as string;
 
   // PATCH settings onto the new endpoint
-  if (Object.keys(config).length > 0) {
-    const patchBody = { profile: { settings: config } };
+  // Settings v7: add StrictSchemaValidation=False by default for backward compat
+  // unless the test explicitly sets it
+  const effectiveConfig = { ...config };
+  if (effectiveConfig['StrictSchemaValidation'] === undefined) {
+    effectiveConfig['StrictSchemaValidation'] = 'False';
+  }
+  if (Object.keys(effectiveConfig).length > 0) {
+    const patchBody = { profile: { settings: effectiveConfig } };
     const patchTrace = beginE2eFlowStep({
       method: 'PATCH',
       url: `/scim/admin/endpoints/${endpointId}`,

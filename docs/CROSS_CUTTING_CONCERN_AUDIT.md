@@ -3,7 +3,7 @@
 **Status:** Current | **Last Updated:** 2026-04-01 | **Baseline:** v0.31.0  
 **Scope:** mutability, returned, uniqueness, required, caseExact — all flows, all resource types, all config combinations  
 **RFC References:** RFC 7643 §2 (Attribute Characteristics), RFC 7644 §3 (Protocol Operations)  
-**Test Baseline:** 3,090 unit (74 suites) · 848 E2E (39 suites) · ~951 live + 112 Lexmark — ALL PASSING
+**Test Baseline:** 3,185 unit (80 suites) · 923 E2E (45 suites) · ~739 live + 112 Lexmark — ALL PASSING
 
 ---
 
@@ -53,7 +53,7 @@ Users and Groups services instantiate a `ScimSchemaHelpers` class in the constru
 The Generic service does NOT use `ScimSchemaHelpers`. Instead, it has equivalent private methods (`enforceStrictSchemaValidation`, `validatePayloadSchema`, `coerceBooleanStringsIfEnabled`, `checkImmutableAttributes`, `getSchemaCacheForRT`, etc.) that accept a `ScimResourceType` parameter for dynamic core URN resolution. The underlying logic is identical — both paths use `SchemaValidator` and `sanitizeBooleanStringsByParent` from the shared helpers module.
 
 Shared pure functions extracted via G17/v0.31.0 deduplication:
-- `ensureSchema()`, `enforceIfMatch()`, `guardSoftDeleted()` — used identically by all 3 services
+- `ensureSchema()`, `enforceIfMatch()` — used identically by all 3 services
 - `sanitizeBooleanStringsByParent()` — URN-dot-path boolean coercion (output sanitization)
 - `coercePatchOpBooleans()` — PATCH operation boolean coercion (v0.31.0 extraction)
 - `stripNeverReturnedFromPayload()` — returned:never stripping + dynamic `schemas[]` building (v0.31.0 extraction)
@@ -66,7 +66,7 @@ Shared pure functions extracted via G17/v0.31.0 deduplication:
 
 | # | Issue | Severity | Flows | Description | Status |
 |---|-------|----------|-------|-------------|--------|
-| 1 | **`caseExact` not honored in hardcoded uniqueness checks** | Medium | POST, PUT, PATCH | Hardcoded uniqueness for `userName`, `displayName`, `externalId` uses DB-level CITEXT (PostgreSQL) or `toLowerCase()` (InMemory) — always case-insensitive. Schema-driven uniqueness (`assertSchemaUniqueness`) correctly checks `caseExact`, but column-promoted attributes do not. If a profile overrides `userName` to `caseExact:true`, DB-level checks remain case-insensitive. | **Accepted** — profiles rarely override built-in `caseExact`. Column-level uniqueness is always CI by design. |
+| 1 | **`caseExact` not honored in hardcoded uniqueness checks** | Low | POST, PUT, PATCH | Hardcoded uniqueness for `userName` (Users) and `displayName` (Groups) uses DB-level CITEXT (PostgreSQL) or `toLowerCase()` (InMemory) — always case-insensitive. `externalId` and `User.displayName` no longer enforce uniqueness (v0.33.0). Schema-driven uniqueness (`assertSchemaUniqueness`) correctly checks `caseExact`, but column-promoted attributes do not. | **Accepted** — profiles rarely override built-in `caseExact`. Column-level uniqueness is always CI by design. |
 | 2 | **`writeOnly` attributes not validated in `sortBy`** | Low | LIST | `scim-sort.util.ts` maps `sortBy` to DB columns but does NOT check if the attribute has `mutability:writeOnly`. RFC 7643 §2.2 states writeOnly attrs are meaningful only in write operations. Filter paths ARE validated for writeOnly (in `SchemaValidator.validateFilterAttributePaths`), but sort has no equivalent. Falls through to default sort field silently. | **Accepted** — no built-in sort attributes are writeOnly. |
 | 3 | **Generic service sort uses hardcoded `fieldMap` without schema awareness** | Low | LIST (Generic) | Generic `listResources()` sorts in-memory using a static `fieldMap` (`id`, `externalid`, `displayname`, `meta.created`, `meta.lastmodified`). No `caseExact` awareness, no writeOnly validation, no custom attribute sorting. Users/Groups use `resolveUserSortParams()`/`resolveGroupSortParams()` which return `SortParams` with a `caseExact` flag. | **Accepted** — generic resources use JSONB storage; extending sort to custom JSONB paths is a significant effort with low demand. |
 | 4 | **Generic service filter limited to eq-only** | Low | LIST (Generic) | `parseSimpleFilter()` handles only `displayName eq "value"` and `externalId eq "value"`. All other filter expressions throw `400 invalidFilter`. Users/Groups have full AST-based filter with 10 operators + AND/OR compound push-down. The `validateFilterAttributePaths()` validates paths against schema, but the actual execution path can only handle `eq`. | **Accepted** — designed this way; full generic filter would require JSONB-path query engine. |
@@ -92,7 +92,7 @@ Shared pure functions extracted via G17/v0.31.0 deduplication:
 | 3 | `coerceBooleansByParentIfEnabled(dto)` | `coerceBooleansByParentIfEnabled(dto)` | `coerceBooleanStringsIfEnabled(body, resourceType)` | ✅ Same logic — URN-dot-path boolean coercion |
 | 4 | `validatePayloadSchema(dto, 'create')` | `validatePayloadSchema(dto, 'create')` | `validatePayloadSchema(body, resourceType, 'create')` | ✅ Required + type + mutability + unknowns |
 | 5 | `stripReadOnlyAttributesFromPayload(dto)` | `stripReadOnlyAttributesFromPayload(dto)` | `stripReadOnlyAttributes(body, schemaDefs, readOnlyCache)` | ✅ RFC 7643 §2.2 — server ignores client readOnly |
-| 6 | Hardcoded uniqueness (`findConflict`: userName, externalId) | Hardcoded uniqueness (displayName, externalId) | Hardcoded uniqueness (`findConflict`: externalId, displayName) | ✅ Resource-type-specific DB-level checks |
+| 6 | Hardcoded uniqueness (`findConflict`: userName only) | Hardcoded uniqueness (displayName only) | No hardcoded uniqueness (removed in v0.33.0) | ✅ Resource-type-specific checks |
 | 7 | `assertSchemaUniqueness(uniqueAttrs)` | `assertSchemaUniqueness(uniqueAttrs)` | `assertSchemaUniqueness(uniqueAttrs)` | ✅ Schema-driven custom extension uniqueness |
 | 8 | Create record (`randomUUID()`) | Create record (`randomUUID()`) | Create record (`randomUUID()`) | ✅ Server-assigned `id` (BF-1) |
 | 9 | `toScimUserResource()` → `sanitizeBooleanStringsByParent` + `stripNeverReturnedFromPayload` | `toScimGroupResource()` → same | `toScimResponse()` → same | ✅ All use shared v0.31.0 helpers |
@@ -106,18 +106,17 @@ Shared pure functions extracted via G17/v0.31.0 deduplication:
 | 2 | `enforceStrictSchemaValidation()` | `enforceStrictSchemaValidation()` | `enforceStrictSchemaValidation()` | ✅ |
 | 3 | `coerceBooleansByParentIfEnabled()` | `coerceBooleansByParentIfEnabled()` | `coerceBooleanStringsIfEnabled()` | ✅ |
 | 4 | `validatePayloadSchema('replace')` | `validatePayloadSchema('replace')` | `validatePayloadSchema('replace')` | ✅ |
-| 5 | `stripReadOnlyAttributesFromPayload()` | `stripReadOnlyAttributesFromPayload()` | — (deferred to step 10) | ⚠️ See note |
+| 5 | `stripReadOnlyAttributesFromPayload()` | `stripReadOnlyAttributesFromPayload()` | — (deferred to step 9) | ⚠️ See note |
 | 6 | Find existing / 404 | Find existing / 404 | Find existing / 404 | ✅ |
-| 7 | `guardSoftDeleted()` | `guardSoftDeleted()` | `guardSoftDeleted()` | ✅ |
-| 8 | `enforceIfMatch()` | `enforceIfMatch()` | `enforceIfMatch()` | ✅ |
-| 9 | `checkImmutableAttributes()` | `checkImmutableAttributes()` | `checkImmutableAttributes()` | ✅ H-2 |
-| 10 | — | — | `stripReadOnlyAttributes()` | ⚠️ Generic strips AFTER immutable check |
-| 11 | Hardcoded uniqueness (self-excluded) | Hardcoded uniqueness (self-excluded) | Hardcoded uniqueness (self-excluded) | ✅ |
-| 12 | `assertSchemaUniqueness(self-excluded)` | `assertSchemaUniqueness(self-excluded)` | `assertSchemaUniqueness(self-excluded)` | ✅ |
-| 13 | Update record | Update record | Update record | ✅ |
-| 14 | Response (strips returned:never) | Response (strips returned:never) | Response (strips returned:never) | ✅ |
+| 7 | `enforceIfMatch()` | `enforceIfMatch()` | `enforceIfMatch()` | ✅ |
+| 8 | `checkImmutableAttributes()` | `checkImmutableAttributes()` | `checkImmutableAttributes()` | ✅ H-2 |
+| 9 | — | — | `stripReadOnlyAttributes()` | ⚠️ Generic strips AFTER immutable check |
+| 10 | Hardcoded uniqueness (self-excluded) | Hardcoded uniqueness (self-excluded) | Hardcoded uniqueness (self-excluded) | ✅ |
+| 11 | `assertSchemaUniqueness(self-excluded)` | `assertSchemaUniqueness(self-excluded)` | `assertSchemaUniqueness(self-excluded)` | ✅ |
+| 12 | Update record | Update record | Update record | ✅ |
+| 13 | Response (strips returned:never) | Response (strips returned:never) | Response (strips returned:never) | ✅ |
 
-> **Note on step 5/10:** Users and Groups strip readOnly BEFORE the DB fetch and immutable check. Generic strips AFTER. Both are correct because `readOnly` and `immutable` are mutually exclusive (RFC 7643 §2.2). The immutable check filters for `mutability === 'immutable'` only, so readOnly attrs don't affect it in either order.
+> **Note on step 5/9:** Users and Groups strip readOnly BEFORE the DB fetch and immutable check. Generic strips AFTER. Both are correct because `readOnly` and `immutable` are mutually exclusive (RFC 7643 §2.2). The immutable check filters for `mutability === 'immutable'` only, so readOnly attrs don't affect it in either order.
 
 ### 3.3 PATCH
 
@@ -125,18 +124,17 @@ Shared pure functions extracted via G17/v0.31.0 deduplication:
 |------|-------|--------|---------|-------|
 | 1 | `ensureSchema(SCIM_PATCH_SCHEMA)` | `ensureSchema(SCIM_PATCH_SCHEMA)` | `ensureSchema(SCIM_PATCH_SCHEMA)` | ✅ |
 | 2 | Find existing / 404 | Find existing / 404 | Find existing / 404 | ✅ |
-| 3 | `guardSoftDeleted()` | `guardSoftDeleted()` | `guardSoftDeleted()` | ✅ |
-| 4 | `enforceIfMatch()` | `enforceIfMatch()` | `enforceIfMatch()` | ✅ |
-| 5 | ReadOnly strip (gated: `!strict` OR `ignorePatchRO`) | ReadOnly strip (gated) | ReadOnly strip (gated) | ✅ All 3 follow identical gating pattern |
-| 6 | V2 pre-validation + `coercePatchOpBooleans()` (strict) | V2 pre-validation + `coercePatchOpBooleans()` (strict) | V2 pre-validation + `coercePatchOpBooleans()` (strict) | ✅ |
-| 7 | Apply `UserPatchEngine` | Apply `GroupPatchEngine` | Apply `GenericPatchEngine` | ✅ |
-| 8 | `coerceBooleansByParentIfEnabled()` on result | `coerceBooleansByParentIfEnabled()` on result | `coerceBooleanStringsIfEnabled()` on result | ✅ Post-PATCH coercion |
-| 9 | `validatePayloadSchema('patch')` — H-1 | `validatePayloadSchema('patch')` — H-1 | `validatePayloadSchema('patch')` — H-1 | ✅ |
-| 10 | `checkImmutableAttributes()` — H-2 | `checkImmutableAttributes()` — H-2 | `checkImmutableAttributes()` — H-2 | ✅ |
-| 11 | Hardcoded uniqueness (self-excluded) | Hardcoded uniqueness (self-excluded) | Hardcoded uniqueness (self-excluded) | ✅ |
-| 12 | `assertSchemaUniqueness(self-excluded)` | `assertSchemaUniqueness(self-excluded)` | `assertSchemaUniqueness(self-excluded)` | ✅ |
-| 13 | Update record | Update record (transactional `updateGroupWithMembers`) | Update record | ✅ |
-| 14 | Response (strips returned:never) | Response (strips returned:never) | Response (strips returned:never) | ✅ |
+| 3 | `enforceIfMatch()` | `enforceIfMatch()` | `enforceIfMatch()` | ✅ |
+| 4 | ReadOnly strip (gated: `!strict` OR `ignorePatchRO`) | ReadOnly strip (gated) | ReadOnly strip (gated) | ✅ All 3 follow identical gating pattern |
+| 5 | V2 pre-validation + `coercePatchOpBooleans()` (strict) | V2 pre-validation + `coercePatchOpBooleans()` (strict) | V2 pre-validation + `coercePatchOpBooleans()` (strict) | ✅ |
+| 6 | Apply `UserPatchEngine` | Apply `GroupPatchEngine` | Apply `GenericPatchEngine` | ✅ |
+| 7 | `coerceBooleansByParentIfEnabled()` on result | `coerceBooleansByParentIfEnabled()` on result | `coerceBooleanStringsIfEnabled()` on result | ✅ Post-PATCH coercion |
+| 8 | `validatePayloadSchema('patch')` — H-1 | `validatePayloadSchema('patch')` — H-1 | `validatePayloadSchema('patch')` — H-1 | ✅ |
+| 9 | `checkImmutableAttributes()` — H-2 | `checkImmutableAttributes()` — H-2 | `checkImmutableAttributes()` — H-2 | ✅ |
+| 10 | Hardcoded uniqueness (self-excluded) | Hardcoded uniqueness (self-excluded) | Hardcoded uniqueness (self-excluded) | ✅ |
+| 11 | `assertSchemaUniqueness(self-excluded)` | `assertSchemaUniqueness(self-excluded)` | `assertSchemaUniqueness(self-excluded)` | ✅ |
+| 12 | Update record | Update record (transactional `updateGroupWithMembers`) | Update record | ✅ |
+| 13 | Response (strips returned:never) | Response (strips returned:never) | Response (strips returned:never) | ✅ |
 
 ### 3.4 READ (GET) / LIST
 
@@ -145,9 +143,8 @@ Shared pure functions extracted via G17/v0.31.0 deduplication:
 | 1 | (LIST) `buildUserFilter()` + `validateFilterPaths()` | (LIST) `buildGroupFilter()` + `validateFilterPaths()` | (LIST) `validateFilterAttributePaths()` + `parseSimpleFilter()` | ✅ All validate filter paths in strict mode |
 | 2 | (LIST) `resolveUserSortParams()` | (LIST) `resolveGroupSortParams()` | (LIST) In-memory sort via `fieldMap` | ⚠️ Finding #3 |
 | 3 | Fetch from DB | Fetch from DB | Fetch from DB | ✅ |
-| 4 | (GET) `guardSoftDeleted()` / (LIST) filter `deletedAt == null` | Same | Same | ✅ |
-| 5 | `toScim*Resource()` → `sanitizeBooleanStringsByParent` + `stripNeverReturnedFromPayload` | Same | Same | ✅ |
-| 6 | Controller: `applyAttributeProjection()` | Controller: same | Controller: same | ✅ |
+| 4 | `toScim*Resource()` → `sanitizeBooleanStringsByParent` + `stripNeverReturnedFromPayload` | Same | Same | ✅ |
+| 5 | Controller: `applyAttributeProjection()` | Controller: same | Controller: same | ✅ |
 | — | Strips `returned:request` (unless in `?attributes`) | Same | Same | ✅ |
 | — | Honors `returned:always` (never excluded) | Same | Same | ✅ |
 
@@ -156,9 +153,8 @@ Shared pure functions extracted via G17/v0.31.0 deduplication:
 | Step | Users | Groups | Generic | Notes |
 |------|-------|--------|---------|-------|
 | 1 | Find existing / 404 | Find existing / 404 | Find existing / 404 | ✅ |
-| 2 | `guardSoftDeleted()` | `guardSoftDeleted()` | `guardSoftDeleted()` | ✅ Double-delete → 404 |
-| 3 | `enforceIfMatch()` | `enforceIfMatch()` | `enforceIfMatch()` | ✅ |
-| 4 | Soft-delete (`active=false, deletedAt=now`) or hard-delete | Same | Same | ✅ Per `SoftDeleteEnabled` |
+| 2 | `enforceIfMatch()` | `enforceIfMatch()` | `enforceIfMatch()` | ✅ |
+| 3 | Hard-delete (row physically removed) | Same | Same | ✅ DELETE always hard-deletes |
 
 No attribute characteristic concerns on DELETE.
 
@@ -188,7 +184,7 @@ No attribute characteristic concerns on DELETE.
 
 | Uniqueness | POST | PUT | PATCH | GET/LIST | DELETE |
 |------------|------|-----|-------|----------|--------|
-| **server** (hardcoded: userName, displayName, externalId) | ✅ 409 on conflict (+ reprovision for soft-deleted) | ✅ 409 (self-excluded) | ✅ 409 (self-excluded) | N/A | N/A |
+| **server** (hardcoded: User.userName, Group.displayName) | ✅ 409 on conflict | ✅ 409 (self-excluded) | ✅ 409 (self-excluded) | N/A | N/A |
 | **server** (schema-driven custom attrs via `assertSchemaUniqueness`) | ✅ | ✅ (self-excluded) | ✅ (self-excluded) | N/A | N/A |
 | **global** | ❌ Not implemented | ❌ | ❌ | N/A | N/A |
 | **none** | No check | No check | No check | N/A | N/A |
@@ -284,8 +280,6 @@ All three services follow the same v0.31.0 response-building pattern using share
 | caseExact + uniqueness (schema-driven) | Correctly uses `caseExact` flag in `uniquenessValuesMatch()` | ✅ Correct |
 | required + PATCH (post-validation) | Not enforced in patch mode | ✅ Design choice |
 | readOnly + PATCH + strict | Configurable per `IgnoreReadOnlyAttributesInPatch` | ✅ Correct |
-| softDelete + uniqueness | Soft-deleted resources skipped in uniqueness checks (`deletedAt != null`) | ✅ Correct |
-| softDelete + reprovision | POST conflict with soft-deleted resource re-activates instead of 409 | ✅ Correct (per `ReprovisionOnConflictForSoftDeletedResource`) |
 
 ---
 
@@ -310,8 +304,8 @@ All three services follow the same v0.31.0 response-building pattern using share
 | PATCH boolean coercion | ✅ `coercePatchOpBooleans` | ✅ same | ✅ same |
 | Hardcoded uniqueness | ✅ userName + externalId | ✅ displayName + externalId | ✅ externalId + displayName |
 | Schema-driven uniqueness | ✅ `assertSchemaUniqueness` | ✅ same | ✅ same |
-| Soft-delete guard | ✅ `guardSoftDeleted` | ✅ same | ✅ same |
-| Reprovision on conflict | ✅ | ✅ | ✅ |
+| Soft-delete guard | N/A (removed — DELETE always hard-deletes) | N/A | N/A |
+| Reprovision on conflict | N/A (removed in v0.33.0) | N/A | N/A |
 | If-Match / ETag enforcement | ✅ `enforceIfMatch` | ✅ same | ✅ same |
 | Filter path validation | ✅ `validateFilterPaths` | ✅ same | ✅ `validateFilterAttributePaths` |
 | Full filter operators | ✅ 10 operators + AND/OR | ✅ same | ❌ eq-only (Finding #4) |
@@ -348,7 +342,6 @@ All three services follow the same v0.31.0 response-building pattern using share
 - Attribute projection (`attributes`/`excludedAttributes`) correctly handles `always`/`default`/`request`/`never` lifecycle
 - G8g write-response projection is consistently applied on POST, PUT, PATCH across all controllers
 - Schema-driven uniqueness enforcement correctly uses `caseExact` for comparison
-- Soft-delete + reprovision interaction is fully implemented across all 3 services
 
 ### Accepted Gaps (by priority)
 

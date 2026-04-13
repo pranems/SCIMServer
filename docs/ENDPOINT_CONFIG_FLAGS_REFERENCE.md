@@ -1,10 +1,12 @@
 # Endpoint Configuration Flags — Complete Reference
 
-> **Status:** Living document · **Last Updated:** 2026-03-31
+> **Status:** Living document · **Last Updated:** 2026-04-09
 >
 > Authoritative reference for all per-endpoint configuration flags in SCIMServer.
 > Covers flag definitions, defaults, type handling, precedence rules, applicability matrices,
 > flag interaction combinations, request/response examples, and decision-flow diagrams.
+>
+> **Settings v7 (v0.34.0):** 4 flags removed, 5 added, 2 defaults changed. See [CHANGELOG.md](../CHANGELOG.md) for migration guide.
 
 ---
 
@@ -28,19 +30,21 @@
 4. [Individual Flag Reference](#4-individual-flag-reference)
    - 4.1 [AllowAndCoerceBooleanStrings](#41-allowandcoercebooleanstrings)
    - 4.2 [StrictSchemaValidation](#42-strictschemavalidation)
-   - 4.3 [SoftDeleteEnabled](#43-softdeleteenabled)
-   - 4.4 [VerbosePatchSupported](#44-verbosepatchsupported)
-   - 4.5 [MultiOpPatchRequestAddMultipleMembersToGroup](#45-multioppatchrequestaddmultiplememberstogroup)
-   - 4.6 [MultiOpPatchRequestRemoveMultipleMembersFromGroup](#46-multioppatchrequestremovemultiplemembersfromgroup)
-   - 4.7 [PatchOpAllowRemoveAllMembers](#47-patchopallowremoveallmembers)
-   - 4.8 [RequireIfMatch](#48-requireifmatch)
-   - 4.9 [ReprovisionOnConflictForSoftDeletedResource](#49-reprovisiononconflictforsoftdeletedresource)
-   - 4.10 [CustomResourceTypesEnabled](#410-customresourcetypesenabled)
-   - 4.11 [BulkOperationsEnabled](#411-bulkoperationsenabled)
-   - 4.12 [PerEndpointCredentialsEnabled](#412-perendpointcredentialsenabled)
-   - 4.13 [IncludeWarningAboutIgnoredReadOnlyAttribute](#413-includewarningaboutignoredreadonlyattribute)
-   - 4.14 [IgnoreReadOnlyAttributesInPatch](#414-ignorereadonlyattributesinpatch)
+   - 4.3 [UserSoftDeleteEnabled](#43-usersoft-deleteenabled) *(replaces SoftDeleteEnabled)*
+   - 4.4 [UserHardDeleteEnabled](#44-userharddeleteenabled) *(new in v0.33.0)*
+   - 4.5 [GroupHardDeleteEnabled](#45-groupharddeleteenabled) *(new in v0.33.0)*
+   - 4.6 [MultiMemberPatchOpForGroupEnabled](#46-multimemberpatchopforgroupenabled) *(replaces MultiOpPatchRequest…)*
+   - 4.7 [SchemaDiscoveryEnabled](#47-schemadiscoveryenabled) *(new in v0.33.0)*
+   - 4.8 [VerbosePatchSupported](#48-verbosepatchsupported)
+   - 4.9 [PatchOpAllowRemoveAllMembers](#49-patchopallowremoveallmembers)
+   - 4.10 [RequireIfMatch](#410-requireifmatch)
+   - 4.11 [PerEndpointCredentialsEnabled](#411-perendpointcredentialsenabled)
+   - 4.12 [IncludeWarningAboutIgnoredReadOnlyAttribute](#412-includewarningaboutignoredreadonlyattribute)
+   - 4.13 [IgnoreReadOnlyAttributesInPatch](#413-ignorereadonlyattributesinpatch)
+   - 4.14 [logFileEnabled](#414-logfileenabled) *(new in v0.33.0)*
    - 4.15 [logLevel](#415-loglevel)
+   - 4.16 [CustomResourceTypesEnabled](#416-customresourcetypesenabled) *(derived)*
+   - 4.17 [BulkOperationsEnabled](#417-bulkoperationsenabled) *(derived)*
 5. [Flag Applicability Matrix](#5-flag-applicability-matrix)
 6. [Flag Interaction & Precedence](#6-flag-interaction--precedence)
 7. [Flag Combination Examples](#7-flag-combination-examples)
@@ -82,22 +86,26 @@ api/src/modules/endpoint/endpoint-config.interface.ts
 | # | Flag Name | Constant Key | Default | Type | Scope | Description |
 |---|-----------|-------------|---------|------|-------|-------------|
 | 1 | `AllowAndCoerceBooleanStrings` | `ALLOW_AND_COERCE_BOOLEAN_STRINGS` | **`true`** | boolean | All write paths | Coerce boolean strings ("True"/"False") → native booleans before validation |
-| 2 | `StrictSchemaValidation` | `STRICT_SCHEMA_VALIDATION` | `false` | boolean | POST, PUT, PATCH | Enforce extension schema URN validation + type checking |
-| 3 | `SoftDeleteEnabled` | `SOFT_DELETE_ENABLED` | `false` | boolean | DELETE, GET, LIST, PATCH, PUT | Soft-delete (set `active=false`); returns 404 on subsequent operations (RFC 7644 §3.6) |
-| 4 | `VerbosePatchSupported` | `VERBOSE_PATCH_SUPPORTED` | `false` | boolean | PATCH | Dot-notation path resolution (`name.givenName`) |
-| 5 | `MultiOpPatchRequestAddMultipleMembersToGroup` | `MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP` | `false` | boolean | PATCH (Groups) | Allow multi-member add in single PATCH operation |
-| 6 | `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | `MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP` | `false` | boolean | PATCH (Groups) | Allow multi-member remove in single PATCH operation |
-| 7 | `PatchOpAllowRemoveAllMembers` | `PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS` | **`true`** | boolean | PATCH (Groups) | Allow removing all members via `path=members` |
-| 8 | `RequireIfMatch` | `REQUIRE_IF_MATCH` | `false` | boolean | PUT, PATCH, DELETE | Require If-Match header (428 if missing) |
-| 9 | `ReprovisionOnConflictForSoftDeletedResource` | `REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED` | `false` | boolean | POST | Re-activate soft-deleted resource on POST conflict instead of 409 (requires SoftDeleteEnabled) |
-| 10 | `CustomResourceTypesEnabled` | `CUSTOM_RESOURCE_TYPES_ENABLED` | `false` | boolean | Admin API, SCIM CRUD | **Derived (v0.28.0):** Implied by custom entries in `profile.resourceTypes`. Legacy: explicit config flag. Enable custom resource type registration and generic SCIM CRUD beyond User/Group |
-| 11 | `BulkOperationsEnabled` | `BULK_OPERATIONS_ENABLED` | `false` | boolean | POST /Bulk | **Derived (v0.28.0):** Implied by `profile.serviceProviderConfig.bulk.supported`. Legacy: explicit config flag. Enable SCIM Bulk Operations (RFC 7644 §3.7) — batch processing of multiple operations |
-| 12 | `PerEndpointCredentialsEnabled` | `PER_ENDPOINT_CREDENTIALS_ENABLED` | `false` | boolean | Auth (all requests) | Enable per-endpoint bearer token credentials with bcrypt hashing and admin CRUD API |
-| 13 | `IncludeWarningAboutIgnoredReadOnlyAttribute` | `INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE` | `false` | boolean | POST, PUT, PATCH | Attach warning URN to responses when readOnly attributes were stripped (RFC 7643 §2.2) |
-| 14 | `IgnoreReadOnlyAttributesInPatch` | `IGNORE_READONLY_ATTRIBUTES_IN_PATCH` | `false` | boolean | PATCH | Override G8c strict rejection → strip+warn instead of 400 (requires StrictSchemaValidation ON) |
+| 2 | `StrictSchemaValidation` | `STRICT_SCHEMA_VALIDATION` | **`true`** | boolean | POST, PUT, PATCH | Enforce extension schema URN validation + type checking |
+| 3 | `UserSoftDeleteEnabled` | `USER_SOFT_DELETE_ENABLED` | **`true`** | boolean | PATCH | PATCH {active:false} deactivates user (default true). When false, PATCH active=false → 400 error. |
+| 4 | `UserHardDeleteEnabled` | `USER_HARD_DELETE_ENABLED` | **`true`** | boolean | DELETE (Users) | Allow permanent user deletion. When false, DELETE Users returns 400. |
+| 5 | `GroupHardDeleteEnabled` | `GROUP_HARD_DELETE_ENABLED` | **`true`** | boolean | DELETE (Groups) | Allow permanent group deletion. When false, DELETE Groups returns 400. |
+| 6 | `MultiMemberPatchOpForGroupEnabled` | `MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED` | **`true`** | boolean | PATCH (Groups) | Allow multi-member add/remove in single PATCH operation |
+| 7 | `SchemaDiscoveryEnabled` | `SCHEMA_DISCOVERY_ENABLED` | **`true`** | boolean | GET | Enable endpoint-scoped discovery endpoints (/Schemas, /ResourceTypes, /ServiceProviderConfig) |
+| 8 | `VerbosePatchSupported` | `VERBOSE_PATCH_SUPPORTED` | `false` | boolean | PATCH | Dot-notation path resolution (`name.givenName`) |
+| 9 | `PatchOpAllowRemoveAllMembers` | `PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS` | `false` | boolean | PATCH (Groups) | Allow removing all members via `path=members` |
+| 10 | `RequireIfMatch` | `REQUIRE_IF_MATCH` | `false` | boolean | PUT, PATCH, DELETE | Require If-Match header (428 if missing) |
+| 11 | `PerEndpointCredentialsEnabled` | `PER_ENDPOINT_CREDENTIALS_ENABLED` | `false` | boolean | Auth (all requests) | Enable per-endpoint bearer token credentials |
+| 12 | `IncludeWarningAboutIgnoredReadOnlyAttribute` | `INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE` | `false` | boolean | POST, PUT, PATCH | Attach warning URN when readOnly attributes stripped |
+| 13 | `IgnoreReadOnlyAttributesInPatch` | `IGNORE_READONLY_ATTRIBUTES_IN_PATCH` | `false` | boolean | PATCH | Strip+warn instead of 400 for readOnly PATCH ops |
+| 14 | `logFileEnabled` | `LOG_FILE_ENABLED` | `false` | boolean | Logging | Enable per-endpoint log file under `logs/endpoints/` |
 | 15 | `logLevel` | `LOG_LEVEL` | *(unset)* | string/number | All requests | Per-endpoint log level override |
+| — | `CustomResourceTypesEnabled` | *derived* | `false` | boolean | Admin API, SCIM CRUD | **Derived:** Implied by custom entries in `profile.resourceTypes` |
+| — | `BulkOperationsEnabled` | *derived* | `false` | boolean | POST /Bulk | **Derived:** Implied by `profile.serviceProviderConfig.bulk.supported` |
 
-> **Note:** Two flags default to `true`: `AllowAndCoerceBooleanStrings`, `PatchOpAllowRemoveAllMembers`. All others default to `false`. `ReprovisionOnConflictForSoftDeletedResource` has no effect unless `SoftDeleteEnabled` is also `true`. `IgnoreReadOnlyAttributesInPatch` has no effect unless `StrictSchemaValidation` is also `true`.
+> **Settings v7 defaults:** `AllowAndCoerceBooleanStrings`, `StrictSchemaValidation`, `UserSoftDeleteEnabled`, `UserHardDeleteEnabled`, `GroupHardDeleteEnabled`, `MultiMemberPatchOpForGroupEnabled`, `SchemaDiscoveryEnabled` default to `true`. All others default to `false`.
+>
+> **Deprecated flags (v0.33.0 settings v7 clean break):** `SoftDeleteEnabled` (replaced by `UserSoftDeleteEnabled` + `UserHardDeleteEnabled`), `ReprovisionOnConflictForSoftDeletedResource` (removed — POST collision always 409), `MultiOpPatchRequestAddMultipleMembersToGroup` and `MultiOpPatchRequestRemoveMultipleMembersFromGroup` (replaced by `MultiMemberPatchOpForGroupEnabled`).
 
 ---
 
@@ -108,31 +116,32 @@ api/src/modules/endpoint/endpoint-config.interface.ts
 | Flag | Value in `entra-id` preset | Why |
 |------|----------------------------|-----|
 | `AllowAndCoerceBooleanStrings` | `True` | Entra sends `"True"`/`"False"` strings for boolean attributes |
+| `StrictSchemaValidation` | `True` | Enforce schema compliance |
 | `VerbosePatchSupported` | `True` | Entra uses dot-notation PATCH paths like `name.givenName` |
-| `MultiOpPatchRequestAddMultipleMembersToGroup` | `True` | Entra sends multi-member add operations |
-| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | `True` | Entra sends multi-member remove operations |
-| `PatchOpAllowRemoveAllMembers` | `True` | Entra can issue `path=members` without value |
+| `MultiMemberPatchOpForGroupEnabled` | `True` | Entra sends multi-member add/remove operations |
 
-All other flags resolve to their defaults (all `false`). This means **out of the box**:
+All other flags resolve to their defaults. Settings v7 defaults mean **out of the box**:
 
-- ✅ **DELETE is hard-delete** (SoftDeleteEnabled = false) — resources are permanently removed
-- ✅ **Schema validation is lenient** (StrictSchemaValidation = false) — extension data accepted without matching `schemas[]`
+- ✅ **PATCH active=false deactivates users** (UserSoftDeleteEnabled = true) — PATCH {active:false} sets user inactive. DELETE always hard-deletes.
+- ✅ **Hard delete also available** (UserHardDeleteEnabled = true) — DELETE permanently removes when invoked
+- ✅ **Schema validation is strict** (StrictSchemaValidation = true) — extension URNs required in `schemas[]`
 - ✅ **`If-Match` is optional** (RequireIfMatch = false) — ETag validated when present but not required
 - ✅ **ReadOnly attributes silently stripped** — no warning headers, no 400 errors
 - ✅ **Only global auth** (PerEndpointCredentialsEnabled = false) — shared secret / OAuth JWT only
-- ✅ **409 on conflicts** (ReprovisionOnConflict = false) — soft-deleted resources are not auto-reactivated
+- ✅ **409 on all POST conflicts** — no reprovision; POST collision always returns 409
+- ✅ **Discovery endpoints enabled** (SchemaDiscoveryEnabled = true)
 - ✅ **No Bulk operations** — disabled unless profile SPC says `bulk.supported: true`
 
 ### Per-Preset Default Comparison
 
-| Flag | `entra-id` (default) | `rfc-standard` | `minimal` | `lexmark` |
+| Flag | `entra-id` (default) | `rfc-standard` | `minimal` | `user-only-with-custom-ext` |
 |------|---------------------|----------------|-----------|-----------|
 | AllowAndCoerceBooleanStrings | **True** | *true (default)* | *true (default)* | *true (default)* |
 | VerbosePatchSupported | **True** | false | false | false |
 | MultiOpPatchRequest…Add | **True** | false | false | false |
 | MultiOpPatchRequest…Remove | **True** | false | false | false |
 | PatchOpAllowRemoveAllMembers | **True** | *true (default)* | *true (default)* | *true (default)* |
-| SoftDeleteEnabled | false | false | false | false |
+| UserSoftDeleteEnabled | *true (default)* | *true (default)* | *true (default)* | *true (default)* |
 | StrictSchemaValidation | false | false | false | false |
 | RequireIfMatch | false | false | false | false |
 | All others | false | false | false | false |
@@ -145,13 +154,13 @@ All other flags resolve to their defaults (all `false`). This means **out of the
 |---|------|-----------|------------------------|
 | 1 | **AllowAndCoerceBooleanStrings** | `"True"`/`"False"` strings in request bodies are silently converted to native `true`/`false` before schema validation. Prevents Entra rejections. | String boolean values pass through as-is. If `StrictSchemaValidation` is on, they fail type validation. |
 | 2 | **StrictSchemaValidation** | POST/PUT bodies must include all extension URNs in `schemas[]`. Unknown attributes rejected. ReadOnly PATCH ops → 400. Full RFC 7643 §2 enforcement. | Extension data accepted without matching URNs. Unknown attributes stored as-is. ReadOnly attributes silently stripped. Lenient mode. |
-| 3 | **SoftDeleteEnabled** | DELETE sets `active=false` + records `deletedAt`. Resource hidden from GET/LIST but record preserved in database. | DELETE permanently removes the resource from the database. |
+| 3 | **UserSoftDeleteEnabled** | PATCH {active:false} deactivates user. | PATCH active=false → 400 error. |
 | 4 | **VerbosePatchSupported** | Dot-notation PATCH paths (e.g., `name.givenName`) resolved into nested object updates. Required for Entra ID compatibility. | Dot-notation paths stored as literal top-level attribute names (not nested). |
 | 5 | **MultiOpPatchRequest…Add** | A single PATCH operation can add multiple group members at once (array in `value`). | Each member addition requires a separate PATCH operation. |
 | 6 | **MultiOpPatchRequest…Remove** | A single PATCH operation can remove multiple group members at once. | Each member removal requires a separate PATCH operation. |
 | 7 | **PatchOpAllowRemoveAllMembers** | `PATCH /Groups/{id}` with `op:remove, path:members` (no `value`) removes ALL members. | Must provide explicit member IDs in the `value` array or use a value filter in the path. |
 | 8 | **RequireIfMatch** | PUT/PATCH/DELETE **require** an `If-Match` header. Missing → **428 Precondition Required**. Matched → proceed. Mismatch → **412 Precondition Failed**. | `If-Match` is optional. If provided, it's still validated (412 on mismatch), but omission is allowed. |
-| 9 | **ReprovisionOnConflict…** | POST that collides with a soft-deleted resource **re-activates** it: clears `deletedAt`, sets `active=true`, replaces payload. Requires `SoftDeleteEnabled=true`. | Collision → 409 Conflict (even if the existing resource is soft-deleted). |
+| 9 | **~~ReprovisionOnConflict…~~** | *(Removed in v0.33.0)* — POST collision always returns 409 Conflict. | Collision → 409 Conflict. |
 | 10 | **PerEndpointCredentialsEnabled** | Bearer tokens checked against per-endpoint credential table (bcrypt). Falls back to OAuth JWT → global shared secret if no match. | Only global shared secret and OAuth JWT are evaluated. Per-endpoint credential table ignored. |
 | 11 | **IncludeWarningAboutIgnoredReadOnlyAttribute** | Write responses include `urn:scimserver:api:messages:2.0:Warning` extension listing readOnly attributes that were stripped. | ReadOnly attributes stripped silently — no indication in the response. |
 | 12 | **IgnoreReadOnlyAttributesInPatch** | When `StrictSchemaValidation` is ON: PATCH ops targeting readOnly attributes are **stripped + warned** instead of rejected. No effect when strict is OFF. | With strict schema ON: PATCH ops on readOnly attributes → **400 Bad Request** (`mutability` error). |
@@ -194,14 +203,14 @@ getConfigBooleanWithDefault(config, flagName, defaultValue)
 
 ### 3.3 Resolution Examples
 
-| Config JSON | `getConfigBoolean(config, 'SoftDeleteEnabled')` | `getConfigBooleanWithDefault(config, 'AllowAndCoerceBooleanStrings', true)` |
+| Config JSON | `getConfigBoolean(config, 'UserSoftDeleteEnabled')` | `getConfigBooleanWithDefault(config, 'AllowAndCoerceBooleanStrings', true)` |
 |---|---|---|
 | `undefined` (no config) | `false` | `true` |
 | `{}` (empty config) | `false` | `true` |
-| `{"SoftDeleteEnabled": true}` | `true` | `true` |
-| `{"SoftDeleteEnabled": "True"}` | `true` | `true` |
-| `{"SoftDeleteEnabled": "1"}` | `true` | `true` |
-| `{"SoftDeleteEnabled": false}` | `false` | `true` |
+| `{"UserSoftDeleteEnabled": true}` | `true` | `true` |
+| `{"UserSoftDeleteEnabled": "True"}` | `true` | `true` |
+| `{"UserSoftDeleteEnabled": "1"}` | `true` | `true` |
+| `{"UserSoftDeleteEnabled": false}` | `false` | `true` |
 | `{"AllowAndCoerceBooleanStrings": false}` | `false` | `false` |
 | `{"AllowAndCoerceBooleanStrings": "False"}` | `false` | `false` |
 | `{"AllowAndCoerceBooleanStrings": "0"}` | `false` | `false` |
@@ -350,7 +359,7 @@ When `AllowAndCoerceBooleanStrings` is `true`, the filter `primary eq "True"` co
 |----------|-------|
 | **Config key** | `StrictSchemaValidation` |
 | **Constant** | `ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION` |
-| **Default** | `false` |
+| **Default** | `true` |
 | **Helper** | `getConfigBoolean(config, key)` |
 | **Scope** | POST, PUT, PATCH |
 | **RFC** | RFC 7643 §8.7 (extension registration) |
@@ -359,10 +368,15 @@ When `AllowAndCoerceBooleanStrings` is `true`, the filter `primary eq "True"` co
 **Purpose:** Enforces full schema validation on write operations:
 1. **Extension URN validation**: All extension URNs in the body must be declared in `schemas[]` and registered in the schema registry.
 2. **Type checking**: Attribute types must match schema definitions (string, boolean, integer, etc.).
-3. **Immutability enforcement** (H-2): Immutable attributes cannot be changed after creation.
-4. **Post-PATCH validation** (H-1): PATCH results are validated after assembly.
+3. **Post-PATCH validation** (H-1): PATCH results are validated after assembly.
+4. **Unknown attribute rejection**: Unrecognized attributes → 400.
+5. **Canonical value enforcement**: Values must match schema-declared canonical values.
 
-**When OFF (default):** `validatePayloadSchema()` returns immediately. Extension data is silently accepted. No type checking.
+> **Note (P4 v0.34.0):** Two checks are now **unconditional** regardless of this flag:
+> - **Required attributes** (RFC 7643 §2.4): Missing required attributes on POST/PUT always return 400.
+> - **Immutable enforcement** (RFC 7643 §2.2): Changed immutable attributes on PUT/PATCH always return 400.
+
+**When OFF:** Extension data is silently accepted. No type checking, unknown attribute rejection, or canonical value enforcement. Required and immutable checks still run.
 
 **Example — Strict ON, unregistered extension rejected:**
 
@@ -398,7 +412,9 @@ Response (400):
 
 ---
 
-### 4.3 SoftDeleteEnabled
+### 4.3 SoftDeleteEnabled *(deprecated)*
+
+> **⚠️ Deprecated:** This flag is stored but **ignored** by the system. DELETE always hard-deletes. Replaced by `UserSoftDeleteEnabled` + `UserHardDeleteEnabled`.
 
 | Property | Value |
 |----------|-------|
@@ -406,26 +422,13 @@ Response (400):
 | **Constant** | `ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED` |
 | **Default** | `false` |
 | **Helper** | `getConfigBoolean(config, key)` |
-| **Scope** | DELETE, GET, LIST, PATCH, PUT |
+| **Scope** | *(none — deprecated, ignored at runtime)* |
 | **RFC** | RFC 7644 §3.6 |
 | **Added** | v0.15.0 |
+| **Deprecated** | v0.33.0 |
+| **Replaced by** | `UserSoftDeleteEnabled` + `UserHardDeleteEnabled` |
 
-**Purpose:** On `DELETE /Users/{id}` or `DELETE /Groups/{id}`, sets `active = false` instead of physically removing the record. Per RFC 7644 §3.6, soft-deleted resources return **404** on all subsequent operations (GET, PATCH, PUT, DELETE) and are **omitted** from LIST/query results.
-
-**Example — Soft delete user:**
-
-```http
-DELETE /scim/v2/Users/a1b2c3d4-...
-Authorization: Bearer <token>
-```
-
-Response: `204 No Content` (same as hard delete)
-
-The user record remains in the database with `active = false`. All subsequent operations (GET, PATCH, PUT, DELETE) return `404 Not Found` per RFC 7644 §3.6. LIST queries omit the resource.
-
-**Example — Hard delete (default):**
-
-Same request, same 204 response, but the row is permanently removed from the database.
+**Original purpose (no longer active):** Previously set `active = false` on DELETE instead of physically removing the record. This behavior has been removed — DELETE now always hard-deletes. Use `UserSoftDeleteEnabled` to control whether PATCH {active:false} is allowed, and `UserHardDeleteEnabled` to control whether DELETE is allowed.
 
 ---
 
@@ -612,51 +615,15 @@ Response (200): Success, version incremented to `W/"v4"`.
 
 ---
 
-### 4.9 ReprovisionOnConflictForSoftDeletedResource
+### 4.9 ReprovisionOnConflictForSoftDeletedResource *(removed)*
+
+> **⚠️ Removed in v0.33.0:** This flag has been removed. POST collision always returns **409 Conflict**. There is no soft-delete concept — DELETE always hard-deletes.
 
 | Property | Value |
 |----------|-------|
 | **Config key** | `ReprovisionOnConflictForSoftDeletedResource` |
-| **Constant** | `ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED` |
-| **Default** | `false` |
-| **Type** | boolean |
-| **Scope** | POST (create) |
-| **Added** | v0.17.2 |
-| **Prerequisite** | Requires `SoftDeleteEnabled: true` — has no effect with hard-delete |
-
-**Purpose:** When enabled alongside `SoftDeleteEnabled`, POST operations that collide with a soft-deleted resource (same `userName`/`externalId` for Users, same `displayName`/`externalId` for Groups) will **re-activate the existing resource** with the new payload instead of returning 409 Conflict.
-
-**Reprovision behavior:**
-- Sets `active = true`, `deletedAt = null` (clears soft-delete markers)
-- Replaces the entire resource payload with the new POST body
-- Returns 201 Created with the re-activated resource
-- For Groups: member references are re-resolved via `resolveMemberInputs()`
-
-**Example config:**
-
-```json
-{
-  "config": {
-    "SoftDeleteEnabled": "True",
-    "ReprovisionOnConflictForSoftDeletedResource": "True"
-  }
-}
-```
-
-**Flow:**
-1. Client POSTs a user with `userName: "user@test.com"`
-2. Existing resource found with same userName, but `deletedAt` is set (soft-deleted)
-3. Instead of 409, the service replaces the payload, clears `deletedAt`, sets `active=true`
-4. Returns 201 with the re-activated resource
-
-**Flag combinations:**
-
-| SoftDeleteEnabled | ReprovisionOnConflict | Conflict is soft-deleted | Result |
-|---|---|---|---|
-| `false` | `false` | N/A | 409 Conflict |
-| `true` | `false` | Yes | 409 Conflict |
-| `true` | `true` | No (active) | 409 Conflict |
-| `true` | `true` | Yes (deletedAt set) | **201 — re-activated** |
+| **Status** | **Removed in v0.33.0** |
+| **Current behavior** | POST collision always → 409 Conflict |
 
 ---
 
@@ -1003,8 +970,8 @@ Which flags affect which HTTP methods and resource types:
 |------|------|-----|-------|--------|-----|------|-------|--------|
 | `AllowAndCoerceBooleanStrings` | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ |
 | `StrictSchemaValidation` | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ |
-| `SoftDeleteEnabled` | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `ReprovisionOnConflict...` | ✅ | — | — | — | — | — | ✅ | ✅ |
+| `UserSoftDeleteEnabled` | — | — | ✅ | — | — | — | ✅ | — |
+| ~~`ReprovisionOnConflict...`~~ | — | — | — | — | — | — | — | — |
 | `VerbosePatchSupported` | — | — | ✅ | — | — | — | ✅ | — |
 | `MultiOpPatchAdd...` | — | — | ✅ | — | — | — | — | ✅ |
 | `MultiOpPatchRemove...` | — | — | ✅ | — | — | — | — | ✅ |
@@ -1041,30 +1008,18 @@ flowchart TD
 
 **Precedence:** `AllowAndCoerceBooleanStrings` supersedes `StrictSchemaValidation` for boolean type errors specifically. With both flags ON, string booleans are coerced first so they pass type checks.
 
-### 6.2 SoftDeleteEnabled × GET/LIST
+### 6.2 UserSoftDeleteEnabled × PATCH active
 
 ```mermaid
 flowchart TD
-    A[DELETE /Users/id] --> B{SoftDeleteEnabled?}
-    B -->|true| C[SET active=false<br>204 No Content]
-    B -->|false| D[Physical DELETE<br>204 No Content]
+    A[PATCH /Users/id<br>active=false] --> B{UserSoftDeleteEnabled?}
+    B -->|true| C[Set active=false<br>200 OK]
+    B -->|false| D[400 Bad Request]
     
-    E[GET /Users/id] --> F{SoftDeleteEnabled?}
-    F -->|true| G{active=false?}
-    G -->|yes| I[404 Not Found]
-    G -->|no| J[Return resource]
-    F -->|false| H[No active filter<br>Not applicable - rows deleted]
-    
-    K[LIST /Users] --> L{SoftDeleteEnabled?}
-    L -->|true| M[Filter out active=false<br>Omit from results]
-    L -->|false| N[No filter needed - rows deleted]
-    
-    O[PATCH/PUT/DELETE /Users/id] --> P{SoftDeleteEnabled?}
-    P -->|true| Q{active=false?}
-    Q -->|yes| R[404 Not Found]
-    Q -->|no| S[Continue operation]
-    P -->|false| S
+    E[DELETE /Users/id] --> F[Always hard-delete<br>204 No Content]
 ```
+
+> **Note:** DELETE always hard-deletes regardless of any flag. The old `SoftDeleteEnabled` behavior (set `active=false` on DELETE, filter from GET/LIST) has been removed.
 
 ### 6.3 RequireIfMatch × PUT/PATCH/DELETE
 
@@ -1160,7 +1115,7 @@ flowchart TD
       "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True",
       "PatchOpAllowRemoveAllMembers": "True",
       "VerbosePatchSupported": "True",
-      "SoftDeleteEnabled": "True",
+      "UserSoftDeleteEnabled": "True",
       "StrictSchemaValidation": "True",
       "AllowAndCoerceBooleanStrings": "True",
       "RequireIfMatch": "False",
@@ -1176,7 +1131,7 @@ flowchart TD
 **Why each flag:**
 - `MultiOp*`: Entra sends multi-member PATCH operations
 - `VerbosePatchSupported`: Entra uses `name.givenName` dot paths
-- `SoftDeleteEnabled`: Recommended for Entra disable-before-delete pattern
+- `UserSoftDeleteEnabled`: Allows Entra to deactivate users via PATCH {active:false} before deleting
 - `StrictSchemaValidation`: Full type/schema enforcement
 - `AllowAndCoerceBooleanStrings`: Entra sends `"True"` for boolean attrs
 - `RequireIfMatch`: `False` — Entra does not send If-Match headers
@@ -1190,12 +1145,12 @@ flowchart TD
     "StrictSchemaValidation": "True",
     "AllowAndCoerceBooleanStrings": "True",
     "RequireIfMatch": "True",
-    "SoftDeleteEnabled": "True"
+    "UserSoftDeleteEnabled": "True"
   }
 }
 ```
 
-**Behavior:** All validation enforced. Boolean strings coerced on input. ETags required. Soft-delete on removal.
+**Behavior:** All validation enforced. Boolean strings coerced on input. ETags required. PATCH active=false allowed.
 
 ### 7.3 Lenient Mode (Minimal Validation)
 
@@ -1213,12 +1168,12 @@ Or equivalently:
     "StrictSchemaValidation": "False",
     "AllowAndCoerceBooleanStrings": "True",
     "RequireIfMatch": "False",
-    "SoftDeleteEnabled": "False"
+    "UserSoftDeleteEnabled": "False"
   }
 }
 ```
 
-**Behavior:** No schema validation. Boolean strings still coerced (default on). No ETag enforcement. Hard deletes.
+**Behavior:** No schema validation. Boolean strings still coerced (default on). No ETag enforcement. PATCH active=false blocked.
 
 ### 7.4 Strict Schema WITHOUT Boolean Coercion (Testing Only)
 
@@ -1242,7 +1197,7 @@ Or equivalently:
     "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True",
     "PatchOpAllowRemoveAllMembers": "True",
     "VerbosePatchSupported": "True",
-    "SoftDeleteEnabled": "True",
+    "UserSoftDeleteEnabled": "True",
     "StrictSchemaValidation": "True",
     "AllowAndCoerceBooleanStrings": "True",
     "RequireIfMatch": "True",
@@ -1262,7 +1217,7 @@ Or equivalently:
     "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "False",
     "PatchOpAllowRemoveAllMembers": "False",
     "VerbosePatchSupported": "False",
-    "SoftDeleteEnabled": "False",
+    "UserSoftDeleteEnabled": "False",
     "StrictSchemaValidation": "False",
     "AllowAndCoerceBooleanStrings": "False",
     "RequireIfMatch": "False",
@@ -1321,9 +1276,7 @@ flowchart TD
     D -->|yes| E
     E --> G{Resource exists?}
     G -->|no| H[404 Not Found]
-    G -->|yes| I{SoftDeleteEnabled?}
-    I -->|yes| J[SET active=false<br>204 No Content]
-    I -->|no| K[Physical DELETE<br>204 No Content]
+    G -->|yes| I[Hard DELETE<br>204 No Content]
 ```
 
 ### 8.3 PATCH Operation Processing Flow
@@ -1384,7 +1337,7 @@ Authorization: Bearer <admin-token>
     "settings": {
       "StrictSchemaValidation": "True",
       "AllowAndCoerceBooleanStrings": "True",
-      "SoftDeleteEnabled": "True",
+      "UserSoftDeleteEnabled": "True",
       "VerbosePatchSupported": "True",
       "MultiOpPatchRequestAddMultipleMembersToGroup": "True",
       "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True"
@@ -1435,7 +1388,7 @@ Response:
     "settings": {
       "StrictSchemaValidation": "True",
       "AllowAndCoerceBooleanStrings": "True",
-      "SoftDeleteEnabled": "True",
+      "UserSoftDeleteEnabled": "True",
       "VerbosePatchSupported": "True",
       "MultiOpPatchRequestAddMultipleMembersToGroup": "True",
       "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True",
@@ -1477,7 +1430,7 @@ For production use with Microsoft Entra ID (Azure AD) provisioning, the recommen
       "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True",
       "PatchOpAllowRemoveAllMembers": "True",
       "VerbosePatchSupported": "True",
-      "SoftDeleteEnabled": "True",
+      "UserSoftDeleteEnabled": "True",
       "StrictSchemaValidation": "True",
       "AllowAndCoerceBooleanStrings": "True",
       "IgnoreReadOnlyAttributesInPatch": "True",
@@ -1499,7 +1452,7 @@ For production use with Microsoft Entra ID (Azure AD) provisioning, the recommen
 | `MultiOpPatchRemove...` = True | Entra sends multi-member removes (e.g., unassign 3 users) |
 | `PatchOpAllowRemoveAll...` = True | Entra may remove all members on group sync |
 | `VerbosePatchSupported` = True | Entra uses `name.givenName` dot-notation PATCH paths |
-| `SoftDeleteEnabled` = True | Entra disables users before deleting (soft-delete preserves data) |
+| `UserSoftDeleteEnabled` = True | Entra deactivates users via PATCH {active:false} before deleting |
 | `StrictSchemaValidation` = True | Full type/schema enforcement for data quality |
 | `AllowAndCoerceBooleanStrings` = True | **Critical**: Entra sends `roles[].primary = "True"` (string), not `true` (boolean) |
 | `RequireIfMatch` = False (default) | Entra does NOT send If-Match headers — enabling would reject all writes |

@@ -41,7 +41,7 @@ SCIM servers MAY support sorting of results using `sortBy` and `sortOrder` query
 
 ### Problem
 
-The `EndpointScimUsersService` (~904 lines) and `EndpointScimGroupsService` (~1005 lines) contained 13+ identical private methods for schema validation, boolean coercion, ETag enforcement, soft-delete guards, and JSON parsing.
+The `EndpointScimUsersService` (~904 lines) and `EndpointScimGroupsService` (~1005 lines) contained 13+ identical private methods for schema validation, boolean coercion, ETag enforcement, and JSON parsing.
 
 ### Solution
 
@@ -52,7 +52,6 @@ Extracted shared logic into `scim-service-helpers.ts`:
 - `ensureSchema()` — Validates `schemas` array presence
 - `enforceIfMatch()` — ETag If-Match header enforcement
 - `sanitizeBooleanStrings()` — Boolean string → boolean coercion
-- `guardSoftDeleted()` — Soft-delete status checking
 
 **`ScimSchemaHelpers` Class** (parameterized by `schemaRegistry` + `coreSchemaUrn`):
 - `enforceStrictSchemaValidation()`

@@ -268,4 +268,28 @@ E2E coverage via existing attribute-projection, filter, and write-operation test
 
 ---
 
+## Addendum: Uniqueness Enforcement Alignment (v0.33.0)
+
+As of v0.33.0, uniqueness enforcement has been corrected to match RFC 7643 §2.4 schema declarations. Previously, the code over-enforced uniqueness on attributes declared as `uniqueness: "none"`:
+
+### Current Uniqueness Enforcement Matrix
+
+| Resource | Attribute | RFC `uniqueness` | Enforced? | Level |
+|----------|-----------|-----------------|-----------|-------|
+| **User** | `userName` | `"server"` | ✅ Yes | Service + DB unique index |
+| **User** | `externalId` | `"none"` | ❌ No | Saved as received |
+| **User** | `displayName` | *(none declared)* | ❌ No | Saved as received |
+| **Group** | `displayName` | `"server"` | ✅ Yes | Service-level only |
+| **Group** | `externalId` | `"none"` | ❌ No | Saved as received |
+
+### What Changed
+- **Removed**: DB unique constraints on `displayName` and `externalId` (replaced with non-unique indexes)
+- **Removed**: `externalId` from `findConflict()` in User service
+- **Removed**: `assertUniqueExternalId()` from Group service
+- **Removed**: `findConflict()` from Generic service entirely
+- **Kept**: `userName` uniqueness for Users, `displayName` uniqueness for Groups
+- **Kept**: Schema-driven `assertSchemaUniqueness()` for custom extension attributes with `uniqueness: "server"`
+
+---
+
 *Document created 2026-03-01. Covers P2 Attribute Characteristic Enforcement for SCIMServer v0.24.0. 6/6 items complete. All unit, E2E, and live tests passing. 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for counts.*

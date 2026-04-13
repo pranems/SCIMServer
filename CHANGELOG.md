@@ -5,6 +5,141 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.34.0] - 2026-04-10
+
+### P4 — Attribute Characteristic Schema Validation Fixes (SEC-1, G1, G2, G3)
+
+**Security:**
+- SEC-1: Add `DANGEROUS_KEYS` prototype pollution guard to `GenericPatchEngine` (matching User/Group pattern)
+- Guards `setNested()`, `setAtPath()`, `removeAtPath()` for path-based ops
+- Strips `__proto__`/`constructor`/`prototype` from no-path add/replace value objects
+
+**RFC Compliance (G1/G2 — unconditional immutable + required enforcement):**
+- G1: Remove `StrictSchemaValidation` gate from `checkImmutableAttributes()` — runs unconditionally (RFC 7643 §2.2 "SHALL NOT")
+- G2: Add `SchemaValidator.validateRequired()` for unconditional required checks on create/replace (RFC 7643 §2.4 "MUST")
+- Type/unknown/canonical validation remains strict-gated for Entra ID backward compat
+
+**Functional (G3 — Generic filter caseExact):**
+- Pass `caseExactPaths` to `buildGenericFilter()` — was captured but never passed (one-line fix)
+- Generic resources now correctly use case-sensitive filtering for `caseExact:true` attributes
+
+**Tests (80 unit suites, 3,185 tests — 45 E2E suites, 923 tests):**
+- +14 unit tests (11 SEC-1 prototype pollution, 1 G1 immutable, 3 G2 required)
+- +7 E2E tests (4 SEC-1 PATCH rejection, 3 G3 caseExact filtering)
+
+**Documentation:**
+- P4 deep analysis document: `docs/P4_ATTRIBUTE_CHARACTERISTIC_DEEP_ANALYSIS.md`
+- Updated all docs with correct endpoint count (82 across 19 controllers)
+
+### Remove deletedAt + Implement UserSoftDeleteEnabled PATCH Gate
+
+**Schema & Models:**
+- Drop `deletedAt` column from Prisma ScimResource model
+- Remove `deletedAt` from all domain models (UserRecord, GroupRecord, GenericResourceRecord, *UpdateInput, UserConflictResult)
+- Remove `deletedAt` from repository interfaces and implementations
+
+**Service Layer:**
+- Delete `guardSoftDeleted()` function (was dead code — never triggered)
+- Remove 9 `guardSoftDeleted()` calls across Users/Generic services
+- Remove LIST `deletedAt` filtering (Users + Generic services)
+- Simplify `assertSchemaUniqueness()` — remove `deletedAt` param and skip logic
+- Implement PATCH `active=false` gate: `UserSoftDeleteEnabled=false` → 400 `SOFT_DELETE_DISABLED`
+- Add pre-throw debug/info logs for all 404 not-found and config-gated error paths
+
+**Stats Endpoint:**
+- Rename `ResourceStats.softDeleted` → `inactive` (accurately reflects `active=false` count)
+
+**Tests (80 unit suites, 3171 tests — 44 E2E suites, 926 tests):**
+- +7 new unit tests (PATCH gate diagnostics, flag combos)
+- +1 enhanced E2E test (diagnostics verification)
+- Remove ~20 dead soft-delete/guardSoftDeleted tests
+- Rewrite soft-delete-flags E2E as hard-delete lifecycle tests
+
+**Documentation:**
+- Update 30+ docs to remove deletedAt/guardSoftDeleted/soft-delete references
+- Update all API artifacts (OpenAPI, Postman, Insomnia)
+- Update live-test scripts with correct flag names and stats fields
+
+## [0.33.0] - 2026-04-09
+
+### Uniqueness Enforcement Alignment with RFC 7643 §2.4
+
+**Breaking behavior change** — `externalId` and `User.displayName` no longer enforce uniqueness:
+
+| Attribute | Before | After (v0.33.0) |
+|-----------|--------|------------------|
+| `User.externalId` | 409 on duplicate | Saved as received (uniqueness: "none") |
+| `User.displayName` | 409 via DB constraint | Saved as received (uniqueness: "none") |
+| `Group.externalId` | 409 on duplicate | Saved as received (uniqueness: "none") |
+| `User.userName` | 409 on duplicate | **Unchanged** (uniqueness: "server") |
+| `Group.displayName` | 409 on duplicate | **Unchanged** (uniqueness: "server") |
+
+#### Database
+- Dropped `@@unique([endpointId, displayName])` — replaced with `@@index`
+- Dropped `@@unique([endpointId, resourceType, externalId])` — replaced with `@@index`
+- New Prisma migration: `remove_uniqueness_displayname_externalid`
+
+#### Service Layer
+- User service: `findConflict()` now checks only `userName` (removed `externalId` param)
+- Group service: Removed `assertUniqueExternalId()` method and all callers
+- Generic service: Removed `findConflict()` private method (no externalId/displayName uniqueness for custom types)
+- User repository interface: `findConflict(endpointId, userName, excludeScimId?)` — 3rd param changed from `externalId` to `excludeScimId`
+
+#### Tests Updated
+- Unit tests: externalId uniqueness tests removed/updated across 5 spec files
+- E2E tests: duplicate externalId now expects 200 instead of 409
+- Live tests: 6 tests updated across sections 3d, 4, 9o, 9x
+
+### Settings v7 — Endpoint Configuration Redesign
+
+**Breaking changes** — 4 flags removed, 5 added, 2 defaults changed:
+
+#### New Flags
+- **`UserSoftDeleteEnabled`** (default: `true`) — PATCH `{active:false}` deactivates user. When false, PATCH active=false → error.
+- **`UserHardDeleteEnabled`** (default: `true`) — DELETE /Users/{id} permanently removes. When false → 400 error.
+- **`GroupHardDeleteEnabled`** (default: `true`) — DELETE /Groups/{id} permanently removes. When false → 400 error.
+- **`MultiMemberPatchOpForGroupEnabled`** (default: `true`) — Multi-member add/remove in single PATCH op. Replaces two old flags.
+- **`SchemaDiscoveryEnabled`** (default: `true`) — When false, endpoint-scoped discovery (/ServiceProviderConfig, /Schemas, /ResourceTypes) returns 404 + server WARN log.
+
+#### Changed Defaults
+- **`StrictSchemaValidation`** default: `false` → **`true`** — Extension URNs now required in schemas[], types enforced by default.
+- **`PatchOpAllowRemoveAllMembers`** default: `true` → **`false`** — Blanket member removal now blocked by default.
+
+#### Removed (clean break — old names ignored in API)
+- `SoftDeleteEnabled` → replaced by `UserSoftDeleteEnabled` + `UserHardDeleteEnabled`
+- `ReprovisionOnConflictForSoftDeletedResource` → removed entirely (POST collision always 409)
+- `MultiOpPatchRequestAddMultipleMembersToGroup` → replaced by `MultiMemberPatchOpForGroupEnabled`
+- `MultiOpPatchRequestRemoveMultipleMembersFromGroup` → replaced by `MultiMemberPatchOpForGroupEnabled`
+
+#### Group Active Field Removed
+- Groups no longer have `active` attribute in responses (not in RFC 7643 §4.2)
+- Removed from: schema constants, auto-expand injection (D7), projection always-returned set, preset JSONs
+- No soft-delete concept for Groups — DELETE always hard-deletes
+
+#### Preset Updates
+- `lexmark` renamed to `user-only-with-custom-ext` (backward compat alias kept)
+- `entra-id`: replaced old MultiOp flags with `MultiMemberPatchOpForGroupEnabled`, added `StrictSchemaValidation: "True"`
+- `entra-id-minimal`: added `StrictSchemaValidation: "True"`
+- `rfc-standard`: added `StrictSchemaValidation: "True"`
+
+### Logging & Observability (Phase C-D)
+- 14 log categories (added `scim.bulk`, `scim.resource`, `config`)
+- Bulk operation logging: INFO start/complete, WARN on failures with `bulkOperationIndex`
+- HTTP bookends demoted from INFO → DEBUG (~75% volume reduction at INFO level)
+- 4xx error reclassification: 401/403→WARN, 404→DEBUG, other 4xx→INFO
+- Admin audit trail: config changes, endpoint CRUD, credential management logged at INFO
+- Silent catch elimination: 5 WARN/DEBUG logs at previously-silent JSON.parse catches
+- Ring buffer configurable via `LOG_RING_BUFFER_SIZE` (default 500)
+- Slow request threshold configurable via `LOG_SLOW_REQUEST_MS` (default 2000ms)
+- Docker log rotation: max-size 10m, max-file 3
+
+### Test Coverage
+- **Unit tests**: 3,299 passed (80 suites) — +73 new tests for v7 flag validation
+- **E2E tests**: 918 passed (44 suites) — +4 new v7 E2E tests, 84 updated for v7 behavior
+- **Logging audit**: 97/104 checkpoints pass (v2.2)
+
+---
+
 ## [0.32.0] - 2026-04-01
 
 ### Fixed — Generic Resource Filter Wiring (Gap G6)

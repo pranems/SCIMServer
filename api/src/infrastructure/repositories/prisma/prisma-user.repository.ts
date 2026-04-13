@@ -32,7 +32,6 @@ function toUserRecord(resource: Record<string, unknown>): UserRecord {
     userName: resource.userName as string,
     displayName: (resource.displayName as string) ?? null,
     active: resource.active as boolean,
-    deletedAt: (resource.deletedAt as Date) ?? null,
     rawPayload,
     version: (resource.version as number) ?? 1,
     meta: (resource.meta as string) ?? null,
@@ -123,32 +122,21 @@ export class PrismaUserRepository implements IUserRepository {
   async findConflict(
     endpointId: string,
     userName: string,
-    externalId?: string,
     excludeScimId?: string,
   ): Promise<UserConflictResult | null> {
     // Phase 3: CITEXT handles case-insensitive comparison natively — no toLowerCase needed
-    const orConditions: Prisma.ScimResourceWhereInput[] = [
-      { userName },
-    ];
-    if (externalId) {
-      orConditions.push({ externalId });
-    }
-
+    // Note: Only userName is checked — externalId/displayName are NOT unique per RFC 7643.
     const filters: Prisma.ScimResourceWhereInput[] = [
       { endpointId, resourceType: 'User' },
+      { userName },
     ];
     if (excludeScimId) {
       filters.push({ NOT: { scimId: excludeScimId } });
     }
-    if (orConditions.length === 1) {
-      filters.push(orConditions[0]);
-    } else {
-      filters.push({ OR: orConditions });
-    }
 
     const conflict = await this.prisma.scimResource.findFirst({
       where: { AND: filters },
-      select: { scimId: true, userName: true, externalId: true, active: true, deletedAt: true },
+      select: { scimId: true, userName: true, externalId: true, active: true },
     });
 
     if (!conflict || !conflict.userName) return null;
@@ -157,7 +145,6 @@ export class PrismaUserRepository implements IUserRepository {
       userName: conflict.userName,
       externalId: conflict.externalId ?? null,
       active: conflict.active,
-      deletedAt: conflict.deletedAt ?? null,
     };
   }
 

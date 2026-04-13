@@ -1,8 +1,8 @@
 # Self-Improving Error Handling Verification Prompt
 
-> **Last audit run**: Not yet run  
-> **Pass rate**: —  
-> **Version**: 1.0 · April 7, 2026
+> **Last audit run**: April 13, 2026  
+> **Pass rate**: 70/73 PASS, 3 PARTIAL (Prisma create() wrapping — race-condition defense-in-depth)  
+> **Version**: 1.1 · April 13, 2026
 
 ## Context
 You are auditing SCIMServer's error handling completeness. The system has:
@@ -46,13 +46,12 @@ For EACH service (Users, Groups, Generic):
   4. RepositoryError caught → handleRepositoryError → logger.error + createScimError
   5. PatchError caught → createScimError with err.status/err.scimType
   6. Non-PatchError re-thrown → reaches GlobalExceptionFilter
-  7. guardSoftDeleted → createScimError 404/noTarget (with DEBUG log)
-  8. enforceIfMatch missing header + RequireIfMatch=ON → createScimError 428
-  9. enforceIfMatch ETag mismatch → createScimError 412/versionMismatch
-  10. Schema validation failure → createScimError 400 + diagnostics.triggeredBy=StrictSchemaValidation
-  11. Immutable attribute violation → createScimError 400/mutability + diagnostics.triggeredBy
-  12. Extension URN not declared → createScimError 400/invalidSyntax + diagnostics.triggeredBy
-  13. Extension URN not registered → createScimError 400/invalidValue + diagnostics.triggeredBy
+  7. enforceIfMatch missing header + RequireIfMatch=ON → createScimError 428
+  8. enforceIfMatch ETag mismatch → createScimError 412/versionMismatch
+  9. Schema validation failure → createScimError 400 + diagnostics.triggeredBy=StrictSchemaValidation
+  10. Immutable attribute violation → createScimError 400/mutability + diagnostics.triggeredBy
+  11. Extension URN not declared → createScimError 400/invalidSyntax + diagnostics.triggeredBy
+  12. Extension URN not registered → createScimError 400/invalidValue + diagnostics.triggeredBy
   14. Filter validation failure → createScimError 400/invalidFilter + diagnostics.triggeredBy
 
 ### C. Exception Filter Chain

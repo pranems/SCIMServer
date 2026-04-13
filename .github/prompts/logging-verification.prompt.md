@@ -5,7 +5,7 @@ mode: "agent"
 
 Go through all code paths and flows in the SCIMServer codebase to verify logging and error handling. Use the detailed checklist in #file:docs/PROMPT_LOGGING_VERIFICATION.md as the audit guide.
 
-For each flow section (A through I), trace the actual code, verify logs are present at correct levels/categories, verify SCIM-compliant error responses with diagnostics extension, and report ✅/⚠️/❌ for each checkpoint.
+For each flow section (A through N), trace the actual code, verify logs are present at correct levels/categories, verify SCIM-compliant error responses with diagnostics extension (including errorCode, conflictingResourceId, failedOperationIndex, parseError, currentETag, operation), and report checkmarks/warnings/failures for each checkpoint.
 
 After the audit:
 1. List all failures sorted by severity

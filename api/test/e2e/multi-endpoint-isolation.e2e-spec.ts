@@ -48,7 +48,7 @@ describe('Multi-Endpoint Isolation (E2E)', () => {
       .send({ profile: { settings: { SoftDeleteEnabled: 'True', StrictSchemaValidation: 'True' } } })
       .expect(200);
 
-    // EP-B: minimal + VerbosePatch
+    // EP-B: minimal + VerbosePatch + StrictSchema OFF (for lenient tests)
     const resB = await request(app.getHttpServer())
       .post('/scim/admin/endpoints')
       .set('Authorization', `Bearer ${token}`)
@@ -60,7 +60,7 @@ describe('Multi-Endpoint Isolation (E2E)', () => {
       .patch(`/scim/admin/endpoints/${epB}`)
       .set('Authorization', `Bearer ${token}`)
       .set('Content-Type', 'application/json')
-      .send({ profile: { settings: { VerbosePatchSupported: 'True' } } })
+      .send({ profile: { settings: { VerbosePatchSupported: 'True', StrictSchemaValidation: 'False' } } })
       .expect(200);
 
     // EP-C: Custom inline profile with HR extension

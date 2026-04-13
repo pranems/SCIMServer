@@ -302,11 +302,19 @@
       },
       {
         "id": "urn:ietf:params:scim:schemas:extension:msfttest:User",
-        "name": "MsftTestIetfUser"
+        "name": "MsftTestIetfUser",
+        "attributes": [
+          { "name": "immutableId", "type": "string", "multiValued": false, "required": false, "caseExact": true, "mutability": "readWrite", "returned": "default", "uniqueness": "none", "description": "Immutable identifier for directory sync." },
+          { "name": "costCenter", "type": "string", "multiValued": false, "required": false, "caseExact": false, "mutability": "readWrite", "returned": "default", "uniqueness": "none", "description": "Cost center code." }
+        ]
       },
       {
         "id": "urn:ietf:params:scim:schemas:extension:msfttest:Group",
-        "name": "MsftTestIetfGroup"
+        "name": "MsftTestIetfGroup",
+        "attributes": [
+          { "name": "description", "type": "string", "multiValued": false, "required": false, "caseExact": false, "mutability": "readWrite", "returned": "default", "uniqueness": "none", "description": "Extended group description." },
+          { "name": "securityEnabled", "type": "boolean", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "description": "Whether the group is security-enabled." }
+        ]
       }
     ],
     "resourceTypes": [
@@ -371,7 +379,8 @@
       }
     },
     "settings": {
-      "AllowAndCoerceBooleanStrings": "True"
+      "AllowAndCoerceBooleanStrings": "True",
+      "StrictSchemaValidation": "True"
     }
   }
 }

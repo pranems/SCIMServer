@@ -269,8 +269,8 @@ describe('EndpointController', () => {
   describe('getEndpointStats', () => {
     it('should get endpoint statistics (nested format)', async () => {
       const mockStats = {
-        users: { total: 10, active: 8, softDeleted: 2 },
-        groups: { total: 5, active: 5, softDeleted: 0 },
+        users: { total: 10, active: 8, inactive: 2 },
+        groups: { total: 5, active: 5, inactive: 0 },
         groupMembers: { total: 25 },
         requestLogs: { total: 100 },
       };
@@ -281,14 +281,14 @@ describe('EndpointController', () => {
       expect(result).toEqual(mockStats);
       expect(result.users.total).toBe(10);
       expect(result.users.active).toBe(8);
-      expect(result.users.softDeleted).toBe(2);
+      expect(result.users.inactive).toBe(2);
       expect(mockEndpointService.getEndpointStats).toHaveBeenCalledWith('endpoint-1');
     });
 
     it('should return zero counts for empty endpoint', async () => {
       const emptyStats = {
-        users: { total: 0, active: 0, softDeleted: 0 },
-        groups: { total: 0, active: 0, softDeleted: 0 },
+        users: { total: 0, active: 0, inactive: 0 },
+        groups: { total: 0, active: 0, inactive: 0 },
         groupMembers: { total: 0 },
         requestLogs: { total: 0 },
       };

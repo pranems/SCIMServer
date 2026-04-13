@@ -569,4 +569,39 @@ describe('UserPatchEngine', () => {
       expect(result.payload[CUSTOM_URN]).toBeUndefined();
     });
   });
+
+  // -- operationIndex tracking (Step 3.2) --
+
+  describe('operationIndex tracking', () => {
+    it('should include operationIndex in PatchError when an operation fails', () => {
+      const ops: PatchOperation[] = [
+        { op: 'replace', path: 'displayName', value: 'Good Name' },
+        { op: 'replace', path: 'active', value: 'invalid-not-boolean' }, // fails at index 1
+      ];
+
+      try {
+        apply(ops);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.operationIndex).toBe(1);
+        expect(e.failedOp).toBe('replace');
+        expect(e.failedPath).toBe('active');
+      }
+    });
+
+    it('should report index 0 when the first operation fails', () => {
+      const ops: PatchOperation[] = [
+        { op: 'banana' as any, path: 'userName', value: 'x' }, // unsupported op at index 0
+      ];
+
+      try {
+        apply(ops);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(PatchError);
+        expect(e.operationIndex).toBe(0);
+      }
+    });
+  });
 });

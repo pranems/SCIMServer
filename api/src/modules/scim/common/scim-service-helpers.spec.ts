@@ -5,7 +5,6 @@
  *  - parseJson: safe JSON parsing with fallback
  *  - ensureSchema: schema URN validation
  *  - enforceIfMatch: ETag/If-Match enforcement
- *  - guardSoftDeleted: soft-delete guard
  *  - coercePatchOpBooleans: PATCH operation boolean coercion
  *  - stripNeverReturnedFromPayload: never-returned attribute stripping
  *  - ScimSchemaHelpers: parameterized schema-aware methods
@@ -19,7 +18,6 @@ import {
   sanitizeBooleanStringsByParent,
   coercePatchOpBooleans,
   stripNeverReturnedFromPayload,
-  guardSoftDeleted,
   ScimSchemaHelpers,
   stripReadOnlyAttributes,
   stripReadOnlyPatchOps,
@@ -117,62 +115,22 @@ describe('enforceIfMatch', () => {
     }
   });
 
-  it('should not throw 428 when RequireIfMatch is false and no If-Match', () => {
-    const config = { RequireIfMatch: 'false' } as any;
-    expect(() => enforceIfMatch(3, undefined, config)).not.toThrow();
-  });
-});
-
-// ─── guardSoftDeleted ───────────────────────────────────────────────────────
-
-describe('guardSoftDeleted', () => {
-  const mockLogger = {
-    trace: jest.fn(),
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    fatal: jest.fn(),
-    isEnabled: jest.fn().mockReturnValue(true),
-  } as any;
-
-  const logCategory = 'SCIM_USER' as any;
-
-  afterEach(() => jest.clearAllMocks());
-
-  it('should not throw when SoftDeleteEnabled is off', () => {
-    const record = { deletedAt: new Date() };
-    expect(() => guardSoftDeleted(record, undefined, 'id-1', mockLogger, logCategory)).not.toThrow();
-  });
-
-  it('should not throw when SoftDeleteEnabled is on but deletedAt is null', () => {
-    const config = { SoftDeleteEnabled: 'true' } as any;
-    const record = { deletedAt: null };
-    expect(() => guardSoftDeleted(record, config, 'id-1', mockLogger, logCategory)).not.toThrow();
-  });
-
-  it('should throw 404 when SoftDeleteEnabled is on and deletedAt is set', () => {
-    const config = { SoftDeleteEnabled: 'true' } as any;
-    const record = { deletedAt: new Date() };
+  it('should include currentETag in 428 diagnostics', () => {
+    const config = { RequireIfMatch: 'true' } as any;
     try {
-      guardSoftDeleted(record, config, 'id-1', mockLogger, logCategory);
-      fail('should have thrown');
-    } catch (e: any) {
-      expect(e.getStatus()).toBe(404);
-    }
-  });
-
-  it('should include triggeredBy SoftDeleteEnabled in diagnostics (P5)', () => {
-    const config = { SoftDeleteEnabled: 'true' } as any;
-    const record = { deletedAt: new Date() };
-    try {
-      guardSoftDeleted(record, config, 'id-1', mockLogger, logCategory);
+      enforceIfMatch(5, undefined, config);
       fail('should have thrown');
     } catch (e: any) {
       const body = e.getResponse();
       expect(body[SCIM_DIAGNOSTICS_URN]).toBeDefined();
-      expect(body[SCIM_DIAGNOSTICS_URN].triggeredBy).toBe('SoftDeleteEnabled');
+      expect(body[SCIM_DIAGNOSTICS_URN].currentETag).toBe('W/"v5"');
+      expect(body[SCIM_DIAGNOSTICS_URN].triggeredBy).toBe('RequireIfMatch');
     }
+  });
+
+  it('should not throw 428 when RequireIfMatch is false and no If-Match', () => {
+    const config = { RequireIfMatch: 'false' } as any;
+    expect(() => enforceIfMatch(3, undefined, config)).not.toThrow();
   });
 });
 
@@ -292,10 +250,51 @@ describe('ScimSchemaHelpers', () => {
   });
 
   describe('validatePayloadSchema', () => {
-    it('should do nothing when strict mode is off', () => {
+    it('should enforce required attrs even when StrictSchemaValidation is explicitly false on create (G2)', () => {
+      const coreDef = {
+        id: CORE_URN,
+        name: 'User',
+        attributes: [
+          { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+          { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+        ],
+      };
+      mockRegistry.getSchema.mockReturnValue(coreDef);
+
+      const config = { StrictSchemaValidation: 'false' } as any;
+      const dto = { schemas: [CORE_URN], displayName: 'Alice' } as Record<string, unknown>; // missing userName
+
+      // G2: required should be enforced unconditionally (RFC 7643 §2.4 "MUST")
+      expect(() => helpers.validatePayloadSchema(dto, 'ep-1', config, 'create')).toThrow();
+      try {
+        helpers.validatePayloadSchema(dto, 'ep-1', config, 'create');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+        expect(e.getResponse().detail).toContain("'userName' is missing");
+      }
+    });
+
+    it('should allow unknown attrs when strict is off (type/unknown remains gated)', () => {
+      const coreDef = {
+        id: CORE_URN,
+        name: 'User',
+        attributes: [
+          { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+        ],
+      };
+      mockRegistry.getSchema.mockReturnValue(coreDef);
+
+      const config = { StrictSchemaValidation: 'false' } as any;
+      const dto = { schemas: [CORE_URN], userName: 'alice', unknownField: 'bad' } as Record<string, unknown>;
+
+      // Unknown attrs should NOT throw when strict is off — only required is enforced
+      expect(() => helpers.validatePayloadSchema(dto, 'ep-1', config, 'create')).not.toThrow();
+    });
+
+    it('should skip validation entirely for PATCH when strict is off', () => {
       const dto = { schemas: [CORE_URN] };
-      // No throw
-      helpers.validatePayloadSchema(dto, 'ep-1', undefined, 'create');
+      // No throw — PATCH with strict OFF skips everything
+      helpers.validatePayloadSchema(dto, 'ep-1', { StrictSchemaValidation: 'false' } as any, 'patch');
     });
 
     it('should throw 400 for unknown attribute when strict mode is on', () => {
@@ -338,10 +337,35 @@ describe('ScimSchemaHelpers', () => {
   });
 
   describe('checkImmutableAttributes', () => {
-    it('should do nothing when strict mode is off', () => {
+    it('should enforce immutable even when StrictSchemaValidation is explicitly false (G1)', () => {
+      const coreDef = {
+        id: CORE_URN,
+        name: 'User',
+        attributes: [
+          { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'immutable' },
+          { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+        ],
+      };
+      mockRegistry.getSchema.mockReturnValue(coreDef);
+
+      const config = { StrictSchemaValidation: 'false' } as any;
+      const existing = { schemas: [CORE_URN], userName: 'alice' };
+      const incoming = { schemas: [CORE_URN], userName: 'bob' };
+      // G1: immutable should be enforced unconditionally (RFC 7643 §2.2 "SHALL NOT")
+      // Even when StrictSchemaValidation is explicitly false
+      expect(() => helpers.checkImmutableAttributes(existing, incoming, 'ep-1', config)).toThrow();
+      try {
+        helpers.checkImmutableAttributes(existing, incoming, 'ep-1', config);
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+        expect(e.getResponse().scimType).toBe('mutability');
+      }
+    });
+
+    it('should not throw when no schemas in payload (no-op fallback)', () => {
       const existing = { displayName: 'Alice' };
       const incoming = { displayName: 'Bob' };
-      // No throw — strict mode is off
+      // No schemas[] → can't resolve schema → no-op
       helpers.checkImmutableAttributes(existing, incoming, 'ep-1');
     });
 
@@ -1373,7 +1397,7 @@ describe('assertSchemaUniqueness triggeredBy (P5)', () => {
     const uniqueAttrs = [{ schemaUrn: null, attrName: 'employeeId', caseExact: true }];
     const payload = { employeeId: 'EMP-001' };
     const existing = [
-      { scimId: 'existing-1', rawPayload: JSON.stringify({ employeeId: 'EMP-001' }), deletedAt: null },
+      { scimId: 'existing-1', rawPayload: JSON.stringify({ employeeId: 'EMP-001' }) },
     ];
 
     try {

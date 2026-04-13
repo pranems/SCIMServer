@@ -121,31 +121,42 @@ export class UserPatchEngine {
     let { userName, displayName, externalId, active } = state;
     let rawPayload = { ...state.rawPayload };
 
-    for (const operation of operations) {
+    for (let i = 0; i < operations.length; i++) {
+      const operation = operations[i];
       const op = operation.op?.toLowerCase();
       if (!op || !['add', 'replace', 'remove'].includes(op)) {
         throw new PatchError(
           400,
           `Patch operation '${operation.op}' is not supported.`,
           'invalidValue',
+          { operationIndex: i, path: operation.path, op: operation.op },
         );
       }
 
       const originalPath = operation.path;
       const path = originalPath?.toLowerCase();
 
-      if (op === 'add' || op === 'replace') {
-        ({ userName, displayName, externalId, active, rawPayload } =
-          UserPatchEngine.applyAddOrReplace(
-            op, originalPath, path, operation.value,
-            userName, displayName, externalId, active, rawPayload,
-            config,
-          ));
-      } else {
-        ({ active, rawPayload } =
-          UserPatchEngine.applyRemove(
-            originalPath, path, active, rawPayload, config,
-          ));
+      try {
+        if (op === 'add' || op === 'replace') {
+          ({ userName, displayName, externalId, active, rawPayload } =
+            UserPatchEngine.applyAddOrReplace(
+              op, originalPath, path, operation.value,
+              userName, displayName, externalId, active, rawPayload,
+              config,
+            ));
+        } else {
+          ({ active, rawPayload } =
+            UserPatchEngine.applyRemove(
+              originalPath, path, active, rawPayload, config,
+            ));
+        }
+      } catch (err) {
+        if (err instanceof PatchError && err.operationIndex === undefined) {
+          throw new PatchError(err.status, err.message, err.scimType, {
+            operationIndex: i, path: operation.path, op: operation.op,
+          });
+        }
+        throw err;
       }
     }
 

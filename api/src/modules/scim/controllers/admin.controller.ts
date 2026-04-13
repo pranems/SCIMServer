@@ -16,6 +16,7 @@ import fs from 'node:fs';
 
 import { LoggingService } from '../../logging/logging.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EndpointService } from '../../endpoint/services/endpoint.service';
 import { buildBaseUrl } from '../common/base-url.util';
 import { SCIM_CORE_GROUP_SCHEMA, SCIM_CORE_USER_SCHEMA } from '../common/scim-constants';
 import type { ScimGroupResource, ScimUserResource } from '../common/scim-types';
@@ -104,20 +105,22 @@ export class AdminController {
     private readonly loggingService: LoggingService,
     private readonly prisma: PrismaService,
     private readonly usersService: EndpointScimUsersService,
-    private readonly groupsService: EndpointScimGroupsService
+    private readonly groupsService: EndpointScimGroupsService,
+    private readonly endpointService: EndpointService,
   ) {}
 
   /**
    * Get or create a default endpoint for admin operations.
-   * Uses the first available endpoint, or creates one named "default".
+   * Uses the first available endpoint, or creates one via EndpointService (inmemory-safe).
    */
   private async getDefaultEndpointId(): Promise<string> {
-    const existing = await this.prisma.endpoint.findFirst({ orderBy: { createdAt: 'asc' } });
-    if (existing) return existing.id;
-
-    const created = await this.prisma.endpoint.create({
-      data: { name: 'default', active: true }
-    });
+    // Use EndpointService which handles both inmemory and Prisma backends
+    const result = await this.endpointService.listEndpoints();
+    if (result.endpoints.length > 0) {
+      return result.endpoints[0].id;
+    }
+    // No endpoints exist — create a default one
+    const created = await this.endpointService.createEndpoint({ name: 'default' });
     return created.id;
   }
 
@@ -125,6 +128,16 @@ export class AdminController {
   @HttpCode(204)
   async clearLogs(): Promise<void> {
     await this.loggingService.clearLogs();
+  }
+
+  @Post('logs/prune')
+  async pruneLogs(
+    @Query('retentionDays') retentionDays?: string,
+  ) {
+    const days = retentionDays ? Number(retentionDays)
+      : Number(process.env.LOG_RETENTION_DAYS) || 30;
+    const pruned = await this.loggingService.pruneOldLogs(days);
+    return { pruned };
   }
 
   @Get('logs')
@@ -139,7 +152,8 @@ export class AdminController {
     @Query('until') until?: string,
     @Query('search') search?: string,
     @Query('includeAdmin') includeAdmin?: string,
-    @Query('hideKeepalive') hideKeepalive?: string
+    @Query('hideKeepalive') hideKeepalive?: string,
+    @Query('minDurationMs') minDurationMs?: string,
   ) {
     return this.loggingService.listLogs({
       page: page ? Number(page) : undefined,
@@ -152,7 +166,8 @@ export class AdminController {
       until: until ? new Date(until) : undefined,
       search: search || undefined,
       includeAdmin: includeAdmin === 'true',
-      hideKeepalive: hideKeepalive === 'true'
+      hideKeepalive: hideKeepalive === 'true',
+      minDurationMs: minDurationMs ? Number(minDurationMs) : undefined,
     });
   }
 
@@ -271,15 +286,17 @@ export class AdminController {
   @Post('users/:id/delete')
   @HttpCode(204)
   async deleteUser(@Param('id') id: string): Promise<void> {
-    // Search by Prisma PK (id) or SCIM identifier (scimId)
-    const user = await this.prisma.scimResource.findFirst({
-      where: { OR: [{ id }, { scimId: id }], resourceType: 'User' },
-      select: { id: true }
-    });
-    if (!user) {
-      throw new NotFoundException('User not found');
+    // Find the user across all endpoints via EndpointService + UsersService
+    const result = await this.endpointService.listEndpoints();
+    for (const ep of result.endpoints) {
+      try {
+        await this.usersService.deleteUserForEndpoint(id, ep.id);
+        return; // Success — user found and deleted
+      } catch {
+        // Not found in this endpoint, try next
+      }
     }
-    await this.prisma.scimResource.delete({ where: { id: user.id } });
+    throw new NotFoundException('User not found');
   }
 
   @Get('version')

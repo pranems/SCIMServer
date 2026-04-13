@@ -34,8 +34,7 @@ export class InMemoryGroupRepository implements IGroupRepository {
       scimId: input.scimId,
       externalId: input.externalId,
       displayName: input.displayName,
-      active: input.active,
-      deletedAt: null,
+      active: input.active ?? true,  // Settings v7: Groups don't use active; default true
       rawPayload: input.rawPayload,
       version: 1,
       meta: input.meta,
@@ -130,14 +129,14 @@ export class InMemoryGroupRepository implements IGroupRepository {
     endpointId: string,
     displayName: string,
     excludeScimId?: string,
-  ): Promise<{ scimId: string; active: boolean; deletedAt: Date | null } | null> {
+  ): Promise<{ scimId: string; active: boolean } | null> {
     // Phase 3: Case-insensitive comparison at query time (matches CITEXT behavior)
     const lowerName = displayName.toLowerCase();
     for (const group of this.groups.values()) {
       if (group.endpointId !== endpointId) continue;
       if (excludeScimId && group.scimId === excludeScimId) continue;
       if (group.displayName.toLowerCase() === lowerName) {
-        return { scimId: group.scimId, active: group.active, deletedAt: group.deletedAt };
+        return { scimId: group.scimId, active: group.active };
       }
     }
     return null;

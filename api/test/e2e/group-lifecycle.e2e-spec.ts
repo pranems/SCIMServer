@@ -155,15 +155,14 @@ describe('Group Lifecycle (E2E)', () => {
       expect(res.body.displayName).toBe('SelfUpdate');
     });
 
-    it('should return 409 when PUT changes externalId to one that already exists', async () => {
+    it('should allow PUT with duplicate externalId (uniqueness:none per RFC 7643)', async () => {
       const groupA = (await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'ExtA', externalId: 'ext-a' } as any)).expect(201)).body;
       const groupB = (await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'ExtB', externalId: 'ext-b' } as any)).expect(201)).body;
 
-      // Try to PUT groupB with groupA's externalId
+      // PUT groupB with groupA's externalId — allowed since v0.33.0
       const replacement = { ...validGroup({ displayName: 'ExtB-Updated' }), externalId: 'ext-a' };
-      const res = await scimPut(app, `${basePath}/Groups/${groupB.id}`, token, replacement).expect(409);
-      expect(res.body.detail).toContain('externalId');
-      expect(res.body.scimType).toBe('uniqueness');
+      const res = await scimPut(app, `${basePath}/Groups/${groupB.id}`, token, replacement).expect(200);
+      expect(res.body.externalId).toBe('ext-a');
     });
   });
 
@@ -257,12 +256,12 @@ describe('Group Lifecycle (E2E)', () => {
       expect(res.body.displayName).toBe('BrandNewName');
     });
 
-    it('should return 409 when PATCH changes externalId to one that already exists', async () => {
+    it('should allow PATCH with duplicate externalId (uniqueness:none per RFC 7643)', async () => {
       // Create groupA with externalId ext-patch-a
       await scimPost(app, `${basePath}/Groups`, token, { ...validGroup({ displayName: 'PatchExtA' }), externalId: 'ext-patch-a' }).expect(201);
       const groupB = (await scimPost(app, `${basePath}/Groups`, token, { ...validGroup({ displayName: 'PatchExtB' }), externalId: 'ext-patch-b' }).expect(201)).body;
 
-      // Try to PATCH groupB's externalId to groupA's externalId
+      // PATCH groupB's externalId to groupA's externalId — allowed since v0.33.0
       const res = await scimPatch(
         app,
         `${basePath}/Groups/${groupB.id}`,
@@ -271,10 +270,9 @@ describe('Group Lifecycle (E2E)', () => {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
           Operations: [{ op: 'replace', path: 'externalId', value: 'ext-patch-a' }],
         },
-      ).expect(409);
+      ).expect(200);
 
-      expect(res.body.detail).toContain('externalId');
-      expect(res.body.scimType).toBe('uniqueness');
+      expect(res.body.externalId).toBe('ext-patch-a');
     });
   });
 

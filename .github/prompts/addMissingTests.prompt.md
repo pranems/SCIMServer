@@ -23,9 +23,12 @@ Perform a comprehensive test gap audit across the entire project and add any mis
 
 Audit for missing tests in these categories:
 
-### A. Config Flag Coverage (14 boolean flags in ProfileSettings + logLevel; 12 persisted, 2 derived)
+### A. Config Flag Coverage (13 boolean flags in ProfileSettings + logLevel; settings v7)
 
-For each flag (`AllowAndCoerceBooleanStrings`, `StrictSchemaValidation`, `SoftDeleteEnabled`, `VerbosePatchSupported`, `MultiOpPatchRequestAddMultipleMembersToGroup`, `MultiOpPatchRequestRemoveMultipleMembersFromGroup`, `PatchOpAllowRemoveAllMembers`, `RequireIfMatch`, `ReprovisionOnConflictForSoftDeletedResource`, `CustomResourceTypesEnabled` *(derived from profile.resourceTypes)*, `BulkOperationsEnabled` *(derived from profile SPC)*, `PerEndpointCredentialsEnabled`, `IncludeWarningAboutIgnoredReadOnlyAttribute`, `IgnoreReadOnlyAttributesInPatch`):
+For each flag (`UserSoftDeleteEnabled`, `UserHardDeleteEnabled`, `GroupHardDeleteEnabled`, `MultiMemberPatchOpForGroupEnabled`, `SchemaDiscoveryEnabled`, `AllowAndCoerceBooleanStrings`, `StrictSchemaValidation`, `VerbosePatchSupported`, `PatchOpAllowRemoveAllMembers`, `RequireIfMatch`, `PerEndpointCredentialsEnabled`, `IncludeWarningAboutIgnoredReadOnlyAttribute`, `IgnoreReadOnlyAttributesInPatch`, `logFileEnabled`):
+
+**Deprecated flags (settings v7 clean break):** `SoftDeleteEnabled`, `ReprovisionOnConflictForSoftDeletedResource`, `MultiOpPatchRequestAddMultipleMembersToGroup`, `MultiOpPatchRequestRemoveMultipleMembersFromGroup`.
+**Derived flags:** `CustomResourceTypesEnabled` (from profile.resourceTypes), `BulkOperationsEnabled` (from profile SPC).
 
 | Check | Unit | E2E | Live |
 |-------|------|-----|------|
@@ -41,22 +44,22 @@ Priority combinations to verify:
 
 | Combo | Why it matters | Expected interaction |
 |-------|----------------|---------------------|
-| `SoftDelete + StrictSchema` | Strict rejects bad payloads even on soft-deleted resources | Both enforced independently |
-| `SoftDelete + RequireIfMatch` | Soft-deleted resource has ETag but returns 404 | 404 before 428 check |
-| `SoftDelete + Reprovision` | Reprovision only works when SoftDelete is ON | Reprovision no-op without SoftDelete |
+| `UserSoftDelete + StrictSchema` | Strict rejects bad payloads even when user is deactivated | Both enforced independently |
+| `UserSoftDelete + RequireIfMatch` | Soft-deleted user returns 404 before ETag check | 404 before 428 check |
+| `UserHardDelete false + UserSoftDelete true` | Only soft-delete allowed, hard-delete blocked | DELETE → 400, PATCH active=false allowed |
 | `RequireIfMatch + VerbosePatch` | Both affect PATCH behavior | Independent; both enforced |
 | `Bulk + StrictSchema` | Bulk operations should still validate schemas | Per-operation validation |
 | `Bulk + CustomResourceTypes` | Bulk should work with custom resource CRUD | Custom type paths in Bulk |
 | `StrictSchema + BooleanStrings` | Coercion happens before validation | Coerce first, then validate |
-| `MultiOpAdd + MultiOpRemove` | Both member flags together | Each controls its direction |
-| `Reprovision` WITHOUT `SoftDelete` | Edge: meaningless combo | Reprovision silently ignored |
+| `MultiMemberPatchOp + PatchOpAllowRemoveAll` | Both control group member PATCH behavior | Independent; each controls its scope |
+| `SchemaDiscovery false` | Discovery endpoints return 404 | All 3 discovery endpoints gated |
+| `GroupHardDelete false` | DELETE Groups blocked | 400 on DELETE |
 | `PerEndpointCredentials + RequireIfMatch` | Both affect request validation flow | Each validated independently |
 | `IncludeWarning + IgnoreReadOnly` | Both relate to readOnly handling | Warning emitted even when silently stripping |
 | `IgnoreReadOnly` WITHOUT `StrictSchema` | readOnly attributes stripped silently | Stripping happens regardless of strict mode |
 | `IncludeWarning` WITHOUT `IgnoreReadOnly` | Warning flag without stripping flag | Warning only when strict mode rejects |
 
 - Three-flag and higher combinations for interacting flags
-- Conflicting/edge combos (e.g., `ReprovisionOnConflict` without `SoftDeleteEnabled`)
 
 ### C. Attribute Characteristics (RFC 7643 §2.4)
 
@@ -72,7 +75,8 @@ For each characteristic, verify across all operations:
 | `mutability: readWrite` (displayName) | Accepted | N/A | N/A | N/A | Accepted | Accepted | N/A |
 | `mutability: writeOnly` (password) | Accepted, never returned | N/A | N/A | N/A | Accepted | Accepted | N/A |
 | `mutability: immutable` (userName) | Accepted on create | N/A | N/A | N/A | Rejected if changed | Rejected if changed | N/A |
-| `uniqueness: server` (userName, displayName) | 409 on conflict | N/A | N/A | N/A | 409 on conflict (User+Group) | 409 on conflict (User+Group) | N/A |
+| `uniqueness: server` (User.userName, Group.displayName) | 409 on conflict | N/A | N/A | N/A | 409 on conflict | 409 on conflict | N/A |
+| `uniqueness: none` (externalId, User.displayName) | Duplicates allowed (201) | N/A | N/A | N/A | Duplicates allowed (200) | Duplicates allowed (200) | N/A |
 | `caseExact: false` (userName) | Case-insensitive uniqueness | N/A | Case-insensitive filter | Case-insensitive filter | Case-insensitive uniqueness | Case-insensitive uniqueness | N/A |
 | `required: true` (userName, schemas) | 400 if missing | N/A | N/A | N/A | 400 if missing (User) | N/A | N/A |
 
@@ -239,9 +243,55 @@ For every behavior tested on Users, verify the equivalent exists for Groups (and
 | `ProfileSummary`: activeSettings (non-default only) | ✅ | ✅ | ✅ |
 | `buildProfileSummary` handles empty/extension schemas | ✅ | N/A | N/A |
 
+### N. Logging & Error Handling (v0.32.0 overhaul)
+
+| Scenario | Unit | E2E | Live |
+|----------|------|-----|------|
+| Interceptor tiered log levels (5xx->ERROR, 401->WARN, 404->DEBUG, 4xx->INFO) | ✅ | ? | ? |
+| GlobalExceptionFilter diagnostics on 500 (requestId/endpointId/logsUrl) | ✅ | ? | ? |
+| triggeredBy on guardSoftDeleted, assertSchemaUniqueness, PatchError catches | ✅ | ? | ? |
+| Service-level diagnostic logs before uniqueness/reprovision throws | ✅ | ? | ? |
+| Silent catches have TRACE/DEBUG logs (15 catches in logging/activity-parser) | ✅ | N/A | N/A |
+| Ring buffer default 2000 (was 500) | ✅ | ? | ? |
+| Config change audit with before/after values | ✅ | ? | ? |
+| Empty ring buffer hint when requestId returns 0 entries | ✅ | ✅ | ? |
+| slowRequestThresholdMs runtime-configurable | ✅ | ? | ? |
+| 409 conflictingResourceId/conflictingAttribute/incomingValue in diagnostics | ✅ | ✅ | ? |
+| PATCH failedOperationIndex/failedPath/failedOp in diagnostics | ✅ | ✅ | ? |
+| Filter parseError in invalidFilter diagnostics | ✅ | ✅ | ? |
+| 428 currentETag in diagnostics | ✅ | ✅ | ? |
+| operation auto-read from correlation context in diagnostics | ✅ | ? | ? |
+| errorCode enum in ALL diagnostics (48 sites) | ✅ | ? | ? |
+| All 50 createScimError calls have diagnostics (100%) | implicit | ✅ | ? |
+
+### O. File Logging (Phase 1)
+
+| Scenario | Unit | E2E | Live |
+|----------|------|-----|------|
+| RotatingFileWriter size-based rotation | ✅ | N/A | ? |
+| RotatingFileWriter creates parent directories | ✅ | N/A | ? |
+| RotatingFileWriter maxFiles limit | ✅ | N/A | ? |
+| FileLogTransport main file write (LOG_FILE) | ✅ | N/A | ? |
+| FileLogTransport LOG_FILE="" disables main file | ✅ | N/A | ? |
+| FileLogTransport per-endpoint file when logFileEnabled=True | ✅ | N/A | ? |
+| FileLogTransport endpoint name sanitization | ✅ | N/A | ? |
+| FileLogTransport disableEndpointFile closes handle | ✅ | N/A | ? |
+| logFileEnabled profile setting wired to endpoint create/update | implicit | ? | ? |
+| Docker volume mount for logs/ | N/A | N/A | ? |
+
+### P. Operational Logging (Phase 4)
+
+| Scenario | Unit | E2E | Live |
+|----------|------|-----|------|
+| GET /admin/logs?minDurationMs=5000 filters by duration | ✅ | ? | ? |
+| GET /endpoints/:id/logs/history queries DB filtered by endpoint | ✅ | ? | ? |
+| GET /admin/log-config/audit returns config/endpoint/auth entries | ✅ | ? | ? |
+| POST /admin/logs/prune?retentionDays=30 deletes old entries | ✅ | ? | ? |
+| errorCode UNIQUENESS_USERNAME in 409 diagnostics | ✅ | ? | ? |
+
 ---
 
-## Step 3 — Implement Missing Tests
+## Step 3 - Implement Missing Tests
 
 For each identified gap:
 
@@ -561,12 +611,12 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
-| Unit  | 3,201  | ?     | +?    |
-| E2E   | 913    | ?     | +?    |
+| Unit  | 3,193  | ?     | +?    |
+| E2E   | 939    | ?     | +?    |
 | Live  | ~980   | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
-> *Last updated: v0.32.0 — Test gap audit #2 (2026-04-08)*
+> *Last updated: v0.34.0 - Settings v7 (2026-04-09)*
 
 4. Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts.
 

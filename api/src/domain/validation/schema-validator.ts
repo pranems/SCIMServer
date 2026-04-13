@@ -109,33 +109,7 @@ export class SchemaValidator {
     // "readOnly". The required check still enforces client-writable attributes
     // like userName and displayName.
     if (options.mode !== 'patch') {
-      for (const attr of coreAttributes.values()) {
-        if (attr.required && attr.mutability !== 'readOnly' && !(this.findKeyIgnoreCase(payload, attr.name))) {
-          errors.push({
-            path: attr.name,
-            message: `Required attribute '${attr.name}' is missing.`,
-            scimType: 'invalidValue',
-          });
-        }
-      }
-
-      // Check required extension attributes
-      for (const [urn, schema] of extensionSchemas) {
-        const extPayload = payload[urn] as Record<string, unknown> | undefined;
-        // Extension schemas with required attributes only apply if the extension block exists
-        // OR if the extension itself is marked as required on the resource type
-        if (extPayload && typeof extPayload === 'object') {
-          for (const attr of schema.attributes) {
-            if (attr.required && attr.mutability !== 'readOnly' && !(this.findKeyIgnoreCase(extPayload, attr.name))) {
-              errors.push({
-                path: `${urn}.${attr.name}`,
-                message: `Required attribute '${attr.name}' is missing in extension '${urn}'.`,
-                scimType: 'invalidValue',
-              });
-            }
-          }
-        }
-      }
+      this.collectRequiredErrors(payload, coreAttributes, extensionSchemas, errors);
     }
 
     // ── 2-5. Per-attribute validation (type, mutability, unknown) ───────
@@ -477,6 +451,97 @@ export class SchemaValidator {
    *  - The value has changed in the incoming resource
    *
    * Immutable attributes may be set on creation but MUST NOT be modified thereafter.
+   *
+  // ─── Required-only validation (G2) ─────────────────────────────────
+
+  /**
+   * Validate ONLY required attributes — without any type/unknown/mutability checks.
+   * Used when StrictSchemaValidation is OFF to enforce RFC 7643 §2.4 "MUST" unconditionally.
+   *
+   * @param payload - The incoming request body
+   * @param schemas - Schema definitions
+   * @param mode    - Operation mode (required check only runs for create/replace)
+   * @returns ValidationResult with required-only errors
+   */
+  static validateRequired(
+    payload: Record<string, unknown>,
+    schemas: readonly SchemaDefinition[],
+    mode: 'create' | 'replace' | 'patch',
+    preBuiltMaps?: { coreAttrMap: Map<string, SchemaAttributeDefinition>; extensionSchemaMap: Map<string, SchemaDefinition> },
+  ): ValidationResult {
+    if (mode === 'patch') {
+      return { valid: true, errors: [] };
+    }
+
+    const errors: ValidationError[] = [];
+
+    let coreAttributes: Map<string, SchemaAttributeDefinition>;
+    let extensionSchemas: Map<string, SchemaDefinition>;
+
+    if (preBuiltMaps) {
+      coreAttributes = preBuiltMaps.coreAttrMap;
+      extensionSchemas = preBuiltMaps.extensionSchemaMap;
+    } else {
+      coreAttributes = new Map<string, SchemaAttributeDefinition>();
+      extensionSchemas = new Map<string, SchemaDefinition>();
+
+      for (const schema of schemas) {
+        if (isCoreSchema(schema)) {
+          for (const attr of schema.attributes) {
+            coreAttributes.set(attr.name.toLowerCase(), attr);
+          }
+        } else {
+          extensionSchemas.set(schema.id, schema);
+        }
+      }
+    }
+
+    this.collectRequiredErrors(payload, coreAttributes, extensionSchemas, errors);
+
+    return { valid: errors.length === 0, errors };
+  }
+
+  /**
+   * Collect required attribute errors into the errors array.
+   * Shared by validate() and validateRequired().
+   */
+  private static collectRequiredErrors(
+    payload: Record<string, unknown>,
+    coreAttributes: Map<string, SchemaAttributeDefinition>,
+    extensionSchemas: Map<string, SchemaDefinition>,
+    errors: ValidationError[],
+  ): void {
+    for (const attr of coreAttributes.values()) {
+      if (attr.required && attr.mutability !== 'readOnly' && !(this.findKeyIgnoreCase(payload, attr.name))) {
+        errors.push({
+          path: attr.name,
+          message: `Required attribute '${attr.name}' is missing.`,
+          scimType: 'invalidValue',
+        });
+      }
+    }
+
+    // Check required extension attributes
+    for (const [urn, schema] of extensionSchemas) {
+      const extPayload = payload[urn] as Record<string, unknown> | undefined;
+      if (extPayload && typeof extPayload === 'object') {
+        for (const attr of schema.attributes) {
+          if (attr.required && attr.mutability !== 'readOnly' && !(this.findKeyIgnoreCase(extPayload, attr.name))) {
+            errors.push({
+              path: `${urn}.${attr.name}`,
+              message: `Required attribute '${attr.name}' is missing in extension '${urn}'.`,
+              scimType: 'invalidValue',
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // ─── Immutable enforcement ────────────────────────────────────────
+
+  /**
+   * Check immutable attributes: compare existing vs incoming resource.
    *
    * @param existing  - The current resource payload (before modification)
    * @param incoming  - The new resource payload (after modification / incoming PUT body)

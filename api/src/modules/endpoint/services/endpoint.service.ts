@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, OnModuleInit } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, OnModuleInit, Inject, Optional } from '@nestjs/common';
 import type { Endpoint, Prisma } from '../../../generated/prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -11,6 +11,9 @@ import { parseLogLevel, logLevelName } from '../../logging/log-levels';
 import { validateAndExpandProfile } from '../../scim/endpoint-profile/endpoint-profile.service';
 import { getBuiltInPreset, DEFAULT_PRESET_NAME, BUILT_IN_PRESETS, PRESET_NAMES } from '../../scim/endpoint-profile/built-in-presets';
 import type { EndpointProfile, ServiceProviderConfig } from '../../scim/endpoint-profile/endpoint-profile.types';
+import type { IUserRepository } from '../../../domain/repositories/user.repository.interface';
+import type { IGroupRepository } from '../../../domain/repositories/group.repository.interface';
+import { USER_REPOSITORY, GROUP_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 
 /** Callback type for profile change notifications (registry hydration) */
 export type ProfileChangeListener = (endpointId: string, profile: EndpointProfile | null) => void;
@@ -105,7 +108,7 @@ export interface PresetListResponse {
 export interface ResourceStats {
   total: number;
   active: number;
-  softDeleted: number;
+  inactive: number;
 }
 
 export interface EndpointStatsResponse {
@@ -146,6 +149,8 @@ export class EndpointService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly scimLogger: ScimLogger,
+    @Optional() @Inject(USER_REPOSITORY) private readonly userRepo?: IUserRepository,
+    @Optional() @Inject(GROUP_REPOSITORY) private readonly groupRepo?: IGroupRepository,
   ) {}
 
   /**
@@ -374,6 +379,7 @@ export class EndpointService implements OnModuleInit {
       };
       this.cacheSet(cached);
       this.syncEndpointLogLevel(cached.id, resolvedProfile.settings);
+      this.syncEndpointFileLogging(cached.id, dto.name, resolvedProfile.settings);
       this.profileChangeListener?.(cached.id, resolvedProfile);
       this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint created', {
         endpointId: cached.id, name: dto.name, preset: dto.profilePreset ?? 'custom',
@@ -402,6 +408,7 @@ export class EndpointService implements OnModuleInit {
     const cached = this.toCached(endpoint);
     this.cacheSet(cached);
     this.syncEndpointLogLevel(endpoint.id, resolvedProfile.settings);
+    this.syncEndpointFileLogging(endpoint.id, dto.name, resolvedProfile.settings);
     this.profileChangeListener?.(endpoint.id, resolvedProfile);
     this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint created', {
       endpointId: endpoint.id, name: dto.name, preset: dto.profilePreset ?? 'custom',
@@ -534,6 +541,7 @@ export class EndpointService implements OnModuleInit {
       this.cacheSet(updated);
       if (dto.profile?.settings) {
         this.syncEndpointLogLevel(endpointId, dto.profile.settings as Record<string, any>);
+        this.syncEndpointFileLogging(endpointId, updated.name, dto.profile.settings as Record<string, any>);
       }
       this.profileChangeListener?.(endpointId, updated.profile ?? null);
       this.scimLogger.info(LogCategory.ENDPOINT, 'Endpoint updated', {
@@ -582,6 +590,7 @@ export class EndpointService implements OnModuleInit {
 
     if (dto.profile?.settings) {
       this.syncEndpointLogLevel(endpointId, dto.profile.settings as Record<string, any>);
+      this.syncEndpointFileLogging(endpointId, cached.name, dto.profile.settings as Record<string, any>);
     }
     this.profileChangeListener?.(endpointId, cached.profile ?? null);
 
@@ -695,16 +704,28 @@ export class EndpointService implements OnModuleInit {
     }
 
     if (this.isInMemoryBackend) {
+      // Use repository layer to count actual resources (not hardcoded zeros)
+      let totalUsers = 0, activeUsers = 0, totalGroups = 0, activeGroups = 0;
+      if (this.userRepo) {
+        const users = await this.userRepo.findAll(endpointId);
+        totalUsers = users.length;
+        activeUsers = users.filter(u => u.active).length;
+      }
+      if (this.groupRepo) {
+        const groups = await this.groupRepo.findAllWithMembers(endpointId);
+        totalGroups = groups.length;
+        activeGroups = totalGroups; // Groups don't have active field
+      }
       return {
-        users: { total: 0, active: 0, softDeleted: 0 },
-        groups: { total: 0, active: 0, softDeleted: 0 },
-        groupMembers: { total: 0 },
+        users: { total: totalUsers, active: activeUsers, inactive: totalUsers - activeUsers },
+        groups: { total: totalGroups, active: activeGroups, inactive: 0 },
+        groupMembers: { total: 0 }, // InMemory member count not easily derived without iterating
         requestLogs: { total: 0 },
       };
     }
 
-    const [totalUsers, activeUsers, softDeletedUsers,
-           totalGroups, activeGroups, softDeletedGroups,
+    const [totalUsers, activeUsers, inactiveUsers,
+           totalGroups, activeGroups, inactiveGroups,
            totalGroupMembers, requestLogCount] = await Promise.all([
       this.prisma.scimResource.count({ where: { endpointId, resourceType: 'User' } }),
       this.prisma.scimResource.count({ where: { endpointId, resourceType: 'User', active: true } }),
@@ -717,8 +738,8 @@ export class EndpointService implements OnModuleInit {
     ]);
 
     return {
-      users: { total: totalUsers, active: activeUsers, softDeleted: softDeletedUsers },
-      groups: { total: totalGroups, active: activeGroups, softDeleted: softDeletedGroups },
+      users: { total: totalUsers, active: activeUsers, inactive: inactiveUsers },
+      groups: { total: totalGroups, active: activeGroups, inactive: inactiveGroups },
       groupMembers: { total: totalGroupMembers },
       requestLogs: { total: requestLogCount },
     };
@@ -823,6 +844,16 @@ export class EndpointService implements OnModuleInit {
       this.scimLogger.info(LogCategory.ENDPOINT, `Set log level ${logLevelName(level)} for endpoint ${endpointId}`);
     } else {
       this.scimLogger.clearEndpointLevel(endpointId);
+    }
+  }
+
+  /** Sync per-endpoint file logging based on logFileEnabled setting. */
+  private syncEndpointFileLogging(endpointId: string, endpointName: string, settings?: Record<string, any> | null): void {
+    const enabled = settings?.logFileEnabled;
+    if (enabled === true || enabled === 'True' || enabled === 'true') {
+      this.scimLogger.enableEndpointFileLogging(endpointId, endpointName);
+    } else {
+      this.scimLogger.disableEndpointFileLogging(endpointId);
     }
   }
 }

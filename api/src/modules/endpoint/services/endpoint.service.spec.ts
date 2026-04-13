@@ -67,6 +67,8 @@ describe('EndpointService', () => {
             enrichContext: jest.fn(),
             setEndpointLevel: jest.fn(),
             clearEndpointLevel: jest.fn(),
+            enableEndpointFileLogging: jest.fn(),
+            disableEndpointFileLogging: jest.fn(),
           },
         },
       ],
@@ -85,7 +87,7 @@ describe('EndpointService', () => {
           service.createEndpoint({
             name: 'test-settings-val',
             profile: {
-              settings: { MultiOpPatchRequestAddMultipleMembersToGroup: 'Yes' } as any,
+              settings: { StrictSchemaValidation: 'Yes' } as any,
               schemas: [{ id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributes: 'all' }],
               resourceTypes: [{ id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] }],
             },
@@ -309,23 +311,23 @@ describe('EndpointService', () => {
   describe('getEndpointStats', () => {
     it('should return endpoint statistics (nested format)', async () => {
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
-      // 8 parallel count queries: totalUsers, activeUsers, softDeletedUsers,
-      //   totalGroups, activeGroups, softDeletedGroups, totalGroupMembers, requestLogCount
+      // 8 parallel count queries: totalUsers, activeUsers, inactiveUsers,
+      //   totalGroups, activeGroups, inactiveGroups, totalGroupMembers, requestLogCount
       (prisma.scimResource.count as jest.Mock)
         .mockResolvedValueOnce(10)  // totalUsers
         .mockResolvedValueOnce(8)   // activeUsers
-        .mockResolvedValueOnce(2)   // softDeletedUsers
+        .mockResolvedValueOnce(2)   // inactiveUsers
         .mockResolvedValueOnce(5)   // totalGroups
         .mockResolvedValueOnce(5)   // activeGroups
-        .mockResolvedValueOnce(0);  // softDeletedGroups
+        .mockResolvedValueOnce(0);  // inactiveGroups
       (prisma.resourceMember.count as jest.Mock).mockResolvedValue(25);
       (prisma.requestLog.count as jest.Mock).mockResolvedValue(100);
 
       const result = await service.getEndpointStats('test-endpoint-id');
 
       expect(result).toEqual({
-        users: { total: 10, active: 8, softDeleted: 2 },
-        groups: { total: 5, active: 5, softDeleted: 0 },
+        users: { total: 10, active: 8, inactive: 2 },
+        groups: { total: 5, active: 5, inactive: 0 },
         groupMembers: { total: 25 },
         requestLogs: { total: 100 },
       });
@@ -340,8 +342,8 @@ describe('EndpointService', () => {
       const result = await service.getEndpointStats('test-endpoint-id');
 
       expect(result).toEqual({
-        users: { total: 0, active: 0, softDeleted: 0 },
-        groups: { total: 0, active: 0, softDeleted: 0 },
+        users: { total: 0, active: 0, inactive: 0 },
+        groups: { total: 0, active: 0, inactive: 0 },
         groupMembers: { total: 0 },
         requestLogs: { total: 0 },
       });

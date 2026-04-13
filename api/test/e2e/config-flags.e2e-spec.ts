@@ -6,6 +6,7 @@ import {
   scimPost,
   scimGet,
   scimPatch,
+  scimDelete,
   createEndpoint,
   createEndpointWithConfig,
   scimBasePath,
@@ -73,8 +74,10 @@ describe('Config Flags (E2E)', () => {
       expect(res.body.members.length).toBeGreaterThanOrEqual(2);
     });
 
-    it('should reject multi-member ADD when flag is not set', async () => {
-      const endpointId = await createEndpoint(app, token);
+    it('should reject multi-member ADD when flag is explicitly false', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        MultiMemberPatchOpForGroupEnabled: 'False',
+      });
       const basePath = scimBasePath(endpointId);
 
       const user1 = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
@@ -120,8 +123,10 @@ describe('Config Flags (E2E)', () => {
       expect(res.body.members ?? []).toHaveLength(0);
     });
 
-    it('should reject multi-member REMOVE when flag is not set', async () => {
-      const endpointId = await createEndpoint(app, token);
+    it('should reject multi-member REMOVE when flag is explicitly false', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        MultiMemberPatchOpForGroupEnabled: 'False',
+      });
       const basePath = scimBasePath(endpointId);
 
       const user1 = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
@@ -197,7 +202,7 @@ describe('Config Flags (E2E)', () => {
       expect(groupRes.body.members).toHaveLength(1);
     });
 
-    it('should allow blanket remove by default (flag not set)', async () => {
+    it('should reject blanket remove by default (v7: PatchOpAllowRemoveAllMembers=false)', async () => {
       const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
 
@@ -206,16 +211,13 @@ describe('Config Flags (E2E)', () => {
 
       await scimPatch(app, `${basePath}/Groups/${group.id}`, token, addMemberPatch(user.id)).expect(200);
 
-      // Blanket remove should succeed (default = allow)
+      // Blanket remove should be rejected (v7 default = false)
       await scimPatch(
         app,
         `${basePath}/Groups/${group.id}`,
         token,
         removeAllMembersPatch(),
-      ).expect(200);
-
-      const groupRes = await scimGet(app, `${basePath}/Groups/${group.id}`, token).expect(200);
-      expect(groupRes.body.members ?? []).toHaveLength(0);
+      ).expect(400);
     });
   });
 
@@ -435,5 +437,182 @@ describe('Config Flags (E2E)', () => {
     // The legacy `config` field was removed from CreateEndpointDto (v0.28+).
     // Settings values (profile.settings) are not individually validated,
     // so invalid flag values are no longer rejected at the admin API level.
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Settings v7: UserHardDeleteEnabled
+  // ═══════════════════════════════════════════════════════════
+
+  describe('UserHardDeleteEnabled (settings v7)', () => {
+    it('should block DELETE when UserHardDeleteEnabled=False', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        UserHardDeleteEnabled: 'False',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+      // DELETE should be blocked
+      await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(400);
+
+      // User should still exist
+      await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(200);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Settings v7: GroupHardDeleteEnabled
+  // ═══════════════════════════════════════════════════════════
+
+  describe('GroupHardDeleteEnabled (settings v7)', () => {
+    it('should block DELETE when GroupHardDeleteEnabled=False', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        GroupHardDeleteEnabled: 'False',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const group = (await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)).body;
+
+      // DELETE should be blocked
+      await scimDelete(app, `${basePath}/Groups/${group.id}`, token).expect(400);
+
+      // Group should still exist
+      await scimGet(app, `${basePath}/Groups/${group.id}`, token).expect(200);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Settings v7: SchemaDiscoveryEnabled
+  // ═══════════════════════════════════════════════════════════
+
+  describe('SchemaDiscoveryEnabled (settings v7)', () => {
+    it('should return 404 for all discovery endpoints when SchemaDiscoveryEnabled=False', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        SchemaDiscoveryEnabled: 'False',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      // All 3 discovery endpoints should return 404
+      await request(app.getHttpServer()).get(`${basePath}/Schemas`).expect(404);
+      await request(app.getHttpServer()).get(`${basePath}/ResourceTypes`).expect(404);
+      await request(app.getHttpServer()).get(`${basePath}/ServiceProviderConfig`).expect(404);
+    });
+
+    it('should return 200 for discovery endpoints when SchemaDiscoveryEnabled=True', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        SchemaDiscoveryEnabled: 'True',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      await request(app.getHttpServer()).get(`${basePath}/Schemas`).expect(200);
+      await request(app.getHttpServer()).get(`${basePath}/ResourceTypes`).expect(200);
+      await request(app.getHttpServer()).get(`${basePath}/ServiceProviderConfig`).expect(200);
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // Settings v7: Delete Behavior Matrix (UserDeactivation × UserHardDelete)
+  // ═══════════════════════════════════════════════════════════
+
+  describe('Delete Behavior Matrix (settings v7)', () => {
+    it('Deactivation=true + HardDelete=true → DELETE hard-deletes, GET returns 404', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        UserSoftDeleteEnabled: 'True',
+        UserHardDeleteEnabled: 'True',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+      await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(204);
+      await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(404);
+    });
+
+    it('Deactivation=true + HardDelete=false → DELETE blocked with 400', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        UserSoftDeleteEnabled: 'True',
+        UserHardDeleteEnabled: 'False',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+      await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(400);
+      // User still exists
+      await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(200);
+    });
+
+    it('Deactivation=false + HardDelete=true → DELETE hard-deletes', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        UserSoftDeleteEnabled: 'False',
+        UserHardDeleteEnabled: 'True',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+      await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(204);
+      await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(404);
+    });
+
+    it('Deactivation=false + HardDelete=false → DELETE blocked with 400', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        UserSoftDeleteEnabled: 'False',
+        UserHardDeleteEnabled: 'False',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+      await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(400);
+      // User still exists
+      await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(200);
+    });
+
+    it('Deactivation=true + HardDelete=false → PATCH active=false deactivates user', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        UserSoftDeleteEnabled: 'True',
+        UserHardDeleteEnabled: 'False',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+      // DELETE is blocked
+      await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(400);
+
+      // But PATCH active=false should work as soft-delete
+      const patch = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', path: 'active', value: false }],
+      };
+      const res = await scimPatch(app, `${basePath}/Users/${user.id}`, token, patch).expect(200);
+      expect(res.body.active).toBe(false);
+
+      // User still exists but is deactivated
+      const getRes = await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(200);
+      expect(getRes.body.active).toBe(false);
+    });
+
+    it('Deactivation=false → PATCH active=false blocked with 400', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        UserSoftDeleteEnabled: 'False',
+        UserHardDeleteEnabled: 'True',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+      // PATCH active=false should be blocked
+      const patch = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', path: 'active', value: false }],
+      };
+      const res = await scimPatch(app, `${basePath}/Users/${user.id}`, token, patch).expect(400);
+      expect(res.body.detail).toContain('soft-delete');
+      expect(res.body.scimType).toBe('invalidValue');
+
+      // Verify diagnostics extension
+      const diag = res.body['urn:scimserver:api:messages:2.0:Diagnostics'];
+      expect(diag).toBeDefined();
+      expect(diag.errorCode).toBe('SOFT_DELETE_DISABLED');
+      expect(diag.triggeredBy).toBe('UserSoftDeleteEnabled');
+    });
   });
 });

@@ -573,7 +573,7 @@ az monitor log-analytics query `
 | **PG extension error** | Extensions not enabled | Run: `az postgres flexible-server parameter set --name azure.extensions --value "citext,pgcrypto,pg_trgm"` |
 | **PG out of storage** | Auto-grow may be off | Check storage usage in Azure Portal; enable storage auto-grow |
 | **Slow queries** | Missing indexes | Check `ScimResource` table has CITEXT unique indexes on `userName` and `displayName` |
-| **409 Conflict on user creation** | Duplicate userName/externalId | User already exists; Entra will PATCH instead |
+| **409 Conflict on user creation** | Duplicate userName | User already exists; Entra will PATCH instead |
 | **Slow first response** | Container cold start | First request after scale-to-zero takes ~5-10s; subsequent requests are fast |
 | **Multiple replicas out of sync** | Not a PG issue | All replicas share the same PG instance; data is always consistent |
 | **PG backup/restore** | Need point-in-time restore | Azure Portal → PG Flexible Server → Backups → Restore to point in time |

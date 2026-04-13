@@ -25,6 +25,27 @@ import {
   removeExtensionAttribute,
 } from '../../modules/scim/utils/scim-patch-path';
 
+// ─── Prototype pollution guard ──────────────────────────────────────────────
+
+/** Keys that MUST be rejected to prevent prototype pollution attacks (V19) */
+const DANGEROUS_KEYS = new Set([
+  '__proto__', 'constructor', 'prototype',
+]);
+
+/** Throws PatchError if path contains a dangerous prototype-polluting key */
+function guardPrototypePollution(path: string): void {
+  const segments = path.split('.');
+  for (const seg of segments) {
+    if (DANGEROUS_KEYS.has(seg)) {
+      throw new PatchError(
+        400,
+        `Attribute path '${path}' contains a forbidden key '${seg}'.`,
+        'invalidPath',
+      );
+    }
+  }
+}
+
 interface PatchOperation {
   op: string;
   path?: string;
@@ -77,12 +98,15 @@ export class GenericPatchEngine {
 
   private applyAdd(op: PatchOperation): void {
     if (op.path) {
+      guardPrototypePollution(op.path);
       this.setAtPath(op.path, op.value, /* merge */ true);
     } else {
       // No path → merge value into root (RFC 7644 §3.5.2.1)
       if (typeof op.value === 'object' && op.value !== null && !Array.isArray(op.value)) {
         for (const [key, val] of Object.entries(op.value)) {
-          this.payload[key] = val;
+          if (!DANGEROUS_KEYS.has(key)) {
+            this.payload[key] = val;
+          }
         }
       } else {
         throw new PatchError(
@@ -96,12 +120,15 @@ export class GenericPatchEngine {
 
   private applyReplace(op: PatchOperation): void {
     if (op.path) {
+      guardPrototypePollution(op.path);
       this.setAtPath(op.path, op.value, /* merge */ false);
     } else {
       // No path → replace entire resource attributes (RFC 7644 §3.5.2.3)
       if (typeof op.value === 'object' && op.value !== null && !Array.isArray(op.value)) {
         for (const [key, val] of Object.entries(op.value)) {
-          this.payload[key] = val;
+          if (!DANGEROUS_KEYS.has(key)) {
+            this.payload[key] = val;
+          }
         }
       } else {
         throw new PatchError(
@@ -117,6 +144,7 @@ export class GenericPatchEngine {
     if (!op.path) {
       throw new PatchError(400, 'PATCH remove requires a "path".', 'noTarget');
     }
+    guardPrototypePollution(op.path);
     this.removeAtPath(op.path);
   }
 

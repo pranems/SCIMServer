@@ -1,11 +1,11 @@
 # Feature Documentation: Soft Delete, Strict Schema Validation & Custom Extension URNs
 
-> **Cross-reference**: For strict schema validation internals and custom extension registration details, see [`SCHEMA_LIFECYCLE_AND_REGISTRY.md`](SCHEMA_LIFECYCLE_AND_REGISTRY.md) and [`SCHEMA_CUSTOMIZATION_GUIDE.md`](SCHEMA_CUSTOMIZATION_GUIDE.md). This document remains the canonical reference for the **Soft Delete** feature.
+> **Cross-reference**: For strict schema validation internals and custom extension registration details, see [`SCHEMA_LIFECYCLE_AND_REGISTRY.md`](SCHEMA_LIFECYCLE_AND_REGISTRY.md) and [`SCHEMA_CUSTOMIZATION_GUIDE.md`](SCHEMA_CUSTOMIZATION_GUIDE.md). This document remains the canonical reference for the **UserSoftDeleteEnabled** feature.
 
-> **Version**: 1.1  
-> **Date**: 2026-02-25  
-> **Status**: Implemented & Tested  
-> **Config flags**: `SoftDeleteEnabled`, `ReprovisionOnConflictForSoftDeletedResource`, `StrictSchemaValidation`  
+> **Version**: 2.0  
+> **Date**: 2026-04-09  
+> **Status**: Updated for Settings v7  
+> **Config flags**: `UserSoftDeleteEnabled`, `StrictSchemaValidation`  
 > **Extension URNs**: 4 msfttest schemas registered globally
 
 ---
@@ -31,29 +31,36 @@ Three features were implemented to bring the SCIM Server closer to production-re
 
 | Feature | Config Flag | Default | Purpose |
 |---------|-------------|---------|---------|
-| Soft / Hard Delete | `SoftDeleteEnabled` | `false` | Control whether DELETE sets `active=false` + `deletedAt` or physically removes the resource |
-| Reprovision on Conflict | `ReprovisionOnConflictForSoftDeletedResource` | `false` | Re-activate soft-deleted resources on POST conflict instead of 409 (requires SoftDeleteEnabled) |
+| User Deactivation Gate | `UserSoftDeleteEnabled` | `true` | Controls whether PATCH active=false is allowed |
 | Strict Schema Validation | `StrictSchemaValidation` | `false` | Enforce that extension URNs in request body are declared in `schemas[]` AND registered |
 | Custom Extension URNs | *(built-in)* | Always registered | 4 msfttest extension schemas pre-registered for Microsoft Entra ID compliance testing |
+
+> **Settings v7 change:** Soft-delete has been removed. DELETE always hard-deletes. `UserSoftDeleteEnabled` now controls whether PATCH active=false is allowed. `ReprovisionOnConflictForSoftDeletedResource` and `deletedAt` have been removed. `guardSoftDeleted()` no longer exists.
 
 All features are **per-endpoint** — each SCIM endpoint can independently enable/disable these behaviors via its config object.
 
 ---
 
-## 2. Feature 1 — Soft / Hard Delete
+## 2. Feature 1 — User Deactivation Gate
 
 ### 2.1 Behavior
 
 | Config Value | DELETE /Users/{id} | DELETE /Groups/{id} |
 |--------------|-------------------|---------------------|
-| `SoftDeleteEnabled: false` (default) | Physical row deletion | Physical row deletion |
-| `SoftDeleteEnabled: true` | Sets `active = false` + `deletedAt = now()`; subsequent GET/PATCH/PUT/DELETE returns 404 (RFC 7644 §3.6) | Sets `active = false` + `deletedAt = now()`; subsequent GET/PATCH/PUT/DELETE returns 404 (RFC 7644 §3.6) |
+| Any value | Physical row deletion (hard-delete) | Physical row deletion (hard-delete) |
+
+> DELETE always hard-deletes regardless of `UserSoftDeleteEnabled`. The flag only controls whether PATCH active=false is allowed.
+
+| Config Value | PATCH active=false |
+|--------------|-------------------|
+| `UserSoftDeleteEnabled: true` (default) | Allowed — sets `active = false` |
+| `UserSoftDeleteEnabled: false` | Rejected — 400 error |
 
 ### 2.2 Config Flag
 
 ```json
 {
-  "SoftDeleteEnabled": "True"
+  "UserSoftDeleteEnabled": "True"
 }
 ```
 
@@ -61,102 +68,25 @@ Accepted values: `true`, `false`, `"True"`, `"False"`, `"1"`, `"0"`.
 
 ### 2.3 Implementation Details
 
-**RFC 7644 §3.6 Compliance:** After a soft-delete, the service MUST return 404 for all operations (GET, PATCH, PUT, DELETE) on the deleted resource and MUST omit it from LIST/query results. The `guardSoftDeleted()` helper enforces this across all operations using the `deletedAt` timestamp (not `active` flag — a client can set `active=false` via PATCH without soft-deleting).
+**DELETE** always performs a physical row deletion (hard-delete). There is no soft-delete path.
 
-**User Service** (`endpoint-scim-users.service.ts`):
-```typescript
-// Guard — returns 404 if resource is soft-deleted (deletedAt is set) and SoftDeleteEnabled is true
-private guardSoftDeleted(user: UserRecord, config: EndpointConfig | undefined, scimId: string): void {
-  const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
-  if (softDelete && user.deletedAt != null) {
-    throw createScimError({ status: 404, scimType: 'noTarget', detail: `User ${scimId} not found` });
-  }
-}
+**PATCH active=false** is gated by the `UserSoftDeleteEnabled` flag. When the flag is disabled, attempts to set `active=false` via PATCH are rejected with a 400 error.
 
-async deleteUserForEndpoint(scimId: string, endpointId: string, config?: EndpointConfig): Promise<void> {
-  const user = await this.userRepo.findByScimId(endpointId, scimId);
-  if (!user) throw createScimError({ status: 404, scimType: 'noTarget', ... });
-  this.guardSoftDeleted(user, config, scimId);  // Double-delete → 404
+**Stats** uses `inactive` count (not `softDeleted`) to track deactivated resources.
 
-  const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
-  if (softDelete) {
-    await this.userRepo.update(user.id, { active: false, deletedAt: new Date() });  // Soft-delete
-  } else {
-    await this.userRepo.delete(user.id);                      // Hard-delete
-  }
-}
-```
-
-**GET/PATCH/PUT** all invoke `guardSoftDeleted()` before processing.  
-**LIST** filters out resources where `deletedAt != null` when `SoftDeleteEnabled` is true.
-
-**Group Service** (`endpoint-scim-groups.service.ts`): Identical pattern with `guardSoftDeleted()` across all operations.
-
-### 2.4 Reprovision on Conflict (Re-activation)
-
-When **both** `SoftDeleteEnabled` and `ReprovisionOnConflictForSoftDeletedResource` are enabled, POST (create) operations that collide with a soft-deleted resource will **re-activate** the existing resource instead of returning 409 Conflict:
-
-```typescript
-// In createUserForEndpoint:
-const conflict = await this.userRepo.findConflict(endpointId, userName, externalId);
-if (conflict) {
-  const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
-  const reprovision = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED);
-  if (softDelete && reprovision && conflict.deletedAt != null) {
-    return this.reprovisionUser(conflict.scimId, dto, baseUrl, endpointId, config);
-  }
-  throw createScimError({ status: 409, scimType: 'uniqueness', ... });
-}
-```
-
-**Reprovision behavior:**
-- Sets `active = true`, `deletedAt = null` (clears soft-delete markers)
-- Replaces the entire resource payload with the new POST body
-- Returns 201 Created with the re-activated resource
-- For Groups: member references are re-resolved via `resolveMemberInputs()`
-
-### 2.4 Flow Diagram
+### 2.5 Database Values
 
 ```
-┌──────────┐     DELETE /Users/{id}     ┌──────────────────┐
-│  Client  │ ─────────────────────────► │  UsersController │
-└──────────┘                            └────────┬─────────┘
-                                                 │
-                                    passes config │
-                                                 ▼
-                                        ┌────────────────────┐
-                                        │  UsersService      │
-                                        │  deleteUserFor...  │
-                                        └────────┬───────────┘
-                                                 │
-                                   ┌─────────────┼─────────────┐
-                                   │             │             │
-                              SoftDelete?   SoftDelete?        │
-                              ┌──YES──┐    ┌──NO───┐           │
-                              ▼       │    ▼       │           │
-                         ┌─────────┐  │ ┌────────┐ │           │
-                         │ UPDATE  │  │ │ DELETE │ │           │
-                         │active=F │  │ │ (hard) │ │           │
-                         └─────────┘  │ └────────┘ │           │
-                                      │            │           │
-                                      └────────────┘           │
-                                                               │
-                                                    HTTP 204 No Content
+┌─────────┬──────────────┬────────────────┬─────────┐
+│ id      │ scimId       │ userName       │ active  │
+├─────────┼──────────────┼────────────────┼─────────┤
+│ user-1  │ abc-def-123  │ user@test.com  │ true    │  ← active user
+│ user-2  │ ghi-jkl-456  │ admin@test.com │ true    │  ← active user
+│ user-3  │ mno-pqr-789  │ patch@test.com │ false   │  ← deactivated via PATCH active=false
+└─────────┴──────────────┴────────────────┴─────────┘
 ```
 
-### 2.6 Database Values After Soft Delete
-
-```
-┌─────────┬──────────────┬────────────────┬─────────┬─────────────────────┐
-│ id      │ scimId       │ userName       │ active  │ deletedAt           │
-├─────────┼──────────────┼────────────────┼─────────┼─────────────────────┤
-│ user-1  │ abc-def-123  │ user@test.com  │ false   │ 2026-02-25T12:00:00 │  ← soft-deleted
-│ user-2  │ ghi-jkl-456  │ admin@test.com │ true    │ NULL                │  ← normal
-│ user-3  │ mno-pqr-789  │ patch@test.com │ false   │ NULL                │  ← PATCH-disabled (not soft-deleted)
-└─────────┴──────────────┴────────────────┴─────────┴─────────────────────┘
-```
-
-> **Key distinction:** `deletedAt != null` means soft-deleted (404 on all operations). `active = false` with `deletedAt = null` means the user was disabled via PATCH — this is a normal state and the resource remains accessible.
+> **Note:** The `deletedAt` column has been removed from the database. Deactivated users (`active = false`) remain accessible for all operations.
 
 ---
 
@@ -476,7 +406,7 @@ Authorization: Bearer <admin-token>
 {
   "profile": {
     "settings": {
-      "SoftDeleteEnabled": "True",
+      "UserSoftDeleteEnabled": "True",
       "StrictSchemaValidation": "True"
     }
   }
@@ -630,25 +560,17 @@ Authorization: Bearer <token>
 
 ### 8.1 Schema Changes
 
-A new `deletedAt` column was added to the `ScimResource` Prisma model:
+> **Settings v7:** The `deletedAt` column has been removed from the `ScimResource` Prisma model. DELETE always performs a physical row deletion (hard-delete). The `active` column remains and is used to track deactivated resources via PATCH active=false.
 
-```prisma
-deletedAt DateTime? @db.Timestamptz
-```
+### 8.2 Resource State
 
-This nullable timestamp tracks when a resource was soft-deleted. Domain models updated: `UserRecord` and `GroupRecord` include `deletedAt: Date | null`; `UserUpdateInput` and `GroupUpdateInput` include `deletedAt?: Date | null`; `UserConflictResult` includes `active: boolean` and `deletedAt: Date | null`. `GroupRecord` and `GroupCreateInput` now include `active: boolean` (Groups created with `active: true`).
-
-### 8.2 Soft Delete State
-
-| Operation | `active` column | `deletedAt` column | Row present |
-|-----------|----------------|-------------------|-------------|
-| Normal user | `true` | `NULL` | Yes |
-| Soft-deleted user | `false` | Timestamp | Yes |
-| PATCH-disabled user | `false` | `NULL` | Yes (accessible) |
-| Hard-deleted user | N/A | N/A | No |
-| Normal group | `true` | `NULL` | Yes |
-| Soft-deleted group | `false` | Timestamp | Yes |
-| Hard-deleted group | N/A | N/A | No |
+| Operation | `active` column | Row present |
+|-----------|----------------|-------------|
+| Normal user | `true` | Yes |
+| Deactivated user (PATCH active=false) | `false` | Yes (accessible) |
+| Deleted user (DELETE) | N/A | No (hard-deleted) |
+| Normal group | `true` | Yes |
+| Deleted group (DELETE) | N/A | No (hard-deleted) |
 
 ---
 

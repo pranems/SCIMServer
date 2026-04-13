@@ -20,13 +20,19 @@ import {
   Param,
   Query,
   Res,
+  Optional,
+  Inject,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { LogQueryService } from '../../logging/log-query.service';
+import { LoggingService } from '../../logging/logging.service';
 
 @Controller('endpoints/:endpointId/logs')
 export class EndpointLogController {
-  constructor(private readonly logQuery: LogQueryService) {}
+  constructor(
+    private readonly logQuery: LogQueryService,
+    @Optional() @Inject(LoggingService) private readonly loggingService?: LoggingService,
+  ) {}
 
   /**
    * GET /scim/endpoints/:endpointId/logs/recent
@@ -80,6 +86,41 @@ export class EndpointLogController {
       limit: limit ? parseInt(limit, 10) : undefined,
       level, category, requestId, endpointId, format,
       filenamePrefix: `endpoint-${endpointId.slice(0, 8)}`,
+    });
+  }
+
+  /**
+   * GET /scim/endpoints/:endpointId/logs/history
+   * Query persistent DB logs filtered by this endpoint's URL pattern.
+   * Returns paginated request history with full payloads.
+   */
+  @Get('history')
+  async getHistory(
+    @Param('endpointId') endpointId: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('method') method?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('since') since?: string,
+    @Query('until') until?: string,
+    @Query('minDurationMs') minDurationMs?: string,
+  ) {
+    if (!this.loggingService) {
+      return { endpointId, total: 0, items: [], message: 'Persistent logging not available (InMemory backend)' };
+    }
+
+    return this.loggingService.listLogs({
+      urlContains: `/endpoints/${endpointId}/`,
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+      method: method || undefined,
+      status: status ? Number(status) : undefined,
+      search: search || undefined,
+      since: since ? new Date(since) : undefined,
+      until: until ? new Date(until) : undefined,
+      minDurationMs: minDurationMs ? Number(minDurationMs) : undefined,
+      includeAdmin: false,
     });
   }
 }

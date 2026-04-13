@@ -32,7 +32,7 @@ npx jest --no-coverage --json --outputFile=pipeline-unit.json 2>$null
 # Parse results:
 node -e "const r=JSON.parse(require('fs').readFileSync('pipeline-unit.json','utf8'));console.log('suites:',r.numPassedTestSuites+'/'+r.numTotalTestSuites,'tests:',r.numPassedTests+'/'+r.numTotalTests,'failed:',r.numFailedTests)"
 ```
-> **Baselines (v0.31.0):** 3,090 pass / 0 fail / 74 suites.
+> **Baselines (v0.34.0):** 3,193 pass / 0 fail / 80 suites.
 > *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 
 ### Step 3: Run E2E Tests
@@ -42,7 +42,7 @@ npx jest --config test/e2e/jest-e2e.config.ts --no-coverage --json --outputFile=
 # Parse results:
 node -e "const r=JSON.parse(require('fs').readFileSync('pipeline-e2e.json','utf8'));console.log('suites:',r.numPassedTestSuites+'/'+r.numTotalTestSuites,'tests:',r.numPassedTests+'/'+r.numTotalTests,'failed:',r.numFailedTests)"
 ```
-> **Baselines (v0.31.0):** 817 pass / 0 fail / 37 suites.
+> **Baselines (v0.34.0):** 939 pass / 0 fail / 45 suites.
 > *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 > **E2E config path:** `test/e2e/jest-e2e.config.ts`
 
@@ -55,7 +55,13 @@ $env:PERSISTENCE_BACKEND = "inmemory"   # or omit for Prisma/PostgreSQL
 $env:SCIM_SHARED_SECRET = "local-secret"
 $env:OAUTH_CLIENT_SECRET = "localoauthsecret123"
 $env:JWT_SECRET = "localjwtsecret123"
-node dist/main.js                 # Start in background terminal
+
+# Start in background (recommended — keeps terminal free)
+Start-Process -FilePath "node" -ArgumentList "dist/main.js" -WindowStyle Hidden
+Start-Sleep -Seconds 5  # Wait for bootstrap
+
+# OR start in foreground (blocks terminal):
+# node dist/main.js
 ```
 > **Port:** 6000 (local default)
 > **Health poll:** `Invoke-RestMethod -Uri "http://localhost:6000/scim/ServiceProviderConfig"` — discovery endpoints are **public** (no auth required per RFC 7644 §4).
@@ -66,7 +72,7 @@ cd scripts
 .\live-test.ps1 -BaseUrl "http://localhost:6000" -ClientSecret "localoauthsecret123" *> ..\local-live-pipeline.txt
 ```
 > **Output capture:** Use `*>` (all PowerShell streams) not `>` (stdout only). The script writes to multiple output streams.
-> **Baselines (v0.31.0):** ~951 assertions.
+> **Baselines (v0.34.0):** ~739 assertions.
 > *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 
 ### Step 6: Stop Local Instance
@@ -98,10 +104,19 @@ docker compose build --no-cache   # Full rebuild (~3-5 min)
 > **Tip:** Use `--no-cache` only when Dockerfile or base image changed. Cached builds are fine for code-only changes.
 
 ### Step 9: Start Docker Containers (Detached)
+
+> **⚠️ CRITICAL — ENV VAR ISOLATION:** Before running `docker compose up`, ensure the PowerShell session does NOT have local-server env vars (`$env:OAUTH_CLIENT_SECRET`, `$env:SCIM_SHARED_SECRET`, `$env:JWT_SECRET`) from Phase 1 Step 4. Docker Compose's `${VAR:-default}` syntax inherits PowerShell env vars, causing Docker containers to use **local credentials** instead of Docker defaults. This causes OAuth 401 failures.
+
 ```powershell
-docker compose up -d
+# Set Docker-specific credentials explicitly (overrides any leftover local env vars)
+$env:OAUTH_CLIENT_SECRET = "devscimclientsecret"
+$env:SCIM_SHARED_SECRET = "devscimsharedsecret"
+$env:JWT_SECRET = "devjwtsecretkey123456"
+
+docker compose up -d --force-recreate
 ```
-> Do NOT use `--build` here (already built in step 8).
+> Use `--force-recreate` to pick up env var changes. Do NOT use `--build` here (already built in step 8).
+> **Verify env vars inside container:** `docker exec scimserver-api env | Select-String "OAUTH|SCIM_SHARED|JWT"`
 
 ### Step 10: Health Check
 ```powershell
@@ -131,23 +146,195 @@ docker compose down --remove-orphans
 
 ## Docker Credentials Reference
 
-| Credential | Env Var | Docker Default | Local Default |
-|------------|---------|---------------|---------------|
-| OAuth Client Secret | `OAUTH_CLIENT_SECRET` | `devscimclientsecret` | `localoauthsecret123` |
-| Legacy Shared Secret | `SCIM_SHARED_SECRET` | `devscimsharedsecret` | `local-secret` |
-| JWT Secret | `JWT_SECRET` | `devjwtsecretkey123456` | `localjwtsecret123` |
-| DB URL | `DATABASE_URL` | `postgresql://scim:scim@postgres:5432/scimdb` | N/A (inmemory) |
+| Credential | Env Var | Docker Default | Local Default | Standalone Default |
+|------------|---------|---------------|---------------|-------------------|
+| OAuth Client Secret | `OAUTH_CLIENT_SECRET` | `devscimclientsecret` | `localoauthsecret123` | `standalonesecret123` |
+| Legacy Shared Secret | `SCIM_SHARED_SECRET` | `devscimsharedsecret` | `local-secret` | `standalone-secret` |
+| JWT Secret | `JWT_SECRET` | `devjwtsecretkey123456` | `localjwtsecret123` | `standalonejwt123` |
+| DB URL | `DATABASE_URL` | `postgresql://scim:scim@postgres:5432/scimdb` | N/A (inmemory) | N/A (inmemory) |
+
+## Phase 3 — Standalone Build & Validation
+
+> **Purpose:** Validate the self-contained standalone package that runs without Docker or global Node.js.
+> The standalone build is the portable distribution artifact — if it breaks, customers can't deploy.
+
+### Step 13: Build Standalone Package
+```powershell
+cd $env:USERPROFILE\source\repos\SCIMServer
+
+# CRITICAL: Kill any running standalone process first (node.exe locks prevent rebuild)
+Get-Process -Id (Get-NetTCPConnection -LocalPort 9090 -ErrorAction SilentlyContinue).OwningProcess -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 2
+
+# Clean previous artifacts
+Remove-Item -Recurse -Force standalone -ErrorAction SilentlyContinue
+Remove-Item -Force SCIMServer-standalone.zip -ErrorAction SilentlyContinue
+
+# Build with bundled Node.js + ZIP
+pwsh -File scripts\build-standalone.ps1 -IncludeNode -Zip
+```
+> **Output:** `standalone/` folder + `SCIMServer-standalone.zip`
+> **Duration:** ~2-5 min (downloads Node.js binary on first run, cached later)
+> **Verify:** `Test-Path standalone\start.ps1` should be `True`
+> **⚠️ Common failure:** `node.exe is denied` — the bundled Node.js binary is locked by a running standalone process from a previous run. Always kill port 9090 processes first.
+
+### Step 14: Deploy Standalone to Fresh Folder
+```powershell
+# Create a clean deployment folder (simulates customer install)
+$standaloneTestDir = "$env:TEMP\scimserver-standalone-test-$(Get-Random)"
+New-Item -ItemType Directory -Path $standaloneTestDir | Out-Null
+
+# Extract the ZIP (or copy the standalone folder)
+if (Test-Path SCIMServer-standalone.zip) {
+    Expand-Archive -Path SCIMServer-standalone.zip -DestinationPath $standaloneTestDir -Force
+} else {
+    Copy-Item -Recurse -Path standalone\* -Destination $standaloneTestDir
+}
+```
+
+### Step 15: Start Standalone Instance
+```powershell
+Push-Location $standaloneTestDir
+# Start in background — standalone uses inmemory backend by default
+$env:PORT = "9090"
+$env:PERSISTENCE_BACKEND = "inmemory"
+$env:SCIM_SHARED_SECRET = "standalone-secret"
+$env:OAUTH_CLIENT_SECRET = "standalonesecret123"
+$env:JWT_SECRET = "standalonejwt123"
+
+# Start the standalone server in background
+Start-Process -FilePath "pwsh" -ArgumentList "-File", "start.ps1" -WindowStyle Hidden
+# OR if Node.js is bundled:
+# Start-Process -FilePath ".\node\node.exe" -ArgumentList "dist\main.js" -WindowStyle Hidden
+```
+> **Port:** 9090 (avoid conflict with local 6000 and Docker 8080)
+> **Health poll:** `Invoke-RestMethod -Uri "http://localhost:9090/scim/ServiceProviderConfig"`
+> Wait until health check returns 200 (typically 5-10s).
+
+### Step 16: Run Live Tests Against Standalone
+```powershell
+cd $env:USERPROFILE\source\repos\SCIMServer\scripts
+.\live-test.ps1 -BaseUrl "http://localhost:9090" -ClientSecret "standalonesecret123" *> ..\standalone-live-pipeline.txt
+```
+> Parse results from output file — same format as other live test runs.
+
+### Step 17: Stop Standalone Instance & Clean Up
+```powershell
+Get-Process -Id (Get-NetTCPConnection -LocalPort 9090 -ErrorAction SilentlyContinue).OwningProcess -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Pop-Location
+# Clean up test directory
+Remove-Item -Recurse -Force $standaloneTestDir -ErrorAction SilentlyContinue
+```
+
+## Phase 4 — Docker Image Publish & Azure Deployment
+
+> **Purpose:** Push the Docker image to GitHub Container Registry (GHCR) and deploy to Azure Container Apps.
+> This validates the full production deployment path.
+> **Prerequisites:** `az` CLI logged in, Docker logged into GHCR, `scripts/deploy-azure.ps1` available.
+
+### Step 18: Tag & Push Docker Image to GHCR
+```powershell
+cd $env:USERPROFILE\source\repos\SCIMServer
+
+# Tag with version from package.json
+$version = (Get-Content api/package.json | ConvertFrom-Json).version
+$ghcrRepo = "ghcr.io/<owner>/scimserver"
+
+docker tag scimserver-api:latest "$ghcrRepo`:$version"
+docker tag scimserver-api:latest "$ghcrRepo`:latest"
+
+# Push (requires `docker login ghcr.io` with PAT)
+docker push "$ghcrRepo`:$version"
+docker push "$ghcrRepo`:latest"
+```
+> Replace `<owner>` with the GitHub org/user name.
+> **Duration:** ~1-3 min depending on image size and network.
+
+### Step 19: Deploy to Azure Container Apps
+```powershell
+cd scripts
+.\deploy-azure.ps1 `
+    -ResourceGroup "scimserver-rg" `
+    -AppName "scimserver" `
+    -Location "eastus" `
+    -ScimSecret "az-scim-secret-$(Get-Random)" `
+    -JwtSecret "az-jwt-secret-$(Get-Random)" `
+    -OauthClientSecret "az-oauth-secret-$(Get-Random)" `
+    -ImageTag "$version" `
+    -GhcrUsername "<github-username>" `
+    -GhcrPassword "<github-pat>" `
+    -ProvisionPostgres `
+    -PgAdminPassword "PgAdmin$(Get-Random)!"
+```
+> **Duration:** ~5-15 min (Container App + PostgreSQL provisioning)
+> The script outputs the app URL on completion. Save it for Step 20.
+> **State persistence:** The script creates `scripts/logs/deploy-state.json` with idempotent state.
+
+### Step 20: Run Live Tests Against Azure
+```powershell
+$azUrl = "<azure-container-app-url>"    # from Step 19 output
+$azOauthSecret = "<oauth-secret>"        # from Step 19 -OauthClientSecret
+
+cd scripts
+.\live-test.ps1 -BaseUrl $azUrl -ClientSecret $azOauthSecret *> ..\azure-live-pipeline.txt
+```
+> **Note:** Azure uses HTTPS. Ensure `$azUrl` starts with `https://`.
+> Existing endpoints and data from previous deployments are preserved (PostgreSQL is persistent).
+
+### Step 21: Verify Existing Data Preserved
+After deploying a new version, verify that endpoints and resources from previous deployments still exist:
+```powershell
+# List endpoints — should show previously created endpoints
+$endpoints = Invoke-RestMethod -Uri "$azUrl/scim/admin/endpoints" -Headers @{ Authorization = "Bearer $azOauthSecret" }
+Write-Host "Existing endpoints: $($endpoints.totalResults)"
+
+# If endpoints exist, verify resources are still accessible
+if ($endpoints.totalResults -gt 0) {
+    $firstEp = $endpoints.endpoints[0]
+    $users = Invoke-RestMethod -Uri "$azUrl/scim/endpoints/$($firstEp.id)/Users" -Headers @{ Authorization = "Bearer $azOauthSecret" }
+    Write-Host "Users in first endpoint: $($users.totalResults)"
+}
+```
 
 ## Reporting
 - After each phase, report a summary of test results (pass/fail counts).
 - If any step fails, diagnose the issue, attempt a fix, and re-run from the failing step.
-- At the end, provide a final summary comparing local vs. Docker test results.
+- At the end, provide a **final summary table** comparing ALL deployment targets:
+
+| Target | Unit | E2E | Live | Data Preserved? | Notes |
+|--------|------|-----|------|----------------|-------|
+| Local (inmemory) | ✅/❌ | ✅/❌ | ✅/❌ | N/A (ephemeral) | Port 6000 |
+| Docker (postgres) | N/A | N/A | ✅/❌ | N/A (fresh) | Port 8080 |
+| Standalone (inmemory) | N/A | N/A | ✅/❌ | N/A (ephemeral) | Port 9090 |
+| Azure (postgres) | N/A | N/A | ✅/❌ | ✅ verify | HTTPS |
+
 - Include duration where available.
 - Note any pre-existing failures explicitly so new regressions are clearly distinguishable.
+- For Azure, explicitly verify existing endpoints/data survived the deployment.
 
-## Known Pre-Existing Failures (v0.31.0)
+## Known Pre-Existing Failures (v0.34.0)
 
-**None.** All pre-existing failures from v0.21.0 (24 unit, 41 E2E, 5 live — boolean coercion schema validation) have been fixed as of v0.24.0. No new failures introduced through v0.31.0.
+**None.** All tests pass: **3,193 unit** (80 suites), **939 E2E** (45 suites), **739 live**.
+
+## Entra ID Provisioning Configuration
+
+After deploying to any target, provide the Entra ID provisioning input in this format:
+
+```
+CONFIGURE ENTRA ID
+   In Entra ID provisioning config, set:
+     Tenant URL:          http://<host>:<port>/scim/v2/endpoints/<endpoint-uuid>
+     Token endpoint url:  http://<host>:<port>/scim/oauth/token
+     Client ID:           scimserver-client
+     Client Secret:       <OAUTH_CLIENT_SECRET for the target>
+```
+
+| Target | Host:Port | OAuth Client Secret |
+|--------|-----------|--------------------|
+| Local | `localhost:6000` | `localoauthsecret123` |
+| Docker | `localhost:8080` | `devscimclientsecret` |
+| Standalone | `localhost:9090` | `standalonesecret123` |
+| Azure | `<app>.azurecontainerapps.io` (HTTPS) | Value from deploy script |
 
 ## Self-Improvement Check
 
@@ -177,6 +364,8 @@ After completing the full pipeline, critically evaluate **this prompt itself** f
 15. **Did the Docker port mapping change?** 8080:8080 for API, 5432:5432 for PostgreSQL.
 16. **Did Docker credentials change?** OAuth: `devscimclientsecret`, Legacy: `devscimsharedsecret`, JWT: `devjwtsecretkey123456`. NOT `docker-secret`.
 17. **Did `--no-cache` take excessively long?** ~3-5 min. Cached build is ~30s. Made `--no-cache` optional.
+18. **Did Docker inherit wrong env vars?** YES — critical learning. PowerShell `$env:*` set in Phase 1 leaks into Docker via `${VAR:-default}` syntax. Always explicitly set Docker credentials before `docker compose up`. Verify with `docker exec scimserver-api env | Select-String "OAUTH"`.
+19. **Did `docker compose up -d` fail with stale container reference?** YES — after `docker compose down`, subsequent `up -d` can fail with "No such container" if orphaned references remain. Use `docker compose up -d --force-recreate` to fix.
 
 ### Live Test Self-Check
 18. **Did the live test script path change?** `scripts/live-test.ps1` with `-BaseUrl` and `-ClientSecret` params.
@@ -190,5 +379,20 @@ After completing the full pipeline, critically evaluate **this prompt itself** f
 24. **Did the "stop on failure" strategy work?** Yes. Pre-existing failures are documented and don't block.
 
 ### Reporting Self-Check
-25. **Was the report format sufficient?** Added duration and pre-existing failure documentation.
-26. **Were there comparison gaps?** Local uses InMemory or Prisma with localhost DB. Docker always uses Prisma with containerized PostgreSQL. Results should be identical for SCIM operations.
+25. **Was the report format sufficient?** Added duration, pre-existing failure documentation, and 4-target comparison table.
+26. **Were there comparison gaps?** Local uses InMemory. Docker/Azure use PostgreSQL. Standalone uses InMemory. Results should be identical for SCIM operations. Azure additionally verifies data persistence across deploys.
+
+### Standalone Self-Check
+27. **Did `build-standalone.ps1` succeed?** Verify `standalone/start.ps1` exists and ZIP is created. **Common failure:** `node.exe access denied` if a previous standalone process is still running — kill port 9090 first.
+28. **Did the standalone server start?** Verify health check at port 9090. Common issue: bundled Node.js binary may need `--experimental-*` flags.
+29. **Did the standalone use the right persistence?** Default is InMemory. Verify with `GET /scim/admin/endpoints` returning empty initially.
+30. **Did standalone live tests pass?** Same live-test.ps1 script, different port + secret.
+31. **Was the standalone cleanup complete?** Temp directory removed, port freed. Always kill node.exe before attempting rebuild.
+
+### Azure Deployment Self-Check
+32. **Did GHCR push succeed?** Verify `docker push` completes without auth errors. Require `docker login ghcr.io`.
+33. **Did Azure deploy script complete?** Check `scripts/logs/deploy-state.json` for completion state.
+34. **Was the Azure app URL correct?** Script outputs the FQDN. Verify HTTPS.
+35. **Did existing data survive?** Verify endpoint count matches pre-deploy state. Critical for upgrades.
+36. **Did Azure live tests use HTTPS?** Ensure `-BaseUrl` starts with `https://`.
+37. **Were Azure credentials rotated?** Each deploy uses `Get-Random` in secrets for security.

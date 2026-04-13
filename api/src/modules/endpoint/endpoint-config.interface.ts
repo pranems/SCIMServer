@@ -1,25 +1,17 @@
 /**
  * Endpoint Configuration Flag Constants
- * 
+ *
  * Central location for all endpoint config flag string constants.
  * Use these constants throughout the codebase to avoid typos and enable easy refactoring.
+ *
+ * For default values and full metadata see {@link ENDPOINT_CONFIG_FLAGS_DEFINITIONS}.
  */
 export const ENDPOINT_CONFIG_FLAGS = {
   /**
-   * When true, allows a single PATCH operation to add multiple members to a group.
-   * When false (default), each member addition requires a separate PATCH operation.
-   */
-  MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP: 'MultiOpPatchRequestAddMultipleMembersToGroup',
-  
-  /**
-   * When true, allows a single PATCH operation to remove multiple members from a group.
-   * When false (default), each member removal requires a separate PATCH operation.
-   */
-  MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP: 'MultiOpPatchRequestRemoveMultipleMembersFromGroup',
-  
-  /**
-   * When true (default), allows removing all members from a group via path=members without value array.
-   * When false, requires explicit member specification in value array or path filter.
+   * When true, allows removing all members from a group via path=members without value array.
+   * When false (default), requires explicit member specification in value array or path filter.
+   * In practice: most SCIM clients send explicit member values; set true only if your client
+   * sends bare `remove` on `members` without a value array.
    */
   PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS: 'PatchOpAllowRemoveAllMembers',
 
@@ -27,6 +19,7 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * When true, enables verbose PATCH support with dot-notation path resolution.
    * Paths like "name.givenName" are resolved into nested objects instead of flat keys.
    * When false (default), dot-notation paths are stored as literal top-level keys.
+   * In practice: enable for RFC-compliant clients; disable for Entra ID which sends flat keys.
    */
   VERBOSE_PATCH_SUPPORTED: 'VerbosePatchSupported',
 
@@ -34,29 +27,31 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * Per-endpoint log level override. Accepts log level name ("TRACE", "DEBUG", "INFO", etc.)
    * or numeric level (0-6). When set, the ScimLogger will use this level for requests
    * to the endpoint instead of the global/category levels.
-   * When removed, the endpoint reverts to global/category-level logging.
+   * When removed/unset, the endpoint reverts to global/category-level logging.
+   * In practice: use "DEBUG" for troubleshooting a specific endpoint without flooding all logs.
    */
   LOG_LEVEL: 'logLevel',
 
   /**
-   * When true, DELETE operations set `active=false` instead of physically removing the resource.
-   * Soft-deleted resources are excluded from GET/LIST responses.
-   * When false (default), DELETE permanently removes the resource from the database.
-   */
-  SOFT_DELETE_ENABLED: 'SoftDeleteEnabled',
-
-  /**
-   * When true, POST/PUT requests must include ALL extension schema URNs in the `schemas[]`
-   * array for any extension data present in the request body.
-   * When false (default), extension data in the body without a matching `schemas[]` entry
-   * is silently accepted (lenient mode — matches most real-world SCIM clients).
+   * When true (default), enforces RFC 7643 schema validation on inbound payloads:
+   * - POST/PUT reject bodies containing extension URNs not declared in schemas[] (400 invalidSyntax)
+   * - POST/PUT reject unregistered extension URNs (400 invalidValue)
+   * - Attribute-level type/format validation against schema definitions
+   * - Immutable attribute enforcement on PUT (400 mutability)
+   * - PATCH operations on readOnly attributes rejected with 400 (G8c)
+   * When false, the server is lenient: accepts undeclared URNs, skips type validation,
+   * silently strips readOnly PATCH ops instead of rejecting.
+   * In practice: set false for Entra ID compatibility (sends readOnly attrs, boolean strings).
+   * @see RFC 7643 §2.2, RFC 7644 §3.3/§3.5.1/§3.5.2
    */
   STRICT_SCHEMA_VALIDATION: 'StrictSchemaValidation',
 
   /**
-   * Phase 7: When true, PUT/PATCH/DELETE requests MUST include an If-Match header
+   * When true, PUT/PATCH/DELETE requests MUST include an If-Match header
    * with the current resource ETag. Missing If-Match → 428 Precondition Required.
    * When false (default), If-Match is optional but still validated when present.
+   * In practice: enable for environments requiring strict concurrency control.
+   * @see RFC 7644 §3.14
    */
   REQUIRE_IF_MATCH: 'RequireIfMatch',
 
@@ -65,43 +60,14 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * are automatically coerced to native booleans before schema validation and storage.
    * This enables interoperability with clients like Microsoft Entra ID that send boolean
    * values as strings (e.g., roles[].primary = "True" instead of true).
-   *
    * Scope: All paths — POST/PUT body, PATCH values, PATCH filter literals, GET/LIST output.
    * Supersedes StrictSchemaValidation for boolean type checks when enabled.
-   *
    * When false, string boolean values are passed through as-is and will be rejected
    * by StrictSchemaValidation if that flag is also enabled.
-   *
+   * In practice: keep true unless all clients send proper JSON booleans.
    * @see RFC 7643 §2.2 — Boolean attribute type
-   * @see RFC 7644 §3.12 — "Be liberal in what you accept" (Postel's Law)
    */
   ALLOW_AND_COERCE_BOOLEAN_STRINGS: 'AllowAndCoerceBooleanStrings',
-  /**
-   * When true, POST (create) operations that collide with a soft-deleted resource
-   * (same userName/externalId for Users, same displayName/externalId for Groups)
-   * will re-activate the existing resource with the new payload instead of returning 409.
-   * Requires SoftDeleteEnabled to also be true — has no effect with hard-delete.
-   * When false (default), uniqueness collisions with soft-deleted resources return
-   * 409 Conflict like any other duplicate.
-   *
-   * @see RFC 7644 §3.3 — Creating Resources (uniqueness)
-   * @see RFC 7644 §3.6 — Deleting Resources (soft-delete)
-   */
-  REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED: 'ReprovisionOnConflictForSoftDeletedResource',
-
-  /**
-   * @deprecated DERIVED — Custom resource types are now enabled by adding
-   * entries to profile.resourceTypes beyond User/Group. This flag is no longer
-   * read at runtime. Kept for backward-compatible settings validation only.
-   */
-  CUSTOM_RESOURCE_TYPES_ENABLED: 'CustomResourceTypesEnabled',
-
-  /**
-   * @deprecated DERIVED — Bulk operations are now controlled by
-   * profile.serviceProviderConfig.bulk.supported. This flag is no longer
-   * read at runtime. Kept for backward-compatible settings validation only.
-   */
-  BULK_OPERATIONS_ENABLED: 'BulkOperationsEnabled',
 
   /**
    * When true, enables per-endpoint credential validation for this endpoint.
@@ -110,8 +76,7 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * AND this flag is true, the guard falls back to the global SCIM_SHARED_SECRET
    * and OAuth JWT validation.
    * When false (default), only the global SCIM_SHARED_SECRET and OAuth JWT are used.
-   *
-   * @see Phase 11 — Per-Endpoint Credentials (RFC 7643 §7 multi-tenant isolation)
+   * In practice: enable for multi-tenant deployments where each endpoint has its own secret.
    */
   PER_ENDPOINT_CREDENTIALS_ENABLED: 'PerEndpointCredentialsEnabled',
 
@@ -119,7 +84,7 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * When true, write responses include a warning extension URN listing any readOnly
    * attributes that were silently stripped from the incoming payload.
    * When false (default), stripping happens silently without response annotation.
-   *
+   * In practice: enable during development/debugging to see which attributes were stripped.
    * @see RFC 7643 §2.2 — readOnly mutability
    */
   INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE: 'IncludeWarningAboutIgnoredReadOnlyAttribute',
@@ -127,231 +92,340 @@ export const ENDPOINT_CONFIG_FLAGS = {
   /**
    * When true AND StrictSchemaValidation is ON, PATCH operations targeting readOnly
    * attributes are silently stripped instead of producing a 400 error (G8c).
-   * When false (default) with strict schema on, readOnly PATCH ops still cause 400.
-   * Has no effect when StrictSchemaValidation is OFF (stripping always happens).
-   *
+   * When false (default) with strict schema on, readOnly PATCH ops cause 400.
+   * Has no effect when StrictSchemaValidation is OFF (stripping always happens regardless).
+   * In practice: enable alongside StrictSchemaValidation for Entra ID, which sends readOnly
+   * attributes like `groups` and `id` in PATCH operations.
    * @see RFC 7643 §2.2 — readOnly mutability
    */
   IGNORE_READONLY_ATTRIBUTES_IN_PATCH: 'IgnoreReadOnlyAttributesInPatch',
+
+  /**
+   * When true (default), PATCH /Users/{id} with {active:false} deactivates the user.
+   * Deactivated user retains all uniqueness:server attribute values (userName).
+   * POST with matching unique attr → 409 Conflict. Must hard-delete to free unique values.
+   * When false, PATCH {active:false} → 400 error (soft-delete disabled).
+   * In practice: keep true for standard SCIM provisioning workflows.
+   */
+  USER_SOFT_DELETE_ENABLED: 'UserSoftDeleteEnabled',
+
+  /**
+   * When true (default), DELETE /Users/{id} permanently removes the user from the database.
+   * When false, DELETE → 400 error (hard-delete disabled for this endpoint).
+   * In practice: set false to prevent accidental permanent deletions in production.
+   */
+  USER_HARD_DELETE_ENABLED: 'UserHardDeleteEnabled',
+
+  /**
+   * When true (default), DELETE /Groups/{id} permanently removes the group from the database.
+   * When false, DELETE → 400 error (hard-delete disabled for this endpoint).
+   * In practice: set false to prevent accidental permanent deletions in production.
+   */
+  GROUP_HARD_DELETE_ENABLED: 'GroupHardDeleteEnabled',
+
+  /**
+   * When true (default), a single PATCH operation can add/remove multiple members
+   * on a Group: value: [{value:"id1"},{value:"id2"}].
+   * When false, only one member per PATCH op — multiple members in value array → 400 error.
+   * In practice: keep true; most SCIM clients (Entra ID, Okta) send multi-member PATCH ops.
+   */
+  MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED: 'MultiMemberPatchOpForGroupEnabled',
+
+  /**
+   * When true (default), endpoint-scoped /ServiceProviderConfig, /Schemas,
+   * /ResourceTypes discovery endpoints respond normally.
+   * When false, discovery endpoints return 404 + server WARN log.
+   * In practice: set false to hide schema metadata from clients that don't need it.
+   */
+  SCHEMA_DISCOVERY_ENABLED: 'SchemaDiscoveryEnabled',
 } as const;
 
 /**
- * Type for endpoint config flag keys
+ * Type for endpoint config flag values (the runtime string keys).
  */
 export type EndpointConfigFlag = typeof ENDPOINT_CONFIG_FLAGS[keyof typeof ENDPOINT_CONFIG_FLAGS];
 
+// ─── Flag Definitions — Single Source of Truth ───────────────────────────────
+
+/** Valid types for flag definitions. */
+type FlagType = 'boolean' | 'logLevel';
+
+/** Metadata for a single endpoint config flag. */
+export interface EndpointConfigFlagDefinition {
+  /** The runtime config key string (from ENDPOINT_CONFIG_FLAGS). */
+  readonly key: string;
+  /** Data type of the flag. */
+  readonly type: FlagType;
+  /** Default value when not set (undefined = no default). */
+  readonly default: boolean | undefined;
+  /** Human-readable description. */
+  readonly description: string;
+}
+
+/**
+ * ENDPOINT_CONFIG_FLAGS_DEFINITIONS — Single source of truth for all endpoint config flags.
+ *
+ * Each entry defines the flag's runtime key (via ENDPOINT_CONFIG_FLAGS constant),
+ * data type, default value, and human-readable description.
+ *
+ * All other constructs (DEFAULT_ENDPOINT_CONFIG, validateEndpointConfig)
+ * are derived from this registry. To add a new flag, add it to ENDPOINT_CONFIG_FLAGS
+ * and then add an entry here — everything else is automatic.
+ */
+export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFlagDefinition> = {
+  PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS: {
+    key: ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS,
+    type: 'boolean',
+    default: false,
+    description:
+      'When true, allows removing all members from a group via path=members without value array. ' +
+      'When false (default), requires explicit member specification in value array or path filter.',
+  },
+  VERBOSE_PATCH_SUPPORTED: {
+    key: ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED,
+    type: 'boolean',
+    default: false,
+    description:
+      'When true, enables dot-notation path resolution in PATCH (e.g., "name.givenName" → nested object). ' +
+      'When false (default), dot-notation paths are stored as literal top-level keys. ' +
+      'Enable for RFC-compliant clients; disable for Entra ID which sends flat keys.',
+  },
+  LOG_LEVEL: {
+    key: ENDPOINT_CONFIG_FLAGS.LOG_LEVEL,
+    type: 'logLevel',
+    default: undefined,
+    description:
+      'Per-endpoint log level override. Accepts log level name (TRACE/DEBUG/INFO/WARN/ERROR/FATAL/OFF) ' +
+      'or numeric level (0–6). When set, overrides global/category levels for this endpoint. ' +
+      'When unset, endpoint uses global/category-level logging.',
+  },
+  STRICT_SCHEMA_VALIDATION: {
+    key: ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION,
+    type: 'boolean',
+    default: true,
+    description:
+      'When true (default), enforces RFC 7643 schema validation on inbound payloads: ' +
+      'rejects undeclared/unregistered extension URNs in POST/PUT, validates attribute types, ' +
+      'enforces immutable attributes on PUT, rejects readOnly PATCH ops with 400. ' +
+      'When false, lenient mode: accepts undeclared URNs, skips type validation, ' +
+      'silently strips readOnly PATCH ops. Set false for Entra ID compatibility.',
+  },
+  REQUIRE_IF_MATCH: {
+    key: ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH,
+    type: 'boolean',
+    default: false,
+    description:
+      'When true, PUT/PATCH/DELETE requests MUST include an If-Match header with the current ETag. ' +
+      'Missing If-Match → 428 Precondition Required. ' +
+      'When false (default), If-Match is optional but still validated when present.',
+  },
+  ALLOW_AND_COERCE_BOOLEAN_STRINGS: {
+    key: ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS,
+    type: 'boolean',
+    default: true,
+    description:
+      'When true (default), boolean-typed attributes received as strings ("True"/"False") ' +
+      'are coerced to native booleans before schema validation and storage. ' +
+      'Scope: POST/PUT body, PATCH values, PATCH filter literals, GET/LIST output. ' +
+      'Supersedes StrictSchemaValidation for boolean type checks. ' +
+      'When false, string booleans are passed through as-is and rejected by strict schema if enabled. ' +
+      'Keep true for Entra ID interoperability.',
+  },
+  PER_ENDPOINT_CREDENTIALS_ENABLED: {
+    key: ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED,
+    type: 'boolean',
+    default: false,
+    description:
+      'When true, incoming bearer tokens are validated against the EndpointCredential table ' +
+      '(bcrypt-hashed per-endpoint tokens). Falls back to global SCIM_SHARED_SECRET and OAuth JWT. ' +
+      'When false (default), only global SCIM_SHARED_SECRET and OAuth JWT are used. ' +
+      'Enable for multi-tenant deployments where each endpoint has its own secret.',
+  },
+  INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE: {
+    key: ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE,
+    type: 'boolean',
+    default: false,
+    description:
+      'When true, write responses include a warning extension URN listing any readOnly ' +
+      'attributes that were silently stripped from the incoming payload. ' +
+      'When false (default), stripping happens silently without response annotation. ' +
+      'Enable during development/debugging to see which attributes were stripped.',
+  },
+  IGNORE_READONLY_ATTRIBUTES_IN_PATCH: {
+    key: ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH,
+    type: 'boolean',
+    default: false,
+    description:
+      'When true AND StrictSchemaValidation is ON, PATCH operations targeting readOnly attributes ' +
+      'are silently stripped instead of producing a 400 error (overrides G8c behavior). ' +
+      'When false (default) with strict schema on, readOnly PATCH ops cause 400. ' +
+      'Has no effect when StrictSchemaValidation is OFF (stripping always happens). ' +
+      'Enable alongside StrictSchemaValidation for Entra ID which sends readOnly attrs in PATCH.',
+  },
+  USER_SOFT_DELETE_ENABLED: {
+    key: ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED,
+    type: 'boolean',
+    default: true,
+    description:
+      'When true (default), PATCH /Users/{id} with {active:false} deactivates the user. ' +
+      'Deactivated user retains all uniqueness:server attribute values (userName). ' +
+      'POST with matching unique attr → 409. Must hard-delete to free unique values. ' +
+      'When false, PATCH {active:false} → 400 error.',
+  },
+  USER_HARD_DELETE_ENABLED: {
+    key: ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED,
+    type: 'boolean',
+    default: true,
+    description:
+      'When true (default), DELETE /Users/{id} permanently removes the user from the database. ' +
+      'When false, DELETE → 400 error (hard-delete disabled). ' +
+      'Set false to prevent accidental permanent deletions in production.',
+  },
+  GROUP_HARD_DELETE_ENABLED: {
+    key: ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED,
+    type: 'boolean',
+    default: true,
+    description:
+      'When true (default), DELETE /Groups/{id} permanently removes the group from the database. ' +
+      'When false, DELETE → 400 error (hard-delete disabled). ' +
+      'Set false to prevent accidental permanent deletions in production.',
+  },
+  MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED: {
+    key: ENDPOINT_CONFIG_FLAGS.MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED,
+    type: 'boolean',
+    default: true,
+    description:
+      'When true (default), a single PATCH operation can add/remove multiple members ' +
+      'on a Group: value: [{value:"id1"},{value:"id2"}]. ' +
+      'When false, only one member per PATCH op — multiple members → 400. ' +
+      'Keep true; most SCIM clients (Entra ID, Okta) send multi-member PATCH ops.',
+  },
+  SCHEMA_DISCOVERY_ENABLED: {
+    key: ENDPOINT_CONFIG_FLAGS.SCHEMA_DISCOVERY_ENABLED,
+    type: 'boolean',
+    default: true,
+    description:
+      'When true (default), endpoint-scoped /ServiceProviderConfig, /Schemas, ' +
+      '/ResourceTypes discovery endpoints respond normally. ' +
+      'When false, discovery endpoints return 404 + server WARN log. ' +
+      'Set false to hide schema metadata from clients that don\'t need it.',
+  },
+};
+
+// ─── Endpoint Configuration Interface ────────────────────────────────────────
+
 /**
  * Endpoint Configuration Interface
- * 
+ *
  * Defines all supported configuration flags for endpoint-specific behavior.
  * These flags control how the SCIM API behaves for each endpoint.
  */
 export interface EndpointConfig {
-  /**
-   * When true, allows a single PATCH operation to add multiple members to a group.
-   * When false (default), each member addition requires a separate PATCH operation.
-   * 
-   * Example config: { "MultiOpPatchRequestAddMultipleMembersToGroup": "True" }
-   */
-  [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP]?: boolean | string;
-
-  /**
-   * When true, allows a single PATCH operation to remove multiple members from a group.
-   * When false (default), each member removal requires a separate PATCH operation.
-   * 
-   * Example config: { "MultiOpPatchRequestRemoveMultipleMembersFromGroup": "True" }
-   */
-  [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP]?: boolean | string;
-
-  /**
-   * When true (default), allows removing all members via path=members without value array.
-   * When false, requires explicit member specification in value array or path filter.
-   * 
-   * Example config: { "PatchOpAllowRemoveAllMembers": "False" }
-   */
   [ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS]?: boolean | string;
-
-  /**
-   * When true, enables verbose PATCH support with dot-notation path resolution.
-   * Paths like "name.givenName" are resolved into nested objects instead of flat keys.
-   * When false (default), dot-notation paths are stored as literal top-level keys.
-   *
-   * Example config: { "VerbosePatchSupported": "True" }
-   */
   [ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED]?: boolean | string;
-
-  /**
-   * Per-endpoint log level override.
-   * Accepts log level name ("TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF")
-   * or numeric level (0-6). When set, overrides global/category levels for this endpoint.
-   *
-   * Example config: { "logLevel": "DEBUG" }
-   */
   [ENDPOINT_CONFIG_FLAGS.LOG_LEVEL]?: string | number;
-
-  /**
-   * When true, DELETE operations perform soft-delete (set active=false).
-   * When false (default), DELETE permanently removes the resource.
-   *
-   * Example config: { "SoftDeleteEnabled": "True" }
-   */
-  [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]?: boolean | string;
-
-  /**
-   * When true, POST/PUT must include all extension URNs in schemas[] for any
-   * extension data in the body. When false (default), lenient mode.
-   *
-   * Example config: { "StrictSchemaValidation": "True" }
-   */
   [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]?: boolean | string;
-
-  /**
-   * Phase 7: When true, PUT/PATCH/DELETE must include If-Match header.
-   * Missing If-Match → 428 Precondition Required.
-   * When false (default), If-Match is optional but validated when present.
-   *
-   * Example config: { "RequireIfMatch": "True" }
-   */
   [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]?: boolean | string;
-
-  /**
-   * When true (default), boolean-typed attributes received as strings ("True"/"False")
-   * are coerced to native booleans before schema validation and storage.
-   * Enables interoperability with clients that send boolean values as strings
-   * (e.g., Microsoft Entra ID sends roles[].primary = "True").
-   *
-   * Supersedes StrictSchemaValidation for boolean type checks when enabled.
-   *
-   * Example config: { "AllowAndCoerceBooleanStrings": "True" }
-   */
   [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]?: boolean | string;
-
-  /**
-   * When true, POST that collides with a soft-deleted resource will re-activate
-   * it with the new payload instead of returning 409 Conflict.
-   * Requires SoftDeleteEnabled. When false (default), 409 is returned.
-   *
-   * Example config: { "ReprovisionOnConflictForSoftDeletedResource": "True" }
-   */
-  [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]?: boolean | string;
-
-  /** @deprecated DERIVED — use profile.resourceTypes instead */
-  [ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED]?: boolean | string;
-
-  /** @deprecated DERIVED — use profile.serviceProviderConfig.bulk.supported instead */
-  [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]?: boolean | string;
-
-  /**
-   * When true, enables per-endpoint credential validation for this endpoint.
-   * Tokens are checked against EndpointCredential table before global fallback.
-   * When false (default), only global SCIM_SHARED_SECRET and OAuth JWT are used.
-   *
-   * Example config: { "PerEndpointCredentialsEnabled": "True" }
-   */
   [ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED]?: boolean | string;
-
-  /**
-   * When true, responses for write operations that had readOnly attributes stripped
-   * include a warning extension URN (urn:scimserver:api:messages:2.0:Warning).
-   * When false (default), readOnly attributes are silently stripped.
-   *
-   * Example config: { "IncludeWarningAboutIgnoredReadOnlyAttribute": "True" }
-   */
   [ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE]?: boolean | string;
-
-  /**
-   * When true AND StrictSchemaValidation is ON, PATCH ops targeting readOnly attrs
-   * are stripped+warned instead of rejected with 400 (overrides G8c).
-   * When false (default), strict mode rejects readOnly PATCH ops.
-   *
-   * Example config: { "IgnoreReadOnlyAttributesInPatch": "True" }
-   */
   [ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH]?: boolean | string;
-
-  /**
-   * Allow any additional configuration flags
-   */
+  [ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.USER_HARD_DELETE_ENABLED]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.SCHEMA_DISCOVERY_ENABLED]?: boolean | string;
+  /** Allow any additional configuration flags. */
   [key: string]: unknown;
 }
 
+// ─── Derived: Default configuration (from definitions) ───────────────────────
+
 /**
- * Helper function to parse config value as boolean
- * Handles string values like "True", "true", "false", etc.
+ * Default configuration values — derived from ENDPOINT_CONFIG_FLAGS_DEFINITIONS.
+ * Not hand-maintained: add a new flag to ENDPOINT_CONFIG_FLAGS_DEFINITIONS
+ * and the default automatically appears here.
  */
-export function getConfigBoolean(config: EndpointConfig | undefined, key: string): boolean {
-  if (!config) return false;
-  
-  const value = config[key];
+export const DEFAULT_ENDPOINT_CONFIG: EndpointConfig = Object.fromEntries(
+  Object.values(ENDPOINT_CONFIG_FLAGS_DEFINITIONS)
+    .filter(def => def.default !== undefined)
+    .map(def => [def.key, def.default]),
+);
+
+// ─── Config Helper Functions ─────────────────────────────────────────────────
+
+/**
+ * Parse a boolean value from raw config input.
+ * Handles native booleans and string values ("True", "true", "1", etc.).
+ */
+function parseBooleanValue(value: unknown): boolean | undefined {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'string') {
-    return value.toLowerCase() === 'true' || value === '1';
+    const lower = value.toLowerCase();
+    if (lower === 'true' || value === '1') return true;
+    if (lower === 'false' || value === '0') return false;
   }
+  return undefined;
+}
+
+/**
+ * Get a boolean config flag value, falling back to the centrally-defined default
+ * from ENDPOINT_CONFIG_FLAGS_DEFINITIONS when the flag is not set in the config.
+ *
+ * Resolution order:
+ * 1. Explicit value in config → parse and return
+ * 2. Default from DEFAULT_ENDPOINT_CONFIG → return
+ * 3. false (for flags with no defined default)
+ */
+export function getConfigBoolean(config: EndpointConfig | undefined, key: string): boolean {
+  // Check explicit value in provided config
+  if (config) {
+    const value = config[key];
+    if (value !== undefined) {
+      const parsed = parseBooleanValue(value);
+      if (parsed !== undefined) return parsed;
+    }
+  }
+  // Fall back to centrally-defined default
+  const defaultValue = DEFAULT_ENDPOINT_CONFIG[key];
+  if (typeof defaultValue === 'boolean') return defaultValue;
   return false;
 }
 
 /**
- * Helper function to parse config value as boolean with a custom default.
- * Unlike getConfigBoolean (which defaults to false), this allows specifying
- * what to return when the key is absent or the config is undefined.
+ * @deprecated Use getConfigBoolean() instead — it now falls back to centrally-defined
+ * defaults from ENDPOINT_CONFIG_FLAGS_DEFINITIONS, making per-call-site defaults unnecessary.
  *
- * Used for flags that should default to true (e.g., AllowAndCoerceBooleanStrings).
+ * Kept for backward compatibility during migration.
  */
 export function getConfigBooleanWithDefault(config: EndpointConfig | undefined, key: string, defaultValue: boolean): boolean {
   if (!config) return defaultValue;
-  
   const value = config[key];
   if (value === undefined) return defaultValue;
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'string') {
-    return value.toLowerCase() === 'true' || value === '1';
-  }
-  return defaultValue;
+  const parsed = parseBooleanValue(value);
+  return parsed !== undefined ? parsed : defaultValue;
 }
 
 /**
- * Helper function to get config string value
+ * Get a string config value.
  */
 export function getConfigString(config: EndpointConfig | undefined, key: string): string | undefined {
   if (!config) return undefined;
-  
   const value = config[key];
   if (typeof value === 'string') return value;
   return undefined;
 }
 
-/**
- * Default configuration values
- */
-export const DEFAULT_ENDPOINT_CONFIG: EndpointConfig = {
-  [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP]: false,
-  [ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP]: false,
-  [ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS]: true,
-  [ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED]: false,
-  [ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED]: false,
-  [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: false,
-  [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: false,
-  [ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS]: true,
-  [ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED]: false,
-  [ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED]: false,
-  [ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED]: false,
-  [ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED]: false,
-  [ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE]: false,
-  [ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH]: false,
-};
+// ─── Validation ──────────────────────────────────────────────────────────────
 
-/**
- * Valid boolean string values (case-insensitive)
- */
+/** Valid boolean string values (case-insensitive). */
 const VALID_BOOLEAN_VALUES = ['true', 'false', '1', '0'];
 
-/**
- * Valid log level names (case-insensitive)
- */
+/** Valid log level names (case-insensitive). */
 const VALID_LOG_LEVEL_NAMES = ['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'off'];
 
 /**
- * Helper to validate a boolean-typed config flag.
- * Avoids repetition for each boolean flag validation.
+ * Validate a boolean-typed config flag value.
  */
 function validateBooleanFlag(config: Record<string, any>, flagName: string): void {
   const value = config[flagName];
@@ -361,65 +435,60 @@ function validateBooleanFlag(config: Record<string, any>, flagName: string): voi
     if (!VALID_BOOLEAN_VALUES.includes(value.toLowerCase())) {
       throw new Error(
         `Invalid value "${value}" for config flag "${flagName}". ` +
-        `Allowed values: "True", "False", true, false, "1", "0".`
+        `Allowed values: "True", "False", true, false, "1", "0".`,
       );
     }
   } else {
     throw new Error(
       `Invalid type for config flag "${flagName}". ` +
-      `Expected boolean or string ("True"/"False"), got ${typeof value}.`
+      `Expected boolean or string ("True"/"False"), got ${typeof value}.`,
     );
   }
 }
 
 /**
- * Validate endpoint configuration
- * Throws an error if any config value is invalid
- * 
+ * Validate a logLevel config flag value.
+ */
+function validateLogLevelFlag(config: Record<string, any>, flagName: string): void {
+  const value = config[flagName];
+  if (value === undefined) return;
+  if (typeof value === 'string') {
+    if (!VALID_LOG_LEVEL_NAMES.includes(value.toLowerCase())) {
+      throw new Error(
+        `Invalid value "${value}" for config flag "${flagName}". ` +
+        `Allowed values: "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF" (case-insensitive).`,
+      );
+    }
+  } else if (typeof value === 'number') {
+    if (!Number.isInteger(value) || value < 0 || value > 6) {
+      throw new Error(
+        `Invalid numeric value ${value} for config flag "${flagName}". ` +
+        `Allowed range: 0 (TRACE) through 6 (OFF).`,
+      );
+    }
+  } else {
+    throw new Error(
+      `Invalid type for config flag "${flagName}". ` +
+      `Expected string ("TRACE"/"DEBUG"/"INFO"/"WARN"/"ERROR"/"FATAL"/"OFF") or number (0-6), got ${typeof value}.`,
+    );
+  }
+}
+
+/**
+ * Validate endpoint configuration.
+ * Driven by ENDPOINT_CONFIG_FLAGS_DEFINITIONS — no manual flag list to maintain.
+ *
  * @param config - The endpoint configuration to validate
  * @throws Error if validation fails
  */
 export function validateEndpointConfig(config: Record<string, any> | undefined): void {
   if (!config) return;
 
-  // Validate boolean flags
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_ADD_MULTIPLE_MEMBERS_TO_GROUP);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.VERBOSE_PATCH_SUPPORTED);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.REPROVISION_ON_CONFLICT_FOR_SOFT_DELETED);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.CUSTOM_RESOURCE_TYPES_ENABLED);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.BULK_OPERATIONS_ENABLED);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.PER_ENDPOINT_CREDENTIALS_ENABLED);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE);
-  validateBooleanFlag(config, ENDPOINT_CONFIG_FLAGS.IGNORE_READONLY_ATTRIBUTES_IN_PATCH);
-
-  // Validate logLevel
-  const logLevelFlag = config[ENDPOINT_CONFIG_FLAGS.LOG_LEVEL];
-  if (logLevelFlag !== undefined) {
-    if (typeof logLevelFlag === 'string') {
-      if (!VALID_LOG_LEVEL_NAMES.includes(logLevelFlag.toLowerCase())) {
-        throw new Error(
-          `Invalid value "${logLevelFlag}" for config flag "${ENDPOINT_CONFIG_FLAGS.LOG_LEVEL}". ` +
-          `Allowed values: "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF" (case-insensitive).`
-        );
-      }
-    } else if (typeof logLevelFlag === 'number') {
-      if (!Number.isInteger(logLevelFlag) || logLevelFlag < 0 || logLevelFlag > 6) {
-        throw new Error(
-          `Invalid numeric value ${logLevelFlag} for config flag "${ENDPOINT_CONFIG_FLAGS.LOG_LEVEL}". ` +
-          `Allowed range: 0 (TRACE) through 6 (OFF).`
-        );
-      }
-    } else {
-      throw new Error(
-        `Invalid type for config flag "${ENDPOINT_CONFIG_FLAGS.LOG_LEVEL}". ` +
-        `Expected string ("TRACE"/"DEBUG"/"INFO"/"WARN"/"ERROR"/"FATAL"/"OFF") or number (0-6), got ${typeof logLevelFlag}.`
-      );
+  for (const def of Object.values(ENDPOINT_CONFIG_FLAGS_DEFINITIONS)) {
+    if (def.type === 'boolean') {
+      validateBooleanFlag(config, def.key);
+    } else if (def.type === 'logLevel') {
+      validateLogLevelFlag(config, def.key);
     }
   }
 }

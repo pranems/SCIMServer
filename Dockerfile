@@ -88,6 +88,7 @@ ENV NODE_ENV=production \
 
 # Create data directory for volume mount
 RUN mkdir -p /app/data && chown scim:nodejs /app/data
+RUN mkdir -p /app/logs && chown scim:nodejs /app/logs
 
 # Copy production node_modules (prod deps + prisma CLI for migrate deploy)
 COPY --from=prod-deps --chown=scim:nodejs /app/node_modules ./node_modules

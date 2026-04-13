@@ -7,14 +7,12 @@
  *
  * @see RFC 7643 §2.1 — Attribute Characteristics
  * @see RFC 7644 §3.14 — ETag/If-Match
- * @see RFC 7644 §3.6 — Soft Delete Guard
  */
 
 import { createScimError } from './scim-errors';
 import { assertIfMatch } from '../interceptors/scim-etag.interceptor';
 import {
   getConfigBoolean,
-  getConfigBooleanWithDefault,
   ENDPOINT_CONFIG_FLAGS,
   type EndpointConfig,
 } from '../../endpoint/endpoint-config.interface';
@@ -62,7 +60,7 @@ export function handleRepositoryError(
     throw createScimError({
       status: repositoryErrorToHttpStatus(error.code),
       detail: `Failed to ${operation}: ${error.message}`,
-      diagnostics: { triggeredBy: 'database' },
+      diagnostics: { errorCode: 'DATABASE_ERROR', triggeredBy: 'database' },
     });
   }
   // Non-RepositoryError — re-throw for GlobalExceptionFilter
@@ -125,7 +123,7 @@ export function ensureSchema(schemas: string[] | undefined, requiredSchema: stri
       status: 400,
       scimType: 'invalidSyntax',
       detail: `Missing required schema '${requiredSchema}'.`,
-      diagnostics: {},
+      diagnostics: { errorCode: 'VALIDATION_REQUIRED' },
     });
   }
 }
@@ -151,7 +149,7 @@ export function enforceIfMatch(
         status: 428,
         detail:
           `If-Match header is required for this operation. Current ETag: ${currentETag}`,
-        diagnostics: { triggeredBy: 'RequireIfMatch', currentETag },
+        diagnostics: { errorCode: 'PRECONDITION_IF_MATCH', triggeredBy: 'RequireIfMatch', currentETag },
       });
     }
     return;
@@ -329,32 +327,6 @@ function stripSubAttrs(value: unknown, subNever: Set<string>): void {
         }
       }
     }
-  }
-}
-
-/**
- * RFC 7644 §3.6: Guard against operations on soft-deleted resources.
- *
- * When SoftDeleteEnabled is active, a resource with deletedAt set is considered
- * deleted and MUST return 404 for all subsequent operations (GET, PATCH, PUT, DELETE).
- * Note: A resource disabled via PATCH (active=false) is NOT soft-deleted — only DELETE sets deletedAt.
- */
-export function guardSoftDeleted(
-  record: { deletedAt?: Date | null },
-  config: EndpointConfig | undefined,
-  scimId: string,
-  logger: ScimLogger,
-  logCategory: LogCategory,
-): void {
-  const softDelete = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED);
-  if (softDelete && record.deletedAt != null) {
-    logger.debug(logCategory, 'Soft-deleted resource accessed — returning 404', { scimId });
-    throw createScimError({
-      status: 404,
-      scimType: 'noTarget',
-      detail: `Resource ${scimId} not found.`,
-      diagnostics: { triggeredBy: 'SoftDeleteEnabled' },
-    });
   }
 }
 
@@ -811,7 +783,7 @@ export class ScimSchemaHelpers {
             detail:
               `Extension URN "${key}" found in request body but not declared in schemas[]. ` +
               `When StrictSchemaValidation is enabled, all extension URNs must be listed in the schemas array.`,
-            diagnostics: { triggeredBy: 'StrictSchemaValidation' },
+            diagnostics: { errorCode: 'VALIDATION_SCHEMA', triggeredBy: 'StrictSchemaValidation' },
           });
         }
         if (!registeredLower.has(keyLower)) {
@@ -821,7 +793,7 @@ export class ScimSchemaHelpers {
             detail:
               `Extension URN "${key}" is not a registered extension schema for this endpoint. ` +
               `Registered extensions: [${registeredUrns.join(', ')}].`,
-            diagnostics: { triggeredBy: 'StrictSchemaValidation' },
+            diagnostics: { errorCode: 'VALIDATION_SCHEMA', triggeredBy: 'StrictSchemaValidation' },
           });
         }
       }
@@ -839,6 +811,9 @@ export class ScimSchemaHelpers {
    *  - Multi-valued / single-valued enforcement
    *  - Sub-attribute validation for complex types
    *
+   * G2 fix: Required attribute checks now run unconditionally on create/replace
+   * (RFC 7643 §2.4 "MUST"). Type/unknown validation remains strict-gated.
+   *
    * @see RFC 7643 §2.1 — Attribute Characteristics
    */
   validatePayloadSchema(
@@ -847,7 +822,26 @@ export class ScimSchemaHelpers {
     config: EndpointConfig | undefined,
     mode: 'create' | 'replace' | 'patch',
   ): void {
-    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
+    const isStrict = getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION);
+
+    if (!isStrict) {
+      // G2: Required checks run unconditionally for create/replace (RFC 7643 §2.4 "MUST")
+      // Type/unknown/canonical validation remains strict-gated
+      if (mode === 'patch') return; // PATCH with strict OFF has no required check per RFC 7644 §3.5.2
+      const schemas = this.buildSchemaDefinitions(dto, endpointId);
+      if (schemas.length === 0) return;
+      const cache = this.getSchemaCache(endpointId);
+      const result = SchemaValidator.validateRequired(dto, schemas, mode,
+        cache ? { coreAttrMap: cache.coreAttrMap, extensionSchemaMap: cache.extensionSchemaMap } : undefined);
+      if (!result.valid) {
+        const details = result.errors.map((e) => `${e.path}: ${e.message}`).join('; ');
+        throw createScimError({
+          status: 400,
+          scimType: result.errors[0]?.scimType ?? 'invalidValue',
+          detail: `Schema validation failed: ${details}`,
+          diagnostics: { errorCode: 'VALIDATION_SCHEMA', triggeredBy: 'RequiredAttributeCheck' },
+        });
+      }
       return;
     }
 
@@ -866,7 +860,7 @@ export class ScimSchemaHelpers {
         status: 400,
         scimType: result.errors[0]?.scimType ?? 'invalidValue',
         detail: `Schema validation failed: ${details}`,
-        diagnostics: { triggeredBy: 'StrictSchemaValidation' },
+        diagnostics: { errorCode: 'VALIDATION_SCHEMA', triggeredBy: 'StrictSchemaValidation' },
       });
     }
   }
@@ -1014,10 +1008,9 @@ export class ScimSchemaHelpers {
     endpointId: string,
     config?: EndpointConfig,
   ): void {
-    const coerceEnabled = getConfigBooleanWithDefault(
+    const coerceEnabled = getConfigBoolean(
       config,
       ENDPOINT_CONFIG_FLAGS.ALLOW_AND_COERCE_BOOLEAN_STRINGS,
-      true,
     );
     if (!coerceEnabled) return;
 
@@ -1093,7 +1086,7 @@ export class ScimSchemaHelpers {
         status: 400,
         scimType: 'invalidFilter',
         detail: `Filter validation failed: ${details}`,
-        diagnostics: { triggeredBy: 'StrictSchemaValidation' },
+        diagnostics: { errorCode: 'VALIDATION_FILTER', triggeredBy: 'StrictSchemaValidation' },
       });
     }
   }
@@ -1177,6 +1170,7 @@ export class ScimSchemaHelpers {
    * Compares the existing resource state with the incoming payload
    * and rejects changes to attributes declared as immutable.
    * Only runs when StrictSchemaValidation is enabled.
+   * G1 fix: Immutable enforcement now runs unconditionally (RFC 7643 §2.2 "SHALL NOT").
    *
    * @param existingPayload - Reconstructed existing resource payload (caller builds this)
    * @param incomingDto     - Incoming request payload
@@ -1187,9 +1181,8 @@ export class ScimSchemaHelpers {
     endpointId: string,
     config?: EndpointConfig,
   ): void {
-    if (!getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION)) {
-      return;
-    }
+    // G1: Immutable enforcement runs unconditionally (RFC 7643 §2.2 "SHALL NOT")
+    // Previously gated by StrictSchemaValidation — removed per P4 analysis
 
     const cache = this.getSchemaCache(endpointId);
     let result;
@@ -1213,7 +1206,7 @@ export class ScimSchemaHelpers {
         status: 400,
         scimType: 'mutability',
         detail: `Immutable attribute violation: ${details}`,
-        diagnostics: { triggeredBy: 'StrictSchemaValidation' },
+        diagnostics: { errorCode: 'VALIDATION_IMMUTABLE' },
       });
     }
   }
@@ -1322,7 +1315,7 @@ export function assertSchemaUniqueness(
   endpointId: string,
   payload: Record<string, unknown>,
   uniqueAttrs: Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }>,
-  existingResources: Array<{ scimId: string; rawPayload: string | Record<string, unknown>; deletedAt?: Date | null }>,
+  existingResources: Array<{ scimId: string; rawPayload: string | Record<string, unknown> }>,
   excludeScimId?: string,
 ): void {
   if (uniqueAttrs.length === 0) return;
@@ -1334,8 +1327,6 @@ export function assertSchemaUniqueness(
     for (const existing of existingResources) {
       // Skip self (for PUT/PATCH)
       if (excludeScimId && existing.scimId === excludeScimId) continue;
-      // Skip soft-deleted resources
-      if (existing.deletedAt != null) continue;
 
       const existingValue = extractFromRawPayload(existing.rawPayload, desc);
       if (existingValue === undefined || existingValue === null) continue;
@@ -1348,7 +1339,7 @@ export function assertSchemaUniqueness(
           status: 409,
           scimType: 'uniqueness',
           detail: `Attribute '${attrPath}' value '${String(incomingValue)}' must be unique within the endpoint.`,
-          diagnostics: { triggeredBy: 'SchemaUniqueness' },
+          diagnostics: { errorCode: 'UNIQUENESS_SCHEMA_ATTR', triggeredBy: 'SchemaUniqueness' },
         });
       }
     }

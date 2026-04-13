@@ -125,6 +125,11 @@ When working on development projects:
 - Build incrementally on documented progress and achievements
 - Use MCP servers for accurate, up-to-date information when needed
 
+## Git Commit Rules (CRITICAL)
+- NEVER use `git commit --amend` unless explicitly specified by the user — always create new commits with `git commit -m "..."`
+- NEVER rewrite history on commits that have been pushed
+- Always use `git add -A; git commit -m "<descriptive message>"` for saving progress
+
 ## Feature / Bug-Fix Commit Checklist (Standing Rule)
 
 Every feature or significant change commit MUST include ALL of the following before committing. Do NOT skip any item:

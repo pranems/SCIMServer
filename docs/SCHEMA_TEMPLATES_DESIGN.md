@@ -176,7 +176,7 @@ Together, these three documents tell a client everything it needs to know to int
 | `id` | **true** | readOnly | Server-assigned |
 | `displayName` | **true** | readWrite | **Only RFC-mandated client-supplied required attribute** |
 | `members`, `externalId` | false | varies | Optional |
-| `active` |  | — | **Not in RFC**  our project addition for soft-delete support |
+| `active` |  | — | **Not in RFC**  our project addition for deactivation support |
 
 #### Common Attributes (RFC 7643 §3.1)
 
@@ -235,7 +235,7 @@ Real-world examples: Entra ID requires `emails`, Okta requires `name`, Google re
 flowchart LR
     subgraph BEFORE["Before: 4 Data Sources"]
         direction TB
-        B1["Endpoint.config JSONB<br/>{SoftDeleteEnabled: true,<br/>AllowAndCoerce: true}"]
+        B1["Endpoint.config JSONB<br/>{UserSoftDeleteEnabled: true,<br/>AllowAndCoerce: true}"]
         B2["EndpointSchema rows<br/>urn:enterprise:2.0:User<br/>urn:msfttest:custom:User"]
         B3["EndpointResourceType rows<br/>Device (custom RT)"]
         B4["Hardcoded in code<br/>User schema, Group schema,<br/>SPC capabilities"]
@@ -243,7 +243,7 @@ flowchart LR
 
     subgraph AFTER["After: 1 Data Source"]
         direction TB
-        A1["Endpoint.profile JSONB<br/>{<br/>  schemas: [...all...],<br/>  resourceTypes: [...all...],<br/>  serviceProviderConfig: {...},<br/>  settings: {SoftDeleteEnabled: true}<br/>}"]
+        A1["Endpoint.profile JSONB<br/>{<br/>  schemas: [...all...],<br/>  resourceTypes: [...all...],<br/>  serviceProviderConfig: {...},<br/>  settings: {UserSoftDeleteEnabled: true}<br/>}"]
     end
 
     B1 -->|"settings"| A1
@@ -434,7 +434,7 @@ When `EndpointProfile` is submitted (via preset expansion, inline profile, or PA
       id (required:true, readOnly) on every resource type schema
       userName on User, displayName on Group (RFC-mandated)
       externalId and meta on all schemas (project default)
-      active on Group (always  simplest approach, supports soft-delete)
+      active on Group (always  simplest approach, supports deactivation)
 3. TIGHTEN-ONLY  For each explicitly set characteristic, verify same-or-tighter vs. RFC baseline:
      required:    only false  true
      returned:    validate direction (never=tightest exclusion, always=tightest inclusion)
@@ -565,7 +565,7 @@ sequenceDiagram
     API-->>Op: 201 Created { id, name, profile, ... }
 
     Note over Op,Reg: Customize settings
-    Op->>API: PATCH /admin/endpoints/:id { profile: { settings: { SoftDeleteEnabled: true } } }
+    Op->>API: PATCH /admin/endpoints/:id { profile: { settings: { UserSoftDeleteEnabled: true } } }
     API->>API: Deep merge settings into existing profile
     API->>Val: validate(mergedProfile)
     Val-->>API:  valid
@@ -596,7 +596,7 @@ When PATCHing an endpoint's `profile` field:
 PATCH /admin/endpoints/:id
 {
   "profile": {
-    "settings": { "SoftDeleteEnabled": "True" }
+    "settings": { "UserSoftDeleteEnabled": "True" }
   }
 }
 ```
@@ -625,14 +625,14 @@ flowchart LR
     end
 
     subgraph "PATCH Body"
-        PATCH["profile: {<br/>  settings: {<br/>    SoftDeleteEnabled: true<br/>  }<br/>}"]
+        PATCH["profile: {<br/>  settings: {<br/>    UserSoftDeleteEnabled: true<br/>  }<br/>}"]
     end
 
     subgraph "Result"
         S2["schemas: [User, Group] unchanged"]
         RT2["resourceTypes: [User, Group] unchanged"]
         SPC2["serviceProviderConfig: {...} unchanged"]
-        SET2["settings: {<br/>  AllowAndCoerce: true<br/>  SoftDeleteEnabled: true  NEW<br/>}"]
+        SET2["settings: {<br/>  AllowAndCoerce: true<br/>  UserSoftDeleteEnabled: true  NEW<br/>}"]
     end
 
     S1 -.->|"not in PATCH = keep"| S2
@@ -1270,11 +1270,10 @@ These settings live in `profile.settings` and are persisted as part of the endpo
 | `PatchOpAllowRemoveAllMembers` | boolean | `true` | Allow remove-all-members via `path=members` |
 | `VerbosePatchSupported` | boolean | `false` | Enable dot-notation path resolution in PATCH |
 | `logLevel` | string/number |  | Per-endpoint log level override |
-| `SoftDeleteEnabled` | boolean | `false` | DELETE  soft-delete (`active=false`) |
+| `UserSoftDeleteEnabled` | boolean | `false` | Controls whether PATCH active=false is allowed |
 | `StrictSchemaValidation` | boolean | `false` | Require extension URNs in `schemas[]` |
 | `RequireIfMatch` | boolean | `false` | Mandatory ETag on PUT/PATCH/DELETE |
 | `AllowAndCoerceBooleanStrings` | boolean | `true` | Coerce `"True"`/`"False"` strings to booleans |
-| `ReprovisionOnConflictForSoftDeletedResource` | boolean | `false` | Re-activate soft-deleted on conflict |
 | `PerEndpointCredentialsEnabled` | boolean | `false` | Enable per-endpoint bearer token validation |
 | `IncludeWarningAboutIgnoredReadOnlyAttribute` | boolean | `false` | Warn on readOnly attribute stripping |
 | `IgnoreReadOnlyAttributesInPatch` | boolean | `false` | Strip (don't reject) readOnly PATCH ops |
@@ -1301,7 +1300,7 @@ flowchart TB
             ETAG_CAP["etag.supported"]
         end
         subgraph Settings["settings (13 persisted)"]
-            SD["SoftDeleteEnabled"]
+            SD["UserSoftDeleteEnabled"]
             SSV["StrictSchemaValidation"]
             ABC["AllowAndCoerceBooleanStrings"]
             RIM["RequireIfMatch"]
@@ -1362,7 +1361,7 @@ These are the absolute minimums that the validation engine enforces  everything 
 | Endpoints can omit Group entirely | **RFC** | RFC 7643 §6  resource types are server-declared |
 | `externalId` auto-included by default | **Project** | Not RFC-required, but most IdP clients expect it |
 | `meta` auto-included by default | **Project** | Not RFC-required, but essential for ETag support |
-| `active` always included on Group | **Project** | Not RFC-defined, but needed for soft-delete support |
+| `active` always included on Group | **Project** | Not RFC-defined, but needed for deactivation support |
 
 ### 10.3 What Can Be Customized
 
@@ -1439,7 +1438,7 @@ All 38 existing SCIM features validated against the embedded profile model:
 | 9 | Sorting |  None | `sort.supported` from SPC |
 | 10 | Pagination |  None | Unaffected |
 | 11 | ETag/Conditional requests |  None | `etag.supported` from SPC, `RequireIfMatch` from settings |
-| 12 | Soft delete |  None | `SoftDeleteEnabled` from settings |
+| 12 | Deactivation |  None | `UserSoftDeleteEnabled` from settings |
 | 13 | Strict schema validation |  None | `StrictSchemaValidation` from settings |
 | 14 | Boolean string coercion |  None | `AllowAndCoerceBooleanStrings` from settings |
 | 15 | Re-provision on conflict |  None | Setting in `profile.settings` |
@@ -1584,7 +1583,7 @@ curl -X PATCH http://localhost:6000/admin/endpoints/$EP_ID \
   -d '{
     "profile": {
       "settings": {
-        "SoftDeleteEnabled": "True",
+        "UserSoftDeleteEnabled": "True",
         "StrictSchemaValidation": "True"
       }
     }
@@ -1822,7 +1821,7 @@ All design decisions finalized during the March 912, 2026 design sessions.
 | D4 | `ProfilePreset` DB table? | **No**  code constants only | YAGNI; built-in presets don't need CRUD persistence |
 | D5 | Default preset | **`entra-id`** (not `rfc-standard`) | Entra ID is the primary deployment target |
 | D6 | POST accepts what? | `{ name, profilePreset? }` OR `{ name, profile? }` OR `{ name }` ( default `entra-id`) | Mutually exclusive `profilePreset` vs. `profile`; simple path for 90% case |
-| D7 | Group `active` attribute | **Always included** (simplest approach) | Supports soft-delete without conditional logic |
+| D7 | Group `active` attribute | **Always included** (simplest approach) | Supports deactivation without conditional logic |
 | D8 | `BulkOperationsEnabled` flag | **Derived** from `serviceProviderConfig.bulk.supported` | Avoids redundant flag that can contradict SPC |
 | D9 | `CustomResourceTypesEnabled` flag | **Derived** from `resourceTypes[]` having non-User/Group entries | Same  avoids contradiction |
 | D10 | msfttest extensions placement | **Only in `entra-id` and `entra-id-minimal` presets** | Microsoft-specific; not needed for generic SCIM |
@@ -2109,7 +2108,7 @@ All design decisions finalized during the March 912, 2026 design sessions.
 
 | Tests | Details |
 |---|---|
-| PATCH settings (deep merge) | Add `SoftDeleteEnabled: true`  only that setting changes |
+| PATCH settings (deep merge) | Add `UserSoftDeleteEnabled: true`  only that setting changes |
 | PATCH schemas (full replace) | Replace schemas array  settings unchanged |
 | PATCH with validation error | Loosen `userName.required`  400 |
 | Verify discovery reflects changes | After PATCH, `/Schemas` returns updated schemas |

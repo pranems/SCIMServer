@@ -364,7 +364,7 @@ SCIMServer is a **SCIM 2.0 provisioning visibility and monitoring tool** for Mic
 | 400 | `invalidSyntax` | Malformed request body |
 | 401 | — | Missing or invalid authentication |
 | 404 | `noTarget` | Resource not found |
-| 409 | `uniqueness` | Duplicate userName or externalId |
+| 409 | `uniqueness` | Duplicate userName (Users) or displayName (Groups) |
 | 413 | `tooLarge` | Request exceeds size limit |
 | 500 | — | Internal server error |
 

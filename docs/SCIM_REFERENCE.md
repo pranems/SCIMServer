@@ -1,7 +1,7 @@
 # SCIM v2 Reference & Examples
 
 > **Status**: Living reference  
-> **Last Updated**: March 31, 2026  
+> **Last Updated**: April 10, 2026  
 > **Baseline**: SCIMServer (current release)
 
 > Implementation-agnostic SCIM 2.0 API reference with runnable example payloads.
@@ -32,14 +32,14 @@
 | `POST` | `/Users/.search` | Search users via POST body |
 | `PUT` | `/Users/{id}` | Replace user |
 | `PATCH` | `/Users/{id}` | Partial update user |
-| `DELETE` | `/Users/{id}` | Delete user (204). Hard-delete by default; set `SoftDeleteEnabled=True` for soft-delete |
+| `DELETE` | `/Users/{id}` | Delete user (204). Always hard-deletes (row removed) |
 | `POST` | `/Groups` | Create group (201 + Location) |
 | `GET` | `/Groups` | List groups |
 | `GET` | `/Groups/{id}` | Get group by ID |
 | `POST` | `/Groups/.search` | Search groups via POST body |
 | `PUT` | `/Groups/{id}` | Replace group |
 | `PATCH` | `/Groups/{id}` | Partial update group |
-| `DELETE` | `/Groups/{id}` | Delete group (204). Hard-delete by default; set `SoftDeleteEnabled=True` for soft-delete |
+| `DELETE` | `/Groups/{id}` | Delete group (204). Always hard-deletes (row removed) |
 | `POST` | `/Bulk` | Bulk operations (RFC 7644 §3.7) — requires `bulk.supported = true` |
 | `GET` | `/Me` | Get current authenticated user (requires OAuth JWT with `sub` claim) |
 | `PUT` | `/Me` | Replace current user |

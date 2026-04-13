@@ -210,7 +210,8 @@ curl -X PUT https://HOST/scim/admin/log-config \
     "format": "json",
     "availableLevels": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"],
     "availableCategories": ["http", "auth", "scim.user", "scim.group", "scim.patch",
-      "scim.filter", "scim.discovery", "endpoint", "database", "oauth", "general"]
+      "scim.filter", "scim.discovery", "endpoint", "database", "oauth",
+      "scim.bulk", "scim.resource", "config", "general"]
   }
 }
 ```

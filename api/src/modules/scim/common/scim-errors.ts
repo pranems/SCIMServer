@@ -11,6 +11,8 @@ import { getCorrelationContext } from '../../logging/scim-logger.service';
 export interface ScimErrorDiagnostics {
   /** Which config flag activated this validation path (e.g., 'StrictSchemaValidation') */
   triggeredBy?: string;
+  /** Machine-readable error code for programmatic handling */
+  errorCode?: string;
 
   // ── Attribute-level RCA context ────────────────────────────────────
 
@@ -88,6 +90,7 @@ export function createScimError({ status, detail, scimType, diagnostics }: ScimE
     if (ctx?.requestId) diag.requestId = ctx.requestId;
     if (ctx?.endpointId) diag.endpointId = ctx.endpointId;
     if (diagnostics?.triggeredBy) diag.triggeredBy = diagnostics.triggeredBy;
+    if (diagnostics?.errorCode) diag.errorCode = diagnostics.errorCode;
 
     // Build logsUrl pointing to endpoint-scoped or admin log endpoint
     if (ctx?.requestId) {
@@ -98,6 +101,7 @@ export function createScimError({ status, detail, scimType, diagnostics }: ScimE
 
     // Attribute-level RCA context
     if (diagnostics?.operation) diag.operation = diagnostics.operation;
+    else if (ctx?.operation) diag.operation = ctx.operation;
     if (diagnostics?.attributePath) diag.attributePath = diagnostics.attributePath;
     if (diagnostics?.schemaUrn) diag.schemaUrn = diagnostics.schemaUrn;
 

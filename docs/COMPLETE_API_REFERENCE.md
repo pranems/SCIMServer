@@ -1,10 +1,10 @@
 # Complete API Reference
 
-> **Version:** 0.31.0 · **Updated:** March 31, 2026  
+> **Version:** 0.34.0 · **Updated:** April 10, 2026  
 > **Base URL:** `http://localhost:{PORT}/scim` (default port: 3000, Docker: 8080)  
 > **Content-Type:** `application/scim+json` for SCIM operations, `application/json` for admin  
 > **URL Rewriting:** `/scim/v2/*` is automatically rewritten to `/scim/*`  
-> **Total Endpoints:** 76 across 18 controllers
+> **Total Endpoints:** 82 across 19 controllers
 
 ---
 
@@ -121,7 +121,7 @@ Content-Type: application/json
 | `name` | string (required) | Unique endpoint name |
 | `displayName` | string | Human-readable label |
 | `description` | string | Description |
-| `profilePreset` | string | One of: `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `lexmark` |
+| `profilePreset` | string | One of: `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `user-only-with-custom-ext` |
 | `profile` | object | Inline profile (schemas, resourceTypes, serviceProviderConfig, settings) — mutually exclusive with `profilePreset` |
 
 ### GET /scim/admin/endpoints
@@ -201,7 +201,7 @@ Content-Type: application/json
   "displayName": "Updated Name",
   "profile": {
     "settings": {
-      "SoftDeleteEnabled": "True",
+      "UserHardDeleteEnabled": "True",
       "RequireIfMatch": "True"
     }
   }
@@ -328,7 +328,7 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "version": "0.31.0",
+  "version": "0.34.0",
   "node": "v24.x.x",
   "uptime": 3600,
   "persistence": "inmemory",
@@ -944,7 +944,7 @@ Authorization: Bearer <token>
 If-Match: W/"1"
 ```
 
-**Response: 204 No Content** (or soft-delete with `active: false` if `SoftDeleteEnabled` is on)
+**Response: 204 No Content** (hard-delete by default; blocked with 400 if `UserHardDeleteEnabled` / `GroupHardDeleteEnabled` is off)
 
 ---
 
@@ -1026,7 +1026,7 @@ Content-Type: application/scim+json
 }
 ```
 
-> **Note:** Multi-member add/remove requires `MultiOpPatchRequestAddMultipleMembersToGroup` / `MultiOpPatchRequestRemoveMultipleMembersFromGroup` to be enabled in endpoint settings.
+> **Note:** Multi-member add/remove requires `MultiMemberPatchOpForGroupEnabled` to be enabled in endpoint settings (default: enabled).
 
 ### DELETE — Delete Group
 

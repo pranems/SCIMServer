@@ -53,6 +53,7 @@ export class ScimContentTypeValidationMiddleware implements NestMiddleware {
       detail: `Unsupported Media Type: "${req.headers['content-type'] ?? '(none)'}"` +
               `. SCIM requests MUST use Content-Type "application/scim+json" or "application/json" (RFC 7644 \u00a73.1).`,
       scimType: 'invalidValue',
+      diagnostics: { errorCode: 'CONTENT_TYPE_UNSUPPORTED' },
     });
   }
 }

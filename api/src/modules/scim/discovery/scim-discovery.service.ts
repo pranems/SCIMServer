@@ -46,7 +46,7 @@ export class ScimDiscoveryService {
   getSchemaByUrn(schemaUrn: string) {
     const schema = this.registry.getSchema(schemaUrn);
     if (!schema) {
-      throw createScimError({ status: 404, detail: `Schema "${schemaUrn}" not found.` });
+      throw createScimError({ status: 404, detail: `Schema "${schemaUrn}" not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
     return schema;
   }
@@ -67,7 +67,7 @@ export class ScimDiscoveryService {
   getResourceTypeById(resourceTypeId: string) {
     const rt = this.registry.getResourceType(resourceTypeId);
     if (!rt) {
-      throw createScimError({ status: 404, detail: `ResourceType "${resourceTypeId}" not found.` });
+      throw createScimError({ status: 404, detail: `ResourceType "${resourceTypeId}" not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
     return rt;
   }
@@ -101,7 +101,7 @@ export class ScimDiscoveryService {
   getSchemaByUrnFromProfile(schemaUrn: string, profile?: EndpointProfile) {
     const schema = profile?.schemas?.find(s => s.id === schemaUrn);
     if (!schema) {
-      throw createScimError({ status: 404, detail: `Schema "${schemaUrn}" not found.` });
+      throw createScimError({ status: 404, detail: `Schema "${schemaUrn}" not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
     return {
       ...schema,
@@ -131,7 +131,7 @@ export class ScimDiscoveryService {
   getResourceTypeByIdFromProfile(resourceTypeId: string, profile?: EndpointProfile) {
     const rt = profile?.resourceTypes?.find(r => r.id === resourceTypeId || r.name === resourceTypeId);
     if (!rt) {
-      throw createScimError({ status: 404, detail: `ResourceType "${resourceTypeId}" not found.` });
+      throw createScimError({ status: 404, detail: `ResourceType "${resourceTypeId}" not found.`, diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' } });
     }
     return {
       ...rt,

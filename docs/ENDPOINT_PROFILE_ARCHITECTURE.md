@@ -205,12 +205,12 @@ POST /scim/admin/endpoints
 {
   "name": "custom-settings",
   "profile": {
-    "settings": { "SoftDeleteEnabled": "True" },
+    "settings": { "UserSoftDeleteEnabled": "True" },
     "serviceProviderConfig": { "bulk": { "supported": true } }
   }
 }
 ```
-Result: `rfc-standard` base + `bulk.supported=true` in SPC + `SoftDeleteEnabled` in `settings`.
+Result: `rfc-standard` base + `bulk.supported=true` in SPC + `UserSoftDeleteEnabled` in `settings`.
 
 ---
 
@@ -271,9 +271,9 @@ PATCH {
 **Example 5: Add a setting (additive merge)**
 ```json
 PATCH /scim/admin/endpoints/:id
-{ "profile": { "settings": { "SoftDeleteEnabled": "True" } } }
+{ "profile": { "settings": { "UserSoftDeleteEnabled": "True" } } }
 ```
-Result: `SoftDeleteEnabled` added to existing settings. Schemas, RTs, SPC unchanged.
+Result: `UserSoftDeleteEnabled` added to existing settings. Schemas, RTs, SPC unchanged.
 
 **Example 6: Replace SPC (shallow merge)**
 ```json

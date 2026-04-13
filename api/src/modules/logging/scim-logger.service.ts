@@ -9,6 +9,7 @@ import {
   logLevelName,
   parseLogLevel,
 } from './log-levels';
+import { FileLogTransport } from './file-log-transport';
 
 /**
  * Correlation context attached to every log entry within a single request.
@@ -139,11 +140,15 @@ export class ScimLogger {
   /** EventEmitter for real-time log streaming (SSE subscribers) */
   private readonly emitter = new EventEmitter();
 
+  /** File log transport for main + per-endpoint log files */
+  private readonly fileTransport: FileLogTransport;
+
   constructor() {
     this.config = buildDefaultLogConfig();
     this.maxRingBufferSize = Number(process.env.LOG_RING_BUFFER_SIZE) || ScimLogger.DEFAULT_RING_BUFFER_SIZE;
     // Allow many SSE subscribers without warning
     this.emitter.setMaxListeners(50);
+    this.fileTransport = new FileLogTransport();
   }
 
   /** Get the configured slow request threshold in ms */
@@ -217,6 +222,18 @@ export class ScimLogger {
   /** Remove endpoint-specific log level override. */
   clearEndpointLevel(endpointId: string): void {
     delete this.config.endpointLevels[endpointId];
+  }
+
+  // ── File logging (per-endpoint) ───────────────────────────────────
+
+  /** Enable file logging for a specific endpoint. */
+  enableEndpointFileLogging(endpointId: string, endpointName: string): void {
+    this.fileTransport.enableEndpointFile(endpointId, endpointName);
+  }
+
+  /** Disable file logging for a specific endpoint. */
+  disableEndpointFileLogging(endpointId: string): void {
+    this.fileTransport.disableEndpointFile(endpointId);
   }
 
   // ─── Level-specific methods ───────────────────────────────────────
@@ -337,6 +354,9 @@ export class ScimLogger {
 
     // Notify live stream subscribers (SSE)
     this.emitter.emit('log', entry);
+
+    // Write to log files (main + per-endpoint)
+    this.fileTransport.write(entry);
 
     // Emit to console
     this.emit(level, entry);

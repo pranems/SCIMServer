@@ -170,6 +170,7 @@ export class BulkProcessorService {
           status: 400,
           detail: `Unsupported resource type in bulk path: "${resourceType}". Supported: Users, Groups.`,
           scimType: SCIM_ERROR_TYPE.INVALID_PATH,
+          diagnostics: { errorCode: 'BULK_UNSUPPORTED_RESOURCE' },
         });
     }
   }
@@ -189,7 +190,7 @@ export class BulkProcessorService {
   ): Promise<BulkOperationResult> {
     switch (method) {
       case 'POST': {
-        if (!data) throw createScimError({ status: 400, detail: 'POST operation requires data.', scimType: SCIM_ERROR_TYPE.INVALID_VALUE });
+        if (!data) throw createScimError({ status: 400, detail: 'POST operation requires data.', scimType: SCIM_ERROR_TYPE.INVALID_VALUE, diagnostics: { errorCode: 'BULK_INVALID_OPERATION' } });
         const result = await this.usersService.createUserForEndpoint(data as any, baseUrl, endpointId, config);
         const location = `${baseUrl}/Users/${result.id}`;
         // Track bulkId → SCIM id for cross-references
@@ -206,8 +207,8 @@ export class BulkProcessorService {
       }
 
       case 'PUT': {
-        if (!resourceId) throw createScimError({ status: 400, detail: 'PUT operation requires resource ID in path.', scimType: SCIM_ERROR_TYPE.INVALID_PATH });
-        if (!data) throw createScimError({ status: 400, detail: 'PUT operation requires data.', scimType: SCIM_ERROR_TYPE.INVALID_VALUE });
+        if (!resourceId) throw createScimError({ status: 400, detail: 'PUT operation requires resource ID in path.', scimType: SCIM_ERROR_TYPE.INVALID_PATH, diagnostics: { errorCode: 'BULK_INVALID_OPERATION' } });
+        if (!data) throw createScimError({ status: 400, detail: 'PUT operation requires data.', scimType: SCIM_ERROR_TYPE.INVALID_VALUE, diagnostics: { errorCode: 'BULK_INVALID_OPERATION' } });
         const result = await this.usersService.replaceUserForEndpoint(resourceId, data as any, baseUrl, endpointId, config, op.version);
         return {
           method: 'PUT',
@@ -219,8 +220,8 @@ export class BulkProcessorService {
       }
 
       case 'PATCH': {
-        if (!resourceId) throw createScimError({ status: 400, detail: 'PATCH operation requires resource ID in path.', scimType: SCIM_ERROR_TYPE.INVALID_PATH });
-        if (!data) throw createScimError({ status: 400, detail: 'PATCH operation requires data.', scimType: SCIM_ERROR_TYPE.INVALID_VALUE });
+        if (!resourceId) throw createScimError({ status: 400, detail: 'PATCH operation requires resource ID in path.', scimType: SCIM_ERROR_TYPE.INVALID_PATH, diagnostics: { errorCode: 'BULK_INVALID_OPERATION' } });
+        if (!data) throw createScimError({ status: 400, detail: 'PATCH operation requires data.', scimType: SCIM_ERROR_TYPE.INVALID_VALUE, diagnostics: { errorCode: 'BULK_INVALID_OPERATION' } });
         const result = await this.usersService.patchUserForEndpoint(resourceId, data as any, baseUrl, endpointId, config, op.version);
         return {
           method: 'PATCH',
@@ -232,7 +233,7 @@ export class BulkProcessorService {
       }
 
       case 'DELETE': {
-        if (!resourceId) throw createScimError({ status: 400, detail: 'DELETE operation requires resource ID in path.', scimType: SCIM_ERROR_TYPE.INVALID_PATH });
+        if (!resourceId) throw createScimError({ status: 400, detail: 'DELETE operation requires resource ID in path.', scimType: SCIM_ERROR_TYPE.INVALID_PATH, diagnostics: { errorCode: 'BULK_INVALID_OPERATION' } });
         await this.usersService.deleteUserForEndpoint(resourceId, endpointId, config, op.version);
         return {
           method: 'DELETE',
@@ -243,7 +244,7 @@ export class BulkProcessorService {
       }
 
       default:
-        throw createScimError({ status: 400, detail: `Unsupported method: ${method}`, scimType: SCIM_ERROR_TYPE.INVALID_VALUE });
+        throw createScimError({ status: 400, detail: `Unsupported method: ${method}`, scimType: SCIM_ERROR_TYPE.INVALID_VALUE, diagnostics: { errorCode: 'BULK_INVALID_OPERATION' } });
     }
   }
 
@@ -262,7 +263,7 @@ export class BulkProcessorService {
   ): Promise<BulkOperationResult> {
     switch (method) {
       case 'POST': {
-        if (!data) throw createScimError({ status: 400, detail: 'POST operation requires data.', scimType: SCIM_ERROR_TYPE.INVALID_VALUE });
+        if (!data) throw createScimError({ status: 400, detail: 'POST operation requires data.', scimType: SCIM_ERROR_TYPE.INVALID_VALUE, diagnostics: { errorCode: 'BULK_INVALID_OPERATION' } });
         const result = await this.groupsService.createGroupForEndpoint(data as any, baseUrl, endpointId, config);
         const location = `${baseUrl}/Groups/${result.id}`;
         if (op.bulkId) {
@@ -278,8 +279,8 @@ export class BulkProcessorService {
       }
 
       case 'PUT': {
-        if (!resourceId) throw createScimError({ status: 400, detail: 'PUT operation requires resource ID in path.', scimType: SCIM_ERROR_TYPE.INVALID_PATH });
-        if (!data) throw createScimError({ status: 400, detail: 'PUT operation requires data.', scimType: SCIM_ERROR_TYPE.INVALID_VALUE });
+        if (!resourceId) throw createScimError({ status: 400, detail: 'PUT operation requires resource ID in path.', scimType: SCIM_ERROR_TYPE.INVALID_PATH, diagnostics: { errorCode: 'BULK_INVALID_OPERATION' } });
+        if (!data) throw createScimError({ status: 400, detail: 'PUT operation requires data.', scimType: SCIM_ERROR_TYPE.INVALID_VALUE, diagnostics: { errorCode: 'BULK_INVALID_OPERATION' } });
         const result = await this.groupsService.replaceGroupForEndpoint(resourceId, data as any, baseUrl, endpointId, config, op.version);
         return {
           method: 'PUT',
@@ -291,8 +292,8 @@ export class BulkProcessorService {
       }
 
       case 'PATCH': {
-        if (!resourceId) throw createScimError({ status: 400, detail: 'PATCH operation requires resource ID in path.', scimType: SCIM_ERROR_TYPE.INVALID_PATH });
-        if (!data) throw createScimError({ status: 400, detail: 'PATCH operation requires data.', scimType: SCIM_ERROR_TYPE.INVALID_VALUE });
+        if (!resourceId) throw createScimError({ status: 400, detail: 'PATCH operation requires resource ID in path.', scimType: SCIM_ERROR_TYPE.INVALID_PATH, diagnostics: { errorCode: 'BULK_INVALID_OPERATION' } });
+        if (!data) throw createScimError({ status: 400, detail: 'PATCH operation requires data.', scimType: SCIM_ERROR_TYPE.INVALID_VALUE, diagnostics: { errorCode: 'BULK_INVALID_OPERATION' } });
         const result = await this.groupsService.patchGroupForEndpoint(resourceId, data as any, baseUrl, endpointId, config, op.version);
         return {
           method: 'PATCH',
@@ -304,7 +305,7 @@ export class BulkProcessorService {
       }
 
       case 'DELETE': {
-        if (!resourceId) throw createScimError({ status: 400, detail: 'DELETE operation requires resource ID in path.', scimType: SCIM_ERROR_TYPE.INVALID_PATH });
+        if (!resourceId) throw createScimError({ status: 400, detail: 'DELETE operation requires resource ID in path.', scimType: SCIM_ERROR_TYPE.INVALID_PATH, diagnostics: { errorCode: 'BULK_INVALID_OPERATION' } });
         await this.groupsService.deleteGroupForEndpoint(resourceId, endpointId, config, op.version);
         return {
           method: 'DELETE',
@@ -315,7 +316,7 @@ export class BulkProcessorService {
       }
 
       default:
-        throw createScimError({ status: 400, detail: `Unsupported method: ${method}`, scimType: SCIM_ERROR_TYPE.INVALID_VALUE });
+        throw createScimError({ status: 400, detail: `Unsupported method: ${method}`, scimType: SCIM_ERROR_TYPE.INVALID_VALUE, diagnostics: { errorCode: 'BULK_INVALID_OPERATION' } });
     }
   }
 
@@ -335,6 +336,7 @@ export class BulkProcessorService {
         status: 400,
         detail: `POST operations must target a collection path (e.g., "/${resourceType}"), not a specific resource.`,
         scimType: SCIM_ERROR_TYPE.INVALID_PATH,
+        diagnostics: { errorCode: 'BULK_INVALID_OPERATION' },
       });
     }
     if (method !== 'POST' && !resourceId) {
@@ -342,6 +344,7 @@ export class BulkProcessorService {
         status: 400,
         detail: `${method} operations must target a specific resource (e.g., "/${resourceType}/{id}").`,
         scimType: SCIM_ERROR_TYPE.INVALID_PATH,
+        diagnostics: { errorCode: 'BULK_INVALID_OPERATION' },
       });
     }
   }
@@ -358,6 +361,7 @@ export class BulkProcessorService {
           status: 400,
           detail: `Unresolved bulkId reference: "${id}". Referenced bulkId must appear in a prior POST operation.`,
           scimType: SCIM_ERROR_TYPE.INVALID_VALUE,
+          diagnostics: { errorCode: 'BULK_UNRESOLVED_BULKID' },
         });
       }
       this.logger.debug(LogCategory.SCIM_BULK, 'Resolved bulkId reference', { bulkId: id, resolvedId: resolved });

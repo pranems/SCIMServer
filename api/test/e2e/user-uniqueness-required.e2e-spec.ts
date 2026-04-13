@@ -14,11 +14,12 @@ import { validUser, patchOp, resetFixtureCounter } from './helpers/fixtures';
  * RFC 7643 §2.2 — uniqueness:server (409) and required:true (400) E2E tests.
  *
  * These tests cover gaps identified in the attribute-characteristics audit:
- * - User PUT 409 when userName/externalId conflicts with another user
- * - User PATCH 409 when userName/externalId conflicts with another user
+ * - User PUT 409 when userName conflicts with another user
+ * - User PATCH 409 when userName conflicts with another user
  * - PUT 400 when required userName is missing
  * - User PUT allows self-update (same userName, no conflict)
  * - User PATCH allows same userName (no conflict)
+ * - User PUT/PATCH allows duplicate externalId (uniqueness:none per RFC 7643)
  */
 describe('User Uniqueness & Required Field Enforcement (E2E)', () => {
   let app: INestApplication;
@@ -73,15 +74,15 @@ describe('User Uniqueness & Required Field Enforcement (E2E)', () => {
       expect(res.body.scimType).toBe('uniqueness');
     });
 
-    it('PUT should return 409 when changing externalId to existing one', async () => {
+    it('PUT should allow duplicate externalId (uniqueness:none per RFC 7643)', async () => {
       const body = validUser({
         userName: 'uniq-put-user2@test.com',
-        externalId: 'ext-put-1', // collides with user1
+        externalId: 'ext-put-1', // same as user1 — allowed
       });
 
-      const res = await scimPut(app, `${basePath}/Users/${user2Id}`, token, body).expect(409);
+      const res = await scimPut(app, `${basePath}/Users/${user2Id}`, token, body).expect(200);
 
-      expect(res.body.scimType).toBe('uniqueness');
+      expect(res.body.externalId).toBe('ext-put-1');
     });
 
     it('PUT should allow self-update with same userName (no conflict)', async () => {
@@ -146,14 +147,14 @@ describe('User Uniqueness & Required Field Enforcement (E2E)', () => {
       expect(res.body.scimType).toBe('uniqueness');
     });
 
-    it('PATCH should return 409 when changing externalId to existing one', async () => {
+    it('PATCH should allow duplicate externalId (uniqueness:none per RFC 7643)', async () => {
       const patch = patchOp([
         { op: 'replace', path: 'externalId', value: 'ext-patch-1' },
       ]);
 
-      const res = await scimPatch(app, `${basePath}/Users/${user2Id}`, token, patch).expect(409);
+      const res = await scimPatch(app, `${basePath}/Users/${user2Id}`, token, patch).expect(200);
 
-      expect(res.body.scimType).toBe('uniqueness');
+      expect(res.body.externalId).toBe('ext-patch-1');
     });
 
     it('PATCH no-path should return 409 when userName collides', async () => {
@@ -174,6 +175,75 @@ describe('User Uniqueness & Required Field Enforcement (E2E)', () => {
       const res = await scimPatch(app, `${basePath}/Users/${user2Id}`, token, patch).expect(200);
 
       expect(res.body.displayName).toBe('Patched Display Name');
+    });
+  });
+
+  // ───────────── uniqueness:none — positive tests (v0.33.0) ─────────────
+
+  describe('uniqueness:none — duplicates allowed (v0.33.0)', () => {
+    let endpointId: string;
+    let basePath: string;
+
+    beforeAll(async () => {
+      resetFixtureCounter();
+      endpointId = await createEndpoint(app, token);
+      basePath = scimBasePath(endpointId);
+    });
+
+    it('POST two Users with same externalId should both succeed (201)', async () => {
+      const user1 = validUser({ externalId: 'dup-post-ext' });
+      const user2 = validUser({ externalId: 'dup-post-ext' });
+
+      const res1 = await scimPost(app, `${basePath}/Users`, token, user1).expect(201);
+      const res2 = await scimPost(app, `${basePath}/Users`, token, user2).expect(201);
+
+      expect(res1.body.externalId).toBe('dup-post-ext');
+      expect(res2.body.externalId).toBe('dup-post-ext');
+      expect(res1.body.id).not.toBe(res2.body.id);
+    });
+
+    it('POST two Users with same displayName should both succeed (201)', async () => {
+      const user1 = validUser({ displayName: 'Same Display Name' });
+      const user2 = validUser({ displayName: 'Same Display Name' });
+
+      const res1 = await scimPost(app, `${basePath}/Users`, token, user1).expect(201);
+      const res2 = await scimPost(app, `${basePath}/Users`, token, user2).expect(201);
+
+      expect(res1.body.displayName).toBe('Same Display Name');
+      expect(res2.body.displayName).toBe('Same Display Name');
+    });
+  });
+
+  // ───────────── Group externalId — duplicates allowed (v0.33.0) ─────────────
+
+  describe('Group externalId — uniqueness:none (v0.33.0)', () => {
+    let endpointId: string;
+    let basePath: string;
+
+    beforeAll(async () => {
+      resetFixtureCounter();
+      endpointId = await createEndpoint(app, token);
+      basePath = scimBasePath(endpointId);
+    });
+
+    it('POST two Groups with same externalId should both succeed (201)', async () => {
+      const group1 = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+        displayName: `uniq-grp-1-${Date.now()}`,
+        externalId: 'dup-grp-ext',
+      };
+      const group2 = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+        displayName: `uniq-grp-2-${Date.now()}`,
+        externalId: 'dup-grp-ext',
+      };
+
+      const res1 = await scimPost(app, `${basePath}/Groups`, token, group1).expect(201);
+      const res2 = await scimPost(app, `${basePath}/Groups`, token, group2).expect(201);
+
+      expect(res1.body.externalId).toBe('dup-grp-ext');
+      expect(res2.body.externalId).toBe('dup-grp-ext');
+      expect(res1.body.id).not.toBe(res2.body.id);
     });
   });
 

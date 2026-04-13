@@ -1,7 +1,8 @@
 # SCIMServer — Context Instructions for AI Assistants
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.  
-> **Last Updated**: March 31, 2026
+> **Version**: 0.34.0  
+> **Last Updated**: April 10, 2026
 
 ---
 
@@ -54,7 +55,7 @@ api/src/modules/scim/services/
   bulk-processor.service.ts         (395 lines)          # Bulk operation processor with bulkId resolution
   scim-metadata.service.ts                               # buildLocation, timestamp
 api/src/modules/scim/common/
-  scim-service-helpers.ts           (353 lines)          # G17: parseJson, ensureSchema, enforceIfMatch, sanitizeBooleanStrings, guardSoftDeleted, ScimSchemaHelpers
+  scim-service-helpers.ts           (353 lines)          # G17: parseJson, ensureSchema, enforceIfMatch, sanitizeBooleanStrings, ScimSchemaHelpers
 api/src/modules/scim/dto/
   bulk-request.dto.ts                                    # BulkRequest/Response DTOs (RFC 7644 §3.7)
   create-user.dto.ts                                     # User creation DTO
@@ -75,7 +76,7 @@ api/src/modules/scim/controllers/
 api/src/modules/scim/common/
   scim-sort.util.ts                                      # sortBy/sortOrder mapping utility (v0.20.0)
 api/src/modules/endpoint/
-  endpoint-config.interface.ts                           # 14 boolean flags + logLevel in interface (12 persisted in profile.settings, 2 derived from profile structure) + helpers
+  endpoint-config.interface.ts                           # 13 boolean flags + logLevel (settings v7) + helpers
   endpoint-context.storage.ts                            # AsyncLocalStorage for endpoint context
 api/src/modules/scim/filters/
   scim-filter-parser.ts                                  # Filter AST attribute path extraction
@@ -330,7 +331,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 
 > 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
 
-- **Unit** and **E2E** — all passing (0 failures). **Unit**: 3,090 (74 suites). **E2E**: 817 (37 suites). **Live integration** — ~951 assertions + 112 Lexmark
+- **Unit** and **E2E** — all passing (0 failures). **Unit**: 3,193 (80 suites). **E2E**: 939 (45 suites). **Live integration** — ~739 assertions
 - **SCIM Validator**: 10/12 mandatory (2 FP on Lexmark returned:never), 25/25 on standard profile + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
 - Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`
@@ -343,7 +344,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 
 ### Phase 13: Endpoint Profile Configuration (v0.28.0) → Phase 14: Legacy Removal (v0.29.0)
 - Unified `Endpoint.profile` JSONB replaces fragmented `config` + `EndpointSchema` + `EndpointResourceType`
-- 5 named presets (entra-id default, entra-id-minimal, rfc-standard, minimal, user-only)
+- 6 named presets (entra-id default, entra-id-minimal, rfc-standard, minimal, user-only, user-only-with-custom-ext)
 - RFC-native SCIM discovery format as configuration input with auto-expand + tighten-only validation
 - New API: `GET /admin/profile-presets` (read-only, 5 presets)
 - Prisma schema: 5 models (Endpoint, RequestLog, ScimResource, ResourceMember, EndpointCredential)
@@ -396,7 +397,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 8. **The `/scim/v2` rewrite** — Express middleware in `main.ts` rewrites `/scim/v2/*` to `/scim/*` for spec compliance
 9. **SchemaValidator** — 950-line pure domain class for RFC 7643 payload validation. Gated behind `StrictSchemaValidation` config flag. Validates type, mutability (readOnly + immutable), required attrs, unknown attrs, sub-attributes, canonicalValues, size limits. New: `collectBooleanAttributeNames()` for schema-aware boolean coercion, `collectReadOnlyAttributes()` for readOnly stripping, `validateFilterAttributePaths()` for filter validation (V32).
 10. **Repository Pattern** — `IUserRepository`/`IGroupRepository` interfaces injected via tokens. `PERSISTENCE_BACKEND` env var toggles between `prisma` and `inmemory` implementations.
-11. **G2 is DONE + G17 RESOLVED (v0.20.0)** — Database uses a single unified `ScimResource` table. G17 service code deduplication completed: 13+ duplicate private methods extracted into `scim-service-helpers.ts` (`parseJson`, `ensureSchema`, `enforceIfMatch`, `sanitizeBooleanStrings`, `guardSoftDeleted`, `ScimSchemaHelpers`). All 27 migration gaps (G1–G20) are now closed.
+11. **G2 is DONE + G17 RESOLVED (v0.20.0)** — Database uses a single unified `ScimResource` table. G17 service code deduplication completed: 13+ duplicate private methods extracted into `scim-service-helpers.ts` (`parseJson`, `ensureSchema`, `enforceIfMatch`, `sanitizeBooleanStrings`, `ScimSchemaHelpers`). All 27 migration gaps (G1–G20) are now closed.
 12. **3-tier auth guard** — `SharedSecretGuard` now implements 3-tier fallback: per-endpoint bcrypt credentials → OAuth JWT → global `SCIM_SHARED_SECRET`. Per-endpoint credentials use lazy-loaded native bcrypt (12 rounds, cached after first use). Active + non-expired credentials only.
 13. **CORS wildcard** — `main.ts` sets `origin: true` (accept all origins). Should be restricted for production deployments.
 

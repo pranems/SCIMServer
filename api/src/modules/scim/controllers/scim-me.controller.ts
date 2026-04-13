@@ -113,6 +113,7 @@ export class ScimMeController {
         detail:
           'The /Me endpoint requires OAuth authentication with a JWT token ' +
           'whose "sub" claim matches a SCIM User\'s userName.',
+        diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' },
       });
     }
 
@@ -122,6 +123,7 @@ export class ScimMeController {
         status: 404,
         scimType: 'noTarget',
         detail: 'JWT token does not contain a "sub" claim. Cannot resolve /Me identity.',
+        diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' },
       });
     }
 
@@ -139,6 +141,7 @@ export class ScimMeController {
         status: 404,
         scimType: 'noTarget',
         detail: `No User resource found with userName matching the authenticated subject "${sub}".`,
+        diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' },
       });
     }
 

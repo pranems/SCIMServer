@@ -12,7 +12,6 @@ export interface GroupRecord {
   externalId: string | null;
   displayName: string;
   active: boolean;
-  deletedAt: Date | null;
   rawPayload: string;
   version: number;
   meta: string | null;
@@ -39,7 +38,7 @@ export interface GroupCreateInput {
   scimId: string;
   externalId: string | null;
   displayName: string;
-  active: boolean;
+  active?: boolean;  // Settings v7: Groups no longer have active; defaults to true in DB
   rawPayload: string;
   meta: string;
 }
@@ -48,7 +47,6 @@ export interface GroupUpdateInput {
   displayName?: string;
   externalId?: string | null;
   active?: boolean;
-  deletedAt?: Date | null;
   rawPayload?: string;
   meta?: string;
 }

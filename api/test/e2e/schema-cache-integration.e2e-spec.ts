@@ -260,6 +260,7 @@ describe('Schema Cache Integration (E2E)', () => {
         .send({
           name: `cache-refresh-${ts()}`,
           profile: {
+            settings: { StrictSchemaValidation: 'False' },
             schemas: [{ id: CORE_SCHEMA, name: 'User', attributes: 'all' }],
             resourceTypes: [
               { id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: CORE_SCHEMA, schemaExtensions: [] },
