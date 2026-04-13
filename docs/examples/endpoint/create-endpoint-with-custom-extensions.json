@@ -1,0 +1,586 @@
+{
+  "_comment": "One-click examples: Creating endpoints with custom extensions (all combinations)",
+  "_usage": "POST /scim/admin/endpoints — Copy any top-level object as request body",
+  "_docs": "See ENDPOINT_PROFILE_ARCHITECTURE.md, SCHEMA_CUSTOMIZATION_GUIDE.md",
+
+
+  "1_user_extension_basic": {
+    "_comment": "Custom extension on User — single scalar attribute",
+    "name": "user-ext-basic",
+    "profile": {
+      "schemas": [
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+        {
+          "id": "urn:example:scim:extension:badge:2.0:User",
+          "name": "BadgeExtension",
+          "description": "Employee badge extension",
+          "attributes": [
+            { "name": "badgeNumber", "type": "string", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": true, "uniqueness": "none" }
+          ]
+        },
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" }
+      ],
+      "resourceTypes": [
+        { "id": "User", "name": "User", "endpoint": "/Users", "description": "User Account",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+          "schemaExtensions": [{ "schema": "urn:example:scim:extension:badge:2.0:User", "required": false }] },
+        { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] }
+      ],
+      "serviceProviderConfig": {
+        "patch": { "supported": true }, "bulk": { "supported": false },
+        "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
+        "etag": { "supported": true }, "changePassword": { "supported": false }
+      }
+    }
+  },
+
+
+  "2_user_extension_full_characteristics": {
+    "_comment": "Custom extension on User — all mutability/returned characteristics demonstrated",
+    "name": "user-ext-full",
+    "profile": {
+      "schemas": [
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+        {
+          "id": "urn:example:scim:extension:hr:2.0:User",
+          "name": "HRExtension",
+          "description": "HR system attributes with all characteristic types",
+          "attributes": [
+            { "name": "badgeNumber",      "type": "string",   "multiValued": false, "required": false, "mutability": "readWrite",  "returned": "default", "caseExact": true,  "uniqueness": "server",  "description": "Unique badge (readWrite, default, unique)" },
+            { "name": "costCenter",       "type": "string",   "multiValued": false, "required": false, "mutability": "readWrite",  "returned": "default", "caseExact": false, "uniqueness": "none",    "description": "Cost center (readWrite, default)" },
+            { "name": "secretToken",      "type": "string",   "multiValued": false, "required": false, "mutability": "writeOnly",  "returned": "never",   "caseExact": true,  "uniqueness": "none",    "description": "Write-only — never returned in responses" },
+            { "name": "hireDate",         "type": "dateTime", "multiValued": false, "required": false, "mutability": "immutable",  "returned": "default", "caseExact": false, "uniqueness": "none",    "description": "Set once on create, cannot be changed" },
+            { "name": "internalNotes",    "type": "string",   "multiValued": false, "required": false, "mutability": "readWrite",  "returned": "request", "caseExact": false, "uniqueness": "none",    "description": "Only returned when ?attributes=internalNotes" },
+            { "name": "tags",             "type": "string",   "multiValued": true,  "required": false, "mutability": "readWrite",  "returned": "default", "caseExact": false, "uniqueness": "none",    "description": "Multi-valued string array" },
+            { "name": "isContractor",     "type": "boolean",  "multiValued": false, "required": false, "mutability": "readWrite",  "returned": "default", "caseExact": false, "uniqueness": "none",    "description": "Boolean attribute" },
+            { "name": "floorNumber",      "type": "integer",  "multiValued": false, "required": false, "mutability": "readWrite",  "returned": "default", "caseExact": false, "uniqueness": "none",    "description": "Integer attribute" }
+          ]
+        },
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" }
+      ],
+      "resourceTypes": [
+        { "id": "User", "name": "User", "endpoint": "/Users", "description": "User Account",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+          "schemaExtensions": [{ "schema": "urn:example:scim:extension:hr:2.0:User", "required": false }] },
+        { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] }
+      ],
+      "serviceProviderConfig": {
+        "patch": { "supported": true }, "bulk": { "supported": true, "maxOperations": 100, "maxPayloadSize": 1048576 },
+        "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
+        "etag": { "supported": true }, "changePassword": { "supported": false }
+      }
+    }
+  },
+
+
+  "3_group_extension": {
+    "_comment": "Custom extension on Group only — User remains standard",
+    "name": "group-ext",
+    "profile": {
+      "schemas": [
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" },
+        {
+          "id": "urn:example:scim:extension:dept:2.0:Group",
+          "name": "DeptExtension",
+          "description": "Department extension for Groups",
+          "attributes": [
+            { "name": "department",   "type": "string", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" },
+            { "name": "costCode",     "type": "string", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" },
+            { "name": "managerEmail", "type": "string", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" }
+          ]
+        }
+      ],
+      "resourceTypes": [
+        { "id": "User", "name": "User", "endpoint": "/Users", "description": "User",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:User", "schemaExtensions": [] },
+        { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:Group",
+          "schemaExtensions": [{ "schema": "urn:example:scim:extension:dept:2.0:Group", "required": false }] }
+      ],
+      "serviceProviderConfig": {
+        "patch": { "supported": true }, "bulk": { "supported": false },
+        "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
+        "etag": { "supported": true }, "changePassword": { "supported": false }
+      }
+    }
+  },
+
+
+  "4_both_user_and_group_extensions": {
+    "_comment": "Custom extensions on BOTH User and Group",
+    "name": "dual-ext",
+    "profile": {
+      "schemas": [
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" },
+        {
+          "id": "urn:acme:scim:extension:hr:2.0:User",
+          "name": "AcmeHR",
+          "description": "ACME HR extension for Users",
+          "attributes": [
+            { "name": "division",    "type": "string", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" },
+            { "name": "employeeId",  "type": "string", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": true,  "uniqueness": "server" }
+          ]
+        },
+        {
+          "id": "urn:acme:scim:extension:org:2.0:Group",
+          "name": "AcmeOrg",
+          "description": "ACME Org extension for Groups",
+          "attributes": [
+            { "name": "orgUnit",      "type": "string", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" },
+            { "name": "classification","type": "string", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" }
+          ]
+        }
+      ],
+      "resourceTypes": [
+        { "id": "User", "name": "User", "endpoint": "/Users", "description": "User",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+          "schemaExtensions": [{ "schema": "urn:acme:scim:extension:hr:2.0:User", "required": false }] },
+        { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:Group",
+          "schemaExtensions": [{ "schema": "urn:acme:scim:extension:org:2.0:Group", "required": false }] }
+      ],
+      "serviceProviderConfig": {
+        "patch": { "supported": true }, "bulk": { "supported": true, "maxOperations": 100, "maxPayloadSize": 1048576 },
+        "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
+        "etag": { "supported": true }, "changePassword": { "supported": false }
+      }
+    }
+  },
+
+
+  "5_multiple_extensions_on_user": {
+    "_comment": "Multiple extensions on same User (e.g., HR + IT + Security)",
+    "name": "multi-ext-user",
+    "profile": {
+      "schemas": [
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" },
+        {
+          "id": "urn:corp:scim:extension:hr:2.0:User",
+          "name": "HRExtension",
+          "description": "HR department attributes",
+          "attributes": [
+            { "name": "hireDate",       "type": "dateTime", "multiValued": false, "required": false, "mutability": "immutable", "returned": "default", "caseExact": false, "uniqueness": "none" },
+            { "name": "costCenter",     "type": "string",   "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" }
+          ]
+        },
+        {
+          "id": "urn:corp:scim:extension:it:2.0:User",
+          "name": "ITExtension",
+          "description": "IT department attributes",
+          "attributes": [
+            { "name": "laptop",         "type": "string",  "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" },
+            { "name": "vpnEnabled",     "type": "boolean", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" }
+          ]
+        },
+        {
+          "id": "urn:corp:scim:extension:security:2.0:User",
+          "name": "SecurityExtension",
+          "description": "Security attributes",
+          "attributes": [
+            { "name": "clearanceLevel", "type": "string",  "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" },
+            { "name": "accessPin",      "type": "string",  "multiValued": false, "required": false, "mutability": "writeOnly", "returned": "never",   "caseExact": true,  "uniqueness": "none" }
+          ]
+        }
+      ],
+      "resourceTypes": [
+        { "id": "User", "name": "User", "endpoint": "/Users", "description": "User",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+          "schemaExtensions": [
+            { "schema": "urn:corp:scim:extension:hr:2.0:User", "required": false },
+            { "schema": "urn:corp:scim:extension:it:2.0:User", "required": false },
+            { "schema": "urn:corp:scim:extension:security:2.0:User", "required": false }
+          ] },
+        { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] }
+      ],
+      "serviceProviderConfig": {
+        "patch": { "supported": true }, "bulk": { "supported": true, "maxOperations": 100, "maxPayloadSize": 1048576 },
+        "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
+        "etag": { "supported": true }, "changePassword": { "supported": false }
+      }
+    }
+  },
+
+
+  "6_extension_with_complex_attributes": {
+    "_comment": "Extension with complex (nested) and multi-valued complex attributes",
+    "name": "complex-ext",
+    "profile": {
+      "schemas": [
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" },
+        {
+          "id": "urn:example:scim:extension:identity:2.0:User",
+          "name": "IdentityExtension",
+          "description": "Extension with complex and multi-valued complex attributes",
+          "attributes": [
+            {
+              "name": "primaryOffice",
+              "type": "complex", "multiValued": false, "required": false,
+              "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none",
+              "description": "Single-valued complex: office location",
+              "subAttributes": [
+                { "name": "building",  "type": "string",  "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" },
+                { "name": "floor",     "type": "integer", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" },
+                { "name": "deskCode",  "type": "string",  "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": true,  "uniqueness": "none" }
+              ]
+            },
+            {
+              "name": "badges",
+              "type": "complex", "multiValued": true, "required": false,
+              "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none",
+              "description": "Multi-valued complex: security badges",
+              "subAttributes": [
+                { "name": "badgeId",   "type": "string",  "multiValued": false, "required": true,  "mutability": "readWrite", "returned": "default", "caseExact": true,  "uniqueness": "none" },
+                { "name": "level",     "type": "string",  "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none", "canonicalValues": ["basic", "elevated", "admin"] },
+                { "name": "issuedAt",  "type": "dateTime","multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" }
+              ]
+            },
+            {
+              "name": "simpleTag",
+              "type": "string", "multiValued": false, "required": false,
+              "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none"
+            }
+          ]
+        }
+      ],
+      "resourceTypes": [
+        { "id": "User", "name": "User", "endpoint": "/Users", "description": "User",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+          "schemaExtensions": [{ "schema": "urn:example:scim:extension:identity:2.0:User", "required": false }] },
+        { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] }
+      ],
+      "serviceProviderConfig": {
+        "patch": { "supported": true }, "bulk": { "supported": false },
+        "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
+        "etag": { "supported": true }, "changePassword": { "supported": false }
+      }
+    }
+  },
+
+
+  "7_required_extension": {
+    "_comment": "Required extension — ALL users MUST include extension data on create",
+    "name": "required-ext",
+    "profile": {
+      "schemas": [
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" },
+        {
+          "id": "urn:example:scim:extension:onboarding:2.0:User",
+          "name": "OnboardingExtension",
+          "description": "Mandatory onboarding data — required on every user",
+          "attributes": [
+            { "name": "enrollmentId", "type": "string",  "multiValued": false, "required": true,  "mutability": "immutable", "returned": "default", "caseExact": true,  "uniqueness": "server" },
+            { "name": "sponsor",      "type": "string",  "multiValued": false, "required": true,  "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" }
+          ]
+        }
+      ],
+      "resourceTypes": [
+        { "id": "User", "name": "User", "endpoint": "/Users", "description": "User",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+          "schemaExtensions": [{ "schema": "urn:example:scim:extension:onboarding:2.0:User", "required": true }] },
+        { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] }
+      ],
+      "serviceProviderConfig": {
+        "patch": { "supported": true }, "bulk": { "supported": false },
+        "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
+        "etag": { "supported": true }, "changePassword": { "supported": false }
+      },
+      "settings": {
+        "StrictSchemaValidation": "True"
+      }
+    }
+  },
+
+
+  "8_extension_plus_enterprise_user": {
+    "_comment": "Custom extension PLUS standard EnterpriseUser extension on User",
+    "name": "enterprise-plus-custom",
+    "profile": {
+      "schemas": [
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+        { "id": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", "name": "EnterpriseUser", "attributes": "all" },
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" },
+        {
+          "id": "urn:example:scim:extension:custom:2.0:User",
+          "name": "CustomExtension",
+          "description": "Custom extension alongside standard EnterpriseUser",
+          "attributes": [
+            { "name": "region",       "type": "string",  "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" },
+            { "name": "subsidiaryId", "type": "string",  "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": true,  "uniqueness": "none" }
+          ]
+        }
+      ],
+      "resourceTypes": [
+        { "id": "User", "name": "User", "endpoint": "/Users", "description": "User",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+          "schemaExtensions": [
+            { "schema": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", "required": false },
+            { "schema": "urn:example:scim:extension:custom:2.0:User", "required": false }
+          ] },
+        { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] }
+      ],
+      "serviceProviderConfig": {
+        "patch": { "supported": true }, "bulk": { "supported": true, "maxOperations": 100, "maxPayloadSize": 1048576 },
+        "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
+        "etag": { "supported": true }, "changePassword": { "supported": false }
+      }
+    }
+  },
+
+
+  "9_extension_with_strict_settings": {
+    "_comment": "Extension + strict schema validation + Entra-compatible settings",
+    "name": "strict-ext",
+    "profile": {
+      "schemas": [
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" },
+        {
+          "id": "urn:example:scim:extension:billing:2.0:User",
+          "name": "BillingExtension",
+          "description": "Billing attributes with strict validation enforced",
+          "attributes": [
+            { "name": "billingCode",  "type": "string",  "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": true,  "uniqueness": "none" },
+            { "name": "invoiceEmail", "type": "string",  "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" }
+          ]
+        }
+      ],
+      "resourceTypes": [
+        { "id": "User", "name": "User", "endpoint": "/Users", "description": "User",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+          "schemaExtensions": [{ "schema": "urn:example:scim:extension:billing:2.0:User", "required": false }] },
+        { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] }
+      ],
+      "serviceProviderConfig": {
+        "patch": { "supported": true }, "bulk": { "supported": false },
+        "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
+        "etag": { "supported": true }, "changePassword": { "supported": false }
+      },
+      "settings": {
+        "StrictSchemaValidation": "True",
+        "AllowAndCoerceBooleanStrings": "True",
+        "VerbosePatchSupported": "True",
+        "IgnoreReadOnlyAttributesInPatch": "True",
+        "IncludeWarningAboutIgnoredReadOnlyAttribute": "True"
+      }
+    }
+  },
+
+
+  "10_extension_plus_custom_resource_type": {
+    "_comment": "Custom extension on User PLUS custom resource type (Device)",
+    "name": "ext-plus-custom-rt",
+    "profile": {
+      "schemas": [
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" },
+        {
+          "id": "urn:example:scim:extension:access:2.0:User",
+          "name": "AccessExtension",
+          "description": "Access management extension",
+          "attributes": [
+            { "name": "accessLevel", "type": "string", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" }
+          ]
+        },
+        {
+          "id": "urn:example:scim:schemas:core:2.0:Device",
+          "name": "Device",
+          "description": "Network device schema",
+          "attributes": [
+            { "name": "deviceName",    "type": "string", "multiValued": false, "required": true,  "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "server" },
+            { "name": "deviceType",    "type": "string", "multiValued": false, "required": true,  "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none", "canonicalValues": ["laptop", "desktop", "mobile", "server"] },
+            { "name": "serialNumber",  "type": "string", "multiValued": false, "required": false, "mutability": "immutable", "returned": "default", "caseExact": true,  "uniqueness": "server" }
+          ]
+        }
+      ],
+      "resourceTypes": [
+        { "id": "User", "name": "User", "endpoint": "/Users", "description": "User",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+          "schemaExtensions": [{ "schema": "urn:example:scim:extension:access:2.0:User", "required": false }] },
+        { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] },
+        { "id": "Device", "name": "Device", "endpoint": "/Devices", "description": "Network Device",
+          "schema": "urn:example:scim:schemas:core:2.0:Device", "schemaExtensions": [] }
+      ],
+      "serviceProviderConfig": {
+        "patch": { "supported": true }, "bulk": { "supported": true, "maxOperations": 100, "maxPayloadSize": 1048576 },
+        "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
+        "etag": { "supported": true }, "changePassword": { "supported": false }
+      }
+    }
+  },
+
+
+  "11_extension_on_custom_resource_type": {
+    "_comment": "Extension ON a custom resource type (Device + warranty extension)",
+    "name": "ext-on-custom-rt",
+    "profile": {
+      "schemas": [
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" },
+        {
+          "id": "urn:example:scim:schemas:core:2.0:Device",
+          "name": "Device",
+          "description": "Device schema",
+          "attributes": [
+            { "name": "deviceName",   "type": "string", "multiValued": false, "required": true,  "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "server" },
+            { "name": "deviceType",   "type": "string", "multiValued": false, "required": true,  "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" },
+            { "name": "serialNumber", "type": "string", "multiValued": false, "required": false, "mutability": "immutable", "returned": "default", "caseExact": true,  "uniqueness": "server" }
+          ]
+        },
+        {
+          "id": "urn:example:scim:extension:warranty:2.0:Device",
+          "name": "WarrantyExtension",
+          "description": "Warranty data for devices",
+          "attributes": [
+            { "name": "warrantyExpiry", "type": "dateTime", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" },
+            { "name": "warrantyType",   "type": "string",   "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none", "canonicalValues": ["standard", "extended", "premium"] }
+          ]
+        }
+      ],
+      "resourceTypes": [
+        { "id": "User", "name": "User", "endpoint": "/Users", "description": "User",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:User", "schemaExtensions": [] },
+        { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] },
+        { "id": "Device", "name": "Device", "endpoint": "/Devices", "description": "Network Device",
+          "schema": "urn:example:scim:schemas:core:2.0:Device",
+          "schemaExtensions": [{ "schema": "urn:example:scim:extension:warranty:2.0:Device", "required": false }] }
+      ],
+      "serviceProviderConfig": {
+        "patch": { "supported": true }, "bulk": { "supported": false },
+        "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
+        "etag": { "supported": true }, "changePassword": { "supported": false }
+      }
+    }
+  },
+
+
+  "12_user_only_with_extension_no_group": {
+    "_comment": "User-only endpoint (no Groups) with custom extension",
+    "name": "user-only-ext",
+    "profile": {
+      "schemas": [
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+        {
+          "id": "urn:example:scim:extension:vendor:2.0:User",
+          "name": "VendorExtension",
+          "description": "Vendor-specific user attributes",
+          "attributes": [
+            { "name": "vendorId",    "type": "string",  "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": true,  "uniqueness": "none" },
+            { "name": "licenseType", "type": "string",  "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" }
+          ]
+        }
+      ],
+      "resourceTypes": [
+        { "id": "User", "name": "User", "endpoint": "/Users", "description": "User",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+          "schemaExtensions": [{ "schema": "urn:example:scim:extension:vendor:2.0:User", "required": false }] }
+      ],
+      "serviceProviderConfig": {
+        "patch": { "supported": true }, "bulk": { "supported": false },
+        "filter": { "supported": true, "maxResults": 100 }, "sort": { "supported": false },
+        "etag": { "supported": false }, "changePassword": { "supported": false }
+      }
+    }
+  },
+
+
+  "_13_patch_add_extension_to_existing_endpoint": {
+    "_comment": "PATCH /scim/admin/endpoints/{id} — Add extension to an existing endpoint. NOTE: schemas + resourceTypes must be sent together (replace semantics)",
+    "_method": "PATCH",
+    "_path": "/scim/admin/endpoints/{id}",
+    "profile": {
+      "schemas": [
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" },
+        {
+          "id": "urn:example:scim:extension:newext:2.0:User",
+          "name": "NewExtension",
+          "description": "Extension added after initial creation",
+          "attributes": [
+            { "name": "newField", "type": "string", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" }
+          ]
+        }
+      ],
+      "resourceTypes": [
+        { "id": "User", "name": "User", "endpoint": "/Users", "description": "User",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+          "schemaExtensions": [{ "schema": "urn:example:scim:extension:newext:2.0:User", "required": false }] },
+        { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+          "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] }
+      ]
+    }
+  },
+
+
+  "_usage_create_user_with_extension": {
+    "_comment": "POST /scim/endpoints/{endpointId}/Users — Create user with extension data (use with any endpoint above)",
+    "_method": "POST",
+    "_path": "/scim/endpoints/{endpointId}/Users",
+    "schemas": [
+      "urn:ietf:params:scim:schemas:core:2.0:User",
+      "urn:example:scim:extension:hr:2.0:User"
+    ],
+    "userName": "jdoe@example.com",
+    "displayName": "John Doe",
+    "active": true,
+    "name": { "givenName": "John", "familyName": "Doe" },
+    "emails": [{ "value": "jdoe@example.com", "type": "work", "primary": true }],
+    "urn:example:scim:extension:hr:2.0:User": {
+      "badgeNumber": "B12345",
+      "costCenter": "Engineering",
+      "secretToken": "mysecret",
+      "tags": ["vip", "engineering"]
+    }
+  },
+
+
+  "_usage_patch_extension_attribute": {
+    "_comment": "PATCH /scim/endpoints/{endpointId}/Users/{userId} — Patch extension attribute",
+    "_method": "PATCH",
+    "_path": "/scim/endpoints/{endpointId}/Users/{userId}",
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+    "Operations": [
+      { "op": "replace", "value": { "urn:example:scim:extension:hr:2.0:User": { "badgeNumber": "B99999" } } }
+    ]
+  },
+
+
+  "_usage_patch_extension_by_path": {
+    "_comment": "PATCH with URN-prefixed path targeting a single extension attribute",
+    "_method": "PATCH",
+    "_path": "/scim/endpoints/{endpointId}/Users/{userId}",
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+    "Operations": [
+      { "op": "replace", "path": "urn:example:scim:extension:hr:2.0:User:costCenter", "value": "Sales" }
+    ]
+  },
+
+
+  "_usage_create_group_with_extension": {
+    "_comment": "POST /scim/endpoints/{endpointId}/Groups — Create group with extension data",
+    "_method": "POST",
+    "_path": "/scim/endpoints/{endpointId}/Groups",
+    "schemas": [
+      "urn:ietf:params:scim:schemas:core:2.0:Group",
+      "urn:example:scim:extension:dept:2.0:Group"
+    ],
+    "displayName": "Engineering Team",
+    "urn:example:scim:extension:dept:2.0:Group": {
+      "department": "Engineering",
+      "costCode": "ENG-001"
+    }
+  }
+}

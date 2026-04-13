@@ -130,6 +130,7 @@
 | Postman Collection | [postman/](postman/) | Importable Postman collection — all 82 endpoints, 14 folders |
 | Insomnia Collection | [insomnia/](insomnia/) | Importable Insomnia workspace — all 82 endpoints, 14 folders |
 | Example JSONs | [examples/](examples/) | Request/response samples for all resource types |
+| Extension Examples | [examples/endpoint/create-endpoint-with-custom-extensions.json](examples/endpoint/create-endpoint-with-custom-extensions.json) | 12 one-click endpoint+extension combos + PATCH/User/Group usage examples |
 | Mermaid Diagrams | [create-user-sequence.mmd](create-user-sequence.mmd), [list-get-user-sequence.mmd](list-get-user-sequence.mmd) | Sequence diagrams |
 
 > **Note:** All collections were regenerated for v0.34.0 with full 82-endpoint coverage (19 controllers) including multi-tenant endpoint architecture, admin management, per-endpoint credentials, /Me, custom resource types, database browser, activity feed, per-endpoint logs, and structured logging.
