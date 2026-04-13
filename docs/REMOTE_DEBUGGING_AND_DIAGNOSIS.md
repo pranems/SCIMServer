@@ -762,7 +762,7 @@ SCIMServer is designed for environments where operators have **no SSH/shell acce
 |--------|-------|-------------|
 | `GET` | `/scim/admin/logs` | Paginated log list with filters |
 | `GET` | `/scim/admin/logs/:id` | Full request/response detail |
-| `DELETE` | `/scim/admin/logs` | Clear all persistent logs |
+| `POST` | `/scim/admin/logs/clear` | Clear all persistent logs |
 
 ---
 

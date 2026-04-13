@@ -505,7 +505,7 @@ GET /scim/admin/logs?hideKeepalive=true
 # Programmatic: loggingService.pruneOldLogs(30)
 
 # Clear all logs
-DELETE /scim/admin/logs
+POST /scim/admin/logs/clear
 ```
 
 ### In-Memory Backend
