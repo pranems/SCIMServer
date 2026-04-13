@@ -847,13 +847,14 @@ export class EndpointService implements OnModuleInit {
     }
   }
 
-  /** Sync per-endpoint file logging based on logFileEnabled setting. */
+  /** Sync per-endpoint file logging based on logFileEnabled setting (default: true). */
   private syncEndpointFileLogging(endpointId: string, endpointName: string, settings?: Record<string, any> | null): void {
     const enabled = settings?.logFileEnabled;
-    if (enabled === true || enabled === 'True' || enabled === 'true') {
-      this.scimLogger.enableEndpointFileLogging(endpointId, endpointName);
-    } else {
+    // Default to true: undefined/null → enable; only explicit false/"false"/"False"/"0" disables
+    if (enabled === false || enabled === 'false' || enabled === 'False' || enabled === '0') {
       this.scimLogger.disableEndpointFileLogging(endpointId);
+    } else {
+      this.scimLogger.enableEndpointFileLogging(endpointId, endpointName);
     }
   }
 }

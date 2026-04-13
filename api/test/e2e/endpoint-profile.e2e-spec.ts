@@ -183,4 +183,72 @@ describe('Endpoint Profile (E2E)', () => {
       expect(types.length).toBeGreaterThan(0);
     });
   });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // logFileEnabled default=true flag behavior
+  // ═══════════════════════════════════════════════════════════════════════
+
+  describe('logFileEnabled default=true', () => {
+    it('should validate logFileEnabled=true on endpoint profile settings', async () => {
+      const name = `e2e-logfile-true-${Date.now()}`;
+      const createRes = await request(app.getHttpServer())
+        .post('/scim/admin/endpoints')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ name, profilePreset: 'rfc-standard' })
+        .expect(201);
+
+      const epId = createRes.body.id;
+
+      // PATCH logFileEnabled=true explicitly
+      const patchRes = await request(app.getHttpServer())
+        .patch(`/scim/admin/endpoints/${epId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ profile: { settings: { logFileEnabled: true } } })
+        .expect(200);
+
+      expect(patchRes.body.profile?.settings?.logFileEnabled).toBe(true);
+    });
+
+    it('should validate logFileEnabled="False" explicitly disables file logging', async () => {
+      const name = `e2e-logfile-false-${Date.now()}`;
+      const createRes = await request(app.getHttpServer())
+        .post('/scim/admin/endpoints')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ name, profilePreset: 'rfc-standard' })
+        .expect(201);
+
+      const epId = createRes.body.id;
+
+      const patchRes = await request(app.getHttpServer())
+        .patch(`/scim/admin/endpoints/${epId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ profile: { settings: { logFileEnabled: 'False' } } })
+        .expect(200);
+
+      expect(patchRes.body.profile?.settings?.logFileEnabled).toBe('False');
+    });
+
+    it('should reject invalid logFileEnabled value', async () => {
+      const name = `e2e-logfile-invalid-${Date.now()}`;
+      const createRes = await request(app.getHttpServer())
+        .post('/scim/admin/endpoints')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ name, profilePreset: 'rfc-standard' })
+        .expect(201);
+
+      const epId = createRes.body.id;
+
+      await request(app.getHttpServer())
+        .patch(`/scim/admin/endpoints/${epId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ profile: { settings: { logFileEnabled: 'Yes' } } })
+        .expect(400);
+    });
+  });
 });

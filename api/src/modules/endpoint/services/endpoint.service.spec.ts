@@ -1268,4 +1268,103 @@ describe('EndpointService', () => {
       expect(rfc.profile.serviceProviderConfig.filter.supported).toBe(true);
     });
   });
+
+  // ─── logFileEnabled syncing (default: true) ──────────────────────────────
+
+  describe('syncEndpointFileLogging (logFileEnabled default=true)', () => {
+    const minSchema = { id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributes: 'all' as const };
+    const minRT = { id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] };
+
+    it('should enable file logging when logFileEnabled is not set (default true)', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.endpoint.create as jest.Mock).mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: {}, schemas: [minSchema], resourceTypes: [minRT], serviceProviderConfig: {} },
+      });
+
+      await service.createEndpoint({
+        name: 'test-file-log-default',
+        profile: { settings: {}, schemas: [minSchema], resourceTypes: [minRT] },
+      });
+
+      // logFileEnabled not set → defaults to true → enable is called, disable is NOT called for this endpoint
+      expect(scimLogger.enableEndpointFileLogging).toHaveBeenCalled();
+      expect(scimLogger.disableEndpointFileLogging).not.toHaveBeenCalledWith('test-endpoint-id');
+    });
+
+    it('should enable file logging when logFileEnabled is explicitly true', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.endpoint.create as jest.Mock).mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { logFileEnabled: true }, schemas: [minSchema], resourceTypes: [minRT], serviceProviderConfig: {} },
+      });
+
+      await service.createEndpoint({
+        name: 'test-file-log-true',
+        profile: { settings: { logFileEnabled: true }, schemas: [minSchema], resourceTypes: [minRT] },
+      });
+
+      expect(scimLogger.enableEndpointFileLogging).toHaveBeenCalledWith('test-endpoint-id', expect.any(String));
+    });
+
+    it('should disable file logging when logFileEnabled is explicitly false', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.endpoint.create as jest.Mock).mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { logFileEnabled: false }, schemas: [minSchema], resourceTypes: [minRT], serviceProviderConfig: {} },
+      });
+
+      await service.createEndpoint({
+        name: 'test-file-log-false',
+        profile: { settings: { logFileEnabled: false }, schemas: [minSchema], resourceTypes: [minRT] },
+      });
+
+      expect(scimLogger.disableEndpointFileLogging).toHaveBeenCalledWith('test-endpoint-id');
+    });
+
+    it('should disable file logging when logFileEnabled is "False" (string)', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.endpoint.create as jest.Mock).mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { logFileEnabled: 'False' }, schemas: [minSchema], resourceTypes: [minRT], serviceProviderConfig: {} },
+      });
+
+      await service.createEndpoint({
+        name: 'test-file-log-false-str',
+        profile: { settings: { logFileEnabled: 'False' }, schemas: [minSchema], resourceTypes: [minRT] },
+      });
+
+      expect(scimLogger.disableEndpointFileLogging).toHaveBeenCalledWith('test-endpoint-id');
+    });
+
+    it('should disable file logging when logFileEnabled is "0"', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.endpoint.create as jest.Mock).mockResolvedValue({
+        ...mockEndpoint,
+        profile: { settings: { logFileEnabled: '0' }, schemas: [minSchema], resourceTypes: [minRT], serviceProviderConfig: {} },
+      });
+
+      await service.createEndpoint({
+        name: 'test-file-log-zero',
+        profile: { settings: { logFileEnabled: '0' }, schemas: [minSchema], resourceTypes: [minRT] },
+      });
+
+      expect(scimLogger.disableEndpointFileLogging).toHaveBeenCalledWith('test-endpoint-id');
+    });
+
+    it('should enable file logging when profile is null (default behavior)', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
+      (prisma.endpoint.create as jest.Mock).mockResolvedValue({
+        ...mockEndpoint,
+        profile: null,
+      });
+
+      await service.createEndpoint({ name: 'test-file-log-null' });
+
+      // Default preset is applied, so enableEndpointFileLogging is called
+      // (logFileEnabled defaults to true, no explicit false to disable)
+      expect(scimLogger.enableEndpointFileLogging).toHaveBeenCalled();
+      expect(scimLogger.disableEndpointFileLogging).not.toHaveBeenCalledWith('test-endpoint-id');
+    });
+  });
 });
