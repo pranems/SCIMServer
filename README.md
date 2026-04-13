@@ -481,7 +481,7 @@ Content-Type: application/json
 
 ## Observability Quick Start
 
-All log endpoints require `Authorization: Bearer <shared-secret>`. Pick your deployment:
+All log and audit endpoints require `Authorization: Bearer <shared-secret>`. Pick your deployment:
 
 | Deployment | Base URL | Bearer Token |
 |------------|----------|-------------|
@@ -489,41 +489,119 @@ All log endpoints require `Authorization: Bearer <shared-secret>`. Pick your dep
 | **Docker** | `http://localhost:8080` | `devscimsharedsecret` |
 | **Azure** | `https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io` | `changeme-scim` |
 
+### Recent Logs (Ring Buffer)
+
+Returns the last N entries from the in-memory ring buffer (default 2,000 entries).
+
+```http
+GET /scim/admin/log-config/recent?limit=25&level=WARN HTTP/1.1
+Authorization: Bearer changeme-scim
+```
+
+```json
+{
+  "count": 2,
+  "entries": [
+    {
+      "timestamp": "2026-04-13T10:30:46.456Z",
+      "level": "WARN",
+      "category": "http",
+      "message": "Slow request: 3456ms",
+      "requestId": "b2c3d4e5-...",
+      "endpointId": "f8e7d6c5-...",
+      "method": "GET",
+      "path": "/scim/endpoints/.../Users",
+      "durationMs": 3456
+    }
+  ]
+}
+```
+
 ```powershell
-# ── Setup (Azure example — change $base/$secret for other deployments) ──
 $base = "https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io"
-$secret = "changeme-scim"
-$h = @{ Authorization = "Bearer $secret" }
-
-# Recent logs (last 25 from in-memory ring buffer)
+$h = @{ Authorization = "Bearer changeme-scim" }
 Invoke-RestMethod "$base/scim/admin/log-config/recent?limit=25" -Headers $h | ConvertTo-Json -Depth 5
+```
 
-# Errors only (WARN+)
-Invoke-RestMethod "$base/scim/admin/log-config/recent?level=WARN&limit=50" -Headers $h | ConvertTo-Json -Depth 5
+### Audit Trail
 
-# Audit trail (config changes, auth events, endpoint CRUD)
-Invoke-RestMethod "$base/scim/admin/log-config/audit" -Headers $h | ConvertTo-Json -Depth 5
+Returns CONFIG, ENDPOINT, and AUTH events — config changes, endpoint CRUD, auth successes/failures.
 
-# Full request/response detail for a specific log entry
-Invoke-RestMethod "$base/scim/admin/logs?pageSize=10" -Headers $h | ConvertTo-Json -Depth 5
+```http
+GET /scim/admin/log-config/audit?limit=100 HTTP/1.1
+Authorization: Bearer changeme-scim
+```
 
-# Trace a failed request (paste requestId from error response diagnostics)
-Invoke-RestMethod "$base/scim/admin/log-config/recent?requestId=PASTE-ID" -Headers $h | ConvertTo-Json -Depth 5
+### Per-Endpoint Logs
 
-# Per-endpoint logs (isolated by tenant)
-$epId = "PASTE-ENDPOINT-ID"
+Each endpoint has isolated log access. First list endpoints, then query:
+
+```powershell
+# List endpoints → get endpoint IDs
+Invoke-RestMethod "$base/scim/admin/endpoints" -Headers $h | ConvertTo-Json -Depth 3
+
+# Get logs for one endpoint
+$epId = "f8e7d6c5-b4a3-2190-fedc-ba0987654321"
 Invoke-RestMethod "$base/scim/endpoints/$epId/logs/recent?limit=50" -Headers $h | ConvertTo-Json -Depth 5
+```
 
-# Download logs for offline analysis (Azure — files are ephemeral in container)
-Invoke-RestMethod "$base/scim/admin/log-config/download" -Headers $h -OutFile "scimserver-logs.ndjson"
+### Full Request Detail (Headers + Bodies)
 
-# Turn on TRACE for max detail (no restart needed)
+View complete request/response including headers and bodies from the persistent database:
+
+```http
+GET /scim/admin/logs/clu8x9y0z-log-uuid-001 HTTP/1.1
+Authorization: Bearer changeme-scim
+```
+
+```json
+{
+  "method": "POST",
+  "url": "/scim/endpoints/.../Users",
+  "status": 409,
+  "requestHeaders": { "content-type": "application/scim+json", "x-request-id": "f47ac10b-..." },
+  "requestBody": { "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], "userName": "jsmith@contoso.com" },
+  "responseBody": {
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+    "detail": "A resource with userName 'jsmith@contoso.com' already exists.",
+    "status": "409",
+    "scimType": "uniqueness",
+    "urn:scimserver:api:messages:2.0:Diagnostics": {
+      "requestId": "f47ac10b-...",
+      "conflictingResourceId": "usr-existing-456",
+      "logsUrl": "/scim/endpoints/.../logs/recent?requestId=f47ac10b-..."
+    }
+  }
+}
+```
+
+### Trace a Failed Request
+
+Every error response includes a `requestId` in the diagnostics extension. Use it to see all correlated logs:
+
+```powershell
+Invoke-RestMethod "$base/scim/admin/log-config/recent?requestId=f47ac10b-..." -Headers $h | ConvertTo-Json -Depth 5
+```
+
+### More Operations
+
+```powershell
+# Download logs (Azure — files are ephemeral in container)
+Invoke-RestMethod "$base/scim/admin/log-config/download" -Headers $h -OutFile "logs.ndjson"
+
+# Search persistent history by userName/email
+Invoke-RestMethod "$base/scim/admin/logs?search=jsmith@contoso.com" -Headers $h | ConvertTo-Json -Depth 5
+
+# Live SSE stream (use curl, Ctrl+C to stop)
+# curl -N "$base/scim/admin/log-config/stream?level=INFO" -H "Authorization: Bearer changeme-scim"
+
+# Set to TRACE for max detail (no restart needed)
 Invoke-RestMethod -Method PUT "$base/scim/admin/log-config/level/TRACE" -Headers $h
-# Restore after debugging
+# Restore
 Invoke-RestMethod -Method PUT "$base/scim/admin/log-config/level/INFO" -Headers $h
 ```
 
-> **Full reference:** [REMOTE_DEBUGGING_AND_DIAGNOSIS.md](docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md) — 20 troubleshooting scenarios, SSE live stream, log file layout, per-endpoint isolation, 4 diagnosis workflows.
+> **Full reference:** [REMOTE_DEBUGGING_AND_DIAGNOSIS.md](docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md) — 20 troubleshooting scenarios, log file layout, SSE live stream, per-endpoint isolation, 4 diagnosis workflows.
 
 ---
 
