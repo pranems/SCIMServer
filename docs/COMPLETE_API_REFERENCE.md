@@ -489,7 +489,7 @@ Content-Type: application/json
   "includeStackTraces": true,
   "maxPayloadSizeBytes": 20480,
   "format": "json",
-  "categoryLevels": { "auth": "debug", "scim": "verbose" }
+  "categoryLevels": { "auth": "DEBUG", "scim.patch": "TRACE" }
 }
 ```
 

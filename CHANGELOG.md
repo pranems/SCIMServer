@@ -144,7 +144,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 4xx error reclassification: 401/403→WARN, 404→DEBUG, other 4xx→INFO
 - Admin audit trail: config changes, endpoint CRUD, credential management logged at INFO
 - Silent catch elimination: 5 WARN/DEBUG logs at previously-silent JSON.parse catches
-- Ring buffer configurable via `LOG_RING_BUFFER_SIZE` (default 500)
+- Ring buffer configurable via `LOG_RING_BUFFER_SIZE` (default 2000)
 - Slow request threshold configurable via `LOG_SLOW_REQUEST_MS` (default 2000ms)
 - Docker log rotation: max-size 10m, max-file 3
 
