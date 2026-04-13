@@ -138,6 +138,15 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * In practice: set false to hide schema metadata from clients that don't need it.
    */
   SCHEMA_DISCOVERY_ENABLED: 'SchemaDiscoveryEnabled',
+
+  /**
+   * When true (default), enables per-endpoint log file under logs/endpoints/.
+   * Each endpoint gets its own log file named after the endpoint.
+   * When false, per-endpoint file logging is disabled.
+   * In practice: keep true for local/dev environments; set false in Docker/Azure
+   * where stdout is the log sink and container-local files are ephemeral.
+   */
+  LOG_FILE_ENABLED: 'logFileEnabled',
 } as const;
 
 /**
@@ -310,6 +319,16 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'When false, discovery endpoints return 404 + server WARN log. ' +
       'Set false to hide schema metadata from clients that don\'t need it.',
   },
+  LOG_FILE_ENABLED: {
+    key: ENDPOINT_CONFIG_FLAGS.LOG_FILE_ENABLED,
+    type: 'boolean',
+    default: true,
+    description:
+      'When true (default), enables per-endpoint log file under logs/endpoints/. ' +
+      'Each endpoint gets its own log file named after the endpoint. ' +
+      'When false, per-endpoint file logging is disabled. ' +
+      'Set false in Docker/Azure where stdout is the log sink.',
+  },
 };
 
 // ─── Endpoint Configuration Interface ────────────────────────────────────────
@@ -335,6 +354,7 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.GROUP_HARD_DELETE_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.SCHEMA_DISCOVERY_ENABLED]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.LOG_FILE_ENABLED]?: boolean | string;
   /** Allow any additional configuration flags. */
   [key: string]: unknown;
 }
