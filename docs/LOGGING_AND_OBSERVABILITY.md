@@ -498,14 +498,54 @@ GET /scim/admin/logs?includeAdmin=true
 GET /scim/admin/logs?hideKeepalive=true
 ```
 
-### Log Retention
+### Log Retention & Pruning
 
-```bash
-# Delete logs older than 30 days
-# Programmatic: loggingService.pruneOldLogs(30)
+Persistent request logs can be pruned (delete entries older than N days) or cleared entirely.
 
-# Clear all logs
-POST /scim/admin/logs/clear
+#### Prune Old Logs
+
+| Property | Value |
+|----------|-------|
+| **Method** | `POST` |
+| **URL** | `/scim/admin/logs/prune?retentionDays=30` |
+| **Headers** | `Authorization: Bearer <token>` |
+| **Query params** | `retentionDays` (int, optional — defaults to `LOG_RETENTION_DAYS` env var or 30) |
+
+**Request:**
+
+```http
+POST /scim/admin/logs/prune?retentionDays=7 HTTP/1.1
+Authorization: Bearer changeme-scim
+```
+
+**Response: `200 OK`**
+
+```json
+{
+  "pruned": 142
+}
+```
+
+**PowerShell:**
+
+```powershell
+# Prune logs older than 7 days
+Invoke-RestMethod -Method POST "$base/scim/admin/logs/prune?retentionDays=7" -Headers $h
+
+# Prune using default retention (LOG_RETENTION_DAYS env var, or 30 days)
+Invoke-RestMethod -Method POST "$base/scim/admin/logs/prune" -Headers $h
+```
+
+#### Clear All Logs
+
+| Property | Value |
+|----------|-------|
+| **Method** | `POST` |
+| **URL** | `/scim/admin/logs/clear` |
+| **Response** | `204 No Content` |
+
+```powershell
+Invoke-RestMethod -Method POST "$base/scim/admin/logs/clear" -Headers $h
 ```
 
 ### In-Memory Backend
@@ -591,6 +631,7 @@ Every config change is logged at INFO level with before/after values:
 | `LOG_FILE` | `logs/scimserver.log` | Main log file path. Set to `""` to disable. |
 | `LOG_FILE_MAX_SIZE` | `10485760` (10 MB) | Max file size before rotation |
 | `LOG_FILE_MAX_COUNT` | `3` | Number of rotated files to keep |
+| `LOG_RETENTION_DAYS` | `30` | Default retention for `POST /admin/logs/prune` (days) |
 | `NODE_ENV` | _(unset)_ | `production` → JSON format, payloads off by default |
 
 ---
