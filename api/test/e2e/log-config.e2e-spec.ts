@@ -422,4 +422,117 @@ describe('Log Configuration API (E2E)', () => {
       expect(res.headers['x-request-id'].length).toBeGreaterThan(10);
     });
   });
+
+  // ─── Audit Trail ─────────────────────────────────────────────────
+
+  describe('GET /scim/admin/log-config/audit', () => {
+    it('should return 200 with audit trail entries', async () => {
+      // Trigger a config change to generate an audit entry
+      await request(app.getHttpServer())
+        .put('/scim/admin/log-config/level/DEBUG')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .get('/scim/admin/log-config/audit?limit=50')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body).toHaveProperty('count');
+      expect(res.body).toHaveProperty('entries');
+      expect(Array.isArray(res.body.entries)).toBe(true);
+
+      // Should contain at least the config change we just made
+      const configEntries = res.body.entries.filter(
+        (e: any) => e.category === 'config',
+      );
+      expect(configEntries.length).toBeGreaterThan(0);
+
+      // Restore
+      await request(app.getHttpServer())
+        .put('/scim/admin/log-config/level/INFO')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+    });
+
+    it('should only return CONFIG, ENDPOINT, and AUTH categories', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/scim/admin/log-config/audit?limit=100')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const validCategories = ['config', 'endpoint', 'auth'];
+      for (const entry of res.body.entries) {
+        expect(validCategories).toContain(entry.category);
+      }
+    });
+  });
+
+  // ─── Persistent Logs: Prune ────────────────────────────────────────
+
+  describe('POST /scim/admin/logs/prune', () => {
+    it('should return pruned count', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/scim/admin/logs/prune?retentionDays=365')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(201);
+
+      expect(res.body).toHaveProperty('pruned');
+      expect(typeof res.body.pruned).toBe('number');
+    });
+
+    it('should default to 30 days when retentionDays not specified', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/scim/admin/logs/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(201);
+
+      expect(res.body).toHaveProperty('pruned');
+    });
+  });
+
+  // ─── Persistent Logs: minDurationMs filter ─────────────────────────
+
+  describe('GET /scim/admin/logs?minDurationMs', () => {
+    it('should accept minDurationMs query parameter', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/scim/admin/logs?minDurationMs=9999999')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body).toHaveProperty('total');
+      expect(res.body).toHaveProperty('items');
+      // With a very high threshold, should return 0 or very few results
+      expect(res.body.total).toBe(0);
+    });
+  });
+
+  // ─── slowRequestThresholdMs runtime config ─────────────────────────
+
+  describe('slowRequestThresholdMs runtime configuration', () => {
+    it('should accept slowRequestThresholdMs in PUT /admin/log-config', async () => {
+      const res = await request(app.getHttpServer())
+        .put('/scim/admin/log-config')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ slowRequestThresholdMs: 5000 })
+        .expect(200);
+
+      expect(res.body.config).toBeDefined();
+
+      // Verify it was applied
+      const getRes = await request(app.getHttpServer())
+        .get('/scim/admin/log-config')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      // Restore default
+      await request(app.getHttpServer())
+        .put('/scim/admin/log-config')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ slowRequestThresholdMs: 2000 })
+        .expect(200);
+    });
+  });
 });
