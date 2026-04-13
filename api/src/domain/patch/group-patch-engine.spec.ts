@@ -450,4 +450,41 @@ describe('GroupPatchEngine', () => {
       expect(result.displayName).toBe('Updated');
     });
   });
+
+  // ─── G7: caseExact-aware valuePath matching ─────────────────────────
+
+  describe('G7 — caseExact-aware valuePath matching', () => {
+    it('should match members[value eq "..."] case-insensitively by default (no caseExactPaths)', () => {
+      const result = apply([{
+        op: 'remove',
+        path: 'members[value eq "USER-1"]', // uppercase — should still match "user-1"
+      }]);
+      expect(result.members.map(m => m.value)).toEqual(['user-2']);
+    });
+
+    it('should match case-sensitively when value is in caseExactPaths', () => {
+      const configWithCaseExact = {
+        ...defaultConfig,
+        caseExactPaths: new Set(['value']),
+      };
+      const result = apply([{
+        op: 'remove',
+        path: 'members[value eq "USER-1"]', // uppercase — should NOT match "user-1" when caseExact
+      }], undefined, configWithCaseExact);
+      // All members remain because "USER-1" !== "user-1" in case-sensitive mode
+      expect(result.members.map(m => m.value)).toEqual(['user-1', 'user-2']);
+    });
+
+    it('should match case-insensitively when value is NOT in caseExactPaths', () => {
+      const configWithOtherCaseExact = {
+        ...defaultConfig,
+        caseExactPaths: new Set(['display']), // different attr, not 'value'
+      };
+      const result = apply([{
+        op: 'remove',
+        path: 'members[value eq "USER-2"]',
+      }], undefined, configWithOtherCaseExact);
+      expect(result.members.map(m => m.value)).toEqual(['user-1']);
+    });
+  });
 });

@@ -116,7 +116,7 @@ export class GroupPatchEngine {
               }
             }
             members = GroupPatchEngine.handleRemove(
-              operation, members, config.allowMultiMemberRemove, config.allowRemoveAllMembers,
+              operation, members, config.allowMultiMemberRemove, config.allowRemoveAllMembers, config.caseExactPaths,
             );
             break;
         }
@@ -283,6 +283,7 @@ export class GroupPatchEngine {
     members: GroupMemberDto[],
     allowMultiMemberRemove: boolean,
     allowRemoveAllMembers: boolean,
+    caseExactPaths?: Set<string>,
   ): GroupMemberDto[] {
     const path = operation.path?.toLowerCase();
 
@@ -308,10 +309,17 @@ export class GroupPatchEngine {
     }
 
     // Targeted removal: members[value eq "user-id"]
-    const memberPathMatch = path?.match(/^members\[value\s+eq\s+"?([^"]+)"?\]$/i);
+    // Use original path (not lowercased) to preserve filter value casing for G7 caseExact
+    const memberPathMatch = operation.path?.match(/^members\[value\s+eq\s+"?([^"]+)"?\]$/i);
     if (memberPathMatch) {
       const valueToRemove = memberPathMatch[1];
-      return members.filter(m => m.value !== valueToRemove);
+      // G7: Use caseExact from schema cache for value comparison
+      // members[].value has no explicit caseExact → defaults to case-insensitive
+      const isCaseExact = caseExactPaths?.has('value') ?? false;
+      if (isCaseExact) {
+        return members.filter(m => m.value !== valueToRemove);
+      }
+      return members.filter(m => m.value.toLowerCase() !== valueToRemove.toLowerCase());
     }
 
     // path=members without value — remove all members
