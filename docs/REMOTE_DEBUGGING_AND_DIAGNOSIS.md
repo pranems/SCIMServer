@@ -7,7 +7,16 @@
 
 ## Table of Contents
 
-0. [Quick Start Script (Copy-Paste)](#0-quick-start-script-copy-paste)
+0. [Quick Start — Fetching Logs & Audit Data](#0-quick-start--fetching-logs--audit-data)
+   - [0.1 Authentication](#01-authentication)
+   - [0.2 View Recent Logs (Ring Buffer)](#02-view-recent-logs-ring-buffer)
+   - [0.3 View Audit Trail](#03-view-audit-trail)
+   - [0.4 View Per-Endpoint Logs](#04-view-per-endpoint-logs-tenant-isolated)
+   - [0.5 View Persistent Request History](#05-view-persistent-request-history-full-requestresponse-bodies)
+   - [0.6 Trace a Failed Request (RCA)](#06-trace-a-failed-request-rca-via-requestid)
+   - [0.7 Log Files (On-Disk)](#07-log-files-on-disk)
+   - [0.8 SSE Live Stream](#08-sse-live-stream-real-time-tail)
+   - [0.9 Change Log Level at Runtime](#09-change-log-level-at-runtime)
 1. [Zero-Access Diagnosis Model](#1-zero-access-diagnosis-model)
 2. [Diagnosis Endpoints](#2-diagnosis-endpoints)
 3. [Self-Service RCA via Error Responses](#3-self-service-rca-via-error-responses)
@@ -26,143 +35,650 @@
 
 ---
 
-## 0. Quick Start Script (Copy-Paste)
+## 0. Quick Start — Fetching Logs & Audit Data
 
-> **New here?** Copy this entire block into PowerShell. It works immediately against the live Azure deployment. Change `$base` and `$secret` for Docker or local.
+> **Audience:** Colleague who has never used SCIMServer. This section gets you from zero to reading logs in under 2 minutes.
+
+### 0.1 Authentication
+
+All observability endpoints require a bearer token. Use the **shared secret** for the deployment you're targeting:
+
+| Deployment | Base URL | Shared Secret (Bearer Token) |
+|------------|----------|------------------------------|
+| **Local** (InMemory, port 6000) | `http://localhost:6000` | `local-secret` |
+| **Docker** (PostgreSQL, port 8080) | `http://localhost:8080` | `devscimsharedsecret` |
+| **Azure** (live production) | `https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io` | `changeme-scim` |
+
+Every request below requires this header:
+
+```
+Authorization: Bearer <shared-secret>
+```
+
+**PowerShell setup (choose one):**
 
 ```powershell
-# ═══ Pick your deployment (uncomment one) ═════════════════════════════════════════
+# Azure (live):
 $base = "https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io"
-$secret = "changeme-scim"
-# $base = "http://localhost:8080"; $secret = "devscimsharedsecret"   # Docker
-# $base = "http://localhost:6000"; $secret = "local-secret"          # Local
-$h = @{ Authorization = "Bearer $secret" }
+$h = @{ Authorization = "Bearer changeme-scim" }
 
-# ═══ A. RECENT LOGS (in-memory ring buffer, last ~2000 entries) ═══════
-#
-# GET /scim/admin/log-config/recent?limit=25
-# Headers:  Authorization: Bearer <token>
-# Response: { "count": 25, "entries": [ { "timestamp": "...", "level": "INFO",
-#            "category": "scim.user", "message": "User created",
-#            "requestId": "a1b2c3d4-...", "endpointId": "ep-abc123",
-#            "method": "POST", "path": "/scim/endpoints/ep-abc123/Users",
-#            "durationMs": 45, "authType": "oauth", "resourceType": "User",
-#            "operation": "create" } ] }
+# Docker:
+# $base = "http://localhost:8080"; $h = @{ Authorization = "Bearer devscimsharedsecret" }
 
-Invoke-RestMethod "$base/scim/admin/log-config/recent?limit=25" -Headers $h |
-  ConvertTo-Json -Depth 5
+# Local:
+# $base = "http://localhost:6000"; $h = @{ Authorization = "Bearer local-secret" }
+```
 
-# ═══ B. ERRORS ONLY (WARN+) ═════════════════════════════════════════════
-Invoke-RestMethod "$base/scim/admin/log-config/recent?level=WARN&limit=50" -Headers $h |
-  ConvertTo-Json -Depth 5
+---
 
-# ═══ C. AUDIT TRAIL (config changes, auth, endpoint CRUD) ════════════
-#
-# GET /scim/admin/log-config/audit?limit=100
-# Response: { "count": 5, "entries": [
-#   { "category": "config", "message": "Log configuration updated", ... },
-#   { "category": "auth",   "message": "OAuth 2.0 authentication successful", ... },
-#   { "category": "endpoint", "message": "Endpoint created", ... }
-# ] }
+### 0.2 View Recent Logs (Ring Buffer)
 
-Invoke-RestMethod "$base/scim/admin/log-config/audit?limit=100" -Headers $h |
-  ConvertTo-Json -Depth 5
+The server keeps the last 2,000 log entries in an in-memory ring buffer. This is the fastest way to see what happened.
 
-# ═══ D. PER-ENDPOINT LOGS (tenant-isolated) ═════════════════════════
-# Step 1: List endpoints
+| Property | Value |
+|----------|-------|
+| **Method** | `GET` |
+| **URL** | `/scim/admin/log-config/recent?limit=25` |
+| **Headers** | `Authorization: Bearer <token>` |
+| **Query params** | `limit` (int), `level` (TRACE\|DEBUG\|INFO\|WARN\|ERROR\|FATAL), `category` (http\|auth\|scim.user\|...), `requestId` (UUID), `endpointId` (UUID) |
+
+**Request:**
+
+```http
+GET /scim/admin/log-config/recent?limit=3&level=INFO HTTP/1.1
+Host: scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io
+Authorization: Bearer changeme-scim
+```
+
+**Response: `200 OK`**
+
+```json
+{
+  "count": 3,
+  "entries": [
+    {
+      "timestamp": "2026-04-13T10:30:45.123Z",
+      "level": "INFO",
+      "category": "scim.user",
+      "message": "User created",
+      "requestId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "endpointId": "f8e7d6c5-b4a3-2190-fedc-ba0987654321",
+      "method": "POST",
+      "path": "/scim/endpoints/f8e7d6c5-.../Users",
+      "durationMs": 45,
+      "authType": "oauth",
+      "resourceType": "User",
+      "resourceId": "usr-abc-123",
+      "operation": "create"
+    },
+    {
+      "timestamp": "2026-04-13T10:30:46.456Z",
+      "level": "WARN",
+      "category": "http",
+      "message": "Slow request: 3456ms",
+      "requestId": "b2c3d4e5-...",
+      "method": "GET",
+      "path": "/scim/endpoints/.../Users",
+      "durationMs": 3456
+    },
+    {
+      "timestamp": "2026-04-13T10:30:47.789Z",
+      "level": "INFO",
+      "category": "auth",
+      "message": "OAuth 2.0 authentication successful",
+      "authType": "oauth",
+      "data": { "clientId": "scimclient" }
+    }
+  ]
+}
+```
+
+**PowerShell:**
+
+```powershell
+# All recent logs
+Invoke-RestMethod "$base/scim/admin/log-config/recent?limit=25" -Headers $h | ConvertTo-Json -Depth 5
+
+# Errors only (WARN+)
+Invoke-RestMethod "$base/scim/admin/log-config/recent?level=WARN&limit=50" -Headers $h | ConvertTo-Json -Depth 5
+
+# Only auth events
+Invoke-RestMethod "$base/scim/admin/log-config/recent?category=auth" -Headers $h | ConvertTo-Json -Depth 5
+```
+
+**curl:**
+
+```bash
+curl -s "https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim/admin/log-config/recent?limit=25" \
+  -H "Authorization: Bearer changeme-scim" | jq
+```
+
+---
+
+### 0.3 View Audit Trail
+
+The audit trail filters the ring buffer to show only CONFIG, ENDPOINT, and AUTH category events — config changes, endpoint CRUD, credential management, auth successes/failures.
+
+| Property | Value |
+|----------|-------|
+| **Method** | `GET` |
+| **URL** | `/scim/admin/log-config/audit?limit=100` |
+| **Headers** | `Authorization: Bearer <token>` |
+
+**Request:**
+
+```http
+GET /scim/admin/log-config/audit?limit=100 HTTP/1.1
+Authorization: Bearer changeme-scim
+```
+
+**Response: `200 OK`**
+
+```json
+{
+  "count": 4,
+  "entries": [
+    {
+      "timestamp": "2026-04-13T10:00:00.000Z",
+      "level": "INFO",
+      "category": "config",
+      "message": "Log configuration updated",
+      "data": {
+        "changes": {
+          "globalLevel": { "from": 2, "to": 0 }
+        }
+      }
+    },
+    {
+      "timestamp": "2026-04-13T09:55:00.000Z",
+      "level": "INFO",
+      "category": "auth",
+      "message": "OAuth 2.0 authentication successful",
+      "data": { "clientId": "scimclient" }
+    },
+    {
+      "timestamp": "2026-04-13T09:50:00.000Z",
+      "level": "INFO",
+      "category": "endpoint",
+      "message": "Endpoint created",
+      "data": { "name": "contoso-prod", "preset": "entra-id" }
+    },
+    {
+      "timestamp": "2026-04-13T09:45:00.000Z",
+      "level": "WARN",
+      "category": "auth",
+      "message": "Authentication failed – per-endpoint, OAuth, and legacy token all invalid",
+      "requestId": "c3d4e5f6-..."
+    }
+  ]
+}
+```
+
+**PowerShell:**
+
+```powershell
+Invoke-RestMethod "$base/scim/admin/log-config/audit?limit=100" -Headers $h | ConvertTo-Json -Depth 5
+```
+
+---
+
+### 0.4 View Per-Endpoint Logs (Tenant-Isolated)
+
+Each SCIM endpoint has isolated log access. Per-endpoint credential holders can only see their own endpoint's logs.
+
+**Step 1 — List endpoints to get IDs:**
+
+| Property | Value |
+|----------|-------|
+| **Method** | `GET` |
+| **URL** | `/scim/admin/endpoints` |
+
+```powershell
 Invoke-RestMethod "$base/scim/admin/endpoints" -Headers $h | ConvertTo-Json -Depth 3
+```
 
-# Step 2: Get logs for one endpoint
-$epId = "PASTE-ENDPOINT-ID-HERE"
-Invoke-RestMethod "$base/scim/endpoints/$epId/logs/recent?limit=50" -Headers $h |
-  ConvertTo-Json -Depth 5
+**Response excerpt:**
 
-# ═══ E. PERSISTENT REQUEST HISTORY (full req/resp from DB) ═══════════
-#
-# GET /scim/admin/logs?pageSize=10
-# Response: { "total": 847, "page": 1, "items": [
-#   { "id": "log-uuid", "method": "POST", "url": "/scim/endpoints/.../Users",
-#     "status": 201, "durationMs": 45, "reportableIdentifier": "jsmith@contoso.com" }
-# ] }
+```json
+{
+  "totalResults": 2,
+  "endpoints": [
+    { "id": "f8e7d6c5-b4a3-2190-fedc-ba0987654321", "name": "contoso-prod", "isActive": true },
+    { "id": "a1b2c3d4-5678-90ab-cdef-1234567890ab", "name": "fabrikam-test", "isActive": true }
+  ]
+}
+```
 
-Invoke-RestMethod "$base/scim/admin/logs?pageSize=10" -Headers $h |
-  ConvertTo-Json -Depth 5
+**Step 2 — Get logs for that endpoint:**
 
-# Search by userName/email:
-Invoke-RestMethod "$base/scim/admin/logs?search=jsmith@contoso.com" -Headers $h |
-  ConvertTo-Json -Depth 5
+| Property | Value |
+|----------|-------|
+| **Method** | `GET` |
+| **URL** | `/scim/endpoints/{endpointId}/logs/recent?limit=50` |
+| **Headers** | `Authorization: Bearer <token>` |
+| **Query params** | `limit`, `level`, `category`, `requestId`, `method` |
 
-# ═══ F. FULL REQUEST DETAIL (headers + bodies) ═════════════════════
-#
-# GET /scim/admin/logs/{logId}
-# Response:
-# {
-#   "id": "log-uuid",
-#   "method": "POST",
-#   "url": "/scim/endpoints/ep-abc123/Users",
-#   "status": 409,
-#   "durationMs": 23,
-#   "requestHeaders": {
-#     "content-type": "application/scim+json",
-#     "authorization": "Bearer ey...",
-#     "x-request-id": "f47ac10b-..."
-#   },
-#   "requestBody": {
-#     "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
-#     "userName": "jsmith@contoso.com",
-#     "name": { "givenName": "John", "familyName": "Smith" }
-#   },
-#   "responseBody": {
-#     "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
-#     "detail": "A resource with userName 'jsmith@contoso.com' already exists.",
-#     "status": "409",
-#     "scimType": "uniqueness",
-#     "urn:scimserver:api:messages:2.0:Diagnostics": {
-#       "requestId": "f47ac10b-...",
-#       "errorCode": "UNIQUENESS_USERNAME",
-#       "conflictingResourceId": "usr-existing-456",
-#       "logsUrl": "/scim/endpoints/ep-abc123/logs/recent?requestId=f47ac10b-..."
-#     }
-#   },
-#   "errorMessage": "A resource with userName 'jsmith@contoso.com' already exists.",
-#   "reportableIdentifier": "jsmith@contoso.com"
-# }
+**Request:**
 
-$logId = "PASTE-LOG-ID-HERE"
-Invoke-RestMethod "$base/scim/admin/logs/$logId" -Headers $h |
-  ConvertTo-Json -Depth 10
+```http
+GET /scim/endpoints/f8e7d6c5-b4a3-2190-fedc-ba0987654321/logs/recent?limit=10&level=INFO HTTP/1.1
+Authorization: Bearer changeme-scim
+```
 
-# ═══ G. TRACE A FAILED REQUEST (paste requestId from error diagnostics) ═
-$reqId = "PASTE-REQUEST-ID-FROM-ERROR-RESPONSE"
-Invoke-RestMethod "$base/scim/admin/log-config/recent?requestId=$reqId" -Headers $h |
-  ConvertTo-Json -Depth 5
+**Response: `200 OK`**
 
-# ═══ H. LOG FILES ═══════════════════════════════════════════════════
-#
-# On-disk file layout (NDJSON — one JSON per line):
-#   logs/scimserver.log               ← all traffic
-#   logs/scimserver.log.1             ← previous rotation
-#   logs/scimserver.log.2             ← oldest rotation
-#   logs/endpoints/{name}_ep-{id8}/   ← per-endpoint files
-#
-# Config: LOG_FILE (default: logs/scimserver.log, "" = disabled)
-#         LOG_FILE_MAX_SIZE (10 MB)  LOG_FILE_MAX_COUNT (3)
-#
-# LOCAL:  Get-Content logs/scimserver.log -Tail 20
-# DOCKER: docker cp scimserver-api:/app/logs/scimserver.log .
-#         docker exec scimserver-api cat /app/logs/scimserver.log | jq
-# AZURE:  Files are ephemeral — use the download API instead:
-Invoke-RestMethod "$base/scim/admin/log-config/download" -Headers $h -OutFile "logs.ndjson"
+```json
+{
+  "endpointId": "f8e7d6c5-b4a3-2190-fedc-ba0987654321",
+  "count": 10,
+  "entries": [
+    {
+      "timestamp": "2026-04-13T10:30:45.123Z",
+      "level": "INFO",
+      "category": "scim.user",
+      "message": "User created",
+      "requestId": "a1b2c3d4-...",
+      "endpointId": "f8e7d6c5-...",
+      "method": "POST",
+      "path": "/scim/endpoints/f8e7d6c5-.../Users",
+      "durationMs": 45,
+      "resourceType": "User",
+      "operation": "create"
+    }
+  ]
+}
+```
+
+**PowerShell:**
+
+```powershell
+$epId = "f8e7d6c5-b4a3-2190-fedc-ba0987654321"
+Invoke-RestMethod "$base/scim/endpoints/$epId/logs/recent?limit=50" -Headers $h | ConvertTo-Json -Depth 5
+```
+
+---
+
+### 0.5 View Persistent Request History (Full Request/Response Bodies)
+
+Beyond the ring buffer, every HTTP request is persisted to the database with full headers and bodies. This survives server restarts.
+
+| Property | Value |
+|----------|-------|
+| **Method** | `GET` |
+| **URL** | `/scim/admin/logs?pageSize=10` |
+| **Headers** | `Authorization: Bearer <token>` |
+| **Query params** | `page`, `pageSize`, `method`, `status`, `search`, `since`, `until`, `minDurationMs`, `includeAdmin`, `hideKeepalive` |
+
+**Request — list recent requests:**
+
+```http
+GET /scim/admin/logs?pageSize=5&status=409 HTTP/1.1
+Authorization: Bearer changeme-scim
+```
+
+**Response: `200 OK`**
+
+```json
+{
+  "total": 23,
+  "page": 1,
+  "pageSize": 5,
+  "count": 5,
+  "hasNext": true,
+  "hasPrev": false,
+  "items": [
+    {
+      "id": "clu8x9y0z-log-uuid-001",
+      "method": "POST",
+      "url": "/scim/endpoints/f8e7d6c5-.../Users",
+      "status": 409,
+      "durationMs": 23,
+      "createdAt": "2026-04-13T10:30:45.000Z",
+      "errorMessage": "A resource with userName 'jsmith@contoso.com' already exists.",
+      "reportableIdentifier": "jsmith@contoso.com"
+    }
+  ]
+}
+```
+
+**Request — full detail for one entry (includes headers + bodies):**
+
+| Property | Value |
+|----------|-------|
+| **Method** | `GET` |
+| **URL** | `/scim/admin/logs/{logId}` |
+
+```http
+GET /scim/admin/logs/clu8x9y0z-log-uuid-001 HTTP/1.1
+Authorization: Bearer changeme-scim
+```
+
+**Response: `200 OK`**
+
+```json
+{
+  "id": "clu8x9y0z-log-uuid-001",
+  "method": "POST",
+  "url": "/scim/endpoints/f8e7d6c5-.../Users",
+  "status": 409,
+  "durationMs": 23,
+  "createdAt": "2026-04-13T10:30:45.000Z",
+  "requestHeaders": {
+    "content-type": "application/scim+json",
+    "authorization": "Bearer ey...",
+    "x-request-id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "user-agent": "azure-ad-scim-provisioning/1.0"
+  },
+  "requestBody": {
+    "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+    "userName": "jsmith@contoso.com",
+    "name": { "givenName": "John", "familyName": "Smith" },
+    "emails": [{ "value": "jsmith@contoso.com", "primary": true }],
+    "active": true
+  },
+  "responseHeaders": {
+    "content-type": "application/scim+json; charset=utf-8",
+    "x-request-id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "etag": "W/\"v1-abc123\""
+  },
+  "responseBody": {
+    "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+    "detail": "A resource with userName 'jsmith@contoso.com' already exists.",
+    "status": "409",
+    "scimType": "uniqueness",
+    "urn:scimserver:api:messages:2.0:Diagnostics": {
+      "requestId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "endpointId": "f8e7d6c5-...",
+      "errorCode": "UNIQUENESS_USERNAME",
+      "operation": "create",
+      "conflictingAttribute": "userName",
+      "conflictingResourceId": "usr-existing-456",
+      "incomingValue": "jsmith@contoso.com",
+      "logsUrl": "/scim/endpoints/f8e7d6c5-.../logs/recent?requestId=f47ac10b-..."
+    }
+  },
+  "errorMessage": "A resource with userName 'jsmith@contoso.com' already exists.",
+  "reportableIdentifier": "jsmith@contoso.com"
+}
+```
+
+**PowerShell:**
+
+```powershell
+# List recent requests
+Invoke-RestMethod "$base/scim/admin/logs?pageSize=10" -Headers $h | ConvertTo-Json -Depth 5
+
+# Search by userName or email
+Invoke-RestMethod "$base/scim/admin/logs?search=jsmith@contoso.com" -Headers $h | ConvertTo-Json -Depth 5
+
+# Full detail for one request
+$logId = "clu8x9y0z-log-uuid-001"
+Invoke-RestMethod "$base/scim/admin/logs/$logId" -Headers $h | ConvertTo-Json -Depth 10
+```
+
+---
+
+### 0.6 Trace a Failed Request (RCA via requestId)
+
+Every SCIM error response includes a `requestId` in the diagnostics extension. Use it to retrieve all correlated log entries for that exact request.
+
+**Step 1 — Find the requestId in the error response:**
+
+When any SCIM request fails, the response body includes:
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+  "detail": "A resource with userName 'jsmith@contoso.com' already exists.",
+  "status": "409",
+  "scimType": "uniqueness",
+  "urn:scimserver:api:messages:2.0:Diagnostics": {
+    "requestId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    "logsUrl": "/scim/endpoints/f8e7d6c5-.../logs/recent?requestId=f47ac10b-..."
+  }
+}
+```
+
+**Step 2 — Query logs by requestId:**
+
+```http
+GET /scim/admin/log-config/recent?requestId=f47ac10b-58cc-4372-a567-0e02b2c3d479 HTTP/1.1
+Authorization: Bearer changeme-scim
+```
+
+**Response — the full correlated trace for that request:**
+
+```json
+{
+  "count": 5,
+  "entries": [
+    { "level": "DEBUG", "category": "http", "message": "→ POST /scim/endpoints/.../Users",
+      "data": { "userAgent": "azure-ad-scim-provisioning/1.0", "contentType": "application/scim+json" } },
+    { "level": "TRACE", "category": "http", "message": "Request body",
+      "data": { "body": { "schemas": ["..."], "userName": "jsmith@contoso.com" } } },
+    { "level": "INFO",  "category": "auth", "message": "OAuth 2.0 authentication successful" },
+    { "level": "INFO",  "category": "scim.user", "message": "Uniqueness conflict: userName",
+      "data": { "conflictingResourceId": "usr-existing-456" } },
+    { "level": "INFO",  "category": "http", "message": "← 409 POST /scim/endpoints/.../Users" }
+  ]
+}
+```
+
+**PowerShell:**
+
+```powershell
+$reqId = "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+Invoke-RestMethod "$base/scim/admin/log-config/recent?requestId=$reqId" -Headers $h | ConvertTo-Json -Depth 5
+```
+
+---
+
+### 0.7 Log Files (On-Disk)
+
+SCIMServer writes structured JSON logs to rotating files. Each line is one JSON object (NDJSON format).
+
+#### File Layout
+
+```
+logs/
+  scimserver.log                              ← ALL traffic (current, up to 10 MB)
+  scimserver.log.1                            ← previous rotation
+  scimserver.log.2                            ← oldest rotation (3 files max)
+  endpoints/
+    contoso-prod_ep-f8e7d6c5/
+      contoso-prod_ep-f8e7d6c5.log            ← endpoint-specific logs
+```
+
+#### Configuration
+
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| `LOG_FILE` | `logs/scimserver.log` | Main log path. Set `""` to disable file logging. |
+| `LOG_FILE_MAX_SIZE` | `10485760` (10 MB) | Max bytes per file before rotation |
+| `LOG_FILE_MAX_COUNT` | `3` | Rotated files to keep |
+
+#### Accessing Log Files by Deployment
+
+**Local:**
+
+```powershell
+# Tail last 20 entries
+Get-Content logs/scimserver.log -Tail 20 | ForEach-Object { $_ | ConvertFrom-Json } | Format-Table timestamp, level, category, message
+
+# Stream in real-time
+Get-Content logs/scimserver.log -Wait | ForEach-Object { $_ | ConvertFrom-Json }
+```
+
+**Docker:**
+
+```bash
+# Copy file out of container
+docker cp scimserver-api:/app/logs/scimserver.log ./scimserver.log
+
+# View inside container
+docker exec scimserver-api cat /app/logs/scimserver.log | jq
+
+# If volume-mounted (docker-compose.yml: volumes: - ./logs:/app/logs):
+tail -f logs/scimserver.log | jq
+```
+
+**Azure Container Apps:**
+
+Log files are **ephemeral** inside the container (lost on restart/scale). Use the download API instead:
+
+| Property | Value |
+|----------|-------|
+| **Method** | `GET` |
+| **URL** | `/scim/admin/log-config/download` |
+| **Query params** | `format` (ndjson\|json), `limit`, `level`, `category`, `requestId`, `endpointId` |
+| **Response** | File download with `Content-Disposition` header |
+
+```http
+GET /scim/admin/log-config/download?format=ndjson&level=WARN HTTP/1.1
+Authorization: Bearer changeme-scim
+```
+
+**Response:** File download — `scimserver-logs-2026-04-13T10-30-45.ndjson`
+
+```
+{"timestamp":"2026-04-13T10:30:46.456Z","level":"WARN","category":"http","message":"Slow request: 3456ms","durationMs":3456,...}
+{"timestamp":"2026-04-13T10:31:02.789Z","level":"ERROR","category":"http","message":"Unhandled TypeError on POST /scim/...","error":{"message":"Cannot read properties of undefined",...},...}
+```
+
+**PowerShell:**
+
+```powershell
+# Download as NDJSON (default)
+Invoke-RestMethod "$base/scim/admin/log-config/download" -Headers $h -OutFile "scimserver-logs.ndjson"
+
+# Download errors only as JSON array
 Invoke-RestMethod "$base/scim/admin/log-config/download?format=json&level=WARN" -Headers $h -OutFile "errors.json"
 
-# ═══ I. LIVE STREAM (SSE, use curl — Ctrl+C to stop) ══════════════
-# curl -N "$base/scim/admin/log-config/stream?level=INFO" -H "Authorization: Bearer $secret"
-# curl -N "$base/scim/endpoints/$epId/logs/stream?level=WARN" -H "Authorization: Bearer $secret"
+# Per-endpoint download
+Invoke-RestMethod "$base/scim/endpoints/$epId/logs/download?format=ndjson" -Headers $h -OutFile "endpoint-logs.ndjson"
+```
 
-# ═══ J. CHANGE LOG LEVEL AT RUNTIME (no restart) ══════════════════
+Azure also ingests stdout/stderr JSON into Log Analytics:
+
+```bash
+az containerapp logs show -n scimserver2 -g scimserver-rg --tail 50
+```
+
+---
+
+### 0.8 SSE Live Stream (Real-Time Tail)
+
+Stream log entries as they happen via Server-Sent Events. Use `curl` (not `Invoke-RestMethod` — SSE requires a streaming client).
+
+| Property | Value |
+|----------|-------|
+| **Method** | `GET` |
+| **URL** | `/scim/admin/log-config/stream?level=INFO` |
+| **Headers** | `Authorization: Bearer <token>` |
+| **Response** | `text/event-stream` (SSE) |
+
+**Request:**
+
+```bash
+curl -N "https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim/admin/log-config/stream?level=INFO" \
+  -H "Authorization: Bearer changeme-scim"
+```
+
+**Response (streaming):**
+
+```
+event: connected
+data: {"message":"Log stream connected","filters":{"level":"INFO","category":"ALL","endpointId":"ALL"}}
+
+data: {"timestamp":"2026-04-13T10:30:45.123Z","level":"INFO","category":"scim.user","message":"User created","requestId":"a1b2c3d4-...","endpointId":"f8e7d6c5-...","method":"POST","path":"/scim/endpoints/.../Users","durationMs":45}
+
+: ping 2026-04-13T10:31:15.000Z
+
+data: {"timestamp":"2026-04-13T10:31:20.456Z","level":"WARN","category":"http","message":"Slow request: 3456ms","durationMs":3456}
+```
+
+**Per-endpoint stream:**
+
+```bash
+curl -N "https://host/scim/endpoints/f8e7d6c5-.../logs/stream?level=WARN" \
+  -H "Authorization: Bearer changeme-scim"
+```
+
+Press `Ctrl+C` to stop.
+
+---
+
+### 0.9 Change Log Level at Runtime
+
+Increase verbosity for debugging without restarting the server. Levels: `TRACE` > `DEBUG` > `INFO` > `WARN` > `ERROR` > `FATAL` > `OFF`.
+
+| Property | Value |
+|----------|-------|
+| **Method** | `PUT` |
+| **URL** | `/scim/admin/log-config/level/{level}` |
+
+**Request — set to TRACE (maximum detail, shows full request/response bodies):**
+
+```http
+PUT /scim/admin/log-config/level/TRACE HTTP/1.1
+Authorization: Bearer changeme-scim
+```
+
+**Response: `200 OK`**
+
+```json
+{
+  "message": "Global log level set to TRACE",
+  "globalLevel": "TRACE"
+}
+```
+
+**View current config:**
+
+```http
+GET /scim/admin/log-config HTTP/1.1
+Authorization: Bearer changeme-scim
+```
+
+**Response: `200 OK`**
+
+```json
+{
+  "globalLevel": "TRACE",
+  "categoryLevels": {},
+  "endpointLevels": {},
+  "includePayloads": true,
+  "includeStackTraces": true,
+  "maxPayloadSizeBytes": 8192,
+  "format": "pretty",
+  "availableLevels": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"],
+  "availableCategories": ["http", "auth", "scim.user", "scim.group", "scim.patch", "scim.filter", "scim.discovery", "endpoint", "database", "oauth", "scim.bulk", "scim.resource", "config", "general"]
+}
+```
+
+**Restore after debugging:**
+
+```http
+PUT /scim/admin/log-config/level/INFO HTTP/1.1
+Authorization: Bearer changeme-scim
+```
+
+**PowerShell:**
+
+```powershell
+# View current config
 Invoke-RestMethod "$base/scim/admin/log-config" -Headers $h | ConvertTo-Json -Depth 3
+
+# Set to TRACE
 Invoke-RestMethod -Method PUT "$base/scim/admin/log-config/level/TRACE" -Headers $h
-# ... reproduce issue, check logs, then restore:
+
+# Set only one endpoint to DEBUG
+Invoke-RestMethod -Method PUT "$base/scim/admin/log-config/endpoint/$epId/DEBUG" -Headers $h
+
+# Set only PATCH category to TRACE
+Invoke-RestMethod -Method PUT "$base/scim/admin/log-config/category/scim.patch/TRACE" -Headers $h
+
+# Restore to INFO
 Invoke-RestMethod -Method PUT "$base/scim/admin/log-config/level/INFO" -Headers $h
 ```
 
