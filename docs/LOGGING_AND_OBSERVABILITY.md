@@ -25,8 +25,9 @@
 16. [Slow Request Detection](#16-slow-request-detection)
 17. [Audit Trail](#17-audit-trail)
 18. [Deployment Mode Behavior](#18-deployment-mode-behavior)
-19. [Mermaid Diagrams](#19-mermaid-diagrams)
-20. [Source File Reference](#20-source-file-reference)
+19. [Troubleshooting Log-Related Issues](#19-troubleshooting-log-related-issues)
+20. [Mermaid Diagrams](#20-mermaid-diagrams)
+21. [Source File Reference](#21-source-file-reference)
 
 ---
 
@@ -714,7 +715,163 @@ volumes:
 
 ---
 
-## 19. Mermaid Diagrams
+## 19. Troubleshooting Log-Related Issues
+
+### TL-01: "No entries in ring buffer" — logs disappeared
+
+**Symptom:** `GET /scim/admin/log-config/recent?requestId=abc` returns `{"count": 0, "entries": []}`.
+
+**Response hint:**
+```json
+{
+  "count": 0,
+  "entries": [],
+  "hint": "No entries in ring buffer for requestId 'abc'. Try persistent logs: GET /scim/admin/logs?search=abc"
+}
+```
+
+**Cause:** The ring buffer holds only the last 2,000 entries (default). Older entries are evicted.
+
+**Resolution:**
+1. Use persistent DB logs instead: `GET /scim/admin/logs?search=abc`
+2. Increase buffer: set `LOG_RING_BUFFER_SIZE=10000` env var
+3. For future incidents: download logs before they're evicted: `GET /scim/admin/log-config/download`
+
+---
+
+### TL-02: Logs are too verbose / flooding console
+
+**Symptom:** Thousands of TRACE/DEBUG lines in stdout.
+
+**Resolution — runtime (no restart):**
+```bash
+# Set to INFO (suppress DEBUG/TRACE)
+curl -X PUT https://host/scim/admin/log-config/level/INFO \
+  -H "Authorization: Bearer $TOKEN"
+
+# Or suppress a noisy category:
+curl -X PUT https://host/scim/admin/log-config/category/http/WARN \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Resolution — env var (restart required):**
+```bash
+LOG_LEVEL=INFO
+LOG_CATEGORY_LEVELS=http=WARN,scim.filter=WARN
+```
+
+---
+
+### TL-03: Logs don't show request/response bodies
+
+**Symptom:** Only `"→ POST /scim/..."` and `"← 201"` log entries, no body content.
+
+**Cause:** Request/response bodies are logged at **TRACE** level. Default `LOG_LEVEL=INFO` suppresses them.
+
+**Resolution:**
+```bash
+# Enable TRACE for HTTP category only (targeted)
+curl -X PUT https://host/scim/admin/log-config/category/http/TRACE \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+Also ensure `includePayloads` is `true`:
+```bash
+curl -X PUT https://host/scim/admin/log-config \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"includePayloads": true}'
+```
+
+---
+
+### TL-04: SSE stream disconnects immediately
+
+**Symptom:** `curl -N https://host/scim/admin/log-config/stream` connects then closes.
+
+**Cause:** Reverse proxy (NGINX, Azure Front Door) buffering the SSE response.
+
+**Resolution:** The server sends `X-Accel-Buffering: no` but some proxies may still buffer. Check:
+1. NGINX: add `proxy_buffering off;` in your location block
+2. Azure Container Apps: SSE works out of the box (no proxy buffering by default)
+3. Verify with: `curl -N -v https://host/scim/admin/log-config/stream` — look for the `event: connected` line
+
+---
+
+### TL-05: Log files not appearing in `logs/` directory
+
+**Symptom:** No `logs/scimserver.log` file created.
+
+**Cause:** File logging is disabled or path is not writable.
+
+**Resolution:**
+1. Check `LOG_FILE` env var — empty string `""` disables file logging
+2. Default path is `logs/scimserver.log` relative to working directory
+3. In Docker: ensure volume mount exists and is writable
+4. Check permissions: the Node.js process needs write access to the directory
+
+---
+
+### TL-06: "[REDACTED]" appearing in log data
+
+**Symptom:** Log entries show `"authorization": "[REDACTED]"` or `"password": "[REDACTED]"`.
+
+**This is expected behavior.** The logger automatically redacts any data key matching `/secret|password|token|authorization|bearer|jwt/i` to prevent credential leakage.
+
+---
+
+### TL-07: Request ID not matching between request and response
+
+**Symptom:** `X-Request-Id` in the response doesn't match what you sent.
+
+**Expected behavior:** If you send `X-Request-Id: my-id` in the request header, the server propagates it. If you don't send it, the server generates a UUID.
+
+**Resolution:** If you need deterministic request IDs for tracing, always send `X-Request-Id` header in your requests:
+```bash
+curl -H "X-Request-Id: my-trace-id-123" \
+     -H "Authorization: Bearer $TOKEN" \
+     https://host/scim/endpoints/ep-abc123/Users
+```
+
+---
+
+### TL-08: GET /admin/log-config returns 401
+
+**Cause:** The admin API requires the same bearer token as SCIM endpoints. The log config endpoints are protected by `SharedSecretGuard`.
+
+**Resolution:** Include `Authorization: Bearer <your-token>` header. All `/scim/admin/*` routes require authentication.
+
+---
+
+### TL-09: Per-endpoint logs show entries from other endpoints
+
+**Symptom:** `GET /scim/endpoints/ep-abc/logs/recent` returns entries without `endpointId` or with a different `endpointId`.
+
+**This should not happen.** The endpoint log controller filters by `endpointId` from the URL path. If you see this:
+1. Verify the URL path: it must be `/scim/endpoints/{exact-id}/logs/recent`
+2. Check if you're hitting the admin endpoint by mistake: `/scim/admin/log-config/recent` (unfiltered)
+
+---
+
+### TL-10: Slow request warnings but response times look normal
+
+**Symptom:** WARN logs say "Slow request: 3456ms" but your client sees fast responses.
+
+**Cause:** The slow request threshold may be set too low, or server-side processing genuinely takes longer than client-side perceived latency (e.g., async DB write after response is sent).
+
+**Resolution:** Adjust the threshold:
+```bash
+curl -X PUT https://host/scim/admin/log-config \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"slowRequestThresholdMs": 5000}'
+```
+
+Or via env var: `LOG_SLOW_REQUEST_MS=5000`
+
+---
+
+## 20. Mermaid Diagrams
 
 ### Log Entry Flow
 
@@ -795,7 +952,7 @@ sequenceDiagram
 
 ---
 
-## 20. Source File Reference
+## 21. Source File Reference
 
 ### Core Logging Module (`api/src/modules/logging/`)
 
