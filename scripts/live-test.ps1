@@ -7738,6 +7738,35 @@ if ($ComboEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/
 if ($StrictComboEndpointId) { Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$StrictComboEndpointId" -Name "Strict Schema Combo Endpoint (9m-C)" }
 
 # ============================================
+# SWEEP: Delete ALL remaining live-test-* endpoints
+# Catches any orphaned endpoints from interrupted test runs.
+# Preserves ISV and manually-created endpoints (non live-test-* names).
+# ============================================
+Write-Host "`n--- Sweep: Delete ALL remaining live-test-* endpoints ---" -ForegroundColor Cyan
+try {
+    $allEndpoints = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Headers $headers -ErrorAction Stop
+    $testEndpoints = $allEndpoints.endpoints | Where-Object { $_.name -like "live-test-*" }
+    if ($testEndpoints.Count -gt 0) {
+        Write-Host "  Found $($testEndpoints.Count) orphaned live-test-* endpoint(s) to clean up:" -ForegroundColor Yellow
+        foreach ($ep in $testEndpoints) {
+            Remove-TestResource -Uri "$baseUrl/scim/admin/endpoints/$($ep.id)" -Name "$($ep.name) ($($ep.id))"
+        }
+    } else {
+        Write-Host "  ✅ No orphaned live-test-* endpoints found" -ForegroundColor Green
+    }
+    # Report preserved endpoints
+    $preserved = $allEndpoints.endpoints | Where-Object { $_.name -notlike "live-test-*" }
+    if ($preserved.Count -gt 0) {
+        Write-Host "  Preserved $($preserved.Count) non-test endpoint(s):" -ForegroundColor Cyan
+        foreach ($ep in $preserved) {
+            Write-Host "    🔒 $($ep.name) ($($ep.id))" -ForegroundColor DarkCyan
+        }
+    }
+} catch {
+    Write-Host "  ⚠️ Could not list endpoints for sweep cleanup: $_" -ForegroundColor Yellow
+}
+
+# ============================================
 # FINAL SUMMARY
 # ============================================
 $elapsed = (Get-Date) - $script:startTime
