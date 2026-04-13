@@ -144,4 +144,29 @@ describe('scim-sort.util', () => {
       expect(result.caseExact).toBe(false);
     });
   });
+
+  // ─── G6: writeOnly attributes in sortBy ─────────────────────────
+
+  describe('G6 — writeOnly attribute in sortBy silently ignored', () => {
+    it('should fall back to default sort for password (writeOnly, not in sort map)', () => {
+      const result = resolveUserSortParams('password');
+      expect(result.field).toBe('createdAt'); // silent fallback per RFC 7644 §3.4.2.3
+      expect(result.direction).toBe('asc');
+    });
+
+    it('should fall back for any unknown/writeOnly attribute on Groups', () => {
+      const result = resolveGroupSortParams('password');
+      expect(result.field).toBe('createdAt');
+    });
+
+    it('should NOT leak writeOnly attribute values via sort ordering', () => {
+      // Password is writeOnly — if it were in the sort map, an attacker could
+      // infer password values by observing sort ordering. The silent fallback
+      // to createdAt prevents this. RFC 7644 §3.4.2.3: unknown attrs SHALL be ignored.
+      const userResult = resolveUserSortParams('password');
+      const groupResult = resolveGroupSortParams('password');
+      expect(userResult.field).toBe('createdAt');
+      expect(groupResult.field).toBe('createdAt');
+    });
+  });
 });
