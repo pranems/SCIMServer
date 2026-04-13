@@ -1,6 +1,6 @@
 # 📚 SCIMServer Documentation Index
 
-> **Version:** 0.34.0 · **Updated:** April 10, 2026  
+> **Version:** 0.34.0 · **Updated:** April 13, 2026  
 > 62 active docs in `docs/` · 45 E2E suites (939 pass) · 80 unit suites (3,206 pass) · 6 built-in presets
 
 ---
@@ -23,7 +23,7 @@
 | [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) | Docker Compose build/run, healthcheck, test report |
 | [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) | Running instances, connection info, credentials, Azure costs |
 | [README_VISUAL_STUDIO_DEBUG.md](README_VISUAL_STUDIO_DEBUG.md) | VS Code debugging — launch configs, remote attach |
-| [REMOTE_DEBUGGING_AND_DIAGNOSIS.md](REMOTE_DEBUGGING_AND_DIAGNOSIS.md) | Production log access, remote diagnosis |
+| [REMOTE_DEBUGGING_AND_DIAGNOSIS.md](REMOTE_DEBUGGING_AND_DIAGNOSIS.md) | **v3.0** Zero-access diagnosis — SSE, ring buffer, per-endpoint isolation, 4 workflows |
 
 ## Architecture & Design
 
@@ -38,7 +38,7 @@
 | [SCHEMA_TEMPLATES_DESIGN.md](SCHEMA_TEMPLATES_DESIGN.md) | Profile configuration design (Phase 13) — decisions, types, flows |
 | [SCHEMA_CUSTOMIZATION_GUIDE.md](SCHEMA_CUSTOMIZATION_GUIDE.md) | **v3.0** Operator guide — custom extensions, resource types, profile-based (source-verified) |
 | [H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md](H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md) | PATCH validation architecture + immutable enforcement |
-| [LOGGING_AND_OBSERVABILITY.md](LOGGING_AND_OBSERVABILITY.md) | Structured logging, per-endpoint log levels, request/response capture |
+| [LOGGING_AND_OBSERVABILITY.md](LOGGING_AND_OBSERVABILITY.md) | **v4.0** Structured logging — 20 sections, 3 Mermaid diagrams, source-verified, zero-dep stack |
 
 ## SCIM Protocol & RFC Compliance
 
@@ -97,14 +97,16 @@
 | [TEST_INVENTORY.md](TEST_INVENTORY.md) | Test file inventory with coverage scope |
 | [TEST_FAILURE_ANALYSIS.md](TEST_FAILURE_ANALYSIS.md) | Test failure root cause analysis |
 | [SELF_IMPROVING_TEST_HEALTH_PROMPT.md](SELF_IMPROVING_TEST_HEALTH_PROMPT.md) | AI-assisted test health monitoring prompt |
+| [PROMPT_LOGGING_VERIFICATION.md](PROMPT_LOGGING_VERIFICATION.md) | **v3.0** Self-improving logging audit — 71-check, 12-section verification prompt |
+| [PROMPT_ERROR_HANDLING_VERIFICATION.md](PROMPT_ERROR_HANDLING_VERIFICATION.md) | **v3.0** Self-improving error handling audit — 55-check, 10-section verification prompt |
 
 ## Issues, Audits & Root Cause Analysis
 
 | Document | Description |
 |----------|-------------|
 | [DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md](DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md) | **v0.34.0 deep analysis** — security, SOLID, DRY, DTO, data integrity, RFC gaps, 25-item roadmap |
-| [LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md](LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md) | **Deep audit v1.1** — 28-gap register across all flows, levels, error paths, deployment modes |
-| [LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md](LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md) | **Ideal design v2.0** — 9 principles, event taxonomy, level redesign, error classification, Mermaid diagrams |
+| [LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md](LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md) | **v3.0 quality audit** — 20-gap register, 5 open, 14 resolved, source-verified |
+| [LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md](LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md) | **v3.0 error handling architecture** — 20 sections, 5 Mermaid diagrams, 5-layer error boundary |
 | [ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md](ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md) | Historical bug log with RCA and resolution |
 | [AZURE_DEPLOYMENT_ISSUES_AND_FIXES.md](AZURE_DEPLOYMENT_ISSUES_AND_FIXES.md) | Azure-specific deployment troubleshooting |
 
