@@ -1,8 +1,8 @@
 # Self-Improving Error Handling Verification Prompt
 
-> **Last audit run**: Not yet run  
-> **Pass rate**: —  
-> **Version**: 1.0 · April 7, 2026
+> **Last audit run**: April 13, 2026  
+> **Pass rate**: 70/73 PASS, 3 PARTIAL (Prisma create() wrapping — race-condition defense-in-depth)  
+> **Version**: 1.1 · April 13, 2026
 
 ## Context
 You are auditing SCIMServer's error handling completeness. The system has:
