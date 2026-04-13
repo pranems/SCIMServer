@@ -87,3 +87,4 @@ api/sd-results.json
 api/unit-final.json
 SCIMServer-standalone.zip
 standalone/
+endpoint-creation-output.txt

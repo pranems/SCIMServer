@@ -278,7 +278,7 @@ const config = ctx?.config;
 | `GET` | `/scim/admin/endpoints/{id}/stats` | `EndpointController` | Endpoint statistics |
 | `GET` | `/scim/admin/logs` | `AdminController` | List request logs |
 | `GET` | `/scim/admin/logs/{id}` | `AdminController` | Log detail |
-| `DELETE` | `/scim/admin/logs` | `AdminController` | Clear logs |
+| `POST` | `/scim/admin/logs/clear` | `AdminController` | Clear logs |
 | `GET` | `/scim/admin/activity` | `ActivityController` | Activity feed |
 | `GET` | `/scim/admin/database/users` | `DatabaseController` | Browse users |
 | `GET` | `/scim/admin/database/groups` | `DatabaseController` | Browse groups |

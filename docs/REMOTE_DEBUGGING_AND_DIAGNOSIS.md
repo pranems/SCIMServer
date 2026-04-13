@@ -17,6 +17,8 @@
    - [0.7 Log Files (On-Disk)](#07-log-files-on-disk)
    - [0.8 SSE Live Stream](#08-sse-live-stream-real-time-tail)
    - [0.9 Change Log Level at Runtime](#09-change-log-level-at-runtime)
+   - [0.10 Web UI (Admin Dashboard)](#010-web-ui-admin-dashboard)
+   - [0.11 Health Endpoint](#011-health-endpoint)
 1. [Zero-Access Diagnosis Model](#1-zero-access-diagnosis-model)
 2. [Diagnosis Endpoints](#2-diagnosis-endpoints)
 3. [Self-Service RCA via Error Responses](#3-self-service-rca-via-error-responses)
@@ -684,6 +686,69 @@ Invoke-RestMethod -Method PUT "$base/scim/admin/log-config/level/INFO" -Headers 
 
 ---
 
+### 0.10 Web UI (Admin Dashboard)
+
+SCIMServer includes a built-in React SPA served at `/admin` that provides a browser-based interface for all log and data browsing operations.
+
+**Access URL:** `{base-url}/admin`
+
+| Deployment | Admin Dashboard URL |
+|------------|-------------------|
+| **Local** | `http://localhost:6000/admin` |
+| **Docker** | `http://localhost:8080/admin` |
+| **Azure** | `https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/admin` |
+
+**Features:**
+
+| Tab | Description |
+|-----|-------------|
+| **Activity Feed** | Human-readable log entries with icons, severity colors, keepalive filtering, auto-refresh (10s) |
+| **Raw Logs** | Searchable request log list with method/status/duration filters, full request/response detail modal |
+| **Database** | Browse Users and Groups with pagination, search, detail modals, inline JSON payload view |
+| **Manual Provisioning** | Create users/groups directly for collision testing |
+
+**Authentication:** The SPA requires a bearer token on first use. Enter the shared secret for your deployment (same as the API token). The token is stored in `localStorage` (`scimserver.authToken`).
+
+**No separate build required** — the SPA is pre-built and served as static files from `api/public/`. It uses client-side routing at `/admin`.
+
+---
+
+### 0.11 Health Endpoint
+
+The health endpoint is public (no auth required) and used by Docker HEALTHCHECK and container orchestrators.
+
+| Property | Value |
+|----------|-------|
+| **Method** | `GET` |
+| **URL** | `/health` |
+| **Auth** | None (public, `@Public()` decorator) |
+
+**Request:**
+
+```http
+GET /health HTTP/1.1
+Host: scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io
+```
+
+**Response: `200 OK`**
+
+```json
+{
+  "status": "ok",
+  "uptime": 86400,
+  "timestamp": "2026-04-13T10:30:45.123Z"
+}
+```
+
+**curl:**
+
+```bash
+# No auth needed
+curl -s https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/health | jq
+```
+
+---
+
 ## 1. Zero-Access Diagnosis Model
 
 SCIMServer is designed for environments where operators have **no SSH/shell access** to the running container (Azure Container Apps, managed Docker, etc.). All diagnosis is done through HTTP endpoints.
@@ -762,7 +827,17 @@ SCIMServer is designed for environments where operators have **no SSH/shell acce
 |--------|-------|-------------|
 | `GET` | `/scim/admin/logs` | Paginated log list with filters |
 | `GET` | `/scim/admin/logs/:id` | Full request/response detail |
-| `DELETE` | `/scim/admin/logs` | Clear all persistent logs |
+| `POST` | `/scim/admin/logs/clear` | Clear all persistent logs |
+| `POST` | `/scim/admin/logs/prune?retentionDays=N` | Delete logs older than N days (default: `LOG_RETENTION_DAYS` or 30) |
+
+### Activity Feed API (`/scim/admin/activity/*`)
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| `GET` | `/scim/admin/activity` | Human-readable activity feed (parsed from raw logs) |
+| `GET` | `/scim/admin/activity/summary` | Activity summary stats (last 24h, last week, by type) |
+
+The activity feed converts raw request logs into human-readable entries with icons, severity levels, and Entra keepalive detection. Query params: `page`, `limit`, `type` (user/group/system), `severity` (info/success/warning/error), `search`, `hideKeepalive` (true/false).
 
 ---
 
