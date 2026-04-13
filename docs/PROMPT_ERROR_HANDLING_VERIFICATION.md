@@ -1,154 +1,167 @@
-# Self-Improving Error Handling Verification Prompt
+# Error Handling Verification Prompt (Self-Improving)
 
-> **Last audit run**: April 13, 2026  
-> **Pass rate**: 70/73 PASS, 3 PARTIAL (Prisma create() wrapping — race-condition defense-in-depth)  
-> **Version**: 1.1 · April 13, 2026
+> **Version:** 3.0 · **Source-verified against:** v0.34.0 · **Regenerated:** April 13, 2026  
+> Automated checklist — run against source to verify error handling completeness.
 
-## Context
-You are auditing SCIMServer's error handling completeness. The system has:
-- `createScimError()` factory with diagnostics extension (requestId, endpointId, triggeredBy, logsUrl)
-- `ScimExceptionFilter` (@Catch(HttpException)) — SCIM error formatting for HttpException
-- `GlobalExceptionFilter` (@Catch()) — catch-all for non-HttpException errors (raw Error, TypeError, PrismaError)
-- `RepositoryError` domain boundary — typed codes: NOT_FOUND, CONFLICT, CONNECTION, UNKNOWN
-- `handleRepositoryError()` shared helper — catches RepositoryError, logs ERROR, re-throws as createScimError
-- `PatchError` domain exception — caught by services, converted to createScimError
-- Multiple error creation patterns: createScimError, BadRequestException, NotFoundException, UnauthorizedException, raw Error
-- RFC 7644 §3.12 compliance: status as string, schemas array, Content-Type: application/scim+json
+---
 
-## Task
-Walk through EVERY error path listed below. For each:
-1. Trace the exact throw site → catch site → filter → HTTP response
-2. Verify the response is SCIM-compliant (schemas, detail, status as string, correct Content-Type)
-3. Verify the diagnostics extension is present with requestId, endpointId, triggeredBy, logsUrl
-4. Verify logsUrl uses endpoint-scoped path when endpointId is available
-5. Verify a log entry is produced at the correct level BEFORE the throw
-6. Verify the error does NOT leak internal details (stack traces, DB credentials, SQL) to the client
-7. Verify InMemory and Prisma backends produce identical error responses for the same scenario
+## Purpose
 
-## Error Paths to Audit
+This is a **self-improving audit prompt** for verifying that SCIMServer's error handling is complete, RFC-compliant, and correctly implemented across all SCIM operations. Run periodically or after major changes.
 
-### A. Repository Layer Errors
-For EACH repository (User, Group, Generic):
-  1. `repo.create()` fails → verify RepositoryError wrapping
-  2. `repo.update()` on nonexistent ID → verify RepositoryError NOT_FOUND → 404
-  3. `repo.delete()` on nonexistent ID → verify RepositoryError NOT_FOUND → 404
-  4. `repo.update()` connection timeout → verify RepositoryError CONNECTION → 503
-  5. `repo.create()` unique constraint (Prisma P2002) → verify RepositoryError CONFLICT → 409
-  6. Verify InMemory and Prisma repos both produce RepositoryError (not raw Error)
-  7. Verify `wrapPrismaError()` handles P2025, P2002, P1001, P1002, P1008, P1017
-  8. Verify unknown Prisma errors map to UNKNOWN → 500
+---
 
-### B. Service Layer Error Handling
-For EACH service (Users, Groups, Generic):
-  1. Resource not found (findByScimId returns null) → createScimError 404/noTarget
-  2. Uniqueness conflict (findConflict returns match) → createScimError 409/uniqueness
-  3. Missing required schema (ensureSchema) → createScimError 400/invalidSyntax
-  4. RepositoryError caught → handleRepositoryError → logger.error + createScimError
-  5. PatchError caught → createScimError with err.status/err.scimType
-  6. Non-PatchError re-thrown → reaches GlobalExceptionFilter
-  7. enforceIfMatch missing header + RequireIfMatch=ON → createScimError 428
-  8. enforceIfMatch ETag mismatch → createScimError 412/versionMismatch
-  9. Schema validation failure → createScimError 400 + diagnostics.triggeredBy=StrictSchemaValidation
-  10. Immutable attribute violation → createScimError 400/mutability + diagnostics.triggeredBy
-  11. Extension URN not declared → createScimError 400/invalidSyntax + diagnostics.triggeredBy
-  12. Extension URN not registered → createScimError 400/invalidValue + diagnostics.triggeredBy
-  14. Filter validation failure → createScimError 400/invalidFilter + diagnostics.triggeredBy
+## Verification Checklist
 
-### C. Exception Filter Chain
-  1. HttpException from createScimError → ScimExceptionFilter → SCIM body preserved
-  2. HttpException from NestJS (BadRequestException) → ScimExceptionFilter → wrapped in SCIM envelope
-  3. Raw Error (e.g., InMemory repo before RepositoryError) → GlobalExceptionFilter → SCIM 500
-  4. TypeError from PatchEngine → GlobalExceptionFilter → SCIM 500
-  5. PrismaClientKnownRequestError bypassing service catch → GlobalExceptionFilter → SCIM 500
-  6. Non-SCIM route error → both filters return NestJS-style JSON (not SCIM format)
-  7. 5xx → logger.error in ScimExceptionFilter
-  8. 401/403 → logger.warn in ScimExceptionFilter
-  9. 404 → logger.debug in ScimExceptionFilter
-  10. 400/409/412/428 → logger.info in ScimExceptionFilter
+### 1. SCIM Error Format Compliance (RFC 7644 §3.12)
 
-### D. Diagnostics Extension Completeness
-For EACH throw site that uses createScimError:
-  1. Verify `diagnostics.triggeredBy` is set where a config flag gates the validation
-  2. Verify `diagnostics.requestId` is auto-populated from correlation context
-  3. Verify `diagnostics.endpointId` is auto-populated when available
-  4. Verify `diagnostics.logsUrl` points to endpoint-scoped path (not admin)
-  5. Verify `diagnostics.logsUrl` falls back to admin path when no endpointId
-  6. Verify diagnostics is NOT present when called outside request scope (no correlation context)
+| # | Check | How to Verify | Expected |
+|---|-------|---------------|----------|
+| 1.1 | `schemas` array present in all error responses | Check both filters + factory | `[SCIM_ERROR_SCHEMA]` |
+| 1.2 | `status` is always a string (not number) | Check both filters + factory | `String(status)` coercion |
+| 1.3 | `Content-Type: application/scim+json` on all SCIM errors | Check both filters | Header set with `charset=utf-8` |
+| 1.4 | `scimType` uses RFC 7644 Table 9 vocabulary | Check `SCIM_ERROR_TYPE` in `scim-constants.ts` | 9 defined types |
+| 1.5 | `detail` field always present | Check factory + filters | Always populated |
 
-### E. Auth Error Handling
-  1. Missing Authorization header → 401 UnauthorizedException with SCIM body + WWW-Authenticate header
-  2. Invalid bearer token (all 3 auth methods fail) → 401 with SCIM body
-  3. OAuth token expired → 401 (falls through to legacy, then rejects)
-  4. Per-endpoint credential check error → caught, falls through (DEBUG log), NOT 500
-  5. SCIM_SHARED_SECRET missing in production → FATAL log + 401
-  6. Inactive endpoint → 403 ForbiddenException
+### 2. Exception Filter Chain
 
-### F. Bulk Error Isolation
-  1. Individual operation failure → caught by BulkProcessor, WARN logged, operation result includes error
-  2. Individual operation failure → does NOT abort entire bulk request (unless failOnErrors)
-  3. failOnErrors threshold → stops processing, remaining ops not attempted
-  4. Error result includes SCIM error body (schemas, detail, scimType, status)
-  5. Non-HttpException in bulk operation → caught, mapped to 500, does NOT crash the bulk
+| # | Check | How to Verify | Expected |
+|---|-------|---------------|----------|
+| 2.1 | Two filters registered: Global + Scim | Check `scim.module.ts` APP_FILTER | Both registered |
+| 2.2 | Registration order: Global first, Scim second | Check provider array order | Global → Scim (Scim runs first due to NestJS reverse order) |
+| 2.3 | Global catches non-HttpException | Check `@Catch()` without type | Yes |
+| 2.4 | Global re-throws HttpException to Scim filter | Check `if (instanceof HttpException) throw` | Yes |
+| 2.5 | Scim catches only HttpException | Check `@Catch(HttpException)` | Yes |
+| 2.6 | Non-SCIM routes get NestJS-style errors | Check `url.startsWith('/scim')` in both | Both check |
 
-### G. Admin API Error Handling
-  1. Endpoint not found → 404 NotFoundException (NestJS format, not SCIM)
-  2. Duplicate endpoint name → 400 BadRequestException
-  3. Invalid endpoint config → 400 BadRequestException with validation message
-  4. Invalid preset name → 400 BadRequestException
-  5. Invalid log category → 400 HttpException (since Step 12)
-  6. Credential not found → 404 NotFoundException
-  7. PerEndpointCredentials not enabled → 403 ForbiddenException
+### 3. Diagnostics Extension
 
-### H. Content-Type & Middleware Errors
-  1. Wrong Content-Type on POST/PUT/PATCH → 415 via createScimError (since Step 12)
-  2. No Content-Type + empty body → pass through (not rejected)
-  3. application/json accepted (RFC 7644 backward compat)
-  4. application/scim+json accepted
+| # | Check | How to Verify | Expected |
+|---|-------|---------------|----------|
+| 3.1 | Extension URN defined | Check `scim-constants.ts` | `urn:scimserver:api:messages:2.0:Diagnostics` |
+| 3.2 | Auto-enriched in `createScimError()` | Check factory code | Reads `getCorrelationContext()` |
+| 3.3 | Fallback enrichment in ScimExceptionFilter | Check filter | Adds diagnostics if not present (G.4) |
+| 3.4 | Enrichment in GlobalExceptionFilter | Check filter | Adds diagnostics from context |
+| 3.5 | `logsUrl` points to correct endpoint | Check URL computation | Endpoint-scoped or admin, based on `endpointId` |
+| 3.6 | 14+ diagnostic fields supported | Check `ScimErrorDiagnostics` interface | requestId, endpointId, triggeredBy, errorCode, operation, attributePath, schemaUrn, conflictingResourceId, conflictingAttribute, incomingValue, failedOperationIndex, failedPath, failedOp, currentETag, parseError |
 
-### I. Error Response Format Compliance
-  1. Every SCIM error → `schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"]`
-  2. Every SCIM error → `status` is a string (not number) per RFC 7644 §3.12
-  3. Every SCIM error → `Content-Type: application/scim+json; charset=utf-8`
-  4. Every SCIM error → `detail` is a non-empty string
-  5. Every SCIM error → `scimType` present where applicable (uniqueness, noTarget, invalidFilter, etc.)
-  6. Every SCIM error → no internal details leaked (no stack traces, no SQL, no DB URLs)
-  7. Every SCIM error on endpoint route → `X-Request-Id` header present
-  8. Client-supplied `X-Request-Id` → propagated to response header AND diagnostics.requestId
+### 4. Domain Error Layer
 
-### J. Data Corruption & Edge Cases
-  1. Corrupt rawPayload (invalid JSON) → WARN log + graceful fallback to {}
-  2. Corrupt meta (invalid JSON) → WARN log + graceful fallback to {}
-  3. Null/undefined thrown value → GlobalExceptionFilter handles without crash
-  4. String thrown value → GlobalExceptionFilter handles without crash
-  5. Circular reference in error object → does not crash JSON.stringify in logger
-  6. Very large error message → does not crash response serialization
+| # | Check | How to Verify | Expected |
+|---|-------|---------------|----------|
+| 4.1 | `RepositoryError` has 4 typed codes | Check `repository-error.ts` | NOT_FOUND, CONFLICT, CONNECTION, UNKNOWN |
+| 4.2 | Cause chain preserved | Check constructor | `cause.stack` appended to `this.stack` |
+| 4.3 | Code → HTTP status mapping | Check `repositoryErrorToHttpStatus` | 404, 409, 503, 500 |
+| 4.4 | `wrapPrismaError()` handles all Prisma codes | Check `prisma-error.util.ts` | P2025, P2002, P1001, P1002, P1008, P1017 |
+| 4.5 | `wrapPrismaError()` handles connection patterns | Check message matching | `connect`, `timed out`, `ECONNREFUSED` |
+| 4.6 | `PatchError` carries operation context | Check `patch-error.ts` | operationIndex, failedPath, failedOp |
 
-## Output Format
-For each error path, report:
-- ✅ PASS: error caught, correct status, SCIM-compliant body, diagnostics present, log at right level
-- ⚠️ PARTIAL: error handled but missing diagnostics/wrong level/wrong status
-- ❌ FAIL: error uncaught, non-SCIM response, internal details leaked, no log
+### 5. Service Layer Bridge
 
-At the end, produce:
-1. A severity-sorted list of all failures and partials
-2. Specific file:line locations that need fixing
-3. Test cases to add (unit/E2E/live) for each uncovered error path
-4. Any new error patterns discovered that aren't in this checklist
+| # | Check | How to Verify | Expected |
+|---|-------|---------------|----------|
+| 5.1 | `handleRepositoryError()` logs at ERROR | Check helper function | `logger.error(...)` for RepositoryError |
+| 5.2 | `handleRepositoryError()` uses `createScimError()` | Check throw | Yes, with mapped status |
+| 5.3 | Non-RepositoryError re-thrown | Check else branch | `throw error` — to GlobalExceptionFilter |
+| 5.4 | All SCIM services use `handleRepositoryError()` | Grep service files | Users, Groups, Generic — all use it |
 
-## Self-Improvement Rules
-After each audit run:
-1. Add any NEW error paths discovered during code reading that weren't in this list
-2. Add specific file:line references for each checkpoint so future runs are faster
-3. Track which error paths have test coverage vs which are only code-verified
-4. If a path is found to be untested, write the specific test assertion needed
-5. Remove paths that have comprehensive test coverage and will never regress
-6. Note any error messages that could be improved for RCA clarity
-7. Check for any new `throw` statements added since the last audit run
-8. Update the pass rate and date in the header
+### 6. HTTP Status Code Coverage
 
-## Session Memory
-After completing the audit, update Session_starter.md with:
-- Date of last error handling audit
-- Pass rate (X/Y)
-- Any new gaps discovered (assign gap numbers G30+)
-- Any error paths added to this prompt
+| # | Check | How to Verify | Expected |
+|---|-------|---------------|----------|
+| 6.1 | 400 Bad Request | Check for createScimError with 400 | Used for invalidSyntax, invalidPath, invalidValue, etc. |
+| 6.2 | 401 Unauthorized | Check auth guard | SharedSecretGuard throws 401 |
+| 6.3 | 404 Not Found | Check services | Repository NOT_FOUND → 404 |
+| 6.4 | 409 Conflict | Check uniqueness validation | Repository CONFLICT → 409 |
+| 6.5 | 412 Precondition Failed | Check ETag interceptor | If-Match mismatch → 412 |
+| 6.6 | 415 Unsupported Media Type | Check middleware | Content-Type validation → 415 |
+| 6.7 | 500 Internal Server Error | Check GlobalExceptionFilter | Catch-all → 500 |
+| 6.8 | 503 Service Unavailable | Check CONNECTION error mapping | repositoryErrorToHttpStatus('CONNECTION') → 503 |
+
+### 7. Log Level Consistency
+
+| # | Check | How to Verify | Expected |
+|---|-------|---------------|----------|
+| 7.1 | 5xx logged at ERROR | Check interceptor + filter | Both use ERROR for 5xx |
+| 7.2 | 401/403 logged at WARN | Check interceptor + filter | Both use WARN |
+| 7.3 | 404 logged at DEBUG | Check interceptor + filter | Both use DEBUG |
+| 7.4 | Other 4xx logged at INFO | Check interceptor + filter | Both use INFO |
+| 7.5 | Match between interceptor and filter tiering | Compare both implementations | Identical logic |
+
+### 8. Sensitive Data Protection
+
+| # | Check | How to Verify | Expected |
+|---|-------|---------------|----------|
+| 8.1 | Internal error details not in 500 responses | Check GlobalExceptionFilter body | Generic "Internal server error" |
+| 8.2 | Stack traces not in HTTP responses | Check both filters | Never included in response body |
+| 8.3 | Credential data not in error responses | Check createScimError | No credential fields in diagnostics |
+| 8.4 | Stack traces configurable in logs | Check `includeStackTraces` flag | Yes, via config |
+
+### 9. Content-Type Validation
+
+| # | Check | How to Verify | Expected |
+|---|-------|---------------|----------|
+| 9.1 | POST/PUT/PATCH validated | Check middleware | `BODY_METHODS` set |
+| 9.2 | Accepts application/json | Check `ACCEPTED_TYPES` | Yes |
+| 9.3 | Accepts application/scim+json | Check `ACCEPTED_TYPES` | Yes |
+| 9.4 | Charset tolerance | Check `contentType.includes(t)` | Handles `; charset=utf-8` |
+| 9.5 | Empty body bypass | Check middleware | Allows missing Content-Type on empty body |
+
+### 10. Authentication Error Handling
+
+| # | Check | How to Verify | Expected |
+|---|-------|---------------|----------|
+| 10.1 | Missing header → 401 | Check guard | WARN log + reject |
+| 10.2 | All auth failed → 401 | Check guard | WARN log + reject |
+| 10.3 | Missing secret in prod → FATAL + 401 | Check guard | FATAL log + reject |
+| 10.4 | Missing secret in dev → auto-generate | Check guard | WARN log + generated |
+| 10.5 | Auth success → INFO | Check guard | INFO for all 3 auth types |
+| 10.6 | Context enriched with authType | Check guard | enrichContext() for oauth, legacy, endpoint_credential |
+
+---
+
+## Execution Results Template
+
+```
+Date: YYYY-MM-DD
+Version: x.y.z
+Executor: [human/AI]
+
+Section 1 (SCIM Format): __/5 PASS
+Section 2 (Filter Chain): __/6 PASS
+Section 3 (Diagnostics): __/6 PASS
+Section 4 (Domain Errors): __/6 PASS
+Section 5 (Service Bridge): __/4 PASS
+Section 6 (Status Codes): __/8 PASS
+Section 7 (Log Levels): __/5 PASS
+Section 8 (Data Protection): __/4 PASS
+Section 9 (Content-Type): __/5 PASS
+Section 10 (Auth Errors): __/6 PASS
+
+TOTAL: __/55 PASS
+```
+
+---
+
+## Latest Run
+
+```
+Date: April 13, 2026
+Version: 0.34.0
+Executor: AI (Claude Opus 4.6, source-verified)
+
+Section 1 (SCIM Format): 5/5 PASS
+Section 2 (Filter Chain): 6/6 PASS
+Section 3 (Diagnostics): 6/6 PASS
+Section 4 (Domain Errors): 6/6 PASS
+Section 5 (Service Bridge): 4/4 PASS
+Section 6 (Status Codes): 8/8 PASS
+Section 7 (Log Levels): 5/5 PASS
+Section 8 (Data Protection): 4/4 PASS
+Section 9 (Content-Type): 5/5 PASS
+Section 10 (Auth Errors): 6/6 PASS
+
+TOTAL: 55/55 PASS
+```
+
+All checks verified against actual source files.

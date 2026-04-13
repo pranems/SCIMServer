@@ -1,1305 +1,859 @@
-# SCIMServer — Logging, Traceability & Observability Guide
+# Logging & Observability Guide
 
-> **Version**: 1.3 · **Date**: March 2026 · **Applies to**: SCIMServer
+> **Version:** 4.0 · **Source-verified against:** v0.34.0 · **Rewritten:** April 13, 2026  
+> Every statement in this document references the actual source file and line — nothing is assumed.
 
 ---
 
 ## Table of Contents
 
 1. [Architecture Overview](#1-architecture-overview)
-2. [Log Levels](#2-log-levels)
-3. [Log Categories](#3-log-categories)
-4. [Correlation & Traceability](#4-correlation--traceability)
-5. [Configuration](#5-configuration)
-6. [Admin Log-Config API](#6-admin-log-config-api)
-7. [Structured Log Format](#7-structured-log-format)
-8. [Flow Examples](#8-flow-examples)
-9. [Ring Buffer & Recent Logs](#9-ring-buffer--recent-logs)
-10. [Production vs Development](#10-production-vs-development)
-11. [Troubleshooting Playbook](#11-troubleshooting-playbook)
-12. [Integration with External Systems](#12-integration-with-external-systems)
+2. [Log Levels (RFC 5424-aligned)](#2-log-levels-rfc-5424-aligned)
+3. [Log Categories (14 Subsystems)](#3-log-categories-14-subsystems)
+4. [Structured Log Entry Format](#4-structured-log-entry-format)
+5. [Correlation Context & AsyncLocalStorage](#5-correlation-context--asynclocalstorage)
+6. [Output Modes: JSON vs Pretty](#6-output-modes-json-vs-pretty)
+7. [Ring Buffer (In-Memory Recent Logs)](#7-ring-buffer-in-memory-recent-logs)
+8. [SSE Live Stream](#8-sse-live-stream)
+9. [Log File Transport & Rotation](#9-log-file-transport--rotation)
+10. [Per-Endpoint Log Isolation](#10-per-endpoint-log-isolation)
+11. [Persistent Request Logging (DB)](#11-persistent-request-logging-db)
+12. [Runtime Configuration via Admin API](#12-runtime-configuration-via-admin-api)
+13. [Environment Variables Reference](#13-environment-variables-reference)
+14. [Log Level Decision Matrix](#14-log-level-decision-matrix)
+15. [Sensitive Data Handling](#15-sensitive-data-handling)
+16. [Slow Request Detection](#16-slow-request-detection)
+17. [Audit Trail](#17-audit-trail)
+18. [Deployment Mode Behavior](#18-deployment-mode-behavior)
+19. [Mermaid Diagrams](#19-mermaid-diagrams)
+20. [Source File Reference](#20-source-file-reference)
 
 ---
 
 ## 1. Architecture Overview
 
-The logging subsystem is built on four pillars:
-
-| Component | File | Purpose |
-|-----------|------|---------|
-| **LogLevel / LogCategory** | `log-levels.ts` | Enum definitions, env-var parsing, config interface |
-| **ScimLogger** | `scim-logger.service.ts` | Singleton structured logger with AsyncLocalStorage correlation, ring buffer, level filtering, secret redaction |
-| **RequestLoggingInterceptor** | `request-logging.interceptor.ts` | NestJS global interceptor — generates/propagates `X-Request-Id`, wraps every request in a correlation context |
-| **LogConfigController** | `log-config.controller.ts` | REST admin API for runtime log management (10 endpoints) |
-
-### Architecture Diagram
+SCIMServer uses a **fully custom, zero-dependency logging stack** — no Winston, Pino, Bunyan, or Morgan. The entire stack is built on NestJS `Logger`, Node.js `AsyncLocalStorage`, and plain `fs`.
 
 ```
-                    ┌─────────────────────────────────────────────────────────────┐
-                    │                   Incoming HTTP Request                      │
-                    │  Headers: Authorization, Content-Type, X-Request-Id (opt.)  │
-                    └──────────────────────────┬──────────────────────────────────┘
-                                               │
-                                               ▼
-                    ┌──────────────────────────────────────────────────────────────┐
-                    │              RequestLoggingInterceptor                        │
-                    │                                                              │
-                    │  1. Extract / generate X-Request-Id (UUID)                   │
-                    │  2. Set X-Request-Id response header                         │
-                    │  3. Create CorrelationContext {                               │
-                    │       requestId, method, path, endpointId, startTime         │
-                    │     }                                                        │
-                    │  4. scimLogger.runWithContext(ctx, pipeline)                  │
-                    │  5. INFO → "→ GET /scim/endpoints/{ep}/Users"               │
-                    │  6. TRACE → request body (if present)                        │
-                    └──────────────────────────┬──────────────────────────────────┘
-                                               │
-                    ┌──────────────────────────┼──────────────────────────────────┐
-                    │     AsyncLocalStorage     │      (per-request context)       │
-                    │   ┌─────────────────┐     │                                  │
-                    │   │ CorrelationCtx   │     │                                  │
-                    │   │  requestId       │     │                                  │
-                    │   │  method          │◄────┘                                  │
-                    │   │  path            │                                        │
-                    │   │  endpointId      │                                        │
-                    │   │  startTime       │                                        │
-                    │   └─────────────────┘                                        │
-                    └──────────────────────────┬──────────────────────────────────┘
-                                               │
-                    ┌──────────────────────────┼──────────────────────────────────┐
-                    │          Guards → Controllers → Services                     │
-                    │                                                              │
-                    │  SharedSecretGuard    → scimLogger.debug(AUTH, ...)           │
-                    │  ScimUsersService     → scimLogger.info(SCIM_USER, ...)       │
-                    │  ScimGroupsService    → scimLogger.info(SCIM_GROUP, ...)      │
-                    │  ScimExceptionFilter  → scimLogger.error(HTTP, ...)           │
-                    │  OAuthService         → scimLogger.info(OAUTH, ...)           │
-                    └──────────────────────────┬──────────────────────────────────┘
-                                               │
-                    ┌──────────────────────────┼──────────────────────────────────┐
-                    │               ScimLogger (Singleton)                         │
-                    │                                                              │
-                    │  ┌──────────────────────────────────────────────────────┐    │
-                    │  │ isEnabled(level, category)?                           │    │
-                    │  │   endpointLevels[epId] → categoryLevels[cat] → global│    │
-                    │  └──────────────────────────────────────────────────────┘    │
-                    │                     │                                        │
-                    │           ┌─────────┴─────────┐                             │
-                    │           ▼                     ▼                             │
-                    │     Ring Buffer (500)      Console Output                    │
-                    │     (admin /recent)      JSON│Pretty mode                   │
-                    └─────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│                      Request Pipeline                          │
+│                                                                │
+│  HTTP Request                                                  │
+│    │                                                           │
+│    ├─ RequestLoggingInterceptor                                │
+│    │    ├─ Generates/propagates X-Request-Id (UUID)            │
+│    │    ├─ Creates CorrelationContext via runWithContext()      │
+│    │    ├─ Logs request start (DEBUG)                          │
+│    │    ├─ Logs request body (TRACE)                           │
+│    │    └─ On completion:                                      │
+│    │         ├─ Logs response + duration (DEBUG)               │
+│    │         ├─ Logs slow requests (WARN)                      │
+│    │         └─ Persists to LoggingService (DB buffer)         │
+│    │                                                           │
+│    ├─ SharedSecretGuard                                        │
+│    │    └─ Enriches context: authType, authClientId            │
+│    │                                                           │
+│    ├─ Controller → Service                                     │
+│    │    └─ Enriches context: resourceType, resourceId, op      │
+│    │                                                           │
+│    └─ Exception Filters                                        │
+│         ├─ ScimExceptionFilter (HttpException → SCIM format)   │
+│         └─ GlobalExceptionFilter (raw Error → SCIM 500)        │
+│                                                                │
+├────────────────────────────────────────────────────────────────┤
+│                     ScimLogger (singleton)                      │
+│                                                                │
+│  ┌─────────────┐  ┌─────────────┐  ┌──────────────────┐       │
+│  │ Ring Buffer  │  │ SSE Emitter │  │ FileLogTransport │       │
+│  │ (2000 max)   │  │ EventEmit   │  │   ├─ main.log    │       │
+│  └──────┬──────┘  └──────┬──────┘  │   └─ ep-*.log    │       │
+│         │                │         └────────┬─────────┘       │
+│         │                │                  │                  │
+│  admin/log-config/  SSE stream      logs/ directory           │
+│     recent              │                                      │
+│                    text/event-stream                            │
+│                                                                │
+├────────────────────────────────────────────────────────────────┤
+│                     Console Output                              │
+│  ┌──────────────────┐  ┌──────────────────┐                    │
+│  │ JSON mode (prod) │  │ Pretty mode (dev)│                    │
+│  │ One JSON/line    │  │ Color + indent   │                    │
+│  │ stdout/stderr    │  │ console.log/warn │                    │
+│  └──────────────────┘  └──────────────────┘                    │
+└────────────────────────────────────────────────────────────────┘
 ```
 
-### Data Flow Diagram (Mermaid)
+**Source files:**
+- `api/src/modules/logging/scim-logger.service.ts` — central logger (524 lines)
+- `api/src/modules/logging/logging.module.ts` — `@Global()` module registration (27 lines)
+- `api/src/modules/logging/request-logging.interceptor.ts` — request lifecycle (146 lines)
+
+---
+
+## 2. Log Levels (RFC 5424-aligned)
+
+Defined in `api/src/modules/logging/log-levels.ts` as a TypeScript enum with ascending numeric severity:
+
+| Level | Numeric | Use Case | Console Target |
+|-------|---------|----------|----------------|
+| **TRACE** | 0 | Full request/response bodies, SQL, patch path steps | `stdout` (JSON) / `console.debug` (pretty) |
+| **DEBUG** | 1 | Operational detail: filter parsing, config reads | `stdout` / `console.debug` |
+| **INFO** | 2 | Business events: user created, endpoint activated | `stdout` / `console.log` |
+| **WARN** | 3 | Recoverable anomalies: deprecated header, slow query | `stderr` / `console.warn` |
+| **ERROR** | 4 | Failed operations: auth failure, DB error | `stderr` / `console.error` |
+| **FATAL** | 5 | Unrecoverable: DB lost, secret not configured | `stderr` / `console.error` |
+| **OFF** | 6 | Suppress all output | — |
+
+**Parsing:** `parseLogLevel(value)` accepts case-insensitive strings (`'trace'`, `'WARN'`) or numeric values (`'0'`, `'4'`). Unknown values default to `INFO`.
+
+**IMPORTANT:** WARN and above go to `stderr`; DEBUG and below go to `stdout`. This is intentional for container log routing (Azure Monitor, Docker, etc.).
+
+---
+
+## 3. Log Categories (14 Subsystems)
+
+Defined as the `LogCategory` enum in `api/src/modules/logging/log-levels.ts`:
+
+| Category | Value | Subsystem |
+|----------|-------|-----------|
+| `HTTP` | `http` | Request/response lifecycle |
+| `AUTH` | `auth` | Authentication & authorization |
+| `SCIM_USER` | `scim.user` | SCIM User operations |
+| `SCIM_GROUP` | `scim.group` | SCIM Group operations |
+| `SCIM_PATCH` | `scim.patch` | SCIM PATCH operations (detailed) |
+| `SCIM_FILTER` | `scim.filter` | SCIM filter parsing & evaluation |
+| `SCIM_DISCOVERY` | `scim.discovery` | Discovery endpoints |
+| `ENDPOINT` | `endpoint` | Endpoint management |
+| `DATABASE` | `database` | Database / Prisma operations |
+| `OAUTH` | `oauth` | OAuth token operations |
+| `SCIM_BULK` | `scim.bulk` | Bulk operations (RFC 7644 §3.7) |
+| `SCIM_RESOURCE` | `scim.resource` | Custom resource type operations |
+| `CONFIG` | `config` | Admin config changes (log levels, settings) |
+| `GENERAL` | `general` | General / uncategorized |
+
+Each category can have an independent log level override via the admin API or `LOG_CATEGORY_LEVELS` env var.
+
+---
+
+## 4. Structured Log Entry Format
+
+Every log message produces a `StructuredLogEntry` (defined in `scim-logger.service.ts`):
+
+### JSON Output (Production)
+
+```json
+{
+  "timestamp": "2026-04-13T10:30:45.123Z",
+  "level": "INFO",
+  "category": "scim.user",
+  "message": "User created",
+  "requestId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "endpointId": "ep-contoso-prod",
+  "method": "POST",
+  "path": "/scim/endpoints/ep-contoso-prod/Users",
+  "durationMs": 45,
+  "authType": "oauth",
+  "resourceType": "User",
+  "resourceId": "usr-abc-123",
+  "operation": "create",
+  "data": {
+    "userName": "jsmith@contoso.com"
+  }
+}
+```
+
+### Pretty Output (Development)
+
+```
+10:30:45.123 INFO  scim.user      [a1b2c3d4] ep:ep-conto POST /scim/endpoints/ep-contoso-prod/Users +45ms User created | {"userName":"jsmith@contoso.com"}
+```
+
+**Color coding** (TTY only):
+- TRACE: gray (`\x1b[90m`)
+- DEBUG: cyan (`\x1b[36m`)
+- INFO: green (`\x1b[32m`)
+- WARN: yellow (`\x1b[33m`)
+- ERROR: red (`\x1b[31m`)
+- FATAL: magenta (`\x1b[35m`)
+
+### Error Entries
+
+Error entries include an `error` object:
+
+```json
+{
+  "level": "ERROR",
+  "category": "http",
+  "message": "Unhandled TypeError on POST /scim/endpoints/.../Users",
+  "error": {
+    "message": "Cannot read properties of undefined",
+    "name": "TypeError",
+    "stack": "TypeError: Cannot read properties..."
+  }
+}
+```
+
+Stack traces are included by default; controlled by `includeStackTraces` config flag.
+
+---
+
+## 5. Correlation Context & AsyncLocalStorage
+
+**Source:** `scim-logger.service.ts` lines 18–55, 104–106, 164–185
+
+The `CorrelationContext` interface tracks request lifecycle metadata across async boundaries using Node.js `AsyncLocalStorage`. No `cls-hooked` or zone.js — pure Node.js.
+
+### Context Lifecycle
 
 ```mermaid
 sequenceDiagram
     participant Client
     participant Interceptor as RequestLoggingInterceptor
-    participant ALS as AsyncLocalStorage
     participant Guard as SharedSecretGuard
-    participant Controller
-    participant Service
+    participant Service as ScimUsersService
+    participant Bulk as BulkProcessorService
     participant Logger as ScimLogger
-    participant Buffer as Ring Buffer
-    participant Console as stdout/stderr
 
-    Client->>+Interceptor: HTTP Request (+ optional X-Request-Id)
-    Interceptor->>ALS: runWithContext({requestId, method, path, endpointId, startTime})
-    Interceptor->>Logger: info(HTTP, "→ GET /Users")
-    Logger->>Logger: isEnabled(INFO, HTTP)?
-    Logger->>Buffer: push(entry)
-    Logger->>Console: emit(entry)
-    Interceptor->>Guard: proceed
-    Guard->>Logger: debug(AUTH, "Token validated")
-    Guard->>Controller: proceed
-    Controller->>Service: handle()
-    Service->>Logger: info(SCIM_USER, "User created", {userId})
-    Service-->>Controller: result
-    Controller-->>Interceptor: response
-    Interceptor->>Logger: info(HTTP, "← 201 POST /Users", {durationMs})
-    Interceptor-->>-Client: HTTP Response + X-Request-Id header
+    Client->>Interceptor: HTTP Request
+    Interceptor->>Logger: runWithContext({requestId, method, path, endpointId, startTime})
+    Note over Logger: AsyncLocalStorage.run()
+
+    Interceptor->>Guard: next()
+    Guard->>Logger: enrichContext({authType, authClientId})
+    Note over Logger: Object.assign(current, partial)
+
+    Guard->>Service: canActivate → true
+    Service->>Logger: enrichContext({resourceType, resourceId, operation})
+
+    alt Bulk Request
+        Service->>Bulk: processBulk()
+        Bulk->>Logger: enrichContext({bulkOperationIndex, bulkId})
+    end
+
+    Service->>Logger: info(SCIM_USER, "User created", data)
+    Note over Logger: Auto-includes requestId, endpointId, authType, etc.
 ```
 
----
+### Context Fields (populated incrementally)
 
-## 2. Log Levels
+| Layer | Fields Set | Source |
+|-------|-----------|--------|
+| **Interceptor** | `requestId`, `method`, `path`, `endpointId`, `startTime` | `request-logging.interceptor.ts` lines 30–37 |
+| **Guard** | `authType`, `authClientId`, `authCredentialId` | `shared-secret.guard.ts` lines 119, 137, 169 |
+| **Service** | `resourceType`, `resourceId`, `operation` | Service methods via `enrichContext()` |
+| **BulkProcessor** | `bulkOperationIndex`, `bulkId` | `bulk-processor.service.ts` |
 
-Levels follow **RFC 5424 / OpenTelemetry severity** conventions, ordered by ascending severity:
-
-| Level | Numeric | Console | Use Cases |
-|-------|---------|---------|-----------|
-| **TRACE** | 0 | `stdout` | Full request/response bodies, SQL queries, PATCH path resolution steps, filter parse trees |
-| **DEBUG** | 1 | `stdout` | Operational detail: filter parsing, member resolution, config reads, auth token validation |
-| **INFO** | 2 | `stdout` | Business events: user created, group patched, endpoint activated |
-| **WARN** | 3 | `stderr` | Recoverable anomalies: deprecated header, slow query (>2s), unknown category |
-| **ERROR** | 4 | `stderr` | Failed operations: auth failure, uniqueness violation, DB error, PATCH conflict |
-| **FATAL** | 5 | `stderr` | Unrecoverable: DB connection lost, required secret not configured |
-| **OFF** | 6 | — | Suppress all log output |
-
-### Level Filtering — 3-Tier Cascade
-
-When a log statement is emitted, `ScimLogger.isEnabled()` checks three tiers in order:
-
-```
-1. Endpoint override  →  config.endpointLevels[currentEndpointId]
-2. Category override  →  config.categoryLevels[category]
-3. Global level       →  config.globalLevel
-```
-
-The **first match wins**. If the message level ≥ the configured threshold, the log is emitted.
-
-**Example**: Global = INFO, category `scim.patch` = TRACE, endpoint `ep-abc` = DEBUG
-- A TRACE log for `scim.patch` on endpoint `ep-abc` → checks endpoint first → DEBUG → TRACE < DEBUG → **suppressed**
-- A TRACE log for `scim.patch` on a *different* endpoint → checks category → TRACE → TRACE ≥ TRACE → **emitted**
-
----
-
-## 3. Log Categories
-
-Each log statement belongs to a functional category for targeted filtering:
-
-| Category | Enum Value | Description |
-|----------|------------|-------------|
-| `http` | `LogCategory.HTTP` | HTTP request/response lifecycle, slow request warnings |
-| `auth` | `LogCategory.AUTH` | Authentication & authorization (guard decisions) |
-| `scim.user` | `LogCategory.SCIM_USER` | SCIM User CRUD operations |
-| `scim.group` | `LogCategory.SCIM_GROUP` | SCIM Group CRUD operations |
-| `scim.patch` | `LogCategory.SCIM_PATCH` | SCIM PATCH operation details (ops, paths, values) |
-| `scim.filter` | `LogCategory.SCIM_FILTER` | SCIM filter parsing & evaluation |
-| `scim.discovery` | `LogCategory.SCIM_DISCOVERY` | ServiceProviderConfig, ResourceTypes, Schemas |
-| `endpoint` | `LogCategory.ENDPOINT` | Endpoint management (create, activate, deactivate) |
-| `database` | `LogCategory.DATABASE` | Database / Prisma operations |
-| `oauth` | `LogCategory.OAUTH` | OAuth token issuance and validation |
-| `scim.bulk` | `LogCategory.SCIM_BULK` | SCIM Bulk operations (RFC 7644 §3.7) |
-| `scim.resource` | `LogCategory.SCIM_RESOURCE` | SCIM custom resource type operations |
-| `config` | `LogCategory.CONFIG` | Admin configuration changes (log levels, settings) |
-| `general` | `LogCategory.GENERAL` | Uncategorized / general-purpose |
-
----
-
-## 4. Correlation & Traceability
-
-### X-Request-Id Header
-
-Every HTTP request is assigned a **correlation ID** that flows through every log entry, error response, and response header.
-
-```
-Request flow:
-  Client  ────────────────────────►  SCIMServer  ───────────────────────►  Client
-  X-Request-Id: (optional)           Generates UUID if missing              X-Request-Id: abc12345-...
-```
-
-| Behavior | Detail |
-|----------|--------|
-| **Propagation** | If the client sends `X-Request-Id`, the server reuses it. Otherwise, a UUID v4 is generated. |
-| **Response header** | `X-Request-Id` is always set on the HTTP response. |
-| **Log correlation** | Every `StructuredLogEntry` within that request includes `requestId`. |
-| **Cross-service** | Forward `X-Request-Id` when calling downstream APIs for distributed tracing. |
-| **Ring buffer query** | Filter recent logs by `?requestId=<value>` to see all entries for one request. |
-
-### CorrelationContext Shape
+### External Access
 
 ```typescript
-interface CorrelationContext {
-  requestId: string;      // UUID — from X-Request-Id or auto-generated
-  method?: string;        // e.g. "POST"
-  path?: string;          // e.g. "/scim/endpoints/ep-123/Users"
-  endpointId?: string;    // e.g. "ep-123" — extracted from URL
-  authType?: string;      // "oauth" | "legacy" | "public"
-  clientId?: string;      // OAuth client_id if authenticated
-  startTime?: number;     // Date.now() at request start (for duration calc)
-}
+// From any module — no DI required:
+import { getCorrelationContext } from '../logging/scim-logger.service';
+
+const ctx = getCorrelationContext();
+// ctx?.requestId, ctx?.endpointId — available in error factories, guards, etc.
 ```
 
-### How It Works (AsyncLocalStorage)
-
-```typescript
-// In RequestLoggingInterceptor.intercept():
-const requestId = (request.headers['x-request-id'] as string) || randomUUID();
-response.setHeader('X-Request-Id', requestId);
-
-this.scimLogger.runWithContext(
-  { requestId, method: request.method, path: request.originalUrl, endpointId, startTime: Date.now() },
-  () => {
-    // All code inside this closure — guards, controllers, services —
-    // automatically inherit the correlation context.
-    // scimLogger.info(...) will include requestId in every log entry.
-  }
-);
-```
+This is used by `createScimError()` to auto-enrich SCIM error responses with `requestId` and `endpointId` without requiring the logger to be injected.
 
 ---
 
-## 5. Configuration
+## 6. Output Modes: JSON vs Pretty
 
-### Environment Variables
+Controlled by the `format` field in `LogConfig` (source: `log-levels.ts` lines 116–117):
 
-| Variable | Default (dev) | Default (prod) | Description |
-|----------|--------------|----------------|-------------|
-| `LOG_LEVEL` | `DEBUG` | `INFO` | Global minimum log level |
-| `LOG_FORMAT` | `pretty` | `json` | Output format: `pretty` (human-readable) or `json` (structured) |
-| `LOG_INCLUDE_PAYLOADS` | `true` | `false` | Include request/response bodies at TRACE/DEBUG |
-| `LOG_INCLUDE_STACKS` | `true` | `true` | Include stack traces in ERROR/FATAL output |
-| `LOG_MAX_PAYLOAD_SIZE` | `8192` | `8192` | Max payload bytes to log (larger bodies are truncated) |
-| `LOG_CATEGORY_LEVELS` | *(empty)* | *(empty)* | Per-category overrides, e.g. `scim.patch=TRACE,auth=WARN` |
+| Mode | When | Behavior |
+|------|------|----------|
+| **`json`** | `NODE_ENV=production` (default in prod) | One JSON line per entry to `stdout`/`stderr`. Ideal for ELK, Azure Monitor, CloudWatch. |
+| **`pretty`** | Non-production (default in dev) | Human-readable with ANSI colors, timestamps shortened to `HH:mm:ss.SSS`, data indented at TRACE/DEBUG. |
 
-### .env Example
+Can be overridden via:
+- `LOG_FORMAT=json` (env var)
+- `PUT /scim/admin/log-config` with `{ "format": "json" }` (runtime)
 
-```env
-# Logging configuration
-LOG_LEVEL=DEBUG
-LOG_FORMAT=pretty
-LOG_INCLUDE_PAYLOADS=true
-LOG_INCLUDE_STACKS=true
-LOG_MAX_PAYLOAD_SIZE=4096
-LOG_CATEGORY_LEVELS=scim.patch=TRACE,oauth=WARN
-```
+### Output Routing
 
-### Runtime Configuration via API
-
-All configuration can be changed at runtime without server restart — see [Admin Log-Config API](#6-admin-log-config-api).
+| Level | JSON mode | Pretty mode |
+|-------|-----------|-------------|
+| TRACE, DEBUG, INFO | `process.stdout.write()` | `console.debug()` / `console.log()` |
+| WARN | `process.stderr.write()` | `console.warn()` |
+| ERROR, FATAL | `process.stderr.write()` | `console.error()` |
 
 ---
 
-## 6. Admin Log-Config API
+## 7. Ring Buffer (In-Memory Recent Logs)
 
-**Base path**: `/scim/admin/log-config`
+**Source:** `scim-logger.service.ts` lines 125–128, 250–285
 
-All endpoints require authentication (Bearer token).
+The ScimLogger maintains a circular buffer of the most recent log entries for real-time debugging via the admin API.
 
-### 6.1 GET /scim/admin/log-config — Get Current Configuration
+| Parameter | Default | Env Var | Description |
+|-----------|---------|---------|-------------|
+| Size | 2,000 entries | `LOG_RING_BUFFER_SIZE` | Maximum entries before oldest is discarded |
 
-**Request:**
-```http
-GET /scim/admin/log-config HTTP/1.1
-Host: localhost:6000
-Authorization: Bearer <token>
-```
+### Access via Admin API
 
-**curl:**
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" \
-  http://localhost:6000/scim/admin/log-config | jq
+# Get recent 25 entries
+GET /scim/admin/log-config/recent?limit=25
+
+# Filter by level (entries ≥ WARN)
+GET /scim/admin/log-config/recent?level=WARN
+
+# Filter by category
+GET /scim/admin/log-config/recent?category=scim.patch
+
+# Filter by requestId (trace a single request)
+GET /scim/admin/log-config/recent?requestId=a1b2c3d4-...
+
+# Filter by endpointId
+GET /scim/admin/log-config/recent?endpointId=ep-contoso
+
+# Clear buffer
+DELETE /scim/admin/log-config/recent
 ```
 
-**Response (200 OK):**
+**Response format:**
+
 ```json
 {
-  "globalLevel": "DEBUG",
-  "categoryLevels": {
-    "scim.patch": "TRACE",
-    "oauth": "WARN"
-  },
-  "endpointLevels": {},
-  "includePayloads": true,
-  "includeStackTraces": true,
-  "maxPayloadSizeBytes": 4096,
-  "format": "pretty",
-  "availableLevels": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"],
-  "availableCategories": [
-    "http", "auth", "scim.user", "scim.group", "scim.patch",
-    "scim.filter", "scim.discovery", "endpoint", "database",
-    "oauth", "scim.bulk", "scim.resource", "config", "general"
+  "count": 25,
+  "entries": [
+    { "timestamp": "...", "level": "INFO", "category": "scim.user", "message": "...", ... }
   ]
 }
 ```
 
----
+When filtered by `requestId` and nothing is found, the response includes a hint:
 
-### 6.2 PUT /scim/admin/log-config — Update Configuration
-
-Supports partial updates. Only include fields you want to change.
-
-**Request:**
-```http
-PUT /scim/admin/log-config HTTP/1.1
-Host: localhost:6000
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "globalLevel": "INFO",
-  "includePayloads": false,
-  "format": "json",
-  "categoryLevels": {
-    "scim.patch": "DEBUG",
-    "auth": "WARN"
-  }
-}
-```
-
-**curl:**
-```bash
-curl -s -X PUT -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"globalLevel":"INFO","includePayloads":false,"format":"json","categoryLevels":{"scim.patch":"DEBUG","auth":"WARN"}}' \
-  http://localhost:6000/scim/admin/log-config | jq
-```
-
-**Response (200 OK):**
 ```json
 {
-  "message": "Log configuration updated",
-  "config": {
-    "globalLevel": "INFO",
-    "categoryLevels": {
-      "scim.patch": "DEBUG",
-      "auth": "WARN"
-    },
-    "endpointLevels": {},
-    "includePayloads": false,
-    "includeStackTraces": true,
-    "maxPayloadSizeBytes": 4096,
-    "format": "json",
-    "availableLevels": ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL", "OFF"],
-    "availableCategories": ["http", "auth", "scim.user", "scim.group", "scim.patch", "scim.filter", "scim.discovery", "endpoint", "database", "oauth", "scim.bulk", "scim.resource", "config", "general"]
-  }
+  "count": 0,
+  "entries": [],
+  "hint": "No entries in ring buffer for requestId 'abc'. Try persistent logs: GET /scim/admin/logs?search=abc"
 }
 ```
 
 ---
 
-### 6.3 PUT /scim/admin/log-config/level/:level — Quick Global Level Change
+## 8. SSE Live Stream
 
-**Request:**
-```http
-PUT /scim/admin/log-config/level/TRACE HTTP/1.1
-Host: localhost:6000
-Authorization: Bearer <token>
-```
+**Source:** `log-config.controller.ts` lines 248–305, `log-query.service.ts` lines 70–118
 
-**curl:**
+Real-time log tailing via Server-Sent Events:
+
 ```bash
-curl -s -X PUT -H "Authorization: Bearer $TOKEN" \
-  http://localhost:6000/scim/admin/log-config/level/TRACE | jq
+# Stream all INFO+ entries
+curl -N https://host/scim/admin/log-config/stream?level=INFO
+
+# Stream only authentication events
+curl -N https://host/scim/admin/log-config/stream?category=auth
+
+# Stream for a specific endpoint
+curl -N https://host/scim/admin/log-config/stream?endpointId=ep-abc123
+
+# Per-endpoint scoped stream (endpoint credential holders)
+curl -N https://host/scim/endpoints/ep-abc123/logs/stream
 ```
 
-**Response (200 OK):**
-```json
-{
-  "message": "Global log level set to TRACE",
-  "globalLevel": "TRACE"
-}
+### SSE Protocol Details
+
+| Feature | Implementation |
+|---------|----------------|
+| **Initial event** | `event: connected\ndata: ...` with filter summary |
+| **Log events** | `data: {JSON}\n\n` — one structured entry per event |
+| **Keep-alive** | `: ping {ISO-8601}\n\n` every 30 seconds |
+| **NGINX buffering** | `X-Accel-Buffering: no` header prevents proxy caching |
+| **Max listeners** | `emitter.setMaxListeners(50)` — supports 50 concurrent SSE clients |
+| **Cleanup** | `res.on('close')` unsubscribes + clears interval |
+
+### Browser Usage
+
+```javascript
+const source = new EventSource('/scim/admin/log-config/stream?level=INFO');
+source.addEventListener('connected', (e) => console.log(JSON.parse(e.data)));
+source.onmessage = (e) => console.log(JSON.parse(e.data));
 ```
 
 ---
 
-### 6.4 PUT /scim/admin/log-config/category/:category/:level — Set Category Level
+## 9. Log File Transport & Rotation
 
-**Request:**
-```http
-PUT /scim/admin/log-config/category/scim.patch/TRACE HTTP/1.1
-Host: localhost:6000
-Authorization: Bearer <token>
+**Source:** `file-log-transport.ts` (101 lines), `rotating-file-writer.ts` (99 lines)
+
+### File Layout
+
+```
+logs/
+  scimserver.log                              ← ALL traffic (main file)
+  scimserver.log.1                            ← Previous rotation
+  scimserver.log.2                            ← Oldest rotation
+  endpoints/
+    contoso-prod_ep-a1b2c3d4/
+      contoso-prod_ep-a1b2c3d4.log            ← Endpoint-specific
+    fabrikam-test_ep-e5f67890/
+      fabrikam-test_ep-e5f67890.log           ← Another endpoint
 ```
 
-**curl:**
-```bash
-curl -s -X PUT -H "Authorization: Bearer $TOKEN" \
-  http://localhost:6000/scim/admin/log-config/category/scim.patch/TRACE | jq
+### Configuration
+
+| Env Var | Default | Description |
+|---------|---------|-------------|
+| `LOG_FILE` | `logs/scimserver.log` | Main log file path. Set to empty string `""` to disable file logging. |
+| `LOG_FILE_MAX_SIZE` | `10485760` (10 MB) | Max bytes per file before rotation |
+| `LOG_FILE_MAX_COUNT` | `3` | Number of rotated files to keep |
+
+### Rotation Scheme
+
+Pure Node.js `fs` (synchronous writes, no external dependencies):
+
+```
+scimserver.log       ← current (appending)
+    │ (exceeds 10 MB)
+    ▼
+scimserver.log.3     ← DELETED (exceeds maxFiles)
+scimserver.log.2     ← renamed from .1
+scimserver.log.1     ← renamed from scimserver.log
+scimserver.log       ← NEW empty file opened
 ```
 
-**Response (200 OK):**
-```json
-{
-  "message": "Category 'scim.patch' log level set to TRACE"
-}
-```
+### Per-Endpoint File Logging
 
-**Error Response (unknown category):**
-```json
-{
-  "error": "Unknown category 'invalid'",
-  "availableCategories": [
-    "http", "auth", "scim.user", "scim.group", "scim.patch",
-    "scim.filter", "scim.discovery", "endpoint", "database",
-    "oauth", "scim.bulk", "scim.resource", "config", "general"
-  ]
-}
-```
+Enabled per-endpoint via `enableEndpointFileLogging(endpointId, endpointName)`. The directory name is sanitized for filesystem safety:
+- Non-alphanumeric characters → hyphens
+- Truncated to 50 characters
+- Format: `{safeName}_ep-{first8chars}/`
 
 ---
 
-### 6.5 PUT /scim/admin/log-config/endpoint/:endpointId/:level — Set Endpoint Level
+## 10. Per-Endpoint Log Isolation
 
-**Request:**
-```http
-PUT /scim/admin/log-config/endpoint/ep-abc123/TRACE HTTP/1.1
-Host: localhost:6000
-Authorization: Bearer <token>
-```
+**Source:** `endpoint-log.controller.ts` (127 lines)
 
-**curl:**
-```bash
-curl -s -X PUT -H "Authorization: Bearer $TOKEN" \
-  http://localhost:6000/scim/admin/log-config/endpoint/ep-abc123/TRACE | jq
-```
+Each SCIM endpoint gets isolated log access under `/scim/endpoints/:endpointId/logs/*`:
 
-**Response (200 OK):**
-```json
-{
-  "message": "Endpoint 'ep-abc123' log level set to TRACE"
-}
-```
+| Route | Description |
+|-------|-------------|
+| `GET /scim/endpoints/:id/logs/recent` | Ring buffer filtered by `endpointId` |
+| `GET /scim/endpoints/:id/logs/stream` | SSE stream filtered by `endpointId` |
+| `GET /scim/endpoints/:id/logs/download` | File download filtered by `endpointId` |
+| `GET /scim/endpoints/:id/logs/history` | Persistent DB logs filtered by URL pattern |
+
+This provides **tenant-safe log access** — per-endpoint credential holders can only see their own endpoint's log entries. The `endpointId` is taken from the URL path parameter, not from a query string, so it cannot be spoofed.
+
+The controller delegates to `LogQueryService` for shared ring buffer query, SSE stream setup, and file download logic.
 
 ---
 
-### 6.6 DELETE /scim/admin/log-config/endpoint/:endpointId — Remove Endpoint Override
+## 11. Persistent Request Logging (DB)
 
-**Request:**
-```http
-DELETE /scim/admin/log-config/endpoint/ep-abc123 HTTP/1.1
-Host: localhost:6000
-Authorization: Bearer <token>
-```
+**Source:** `logging.service.ts` (715 lines)
 
-**curl:**
+Every HTTP request is persisted to the database (Prisma/PostgreSQL or in-memory) for historical analysis.
+
+### Buffered Write Strategy
+
+| Parameter | Value | Rationale |
+|-----------|-------|-----------|
+| Flush interval | 3,000 ms | Trade up to 3s data loss on crash for reduced DB write overhead |
+| Max buffer size | 50 entries | Flush immediately when 50 entries accumulate |
+| Write strategy | `createMany` (single batch insert) | 1 write instead of N individual writes |
+
+### Record Fields
+
+Each `RequestLog` row contains:
+- `id` (UUID), `method`, `url`, `status`, `durationMs`, `createdAt`
+- `requestHeaders`, `requestBody` (JSON stringified)
+- `responseHeaders`, `responseBody` (JSON stringified)
+- `errorMessage`, `errorStack`
+- `identifier` — derived reportable identifier (userName, email, displayName)
+
+### Identifier Derivation
+
+The `LoggingService` derives a human-readable identifier for each log entry:
+1. **User endpoints:** Extracts `userName`, primary email, `externalId`, or resource `id` from request/response bodies
+2. **Group endpoints:** Extracts `displayName`
+3. **URL fallback:** Extracts last UUID-like segment from URL path
+4. **Display name resolution:** For User IDs, attempts DB lookup → `displayName` / `name.formatted` / `name.givenName + familyName` / `userName`
+
+### Query API
+
 ```bash
-curl -s -X DELETE -H "Authorization: Bearer $TOKEN" \
-  http://localhost:6000/scim/admin/log-config/endpoint/ep-abc123
+# List logs (paginated, filtered)
+GET /scim/admin/logs?page=1&pageSize=50&method=POST&status=409
+
+# Full text search across all fields
+GET /scim/admin/logs?search=jsmith@contoso.com
+
+# Date range
+GET /scim/admin/logs?since=2026-04-01T00:00:00Z&until=2026-04-13T23:59:59Z
+
+# Show slow requests only
+GET /scim/admin/logs?minDurationMs=1000
+
+# Include admin endpoints (excluded by default)
+GET /scim/admin/logs?includeAdmin=true
+
+# Hide keepalive probes (Entra ID filter probes)
+GET /scim/admin/logs?hideKeepalive=true
 ```
 
-**Response: 204 No Content** (empty body)
+### Log Retention
+
+```bash
+# Delete logs older than 30 days
+# Programmatic: loggingService.pruneOldLogs(30)
+
+# Clear all logs
+DELETE /scim/admin/logs
+```
+
+### In-Memory Backend
+
+When `PERSISTENCE_BACKEND=inmemory`, logs are stored in a plain array (`inMemoryLogRows`). Same query interface applies but all data is ephemeral.
 
 ---
 
-### 6.7 Per-Endpoint Log Level via Endpoint Config (Alternative)
+## 12. Runtime Configuration via Admin API
 
-In addition to the dedicated log-config endpoints (6.5/6.6), you can set per-endpoint log levels directly in the endpoint's `profile.settings` when creating or updating an endpoint via the admin CRUD API. This is often more convenient because the log level is stored alongside other endpoint behavior flags and persists across server restarts.
+**Source:** `log-config.controller.ts` (352 lines)
 
-**Create endpoint with logLevel:**
+All log configuration is changeable at runtime without server restart:
+
+### Routes
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| `GET` | `/scim/admin/log-config` | Current config + available levels/categories |
+| `PUT` | `/scim/admin/log-config` | Update config (partial updates supported) |
+| `PUT` | `/scim/admin/log-config/level/:level` | Quick: set global level |
+| `PUT` | `/scim/admin/log-config/category/:cat/:level` | Set category level |
+| `PUT` | `/scim/admin/log-config/endpoint/:id/:level` | Set endpoint level |
+| `DELETE` | `/scim/admin/log-config/endpoint/:id` | Remove endpoint override |
+| `GET` | `/scim/admin/log-config/recent` | Ring buffer query |
+| `GET` | `/scim/admin/log-config/audit` | Audit trail (CONFIG, ENDPOINT, AUTH entries) |
+| `DELETE` | `/scim/admin/log-config/recent` | Clear ring buffer |
+| `GET` | `/scim/admin/log-config/stream` | SSE live stream |
+| `GET` | `/scim/admin/log-config/download` | Download logs as NDJSON/JSON |
+
+### Example: PUT Config
+
 ```bash
-curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+curl -X PUT https://host/scim/admin/log-config \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "debug-endpoint",
-    "profilePreset": "entra-id",
-    "profile": {
-      "settings": {
-        "logLevel": "DEBUG",
-        "VerbosePatchSupported": "True"
-      }
+    "globalLevel": "DEBUG",
+    "includePayloads": true,
+    "includeStackTraces": true,
+    "maxPayloadSizeBytes": 16384,
+    "format": "json",
+    "slowRequestThresholdMs": 1000,
+    "categoryLevels": {
+      "scim.patch": "TRACE",
+      "auth": "WARN"
     }
-  }' \
-  http://localhost:6000/scim/admin/endpoints | jq
+  }'
 ```
 
-**Update endpoint logLevel:**
-```bash
-curl -s -X PATCH -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"profile": {"settings": {"logLevel": "TRACE"}}}' \
-  http://localhost:6000/scim/admin/endpoints/<endpointId> | jq
-```
+### Audit Logging of Config Changes
 
-**Remove endpoint logLevel** (set to empty string or omit):
-```bash
-curl -s -X PATCH -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"profile": {"settings": {"logLevel": ""}}}' \
-  http://localhost:6000/scim/admin/endpoints/<endpointId> | jq
-```
-
-**Behavior notes:**
-- Valid values: `"TRACE"`, `"DEBUG"`, `"INFO"`, `"WARN"`, `"ERROR"`, `"FATAL"`, `"OFF"` (case-insensitive), or numeric `0`-`6`.
-- When `logLevel` is set in endpoint config, it is automatically synced to `ScimLogger.setEndpointLevel()`.
-- When `logLevel` is removed from config (or config is replaced without it), the endpoint-level override is cleared.
-- On server startup, all persisted endpoint log levels are automatically restored from the database.
-- The dedicated log-config API (6.5/6.6) still works and takes effect immediately, but is not persisted across restarts. Endpoint config log levels are persisted.
-- Both approaches write to the same `ScimLogger.endpointLevels` map — the last write wins.
-
----
-
-### 6.8 GET /scim/admin/log-config/recent — Query Recent Logs
-
-Retrieves entries from the in-memory ring buffer (last 500 entries).
-
-**Query Parameters:**
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `limit` | number | 100 | Max entries to return |
-| `level` | string | — | Minimum severity filter (e.g. `WARN`) |
-| `category` | string | — | Filter by category (e.g. `scim.patch`) |
-| `requestId` | string | — | Filter by correlation ID |
-| `endpointId` | string | — | Filter by SCIM endpoint |
-
-**Request:**
-```http
-GET /scim/admin/log-config/recent?limit=10&level=WARN&category=http HTTP/1.1
-Host: localhost:6000
-Authorization: Bearer <token>
-```
-
-**curl:**
-```bash
-curl -s -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:6000/scim/admin/log-config/recent?limit=10&level=WARN" | jq
-```
-
-**Response (200 OK):**
-```json
-{
-  "count": 2,
-  "entries": [
-    {
-      "timestamp": "2026-02-14T10:23:45.123Z",
-      "level": "WARN",
-      "category": "http",
-      "message": "Slow request: 2345ms",
-      "requestId": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
-      "endpointId": "ep-abc123",
-      "method": "GET",
-      "path": "/scim/endpoints/ep-abc123/Users",
-      "durationMs": 2345,
-      "data": {
-        "status": 200,
-        "durationMs": 2345
-      }
-    },
-    {
-      "timestamp": "2026-02-14T10:24:12.456Z",
-      "level": "ERROR",
-      "category": "http",
-      "message": "← 409 POST /scim/endpoints/ep-abc123/Users",
-      "requestId": "f1e2d3c4-b5a6-9870-fedc-ba9876543210",
-      "endpointId": "ep-abc123",
-      "method": "POST",
-      "path": "/scim/endpoints/ep-abc123/Users",
-      "durationMs": 45,
-      "error": {
-        "message": "A resource with userName \"alice@example.com\" already exists.",
-        "name": "HttpException"
-      },
-      "data": {
-        "status": 409,
-        "durationMs": 45
-      }
-    }
-  ]
-}
-```
-
-**Filter by Request ID:**
-```bash
-curl -s -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:6000/scim/admin/log-config/recent?requestId=a1b2c3d4-e5f6-7890-abcd-1234567890ab" | jq
-```
-
----
-
-### 6.9 DELETE /scim/admin/log-config/recent — Clear Ring Buffer
-
-**Request:**
-```http
-DELETE /scim/admin/log-config/recent HTTP/1.1
-Host: localhost:6000
-Authorization: Bearer <token>
-```
-
-**curl:**
-```bash
-curl -s -X DELETE -H "Authorization: Bearer $TOKEN" \
-  http://localhost:6000/scim/admin/log-config/recent
-```
-
-**Response: 204 No Content** (empty body)
-
----
-
-### 6.10 GET /scim/admin/log-config/stream — Live Log Tailing (SSE)
-
-> **New in v0.10.0** — Real-time Server-Sent Events log stream.
-
-**Query Parameters:**
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `level` | string | Minimum log level: TRACE, DEBUG, INFO, WARN, ERROR, FATAL |
-| `category` | string | Filter by category: http, auth, scim.user, scim.group, etc. |
-| `endpointId` | string | Filter by SCIM endpoint ID |
-
-**curl:**
-```bash
-# Tail all logs (requires -N to disable buffering)
-curl -N http://localhost:6000/scim/admin/log-config/stream
-
-# Tail only WARN+ logs
-curl -N "http://localhost:6000/scim/admin/log-config/stream?level=WARN"
-
-# Tail specific category
-curl -N "http://localhost:6000/scim/admin/log-config/stream?category=scim.patch"
-
-# Tail with authentication
-curl -N -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:6000/scim/admin/log-config/stream?level=INFO"
-```
-
-**Response (SSE format):**
-```
-event: connected
-data: {"message":"Log stream connected","filters":{"level":"ALL","category":"ALL","endpointId":"ALL"}}
-
-data: {"timestamp":"2026-02-18T14:30:00.123Z","level":"INFO","category":"http","message":"→ POST /scim/v2/Users","requestId":"a1b2c3d4-..."}
-
-: ping 2026-02-18T14:30:30.000Z
-```
-
-**Notes:**
-- Server sends keep-alive `: ping` comments every 30 seconds
-- `X-Accel-Buffering: no` header disables NGINX proxy buffering
-- Browser EventSource API auto-reconnects on disconnect
-- Maximum 50 concurrent SSE subscribers (configurable via EventEmitter maxListeners)
-
----
-
-### 6.11 GET /scim/admin/log-config/download — Download Log File
-
-> **New in v0.10.0** — Download ring buffer contents as a file.
-
-**Query Parameters:**
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `format` | string | `ndjson` | Output format: `ndjson` or `json` |
-| `limit` | number | all | Max entries (up to 500) |
-| `level` | string | all | Minimum level filter |
-| `category` | string | all | Category filter |
-| `requestId` | string | — | Filter by X-Request-Id |
-| `endpointId` | string | — | Filter by endpoint ID |
-
-**curl:**
-```bash
-# Download as NDJSON (default)
-curl -o scim-logs.ndjson http://localhost:6000/scim/admin/log-config/download
-
-# Download as JSON array
-curl -o scim-logs.json "http://localhost:6000/scim/admin/log-config/download?format=json"
-
-# Download only ERROR+ entries
-curl -o errors.ndjson "http://localhost:6000/scim/admin/log-config/download?level=ERROR"
-
-# Download logs for a specific request
-curl -o trace.ndjson \
-  "http://localhost:6000/scim/admin/log-config/download?requestId=a1b2c3d4-..."
-```
-
-**Response Headers:**
-```
-Content-Type: application/x-ndjson
-Content-Disposition: attachment; filename="scimserver-logs-2026-02-18T14-30-00.ndjson"
-```
-
----
-
-### API Summary Table
-
-| Method | Endpoint | Status | Description |
-|--------|----------|--------|-------------|
-| `GET` | `/scim/admin/log-config` | 200 | Get current config + available levels/categories |
-| `PUT` | `/scim/admin/log-config` | 200 | Partial update of config |
-| `PUT` | `/scim/admin/log-config/level/:level` | 200 | Quick global level change |
-| `PUT` | `/scim/admin/log-config/category/:category/:level` | 200 | Set category level override |
-| `PUT` | `/scim/admin/log-config/endpoint/:endpointId/:level` | 200 | Set endpoint level override |
-| `DELETE` | `/scim/admin/log-config/endpoint/:endpointId` | 204 | Remove endpoint override |
-| `GET` | `/scim/admin/log-config/recent` | 200 | Query in-memory ring buffer |
-| `DELETE` | `/scim/admin/log-config/recent` | 204 | Clear ring buffer |
-| `GET` | `/scim/admin/log-config/stream` | SSE | **Live log tailing (Server-Sent Events)** |
-| `GET` | `/scim/admin/log-config/download` | 200 | **Download logs as NDJSON or JSON file** |
-
-> **Tip:** Per-endpoint log levels can also be set via the `logLevel` field in endpoint config
-> (`POST/PATCH /scim/admin/endpoints/:id`). Config-based levels persist across restarts.
-> See §6.7 for details.
-
-> **See also:** [Remote Debugging & Diagnosis Guide](REMOTE_DEBUGGING_AND_DIAGNOSIS.md) for
-> comprehensive troubleshooting workflows, Azure Container Apps access methods, and the
-> `scripts/remote-logs.ps1` PowerShell script for remote log management.
-
----
-
-## 7. Structured Log Format
-
-### JSON Format (Production)
-
-Each log entry is emitted as a single JSON line to `stdout` (TRACE–INFO) or `stderr` (WARN–FATAL):
+Every config change is logged at INFO level with before/after values:
 
 ```json
 {
-  "timestamp": "2026-02-14T10:23:45.123Z",
   "level": "INFO",
-  "category": "scim.user",
-  "message": "User created",
-  "requestId": "a1b2c3d4-e5f6-7890-abcd-1234567890ab",
-  "endpointId": "ep-abc123",
-  "method": "POST",
-  "path": "/scim/endpoints/ep-abc123/Users",
-  "durationMs": 23,
+  "category": "config",
+  "message": "Log configuration updated",
   "data": {
-    "userId": "usr-789xyz",
-    "userName": "alice@example.com"
+    "changes": {
+      "globalLevel": { "from": 2, "to": 1 },
+      "format": { "from": "pretty", "to": "json" }
+    }
   }
 }
 ```
 
-### Pretty Format (Development)
+---
+
+## 13. Environment Variables Reference
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOG_LEVEL` | `INFO` | Global minimum log level (TRACE/DEBUG/INFO/WARN/ERROR/FATAL/OFF) |
+| `LOG_FORMAT` | `pretty` (dev) / `json` (prod) | Output format |
+| `LOG_CATEGORY_LEVELS` | _(empty)_ | Per-category overrides. Format: `scim.patch=TRACE,auth=WARN,http=DEBUG` |
+| `LOG_INCLUDE_PAYLOADS` | `true` (dev) / `false` (prod) | Include request/response bodies in TRACE/DEBUG |
+| `LOG_INCLUDE_STACKS` | `true` | Include stack traces in ERROR/FATAL |
+| `LOG_MAX_PAYLOAD_SIZE` | `8192` (8 KB) | Max bytes before payload truncation in log data |
+| `LOG_RING_BUFFER_SIZE` | `2000` | Ring buffer capacity (entries) |
+| `LOG_SLOW_REQUEST_MS` | `2000` | Slow request threshold (ms) — emits WARN |
+| `LOG_FILE` | `logs/scimserver.log` | Main log file path. Set to `""` to disable. |
+| `LOG_FILE_MAX_SIZE` | `10485760` (10 MB) | Max file size before rotation |
+| `LOG_FILE_MAX_COUNT` | `3` | Number of rotated files to keep |
+| `NODE_ENV` | _(unset)_ | `production` → JSON format, payloads off by default |
+
+---
+
+## 14. Log Level Decision Matrix
+
+The system uses **tiered log levels** based on HTTP status codes and operation context. Source: `request-logging.interceptor.ts` lines 97–116, `scim-exception.filter.ts` lines 53–72.
+
+| Status / Event | Level | Rationale |
+|---------------|-------|-----------|
+| 5xx | **ERROR** | Server fault — operator should investigate |
+| 401 / 403 | **WARN** | Potential security event |
+| 404 | **DEBUG** | Routine probe (especially from Entra ID) |
+| Other 4xx (400, 409, 412, 415) | **INFO** | Client error — logged for traceability |
+| Request start | **DEBUG** | Operational detail (not business event) |
+| Request body | **TRACE** | Full payload detail |
+| Response completion | **DEBUG** | Operational detail with duration |
+| Response body | **TRACE** | Full payload detail |
+| Slow request | **WARN** | Performance anomaly |
+| Auth success | **INFO** | Business event |
+| Auth skip (public) | **TRACE** | No-op, extremely verbose |
+| Config change | **INFO** | Audit trail |
+| User/Group created | **INFO** | Business event |
+| Repository failure | **ERROR** | Service-level failure |
+| FATAL (no secret, DB lost) | **FATAL** | Unrecoverable |
+
+---
+
+## 15. Sensitive Data Handling
+
+**Source:** `scim-logger.service.ts` lines 361–380 (`sanitizeData`)
+
+### Automatic Redaction
+
+Any log data key matching this regex is replaced with `[REDACTED]`:
 
 ```
-10:23:45.123 INFO  scim.user      [a1b2c3d4] ep:ep-abc1 POST /scim/endpoints/ep-abc123/Users +23ms User created | {"userId":"usr-789xyz","userName":"alice@example.com"}
-```
-
-Format breakdown:
-```
-HH:mm:ss.SSS LEVEL category       [reqId8ch] ep:epId8ch METHOD path +duration message | {compact data}
-```
-
-Color coding in TTY terminals:
-- TRACE → gray
-- DEBUG → cyan
-- INFO → green
-- WARN → yellow
-- ERROR → red
-- FATAL → magenta
-
-### Error Entries
-
-```json
-{
-  "timestamp": "2026-02-14T10:24:12.456Z",
-  "level": "ERROR",
-  "category": "http",
-  "message": "← 409 POST /scim/endpoints/ep-abc123/Users",
-  "requestId": "f1e2d3c4-b5a6-9870-fedc-ba9876543210",
-  "endpointId": "ep-abc123",
-  "method": "POST",
-  "path": "/scim/endpoints/ep-abc123/Users",
-  "durationMs": 45,
-  "error": {
-    "message": "A resource with userName \"alice@example.com\" already exists.",
-    "name": "HttpException",
-    "stack": "HttpException: ...\n    at ScimUsersService.create ..."
-  },
-  "data": {
-    "status": 409,
-    "durationMs": 45
-  }
-}
-```
-
-### Secret Redaction
-
-Fields matching `/secret|password|token|authorization|bearer|jwt/i` are automatically replaced with `[REDACTED]`:
-
-```json
-{
-  "level": "DEBUG",
-  "category": "auth",
-  "message": "Token validated",
-  "data": {
-    "clientId": "scimserver-client",
-    "authorization": "[REDACTED]",
-    "token": "[REDACTED]"
-  }
-}
+/secret|password|token|authorization|bearer|jwt/i
 ```
 
 ### Payload Truncation
 
-Bodies exceeding `maxPayloadSizeBytes` (default 8KB) are truncated:
+Large string values are truncated to `maxPayloadSizeBytes` (default 8 KB) with a suffix:
+
+```
+"requestBody": "{ very long json ..... ...[truncated 15234B]"
+```
+
+Object values are serialized to JSON first, then truncated if needed:
+
+```
+"data": "{ serialized json ..... ...[truncated]"
+```
+
+---
+
+## 16. Slow Request Detection
+
+**Source:** `request-logging.interceptor.ts` lines 87–91, `log-levels.ts` line 120
+
+Requests exceeding `slowRequestThresholdMs` (default 2,000 ms) emit a WARN log:
 
 ```json
 {
-  "data": {
-    "body": "{\"schemas\":[\"urn:ietf:params:scim:schemas...[truncated 12340B]"
-  }
+  "level": "WARN",
+  "category": "http",
+  "message": "Slow request: 3456ms",
+  "durationMs": 3456,
+  "status": 200
 }
 ```
 
----
-
-## 8. Flow Examples
-
-### 8.1 Create User — Full Trace
-
-**Request:**
-```http
-POST /scim/endpoints/ep-abc123/Users HTTP/1.1
-Host: localhost:6000
-Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
-Content-Type: application/scim+json
-X-Request-Id: req-001-user-create
-
-{
-  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
-  "userName": "alice@example.com",
-  "name": { "givenName": "Alice", "familyName": "Example" },
-  "emails": [{ "value": "alice@example.com", "type": "work", "primary": true }],
-  "active": true
-}
-```
-
-**Log Output (pretty mode, LOG_LEVEL=TRACE):**
-```
-10:23:45.100 INFO  http           [req-001-] ep:ep-abc1 POST /scim/endpoints/ep-abc123/Users User request → POST /scim/endpoints/ep-abc123/Users
-10:23:45.101 TRACE http           [req-001-]   Request body
-  {
-    "body": {
-      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
-      "userName": "alice@example.com",
-      "name": { "givenName": "Alice", "familyName": "Example" },
-      "emails": [{ "value": "alice@example.com", "type": "work", "primary": true }],
-      "active": true
-    }
-  }
-10:23:45.102 DEBUG auth           [req-001-] Token validated | {"clientId":"scimserver-client","authType":"oauth"}
-10:23:45.115 INFO  scim.user      [req-001-] ep:ep-abc1 +15ms User created | {"userId":"usr-789xyz","userName":"alice@example.com"}
-10:23:45.116 TRACE http           [req-001-]   Response body
-  {
-    "body": {
-      "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
-      "id": "usr-789xyz",
-      "userName": "alice@example.com",
-      ...
-    }
-  }
-10:23:45.117 INFO  http           [req-001-] ep:ep-abc1 POST /scim/endpoints/ep-abc123/Users +17ms ← 201 POST /scim/endpoints/ep-abc123/Users
-```
-
-**Response:**
-```http
-HTTP/1.1 201 Created
-Content-Type: application/scim+json; charset=utf-8
-X-Request-Id: req-001-user-create
-ETag: W/"1"
-```
+Configurable via:
+- `LOG_SLOW_REQUEST_MS` env var
+- `PUT /scim/admin/log-config` with `{ "slowRequestThresholdMs": 1000 }`
 
 ---
 
-### 8.2 PATCH User — Complex Operation
+## 17. Audit Trail
 
-**Request:**
-```http
-PATCH /scim/endpoints/ep-abc123/Users/usr-789xyz HTTP/1.1
-Host: localhost:6000
-Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
-Content-Type: application/scim+json
+**Source:** `log-config.controller.ts` lines 232–246
 
+The `GET /scim/admin/log-config/audit` endpoint returns audit trail entries — CONFIG, ENDPOINT, and AUTH category logs from the ring buffer:
+
+```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [
-    { "op": "replace", "path": "emails[type eq \"work\"].value", "value": "newalice@example.com" },
-    { "op": "add", "path": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department", "value": "Engineering" }
+  "count": 12,
+  "entries": [
+    { "category": "config", "message": "Log configuration updated", ... },
+    { "category": "endpoint", "message": "Endpoint created", ... },
+    { "category": "auth", "message": "Per-endpoint credential authentication successful", ... }
   ]
 }
 ```
 
-**Log Output (pretty mode, scim.patch=TRACE):**
-```
-10:25:00.050 INFO  http           [auto-uuid] ep:ep-abc1 PATCH /scim/endpoints/ep-abc123/Users/usr-789xyz → PATCH
-10:25:00.051 TRACE scim.patch     [auto-uuid] Processing PATCH operations
-  {
-    "operationCount": 2,
-    "operations": [
-      { "op": "replace", "path": "emails[type eq \"work\"].value" },
-      { "op": "add", "path": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department" }
-    ]
-  }
-10:25:00.060 DEBUG scim.patch     [auto-uuid] Op 1: replace emails[type eq "work"].value → "newalice@example.com"
-10:25:00.065 DEBUG scim.patch     [auto-uuid] Op 2: add enterprise:department → "Engineering"
-10:25:00.075 INFO  scim.user      [auto-uuid] ep:ep-abc1 +25ms User patched | {"userId":"usr-789xyz","patchedFields":["emails","enterprise:department"]}
-10:25:00.076 INFO  http           [auto-uuid] ep:ep-abc1 PATCH /scim/endpoints/ep-abc123/Users/usr-789xyz +26ms ← 200
-```
-
 ---
 
-### 8.3 Authentication Failure
-
-**Request:**
-```http
-GET /scim/endpoints/ep-abc123/Users HTTP/1.1
-Host: localhost:6000
-Authorization: Bearer invalid-token-here
-```
-
-**Log Output:**
-```
-10:30:00.100 INFO  http           [auto-uuid] GET /scim/endpoints/ep-abc123/Users → GET
-10:30:00.102 ERROR auth           [auto-uuid] Authentication failed | {"reason":"Invalid token"}
-10:30:00.103 ERROR http           [auto-uuid] ← 401 GET /scim/endpoints/ep-abc123/Users +3ms
-```
-
----
-
-### 8.4 Group Membership — Add Members
-
-**Request:**
-```http
-PATCH /scim/endpoints/ep-abc123/Groups/grp-456 HTTP/1.1
-Host: localhost:6000
-Authorization: Bearer <token>
-Content-Type: application/scim+json
-
-{
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [
-    {
-      "op": "add",
-      "path": "members",
-      "value": [
-        { "value": "usr-001", "display": "Alice" },
-        { "value": "usr-002", "display": "Bob" }
-      ]
-    }
-  ]
-}
-```
-
-**Log Output:**
-```
-10:35:00.100 INFO  http           [auto-uuid] ep:ep-abc1 PATCH /scim/endpoints/ep-abc123/Groups/grp-456 → PATCH
-10:35:00.110 DEBUG scim.patch     [auto-uuid] Processing group membership PATCH | {"op":"add","path":"members","memberCount":2}
-10:35:00.130 INFO  scim.group     [auto-uuid] ep:ep-abc1 +30ms Group members updated | {"groupId":"grp-456","addedMembers":2,"totalMembers":5}
-10:35:00.131 INFO  http           [auto-uuid] ep:ep-abc1 ← 200 PATCH /scim/endpoints/ep-abc123/Groups/grp-456 +31ms
-```
-
----
-
-### 8.5 OAuth Token Issuance
-
-**Request:**
-```http
-POST /scim/oauth/token HTTP/1.1
-Host: localhost:6000
-Content-Type: application/json
-
-{
-  "grant_type": "client_credentials",
-  "client_id": "scimserver-client",
-  "client_secret": "my-secret"
-}
-```
-
-**Log Output:**
-```
-10:40:00.050 INFO  http           [auto-uuid] POST /scim/oauth/token → POST
-10:40:00.060 INFO  oauth          [auto-uuid] Token issued | {"clientId":"scimserver-client","expiresIn":3600}
-10:40:00.061 INFO  http           [auto-uuid] ← 201 POST /scim/oauth/token +11ms
-```
-
----
-
----
-
-### 8.7 Slow Request Warning
-
-When any request exceeds 2 seconds:
-
-```
-10:50:00.000 INFO  http           [auto-uuid] GET /scim/endpoints/ep-big/Users → GET
-10:50:03.200 WARN  http           [auto-uuid] Slow request: 3200ms | {"status":200,"durationMs":3200}
-10:50:03.201 INFO  http           [auto-uuid] ← 200 GET /scim/endpoints/ep-big/Users +3201ms
-```
-
----
-
-## 9. Ring Buffer & Recent Logs
-
-The ring buffer stores the most recent **500 log entries** in memory. This provides a lightweight debugging tool accessible via the admin API without requiring external log infrastructure.
-
-### Characteristics
-
-| Property | Value |
-|----------|-------|
-| Max entries | 500 (configurable in source) |
-| Eviction | FIFO — oldest entry is removed when buffer is full |
-| Persistence | In-memory only — cleared on server restart |
-| Access | `GET /scim/admin/log-config/recent` |
-| Clear | `DELETE /scim/admin/log-config/recent` |
-
-### Common Query Patterns
-
-```bash
-# All recent errors
-curl -s -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:6000/scim/admin/log-config/recent?level=ERROR" | jq
-
-# Trace a specific request
-curl -s -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:6000/scim/admin/log-config/recent?requestId=a1b2c3d4-e5f6-7890-abcd-1234567890ab" | jq
-
-# SCIM PATCH debug entries for a specific endpoint
-curl -s -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:6000/scim/admin/log-config/recent?category=scim.patch&endpointId=ep-abc123" | jq
-
-# Last 5 entries
-curl -s -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:6000/scim/admin/log-config/recent?limit=5" | jq
-```
-
----
-
-## 10. Production vs Development
-
-### Development Configuration
-
-```env
-LOG_LEVEL=DEBUG
-LOG_FORMAT=pretty
-LOG_INCLUDE_PAYLOADS=true
-LOG_INCLUDE_STACKS=true
-LOG_MAX_PAYLOAD_SIZE=8192
-```
-
-- Colorized terminal output with human-readable timestamps
-- Full request/response bodies at TRACE level
-- Stack traces on errors
-- Ring buffer accessible for quick debugging
-
-### Production Configuration
-
-```env
-NODE_ENV=production
-LOG_LEVEL=INFO
-LOG_FORMAT=json
-LOG_INCLUDE_PAYLOADS=false
-LOG_INCLUDE_STACKS=true
-LOG_MAX_PAYLOAD_SIZE=4096
-```
-
-- JSON structured output (one line per entry) for log aggregation
-- No request/response bodies (security + performance)
-- Errors include stack traces
-- Compatible with: Azure Monitor, ELK Stack, Datadog, Splunk, CloudWatch
-
-### Dynamic Level Escalation
-
-In production, temporarily increase verbosity for debugging:
-
-```bash
-# Enable TRACE for a specific problematic endpoint
-curl -X PUT -H "Authorization: Bearer $TOKEN" \
-  http://prod-server/scim/admin/log-config/endpoint/ep-problem/TRACE
-
-# Debug for 5 minutes, then revert
-sleep 300
-curl -X DELETE -H "Authorization: Bearer $TOKEN" \
-  http://prod-server/scim/admin/log-config/endpoint/ep-problem
-```
-
----
-
-## 11. Troubleshooting Playbook
-
-### "Why is my PATCH failing?"
-
-```bash
-# 1. Enable TRACE for scim.patch
-curl -X PUT -H "Authorization: Bearer $TOKEN" \
-  http://localhost:6000/scim/admin/log-config/category/scim.patch/TRACE
-
-# 2. Reproduce the failing PATCH
-curl -X PATCH -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/scim+json" \
-  -d '{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[{"op":"replace","path":"invalidPath","value":"test"}]}' \
-  http://localhost:6000/scim/endpoints/ep-123/Users/usr-456
-
-# 3. Query recent logs for that request
-curl -s -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:6000/scim/admin/log-config/recent?category=scim.patch&limit=20" | jq
-
-# 4. Reset category level
-curl -X PUT -H "Authorization: Bearer $TOKEN" \
-  http://localhost:6000/scim/admin/log-config/category/scim.patch/INFO
-```
-
-### "Why is authentication failing?"
-
-```bash
-# Enable DEBUG for auth
-curl -X PUT -H "Authorization: Bearer $TOKEN" \
-  http://localhost:6000/scim/admin/log-config/category/auth/DEBUG
-
-# Query auth errors
-curl -s -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:6000/scim/admin/log-config/recent?category=auth&level=ERROR" | jq
-```
-
-### "Which requests are slow?"
-
-```bash
-# Query WARN-level HTTP logs (slow request warnings trigger at >2s)
-curl -s -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:6000/scim/admin/log-config/recent?category=http&level=WARN" | jq '.entries[] | {path, durationMs, timestamp}'
-```
-
-### "What happened for request X?"
-
-```bash
-# Get the X-Request-Id from the response header, then:
-curl -s -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:6000/scim/admin/log-config/recent?requestId=a1b2c3d4-e5f6-7890-abcd-1234567890ab" | jq
-```
-
----
-
-## 12. Integration with External Systems
-
-### Azure Container Apps — Remote Log Access
-
-When deployed to Azure Container Apps, all `stdout` / `stderr` output from the NestJS application is automatically captured by the platform. Logs are accessible remotely from any machine with `az login` authenticated.
-
-#### Real-time Streaming
-
-```powershell
-# Live tail — application console output (like docker logs -f)
-az containerapp logs show `
-    --name scimserver-app `
-    --resource-group scimserver-rg `
-    --type console `
-    --follow
-
-# System logs — platform events (restarts, crashes, scaling, image pulls)
-az containerapp logs show `
-    --name scimserver-app `
-    --resource-group scimserver-rg `
-    --type system `
-    --follow
-
-# Recent 100 lines (without live follow)
-az containerapp logs show `
-    --name scimserver-app `
-    --resource-group scimserver-rg `
-    --type console `
-    --tail 100
-```
-
-#### Log Analytics Queries (KQL — 30-day retention)
-
-```powershell
-# Get workspace ID
-$wsId = az containerapp env show `
-    --name scimserver-env `
-    --resource-group scimserver-rg `
-    --query "properties.appLogsConfiguration.logAnalyticsConfiguration.customerId" -o tsv
-
-# Last hour of app logs
-az monitor log-analytics query -w $wsId `
-    --analytics-query "ContainerAppConsoleLogs_CL | where TimeGenerated > ago(1h) | order by TimeGenerated desc | take 200" `
-    -o table
-
-# Errors only (last 24h)
-az monitor log-analytics query -w $wsId `
-    --analytics-query "ContainerAppConsoleLogs_CL | where Log_s contains 'ERROR' | where TimeGenerated > ago(24h) | order by TimeGenerated desc" `
-    -o table
-
-# System events — container restarts, image pulls, scaling
-az monitor log-analytics query -w $wsId `
-    --analytics-query "ContainerAppSystemLogs_CL | where TimeGenerated > ago(24h) | order by TimeGenerated desc | take 100" `
-    -o table
-
-# Count errors per hour (last 12h)
-az monitor log-analytics query -w $wsId `
-    --analytics-query "ContainerAppConsoleLogs_CL | where Log_s contains 'ERROR' | where TimeGenerated > ago(12h) | summarize count() by bin(TimeGenerated, 1h) | order by TimeGenerated desc" `
-    -o table
-```
-
-#### Azure Portal (GUI)
-
-| Section | Path |
-|---------|------|
-| **Log stream** | Container Apps → scimserver-app → Log stream (real-time) |
-| **Logs** | Container Apps → scimserver-app → Logs (KQL query editor) |
-| **Metrics** | Container Apps → scimserver-app → Metrics (CPU, memory, requests) |
-| **Revisions** | Container Apps → scimserver-app → Revisions (health per deployment) |
-
-#### Application-Level Logs via REST API
-
-These endpoints are available from any HTTP client — no Azure CLI required:
-
-```powershell
-$url = "https://<fqdn>"
-$h = @{ Authorization = "Bearer <secret>" }
-
-# Paginated request logs (stored in PostgreSQL)
-Invoke-RestMethod "$url/scim/admin/logs?pageSize=50" -Headers $h
-
-# In-memory ring buffer (last ~200 structured entries)
-Invoke-RestMethod "$url/scim/admin/log-config/recent" -Headers $h
-
-# Current log levels
-Invoke-RestMethod "$url/scim/admin/log-config" -Headers $h
-
-# Change global log level at runtime (no restart)
-Invoke-RestMethod "$url/scim/admin/log-config/level/DEBUG" -Method PUT -Headers $h
-
-# Set category-level override
-Invoke-RestMethod "$url/scim/admin/log-config/category/scim/TRACE" -Method PUT -Headers $h
-```
-
-> **Tip**: Set `LOG_FORMAT=json` in the container env vars for structured JSON output that integrates best with Log Analytics queries and external log aggregators.
-
-### Azure Monitor / Application Insights
-
-With `LOG_FORMAT=json`, stdout/stderr output is JSON-structured and automatically ingested by Azure Container Apps logging:
-
-```bash
-# View logs via Azure CLI
-az containerapp logs show --name scimserver --resource-group rg-scim \
-  --type console --follow
-```
-
-### ELK Stack (Elasticsearch, Logstash, Kibana)
-
-JSON log lines are directly compatible with Filebeat / Logstash ingestion. Useful Kibana queries:
-
-```
-# All errors for an endpoint
-level: "ERROR" AND endpointId: "ep-abc123"
-
-# Slow requests
-category: "http" AND level: "WARN" AND message: "Slow request*"
-
-# Trace a single request
-requestId: "a1b2c3d4-e5f6-7890-abcd-1234567890ab"
-```
-
-### Docker Compose Logging
+## 18. Deployment Mode Behavior
+
+| Behavior | Development | Production | Docker | Azure Container Apps |
+|----------|-------------|------------|--------|---------------------|
+| Default format | `pretty` | `json` | `json` | `json` |
+| Include payloads | `true` | `false` | `false` | `false` |
+| Console colors | Yes (TTY) | No (no TTY) | No | No |
+| File logging | Optional | Optional | Via volume mount | Via Azure Files share |
+| Ring buffer | Yes | Yes | Yes | Yes |
+| SSE stream | Yes | Yes | Yes | Yes |
+| DB log persistence | Yes | Yes | Yes | Yes |
+| Slow request threshold | 2,000 ms | 2,000 ms | 2,000 ms | 2,000 ms |
+
+**Docker Compose** example:
 
 ```yaml
-services:
-  scimserver:
-    image: scimserver:latest
-    environment:
-      - LOG_FORMAT=json
-      - LOG_LEVEL=INFO
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+environment:
+  - LOG_LEVEL=INFO
+  - LOG_FORMAT=json
+  - LOG_FILE=/app/logs/scimserver.log
+  - LOG_SLOW_REQUEST_MS=3000
+volumes:
+  - ./logs:/app/logs
 ```
 
 ---
 
-## Appendix: StructuredLogEntry Schema
+## 19. Mermaid Diagrams
 
-```typescript
-interface StructuredLogEntry {
-  timestamp: string;                    // ISO-8601
-  level: string;                        // TRACE | DEBUG | INFO | WARN | ERROR | FATAL
-  category: string;                     // LogCategory enum value
-  message: string;                      // Human-readable message
-  requestId?: string;                   // Correlation ID (UUID)
-  endpointId?: string;                  // SCIM endpoint ID
-  method?: string;                      // HTTP method
-  path?: string;                        // Request URL path
-  durationMs?: number;                  // Elapsed time since request start
-  error?: {
-    message: string;
-    name?: string;
-    stack?: string;                     // Included when includeStackTraces=true
-  };
-  data?: Record<string, unknown>;       // Additional structured data
-}
+### Log Entry Flow
+
+```mermaid
+flowchart TD
+    A[HTTP Request] --> B[RequestLoggingInterceptor]
+    B --> C{Generate X-Request-Id}
+    C --> D[runWithContext<br/>AsyncLocalStorage]
+    D --> E[SharedSecretGuard<br/>enrichContext: authType]
+    E --> F[Controller → Service<br/>enrichContext: resourceType, op]
+    F --> G[scimLogger.info/debug/etc]
+
+    G --> H{isEnabled?<br/>endpoint → category → global}
+    H -->|No| I[Drop]
+    H -->|Yes| J[Build StructuredLogEntry]
+
+    J --> K[Ring Buffer<br/>push + evict oldest]
+    J --> L[EventEmitter<br/>notify SSE subscribers]
+    J --> M[FileLogTransport<br/>main.log + ep-*.log]
+    J --> N{Format?}
+    N -->|json| O[JSON.stringify → stdout/stderr]
+    N -->|pretty| P[Colorized → console.log/warn/error]
+
+    B --> Q[Response/Error]
+    Q --> R[LoggingService.recordRequest<br/>buffer → batch DB write]
 ```
+
+### Level Resolution Priority
+
+```mermaid
+flowchart TD
+    A[Log Call: level + category] --> B{Endpoint override?<br/>config.endpointLevels}
+    B -->|Yes| C{level >= endpointLevel?}
+    C -->|Yes| D[Emit]
+    C -->|No| E[Drop]
+
+    B -->|No| F{Category override?<br/>config.categoryLevels}
+    F -->|Yes| G{level >= categoryLevel?}
+    G -->|Yes| D
+    G -->|No| E
+
+    F -->|No| H{level >= globalLevel?}
+    H -->|Yes| D
+    H -->|No| E
+```
+
+### Request Lifecycle Logging
+
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant I as Interceptor
+    participant G as Guard
+    participant S as Service
+    participant L as Logger
+    participant DB as LoggingService
+
+    C->>I: POST /scim/endpoints/:id/Users
+    I->>L: runWithContext({requestId, method, path, endpointId})
+    I->>L: debug(HTTP, "→ POST /scim/...")
+    I->>L: trace(HTTP, "Request body", {body})
+
+    I->>G: next()
+    G->>L: trace(AUTH, "Attempting OAuth")
+    G->>L: enrichContext({authType: "oauth"})
+    G->>L: info(AUTH, "OAuth successful")
+
+    G->>S: canActivate → true
+    S->>L: enrichContext({resourceType: "User", operation: "create"})
+    S->>L: info(SCIM_USER, "User created", {userName})
+
+    S-->>I: response body
+    I->>L: debug(HTTP, "← 201 POST /scim/...")
+    I->>L: trace(HTTP, "Response body", {body})
+    I->>DB: recordRequest({method, url, status, durationMs, ...})
+    DB->>DB: buffer → batch flush (3s / 50 entries)
+```
+
+---
+
+## 20. Source File Reference
+
+### Core Logging Module (`api/src/modules/logging/`)
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `scim-logger.service.ts` | 524 | Central logger: AsyncLocalStorage, ring buffer, structured JSON, SSE, file transport |
+| `log-levels.ts` | 149 | LogLevel enum (TRACE→OFF), LogCategory enum (14), LogConfig interface, env parsing |
+| `logging.service.ts` | 715 | Persistent request log: buffered writes, batch insert, identifier derivation |
+| `log-config.controller.ts` | 352 | Admin API: GET/PUT config, recent, audit, stream, download |
+| `log-query.service.ts` | 147 | Shared query/stream/download logic for admin + endpoint controllers |
+| `request-logging.interceptor.ts` | 146 | Request lifecycle: X-Request-Id, correlation context, duration, persist |
+| `file-log-transport.ts` | 101 | File transport: main + per-endpoint log files |
+| `rotating-file-writer.ts` | 99 | Size-based file rotation: pure Node.js fs |
+| `logging.module.ts` | 27 | @Global() NestJS module registration |
+
+### Exception Filters (`api/src/modules/scim/filters/`)
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `global-exception.filter.ts` | 104 | Catch-all for non-HttpException → SCIM 500 |
+| `scim-exception.filter.ts` | 128 | HttpException → SCIM error format (RFC 7644 §3.12) |
+
+### Error Utilities
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `scim-errors.ts` | 134 | `createScimError()` factory with diagnostics extension |
+| `scim-constants.ts` | 67 | `SCIM_ERROR_SCHEMA`, `SCIM_DIAGNOSTICS_URN`, `SCIM_ERROR_TYPE` |
+| `repository-error.ts` | 51 | Domain error: NOT_FOUND, CONFLICT, CONNECTION, UNKNOWN |
+| `prisma-error.util.ts` | 43 | Prisma error code → RepositoryError mapping |
+| `patch-error.ts` | 32 | PATCH-specific error with operationIndex, failedPath |
+| `scim-service-helpers.ts` | 1,348 | `handleRepositoryError()` bridge function |
+
+### Per-Endpoint Log Controller
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `endpoint-log.controller.ts` | 127 | `/scim/endpoints/:id/logs/*` — recent, stream, download, history |
+
+### Test Coverage
+
+| File | Lines | Type |
+|------|-------|------|
+| `scim-logger.service.spec.ts` | 666 | Unit |
+| `log-levels.spec.ts` | 193 | Unit |
+| `log-config.controller.spec.ts` | 533 | Unit |
+| `request-logging.interceptor.spec.ts` | 258 | Unit |
+| `file-log-transport.spec.ts` | 137 | Unit |
+| `rotating-file-writer.spec.ts` | 85 | Unit |
+| `log-config.e2e-spec.ts` | 350 | E2E |
+| `endpoint-scoped-logs.e2e-spec.ts` | 126 | E2E |
+| `rca-diagnostics.e2e-spec.ts` | 171 | E2E |
+| `error-handling.e2e-spec.ts` | 345 | E2E |
+| `http-error-codes.e2e-spec.ts` | 165 | E2E |
+| `scripts/live-test.ps1` (Section 9j) | — | Live integration |
+
+---
+
+> **Total logging stack:** 55 dedicated files, ~14,767 lines of source code + tests.  
+> **External dependencies:** Zero (no Winston, Pino, Bunyan, or Morgan).  
+> **Test coverage:** 6 unit suites, 5 E2E suites, 1 live test section.

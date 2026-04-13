@@ -93,6 +93,8 @@ This ensures complete data isolation between concurrent requests to different en
 | `DELETE` | `/scim/admin/endpoints/{id}` | Delete endpoint + cascade all data |
 | `GET` | `/scim/admin/endpoints/{id}/stats` | Get user/group counts |
 
+> **PATCH merge semantics**: `settings` and `serviceProviderConfig` are **shallow-merged** (additive — unmentioned flags preserved). `schemas` and `resourceTypes` are **replaced** wholesale — send complete arrays including existing items. All changes take effect **immediately** (in-memory cache updated synchronously, `_schemaCaches` lazily rebuilt). No restart required. Custom extensions can be added to or removed from an existing endpoint this way. See [SCHEMA_CUSTOMIZATION_GUIDE.md §11](SCHEMA_CUSTOMIZATION_GUIDE.md#11-adding-extensions-to-existing-endpoints-patch) for detailed examples.
+
 #### Create Endpoint
 
 ```bash

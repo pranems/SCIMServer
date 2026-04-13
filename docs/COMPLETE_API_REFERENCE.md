@@ -214,8 +214,19 @@ Content-Type: application/json
 |-------|------|-------------|
 | `displayName` | string | Updated display name |
 | `description` | string | Updated description |
-| `profile` | object | Profile changes (settings are deep-merged; schemas/SPC replaced if provided) |
+| `profile` | object | Profile changes (settings are deep-merged; schemas/RTs replaced if provided) |
 | `active` | boolean | Enable/disable the endpoint |
+
+**Merge semantics:**
+
+| Profile Section | Strategy | Implication |
+|----------------|----------|-------------|
+| `schemas` | **Replace** | Full array replaces old — must include ALL schemas |
+| `resourceTypes` | **Replace** | Full array replaces old — must reference schemas in the new set |
+| `serviceProviderConfig` | Shallow merge | Unmentioned capabilities preserved |
+| `settings` | Shallow merge (additive) | Unmentioned flags preserved |
+
+> **Takes effect immediately** — the in-memory cache is updated synchronously. No restart required. The `_schemaCaches` is cleared and lazily rebuilt on the next request — discovery, validation, and characteristic enforcement all reflect the new profile instantly.
 
 **Response: 200 OK** — Updated endpoint.
 

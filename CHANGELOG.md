@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.34.0] - 2026-04-10
 
+### logFileEnabled default changed to true
+
+**Breaking Change (minor):**
+- `logFileEnabled` endpoint setting now defaults to **`true`** (was `false`)
+- Endpoints automatically get per-endpoint log files under `logs/endpoints/` on create
+- Set `logFileEnabled: false` explicitly in Docker/Azure where stdout is the log sink
+- Added `LOG_FILE_ENABLED` to `ENDPOINT_CONFIG_FLAGS` constant and `ENDPOINT_CONFIG_FLAGS_DEFINITIONS`
+- `syncEndpointFileLogging` inverted: enables by default, only disables on explicit `false`/`"false"`/`"False"`/`"0"`
+
+**Tests (80 unit suites, 3,212 tests — 45 E2E suites, 942 tests):**
+- +29 unit tests (endpoint-config.interface: LOG_FILE_ENABLED constant, validation battery, default assertions)
+- +6 unit tests (endpoint.service: syncEndpointFileLogging default=true behavior)
+- +3 E2E tests (endpoint-profile: logFileEnabled=true/false/invalid validation)
+- +4 live tests (9z-K: logFileEnabled PATCH true/false/invalid + cleanup)
+
 ### P4 — Attribute Characteristic Schema Validation Fixes (SEC-1, G1, G2, G3)
 
 **Security:**

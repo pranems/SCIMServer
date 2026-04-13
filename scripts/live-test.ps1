@@ -7672,6 +7672,64 @@ if ($epLogId) {
 
 Write-Host "`n--- 9z-J: Endpoint-Scoped Log Tests Complete ---" -ForegroundColor Green
 
+# TEST SECTION 9z-K: LOG FILE ENABLED DEFAULT (logFileEnabled=true)
+$script:currentSection = "9z-K: logFileEnabled Default"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-K: LOG FILE ENABLED DEFAULT (logFileEnabled=true)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Test: Create endpoint and verify logFileEnabled defaults to true
+Write-Host "`n--- Test: logFileEnabled default=true ---" -ForegroundColor Cyan
+$lfeName = "e2e-logfile-default-$(Get-Random)"
+try {
+    $lfeEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body (@{ name = $lfeName; profilePreset = "rfc-standard" } | ConvertTo-Json) -ContentType "application/json"
+    $lfeId = $lfeEndpoint.id
+    Test-Result -Success ($lfeEndpoint.id -ne $null) -Message "9z-K.1: Created endpoint for logFileEnabled test"
+} catch {
+    Test-Result -Success $false -Message "9z-K.1: Failed to create endpoint: $_"
+    $lfeId = $null
+}
+
+if ($lfeId) {
+    # Test: PATCH logFileEnabled=False should be accepted
+    Write-Host "`n--- Test: PATCH logFileEnabled=False ---" -ForegroundColor Cyan
+    try {
+        $patchBody = @{ profile = @{ settings = @{ logFileEnabled = "False" } } } | ConvertTo-Json -Depth 4
+        $patchResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$lfeId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json"
+        Test-Result -Success ($patchResult.profile.settings.logFileEnabled -eq "False") -Message "9z-K.2: PATCH logFileEnabled=False accepted and persisted"
+    } catch {
+        Test-Result -Success $false -Message "9z-K.2: Failed: $_"
+    }
+
+    # Test: PATCH logFileEnabled back to True
+    Write-Host "`n--- Test: PATCH logFileEnabled=True ---" -ForegroundColor Cyan
+    try {
+        $patchBody2 = @{ profile = @{ settings = @{ logFileEnabled = "True" } } } | ConvertTo-Json -Depth 4
+        $patchResult2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$lfeId" -Method PATCH -Headers $headers -Body $patchBody2 -ContentType "application/json"
+        Test-Result -Success ($patchResult2.profile.settings.logFileEnabled -eq "True") -Message "9z-K.3: PATCH logFileEnabled=True accepted and persisted"
+    } catch {
+        Test-Result -Success $false -Message "9z-K.3: Failed: $_"
+    }
+
+    # Test: PATCH logFileEnabled with invalid value should return 400
+    Write-Host "`n--- Test: PATCH logFileEnabled=invalid ---" -ForegroundColor Cyan
+    try {
+        $badPatch = @{ profile = @{ settings = @{ logFileEnabled = "Yes" } } } | ConvertTo-Json -Depth 4
+        $badResp = Invoke-WebRequest -Uri "$baseUrl/scim/admin/endpoints/$lfeId" -Method PATCH -Headers $headers -Body $badPatch -ContentType "application/json" -SkipHttpErrorCheck
+        Test-Result -Success ($badResp.StatusCode -eq 400) -Message "9z-K.4: logFileEnabled='Yes' rejected with 400"
+    } catch {
+        Test-Result -Success $false -Message "9z-K.4: Failed: $_"
+    }
+
+    # Cleanup
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$lfeId" -Method DELETE -Headers $headers | Out-Null
+    } catch { }
+}
+
+Write-Host "`n--- 9z-K: logFileEnabled Tests Complete ---" -ForegroundColor Green
+
 # ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"

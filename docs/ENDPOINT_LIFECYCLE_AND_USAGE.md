@@ -208,6 +208,37 @@ Invoke-RestMethod -Uri "$BASE/scim/admin/endpoints/$ENDPOINT_ID" -Method PATCH -
 | `PatchOpAllowRemoveAllMembers` | — | Allow remove-all via `path=members` |
 | `logLevel` | — | Per-endpoint log level override |
 
+### Add a Custom Extension to an Existing Endpoint
+
+You can PATCH custom extensions into an already-running endpoint. `schemas` and `resourceTypes` use **replace** semantics — send complete arrays. `settings` and `SPC` are preserved.
+
+```powershell
+$extensionPatch = @{
+    profile = @{
+        schemas = @(
+            @{ id = "urn:ietf:params:scim:schemas:core:2.0:User"; name = "User"; attributes = "all" },
+            @{ id = "urn:ietf:params:scim:schemas:core:2.0:Group"; name = "Group"; attributes = "all" },
+            @{ id = "urn:example:ext:hr:2.0:User"; name = "HRExtension"
+               attributes = @(
+                   @{ name = "badgeNumber"; type = "string"; multiValued = $false; required = $false; mutability = "readWrite"; returned = "default" }
+               )
+            }
+        )
+        resourceTypes = @(
+            @{ id = "User"; name = "User"; endpoint = "/Users"; description = "User"
+               schema = "urn:ietf:params:scim:schemas:core:2.0:User"
+               schemaExtensions = @(@{ schema = "urn:example:ext:hr:2.0:User"; required = $false }) },
+            @{ id = "Group"; name = "Group"; endpoint = "/Groups"; description = "Group"
+               schema = "urn:ietf:params:scim:schemas:core:2.0:Group"; schemaExtensions = @() }
+        )
+    }
+} | ConvertTo-Json -Depth 10
+
+Invoke-RestMethod -Uri "$BASE/scim/admin/endpoints/$ENDPOINT_ID" -Method PATCH -Headers $headers -Body $extensionPatch
+```
+
+> **Takes effect immediately** — no restart required. The in-memory cache is updated synchronously and `_schemaCaches` is lazily rebuilt on the next request. Discovery, validation, and characteristic enforcement all reflect the new extension instantly. Existing resources without extension data continue working normally. See [SCHEMA_CUSTOMIZATION_GUIDE.md §11](SCHEMA_CUSTOMIZATION_GUIDE.md#11-adding-extensions-to-existing-endpoints-patch) for all combination examples.
+
 ---
 
 ## Step 4: Provision Users & Groups

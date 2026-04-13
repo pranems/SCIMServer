@@ -305,6 +305,20 @@ PATCH /scim/admin/endpoints/:id
 ```
 Result: Custom `Badge` extension added. Existing settings and SPC preserved.
 
+### Immediate Effect — No Restart Required
+
+All profile PATCHes (examples 5–7) take effect **immediately** on the next SCIM request. The update pipeline:
+
+1. `mergeProfilePartial()` merges the partial into the current profile (replace for schemas/RTs, shallow-merge for settings/SPC)
+2. `validateAndExpandProfile()` validates the merged result (fails → 400, nothing changes)
+3. In-memory endpoint cache is updated synchronously
+4. `_schemaCaches` is deleted — lazily rebuilt on first request access
+5. `profileChangeListener` fires for any registered listeners
+
+There is no deferred reload, no scheduler, and no eventual consistency — the new profile is immediately visible to discovery, validation, and characteristic enforcement.
+
+**Existing resources** without extension data continue working normally. Extension data is only returned for resources that have it stored in their `rawPayload`.
+
 ---
 
 ## 5. Expansion Pipeline

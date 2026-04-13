@@ -548,6 +548,30 @@ PATCH /scim/admin/endpoints/{id}
 
 > **Settings and SPC are preserved**: Only schemas/resourceTypes are replaced. `serviceProviderConfig` and `settings` from the existing endpoint are preserved if not included in the PATCH body.
 
+### When Does It Take Effect?
+
+**Immediately — on the very next SCIM request. No restart required.**
+
+The PATCH handler follows this pipeline:
+
+1. `mergeProfilePartial()` — replaces `schemas`/`resourceTypes`, shallow-merges `settings`/`serviceProviderConfig`
+2. `validateAndExpandProfile()` — runs the full 5-step validation pipeline on the merged profile (if validation fails, nothing changes → `400`)
+3. **In-memory cache updated** — the cached endpoint object is replaced synchronously
+4. **`_schemaCaches` cleared** — the lazy schema characteristics cache is deleted, forcing a rebuild on first access
+5. `profileChangeListener` fired — notifies any registered listeners
+6. **200 OK** returned with the updated endpoint
+
+Every subsequent SCIM request reads from the in-memory cache, so the new extension is visible instantly — in discovery (`/Schemas`, `/ResourceTypes`), in validation, and in characteristic enforcement.
+
+### Impact on Existing Resources
+
+| Scenario | Behavior |
+|----------|----------|
+| Existing resources **without** extension data | Continue to work. Extension data is optional (unless `required: true`). |
+| New resources created **after** the PATCH | Extension data accepted, validated, and stored per the new schema definition. |
+| `GET` on existing resources | No change — extension data isn't retroactively added. Only visible if the resource has extension data stored. |
+| **Removing** an extension via PATCH | Data persists in `rawPayload` but becomes invisible to discovery. Strict mode will reject subsequent PUTs with the removed URN. |
+
 ---
 
 ## 12. Using Extensions in SCIM Operations
