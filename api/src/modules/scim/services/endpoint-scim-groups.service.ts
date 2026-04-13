@@ -344,7 +344,7 @@ export class EndpointScimGroupsService {
           members: this.memberRecordsToDtos(group.members),
           rawPayload: parseJson<Record<string, unknown>>(String(group.rawPayload ?? '{}')),
         },
-        { allowMultiMemberAdd, allowMultiMemberRemove, allowRemoveAllMembers, extensionUrns },
+        { allowMultiMemberAdd, allowMultiMemberRemove, allowRemoveAllMembers, extensionUrns, caseExactPaths: this.schemaHelpers.getCaseExactAttributes(endpointId) },
       );
     } catch (err) {
       if (err instanceof PatchError) {

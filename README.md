@@ -484,7 +484,7 @@ Content-Type: application/json
 
 | Layer | Suites | Tests | Framework |
 |-------|--------|-------|-----------|
-| **Unit** | 80 | 3,193 | Jest + ts-jest |
+| **Unit** | 80 | 3,206 | Jest + ts-jest |
 | **E2E** | 45 | 939 | Jest + supertest + NestJS testing |
 | **Live Integration** | 43 sections | ~739 | PowerShell (live-test.ps1) |
 | **ISV Live (Lexmark)** | 13 sections | 112 | PowerShell (lexmark-live-test.ps1) |

@@ -3,7 +3,7 @@
 **Status:** Current | **Last Updated:** 2026-04-13 | **Baseline:** v0.34.0  
 **Scope:** Full source-verified audit — architecture, SOLID, DRY, security, RFC compliance, DTO validation, data layer, maintainability  
 **RFC References:** RFC 7643 (SCIM Core Schema), RFC 7644 (SCIM Protocol)  
-**Test Baseline:** 3,200 unit (80 suites) · 939 E2E (45 suites) · ~739 live + 112 Lexmark — ALL PASSING  
+**Test Baseline:** 3,206 unit (80 suites) · 939 E2E (45 suites) · ~739 live + 112 Lexmark — ALL PASSING  
 **Files Audited:** 60+ source files across all layers  
 **Overall Rating:** **B+ (7.5/10)**
 
@@ -966,4 +966,4 @@ radar
 
 ---
 
-*This document was produced by deep analysis of 60+ source files across all architectural layers, verified against RFC 7643 (SCIM Core Schema) and RFC 7644 (SCIM Protocol), and cross-referenced with the project's existing test suite (3,200 unit + 939 E2E tests). All line numbers, file paths, and code snippets are sourced directly from the v0.34.0 codebase.*
+*This document was produced by deep analysis of 60+ source files across all architectural layers, verified against RFC 7643 (SCIM Core Schema) and RFC 7644 (SCIM Protocol), and cross-referenced with the project's existing test suite (3,206 unit + 939 E2E tests). All line numbers, file paths, and code snippets are sourced directly from the v0.34.0 codebase.*
