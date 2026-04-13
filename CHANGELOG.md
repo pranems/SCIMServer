@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.34.0] - 2026-04-10
 
+### Documentation: Logging & Observability Complete Rewrite (April 13, 2026)
+
+**6 docs rewritten from scratch** (source-verified against v0.34.0 codebase):
+
+- `LOGGING_AND_OBSERVABILITY.md` v4.0 — 21 sections, 3 Mermaid diagrams, 10 log troubleshooting scenarios, complete 55-file source reference
+- `LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md` v3.0 — 21 sections, 5 Mermaid diagrams, error catalog by status code (400–503), 5-layer error boundary architecture
+- `LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md` v3.0 — 20-gap register (5 open, 14 resolved, 1 accepted), code evidence with exact line numbers
+- `REMOTE_DEBUGGING_AND_DIAGNOSIS.md` v3.0 — 16 sections (Section 0: copy-paste quick start), 20 troubleshooting scenarios with full request/response JSON, 4 diagnosis workflows, log file reference (local/Docker/Azure)
+- `PROMPT_LOGGING_VERIFICATION.md` v3.0 — 71-check, 12-section self-improving audit
+- `PROMPT_ERROR_HANDLING_VERIFICATION.md` v3.0 — 55-check, 10-section self-improving audit
+
+**Quick Start additions:**
+- README.md: New "Observability Quick Start" section — deployment table (Local/Docker/Azure URLs + tokens), 10 copy-paste PowerShell commands
+- REMOTE_DEBUGGING: New Section 0 — full A–J copy-paste script with inline URL/header/response JSON for every log access pattern
+
+**Cross-doc freshness sweep** (13 stale items fixed across 9 files):
+- LOG_LEVEL values: NestJS-era `verbose` → custom `TRACE/DEBUG/INFO/WARN/ERROR/FATAL/OFF` (README, ENDPOINT_CONFIG_FLAGS, COMPLETE_API_REFERENCE)
+- Ring buffer default: 500 → 2000 (CHANGELOG, source-verified)
+- LoggingModule: 4 → 8 components (TECHNICAL_DESIGN_DOCUMENT)
+- Logging module file listing: 2 → 9 files (CONTEXT_INSTRUCTIONS)
+- Unit test count: 3,193 → 3,206 (CONTEXT_INSTRUCTIONS)
+- Section counts synced across INDEX.md, Session_starter.md
+- DEPLOYMENT.md version: v0.31.0 → v0.34.0
+
 ### logFileEnabled default changed to true
 
 **Breaking Change (minor):**

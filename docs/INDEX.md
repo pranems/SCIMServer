@@ -23,7 +23,7 @@
 | [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) | Docker Compose build/run, healthcheck, test report |
 | [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) | Running instances, connection info, credentials, Azure costs |
 | [README_VISUAL_STUDIO_DEBUG.md](README_VISUAL_STUDIO_DEBUG.md) | VS Code debugging — launch configs, remote attach |
-| [REMOTE_DEBUGGING_AND_DIAGNOSIS.md](REMOTE_DEBUGGING_AND_DIAGNOSIS.md) | **v3.0** Zero-access diagnosis — SSE, ring buffer, per-endpoint isolation, 4 workflows |
+| [REMOTE_DEBUGGING_AND_DIAGNOSIS.md](REMOTE_DEBUGGING_AND_DIAGNOSIS.md) | **v3.0** Zero-access diagnosis — copy-paste quick start script, 20 troubleshooting scenarios, SSE, ring buffer, per-endpoint isolation, 4 workflows, log file reference |
 
 ## Architecture & Design
 
