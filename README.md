@@ -25,6 +25,7 @@ Production-ready, multi-tenant SCIM 2.0 server purpose-built for Microsoft Entra
 - [Per-Endpoint Configuration Flags](#per-endpoint-configuration-flags)
 - [Microsoft Entra ID Setup](#microsoft-entra-id-setup)
 - [Environment Variables](#environment-variables)
+- [Observability Quick Start](#observability-quick-start)
 - [Testing](#testing)
 - [Repository Structure](#repository-structure)
 - [Technology Stack](#technology-stack)
@@ -475,6 +476,54 @@ Content-Type: application/json
 | `API_PREFIX` | No | `scim` | URL prefix for all routes |
 | `NODE_ENV` | No | — | `production`, `development`, `test` |
 | `LOG_LEVEL` | No | `info` | Global log level (TRACE/DEBUG/INFO/WARN/ERROR/FATAL/OFF) |
+
+---
+
+## Observability Quick Start
+
+All log endpoints require `Authorization: Bearer <shared-secret>`. Pick your deployment:
+
+| Deployment | Base URL | Bearer Token |
+|------------|----------|-------------|
+| **Local** | `http://localhost:6000` | `local-secret` |
+| **Docker** | `http://localhost:8080` | `devscimsharedsecret` |
+| **Azure** | `https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io` | `changeme-scim` |
+
+```powershell
+# ── Setup (Azure example — change $base/$secret for other deployments) ──
+$base = "https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io"
+$secret = "changeme-scim"
+$h = @{ Authorization = "Bearer $secret" }
+
+# Recent logs (last 25 from in-memory ring buffer)
+Invoke-RestMethod "$base/scim/admin/log-config/recent?limit=25" -Headers $h | ConvertTo-Json -Depth 5
+
+# Errors only (WARN+)
+Invoke-RestMethod "$base/scim/admin/log-config/recent?level=WARN&limit=50" -Headers $h | ConvertTo-Json -Depth 5
+
+# Audit trail (config changes, auth events, endpoint CRUD)
+Invoke-RestMethod "$base/scim/admin/log-config/audit" -Headers $h | ConvertTo-Json -Depth 5
+
+# Full request/response detail for a specific log entry
+Invoke-RestMethod "$base/scim/admin/logs?pageSize=10" -Headers $h | ConvertTo-Json -Depth 5
+
+# Trace a failed request (paste requestId from error response diagnostics)
+Invoke-RestMethod "$base/scim/admin/log-config/recent?requestId=PASTE-ID" -Headers $h | ConvertTo-Json -Depth 5
+
+# Per-endpoint logs (isolated by tenant)
+$epId = "PASTE-ENDPOINT-ID"
+Invoke-RestMethod "$base/scim/endpoints/$epId/logs/recent?limit=50" -Headers $h | ConvertTo-Json -Depth 5
+
+# Download logs for offline analysis (Azure — files are ephemeral in container)
+Invoke-RestMethod "$base/scim/admin/log-config/download" -Headers $h -OutFile "scimserver-logs.ndjson"
+
+# Turn on TRACE for max detail (no restart needed)
+Invoke-RestMethod -Method PUT "$base/scim/admin/log-config/level/TRACE" -Headers $h
+# Restore after debugging
+Invoke-RestMethod -Method PUT "$base/scim/admin/log-config/level/INFO" -Headers $h
+```
+
+> **Full reference:** [REMOTE_DEBUGGING_AND_DIAGNOSIS.md](docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md) — 20 troubleshooting scenarios, SSE live stream, log file layout, per-endpoint isolation, 4 diagnosis workflows.
 
 ---
 

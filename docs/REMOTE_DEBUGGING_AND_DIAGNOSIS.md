@@ -7,6 +7,7 @@
 
 ## Table of Contents
 
+0. [Quick Start Script (Copy-Paste)](#0-quick-start-script-copy-paste)
 1. [Zero-Access Diagnosis Model](#1-zero-access-diagnosis-model)
 2. [Diagnosis Endpoints](#2-diagnosis-endpoints)
 3. [Self-Service RCA via Error Responses](#3-self-service-rca-via-error-responses)
@@ -22,6 +23,148 @@
 13. [Deployment-Specific Access](#13-deployment-specific-access)
 14. [Mermaid Diagrams](#14-mermaid-diagrams)
 15. [Quick Reference Card](#15-quick-reference-card)
+
+---
+
+## 0. Quick Start Script (Copy-Paste)
+
+> **New here?** Copy this entire block into PowerShell. It works immediately against the live Azure deployment. Change `$base` and `$secret` for Docker or local.
+
+```powershell
+# ═══ Pick your deployment (uncomment one) ═════════════════════════════════════════
+$base = "https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io"
+$secret = "changeme-scim"
+# $base = "http://localhost:8080"; $secret = "devscimsharedsecret"   # Docker
+# $base = "http://localhost:6000"; $secret = "local-secret"          # Local
+$h = @{ Authorization = "Bearer $secret" }
+
+# ═══ A. RECENT LOGS (in-memory ring buffer, last ~2000 entries) ═══════
+#
+# GET /scim/admin/log-config/recent?limit=25
+# Headers:  Authorization: Bearer <token>
+# Response: { "count": 25, "entries": [ { "timestamp": "...", "level": "INFO",
+#            "category": "scim.user", "message": "User created",
+#            "requestId": "a1b2c3d4-...", "endpointId": "ep-abc123",
+#            "method": "POST", "path": "/scim/endpoints/ep-abc123/Users",
+#            "durationMs": 45, "authType": "oauth", "resourceType": "User",
+#            "operation": "create" } ] }
+
+Invoke-RestMethod "$base/scim/admin/log-config/recent?limit=25" -Headers $h |
+  ConvertTo-Json -Depth 5
+
+# ═══ B. ERRORS ONLY (WARN+) ═════════════════════════════════════════════
+Invoke-RestMethod "$base/scim/admin/log-config/recent?level=WARN&limit=50" -Headers $h |
+  ConvertTo-Json -Depth 5
+
+# ═══ C. AUDIT TRAIL (config changes, auth, endpoint CRUD) ════════════
+#
+# GET /scim/admin/log-config/audit?limit=100
+# Response: { "count": 5, "entries": [
+#   { "category": "config", "message": "Log configuration updated", ... },
+#   { "category": "auth",   "message": "OAuth 2.0 authentication successful", ... },
+#   { "category": "endpoint", "message": "Endpoint created", ... }
+# ] }
+
+Invoke-RestMethod "$base/scim/admin/log-config/audit?limit=100" -Headers $h |
+  ConvertTo-Json -Depth 5
+
+# ═══ D. PER-ENDPOINT LOGS (tenant-isolated) ═════════════════════════
+# Step 1: List endpoints
+Invoke-RestMethod "$base/scim/admin/endpoints" -Headers $h | ConvertTo-Json -Depth 3
+
+# Step 2: Get logs for one endpoint
+$epId = "PASTE-ENDPOINT-ID-HERE"
+Invoke-RestMethod "$base/scim/endpoints/$epId/logs/recent?limit=50" -Headers $h |
+  ConvertTo-Json -Depth 5
+
+# ═══ E. PERSISTENT REQUEST HISTORY (full req/resp from DB) ═══════════
+#
+# GET /scim/admin/logs?pageSize=10
+# Response: { "total": 847, "page": 1, "items": [
+#   { "id": "log-uuid", "method": "POST", "url": "/scim/endpoints/.../Users",
+#     "status": 201, "durationMs": 45, "reportableIdentifier": "jsmith@contoso.com" }
+# ] }
+
+Invoke-RestMethod "$base/scim/admin/logs?pageSize=10" -Headers $h |
+  ConvertTo-Json -Depth 5
+
+# Search by userName/email:
+Invoke-RestMethod "$base/scim/admin/logs?search=jsmith@contoso.com" -Headers $h |
+  ConvertTo-Json -Depth 5
+
+# ═══ F. FULL REQUEST DETAIL (headers + bodies) ═════════════════════
+#
+# GET /scim/admin/logs/{logId}
+# Response:
+# {
+#   "id": "log-uuid",
+#   "method": "POST",
+#   "url": "/scim/endpoints/ep-abc123/Users",
+#   "status": 409,
+#   "durationMs": 23,
+#   "requestHeaders": {
+#     "content-type": "application/scim+json",
+#     "authorization": "Bearer ey...",
+#     "x-request-id": "f47ac10b-..."
+#   },
+#   "requestBody": {
+#     "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+#     "userName": "jsmith@contoso.com",
+#     "name": { "givenName": "John", "familyName": "Smith" }
+#   },
+#   "responseBody": {
+#     "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+#     "detail": "A resource with userName 'jsmith@contoso.com' already exists.",
+#     "status": "409",
+#     "scimType": "uniqueness",
+#     "urn:scimserver:api:messages:2.0:Diagnostics": {
+#       "requestId": "f47ac10b-...",
+#       "errorCode": "UNIQUENESS_USERNAME",
+#       "conflictingResourceId": "usr-existing-456",
+#       "logsUrl": "/scim/endpoints/ep-abc123/logs/recent?requestId=f47ac10b-..."
+#     }
+#   },
+#   "errorMessage": "A resource with userName 'jsmith@contoso.com' already exists.",
+#   "reportableIdentifier": "jsmith@contoso.com"
+# }
+
+$logId = "PASTE-LOG-ID-HERE"
+Invoke-RestMethod "$base/scim/admin/logs/$logId" -Headers $h |
+  ConvertTo-Json -Depth 10
+
+# ═══ G. TRACE A FAILED REQUEST (paste requestId from error diagnostics) ═
+$reqId = "PASTE-REQUEST-ID-FROM-ERROR-RESPONSE"
+Invoke-RestMethod "$base/scim/admin/log-config/recent?requestId=$reqId" -Headers $h |
+  ConvertTo-Json -Depth 5
+
+# ═══ H. LOG FILES ═══════════════════════════════════════════════════
+#
+# On-disk file layout (NDJSON — one JSON per line):
+#   logs/scimserver.log               ← all traffic
+#   logs/scimserver.log.1             ← previous rotation
+#   logs/scimserver.log.2             ← oldest rotation
+#   logs/endpoints/{name}_ep-{id8}/   ← per-endpoint files
+#
+# Config: LOG_FILE (default: logs/scimserver.log, "" = disabled)
+#         LOG_FILE_MAX_SIZE (10 MB)  LOG_FILE_MAX_COUNT (3)
+#
+# LOCAL:  Get-Content logs/scimserver.log -Tail 20
+# DOCKER: docker cp scimserver-api:/app/logs/scimserver.log .
+#         docker exec scimserver-api cat /app/logs/scimserver.log | jq
+# AZURE:  Files are ephemeral — use the download API instead:
+Invoke-RestMethod "$base/scim/admin/log-config/download" -Headers $h -OutFile "logs.ndjson"
+Invoke-RestMethod "$base/scim/admin/log-config/download?format=json&level=WARN" -Headers $h -OutFile "errors.json"
+
+# ═══ I. LIVE STREAM (SSE, use curl — Ctrl+C to stop) ══════════════
+# curl -N "$base/scim/admin/log-config/stream?level=INFO" -H "Authorization: Bearer $secret"
+# curl -N "$base/scim/endpoints/$epId/logs/stream?level=WARN" -H "Authorization: Bearer $secret"
+
+# ═══ J. CHANGE LOG LEVEL AT RUNTIME (no restart) ══════════════════
+Invoke-RestMethod "$base/scim/admin/log-config" -Headers $h | ConvertTo-Json -Depth 3
+Invoke-RestMethod -Method PUT "$base/scim/admin/log-config/level/TRACE" -Headers $h
+# ... reproduce issue, check logs, then restore:
+Invoke-RestMethod -Method PUT "$base/scim/admin/log-config/level/INFO" -Headers $h
+```
 
 ---
 
