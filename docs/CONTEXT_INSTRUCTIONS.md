@@ -86,8 +86,15 @@ api/src/modules/auth/
   shared-secret.guard.ts                                 # Global auth guard (JWT + legacy)
   public.decorator.ts                                    # @Public() route exemption
 api/src/modules/logging/
-  logging.service.ts                                     # RequestLog persistence (supports in-memory mode)
-  request-logging.interceptor.ts                         # Global request/response logging
+  scim-logger.service.ts                                 # Central structured logger (AsyncLocalStorage, ring buffer, SSE, file transport)
+  log-levels.ts                                          # 7 log levels (TRACE→OFF), 14 categories, LogConfig interface
+  logging.service.ts                                     # RequestLog persistence (buffered DB writes, supports in-memory)
+  log-config.controller.ts                               # Admin API: GET/PUT config, recent, audit, stream, download
+  log-query.service.ts                                   # Shared query/stream/download logic
+  request-logging.interceptor.ts                         # X-Request-Id, correlation context, duration, tiered log levels
+  file-log-transport.ts                                  # Main + per-endpoint log files
+  rotating-file-writer.ts                                # Size-based file rotation (pure Node.js fs)
+  logging.module.ts                                      # @Global() module registration
 api/src/modules/endpoint/
   endpoint.controller.ts                                 # Admin CRUD for endpoints
   endpoint.service.ts                                    # Endpoint business logic (supports in-memory mode)
@@ -331,7 +338,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 
 > 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
 
-- **Unit** and **E2E** — all passing (0 failures). **Unit**: 3,193 (80 suites). **E2E**: 939 (45 suites). **Live integration** — ~739 assertions
+- **Unit** and **E2E** — all passing (0 failures). **Unit**: 3,206 (80 suites). **E2E**: 939 (45 suites). **Live integration** — ~739 assertions
 - **SCIM Validator**: 10/12 mandatory (2 FP on Lexmark returned:never), 25/25 on standard profile + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
 - Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`

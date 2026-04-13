@@ -474,7 +474,7 @@ Content-Type: application/json
 | `OAUTH_CLIENT_SCOPES` | No | `scim.read,scim.write,scim.manage` | Comma-separated OAuth scopes |
 | `API_PREFIX` | No | `scim` | URL prefix for all routes |
 | `NODE_ENV` | No | — | `production`, `development`, `test` |
-| `LOG_LEVEL` | No | `info` | Global log level (error/warn/info/debug/verbose) |
+| `LOG_LEVEL` | No | `info` | Global log level (TRACE/DEBUG/INFO/WARN/ERROR/FATAL/OFF) |
 
 ---
 

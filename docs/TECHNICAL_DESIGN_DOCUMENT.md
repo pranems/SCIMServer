@@ -112,8 +112,11 @@ AppModule
 ├── LoggingModule (@Global)
 │   ├── RequestLoggingInterceptor (APP_INTERCEPTOR — global, correlation IDs)
 │   ├── ScimLogger → Structured leveled logger (AsyncLocalStorage correlation)
-│   ├── LogConfigController → /admin/log-config (8 REST endpoints)
-│   └── LoggingService → RequestLog persistence
+│   ├── LogConfigController → /admin/log-config (11 REST endpoints)
+│   ├── LogQueryService → Shared query/stream/download logic
+│   ├── LoggingService → RequestLog persistence (buffered DB writes)
+│   ├── FileLogTransport → Main + per-endpoint log files
+│   └── RotatingFileWriter → Size-based file rotation
 ├── ScimModule
 │   ├── EndpointScimUsersController
 │   ├── EndpointScimGroupsController
@@ -146,7 +149,7 @@ AppModule
 | **OAuthModule** | OAuth 2.0 flows | `OAuthController`, `OAuthService` |
 | **ScimModule** | Core SCIM protocol | Controllers, services, interceptors, utilities |
 | **EndpointModule** | Multi-endpoint management | `EndpointController`, `EndpointService` |
-| **LoggingModule** | Structured logging, traceability, admin config | `ScimLogger` (global), `RequestLoggingInterceptor`, `LogConfigController`, `LoggingService` |
+| **LoggingModule** | Structured logging, traceability, admin config | `ScimLogger` (global), `RequestLoggingInterceptor`, `LogConfigController`, `LogQueryService`, `LoggingService`, `FileLogTransport` |
 | **DatabaseModule** | Dashboard data | `DatabaseController`, `DatabaseService` |
 | **ActivityParserModule** | Activity feed | `ActivityParserService` (898 lines of parsing) |
 | **WebModule** | SPA serving | `WebController` — serves pre-built React app |

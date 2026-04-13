@@ -38,7 +38,7 @@
 | [SCHEMA_TEMPLATES_DESIGN.md](SCHEMA_TEMPLATES_DESIGN.md) | Profile configuration design (Phase 13) — decisions, types, flows |
 | [SCHEMA_CUSTOMIZATION_GUIDE.md](SCHEMA_CUSTOMIZATION_GUIDE.md) | **v3.0** Operator guide — custom extensions, resource types, profile-based (source-verified) |
 | [H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md](H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md) | PATCH validation architecture + immutable enforcement |
-| [LOGGING_AND_OBSERVABILITY.md](LOGGING_AND_OBSERVABILITY.md) | **v4.0** Structured logging — 20 sections, 3 Mermaid diagrams, source-verified, zero-dep stack |
+| [LOGGING_AND_OBSERVABILITY.md](LOGGING_AND_OBSERVABILITY.md) | **v4.0** Structured logging — 21 sections, 3 Mermaid diagrams, 10 troubleshooting scenarios, source-verified, zero-dep stack |
 
 ## SCIM Protocol & RFC Compliance
 
@@ -105,8 +105,8 @@
 | Document | Description |
 |----------|-------------|
 | [DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md](DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md) | **v0.34.0 deep analysis** — security, SOLID, DRY, DTO, data integrity, RFC gaps, 25-item roadmap |
-| [LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md](LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md) | **v3.0 quality audit** — 20-gap register, 5 open, 14 resolved, source-verified |
-| [LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md](LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md) | **v3.0 error handling architecture** — 20 sections, 5 Mermaid diagrams, 5-layer error boundary |
+| [LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md](LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md) | **v3.0 quality audit** — 20-gap register, 5 open, 14 resolved, 1 accepted, source-verified |
+| [LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md](LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md) | **v3.0 error handling architecture** — 21 sections, error catalog by status code, 5 Mermaid diagrams, 5-layer error boundary |
 | [ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md](ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md) | Historical bug log with RCA and resolution |
 | [AZURE_DEPLOYMENT_ISSUES_AND_FIXES.md](AZURE_DEPLOYMENT_ISSUES_AND_FIXES.md) | Azure-specific deployment troubleshooting |
 
