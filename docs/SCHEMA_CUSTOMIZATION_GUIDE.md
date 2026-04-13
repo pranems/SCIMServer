@@ -1,441 +1,473 @@
 # Schema Customization Guide — Operator Reference
 
-> **⚠️ Partially Superseded (v0.28.0)**: The `EndpointSchema` / `EndpointResourceType` tables, their repository interfaces, and the `POST/GET/DELETE /admin/endpoints/:id/schemas` & `/resource-types` admin routes referenced here were **removed** in Phase 13. Schema data now lives in `Endpoint.profile` JSONB. See [SCHEMA_TEMPLATES_DESIGN.md](SCHEMA_TEMPLATES_DESIGN.md).
-
-## Overview
-
-**Document Type**: Operator Usability Guide  
-**Audience**: Operators, DevOps engineers, and anyone configuring SCIM schema extensions or custom resource types  
-**Status**: ✅ Complete  
-**Date**: March 2, 2026  
-**Version**: 0.24.0
-
-### Purpose
-
-This guide provides step-by-step instructions for:
-
-1. Registering custom schema extensions on endpoints
-2. Creating custom resource types (beyond User/Group)
-3. Configuring schema validation behavior
-4. Understanding what you can and cannot customize
-5. Do's, Don'ts, and common pitfalls
-
-> **Cross-references:**
-> - RFC rules → [RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md)
-> - Architecture internals → [SCHEMA_LIFECYCLE_AND_REGISTRY.md](SCHEMA_LIFECYCLE_AND_REGISTRY.md)
-> - Behavior matrices → [SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md](SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md)
-> - Config flags → [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md)
+> **Version**: 3.0 · **Date**: April 13, 2026 · **Status**: ✅ Complete (source-verified)  
+> **Audience**: Operators, DevOps engineers, ISVs configuring SCIM schema extensions & custom resource types  
+> **Supersedes**: v2.0 (March 2, 2026) which referenced deleted `POST/GET/DELETE /admin/endpoints/:id/schemas` routes
 
 ---
 
-## 1. Prerequisites
+## Cross-References
 
-Before customizing schemas:
+| Topic | Document |
+|-------|----------|
+| Profile architecture internals | [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md) |
+| One-click JSON examples (12 combos) | [examples/endpoint/create-endpoint-with-custom-extensions.json](examples/endpoint/create-endpoint-with-custom-extensions.json) |
+| Config flags (14 booleans + logLevel) | [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) |
+| RFC schema & extension deep dive | [RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md) |
+| Complete API reference | [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) |
+| Multi-endpoint guide | [MULTI_ENDPOINT_GUIDE.md](MULTI_ENDPOINT_GUIDE.md) |
+| Extension feature doc | [FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md](FEATURE_SOFT_DELETE_STRICT_SCHEMA_CUSTOM_EXTENSIONS.md) |
 
-1. **An endpoint must exist** — Create one via the Admin API first
-2. **The server must be running** — Schema changes are runtime operations via the Admin API
-3. **Admin access** — Schema operations use the `/admin/` prefix (requires auth token)
-4. **Understand the persistence backend** — InMemory mode loses customizations on restart; Prisma mode persists them
+---
 
-```bash
-# Verify server is running and endpoint exists
-curl -s http://localhost:6000/admin/endpoints \
-  -H "Authorization: Bearer $TOKEN" | jq '.[0].id'
+## Table of Contents
+
+1. [How Schema Customization Works (v0.28.0+)](#1-how-schema-customization-works)
+2. [Registering a Custom Extension on User](#2-registering-a-custom-extension-on-user)
+3. [Registering a Custom Extension on Group](#3-registering-a-custom-extension-on-group)
+4. [Multiple Extensions on One Resource Type](#4-multiple-extensions-on-one-resource-type)
+5. [Extensions on Both User and Group](#5-extensions-on-both-user-and-group)
+6. [Custom Extension + EnterpriseUser Together](#6-custom-extension--enterpriseuser-together)
+7. [Complex & Multi-Valued Extension Attributes](#7-complex--multi-valued-extension-attributes)
+8. [Required Extensions](#8-required-extensions)
+9. [Creating Custom Resource Types](#9-creating-custom-resource-types)
+10. [Extensions on Custom Resource Types](#10-extensions-on-custom-resource-types)
+11. [Adding Extensions to Existing Endpoints (PATCH)](#11-adding-extensions-to-existing-endpoints-patch)
+12. [Using Extensions in SCIM Operations](#12-using-extensions-in-scim-operations)
+13. [PATCH Operations on Extension Attributes](#13-patch-operations-on-extension-attributes)
+14. [Schema Validation & Config Flags](#14-schema-validation--config-flags)
+15. [Discovery Verification](#15-discovery-verification)
+16. [Extension Attribute Reference](#16-extension-attribute-reference)
+17. [Profile Expansion Pipeline](#17-profile-expansion-pipeline)
+18. [Do's and Don'ts](#18-dos-and-donts)
+19. [Troubleshooting](#19-troubleshooting)
+20. [Quick Reference Card](#20-quick-reference-card)
+
+---
+
+## 1. How Schema Customization Works
+
+### The Profile Model (v0.28.0+)
+
+Schema customization is done **entirely through the endpoint profile** — a single JSONB document attached to each endpoint. There are **no separate admin schema/resource-type routes**; everything is defined at endpoint creation or updated via `PATCH`.
+
+```mermaid
+flowchart LR
+    subgraph "Endpoint Creation"
+        A[POST /scim/admin/endpoints] --> B{profilePreset OR profile?}
+        B -->|profilePreset| C[Load built-in preset]
+        B -->|profile| D[Use inline definition]
+        B -->|Neither| E["Default: entra-id preset"]
+        C --> F[validateAndExpandProfile]
+        D --> F
+        E --> F
+        F --> G["Stored as Endpoint.profile JSONB"]
+    end
+
+    subgraph "Runtime"
+        G --> H[/Schemas discovery/]
+        G --> I[/ResourceTypes discovery/]
+        G --> J[Schema validation on writes]
+        G --> K[Attribute characteristic enforcement]
+    end
+```
+
+### Profile Structure
+
+A profile has four sections:
+
+```json
+{
+  "profile": {
+    "schemas": [],              // Schema definitions (core + extensions)
+    "resourceTypes": [],        // Resource type declarations with extension bindings
+    "serviceProviderConfig": {},// RFC 7644 §4 capability advertisement
+    "settings": {}              // Behavioral flags (StrictSchemaValidation, etc.)
+  }
+}
+```
+
+| Section | Merge Strategy on PATCH | Required |
+|---------|------------------------|----------|
+| `schemas` | **Replace** (full array) | ≥1 schema |
+| `resourceTypes` | **Replace** (full array) | ≥1 resource type |
+| `serviceProviderConfig` | Shallow merge | No (defaults applied) |
+| `settings` | Shallow merge (additive) | No (defaults applied) |
+
+### Key Architecture Points
+
+1. **Extension data is stored in `rawPayload`** — the JSONB blob alongside core attributes. No separate table.
+2. **Extension URNs must start with `urn:`** — the server detects extensions by checking payload keys that start with `urn:`.
+3. **`schemas[]` array on resources is built dynamically** — from visible extension URN keys present in the stored payload.
+4. **Each endpoint is fully isolated** — extension schemas on one endpoint don't affect another.
+
+---
+
+## 2. Registering a Custom Extension on User
+
+### Minimal Example
+
+```json
+POST /scim/admin/endpoints
+{
+  "name": "hr-endpoint",
+  "profile": {
+    "schemas": [
+      { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+      {
+        "id": "urn:example:scim:extension:hr:2.0:User",
+        "name": "HRExtension",
+        "description": "HR attributes",
+        "attributes": [
+          { "name": "badgeNumber", "type": "string", "multiValued": false, "required": false,
+            "mutability": "readWrite", "returned": "default", "caseExact": true, "uniqueness": "none" }
+        ]
+      },
+      { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" }
+    ],
+    "resourceTypes": [
+      { "id": "User", "name": "User", "endpoint": "/Users", "description": "User",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+        "schemaExtensions": [{ "schema": "urn:example:scim:extension:hr:2.0:User", "required": false }] },
+      { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] }
+    ],
+    "serviceProviderConfig": {
+      "patch": { "supported": true }, "bulk": { "supported": false },
+      "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
+      "etag": { "supported": true }, "changePassword": { "supported": false }
+    }
+  }
+}
+```
+
+### What Happens Under the Hood
+
+1. **Expansion**: Core schemas with `"attributes": "all"` get expanded to full RFC 7643 attribute lists. Custom extension schemas are used as-is (no RFC baseline exists).
+2. **Auto-inject**: `id`, `userName`, `externalId`, `meta` are injected into User schema if missing. `id`, `displayName`, `externalId`, `meta`, `active` are injected into Group schema.
+3. **Structural validation**: Server verifies that every `schemaExtensions[].schema` references a schema in the `schemas[]` array.
+4. **Cache build**: A `SchemaCharacteristicsCache` is lazily built at first access — producing O(1) lookup maps for booleans, returned characteristics, uniqueness, case-exactness, readOnly/immutable attributes, all keyed by URN-qualified dot-paths.
+
+### The Three-Part Pattern
+
+Every custom extension requires three things:
+
+| Part | Where | What |
+|------|-------|------|
+| 1. Schema definition | `profile.schemas[]` | `id` (URN), `name`, `attributes[]` with full characteristics |
+| 2. Resource type binding | `profile.resourceTypes[].schemaExtensions[]` | `{ schema: "<URN>", required: true/false }` |
+| 3. Extension data in requests | SCIM payloads | URN in `schemas[]` + data block keyed by URN |
+
+---
+
+## 3. Registering a Custom Extension on Group
+
+Same three-part pattern, but the binding goes on the Group resource type:
+
+```json
+POST /scim/admin/endpoints
+{
+  "name": "group-ext",
+  "profile": {
+    "schemas": [
+      { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+      { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" },
+      {
+        "id": "urn:example:scim:extension:dept:2.0:Group",
+        "name": "DeptExtension",
+        "description": "Department extension for Groups",
+        "attributes": [
+          { "name": "department", "type": "string", "multiValued": false, "required": false,
+            "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" },
+          { "name": "costCode",   "type": "string", "multiValued": false, "required": false,
+            "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" }
+        ]
+      }
+    ],
+    "resourceTypes": [
+      { "id": "User", "name": "User", "endpoint": "/Users", "description": "User",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:User", "schemaExtensions": [] },
+      { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:Group",
+        "schemaExtensions": [{ "schema": "urn:example:scim:extension:dept:2.0:Group", "required": false }] }
+    ],
+    "serviceProviderConfig": {
+      "patch": { "supported": true }, "bulk": { "supported": false },
+      "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
+      "etag": { "supported": true }, "changePassword": { "supported": false }
+    }
+  }
+}
 ```
 
 ---
 
-## 2. Registering a Custom Schema Extension
+## 4. Multiple Extensions on One Resource Type
 
-### 2.1 What is a Schema Extension?
-
-A schema extension adds new attributes to an existing resource type (User or Group). For example, adding a `department` and `floor` attribute to all Users.
-
-### 2.2 Step-by-Step: Register an Extension
-
-**Step 1**: Define your extension schema
+You can bind multiple extensions to a single resource type. Each extension is a separate schema definition with its own URN, linked in `schemaExtensions[]`:
 
 ```json
 {
-  "schemaUrn": "urn:example:scim:schemas:extension:acme:2.0:User",
-  "name": "AcmeUserExtension",
-  "description": "Custom attributes for Acme Corp users",
-  "resourceTypeId": "User",
-  "required": false,
+  "name": "multi-ext-user",
+  "profile": {
+    "schemas": [
+      { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+      { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" },
+      {
+        "id": "urn:corp:scim:extension:hr:2.0:User",
+        "name": "HRExtension",
+        "attributes": [
+          { "name": "hireDate",   "type": "dateTime", "multiValued": false, "required": false, "mutability": "immutable", "returned": "default" },
+          { "name": "costCenter", "type": "string",   "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default" }
+        ]
+      },
+      {
+        "id": "urn:corp:scim:extension:it:2.0:User",
+        "name": "ITExtension",
+        "attributes": [
+          { "name": "laptop",     "type": "string",  "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default" },
+          { "name": "vpnEnabled", "type": "boolean", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default" }
+        ]
+      },
+      {
+        "id": "urn:corp:scim:extension:security:2.0:User",
+        "name": "SecurityExtension",
+        "attributes": [
+          { "name": "clearanceLevel", "type": "string", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default" },
+          { "name": "accessPin",      "type": "string", "multiValued": false, "required": false, "mutability": "writeOnly", "returned": "never" }
+        ]
+      }
+    ],
+    "resourceTypes": [
+      { "id": "User", "name": "User", "endpoint": "/Users", "description": "User",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+        "schemaExtensions": [
+          { "schema": "urn:corp:scim:extension:hr:2.0:User", "required": false },
+          { "schema": "urn:corp:scim:extension:it:2.0:User", "required": false },
+          { "schema": "urn:corp:scim:extension:security:2.0:User", "required": false }
+        ] },
+      { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] }
+    ],
+    "serviceProviderConfig": {
+      "patch": { "supported": true }, "bulk": { "supported": true, "maxOperations": 100, "maxPayloadSize": 1048576 },
+      "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
+      "etag": { "supported": true }, "changePassword": { "supported": false }
+    }
+  }
+}
+```
+
+**Usage** — Creating a user with all three extensions:
+
+```json
+POST /scim/endpoints/{endpointId}/Users
+{
+  "schemas": [
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "urn:corp:scim:extension:hr:2.0:User",
+    "urn:corp:scim:extension:it:2.0:User",
+    "urn:corp:scim:extension:security:2.0:User"
+  ],
+  "userName": "alice@corp.com",
+  "active": true,
+  "urn:corp:scim:extension:hr:2.0:User": { "hireDate": "2025-06-15T00:00:00Z", "costCenter": "Engineering" },
+  "urn:corp:scim:extension:it:2.0:User": { "laptop": "MacBook Pro M3", "vpnEnabled": true },
+  "urn:corp:scim:extension:security:2.0:User": { "clearanceLevel": "L3", "accessPin": "1234" }
+}
+```
+
+**Response**: `accessPin` will NOT be returned (`returned: "never"` / `mutability: "writeOnly"`).
+
+---
+
+## 5. Extensions on Both User and Group
+
+```json
+POST /scim/admin/endpoints
+{
+  "name": "dual-ext",
+  "profile": {
+    "schemas": [
+      { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+      { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" },
+      { "id": "urn:acme:ext:hr:2.0:User", "name": "AcmeHR",
+        "attributes": [
+          { "name": "division", "type": "string", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default" }
+        ] },
+      { "id": "urn:acme:ext:org:2.0:Group", "name": "AcmeOrg",
+        "attributes": [
+          { "name": "orgUnit", "type": "string", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default" }
+        ] }
+    ],
+    "resourceTypes": [
+      { "id": "User", "name": "User", "endpoint": "/Users", "description": "User",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+        "schemaExtensions": [{ "schema": "urn:acme:ext:hr:2.0:User", "required": false }] },
+      { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:Group",
+        "schemaExtensions": [{ "schema": "urn:acme:ext:org:2.0:Group", "required": false }] }
+    ]
+  }
+}
+```
+
+---
+
+## 6. Custom Extension + EnterpriseUser Together
+
+The standard `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User` extension is just another schema. You can include it alongside your custom extension:
+
+```json
+{
+  "name": "enterprise-plus-custom",
+  "profile": {
+    "schemas": [
+      { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+      { "id": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", "name": "EnterpriseUser", "attributes": "all" },
+      { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" },
+      {
+        "id": "urn:example:ext:billing:2.0:User",
+        "name": "BillingExtension",
+        "attributes": [
+          { "name": "billingCode",  "type": "string", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default" },
+          { "name": "invoiceEmail", "type": "string", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default" }
+        ]
+      }
+    ],
+    "resourceTypes": [
+      { "id": "User", "name": "User", "endpoint": "/Users", "description": "User",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+        "schemaExtensions": [
+          { "schema": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", "required": false },
+          { "schema": "urn:example:ext:billing:2.0:User", "required": false }
+        ] },
+      { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] }
+    ]
+  }
+}
+```
+
+> **Tip**: The `entra-id` preset already includes EnterpriseUser + msfttest extensions. You can use `profilePreset: "rfc-standard"` as a base, then add your custom extension alongside.
+
+---
+
+## 7. Complex & Multi-Valued Extension Attributes
+
+Extensions support the full RFC 7643 attribute type system, including nested objects and arrays:
+
+```json
+{
+  "id": "urn:example:ext:identity:2.0:User",
+  "name": "IdentityExtension",
+  "description": "Extension with complex and multi-valued complex attributes",
   "attributes": [
     {
-      "name": "department",
-      "type": "string",
-      "multiValued": false,
-      "required": false,
-      "mutability": "readWrite",
-      "returned": "default",
-      "caseExact": false,
-      "uniqueness": "none",
-      "description": "User's department"
-    },
-    {
-      "name": "floor",
-      "type": "integer",
-      "multiValued": false,
-      "required": false,
-      "mutability": "readWrite",
-      "returned": "default",
-      "caseExact": false,
-      "uniqueness": "none",
-      "description": "Building floor number"
+      "name": "primaryOffice",
+      "type": "complex", "multiValued": false, "required": false,
+      "mutability": "readWrite", "returned": "default",
+      "description": "Single-valued complex: office location",
+      "subAttributes": [
+        { "name": "building", "type": "string",  "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default" },
+        { "name": "floor",    "type": "integer", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default" },
+        { "name": "deskCode", "type": "string",  "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default", "caseExact": true }
+      ]
     },
     {
       "name": "badges",
-      "type": "complex",
-      "multiValued": true,
-      "required": false,
-      "mutability": "readWrite",
-      "returned": "default",
-      "caseExact": false,
-      "uniqueness": "none",
-      "description": "Security badges",
+      "type": "complex", "multiValued": true, "required": false,
+      "mutability": "readWrite", "returned": "default",
+      "description": "Multi-valued complex: security badges",
       "subAttributes": [
-        {
-          "name": "badgeId",
-          "type": "string",
-          "multiValued": false,
-          "required": true,
-          "mutability": "readWrite",
-          "returned": "default",
-          "caseExact": true,
-          "uniqueness": "none"
-        },
-        {
-          "name": "level",
-          "type": "string",
-          "multiValued": false,
-          "required": false,
-          "mutability": "readWrite",
-          "returned": "default",
-          "caseExact": false,
-          "uniqueness": "none",
-          "canonicalValues": ["basic", "elevated", "admin"]
-        }
+        { "name": "badgeId",  "type": "string",   "multiValued": false, "required": true,  "mutability": "readWrite", "returned": "default", "caseExact": true },
+        { "name": "level",    "type": "string",   "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default",
+          "canonicalValues": ["basic", "elevated", "admin"] },
+        { "name": "issuedAt", "type": "dateTime", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default" }
       ]
+    },
+    {
+      "name": "tags",
+      "type": "string", "multiValued": true, "required": false,
+      "mutability": "readWrite", "returned": "default",
+      "description": "Multi-valued string array"
     }
   ]
 }
 ```
 
-**Step 2**: Register it via the Admin API
+**Usage in SCIM payload:**
 
-```bash
-ENDPOINT_ID="your-endpoint-id"
-
-curl -X POST "http://localhost:6000/admin/endpoints/${ENDPOINT_ID}/schemas" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d @acme-extension.json
-```
-
-**Expected response**: `201 Created` with the persisted record.
-
-**Step 3**: Verify via discovery
-
-```bash
-# Check /Schemas — your extension should appear
-curl -s "http://localhost:6000/endpoints/${ENDPOINT_ID}/Schemas" \
-  -H "Authorization: Bearer $TOKEN" | jq '.Resources[] | select(.id | contains("acme"))'
-
-# Check /ResourceTypes — User's schemaExtensions should include your URN
-curl -s "http://localhost:6000/endpoints/${ENDPOINT_ID}/ResourceTypes/User" \
-  -H "Authorization: Bearer $TOKEN" | jq '.schemaExtensions'
-```
-
-**Step 4**: Use the extension in SCIM operations
-
-```bash
-# Create a user with the custom extension
-curl -X POST "http://localhost:6000/endpoints/${ENDPOINT_ID}/Users" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/scim+json" \
-  -d '{
-    "schemas": [
-      "urn:ietf:params:scim:schemas:core:2.0:User",
-      "urn:example:scim:schemas:extension:acme:2.0:User"
+```json
+{
+  "urn:example:ext:identity:2.0:User": {
+    "primaryOffice": { "building": "HQ", "floor": 3, "deskCode": "A-312" },
+    "badges": [
+      { "badgeId": "ENG-001", "level": "elevated", "issuedAt": "2025-01-15T00:00:00Z" },
+      { "badgeId": "SEC-002", "level": "admin" }
     ],
-    "userName": "jane@acme.com",
-    "active": true,
-    "urn:example:scim:schemas:extension:acme:2.0:User": {
-      "department": "Engineering",
-      "floor": 3,
-      "badges": [
-        { "badgeId": "ENG-001", "level": "elevated" }
-      ]
-    }
-  }'
+    "tags": ["vip", "engineering"]
+  }
+}
 ```
-
-### 2.3 Extension Attribute Types
-
-| Type | JSON Type | Example Value | Notes |
-|------|-----------|---------------|-------|
-| `string` | String | `"Engineering"` | Default type |
-| `boolean` | Boolean | `true` | True/false only |
-| `integer` | Number | `42` | Whole numbers |
-| `decimal` | Number | `3.14` | Floating point |
-| `dateTime` | String | `"2026-03-01T10:00:00Z"` | ISO 8601 / xsd:dateTime format |
-| `reference` | String | `"https://example.com/Users/abc"` | URI reference |
-| `binary` | String | `"dGVzdA=="` | Base64-encoded binary |
-| `complex` | Object | `{"value": "x", "type": "work"}` | Must define `subAttributes` |
-
-### 2.4 Extension Attribute Characteristics
-
-| Characteristic | Required | Values | Default |
-|----------------|----------|--------|---------|
-| `name` | Yes | Any string | — |
-| `type` | Yes | See table above | — |
-| `multiValued` | Yes | `true` / `false` | — |
-| `required` | Yes | `true` / `false` | — |
-| `mutability` | Yes | `readOnly`, `readWrite`, `immutable`, `writeOnly` | — |
-| `returned` | Yes | `always`, `never`, `default`, `request` | — |
-| `caseExact` | Yes | `true` / `false` | — |
-| `uniqueness` | Yes | `none`, `server`, `global` | — |
-| `description` | No | Any string | — |
-| `referenceTypes` | No | Array of strings | — |
-| `subAttributes` | Only for `complex` | Array of attribute definitions | — |
-| `canonicalValues` | No | Array of strings | — |
-
-### 2.5 List Extensions for an Endpoint
-
-```bash
-curl -s "http://localhost:6000/admin/endpoints/${ENDPOINT_ID}/schemas" \
-  -H "Authorization: Bearer $TOKEN" | jq '.'
-```
-
-### 2.6 Remove an Extension
-
-```bash
-curl -X DELETE "http://localhost:6000/admin/endpoints/${ENDPOINT_ID}/schemas/urn:example:scim:schemas:extension:acme:2.0:User" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-> **⚠️ Warning**: Removing an extension does NOT remove the extension data from existing resources. The data remains in the JSONB payload but will no longer be validated or appear in discovery. See [Do's and Don'ts](#7-dos-and-donts) for guidance.
 
 ---
 
-## 3. Creating Custom Resource Types
+## 8. Required Extensions
 
-### 3.1 What is a Custom Resource Type?
+Setting `"required": true` in the resource type binding means **every** created resource of that type MUST include the extension data (when strict schema validation is on):
 
-A custom resource type lets you manage resources beyond the built-in User and Group. For example, `Device`, `Application`, `License`, or `AccessRequest`.
-
-### 3.2 Prerequisites
-
-The `CustomResourceTypesEnabled` capability is automatically derived when your profile includes custom resource types beyond User and Group (v0.28.0+). Alternatively, you can define custom resource types in the inline profile:
-
-```bash
-# Create an endpoint with a custom resource type in the profile
-curl -X POST "http://localhost:6000/scim/admin/endpoints" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "custom-endpoint",
-    "profile": {
-      "resourceTypes": [
-        { "id": "User", "name": "User", "endpoint": "/Users", "schema": "urn:ietf:params:scim:schemas:core:2.0:User" },
-        { "id": "Device", "name": "Device", "endpoint": "/Devices", "schema": "urn:custom:schemas:2.0:Device" }
-      ]
-    }
-  }'
+```json
+{
+  "schemaExtensions": [
+    { "schema": "urn:example:ext:onboarding:2.0:User", "required": true }
+  ]
+}
 ```
 
-### 3.3 Step-by-Step: Register a Custom Resource Type
+With `StrictSchemaValidation: "True"`, a `POST /Users` that omits the required extension's URN from `schemas[]` or omits required attributes within it will be rejected with `400`.
 
-**Step 1**: Create the core schema for your resource type
+> **Caution**: Required extensions are strict. Use sparingly — every resource of that type must include the extension data.
 
-```bash
-# First, register the schema that defines your resource type's attributes
-curl -X POST "http://localhost:6000/admin/endpoints/${ENDPOINT_ID}/schemas" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "schemaUrn": "urn:example:scim:schemas:core:2.0:Device",
-    "name": "Device",
-    "description": "Network device resource",
-    "attributes": [
+---
+
+## 9. Creating Custom Resource Types
+
+Custom resource types let you manage resources beyond User and Group (e.g., `Device`, `Application`, `License`).
+
+```json
+POST /scim/admin/endpoints
+{
+  "name": "with-devices",
+  "profile": {
+    "schemas": [
+      { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+      { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" },
       {
-        "name": "deviceName",
-        "type": "string",
-        "multiValued": false,
-        "required": true,
-        "mutability": "readWrite",
-        "returned": "default",
-        "caseExact": false,
-        "uniqueness": "server"
-      },
-      {
-        "name": "deviceType",
-        "type": "string",
-        "multiValued": false,
-        "required": true,
-        "mutability": "readWrite",
-        "returned": "default",
-        "caseExact": false,
-        "uniqueness": "none",
-        "canonicalValues": ["laptop", "desktop", "mobile", "server"]
-      },
-      {
-        "name": "serialNumber",
-        "type": "string",
-        "multiValued": false,
-        "required": false,
-        "mutability": "immutable",
-        "returned": "default",
-        "caseExact": true,
-        "uniqueness": "server"
-      },
-      {
-        "name": "assignedTo",
-        "type": "reference",
-        "multiValued": false,
-        "required": false,
-        "mutability": "readWrite",
-        "returned": "default",
-        "caseExact": false,
-        "uniqueness": "none",
-        "referenceTypes": ["User"]
-      },
-      {
-        "name": "metadata",
-        "type": "complex",
-        "multiValued": false,
-        "required": false,
-        "mutability": "readWrite",
-        "returned": "default",
-        "caseExact": false,
-        "uniqueness": "none",
-        "subAttributes": [
-          {
-            "name": "os",
-            "type": "string",
-            "multiValued": false,
-            "required": false,
-            "mutability": "readWrite",
-            "returned": "default",
-            "caseExact": false,
-            "uniqueness": "none"
-          },
-          {
-            "name": "lastSeen",
-            "type": "dateTime",
-            "multiValued": false,
-            "required": false,
-            "mutability": "readWrite",
-            "returned": "default",
-            "caseExact": false,
-            "uniqueness": "none"
-          }
+        "id": "urn:example:schemas:core:2.0:Device",
+        "name": "Device",
+        "description": "Network device schema",
+        "attributes": [
+          { "name": "deviceName",   "type": "string", "multiValued": false, "required": true,  "mutability": "readWrite", "returned": "default", "uniqueness": "server" },
+          { "name": "deviceType",   "type": "string", "multiValued": false, "required": true,  "mutability": "readWrite", "returned": "default",
+            "canonicalValues": ["laptop", "desktop", "mobile", "server"] },
+          { "name": "serialNumber", "type": "string", "multiValued": false, "required": false, "mutability": "immutable", "returned": "default", "caseExact": true, "uniqueness": "server" }
         ]
       }
+    ],
+    "resourceTypes": [
+      { "id": "User", "name": "User", "endpoint": "/Users", "description": "User",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:User", "schemaExtensions": [] },
+      { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] },
+      { "id": "Device", "name": "Device", "endpoint": "/Devices", "description": "Network Device",
+        "schema": "urn:example:schemas:core:2.0:Device", "schemaExtensions": [] }
     ]
-  }'
+  }
+}
 ```
 
-**Step 2**: Register the resource type
-
-```bash
-curl -X POST "http://localhost:6000/admin/endpoints/${ENDPOINT_ID}/resource-types" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Device",
-    "schemaUri": "urn:example:scim:schemas:core:2.0:Device",
-    "endpoint": "/Devices",
-    "description": "Network device resource type",
-    "schemaExtensions": []
-  }'
-```
-
-**Expected response**: `201 Created`
-
-**Step 3**: Verify via discovery
-
-```bash
-# Check /ResourceTypes
-curl -s "http://localhost:6000/endpoints/${ENDPOINT_ID}/ResourceTypes" \
-  -H "Authorization: Bearer $TOKEN" | jq '.Resources[] | select(.name == "Device")'
-```
-
-**Step 4**: Use SCIM CRUD on your custom resource type
-
-```bash
-# CREATE a device
-curl -X POST "http://localhost:6000/endpoints/${ENDPOINT_ID}/Devices" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/scim+json" \
-  -d '{
-    "schemas": ["urn:example:scim:schemas:core:2.0:Device"],
-    "deviceName": "MacBook Pro - Jane",
-    "deviceType": "laptop",
-    "serialNumber": "C02X123456",
-    "metadata": {
-      "os": "macOS 15.3",
-      "lastSeen": "2026-03-01T09:30:00Z"
-    }
-  }'
-
-# LIST devices
-curl -s "http://localhost:6000/endpoints/${ENDPOINT_ID}/Devices" \
-  -H "Authorization: Bearer $TOKEN" | jq '.Resources'
-
-# GET a specific device
-curl -s "http://localhost:6000/endpoints/${ENDPOINT_ID}/Devices/${DEVICE_ID}" \
-  -H "Authorization: Bearer $TOKEN"
-
-# PATCH a device
-curl -X PATCH "http://localhost:6000/endpoints/${ENDPOINT_ID}/Devices/${DEVICE_ID}" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/scim+json" \
-  -d '{
-    "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-    "Operations": [
-      {
-        "op": "replace",
-        "path": "metadata.os",
-        "value": "macOS 15.4"
-      }
-    ]
-  }'
-
-# REPLACE a device (PUT)
-curl -X PUT "http://localhost:6000/endpoints/${ENDPOINT_ID}/Devices/${DEVICE_ID}" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/scim+json" \
-  -d '{
-    "schemas": ["urn:example:scim:schemas:core:2.0:Device"],
-    "deviceName": "MacBook Pro - Jane (Updated)",
-    "deviceType": "laptop",
-    "serialNumber": "C02X123456",
-    "metadata": {
-      "os": "macOS 15.4",
-      "lastSeen": "2026-03-02T11:00:00Z"
-    }
-  }'
-
-# DELETE a device
-curl -X DELETE "http://localhost:6000/endpoints/${ENDPOINT_ID}/Devices/${DEVICE_ID}" \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### 3.4 Reserved Names and Paths
-
-You **cannot** use these names or paths for custom resource types:
-
-**Reserved Names** (case-sensitive):
-
-| Name | Reason |
-|------|--------|
-| `User` | Built-in resource type |
-| `Group` | Built-in resource type |
-
-**Reserved Paths** (case-sensitive):
+### Reserved Endpoint Paths
 
 | Path | Reason |
 |------|--------|
@@ -447,608 +479,612 @@ You **cannot** use these names or paths for custom resource types:
 | `/Bulk` | RFC bulk operations |
 | `/Me` | RFC delegated identity |
 
-### 3.5 Adding Extensions to Custom Resource Types
+> **Note**: `CustomResourceTypesEnabled` is automatically derived when your profile's `resourceTypes` includes types beyond User and Group. No flag to set.
+
+---
+
+## 10. Extensions on Custom Resource Types
 
 Custom resource types can also have schema extensions:
 
-```bash
-# Register an extension for the Device resource type
-curl -X POST "http://localhost:6000/admin/endpoints/${ENDPOINT_ID}/schemas" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "schemaUrn": "urn:example:scim:schemas:extension:warranty:2.0:Device",
-    "name": "DeviceWarranty",
-    "description": "Warranty information for devices",
-    "resourceTypeId": "Device",
-    "required": false,
-    "attributes": [
-      {
-        "name": "warrantyExpiry",
-        "type": "dateTime",
-        "multiValued": false,
-        "required": false,
-        "mutability": "readWrite",
-        "returned": "default",
-        "caseExact": false,
-        "uniqueness": "none"
-      },
-      {
-        "name": "warrantyType",
-        "type": "string",
-        "multiValued": false,
-        "required": false,
-        "mutability": "readWrite",
-        "returned": "default",
-        "caseExact": false,
-        "uniqueness": "none",
-        "canonicalValues": ["standard", "extended", "premium"]
-      }
-    ]
-  }'
+```json
+{
+  "schemas": [
+    { "id": "urn:example:schemas:core:2.0:Device", "name": "Device", "attributes": [
+      { "name": "deviceName", "type": "string", "multiValued": false, "required": true, "mutability": "readWrite", "returned": "default" }
+    ]},
+    { "id": "urn:example:ext:warranty:2.0:Device", "name": "WarrantyExtension", "attributes": [
+      { "name": "warrantyExpiry", "type": "dateTime", "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default" },
+      { "name": "warrantyType",   "type": "string",   "multiValued": false, "required": false, "mutability": "readWrite", "returned": "default",
+        "canonicalValues": ["standard", "extended", "premium"] }
+    ]}
+  ],
+  "resourceTypes": [
+    { "id": "Device", "name": "Device", "endpoint": "/Devices", "description": "Device",
+      "schema": "urn:example:schemas:core:2.0:Device",
+      "schemaExtensions": [{ "schema": "urn:example:ext:warranty:2.0:Device", "required": false }] }
+  ]
+}
 ```
 
 ---
 
-## 4. Configuring Schema Validation
+## 11. Adding Extensions to Existing Endpoints (PATCH)
 
-### 4.1 StrictSchemaValidation
+> **Important**: `schemas` and `resourceTypes` use **Replace** merge semantics. You must send the complete arrays — including all existing schemas/RTs plus the new extension.
 
-Controls whether the server validates inbound payloads against registered schema definitions.
-
-| Value | Behavior |
-|-------|----------|
-| `false` (default) | No schema validation — unknown attributes and extension URNs are accepted and stored as-is in JSONB |
-| `true` | Full validation — checks required attributes, types, mutability, unknown attributes, schemas[] array, immutable enforcement |
-
-```bash
-# Enable strict validation
-curl -X PATCH "http://localhost:6000/scim/admin/endpoints/${ENDPOINT_ID}" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "profile": {
-      "settings": {
-        "StrictSchemaValidation": "True"
+```json
+PATCH /scim/admin/endpoints/{id}
+{
+  "profile": {
+    "schemas": [
+      { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+      { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" },
+      {
+        "id": "urn:example:ext:new:2.0:User",
+        "name": "NewExtension",
+        "attributes": [
+          { "name": "newField", "type": "string", "multiValued": false, "required": false,
+            "mutability": "readWrite", "returned": "default" }
+        ]
       }
-    }
-  }'
-```
-
-**When strict mode is ON, these will be rejected:**
-
-```bash
-# ❌ Rejected: Unknown extension URN
-curl -X POST "http://localhost:6000/endpoints/${ENDPOINT_ID}/Users" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/scim+json" \
-  -d '{
-    "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User", "urn:unknown:ext"],
-    "userName": "test@example.com",
-    "urn:unknown:ext": { "foo": "bar" }
-  }'
-# → 400 Bad Request: "Unregistered schema URN: urn:unknown:ext"
-
-# ❌ Rejected: Missing schemas[] array
-curl -X POST "http://localhost:6000/endpoints/${ENDPOINT_ID}/Users" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/scim+json" \
-  -d '{ "userName": "test@example.com" }'
-# → 400 Bad Request: "Missing required attribute: schemas"
-
-# ❌ Rejected: readOnly attribute provided
-curl -X POST "http://localhost:6000/endpoints/${ENDPOINT_ID}/Users" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/scim+json" \
-  -d '{
-    "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
-    "userName": "test@example.com",
-    "id": "manually-set-id"
-  }'
-# → 400 Bad Request: "Attribute 'id' is readOnly and cannot be set by client"
-```
-
-### 4.2 AllowAndCoerceBooleanStrings
-
-Controls boolean string coercion (e.g., `"True"` → `true`):
-
-| Value | Behavior |
-|-------|----------|
-| `true` (default) | `"True"`, `"true"`, `"False"`, `"false"` strings are converted to booleans for schema-declared boolean attributes |
-| `false` | No coercion — `"True"` stays as string `"True"` |
-
-This is particularly important for Entra ID compatibility, which sometimes sends boolean values as strings.
-
-### 4.3 IgnoreReadOnlyAttributesInPatch
-
-Controls how readOnly attributes in PATCH operations are handled when strict mode is on:
-
-| Value | Behavior |
-|-------|----------|
-| `false` (default) | PATCH ops targeting readOnly attributes are **rejected** with 400 |
-| `true` | PATCH ops targeting readOnly attributes are **silently stripped** (removed from the operation list) |
-
-### 4.4 IncludeWarningAboutIgnoredReadOnlyAttribute
-
-Controls whether a warning is included when readOnly attributes are stripped:
-
-| Value | Behavior |
-|-------|----------|
-| `false` (default) | No warning |
-| `true` | Adds `urn:scimserver:api:messages:2.0:Warning` to the `schemas[]` array of write responses when readOnly attributes were stripped |
-
-### 4.5 Recommended Configuration Profiles
-
-#### Profile: Entra ID Compatible (Permissive)
-
-```json
-{
-  "profile": {
-    "settings": {
-      "StrictSchemaValidation": "False",
-      "AllowAndCoerceBooleanStrings": "True",
-      "IgnoreReadOnlyAttributesInPatch": "False",
-      "IncludeWarningAboutIgnoredReadOnlyAttribute": "False"
-    }
+    ],
+    "resourceTypes": [
+      { "id": "User", "name": "User", "endpoint": "/Users", "description": "User",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+        "schemaExtensions": [{ "schema": "urn:example:ext:new:2.0:User", "required": false }] },
+      { "id": "Group", "name": "Group", "endpoint": "/Groups", "description": "Group",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] }
+    ]
   }
 }
 ```
 
-> **Tip:** The `entra-id` preset already applies these defaults. You don't need to set them explicitly.
+**Structural integrity rule**: If you replace `schemas` without also including all resource types that reference those schemas, you'll get:
 
-#### Profile: Strict RFC Compliant
-
-```json
-{
-  "profile": {
-    "settings": {
-      "StrictSchemaValidation": "True",
-      "AllowAndCoerceBooleanStrings": "False",
-      "IgnoreReadOnlyAttributesInPatch": "False",
-      "IncludeWarningAboutIgnoredReadOnlyAttribute": "True"
-    }
-  }
-}
+```
+400: ResourceType "Group" references schema "urn:...Group" not in schemas array.
 ```
 
-#### Profile: Full-Featured (Extensions + Strict)
-
-```json
-{
-  "profile": {
-    "settings": {
-      "StrictSchemaValidation": "True",
-      "AllowAndCoerceBooleanStrings": "True",
-      "IgnoreReadOnlyAttributesInPatch": "True",
-      "IncludeWarningAboutIgnoredReadOnlyAttribute": "True"
-    }
-  }
-}
-```
-
-> **Note:** `CustomResourceTypesEnabled` is now derived from the profile's `resourceTypes` array (v0.28.0+). Include custom resource types in your profile to enable this capability.
+> **Settings and SPC are preserved**: Only schemas/resourceTypes are replaced. `serviceProviderConfig` and `settings` from the existing endpoint are preserved if not included in the PATCH body.
 
 ---
 
-## 5. PATCH Operations on Extension Attributes
+## 12. Using Extensions in SCIM Operations
 
-### 5.1 Path-Based PATCH
-
-Use URN-prefixed paths to target extension attributes:
+### Creating a User with Extension Data
 
 ```bash
-# Replace an extension attribute
-curl -X PATCH "http://localhost:6000/endpoints/${ENDPOINT_ID}/Users/${USER_ID}" \
+curl -X POST "http://localhost:6000/scim/endpoints/${ENDPOINT_ID}/Users" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/scim+json" \
   -d '{
-    "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-    "Operations": [
-      {
-        "op": "replace",
-        "path": "urn:example:scim:schemas:extension:acme:2.0:User:department",
-        "value": "Marketing"
-      }
-    ]
+    "schemas": [
+      "urn:ietf:params:scim:schemas:core:2.0:User",
+      "urn:example:ext:hr:2.0:User"
+    ],
+    "userName": "jane@example.com",
+    "displayName": "Jane Doe",
+    "active": true,
+    "emails": [{ "value": "jane@example.com", "type": "work", "primary": true }],
+    "urn:example:ext:hr:2.0:User": {
+      "badgeNumber": "B12345",
+      "costCenter": "Engineering",
+      "secretToken": "my-secret",
+      "tags": ["vip", "engineering"]
+    }
   }'
 ```
 
-### 5.2 No-Path Merge PATCH
+**Response** (201 Created):
+```json
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User", "urn:example:ext:hr:2.0:User"],
+  "id": "...",
+  "userName": "jane@example.com",
+  "displayName": "Jane Doe",
+  "active": true,
+  "urn:example:ext:hr:2.0:User": {
+    "badgeNumber": "B12345",
+    "costCenter": "Engineering",
+    "tags": ["vip", "engineering"]
+  },
+  "meta": { "resourceType": "User", "created": "...", "lastModified": "...", "location": "..." }
+}
+```
+
+> **Note**: `secretToken` is NOT in the response — it's `returned: "never"` / `mutability: "writeOnly"`.
+
+### Creating a Group with Extension Data
+
+```bash
+curl -X POST "http://localhost:6000/scim/endpoints/${ENDPOINT_ID}/Groups" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/scim+json" \
+  -d '{
+    "schemas": [
+      "urn:ietf:params:scim:schemas:core:2.0:Group",
+      "urn:example:ext:dept:2.0:Group"
+    ],
+    "displayName": "Engineering Team",
+    "urn:example:ext:dept:2.0:Group": {
+      "department": "Engineering",
+      "costCode": "ENG-001"
+    }
+  }'
+```
+
+### Extension Data on GET
+
+Extension data roundtrips through GET — both single-resource and list responses. `schemas[]` is built dynamically from visible extension URN keys:
+
+```json
+GET /scim/endpoints/{endpointId}/Users/{userId}
+
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User", "urn:example:ext:hr:2.0:User"],
+  "id": "...",
+  "userName": "jane@example.com",
+  "urn:example:ext:hr:2.0:User": {
+    "badgeNumber": "B12345",
+    "costCenter": "Engineering",
+    "tags": ["vip", "engineering"]
+  },
+  "meta": { ... }
+}
+```
+
+---
+
+## 13. PATCH Operations on Extension Attributes
+
+### 13.1 No-Path Merge PATCH
 
 Merge an entire extension block without specifying paths:
 
-```bash
-curl -X PATCH "http://localhost:6000/endpoints/${ENDPOINT_ID}/Users/${USER_ID}" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/scim+json" \
-  -d '{
-    "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-    "Operations": [
-      {
-        "op": "add",
-        "value": {
-          "urn:example:scim:schemas:extension:acme:2.0:User": {
-            "department": "Marketing",
-            "floor": 5
-          }
+```json
+PATCH /scim/endpoints/{endpointId}/Users/{userId}
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    {
+      "op": "replace",
+      "value": {
+        "urn:example:ext:hr:2.0:User": {
+          "badgeNumber": "B99999",
+          "costCenter": "Sales"
         }
       }
-    ]
-  }'
+    }
+  ]
+}
 ```
 
-### 5.3 Multi-Valued Extension Attribute PATCH
+### 13.2 URN-Prefixed Path PATCH
 
-```bash
-# Add a badge to the multi-valued badges array
-curl -X PATCH "http://localhost:6000/endpoints/${ENDPOINT_ID}/Users/${USER_ID}" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/scim+json" \
-  -d '{
-    "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-    "Operations": [
-      {
-        "op": "add",
-        "path": "urn:example:scim:schemas:extension:acme:2.0:User:badges",
-        "value": [
-          { "badgeId": "SEC-002", "level": "admin" }
-        ]
-      }
-    ]
-  }'
-```
-
-### 5.4 Remove Extension Data
-
-```bash
-# Remove the entire extension block
-curl -X PATCH "http://localhost:6000/endpoints/${ENDPOINT_ID}/Users/${USER_ID}" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/scim+json" \
-  -d '{
-    "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-    "Operations": [
-      {
-        "op": "remove",
-        "path": "urn:example:scim:schemas:extension:acme:2.0:User"
-      }
-    ]
-  }'
-```
-
----
-
-## 6. Discovery Verification Checklist
-
-After making schema changes, verify the following:
-
-### 6.1 Extension Registration Verification
-
-```bash
-# ✅ 1. Extension appears in /Schemas
-curl -s "http://localhost:6000/endpoints/${ENDPOINT_ID}/Schemas" \
-  -H "Authorization: Bearer $TOKEN" \
-  | jq '[.Resources[].id]'
-# Should include your extension URN
-
-# ✅ 2. Extension details are correct
-curl -s "http://localhost:6000/endpoints/${ENDPOINT_ID}/Schemas/urn:example:scim:schemas:extension:acme:2.0:User" \
-  -H "Authorization: Bearer $TOKEN" \
-  | jq '{name, attributes: [.attributes[].name]}'
-
-# ✅ 3. ResourceType shows extension in schemaExtensions[]
-curl -s "http://localhost:6000/endpoints/${ENDPOINT_ID}/ResourceTypes/User" \
-  -H "Authorization: Bearer $TOKEN" \
-  | jq '.schemaExtensions'
-# Should include {"schema": "urn:...acme:2.0:User", "required": false}
-
-# ✅ 4. Resources with extension data include URN in schemas[]
-curl -s "http://localhost:6000/endpoints/${ENDPOINT_ID}/Users/${USER_ID}" \
-  -H "Authorization: Bearer $TOKEN" \
-  | jq '.schemas'
-# Should include your extension URN if extension data is present
-```
-
-### 6.2 Custom Resource Type Verification
-
-```bash
-# ✅ 1. ResourceType appears in /ResourceTypes
-curl -s "http://localhost:6000/endpoints/${ENDPOINT_ID}/ResourceTypes" \
-  -H "Authorization: Bearer $TOKEN" \
-  | jq '.Resources[] | select(.name == "Device")'
-
-# ✅ 2. CRUD works on the custom endpoint
-curl -s "http://localhost:6000/endpoints/${ENDPOINT_ID}/Devices" \
-  -H "Authorization: Bearer $TOKEN" \
-  | jq '.totalResults'
-
-# ✅ 3. Schema appears in /Schemas
-curl -s "http://localhost:6000/endpoints/${ENDPOINT_ID}/Schemas/urn:example:scim:schemas:core:2.0:Device" \
-  -H "Authorization: Bearer $TOKEN" \
-  | jq '.name'
-```
-
----
-
-## 7. Do's and Don'ts
-
-### ✅ DO
-
-| Practice | Reason |
-|----------|--------|
-| **DO use unique URN identifiers** | URN collisions cause unpredictable behavior. Use your organization's domain: `urn:acme:scim:schemas:extension:...` |
-| **DO register the extension schema BEFORE creating resources** | Ensures correct validation and discovery from the start |
-| **DO include all attribute characteristics** | Every attribute needs `type`, `mutability`, `returned`, `required`, `multiValued`, `caseExact`, `uniqueness` |
-| **DO verify discovery after registration** | Confirm `/Schemas` and `/ResourceTypes` reflect your changes |
-| **DO use `StrictSchemaValidation: true` in production** | Catches malformed payloads early; prevents data quality issues |
-| **DO version extension URNs** | When changing extension structure, create a new version: `acme:3.0:User` |
-| **DO test PATCH operations with extension paths** | URN-prefixed paths have specific syntax that must be tested |
-| **DO define `subAttributes` for complex types** | Required for the validator to check nested objects |
-| **DO persist schema customizations** | Use Prisma (PostgreSQL) backend; InMemory mode loses changes on restart |
-| **DO register the core schema first when creating custom resource types** | The resource type needs a `schemaUri` that points to an existing schema |
-
-### ❌ DON'T
-
-| Anti-Pattern | Consequence |
-|--------------|-------------|
-| **DON'T try to override core schemas** | `urn:...core:2.0:User` and `urn:...core:2.0:Group` are protected — registration will fail |
-| **DON'T remove extensions with live data** | Extension data remains in resources but becomes invisible to discovery and validation |
-| **DON'T change extension attribute characteristics after deployment** | Changing `type`, `mutability`, or `returned` breaks existing clients. Version the URN instead |
-| **DON'T use reserved names for custom resource types** | `User`, `Group` will be rejected |
-| **DON'T use reserved endpoint paths** | `/Users`, `/Groups`, `/Schemas`, etc. will be rejected |
-| **DON'T rely on schemas[] auto-building with strict mode** | With `StrictSchemaValidation: true`, missing `schemas[]` is a 400 error |
-| **DON'T mix InMemory and Prisma for schema registration** | InMemory loses registrations on restart; Prisma persists them |
-| **DON'T create extensions with empty attributes arrays** | While technically allowed, an extension with no attributes adds no value |
-| **DON'T set `required: true` on extensions unless needed** | Required extensions must be present on ALL resources of that type — this is strict |
-| **DON'T forget to enable `CustomResourceTypesEnabled` before registering custom types** | Registration will fail with 400 |
-
----
-
-## 8. Troubleshooting
-
-### 8.1 Common Errors
-
-| Error | Cause | Fix |
-|-------|-------|-----|
-| `400: Cannot overwrite core schema` | Tried to register with a core schema URN | Use a custom URN, not `urn:...core:2.0:User` |
-| `400: Schema already registered` | Duplicate URN for this endpoint | Delete the existing schema first, or use a different URN |
-| `400: Custom resource types are not enabled` | `CustomResourceTypesEnabled` is `false` | Enable the flag on the endpoint config |
-| `400: Reserved resource type name` | Used `User` or `Group` as custom RT name | Choose a different name |
-| `400: Reserved endpoint path` | Used `/Users`, `/Groups`, etc. as custom RT path | Choose a different path (e.g., `/Devices`) |
-| `404: Endpoint not found` | Invalid `endpointId` | Check endpoint exists via `GET /admin/endpoints` |
-| `400: Unregistered schema URN` (strict mode) | Extension URN in body not registered | Register the extension first, or disable `StrictSchemaValidation` |
-| `400: Missing required attribute: schemas` (strict mode) | No `schemas[]` in POST/PUT body | Include the `schemas` array with correct URNs |
-
-### 8.2 Extension Data Orphaned After Removal
-
-If you remove an extension and then GET a resource that has extension data:
-
-- **With `StrictSchemaValidation: false`**: The extension data is still in the JSONB payload and will be returned (extension URN will NOT appear in `schemas[]`)
-- **With `StrictSchemaValidation: true`**: The extension data is still stored but the URN won't be in `schemas[]`; subsequent PUTs with the unknown URN will be rejected
-
-**Resolution**: If you need to clean up orphaned data, write a migration script to remove the extension keys from affected resources.
-
-### 8.3 InMemory Mode and Persistence
-
-Schema registrations in InMemory mode are **volatile**:
-
-- ✅ `onModuleInit()` re-hydrates from DB (but InMemory DB is also empty on startup)
-- ❌ Registrations are lost on server restart
-- ✅ Built-in schemas (User, Group, Enterprise, msfttest) are always available
-
-**Recommendation**: Use Prisma (PostgreSQL) backend for any environment where schema customizations matter.
-
----
-
-## 9. Advanced: Extension Schema Template
-
-Here is a complete, production-ready extension template you can customize:
+Target a single extension attribute with a URN-prefixed path:
 
 ```json
 {
-  "schemaUrn": "urn:YOUR_ORG:scim:schemas:extension:YOUR_EXT:2.0:User",
-  "name": "YourExtensionName",
-  "description": "Description of what this extension adds",
-  "resourceTypeId": "User",
-  "required": false,
-  "attributes": [
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
     {
-      "name": "simpleString",
-      "type": "string",
-      "multiValued": false,
-      "required": false,
-      "mutability": "readWrite",
-      "returned": "default",
-      "caseExact": false,
-      "uniqueness": "none",
-      "description": "A simple string attribute"
-    },
+      "op": "replace",
+      "path": "urn:example:ext:hr:2.0:User:costCenter",
+      "value": "Marketing"
+    }
+  ]
+}
+```
+
+### 13.3 Add to Multi-Valued Extension Array
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
     {
-      "name": "requiredField",
-      "type": "string",
-      "multiValued": false,
-      "required": true,
-      "mutability": "readWrite",
-      "returned": "default",
-      "caseExact": false,
-      "uniqueness": "none",
-      "description": "This field must be provided on create"
-    },
-    {
-      "name": "immutableId",
-      "type": "string",
-      "multiValued": false,
-      "required": false,
-      "mutability": "immutable",
-      "returned": "default",
-      "caseExact": true,
-      "uniqueness": "server",
-      "description": "Set once on create, cannot be changed"
-    },
-    {
-      "name": "writeOnlySecret",
-      "type": "string",
-      "multiValued": false,
-      "required": false,
-      "mutability": "writeOnly",
-      "returned": "never",
-      "caseExact": false,
-      "uniqueness": "none",
-      "description": "Write-only field — never returned in responses"
-    },
-    {
-      "name": "serverManaged",
-      "type": "dateTime",
-      "multiValued": false,
-      "required": false,
-      "mutability": "readOnly",
-      "returned": "default",
-      "caseExact": false,
-      "uniqueness": "none",
-      "description": "Server-managed field — client values ignored"
-    },
-    {
-      "name": "requestOnly",
-      "type": "string",
-      "multiValued": false,
-      "required": false,
-      "mutability": "readWrite",
-      "returned": "request",
-      "caseExact": false,
-      "uniqueness": "none",
-      "description": "Only returned when explicitly requested via ?attributes="
-    },
-    {
-      "name": "tags",
-      "type": "string",
-      "multiValued": true,
-      "required": false,
-      "mutability": "readWrite",
-      "returned": "default",
-      "caseExact": false,
-      "uniqueness": "none",
-      "description": "Array of string tags"
-    },
-    {
-      "name": "address",
-      "type": "complex",
-      "multiValued": false,
-      "required": false,
-      "mutability": "readWrite",
-      "returned": "default",
-      "caseExact": false,
-      "uniqueness": "none",
-      "description": "Complex single-valued attribute",
-      "subAttributes": [
-        {
-          "name": "street",
-          "type": "string",
-          "multiValued": false,
-          "required": false,
-          "mutability": "readWrite",
-          "returned": "default",
-          "caseExact": false,
-          "uniqueness": "none"
-        },
-        {
-          "name": "city",
-          "type": "string",
-          "multiValued": false,
-          "required": true,
-          "mutability": "readWrite",
-          "returned": "default",
-          "caseExact": false,
-          "uniqueness": "none"
-        }
-      ]
-    },
-    {
-      "name": "contacts",
-      "type": "complex",
-      "multiValued": true,
-      "required": false,
-      "mutability": "readWrite",
-      "returned": "default",
-      "caseExact": false,
-      "uniqueness": "none",
-      "description": "Multi-valued complex attribute",
-      "subAttributes": [
-        {
-          "name": "value",
-          "type": "string",
-          "multiValued": false,
-          "required": true,
-          "mutability": "readWrite",
-          "returned": "default",
-          "caseExact": false,
-          "uniqueness": "none"
-        },
-        {
-          "name": "type",
-          "type": "string",
-          "multiValued": false,
-          "required": false,
-          "mutability": "readWrite",
-          "returned": "default",
-          "caseExact": false,
-          "uniqueness": "none",
-          "canonicalValues": ["work", "home", "other"]
-        },
-        {
-          "name": "primary",
-          "type": "boolean",
-          "multiValued": false,
-          "required": false,
-          "mutability": "readWrite",
-          "returned": "default",
-          "caseExact": false,
-          "uniqueness": "none"
-        }
+      "op": "add",
+      "path": "urn:example:ext:identity:2.0:User:badges",
+      "value": [
+        { "badgeId": "SEC-003", "level": "admin" }
       ]
     }
   ]
 }
 ```
 
-This template demonstrates every attribute type, mutability, returned characteristic, and complex/multi-valued combination.
+### 13.4 Remove Extension Data
+
+Remove specific attribute:
+
+```json
+{
+  "op": "remove",
+  "path": "urn:example:ext:hr:2.0:User:costCenter"
+}
+```
+
+Remove entire extension block:
+
+```json
+{
+  "op": "remove",
+  "path": "urn:example:ext:hr:2.0:User"
+}
+```
+
+### 13.5 PATCH Path Resolution
+
+```mermaid
+flowchart TD
+    Path["PATCH path string"] --> IsExtPath{"starts with urn: ?"}
+    IsExtPath -->|Yes| ParseExt["parseExtensionPath → { schemaUrn, attrPath }"]
+    IsExtPath -->|No| IsVP{"contains [ ] ?"}
+    IsVP -->|Yes| ParseVP["parseValuePath → filter-based update"]
+    IsVP -->|No| Simple["simple attribute path"]
+    ParseExt --> Apply[Apply to extension block in rawPayload]
+    ParseVP --> Apply
+    Simple --> Apply
+```
+
+> **VerbosePatchSupported**: When `true`, dot-notation paths (e.g., `name.givenName`) are resolved as nested attribute paths. When `false`, they're treated as literal top-level keys.
 
 ---
 
-## 10. Quick Reference Card
+## 14. Schema Validation & Config Flags
 
-### Admin API Endpoints
+### Validation Modes
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| `POST` | `/admin/endpoints/:id/schemas` | Register extension schema |
-| `GET` | `/admin/endpoints/:id/schemas` | List all extension schemas |
-| `GET` | `/admin/endpoints/:id/schemas/:urn` | Get specific extension schema |
-| `DELETE` | `/admin/endpoints/:id/schemas/:urn` | Remove extension schema |
-| `POST` | `/admin/endpoints/:id/resource-types` | Register custom resource type |
-| `GET` | `/admin/endpoints/:id/resource-types` | List custom resource types |
-| `GET` | `/admin/endpoints/:id/resource-types/:name` | Get specific custom resource type |
-| `DELETE` | `/admin/endpoints/:id/resource-types/:name` | Remove custom resource type |
+| Flag | Default | Effect |
+|------|---------|--------|
+| `StrictSchemaValidation` | `true` (entra-id preset) | Full validation: types, required, unknowns, schemas[] array, canonical values |
+| *(flag off)* | — | Required-only validation: just checks required attributes exist |
 
-### Discovery Endpoints
+### What Strict Validation Checks
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| `GET` | `/endpoints/:id/Schemas` | List all available schemas (no auth) |
-| `GET` | `/endpoints/:id/Schemas/:urn` | Get specific schema (no auth) |
-| `GET` | `/endpoints/:id/ResourceTypes` | List all resource types (no auth) |
-| `GET` | `/endpoints/:id/ResourceTypes/:id` | Get specific resource type (no auth) |
-| `GET` | `/endpoints/:id/ServiceProviderConfig` | Server capabilities (no auth) |
+| Check | RFC Section | Error |
+|-------|------------|-------|
+| Each `schemas[]` entry is a registered URN | §7 | `Unregistered schema URN: ...` |
+| Extension URN keys present in `schemas[]` | §3.1 | `Extension URN ... not declared in schemas[]` |
+| Required attributes present | §2.2 | `Missing required attribute: ...` |
+| Attribute types match schema | §2.3 | `Attribute ... expected type ... got ...` |
+| readOnly attributes rejected on create | §2.2 | `Attribute ... is readOnly` |
+| Unknown attributes rejected | §2.1 | `Unknown attribute: ...` |
+| dateTime format valid | §2.3.5 | `Invalid dateTime format` |
+| Canonical values enforced | §7 | `Value ... not in canonicalValues` |
+| Multi-valued must be array | §2.4 | `Expected array for multi-valued attribute ...` |
+| Sub-attribute validation | §2.4 | Per-sub-attribute type/required checks |
 
-### Config Flags Quick Reference
+### Related Config Flags
 
-| Flag | Default | Key Effect |
-|------|---------|-----|
-| `StrictSchemaValidation` | `false` | Full schema validation on writes |
-| `CustomResourceTypesEnabled` | `false` | Enables custom resource type registration |
-| `AllowAndCoerceBooleanStrings` | `true` | Boolean string coercion |
-| `IgnoreReadOnlyAttributesInPatch` | `false` | Strip vs reject readOnly in PATCH |
-| `IncludeWarningAboutIgnoredReadOnlyAttribute` | `false` | Warning URN in responses |
+| Flag | Default | Interaction with Schema Validation |
+|------|---------|-------------------------------------|
+| `AllowAndCoerceBooleanStrings` | `true` | Converts `"True"`/`"False"` to booleans before validation |
+| `IgnoreReadOnlyAttributesInPatch` | `false` | Strip (don't reject) readOnly PATCH ops when strict is on |
+| `IncludeWarningAboutIgnoredReadOnlyAttribute` | `false` | Adds warning URN to response when readOnly attrs stripped |
+
+### What Lenient Mode (StrictSchemaValidation OFF) Does
+
+- **Required-only validation:** Checks that required attributes exist
+- **Unknown attributes:** Accepted and stored as-is in JSONB
+- **Extension URNs:** Not validated against registered schemas
+- **Type/canonical checks:** Skipped
 
 ---
 
-*Last updated: March 2, 2026*
+## 15. Discovery Verification
+
+After creating an endpoint with extensions, verify through the discovery endpoints:
+
+### Extension in /Schemas
+
+```bash
+curl -s "http://localhost:6000/scim/endpoints/${ENDPOINT_ID}/Schemas" \
+  -H "Authorization: Bearer $TOKEN" | jq '[.Resources[].id]'
+```
+
+Should include your extension URN alongside core schemas.
+
+### Extension details
+
+```bash
+curl -s "http://localhost:6000/scim/endpoints/${ENDPOINT_ID}/Schemas/urn:example:ext:hr:2.0:User" \
+  -H "Authorization: Bearer $TOKEN" | jq '{name, attributes: [.attributes[].name]}'
+```
+
+### ResourceType shows extension binding
+
+```bash
+curl -s "http://localhost:6000/scim/endpoints/${ENDPOINT_ID}/ResourceTypes" \
+  -H "Authorization: Bearer $TOKEN" | jq '.Resources[] | select(.name == "User") | .schemaExtensions'
+```
+
+### Cross-endpoint isolation
+
+Extensions on endpoint A **never** appear in endpoint B's discovery or affect endpoint B's validation — even if they share the same server.
+
+> **All discovery endpoints are unauthenticated** (`@Public()` decorator) per RFC 7644 §4. They require no bearer token.
+
+---
+
+## 16. Extension Attribute Reference
+
+### Attribute Types
+
+| Type | JSON Type | Example Value | Notes |
+|------|-----------|---------------|-------|
+| `string` | String | `"Engineering"` | Default type |
+| `boolean` | Boolean | `true` | `true`/`false` only |
+| `integer` | Number | `42` | `Number.isInteger()` check |
+| `decimal` | Number | `3.14` | Any numeric |
+| `dateTime` | String | `"2026-03-01T10:00:00Z"` | xsd:dateTime format |
+| `reference` | String | `"https://example.com/Users/abc"` | URI reference |
+| `binary` | String | `"dGVzdA=="` | Base64-encoded |
+| `complex` | Object | `{"value": "x", "type": "work"}` | Must define `subAttributes` |
+
+### Attribute Characteristics
+
+| Characteristic | Required | Values | Default when omitted |
+|----------------|----------|--------|---------------------|
+| `name` | Yes | Any string | — |
+| `type` | Yes | See table above | — |
+| `multiValued` | Yes | `true` / `false` | — |
+| `required` | Yes | `true` / `false` | — |
+| `mutability` | Recommended | `readOnly` · `readWrite` · `immutable` · `writeOnly` | `readWrite` |
+| `returned` | Recommended | `always` · `never` · `default` · `request` | `default` |
+| `caseExact` | No | `true` / `false` | `false` |
+| `uniqueness` | No | `none` · `server` · `global` | `none` |
+| `description` | No | Any string | — |
+| `referenceTypes` | No | Array of strings | — |
+| `subAttributes` | Only for `complex` | Array of attribute definitions | — |
+| `canonicalValues` | No | Array of strings | — |
+
+### Mutability × Returned Matrix
+
+| Mutability | Behavior on Create | Behavior on Update | Returned in GET |
+|------------|--------------------|--------------------|-----------------|
+| `readWrite` | Accept | Accept | Per `returned` setting |
+| `readOnly` | Reject (or strip) | Reject (or strip) | Always (if data exists) |
+| `immutable` | Accept | Reject if changed (H-2) | Per `returned` setting |
+| `writeOnly` | Accept | Accept | Never (even if `returned: "default"`) |
+
+| Returned | Behavior |
+|----------|----------|
+| `always` | Always in response |
+| `default` | In response unless excluded by `excludedAttributes` |
+| `request` | Only when explicitly requested via `?attributes=` |
+| `never` | Never in response (same as `writeOnly`) |
+
+### Characteristic Enforcement in Extension Attributes
+
+The server enforces **all** attribute characteristics on extension attributes identically to core attributes:
+
+- **`returned: "never"`** → stripped from all response payloads via `stripNeverReturnedFromPayload()`
+- **`mutability: "writeOnly"`** → also treated as never-returned (source: `schema-validator-cache.ts`)
+- **`mutability: "immutable"`** → enforced via `checkImmutable()` on PUT/PATCH (H-2)
+- **`uniqueness: "server"`** → enforced via `assertSchemaUniqueness()` using `caseExact` from schema
+- **`caseExact: true`** → exact-match comparison in uniqueness checks
+- **`canonicalValues`** → validated in strict mode (V10)
+
+---
+
+## 17. Profile Expansion Pipeline
+
+### End-to-End Flow
+
+```mermaid
+flowchart TD
+    A[ShorthandProfileInput] --> B["expandProfile()"]
+    B --> B1["'all' → Full RFC attributes"]
+    B --> B2["Partial[] → merge with baseline"]
+    B --> B3["Custom schema → passthrough"]
+    B --> C["Auto-inject required attrs"]
+    C --> C1["id, userName/displayName"]
+    C --> C2["externalId, meta"]
+    C --> C3["active (Group only)"]
+    C --> D["SPC defaults filled"]
+    D --> E["runTightenOnlyValidation"]
+    E --> F["validateSpcTruthfulness"]
+    F --> G["validateStructure"]
+    G -->|errors| H["{ valid: false, errors[] }"]
+    G -->|OK| I["{ valid: true, profile: EndpointProfile }"]
+```
+
+### Tighten-Only Rules (Core Schemas Only)
+
+When operators override attributes on RFC schemas, changes must be same-or-tighter:
+
+| Characteristic | Allowed | Rejected |
+|----------------|---------|----------|
+| `type` | No change | Any change |
+| `multiValued` | No change | Any change |
+| `required` | `false → true` | `true → false` |
+| `mutability` | `readWrite → immutable → readOnly` | Any loosening |
+| `uniqueness` | `none → server → global` | Any loosening |
+| `caseExact` | `false → true` | `true → false` |
+| `returned` | Cannot change `never` | Loosening `never` |
+
+> **Custom schemas (non-RFC URNs)** have no baseline — tighten-only validation is skipped; attributes are used as-is.
+
+### SPC Truthfulness Rules
+
+| Capability | Constraint |
+|------------|-----------|
+| `changePassword.supported` | Must be `false` (not implemented) |
+| `filter.maxResults` | 1 – 10,000 |
+| All others | Any valid boolean |
+
+### Structural Validation
+
+| Check | Error Code |
+|-------|-----------|
+| At least 1 schema | `MISSING_SCHEMAS` |
+| At least 1 resource type | `MISSING_RESOURCE_TYPES` |
+| RT core schema exists in schemas[] | `RT_MISSING_SCHEMA` |
+| RT extension schema exists in schemas[] | `RT_MISSING_EXTENSION_SCHEMA` |
+| No duplicate schema IDs | `DUPLICATE_SCHEMA` |
+| No duplicate RT IDs/names | `DUPLICATE_RT` |
+
+---
+
+## 18. Do's and Don'ts
+
+### ✅ DO
+
+| Practice | Reason |
+|----------|--------|
+| Define **all** extension schemas in one profile at creation time | Avoids PATCH replace-all complexity |
+| Use unique URN identifiers with your org domain | `urn:acme:scim:extension:...` avoids collisions |
+| Include all attribute characteristics | Ensures correct validation, filtering, response projection |
+| Use `"attributes": "all"` for core schemas | Gets the full RFC baseline without hand-listing attributes |
+| Verify discovery after creation | Confirm `/Schemas` and `/ResourceTypes` reflect your extensions |
+| Use `StrictSchemaValidation: "True"` in production | Catches malformed payloads early |
+| Define `subAttributes` for complex types | Required for nested object validation |
+| Use Prisma (PostgreSQL) for persistent deployments | InMemory mode loses all data on restart |
+| Send `schemas` + `resourceTypes` together on PATCH | Replace semantics — orphaned references get rejected |
+| Test PATCH operations with URN-prefixed paths | Extension paths have specific syntax |
+
+### ❌ DON'T
+
+| Anti-Pattern | Consequence |
+|--------------|-------------|
+| Use `"attributes": "all"` on custom schemas | Only works for known RFC schemas — custom schemas have no baseline |
+| Try to override `type` or `multiValued` on core schemas | Tighten-only validation rejects this |
+| Omit `schemas[]` from SCIM payloads when strict is on | `400: Missing required attribute: schemas` |
+| Use non-`urn:` prefixes for extension IDs | Server detects extensions by `urn:` prefix on payload keys |
+| Send only `schemas` without `resourceTypes` in PATCH | `400: ResourceType "X" references schema not in schemas array` |
+| Create extensions with empty attributes arrays | Technically valid but adds no value |
+| Set `required: true` on extensions unless needed | Every resource must include the extension data |
+| Change attribute characteristics after deployment | Changes to `type`, `mutability`, `returned` break existing clients |
+| Claim `changePassword.supported: true` in SPC | Not implemented — rejected by SPC truthfulness validation |
+| Set `filter.maxResults` > 10,000 or < 1 | SPC validation rejects out-of-range values |
+
+---
+
+## 19. Troubleshooting
+
+### Common Errors
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `400: RT_MISSING_EXTENSION_SCHEMA` | Extension URN in `resourceTypes[].schemaExtensions` doesn't match any schema in `schemas[]` | Add the extension schema definition to `schemas[]` |
+| `400: DUPLICATE_SCHEMA` | Two schemas with the same `id` | Use unique URNs |
+| `400: TIGHTEN_ONLY_VIOLATION` | Tried to loosen a core schema attribute (e.g., `readOnly → readWrite`) | Only same-or-tighter overrides allowed |
+| `400: SPC_UNIMPLEMENTED` | Claimed `changePassword.supported: true` | Set to `false` |
+| `400: SPC_INVALID_VALUE` | `filter.maxResults` out of [1, 10000] | Use a value within range |
+| `400: Cannot use "attributes": "all"` | Used `"all"` on a custom schema URN that has no RFC baseline | Provide full attribute definitions inline |
+| `400: Unregistered schema URN: ...` (strict mode) | Extension URN in SCIM payload not registered for this endpoint | Register the extension in the endpoint profile, or disable strict mode |
+| `400: Extension URN ... not declared in schemas[]` (strict mode) | Extension data present but URN not listed in payload's `schemas[]` | Add the URN to the `schemas[]` array in the request body |
+| `400: Unknown attribute: ...` (strict mode) | Attribute not defined in any registered schema for the resource type | Add the attribute to the extension schema, or disable strict mode |
+| `400: Attribute '...' is readOnly` (strict mode) | Tried to set a readOnly attribute on create/PUT | Remove the attribute from the payload |
+| `400: ResourceType "..." references schema "..." not in schemas array` | PATCH replaced schemas without including all RT-referenced schemas | Send both `schemas` and `resourceTypes` together |
+| `409: Conflict — uniqueness violation` | Extension attribute with `uniqueness: "server"` has a duplicate value | Use a unique value for that attribute |
+
+### Extension Data After Schema Removal
+
+If you remove an extension from the profile (via PATCH replacing schemas/RTs) but resources already have extension data stored:
+
+- **Data persists** in `rawPayload` JSONB
+- **Discovery** no longer shows the extension
+- **Response**: Extension data may still appear in GET responses (from stored rawPayload) but the URN won't be in `schemas[]`
+- **Strict mode**: Subsequent PUTs with the removed URN will be rejected as unknown
+
+### InMemory vs Prisma
+
+| | InMemory | Prisma (PostgreSQL) |
+|---|---|---|
+| Endpoint/profile persistence | ❌ Lost on restart | ✅ Persisted |
+| Extension data persistence | ❌ Lost on restart | ✅ Persisted |
+| Use case | Development/testing | Production |
+
+---
+
+## 20. Quick Reference Card
+
+### Endpoint Creation Patterns
+
+| Pattern | Method | Body |
+|---------|--------|------|
+| Preset | `POST /scim/admin/endpoints` | `{ "name": "x", "profilePreset": "rfc-standard" }` |
+| Inline with extension | `POST /scim/admin/endpoints` | `{ "name": "x", "profile": { schemas, resourceTypes, spc } }` |
+| Default (no profile) | `POST /scim/admin/endpoints` | `{ "name": "x" }` → entra-id preset |
+| Add extension to existing | `PATCH /scim/admin/endpoints/:id` | `{ "profile": { schemas, resourceTypes } }` |
+
+### Built-In Presets
+
+| Preset | User | Group | Extensions | Key Settings |
+|--------|------|-------|------------|--------------|
+| `entra-id` **(default)** | Full | Yes | EnterpriseUser + msfttest | Strict+Coerce+Verbose+MultiMember |
+| `entra-id-minimal` | Minimal | Yes | EnterpriseUser + msfttest | Same as entra-id |
+| `rfc-standard` | Full | Yes | EnterpriseUser | All defaults |
+| `minimal` | Bare min | Yes | None | All defaults |
+| `user-only` | Full | No | EnterpriseUser | All defaults |
+| `user-only-with-custom-ext` | Core | No | EnterpriseUser + custom (writeOnly attrs) | All defaults |
+
+### Extension Data End-to-End Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Server
+    participant DB
+
+    Note over Client,DB: 1. Create endpoint with extension
+    Client->>Server: POST /admin/endpoints { profile: { schemas[ext], RTs[ext] } }
+    Server->>DB: Store endpoint with expanded profile
+
+    Note over Client,DB: 2. Create user with extension
+    Client->>Server: POST /Users { schemas: [core, ext], [extUrn]: { attrs } }
+    Server->>Server: enforceStrictSchemaValidation()
+    Server->>Server: validatePayloadSchema() — type/required/unknown checks
+    Server->>Server: stripReadOnlyAttributes()
+    Server->>Server: extractAdditionalAttributes() — ext stays in rawPayload
+    Server->>DB: Store rawPayload (JSON with ext data)
+
+    Note over Client,DB: 3. GET user
+    Client->>Server: GET /Users/{id}
+    Server->>DB: Fetch rawPayload
+    Server->>Server: stripNeverReturnedFromPayload() — remove writeOnly/never
+    Server->>Server: Build schemas[] from visible extension URN keys
+    Server->>Client: { schemas: [core, ext], [extUrn]: { visible attrs }, ... }
+```
+
+### Discovery Endpoints (All @Public, No Auth Required)
+
+| Endpoint | What It Shows |
+|----------|---------------|
+| `GET /scim/endpoints/{id}/Schemas` | All schema definitions including extensions |
+| `GET /scim/endpoints/{id}/Schemas/{urn}` | Single schema by URN |
+| `GET /scim/endpoints/{id}/ResourceTypes` | Resource types with `schemaExtensions[]` bindings |
+| `GET /scim/endpoints/{id}/ServiceProviderConfig` | Server capabilities |
+
+### One-Click Examples
+
+12 ready-to-paste endpoint creation examples with all extension combinations are available in:
+[examples/endpoint/create-endpoint-with-custom-extensions.json](examples/endpoint/create-endpoint-with-custom-extensions.json)
+
+---
+
+### Source Files
+
+| File | Purpose |
+|------|---------|
+| `src/modules/scim/endpoint-profile/endpoint-profile.types.ts` | Profile interfaces & types |
+| `src/modules/scim/endpoint-profile/built-in-presets.ts` | 6 preset definitions |
+| `src/modules/scim/endpoint-profile/endpoint-profile.service.ts` | Validation & expansion pipeline |
+| `src/modules/scim/endpoint-profile/auto-expand.service.ts` | Attribute expansion & auto-inject |
+| `src/modules/scim/endpoint-profile/tighten-only-validator.ts` | Core schema tighten-only rules |
+| `src/modules/scim/endpoint-profile/rfc-baseline.ts` | RFC 7643 attribute baselines |
+| `src/domain/validation/schema-validator.ts` | Runtime schema validation (1,467 lines) |
+| `src/domain/validation/schema-validator-cache.ts` | Characteristics cache builder |
+| `src/modules/scim/common/scim-service-helpers.ts` | Extension helpers, stripping, coercion |
+| `src/modules/scim/utils/scim-patch-path.ts` | URN-prefixed PATCH path resolution |
+| `src/modules/scim/discovery/scim-discovery.service.ts` | Profile-based discovery serving |
+| `src/modules/endpoint/controllers/endpoint.controller.ts` | Admin endpoint management API |
+| `src/modules/endpoint/endpoint-config.interface.ts` | 14 config flag definitions |
+| `test/e2e/profile-combinations.e2e-spec.ts` | E2E tests for all extension patterns |
+
+---
+
+*Last updated: April 13, 2026 · Source-verified against v0.34.0 codebase*
