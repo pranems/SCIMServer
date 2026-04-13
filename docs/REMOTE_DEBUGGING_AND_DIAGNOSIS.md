@@ -765,6 +765,15 @@ SCIMServer is designed for environments where operators have **no SSH/shell acce
 | `POST` | `/scim/admin/logs/clear` | Clear all persistent logs |
 | `POST` | `/scim/admin/logs/prune?retentionDays=N` | Delete logs older than N days (default: `LOG_RETENTION_DAYS` or 30) |
 
+### Activity Feed API (`/scim/admin/activity/*`)
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| `GET` | `/scim/admin/activity` | Human-readable activity feed (parsed from raw logs) |
+| `GET` | `/scim/admin/activity/summary` | Activity summary stats (last 24h, last week, by type) |
+
+The activity feed converts raw request logs into human-readable entries with icons, severity levels, and Entra keepalive detection. Query params: `page`, `limit`, `type` (user/group/system), `severity` (info/success/warning/error), `search`, `hideKeepalive` (true/false).
+
 ---
 
 ## 3. Self-Service RCA via Error Responses

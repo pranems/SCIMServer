@@ -550,7 +550,124 @@ Invoke-RestMethod -Method POST "$base/scim/admin/logs/clear" -Headers $h
 
 ### In-Memory Backend
 
-When `PERSISTENCE_BACKEND=inmemory`, logs are stored in a plain array (`inMemoryLogRows`). Same query interface applies but all data is ephemeral.
+When `PERSISTENCE_BACKEND=inmemory`, logs are stored in a plain array (`inMemoryLogRows`). Same query interface applies but all data is ephemeral. The activity feed falls back to in-memory mode with simplified query logic. Database statistics show zero activity counts in InMemory mode.
+
+### Activity Feed (Human-Readable Log View)
+
+**Source:** `activity-parser.service.ts` (904 lines), `activity.controller.ts` (284 lines)
+
+The activity feed converts raw request logs into human-readable entries with icons, severity levels, and keepalive detection. It's a log visualization layer built on top of the persistent request log.
+
+#### GET /scim/admin/activity
+
+| Property | Value |
+|----------|-------|
+| **Method** | `GET` |
+| **URL** | `/scim/admin/activity` |
+| **Headers** | `Authorization: Bearer <token>` |
+| **Query params** | `page` (int), `limit` (int), `type` (user\|group\|system), `severity` (info\|success\|warning\|error), `search` (text), `hideKeepalive` (true\|false) |
+
+**Request:**
+
+```http
+GET /scim/admin/activity?limit=5&hideKeepalive=true HTTP/1.1
+Authorization: Bearer changeme-scim
+```
+
+**Response: `200 OK`**
+
+```json
+{
+  "activities": [
+    {
+      "id": "act-uuid-001",
+      "timestamp": "2026-04-13T10:30:45.000Z",
+      "icon": "✅",
+      "message": "User jsmith@contoso.com created successfully",
+      "details": "POST /scim/endpoints/.../Users → 201",
+      "type": "user",
+      "severity": "success",
+      "userIdentifier": "jsmith@contoso.com"
+    },
+    {
+      "id": "act-uuid-002",
+      "timestamp": "2026-04-13T10:30:46.000Z",
+      "icon": "🏢",
+      "message": "Group 'Engineering' members updated",
+      "details": "PATCH /scim/endpoints/.../Groups/grp-123 → 200",
+      "type": "group",
+      "severity": "info",
+      "groupIdentifier": "Engineering",
+      "addedMembers": [{ "id": "usr-1", "name": "jsmith" }],
+      "removedMembers": []
+    },
+    {
+      "id": "act-uuid-003",
+      "timestamp": "2026-04-13T10:30:47.000Z",
+      "icon": "❌",
+      "message": "User creation failed: userName 'jdoe' already exists",
+      "details": "POST /scim/endpoints/.../Users → 409",
+      "type": "user",
+      "severity": "error",
+      "userIdentifier": "jdoe@contoso.com"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 5,
+    "total": 847,
+    "pages": 170
+  },
+  "filters": {
+    "types": ["user", "group", "system"],
+    "severities": ["info", "success", "warning", "error"]
+  }
+}
+```
+
+**PowerShell:**
+
+```powershell
+# Activity feed (excludes Entra keepalive probes)
+Invoke-RestMethod "$base/scim/admin/activity?limit=20&hideKeepalive=true" -Headers $h | ConvertTo-Json -Depth 5
+
+# Only errors
+Invoke-RestMethod "$base/scim/admin/activity?severity=error" -Headers $h | ConvertTo-Json -Depth 5
+
+# Only user operations
+Invoke-RestMethod "$base/scim/admin/activity?type=user" -Headers $h | ConvertTo-Json -Depth 5
+```
+
+#### GET /scim/admin/activity/summary
+
+Returns aggregate activity statistics.
+
+| Property | Value |
+|----------|-------|
+| **Method** | `GET` |
+| **URL** | `/scim/admin/activity/summary` |
+
+**Response: `200 OK`**
+
+```json
+{
+  "summary": {
+    "last24Hours": 156,
+    "lastWeek": 1247,
+    "operations": {
+      "users": 892,
+      "groups": 355,
+      "system": 12
+    }
+  }
+}
+```
+
+**PowerShell:**
+
+```powershell
+Invoke-RestMethod "$base/scim/admin/activity/summary" -Headers $h | ConvertTo-Json -Depth 3
+```
 
 ---
 
