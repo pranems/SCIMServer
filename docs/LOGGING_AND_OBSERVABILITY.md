@@ -459,6 +459,8 @@ Every HTTP request is persisted to the database (Prisma/PostgreSQL or in-memory)
 | Max buffer size | 50 entries | Flush immediately when 50 entries accumulate |
 | Write strategy | `createMany` (single batch insert) | 1 write instead of N individual writes |
 
+> **Caveat:** The buffering mechanism means up to 3 seconds of request logs can be lost if the server crashes or is killed (SIGKILL). This is an intentional trade-off to reduce database write overhead. Graceful shutdown (SIGTERM) triggers `onModuleDestroy` which flushes the remaining buffer. The 3s/50-entry buffering **only applies to Prisma mode** — InMemory mode writes immediately to the in-memory array.
+
 ### Record Fields
 
 Each `RequestLog` row contains:
@@ -1160,6 +1162,11 @@ sequenceDiagram
 | `request-logging.interceptor.spec.ts` | 258 | Unit |
 | `file-log-transport.spec.ts` | 137 | Unit |
 | `rotating-file-writer.spec.ts` | 85 | Unit |
+| `endpoint-log.controller.spec.ts` | 218 | Unit |
+| `admin.controller.spec.ts` (log routes) | — | Unit |
+| `activity.controller.spec.ts` | — | Unit |
+| `database.controller.spec.ts` | — | Unit |
+| `database.service.spec.ts` | — | Unit |
 | `log-config.e2e-spec.ts` | 350 | E2E |
 | `endpoint-scoped-logs.e2e-spec.ts` | 126 | E2E |
 | `rca-diagnostics.e2e-spec.ts` | 171 | E2E |
