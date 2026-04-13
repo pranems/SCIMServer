@@ -24,9 +24,10 @@
 15. [Log Level Assignment by Status Code](#15-log-level-assignment-by-status-code)
 16. [SCIM Error Type Vocabulary](#16-scim-error-type-vocabulary)
 17. [Error Response Examples](#17-error-response-examples)
-18. [Mermaid Diagrams](#18-mermaid-diagrams)
-19. [Error Handling Checklist](#19-error-handling-checklist)
-20. [Source File Reference](#20-source-file-reference)
+18. [Troubleshooting: Error Catalog by Status Code](#18-troubleshooting-error-catalog-by-status-code)
+19. [Mermaid Diagrams](#19-mermaid-diagrams)
+20. [Error Handling Checklist](#20-error-handling-checklist)
+21. [Source File Reference](#21-source-file-reference)
 
 ---
 
@@ -604,7 +605,109 @@ Note: Internal error details (`TypeError`, stack traces) are NEVER exposed to th
 
 ---
 
-## 18. Mermaid Diagrams
+## 18. Troubleshooting: Error Catalog by Status Code
+
+Complete reference of every HTTP error status the server can return, with exact `scimType`, `diagnostics.errorCode`, and triggering condition. Source-verified against v0.34.0.
+
+### 400 Bad Request
+
+| scimType | errorCode | detail (pattern) | Trigger |
+|----------|-----------|-------------------|--------|
+| `invalidSyntax` | `VALIDATION_REQUIRED` | Missing required schema '...' | `schemas[]` missing required URN |
+| `invalidSyntax` | `VALIDATION_SCHEMA` | Extension URN found but not declared in schemas[] | Undeclared extension URN key in body (strict mode) |
+| `invalidValue` | `VALIDATION_SCHEMA` | Extension URN is not a registered extension schema | Unknown extension URN in body (strict mode) |
+| _(dynamic)_ | `VALIDATION_SCHEMA` | Schema validation failed: ... | Required attribute missing, type mismatch, unknown attribute (strict) |
+| `invalidFilter` | `FILTER_INVALID` | Unsupported or invalid filter expression | Filter syntax error or unknown attribute |
+| `invalidFilter` | `VALIDATION_FILTER` | Filter validation failed: ... | Filter path references unknown schema attribute |
+| `mutability` | `VALIDATION_IMMUTABLE` | Immutable attribute violation: ... | PUT/PATCH attempts to change immutable attribute |
+| _(from PatchError)_ | `VALIDATION_PATCH` | _(dynamic)_ | PatchEngine rejects operation (invalidPath, invalidValue, noTarget, mutability) |
+| `invalidValue` | `HARD_DELETE_DISABLED` | User hard delete is not enabled | DELETE when `UserHardDeleteEnabled=false` |
+| `invalidValue` | `SOFT_DELETE_DISABLED` | User soft-delete is not enabled | PATCH `active=false` when `UserSoftDeleteEnabled=false` |
+| — | `DELETE_DISABLED` | Group/resource deletion is disabled | DELETE when `GroupHardDeleteEnabled=false` |
+| `invalidValue` | `BULK_INVALID_OPERATION` | POST operation requires data / missing schema | Invalid bulk operation structure |
+| `invalidPath` | `BULK_INVALID_OPERATION` | Unsupported resource type in bulk path | Bulk path is not `/Users` or `/Groups` |
+| `invalidValue` | `BULK_UNRESOLVED_BULKID` | Unresolved bulkId reference | bulkId not defined by a prior POST |
+
+### 401 Unauthorized
+
+| detail | Trigger | Response Headers |
+|--------|---------|------------------|
+| Missing bearer token. | No `Authorization: Bearer` header | `WWW-Authenticate: Bearer realm="SCIM"` |
+| Invalid bearer token. | All auth methods failed | `WWW-Authenticate: Bearer realm="SCIM"` |
+| SCIM shared secret not configured. | Production with no `SCIM_SHARED_SECRET` | `WWW-Authenticate: Bearer realm="SCIM"` |
+| Invalid client credentials | Wrong OAuth `client_id`/`client_secret` | _(OAuth error format)_ |
+| Invalid or expired token | JWT verification failure | _(standard 401)_ |
+
+### 403 Forbidden
+
+| detail | Trigger |
+|--------|---------|
+| Endpoint "..." is inactive. SCIM operations are not allowed. | `isActive=false` on endpoint (all controllers) |
+| Bulk operations are not enabled for this endpoint. | `bulk.supported=false` in SPC |
+| Per-endpoint credentials are not enabled for endpoint "...". | `PerEndpointCredentialsEnabled=false` |
+
+### 404 Not Found
+
+| scimType | errorCode | detail (pattern) | Trigger |
+|----------|-----------|-------------------|--------|
+| `noTarget` | `RESOURCE_NOT_FOUND` | Resource {id} not found. | GET/PATCH/PUT/DELETE by ID — not found |
+| — | — | Schema "{urn}" not found. | Discovery: unknown schema URN |
+| — | — | ResourceType "{id}" not found. | Discovery: unknown resource type |
+| — | — | Resource not found. | `SchemaDiscoveryEnabled=false` |
+| `noTarget` | — | No User resource found matching "..." | `/Me` — JWT `sub` doesn't match any user |
+| — | — | No custom resource type registered at "/..." | Custom RT path not configured |
+| — | — | Endpoint "{id}" not found | Admin endpoint CRUD |
+| — | — | Unknown preset "...". Valid presets: ... | Invalid preset name |
+
+### 409 Conflict
+
+| scimType | errorCode | detail (pattern) | diagnostics fields |
+|----------|-----------|-------------------|--------------------|
+| `uniqueness` | `UNIQUENESS_USERNAME` | A resource with userName '...' already exists. | `conflictingResourceId`, `conflictingAttribute`, `incomingValue`, `operation` |
+| `uniqueness` | `UNIQUENESS_DISPLAY_NAME` | A group with displayName '...' already exists. | Same as above |
+| `uniqueness` | `UNIQUENESS_SCHEMA_ATTR` | Attribute '...' value '...' must be unique. | Schema-driven uniqueness check |
+
+### 412 Precondition Failed
+
+| scimType | errorCode | detail | diagnostics fields |
+|----------|-----------|--------|--------------------|
+| `versionMismatch` | `PRECONDITION_VERSION_MISMATCH` | ETag mismatch. Expected: ..., current: ... | `currentETag` |
+
+### 413 Payload Too Large
+
+| scimType | errorCode | detail | Trigger |
+|----------|-----------|--------|---------|
+| `tooLarge` | `BULK_PAYLOAD_TOO_LARGE` | Bulk request payload (...) exceeds maximum allowed size | `Content-Length` > 1 MB |
+
+### 415 Unsupported Media Type
+
+| scimType | errorCode | detail | Trigger |
+|----------|-----------|--------|---------|
+| `invalidValue` | `CONTENT_TYPE_UNSUPPORTED` | Unsupported Media Type: "...". SCIM requests MUST use... | POST/PUT/PATCH with non-JSON Content-Type |
+
+### 428 Precondition Required
+
+| errorCode | detail | diagnostics fields |
+|-----------|--------|--------------------|
+| `PRECONDITION_IF_MATCH` | If-Match header is required for this operation. Current ETag: ... | `currentETag` |
+
+### 500 Internal Server Error
+
+| errorCode | detail | Trigger |
+|-----------|--------|---------|
+| `DATABASE_ERROR` | Failed to {operation}: ... | RepositoryError with code `UNKNOWN` |
+| — | Internal server error | Unhandled Error/TypeError (GlobalExceptionFilter) |
+| `DATABASE_ERROR` | Failed to retrieve updated group. | Post-write re-fetch returns null |
+
+### 503 Service Unavailable
+
+| errorCode | detail | Trigger |
+|-----------|--------|---------|
+| `DATABASE_ERROR` | Failed to {operation}: database connection error | RepositoryError `CONNECTION` (Prisma P1001/P1002/P1008) |
+
+---
+
+## 19. Mermaid Diagrams
 
 ### Complete Error Processing Pipeline
 
@@ -681,7 +784,7 @@ sequenceDiagram
 
 ---
 
-## 19. Error Handling Checklist
+## 20. Error Handling Checklist
 
 ### Completeness Verification
 
@@ -701,7 +804,7 @@ sequenceDiagram
 
 ---
 
-## 20. Source File Reference
+## 21. Source File Reference
 
 | File | Lines | Purpose |
 |------|-------|---------|
