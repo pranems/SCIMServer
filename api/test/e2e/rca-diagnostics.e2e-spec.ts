@@ -84,10 +84,7 @@ describe('RCA Diagnostics Enrichment (E2E)', () => {
 
     beforeAll(async () => {
       resetFixtureCounter();
-      endpointId = await createEndpointWithConfig(app, token, {
-        StrictSchemaValidation: 'True',
-        IgnoreReadOnlyAttributesInPatch: 'False',
-      });
+      endpointId = await createEndpoint(app, token);
       basePath = scimBasePath(endpointId);
 
       const user = await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201);
@@ -98,12 +95,14 @@ describe('RCA Diagnostics Enrichment (E2E)', () => {
       await scimDelete(app, `${basePath}/Users/${userId}`, token).expect(204);
     });
 
-    it('should include diagnostics in PATCH 400 response', async () => {
+    it('should include failedOperationIndex/failedPath/failedOp in PATCH 400 diagnostics', async () => {
+      // Use an invalid value type (non-boolean for active) to trigger PatchEngine error
+      // which includes failedOperationIndex, failedPath, failedOp
       const res = await scimPatch(app, `${basePath}/Users/${userId}`, token, {
         schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
         Operations: [
           { op: 'replace', path: 'displayName', value: 'Good' },
-          { op: 'replace', path: 'id', value: 'hacked-id' }, // readOnly - fails
+          { op: 'replace', path: 'active', value: 'not-a-boolean' }, // PatchEngine rejects
         ],
       }).expect(400);
 
@@ -112,6 +111,11 @@ describe('RCA Diagnostics Enrichment (E2E)', () => {
       expect(diag.requestId).toBeDefined();
       expect(diag.endpointId).toBe(endpointId);
       expect(diag.logsUrl).toContain(endpointId);
+      // PATCH-specific diagnostic fields from PatchError
+      expect(diag.failedOperationIndex).toBeDefined();
+      expect(typeof diag.failedOperationIndex).toBe('number');
+      expect(diag.failedPath).toBe('active');
+      expect(diag.failedOp).toBe('replace');
     });
   });
 

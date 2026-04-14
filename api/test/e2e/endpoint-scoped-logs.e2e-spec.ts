@@ -150,4 +150,37 @@ describe('Endpoint-Scoped Logs (E2E)', () => {
       expect(res.headers['content-type']).toContain('application/json');
     });
   });
+
+  // ─── GET /endpoints/:id/logs/history ──────────────────────────────
+
+  describe('GET /endpoints/:id/logs/history', () => {
+    it('should return paginated persistent logs for the endpoint', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/scim/endpoints/${endpointId}/logs/history?page=1&pageSize=10`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body).toHaveProperty('total');
+      expect(res.body).toHaveProperty('items');
+      expect(Array.isArray(res.body.items)).toBe(true);
+    });
+
+    it('should accept method filter', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/scim/endpoints/${endpointId}/logs/history?method=POST`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body).toHaveProperty('total');
+    });
+
+    it('should accept minDurationMs filter', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/scim/endpoints/${endpointId}/logs/history?minDurationMs=9999999`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body.total).toBe(0);
+    });
+  });
 });

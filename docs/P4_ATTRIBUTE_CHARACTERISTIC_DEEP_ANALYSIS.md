@@ -3,7 +3,7 @@
 ## Overview
 
 **Feature**: Comprehensive re-audit of ALL RFC 7643 §2 attribute characteristic enforcement across every service, operation, config combination, and code path  
-**Version**: v0.34.0  
+**Version**: v0.35.0  
 **Date**: 2026-04-10  
 **Status**: Source-code-verified gap analysis — 19 gaps catalogued, 3 actionable fixes identified  
 **Methodology**: Full RFC re-read → all prior audit docs re-read → source code inspection (sole source of truth)  
@@ -44,10 +44,10 @@
 
 ## Problem Statement
 
-After the P3 audit (v0.32.0) identified 9 remaining gaps and the Cross-Cutting Concern Audit (v0.31.0) documented 12 findings, a fresh full-stack re-audit was needed against v0.34.0 source to:
+After the P3 audit (v0.32.0) identified 9 remaining gaps and the Cross-Cutting Concern Audit (v0.31.0) documented 12 findings, a fresh full-stack re-audit was needed against v0.35.0 source to:
 
 1. **Verify the actual current state** — prior audit docs were produced at different versions, causing conflicting claims
-2. **Discover new gaps** introduced by v0.33.0 (uniqueness realignment) and v0.34.0 (deletedAt removal)
+2. **Discover new gaps** introduced by v0.33.0 (uniqueness realignment) and v0.35.0 (deletedAt removal)
 3. **Identify actionable security issues** — specifically the `GenericPatchEngine` prototype pollution vulnerability
 4. **Produce a single authoritative gap register** with severity-based prioritization and effort estimates
 5. **Catalogue every enforcement point** per characteristic × flow × service × config combination
@@ -614,8 +614,8 @@ No attribute characteristic concerns — only `enforceIfMatch()` and hard-delete
 | **Okta** | Strip + warn | ✅ Strip password | Schema-driven | ❌ No | ✅ Yes |
 | **Ping Identity** | Strip + warn | ✅ Strip password | Schema-driven | ❌ No | ✅ Yes |
 | **AWS SSO** | Strip + ignore | ✅ Strip password | Partial | ❌ No | ❌ No |
-| **SCIMServer v0.34.0** | Strip + warn ✅ | ✅ Strip password | Schema-driven ✅ | ❌ No | ❌ No |
+| **SCIMServer v0.35.0** | Strip + warn ✅ | ✅ Strip password | Schema-driven ✅ | ❌ No | ❌ No |
 
 ---
 
-*Document created 2026-04-10. Source-code-verified against SCIMServer v0.34.0. Source files are the single source of truth — not this document. Supersedes prior P3 gap status for items re-audited here. See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.*
+*Document created 2026-04-10. Source-code-verified against SCIMServer v0.35.0. Source files are the single source of truth — not this document. Supersedes prior P3 gap status for items re-audited here. See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.*

@@ -1,6 +1,6 @@
-# Design Improvement Deep Analysis — v0.34.0
+# Design Improvement Deep Analysis — v0.35.0
 
-**Status:** Current | **Last Updated:** 2026-04-13 | **Baseline:** v0.34.0  
+**Status:** Current | **Last Updated:** 2026-04-13 | **Baseline:** v0.35.0  
 **Scope:** Full source-verified audit — architecture, SOLID, DRY, security, RFC compliance, DTO validation, data layer, maintainability  
 **RFC References:** RFC 7643 (SCIM Core Schema), RFC 7644 (SCIM Protocol)  
 **Test Baseline:** 3,206 unit (80 suites) · 939 E2E (45 suites) · ~739 live + 112 Lexmark — ALL PASSING  
@@ -814,7 +814,7 @@ coverageThreshold: {
 | Two auth guards | Developer confusion about which guard protects what | Onboarding friction |
 | `OAuthModule` placement | `src/oauth/` vs `src/modules/auth/` — inconsistent | Navigation difficulty |
 | `EndpointConfig` index signature | `[key: string]: unknown` — misspelled flags compile | Subtle bugs |
-| Version/doc drift | README 0.34.0, Session_starter mentions 0.29.0–0.33.0, various stale counts | Trust erosion |
+| Version/doc drift | README 0.35.0, Session_starter mentions 0.29.0–0.33.0, various stale counts | Trust erosion |
 | Commented-out code | None found (`// TODO`, `// FIXME`) | ✅ Clean |
 
 ### 16.3 Cognitive Load by File
@@ -951,7 +951,7 @@ Based on recurring design patterns and trade-offs identified in this audit, the 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
 radar
-    title SCIMServer v0.34.0 — Quality Radar
+    title SCIMServer v0.35.0 — Quality Radar
     "RFC Compliance" : 93
     "Security" : 60
     "SOLID" : 65
@@ -966,4 +966,4 @@ radar
 
 ---
 
-*This document was produced by deep analysis of 60+ source files across all architectural layers, verified against RFC 7643 (SCIM Core Schema) and RFC 7644 (SCIM Protocol), and cross-referenced with the project's existing test suite (3,206 unit + 939 E2E tests). All line numbers, file paths, and code snippets are sourced directly from the v0.34.0 codebase.*
+*This document was produced by deep analysis of 60+ source files across all architectural layers, verified against RFC 7643 (SCIM Core Schema) and RFC 7644 (SCIM Protocol), and cross-referenced with the project's existing test suite (3,206 unit + 939 E2E tests). All line numbers, file paths, and code snippets are sourced directly from the v0.35.0 codebase.*

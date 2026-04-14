@@ -1,6 +1,6 @@
 # Logging & Error Handling Quality Audit
 
-> **Version:** 3.0 · **Source-verified against:** v0.34.0 · **Audited:** April 13, 2026  
+> **Version:** 3.0 · **Source-verified against:** v0.35.0 · **Audited:** April 13, 2026  
 > Complete gap register with code evidence, severity, and resolution recommendations.
 
 ---
@@ -222,7 +222,7 @@ if (!process.env.DATABASE_URL) {
 
 ### GAP-07 through GAP-20: Previously Identified Gaps (Resolved)
 
-These gaps were identified in v1.0/v2.0 audits and have been **resolved** in the current v0.34.0 codebase:
+These gaps were identified in v1.0/v2.0 audits and have been **resolved** in the current v0.35.0 codebase:
 
 | # | Gap Description | Resolution | Verified In |
 |---|----------------|------------|-------------|
@@ -294,7 +294,7 @@ These gaps were identified in v1.0/v2.0 audits and have been **resolved** in the
 ## Severity Distribution
 
 ```mermaid
-pie title Gap Severity Distribution (v0.34.0)
+pie title Gap Severity Distribution (v0.35.0)
     "Critical" : 0
     "High" : 1
     "Medium" : 4
@@ -323,6 +323,6 @@ pie title Gap Severity Distribution (v0.34.0)
 
 | Version | Date | Highlights |
 |---------|------|------------|
-| 3.0 | April 13, 2026 | Complete rewrite from scratch. Source-verified against v0.34.0. 20 gaps (5 open, 14 resolved, 1 accepted). |
+| 3.0 | April 13, 2026 | Complete rewrite from scratch. Source-verified against v0.35.0. 20 gaps (5 open, 14 resolved, 1 accepted). |
 | 2.0 | March 2026 | 28 gaps identified, 22 resolved. |
 | 1.0 | February 2026 | Initial audit, 29 gaps identified. |

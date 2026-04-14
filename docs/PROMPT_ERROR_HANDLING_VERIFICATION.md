@@ -1,6 +1,6 @@
 # Error Handling Verification Prompt (Self-Improving)
 
-> **Version:** 3.0 · **Source-verified against:** v0.34.0 · **Regenerated:** April 13, 2026  
+> **Version:** 3.0 · **Source-verified against:** v0.35.0 · **Regenerated:** April 13, 2026  
 > Automated checklist — run against source to verify error handling completeness.
 
 ---
@@ -147,7 +147,7 @@ TOTAL: __/55 PASS
 
 ```
 Date: April 13, 2026
-Version: 0.34.0
+Version: 0.35.0
 Executor: AI (Claude Opus 4.6, source-verified)
 
 Section 1 (SCIM Format): 5/5 PASS

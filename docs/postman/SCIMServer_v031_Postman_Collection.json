@@ -2,7 +2,7 @@
   "info": {
     "name": "SCIMServer v0.31.0 — Complete API Collection",
     "_postman_id": "scimserver-v031-complete",
-    "description": "Complete Postman collection for SCIMServer v0.34.0 — all 82 endpoints across 19 controllers.\n\nSet collection variables:\n- baseUrl: http://localhost:6000/scim\n- token: your bearer token or shared secret\n- endpointId: UUID of target endpoint\n- userId: UUID of target user\n- groupId: UUID of target group",
+    "description": "Complete Postman collection for SCIMServer v0.35.0 — all 82 endpoints across 19 controllers.\n\nSet collection variables:\n- baseUrl: http://localhost:6000/scim\n- token: your bearer token or shared secret\n- endpointId: UUID of target endpoint\n- userId: UUID of target user\n- groupId: UUID of target group",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
