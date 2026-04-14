@@ -5,6 +5,30 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.35.0] - 2026-04-13
+
+### Documentation & Observability Overhaul
+
+**6 logging/error handling docs rewritten from scratch** (source-verified):
+- `LOGGING_AND_OBSERVABILITY.md` v4.0 — 21 sections, activity feed, version endpoint, query param tables
+- `LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md` v3.0 — 21 sections, error catalog by status code
+- `LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md` v3.0 — 20-gap register
+- `REMOTE_DEBUGGING_AND_DIAGNOSIS.md` v3.0 — 16 sections, 20 troubleshooting scenarios, quick start
+- `PROMPT_LOGGING_VERIFICATION.md` v3.0 (71/71 PASS)
+- `PROMPT_ERROR_HANDLING_VERIFICATION.md` v3.0 (55/55 PASS)
+
+**17 documentation gaps fixed** across COMPLETE_API_REFERENCE, LOGGING_AND_OBSERVABILITY, REMOTE_DEBUGGING:
+- Critical: Route correction DELETE→POST /admin/logs/clear
+- Significant: Prune endpoint, activity feed, web UI, per-endpoint log routes, version response rewrite
+- Moderate: Health endpoint, log buffering caveat, query param tables, startup logs
+
+**Observability Quick Start** added to README.md + REMOTE_DEBUGGING Section 0 with full HTTP request/response examples
+
+**Cross-doc freshness sweep**: 13 stale items fixed (LOG_LEVEL names, ring buffer default, LoggingModule components)
+
+**Tests (80 unit suites, 3,206 tests — 45 E2E suites, 950 tests):**
+- +11 E2E tests: audit trail, log pruning, PATCH diagnostics, per-endpoint history, minDurationMs, slowRequestThresholdMs
+
 ## [0.34.0] - 2026-04-10
 
 ### Documentation: Logging & Observability Complete Rewrite (April 13, 2026)

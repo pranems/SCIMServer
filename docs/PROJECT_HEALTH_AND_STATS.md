@@ -1,6 +1,6 @@
 # Project Health & Stats
 
-> **Version:** 0.34.0 · **Updated:** April 10, 2026 · **Status:** Production-ready
+> **Version:** 0.35.0 · **Updated:** April 10, 2026 · **Status:** Production-ready
 
 ---
 

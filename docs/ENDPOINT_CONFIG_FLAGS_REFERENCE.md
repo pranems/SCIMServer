@@ -6,7 +6,7 @@
 > Covers flag definitions, defaults, type handling, precedence rules, applicability matrices,
 > flag interaction combinations, request/response examples, and decision-flow diagrams.
 >
-> **Settings v7 (v0.34.0):** 4 flags removed, 5 added, 2 defaults changed. See [CHANGELOG.md](../CHANGELOG.md) for migration guide.
+> **Settings v7 (v0.35.0):** 4 flags removed, 5 added, 2 defaults changed. See [CHANGELOG.md](../CHANGELOG.md) for migration guide.
 
 ---
 
@@ -372,7 +372,7 @@ When `AllowAndCoerceBooleanStrings` is `true`, the filter `primary eq "True"` co
 4. **Unknown attribute rejection**: Unrecognized attributes → 400.
 5. **Canonical value enforcement**: Values must match schema-declared canonical values.
 
-> **Note (P4 v0.34.0):** Two checks are now **unconditional** regardless of this flag:
+> **Note (P4 v0.35.0):** Two checks are now **unconditional** regardless of this flag:
 > - **Required attributes** (RFC 7643 §2.4): Missing required attributes on POST/PUT always return 400.
 > - **Immutable enforcement** (RFC 7643 §2.2): Changed immutable attributes on PUT/PATCH always return 400.
 

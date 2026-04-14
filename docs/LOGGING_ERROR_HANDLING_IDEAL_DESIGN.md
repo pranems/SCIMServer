@@ -1,6 +1,6 @@
 # Error Handling Architecture & Ideal Design
 
-> **Version:** 3.0 · **Source-verified against:** v0.34.0 · **Rewritten from scratch:** April 13, 2026  
+> **Version:** 3.0 · **Source-verified against:** v0.35.0 · **Rewritten from scratch:** April 13, 2026  
 > Describes the *as-built* error handling architecture plus design principles — every claim verified against source.
 
 ---
@@ -607,7 +607,7 @@ Note: Internal error details (`TypeError`, stack traces) are NEVER exposed to th
 
 ## 18. Troubleshooting: Error Catalog by Status Code
 
-Complete reference of every HTTP error status the server can return, with exact `scimType`, `diagnostics.errorCode`, and triggering condition. Source-verified against v0.34.0.
+Complete reference of every HTTP error status the server can return, with exact `scimType`, `diagnostics.errorCode`, and triggering condition. Source-verified against v0.35.0.
 
 ### 400 Bad Request
 

@@ -1,6 +1,6 @@
 # Logging & Observability Guide
 
-> **Version:** 4.0 · **Source-verified against:** v0.34.0 · **Rewritten:** April 13, 2026  
+> **Version:** 4.0 · **Source-verified against:** v0.35.0 · **Rewritten:** April 13, 2026  
 > Every statement in this document references the actual source file and line — nothing is assumed.
 
 ---
@@ -973,7 +973,7 @@ Authorization: Bearer changeme-scim
 
 ```json
 {
-  "version": "0.34.0",
+  "version": "0.35.0",
   "service": {
     "name": "scimserver-api",
     "environment": "production",
@@ -1014,7 +1014,7 @@ Authorization: Bearer changeme-scim
   "container": {
     "app": {
       "name": "scimserver2",
-      "image": "ghcr.io/pranems/scimserver:0.34.0",
+      "image": "ghcr.io/pranems/scimserver:0.35.0",
       "runtime": "node",
       "platform": "linux/amd64"
     }
@@ -1023,7 +1023,7 @@ Authorization: Bearer changeme-scim
     "resourceGroup": "scimserver-rg",
     "containerApp": "scimserver2",
     "registry": "ghcr.io/pranems",
-    "currentImage": "ghcr.io/pranems/scimserver:0.34.0"
+    "currentImage": "ghcr.io/pranems/scimserver:0.35.0"
   }
 }
 ```
