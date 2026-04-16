@@ -117,7 +117,9 @@ export class ActivityController {
     ]);
 
     // Parse each log into an activity summary
-    let activities: ActivitySummary[] = await Promise.all(
+    // Parse each log into an activity summary.
+    // Use allSettled to prevent one malformed log from crashing the entire page.
+    const results = await Promise.allSettled(
       logs.map(async log =>
         await this.activityParser.parseActivity({
           id: log.id,
@@ -131,6 +133,9 @@ export class ActivityController {
         })
       )
     );
+    let activities: ActivitySummary[] = results
+      .filter((r): r is PromiseFulfilledResult<ActivitySummary> => r.status === 'fulfilled')
+      .map(r => r.value);
 
     // Apply client-side filters
     if (type) {
@@ -208,20 +213,23 @@ export class ActivityController {
           ...notKeepalive,
         },
       }),
-      // User operations: non-admin, non-keepalive, URL contains /Users
+      // User operations: last 30 days, non-admin, non-keepalive, URL contains /Users
+      // Bounded to 30 days to avoid full table scans on burstable DB tiers.
       this.prisma.requestLog.count({
         where: {
           AND: [
+            { createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
             { url: { contains: '/Users' } },
             notAdmin,
             notKeepalive,
           ],
         },
       }),
-      // Group operations: non-admin count (keepalive only targets /Users, not /Groups)
+      // Group operations: last 30 days, non-admin count (keepalive only targets /Users, not /Groups)
       this.prisma.requestLog.count({
         where: {
           AND: [
+            { createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
             { url: { contains: '/Groups' } },
             notAdmin,
           ],

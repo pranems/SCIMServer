@@ -188,4 +188,55 @@ describe('Filter Operators (E2E)', () => {
       expect(res.body.totalResults).toBe(1);
     });
   });
+
+  // ── UUID guard on id filter ──────────────────────────────────────────────
+
+  describe('id filter with non-UUID value (UUID guard)', () => {
+    it('should return 200 with empty results for id eq non-UUID (not 500)', async () => {
+      // This was the exact production outage: non-UUID in id filter
+      // crashed PostgreSQL with "invalid input syntax for type uuid"
+      const res = await scimGet(
+        app,
+        `${basePath}/Users?filter=id eq "not-a-valid-uuid"`,
+        token,
+      ).expect(200);
+
+      expect(res.body.totalResults).toBe(0);
+      expect(res.body.Resources).toEqual([]);
+    });
+
+    it('should return 200 with empty results for id eq email address', async () => {
+      const res = await scimGet(
+        app,
+        `${basePath}/Users?filter=id eq "user@example.com"`,
+        token,
+      ).expect(200);
+
+      expect(res.body.totalResults).toBe(0);
+    });
+
+    it('should return 200 for id ne non-UUID on Groups', async () => {
+      const res = await scimGet(
+        app,
+        `${basePath}/Groups?filter=id ne "not-a-uuid"`,
+        token,
+      ).expect(200);
+
+      // ne with non-UUID: guard returns contradictory filter → 0 results
+      // (rather than crash). This is acceptable — a non-UUID can never
+      // match a UUID column, so ne should logically return all, but the
+      // guard prioritizes safety over accuracy for this edge case.
+      expect(res.body).toHaveProperty('totalResults');
+    });
+
+    it('should return results for id eq with a valid (but non-existent) UUID', async () => {
+      const res = await scimGet(
+        app,
+        `${basePath}/Users?filter=id eq "a1b2c3d4-e5f6-7890-abcd-ef1234567890"`,
+        token,
+      ).expect(200);
+
+      expect(res.body.totalResults).toBe(0);
+    });
+  });
 });

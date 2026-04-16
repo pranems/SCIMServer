@@ -32,7 +32,7 @@ npx jest --no-coverage --json --outputFile=pipeline-unit.json 2>$null
 # Parse results:
 node -e "const r=JSON.parse(require('fs').readFileSync('pipeline-unit.json','utf8'));console.log('suites:',r.numPassedTestSuites+'/'+r.numTotalTestSuites,'tests:',r.numPassedTests+'/'+r.numTotalTests,'failed:',r.numFailedTests)"
 ```
-> **Baselines (v0.37.0):** 3,241 pass / 0 fail / 82 suites.
+> **Baselines (v0.37.1):** 3,265 pass / 0 fail / 83 suites.
 > *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 
 ### Step 3: Run E2E Tests
@@ -42,7 +42,7 @@ npx jest --config test/e2e/jest-e2e.config.ts --no-coverage --json --outputFile=
 # Parse results:
 node -e "const r=JSON.parse(require('fs').readFileSync('pipeline-e2e.json','utf8'));console.log('suites:',r.numPassedTestSuites+'/'+r.numTotalTestSuites,'tests:',r.numPassedTests+'/'+r.numTotalTests,'failed:',r.numFailedTests)"
 ```
-> **Baselines (v0.35.0):** 960 pass / 0 fail / 46 suites.
+> **Baselines (v0.37.1):** 969 pass / 0 fail / 46 suites.
 > *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 > **E2E config path:** `test/e2e/jest-e2e.config.ts`
 
@@ -314,7 +314,7 @@ if ($endpoints.totalResults -gt 0) {
 
 ## Known Pre-Existing Failures (v0.34.0)
 
-**None.** All tests pass: **3,206 unit** (80 suites), **950 E2E** (45 suites), **739 live**.
+**None.** All tests pass: **3,265 unit** (83 suites), **969 E2E** (46 suites), **~753 live**.
 
 ## Entra ID Provisioning Configuration
 

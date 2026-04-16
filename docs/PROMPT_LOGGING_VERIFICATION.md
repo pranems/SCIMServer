@@ -178,8 +178,8 @@ TOTAL: __/73 PASS
 ## Latest Run
 
 ```
-Date: April 15, 2026
-Version: 0.37.0
+Date: April 16, 2026
+Version: 0.37.1
 Executor: AI (Claude Opus 4.6, source-verified)
 
 Section 1 (Core): 6/6 PASS

@@ -10,9 +10,8 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 COPY public/ ./public
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 RUN npx prisma generate
-ENV DATABASE_URL="file:./data.db"
-RUN npx prisma db push
 RUN npm run build
 
 # Runtime stage: only production deps + dist + entrypoint

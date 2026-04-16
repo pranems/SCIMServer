@@ -2,6 +2,7 @@
 import { PrismaService } from '../prisma/prisma.service';
 import { ScimLogger } from '../logging/scim-logger.service';
 import { LogCategory } from '../logging/log-levels';
+import { isValidUuid } from '../../infrastructure/repositories/prisma/uuid-guard';
 
 export interface ActivitySummary {
   id: string;
@@ -45,6 +46,17 @@ export class ActivityParserService {
     createdAt: string;
     identifier?: string;
   }): Promise<ActivitySummary> {
+    // Guard against malformed log entries — null/undefined method would throw TypeError
+    if (!log.method || !log.url) {
+      return {
+        id: log.id,
+        timestamp: log.createdAt,
+        icon: '⚠️',
+        message: 'Malformed log entry (missing method or url)',
+        type: 'error',
+        severity: 'warning',
+      };
+    }
     const timestamp = log.createdAt;
     const method = log.method.toUpperCase();
     const url = log.url;
@@ -755,6 +767,13 @@ export class ActivityParserService {
    * Resolve user ID to display name
    */
   private async resolveUserName(userId: string): Promise<string> {
+    // Guard: scimId is @db.Uuid — reject non-UUID identifiers to avoid
+    // PostgreSQL "invalid input syntax for type uuid" errors that
+    // waste pool connections and flood logs.
+    if (!isValidUuid(userId)) {
+      this.logger?.trace(LogCategory.DATABASE, 'resolveUserName: skipped lookup for non-UUID identifier', { userId });
+      return userId;
+    }
     try {
       const user = await this.prisma.scimResource.findFirst({
         where: { scimId: userId, resourceType: 'User' },
@@ -787,6 +806,11 @@ export class ActivityParserService {
    * Resolve group ID to display name
    */
   private async resolveGroupName(groupId: string): Promise<string> {
+    // Guard: scimId is @db.Uuid — skip lookup for non-UUID values.
+    if (!isValidUuid(groupId)) {
+      this.logger?.trace(LogCategory.DATABASE, 'resolveGroupName: skipped lookup for non-UUID identifier', { groupId });
+      return groupId;
+    }
     try {
       const group = await this.prisma.scimResource.findFirst({
         where: { scimId: groupId, resourceType: 'Group' },

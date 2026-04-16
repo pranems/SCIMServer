@@ -5,6 +5,30 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.37.1] - 2026-04-16
+
+### Azure Production Outage Fix — Connection Pool Exhaustion
+
+**Root cause:** Prisma connection pool (5 connections) fully exhausted by slow admin activity queries (87–129s each) on burstable B1ms PostgreSQL. Web UI auto-refresh polling every 10s generated 6+ queries per cycle. `resolveUserName`/`resolveGroupName` bypassed repository UUID guards and sent email-formatted test identifiers to `@db.Uuid` column, causing continuous errors.
+
+**Fixes:**
+- `activity-parser.service.ts`: Add `isValidUuid()` guard to `resolveUserName()` and `resolveGroupName()` — prevents Prisma "invalid input syntax for type uuid" errors
+- `activity.controller.ts`: Add 30-day date bound to all-time user/group operations `COUNT(*)` — prevents full table scans; replace `Promise.all` → `Promise.allSettled` for resilience
+- `activity-parser.service.ts`: Add null guard on `parseActivity()` for missing method/url
+- `apply-scim-filter.ts`: Add UUID validation for uuid-typed columns in SCIM filter push-down — non-UUID `id eq "email@test.com"` returns empty results instead of 500
+- `database.service.ts`: Remove `scimId` from user search `OR` clause (was `{ scimId: { contains: search } }` on `@db.Uuid` — crashes PostgreSQL); add `isValidUuid()` guard to `getUserDetails()`/`getGroupDetails()`
+- `Dockerfile`: Set `DATABASE_URL` before `prisma generate` (fixes `PrismaConfigEnvError`)
+
+**Azure infra changes:**
+- `LOG_AUTO_PRUNE=true`, `LOG_RETENTION_DAYS=7` — enables automatic RequestLog cleanup
+- Container image: `ghcr.io/pranems/scimserver:0.37.1`
+
+**Tests (83 unit suites, 3,265 tests — 46 E2E suites, 969 tests):**
+- +14 unit: `activity-parser.service.spec.ts` (NEW — resolveUserName/resolveGroupName UUID guards, parseActivity)
+- +4 unit: apply-scim-filter UUID guard for ne/co/sw/gt operators on id column
+- +3 unit: database.service UUID guard tests + search UUID-only match
+- +4 E2E: filter-operators `id eq "non-uuid"`, `id eq "email"`, `id ne "non-uuid"`, UUID exact match
+
 ## [0.37.0] - 2026-04-15
 
 ### Version Bump & Full Validation Pipeline

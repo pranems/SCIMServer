@@ -1,6 +1,6 @@
 # Project Health & Stats
 
-> **Version:** 0.37.0 · **Updated:** April 15, 2026 · **Status:** Production-ready
+> **Version:** 0.37.1 · **Updated:** April 16, 2026 · **Status:** Production-ready
 
 ---
 
@@ -10,7 +10,7 @@
 |--------|-------|
 | **Source files** (`api/src/**/*.ts`) | 127 |
 | **Source LoC** | 29,837 |
-| **Unit test files** (`api/src/**/*.spec.ts`) | 82 |
+| **Unit test files** (`api/src/**/*.spec.ts`) | 83 |
 | **Unit test LoC** | 32,776 |
 | **E2E test files** (`api/test/e2e/**/*.e2e-spec.ts`) | 46 |
 | **E2E test LoC** | ~13,300 |
@@ -22,18 +22,18 @@
 
 | Layer | Suites | Tests | Skip | Status |
 |-------|--------|-------|------|--------|
-| **Unit** | 82 | 3,241 | 0 | ✅ All pass |
-| **E2E** | 46 | 965 | 0 | ✅ All pass |
+| **Unit** | 83 | 3,265 | 0 | ✅ All pass |
+| **E2E** | 46 | 969 | 0 | ✅ All pass |
 | **Live (main)** | 43 sections | ~753 | 0 | ✅ All pass |
 | **Live (Lexmark ISV)** | 13 sections | 112 | 0 | ✅ All pass |
 | **Total** | **~171** | **~5,012** | 0 | ✅ All pass |
 
-### Unit Test Suites (82)
+### Unit Test Suites (83)
 
 **Domain layer (11):** patch engines (6), schema validators (5)  
 **Infrastructure (7):** repositories (inmemory 3, prisma 3, module 1)  
 **Auth/OAuth (3):** auth guard, OAuth controller, OAuth service  
-**Modules (59):** controllers, services, DTOs, filters, interceptors, endpoint-profile, discovery, logging, database, web
+**Modules (60):** controllers, services, DTOs, filters, interceptors, endpoint-profile, discovery, logging, database, activity-parser, web
 
 ### E2E Test Suites (46)
 
