@@ -31,7 +31,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 8080
-      DATABASE_URL: postgresql://scim:scim@postgres:5432/scimdb
+      DATABASE_URL: postgresql://scim:scim@postgres:5432/scimdb?connect_timeout=10&pool_timeout=10
       PERSISTENCE_BACKEND: prisma
       JWT_SECRET: ${JWT_SECRET:-devjwtsecretkey123456}
       OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET:-devscimclientsecret}

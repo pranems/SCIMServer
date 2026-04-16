@@ -20,7 +20,11 @@ describe('LogConfigController', () => {
     process.env.LOG_FORMAT = 'json';
 
     scimLogger = new ScimLogger();
-    controller = new LogConfigController(scimLogger);
+    const mockLoggingService = {
+      getAutoPruneConfig: jest.fn().mockReturnValue({ enabled: true, retentionDays: 1, intervalMs: 3600000 }),
+      setAutoPruneConfig: jest.fn(),
+    } as any;
+    controller = new LogConfigController(scimLogger, mockLoggingService);
 
     stdoutSpy = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
     stderrSpy = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);

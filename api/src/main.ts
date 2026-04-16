@@ -86,8 +86,18 @@ async function bootstrap(): Promise<void> {
   );
 
   const port = Number(process.env.PORT ?? 3000);
+  const requestTimeoutMs = Number(process.env.REQUEST_TIMEOUT_MS) || 30_000;
   await app.listen(port);
+
+  // Set HTTP server request timeout — prevents any single request from blocking
+  // the event loop indefinitely (e.g., slow DB queries, N+1 bugs).
+  // Default: 30 seconds. Override with REQUEST_TIMEOUT_MS env var.
+  const httpServer = app.getHttpServer();
+  httpServer.setTimeout(requestTimeoutMs);
+  httpServer.keepAliveTimeout = requestTimeoutMs;
+
   Logger.log(`🚀 SCIM Endpoint Server API is running on http://localhost:${port}/${globalPrefix}`);
+  Logger.log(`⏱️ Request timeout: ${requestTimeoutMs}ms (REQUEST_TIMEOUT_MS)`);
   Logger.log(`🔎 Log API quick access: http://localhost:${port}/scim/admin/log-config/recent?limit=25`);
   Logger.log(`🔎 Log stream (SSE): http://localhost:${port}/scim/admin/log-config/stream?level=INFO`);
   Logger.log(`🔎 Log download (JSON): http://localhost:${port}/scim/admin/log-config/download?format=json`);
