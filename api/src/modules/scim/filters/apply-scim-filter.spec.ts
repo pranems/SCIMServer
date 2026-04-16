@@ -51,8 +51,8 @@ describe('apply-scim-filter', () => {
     });
 
     it('should push eq filter on id to DB (maps to scimId)', () => {
-      const result = buildUserFilter('id eq "a1b2c3d4-e5f6-7890-abcd-ef1234567890"');
-      expect(result.dbWhere).toEqual({ scimId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' });
+      const result = buildUserFilter('id eq "a1b2c3d4-e5f6-4890-abcd-ef1234567890"');
+      expect(result.dbWhere).toEqual({ scimId: 'a1b2c3d4-e5f6-4890-abcd-ef1234567890' });
       expect(result.fetchAll).toBe(false);
     });
 
@@ -64,6 +64,33 @@ describe('apply-scim-filter', () => {
       expect(result.fetchAll).toBe(false);
       // The dbWhere should NOT contain the raw non-UUID value
       expect(JSON.stringify(result.dbWhere)).not.toContain('not-a-uuid');
+    });
+
+    it('should return zero-result filter for id ne with non-UUID value', () => {
+      const result = buildUserFilter('id ne "email@test.com"');
+      expect(result.dbWhere).toBeDefined();
+      expect(result.fetchAll).toBe(false);
+      expect(JSON.stringify(result.dbWhere)).not.toContain('email@test.com');
+    });
+
+    it('should return zero-result filter for id co with non-UUID value', () => {
+      const result = buildUserFilter('id co "abc"');
+      // co on uuid column with non-UUID value → zero results (not 500)
+      expect(result.dbWhere).toBeDefined();
+      expect(result.fetchAll).toBe(false);
+      expect(JSON.stringify(result.dbWhere)).not.toContain('"abc"');
+    });
+
+    it('should return zero-result filter for id sw with non-UUID value', () => {
+      const result = buildUserFilter('id sw "xyz"');
+      expect(result.dbWhere).toBeDefined();
+      expect(result.fetchAll).toBe(false);
+    });
+
+    it('should return zero-result filter for id gt with non-UUID value', () => {
+      const result = buildUserFilter('id gt "not-uuid"');
+      expect(result.dbWhere).toBeDefined();
+      expect(result.fetchAll).toBe(false);
     });
 
     it('should be case-insensitive on attribute name for DB push', () => {
@@ -265,8 +292,8 @@ describe('apply-scim-filter', () => {
     });
 
     it('should push eq filter on id to DB (maps to scimId)', () => {
-      const result = buildGroupFilter('id eq "a1b2c3d4-e5f6-7890-abcd-ef1234567890"');
-      expect(result.dbWhere).toEqual({ scimId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' });
+      const result = buildGroupFilter('id eq "a1b2c3d4-e5f6-4890-abcd-ef1234567890"');
+      expect(result.dbWhere).toEqual({ scimId: 'a1b2c3d4-e5f6-4890-abcd-ef1234567890' });
       expect(result.fetchAll).toBe(false);
     });
 
@@ -426,8 +453,8 @@ describe('apply-scim-filter', () => {
     });
 
     it('should push id eq to DB (uuid)', () => {
-      const result = buildGenericFilter('id eq "a1b2c3d4-e5f6-7890-abcd-ef1234567890"');
-      expect(result.dbWhere).toEqual({ scimId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' });
+      const result = buildGenericFilter('id eq "a1b2c3d4-e5f6-4890-abcd-ef1234567890"');
+      expect(result.dbWhere).toEqual({ scimId: 'a1b2c3d4-e5f6-4890-abcd-ef1234567890' });
       expect(result.fetchAll).toBe(false);
     });
 

@@ -86,7 +86,7 @@ describe('DatabaseService', () => {
       );
     });
 
-    it('should add search filter across userName, scimId, externalId', async () => {
+    it('should add search filter across userName and externalId (not scimId — UUID column)', async () => {
       prisma.scimResource.findMany.mockResolvedValue([]);
       prisma.scimResource.count.mockResolvedValue(0);
 
@@ -96,10 +96,23 @@ describe('DatabaseService', () => {
       expect(call.where.OR).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ userName: expect.objectContaining({ contains: 'test' }) }),
-          expect.objectContaining({ scimId: expect.objectContaining({ contains: 'test' }) }),
           expect.objectContaining({ externalId: expect.objectContaining({ contains: 'test' }) }),
         ]),
       );
+      // scimId is @db.Uuid — non-UUID search terms must NOT use contains on it
+      const scimIdClause = call.where.OR.find((c: any) => c.scimId?.contains);
+      expect(scimIdClause).toBeUndefined();
+    });
+
+    it('should include scimId exact match when search term is a valid UUID', async () => {
+      prisma.scimResource.findMany.mockResolvedValue([]);
+      prisma.scimResource.count.mockResolvedValue(0);
+
+      await service.getUsers({ page: 1, limit: 10, search: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' });
+
+      const call = prisma.scimResource.findMany.mock.calls[0][0];
+      const scimIdClause = call.where.OR.find((c: any) => c.scimId === 'a1b2c3d4-e5f6-7890-abcd-ef1234567890');
+      expect(scimIdClause).toBeDefined();
     });
 
     it('should filter by active status when provided', async () => {
@@ -225,84 +238,99 @@ describe('DatabaseService', () => {
   // ── getUserDetails ─────────────────────────────────────────────────────────
 
   describe('getUserDetails', () => {
+    const validUserId = '11111111-1111-4111-8111-111111111111';
+
     it('should query by id with resourceType "User"', async () => {
       prisma.scimResource.findFirst.mockResolvedValue({
-        id: 'u1',
+        id: validUserId,
         userName: 'alice',
         resourceType: 'User',
         membersAsMember: [],
       });
 
-      await service.getUserDetails('u1');
+      await service.getUserDetails(validUserId);
 
       expect(prisma.scimResource.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'u1', resourceType: 'User' },
+          where: { id: validUserId, resourceType: 'User' },
         }),
       );
     });
 
-    it('should throw when user not found', async () => {
+    it('should throw when user not found (valid UUID but no DB record)', async () => {
       prisma.scimResource.findFirst.mockResolvedValue(null);
 
-      await expect(service.getUserDetails('nonexistent')).rejects.toThrow('User not found');
+      await expect(service.getUserDetails('99999999-9999-4999-8999-999999999999')).rejects.toThrow('User not found');
+    });
+
+    it('should throw for non-UUID id without querying DB (UUID guard)', async () => {
+      await expect(service.getUserDetails('not-a-uuid')).rejects.toThrow('User not found');
+      // DB should NOT be called — guard short-circuits
+      expect(prisma.scimResource.findFirst).not.toHaveBeenCalled();
     });
 
     it('should include membersAsMember with group details', async () => {
       prisma.scimResource.findFirst.mockResolvedValue({
-        id: 'u1',
+        id: validUserId,
         userName: 'alice',
         resourceType: 'User',
         membersAsMember: [
-          { group: { id: 'g1', displayName: 'Engineering' } },
+          { group: { id: '22222222-2222-4222-8222-222222222222', displayName: 'Engineering' } },
         ],
       });
 
-      const result = await service.getUserDetails('u1');
+      const result = await service.getUserDetails(validUserId);
 
-      expect(result.groups).toEqual([{ id: 'g1', displayName: 'Engineering' }]);
+      expect(result.groups).toEqual([{ id: '22222222-2222-4222-8222-222222222222', displayName: 'Engineering' }]);
     });
   });
 
   // ── getGroupDetails ────────────────────────────────────────────────────────
 
   describe('getGroupDetails', () => {
+    const validGroupId = '33333333-3333-4333-8333-333333333333';
+
     it('should query by id with resourceType "Group"', async () => {
       prisma.scimResource.findFirst.mockResolvedValue({
-        id: 'g1',
+        id: validGroupId,
         displayName: 'Engineering',
         resourceType: 'Group',
         membersAsGroup: [],
       });
 
-      await service.getGroupDetails('g1');
+      await service.getGroupDetails(validGroupId);
 
       expect(prisma.scimResource.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'g1', resourceType: 'Group' },
+          where: { id: validGroupId, resourceType: 'Group' },
         }),
       );
     });
 
-    it('should throw when group not found', async () => {
+    it('should throw when group not found (valid UUID but no DB record)', async () => {
       prisma.scimResource.findFirst.mockResolvedValue(null);
 
-      await expect(service.getGroupDetails('nonexistent')).rejects.toThrow('Group not found');
+      await expect(service.getGroupDetails('99999999-9999-4999-8999-999999999999')).rejects.toThrow('Group not found');
+    });
+
+    it('should throw for non-UUID id without querying DB (UUID guard)', async () => {
+      await expect(service.getGroupDetails('not-a-uuid')).rejects.toThrow('Group not found');
+      expect(prisma.scimResource.findFirst).not.toHaveBeenCalled();
     });
 
     it('should include membersAsGroup with member details', async () => {
       prisma.scimResource.findFirst.mockResolvedValue({
-        id: 'g1',
+        id: validGroupId,
         displayName: 'Engineering',
         resourceType: 'Group',
         membersAsGroup: [
-          { member: { id: 'u1', userName: 'alice', active: true } },
+          { member: { id: '11111111-1111-4111-8111-111111111111', userName: 'alice', active: true } },
         ],
       });
 
-      const result = await service.getGroupDetails('g1');
+      const result = await service.getGroupDetails(validGroupId);
 
-      expect(result.members).toEqual([{ id: 'u1', userName: 'alice', active: true }]);
+      expect(result.members).toEqual([{ id: '11111111-1111-4111-8111-111111111111', userName: 'alice', active: true }]);
     });
   });
 

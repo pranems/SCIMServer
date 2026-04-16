@@ -5,6 +5,7 @@ import type { IGroupRepository } from '../../domain/repositories/group.repositor
 import { USER_REPOSITORY, GROUP_REPOSITORY } from '../../domain/repositories/repository.tokens';
 import { EndpointService } from '../endpoint/services/endpoint.service';
 import { LoggingService } from '../logging/logging.service';
+import { isValidUuid } from '../../infrastructure/repositories/prisma/uuid-guard';
 
 interface UserQuery {
   page: number;
@@ -41,12 +42,16 @@ export class DatabaseService {
     const where: any = {};
     
     if (search) {
+      // Only search text-compatible columns — scimId is @db.Uuid and
+      // cannot use 'contains' without crashing PostgreSQL.
       where.OR = [
         { userName: { contains: search, mode: 'insensitive' } },
-        { scimId: { contains: search, mode: 'insensitive' } },
         { externalId: { contains: search, mode: 'insensitive' } },
-        // Note: JSONB payload cannot be searched with simple contains
       ];
+      // If the search term looks like a UUID, also search by scimId (exact match)
+      if (isValidUuid(search)) {
+        where.OR.push({ scimId: search });
+      }
     }
 
     if (active !== undefined) {
@@ -176,6 +181,10 @@ export class DatabaseService {
       }
       throw new Error('User not found');
     }
+    // Guard: id column is @db.Uuid — reject non-UUID to avoid PostgreSQL crash
+    if (!isValidUuid(id)) {
+      throw new Error('User not found');
+    }
     const user = await this.prisma.scimResource.findFirst({
       where: { id, resourceType: 'User' },
       include: {
@@ -212,6 +221,10 @@ export class DatabaseService {
           return { ...group, ...payload, members: group.members ?? [] };
         }
       }
+      throw new Error('Group not found');
+    }
+    // Guard: id column is @db.Uuid
+    if (!isValidUuid(id)) {
       throw new Error('Group not found');
     }
     const group = await this.prisma.scimResource.findFirst({
