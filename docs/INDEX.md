@@ -109,7 +109,7 @@
 | [LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md](LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md) | **v3.0 quality audit** — 20-gap register, 5 open, 14 resolved, 1 accepted, source-verified |
 | [LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md](LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md) | **v3.0 error handling architecture** — 21 sections, error catalog by status code, 5 Mermaid diagrams, 5-layer error boundary |
 | [ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md](ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md) | Historical bug log with RCA and resolution |
-| [POST_V036_CHANGES_ROOT_CAUSE_ANALYSIS.md](POST_V036_CHANGES_ROOT_CAUSE_ANALYSIS.md) | **Post-v0.36.0** — 5 commits, N+1 fix, timeout, auto-prune, migration risk, 12 Azure failures explained |
+| [POST_V034_CHANGES_ROOT_CAUSE_ANALYSIS.md](POST_V034_CHANGES_ROOT_CAUSE_ANALYSIS.md) | **Post-v0.34.0** — 26 commits, 12 issues, N+1 fix, UI bugs, migration risk, auto-prune, 3 Mermaid diagrams |
 | [AZURE_DEPLOYMENT_ISSUES_AND_FIXES.md](AZURE_DEPLOYMENT_ISSUES_AND_FIXES.md) | Azure-specific deployment troubleshooting |
 
 ## Requirements & Compliance
