@@ -135,7 +135,6 @@ describe('LoggingService — Auto-Prune', () => {
 
   describe('onModuleInit', () => {
     it('should not start timer when auto-prune is disabled', async () => {
-      // Already disabled via env in beforeEach
       const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
       const setIntervalSpy = jest.spyOn(global, 'setInterval');
       const initialTimeouts = setTimeoutSpy.mock.calls.length;
@@ -143,12 +142,62 @@ describe('LoggingService — Auto-Prune', () => {
 
       await service.onModuleInit();
 
-      // Should not have added new timers (may have been called for other reasons)
       expect(setTimeoutSpy.mock.calls.length).toBe(initialTimeouts);
       expect(setIntervalSpy.mock.calls.length).toBe(initialIntervals);
 
       setTimeoutSpy.mockRestore();
       setIntervalSpy.mockRestore();
+    });
+
+    it('should start timers when auto-prune is enabled', async () => {
+      service.setAutoPruneConfig({ enabled: true });
+
+      const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+      const setIntervalSpy = jest.spyOn(global, 'setInterval');
+      const beforeTimeout = setTimeoutSpy.mock.calls.length;
+      const beforeInterval = setIntervalSpy.mock.calls.length;
+
+      await service.onModuleInit();
+
+      // Should have added a delayed initial prune (setTimeout) and recurring (setInterval)
+      expect(setTimeoutSpy.mock.calls.length).toBeGreaterThan(beforeTimeout);
+      expect(setIntervalSpy.mock.calls.length).toBeGreaterThan(beforeInterval);
+
+      setTimeoutSpy.mockRestore();
+      setIntervalSpy.mockRestore();
+    });
+
+    it('should log when auto-prune is enabled on init', async () => {
+      service.setAutoPruneConfig({ enabled: true });
+      await service.onModuleInit();
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.stringContaining('Auto-prune enabled'),
+      );
+    });
+  });
+
+  describe('runAutoPrune (via pruneOldLogs)', () => {
+    it('should handle pruneOldLogs errors gracefully', async () => {
+      prisma.requestLog.deleteMany.mockRejectedValue(new Error('DB connection lost'));
+      // pruneOldLogs will throw — runAutoPrune catches it
+      // We test directly that pruneOldLogs throws
+      await expect(service.pruneOldLogs(1)).rejects.toThrow('DB connection lost');
+    });
+
+    it('should prune with the configured retention days', async () => {
+      service.setAutoPruneConfig({ retentionDays: 14 });
+      prisma.requestLog.deleteMany.mockResolvedValue({ count: 5 });
+      
+      const result = await service.pruneOldLogs(service.getAutoPruneConfig().retentionDays);
+      expect(result).toBe(5);
+      
+      // Verify the cutoff date is ~14 days ago
+      const call = prisma.requestLog.deleteMany.mock.calls[0][0];
+      const cutoff = call.where.createdAt.lt as Date;
+      const daysAgo = (Date.now() - cutoff.getTime()) / (24 * 60 * 60 * 1000);
+      expect(daysAgo).toBeGreaterThan(13.9);
+      expect(daysAgo).toBeLessThan(14.1);
     });
   });
 

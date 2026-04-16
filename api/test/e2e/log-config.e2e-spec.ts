@@ -535,4 +535,95 @@ describe('Log Configuration API (E2E)', () => {
         .expect(200);
     });
   });
+
+  // ─── Auto-Prune Configuration API ──────────────────────────────────
+
+  describe('Auto-prune configuration (GET/PUT /admin/log-config/prune)', () => {
+    it('GET /admin/log-config/prune should return current config', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body).toHaveProperty('enabled');
+      expect(res.body).toHaveProperty('retentionDays');
+      expect(res.body).toHaveProperty('intervalMs');
+      expect(typeof res.body.enabled).toBe('boolean');
+      expect(typeof res.body.retentionDays).toBe('number');
+      expect(typeof res.body.intervalMs).toBe('number');
+    });
+
+    it('PUT /admin/log-config/prune should update retentionDays', async () => {
+      const res = await request(app.getHttpServer())
+        .put('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ retentionDays: 30 })
+        .expect(200);
+
+      expect(res.body.retentionDays).toBe(30);
+
+      // Restore default
+      await request(app.getHttpServer())
+        .put('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ retentionDays: 1 })
+        .expect(200);
+    });
+
+    it('PUT /admin/log-config/prune should update enabled flag', async () => {
+      const res = await request(app.getHttpServer())
+        .put('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ enabled: false })
+        .expect(200);
+
+      expect(res.body.enabled).toBe(false);
+    });
+
+    it('PUT /admin/log-config/prune should reject intervalMs < 60000', async () => {
+      const before = (await request(app.getHttpServer())
+        .get('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)).body;
+
+      await request(app.getHttpServer())
+        .put('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ intervalMs: 5000 })
+        .expect(200);
+
+      // intervalMs should remain unchanged
+      const after = (await request(app.getHttpServer())
+        .get('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)).body;
+
+      expect(after.intervalMs).toBe(before.intervalMs);
+    });
+
+    it('PUT /admin/log-config/prune should reject retentionDays <= 0', async () => {
+      const before = (await request(app.getHttpServer())
+        .get('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)).body;
+
+      await request(app.getHttpServer())
+        .put('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ retentionDays: 0 })
+        .expect(200);
+
+      const after = (await request(app.getHttpServer())
+        .get('/scim/admin/log-config/prune')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)).body;
+
+      expect(after.retentionDays).toBe(before.retentionDays);
+    });
+  });
 });
