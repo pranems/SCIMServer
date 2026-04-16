@@ -2,6 +2,7 @@
 import { PrismaService } from '../prisma/prisma.service';
 import { ScimLogger } from '../logging/scim-logger.service';
 import { LogCategory } from '../logging/log-levels';
+import { isValidUuid } from '../../infrastructure/repositories/prisma/uuid-guard';
 
 export interface ActivitySummary {
   id: string;
@@ -755,6 +756,10 @@ export class ActivityParserService {
    * Resolve user ID to display name
    */
   private async resolveUserName(userId: string): Promise<string> {
+    // Guard: scimId is @db.Uuid — reject non-UUID identifiers to avoid
+    // PostgreSQL "invalid input syntax for type uuid" errors that
+    // waste pool connections and flood logs.
+    if (!isValidUuid(userId)) return userId;
     try {
       const user = await this.prisma.scimResource.findFirst({
         where: { scimId: userId, resourceType: 'User' },
@@ -787,6 +792,8 @@ export class ActivityParserService {
    * Resolve group ID to display name
    */
   private async resolveGroupName(groupId: string): Promise<string> {
+    // Guard: scimId is @db.Uuid — skip lookup for non-UUID values.
+    if (!isValidUuid(groupId)) return groupId;
     try {
       const group = await this.prisma.scimResource.findFirst({
         where: { scimId: groupId, resourceType: 'Group' },

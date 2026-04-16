@@ -24,6 +24,7 @@ import {
   type CompareNode,
   type LogicalNode,
 } from './scim-filter-parser';
+import { isValidUuid } from '../../../infrastructure/repositories/prisma/uuid-guard';
 
 // ─── Column Map Types ────────────────────────────────────────────────────────
 
@@ -260,6 +261,15 @@ function buildColumnFilter(
   const isStringType = type === 'citext' || type === 'varchar' || type === 'text';
   // Case-insensitive types (caseExact=false per RFC)
   const isCaseInsensitive = type === 'citext' || type === 'varchar';
+
+  // UUID columns: validate the value before sending to PostgreSQL.
+  // Per RFC 7643, SCIM `id` is a string — clients may send non-UUID values.
+  // A non-UUID value can never match a @db.Uuid column, so return a
+  // contradictory filter that yields zero results instead of crashing.
+  if (type === 'uuid' && typeof value === 'string' && !isValidUuid(value)) {
+    // Return impossible condition: id = a UUID that can never exist
+    return { [column]: '00000000-0000-0000-0000-000000000000', NOT: { [column]: '00000000-0000-0000-0000-000000000000' } };
+  }
 
   switch (op) {
     case 'eq':

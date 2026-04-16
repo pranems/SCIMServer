@@ -51,9 +51,19 @@ describe('apply-scim-filter', () => {
     });
 
     it('should push eq filter on id to DB (maps to scimId)', () => {
-      const result = buildUserFilter('id eq "abc-123"');
-      expect(result.dbWhere).toEqual({ scimId: 'abc-123' });
+      const result = buildUserFilter('id eq "a1b2c3d4-e5f6-7890-abcd-ef1234567890"');
+      expect(result.dbWhere).toEqual({ scimId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' });
       expect(result.fetchAll).toBe(false);
+    });
+
+    it('should return zero-result filter when id eq value is not a valid UUID', () => {
+      const result = buildUserFilter('id eq "not-a-uuid"');
+      // Non-UUID values can never match a @db.Uuid column — guard returns
+      // a contradictory filter instead of crashing PostgreSQL.
+      expect(result.dbWhere).toBeDefined();
+      expect(result.fetchAll).toBe(false);
+      // The dbWhere should NOT contain the raw non-UUID value
+      expect(JSON.stringify(result.dbWhere)).not.toContain('not-a-uuid');
     });
 
     it('should be case-insensitive on attribute name for DB push', () => {
@@ -255,9 +265,16 @@ describe('apply-scim-filter', () => {
     });
 
     it('should push eq filter on id to DB (maps to scimId)', () => {
-      const result = buildGroupFilter('id eq "group-uuid-1"');
-      expect(result.dbWhere).toEqual({ scimId: 'group-uuid-1' });
+      const result = buildGroupFilter('id eq "a1b2c3d4-e5f6-7890-abcd-ef1234567890"');
+      expect(result.dbWhere).toEqual({ scimId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' });
       expect(result.fetchAll).toBe(false);
+    });
+
+    it('should return zero-result filter when id eq value is not a valid UUID (Groups)', () => {
+      const result = buildGroupFilter('id eq "group-uuid-1"');
+      expect(result.dbWhere).toBeDefined();
+      expect(result.fetchAll).toBe(false);
+      expect(JSON.stringify(result.dbWhere)).not.toContain('group-uuid-1');
     });
 
     it('should be case-insensitive on attribute name', () => {
@@ -409,9 +426,16 @@ describe('apply-scim-filter', () => {
     });
 
     it('should push id eq to DB (uuid)', () => {
-      const result = buildGenericFilter('id eq "abc-123"');
-      expect(result.dbWhere).toEqual({ scimId: 'abc-123' });
+      const result = buildGenericFilter('id eq "a1b2c3d4-e5f6-7890-abcd-ef1234567890"');
+      expect(result.dbWhere).toEqual({ scimId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' });
       expect(result.fetchAll).toBe(false);
+    });
+
+    it('should return zero-result filter when id eq value is not a valid UUID (Generic)', () => {
+      const result = buildGenericFilter('id eq "abc-123"');
+      expect(result.dbWhere).toBeDefined();
+      expect(result.fetchAll).toBe(false);
+      expect(JSON.stringify(result.dbWhere)).not.toContain('abc-123');
     });
 
     // ─── co/sw/ew push-down ────────────────────────────────────────────
