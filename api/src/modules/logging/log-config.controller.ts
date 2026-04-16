@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { ScimLogger } from './scim-logger.service';
+import { LoggingService } from './logging.service';
 import {
   LogLevel,
   LogCategory,
@@ -33,7 +34,10 @@ import {
  */
 @Controller('admin/log-config')
 export class LogConfigController {
-  constructor(private readonly scimLogger: ScimLogger) {}
+  constructor(
+    private readonly scimLogger: ScimLogger,
+    private readonly loggingService: LoggingService,
+  ) {}
 
   /**
    * GET /scim/admin/log-config
@@ -347,5 +351,39 @@ export class LogConfigController {
       const ndjson = entries.map(e => JSON.stringify(e)).join('\n') + '\n';
       res.send(ndjson);
     }
+  }
+
+  // ── Auto-Prune Configuration ──────────────────────────────────────
+
+  /**
+   * GET /scim/admin/log-config/prune
+   * Returns the current auto-prune configuration.
+   */
+  @Get('prune')
+  getAutoPruneConfig() {
+    return this.loggingService.getAutoPruneConfig();
+  }
+
+  /**
+   * PUT /scim/admin/log-config/prune
+   * Update auto-prune configuration at runtime.
+   * Body: { retentionDays?: number, intervalMs?: number, enabled?: boolean }
+   */
+  @Put('prune')
+  updateAutoPruneConfig(@Body() body: Record<string, unknown>) {
+    const config: { retentionDays?: number; intervalMs?: number; enabled?: boolean } = {};
+
+    if (typeof body.retentionDays === 'number' && body.retentionDays > 0) {
+      config.retentionDays = body.retentionDays;
+    }
+    if (typeof body.intervalMs === 'number' && body.intervalMs >= 60_000) {
+      config.intervalMs = body.intervalMs;
+    }
+    if (typeof body.enabled === 'boolean') {
+      config.enabled = body.enabled;
+    }
+
+    this.loggingService.setAutoPruneConfig(config);
+    return this.loggingService.getAutoPruneConfig();
   }
 }

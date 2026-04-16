@@ -7731,6 +7731,43 @@ if ($lfeId) {
 Write-Host "`n--- 9z-K: logFileEnabled Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-L: AUTO-PRUNE CONFIG API + DATABASE STATS TYPE
+$script:currentSection = "9z-L: Auto-Prune + DB Stats"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-L: AUTO-PRUNE CONFIG API + DATABASE STATS TYPE" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# --- Test 9z-L.1: GET auto-prune config ---
+Write-Host "`n--- Test 9z-L.1: GET /admin/log-config/prune ---" -ForegroundColor Cyan
+$pruneConfig = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/prune" -Method GET -Headers $headers
+Test-Result -Success ($null -ne $pruneConfig) -Message "9z-L.1: GET prune config returns response"
+Test-Result -Success ($null -ne $pruneConfig.retentionDays) -Message "9z-L.2: Has retentionDays field"
+Test-Result -Success ($null -ne $pruneConfig.intervalMs) -Message "9z-L.3: Has intervalMs field"
+Test-Result -Success ($pruneConfig.PSObject.Properties.Name -contains 'enabled') -Message "9z-L.4: Has enabled field"
+
+# --- Test 9z-L.5: PUT auto-prune config ---
+Write-Host "`n--- Test 9z-L.5: PUT /admin/log-config/prune ---" -ForegroundColor Cyan
+$updateBody = @{ retentionDays = 14; enabled = $false } | ConvertTo-Json
+$updatedPrune = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/prune" -Method PUT -Headers $headers -Body $updateBody -ContentType "application/json"
+Test-Result -Success ($updatedPrune.retentionDays -eq 14) -Message "9z-L.5: PUT updates retentionDays to 14"
+Test-Result -Success ($updatedPrune.enabled -eq $false) -Message "9z-L.6: PUT updates enabled to false"
+
+# --- Test 9z-L.7: Restore prune config ---
+$restoreBody = @{ retentionDays = 1; enabled = $true } | ConvertTo-Json
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config/prune" -Method PUT -Headers $headers -Body $restoreBody -ContentType "application/json" | Out-Null
+Test-Result -Success $true -Message "9z-L.7: Restored prune config"
+
+# --- Test 9z-L.8: Database statistics includes database.type ---
+Write-Host "`n--- Test 9z-L.8: Database statistics type field ---" -ForegroundColor Cyan
+$dbStats = Invoke-RestMethod -Uri "$baseUrl/scim/admin/database/statistics" -Method GET -Headers $headers
+Test-Result -Success ($null -ne $dbStats.database) -Message "9z-L.8: Statistics has database field"
+Test-Result -Success ($dbStats.database.type -eq 'PostgreSQL' -or $dbStats.database.type -eq 'In-Memory') -Message "9z-L.9: database.type is PostgreSQL or In-Memory (got: $($dbStats.database.type))"
+Test-Result -Success ($dbStats.database.persistenceBackend -eq 'prisma' -or $dbStats.database.persistenceBackend -eq 'inmemory') -Message "9z-L.10: persistenceBackend is prisma or inmemory (got: $($dbStats.database.persistenceBackend))"
+
+Write-Host "`n--- 9z-L: Auto-Prune + DB Stats Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

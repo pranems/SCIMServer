@@ -120,6 +120,8 @@ This is a **self-improving audit prompt** for verifying that the SCIMServer logg
 | 10.3 | Config change audit log | Check PUT handler | Logs at INFO with before/after changes |
 | 10.4 | GET /admin/log-config/audit endpoint exists | Check controller | Filters ring buffer by CONFIG, ENDPOINT, AUTH categories |
 | 10.5 | Download supports NDJSON and JSON | Check download handler | `?format=json` or `?format=ndjson` (default) |
+| 10.6 | GET /admin/log-config/prune returns auto-prune config | Check controller | Returns `{ enabled, retentionDays, intervalMs }` |
+| 10.7 | PUT /admin/log-config/prune accepts partial updates | Check controller | Validates `retentionDays > 0`, `intervalMs >= 60000`, `enabled` boolean |
 
 ### 11. Exception Filters
 
@@ -164,11 +166,11 @@ Section 6 (SSE): __/6 PASS
 Section 7 (File): __/6 PASS
 Section 8 (Output): __/5 PASS
 Section 9 (Sensitive): __/4 PASS
-Section 10 (Admin API): __/5 PASS
+Section 10 (Admin API): __/7 PASS
 Section 11 (Filters): __/9 PASS
 Section 12 (Factory): __/4 PASS
 
-TOTAL: __/71 PASS
+TOTAL: __/73 PASS
 ```
 
 ---
@@ -177,7 +179,7 @@ TOTAL: __/71 PASS
 
 ```
 Date: April 15, 2026
-Version: 0.35.0
+Version: 0.37.0
 Executor: AI (Claude Opus 4.6, source-verified)
 
 Section 1 (Core): 6/6 PASS
@@ -189,11 +191,13 @@ Section 6 (SSE): 6/6 PASS
 Section 7 (File): 6/6 PASS
 Section 8 (Output): 5/5 PASS
 Section 9 (Sensitive): 4/4 PASS
-Section 10 (Admin API): 5/5 PASS
+Section 10 (Admin API): 7/7 PASS
 Section 11 (Filters): 9/9 PASS
 Section 12 (Factory): 4/4 PASS
 
-TOTAL: 71/71 PASS
+TOTAL: 73/73 PASS
 ```
 
-Re-verified after April 14 changes (activity controller fix, backup removal, database stats, App.tsx re-render fix). Focused re-verification on sections 4, 10, 11, 12 — all core logging infrastructure confirmed intact.
+Re-verified after v0.36.0 P0–P3 performance hardening. Added 2 new checkpoints:
+- 10.6: GET /admin/log-config/prune (auto-prune config read)
+- 10.7: PUT /admin/log-config/prune (auto-prune config update with validation)

@@ -1,4 +1,4 @@
-﻿import { Injectable, OnModuleDestroy } from '@nestjs/common';
+﻿import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import type { Prisma } from '../../generated/prisma/client';
 import { randomUUID } from 'crypto';
 
@@ -19,8 +19,14 @@ export interface CreateRequestLogOptions {
 }
 
 @Injectable()
-export class LoggingService implements OnModuleDestroy {
+export class LoggingService implements OnModuleDestroy, OnModuleInit {
   private readonly isInMemoryBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() === 'inmemory';
+
+  // ── Auto-prune configuration ──
+  private autoPruneRetentionDays: number = Number(process.env.LOG_RETENTION_DAYS) || 21;
+  private autoPruneIntervalMs: number = Number(process.env.LOG_PRUNE_INTERVAL_MS) || 60 * 60 * 1000; // default: 1 hour
+  private autoPruneTimer: ReturnType<typeof setInterval> | null = null;
+  private autoPruneEnabled: boolean = (process.env.LOG_AUTO_PRUNE ?? 'true').toLowerCase() !== 'false';
 
   // ── Buffered logging for performance ──
   // Buffering trades real-time logging (up to 3s data loss on crash) for reduced
@@ -52,6 +58,62 @@ export class LoggingService implements OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly logger: ScimLogger,
   ) {}
+
+  // ── Auto-prune lifecycle ──
+
+  async onModuleInit(): Promise<void> {
+    if (this.autoPruneEnabled && !this.isInMemoryBackend) {
+      this.logger.info(LogCategory.DATABASE, `Auto-prune enabled: retention=${this.autoPruneRetentionDays}d, interval=${this.autoPruneIntervalMs}ms`);
+      // Run initial prune after a short delay (don't block startup)
+      setTimeout(() => void this.runAutoPrune(), 5_000);
+      // Schedule recurring prune
+      this.autoPruneTimer = setInterval(() => void this.runAutoPrune(), this.autoPruneIntervalMs);
+    }
+  }
+
+  private async runAutoPrune(): Promise<void> {
+    try {
+      const pruned = await this.pruneOldLogs(this.autoPruneRetentionDays);
+      if (pruned > 0) {
+        this.logger.info(LogCategory.DATABASE, `Auto-pruned ${pruned} log entries (retention: ${this.autoPruneRetentionDays}d)`);
+      }
+    } catch (err) {
+      this.logger.error(LogCategory.DATABASE, `Auto-prune failed: ${(err as Error).message}`);
+    }
+  }
+
+  /** Get current auto-prune configuration */
+  getAutoPruneConfig() {
+    return {
+      enabled: this.autoPruneEnabled,
+      retentionDays: this.autoPruneRetentionDays,
+      intervalMs: this.autoPruneIntervalMs,
+    };
+  }
+
+  /** Update auto-prune configuration at runtime */
+  setAutoPruneConfig(config: { retentionDays?: number; intervalMs?: number; enabled?: boolean }): void {
+    if (config.retentionDays !== undefined && config.retentionDays > 0) {
+      this.autoPruneRetentionDays = config.retentionDays;
+    }
+    if (config.intervalMs !== undefined && config.intervalMs >= 60_000) {
+      this.autoPruneIntervalMs = config.intervalMs;
+    }
+    if (config.enabled !== undefined) {
+      this.autoPruneEnabled = config.enabled;
+    }
+
+    // Restart the timer with new interval
+    if (this.autoPruneTimer) {
+      clearInterval(this.autoPruneTimer);
+      this.autoPruneTimer = null;
+    }
+    if (this.autoPruneEnabled && !this.isInMemoryBackend) {
+      this.autoPruneTimer = setInterval(() => void this.runAutoPrune(), this.autoPruneIntervalMs);
+    }
+
+    this.logger.info(LogCategory.CONFIG, `Auto-prune config updated: enabled=${this.autoPruneEnabled}, retention=${this.autoPruneRetentionDays}d, interval=${this.autoPruneIntervalMs}ms`);
+  }
 
   /**
    * Buffer a request log entry. The entry is written to the DB asynchronously
@@ -203,11 +265,15 @@ export class LoggingService implements OnModuleDestroy {
     }
   }
 
-  /** Flush remaining log entries on application shutdown. */
+  /** Flush remaining log entries and stop timers on application shutdown. */
   async onModuleDestroy(): Promise<void> {
     if (this.flushTimer) {
       clearTimeout(this.flushTimer);
       this.flushTimer = null;
+    }
+    if (this.autoPruneTimer) {
+      clearInterval(this.autoPruneTimer);
+      this.autoPruneTimer = null;
     }
     await this.flushLogs();
   }
