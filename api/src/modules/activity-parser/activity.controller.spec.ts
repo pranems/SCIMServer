@@ -360,6 +360,66 @@ describe('ActivityController', () => {
     });
   });
 
+  // ── getActivitySummary — uses count() for all fields ───────────────────────
+
+  describe('getActivitySummary — SQL-level counting', () => {
+    it('should use count() for all summary fields (no findMany)', async () => {
+      // All 4 fields should use count() — no findMany at all
+      (prismaService.requestLog.count as jest.Mock)
+        .mockResolvedValueOnce(100)   // last24Hours
+        .mockResolvedValueOnce(500)   // lastWeek
+        .mockResolvedValueOnce(200)   // userOperations
+        .mockResolvedValueOnce(50);   // groupOperations
+
+      const result = await controller.getActivitySummary();
+
+      expect(result.summary.last24Hours).toBe(100);
+      expect(result.summary.lastWeek).toBe(500);
+      expect(result.summary.operations.users).toBe(200);
+      expect(result.summary.operations.groups).toBe(50);
+
+      // Verify findMany was NOT called (count-only approach)
+      expect(prismaService.requestLog.findMany).not.toHaveBeenCalled();
+
+      // Verify count was called exactly 4 times
+      expect(prismaService.requestLog.count).toHaveBeenCalledTimes(4);
+    });
+
+    it('should exclude admin traffic in all count queries', async () => {
+      (prismaService.requestLog.count as jest.Mock).mockResolvedValue(0);
+
+      await controller.getActivitySummary();
+
+      const calls = (prismaService.requestLog.count as jest.Mock).mock.calls;
+      // Every call should contain admin exclusion
+      for (const call of calls) {
+        const where = JSON.stringify(call[0]?.where ?? {});
+        expect(where).toContain('/admin/');
+      }
+    });
+
+    it('should exclude keepalive in user and time-based counts', async () => {
+      (prismaService.requestLog.count as jest.Mock).mockResolvedValue(0);
+
+      await controller.getActivitySummary();
+
+      const calls = (prismaService.requestLog.count as jest.Mock).mock.calls;
+      // First 3 calls (24h, 7d, users) should have keepalive exclusion (NOT clause with method=GET)
+      for (let i = 0; i < 3; i++) {
+        const where = JSON.stringify(calls[i][0]?.where ?? {});
+        expect(where).toContain('GET');
+      }
+    });
+
+    it('should not return system operations key', async () => {
+      (prismaService.requestLog.count as jest.Mock).mockResolvedValue(0);
+
+      const result = await controller.getActivitySummary();
+
+      expect(result.summary.operations).not.toHaveProperty('system');
+    });
+  });
+
   // ── InMemory fallback paths ───────────────────────────────────────────────
 
   describe('InMemory backend fallback', () => {
@@ -403,7 +463,7 @@ describe('ActivityController', () => {
       const result = await inmemController.getActivitySummary();
       expect(result.summary.last24Hours).toBe(0);
       expect(result.summary.lastWeek).toBe(0);
-      expect(result.summary.operations).toEqual({ users: 0, groups: 0, system: 0 });
+      expect(result.summary.operations).toEqual({ users: 0, groups: 0 });
     });
   });
 });

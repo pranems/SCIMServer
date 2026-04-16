@@ -164,7 +164,7 @@ export class ActivityController {
         summary: {
           last24Hours: 0,
           lastWeek: 0,
-          operations: { users: 0, groups: 0, system: 0 },
+          operations: { users: 0, groups: 0 },
         },
       };
     }
@@ -173,41 +173,52 @@ export class ActivityController {
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const selectFields = {
-      method: true,
-      url: true,
-      status: true,
-      identifier: true as const,
-    };
-
     // Common exclusion: admin traffic should never count as SCIM operations
     const notAdmin = { url: { not: { contains: '/admin/' } } };
 
-    const [recentDayLogs, recentWeekLogs, userLogs, groupOperations] = await Promise.all([
-      this.prisma.requestLog.findMany({
+    // SQL-level keepalive exclusion — Entra keepalive probes are:
+    // method=GET + url contains /Users + identifier IS NULL + status < 400 + url has ?filter=
+    // We EXCLUDE these by using NOT { AND: [all keepalive conditions] }
+    const notKeepalive = {
+      NOT: {
+        AND: [
+          { method: 'GET' },
+          { url: { contains: '/Users' } },
+          { identifier: null },
+          { OR: [{ status: null }, { status: { lt: 400 } }] },
+          { url: { contains: '?filter=' } },
+        ],
+      },
+    };
+
+    const [last24Hours, lastWeek, userOperations, groupOperations] = await Promise.all([
+      // Last 24h: non-admin, non-keepalive count
+      this.prisma.requestLog.count({
         where: {
           createdAt: { gte: oneDayAgo },
           ...notAdmin,
+          ...notKeepalive,
         },
-        select: selectFields,
       }),
-      this.prisma.requestLog.findMany({
+      // Last 7d: non-admin, non-keepalive count
+      this.prisma.requestLog.count({
         where: {
           createdAt: { gte: oneWeekAgo },
           ...notAdmin,
+          ...notKeepalive,
         },
-        select: selectFields,
       }),
-      this.prisma.requestLog.findMany({
+      // User operations: non-admin, non-keepalive, URL contains /Users
+      this.prisma.requestLog.count({
         where: {
           AND: [
             { url: { contains: '/Users' } },
             notAdmin,
+            notKeepalive,
           ],
         },
-        select: selectFields,
       }),
-      // Groups: use count() — keepalive probes only target /Users, never /Groups
+      // Group operations: non-admin count (keepalive only targets /Users, not /Groups)
       this.prisma.requestLog.count({
         where: {
           AND: [
@@ -217,13 +228,6 @@ export class ActivityController {
         },
       }),
     ]);
-
-    const removeKeepalive = (logs: Array<{ method: string; url: string; status: number | null; identifier: string | null }>) =>
-      logs.filter((log) => !this.activityParser.isKeepaliveLog(log)).length;
-
-    const last24Hours = removeKeepalive(recentDayLogs);
-    const lastWeek = removeKeepalive(recentWeekLogs);
-    const userOperations = removeKeepalive(userLogs);
 
     return {
       summary: {
