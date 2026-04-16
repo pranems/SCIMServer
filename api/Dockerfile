@@ -30,11 +30,14 @@ COPY --from=build /app/node_modules/@prisma/engines-version ./node_modules/@pris
 # Clean non-essential files
 RUN find ./node_modules -name "*.md" -delete 2>/dev/null || true && \
     find ./node_modules -name "*.map" -delete 2>/dev/null || true && \
+    find ./node_modules -path "*/effect" -prune -o -name "test*" -type d -exec rm -rf {} + 2>/dev/null || true && \
     find ./node_modules/@prisma/client/runtime -name "*.cockroachdb.*" -delete 2>/dev/null || true && \
     find ./node_modules/@prisma/client/runtime -name "*.mysql.*" -delete 2>/dev/null || true && \
     find ./node_modules/@prisma/client/runtime -name "*.sqlite.*" -delete 2>/dev/null || true && \
     find ./node_modules/@prisma/client/runtime -name "*.sqlserver.*" -delete 2>/dev/null || true && \
-    rm -rf ./node_modules/typescript ./node_modules/@types 2>/dev/null || true
+    rm -rf ./node_modules/typescript ./node_modules/@types 2>/dev/null || true && \
+    rm -rf ./node_modules/@prisma/studio-core/dist/ui 2>/dev/null || true && \
+    rm -rf ./node_modules/@prisma/client/generator-build 2>/dev/null || true
 
 # ── Stage 3: Minimal runtime ────────────────────────────────────────
 FROM node:24-alpine AS runtime
