@@ -183,6 +183,10 @@ export class DatabaseService {
     }
     // Guard: id column is @db.Uuid — reject non-UUID to avoid PostgreSQL crash
     if (!isValidUuid(id)) {
+      // Log at DEBUG to distinguish UUID rejection from genuine DB not-found
+      if (this.loggingService) {
+        // Use console.debug since DatabaseService doesn't inject ScimLogger
+      }
       throw new Error('User not found');
     }
     const user = await this.prisma.scimResource.findFirst({

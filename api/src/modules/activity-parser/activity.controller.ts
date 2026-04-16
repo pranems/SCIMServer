@@ -117,7 +117,9 @@ export class ActivityController {
     ]);
 
     // Parse each log into an activity summary
-    let activities: ActivitySummary[] = await Promise.all(
+    // Parse each log into an activity summary.
+    // Use allSettled to prevent one malformed log from crashing the entire page.
+    const results = await Promise.allSettled(
       logs.map(async log =>
         await this.activityParser.parseActivity({
           id: log.id,
@@ -131,6 +133,9 @@ export class ActivityController {
         })
       )
     );
+    let activities: ActivitySummary[] = results
+      .filter((r): r is PromiseFulfilledResult<ActivitySummary> => r.status === 'fulfilled')
+      .map(r => r.value);
 
     // Apply client-side filters
     if (type) {
