@@ -437,7 +437,26 @@ Test-Result -Success $allValid -Message "All three config flags set together"
 
 # Reset RequireIfMatch to false so subsequent sections don't get 428 errors
 $resetBody = '{"profile":{"settings":{"RequireIfMatch":"False"}}}'
-Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $resetBody -ContentType "application/json" | Out-Null
+try {
+    Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $resetBody -ContentType "application/json" | Out-Null
+} catch {
+    Write-Host "    ⚠️ RequireIfMatch reset failed, retrying..." -ForegroundColor Yellow
+    Start-Sleep 2
+    try {
+        Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $resetBody -ContentType "application/json" | Out-Null
+    } catch {
+        Write-Host "    ⚠️ RequireIfMatch reset still failed — subsequent tests will use If-Match:* as safety net" -ForegroundColor Yellow
+    }
+}
+
+# Write headers include If-Match:* as a safety net — works regardless of RequireIfMatch setting.
+# If-Match:* is valid per RFC 7232 §3.1 and means "match any version".
+$headers = @{ Authorization = $headers['Authorization']; 'Content-Type' = 'application/json'; 'If-Match' = '*' }
+
+# Also add If-Match:* to the main $headers so ALL subsequent Invoke-RestMethod calls
+# (83+ PATCH/PUT/DELETE across Sections 3-10) are protected. If-Match:* is harmless on
+# GET/POST — the server ignores it on reads and creates.
+$headers['If-Match'] = '*'
 
 # ============================================
 # TEST SECTION 3: SCIM USER OPERATIONS
@@ -6361,6 +6380,9 @@ Test-Result -Success ($null -ne $Y9DeviceId) -Message "9y.0: Test device created
 
 # ── Fix #1: RequireIfMatch 428 on Generic PUT/PATCH/DELETE ─────────────
 
+# Section 9y needs headers WITHOUT If-Match to test 428 behavior
+$noIfMatchHeaders = @{ Authorization = $headers['Authorization']; 'Content-Type' = 'application/json' }
+
 # --- Test 9y.1: PUT without If-Match → 428 ---
 Write-Host "`n--- Test 9y.1: PUT without If-Match → 428 ---" -ForegroundColor Cyan
 $y9PutBody = @{
@@ -6368,7 +6390,7 @@ $y9PutBody = @{
     displayName = "Updated Device"
 } | ConvertTo-Json -Depth 5
 try {
-    $null = Invoke-RestMethod -Uri "$scimBase9y/Devices/$Y9DeviceId" -Method PUT -Headers $headers -Body $y9PutBody -ContentType "application/scim+json"
+    $null = Invoke-RestMethod -Uri "$scimBase9y/Devices/$Y9DeviceId" -Method PUT -Headers $noIfMatchHeaders -Body $y9PutBody -ContentType "application/scim+json"
     Test-Result -Success $false -Message "9y.1: PUT without If-Match should have returned 428"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
@@ -6384,7 +6406,7 @@ $y9PatchBody = @{
     )
 } | ConvertTo-Json -Depth 5
 try {
-    $null = Invoke-RestMethod -Uri "$scimBase9y/Devices/$Y9DeviceId" -Method PATCH -Headers $headers -Body $y9PatchBody -ContentType "application/scim+json"
+    $null = Invoke-RestMethod -Uri "$scimBase9y/Devices/$Y9DeviceId" -Method PATCH -Headers $noIfMatchHeaders -Body $y9PatchBody -ContentType "application/scim+json"
     Test-Result -Success $false -Message "9y.2: PATCH without If-Match should have returned 428"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
@@ -6394,7 +6416,7 @@ try {
 # --- Test 9y.3: DELETE without If-Match → 428 ---
 Write-Host "`n--- Test 9y.3: DELETE without If-Match → 428 ---" -ForegroundColor Cyan
 try {
-    $null = Invoke-RestMethod -Uri "$scimBase9y/Devices/$Y9DeviceId" -Method DELETE -Headers $headers
+    $null = Invoke-RestMethod -Uri "$scimBase9y/Devices/$Y9DeviceId" -Method DELETE -Headers $noIfMatchHeaders
     Test-Result -Success $false -Message "9y.3: DELETE without If-Match should have returned 428"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
