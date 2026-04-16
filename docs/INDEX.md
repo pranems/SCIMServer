@@ -11,7 +11,7 @@
 |----------|-------------|
 | [README.md](../README.md) | Overview, quick start, architecture, compliance, deployment |
 | [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) | Living stats — LoC, test counts, dependency versions, architecture |
-| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 → v0.37.0 |
+| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 → v0.37.1 |
 | [admin.md](../admin.md) | Release workflow (version, tag, publish, update) |
 
 ## Deployment Guides
