@@ -23,7 +23,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
   private readonly isInMemoryBackend = (process.env.PERSISTENCE_BACKEND ?? 'prisma').toLowerCase() === 'inmemory';
 
   // ── Auto-prune configuration ──
-  private autoPruneRetentionDays: number = Number(process.env.LOG_RETENTION_DAYS) || 1;
+  private autoPruneRetentionDays: number = Number(process.env.LOG_RETENTION_DAYS) || 21;
   private autoPruneIntervalMs: number = Number(process.env.LOG_PRUNE_INTERVAL_MS) || 60 * 60 * 1000; // default: 1 hour
   private autoPruneTimer: ReturnType<typeof setInterval> | null = null;
   private autoPruneEnabled: boolean = (process.env.LOG_AUTO_PRUNE ?? 'true').toLowerCase() !== 'false';

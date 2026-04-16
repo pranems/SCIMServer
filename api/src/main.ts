@@ -91,7 +91,7 @@ async function bootstrap(): Promise<void> {
 
   // Set HTTP server request timeout — prevents any single request from blocking
   // the event loop indefinitely (e.g., slow DB queries, N+1 bugs).
-  // Default: 30 seconds. Override with REQUEST_TIMEOUT_MS env var.
+  // Default: 120 seconds (Node.js default). Override with REQUEST_TIMEOUT_MS env var.
   const httpServer = app.getHttpServer();
   httpServer.setTimeout(requestTimeoutMs);
   httpServer.keepAliveTimeout = requestTimeoutMs;
