@@ -640,4 +640,51 @@ describe('LogConfigController', () => {
       }
     });
   });
+
+  // ── Auto-Prune Endpoints ──────────────────────────────────────────
+
+  describe('getAutoPruneConfig', () => {
+    it('should delegate to loggingService.getAutoPruneConfig()', () => {
+      const result = controller.getAutoPruneConfig();
+      expect(result).toEqual({ enabled: true, retentionDays: 1, intervalMs: 3600000 });
+    });
+  });
+
+  describe('updateAutoPruneConfig', () => {
+    it('should pass valid retentionDays to setAutoPruneConfig', () => {
+      const mockSet = (controller as any).loggingService.setAutoPruneConfig;
+      controller.updateAutoPruneConfig({ retentionDays: 30 });
+      expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ retentionDays: 30 }));
+    });
+
+    it('should pass valid intervalMs to setAutoPruneConfig', () => {
+      const mockSet = (controller as any).loggingService.setAutoPruneConfig;
+      controller.updateAutoPruneConfig({ intervalMs: 120000 });
+      expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ intervalMs: 120000 }));
+    });
+
+    it('should pass enabled flag to setAutoPruneConfig', () => {
+      const mockSet = (controller as any).loggingService.setAutoPruneConfig;
+      controller.updateAutoPruneConfig({ enabled: false });
+      expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }));
+    });
+
+    it('should ignore retentionDays <= 0', () => {
+      const mockSet = (controller as any).loggingService.setAutoPruneConfig;
+      controller.updateAutoPruneConfig({ retentionDays: 0 });
+      expect(mockSet).toHaveBeenCalledWith({});
+    });
+
+    it('should ignore intervalMs < 60000', () => {
+      const mockSet = (controller as any).loggingService.setAutoPruneConfig;
+      controller.updateAutoPruneConfig({ intervalMs: 5000 });
+      expect(mockSet).toHaveBeenCalledWith({});
+    });
+
+    it('should return updated config from getAutoPruneConfig', () => {
+      const result = controller.updateAutoPruneConfig({ retentionDays: 14 });
+      // Returns the mock's return value
+      expect(result).toEqual({ enabled: true, retentionDays: 1, intervalMs: 3600000 });
+    });
+  });
 });
