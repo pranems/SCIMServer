@@ -179,7 +179,7 @@ TOTAL: __/73 PASS
 
 ```
 Date: April 15, 2026
-Version: 0.36.0
+Version: 0.37.0
 Executor: AI (Claude Opus 4.6, source-verified)
 
 Section 1 (Core): 6/6 PASS

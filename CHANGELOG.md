@@ -5,6 +5,15 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.37.0] - 2026-04-15
+
+### Version Bump & Full Validation Pipeline
+- Version bump from 0.36.0 → 0.37.0 across package.json, docs, prompts
+- Full end-to-end validation pipeline: Local (PostgreSQL) + Docker + Standalone + Azure
+- All test counts verified: 3,241 unit (82 suites), 965 E2E (46 suites), ~753 live assertions
+- Clean Docker image rebuild and GHCR push
+- Azure deployment with preserved endpoints (12 endpoints: 7 MS-entraid-*-ISV + 5 ISV-1)
+
 ## [0.36.0] - 2026-04-15
 
 ### Web UI Overhaul & Test Infrastructure
