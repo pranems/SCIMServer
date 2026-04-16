@@ -40,6 +40,10 @@ interface Statistics {
     totalRequests: number;
     last24Hours: number;
   };
+  database?: {
+    type: string;
+    persistenceBackend: 'prisma' | 'inmemory';
+  };
 }
 
 type TabType = 'statistics' | 'users' | 'groups';

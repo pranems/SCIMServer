@@ -1,4 +1,5 @@
-﻿import { defineConfig } from 'vite';
+﻿/// <reference types="vitest/config" />
+import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
@@ -11,5 +12,12 @@ export default defineConfig({
         changeOrigin: true
       }
     }
+  },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    css: { modules: { classNameStrategy: 'non-scoped' } },
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
   }
 });

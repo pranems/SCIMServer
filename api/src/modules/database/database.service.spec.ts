@@ -360,6 +360,7 @@ describe('DatabaseService', () => {
         users: { total: 10, active: 8, inactive: 2 },
         groups: { total: 3 },
         activity: { totalRequests: 100, last24Hours: 20 },
+        database: { type: 'PostgreSQL', persistenceBackend: 'prisma' },
       });
     });
   });
@@ -431,6 +432,7 @@ describe('DatabaseService', () => {
       expect(result.users.inactive).toBe(1);
       expect(result.groups.total).toBe(1);
       expect(result.activity).toEqual({ totalRequests: 0, last24Hours: 0 });
+      expect(result.database).toEqual({ type: 'In-Memory', persistenceBackend: 'inmemory' });
     });
 
     it('should filter users by search term in inmemory mode', async () => {

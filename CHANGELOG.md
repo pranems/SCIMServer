@@ -5,6 +5,36 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.36.0] - 2026-04-15
+
+### Web UI Overhaul & Test Infrastructure
+
+**UI Bug Fixes:**
+- Fixed infinite re-render loop in Raw Logs tab (input boxes flickering) — replaced `setFilters` → `useRef` pattern
+- Fixed StatisticsTab hardcoding "SQLite" — now shows `PostgreSQL` or `In-Memory` from backend API
+- Removed dead `fetchBackupStats()` code from Header — endpoint deleted in v0.23.0, was spamming console with 404s every 30s
+- Removed "Made by Loïc MICHEL" from footer — shows "SCIMServer" with dynamic version
+- Fixed hardcoded `v0.9.1` version fallback — footer now shows nothing until API responds
+
+**Activity Summary Fix:**
+- Fixed `getActivitySummary()` — `groups` count now excludes admin traffic and applies keepalive filtering (was raw `count()`)
+- Removed inflated `system` operations category from summary (was including all admin/health/oauth/discovery traffic)
+
+**Backend Enhancement:**
+- `GET /admin/database/statistics` now returns `database: { type, persistenceBackend }` — UI reads dynamically instead of hardcoding
+
+**Web UI Test Infrastructure (NEW):**
+- Vitest + @testing-library/react: 16 test files, 152 component tests
+- Playwright E2E: 6 spec files, 86 live browser tests against running server
+- Self-improving audit prompt: `.github/prompts/uiTestAndValidation.prompt.md`
+- New documentation: `docs/WEB_UI_FLOWS_AND_BEHAVIORS.md` (20 sections, 7 Mermaid diagrams)
+
+**API E2E Gap Closure:**
+- `test-gaps-audit-3.e2e-spec.ts`: +9 tests covering returned:always on PUT/PATCH write-response, ETag on LIST/.search, .search query-param projection, returned:request on LIST
+
+**Tests (80 unit suites, 3,206 tests — 46 E2E suites, 960 tests — 16 web UI files, 152 Vitest — 6 Playwright files, 86 E2E):**
+- Total: ~5,249 tests across all layers
+
 ## [0.35.0] - 2026-04-13
 
 ### Documentation & Observability Overhaul
@@ -26,8 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Cross-doc freshness sweep**: 13 stale items fixed (LOG_LEVEL names, ring buffer default, LoggingModule components)
 
-**Tests (80 unit suites, 3,206 tests — 45 E2E suites, 950 tests):**
+**Tests (80 unit suites, 3,206 tests — 46 E2E suites, 960 tests):**
 - +11 E2E tests: audit trail, log pruning, PATCH diagnostics, per-endpoint history, minDurationMs, slowRequestThresholdMs
+- +9 E2E tests (`test-gaps-audit-3`): returned:always on write-response, ETag on LIST/.search, .search query-param projection, returned:request on LIST
+- +152 Web UI Vitest tests (16 files): token, keepalive, semver, Header, LogList, LogDetail, LogFilters, ActivityFeed, DatabaseBrowser, StatisticsTab, UsersTab, GroupsTab, ManualProvision, API client
+- +86 Playwright E2E tests (6 files): app-shell, activity-feed, raw-logs, database-browser, manual-provision, live-data-verification
 
 ## [0.34.0] - 2026-04-10
 
