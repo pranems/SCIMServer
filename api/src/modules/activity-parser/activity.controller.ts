@@ -183,7 +183,7 @@ export class ActivityController {
     // Common exclusion: admin traffic should never count as SCIM operations
     const notAdmin = { url: { not: { contains: '/admin/' } } };
 
-    const [recentDayLogs, recentWeekLogs, userLogs, groupLogs] = await Promise.all([
+    const [recentDayLogs, recentWeekLogs, userLogs, groupOperations] = await Promise.all([
       this.prisma.requestLog.findMany({
         where: {
           createdAt: { gte: oneDayAgo },
@@ -207,14 +207,14 @@ export class ActivityController {
         },
         select: selectFields,
       }),
-      this.prisma.requestLog.findMany({
+      // Groups: use count() — keepalive probes only target /Users, never /Groups
+      this.prisma.requestLog.count({
         where: {
           AND: [
             { url: { contains: '/Groups' } },
             notAdmin,
           ],
         },
-        select: selectFields,
       }),
     ]);
 
@@ -224,7 +224,6 @@ export class ActivityController {
     const last24Hours = removeKeepalive(recentDayLogs);
     const lastWeek = removeKeepalive(recentWeekLogs);
     const userOperations = removeKeepalive(userLogs);
-    const groupOperations = removeKeepalive(groupLogs);
 
     return {
       summary: {
