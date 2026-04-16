@@ -10,7 +10,7 @@
 |--------|-------|
 | **Source files** (`api/src/**/*.ts`) | 127 |
 | **Source LoC** | 29,837 |
-| **Unit test files** (`api/src/**/*.spec.ts`) | 80 |
+| **Unit test files** (`api/src/**/*.spec.ts`) | 82 |
 | **Unit test LoC** | 32,776 |
 | **E2E test files** (`api/test/e2e/**/*.e2e-spec.ts`) | 46 |
 | **E2E test LoC** | ~13,300 |
@@ -22,13 +22,13 @@
 
 | Layer | Suites | Tests | Skip | Status |
 |-------|--------|-------|------|--------|
-| **Unit** | 80 | 3,206 | 0 | ✅ All pass |
+| **Unit** | 82 | 3,237 | 0 | ✅ All pass |
 | **E2E** | 46 | 960 | 0 | ✅ All pass |
 | **Live (main)** | 43 sections | ~739 | 0 | ✅ All pass |
 | **Live (Lexmark ISV)** | 13 sections | 112 | 0 | ✅ All pass |
-| **Total** | **~169** | **~4,981** | 0 | ✅ All pass |
+| **Total** | **~171** | **~5,012** | 0 | ✅ All pass |
 
-### Unit Test Suites (80)
+### Unit Test Suites (82)
 
 **Domain layer (11):** patch engines (6), schema validators (5)  
 **Infrastructure (7):** repositories (inmemory 3, prisma 3, module 1)  

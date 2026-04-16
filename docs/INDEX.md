@@ -1,7 +1,7 @@
 # 📚 SCIMServer Documentation Index
 
 > **Version:** 0.36.0 · **Updated:** April 15, 2026  
-> 64 active docs in `docs/` · 46 E2E suites (960 pass) · 80 unit suites (3,206 pass) · 6 built-in presets
+> 64 active docs in `docs/` · 46 E2E suites (960 pass) · 82 unit suites (3,237 pass) · 6 built-in presets
 
 ---
 
@@ -11,7 +11,7 @@
 |----------|-------------|
 | [README.md](../README.md) | Overview, quick start, architecture, compliance, deployment |
 | [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) | Living stats — LoC, test counts, dependency versions, architecture |
-| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 → v0.35.0 |
+| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 → v0.36.0 |
 | [admin.md](../admin.md) | Release workflow (version, tag, publish, update) |
 
 ## Deployment Guides
@@ -82,7 +82,7 @@
 
 | Document | Description |
 |----------|-------------|
-| [P4_ATTRIBUTE_CHARACTERISTIC_DEEP_ANALYSIS.md](P4_ATTRIBUTE_CHARACTERISTIC_DEEP_ANALYSIS.md) | **Latest (v0.35.0)** — source-verified gap analysis, 19 gaps, 3 actionable fixes |
+| [P4_ATTRIBUTE_CHARACTERISTIC_DEEP_ANALYSIS.md](P4_ATTRIBUTE_CHARACTERISTIC_DEEP_ANALYSIS.md) | **Latest (v0.36.0)** — source-verified gap analysis, 19 gaps, 3 actionable fixes |
 | [ATTRIBUTE_CHARACTERISTICS_GAPS.md](ATTRIBUTE_CHARACTERISTICS_GAPS.md) | Gap matrix — characteristic enforcement status |
 | [RFC7643_ATTRIBUTE_CHARACTERISTICS_FULL_AUDIT.md](RFC7643_ATTRIBUTE_CHARACTERISTICS_FULL_AUDIT.md) | Full RFC 7643 attribute characteristic audit |
 | [RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md](RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md) | Attribute characteristics analysis |
@@ -105,7 +105,7 @@
 
 | Document | Description |
 |----------|-------------|
-| [DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md](DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md) | **v0.35.0 deep analysis** — security, SOLID, DRY, DTO, data integrity, RFC gaps, 25-item roadmap |
+| [DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md](DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md) | **v0.36.0 deep analysis** — security, SOLID, DRY, DTO, data integrity, RFC gaps, 25-item roadmap |
 | [LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md](LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md) | **v3.0 quality audit** — 20-gap register, 5 open, 14 resolved, 1 accepted, source-verified |
 | [LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md](LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md) | **v3.0 error handling architecture** — 21 sections, error catalog by status code, 5 Mermaid diagrams, 5-layer error boundary |
 | [ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md](ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md) | Historical bug log with RCA and resolution |
@@ -136,7 +136,7 @@
 | Extension Examples | [examples/endpoint/create-endpoint-with-custom-extensions.json](examples/endpoint/create-endpoint-with-custom-extensions.json) | 12 one-click endpoint+extension combos + PATCH/User/Group usage examples |
 | Mermaid Diagrams | [create-user-sequence.mmd](create-user-sequence.mmd), [list-get-user-sequence.mmd](list-get-user-sequence.mmd) | Sequence diagrams |
 
-> **Note:** All collections were regenerated for v0.35.0 with full 82-endpoint coverage (19 controllers) including multi-tenant endpoint architecture, admin management, per-endpoint credentials, /Me, custom resource types, database browser, activity feed, per-endpoint logs, and structured logging.
+> **Note:** All collections were regenerated for v0.36.0 with full 82-endpoint coverage (19 controllers) including multi-tenant endpoint architecture, admin management, per-endpoint credentials, /Me, custom resource types, database browser, activity feed, per-endpoint logs, and structured logging.
 
 ## Archived Documentation
 
@@ -146,12 +146,12 @@
 
 ---
 
-## Current Test Counts (v0.35.0)
+## Current Test Counts (v0.36.0)
 
 | Suite | Suites | Tests | Status |
 |-------|--------|-------|--------|
-| Unit | 80 | 3,206 | ✅ All pass |
+| Unit | 82 | 3,237 | ✅ All pass |
 | E2E | 46 | 960 | ✅ All pass |
 | Live (main) | 43 sections | ~739 | ✅ All pass |
 | Live (Lexmark ISV) | 13 sections | 112 | ✅ All pass |
-| **Total** | **~182** | **~4,969** | **✅ All pass** |
+| **Total** | **~184** | **~5,000** | **✅ All pass** |

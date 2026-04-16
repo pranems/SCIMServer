@@ -611,11 +611,11 @@ Invoke-RestMethod -Method PUT "$base/scim/admin/log-config/level/INFO" -Headers 
 
 | Layer | Suites | Tests | Framework |
 |-------|--------|-------|-----------|
-| **Unit** | 80 | 3,206 | Jest + ts-jest |
+| **Unit** | 82 | 3,237 | Jest + ts-jest |
 | **E2E** | 46 | 960 | Jest + supertest + NestJS testing |
 | **Live Integration** | 43 sections | ~739 | PowerShell (live-test.ps1) |
 | **ISV Live (Lexmark)** | 13 sections | 112 | PowerShell (lexmark-live-test.ps1) |
-| **Total** | **~182** | **~4,981** | — |
+| **Total** | **~184** | **~5,012** | — |
 
 ### Run Tests
 
