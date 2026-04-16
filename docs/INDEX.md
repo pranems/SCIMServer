@@ -1,7 +1,7 @@
 # 📚 SCIMServer Documentation Index
 
 > **Version:** 0.36.0 · **Updated:** April 15, 2026  
-> 64 active docs in `docs/` · 46 E2E suites (960 pass) · 82 unit suites (3,237 pass) · 6 built-in presets
+> 65 active docs in `docs/` · 46 E2E suites (965 pass) · 82 unit suites (3,241 pass) · 6 built-in presets
 
 ---
 
@@ -151,8 +151,8 @@
 
 | Suite | Suites | Tests | Status |
 |-------|--------|-------|--------|
-| Unit | 82 | 3,237 | ✅ All pass |
-| E2E | 46 | 960 | ✅ All pass |
-| Live (main) | 43 sections | ~739 | ✅ All pass |
+| Unit | 82 | 3,241 | ✅ All pass |
+| E2E | 46 | 965 | ✅ All pass |
+| Live (main) | 43 sections | ~753 | ✅ All pass |
 | Live (Lexmark ISV) | 13 sections | 112 | ✅ All pass |
 | **Total** | **~184** | **~5,000** | **✅ All pass** |

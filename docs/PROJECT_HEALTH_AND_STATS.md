@@ -22,9 +22,9 @@
 
 | Layer | Suites | Tests | Skip | Status |
 |-------|--------|-------|------|--------|
-| **Unit** | 82 | 3,237 | 0 | ✅ All pass |
-| **E2E** | 46 | 960 | 0 | ✅ All pass |
-| **Live (main)** | 43 sections | ~739 | 0 | ✅ All pass |
+| **Unit** | 82 | 3,241 | 0 | ✅ All pass |
+| **E2E** | 46 | 965 | 0 | ✅ All pass |
+| **Live (main)** | 43 sections | ~753 | 0 | ✅ All pass |
 | **Live (Lexmark ISV)** | 13 sections | 112 | 0 | ✅ All pass |
 | **Total** | **~171** | **~5,012** | 0 | ✅ All pass |
 
