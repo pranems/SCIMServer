@@ -101,6 +101,77 @@ curl "https://<app-url>/scim/admin/log-config/download?format=json" -H "Authoriz
 
 ---
 
+## Dev / Prod Separation (Recommended)
+
+When the production instance has active users, deploy a **separate dev resource group** for development. This gives full blast-radius isolation — the production deployment is never touched during development.
+
+### Architecture
+
+```
+scimserver-rg           ← PROD (users) — do not touch
+├── VNet, subnets
+├── Container Apps Env + Log Analytics
+├── PostgreSQL Flexible Server (scimdb)
+└── Container App: scimserver2 (ghcr.io/pranems/scimserver:0.37.0)
+
+scimserver-rg-dev       ← DEV (your iteration) — fully isolated
+├── VNet, subnets
+├── Container Apps Env + Log Analytics
+├── PostgreSQL Flexible Server (scimdb)
+└── Container App: scimserver-dev (ghcr.io/pranems/scimserver:dev)
+```
+
+### Deploy Dev Environment
+
+```powershell
+# One-time: provision the full dev environment (~5 min, ~$15-25/mo)
+.\scripts\deploy-dev.ps1 -ProdResourceGroup "scimserver-rg"
+
+# Optional: deploy a specific image tag
+.\scripts\deploy-dev.ps1 -ProdResourceGroup "scimserver-rg" -ImageTag "dev"
+```
+
+### Daily Dev Workflow
+
+```powershell
+# Start dev PG server (if stopped to save costs)
+.\scripts\start-dev.ps1
+
+# ... develop, test, iterate ...
+.\scripts\live-test.ps1 -BaseUrl "https://scimserver-dev.<fqdn>" -ClientSecret "<dev-secret>"
+
+# Stop dev PG server when done (saves ~$12-20/mo)
+.\scripts\stop-dev.ps1
+```
+
+### Promote to Production
+
+```powershell
+# Promote the tested dev image tag to prod (rolling update, zero downtime)
+.\scripts\promote-to-prod.ps1 -ProdResourceGroup "scimserver-rg" -DevResourceGroup "scimserver-rg-dev"
+
+# Or promote a specific version directly
+.\scripts\promote-to-prod.ps1 -ProdResourceGroup "scimserver-rg" -ImageTag "0.38.0"
+```
+
+### Tear Down Dev (Optional)
+
+```powershell
+# Delete the entire dev resource group when no longer needed
+az group delete --name scimserver-rg-dev --yes --no-wait
+```
+
+### Dev/Prod Scripts Summary
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/deploy-dev.ps1` | Provision isolated dev environment (separate RG, VNet, PG, Container App) |
+| `scripts/start-dev.ps1` | Start stopped dev PostgreSQL server |
+| `scripts/stop-dev.ps1` | Stop dev PostgreSQL server to save costs |
+| `scripts/promote-to-prod.ps1` | Update prod Container App image to a tested version |
+
+---
+
 ## Docker Compose (Self-Hosted)
 
 ```yaml
