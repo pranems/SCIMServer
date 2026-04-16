@@ -1,7 +1,7 @@
 # 📚 SCIMServer Documentation Index
 
-> **Version:** 0.35.0 · **Updated:** April 13, 2026  
-> 62 active docs in `docs/` · 45 E2E suites (950 pass) · 80 unit suites (3,206 pass) · 6 built-in presets
+> **Version:** 0.36.0 · **Updated:** April 15, 2026  
+> 64 active docs in `docs/` · 46 E2E suites (960 pass) · 80 unit suites (3,206 pass) · 6 built-in presets
 
 ---
 
@@ -39,6 +39,7 @@
 | [SCHEMA_CUSTOMIZATION_GUIDE.md](SCHEMA_CUSTOMIZATION_GUIDE.md) | **v3.0** Operator guide — custom extensions, resource types, profile-based (source-verified) |
 | [H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md](H1_H2_ARCHITECTURE_AND_IMPLEMENTATION.md) | PATCH validation architecture + immutable enforcement |
 | [LOGGING_AND_OBSERVABILITY.md](LOGGING_AND_OBSERVABILITY.md) | **v4.0** Structured logging — 21 sections, 3 Mermaid diagrams, 10 troubleshooting scenarios, source-verified, zero-dep stack |
+| [WEB_UI_FLOWS_AND_BEHAVIORS.md](WEB_UI_FLOWS_AND_BEHAVIORS.md) | **v1.0** Web UI — 20 sections, 5 screens, data source matrix, 116 tests, 7 Mermaid diagrams, source-verified |
 
 ## SCIM Protocol & RFC Compliance
 
@@ -150,7 +151,7 @@
 | Suite | Suites | Tests | Status |
 |-------|--------|-------|--------|
 | Unit | 80 | 3,206 | ✅ All pass |
-| E2E | 45 | 950 | ✅ All pass |
+| E2E | 46 | 960 | ✅ All pass |
 | Live (main) | 43 sections | ~739 | ✅ All pass |
 | Live (Lexmark ISV) | 13 sections | 112 | ✅ All pass |
-| **Total** | **~181** | **~4,959** | **✅ All pass** |
+| **Total** | **~182** | **~4,969** | **✅ All pass** |

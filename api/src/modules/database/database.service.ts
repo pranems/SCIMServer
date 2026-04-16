@@ -278,6 +278,10 @@ export class DatabaseService {
         totalRequests: totalLogs,
         last24Hours: recentActivity,
       },
+      database: {
+        type: 'PostgreSQL',
+        persistenceBackend: 'prisma' as const,
+      },
     };
   }
 
@@ -379,6 +383,10 @@ export class DatabaseService {
       users: { total: totalUsers, active: activeUsers, inactive: totalUsers - activeUsers },
       groups: { total: totalGroups },
       activity: { totalRequests: 0, last24Hours: 0 },
+      database: {
+        type: 'In-Memory',
+        persistenceBackend: 'inmemory' as const,
+      },
     };
   }
 }

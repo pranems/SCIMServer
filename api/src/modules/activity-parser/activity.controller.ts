@@ -180,37 +180,41 @@ export class ActivityController {
       identifier: true as const,
     };
 
-    const [recentDayLogs, recentWeekLogs, userLogs, groupOperations, systemOperations] = await Promise.all([
+    // Common exclusion: admin traffic should never count as SCIM operations
+    const notAdmin = { url: { not: { contains: '/admin/' } } };
+
+    const [recentDayLogs, recentWeekLogs, userLogs, groupLogs] = await Promise.all([
       this.prisma.requestLog.findMany({
         where: {
           createdAt: { gte: oneDayAgo },
-          url: { not: { contains: '/admin/' } },
+          ...notAdmin,
         },
         select: selectFields,
       }),
       this.prisma.requestLog.findMany({
         where: {
           createdAt: { gte: oneWeekAgo },
-          url: { not: { contains: '/admin/' } },
+          ...notAdmin,
         },
         select: selectFields,
       }),
       this.prisma.requestLog.findMany({
         where: {
-          url: { contains: '/Users' },
+          AND: [
+            { url: { contains: '/Users' } },
+            notAdmin,
+          ],
         },
         select: selectFields,
       }),
-      this.prisma.requestLog.count({
+      this.prisma.requestLog.findMany({
         where: {
-          url: { contains: '/Groups' },
+          AND: [
+            { url: { contains: '/Groups' } },
+            notAdmin,
+          ],
         },
-      }),
-      this.prisma.requestLog.count({
-        where: {
-          url: { not: { contains: '/Users' } },
-          AND: { url: { not: { contains: '/Groups' } } },
-        },
+        select: selectFields,
       }),
     ]);
 
@@ -220,6 +224,7 @@ export class ActivityController {
     const last24Hours = removeKeepalive(recentDayLogs);
     const lastWeek = removeKeepalive(recentWeekLogs);
     const userOperations = removeKeepalive(userLogs);
+    const groupOperations = removeKeepalive(groupLogs);
 
     return {
       summary: {
@@ -228,7 +233,6 @@ export class ActivityController {
         operations: {
           users: userOperations,
           groups: groupOperations,
-          system: systemOperations,
         },
       },
     };

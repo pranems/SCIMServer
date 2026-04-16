@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchLogs, clearLogs, fetchLog, RequestLogItem, LogQuery, LogListResponse, fetchLocalVersion, VersionInfo, DeploymentInfo } from './api/client';
 import { TOKEN_INVALID_EVENT } from './auth/token';
 import { LogList } from './components/LogList';
@@ -225,7 +225,11 @@ const AppContent: React.FC = () => {
         count: filteredItems.length,
         total: Math.max(0, rest.total - removedThisPage)
       });
-      setFilters(q); // persist any page reset
+      // Only persist filters when they actually changed (override or page reset)
+      // Avoids infinite re-render loop: setFilters → new ref → load changes → effect re-fires
+      if (override || applyPageReset) {
+        setFilters(q);
+      }
     } catch (e: any) {
       const message = e?.message ?? 'Unknown error';
       if (typeof message === 'string' && (message.includes('401') || message.includes('not configured'))) {
@@ -239,6 +243,15 @@ const AppContent: React.FC = () => {
       setLoading(false);
     }
   }, [filters, token, hideKeepalive]);
+
+  // Stable ref to the latest load function — used by effects that should NOT
+  // re-trigger when load's identity changes (avoids infinite re-render loops).
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  const loadingRef = useRef(loading);
+  loadingRef.current = loading;
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
 
   async function handleClear() {
     if (!token) {
@@ -337,16 +350,19 @@ const AppContent: React.FC = () => {
   }, [githubRepo]);
   useEffect(() => {
     if (!auto || !token) return;
-    const h = setInterval(() => { if (!loading && !selected) load(); }, 10000);
+    const h = setInterval(() => {
+      if (!loadingRef.current && !selectedRef.current) loadRef.current();
+    }, 10000);
     return () => clearInterval(h);
-  }, [auto, loading, selected, load, token]);
+  }, [auto, token]);
 
   // Refresh logs when switching to Raw Logs tab
   useEffect(() => {
     if (currentView === 'logs' && token) {
-      load();
+      loadRef.current();
     }
-  }, [currentView, load, token]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentView, token]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -636,8 +652,8 @@ const AppContent: React.FC = () => {
 
       <footer className={styles.footer}>
         <div className={styles.footerContent}>
-          <span>Made by <strong>Loïc MICHEL</strong></span>
-          <span>v{localVersion?.version || '0.9.1'}</span>
+          <span>SCIMServer</span>
+          {localVersion?.version && <span>v{localVersion.version}</span>}
           <a
             href="https://github.com/pranems/SCIMServer"
             target="_blank"

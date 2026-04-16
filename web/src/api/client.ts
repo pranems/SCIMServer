@@ -204,27 +204,6 @@ async function fetchWithAuth(input: RequestInfo, init: RequestInit = {}): Promis
   return response;
 }
 
-// Backup status
-export interface BackupStats {
-  backupCount: number;
-  lastBackupTime: string | null;
-  localDbPath: string;
-  azureFilesBackupPath: string;
-  mode: 'blob' | 'azureFiles' | 'none';
-  blobMode: boolean;
-  lastBackupSucceeded: boolean | null;
-  lastError: string | null;
-  restoredFromSnapshot: boolean;
-  initialRestoreAttempted: boolean;
-  hasSnapshots: boolean;
-}
-
-export async function fetchBackupStats(): Promise<BackupStats> {
-  const res = await fetchWithAuth(buildUrl('/scim/admin/backup/stats'));
-  if (!res.ok) throw new Error(`Failed to fetch backup stats: ${res.status}`);
-  return res.json();
-}
-
 export interface ScimUserResource {
   id: string;
   userName: string;

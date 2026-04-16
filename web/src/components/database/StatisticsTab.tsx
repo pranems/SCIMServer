@@ -14,6 +14,10 @@ interface Statistics {
     totalRequests: number;
     last24Hours: number;
   };
+  database?: {
+    type: string;
+    persistenceBackend: 'prisma' | 'inmemory';
+  };
 }
 
 interface StatisticsTabProps {
@@ -102,12 +106,14 @@ export const StatisticsTab: React.FC<StatisticsTabProps> = ({
           </div>
           <div className={styles.statContent}>
             <div className={styles.statMain}>
-              <span className={styles.statNumber}>SQLite</span>
+              <span className={styles.statNumber}>{statistics.database?.type ?? 'PostgreSQL'}</span>
               <span className={styles.statLabel}>Database Type</span>
             </div>
-            <div className={styles.statNote}>
-              ⚠️ Data is ephemeral in container environment
-            </div>
+            {statistics.database?.persistenceBackend === 'inmemory' && (
+              <div className={styles.statNote}>
+                ⚠️ Data is ephemeral — stored in memory only
+              </div>
+            )}
           </div>
         </div>
       </div>
