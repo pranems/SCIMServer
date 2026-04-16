@@ -86,7 +86,7 @@ async function bootstrap(): Promise<void> {
   );
 
   const port = Number(process.env.PORT ?? 3000);
-  const requestTimeoutMs = Number(process.env.REQUEST_TIMEOUT_MS) || 30_000;
+  const requestTimeoutMs = Number(process.env.REQUEST_TIMEOUT_MS) || 120_000;
   await app.listen(port);
 
   // Set HTTP server request timeout — prevents any single request from blocking
