@@ -100,6 +100,7 @@ export function isSubAttrKey(key: string): boolean {
 
 /**
  * Safely parse JSON, returning an empty object on failure.
+ * Logs a console.warn when invalid JSON is encountered (for traceability).
  */
 export function parseJson<T>(value: string | null | undefined): T {
   if (!value) {
@@ -107,7 +108,8 @@ export function parseJson<T>(value: string | null | undefined): T {
   }
   try {
     return JSON.parse(value) as T;
-  } catch {
+  } catch (e) {
+    console.warn('parseJson: corrupt JSON fallback to {}', (e as Error).message);
     return {} as T;
   }
 }

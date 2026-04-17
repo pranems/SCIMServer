@@ -7,6 +7,7 @@
  */
 import { PrismaUserRepository } from './prisma-user.repository';
 import type { PrismaService } from '../../../modules/prisma/prisma.service';
+import { RepositoryError } from '../../../domain/errors/repository-error';
 
 // ─── Factory helpers ──────────────────────────────────────────────────────────
 
@@ -125,6 +126,45 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
       expect(result).not.toHaveProperty('resourceType');
       expect(result).toHaveProperty('version', 1);
     });
+
+    it('should throw RepositoryError CONFLICT on P2002 unique constraint', async () => {
+      const prismaError = Object.assign(new Error('Unique constraint violation'), { code: 'P2002' });
+      (prisma.scimResource.create as jest.Mock).mockRejectedValue(prismaError);
+
+      await expect(repo.create({
+        endpointId: 'ep-1', scimId: SCIM_ID_1, externalId: null,
+        userName: 'alice', displayName: null, active: true,
+        rawPayload: '{}', meta: '{}',
+      })).rejects.toThrow(RepositoryError);
+
+      await expect(repo.create({
+        endpointId: 'ep-1', scimId: SCIM_ID_1, externalId: null,
+        userName: 'alice', displayName: null, active: true,
+        rawPayload: '{}', meta: '{}',
+      })).rejects.toMatchObject({ code: 'CONFLICT' });
+    });
+
+    it('should throw RepositoryError CONNECTION on P1001 connection error', async () => {
+      const prismaError = Object.assign(new Error('Can\'t reach database'), { code: 'P1001' });
+      (prisma.scimResource.create as jest.Mock).mockRejectedValue(prismaError);
+
+      await expect(repo.create({
+        endpointId: 'ep-1', scimId: SCIM_ID_1, externalId: null,
+        userName: 'alice', displayName: null, active: true,
+        rawPayload: '{}', meta: '{}',
+      })).rejects.toMatchObject({ code: 'CONNECTION' });
+    });
+
+    it('should throw RepositoryError UNKNOWN on unexpected Prisma error', async () => {
+      const prismaError = Object.assign(new Error('Something bad'), { code: 'P9999' });
+      (prisma.scimResource.create as jest.Mock).mockRejectedValue(prismaError);
+
+      await expect(repo.create({
+        endpointId: 'ep-1', scimId: SCIM_ID_1, externalId: null,
+        userName: 'alice', displayName: null, active: true,
+        rawPayload: '{}', meta: '{}',
+      })).rejects.toMatchObject({ code: 'UNKNOWN' });
+    });
   });
 
   // ─── findByScimId ────────────────────────────────────────────────────
@@ -162,6 +202,14 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
       expect(result).not.toBeNull();
       expect(result!.scimId).toBe(SCIM_ID_FOUND);
       expect(result!.userName).toBe('alice');
+    });
+
+    it('should throw RepositoryError CONNECTION on Prisma connection error', async () => {
+      const prismaError = Object.assign(new Error('Can\'t reach database'), { code: 'P1001' });
+      (prisma.scimResource.findFirst as jest.Mock).mockRejectedValue(prismaError);
+
+      await expect(repo.findByScimId('ep-1', SCIM_ID_1))
+        .rejects.toMatchObject({ code: 'CONNECTION' });
     });
   });
 
@@ -216,6 +264,14 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
       expect(result).toHaveLength(2);
       expect(result[0].userName).toBe('alice');
       expect(result[1].userName).toBe('bob');
+    });
+
+    it('should throw RepositoryError CONNECTION on Prisma connection error', async () => {
+      const prismaError = Object.assign(new Error('Can\'t reach database'), { code: 'P1001' });
+      (prisma.scimResource.findMany as jest.Mock).mockRejectedValue(prismaError);
+
+      await expect(repo.findAll('ep-1'))
+        .rejects.toMatchObject({ code: 'CONNECTION' });
     });
   });
 
@@ -314,6 +370,14 @@ describe('PrismaUserRepository (Phase 2 — unified table)', () => {
 
       const result = await repo.findConflict('ep-1', 'alice');
       expect(result).toBeNull();
+    });
+
+    it('should throw RepositoryError CONNECTION on Prisma connection error', async () => {
+      const prismaError = Object.assign(new Error('Can\'t reach database'), { code: 'P1001' });
+      (prisma.scimResource.findFirst as jest.Mock).mockRejectedValue(prismaError);
+
+      await expect(repo.findConflict('ep-1', 'alice'))
+        .rejects.toMatchObject({ code: 'CONNECTION' });
     });
   });
 

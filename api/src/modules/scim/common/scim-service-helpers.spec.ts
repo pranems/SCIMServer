@@ -50,6 +50,25 @@ describe('parseJson', () => {
     expect(parseJson('not json')).toEqual({});
   });
 
+  it('should log console.warn for invalid JSON', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    parseJson('not json');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('parseJson'),
+      expect.any(String),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('should not log console.warn for null/undefined/empty', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    parseJson(null);
+    parseJson(undefined);
+    parseJson('');
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
   it('should parse arrays', () => {
     expect(parseJson<string[]>('["a","b"]')).toEqual(['a', 'b']);
   });
