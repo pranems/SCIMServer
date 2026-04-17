@@ -166,6 +166,17 @@
                 "description": "Email address value."
               },
               {
+                "name": "display",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "A human-readable name, primarily used for display purposes. READ-ONLY."
+              },
+              {
                 "name": "type",
                 "type": "string",
                 "multiValued": false,
@@ -326,6 +337,17 @@
                 "description": "Phone number value."
               },
               {
+                "name": "display",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "A human-readable name, primarily used for display purposes. READ-ONLY."
+              },
+              {
                 "name": "type",
                 "type": "string",
                 "multiValued": false,
@@ -372,6 +394,17 @@
                 "mutability": "readWrite",
                 "returned": "default",
                 "description": "Instant messaging address value."
+              },
+              {
+                "name": "display",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "A human-readable name, primarily used for display purposes. READ-ONLY."
               },
               {
                 "name": "type",
@@ -425,6 +458,17 @@
                   "external"
                 ],
                 "description": "URL of a photo of the User."
+              },
+              {
+                "name": "display",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "A human-readable name, primarily used for display purposes. READ-ONLY."
               },
               {
                 "name": "type",
@@ -765,6 +809,10 @@
                 "required": false,
                 "mutability": "immutable",
                 "returned": "default",
+                "canonicalValues": [
+                  "User",
+                  "Group"
+                ],
                 "description": "The type of the member (e.g., \"User\")."
               }
             ]

@@ -91,7 +91,7 @@ describe('endpoint-profile.service (orchestrator)', () => {
       // Check auto-injected id
       const id = user.attributes.find(a => a.name === 'id');
       expect(id).toBeDefined();
-      expect(id!.required).toBe(true);
+      expect(id!.required).toBe(false); // RFC 7643 §3.1: readOnly, server-assigned
     });
 
     it('should expand rfc-standard "all" to full attribute lists', () => {

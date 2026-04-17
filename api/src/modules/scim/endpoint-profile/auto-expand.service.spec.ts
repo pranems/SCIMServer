@@ -32,7 +32,7 @@ describe('auto-expand.service', () => {
       expect(userName.multiValued).toBe(false);
       expect(userName.required).toBe(true);
       expect(userName.mutability).toBe('readWrite');
-      expect(userName.returned).toBe('always');
+      expect(userName.returned).toBe('default'); // RFC 7643 §8.7.1
       expect(userName.uniqueness).toBe('server');
     });
 
@@ -153,7 +153,7 @@ describe('auto-expand.service', () => {
       const names = result.schemas[0].attributes.map(a => a.name);
       expect(names).toContain('id');
       const id = result.schemas[0].attributes.find(a => a.name === 'id')!;
-      expect(id.required).toBe(true);
+      expect(id.required).toBe(false); // RFC 7643 §3.1: readOnly, server-assigned
       expect(id.mutability).toBe('readOnly');
     });
 

@@ -17,7 +17,7 @@
             "required": true,
             "caseExact": false,
             "mutability": "readWrite",
-            "returned": "always",
+            "returned": "default",
             "uniqueness": "server",
             "description": "Unique identifier for the User, typically used by the user to directly authenticate."
           },
@@ -64,11 +64,22 @@
                 "name": "value",
                 "type": "string",
                 "multiValued": false,
-                "required": true,
+                "required": false,
                 "caseExact": false,
                 "mutability": "readWrite",
-                "returned": "always",
+                "returned": "default",
                 "description": "Email address value."
+              },
+              {
+                "name": "display",
+                "type": "string",
+                "multiValued": false,
+                "required": false,
+                "caseExact": false,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "A human-readable name, primarily used for display purposes. READ-ONLY."
               },
               {
                 "name": "type",
@@ -120,8 +131,8 @@
             "required": true,
             "caseExact": false,
             "mutability": "readWrite",
-            "returned": "always",
-            "uniqueness": "server",
+            "returned": "default",
+            "uniqueness": "none",
             "description": "A human-readable name for the Group."
           },
           {
@@ -137,9 +148,9 @@
                 "name": "value",
                 "type": "string",
                 "multiValued": false,
-                "required": true,
+                "required": false,
                 "mutability": "immutable",
-                "returned": "always",
+                "returned": "default",
                 "description": "Identifier of the member."
               },
               {
@@ -172,6 +183,10 @@
                 "required": false,
                 "mutability": "immutable",
                 "returned": "default",
+                "canonicalValues": [
+                  "User",
+                  "Group"
+                ],
                 "description": "The type of the member (e.g., \"User\")."
               }
             ]
