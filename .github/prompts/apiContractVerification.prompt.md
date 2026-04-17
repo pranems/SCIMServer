@@ -191,13 +191,18 @@ Test-Result -Success ($extraKeys.Count -eq 0) -Message "No unexpected keys (extr
 
 | Endpoint Category | Allowlist Test | Denylist Test | Temporal Test |
 |-------------------|---------------|---------------|---------------|
-| Admin endpoints (full) | ? | ? | ? |
-| Admin endpoints (summary) | ? | ? | ? |
-| Admin endpoints (list) | ? | ? | ? |
-| SCIM User responses | ? | ? | N/A |
-| SCIM Group responses | ? | ? | N/A |
-| SCIM Error responses | ? | ? | N/A |
-| Discovery endpoints | ? | ? | N/A |
+| Admin endpoints (full) | ✅ Unit+E2E+Live | ✅ Unit+E2E+Live | ✅ Unit+E2E+Live |
+| Admin endpoints (summary) | ✅ Unit+E2E+Live | ✅ Unit+E2E+Live | N/A |
+| Admin endpoints (list) | ✅ Live | ✅ Live | N/A |
+| Admin endpoints (create/PATCH) | ✅ E2E | ✅ E2E | N/A |
+| Admin /version | N/A | ✅ E2E | N/A |
+| SCIM User responses (POST/GET/PUT/PATCH) | ✅ E2E | ✅ E2E | N/A |
+| SCIM Group responses (POST/GET/PATCH) | ✅ E2E | ✅ E2E | N/A |
+| SCIM ListResponse (Users/Groups/.search) | ✅ E2E | ✅ E2E (per-resource) | N/A |
+| SCIM Error responses (400/404/409) | ✅ E2E | implicit | N/A |
+| Discovery: ServiceProviderConfig | ✅ E2E | ✅ E2E | N/A |
+| Discovery: Schemas | ✅ E2E | ✅ E2E | N/A |
+| Discovery: ResourceTypes | ✅ E2E | ✅ E2E | N/A |
 
 ---
 
@@ -243,3 +248,4 @@ After completing the audit:
 | Date | Version | Findings | Tests Added |
 |------|---------|----------|-------------|
 | 2026-04-17 | v0.37.2 | Initial creation. `_schemaCaches` leak found in 4/16 Azure endpoints. Extension URN cross-contamination confirmed. 3 endpoints had stale settings keys. | Unit: +12, E2E: +4, Live: Section 9z-M (+10 assertions) |
+| 2026-04-17 | v0.37.2 | First full audit run. 82 endpoints across 18 controllers inventoried. Admin GET covered at all 3 levels. Added contract tests for: SCIM User (4), Group (3), ListResponse (3), Error (3), Discovery (3), Admin write (2), Admin version (1). | E2E: +19 (api-response-contracts.e2e-spec.ts) |
