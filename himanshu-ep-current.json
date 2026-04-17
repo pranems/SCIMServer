@@ -1,0 +1,1115 @@
+{
+  "id": "a4225b6d-d213-4183-ae78-ef11c14a5f54",
+  "name": "Himanshu-ISV-1",
+  "displayName": "Himanshu corp ISV",
+  "description": "Entra-ID profile endpoint for Himanshu Corp",
+  "profile": {
+    "schemas": [
+      {
+        "id": "urn:ietf:params:scim:schemas:core:2.0:User",
+        "name": "User",
+        "attributes": [
+          {
+            "name": "id",
+            "type": "string",
+            "required": true,
+            "returned": "always",
+            "caseExact": true,
+            "mutability": "readOnly",
+            "uniqueness": "server",
+            "description": "A unique identifier for a SCIM resource as defined by the service provider.",
+            "multiValued": false
+          },
+          {
+            "name": "meta",
+            "type": "complex",
+            "required": false,
+            "returned": "default",
+            "mutability": "readOnly",
+            "description": "A complex attribute containing resource metadata.",
+            "multiValued": false,
+            "subAttributes": [
+              {
+                "name": "resourceType",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": true,
+                "mutability": "readOnly",
+                "description": "The name of the resource type of the resource.",
+                "multiValued": false
+              },
+              {
+                "name": "created",
+                "type": "dateTime",
+                "required": false,
+                "returned": "default",
+                "mutability": "readOnly",
+                "description": "The DateTime that the resource was added to the service provider.",
+                "multiValued": false
+              },
+              {
+                "name": "lastModified",
+                "type": "dateTime",
+                "required": false,
+                "returned": "default",
+                "mutability": "readOnly",
+                "description": "The most recent DateTime that the details of this resource were updated at the service provider.",
+                "multiValued": false
+              },
+              {
+                "name": "location",
+                "type": "reference",
+                "required": false,
+                "returned": "default",
+                "caseExact": true,
+                "mutability": "readOnly",
+                "description": "The URI of the resource being returned.",
+                "multiValued": false,
+                "referenceTypes": [
+                  "uri"
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": true,
+                "mutability": "readOnly",
+                "description": "The version of the resource being returned (ETag).",
+                "multiValued": false
+              }
+            ]
+          },
+          {
+            "name": "userName",
+            "type": "string",
+            "required": true,
+            "returned": "always",
+            "caseExact": false,
+            "mutability": "readWrite",
+            "uniqueness": "server",
+            "description": "Unique identifier for the User, typically used by the user to directly authenticate.",
+            "multiValued": false
+          },
+          {
+            "name": "name",
+            "type": "complex",
+            "required": false,
+            "returned": "default",
+            "mutability": "readWrite",
+            "description": "The components of the user's real name.",
+            "multiValued": false,
+            "subAttributes": [
+              {
+                "name": "formatted",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "The full name.",
+                "multiValued": false
+              },
+              {
+                "name": "familyName",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "The family name.",
+                "multiValued": false
+              },
+              {
+                "name": "givenName",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "The given name.",
+                "multiValued": false
+              },
+              {
+                "name": "middleName",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "The middle name.",
+                "multiValued": false
+              },
+              {
+                "name": "honorificPrefix",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "The honorific prefix.",
+                "multiValued": false
+              },
+              {
+                "name": "honorificSuffix",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "The honorific suffix.",
+                "multiValued": false
+              }
+            ]
+          },
+          {
+            "name": "displayName",
+            "type": "string",
+            "required": true,
+            "returned": "default",
+            "caseExact": false,
+            "mutability": "readWrite",
+            "description": "The name of the User, suitable for display to end-users.",
+            "multiValued": false
+          },
+          {
+            "name": "nickName",
+            "type": "string",
+            "required": false,
+            "returned": "default",
+            "caseExact": false,
+            "mutability": "readWrite",
+            "description": "The casual way to address the user in real life.",
+            "multiValued": false
+          },
+          {
+            "name": "profileUrl",
+            "type": "reference",
+            "required": false,
+            "returned": "default",
+            "caseExact": false,
+            "mutability": "readWrite",
+            "description": "A fully qualified URL pointing to a page representing the User's online profile.",
+            "multiValued": false,
+            "referenceTypes": [
+              "external"
+            ]
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "required": false,
+            "returned": "default",
+            "caseExact": false,
+            "mutability": "readWrite",
+            "description": "The user's title, such as \"Vice President\".",
+            "multiValued": false,
+            "canonicalValues": [
+              "Engineer",
+              "PM"
+            ]
+          },
+          {
+            "name": "userType",
+            "type": "string",
+            "required": false,
+            "returned": "default",
+            "caseExact": false,
+            "mutability": "readWrite",
+            "description": "Used to identify the relationship between the organization and the user.",
+            "multiValued": false
+          },
+          {
+            "name": "emails",
+            "type": "complex",
+            "required": true,
+            "returned": "default",
+            "mutability": "readWrite",
+            "description": "Email addresses for the user.",
+            "multiValued": true,
+            "subAttributes": [
+              {
+                "name": "value",
+                "type": "string",
+                "required": true,
+                "returned": "always",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "Email address value.",
+                "multiValued": false
+              },
+              {
+                "name": "type",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "Label (e.g., \"work\", \"home\").",
+                "multiValued": false,
+                "canonicalValues": [
+                  "work",
+                  "home",
+                  "other"
+                ]
+              },
+              {
+                "name": "primary",
+                "type": "boolean",
+                "required": false,
+                "returned": "default",
+                "mutability": "readWrite",
+                "description": "Whether this is the primary email.",
+                "multiValued": false
+              }
+            ]
+          },
+          {
+            "name": "active",
+            "type": "boolean",
+            "required": false,
+            "returned": "always",
+            "mutability": "readWrite",
+            "description": "A Boolean value indicating the User's administrative status.",
+            "multiValued": false
+          },
+          {
+            "name": "externalId",
+            "type": "string",
+            "required": false,
+            "returned": "default",
+            "caseExact": true,
+            "mutability": "readWrite",
+            "uniqueness": "server",
+            "description": "An identifier for the Resource as defined by the Service Consumer.",
+            "multiValued": false
+          },
+          {
+            "name": "addresses",
+            "type": "complex",
+            "required": false,
+            "returned": "default",
+            "mutability": "readWrite",
+            "description": "A physical mailing address for this User.",
+            "multiValued": true,
+            "subAttributes": [
+              {
+                "name": "formatted",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "The full street address.",
+                "multiValued": false
+              },
+              {
+                "name": "streetAddress",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "The street address component.",
+                "multiValued": false
+              },
+              {
+                "name": "locality",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "The city or locality component.",
+                "multiValued": false
+              },
+              {
+                "name": "region",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "The state or region component.",
+                "multiValued": false
+              },
+              {
+                "name": "postalCode",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "The zip or postal code component.",
+                "multiValued": false
+              },
+              {
+                "name": "country",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "The country name component.",
+                "multiValued": false,
+                "canonicalValues": [
+                  "US",
+                  "IN"
+                ]
+              },
+              {
+                "name": "type",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "Label (e.g., \"work\", \"home\").",
+                "multiValued": false,
+                "canonicalValues": [
+                  "work",
+                  "home",
+                  "other"
+                ]
+              },
+              {
+                "name": "primary",
+                "type": "boolean",
+                "required": false,
+                "returned": "default",
+                "mutability": "readWrite",
+                "description": "Whether this is the primary address.",
+                "multiValued": false
+              }
+            ]
+          },
+          {
+            "name": "phoneNumbers",
+            "type": "complex",
+            "required": false,
+            "returned": "default",
+            "mutability": "readWrite",
+            "description": "Phone numbers for the User.",
+            "multiValued": true,
+            "subAttributes": [
+              {
+                "name": "value",
+                "type": "string",
+                "required": true,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "Phone number value.",
+                "multiValued": false
+              },
+              {
+                "name": "type",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "Label (e.g., \"work\", \"mobile\", \"fax\").",
+                "multiValued": false,
+                "canonicalValues": [
+                  "work",
+                  "home",
+                  "mobile",
+                  "fax",
+                  "pager",
+                  "other"
+                ]
+              },
+              {
+                "name": "primary",
+                "type": "boolean",
+                "required": false,
+                "returned": "default",
+                "mutability": "readWrite",
+                "description": "Whether this is the primary phone number.",
+                "multiValued": false
+              }
+            ]
+          },
+          {
+            "name": "ims",
+            "type": "complex",
+            "required": false,
+            "returned": "default",
+            "mutability": "readWrite",
+            "description": "Instant messaging addresses for the User.",
+            "multiValued": true,
+            "subAttributes": [
+              {
+                "name": "value",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "Instant messaging address value.",
+                "multiValued": false
+              },
+              {
+                "name": "type",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "Label (e.g., \"aim\", \"gtalk\").",
+                "multiValued": false,
+                "canonicalValues": [
+                  "aim",
+                  "gtalk",
+                  "icq",
+                  "xmpp",
+                  "msn",
+                  "skype",
+                  "qq",
+                  "yahoo"
+                ]
+              },
+              {
+                "name": "primary",
+                "type": "boolean",
+                "required": false,
+                "returned": "default",
+                "mutability": "readWrite",
+                "description": "Whether this is the primary IM address.",
+                "multiValued": false
+              }
+            ]
+          },
+          {
+            "name": "photos",
+            "type": "complex",
+            "required": false,
+            "returned": "default",
+            "mutability": "readWrite",
+            "description": "URLs of photos of the User.",
+            "multiValued": true,
+            "subAttributes": [
+              {
+                "name": "value",
+                "type": "reference",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "URL of a photo of the User.",
+                "multiValued": false,
+                "referenceTypes": [
+                  "external"
+                ]
+              },
+              {
+                "name": "type",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "readWrite",
+                "description": "Label (e.g., \"photo\", \"thumbnail\").",
+                "multiValued": false,
+                "canonicalValues": [
+                  "photo",
+                  "thumbnail"
+                ]
+              },
+              {
+                "name": "primary",
+                "type": "boolean",
+                "required": false,
+                "returned": "default",
+                "mutability": "readWrite",
+                "description": "Whether this is the primary photo.",
+                "multiValued": false
+              }
+            ]
+          },
+          {
+            "name": "roles",
+            "type": "complex",
+            "required": false,
+            "returned": "default",
+            "mutability": "readWrite",
+            "description": "A list of roles for the User.",
+            "multiValued": true,
+            "subAttributes": [
+              {
+                "name": "value",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "mutability": "readWrite",
+                "description": "The role value.",
+                "multiValued": false
+              },
+              {
+                "name": "display",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "mutability": "readWrite",
+                "description": "The display name.",
+                "multiValued": false
+              },
+              {
+                "name": "type",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "mutability": "readWrite",
+                "description": "The type label.",
+                "multiValued": false
+              },
+              {
+                "name": "primary",
+                "type": "boolean",
+                "required": false,
+                "returned": "default",
+                "mutability": "readWrite",
+                "description": "Whether this is the primary role.",
+                "multiValued": false
+              }
+            ]
+          },
+          {
+            "name": "entitlements",
+            "type": "complex",
+            "required": false,
+            "returned": "default",
+            "mutability": "readWrite",
+            "description": "A list of entitlements for the User that represent a thing the User has.",
+            "multiValued": true,
+            "subAttributes": [
+              {
+                "name": "value",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "mutability": "readWrite",
+                "description": "The entitlement value.",
+                "multiValued": false
+              },
+              {
+                "name": "display",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "mutability": "readWrite",
+                "description": "The display name.",
+                "multiValued": false
+              },
+              {
+                "name": "type",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "mutability": "readWrite",
+                "description": "The type label.",
+                "multiValued": false
+              },
+              {
+                "name": "primary",
+                "type": "boolean",
+                "required": false,
+                "returned": "default",
+                "mutability": "readWrite",
+                "description": "Whether this is the primary entitlement.",
+                "multiValued": false
+              }
+            ]
+          },
+          {
+            "name": "preferredLanguage",
+            "type": "string",
+            "required": false,
+            "returned": "default",
+            "caseExact": false,
+            "mutability": "readWrite",
+            "description": "Indicates the User's preferred written or spoken language (BCP 47).",
+            "multiValued": false
+          },
+          {
+            "name": "locale",
+            "type": "string",
+            "required": false,
+            "returned": "default",
+            "caseExact": false,
+            "mutability": "readWrite",
+            "description": "Used to indicate the User's default location for purposes of localizing items.",
+            "multiValued": false
+          },
+          {
+            "name": "timezone",
+            "type": "string",
+            "required": false,
+            "returned": "default",
+            "caseExact": false,
+            "mutability": "readWrite",
+            "description": "The User's time zone in the \"Olson\" time zone database format (e.g., \"America/Los_Angeles\").",
+            "multiValued": false
+          },
+          {
+            "name": "password",
+            "type": "string",
+            "required": false,
+            "returned": "never",
+            "caseExact": false,
+            "mutability": "writeOnly",
+            "description": "The User's cleartext password. This attribute is intended to be used as a means to specify an initial password when creating a new User or to reset an existing User's password.",
+            "multiValued": false
+          }
+        ],
+        "description": "User Account"
+      },
+      {
+        "id": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+        "name": "EnterpriseUser",
+        "attributes": [
+          {
+            "name": "employeeNumber",
+            "type": "string",
+            "required": false,
+            "returned": "default",
+            "caseExact": false,
+            "mutability": "readWrite",
+            "uniqueness": "none",
+            "description": "Numeric or alphanumeric identifier assigned to a person.",
+            "multiValued": false
+          },
+          {
+            "name": "costCenter",
+            "type": "string",
+            "required": false,
+            "returned": "default",
+            "caseExact": false,
+            "mutability": "readWrite",
+            "uniqueness": "none",
+            "description": "Identifies the name of a cost center.",
+            "multiValued": false
+          },
+          {
+            "name": "organization",
+            "type": "string",
+            "required": false,
+            "returned": "default",
+            "caseExact": false,
+            "mutability": "readWrite",
+            "uniqueness": "none",
+            "description": "Identifies the name of an organization.",
+            "multiValued": false
+          },
+          {
+            "name": "division",
+            "type": "string",
+            "required": false,
+            "returned": "default",
+            "caseExact": false,
+            "mutability": "readWrite",
+            "uniqueness": "none",
+            "description": "Identifies the name of a division.",
+            "multiValued": false
+          },
+          {
+            "name": "department",
+            "type": "string",
+            "required": false,
+            "returned": "default",
+            "caseExact": false,
+            "mutability": "readWrite",
+            "uniqueness": "none",
+            "description": "Identifies the name of a department.",
+            "multiValued": false,
+            "canonicalValues": [
+              "HR",
+              "Finance"
+            ]
+          },
+          {
+            "name": "manager",
+            "type": "complex",
+            "required": false,
+            "returned": "default",
+            "mutability": "readWrite",
+            "description": "The User's manager.",
+            "multiValued": false,
+            "subAttributes": [
+              {
+                "name": "value",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "mutability": "readWrite",
+                "description": "The id of the SCIM resource representing the User's manager.",
+                "multiValued": false
+              },
+              {
+                "name": "$ref",
+                "type": "reference",
+                "required": false,
+                "returned": "default",
+                "mutability": "readWrite",
+                "description": "The URI of the SCIM resource representing the User's manager.",
+                "multiValued": false,
+                "referenceTypes": [
+                  "User"
+                ]
+              },
+              {
+                "name": "displayName",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "mutability": "readOnly",
+                "description": "The displayName of the User's manager.",
+                "multiValued": false
+              }
+            ]
+          }
+        ],
+        "description": "Enterprise User Extension"
+      },
+      {
+        "id": "urn:ietf:params:scim:schemas:core:2.0:Group",
+        "name": "Group",
+        "attributes": [
+          {
+            "name": "id",
+            "type": "string",
+            "required": true,
+            "returned": "always",
+            "caseExact": true,
+            "mutability": "readOnly",
+            "uniqueness": "server",
+            "description": "A unique identifier for a SCIM resource as defined by the service provider.",
+            "multiValued": false
+          },
+          {
+            "name": "displayName",
+            "type": "string",
+            "required": true,
+            "returned": "always",
+            "caseExact": false,
+            "mutability": "readWrite",
+            "uniqueness": "server",
+            "description": "A human-readable name for the Group.",
+            "multiValued": false
+          },
+          {
+            "name": "members",
+            "type": "complex",
+            "required": false,
+            "returned": "default",
+            "mutability": "readWrite",
+            "description": "A list of members of the Group.",
+            "multiValued": true,
+            "subAttributes": [
+              {
+                "name": "value",
+                "type": "string",
+                "required": true,
+                "returned": "always",
+                "mutability": "immutable",
+                "description": "Identifier of the member.",
+                "multiValued": false
+              },
+              {
+                "name": "$ref",
+                "type": "reference",
+                "required": false,
+                "returned": "default",
+                "caseExact": false,
+                "mutability": "immutable",
+                "description": "The URI of the corresponding resource.",
+                "multiValued": false,
+                "referenceTypes": [
+                  "User",
+                  "Group"
+                ]
+              },
+              {
+                "name": "display",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "mutability": "immutable",
+                "description": "The display name of the member.",
+                "multiValued": false
+              },
+              {
+                "name": "type",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "mutability": "immutable",
+                "description": "The type of the member (e.g., \"User\").",
+                "multiValued": false
+              }
+            ]
+          },
+          {
+            "name": "externalId",
+            "type": "string",
+            "required": false,
+            "returned": "default",
+            "caseExact": true,
+            "mutability": "readWrite",
+            "uniqueness": "none",
+            "description": "An identifier for the Group as defined by the Service Consumer.",
+            "multiValued": false
+          },
+          {
+            "name": "meta",
+            "type": "complex",
+            "required": false,
+            "returned": "default",
+            "mutability": "readOnly",
+            "description": "A complex attribute containing resource metadata.",
+            "multiValued": false,
+            "subAttributes": [
+              {
+                "name": "resourceType",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": true,
+                "mutability": "readOnly",
+                "description": "The name of the resource type of the resource.",
+                "multiValued": false
+              },
+              {
+                "name": "created",
+                "type": "dateTime",
+                "required": false,
+                "returned": "default",
+                "mutability": "readOnly",
+                "description": "The DateTime that the resource was added to the service provider.",
+                "multiValued": false
+              },
+              {
+                "name": "lastModified",
+                "type": "dateTime",
+                "required": false,
+                "returned": "default",
+                "mutability": "readOnly",
+                "description": "The most recent DateTime that the details of this resource were updated at the service provider.",
+                "multiValued": false
+              },
+              {
+                "name": "location",
+                "type": "reference",
+                "required": false,
+                "returned": "default",
+                "caseExact": true,
+                "mutability": "readOnly",
+                "description": "The URI of the resource being returned.",
+                "multiValued": false,
+                "referenceTypes": [
+                  "uri"
+                ]
+              },
+              {
+                "name": "version",
+                "type": "string",
+                "required": false,
+                "returned": "default",
+                "caseExact": true,
+                "mutability": "readOnly",
+                "description": "The version of the resource being returned (ETag).",
+                "multiValued": false
+              }
+            ]
+          }
+        ],
+        "description": "Group"
+      },
+      {
+        "id": "urn:msfttest:cloud:scim:schemas:extension:custom:2.0:User",
+        "name": "MsftTestCustomUser",
+        "attributes": [],
+        "description": "Microsoft SCIM Validator custom User extension"
+      },
+      {
+        "id": "urn:msfttest:cloud:scim:schemas:extension:custom:2.0:Group",
+        "name": "MsftTestCustomGroup",
+        "attributes": [],
+        "description": "Microsoft SCIM Validator custom Group extension"
+      },
+      {
+        "id": "urn:ietf:params:scim:schemas:extension:msfttest:User",
+        "name": "MsftTestIetfUser",
+        "attributes": [
+          {
+            "name": "immutableId",
+            "type": "string",
+            "required": false,
+            "returned": "default",
+            "caseExact": true,
+            "mutability": "readWrite",
+            "uniqueness": "none",
+            "description": "Immutable identifier for directory sync.",
+            "multiValued": false
+          },
+          {
+            "name": "costCenter",
+            "type": "string",
+            "required": false,
+            "returned": "default",
+            "caseExact": false,
+            "mutability": "readWrite",
+            "uniqueness": "none",
+            "description": "Cost center code.",
+            "multiValued": false
+          }
+        ],
+        "description": "Microsoft SCIM Validator IETF User extension"
+      },
+      {
+        "id": "urn:ietf:params:scim:schemas:extension:msfttest:Group",
+        "name": "MsftTestIetfGroup",
+        "attributes": [
+          {
+            "name": "description",
+            "type": "string",
+            "required": false,
+            "returned": "default",
+            "caseExact": false,
+            "mutability": "readWrite",
+            "uniqueness": "none",
+            "description": "Extended group description.",
+            "multiValued": false
+          },
+          {
+            "name": "securityEnabled",
+            "type": "boolean",
+            "required": false,
+            "returned": "default",
+            "mutability": "readWrite",
+            "description": "Whether the group is security-enabled.",
+            "multiValued": false
+          }
+        ],
+        "description": "Microsoft SCIM Validator IETF Group extension"
+      }
+    ],
+    "settings": {
+      "logLevel": "INFO",
+      "logFileEnabled": "True",
+      "UserHardDeleteEnabled": "True",
+      "UserSoftDeleteEnabled": "True",
+      "VerbosePatchSupported": "True",
+      "GroupHardDeleteEnabled": "True",
+      "SchemaDiscoveryEnabled": "True",
+      "StrictSchemaValidation": "True",
+      "AllowAndCoerceBooleanStrings": "True",
+      "PatchOpAllowRemoveAllMembers": "True",
+      "MultiMemberPatchOpForGroupEnabled": "True"
+    },
+    "resourceTypes": [
+      {
+        "id": "User",
+        "name": "User",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
+        "endpoint": "/Users",
+        "description": "User Account",
+        "schemaExtensions": [
+          {
+            "schema": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+            "required": false
+          },
+          {
+            "schema": "urn:msfttest:cloud:scim:schemas:extension:custom:2.0:User",
+            "required": false
+          },
+          {
+            "schema": "urn:ietf:params:scim:schemas:extension:msfttest:User",
+            "required": false
+          }
+        ]
+      },
+      {
+        "id": "Group",
+        "name": "Group",
+        "schema": "urn:ietf:params:scim:schemas:core:2.0:Group",
+        "endpoint": "/Groups",
+        "description": "Group",
+        "schemaExtensions": [
+          {
+            "schema": "urn:msfttest:cloud:scim:schemas:extension:custom:2.0:Group",
+            "required": false
+          },
+          {
+            "schema": "urn:ietf:params:scim:schemas:extension:msfttest:Group",
+            "required": false
+          }
+        ]
+      }
+    ],
+    "serviceProviderConfig": {
+      "bulk": {
+        "supported": false
+      },
+      "etag": {
+        "supported": true
+      },
+      "sort": {
+        "supported": false
+      },
+      "patch": {
+        "supported": true
+      },
+      "filter": {
+        "supported": true,
+        "maxResults": 200
+      },
+      "changePassword": {
+        "supported": false
+      }
+    },
+    "_schemaCaches": {
+      "urn:ietf:params:scim:schemas:core:2.0:User": {
+        "booleansByParent": {},
+        "neverReturnedByParent": {},
+        "alwaysReturnedByParent": {},
+        "requestReturnedByParent": {},
+        "immutableByParent": {},
+        "caseExactByParent": {},
+        "caseExactPaths": {},
+        "uniqueAttrs": [],
+        "extensionUrns": [
+          "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+          "urn:msfttest:cloud:scim:schemas:extension:custom:2.0:User",
+          "urn:ietf:params:scim:schemas:extension:msfttest:User",
+          "urn:msfttest:cloud:scim:schemas:extension:custom:2.0:Group",
+          "urn:ietf:params:scim:schemas:extension:msfttest:Group"
+        ],
+        "coreSchemaUrn": "urn:ietf:params:scim:schemas:core:2.0:user",
+        "schemaUrnSet": {},
+        "coreAttrMap": {},
+        "extensionSchemaMap": {},
+        "readOnlyByParent": {},
+        "readOnlyCollected": {
+          "core": {},
+          "extensions": {},
+          "coreSubAttrs": {},
+          "extensionSubAttrs": {}
+        }
+      }
+    }
+  },
+  "active": true,
+  "scimBasePath": "/scim/endpoints/a4225b6d-d213-4183-ae78-ef11c14a5f54",
+  "createdAt": "2026-04-16T18:08:41.339Z",
+  "updatedAt": "2026-04-16T22:46:15.692Z",
+  "_links": {
+    "self": "/admin/endpoints/a4225b6d-d213-4183-ae78-ef11c14a5f54",
+    "stats": "/admin/endpoints/a4225b6d-d213-4183-ae78-ef11c14a5f54/stats",
+    "credentials": "/admin/endpoints/a4225b6d-d213-4183-ae78-ef11c14a5f54/credentials",
+    "scim": "/scim/endpoints/a4225b6d-d213-4183-ae78-ef11c14a5f54"
+  }
+}

@@ -67,36 +67,48 @@ export class PrismaGroupRepository implements IGroupRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(input: GroupCreateInput): Promise<GroupRecord> {
-    const created = await this.prisma.scimResource.create({
-      data: {
-        resourceType: 'Group',
-        scimId: input.scimId,
-        externalId: input.externalId,
-        displayName: input.displayName,
-        active: input.active ?? true,  // Settings v7: Groups default active=true
-        payload: JSON.parse(input.rawPayload),   // domain string → JSONB
-        meta: input.meta,
-        endpoint: { connect: { id: input.endpointId } },
-      },
-    });
-    return toGroupRecord(created as unknown as Record<string, unknown>);
+    try {
+      const created = await this.prisma.scimResource.create({
+        data: {
+          resourceType: 'Group',
+          scimId: input.scimId,
+          externalId: input.externalId,
+          displayName: input.displayName,
+          active: input.active ?? true,  // Settings v7: Groups default active=true
+          payload: JSON.parse(input.rawPayload),   // domain string → JSONB
+          meta: input.meta,
+          endpoint: { connect: { id: input.endpointId } },
+        },
+      });
+      return toGroupRecord(created as unknown as Record<string, unknown>);
+    } catch (error) {
+      throw wrapPrismaError(error, `Group create(${input.scimId})`);
+    }
   }
 
   async findByScimId(endpointId: string, scimId: string): Promise<GroupRecord | null> {
     if (!isValidUuid(scimId)) return null;   // PostgreSQL UUID column rejects non-UUID strings
-    const resource = await this.prisma.scimResource.findFirst({
-      where: { scimId, endpointId, resourceType: 'Group' },
-    });
-    return resource ? toGroupRecord(resource as unknown as Record<string, unknown>) : null;
+    try {
+      const resource = await this.prisma.scimResource.findFirst({
+        where: { scimId, endpointId, resourceType: 'Group' },
+      });
+      return resource ? toGroupRecord(resource as unknown as Record<string, unknown>) : null;
+    } catch (error) {
+      throw wrapPrismaError(error, `Group findByScimId(${scimId})`);
+    }
   }
 
   async findWithMembers(endpointId: string, scimId: string): Promise<GroupWithMembers | null> {
     if (!isValidUuid(scimId)) return null;   // PostgreSQL UUID column rejects non-UUID strings
-    const resource = await this.prisma.scimResource.findFirst({
-      where: { scimId, endpointId, resourceType: 'Group' },
-      include: { membersAsGroup: true },
-    });
-    return resource ? toGroupWithMembers(resource as unknown as Record<string, unknown>) : null;
+    try {
+      const resource = await this.prisma.scimResource.findFirst({
+        where: { scimId, endpointId, resourceType: 'Group' },
+        include: { membersAsGroup: true },
+      });
+      return resource ? toGroupWithMembers(resource as unknown as Record<string, unknown>) : null;
+    } catch (error) {
+      throw wrapPrismaError(error, `Group findWithMembers(${scimId})`);
+    }
   }
 
   async findAllWithMembers(
@@ -114,12 +126,16 @@ export class PrismaGroupRepository implements IGroupRepository {
       ? { [orderBy.field]: orderBy.direction }
       : { createdAt: 'asc' as const };
 
-    const resources = await this.prisma.scimResource.findMany({
-      where,
-      orderBy: prismaOrderBy,
-      include: { membersAsGroup: true },
-    });
-    return resources.map((r) => toGroupWithMembers(r as unknown as Record<string, unknown>));
+    try {
+      const resources = await this.prisma.scimResource.findMany({
+        where,
+        orderBy: prismaOrderBy,
+        include: { membersAsGroup: true },
+      });
+      return resources.map((r) => toGroupWithMembers(r as unknown as Record<string, unknown>));
+    } catch (error) {
+      throw wrapPrismaError(error, `Group findAllWithMembers(${endpointId})`);
+    }
   }
 
   async update(id: string, data: GroupUpdateInput): Promise<GroupRecord> {
@@ -165,11 +181,15 @@ export class PrismaGroupRepository implements IGroupRepository {
       where.NOT = { scimId: excludeScimId };
     }
 
-    const conflict = await this.prisma.scimResource.findFirst({
-      where,
-      select: { scimId: true, active: true },
-    });
-    return conflict ? { scimId: conflict.scimId, active: conflict.active } : null;
+    try {
+      const conflict = await this.prisma.scimResource.findFirst({
+        where,
+        select: { scimId: true, active: true },
+      });
+      return conflict ? { scimId: conflict.scimId, active: conflict.active } : null;
+    } catch (error) {
+      throw wrapPrismaError(error, `Group findByDisplayName(${endpointId}, ${displayName})`);
+    }
   }
 
   async findByExternalId(
@@ -186,22 +206,30 @@ export class PrismaGroupRepository implements IGroupRepository {
       where.NOT = { scimId: excludeScimId };
     }
 
-    const resource = await this.prisma.scimResource.findFirst({ where });
-    return resource ? toGroupRecord(resource as unknown as Record<string, unknown>) : null;
+    try {
+      const resource = await this.prisma.scimResource.findFirst({ where });
+      return resource ? toGroupRecord(resource as unknown as Record<string, unknown>) : null;
+    } catch (error) {
+      throw wrapPrismaError(error, `Group findByExternalId(${endpointId}, ${externalId})`);
+    }
   }
 
   async addMembers(groupId: string, members: MemberCreateInput[]): Promise<void> {
     if (members.length === 0) return;
-    await this.prisma.resourceMember.createMany({
-      data: members.map((m) => ({
-        groupResourceId: groupId,
-        memberResourceId: m.userId,
-        value: m.value,
-        type: m.type,
-        display: m.display,
-        createdAt: new Date(),
-      })),
-    });
+    try {
+      await this.prisma.resourceMember.createMany({
+        data: members.map((m) => ({
+          groupResourceId: groupId,
+          memberResourceId: m.userId,
+          value: m.value,
+          type: m.type,
+          display: m.display,
+          createdAt: new Date(),
+        })),
+      });
+    } catch (error) {
+      throw wrapPrismaError(error, `Group addMembers(${groupId})`);
+    }
   }
 
   async updateGroupWithMembers(

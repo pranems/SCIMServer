@@ -45,28 +45,36 @@ export class PrismaUserRepository implements IUserRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(input: UserCreateInput): Promise<UserRecord> {
-    const created = await this.prisma.scimResource.create({
-      data: {
-        resourceType: 'User',
-        scimId: input.scimId,
-        externalId: input.externalId,
-        userName: input.userName,
-        displayName: input.displayName,
-        active: input.active,
-        payload: JSON.parse(input.rawPayload),   // domain string → JSONB
-        meta: input.meta,
-        endpoint: { connect: { id: input.endpointId } },
-      },
-    });
-    return toUserRecord(created as unknown as Record<string, unknown>);
+    try {
+      const created = await this.prisma.scimResource.create({
+        data: {
+          resourceType: 'User',
+          scimId: input.scimId,
+          externalId: input.externalId,
+          userName: input.userName,
+          displayName: input.displayName,
+          active: input.active,
+          payload: JSON.parse(input.rawPayload),   // domain string → JSONB
+          meta: input.meta,
+          endpoint: { connect: { id: input.endpointId } },
+        },
+      });
+      return toUserRecord(created as unknown as Record<string, unknown>);
+    } catch (error) {
+      throw wrapPrismaError(error, `User create(${input.scimId})`);
+    }
   }
 
   async findByScimId(endpointId: string, scimId: string): Promise<UserRecord | null> {
     if (!isValidUuid(scimId)) return null;   // PostgreSQL UUID column rejects non-UUID strings
-    const resource = await this.prisma.scimResource.findFirst({
-      where: { scimId, endpointId, resourceType: 'User' },
-    });
-    return resource ? toUserRecord(resource as unknown as Record<string, unknown>) : null;
+    try {
+      const resource = await this.prisma.scimResource.findFirst({
+        where: { scimId, endpointId, resourceType: 'User' },
+      });
+      return resource ? toUserRecord(resource as unknown as Record<string, unknown>) : null;
+    } catch (error) {
+      throw wrapPrismaError(error, `User findByScimId(${scimId})`);
+    }
   }
 
   async findAll(
@@ -84,11 +92,15 @@ export class PrismaUserRepository implements IUserRepository {
       ? { [orderBy.field]: orderBy.direction }
       : { createdAt: 'asc' as const };
 
-    const resources = await this.prisma.scimResource.findMany({
-      where,
-      orderBy: prismaOrderBy,
-    });
-    return resources.map((r) => toUserRecord(r as unknown as Record<string, unknown>));
+    try {
+      const resources = await this.prisma.scimResource.findMany({
+        where,
+        orderBy: prismaOrderBy,
+      });
+      return resources.map((r) => toUserRecord(r as unknown as Record<string, unknown>));
+    } catch (error) {
+      throw wrapPrismaError(error, `User findAll(${endpointId})`);
+    }
   }
 
   async update(id: string, data: UserUpdateInput): Promise<UserRecord> {
@@ -134,18 +146,22 @@ export class PrismaUserRepository implements IUserRepository {
       filters.push({ NOT: { scimId: excludeScimId } });
     }
 
-    const conflict = await this.prisma.scimResource.findFirst({
-      where: { AND: filters },
-      select: { scimId: true, userName: true, externalId: true, active: true },
-    });
+    try {
+      const conflict = await this.prisma.scimResource.findFirst({
+        where: { AND: filters },
+        select: { scimId: true, userName: true, externalId: true, active: true },
+      });
 
-    if (!conflict || !conflict.userName) return null;
-    return {
-      scimId: conflict.scimId,
-      userName: conflict.userName,
-      externalId: conflict.externalId ?? null,
-      active: conflict.active,
-    };
+      if (!conflict || !conflict.userName) return null;
+      return {
+        scimId: conflict.scimId,
+        userName: conflict.userName,
+        externalId: conflict.externalId ?? null,
+        active: conflict.active,
+      };
+    } catch (error) {
+      throw wrapPrismaError(error, `User findConflict(${endpointId}, ${userName})`);
+    }
   }
 
   async findByScimIds(
@@ -155,9 +171,13 @@ export class PrismaUserRepository implements IUserRepository {
     // Filter out non-UUID values to avoid PostgreSQL P2007 errors
     const validIds = scimIds.filter(isValidUuid);
     if (validIds.length === 0) return [];
-    return this.prisma.scimResource.findMany({
-      where: { scimId: { in: validIds }, endpointId, resourceType: 'User' },
-      select: { id: true, scimId: true },
-    });
+    try {
+      return this.prisma.scimResource.findMany({
+        where: { scimId: { in: validIds }, endpointId, resourceType: 'User' },
+        select: { id: true, scimId: true },
+      });
+    } catch (error) {
+      throw wrapPrismaError(error, `User findByScimIds(${endpointId})`);
+    }
   }
 }

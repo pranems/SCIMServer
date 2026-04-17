@@ -392,6 +392,26 @@ export class ScimLogger {
     return { message: String(error) };
   }
 
+  /**
+   * Safe JSON.stringify that handles circular references without crashing.
+   * Falls back to a [Circular] placeholder if serialization fails.
+   */
+  private safeStringify(value: unknown, indent?: number): string {
+    try {
+      return JSON.stringify(value, null, indent);
+    } catch {
+      // Circular reference or other serialization failure — use a replacer
+      const seen = new WeakSet();
+      return JSON.stringify(value, (_key, val) => {
+        if (typeof val === 'object' && val !== null) {
+          if (seen.has(val)) return '[Circular]';
+          seen.add(val);
+        }
+        return val;
+      }, indent);
+    }
+  }
+
   /** Sanitize data: truncate large payloads, redact secrets. */
   private sanitizeData(data: Record<string, unknown>): Record<string, unknown> {
     const result: Record<string, unknown> = {};
@@ -405,9 +425,13 @@ export class ScimLogger {
       if (typeof value === 'string' && value.length > this.config.maxPayloadSizeBytes) {
         result[key] = value.slice(0, this.config.maxPayloadSizeBytes) + `...[truncated ${value.length - this.config.maxPayloadSizeBytes}B]`;
       } else if (typeof value === 'object' && value !== null) {
-        const serialized = JSON.stringify(value);
+        const serialized = this.safeStringify(value);
         if (serialized.length > this.config.maxPayloadSizeBytes) {
           result[key] = serialized.slice(0, this.config.maxPayloadSizeBytes) + `...[truncated]`;
+        } else if (serialized.includes('[Circular]')) {
+          // Circular reference detected — store the safe-serialized string to prevent
+          // downstream JSON.stringify crashes (e.g., in FileLogTransport).
+          result[key] = serialized;
         } else {
           result[key] = value;
         }
@@ -429,7 +453,7 @@ export class ScimLogger {
 
   /** JSON structured output — one line per entry, ideal for log aggregation (ELK, Azure Monitor). */
   private emitJson(level: LogLevel, entry: StructuredLogEntry): void {
-    const line = JSON.stringify(entry);
+    const line = this.safeStringify(entry);
     switch (level) {
       case LogLevel.TRACE:
       case LogLevel.DEBUG:
@@ -472,9 +496,9 @@ export class ScimLogger {
     if (entry.data && Object.keys(entry.data).length > 0) {
       // For TRACE level show full data, for higher levels show compact
       if (level <= LogLevel.DEBUG) {
-        line += `\n  ${JSON.stringify(entry.data, null, 2).replace(/\n/g, '\n  ')}`;
+        line += `\n  ${this.safeStringify(entry.data, 2).replace(/\n/g, '\n  ')}`;
       } else {
-        const compact = JSON.stringify(entry.data);
+        const compact = this.safeStringify(entry.data);
         if (compact.length <= 200) {
           line += ` | ${compact}`;
         }

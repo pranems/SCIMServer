@@ -379,6 +379,25 @@ describe('ScimLogger', () => {
       const entry = JSON.parse(stdoutSpy.mock.calls[0][0]) as StructuredLogEntry;
       expect(entry.data).toEqual({ name: 'Alice', age: 30 });
     });
+
+    it('should handle circular references in data without crashing', () => {
+      const circular: Record<string, unknown> = { name: 'test' };
+      circular.self = circular; // circular reference
+
+      expect(() => {
+        logger.info(LogCategory.HTTP, 'Circular data', circular);
+      }).not.toThrow();
+    });
+
+    it('should handle circular references in emitJson without crashing', () => {
+      logger.updateConfig({ format: 'json' });
+      const circular: Record<string, unknown> = { name: 'test' };
+      circular.self = circular;
+
+      expect(() => {
+        logger.info(LogCategory.HTTP, 'Circular data', circular);
+      }).not.toThrow();
+    });
   });
 
   // ─── Stack Traces ─────────────────────────────────────────────────

@@ -41,19 +41,23 @@ export class PrismaGenericResourceRepository implements IGenericResourceReposito
   constructor(private readonly prisma: PrismaService) {}
 
   async create(input: GenericResourceCreateInput): Promise<GenericResourceRecord> {
-    const created = await this.prisma.scimResource.create({
-      data: {
-        resourceType: input.resourceType,
-        scimId: input.scimId,
-        externalId: input.externalId,
-        displayName: input.displayName,
-        active: input.active,
-        payload: JSON.parse(input.rawPayload),
-        meta: input.meta,
-        endpoint: { connect: { id: input.endpointId } },
-      },
-    });
-    return toGenericRecord(created as unknown as Record<string, unknown>);
+    try {
+      const created = await this.prisma.scimResource.create({
+        data: {
+          resourceType: input.resourceType,
+          scimId: input.scimId,
+          externalId: input.externalId,
+          displayName: input.displayName,
+          active: input.active,
+          payload: JSON.parse(input.rawPayload),
+          meta: input.meta,
+          endpoint: { connect: { id: input.endpointId } },
+        },
+      });
+      return toGenericRecord(created as unknown as Record<string, unknown>);
+    } catch (error) {
+      throw wrapPrismaError(error, `GenericResource create(${input.scimId})`);
+    }
   }
 
   async findByScimId(
@@ -62,10 +66,14 @@ export class PrismaGenericResourceRepository implements IGenericResourceReposito
     scimId: string,
   ): Promise<GenericResourceRecord | null> {
     if (!isValidUuid(scimId)) return null;
-    const resource = await this.prisma.scimResource.findFirst({
-      where: { scimId, endpointId, resourceType },
-    });
-    return resource ? toGenericRecord(resource as unknown as Record<string, unknown>) : null;
+    try {
+      const resource = await this.prisma.scimResource.findFirst({
+        where: { scimId, endpointId, resourceType },
+      });
+      return resource ? toGenericRecord(resource as unknown as Record<string, unknown>) : null;
+    } catch (error) {
+      throw wrapPrismaError(error, `GenericResource findByScimId(${scimId})`);
+    }
   }
 
   async findAll(
@@ -78,11 +86,15 @@ export class PrismaGenericResourceRepository implements IGenericResourceReposito
       endpointId,
       resourceType,
     };
-    const resources = await this.prisma.scimResource.findMany({
-      where,
-      orderBy: { createdAt: 'asc' },
-    });
-    return resources.map((r) => toGenericRecord(r as unknown as Record<string, unknown>));
+    try {
+      const resources = await this.prisma.scimResource.findMany({
+        where,
+        orderBy: { createdAt: 'asc' },
+      });
+      return resources.map((r) => toGenericRecord(r as unknown as Record<string, unknown>));
+    } catch (error) {
+      throw wrapPrismaError(error, `GenericResource findAll(${endpointId}, ${resourceType})`);
+    }
   }
 
   async update(id: string, data: GenericResourceUpdateInput): Promise<GenericResourceRecord> {
@@ -116,10 +128,14 @@ export class PrismaGenericResourceRepository implements IGenericResourceReposito
     resourceType: string,
     externalId: string,
   ): Promise<GenericResourceRecord | null> {
-    const resource = await this.prisma.scimResource.findFirst({
-      where: { endpointId, resourceType, externalId },
-    });
-    return resource ? toGenericRecord(resource as unknown as Record<string, unknown>) : null;
+    try {
+      const resource = await this.prisma.scimResource.findFirst({
+        where: { endpointId, resourceType, externalId },
+      });
+      return resource ? toGenericRecord(resource as unknown as Record<string, unknown>) : null;
+    } catch (error) {
+      throw wrapPrismaError(error, `GenericResource findByExternalId(${endpointId}, ${externalId})`);
+    }
   }
 
   async findByDisplayName(
@@ -127,9 +143,13 @@ export class PrismaGenericResourceRepository implements IGenericResourceReposito
     resourceType: string,
     displayName: string,
   ): Promise<GenericResourceRecord | null> {
-    const resource = await this.prisma.scimResource.findFirst({
-      where: { endpointId, resourceType, displayName },
-    });
-    return resource ? toGenericRecord(resource as unknown as Record<string, unknown>) : null;
+    try {
+      const resource = await this.prisma.scimResource.findFirst({
+        where: { endpointId, resourceType, displayName },
+      });
+      return resource ? toGenericRecord(resource as unknown as Record<string, unknown>) : null;
+    } catch (error) {
+      throw wrapPrismaError(error, `GenericResource findByDisplayName(${endpointId}, ${displayName})`);
+    }
   }
 }

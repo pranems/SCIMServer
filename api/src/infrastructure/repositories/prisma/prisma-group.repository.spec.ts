@@ -8,6 +8,7 @@
  */
 import { PrismaGroupRepository } from './prisma-group.repository';
 import type { PrismaService } from '../../../modules/prisma/prisma.service';
+import { RepositoryError } from '../../../domain/errors/repository-error';
 
 // ─── Factory helpers ──────────────────────────────────────────────────────────
 
@@ -138,6 +139,45 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
       expect(result).not.toHaveProperty('resourceType');
       expect(result).toHaveProperty('version', 1);
     });
+
+    it('should throw RepositoryError CONFLICT on P2002 unique constraint', async () => {
+      const prismaError = Object.assign(new Error('Unique constraint violation'), { code: 'P2002' });
+      (prisma.scimResource.create as jest.Mock).mockRejectedValue(prismaError);
+
+      await expect(repo.create({
+        endpointId: 'ep-1', scimId: GRP_SCIM_ID, externalId: null,
+        displayName: 'Engineering', active: true,
+        rawPayload: '{}', meta: '{}',
+      })).rejects.toThrow(RepositoryError);
+
+      await expect(repo.create({
+        endpointId: 'ep-1', scimId: GRP_SCIM_ID, externalId: null,
+        displayName: 'Engineering', active: true,
+        rawPayload: '{}', meta: '{}',
+      })).rejects.toMatchObject({ code: 'CONFLICT' });
+    });
+
+    it('should throw RepositoryError CONNECTION on P1001 connection error', async () => {
+      const prismaError = Object.assign(new Error('Can\'t reach database'), { code: 'P1001' });
+      (prisma.scimResource.create as jest.Mock).mockRejectedValue(prismaError);
+
+      await expect(repo.create({
+        endpointId: 'ep-1', scimId: GRP_SCIM_ID, externalId: null,
+        displayName: 'Engineering', active: true,
+        rawPayload: '{}', meta: '{}',
+      })).rejects.toMatchObject({ code: 'CONNECTION' });
+    });
+
+    it('should throw RepositoryError UNKNOWN on unexpected Prisma error', async () => {
+      const prismaError = Object.assign(new Error('Something bad'), { code: 'P9999' });
+      (prisma.scimResource.create as jest.Mock).mockRejectedValue(prismaError);
+
+      await expect(repo.create({
+        endpointId: 'ep-1', scimId: GRP_SCIM_ID, externalId: null,
+        displayName: 'Engineering', active: true,
+        rawPayload: '{}', meta: '{}',
+      })).rejects.toMatchObject({ code: 'UNKNOWN' });
+    });
   });
 
   // ─── findByScimId ────────────────────────────────────────────────────
@@ -161,6 +201,14 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
     it('should return null when not found (valid UUID)', async () => {
       (prisma.scimResource.findFirst as jest.Mock).mockResolvedValue(null);
       expect(await repo.findByScimId('ep-1', GRP_SCIM_ID)).toBeNull();
+    });
+
+    it('should throw RepositoryError CONNECTION on Prisma connection error', async () => {
+      const prismaError = Object.assign(new Error('Can\'t reach database'), { code: 'P1001' });
+      (prisma.scimResource.findFirst as jest.Mock).mockRejectedValue(prismaError);
+
+      await expect(repo.findByScimId('ep-1', GRP_SCIM_ID))
+        .rejects.toMatchObject({ code: 'CONNECTION' });
     });
   });
 
@@ -227,6 +275,14 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
       const result = await repo.findWithMembers('ep-1', GRP_SCIM_ID);
       expect(result!.members[0].userId).toBeNull();
     });
+
+    it('should throw RepositoryError CONNECTION on Prisma connection error', async () => {
+      const prismaError = Object.assign(new Error('Can\'t reach database'), { code: 'P1001' });
+      (prisma.scimResource.findFirst as jest.Mock).mockRejectedValue(prismaError);
+
+      await expect(repo.findWithMembers('ep-1', GRP_SCIM_ID))
+        .rejects.toMatchObject({ code: 'CONNECTION' });
+    });
   });
 
   // ─── findAllWithMembers ──────────────────────────────────────────────
@@ -275,6 +331,14 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
       expect(result[0].members).toHaveLength(0);
       expect(result[1].displayName).toBe('Team B');
       expect(result[1].members).toHaveLength(1);
+    });
+
+    it('should throw RepositoryError CONNECTION on Prisma connection error', async () => {
+      const prismaError = Object.assign(new Error('Can\'t reach database'), { code: 'P1001' });
+      (prisma.scimResource.findMany as jest.Mock).mockRejectedValue(prismaError);
+
+      await expect(repo.findAllWithMembers('ep-1'))
+        .rejects.toMatchObject({ code: 'CONNECTION' });
     });
   });
 
@@ -334,6 +398,14 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
 
       const call = (prisma.scimResource.findFirst as jest.Mock).mock.calls[0][0];
       expect(call.where.NOT).toEqual({ scimId: 'exclude-me' });
+    });
+
+    it('should throw RepositoryError CONNECTION on Prisma connection error', async () => {
+      const prismaError = Object.assign(new Error('Can\'t reach database'), { code: 'P1001' });
+      (prisma.scimResource.findFirst as jest.Mock).mockRejectedValue(prismaError);
+
+      await expect(repo.findByDisplayName('ep-1', 'engineering'))
+        .rejects.toMatchObject({ code: 'CONNECTION' });
     });
   });
 
