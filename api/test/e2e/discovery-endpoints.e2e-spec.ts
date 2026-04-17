@@ -137,11 +137,11 @@ describe('Discovery Endpoints (E2E)', () => {
       expect(refSub.referenceTypes).toEqual(['User', 'Group']);
     });
 
-    it('should include uniqueness:server on Group displayName (R-UNIQ-1)', async () => {
+    it('should include uniqueness:none on Group displayName (RFC 7643 §8.7.1 baseline)', async () => {
       const res = await scimGet(app, `${basePath}/Schemas/urn:ietf:params:scim:schemas:core:2.0:Group`, token).expect(200);
       const displayName = res.body.attributes.find((a: any) => a.name === 'displayName');
       expect(displayName).toBeDefined();
-      expect(displayName.uniqueness).toBe('server');
+      expect(displayName.uniqueness).toBe('none'); // RFC 7643 §8.7.1 — presets may tighten to 'server'
     });
 
     it('should include uniqueness:none on Group externalId (R-UNIQ-1)', async () => {

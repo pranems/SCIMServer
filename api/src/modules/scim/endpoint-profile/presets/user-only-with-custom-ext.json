@@ -17,7 +17,7 @@
             "required": true,
             "caseExact": false,
             "mutability": "readWrite",
-            "returned": "always",
+            "returned": "default",
             "uniqueness": "server",
             "description": "Unique identifier for the User. Will need to be an email address."
           },
@@ -61,7 +61,7 @@
             "type": "string",
             "multiValued": false,
             "required": false,
-            "caseExact": true,
+            "caseExact": false,
             "mutability": "readWrite",
             "returned": "default",
             "uniqueness": "none",

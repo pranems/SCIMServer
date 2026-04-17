@@ -36,7 +36,7 @@ describe('rfc-baseline', () => {
     it('should contain id (RFC 7643 §3.1)', () => {
       const id = (RFC_USER_ATTRIBUTES as readonly any[]).find((a: any) => a.name === 'id');
       expect(id).toBeDefined();
-      expect(id!.required).toBe(true);
+      expect(id!.required).toBe(false); // RFC 7643 §3.1: readOnly, server-assigned
       expect(id!.mutability).toBe('readOnly');
       expect(id!.returned).toBe('always');
       expect(id!.uniqueness).toBe('server');
@@ -97,7 +97,7 @@ describe('rfc-baseline', () => {
     it('should contain id (RFC 7643 §3.1)', () => {
       const id = (RFC_GROUP_ATTRIBUTES as readonly any[]).find((a: any) => a.name === 'id');
       expect(id).toBeDefined();
-      expect(id!.required).toBe(true);
+      expect(id!.required).toBe(false); // RFC 7643 §3.1: readOnly, server-assigned
       expect(id!.mutability).toBe('readOnly');
     });
 

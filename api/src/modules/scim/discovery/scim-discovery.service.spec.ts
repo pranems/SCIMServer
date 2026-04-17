@@ -161,7 +161,7 @@ describe('ScimDiscoveryService', () => {
       expect(userName!.required).toBe(true);
       expect(userName!.uniqueness).toBe('server');
       expect(userName!.mutability).toBe('readWrite');
-      expect(userName!.returned).toBe('always');
+      expect(userName!.returned).toBe('default'); // RFC 7643 §8.7.1
     });
 
     // ─── RFC 7643 §3.1 Common Attributes ────────────────────────────────
@@ -246,12 +246,12 @@ describe('ScimDiscoveryService', () => {
 
     // ─── P1: R-UNIQ-1 — uniqueness on Group attributes ───────────────────
 
-    it('should have uniqueness:server on Group displayName (R-UNIQ-1, RFC 7643 §4.2)', () => {
+    it('should have uniqueness:none on Group displayName (RFC 7643 §8.7.1 baseline)', () => {
       const result = service.getSchemas();
       const groupSchema = result.Resources.find((r: any) => r.id === SCIM_CORE_GROUP_SCHEMA)! as any;
       const displayName = groupSchema.attributes.find((a: any) => a.name === 'displayName');
       expect(displayName).toBeDefined();
-      expect(displayName.uniqueness).toBe('server');
+      expect(displayName.uniqueness).toBe('none'); // RFC 7643 §8.7.1 — presets may tighten to 'server'
     });
 
     it('should have uniqueness:none on Group externalId (R-UNIQ-1, RFC 7643 §3.1)', () => {
