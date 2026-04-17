@@ -16,6 +16,8 @@ export interface CreateRequestLogOptions {
   responseHeaders?: Record<string, unknown>;
   responseBody?: unknown;
   error?: unknown;
+  /** SCIM endpoint ID extracted from URL (persisted for indexed endpoint-scoped queries) */
+  endpointId?: string;
 }
 
 @Injectable()
@@ -33,7 +35,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
   // database write overhead. Single batch insert instead of N individual writes.
   // Originally introduced to mitigate SQLite single-writer contention; retained
   // for PostgreSQL to reduce connection pool pressure.
-  private logBuffer: Array<Prisma.RequestLogCreateInput & { _identifier?: string }> = [];
+  private logBuffer: Array<Prisma.RequestLogCreateManyInput & { _identifier?: string }> = [];
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private flushInProgress = false;
   private static readonly FLUSH_INTERVAL_MS = 3_000;  // flush every 3 seconds
@@ -42,6 +44,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     id: string;
     method: string;
     url: string;
+    endpointId: string | null;
     status: number | null;
     durationMs: number | null;
     createdAt: Date;
@@ -128,7 +131,8 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     requestBody,
     responseHeaders,
     responseBody,
-    error
+    error,
+    endpointId,
   }: CreateRequestLogOptions): void {
     if (this.isInMemoryBackend) {
       const errorMessage = this.extractErrorMessage(error);
@@ -149,6 +153,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         id: randomUUID(),
         method,
         url,
+        endpointId: endpointId ?? null,
         status: status ?? null,
         durationMs: durationMs ?? null,
         createdAt: new Date(),
@@ -178,7 +183,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       this.logger.debug(LogCategory.DATABASE, 'Identifier derivation failed', { url, error: (e as Error).message });
     }
 
-    const data: Prisma.RequestLogCreateInput & { _identifier?: string } = {
+    const data: Prisma.RequestLogCreateManyInput & { _identifier?: string } = {
       method,
       url,
       status: status ?? null,
@@ -190,6 +195,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       errorMessage,
       errorStack,
       _identifier: identifier,
+      endpointId: endpointId ?? null,
     };
 
     this.logBuffer.push(data);
@@ -319,12 +325,18 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     includeAdmin?: boolean;
     hideKeepalive?: boolean;
     minDurationMs?: number;
+    /** Filter by indexed endpointId column (preferred over urlContains) */
+    endpointId?: string;
   } = {}) {
     if (this.isInMemoryBackend) {
       const pageSize = Math.min(Math.max(filters.pageSize ?? 50, 1), 200);
       const page = Math.max(filters.page ?? 1, 1);
       const skip = (page - 1) * pageSize;
-      const records = [...this.inMemoryLogRows]
+      let filtered = [...this.inMemoryLogRows];
+      if (filters.endpointId) {
+        filtered = filtered.filter(r => r.endpointId === filters.endpointId);
+      }
+      const records = filtered
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
         .slice(skip, skip + pageSize);
 
@@ -339,7 +351,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
         reportableIdentifier: r.identifier ?? this.deriveIdentifierFromUrl(r.url),
       }));
 
-      const total = this.inMemoryLogRows.length;
+      const total = filtered.length;
       return {
         total,
         page,
@@ -355,6 +367,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     const page = Math.max(filters.page ?? 1, 1);
 
   const where: Prisma.RequestLogWhereInput = {};
+    if (filters.endpointId) where.endpointId = filters.endpointId;
     if (filters.method) where.method = filters.method.toUpperCase();
     if (typeof filters.status === 'number') where.status = filters.status;
     if (filters.hasError === true) where.errorMessage = { not: null };

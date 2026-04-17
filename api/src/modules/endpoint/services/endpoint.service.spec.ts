@@ -20,7 +20,7 @@ describe('EndpointService', () => {
     name: 'test-endpoint',
     displayName: 'Test Endpoint',
     description: 'A test endpoint',
-    profile: { settings: { MultiOpPatchRequestAddMultipleMembersToGroup: 'True' }, schemas: [], resourceTypes: [], serviceProviderConfig: {} },
+    profile: { settings: { MultiMemberPatchOpForGroupEnabled: 'True' }, schemas: [], resourceTypes: [], serviceProviderConfig: {} },
     active: true,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -99,12 +99,12 @@ describe('EndpointService', () => {
         (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(null);
         (prisma.endpoint.create as jest.Mock).mockResolvedValue({
           ...mockEndpoint,
-          profile: { settings: { MultiOpPatchRequestAddMultipleMembersToGroup: 'True' }, schemas: [], resourceTypes: [], serviceProviderConfig: {} },
+          profile: { settings: { MultiMemberPatchOpForGroupEnabled: 'True' }, schemas: [], resourceTypes: [], serviceProviderConfig: {} },
         });
         const result = await service.createEndpoint({
           name: 'test-valid-setting',
           profile: {
-            settings: { MultiOpPatchRequestAddMultipleMembersToGroup: 'True' },
+            settings: { MultiMemberPatchOpForGroupEnabled: 'True' },
             schemas: [{ id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributes: 'all' }],
             resourceTypes: [{ id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] }],
           },
@@ -119,7 +119,7 @@ describe('EndpointService', () => {
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
       await expect(
         service.updateEndpoint('test-endpoint-id', {
-          profile: { settings: { MultiOpPatchRequestAddMultipleMembersToGroup: 'invalid' } as any },
+          profile: { settings: { MultiMemberPatchOpForGroupEnabled: 'invalid' } as any },
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -209,7 +209,7 @@ describe('EndpointService', () => {
 
       const result = await service.getEndpoint('test-endpoint-id');
 
-      expect(result.profile?.settings).toEqual({ MultiOpPatchRequestAddMultipleMembersToGroup: 'True' });
+      expect(result.profile?.settings).toEqual({ MultiMemberPatchOpForGroupEnabled: 'True' });
     });
 
     it('should handle null profile', async () => {
@@ -221,6 +221,35 @@ describe('EndpointService', () => {
       const result = await service.getEndpoint('test-endpoint-id');
 
       expect(result.profile).toBeNull();
+    });
+
+    it('should normalize stale settings keys to current names', async () => {
+      (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue({
+        ...mockEndpoint,
+        profile: {
+          settings: {
+            SoftDeleteEnabled: 'True',
+            MultiOpPatchRequestAddMultipleMembersToGroup: 'True',
+            MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'True',
+            VerbosePatchSupported: 'True',
+          },
+          schemas: [],
+          resourceTypes: [],
+          serviceProviderConfig: {},
+        },
+      });
+
+      const result = await service.getEndpoint('test-endpoint-id');
+
+      // Stale keys should be renamed to current names
+      expect(result.profile?.settings).toHaveProperty('UserSoftDeleteEnabled', 'True');
+      expect(result.profile?.settings).toHaveProperty('MultiMemberPatchOpForGroupEnabled', 'True');
+      expect(result.profile?.settings).toHaveProperty('VerbosePatchSupported', 'True');
+      // Old keys should be removed
+      expect(result.profile?.settings).not.toHaveProperty('SoftDeleteEnabled');
+      expect(result.profile?.settings).not.toHaveProperty('MultiOpPatchRequestAddMultipleMembersToGroup');
+      expect(result.profile?.settings).not.toHaveProperty('SoftDeleteEnabled');
+      expect(result.profile?.settings).not.toHaveProperty('MultiOpPatchRequestRemoveMultipleMembersFromGroup');
     });
   });
 
@@ -442,7 +471,7 @@ describe('EndpointService', () => {
       const validProfileEndpoint = {
         ...mockEndpoint,
         profile: {
-          settings: { MultiOpPatchRequestAddMultipleMembersToGroup: 'True' },
+          settings: { MultiMemberPatchOpForGroupEnabled: 'True' },
           schemas: [{ id: 'urn:ietf:params:scim:schemas:core:2.0:User', name: 'User', attributes: 'all' }],
           resourceTypes: [{ id: 'User', name: 'User', endpoint: '/Users', description: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', schemaExtensions: [] }],
           serviceProviderConfig: {},
@@ -701,6 +730,21 @@ describe('EndpointService', () => {
       expect(prisma.endpoint.findUnique).toHaveBeenCalledWith({ where: { id: 'db-only-ep' } });
     });
 
+    it('getEndpoint should log DB errors at DEBUG (not silently swallow)', async () => {
+      // Simulate a DB connection error on both ID and name lookups
+      const dbError = new Error('Connection refused');
+      (prisma.endpoint.findUnique as jest.Mock).mockRejectedValue(dbError);
+
+      await expect(service.getEndpoint('some-id')).rejects.toThrow(NotFoundException);
+
+      // Verify the catch block logged at DEBUG (not silently swallowed)
+      expect(scimLogger.debug).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.stringContaining('lookup failed'),
+        expect.objectContaining({ error: 'Connection refused' }),
+      );
+    });
+
     it('listEndpoints with active=true filter should work from cache', async () => {
       const activeEp = { ...cachedEndpoint, id: 'active-ep', name: 'active-test', active: true };
       const inactiveEp = { ...cachedEndpoint, id: 'inactive-ep', name: 'inactive-test', active: false };
@@ -752,7 +796,7 @@ describe('EndpointService', () => {
           filter: { supported: true, maxResults: 200 }, sort: { supported: true },
           etag: { supported: true }, changePassword: { supported: false },
         },
-        settings: { SoftDeleteEnabled: 'True' },
+        settings: { UserSoftDeleteEnabled: 'True' },
       },
       active: true,
       createdAt: new Date(),
@@ -771,7 +815,7 @@ describe('EndpointService', () => {
       });
 
       // Original settings should be preserved + new one added
-      expect(result.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(result.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
       expect(result.profile?.settings?.StrictSchemaValidation).toBe('True');
       // Schemas should still exist
       expect(result.profile?.schemas?.length).toBeGreaterThanOrEqual(2);
@@ -786,10 +830,10 @@ describe('EndpointService', () => {
       });
 
       const result = await service.updateEndpoint('patch-ep-1', {
-        profile: { settings: { SoftDeleteEnabled: 'False' } },
+        profile: { settings: { UserSoftDeleteEnabled: 'False' } },
       });
 
-      expect(result.profile?.settings?.SoftDeleteEnabled).toBe('False');
+      expect(result.profile?.settings?.UserSoftDeleteEnabled).toBe('False');
     });
 
     it('should replace SPC when provided in partial profile', async () => {
@@ -812,7 +856,7 @@ describe('EndpointService', () => {
       expect(result.profile?.serviceProviderConfig?.sort?.supported).toBe(false);
       expect(result.profile?.serviceProviderConfig?.filter?.maxResults).toBe(50);
       // Settings should be preserved
-      expect(result.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(result.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
     });
 
     it('should replace schemas when provided in partial profile', async () => {
@@ -873,7 +917,7 @@ describe('EndpointService', () => {
         },
       });
 
-      expect(result.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(result.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
       expect(result.profile?.settings?.RequireIfMatch).toBe('True');
       expect(result.profile?.serviceProviderConfig?.bulk?.supported).toBe(false);
     });
@@ -926,7 +970,7 @@ describe('EndpointService', () => {
 
       const result = await service.updateEndpoint('patch-ep-1', { displayName: 'New Name' });
       expect(result.displayName).toBe('New Name');
-      expect(result.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(result.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
     });
 
     it('should handle multiple settings additions in sequence', async () => {
@@ -944,7 +988,7 @@ describe('EndpointService', () => {
         profile: { settings: { StrictSchemaValidation: 'True' } },
       });
 
-      expect(result1.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(result1.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
       expect(result1.profile?.settings?.StrictSchemaValidation).toBe('True');
 
       // Second PATCH: add RequireIfMatch — should keep both previous settings
@@ -960,7 +1004,7 @@ describe('EndpointService', () => {
         profile: { settings: { RequireIfMatch: 'True' } },
       });
 
-      expect(result2.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(result2.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
       expect(result2.profile?.settings?.StrictSchemaValidation).toBe('True');
       expect(result2.profile?.settings?.RequireIfMatch).toBe('True');
     });
@@ -986,7 +1030,7 @@ describe('EndpointService', () => {
           sort: { supported: true },
           etag: { supported: true },
         },
-        settings: { SoftDeleteEnabled: 'True', logLevel: 'DEBUG' },
+        settings: { UserSoftDeleteEnabled: 'True', logLevel: 'DEBUG' },
       } as any;
 
       const summary = EndpointService.buildProfileSummary(profile);
@@ -1017,7 +1061,7 @@ describe('EndpointService', () => {
       });
 
       // Active settings (only non-empty, non-false values)
-      expect(summary.activeSettings).toEqual({ SoftDeleteEnabled: 'True', logLevel: 'DEBUG' });
+      expect(summary.activeSettings).toEqual({ UserSoftDeleteEnabled: 'True', logLevel: 'DEBUG' });
     });
 
     it('should handle empty profile with no schemas, resourceTypes, or settings', () => {
@@ -1056,7 +1100,7 @@ describe('EndpointService', () => {
           changePassword: { supported: false }, sort: { supported: false }, etag: { supported: false },
         },
         settings: {
-          SoftDeleteEnabled: 'False',
+          UserSoftDeleteEnabled: 'False',
           StrictSchemaValidation: false,
           VerbosePatchSupported: 'True',
           logLevel: '',
@@ -1365,6 +1409,116 @@ describe('EndpointService', () => {
       // (logFileEnabled defaults to true, no explicit false to disable)
       expect(scimLogger.enableEndpointFileLogging).toHaveBeenCalled();
       expect(scimLogger.disableEndpointFileLogging).not.toHaveBeenCalledWith('test-endpoint-id');
+    });
+  });
+
+  // ─── Phase 2: API Response Contract Enforcement ──────────────────────────
+
+  describe('API response contract enforcement', () => {
+    const FULL_VIEW_ALLOWED_KEYS = [
+      'id', 'name', 'displayName', 'description', 'profile',
+      'active', 'scimBasePath', 'createdAt', 'updatedAt', '_links',
+    ].sort();
+
+    const SUMMARY_VIEW_ALLOWED_KEYS = [
+      'id', 'name', 'displayName', 'description', 'profileSummary',
+      'active', 'scimBasePath', 'createdAt', 'updatedAt', '_links',
+    ].sort();
+
+    const PROFILE_ALLOWED_KEYS = [
+      'schemas', 'settings', 'resourceTypes', 'serviceProviderConfig',
+    ].sort();
+
+    describe('full view response shape', () => {
+      it('should contain ONLY allowed keys in full view response', async () => {
+        (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
+        const result = await service.getEndpoint('test-endpoint-id');
+        const keys = Object.keys(result).sort();
+        expect(keys).toEqual(FULL_VIEW_ALLOWED_KEYS);
+      });
+
+      it('should NOT contain _schemaCaches in full view response', async () => {
+        (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
+        const result = await service.getEndpoint('test-endpoint-id');
+        expect(result).not.toHaveProperty('_schemaCaches');
+        expect(result.profile).not.toHaveProperty('_schemaCaches');
+      });
+
+      it('should strip _schemaCaches when profile has runtime cache attached', async () => {
+        // Simulate a profile that has been mutated by SCIM operations at runtime
+        const profileWithCache = {
+          ...mockEndpoint.profile,
+          _schemaCaches: {
+            'urn:ietf:params:scim:schemas:core:2.0:User': {
+              booleansByParent: new Map([['root', new Set(['active'])]]),
+              neverReturnedByParent: new Map(),
+              alwaysReturnedByParent: new Map(),
+              requestReturnedByParent: new Map(),
+              immutableByParent: new Map(),
+              caseExactByParent: new Map(),
+              caseExactPaths: new Set(),
+              uniqueAttrs: [],
+              extensionUrns: [],
+              coreSchemaUrn: 'urn:ietf:params:scim:schemas:core:2.0:user',
+              schemaUrnSet: new Set(),
+              coreAttrMap: new Map(),
+              extensionSchemaMap: new Map(),
+              readOnlyByParent: new Map(),
+              readOnlyCollected: { core: new Set(), extensions: new Map(), coreSubAttrs: new Map(), extensionSubAttrs: new Map() },
+            },
+          },
+        };
+        (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue({
+          ...mockEndpoint,
+          profile: profileWithCache,
+        });
+
+        const result = await service.getEndpoint('test-endpoint-id');
+
+        // _schemaCaches must NOT appear in the response
+        expect(result.profile).not.toHaveProperty('_schemaCaches');
+        // Profile should still have the valid keys
+        expect(result.profile).toHaveProperty('settings');
+        expect(result.profile).toHaveProperty('schemas');
+      });
+
+      it('should have profile keys matching allowlist (no internal fields)', async () => {
+        (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
+        const result = await service.getEndpoint('test-endpoint-id');
+        const profileKeys = Object.keys(result.profile!).sort();
+        expect(profileKeys).toEqual(PROFILE_ALLOWED_KEYS);
+      });
+    });
+
+    describe('summary view response shape', () => {
+      it('should contain ONLY allowed keys in summary view response', async () => {
+        (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
+        (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([mockEndpoint]);
+        const result = await service.listEndpoints(undefined, 'summary');
+        const ep = result.endpoints[0];
+        const keys = Object.keys(ep).sort();
+        expect(keys).toEqual(SUMMARY_VIEW_ALLOWED_KEYS);
+      });
+
+      it('should NOT have profile in summary view', async () => {
+        (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
+        (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([mockEndpoint]);
+        const result = await service.listEndpoints(undefined, 'summary');
+        expect(result.endpoints[0]).not.toHaveProperty('profile');
+      });
+    });
+
+    describe('_links correctness', () => {
+      it('should have _links with correct paths for the endpoint ID', async () => {
+        (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(mockEndpoint);
+        const result = await service.getEndpoint('test-endpoint-id');
+        expect(result._links).toEqual({
+          self: '/admin/endpoints/test-endpoint-id',
+          stats: '/admin/endpoints/test-endpoint-id/stats',
+          credentials: '/admin/endpoints/test-endpoint-id/credentials',
+          scim: '/scim/endpoints/test-endpoint-id',
+        });
+      });
     });
   });
 });

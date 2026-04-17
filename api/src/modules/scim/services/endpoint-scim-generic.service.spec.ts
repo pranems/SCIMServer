@@ -204,6 +204,7 @@ describe('EndpointScimGenericService', () => {
         fail('Expected 404');
       } catch (e: any) {
         expect(e.getStatus()).toBe(404);
+        expect(e.getResponse().scimType).toBe('noTarget');
       }
     });
   });

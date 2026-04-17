@@ -111,7 +111,7 @@ export class EndpointLogController {
     }
 
     return this.loggingService.listLogs({
-      urlContains: `/endpoints/${endpointId}/`,
+      endpointId,
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
       method: method || undefined,

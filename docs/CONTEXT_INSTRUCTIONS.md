@@ -338,7 +338,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 
 > 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
 
-- **Unit** and **E2E** — all passing (0 failures). **Unit**: 3,265 (83 suites). **E2E**: 969 (46 suites). **Live integration** — ~753 assertions
+- **Unit** and **E2E** — all passing (0 failures). **Unit**: 3,318 (84 suites). **E2E**: 986 (47 suites). **Live integration** — ~753 assertions
 - **SCIM Validator**: 10/12 mandatory (2 FP on Lexmark returned:never), 25/25 on standard profile + 7/7 preview
 - Test runners: `npm test`, `npm run test:e2e`, `npm run test:smoke`
 - Coverage runners: `npm run test:cov`, `npm run test:e2e:cov`, `npm run test:cov:all`

@@ -220,4 +220,16 @@ describe('assertIfMatch', () => {
       expect(error.getResponse().scimType).toBe('versionMismatch');
     }
   });
+
+  it('should include currentETag in diagnostics on 412', () => {
+    try {
+      assertIfMatch('W/"v5"', 'W/"v3"');
+      fail('should have thrown');
+    } catch (error: any) {
+      const diag = error.getResponse()['urn:scimserver:api:messages:2.0:Diagnostics'];
+      expect(diag).toBeDefined();
+      expect(diag.currentETag).toBe('W/"v5"');
+      expect(diag.errorCode).toBe('PRECONDITION_VERSION_MISMATCH');
+    }
+  });
 });

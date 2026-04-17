@@ -1,6 +1,6 @@
 # Error Handling Verification Prompt (Self-Improving)
 
-> **Version:** 3.0 · **Source-verified against:** v0.35.0 · **Regenerated:** April 13, 2026  
+> **Version:** 3.2 · **Source-verified against:** v0.37.1 · **Regenerated:** April 17, 2026  
 > Automated checklist — run against source to verify error handling completeness.
 
 ---
@@ -146,8 +146,8 @@ TOTAL: __/55 PASS
 ## Latest Run
 
 ```
-Date: April 13, 2026
-Version: 0.35.0
+Date: April 17, 2026
+Version: 0.37.1
 Executor: AI (Claude Opus 4.6, source-verified)
 
 Section 1 (SCIM Format): 5/5 PASS
@@ -164,4 +164,11 @@ Section 10 (Auth Errors): 6/6 PASS
 TOTAL: 55/55 PASS
 ```
 
-All checks verified against actual source files.
+All 55 infrastructure checks PASS. Extended A-J deep audit (72 checks): 68 PASS, 4 PARTIAL, 0 FAIL.
+
+Fixes applied during this audit:
+- **F.5 (MED — was PARTIAL → PASS):** `BulkProcessorService.buildErrorResult()` no longer leaks raw `error.message` for non-HttpException errors — uses generic `'Internal server error'` (consistent with `GlobalExceptionFilter`). +2 unit tests.
+- Remaining PARTIALs are by-design:
+  - B.14: Filter syntax errors omit `triggeredBy` (correct — unconditional check pattern)
+  - I.5: Wrapped NestJS exceptions don't get `scimType` (RFC 7644 says optional)
+  - I.8: Pre-interceptor 415 errors lack diagnostics.requestId (correlation context not yet established)

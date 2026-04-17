@@ -489,4 +489,106 @@ describe('Admin Endpoint API (E2E)', () => {
       expect(fromList.profileSummary.resourceTypeCount).toBe(singleRes.body.profileSummary.resourceTypeCount);
     });
   });
+
+  // ─── API Response Contract Enforcement ───────────────────────────────────
+
+  describe('Response contract enforcement', () => {
+    const FULL_VIEW_ALLOWED_KEYS = [
+      'id', 'name', 'displayName', 'description', 'profile',
+      'active', 'scimBasePath', 'createdAt', 'updatedAt', '_links',
+    ].sort();
+
+    const SUMMARY_VIEW_ALLOWED_KEYS = [
+      'id', 'name', 'displayName', 'description', 'profileSummary',
+      'active', 'scimBasePath', 'createdAt', 'updatedAt', '_links',
+    ].sort();
+
+    const PROFILE_ALLOWED_KEYS = [
+      'schemas', 'settings', 'resourceTypes', 'serviceProviderConfig',
+    ].sort();
+
+    it('full view response should contain ONLY allowed keys', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/scim/admin/endpoints/${endpointId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const keys = Object.keys(res.body).sort();
+      // Every key in response must be in the allowed set (no extras)
+      for (const key of keys) {
+        expect(FULL_VIEW_ALLOWED_KEYS).toContain(key);
+      }
+      // Required keys must be present
+      expect(keys).toContain('id');
+      expect(keys).toContain('name');
+      expect(keys).toContain('profile');
+      expect(keys).toContain('active');
+      expect(keys).toContain('_links');
+    });
+
+    it('summary view response should contain ONLY allowed keys', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/scim/admin/endpoints/${endpointId}?view=summary`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const keys = Object.keys(res.body).sort();
+      // Every key in response must be in the allowed set (no extras)
+      for (const key of keys) {
+        expect(SUMMARY_VIEW_ALLOWED_KEYS).toContain(key);
+      }
+      // Required keys must be present
+      expect(keys).toContain('id');
+      expect(keys).toContain('name');
+      expect(keys).toContain('profileSummary');
+      expect(keys).toContain('active');
+      expect(keys).toContain('_links');
+    });
+
+    it('profile should contain ONLY allowed keys (no _schemaCaches)', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/scim/admin/endpoints/${endpointId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const profileKeys = Object.keys(res.body.profile).sort();
+      expect(profileKeys).toEqual(PROFILE_ALLOWED_KEYS);
+      expect(res.body.profile).not.toHaveProperty('_schemaCaches');
+    });
+
+    it('profile should have no _schemaCaches even after SCIM operations trigger cache building', async () => {
+      const scimBase = `/scim/endpoints/${endpointId}`;
+
+      // Trigger a SCIM operation to build the in-memory schema cache
+      const createRes = await request(app.getHttpServer())
+        .post(`${scimBase}/Users`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+          userName: `contract-test-${Date.now()}@test.com`,
+          displayName: 'Contract Test User',
+          active: true,
+        })
+        .expect(201);
+
+      // Now GET the admin endpoint — profile must still be clean
+      const adminRes = await request(app.getHttpServer())
+        .get(`/scim/admin/endpoints/${endpointId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const profileKeys = Object.keys(adminRes.body.profile).sort();
+      expect(profileKeys).toEqual(PROFILE_ALLOWED_KEYS);
+      expect(adminRes.body.profile).not.toHaveProperty('_schemaCaches');
+
+      // Cleanup the test user
+      if (createRes.body.id) {
+        await request(app.getHttpServer())
+          .delete(`${scimBase}/Users/${createRes.body.id}`)
+          .set('Authorization', `Bearer ${token}`)
+          .expect(204);
+      }
+    });
+  });
 });

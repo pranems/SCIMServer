@@ -67,7 +67,7 @@
           "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] }
       ],
       "serviceProviderConfig": {
-        "patch": { "supported": true }, "bulk": { "supported": true, "maxOperations": 100, "maxPayloadSize": 1048576 },
+        "patch": { "supported": true }, "bulk": { "supported": true, "maxOperations": 1000, "maxPayloadSize": 1048576 },
         "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
         "etag": { "supported": true }, "changePassword": { "supported": false }
       }
@@ -144,7 +144,7 @@
           "schemaExtensions": [{ "schema": "urn:acme:scim:extension:org:2.0:Group", "required": false }] }
       ],
       "serviceProviderConfig": {
-        "patch": { "supported": true }, "bulk": { "supported": true, "maxOperations": 100, "maxPayloadSize": 1048576 },
+        "patch": { "supported": true }, "bulk": { "supported": true, "maxOperations": 1000, "maxPayloadSize": 1048576 },
         "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
         "etag": { "supported": true }, "changePassword": { "supported": false }
       }
@@ -199,7 +199,7 @@
           "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] }
       ],
       "serviceProviderConfig": {
-        "patch": { "supported": true }, "bulk": { "supported": true, "maxOperations": 100, "maxPayloadSize": 1048576 },
+        "patch": { "supported": true }, "bulk": { "supported": true, "maxOperations": 1000, "maxPayloadSize": 1048576 },
         "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
         "etag": { "supported": true }, "changePassword": { "supported": false }
       }
@@ -330,7 +330,7 @@
           "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] }
       ],
       "serviceProviderConfig": {
-        "patch": { "supported": true }, "bulk": { "supported": true, "maxOperations": 100, "maxPayloadSize": 1048576 },
+        "patch": { "supported": true }, "bulk": { "supported": true, "maxOperations": 1000, "maxPayloadSize": 1048576 },
         "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
         "etag": { "supported": true }, "changePassword": { "supported": false }
       }
@@ -414,7 +414,7 @@
           "schema": "urn:example:scim:schemas:core:2.0:Device", "schemaExtensions": [] }
       ],
       "serviceProviderConfig": {
-        "patch": { "supported": true }, "bulk": { "supported": true, "maxOperations": 100, "maxPayloadSize": 1048576 },
+        "patch": { "supported": true }, "bulk": { "supported": true, "maxOperations": 1000, "maxPayloadSize": 1048576 },
         "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
         "etag": { "supported": true }, "changePassword": { "supported": false }
       }

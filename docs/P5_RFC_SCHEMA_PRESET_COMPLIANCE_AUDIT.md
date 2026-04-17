@@ -8,7 +8,7 @@
 **Status**: Audit complete — **13 critical findings, ~16 warnings, 7 info items, 3 RFC ambiguities**  
 **Methodology**: **RFC 7643 fetched live from IETF datatracker** → §8.7.1 normative JSON extracted → field-by-field comparison against `scim-schemas.constants.ts` (baseline) and all 6 preset JSONs  
 **RFC Source**: [RFC 7643 fetched 2026-04-16](https://datatracker.ietf.org/doc/html/rfc7643) — canonical schema extracts saved to [docs/rfcs/RFC7643_SCHEMA_EXTRACT.md](rfcs/RFC7643_SCHEMA_EXTRACT.md)  
-**Test Baseline**: 3,265 unit (83 suites) · 969 E2E (46 suites) · ~753 live assertions · ~5,000 total  
+**Test Baseline**: 3,318 unit (84 suites) · 986 E2E (47 suites) · ~753 live assertions · ~5,000 total  
 **Predecessor**: P4 (v0.35.0), P3 (v0.32.0), P2 (v0.24.0), Discovery Endpoints RFC Audit (v0.19.3)
 
 **RFC References** (all verified against fetched source):

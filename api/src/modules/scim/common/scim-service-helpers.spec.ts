@@ -243,6 +243,119 @@ describe('ScimSchemaHelpers', () => {
       expect(helpers.getExtensionUrns('ep-1')).toEqual([EXT_URN]);
       expect(mockRegistry.getExtensionUrns).toHaveBeenCalled();
     });
+
+    it('should return ONLY User extensions when coreSchemaUrn is User (multi-RT profile)', () => {
+      const USER_CORE = 'urn:ietf:params:scim:schemas:core:2.0:User';
+      const GROUP_CORE = 'urn:ietf:params:scim:schemas:core:2.0:Group';
+      const USER_EXT = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+      const USER_EXT2 = 'urn:msfttest:cloud:scim:schemas:extension:custom:2.0:User';
+      const GROUP_EXT = 'urn:msfttest:cloud:scim:schemas:extension:custom:2.0:Group';
+
+      const mockContext = {
+        getProfile: () => ({
+          schemas: [],
+          settings: {},
+          resourceTypes: [
+            { id: 'User', name: 'User', schema: USER_CORE, endpoint: '/Users', description: 'User',
+              schemaExtensions: [{ schema: USER_EXT, required: false }, { schema: USER_EXT2, required: false }] },
+            { id: 'Group', name: 'Group', schema: GROUP_CORE, endpoint: '/Groups', description: 'Group',
+              schemaExtensions: [{ schema: GROUP_EXT, required: false }] },
+          ],
+          serviceProviderConfig: {},
+        }),
+        getConfig: () => ({}),
+      } as any;
+
+      const userHelpers = new ScimSchemaHelpers(mockRegistry, USER_CORE, mockContext);
+      const result = userHelpers.getExtensionUrns();
+
+      expect(result).toContain(USER_EXT);
+      expect(result).toContain(USER_EXT2);
+      expect(result).not.toContain(GROUP_EXT);
+      expect(result).toHaveLength(2);
+    });
+
+    it('should return ONLY Group extensions when coreSchemaUrn is Group (multi-RT profile)', () => {
+      const USER_CORE = 'urn:ietf:params:scim:schemas:core:2.0:User';
+      const GROUP_CORE = 'urn:ietf:params:scim:schemas:core:2.0:Group';
+      const USER_EXT = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+      const GROUP_EXT = 'urn:msfttest:cloud:scim:schemas:extension:custom:2.0:Group';
+      const GROUP_EXT2 = 'urn:ietf:params:scim:schemas:extension:msfttest:Group';
+
+      const mockContext = {
+        getProfile: () => ({
+          schemas: [],
+          settings: {},
+          resourceTypes: [
+            { id: 'User', name: 'User', schema: USER_CORE, endpoint: '/Users', description: 'User',
+              schemaExtensions: [{ schema: USER_EXT, required: false }] },
+            { id: 'Group', name: 'Group', schema: GROUP_CORE, endpoint: '/Groups', description: 'Group',
+              schemaExtensions: [{ schema: GROUP_EXT, required: false }, { schema: GROUP_EXT2, required: false }] },
+          ],
+          serviceProviderConfig: {},
+        }),
+        getConfig: () => ({}),
+      } as any;
+
+      const groupHelpers = new ScimSchemaHelpers(mockRegistry, GROUP_CORE, mockContext);
+      const result = groupHelpers.getExtensionUrns();
+
+      expect(result).toContain(GROUP_EXT);
+      expect(result).toContain(GROUP_EXT2);
+      expect(result).not.toContain(USER_EXT);
+      expect(result).toHaveLength(2);
+    });
+
+    it('should fall back to global registry when no profile RTs match coreSchemaUrn', () => {
+      const CUSTOM_CORE = 'urn:custom:FooResource';
+      const mockContext = {
+        getProfile: () => ({
+          schemas: [],
+          settings: {},
+          resourceTypes: [
+            { id: 'User', name: 'User', schema: 'urn:ietf:params:scim:schemas:core:2.0:User', endpoint: '/Users', description: 'User',
+              schemaExtensions: [{ schema: EXT_URN, required: false }] },
+          ],
+          serviceProviderConfig: {},
+        }),
+        getConfig: () => ({}),
+      } as any;
+
+      mockRegistry.getExtensionUrns.mockReturnValue(['urn:global:fallback']);
+      const customHelpers = new ScimSchemaHelpers(mockRegistry, CUSTOM_CORE, mockContext);
+      const result = customHelpers.getExtensionUrns();
+
+      expect(result).toEqual(['urn:global:fallback']);
+      expect(mockRegistry.getExtensionUrns).toHaveBeenCalled();
+    });
+
+    it('should use cached extensionUrns when _schemaCaches has valid Map', () => {
+      const USER_CORE = 'urn:ietf:params:scim:schemas:core:2.0:User';
+      const CACHED_EXT = 'urn:cached:extension';
+
+      const mockContext = {
+        getProfile: () => ({
+          schemas: [],
+          settings: {},
+          resourceTypes: [],
+          serviceProviderConfig: {},
+          _schemaCaches: {
+            [USER_CORE]: {
+              booleansByParent: new Map(), // instanceof Map → cache hit
+              extensionUrns: [CACHED_EXT],
+            },
+          },
+        }),
+        getConfig: () => ({}),
+      } as any;
+
+      const cachedHelpers = new ScimSchemaHelpers(mockRegistry, USER_CORE, mockContext);
+      const result = cachedHelpers.getExtensionUrns();
+
+      expect(result).toEqual([CACHED_EXT]);
+      // Should NOT call the registry since cache was hit
+      expect(mockRegistry.getExtensionUrns).not.toHaveBeenCalled();
+    });
   });
 
   describe('getSchemaDefinitions', () => {
@@ -409,6 +522,31 @@ describe('ScimSchemaHelpers', () => {
       } catch (e: any) {
         expect(e.getStatus()).toBe(400);
         expect(e.getResponse().scimType).toBe('mutability');
+      }
+    });
+
+    it('should include attributePath in diagnostics for immutable violation', () => {
+      const coreDef = {
+        id: CORE_URN,
+        name: 'User',
+        attributes: [
+          { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'immutable' },
+          { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+        ],
+      };
+      mockRegistry.getSchema.mockReturnValue(coreDef);
+
+      const existing = { schemas: [CORE_URN], userName: 'alice' };
+      const incoming = { schemas: [CORE_URN], userName: 'bob' };
+
+      try {
+        helpers.checkImmutableAttributes(existing, incoming, 'ep-1');
+        fail('should have thrown');
+      } catch (e: any) {
+        const diag = e.getResponse()[SCIM_DIAGNOSTICS_URN];
+        expect(diag).toBeDefined();
+        expect(diag.attributePath).toBe('userName');
+        expect(diag.errorCode).toBe('VALIDATION_IMMUTABLE');
       }
     });
 
@@ -1427,6 +1565,42 @@ describe('assertSchemaUniqueness triggeredBy (P5)', () => {
       const body = e.getResponse();
       expect(body[SCIM_DIAGNOSTICS_URN]).toBeDefined();
       expect(body[SCIM_DIAGNOSTICS_URN].triggeredBy).toBe('SchemaUniqueness');
+    }
+  });
+
+  it('should include conflictingResourceId, conflictingAttribute, and incomingValue in diagnostics', () => {
+    const uniqueAttrs = [{ schemaUrn: null, attrName: 'employeeId', caseExact: true }];
+    const payload = { employeeId: 'EMP-001' };
+    const existing = [
+      { scimId: 'existing-res-42', rawPayload: JSON.stringify({ employeeId: 'EMP-001' }) },
+    ];
+
+    try {
+      assertSchemaUniqueness('ep-1', payload, uniqueAttrs, existing);
+      fail('should have thrown');
+    } catch (e: any) {
+      const diag = e.getResponse()[SCIM_DIAGNOSTICS_URN];
+      expect(diag.conflictingResourceId).toBe('existing-res-42');
+      expect(diag.conflictingAttribute).toBe('employeeId');
+      expect(diag.incomingValue).toBe('EMP-001');
+    }
+  });
+
+  it('should include URN-qualified conflictingAttribute for extension attributes', () => {
+    const extUrn = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+    const uniqueAttrs = [{ schemaUrn: extUrn, attrName: 'costCenter', caseExact: false }];
+    const payload = { [extUrn]: { costCenter: 'CC-100' } };
+    const existing = [
+      { scimId: 'existing-ext-7', rawPayload: JSON.stringify({ [extUrn]: { costCenter: 'cc-100' } }) },
+    ];
+
+    try {
+      assertSchemaUniqueness('ep-1', payload, uniqueAttrs, existing);
+      fail('should have thrown');
+    } catch (e: any) {
+      const diag = e.getResponse()[SCIM_DIAGNOSTICS_URN];
+      expect(diag.conflictingAttribute).toBe(`${extUrn}:costCenter`);
+      expect(diag.conflictingResourceId).toBe('existing-ext-7');
     }
   });
 });

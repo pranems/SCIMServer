@@ -1110,17 +1110,18 @@ export class ScimSchemaHelpers {
       return profile._schemaCaches[cacheKey].extensionUrns;
     }
 
-    // Fallback: compute from profile resourceTypes
+    // Fallback: compute from profile resourceTypes — only include extensions
+    // for resource types that use THIS service's core schema (not all RTs).
     if (profile?.resourceTypes && profile.resourceTypes.length > 0) {
       const urns = new Set<string>();
       for (const rt of profile.resourceTypes) {
-        if (rt.schemaExtensions) {
+        if (rt.schema === this.coreSchemaUrn && rt.schemaExtensions) {
           for (const ext of rt.schemaExtensions) {
             urns.add(ext.schema);
           }
         }
       }
-      return [...urns];
+      if (urns.size > 0) return [...urns];
     }
     // Fallback: global registry defaults (no profile available)
     return [...this.schemaRegistry.getExtensionUrns()];
@@ -1208,7 +1209,10 @@ export class ScimSchemaHelpers {
         status: 400,
         scimType: 'mutability',
         detail: `Immutable attribute violation: ${details}`,
-        diagnostics: { errorCode: 'VALIDATION_IMMUTABLE' },
+        diagnostics: {
+          errorCode: 'VALIDATION_IMMUTABLE',
+          attributePath: result.errors[0]?.path,
+        },
       });
     }
   }
@@ -1341,7 +1345,13 @@ export function assertSchemaUniqueness(
           status: 409,
           scimType: 'uniqueness',
           detail: `Attribute '${attrPath}' value '${String(incomingValue)}' must be unique within the endpoint.`,
-          diagnostics: { errorCode: 'UNIQUENESS_SCHEMA_ATTR', triggeredBy: 'SchemaUniqueness' },
+          diagnostics: {
+            errorCode: 'UNIQUENESS_SCHEMA_ATTR',
+            triggeredBy: 'SchemaUniqueness',
+            conflictingResourceId: existing.scimId,
+            conflictingAttribute: attrPath,
+            incomingValue: String(incomingValue),
+          },
         });
       }
     }

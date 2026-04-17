@@ -137,6 +137,58 @@ describe('RequestLoggingInterceptor', () => {
     });
   });
 
+  // ── Step 1: endpointId persisted to RequestLog ──────────────────────
+
+  it('should pass endpointId to recordRequest on success', (done) => {
+    const { context } = createMockContext({ method: 'POST', url: '/scim/endpoints/ep-abc123/Users' });
+    const handler: CallHandler = { handle: () => of({ id: 'u1' }) };
+
+    interceptor.intercept(context, handler).subscribe({
+      complete: () => {
+        expect(mockLoggingService.recordRequest).toHaveBeenCalledWith(
+          expect.objectContaining({
+            method: 'POST',
+            url: '/scim/endpoints/ep-abc123/Users',
+            endpointId: 'ep-abc123',
+          }),
+        );
+        done();
+      },
+    });
+  });
+
+  it('should pass endpointId to recordRequest on error', (done) => {
+    const { context } = createMockContext({ method: 'GET', url: '/scim/endpoints/ep-err456/Users/bad' });
+    const testError = new Error('not found');
+    (testError as any).status = 404;
+    const handler: CallHandler = { handle: () => throwError(() => testError) };
+
+    interceptor.intercept(context, handler).subscribe({
+      error: () => {
+        expect(mockLoggingService.recordRequest).toHaveBeenCalledWith(
+          expect.objectContaining({
+            url: '/scim/endpoints/ep-err456/Users/bad',
+            endpointId: 'ep-err456',
+          }),
+        );
+        done();
+      },
+    });
+  });
+
+  it('should pass undefined endpointId for non-endpoint URLs', (done) => {
+    const { context } = createMockContext({ method: 'GET', url: '/scim/Users' });
+    const handler: CallHandler = { handle: () => of({ id: 'u1' }) };
+
+    interceptor.intercept(context, handler).subscribe({
+      complete: () => {
+        const call = mockLoggingService.recordRequest.mock.calls[0][0];
+        expect(call.endpointId).toBeUndefined();
+        done();
+      },
+    });
+  });
+
   it('should log errors and re-throw them', (done) => {
     const { context } = createMockContext({ method: 'POST', url: '/scim/Users' });
     const testError = new Error('Test error');

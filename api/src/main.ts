@@ -3,6 +3,7 @@ import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import type { Request, Response, NextFunction } from 'express';
 import { NestFactory } from '@nestjs/core';
 import { json } from 'express';
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
@@ -36,6 +37,14 @@ async function bootstrap(): Promise<void> {
       // Remove the /v2 segment
       req.url = req.url.replace('/scim/v2', '/scim');
     }
+    next();
+  });
+
+  // Early X-Request-Id middleware — runs before guards and interceptors so that
+  // 401/403/415 error responses also carry the correlation header.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const requestId = (req.headers['x-request-id'] as string) || randomUUID();
+    res.setHeader('X-Request-Id', requestId);
     next();
   });
 

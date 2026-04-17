@@ -125,7 +125,7 @@ Specifically check:
 |-------------|--------------|-------------------|
 | Bulk + projection | `POST /Bulk` with `?attributes=` on individual ops | Each op response projected |
 | Bulk + StrictSchema | Bulk op with unknown attribute + StrictSchema ON | Per-op 400 error |
-| Bulk + SoftDelete | Bulk DELETE with SoftDelete ON | Soft-deletes, resources get active=false |
+| Bulk + SoftDelete | Bulk DELETE with SoftDelete ON | Hard-delete blocked (400); Bulk PATCH deactivate works |
 | Custom resource types + projection | GET /CustomType?attributes=X | Projection works on custom types |
 | Custom resource types + StrictSchema | POST custom type with unknown attr + StrictSchema | 400 rejected |
 | ETag/If-Match + SoftDelete | PUT soft-deleted resource | 404 (not 412/428) |
@@ -139,7 +139,7 @@ Specifically check:
 - Every E2E test scenario should have a corresponding live test in `scripts/live-test.ps1`
 - Live tests should cover both local (port 6000) and Docker (port 8080) scenarios
 - Verify all live test sections in `scripts/live-test.ps1` exist by grepping for `TEST SECTION`
-- Ensure new sections use the next available number (check current highest before `Section 10`; as of v0.37.0 the latest is **9z-L**)
+- Ensure new sections use the next available number (check current highest before `Section 10`; as of v0.37.2 the latest is **9z-M**)
 
 ### H. Resource-Type Symmetry
 
@@ -205,6 +205,11 @@ For every behavior tested on Users, verify the equivalent exists for Groups (and
 | `EndpointContext.profile` stored via `setContext()` | ✅ | implicit | ? |
 | `getProfile()` returns stored profile | ✅ | N/A | ? |
 | `getConfig()` compat shim returns `profile.settings` | ✅ | implicit | ? |
+| **Cache does not leak to API** — `_schemaCaches` stripped from `toFullResponse()` | ✅ | ✅ | ✅ |
+| **`getExtensionUrns()` filters by `coreSchemaUrn`** — User service gets only User extensions | ✅ | N/A | ? |
+| **`getExtensionUrns()` RT isolation** — Group service gets only Group extensions | ✅ | N/A | ? |
+| **`getExtensionUrns()` cache hit** — returns cached extensionUrns when valid Map exists | ✅ | N/A | ? |
+| **`getExtensionUrns()` fallback** — falls back to global registry when no RTs match | ✅ | N/A | ? |
 
 ### L. Registry Simplification + Derived Flags (Phase 14.2–14.4)
 
@@ -242,6 +247,11 @@ For every behavior tested on Users, verify the equivalent exists for Groups (and
 | `ProfileSummary`: serviceProviderConfig boolean flags | ✅ | ✅ | ✅ |
 | `ProfileSummary`: activeSettings (non-default only) | ✅ | ✅ | ✅ |
 | `buildProfileSummary` handles empty/extension schemas | ✅ | N/A | N/A |
+| **Response key allowlist** — full view has ONLY documented keys, no extras | ✅ | ✅ | ✅ |
+| **Response key allowlist** — summary view has ONLY documented keys | ✅ | ✅ | ✅ |
+| **Profile key allowlist** — only `schemas, settings, resourceTypes, serviceProviderConfig` | ✅ | ✅ | ✅ |
+| **No `_schemaCaches` in API response** — internal runtime cache stripped | ✅ | ✅ | ✅ |
+| **Profile clean after SCIM operations** — GET admin endpoint after SCIM CRUD shows no cache artifacts | ✅ | ✅ | ✅ |
 
 ### N. Logging & Error Handling (v0.32.0 overhaul)
 
@@ -288,6 +298,34 @@ For every behavior tested on Users, verify the equivalent exists for Groups (and
 | GET /admin/log-config/audit returns config/endpoint/auth entries | ✅ | ? | ? |
 | POST /admin/logs/prune?retentionDays=30 deletes old entries | ✅ | ? | ? |
 | errorCode UNIQUENESS_USERNAME in 409 diagnostics | ✅ | ? | ? |
+
+### Q. API Response Contract Enforcement (v0.37.2)
+
+Every API endpoint response must be verified for **shape integrity** — not just "does field X exist?" but "does ONLY field X exist?" (allowlist) and "does internal field Y NOT exist?" (denylist).
+
+| Scenario | Unit | E2E | Live |
+|----------|------|-----|------|
+| Full view response key allowlist (no extras) | ✅ | ✅ | ✅ |
+| Summary view response key allowlist (no extras) | ✅ | ✅ | ✅ |
+| Profile key allowlist (no `_schemaCaches`, no `_prismaMetadata`) | ✅ | ✅ | ✅ |
+| `_schemaCaches` stripped even when runtime cache is populated | ✅ | ✅ | ✅ |
+| Profile clean after SCIM CRUD triggers cache building | ✅ | ✅ | ✅ |
+| Map/Set objects never serialize to `{}` in JSON responses | ✅ | implicit | ✅ |
+| `_links` values match endpoint ID | ✅ | ✅ | ✅ |
+| Extension URNs scoped per resource type (User ≠ Group) | ✅ | N/A | ? |
+| SCIM error responses contain only documented fields | ? | ? | ? |
+| List envelope has only `totalResults` + `endpoints` | ? | ✅ | ✅ |
+
+**Anti-Pattern to avoid:**
+```typescript
+// ❌ BAD — catches absence but NOT leakage of extra fields
+expect(result).toHaveProperty('profile');
+
+// ✅ GOOD — catches both absence AND leakage
+for (const key of Object.keys(result)) {
+  expect(ALLOWED_KEYS).toContain(key);
+}
+```
 
 ---
 
@@ -611,12 +649,12 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
-| Unit  | 3,241  | ?     | +?    |
-| E2E   | 960    | ?     | +?    |
-| Live  | ~980   | ?     | +?    |
+| Unit  | 3,331  | ?     | +?    |
+| E2E   | 990    | ?     | +?    |
+| Live  | ~990   | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
-> *Last updated: v0.37.0 - Test Gaps Audit #5 (2026-04-15)*
+> *Last updated: v0.37.2 - API Response Contract Enforcement (2026-04-17)*
 
 4. Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts.
 
@@ -651,4 +689,7 @@ If any updates are needed, apply them directly to this file (`.github/prompts/ad
 - Every test must clean up its own resources (create → test → delete).
 - Test both the happy path AND the error path for every feature.
 - Use `toMatchObject()` for partial JSON matching, `toHaveProperty()` for field presence.
+- **API Response Contract**: Every test that reads an API response MUST include a key allowlist OR denylist assertion. Presence-only tests (`toHaveProperty`) are insufficient — they catch missing fields but not leaked internal fields.
+- **Internal Field Denylist**: Runtime-only fields prefixed with `_` (e.g., `_schemaCaches`, `_prismaMetadata`) must NEVER appear in API responses. Add explicit `not.toHaveProperty('_schemaCaches')` assertions.
+- **Serialization Safety**: Map/Set objects serialize to `{}` via `JSON.stringify`. Any field containing Maps must be stripped before API response serialization.
 - Live tests must work with `-BaseUrl http://localhost:8080 -ClientSecret "devscimclientsecret"` (Docker mode).

@@ -77,7 +77,7 @@ export function assertIfMatch(
       status: 412,
       scimType: 'versionMismatch',
       detail: `ETag mismatch. Expected: ${ifMatchHeader}, current: ${currentVersion}. The resource has been modified.`,
-      diagnostics: { errorCode: 'PRECONDITION_VERSION_MISMATCH' },
+      diagnostics: { errorCode: 'PRECONDITION_VERSION_MISMATCH', currentETag: currentVersion },
     });
   }
 }

@@ -473,7 +473,7 @@ export class EndpointScimUsersService {
         coercePatchOpBooleans(patchDto.Operations, boolMap, coreUrnLower);
       }
 
-      for (const op of patchDto.Operations) {
+      for (const [opIndex, op] of patchDto.Operations.entries()) {
         const preResult = SchemaValidator.validatePatchOperationValue(
           op.op, op.path, op.value, schemaDefs,
           this.schemaHelpers.getAttrMaps(endpointId),
@@ -484,7 +484,13 @@ export class EndpointScimUsersService {
             status: 400,
             scimType: preResult.errors[0]?.scimType ?? 'invalidValue',
             detail: `PATCH operation value validation failed: ${messages}`,
-            diagnostics: { errorCode: 'VALIDATION_SCHEMA', triggeredBy: 'StrictSchemaValidation' },
+            diagnostics: {
+              errorCode: 'VALIDATION_SCHEMA',
+              triggeredBy: 'StrictSchemaValidation',
+              failedOperationIndex: opIndex,
+              failedPath: op.path,
+              failedOp: op.op,
+            },
           });
         }
       }

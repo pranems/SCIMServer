@@ -93,7 +93,8 @@ export class RequestLoggingInterceptor implements NestInterceptor {
                 requestHeaders: { ...request.headers },
                 requestBody: request.body,
                 responseHeaders: response.getHeaders() as Record<string, unknown>,
-                responseBody
+                responseBody,
+                endpointId,
               });
             }),
             catchError((error: unknown) => {
@@ -125,7 +126,8 @@ export class RequestLoggingInterceptor implements NestInterceptor {
                 requestHeaders: { ...request.headers },
                 requestBody: request.body,
                 responseHeaders: response.getHeaders() as Record<string, unknown>,
-                error
+                error,
+                endpointId,
               });
               throw error;
             })

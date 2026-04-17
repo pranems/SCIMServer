@@ -272,12 +272,20 @@ export class EndpointService implements OnModuleInit {
    * Includes full profile, no profileSummary.
    */
   private toFullResponse(cached: CachedEndpoint): EndpointResponse {
+    // Strip runtime-only _schemaCaches from profile before serialization.
+    // _schemaCaches contains Map/Set objects (which serialize to {}) and is
+    // an internal implementation detail that should not leak to consumers.
+    let profileOut = cached.profile;
+    if (cached.profile && '_schemaCaches' in cached.profile) {
+      const { _schemaCaches, ...rest } = cached.profile;
+      profileOut = rest as typeof cached.profile;
+    }
     return {
       id: cached.id,
       name: cached.name,
       displayName: cached.displayName,
       description: cached.description,
-      profile: cached.profile,
+      profile: profileOut,
       active: cached.active,
       scimBasePath: cached.scimBasePath,
       createdAt: cached.createdAt.toISOString(),
@@ -433,8 +441,9 @@ export class EndpointService implements OnModuleInit {
       endpoint = await this.prisma.endpoint.findUnique({
         where: { id: endpointId }
       });
-    } catch {
+    } catch (e) {
       // ID lookup failed (e.g., invalid UUID) — will try by name below
+      this.scimLogger.debug(LogCategory.ENDPOINT, 'Endpoint ID lookup failed, trying by name', { endpointId, error: (e as Error).message });
     }
 
     // Fallback: try by name (allows using endpoint name in SCIM URLs)
@@ -443,8 +452,9 @@ export class EndpointService implements OnModuleInit {
         endpoint = await this.prisma.endpoint.findUnique({
           where: { name: endpointId }
         });
-      } catch {
+      } catch (e) {
         // Name lookup also failed
+        this.scimLogger.debug(LogCategory.ENDPOINT, 'Endpoint name lookup failed', { endpointId, error: (e as Error).message });
       }
     }
 
@@ -556,7 +566,8 @@ export class EndpointService implements OnModuleInit {
       endpoint = await this.prisma.endpoint.findUnique({
         where: { id: endpointId }
       });
-    } catch {
+    } catch (e) {
+      this.scimLogger.debug(LogCategory.ENDPOINT, 'Endpoint lookup failed during update', { endpointId, error: (e as Error).message });
       throw new NotFoundException(`Endpoint with ID "${endpointId}" not found`);
     }
 
@@ -816,6 +827,25 @@ export class EndpointService implements OnModuleInit {
     // The cache is built lazily by getSchemaCache() on first request access.
     if (typedProfile?._schemaCaches) {
       delete typedProfile._schemaCaches;
+    }
+
+    // Normalize stale settings keys from pre-v0.29 profiles to current names.
+    // These old keys may persist in the DB from endpoints created before the rename.
+    if (typedProfile?.settings) {
+      const s = typedProfile.settings as Record<string, unknown>;
+      const STALE_KEY_MAP: Record<string, string> = {
+        SoftDeleteEnabled: 'UserSoftDeleteEnabled',
+        MultiOpPatchRequestAddMultipleMembersToGroup: 'MultiMemberPatchOpForGroupEnabled',
+        MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'MultiMemberPatchOpForGroupEnabled',
+      };
+      for (const [oldKey, newKey] of Object.entries(STALE_KEY_MAP)) {
+        if (oldKey in s && !(newKey in s)) {
+          s[newKey] = s[oldKey];
+        }
+        if (oldKey in s) {
+          delete s[oldKey];
+        }
+      }
     }
 
     return {

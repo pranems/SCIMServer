@@ -58,7 +58,7 @@ All non-public routes are protected by `SharedSecretGuard` (global `APP_GUARD`) 
 
 - Container startup runs `docker-entrypoint.sh`, runs `prisma migrate deploy` against PostgreSQL, then starts app.
 - Database is PostgreSQL 17 running in a separate container (`postgres:17-alpine`) via docker-compose.
-- Backup module supports blob backup configuration via env.
+- Database backup is handled by Azure-managed PostgreSQL PITR (no application-level backup module).
 
 ---
 

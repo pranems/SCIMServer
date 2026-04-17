@@ -144,6 +144,17 @@ For each error path, report:
 - **⚠️ PARTIAL**: error handled but missing diagnostics/wrong level/wrong status
 - **❌ FAIL**: error uncaught, non-SCIM response, internal details leaked, no log
 
+### K. Response Body Integrity
+
+| Check | Description |
+|-------|-------------|
+| K.1 | Map/Set objects never appear in JSON API responses (they serialize to `{}`) |
+| K.2 | Internal runtime fields (`_schemaCaches`, `_prismaMetadata`, etc.) never appear in API responses |
+| K.3 | Error response bodies contain ONLY documented SCIM Error fields (`schemas`, `status`, `scimType`, `detail`, diagnostics URN) |
+| K.4 | Admin endpoint responses strip profile `_schemaCaches` in `toFullResponse()` |
+| K.5 | Profile serialization produces only `schemas`, `settings`, `resourceTypes`, `serviceProviderConfig` |
+| K.6 | `getExtensionUrns()` returns only extensions for the matching resource type (no cross-contamination) |
+
 At the end, produce:
 1. A severity-sorted list of all failures and partials
 2. Specific file:line locations that need fixing

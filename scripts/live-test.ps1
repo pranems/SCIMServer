@@ -7790,6 +7790,64 @@ Test-Result -Success ($dbStats.database.persistenceBackend -eq 'prisma' -or $dbS
 Write-Host "`n--- 9z-L: Auto-Prune + DB Stats Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-M: API RESPONSE CONTRACT ENFORCEMENT
+$script:currentSection = "9z-M: API Response Contract"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-M: API RESPONSE CONTRACT ENFORCEMENT" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# --- Test 9z-M.1: Full view response key allowlist ---
+Write-Host "`n--- Test 9z-M.1: Full view response key allowlist ---" -ForegroundColor Cyan
+$fullEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method GET -Headers $headers
+$fullKeys = $fullEndpoint.PSObject.Properties.Name | Sort-Object
+$allowedFullKeys = @('id', 'name', 'displayName', 'description', 'profile', 'active', 'scimBasePath', 'createdAt', 'updatedAt', '_links') | Sort-Object
+$extraKeys = $fullKeys | Where-Object { $_ -notin $allowedFullKeys }
+Test-Result -Success ($extraKeys.Count -eq 0) -Message "9z-M.1: Full view has no unexpected keys (extras: $($extraKeys -join ', '))"
+
+# --- Test 9z-M.2: Profile key denylist ---
+Write-Host "`n--- Test 9z-M.2: Profile key denylist ---" -ForegroundColor Cyan
+$profileKeys = $fullEndpoint.profile.PSObject.Properties.Name | Sort-Object
+$allowedProfileKeys = @('schemas', 'settings', 'resourceTypes', 'serviceProviderConfig') | Sort-Object
+$extraProfileKeys = $profileKeys | Where-Object { $_ -notin $allowedProfileKeys }
+Test-Result -Success ($extraProfileKeys.Count -eq 0) -Message "9z-M.2: Profile has no unexpected keys (extras: $($extraProfileKeys -join ', '))"
+Test-Result -Success ('_schemaCaches' -notin $profileKeys) -Message "9z-M.3: _schemaCaches NOT in profile"
+
+# --- Test 9z-M.4: Profile clean AFTER SCIM operations ---
+Write-Host "`n--- Test 9z-M.4: Profile clean after SCIM ops ---" -ForegroundColor Cyan
+# Create a user to trigger schema cache building
+$contractUser = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "9zm-contract-$(Get-Random)@test.com"
+    displayName = "Contract Test"
+    active = $true
+} | ConvertTo-Json
+$contractCreated = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $contractUser
+Test-Result -Success ($null -ne $contractCreated.id) -Message "9z-M.4.setup: Created user to trigger cache"
+
+# Now GET admin endpoint — profile must still be clean
+$postScimEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method GET -Headers $headers
+$postScimProfileKeys = $postScimEndpoint.profile.PSObject.Properties.Name
+Test-Result -Success ('_schemaCaches' -notin $postScimProfileKeys) -Message "9z-M.4: _schemaCaches absent AFTER SCIM operations"
+$postScimExtraKeys = $postScimProfileKeys | Where-Object { $_ -notin $allowedProfileKeys }
+Test-Result -Success ($postScimExtraKeys.Count -eq 0) -Message "9z-M.5: No extra profile keys after SCIM ops (extras: $($postScimExtraKeys -join ', '))"
+
+# Cleanup
+try { Invoke-RestMethod -Uri "$scimBase/Users/$($contractCreated.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+# --- Test 9z-M.6: Summary view key allowlist ---
+Write-Host "`n--- Test 9z-M.6: Summary view key allowlist ---" -ForegroundColor Cyan
+$summaryEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId`?view=summary" -Method GET -Headers $headers
+$summaryKeys = $summaryEndpoint.PSObject.Properties.Name | Sort-Object
+$allowedSummaryKeys = @('id', 'name', 'displayName', 'description', 'profileSummary', 'active', 'scimBasePath', 'createdAt', 'updatedAt', '_links') | Sort-Object
+$extraSummaryKeys = $summaryKeys | Where-Object { $_ -notin $allowedSummaryKeys }
+Test-Result -Success ($extraSummaryKeys.Count -eq 0) -Message "9z-M.6: Summary view has no unexpected keys (extras: $($extraSummaryKeys -join ', '))"
+Test-Result -Success ('profile' -notin $summaryKeys) -Message "9z-M.7: Full profile NOT in summary view"
+Test-Result -Success ('profileSummary' -in $summaryKeys) -Message "9z-M.8: profileSummary IS in summary view"
+
+Write-Host "`n--- 9z-M: API Response Contract Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

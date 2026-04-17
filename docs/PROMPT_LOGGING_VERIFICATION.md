@@ -1,6 +1,6 @@
 # Logging Verification Prompt (Self-Improving)
 
-> **Version:** 3.0 · **Source-verified against:** v0.35.0 · **Regenerated:** April 13, 2026  
+> **Version:** 3.2 · **Source-verified against:** v0.37.1 · **Regenerated:** April 17, 2026  
 > Automated checklist — run against source to verify logging completeness.
 
 ---
@@ -178,7 +178,7 @@ TOTAL: __/73 PASS
 ## Latest Run
 
 ```
-Date: April 16, 2026
+Date: April 17, 2026
 Version: 0.37.1
 Executor: AI (Claude Opus 4.6, source-verified)
 
@@ -198,6 +198,19 @@ Section 12 (Factory): 4/4 PASS
 TOTAL: 73/73 PASS
 ```
 
-Re-verified after v0.36.0 P0–P3 performance hardening. Added 2 new checkpoints:
-- 10.6: GET /admin/log-config/prune (auto-prune config read)
-- 10.7: PUT /admin/log-config/prune (auto-prune config update with validation)
+Re-verified after v0.37.1 logging improvements + test-gaps-audit-4.
+
+**Infrastructure layer: 73/73 PASS** — all checklist items verified against source.
+
+**Service-level deep audit (beyond checklist):**
+- `createScimError()` calls: **57 total across 5 files — ALL 57 have diagnostics.errorCode** ✅
+- `enrichContext()` calls: all 18 SCIM service methods set operation + resourceType ✅
+- Silent `catch {}` blocks: 3 found in `endpoint.service.ts` → **FIXED** with DEBUG logging (+1 unit test)
+- Auth guard logging: complete (12 distinct events across all auth paths) ✅
+- Bulk processor: INFO start/completion, WARN per-op failures, enrichContext per sub-op ✅
+
+**Fixes applied in this run:**
+- `endpoint.service.ts`: 3 bare `catch {}` → `catch (e) { this.scimLogger.debug(...) }`
+  - `getEndpoint()`: ID lookup and name lookup now log at DEBUG on failure
+  - `updateEndpoint()`: findUnique now logs at DEBUG on failure
+- `endpoint.service.spec.ts`: +1 test verifying DB errors are logged (not silently swallowed)

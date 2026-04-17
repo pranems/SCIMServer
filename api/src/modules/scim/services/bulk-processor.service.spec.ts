@@ -421,7 +421,7 @@ describe('BulkProcessorService', () => {
       });
     });
 
-    it('should capture generic Error as 500', async () => {
+    it('should capture generic Error as 500 with generic detail (no leak)', async () => {
       mockUsersService.deleteUserForEndpoint!.mockRejectedValue(new Error('Database timeout'));
 
       const ops: BulkOperationDto[] = [
@@ -430,7 +430,8 @@ describe('BulkProcessorService', () => {
 
       const result = await service.process(endpointId, ops, baseUrl, config);
       expect(result.Operations[0].status).toBe('500');
-      expect(result.Operations[0].response?.detail).toBe('Database timeout');
+      // Must NOT leak raw error message — use generic detail
+      expect(result.Operations[0].response?.detail).toBe('Internal server error');
     });
 
     it('should handle unknown error types', async () => {
@@ -635,6 +636,25 @@ describe('BulkProcessorService', () => {
       const failCall = warnCalls.find((c: any[]) => c[1]?.includes('failed'));
       expect(failCall).toBeDefined();
       expect(failCall[2].status).toBe(500); // fallback for non-HttpException
+    });
+
+    it('should NOT leak internal error messages for non-HttpException in bulk response', async () => {
+      mockUsersService.createUserForEndpoint!.mockRejectedValue(
+        new TypeError('Cannot read properties of undefined (reading "scimId")'),
+      );
+
+      const ops: BulkOperationDto[] = [
+        { method: 'POST', path: '/Users', bulkId: 'u1', data: { userName: 'leak-test' } },
+      ];
+
+      const result = await service.process(endpointId, ops, baseUrl, config);
+      const failedOp = result.Operations[0];
+
+      expect(failedOp.status).toBe('500');
+      // The detail must NOT leak internal error messages (e.g., "Cannot read properties of undefined")
+      expect(failedOp.response?.detail).toBe('Internal server error');
+      expect(failedOp.response?.detail).not.toContain('Cannot read');
+      expect(failedOp.response?.detail).not.toContain('undefined');
     });
   });
 });
