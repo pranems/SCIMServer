@@ -1071,8 +1071,12 @@ export class ScimSchemaHelpers {
     let ast;
     try {
       ast = parseScimFilter(filter);
-    } catch {
+    } catch (err) {
       // Syntax error already handled by buildUserFilter / buildGroupFilter
+      // Log at TRACE for debugging filter parse failures
+      if (process.env.NODE_ENV !== 'test') {
+        console.debug?.('[scim-helpers] Filter parse failed in validateFilterPaths:', (err as Error).message);
+      }
       return;
     }
     const paths = extractFilterPaths(ast);
@@ -1290,7 +1294,13 @@ function extractFromRawPayload(
   let parsed: Record<string, unknown>;
   if (typeof rawPayload === 'string') {
     try { parsed = JSON.parse(rawPayload) as Record<string, unknown>; }
-    catch { return undefined; }
+    catch (err) {
+      // Corrupt JSON in rawPayload — log at debug level for observability
+      if (process.env.NODE_ENV !== 'test') {
+        console.debug?.('[scim-helpers] extractFromRawPayload: corrupt JSON:', (err as Error).message);
+      }
+      return undefined;
+    }
   } else {
     parsed = rawPayload;
   }

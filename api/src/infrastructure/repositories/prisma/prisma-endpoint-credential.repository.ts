@@ -42,8 +42,12 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
     try {
       const row = await this.prisma.endpointCredential.findUnique({ where: { id } });
       return row ? this.toModel(row) : null;
-    } catch {
-      return null; // Invalid UUID format
+    } catch (err) {
+      // Invalid UUID format or DB connection error — return null (guard handles 401)
+      if (process.env.NODE_ENV !== 'test') {
+        console.debug?.('[credential-repo] findById error:', (err as Error).message);
+      }
+      return null;
     }
   }
 
@@ -62,7 +66,11 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
         data: { active: false },
       });
       return this.toModel(row);
-    } catch {
+    } catch (err) {
+      // Record not found or DB error — return null
+      if (process.env.NODE_ENV !== 'test') {
+        console.debug?.('[credential-repo] deactivate error:', (err as Error).message);
+      }
       return null;
     }
   }
@@ -70,8 +78,11 @@ export class PrismaEndpointCredentialRepository implements IEndpointCredentialRe
   async delete(id: string): Promise<void> {
     try {
       await this.prisma.endpointCredential.delete({ where: { id } });
-    } catch {
-      // Already deleted or invalid ID — no-op
+    } catch (err) {
+      // Already deleted or invalid ID — no-op, but log for observability
+      if (process.env.NODE_ENV !== 'test') {
+        console.debug?.('[credential-repo] delete error:', (err as Error).message);
+      }
     }
   }
 

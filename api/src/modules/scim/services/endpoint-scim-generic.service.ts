@@ -1119,8 +1119,11 @@ export class EndpointScimGenericService {
     let ast;
     try {
       ast = parseScimFilter(filter);
-    } catch {
+    } catch (err) {
       // Syntax errors are handled by buildGenericFilter in the caller
+      if (process.env.NODE_ENV !== 'test') {
+        console.debug?.('[generic-service] Filter parse failed in validateFilterAttributePaths:', (err as Error).message);
+      }
       return;
     }
     const paths = extractFilterPaths(ast);
