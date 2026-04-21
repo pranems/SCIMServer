@@ -114,6 +114,10 @@ const META_ALLOWED_KEYS = [
   'resourceType', 'created', 'lastModified', 'location', 'version',
 ];
 
+const PROFILE_ALLOWED_KEYS = [
+  'schemas', 'settings', 'resourceTypes', 'serviceProviderConfig',
+];
+
 describe('API Response Contract Verification (E2E)', () => {
   let app: INestApplication;
   let token: string;
@@ -423,6 +427,140 @@ describe('API Response Contract Verification (E2E)', () => {
       assertNoDeniedFields(res.body, 'GET /admin/version');
       // Version response should have at least version field
       expect(res.body).toHaveProperty('version');
+    });
+  });
+
+  // ─── Admin List Endpoint Response Contract ──────────────────────────────
+
+  describe('Admin list endpoints response contract', () => {
+    it('GET /admin/endpoints (list) should return envelope with allowlisted keys', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/scim/admin/endpoints')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      // Envelope keys
+      const envelopeAllowed = ['totalResults', 'endpoints'];
+      assertAllowedKeys(res.body, envelopeAllowed, 'GET /admin/endpoints envelope');
+      expect(typeof res.body.totalResults).toBe('number');
+      expect(Array.isArray(res.body.endpoints)).toBe(true);
+
+      // Each endpoint in the list should match summary view shape
+      if (res.body.endpoints.length > 0) {
+        const ep = res.body.endpoints[0];
+        const SUMMARY_KEYS = [
+          'id', 'name', 'displayName', 'description', 'profileSummary',
+          'active', 'scimBasePath', 'createdAt', 'updatedAt', '_links',
+        ];
+        assertAllowedKeys(ep, SUMMARY_KEYS, 'endpoint summary item');
+        assertNoDeniedFields(ep, 'endpoint summary item');
+      }
+    });
+  });
+
+  // ─── Bulk Response Contract ─────────────────────────────────────────────
+
+  describe('Bulk response contract', () => {
+    let bulkEndpointId: string;
+    let bulkBasePath: string;
+
+    beforeAll(async () => {
+      // Create endpoint with bulk enabled
+      const epRes = await request(app.getHttpServer())
+        .post('/scim/admin/endpoints')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ name: `contract-bulk-${Date.now()}`, profilePreset: 'rfc-standard' })
+        .expect(201);
+      bulkEndpointId = epRes.body.id;
+      bulkBasePath = scimBasePath(bulkEndpointId);
+    });
+
+    it('POST /Bulk response should match BulkResponse contract', async () => {
+      const bulkReq = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:BulkRequest'],
+        failOnErrors: 0,
+        Operations: [
+          {
+            method: 'POST',
+            path: '/Users',
+            bulkId: 'bulk-contract-1',
+            data: {
+              schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+              userName: `bulk-contract-${Date.now()}@test.com`,
+              displayName: 'Bulk Contract Test',
+              active: true,
+            },
+          },
+        ],
+      };
+
+      const res = await request(app.getHttpServer())
+        .post(`${bulkBasePath}/Bulk`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/scim+json')
+        .send(bulkReq)
+        .expect(200);
+
+      // BulkResponse envelope
+      const BULK_ALLOWED = ['schemas', 'Operations'];
+      assertAllowedKeys(res.body, BULK_ALLOWED, 'POST /Bulk');
+      expect(res.body.schemas).toContain('urn:ietf:params:scim:api:messages:2.0:BulkResponse');
+      expect(Array.isArray(res.body.Operations)).toBe(true);
+
+      // Each operation result should have valid keys
+      if (res.body.Operations.length > 0) {
+        const op = res.body.Operations[0];
+        const OP_ALLOWED = ['method', 'bulkId', 'version', 'location', 'status', 'response'];
+        assertAllowedKeys(op, OP_ALLOWED, 'Bulk operation result');
+        assertNoDeniedFields(op, 'Bulk operation result');
+        expect(op.status).toBe('201');
+
+        // If response body present (for POST), verify resource shape
+        if (op.response) {
+          assertNoDeniedFields(op.response, 'Bulk POST response body');
+        }
+      }
+
+      // Cleanup
+      if (res.body.Operations?.[0]?.location) {
+        const userId = res.body.Operations[0].location.split('/').pop();
+        try {
+          await request(app.getHttpServer())
+            .delete(`${bulkBasePath}/Users/${userId}`)
+            .set('Authorization', `Bearer ${token}`);
+        } catch { /* ignore */ }
+      }
+    });
+  });
+
+  // ─── Temporal Coupling: Cache Leak Detection (⚡ F-A1) ──────────────────
+
+  describe('Temporal coupling: admin endpoint after SCIM operations', () => {
+    it('GET /admin/endpoints/:id should have clean profile after SCIM operations trigger cache building', async () => {
+      // 1. Create users to trigger schema cache building
+      const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+      // 2. Read admin endpoint — must still be clean
+      const adminRes = await request(app.getHttpServer())
+        .get(`/scim/admin/endpoints/${endpointId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      // Profile must not contain _schemaCaches
+      const profile = adminRes.body.profile;
+      if (profile) {
+        assertAllowedKeys(profile, PROFILE_ALLOWED_KEYS, 'Profile after SCIM ops');
+        expect(profile).not.toHaveProperty('_schemaCaches');
+      }
+      assertNoDeniedFields(adminRes.body, 'Admin endpoint after SCIM ops');
+
+      // Cleanup
+      try {
+        await request(app.getHttpServer())
+          .delete(`${basePath}/Users/${user.id}`)
+          .set('Authorization', `Bearer ${token}`);
+      } catch { /* ignore */ }
     });
   });
 });
