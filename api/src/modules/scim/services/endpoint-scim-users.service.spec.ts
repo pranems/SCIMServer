@@ -640,6 +640,88 @@ describe('EndpointScimUsersService', () => {
       expect(storedPayload[URN].department).toBe('Eng');
     });
 
+    it('should accept raw string value for manager PATCH (Postel\'s Law / Entra ID compat)', async () => {
+      const URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+      const userNoManager = {
+        ...mockUser,
+        rawPayload: JSON.stringify({
+          displayName: 'Test User',
+          [URN]: { department: 'Eng' },
+        }),
+      };
+
+      const patchDto: PatchUserDto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [
+          {
+            op: 'add',
+            path: `${URN}:manager`,
+            value: 'raw-uuid-string-123',
+          },
+        ],
+      };
+
+      mockUserRepo.findByScimId.mockResolvedValueOnce(userNoManager);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
+
+      mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
+        ...userNoManager,
+        rawPayload: data.rawPayload,
+      }));
+
+      await service.patchUserForEndpoint(
+        mockUser.scimId,
+        patchDto,
+        'http://localhost:3000/scim',
+        mockEndpoint.id
+      );
+
+      const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
+      expect(storedPayload[URN].manager).toEqual({ value: 'raw-uuid-string-123' });
+      expect(storedPayload[URN].department).toBe('Eng');
+    });
+
+    it('should remove manager when replace sends empty string "" (RFC 7644 §3.5.2.3)', async () => {
+      const URN = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
+      const userWithManager = {
+        ...mockUser,
+        rawPayload: JSON.stringify({
+          displayName: 'Test User',
+          [URN]: { manager: { value: 'OLD-MGR' }, department: 'Eng' },
+        }),
+      };
+
+      const patchDto: PatchUserDto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [
+          {
+            op: 'replace',
+            path: `${URN}:manager`,
+            value: '',
+          },
+        ],
+      };
+
+      mockUserRepo.findByScimId.mockResolvedValueOnce(userWithManager);
+      mockUserRepo.findConflict.mockResolvedValueOnce(null);
+
+      mockUserRepo.update.mockImplementation(async (_id: string, data: any) => ({
+        ...userWithManager,
+        rawPayload: data.rawPayload,
+      }));
+
+      await service.patchUserForEndpoint(
+        mockUser.scimId,
+        patchDto,
+        'http://localhost:3000/scim',
+        mockEndpoint.id
+      );
+
+      const storedPayload = JSON.parse(mockUserRepo.update.mock.calls[0][1].rawPayload);
+      expect(storedPayload[URN].manager).toBeUndefined();
+      expect(storedPayload[URN].department).toBe('Eng');
+    });
+
     it('should remove valuePath entry via PATCH remove', async () => {
       const userWithEmails = {
         ...mockUser,

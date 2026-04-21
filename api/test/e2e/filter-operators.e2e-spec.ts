@@ -187,6 +187,48 @@ describe('Filter Operators (E2E)', () => {
 
       expect(res.body.totalResults).toBe(1);
     });
+
+    it('should filter groups by displayName sw (startsWith)', async () => {
+      await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'SwTestGroup Alpha' })).expect(201);
+      await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'Other Group' })).expect(201);
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Groups?filter=displayName sw "SwTest"`,
+        token,
+      ).expect(200);
+
+      expect(res.body.totalResults).toBe(1);
+      expect(res.body.Resources[0].displayName).toBe('SwTestGroup Alpha');
+    });
+
+    it('should filter groups by displayName pr (present)', async () => {
+      await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'PrGroup' })).expect(201);
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Groups?filter=displayName pr`,
+        token,
+      ).expect(200);
+
+      expect(res.body.totalResults).toBeGreaterThanOrEqual(1);
+      expect(res.body.Resources.every((g: any) => g.displayName)).toBe(true);
+    });
+
+    it('should filter groups by externalId pr (present)', async () => {
+      await scimPost(app, `${basePath}/Groups`, token, validGroup({ externalId: 'pr-ext-grp-123' })).expect(201);
+      await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201); // no externalId
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Groups?filter=externalId pr`,
+        token,
+      ).expect(200);
+
+      // At least the one with externalId should be returned
+      expect(res.body.totalResults).toBeGreaterThanOrEqual(1);
+      expect(res.body.Resources.every((g: any) => g.externalId)).toBe(true);
+    });
   });
 
   // ── UUID guard on id filter ──────────────────────────────────────────────
