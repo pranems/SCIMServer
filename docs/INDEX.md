@@ -1,6 +1,6 @@
 # 📚 SCIMServer Documentation Index
 
-> **Version:** 0.37.2 · **Updated:** April 21, 2026  
+> **Version:** 0.37.3 · **Updated:** April 21, 2026  
 > 68 active docs in `docs/` · 49 E2E suites (1,025 pass) · 84 unit suites (3,345 pass) · 6 built-in presets
 
 ---
@@ -11,7 +11,7 @@
 |----------|-------------|
 | [README.md](../README.md) | Overview, quick start, architecture, compliance, deployment |
 | [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) | Living stats — LoC, test counts, dependency versions, architecture |
-| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 → v0.37.2 |
+| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 → v0.37.3 |
 | [admin.md](../admin.md) | Release workflow (version, tag, publish, update) |
 
 ## Deployment Guides
@@ -150,7 +150,7 @@
 
 ---
 
-## Current Test Counts (v0.37.2)
+## Current Test Counts (v0.37.3)
 
 | Suite | Suites | Tests | Status |
 |-------|--------|-------|--------|

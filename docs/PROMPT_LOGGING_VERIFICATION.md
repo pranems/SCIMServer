@@ -1,6 +1,6 @@
 # Logging Verification Prompt (Self-Improving)
 
-> **Version:** 3.3 · **Source-verified against:** v0.37.2 · **Regenerated:** April 21, 2026  
+> **Version:** 3.3 · **Source-verified against:** v0.37.3 · **Regenerated:** April 21, 2026  
 > Automated checklist — run against source to verify logging completeness.
 
 ---
@@ -179,7 +179,7 @@ TOTAL: __/73 PASS
 
 ```
 Date: April 21, 2026
-Version: 0.37.2
+Version: 0.37.3
 Executor: AI (Claude Opus 4.6, source-verified)
 
 Section 1 (Core): 6/6 PASS
@@ -198,7 +198,7 @@ Section 12 (Factory): 4/4 PASS
 TOTAL: 73/73 PASS
 ```
 
-Re-verified after v0.37.2 manager PATCH fix + test gap audit + doc freshness audit.
+Re-verified after v0.37.3 manager PATCH fix + test gap audit + doc freshness audit.
 
 **Infrastructure layer: 73/73 PASS** — all checklist items verified against source.
 

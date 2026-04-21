@@ -2,12 +2,12 @@
   "_type": "export",
   "__export_format": 4,
   "__export_date": "2026-03-31T00:00:00.000Z",
-  "__export_source": "SCIMServer docs generator v0.37.2",
+  "__export_source": "SCIMServer docs generator v0.37.3",
   "resources": [
     {
       "_id": "wrk_scimserver",
       "_type": "workspace",
-      "name": "SCIMServer v0.37.2 — Complete API",
+      "name": "SCIMServer v0.37.3 — Complete API",
       "description": "All 82 endpoints across 19 controllers. Set base_url, token, endpoint_id, user_id, group_id in environment.",
       "scope": "collection"
     },

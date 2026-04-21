@@ -5,6 +5,17 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.37.3] - 2026-04-21
+
+### Release — Full Validation Pipeline
+
+- **fix(schema-validator)**: Accept raw string values for complex PATCH attributes (manager) — Postel's Law / Entra ID compat, fixes 3 SCIM Validator failures
+- **fix(logging)**: Add DEBUG logging to 6 silent catch blocks (credential repo, service helpers, generic service)
+- **test(gaps)**: Comprehensive test gap audit — +14 unit, +18 E2E, +7 live tests
+- **test(contracts)**: API contract verification execution #3 — shared assertions helper, 22/82 endpoints with strict contract tests
+- **docs**: Full freshness audit, JSON artifact version sync, API reference update
+- Logging verification: 73/73 PASS. Error handling: 55/55 PASS.
+- **Totals**: 84 unit suites (3,345 tests), 49 E2E suites (~1,025 tests)
 ## [0.37.2] - 2026-04-21
 
 ### Bug Fixes — Manager PATCH String Coercion
