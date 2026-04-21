@@ -1,6 +1,6 @@
 # Project Health & Stats
 
-> **Version:** 0.37.1 · **Updated:** April 17, 2026 · **Status:** Production-ready
+> **Version:** 0.37.2 · **Updated:** April 21, 2026 · **Status:** Production-ready
 
 ---
 
@@ -12,9 +12,9 @@
 | **Source LoC** | 29,837 |
 | **Unit test files** (`api/src/**/*.spec.ts`) | 84 |
 | **Unit test LoC** | 32,776 |
-| **E2E test files** (`api/test/e2e/**/*.e2e-spec.ts`) | 47 |
+| **E2E test files** (`api/test/e2e/**/*.e2e-spec.ts`) | 49 |
 | **E2E test LoC** | ~13,300 |
-| **Documentation files** (`docs/**/*.md`) | ~120 (64 active + 56 archived) |
+| **Documentation files** (`docs/**/*.md`) | ~125 (68 active + 57 archived) |
 | **Scripts** (`scripts/*.ps1`) | 18 |
 | **Total project files** | ~400+ |
 
@@ -22,11 +22,11 @@
 
 | Layer | Suites | Tests | Skip | Status |
 |-------|--------|-------|------|--------|
-| **Unit** | 84 | 3,318 | 0 | ✅ All pass |
-| **E2E** | 47 | 986 | 0 | ✅ All pass |
-| **Live (main)** | 43 sections | ~753 | 0 | ✅ All pass |
+| **Unit** | 84 | 3,345 | 0 | ✅ All pass |
+| **E2E** | 49 | 1,025 | 0 | ✅ All pass |
+| **Live (main)** | 43 sections | ~760 | 0 | ✅ All pass |
 | **Live (Lexmark ISV)** | 13 sections | 112 | 0 | ✅ All pass |
-| **Total** | **~184** | **~5,145** | 0 | ✅ All pass |
+| **Total** | **~186** | **~5,200** | 0 | ✅ All pass |
 
 ### Unit Test Suites (84)
 

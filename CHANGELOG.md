@@ -5,6 +5,25 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.37.2] - 2026-04-21
+
+### Bug Fixes — Manager PATCH String Coercion
+
+- **fix(schema-validator)**: Accept raw string values for complex PATCH attributes (manager) — pre-PATCH strict schema validator now allows raw strings for complex attrs with a `value` sub-attribute (Postel's Law / Entra ID compat) and empty values as RFC 7644 §3.5.2.3 removal signals
+- **Impact**: SCIM Validator SFComplianceFailed: true → false (3 manager PATCH failures resolved)
+
+### Tests Added — Manager PATCH + Test Gap Audit
+
+- Unit: +14 (schema-validator: 12 string coercion tests, service: 2 raw string/empty removal)
+- E2E: +18 (manager-patch: 8, error-response-allowlist: 4, group-filters: 3, group-reprovision: 1, write-projection: 2)
+- Live: +7 (section 9z-N: manager PATCH string coercion)
+- **Totals**: 84 unit suites (3,345 tests), 49 E2E suites (~1,025 tests)
+
+### Documentation
+
+- New: `docs/MANAGER_PATCH_STRING_COERCION.md` — full feature doc with RFC analysis, Mermaid diagrams, code examples
+- Updated: `docs/INDEX.md`, pipeline JSONs, all version/count references updated
+
 ## [0.37.2] - 2026-04-17
 
 ### Bug Fixes — API Response Contract Enforcement

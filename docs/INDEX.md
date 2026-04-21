@@ -1,7 +1,7 @@
 # 📚 SCIMServer Documentation Index
 
-> **Version:** 0.37.1 · **Updated:** April 17, 2026  
-> 67 active docs in `docs/` · 47 E2E suites (986 pass) · 84 unit suites (3,318 pass) · 6 built-in presets
+> **Version:** 0.37.2 · **Updated:** April 21, 2026  
+> 68 active docs in `docs/` · 49 E2E suites (1,025 pass) · 84 unit suites (3,345 pass) · 6 built-in presets
 
 ---
 
@@ -11,7 +11,7 @@
 |----------|-------------|
 | [README.md](../README.md) | Overview, quick start, architecture, compliance, deployment |
 | [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) | Living stats — LoC, test counts, dependency versions, architecture |
-| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 → v0.37.1 |
+| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 → v0.37.2 |
 | [admin.md](../admin.md) | Release workflow (version, tag, publish, update) |
 
 ## Deployment Guides
@@ -150,12 +150,12 @@
 
 ---
 
-## Current Test Counts (v0.37.1)
+## Current Test Counts (v0.37.2)
 
 | Suite | Suites | Tests | Status |
 |-------|--------|-------|--------|
-| Unit | 84 | 3,318 | ✅ All pass |
-| E2E | 47 | 986 | ✅ All pass |
-| Live (main) | 43 sections | ~753 | ✅ All pass |
+| Unit | 84 | 3,345 | ✅ All pass |
+| E2E | 49 | 1,025 | ✅ All pass |
+| Live (main) | 43 sections | ~760 | ✅ All pass |
 | Live (Lexmark ISV) | 13 sections | 112 | ✅ All pass |
-| **Total** | **~184** | **~5,000** | **✅ All pass** |
+| **Total** | **~186** | **~5,100** | **✅ All pass** |
