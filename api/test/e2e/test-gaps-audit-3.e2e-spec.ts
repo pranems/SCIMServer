@@ -85,6 +85,47 @@ describe('Test Gaps Audit #3 — Remaining projection & characteristic gaps (E2E
       expect(res.body.schemas).toBeDefined();
       expect(res.body.meta).toBeDefined();
     });
+
+    it('PATCH with ?excludedAttributes=displayName should exclude displayName from response', async () => {
+      const res = await scimPatch(
+        app,
+        `${basePath}/Users/${userId}?excludedAttributes=displayName`,
+        token,
+        {
+          schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+          Operations: [{ op: 'replace', value: { title: 'Excluded Test' } }],
+        },
+      ).expect(200);
+
+      // displayName should be excluded because it's returned:'default' and excluded by query
+      expect(res.body).not.toHaveProperty('displayName');
+      // always-returned fields should still be present
+      expect(res.body.id).toBeDefined();
+      expect(res.body.schemas).toBeDefined();
+      expect(res.body.meta).toBeDefined();
+      // userName should still be present (not excluded)
+      expect(res.body.userName).toBeDefined();
+    });
+
+    it('PUT with ?attributes=displayName should include displayName, exclude others', async () => {
+      const user = (await scimGet(app, `${basePath}/Users/${userId}`, token).expect(200)).body;
+      const putBody = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: user.userName,
+        displayName: 'PUT Projected',
+        active: true,
+      };
+      const res = await scimPut(app, `${basePath}/Users/${userId}?attributes=displayName`, token, putBody).expect(200);
+
+      // Requested attribute present
+      expect(res.body.displayName).toBe('PUT Projected');
+      // Always-returned fields present
+      expect(res.body.id).toBeDefined();
+      expect(res.body.schemas).toBeDefined();
+      expect(res.body.meta).toBeDefined();
+      // Non-requested default attributes absent
+      expect(res.body).not.toHaveProperty('title');
+    });
   });
 
   // ═══════════════════════════════════════════════════════════════════

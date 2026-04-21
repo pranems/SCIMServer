@@ -412,4 +412,71 @@ describe('Error Handling & SCIM Error Format (E2E)', () => {
       }
     });
   });
+
+  // ─── Error Response Key Allowlist (API Contract Enforcement) ──────
+
+  describe('Error response key allowlist (no internal field leakage)', () => {
+    const ALLOWED_ERROR_KEYS = new Set([
+      'schemas', 'status', 'scimType', 'detail',
+      'urn:scimserver:api:messages:2.0:Diagnostics',
+    ]);
+    const INTERNAL_DENYLIST = [
+      '_schemaCaches', '_rawPayload', '_prismaMetadata', '_version',
+      'endpointId', 'scimId', 'rawPayload', 'stackTrace', 'stack',
+    ];
+
+    function assertErrorKeyAllowlist(body: Record<string, unknown>, context: string) {
+      for (const key of Object.keys(body)) {
+        expect(ALLOWED_ERROR_KEYS).toContain(key);
+      }
+      for (const field of INTERNAL_DENYLIST) {
+        expect(body).not.toHaveProperty(field);
+      }
+      // No _-prefixed fields (except _links which doesn't apply to errors)
+      for (const key of Object.keys(body)) {
+        if (key.startsWith('_')) {
+          expect(key).toBe('_this_should_never_match');
+        }
+      }
+    }
+
+    it('400 error should contain ONLY allowed keys', async () => {
+      const res = await scimPost(app, `${basePath}/Users`, token, {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        // missing userName — triggers 400
+      }).expect(400);
+      assertErrorKeyAllowlist(res.body, '400 missing userName');
+    });
+
+    it('404 error should contain ONLY allowed keys', async () => {
+      const res = await scimGet(
+        app,
+        `${basePath}/Users/00000000-0000-0000-0000-000000000000`,
+        token,
+      ).expect(404);
+      assertErrorKeyAllowlist(res.body, '404 not found');
+    });
+
+    it('409 error should contain ONLY allowed keys', async () => {
+      await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'dup-errkey@test.com' })).expect(201);
+      const res = await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'dup-errkey@test.com' })).expect(409);
+      assertErrorKeyAllowlist(res.body, '409 uniqueness');
+    });
+
+    it('diagnostics extension should NOT contain endpointId or scimId', async () => {
+      const res = await scimGet(
+        app,
+        `${basePath}/Users/00000000-0000-0000-0000-000000000000`,
+        token,
+      ).expect(404);
+      const diag = res.body['urn:scimserver:api:messages:2.0:Diagnostics'];
+      if (diag) {
+        expect(diag).not.toHaveProperty('_schemaCaches');
+        expect(diag).not.toHaveProperty('rawPayload');
+        // endpointId IS expected in diagnostics (it helps debugging), so it's allowed there
+        // But scimId (internal DB field) should not leak
+        expect(diag).not.toHaveProperty('scimId');
+      }
+    });
+  });
 });

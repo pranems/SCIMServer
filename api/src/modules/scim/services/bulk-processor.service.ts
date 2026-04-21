@@ -418,7 +418,9 @@ export class BulkProcessorService {
         detail = response;
       }
     } else if (error instanceof Error) {
-      detail = error.message;
+      // Do NOT leak internal error details (table names, stack traces, etc.)
+      // to the client. Log the full message server-side; return generic detail.
+      detail = 'Internal server error';
     }
 
     return {

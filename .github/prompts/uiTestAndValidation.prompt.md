@@ -53,7 +53,7 @@ cd web; npx vitest run *> c:\temp\vitest-step1.txt; type c:\temp\vitest-step1.tx
 
 Record: total files, total tests, pass count, fail count, duration.
 
-**Current baseline:** 16 test files, 152 tests, 0 failures.
+**Current baseline:** 17 test files, 164 tests, 0 failures.
 
 If any tests fail, immediately read the failing test + source component, fix whichever is wrong, and rerun. Do not ask the user.
 
@@ -81,7 +81,7 @@ Build a coverage matrix of all source files vs test files:
 | `api/client.ts` | `api/client.test.ts` | 13 | ✅ |
 | `components/activity/ActivityFeed.tsx` | `components/activity/ActivityFeed.test.tsx` | 13 | ✅ |
 | `components/database/DatabaseBrowser.tsx` | `components/database/DatabaseBrowser.test.tsx` | 10 | ✅ |
-| `App.tsx` (footer, tabs, modals) | — | 0 | ❌ GAP (root component, many effects + mocks needed for all child components) |
+| `App.tsx` (footer, tabs, modals) | `App.test.tsx` | 12 | ✅ |
 
 For each ❌ GAP, read the source file and determine what is testable with Vitest + jsdom (component rendering, user interactions, state changes). API calls should be mocked with `vi.mock()`.
 
@@ -198,6 +198,7 @@ After each run of this prompt, update THIS FILE with:
 
 | Date | Tests | Files | Gaps Closed | Notes |
 |------|-------|-------|-------------|-------|
+| 2026-04-17 | 164 | 17 | 1 | Closed App.tsx (12 tests: token modal show/hide/pre-existing, 4 tab navigation, 3 footer content, version display). All source files now have co-located tests. 0 remaining gaps. |
 | 2026-04-14 | 152 | 16 | 2 | Closed ActivityFeed (13 tests), DatabaseBrowser (10 tests). Live data verified: version, summary, stats, users, groups, backup 404 — all correct. 1 remaining gap: App.tsx. |
 | 2026-04-14 | 129 | 14 | 5 | Closed api/client.ts (13 tests). Live data verification: all endpoints correct after Fix #1–3. |
 | 2026-04-14 | 116 | 13 | 4 | Closed StatisticsTab (10), UsersTab (10), GroupsTab (7), ManualProvision (12). |

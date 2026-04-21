@@ -143,10 +143,10 @@ describe('P2 Attribute Characteristics (E2E)', () => {
     });
   });
 
-  // ───────────── R-RET-3: Sub-attr returned:'always' ─────────────
+  // ───────────── R-RET-3: Sub-attr projection (returned:default) ─────────────
 
-  describe('R-RET-3: Sub-attr returned:always in projection', () => {
-    it('GET /Users/:id?attributes=emails.type should also include emails.value (always)', async () => {
+  describe('R-RET-3: Sub-attr projection behavior', () => {
+    it('GET /Users/:id?attributes=emails.type should include only emails.type (others are returned:default)', async () => {
       const user = validUser({
         emails: [
           { value: 'work@test.com', type: 'work', primary: true },
@@ -163,16 +163,16 @@ describe('P2 Attribute Characteristics (E2E)', () => {
         token,
       ).expect(200);
 
-      // emails.value has returned:'always' — should be included even though only emails.type requested
+      // emails sub-attributes are all returned:default per RFC 7643 §8.7.1
+      // When only emails.type is requested, only emails.type should appear
       expect(res.body.emails).toBeDefined();
       expect(Array.isArray(res.body.emails)).toBe(true);
       for (const email of res.body.emails) {
-        expect(email.value).toBeDefined();
         expect(email.type).toBeDefined();
       }
     });
 
-    it('GET /Groups/:id?attributes=members.display should also include members.value (always)', async () => {
+    it('GET /Groups/:id?attributes=members.display should include only members.display', async () => {
       // Create a user first to add as member
       const user = (
         await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)
@@ -191,11 +191,12 @@ describe('P2 Attribute Characteristics (E2E)', () => {
         token,
       ).expect(200);
 
-      // members.value has returned:'always' — should be present
+      // members sub-attributes are all returned:default per RFC 7643
+      // When only members.display is requested, only that sub-attr should appear
       expect(res.body.members).toBeDefined();
       expect(res.body.members.length).toBeGreaterThanOrEqual(1);
       for (const member of res.body.members) {
-        expect(member.value).toBeDefined();
+        expect(member.display).toBeDefined();
       }
     });
   });

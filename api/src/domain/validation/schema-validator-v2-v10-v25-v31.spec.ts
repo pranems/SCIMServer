@@ -436,6 +436,178 @@ describe('V2 — validatePatchOperationValue — additional cases', () => {
   });
 });
 
+// ─── V2: Manager PATCH string coercion (RFC 7644 §3.5.2.3 + Postel's Law) ────
+
+describe('V2 — complex attribute string coercion in PATCH mode', () => {
+  const schemasWithManager: SchemaDefinition[] = [
+    makeCoreSchema([
+      makeAttr({ name: 'userName', required: true }),
+      makeAttr({ name: 'active', type: 'boolean' }),
+      makeAttr({
+        name: 'name',
+        type: 'complex',
+        subAttributes: [
+          makeAttr({ name: 'givenName' }),
+          makeAttr({ name: 'familyName' }),
+        ],
+      }),
+    ]),
+    makeExtSchema([
+      makeAttr({ name: 'department' }),
+      makeAttr({
+        name: 'manager',
+        type: 'complex',
+        subAttributes: [
+          makeAttr({ name: 'value', type: 'string' }),
+          makeAttr({ name: '$ref', type: 'reference' }),
+          makeAttr({ name: 'displayName', type: 'string', mutability: 'readOnly' }),
+        ],
+      }),
+    ]),
+  ];
+
+  // ── Guard 1: empty-value removal signals ──
+
+  it('should allow empty string for complex attr in patch mode (removal signal)', () => {
+    const result = SchemaValidator.validatePatchOperationValue(
+      'replace',
+      `${EXT_SCHEMA_ID}:manager`,
+      '',
+      schemasWithManager,
+    );
+    expect(result.valid).toBe(true);
+  });
+
+  it('should allow null for complex attr in patch mode (removal signal)', () => {
+    const result = SchemaValidator.validatePatchOperationValue(
+      'replace',
+      `${EXT_SCHEMA_ID}:manager`,
+      null,
+      schemasWithManager,
+    );
+    expect(result.valid).toBe(true);
+  });
+
+  it('should allow {value:""} for complex attr in patch mode (removal signal)', () => {
+    const result = SchemaValidator.validatePatchOperationValue(
+      'replace',
+      `${EXT_SCHEMA_ID}:manager`,
+      { value: '' },
+      schemasWithManager,
+    );
+    expect(result.valid).toBe(true);
+  });
+
+  it('should allow {value:null} for complex attr in patch mode (removal signal)', () => {
+    const result = SchemaValidator.validatePatchOperationValue(
+      'replace',
+      `${EXT_SCHEMA_ID}:manager`,
+      { value: null },
+      schemasWithManager,
+    );
+    expect(result.valid).toBe(true);
+  });
+
+  // ── Guard 2: raw string for complex attrs with value sub-attr ──
+
+  it('should allow raw string for manager in patch mode (Entra ID compat)', () => {
+    const result = SchemaValidator.validatePatchOperationValue(
+      'add',
+      `${EXT_SCHEMA_ID}:manager`,
+      'a2c1f66c-8611-4bcd-852f-54dc340e3d97',
+      schemasWithManager,
+    );
+    expect(result.valid).toBe(true);
+  });
+
+  it('should allow raw string for manager replace in patch mode', () => {
+    const result = SchemaValidator.validatePatchOperationValue(
+      'replace',
+      `${EXT_SCHEMA_ID}:manager`,
+      'f7265ba9-fa36-4bbd-9ec8-1819396cc27d',
+      schemasWithManager,
+    );
+    expect(result.valid).toBe(true);
+  });
+
+  // ── Still accepts canonical form ──
+
+  it('should still accept correct complex object in patch mode', () => {
+    const result = SchemaValidator.validatePatchOperationValue(
+      'add',
+      `${EXT_SCHEMA_ID}:manager`,
+      { value: 'MGR-UUID-123' },
+      schemasWithManager,
+    );
+    expect(result.valid).toBe(true);
+  });
+
+  it('should accept complex object with multiple sub-attrs in patch mode', () => {
+    const result = SchemaValidator.validatePatchOperationValue(
+      'replace',
+      `${EXT_SCHEMA_ID}:manager`,
+      { value: 'MGR-UUID-123', displayName: 'Bob' },
+      schemasWithManager,
+    );
+    // displayName is readOnly, but validatePatchOperationValue doesn't check
+    // sub-attr mutability (it resolves to the parent 'manager' attr def).
+    expect(result.valid).toBe(true);
+  });
+
+  // ── Safety: create mode still rejects strings ──
+
+  it('should still reject raw string for complex attr in create mode', () => {
+    const result = SchemaValidator.validate(
+      {
+        schemas: [CORE_SCHEMA_ID, EXT_SCHEMA_ID],
+        userName: 'test@example.com',
+        [EXT_SCHEMA_ID]: { manager: 'MGR-STRING' },
+      },
+      schemasWithManager,
+      createOpts,
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors.some(e => e.message.match(/complex object/))).toBe(true);
+  });
+
+  // ── Safety: complex attr WITHOUT value sub-attr still rejects strings ──
+
+  it('should still reject raw string for complex attr without value sub-attr', () => {
+    const schemasNoValueSub: SchemaDefinition[] = [
+      makeCoreSchema([
+        makeAttr({
+          name: 'customComplex',
+          type: 'complex',
+          subAttributes: [
+            makeAttr({ name: 'code', type: 'string' }),
+            makeAttr({ name: 'label', type: 'string' }),
+          ],
+        }),
+      ]),
+    ];
+    const result = SchemaValidator.validatePatchOperationValue(
+      'add',
+      'customComplex',
+      'raw-string-value',
+      schemasNoValueSub,
+    );
+    expect(result.valid).toBe(false);
+    expect(result.errors[0].message).toMatch(/complex object/);
+  });
+
+  // ── remove op still works ──
+
+  it('should allow remove op for manager (no value needed)', () => {
+    const result = SchemaValidator.validatePatchOperationValue(
+      'remove',
+      `${EXT_SCHEMA_ID}:manager`,
+      undefined,
+      schemasWithManager,
+    );
+    expect(result.valid).toBe(true);
+  });
+});
+
 // ─── V10: Canonical enforcement via validatePatchOperationValue ──────────────
 
 describe('V10 — canonical via validatePatchOperationValue', () => {

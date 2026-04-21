@@ -326,6 +326,9 @@ Apply updates directly to this file (`.github/prompts/auditAndUpdateDocs.prompt.
 | 2026-04-15 | v0.36.0 | Post-P0/P1/P2/P3 perf hardening | 16 across 6 files | Version 0.35→0.36, unit 80→82 suites / 3,206→3,237 tests (added auto-prune + timeout specs), fullValidationPipeline baseline update, INDEX version refs v0.35→v0.36 |
 | 2026-04-15 | v0.35.0 | Post-UI overhaul audit | 22 across 7 files | E2E count 45→46/950→960 (test-gaps-audit-3), doc count 52→64 active, fullValidationPipeline baselines v0.34→v0.35, CHANGELOG missing web UI test entries + Playwright suite |
 | 2026-04-10 | v0.34.0 | Post-P4 fixes full audit | ~20 across 16 files | Endpoint count 76→82 (19 controllers), test counts propagation (3,185 unit/923 E2E/45 suites), version headers 0.31.0→0.34.0 in 8 docs, StrictSchema default documented as false (actual: true), P4 immutable/required now unconditional |
+| 2026-04-16 | v0.37.1 | Post error-handling audit | 12 across 9 files + 1 JSON | Unit 83→84 suites / 3,265→3,311 tests (error-handling + generic-resource tests), maxOperations 100→1000 in 2 files, stale backup module ref, doc count 65→67, pipeline-unit.json regenerated |
+| 2026-04-17 | v0.37.1 | Post logging+tests audit | 10 across 8 files + 2 JSONs | Unit 3,311→3,318 (+7 interceptor/endpointId), E2E 46→47 suites / 969→986 (+17 test-gaps-audit-4), phantom `backup` category in recent-logs-latest.json (regenerated), pipeline-e2e.json regenerated, CHANGELOG/Session updated with endpointId persistence + Bicep logging defaults |
+| 2026-04-21 | v0.37.2 | Post manager PATCH fix + test gap audit | ~25 across 10 files + 2 JSONs + 1 HTML | Unit 3,318→3,345 (+27 schema-validator/service tests), E2E 47→49 suites / 986→1,025 (+39 manager-patch/error-allowlist/group-filters/projection), doc count 67→68, version headers 0.37.1→0.37.2 in 7 files, phantom `backup` category in recent-logs-latest.html, pipeline JSONs regenerated |
 
 ### Common Staleness Patterns Discovered
 
@@ -338,7 +341,7 @@ Apply updates directly to this file (`.github/prompts/auditAndUpdateDocs.prompt.
 | Missing routes in endpoint tables | MULTI_ENDPOINT_GUIDE, SCIM_REFERENCE, ENDPOINT_LIFECYCLE | Compare table rows vs controller survey |
 | Missing query params (?view, ?active) | ENDPOINT_LIFECYCLE, MULTI_ENDPOINT_GUIDE | Compare `@Query()` decorators vs docs |
 | Stale Prisma schema in inline blocks | MULTI_ENDPOINT_GUIDE, TECHNICAL_DESIGN_DOCUMENT | Search for `config String?` in code blocks |
-| API collection coverage gap | INDEX.md descriptions, OpenAPI/Postman/Insomnia files | Count operations vs 76 baseline |
+| API collection coverage gap | INDEX.md descriptions, OpenAPI/Postman/Insomnia files | Count operations vs 82 baseline |
 | Stale "Last Updated" date headers | ENDPOINT_CONFIG_FLAGS_REFERENCE, SCIM_REFERENCE | Search for `Last Updated.*2026-` and compare |
 | Stale feature support notes | SCIM_REFERENCE (filter operators) | Search for "limited support" |
 - Every numeric claim (test counts, flag counts, LoC) must be freshly measured — never copy from stale docs.

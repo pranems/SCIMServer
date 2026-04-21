@@ -237,7 +237,7 @@ describe('EndpointLogController', () => {
   });
 
   describe('getHistory (Step 4.2)', () => {
-    it('should call loggingService.listLogs with endpointId URL filter', async () => {
+    it('should call loggingService.listLogs with indexed endpointId filter', async () => {
       const mockLoggingService = {
         listLogs: jest.fn().mockResolvedValue({ total: 0, items: [], page: 1, pageSize: 50, count: 0, hasNext: false, hasPrev: false }),
       };
@@ -247,11 +247,14 @@ describe('EndpointLogController', () => {
 
       expect(mockLoggingService.listLogs).toHaveBeenCalledWith(
         expect.objectContaining({
-          urlContains: '/endpoints/ep-hist-123/',
+          endpointId: 'ep-hist-123',
           page: 1,
           pageSize: 20,
         }),
       );
+      // Should NOT use fragile urlContains string matching
+      const callArgs = mockLoggingService.listLogs.mock.calls[0][0];
+      expect(callArgs.urlContains).toBeUndefined();
     });
   });
 });

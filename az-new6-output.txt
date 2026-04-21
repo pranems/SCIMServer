@@ -1,0 +1,157 @@
+================================================================================
+ENDPOINT 8: MS-entraid-soft-delete-enabled-ISV (All enabled, logLevel=DEBUG)
+================================================================================
+  Endpoint ID:    5b9e0336-c178-463d-8713-bc4632c20a8b
+
+  CONFIGURE ENTRA ID
+    Tenant URL:          https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim/v2/endpoints/5b9e0336-c178-463d-8713-bc4632c20a8b
+    Token endpoint url:  https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim/oauth/token
+    Client ID:           scimserver-client
+    Client Secret:       changeme-oauth
+
+  SETTINGS:
+{
+  "logLevel": "DEBUG",
+  "logFileEnabled": "True",
+  "UserHardDeleteEnabled": "True",
+  "UserSoftDeleteEnabled": "True",
+  "VerbosePatchSupported": "True",
+  "GroupHardDeleteEnabled": "True",
+  "SchemaDiscoveryEnabled": "True",
+  "StrictSchemaValidation": "True",
+  "AllowAndCoerceBooleanStrings": "True",
+  "PatchOpAllowRemoveAllMembers": "True",
+  "MultiMemberPatchOpForGroupEnabled": "True"
+}
+
+================================================================================
+ENDPOINT 9: MS-entraid-user-hard-delete-enabled-ISV (All enabled, logLevel=DEBUG)
+================================================================================
+  Endpoint ID:    dc3a7870-33d1-48c7-b6dd-776bba38c923
+
+  CONFIGURE ENTRA ID
+    Tenant URL:          https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim/v2/endpoints/dc3a7870-33d1-48c7-b6dd-776bba38c923
+    Token endpoint url:  https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim/oauth/token
+    Client ID:           scimserver-client
+    Client Secret:       changeme-oauth
+
+  SETTINGS:
+{
+  "logLevel": "DEBUG",
+  "logFileEnabled": "True",
+  "UserHardDeleteEnabled": "True",
+  "UserSoftDeleteEnabled": "True",
+  "VerbosePatchSupported": "True",
+  "GroupHardDeleteEnabled": "True",
+  "SchemaDiscoveryEnabled": "True",
+  "StrictSchemaValidation": "True",
+  "AllowAndCoerceBooleanStrings": "True",
+  "PatchOpAllowRemoveAllMembers": "True",
+  "MultiMemberPatchOpForGroupEnabled": "True"
+}
+
+================================================================================
+ENDPOINT 10: MS-entraid-group-hard-delete-enabled-ISV (All enabled, logLevel=DEBUG)
+================================================================================
+  Endpoint ID:    1319a1da-0063-4333-960e-70f68c2d3119
+
+  CONFIGURE ENTRA ID
+    Tenant URL:          https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim/v2/endpoints/1319a1da-0063-4333-960e-70f68c2d3119
+    Token endpoint url:  https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim/oauth/token
+    Client ID:           scimserver-client
+    Client Secret:       changeme-oauth
+
+  SETTINGS:
+{
+  "logLevel": "DEBUG",
+  "logFileEnabled": "True",
+  "UserHardDeleteEnabled": "True",
+  "UserSoftDeleteEnabled": "True",
+  "VerbosePatchSupported": "True",
+  "GroupHardDeleteEnabled": "True",
+  "SchemaDiscoveryEnabled": "True",
+  "StrictSchemaValidation": "True",
+  "AllowAndCoerceBooleanStrings": "True",
+  "PatchOpAllowRemoveAllMembers": "True",
+  "MultiMemberPatchOpForGroupEnabled": "True"
+}
+
+================================================================================
+ENDPOINT 11: MS-entraid-multi-member-patch-enabled-ISV (All enabled, logLevel=DEBUG)
+================================================================================
+  Endpoint ID:    9166645e-d571-49a0-be20-e4ea17a6254d
+
+  CONFIGURE ENTRA ID
+    Tenant URL:          https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim/v2/endpoints/9166645e-d571-49a0-be20-e4ea17a6254d
+    Token endpoint url:  https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim/oauth/token
+    Client ID:           scimserver-client
+    Client Secret:       changeme-oauth
+
+  SETTINGS:
+{
+  "logLevel": "DEBUG",
+  "logFileEnabled": "True",
+  "UserHardDeleteEnabled": "True",
+  "UserSoftDeleteEnabled": "True",
+  "VerbosePatchSupported": "True",
+  "GroupHardDeleteEnabled": "True",
+  "SchemaDiscoveryEnabled": "True",
+  "StrictSchemaValidation": "True",
+  "AllowAndCoerceBooleanStrings": "True",
+  "PatchOpAllowRemoveAllMembers": "True",
+  "MultiMemberPatchOpForGroupEnabled": "True"
+}
+
+================================================================================
+ENDPOINT 12: MS-entraid-schema-discovery-enabled-ISV (All enabled, logLevel=DEBUG)
+================================================================================
+  Endpoint ID:    d03c221e-071c-4082-b73d-4ed9de452427
+
+  CONFIGURE ENTRA ID
+    Tenant URL:          https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim/v2/endpoints/d03c221e-071c-4082-b73d-4ed9de452427
+    Token endpoint url:  https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim/oauth/token
+    Client ID:           scimserver-client
+    Client Secret:       changeme-oauth
+
+  SETTINGS:
+{
+  "logLevel": "DEBUG",
+  "logFileEnabled": "True",
+  "UserHardDeleteEnabled": "True",
+  "UserSoftDeleteEnabled": "True",
+  "VerbosePatchSupported": "True",
+  "GroupHardDeleteEnabled": "True",
+  "SchemaDiscoveryEnabled": "True",
+  "StrictSchemaValidation": "True",
+  "AllowAndCoerceBooleanStrings": "True",
+  "PatchOpAllowRemoveAllMembers": "True",
+  "MultiMemberPatchOpForGroupEnabled": "True"
+}
+
+================================================================================
+ENDPOINT 13: MS-entraid-verbose-patch-enabled-ISV (All enabled, logLevel=DEBUG)
+================================================================================
+  Endpoint ID:    f2e596e4-c9f7-419c-be3c-3844357b90c1
+
+  CONFIGURE ENTRA ID
+    Tenant URL:          https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim/v2/endpoints/f2e596e4-c9f7-419c-be3c-3844357b90c1
+    Token endpoint url:  https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim/oauth/token
+    Client ID:           scimserver-client
+    Client Secret:       changeme-oauth
+
+  SETTINGS:
+{
+  "logLevel": "DEBUG",
+  "logFileEnabled": "True",
+  "UserHardDeleteEnabled": "True",
+  "UserSoftDeleteEnabled": "True",
+  "VerbosePatchSupported": "True",
+  "GroupHardDeleteEnabled": "True",
+  "SchemaDiscoveryEnabled": "True",
+  "StrictSchemaValidation": "True",
+  "AllowAndCoerceBooleanStrings": "True",
+  "PatchOpAllowRemoveAllMembers": "True",
+  "MultiMemberPatchOpForGroupEnabled": "True"
+}
+
+

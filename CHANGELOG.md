@@ -5,11 +5,129 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.37.3] - 2026-04-21
+
+### Release — Full Validation Pipeline
+
+- **fix(schema-validator)**: Accept raw string values for complex PATCH attributes (manager) — Postel's Law / Entra ID compat, fixes 3 SCIM Validator failures
+- **fix(logging)**: Add DEBUG logging to 6 silent catch blocks (credential repo, service helpers, generic service)
+- **test(gaps)**: Comprehensive test gap audit — +14 unit, +18 E2E, +7 live tests
+- **test(contracts)**: API contract verification execution #3 — shared assertions helper, 22/82 endpoints with strict contract tests
+- **docs**: Full freshness audit, JSON artifact version sync, API reference update
+- Logging verification: 73/73 PASS. Error handling: 55/55 PASS.
+- **Totals**: 84 unit suites (3,345 tests), 49 E2E suites (~1,025 tests)
+## [0.37.2] - 2026-04-21
+
+### Bug Fixes — Manager PATCH String Coercion
+
+- **fix(schema-validator)**: Accept raw string values for complex PATCH attributes (manager) — pre-PATCH strict schema validator now allows raw strings for complex attrs with a `value` sub-attribute (Postel's Law / Entra ID compat) and empty values as RFC 7644 §3.5.2.3 removal signals
+- **Impact**: SCIM Validator SFComplianceFailed: true → false (3 manager PATCH failures resolved)
+
+### Tests Added — Manager PATCH + Test Gap Audit
+
+- Unit: +14 (schema-validator: 12 string coercion tests, service: 2 raw string/empty removal)
+- E2E: +18 (manager-patch: 8, error-response-allowlist: 4, group-filters: 3, group-reprovision: 1, write-projection: 2)
+- Live: +7 (section 9z-N: manager PATCH string coercion)
+- **Totals**: 84 unit suites (3,345 tests), 49 E2E suites (~1,025 tests)
+
+### Documentation
+
+- New: `docs/MANAGER_PATCH_STRING_COERCION.md` — full feature doc with RFC analysis, Mermaid diagrams, code examples
+- Updated: `docs/INDEX.md`, pipeline JSONs, all version/count references updated
+
+## [0.37.2] - 2026-04-17
+
+### Bug Fixes — API Response Contract Enforcement
+
+- **fix(endpoint)**: Strip `_schemaCaches` from admin endpoint GET responses — runtime schema cache (containing Map/Set objects) was leaking into JSON API responses after SCIM operations triggered cache building
+- **fix(scim-helpers)**: `getExtensionUrns()` now filters by `coreSchemaUrn` per resource type — User service was incorrectly receiving Group extensions and vice versa
+- **fix(endpoint)**: Normalize stale settings keys from pre-v0.29 profiles — `SoftDeleteEnabled` → `UserSoftDeleteEnabled`, `MultiOpPatchRequest*` → `MultiMemberPatchOpForGroupEnabled`
+
+### Tests Added — Response Contract Enforcement (TDD)
+
+#### Unit Tests (endpoint.service.spec.ts: +8)
+- Response key allowlist for full view (only documented keys, no extras)
+- Response key allowlist for summary view
+- Profile key allowlist (no `_schemaCaches`)
+- `_schemaCaches` stripped when profile has runtime Map-based cache
+- `_links` correctness matches endpoint ID
+- Stale settings key normalization test
+
+#### Unit Tests (scim-service-helpers.spec.ts: +4)
+- `getExtensionUrns()` returns ONLY User extensions for User coreSchemaUrn
+- `getExtensionUrns()` returns ONLY Group extensions for Group coreSchemaUrn
+- `getExtensionUrns()` falls back to global registry when no RTs match
+- `getExtensionUrns()` cache hit uses precomputed extensionUrns
+
+#### E2E Tests (admin-endpoint-api.e2e-spec.ts: +4)
+- Full view response key allowlist enforcement
+- Summary view response key allowlist enforcement
+- Profile key allowlist (no `_schemaCaches`)
+- Profile clean after SCIM CRUD operations trigger cache building
+
+#### Live Integration Tests (live-test.ps1: Section 9z-M)
+- Admin endpoint GET response key allowlist check (+3 assertions)
+- Profile key denylist — `_schemaCaches` absent (+2 assertions)
+- Profile clean after SCIM user creation (+2 assertions)
+- Summary view key allowlist + view toggling (+3 assertions)
+
+### Prompt Improvements
+
+- **addMissingTests.prompt.md**: Added Section Q (API Response Contract Enforcement), expanded Sections M/K, added standing rules for key allowlist/denylist assertions, anti-pattern warning
+- **error-handling-verification.prompt.md**: Added Section K (Response Body Integrity — Map/Set serialization, internal field denylist)
+- **fullValidationPipeline.prompt.md**: Added API Response Contract Self-Check questions (25-27)
+- **copilot-instructions.md**: Added commit checklist item 9 (Response Contract Tests)
+
+### Test Counts
+- Unit: 84 suites / 3,332 tests
+- E2E: 47 suites / 990 tests
+
 ## [0.37.1] - 2026-04-16
+
+### Logging Improvements — endpointId Persistence + Azure Defaults
+
+- `endpointId` now persisted in `RequestLog` table via `RequestLoggingInterceptor` (uses indexed column instead of fragile `urlContains` string matching)
+- `CreateRequestLogOptions` interface: added `endpointId?: string` field
+- `listLogs()`: added direct `endpointId` filter (uses `@@index([endpointId])`)
+- `EndpointLogController.getHistory()`: switched from `urlContains` to indexed `endpointId` filter
+- Azure Bicep (`containerapp.bicep`): added 6 production logging env vars — `LOG_LEVEL=DEBUG`, `LOG_FORMAT=json`, `LOG_FILE=""`, `LOG_RING_BUFFER_SIZE=5000`, `LOG_RETENTION_DAYS=30`, `LOG_SLOW_REQUEST_MS=1000`
+
+### Test Gap Audit #6
+
+- Fixed 2 pre-existing E2E failures: R-RET-3 tests incorrectly asserted `emails.value`/`members.value` as `returned:always` — per RFC 7643 §8.7.1 they're `returned:default`
+- +17 new E2E tests in `test-gaps-audit-4.e2e-spec.ts`: Location header on POST 201, endpointId persistence, Bulk+SoftDelete combo, SoftDelete+projection, GroupHardDelete=False, Bulk+write-response, three-flag combos (StrictSchema+SoftDelete+RequireIfMatch, SchemaDiscovery+RequireIfMatch, IgnoreReadOnly+StrictSchema+VerbosePatch)
+
+### Documentation Freshness Audit
+
+- Test counts updated across 6 living docs: 3,311→3,318 unit, 46→47 E2E suites, 969→986 E2E tests
+- `pipeline-unit.json` regenerated (84 suites / 3,318 tests)
+- `pipeline-e2e.json` regenerated (47 suites / 986 tests)
+- `recent-logs-latest.json` regenerated (removed phantom `backup` category entries)
+
+**Tests (84 unit suites, 3,318 tests — 47 E2E suites, 986 tests):**
+- +3 unit: request-logging.interceptor endpointId tests (success, error, undefined)
+- +1 E2E: endpoint-log.controller endpointId indexed filter test (updated)
+- +17 E2E: test-gaps-audit-4 (cross-feature integration + HTTP compliance)
 
 ### Azure Production Outage Fix — Connection Pool Exhaustion
 
 **Root cause:** Prisma connection pool (5 connections) fully exhausted by slow admin activity queries (87–129s each) on burstable B1ms PostgreSQL. Web UI auto-refresh polling every 10s generated 6+ queries per cycle. `resolveUserName`/`resolveGroupName` bypassed repository UUID guards and sent email-formatted test identifiers to `@db.Uuid` column, causing continuous errors.
+
+### Error Handling Audit — wrapPrismaError + Safe Logging
+
+- Wrap all Prisma `create()` operations with `wrapPrismaError` (P2002→409 CONFLICT, P1001→503 CONNECTION)
+- Wrap all Prisma `find*()` operations with `wrapPrismaError` (P1001→503 CONNECTION)
+- `parseJson()` WARN logging on corrupt JSON parse fallback
+- `ScimLogger.safeStringify()` — circular reference handling prevents logger crash
+- `prisma-generic-resource.repository.spec.ts` — comprehensive test suite (29 tests covering all 7 public methods)
+
+### Documentation Freshness Audit
+
+- Test counts updated across 7 living docs: 83→84 suites, 3,265→3,311 unit tests
+- `pipeline-unit.json` regenerated (84 suites / 3,311 tests)
+- Fixed `maxOperations: 100` → `1000` in SCHEMA_CUSTOMIZATION_GUIDE
+- Fixed stale backup module reference in REPO_API_UNDERSTANDING_BASELINE
+- Active doc count updated: 65→67 in INDEX.md
 
 **Fixes:**
 - `activity-parser.service.ts`: Add `isValidUuid()` guard to `resolveUserName()` and `resolveGroupName()` — prevents Prisma "invalid input syntax for type uuid" errors
@@ -23,7 +141,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `LOG_AUTO_PRUNE=true`, `LOG_RETENTION_DAYS=7` — enables automatic RequestLog cleanup
 - Container image: `ghcr.io/pranems/scimserver:0.37.1`
 
-**Tests (83 unit suites, 3,265 tests — 46 E2E suites, 969 tests):**
+**Tests (84 unit suites, 3,311 tests — 46 E2E suites, 969 tests):**
 - +14 unit: `activity-parser.service.spec.ts` (NEW — resolveUserName/resolveGroupName UUID guards, parseActivity)
 - +4 unit: apply-scim-filter UUID guard for ne/co/sw/gt operators on id column
 - +3 unit: database.service UUID guard tests + search UUID-only match

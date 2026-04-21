@@ -119,6 +119,15 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'SCIM_APP', value: appName }
             { name: 'SCIM_REGISTRY', value: acrLoginServer }
             { name: 'SCIM_CURRENT_IMAGE', value: '${acrLoginServer}/${image}' }
+            // ── Production logging defaults ──
+            // DEBUG captures full request lifecycle (→/←) for diagnosis;
+            // bodies are still persisted in RequestLog DB — no need for console payloads.
+            { name: 'LOG_LEVEL', value: 'DEBUG' }
+            { name: 'LOG_FORMAT', value: 'json' }
+            { name: 'LOG_FILE', value: '' }          // disable file logging (ephemeral container disk)
+            { name: 'LOG_RING_BUFFER_SIZE', value: '5000' }
+            { name: 'LOG_RETENTION_DAYS', value: '30' }
+            { name: 'LOG_SLOW_REQUEST_MS', value: '1000' }
           ]
           resources: {
             cpu: json(cpuCores)

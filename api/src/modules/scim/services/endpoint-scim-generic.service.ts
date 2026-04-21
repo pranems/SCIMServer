@@ -256,6 +256,7 @@ export class EndpointScimGenericService {
       this.scimLogger.debug(LogCategory.SCIM_RESOURCE, `${resourceType.name} not found`, { scimId, endpointId });
       throw createScimError({
         status: 404,
+        scimType: 'noTarget',
         detail: `${resourceType.name} "${scimId}" not found.`,
         diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' },
       });
@@ -383,6 +384,7 @@ export class EndpointScimGenericService {
       this.scimLogger.debug(LogCategory.SCIM_RESOURCE, `Replace target ${resourceType.name} not found`, { scimId, endpointId });
       throw createScimError({
         status: 404,
+        scimType: 'noTarget',
         detail: `${resourceType.name} "${scimId}" not found.`,
         diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' },
       });
@@ -486,6 +488,7 @@ export class EndpointScimGenericService {
       this.scimLogger.debug(LogCategory.SCIM_RESOURCE, `Patch target ${resourceType.name} not found`, { scimId, endpointId });
       throw createScimError({
         status: 404,
+        scimType: 'noTarget',
         detail: `${resourceType.name} "${scimId}" not found.`,
         diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' },
       });
@@ -529,7 +532,7 @@ export class EndpointScimGenericService {
       }
 
       // GEN-01: Pre-PATCH validation — validate each operation value against schema
-      for (const op of patchDto.Operations) {
+      for (const [opIndex, op] of patchDto.Operations.entries()) {
         const preResult = SchemaValidator.validatePatchOperationValue(
           op.op, op.path, op.value, schemaDefs,
           this.getAttrMapsForRT(resourceType, endpointId),
@@ -540,7 +543,13 @@ export class EndpointScimGenericService {
             status: 400,
             scimType: preResult.errors[0]?.scimType ?? 'invalidValue',
             detail: `PATCH operation value validation failed: ${messages}`,
-            diagnostics: { errorCode: 'VALIDATION_SCHEMA', triggeredBy: 'StrictSchemaValidation' },
+            diagnostics: {
+              errorCode: 'VALIDATION_SCHEMA',
+              triggeredBy: 'StrictSchemaValidation',
+              failedOperationIndex: opIndex,
+              failedPath: op.path,
+              failedOp: op.op,
+            },
           });
         }
       }
@@ -694,6 +703,7 @@ export class EndpointScimGenericService {
       this.scimLogger.debug(LogCategory.SCIM_RESOURCE, `Delete target ${resourceType.name} not found`, { scimId, endpointId });
       throw createScimError({
         status: 404,
+        scimType: 'noTarget',
         detail: `${resourceType.name} "${scimId}" not found.`,
         diagnostics: { errorCode: 'RESOURCE_NOT_FOUND' },
       });
@@ -988,7 +998,10 @@ export class EndpointScimGenericService {
         status: 400,
         scimType: 'mutability',
         detail: `Immutable attribute violation: ${details}`,
-        diagnostics: { errorCode: 'VALIDATION_IMMUTABLE' },
+        diagnostics: {
+          errorCode: 'VALIDATION_IMMUTABLE',
+          attributePath: result.errors[0]?.path,
+        },
       });
     }
   }
@@ -1106,8 +1119,11 @@ export class EndpointScimGenericService {
     let ast;
     try {
       ast = parseScimFilter(filter);
-    } catch {
+    } catch (err) {
       // Syntax errors are handled by buildGenericFilter in the caller
+      if (process.env.NODE_ENV !== 'test') {
+        console.debug?.('[generic-service] Filter parse failed in validateFilterAttributePaths:', (err as Error).message);
+      }
       return;
     }
     const paths = extractFilterPaths(ast);

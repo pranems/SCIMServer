@@ -1,0 +1,25 @@
+================================================================================
+ENDPOINT 2: MS-entraid-no-user-soft-delete-ISV (UserSoftDeleteEnabled: False)
+================================================================================
+  Endpoint ID:    704bebbf-9975-43d3-a914-0713ce4989ba
+
+  CONFIGURE ENTRA ID
+    Tenant URL:          https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim/v2/endpoints/704bebbf-9975-43d3-a914-0713ce4989ba
+    Token endpoint url:  https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/scim/oauth/token
+    Client ID:           scimserver-client
+    Client Secret:       changeme-oauth
+
+  SETTINGS:
+{
+  "logLevel": "DEBUG",
+  "logFileEnabled": "True",
+  "UserHardDeleteEnabled": "True",
+  "UserSoftDeleteEnabled": "False",
+  "VerbosePatchSupported": "True",
+  "GroupHardDeleteEnabled": "True",
+  "SchemaDiscoveryEnabled": "True",
+  "StrictSchemaValidation": "True",
+  "AllowAndCoerceBooleanStrings": "True",
+  "PatchOpAllowRemoveAllMembers": "True",
+  "MultiMemberPatchOpForGroupEnabled": "True"
+}

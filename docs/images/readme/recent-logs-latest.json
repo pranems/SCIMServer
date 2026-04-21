@@ -1,189 +1,105 @@
 {
-  "count": 18,
+  "count": 12,
   "entries": [
     {
-      "timestamp": "2026-02-19T01:47:00.972Z",
+      "timestamp": "2026-04-17T10:00:00.100Z",
       "level": "INFO",
-      "category": "backup",
-      "message": "Backup service initialized"
+      "category": "endpoint",
+      "message": "Endpoint created",
+      "data": { "endpointId": "f8e7d6c5-1234-5678-abcd-000000000001", "name": "contoso-prod", "preset": "entra-id" }
     },
     {
-      "timestamp": "2026-02-19T01:47:00.973Z",
+      "timestamp": "2026-04-17T10:00:00.200Z",
       "level": "INFO",
-      "category": "backup",
-      "message": "Local DB (ephemeral): /tmp/local-data/scim.db"
+      "category": "config",
+      "message": "Log configuration updated",
+      "data": { "changes": { "globalLevel": { "from": "INFO", "to": "DEBUG" } } }
     },
     {
-      "timestamp": "2026-02-19T01:47:00.973Z",
-      "level": "INFO",
-      "category": "backup",
-      "message": "Azure Files backup (persistent path): /app/data/scim.db"
+      "timestamp": "2026-04-17T10:00:01.000Z",
+      "level": "DEBUG",
+      "category": "http",
+      "message": "-> POST /scim/endpoints/f8e7d6c5-.../Users",
+      "requestId": "a1b2c3d4-0001-0001-0001-000000000001",
+      "endpointId": "f8e7d6c5-1234-5678-abcd-000000000001",
+      "method": "POST",
+      "path": "/scim/endpoints/f8e7d6c5-1234-5678-abcd-000000000001/Users"
     },
     {
-      "timestamp": "2026-02-19T01:47:03.588Z",
+      "timestamp": "2026-04-17T10:00:01.015Z",
+      "level": "INFO",
+      "category": "scim.user",
+      "message": "Creating user",
+      "requestId": "a1b2c3d4-0001-0001-0001-000000000001",
+      "endpointId": "f8e7d6c5-1234-5678-abcd-000000000001",
+      "data": { "userName": "jdoe@contoso.com" }
+    },
+    {
+      "timestamp": "2026-04-17T10:00:01.032Z",
+      "level": "INFO",
+      "category": "scim.user",
+      "message": "User created",
+      "requestId": "a1b2c3d4-0001-0001-0001-000000000001",
+      "endpointId": "f8e7d6c5-1234-5678-abcd-000000000001",
+      "data": { "scimId": "b2c3d4e5-2222-3333-4444-555555555555", "userName": "jdoe@contoso.com" }
+    },
+    {
+      "timestamp": "2026-04-17T10:00:01.033Z",
+      "level": "DEBUG",
+      "category": "http",
+      "message": "<- 201 POST /scim/endpoints/f8e7d6c5-.../Users",
+      "requestId": "a1b2c3d4-0001-0001-0001-000000000001",
+      "endpointId": "f8e7d6c5-1234-5678-abcd-000000000001",
+      "data": { "status": 201, "durationMs": 33 }
+    },
+    {
+      "timestamp": "2026-04-17T10:00:05.000Z",
+      "level": "DEBUG",
+      "category": "http",
+      "message": "-> GET /scim/endpoints/f8e7d6c5-.../Users?filter=userName eq \"jdoe@contoso.com\"",
+      "requestId": "a1b2c3d4-0002-0002-0002-000000000002",
+      "endpointId": "f8e7d6c5-1234-5678-abcd-000000000001"
+    },
+    {
+      "timestamp": "2026-04-17T10:00:05.012Z",
+      "level": "DEBUG",
+      "category": "http",
+      "message": "<- 200 GET /scim/endpoints/f8e7d6c5-.../Users",
+      "requestId": "a1b2c3d4-0002-0002-0002-000000000002",
+      "endpointId": "f8e7d6c5-1234-5678-abcd-000000000001",
+      "data": { "status": 200, "durationMs": 12 }
+    },
+    {
+      "timestamp": "2026-04-17T10:00:10.000Z",
+      "level": "DEBUG",
+      "category": "auth",
+      "message": "OAuth 2.0 token validated",
+      "requestId": "a1b2c3d4-0003-0003-0003-000000000003",
+      "data": { "authType": "oauth", "clientId": "entra-provisioning" }
+    },
+    {
+      "timestamp": "2026-04-17T10:00:15.000Z",
+      "level": "INFO",
+      "category": "database",
+      "message": "Auto-pruned 142 log entries (retention: 30d)"
+    },
+    {
+      "timestamp": "2026-04-17T10:00:20.000Z",
       "level": "WARN",
       "category": "http",
-      "message": "Client error 404 on GET /health",
-      "data": {
-        "status": 404
-      }
+      "message": "Slow request: 2150ms",
+      "requestId": "a1b2c3d4-0004-0004-0004-000000000004",
+      "endpointId": "f8e7d6c5-1234-5678-abcd-000000000001",
+      "data": { "status": 200, "durationMs": 2150 }
     },
     {
-      "timestamp": "2026-02-19T01:47:08.984Z",
+      "timestamp": "2026-04-17T10:00:25.000Z",
       "level": "INFO",
-      "category": "backup",
-      "message": "Starting backup #1",
-      "data": {
-        "fileSizeKB": "128.00"
-      }
-    },
-    {
-      "timestamp": "2026-02-19T01:47:08.986Z",
-      "level": "INFO",
-      "category": "backup",
-      "message": "Backup #1 completed",
-      "data": {
-        "fileSizeKB": "128.00",
-        "timestamp": "2026-02-19T01:47:08.986Z"
-      }
-    },
-    {
-      "timestamp": "2026-02-19T01:47:20.058Z",
-      "level": "WARN",
-      "category": "http",
-      "message": "Client error 404 on HEAD /scim",
-      "data": {
-        "status": 404
-      }
-    },
-    {
-      "timestamp": "2026-02-19T01:47:20.153Z",
-      "level": "INFO",
-      "category": "http",
-      "message": "→ HEAD /",
-      "requestId": "ad10d137-cfac-4b54-84e0-054a47b5e9aa",
-      "method": "HEAD",
-      "path": "/",
-      "durationMs": 3,
-      "data": {
-        "userAgent": "curl/8.16.0",
-        "ip": "::ffff:172.17.0.1"
-      }
-    },
-    {
-      "timestamp": "2026-02-19T01:47:20.16Z",
-      "level": "INFO",
-      "category": "http",
-      "message": "← 200 HEAD /",
-      "requestId": "ad10d137-cfac-4b54-84e0-054a47b5e9aa",
-      "method": "HEAD",
-      "path": "/",
-      "durationMs": 10,
-      "data": {
-        "status": 200,
-        "durationMs": 10
-      }
-    },
-    {
-      "timestamp": "2026-02-19T01:47:30.975Z",
-      "level": "INFO",
-      "category": "backup",
-      "message": "Starting backup #2",
-      "data": {
-        "fileSizeKB": "128.00"
-      }
-    },
-    {
-      "timestamp": "2026-02-19T01:47:30.978Z",
-      "level": "INFO",
-      "category": "backup",
-      "message": "Backup #2 completed",
-      "data": {
-        "fileSizeKB": "128.00",
-        "timestamp": "2026-02-19T01:47:30.978Z"
-      }
-    },
-    {
-      "timestamp": "2026-02-19T01:47:35.169Z",
-      "level": "INFO",
-      "category": "http",
-      "message": "→ GET /",
-      "requestId": "09d15b50-ece9-41bc-92b0-c6d07effd45c",
-      "method": "GET",
-      "path": "/",
-      "durationMs": 0,
-      "data": {
-        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/145.0.7632.6 Safari/537.36",
-        "ip": "::ffff:172.17.0.1"
-      }
-    },
-    {
-      "timestamp": "2026-02-19T01:47:35.17Z",
-      "level": "INFO",
-      "category": "http",
-      "message": "← 200 GET /",
-      "requestId": "09d15b50-ece9-41bc-92b0-c6d07effd45c",
-      "method": "GET",
-      "path": "/",
-      "durationMs": 1,
-      "data": {
-        "status": 200,
-        "durationMs": 1
-      }
-    },
-    {
-      "timestamp": "2026-02-19T01:47:45.197Z",
-      "level": "INFO",
-      "category": "auth",
-      "message": "Legacy bearer token authentication successful"
-    },
-    {
-      "timestamp": "2026-02-19T01:47:45.197Z",
-      "level": "INFO",
-      "category": "http",
-      "message": "→ GET /scim/admin/version",
-      "requestId": "b086aca0-fd50-466c-8bcb-b2b2ef3806bd",
-      "method": "GET",
-      "path": "/scim/admin/version",
-      "durationMs": 0,
-      "data": {
-        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Microsoft Windows 10.0.26200; en-US) PowerShell/7.4.13",
-        "ip": "::ffff:172.17.0.1"
-      }
-    },
-    {
-      "timestamp": "2026-02-19T01:47:45.206Z",
-      "level": "INFO",
-      "category": "http",
-      "message": "← 200 GET /scim/admin/version",
-      "requestId": "b086aca0-fd50-466c-8bcb-b2b2ef3806bd",
-      "method": "GET",
-      "path": "/scim/admin/version",
-      "durationMs": 9,
-      "data": {
-        "status": 200,
-        "durationMs": 9
-      }
-    },
-    {
-      "timestamp": "2026-02-19T01:47:45.233Z",
-      "level": "INFO",
-      "category": "auth",
-      "message": "Legacy bearer token authentication successful"
-    },
-    {
-      "timestamp": "2026-02-19T01:47:45.233Z",
-      "level": "INFO",
-      "category": "http",
-      "message": "→ GET /scim/admin/log-config/recent?limit=25",
-      "requestId": "f5b40231-f2f9-441b-ae4e-f2338b466a0a",
-      "method": "GET",
-      "path": "/scim/admin/log-config/recent?limit=25",
-      "durationMs": 0,
-      "data": {
-        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Microsoft Windows 10.0.26200; en-US) PowerShell/7.4.13",
-        "ip": "::ffff:172.17.0.1"
-      }
+      "category": "scim.group",
+      "message": "Group created",
+      "requestId": "a1b2c3d4-0005-0005-0005-000000000005",
+      "endpointId": "f8e7d6c5-1234-5678-abcd-000000000001",
+      "data": { "scimId": "c3d4e5f6-3333-4444-5555-666666666666", "displayName": "Engineering" }
     }
   ]
 }

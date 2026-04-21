@@ -1,6 +1,6 @@
 # Logging Verification Prompt (Self-Improving)
 
-> **Version:** 3.0 · **Source-verified against:** v0.35.0 · **Regenerated:** April 13, 2026  
+> **Version:** 3.3 · **Source-verified against:** v0.37.3 · **Regenerated:** April 21, 2026  
 > Automated checklist — run against source to verify logging completeness.
 
 ---
@@ -178,8 +178,8 @@ TOTAL: __/73 PASS
 ## Latest Run
 
 ```
-Date: April 16, 2026
-Version: 0.37.1
+Date: April 21, 2026
+Version: 0.37.3
 Executor: AI (Claude Opus 4.6, source-verified)
 
 Section 1 (Core): 6/6 PASS
@@ -198,6 +198,32 @@ Section 12 (Factory): 4/4 PASS
 TOTAL: 73/73 PASS
 ```
 
-Re-verified after v0.36.0 P0–P3 performance hardening. Added 2 new checkpoints:
-- 10.6: GET /admin/log-config/prune (auto-prune config read)
-- 10.7: PUT /admin/log-config/prune (auto-prune config update with validation)
+Re-verified after v0.37.3 manager PATCH fix + test gap audit + doc freshness audit.
+
+**Infrastructure layer: 73/73 PASS** — all checklist items verified against source.
+
+**Service-level deep audit (beyond checklist):**
+- `createScimError()` calls: **77 total across 10 files — ALL 77 have diagnostics.errorCode** ✅
+- `enrichContext()` calls: all 18 SCIM service methods set operation + resourceType ✅
+- Silent `catch {}` blocks: 7 found → **FIXED** with DEBUG logging:
+  - `prisma-endpoint-credential.repository.ts`: 3 catches (findById, deactivate, delete)
+  - `scim-service-helpers.ts`: 2 catches (extractFromRawPayload, validateFilterPaths)
+  - `endpoint-scim-generic.service.ts`: 1 catch (validateFilterAttributePaths)
+  - `admin.controller.ts`: 3 catches — ACCEPTED (diagnostic utility methods, not SCIM operations)
+- `scim-auth.guard.ts`: 4 bare `console.log` calls — ACCEPTED (legacy guard, rarely used; `shared-secret.guard.ts` uses ScimLogger properly)
+- Auth guard logging: complete (12 distinct events across all auth paths) ✅
+- Bulk processor: INFO start/completion, WARN per-op failures, enrichContext per sub-op ✅
+- `safeStringify()`: circular reference handling verified in 3 downstream call sites ✅
+
+**Fixes applied in this run:**
+- `prisma-endpoint-credential.repository.ts`: 3 bare `catch {}` → `catch (err) { console.debug?.(...) }`
+  - `findById()`, `deactivate()`, `delete()` now log at DEBUG on failure
+- `scim-service-helpers.ts`: 2 bare `catch {}` → `catch (err) { console.debug?.(...) }`
+  - `extractFromRawPayload()` and `validateFilterPaths()` now log at DEBUG
+- `endpoint-scim-generic.service.ts`: 1 bare `catch {}` → `catch (err) { console.debug?.(...) }`
+  - `validateFilterAttributePaths()` now logs at DEBUG
+
+**Not fixed (accepted risks):**
+- `admin.controller.ts`: 3 bare catches in `deleteUser` loop, `getDeploymentInfo`, `readContainerId`/`readPackageVersion` — diagnostic utility methods not on SCIM hot path
+- `scim-auth.guard.ts`: 4 `console.log` calls — legacy guard kept for backward compat; primary auth uses `SharedSecretGuard` with proper ScimLogger
+- `rotating-file-writer.ts`: 1 bare catch on `fstat` — file transport edge case, non-critical

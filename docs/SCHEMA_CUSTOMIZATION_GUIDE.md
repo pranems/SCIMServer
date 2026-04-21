@@ -250,7 +250,7 @@ You can bind multiple extensions to a single resource type. Each extension is a 
         "schema": "urn:ietf:params:scim:schemas:core:2.0:Group", "schemaExtensions": [] }
     ],
     "serviceProviderConfig": {
-      "patch": { "supported": true }, "bulk": { "supported": true, "maxOperations": 100, "maxPayloadSize": 1048576 },
+      "patch": { "supported": true }, "bulk": { "supported": true, "maxOperations": 1000, "maxPayloadSize": 1048576 },
       "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
       "etag": { "supported": true }, "changePassword": { "supported": false }
     }

@@ -1,7 +1,7 @@
 # 📚 SCIMServer Documentation Index
 
-> **Version:** 0.37.1 · **Updated:** April 16, 2026  
-> 65 active docs in `docs/` · 46 E2E suites (969 pass) · 83 unit suites (3,265 pass) · 6 built-in presets
+> **Version:** 0.37.3 · **Updated:** April 21, 2026  
+> 68 active docs in `docs/` · 49 E2E suites (1,025 pass) · 84 unit suites (3,345 pass) · 6 built-in presets
 
 ---
 
@@ -11,7 +11,7 @@
 |----------|-------------|
 | [README.md](../README.md) | Overview, quick start, architecture, compliance, deployment |
 | [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) | Living stats — LoC, test counts, dependency versions, architecture |
-| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 → v0.37.1 |
+| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 → v0.37.3 |
 | [admin.md](../admin.md) | Release workflow (version, tag, publish, update) |
 
 ## Deployment Guides
@@ -76,6 +76,7 @@
 | [PHASE_10_ME_ENDPOINT.md](PHASE_10_ME_ENDPOINT.md) | /Me endpoint (RFC 7644 §3.11) |
 | [PHASE_12_SORTING_AND_DEDUP.md](PHASE_12_SORTING_AND_DEDUP.md) | Sorting + service deduplication |
 | [READONLY_ATTRIBUTE_STRIPPING_AND_WARNINGS.md](READONLY_ATTRIBUTE_STRIPPING_AND_WARNINGS.md) | ReadOnly attribute stripping & warning headers |
+| [MANAGER_PATCH_STRING_COERCION.md](MANAGER_PATCH_STRING_COERCION.md) | Manager PATCH string coercion — complex attribute relaxation for SCIM compliance |
 | [P2_ATTRIBUTE_CHARACTERISTIC_ENFORCEMENT.md](P2_ATTRIBUTE_CHARACTERISTIC_ENFORCEMENT.md) | Attribute characteristic enforcement (Phase P2) |
 | [P3_REMAINING_ATTRIBUTE_CHARACTERISTIC_GAPS.md](P3_REMAINING_ATTRIBUTE_CHARACTERISTIC_GAPS.md) | Remaining characteristic gaps (Phase P3) |
 
@@ -149,12 +150,12 @@
 
 ---
 
-## Current Test Counts (v0.37.1)
+## Current Test Counts (v0.37.3)
 
 | Suite | Suites | Tests | Status |
 |-------|--------|-------|--------|
-| Unit | 83 | 3,265 | ✅ All pass |
-| E2E | 46 | 969 | ✅ All pass |
-| Live (main) | 43 sections | ~753 | ✅ All pass |
+| Unit | 84 | 3,345 | ✅ All pass |
+| E2E | 49 | 1,025 | ✅ All pass |
+| Live (main) | 43 sections | ~760 | ✅ All pass |
 | Live (Lexmark ISV) | 13 sections | 112 | ✅ All pass |
-| **Total** | **~184** | **~5,000** | **✅ All pass** |
+| **Total** | **~186** | **~5,100** | **✅ All pass** |

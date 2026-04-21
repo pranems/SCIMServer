@@ -202,6 +202,38 @@ describe('Group Parity & Flag Interaction Gaps (E2E)', () => {
     it('should return 404 when GETting a soft-deleted group', async () => {
       await scimGet(app, `${basePath}/Groups/${groupId}`, token).expect(404);
     });
+
+    it('should reprovision a soft-deleted group when re-POSTing same displayName', async () => {
+      // Create another group with the same displayName as the soft-deleted one
+      // to trigger reprovision (if supported), or succeed as a new group
+      const groupName = `reprovision-test-${Date.now()}`;
+
+      // Create endpoint fresh for this test to avoid conflicts
+      const rpEndpointId = await createEndpointWithConfig(app, token, { SoftDeleteEnabled: 'True' });
+      const rpBasePath = scimBasePath(rpEndpointId);
+
+      // Create original group
+      const original = (await scimPost(app, `${rpBasePath}/Groups`, token,
+        validGroup({ displayName: groupName, externalId: 'reprov-ext-1' })).expect(201)).body;
+
+      // Soft-delete it
+      await scimDelete(app, `${rpBasePath}/Groups/${original.id}`, token).expect(204);
+
+      // Verify it's gone
+      await scimGet(app, `${rpBasePath}/Groups/${original.id}`, token).expect(404);
+
+      // Re-POST with same displayName — should either reprovision or create new
+      const reprovisioned = (await scimPost(app, `${rpBasePath}/Groups`, token,
+        validGroup({ displayName: groupName, externalId: 'reprov-ext-2' })).expect(201)).body;
+
+      expect(reprovisioned.id).toBeDefined();
+      expect(reprovisioned.displayName).toBe(groupName);
+      expect(reprovisioned.active).not.toBe(false);
+
+      // The reprovisioned group should be GETtable
+      const getRes = await scimGet(app, `${rpBasePath}/Groups/${reprovisioned.id}`, token).expect(200);
+      expect(getRes.body.displayName).toBe(groupName);
+    });
   });
 
   // ═══════════════════════════════════════════════════════════════════════

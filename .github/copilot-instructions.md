@@ -142,6 +142,7 @@ Every feature or significant change commit MUST include ALL of the following bef
 6. **CHANGELOG.md Update** — Version bump entry with full test counts and feature summary
 7. **Session & Context Updates** — Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts, version, and feature status
 8. **Version Management** — Bump version in `package.json` and all relevant version references
+9. **Response Contract Tests** — Verify API responses contain ONLY documented fields (key allowlist assertion at unit + E2E + live levels). Internal runtime fields (prefixed with `_`) must never appear in responses. Use `expect(ALLOWED_KEYS).toContain(key)` pattern, not just `toHaveProperty`.
 
 **Live Test Conventions:**
 - New sections go before TEST SECTION 10 (DELETE OPERATIONS / Cleanup)
