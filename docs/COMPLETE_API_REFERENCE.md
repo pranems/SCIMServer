@@ -1,6 +1,6 @@
 # Complete API Reference
 
-> **Version:** 0.35.0 · **Updated:** April 10, 2026  
+> **Version:** 0.37.2 · **Updated:** April 21, 2026  
 > **Base URL:** `http://localhost:{PORT}/scim` (default port: 3000, Docker: 8080)  
 > **Content-Type:** `application/scim+json` for SCIM operations, `application/json` for admin  
 > **URL Rewriting:** `/scim/v2/*` is automatically rewritten to `/scim/*`  
@@ -339,7 +339,7 @@ Authorization: Bearer <token>
 
 ```json
 {
-  "version": "0.35.0",
+  "version": "0.37.2",
   "service": {
     "name": "scimserver-api",
     "environment": "production",
@@ -374,7 +374,7 @@ Authorization: Bearer <token>
   "deployment": {
     "resourceGroup": "scimserver-rg",
     "containerApp": "scimserver2",
-    "currentImage": "ghcr.io/pranems/scimserver:0.35.0"
+    "currentImage": "ghcr.io/pranems/scimserver:0.37.2"
   }
 }
 ```
