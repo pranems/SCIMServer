@@ -1,0 +1,8 @@
+MS-entraid-full-features-ISV -> logLevel=DEBUG
+MS-entraid-no-soft-delete-ISV -> logLevel=DEBUG
+MS-entraid-no-user-hard-delete-ISV -> logLevel=DEBUG
+MS-entraid-no-group-hard-delete-ISV -> logLevel=DEBUG
+MS-entraid-no-multi-member-patch-ISV -> logLevel=DEBUG
+MS-entraid-no-schema-discovery-ISV -> logLevel=DEBUG
+MS-entraid-no-verbose-patch-ISV -> logLevel=DEBUG
+

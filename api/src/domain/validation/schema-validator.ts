@@ -351,6 +351,27 @@ export class SchemaValidator {
         break;
 
       case 'complex':
+        // RFC 7644 §3.5.2.3: In patch mode, empty values (null, "", {"value":""})
+        // are removal signals — skip type validation. The Patch Engine handles
+        // removal via isEmptyScimValue().
+        if (options.mode === 'patch' && SchemaValidator.isEmptyRemovalValue(value)) {
+          break;
+        }
+
+        // Robustness Principle (Postel's Law): In patch mode, accept raw strings
+        // for complex attributes that have a 'value' sub-attribute of type string.
+        // Microsoft Entra ID sends manager as a raw UUID string instead of
+        // {"value":"uuid"}. The Patch Engine wraps these in applyExtensionUpdate().
+        if (
+          options.mode === 'patch' &&
+          typeof value === 'string' &&
+          attrDef.subAttributes?.some(
+            sa => sa.name.toLowerCase() === 'value' && (sa.type === 'string' || sa.type === 'reference'),
+          )
+        ) {
+          break;
+        }
+
         if (typeof value !== 'object' || Array.isArray(value)) {
           errors.push({
             path,
@@ -1105,6 +1126,29 @@ export class SchemaValidator {
     // Core attribute path
     const segments = cleanPath.split('.');
     return this.walkAttributePath(segments, coreAttributes);
+  }
+
+  /**
+   * Detect SCIM "empty" values that signal attribute removal per RFC 7644 §3.5.2.3.
+   *
+   * Empty values include:
+   *  - null or undefined
+   *  - empty string ""
+   *  - object with a single "value" key set to null, undefined, or ""
+   *
+   * Mirrors isEmptyScimValue() from scim-patch-path.ts (used by the Patch Engine)
+   * but as a static validator helper for pre-PATCH gating.
+   */
+  private static isEmptyRemovalValue(value: unknown): boolean {
+    if (value === null || value === undefined || value === '') return true;
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      const keys = Object.keys(value as Record<string, unknown>);
+      if (keys.length === 1 && keys[0] === 'value') {
+        const v = (value as Record<string, unknown>).value;
+        return v === null || v === undefined || v === '';
+      }
+    }
+    return false;
   }
 
   /**

@@ -7848,6 +7848,173 @@ Test-Result -Success ('profileSummary' -in $summaryKeys) -Message "9z-M.8: profi
 Write-Host "`n--- 9z-M: API Response Contract Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-N: MANAGER PATCH STRING COERCION (RFC 7644 §3.5.2.3 + Postel's Law)
+$script:currentSection = "9z-N: Manager PATCH String"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-N: MANAGER PATCH STRING COERCION" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# Create a dedicated endpoint with StrictSchemaValidation=True for manager tests
+$mgrEpBody = @{
+    name = "mgr-patch-test-$(Get-Random)"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json
+$mgrEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $mgrEpBody
+$mgrEpId = $mgrEp.id
+$mgrScimBase = "$baseUrl$($mgrEp.scimBasePath)"
+# Ensure StrictSchemaValidation is ON
+$mgrSettings = @{ profile = @{ settings = @{ StrictSchemaValidation = "True" } } } | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$mgrEpId" -Method PATCH -Headers $headers -Body $mgrSettings | Out-Null
+Write-Host "Created strict endpoint $mgrEpId for manager tests" -ForegroundColor DarkGray
+
+# Create a test user
+$mgrUser = @{
+    schemas  = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "mgr-test-$(Get-Random)@test.com"
+    displayName = "Manager Test User"
+    active   = $true
+} | ConvertTo-Json
+$mgrCreated = Invoke-RestMethod -Uri "$mgrScimBase/Users" -Method POST -Headers $headers -Body $mgrUser
+$mgrUserId = $mgrCreated.id
+Write-Host "Created test user $mgrUserId" -ForegroundColor DarkGray
+
+# --- Test 9z-N.1: PATCH add manager with raw string (Entra ID style) ---
+Write-Host "`n--- Test 9z-N.1: PATCH add manager with raw string ---" -ForegroundColor Cyan
+$addMgrPatch = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "add"
+        path = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager"
+        value = "raw-mgr-uuid-001"
+    })
+} | ConvertTo-Json -Depth 5
+try {
+    $addMgrRes = Invoke-RestMethod -Uri "$mgrScimBase/Users/$mgrUserId" -Method PATCH -Headers $headers -Body $addMgrPatch
+    $mgrVal = $addMgrRes.'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'.manager.value
+    Test-Result -Success ($mgrVal -eq "raw-mgr-uuid-001") -Message "9z-N.1: Add manager with raw string → 200, manager.value='$mgrVal'"
+} catch {
+    Test-Result -Success $false -Message "9z-N.1: Add manager with raw string FAILED: $($_.Exception.Message)"
+}
+
+# --- Test 9z-N.2: PATCH replace manager with raw string ---
+Write-Host "`n--- Test 9z-N.2: PATCH replace manager with raw string ---" -ForegroundColor Cyan
+$replaceMgrPatch = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        path = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager"
+        value = "new-mgr-uuid-002"
+    })
+} | ConvertTo-Json -Depth 5
+try {
+    $replaceMgrRes = Invoke-RestMethod -Uri "$mgrScimBase/Users/$mgrUserId" -Method PATCH -Headers $headers -Body $replaceMgrPatch
+    $mgrVal2 = $replaceMgrRes.'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'.manager.value
+    Test-Result -Success ($mgrVal2 -eq "new-mgr-uuid-002") -Message "9z-N.2: Replace manager with raw string → 200, manager.value='$mgrVal2'"
+} catch {
+    Test-Result -Success $false -Message "9z-N.2: Replace manager with raw string FAILED: $($_.Exception.Message)"
+}
+
+# --- Test 9z-N.3: GET after raw-string PATCH confirms persistence ---
+Write-Host "`n--- Test 9z-N.3: GET after raw-string PATCH confirms persistence ---" -ForegroundColor Cyan
+$getAfterPatch = Invoke-RestMethod -Uri "$mgrScimBase/Users/$mgrUserId" -Method GET -Headers $headers
+$mgrVal3 = $getAfterPatch.'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'.manager.value
+Test-Result -Success ($mgrVal3 -eq "new-mgr-uuid-002") -Message "9z-N.3: GET confirms persisted manager.value='$mgrVal3'"
+
+# --- Test 9z-N.4: PATCH remove manager with empty string (RFC 7644 §3.5.2.3) ---
+Write-Host "`n--- Test 9z-N.4: Remove manager with empty string ---" -ForegroundColor Cyan
+$removeMgrPatch = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        path = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager"
+        value = ""
+    })
+} | ConvertTo-Json -Depth 5
+try {
+    $removeMgrRes = Invoke-RestMethod -Uri "$mgrScimBase/Users/$mgrUserId" -Method PATCH -Headers $headers -Body $removeMgrPatch
+    $mgrExt4 = $removeMgrRes.'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'
+    $mgrGone4 = ($null -eq $mgrExt4) -or ($null -eq $mgrExt4.manager)
+    Test-Result -Success $mgrGone4 -Message "9z-N.4: Remove manager with empty string → manager absent=$mgrGone4"
+} catch {
+    Test-Result -Success $false -Message "9z-N.4: Remove manager with empty string FAILED: $($_.Exception.Message)"
+}
+
+# --- Test 9z-N.5: Re-add manager, then remove with {value:""} ---
+Write-Host "`n--- Test 9z-N.5: Remove manager with {value:''} ---" -ForegroundColor Cyan
+$readdMgr = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "add"
+        path = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager"
+        value = @{ value = "temp-mgr-for-removal" }
+    })
+} | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Uri "$mgrScimBase/Users/$mgrUserId" -Method PATCH -Headers $headers -Body $readdMgr | Out-Null
+
+$removeObjPatch = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        path = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager"
+        value = @{ value = "" }
+    })
+} | ConvertTo-Json -Depth 5
+try {
+    $removeObjRes = Invoke-RestMethod -Uri "$mgrScimBase/Users/$mgrUserId" -Method PATCH -Headers $headers -Body $removeObjPatch
+    $mgrExt5 = $removeObjRes.'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'
+    $mgrGone5 = ($null -eq $mgrExt5) -or ($null -eq $mgrExt5.manager)
+    Test-Result -Success $mgrGone5 -Message "9z-N.5: Remove manager with {value:''} → manager absent=$mgrGone5"
+} catch {
+    Test-Result -Success $false -Message "9z-N.5: Remove manager with {value:''} FAILED: $($_.Exception.Message)"
+}
+
+# --- Test 9z-N.6: PATCH remove op (explicit remove, no value) ---
+Write-Host "`n--- Test 9z-N.6: Explicit remove op ---" -ForegroundColor Cyan
+# Re-add manager first
+Invoke-RestMethod -Uri "$mgrScimBase/Users/$mgrUserId" -Method PATCH -Headers $headers -Body $readdMgr | Out-Null
+
+$explicitRemove = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "remove"
+        path = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager"
+    })
+} | ConvertTo-Json -Depth 5
+try {
+    $explRmRes = Invoke-RestMethod -Uri "$mgrScimBase/Users/$mgrUserId" -Method PATCH -Headers $headers -Body $explicitRemove
+    $mgrExt6 = $explRmRes.'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'
+    $mgrGone6 = ($null -eq $mgrExt6) -or ($null -eq $mgrExt6.manager)
+    Test-Result -Success $mgrGone6 -Message "9z-N.6: Explicit remove op → manager absent=$mgrGone6"
+} catch {
+    Test-Result -Success $false -Message "9z-N.6: Explicit remove op FAILED: $($_.Exception.Message)"
+}
+
+# --- Test 9z-N.7: Canonical complex object form still works ---
+Write-Host "`n--- Test 9z-N.7: Canonical complex object form ---" -ForegroundColor Cyan
+$canonicalPatch = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "add"
+        path = "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager"
+        value = @{ value = "canonical-mgr-uuid" }
+    })
+} | ConvertTo-Json -Depth 5
+try {
+    $canonRes = Invoke-RestMethod -Uri "$mgrScimBase/Users/$mgrUserId" -Method PATCH -Headers $headers -Body $canonicalPatch
+    $mgrVal7 = $canonRes.'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'.manager.value
+    Test-Result -Success ($mgrVal7 -eq "canonical-mgr-uuid") -Message "9z-N.7: Canonical object form → manager.value='$mgrVal7'"
+} catch {
+    Test-Result -Success $false -Message "9z-N.7: Canonical object form FAILED: $($_.Exception.Message)"
+}
+
+# Cleanup: delete test user and endpoint
+try { Invoke-RestMethod -Uri "$mgrScimBase/Users/$mgrUserId" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$mgrEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+Write-Host "`n--- 9z-N: Manager PATCH String Coercion Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
