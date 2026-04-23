@@ -116,7 +116,7 @@ describe('ScimDiscoveryService', () => {
       expect(subNames).toContain('formatted');
     });
 
-    // ─── P1: R-SUB-1 — caseExact:false on name sub-attributes ────────────
+    // ─── P1: R-SUB-1 - caseExact:false on name sub-attributes ────────────
 
     it('should have caseExact:false on all name sub-attributes (R-SUB-1, RFC 7643 §4.1.1)', () => {
       const result = service.getSchemas();
@@ -130,7 +130,7 @@ describe('ScimDiscoveryService', () => {
       }
     });
 
-    // ─── P1: R-SUB-3 — caseExact:false on addresses sub-attributes ───────
+    // ─── P1: R-SUB-3 - caseExact:false on addresses sub-attributes ───────
 
     it('should have caseExact:false on all addresses sub-attributes (R-SUB-3, RFC 7643 §4.1.2)', () => {
       const result = service.getSchemas();
@@ -144,7 +144,7 @@ describe('ScimDiscoveryService', () => {
       }
     });
 
-    // ─── P1: R-UNIQ-1 — uniqueness on externalId attributes ──────────────
+    // ─── P1: R-UNIQ-1 - uniqueness on externalId attributes ──────────────
 
     it('should have uniqueness:none on User externalId (R-UNIQ-1, RFC 7643 §3.1)', () => {
       const result = service.getSchemas();
@@ -222,7 +222,7 @@ describe('ScimDiscoveryService', () => {
       expect(subNames).toContain('version');
     });
 
-    // ─── P1: R-REF-1 — $ref sub-attribute on Group members ───────────────
+    // ─── P1: R-REF-1 - $ref sub-attribute on Group members ───────────────
 
     it('should include $ref sub-attribute on Group members with referenceTypes (R-REF-1, RFC 7643 §4.2)', () => {
       const result = service.getSchemas();
@@ -244,14 +244,14 @@ describe('ScimDiscoveryService', () => {
       expect(subNames).toEqual(['value', '$ref', 'display', 'type']);
     });
 
-    // ─── P1: R-UNIQ-1 — uniqueness on Group attributes ───────────────────
+    // ─── P1: R-UNIQ-1 - uniqueness on Group attributes ───────────────────
 
     it('should have uniqueness:none on Group displayName (RFC 7643 §8.7.1 baseline)', () => {
       const result = service.getSchemas();
       const groupSchema = result.Resources.find((r: any) => r.id === SCIM_CORE_GROUP_SCHEMA)! as any;
       const displayName = groupSchema.attributes.find((a: any) => a.name === 'displayName');
       expect(displayName).toBeDefined();
-      expect(displayName.uniqueness).toBe('none'); // RFC 7643 §8.7.1 — presets may tighten to 'server'
+      expect(displayName.uniqueness).toBe('none'); // RFC 7643 §8.7.1 - presets may tighten to 'server'
     });
 
     it('should have uniqueness:none on Group externalId (R-UNIQ-1, RFC 7643 §3.1)', () => {
@@ -433,7 +433,7 @@ describe('ScimDiscoveryService', () => {
       expect(result.authenticationSchemes[0].type).toBe('oauthbearertoken');
     });
 
-    it('should include primary:true on authentication scheme (D6 — RFC 7643 §5)', () => {
+    it('should include primary:true on authentication scheme (D6 - RFC 7643 §5)', () => {
       const result = service.getServiceProviderConfig();
       expect(result.authenticationSchemes[0].primary).toBe(true);
     });
@@ -582,7 +582,7 @@ describe('ScimDiscoveryService', () => {
     });
   });
 
-  // ─── Root-level discovery (Phase 14.4 — no endpointId) ─────────────
+  // ─── Root-level discovery (Phase 14.4 - no endpointId) ─────────────
 
   describe('Root-level discovery', () => {
     it('getSchemas returns root-level defaults', () => {

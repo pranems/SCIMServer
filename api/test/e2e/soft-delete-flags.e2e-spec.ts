@@ -25,7 +25,7 @@ import {
 /**
  * Delete Lifecycle, Config Flag Combinations, and PATCH Path Patterns (E2E).
  *
- * Settings v7: No soft-delete concept — DELETE always hard-deletes (row removed).
+ * Settings v7: No soft-delete concept - DELETE always hard-deletes (row removed).
  * UserSoftDeleteEnabled gates PATCH active=false (soft-delete).
  *
  * Tests:
@@ -55,10 +55,10 @@ describe('Delete Lifecycle, Flag Combinations & PATCH Paths (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════
-  // Hard Delete — Users (settings v7: DELETE always removes row)
+  // Hard Delete - Users (settings v7: DELETE always removes row)
   // ═══════════════════════════════════════════════════════════
 
-  describe('Hard Delete — Users', () => {
+  describe('Hard Delete - Users', () => {
     it('should hard-delete user (DELETE returns 204, GET returns 404)', async () => {
       const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
@@ -126,7 +126,7 @@ describe('Delete Lifecycle, Flag Combinations & PATCH Paths (E2E)', () => {
       // Hard-delete user1
       await scimDelete(app, `${basePath}/Users/${user1.id}`, token).expect(204);
 
-      // Filter for inactive users — hard-deleted row is gone, no active=false records exist
+      // Filter for inactive users - hard-deleted row is gone, no active=false records exist
       const res = await scimGet(
         app,
         `${basePath}/Users?filter=active eq false`,
@@ -168,17 +168,17 @@ describe('Delete Lifecycle, Flag Combinations & PATCH Paths (E2E)', () => {
       // GET returns 404
       await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(404);
 
-      // PATCH (re-activate attempt) returns 404 — row is gone
+      // PATCH (re-activate attempt) returns 404 - row is gone
       const patch = patchOp([{ op: 'replace', path: 'active', value: true }]);
       await scimPatch(app, `${basePath}/Users/${user.id}`, token, patch).expect(404);
     });
   });
 
   // ═══════════════════════════════════════════════════════════
-  // Hard Delete — Groups (settings v7: DELETE always removes row)
+  // Hard Delete - Groups (settings v7: DELETE always removes row)
   // ═══════════════════════════════════════════════════════════
 
-  describe('Hard Delete — Groups', () => {
+  describe('Hard Delete - Groups', () => {
     it('should hard-delete group (DELETE returns 204, GET returns 404)', async () => {
       const endpointId = await createEndpoint(app, token);
       const basePath = scimBasePath(endpointId);
@@ -254,7 +254,7 @@ describe('Delete Lifecycle, Flag Combinations & PATCH Paths (E2E)', () => {
       const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
       await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(204);
 
-      // PATCH displayName on deleted user — returns 404
+      // PATCH displayName on deleted user - returns 404
       const patch = patchOp([{ op: 'replace', path: 'displayName', value: 'Inactive Updated' }]);
       await scimPatch(app, `${basePath}/Users/${user.id}`, token, patch).expect(404);
     });
@@ -270,7 +270,7 @@ describe('Delete Lifecycle, Flag Combinations & PATCH Paths (E2E)', () => {
       // Hard-delete
       await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(204);
 
-      // PATCH email via valuePath on deleted user — returns 404
+      // PATCH email via valuePath on deleted user - returns 404
       const patch = patchOp([{
         op: 'replace',
         path: 'emails[type eq "work"].value',
@@ -292,7 +292,7 @@ describe('Delete Lifecycle, Flag Combinations & PATCH Paths (E2E)', () => {
       // Hard-delete
       await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(204);
 
-      // PATCH extension attribute on deleted user — returns 404
+      // PATCH extension attribute on deleted user - returns 404
       const patch = patchOp([{
         op: 'replace',
         path: `${ENTERPRISE}:department`,
@@ -314,7 +314,7 @@ describe('Delete Lifecycle, Flag Combinations & PATCH Paths (E2E)', () => {
       // Hard-delete
       await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(204);
 
-      // PATCH name.givenName with dot-notation — returns 404
+      // PATCH name.givenName with dot-notation - returns 404
       const patch = patchOp([{ op: 'replace', path: 'name.givenName', value: 'NewGiven' }]);
       await scimPatch(app, `${basePath}/Users/${user.id}`, token, patch).expect(404);
     });
@@ -334,7 +334,7 @@ describe('Delete Lifecycle, Flag Combinations & PATCH Paths (E2E)', () => {
       // Create user with valid schema
       const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
 
-      // Hard-delete removes row — GET returns 404
+      // Hard-delete removes row - GET returns 404
       await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(204);
       await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(404);
 
@@ -364,7 +364,7 @@ describe('Delete Lifecycle, Flag Combinations & PATCH Paths (E2E)', () => {
       ).expect(200);
       expect(res.body.members.length).toBeGreaterThanOrEqual(2);
 
-      // Hard-delete removes row — GET returns 404
+      // Hard-delete removes row - GET returns 404
       await scimDelete(app, `${basePath}/Groups/${group.id}`, token).expect(204);
       await scimGet(app, `${basePath}/Groups/${group.id}`, token).expect(404);
     });
@@ -408,7 +408,7 @@ describe('Delete Lifecycle, Flag Combinations & PATCH Paths (E2E)', () => {
       await scimPatch(app, `${basePath}/Groups/${group.id}`, token, addMemberPatch(user.id)).expect(200);
       await scimPatch(app, `${basePath}/Groups/${group.id}`, token, removeAllMembersPatch()).expect(400);
 
-      // Hard-delete removes row — GET returns 404
+      // Hard-delete removes row - GET returns 404
       await scimDelete(app, `${basePath}/Users/${user.id}`, token).expect(204);
       await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(404);
     });
@@ -446,7 +446,7 @@ describe('Delete Lifecycle, Flag Combinations & PATCH Paths (E2E)', () => {
       // Remove-all members allowed
       await scimPatch(app, `${basePath}/Groups/${group.id}`, token, removeAllMembersPatch()).expect(200);
 
-      // Hard-delete removes row — GET returns 404
+      // Hard-delete removes row - GET returns 404
       await scimDelete(app, `${basePath}/Users/${user1.id}`, token).expect(204);
       await scimGet(app, `${basePath}/Users/${user1.id}`, token).expect(404);
 
@@ -749,7 +749,7 @@ describe('Delete Lifecycle, Flag Combinations & PATCH Paths (E2E)', () => {
       // Without coercion on write, the string is stored. But the READ path
       // always sanitizes boolean strings via toScimUserResource, so the
       // response will still show boolean true.
-      // This is by design — the read-path sanitization is always on.
+      // This is by design - the read-path sanitization is always on.
       expect(res.body.roles?.[0]?.primary).toBe(true);
     });
 
@@ -764,9 +764,9 @@ describe('Delete Lifecycle, Flag Combinations & PATCH Paths (E2E)', () => {
         roles: [{ value: 'true', primary: 'True' }],
       } as any)).expect(201);
 
-      // "value" is a string attribute — should not be coerced
+      // "value" is a string attribute - should not be coerced
       expect(res.body.roles?.[0]?.value).toBe('true');
-      // "primary" is a boolean attribute — should be coerced
+      // "primary" is a boolean attribute - should be coerced
       expect(res.body.roles?.[0]?.primary).toBe(true);
     });
 
@@ -970,7 +970,7 @@ describe('Delete Lifecycle, Flag Combinations & PATCH Paths (E2E)', () => {
   // ReprovisionOnConflictForSoftDeletedResource
   // ═══════════════════════════════════════════════════════════
 
-  describe('Settings v7 — POST collision always 409 (no reprovision)', () => {
+  describe('Settings v7 - POST collision always 409 (no reprovision)', () => {
     describe('Users', () => {
       it('should 409 on POST with same userName even with old reprovision flags set', async () => {
         const endpointId = await createEndpointWithConfig(app, token, {

@@ -6,7 +6,7 @@ import { createEndpointWithConfig, scimBasePath, scimPost } from './helpers/requ
 import { resetFixtureCounter } from './helpers/fixtures';
 
 /**
- * Bulk Operations (Phase 9, RFC 7644 §3.7) — E2E tests.
+ * Bulk Operations (Phase 9, RFC 7644 §3.7) - E2E tests.
  *
  * Tests the full lifecycle for:
  *   1. Config flag gating: BulkOperationsEnabled
@@ -358,7 +358,7 @@ describe('Bulk Operations (Phase 9) E2E', () => {
 
   describe('failOnErrors', () => {
     it('should stop after failOnErrors threshold', async () => {
-      // Attempt to DELETE non-existent users — will produce 404 errors
+      // Attempt to DELETE non-existent users - will produce 404 errors
       const res = await request(app.getHttpServer())
         .post(`${scimBasePath(endpointId)}/Bulk`)
         .set('Authorization', `Bearer ${token}`)

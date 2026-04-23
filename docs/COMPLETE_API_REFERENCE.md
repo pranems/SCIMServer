@@ -12,20 +12,20 @@
 
 - [Authentication](#authentication)
 - [Health & Version](#health--version)
-- [Admin API — Endpoint Management](#admin-api--endpoint-management)
-- [Admin API — Per-Endpoint Credentials](#admin-api--per-endpoint-credentials)
-- [Admin API — General (Logs, Manual Ops, Version)](#admin-api--general)
-- [Admin API — Log Configuration](#admin-api--log-configuration)
-- [Admin API — Database Browser](#admin-api--database-browser)
-- [Admin API — Activity Feed](#admin-api--activity-feed)
-- [SCIM — Discovery (Root-Level)](#scim--discovery-root-level)
-- [SCIM — Discovery (Endpoint-Scoped)](#scim--discovery-endpoint-scoped)
-- [SCIM — Users](#scim--users)
-- [SCIM — Groups](#scim--groups)
-- [SCIM — Bulk Operations](#scim--bulk-operations)
-- [SCIM — POST Search](#scim--post-search)
-- [SCIM — /Me Endpoint](#scim--me-endpoint)
-- [SCIM — Custom Resource Types](#scim--custom-resource-types)
+- [Admin API - Endpoint Management](#admin-api--endpoint-management)
+- [Admin API - Per-Endpoint Credentials](#admin-api--per-endpoint-credentials)
+- [Admin API - General (Logs, Manual Ops, Version)](#admin-api--general)
+- [Admin API - Log Configuration](#admin-api--log-configuration)
+- [Admin API - Database Browser](#admin-api--database-browser)
+- [Admin API - Activity Feed](#admin-api--activity-feed)
+- [SCIM - Discovery (Root-Level)](#scim--discovery-root-level)
+- [SCIM - Discovery (Endpoint-Scoped)](#scim--discovery-endpoint-scoped)
+- [SCIM - Users](#scim--users)
+- [SCIM - Groups](#scim--groups)
+- [SCIM - Bulk Operations](#scim--bulk-operations)
+- [SCIM - POST Search](#scim--post-search)
+- [SCIM - /Me Endpoint](#scim--me-endpoint)
+- [SCIM - Custom Resource Types](#scim--custom-resource-types)
 - [OAuth Token Endpoint](#oauth-token-endpoint)
 - [Error Responses](#error-responses)
 - [Common Headers](#common-headers)
@@ -36,10 +36,10 @@
 
 The server supports a 3-tier authentication chain, evaluated in order:
 
-1. **Public routes** — endpoints decorated `@Public()` skip auth entirely (health, discovery, OAuth)
-2. **Per-endpoint credentials** — if the URL contains `/endpoints/{uuid}/`, checks bcrypt-hashed bearer tokens stored per-endpoint (requires `PerEndpointCredentialsEnabled` flag)
-3. **OAuth 2.0 JWT** — validates token via `OAuthService.validateAccessToken()`; sets `authType = 'oauth'`
-4. **Legacy bearer token** — compares against the `SCIM_SHARED_SECRET` environment variable; sets `authType = 'legacy'`
+1. **Public routes** - endpoints decorated `@Public()` skip auth entirely (health, discovery, OAuth)
+2. **Per-endpoint credentials** - if the URL contains `/endpoints/{uuid}/`, checks bcrypt-hashed bearer tokens stored per-endpoint (requires `PerEndpointCredentialsEnabled` flag)
+3. **OAuth 2.0 JWT** - validates token via `OAuthService.validateAccessToken()`; sets `authType = 'oauth'`
+4. **Legacy bearer token** - compares against the `SCIM_SHARED_SECRET` environment variable; sets `authType = 'legacy'`
 
 | Environment Variable | Purpose |
 |---------------------|---------|
@@ -73,7 +73,7 @@ GET /scim/health
 
 ---
 
-## Admin API — Endpoint Management
+## Admin API - Endpoint Management
 
 > **Base path:** `/scim/admin/endpoints` · **Auth:** Bearer token required
 
@@ -122,7 +122,7 @@ Content-Type: application/json
 | `displayName` | string | Human-readable label |
 | `description` | string | Description |
 | `profilePreset` | string | One of: `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `user-only-with-custom-ext` |
-| `profile` | object | Inline profile (schemas, resourceTypes, serviceProviderConfig, settings) — mutually exclusive with `profilePreset` |
+| `profile` | object | Inline profile (schemas, resourceTypes, serviceProviderConfig, settings) - mutually exclusive with `profilePreset` |
 
 ### GET /scim/admin/endpoints
 
@@ -138,7 +138,7 @@ Authorization: Bearer <token>
 | `active` | `true`/`false` | Filter by active status |
 | `view` | `summary`/`full` | Response detail level (default: `summary`) |
 
-**Response: 200 OK** — Array of endpoint objects.
+**Response: 200 OK** - Array of endpoint objects.
 
 ### GET /scim/admin/endpoints/presets
 
@@ -149,7 +149,7 @@ GET /scim/admin/endpoints/presets
 Authorization: Bearer <token>
 ```
 
-**Response: 200 OK** — Array of preset names and descriptions.
+**Response: 200 OK** - Array of preset names and descriptions.
 
 ### GET /scim/admin/endpoints/presets/:name
 
@@ -160,7 +160,7 @@ GET /scim/admin/endpoints/presets/entra-id
 Authorization: Bearer <token>
 ```
 
-**Response: 200 OK** — Full profile object (schemas, resourceTypes, SPC, settings).
+**Response: 200 OK** - Full profile object (schemas, resourceTypes, SPC, settings).
 
 ### GET /scim/admin/endpoints/:endpointId
 
@@ -190,7 +190,7 @@ Authorization: Bearer <token>
 
 ### PATCH /scim/admin/endpoints/:endpointId
 
-Update endpoint — deep-merges profile settings.
+Update endpoint - deep-merges profile settings.
 
 ```http
 PATCH /scim/admin/endpoints/a1b2c3d4-...
@@ -221,20 +221,20 @@ Content-Type: application/json
 
 | Profile Section | Strategy | Implication |
 |----------------|----------|-------------|
-| `schemas` | **Replace** | Full array replaces old — must include ALL schemas |
-| `resourceTypes` | **Replace** | Full array replaces old — must reference schemas in the new set |
+| `schemas` | **Replace** | Full array replaces old - must include ALL schemas |
+| `resourceTypes` | **Replace** | Full array replaces old - must reference schemas in the new set |
 | `serviceProviderConfig` | Shallow merge | Unmentioned capabilities preserved |
 | `settings` | Shallow merge (additive) | Unmentioned flags preserved |
 
-> **Takes effect immediately** — the in-memory cache is updated synchronously. No restart required. The `_schemaCaches` is cleared and lazily rebuilt on the next request — discovery, validation, and characteristic enforcement all reflect the new profile instantly.
+> **Takes effect immediately** - the in-memory cache is updated synchronously. No restart required. The `_schemaCaches` is cleared and lazily rebuilt on the next request - discovery, validation, and characteristic enforcement all reflect the new profile instantly.
 
-**Response: 200 OK** — Updated endpoint.
+**Response: 200 OK** - Updated endpoint.
 
 > **All per-endpoint config flags** (13 booleans + `logLevel`) are documented in [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md).
 
 ### DELETE /scim/admin/endpoints/:endpointId
 
-Delete endpoint (**cascades** — deletes all users, groups, logs, credentials).
+Delete endpoint (**cascades** - deletes all users, groups, logs, credentials).
 
 **Response: 204 No Content**
 
@@ -251,14 +251,14 @@ Authorization: Bearer <token>
 
 ---
 
-## Admin API — Per-Endpoint Credentials
+## Admin API - Per-Endpoint Credentials
 
 > **Base path:** `/scim/admin/endpoints/:endpointId/credentials` · **Auth:** Bearer token required  
 > **Prerequisite:** Endpoint must have `PerEndpointCredentialsEnabled` flag set to `True`
 
 ### POST /scim/admin/endpoints/:endpointId/credentials
 
-Create a per-endpoint credential. **The server generates the token** — the plaintext is returned exactly once in the response; only the bcrypt hash is stored.
+Create a per-endpoint credential. **The server generates the token** - the plaintext is returned exactly once in the response; only the bcrypt hash is stored.
 
 ```http
 POST /scim/admin/endpoints/a1b2c3d4-.../credentials
@@ -287,15 +287,15 @@ Content-Type: application/json
 }
 ```
 
-> **Important:** Save the `token` value immediately — it cannot be retrieved again.
+> **Important:** Save the `token` value immediately - it cannot be retrieved again.
 
 **Body fields:**
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `label` | string | — | Optional human-readable label |
+| `label` | string | - | Optional human-readable label |
 | `credentialType` | `bearer` / `oauth_client` | `bearer` | Credential type |
-| `expiresAt` | ISO 8601 | — | Optional expiration (must be in the future) |
+| `expiresAt` | ISO 8601 | - | Optional expiration (must be in the future) |
 
 | Status | Condition |
 |--------|-----------|
@@ -307,7 +307,7 @@ Content-Type: application/json
 
 List all credentials for an endpoint (tokens/hashes are never returned).
 
-**Response: 200 OK** — Array of credential metadata objects.
+**Response: 200 OK** - Array of credential metadata objects.
 
 ### DELETE /scim/admin/endpoints/:endpointId/credentials/:credentialId
 
@@ -322,7 +322,7 @@ Revoke (deactivate) a credential.
 
 ---
 
-## Admin API — General
+## Admin API - General
 
 > **Base path:** `/scim/admin` · **Auth:** Bearer token required
 
@@ -403,7 +403,7 @@ Authorization: Bearer <token>
 | `hideKeepalive` | boolean | Exclude health-check/keepalive requests |
 | `minDurationMs` | number | Only requests taking >= N milliseconds |
 
-**Response: 200 OK** — Paginated log entries.
+**Response: 200 OK** - Paginated log entries.
 
 ### GET /scim/admin/logs/:id
 
@@ -457,7 +457,7 @@ Content-Type: application/json
 }
 ```
 
-**Response: 201 Created** — SCIM User resource (`Content-Type: application/scim+json`).
+**Response: 201 Created** - SCIM User resource (`Content-Type: application/scim+json`).
 
 **Body fields:**
 
@@ -488,7 +488,7 @@ Content-Type: application/json
 }
 ```
 
-**Response: 201 Created** — SCIM Group resource.
+**Response: 201 Created** - SCIM Group resource.
 
 **Body fields:**
 
@@ -506,7 +506,7 @@ Delete a user by primary key or SCIM ID.
 
 ---
 
-## Admin API — Log Configuration
+## Admin API - Log Configuration
 
 > **Base path:** `/scim/admin/log-config` · **Auth:** Bearer token required
 
@@ -547,7 +547,7 @@ Content-Type: application/json
 }
 ```
 
-**Response: 200 OK** — Updated configuration.
+**Response: 200 OK** - Updated configuration.
 
 ### PUT /scim/admin/log-config/level/:level
 
@@ -605,7 +605,7 @@ Authorization: Bearer <token>
 | `requestId` | string | Filter by request ID |
 | `endpointId` | string | Filter by endpoint ID |
 
-**Response: 200 OK** — Array of structured log entries.
+**Response: 200 OK** - Array of structured log entries.
 
 ### DELETE /scim/admin/log-config/recent
 
@@ -653,7 +653,7 @@ Authorization: Bearer <token>
 
 ---
 
-## Admin API — Database Browser
+## Admin API - Database Browser
 
 > **Base path:** `/scim/admin/database` · **Auth:** Bearer token required
 
@@ -670,10 +670,10 @@ Authorization: Bearer <token>
 |------------|---------|-------------|
 | `page` | 1 | Page number |
 | `limit` | 50 | Results per page |
-| `search` | — | Search by name/email |
-| `active` | — | Filter by active status |
+| `search` | - | Search by name/email |
+| `active` | - | Filter by active status |
 
-**Response: 200 OK** — Paginated user list.
+**Response: 200 OK** - Paginated user list.
 
 ### GET /scim/admin/database/users/:id
 
@@ -689,9 +689,9 @@ Browse groups in the database.
 |------------|---------|-------------|
 | `page` | 1 | Page number |
 | `limit` | 50 | Results per page |
-| `search` | — | Search by display name |
+| `search` | - | Search by display name |
 
-**Response: 200 OK** — Paginated group list.
+**Response: 200 OK** - Paginated group list.
 
 ### GET /scim/admin/database/groups/:id
 
@@ -707,7 +707,7 @@ Get aggregate database statistics.
 
 ---
 
-## Admin API — Activity Feed
+## Admin API - Activity Feed
 
 > **Base path:** `/scim/admin/activity` · **Auth:** Bearer token required
 
@@ -724,12 +724,12 @@ Authorization: Bearer <token>
 |------------|---------|-------------|
 | `page` | 1 | Page number |
 | `limit` | 50 | Results per page |
-| `type` | — | Filter by activity type |
-| `severity` | — | Filter by severity |
-| `search` | — | Full-text search |
-| `hideKeepalive` | — | Exclude keepalive entries |
+| `type` | - | Filter by activity type |
+| `severity` | - | Filter by severity |
+| `search` | - | Full-text search |
+| `hideKeepalive` | - | Exclude keepalive entries |
 
-**Response: 200 OK** — `{ activities[], pagination, filters }`
+**Response: 200 OK** - `{ activities[], pagination, filters }`
 
 ### GET /scim/admin/activity/summary
 
@@ -739,7 +739,7 @@ Get activity summary with 24h/7d counts and operation breakdown.
 
 ---
 
-## SCIM — Discovery (Root-Level)
+## SCIM - Discovery (Root-Level)
 
 > **No authentication required** (RFC 7644 §4)  
 > These return global default schemas/resource types (not endpoint-specific).
@@ -758,7 +758,7 @@ GET /scim/ServiceProviderConfig
 GET /scim/Schemas
 ```
 
-**Response: 200 OK** — All global schema definitions.
+**Response: 200 OK** - All global schema definitions.
 
 ### GET /scim/Schemas/:uri
 
@@ -766,7 +766,7 @@ GET /scim/Schemas
 GET /scim/Schemas/urn:ietf:params:scim:schemas:core:2.0:User
 ```
 
-**Response: 200 OK** — Single schema by URN.
+**Response: 200 OK** - Single schema by URN.
 
 ### GET /scim/ResourceTypes
 
@@ -774,7 +774,7 @@ GET /scim/Schemas/urn:ietf:params:scim:schemas:core:2.0:User
 GET /scim/ResourceTypes
 ```
 
-**Response: 200 OK** — All global resource type definitions.
+**Response: 200 OK** - All global resource type definitions.
 
 ### GET /scim/ResourceTypes/:id
 
@@ -782,11 +782,11 @@ GET /scim/ResourceTypes
 GET /scim/ResourceTypes/User
 ```
 
-**Response: 200 OK** — Single resource type by ID.
+**Response: 200 OK** - Single resource type by ID.
 
 ---
 
-## SCIM — Discovery (Endpoint-Scoped)
+## SCIM - Discovery (Endpoint-Scoped)
 
 > **No authentication required** (RFC 7644 §4)  
 > These return endpoint-specific schemas, including custom extensions registered on the endpoint.
@@ -832,11 +832,11 @@ Get a single endpoint-specific resource type by ID.
 
 ---
 
-## SCIM — Users
+## SCIM - Users
 
 > **Base path:** `/scim/endpoints/{endpointId}/Users` · **Auth:** Bearer token required
 
-### POST — Create User
+### POST - Create User
 
 ```http
 POST /scim/endpoints/{endpointId}/Users
@@ -911,7 +911,7 @@ Content-Type: application/scim+json
 | `attributes` | Comma-separated list of attributes to include in response |
 | `excludedAttributes` | Comma-separated list of attributes to exclude from response |
 
-### GET — Read User
+### GET - Read User
 
 ```http
 GET /scim/endpoints/{endpointId}/Users/{userId}?attributes=userName,displayName
@@ -919,7 +919,7 @@ Authorization: Bearer <token>
 Accept: application/scim+json
 ```
 
-### GET — List/Filter Users
+### GET - List/Filter Users
 
 ```http
 GET /scim/endpoints/{endpointId}/Users?filter=userName eq "jdoe@example.com"&startIndex=1&count=10&sortBy=userName&sortOrder=ascending
@@ -952,7 +952,7 @@ Authorization: Bearer <token>
 
 **Supported filter operators:** `eq`, `ne`, `co`, `sw`, `ew`, `pr`, `gt`, `ge`, `lt`, `le`, `and`, `or`, `not`
 
-### PUT — Replace User
+### PUT - Replace User
 
 ```http
 PUT /scim/endpoints/{endpointId}/Users/{userId}
@@ -976,7 +976,7 @@ If-Match: W/"1"
 | 412 | ETag precondition failed (when `RequireIfMatch` is enabled) |
 | 428 | `If-Match` required but not provided |
 
-### PATCH — Modify User
+### PATCH - Modify User
 
 ```http
 PATCH /scim/endpoints/{endpointId}/Users/{userId}
@@ -1001,7 +1001,7 @@ Content-Type: application/scim+json
 | 404 | User not found |
 | 412 | ETag precondition failed |
 
-### DELETE — Delete User
+### DELETE - Delete User
 
 ```http
 DELETE /scim/endpoints/{endpointId}/Users/{userId}
@@ -1013,12 +1013,12 @@ If-Match: W/"1"
 
 ---
 
-## SCIM — Groups
+## SCIM - Groups
 
 > **Base path:** `/scim/endpoints/{endpointId}/Groups` · **Auth:** Bearer token required  
 > Same CRUD pattern as Users with identical query parameters support.
 
-### POST — Create Group
+### POST - Create Group
 
 ```http
 POST /scim/endpoints/{endpointId}/Groups
@@ -1041,21 +1041,21 @@ Content-Type: application/scim+json
 | 201 | Group created |
 | 409 | `displayName` already exists (uniqueness violation) |
 
-### GET — Read Group
+### GET - Read Group
 
 ```http
 GET /scim/endpoints/{endpointId}/Groups/{groupId}
 Authorization: Bearer <token>
 ```
 
-### GET — List/Filter Groups
+### GET - List/Filter Groups
 
 ```http
 GET /scim/endpoints/{endpointId}/Groups?filter=displayName eq "Engineering"&startIndex=1&count=10
 Authorization: Bearer <token>
 ```
 
-### PUT — Replace Group
+### PUT - Replace Group
 
 ```http
 PUT /scim/endpoints/{endpointId}/Groups/{groupId}
@@ -1072,7 +1072,7 @@ If-Match: W/"1"
 }
 ```
 
-### PATCH — Modify Group / Add/Remove Members
+### PATCH - Modify Group / Add/Remove Members
 
 ```http
 PATCH /scim/endpoints/{endpointId}/Groups/{groupId}
@@ -1093,7 +1093,7 @@ Content-Type: application/scim+json
 
 > **Note:** Multi-member add/remove requires `MultiMemberPatchOpForGroupEnabled` to be enabled in endpoint settings (default: enabled).
 
-### DELETE — Delete Group
+### DELETE - Delete Group
 
 ```http
 DELETE /scim/endpoints/{endpointId}/Groups/{groupId}
@@ -1105,7 +1105,7 @@ If-Match: W/"1"
 
 ---
 
-## SCIM — Bulk Operations
+## SCIM - Bulk Operations
 
 > **Base path:** `/scim/endpoints/{endpointId}/Bulk` · **Auth:** Bearer token required  
 > **Prerequisite:** `profile.serviceProviderConfig.bulk.supported = true` (e.g., `rfc-standard` preset)
@@ -1153,7 +1153,7 @@ Content-Type: application/scim+json
 
 | Field | Description |
 |-------|-------------|
-| `failOnErrors` | Optional — stop processing after this many errors |
+| `failOnErrors` | Optional - stop processing after this many errors |
 | `Operations[].method` | `POST`, `PUT`, `PATCH`, or `DELETE` |
 | `Operations[].path` | Resource path (e.g., `/Users`, `/Groups/{id}`) |
 | `Operations[].bulkId` | Client-specified correlation ID (required for POST) |
@@ -1161,7 +1161,7 @@ Content-Type: application/scim+json
 
 ---
 
-## SCIM — POST Search
+## SCIM - POST Search
 
 > Available on all resource types: Users, Groups, and custom resources.
 
@@ -1184,7 +1184,7 @@ Content-Type: application/scim+json
 }
 ```
 
-**Response: 200 OK** — ListResponse (same format as GET list).
+**Response: 200 OK** - ListResponse (same format as GET list).
 
 ### POST /scim/endpoints/{endpointId}/Groups/.search
 
@@ -1192,7 +1192,7 @@ Same request/response format, scoped to Groups.
 
 ---
 
-## SCIM — /Me Endpoint
+## SCIM - /Me Endpoint
 
 > **Base path:** `/scim/endpoints/{endpointId}/Me` · **Auth:** OAuth 2.0 JWT required  
 > Requires `authType === 'oauth'` with the JWT `sub` claim matching a User's `userName` in the endpoint. Legacy bearer tokens are **not** supported for /Me.
@@ -1221,7 +1221,7 @@ Authorization: Bearer <oauth-jwt-with-sub-claim>
 
 ---
 
-## SCIM — Custom Resource Types
+## SCIM - Custom Resource Types
 
 > **Base path:** `/scim/endpoints/{endpointId}/{resourceType}` · **Auth:** Bearer token required  
 > **Prerequisite:** Custom resource type must be registered in endpoint profile's `resourceTypes`
@@ -1315,15 +1315,15 @@ All errors follow the SCIM error format (RFC 7644 §3.12):
 | 400 | `invalidFilter` | Malformed SCIM filter expression |
 | 400 | `invalidPath` | Invalid PATCH path |
 | 400 | `mutability` | Attempt to write readOnly/immutable attribute |
-| 401 | — | Missing or invalid authentication |
-| 403 | — | Feature not enabled (e.g., per-endpoint credentials disabled) |
-| 404 | — | Resource not found |
+| 401 | - | Missing or invalid authentication |
+| 403 | - | Feature not enabled (e.g., per-endpoint credentials disabled) |
+| 404 | - | Resource not found |
 | 409 | `uniqueness` | Duplicate `userName` or `displayName` |
-| 412 | — | ETag precondition failed |
+| 412 | - | ETag precondition failed |
 | 413 | `tooLarge` | Bulk payload exceeds `maxPayloadSize` |
-| 415 | — | Unsupported Content-Type (not `application/scim+json` or `application/json`) |
-| 428 | — | `If-Match` required but missing (when `RequireIfMatch` is on) |
-| 500 | — | Internal server error |
+| 415 | - | Unsupported Content-Type (not `application/scim+json` or `application/json`) |
+| 428 | - | `If-Match` required but missing (when `RequireIfMatch` is on) |
+| 500 | - | Internal server error |
 
 ---
 
@@ -1333,7 +1333,7 @@ All errors follow the SCIM error format (RFC 7644 §3.12):
 
 | Header | Required | Description |
 |--------|----------|-------------|
-| `Authorization` | Yes (except public routes) | `Bearer <token>` — shared secret, OAuth JWT, or per-endpoint credential |
+| `Authorization` | Yes (except public routes) | `Bearer <token>` - shared secret, OAuth JWT, or per-endpoint credential |
 | `Content-Type` | For POST/PUT/PATCH | `application/scim+json` or `application/json` |
 | `Accept` | No | `application/scim+json` |
 | `If-Match` | Conditional | ETag value for conditional writes (required if `RequireIfMatch` is on) |

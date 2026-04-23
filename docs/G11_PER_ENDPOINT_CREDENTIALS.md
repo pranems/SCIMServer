@@ -170,5 +170,5 @@ Authorization: Bearer {admin-token}
 
 ## RFC References
 
-- **RFC 7644 §2**: Authentication and Authorization — per-endpoint credentials provide endpoint-scoped auth isolation
-- **RFC 7643 §7**: Security Considerations — credential hashing, one-time display, expiry support
+- **RFC 7644 §2**: Authentication and Authorization - per-endpoint credentials provide endpoint-scoped auth isolation
+- **RFC 7643 §7**: Security Considerations - credential hashing, one-time display, expiry support

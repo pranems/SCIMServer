@@ -1002,7 +1002,7 @@ describe('endpoint-config.interface', () => {
 
   // ─── Settings v7: New flag constants ──────────────────────────────────
 
-  describe('Settings v7 — new flag constants', () => {
+  describe('Settings v7 - new flag constants', () => {
     it('should have USER_SOFT_DELETE_ENABLED constant', () => {
       expect(ENDPOINT_CONFIG_FLAGS.USER_SOFT_DELETE_ENABLED).toBe('UserSoftDeleteEnabled');
     });

@@ -469,7 +469,7 @@ describe('EndpointScimUsersController', () => {
 
   // ───────────── G8e: returned characteristic filtering ─────────────
 
-  describe('G8e — returned:request attribute filtering', () => {
+  describe('G8e - returned:request attribute filtering', () => {
     it('POST createUser should strip returned:request attributes from response', async () => {
       const createDto: CreateUserDto = {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
@@ -570,7 +570,7 @@ describe('EndpointScimUsersController', () => {
 
   // ───────────── G8g: write-response attribute projection ─────────────
 
-  describe('G8g — write-response attributes/excludedAttributes projection', () => {
+  describe('G8g - write-response attributes/excludedAttributes projection', () => {
     const fullUser = {
       schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
       id: 'scim-g8g',
@@ -719,7 +719,7 @@ describe('EndpointScimUsersController', () => {
       expect(result.id).toBe('scim-g8g'); // always-returned
     });
 
-    it('POST with both attributes AND excludedAttributes — attributes takes precedence', async () => {
+    it('POST with both attributes AND excludedAttributes - attributes takes precedence', async () => {
       mockUsersService.createUserForEndpoint.mockResolvedValue({ ...fullUser });
 
       const result = await controller.createUser(
@@ -730,7 +730,7 @@ describe('EndpointScimUsersController', () => {
         'displayName'                 // also try to exclude displayName
       );
 
-      // Per RFC 7644: attributes takes precedence — displayName IS in the include list
+      // Per RFC 7644: attributes takes precedence - displayName IS in the include list
       expect(result.userName).toBe('g8g-test@example.com');
       expect(result.displayName).toBe('G8g Test User'); // included via attributes
       expect(result.id).toBe('scim-g8g'); // always-returned
@@ -771,7 +771,7 @@ describe('EndpointScimUsersController', () => {
         { schemas: fullUser.schemas, userName: 'g8g-test@example.com', active: true } as CreateUserDto,
         mockRequest,
         undefined,
-        'emails'  // excludedAttributes — no explicit request for secretQuestion
+        'emails'  // excludedAttributes - no explicit request for secretQuestion
       );
 
       // returned:'request' is stripped because it's not in an attributes= list

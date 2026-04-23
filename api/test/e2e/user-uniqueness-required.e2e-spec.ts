@@ -11,7 +11,7 @@ import {
 import { validUser, patchOp, resetFixtureCounter } from './helpers/fixtures';
 
 /**
- * RFC 7643 §2.2 — uniqueness:server (409) and required:true (400) E2E tests.
+ * RFC 7643 §2.2 - uniqueness:server (409) and required:true (400) E2E tests.
  *
  * These tests cover gaps identified in the attribute-characteristics audit:
  * - User PUT 409 when userName conflicts with another user
@@ -36,7 +36,7 @@ describe('User Uniqueness & Required Field Enforcement (E2E)', () => {
 
   // ───────────── uniqueness:server on User PUT ─────────────
 
-  describe('uniqueness:server — User PUT', () => {
+  describe('uniqueness:server - User PUT', () => {
     let endpointId: string;
     let basePath: string;
     let user1Id: string;
@@ -77,7 +77,7 @@ describe('User Uniqueness & Required Field Enforcement (E2E)', () => {
     it('PUT should allow duplicate externalId (uniqueness:none per RFC 7643)', async () => {
       const body = validUser({
         userName: 'uniq-put-user2@test.com',
-        externalId: 'ext-put-1', // same as user1 — allowed
+        externalId: 'ext-put-1', // same as user1 - allowed
       });
 
       const res = await scimPut(app, `${basePath}/Users/${user2Id}`, token, body).expect(200);
@@ -111,7 +111,7 @@ describe('User Uniqueness & Required Field Enforcement (E2E)', () => {
 
   // ───────────── uniqueness:server on User PATCH ─────────────
 
-  describe('uniqueness:server — User PATCH', () => {
+  describe('uniqueness:server - User PATCH', () => {
     let endpointId: string;
     let basePath: string;
     let user1Id: string;
@@ -178,9 +178,9 @@ describe('User Uniqueness & Required Field Enforcement (E2E)', () => {
     });
   });
 
-  // ───────────── uniqueness:none — positive tests (v0.33.0) ─────────────
+  // ───────────── uniqueness:none - positive tests (v0.33.0) ─────────────
 
-  describe('uniqueness:none — duplicates allowed (v0.33.0)', () => {
+  describe('uniqueness:none - duplicates allowed (v0.33.0)', () => {
     let endpointId: string;
     let basePath: string;
 
@@ -214,9 +214,9 @@ describe('User Uniqueness & Required Field Enforcement (E2E)', () => {
     });
   });
 
-  // ───────────── Group externalId — duplicates allowed (v0.33.0) ─────────────
+  // ───────────── Group externalId - duplicates allowed (v0.33.0) ─────────────
 
-  describe('Group externalId — uniqueness:none (v0.33.0)', () => {
+  describe('Group externalId - uniqueness:none (v0.33.0)', () => {
     let endpointId: string;
     let basePath: string;
 
@@ -249,7 +249,7 @@ describe('User Uniqueness & Required Field Enforcement (E2E)', () => {
 
   // ───────────── required:true on PUT ─────────────
 
-  describe('required:true — PUT enforcement', () => {
+  describe('required:true - PUT enforcement', () => {
     let endpointId: string;
     let basePath: string;
     let userId: string;

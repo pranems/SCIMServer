@@ -7,7 +7,7 @@
 
 ## Table of Contents
 
-0. [Quick Start — Fetching Logs & Audit Data](#0-quick-start--fetching-logs--audit-data)
+0. [Quick Start - Fetching Logs & Audit Data](#0-quick-start--fetching-logs--audit-data)
    - [0.1 Authentication](#01-authentication)
    - [0.2 View Recent Logs (Ring Buffer)](#02-view-recent-logs-ring-buffer)
    - [0.3 View Audit Trail](#03-view-audit-trail)
@@ -37,7 +37,7 @@
 
 ---
 
-## 0. Quick Start — Fetching Logs & Audit Data
+## 0. Quick Start - Fetching Logs & Audit Data
 
 > **Audience:** Colleague who has never used SCIMServer. This section gets you from zero to reading logs in under 2 minutes.
 
@@ -159,7 +159,7 @@ curl -s "https://scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io/s
 
 ### 0.3 View Audit Trail
 
-The audit trail filters the ring buffer to show only CONFIG, ENDPOINT, and AUTH category events — config changes, endpoint CRUD, credential management, auth successes/failures.
+The audit trail filters the ring buffer to show only CONFIG, ENDPOINT, and AUTH category events - config changes, endpoint CRUD, credential management, auth successes/failures.
 
 | Property | Value |
 |----------|-------|
@@ -228,7 +228,7 @@ Invoke-RestMethod "$base/scim/admin/log-config/audit?limit=100" -Headers $h | Co
 
 Each SCIM endpoint has isolated log access. Per-endpoint credential holders can only see their own endpoint's logs.
 
-**Step 1 — List endpoints to get IDs:**
+**Step 1 - List endpoints to get IDs:**
 
 | Property | Value |
 |----------|-------|
@@ -251,7 +251,7 @@ Invoke-RestMethod "$base/scim/admin/endpoints" -Headers $h | ConvertTo-Json -Dep
 }
 ```
 
-**Step 2 — Get logs for that endpoint:**
+**Step 2 - Get logs for that endpoint:**
 
 | Property | Value |
 |----------|-------|
@@ -311,7 +311,7 @@ Beyond the ring buffer, every HTTP request is persisted to the database with ful
 | **Headers** | `Authorization: Bearer <token>` |
 | **Query params** | `page`, `pageSize`, `method`, `status`, `search`, `since`, `until`, `minDurationMs`, `includeAdmin`, `hideKeepalive` |
 
-**Request — list recent requests:**
+**Request - list recent requests:**
 
 ```http
 GET /scim/admin/logs?pageSize=5&status=409 HTTP/1.1
@@ -343,7 +343,7 @@ Authorization: Bearer changeme-scim
 }
 ```
 
-**Request — full detail for one entry (includes headers + bodies):**
+**Request - full detail for one entry (includes headers + bodies):**
 
 | Property | Value |
 |----------|-------|
@@ -424,7 +424,7 @@ Invoke-RestMethod "$base/scim/admin/logs/$logId" -Headers $h | ConvertTo-Json -D
 
 Every SCIM error response includes a `requestId` in the diagnostics extension. Use it to retrieve all correlated log entries for that exact request.
 
-**Step 1 — Find the requestId in the error response:**
+**Step 1 - Find the requestId in the error response:**
 
 When any SCIM request fails, the response body includes:
 
@@ -441,14 +441,14 @@ When any SCIM request fails, the response body includes:
 }
 ```
 
-**Step 2 — Query logs by requestId:**
+**Step 2 - Query logs by requestId:**
 
 ```http
 GET /scim/admin/log-config/recent?requestId=f47ac10b-58cc-4372-a567-0e02b2c3d479 HTTP/1.1
 Authorization: Bearer changeme-scim
 ```
 
-**Response — the full correlated trace for that request:**
+**Response - the full correlated trace for that request:**
 
 ```json
 {
@@ -540,7 +540,7 @@ GET /scim/admin/log-config/download?format=ndjson&level=WARN HTTP/1.1
 Authorization: Bearer changeme-scim
 ```
 
-**Response:** File download — `scimserver-logs-2026-04-13T10-30-45.ndjson`
+**Response:** File download - `scimserver-logs-2026-04-13T10-30-45.ndjson`
 
 ```
 {"timestamp":"2026-04-13T10:30:46.456Z","level":"WARN","category":"http","message":"Slow request: 3456ms","durationMs":3456,...}
@@ -570,7 +570,7 @@ az containerapp logs show -n scimserver2 -g scimserver-rg --tail 50
 
 ### 0.8 SSE Live Stream (Real-Time Tail)
 
-Stream log entries as they happen via Server-Sent Events. Use `curl` (not `Invoke-RestMethod` — SSE requires a streaming client).
+Stream log entries as they happen via Server-Sent Events. Use `curl` (not `Invoke-RestMethod` - SSE requires a streaming client).
 
 | Property | Value |
 |----------|-------|
@@ -619,7 +619,7 @@ Increase verbosity for debugging without restarting the server. Levels: `TRACE` 
 | **Method** | `PUT` |
 | **URL** | `/scim/admin/log-config/level/{level}` |
 
-**Request — set to TRACE (maximum detail, shows full request/response bodies):**
+**Request - set to TRACE (maximum detail, shows full request/response bodies):**
 
 ```http
 PUT /scim/admin/log-config/level/TRACE HTTP/1.1
@@ -709,7 +709,7 @@ SCIMServer includes a built-in React SPA served at `/admin` that provides a brow
 
 **Authentication:** The SPA requires a bearer token on first use. Enter the shared secret for your deployment (same as the API token). The token is stored in `localStorage` (`scimserver.authToken`).
 
-**No separate build required** — the SPA is pre-built and served as static files from `api/public/`. It uses client-side routing at `/admin`.
+**No separate build required** - the SPA is pre-built and served as static files from `api/public/`. It uses client-side routing at `/admin`.
 
 ---
 
@@ -780,7 +780,7 @@ SCIMServer is designed for environments where operators have **no SSH/shell acce
 │     → GET /scim/admin/log-config/recent?requestId  │
 │                                                   │
 │  3. Gets full request trace with correlation       │
-│     → auth, service, DB, response — all linked     │
+│     → auth, service, DB, response - all linked     │
 │                                                   │
 │  4. If more detail needed:                         │
 │     → PUT /scim/admin/log-config with TRACE level  │
@@ -867,10 +867,10 @@ Every SCIM error response includes a diagnostics extension with everything neede
 
 ### RCA Workflow
 
-1. **Read the error response** — `detail`, `scimType`, and diagnostics tell you what happened
-2. **Click/query `logsUrl`** — see all correlated logs for this exact request
-3. **Check `conflictingResourceId`** — look up the existing resource that caused the conflict
-4. **If more detail needed** — set endpoint to TRACE, reproduce, check ring buffer
+1. **Read the error response** - `detail`, `scimType`, and diagnostics tell you what happened
+2. **Click/query `logsUrl`** - see all correlated logs for this exact request
+3. **Check `conflictingResourceId`** - look up the existing resource that caused the conflict
+4. **If more detail needed** - set endpoint to TRACE, reproduce, check ring buffer
 
 ---
 
@@ -947,7 +947,7 @@ When a `requestId` search returns nothing (entry evicted from ring buffer), the 
 
 ## 5. SSE Live Tailing
 
-Real-time log streaming via Server-Sent Events — no polling required.
+Real-time log streaming via Server-Sent Events - no polling required.
 
 ### Usage
 
@@ -1011,7 +1011,7 @@ source.onerror = () => console.log('SSE connection lost, retrying...');
 Download ring buffer contents as a file for offline analysis:
 
 ```bash
-# NDJSON format (default — one JSON per line, ideal for grep/jq)
+# NDJSON format (default - one JSON per line, ideal for grep/jq)
 curl -O https://host/scim/admin/log-config/download \
   -H "Authorization: Bearer $TOKEN"
 
@@ -1124,7 +1124,7 @@ Returns complete request/response including:
 
 ## 9. Runtime Log Level Tuning
 
-Change log verbosity at runtime without server restart — essential for production debugging:
+Change log verbosity at runtime without server restart - essential for production debugging:
 
 ### Increase Verbosity for Debugging
 
@@ -1289,7 +1289,7 @@ Every scenario below includes the **exact error response** the server returns, t
 
 ---
 
-### TS-01: 401 — "Missing bearer token"
+### TS-01: 401 - "Missing bearer token"
 
 **Symptom:** All requests return 401.
 
@@ -1323,7 +1323,7 @@ curl -H "Authorization: Bearer $TOKEN" https://host/scim/endpoints/ep-abc123/Use
 
 ---
 
-### TS-02: 401 — "Invalid bearer token"
+### TS-02: 401 - "Invalid bearer token"
 
 **Symptom:** Token is sent but rejected.
 
@@ -1347,7 +1347,7 @@ curl -H "Authorization: Bearer $TOKEN" https://host/scim/endpoints/ep-abc123/Use
 
 ---
 
-### TS-03: 403 — "Endpoint is inactive"
+### TS-03: 403 - "Endpoint is inactive"
 
 **Symptom:** SCIM operations return 403 on a specific endpoint.
 
@@ -1372,7 +1372,7 @@ curl -X PATCH https://host/scim/admin/endpoints/ep-abc123 \
 
 ---
 
-### TS-04: 404 — "Resource not found" (noTarget)
+### TS-04: 404 - "Resource not found" (noTarget)
 
 **Symptom:** GET/PATCH/PUT/DELETE by ID returns 404.
 
@@ -1407,7 +1407,7 @@ Authorization: Bearer token123
 
 ---
 
-### TS-05: 409 — "userName already exists" (uniqueness)
+### TS-05: 409 - "userName already exists" (uniqueness)
 
 **Symptom:** POST or PUT User returns 409.
 
@@ -1454,7 +1454,7 @@ Content-Type: application/scim+json
 
 ---
 
-### TS-06: 409 — "displayName already exists" (Group uniqueness)
+### TS-06: 409 - "displayName already exists" (Group uniqueness)
 
 **Response:**
 ```json
@@ -1477,7 +1477,7 @@ Content-Type: application/scim+json
 
 ---
 
-### TS-07: 400 — "Missing required schema" (invalidSyntax)
+### TS-07: 400 - "Missing required schema" (invalidSyntax)
 
 **Request:**
 ```http
@@ -1507,7 +1507,7 @@ Content-Type: application/scim+json
 
 ---
 
-### TS-08: 400 — PATCH invalidPath / mutability
+### TS-08: 400 - PATCH invalidPath / mutability
 
 **Request:**
 ```http
@@ -1543,7 +1543,7 @@ Content-Type: application/scim+json
 
 ---
 
-### TS-09: 400 — "Unsupported filter expression" (invalidFilter)
+### TS-09: 400 - "Unsupported filter expression" (invalidFilter)
 
 **Request:**
 ```http
@@ -1570,7 +1570,7 @@ GET /scim/endpoints/ep-abc123/Users?filter=foo%20eq%20%22bar%22 HTTP/1.1
 
 ---
 
-### TS-10: 412 — "ETag mismatch" (versionMismatch)
+### TS-10: 412 - "ETag mismatch" (versionMismatch)
 
 **Request:**
 ```http
@@ -1602,7 +1602,7 @@ Content-Type: application/scim+json
 
 ---
 
-### TS-11: 428 — "If-Match header is required"
+### TS-11: 428 - "If-Match header is required"
 
 **Request:**
 ```http
@@ -1632,7 +1632,7 @@ Content-Type: application/scim+json
 
 ---
 
-### TS-12: 415 — "Unsupported Media Type"
+### TS-12: 415 - "Unsupported Media Type"
 
 **Request:**
 ```http
@@ -1659,7 +1659,7 @@ Content-Type: text/xml
 
 ---
 
-### TS-13: 400 — "Hard delete is not enabled"
+### TS-13: 400 - "Hard delete is not enabled"
 
 **Request:**
 ```http
@@ -1688,7 +1688,7 @@ DELETE /scim/endpoints/ep-abc123/Users/usr-123 HTTP/1.1
 
 ---
 
-### TS-14: 403 — "Bulk operations are not enabled"
+### TS-14: 403 - "Bulk operations are not enabled"
 
 **Response:**
 ```json
@@ -1703,7 +1703,7 @@ DELETE /scim/endpoints/ep-abc123/Users/usr-123 HTTP/1.1
 
 ---
 
-### TS-15: 400 — PATCH "Adding multiple members not allowed"
+### TS-15: 400 - PATCH "Adding multiple members not allowed"
 
 **Request:**
 ```http
@@ -1738,7 +1738,7 @@ Content-Type: application/scim+json
 
 ---
 
-### TS-16: 500 — "Internal server error" (unhandled)
+### TS-16: 500 - "Internal server error" (unhandled)
 
 **Response:**
 ```json
@@ -1762,7 +1762,7 @@ Content-Type: application/scim+json
 
 ---
 
-### TS-17: 503 — Database connection failure
+### TS-17: 503 - Database connection failure
 
 **Response:**
 ```json
@@ -1788,7 +1788,7 @@ Content-Type: application/scim+json
 
 ---
 
-### TS-18: 404 — "/Me" endpoint — "No User resource found"
+### TS-18: 404 - "/Me" endpoint - "No User resource found"
 
 **Request:**
 ```http
@@ -1815,7 +1815,7 @@ Authorization: Bearer <jwt-token>
 
 ---
 
-### TS-19: 413 — Bulk payload too large
+### TS-19: 413 - Bulk payload too large
 
 **Response:**
 ```json
@@ -1834,7 +1834,7 @@ Authorization: Bearer <jwt-token>
 
 ---
 
-### TS-20: 400 — Strict schema validation failure
+### TS-20: 400 - Strict schema validation failure
 
 **Request:**
 ```http

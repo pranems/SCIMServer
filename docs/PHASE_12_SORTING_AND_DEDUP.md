@@ -1,10 +1,10 @@
-# Phase 12 — Sorting + Service Deduplication
+# Phase 12 - Sorting + Service Deduplication
 
 > **Version**: v0.20.0 | **Gaps**: G12 (Sorting), G17 (Service Dedup) | **Status**: ✅ Complete
 
 ---
 
-## Sorting (G12 — RFC 7644 §3.4.2.3)
+## Sorting (G12 - RFC 7644 §3.4.2.3)
 
 ### Overview
 
@@ -48,10 +48,10 @@ The `EndpointScimUsersService` (~904 lines) and `EndpointScimGroupsService` (~10
 Extracted shared logic into `scim-service-helpers.ts`:
 
 **Pure Functions** (stateless, no class dependency):
-- `parseJson<T>()` — Safe JSON parsing with SCIM error
-- `ensureSchema()` — Validates `schemas` array presence
-- `enforceIfMatch()` — ETag If-Match header enforcement
-- `sanitizeBooleanStrings()` — Boolean string → boolean coercion
+- `parseJson<T>()` - Safe JSON parsing with SCIM error
+- `ensureSchema()` - Validates `schemas` array presence
+- `enforceIfMatch()` - ETag If-Match header enforcement
+- `sanitizeBooleanStrings()` - Boolean string → boolean coercion
 
 **`ScimSchemaHelpers` Class** (parameterized by `schemaRegistry` + `coreSchemaUrn`):
 - `enforceStrictSchemaValidation()`
@@ -95,5 +95,5 @@ Extracted shared logic into `scim-service-helpers.ts`:
 
 ## RFC References
 
-- **RFC 7644 §3.4.2.3** — Sorting
-- **RFC 7643 §5** — ServiceProviderConfig (sort capability)
+- **RFC 7644 §3.4.2.3** - Sorting
+- **RFC 7643 §5** - ServiceProviderConfig (sort capability)

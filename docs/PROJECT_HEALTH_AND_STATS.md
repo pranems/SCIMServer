@@ -44,9 +44,9 @@
 ```
 NestJS Application (11 modules)
 ├── AppModule (root)
-├── AuthModule — SharedSecret guard, 3-tier auth chain
-├── OAuthModule — client_credentials grant, JWT issuance
-├── EndpointModule — CRUD, profile management
+├── AuthModule - SharedSecret guard, 3-tier auth chain
+├── OAuthModule - client_credentials grant, JWT issuance
+├── EndpointModule - CRUD, profile management
 ├── ScimModule (★ main)
 │   ├── Controllers (12): Users, Groups, Bulk, Discovery, Me, Admin, Credentials, Generic, Schemas, ResourceTypes, SPC
 │   ├── Services (6): Users, Groups, Generic, Bulk, Metadata, Discovery
@@ -54,12 +54,12 @@ NestJS Application (11 modules)
 │   ├── Filters (3): filter parser, evaluator, exception filter
 │   ├── Interceptors (2): ETag, Content-Type
 │   └── DTOs (12): create/update/patch/search for Users, Groups, Bulk, ResourceTypes
-├── LoggingModule — structured logging, per-endpoint levels
-├── PrismaModule — Prisma 7 service
-├── DatabaseModule — DB health, management
-├── WebModule — React observability UI
-├── ActivityParserModule — log parsing
-└── HealthModule — /health endpoint
+├── LoggingModule - structured logging, per-endpoint levels
+├── PrismaModule - Prisma 7 service
+├── DatabaseModule - DB health, management
+├── WebModule - React observability UI
+├── ActivityParserModule - log parsing
+└── HealthModule - /health endpoint
 ```
 
 ## Persistence Layer
@@ -98,8 +98,8 @@ NestJS Application (11 modules)
 | Jest | 30.2 | Test runner |
 | Supertest | 7.2 | HTTP testing |
 | Docker | node:24-alpine | Container |
-| React + Vite | — | Observability UI |
-| Azure Container Apps | — | Cloud deployment |
+| React + Vite | - | Observability UI |
+| Azure Container Apps | - | Cloud deployment |
 
 ## SCIM Compliance
 

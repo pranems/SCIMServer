@@ -127,7 +127,7 @@ describe('EndpointContextStorage', () => {
     });
 
     it('should silently ignore addWarnings when no store exists', () => {
-      // No setContext called — addWarnings should not throw
+      // No setContext called - addWarnings should not throw
       storage.addWarnings(['id']);
       expect(storage.getWarnings()).toEqual([]);
     });
@@ -175,7 +175,7 @@ describe('EndpointContextStorage', () => {
       mw({} as any, {} as any, () => {
         // Warnings added before setContext
         storage.addWarnings(['early-warning']);
-        // setContext mutates existing store — warnings should persist
+        // setContext mutates existing store - warnings should persist
         storage.setContext({ endpointId: 'ep-1', baseUrl: 'http://x' });
         storage.addWarnings(['late-warning']);
         expect(storage.getWarnings()).toEqual(['early-warning', 'late-warning']);

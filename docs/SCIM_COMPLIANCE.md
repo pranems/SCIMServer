@@ -12,20 +12,20 @@
 |----------|-------|-------|
 | Core Operations (CRUD) | **100%** | All operations for Users and Groups |
 | Media Type (RFC 7644 §3.1) | **100%** | `application/scim+json` on all responses including errors |
-| Discovery Endpoints (RFC 7644 §4) | **100%** | ServiceProviderConfig, Schemas, ResourceTypes — all RFC requirements met including auth bypass (D1), individual lookups (D2/D3), `schemas` arrays (D4/D5), `primary` flag (D6). See [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](DISCOVERY_ENDPOINTS_RFC_AUDIT.md) |
+| Discovery Endpoints (RFC 7644 §4) | **100%** | ServiceProviderConfig, Schemas, ResourceTypes - all RFC requirements met including auth bypass (D1), individual lookups (D2/D3), `schemas` arrays (D4/D5), `primary` flag (D6). See [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](DISCOVERY_ENDPOINTS_RFC_AUDIT.md) |
 | Error Handling (RFC 7644 §3.12) | **100%** | SCIM error schema, string status, scimType, detail |
 | PATCH Operations (RFC 7644 §3.5.2) | **98%** | add/replace/remove, valuePath, extension URN, no-path merge, boolean coercion |
 | Pagination (RFC 7644 §3.4.2) | **100%** | startIndex, count, totalResults, itemsPerPage |
 | Filtering (RFC 7644 §3.4.2.2) | **100%** | All 10 operators: `eq`, `ne`, `co`, `sw`, `ew`, `gt`, `lt`, `ge`, `le`, `pr` + `and`/`or`/`not` + grouping |
 | POST /.search (RFC 7644 §3.4.3) | **100%** | SearchRequest body with filter, pagination, attributes, excludedAttributes |
-| Attribute Projection (RFC 7644 §3.4.2.5) | **100%** | `attributes` and `excludedAttributes` params on GET, /.search, POST, PUT, and PATCH (write-response projection added in v0.19.2 — G8g) |
+| Attribute Projection (RFC 7644 §3.4.2.5) | **100%** | `attributes` and `excludedAttributes` params on GET, /.search, POST, PUT, and PATCH (write-response projection added in v0.19.2 - G8g) |
 | ETag / Conditional Requests (RFC 7644 §3.14) | **100%** | Version-based ETags `W/"v{N}"`, If-None-Match → 304, If-Match → 412, RequireIfMatch → 428 |
 | Sorting (RFC 7644 §3.4.2.3) | **100%** | `sortBy` / `sortOrder` on GET and POST `/.search` for Users, Groups, Generic. SPC: `sort.supported: true` (v0.20.0) |
 | Bulk Operations (RFC 7644 §3.7) | **100%** | `POST /Bulk` with sequential processing, `bulkId` cross-referencing, `failOnErrors` threshold, per-endpoint `BulkOperationsEnabled` flag (v0.19.0) |
 | `/Me` Endpoint (RFC 7644 §3.11) | **100%** | JWT `sub` → `userName` identity resolution, full CRUD delegation, attribute projection (v0.20.0) |
 | Per-Endpoint Credentials (RFC 7643 §7) | **100%** | bcrypt-hashed per-endpoint tokens, admin CRUD API, 3-tier fallback chain, `PerEndpointCredentialsEnabled` flag (v0.21.0) |
 
-**Overall: 100% RFC 7643/7644 compliant** — All 27 migration gaps (G1–G20) fully resolved as of v0.24.0. P2 attribute characteristic enforcement complete. All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
+**Overall: 100% RFC 7643/7644 compliant** - All 27 migration gaps (G1–G20) fully resolved as of v0.24.0. P2 attribute characteristic enforcement complete. All 25 Microsoft SCIM Validator tests pass + 7 preview tests pass. 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
 
 ### New in v0.24.0
 
@@ -48,22 +48,22 @@
 | 2 New Config Flags | `IncludeWarningAboutIgnoredReadOnlyAttribute` (14th boolean flag, default: false) + `IgnoreReadOnlyAttributesInPatch` (15th boolean flag, default: false). |
 | AsyncLocalStorage Middleware | `EndpointContextStorage.createMiddleware()` wraps requests in `storage.run()` for reliable warning accumulation across NestJS interceptor pipeline. Critical fix: `enterWith()` context loss. |
 | Generic Service readOnly Support | Dynamic schema resolution via `getSchemaDefinitions()` for custom resource types. Full PATCH behavior matrix coverage. |
-| BF-1: Groups `id` Fix | Server-generates `randomUUID()` always — client `id` no longer accepted (RFC 7643 §3.1). |
+| BF-1: Groups `id` Fix | Server-generates `randomUUID()` always - client `id` no longer accepted (RFC 7643 §3.1). |
 | Test Coverage | 13 unit (strip helpers) + 10 unit (EndpointContextStorage) + 17 E2E (readonly-stripping) + 10 live (section 9t). |
 
 ### New in v0.21.0
 
 | Feature | Description |
 |---------|-------------|
-| G11 — Per-Endpoint Credentials | `EndpointCredential` Prisma model with bcrypt-hashed tokens. `PerEndpointCredentialsEnabled` flag (12th boolean flag). Admin API at `/admin/endpoints/{id}/credentials` (POST/GET/DELETE). 3-tier auth fallback: per-endpoint bcrypt → OAuth JWT → global secret. Lazy bcrypt loading. 33+16+22 new tests. Compliance: ~99%→**100%**. |
+| G11 - Per-Endpoint Credentials | `EndpointCredential` Prisma model with bcrypt-hashed tokens. `PerEndpointCredentialsEnabled` flag (12th boolean flag). Admin API at `/admin/endpoints/{id}/credentials` (POST/GET/DELETE). 3-tier auth fallback: per-endpoint bcrypt → OAuth JWT → global secret. Lazy bcrypt loading. 33+16+22 new tests. Compliance: ~99%→**100%**. |
 
 ### New in v0.20.0
 
 | Feature | Description |
 |---------|-------------|
-| Phase 10 — `/Me` Endpoint (RFC 7644 §3.11) | `ScimMeController` — resolves JWT `sub` → `userName`, delegates full CRUD. Attribute projection on all /Me operations. 11+10+15 new tests. |
-| Phase 12 — Sorting (RFC 7644 §3.4.2.3) | `scim-sort.util.ts`. `sortBy`/`sortOrder` on GET and POST `/.search`. `sort.supported: true` in SPC. 20+14+11 new tests. |
-| G17 — Service Deduplication | `scim-service-helpers.ts`: 13+ duplicate methods extracted from Users/Groups services. Users service −29% LoC, Groups service −28% LoC. 43 new unit tests. |
+| Phase 10 - `/Me` Endpoint (RFC 7644 §3.11) | `ScimMeController` - resolves JWT `sub` → `userName`, delegates full CRUD. Attribute projection on all /Me operations. 11+10+15 new tests. |
+| Phase 12 - Sorting (RFC 7644 §3.4.2.3) | `scim-sort.util.ts`. `sortBy`/`sortOrder` on GET and POST `/.search`. `sort.supported: true` in SPC. 20+14+11 new tests. |
+| G17 - Service Deduplication | `scim-service-helpers.ts`: 13+ duplicate methods extracted from Users/Groups services. Users service −29% LoC, Groups service −28% LoC. 43 new unit tests. |
 
 ### New in v0.19.3
 
@@ -76,37 +76,37 @@
 
 | Feature | Description |
 |---------|-------------|
-| G8g — Write-Response Attribute Projection | `attributes`/`excludedAttributes` query params honored on POST/PUT/PATCH write responses (RFC 7644 §3.9). Replaced 6 inline stripping loops with `applyAttributeProjection()` calls. 23+14+33 new tests. |
+| G8g - Write-Response Attribute Projection | `attributes`/`excludedAttributes` query params honored on POST/PUT/PATCH write responses (RFC 7644 §3.9). Replaced 6 inline stripping loops with `applyAttributeProjection()` calls. 23+14+33 new tests. |
 
 ### New in v0.19.1
 
 | Feature | Description |
 |---------|-------------|
-| G8f — Group Uniqueness on PUT/PATCH | `assertUniqueDisplayName()` called on PUT/PATCH paths with `excludeScimId` self-exclusion. `assertUniqueExternalId()` removed in v0.33.0 (externalId has uniqueness:none per RFC 7643). |
+| G8f - Group Uniqueness on PUT/PATCH | `assertUniqueDisplayName()` called on PUT/PATCH paths with `excludeScimId` self-exclusion. `assertUniqueExternalId()` removed in v0.33.0 (externalId has uniqueness:none per RFC 7643). |
 
 ### New in v0.19.0
 
 | Feature | Description |
 |---------|-------------|
-| Phase 9 — Bulk Operations (RFC 7644 §3.7) | `POST /Bulk` with sequential processing, `bulkId` cross-referencing, `failOnErrors` threshold. `BulkOperationsEnabled` per-endpoint flag (default: false). SPC: `bulk.supported=true, maxOperations=1000, maxPayloadSize=1048576`. 43+24+18 new tests. |
+| Phase 9 - Bulk Operations (RFC 7644 §3.7) | `POST /Bulk` with sequential processing, `bulkId` cross-referencing, `failOnErrors` threshold. `BulkOperationsEnabled` per-endpoint flag (default: false). SPC: `bulk.supported=true, maxOperations=1000, maxPayloadSize=1048576`. 43+24+18 new tests. |
 
 ### New in v0.18.0
 
 | Feature | Description |
 |---------|-------------|
-| G8b — Custom Resource Type Registration | Data-driven extensibility beyond User/Group. Admin API for resource type CRUD. Generic SCIM CRUD controller with wildcard `:resourceType` routing. `GenericPatchEngine` for JSONB-based PATCH. `CustomResourceTypesEnabled` per-endpoint flag (default: false). 121+29+20 new tests. |
+| G8b - Custom Resource Type Registration | Data-driven extensibility beyond User/Group. Admin API for resource type CRUD. Generic SCIM CRUD controller with wildcard `:resourceType` routing. `GenericPatchEngine` for JSONB-based PATCH. `CustomResourceTypesEnabled` per-endpoint flag (default: false). 121+29+20 new tests. |
 
 ### New in v0.17.4
 
 | Feature | Description |
 |---------|-------------|
-| G8e — `returned` Characteristic Filtering | RFC 7643 §2.4 compliance. Service layer strips `returned:'never'` (e.g. `password`) from ALL responses. Controller layer strips `returned:'request'` from read ops unless explicitly requested. `password` attribute added to User schema constants. Deep-frozen schema constants prevent runtime mutation. 40+8+10 new tests. |
+| G8e - `returned` Characteristic Filtering | RFC 7643 §2.4 compliance. Service layer strips `returned:'never'` (e.g. `password`) from ALL responses. Controller layer strips `returned:'request'` from read ops unless explicitly requested. `password` attribute added to User schema constants. Deep-frozen schema constants prevent runtime mutation. 40+8+10 new tests. |
 
 ### New in v0.17.3
 
 | Feature | Description |
 |---------|-------------|
-| G8c — PATCH readOnly Pre-Validation | `SchemaValidator.validatePatchOperationValue()` enforces `mutability:'readOnly'` on PATCH ops. Rejects add/replace/remove on readOnly attrs (e.g. `groups`) with 400. `groups` attribute added to User schema constants. Gated behind `StrictSchemaValidation`. 25+7 new tests. |
+| G8c - PATCH readOnly Pre-Validation | `SchemaValidator.validatePatchOperationValue()` enforces `mutability:'readOnly'` on PATCH ops. Rejects add/replace/remove on readOnly attrs (e.g. `groups`) with 400. `groups` attribute added to User schema constants. Gated behind `StrictSchemaValidation`. 25+7 new tests. |
 
 ### New in v0.17.2
 
@@ -117,9 +117,9 @@
 | In-memory EndpointService/LoggingService | Both services support `PERSISTENCE_BACKEND=inmemory` for fully Prisma-free operation |
 | Resource-type-aware projection | `displayName` always-returned only for Groups (RFC 7643); excludable for Users |
 | `getConfigBooleanWithDefault()` | Config helper for flags defaulting to `true` |
-| externalId caseExact compliance | `externalId` column changed from `CITEXT` to `TEXT` — case-sensitive per RFC 7643 §3.1 (`caseExact: true`). Filter engine uses `'text'` type for case-sensitive `co`/`sw`/`ew`. Migration: `20260225181836_externalid_citext_to_text`. See `docs/EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md`. |
-| `SchemaValidator.collectBooleanAttributeNames()` | New static method — extracts boolean-typed attribute names from schema definitions for schema-aware coercion |
-| `SchemaValidator.validateFilterAttributePaths()` | V32 — validates filter attribute paths against registered schema definitions |
+| externalId caseExact compliance | `externalId` column changed from `CITEXT` to `TEXT` - case-sensitive per RFC 7643 §3.1 (`caseExact: true`). Filter engine uses `'text'` type for case-sensitive `co`/`sw`/`ew`. Migration: `20260225181836_externalid_citext_to_text`. See `docs/EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md`. |
+| `SchemaValidator.collectBooleanAttributeNames()` | New static method - extracts boolean-typed attribute names from schema definitions for schema-aware coercion |
+| `SchemaValidator.validateFilterAttributePaths()` | V32 - validates filter attribute paths against registered schema definitions |
 | `scim-filter-parser.ts` | New module for extracting attribute paths from parsed SCIM filter AST |
 | Startup StrictSchemaValidation warning | `main.ts` logs warning when StrictSchemaValidation is OFF by default |
 
@@ -137,7 +137,7 @@
 
 | Feature | Description |
 |---------|-------------|
-| `UserSoftDeleteEnabled` config flag | Controls whether PATCH `active=false` is allowed (deprecated name — no longer related to soft-delete; DELETE always hard-deletes) |
+| `UserSoftDeleteEnabled` config flag | Controls whether PATCH `active=false` is allowed (deprecated name - no longer related to soft-delete; DELETE always hard-deletes) |
 | `StrictSchemaValidation` config flag | Reject extension URNs not declared in `schemas[]` or not registered |
 | Custom Extension URNs (msfttest) | 4 msfttest extension schemas registered globally (2 User + 2 Group) |
 | Dynamic `schemas[]` on Groups | Group responses include extension URNs from `payload` |
@@ -241,10 +241,10 @@ SCIMServer passes all critical requirements for Microsoft Entra ID enterprise ap
 
 | Feature | Status | Impact |
 |---------|--------|--------|
-| Bulk operations | ✅ Implemented (v0.19.0) | None — Entra doesn't use `/Bulk` |
-| `/Me` endpoint | ✅ Implemented (v0.20.0) | None — Entra provisioning doesn't use `/Me` |
+| Bulk operations | ✅ Implemented (v0.19.0) | None - Entra doesn't use `/Bulk` |
+| `/Me` endpoint | ✅ Implemented (v0.20.0) | None - Entra provisioning doesn't use `/Me` |
 | Complex filter operators (co, sw, ew, etc.) | ✅ Implemented | All 10 operators available (Entra only uses `eq` + `and`) |
-| Sorting | ✅ Implemented (v0.20.0) | None — Entra doesn't request sorting |
+| Sorting | ✅ Implemented (v0.20.0) | None - Entra doesn't request sorting |
 
 ---
 
@@ -252,22 +252,22 @@ SCIMServer passes all critical requirements for Microsoft Entra ID enterprise ap
 
 | Feature | Priority | Notes |
 |---------|----------|-------|
-| ~~D1 — Discovery endpoints require auth~~ | ~~High~~ | ✅ Resolved v0.19.3 — `@Public()` on all 4 discovery controllers |
-| ~~D2 — No `GET /Schemas/{uri}` individual lookup~~ | ~~Medium~~ | ✅ Resolved v0.19.3 — `@Get(':uri')` route added |
-| ~~D3 — No `GET /ResourceTypes/{id}` individual lookup~~ | ~~Medium~~ | ✅ Resolved v0.19.3 — `@Get(':id')` route added |
-| ~~D4 — Schema resources missing `schemas` array~~ | ~~Low~~ | ✅ Resolved v0.19.3 — `schemas: ["...Schema"]` added |
-| ~~D5 — ResourceType resources missing `schemas` array~~ | ~~Low~~ | ✅ Resolved v0.19.3 — `schemas: ["...ResourceType"]` added |
-| ~~D6 — SPC `authenticationSchemes` missing `primary` flag~~ | ~~Very Low~~ | ✅ Resolved v0.19.3 — `primary: true` added |
-| ~~`sortBy` / `sortOrder`~~ | ~~Low~~ | ✅ Resolved v0.20.0 — `sort.supported: true`, sortBy/sortOrder on GET and `/.search` |
-| ~~`/Me` endpoint~~ | ~~Low~~ | ✅ Resolved v0.20.0 — JWT `sub` → userName identity resolution, full CRUD |
-| ~~`caseExact` enforcement in filters~~ | ~~Low~~ | ✅ Resolved v0.24.0 — R-CASE-1: `evaluateFilter()` accepts `caseExactAttrs` set for schema-driven case-sensitive comparisons on `caseExact:true` attributes (`id`, `externalId`, `meta.location`). `externalId` column also TEXT (CITEXT → TEXT in v0.17.2). |
+| ~~D1 - Discovery endpoints require auth~~ | ~~High~~ | ✅ Resolved v0.19.3 - `@Public()` on all 4 discovery controllers |
+| ~~D2 - No `GET /Schemas/{uri}` individual lookup~~ | ~~Medium~~ | ✅ Resolved v0.19.3 - `@Get(':uri')` route added |
+| ~~D3 - No `GET /ResourceTypes/{id}` individual lookup~~ | ~~Medium~~ | ✅ Resolved v0.19.3 - `@Get(':id')` route added |
+| ~~D4 - Schema resources missing `schemas` array~~ | ~~Low~~ | ✅ Resolved v0.19.3 - `schemas: ["...Schema"]` added |
+| ~~D5 - ResourceType resources missing `schemas` array~~ | ~~Low~~ | ✅ Resolved v0.19.3 - `schemas: ["...ResourceType"]` added |
+| ~~D6 - SPC `authenticationSchemes` missing `primary` flag~~ | ~~Very Low~~ | ✅ Resolved v0.19.3 - `primary: true` added |
+| ~~`sortBy` / `sortOrder`~~ | ~~Low~~ | ✅ Resolved v0.20.0 - `sort.supported: true`, sortBy/sortOrder on GET and `/.search` |
+| ~~`/Me` endpoint~~ | ~~Low~~ | ✅ Resolved v0.20.0 - JWT `sub` → userName identity resolution, full CRUD |
+| ~~`caseExact` enforcement in filters~~ | ~~Low~~ | ✅ Resolved v0.24.0 - R-CASE-1: `evaluateFilter()` accepts `caseExactAttrs` set for schema-driven case-sensitive comparisons on `caseExact:true` attributes (`id`, `externalId`, `meta.location`). `externalId` column also TEXT (CITEXT → TEXT in v0.17.2). |
 
 ---
 
 ## References
 
-- [RFC 7643 — SCIM Core Schema](https://tools.ietf.org/html/rfc7643)
-- [RFC 7644 — SCIM Protocol](https://tools.ietf.org/html/rfc7644)
+- [RFC 7643 - SCIM Core Schema](https://tools.ietf.org/html/rfc7643)
+- [RFC 7644 - SCIM Protocol](https://tools.ietf.org/html/rfc7644)
 - [Microsoft Entra SCIM Documentation](https://learn.microsoft.com/en-us/entra/identity/app-provisioning/use-scim-to-provision-users-and-groups)
 
 ---

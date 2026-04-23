@@ -1,4 +1,4 @@
-# Phase 6 — Data-Driven Discovery
+# Phase 6 - Data-Driven Discovery
 
 **Version:** 0.14.0  
 **Date:** 2026-02-23  
@@ -21,7 +21,7 @@ User responses, and removes 7 dead configuration flags.
 |-----|-------------|------------|
 | G6  | Discovery endpoints 100% hardcoded across 4 controllers | Centralized into `ScimDiscoveryService` with rich RFC 7643 constants |
 | G16 | Extension URN hardcoded as local constant in patch utility | Exported `KNOWN_EXTENSION_URNS` from `scim-constants.ts` |
-| G19 | `schemas[]` in User responses always `[core:User]`, ignores enterprise data | Dynamic `schemas[]` — includes enterprise URN when extension data present in payload |
+| G19 | `schemas[]` in User responses always `[core:User]`, ignores enterprise data | Dynamic `schemas[]` - includes enterprise URN when extension data present in payload |
 | G20 | 7 dead config flags in `EndpointConfig` interface | Removed: `EXCLUDE_META`, `EXCLUDE_SCHEMAS`, `CUSTOM_SCHEMA_URN`, `INCLUDE_ENTERPRISE_SCHEMA`, `STRICT_MODE`, `LEGACY_MODE`, `CUSTOM_HEADERS` |
 
 ## Architecture Decision
@@ -82,15 +82,15 @@ This decision balances pragmatism with extensibility:
 | User responses `schemas[]` | Always `[core:User]` | Dynamically includes enterprise URN when enterprise data present |
 | Authentication scheme | `specificationUrl` field | `specUri` field (RFC 7643 §5 compliant) |
 
-All changes are **backward compatible** — they add information, never remove or rename existing response fields consumed by clients.
+All changes are **backward compatible** - they add information, never remove or rename existing response fields consumed by clients.
 
 ## Validation Results
 
 | Gate | Result |
 |------|--------|
 | TypeScript Build | Clean (only pre-existing e2e reporter `.ts` import warning) |
-| Unit Tests | **1171/1171 passed** (47 suites) — up from 1135 (+36 new) |
-| E2E Tests | **196/196 passed** (15 suites) — up from 193 (+3 new) |
+| Unit Tests | **1171/1171 passed** (47 suites) - up from 1135 (+36 new) |
+| E2E Tests | **196/196 passed** (15 suites) - up from 193 (+3 new) |
 
 ## RFC Compliance Improvements
 

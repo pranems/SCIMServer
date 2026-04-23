@@ -32,9 +32,9 @@ describe('ReadOnly Attribute Stripping (RFC 7643 §2.2)', () => {
     await app.close();
   });
 
-  // ────────── POST /Users — readOnly stripping ──────────
+  // ────────── POST /Users - readOnly stripping ──────────
 
-  describe('POST /Users — strip readOnly attributes', () => {
+  describe('POST /Users - strip readOnly attributes', () => {
     let endpointId: string;
     let basePath: string;
 
@@ -65,7 +65,7 @@ describe('ReadOnly Attribute Stripping (RFC 7643 §2.2)', () => {
       const user = validUser({ groups: [{ value: 'fake-group', display: 'Fake' }] } as any);
       const res = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
 
-      // groups should either be undefined/empty — client value should not persist
+      // groups should either be undefined/empty - client value should not persist
       const getRes = await scimGet(app, `${basePath}/Users/${res.body.id}`, token).expect(200);
       expect(getRes.body.groups ?? []).toHaveLength(0);
     });
@@ -83,9 +83,9 @@ describe('ReadOnly Attribute Stripping (RFC 7643 §2.2)', () => {
     });
   });
 
-  // ────────── PUT /Users — readOnly stripping ──────────
+  // ────────── PUT /Users - readOnly stripping ──────────
 
-  describe('PUT /Users — strip readOnly attributes', () => {
+  describe('PUT /Users - strip readOnly attributes', () => {
     let endpointId: string;
     let basePath: string;
 
@@ -115,9 +115,9 @@ describe('ReadOnly Attribute Stripping (RFC 7643 §2.2)', () => {
     });
   });
 
-  // ────────── PATCH /Users — readOnly stripping ──────────
+  // ────────── PATCH /Users - readOnly stripping ──────────
 
-  describe('PATCH /Users — readOnly op stripping', () => {
+  describe('PATCH /Users - readOnly op stripping', () => {
     let endpointId: string;
     let basePath: string;
 
@@ -132,7 +132,7 @@ describe('ReadOnly Attribute Stripping (RFC 7643 §2.2)', () => {
       const created = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
       const scimId = created.body.id;
 
-      // Attempt to PATCH groups (readOnly) — should be silently dropped
+      // Attempt to PATCH groups (readOnly) - should be silently dropped
       const patch = patchOp([
         { op: 'replace', path: 'groups', value: [{ value: 'fake-group' }] },
         { op: 'replace', path: 'displayName', value: 'NewName' },
@@ -186,9 +186,9 @@ describe('ReadOnly Attribute Stripping (RFC 7643 §2.2)', () => {
     });
   });
 
-  // ────────── POST /Groups — readOnly stripping ──────────
+  // ────────── POST /Groups - readOnly stripping ──────────
 
-  describe('POST /Groups — strip readOnly (id, meta)', () => {
+  describe('POST /Groups - strip readOnly (id, meta)', () => {
     let endpointId: string;
     let basePath: string;
 
@@ -317,7 +317,7 @@ describe('ReadOnly Attribute Stripping (RFC 7643 §2.2)', () => {
         { op: 'replace', path: 'groups', value: [{ value: 'g1' }] },
       ]);
 
-      // With strict ON and ignorePatch OFF, readOnly ops are NOT stripped — G8c rejects them
+      // With strict ON and ignorePatch OFF, readOnly ops are NOT stripped - G8c rejects them
       const res = await scimPatch(app, `${basePath}/Users/${created.body.id}`, token, patch).expect(400);
       expect(res.body.status).toBe('400');
     });

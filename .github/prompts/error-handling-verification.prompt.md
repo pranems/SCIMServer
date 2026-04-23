@@ -1,5 +1,5 @@
 ---
-description: "Audit all error handling paths — exception filters, RepositoryError, diagnostics, SCIM compliance, auth errors, bulk isolation"
+description: "Audit all error handling paths - exception filters, RepositoryError, diagnostics, SCIM compliance, auth errors, bulk isolation"
 mode: "agent"
 ---
 
@@ -8,15 +8,15 @@ Go through all error handling code paths in the SCIMServer codebase to verify co
 ## System Context
 
 The error handling system has these components:
-- `createScimError()` factory in `scim-errors.ts` — produces `HttpException` with SCIM body + diagnostics extension (requestId, endpointId, triggeredBy, logsUrl, errorCode)
-- `ScimExceptionFilter` (`@Catch(HttpException)`) — formats SCIM error responses, auto-enriches ALL HttpExceptions with diagnostics from correlation context, tiered logging (5xx→ERROR, 401/403→WARN, 404→DEBUG, 4xx→INFO)
-- `GlobalExceptionFilter` (`@Catch()`) — catch-all for non-HttpException errors, returns SCIM 500 with generic message, no info leakage
-- `RepositoryError` domain boundary — typed codes: NOT_FOUND, CONFLICT, CONNECTION, UNKNOWN
-- `handleRepositoryError()` shared helper in `scim-service-helpers.ts` — catches RepositoryError, logs ERROR, re-throws as createScimError
-- `PatchError` domain exception — caught by services, converted to createScimError with failedOperationIndex/failedPath/failedOp
+- `createScimError()` factory in `scim-errors.ts` - produces `HttpException` with SCIM body + diagnostics extension (requestId, endpointId, triggeredBy, logsUrl, errorCode)
+- `ScimExceptionFilter` (`@Catch(HttpException)`) - formats SCIM error responses, auto-enriches ALL HttpExceptions with diagnostics from correlation context, tiered logging (5xx→ERROR, 401/403→WARN, 404→DEBUG, 4xx→INFO)
+- `GlobalExceptionFilter` (`@Catch()`) - catch-all for non-HttpException errors, returns SCIM 500 with generic message, no info leakage
+- `RepositoryError` domain boundary - typed codes: NOT_FOUND, CONFLICT, CONNECTION, UNKNOWN
+- `handleRepositoryError()` shared helper in `scim-service-helpers.ts` - catches RepositoryError, logs ERROR, re-throws as createScimError
+- `PatchError` domain exception - caught by services, converted to createScimError with failedOperationIndex/failedPath/failedOp
 - Diagnostics extension URN: `urn:scimserver:api:messages:2.0:Diagnostics`
 - Enriched correlation context via `AsyncLocalStorage`: requestId, endpointId, authType, resourceType, resourceId, operation, bulkOperationIndex
-- **82 endpoints across 19 controllers** — all SCIM routes produce SCIM-compliant error bodies
+- **82 endpoints across 19 controllers** - all SCIM routes produce SCIM-compliant error bodies
 
 ## Audit Checklist (Sections A–J)
 
@@ -124,15 +124,15 @@ For EACH throw site that uses createScimError:
 | File | Purpose |
 |------|---------|
 | `api/src/modules/scim/common/scim-errors.ts` | `createScimError()` factory + `ScimErrorDiagnostics` interface |
-| `api/src/modules/scim/filters/scim-exception.filter.ts` | `ScimExceptionFilter` — SCIM error formatting + diagnostics auto-enrichment |
-| `api/src/modules/scim/filters/global-exception.filter.ts` | `GlobalExceptionFilter` — catch-all for non-HttpException |
+| `api/src/modules/scim/filters/scim-exception.filter.ts` | `ScimExceptionFilter` - SCIM error formatting + diagnostics auto-enrichment |
+| `api/src/modules/scim/filters/global-exception.filter.ts` | `GlobalExceptionFilter` - catch-all for non-HttpException |
 | `api/src/modules/scim/common/scim-service-helpers.ts` | `handleRepositoryError()`, `enforceIfMatch()`, `ensureSchema()` |
 | `api/src/domain/errors/repository-error.ts` | `RepositoryError` class with typed codes |
-| `api/src/infrastructure/repositories/prisma/prisma-error.util.ts` | `wrapPrismaError()` — Prisma error code → RepositoryError mapping |
+| `api/src/infrastructure/repositories/prisma/prisma-error.util.ts` | `wrapPrismaError()` - Prisma error code → RepositoryError mapping |
 | `api/src/domain/patch/patch-error.ts` | `PatchError` class |
-| `api/src/modules/scim/services/endpoint-scim-users.service.ts` | Users service — all error paths |
-| `api/src/modules/scim/services/endpoint-scim-groups.service.ts` | Groups service — all error paths |
-| `api/src/modules/scim/services/endpoint-scim-generic.service.ts` | Generic service — all error paths |
+| `api/src/modules/scim/services/endpoint-scim-users.service.ts` | Users service - all error paths |
+| `api/src/modules/scim/services/endpoint-scim-groups.service.ts` | Groups service - all error paths |
+| `api/src/modules/scim/services/endpoint-scim-generic.service.ts` | Generic service - all error paths |
 | `api/src/modules/scim/services/bulk-processor.service.ts` | Bulk error isolation |
 | `api/src/modules/auth/shared-secret.guard.ts` | Active auth guard (3-tier chain) |
 | `api/src/modules/scim/interceptors/scim-content-type.interceptor.ts` | Content-Type validation |

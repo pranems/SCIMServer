@@ -1,13 +1,13 @@
 /**
- * Endpoint Profile Service (Orchestrator) — Phase 13, Step 2.5
+ * Endpoint Profile Service (Orchestrator) - Phase 13, Step 2.5
  *
  * Runs the complete 6-step validation pipeline:
- *   1. AUTO-EXPAND  — Fill missing fields from RFC baseline
- *   2. AUTO-INJECT  — Add required structural attributes
- *   3. TIGHTEN-ONLY — Verify overrides are same-or-tighter
- *   4. SPC-TRUTHFUL — Verify SPC only claims implemented capabilities
- *   5. STORE        — (caller's responsibility — returns expanded profile)
- *   6. HYDRATE      — (caller's responsibility — registry update)
+ *   1. AUTO-EXPAND  - Fill missing fields from RFC baseline
+ *   2. AUTO-INJECT  - Add required structural attributes
+ *   3. TIGHTEN-ONLY - Verify overrides are same-or-tighter
+ *   4. SPC-TRUTHFUL - Verify SPC only claims implemented capabilities
+ *   5. STORE        - (caller's responsibility - returns expanded profile)
+ *   6. HYDRATE      - (caller's responsibility - registry update)
  *
  * This is a pure function module (no NestJS DI needed for Phase 2).
  * Will become an @Injectable() NestJS service in Phase 3.
@@ -50,7 +50,7 @@ const SERVER_CAPABILITIES = {
 function validateSpcTruthfulness(spc: ServiceProviderConfig): ProfileValidationError[] {
   const errors: ProfileValidationError[] = [];
 
-  // changePassword — we don't implement this
+  // changePassword - we don't implement this
   if (spc.changePassword?.supported === true && !SERVER_CAPABILITIES.changePassword) {
     errors.push({
       code: 'SPC_UNIMPLEMENTED',
@@ -88,11 +88,11 @@ function runTightenOnlyValidation(profile: EndpointProfile): ProfileValidationEr
 
   for (const schema of profile.schemas) {
     const attrMap = RFC_SCHEMA_ATTRIBUTE_MAPS.get(schema.id);
-    if (!attrMap) continue; // Custom schema — no baseline to compare against
+    if (!attrMap) continue; // Custom schema - no baseline to compare against
 
     for (const attr of schema.attributes) {
       const baseline = attrMap.get(attr.name.toLowerCase());
-      if (!baseline) continue; // Custom attribute within a known schema — no baseline
+      if (!baseline) continue; // Custom attribute within a known schema - no baseline
 
       const attrErrors = validateAttributeTightenOnly(schema.id, attr, baseline);
       for (const err of attrErrors) {

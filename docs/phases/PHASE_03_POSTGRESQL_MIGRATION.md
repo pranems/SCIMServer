@@ -1,7 +1,7 @@
 # Phase 3: PostgreSQL Migration
 
 > **Branch:** `feat/torfc1stscimsvr`  
-> **Predecessor:** Phase 2 — Unified `scim_resource` Table (`d3c4a1c`)  
+> **Predecessor:** Phase 2 - Unified `scim_resource` Table (`d3c4a1c`)  
 > **Date:** 2026-02-20  
 
 ---
@@ -13,10 +13,10 @@
 3. [Architecture Before & After](#architecture-before--after)
 4. [Schema Changes](#schema-changes)
 5. [Prisma 7 Adapter Pattern](#prisma-7-adapter-pattern)
-6. [CITEXT — Native Case-Insensitive Matching](#citext--native-case-insensitive-matching)
+6. [CITEXT - Native Case-Insensitive Matching](#citext--native-case-insensitive-matching)
 7. [JSONB Payload Storage](#jsonb-payload-storage)
 8. [Docker Compose Setup](#docker-compose-setup)
-9. [Deployment Scenarios — Complete Reference](#deployment-scenarios--complete-reference)
+9. [Deployment Scenarios - Complete Reference](#deployment-scenarios--complete-reference)
 10. [Azure Deployment Architecture](#azure-deployment-architecture)
 11. [Migration Strategy](#migration-strategy)
 12. [File-by-File Change Log](#file-by-file-change-log)
@@ -27,7 +27,7 @@
 
 ## Overview
 
-Phase 3 replaces the **better-sqlite3** persistence layer with **PostgreSQL 17** using Prisma 7's driver-adapter architecture. The change is transparent to SCIM consumers — the InMemory backend remains available for testing and local development.
+Phase 3 replaces the **better-sqlite3** persistence layer with **PostgreSQL 17** using Prisma 7's driver-adapter architecture. The change is transparent to SCIM consumers - the InMemory backend remains available for testing and local development.
 
 ### Key Transformations
 
@@ -35,8 +35,8 @@ Phase 3 replaces the **better-sqlite3** persistence layer with **PostgreSQL 17**
 |---|---|---|
 | **Database** | better-sqlite3 (embedded) | PostgreSQL 17-alpine (networked) |
 | **Column types** | `TEXT` for everything | `UUID`, `CITEXT`, `JSONB`, `TIMESTAMPTZ`, `VARCHAR` |
-| **Case insensitivity** | `userNameLower` / `displayNameLower` helper columns | PostgreSQL `CITEXT` extension — native |
-| **Payload storage** | `rawPayload TEXT` (JSON string) | `payload JSONB` — queryable, GIN-indexable |
+| **Case insensitivity** | `userNameLower` / `displayNameLower` helper columns | PostgreSQL `CITEXT` extension - native |
+| **Payload storage** | `rawPayload TEXT` (JSON string) | `payload JSONB` - queryable, GIN-indexable |
 | **Primary keys** | Random UUID as `TEXT` | `gen_random_uuid()` via `pgcrypto` |
 | **Prisma connection** | `datasourceUrl` constructor option | `PrismaPg` adapter wrapping `pg.Pool` |
 | **Migrations** | 8 incremental SQLite migrations | 1 fresh PostgreSQL baseline |
@@ -46,11 +46,11 @@ Phase 3 replaces the **better-sqlite3** persistence layer with **PostgreSQL 17**
 
 ## Motivation & Goals
 
-1. **Production readiness** — SQLite cannot handle concurrent writes from multiple API replicas
-2. **Native case insensitivity** — `CITEXT` eliminates the need for manually maintained `*Lower` mirror columns
-3. **Structured payload queries** — `JSONB` enables future GIN-indexed SCIM filter push-down directly to PostgreSQL
-4. **Schema-native types** — `UUID`, `TIMESTAMPTZ`, `VARCHAR(n)` provide proper type safety and storage efficiency
-5. **Prisma 7 compatibility** — Prisma 7 dropped `datasourceUrl` in the constructor; adapter pattern is the new standard
+1. **Production readiness** - SQLite cannot handle concurrent writes from multiple API replicas
+2. **Native case insensitivity** - `CITEXT` eliminates the need for manually maintained `*Lower` mirror columns
+3. **Structured payload queries** - `JSONB` enables future GIN-indexed SCIM filter push-down directly to PostgreSQL
+4. **Schema-native types** - `UUID`, `TIMESTAMPTZ`, `VARCHAR(n)` provide proper type safety and storage efficiency
+5. **Prisma 7 compatibility** - Prisma 7 dropped `datasourceUrl` in the constructor; adapter pattern is the new standard
 
 ---
 
@@ -218,7 +218,7 @@ export class PrismaService extends PrismaClient {
 
 ---
 
-## CITEXT — Native Case-Insensitive Matching
+## CITEXT - Native Case-Insensitive Matching
 
 ### Problem (Phase 2)
 
@@ -316,7 +316,7 @@ create(endpointId, input): Promise<UserRecord> {
 }
 ```
 
-This preserves the domain model's `rawPayload: string` contract while storing data as JSONB in PostgreSQL — enabling future GIN-indexed `payload @> '{"emails":[{"value":"..."}]}'` queries.
+This preserves the domain model's `rawPayload: string` contract while storing data as JSONB in PostgreSQL - enabling future GIN-indexed `payload @> '{"emails":[{"value":"..."}]}'` queries.
 
 ---
 
@@ -366,7 +366,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 ---
 
-## Deployment Scenarios — Complete Reference
+## Deployment Scenarios - Complete Reference
 
 Phase 3 supports **four** deployment scenarios. Each has distinct container topology, networking, port mappings, and DATABASE_URL configuration.
 
@@ -382,7 +382,7 @@ Phase 3 supports **four** deployment scenarios. Each has distinct container topo
 
 ---
 
-### Scenario 1: Docker Compose — Local Development
+### Scenario 1: Docker Compose - Local Development
 
 **Use for:** Running the full application stack locally with persistent PostgreSQL.
 
@@ -474,7 +474,7 @@ services:
         condition: service_healthy
 
 volumes:
-  pgdata:                     # Named volume — survives container restarts
+  pgdata:                     # Named volume - survives container restarts
 ```
 
 #### Commands
@@ -523,7 +523,7 @@ docker compose down -v
 
 ---
 
-### Scenario 2: Docker Compose — Debug Mode
+### Scenario 2: Docker Compose - Debug Mode
 
 **Use for:** Live-reload development with VS Code debugger attached.
 
@@ -710,7 +710,7 @@ docker run -d \
 
 ### Scenario 4: Unit & E2E Tests (InMemory Backend)
 
-**Use for:** Running the test suite — no PostgreSQL needed.
+**Use for:** Running the test suite - no PostgreSQL needed.
 
 #### Test Architecture
 
@@ -732,7 +732,7 @@ docker run -d \
  │   │           ▼                      ▼                    │   │
  │   │  ┌─────────────────────────────────────────────────┐  │   │
  │   │  │ InMemory Repositories                           │  │   │
- │   │  │ (Map<string, Record[]> — process memory only)   │  │   │
+ │   │  │ (Map<string, Record[]> - process memory only)   │  │   │
  │   │  │                                                 │  │   │
  │   │  │ InMemoryUserRepository                          │  │   │
  │   │  │ InMemoryGroupRepository                         │  │   │
@@ -757,12 +757,12 @@ docker run -d \
 #### Test Commands
 
 ```powershell
-# Unit tests — all 28 suites
+# Unit tests - all 28 suites
 cd api
 npm test
 # Test Suites: 28 passed | Tests: 862 passed | Time: ~40s
 
-# E2E tests — all 15 suites
+# E2E tests - all 15 suites
 npm run test:e2e
 # Test Suites: 15 passed | Tests: 193 passed | Workers: 1
 
@@ -779,7 +779,7 @@ npm run test:cov
 // test/e2e/helpers/app.helper.ts
 export async function createTestApp(): Promise<INestApplication> {
   process.env.PERSISTENCE_BACKEND = 'inmemory';  // ← force InMemory
-  // No DATABASE_URL needed — PrismaService skips connection
+  // No DATABASE_URL needed - PrismaService skips connection
   const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = module.createNestApplication();
   await app.listen(0);  // Random available port
@@ -832,7 +832,7 @@ See [§10 Azure Deployment Architecture](#azure-deployment-architecture) for ful
 All containerized scenarios (1, 2, 3, 5) use the same multi-stage Dockerfile:
 
 ```
- Dockerfile — 4-Stage Build
+ Dockerfile - 4-Stage Build
  ┌────────────────────────────────────────────────────────────────────┐
  │                                                                    │
  │  Stage 1: web-build                    Stage 2: api-build          │
@@ -951,7 +951,7 @@ Phase 3 fundamentally changes the Azure deployment architecture. The previous SQ
 │   │  private-endpoints subnet                │                     │  │
 │   │  (10.40.16.0/24)                         ▼                     │  │
 │   │  ┌──────────────────────────────────────────────────────────┐  │  │
-│   │  │ Azure Database for PostgreSQL — Flexible Server          │  │  │
+│   │  │ Azure Database for PostgreSQL - Flexible Server          │  │  │
 │   │  │                                                          │  │  │
 │   │  │ SKU: Burstable B1ms (1 vCore, 2 GB RAM)                 │  │  │
 │   │  │ Storage: 32 GB (auto-grow)                               │  │  │
@@ -975,7 +975,7 @@ Phase 3 fundamentally changes the Azure deployment architecture. The previous SQ
 │     • Automated daily backups with PITR                               │
 │     • Real-time data durability (synchronous writes)                  │
 │     • No manual backup/restore                                        │
-│     • VNet-private — no public exposure                               │
+│     • VNet-private - no public exposure                               │
 │     • Managed patching & updates                                      │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -999,10 +999,10 @@ Phase 3 fundamentally changes the Azure deployment architecture. The previous SQ
 | Resource | Phase 2 Cost | Phase 3 Cost | Notes |
 |---|---|---|---|
 | Container App (0.5 vCPU, 1 GiB) | ~$5–15 | ~$5–15 | Same (scales to zero) |
-| PG Flexible Server (B1ms) | — | ~$13–18 | New: managed PostgreSQL |
-| Blob Storage | ~$0.20–0.50 | — | Removed |
-| Private Endpoint (Blob) | ~$7.50 | — | Removed |
-| Private Endpoint (PG) | — | ~$7.50 | New: PG VNet access |
+| PG Flexible Server (B1ms) | - | ~$13–18 | New: managed PostgreSQL |
+| Blob Storage | ~$0.20–0.50 | - | Removed |
+| Private Endpoint (Blob) | ~$7.50 | - | Removed |
+| Private Endpoint (PG) | - | ~$7.50 | New: PG VNet access |
 | Log Analytics | ~$0–5 | ~$0–5 | Same |
 | VNet / DNS | ~$0.50 | ~$0.50 | Same |
 | **Total** | **~$13–28/mo** | **~$26–46/mo** | +$13–18 for managed PG |
@@ -1048,7 +1048,7 @@ Phase 3 fundamentally changes the Azure deployment architecture. The previous SQ
 
 ### Bicep Changes Required
 
-#### containerapp.bicep — Key Changes
+#### containerapp.bicep - Key Changes
 
 ```diff
   // Environment variables
@@ -1072,7 +1072,7 @@ Phase 3 fundamentally changes the Azure deployment architecture. The previous SQ
 #### New: postgresql.bicep
 
 ```bicep
-// Azure Database for PostgreSQL — Flexible Server
+// Azure Database for PostgreSQL - Flexible Server
 resource postgresServer 'Microsoft.DBforPostgreSQL/flexibleServers@2023-12-01-preview' = {
   name: serverName
   location: location
@@ -1161,7 +1161,7 @@ The baseline migration creates all tables, indexes, constraints, and extensions 
 | `api/src/infrastructure/repositories/prisma/prisma-group.repository.ts` | Same pattern for groups |
 | `api/src/infrastructure/repositories/inmemory/inmemory-user.repository.ts` | Removed `userNameLower`, `.toLowerCase()` at query time |
 | `api/src/infrastructure/repositories/inmemory/inmemory-group.repository.ts` | Removed `displayNameLower`, `.toLowerCase()` at query time |
-| `api/src/infrastructure/repositories/repository.module.ts` | Comment update: "Default: Prisma (PostgreSQL — Phase 3)" |
+| `api/src/infrastructure/repositories/repository.module.ts` | Comment update: "Default: Prisma (PostgreSQL - Phase 3)" |
 | `api/src/modules/scim/services/endpoint-scim-users.service.ts` | Removed 3 `userNameLower` lines |
 | `api/src/modules/scim/services/endpoint-scim-groups.service.ts` | Removed 3 `displayNameLower` lines |
 | `api/src/modules/scim/filters/apply-scim-filter.ts` | Column maps use `userName`/`displayName`; removed `.toLowerCase()` in `tryPushToDb` |
@@ -1220,19 +1220,19 @@ Tests:       193 passed, 193 total
 Workers:     1 (connection pool limit)
 ```
 
-### Live Tests — Local Server (InMemory)
+### Live Tests - Local Server (InMemory)
 
 ```
 PASS: 301 / 302
-FAIL: 1 (Non-existent endpoint returns 404 — pre-existing)
+FAIL: 1 (Non-existent endpoint returns 404 - pre-existing)
 Duration: ~10s
 ```
 
-### Live Tests — Docker Container (PostgreSQL)
+### Live Tests - Docker Container (PostgreSQL)
 
 ```
 PASS: 301 / 302
-FAIL: 1 (Non-existent endpoint returns 404 — pre-existing)
+FAIL: 1 (Non-existent endpoint returns 404 - pre-existing)
 Duration: ~10s
 Container: scimserver-api (healthy)
 Database: scimserver-postgres (PostgreSQL 17-alpine)
@@ -1244,10 +1244,10 @@ Database: scimserver-postgres (PostgreSQL 17-alpine)
 
 1. **Non-existent endpoint 404 test (1 failure):** `Non-existent endpoint returns 404` fails in the live test suite. The admin endpoint GET returns a different status code than expected. This is a pre-existing issue not related to Phase 3.
 
-2. **BackupService SQLite warnings:** The legacy `BackupService` still runs and logs `"Local database not found at /tmp/local-data/scim.db"` warnings in Docker. This service is a Phase 4/5 cleanup item — it has no impact on PostgreSQL operation.
+2. **BackupService SQLite warnings:** The legacy `BackupService` still runs and logs `"Local database not found at /tmp/local-data/scim.db"` warnings in Docker. This service is a Phase 4/5 cleanup item - it has no impact on PostgreSQL operation.
 
 3. **Connection pool sizing:** `pg.Pool` is configured with `max: 5` to prevent exhaustion during E2E test parallelism. Production deployments may increase this via environment configuration.
 
-4. **SCIM ID leak (Issue 16 — FIXED):** Client-supplied `id` in POST/PATCH body could leak into response via `rawPayload` spread. Fixed with defense-in-depth: `extractAdditionalAttributes` strips `id`, `toScimUserResource` deletes `rawPayload.id`, and `stripReservedAttributes` now includes `'id'`.
+4. **SCIM ID leak (Issue 16 - FIXED):** Client-supplied `id` in POST/PATCH body could leak into response via `rawPayload` spread. Fixed with defense-in-depth: `extractAdditionalAttributes` strips `id`, `toScimUserResource` deletes `rawPayload.id`, and `stripReservedAttributes` now includes `'id'`.
 
-5. **Version endpoint cleanup (Issue 17 — FIXED):** Obsolete blob storage fields removed from version endpoint. Added `persistenceBackend`, `connectionPool`, and `migratePhase` fields. Version bumped to 0.11.0.
+5. **Version endpoint cleanup (Issue 17 - FIXED):** Obsolete blob storage fields removed from version endpoint. Added `persistenceBackend`, `connectionPool`, and `migratePhase` fields. Version bumped to 0.11.0.

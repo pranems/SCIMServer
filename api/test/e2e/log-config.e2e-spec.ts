@@ -373,7 +373,7 @@ describe('Log Configuration API (E2E)', () => {
         .expect(200);
 
       expect(Array.isArray(res.body)).toBe(true);
-      // The custom X-Request-Id was set on a prior request — entries must exist
+      // The custom X-Request-Id was set on a prior request - entries must exist
       expect(res.body.length).toBeGreaterThan(0);
       for (const entry of res.body as Array<{ requestId?: string }>) {
         expect(entry.requestId).toBe(requestId);

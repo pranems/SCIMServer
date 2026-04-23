@@ -5,7 +5,7 @@ You are updating the project health and statistics report for SCIMServer.
 
 ## Instructions
 
-Perform a comprehensive audit of the current workspace and update the project health document with fresh, accurate data. Do NOT use cached values from the existing document — re-measure everything.
+Perform a comprehensive audit of the current workspace and update the project health document with fresh, accurate data. Do NOT use cached values from the existing document - re-measure everything.
 
 ### 1. Codebase Statistics
 Run these measurements against git-tracked files (excluding `node_modules`, `dist`, `.git`, `coverage`):
@@ -22,7 +22,7 @@ git ls-files -- "*.ts" "*.tsx" | Select-String -NotMatch "spec|test" | Measure-O
 git ls-files -- "*.ts" "*.tsx" | Select-String "spec|test" | Measure-Object -Line
 ```
 
-### 2. Lines of Code — Categorized
+### 2. Lines of Code - Categorized
 Count lines for each category by piping file lists to `Get-Content | Measure-Object -Line`:
 
 - **Source TypeScript** (non-test `.ts`/`.tsx`)

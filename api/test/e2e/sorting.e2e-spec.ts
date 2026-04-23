@@ -15,7 +15,7 @@ import {
 } from './helpers/fixtures';
 
 /**
- * Sorting E2E tests — RFC 7644 §3.4.2.3
+ * Sorting E2E tests - RFC 7644 §3.4.2.3
  *
  * Validates sortBy/sortOrder query parameter support on
  * GET list endpoints and POST /.search for Users and Groups.

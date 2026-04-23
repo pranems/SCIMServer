@@ -2,7 +2,7 @@
  * Group PATCH Engine (Phase 5)
  *
  * Pure domain class that applies SCIM PATCH operations to a group's in-memory state.
- * Zero NestJS / Prisma / DB dependencies — takes plain data in, returns plain data out.
+ * Zero NestJS / Prisma / DB dependencies - takes plain data in, returns plain data out.
  *
  * Responsibilities:
  *   - Operation dispatch (add / replace / remove) for groups
@@ -12,7 +12,7 @@
  *
  * The calling service handles: DB load, member resolution, DB save, meta generation.
  *
- * @see RFC 7644 §3.5.2 — Modifying with PATCH
+ * @see RFC 7644 §3.5.2 - Modifying with PATCH
  */
 
 import type {
@@ -146,7 +146,7 @@ export class GroupPatchEngine {
     const path = operation.path?.toLowerCase();
     const originalPath = operation.path;
 
-    // No path — value is either a string (displayName) or an object with attribute(s)
+    // No path - value is either a string (displayName) or an object with attribute(s)
     if (!path) {
       if (typeof operation.value === 'string') {
         return { displayName: operation.value, externalId: currentExternalId, members, rawPayload };
@@ -322,7 +322,7 @@ export class GroupPatchEngine {
       return members.filter(m => m.value.toLowerCase() !== valueToRemove.toLowerCase());
     }
 
-    // path=members without value — remove all members
+    // path=members without value - remove all members
     if (path === 'members') {
       if (!allowRemoveAllMembers) {
         throw new PatchError(

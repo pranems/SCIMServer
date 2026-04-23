@@ -70,7 +70,7 @@ function assertAllowedKeys(
 // ─── SCIM Resource Allowlists ───────────────────────────────────────────────
 
 // Core User attributes that MAY appear in a User resource response.
-// This is intentionally broad — the point is to catch LEAKED fields, not
+// This is intentionally broad - the point is to catch LEAKED fields, not
 // to enforce which optional SCIM fields are present.
 const USER_ALLOWED_KEYS = [
   'schemas', 'id', 'externalId', 'meta',
@@ -315,7 +315,7 @@ describe('API Response Contract Verification (E2E)', () => {
     it('400 error (missing userName) should contain only allowed keys', async () => {
       const res = await scimPost(app, `${basePath}/Users`, token, {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
-        // Missing userName — required
+        // Missing userName - required
       }).expect(400);
 
       assertAllowedKeys(res.body, ERROR_RESPONSE_ALLOWED_KEYS, '400 error');
@@ -360,7 +360,7 @@ describe('API Response Contract Verification (E2E)', () => {
     it('Schemas endpoint should return ListResponse envelope', async () => {
       const res = await scimGet(app, `${basePath}/Schemas`, token).expect(200);
 
-      // Schemas may return a ListResponse or a direct array — check both
+      // Schemas may return a ListResponse or a direct array - check both
       if (res.body.schemas && Array.isArray(res.body.Resources)) {
         assertAllowedKeys(res.body, LIST_RESPONSE_ALLOWED_KEYS, 'GET /Schemas');
       }
@@ -541,7 +541,7 @@ describe('API Response Contract Verification (E2E)', () => {
       // 1. Create users to trigger schema cache building
       const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
 
-      // 2. Read admin endpoint — must still be clean
+      // 2. Read admin endpoint - must still be clean
       const adminRes = await request(app.getHttpServer())
         .get(`/scim/admin/endpoints/${endpointId}`)
         .set('Authorization', `Bearer ${token}`)

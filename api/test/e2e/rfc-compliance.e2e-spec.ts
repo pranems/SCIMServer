@@ -43,9 +43,9 @@ describe('RFC Compliance (E2E)', () => {
     basePath = scimBasePath(endpointId);
   });
 
-  // ───────────── RFC 7644 §3.1 — POST returns 201 + Location ─────────────
+  // ───────────── RFC 7644 §3.1 - POST returns 201 + Location ─────────────
 
-  describe('RFC 7644 §3.1 — Resource Creation', () => {
+  describe('RFC 7644 §3.1 - Resource Creation', () => {
     it('should return 201 Created for POST /Users', async () => {
       await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201);
     });
@@ -74,9 +74,9 @@ describe('RFC Compliance (E2E)', () => {
     });
   });
 
-  // ───────────── RFC 7644 §3.4.2 — List Response ─────────────
+  // ───────────── RFC 7644 §3.4.2 - List Response ─────────────
 
-  describe('RFC 7644 §3.4.2 — List Response', () => {
+  describe('RFC 7644 §3.4.2 - List Response', () => {
     it('should include ListResponse schema', async () => {
       const res = await scimGet(app, `${basePath}/Users`, token).expect(200);
       expect(res.body.schemas).toContain('urn:ietf:params:scim:api:messages:2.0:ListResponse');
@@ -97,17 +97,17 @@ describe('RFC Compliance (E2E)', () => {
     });
   });
 
-  // ───────────── RFC 7644 §3.5.2 — PATCH ─────────────
+  // ───────────── RFC 7644 §3.5.2 - PATCH ─────────────
 
-  describe('RFC 7644 §3.5.2 — PATCH Operations', () => {
+  describe('RFC 7644 §3.5.2 - PATCH Operations', () => {
     it('should require PatchOp schema in request body', async () => {
       const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
 
-      // Valid schema — should succeed
+      // Valid schema - should succeed
       const validPatch = patchOp([{ op: 'replace', path: 'active', value: false }]);
       await scimPatch(app, `${basePath}/Users/${user.id}`, token, validPatch).expect(200);
 
-      // Missing PatchOp schema — should be rejected
+      // Missing PatchOp schema - should be rejected
       const noSchema = {
         schemas: [],
         Operations: [{ op: 'replace', path: 'active', value: true }],
@@ -138,9 +138,9 @@ describe('RFC Compliance (E2E)', () => {
     });
   });
 
-  // ───────────── RFC 7644 §3.6 — DELETE ─────────────
+  // ───────────── RFC 7644 §3.6 - DELETE ─────────────
 
-  describe('RFC 7644 §3.6 — Delete', () => {
+  describe('RFC 7644 §3.6 - Delete', () => {
     it('should return 204 No Content with no body', async () => {
       const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
 
@@ -149,9 +149,9 @@ describe('RFC Compliance (E2E)', () => {
     });
   });
 
-  // ───────────── RFC 7644 §3.12 — Error Responses ─────────────
+  // ───────────── RFC 7644 §3.12 - Error Responses ─────────────
 
-  describe('RFC 7644 §3.12 — Error Responses', () => {
+  describe('RFC 7644 §3.12 - Error Responses', () => {
     it('should include Error schema in error responses', async () => {
       const res = await scimGet(app, `${basePath}/Users/nonexistent`, token).expect(404);
       expect(res.body.schemas).toContain('urn:ietf:params:scim:api:messages:2.0:Error');
@@ -170,9 +170,9 @@ describe('RFC Compliance (E2E)', () => {
     });
   });
 
-  // ───────────── RFC 7643 §2.4 — Meta Attribute ─────────────
+  // ───────────── RFC 7643 §2.4 - Meta Attribute ─────────────
 
-  describe('RFC 7643 §2.4 — Meta Attribute', () => {
+  describe('RFC 7643 §2.4 - Meta Attribute', () => {
     it('should include resourceType, created, lastModified, location in meta', async () => {
       const res = await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201);
 
@@ -188,9 +188,9 @@ describe('RFC Compliance (E2E)', () => {
     });
   });
 
-  // ───────────── RFC 7643 §2.1 — Case-Insensitive Attributes ─────────────
+  // ───────────── RFC 7643 §2.1 - Case-Insensitive Attributes ─────────────
 
-  describe('RFC 7643 §2.1 — Case-Insensitive Attributes', () => {
+  describe('RFC 7643 §2.1 - Case-Insensitive Attributes', () => {
     it('should find users with case-insensitive userName filter', async () => {
       await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'CaseTest@Example.COM' })).expect(201);
 
@@ -210,9 +210,9 @@ describe('RFC Compliance (E2E)', () => {
     });
   });
 
-  // ───────────── RFC 7644 §3.1 — Content-Type Verification ─────────────
+  // ───────────── RFC 7644 §3.1 - Content-Type Verification ─────────────
 
-  describe('RFC 7644 — Content-Type Verification', () => {
+  describe('RFC 7644 - Content-Type Verification', () => {
     it('should return application/scim+json Content-Type on GET /Users', async () => {
       await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201);
       const res = await scimGet(app, `${basePath}/Users`, token).expect(200);
@@ -237,9 +237,9 @@ describe('RFC Compliance (E2E)', () => {
     });
   });
 
-  // ───────────── RFC 7644 §3.12 — 409 Error Format ─────────────
+  // ───────────── RFC 7644 §3.12 - 409 Error Format ─────────────
 
-  describe('RFC 7644 §3.12 — 409 Error Format', () => {
+  describe('RFC 7644 §3.12 - 409 Error Format', () => {
     it('should return proper SCIM error format on 409', async () => {
       const user = validUser();
       await scimPost(app, `${basePath}/Users`, token, user).expect(201);
@@ -252,9 +252,9 @@ describe('RFC Compliance (E2E)', () => {
     });
   });
 
-  // ───────────── RFC 7644 — meta.lastModified Behavior ─────────────
+  // ───────────── RFC 7644 - meta.lastModified Behavior ─────────────
 
-  describe('RFC 7644 — meta.lastModified Behavior', () => {
+  describe('RFC 7644 - meta.lastModified Behavior', () => {
     it('should update meta.lastModified on PATCH', async () => {
       const created = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
       const originalLastModified = created.meta.lastModified;
@@ -280,9 +280,9 @@ describe('RFC Compliance (E2E)', () => {
     });
   });
 
-  // ───────────── RFC 7644 §3.12 — HTTP Error Status Coverage ─────────────
+  // ───────────── RFC 7644 §3.12 - HTTP Error Status Coverage ─────────────
 
-  describe('RFC 7644 §3.12 — HTTP Error Status Coverage', () => {
+  describe('RFC 7644 §3.12 - HTTP Error Status Coverage', () => {
     it('should return 404 for truly unknown SCIM path', async () => {
       const res = await scimGet(app, `${basePath}/NonExistentResourceType`, token);
       expect([404, 400]).toContain(res.status);
@@ -345,9 +345,9 @@ describe('RFC Compliance (E2E)', () => {
     });
   });
 
-  // ───────────── RFC 7644 — Content-Type Acceptance ─────────────
+  // ───────────── RFC 7644 - Content-Type Acceptance ─────────────
 
-  describe('RFC 7644 — Content-Type Acceptance', () => {
+  describe('RFC 7644 - Content-Type Acceptance', () => {
     it('should accept application/json Content-Type on POST', async () => {
       const res = await request(app.getHttpServer())
         .post(`${basePath}/Users`)
@@ -365,9 +365,9 @@ describe('RFC Compliance (E2E)', () => {
     });
   });
 
-  // ───────────── RFC 7644 — SCIM status field as string ─────────────
+  // ───────────── RFC 7644 - SCIM status field as string ─────────────
 
-  describe('RFC 7644 — SCIM status is always a string', () => {
+  describe('RFC 7644 - SCIM status is always a string', () => {
     it('should return status as string "409" not number 409', async () => {
       const user = validUser();
       await scimPost(app, `${basePath}/Users`, token, user).expect(201);

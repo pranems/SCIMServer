@@ -1,6 +1,6 @@
-# G8g — Write-Response Attribute Projection
+# G8g - Write-Response Attribute Projection
 
-> **Document Purpose**: Feature reference for the G8g enhancement — `attributes`/`excludedAttributes` query parameter support on POST, PUT, and PATCH write-response bodies.
+> **Document Purpose**: Feature reference for the G8g enhancement - `attributes`/`excludedAttributes` query parameter support on POST, PUT, and PATCH write-response bodies.
 >
 > **Created**: February 26, 2026
 > **Version**: v0.19.1
@@ -24,13 +24,13 @@ The controllers had an inline loop that only stripped `returned:'request'` attri
 
 ### Solution
 
-Added `@Query('attributes')` and `@Query('excludedAttributes')` optional parameters to all 6 write controller methods, and replaced the inline `returned:'request'` stripping loop with a call to the existing `applyAttributeProjection()` utility function — the same function already used by GET and .search endpoints.
+Added `@Query('attributes')` and `@Query('excludedAttributes')` optional parameters to all 6 write controller methods, and replaced the inline `returned:'request'` stripping loop with a call to the existing `applyAttributeProjection()` utility function - the same function already used by GET and .search endpoints.
 
 This ensures:
 1. **Consistent behavior** across all SCIM operations (read and write)
 2. **RFC 7644 §3.9 compliance** for attribute projection on write responses
-3. **Code simplification** — removed 6 instances of inline stripping loops, replaced with single-line projection calls
-4. **Backward compatible** — when no query params are provided, full response is returned (projection function handles this correctly, including `returned:'request'` stripping)
+3. **Code simplification** - removed 6 instances of inline stripping loops, replaced with single-line projection calls
+4. **Backward compatible** - when no query params are provided, full response is returned (projection function handles this correctly, including `returned:'request'` stripping)
 
 ---
 
@@ -159,7 +159,7 @@ return applyAttributeProjection(result, attributes, excludedAttributes, requestO
 | 9p.4 | POST /Groups?attributes=displayName | POST | 3 assertions |
 | 9p.5 | PUT /Groups?excludedAttributes=members | PUT | 2 assertions |
 | 9p.6 | PATCH /Groups?attributes=displayName | PATCH | 3 assertions |
-| 9p.7 | POST /Users with BOTH params — attributes wins | POST | 4 assertions (precedence) |
+| 9p.7 | POST /Users with BOTH params - attributes wins | POST | 4 assertions (precedence) |
 | 9p.8 | POST /Users?excludedAttributes=id,schemas,meta | POST | 4 assertions (always-returned protection) |
 | 9p.9 | PUT /Users?excludedAttributes=emails,name | PUT | 4 assertions |
 | setup/cleanup | Create/delete test resources | POST/DELETE | 3 assertions |
@@ -182,7 +182,7 @@ return applyAttributeProjection(result, attributes, excludedAttributes, requestO
 
 ## Related Documentation
 
-- [Attribute Projection E2E tests](../api/test/e2e/attribute-projection.e2e-spec.ts) — Full E2E coverage
-- [scim-attribute-projection.ts](../api/src/modules/scim/common/scim-attribute-projection.ts) — Core projection implementation
-- [G8E_RETURNED_CHARACTERISTIC_FILTERING.md](G8E_RETURNED_CHARACTERISTIC_FILTERING.md) — Related `returned` characteristic enforcement
-- [RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md](RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md) — Full attribute characteristics gap analysis
+- [Attribute Projection E2E tests](../api/test/e2e/attribute-projection.e2e-spec.ts) - Full E2E coverage
+- [scim-attribute-projection.ts](../api/src/modules/scim/common/scim-attribute-projection.ts) - Core projection implementation
+- [G8E_RETURNED_CHARACTERISTIC_FILTERING.md](G8E_RETURNED_CHARACTERISTIC_FILTERING.md) - Related `returned` characteristic enforcement
+- [RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md](RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md) - Full attribute characteristics gap analysis

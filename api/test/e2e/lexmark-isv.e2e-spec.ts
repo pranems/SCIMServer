@@ -1,5 +1,5 @@
 /**
- * E2E Tests — Lexmark ISV Endpoint Profile
+ * E2E Tests - Lexmark ISV Endpoint Profile
  *
  * Comprehensive tests for the Lexmark Cloud Print Management SCIM profile.
  * Lexmark-specific characteristics:
@@ -355,7 +355,7 @@ describe('Lexmark ISV Endpoint Profile (E2E)', () => {
     });
 
     it('should NOT return badgeCode in the POST 201 response body (returned:never)', () => {
-      // Verify the actual POST 201 response — not a follow-up GET
+      // Verify the actual POST 201 response - not a follow-up GET
       expect(postResponseBody.id).toBeDefined();
       expect(postResponseBody[CUSTOM_URN]?.badgeCode).toBeUndefined();
     });
@@ -382,7 +382,7 @@ describe('Lexmark ISV Endpoint Profile (E2E)', () => {
 
     it('should omit custom extension URN from GET response entirely (FP-1)', async () => {
       const res = await scimGet(app, `${scimBasePath(epId)}/Users/${userId}`, token).expect(200);
-      // Extension key itself should be absent — not present as {}
+      // Extension key itself should be absent - not present as {}
       expect(res.body[CUSTOM_URN]).toBeUndefined();
       expect(res.body.schemas).not.toContain(CUSTOM_URN);
     });
@@ -416,7 +416,7 @@ describe('Lexmark ISV Endpoint Profile (E2E)', () => {
           value: { [CUSTOM_URN]: { badgeCode: 'BADGE-99999', pin: '1111' } },
         }],
       }).expect(200);
-      // Updated but still not returned — FP-1: extension key itself absent
+      // Updated but still not returned - FP-1: extension key itself absent
       expect(res.body[CUSTOM_URN]).toBeUndefined();
       expect(res.body.schemas).not.toContain(CUSTOM_URN);
     });

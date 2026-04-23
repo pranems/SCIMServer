@@ -86,7 +86,7 @@ describe('DatabaseService', () => {
       );
     });
 
-    it('should add search filter across userName and externalId (not scimId — UUID column)', async () => {
+    it('should add search filter across userName and externalId (not scimId - UUID column)', async () => {
       prisma.scimResource.findMany.mockResolvedValue([]);
       prisma.scimResource.count.mockResolvedValue(0);
 
@@ -99,7 +99,7 @@ describe('DatabaseService', () => {
           expect.objectContaining({ externalId: expect.objectContaining({ contains: 'test' }) }),
         ]),
       );
-      // scimId is @db.Uuid — non-UUID search terms must NOT use contains on it
+      // scimId is @db.Uuid - non-UUID search terms must NOT use contains on it
       const scimIdClause = call.where.OR.find((c: any) => c.scimId?.contains);
       expect(scimIdClause).toBeUndefined();
     });
@@ -265,7 +265,7 @@ describe('DatabaseService', () => {
 
     it('should throw for non-UUID id without querying DB (UUID guard)', async () => {
       await expect(service.getUserDetails('not-a-uuid')).rejects.toThrow('User not found');
-      // DB should NOT be called — guard short-circuits
+      // DB should NOT be called - guard short-circuits
       expect(prisma.scimResource.findFirst).not.toHaveBeenCalled();
     });
 

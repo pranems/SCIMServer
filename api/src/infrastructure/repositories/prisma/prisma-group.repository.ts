@@ -1,9 +1,9 @@
 /**
- * PrismaGroupRepository — IGroupRepository backed by Prisma (PostgreSQL).
+ * PrismaGroupRepository - IGroupRepository backed by Prisma (PostgreSQL).
  *
  * Phase 3: Queries the unified `ScimResource` table with `resourceType = 'Group'`
  * and `ResourceMember`. CITEXT on displayName handles case-insensitive matching
- * natively — no displayNameLower helper column. JSONB payload is converted
+ * natively - no displayNameLower helper column. JSONB payload is converted
  * to/from string at the repository boundary.
  */
 import { Injectable } from '@nestjs/common';

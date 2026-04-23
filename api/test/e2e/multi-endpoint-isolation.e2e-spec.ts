@@ -2,7 +2,7 @@
  * Multi-Endpoint Isolation E2E Tests
  *
  * Verifies that 3 independent endpoints with different profile configurations
- * operate in complete isolation — data, config flags, schemas, discovery,
+ * operate in complete isolation - data, config flags, schemas, discovery,
  * and SCIM operations are fully independent and concurrent-safe.
  *
  * Endpoints:
@@ -99,7 +99,7 @@ describe('Multi-Endpoint Isolation (E2E)', () => {
       .expect(201);
     epC = resC.body.id;
 
-    // EP-D: entra-id (default preset — scoped 20 User attrs, MSFT extensions, no bulk, Entra PATCH flags)
+    // EP-D: entra-id (default preset - scoped 20 User attrs, MSFT extensions, no bulk, Entra PATCH flags)
     const resD = await request(app.getHttpServer())
       .post('/scim/admin/endpoints')
       .set('Authorization', `Bearer ${token}`)
@@ -120,7 +120,7 @@ describe('Multi-Endpoint Isolation (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // 1. Discovery Isolation — each endpoint returns its own schemas/SPC
+  // 1. Discovery Isolation - each endpoint returns its own schemas/SPC
   // ═══════════════════════════════════════════════════════════════════
 
   describe('Discovery Isolation', () => {
@@ -172,7 +172,7 @@ describe('Multi-Endpoint Isolation (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // 2. Data Isolation — CRUD on one endpoint doesn't affect others
+  // 2. Data Isolation - CRUD on one endpoint doesn't affect others
   // ═══════════════════════════════════════════════════════════════════
 
   describe('Data Isolation', () => {
@@ -266,7 +266,7 @@ describe('Multi-Endpoint Isolation (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // 3. Config Flag Isolation — flags on one EP don't affect others
+  // 3. Config Flag Isolation - flags on one EP don't affect others
   // ═══════════════════════════════════════════════════════════════════
 
   describe('Config Flag Isolation', () => {
@@ -325,7 +325,7 @@ describe('Multi-Endpoint Isolation (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // 4. Concurrent Operations — parallel CRUD across all 4 endpoints
+  // 4. Concurrent Operations - parallel CRUD across all 4 endpoints
   // ═══════════════════════════════════════════════════════════════════
 
   describe('Concurrent Operations', () => {

@@ -1,6 +1,6 @@
-# SCIM Extensions Analysis — Enterprise & Custom Extensions
+# SCIM Extensions Analysis - Enterprise & Custom Extensions
 
-> **⚠️ SUPERSEDED** — This v1 document (Feb 16) has been superseded by the v3 architecture docs (Feb 20, 2026) and the comprehensive schema documentation suite (Mar 2026). The code-driven `IScimExtension` pattern described here was replaced by a data-driven `endpoint_schema` + `endpoint_resource_type` model. **Retained for**: concrete extension implementation examples, `IScimExtension` interface reference, hybrid storage analysis, and the new-extension checklist.
+> **⚠️ SUPERSEDED** - This v1 document (Feb 16) has been superseded by the v3 architecture docs (Feb 20, 2026) and the comprehensive schema documentation suite (Mar 2026). The code-driven `IScimExtension` pattern described here was replaced by a data-driven `endpoint_schema` + `endpoint_resource_type` model. **Retained for**: concrete extension implementation examples, `IScimExtension` interface reference, hybrid storage analysis, and the new-extension checklist.
 > **See**: [`RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md`](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md) · [`SCHEMA_LIFECYCLE_AND_REGISTRY.md`](SCHEMA_LIFECYCLE_AND_REGISTRY.md) · [`SCHEMA_CUSTOMIZATION_GUIDE.md`](SCHEMA_CUSTOMIZATION_GUIDE.md) · [`SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md`](SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md)
 
 > **Date**: February 16, 2026
@@ -36,11 +36,11 @@ Based on **RFC 7643** (Core Schema) and **RFC 7644** (Protocol):
 | Rule                   | Detail                                                                                        |
 | ---------------------- | --------------------------------------------------------------------------------------------- |
 | **URN format**         | Extensions SHOULD use URN notation (e.g., `urn:ietf:params:scim:schemas:extension:...`)       |
-| **Namespace isolation**| Extension attributes live under their schema URI key — they do NOT pollute the core namespace  |
+| **Namespace isolation**| Extension attributes live under their schema URI key - they do NOT pollute the core namespace  |
 | **Schema discovery**   | Extensions MUST be discoverable via the `/Schemas` endpoint (RFC 7644 §4)                     |
 | **`required` flag**    | Each extension can declare whether it is required or optional via `/ResourceTypes`             |
-| **No collisions**      | Attributes are scoped under the URI — no conflict with core attributes or other extensions     |
-| **CRUD operations**    | Extensions participate fully in CRUD — filter, sort, patch, etc.                              |
+| **No collisions**      | Attributes are scoped under the URI - no conflict with core attributes or other extensions     |
+| **CRUD operations**    | Extensions participate fully in CRUD - filter, sort, patch, etc.                              |
 | **PATCH support**      | Path syntax uses the schema URI prefix: `urn:...:enterprise:2.0:User:department`              |
 
 ### 1.2 Extension Identification (RFC 7643 §3.3)
@@ -70,7 +70,7 @@ Example:
 
 The RFCs explicitly state that a server **MUST NOT** require a client to understand an extension to interact with core resources. If an extension is marked `"required": false`, a client can ignore it entirely and still function.
 
-### 1.4 RFC 7643 §8.7 — ResourceType Representation
+### 1.4 RFC 7643 §8.7 - ResourceType Representation
 
 The `/ResourceTypes` endpoint declares which extensions apply to a resource and whether they're required:
 
@@ -92,10 +92,10 @@ The `/ResourceTypes` endpoint declares which extensions apply to a resource and 
 
 ### 1.5 Best Practices from the RFCs
 
-1. **Use a unique URN** for your organization — e.g., `urn:ietf:params:scim:schemas:extension:myorg:2.0:CustomUser`
+1. **Use a unique URN** for your organization - e.g., `urn:ietf:params:scim:schemas:extension:myorg:2.0:CustomUser`
 2. **Register the schema** via the `/Schemas` endpoint so clients can discover it
 3. **Declare the extension** in `/ResourceTypes` with the appropriate `required` flag
-4. **Keep extensions modular** — prefer multiple small extensions over one monolithic one
+4. **Keep extensions modular** - prefer multiple small extensions over one monolithic one
 5. **Extension attributes follow the same type system** as core (String, Boolean, Complex, Multi-valued, etc.)
 
 ---
@@ -710,7 +710,7 @@ NestJS Module Init
     ├──► DepartmentMetadataExtension.onModuleInit()
     │       └──► registry.register(this)  →  Map["urn:..deptmeta"] = ext
     │
-    └──► Server ready — all extensions registered and discoverable
+    └──► Server ready - all extensions registered and discoverable
 ```
 
 ---
@@ -1068,7 +1068,7 @@ export class DepartmentMetadataExtension implements IScimExtension, OnModuleInit
     ExtensionRegistryService,
     // Standard Extensions
     EnterpriseUserExtension,
-    // Custom Extensions — add new extensions here
+    // Custom Extensions - add new extensions here
     DepartmentMetadataExtension,
   ],
   exports: [ExtensionRegistryService],
@@ -1092,7 +1092,7 @@ model User {
   managerRef          String?
   managerDisplayName  String?
 
-  // Custom Extensions (generic JSON blob — no migration needed)
+  // Custom Extensions (generic JSON blob - no migration needed)
   customExtensions    Json?     @default("{}")
 }
 ```
@@ -1507,13 +1507,13 @@ Content-Type: application/scim+json
 
 ## 12. References
 
-- [RFC 7643 — SCIM Core Schema](https://datatracker.ietf.org/doc/html/rfc7643)
-- [RFC 7644 — SCIM Protocol](https://datatracker.ietf.org/doc/html/rfc7644)
-- [RFC 7643 §3.3 — Schema Extensions](https://datatracker.ietf.org/doc/html/rfc7643#section-3.3)
-- [RFC 7643 §4.3 — Enterprise User Extension](https://datatracker.ietf.org/doc/html/rfc7643#section-4.3)
-- [RFC 7643 §8.7 — ResourceType Representation](https://datatracker.ietf.org/doc/html/rfc7643#section-8.7)
-- [RFC 7644 §3.4.2 — Filtering](https://datatracker.ietf.org/doc/html/rfc7644#section-3.4.2)
-- [RFC 7644 §3.5.2 — Modifying with PATCH](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2)
+- [RFC 7643 - SCIM Core Schema](https://datatracker.ietf.org/doc/html/rfc7643)
+- [RFC 7644 - SCIM Protocol](https://datatracker.ietf.org/doc/html/rfc7644)
+- [RFC 7643 §3.3 - Schema Extensions](https://datatracker.ietf.org/doc/html/rfc7643#section-3.3)
+- [RFC 7643 §4.3 - Enterprise User Extension](https://datatracker.ietf.org/doc/html/rfc7643#section-4.3)
+- [RFC 7643 §8.7 - ResourceType Representation](https://datatracker.ietf.org/doc/html/rfc7643#section-8.7)
+- [RFC 7644 §3.4.2 - Filtering](https://datatracker.ietf.org/doc/html/rfc7644#section-3.4.2)
+- [RFC 7644 §3.5.2 - Modifying with PATCH](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2)
 
 ---
 

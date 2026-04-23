@@ -1,9 +1,9 @@
-# Live Integration Test — Norms, Best Practices & Industry Recommendations
+# Live Integration Test - Norms, Best Practices & Industry Recommendations
 
 > **Last Updated**: March 1, 2026  
 > **Applies to**: SCIMServer  
 > **Persistence**: PostgreSQL 17 (Prisma ORM)  
-> **Script**: `scripts/live-test.ps1` (3,500+ lines, 10+ sections) — 📊 see [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for counts  
+> **Script**: `scripts/live-test.ps1` (3,500+ lines, 10+ sections) - 📊 see [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for counts  
 > **Targets**: Local (`:6000`), Docker Compose (`:8080`), Azure Container Apps
 
 ---
@@ -28,7 +28,7 @@
 
 ## 1. Overview & Purpose
 
-Live integration tests exercise the **full HTTP stack** against a running SCIMServer instance — the only test layer that covers real PostgreSQL queries, OAuth token flow, network serialization, Docker entrypoint/migration flow, and production secret validation.
+Live integration tests exercise the **full HTTP stack** against a running SCIMServer instance - the only test layer that covers real PostgreSQL queries, OAuth token flow, network serialization, Docker entrypoint/migration flow, and production secret validation.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -109,9 +109,9 @@ Unlike `inmemory` (wiped on restart), **PostgreSQL persists data across containe
 
 Every test run must be fully self-contained:
 
-- **CREATE** all needed resources (endpoints, users, groups) — never assume pre-existing data.
+- **CREATE** all needed resources (endpoints, users, groups) - never assume pre-existing data.
 - **USE** randomized names to avoid collisions with parallel runs or leftover data.
-- **CLEAN UP** every resource created — cascade endpoint delete removes all child resources.
+- **CLEAN UP** every resource created - cascade endpoint delete removes all child resources.
 
 ```powershell
 # ✅ Good: Randomized, self-contained
@@ -171,7 +171,7 @@ The same script runs against local, Docker, and Azure:
 | **Schema changes** | If tests depend on new columns/tables, rebuild the Docker image (migrations run in `docker-entrypoint.sh` via `prisma migrate deploy`). |
 | **Migration ordering** | Prisma applies migrations alphabetically by folder name (timestamp prefix). Never rename existing migration folders. |
 | **Fresh database** | Use `docker compose down -v && docker compose up -d` for a clean slate. |
-| **Migration failures** | Check `docker logs scimserver-api` — migration failure blocks startup. |
+| **Migration failures** | Check `docker logs scimserver-api` - migration failure blocks startup. |
 
 ### 4.2 Case Sensitivity
 
@@ -181,7 +181,7 @@ PostgreSQL text comparison rules affect live test assertions:
 |--------|------|----------|------------------|
 | `userName` | `CITEXT` | Case-insensitive uniqueness | `Alice` and `alice` are the same user (409 on duplicate) |
 | `displayName` | `VARCHAR` | Case-sensitive | `Eng Team` ≠ `eng team` for filter `eq` |
-| `externalId` | `TEXT` | Case-sensitive (`caseExact: true` per RFC 7643 §3.1) | `EXT-001` ≠ `ext-001` — both can coexist |
+| `externalId` | `TEXT` | Case-sensitive (`caseExact: true` per RFC 7643 §3.1) | `EXT-001` ≠ `ext-001` - both can coexist |
 | `payload` (JSONB) | JSONB | Keys: case-sensitive. Values: depends on operator | Extension attribute keys are case-sensitive |
 
 ```powershell
@@ -206,7 +206,7 @@ PostgreSQL defaults to **Read Committed** isolation:
 
 - Rapid concurrent writes may see different snapshots.
 - ETag/version checks use optimistic concurrency (`enforceIfMatch()`).
-- Don't depend on serializable ordering in tests — add explicit waits or sequential execution.
+- Don't depend on serializable ordering in tests - add explicit waits or sequential execution.
 
 ### 4.5 Connection Limits
 
@@ -220,7 +220,7 @@ PostgreSQL defaults to **Read Committed** isolation:
 
 - Extension attributes live in the `payload` JSONB column.
 - JSONB preserves type fidelity: numbers stay numbers, booleans stay booleans.
-- JSONB keys are case-sensitive — `Department` ≠ `department`.
+- JSONB keys are case-sensitive - `Department` ≠ `department`.
 - GIN indexes enable JSONB filter push-down for `eq`, `co`, `sw`, etc.
 
 ---
@@ -243,7 +243,7 @@ Section 9b-9l:   Feature-specific (RFC compliance, filters, ETag, etc.)
 Section 10:      DELETE / Cleanup (always last)
 ```
 
-**New sections**: Use `9m`, `9n`, `9o`, etc. — always **before** Section 10.
+**New sections**: Use `9m`, `9n`, `9o`, etc. - always **before** Section 10.
 
 ### 5.2 Section Template
 
@@ -293,7 +293,7 @@ try {
 ### 5.3 Assertion Pattern
 
 ```powershell
-# Always use Test-Result for assertions — it tracks pass/fail counts
+# Always use Test-Result for assertions - it tracks pass/fail counts
 Test-Result -Success ($response.statusCode -eq 200) -Message "GET /Users returns 200"
 
 # For error-path testing, use try/catch
@@ -308,14 +308,14 @@ try {
 
 ### 5.4 Verbose Logging
 
-The script overrides `Invoke-RestMethod` and `Invoke-WebRequest` globally — all HTTP calls automatically log request/response details when `-Verbose` is used. No per-call changes needed.
+The script overrides `Invoke-RestMethod` and `Invoke-WebRequest` globally - all HTTP calls automatically log request/response details when `-Verbose` is used. No per-call changes needed.
 
 ### 5.5 Flow Step Tracking
 
 Every HTTP call is automatically tracked via `Add-FlowStep`. The JSON results file includes:
-- `flowSteps[]` — every HTTP request/response with timing
-- `tests[]` — every assertion with linked flow step IDs
-- `sections[]` — pass/fail summary per section
+- `flowSteps[]` - every HTTP request/response with timing
+- `tests[]` - every assertion with linked flow step IDs
+- `sections[]` - pass/fail summary per section
 
 ---
 
@@ -366,7 +366,7 @@ Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method DELET
 ### 6.3 Interrupted Run Recovery
 
 If a test run is interrupted before cleanup:
-- **inmemory**: No issue — data vanishes on restart.
+- **inmemory**: No issue - data vanishes on restart.
 - **PostgreSQL**: Orphaned data remains. Next run succeeds because of randomized names, but garbage accumulates.
 - **Recovery**: Either run Section 10 manually, or `docker compose down -v` for a fresh DB.
 
@@ -435,7 +435,7 @@ SELECT * FROM "_prisma_migrations" ORDER BY "finished_at" DESC LIMIT 5;    -- Mi
 | **Healthcheck dependency** | API container waits for `pg_isready` healthcheck before starting |
 | **Entrypoint** | `docker-entrypoint.sh` runs `prisma migrate deploy` before `node dist/main.js` |
 | **Secret defaults** | Docker Compose uses env vars with defaults: `JWT_SECRET:-devjwtsecretkey123456`, etc. |
-| **Non-root user** | Container runs as `scim:nodejs` — no root access |
+| **Non-root user** | Container runs as `scim:nodejs` - no root access |
 | **Log inspection** | `docker logs scimserver-api` for app logs, `docker logs scimserver-postgres` for PG logs |
 | **Resource limits** | Set `NODE_OPTIONS=--max_old_space_size=384` for memory-constrained containers |
 
@@ -484,12 +484,12 @@ services:
 
 | Norm | Detail |
 |------|--------|
-| **Startup readiness** | Poll `/scim/admin/version` before running tests — cold starts may take 10-30s |
-| **Shared database** | Azure PG may be shared across environments — always scope tests to unique endpoint names |
-| **Secrets management** | Use `-ClientSecret` parameter matching the server's `OAUTH_CLIENT_SECRET` — never hardcode production secrets |
-| **Rate limiting** | Azure Front Door or App Gateway may enforce rate limits — space rapid requests or handle 429s |
+| **Startup readiness** | Poll `/scim/admin/version` before running tests - cold starts may take 10-30s |
+| **Shared database** | Azure PG may be shared across environments - always scope tests to unique endpoint names |
+| **Secrets management** | Use `-ClientSecret` parameter matching the server's `OAUTH_CLIENT_SECRET` - never hardcode production secrets |
+| **Rate limiting** | Azure Front Door or App Gateway may enforce rate limits - space rapid requests or handle 429s |
 | **Timeout** | Consider adding `-TimeoutSec 30` to HTTP calls for Azure targets |
-| **Network** | Azure may require TLS (HTTPS) — the live-test script uses `Invoke-RestMethod` which handles this natively |
+| **Network** | Azure may require TLS (HTTPS) - the live-test script uses `Invoke-RestMethod` which handles this natively |
 
 ### 8.3 Azure Pre-Flight Check
 
@@ -503,7 +503,7 @@ for ($i = 1; $i -le $maxRetries; $i++) {
         Write-Host "Azure instance ready: v$($v.version)"
         break
     } catch {
-        Write-Host "Attempt $i/$maxRetries — waiting for Azure cold start..."
+        Write-Host "Attempt $i/$maxRetries - waiting for Azure cold start..."
         Start-Sleep 5
     }
 }
@@ -684,7 +684,7 @@ Always test both success and failure paths:
 $user = Invoke-RestMethod -Uri "$myBase/Users" -Method POST -Headers $headers -Body $validBody
 Test-Result -Success ($null -ne $user.id) -Message "POST valid user succeeds"
 
-# Error path — test expected rejection
+# Error path - test expected rejection
 try {
     Invoke-RestMethod -Uri "$myBase/Users" -Method POST -Headers $headers -Body $invalidBody
     Test-Result -Success $false -Message "Should have rejected invalid payload"
@@ -703,14 +703,14 @@ try {
 ### ❌ Hardcoded Resource References
 
 ```powershell
-# Bad — assumes endpoint "abc123" exists
+# Bad - assumes endpoint "abc123" exists
 $scimBase = "$baseUrl/scim/endpoints/abc123"
 ```
 
 ### ❌ Shared Mutable State Between Sections
 
 ```powershell
-# Bad — Section 9n modifies Section 3's user, breaking Section 3 on re-run
+# Bad - Section 9n modifies Section 3's user, breaking Section 3 on re-run
 $UserId = "id-from-section-3"
 Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method DELETE -Headers $headers
 ```
@@ -718,16 +718,16 @@ Invoke-RestMethod -Uri "$scimBase/Users/$UserId" -Method DELETE -Headers $header
 ### ❌ Missing Cleanup
 
 ```powershell
-# Bad — creates resources but never deletes them
+# Bad - creates resources but never deletes them
 $ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $body
 # ... tests ...
-# (no cleanup — endpoint and users/groups leak into PG)
+# (no cleanup - endpoint and users/groups leak into PG)
 ```
 
 ### ❌ Timing-Dependent Assertions
 
 ```powershell
-# Bad — relies on exact timing
+# Bad - relies on exact timing
 Start-Sleep 1
 $result = Invoke-RestMethod -Uri "$scimBase/Users" -Method GET -Headers $headers
 Test-Result -Success ($result.totalResults -eq 5) -Message "Exactly 5 users exist"
@@ -737,14 +737,14 @@ Test-Result -Success ($result.totalResults -eq 5) -Message "Exactly 5 users exis
 ### ❌ Environment-Specific Assumptions
 
 ```powershell
-# Bad — fails on Docker/Azure
+# Bad - fails on Docker/Azure
 Test-Result -Success (Test-Path "C:\Users\dev\data.db") -Message "DB file exists"
 ```
 
 ### ❌ Sensitive Data in Output
 
 ```powershell
-# Bad — logs secrets
+# Bad - logs secrets
 Write-Host "Token: $Token"
 Write-Host "Secret: $ClientSecret"
 # The verbose logging wrapper already masks Authorization headers
@@ -753,7 +753,7 @@ Write-Host "Secret: $ClientSecret"
 ### ❌ Parallel HTTP Calls
 
 ```powershell
-# Bad — exceeds Prisma connection pool
+# Bad - exceeds Prisma connection pool
 1..20 | ForEach-Object -Parallel {
     Invoke-RestMethod -Uri "$using:scimBase/Users" -Method POST ...
 }
@@ -769,7 +769,7 @@ Use this checklist when adding a new section to `scripts/live-test.ps1`:
 ### Planning
 
 - [ ] Feature or behavior requires live HTTP validation (not covered by unit/E2E)
-- [ ] Section number assigned (`9m`, `9n`, etc.) — before Section 10
+- [ ] Section number assigned (`9m`, `9n`, etc.) - before Section 10
 - [ ] `$script:currentSection` set for JSON result tracking
 - [ ] RFC reference cited in section header comment (if applicable)
 
@@ -813,7 +813,7 @@ Use this checklist when adding a new section to `scripts/live-test.ps1`:
 
 - [ ] Section purpose described in header comment
 - [ ] Individual tests labeled with `Test 9m.1:`, `Test 9m.2:`, etc.
-- [ ] Feature doc created in `docs/` (if significant feature — per commit checklist)
+- [ ] Feature doc created in `docs/` (if significant feature - per commit checklist)
 
 ---
 

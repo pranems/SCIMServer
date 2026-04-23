@@ -1,6 +1,6 @@
-# CL v0.27.0 — InMemory Backend Bug Fixes, Generic Service Parity & P3 Attribute Gaps
+# CL v0.27.0 - InMemory Backend Bug Fixes, Generic Service Parity & P3 Attribute Gaps
 
-> **Document Purpose**: Changelist summary for v0.27.0 — all changes, root causes, fixes, file inventory, test coverage, deployment validation, and remaining work.
+> **Document Purpose**: Changelist summary for v0.27.0 - all changes, root causes, fixes, file inventory, test coverage, deployment validation, and remaining work.
 >
 > **Date**: March 3, 2026
 > **Version**: v0.27.0
@@ -13,10 +13,10 @@
 ## Table of Contents
 
 - [1. Summary](#1-summary)
-- [2. Changes — Generic Service Parity (3 P0 Fixes)](#2-changes--generic-service-parity-3-p0-fixes)
-- [3. Changes — InMemory Backend Bugs (4 Fixes)](#3-changes--inmemory-backend-bugs-4-fixes)
-- [4. Changes — Live Test Script Fix](#4-changes--live-test-script-fix)
-- [5. Changes — Documentation Audit (10 Files)](#5-changes--documentation-audit-10-files)
+- [2. Changes - Generic Service Parity (3 P0 Fixes)](#2-changes--generic-service-parity-3-p0-fixes)
+- [3. Changes - InMemory Backend Bugs (4 Fixes)](#3-changes--inmemory-backend-bugs-4-fixes)
+- [4. Changes - Live Test Script Fix](#4-changes--live-test-script-fix)
+- [5. Changes - Documentation Audit (10 Files)](#5-changes--documentation-audit-10-files)
 - [6. File Inventory](#6-file-inventory)
 - [7. Architecture Diagrams](#7-architecture-diagrams)
 - [8. Test Coverage](#8-test-coverage)
@@ -40,30 +40,30 @@ v0.27.0 addresses **8 issues** (3 P0 generic service parity gaps + 4 inmemory ba
 
 ---
 
-## 2. Changes — Generic Service Parity (3 P0 Fixes)
+## 2. Changes - Generic Service Parity (3 P0 Fixes)
 
 These closed the top 3 remaining P0 gaps from the [P3 re-audit](P3_REMAINING_ATTRIBUTE_CHARACTERISTIC_GAPS.md), bringing Generic custom-resource service behavior in line with Users/Groups.
 
-### Fix #1 — RequireIfMatch 428 Parity
+### Fix #1 - RequireIfMatch 428 Parity
 
 | Aspect | Detail |
 |---|---|
 | **Problem** | Generic PUT/PATCH/DELETE called `assertIfMatch()` (returns 412 on mismatch but does nothing when header is absent). Users/Groups called `enforceIfMatch()` which also returns 428 when `RequireIfMatch` is enabled and the header is missing. |
-| **Why it matters** | Endpoints configured with `RequireIfMatch: true` silently accepted Generic resource mutations without an `If-Match` header — a data integrity hole compared to Users/Groups. |
+| **Why it matters** | Endpoints configured with `RequireIfMatch: true` silently accepted Generic resource mutations without an `If-Match` header - a data integrity hole compared to Users/Groups. |
 | **Fix** | Replaced `assertIfMatch()` → `enforceIfMatch()` in `endpoint-scim-generic.service.ts` for PUT, PATCH, and DELETE. |
-| **RFC** | RFC 7644 §3.14 — conditional request headers |
+| **RFC** | RFC 7644 §3.14 - conditional request headers |
 | **Files** | `api/src/modules/scim/services/endpoint-scim-generic.service.ts` |
 
-### Fix #2 — Filter Attribute Path Validation
+### Fix #2 - Filter Attribute Path Validation
 
 | Aspect | Detail |
 |---|---|
 | **Problem** | `SchemaValidator.validateFilterAttributePaths()` existed but was never wired into runtime filter paths. Unknown filter attributes (e.g., `filter=fakeAttr eq "x"`) silently passed through, returning unfiltered results instead of 400. |
-| **Why it matters** | Clients with typos in filter expressions got all records back with 200 instead of an error — violates RFC 7644 §3.4.2.2 expectation that invalid filter paths produce `invalidFilter`. |
+| **Why it matters** | Clients with typos in filter expressions got all records back with 200 instead of an error - violates RFC 7644 §3.4.2.2 expectation that invalid filter paths produce `invalidFilter`. |
 | **Fix** | Integrated `validateFilterAttributePaths()` into `listUsersForEndpoint()`, `listGroupsForEndpoint()`, and `listResources()`. Unknown filter attributes now return `400 invalidFilter`. |
 | **Files** | `api/src/modules/scim/services/endpoint-scim-users.service.ts`, `endpoint-scim-groups.service.ts`, `endpoint-scim-generic.service.ts` |
 
-### Fix #3 — Generic Filter 400 on Unsupported Expressions
+### Fix #3 - Generic Filter 400 on Unsupported Expressions
 
 | Aspect | Detail |
 |---|---|
@@ -74,20 +74,20 @@ These closed the top 3 remaining P0 gaps from the [P3 re-audit](P3_REMAINING_ATT
 
 ---
 
-## 3. Changes — InMemory Backend Bugs (4 Fixes)
+## 3. Changes - InMemory Backend Bugs (4 Fixes)
 
-Discovered during live testing with `PERSISTENCE_BACKEND=inmemory`. All 4 were **blocking** — the inmemory backend was non-functional for custom resource types and per-endpoint credentials.
+Discovered during live testing with `PERSISTENCE_BACKEND=inmemory`. All 4 were **blocking** - the inmemory backend was non-functional for custom resource types and per-endpoint credentials.
 
-### Bug #1 — AdminSchemaController InMemory Incompatibility
+### Bug #1 - AdminSchemaController InMemory Incompatibility
 
 | Aspect | Detail |
 |---|---|
 | **Symptom** | `GET /admin/endpoints/:id/schemas` and all Admin Schema API endpoints returned 500 when `PERSISTENCE_BACKEND=inmemory`. |
-| **Root Cause** | `AdminSchemaController` injected `PrismaService` directly and called `prisma.endpoint.findUnique()`. With inmemory backend, `PrismaService` is null — there's no Prisma instance. |
+| **Root Cause** | `AdminSchemaController` injected `PrismaService` directly and called `prisma.endpoint.findUnique()`. With inmemory backend, `PrismaService` is null - there's no Prisma instance. |
 | **Fix** | Replaced `PrismaService` injection with `EndpointService.getEndpoint()` + `requireEndpoint()` helper, which works for both Prisma and inmemory backends. |
 | **Files** | `api/src/modules/scim/controllers/admin-schema.controller.ts`, `admin-schema.controller.spec.ts` |
 
-### Bug #2 — Custom Resource Types Missing Core Schema Definition
+### Bug #2 - Custom Resource Types Missing Core Schema Definition
 
 | Aspect | Detail |
 |---|---|
@@ -96,11 +96,11 @@ Discovered during live testing with `PERSISTENCE_BACKEND=inmemory`. All 4 were *
 | **Fix** | Auto-generate a stub core schema definition (with `id`, `externalId`, `displayName`, `active` attributes) in `registerResourceType()` when no existing schema definition is found for the core schema URN. |
 | **Files** | `api/src/modules/scim/services/scim-schema-registry.ts` |
 
-### Bug #3 — SchemaValidator Hardcoded Core Schema Prefix
+### Bug #3 - SchemaValidator Hardcoded Core Schema Prefix
 
 | Aspect | Detail |
 |---|---|
-| **Symptom** | Custom resource types with non-standard URNs (e.g., `urn:example:schemas:Device`) had top-level attributes like `displayName` rejected as invalid — the validator treated the core schema as an extension. |
+| **Symptom** | Custom resource types with non-standard URNs (e.g., `urn:example:schemas:Device`) had top-level attributes like `displayName` rejected as invalid - the validator treated the core schema as an extension. |
 | **Root Cause** | `SchemaValidator` used `schema.id.startsWith('urn:ietf:params:scim:schemas:core:')` in 5 locations to decide core vs extension behavior. Custom URNs that don't start with the IETF prefix were misclassified as extensions, causing top-level attributes to be routed through extension validation logic (which expects URN-prefixed paths). |
 | **Fix** | Added `isCoreSchema?: boolean` optional flag to the `SchemaDefinition` interface and a module-level `isCoreSchema()` helper: |
 
@@ -113,11 +113,11 @@ function isCoreSchema(schema: SchemaDefinition): boolean {
 ```
 
 Updated 5 locations in `schema-validator.ts`:
-1. `validate()` — core vs extension attribute routing
-2. `checkImmutable()` — core vs extension immutable attribute collection
-3. `validateFilterAttributePaths()` — core vs extension filter path resolution
-4. `validatePatchOperationValue()` — core vs extension PATCH op value validation
-5. `collectReadOnlyAttributes()` — core vs extension readOnly attribute collection
+1. `validate()` - core vs extension attribute routing
+2. `checkImmutable()` - core vs extension immutable attribute collection
+3. `validateFilterAttributePaths()` - core vs extension filter path resolution
+4. `validatePatchOperationValue()` - core vs extension PATCH op value validation
+5. `collectReadOnlyAttributes()` - core vs extension readOnly attribute collection
 
 Set `isCoreSchema: true` on core schema definitions built by:
 - `endpoint-scim-generic.service.ts` (2 methods)
@@ -125,7 +125,7 @@ Set `isCoreSchema: true` on core schema definitions built by:
 
 | **Files** | `api/src/modules/scim/services/schema-validator.ts`, `validation-types.ts`, `endpoint-scim-generic.service.ts`, `scim-service-helpers.ts`, `scim-service-helpers.spec.ts` |
 
-### Bug #4 — RepositoryModule Duplicate InMemory Instances
+### Bug #4 - RepositoryModule Duplicate InMemory Instances
 
 | Aspect | Detail |
 |---|---|
@@ -161,7 +161,7 @@ Added `resetCache()` call in `repository.module.spec.ts` `afterEach` to prevent 
 
 ---
 
-## 4. Changes — Live Test Script Fix
+## 4. Changes - Live Test Script Fix
 
 | Aspect | Detail |
 |---|---|
@@ -171,7 +171,7 @@ Added `resetCache()` call in `repository.module.spec.ts` `afterEach` to prevent 
 
 ---
 
-## 5. Changes — Documentation Audit (10 Files)
+## 5. Changes - Documentation Audit (10 Files)
 
 A two-pass documentation freshness audit updated 10 files with ~20 stale items:
 
@@ -227,7 +227,7 @@ A two-pass documentation freshness audit updated 10 files with ~20 stale items:
 
 ## 7. Architecture Diagrams
 
-### Bug Fix Flow — InMemory Backend
+### Bug Fix Flow - InMemory Backend
 
 ```mermaid
 graph TD
@@ -351,12 +351,12 @@ graph LR
 |---|:---:|:---:|---|
 | Unit | 2,741 | 73 | +24 |
 | E2E | 651 | 32 | +15 |
-| Live | 659 (647 pass, 12 gaps) | — | +89 |
+| Live | 659 (647 pass, 12 gaps) | - | +89 |
 | **Total** | **4,051** | **105** | **+128** |
 
 ### 12 Pre-Existing Live Test Gaps (Not Regressions)
 
-These are **feature gaps** identified by live tests — not regressions from this CL:
+These are **feature gaps** identified by live tests - not regressions from this CL:
 
 | Tests | Category | Expected | Actual | Gap |
 |---|---|---|---|---|
@@ -411,7 +411,7 @@ Pre-existing feature gaps captured by live tests (see §8 table above). These ar
 |---|---|---|
 | Legacy API token | `AUTH_TOKEN` env var still checked as fallback auth | Tracked |
 | Console.log usage | Some modules use `console.log` instead of NestJS Logger | Tracked |
-| CORS | Currently `*` — needs origin restriction for production | Tracked |
+| CORS | Currently `*` - needs origin restriction for production | Tracked |
 | `/scim/v2` rewrite | URL prefix not normalized to `/scim/v2` per RFC 7644 §1.3 | Tracked |
 
 ### 10d. Queued Tasks
@@ -427,9 +427,9 @@ Pre-existing feature gaps captured by live tests (see §8 table above). These ar
 
 | Document | Relevance |
 |---|---|
-| [P3_REMAINING_ATTRIBUTE_CHARACTERISTIC_GAPS.md](P3_REMAINING_ATTRIBUTE_CHARACTERISTIC_GAPS.md) | Full RFC §2 audit with enforcement matrix — 10 remaining gaps |
+| [P3_REMAINING_ATTRIBUTE_CHARACTERISTIC_GAPS.md](P3_REMAINING_ATTRIBUTE_CHARACTERISTIC_GAPS.md) | Full RFC §2 audit with enforcement matrix - 10 remaining gaps |
 | [ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md](ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md) | Historical bug index (11 issues pre-v0.27.0) |
-| [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) | Living stats — 4,051 total tests, 99.7% pass rate |
+| [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) | Living stats - 4,051 total tests, 99.7% pass rate |
 | [DEPLOYMENT_INSTANCES_AND_COSTS.md](DEPLOYMENT_INSTANCES_AND_COSTS.md) | Instance connection info, credentials, Azure costs |
 | [CHANGELOG.md](../CHANGELOG.md) | Full version history |
 | [G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md](G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md) | Custom resource type architecture (context for Bug #2 and #3) |
@@ -439,4 +439,4 @@ Pre-existing feature gaps captured by live tests (see §8 table above). These ar
 
 ---
 
-*Document generated 2026-03-03. Source code is the single source of truth — not this document.*
+*Document generated 2026-03-03. Source code is the single source of truth - not this document.*

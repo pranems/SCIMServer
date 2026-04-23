@@ -276,7 +276,7 @@ describe('Error Handling & SCIM Error Format (E2E)', () => {
 
   // ─── GlobalExceptionFilter integration (Step C) ───────────────────
 
-  describe('GlobalExceptionFilter — non-HttpException handling', () => {
+  describe('GlobalExceptionFilter - non-HttpException handling', () => {
     it('should return SCIM-compliant 500 for requests to non-existent custom resource types', async () => {
       // Requesting a resource type that doesn't exist on the endpoint
       // triggers a code path that may throw a non-HttpException depending on
@@ -287,7 +287,7 @@ describe('Error Handling & SCIM Error Format (E2E)', () => {
         .set('Authorization', `Bearer ${token}`)
         .set('Accept', 'application/scim+json');
 
-      // Should get 404 (resource type not found) — either from generic controller or NestJS routing
+      // Should get 404 (resource type not found) - either from generic controller or NestJS routing
       expect(res.status).toBeGreaterThanOrEqual(400);
 
       // Verify SCIM error format if body has schemas
@@ -302,7 +302,7 @@ describe('Error Handling & SCIM Error Format (E2E)', () => {
         .post(`${basePath}/Users`)
         .set('Authorization', `Bearer ${token}`)
         .set('Content-Type', 'application/scim+json')
-        .send({}); // Empty body — triggers validation error
+        .send({}); // Empty body - triggers validation error
 
       expect(res.status).toBeGreaterThanOrEqual(400);
       expect(res.headers['x-request-id']).toBeDefined();
@@ -315,7 +315,7 @@ describe('Error Handling & SCIM Error Format (E2E)', () => {
         .set('Authorization', `Bearer ${token}`)
         .set('Content-Type', 'application/scim+json')
         .send({ schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'] });
-        // Missing userName — should get 400, not 500 with stack trace
+        // Missing userName - should get 400, not 500 with stack trace
 
       expect(res.status).toBeGreaterThanOrEqual(400);
       // Response body should not contain stack traces
@@ -359,7 +359,7 @@ describe('Error Handling & SCIM Error Format (E2E)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      // Now change level to TRACE — this change itself is logged at INFO (which passes DEBUG threshold)
+      // Now change level to TRACE - this change itself is logged at INFO (which passes DEBUG threshold)
       await request(app.getHttpServer())
         .put('/scim/admin/log-config/level/TRACE')
         .set('Authorization', `Bearer ${token}`)
@@ -443,7 +443,7 @@ describe('Error Handling & SCIM Error Format (E2E)', () => {
     it('400 error should contain ONLY allowed keys', async () => {
       const res = await scimPost(app, `${basePath}/Users`, token, {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
-        // missing userName — triggers 400
+        // missing userName - triggers 400
       }).expect(400);
       assertErrorKeyAllowlist(res.body, '400 missing userName');
     });

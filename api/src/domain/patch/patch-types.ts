@@ -1,7 +1,7 @@
 /**
  * Domain-Layer PATCH Types (Phase 5)
  *
- * Pure domain types for SCIM PATCH operations — zero framework/DB imports.
+ * Pure domain types for SCIM PATCH operations - zero framework/DB imports.
  * These types are the contract between the SCIM service layer and the
  * standalone PatchEngine that performs all data transformations.
  *

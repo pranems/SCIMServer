@@ -1,5 +1,5 @@
 /**
- * E2E Tests — Test Gap Audit #2 (April 2026)
+ * E2E Tests - Test Gap Audit #2 (April 2026)
  *
  * Covers gaps identified by the addMissingTests prompt (round 3):
  *
@@ -263,7 +263,7 @@ describe('Test Gap Audit #2 (E2E)', () => {
     });
 
     it('PUT should return 400 when changing immutable externalId', async () => {
-      // Create a user with externalId — use bare attrs matching the custom schema
+      // Create a user with externalId - use bare attrs matching the custom schema
       const user = await scimPost(app, `${basePath}/Users`, token, {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
         userName: `immutable-change-${Date.now()}@example.com`,
@@ -524,7 +524,7 @@ describe('Test Gap Audit #2 (E2E)', () => {
         })
         .expect(200);
 
-      // Cleanup — DELETE requires If-Match too when RequireIfMatch=ON
+      // Cleanup - DELETE requires If-Match too when RequireIfMatch=ON
       const updatedEtag = putRes.headers['etag'];
       await request(app.getHttpServer())
         .delete(`${basePath}/Users/${userId}`)

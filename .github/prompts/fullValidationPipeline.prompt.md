@@ -13,7 +13,7 @@ Before starting, ensure:
 - API source is in `api/` subdirectory
 - Docker Desktop is running (for Phase 2)
 
-## Phase 1 — Local Build & Validation
+## Phase 1 - Local Build & Validation
 
 ### Step 1: Clean Build
 ```powershell
@@ -23,7 +23,7 @@ npm ci                          # Install exact dependencies from lockfile
 npx prisma generate             # Generate Prisma client (required before build)
 npm run build                   # TypeScript build via tsc (outputs to dist/)
 ```
-> **Note:** `npm run build` runs `tsc -p tsconfig.build.json`. The NestJS CLI (`@nestjs/cli`) is NOT installed as a dependency — do NOT use `npx nest build`.
+> **Note:** `npm run build` runs `tsc -p tsconfig.build.json`. The NestJS CLI (`@nestjs/cli`) is NOT installed as a dependency - do NOT use `npx nest build`.
 
 ### Step 2: Run Unit Tests
 ```powershell
@@ -56,7 +56,7 @@ $env:SCIM_SHARED_SECRET = "local-secret"
 $env:OAUTH_CLIENT_SECRET = "localoauthsecret123"
 $env:JWT_SECRET = "localjwtsecret123"
 
-# Start in background (recommended — keeps terminal free)
+# Start in background (recommended - keeps terminal free)
 Start-Process -FilePath "node" -ArgumentList "dist/main.js" -WindowStyle Hidden
 Start-Sleep -Seconds 5  # Wait for bootstrap
 
@@ -64,7 +64,7 @@ Start-Sleep -Seconds 5  # Wait for bootstrap
 # node dist/main.js
 ```
 > **Port:** 6000 (local default)
-> **Health poll:** `Invoke-RestMethod -Uri "http://localhost:6000/scim/ServiceProviderConfig"` — discovery endpoints are **public** (no auth required per RFC 7644 §4).
+> **Health poll:** `Invoke-RestMethod -Uri "http://localhost:6000/scim/ServiceProviderConfig"` - discovery endpoints are **public** (no auth required per RFC 7644 §4).
 
 ### Step 5: Run Live/Integration Tests
 ```powershell
@@ -80,9 +80,9 @@ cd scripts
 Get-Process -Id (Get-NetTCPConnection -LocalPort 6000 -ErrorAction SilentlyContinue).OwningProcess -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 ```
 
-## Phase 2 — Docker Build & Validation
+## Phase 2 - Docker Build & Validation
 
-> **⚠️ CRITICAL — Docker terminal safety:**
+> **⚠️ CRITICAL - Docker terminal safety:**
 > - **NEVER** run `docker compose up` without the `-d` (detached) flag. Without `-d` the command streams container logs forever, floods the terminal buffer, and freezes VS Code.
 > - **ALWAYS** separate build and start: run `docker compose build` first, then `docker compose up -d`.
 > - **Poll health** with `docker compose ps` or `docker ps`, NOT by watching log output.
@@ -105,7 +105,7 @@ docker compose build --no-cache   # Full rebuild (~3-5 min)
 
 ### Step 9: Start Docker Containers (Detached)
 
-> **⚠️ CRITICAL — ENV VAR ISOLATION:** Before running `docker compose up`, ensure the PowerShell session does NOT have local-server env vars (`$env:OAUTH_CLIENT_SECRET`, `$env:SCIM_SHARED_SECRET`, `$env:JWT_SECRET`) from Phase 1 Step 4. Docker Compose's `${VAR:-default}` syntax inherits PowerShell env vars, causing Docker containers to use **local credentials** instead of Docker defaults. This causes OAuth 401 failures.
+> **⚠️ CRITICAL - ENV VAR ISOLATION:** Before running `docker compose up`, ensure the PowerShell session does NOT have local-server env vars (`$env:OAUTH_CLIENT_SECRET`, `$env:SCIM_SHARED_SECRET`, `$env:JWT_SECRET`) from Phase 1 Step 4. Docker Compose's `${VAR:-default}` syntax inherits PowerShell env vars, causing Docker containers to use **local credentials** instead of Docker defaults. This causes OAuth 401 failures.
 
 ```powershell
 # Set Docker-specific credentials explicitly (overrides any leftover local env vars)
@@ -153,10 +153,10 @@ docker compose down --remove-orphans
 | JWT Secret | `JWT_SECRET` | `devjwtsecretkey123456` | `localjwtsecret123` | `standalonejwt123` |
 | DB URL | `DATABASE_URL` | `postgresql://scim:scim@postgres:5432/scimdb` | N/A (inmemory) | N/A (inmemory) |
 
-## Phase 3 — Standalone Build & Validation
+## Phase 3 - Standalone Build & Validation
 
 > **Purpose:** Validate the self-contained standalone package that runs without Docker or global Node.js.
-> The standalone build is the portable distribution artifact — if it breaks, customers can't deploy.
+> The standalone build is the portable distribution artifact - if it breaks, customers can't deploy.
 
 ### Step 13: Build Standalone Package
 ```powershell
@@ -176,7 +176,7 @@ pwsh -File scripts\build-standalone.ps1 -IncludeNode -Zip
 > **Output:** `standalone/` folder + `SCIMServer-standalone.zip`
 > **Duration:** ~2-5 min (downloads Node.js binary on first run, cached later)
 > **Verify:** `Test-Path standalone\start.ps1` should be `True`
-> **⚠️ Common failure:** `node.exe is denied` — the bundled Node.js binary is locked by a running standalone process from a previous run. Always kill port 9090 processes first.
+> **⚠️ Common failure:** `node.exe is denied` - the bundled Node.js binary is locked by a running standalone process from a previous run. Always kill port 9090 processes first.
 
 ### Step 14: Deploy Standalone to Fresh Folder
 ```powershell
@@ -195,7 +195,7 @@ if (Test-Path SCIMServer-standalone.zip) {
 ### Step 15: Start Standalone Instance
 ```powershell
 Push-Location $standaloneTestDir
-# Start in background — standalone uses inmemory backend by default
+# Start in background - standalone uses inmemory backend by default
 $env:PORT = "9090"
 $env:PERSISTENCE_BACKEND = "inmemory"
 $env:SCIM_SHARED_SECRET = "standalone-secret"
@@ -216,7 +216,7 @@ Start-Process -FilePath "pwsh" -ArgumentList "-File", "start.ps1" -WindowStyle H
 cd $env:USERPROFILE\source\repos\SCIMServer\scripts
 .\live-test.ps1 -BaseUrl "http://localhost:9090" -ClientSecret "standalonesecret123" *> ..\standalone-live-pipeline.txt
 ```
-> Parse results from output file — same format as other live test runs.
+> Parse results from output file - same format as other live test runs.
 
 ### Step 17: Stop Standalone Instance & Clean Up
 ```powershell
@@ -226,7 +226,7 @@ Pop-Location
 Remove-Item -Recurse -Force $standaloneTestDir -ErrorAction SilentlyContinue
 ```
 
-## Phase 4 — Docker Image Publish & Azure Deployment
+## Phase 4 - Docker Image Publish & Azure Deployment
 
 > **Purpose:** Push the Docker image to GitHub Container Registry (GHCR) and deploy to Azure Container Apps.
 > This validates the full production deployment path.
@@ -284,7 +284,7 @@ cd scripts
 ### Step 21: Verify Existing Data Preserved
 After deploying a new version, verify that endpoints and resources from previous deployments still exist:
 ```powershell
-# List endpoints — should show previously created endpoints
+# List endpoints - should show previously created endpoints
 $endpoints = Invoke-RestMethod -Uri "$azUrl/scim/admin/endpoints" -Headers @{ Authorization = "Bearer $azOauthSecret" }
 Write-Host "Existing endpoints: $($endpoints.totalResults)"
 
@@ -341,9 +341,9 @@ CONFIGURE ENTRA ID
 After completing the full pipeline, critically evaluate **this prompt itself** for accuracy, completeness, and efficiency. Ask these questions and apply fixes directly to `.github/prompts/fullValidationPipeline.prompt.md`:
 
 ### Build & Dependency Self-Check
-1. **Did the build command work?** Verified: `npm run build` (runs `tsc -p tsconfig.build.json`). NestJS CLI is NOT installed — do NOT use `npx nest build`.
+1. **Did the build command work?** Verified: `npm run build` (runs `tsc -p tsconfig.build.json`). NestJS CLI is NOT installed - do NOT use `npx nest build`.
 2. **Were dependency install steps needed?** Yes: `npm ci` + `npx prisma generate` are required prerequisites.
-3. **Did the clean build require cache clearing?** No — `npm run build` handles this. `rm -rf dist/` is only needed if switching branches.
+3. **Did the clean build require cache clearing?** No - `npm run build` handles this. `rm -rf dist/` is only needed if switching branches.
 
 ### Test Runner Self-Check
 4. **Did the Jest commands work as written?** Yes. Use `--testPathPatterns` (plural, Jest 30+). `--forceExit` is NOT needed for unit tests but may help for E2E if hanging.
@@ -364,8 +364,8 @@ After completing the full pipeline, critically evaluate **this prompt itself** f
 15. **Did the Docker port mapping change?** 8080:8080 for API, 5432:5432 for PostgreSQL.
 16. **Did Docker credentials change?** OAuth: `devscimclientsecret`, Legacy: `devscimsharedsecret`, JWT: `devjwtsecretkey123456`. NOT `docker-secret`.
 17. **Did `--no-cache` take excessively long?** ~3-5 min. Cached build is ~30s. Made `--no-cache` optional.
-18. **Did Docker inherit wrong env vars?** YES — critical learning. PowerShell `$env:*` set in Phase 1 leaks into Docker via `${VAR:-default}` syntax. Always explicitly set Docker credentials before `docker compose up`. Verify with `docker exec scimserver-api env | Select-String "OAUTH"`.
-19. **Did `docker compose up -d` fail with stale container reference?** YES — after `docker compose down`, subsequent `up -d` can fail with "No such container" if orphaned references remain. Use `docker compose up -d --force-recreate` to fix.
+18. **Did Docker inherit wrong env vars?** YES - critical learning. PowerShell `$env:*` set in Phase 1 leaks into Docker via `${VAR:-default}` syntax. Always explicitly set Docker credentials before `docker compose up`. Verify with `docker exec scimserver-api env | Select-String "OAUTH"`.
+19. **Did `docker compose up -d` fail with stale container reference?** YES - after `docker compose down`, subsequent `up -d` can fail with "No such container" if orphaned references remain. Use `docker compose up -d --force-recreate` to fix.
 
 ### Live Test Self-Check
 18. **Did the live test script path change?** `scripts/live-test.ps1` with `-BaseUrl` and `-ClientSecret` params.
@@ -379,16 +379,16 @@ After completing the full pipeline, critically evaluate **this prompt itself** f
 24. **Did the "stop on failure" strategy work?** Yes. Pre-existing failures are documented and don't block.
 
 ### API Response Contract Self-Check
-25. **Do live tests verify API response shapes?** Yes — Section 9z-M checks key allowlists and denylists on admin endpoint responses. Verify after each run.
-26. **Do live tests check for internal field leakage after SCIM operations?** Yes — 9z-M.4 creates a SCIM user (triggering cache building), then verifies admin GET returns a clean profile without `_schemaCaches`.
-27. **Are Map/Set serialization artifacts checked?** Implicitly — if `_schemaCaches` leaked, its Map fields would serialize to `{}`, caught by profile key allowlist check.
+25. **Do live tests verify API response shapes?** Yes - Section 9z-M checks key allowlists and denylists on admin endpoint responses. Verify after each run.
+26. **Do live tests check for internal field leakage after SCIM operations?** Yes - 9z-M.4 creates a SCIM user (triggering cache building), then verifies admin GET returns a clean profile without `_schemaCaches`.
+27. **Are Map/Set serialization artifacts checked?** Implicitly - if `_schemaCaches` leaked, its Map fields would serialize to `{}`, caught by profile key allowlist check.
 
 ### Reporting Self-Check
 25. **Was the report format sufficient?** Added duration, pre-existing failure documentation, and 4-target comparison table.
 26. **Were there comparison gaps?** Local uses InMemory. Docker/Azure use PostgreSQL. Standalone uses InMemory. Results should be identical for SCIM operations. Azure additionally verifies data persistence across deploys.
 
 ### Standalone Self-Check
-27. **Did `build-standalone.ps1` succeed?** Verify `standalone/start.ps1` exists and ZIP is created. **Common failure:** `node.exe access denied` if a previous standalone process is still running — kill port 9090 first.
+27. **Did `build-standalone.ps1` succeed?** Verify `standalone/start.ps1` exists and ZIP is created. **Common failure:** `node.exe access denied` if a previous standalone process is still running - kill port 9090 first.
 28. **Did the standalone server start?** Verify health check at port 9090. Common issue: bundled Node.js binary may need `--experimental-*` flags.
 29. **Did the standalone use the right persistence?** Default is InMemory. Verify with `GET /scim/admin/endpoints` returning empty initially.
 30. **Did standalone live tests pass?** Same live-test.ps1 script, different port + secret.

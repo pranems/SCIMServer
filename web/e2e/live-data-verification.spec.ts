@@ -10,7 +10,7 @@ async function apiGet(path: string) {
   return res.json();
 }
 
-test.describe('Live Data Verification — UI matches API', () => {
+test.describe('Live Data Verification - UI matches API', () => {
   test('version in footer matches /admin/version API', async ({ page }) => {
     // Wait for async version fetch
     await page.waitForTimeout(3000);

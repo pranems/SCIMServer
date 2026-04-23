@@ -1,10 +1,10 @@
-# SCIM Group Operations — Performance & Failure Analysis
+# SCIM Group Operations - Performance & Failure Analysis
 
 > **Status**: Historical analysis with current-state annotations  
 > **Last Updated**: March 1, 2026  
 > **Baseline**: SCIMServer v0.10.0
 
-> **✅ ALL ISSUES RESOLVED** — February 13, 2026 (fixes introduced in v0.9.1, retained in v0.10.0). All 3 failures fixed; 24/24 SCIM validator tests now pass.
+> **✅ ALL ISSUES RESOLVED** - February 13, 2026 (fixes introduced in v0.9.1, retained in v0.10.0). All 3 failures fixed; 24/24 SCIM validator tests now pass.
 > See also: [PERSISTENCE_PERFORMANCE_ANALYSIS.md](PERSISTENCE_PERFORMANCE_ANALYSIS.md) for the holistic 12-issue persistence analysis.
 
 **Date:** February 2026  
@@ -17,7 +17,7 @@
 
 > **Resolution:** All three Group PATCH failures have been fixed by applying fixes to buffered logging, `displayNameLower` DB push-down, and pre-transaction member resolution. The sections below retain the original analysis for reference.
 
-Three Group PATCH operations ~~fail~~ **previously failed** during the Entra SCIM Validator run. All three shared a common root — **SQLite write-lock contention** amplified by two architectural issues: request-log writes competing for the single-writer lock, and an in-memory group filter that delays responses enough to chain-stall subsequent transactions.
+Three Group PATCH operations ~~fail~~ **previously failed** during the Entra SCIM Validator run. All three shared a common root - **SQLite write-lock contention** amplified by two architectural issues: request-log writes competing for the single-writer lock, and an in-memory group filter that delays responses enough to chain-stall subsequent transactions.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -72,7 +72,7 @@ Three Group PATCH operations ~~fail~~ **previously failed** during the Entra SCI
 └─────────────────────────────────────────────────────┘
 ```
 
-**Critical constraint:** SQLite WAL allows **unlimited concurrent readers** but only **one writer at a time**. All write operations are serialized — they queue behind each other even across different tables.
+**Critical constraint:** SQLite WAL allows **unlimited concurrent readers** but only **one writer at a time**. All write operations are serialized - they queue behind each other even across different tables.
 
 ### 2.2 Request Processing Pipeline
 
@@ -107,21 +107,21 @@ Three Group PATCH operations ~~fail~~ **previously failed** during the Entra SCI
 
 ---
 
-## 3. Issue #1 — SQLite Write-Lock Contention (Critical)
+## 3. Issue #1 - SQLite Write-Lock Contention (Critical)
 
 ### 3.1 The Problem
 
 Every SCIM request goes through the `RequestLoggingInterceptor`, which fires a **fire-and-forget write** after the response:
 
 ```typescript
-// request-logging.interceptor.ts — line 88
+// request-logging.interceptor.ts - line 88
 void this.loggingService.recordRequest({ ... });
 ```
 
 The `recordRequest` method does **two writes**:
 
 ```typescript
-// logging.service.ts — line 62
+// logging.service.ts - line 62
 const created = await this.prisma.requestLog.create({ data });
 //                                          ^^^^^^^^^^^^^^^^^^^
 //                                          WRITE #1: INSERT into RequestLog
@@ -148,7 +148,7 @@ Request 1 (POST /Groups)
 │   └── void recordRequest() ──────── waits ────┤
 │       → requestLog.create()         for lock  │
 │                                               │
-Request 2 (PATCH /Groups — add member)          │
+Request 2 (PATCH /Groups - add member)          │
 ├── SCIM $transaction starts... ────── waits ───┤
 │   │                                           │
 │   │  Meanwhile, recordRequest() from Req 1    │
@@ -198,18 +198,18 @@ Request 2 (PATCH /Groups — add member)          │
 
 | Time (s) | Pending SCIM Write | Pending Log Writes | Lock Holder | SQLITE_BUSY? |
 |----------|--------------------|--------------------|-------------|-------------|
-| 0.0 | POST /Users (create) | — | POST /Users | No |
-| 0.3 | — | Log: POST /Users | Log INSERT | No |
+| 0.0 | POST /Users (create) | - | POST /Users | No |
+| 0.3 | - | Log: POST /Users | Log INSERT | No |
 | 0.5 | POST /Users (dup check) | Log: POST /Users UPDATE | Log UPDATE | **Yes** |
-| 0.8 | GET /Users filter | — | — | No (read-only) |
+| 0.8 | GET /Users filter | - | - | No (read-only) |
 | 3.0 | POST /Groups (create) | Log: GET ... | Log INSERT | No |
-| 3.3 | — | Log: POST /Groups | Log INSERT | No |
+| 3.3 | - | Log: POST /Groups | Log INSERT | No |
 | 3.5 | GET /Groups filter (dn) | Log: POST /Groups UPDATE | Log UPDATE | No (read) |
 | 13.5 | PATCH /Groups (replace) | Log: GET filter × 2 | Queued | Queued |
 | 14.0 | PATCH $transaction START | Log × 4 pending | **Contention** | **Yes** |
-| 29.0 | — | — | PATCH txn (held 15s) | — |
+| 29.0 | - | - | PATCH txn (held 15s) | - |
 | 44.0 | PATCH /Groups (member) | Log × N pending | **Stalled** | **Yes, 40s** |
-| 44.1 | — | — | **TIMEOUT** | **500** |
+| 44.1 | - | - | **TIMEOUT** | **500** |
 
 ### 3.5 The Fix: Buffered Async Logging
 
@@ -230,23 +230,23 @@ BEFORE (contention):                    AFTER (buffered):
 
 ---
 
-## 4. Issue #2 — displayName Filter Falls Back to In-Memory (High)
+## 4. Issue #2 - displayName Filter Falls Back to In-Memory (High)
 
 ### 4.1 The Problem
 
 The `GROUP_DB_COLUMNS` mapping deliberately **excludes** `displayName`:
 
 ```typescript
-// apply-scim-filter.ts — line 81
+// apply-scim-filter.ts - line 81
 const GROUP_DB_COLUMNS: Record<string, string> = {
   externalid: 'externalId',
   id: 'scimId',
-  // displayName: NOT HERE — see comment in source
+  // displayName: NOT HERE - see comment in source
 };
 ```
 
 The original comment says:
-> *displayName is intentionally excluded — SQLite performs case-sensitive comparisons by default and there is no lowercase column for displayName.*
+> *displayName is intentionally excluded - SQLite performs case-sensitive comparisons by default and there is no lowercase column for displayName.*
 
 This means when the Validator sends:
 
@@ -292,7 +292,7 @@ The filter engine does this:
 
 ### 4.2 Example: What the DB Actually Sees
 
-**Efficient path (for `userName eq` — already works):**
+**Efficient path (for `userName eq` - already works):**
 
 ```sql
 -- Pushed to DB via USER_DB_COLUMNS
@@ -302,7 +302,7 @@ WHERE endpointId = 'cmlk8st7x000ak601hv9g2bqg'
 -- Returns: 1 row, ~1ms
 ```
 
-**Inefficient path (for `displayName eq` — current behavior):**
+**Inefficient path (for `displayName eq` - current behavior):**
 
 ```sql
 -- Falls back to fetchAll because displayName not in GROUP_DB_COLUMNS
@@ -349,7 +349,7 @@ Then in `tryPushToDb`, handle case-insensitive matching by querying with Prisma'
 
 ---
 
-## 5. Issue #3 — User ID Resolution Inside Transaction (Medium)
+## 5. Issue #3 - User ID Resolution Inside Transaction (Medium)
 
 ### 5.1 The Problem
 
@@ -414,7 +414,7 @@ Transaction Timeline (30s budget):
                     ↑ 30s timeout
 ```
 
-The `SELECT` inside the transaction doesn't need to be there — it's a **read operation** that can be performed **before** the transaction starts. Moving it outside:
+The `SELECT` inside the transaction doesn't need to be there - it's a **read operation** that can be performed **before** the transaction starts. Moving it outside:
 - Reduces the transaction's wall-clock time
 - Reduces the window during which the write lock must be held
 - Makes the transaction immune to read-stalls from concurrent log writes
@@ -432,7 +432,7 @@ BEFORE (read inside transaction):
 └────────────────────────────────────────────────────────────┘
 
 AFTER (read before transaction):
-    SELECT users (outside txn — no timeout pressure)
+    SELECT users (outside txn - no timeout pressure)
     │
     ▼
 ┌─────────────── $transaction (30s timeout) ─────────────────┐
@@ -461,7 +461,7 @@ AFTER (read before transaction):
 
 | id | groupId | userId | value |
 |----|---------|--------|-------|
-| (empty — new group) | | | |
+| (empty - new group) | | | |
 
 **Transaction operations:**
 
@@ -542,34 +542,34 @@ AFTER (read before transaction):
 
 | # | Test | Status | Time | Root Cause |
 |---|------|--------|------|-----------|
-| 1 | POST /Users (create) | ✅ | 924ms | — |
-| 2 | POST /Users (duplicate) | ✅ | 989ms | — |
+| 1 | POST /Users (create) | ✅ | 924ms | - |
+| 2 | POST /Users (duplicate) | ✅ | 989ms | - |
 | 3 | GET /Users filter | ✅ | 286ms | DB push-down works |
-| 4 | GET /Users filter (non-existing) | ✅ | 279ms | — |
+| 4 | GET /Users filter (non-existing) | ✅ | 279ms | - |
 | 5 | GET /Users filter (case diff) | ✅ | 230ms | userNameLower column works |
-| 6 | PATCH /Users (replace attrs) | ✅ | 718ms | — |
-| 7 | PATCH /Users (userName) | ✅ | 753ms | — |
-| 8 | PATCH /Users (disable) | ✅ | 725ms | — |
-| 9 | PATCH /Users (add manager) | ✅ | 724ms | — |
-| 10 | PATCH /Users (replace manager) | ✅ | 1245ms | — |
-| 11 | PATCH /Users (remove manager) | ✅ | 724ms | — |
-| 12 | DELETE /Users | ✅ | 930ms | — |
-| 13 | GET /Groups/Id (excl members) | ✅ | 211ms | — |
+| 6 | PATCH /Users (replace attrs) | ✅ | 718ms | - |
+| 7 | PATCH /Users (userName) | ✅ | 753ms | - |
+| 8 | PATCH /Users (disable) | ✅ | 725ms | - |
+| 9 | PATCH /Users (add manager) | ✅ | 724ms | - |
+| 10 | PATCH /Users (replace manager) | ✅ | 1245ms | - |
+| 11 | PATCH /Users (remove manager) | ✅ | 724ms | - |
+| 12 | DELETE /Users | ✅ | 930ms | - |
+| 13 | GET /Groups/Id (excl members) | ✅ | 211ms | - |
 | 14 | GET /Groups filter (displayName, excl members) | ✅ | **10,154ms** | **Issue #2**: in-memory filter |
 | 15 | GET /Groups filter | ✅ | 248ms | externalId push-down works |
-| 16 | GET /Groups filter (non-existing) | ✅ | 239ms | — |
+| 16 | GET /Groups filter (non-existing) | ✅ | 239ms | - |
 | 17 | GET /Groups filter (case diff) | ✅ | **10,031ms** | **Issue #2**: in-memory filter |
-| 18 | POST /Groups (create) | ✅ | 302ms | — |
-| 19 | POST /Groups (duplicate) | ✅ | 474ms | — |
+| 18 | POST /Groups (create) | ✅ | 302ms | - |
+| 19 | POST /Groups (duplicate) | ✅ | 474ms | - |
 | 20 | PATCH /Groups (replace attrs) | ✅ | **30,933ms** | **Issue #1+#3**: lock contention + txn |
 | 21 | **PATCH /Groups (displayName)** | ❌ | **5,147ms** | **Issue #1**: setup POST /Groups → 500 |
 | 22 | **PATCH /Groups (add member)** | ❌ | **51,013ms** | **Issue #1+#3**: txn timeout 40086ms |
 | 23 | **PATCH /Groups (remove member)** | ❌ | **25,605ms** | Cascading from earlier 500s |
-| 24 | DELETE /Groups | ✅ | 403ms | — |
+| 24 | DELETE /Groups | ✅ | 403ms | - |
 
 ---
 
-## 8. Fix Plan — ✅ ALL IMPLEMENTED
+## 8. Fix Plan - ✅ ALL IMPLEMENTED
 
 | Fix | Issue Addressed | Change | Status |
 |-----|----------------|--------|--------|

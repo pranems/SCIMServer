@@ -5,7 +5,7 @@ import { getAuthToken } from './helpers/auth.helper';
 import { resetFixtureCounter } from './helpers/fixtures';
 
 /**
- * P4 Attribute Characteristic Fixes — E2E
+ * P4 Attribute Characteristic Fixes - E2E
  *
  * Tests for the 3 actionable items from the P4 deep analysis:
  *   SEC-1: GenericPatchEngine prototype pollution guard
@@ -13,7 +13,7 @@ import { resetFixtureCounter } from './helpers/fixtures';
  *
  * Uses a custom resource type (Devices) exercising the generic service path.
  */
-describe('P4 — Attribute Characteristic Fixes (E2E)', () => {
+describe('P4 - Attribute Characteristic Fixes (E2E)', () => {
   let app: INestApplication;
   let token: string;
   let endpointId: string;
@@ -82,7 +82,7 @@ describe('P4 — Attribute Characteristic Fixes (E2E)', () => {
 
   // ─── SEC-1: Prototype Pollution Guard (GenericPatchEngine) ─────────
 
-  describe('SEC-1 — GenericPatchEngine prototype pollution guard', () => {
+  describe('SEC-1 - GenericPatchEngine prototype pollution guard', () => {
     let deviceId: string;
 
     beforeAll(async () => {
@@ -175,7 +175,7 @@ describe('P4 — Attribute Characteristic Fixes (E2E)', () => {
 
   // ─── G3: Generic Filter caseExactAttrs Pass-Through ────────────────
 
-  describe('G3 — Generic filter caseExactAttrs pass-through', () => {
+  describe('G3 - Generic filter caseExactAttrs pass-through', () => {
     const createdIds: string[] = [];
 
     beforeAll(async () => {
@@ -207,7 +207,7 @@ describe('P4 — Attribute Characteristic Fixes (E2E)', () => {
     });
 
     it('should filter caseExact:true attr (serialNumber) case-sensitively with eq', async () => {
-      // serialNumber is caseExact:true — eq "SN-CaseTest-ABC" should match exactly 1
+      // serialNumber is caseExact:true - eq "SN-CaseTest-ABC" should match exactly 1
       const res = await request(app.getHttpServer())
         .get(`${basePath}?filter=${encodeURIComponent('serialNumber eq "SN-CaseTest-ABC"')}`)
         .set('Authorization', `Bearer ${token}`)
@@ -228,7 +228,7 @@ describe('P4 — Attribute Characteristic Fixes (E2E)', () => {
     });
 
     it('should filter caseExact:false attr (deviceName) case-insensitively', async () => {
-      // deviceName is caseExact:false — "DEVICE SN-CASETEST-ABC" should match both
+      // deviceName is caseExact:false - "DEVICE SN-CASETEST-ABC" should match both
       // "Device SN-CaseTest-ABC" and "Device SN-CaseTest-abc" case-insensitively
       // (both lowercase to "device sn-casetest-abc")
       const res = await request(app.getHttpServer())
@@ -242,7 +242,7 @@ describe('P4 — Attribute Characteristic Fixes (E2E)', () => {
 
   // ─── G1: Immutable enforcement with strict=false (unconditional) ───
 
-  describe('G1 — Immutable enforcement with StrictSchemaValidation=False', () => {
+  describe('G1 - Immutable enforcement with StrictSchemaValidation=False', () => {
     let deviceId: string;
     const originalSerial = 'SN-IMMUTABLE-001';
 
@@ -306,7 +306,7 @@ describe('P4 — Attribute Characteristic Fixes (E2E)', () => {
 
   // ─── G2: Required enforcement with strict=false (unconditional) ────
 
-  describe('G2 — Required enforcement with StrictSchemaValidation=False', () => {
+  describe('G2 - Required enforcement with StrictSchemaValidation=False', () => {
     it('should reject POST custom resource without required deviceName even with strict=false (G2)', async () => {
       const res = await request(app.getHttpServer())
         .post(basePath)

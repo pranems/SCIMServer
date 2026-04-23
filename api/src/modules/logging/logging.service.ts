@@ -1,4 +1,4 @@
-﻿import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import type { Prisma } from '../../generated/prisma/client';
 import { randomUUID } from 'crypto';
 
@@ -664,7 +664,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
       }
       return undefined;
     } catch {
-      this.logger.trace(LogCategory.DATABASE, 'deriveReportableIdentifier failed — returning undefined');
+      this.logger.trace(LogCategory.DATABASE, 'deriveReportableIdentifier failed - returning undefined');
       return undefined;
     }
   }

@@ -1,9 +1,9 @@
 /**
- * Phase 8.1 Gap Tests — V19 (prototype pollution) & V20 (reserved attributes)
+ * Phase 8.1 Gap Tests - V19 (prototype pollution) & V20 (reserved attributes)
  *
  * Tests for:
- *  V19 — __proto__ / constructor / prototype guard in PATCH engines
- *  V20 — meta & schemas stripping from rawPayload via stripReservedAttributes
+ *  V19 - __proto__ / constructor / prototype guard in PATCH engines
+ *  V20 - meta & schemas stripping from rawPayload via stripReservedAttributes
  */
 
 import { UserPatchEngine, type UserPatchState } from './user-patch-engine';
@@ -47,7 +47,7 @@ function makeGroupState(overrides: Partial<GroupPatchState> = {}): GroupPatchSta
 
 // ─── V19: Prototype pollution guard (UserPatchEngine) ─────────────────────────
 
-describe('V19 — prototype pollution guard (UserPatchEngine)', () => {
+describe('V19 - prototype pollution guard (UserPatchEngine)', () => {
   it('should reject add op with __proto__ in dot-notation path', () => {
     const ops: PatchOperation[] = [
       { op: 'add', path: '__proto__.polluted', value: true },
@@ -122,7 +122,7 @@ describe('V19 — prototype pollution guard (UserPatchEngine)', () => {
 
 // ─── V19: Prototype pollution guard (GroupPatchEngine) ────────────────────────
 
-describe('V19 — prototype pollution guard (GroupPatchEngine)', () => {
+describe('V19 - prototype pollution guard (GroupPatchEngine)', () => {
   it('should strip __proto__ from no-path replace objects', () => {
     const ops: PatchOperation[] = [
       {
@@ -169,7 +169,7 @@ describe('V19 — prototype pollution guard (GroupPatchEngine)', () => {
 
 // ─── V19: Deep dot-notation prototype pollution (UserPatchEngine) ─────────────
 
-describe('V19 — deep dot-notation prototype pollution (UserPatchEngine)', () => {
+describe('V19 - deep dot-notation prototype pollution (UserPatchEngine)', () => {
   const verboseConfig: PatchConfig = { verbosePatch: true };
 
   it('should reject deeply nested __proto__ in dot-notation path', () => {
@@ -202,7 +202,7 @@ describe('V19 — deep dot-notation prototype pollution (UserPatchEngine)', () =
 
 // ─── V20: Reserved attribute stripping (meta, schemas) ────────────────────────
 
-describe('V20 — reserved attribute stripping (UserPatchEngine)', () => {
+describe('V20 - reserved attribute stripping (UserPatchEngine)', () => {
   it('should strip meta from rawPayload when injected via add op', () => {
     const ops: PatchOperation[] = [
       {
@@ -260,9 +260,9 @@ describe('V20 — reserved attribute stripping (UserPatchEngine)', () => {
   });
 });
 
-// ─── V20: Reserved attribute stripping (UserPatchEngine) — additional ─────────
+// ─── V20: Reserved attribute stripping (UserPatchEngine) - additional ─────────
 
-describe('V20 — reserved attribute stripping — additional edge cases (UserPatchEngine)', () => {
+describe('V20 - reserved attribute stripping - additional edge cases (UserPatchEngine)', () => {
   it('should strip multiple reserved attributes in a single no-path op', () => {
     const ops: PatchOperation[] = [
       {
@@ -304,7 +304,7 @@ describe('V20 — reserved attribute stripping — additional edge cases (UserPa
 
 // ─── V20: meta stripping in GroupPatchEngine ──────────────────────────────────
 
-describe('V20 — reserved attribute stripping (GroupPatchEngine)', () => {
+describe('V20 - reserved attribute stripping (GroupPatchEngine)', () => {
   it('should strip meta from no-path replace in groups', () => {
     const ops: PatchOperation[] = [
       {
@@ -348,7 +348,7 @@ describe('V20 — reserved attribute stripping (GroupPatchEngine)', () => {
       },
     ];
     const result = GroupPatchEngine.apply(ops, makeGroupState(), groupConfig);
-    // id flows through as a generic key — service layer handles rejection
+    // id flows through as a generic key - service layer handles rejection
     expect(result.payload).toHaveProperty('id', 'injected-id');
   });
 

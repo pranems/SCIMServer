@@ -1,4 +1,4 @@
-# SCIM Validator Results #32 — Lexmark Schema Analysis
+# SCIM Validator Results #32 - Lexmark Schema Analysis
 
 > **Date:** March 19, 2026  
 > **Results File:** `scim-results (32).json`  
@@ -18,11 +18,11 @@
 | **Passed (Mandatory)** | 6 | ✅ |
 | **Failed (Mandatory)** | 2 | ❌ (False Positive) |
 | **Preview (Passed)** | 4 | ✅ |
-| **Preview (Failed)** | 0 | — |
-| **Warnings** | 0 | — |
-| **Total** | 12 | — |
+| **Preview (Failed)** | 0 | - |
+| **Warnings** | 0 | - |
+| **Total** | 12 | - |
 
-**Both failures are false positives caused by a SCIM Validator bug.** The validator discovers `badgeCode` and `pin` via `/Schemas`, sends them in POST/PATCH requests, then expects them in GET responses — ignoring the `returned: "never"` and `mutability: "writeOnly"` characteristics it discovered from the same schema. Our server is **RFC 7643 §2.4 compliant** by stripping these attributes from all responses.
+**Both failures are false positives caused by a SCIM Validator bug.** The validator discovers `badgeCode` and `pin` via `/Schemas`, sends them in POST/PATCH requests, then expects them in GET responses - ignoring the `returned: "never"` and `mutability: "writeOnly"` characteristics it discovered from the same schema. Our server is **RFC 7643 §2.4 compliant** by stripping these attributes from all responses.
 
 ### Verdict: ✅ Server is fully RFC-compliant. SFComplianceFailed = `true` is a validator issue.
 
@@ -35,7 +35,7 @@ The endpoint uses the **Lexmark** built-in preset (User-only provisioning):
 ```json
 {
   "preset": "lexmark",
-  "description": "Lexmark Cloud Print Management. User-only provisioning with EnterpriseUser (costCenter, department) and custom extension (badgeCode, pin — writeOnly/never). No Groups."
+  "description": "Lexmark Cloud Print Management. User-only provisioning with EnterpriseUser (costCenter, department) and custom extension (badgeCode, pin - writeOnly/never). No Groups."
 }
 ```
 
@@ -43,7 +43,7 @@ The endpoint uses the **Lexmark** built-in preset (User-only provisioning):
 
 | Schema URN | Resource Type | Required |
 |------------|---------------|----------|
-| `urn:ietf:params:scim:schemas:core:2.0:User` | User | — (core) |
+| `urn:ietf:params:scim:schemas:core:2.0:User` | User | - (core) |
 | `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User` | User | Yes |
 | `urn:ietf:params:scim:schemas:extension:custom:2.0:User` | User | No |
 
@@ -54,7 +54,7 @@ The endpoint uses the **Lexmark** built-in preset (User-only provisioning):
 | `badgeCode` | string | false | **true** | **writeOnly** | **never** | none |
 | `pin` | string | false | **true** | **writeOnly** | **never** | none |
 
-These attributes model a **write-only credential store** — clients write badge codes and PINs that the server persists but MUST NEVER return in any response, per RFC 7643 §2.4 (`returned: "never"`) and §2.2 (`mutability: "writeOnly"`).
+These attributes model a **write-only credential store** - clients write badge codes and PINs that the server persists but MUST NEVER return in any response, per RFC 7643 §2.4 (`returned: "never"`) and §2.2 (`mutability: "writeOnly"`).
 
 ---
 
@@ -65,9 +65,9 @@ These attributes model a **write-only credential store** — clients write badge
 | # | Test Name | Description | HTTP Status | Time | Details |
 |---|-----------|-------------|-------------|------|---------|
 | 1 | POST /Users | Create duplicate User | 409 Conflict | 791ms | Correct uniqueness enforcement on `userName` |
-| 2 | GET /Users filter | Filter for existing user | 200 OK | 375ms | 8/8 assertions pass — list response, schema URI, totalResults, Resources, required fields, serialization |
-| 3 | GET /Users filter | Filter for non-existing user | 200 OK | 240ms | 4/4 assertions pass — empty list with `totalResults: 0` |
-| 4 | GET /Users filter | Filter with different case | 200 OK | 108ms | 8/8 assertions pass — case-insensitive `userName` filter (RFC 7643 §2.3) |
+| 2 | GET /Users filter | Filter for existing user | 200 OK | 375ms | 8/8 assertions pass - list response, schema URI, totalResults, Resources, required fields, serialization |
+| 3 | GET /Users filter | Filter for non-existing user | 200 OK | 240ms | 4/4 assertions pass - empty list with `totalResults: 0` |
+| 4 | GET /Users filter | Filter with different case | 200 OK | 108ms | 8/8 assertions pass - case-insensitive `userName` filter (RFC 7643 §2.3) |
 | 5 | PATCH /Users/Id | Update User userName | 200 OK | 736ms | userName replaced successfully, ETag bumped to v2 |
 | 6 | PATCH /Users/Id | Disable User (active=false) | 200 OK | 454ms | `"active": false` in response, correct path-based PATCH |
 
@@ -84,12 +84,12 @@ These attributes model a **write-only credential store** — clients write badge
 
 | # | Test Name | HTTP | Failure Messages | Verdict |
 |---|-----------|------|------------------|---------|
-| F1 | POST /Users — "Create a new User" | 200 OK (GET) | `badgeCode is Missing`, `pin is Missing` | **False Positive** |
-| F2 | PATCH /Users/Id — "Replace Attributes" | 200 OK | `badgeCode is Missing`, `pin is Missing` | **False Positive** |
+| F1 | POST /Users - "Create a new User" | 200 OK (GET) | `badgeCode is Missing`, `pin is Missing` | **False Positive** |
+| F2 | PATCH /Users/Id - "Replace Attributes" | 200 OK | `badgeCode is Missing`, `pin is Missing` | **False Positive** |
 
 ---
 
-## 4. Root Cause Analysis — The Two Failed Tests
+## 4. Root Cause Analysis - The Two Failed Tests
 
 ### 4.1 Failed Test F1: "Create a new User"
 
@@ -141,8 +141,8 @@ The SCIM Validator's behavior contradicts RFC 7643:
 
 | RFC Requirement | Section | Our Behavior | Validator Expectation |
 |-----------------|---------|--------------|----------------------|
-| `returned: "never"` — attribute MUST NOT be returned in any response | §2.4 | ✅ Stripped from response | ❌ Expects attribute in response |
-| `mutability: "writeOnly"` — attribute is never returned | §2.2 | ✅ Stripped from response | ❌ Expects attribute in response |
+| `returned: "never"` - attribute MUST NOT be returned in any response | §2.4 | ✅ Stripped from response | ❌ Expects attribute in response |
+| `mutability: "writeOnly"` - attribute is never returned | §2.2 | ✅ Stripped from response | ❌ Expects attribute in response |
 
 **RFC 7643 §2.4 (returned → "never"):**
 > *"The attribute is NEVER returned. This may occur because the original attribute value (e.g., a hashed value) is not of use to clients. Note that an attribute with a "returned" value of "never" and a "mutability" value of "writeOnly" is equivalent to a write-only attribute."*
@@ -150,7 +150,7 @@ The SCIM Validator's behavior contradicts RFC 7643:
 **RFC 7643 §2.2 (mutability → "writeOnly"):**
 > *"The attribute may be updated at any time but SHALL NOT be returned in a SCIM response."*
 
-The double designation (`writeOnly` + `never`) is intentional for the Lexmark use case — these are credential values that the server stores but **MUST NOT echo back**. This is identical to how the `password` attribute works in standard SCIM.
+The double designation (`writeOnly` + `never`) is intentional for the Lexmark use case - these are credential values that the server stores but **MUST NOT echo back**. This is identical to how the `password` attribute works in standard SCIM.
 
 ### 4.4 The Validator Bug
 
@@ -275,7 +275,7 @@ One cosmetic observation: when all attributes inside a custom extension are `ret
 **RFC 7643 §3 says:**
 > *"Each extension schema URI MUST be unique... The extension schema URI is the 'schemas' attribute value for extension schemas."*
 
-Strictly speaking, listing an extension URN in `schemas[]` with an empty object is not an RFC violation — the extension is declared on the resource type and the schema URI correctly identifies it. However, it could be argued that omitting the URN from `schemas[]` when no visible attributes remain would be cleaner. This is a **cosmetic improvement opportunity**, not a compliance issue.
+Strictly speaking, listing an extension URN in `schemas[]` with an empty object is not an RFC violation - the extension is declared on the resource type and the schema URI correctly identifies it. However, it could be argued that omitting the URN from `schemas[]` when no visible attributes remain would be cleaner. This is a **cosmetic improvement opportunity**, not a compliance issue.
 
 **Potential Enhancement (Low Priority):**
 After stripping `returned: "never"` attributes from an extension object, check if the object is empty. If so, remove the URN from `schemas[]` and the empty object from the response. This would produce a cleaner response:
@@ -356,7 +356,7 @@ All response times are within acceptable ranges. No performance concerns.
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│  SCIM Validator Results #32 — Lexmark Schema                  │
+│  SCIM Validator Results #32 - Lexmark Schema                  │
 ├───────────────────────────────────────────────────────────────┤
 │  Total Tests:     12                                          │
 │  True Passes:     10  (6 mandatory + 4 preview)               │

@@ -1,4 +1,4 @@
-# ✅ Runtime Upgrade Report — Completed
+# ✅ Runtime Upgrade Report - Completed
 
 > **Status**: Historical completion report (retained for auditability)  
 > **Last Updated**: March 1, 2026  
@@ -6,7 +6,7 @@
 
 > **Original analysis**: February 11, 2026  
 > **Upgrade completed**: February 14, 2026  
-> **Project**: SCIMServer — NestJS + Prisma + SQLite SCIM 2.0 Server
+> **Project**: SCIMServer - NestJS + Prisma + SQLite SCIM 2.0 Server
 
 ---
 
@@ -15,7 +15,7 @@
 | Component | Before | After | Change |
 |-----------|--------|-------|--------|
 | **Node.js** (Docker) | `node:18-alpine` | `node:24-alpine` | ✅ 2 major versions |
-| **Node.js** (local dev) | v24.13.0 | v24.13.0 | — (unchanged) |
+| **Node.js** (local dev) | v24.13.0 | v24.13.0 | - (unchanged) |
 | **NestJS** | 10.4.22 | **11.1.13** | ✅ Major upgrade |
 | **Prisma** | 5.16.0 | **7.4.0** | ✅ Major upgrade |
 | **TypeScript** | 5.4.5 | **5.9.3** | ✅ Minor upgrade |
@@ -57,7 +57,7 @@
 
 ## 🔧 Breaking Changes Encountered & Fixed
 
-### 1. NestJS 11 — Route Wildcard Syntax
+### 1. NestJS 11 - Route Wildcard Syntax
 
 **Problem**: NestJS 11 uses `path-to-regexp` v8, which requires named wildcard parameters.
 
@@ -68,15 +68,15 @@
 - @Param('0')          →  @Param('path')
 ```
 
-### 2. Prisma 7 — Config Pattern Migration
+### 2. Prisma 7 - Config Pattern Migration
 
 **Change**: Prisma 7.4.0 requires a `prisma.config.ts` file and updated datasource configuration handling.
 
 **Outcome**: Migrated successfully to Prisma **7.4.0** with `prisma.config.ts` in place and all migrations, tests, and runtime flows validated.
 
-### 3. Docker — `effect` Package Deletion
+### 3. Docker - `effect` Package Deletion
 
-**Problem**: The Docker cleanup step `find -name "test*" -type d -exec rm -rf` was deleting `effect/dist/cjs/internal/testing/` — a directory that Prisma 7 CLI requires at runtime.
+**Problem**: The Docker cleanup step `find -name "test*" -type d -exec rm -rf` was deleting `effect/dist/cjs/internal/testing/` - a directory that Prisma 7 CLI requires at runtime.
 
 **Fix** in `Dockerfile`:
 ```diff
@@ -84,7 +84,7 @@
 + find ./node_modules -path "*/effect" -prune -o -name "test*" -type d -exec rm -rf {} +
 ```
 
-### 4. Docker — `npm prune --production` Removed
+### 4. Docker - `npm prune --production` Removed
 
 **Problem**: `npm prune --production` removes Prisma CLI (a devDependency), but `docker-entrypoint.sh` needs `npx prisma migrate deploy` at runtime.
 
@@ -94,7 +94,7 @@
 
 **Note**: NestJS 11 has strict peer dependency requirements. Install with `--legacy-peer-deps` flag.
 
-### 6. @typescript-eslint 7→8 — Stricter Rules
+### 6. @typescript-eslint 7→8 - Stricter Rules
 
 **Problem**: `@typescript-eslint` 8.55.0 is significantly stricter than 7.8.0. The upgrade surfaced 223 new errors from rules like `no-unsafe-argument`, `unbound-method`, `require-await`, and stricter `no-unused-vars`.
 

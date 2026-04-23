@@ -1,7 +1,7 @@
 # Logging & Observability Guide
 
 > **Version:** 4.0 · **Source-verified against:** v0.35.0 · **Rewritten:** April 13, 2026  
-> Every statement in this document references the actual source file and line — nothing is assumed.
+> Every statement in this document references the actual source file and line - nothing is assumed.
 
 ---
 
@@ -33,7 +33,7 @@
 
 ## 1. Architecture Overview
 
-SCIMServer uses a **fully custom, zero-dependency logging stack** — no Winston, Pino, Bunyan, or Morgan. The entire stack is built on NestJS `Logger`, Node.js `AsyncLocalStorage`, and plain `fs`.
+SCIMServer uses a **fully custom, zero-dependency logging stack** - no Winston, Pino, Bunyan, or Morgan. The entire stack is built on NestJS `Logger`, Node.js `AsyncLocalStorage`, and plain `fs`.
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
@@ -85,9 +85,9 @@ SCIMServer uses a **fully custom, zero-dependency logging stack** — no Winston
 ```
 
 **Source files:**
-- `api/src/modules/logging/scim-logger.service.ts` — central logger (524 lines)
-- `api/src/modules/logging/logging.module.ts` — `@Global()` module registration (27 lines)
-- `api/src/modules/logging/request-logging.interceptor.ts` — request lifecycle (146 lines)
+- `api/src/modules/logging/scim-logger.service.ts` - central logger (524 lines)
+- `api/src/modules/logging/logging.module.ts` - `@Global()` module registration (27 lines)
+- `api/src/modules/logging/request-logging.interceptor.ts` - request lifecycle (146 lines)
 
 ---
 
@@ -103,7 +103,7 @@ Defined in `api/src/modules/logging/log-levels.ts` as a TypeScript enum with asc
 | **WARN** | 3 | Recoverable anomalies: deprecated header, slow query | `stderr` / `console.warn` |
 | **ERROR** | 4 | Failed operations: auth failure, DB error | `stderr` / `console.error` |
 | **FATAL** | 5 | Unrecoverable: DB lost, secret not configured | `stderr` / `console.error` |
-| **OFF** | 6 | Suppress all output | — |
+| **OFF** | 6 | Suppress all output | - |
 
 **Parsing:** `parseLogLevel(value)` accepts case-insensitive strings (`'trace'`, `'WARN'`) or numeric values (`'0'`, `'4'`). Unknown values default to `INFO`.
 
@@ -202,7 +202,7 @@ Stack traces are included by default; controlled by `includeStackTraces` config 
 
 **Source:** `scim-logger.service.ts` lines 18–55, 104–106, 164–185
 
-The `CorrelationContext` interface tracks request lifecycle metadata across async boundaries using Node.js `AsyncLocalStorage`. No `cls-hooked` or zone.js — pure Node.js.
+The `CorrelationContext` interface tracks request lifecycle metadata across async boundaries using Node.js `AsyncLocalStorage`. No `cls-hooked` or zone.js - pure Node.js.
 
 ### Context Lifecycle
 
@@ -247,11 +247,11 @@ sequenceDiagram
 ### External Access
 
 ```typescript
-// From any module — no DI required:
+// From any module - no DI required:
 import { getCorrelationContext } from '../logging/scim-logger.service';
 
 const ctx = getCorrelationContext();
-// ctx?.requestId, ctx?.endpointId — available in error factories, guards, etc.
+// ctx?.requestId, ctx?.endpointId - available in error factories, guards, etc.
 ```
 
 This is used by `createScimError()` to auto-enrich SCIM error responses with `requestId` and `endpointId` without requiring the logger to be injected.
@@ -361,10 +361,10 @@ curl -N https://host/scim/endpoints/ep-abc123/logs/stream
 | Feature | Implementation |
 |---------|----------------|
 | **Initial event** | `event: connected\ndata: ...` with filter summary |
-| **Log events** | `data: {JSON}\n\n` — one structured entry per event |
+| **Log events** | `data: {JSON}\n\n` - one structured entry per event |
 | **Keep-alive** | `: ping {ISO-8601}\n\n` every 30 seconds |
 | **NGINX buffering** | `X-Accel-Buffering: no` header prevents proxy caching |
-| **Max listeners** | `emitter.setMaxListeners(50)` — supports 50 concurrent SSE clients |
+| **Max listeners** | `emitter.setMaxListeners(50)` - supports 50 concurrent SSE clients |
 | **Cleanup** | `res.on('close')` unsubscribes + clears interval |
 
 ### Browser Usage
@@ -439,7 +439,7 @@ Each SCIM endpoint gets isolated log access under `/scim/endpoints/:endpointId/l
 | `GET /scim/endpoints/:id/logs/download` | File download filtered by `endpointId` |
 | `GET /scim/endpoints/:id/logs/history` | Persistent DB logs filtered by URL pattern |
 
-This provides **tenant-safe log access** — per-endpoint credential holders can only see their own endpoint's log entries. The `endpointId` is taken from the URL path parameter, not from a query string, so it cannot be spoofed.
+This provides **tenant-safe log access** - per-endpoint credential holders can only see their own endpoint's log entries. The `endpointId` is taken from the URL path parameter, not from a query string, so it cannot be spoofed.
 
 The controller delegates to `LogQueryService` for shared ring buffer query, SSE stream setup, and file download logic.
 
@@ -453,7 +453,7 @@ The controller delegates to `LogQueryService` for shared ring buffer query, SSE 
 | `level` | string | Minimum level filter (TRACE/DEBUG/INFO/WARN/ERROR/FATAL) |
 | `category` | string | Category filter (http, auth, scim.user, etc.) |
 | `requestId` | UUID | Filter by correlation request ID |
-| `method` | string | Filter by HTTP method (GET, POST, PATCH, etc.) — *unique to per-endpoint, not on admin /recent* |
+| `method` | string | Filter by HTTP method (GET, POST, PATCH, etc.) - *unique to per-endpoint, not on admin /recent* |
 
 **`/logs/stream`:**
 
@@ -501,7 +501,7 @@ Every HTTP request is persisted to the database (Prisma/PostgreSQL or in-memory)
 | Max buffer size | 50 entries | Flush immediately when 50 entries accumulate |
 | Write strategy | `createMany` (single batch insert) | 1 write instead of N individual writes |
 
-> **Caveat:** The buffering mechanism means up to 3 seconds of request logs can be lost if the server crashes or is killed (SIGKILL). This is an intentional trade-off to reduce database write overhead. Graceful shutdown (SIGTERM) triggers `onModuleDestroy` which flushes the remaining buffer. The 3s/50-entry buffering **only applies to Prisma mode** — InMemory mode writes immediately to the in-memory array.
+> **Caveat:** The buffering mechanism means up to 3 seconds of request logs can be lost if the server crashes or is killed (SIGKILL). This is an intentional trade-off to reduce database write overhead. Graceful shutdown (SIGTERM) triggers `onModuleDestroy` which flushes the remaining buffer. The 3s/50-entry buffering **only applies to Prisma mode** - InMemory mode writes immediately to the in-memory array.
 
 ### Record Fields
 
@@ -510,7 +510,7 @@ Each `RequestLog` row contains:
 - `requestHeaders`, `requestBody` (JSON stringified)
 - `responseHeaders`, `responseBody` (JSON stringified)
 - `errorMessage`, `errorStack`
-- `identifier` — derived reportable identifier (userName, email, displayName)
+- `identifier` - derived reportable identifier (userName, email, displayName)
 
 ### Identifier Derivation
 
@@ -576,7 +576,7 @@ Persistent request logs can be pruned (delete entries older than N days) or clea
 | **Method** | `POST` |
 | **URL** | `/scim/admin/logs/prune?retentionDays=30` |
 | **Headers** | `Authorization: Bearer <token>` |
-| **Query params** | `retentionDays` (int, optional — defaults to `LOG_RETENTION_DAYS` env var or 30) |
+| **Query params** | `retentionDays` (int, optional - defaults to `LOG_RETENTION_DAYS` env var or 30) |
 
 **Request:**
 
@@ -811,7 +811,7 @@ Every config change is logged at INFO level with before/after values:
 | `LOG_INCLUDE_STACKS` | `true` | Include stack traces in ERROR/FATAL |
 | `LOG_MAX_PAYLOAD_SIZE` | `8192` (8 KB) | Max bytes before payload truncation in log data |
 | `LOG_RING_BUFFER_SIZE` | `2000` | Ring buffer capacity (entries) |
-| `LOG_SLOW_REQUEST_MS` | `2000` | Slow request threshold (ms) — emits WARN |
+| `LOG_SLOW_REQUEST_MS` | `2000` | Slow request threshold (ms) - emits WARN |
 | `LOG_FILE` | `logs/scimserver.log` | Main log file path. Set to `""` to disable. |
 | `LOG_FILE_MAX_SIZE` | `10485760` (10 MB) | Max file size before rotation |
 | `LOG_FILE_MAX_COUNT` | `3` | Number of rotated files to keep |
@@ -826,10 +826,10 @@ The system uses **tiered log levels** based on HTTP status codes and operation c
 
 | Status / Event | Level | Rationale |
 |---------------|-------|-----------|
-| 5xx | **ERROR** | Server fault — operator should investigate |
+| 5xx | **ERROR** | Server fault - operator should investigate |
 | 401 / 403 | **WARN** | Potential security event |
 | 404 | **DEBUG** | Routine probe (especially from Entra ID) |
-| Other 4xx (400, 409, 412, 415) | **INFO** | Client error — logged for traceability |
+| Other 4xx (400, 409, 412, 415) | **INFO** | Client error - logged for traceability |
 | Request start | **DEBUG** | Operational detail (not business event) |
 | Request body | **TRACE** | Full payload detail |
 | Response completion | **DEBUG** | Operational detail with duration |
@@ -898,7 +898,7 @@ Configurable via:
 
 **Source:** `log-config.controller.ts` lines 232–246
 
-The `GET /scim/admin/log-config/audit` endpoint returns audit trail entries — CONFIG, ENDPOINT, and AUTH category logs from the ring buffer:
+The `GET /scim/admin/log-config/audit` endpoint returns audit trail entries - CONFIG, ENDPOINT, and AUTH category logs from the ring buffer:
 
 ```json
 {
@@ -1038,7 +1038,7 @@ Invoke-RestMethod "$base/scim/admin/version" -Headers $h | ConvertTo-Json -Depth
 
 ## 19. Troubleshooting Log-Related Issues
 
-### TL-01: "No entries in ring buffer" — logs disappeared
+### TL-01: "No entries in ring buffer" - logs disappeared
 
 **Symptom:** `GET /scim/admin/log-config/recent?requestId=abc` returns `{"count": 0, "entries": []}`.
 
@@ -1064,7 +1064,7 @@ Invoke-RestMethod "$base/scim/admin/version" -Headers $h | ConvertTo-Json -Depth
 
 **Symptom:** Thousands of TRACE/DEBUG lines in stdout.
 
-**Resolution — runtime (no restart):**
+**Resolution - runtime (no restart):**
 ```bash
 # Set to INFO (suppress DEBUG/TRACE)
 curl -X PUT https://host/scim/admin/log-config/level/INFO \
@@ -1075,7 +1075,7 @@ curl -X PUT https://host/scim/admin/log-config/category/http/WARN \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-**Resolution — env var (restart required):**
+**Resolution - env var (restart required):**
 ```bash
 LOG_LEVEL=INFO
 LOG_CATEGORY_LEVELS=http=WARN,scim.filter=WARN
@@ -1115,7 +1115,7 @@ curl -X PUT https://host/scim/admin/log-config \
 **Resolution:** The server sends `X-Accel-Buffering: no` but some proxies may still buffer. Check:
 1. NGINX: add `proxy_buffering off;` in your location block
 2. Azure Container Apps: SSE works out of the box (no proxy buffering by default)
-3. Verify with: `curl -N -v https://host/scim/admin/log-config/stream` — look for the `event: connected` line
+3. Verify with: `curl -N -v https://host/scim/admin/log-config/stream` - look for the `event: connected` line
 
 ---
 
@@ -1126,7 +1126,7 @@ curl -X PUT https://host/scim/admin/log-config \
 **Cause:** File logging is disabled or path is not writable.
 
 **Resolution:**
-1. Check `LOG_FILE` env var — empty string `""` disables file logging
+1. Check `LOG_FILE` env var - empty string `""` disables file logging
 2. Default path is `logs/scimserver.log` relative to working directory
 3. In Docker: ensure volume mount exists and is writable
 4. Check permissions: the Node.js process needs write access to the directory
@@ -1311,7 +1311,7 @@ sequenceDiagram
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `endpoint-log.controller.ts` | 127 | `/scim/endpoints/:id/logs/*` — recent, stream, download, history |
+| `endpoint-log.controller.ts` | 127 | `/scim/endpoints/:id/logs/*` - recent, stream, download, history |
 
 ### Test Coverage
 
@@ -1324,16 +1324,16 @@ sequenceDiagram
 | `file-log-transport.spec.ts` | 137 | Unit |
 | `rotating-file-writer.spec.ts` | 85 | Unit |
 | `endpoint-log.controller.spec.ts` | 218 | Unit |
-| `admin.controller.spec.ts` (log routes) | — | Unit |
-| `activity.controller.spec.ts` | — | Unit |
-| `database.controller.spec.ts` | — | Unit |
-| `database.service.spec.ts` | — | Unit |
+| `admin.controller.spec.ts` (log routes) | - | Unit |
+| `activity.controller.spec.ts` | - | Unit |
+| `database.controller.spec.ts` | - | Unit |
+| `database.service.spec.ts` | - | Unit |
 | `log-config.e2e-spec.ts` | 350 | E2E |
 | `endpoint-scoped-logs.e2e-spec.ts` | 126 | E2E |
 | `rca-diagnostics.e2e-spec.ts` | 171 | E2E |
 | `error-handling.e2e-spec.ts` | 345 | E2E |
 | `http-error-codes.e2e-spec.ts` | 165 | E2E |
-| `scripts/live-test.ps1` (Section 9j) | — | Live integration |
+| `scripts/live-test.ps1` (Section 9j) | - | Live integration |
 
 ---
 

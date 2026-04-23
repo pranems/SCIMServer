@@ -149,7 +149,7 @@ describe('Group Lifecycle (E2E)', () => {
     it('should allow PUT with same displayName (self-update)', async () => {
       const group = (await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'SelfUpdate' })).expect(201)).body;
 
-      // PUT same group with same displayName — should succeed
+      // PUT same group with same displayName - should succeed
       const replacement = validGroup({ displayName: 'SelfUpdate' });
       const res = await scimPut(app, `${basePath}/Groups/${group.id}`, token, replacement).expect(200);
       expect(res.body.displayName).toBe('SelfUpdate');
@@ -159,7 +159,7 @@ describe('Group Lifecycle (E2E)', () => {
       const groupA = (await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'ExtA', externalId: 'ext-a' } as any)).expect(201)).body;
       const groupB = (await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'ExtB', externalId: 'ext-b' } as any)).expect(201)).body;
 
-      // PUT groupB with groupA's externalId — allowed since v0.33.0
+      // PUT groupB with groupA's externalId - allowed since v0.33.0
       const replacement = { ...validGroup({ displayName: 'ExtB-Updated' }), externalId: 'ext-a' };
       const res = await scimPut(app, `${basePath}/Groups/${groupB.id}`, token, replacement).expect(200);
       expect(res.body.externalId).toBe('ext-a');
@@ -245,7 +245,7 @@ describe('Group Lifecycle (E2E)', () => {
       await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'ExistingGroup' })).expect(201);
       const groupB = (await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'ToBeRenamed' })).expect(201)).body;
 
-      // PATCH to a new unique name — should succeed
+      // PATCH to a new unique name - should succeed
       const res = await scimPatch(
         app,
         `${basePath}/Groups/${groupB.id}`,
@@ -261,7 +261,7 @@ describe('Group Lifecycle (E2E)', () => {
       await scimPost(app, `${basePath}/Groups`, token, { ...validGroup({ displayName: 'PatchExtA' }), externalId: 'ext-patch-a' }).expect(201);
       const groupB = (await scimPost(app, `${basePath}/Groups`, token, { ...validGroup({ displayName: 'PatchExtB' }), externalId: 'ext-patch-b' }).expect(201)).body;
 
-      // PATCH groupB's externalId to groupA's externalId — allowed since v0.33.0
+      // PATCH groupB's externalId to groupA's externalId - allowed since v0.33.0
       const res = await scimPatch(
         app,
         `${basePath}/Groups/${groupB.id}`,
@@ -290,7 +290,7 @@ describe('Group Lifecycle (E2E)', () => {
       await scimDelete(app, `${basePath}/Groups/does-not-exist`, token).expect(404);
     });
 
-    it('should be idempotent — second delete returns 404', async () => {
+    it('should be idempotent - second delete returns 404', async () => {
       const created = (await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)).body;
 
       await scimDelete(app, `${basePath}/Groups/${created.id}`, token).expect(204);

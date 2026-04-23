@@ -366,7 +366,7 @@ describe('BulkProcessorService', () => {
 
       const result = await service.process(endpointId, ops, baseUrl, config, 1);
 
-      // Only 1 operation should be in results (the error) — rest skipped
+      // Only 1 operation should be in results (the error) - rest skipped
       expect(result.Operations).toHaveLength(1);
       expect(result.Operations[0].status).toBe('409');
     });
@@ -430,7 +430,7 @@ describe('BulkProcessorService', () => {
 
       const result = await service.process(endpointId, ops, baseUrl, config);
       expect(result.Operations[0].status).toBe('500');
-      // Must NOT leak raw error message — use generic detail
+      // Must NOT leak raw error message - use generic detail
       expect(result.Operations[0].response?.detail).toBe('Internal server error');
     });
 

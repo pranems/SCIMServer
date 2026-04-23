@@ -1,12 +1,12 @@
 /**
- * Shared SCIM Service Helpers (G17 — Service Deduplication)
+ * Shared SCIM Service Helpers (G17 - Service Deduplication)
  *
  * Extracts duplicate private methods from EndpointScimUsersService and
  * EndpointScimGroupsService into reusable pure functions and a
  * parameterized SchemaHelpers class.
  *
- * @see RFC 7643 §2.1 — Attribute Characteristics
- * @see RFC 7644 §3.14 — ETag/If-Match
+ * @see RFC 7643 §2.1 - Attribute Characteristics
+ * @see RFC 7644 §3.14 - ETag/If-Match
  */
 
 import { createScimError } from './scim-errors';
@@ -63,7 +63,7 @@ export function handleRepositoryError(
       diagnostics: { errorCode: 'DATABASE_ERROR', triggeredBy: 'database' },
     });
   }
-  // Non-RepositoryError — re-throw for GlobalExceptionFilter
+  // Non-RepositoryError - re-throw for GlobalExceptionFilter
   throw error;
 }
 
@@ -134,7 +134,7 @@ export function ensureSchema(schemas: string[] | undefined, requiredSchema: stri
  * Phase 7: Pre-write If-Match enforcement (RFC 7644 §3.14).
  *
  * When the client sends an If-Match header, the resource's current version-based
- * ETag must match — otherwise 412 Precondition Failed is thrown BEFORE the write.
+ * ETag must match - otherwise 412 Precondition Failed is thrown BEFORE the write.
  * When RequireIfMatch is enabled, a missing If-Match header → 428 Precondition Required.
  */
 export function enforceIfMatch(
@@ -170,9 +170,9 @@ export function enforceIfMatch(
  * `active` is string).
  *
  * Parent path convention (URN-qualified dot-paths):
- * - `urn:...:core:2.0:user`           — core schema top-level attributes
- * - `urn:...:enterprise:2.0:user`     — extension top-level attributes
- * - `urn:...:core:2.0:user.emails`    — sub-attributes of core complex parent
+ * - `urn:...:core:2.0:user`           - core schema top-level attributes
+ * - `urn:...:enterprise:2.0:user`     - extension top-level attributes
+ * - `urn:...:core:2.0:user.emails`    - sub-attributes of core complex parent
  *
  * At runtime:
  * - When encountering a key starting with `urn:`, switch parentPath to that URN
@@ -357,7 +357,7 @@ export const SCIM_WARNING_URN = 'urn:scimserver:api:messages:2.0:Warning';
  * @param schemaDefinitions - Core + extension schema definitions
  * @returns Array of stripped attribute names (for logging/warning)
  *
- * @see RFC 7643 §2.2 — readOnly attributes SHALL be ignored by the server
+ * @see RFC 7643 §2.2 - readOnly attributes SHALL be ignored by the server
  */
 export function stripReadOnlyAttributes(
   payload: Record<string, unknown>,
@@ -369,7 +369,7 @@ export function stripReadOnlyAttributes(
 
   // Strip core readOnly attributes (case-insensitive)
   for (const key of Object.keys(payload)) {
-    // Never strip 'schemas' — it's structural, not a user attribute
+    // Never strip 'schemas' - it's structural, not a user attribute
     if (key.toLowerCase() === 'schemas') continue;
 
     if (core.has(key.toLowerCase())) {
@@ -476,12 +476,12 @@ export function stripReadOnlyAttributes(
  * Filter PATCH operations that target readOnly attributes.
  *
  * Removes operations whose target attribute is `mutability: 'readOnly'`.
- * Operations targeting `id` are NEVER stripped — they are kept so G8c can
+ * Operations targeting `id` are NEVER stripped - they are kept so G8c can
  * hard-reject them with 400 (id modification must always fail).
  *
  * Handles three PATCH operation forms:
- * 1. Path-based ops (`path: "groups"`) — resolve path → check readOnly
- * 2. No-path ops with object value — check each key in value object
+ * 1. Path-based ops (`path: "groups"`) - resolve path → check readOnly
+ * 2. No-path ops with object value - check each key in value object
  * 3. Extension URN path ops (`path: "urn:...extensionAttr"`)
  *
  * @param operations        - Array of PATCH operations (not mutated)
@@ -507,10 +507,10 @@ export function stripReadOnlyPatchOps(
 
   for (const op of operations) {
     if (op.path) {
-      // Path-based operation — resolve the target attribute
+      // Path-based operation - resolve the target attribute
       const targetAttr = resolvePathToAttrName(op.path, extensionSchemaMap);
 
-      // NEVER strip operations targeting 'id' — let G8c hard-reject
+      // NEVER strip operations targeting 'id' - let G8c hard-reject
       if (targetAttr.toLowerCase() === 'id') {
         filtered.push(op);
         continue;
@@ -553,12 +553,12 @@ export function stripReadOnlyPatchOps(
         filtered.push(op);
       }
     } else if (op.value && typeof op.value === 'object' && !Array.isArray(op.value)) {
-      // No-path operation — check each key in the value object
+      // No-path operation - check each key in the value object
       const valueObj = { ...(op.value as Record<string, unknown>) };
       let modified = false;
 
       for (const key of Object.keys(valueObj)) {
-        // Never strip 'id' — let G8c reject
+        // Never strip 'id' - let G8c reject
         if (key.toLowerCase() === 'id') continue;
 
         if (core.has(key.toLowerCase())) {
@@ -611,10 +611,10 @@ export function stripReadOnlyPatchOps(
       if (Object.keys(valueObj).length > 0) {
         filtered.push(modified ? { ...op, value: valueObj } : op);
       } else {
-        // All keys were readOnly — entire operation is stripped
+        // All keys were readOnly - entire operation is stripped
       }
     } else {
-      // Non-object value or array value — keep as-is
+      // Non-object value or array value - keep as-is
       filtered.push(op);
     }
   }
@@ -642,7 +642,7 @@ function resolvePathToAttrName(
     }
   }
 
-  // Core attribute — first segment
+  // Core attribute - first segment
   return clean.split('.')[0];
 }
 
@@ -680,7 +680,7 @@ export class ScimSchemaHelpers {
   private getProfileAwareSchemaDefinitions(): SchemaDefinition[] {
     const profile = this.endpointContextStorage?.getProfile?.();
     if (!profile?.schemas || profile.schemas.length === 0) {
-      // No profile or no profile schemas — fall back to global registry only
+      // No profile or no profile schemas - fall back to global registry only
       return this.getGlobalSchemaDefinitions();
     }
 
@@ -746,7 +746,7 @@ export class ScimSchemaHelpers {
   }
 
   /**
-   * Strict Schema Validation — when StrictSchemaValidation is enabled, reject
+   * Strict Schema Validation - when StrictSchemaValidation is enabled, reject
    * any request body that contains extension URN keys not listed in the
    * request's `schemas[]` array or not registered for this endpoint.
    *
@@ -816,7 +816,7 @@ export class ScimSchemaHelpers {
    * G2 fix: Required attribute checks now run unconditionally on create/replace
    * (RFC 7643 §2.4 "MUST"). Type/unknown validation remains strict-gated.
    *
-   * @see RFC 7643 §2.1 — Attribute Characteristics
+   * @see RFC 7643 §2.1 - Attribute Characteristics
    */
   validatePayloadSchema(
     dto: Record<string, unknown>,
@@ -1104,17 +1104,17 @@ export class ScimSchemaHelpers {
    * Falls back to profile.resourceTypes scan, then global registry.
    *
    * Note: reads _schemaCaches directly (not via getSchemaCache()) to avoid
-   * circular calls — getSchemaCache() calls getExtensionUrns() during build.
+   * circular calls - getSchemaCache() calls getExtensionUrns() during build.
    */
   getExtensionUrns(endpointId?: string): readonly string[] {
-    // Check cache directly — avoid getSchemaCache() to prevent circular call
+    // Check cache directly - avoid getSchemaCache() to prevent circular call
     const profile = this.endpointContextStorage?.getProfile?.();
     const cacheKey = this.coreSchemaUrn;
     if (profile?._schemaCaches?.[cacheKey]?.booleansByParent instanceof Map) {
       return profile._schemaCaches[cacheKey].extensionUrns;
     }
 
-    // Fallback: compute from profile resourceTypes — only include extensions
+    // Fallback: compute from profile resourceTypes - only include extensions
     // for resource types that use THIS service's core schema (not all RTs).
     if (profile?.resourceTypes && profile.resourceTypes.length > 0) {
       const urns = new Set<string>();
@@ -1189,13 +1189,13 @@ export class ScimSchemaHelpers {
     config?: EndpointConfig,
   ): void {
     // G1: Immutable enforcement runs unconditionally (RFC 7643 §2.2 "SHALL NOT")
-    // Previously gated by StrictSchemaValidation — removed per P4 analysis
+    // Previously gated by StrictSchemaValidation - removed per P4 analysis
 
     const cache = this.getSchemaCache(endpointId);
     let result;
 
     if (cache) {
-      // Use precomputed maps from cache — skip per-call map building
+      // Use precomputed maps from cache - skip per-call map building
       const schemas = this.buildSchemaDefinitions(incomingDto, endpointId);
       result = SchemaValidator.checkImmutable(existingPayload, incomingDto, schemas, {
         coreAttrMap: cache.coreAttrMap,
@@ -1224,7 +1224,7 @@ export class ScimSchemaHelpers {
   /**
    * Get custom extension attributes with uniqueness:'server'.
    *
-   * @see RFC 7643 §2.1 — `uniqueness: 'server'` SHOULD be unique within the endpoint
+   * @see RFC 7643 §2.1 - `uniqueness: 'server'` SHOULD be unique within the endpoint
    */
   getUniqueAttributes(endpointId?: string): Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }> {
     return this.getSchemaCache(endpointId)?.uniqueAttrs ?? [];
@@ -1246,7 +1246,7 @@ export function extractPayloadValue(
   desc: { schemaUrn: string | null; attrName: string },
 ): unknown {
   if (desc.schemaUrn === null) {
-    // Core attribute — look up at top level (case-insensitive key match)
+    // Core attribute - look up at top level (case-insensitive key match)
     for (const key of Object.keys(payload)) {
       if (key.toLowerCase() === desc.attrName.toLowerCase()) {
         return payload[key];
@@ -1255,7 +1255,7 @@ export function extractPayloadValue(
     return undefined;
   }
 
-  // Extension attribute — find the extension URN block first
+  // Extension attribute - find the extension URN block first
   for (const key of Object.keys(payload)) {
     if (key.toLowerCase() === desc.schemaUrn.toLowerCase()) {
       const extBlock = payload[key];
@@ -1295,7 +1295,7 @@ function extractFromRawPayload(
   if (typeof rawPayload === 'string') {
     try { parsed = JSON.parse(rawPayload) as Record<string, unknown>; }
     catch (err) {
-      // Corrupt JSON in rawPayload — log at debug level for observability
+      // Corrupt JSON in rawPayload - log at debug level for observability
       if (process.env.NODE_ENV !== 'test') {
         console.debug?.('[scim-helpers] extractFromRawPayload: corrupt JSON:', (err as Error).message);
       }

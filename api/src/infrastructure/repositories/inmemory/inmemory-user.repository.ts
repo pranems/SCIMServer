@@ -1,7 +1,7 @@
 /**
- * InMemoryUserRepository — IUserRepository backed by an in-memory Map.
+ * InMemoryUserRepository - IUserRepository backed by an in-memory Map.
  *
- * Phase 3: Removed userNameLower — case-insensitive comparison is done at
+ * Phase 3: Removed userNameLower - case-insensitive comparison is done at
  * query time via toLowerCase(). Suitable for testing and lightweight deployments.
  *
  * Phase 4: Uses matchesPrismaFilter() to evaluate Prisma-style WHERE clauses
@@ -110,7 +110,7 @@ export class InMemoryUserRepository implements IUserRepository {
     userName: string,
     excludeScimId?: string,
   ): Promise<UserConflictResult | null> {
-    // Only userName is checked — externalId/displayName are NOT unique per RFC 7643.
+    // Only userName is checked - externalId/displayName are NOT unique per RFC 7643.
     const lowerName = userName.toLowerCase();
     for (const user of this.users.values()) {
       if (user.endpointId !== endpointId) continue;
@@ -143,7 +143,7 @@ export class InMemoryUserRepository implements IUserRepository {
     return results;
   }
 
-  /** Clear all data — useful in test teardowns. */
+  /** Clear all data - useful in test teardowns. */
   clear(): void {
     this.users.clear();
   }

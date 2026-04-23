@@ -1,4 +1,4 @@
-﻿import {
+import {
   CallHandler,
   ExecutionContext,
   Injectable,
@@ -45,7 +45,7 @@ export class RequestLoggingInterceptor implements NestInterceptor {
           startTime: startedAt,
         },
         () => {
-          // Log incoming request (DEBUG — operational detail, not business event)
+          // Log incoming request (DEBUG - operational detail, not business event)
           this.scimLogger.debug(LogCategory.HTTP, `→ ${request.method} ${request.originalUrl ?? request.url}`, {
             userAgent: request.headers['user-agent'] as string,
             contentType: request.headers['content-type'] as string,
@@ -63,7 +63,7 @@ export class RequestLoggingInterceptor implements NestInterceptor {
             tap((responseBody: unknown) => {
               const durationMs = Date.now() - startedAt;
 
-              // Structured response log (DEBUG — operational detail)
+              // Structured response log (DEBUG - operational detail)
               this.scimLogger.debug(LogCategory.HTTP, `← ${response.statusCode} ${request.method} ${request.originalUrl ?? request.url}`, {
                 status: response.statusCode,
                 durationMs,

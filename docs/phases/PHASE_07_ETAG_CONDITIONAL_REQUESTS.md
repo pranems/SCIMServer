@@ -1,8 +1,8 @@
-# Phase 7 — ETag & Conditional Requests
+# Phase 7 - ETag & Conditional Requests
 
 **Date:** 2026-02-24  
 **Version:** 0.16.0  
-**Gaps Resolved:** G7 (If-Match NOT enforced — HIGH), G13 (ETag uses timestamp — MEDIUM)
+**Gaps Resolved:** G7 (If-Match NOT enforced - HIGH), G13 (ETag uses timestamp - MEDIUM)
 
 ## Overview
 
@@ -14,7 +14,7 @@ Phase 7 replaces the timestamp-based ETag system with a version-based, monotonic
 
 ```
 ETag format:     W/"2024-01-01T00:00:00.000Z"  (timestamp, collision-prone)
-If-Match check:  Post-write in interceptor (BROKEN — modifies THEN checks)
+If-Match check:  Post-write in interceptor (BROKEN - modifies THEN checks)
 Version column:  Existed in schema.prisma but never read or incremented
 Config flags:    No RequireIfMatch
 ```
@@ -23,7 +23,7 @@ Config flags:    No RequireIfMatch
 
 ```
 ETag format:     W/"v1", W/"v2", W/"v3", ...   (monotonic integer, deterministic)
-If-Match check:  Pre-write in service enforceIfMatch() (correct — checks THEN modifies)
+If-Match check:  Pre-write in service enforceIfMatch() (correct - checks THEN modifies)
 Version column:  Mapped in domain models, atomically incremented on every update
 Config flags:    RequireIfMatch (default: false)
 ```

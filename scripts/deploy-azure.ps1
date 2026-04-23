@@ -109,7 +109,7 @@ if (-not $ImageTag -or $ImageTag -eq '') {
         Write-Host "📦 ImageTag auto-read from api/package.json: $ImageTag" -ForegroundColor Cyan
     } else {
         $ImageTag = 'latest'
-        Write-Host "⚠️  api/package.json not found — defaulting to ImageTag='latest'" -ForegroundColor Yellow
+        Write-Host "⚠️  api/package.json not found - defaulting to ImageTag='latest'" -ForegroundColor Yellow
     }
 }
 
@@ -417,7 +417,7 @@ Write-Host "  App Name       : $AppName" -ForegroundColor White
 Write-Host "  Location       : $Location" -ForegroundColor White
 Write-Host "  Image Tag      : $ImageTag" -ForegroundColor White
 Write-Host "  GHCR Pull Mode : $([string]::IsNullOrWhiteSpace($GhcrUsername) ? 'Anonymous (public image)' : 'Authenticated (private image)')" -ForegroundColor White
-Write-Host "  Database       : $($ProvisionPostgres ? 'Provision new Flexible Server' : '(BYO — see DATABASE_URL)')" -ForegroundColor White
+Write-Host "  Database       : $($ProvisionPostgres ? 'Provision new Flexible Server' : '(BYO - see DATABASE_URL)')" -ForegroundColor White
 if ($ProvisionPostgres -and $PgLocation -ne $Location) {
     Write-Host "  PG Location    : $PgLocation (overrides main location)" -ForegroundColor Yellow
 }

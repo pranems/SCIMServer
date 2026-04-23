@@ -13,13 +13,13 @@ What are the known test failures and what are their root causes and what do you 
 Follow this systematic methodology:
 
 ### Phase 1: Discovery
-1. Locate test result files (JSON, XML, logs) — search for patterns like *-results.json, *-output.txt, test-results/
+1. Locate test result files (JSON, XML, logs) - search for patterns like *-results.json, *-output.txt, test-results/
 2. Parse results to extract: total tests, passed, failed, skipped, suite counts
 3. List every failing test by: suite name, test name, file path, line number, error message
 
 ### Phase 2: Root Cause Analysis
 4. Group failures by shared error signatures (same error message, same stack trace origin, same assertion pattern)
-5. For each group, trace to the SINGLE root cause — read the source code at the failure point
+5. For each group, trace to the SINGLE root cause - read the source code at the failure point
 6. Classify root causes:
    - **Code bug** (production code defect causing legitimate test failures)
    - **Test bug** (mock drift, missing setup, stale assertions, false positives)
@@ -30,7 +30,7 @@ Follow this systematic methodology:
 
 ### Phase 3: Fix
 9. Prioritize: fix the root cause with the LARGEST blast radius first
-10. Apply the minimal, targeted fix — do NOT refactor unrelated code
+10. Apply the minimal, targeted fix - do NOT refactor unrelated code
 11. For code bugs: cite the RFC/spec/contract that justifies the fix
 12. For test bugs: explain why the mock/setup was wrong and what the correct behavior is
 13. Run the FULL test suite after each fix to measure improvement
@@ -70,10 +70,10 @@ Output format for each root cause:
 
 | Pattern | Category | Signature | Fix Template | First Seen |
 |---------|----------|-----------|-------------|------------|
-| **Required + ReadOnly catch-22** | code-bug | Attribute is `required: true` + `mutability: 'readOnly'` — omitting fails required check, including fails readOnly check | Skip readOnly attributes in required-attribute validation; server-assigned attributes must not be required from client payloads | 2026-02-27, SchemaValidator `id` attribute |
-| **Mock consumed by prior call** | test-bug | Test calls function N times but `mockResolvedValueOnce` set only once — subsequent calls return `undefined` | Re-mock before each call, or use `mockResolvedValue` (persistent) when all calls should return the same value | 2026-02-27, G8f PUT uniqueness double-call |
-| **Cascade from unconsumed mocks** | cascade | `jest.clearAllMocks()` does NOT clear `mockResolvedValueOnce` queue — earlier failing tests leave unconsumed Once items that leak into later tests | Fix the upstream failure; cascade resolves automatically | 2026-02-27, G8f tests receiving leaked mocks |
-| **Strict mode + coercion interaction** | code-bug | Feature A (boolean coercion) enables feature B (strict schema validation) as a side effect — tests written for A trigger failures in B | Ensure feature flags are orthogonal; fix the underlying validation bug | 2026-02-27, AllowAndCoerceBooleanStrings + StrictSchemaValidation |
+| **Required + ReadOnly catch-22** | code-bug | Attribute is `required: true` + `mutability: 'readOnly'` - omitting fails required check, including fails readOnly check | Skip readOnly attributes in required-attribute validation; server-assigned attributes must not be required from client payloads | 2026-02-27, SchemaValidator `id` attribute |
+| **Mock consumed by prior call** | test-bug | Test calls function N times but `mockResolvedValueOnce` set only once - subsequent calls return `undefined` | Re-mock before each call, or use `mockResolvedValue` (persistent) when all calls should return the same value | 2026-02-27, G8f PUT uniqueness double-call |
+| **Cascade from unconsumed mocks** | cascade | `jest.clearAllMocks()` does NOT clear `mockResolvedValueOnce` queue - earlier failing tests leave unconsumed Once items that leak into later tests | Fix the upstream failure; cascade resolves automatically | 2026-02-27, G8f tests receiving leaked mocks |
+| **Strict mode + coercion interaction** | code-bug | Feature A (boolean coercion) enables feature B (strict schema validation) as a side effect - tests written for A trigger failures in B | Ensure feature flags are orthogonal; fix the underlying validation bug | 2026-02-27, AllowAndCoerceBooleanStrings + StrictSchemaValidation |
 
 ### Diagnostic Techniques
 
@@ -100,4 +100,4 @@ Output format for each root cause:
 - **First run**: Copy the prompt section into your AI assistant. It will systematically diagnose all failures.
 - **After each use**: Update the Pattern Library with new discoveries. The prompt gets smarter over time.
 - **Sharing**: Share the updated prompt (with Pattern Library) across team members so everyone benefits from accumulated diagnostic knowledge.
-- **Scope**: Works for any test framework (Jest, pytest, JUnit, etc.) — adjust command examples as needed.
+- **Scope**: Works for any test framework (Jest, pytest, JUnit, etc.) - adjust command examples as needed.

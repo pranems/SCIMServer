@@ -1,7 +1,7 @@
 /**
  * Domain models for SCIM Group resources plus group membership.
  *
- * Phase 3: Removed displayNameLower — PostgreSQL CITEXT handles case-insensitive
+ * Phase 3: Removed displayNameLower - PostgreSQL CITEXT handles case-insensitive
  * matching natively. The rawPayload field remains a JSON string at the domain
  * boundary; Prisma repositories convert to/from JSONB transparently.
  */

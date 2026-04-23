@@ -1,5 +1,5 @@
 /**
- * SCIM ETag Interceptor — RFC 7644 §3.14
+ * SCIM ETag Interceptor - RFC 7644 §3.14
  *
  * Sets the ETag response header from `meta.version` and handles
  * conditional GET via If-None-Match → 304 Not Modified.
@@ -71,7 +71,7 @@ export function assertIfMatch(
   if (!ifMatchHeader) return; // no If-Match header → allow the operation
   if (!currentVersion) return; // resource has no version → allow (lenient)
 
-  // Weak ETags: W/"..." — compare the full string including W/ prefix
+  // Weak ETags: W/"..." - compare the full string including W/ prefix
   if (ifMatchHeader !== currentVersion && ifMatchHeader !== '*') {
     throw createScimError({
       status: 412,

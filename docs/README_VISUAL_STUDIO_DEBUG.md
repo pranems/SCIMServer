@@ -1,4 +1,4 @@
-# Visual Studio — Debugging Node (SCIMServer API) Quickstart
+# Visual Studio - Debugging Node (SCIMServer API) Quickstart
 
 > Updated: March 1, 2026 · Applies to: Node 24 / SCIMServer
 
@@ -9,7 +9,7 @@ Prerequisites
 - Docker Desktop (if debugging inside container).
 - Node.js 24+ installed (for local runs).
 
-Option A — Debug the API script directly from Visual Studio (recommended)
+Option A - Debug the API script directly from Visual Studio (recommended)
 1. Open Visual Studio 2022.
 2. `File > Open > Folder...` and choose the repository root (contains the `api/` folder).
 3. In Solution Explorer expand `api/package.json` and view `Scripts`.
@@ -18,7 +18,7 @@ Option A — Debug the API script directly from Visual Studio (recommended)
 5. Set breakpoints in TypeScript files under `api/src` (e.g., `admin.controller.ts`).
 6. Make HTTP requests to `http://localhost:3000/scim/v2/...` to trigger the breakpoints.
 
-Option B — Start Node with inspector and Attach to Process
+Option B - Start Node with inspector and Attach to Process
 (Local run)
 1. Open a terminal in the `api` directory.
 2. Start the server with inspector:

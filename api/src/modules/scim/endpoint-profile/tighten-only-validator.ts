@@ -1,5 +1,5 @@
 /**
- * Tighten-Only Validator — Phase 13, Step 2.3
+ * Tighten-Only Validator - Phase 13, Step 2.3
  *
  * Validates that attribute characteristic overrides only move in the
  * "tighter" direction relative to RFC 7643 baselines. Loosening is rejected.
@@ -62,7 +62,7 @@ export function validateAttributeTightenOnly(
   const errors: TightenOnlyError[] = [];
   const attrName = provided.name ?? baseline.name;
 
-  // type — REJECT any change
+  // type - REJECT any change
   if (provided.type !== undefined && provided.type !== baseline.type) {
     errors.push({
       schemaId,
@@ -74,7 +74,7 @@ export function validateAttributeTightenOnly(
     });
   }
 
-  // multiValued — REJECT any change
+  // multiValued - REJECT any change
   if (provided.multiValued !== undefined && provided.multiValued !== baseline.multiValued) {
     errors.push({
       schemaId,
@@ -86,7 +86,7 @@ export function validateAttributeTightenOnly(
     });
   }
 
-  // required — only false → true
+  // required - only false → true
   if (provided.required !== undefined && provided.required !== baseline.required) {
     if (baseline.required === true && provided.required === false) {
       errors.push({
@@ -101,7 +101,7 @@ export function validateAttributeTightenOnly(
     // false → true is always valid (tightening)
   }
 
-  // mutability — only tighter (lower rank = tighter)
+  // mutability - only tighter (lower rank = tighter)
   if (provided.mutability !== undefined && provided.mutability !== baseline.mutability) {
     const baseRank = MUTABILITY_RANK[baseline.mutability ?? 'readWrite'];
     const provRank = MUTABILITY_RANK[provided.mutability];
@@ -117,7 +117,7 @@ export function validateAttributeTightenOnly(
     }
   }
 
-  // uniqueness — only tighter (lower rank = tighter)
+  // uniqueness - only tighter (lower rank = tighter)
   if (provided.uniqueness !== undefined && provided.uniqueness !== baseline.uniqueness) {
     const baseRank = UNIQUENESS_RANK[baseline.uniqueness ?? 'none'];
     const provRank = UNIQUENESS_RANK[provided.uniqueness];
@@ -133,7 +133,7 @@ export function validateAttributeTightenOnly(
     }
   }
 
-  // caseExact — only false → true
+  // caseExact - only false → true
   if (provided.caseExact !== undefined && provided.caseExact !== baseline.caseExact) {
     if (baseline.caseExact === true && provided.caseExact === false) {
       errors.push({
@@ -147,7 +147,7 @@ export function validateAttributeTightenOnly(
     }
   }
 
-  // returned — validate: cannot change 'never' to anything else (password)
+  // returned - validate: cannot change 'never' to anything else (password)
   if (provided.returned !== undefined && provided.returned !== baseline.returned) {
     if (baseline.returned === 'never' && provided.returned !== 'never') {
       errors.push({

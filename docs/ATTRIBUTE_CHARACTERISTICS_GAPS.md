@@ -27,7 +27,7 @@
 ^1^ Only when `StrictSchemaValidation=true`  
 ^2^ Correctly skipped per RFC 7644 §3.5.2  
 ^3^ Declared in schema constants but never consumed by validation/filtering  
-^4^ Hardcoded for userName, externalId, displayName — not schema-driven  
+^4^ Hardcoded for userName, externalId, displayName - not schema-driven  
 ^5^ Missing from all extension attribute definitions  
 ^6^ Immutable enforcement via `SchemaValidator.checkImmutable()` (old-vs-new comparison)  
 ^7^ Schema-driven caseExact-aware filtering via `apply-scim-filter.ts` column map (v0.24.0 R-CASE-1)  
@@ -42,7 +42,7 @@
 **Location:** `scim-patch-path.ts` L84, `scim-constants.ts` L22-28  
 **RFC:** 7644 §3.5.2
 
-`isExtensionPath()` and `parseExtensionPath()` default to `KNOWN_EXTENSION_URNS` — a **hardcoded array** of 5 URNs. Custom extensions registered via `EndpointSchema` table are not included.
+`isExtensionPath()` and `parseExtensionPath()` default to `KNOWN_EXTENSION_URNS` - a **hardcoded array** of 5 URNs. Custom extensions registered via `EndpointSchema` table are not included.
 
 **Impact:** PATCH operations targeting custom extension attributes (e.g., `urn:example:custom:2.0:User:field`) silently store the full URN path as a flat key in rawPayload instead of nesting under the extension namespace. This corrupts:
 - Response building (extension not in `schemas[]`)
@@ -106,7 +106,7 @@ SchemaValidator only checks for `readOnly`:
 if (attrDef.mutability === 'readOnly' && (options.mode === 'create' || options.mode === 'replace')) {
 ```
 
-`immutable` attributes (set-once, then locked) can be freely changed via PUT. Current schema constants declare `members.value` as `immutable` — this means group member IDs could theoretically be changed via PUT (though member replacement works differently in practice).
+`immutable` attributes (set-once, then locked) can be freely changed via PUT. Current schema constants declare `members.value` as `immutable` - this means group member IDs could theoretically be changed via PUT (though member replacement works differently in practice).
 
 **Fix:** Add `immutable` check: if `mode === 'replace'` and `attr.mutability === 'immutable'` → error.
 
@@ -121,18 +121,18 @@ Neither PatchEngine checks attribute mutability against schema. A `readOnly` att
 
 **Impact:** Currently low because first-class fields (userName, active, etc.) are all `readWrite`, and the User schema doesn't define any `readOnly` top-level attributes. But Group `members.value` is `immutable`, and extension attributes could have `readOnly`/`immutable` mutability.
 
-**Fix:** Not adding full schema validation to PATCH in this iteration (too complex — requires path-to-attrDef resolution). Document as known limitation.
+**Fix:** Not adding full schema validation to PATCH in this iteration (too complex - requires path-to-attrDef resolution). Document as known limitation.
 
 ---
 
-### BUG-006: `caseExact` never consulted by any code path — ✅ PARTIALLY FIXED
+### BUG-006: `caseExact` never consulted by any code path - ✅ PARTIALLY FIXED
 
 **Location:** `apply-scim-filter.ts`, `schema.prisma`  
 **RFC:** 7643 §2.2
 
 **Status:** ✅ **FIXED for `externalId`** (the only first-class `caseExact: true` string attribute).
 
-`externalId` column changed from `@db.Citext` (case-insensitive) to `@db.Text` (case-sensitive) per RFC 7643 §3.1 (`caseExact: true`). Filter engine now uses `'text'` column type for `externalId` — `co`/`sw`/`ew` operators omit `mode: 'insensitive'`, and `eq` uses PostgreSQL `TEXT =` (case-sensitive). Migration: `20260225181836_externalid_citext_to_text`.
+`externalId` column changed from `@db.Citext` (case-insensitive) to `@db.Text` (case-sensitive) per RFC 7643 §3.1 (`caseExact: true`). Filter engine now uses `'text'` column type for `externalId` - `co`/`sw`/`ew` operators omit `mode: 'insensitive'`, and `eq` uses PostgreSQL `TEXT =` (case-sensitive). Migration: `20260225181836_externalid_citext_to_text`.
 
 **Remaining:** Schema-driven `caseExact` lookup is still not implemented for dynamic/extension attributes. All first-class indexed columns (`userName`, `displayName`, `externalId`, `id`, `active`) now have correct case semantics through their column types. See `docs/EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md` for details.
 
@@ -171,7 +171,7 @@ None of the enterprise extension attributes specify `uniqueness`. Per RFC, the d
 
 **Impact:** `manager.$ref` (with `referenceTypes: ['User']`) accepts any string. Group member resolution (`resolveMemberInputs()`) does verify user existence but that's member-specific, not schema-driven.
 
-**Fix:** Not fixing — most SCIM servers don't validate referenceTypes. RFC says MAY.
+**Fix:** Not fixing - most SCIM servers don't validate referenceTypes. RFC says MAY.
 
 ---
 
@@ -225,17 +225,17 @@ Missing or malformed attribute definitions (no `type`, no `multiValued`) cause S
 | 7 | Tests for all fixes | ✅ DONE | user-patch-engine.spec.ts, group-patch-engine.spec.ts, scim-patch-path.spec.ts |
 | 8 | **H-1**: PATCH SchemaValidator integration | ✅ DONE | endpoint-scim-users.service.ts, endpoint-scim-groups.service.ts |
 | 9 | **H-2**: Immutable attribute enforcement | ✅ DONE | schema-validator.ts, endpoint-scim-users.service.ts, endpoint-scim-groups.service.ts |
-| — | Full test suite | ✅ All pass | — |
-| 10 | **BUG-006**: `caseExact` in filter evaluation — externalId CITEXT→TEXT | ✅ DONE (v0.17.2) | schema.prisma, apply-scim-filter.ts, apply-scim-filter.spec.ts, endpoint-scim-groups.service.spec.ts, scim-validator-compliance.e2e-spec.ts, live-test.ps1, migration `20260225181836_externalid_citext_to_text` |
+| - | Full test suite | ✅ All pass | - |
+| 10 | **BUG-006**: `caseExact` in filter evaluation - externalId CITEXT→TEXT | ✅ DONE (v0.17.2) | schema.prisma, apply-scim-filter.ts, apply-scim-filter.spec.ts, endpoint-scim-groups.service.spec.ts, scim-validator-compliance.e2e-spec.ts, live-test.ps1, migration `20260225181836_externalid_citext_to_text` |
 
 ### Deferred (documented, not fixing now)
 
 | # | Issue | Reason |
 |---|-------|--------|
-| ~~BUG-002~~ | ~~`returned:"never"` stripping~~ | ✅ Fixed (v0.17.4 G8e) — schema-driven `returned:'never'` stripping in `stripReturnedNever()` for all responses |
-| ~~BUG-004~~ | ~~`immutable` mutability enforcement~~ | ✅ Fixed — `SchemaValidator.checkImmutable()` + service integration |
-| ~~BUG-005~~ | ~~PATCH mutability enforcement~~ | ✅ Fixed — post-PATCH `SchemaValidator.validate()` with mode:'patch' |
-| ~~BUG-006~~ | ~~`caseExact` in filter parser~~ | ✅ Fixed (v0.17.2) — externalId changed from CITEXT→TEXT, filter engine uses `'text'` column type for case-sensitive matching |
+| ~~BUG-002~~ | ~~`returned:"never"` stripping~~ | ✅ Fixed (v0.17.4 G8e) - schema-driven `returned:'never'` stripping in `stripReturnedNever()` for all responses |
+| ~~BUG-004~~ | ~~`immutable` mutability enforcement~~ | ✅ Fixed - `SchemaValidator.checkImmutable()` + service integration |
+| ~~BUG-005~~ | ~~PATCH mutability enforcement~~ | ✅ Fixed - post-PATCH `SchemaValidator.validate()` with mode:'patch' |
+| ~~BUG-006~~ | ~~`caseExact` in filter parser~~ | ✅ Fixed (v0.17.2) - externalId changed from CITEXT→TEXT, filter engine uses `'text'` column type for case-sensitive matching |
 | BUG-009 | `referenceTypes` validation | RFC says MAY; most servers don't |
 | BUG-010 | Custom schema JSONB validation | Needs admin API changes |
 

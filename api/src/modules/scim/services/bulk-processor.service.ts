@@ -1,12 +1,12 @@
 /**
- * SCIM Bulk Processor — RFC 7644 §3.7
+ * SCIM Bulk Processor - RFC 7644 §3.7
  *
  * Processes multiple SCIM operations in a single HTTP request.
  * Supports bulkId cross-referencing: a POST operation assigns a bulkId,
  * and subsequent operations can reference it via "bulkId:<value>" in paths
  * and member value fields.
  *
- * Sequential processing — each operation completes before the next begins.
+ * Sequential processing - each operation completes before the next begins.
  * Errors are counted and processing stops when failOnErrors threshold is reached.
  *
  * @see https://datatracker.ietf.org/doc/html/rfc7644#section-3.7

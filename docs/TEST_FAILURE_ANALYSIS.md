@@ -1,4 +1,4 @@
-# Test Failure Analysis — v0.28.0
+# Test Failure Analysis - v0.28.0
 
 > **Date**: 2026-03-14  
 > **Scope**: Unit tests · E2E tests · Live integration tests  
@@ -12,7 +12,7 @@
 |-------|------:|-------:|-------:|--------:|
 | **Unit** | 2 844 (73 suites) | 2 844 | **0** | 0 |
 | **E2E** | 677 (31 suites) | 665 | **6** | 6 |
-| **Live** | 604 | 591 | **13** | — |
+| **Live** | 604 | 591 | **13** | - |
 | **Total** | **4 125** | **4 100** | **19** | 6 |
 
 All 19 failures trace to **8 distinct root causes** across 5 categories.
@@ -20,22 +20,22 @@ Unit tests are fully green.
 
 ---
 
-## Architecture Diagram — Failure Hotspots
+## Architecture Diagram - Failure Hotspots
 
 ```mermaid
 graph TD
     subgraph "E2E Failures (6)"
-        E1["Cat A — returned:never<br/>not stripped for<br/>custom extensions (2)"]
-        E2["Cat B — PATCH URN<br/>dot-split corruption (2)"]
-        E3["Cat C — Admin PATCH<br/>schema/RT mismatch (2)"]
+        E1["Cat A - returned:never<br/>not stripped for<br/>custom extensions (2)"]
+        E2["Cat B - PATCH URN<br/>dot-split corruption (2)"]
+        E3["Cat C - Admin PATCH<br/>schema/RT mismatch (2)"]
     end
 
     subgraph "Live Failures (13)"
-        L1["Cat D — logLevel<br/>clearing assertion (1)"]
-        L2["Cat E — Content-Type<br/>negotiation 415 (2)"]
-        L3["Cat F — Collection<br/>PUT/PATCH guard (2)"]
-        L4["Cat G — Immutable<br/>enforcement gap (2)"]
-        L5["Cat H — Uniqueness<br/>collision + required (6)"]
+        L1["Cat D - logLevel<br/>clearing assertion (1)"]
+        L2["Cat E - Content-Type<br/>negotiation 415 (2)"]
+        L3["Cat F - Collection<br/>PUT/PATCH guard (2)"]
+        L4["Cat G - Immutable<br/>enforcement gap (2)"]
+        L5["Cat H - Uniqueness<br/>collision + required (6)"]
     end
 
     E1 --> RC1["ScimServiceHelpers uses<br/>global SchemaRegistry only"]
@@ -59,7 +59,7 @@ graph TD
 
 ---
 
-## Category A — `returned:never` Not Stripped for Custom Extension Attributes
+## Category A - `returned:never` Not Stripped for Custom Extension Attributes
 
 ### Failing Tests (2)
 
@@ -107,15 +107,15 @@ in `toScimUserResource()` / `toScimGroupResource()` skips it.
 
 | Option | Description | Effort | Risk |
 |--------|-------------|--------|------|
-| **A — Per-endpoint schema overlay** | Pass the endpoint's profile schemas to `getReturnedCharacteristics()` alongside the global defaults. Merge before collecting. | Medium | Low |
-| **B — Profile-aware SchemaRegistry** | Make `ScimSchemaRegistry` endpoint-aware: store per-endpoint schema maps, look up by `endpointId`. | High | Medium |
-| **C — Inline strip in toScimResource** | After building the response, iterate over profile extension schemas and strip any attribute where `returned === 'never'`. No registry change needed. | Low | Low |
+| **A - Per-endpoint schema overlay** | Pass the endpoint's profile schemas to `getReturnedCharacteristics()` alongside the global defaults. Merge before collecting. | Medium | Low |
+| **B - Profile-aware SchemaRegistry** | Make `ScimSchemaRegistry` endpoint-aware: store per-endpoint schema maps, look up by `endpointId`. | High | Medium |
+| **C - Inline strip in toScimResource** | After building the response, iterate over profile extension schemas and strip any attribute where `returned === 'never'`. No registry change needed. | Low | Low |
 
 **Recommended**: Option C for a quick fix, then Option A for architectural consistency.
 
 ---
 
-## Category B — PATCH URN Dot-Split Corruption
+## Category B - PATCH URN Dot-Split Corruption
 
 ### Failing Tests (2)
 
@@ -162,21 +162,21 @@ The original extension object is never updated; a garbage sibling key is created
 
 | Option | Description | Effort | Risk |
 |--------|-------------|--------|------|
-| **A — URN guard before dot-split** | Add `key.startsWith('urn:')` check before the `key.includes('.')` branch. URN keys go directly to `rawPayload[key] = value`. | **Low** | **Low** |
-| **B — Extension-aware merge** | Pass the endpoint's profile extension URNs to the patch engine so `isExtensionPath` can recognize them. | Medium | Low |
-| **C — Both A + B** | Guard URN dots AND make the extension list endpoint-aware. | Medium | Low |
+| **A - URN guard before dot-split** | Add `key.startsWith('urn:')` check before the `key.includes('.')` branch. URN keys go directly to `rawPayload[key] = value`. | **Low** | **Low** |
+| **B - Extension-aware merge** | Pass the endpoint's profile extension URNs to the patch engine so `isExtensionPath` can recognize them. | Medium | Low |
+| **C - Both A + B** | Guard URN dots AND make the extension list endpoint-aware. | Medium | Low |
 
 **Recommended**: Option A is a 1-line fix:
 
 ```typescript
-// scim-patch-path.ts — resolveNoPathValue()
+// scim-patch-path.ts - resolveNoPathValue()
 } else if (!key.startsWith('urn:') && key.includes('.')) {
     // Dot-notation: name.givenName → update nested object
 ```
 
 ---
 
-## Category C — Admin PATCH Schema Replacement Rejects Due to RT Mismatch
+## Category C - Admin PATCH Schema Replacement Rejects Due to RT Mismatch
 
 ### Failing Tests (2)
 
@@ -216,16 +216,16 @@ exists in `schemas[]`. When schemas are replaced without also replacing RTs, dan
 
 | Option | Description | Effort | Risk |
 |--------|-------------|--------|------|
-| **A — Auto-prune RTs on schema replace** | When `schemas` are replaced, auto-prune `resourceTypes` to only those whose `schema` exists in the new set, and strip `schemaExtensions` referencing missing schemas. | Medium | Medium |
-| **B — Require RTs alongside schemas** | If `partial.schemas` is provided, require `partial.resourceTypes` too. Reject with 400 if only schemas are sent. | Low | Low |
-| **C — Fix the tests** | The tests assume schemas can be replaced independently. If this is intentionally forbidden, update the tests to also send matching `resourceTypes`. | Low | Low |
+| **A - Auto-prune RTs on schema replace** | When `schemas` are replaced, auto-prune `resourceTypes` to only those whose `schema` exists in the new set, and strip `schemaExtensions` referencing missing schemas. | Medium | Medium |
+| **B - Require RTs alongside schemas** | If `partial.schemas` is provided, require `partial.resourceTypes` too. Reject with 400 if only schemas are sent. | Low | Low |
+| **C - Fix the tests** | The tests assume schemas can be replaced independently. If this is intentionally forbidden, update the tests to also send matching `resourceTypes`. | Low | Low |
 
 **Recommended**: Option A (auto-prune) for best UX, or Option C if the current
 strict validation is intentional behavior.
 
 ---
 
-## Category D — logLevel Clearing Assertion
+## Category D - logLevel Clearing Assertion
 
 ### Failing Tests (1)
 
@@ -242,21 +242,21 @@ still has the previously-set value.
 ### Root Cause
 
 The endpoint PATCH uses deep-merge semantics for `config`/`settings`. Setting other config
-properties does **not** clear `logLevel` — it's additive. The test assumes that omitting
+properties does **not** clear `logLevel` - it's additive. The test assumes that omitting
 `logLevel` from a PATCH body clears it, but the service only merges provided keys.
 
 ### Resolution Options
 
 | Option | Description | Effort |
 |--------|-------------|--------|
-| **A — Fix test** | Explicitly send `logLevel: null` in the PATCH to clear it. | Low |
-| **B — Add clear semantics** | Support `null` values in config PATCH to explicitly remove keys. | Medium |
+| **A - Fix test** | Explicitly send `logLevel: null` in the PATCH to clear it. | Low |
+| **B - Add clear semantics** | Support `null` values in config PATCH to explicitly remove keys. | Medium |
 
 **Recommended**: Option A.
 
 ---
 
-## Category E — Content-Type Negotiation (415)
+## Category E - Content-Type Negotiation (415)
 
 ### Failing Tests (2)
 
@@ -286,14 +286,14 @@ returns a semantic 415 status.
 
 | Option | Description | Effort |
 |--------|-------------|--------|
-| **A — Content-Type guard middleware** | Add an Express middleware that checks `Content-Type` for POST/PUT/PATCH and returns 415 if not `application/json` or `application/scim+json`. | Low |
-| **B — NestJS interceptor** | Global interceptor that validates Content-Type on mutation requests. | Low |
+| **A - Content-Type guard middleware** | Add an Express middleware that checks `Content-Type` for POST/PUT/PATCH and returns 415 if not `application/json` or `application/scim+json`. | Low |
+| **B - NestJS interceptor** | Global interceptor that validates Content-Type on mutation requests. | Low |
 
-**Recommended**: Option A — a simple middleware before the JSON parser.
+**Recommended**: Option A - a simple middleware before the JSON parser.
 
 ---
 
-## Category F — Collection-Level PUT/PATCH Guard
+## Category F - Collection-Level PUT/PATCH Guard
 
 ### Failing Tests (2)
 
@@ -316,14 +316,14 @@ RFC 7644 §3.5.1 requires `PUT` and `PATCH` to target a specific resource, not a
 
 | Option | Description | Effort |
 |--------|-------------|--------|
-| **A — Explicit route guards** | Add route parameter validation requiring `:id` segment for PUT/PATCH. Return 404 if the ID param is missing or if a collection endpoint is hit. | Low |
-| **B — NestJS guard** | A global guard that validates the HTTP method against the route path pattern. | Medium |
+| **A - Explicit route guards** | Add route parameter validation requiring `:id` segment for PUT/PATCH. Return 404 if the ID param is missing or if a collection endpoint is hit. | Low |
+| **B - NestJS guard** | A global guard that validates the HTTP method against the route path pattern. | Medium |
 
 **Recommended**: Option A.
 
 ---
 
-## Category G — Immutable Attribute Enforcement (InMemory)
+## Category G - Immutable Attribute Enforcement (InMemory)
 
 ### Failing Tests (2)
 
@@ -339,7 +339,7 @@ returning 400.
 
 ### Root Cause
 
-Immutable attribute enforcement (RFC 7643 §2.2: `mutability: "immutable"` — value cannot
+Immutable attribute enforcement (RFC 7643 §2.2: `mutability: "immutable"` - value cannot
 be changed after initial creation) relies on `SchemaHelpers.checkImmutableAttributes()`,
 which uses schema definitions from the global `ScimSchemaRegistry`. In the in-memory
 backend under live test conditions, the `employeeNumber` attribute's immutable characteristic
@@ -347,21 +347,21 @@ is defined in the Enterprise User extension schema. However, the inmemory SCIM s
 helpers may not properly resolve immutable attributes for extension schemas, or the
 enforcement code path may have a gap for extension-namespace attributes in PATCH operations.
 
-This is closely related to **Category A** — the global schema registry doesn't include
+This is closely related to **Category A** - the global schema registry doesn't include
 endpoint-specific extension attribute characteristics.
 
 ### Resolution Options
 
 | Option | Description | Effort |
 |--------|-------------|--------|
-| **A — Fix schema resolution** | Same fix as Cat A — make immutable attribute detection endpoint-profile-aware. | Medium |
-| **B — Inline immutable check** | After building the PATCH result, compare extension namespace values against the original and reject changes to immutable fields. | Medium |
+| **A - Fix schema resolution** | Same fix as Cat A - make immutable attribute detection endpoint-profile-aware. | Medium |
+| **B - Inline immutable check** | After building the PATCH result, compare extension namespace values against the original and reject changes to immutable fields. | Medium |
 
 **Recommended**: Fix alongside Category A.
 
 ---
 
-## Category H — Uniqueness Collision + Required Attribute Enforcement (InMemory)
+## Category H - Uniqueness Collision + Required Attribute Enforcement (InMemory)
 
 ### Failing Tests (6)
 
@@ -388,7 +388,7 @@ calling this check consistently. The live test creates users under one endpoint
 and then attempts collisions via PUT/PATCH, which the in-memory service fails
 to catch.
 
-For **H6**, the in-memory backend doesn't validate required attributes on PUT —
+For **H6**, the in-memory backend doesn't validate required attributes on PUT -
 it relies on strict schema validation, which is only enabled when
 `StrictSchemaValidation = True`. The live test endpoint may not have it enabled.
 
@@ -396,8 +396,8 @@ it relies on strict schema validation, which is only enabled when
 
 | Option | Description | Effort |
 |--------|-------------|--------|
-| **A — Ensure PUT/PATCH uniqueness checks** | Verify `assertUniqueIdentifiersForEndpoint()` is called in the PUT and PATCH flows for the inmemory backend, with the correct `excludeScimId` parameter. | Medium |
-| **B — Required field validation** | Add `userName` presence validation in the PUT path independent of strict schema validation (RFC 7643 §7: `userName` is defined as `required`). | Low |
+| **A - Ensure PUT/PATCH uniqueness checks** | Verify `assertUniqueIdentifiersForEndpoint()` is called in the PUT and PATCH flows for the inmemory backend, with the correct `excludeScimId` parameter. | Medium |
+| **B - Required field validation** | Add `userName` presence validation in the PUT path independent of strict schema validation (RFC 7643 §7: `userName` is defined as `required`). | Low |
 
 **Recommended**: Both A and B.
 
@@ -430,18 +430,18 @@ quadrantChart
 
 | Priority | Category | Tests Fixed | Effort | Description |
 |:--------:|----------|:-----------:|--------|-------------|
-| 1 | **B** — URN dot-split | 2 | 1 line | Add `!key.startsWith('urn:')` guard in `resolveNoPathValue` |
-| 2 | **A** — returned:never | 2 | ~50 lines | Pass profile schemas to `getReturnedCharacteristics` |
-| 3 | **H** — Uniqueness | 6 | ~30 lines | Ensure PUT/PATCH call uniqueness checks + required validation |
-| 4 | **G** — Immutable | 2 | ~20 lines | Fix extension immutable enforcement (shared with A) |
-| 5 | **E** — Content-Type | 2 | ~15 lines | Add Content-Type guard middleware |
-| 6 | **F** — Collection guard | 2 | ~10 lines | Add route validation for PUT/PATCH collection endpoints |
-| 7 | **C** — Schema/RT prune | 2 | ~40 lines | Auto-prune RTs when schemas replaced, or fix tests |
-| 8 | **D** — logLevel test | 1 | 1 line | Fix live test to explicitly send `logLevel: null` |
+| 1 | **B** - URN dot-split | 2 | 1 line | Add `!key.startsWith('urn:')` guard in `resolveNoPathValue` |
+| 2 | **A** - returned:never | 2 | ~50 lines | Pass profile schemas to `getReturnedCharacteristics` |
+| 3 | **H** - Uniqueness | 6 | ~30 lines | Ensure PUT/PATCH call uniqueness checks + required validation |
+| 4 | **G** - Immutable | 2 | ~20 lines | Fix extension immutable enforcement (shared with A) |
+| 5 | **E** - Content-Type | 2 | ~15 lines | Add Content-Type guard middleware |
+| 6 | **F** - Collection guard | 2 | ~10 lines | Add route validation for PUT/PATCH collection endpoints |
+| 7 | **C** - Schema/RT prune | 2 | ~40 lines | Auto-prune RTs when schemas replaced, or fix tests |
+| 8 | **D** - logLevel test | 1 | 1 line | Fix live test to explicitly send `logLevel: null` |
 
 ---
 
-## Appendix — Test Execution Commands
+## Appendix - Test Execution Commands
 
 ```powershell
 # Unit tests (all pass)
@@ -466,4 +466,4 @@ cd scripts; pwsh -File .\live-test.ps1 -ClientSecret "localoauthsecret123"
 
 | Date | Change |
 |------|--------|
-| 2026-03-14 | Initial analysis — 19 failures across 8 root causes |
+| 2026-03-14 | Initial analysis - 19 failures across 8 root causes |

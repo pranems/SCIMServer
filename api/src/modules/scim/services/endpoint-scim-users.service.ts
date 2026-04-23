@@ -89,8 +89,8 @@ export class EndpointScimUsersService {
     this.logger.info(LogCategory.SCIM_USER, 'Creating user', { userName: dto.userName, endpointId });
     this.logger.trace(LogCategory.SCIM_USER, 'Create user payload', { body: dto as unknown as Record<string, unknown> });
 
-    // Check userName uniqueness — always 409 on conflict
-    // Note: externalId and displayName are NOT checked — saved as received per RFC 7643.
+    // Check userName uniqueness - always 409 on conflict
+    // Note: externalId and displayName are NOT checked - saved as received per RFC 7643.
     const conflict = await this.userRepo.findConflict(endpointId, dto.userName);
     if (conflict) {
       this.logger.info(LogCategory.SCIM_USER, `Uniqueness conflict on POST: userName '${dto.userName}'`, {
@@ -273,7 +273,7 @@ export class EndpointScimUsersService {
     ensureSchema(dto.schemas, SCIM_CORE_USER_SCHEMA);
     this.schemaHelpers.enforceStrictSchemaValidation(dto, endpointId, config);
 
-    // Coerce boolean strings before schema validation (same as create path — parent-aware)
+    // Coerce boolean strings before schema validation (same as create path - parent-aware)
     this.schemaHelpers.coerceBooleansByParentIfEnabled(dto as Record<string, unknown>, endpointId, config);
 
     this.schemaHelpers.validatePayloadSchema(dto, endpointId, config, 'replace');
@@ -299,7 +299,7 @@ export class EndpointScimUsersService {
     // Phase 7: Pre-write If-Match enforcement
     enforceIfMatch(user.version, ifMatch, config);
 
-    // H-2: Immutable attribute enforcement — compare existing resource with incoming payload
+    // H-2: Immutable attribute enforcement - compare existing resource with incoming payload
     this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(user), dto, endpointId, config);
 
     await this.assertUniqueUserNameForEndpoint(dto.userName, endpointId, scimId);
@@ -394,7 +394,7 @@ export class EndpointScimUsersService {
 
   /**
    * Assert userName uniqueness within the endpoint (case-insensitive).
-   * externalId and displayName are NOT checked — saved as received per RFC 7643.
+   * externalId and displayName are NOT checked - saved as received per RFC 7643.
    */
   private async assertUniqueUserNameForEndpoint(
     userName: string,
@@ -455,7 +455,7 @@ export class EndpointScimUsersService {
       }
     }
 
-    // V2: Pre-PATCH validation — validate each operation value against its schema attribute
+    // V2: Pre-PATCH validation - validate each operation value against its schema attribute
     if (strictSchemaEnabled) {
       const resultPayloadPlaceholder: Record<string, unknown> = {
         schemas: [SCIM_CORE_USER_SCHEMA],
@@ -532,7 +532,7 @@ export class EndpointScimUsersService {
       }
     }
 
-    // H-1: Post-PATCH schema validation — validate the resulting payload
+    // H-1: Post-PATCH schema validation - validate the resulting payload
     const resultPayload: Record<string, unknown> = {
       schemas: [SCIM_CORE_USER_SCHEMA],
       userName: extractedFields.userName ?? user.userName,
@@ -549,12 +549,12 @@ export class EndpointScimUsersService {
 
     // Coerce boolean strings in post-PATCH payload before schema validation.
     // PATCH filter expressions like roles[primary eq "True"] can materialise string
-    // literals into the result payload — this converts them to native booleans.
+    // literals into the result payload - this converts them to native booleans.
     this.schemaHelpers.coerceBooleansByParentIfEnabled(resultPayload, endpointId, config);
 
     this.schemaHelpers.validatePayloadSchema(resultPayload, endpointId, config, 'patch');
 
-    // H-2: Immutable attribute enforcement — compare existing state with PATCH result
+    // H-2: Immutable attribute enforcement - compare existing state with PATCH result
     this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(user), resultPayload, endpointId, config);
 
     await this.assertUniqueUserNameForEndpoint(
@@ -587,7 +587,7 @@ export class EndpointScimUsersService {
     const meta = this.buildMeta(user, baseUrl);
     const rawPayload = parseJson<Record<string, unknown>>(String(user.rawPayload ?? '{}'));
 
-    // Parent-context-aware boolean sanitization — uses precomputed Parent→Children maps
+    // Parent-context-aware boolean sanitization - uses precomputed Parent→Children maps
     // for precision. Prevents name-collision false positives (e.g., core `active` boolean
     // vs extension `active` string). Also prevents corruption of string attributes.
     const boolMap = this.schemaHelpers.getBooleansByParent(endpointId);
@@ -603,7 +603,7 @@ export class EndpointScimUsersService {
     // Remove reserved server-assigned attributes from rawPayload to prevent overwriting
     // (e.g., a client-supplied "id" in the POST body must never override scimId)
     delete rawPayload.id;
-    // Remove schemas from rawPayload — we built it dynamically above (G19 / FP-1)
+    // Remove schemas from rawPayload - we built it dynamically above (G19 / FP-1)
     delete rawPayload.schemas;
 
     return {
@@ -651,7 +651,7 @@ export class EndpointScimUsersService {
     delete additional.userName;
     delete additional.externalId;
     delete additional.active;
-    delete additional.id;  // RFC 7643 §3.1: id is assigned by the service provider — ignore client-supplied values
+    delete additional.id;  // RFC 7643 §3.1: id is assigned by the service provider - ignore client-supplied values
 
     return {
       schemas,

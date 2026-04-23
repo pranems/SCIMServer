@@ -1,4 +1,4 @@
-# Azure Container Apps Deployment Issues — Root Cause Analysis & Fixes
+# Azure Container Apps Deployment Issues - Root Cause Analysis & Fixes
 
 > **Version**: 0.11.0 · **Date**: 2026 · **Status**: All 1,357 tests passing (862 unit + 193 e2e + 302 live)
 
@@ -43,7 +43,7 @@ POST https://scimserver-app.prouddune-131ec58e.eastus.azurecontainerapps.io/scim
 }
 ```
 
-### The Flow — What Happened
+### The Flow - What Happened
 
 ```
 ┌────────────────────┐     POST /scim/oauth/token          ┌──────────────────────┐
@@ -136,7 +136,7 @@ GET  /scim/endpoints/{id}/Users/{userId} → 404 Not Found ❌
 
 The resource was successfully created but immediately unreadable.
 
-### Architecture — What Was Happening
+### Architecture - What Was Happening
 
 ```
                           Azure Container Apps
@@ -163,7 +163,7 @@ The resource was successfully created but immediately unreadable.
                      (ISOLATED)             (ISOLATED)
 ```
 
-### The Problem — Step by Step
+### The Problem - Step by Step
 
 ```
   Client                    Envoy Proxy              Replica A           Replica B
@@ -193,11 +193,11 @@ The resource was successfully created but immediately unreadable.
 
 ### Why It Happens
 
-1. **SQLite is a file-based embedded database** — the `.db` file lives on the container's local filesystem
-2. **Azure Container Apps replicas each get their own ephemeral filesystem** — there is no shared volume between replicas by default
+1. **SQLite is a file-based embedded database** - the `.db` file lives on the container's local filesystem
+2. **Azure Container Apps replicas each get their own ephemeral filesystem** - there is no shared volume between replicas by default
 3. With `maxReplicas: 2`, each replica has its **own isolated copy** of `scim.db`
 4. Writes on Replica A are invisible to Replica B
-5. The Envoy ingress proxy uses **round-robin** routing — consecutive requests from the same client may hit different replicas
+5. The Envoy ingress proxy uses **round-robin** routing - consecutive requests from the same client may hit different replicas
 
 ### Fix Applied
 
@@ -247,7 +247,7 @@ The redirection was from an HTTPS URI ('https://scimserver-app...')
 to an HTTP URI ('http://scimserver-app...').
 ```
 
-### The Architecture — TLS Termination
+### The Architecture - TLS Termination
 
 Azure Container Apps uses a **reverse proxy (Envoy)** that terminates TLS at the ingress boundary. The internal connection between the proxy and the container runs on plain HTTP:
 
@@ -293,7 +293,7 @@ if (response.statusCode === 201 && data?.meta?.location) {
 The `meta.location` value was built by the controllers using:
 
 ```typescript
-// BEFORE FIX — in all 3 endpoint controllers
+// BEFORE FIX - in all 3 endpoint controllers
 const baseUrl = `${req.protocol}://${req.get('host')}/scim/endpoints/${endpointId}`;
 ```
 
@@ -308,7 +308,7 @@ Location: http://scimserver-app.prouddune-131ec58e.eastus.azurecontainerapps.io/
            Should be HTTPS!
 ```
 
-### The Full Request Flow — Before Fix
+### The Full Request Flow - Before Fix
 
 ```
   Client (PowerShell)           Envoy Proxy                 NestJS Container
@@ -350,7 +350,7 @@ Location: http://scimserver-app.prouddune-131ec58e.eastus.azurecontainerapps.io/
          │                          │                              │
 ```
 
-### HTTP Headers Captured — Before Fix
+### HTTP Headers Captured - Before Fix
 
 **Request:**
 ```http
@@ -391,7 +391,7 @@ Location: http://scimserver-app.prouddune-131ec58e.eastus.azurecontainerapps.io/
 }
 ```
 
-### The Fix — Three Layers
+### The Fix - Three Layers
 
 #### Layer 1: Express Trust Proxy (`api/src/main.ts`)
 
@@ -426,7 +426,7 @@ export function buildBaseUrl(request: Request): string {
 **Why both `trust proxy` AND `buildBaseUrl`?**  Defense in depth:
 - `trust proxy` makes `req.protocol` work correctly (reads `X-Forwarded-Proto`)
 - `buildBaseUrl()` also reads `X-Forwarded-Proto` directly as a fallback
-- The utility also correctly includes `request.baseUrl` (e.g., `/scim`) — the old manual construction hardcoded `/scim`
+- The utility also correctly includes `request.baseUrl` (e.g., `/scim`) - the old manual construction hardcoded `/scim`
 
 #### Layer 3: Controller Refactoring (3 files)
 
@@ -459,7 +459,7 @@ $result = Microsoft.PowerShell.Utility\Invoke-RestMethod @PSBoundParameters
 $result = Microsoft.PowerShell.Utility\Invoke-RestMethod @PSBoundParameters -AllowInsecureRedirect
 ```
 
-### The Full Request Flow — After Fix
+### The Full Request Flow - After Fix
 
 ```
   Client (PowerShell)           Envoy Proxy                 NestJS Container
@@ -501,7 +501,7 @@ $result = Microsoft.PowerShell.Utility\Invoke-RestMethod @PSBoundParameters -All
          │  → GET request succeeds  │                              │
 ```
 
-### HTTP Headers Captured — After Fix
+### HTTP Headers Captured - After Fix
 
 **Response (AFTER fix):**
 ```http
@@ -510,7 +510,7 @@ Content-Type: application/scim+json; charset=utf-8
 Location: https://scimserver-app.prouddune-131ec58e.eastus.azurecontainerapps.io/scim/endpoints/ep-abc123/Users/scim-usr-xyz789
                                            ▲
                                            │
-                                     ✅ HTTPS — matches client!
+                                     ✅ HTTPS - matches client!
 
 {
   "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
@@ -544,7 +544,7 @@ TypeError: Cannot read properties of undefined (reading 'x-forwarded-proto')
 The `buildBaseUrl()` function accesses `request.headers['x-forwarded-proto']` and `request.baseUrl`. The mock `Request` objects in unit tests didn't have these properties:
 
 ```typescript
-// BEFORE — incomplete mock
+// BEFORE - incomplete mock
 const mockRequest = {
     protocol: 'http',
     get: jest.fn((header: string) => {
@@ -560,7 +560,7 @@ const mockRequest = {
 Added the missing properties to all 3 controller spec files:
 
 ```typescript
-// AFTER — complete mock
+// AFTER - complete mock
 const mockRequest = {
     protocol: 'http',
     headers: {} as Record<string, string>,     // ← ADDED
@@ -589,7 +589,7 @@ const mockRequest = {
 ### 1. Always Set `trust proxy` Behind a Reverse Proxy
 
 ```typescript
-// main.ts — REQUIRED for any cloud deployment
+// main.ts - REQUIRED for any cloud deployment
 app.set('trust proxy', true);
 ```
 
@@ -629,9 +629,9 @@ Centralizing URL construction in a utility function:
 ```
 
 For cloud deployments, choose one of:
-- **PostgreSQL / Azure SQL** — the correct production choice
-- **maxReplicas: 1** — acceptable for dev/demo/staging
-- **Sticky sessions** — fragile, not recommended
+- **PostgreSQL / Azure SQL** - the correct production choice
+- **maxReplicas: 1** - acceptable for dev/demo/staging
+- **Sticky sessions** - fragile, not recommended
 
 ### 4. Defense in Depth for Protocol Handling
 
@@ -660,9 +660,9 @@ The issues found in this deployment all stem from **environment differences**:
 | Replicas | 1 process | 1–N replicas (autoscale) |
 | Secrets | `.env` file with defaults | Environment variables (potentially auto-generated) |
 | Database | Shared file on local disk | Ephemeral per-replica filesystem |
-| `req.protocol` | `"http"` (correct) | `"http"` (WRONG — should be `"https"`) |
+| `req.protocol` | `"http"` (correct) | `"http"` (WRONG - should be `"https"`) |
 
-> **The Twelve-Factor App principle:** *"Keep development, staging, and production as similar as possible."* — https://12factor.net/dev-prod-parity
+> **The Twelve-Factor App principle:** *"Keep development, staging, and production as similar as possible."* - https://12factor.net/dev-prod-parity
 
 ### 6. RFC Compliance Matters
 
@@ -670,7 +670,7 @@ SCIM RFC 7644 §3.1 states:
 
 > *"In response to a resource creation request (HTTP POST), the server SHALL set the 'Location' header to the URI of the newly created resource."*
 
-A `Location` header with the wrong protocol (`http://` instead of `https://`) violates the spirit of this requirement — it points clients to an unreachable or insecure URL. Any SCIM-compliant client (including Entra ID) may fail when following such a redirect.
+A `Location` header with the wrong protocol (`http://` instead of `https://`) violates the spirit of this requirement - it points clients to an unreachable or insecure URL. Any SCIM-compliant client (including Entra ID) may fail when following such a redirect.
 
 ---
 

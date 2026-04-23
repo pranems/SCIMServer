@@ -1346,7 +1346,7 @@ describe('EndpointScimUsersService', () => {
   });
 
   // ═══════════════════════════════════════════════════════════
-  // UserSoftDeleteEnabled — PATCH active=false gate
+  // UserSoftDeleteEnabled - PATCH active=false gate
   // ═══════════════════════════════════════════════════════════
 
   describe('UserSoftDeleteEnabled PATCH gate', () => {
@@ -1768,7 +1768,7 @@ describe('EndpointScimUsersService', () => {
   // ───────────── SCIM ID LEAK PREVENTION (Issue 16) ─────────────
 
   describe('SCIM ID leak prevention', () => {
-    describe('createUserForEndpoint — client-supplied id must be ignored', () => {
+    describe('createUserForEndpoint - client-supplied id must be ignored', () => {
       it('should not leak client-supplied id into the response', async () => {
         const createDto: CreateUserDto = {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
@@ -1825,7 +1825,7 @@ describe('EndpointScimUsersService', () => {
       });
     });
 
-    describe('toScimUserResource — rawPayload id must never override scimId', () => {
+    describe('toScimUserResource - rawPayload id must never override scimId', () => {
       it('should use scimId even when rawPayload contains id', async () => {
         const userWithLeakedId = {
           ...mockUser,
@@ -1871,7 +1871,7 @@ describe('EndpointScimUsersService', () => {
       });
     });
 
-    describe('PATCH — stripReservedAttributes must strip id', () => {
+    describe('PATCH - stripReservedAttributes must strip id', () => {
       it('should strip id from no-path replace value', async () => {
         const patchDto: PatchUserDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
@@ -2750,9 +2750,9 @@ describe('EndpointScimUsersService', () => {
         expect(result).toBeDefined();
 
         const storedPayload = JSON.parse(mockUserRepo.create.mock.calls[0][0].rawPayload);
-        // "value" is a string-type attribute — should NOT be coerced
+        // "value" is a string-type attribute - should NOT be coerced
         expect(storedPayload.roles[0].value).toBe('true');
-        // "primary" is a boolean-type attribute — should be coerced
+        // "primary" is a boolean-type attribute - should be coerced
         expect(storedPayload.roles[0].primary).toBe(true);
       });
     });
@@ -2901,7 +2901,7 @@ describe('EndpointScimUsersService', () => {
         expect(result).toBeDefined();
 
         const storedPayload = JSON.parse(mockUserRepo.create.mock.calls[0][0].rawPayload);
-        // String pass-through — not coerced
+        // String pass-through - not coerced
         expect(storedPayload.roles[0].primary).toBe('True');
       });
     });
@@ -2909,10 +2909,10 @@ describe('EndpointScimUsersService', () => {
 
   // ───────────── G8e: returned characteristic filtering ─────────────
 
-  describe('G8e — returned characteristic filtering', () => {
+  describe('G8e - returned characteristic filtering', () => {
     const baseUrl = 'http://localhost:3000/scim/endpoints/endpoint-1';
 
-    describe('toScimUserResource — returned:never stripping', () => {
+    describe('toScimUserResource - returned:never stripping', () => {
       it('should strip password from response when rawPayload contains it', async () => {
         const userWithPassword = {
           ...mockUser,

@@ -318,7 +318,7 @@ describe('EndpointScimDiscoveryController', () => {
 
       const result = await controller.getSchemas('endpoint-1', mockRequest);
 
-      // Returns schemas — endpointId was passed so overlays would be merged
+      // Returns schemas - endpointId was passed so overlays would be merged
       expect(result.Resources).toBeDefined();
       expect(result.Resources.length).toBeGreaterThanOrEqual(3);
     });

@@ -20,7 +20,7 @@
 | 🔍 Preview      | 7     | All passing (informational) |
 | ⚠️ Warnings     | 0     | Content-Type header fixed |
 
-> **🎉 FULLY COMPLIANT** — All 13 failures resolved on February 9, 2026. The 13 failures mapped to **8 distinct root-cause bugs** (A–H), all now fixed across 4 source files. Subsequent performance fixes (introduced in v0.9.1 and retained in v0.10.0) bring the total to **24/24 SCIM validator tests passing**.
+> **🎉 FULLY COMPLIANT** - All 13 failures resolved on February 9, 2026. The 13 failures mapped to **8 distinct root-cause bugs** (A–H), all now fixed across 4 source files. Subsequent performance fixes (introduced in v0.9.1 and retained in v0.10.0) bring the total to **24/24 SCIM validator tests passing**.
 
 ---
 
@@ -28,7 +28,7 @@
 
 > **Content-Type**: Responses return `application/json; charset=utf-8` instead of `application/scim+json; charset=utf-8` per RFC 7644 §3.1.
 
-**Status**: ✅ **Fixed** — `ScimContentTypeInterceptor` created and registered globally.
+**Status**: ✅ **Fixed** - `ScimContentTypeInterceptor` created and registered globally.
 
 ---
 
@@ -36,18 +36,18 @@
 
 | # | Test Name | Method | Endpoint | Fixed? |
 |---|-----------|--------|----------|--------|
-| 1 | Create User | POST | `/Users` | — |
-| 2 | Filter for existing user | GET | `/Users?filter=userName eq "..."` | — |
-| 3 | Get User by ID | GET | `/Users/{id}` | — |
-| 4 | Disable User | PATCH | `/Users/{id}` | — |
-| 5 | Patch User – Add Attributes | PATCH | `/Users/{id}` | — |
-| 6 | Delete User | DELETE | `/Users/{id}` | — |
-| 7 | Create Group | POST | `/Groups` | — |
-| 8 | Filter for existing group | GET | `/Groups?filter=displayName eq "..."` | — |
-| 9 | Get Group by ID | GET | `/Groups/{id}` | — |
-| 10 | Group – Add Member | PATCH | `/Groups/{id}` | — |
-| 11 | Group – Remove Member | PATCH | `/Groups/{id}` | — |
-| 12 | Delete Group | DELETE | `/Groups/{id}` | — |
+| 1 | Create User | POST | `/Users` | - |
+| 2 | Filter for existing user | GET | `/Users?filter=userName eq "..."` | - |
+| 3 | Get User by ID | GET | `/Users/{id}` | - |
+| 4 | Disable User | PATCH | `/Users/{id}` | - |
+| 5 | Patch User – Add Attributes | PATCH | `/Users/{id}` | - |
+| 6 | Delete User | DELETE | `/Users/{id}` | - |
+| 7 | Create Group | POST | `/Groups` | - |
+| 8 | Filter for existing group | GET | `/Groups?filter=displayName eq "..."` | - |
+| 9 | Get Group by ID | GET | `/Groups/{id}` | - |
+| 10 | Group – Add Member | PATCH | `/Groups/{id}` | - |
+| 11 | Group – Remove Member | PATCH | `/Groups/{id}` | - |
+| 12 | Delete Group | DELETE | `/Groups/{id}` | - |
 | 13 | Patch User – Replace Attributes (valuePath) | PATCH | `/Users/{id}` | ✅ Bug C |
 | 14 | Update User userName (no-path replace) | PATCH | `/Users/{id}` | ✅ Bug A |
 | 15 | Patch User – Add Manager (enterprise ext) | PATCH | `/Users/{id}` | ✅ Bug D |
@@ -64,15 +64,15 @@
 
 ---
 
-## ~~❌ Failed Tests (13)~~ → ✅ All Fixed (Feb 9, 2026) — Detailed Breakdown
+## ~~❌ Failed Tests (13)~~ → ✅ All Fixed (Feb 9, 2026) - Detailed Breakdown
 
 > **All 13 failures below have been resolved.** Each section retains the original analysis for reference, with fix status noted.
 
 ---
 
-### FAILURE #1: Patch User — Replace Attributes (valuePath not resolved)
+### FAILURE #1: Patch User - Replace Attributes (valuePath not resolved)
 
-**Test**: `PATCH /Users/Id` — "Patch User - Replace Attributes"
+**Test**: `PATCH /Users/Id` - "Patch User - Replace Attributes"
 
 **Request**:
 ```http
@@ -117,7 +117,7 @@ Content-Type: application/scim+json; charset=utf-8
 }
 ```
 
-**Expected Response**: The `emails`, `phoneNumbers`, and `addresses` arrays should be updated **in-place** — matching the element where `type eq "work"` and modifying the specified sub-attribute:
+**Expected Response**: The `emails`, `phoneNumbers`, and `addresses` arrays should be updated **in-place** - matching the element where `type eq "work"` and modifying the specified sub-attribute:
 ```json
 {
   "emails": [{"type":"work","value":"lilian.graham@millszboncak.ca","primary":true}],
@@ -135,13 +135,13 @@ Content-Type: application/scim+json; charset=utf-8
 ```
 There is **no valuePath parser** that interprets `emails[type eq "work"].value` into "find the email with type=work, set its value".
 
-**Spec Reference**: RFC 7644 §3.5.2 — "If the target location specifies a complex attribute, a set of sub-attributes SHALL be specified..."
+**Spec Reference**: RFC 7644 §3.5.2 - "If the target location specifies a complex attribute, a set of sub-attributes SHALL be specified..."
 
 ---
 
 ### FAILURE #2: Update User userName (no-path replace not updating DB fields)
 
-**Test**: `PATCH /Users/Id` — "Update User userName"
+**Test**: `PATCH /Users/Id` - "Update User userName"
 
 **Request**:
 ```http
@@ -167,7 +167,7 @@ Content-Type: application/scim+json; charset=utf-8
   "userName": "ford_purdy@abernathypadberg.uk"
 }
 ```
-userName is **unchanged** — still shows the old value.
+userName is **unchanged** - still shows the old value.
 
 **Expected Response**:
 ```json
@@ -187,13 +187,13 @@ The `userName` key ends up in `rawPayload`, but `stripReservedAttributes()` on l
 
 The correct pattern checks `!path` first and extracts `userName`, `externalId`, and `active` (as was done in the now-removed legacy `scim-users.service.ts`).
 
-**Spec Reference**: RFC 7644 §3.5.2.3 — "If the target location is not specified, the operation is performed on the resource itself."
+**Spec Reference**: RFC 7644 §3.5.2.3 - "If the target location is not specified, the operation is performed on the resource itself."
 
 ---
 
-### FAILURE #3: Patch User — Add Manager (enterprise extension path stored as flat key)
+### FAILURE #3: Patch User - Add Manager (enterprise extension path stored as flat key)
 
-**Test**: `PATCH /Users/Id` — "Patch User - Add Manager"
+**Test**: `PATCH /Users/Id` - "Patch User - Add Manager"
 
 **Request**:
 ```http
@@ -225,7 +225,7 @@ Content-Type: application/scim+json; charset=utf-8
   }
 }
 ```
-The manager value appears **twice** — once correctly nested, once as a flat top-level key.
+The manager value appears **twice** - once correctly nested, once as a flat top-level key.
 
 **Expected Response**:
 ```json
@@ -242,13 +242,13 @@ rawPayload = { ...rawPayload, [originalPath]: operation.value };
 ```
 It does not recognize the `urn:...:User:` prefix as the enterprise extension namespace and the suffix `manager` as an attribute within that namespace.
 
-**Spec Reference**: RFC 7644 §3.10 — "For an attribute in a schema extension, the attribute name MUST be prefixed by the schema's URN."
+**Spec Reference**: RFC 7644 §3.10 - "For an attribute in a schema extension, the attribute name MUST be prefixed by the schema's URN."
 
 ---
 
-### FAILURE #4: Patch User — Replace Manager
+### FAILURE #4: Patch User - Replace Manager
 
-**Test**: `PATCH /Users/Id` — "Patch User - Replace Manager"
+**Test**: `PATCH /Users/Id` - "Patch User - Replace Manager"
 
 **Request**:
 ```http
@@ -268,7 +268,7 @@ PATCH /scim/endpoints/.../Users/8fac5053-... HTTP/1.1
 }
 ```
 
-**Actual Response**: Same problem as Failure #3 — the path is stored as a flat key.
+**Actual Response**: Same problem as Failure #3 - the path is stored as a flat key.
 
 **Expected Response**: The `manager` key within `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User` should be updated to `{"value": "CBEQXYNPNAZS"}`.
 
@@ -276,9 +276,9 @@ PATCH /scim/endpoints/.../Users/8fac5053-... HTTP/1.1
 
 ---
 
-### FAILURE #5: Patch User — Remove Manager
+### FAILURE #5: Patch User - Remove Manager
 
-**Test**: `PATCH /Users/Id` — "Patch User - Remove Manager"
+**Test**: `PATCH /Users/Id` - "Patch User - Remove Manager"
 
 **Request**:
 ```http
@@ -304,7 +304,7 @@ PATCH /scim/endpoints/.../Users/8fac5053-... HTTP/1.1
   "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:manager": ""
 }
 ```
-The manager is NOT actually removed from the nested extension — only the flat key is set to `""`.
+The manager is NOT actually removed from the nested extension - only the flat key is set to `""`.
 
 **Expected Response**:
 ```json
@@ -332,13 +332,13 @@ This can't navigate into nested objects like the enterprise extension.
 
 ### FAILURE #6: Filter for existing user with different case
 
-**Test**: `GET /Users?filter=` — "Filter for an existing user with a different case"
+**Test**: `GET /Users?filter=` - "Filter for an existing user with a different case"
 
 **Request**:
 ```http
 GET /scim/endpoints/.../Users?filter=userName+eq+"FORD_PURDY@ABERNATHYPADBERG.UK" HTTP/1.1
 ```
-(User was created with `userName = "ford_purdy@abernathypadberg.uk"` — lowercase)
+(User was created with `userName = "ford_purdy@abernathypadberg.uk"` - lowercase)
 
 **Actual Response** (200 OK):
 ```json
@@ -363,19 +363,19 @@ case 'userName':
 ```
 No `mode: 'insensitive'` option is used.
 
-**Spec Reference**: RFC 7644 §3.4.2.2 — "Comparison of Strings is case insensitive unless the attribute type definition specifies a `caseExact` value of true."
+**Spec Reference**: RFC 7644 §3.4.2.2 - "Comparison of Strings is case insensitive unless the attribute type definition specifies a `caseExact` value of true."
 
 ---
 
 ### FAILURE #7: Filter for existing group with different case
 
-**Test**: `GET /Groups?filter=` — "Filter for an existing group with a different case"
+**Test**: `GET /Groups?filter=` - "Filter for an existing group with a different case"
 
 **Request**:
 ```http
 GET /scim/endpoints/.../Groups?filter=displayName+eq+"uhyywkurutzs" HTTP/1.1
 ```
-(Group was created with `displayName = "UHYYWKURUTZS"` — uppercase)
+(Group was created with `displayName = "UHYYWKURUTZS"` - uppercase)
 
 **Actual Response** (200 OK):
 ```json
@@ -398,7 +398,7 @@ return { displayName: match[2] };  // case-SENSITIVE
 
 ### FAILURE #8: Get group by ID excluding members
 
-**Test**: `GET /Groups/Id` — "Get group by id excluding members"
+**Test**: `GET /Groups/Id` - "Get group by id excluding members"
 
 **Request**:
 ```http
@@ -424,30 +424,30 @@ The `members` key should be **absent** from the response.
 
 **Root Cause**: `excludedAttributes` query parameter is not implemented anywhere in the codebase. A grep for `excludedAttributes` across all source files returns **zero results**.
 
-**Spec Reference**: RFC 7644 §3.4.2.5 — "When specified, each resource returned MUST NOT contain the attributes listed."
+**Spec Reference**: RFC 7644 §3.4.2.5 - "When specified, each resource returned MUST NOT contain the attributes listed."
 
 ---
 
 ### FAILURE #9: Filter for existing group excluding members
 
-**Test**: `GET /Groups?filter=` — "Filter for existing group excluding members"
+**Test**: `GET /Groups?filter=` - "Filter for existing group excluding members"
 
 **Request**:
 ```http
 GET /scim/endpoints/.../Groups?excludedAttributes=members&filter=displayName+eq+"UHYYWKURUTZS" HTTP/1.1
 ```
 
-**Actual Response**: Same as #8 — `members` still present.
+**Actual Response**: Same as #8 - `members` still present.
 
 **Expected Response**: Group(s) returned WITHOUT the `members` attribute.
 
-**Root Cause**: Same as Failure #8 — `excludedAttributes` not implemented.
+**Root Cause**: Same as Failure #8 - `excludedAttributes` not implemented.
 
 ---
 
 ### FAILURE #10: Create a duplicate Group
 
-**Test**: `POST /Groups` — "Create a duplicate Group"
+**Test**: `POST /Groups` - "Create a duplicate Group"
 
 **Request**:
 ```http
@@ -485,15 +485,15 @@ The duplicate group was **created successfully** instead of being rejected.
 
 **Root Cause**: In `endpoint-scim-groups.service.ts` line 51, `createGroupForEndpoint()` has **no uniqueness check** on `displayName` or `externalId` before creation. The User service has `assertUniqueIdentifiersForEndpoint()` but the Group service does not.
 
-Additionally, the `ScimGroup` Prisma model has no `externalId` DB column — `externalId` is stored inside `rawPayload`, making it impossible to enforce uniqueness at the DB level.
+Additionally, the `ScimGroup` Prisma model has no `externalId` DB column - `externalId` is stored inside `rawPayload`, making it impossible to enforce uniqueness at the DB level.
 
-**Spec Reference**: RFC 7644 §3.3 — "If the service provider determines that the creation of the requested resource conflicts with existing resources... the service provider MUST return HTTP status code 409."
+**Spec Reference**: RFC 7644 §3.3 - "If the service provider determines that the creation of the requested resource conflicts with existing resources... the service provider MUST return HTTP status code 409."
 
 ---
 
-### FAILURE #11: Patch Group — Replace Attributes (no-path replace with object value)
+### FAILURE #11: Patch Group - Replace Attributes (no-path replace with object value)
 
-**Test**: `PATCH /Groups/Id` — "Patch Group - Replace Attributes"
+**Test**: `PATCH /Groups/Id` - "Patch Group - Replace Attributes"
 
 **Request**:
 ```http
@@ -512,7 +512,7 @@ Content-Type: application/scim+json; charset=utf-8
   ]
 }
 ```
-Note: No `path` field — the value is an **object** with the attribute(s) to replace.
+Note: No `path` field - the value is an **object** with the attribute(s) to replace.
 
 **Actual Response** (400 BadRequest):
 ```json
@@ -543,7 +543,7 @@ When there's no path and the value is an **object** (like `{"externalId": "..."}
 
 ### FAILURE #12: Update Group displayName
 
-**Test**: `PATCH /Groups/Id` — "Update Group displayName"
+**Test**: `PATCH /Groups/Id` - "Update Group displayName"
 
 **Request**:
 ```http
@@ -562,7 +562,7 @@ Content-Type: application/scim+json; charset=utf-8
   ]
 }
 ```
-Note: Same no-path pattern — value is an object `{"displayName": "MSADPJJZWBUS"}`.
+Note: Same no-path pattern - value is an object `{"displayName": "MSADPJJZWBUS"}`.
 
 **Actual Response** (400 BadRequest):
 ```json
@@ -579,7 +579,7 @@ Note: Same no-path pattern — value is an object `{"displayName": "MSADPJJZWBUS
 
 ---
 
-### FAILURE #13: Boolean serialization — roles[].primary
+### FAILURE #13: Boolean serialization - roles[].primary
 
 **Note**: This failure is embedded as a deserialization **warning** in multiple test runs. The Microsoft SCIM validator reports:
 
@@ -607,13 +607,13 @@ The service returns `roles[].primary` as the string `"True"` instead of boolean 
 }]
 ```
 
-**Root Cause**: The `roles` attribute is not defined in the `ScimUserResource` TypeScript interface — it flows through the `rawPayload` spread with no type coercion. The client sends `"True"` (string) and it's stored and returned as-is.
+**Root Cause**: The `roles` attribute is not defined in the `ScimUserResource` TypeScript interface - it flows through the `rawPayload` spread with no type coercion. The client sends `"True"` (string) and it's stored and returned as-is.
 
-**Spec Reference**: RFC 7643 §2.3.6 — `primary` is defined as a Boolean (JSON `true`/`false`).
+**Spec Reference**: RFC 7643 §2.3.6 - `primary` is defined as a Boolean (JSON `true`/`false`).
 
 ---
 
-## 🔍 Preview Tests (7) — All Passing ✅
+## 🔍 Preview Tests (7) - All Passing ✅
 
 | # | Test Name | Status |
 |---|-----------|--------|
@@ -631,14 +631,14 @@ The service returns `roles[].primary` as the string `"True"` instead of boolean 
 
 | Root Cause | Failures | Tests Fixed | Status |
 |------------|----------|-------------|--------|
-| **A.** No-path PATCH replace not resolving dot-notation / URN keys (Users) | #2 | 1 | ✅ Fixed — `resolveNoPathValue()` in `scim-patch-path.ts` |
-| **B.** No-path PATCH replace + stale rawPayload displayName (Groups) | #11, #12 | 2 | ✅ Fixed — `toScimGroupResource()` deletes stale keys |
-| **C.** ValuePath `add` not creating array/element when missing | #1 | 1 | ✅ Fixed — `addValuePathEntry()` in `scim-patch-path.ts` |
-| **D.** Enterprise extension manager stored as string not `{value}` object | #3, #4, #5 | 3 | ✅ Fixed — `applyExtensionUpdate()` wraps manager as `{value}` |
-| **E.** Case-insensitive filter not working (SQLite limitation) | #6, #7 | 2 | ✅ Fixed — in-code filtering with `.toLowerCase()` |
-| **F.** `excludedAttributes` not implemented for Groups | #8, #9 | 2 | ✅ Fixed — `stripExcludedAttributes()` in groups controller |
-| **G.** Duplicate group creation not rejected | #10 | 1 | ✅ Fixed — `assertUniqueDisplayName()` returns 409 |
-| **H.** `roles[].primary` returned as string `"True"` not boolean | #13 | 1 | ✅ Fixed — `sanitizeBooleanStrings()` recursive coercion |
+| **A.** No-path PATCH replace not resolving dot-notation / URN keys (Users) | #2 | 1 | ✅ Fixed - `resolveNoPathValue()` in `scim-patch-path.ts` |
+| **B.** No-path PATCH replace + stale rawPayload displayName (Groups) | #11, #12 | 2 | ✅ Fixed - `toScimGroupResource()` deletes stale keys |
+| **C.** ValuePath `add` not creating array/element when missing | #1 | 1 | ✅ Fixed - `addValuePathEntry()` in `scim-patch-path.ts` |
+| **D.** Enterprise extension manager stored as string not `{value}` object | #3, #4, #5 | 3 | ✅ Fixed - `applyExtensionUpdate()` wraps manager as `{value}` |
+| **E.** Case-insensitive filter not working (SQLite limitation) | #6, #7 | 2 | ✅ Fixed - in-code filtering with `.toLowerCase()` |
+| **F.** `excludedAttributes` not implemented for Groups | #8, #9 | 2 | ✅ Fixed - `stripExcludedAttributes()` in groups controller |
+| **G.** Duplicate group creation not rejected | #10 | 1 | ✅ Fixed - `assertUniqueDisplayName()` returns 409 |
+| **H.** `roles[].primary` returned as string `"True"` not boolean | #13 | 1 | ✅ Fixed - `sanitizeBooleanStrings()` recursive coercion |
 | | | **Total: 13** | **All ✅** |
 
 ---
@@ -646,7 +646,7 @@ The service returns `roles[].primary` as the string `"True"` instead of boolean 
 ## 📋 Holistic Task List & Proposed Fixes
 
 ### Task 1: Fix no-path PATCH replace for Users (Bug A)
-**Priority**: P0 — Affects 1 test  
+**Priority**: P0 - Affects 1 test  
 **File**: `api/src/modules/scim/services/endpoint-scim-users.service.ts` (line ~327)  
 **Effort**: Low  
 
@@ -655,7 +655,7 @@ The service returns `roles[].primary` as the string `"True"` instead of boolean 
 | Dev Time | 1–2 hours |
 | Lines Changed | ~15 lines (1 file) |
 | Testing | ~1 hour (add 3–4 unit tests for no-path replace with userName/externalId/active) |
-| Risk | Low — mirrors proven logic from the original PATCH implementation |
+| Risk | Low - mirrors proven logic from the original PATCH implementation |
 | Dependencies | None |
 
 **Current Code**:
@@ -666,7 +666,7 @@ The service returns `roles[].primary` as the string `"True"` instead of boolean 
 ```
 
 **Proposed Fix**:
-Add the `!path` guard and extract `userName`, `externalId`, and `active` from the value object before spreading — matching the legacy service logic:
+Add the `!path` guard and extract `userName`, `externalId`, and `active` from the value object before spreading - matching the legacy service logic:
 ```typescript
 } else if (!path && typeof operation.value === 'object' && operation.value !== null) {
   const updateObj = { ...(operation.value as Record<string, unknown>) };
@@ -689,16 +689,16 @@ Add the `!path` guard and extract `userName`, `externalId`, and `active` from th
 ---
 
 ### Task 2: Fix no-path PATCH replace for Groups (Bug B)
-**Priority**: P0 — Affects 2 tests  
+**Priority**: P0 - Affects 2 tests  
 **File**: `api/src/modules/scim/services/endpoint-scim-groups.service.ts` (line ~307)  
 **Effort**: Medium  
 
 | Metric | Estimate |
 |--------|----------|
 | Dev Time | 2–3 hours |
-| Lines Changed | ~30–40 lines (1 file — `handleReplace` + `patchGroupForEndpoint` caller) |
+| Lines Changed | ~30–40 lines (1 file - `handleReplace` + `patchGroupForEndpoint` caller) |
 | Testing | ~1.5 hours (add 4–5 unit tests: no-path with displayName object, externalId object, mixed object, members object, invalid) |
-| Risk | Medium — requires changing the return type of `handleReplace()` to include `additionalAttributes` and updating the caller to persist them into `rawPayload` |
+| Risk | Medium - requires changing the return type of `handleReplace()` to include `additionalAttributes` and updating the caller to persist them into `rawPayload` |
 | Dependencies | None |
 
 **Current Code**:
@@ -744,7 +744,7 @@ Also update `patchGroupForEndpoint()` to persist `externalId` and other attribut
 ---
 
 ### Task 3: Implement valuePath parser for PATCH operations (Bug C)
-**Priority**: P0 — Affects 1 test  
+**Priority**: P0 - Affects 1 test  
 **File**: New utility + `endpoint-scim-users.service.ts`  
 **Effort**: High  
 
@@ -753,7 +753,7 @@ Also update `patchGroupForEndpoint()` to persist `externalId` and other attribut
 | Dev Time | 4–6 hours |
 | Lines Changed | ~80–120 lines (new `scim-path-parser.ts` ~60 lines + service integration ~30 lines + tests) |
 | Testing | ~2–3 hours (parser unit tests for `emails[type eq "work"].value`, `addresses[type eq "work"].streetAddress`, edge cases like missing array, no match, nested brackets) |
-| Risk | High — this is new logic with complex string parsing; must handle quoted values, multiple filter operators, and attribute case-insensitivity. Most impactful single change. |
+| Risk | High - this is new logic with complex string parsing; must handle quoted values, multiple filter operators, and attribute case-insensitivity. Most impactful single change. |
 | Dependencies | None, but Task 4 can reuse the parser infrastructure |
 
 **Proposed Fix**:
@@ -789,7 +789,7 @@ if (originalPath && originalPath.includes('[')) {
 ---
 
 ### Task 4: Implement enterprise extension URN path resolution (Bug D)
-**Priority**: P0 — Affects 3 tests  
+**Priority**: P0 - Affects 3 tests  
 **File**: `endpoint-scim-users.service.ts` + path parser from Task 3  
 **Effort**: Medium  
 
@@ -798,7 +798,7 @@ if (originalPath && originalPath.includes('[')) {
 | Dev Time | 2–3 hours |
 | Lines Changed | ~25–35 lines (add URN prefix detection in PATCH add/replace/remove branches) |
 | Testing | ~1.5 hours (add 4–5 unit tests: add manager, replace manager, remove manager, nested sub-attribute, unknown extension) |
-| Risk | Medium — must handle both add/replace and remove operations differently; also need to update `removeAttribute()` or add URN-aware path in the remove branch |
+| Risk | Medium - must handle both add/replace and remove operations differently; also need to update `removeAttribute()` or add URN-aware path in the remove branch |
 | Dependencies | Builds on Task 3 path parser infrastructure (can share URN detection logic) |
 
 **Proposed Fix**:
@@ -829,16 +829,16 @@ For `remove`, also update `removeAttribute()` or bypass it entirely for URN path
 ---
 
 ### Task 5: Implement case-insensitive filter `eq` operator (Bug E)
-**Priority**: P1 — Affects 2 tests  
+**Priority**: P1 - Affects 2 tests  
 **File**: `endpoint-scim-users.service.ts` (line ~236) and `endpoint-scim-groups.service.ts` (line ~289)  
 **Effort**: Low  
 
 | Metric | Estimate |
 |--------|----------|
 | Dev Time | 1–2 hours |
-| Lines Changed | ~6–10 lines (2 files — change 3 Prisma filter expressions) |
+| Lines Changed | ~6–10 lines (2 files - change 3 Prisma filter expressions) |
 | Testing | ~1 hour (add 2–3 unit tests: uppercase userName filter, lowercase displayName filter, mixed case) |
-| Risk | Low-Medium — depends on database provider; Prisma `mode: 'insensitive'` works natively on PostgreSQL but may need a fallback for SQLite dev environments |
+| Risk | Low-Medium - depends on database provider; Prisma `mode: 'insensitive'` works natively on PostgreSQL but may need a fallback for SQLite dev environments |
 | Dependencies | None |
 
 **Current Code (Users)**:
@@ -887,7 +887,7 @@ Best approach: switch dev database to PostgreSQL or add a `userNameLower` indexe
 ---
 
 ### Task 6: Implement `excludedAttributes` query parameter (Bug F)
-**Priority**: P1 — Affects 2 tests  
+**Priority**: P1 - Affects 2 tests  
 **Files**: `endpoint-scim-users.controller.ts`, `endpoint-scim-groups.controller.ts`, user/group service files  
 **Effort**: Medium  
 
@@ -896,7 +896,7 @@ Best approach: switch dev database to PostgreSQL or add a `userNameLower` indexe
 | Dev Time | 2–3 hours |
 | Lines Changed | ~30–40 lines (new utility function ~15 lines + controller `@Query` params ~10 lines + service call-site wiring ~10 lines across 2–3 files) |
 | Testing | ~1.5 hours (add 3–4 unit tests: exclude members, exclude multiple attrs, exclude non-existent attr, ensure `meta`/`schemas`/`id` are never excluded) |
-| Risk | Low — straightforward post-serialization filtering; main consideration is ensuring `attributes` (include) and `excludedAttributes` (exclude) don't conflict per RFC 7644 §3.4.2.5 |
+| Risk | Low - straightforward post-serialization filtering; main consideration is ensuring `attributes` (include) and `excludedAttributes` (exclude) don't conflict per RFC 7644 §3.4.2.5 |
 | Dependencies | None |
 
 **Proposed Fix**:
@@ -926,7 +926,7 @@ function applyExcludedAttributes<T extends Record<string, unknown>>(
 ---
 
 ### Task 7: Implement duplicate group detection (Bug G)
-**Priority**: P2 — Affects 1 test  
+**Priority**: P2 - Affects 1 test  
 **File**: `endpoint-scim-groups.service.ts` (line ~51)  
 **Effort**: Low  
 
@@ -935,7 +935,7 @@ function applyExcludedAttributes<T extends Record<string, unknown>>(
 | Dev Time | 1–2 hours |
 | Lines Changed | ~20–25 lines (new `assertUniqueGroupForEndpoint()` method + call in `createGroupForEndpoint`) |
 | Testing | ~1 hour (add 2–3 unit tests: duplicate displayName → 409, duplicate externalId → 409, unique group → 201) |
-| Risk | Low — mirrors proven pattern from user service; note that `externalId` uniqueness check requires scanning `rawPayload` since there's no DB column (optional enhancement: add DB migration for `externalId` column) |
+| Risk | Low - mirrors proven pattern from user service; note that `externalId` uniqueness check requires scanning `rawPayload` since there's no DB column (optional enhancement: add DB migration for `externalId` column) |
 | Dependencies | None (optional: Prisma migration for `externalId` column) |
 
 **Proposed Fix**:
@@ -978,7 +978,7 @@ Call this before `this.prisma.scimGroup.create(...)` in `createGroupForEndpoint(
 ---
 
 ### Task 8: Coerce `roles[].primary` to boolean on storage (Bug H)
-**Priority**: P2 — Affects 1 test  
+**Priority**: P2 - Affects 1 test  
 **File**: `endpoint-scim-users.service.ts` (serialization/storage)  
 **Effort**: Low  
 
@@ -987,7 +987,7 @@ Call this before `this.prisma.scimGroup.create(...)` in `createGroupForEndpoint(
 | Dev Time | 1–1.5 hours |
 | Lines Changed | ~20–25 lines (new `normalizeMultiValuedAttributes()` method + calls in create and patch flows) |
 | Testing | ~1 hour (add 2–3 unit tests: string "True" → boolean true, string "False" → boolean false, already-boolean passthrough) |
-| Risk | Low — pure data transformation with no side effects; applied at storage time so existing data in DB still returns string until re-saved |
+| Risk | Low - pure data transformation with no side effects; applied at storage time so existing data in DB still returns string until re-saved |
 | Dependencies | None |
 
 **Proposed Fix**:
@@ -1025,7 +1025,7 @@ Call this during both **create** (in `extractAdditionalAttributes`) and **patch*
 
 ## 📊 Implementation Roadmap
 
-### Phase 1 — Critical PATCH Fixes (fixes 7 tests)
+### Phase 1 - Critical PATCH Fixes (fixes 7 tests)
 | Task | Bug | Tests Fixed | Dev Time | Test Time | LOC Changed | Risk |
 |------|-----|-------------|----------|-----------|-------------|------|
 | Task 1: No-path PATCH replace for Users | A | #2 | 1–2 hrs | 1 hr | ~15 | Low |
@@ -1034,14 +1034,14 @@ Call this during both **create** (in `extractAdditionalAttributes`) and **patch*
 | Task 4: Enterprise extension URN resolution | D | #3, #4, #5 | 2–3 hrs | 1.5 hrs | ~25–35 | Medium |
 | | | **Subtotal** | **9–14 hrs** | **6–7.5 hrs** | **~150–210** | |
 
-### Phase 2 — Query & Filter Compliance (fixes 4 tests)
+### Phase 2 - Query & Filter Compliance (fixes 4 tests)
 | Task | Bug | Tests Fixed | Dev Time | Test Time | LOC Changed | Risk |
 |------|-----|-------------|----------|-----------|-------------|------|
 | Task 5: Case-insensitive filters | E | #6, #7 | 1–2 hrs | 1 hr | ~6–10 | Low-Med |
 | Task 6: `excludedAttributes` parameter | F | #8, #9 | 2–3 hrs | 1.5 hrs | ~30–40 | Low |
 | | | **Subtotal** | **3–5 hrs** | **2.5 hrs** | **~36–50** | |
 
-### Phase 3 — Data Integrity & Serialization (fixes 2 tests)
+### Phase 3 - Data Integrity & Serialization (fixes 2 tests)
 | Task | Bug | Tests Fixed | Dev Time | Test Time | LOC Changed | Risk |
 |------|-----|-------------|----------|-----------|-------------|------|
 | Task 7: Duplicate group detection | G | #10 | 1–2 hrs | 1 hr | ~20–25 | Low |
@@ -1078,8 +1078,8 @@ Call this during both **create** (in `extractAdditionalAttributes`) and **patch*
 
 All items completed February 9, 2026:
 
-- [x] Run `npm test` — all unit tests passed at the time of this phase. 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current counts.
-- [x] Run Microsoft SCIM Validator — target 25/25 tests passing
+- [x] Run `npm test` - all unit tests passed at the time of this phase. 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current counts.
+- [x] Run Microsoft SCIM Validator - target 25/25 tests passing
 - [x] Verify `Content-Type: application/scim+json; charset=utf-8` header in all responses
 - [x] Verify case-insensitive filtering works for both Users and Groups
 - [x] Verify `excludedAttributes=members` strips members from Group responses

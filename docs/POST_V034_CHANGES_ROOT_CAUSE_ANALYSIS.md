@@ -1,10 +1,10 @@
-# Post-v0.34.0 Changes — Root Cause Analysis & Necessity Assessment
+# Post-v0.34.0 Changes - Root Cause Analysis & Necessity Assessment
 
 > **Date:** April 15, 2026  
-> **Base Commit:** `1fbe17f9` — *fix(G7): wire caseExactPaths from schema cache into GroupsService* (April 13, 12:34)  
-> **HEAD Commit:** `e1e9bc1a` — *docs: freshness sweep v0.36.0* (April 15, 21:53)  
+> **Base Commit:** `1fbe17f9` - *fix(G7): wire caseExactPaths from schema cache into GroupsService* (April 13, 12:34)  
+> **HEAD Commit:** `e1e9bc1a` - *docs: freshness sweep v0.36.0* (April 15, 21:53)  
 > **Scope:** 26 commits over 2 days, 95 files changed, +11,602/−4,782 lines  
-> **Last Successful Azure Live Test:** April 13, 2026 — v0.35.0, 743/743 pass, 100%  
+> **Last Successful Azure Live Test:** April 13, 2026 - v0.35.0, 743/743 pass, 100%  
 > **Environment:** Windows, NestJS + Prisma + PostgreSQL 17, Docker Compose, Azure Container Apps
 
 ---
@@ -16,14 +16,14 @@
 | 1 | [Executive Summary](#1-executive-summary) | Key findings at a glance |
 | 2 | [Timeline of All Changes](#2-timeline-of-all-changes) | All 26 commits chronologically |
 | 3 | [Baseline Context](#3-baseline-context) | State at v0.34.0 and last Azure deployment |
-| 4 | [Phase 1: Documentation & logFileEnabled (19 commits)](#4-phase-1-documentation--logfileenabled-19-commits) | Apr 13 work — deployed to Azure as v0.35.0 |
+| 4 | [Phase 1: Documentation & logFileEnabled (19 commits)](#4-phase-1-documentation--logfileenabled-19-commits) | Apr 13 work - deployed to Azure as v0.35.0 |
 | 5 | [Phase 2: v0.36.0 Web UI Overhaul (1 commit)](#5-phase-2-v036-web-ui-overhaul-1-commit) | Apr 15 Web UI fixes + test infra |
 | 6 | [Phase 3: Performance Hardening (6 commits)](#6-phase-3-performance-hardening-6-commits) | Apr 15 post-v0.36.0 perf + reliability |
 | 7 | [Issue #1: Web UI Infinite Re-Render Loop](#7-issue-1-web-ui-infinite-re-render-loop) | Root cause, fix, necessity |
 | 8 | [Issue #2: StatisticsTab Hardcoded "SQLite"](#8-issue-2-statisticstab-hardcoded-sqlite) | Root cause, fix, necessity |
 | 9 | [Issue #3: Dead BackupService Code in Header](#9-issue-3-dead-backupservice-code-in-header) | Root cause, fix, necessity |
 | 10 | [Issue #4: Activity Summary N+1 Performance](#10-issue-4-activity-summary-n1-performance) | Root cause, fix, necessity |
-| 11 | [Issue #5: Activity Summary — Incomplete count() Migration](#11-issue-5-activity-summary--incomplete-count-migration) | Root cause, fix, necessity |
+| 11 | [Issue #5: Activity Summary - Incomplete count() Migration](#11-issue-5-activity-summary--incomplete-count-migration) | Root cause, fix, necessity |
 | 12 | [Issue #6: Server Timeout Configuration](#12-issue-6-server-timeout-configuration) | Root cause, fix, necessity |
 | 13 | [Issue #7: RequestLog Missing Performance Indexes](#13-issue-7-requestlog-missing-performance-indexes) | Root cause, fix, necessity |
 | 14 | [Issue #8: Log Table Unbounded Growth](#14-issue-8-log-table-unbounded-growth) | Root cause, fix, necessity |
@@ -31,7 +31,7 @@
 | 16 | [Issue #10: Docker Prisma Connection Timeout](#16-issue-10-docker-prisma-connection-timeout) | Root cause, fix, necessity |
 | 17 | [Issue #11: logFileEnabled Default Inverted](#17-issue-11-logfileenabled-default-inverted) | Root cause, fix, necessity |
 | 18 | [Issue #12: Local Server Startup Failures](#18-issue-12-local-server-startup-failures) | Root cause from terminal context |
-| 19 | [Change-by-Change Necessity Verdict](#19-change-by-change-necessity-verdict) | Needed vs. not needed — all 26 commits |
+| 19 | [Change-by-Change Necessity Verdict](#19-change-by-change-necessity-verdict) | Needed vs. not needed - all 26 commits |
 | 20 | [Recommendations](#20-recommendations) | Immediate actions, deployment, documentation |
 
 ---
@@ -40,16 +40,16 @@
 
 Between commit `1fbe17f9` (April 13, 12:34) and HEAD (`e1e9bc1a`, April 15, 21:53), **26 commits** were made across **95 files** over 2 days. The work falls into three distinct phases:
 
-1. **Phase 1 (Apr 13):** 19 commits — documentation rewrites, `logFileEnabled` default change, E2E tests. **Successfully deployed to Azure as v0.35.0 (743/743 pass).**
-2. **Phase 2 (Apr 15):** 1 commit — v0.36.0 Web UI overhaul fixing 4 real bugs (infinite re-render, hardcoded SQLite, dead backup code, stale version fallback) + test infrastructure (152 Vitest + 86 Playwright tests).
-3. **Phase 3 (Apr 15):** 6 commits — performance hardening (activity summary N+1 fix, server timeout, auto-prune, indexes) + unit tests + doc freshness sweep.
+1. **Phase 1 (Apr 13):** 19 commits - documentation rewrites, `logFileEnabled` default change, E2E tests. **Successfully deployed to Azure as v0.35.0 (743/743 pass).**
+2. **Phase 2 (Apr 15):** 1 commit - v0.36.0 Web UI overhaul fixing 4 real bugs (infinite re-render, hardcoded SQLite, dead backup code, stale version fallback) + test infrastructure (152 Vitest + 86 Playwright tests).
+3. **Phase 3 (Apr 15):** 6 commits - performance hardening (activity summary N+1 fix, server timeout, auto-prune, indexes) + unit tests + doc freshness sweep.
 
 **Key findings:**
-- **Phase 1 is fully validated** — Azure deployment succeeded, all 743 live tests pass.
-- **Phase 2 fixes 4 real bugs** — all needed, well-tested.
-- **Phase 3 has 1 dangerous migration** — `20260416025138` bundles stale schema drift (`DROP COLUMN deletedAt`, `DROP INDEX displayName_key`) with legitimate new indexes. These DROP operations target objects already handled by prior migrations and will fail on any database that already ran them.
+- **Phase 1 is fully validated** - Azure deployment succeeded, all 743 live tests pass.
+- **Phase 2 fixes 4 real bugs** - all needed, well-tested.
+- **Phase 3 has 1 dangerous migration** - `20260416025138` bundles stale schema drift (`DROP COLUMN deletedAt`, `DROP INDEX displayName_key`) with legitimate new indexes. These DROP operations target objects already handled by prior migrations and will fail on any database that already ran them.
 - **The `deletedAt` column** was removed from `schema.prisma` in commit `4ecda76` (April 9) but **no migration was created at that time**. Prisma's `migrate dev` picked up the drift when the index migration was generated, producing a migration that is only safe on a specific database state.
-- **No Azure deployment failures occurred since the base commit** — the last deploy was successful on April 13, v0.35.0. The `azure-live-pipeline.txt` shows an interrupted test run (10 lines), not a failure.
+- **No Azure deployment failures occurred since the base commit** - the last deploy was successful on April 13, v0.35.0. The `azure-live-pipeline.txt` shows an interrupted test run (10 lines), not a failure.
 - **Server startup failures** visible in the terminal context were caused by running `node dist/main.js` from the wrong working directory (root instead of `api/`), not by code bugs.
 
 ---
@@ -131,7 +131,7 @@ gantt
 | Unit tests | 3,206 (80 suites) |
 | E2E tests | 939 (45 suites) |
 | Live tests | 739 (all pass) |
-| Last Azure deployment | v0.34.0 (April 13, 10:49 — 739/739 pass) |
+| Last Azure deployment | v0.34.0 (April 13, 10:49 - 739/739 pass) |
 
 ### Last Successful Azure Deployment
 
@@ -158,15 +158,15 @@ This phase consists of 18 documentation commits and 1 feature commit:
 
 Only **2 source files** changed in Phase 1:
 
-1. **`endpoint.service.ts`** — `syncEndpointFileLogging()` logic inverted: default changed from `false` → `true`. Previously, `logFileEnabled` had to be explicitly set to `true` to enable file logging. Now, it defaults to enabled; only explicit `false`/`"false"`/`"False"`/`"0"` disables it.
+1. **`endpoint.service.ts`** - `syncEndpointFileLogging()` logic inverted: default changed from `false` → `true`. Previously, `logFileEnabled` had to be explicitly set to `true` to enable file logging. Now, it defaults to enabled; only explicit `false`/`"false"`/`"False"`/`"0"` disables it.
 
-2. **`endpoint-config.interface.ts`** — Added `LOG_FILE_ENABLED` constant and definition to the config flags registry.
+2. **`endpoint-config.interface.ts`** - Added `LOG_FILE_ENABLED` constant and definition to the config flags registry.
 
 ### Verdict
 
 | Change | Needed? | Rationale |
 |--------|---------|-----------|
-| `logFileEnabled` default=true | ✅ Yes | Correct for dev/local — endpoints should have log files by default. Docker/Azure can override. |
+| `logFileEnabled` default=true | ✅ Yes | Correct for dev/local - endpoints should have log files by default. Docker/Azure can override. |
 | 18 documentation commits | ✅ Yes | Comprehensive doc rewrites, gap closures, freshness audits. Source-verified. |
 | +11 E2E tests | ✅ Yes | Test coverage for logging endpoints (audit trail, prune, per-endpoint history). |
 
@@ -184,7 +184,7 @@ Commit `0a02f55` is a large single commit containing:
 |-----|-----------|-----|-------|
 | **Infinite re-render loop** in Raw Logs tab | `setFilters(q)` called on every `load()` → new ref → useEffect dependency change → re-fires `load()` → infinite loop | Added `useRef` for stable references; only call `setFilters` when filters actually changed (override or page reset) | `App.tsx` |
 | **StatisticsTab hardcoded "SQLite"** | `StatisticsTab.tsx` rendered `<span>SQLite</span>` regardless of backend | Backend now returns `database: { type, persistenceBackend }` in `/statistics` response; UI reads dynamically | `StatisticsTab.tsx`, `DatabaseBrowser.tsx`, `database.service.ts` |
-| **Dead `fetchBackupStats()` spamming 404s** | `Header.tsx` called `fetchBackupStats()` every 30s — endpoint was deleted in v0.23.0 when BackupService was removed | Removed entire `BackupStats` interface, `fetchBackupStats()`, and Header backup indicator UI | `Header.tsx`, `client.ts` |
+| **Dead `fetchBackupStats()` spamming 404s** | `Header.tsx` called `fetchBackupStats()` every 30s - endpoint was deleted in v0.23.0 when BackupService was removed | Removed entire `BackupStats` interface, `fetchBackupStats()`, and Header backup indicator UI | `Header.tsx`, `client.ts` |
 | **Hardcoded `v0.9.1` version fallback** | Footer showed `v0.9.1` even on v0.36.0 because fallback was never updated | Changed to show nothing until API responds with actual version | `App.tsx` |
 
 ### New Test Infrastructure
@@ -199,8 +199,8 @@ Commit `0a02f55` is a large single commit containing:
 All 4 bug fixes are **genuinely needed**:
 - The infinite re-render loop caused visible UI flickering (input boxes in Raw Logs tab).
 - The 404 spam from dead `fetchBackupStats` polluted browser console every 30 seconds.
-- "SQLite" was factually wrong — the database has been PostgreSQL since v0.11.0.
-- `v0.9.1` was misleading — predates the entire codebase by months.
+- "SQLite" was factually wrong - the database has been PostgreSQL since v0.11.0.
+- `v0.9.1` was misleading - predates the entire codebase by months.
 
 ---
 
@@ -227,7 +227,7 @@ Detailed analysis of each issue follows in sections 10–18.
 `0a02f55` (v0.36.0)
 
 ### Symptoms
-Raw Logs tab input boxes flickered constantly. The tab was unusable — typing in filter inputs caused immediate refresh cycles.
+Raw Logs tab input boxes flickered constantly. The tab was unusable - typing in filter inputs caused immediate refresh cycles.
 
 ### Root Cause
 In `App.tsx`, the `load()` function was called from a `useEffect` with `[filters]` as a dependency. Inside `load()`, `setFilters(q)` was called unconditionally at the end. This created an infinite loop:
@@ -265,7 +265,7 @@ useEffect(() => {
    ```
 3. Auto-refresh interval deps reduced to `[auto, token]` only.
 
-### Necessity: ✅ NEEDED — Real UI bug causing visible flickering.
+### Necessity: ✅ NEEDED - Real UI bug causing visible flickering.
 
 ---
 
@@ -280,14 +280,14 @@ useEffect(() => {
 <span className={styles.statNumber}>SQLite</span>
 ```
 
-Additionally, it always showed "Data is ephemeral in container environment" — which is false for PostgreSQL with persistent storage.
+Additionally, it always showed "Data is ephemeral in container environment" - which is false for PostgreSQL with persistent storage.
 
 ### Fix Applied
 1. Backend `DatabaseService.getStatistics()` now returns `database: { type: 'PostgreSQL', persistenceBackend: 'prisma' }` (or `'In-Memory'`/`'inmemory'`).
 2. UI reads `statistics.database?.type` dynamically.
 3. "Ephemeral" warning only shown when `persistenceBackend === 'inmemory'`.
 
-### Necessity: ✅ NEEDED — Factually incorrect display.
+### Necessity: ✅ NEEDED - Factually incorrect display.
 
 ---
 
@@ -307,14 +307,14 @@ The `/admin/backup/stats` endpoint was **deleted in v0.23.0** (March 1, 2026) wh
 ### Fix Applied
 Removed all backup-related code from `Header.tsx` and the `BackupStats` interface + `fetchBackupStats()` from `client.ts`.
 
-### Necessity: ✅ NEEDED — Dead code causing continuous console 404 spam.
+### Necessity: ✅ NEEDED - Dead code causing continuous console 404 spam.
 
 ---
 
 ## 10. Issue #4: Activity Summary N+1 Performance
 
 ### Commit
-`851eabb` — *perf: fix activity summary N+1 — use count() for Groups instead of findMany()*
+`851eabb` - *perf: fix activity summary N+1 - use count() for Groups instead of findMany()*
 
 ### Root Cause
 In `activity.controller.ts`, the `getActivitySummary()` method used a mix of strategies:
@@ -326,17 +326,17 @@ The Groups count specifically used `count()` but the system operations count was
 ### Fix Applied
 Changed Groups from an already-correct `count()` to a cleaner `count()` with explicit `url contains /Groups` filter. Also removed the `system` operations key from the response entirely.
 
-### Necessity: ✅ NEEDED — First step toward eliminating N+1.
+### Necessity: ✅ NEEDED - First step toward eliminating N+1.
 
 ### Side Effect
 ⚠️ **Breaking API change:** Removed `operations.system` from the response. Any client depending on this field will break. Should have been documented in CHANGELOG.
 
 ---
 
-## 11. Issue #5: Activity Summary — Incomplete count() Migration
+## 11. Issue #5: Activity Summary - Incomplete count() Migration
 
 ### Commit
-`77e1b96` — *perf: activity summary — all fields use count() with SQL-level keepalive exclusion*
+`77e1b96` - *perf: activity summary - all fields use count() with SQL-level keepalive exclusion*
 
 ### Root Cause
 After commit 21 fixed Groups, the remaining three fields (last24Hours, lastWeek, userOperations) still used `findMany()` with JavaScript-level keepalive filtering via `removeKeepalive()`.
@@ -358,7 +358,7 @@ const notKeepalive = {
 };
 ```
 
-### Necessity: ✅ NEEDED — Completes the N+1 fix. Eliminates all `findMany()` + JS filtering.
+### Necessity: ✅ NEEDED - Completes the N+1 fix. Eliminates all `findMany()` + JS filtering.
 
 ---
 
@@ -376,7 +376,7 @@ httpServer.setTimeout(requestTimeoutMs);
 httpServer.keepAliveTimeout = requestTimeoutMs;
 ```
 
-**This was a regression** — Node.js's default `http.Server.setTimeout` is **120 seconds**. By explicitly setting it to 30s, requests that previously succeeded (e.g., Azure cold-start Prisma connections taking 10-30s) would now timeout.
+**This was a regression** - Node.js's default `http.Server.setTimeout` is **120 seconds**. By explicitly setting it to 30s, requests that previously succeeded (e.g., Azure cold-start Prisma connections taking 10-30s) would now timeout.
 
 Commit 24 (`ce17f89`) corrected this:
 ```typescript
@@ -389,11 +389,11 @@ const requestTimeoutMs = Number(process.env.REQUEST_TIMEOUT_MS) || 120_000; // R
 |------|---------|-----------|
 | `REQUEST_TIMEOUT_MS` env var | ✅ Useful | Makes timeout configurable for operators |
 | `httpServer.setTimeout(120s)` | ⚠️ Neutral | Just restores Node.js default explicitly |
-| `httpServer.keepAliveTimeout = 120s` | ✅ Useful | Node.js default is 5s — too low for Azure load balancer. Prevents premature connection drops. |
+| `httpServer.keepAliveTimeout = 120s` | ✅ Useful | Node.js default is 5s - too low for Azure load balancer. Prevents premature connection drops. |
 | Setting timeout to 30s (commit 23) | ❌ Regression | Self-inflicted bug requiring immediate follow-up fix |
 
 ### Code Comment Bug
-The comment says `Default: 30 seconds` — this is **incorrect**. Node.js default is 120 seconds.
+The comment says `Default: 30 seconds` - this is **incorrect**. Node.js default is 120 seconds.
 
 ---
 
@@ -412,7 +412,7 @@ Added two new indexes to `schema.prisma`:
 ### Root Cause
 The activity summary queries filter by `createdAt`, `method`, `url`, and `identifier IS NULL`. Without indexes on these columns, PostgreSQL does sequential scans as the `RequestLog` table grows.
 
-### Necessity: ✅ NEEDED — Supports the count() queries from commits 21-22.
+### Necessity: ✅ NEEDED - Supports the count() queries from commits 21-22.
 
 ---
 
@@ -487,10 +487,10 @@ graph TD
 | Scenario | Outcome |
 |----------|---------|
 | **Azure database** (ran all prior migrations, has `deletedAt`, displayName_key already dropped via ALTER TABLE) | ⚠️ `DROP INDEX` may fail (constraint was dropped, not index), `DROP COLUMN` succeeds |
-| **Fresh database** (e.g., new Docker `prisma migrate deploy`) | ✅ Works — all ops applied in order |
-| **Database that manually removed deletedAt** | ❌ `DROP COLUMN` fails — column doesn't exist |
+| **Fresh database** (e.g., new Docker `prisma migrate deploy`) | ✅ Works - all ops applied in order |
+| **Database that manually removed deletedAt** | ❌ `DROP COLUMN` fails - column doesn't exist |
 
-### Necessity: ❌ DANGEROUS — The `CREATE INDEX` statements are needed. The `DROP INDEX` and `DROP COLUMN` are schema drift artifacts.
+### Necessity: ❌ DANGEROUS - The `CREATE INDEX` statements are needed. The `DROP INDEX` and `DROP COLUMN` are schema drift artifacts.
 
 **Fix required:** Either:
 1. Edit migration SQL to keep only the `CREATE INDEX` statements, or
@@ -561,39 +561,39 @@ node api/dist/main.js   # Finds JS but node_modules resolution fails
 
 # CORRECT:
 cd c:\Users\v-prasrane\source\repos\SCIMServer\api
-node dist/main.js       # Works — correct cwd
+node dist/main.js       # Works - correct cwd
 ```
 
-### Necessity: N/A — This is an operator error, not a code bug.
+### Necessity: N/A - This is an operator error, not a code bug.
 
 ---
 
 ## 19. Change-by-Change Necessity Verdict
 
-### Phase 1 (Apr 13) — Deployed as v0.35.0
+### Phase 1 (Apr 13) - Deployed as v0.35.0
 
 | # | Commit | Type | Verdict | Rationale |
 |---|--------|------|---------|-----------|
 | 1-4 | `ed907f3..0a66f0a` | Docs | ✅ | Schema guide, examples, logging docs |
-| 5 | `afddae4` | Feature | ✅ | `logFileEnabled` default fix — correct behavior |
+| 5 | `afddae4` | Feature | ✅ | `logFileEnabled` default fix - correct behavior |
 | 6-10 | `d98e0d5..e3f3222` | Docs | ✅ | Stale references, quick start, norms |
 | 11-16 | `d2ab09e..3f0dccc` | Docs | ✅ | 17 doc gaps closed (routes, prune, activity) |
 | 17 | `27d95d7` | Tests | ✅ | +11 E2E for logging/error handling |
 | 18 | `a1d840e` | Docs | ✅ | Freshness sweep |
 | 19 | `e4bd0fc` | Release | ✅ | Version bump to v0.35.0 |
 
-### Phase 2 (Apr 15) — v0.36.0
+### Phase 2 (Apr 15) - v0.36.0
 
 | # | Commit | Type | Verdict | Rationale |
 |---|--------|------|---------|-----------|
 | 20 | `0a02f55` | Feature | ✅ | 4 real UI bug fixes + 238 new tests (Vitest + Playwright) |
 
-### Phase 3 (Apr 15) — Post-v0.36.0
+### Phase 3 (Apr 15) - Post-v0.36.0
 
 | # | Commit | Type | Verdict | Rationale |
 |---|--------|------|---------|-----------|
-| 21 | `851eabb` | Perf | ✅ | Groups N+1 fix — real performance bug |
-| 22 | `77e1b96` | Perf | ✅ | Complete count() migration — eliminates all findMany() |
+| 21 | `851eabb` | Perf | ✅ | Groups N+1 fix - real performance bug |
+| 22 | `77e1b96` | Perf | ✅ | Complete count() migration - eliminates all findMany() |
 | 23 | `f9c6d3c` | Feature | ⚠️ Mixed | Contains needed (indexes, auto-prune) + dangerous (migration drift) + regression (30s timeout) |
 | 24 | `ce17f89` | Fix | ⚠️ | Fixes self-inflicted regression from commit 23 |
 | 25 | `18fba72` | Tests | ✅ | +25 auto-prune unit tests |
@@ -612,7 +612,7 @@ pie title Change Necessity Distribution (26 commits)
 |----------|-------|-------|
 | ✅ Needed | 22 | All Phase 1 (19), v0.36.0 (1), N+1 fixes (2) |
 | ⚠️ Mixed/Risky | 3 | P1-P3 hardening (migration drift + 30s timeout), timeout fix (reverts own regression), auto-prune (risky defaults) |
-| ❌ Dangerous | 1 | Migration `20260416025138` — DROP COLUMN + DROP INDEX for already-handled schema changes |
+| ❌ Dangerous | 1 | Migration `20260416025138` - DROP COLUMN + DROP INDEX for already-handled schema changes |
 
 ---
 

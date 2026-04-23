@@ -1,7 +1,7 @@
 # Error Handling Verification Prompt (Self-Improving)
 
 > **Version:** 3.3 · **Source-verified against:** v0.37.3 · **Regenerated:** April 21, 2026  
-> Automated checklist — run against source to verify error handling completeness.
+> Automated checklist - run against source to verify error handling completeness.
 
 ---
 
@@ -62,8 +62,8 @@ This is a **self-improving audit prompt** for verifying that SCIMServer's error 
 |---|-------|---------------|----------|
 | 5.1 | `handleRepositoryError()` logs at ERROR | Check helper function | `logger.error(...)` for RepositoryError |
 | 5.2 | `handleRepositoryError()` uses `createScimError()` | Check throw | Yes, with mapped status |
-| 5.3 | Non-RepositoryError re-thrown | Check else branch | `throw error` — to GlobalExceptionFilter |
-| 5.4 | All SCIM services use `handleRepositoryError()` | Grep service files | Users, Groups, Generic — all use it |
+| 5.3 | Non-RepositoryError re-thrown | Check else branch | `throw error` - to GlobalExceptionFilter |
+| 5.4 | All SCIM services use `handleRepositoryError()` | Grep service files | Users, Groups, Generic - all use it |
 
 ### 6. HTTP Status Code Coverage
 
@@ -167,7 +167,7 @@ TOTAL: 55/55 PASS
 All 55 infrastructure checks PASS. Extended A-K deep audit (35 checks): 35 PASS, 0 PARTIAL, 0 FAIL.
 
 Previous PARTIALs from v0.37.1 remain accepted by-design:
-- B.14: Filter syntax errors omit `triggeredBy` (correct — unconditional check pattern)
+- B.14: Filter syntax errors omit `triggeredBy` (correct - unconditional check pattern)
 - I.5: Wrapped NestJS exceptions don't get `scimType` (RFC 7644 says optional)
 - I.8: Pre-interceptor 415 errors lack diagnostics.requestId (correlation context not yet established)
 
@@ -175,5 +175,5 @@ Improvements since v0.37.1:
 - `createScimError()` calls: 57 → 77 (growth from error-handling + manager PATCH audit)
 - All 77 calls verified to have `diagnostics.errorCode` ✅
 - 6 silent `catch {}` blocks fixed with DEBUG logging (credential repo, service helpers, generic service)
-- `safeStringify()` circular reference handler added to logger — 3 downstream call sites protected
+- `safeStringify()` circular reference handler added to logger - 3 downstream call sites protected
 - Manager PATCH error path verified: pre-validation + PatchError catch both have full diagnostics

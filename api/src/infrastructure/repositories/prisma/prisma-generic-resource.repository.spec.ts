@@ -1,5 +1,5 @@
 /**
- * PrismaGenericResourceRepository — Unit tests.
+ * PrismaGenericResourceRepository - Unit tests.
  *
  * Covers happy-path behaviour, null / not-found returns, UUID validation
  * short-circuits, payload mapping, and Prisma error wrapping for every

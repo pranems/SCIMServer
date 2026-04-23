@@ -1,4 +1,4 @@
-﻿import { Injectable, OnModuleDestroy, OnModuleInit, Inject, Optional } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit, Inject, Optional } from '@nestjs/common';
 import { PrismaClient } from '../../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
@@ -36,10 +36,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   }
 
   async onModuleInit(): Promise<void> {
-    // When using InMemory backend, PostgreSQL may not be available — skip connection
+    // When using InMemory backend, PostgreSQL may not be available - skip connection
     const backend = process.env.PERSISTENCE_BACKEND?.toLowerCase();
     if (backend === 'inmemory') {
-      this.scimLogger?.warn(LogCategory.DATABASE, 'PERSISTENCE_BACKEND=inmemory — skipping PostgreSQL connection');
+      this.scimLogger?.warn(LogCategory.DATABASE, 'PERSISTENCE_BACKEND=inmemory - skipping PostgreSQL connection');
       return;
     }
     try {

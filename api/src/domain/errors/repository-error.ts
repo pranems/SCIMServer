@@ -1,17 +1,17 @@
 /**
- * RepositoryError — Domain-level error from repository operations.
+ * RepositoryError - Domain-level error from repository operations.
  *
  * Translates backend-specific errors (Prisma P2025, InMemory "not found")
  * into a consistent typed error that the service layer can catch and convert
  * to SCIM-compliant error responses.
  *
  * Error codes:
- *   NOT_FOUND   — Record does not exist (→ 404)
- *   CONFLICT    — Uniqueness constraint violation (→ 409)
- *   CONNECTION  — Database connectivity issue (→ 503)
- *   UNKNOWN     — Unexpected error (→ 500)
+ *   NOT_FOUND   - Record does not exist (→ 404)
+ *   CONFLICT    - Uniqueness constraint violation (→ 409)
+ *   CONNECTION  - Database connectivity issue (→ 503)
+ *   UNKNOWN     - Unexpected error (→ 500)
  *
- * @see Phase A Step 2 — LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md §7
+ * @see Phase A Step 2 - LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md §7
  */
 export type RepositoryErrorCode = 'NOT_FOUND' | 'CONFLICT' | 'CONNECTION' | 'UNKNOWN';
 

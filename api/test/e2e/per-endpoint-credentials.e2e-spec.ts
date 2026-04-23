@@ -235,7 +235,7 @@ describe('Per-Endpoint Credentials (E2E)', () => {
         .expect(204);
 
       // The revoked token should no longer work via per-endpoint auth.
-      // It will fall back to OAuth/legacy — which will also reject it → 401
+      // It will fall back to OAuth/legacy - which will also reject it → 401
       await request(app.getHttpServer())
         .get(`${basePath}/Users`)
         .set('Authorization', `Bearer ${tempToken}`)

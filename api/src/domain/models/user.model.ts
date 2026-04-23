@@ -1,7 +1,7 @@
 /**
  * Domain model for SCIM User resources.
  *
- * Phase 3: Removed userNameLower — PostgreSQL CITEXT handles case-insensitive
+ * Phase 3: Removed userNameLower - PostgreSQL CITEXT handles case-insensitive
  * uniqueness natively. The rawPayload field remains a JSON string at the domain
  * boundary; Prisma repositories convert to/from JSONB transparently.
  */

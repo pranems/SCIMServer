@@ -1,4 +1,4 @@
-# SCIM Case-Insensitivity — Complete Reference
+# SCIM Case-Insensitivity - Complete Reference
 
 > **RFC References**: RFC 7643 §2.1, §2.4 (Core Schema); RFC 7644 §3.4.2.2, §3.5.2 (Protocol)  
 > **Date**: February 2026  
@@ -13,7 +13,7 @@
 3. [Schema URIs](#3-schema-uris)
 4. [Filter Attribute Paths](#4-filter-attribute-paths)
 5. [Filter Operators](#5-filter-operators)
-6. [String Attribute Values — caseExact](#6-string-attribute-values--caseexact)
+6. [String Attribute Values - caseExact](#6-string-attribute-values--caseexact)
 7. [PATCH Operation Paths](#7-patch-operation-paths)
 8. [PATCH Operation `op` Values](#8-patch-operation-op-values)
 9. [Sort Attribute Names](#9-sort-attribute-names)
@@ -48,7 +48,7 @@
 
 ### Specification
 
-**RFC 7643 §2.1 — Attribute Names**:
+**RFC 7643 §2.1 - Attribute Names**:
 
 > *"Attribute names are case insensitive and are often 'camel-cased'
 > (e.g., 'camelCase')."*
@@ -67,7 +67,7 @@ username
 uSeRnAmE
 ```
 
-### Request Body — All Valid
+### Request Body - All Valid
 
 ```http
 POST /scim/v2/Users HTTP/1.1
@@ -90,7 +90,7 @@ Authorization: Bearer eyJ...
 
 A compliant server MUST accept this exactly as if camelCase names were used.
 
-### Response — Server Typically Returns Canonical Form
+### Response - Server Typically Returns Canonical Form
 
 ```http
 HTTP/1.1 201 Created
@@ -151,7 +151,7 @@ URN:IETF:PARAMS:SCIM:SCHEMAS:CORE:2.0:USER
 Urn:Ietf:Params:Scim:Schemas:Core:2.0:User
 ```
 
-### Request Example — Mixed-Case Schema URIs
+### Request Example - Mixed-Case Schema URIs
 
 ```http
 POST /scim/v2/Users HTTP/1.1
@@ -190,12 +190,12 @@ A compliant server MUST accept this request and map the schemas correctly.
 
 ### Specification
 
-**RFC 7644 §3.4.2.2 — Filtering**:
+**RFC 7644 §3.4.2.2 - Filtering**:
 
 > *"Attribute names and attribute operators used in filters are case
 > insensitive."*
 
-### Examples — All Equivalent
+### Examples - All Equivalent
 
 ```http
 GET /scim/v2/Users?filter=userName eq "jdoe" HTTP/1.1
@@ -204,14 +204,14 @@ GET /scim/v2/Users?filter=USERNAME eq "jdoe" HTTP/1.1
 GET /scim/v2/Users?filter=username eq "jdoe" HTTP/1.1
 ```
 
-### Sub-Attribute Paths — Also Case-Insensitive
+### Sub-Attribute Paths - Also Case-Insensitive
 
 ```http
 GET /scim/v2/Users?filter=NAME.FAMILYNAME eq "Doe" HTTP/1.1
 GET /scim/v2/Users?filter=name.familyName eq "Doe" HTTP/1.1
 ```
 
-### Value Path Filters (Bracketed) — Attribute Names Are Case-Insensitive
+### Value Path Filters (Bracketed) - Attribute Names Are Case-Insensitive
 
 ```http
 GET /scim/v2/Users?filter=EMAILS[TYPE eq "work"].VALUE co "example" HTTP/1.1
@@ -265,7 +265,7 @@ Content-Type: application/scim+json
 >
 > *`filter=Username eq "john"`"*
 
-### All Operator Variations — Must Be Accepted
+### All Operator Variations - Must Be Accepted
 
 | Operator | Lowercase | Uppercase | Mixed | Meaning |
 |----------|-----------|-----------|-------|---------|
@@ -294,18 +294,18 @@ GET /scim/v2/Users?filter=NOT(userName EQ "admin") HTTP/1.1
 
 ---
 
-## 6. String Attribute Values — `caseExact`
+## 6. String Attribute Values - `caseExact`
 
 ### Specification
 
-**RFC 7643 §2.4 — Returned Characteristics**:
+**RFC 7643 §2.4 - Returned Characteristics**:
 
 > *"For attributes with type 'string', the 'caseExact' characteristic
 > determines how string value comparisons are handled."*
 
 When `caseExact` is `false` (the **default** for string attributes), comparisons for filtering, sorting, and uniqueness MUST be performed case-insensitively.
 
-### User Resource Attributes — RFC 7643 §4.1
+### User Resource Attributes - RFC 7643 §4.1
 
 | Attribute | Type | `caseExact` | Comparison | Notes |
 |-----------|------|:-----------:|------------|-------|
@@ -334,7 +334,7 @@ When `caseExact` is `false` (the **default** for string attributes), comparisons
 | `externalId` | string | **true** | **Case-sensitive** ⚠️ | Client-generated identifier |
 | `password` | string | **true** | **Case-sensitive** ⚠️ | Write-only, never returned |
 
-### Group Resource Attributes — RFC 7643 §4.2
+### Group Resource Attributes - RFC 7643 §4.2
 
 | Attribute | Type | `caseExact` | Comparison |
 |-----------|------|:-----------:|------------|
@@ -344,7 +344,7 @@ When `caseExact` is `false` (the **default** for string attributes), comparisons
 | `members[].type` | string | **false** | Case-insensitive |
 | `id` | string | **true** | **Case-sensitive** |
 
-### Enterprise Extension Attributes — RFC 7643 §4.3
+### Enterprise Extension Attributes - RFC 7643 §4.3
 
 | Attribute | Type | `caseExact` | Comparison |
 |-----------|------|:-----------:|------------|
@@ -356,7 +356,7 @@ When `caseExact` is `false` (the **default** for string attributes), comparisons
 | `manager.value` | string | **true** | **Case-sensitive** (references `id`) |
 | `manager.displayName` | string | **false** | Case-insensitive |
 
-### Example — Filter Value Comparison (caseExact: false)
+### Example - Filter Value Comparison (caseExact: false)
 
 Since `userName` has `caseExact: false`, these filters MUST return the same user:
 
@@ -366,7 +366,7 @@ GET /scim/v2/Users?filter=userName eq "JDOE" HTTP/1.1
 GET /scim/v2/Users?filter=userName eq "JDoe" HTTP/1.1
 ```
 
-### Example — Uniqueness (caseExact: false)
+### Example - Uniqueness (caseExact: false)
 
 If user `"jdoe"` exists, creating `"JDOE"` MUST return a 409 Conflict:
 
@@ -392,7 +392,7 @@ Content-Type: application/scim+json
 }
 ```
 
-### Example — Filter Value Comparison (caseExact: true)
+### Example - Filter Value Comparison (caseExact: true)
 
 Since `externalId` has `caseExact: true`, these filters return **different** results:
 
@@ -408,11 +408,11 @@ GET /scim/v2/Users?filter=externalId eq "ABC-123" HTTP/1.1
 
 ### Specification
 
-**RFC 7644 §3.5.2 — Modifying with PATCH**:
+**RFC 7644 §3.5.2 - Modifying with PATCH**:
 
 PATCH `path` values reference attribute names. Since attribute names are case-insensitive (RFC 7643 §2.1), PATCH paths MUST be resolved case-insensitively.
 
-### Examples — All Equivalent
+### Examples - All Equivalent
 
 **Simple attribute path:**
 
@@ -560,14 +560,14 @@ switch (normalizedOp) {
 
 ### Specification
 
-**RFC 7644 §3.4.2.3 — Sorting**:
+**RFC 7644 §3.4.2.3 - Sorting**:
 
 > *"Sort is OPTIONAL. 'sortBy' is a string that indicates the attribute
 > whose value SHALL be used to order the returned responses."*
 
 Since attribute names are case-insensitive, `sortBy` values MUST be resolved case-insensitively.
 
-### Examples — All Equivalent
+### Examples - All Equivalent
 
 ```http
 GET /scim/v2/Users?sortBy=userName&sortOrder=ascending HTTP/1.1
@@ -644,7 +644,7 @@ ETags are opaque and case-sensitive per RFC 7232.
 
 ### Passwords
 
-`password` is `caseExact: true` — always case-sensitive (and write-only; never returned).
+`password` is `caseExact: true` - always case-sensitive (and write-only; never returned).
 
 ---
 
@@ -706,14 +706,14 @@ Since `externalId` is `caseExact: true`, the value comparison MUST be case-sensi
 
 ## 12. Implementation Checklist
 
-> **Status**: Updated February 25, 2026 — Phase 8.4 caseExact enforcement complete (v0.17.2). `externalId` CITEXT→TEXT migration applied.
+> **Status**: Updated February 25, 2026 - Phase 8.4 caseExact enforcement complete (v0.17.2). `externalId` CITEXT→TEXT migration applied.
 
 ### Attribute Name Resolution
 
 - [ ] Incoming request body attribute names are matched case-insensitively to the schema
 - [x] Filter expressions resolve attribute names case-insensitively (`buildFilter()` uses `.toLowerCase()` switch)
 - [x] PATCH `path` attribute names resolved case-insensitively (extension URN matching)
-- [ ] `sortBy` parameter resolved case-insensitively (sort not supported — `ServiceProviderConfig.sort.supported: false`)
+- [ ] `sortBy` parameter resolved case-insensitively (sort not supported - `ServiceProviderConfig.sort.supported: false`)
 - [x] `attributes` / `excludedAttributes` query parameters resolved case-insensitively (`stripExcludedAttributes()` in groups controller)
 - [x] Extension URN prefixes in attribute paths resolved case-insensitively (`scim-patch-path.ts`)
 
@@ -750,22 +750,22 @@ Since `externalId` is `caseExact: true`, the value comparison MUST be case-sensi
 
 - [x] Added `userNameLower` column to `ScimUser` model (Prisma schema)
 - [x] Unique constraint moved from `[endpointId, userName]` to `[endpointId, userNameLower]`
-- [x] Migration SQL: `20260209120000_add_username_lower_column` — ALTER TABLE, backfill, re-index
+- [x] Migration SQL: `20260209120000_add_username_lower_column` - ALTER TABLE, backfill, re-index
 - [x] All write paths (create, replace, PATCH) set `userNameLower = userName.toLowerCase()`
-- [x] Added `displayNameLower` column to `ScimGroup` model (Prisma schema) — introduced in v0.9.1, current in v0.10.0
-- [x] Unique constraint `@@unique([endpointId, displayNameLower])` for Groups — introduced in v0.9.1, current in v0.10.0
-- [x] Migration SQL: `20260213064256_add_display_name_lower` — ALTER TABLE, backfill `LOWER(displayName)`, re-index — introduced in v0.9.1, current in v0.10.0
-- [x] All group write paths (create, PATCH, PUT) set `displayNameLower = displayName.toLowerCase()` — introduced in v0.9.1, current in v0.10.0
-- [x] Group filter `displayName eq` now uses DB push-down via `displayNameLower` column (no longer in-memory scan) — introduced in v0.9.1, current in v0.10.0
-- [x] `assertUniqueDisplayName` refactored from `findMany` O(N) to `findFirst` O(1) using `displayNameLower` index — introduced in v0.9.1, current in v0.10.0
+- [x] Added `displayNameLower` column to `ScimGroup` model (Prisma schema) - introduced in v0.9.1, current in v0.10.0
+- [x] Unique constraint `@@unique([endpointId, displayNameLower])` for Groups - introduced in v0.9.1, current in v0.10.0
+- [x] Migration SQL: `20260213064256_add_display_name_lower` - ALTER TABLE, backfill `LOWER(displayName)`, re-index - introduced in v0.9.1, current in v0.10.0
+- [x] All group write paths (create, PATCH, PUT) set `displayNameLower = displayName.toLowerCase()` - introduced in v0.9.1, current in v0.10.0
+- [x] Group filter `displayName eq` now uses DB push-down via `displayNameLower` column (no longer in-memory scan) - introduced in v0.9.1, current in v0.10.0
+- [x] `assertUniqueDisplayName` refactored from `findMany` O(N) to `findFirst` O(1) using `displayNameLower` index - introduced in v0.9.1, current in v0.10.0
 - [x] ServiceProviderConfig: `sort.supported` set to `false`
 - [x] In-code filtering for case-insensitive userName/displayName (PostgreSQL CITEXT column type handles case-insensitive matching natively)
-- [x] `externalId` column changed from `@db.Citext` to `@db.Text` — case-sensitive per RFC 7643 §3.1 (`caseExact: true`). Migration: `20260225181836_externalid_citext_to_text`. See `EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md`.
-- [x] Filter engine `ColumnType` expanded: `'text'` type added — `co`/`sw`/`ew` operators on `text` columns omit `mode: 'insensitive'` (case-sensitive matching)
+- [x] `externalId` column changed from `@db.Citext` to `@db.Text` - case-sensitive per RFC 7643 §3.1 (`caseExact: true`). Migration: `20260225181836_externalid_citext_to_text`. See `EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md`.
+- [x] Filter engine `ColumnType` expanded: `'text'` type added - `co`/`sw`/`ew` operators on `text` columns omit `mode: 'insensitive'` (case-sensitive matching)
 
 ---
 
-## Appendix A — Quick Reference Diagram
+## Appendix A - Quick Reference Diagram
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -803,7 +803,7 @@ Since `externalId` is `caseExact: true`, the value comparison MUST be case-sensi
 
 ---
 
-## Appendix B — RFC Cross-Reference
+## Appendix B - RFC Cross-Reference
 
 | Requirement | RFC | Section | Key Quote |
 |---|---|---|---|

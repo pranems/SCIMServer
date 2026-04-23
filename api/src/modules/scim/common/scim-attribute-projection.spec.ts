@@ -158,7 +158,7 @@ describe('applyAttributeProjection', () => {
       const result = applyAttributeProjection(fullUser, undefined, 'EMAILS,ACTIVE');
       expect(result.emails).toBeUndefined();
       expect(result.active).toBeUndefined();
-      // displayName and userName are always-returned — they should still be present
+      // displayName and userName are always-returned - they should still be present
       expect(result.displayName).toBe('Alice Example');
       expect(result.userName).toBe('alice@example.com');
     });
@@ -305,7 +305,7 @@ describe('applyAttributeProjection with requestReturnedByParent (G8e)', () => {
 
   it('should not strip if requestReturnedByParent is undefined', () => {
     const result = applyAttributeProjection(user, undefined, undefined, undefined);
-    expect(result).toBe(user); // reference identity — no-op
+    expect(result).toBe(user); // reference identity - no-op
   });
 
   it('should handle request-only attrs inside extension URN objects', () => {
@@ -564,7 +564,7 @@ describe('stripReturnedNever (G8e)', () => {
   it('should return resource as-is when neverAttrs is empty', () => {
     const resource = { id: 'u1', password: 'secret', schemas: ['s'] };
     const result = stripReturnedNever(resource, new Set());
-    expect(result).toBe(resource); // reference identity — no-op
+    expect(result).toBe(resource); // reference identity - no-op
     expect(result.password).toBe('secret');
   });
 
@@ -608,7 +608,7 @@ describe('stripReturnedNever (G8e)', () => {
     };
     const neverAttrs = new Set(['badgecode', 'pin']);
     const result = stripReturnedNever(resource, neverAttrs);
-    // Extension key itself should be deleted — not left as {}
+    // Extension key itself should be deleted - not left as {}
     expect(result['urn:ext:custom:2.0:User']).toBeUndefined();
     expect(result.userName).toBe('alice');
   });
@@ -705,7 +705,7 @@ describe('stripReturnedNever (G8e)', () => {
     const neverByParent = new Map<string, Set<string>>([
       ['complexattr', new Set(['subsecret'])],
     ]);
-    // Extension block sub-attrs are NOT recursed into here — they are handled
+    // Extension block sub-attrs are NOT recursed into here - they are handled
     // by the service-layer extension block loop. stripReturnedNever skips urn: keys.
     const result = stripReturnedNever(resource, neverAttrs, neverByParent);
     const ext = result['urn:ext:custom'] as Record<string, unknown>;

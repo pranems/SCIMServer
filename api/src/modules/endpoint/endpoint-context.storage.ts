@@ -7,9 +7,9 @@ import type { EndpointProfile } from '../scim/endpoint-profile/endpoint-profile.
 export interface EndpointContext {
   endpointId: string;
   baseUrl: string;
-  /** Full endpoint profile — the single runtime source of truth */
+  /** Full endpoint profile - the single runtime source of truth */
   profile?: EndpointProfile;
-  /** Runtime config flags — derived from profile.settings at context setup time */
+  /** Runtime config flags - derived from profile.settings at context setup time */
   config?: EndpointConfig;
   /** Accumulated warnings for the current request (e.g. stripped readOnly attributes) */
   warnings?: string[];
@@ -20,8 +20,8 @@ export interface EndpointContext {
  * Uses AsyncLocalStorage to ensure endpoint context is isolated per request.
  *
  * Provides two modes:
- * - `run(context, fn)` — preferred, scopes the context to the fn's execution (safe)
- * - `setContext(context)` — populates the current store established by the middleware
+ * - `run(context, fn)` - preferred, scopes the context to the fn's execution (safe)
+ * - `setContext(context)` - populates the current store established by the middleware
  *
  * A global Express middleware (`createContextMiddleware()`) initialises the
  * AsyncLocalStorage store so that `setContext()` can safely mutate it across
@@ -35,7 +35,7 @@ export class EndpointContextStorage {
 
   /**
    * Execute a function within a scoped endpoint context.
-   * This is the preferred API — the context is automatically cleaned up.
+   * This is the preferred API - the context is automatically cleaned up.
    */
   run<T>(context: EndpointContext, fn: () => T): T {
     return this.storage.run(context, fn);
@@ -67,7 +67,7 @@ export class EndpointContextStorage {
       existing.baseUrl = context.baseUrl;
       existing.profile = context.profile;
       existing.config = context.config ?? context.profile?.settings as EndpointConfig;
-      // Do NOT reset warnings — they may have been accumulated before setContext
+      // Do NOT reset warnings - they may have been accumulated before setContext
     } else {
       this.storage.enterWith({
         ...context,

@@ -1,22 +1,22 @@
 /**
- * SCIM Attribute Projection — RFC 7644 §3.4.2.5 + RFC 7643 §2.4
+ * SCIM Attribute Projection - RFC 7644 §3.4.2.5 + RFC 7643 §2.4
  *
  * Implements the `attributes` and `excludedAttributes` query parameters
  * for SCIM list and GET operations, PLUS schema-driven response filtering
  * for the `returned` attribute characteristic.
  *
  * Per RFC 7644:
- * - "attributes" — A multi-valued list of strings indicating the names
+ * - "attributes" - A multi-valued list of strings indicating the names
  *   of resource attributes to return in the response. Only the specified
  *   attributes (plus always-returned: id, schemas, meta) are included.
- * - "excludedAttributes" — A multi-valued list of strings indicating the
+ * - "excludedAttributes" - A multi-valued list of strings indicating the
  *   names of resource attributes to be removed from the default set.
  *
  * Per RFC 7643 §2.4 `returned` characteristic:
- * - "always"  — Always returned regardless of query params.
- * - "default" — Returned by default, removable via excludedAttributes.
- * - "never"   — MUST NOT appear in any response (e.g. password).
- * - "request" — Only returned when explicitly requested via `attributes`.
+ * - "always"  - Always returned regardless of query params.
+ * - "default" - Returned by default, removable via excludedAttributes.
+ * - "never"   - MUST NOT appear in any response (e.g. password).
+ * - "request" - Only returned when explicitly requested via `attributes`.
  *
  * Both parameters are comma-separated, case-insensitive, and support
  * dotted sub-attribute paths (e.g., "name.givenName").
@@ -133,7 +133,7 @@ export function applyAttributeProjectionToList<T extends Record<string, unknown>
  *
  * Per RFC 7643 §2.4: attributes with returned='never' MUST NOT appear
  * in any SCIM response (e.g. password). This applies to ALL responses
- * including POST, PUT, PATCH — not just GET/LIST.
+ * including POST, PUT, PATCH - not just GET/LIST.
  *
  * Handles both top-level attributes and attributes within extension URN objects.
  *
@@ -353,7 +353,7 @@ function parseAttrList(raw: string): Set<string> {
 
 /**
  * Include only the specified attributes + always-returned ones.
- * Supports dotted paths — e.g. "name.givenName" will keep only that sub-attribute.
+ * Supports dotted paths - e.g. "name.givenName" will keep only that sub-attribute.
  */
 function includeOnly(
   resource: Record<string, unknown>,
@@ -408,7 +408,7 @@ function includeOnly(
           const subAttr = attr.substring(keyLower.length + 1);
           if (subAttr) {
             if (topLevel.has(keyLower) && topLevel.get(keyLower) === null) {
-              // Already including full extension — skip
+              // Already including full extension - skip
             } else {
               if (!topLevel.has(keyLower)) topLevel.set(keyLower, new Set());
               topLevel.get(keyLower)!.add(subAttr);
@@ -491,7 +491,7 @@ function includeOnly(
 
 /**
  * Exclude specified attributes from the resource.
- * Supports dotted paths — e.g. "name.givenName" removes only that sub-attribute.
+ * Supports dotted paths - e.g. "name.givenName" removes only that sub-attribute.
  */
 function excludeAttrs(
   resource: Record<string, unknown>,
@@ -511,7 +511,7 @@ function excludeAttrs(
     // URN paths like "urn:ext:2.0:attrName" contain dots in version numbers,
     // so we must resolve them against resource keys BEFORE dot-based splitting.
     if (attr.startsWith('urn:')) {
-      // Exact match for a resource key — exclude entire extension
+      // Exact match for a resource key - exclude entire extension
       if (findKey(result, attr) !== undefined) {
         // Never exclude always-returned URN extensions
         if (!alwaysReturned.has(attr)) {
@@ -533,7 +533,7 @@ function excludeAttrs(
               break;
             }
             if (topLevel.has(keyLower) && topLevel.get(keyLower) === null) {
-              // Already excluding full extension — skip
+              // Already excluding full extension - skip
             } else {
               if (!topLevel.has(keyLower)) topLevel.set(keyLower, new Set());
               topLevel.get(keyLower)!.add(subAttr);

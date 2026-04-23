@@ -1,4 +1,4 @@
-# Endpoint Profile Architecture — Complete Flow Reference
+# Endpoint Profile Architecture - Complete Flow Reference
 
 > **Version**: v0.29.0  
 > **Date**: 2026-03-16  
@@ -25,7 +25,7 @@
 
 ## 1. Overview
 
-Every SCIM endpoint has a **profile** — the single source of truth for its schema definitions,
+Every SCIM endpoint has a **profile** - the single source of truth for its schema definitions,
 resource type declarations, server capability advertisement, and behavioral settings.
 
 ```mermaid
@@ -65,7 +65,7 @@ graph LR
 > Custom resource types are enabled by adding entries to `profile.resourceTypes`.
 
 **Key principle**: The profile is expanded from API inputs using RFC baselines as merge defaults.
-Custom schemas and extensions carry exactly the attributes the operator provides — no global
+Custom schemas and extensions carry exactly the attributes the operator provides - no global
 hardcoded injection for unknown schemas.
 
 ---
@@ -98,9 +98,9 @@ interface ShorthandProfileInput {
 
 | `attributes` value | Behavior | Example |
 |-------------------|----------|---------|
-| `'all'` | Lookup full RFC attribute list for known schemas. **Throws for custom schemas** — they have no RFC baseline. | `{ id: 'urn:...:User', attributes: 'all' }` |
+| `'all'` | Lookup full RFC attribute list for known schemas. **Throws for custom schemas** - they have no RFC baseline. | `{ id: 'urn:...:User', attributes: 'all' }` |
 | `Partial<Attr>[]` | Each partial attribute merged with RFC baseline (if known). Explicit overrides win. Custom attributes used as-is. | `[{ name: 'displayName', required: true }]` |
-| `undefined` | Passthrough extension — empty attributes. Extension data stored/returned without validation. | MSFT test extensions |
+| `undefined` | Passthrough extension - empty attributes. Extension data stored/returned without validation. | MSFT test extensions |
 
 ---
 
@@ -139,7 +139,7 @@ flowchart TD
 | # | Condition | Profile source | Base preset |
 |---|-----------|---------------|------------|
 | 1 | `profilePreset` set | Named preset's shorthand input | Named preset |
-| 2 | `profile` set | Inline shorthand input | N/A — input IS the profile |
+| 2 | `profile` set | Inline shorthand input | N/A - input IS the profile |
 | 3 | None provided | `entra-id` preset default | `entra-id` |
 
 > **What this means for settings:** When no profile or preset is specified, the `entra-id` preset sets 5 behavioral flags to `True` (`AllowAndCoerceBooleanStrings`, `VerbosePatchSupported`, `MultiOp…Add`, `MultiOp…Remove`, `PatchOpAllowRemoveAllMembers`). All other flags default to `false`. DELETE is hard-delete, schema validation is lenient, `If-Match` is optional. See [ENDPOINT_CONFIG_FLAGS_REFERENCE.md §2.1](ENDPOINT_CONFIG_FLAGS_REFERENCE.md#21-default-behavior--what-happens-out-of-the-box) for the complete matrix.
@@ -151,7 +151,7 @@ flowchart TD
 POST /scim/admin/endpoints
 { "name": "my-endpoint", "profilePreset": "rfc-standard" }
 ```
-Result: Full RFC 7643 profile — User + EnterpriseUser + Group, all capabilities.
+Result: Full RFC 7643 profile - User + EnterpriseUser + Group, all capabilities.
 
 **Example 2: Inline profile with custom extension**
 ```json
@@ -187,14 +187,14 @@ POST /scim/admin/endpoints
   }
 }
 ```
-Result: `urn:example:hr:2.0:User` custom extension with `secretToken` (returned:never) — stripped from all responses.
+Result: `urn:example:hr:2.0:User` custom extension with `secretToken` (returned:never) - stripped from all responses.
 
 **Example 3: Default creation (no input)**
 ```json
 POST /scim/admin/endpoints
 { "name": "default-endpoint" }
 ```
-Result: `entra-id` preset — scoped User attributes, MSFT test extensions, no bulk.
+Result: `entra-id` preset - scoped User attributes, MSFT test extensions, no bulk.
 
 **Example 4: Settings-based creation**
 
@@ -241,8 +241,8 @@ flowchart TD
 |---------|----------|-------------|
 | `schemas` | **Replace** | New array replaces old. Must include ALL schemas needed by RTs. |
 | `resourceTypes` | **Replace** | New array replaces old. Must reference existing schemas. |
-| `serviceProviderConfig` | **Shallow merge** | `{ ...current.SPC, ...partial.SPC }` — unmentioned capabilities preserved. |
-| `settings` | **Shallow merge** (additive) | `{ ...current.settings, ...partial.settings }` — unmentioned flags preserved. |
+| `serviceProviderConfig` | **Shallow merge** | `{ ...current.SPC, ...partial.SPC }` - unmentioned capabilities preserved. |
+| `settings` | **Shallow merge** (additive) | `{ ...current.settings, ...partial.settings }` - unmentioned flags preserved. |
 
 ### Structural integrity rule
 
@@ -305,17 +305,17 @@ PATCH /scim/admin/endpoints/:id
 ```
 Result: Custom `Badge` extension added. Existing settings and SPC preserved.
 
-### Immediate Effect — No Restart Required
+### Immediate Effect - No Restart Required
 
 All profile PATCHes (examples 5–7) take effect **immediately** on the next SCIM request. The update pipeline:
 
 1. `mergeProfilePartial()` merges the partial into the current profile (replace for schemas/RTs, shallow-merge for settings/SPC)
 2. `validateAndExpandProfile()` validates the merged result (fails → 400, nothing changes)
 3. In-memory endpoint cache is updated synchronously
-4. `_schemaCaches` is deleted — lazily rebuilt on first request access
+4. `_schemaCaches` is deleted - lazily rebuilt on first request access
 5. `profileChangeListener` fires for any registered listeners
 
-There is no deferred reload, no scheduler, and no eventual consistency — the new profile is immediately visible to discovery, validation, and characteristic enforcement.
+There is no deferred reload, no scheduler, and no eventual consistency - the new profile is immediately visible to discovery, validation, and characteristic enforcement.
 
 **Existing resources** without extension data continue working normally. Extension data is only returned for resources that have it stored in their `rawPayload`.
 
@@ -368,7 +368,7 @@ For custom schemas (no RFC baseline): attributes are used exactly as provided.
 | Project Defaults | `externalId`, `meta` (complex, readOnly) | If missing from schema |
 | Group-specific | `active` (boolean) | Group schema only, if missing |
 
-These are injected **regardless** of whether the operator provided them — they are server-essential.
+These are injected **regardless** of whether the operator provided them - they are server-essential.
 
 ---
 
@@ -407,7 +407,7 @@ Compares operator's attribute characteristics against RFC baseline:
 | `caseExact` | `false → true` | `true → false` |
 | `returned` | Any except from `never` | `never → *` |
 
-Custom schemas (no baseline) — **skipped entirely**.
+Custom schemas (no baseline) - **skipped entirely**.
 
 ### Structural validation
 
@@ -462,7 +462,7 @@ those relevant to the current resource type:
 
 ## 8. Discovery Endpoints
 
-All discovery responses are built **directly from the stored profile** — not from any global registry.
+All discovery responses are built **directly from the stored profile** - not from any global registry.
 
 | Endpoint | Source | Enrichment |
 |----------|--------|------------|
@@ -522,31 +522,31 @@ graph TD
 
 | `profilePreset` | `profile` | Result |
 |:---------------:|:---------:|--------|
-| Set | — | Named preset expanded |
+| Set | - | Named preset expanded |
 | Set | Set | **400**: Cannot specify both |
-| — | Set | Inline profile expanded |
-| — | — | `entra-id` default preset |
+| - | Set | Inline profile expanded |
+| - | - | `entra-id` default preset |
 
 ### Update (PATCH) combinations
 
 | `profile` | `displayName`/`active`/etc | Result |
 |:---------:|:--------------------------:|--------|
 | Set | Optional | Profile merged + fields updated |
-| — | Set | Only metadata fields updated, profile unchanged |
-| — | — | No-op (200 with unchanged endpoint) |
+| - | Set | Only metadata fields updated, profile unchanged |
+| - | - | No-op (200 with unchanged endpoint) |
 
 ### Profile section update combinations
 
 | `schemas` | `resourceTypes` | `SPC` | `settings` | Behavior |
 |:---------:|:--------------:|:-----:|:----------:|----------|
-| Set | Set | — | — | Both replaced. Must be structurally valid. |
-| Set | — | — | — | Schemas replaced. **400 if existing RTs reference missing schemas.** |
-| — | Set | — | — | RTs replaced. **400 if new RTs reference missing schemas.** |
-| — | — | Set | — | SPC shallow-merged. Schemas/RTs untouched. |
-| — | — | — | Set | Settings shallow-merged. Everything else untouched. |
+| Set | Set | - | - | Both replaced. Must be structurally valid. |
+| Set | - | - | - | Schemas replaced. **400 if existing RTs reference missing schemas.** |
+| - | Set | - | - | RTs replaced. **400 if new RTs reference missing schemas.** |
+| - | - | Set | - | SPC shallow-merged. Schemas/RTs untouched. |
+| - | - | - | Set | Settings shallow-merged. Everything else untouched. |
 | Set | Set | Set | Set | All sections updated. Full revalidation. |
-| Set | — | — | Set | Schemas replaced + settings merged. **400 if RT mismatch.** |
-| — | — | Set | Set | SPC + settings merged. Safe — no structural impact. |
+| Set | - | - | Set | Schemas replaced + settings merged. **400 if RT mismatch.** |
+| - | - | Set | Set | SPC + settings merged. Safe - no structural impact. |
 
 ---
 
@@ -651,5 +651,5 @@ keyed by endpoint ID. The profile is the same JSON structure, held in memory.
 
 | Date | Change |
 |------|--------|
-| 2026-03-16 | v0.29.0 — Remove legacy config references, add DB storage section, update combination matrices |
-| 2026-03-16 | Initial — comprehensive profile flow documentation from source code audit |
+| 2026-03-16 | v0.29.0 - Remove legacy config references, add DB storage section, update combination matrices |
+| 2026-03-16 | Initial - comprehensive profile flow documentation from source code audit |

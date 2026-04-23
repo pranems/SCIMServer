@@ -14,7 +14,7 @@
 **Steps to trigger a 409 collision**
 1. **Confirm the joining attribute** in Entra → Provisioning → Mappings.
    - **Only `userName` causes 409 for Users** (uniqueness: "server" per RFC 7643 §2.4).
-   - `externalId` and `displayName` are saved as received — duplicates are allowed (uniqueness: "none").
+   - `externalId` and `displayName` are saved as received - duplicates are allowed (uniqueness: "none").
    - For Groups, `displayName` is the unique identifier (uniqueness: "server").
 2. **Seed an existing record** in SCIMServer (Manual Provision):
    - Create a user with the target user's UPN in `userName`.
@@ -39,10 +39,10 @@ Skip to the sections below for the “why” and troubleshooting details.
 | Resource | Attribute | `uniqueness` | Causes 409? |
 |----------|-----------|-------------|-------------|
 | **User** | `userName` | `"server"` | ✅ Yes (POST/PUT/PATCH) |
-| **User** | `externalId` | `"none"` | ❌ No — saved as received |
-| **User** | `displayName` | `"none"` | ❌ No — saved as received |
+| **User** | `externalId` | `"none"` | ❌ No - saved as received |
+| **User** | `displayName` | `"none"` | ❌ No - saved as received |
 | **Group** | `displayName` | `"server"` | ✅ Yes (POST/PUT/PATCH) |
-| **Group** | `externalId` | `"none"` | ❌ No — saved as received |
+| **Group** | `externalId` | `"none"` | ❌ No - saved as received |
 
 - **Entra behaviour** is driven by the attribute marked “Matching” in provisioning mappings. Whatever is first in matching precedence is what Microsoft Entra uses to find existing users.
 
@@ -107,7 +107,7 @@ Activity Feed shows the failed `POST /Users` and no new user is inserted in the 
 |---------|----------------|-----|
 | Entra keeps PATCHing | Existing match still cached | Use **Force Entra to Re-POST** steps, then retry on-demand |
 | Manual provision succeeds (201) | Wrong identifier duplicated | Confirm which field Entra marks as Matching (mappings + raw logs) |
-| externalId collision expected but got 201 | **Expected behavior since v0.33.0** — externalId has `uniqueness:none` | Use `userName` for User collisions, `displayName` for Group collisions |
+| externalId collision expected but got 201 | **Expected behavior since v0.33.0** - externalId has `uniqueness:none` | Use `userName` for User collisions, `displayName` for Group collisions |
 | Still seeing 200 after collision | Uniqueness bug or different environment | Verify SCIMServer version and database state, then report issue |
 
 ---

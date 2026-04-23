@@ -79,7 +79,7 @@ test.describe('Raw Logs', () => {
     });
 
     test('table rows contain live data', async ({ page }) => {
-      // Wait for table to populate — may take a moment after tab switch
+      // Wait for table to populate - may take a moment after tab switch
       await expect(page.locator('tbody tr').first()).toBeVisible({ timeout: 10000 });
       const rows = page.locator('tbody tr');
       const count = await rows.count();

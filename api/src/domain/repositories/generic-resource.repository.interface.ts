@@ -1,5 +1,5 @@
 /**
- * IGenericResourceRepository — persistence port for custom SCIM resource types.
+ * IGenericResourceRepository - persistence port for custom SCIM resource types.
  *
  * Phase 8b: Generic resources are stored in the polymorphic ScimResource table
  * with an arbitrary resourceType discriminator. All queries are scoped by

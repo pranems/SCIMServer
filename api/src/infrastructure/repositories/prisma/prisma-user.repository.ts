@@ -1,8 +1,8 @@
 /**
- * PrismaUserRepository — IUserRepository backed by Prisma (PostgreSQL).
+ * PrismaUserRepository - IUserRepository backed by Prisma (PostgreSQL).
  *
  * Phase 3: Queries the unified `ScimResource` table with `resourceType = 'User'`.
- * CITEXT on userName handles case-insensitive uniqueness natively — no
+ * CITEXT on userName handles case-insensitive uniqueness natively - no
  * userNameLower helper column. JSONB payload is converted to/from string
  * at the repository boundary so the domain layer stays unchanged.
  */
@@ -21,7 +21,7 @@ import { wrapPrismaError } from './prisma-error.util';
 
 /** Maps a ScimResource row (with JSONB payload) to the UserRecord domain type. */
 function toUserRecord(resource: Record<string, unknown>): UserRecord {
-  // payload comes back as a parsed JS object from Prisma JSONB — stringify for domain
+  // payload comes back as a parsed JS object from Prisma JSONB - stringify for domain
   const payload = resource.payload;
   const rawPayload = typeof payload === 'string' ? payload : JSON.stringify(payload ?? {});
   return {
@@ -136,8 +136,8 @@ export class PrismaUserRepository implements IUserRepository {
     userName: string,
     excludeScimId?: string,
   ): Promise<UserConflictResult | null> {
-    // Phase 3: CITEXT handles case-insensitive comparison natively — no toLowerCase needed
-    // Note: Only userName is checked — externalId/displayName are NOT unique per RFC 7643.
+    // Phase 3: CITEXT handles case-insensitive comparison natively - no toLowerCase needed
+    // Note: Only userName is checked - externalId/displayName are NOT unique per RFC 7643.
     const filters: Prisma.ScimResourceWhereInput[] = [
       { endpointId, resourceType: 'User' },
       { userName },

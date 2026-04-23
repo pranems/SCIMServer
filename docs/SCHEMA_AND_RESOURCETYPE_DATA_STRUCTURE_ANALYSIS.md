@@ -4,18 +4,18 @@
 
 **Feature**: Schema and ResourceType runtime storage, retrieval, and derived computation architecture  
 **Version**: 0.31.0 (URN dot-path cache, 2026-03-30)  
-**Status**: ✅ Implemented — URN-qualified dot-path cache with zero-collision keying  
-**RFC Reference**: [RFC 7643 §2](https://datatracker.ietf.org/doc/html/rfc7643#section-2) — Attribute Characteristics, [§7](https://datatracker.ietf.org/doc/html/rfc7643#section-7) — Schema Definition  
+**Status**: ✅ Implemented - URN-qualified dot-path cache with zero-collision keying  
+**RFC Reference**: [RFC 7643 §2](https://datatracker.ietf.org/doc/html/rfc7643#section-2) - Attribute Characteristics, [§7](https://datatracker.ietf.org/doc/html/rfc7643#section-7) - Schema Definition  
 **Related**: [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md), [P2_ATTRIBUTE_CHARACTERISTIC_ENFORCEMENT.md](P2_ATTRIBUTE_CHARACTERISTIC_ENFORCEMENT.md)
 
 ### Evolution
 
 | Version | Key Change |
 |---------|-----------|
-| v0.28.x | Raw schema tree — 2–9 tree walks per request, ~40–180 µs overhead |
-| v0.29.0 | `SchemaCharacteristicsCache` with `__top__` sentinel — zero per-request tree walks |
+| v0.28.x | Raw schema tree - 2–9 tree walks per request, ~40–180 µs overhead |
+| v0.29.0 | `SchemaCharacteristicsCache` with `__top__` sentinel - zero per-request tree walks |
 | v0.30.0 | Pre-flattened returned Sets, sub-attr collision maps, caseExact-aware sorting |
-| **v0.31.0** | **URN-qualified dot-path keys** — eliminates `__top__` sentinel, zero-collision at any nesting depth |
+| **v0.31.0** | **URN-qualified dot-path keys** - eliminates `__top__` sentinel, zero-collision at any nesting depth |
 
 ---
 
@@ -101,7 +101,7 @@ function isSubAttrKey(key: string): boolean {
 }
 ```
 
-A key is a **sub-attr key** iff it has a `.` AFTER the last `:`. This correctly handles URNs with dots in version numbers (e.g., `urn:...:2.0:User` — the `.` in `2.0` is before the last `:`).
+A key is a **sub-attr key** iff it has a `.` AFTER the last `:`. This correctly handles URNs with dots in version numbers (e.g., `urn:...:2.0:User` - the `.` in `2.0` is before the last `:`).
 
 | Key | `isSubAttrKey` | Classification |
 |-----|---------------|----------------|
@@ -119,7 +119,7 @@ The previous design used `__top__` as a sentinel key for core top-level attribut
 Old keys:                          Collision scenario:
   __top__     → {active}           Core emails.primary (boolean)
   emails      → {primary}          Extension emails.primary (string)
-  urn:ext:... → {department}       ↑ Both land under key "emails" — COLLISION
+  urn:ext:... → {department}       ↑ Both land under key "emails" - COLLISION
 ```
 
 With URN dot-path keys, the same scenario is unambiguous:
@@ -163,13 +163,13 @@ urn:ietf:params:scim:schemas:core:2.0:user.roles    → {primary}
 
 | Step | Key in payload | parentPath | Lookup | Match? | Action |
 |------|---------------|------------|--------|--------|--------|
-| 1 | root object | `urn:...:core:2.0:user` | booleans@`urn:...:user` | — | — |
+| 1 | root object | `urn:...:core:2.0:user` | booleans@`urn:...:user` | - | - |
 | 2 | `"active": "True"` | `urn:...:core:2.0:user` | `active` ∈ `{active}`? | YES | `→ true` |
-| 3 | `"emails": [...]` | recurse with `urn:...:user.emails` | — | — | — |
+| 3 | `"emails": [...]` | recurse with `urn:...:user.emails` | - | - | - |
 | 4 | `"primary": "True"` | `urn:...:core:2.0:user.emails` | `primary` ∈ `{primary}`? | YES | `→ true` |
-| 5 | `"urn:...:enterprise"` | key starts with `urn:` → switch | `urn:...:enterprise:...` | — | — |
+| 5 | `"urn:...:enterprise"` | key starts with `urn:` → switch | `urn:...:enterprise:...` | - | - |
 | 6 | `"department"` | `urn:...:enterprise:2.0:user` | booleans@`urn:...:ent` | ∅ | skip |
-| 7 | `"manager": {...}` | recurse with `urn:...:enterprise:2.0:user.manager` | — | — | — |
+| 7 | `"manager": {...}` | recurse with `urn:...:enterprise:2.0:user.manager` | - | - | - |
 | 8 | `"value": "mgr-id"` | `urn:...:enterprise:2.0:user.manager` | booleans@...manager | ∅ | skip |
 
 ### Other Maps (same key structure)
@@ -265,14 +265,14 @@ sequenceDiagram
 
     Note over Svc,Val: First access (lazy build)
     Svc->>Help: getBooleansByParent()
-    Help->>Help: getSchemaCache() — profile._schemaCaches[coreUrn]?
-    Help-->>Help: Miss — buildCharacteristicsCache(schemas, extUrns)
+    Help->>Help: getSchemaCache() - profile._schemaCaches[coreUrn]?
+    Help-->>Help: Miss - buildCharacteristicsCache(schemas, extUrns)
     Help->>Ctx: Attach cache to profile._schemaCaches[coreUrn]
     Help-->>Svc: booleansByParent Map
 
     Note over Svc,Val: Subsequent access (O(1))
     Svc->>Help: getNeverReturnedByParent()
-    Help->>Help: getSchemaCache() — profile._schemaCaches[coreUrn] HIT
+    Help->>Help: getSchemaCache() - profile._schemaCaches[coreUrn] HIT
     Help-->>Svc: neverReturnedByParent Map
 ```
 
@@ -301,7 +301,7 @@ POST /scim/endpoints/{id}/Users
                     alwaysReturnedByParent, requestReturnedByParent)
 ```
 
-**All 8 steps read from precomputed cache — zero tree walks per request.**
+**All 8 steps read from precomputed cache - zero tree walks per request.**
 
 ---
 
@@ -387,7 +387,7 @@ for (const [key, value] of Object.entries(obj)) {
 }
 ```
 
-### Pattern 3: Projection — extract attr-name-keyed lookup from URN-dot-path map
+### Pattern 3: Projection - extract attr-name-keyed lookup from URN-dot-path map
 
 ```typescript
 // In stripRequestOnlyAttrs / stripReturnedNever / includeOnly:
@@ -434,7 +434,7 @@ for (const [parent, children] of requestByParent) {
 
 ## 9. Test Coverage
 
-### Unit Tests (schema-validator-cache.spec.ts — 95 tests)
+### Unit Tests (schema-validator-cache.spec.ts - 95 tests)
 
 | Category | Tests | Status |
 |----------|-------|--------|
@@ -461,7 +461,7 @@ for (const [parent, children] of requestByParent) {
 | `coreSchemaUrn` / `schemaUrnSet` (values, size, custom URN, empty) | 7 | ✅ |
 | Sub-attr level collision disambiguation (different characteristics) | 2 | ✅ |
 
-### Concurrency Tests (schema-cache-concurrency.spec.ts — ~26 tests)
+### Concurrency Tests (schema-cache-concurrency.spec.ts - ~26 tests)
 
 | Category | Tests |
 |----------|-------|

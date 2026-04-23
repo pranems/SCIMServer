@@ -10,15 +10,15 @@
 
 ## Overview
 
-SCIMServer supports **multi-endpoint isolation** — each endpoint gets a dedicated SCIM base path with completely isolated Users, Groups, and configuration. This enables a single SCIMServer deployment to serve multiple Entra ID enterprise applications or endpoints simultaneously.
+SCIMServer supports **multi-endpoint isolation** - each endpoint gets a dedicated SCIM base path with completely isolated Users, Groups, and configuration. This enables a single SCIMServer deployment to serve multiple Entra ID enterprise applications or endpoints simultaneously.
 
 ### Key Capabilities
 
 - **Isolated SCIM endpoints** at `/scim/endpoints/{endpointId}`
-- **Separate data** — Users and Groups per endpoint (composite unique constraints)
-- **Per-endpoint configuration** — control behavior via config flags
-- **Cascade deletion** — removing an endpoint deletes all associated data
-- **Inactive endpoint blocking** — deactivated endpoints return 403 Forbidden
+- **Separate data** - Users and Groups per endpoint (composite unique constraints)
+- **Per-endpoint configuration** - control behavior via config flags
+- **Cascade deletion** - removing an endpoint deletes all associated data
+- **Inactive endpoint blocking** - deactivated endpoints return 403 Forbidden
 
 ---
 
@@ -69,9 +69,9 @@ SCIMServer supports **multi-endpoint isolation** — each endpoint gets a dedica
 ### Request Context Isolation
 
 Each request flows through `EndpointContextStorage` (AsyncLocalStorage-based) which binds:
-- `endpointId` — the endpoint being accessed
-- `baseUrl` — the SCIM base for `meta.location` generation
-- `profile` — endpoint profile with schemas, resource types, SPC, and settings (behavioral flags)
+- `endpointId` - the endpoint being accessed
+- `baseUrl` - the SCIM base for `meta.location` generation
+- `profile` - endpoint profile with schemas, resource types, SPC, and settings (behavioral flags)
 
 This ensures complete data isolation between concurrent requests to different endpoints.
 
@@ -93,7 +93,7 @@ This ensures complete data isolation between concurrent requests to different en
 | `DELETE` | `/scim/admin/endpoints/{id}` | Delete endpoint + cascade all data |
 | `GET` | `/scim/admin/endpoints/{id}/stats` | Get user/group counts |
 
-> **PATCH merge semantics**: `settings` and `serviceProviderConfig` are **shallow-merged** (additive — unmentioned flags preserved). `schemas` and `resourceTypes` are **replaced** wholesale — send complete arrays including existing items. All changes take effect **immediately** (in-memory cache updated synchronously, `_schemaCaches` lazily rebuilt). No restart required. Custom extensions can be added to or removed from an existing endpoint this way. See [SCHEMA_CUSTOMIZATION_GUIDE.md §11](SCHEMA_CUSTOMIZATION_GUIDE.md#11-adding-extensions-to-existing-endpoints-patch) for detailed examples.
+> **PATCH merge semantics**: `settings` and `serviceProviderConfig` are **shallow-merged** (additive - unmentioned flags preserved). `schemas` and `resourceTypes` are **replaced** wholesale - send complete arrays including existing items. All changes take effect **immediately** (in-memory cache updated synchronously, `_schemaCaches` lazily rebuilt). No restart required. Custom extensions can be added to or removed from an existing endpoint this way. See [SCHEMA_CUSTOMIZATION_GUIDE.md §11](SCHEMA_CUSTOMIZATION_GUIDE.md#11-adding-extensions-to-existing-endpoints-patch) for detailed examples.
 
 #### Create Endpoint
 
@@ -188,10 +188,10 @@ For the full reference: [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLA
 
 ## Data Isolation
 
-1. **Composite unique constraints** — the same `userName`, `externalId`, or `scimId` can exist in different endpoints without conflict.
-2. **Query filtering** — all database queries include `WHERE endpointId = ?`.
-3. **AsyncLocalStorage** — request context isolated per request; no data leakage between concurrent requests.
-4. **Cascade delete** — deleting an endpoint removes all users, groups, memberships, and logs automatically via foreign key constraints.
+1. **Composite unique constraints** - the same `userName`, `externalId`, or `scimId` can exist in different endpoints without conflict.
+2. **Query filtering** - all database queries include `WHERE endpointId = ?`.
+3. **AsyncLocalStorage** - request context isolated per request; no data leakage between concurrent requests.
+4. **Cascade delete** - deleting an endpoint removes all users, groups, memberships, and logs automatically via foreign key constraints.
 
 ---
 

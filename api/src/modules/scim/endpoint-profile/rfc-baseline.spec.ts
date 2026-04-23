@@ -1,5 +1,5 @@
 /**
- * Unit Tests — RFC Baseline Constants (Phase 13, Step 1.2)
+ * Unit Tests - RFC Baseline Constants (Phase 13, Step 1.2)
  *
  * Validates that the RFC baseline attribute maps, required attribute lists,
  * and project auto-inject constants are correctly structured and contain
@@ -42,7 +42,7 @@ describe('rfc-baseline', () => {
       expect(id!.uniqueness).toBe('server');
     });
 
-    it('should contain userName (RFC 7643 §4.1 — only required client attribute)', () => {
+    it('should contain userName (RFC 7643 §4.1 - only required client attribute)', () => {
       const userName = (RFC_USER_ATTRIBUTES as readonly any[]).find((a: any) => a.name === 'userName');
       expect(userName).toBeDefined();
       expect(userName!.required).toBe(true);
@@ -101,7 +101,7 @@ describe('rfc-baseline', () => {
       expect(id!.mutability).toBe('readOnly');
     });
 
-    it('should contain displayName (RFC 7643 §4.2 — required)', () => {
+    it('should contain displayName (RFC 7643 §4.2 - required)', () => {
       const dn = (RFC_GROUP_ATTRIBUTES as readonly any[]).find((a: any) => a.name === 'displayName');
       expect(dn).toBeDefined();
       expect(dn!.required).toBe(true);

@@ -1,4 +1,4 @@
-# Phase 2 — Unified `scim_resource` Table
+# Phase 2 - Unified `scim_resource` Table
 
 > **Status:** ✅ Complete  
 > **Branch:** `feat/customattrflag`  
@@ -25,7 +25,7 @@
 
 ## Executive Summary
 
-Phase 2 unifies the separate `ScimUser`, `ScimGroup`, and `GroupMember` database tables into a single polymorphic `ScimResource` table with a `ResourceMember` join table. This is an **implementation-only change** at the Prisma repository layer — services, controllers, domain interfaces, and InMemory implementations remain completely unchanged.
+Phase 2 unifies the separate `ScimUser`, `ScimGroup`, and `GroupMember` database tables into a single polymorphic `ScimResource` table with a `ResourceMember` join table. This is an **implementation-only change** at the Prisma repository layer - services, controllers, domain interfaces, and InMemory implementations remain completely unchanged.
 
 ### Key Metrics
 
@@ -135,14 +135,14 @@ sequenceDiagram
     participant R as PrismaUserRepo
     participant DB as Database
 
-    Note over C,DB: BEFORE (Phase 1) — Separate ScimUser table
+    Note over C,DB: BEFORE (Phase 1) - Separate ScimUser table
     C->>S: createUser(dto)
     S->>R: create(input)
     R->>DB: prisma.scimUser.create({data})
     DB-->>R: ScimUser row
     R-->>S: UserRecord (as ScimUser)
 
-    Note over C,DB: AFTER (Phase 2) — Unified ScimResource table
+    Note over C,DB: AFTER (Phase 2) - Unified ScimResource table
     C->>S: createUser(dto)
     S->>R: create(input)
     R->>DB: prisma.scimResource.create({data: {..., resourceType:'User'}})
@@ -179,9 +179,9 @@ model ScimResource {
   scimId           String
   externalId       String?
   userName         String?  // Only for Users
-  userNameLower    String?  // Only for Users — SQLite case-insensitivity
+  userNameLower    String?  // Only for Users - SQLite case-insensitivity
   displayName      String?  // Only for Groups
-  displayNameLower String?  // Only for Groups — SQLite case-insensitivity
+  displayNameLower String?  // Only for Groups - SQLite case-insensitivity
   active           Boolean  @default(true)
   rawPayload       String
   version          Int      @default(1)  // Optimistic locking (Phase 7)
@@ -227,7 +227,7 @@ model ResourceMember {
 
 ## Repository Implementation Changes
 
-### PrismaUserRepository — Key Changes
+### PrismaUserRepository - Key Changes
 
 **Before (Phase 1):**
 ```typescript
@@ -279,7 +279,7 @@ function toMemberRecord(member: Record<string, unknown>): MemberRecord {
 }
 ```
 
-### PrismaGroupRepository — Key Changes
+### PrismaGroupRepository - Key Changes
 
 | Operation | Before | After |
 |-----------|--------|-------|
@@ -296,7 +296,7 @@ function toMemberRecord(member: Record<string, unknown>): MemberRecord {
 The repository pattern from Phase 1 provides complete isolation. The domain models are **unchanged**:
 
 ```typescript
-// user.model.ts — NO CHANGES
+// user.model.ts - NO CHANGES
 export interface UserRecord {
   id: string; endpointId: string; scimId: string;
   externalId: string | null; userName: string; userNameLower: string;
@@ -304,7 +304,7 @@ export interface UserRecord {
   createdAt: Date; updatedAt: Date;
 }
 
-// group.model.ts — NO CHANGES  
+// group.model.ts - NO CHANGES  
 export interface GroupRecord { ... }
 export interface MemberRecord {
   id: string; groupId: string;  // ← Still "groupId" in domain
@@ -334,7 +334,7 @@ HTTP Request: GET /scim/endpoints/{id}/Users?filter=userName eq "alice"
   ┌─ EndpointScimUsersService ────┐
   │  buildUserFilter(filter)       │  → { dbWhere: {userNameLower:'alice'} }
   │  userRepo.findAll(epId, where) │
-  │  (unchanged — same interface)  │
+  │  (unchanged - same interface)  │
   └───────────┬───────────────────┘
               │
               ▼
@@ -372,8 +372,8 @@ npx ts-node ../scripts/migrate-to-unified-resource.ts
 
 ### Behavior
 
-- **Additive only** — does NOT delete data from legacy tables
-- **Idempotent** — skips resources already in `scimResource`
+- **Additive only** - does NOT delete data from legacy tables
+- **Idempotent** - skips resources already in `scimResource`
 - Migrates users first, then groups with members
 - Resolves `memberResourceId` by matching `scimId` across endpoints
 - Logs progress with counts of migrated/skipped records
@@ -480,4 +480,4 @@ The next phase migrates from **SQLite to PostgreSQL**:
 - Enable concurrent write support (remove single-writer SQLite limitation)
 - Leverage ILIKE for case-insensitive filter pushdown
 
-The unified `ScimResource` table from Phase 2 makes this migration simpler — only one table needs the column type changes instead of two.
+The unified `ScimResource` table from Phase 2 makes this migration simpler - only one table needs the column type changes instead of two.

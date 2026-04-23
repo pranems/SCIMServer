@@ -57,6 +57,6 @@
     }
   },
   "deployment": {
-    "migratePhase": "Phase 17 — Manager PATCH string coercion + test gap audit (v0.37.3)"
+    "migratePhase": "Phase 17 - Manager PATCH string coercion + test gap audit (v0.37.3)"
   }
 }

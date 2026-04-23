@@ -40,7 +40,7 @@
 | `PUT` | `/Groups/{id}` | Replace group |
 | `PATCH` | `/Groups/{id}` | Partial update group |
 | `DELETE` | `/Groups/{id}` | Delete group (204). Always hard-deletes (row removed) |
-| `POST` | `/Bulk` | Bulk operations (RFC 7644 §3.7) — requires `bulk.supported = true` |
+| `POST` | `/Bulk` | Bulk operations (RFC 7644 §3.7) - requires `bulk.supported = true` |
 | `GET` | `/Me` | Get current authenticated user (requires OAuth JWT with `sub` claim) |
 | `PUT` | `/Me` | Replace current user |
 | `PATCH` | `/Me` | Partial update current user |

@@ -25,8 +25,8 @@ import { UpdateEndpointDto } from '../dto/update-endpoint.dto';
  * Each endpoint gets an isolated SCIM root path at: /scim/endpoints/{endpointId}
  *
  * Query param `view` controls response verbosity:
- *  - `summary` (default for list) — profileSummary digest, no full profile
- *  - `full`    (default for single-get) — full profile included
+ *  - `summary` (default for list) - profileSummary digest, no full profile
+ *  - `full`    (default for single-get) - full profile included
  */
 @Controller('admin/endpoints')
 export class EndpointController {

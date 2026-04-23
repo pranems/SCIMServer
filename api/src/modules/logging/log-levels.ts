@@ -1,17 +1,17 @@
 /**
- * Structured Log Levels — follows RFC 5424 / OpenTelemetry severity conventions.
+ * Structured Log Levels - follows RFC 5424 / OpenTelemetry severity conventions.
  *
  * Levels (ascending severity):
  *   TRACE → DEBUG → INFO → WARN → ERROR → FATAL → OFF
  *
  * Use cases:
- *   TRACE  — Byte-level detail: full request/response bodies, SQL, patch path resolution steps.
- *   DEBUG  — Operational detail useful during development: filter parsing, member resolution, config reads.
- *   INFO   — Significant business events: user created, group patched, endpoint activated.
- *   WARN   — Recoverable anomalies: deprecated header, slow query, backup retry.
- *   ERROR  — Failed operations requiring attention: auth failure, uniqueness violation, DB error.
- *   FATAL  — Unrecoverable: DB connection lost, secret not configured.
- *   OFF    — Suppress all log output.
+ *   TRACE  - Byte-level detail: full request/response bodies, SQL, patch path resolution steps.
+ *   DEBUG  - Operational detail useful during development: filter parsing, member resolution, config reads.
+ *   INFO   - Significant business events: user created, group patched, endpoint activated.
+ *   WARN   - Recoverable anomalies: deprecated header, slow query, backup retry.
+ *   ERROR  - Failed operations requiring attention: auth failure, uniqueness violation, DB error.
+ *   FATAL  - Unrecoverable: DB connection lost, secret not configured.
+ *   OFF    - Suppress all log output.
  */
 
 export enum LogLevel {

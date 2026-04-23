@@ -4,7 +4,7 @@ import { EndpointService } from './endpoint.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ScimLogger } from '../../logging/scim-logger.service';
 
-// Force Prisma backend for unit tests — these tests mock PrismaService,
+// Force Prisma backend for unit tests - these tests mock PrismaService,
 // not the in-memory cache. The inmemory path uses a different code flow.
 const originalBackend = process.env.PERSISTENCE_BACKEND;
 beforeAll(() => { process.env.PERSISTENCE_BACKEND = 'prisma'; });
@@ -716,12 +716,12 @@ describe('EndpointService', () => {
       const list = await service.listEndpoints();
       expect(list.totalResults).toBeGreaterThanOrEqual(1);
       expect(list.endpoints.length).toBeGreaterThanOrEqual(1);
-      // findMany should NOT be called again — served from cache
+      // findMany should NOT be called again - served from cache
       expect(prisma.endpoint.findMany).not.toHaveBeenCalled();
     });
 
     it('getEndpoint cache miss should fall back to DB', async () => {
-      // Don't warm cache — force a cache miss
+      // Don't warm cache - force a cache miss
       const dbEndpoint = { ...cachedEndpoint, id: 'db-only-ep' };
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue(dbEndpoint);
 
@@ -776,7 +776,7 @@ describe('EndpointService', () => {
 
   // ─── Partial Profile PATCH (Phase 14) ──────────────────────────────
 
-  describe('updateEndpoint — partial profile PATCH', () => {
+  describe('updateEndpoint - partial profile PATCH', () => {
     const profileEndpoint = {
       id: 'patch-ep-1',
       name: 'patch-test',
@@ -991,7 +991,7 @@ describe('EndpointService', () => {
       expect(result1.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
       expect(result1.profile?.settings?.StrictSchemaValidation).toBe('True');
 
-      // Second PATCH: add RequireIfMatch — should keep both previous settings
+      // Second PATCH: add RequireIfMatch - should keep both previous settings
       // Now the cached endpoint has the updated profile from PATCH 1
       (prisma.endpoint.findUnique as jest.Mock).mockResolvedValue({
         ...profileEndpoint, profile: result1.profile,
@@ -1131,7 +1131,7 @@ describe('EndpointService', () => {
 
   // ─── View Param (summary vs full) ───────────────────────────────────
 
-  describe('toResponse — view param', () => {
+  describe('toResponse - view param', () => {
     it('full view should include profile and not profileSummary', async () => {
       (prisma.endpoint.findMany as jest.Mock).mockResolvedValue([mockEndpoint]);
       await service.onModuleInit();

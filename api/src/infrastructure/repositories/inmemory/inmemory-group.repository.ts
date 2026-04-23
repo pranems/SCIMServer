@@ -1,7 +1,7 @@
 /**
- * InMemoryGroupRepository — IGroupRepository backed by in-memory Maps.
+ * InMemoryGroupRepository - IGroupRepository backed by in-memory Maps.
  *
- * Phase 3: Removed displayNameLower — case-insensitive comparison done at
+ * Phase 3: Removed displayNameLower - case-insensitive comparison done at
  * query time via toLowerCase(). Suitable for testing and lightweight deployments.
  *
  * Phase 4: Uses matchesPrismaFilter() to evaluate Prisma-style WHERE clauses
@@ -188,7 +188,7 @@ export class InMemoryGroupRepository implements IGroupRepository {
     await this.addMembers(groupId, members);
   }
 
-  /** Clear all data — useful in test teardowns. */
+  /** Clear all data - useful in test teardowns. */
   clear(): void {
     this.groups.clear();
     this.members.clear();

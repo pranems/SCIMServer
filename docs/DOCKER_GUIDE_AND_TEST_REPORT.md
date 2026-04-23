@@ -1,4 +1,4 @@
-# 🐳 SCIMServer Docker Guide — Build, Deploy & Live Test Report
+# 🐳 SCIMServer Docker Guide - Build, Deploy & Live Test Report
 
 > **⚠️ PARTIAL HISTORICAL CONTENT:** Sections describing Azure Files mounts, blob snapshot restore logic, and `BackupService` cron are SQLite-era (pre-v0.11.0) and no longer apply. The startup flow, environment variables, and test results are current.
 
@@ -14,13 +14,13 @@
 
 ## 📋 Table of Contents
 
-**Part 1 — Docker Live Test Guide**
+**Part 1 - Docker Live Test Guide**
 1. [Prerequisites](#1-prerequisites)
 2. [Quick Start (5 Commands)](#2-quick-start-5-commands)
 3. [Step-by-Step Walkthrough](#3-step-by-step-walkthrough)
 4. [Troubleshooting](#4-troubleshooting)
 
-**Part 2 — Docker Deployment Guide**
+**Part 2 - Docker Deployment Guide**
 5. [Architecture Overview](#5-architecture-overview)
 6. [Multi-Stage Build Explained](#6-multi-stage-build-explained)
 7. [Container Entrypoint & Storage](#7-container-entrypoint--storage)
@@ -28,14 +28,14 @@
 9. [Deployment Configurations](#9-deployment-configurations)
 10. [Production Deployment](#10-production-deployment)
 
-**Part 3 — Live Test Results Report**
+**Part 3 - Live Test Results Report**
 11. [Test Summary Dashboard](#11-test-summary-dashboard)
 12. [Detailed Test Results by Section](#12-detailed-test-results-by-section)
 13. [RFC Compliance Coverage Matrix](#13-rfc-compliance-coverage-matrix)
 
 ---
 
-# Part 1 — Docker Live Test Guide
+# Part 1 - Docker Live Test Guide
 
 ## 1. Prerequisites
 
@@ -60,7 +60,7 @@
 
 ## 2. Quick Start (5 Commands)
 
-For those who want to get straight to it — run these from the project root:
+For those who want to get straight to it - run these from the project root:
 
 ```powershell
 # 1. Fix line endings (one-time, Windows → Linux)
@@ -91,7 +91,7 @@ docker rm -f scimserver-live-test
 
 ## 3. Step-by-Step Walkthrough
 
-### Step 1 — Fix Shell Script Line Endings
+### Step 1 - Fix Shell Script Line Endings
 
 > **Why?** Windows stores files with `\r\n` (CRLF) line endings. The Alpine Linux container expects `\n` (LF). Without this fix, the entrypoint script fails with `exec: not found`.
 
@@ -120,7 +120,7 @@ $content = $content -replace "`r`n", "`n"
 
 ---
 
-### Step 2 — Build the Docker Image
+### Step 2 - Build the Docker Image
 
 ```powershell
 docker build -t scimserver:live-test --build-arg IMAGE_TAG=live-test -f Dockerfile .
@@ -180,7 +180,7 @@ docker build -t scimserver:live-test --build-arg IMAGE_TAG=live-test -f Dockerfi
 
 ---
 
-### Step 3 — Run the Container
+### Step 3 - Run the Container
 
 ```powershell
 docker run -d --name scimserver-live-test `
@@ -225,7 +225,7 @@ for ($i = 1; $i -le 15; $i++) {
 
 ---
 
-### Step 4 — Run the Live Tests
+### Step 4 - Run the Live Tests
 
 ```powershell
 # Standard mode (pass/fail only)
@@ -283,7 +283,7 @@ pwsh -File scripts/live-test.ps1 -BaseUrl "http://localhost:6000" |
 
 ---
 
-### Step 5 — Cleanup
+### Step 5 - Cleanup
 
 ```powershell
 # Stop and remove the container
@@ -305,7 +305,7 @@ docker rmi scimserver:live-test
 ```
 
 **Cause:** CRLF line endings in `docker-entrypoint.sh`  
-**Fix:** See [Step 1](#step-1--fix-shell-script-line-endings) — convert to LF
+**Fix:** See [Step 1](#step-1--fix-shell-script-line-endings) - convert to LF
 
 ---
 
@@ -381,7 +381,7 @@ docker info  # Should succeed when ready
 
 ---
 
-# Part 2 — Docker Deployment Guide
+# Part 2 - Docker Deployment Guide
 
 ## 5. Architecture Overview
 
@@ -440,7 +440,7 @@ docker info  # Should succeed when ready
 
 ## 6. Multi-Stage Build Explained
 
-### Stage 1: `web-build` — Frontend Compilation
+### Stage 1: `web-build` - Frontend Compilation
 
 ```dockerfile
 FROM node:24-alpine AS web-build
@@ -455,7 +455,7 @@ RUN rm -rf node_modules          # Cleanup in same layer
 **Output:** `dist/` directory with compiled React + Vite frontend  
 **Size contribution:** ~270 KB (just static assets)
 
-### Stage 2: `api-build` — Backend Compilation
+### Stage 2: `api-build` - Backend Compilation
 
 ```dockerfile
 FROM node:24-alpine AS api-build
@@ -473,7 +473,7 @@ RUN npm prune --production                 # Remove dev dependencies
 
 **Output:** `dist/`, `node_modules/` (production only), `prisma/`, `public/`
 
-### Stage 3: `runtime` — Minimal Production Image
+### Stage 3: `runtime` - Minimal Production Image
 
 ```dockerfile
 FROM node:24-alpine AS runtime
@@ -612,7 +612,7 @@ CMD ["/app/docker-entrypoint.sh"]
 | `NODE_OPTIONS` | `--max_old_space_size=384` | Node.js heap limit |
 | `IMAGE_TAG` | `unknown` | Build-time arg written to `/app/.image-tag` |
 
-### Authentication Model (3-Tier Fallback — v0.21.0)
+### Authentication Model (3-Tier Fallback - v0.21.0)
 
 All non-public routes are protected by `SharedSecretGuard` (global `APP_GUARD`). Each `Authorization: Bearer <token>` is evaluated in order:
 
@@ -749,7 +749,7 @@ HEALTHCHECK --interval=60s --timeout=3s --start-period=10s --retries=2 \
 
 ---
 
-# Part 3 — Live Test Results Report
+# Part 3 - Live Test Results Report
 
 ## 11. Test Summary Dashboard
 
@@ -829,7 +829,7 @@ HEALTHCHECK --interval=60s --timeout=3s --start-period=10s --retries=2 \
 | 32 | PUT user (replace) works | ✅ |
 | 33 | Deactivate user (active=false) works | ✅ |
 
-### Section 3b: Case-Insensitivity — RFC 7643 (7 ✅)
+### Section 3b: Case-Insensitivity - RFC 7643 (7 ✅)
 
 | # | Test | Result |
 |---|------|--------|
@@ -964,7 +964,7 @@ HEALTHCHECK --interval=60s --timeout=3s --start-period=10s --retries=2 \
 | 112 | PATCH updates meta.lastModified | ✅ |
 | 113 | GET does not change meta.lastModified | ✅ |
 
-### Section 9c: POST /.search — RFC 7644 §3.4.3 (16 ✅)
+### Section 9c: POST /.search - RFC 7644 §3.4.3 (16 ✅)
 
 | # | Test | Result |
 |---|------|--------|
@@ -987,7 +987,7 @@ HEALTHCHECK --interval=60s --timeout=3s --start-period=10s --retries=2 \
 | 130 | Groups /.search excludedAttributes removes members | ✅ |
 | 131 | Groups /.search excludedAttributes keeps displayName | ✅ |
 
-### Section 9d: Attribute Projection — RFC 7644 §3.4.2.5 (20 ✅)
+### Section 9d: Attribute Projection - RFC 7644 §3.4.2.5 (20 ✅)
 
 | # | Test | Result |
 |---|------|--------|
@@ -1012,7 +1012,7 @@ HEALTHCHECK --interval=60s --timeout=3s --start-period=10s --retries=2 \
 | 150 | Precedence: attributes includes userName | ✅ |
 | 151 | Precedence: attributes wins over excludedAttributes | ✅ |
 
-### Section 9e: ETag & Conditional Requests — RFC 7644 §3.14 (12 ✅)
+### Section 9e: ETag & Conditional Requests - RFC 7644 §3.14 (12 ✅)
 
 | # | Test | Result |
 |---|------|--------|
@@ -1100,14 +1100,14 @@ HEALTHCHECK --interval=60s --timeout=3s --start-period=10s --retries=2 \
 | RFC 7644 §3.12 | Error response format (string status) | 12 | ✅ |
 | RFC 7644 §3.14 | ETag + conditional requests (304/412) | 12 | ✅ |
 | RFC 7644 §4 | Discovery: ServiceProviderConfig, Schemas, ResourceTypes | 3 | ✅ |
-| — | Authentication (OAuth 2.0 bearer) | 4 | ✅ |
-| — | Multi-endpoint endpoint isolation | 2 | ✅ |
-| — | Inactive endpoint blocking (403) | 6 | ✅ |
-| — | Config flag validation | 13 | ✅ |
-| — | Pagination (startIndex, count) | 5 | ✅ |
-| — | Uniqueness constraints (userName, externalId) | 4 | ✅ |
-| — | Edge cases & error handling | 9 | ✅ |
-| — | Dot-notation PATCH support | 5 | ✅ |
+| - | Authentication (OAuth 2.0 bearer) | 4 | ✅ |
+| - | Multi-endpoint endpoint isolation | 2 | ✅ |
+| - | Inactive endpoint blocking (403) | 6 | ✅ |
+| - | Config flag validation | 13 | ✅ |
+| - | Pagination (startIndex, count) | 5 | ✅ |
+| - | Uniqueness constraints (userName, externalId) | 4 | ✅ |
+| - | Edge cases & error handling | 9 | ✅ |
+| - | Dot-notation PATCH support | 5 | ✅ |
 | **TOTAL** | | **212** | **✅ 100%** |
 
 ---

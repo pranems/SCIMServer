@@ -1,5 +1,5 @@
 /**
- * SCIM Schema & ResourceType Definitions — RFC 7643 §7, §6, §4
+ * SCIM Schema & ResourceType Definitions - RFC 7643 §7, §6, §4
  *
  * Phase 6: Centralized schema definitions replacing hardcoded JSON
  * in discovery controllers. These map to the attributes the server

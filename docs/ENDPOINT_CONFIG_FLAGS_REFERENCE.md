@@ -1,4 +1,4 @@
-# Endpoint Configuration Flags — Complete Reference
+# Endpoint Configuration Flags - Complete Reference
 
 > **Status:** Living document · **Last Updated:** 2026-04-09
 >
@@ -10,7 +10,7 @@
 
 ---
 
-> **⚠️ v0.28.0 Migration Notice:** The legacy `"config": { ... }` field has been **removed** from the admin endpoint API. All per-endpoint settings are now managed through `"profile": { "settings": { ... } }`. The JSON examples in Sections 4, 7, 9, and 10 of this document may still show the legacy `"config"` format for historical reference — when using these examples, replace:
+> **⚠️ v0.28.0 Migration Notice:** The legacy `"config": { ... }` field has been **removed** from the admin endpoint API. All per-endpoint settings are now managed through `"profile": { "settings": { ... } }`. The JSON examples in Sections 4, 7, 9, and 10 of this document may still show the legacy `"config"` format for historical reference - when using these examples, replace:
 > ```json
 > { "config": { "FlagName": "True" } }
 > ```
@@ -49,7 +49,7 @@
 6. [Flag Interaction & Precedence](#6-flag-interaction--precedence)
 7. [Flag Combination Examples](#7-flag-combination-examples)
 8. [Decision Flow Diagrams](#8-decision-flow-diagrams)
-9. [Admin API — Setting Flags](#9-admin-api--setting-flags)
+9. [Admin API - Setting Flags](#9-admin-api--setting-flags)
 10. [Microsoft Entra ID Recommended Config](#10-microsoft-entra-id-recommended-config)
 
 ---
@@ -100,16 +100,16 @@ api/src/modules/endpoint/endpoint-config.interface.ts
 | 13 | `IgnoreReadOnlyAttributesInPatch` | `IGNORE_READONLY_ATTRIBUTES_IN_PATCH` | `false` | boolean | PATCH | Strip+warn instead of 400 for readOnly PATCH ops |
 | 14 | `logFileEnabled` | `LOG_FILE_ENABLED` | `false` | boolean | Logging | Enable per-endpoint log file under `logs/endpoints/` |
 | 15 | `logLevel` | `LOG_LEVEL` | *(unset)* | string/number | All requests | Per-endpoint log level override |
-| — | `CustomResourceTypesEnabled` | *derived* | `false` | boolean | Admin API, SCIM CRUD | **Derived:** Implied by custom entries in `profile.resourceTypes` |
-| — | `BulkOperationsEnabled` | *derived* | `false` | boolean | POST /Bulk | **Derived:** Implied by `profile.serviceProviderConfig.bulk.supported` |
+| - | `CustomResourceTypesEnabled` | *derived* | `false` | boolean | Admin API, SCIM CRUD | **Derived:** Implied by custom entries in `profile.resourceTypes` |
+| - | `BulkOperationsEnabled` | *derived* | `false` | boolean | POST /Bulk | **Derived:** Implied by `profile.serviceProviderConfig.bulk.supported` |
 
 > **Settings v7 defaults:** `AllowAndCoerceBooleanStrings`, `StrictSchemaValidation`, `UserSoftDeleteEnabled`, `UserHardDeleteEnabled`, `GroupHardDeleteEnabled`, `MultiMemberPatchOpForGroupEnabled`, `SchemaDiscoveryEnabled` default to `true`. All others default to `false`.
 >
-> **Deprecated flags (v0.33.0 settings v7 clean break):** `SoftDeleteEnabled` (replaced by `UserSoftDeleteEnabled` + `UserHardDeleteEnabled`), `ReprovisionOnConflictForSoftDeletedResource` (removed — POST collision always 409), `MultiOpPatchRequestAddMultipleMembersToGroup` and `MultiOpPatchRequestRemoveMultipleMembersFromGroup` (replaced by `MultiMemberPatchOpForGroupEnabled`).
+> **Deprecated flags (v0.33.0 settings v7 clean break):** `SoftDeleteEnabled` (replaced by `UserSoftDeleteEnabled` + `UserHardDeleteEnabled`), `ReprovisionOnConflictForSoftDeletedResource` (removed - POST collision always 409), `MultiOpPatchRequestAddMultipleMembersToGroup` and `MultiOpPatchRequestRemoveMultipleMembersFromGroup` (replaced by `MultiMemberPatchOpForGroupEnabled`).
 
 ---
 
-## 2.1 Default Behavior — What Happens Out of the Box
+## 2.1 Default Behavior - What Happens Out of the Box
 
 **When you create an endpoint with no explicit settings** (e.g., `POST /admin/endpoints` with just `{ "name": "my-tenant" }` or with `{ "name": "my-tenant", "profilePreset": "entra-id" }`), the server applies the **`entra-id` preset** as the default profile. This preset explicitly sets 5 flags:
 
@@ -122,15 +122,15 @@ api/src/modules/endpoint/endpoint-config.interface.ts
 
 All other flags resolve to their defaults. Settings v7 defaults mean **out of the box**:
 
-- ✅ **PATCH active=false deactivates users** (UserSoftDeleteEnabled = true) — PATCH {active:false} sets user inactive. DELETE always hard-deletes.
-- ✅ **Hard delete also available** (UserHardDeleteEnabled = true) — DELETE permanently removes when invoked
-- ✅ **Schema validation is strict** (StrictSchemaValidation = true) — extension URNs required in `schemas[]`
-- ✅ **`If-Match` is optional** (RequireIfMatch = false) — ETag validated when present but not required
-- ✅ **ReadOnly attributes silently stripped** — no warning headers, no 400 errors
-- ✅ **Only global auth** (PerEndpointCredentialsEnabled = false) — shared secret / OAuth JWT only
-- ✅ **409 on all POST conflicts** — no reprovision; POST collision always returns 409
+- ✅ **PATCH active=false deactivates users** (UserSoftDeleteEnabled = true) - PATCH {active:false} sets user inactive. DELETE always hard-deletes.
+- ✅ **Hard delete also available** (UserHardDeleteEnabled = true) - DELETE permanently removes when invoked
+- ✅ **Schema validation is strict** (StrictSchemaValidation = true) - extension URNs required in `schemas[]`
+- ✅ **`If-Match` is optional** (RequireIfMatch = false) - ETag validated when present but not required
+- ✅ **ReadOnly attributes silently stripped** - no warning headers, no 400 errors
+- ✅ **Only global auth** (PerEndpointCredentialsEnabled = false) - shared secret / OAuth JWT only
+- ✅ **409 on all POST conflicts** - no reprovision; POST collision always returns 409
 - ✅ **Discovery endpoints enabled** (SchemaDiscoveryEnabled = true)
-- ✅ **No Bulk operations** — disabled unless profile SPC says `bulk.supported: true`
+- ✅ **No Bulk operations** - disabled unless profile SPC says `bulk.supported: true`
 
 ### Per-Preset Default Comparison
 
@@ -148,7 +148,7 @@ All other flags resolve to their defaults. Settings v7 defaults mean **out of th
 
 > **Bold** = explicitly set in the preset's `settings` block. *Italic* = not set, resolved from code default.
 
-## 2.2 True vs False — Every Flag's Effect
+## 2.2 True vs False - Every Flag's Effect
 
 | # | Flag | When `true` | When `false` (or absent) |
 |---|------|-----------|------------------------|
@@ -160,17 +160,17 @@ All other flags resolve to their defaults. Settings v7 defaults mean **out of th
 | 6 | **MultiOpPatchRequest…Remove** | A single PATCH operation can remove multiple group members at once. | Each member removal requires a separate PATCH operation. |
 | 7 | **PatchOpAllowRemoveAllMembers** | `PATCH /Groups/{id}` with `op:remove, path:members` (no `value`) removes ALL members. | Must provide explicit member IDs in the `value` array or use a value filter in the path. |
 | 8 | **RequireIfMatch** | PUT/PATCH/DELETE **require** an `If-Match` header. Missing → **428 Precondition Required**. Matched → proceed. Mismatch → **412 Precondition Failed**. | `If-Match` is optional. If provided, it's still validated (412 on mismatch), but omission is allowed. |
-| 9 | **~~ReprovisionOnConflict…~~** | *(Removed in v0.33.0)* — POST collision always returns 409 Conflict. | Collision → 409 Conflict. |
+| 9 | **~~ReprovisionOnConflict…~~** | *(Removed in v0.33.0)* - POST collision always returns 409 Conflict. | Collision → 409 Conflict. |
 | 10 | **PerEndpointCredentialsEnabled** | Bearer tokens checked against per-endpoint credential table (bcrypt). Falls back to OAuth JWT → global shared secret if no match. | Only global shared secret and OAuth JWT are evaluated. Per-endpoint credential table ignored. |
-| 11 | **IncludeWarningAboutIgnoredReadOnlyAttribute** | Write responses include `urn:scimserver:api:messages:2.0:Warning` extension listing readOnly attributes that were stripped. | ReadOnly attributes stripped silently — no indication in the response. |
+| 11 | **IncludeWarningAboutIgnoredReadOnlyAttribute** | Write responses include `urn:scimserver:api:messages:2.0:Warning` extension listing readOnly attributes that were stripped. | ReadOnly attributes stripped silently - no indication in the response. |
 | 12 | **IgnoreReadOnlyAttributesInPatch** | When `StrictSchemaValidation` is ON: PATCH ops targeting readOnly attributes are **stripped + warned** instead of rejected. No effect when strict is OFF. | With strict schema ON: PATCH ops on readOnly attributes → **400 Bad Request** (`mutability` error). |
-| 13 | **logLevel** | *(string, not boolean)* — Overrides the global `LOG_LEVEL` for this endpoint. Values: `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, `FATAL`, `OFF`. | Global `LOG_LEVEL` is used (default: `INFO`). |
+| 13 | **logLevel** | *(string, not boolean)* - Overrides the global `LOG_LEVEL` for this endpoint. Values: `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, `FATAL`, `OFF`. | Global `LOG_LEVEL` is used (default: `INFO`). |
 
 ---
 
 ## 3. Flag Resolution Logic
 
-### 3.1 `getConfigBoolean(config, key)` — Default: `false`
+### 3.1 `getConfigBoolean(config, key)` - Default: `false`
 
 Used for most flags (default `false`).
 
@@ -185,7 +185,7 @@ getConfigBoolean(config, flagName)
       └── else  → false
 ```
 
-### 3.2 `getConfigBooleanWithDefault(config, key, defaultValue)` — Custom Default
+### 3.2 `getConfigBooleanWithDefault(config, key, defaultValue)` - Custom Default
 
 Used for flags that default to `true`.
 
@@ -257,7 +257,7 @@ getConfigBooleanWithDefault(config, flagName, defaultValue)
 | `true` | `true` (default) | ✅ Coerced to `true` before validation → passes |
 | `true` | `false` | ❌ **400 error**: `Attribute 'primary' must be a boolean, got string` |
 
-**Example — POST with coercion enabled (default):**
+**Example - POST with coercion enabled (default):**
 
 ```http
 POST /scim/v2/Users
@@ -297,7 +297,7 @@ Response (201 Created):
 
 Note: `"primary": "True"` in request → `"primary": true` in response.
 
-**Example — POST with coercion disabled:**
+**Example - POST with coercion disabled:**
 
 Config: `{ "AllowAndCoerceBooleanStrings": "False", "StrictSchemaValidation": "True" }`
 
@@ -328,7 +328,7 @@ Response (400 Bad Request):
 }
 ```
 
-**Example — PATCH with filter path:**
+**Example - PATCH with filter path:**
 
 ```http
 PATCH /scim/v2/Users/{id}
@@ -378,7 +378,7 @@ When `AllowAndCoerceBooleanStrings` is `true`, the filter `primary eq "True"` co
 
 **When OFF:** Extension data is silently accepted. No type checking, unknown attribute rejection, or canonical value enforcement. Required and immutable checks still run.
 
-**Example — Strict ON, unregistered extension rejected:**
+**Example - Strict ON, unregistered extension rejected:**
 
 ```http
 POST /scim/v2/Users
@@ -422,13 +422,13 @@ Response (400):
 | **Constant** | `ENDPOINT_CONFIG_FLAGS.SOFT_DELETE_ENABLED` |
 | **Default** | `false` |
 | **Helper** | `getConfigBoolean(config, key)` |
-| **Scope** | *(none — deprecated, ignored at runtime)* |
+| **Scope** | *(none - deprecated, ignored at runtime)* |
 | **RFC** | RFC 7644 §3.6 |
 | **Added** | v0.15.0 |
 | **Deprecated** | v0.33.0 |
 | **Replaced by** | `UserSoftDeleteEnabled` + `UserHardDeleteEnabled` |
 
-**Original purpose (no longer active):** Previously set `active = false` on DELETE instead of physically removing the record. This behavior has been removed — DELETE now always hard-deletes. Use `UserSoftDeleteEnabled` to control whether PATCH {active:false} is allowed, and `UserHardDeleteEnabled` to control whether DELETE is allowed.
+**Original purpose (no longer active):** Previously set `active = false` on DELETE instead of physically removing the record. This behavior has been removed - DELETE now always hard-deletes. Use `UserSoftDeleteEnabled` to control whether PATCH {active:false} is allowed, and `UserHardDeleteEnabled` to control whether DELETE is allowed.
 
 ---
 
@@ -446,7 +446,7 @@ Response (400):
 
 **Purpose:** Enables dot-notation path resolution for PATCH operations. When ON, paths like `name.givenName` are resolved as nested object access. When OFF, they are treated as literal top-level keys.
 
-**Example — PATCH with dot-notation:**
+**Example - PATCH with dot-notation:**
 
 ```json
 {
@@ -478,7 +478,7 @@ Response (400):
 
 **Purpose:** When `true`, a single PATCH add operation can include multiple members. Required for Microsoft Entra ID, which sends multi-member adds.
 
-**Example — Multi-member add (flag ON):**
+**Example - Multi-member add (flag ON):**
 
 ```json
 {
@@ -518,7 +518,7 @@ Response (400):
 
 **Purpose:** When `true`, a single PATCH remove operation can remove multiple members at once. Required for Microsoft Entra ID.
 
-**Example — Multi-member remove (flag ON):**
+**Example - Multi-member remove (flag ON):**
 
 ```json
 {
@@ -584,7 +584,7 @@ Response (400):
 
 **Purpose:** When ON, all mutating requests MUST include an `If-Match` header with the resource's current ETag. Missing header → `428 Precondition Required`. When OFF (default), `If-Match` is optional but validated against the resource version when present (mismatch → `412 Precondition Failed`).
 
-**Example — Missing If-Match with RequireIfMatch ON:**
+**Example - Missing If-Match with RequireIfMatch ON:**
 
 ```http
 PATCH /scim/v2/Users/a1b2c3d4-...
@@ -602,7 +602,7 @@ Response (428):
 }
 ```
 
-**Example — With correct If-Match:**
+**Example - With correct If-Match:**
 
 ```http
 PATCH /scim/v2/Users/a1b2c3d4-...
@@ -617,7 +617,7 @@ Response (200): Success, version incremented to `W/"v4"`.
 
 ### 4.9 ReprovisionOnConflictForSoftDeletedResource *(removed)*
 
-> **⚠️ Removed in v0.33.0:** This flag has been removed. POST collision always returns **409 Conflict**. There is no soft-delete concept — DELETE always hard-deletes.
+> **⚠️ Removed in v0.33.0:** This flag has been removed. POST collision always returns **409 Conflict**. There is no soft-delete concept - DELETE always hard-deletes.
 
 | Property | Value |
 |----------|-------|
@@ -652,7 +652,7 @@ Response (200): Success, version incremented to `W/"v4"`.
 - Reserved paths blocked (`/Users`, `/Groups`, `/Schemas`, `/ResourceTypes`, `/ServiceProviderConfig`, `/Bulk`, `/Me`)
 - Generic SCIM controller registered LAST in module to avoid intercepting built-in routes
 
-**Example — Register a custom resource type:**
+**Example - Register a custom resource type:**
 
 ```http
 POST /scim/admin/endpoints/42020f1f-.../resource-types
@@ -702,13 +702,13 @@ Response (201):
 
 **Key behaviors when enabled:**
 - **Sequential processing**: Operations are processed in array order to honor `bulkId` dependencies
-- **bulkId cross-referencing**: A POST operation can assign a `bulkId`; subsequent operations can reference it via `bulkId:<id>` in their `path` field — the server resolves the reference to the created resource's server-assigned SCIM ID
-- **failOnErrors**: Optional integer threshold — if the number of errors reaches this count, remaining operations are skipped (0 = process all)
+- **bulkId cross-referencing**: A POST operation can assign a `bulkId`; subsequent operations can reference it via `bulkId:<id>` in their `path` field - the server resolves the reference to the created resource's server-assigned SCIM ID
+- **failOnErrors**: Optional integer threshold - if the number of errors reaches this count, remaining operations are skipped (0 = process all)
 - **Supported resource types**: `Users` and `Groups` (other types return 400)
 - **Limits**: `maxOperations = 1000`, `maxPayloadSize = 1,048,576` bytes (1 MB)
 - **Per-operation error isolation**: A failing operation does not abort the batch (unless `failOnErrors` threshold reached)
 
-**Example — Bulk create user + add to group with bulkId cross-ref:**
+**Example - Bulk create user + add to group with bulkId cross-ref:**
 
 ```http
 POST /scim/endpoints/42020f1f-.../Bulk
@@ -769,7 +769,7 @@ Response (200):
 }
 ```
 
-**Example — Config flag OFF (default):**
+**Example - Config flag OFF (default):**
 
 ```http
 POST /scim/endpoints/42020f1f-.../Bulk
@@ -823,10 +823,10 @@ When Bulk Operations is supported at the application level, `ServiceProviderConf
 - **Admin API**: `POST /admin/endpoints/:id/credentials` generates a 32-byte base64url token, stores bcrypt hash (12 rounds), returns plaintext **once**
 - **Listing**: `GET /admin/endpoints/:id/credentials` lists credentials (hash never returned)
 - **Revocation**: `DELETE /admin/endpoints/:id/credentials/:credentialId` deactivates credential
-- **Expiry**: Optional `expiresAt` (ISO datetime) — expired credentials are automatically filtered out
+- **Expiry**: Optional `expiresAt` (ISO datetime) - expired credentials are automatically filtered out
 - **Active state**: Inactive credentials (revoked) are ignored even if the hash matches
 
-**Example — Create per-endpoint credential:**
+**Example - Create per-endpoint credential:**
 
 ```http
 POST /scim/admin/endpoints/42020f1f-.../credentials
@@ -839,21 +839,21 @@ Response (201):
 ```json
 {
   "id": "cred-uuid",
-  "token": "1a2b3c4d...(plaintext — shown once only)",
+  "token": "1a2b3c4d...(plaintext - shown once only)",
   "createdAt": "2026-02-27T10:00:00Z",
   "expiresAt": null,
   "active": true
 }
 ```
 
-**Example — Authenticate using per-endpoint credential:**
+**Example - Authenticate using per-endpoint credential:**
 
 ```http
 GET /scim/endpoints/42020f1f-.../Users
 Authorization: Bearer 1a2b3c4d...(plaintext token)
 ```
 
-**Example — Flag OFF (default):** All requests are validated against OAuth JWT or global shared secret only. Per-endpoint credential table is not consulted.
+**Example - Flag OFF (default):** All requests are validated against OAuth JWT or global shared secret only. Per-endpoint credential table is not consulted.
 
 ---
 
@@ -877,7 +877,7 @@ Authorization: Bearer 1a2b3c4d...(plaintext token)
 - Works on POST, PUT, and PATCH responses
 - Only triggers when at least one readOnly attribute was actually stripped
 
-**Example — Flag ON + readOnly attrs present:**
+**Example - Flag ON + readOnly attrs present:**
 
 ```json
 {
@@ -893,7 +893,7 @@ Authorization: Bearer 1a2b3c4d...(plaintext token)
 }
 ```
 
-**Example — Flag OFF (default):** readOnly attributes are still silently stripped, but no warning extension is added to the response. Stripping is logged server-side at WARN level.
+**Example - Flag OFF (default):** readOnly attributes are still silently stripped, but no warning extension is added to the response. Stripping is logged server-side at WARN level.
 
 ---
 
@@ -919,9 +919,9 @@ Authorization: Bearer 1a2b3c4d...(plaintext token)
 | ON | OFF | 400 error (G8c hard-reject) |
 | ON | ON | Strip readOnly ops + optional warning (override) |
 
-**Special case:** PATCH targeting `id` always returns 400 regardless of any flags — `id` is never stripped to preserve RFC 7643 §3.1 semantics.
+**Special case:** PATCH targeting `id` always returns 400 regardless of any flags - `id` is never stripped to preserve RFC 7643 §3.1 semantics.
 
-**Example — Both strict + ignore flags ON:**
+**Example - Both strict + ignore flags ON:**
 
 ```json
 {
@@ -943,7 +943,7 @@ With this config, a PATCH replacing `groups` will be silently stripped and a war
 |----------|-------|
 | **Config key** | `logLevel` |
 | **Constant** | `ENDPOINT_CONFIG_FLAGS.LOG_LEVEL` |
-| **Default** | *(unset — uses global/category level)* |
+| **Default** | *(unset - uses global/category level)* |
 | **Type** | string (`"TRACE"`, `"DEBUG"`, `"INFO"`, `"WARN"`, `"ERROR"`, `"FATAL"`, `"OFF"`) or number (0-6) |
 | **Scope** | All requests |
 | **Added** | v0.11.0 |
@@ -968,20 +968,20 @@ Which flags affect which HTTP methods and resource types:
 
 | Flag | POST | PUT | PATCH | DELETE | GET | LIST | Users | Groups |
 |------|------|-----|-------|--------|-----|------|-------|--------|
-| `AllowAndCoerceBooleanStrings` | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ |
-| `StrictSchemaValidation` | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ |
-| `UserSoftDeleteEnabled` | — | — | ✅ | — | — | — | ✅ | — |
-| ~~`ReprovisionOnConflict...`~~ | — | — | — | — | — | — | — | — |
-| `VerbosePatchSupported` | — | — | ✅ | — | — | — | ✅ | — |
-| `MultiOpPatchAdd...` | — | — | ✅ | — | — | — | — | ✅ |
-| `MultiOpPatchRemove...` | — | — | ✅ | — | — | — | — | ✅ |
-| `PatchOpAllowRemoveAll...` | — | — | ✅ | — | — | — | — | ✅ |
-| `RequireIfMatch` | — | ✅ | ✅ | ✅ | — | — | ✅ | ✅ |
-| `CustomResourceTypesEnabled` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
-| `BulkOperationsEnabled` | ✅ | — | — | — | — | — | ✅ | ✅ |
+| `AllowAndCoerceBooleanStrings` | ✅ | ✅ | ✅ | - | - | - | ✅ | ✅ |
+| `StrictSchemaValidation` | ✅ | ✅ | ✅ | - | - | - | ✅ | ✅ |
+| `UserSoftDeleteEnabled` | - | - | ✅ | - | - | - | ✅ | - |
+| ~~`ReprovisionOnConflict...`~~ | - | - | - | - | - | - | - | - |
+| `VerbosePatchSupported` | - | - | ✅ | - | - | - | ✅ | - |
+| `MultiOpPatchAdd...` | - | - | ✅ | - | - | - | - | ✅ |
+| `MultiOpPatchRemove...` | - | - | ✅ | - | - | - | - | ✅ |
+| `PatchOpAllowRemoveAll...` | - | - | ✅ | - | - | - | - | ✅ |
+| `RequireIfMatch` | - | ✅ | ✅ | ✅ | - | - | ✅ | ✅ |
+| `CustomResourceTypesEnabled` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | - | - |
+| `BulkOperationsEnabled` | ✅ | - | - | - | - | - | ✅ | ✅ |
 | `PerEndpointCredentialsEnabled` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `IncludeWarningAboutIgnored...` | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ |
-| `IgnoreReadOnlyAttributesInPatch` | — | — | ✅ | — | — | — | ✅ | ✅ |
+| `IncludeWarningAboutIgnored...` | ✅ | ✅ | ✅ | - | - | - | ✅ | ✅ |
+| `IgnoreReadOnlyAttributesInPatch` | - | - | ✅ | - | - | - | ✅ | ✅ |
 | `logLevel` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ---
@@ -1104,7 +1104,7 @@ flowchart TD
 
 ## 7. Flag Combination Examples
 
-### 7.1 Microsoft Entra ID — Recommended Config
+### 7.1 Microsoft Entra ID - Recommended Config
 
 ```json
 {
@@ -1134,8 +1134,8 @@ flowchart TD
 - `UserSoftDeleteEnabled`: Allows Entra to deactivate users via PATCH {active:false} before deleting
 - `StrictSchemaValidation`: Full type/schema enforcement
 - `AllowAndCoerceBooleanStrings`: Entra sends `"True"` for boolean attrs
-- `RequireIfMatch`: `False` — Entra does not send If-Match headers
-- `BulkOperationsEnabled`: `True` — enables batch provisioning for large-scale syncs
+- `RequireIfMatch`: `False` - Entra does not send If-Match headers
+- `BulkOperationsEnabled`: `True` - enables batch provisioning for large-scale syncs
 
 ### 7.2 Strict-Mode Maximum Validation
 
@@ -1317,7 +1317,7 @@ flowchart TD
 
 ---
 
-## 9. Admin API — Setting Flags
+## 9. Admin API - Setting Flags
 
 > **v0.28.0:** Use `profile.settings` instead of the removed `config` field.
 
@@ -1368,7 +1368,7 @@ Authorization: Bearer <admin-token>
 }
 ```
 
-> **Note:** PATCH merges `profile.settings` — only specified flags are changed. Unspecified flags retain their current values.
+> **Note:** PATCH merges `profile.settings` - only specified flags are changed. Unspecified flags retain their current values.
 
 ### 9.3 Get Endpoint (includes profile)
 
@@ -1455,9 +1455,9 @@ For production use with Microsoft Entra ID (Azure AD) provisioning, the recommen
 | `UserSoftDeleteEnabled` = True | Entra deactivates users via PATCH {active:false} before deleting |
 | `StrictSchemaValidation` = True | Full type/schema enforcement for data quality |
 | `AllowAndCoerceBooleanStrings` = True | **Critical**: Entra sends `roles[].primary = "True"` (string), not `true` (boolean) |
-| `RequireIfMatch` = False (default) | Entra does NOT send If-Match headers — enabling would reject all writes |
+| `RequireIfMatch` = False (default) | Entra does NOT send If-Match headers - enabling would reject all writes |
 | `BulkOperationsEnabled` = True | Enables batch provisioning for large-scale initial syncs |
-| `IgnoreReadOnlyAttributesInPatch` = True | Entra may PATCH readOnly attrs — strip instead of 400 with strict ON |
+| `IgnoreReadOnlyAttributesInPatch` = True | Entra may PATCH readOnly attrs - strip instead of 400 with strict ON |
 | `IncludeWarningAboutIgnored...` = True | Provides warning feedback when Entra sends readOnly attrs |
 
 > **SCIM Validator Score with this config:** 23/23 mandatory + 7/7 preview = **30/30 passed** ✅

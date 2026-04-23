@@ -1,5 +1,5 @@
 /**
- * InMemoryGenericResourceRepository — IGenericResourceRepository backed by an in-memory Map.
+ * InMemoryGenericResourceRepository - IGenericResourceRepository backed by an in-memory Map.
  *
  * Phase 8b: Stores custom SCIM resources in memory with resourceType discrimination.
  * Suitable for testing and lightweight deployments without a database.

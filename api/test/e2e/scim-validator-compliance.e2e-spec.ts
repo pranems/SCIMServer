@@ -28,8 +28,8 @@ import {
  * test assertion.
  *
  * Covers:
- *   Category 0 — Required (25 tests)
- *   Category 1 — Preview  (7 tests)
+ *   Category 0 - Required (25 tests)
+ *   Category 1 - Preview  (7 tests)
  *
  * References: SCIM RFC 7644 §3   (SCIM Protocol)
  *             SCIM RFC 7643 §8.7 (Patch Operations)
@@ -56,7 +56,7 @@ describe('SCIM Validator Compliance (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // CATEGORY 0 — REQUIRED TESTS
+  // CATEGORY 0 - REQUIRED TESTS
   // ═══════════════════════════════════════════════════════════════════════════
 
   // ───────────── User CRUD ─────────────
@@ -377,7 +377,7 @@ describe('SCIM Validator Compliance (E2E)', () => {
     });
 
     it('should filter for an existing group with externalId using exact case (case-sensitive per RFC 7643)', async () => {
-      // externalId has caseExact=true — TEXT column does case-sensitive eq
+      // externalId has caseExact=true - TEXT column does case-sensitive eq
       await scimPost(app, `${basePath}/Groups`, token, validGroup({ externalId: 'abc-def-1234' })).expect(201);
 
       const res = await scimGet(
@@ -473,10 +473,10 @@ describe('SCIM Validator Compliance (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // CATEGORY 1 — PREVIEW TESTS
+  // CATEGORY 1 - PREVIEW TESTS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  describe('Preview: User PATCH — Multiple Ops on Different Attributes', () => {
+  describe('Preview: User PATCH - Multiple Ops on Different Attributes', () => {
     it('should apply add, replace, and remove in a single PATCH', async () => {
       const created = (await scimPost(app, `${basePath}/Users`, token, validUser({
         displayName: 'OriginalDisplayName',
@@ -498,7 +498,7 @@ describe('SCIM Validator Compliance (E2E)', () => {
     });
   });
 
-  describe('Preview: User PATCH — Multiple Ops on Same Attribute', () => {
+  describe('Preview: User PATCH - Multiple Ops on Same Attribute', () => {
     it('should apply remove→add→replace on displayName sequentially', async () => {
       const created = (await scimPost(app, `${basePath}/Users`, token, validUser({
         displayName: 'InitialDisplay',
@@ -541,7 +541,7 @@ describe('SCIM Validator Compliance (E2E)', () => {
     });
   });
 
-  describe('Preview: Group PATCH — Multiple Ops on Same Attribute (add+remove member)', () => {
+  describe('Preview: Group PATCH - Multiple Ops on Same Attribute (add+remove member)', () => {
     it('should add then remove a member in a single PATCH request', async () => {
       const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
       const group = (await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201)).body;
@@ -585,7 +585,7 @@ describe('SCIM Validator Compliance (E2E)', () => {
 
   // ═══════════════════════════════════════════════════════════════════════════
   // ADDITIONAL: externalId uniqueness is case-SENSITIVE (TEXT column, caseExact=true)
-  // RFC 7643 §3.1: externalId uniqueness="none" — server may enforce but must respect case
+  // RFC 7643 §3.1: externalId uniqueness="none" - server may enforce but must respect case
   // ═════════════════════════════════════════════════════════════════════════
 
   describe('Case-sensitive externalId uniqueness (caseExact=true)', () => {

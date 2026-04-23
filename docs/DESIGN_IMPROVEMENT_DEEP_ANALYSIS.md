@@ -1,9 +1,9 @@
-# Design Improvement Deep Analysis — v0.35.0
+# Design Improvement Deep Analysis - v0.35.0
 
 **Status:** Current | **Last Updated:** 2026-04-13 | **Baseline:** v0.35.0  
-**Scope:** Full source-verified audit — architecture, SOLID, DRY, security, RFC compliance, DTO validation, data layer, maintainability  
+**Scope:** Full source-verified audit - architecture, SOLID, DRY, security, RFC compliance, DTO validation, data layer, maintainability  
 **RFC References:** RFC 7643 (SCIM Core Schema), RFC 7644 (SCIM Protocol)  
-**Test Baseline:** 3,206 unit (80 suites) · 939 E2E (45 suites) · ~739 live + 112 Lexmark — ALL PASSING  
+**Test Baseline:** 3,206 unit (80 suites) · 939 E2E (45 suites) · ~739 live + 112 Lexmark - ALL PASSING  
 **Files Audited:** 60+ source files across all layers  
 **Overall Rating:** **B+ (7.5/10)**
 
@@ -39,7 +39,7 @@ SCIMServer demonstrates strong domain-driven architecture with impressive RFC 76
 
 **Key Strengths:**
 - Pure domain layer (`schema-validator.ts`, patch engines, models) with zero framework imports
-- Schema-driven attribute enforcement — precomputed O(1) cache, zero per-request tree walks
+- Schema-driven attribute enforcement - precomputed O(1) cache, zero per-request tree walks
 - 3-tier auth cascade with lazy-loaded bcrypt and per-endpoint credential isolation
 - Typed error hierarchy (`RepositoryError`, `PatchError`, `createScimError`) with RFC 7644 §3.12 compliance
 - Single source of truth for config flags (`ENDPOINT_CONFIG_FLAGS_DEFINITIONS`)
@@ -80,7 +80,7 @@ graph TB
         SH[ScimSchemaHelpers<br/>1,230 lines]
     end
 
-    subgraph "Domain Layer (Pure — Zero Framework Imports)"
+    subgraph "Domain Layer (Pure - Zero Framework Imports)"
         SV[SchemaValidator<br/>1,467 lines]
         UPE[UserPatchEngine<br/>403 lines]
         GPE[GroupPatchEngine<br/>325 lines]
@@ -100,7 +100,7 @@ graph TB
 
     subgraph "Cross-Cutting"
         SSG[SharedSecretGuard<br/>200 lines]
-        SAG[ScimAuthGuard ⚠️<br/>40 lines — legacy]
+        SAG[ScimAuthGuard ⚠️<br/>40 lines - legacy]
         SEF[ScimExceptionFilter<br/>115 lines]
         CTM[ContentType Middleware]
         EI[ETag Interceptor]
@@ -145,7 +145,7 @@ graph TB
 sequenceDiagram
     participant C as Client
     participant SSG as SharedSecretGuard<br/>(200 lines)
-    participant SAG as ScimAuthGuard ⚠️<br/>(40 lines — legacy)
+    participant SAG as ScimAuthGuard ⚠️<br/>(40 lines - legacy)
     participant CR as CredentialRepo
     participant OAuth as OAuthService
     participant ENV as process.env
@@ -159,7 +159,7 @@ sequenceDiagram
     end
     SSG->>ENV: Read SCIM_SHARED_SECRET
     alt Missing in production
-        SSG-->>C: FATAL — not configured
+        SSG-->>C: FATAL - not configured
     end
 
     Note over SSG: Phase 11: Per-endpoint check
@@ -197,8 +197,8 @@ sequenceDiagram
 | **Entrypoint** | `main.ts` | 92 | ✅ | Open CORS (S-4), `enableImplicitConversion` (S-5) |
 | **Auth (Legacy)** | `auth/scim-auth.guard.ts` | 40 | ❌ | **CRITICAL:** Hardcoded credential + console.log |
 | **Auth (Modern)** | `modules/auth/shared-secret.guard.ts` | 200 | ✅ | 3-tier auth, proper Logger. Uses `===` not `timingSafeEqual` |
-| **OAuth** | `oauth/oauth.service.ts` | 118 | ✅ | `client.clientSecret !== clientSecret` — timing-unsafe |
-| **OAuth** | `oauth/oauth.controller.ts` | 89 | ✅ | `TokenRequest` interface — no DTO validation |
+| **OAuth** | `oauth/oauth.service.ts` | 118 | ✅ | `client.clientSecret !== clientSecret` - timing-unsafe |
+| **OAuth** | `oauth/oauth.controller.ts` | 89 | ✅ | `TokenRequest` interface - no DTO validation |
 | **Validation** | `domain/validation/schema-validator.ts` | 1,467 | ❌ | **God class:** 15+ static methods, 5 responsibilities |
 | **Validation** | `domain/validation/validation-types.ts` | 144 | ✅ | 15-field `SchemaCharacteristicsCache` interface |
 | **Helpers** | `common/scim-service-helpers.ts` | 1,230 | ❌ | **Swiss army knife:** 10+ concerns in one file |
@@ -215,7 +215,7 @@ sequenceDiagram
 | **Filter Parser** | `filters/scim-filter-parser.ts` | 537 | ✅ | AST-based, depth-guarded, excellent |
 | **Filter Pushdown** | `filters/apply-scim-filter.ts` | 297 | ✅ | Partial push, graceful fallback |
 | **Exception Filter** | `filters/scim-exception.filter.ts` | 115 | ✅ | RFC 7644 §3.12, auto-enriched diagnostics |
-| **Endpoint Config** | `endpoint/endpoint-config.interface.ts` | 460 | ✅ | Single source of truth — but `[key: string]: unknown` |
+| **Endpoint Config** | `endpoint/endpoint-config.interface.ts` | 460 | ✅ | Single source of truth - but `[key: string]: unknown` |
 | **Endpoint Context** | `endpoint/endpoint-context.storage.ts` | 106 | ✅ | Clean `AsyncLocalStorage` isolation |
 | **Sort** | `common/scim-sort.util.ts` | 93 | ⚠️ | Two nearly-identical functions |
 | **Config Flags** | `common/scim-constants.ts` | 67 | ✅ | Well-organized RFC constants |
@@ -235,11 +235,11 @@ sequenceDiagram
 | DTO | Lines | Validators | Findings |
 |-----|------:|:---:|----------|
 | `CreateUserDto` | 23 | 4 | `[key: string]: unknown` bypass, no `@MaxLength(userName)`, no `@ValidateNested(emails)` |
-| `CreateGroupDto` | ~25 | 5 | `@ValidateNested` on members — well done |
+| `CreateGroupDto` | ~25 | 5 | `@ValidateNested` on members - well done |
 | `PatchUserDto` / `PatchGroupDto` | 33 | 6 | `PatchOperationDto.path` has no `@MaxLength` |
-| `ListQueryDto` | 18 | 3 | **Dangerously sparse** — no `@MaxLength(filter)`, missing sort/projection params |
-| `SearchRequestDto` | 49 | 8 | **Well-hardened** — `@MaxLength`, `@IsIn`, all fields declared |
-| `BulkRequestDto` | ~40 | 7 | **Well-hardened** — `@ArrayMaxSize(1000)`, proper nested validation |
+| `ListQueryDto` | 18 | 3 | **Dangerously sparse** - no `@MaxLength(filter)`, missing sort/projection params |
+| `SearchRequestDto` | 49 | 8 | **Well-hardened** - `@MaxLength`, `@IsIn`, all fields declared |
+| `BulkRequestDto` | ~40 | 7 | **Well-hardened** - `@ArrayMaxSize(1000)`, proper nested validation |
 
 ---
 
@@ -247,16 +247,16 @@ sequenceDiagram
 
 | ID | Severity | File | Line(s) | Issue | RFC | Status |
 |----|:--------:|------|------:|-------|-----|:------:|
-| **S-1** | 🔴 CRITICAL | `auth/scim-auth.guard.ts` | 7 | Hardcoded credential `S@g@r!2011` in source code history. Any repo reader can authenticate. | — | **Open** |
-| **S-2** | 🔴 HIGH | `auth/shared-secret.guard.ts` | 134 | `token === expectedSecret` — timing-attack vulnerable. Same in `oauth.service.ts` L80 (`client.clientSecret !== clientSecret`). Should use `crypto.timingSafeEqual()`. | — | **Open** |
-| **S-3** | 🟡 MEDIUM | `auth/scim-auth.guard.ts` | 28–47 | 5× `console.log`/`console.error` in auth path — bypasses structured logging pipeline. Auth events invisible to SSE stream, log download, and audit trail. | — | **Open** |
-| **S-4** | 🟡 MEDIUM | `main.ts` | 48 | `origin: true` (Allow all CORS origins). Comment says "for now" — unchanged since v0.3.0 (Sep 2025). Should be configurable via `CORS_ORIGIN` env var. | — | **Open** |
-| **S-5** | 🟡 MEDIUM | `main.ts` | 88 | `enableImplicitConversion: true` in `ValidationPipe` — causes `"123"` → `123` type coercion. Combined with DTO index signatures, allows type confusion injection. | — | **Open** |
+| **S-1** | 🔴 CRITICAL | `auth/scim-auth.guard.ts` | 7 | Hardcoded credential `S@g@r!2011` in source code history. Any repo reader can authenticate. | - | **Open** |
+| **S-2** | 🔴 HIGH | `auth/shared-secret.guard.ts` | 134 | `token === expectedSecret` - timing-attack vulnerable. Same in `oauth.service.ts` L80 (`client.clientSecret !== clientSecret`). Should use `crypto.timingSafeEqual()`. | - | **Open** |
+| **S-3** | 🟡 MEDIUM | `auth/scim-auth.guard.ts` | 28–47 | 5× `console.log`/`console.error` in auth path - bypasses structured logging pipeline. Auth events invisible to SSE stream, log download, and audit trail. | - | **Open** |
+| **S-4** | 🟡 MEDIUM | `main.ts` | 48 | `origin: true` (Allow all CORS origins). Comment says "for now" - unchanged since v0.3.0 (Sep 2025). Should be configurable via `CORS_ORIGIN` env var. | - | **Open** |
+| **S-5** | 🟡 MEDIUM | `main.ts` | 88 | `enableImplicitConversion: true` in `ValidationPipe` - causes `"123"` → `123` type coercion. Combined with DTO index signatures, allows type confusion injection. | - | **Open** |
 
 ### S-1 Evidence
 
 ```typescript
-// api/src/auth/scim-auth.guard.ts — Line 7
+// api/src/auth/scim-auth.guard.ts - Line 7
 @Injectable()
 export class ScimAuthGuard implements CanActivate {
   private readonly legacyBearerToken = 'S@g@r!2011';  // ⚠️ PLAINTEXT IN SOURCE
@@ -285,7 +285,7 @@ if (safeCompare(token, expectedSecret)) { ... }
 
 ## 5. SOLID Violations (V1–V5)
 
-### V-1. Single Responsibility — `SchemaValidator` God Class
+### V-1. Single Responsibility - `SchemaValidator` God Class
 
 ```mermaid
 graph LR
@@ -309,7 +309,7 @@ graph LR
 | `PatchPathResolver` | `resolvePatchPath()`, `resolveRootAttribute()`, `validatePatchOperationValue()` | ~250 |
 | `SchemaCharacteristicsBuilder` | `buildCharacteristicsCache()`, all `collect*()` methods | ~500 |
 
-### V-2. Single Responsibility — `scim-service-helpers.ts` Swiss Army Knife
+### V-2. Single Responsibility - `scim-service-helpers.ts` Swiss Army Knife
 
 | Concern | Functions | Lines (est.) |
 |---------|-----------|:---:|
@@ -325,13 +325,13 @@ graph LR
 | Class wrapper | `ScimSchemaHelpers` class skeleton | ~100 |
 
 **Recommendation:** Split into focused modules:
-- `boolean-sanitizer.ts` — `sanitizeBooleanStringsByParent()`, `coercePatchOpBooleans()`
-- `readonly-stripping.ts` — `stripReadOnlyAttributes()`, `stripReadOnlyPatchOps()`
-- `returned-characteristics.ts` — `stripNeverReturnedFromPayload()`
-- `schema-helpers.ts` — `ScimSchemaHelpers` class, schema resolution, cache access
-- `uniqueness-enforcer.ts` — `assertSchemaUniqueness()`
+- `boolean-sanitizer.ts` - `sanitizeBooleanStringsByParent()`, `coercePatchOpBooleans()`
+- `readonly-stripping.ts` - `stripReadOnlyAttributes()`, `stripReadOnlyPatchOps()`
+- `returned-characteristics.ts` - `stripNeverReturnedFromPayload()`
+- `schema-helpers.ts` - `ScimSchemaHelpers` class, schema resolution, cache access
+- `uniqueness-enforcer.ts` - `assertSchemaUniqueness()`
 
-### V-3. Open/Closed — Auth Guard If/Else Chain
+### V-3. Open/Closed - Auth Guard If/Else Chain
 
 `SharedSecretGuard.canActivate()` has a hardcoded sequential `if/else` chain for auth strategies. Adding a new auth method requires modifying the guard body.
 
@@ -360,13 +360,13 @@ class CompositeAuthGuard implements CanActivate {
 }
 ```
 
-### V-4. Dependency Inversion — Legacy Guard
+### V-4. Dependency Inversion - Legacy Guard
 
 `ScimAuthGuard` directly imports and depends on the concrete `OAuthService` class. Should depend on an `IAuthenticationService` interface (if this guard remains at all).
 
-### V-5. Interface Segregation — `SchemaCharacteristicsCache`
+### V-5. Interface Segregation - `SchemaCharacteristicsCache`
 
-`SchemaCharacteristicsCache` (15 properties) is consumed by many callers — each uses only a subset:
+`SchemaCharacteristicsCache` (15 properties) is consumed by many callers - each uses only a subset:
 
 | Consumer | Fields Used |
 |----------|-------------|
@@ -417,13 +417,13 @@ graph TB
 | **D-1** | 🔴 HIGH | ~350 | `endpoint-scim-generic.service.ts` vs `scim-service-helpers.ts` | Generic service contains 10 private methods nearly identical to `ScimSchemaHelpers` methods: `enforceStrictSchemaValidation()`, `validatePayloadSchema()`, `coerceBooleanStringsIfEnabled()`, `checkImmutableAttributes()`, `getSchemaCacheForRT()`, `getAttrMapsForRT()`, `buildSchemaDefinitionsFromPayload()`, `validateFilterAttributePaths()`, `getSchemaDefinitions()`, `getBooleansByParentForRT()`. **Root cause:** `ScimSchemaHelpers` was designed with a fixed `coreSchemaUrn` (User/Group); Generic needs a dynamic URN per resource type. Instead of parameterizing, the GenericService forked the logic. |
 | **D-2** | 🟡 MEDIUM | ~240 | All 3 controllers | `attachWarnings()` (~15 lines ×3, 100% identical), `validateAndSetContext()` (~15 lines ×3), projection + warning pipeline (~10 lines per write endpoint ×9) |
 | **D-3** | 🟡 MEDIUM | ~120 | All 3 patch engines | `DANGEROUS_KEYS` constant (×3), `guardPrototypePollution()` (~10 lines ×2 + inline ×1), op validation loop (×3) |
-| **D-4** | 🟡 MEDIUM | ~80 | All 3 services | `toScimUserResource()`, `toScimGroupResource()`, `toScimResponse()` — same skeleton: parse rawPayload → sanitize booleans → strip never-returned → build `schemas[]` → delete reserved keys → merge with DB columns |
-| **D-5** | 🟡 MEDIUM | ~40 | All 3 services | `buildExistingPayload()` — reconstruct DB record into SCIM payload for immutable comparison |
-| **D-6** | 🟢 LOW | ~36 | All 3 services | 404 guard: check null → log debug → throw `createScimError(404)` — repeated ~12 times |
+| **D-4** | 🟡 MEDIUM | ~80 | All 3 services | `toScimUserResource()`, `toScimGroupResource()`, `toScimResponse()` - same skeleton: parse rawPayload → sanitize booleans → strip never-returned → build `schemas[]` → delete reserved keys → merge with DB columns |
+| **D-5** | 🟡 MEDIUM | ~40 | All 3 services | `buildExistingPayload()` - reconstruct DB record into SCIM payload for immutable comparison |
+| **D-6** | 🟢 LOW | ~36 | All 3 services | 404 guard: check null → log debug → throw `createScimError(404)` - repeated ~12 times |
 | **D-7** | 🟢 LOW | ~30 | All 3 services | `PatchError` → `ScimError` translation: identical catch block ×3 |
-| **D-8** | 🟢 LOW | ~30 | `scim-sort.util.ts` | `resolveUserSortParams()` and `resolveGroupSortParams()` are structurally identical — only the attribute map differs |
-| **D-9** | 🟢 LOW | ~30 | All 3 services | `extractAdditionalAttributes()` — destructure `schemas` and reserved keys from DTO ×2 |
-| **D-10** | 🟢 LOW | ~20 | `schema-validator.ts` | Map-building boilerplate `if (preBuiltMaps) { ... } else { build maps }` — repeated 5–6 times |
+| **D-8** | 🟢 LOW | ~30 | `scim-sort.util.ts` | `resolveUserSortParams()` and `resolveGroupSortParams()` are structurally identical - only the attribute map differs |
+| **D-9** | 🟢 LOW | ~30 | All 3 services | `extractAdditionalAttributes()` - destructure `schemas` and reserved keys from DTO ×2 |
+| **D-10** | 🟢 LOW | ~20 | `schema-validator.ts` | Map-building boilerplate `if (preBuiltMaps) { ... } else { build maps }` - repeated 5–6 times |
 | | | **~946** | | **Total estimated duplication** |
 
 ### 6.3 D-1 Fix Architecture
@@ -448,7 +448,7 @@ graph LR
 
 **Key change:** Refactor `ScimSchemaHelpers` constructor to accept a `urnResolver` callback or a `SchemaContext` object instead of a fixed `coreSchemaUrn`. The Generic service would pass a lambda that resolves URN from the current `ScimResourceType`.
 
-### 6.4 D-2 Fix — Base Controller
+### 6.4 D-2 Fix - Base Controller
 
 ```typescript
 // Proposed: BaseScimController mixin
@@ -480,15 +480,15 @@ abstract class BaseScimController {
 | ID | Severity | File(s) | Issue | Impact |
 |----|:--------:|---------|-------|--------|
 | **R-1** | 🔴 HIGH | `prisma/*.repository.ts` | `create()` missing `try/catch` + `wrapPrismaError()`. On P2002 unique-constraint race during concurrent creates, raw `PrismaClientKnownRequestError` escapes → **500 instead of 409**. `update()` and `delete()` correctly wrap errors. | Data integrity |
-| **R-2** | 🔴 HIGH | All repo interfaces | **Leaky Prisma filter abstraction** — `dbFilter?: Record<string, unknown>` passes Prisma `WhereInput` shapes through domain interfaces. InMemory repos had to build a 200-line `prisma-filter-evaluator.ts` to emulate Prisma query semantics. | Architecture coupling |
-| **R-3** | 🟡 MEDIUM | `prisma-endpoint-credential.repository.ts` | Silent `catch {}` blocks in `findById`, `deactivate`, `delete` — swallow ALL errors including connection failures and permissions errors. Only P2025 (not found) should return null. | Masked failures |
+| **R-2** | 🔴 HIGH | All repo interfaces | **Leaky Prisma filter abstraction** - `dbFilter?: Record<string, unknown>` passes Prisma `WhereInput` shapes through domain interfaces. InMemory repos had to build a 200-line `prisma-filter-evaluator.ts` to emulate Prisma query semantics. | Architecture coupling |
+| **R-3** | 🟡 MEDIUM | `prisma-endpoint-credential.repository.ts` | Silent `catch {}` blocks in `findById`, `deactivate`, `delete` - swallow ALL errors including connection failures and permissions errors. Only P2025 (not found) should return null. | Masked failures |
 | **R-4** | 🟡 MEDIUM | All Prisma repos | `toUserRecord()`, `toGroupRecord()`, `toGenericRecord()` mapping functions are ~15 lines each with 80% identical structure (same cast pattern + payload stringification). | DRY violation |
 | **R-5** | 🟢 LOW | `repository.module.ts` | Static `cachedModule`/`cachedBackend` pattern works but can cause subtle bugs if env vars change during testing without calling `resetCache()`. | Test brittleness |
 
 ### R-1 Fix
 
 ```typescript
-// BEFORE (prisma-user.repository.ts — create):
+// BEFORE (prisma-user.repository.ts - create):
 async create(data: UserCreateInput): Promise<UserRecord> {
   const row = await this.prisma.scimResource.create({ ... });
   return toUserRecord(row);
@@ -505,7 +505,7 @@ async create(data: UserCreateInput): Promise<UserRecord> {
 }
 ```
 
-### R-2 Proposed Fix — Domain Filter Type
+### R-2 Proposed Fix - Domain Filter Type
 
 ```mermaid
 graph LR
@@ -549,8 +549,8 @@ graph LR
 |----|:--------:|-----|-----|----------------|
 | **DTO-1** | 🔴 HIGH | `ListQueryDto` | No `@MaxLength` on `filter`, missing `sortBy`/`sortOrder`/`attributes`/`excludedAttributes` declarations | Harden to parity with `SearchRequestDto` |
 | **DTO-2** | 🟡 MEDIUM | `CreateUserDto` | `[key: string]: unknown` index signature allows arbitrary top-level properties bypassing validation. No `@MaxLength` on `userName`. No `@ValidateNested` on complex attrs (`emails`, `name`, `phoneNumbers`) | Add `@MaxLength(255)` to `userName`, consider `@ValidateNested` for critical sub-objects |
-| **DTO-3** | 🟡 MEDIUM | `PatchOperationDto` | `path` has no `@MaxLength` — oversized PATCH paths impact performance | Add `@MaxLength(500)` |
-| **DTO-4** | 🟡 MEDIUM | `OAuthController` | `TokenRequest` is a plain interface — no class-validator decorators. `client_secret` could be object/array | Convert to DTO class with `@IsString()` validators |
+| **DTO-3** | 🟡 MEDIUM | `PatchOperationDto` | `path` has no `@MaxLength` - oversized PATCH paths impact performance | Add `@MaxLength(500)` |
+| **DTO-4** | 🟡 MEDIUM | `OAuthController` | `TokenRequest` is a plain interface - no class-validator decorators. `client_secret` could be object/array | Convert to DTO class with `@IsString()` validators |
 | **DTO-5** | 🟢 LOW | `PatchOperation` (domain) | `op: string` instead of `'add' \| 'replace' \| 'remove'` union type. Runtime validation exists in DTO but domain type is permissive | Change to union type for compile-time safety |
 
 ---
@@ -559,16 +559,16 @@ graph LR
 
 | ID | RFC | Section | Gap | Severity | Notes |
 |----|-----|---------|-----|:--------:|-------|
-| **RFC-1** | 7644 | §3.4.2.3 | Sort parameters (`sortBy`/`sortOrder`) accepted on GET list as raw `@Query()` strings — bypass DTO validation entirely | 🟢 Low | `SearchRequestDto` validates them; only GET path is unvalidated |
+| **RFC-1** | 7644 | §3.4.2.3 | Sort parameters (`sortBy`/`sortOrder`) accepted on GET list as raw `@Query()` strings - bypass DTO validation entirely | 🟢 Low | `SearchRequestDto` validates them; only GET path is unvalidated |
 | **RFC-2** | 7644 | §3.12 | Generic service 404 errors inconsistently omit `scimType: 'noTarget'`. Users/Groups always include it. | 🟢 Low | Cosmetic inconsistency |
 | **RFC-3** | 7643 | §2.4 | Multi-valued sub-objects (`emails`, `groups`, `addresses`) have no DTO-level structural validation. Accepted blindly. | 🟢 Low | Schema validator catches at service layer |
-| **RFC-4** | 7644 | §3.4.2.2 | `NOT` filter expressions not pushed down to Prisma (trigger full-table scan). Prisma supports `{ NOT: {...} }` natively. | 🟢 Low | Correctness not affected — performance only |
+| **RFC-4** | 7644 | §3.4.2.2 | `NOT` filter expressions not pushed down to Prisma (trigger full-table scan). Prisma supports `{ NOT: {...} }` natively. | 🟢 Low | Correctness not affected - performance only |
 
 ---
 
 ## 10. Auth Module Design Review
 
-### 10.1 Two Guards — Confusion Risk
+### 10.1 Two Guards - Confusion Risk
 
 | Guard | Location | Routes Protected | Auth Methods | Logging |
 |-------|----------|-----------------|--------------|---------|
@@ -624,7 +624,7 @@ src/
 DANGEROUS_KEYS:       ████████████  (3× identical)
 guardPrototypePollution: ████████     (2× + 1 inline)
 Op validation loop:   ████████████  (3× identical)
-Error wrapping:       ████████       (2× — Generic lacks it)
+Error wrapping:       ████████       (2× - Generic lacks it)
 PatchOperation type:  ████            (1× local re-def)
                       ─────────────
                       ~120 lines total duplication
@@ -660,7 +660,7 @@ export function validateOp(op: string): asserts op is 'add' | 'replace' | 'remov
 | Grammar completeness (SCIM ABNF) | **A** | All 10 operators + AND/OR/NOT + grouping + valuePath |
 | Depth guard | **A** | `MAX_FILTER_DEPTH = 50` prevents stack overflow |
 | Input length guard | **B−** | `SearchRequestDto`: `@MaxLength(10000)` ✅; `ListQueryDto.filter`: **no limit** ❌ |
-| Injection resistance | **A** | AST-based — no string interpolation into SQL. Prisma parameterized queries |
+| Injection resistance | **A** | AST-based - no string interpolation into SQL. Prisma parameterized queries |
 | Error messages | **A** | Position-accurate `at position N` errors |
 | Escape handling | **A** | Tokenizer handles `\"` escapes correctly |
 | Case-insensitivity | **A** | Keywords lowercased during tokenization |
@@ -671,14 +671,14 @@ export function validateOp(op: string): asserts op is 'add' | 'replace' | 'remov
 
 | Attribute | Users | Groups | Generic | Type |
 |-----------|:-----:|:------:|:-------:|------|
-| `userName` | ✅ Push | — | — | citext |
-| `displayName` | ✅ Push | ✅ Push | — | citext |
-| `externalId` | ✅ Push | ✅ Push | — | text |
-| `active` | ✅ Push | ✅ Push | — | boolean |
-| `id` / `scimId` | ✅ Push | ✅ Push | — | uuid |
-| `emails[type eq "work"].value` | ❌ In-memory | — | — | — |
-| `name.givenName` | ❌ In-memory | — | — | — |
-| Generic attributes | — | — | ❌ eq-only | — |
+| `userName` | ✅ Push | - | - | citext |
+| `displayName` | ✅ Push | ✅ Push | - | citext |
+| `externalId` | ✅ Push | ✅ Push | - | text |
+| `active` | ✅ Push | ✅ Push | - | boolean |
+| `id` / `scimId` | ✅ Push | ✅ Push | - | uuid |
+| `emails[type eq "work"].value` | ❌ In-memory | - | - | - |
+| `name.givenName` | ❌ In-memory | - | - | - |
+| Generic attributes | - | - | ❌ eq-only | - |
 
 ---
 
@@ -688,13 +688,13 @@ export function validateOp(op: string): asserts op is 'add' | 'replace' | 'remov
 
 | Model | PK | Indexes | Unique Constraints | Issues |
 |-------|:--:|:-------:|:-----------------------:|--------|
-| `Endpoint` | UUID | `name` unique | ✅ | — |
-| `ScimResource` | UUID | 4 indexes | `(endpointId, scimId)` ✅, `(endpointId, userName)` ✅ | User/Group share table — `userName` unique allows NULL (Groups) which is safe in PG |
-| `ResourceMember` | UUID | 2 indexes | **NONE** ⚠️ | **No `@@unique([groupResourceId, memberResourceId])`** — duplicate memberships possible on concurrent PATCH race |
-| `RequestLog` | UUID | 3 indexes | — | Appropriate |
-| `EndpointCredential` | UUID | `(endpointId)` index | — | Cascade delete ✅ |
+| `Endpoint` | UUID | `name` unique | ✅ | - |
+| `ScimResource` | UUID | 4 indexes | `(endpointId, scimId)` ✅, `(endpointId, userName)` ✅ | User/Group share table - `userName` unique allows NULL (Groups) which is safe in PG |
+| `ResourceMember` | UUID | 2 indexes | **NONE** ⚠️ | **No `@@unique([groupResourceId, memberResourceId])`** - duplicate memberships possible on concurrent PATCH race |
+| `RequestLog` | UUID | 3 indexes | - | Appropriate |
+| `EndpointCredential` | UUID | `(endpointId)` index | - | Cascade delete ✅ |
 
-### 13.2 Missing Constraint — ResourceMember
+### 13.2 Missing Constraint - ResourceMember
 
 ```prisma
 // CURRENT:
@@ -732,12 +732,12 @@ model ResourceMember {
 
 | Setting | Value | Verdict |
 |---------|-------|:-------:|
-| `strict` | `true` | ✅ Excellent — enables all strict flags |
+| `strict` | `true` | ✅ Excellent - enables all strict flags |
 | `target` | `es2022` | ✅ Modern |
-| `module` | `commonjs` | ⚠️ Increasingly outdated for Node.js ≥22 — ESM is now standard |
+| `module` | `commonjs` | ⚠️ Increasingly outdated for Node.js ≥22 - ESM is now standard |
 | `forceConsistentCasingInFileNames` | `true` | ✅ Cross-platform safety |
 | `esModuleInterop` | `true` | ✅ Standard |
-| `skipLibCheck` | `true` | ⚠️ Minor — skips `.d.ts` checking (acceptable perf tradeoff) |
+| `skipLibCheck` | `true` | ⚠️ Minor - skips `.d.ts` checking (acceptable perf tradeoff) |
 | `incremental` | `true` | ✅ Good for dev speed |
 
 ### 14.2 Package.json Concerns
@@ -747,8 +747,8 @@ model ResourceMember {
 | `ts-jest` | `^29.4.6` | `^30.x` (match Jest 30) | 🟡 MEDIUM |
 | `@types/bcrypt` | In `dependencies` | Should be `devDependencies` | 🟢 LOW |
 | `prisma` CLI | In `devDependencies` | May need in `dependencies` for `npx prisma migrate deploy` in Docker | 🟢 LOW |
-| Node.js engine | `>=24.0.0` | Aggressive — blocks older Node. Acceptable if intentional | 🟢 LOW |
-| No `precommit` hook | — | Lint + type-check on commit | 🟢 LOW |
+| Node.js engine | `>=24.0.0` | Aggressive - blocks older Node. Acceptable if intentional | 🟢 LOW |
+| No `precommit` hook | - | Lint + type-check on commit | 🟢 LOW |
 
 ---
 
@@ -772,15 +772,15 @@ model ResourceMember {
 | Gap | Detail | Severity |
 |-----|--------|:--------:|
 | Branch coverage threshold | 75% (should be 80+ for compliance-critical) | 🟡 |
-| DTOs excluded from coverage | `!src/**/*.dto.ts` in jest config — hides validation gap metrics | 🟡 |
-| `ts-jest` major version mismatch | v29 + Jest v30 — potential transform failures | 🟡 |
+| DTOs excluded from coverage | `!src/**/*.dto.ts` in jest config - hides validation gap metrics | 🟡 |
+| `ts-jest` major version mismatch | v29 + Jest v30 - potential transform failures | 🟡 |
 | No mutation testing | Would reveal assertion quality beyond false-positive audit | 🟢 |
 | No contract testing | No consumer-driven contract tests for the SCIM API surface | 🟢 |
 
 ### 15.3 Test Configuration
 
 ```typescript
-// jest.config.ts — coverage thresholds
+// jest.config.ts - coverage thresholds
 coverageThreshold: {
   global: {
     branches: 75,    // ⚠️ Should be 80+ for compliance-critical software
@@ -799,21 +799,21 @@ coverageThreshold: {
 
 | Pattern | Quality | Evidence |
 |---------|:-------:|---------|
-| Pure domain layer | ✅ Excellent | `schema-validator.ts`, patch engines, models — zero framework imports |
+| Pure domain layer | ✅ Excellent | `schema-validator.ts`, patch engines, models - zero framework imports |
 | Hexagonal architecture boundary | ✅ Good | Repository interfaces in `domain/`, implementations in `infrastructure/` |
-| Single source of truth for config | ✅ Excellent | `ENDPOINT_CONFIG_FLAGS_DEFINITIONS` — defaults, validation, docs derived from one array |
-| Precomputed schema cache | ✅ Excellent | `buildCharacteristicsCache()` — O(1) lookups, zero per-request allocation |
+| Single source of truth for config | ✅ Excellent | `ENDPOINT_CONFIG_FLAGS_DEFINITIONS` - defaults, validation, docs derived from one array |
+| Precomputed schema cache | ✅ Excellent | `buildCharacteristicsCache()` - O(1) lookups, zero per-request allocation |
 | Typed error hierarchy | ✅ Excellent | `RepositoryError` → `handleRepositoryError()` → `createScimError()` chain |
 | Per-request context isolation | ✅ Excellent | `AsyncLocalStorage` in `EndpointContextStorage` |
-| RFC-compliant error format | ✅ Excellent | `ScimExceptionFilter` — auto-enriched diagnostics, correct Content-Type |
+| RFC-compliant error format | ✅ Excellent | `ScimExceptionFilter` - auto-enriched diagnostics, correct Content-Type |
 
 ### 16.2 Improvement Areas
 
 | Area | Issue | Impact |
 |------|-------|--------|
 | Two auth guards | Developer confusion about which guard protects what | Onboarding friction |
-| `OAuthModule` placement | `src/oauth/` vs `src/modules/auth/` — inconsistent | Navigation difficulty |
-| `EndpointConfig` index signature | `[key: string]: unknown` — misspelled flags compile | Subtle bugs |
+| `OAuthModule` placement | `src/oauth/` vs `src/modules/auth/` - inconsistent | Navigation difficulty |
+| `EndpointConfig` index signature | `[key: string]: unknown` - misspelled flags compile | Subtle bugs |
 | Version/doc drift | README 0.35.0, Session_starter mentions 0.29.0–0.33.0, various stale counts | Trust erosion |
 | Commented-out code | None found (`// TODO`, `// FIXME`) | ✅ Clean |
 
@@ -833,27 +833,27 @@ xychart-beta
 
 ## 17. Prioritized Improvement Roadmap
 
-### Tier 0 — Security (Fix Immediately)
+### Tier 0 - Security (Fix Immediately)
 
 | # | Item | Effort | Impact | Files |
 |:-:|------|:------:|:------:|-------|
-| 1 | Remove hardcoded `S@g@r!2011` from `ScimAuthGuard` — delete entire guard if `SharedSecretGuard` covers all routes | 1h | Critical | `auth/scim-auth.guard.ts`, module registrations |
+| 1 | Remove hardcoded `S@g@r!2011` from `ScimAuthGuard` - delete entire guard if `SharedSecretGuard` covers all routes | 1h | Critical | `auth/scim-auth.guard.ts`, module registrations |
 | 2 | Add `crypto.timingSafeEqual()` for all secret/token comparisons | 1h | High | `shared-secret.guard.ts` L134, `oauth.service.ts` L80 |
 | 3 | Replace `console.log`/`console.error` in `ScimAuthGuard` with `ScimLogger` (or delete guard per #1) | 30m | Medium | `auth/scim-auth.guard.ts` |
 | 4 | Make CORS origin configurable via `CORS_ORIGIN` env var | 30m | Medium | `main.ts` L48 |
 | 5 | Add `@@unique([groupResourceId, memberResourceId])` to `ResourceMember` + Prisma migration | 1h | High | `schema.prisma`, new migration |
 
-### Tier 1 — Architecture (High ROI)
+### Tier 1 - Architecture (High ROI)
 
 | # | Item | Effort | Impact | Files |
 |:-:|------|:------:|:------:|-------|
-| 6 | Parameterize `ScimSchemaHelpers` for dynamic URNs — eliminate ~350 lines of Generic duplication | 4h | High | `scim-service-helpers.ts`, `generic.service.ts` |
+| 6 | Parameterize `ScimSchemaHelpers` for dynamic URNs - eliminate ~350 lines of Generic duplication | 4h | High | `scim-service-helpers.ts`, `generic.service.ts` |
 | 7 | Split `SchemaValidator` into 4 focused classes | 6h | High | `schema-validator.ts` → 4 new files |
 | 8 | Split `scim-service-helpers.ts` (1,230 lines) into focused modules | 3h | Medium | → 5 new files |
 | 9 | Extract `BaseScimController` or controller utility functions | 3h | Medium | 3 controllers |
 | 10 | Wrap `create()` in all Prisma repos with `wrapPrismaError()` | 1h | High | 3 Prisma repos |
 
-### Tier 2 — DTO Hardening
+### Tier 2 - DTO Hardening
 
 | # | Item | Effort | Impact | Files |
 |:-:|------|:------:|:------:|-------|
@@ -862,18 +862,18 @@ xychart-beta
 | 13 | Remove `[key: string]: unknown` from `EndpointConfig` and DTOs | 1h | Medium | `endpoint-config.interface.ts`, `create-user.dto.ts` |
 | 14 | Convert OAuth `TokenRequest` to validated DTO class | 30m | Medium | `oauth.controller.ts` |
 
-### Tier 3 — Clean Code & Consistency
+### Tier 3 - Clean Code & Consistency
 
 | # | Item | Effort | Impact | Files |
 |:-:|------|:------:|:------:|-------|
-| 15 | Extract shared `patch-utils.ts` — `DANGEROUS_KEYS`, `guardPrototypePollution()`, `validateOp()` | 2h | Medium | 3 patch engines + new file |
+| 15 | Extract shared `patch-utils.ts` - `DANGEROUS_KEYS`, `guardPrototypePollution()`, `validateOp()` | 2h | Medium | 3 patch engines + new file |
 | 16 | Normalize patch engine architecture (all static or all instance-based) | 2h | Low | `generic-patch-engine.ts` |
 | 17 | Extract `ScimResourceBase` interface from domain models | 30m | Low | 3 model files |
 | 18 | Parameterize sort utility into single `resolveSortParams()` | 30m | Low | `scim-sort.util.ts` |
 | 19 | Move `OAuthModule` under `modules/` for co-location | 1h | Low | `src/oauth/` → `src/modules/oauth/` |
 | 20 | Upgrade `ts-jest` to v30.x, move `@types/bcrypt` to devDependencies | 30m | Low | `package.json` |
 
-### Tier 4 — Strategic (Long-term)
+### Tier 4 - Strategic (Long-term)
 
 | # | Item | Effort | Impact | Files |
 |:-:|------|:------:|:------:|-------|
@@ -941,17 +941,17 @@ Based on recurring design patterns and trade-offs identified in this audit, the 
 | **Data Integrity** | 80% | B | Missing `@@unique` on ResourceMember, missing `wrapPrismaError` on `create()` |
 | **DTO Validation** | 65% | C+ | `ListQueryDto` vs `SearchRequestDto` gap |
 | **TypeScript Strictness** | 95% | A | `strict: true`, modern target, proper typing (except index signatures) |
-| **Testing** | 92% | A− | 4,990 tests, 4 levels, parallel E2E, false-positive audit — minor threshold gaps |
+| **Testing** | 92% | A− | 4,990 tests, 4 levels, parallel E2E, false-positive audit - minor threshold gaps |
 | **Maintainability** | 72% | B− | Strong patterns but large files, duplication, module placement inconsistency |
-| **Documentation** | 85% | B+ | Comprehensive — 62 docs, INDEX, but version drift across files |
-| **Filter Engine** | 90% | A− | Full ABNF, AST-based, depth-guarded — minor push-down gaps |
+| **Documentation** | 85% | B+ | Comprehensive - 62 docs, INDEX, but version drift across files |
+| **Filter Engine** | 90% | A− | Full ABNF, AST-based, depth-guarded - minor push-down gaps |
 | | | | |
 | **Overall** | **78%** | **B+** | Strong domain architecture + RFC compliance. Security debt + duplication are the main risks. |
 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
 radar
-    title SCIMServer v0.35.0 — Quality Radar
+    title SCIMServer v0.35.0 - Quality Radar
     "RFC Compliance" : 93
     "Security" : 60
     "SOLID" : 65

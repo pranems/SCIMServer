@@ -43,7 +43,7 @@ describe('Manager PATCH String Coercion (E2E)', () => {
 
   beforeEach(async () => {
     resetFixtureCounter();
-    // Create endpoint with StrictSchemaValidation ENABLED — this is where the bug manifests
+    // Create endpoint with StrictSchemaValidation ENABLED - this is where the bug manifests
     endpointId = await createEndpointWithConfig(app, token, {
       StrictSchemaValidation: 'True',
     });

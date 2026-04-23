@@ -1,4 +1,4 @@
-# SCIMServer — Azure Deployment & Usage Guide
+# SCIMServer - Azure Deployment & Usage Guide
 
 > **Repository**: [github.com/pranems/SCIMServer](https://github.com/pranems/SCIMServer) | **Registry**: `ghcr.io/pranems/scimserver`
 
@@ -60,7 +60,7 @@ Resource Group (e.g. scimserver-rg)
 ├── Private DNS Zone (privatelink.postgres.database.azure.com)
 │   └── VNet Link → Virtual Network
 │
-├── Azure Database for PostgreSQL — Flexible Server
+├── Azure Database for PostgreSQL - Flexible Server
 │   ├── SKU: Burstable B1ms (1 vCore, 2 GB RAM)
 │   ├── Storage: 32 GB (auto-grow)
 │   ├── Version: PostgreSQL 17
@@ -137,7 +137,7 @@ GitHub Repository (pranems/SCIMServer)
 
 | Requirement | Details |
 |---|---|
-| **Azure CLI** | v2.50+ — Install: https://aka.ms/InstallAzureCLI |
+| **Azure CLI** | v2.50+ - Install: https://aka.ms/InstallAzureCLI |
 | **Azure Subscription** | Active subscription with permission to create resources |
 | **PowerShell** | Windows PowerShell 5.1+ or PowerShell 7+ (macOS/Linux) |
 | **Resource Providers** | `Microsoft.App` and `Microsoft.ContainerService` (auto-registered by script) |
@@ -161,7 +161,7 @@ az account show --query "{name:name, id:id}" --output table
 
 ### Option A: One-Liner Bootstrap (Recommended)
 
-The simplest way — no git clone needed:
+The simplest way - no git clone needed:
 
 ```powershell
 iex (iwr https://raw.githubusercontent.com/pranems/SCIMServer/master/bootstrap.ps1).Content
@@ -209,8 +209,8 @@ cd SCIMServer
 
 | Parameter | Required | Default | Description |
 |---|---|---|---|
-| `-ResourceGroup` | Yes (prompted) | — | Azure Resource Group name |
-| `-AppName` | Yes (prompted) | — | Container App name (2-32 chars, lowercase, letters/numbers/hyphens) |
+| `-ResourceGroup` | Yes (prompted) | - | Azure Resource Group name |
+| `-AppName` | Yes (prompted) | - | Container App name (2-32 chars, lowercase, letters/numbers/hyphens) |
 | `-Location` | No | `eastus` | Azure region |
 | `-ScimSecret` | No (auto-gen) | `SCIM-<random>-<date>` | Bearer token for SCIM authentication |
 | `-ImageTag` | No | `latest` | Docker image tag |
@@ -315,7 +315,7 @@ curl "https://<your-app-url>/scim/admin/log-config/download?format=json" -H "Aut
 
 - **Image**: `ghcr.io/pranems/scimserver:latest`
 - **CPU**: 0.5 cores | **Memory**: 1 GiB
-- **Replicas**: 1–3 (auto-scale — multi-replica enabled with PostgreSQL)
+- **Replicas**: 1–3 (auto-scale - multi-replica enabled with PostgreSQL)
 - **Port**: 80 (internal) → HTTPS (external, auto TLS)
 - **Health check**: HTTP GET `/` every 30s
 - **DATABASE_URL**: Injected from Container Apps secret (PG connection string)
@@ -361,9 +361,9 @@ Invoke-RestMethod -Uri "$appUrl/scim/admin/endpoints" `
   -Body '{"name": "entra-prod", "displayName": "Entra Production"}'
 ```
 
-The response includes an `id` (e.g., `cmlfuqaft0002i30tlv47pq1f`) — this becomes part of your SCIM URL.
+The response includes an `id` (e.g., `cmlfuqaft0002i30tlv47pq1f`) - this becomes part of your SCIM URL.
 
-> **Default behavior:** Without specifying a `profilePreset`, the `entra-id` preset is applied automatically. This enables boolean string coercion, dot-notation PATCH, multi-member operations, and remove-all-members — all needed for Entra ID. DELETE is hard-delete, schema validation is lenient, and `If-Match` is optional. Customize via `PATCH /admin/endpoints/:id` with `profile.settings`. See [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md#21-default-behavior--what-happens-out-of-the-box) for all defaults.
+> **Default behavior:** Without specifying a `profilePreset`, the `entra-id` preset is applied automatically. This enables boolean string coercion, dot-notation PATCH, multi-member operations, and remove-all-members - all needed for Entra ID. DELETE is hard-delete, schema validation is lenient, and `If-Match` is optional. Customize via `PATCH /admin/endpoints/:id` with `profile.settings`. See [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md#21-default-behavior--what-happens-out-of-the-box) for all defaults.
 
 ### Step 3: Configure Microsoft Entra ID
 
@@ -424,13 +424,13 @@ https://<your-app-url>/
 ```
 
 Features:
-- **Activity Feed** — Real-time SCIM request/response log with human-readable translations
-- **User Browser** — View all provisioned users and their attributes
-- **Group Browser** — View groups and memberships
-- **Database Stats** — User/group counts and database info
-- **Endpoint Management** — Create/manage multiple SCIM endpoints
-- **Log Configuration** — Adjust log levels dynamically
-- **Dark/Light Theme** — Toggle via UI
+- **Activity Feed** - Real-time SCIM request/response log with human-readable translations
+- **User Browser** - View all provisioned users and their attributes
+- **Group Browser** - View groups and memberships
+- **Database Stats** - User/group counts and database info
+- **Endpoint Management** - Create/manage multiple SCIM endpoints
+- **Log Configuration** - Adjust log levels dynamically
+- **Dark/Light Theme** - Toggle via UI
 
 ### API Endpoints
 
@@ -472,7 +472,7 @@ Features:
 | GET | `/scim/admin/logs` | View request logs |
 | GET | `/scim/admin/version` | App version info |
 
-### Authentication (3-Tier Fallback — v0.21.0)
+### Authentication (3-Tier Fallback - v0.21.0)
 
 SCIMServer uses a **3-tier authentication fallback chain**. Each incoming `Authorization: Bearer <token>` is evaluated in order:
 
@@ -598,13 +598,13 @@ az monitor log-analytics query `
 ## 10. Security Notes
 
 - **HTTPS only**: Auto-managed TLS certificate via Azure Container Apps
-- **No public database access**: PG Flexible Server uses VNet integration — accessible only from within the VNet
+- **No public database access**: PG Flexible Server uses VNet integration - accessible only from within the VNet
 - **VNet isolation**: All inter-service traffic (Container App ↔ PostgreSQL) stays within the virtual network
-- **TLS enforced on database**: `sslmode=require` — all PG connections encrypted in transit
+- **TLS enforced on database**: `sslmode=require` - all PG connections encrypted in transit
 - **Secrets management**: DATABASE_URL, SCIM, JWT, and OAuth secrets stored as Container Apps secrets (encrypted at rest)
 - **No hardcoded credentials**: All sensitive values are injected via environment variables from secrets
 - **Automated backups**: PG Flexible Server provides daily automated backups with 7-day point-in-time restore
-- **No storage keys**: Eliminated Blob Storage and Managed Identity role assignments — all persistence through PG connection string
+- **No storage keys**: Eliminated Blob Storage and Managed Identity role assignments - all persistence through PG connection string
 
 ---
 

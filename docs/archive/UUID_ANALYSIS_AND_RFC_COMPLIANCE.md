@@ -1,14 +1,14 @@
-# UUID Usage Analysis — RFC Compliance & Best Practices
+# UUID Usage Analysis - RFC Compliance & Best Practices
 
 > **Date:** 2026-02-20  
-> **Phase:** 3 — PostgreSQL Migration  
+> **Phase:** 3 - PostgreSQL Migration  
 > **Branch:** `feat/torfc1stscimsvr`  
 
 ---
 
 ## 1. What the RFCs Say About `id`
 
-### RFC 7643 §3.1 — Common Attributes
+### RFC 7643 §3.1 - Common Attributes
 
 The SCIM `id` attribute is defined as:
 
@@ -26,10 +26,10 @@ The SCIM `id` attribute is defined as:
 
 ### What the RFC Does NOT Say
 
-- **No UUID mandate** — The RFC specifies `id` as type `string`, not as a UUID
-- **No format requirement** — The RFC says "as defined by the service provider"
-- **No length requirement** — Any non-empty string is technically compliant
-- **The string `"bulkId"` is reserved** — MUST NOT be used as an `id` value
+- **No UUID mandate** - The RFC specifies `id` as type `string`, not as a UUID
+- **No format requirement** - The RFC says "as defined by the service provider"
+- **No length requirement** - Any non-empty string is technically compliant
+- **The string `"bulkId"` is reserved** - MUST NOT be used as an `id` value
 
 ### What the RFC Examples Use
 
@@ -44,7 +44,7 @@ Every single example in RFC 7643 uses UUID format:
 | Group members[].value | §8.4 | `2819c223-7f76-453a-919d-413861904646` |
 | Manager.value | §8.3 | `26118915-6090-4610-87e4-49d8ca9f808d` |
 
-### RFC 7643 §9.3 — Privacy Considerations
+### RFC 7643 §9.3 - Privacy Considerations
 
 > "SCIM defines attributes such as `id`, `externalId`, and SCIM resource URIs, which cause new PII to be generated [...] Where possible, assign and bind identifiers to specific endpoints and/or clients."
 
@@ -86,9 +86,9 @@ model ScimResource {
 }
 ```
 
-- **`id`** — Internal storage key, PostgreSQL UUID, auto-generated
-- **`scimId`** — The SCIM-visible `id` attribute, also UUID, also auto-generated
-- **`gen_random_uuid()`** — PostgreSQL's built-in UUID v4 generator
+- **`id`** - Internal storage key, PostgreSQL UUID, auto-generated
+- **`scimId`** - The SCIM-visible `id` attribute, also UUID, also auto-generated
+- **`gen_random_uuid()`** - PostgreSQL's built-in UUID v4 generator
 
 ---
 
@@ -98,8 +98,8 @@ model ScimResource {
 
 | Aspect | Assessment |
 |---|---|
-| **RFC compliant?** | ✅ Yes — RFC allows any string; UUID is the most common choice |
-| **Best practice?** | ✅ Yes — aligns with Microsoft Entra ID and most SCIM providers |
+| **RFC compliant?** | ✅ Yes - RFC allows any string; UUID is the most common choice |
+| **Best practice?** | ✅ Yes - aligns with Microsoft Entra ID and most SCIM providers |
 | **Trade-off** | Requires UUID guard (Issue 15) since the DB column enforces format |
 
 ### Decision 2: `@db.Uuid` Column Type
@@ -107,7 +107,7 @@ model ScimResource {
 | Aspect | Assessment |
 |---|---|
 | **Benefit** | 16 bytes storage vs 36 bytes for `TEXT`; native UUID comparison; index-efficient |
-| **Benefit** | Database-level format validation — prevents corrupt data |
+| **Benefit** | Database-level format validation - prevents corrupt data |
 | **Trade-off** | Requires application-layer guard for non-UUID lookup attempts |
 | **Alternative rejected** | `String @db.Text` would accept any string but lose UUID benefits |
 
@@ -117,18 +117,18 @@ model ScimResource {
 |---|---|
 | **Location** | Repository methods (`findByScimId`, `findByScimIds`, `findWithMembers`) |
 | **Behavior** | Non-UUID input → `return null` (semantically: "cannot exist") |
-| **InMemory impact** | None — InMemory uses `Map<string, ...>` with no type constraint |
-| **SCIM contract** | Preserved — clients see 404 for non-existent resources regardless of ID format |
+| **InMemory impact** | None - InMemory uses `Map<string, ...>` with no type constraint |
+| **SCIM contract** | Preserved - clients see 404 for non-existent resources regardless of ID format |
 
 ---
 
-## 4. `externalId` — Client-Provided Identifier
+## 4. `externalId` - Client-Provided Identifier
 
 Per RFC 7643 §3.1:
 
 > "`externalId` [...] is always issued by the provisioning client and MUST NOT be specified by the service provider."
 
-Our schema stores `externalId` as `String?` (nullable TEXT, not UUID) — correctly allowing any client-provided string format. This is the right choice since the client controls this value.
+Our schema stores `externalId` as `String?` (nullable TEXT, not UUID) - correctly allowing any client-provided string format. This is the right choice since the client controls this value.
 
 ---
 

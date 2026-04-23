@@ -10,7 +10,7 @@ import { SCIM_SERVICE_PROVIDER_CONFIG } from './scim-schemas.constants';
 import type { EndpointProfile } from '../endpoint-profile/endpoint-profile.types';
 
 /**
- * ScimDiscoveryService — Phase 6: Data-Driven Discovery
+ * ScimDiscoveryService - Phase 6: Data-Driven Discovery
  *
  * Centralizes all SCIM discovery endpoint responses (Schemas, ResourceTypes,
  * ServiceProviderConfig) into a single injectable service.
@@ -30,7 +30,7 @@ export class ScimDiscoveryService {
   // ─── Root-level discovery (no endpointId) ───────────────────────────────
   // Used by GET /scim/Schemas, /ResourceTypes, /ServiceProviderConfig (root)
 
-  /** Root-level GET /Schemas — from default rfc-standard preset */
+  /** Root-level GET /Schemas - from default rfc-standard preset */
   getSchemas() {
     const resources = this.registry.getAllSchemas();
     return {

@@ -1,16 +1,16 @@
 /**
- * Endpoint-Scoped Log Controller — Phase D Step 11
+ * Endpoint-Scoped Log Controller - Phase D Step 11
  *
  * Provides per-endpoint log access under /scim/endpoints/:endpointId/logs/*.
- * Auto-filtered by endpointId from the URL path — per-endpoint credential
+ * Auto-filtered by endpointId from the URL path - per-endpoint credential
  * holders can only see their own endpoint's logs.
  *
  * Delegates to LogQueryService for shared query/stream/download logic.
  *
  * Routes:
- *   GET  /scim/endpoints/:endpointId/logs/recent    — Ring buffer filtered by endpointId
- *   GET  /scim/endpoints/:endpointId/logs/stream     — SSE stream filtered by endpointId
- *   GET  /scim/endpoints/:endpointId/logs/download   — File download filtered by endpointId
+ *   GET  /scim/endpoints/:endpointId/logs/recent    - Ring buffer filtered by endpointId
+ *   GET  /scim/endpoints/:endpointId/logs/stream     - SSE stream filtered by endpointId
+ *   GET  /scim/endpoints/:endpointId/logs/download   - File download filtered by endpointId
  *
  * @see LOGGING_ERROR_HANDLING_IDEAL_DESIGN.md §24 (Tenant Log Isolation)
  */

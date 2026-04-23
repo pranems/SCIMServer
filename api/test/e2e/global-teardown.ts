@@ -5,7 +5,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 
 /**
- * Jest globalTeardown — runs once after all E2E suites.
+ * Jest globalTeardown - runs once after all E2E suites.
  *
  * Truncates all SCIM data tables so test runs don't accumulate stale data.
  * When PERSISTENCE_BACKEND=inmemory, nothing to clean up.
@@ -23,10 +23,10 @@ export default async function globalTeardown(): Promise<void> {
     // Ignore
   }
 
-  // InMemory backend — nothing to clean up
+  // InMemory backend - nothing to clean up
   if (marker === 'inmemory') return;
 
-  // Prisma/PostgreSQL backend — truncate all tables
+  // Prisma/PostgreSQL backend - truncate all tables
   const pool = new pg.Pool({ connectionString: marker, max: 1 });
   const adapter = new PrismaPg(pool);
   const prisma = new PrismaClient({ adapter });
@@ -38,7 +38,7 @@ export default async function globalTeardown(): Promise<void> {
       prisma.endpoint.deleteMany(),
     ]);
   } catch {
-    // Tolerate connection errors — DB may already be gone
+    // Tolerate connection errors - DB may already be gone
   } finally {
     await prisma.$disconnect();
     await pool.end();

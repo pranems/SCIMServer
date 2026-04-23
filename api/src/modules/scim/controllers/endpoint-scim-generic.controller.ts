@@ -1,5 +1,5 @@
 /**
- * EndpointScimGenericController — Phase 8b Wildcard SCIM Controller
+ * EndpointScimGenericController - Phase 8b Wildcard SCIM Controller
  *
  * Handles SCIM CRUD operations for custom resource types registered via the
  * Admin API. Routes are matched by a wildcard `:resourceType` param that

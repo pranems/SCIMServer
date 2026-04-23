@@ -1,4 +1,4 @@
-﻿import { HttpException } from '@nestjs/common';
+import { HttpException } from '@nestjs/common';
 
 import { SCIM_ERROR_SCHEMA, SCIM_DIAGNOSTICS_URN } from './scim-constants';
 import { getCorrelationContext } from '../../logging/scim-logger.service';
@@ -59,7 +59,7 @@ export interface ScimErrorOptions {
   status: number;
   detail: string;
   scimType?: string;
-  /** Optional diagnostics — auto-enriched with requestId and endpointId from correlation context */
+  /** Optional diagnostics - auto-enriched with requestId and endpointId from correlation context */
   diagnostics?: ScimErrorDiagnostics;
 }
 

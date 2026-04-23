@@ -5,10 +5,10 @@
 .DESCRIPTION
     Provides four modes for accessing SCIMServer logs remotely via the admin API:
 
-    1. tail    — Real-time SSE log stream (like 'tail -f')
-    2. recent  — Fetch the last N log entries from the in-memory ring buffer
-    3. download — Download logs as a .ndjson or .json file
-    4. config  — View or update the runtime log configuration
+    1. tail    - Real-time SSE log stream (like 'tail -f')
+    2. recent  - Fetch the last N log entries from the in-memory ring buffer
+    3. download - Download logs as a .ndjson or .json file
+    4. config  - View or update the runtime log configuration
 
 .PARAMETER Mode
     Operation mode: tail | recent | download | config
@@ -120,7 +120,7 @@ function Get-Headers {
 # ── Mode: tail (SSE stream) ─────────────────────────────────────────
 
 function Invoke-Tail {
-    Write-Step "Live log stream (SSE) — press Ctrl+C to stop"
+    Write-Step "Live log stream (SSE) - press Ctrl+C to stop"
 
     $qs = @()
     if ($Level)      { $qs += "level=$Level" }
@@ -170,7 +170,7 @@ function Invoke-Tail {
                     }
                 }
                 catch {
-                    # Non-JSON data line — print raw
+                    # Non-JSON data line - print raw
                     Write-Host $json -ForegroundColor DarkGray
                 }
             }
@@ -178,7 +178,7 @@ function Invoke-Tail {
                 Write-Ok "Connected to log stream"
             }
             elseif ($line.StartsWith(':')) {
-                # SSE comment / keep-alive ping — ignore
+                # SSE comment / keep-alive ping - ignore
             }
             elseif ($line.Trim()) {
                 Write-Host $line -ForegroundColor DarkGray

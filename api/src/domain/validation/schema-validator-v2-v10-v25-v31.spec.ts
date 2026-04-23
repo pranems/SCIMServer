@@ -1,13 +1,13 @@
 /**
- * Phase 8.1 / 8.6 Gap Tests — V2, V9, V10, V25, V31, G8c
+ * Phase 8.1 / 8.6 Gap Tests - V2, V9, V10, V25, V31, G8c
  *
  * Tests for:
- *  V2  — PATCH pre-validation via validatePatchOperationValue()
- *  V9  — Required sub-attribute enforcement
- *  V10 — Canonical value enforcement
- *  V25 — schemas array validation
- *  V31 — Strict xsd:dateTime format
- *  G8c — readOnly mutability pre-validation in PATCH operations
+ *  V2  - PATCH pre-validation via validatePatchOperationValue()
+ *  V9  - Required sub-attribute enforcement
+ *  V10 - Canonical value enforcement
+ *  V25 - schemas array validation
+ *  V31 - Strict xsd:dateTime format
+ *  G8c - readOnly mutability pre-validation in PATCH operations
  */
 
 import { SchemaValidator } from './schema-validator';
@@ -48,7 +48,7 @@ const patchOpts: ValidationOptions = { strictMode: true, mode: 'patch' };
 
 // ─── V2: PATCH pre-validation ─────────────────────────────────────────────────
 
-describe('V2 — validatePatchOperationValue', () => {
+describe('V2 - validatePatchOperationValue', () => {
   const schemas: SchemaDefinition[] = [
     makeCoreSchema([
       makeAttr({ name: 'userName', required: true }),
@@ -176,7 +176,7 @@ describe('V2 — validatePatchOperationValue', () => {
 
 // ─── V9: Required sub-attributes ─────────────────────────────────────────────
 
-describe('V9 — required sub-attribute enforcement', () => {
+describe('V9 - required sub-attribute enforcement', () => {
   const schema = makeCoreSchema([
     makeAttr({
       name: 'name',
@@ -210,7 +210,7 @@ describe('V9 — required sub-attribute enforcement', () => {
 
 // ─── V10: Canonical values ────────────────────────────────────────────────────
 
-describe('V10 — canonical value enforcement', () => {
+describe('V10 - canonical value enforcement', () => {
   const schema = makeCoreSchema([
     makeAttr({
       name: 'emails',
@@ -266,7 +266,7 @@ describe('V10 — canonical value enforcement', () => {
 
 // ─── V25: schemas array validation ────────────────────────────────────────────
 
-describe('V25 — schemas array validation', () => {
+describe('V25 - schemas array validation', () => {
   const schema = makeCoreSchema([makeAttr({ name: 'userName', required: true })]);
 
   it('should reject non-string entries in schemas[]', () => {
@@ -299,7 +299,7 @@ describe('V25 — schemas array validation', () => {
 
 // ─── V31: dateTime strict validation ──────────────────────────────────────────
 
-describe('V31 — strict xsd:dateTime format validation', () => {
+describe('V31 - strict xsd:dateTime format validation', () => {
   const schema = makeCoreSchema([
     makeAttr({ name: 'lastLogin', type: 'dateTime' }),
   ]);
@@ -352,7 +352,7 @@ describe('V31 — strict xsd:dateTime format validation', () => {
 
 // ─── V2: Additional PATCH pre-validation edge cases ──────────────────────────
 
-describe('V2 — validatePatchOperationValue — additional cases', () => {
+describe('V2 - validatePatchOperationValue - additional cases', () => {
   const schemas: SchemaDefinition[] = [
     makeCoreSchema([
       makeAttr({ name: 'userName', required: true }),
@@ -438,7 +438,7 @@ describe('V2 — validatePatchOperationValue — additional cases', () => {
 
 // ─── V2: Manager PATCH string coercion (RFC 7644 §3.5.2.3 + Postel's Law) ────
 
-describe('V2 — complex attribute string coercion in PATCH mode', () => {
+describe('V2 - complex attribute string coercion in PATCH mode', () => {
   const schemasWithManager: SchemaDefinition[] = [
     makeCoreSchema([
       makeAttr({ name: 'userName', required: true }),
@@ -610,7 +610,7 @@ describe('V2 — complex attribute string coercion in PATCH mode', () => {
 
 // ─── V10: Canonical enforcement via validatePatchOperationValue ──────────────
 
-describe('V10 — canonical via validatePatchOperationValue', () => {
+describe('V10 - canonical via validatePatchOperationValue', () => {
   const schemas: SchemaDefinition[] = [
     makeCoreSchema([
       makeAttr({
@@ -648,9 +648,9 @@ describe('V10 — canonical via validatePatchOperationValue', () => {
   });
 });
 
-// ─── V9: Required sub-attributes — multi-valued and extension ────────────────
+// ─── V9: Required sub-attributes - multi-valued and extension ────────────────
 
-describe('V9 — required sub-attributes in multi-valued and extension', () => {
+describe('V9 - required sub-attributes in multi-valued and extension', () => {
   it('should reject multi-valued complex array element missing required sub-attr', () => {
     const schema = makeCoreSchema([
       makeAttr({
@@ -717,7 +717,7 @@ describe('V9 — required sub-attributes in multi-valued and extension', () => {
 
 // ─── V25: Non-strict mode and empty schemas ─────────────────────────────────
 
-describe('V25 — schemas in non-strict mode', () => {
+describe('V25 - schemas in non-strict mode', () => {
   const schema = makeCoreSchema([makeAttr({ name: 'userName', required: true })]);
   const nonStrictOpts: ValidationOptions = { strictMode: false, mode: 'create' };
 
@@ -736,9 +736,9 @@ describe('V25 — schemas in non-strict mode', () => {
   });
 });
 
-// ─── V31: dateTime — additional edge cases ──────────────────────────────────
+// ─── V31: dateTime - additional edge cases ──────────────────────────────────
 
-describe('V31 — dateTime additional edge cases', () => {
+describe('V31 - dateTime additional edge cases', () => {
   const schema = makeCoreSchema([
     makeAttr({ name: 'lastLogin', type: 'dateTime' }),
   ]);
@@ -773,7 +773,7 @@ describe('V31 — dateTime additional edge cases', () => {
 
 // ─── G8c: readOnly mutability pre-validation in PATCH ────────────────────────
 
-describe('G8c — readOnly attribute rejection in PATCH operations', () => {
+describe('G8c - readOnly attribute rejection in PATCH operations', () => {
   const GROUP_CORE_SCHEMA_ID = 'urn:ietf:params:scim:schemas:core:2.0:Group';
 
   const userSchemas: SchemaDefinition[] = [
@@ -970,13 +970,13 @@ describe('G8c — readOnly attribute rejection in PATCH operations', () => {
       expect(result.errors.every(e => e.scimType === 'mutability')).toBe(true);
     });
 
-    it('should skip reserved keys (schemas, meta, id) — no readOnly error', () => {
+    it('should skip reserved keys (schemas, meta, id) - no readOnly error', () => {
       const result = SchemaValidator.validatePatchOperationValue(
         'replace', undefined,
         { schemas: ['urn:some:schema'], meta: {}, id: 'xyz', displayName: 'Alice' },
         userSchemas,
       );
-      // Reserved keys are always skipped — should not produce readOnly errors
+      // Reserved keys are always skipped - should not produce readOnly errors
       expect(result.valid).toBe(true);
     });
   });

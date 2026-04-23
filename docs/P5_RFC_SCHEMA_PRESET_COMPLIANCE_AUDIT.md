@@ -1,27 +1,27 @@
-# P5 — RFC 7643 Schema & Preset Definition Compliance Audit (RFC-Verified)
+# P5 - RFC 7643 Schema & Preset Definition Compliance Audit (RFC-Verified)
 
 ## Overview
 
 **Feature**: Line-by-line compliance audit of all built-in schema definitions, profile presets, ResourceType definitions, and ServiceProviderConfig against RFC 7643/7644 canonical JSON representations  
 **Version**: v0.37.1  
 **Date**: 2026-04-16  
-**Status**: Audit complete — **13 critical findings, ~16 warnings, 7 info items, 3 RFC ambiguities**  
+**Status**: Audit complete - **13 critical findings, ~16 warnings, 7 info items, 3 RFC ambiguities**  
 **Methodology**: **RFC 7643 fetched live from IETF datatracker** → §8.7.1 normative JSON extracted → field-by-field comparison against `scim-schemas.constants.ts` (baseline) and all 6 preset JSONs  
-**RFC Source**: [RFC 7643 fetched 2026-04-16](https://datatracker.ietf.org/doc/html/rfc7643) — canonical schema extracts saved to [docs/rfcs/RFC7643_SCHEMA_EXTRACT.md](rfcs/RFC7643_SCHEMA_EXTRACT.md)  
+**RFC Source**: [RFC 7643 fetched 2026-04-16](https://datatracker.ietf.org/doc/html/rfc7643) - canonical schema extracts saved to [docs/rfcs/RFC7643_SCHEMA_EXTRACT.md](rfcs/RFC7643_SCHEMA_EXTRACT.md)  
 **Test Baseline**: 3,345 unit (84 suites) · 1,025 E2E (49 suites) · ~760 live assertions · ~5,200 total  
 **Predecessor**: P4 (v0.35.0), P3 (v0.32.0), P2 (v0.24.0), Discovery Endpoints RFC Audit (v0.19.3)
 
 **RFC References** (all verified against fetched source):
-- [RFC 7643 §2.2](https://datatracker.ietf.org/doc/html/rfc7643#section-2.2) — Attribute Characteristics (defaults)
-- [RFC 7643 §2.3.2](https://datatracker.ietf.org/doc/html/rfc7643#section-2.3.2) — Booleans ("no case sensitivity or uniqueness")
-- [RFC 7643 §2.4](https://datatracker.ietf.org/doc/html/rfc7643#section-2.4) — Multi-Valued Attributes (default sub-attrs: value, display, type, primary, $ref)
-- [RFC 7643 §3.1](https://datatracker.ietf.org/doc/html/rfc7643#section-3.1) — Common Attributes (id, externalId, meta — NOT part of schema attrs)
-- [RFC 7643 §4.1](https://datatracker.ietf.org/doc/html/rfc7643#section-4.1) — User Resource Schema
-- [RFC 7643 §4.2](https://datatracker.ietf.org/doc/html/rfc7643#section-4.2) — Group Resource Schema
-- [RFC 7643 §4.3](https://datatracker.ietf.org/doc/html/rfc7643#section-4.3) — Enterprise User Schema Extension
-- [RFC 7643 §5](https://datatracker.ietf.org/doc/html/rfc7643#section-5) — ServiceProviderConfig
-- [RFC 7643 §6](https://datatracker.ietf.org/doc/html/rfc7643#section-6) — ResourceType Schema
-- [RFC 7643 §8.7.1](https://datatracker.ietf.org/doc/html/rfc7643#section-8.7.1) — **Normative** Resource Schema JSON Representation (User, Group, EnterpriseUser)
+- [RFC 7643 §2.2](https://datatracker.ietf.org/doc/html/rfc7643#section-2.2) - Attribute Characteristics (defaults)
+- [RFC 7643 §2.3.2](https://datatracker.ietf.org/doc/html/rfc7643#section-2.3.2) - Booleans ("no case sensitivity or uniqueness")
+- [RFC 7643 §2.4](https://datatracker.ietf.org/doc/html/rfc7643#section-2.4) - Multi-Valued Attributes (default sub-attrs: value, display, type, primary, $ref)
+- [RFC 7643 §3.1](https://datatracker.ietf.org/doc/html/rfc7643#section-3.1) - Common Attributes (id, externalId, meta - NOT part of schema attrs)
+- [RFC 7643 §4.1](https://datatracker.ietf.org/doc/html/rfc7643#section-4.1) - User Resource Schema
+- [RFC 7643 §4.2](https://datatracker.ietf.org/doc/html/rfc7643#section-4.2) - Group Resource Schema
+- [RFC 7643 §4.3](https://datatracker.ietf.org/doc/html/rfc7643#section-4.3) - Enterprise User Schema Extension
+- [RFC 7643 §5](https://datatracker.ietf.org/doc/html/rfc7643#section-5) - ServiceProviderConfig
+- [RFC 7643 §6](https://datatracker.ietf.org/doc/html/rfc7643#section-6) - ResourceType Schema
+- [RFC 7643 §8.7.1](https://datatracker.ietf.org/doc/html/rfc7643#section-8.7.1) - **Normative** Resource Schema JSON Representation (User, Group, EnterpriseUser)
 
 ---
 
@@ -29,7 +29,7 @@
 
 1. [Executive Summary](#1-executive-summary)
 2. [Audit Scope & Methodology](#2-audit-scope--methodology)
-3. [Source of Truth — Files Audited](#3-source-of-truth--files-audited)
+3. [Source of Truth - Files Audited](#3-source-of-truth--files-audited)
 4. [User Schema Audit (RFC 7643 §4.1 / §8.7.1)](#4-user-schema-audit)
 5. [Group Schema Audit (RFC 7643 §4.2 / §8.7.1)](#5-group-schema-audit)
 6. [Enterprise User Extension Audit (RFC 7643 §4.3 / §8.7.1)](#6-enterprise-user-extension-audit)
@@ -42,7 +42,7 @@
 13. [RFC Internal Inconsistencies Discovered](#13-rfc-internal-inconsistencies-discovered)
 14. [Consolidated Gap Register](#14-consolidated-gap-register)
 15. [Actionable Fix List](#15-actionable-fix-list)
-16. [Architecture — Where Definitions Live](#16-architecture--where-definitions-live)
+16. [Architecture - Where Definitions Live](#16-architecture--where-definitions-live)
 17. [Lessons Learned & Self-Improvement](#17-lessons-learned--self-improvement)
 
 ---
@@ -61,22 +61,22 @@ A line-by-line, field-by-field audit of every attribute, sub-attribute, and attr
 | ResourceTypes (§6) | 11 fields | 11 | 0 | 0 | 0 | 0 | 0 |
 | ServiceProviderConfig (§5) | 15 fields | 15 | 0 | 0 | 0 | 0 | 0 |
 | Schema URNs | 10 URNs | 10 | 0 | 0 | 0 | 0 | 0 |
-| Common attrs in schema | 3 attrs + ~5 subs | — | 0 | 0 | 0 | 3 | 1 |
+| Common attrs in schema | 3 attrs + ~5 subs | - | 0 | 0 | 0 | 3 | 1 |
 | **TOTAL** | **~130+** | **107** | **9** | **4** | **~13** | **8** | **3** |
 
 **Overall Compliance Score**: 107 / 120 auditable = **89%**
 
-**Risk Assessment**: **Needs Work** — 13 critical items (9 mismatches + 4 missing sub-attrs) in the RFC baseline affect `/Schemas` response correctness.
+**Risk Assessment**: **Needs Work** - 13 critical items (9 mismatches + 4 missing sub-attrs) in the RFC baseline affect `/Schemas` response correctness.
 
 ### Top 5 Critical Findings
 
 | # | Finding | Severity | Verified Against |
 |---|---|---|---|
-| 1 | `display` sub-attribute MISSING from `emails`, `phoneNumbers`, `ims`, `photos` | 🔴 Critical | §8.7.1 — all four show display sub-attr |
-| 2 | `userName.returned` = `"always"` — RFC §8.7.1 says `"default"` | 🔴 Critical | §8.7.1: `"returned" : "default"` |
-| 3 | `emails.value.required` = `true` & `returned` = `"always"` — RFC says `false` / `"default"` | 🔴 Critical | §8.7.1: `"required" : false`, `"returned" : "default"` |
-| 4 | Group `members.value.required` = `true` & `returned` = `"always"` — RFC says `false` / `"default"` | 🔴 Critical | §8.7.1: `"required" : false`, `"returned" : "default"` |
-| 5 | Group `displayName` — `uniqueness: "server"`, `returned: "always"` differ from RFC `"none"` / `"default"` | 🔴 Critical | §8.7.1 unambiguous |
+| 1 | `display` sub-attribute MISSING from `emails`, `phoneNumbers`, `ims`, `photos` | 🔴 Critical | §8.7.1 - all four show display sub-attr |
+| 2 | `userName.returned` = `"always"` - RFC §8.7.1 says `"default"` | 🔴 Critical | §8.7.1: `"returned" : "default"` |
+| 3 | `emails.value.required` = `true` & `returned` = `"always"` - RFC says `false` / `"default"` | 🔴 Critical | §8.7.1: `"required" : false`, `"returned" : "default"` |
+| 4 | Group `members.value.required` = `true` & `returned` = `"always"` - RFC says `false` / `"default"` | 🔴 Critical | §8.7.1: `"required" : false`, `"returned" : "default"` |
+| 5 | Group `displayName` - `uniqueness: "server"`, `returned: "always"` differ from RFC `"none"` / `"default"` | 🔴 Critical | §8.7.1 unambiguous |
 
 ---
 
@@ -90,8 +90,8 @@ This version uses the **actual RFC text fetched live from https://datatracker.ie
 
 | Finding | Prior Report | RFC-Verified | Change |
 |---|---|---|---|
-| Boolean `uniqueness` | Flagged ~8 booleans as 🟡 OMITTED | §2.3.2: "no uniqueness" — omission is **correct** | **Downgraded — not a gap** |
-| `phoneNumbers` parent `uniqueness` | Flagged as 🟡 OMITTED | RFC §8.7.1 also omits `uniqueness` at parent level | **Downgraded — matches RFC** |
+| Boolean `uniqueness` | Flagged ~8 booleans as 🟡 OMITTED | §2.3.2: "no uniqueness" - omission is **correct** | **Downgraded - not a gap** |
+| `phoneNumbers` parent `uniqueness` | Flagged as 🟡 OMITTED | RFC §8.7.1 also omits `uniqueness` at parent level | **Downgraded - matches RFC** |
 | Group `members.value.required` | Not checked | RFC says `false`, impl says `true` | **NEW 🔴 finding** |
 | Group `members.value.returned` | Not checked | RFC says `"default"`, impl says `"always"` | **NEW 🔴 finding** |
 | Group `displayName.required` | Not checked | RFC §8.7.1 says `false`, impl says `true` | **NEW ⚠️ ambiguity** |
@@ -111,13 +111,13 @@ This version uses the **actual RFC text fetched live from https://datatracker.ie
 
 ---
 
-## 3. Source of Truth — Files Audited
+## 3. Source of Truth - Files Audited
 
 | File | Purpose | Lines |
 |---|---|---|
-| **RFC 7643 §8.7.1** (fetched) | **Normative source** — canonical schema JSON | N/A |
+| **RFC 7643 §8.7.1** (fetched) | **Normative source** - canonical schema JSON | N/A |
 | [docs/rfcs/RFC7643_SCHEMA_EXTRACT.md](rfcs/RFC7643_SCHEMA_EXTRACT.md) | Extracted canonical JSON (saved in repo) | ~350 |
-| `api/src/modules/scim/discovery/scim-schemas.constants.ts` | **RFC Baseline** — schema attribute constants | 615 |
+| `api/src/modules/scim/discovery/scim-schemas.constants.ts` | **RFC Baseline** - schema attribute constants | 615 |
 | `api/src/modules/scim/common/scim-constants.ts` | Schema URN constants | 80 |
 | `api/src/modules/scim/endpoint-profile/presets/rfc-standard.json` | Full RFC preset | 1077 |
 | `api/src/modules/scim/endpoint-profile/presets/entra-id.json` | Default preset (D5) | 984 |
@@ -126,7 +126,7 @@ This version uses the **actual RFC text fetched live from https://datatracker.ie
 
 ## 4. User Schema Audit (RFC 7643 §4.1 / §8.7.1) {#4-user-schema-audit}
 
-**RFC Source**: §8.7.1 normative JSON — [saved extract](rfcs/RFC7643_SCHEMA_EXTRACT.md)
+**RFC Source**: §8.7.1 normative JSON - [saved extract](rfcs/RFC7643_SCHEMA_EXTRACT.md)
 
 ### 4.1 Top-Level Attribute Mismatches
 
@@ -138,7 +138,7 @@ This version uses the **actual RFC text fetched live from https://datatracker.ie
 | 4 | `externalId` | presence | Not in §8.7.1 attrs | In `USER_SCHEMA_ATTRIBUTES` | 🔵 EXTRA (§3.1: MAY list) |
 | 5 | `meta` | presence | Not in §8.7.1 attrs | In `USER_SCHEMA_ATTRIBUTES` | 🔵 EXTRA (§3.1: MAY list) |
 
-### 4.2 `uniqueness` — RFC §8.7.1 Comparison
+### 4.2 `uniqueness` - RFC §8.7.1 Comparison
 
 | # | Attribute | RFC §8.7.1 has it? | Impl has it? | Status |
 |---|---|---|---|---|
@@ -159,7 +159,7 @@ This version uses the **actual RFC text fetched live from https://datatracker.ie
 |---|---|---|---|---|---|
 | 1 | `value` | `required` | `false` | `true` | 🔴 MISMATCH |
 | 2 | `value` | `returned` | `"default"` | `"always"` | 🔴 MISMATCH |
-| 3 | **`display`** | — | **defined** | **ABSENT** | 🔴 MISSING |
+| 3 | **`display`** | - | **defined** | **ABSENT** | 🔴 MISSING |
 | 4 | `type` | `canonicalValues` | `["work","home","other"]` | matches | ✅ PASS |
 | 5 | `primary` | all chars | correct | correct | ✅ PASS |
 
@@ -257,7 +257,7 @@ All presets inherit the baseline's missing `display` sub-attributes.
 |---|---|---|---|---|
 | 1 | `display` mutability | `"immutable"` | `"readWrite"` | §8.7.1 takes precedence (normative schema) |
 | 2 | Group `displayName` required | §4.2: "REQUIRED" | `"required": false` | Schema `required` = "must client provide"; the attribute IS required on the resource but `false` is correct in schema |
-| 3 | `uniqueness` on booleans | §2.2 default: `"none"` | NOT specified | §2.3.2: "no uniqueness" — omitting is correct |
+| 3 | `uniqueness` on booleans | §2.2 default: `"none"` | NOT specified | §2.3.2: "no uniqueness" - omitting is correct |
 | 4 | `uniqueness` on parent multi-valued | §2.2 default: `"none"` | Inconsistent: `emails` has it, `phoneNumbers` doesn't | RFC inconsistent; match §8.7.1 exactly |
 
 ---
@@ -290,7 +290,7 @@ All presets inherit the baseline's missing `display` sub-attributes.
 
 ## 15. Actionable Fix List
 
-### P0 — Must Fix
+### P0 - Must Fix
 
 | ID | File | Change | Current | Correct (RFC §8.7.1) |
 |---|---|---|---|---|
@@ -307,20 +307,20 @@ All presets inherit the baseline's missing `display` sub-attributes.
 
 **Cascade**: After fixing `scim-schemas.constants.ts`, also update `rfc-standard.json`.
 
-### P1 — Should Fix
+### P1 - Should Fix
 
 - **P5-16**: Add `canonicalValues: ["User", "Group"]` to Group `members.type`
 - **P5-17**: Add explicit `uniqueness: "none"` to ~12 User string attrs
 
-### P2 — No Change Needed
+### P2 - No Change Needed
 
-- **P5-14**: Group `displayName.required = true` — valid interpretation of §4.2
-- **P5-15**: Group `members.display` — acceptable per §2.4
-- **P5-18/19**: Common attrs in schema — valid per §3.1 backward-compat
+- **P5-14**: Group `displayName.required = true` - valid interpretation of §4.2
+- **P5-15**: Group `members.display` - acceptable per §2.4
+- **P5-18/19**: Common attrs in schema - valid per §3.1 backward-compat
 
 ---
 
-## 16. Architecture — Where Definitions Live
+## 16. Architecture - Where Definitions Live
 
 ```mermaid
 graph TB
@@ -375,7 +375,7 @@ sequenceDiagram
 
 | # | Prior Claim | RFC-Verified Truth | Impact |
 |---|---|---|---|
-| 1 | "~30+ attrs missing uniqueness" | Only ~12 — booleans correctly omit (§2.3.2), some parent multi-valued also correctly omit | Overstated by ~18 |
+| 1 | "~30+ attrs missing uniqueness" | Only ~12 - booleans correctly omit (§2.3.2), some parent multi-valued also correctly omit | Overstated by ~18 |
 | 2 | "active needs uniqueness: none" | §2.3.2: "no uniqueness" for booleans | False positive |
 | 3 | "Group members.display = correct" | RFC §8.7.1 does NOT include display in Group members | Changed to 🔵 EXTRA |
 | 4 | Group members.value not checked | RFC: `required: false`, impl: `true` | NEW critical finding |
@@ -386,14 +386,14 @@ sequenceDiagram
 Training data can be wrong about specific field values. The RFC §8.7.1 canonical JSON is the sole authority. Key surprises from the actual fetch:
 - Group `displayName` has `required: false` despite §4.2 saying "REQUIRED"
 - Group `members` has only 3 sub-attrs (no `display`) despite §2.4 defining it as default
-- `uniqueness` is NOT on every attribute in the RFC — booleans and some parents intentionally omit
+- `uniqueness` is NOT on every attribute in the RFC - booleans and some parents intentionally omit
 - `display.mutability` is `"readWrite"` in §8.7.1, contradicting §2.4 ("immutable")
 
 ### 17.3 Checklist for Future Audits
 
-1. Always check boolean attrs against §2.3.2 — don't flag missing uniqueness
-2. Check parent-level multi-valued attrs individually — RFC is inconsistent
-3. Compare Group members sub-attrs against §8.7.1 specifically — differs from User pattern
+1. Always check boolean attrs against §2.3.2 - don't flag missing uniqueness
+2. Check parent-level multi-valued attrs individually - RFC is inconsistent
+3. Compare Group members sub-attrs against §8.7.1 specifically - differs from User pattern
 4. Document all RFC internal inconsistencies
 
 ---
@@ -402,8 +402,8 @@ Training data can be wrong about specific field values. The RFC §8.7.1 canonica
 
 | Document | Relationship |
 |---|---|
-| [docs/rfcs/RFC7643_SCHEMA_EXTRACT.md](rfcs/RFC7643_SCHEMA_EXTRACT.md) | **Source of truth** — extracted canonical JSON from fetched RFC |
-| [P4_ATTRIBUTE_CHARACTERISTIC_DEEP_ANALYSIS.md](P4_ATTRIBUTE_CHARACTERISTIC_DEEP_ANALYSIS.md) | Prior behavioral audit — P5 audits *definitions* |
+| [docs/rfcs/RFC7643_SCHEMA_EXTRACT.md](rfcs/RFC7643_SCHEMA_EXTRACT.md) | **Source of truth** - extracted canonical JSON from fetched RFC |
+| [P4_ATTRIBUTE_CHARACTERISTIC_DEEP_ANALYSIS.md](P4_ATTRIBUTE_CHARACTERISTIC_DEEP_ANALYSIS.md) | Prior behavioral audit - P5 audits *definitions* |
 | [P2_ATTRIBUTE_CHARACTERISTIC_ENFORCEMENT.md](P2_ATTRIBUTE_CHARACTERISTIC_ENFORCEMENT.md) | Behavioral enforcement |
 | [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](DISCOVERY_ENDPOINTS_RFC_AUDIT.md) | Discovery endpoint compliance |
 | [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md) | Profile system architecture |

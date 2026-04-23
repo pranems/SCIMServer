@@ -60,12 +60,12 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * are automatically coerced to native booleans before schema validation and storage.
    * This enables interoperability with clients like Microsoft Entra ID that send boolean
    * values as strings (e.g., roles[].primary = "True" instead of true).
-   * Scope: All paths — POST/PUT body, PATCH values, PATCH filter literals, GET/LIST output.
+   * Scope: All paths - POST/PUT body, PATCH values, PATCH filter literals, GET/LIST output.
    * Supersedes StrictSchemaValidation for boolean type checks when enabled.
    * When false, string boolean values are passed through as-is and will be rejected
    * by StrictSchemaValidation if that flag is also enabled.
    * In practice: keep true unless all clients send proper JSON booleans.
-   * @see RFC 7643 §2.2 — Boolean attribute type
+   * @see RFC 7643 §2.2 - Boolean attribute type
    */
   ALLOW_AND_COERCE_BOOLEAN_STRINGS: 'AllowAndCoerceBooleanStrings',
 
@@ -85,7 +85,7 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * attributes that were silently stripped from the incoming payload.
    * When false (default), stripping happens silently without response annotation.
    * In practice: enable during development/debugging to see which attributes were stripped.
-   * @see RFC 7643 §2.2 — readOnly mutability
+   * @see RFC 7643 §2.2 - readOnly mutability
    */
   INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE: 'IncludeWarningAboutIgnoredReadOnlyAttribute',
 
@@ -96,7 +96,7 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * Has no effect when StrictSchemaValidation is OFF (stripping always happens regardless).
    * In practice: enable alongside StrictSchemaValidation for Entra ID, which sends readOnly
    * attributes like `groups` and `id` in PATCH operations.
-   * @see RFC 7643 §2.2 — readOnly mutability
+   * @see RFC 7643 §2.2 - readOnly mutability
    */
   IGNORE_READONLY_ATTRIBUTES_IN_PATCH: 'IgnoreReadOnlyAttributesInPatch',
 
@@ -126,7 +126,7 @@ export const ENDPOINT_CONFIG_FLAGS = {
   /**
    * When true (default), a single PATCH operation can add/remove multiple members
    * on a Group: value: [{value:"id1"},{value:"id2"}].
-   * When false, only one member per PATCH op — multiple members in value array → 400 error.
+   * When false, only one member per PATCH op - multiple members in value array → 400 error.
    * In practice: keep true; most SCIM clients (Entra ID, Okta) send multi-member PATCH ops.
    */
   MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED: 'MultiMemberPatchOpForGroupEnabled',
@@ -154,7 +154,7 @@ export const ENDPOINT_CONFIG_FLAGS = {
  */
 export type EndpointConfigFlag = typeof ENDPOINT_CONFIG_FLAGS[keyof typeof ENDPOINT_CONFIG_FLAGS];
 
-// ─── Flag Definitions — Single Source of Truth ───────────────────────────────
+// ─── Flag Definitions - Single Source of Truth ───────────────────────────────
 
 /** Valid types for flag definitions. */
 type FlagType = 'boolean' | 'logLevel';
@@ -172,14 +172,14 @@ export interface EndpointConfigFlagDefinition {
 }
 
 /**
- * ENDPOINT_CONFIG_FLAGS_DEFINITIONS — Single source of truth for all endpoint config flags.
+ * ENDPOINT_CONFIG_FLAGS_DEFINITIONS - Single source of truth for all endpoint config flags.
  *
  * Each entry defines the flag's runtime key (via ENDPOINT_CONFIG_FLAGS constant),
  * data type, default value, and human-readable description.
  *
  * All other constructs (DEFAULT_ENDPOINT_CONFIG, validateEndpointConfig)
  * are derived from this registry. To add a new flag, add it to ENDPOINT_CONFIG_FLAGS
- * and then add an entry here — everything else is automatic.
+ * and then add an entry here - everything else is automatic.
  */
 export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFlagDefinition> = {
   PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS: {
@@ -306,7 +306,7 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     description:
       'When true (default), a single PATCH operation can add/remove multiple members ' +
       'on a Group: value: [{value:"id1"},{value:"id2"}]. ' +
-      'When false, only one member per PATCH op — multiple members → 400. ' +
+      'When false, only one member per PATCH op - multiple members → 400. ' +
       'Keep true; most SCIM clients (Entra ID, Okta) send multi-member PATCH ops.',
   },
   SCHEMA_DISCOVERY_ENABLED: {
@@ -362,7 +362,7 @@ export interface EndpointConfig {
 // ─── Derived: Default configuration (from definitions) ───────────────────────
 
 /**
- * Default configuration values — derived from ENDPOINT_CONFIG_FLAGS_DEFINITIONS.
+ * Default configuration values - derived from ENDPOINT_CONFIG_FLAGS_DEFINITIONS.
  * Not hand-maintained: add a new flag to ENDPOINT_CONFIG_FLAGS_DEFINITIONS
  * and the default automatically appears here.
  */
@@ -413,7 +413,7 @@ export function getConfigBoolean(config: EndpointConfig | undefined, key: string
 }
 
 /**
- * @deprecated Use getConfigBoolean() instead — it now falls back to centrally-defined
+ * @deprecated Use getConfigBoolean() instead - it now falls back to centrally-defined
  * defaults from ENDPOINT_CONFIG_FLAGS_DEFINITIONS, making per-call-site defaults unnecessary.
  *
  * Kept for backward compatibility during migration.
@@ -496,7 +496,7 @@ function validateLogLevelFlag(config: Record<string, any>, flagName: string): vo
 
 /**
  * Validate endpoint configuration.
- * Driven by ENDPOINT_CONFIG_FLAGS_DEFINITIONS — no manual flag list to maintain.
+ * Driven by ENDPOINT_CONFIG_FLAGS_DEFINITIONS - no manual flag list to maintain.
  *
  * @param config - The endpoint configuration to validate
  * @throws Error if validation fails

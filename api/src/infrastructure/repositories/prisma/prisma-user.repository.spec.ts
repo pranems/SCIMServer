@@ -1,5 +1,5 @@
 /**
- * PrismaUserRepository — Unit tests for Phase 3 PostgreSQL migration.
+ * PrismaUserRepository - Unit tests for Phase 3 PostgreSQL migration.
  *
  * Verifies that all queries target `scimResource` with `resourceType: 'User'`
  * and that the mapping from ScimResource → UserRecord is correct.
@@ -23,7 +23,7 @@ function createMockPrismaService(): PrismaService {
   } as unknown as PrismaService;
 }
 
-// Valid UUID constants used in tests — PostgreSQL UUID columns reject non-UUID strings
+// Valid UUID constants used in tests - PostgreSQL UUID columns reject non-UUID strings
 const SCIM_ID_1 = '00000000-0000-4000-a000-000000000001';
 const SCIM_ID_2 = '00000000-0000-4000-a000-000000000002';
 const SCIM_ID_S1 = '00000000-0000-4000-a000-0000000000a1';
@@ -53,7 +53,7 @@ function fakeScimResource(overrides: Record<string, unknown> = {}) {
 
 // ─── Test suite ───────────────────────────────────────────────────────────────
 
-describe('PrismaUserRepository (Phase 2 — unified table)', () => {
+describe('PrismaUserRepository (Phase 2 - unified table)', () => {
   let repo: PrismaUserRepository;
   let prisma: PrismaService;
 

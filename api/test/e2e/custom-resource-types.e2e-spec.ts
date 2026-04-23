@@ -5,7 +5,7 @@ import { getAuthToken } from './helpers/auth.helper';
 import { resetFixtureCounter } from './helpers/fixtures';
 
 /**
- * Custom Resource Type CRUD — E2E
+ * Custom Resource Type CRUD - E2E
  *
  * Tests the generic controller (EndpointScimGenericController) for custom resource types
  * registered via the endpoint profile system.
@@ -96,7 +96,7 @@ describe('Custom Resource Type CRUD (E2E)', () => {
     await app.close();
   });
 
-  describe('POST — Create custom resource', () => {
+  describe('POST - Create custom resource', () => {
     let deviceId: string;
 
     it('should create a custom Device resource', async () => {
@@ -134,7 +134,7 @@ describe('Custom Resource Type CRUD (E2E)', () => {
   describe('Full CRUD lifecycle', () => {
     let resourceId: string;
 
-    it('POST — should create', async () => {
+    it('POST - should create', async () => {
       const res = await request(app.getHttpServer())
         .post(`${basePath}/${CUSTOM_RESOURCE_TYPE}`)
         .set('Authorization', `Bearer ${token}`)
@@ -151,7 +151,7 @@ describe('Custom Resource Type CRUD (E2E)', () => {
       expect(resourceId).toBeDefined();
     });
 
-    it('GET by ID — should retrieve', async () => {
+    it('GET by ID - should retrieve', async () => {
       const res = await request(app.getHttpServer())
         .get(`${basePath}/${CUSTOM_RESOURCE_TYPE}/${resourceId}`)
         .set('Authorization', `Bearer ${token}`)
@@ -161,7 +161,7 @@ describe('Custom Resource Type CRUD (E2E)', () => {
       expect(res.body).toHaveProperty('serialNumber', 'SN-CRUD-001');
     });
 
-    it('GET list — should list resources', async () => {
+    it('GET list - should list resources', async () => {
       const res = await request(app.getHttpServer())
         .get(`${basePath}/${CUSTOM_RESOURCE_TYPE}?startIndex=1&count=10`)
         .set('Authorization', `Bearer ${token}`)
@@ -176,7 +176,7 @@ describe('Custom Resource Type CRUD (E2E)', () => {
       expect(res.body).toHaveProperty('Resources');
     });
 
-    it('POST /.search — should search', async () => {
+    it('POST /.search - should search', async () => {
       const res = await request(app.getHttpServer())
         .post(`${basePath}/${CUSTOM_RESOURCE_TYPE}/.search`)
         .set('Authorization', `Bearer ${token}`)
@@ -194,7 +194,7 @@ describe('Custom Resource Type CRUD (E2E)', () => {
       expect(res.body.totalResults).toBeGreaterThanOrEqual(1);
     });
 
-    it('PUT — should replace', async () => {
+    it('PUT - should replace', async () => {
       const res = await request(app.getHttpServer())
         .put(`${basePath}/${CUSTOM_RESOURCE_TYPE}/${resourceId}`)
         .set('Authorization', `Bearer ${token}`)
@@ -211,7 +211,7 @@ describe('Custom Resource Type CRUD (E2E)', () => {
       expect(res.body).toHaveProperty('serialNumber', 'SN-CRUD-002');
     });
 
-    it('PATCH — should modify', async () => {
+    it('PATCH - should modify', async () => {
       const res = await request(app.getHttpServer())
         .patch(`${basePath}/${CUSTOM_RESOURCE_TYPE}/${resourceId}`)
         .set('Authorization', `Bearer ${token}`)
@@ -227,7 +227,7 @@ describe('Custom Resource Type CRUD (E2E)', () => {
       expect(res.body).toHaveProperty('status', 'retired');
     });
 
-    it('DELETE — should remove', async () => {
+    it('DELETE - should remove', async () => {
       await request(app.getHttpServer())
         .delete(`${basePath}/${CUSTOM_RESOURCE_TYPE}/${resourceId}`)
         .set('Authorization', `Bearer ${token}`)

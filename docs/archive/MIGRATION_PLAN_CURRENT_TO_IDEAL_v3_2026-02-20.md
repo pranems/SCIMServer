@@ -12,19 +12,19 @@
 
 1. [Executive Summary of Gaps](#1-executive-summary-of-gaps)
 2. [Phase Overview Map](#2-phase-overview-map)
-3. [Phase 1 — Repository Pattern (Persistence Agnosticism)](#3-phase-1--repository-pattern)
-4. [Phase 2 — Unified `scim_resource` Table](#4-phase-2--unified-scim_resource-table)
-5. [Phase 3 — PostgreSQL Migration](#5-phase-3--postgresql-migration)
-6. [Phase 4 — Filter Push-Down Expansion](#6-phase-4--filter-push-down-expansion)
-7. [Phase 5 — Domain-Layer PATCH Engine](#7-phase-5--domain-layer-patch-engine)
-8. [Phase 6 — Data-Driven Discovery](#8-phase-6--data-driven-discovery)
-9. [Phase 7 — ETag & Conditional Requests (Strict)](#9-phase-7--etag--conditional-requests)
-10. [Phase 8 — Schema Validation](#10-phase-8--schema-validation)
-10b. [Phase 8 Part 2 — Custom Resource Type Registration](#10b-phase-8-part-2--custom-resource-type-registration)
-11. [Phase 9 — Bulk Operations](#11-phase-9--bulk-operations)
-12. [Phase 10 — /Me Endpoint](#12-phase-10--me-endpoint)
-13. [Phase 11 — Per-Endpoint Credentials](#13-phase-11--per-endpoint-credentials)
-14. [Phase 12 — Sorting, Search, and Cleanup](#14-phase-12--sorting-search-and-cleanup)
+3. [Phase 1 - Repository Pattern (Persistence Agnosticism)](#3-phase-1--repository-pattern)
+4. [Phase 2 - Unified `scim_resource` Table](#4-phase-2--unified-scim_resource-table)
+5. [Phase 3 - PostgreSQL Migration](#5-phase-3--postgresql-migration)
+6. [Phase 4 - Filter Push-Down Expansion](#6-phase-4--filter-push-down-expansion)
+7. [Phase 5 - Domain-Layer PATCH Engine](#7-phase-5--domain-layer-patch-engine)
+8. [Phase 6 - Data-Driven Discovery](#8-phase-6--data-driven-discovery)
+9. [Phase 7 - ETag & Conditional Requests (Strict)](#9-phase-7--etag--conditional-requests)
+10. [Phase 8 - Schema Validation](#10-phase-8--schema-validation)
+10b. [Phase 8 Part 2 - Custom Resource Type Registration](#10b-phase-8-part-2--custom-resource-type-registration)
+11. [Phase 9 - Bulk Operations](#11-phase-9--bulk-operations)
+12. [Phase 10 - /Me Endpoint](#12-phase-10--me-endpoint)
+13. [Phase 11 - Per-Endpoint Credentials](#13-phase-11--per-endpoint-credentials)
+14. [Phase 12 - Sorting, Search, and Cleanup](#14-phase-12--sorting-search-and-cleanup)
 15. [Risk Matrix & Mitigation](#15-risk-matrix--mitigation)
 16. [Dependency Graph](#16-dependency-graph)
 17. [Deployment Modes & Per-Phase Impact](#17-deployment-modes--per-phase-impact)
@@ -37,34 +37,34 @@ The table below maps every gap between the current codebase and the ideal archit
 
 | # | Gap | Severity | Current File(s) | Ideal Resolution | Phase |
 |---|-----|----------|-----------------|------------------|-------|
-| G1 | ~~**No Repository Pattern** — services call `PrismaService` directly~~ | ~~HIGH~~ | ✅ **DONE (v0.10.0)** — `IUserRepository`/`IGroupRepository` interfaces + Prisma/InMemory implementations. `PERSISTENCE_BACKEND` env toggle. Services use `@Inject(TOKEN)` pattern with zero Prisma imports. | Repository interfaces in Domain layer; Prisma implementations in Infrastructure | 1 |
-| G2 | ~~**Separate User/Group tables** (ScimUser, ScimGroup)~~ | ~~MEDIUM~~ | ✅ **DONE (v0.10.0)** — Unified `ScimResource` polymorphic table with `resourceType` discriminator column. All services (`EndpointScimUsersService`, `EndpointScimGroupsService`, `BulkProcessorService`) use `prisma.scimResource`. No separate User/Group tables exist. | Unified `scim_resource` table with `resource_type` discriminator | 2 |
-| G3 | ~~**SQLite** — no CITEXT, no JSONB, no GIN, single-writer lock~~ | ~~HIGH~~ | ✅ **DONE (v0.10.0)** — PostgreSQL 17 with CITEXT, JSONB, GIN, `pg_trgm`. Prisma 7 driver adapter (`@prisma/adapter-pg`). 5 migrations applied. | PostgreSQL with CITEXT, JSONB, GIN, `pg_trgm` | 3 |
-| G4 | ~~**Filter push-down only for `eq`** on 3 columns~~ | ~~HIGH~~ | ✅ **DONE (v0.12.0)** — All 10 operators (eq/ne/co/sw/ew/gt/ge/lt/le/pr) on 5 columns (userName, displayName, externalId, scimId, active). Column type annotations. AND/OR recursive push-down. | Full operator support via PostgreSQL ILIKE, JSONB operators, `pg_trgm` | 4 |
-| G5 | ~~**PATCH engine embedded in service** (~200 lines inline)~~ | ~~HIGH~~ | ✅ **DONE (v0.13.0)** — `UserPatchEngine` (437 lines) and `GroupPatchEngine` (352 lines) extracted to `domain/patch/`. Pure domain, zero NestJS/Prisma deps. Prototype pollution guards, reserved attribute stripping. | Standalone `PatchEngine` in Domain layer, schema-aware, zero DB imports | 5 |
-| G6 | ~~**Discovery endpoints hardcoded**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.14.0)** — `ScimDiscoveryService` (103 lines) with `ScimSchemaRegistry`. `EndpointSchema` DB model + Admin API for custom schemas per endpoint. 7 built-in schemas (was 3), dynamic per-endpoint discovery. | `endpoint_schema` + `endpoint_resource_type` tables, `DiscoveryService` | 6 |
-| G7 | ~~**ETag If-Match NOT enforced** before writes~~ | ~~HIGH~~ | ✅ **DONE (v0.16.0)** — Version-based ETags (`W/"v{N}"`), pre-write `enforceIfMatch()` (412 on mismatch), `RequireIfMatch` config flag (428 on missing), atomic `version` increment. | Pre-write check in Orchestrator; monotonic integer version | 7 |
-| G8 | ~~**No schema validation** against endpoint schema definitions~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.0)** — `SchemaValidator` domain class validates type/required/mutability/multiValued/unknown-attrs/sub-attrs | `SchemaValidator` validates payload against `endpoint_schema.attributes` | 8 |
-| G8b | ~~**No custom resource type registration** — only hardcoded User/Group~~ | ~~MEDIUM~~ | ✅ **DONE (v0.18.0)** — `EndpointResourceType` table + Admin API (POST/GET/GET/:name/DELETE/:name) + generic wildcard controller + `GenericPatchEngine` for JSONB PATCH + `CustomResourceTypesEnabled` config flag. `ScimSchemaRegistry` enhanced with per-endpoint overlay. Reserved name/path protection. 121 unit + 29 E2E + 20 live tests. See `docs/G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md`. | `EndpointResourceType` table + Admin API + generic wildcard controller + `customResourceTypesEnabled` config flag | 8.2 |
-| G8c | ~~**PatchEngine mutability checks** — readOnly/immutable attrs can be modified via PATCH~~ | ~~HIGH~~ | ✅ **DONE (v0.17.3)** — `SchemaValidator.validatePatchOperationValue()` now enforces readOnly on PATCH ops (add/replace/remove). `resolveRootAttribute()` checks parent readOnly for value-filter paths. No-path ops check each key + extension attributes. `groups` attribute added to `USER_SCHEMA_ATTRIBUTES` (RFC 7643 §4.1). Gated behind `StrictSchemaValidation`. 25 unit + 7 E2E tests. See `docs/G8C_PATCH_READONLY_PREVALIDATION.md`. | PatchEngine consults `SchemaDefinition` before applying ops; rejects readOnly, guards immutable | 8.1 |
-| G8d | ~~**`immutable` not enforced on PUT**~~ — existing immutable values can be overwritten | ~~HIGH~~ | ✅ **DONE (v0.17.0)** — `SchemaValidator.checkImmutable()` + service integration in PUT/PATCH for Users & Groups | SchemaValidator compares new vs existing for immutable attrs on replace; 400 mutability | 8.1 |
-| G8e | ~~**Response `returned` not enforced** — never/request/writeOnly attrs leak in responses~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.4)** — Two-layer filtering: service strips `returned:'never'` (e.g. `password`) in `toScim*Resource()`; controller strips `returned:'request'` via enhanced `applyAttributeProjection()`. `password` added to User schema constants (`returned:'never'`, `mutability:'writeOnly'`). `SchemaValidator.collectReturnedCharacteristics()` drives both layers. `stripReturnedNever()` export for write ops. 26 new unit + 8 E2E tests. | Schema-driven response filter strips `returned:never`/`writeOnly`; `request` gated | 8.3 |
-| G8f | ~~**`caseExact` ignored in filter evaluation** — all string comparisons case-insensitive~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.2)** — `externalId` column changed from CITEXT→TEXT, filter engine `'text'` type omits `mode: 'insensitive'`. Migration: `20260225181836_externalid_citext_to_text`. See `docs/EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md` | Filter evaluator consults `caseExact` per-attribute from schema definitions | 8.4 |
-| G8g | ~~**Input hardening: validation disabled by default + DTO gaps**~~ | ~~HIGH~~ | ✅ **DONE (v0.17.1-fix1)** — DTO hardening: `SearchRequestDto` (`@Max(10000)` count, `@MaxLength(10000)` filter, `@IsIn` sortOrder, `@Min(1)` startIndex), `PatchUserDto`/`PatchGroupDto` (`@ArrayMaxSize(1000)`), `CreateUserDto` (`@IsNotEmpty` userName), `@IsIn` on PatchOp. SchemaValidator: `maxPayloadSize` (1MB), `maxStringLength` (65535), `maxArrayElements` (1000), `canonicalValues`. `__proto__`/`constructor`/`prototype` blocked. 5MB JSON body limit in `main.ts`. **Note:** `StrictSchemaValidation` still defaults to `false` (by design for Entra compatibility). | Always-on basic type validation (split from strict mode), DTO guards (`@IsIn`, `@ArrayMaxSize`, `@IsNotEmpty`), prototype key stripping | 8.5 |
-| G8h | ~~**Required sub-attributes + canonicalValues not enforced**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.1-fix1)** — `validateSubAttributes()` enforces required sub-attrs (V9) on create/replace. `canonicalValues` enforced with case-insensitive matching. Both gated behind `StrictSchemaValidation`. | Add required sub-attr check in `validateSubAttributes()`; optional `canonicalValues` enforcement | 8.6 |
-| G8i | ~~**Filter/PATCH hardening: no depth/length limits, valuePath regex gaps**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.1-fix1)** — Filter parser: `MAX_FILTER_DEPTH=50` with `guardDepth()`. PatchEngine: `__proto__`/`constructor`/`prototype` in `RESERVED_ATTRIBUTES`, `meta`/`schemas` stripped. SearchRequestDto: `@MaxLength(10000)` on filter. Patch ops: `@ArrayMaxSize(1000)`. Schema URN format validation + duplicate rejection. | Max filter depth/length, semantic attr validation; PATCH path sanitization; strip `meta`/`schemas` from reserved attrs | 8.7 |
-| G9 | ~~**No /Bulk endpoint**~~ | ~~LOW~~ | ✅ **DONE (v0.19.0)** — `BulkController` + `BulkProcessorService` (395 lines) with sequential processing, `bulkId` cross-referencing, `failOnErrors` threshold, per-operation error isolation. `BulkOperationsEnabled` per-endpoint flag (default: false). SPC: `bulk.supported=true, maxOperations=1000, maxPayloadSize=1048576`. 43 unit + 24 E2E + 18 live tests. See `docs/PHASE_09_BULK_OPERATIONS.md`. | `BulkController` + `BulkProcessor` with bulkId resolution | 9 |
-| G10 | ~~**No /Me endpoint**~~ | ~~LOW~~ | ✅ **DONE (v0.20.0)** — `ScimMeController` resolves JWT `sub` → `userName` lookup → delegates to Users service. Supports GET/PUT/PATCH/DELETE with attribute projection. 36 tests (11 unit + 10 E2E + 15 live). See `docs/PHASE_10_ME_ENDPOINT.md`. | `MeController` mapping authenticated user to resource | 10 |
-| G11 | ~~**Global shared-secret auth**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.21.0)** — `EndpointCredential` model with bcrypt-hashed tokens. `PerEndpointCredentialsEnabled` per-endpoint flag (default: false). `AdminCredentialController` (POST/GET/DELETE). `SharedSecretGuard` extended with 3-tier fallback: per-endpoint bcrypt → OAuth JWT → global SCIM_SHARED_SECRET. 33 unit + 16 E2E + 22 live tests. See `docs/G11_PER_ENDPOINT_CREDENTIALS.md`. | Per-endpoint credentials in `endpoint_credential` table | 11 |
-| G12 | ~~**No sortBy/sortOrder support**~~ | ~~LOW~~ | ✅ **DONE (v0.20.0)** — `scim-sort.util.ts` maps SCIM attributes to DB columns. Controllers accept `sortBy`/`sortOrder` on GET and POST `/.search`. SPC: `sort.supported: true`. 45 tests (20 unit + 14 E2E + 11 live). See `docs/PHASE_12_SORTING_AND_DEDUP.md`. | Sort push-down to DB; in-memory fallback for JSONB paths | 12 |
-| G13 | ~~**ETag uses timestamp** (collision-prone)~~ | ~~MEDIUM~~ | ✅ **DONE (v0.16.0)** — Monotonic `version INT` column with `W/"v{N}"` format. Atomic `version: { increment: 1 }` in Prisma, `(existing.version ?? 1) + 1` in InMemory. | Monotonic `version INT` column | 7 |
-| G14 | ~~**`rawPayload` stored as String** (not JSONB)~~ | ~~MEDIUM~~ | ✅ **DONE (v0.10.0)** — `payload Json @db.JsonB` in unified `ScimResource` model. Direct JSONB storage, no string serialization. | `payload JSONB` column with GIN index | 2,3 |
-| G15 | ~~**`userNameLower` / `displayNameLower`** helper columns~~ | ~~LOW~~ | ✅ **DONE (v0.10.0)** — Removed. `userName` and `displayName` use `@db.Citext` for transparent case-insensitive operations. | Remove; use PostgreSQL CITEXT for transparent case-insensitivity | 3 |
-| G16 | ~~**Extension URN hardcoded** to Enterprise User only~~ | ~~MEDIUM~~ | ✅ **DONE (v0.14.0)** — `KNOWN_EXTENSION_URNS` centralized and includes 4 msfttest schemas. `ScimSchemaRegistry` dynamically loads per-endpoint custom extension URNs from `EndpointSchema` table. | Dynamic from `endpoint_schema` rows | 6 |
-| G17 | ~~**Code duplication** between User/Group services~~ | ~~MEDIUM~~ | ✅ **DONE (v0.20.0)** — `scim-service-helpers.ts` extracts 13+ duplicate methods into pure functions + `ScimSchemaHelpers` class. Users: −29% (904→640 lines), Groups: −28% (1005→726 lines). 43 unit tests. See `docs/PHASE_12_SORTING_AND_DEDUP.md`. | Single `ResourceOrchestrator` parameterized by resource type | 2,5 |
-| G18 | ~~**No POST /.search** endpoint~~ | ~~LOW~~ | ✅ **DONE (v0.10.0)** — `POST /Users/.search` and `POST /Groups/.search` endpoints in both endpoint-scoped and global controllers. | Add alongside existing GET list | 12 |
-| G19 | ~~**Response `schemas[]` never includes extension URNs**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.14.0)** — `toScimUserResource()` dynamically builds `schemas[]` from `{resource payload keys} ∩ {endpoint extension URNs}`. Enterprise User extension + custom extensions included when present in payload. | `schemas[]` dynamically built from `{resource payload keys} ∩ {endpoint_schema URNs}` | 6 |
-| G20 | ~~**7 of 12 config flags are dead code (58%)**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.14.0)** — Dead flags removed. 10 live boolean flags + `logLevel` documented in `docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md`. All flags validated via `validateEndpointConfig()`. | Remove dead flags or wire them to behavior; document live-flag contract in endpoint config | 6 |
+| G1 | ~~**No Repository Pattern** - services call `PrismaService` directly~~ | ~~HIGH~~ | ✅ **DONE (v0.10.0)** - `IUserRepository`/`IGroupRepository` interfaces + Prisma/InMemory implementations. `PERSISTENCE_BACKEND` env toggle. Services use `@Inject(TOKEN)` pattern with zero Prisma imports. | Repository interfaces in Domain layer; Prisma implementations in Infrastructure | 1 |
+| G2 | ~~**Separate User/Group tables** (ScimUser, ScimGroup)~~ | ~~MEDIUM~~ | ✅ **DONE (v0.10.0)** - Unified `ScimResource` polymorphic table with `resourceType` discriminator column. All services (`EndpointScimUsersService`, `EndpointScimGroupsService`, `BulkProcessorService`) use `prisma.scimResource`. No separate User/Group tables exist. | Unified `scim_resource` table with `resource_type` discriminator | 2 |
+| G3 | ~~**SQLite** - no CITEXT, no JSONB, no GIN, single-writer lock~~ | ~~HIGH~~ | ✅ **DONE (v0.10.0)** - PostgreSQL 17 with CITEXT, JSONB, GIN, `pg_trgm`. Prisma 7 driver adapter (`@prisma/adapter-pg`). 5 migrations applied. | PostgreSQL with CITEXT, JSONB, GIN, `pg_trgm` | 3 |
+| G4 | ~~**Filter push-down only for `eq`** on 3 columns~~ | ~~HIGH~~ | ✅ **DONE (v0.12.0)** - All 10 operators (eq/ne/co/sw/ew/gt/ge/lt/le/pr) on 5 columns (userName, displayName, externalId, scimId, active). Column type annotations. AND/OR recursive push-down. | Full operator support via PostgreSQL ILIKE, JSONB operators, `pg_trgm` | 4 |
+| G5 | ~~**PATCH engine embedded in service** (~200 lines inline)~~ | ~~HIGH~~ | ✅ **DONE (v0.13.0)** - `UserPatchEngine` (437 lines) and `GroupPatchEngine` (352 lines) extracted to `domain/patch/`. Pure domain, zero NestJS/Prisma deps. Prototype pollution guards, reserved attribute stripping. | Standalone `PatchEngine` in Domain layer, schema-aware, zero DB imports | 5 |
+| G6 | ~~**Discovery endpoints hardcoded**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.14.0)** - `ScimDiscoveryService` (103 lines) with `ScimSchemaRegistry`. `EndpointSchema` DB model + Admin API for custom schemas per endpoint. 7 built-in schemas (was 3), dynamic per-endpoint discovery. | `endpoint_schema` + `endpoint_resource_type` tables, `DiscoveryService` | 6 |
+| G7 | ~~**ETag If-Match NOT enforced** before writes~~ | ~~HIGH~~ | ✅ **DONE (v0.16.0)** - Version-based ETags (`W/"v{N}"`), pre-write `enforceIfMatch()` (412 on mismatch), `RequireIfMatch` config flag (428 on missing), atomic `version` increment. | Pre-write check in Orchestrator; monotonic integer version | 7 |
+| G8 | ~~**No schema validation** against endpoint schema definitions~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.0)** - `SchemaValidator` domain class validates type/required/mutability/multiValued/unknown-attrs/sub-attrs | `SchemaValidator` validates payload against `endpoint_schema.attributes` | 8 |
+| G8b | ~~**No custom resource type registration** - only hardcoded User/Group~~ | ~~MEDIUM~~ | ✅ **DONE (v0.18.0)** - `EndpointResourceType` table + Admin API (POST/GET/GET/:name/DELETE/:name) + generic wildcard controller + `GenericPatchEngine` for JSONB PATCH + `CustomResourceTypesEnabled` config flag. `ScimSchemaRegistry` enhanced with per-endpoint overlay. Reserved name/path protection. 121 unit + 29 E2E + 20 live tests. See `docs/G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md`. | `EndpointResourceType` table + Admin API + generic wildcard controller + `customResourceTypesEnabled` config flag | 8.2 |
+| G8c | ~~**PatchEngine mutability checks** - readOnly/immutable attrs can be modified via PATCH~~ | ~~HIGH~~ | ✅ **DONE (v0.17.3)** - `SchemaValidator.validatePatchOperationValue()` now enforces readOnly on PATCH ops (add/replace/remove). `resolveRootAttribute()` checks parent readOnly for value-filter paths. No-path ops check each key + extension attributes. `groups` attribute added to `USER_SCHEMA_ATTRIBUTES` (RFC 7643 §4.1). Gated behind `StrictSchemaValidation`. 25 unit + 7 E2E tests. See `docs/G8C_PATCH_READONLY_PREVALIDATION.md`. | PatchEngine consults `SchemaDefinition` before applying ops; rejects readOnly, guards immutable | 8.1 |
+| G8d | ~~**`immutable` not enforced on PUT**~~ - existing immutable values can be overwritten | ~~HIGH~~ | ✅ **DONE (v0.17.0)** - `SchemaValidator.checkImmutable()` + service integration in PUT/PATCH for Users & Groups | SchemaValidator compares new vs existing for immutable attrs on replace; 400 mutability | 8.1 |
+| G8e | ~~**Response `returned` not enforced** - never/request/writeOnly attrs leak in responses~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.4)** - Two-layer filtering: service strips `returned:'never'` (e.g. `password`) in `toScim*Resource()`; controller strips `returned:'request'` via enhanced `applyAttributeProjection()`. `password` added to User schema constants (`returned:'never'`, `mutability:'writeOnly'`). `SchemaValidator.collectReturnedCharacteristics()` drives both layers. `stripReturnedNever()` export for write ops. 26 new unit + 8 E2E tests. | Schema-driven response filter strips `returned:never`/`writeOnly`; `request` gated | 8.3 |
+| G8f | ~~**`caseExact` ignored in filter evaluation** - all string comparisons case-insensitive~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.2)** - `externalId` column changed from CITEXT→TEXT, filter engine `'text'` type omits `mode: 'insensitive'`. Migration: `20260225181836_externalid_citext_to_text`. See `docs/EXTERNALID_CITEXT_TO_TEXT_RFC_COMPLIANCE.md` | Filter evaluator consults `caseExact` per-attribute from schema definitions | 8.4 |
+| G8g | ~~**Input hardening: validation disabled by default + DTO gaps**~~ | ~~HIGH~~ | ✅ **DONE (v0.17.1-fix1)** - DTO hardening: `SearchRequestDto` (`@Max(10000)` count, `@MaxLength(10000)` filter, `@IsIn` sortOrder, `@Min(1)` startIndex), `PatchUserDto`/`PatchGroupDto` (`@ArrayMaxSize(1000)`), `CreateUserDto` (`@IsNotEmpty` userName), `@IsIn` on PatchOp. SchemaValidator: `maxPayloadSize` (1MB), `maxStringLength` (65535), `maxArrayElements` (1000), `canonicalValues`. `__proto__`/`constructor`/`prototype` blocked. 5MB JSON body limit in `main.ts`. **Note:** `StrictSchemaValidation` still defaults to `false` (by design for Entra compatibility). | Always-on basic type validation (split from strict mode), DTO guards (`@IsIn`, `@ArrayMaxSize`, `@IsNotEmpty`), prototype key stripping | 8.5 |
+| G8h | ~~**Required sub-attributes + canonicalValues not enforced**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.1-fix1)** - `validateSubAttributes()` enforces required sub-attrs (V9) on create/replace. `canonicalValues` enforced with case-insensitive matching. Both gated behind `StrictSchemaValidation`. | Add required sub-attr check in `validateSubAttributes()`; optional `canonicalValues` enforcement | 8.6 |
+| G8i | ~~**Filter/PATCH hardening: no depth/length limits, valuePath regex gaps**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.17.1-fix1)** - Filter parser: `MAX_FILTER_DEPTH=50` with `guardDepth()`. PatchEngine: `__proto__`/`constructor`/`prototype` in `RESERVED_ATTRIBUTES`, `meta`/`schemas` stripped. SearchRequestDto: `@MaxLength(10000)` on filter. Patch ops: `@ArrayMaxSize(1000)`. Schema URN format validation + duplicate rejection. | Max filter depth/length, semantic attr validation; PATCH path sanitization; strip `meta`/`schemas` from reserved attrs | 8.7 |
+| G9 | ~~**No /Bulk endpoint**~~ | ~~LOW~~ | ✅ **DONE (v0.19.0)** - `BulkController` + `BulkProcessorService` (395 lines) with sequential processing, `bulkId` cross-referencing, `failOnErrors` threshold, per-operation error isolation. `BulkOperationsEnabled` per-endpoint flag (default: false). SPC: `bulk.supported=true, maxOperations=1000, maxPayloadSize=1048576`. 43 unit + 24 E2E + 18 live tests. See `docs/PHASE_09_BULK_OPERATIONS.md`. | `BulkController` + `BulkProcessor` with bulkId resolution | 9 |
+| G10 | ~~**No /Me endpoint**~~ | ~~LOW~~ | ✅ **DONE (v0.20.0)** - `ScimMeController` resolves JWT `sub` → `userName` lookup → delegates to Users service. Supports GET/PUT/PATCH/DELETE with attribute projection. 36 tests (11 unit + 10 E2E + 15 live). See `docs/PHASE_10_ME_ENDPOINT.md`. | `MeController` mapping authenticated user to resource | 10 |
+| G11 | ~~**Global shared-secret auth**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.21.0)** - `EndpointCredential` model with bcrypt-hashed tokens. `PerEndpointCredentialsEnabled` per-endpoint flag (default: false). `AdminCredentialController` (POST/GET/DELETE). `SharedSecretGuard` extended with 3-tier fallback: per-endpoint bcrypt → OAuth JWT → global SCIM_SHARED_SECRET. 33 unit + 16 E2E + 22 live tests. See `docs/G11_PER_ENDPOINT_CREDENTIALS.md`. | Per-endpoint credentials in `endpoint_credential` table | 11 |
+| G12 | ~~**No sortBy/sortOrder support**~~ | ~~LOW~~ | ✅ **DONE (v0.20.0)** - `scim-sort.util.ts` maps SCIM attributes to DB columns. Controllers accept `sortBy`/`sortOrder` on GET and POST `/.search`. SPC: `sort.supported: true`. 45 tests (20 unit + 14 E2E + 11 live). See `docs/PHASE_12_SORTING_AND_DEDUP.md`. | Sort push-down to DB; in-memory fallback for JSONB paths | 12 |
+| G13 | ~~**ETag uses timestamp** (collision-prone)~~ | ~~MEDIUM~~ | ✅ **DONE (v0.16.0)** - Monotonic `version INT` column with `W/"v{N}"` format. Atomic `version: { increment: 1 }` in Prisma, `(existing.version ?? 1) + 1` in InMemory. | Monotonic `version INT` column | 7 |
+| G14 | ~~**`rawPayload` stored as String** (not JSONB)~~ | ~~MEDIUM~~ | ✅ **DONE (v0.10.0)** - `payload Json @db.JsonB` in unified `ScimResource` model. Direct JSONB storage, no string serialization. | `payload JSONB` column with GIN index | 2,3 |
+| G15 | ~~**`userNameLower` / `displayNameLower`** helper columns~~ | ~~LOW~~ | ✅ **DONE (v0.10.0)** - Removed. `userName` and `displayName` use `@db.Citext` for transparent case-insensitive operations. | Remove; use PostgreSQL CITEXT for transparent case-insensitivity | 3 |
+| G16 | ~~**Extension URN hardcoded** to Enterprise User only~~ | ~~MEDIUM~~ | ✅ **DONE (v0.14.0)** - `KNOWN_EXTENSION_URNS` centralized and includes 4 msfttest schemas. `ScimSchemaRegistry` dynamically loads per-endpoint custom extension URNs from `EndpointSchema` table. | Dynamic from `endpoint_schema` rows | 6 |
+| G17 | ~~**Code duplication** between User/Group services~~ | ~~MEDIUM~~ | ✅ **DONE (v0.20.0)** - `scim-service-helpers.ts` extracts 13+ duplicate methods into pure functions + `ScimSchemaHelpers` class. Users: −29% (904→640 lines), Groups: −28% (1005→726 lines). 43 unit tests. See `docs/PHASE_12_SORTING_AND_DEDUP.md`. | Single `ResourceOrchestrator` parameterized by resource type | 2,5 |
+| G18 | ~~**No POST /.search** endpoint~~ | ~~LOW~~ | ✅ **DONE (v0.10.0)** - `POST /Users/.search` and `POST /Groups/.search` endpoints in both endpoint-scoped and global controllers. | Add alongside existing GET list | 12 |
+| G19 | ~~**Response `schemas[]` never includes extension URNs**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.14.0)** - `toScimUserResource()` dynamically builds `schemas[]` from `{resource payload keys} ∩ {endpoint extension URNs}`. Enterprise User extension + custom extensions included when present in payload. | `schemas[]` dynamically built from `{resource payload keys} ∩ {endpoint_schema URNs}` | 6 |
+| G20 | ~~**7 of 12 config flags are dead code (58%)**~~ | ~~MEDIUM~~ | ✅ **DONE (v0.14.0)** - Dead flags removed. 10 live boolean flags + `logLevel` documented in `docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md`. All flags validated via `validateEndpointConfig()`. | Remove dead flags or wire them to behavior; document live-flag contract in endpoint config | 6 |
 
 ### Gap Heat Map (Severity × Impact on RFC Compliance)
 
@@ -78,7 +78,7 @@ The table below maps every gap between the current codebase and the ideal archit
   Correctness ──────│ MEDIUM       │ ✅G2 ✅G6 ✅G8 ✅G8b ✅G8e ✅G8f ✅G8h ✅G8i ✅G11 │
                     │              │ ✅G13 ✅G14 ✅G16 ✅G19 ✅G20                    │
                     ├──────────────┼────────────────────────────────────────────────────┤
-                    │ LOW (demoted)│ ✅G8c (DONE v0.17.3 — readOnly pre-validated      │
+                    │ LOW (demoted)│ ✅G8c (DONE v0.17.3 - readOnly pre-validated      │
                     │              │  in PATCH via SchemaValidator)                     │
                     ├──────────────┼────────────────────────────────────────────────────┤
   Completeness ─────│ LOW          │ ✅G9 ✅G10 ✅G12 ✅G15 ✅G17 ✅G18              │
@@ -86,7 +86,7 @@ The table below maps every gap between the current codebase and the ideal archit
                     └──────────────┴────────────────────────────────────────────────────┘
 
   ✅ = Resolved in v0.10.0–v0.21.0 (27 of 27 gaps fully resolved)
-  🎉 ALL GAPS RESOLVED — No open gaps remaining
+  🎉 ALL GAPS RESOLVED - No open gaps remaining
 ```
 
 ### Gap Resolution Flow
@@ -148,7 +148,7 @@ flowchart LR
 ## 2. Phase Overview Map
 
 ```
-Phase 1  Repository Pattern         ████████ (foundational — all later phases depend) ✅ DONE v0.10.0
+Phase 1  Repository Pattern         ████████ (foundational - all later phases depend) ✅ DONE v0.10.0
 Phase 2  Unified Resource Table     ██████   (data model alignment)                   ✅ DONE v0.10.0
 Phase 3  PostgreSQL Migration       ██████   (infrastructure swap)                     ✅ DONE v0.10.0
 Phase 4  Filter Push-Down           ████     (perf + compliance)                       ✅ DONE v0.12.0
@@ -268,7 +268,7 @@ flowchart TB
 
 ---
 
-## 3. Phase 1 — Repository Pattern
+## 3. Phase 1 - Repository Pattern
 
 ### Why First?
 
@@ -279,7 +279,7 @@ Every phase after this one benefits from the persistence abstraction. Without it
 Services import and call `PrismaService` directly:
 
 ```typescript
-// endpoint-scim-users.service.ts (current — lines 4-5, 54-55)
+// endpoint-scim-users.service.ts (current - lines 4-5, 54-55)
 import { PrismaService } from '../../prisma/prisma.service';
 
 constructor(private readonly prisma: PrismaService, ...) {}
@@ -294,7 +294,7 @@ await this.prisma.scimUser.delete({ where: { id: user.id } });
 
 **Problem**: Services contain both SCIM business logic AND Prisma query construction. Testing SCIM logic requires a running database or extensive mocking of Prisma internals.
 
-### Phase 1 — Refactoring Flow
+### Phase 1 - Refactoring Flow
 
 ```mermaid
 flowchart LR
@@ -522,7 +522,7 @@ npm test -- --testPathPattern=domain
 
 ---
 
-## 4. Phase 2 — Unified `scim_resource` Table
+## 4. Phase 2 - Unified `scim_resource` Table
 
 ### Why?
 
@@ -586,7 +586,7 @@ Endpoint ──────>│ scim_id          │
 #### Step 2.1: Add New Prisma Model (Additive)
 
 ```prisma
-// schema.prisma — ADD alongside existing models (do NOT remove ScimUser/ScimGroup yet)
+// schema.prisma - ADD alongside existing models (do NOT remove ScimUser/ScimGroup yet)
 model ScimResource {
   id           String   @id @default(cuid())
   endpointId   String
@@ -721,7 +721,7 @@ export class ResourceOrchestrator {
   ) {}
 
   async create(endpointId: string, resourceType: string, dto: any, baseUrl: string) {
-    // Generic create — works for User, Group, or any future type
+    // Generic create - works for User, Group, or any future type
   }
 
   async get(endpointId: string, scimId: string, baseUrl: string) {
@@ -749,12 +749,12 @@ After data migration is verified and all tests pass against the new unified tabl
 |-----------|--------|-------|--------|
 | `endpoint-scim-users.service.ts` | 657 | 0 (deleted) | -657 |
 | `endpoint-scim-groups.service.ts` | 765 | 0 (deleted) | -765 |
-| `resource.orchestrator.ts` | — | ~500 | +500 |
+| `resource.orchestrator.ts` | - | ~500 | +500 |
 | `prisma-resource.repository.ts` | ~150 | ~300 | +150 |
 | `apply-scim-filter.ts` | 170 | ~120 | -50 |
 | **Net** | **~1742** | **~920** | **-822** |
 
-### Phase 2 — Data Migration Flow
+### Phase 2 - Data Migration Flow
 
 ```mermaid
 sequenceDiagram
@@ -784,7 +784,7 @@ sequenceDiagram
 
 ---
 
-## 5. Phase 3 — PostgreSQL Migration
+## 5. Phase 3 - PostgreSQL Migration
 
 ### Why?
 
@@ -793,7 +793,7 @@ SQLite was a pragmatic starting choice, but creates 28 documented compromises (s
 | SQLite Limitation | Impact | PostgreSQL Solution |
 |------------------|--------|-------------------|
 | No CITEXT | `userNameLower` / `displayNameLower` helper columns | CITEXT type; remove helper columns |
-| No JSONB | `rawPayload String` — all queries require `JSON.parse()` | `payload JSONB` with GIN indexing |
+| No JSONB | `rawPayload String` - all queries require `JSON.parse()` | `payload JSONB` with GIN indexing |
 | No ILIKE | `co`/`sw`/`ew` filters can't push to DB | ILIKE + `pg_trgm` extension |
 | Single-writer lock | Concurrent PATCH operations block | Row-level locking; full concurrency |
 | No partial unique index | `externalId` NULL uniqueness issues | `WHERE externalId IS NOT NULL` partial index |
@@ -829,7 +829,7 @@ model ScimResource {
 
   // ... relations unchanged
   
-  // Remove userNameLower, displayNameLower — no longer needed
+  // Remove userNameLower, displayNameLower - no longer needed
   @@unique([endpointId, scimId])
   @@unique([endpointId, userName])      // CITEXT handles case-insensitivity
   @@index([endpointId, resourceType])
@@ -936,7 +936,7 @@ CREATE INDEX idx_resource_displayname_trgm
 └──────────────────────┘
 ```
 
-### Phase 3 — Database Transition Sequence
+### Phase 3 - Database Transition Sequence
 
 ```mermaid
 sequenceDiagram
@@ -948,7 +948,7 @@ sequenceDiagram
     participant TESTS as Test Suite
 
     rect rgb(255, 240, 240)
-        Note over DEV,PG: Step 1 — Dual Database Setup
+        Note over DEV,PG: Step 1 - Dual Database Setup
         DEV->>PG: docker run postgres:17-alpine
         DEV->>SCHEMA: provider = "postgresql"
         DEV->>PG: CREATE EXTENSION citext, pgcrypto, pg_trgm
@@ -956,14 +956,14 @@ sequenceDiagram
     end
 
     rect rgb(255, 255, 230)
-        Note over DEV,PG: Step 2 — Data Migration
+        Note over DEV,PG: Step 2 - Data Migration
         DEV->>SQLITE: Read all ScimUser + ScimGroup rows
         DEV->>PG: Write to scim_resource (unified table)
         DEV->>DEV: Compare row counts (assert match)
     end
 
     rect rgb(230, 255, 230)
-        Note over DEV,TESTS: Step 3 — Validation
+        Note over DEV,TESTS: Step 3 - Validation
         DEV->>APP: Switch DATABASE_URL to postgresql://...
         APP->>PG: All operations now use PostgreSQL
         DEV->>TESTS: npm run test:ci
@@ -973,14 +973,14 @@ sequenceDiagram
     end
 
     rect rgb(230, 230, 255)
-        Note over DEV,SQLITE: Step 4 — Cleanup
+        Note over DEV,SQLITE: Step 4 - Cleanup
         DEV->>SCHEMA: Remove better-sqlite3 dependency
         DEV->>SCHEMA: Remove @prisma/adapter-better-sqlite3
         DEV->>SQLITE: Archive .db file (keep 1 sprint)
     end
 ```
 
-### Phase 3 — PostgreSQL Schema Visualization
+### Phase 3 - PostgreSQL Schema Visualization
 
 ```mermaid
 erDiagram
@@ -1045,7 +1045,7 @@ erDiagram
 
 ---
 
-## 6. Phase 4 — Filter Push-Down Expansion
+## 6. Phase 4 - Filter Push-Down Expansion
 
 ### Why?
 
@@ -1078,7 +1078,7 @@ After PostgreSQL migration, we can push ALL operators to the database.
 ```typescript
 // BEFORE:
 const RESOURCE_DB_COLUMNS: Record<string, string> = {
-  username: 'userName',   // Now CITEXT — no need for userNameLower
+  username: 'userName',   // Now CITEXT - no need for userNameLower
   externalid: 'externalId',
   id: 'scimId',
 };
@@ -1104,11 +1104,11 @@ function pushCompareToDb(
   const mapped = columnMap[attrLower];
 
   if (mapped) {
-    // Indexed column — push to SQL
+    // Indexed column - push to SQL
     return buildColumnFilter(mapped.column, mapped.type, node.op, node.value);
   }
 
-  // JSONB path — push via JSONB operators (PostgreSQL only)
+  // JSONB path - push via JSONB operators (PostgreSQL only)
   return buildJsonbFilter(node.attrPath, node.op, node.value);
 }
 
@@ -1165,7 +1165,7 @@ function pushLogicalToDb(
 | `active eq true` on 10K users | ~30ms (scan all) | ~1ms (B-tree) |
 | `userName eq "j" AND active eq true` | ~40ms (scan all) | ~1ms (compound index) |
 
-### Phase 4 — Filter Processing Pipeline
+### Phase 4 - Filter Processing Pipeline
 
 ```mermaid
 flowchart TD
@@ -1200,7 +1200,7 @@ flowchart TD
 
 ---
 
-## 7. Phase 5 — Domain-Layer PATCH Engine
+## 7. Phase 5 - Domain-Layer PATCH Engine
 
 ### Why?
 
@@ -1210,7 +1210,7 @@ The PATCH implementation is the most complex part of the SCIM server. Currently 
 - Mixed with Prisma types, endpoint config access, and uniqueness checks
 - Difficult to unit test without database mocking
 
-RFC 7644 §3.5.2 defines precise semantics for `add`, `replace`, `remove` — these are pure data transformations that should be testable without a database.
+RFC 7644 §3.5.2 defines precise semantics for `add`, `replace`, `remove` - these are pure data transformations that should be testable without a database.
 
 ### Current PATCH Flow
 
@@ -1248,7 +1248,7 @@ ResourceOrchestrator.patch()
   └─ 6. resourceRepo.update(id, result)        ← Infrastructure
 ```
 
-### Phase 5 — PATCH Operation Sequence Diagram
+### Phase 5 - PATCH Operation Sequence Diagram
 
 ```mermaid
 sequenceDiagram
@@ -1265,7 +1265,7 @@ sequenceDiagram
     CTRL->>ORCH: patch(endpointId, "abc123", ops, "W/\"v5\"")
 
     rect rgb(230, 245, 255)
-        Note over ORCH,DB: Infrastructure — Read
+        Note over ORCH,DB: Infrastructure - Read
         ORCH->>REPO: findById(endpointId, "abc123")
         REPO->>DB: SELECT * FROM scim_resource WHERE scim_id = 'abc123'
         DB-->>REPO: {payload, version: 5, ...}
@@ -1273,7 +1273,7 @@ sequenceDiagram
     end
 
     rect rgb(255, 245, 230)
-        Note over ORCH,VALID: Domain — Pure Logic (no DB)
+        Note over ORCH,VALID: Domain - Pure Logic (no DB)
         ORCH->>ETAG: assertIfMatch("W/\"v5\"", version=5)
         ETAG-->>ORCH: ✅ Match
 
@@ -1288,7 +1288,7 @@ sequenceDiagram
     end
 
     rect rgb(230, 255, 230)
-        Note over ORCH,DB: Infrastructure — Write
+        Note over ORCH,DB: Infrastructure - Write
         ORCH->>REPO: assertUnique(endpointId, extractedFields)
         REPO->>DB: SELECT ... WHERE userName = ...
         DB-->>REPO: No conflict
@@ -1481,7 +1481,7 @@ Extract the following code blocks into the new `PatchEngine` class:
 | `endpoint-scim-groups.service.ts` ~L380-550 | ~170 | `handleAdd/Replace/Remove` for groups | `PatchEngine.processMemberOp()` |
 | `scim-patch-path.ts` | 418 | All path parsing/application utilities | `domain/patch/patch-path.ts` |
 
-### Phase 5 — Code Extraction Map
+### Phase 5 - Code Extraction Map
 
 ```mermaid
 flowchart LR
@@ -1508,7 +1508,7 @@ flowchart LR
 
 ---
 
-## 8. Phase 6 — Data-Driven Discovery
+## 8. Phase 6 - Data-Driven Discovery
 
 ### Why?
 
@@ -1536,9 +1536,9 @@ This means:
 
 ### Current Config Flag Audit
 
-> _Sourced from deep analysis audit — see `SCIM_EXTENSIONS_DEEP_ANALYSIS.md` §2C for line-level references._
+> _Sourced from deep analysis audit - see `SCIM_EXTENSIONS_DEEP_ANALYSIS.md` §2C for line-level references._
 
-Of the 12 config flags defined in the endpoint config model, **only 5 are live** (actually consumed at runtime). The remaining 7 are **dead code** — defined and defaulted but never read:
+Of the 12 config flags defined in the endpoint config model, **only 5 are live** (actually consumed at runtime). The remaining 7 are **dead code** - defined and defaulted but never read:
 
 | Flag | Status | Where Consumed (if live) |
 |------|--------|-------------------------|
@@ -1547,19 +1547,19 @@ Of the 12 config flags defined in the endpoint config model, **only 5 are live**
 | `PatchOpAllowRemoveAllMembers` | LIVE | `groups.service.ts` L192 |
 | `VerbosePatchSupported` | LIVE | `users.service.ts` L323 |
 | `logLevel` | LIVE | `endpoint.service.ts` L48 |
-| `excludeMeta` | DEAD | Defined L45, defaulted false L200 — never consumed |
-| `excludeSchemas` | DEAD | Defined L46, defaulted false L201 — never consumed |
-| `customSchemaUrn` | DEAD | Defined L48, defaulted null L203 — never consumed |
-| `includeEnterpriseSchema` | DEAD | Defined L47, defaulted false L204 — never consumed (**also G19**) |
-| `strictMode` | DEAD | Defined L49, defaulted false L205 — never consumed |
-| `legacyMode` | DEAD | Defined L50, defaulted false L206 — never consumed |
-| `customHeaders` | DEAD | Defined L51, defaulted null L207 — never consumed |
+| `excludeMeta` | DEAD | Defined L45, defaulted false L200 - never consumed |
+| `excludeSchemas` | DEAD | Defined L46, defaulted false L201 - never consumed |
+| `customSchemaUrn` | DEAD | Defined L48, defaulted null L203 - never consumed |
+| `includeEnterpriseSchema` | DEAD | Defined L47, defaulted false L204 - never consumed (**also G19**) |
+| `strictMode` | DEAD | Defined L49, defaulted false L205 - never consumed |
+| `legacyMode` | DEAD | Defined L50, defaulted false L206 - never consumed |
+| `customHeaders` | DEAD | Defined L51, defaulted null L207 - never consumed |
 
 **Impact:** Phase 6 must decide per flag: wire to behavior, or remove. The dead discovery-related flags (`excludeMeta`, `excludeSchemas`, `includeEnterpriseSchema`, `customSchemaUrn`) should be replaced by the data-driven `endpoint_schema` model.
 
 ### ServiceProviderConfig Compliance Gaps
 
-> _Sourced from RFC 7644 §4, Table 1 audit — see `SCIM_EXTENSIONS_DEEP_ANALYSIS.md` §2B for full compliance table._
+> _Sourced from RFC 7644 §4, Table 1 audit - see `SCIM_EXTENSIONS_DEEP_ANALYSIS.md` §2B for full compliance table._
 
 The current `ServiceProviderConfig` response is missing 4 required or best-practice fields:
 
@@ -1570,7 +1570,7 @@ The current `ServiceProviderConfig` response is missing 4 required or best-pract
 | `meta` object | SHOULD (§3.1) | Missing from SPC response | Add `meta: {resourceType: "ServiceProviderConfig", created: ..., location: ...}` |
 | `documentationUri` | OPTIONAL but best practice | Missing | Add `documentationUri` pointing to endpoint docs |
 
-Additionally, the current ServiceProviderConfig response is **identical for all endpoints** — it ignores per-endpoint config. Phase 6 must derive SPC dynamically from `endpoint.config` JSONB so that each endpoint's capabilities are accurately reflected.
+Additionally, the current ServiceProviderConfig response is **identical for all endpoints** - it ignores per-endpoint config. Phase 6 must derive SPC dynamically from `endpoint.config` JSONB so that each endpoint's capabilities are accurately reflected.
 
 ### Target State
 
@@ -1717,7 +1717,7 @@ async getSchemas(@Param('endpointId') endpointId: string) {
 // No more private userSchema() / groupSchema() methods!
 ```
 
-### Phase 6 — Discovery Request Flow
+### Phase 6 - Discovery Request Flow
 
 ```mermaid
 flowchart TD
@@ -1761,12 +1761,12 @@ function getExtensionUrns(endpointSchemas: EndpointSchema[]): string[] {
 
 ---
 
-## 9. Phase 7 — ETag & Conditional Requests
+## 9. Phase 7 - ETag & Conditional Requests
 
 ### Why?
 
 Currently:
-1. **ETag uses timestamp**: `W/"${user.updatedAt.toISOString()}"` — two writes in the same millisecond produce the same ETag (collision).
+1. **ETag uses timestamp**: `W/"${user.updatedAt.toISOString()}"` - two writes in the same millisecond produce the same ETag (collision).
 2. **If-Match is NOT enforced**: `assertIfMatch()` exists in `scim-etag.interceptor.ts` but is **never called** from any service. The interceptor comment says: *"A stricter implementation would check the ETag before applying the write. This interceptor-level check is a best-effort."*
 3. **No precondition required mode**: `strictMode` is a config flag but the ETag interceptor doesn't use it.
 
@@ -1841,7 +1841,7 @@ async patch(endpointId: string, scimId: string, ops: PatchOperation[], ifMatch?:
 #### Step 7.5: Simplify Interceptor
 
 ```typescript
-// scim-etag.interceptor.ts (AFTER — much simpler)
+// scim-etag.interceptor.ts (AFTER - much simpler)
 @Injectable()
 export class ScimEtagInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
@@ -1902,7 +1902,7 @@ AFTER (Phase 7):
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Phase 7 — Concurrent Write Protection Flow
+### Phase 7 - Concurrent Write Protection Flow
 
 ```mermaid
 sequenceDiagram
@@ -1922,7 +1922,7 @@ sequenceDiagram
     DB-->>ORCH: {version: 5, payload: {...}}
     ORCH-->>B: 200 OK, ETag: W/"v5"
 
-    Note over A,DB: Client A writes first — succeeds
+    Note over A,DB: Client A writes first - succeeds
     A->>ORCH: PATCH /Users/abc123<br/>If-Match: W/"v5"
     ORCH->>DB: SELECT version WHERE scim_id = 'abc123'
     DB-->>ORCH: version = 5
@@ -1930,7 +1930,7 @@ sequenceDiagram
     ORCH->>DB: UPDATE ... SET version = 6
     ORCH-->>A: 200 OK, ETag: W/"v6"
 
-    Note over B,DB: Client B writes second — rejected!
+    Note over B,DB: Client B writes second - rejected!
     B->>ORCH: PATCH /Users/abc123<br/>If-Match: W/"v5"
     ORCH->>DB: SELECT version WHERE scim_id = 'abc123'
     DB-->>ORCH: version = 6
@@ -1942,19 +1942,19 @@ sequenceDiagram
 
 ---
 
-## 10. Phase 8 — Schema Validation ✅ COMPLETE (v0.17.0)
+## 10. Phase 8 - Schema Validation ✅ COMPLETE (v0.17.0)
 
-> **Status:** ✅ Complete — implemented 2026-02-24 in v0.17.0  
+> **Status:** ✅ Complete - implemented 2026-02-24 in v0.17.0  
 > **Files:** 6 new + 6 modified | **Tests:** +297 (179 unit + 19 service + 49 E2E + 60 core unit)  
 > **Doc:** [`docs/phases/PHASE_08_SCHEMA_VALIDATION.md`](phases/PHASE_08_SCHEMA_VALIDATION.md) | **Gap Analysis:** [`docs/RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md`](RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md)
 
 ### What Was Delivered
 
-- **`SchemaValidator`** — Pure-domain class (383 lines, zero NestJS/Prisma deps) validates SCIM payloads against registered schema definitions
+- **`SchemaValidator`** - Pure-domain class (383 lines, zero NestJS/Prisma deps) validates SCIM payloads against registered schema definitions
 - **6 validation checks:** required attrs, type checking (all 8 SCIM types), mutability (readOnly rejection), multiValued enforcement, unknown attribute detection (strict mode), sub-attribute recursive validation
-- **Service integration** — `validatePayloadSchema()` added to both User and Group services, gated behind `StrictSchemaValidation` config flag
-- **297 new tests** — 179 comprehensive unit + 60 core unit + 19 service-level + 49 E2E (14 sections)
-- **Key discovery:** NestJS `ValidationPipe` with `enableImplicitConversion: true` coerces DTO properties before the validator runs — documented in E2E §13
+- **Service integration** - `validatePayloadSchema()` added to both User and Group services, gated behind `StrictSchemaValidation` config flag
+- **297 new tests** - 179 comprehensive unit + 60 core unit + 19 service-level + 49 E2E (14 sections)
+- **Key discovery:** NestJS `ValidationPipe` with `enableImplicitConversion: true` coerces DTO properties before the validator runs - documented in E2E §13
 
 ### Remaining Sub-Phases (identified via RFC gap analysis)
 
@@ -1963,13 +1963,13 @@ sequenceDiagram
 | **8.1** | G8c, G8d | PatchEngine mutability checks + immutable on PUT | ~5-8 hrs |
 | **8.2** | G8b | Custom Resource Type Registration (already planned) | ~9 days |
 | **8.3** | G8e | Response `returned` filtering (never/request/writeOnly) | ~6-8 hrs |
-| **8.4** | ✅ G8f | ~~`caseExact` in filter evaluation~~ — **DONE (v0.17.2)** | ✅ Complete |
+| **8.4** | ✅ G8f | ~~`caseExact` in filter evaluation~~ - **DONE (v0.17.2)** | ✅ Complete |
 
 See [`docs/RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md`](RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md) for the complete 15-gap analysis with code examples, diagrams, and remediation plans.
 
 ### Original Design
 
-~~Currently, the server accepts any attributes in a SCIM resource without validation against the endpoint's schema definitions.~~ *(Resolved — SchemaValidator now enforces attribute characteristics when StrictSchemaValidation is enabled.)*
+~~Currently, the server accepts any attributes in a SCIM resource without validation against the endpoint's schema definitions.~~ *(Resolved - SchemaValidator now enforces attribute characteristics when StrictSchemaValidation is enabled.)*
 
 RFC 7643 §2.1 defines attribute characteristics (type, required, mutability, etc.) that SHOULD be enforced on the server side, especially when `strictMode: true`.
 
@@ -2017,7 +2017,7 @@ export class SchemaValidator {
 }
 ```
 
-### Phase 8 — Schema Validation Pipeline
+### Phase 8 - Schema Validation Pipeline
 
 ```mermaid
 flowchart TD
@@ -2047,13 +2047,13 @@ flowchart TD
 
 ---
 
-## 10b. Phase 8 Part 2 — Custom Resource Type Registration
+## 10b. Phase 8 Part 2 - Custom Resource Type Registration
 
 ### Why?
 
-RFC 7643 §6 defines the `ResourceType` metadata object and RFC 7644 §4 mandates that `GET /ResourceTypes` returns all available resource types. The RFCs deliberately allow resource types beyond `User` and `Group` (e.g., `Device`, `Application`, `Organization`), but do not prescribe how a server registers or manages them — that is an implementation concern.
+RFC 7643 §6 defines the `ResourceType` metadata object and RFC 7644 §4 mandates that `GET /ResourceTypes` returns all available resource types. The RFCs deliberately allow resource types beyond `User` and `Group` (e.g., `Device`, `Application`, `Organization`), but do not prescribe how a server registers or manages them - that is an implementation concern.
 
-Currently, the server has only two hardcoded resource types (`User`, `Group`) baked into constants, controllers, services, and repositories. Adding a new resource type requires code changes across ~12 files and a redeployment. This violates the architecture's own design principle P3 ("New resource types require zero code changes — only DB rows").
+Currently, the server has only two hardcoded resource types (`User`, `Group`) baked into constants, controllers, services, and repositories. Adding a new resource type requires code changes across ~12 files and a redeployment. This violates the architecture's own design principle P3 ("New resource types require zero code changes - only DB rows").
 
 Phase 8 Part 2 closes this gap by making resource type registration **data-driven** via the Admin API, per-endpoint, and gated behind a config flag.
 
@@ -2062,7 +2062,7 @@ Phase 8 Part 2 closes this gap by making resource type registration **data-drive
 | Prerequisite | Reason |
 |---|---|
 | **Phase 6** (Data-Driven Discovery) | Provides the per-endpoint overlay architecture in `ScimSchemaRegistry`, the `EndpointSchema` table pattern, and the Admin API for schema extensions |
-| **Phase 8** (Schema Validation) | The `SchemaValidator` must exist before custom types are accepted — without it, arbitrary payloads would be stored with no structural validation |
+| **Phase 8** (Schema Validation) | The `SchemaValidator` must exist before custom types are accepted - without it, arbitrary payloads would be stored with no structural validation |
 
 ### Gap Resolved
 
@@ -2077,12 +2077,12 @@ Phase 8 Part 2 closes this gap by making resource type registration **data-drive
 | 1 | **RFC fidelity** | Custom types appear in `GET /ResourceTypes` and `GET /Schemas` per RFC 7644 §4; wire format is identical to built-in types |
 | 2 | **Zero impact on built-in types** | User/Group retain their dedicated controller+service+repository stack; no performance or behavioral change |
 | 3 | **Per-endpoint isolation** | Resource types registered for Endpoint A are invisible to Endpoint B |
-| 4 | **Feature-flagged** | `customResourceTypesEnabled: false` (default) — endpoints that don't need this feature see zero overhead |
+| 4 | **Feature-flagged** | `customResourceTypesEnabled: false` (default) - endpoints that don't need this feature see zero overhead |
 | 5 | **Schema-validated** | Every custom resource type must reference a registered core schema URN from the `EndpointSchema` table |
 
 ### Step-by-Step Implementation
 
-#### Step 8.2.1: Database Model — `EndpointResourceType`
+#### Step 8.2.1: Database Model - `EndpointResourceType`
 
 ```prisma
 model EndpointResourceType {
@@ -2144,7 +2144,7 @@ CREATE UNIQUE INDEX idx_ert_endpoint_path
 #### Step 8.2.2: Endpoint Config Flag
 
 ```typescript
-// endpoint-config.interface.ts — add to EndpointConfig
+// endpoint-config.interface.ts - add to EndpointConfig
 export interface EndpointConfig {
   // ... existing flags ...
   customResourceTypesEnabled?: boolean;  // default: false
@@ -2250,14 +2250,14 @@ export class PrismaEndpointResourceTypeRepository implements IEndpointResourceTy
 
 **Repository Module Registration:**
 ```typescript
-// repository.module.ts — add alongside existing tokens
+// repository.module.ts - add alongside existing tokens
 {
   provide: ENDPOINT_RESOURCE_TYPE_REPOSITORY,
   useClass: PrismaEndpointResourceTypeRepository,
 },
 ```
 
-#### Step 8.2.4: Admin API — Resource Type CRUD Controller
+#### Step 8.2.4: Admin API - Resource Type CRUD Controller
 
 ```typescript
 // modules/scim/controllers/admin-resource-type.controller.ts
@@ -2348,7 +2348,7 @@ export class SchemaExtensionRefDto {
 | `GET` | `/scim/admin/endpoints/:endpointId/resource-types/:name` | `getResourceType()` | Get a specific resource type by name |
 | `DELETE` | `/scim/admin/endpoints/:endpointId/resource-types/:name` | `unregisterResourceType()` | Remove a custom resource type |
 
-##### Register Resource Type — Full Request/Response Example
+##### Register Resource Type - Full Request/Response Example
 
 **Request:**
 ```http
@@ -2391,7 +2391,7 @@ Authorization: Bearer devscimclientsecret
 }
 ```
 
-**Error Response — duplicate name (409):**
+**Error Response - duplicate name (409):**
 ```json
 {
   "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
@@ -2401,7 +2401,7 @@ Authorization: Bearer devscimclientsecret
 }
 ```
 
-**Error Response — missing core schema (400):**
+**Error Response - missing core schema (400):**
 ```json
 {
   "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
@@ -2442,10 +2442,10 @@ Authorization: Bearer devscimclientsecret
 }
 ```
 
-#### Step 8.2.5: Schema Registry Enhancement — `registerResourceType()`
+#### Step 8.2.5: Schema Registry Enhancement - `registerResourceType()`
 
 ```typescript
-// scim-schema-registry.ts — additions
+// scim-schema-registry.ts - additions
 
 // New per-endpoint overlay field
 interface EndpointOverlay {
@@ -2696,7 +2696,7 @@ export class EndpointScimGenericService {
     // 3. Persist via unified ScimResource table
     const saved = await this.resourceRepo.create({
       endpointId,
-      resourceType: rtMeta.name,      // "Device" — stored in resource_type discriminator
+      resourceType: rtMeta.name,      // "Device" - stored in resource_type discriminator
       scimId,
       externalId: body.externalId as string ?? null,
       userName: null,                   // Not applicable for custom types
@@ -2763,7 +2763,7 @@ export class EndpointScimGenericService {
 
 #### Step 8.2.8: PATCH Engine for Custom Types
 
-Custom resource types use a **generic JSONB PATCH engine** — no type-specific field extraction logic:
+Custom resource types use a **generic JSONB PATCH engine** - no type-specific field extraction logic:
 
 ```typescript
 // domain/patch/generic-patch-engine.ts
@@ -2805,7 +2805,7 @@ export class GenericPatchEngine {
 Custom resource types fall back to **JSONB-only filtering** because they don't have dedicated indexed columns:
 
 ```typescript
-// In apply-scim-filter.ts — buildGenericFilter()
+// In apply-scim-filter.ts - buildGenericFilter()
 function buildGenericFilter(
   ast: FilterNode,
   endpointId: string,
@@ -2823,11 +2823,11 @@ function buildGenericFilter(
 
 This is slower than the indexed-column path used by User/Group, but acceptable for custom types which are typically lower-volume.
 
-### Phase 8 Part 2 — Discovery Impact
+### Phase 8 Part 2 - Discovery Impact
 
 **After registering a `Device` resource type for an endpoint, the discovery endpoints automatically surface it.**
 
-##### `GET /scim/endpoints/{endpointId}/ResourceTypes` — Response
+##### `GET /scim/endpoints/{endpointId}/ResourceTypes` - Response
 
 ```json
 {
@@ -2872,7 +2872,7 @@ This is slower than the indexed-column path used by User/Group, but acceptable f
 }
 ```
 
-##### CRUD on Custom Resource Type — Full Example
+##### CRUD on Custom Resource Type - Full Example
 
 **Create a Device:**
 ```http
@@ -2949,7 +2949,7 @@ If-Match: W/"v1"
 }
 ```
 
-### Phase 8 Part 2 — End-to-End Registration & Runtime Flow
+### Phase 8 Part 2 - End-to-End Registration & Runtime Flow
 
 ```mermaid
 sequenceDiagram
@@ -2962,13 +2962,13 @@ sequenceDiagram
     participant GS as GenericService
     participant DISC as DiscoveryController
 
-    Note over ADM,REG: Step 1 — Register custom schema (prerequisite)
+    Note over ADM,REG: Step 1 - Register custom schema (prerequisite)
     ADM->>AC: POST /admin/endpoints/{id}/schemas<br/>{schemaUrn: "urn:...Device", attributes: [...]}
     AC->>DB: INSERT endpoint_schema
     AC->>REG: registerExtension(schemaDef, null, false, endpointId)
     AC-->>ADM: 201 Created
 
-    Note over ADM,REG: Step 2 — Register custom resource type
+    Note over ADM,REG: Step 2 - Register custom resource type
     ADM->>AC: POST /admin/endpoints/{id}/resource-types<br/>{name: "Device", scimEndpoint: "/Devices", coreSchemaUrn: "urn:...Device"}
     AC->>AC: Validate endpoint exists & is active
     AC->>AC: Validate customResourceTypesEnabled = true
@@ -2978,13 +2978,13 @@ sequenceDiagram
     AC->>REG: registerResourceType({id: "Device", endpoint: "/Devices", ...}, endpointId)
     AC-->>ADM: 201 Created
 
-    Note over CLI,DISC: Step 3 — Client discovers the new type
+    Note over CLI,DISC: Step 3 - Client discovers the new type
     CLI->>DISC: GET /endpoints/{id}/ResourceTypes
     DISC->>REG: getAllResourceTypes(endpointId)
     REG-->>DISC: [User, Group, Device]
     DISC-->>CLI: 200 OK (3 resource types including Device)
 
-    Note over CLI,GS: Step 4 — Client CRUDs the custom type
+    Note over CLI,GS: Step 4 - Client CRUDs the custom type
     CLI->>GC: POST /endpoints/{id}/Devices<br/>{schemas:[...], displayName: "Sensor A", ...}
     GC->>GC: validateCustomResourceType(endpointId, "Devices", config)
     GC->>GS: create(endpointId, "Devices", body)
@@ -2994,7 +2994,7 @@ sequenceDiagram
     GC-->>CLI: 201 Created, Location: .../Devices/{scimId}
 ```
 
-### Phase 8 Part 2 — Architecture Layers Impact
+### Phase 8 Part 2 - Architecture Layers Impact
 
 ```mermaid
 flowchart TB
@@ -3019,7 +3019,7 @@ flowchart TB
     subgraph SHARED["Enhanced (Shared Infrastructure)"]
         direction TB
         REG["ScimSchemaRegistry<br/>+ registerResourceType()<br/>+ per-endpoint overlay.resourceTypes"]
-        DISC["ScimDiscoveryService<br/>(no changes — already generic)"]
+        DISC["ScimDiscoveryService<br/>(no changes - already generic)"]
         SR[("scim_resource<br/>resource_type = 'Device'")]
         CFG["EndpointConfig<br/>+ customResourceTypesEnabled"]
     end
@@ -3043,10 +3043,10 @@ flowchart TB
 |---|---|---|
 | **Request routing** | Negligible | One `Map.has()` lookup per request on generic controller to validate resource type |
 | **User/Group performance** | Zero | Dedicated controllers/services/repos remain unchanged; generic controller only catches unknown paths |
-| **Custom type filtering** | JSONB-only | No indexed columns for custom types — uses `payload->>'attr'` operators. Acceptable for lower-volume custom types |
+| **Custom type filtering** | JSONB-only | No indexed columns for custom types - uses `payload->>'attr'` operators. Acceptable for lower-volume custom types |
 | **Memory** | ~500 bytes/definition | Per-endpoint resource type in registry overlay Map |
 | **Startup** | One extra query | `findAll()` on `endpoint_resource_type` table during `onModuleInit()` |
-| **Schema validation** | Same as built-in | Uses Phase 8 `SchemaValidator` — custom types validated against their registered schema |
+| **Schema validation** | Same as built-in | Uses Phase 8 `SchemaValidator` - custom types validated against their registered schema |
 | **Discovery** | Automatic | Custom types automatically appear in `GET /ResourceTypes` and `GET /Schemas` |
 | **Feature-flag OFF** | Zero overhead | If `customResourceTypesEnabled: false`, the generic controller returns `404` immediately |
 
@@ -3070,11 +3070,11 @@ flowchart TB
 | **Prisma** | Migration file | `schema.prisma` (+model) |
 | **Domain** | `endpoint-resource-type-repository.interface.ts`, `generic-patch-engine.ts` | `repository.tokens.ts` (+token) |
 | **Infrastructure** | `prisma-endpoint-resource-type.repository.ts`, `inmemory-endpoint-resource-type.repository.ts` | `repository.module.ts` (+provider) |
-| **Admin API** | `admin-resource-type.controller.ts`, `create-endpoint-resource-type.dto.ts` | — |
+| **Admin API** | `admin-resource-type.controller.ts`, `create-endpoint-resource-type.dto.ts` | - |
 | **SCIM Controllers** | `endpoint-scim-generic.controller.ts` | `scim.module.ts` (+controller, +service, +provider) |
-| **SCIM Services** | `endpoint-scim-generic.service.ts` | — |
-| **Registry** | — | `scim-schema-registry.ts` (+registerResourceType, +overlay.resourceTypes, +hydration) |
-| **Config** | — | `endpoint-config.interface.ts` (+customResourceTypesEnabled) |
+| **SCIM Services** | `endpoint-scim-generic.service.ts` | - |
+| **Registry** | - | `scim-schema-registry.ts` (+registerResourceType, +overlay.resourceTypes, +hydration) |
+| **Config** | - | `endpoint-config.interface.ts` (+customResourceTypesEnabled) |
 | **Tests** | ~7 new test files | ~3 existing test files updated |
 
 ### Effort Estimate
@@ -3094,7 +3094,7 @@ flowchart TB
 
 ---
 
-## 11. Phase 9 — Bulk Operations
+## 11. Phase 9 - Bulk Operations
 
 ### Why?
 
@@ -3195,7 +3195,7 @@ export class BulkProcessor {
 }
 ```
 
-### Phase 9 — Bulk Processing Pipeline with bulkId Resolution
+### Phase 9 - Bulk Processing Pipeline with bulkId Resolution
 
 ```mermaid
 flowchart TD
@@ -3225,7 +3225,7 @@ flowchart TD
 
 ---
 
-## 12. Phase 10 — /Me Endpoint
+## 12. Phase 10 - /Me Endpoint
 
 ### Why?
 
@@ -3260,7 +3260,7 @@ export class MeController {
 }
 ```
 
-### Phase 10 — /Me Identity Resolution Flow
+### Phase 10 - /Me Identity Resolution Flow
 
 ```mermaid
 sequenceDiagram
@@ -3287,18 +3287,18 @@ sequenceDiagram
 
 ---
 
-## 13. Phase 11 — Per-Endpoint Credentials
+## 13. Phase 11 - Per-Endpoint Credentials
 
 ### Why?
 
 Currently, `shared-secret.guard.ts` uses a single `SCIM_SHARED_SECRET` environment variable for ALL endpoints:
 
 ```typescript
-// shared-secret.guard.ts (current — line ~60)
+// shared-secret.guard.ts (current - line ~60)
 const secret = this.configService.get<string>('SCIM_SHARED_SECRET');
 ```
 
-This means a token valid for Endpoint A can access Endpoint B's data — a security concern.
+This means a token valid for Endpoint A can access Endpoint B's data - a security concern.
 
 ### Implementation
 
@@ -3348,7 +3348,7 @@ GET    /admin/endpoints/{id}/credentials   ← List (hash masked)
 DELETE /admin/endpoints/{id}/credentials/{credId} ← Revoke
 ```
 
-### Phase 11 — Authentication Flow (Before vs After)
+### Phase 11 - Authentication Flow (Before vs After)
 
 ```mermaid
 flowchart TB
@@ -3377,7 +3377,7 @@ flowchart TB
 
 ---
 
-## 14. Phase 12 — Sorting, Search, and Cleanup
+## 14. Phase 12 - Sorting, Search, and Cleanup
 
 ### Step 12.1: Sorting Support
 
@@ -3493,7 +3493,7 @@ sequenceDiagram
 | **Regression in PATCH behavior** | Medium | High | Comprehensive unit tests for PatchEngine BEFORE extracting code (Phase 5 Step 5.2) |
 | **Filter behavior change** | Medium | Medium | Run existing filter tests against both SQLite and PostgreSQL implementations during Phase 4 |
 | **ETag format change breaks clients** | Medium | Medium | Phased rollout: accept both old format (`W/"<timestamp>"`) and new (`W/"v<N>"`) for 2 weeks |
-| **Downtime during schema migration** | Low | High | Use Prisma `prisma migrate deploy` — typically <1 second for schema changes |
+| **Downtime during schema migration** | Low | High | Use Prisma `prisma migrate deploy` - typically <1 second for schema changes |
 | **Per-endpoint credential migration** | Low | Medium | Keep global `SCIM_SHARED_SECRET` as fallback during Phase 11; remove after all endpoints migrated |
 
 ### Risk Timeline Visualization
@@ -3664,7 +3664,7 @@ Deployment Files
 - **Stage 3 (prod-deps)**: `npm ci --omit=dev` → stripped `node_modules/`
 - **Stage 4 (runtime)**: Non-root user `scim:1001`, PORT=8080
 - **Critical**: Deletes PostgreSQL/MySQL/SQL Server WASM query compilers (lines 69-73), keeps **only SQLite**
-- **Entrypoint**: `docker-entrypoint.sh` — restores SQLite from Azure Files or blob snapshot, runs `prisma migrate deploy`
+- **Entrypoint**: `docker-entrypoint.sh` - restores SQLite from Azure Files or blob snapshot, runs `prisma migrate deploy`
 - **Health check**: `wget -qO- http://localhost:8080/health`
 - **NODE_OPTIONS**: `--max_old_space_size=384`
 
@@ -3681,9 +3681,9 @@ Deployment Files
   - VNet-injected (consumption plan)
 - **Networking** (`networking.bicep`):
   - VNet `10.40.0.0/16` with 3 subnets:
-    - `aca-infra` (`10.40.0.0/21`) — Container Apps infrastructure
-    - `aca-runtime` (`10.40.8.0/21`) — Container Apps workloads
-    - `private-endpoints` (`10.40.16.0/24`) — Storage private endpoints
+    - `aca-infra` (`10.40.0.0/21`) - Container Apps infrastructure
+    - `aca-runtime` (`10.40.8.0/21`) - Container Apps workloads
+    - `private-endpoints` (`10.40.16.0/24`) - Storage private endpoints
   - Private DNS zone for `privatelink.blob.core.windows.net`
 - **Blob Storage** (`blob-storage.bicep`):
   - Storage account + container for SQLite backup snapshots
@@ -3695,21 +3695,21 @@ Deployment Files
 
 | Phase | Local Dev | Docker Debug | Docker Production | Azure Container Apps |
 |-------|-----------|-------------|-------------------|---------------------|
-| **P1 — Repository Pattern** | No change | No change | No change | No change |
-| **P2 — Unified Table** | `prisma migrate dev` | Rebuild image | Rebuild image | Rebuild + `prisma migrate deploy` runs on start |
-| **P3 — PostgreSQL** | **Major** — new `.env` | **Major** — add postgres service | **Major** — Dockerfile + entrypoint rewrite | **Major** — new Bicep modules, remove blob/files |
-| **P4 — Filter Push-Down** | No change | No change | Rebuild image | Rebuild image |
-| **P5 — PATCH Engine** | No change | No change | Rebuild image | Rebuild image |
-| **P6 — Discovery** | `prisma migrate dev` | Rebuild image | Rebuild image | Rebuild + migration on start |
-| **P7 — ETag** | `prisma migrate dev` | Rebuild image | Rebuild image | Rebuild + migration on start |
-| **P8 — Schema Validation** | No change | No change | Rebuild image | Rebuild image |
-| **P8.2 — Custom Resource Types** | `prisma migrate dev` | Rebuild image | Rebuild image | Rebuild + migration on start |
-| **P9 — Bulk Operations** | No change | No change | Rebuild image | Rebuild image |
-| **P10 — /Me Endpoint** | No change | No change | Rebuild image | Rebuild image |
-| **P11 — Per-Endpoint Creds** | New env vars | New env vars | New env vars | New secrets in Bicep |
-| **P12 — Sort & Cleanup** | No change | No change | Rebuild image | Rebuild image |
+| **P1 - Repository Pattern** | No change | No change | No change | No change |
+| **P2 - Unified Table** | `prisma migrate dev` | Rebuild image | Rebuild image | Rebuild + `prisma migrate deploy` runs on start |
+| **P3 - PostgreSQL** | **Major** - new `.env` | **Major** - add postgres service | **Major** - Dockerfile + entrypoint rewrite | **Major** - new Bicep modules, remove blob/files |
+| **P4 - Filter Push-Down** | No change | No change | Rebuild image | Rebuild image |
+| **P5 - PATCH Engine** | No change | No change | Rebuild image | Rebuild image |
+| **P6 - Discovery** | `prisma migrate dev` | Rebuild image | Rebuild image | Rebuild + migration on start |
+| **P7 - ETag** | `prisma migrate dev` | Rebuild image | Rebuild image | Rebuild + migration on start |
+| **P8 - Schema Validation** | No change | No change | Rebuild image | Rebuild image |
+| **P8.2 - Custom Resource Types** | `prisma migrate dev` | Rebuild image | Rebuild image | Rebuild + migration on start |
+| **P9 - Bulk Operations** | No change | No change | Rebuild image | Rebuild image |
+| **P10 - /Me Endpoint** | No change | No change | Rebuild image | Rebuild image |
+| **P11 - Per-Endpoint Creds** | New env vars | New env vars | New env vars | New secrets in Bicep |
+| **P12 - Sort & Cleanup** | No change | No change | Rebuild image | Rebuild image |
 
-### 17.5 Phase 3 — PostgreSQL Migration: Detailed Deployment Changes
+### 17.5 Phase 3 - PostgreSQL Migration: Detailed Deployment Changes
 
 Phase 3 is the **only phase that fundamentally transforms the deployment topology**. All other phases require only image rebuilds or prisma migrations. Phase 3 requires changes to every deployment artifact.
 
@@ -3764,7 +3764,7 @@ Phase 3 is the **only phase that fundamentally transforms the deployment topolog
 
 #### 17.5.3 Docker Production Changes (Root `Dockerfile`)
 
-**File: `Dockerfile`** — Lines 69-73 currently delete PostgreSQL WASM. Must reverse:
+**File: `Dockerfile`** - Lines 69-73 currently delete PostgreSQL WASM. Must reverse:
 
 ```diff
   # Remove unused query-engine WASM binaries to trim ~20 MB
@@ -3778,7 +3778,7 @@ Phase 3 is the **only phase that fundamentally transforms the deployment topolog
 +          node_modules/.prisma/client/query_engine_bg.cockroachdb.wasm
 ```
 
-**File: `Dockerfile`** — Runtime environment:
+**File: `Dockerfile`** - Runtime environment:
 
 ```diff
 - ENV DATABASE_URL="file:./data.db"
@@ -3786,14 +3786,14 @@ Phase 3 is the **only phase that fundamentally transforms the deployment topolog
 # DATABASE_URL now provided at runtime via env var (PostgreSQL connection string)
 ```
 
-**File: `Dockerfile`** — Remove `better-sqlite3` native addon build (no more python3/make/g++):
+**File: `Dockerfile`** - Remove `better-sqlite3` native addon build (no more python3/make/g++):
 
 ```diff
 # In Dockerfile.ultra, remove native addon build stage
 - RUN apk add --no-cache python3 make g++
 ```
 
-**File: `api/docker-entrypoint.sh`** — Simplify dramatically (as noted in existing comment on line 13):
+**File: `api/docker-entrypoint.sh`** - Simplify dramatically (as noted in existing comment on line 13):
 
 ```diff
 - #!/bin/sh
@@ -3809,7 +3809,7 @@ Phase 3 is the **only phase that fundamentally transforms the deployment topolog
 
 #### 17.5.4 Azure Container Apps Changes (`infra/*.bicep`)
 
-**File: `infra/containerapp.bicep`** — Major changes:
+**File: `infra/containerapp.bicep`** - Major changes:
 
 ```diff
   # Secrets
@@ -3826,8 +3826,8 @@ Phase 3 is the **only phase that fundamentally transforms the deployment topolog
 - { name: 'BLOB_BACKUP_ACCOUNT', value: blobBackupAccount }
 - { name: 'BLOB_BACKUP_CONTAINER', value: blobBackupContainer }
 
-  # Scaling — REMOVE SQLite single-writer constraint
-- maxReplicas: 1  // SQLite compromise — single instance only
+  # Scaling - REMOVE SQLite single-writer constraint
+- maxReplicas: 1  // SQLite compromise - single instance only
 + maxReplicas: 3  // PostgreSQL enables horizontal scaling
 + minReplicas: 1
 
@@ -3835,12 +3835,12 @@ Phase 3 is the **only phase that fundamentally transforms the deployment topolog
 - volumes: [ { name: 'data', storageType: 'AzureFile', storageName: fileShareName } ]
 ```
 
-**File: `infra/blob-storage.bicep`** — **DELETE ENTIRELY** (as noted in existing comment):
-> "PostgreSQL migration: remove this module — Azure Database for PostgreSQL provides built-in backup with point-in-time recovery."
+**File: `infra/blob-storage.bicep`** - **DELETE ENTIRELY** (as noted in existing comment):
+> "PostgreSQL migration: remove this module - Azure Database for PostgreSQL provides built-in backup with point-in-time recovery."
 
-**File: `infra/storage.bicep`** — **DELETE ENTIRELY** (Azure Files no longer needed for SQLite persistence).
+**File: `infra/storage.bicep`** - **DELETE ENTIRELY** (Azure Files no longer needed for SQLite persistence).
 
-**New File: `infra/postgresql.bicep`** — Add Azure Database for PostgreSQL Flexible Server:
+**New File: `infra/postgresql.bicep`** - Add Azure Database for PostgreSQL Flexible Server:
 
 ```bicep
 // Azure Database for PostgreSQL Flexible Server for SCIMServer
@@ -3891,11 +3891,11 @@ output serverFqdn string = postgres.properties.fullyQualifiedDomainName
 - Remove blob storage and file share provisioning
 - Update `DATABASE_URL` construction to PostgreSQL connection string
 
-### 17.6 Phase 11 — Per-Endpoint Credentials: Deployment Changes
+### 17.6 Phase 11 - Per-Endpoint Credentials: Deployment Changes
 
 #### All Modes
 - **New env vars**: `CREDENTIAL_ENCRYPTION_KEY` (for encrypting stored credentials)
-- **No structural deployment changes** — same container, same database
+- **No structural deployment changes** - same container, same database
 
 #### Azure Container Apps
 ```diff
@@ -3912,11 +3912,11 @@ Currently 5 Dockerfiles exist. After Phase 3, consolidate to **2**:
 
 | Current | Post-Migration | Rationale |
 |---------|---------------|-----------|
-| `Dockerfile` (root, 4-stage) | **KEEP** — Primary production build | Becomes simpler without SQLite native addon and WASM pruning changes |
-| `Dockerfile.optimized` | **DELETE** — Merge optimizations into primary | Marginal gains vs. maintenance cost |
-| `Dockerfile.ultra` | **DELETE** — Native addon builds no longer needed | `better-sqlite3` removed; PostgreSQL uses network driver |
-| `api/Dockerfile` | **KEEP** — API-only build for CI/testing | Useful for building API independently |
-| `api/Dockerfile.multi` | **DELETE** — Redundant with api/Dockerfile | Less optimized duplicate |
+| `Dockerfile` (root, 4-stage) | **KEEP** - Primary production build | Becomes simpler without SQLite native addon and WASM pruning changes |
+| `Dockerfile.optimized` | **DELETE** - Merge optimizations into primary | Marginal gains vs. maintenance cost |
+| `Dockerfile.ultra` | **DELETE** - Native addon builds no longer needed | `better-sqlite3` removed; PostgreSQL uses network driver |
+| `api/Dockerfile` | **KEEP** - API-only build for CI/testing | Useful for building API independently |
+| `api/Dockerfile.multi` | **DELETE** - Redundant with api/Dockerfile | Less optimized duplicate |
 
 ### 17.8 Environment Variable Matrix (Post-Migration)
 
@@ -4004,7 +4004,7 @@ sequenceDiagram
     end
 ```
 
-### Deployment Topology — Before vs After Phase 3
+### Deployment Topology - Before vs After Phase 3
 
 ```mermaid
 flowchart TB
@@ -4057,7 +4057,7 @@ flowchart TB
 | Hardcoded `userSchema()` / `groupSchema()` | `endpoint_schema` + `endpoint_resource_type` DB rows | 6 |
 | `W/"${updatedAt.toISOString()}"` | `W/"v${version}"` monotonic integer | 7 |
 | `assertIfMatch()` exists but never called | `orchestrator.assertIfMatch()` before every write | 7 |
-| ~~No schema validation~~ | ✅ `SchemaValidator` with strictMode — **DONE v0.17.0** | 8 |
+| ~~No schema validation~~ | ✅ `SchemaValidator` with strictMode - **DONE v0.17.0** | 8 |
 | Hardcoded User/Group resource types only | `endpoint_resource_type` DB rows + Admin API + generic wildcard controller | 8.2 |
 | `bulk: {supported: false}` | `BulkProcessor` with bulkId resolution | 9 |
 | No /Me | `MeController` | 10 |

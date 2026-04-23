@@ -1,5 +1,5 @@
 /**
- * Auto-Expand Service — Phase 13, Steps 2.1 + 2.2
+ * Auto-Expand Service - Phase 13, Steps 2.1 + 2.2
  *
  * Expands shorthand profile input into a full EndpointProfile:
  * 1. Resolves "attributes": "all" → full RFC attribute list
@@ -31,13 +31,13 @@ function expandAttribute(
 ): ScimSchemaAttribute {
   const attrMap = RFC_SCHEMA_ATTRIBUTE_MAPS.get(schemaId);
   if (!attrMap || !partial.name) {
-    // Unknown schema or no name — return as-is (custom attribute)
+    // Unknown schema or no name - return as-is (custom attribute)
     return partial as ScimSchemaAttribute;
   }
 
   const baseline = attrMap.get(partial.name.toLowerCase());
   if (!baseline) {
-    // Not a known RFC attribute — return as-is (custom attribute for this schema)
+    // Not a known RFC attribute - return as-is (custom attribute for this schema)
     return partial as ScimSchemaAttribute;
   }
 
@@ -73,7 +73,7 @@ function expandSchema(input: ShorthandSchemaInput): ScimSchemaDefinition {
     const allAttrs = RFC_SCHEMA_ALL_ATTRIBUTES.get(input.id);
     if (!allAttrs) {
       throw new Error(
-        `Cannot use "attributes": "all" for schema "${input.id}" — no RFC baseline exists. ` +
+        `Cannot use "attributes": "all" for schema "${input.id}" - no RFC baseline exists. ` +
         `Provide full attribute definitions for custom schemas.`,
       );
     }
@@ -82,7 +82,7 @@ function expandSchema(input: ShorthandSchemaInput): ScimSchemaDefinition {
     // Expand each partial attribute
     attributes = input.attributes.map(a => expandAttribute(a, input.id));
   } else {
-    // No attributes (extension schema — passthrough storage)
+    // No attributes (extension schema - passthrough storage)
     attributes = [];
   }
 
@@ -132,7 +132,7 @@ function autoInjectAttributes(schema: ScimSchemaDefinition): ScimSchemaDefinitio
     }
   }
 
-  // 3. (D7 removed in settings v7 — Groups no longer have active)
+  // 3. (D7 removed in settings v7 - Groups no longer have active)
 
   if (toInject.length === 0) return schema;
 

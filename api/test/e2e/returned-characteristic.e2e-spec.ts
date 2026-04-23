@@ -16,7 +16,7 @@ import {
 } from './helpers/fixtures';
 
 /**
- * G8e — RFC 7643 §2.4 `returned` attribute characteristic E2E tests.
+ * G8e - RFC 7643 §2.4 `returned` attribute characteristic E2E tests.
  *
  * Verifies that attributes with `returned: 'never'` (e.g. password) are
  * stripped from ALL SCIM responses: POST (create), GET (read), PUT (replace),
@@ -43,9 +43,9 @@ describe('Returned Attribute Characteristic (G8e E2E)', () => {
     basePath = scimBasePath(endpointId);
   });
 
-  // ───────────── returned:'never' — password never in responses ─────────────
+  // ───────────── returned:'never' - password never in responses ─────────────
 
-  describe('returned:never — password stripped from all responses', () => {
+  describe('returned:never - password stripped from all responses', () => {
     it('POST /Users should NOT return password in the 201 response', async () => {
       const res = await scimPost(
         app,
@@ -191,7 +191,7 @@ describe('Returned Attribute Characteristic (G8e E2E)', () => {
 
       const user = res.body.Resources[0];
       expect(user.userName).toBeDefined();
-      // password is returned:'never' — MUST NOT be in response even if requested
+      // password is returned:'never' - MUST NOT be in response even if requested
       expect(user.password).toBeUndefined();
     });
   });

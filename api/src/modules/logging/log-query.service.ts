@@ -1,5 +1,5 @@
 /**
- * LogQueryService — Shared log query, streaming, and download logic.
+ * LogQueryService - Shared log query, streaming, and download logic.
  *
  * Extracted from LogConfigController and EndpointLogController to eliminate
  * duplication. Both controllers delegate to this service for:

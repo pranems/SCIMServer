@@ -2,7 +2,7 @@
  * Domain model for endpoint credentials (Phase 11).
  *
  * Represents a per-endpoint authentication credential stored in the
- * EndpointCredential table. The plaintext token is never stored — only
+ * EndpointCredential table. The plaintext token is never stored - only
  * its bcrypt hash.
  */
 

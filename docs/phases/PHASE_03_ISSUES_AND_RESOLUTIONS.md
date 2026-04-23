@@ -1,6 +1,6 @@
-# Phase 3 — Issues, Root Causes, Diagnosis & Resolution
+# Phase 3 - Issues, Root Causes, Diagnosis & Resolution
 
-> **Phase:** 3 — PostgreSQL Migration  
+> **Phase:** 3 - PostgreSQL Migration  
 > **Branch:** `feat/torfc1stscimsvr`  
 > **Commit:** `1965cad`  
 > **Date:** 2026-02-20  
@@ -9,32 +9,32 @@
 
 ## Table of Contents
 
-1. [Issue Map — Dependency Graph](#issue-map--dependency-graph)
-2. [Issue 1 — Prisma 7 Rejects `url` in `schema.prisma` Datasource](#issue-1--prisma-7-rejects-url-in-schemaprisma-datasource)
-3. [Issue 2 — Prisma 7 Rejects `datasourceUrl` in PrismaClient Constructor](#issue-2--prisma-7-rejects-datasourceurl-in-prismaclient-constructor)
-4. [Issue 3 — 30+ TypeScript Errors from Legacy Model References](#issue-3--30-typescript-errors-from-legacy-model-references)
-5. [Issue 4 — Nullable `userName` Field Causes Type Error](#issue-4--nullable-username-field-causes-type-error)
-6. [Issue 5 — E2E Global Setup Still References SQLite File URL](#issue-5--e2e-global-setup-still-references-sqlite-file-url)
-7. [Issue 6 — E2E App Helper Overrides DATABASE_URL with SQLite Path](#issue-6--e2e-app-helper-overrides-database_url-with-sqlite-path)
-8. [Issue 7 — PostgreSQL Connection Pool Exhaustion ("too many clients")](#issue-7--postgresql-connection-pool-exhaustion-too-many-clients)
-9. [Issue 8 — PrismaService Attempts PostgreSQL Connection in InMemory Mode](#issue-8--prismaservice-attempts-postgresql-connection-in-inmemory-mode)
-10. [Issue 9 — Docker Healthcheck Returns 401/404](#issue-9--docker-healthcheck-returns-401404)
-11. [Issue 10 — SQLite Migrations Incompatible with PostgreSQL](#issue-10--sqlite-migrations-incompatible-with-postgresql)
-12. [Issue 11 — NDJSON Download Live-Test Intermittent Failure](#issue-11--ndjson-download-live-test-intermittent-failure)
-13. [Issue 12 — LoggingService Raw SQL Uses SQLite-Specific Syntax](#issue-12--loggingservice-raw-sql-uses-sqlite-specific-syntax)
-14. [Issue 13 — AdminController Reports Stale `databaseProvider: 'sqlite'`](#issue-13--admincontroller-reports-stale-databaseprovider-sqlite)
-15. [Issue 14 — E2E Assertion Still Expects `'sqlite'` Provider String](#issue-14--e2e-assertion-still-expects-sqlite-provider-string)
-16. [Issue 15 — PostgreSQL UUID Column Rejects Non-UUID Strings (P2007 → 500)](#issue-15--postgresql-uuid-column-rejects-non-uuid-strings-p2007--500)
-17. [Issue 16 — SCIM ID Leak: Client-Supplied `id` Overrides Server-Assigned `scimId`](#issue-16--scim-id-leak-client-supplied-id-overrides-server-assigned-scimid)
-18. [Issue 17 — Version Endpoint Reports Obsolete Blob Storage Fields](#issue-17--version-endpoint-reports-obsolete-blob-storage-fields)
-19. [Issue 18 — False Positive Test Audit: 29 Tests Passing for Wrong Reasons](#issue-18--false-positive-test-audit-29-tests-passing-for-wrong-reasons)
+1. [Issue Map - Dependency Graph](#issue-map--dependency-graph)
+2. [Issue 1 - Prisma 7 Rejects `url` in `schema.prisma` Datasource](#issue-1--prisma-7-rejects-url-in-schemaprisma-datasource)
+3. [Issue 2 - Prisma 7 Rejects `datasourceUrl` in PrismaClient Constructor](#issue-2--prisma-7-rejects-datasourceurl-in-prismaclient-constructor)
+4. [Issue 3 - 30+ TypeScript Errors from Legacy Model References](#issue-3--30-typescript-errors-from-legacy-model-references)
+5. [Issue 4 - Nullable `userName` Field Causes Type Error](#issue-4--nullable-username-field-causes-type-error)
+6. [Issue 5 - E2E Global Setup Still References SQLite File URL](#issue-5--e2e-global-setup-still-references-sqlite-file-url)
+7. [Issue 6 - E2E App Helper Overrides DATABASE_URL with SQLite Path](#issue-6--e2e-app-helper-overrides-database_url-with-sqlite-path)
+8. [Issue 7 - PostgreSQL Connection Pool Exhaustion ("too many clients")](#issue-7--postgresql-connection-pool-exhaustion-too-many-clients)
+9. [Issue 8 - PrismaService Attempts PostgreSQL Connection in InMemory Mode](#issue-8--prismaservice-attempts-postgresql-connection-in-inmemory-mode)
+10. [Issue 9 - Docker Healthcheck Returns 401/404](#issue-9--docker-healthcheck-returns-401404)
+11. [Issue 10 - SQLite Migrations Incompatible with PostgreSQL](#issue-10--sqlite-migrations-incompatible-with-postgresql)
+12. [Issue 11 - NDJSON Download Live-Test Intermittent Failure](#issue-11--ndjson-download-live-test-intermittent-failure)
+13. [Issue 12 - LoggingService Raw SQL Uses SQLite-Specific Syntax](#issue-12--loggingservice-raw-sql-uses-sqlite-specific-syntax)
+14. [Issue 13 - AdminController Reports Stale `databaseProvider: 'sqlite'`](#issue-13--admincontroller-reports-stale-databaseprovider-sqlite)
+15. [Issue 14 - E2E Assertion Still Expects `'sqlite'` Provider String](#issue-14--e2e-assertion-still-expects-sqlite-provider-string)
+16. [Issue 15 - PostgreSQL UUID Column Rejects Non-UUID Strings (P2007 → 500)](#issue-15--postgresql-uuid-column-rejects-non-uuid-strings-p2007--500)
+17. [Issue 16 - SCIM ID Leak: Client-Supplied `id` Overrides Server-Assigned `scimId`](#issue-16--scim-id-leak-client-supplied-id-overrides-server-assigned-scimid)
+18. [Issue 17 - Version Endpoint Reports Obsolete Blob Storage Fields](#issue-17--version-endpoint-reports-obsolete-blob-storage-fields)
+19. [Issue 18 - False Positive Test Audit: 29 Tests Passing for Wrong Reasons](#issue-18--false-positive-test-audit-29-tests-passing-for-wrong-reasons)
 20. [Resolution Summary Table](#resolution-summary-table)
 
 ---
 
-## Issue Map — Dependency Graph
+## Issue Map - Dependency Graph
 
-Several issues were causally chained — fixing one revealed the next. The diagram below shows discovery order and dependencies.
+Several issues were causally chained - fixing one revealed the next. The diagram below shows discovery order and dependencies.
 
 ```
 ┌──────────────────────┐
@@ -51,7 +51,7 @@ Several issues were causally chained — fixing one revealed the next. The diagr
           │                              │
           ▼                              ▼
 ┌──────────────────────────────────────────────────────┐
-│  ISSUE 3  —  ~30 TypeScript errors                   │
+│  ISSUE 3  -  ~30 TypeScript errors                   │
 │  Legacy model names: scimUser, scimGroup, groupMember│
 │  (7 non-repo files still referenced old Prisma models)│
 └─────────────────────────┬────────────────────────────┘
@@ -132,7 +132,7 @@ Several issues were causally chained — fixing one revealed the next. The diagr
 
 ---
 
-## Issue 1 — Prisma 7 Rejects `url` in `schema.prisma` Datasource
+## Issue 1 - Prisma 7 Rejects `url` in `schema.prisma` Datasource
 
 ### Symptom
 
@@ -152,7 +152,7 @@ Running `npx prisma generate` immediately after changing the schema provider fro
 Prisma 7 introduced a new configuration architecture that separates **schema definition** from **runtime configuration**. In Prisma 6 and earlier, the datasource block contained both:
 
 ```prisma
-// ✗ Prisma 6 style — REJECTED by Prisma 7
+// ✗ Prisma 6 style - REJECTED by Prisma 7
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")   // ← Prisma 7 no longer allows this
@@ -188,7 +188,7 @@ Removed the `url` line from `schema.prisma`. The connection URL is managed by `p
 datasource db {
   provider   = "postgresql"
   extensions = [citext, pgcrypto, pg_trgm]
-  // No `url` line — Prisma 7 manages URL via prisma.config.ts
+  // No `url` line - Prisma 7 manages URL via prisma.config.ts
 }
 ```
 
@@ -218,7 +218,7 @@ The `prisma.config.ts` approach is Prisma 7's canonical pattern. It cleanly sepa
 
 ---
 
-## Issue 2 — Prisma 7 Rejects `datasourceUrl` in PrismaClient Constructor
+## Issue 2 - Prisma 7 Rejects `datasourceUrl` in PrismaClient Constructor
 
 ### Symptom
 
@@ -240,7 +240,7 @@ Running `npx tsc --noEmit` after the schema change. The TypeScript compiler flag
 Prisma 7 replaced the `datasourceUrl` constructor option with a **driver adapter** pattern. The old approach:
 
 ```typescript
-// ✗ Prisma 6 — REJECTED by Prisma 7
+// ✗ Prisma 6 - REJECTED by Prisma 7
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 
 constructor() {
@@ -273,7 +273,7 @@ Error points to exact line in prisma.service.ts
 
 Complete rewrite of `PrismaService` using `@prisma/adapter-pg` with `pg.Pool`:
 
-**BEFORE (Phase 2 — SQLite adapter):**
+**BEFORE (Phase 2 - SQLite adapter):**
 ```typescript
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 
@@ -291,7 +291,7 @@ async onModuleInit() {
 }
 ```
 
-**AFTER (Phase 3 — PostgreSQL adapter):**
+**AFTER (Phase 3 - PostgreSQL adapter):**
 ```typescript
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
@@ -339,7 +339,7 @@ async onModuleDestroy() {
 
 | Alternative | Why Rejected |
 |---|---|
-| `@prisma/adapter-pg-lite` (PGlite) | Embedded PostgreSQL in WASM — excellent for testing but not production-grade for multi-replica deployments |
+| `@prisma/adapter-pg-lite` (PGlite) | Embedded PostgreSQL in WASM - excellent for testing but not production-grade for multi-replica deployments |
 | `@prisma/adapter-neon` | Tied to Neon serverless; doesn't work with self-hosted PostgreSQL |
 | Direct `prisma.$connect()` without adapter | Prisma 7 requires adapters for all connection types; no `datasourceUrl` fallback |
 | `postgres` (porsager) npm package | No Prisma adapter available; would require custom query translation |
@@ -350,7 +350,7 @@ async onModuleDestroy() {
 
 ---
 
-## Issue 3 — 30+ TypeScript Errors from Legacy Model References
+## Issue 3 - 30+ TypeScript Errors from Legacy Model References
 
 ### Symptom
 
@@ -405,12 +405,12 @@ Manual categorization:
     │
     ▼
 grep_search confirms no old model names remain in repo files
-(Phase 2 updated repos correctly — these were non-repo consumers)
+(Phase 2 updated repos correctly - these were non-repo consumers)
 ```
 
 ### Affected Files & Changes (22 individual replacements)
 
-#### `database.service.ts` — 10 changes
+#### `database.service.ts` - 10 changes
 
 The heaviest file. Queries for user/group statistics, listings, and detail pages all used old model names.
 
@@ -444,11 +444,11 @@ const user = await this.prisma.scimResource.findUnique({
   include: { membersAsMember: true },
 });
 
-// JSONB payload — no parse needed, already an object
+// JSONB payload - no parse needed, already an object
 const payload = user.payload;
 ```
 
-#### `activity-parser.service.ts` — 2 changes
+#### `activity-parser.service.ts` - 2 changes
 
 ```typescript
 // BEFORE: resolveUserName
@@ -464,7 +464,7 @@ const user = await this.prisma.scimResource.findFirst({
 return user?.userName ?? userId;
 ```
 
-#### `endpoint.service.ts` — 1 change
+#### `endpoint.service.ts` - 1 change
 
 ```typescript
 // BEFORE:
@@ -488,11 +488,11 @@ totalMembers: await this.prisma.resourceMember.count({...}),
 |---|---|
 | Create Prisma model aliases (views) | Adds schema complexity; doesn't solve the JSONB/relation name changes |
 | Keep old models as Prisma views | SQLite views wouldn't translate to PostgreSQL |
-| Automated regex find-replace | Too risky — `rawPayload` → `payload` has semantic implications (string vs JSONB) requiring manual review of each call site |
+| Automated regex find-replace | Too risky - `rawPayload` → `payload` has semantic implications (string vs JSONB) requiring manual review of each call site |
 
 ### Why This Solution
 
-Manual review of each call site was necessary because the change wasn't just a rename — it involved:
+Manual review of each call site was necessary because the change wasn't just a rename - it involved:
 - Adding `resourceType` filter conditions (discriminator queries)
 - Changing relation names (`groups` → `membersAsMember`)
 - Handling `rawPayload` (string) → `payload` (JSONB object) type change
@@ -500,7 +500,7 @@ Manual review of each call site was necessary because the change wasn't just a r
 
 ---
 
-## Issue 4 — Nullable `userName` Field Causes Type Error
+## Issue 4 - Nullable `userName` Field Causes Type Error
 
 ### Symptom
 
@@ -523,7 +523,7 @@ ScimResource model:
   userName  String?  @db.Citext   ← nullable (group resources have null userName)
 
 resolveUserName() return type: string
-                            ↑ conflict — findFirst().userName is string | null
+                            ↑ conflict - findFirst().userName is string | null
 ```
 
 ### Diagnosis Flow
@@ -551,10 +551,10 @@ Used nullish coalescing to provide a fallback:
 
 ```typescript
 // BEFORE:
-return user?.userName;  // type: string | null — TS error
+return user?.userName;  // type: string | null - TS error
 
 // AFTER:
-return user?.userName ?? userId;  // type: string — falls back to raw ID
+return user?.userName ?? userId;  // type: string - falls back to raw ID
 ```
 
 ### Alternatives Considered
@@ -562,8 +562,8 @@ return user?.userName ?? userId;  // type: string — falls back to raw ID
 | Alternative | Why Rejected |
 |---|---|
 | Non-null assertion (`user.userName!`) | Hides potential runtime errors; bad practice |
-| Type cast (`as string`) | Same issue — suppresses the warning without fixing the underlying nullability |
-| Make `userName` non-nullable with default `''` | Would violate the schema design — groups legitimately have no `userName` |
+| Type cast (`as string`) | Same issue - suppresses the warning without fixing the underlying nullability |
+| Make `userName` non-nullable with default `''` | Would violate the schema design - groups legitimately have no `userName` |
 | Split query to filter `resourceType: 'User'` | Already done (the query includes `resourceType: 'User'`), but Prisma's type still reflects the model-level nullability |
 | Return `string \| null` from function | Would propagate nullability to ~12 call sites, increasing change scope |
 
@@ -573,7 +573,7 @@ The `?? userId` fallback is semantically correct: if we're looking up a user's d
 
 ---
 
-## Issue 5 — E2E Global Setup Still References SQLite File URL
+## Issue 5 - E2E Global Setup Still References SQLite File URL
 
 ### Symptom
 
@@ -600,7 +600,7 @@ With PostgreSQL, this was doubly wrong:
 - The `file:` URL scheme doesn't work with PostgreSQL
 - When running InMemory tests, no database setup should happen at all
 
-**BEFORE (Phase 2 — SQLite-era code):**
+**BEFORE (Phase 2 - SQLite-era code):**
 ```typescript
 export default async function globalSetup(): Promise<void> {
   const testDbPath = path.resolve(__dirname, '..', '..', 'prisma', 'test.db');
@@ -652,13 +652,13 @@ export default async function globalSetup(): Promise<void> {
   const backend = process.env.PERSISTENCE_BACKEND?.toLowerCase() ?? 'prisma';
 
   if (backend === 'inmemory') {
-    // InMemory backend — no database setup required
+    // InMemory backend - no database setup required
     const markerPath = path.resolve(__dirname, '.test-db-path');
     fs.writeFileSync(markerPath, 'inmemory', 'utf-8');
     return;  // ← early exit, no DB touch
   }
 
-  // Prisma backend — PostgreSQL migrations
+  // Prisma backend - PostgreSQL migrations
   const dbUrl = process.env.DATABASE_URL
     ?? 'postgresql://scim:scim@localhost:5432/scimdb';
 
@@ -679,7 +679,7 @@ The marker file now stores the PostgreSQL URL (or the string `'inmemory'`) inste
 
 ---
 
-## Issue 6 — E2E App Helper Overrides DATABASE_URL with SQLite Path
+## Issue 6 - E2E App Helper Overrides DATABASE_URL with SQLite Path
 
 ### Symptom
 
@@ -698,7 +698,7 @@ After fixing Issue 5, E2E tests progressed past `globalSetup` but crashed immedi
 `app.helper.ts` unconditionally set `process.env.DATABASE_URL` to a SQLite `file:` URL:
 
 ```typescript
-// ✗ BEFORE: Always overrides DATABASE_URL — breaks PostgreSQL
+// ✗ BEFORE: Always overrides DATABASE_URL - breaks PostgreSQL
 const markerPath = path.resolve(__dirname, '..', '.test-db-path');
 let testDbPath: string;
 if (fs.existsSync(markerPath)) {
@@ -737,7 +737,7 @@ PostgreSQL SASL handshake fails:
 Stack trace points to pg.Pool in prisma.service.ts constructor
 ```
 
-The SASL error was misleading — it suggested an authentication problem, but the real issue was a completely invalid connection string format.
+The SASL error was misleading - it suggested an authentication problem, but the real issue was a completely invalid connection string format.
 
 ### Solution Applied
 
@@ -782,11 +782,11 @@ Connection string parsing chain:
 Error: "SASL: client password must be a string"
 ```
 
-The `pg` library didn't reject the URL format — it parsed what it could and tried to connect, hitting the SASL check because the extracted password was `undefined`.
+The `pg` library didn't reject the URL format - it parsed what it could and tried to connect, hitting the SASL check because the extracted password was `undefined`.
 
 ---
 
-## Issue 7 — PostgreSQL Connection Pool Exhaustion ("too many clients")
+## Issue 7 - PostgreSQL Connection Pool Exhaustion ("too many clients")
 
 ### Symptom
 
@@ -836,7 +836,7 @@ npx jest (E2E)
 PostgreSQL: "too many clients"
 ```
 
-### Solution Applied — Two-Part Fix
+### Solution Applied - Two-Part Fix
 
 **Part 1: Reduce pool size**
 
@@ -882,7 +882,7 @@ PostgreSQL accepts up to 100 → no exhaustion
 
 ---
 
-## Issue 8 — PrismaService Attempts PostgreSQL Connection in InMemory Mode
+## Issue 8 - PrismaService Attempts PostgreSQL Connection in InMemory Mode
 
 ### Symptom
 
@@ -910,8 +910,8 @@ On a fresh machine without PostgreSQL, this would crash the application.
 NestJS Module Resolution:
     │
     ├── AppModule imports RepositoryModule
-    │   ├── exports: UserRepository (InMemory or Prisma — conditional)
-    │   └── exports: GroupRepository (InMemory or Prisma — conditional)
+    │   ├── exports: UserRepository (InMemory or Prisma - conditional)
+    │   └── exports: GroupRepository (InMemory or Prisma - conditional)
     │
     ├── AppModule imports PrismaModule
     │   └── exports: PrismaService  ← ALWAYS instantiated
@@ -952,7 +952,7 @@ async onModuleInit(): Promise<void> {
   const backend = process.env.PERSISTENCE_BACKEND?.toLowerCase();
   if (backend === 'inmemory') {
     this.logger.warn(
-      'PERSISTENCE_BACKEND=inmemory — skipping PostgreSQL connection'
+      'PERSISTENCE_BACKEND=inmemory - skipping PostgreSQL connection'
     );
     return;  // ← skip $connect() entirely
   }
@@ -982,7 +982,7 @@ PERSISTENCE_BACKEND=inmemory:
     onModuleDestroy()
     ├── Reads PERSISTENCE_BACKEND → "inmemory"
     ├── Skips $disconnect()
-    └── pool.end() (closes idle pool — no-op since no connections opened)
+    └── pool.end() (closes idle pool - no-op since no connections opened)
 
 PERSISTENCE_BACKEND=prisma (default):
     │
@@ -1015,7 +1015,7 @@ The `PERSISTENCE_BACKEND` guard is the simplest, most explicit solution:
 
 ---
 
-## Issue 9 — Docker Healthcheck Returns 401/404
+## Issue 9 - Docker Healthcheck Returns 401/404
 
 ### Symptom
 
@@ -1025,7 +1025,7 @@ Docker container remained in `health: starting` state for 60+ seconds, then tran
 
 Running `docker compose up --build` and waiting for the API container's healthcheck to pass. After 60 seconds with `starting` status, the container was marked `unhealthy` despite `/scim/oauth/token` responding correctly.
 
-### Root Cause — Two Iterations
+### Root Cause - Two Iterations
 
 **Iteration 1: `/health` → 404**
 
@@ -1112,7 +1112,7 @@ Content-Type: text/html; charset=UTF-8
 | `interval` | 60s | 30s | Faster recovery detection |
 | `start-period` | 10s | 15s | Allow time for NestJS bootstrap + Prisma migration |
 | `retries` | 2 | 3 | More resilient to transient startup delays |
-| URL path | `/health` | `/` | Root serves SPA — no auth required |
+| URL path | `/health` | `/` | Root serves SPA - no auth required |
 
 ### Alternatives Considered
 
@@ -1134,7 +1134,7 @@ Content-Type: text/html; charset=UTF-8
 
 ---
 
-## Issue 10 — SQLite Migrations Incompatible with PostgreSQL
+## Issue 10 - SQLite Migrations Incompatible with PostgreSQL
 
 ### Symptom
 
@@ -1287,7 +1287,7 @@ A fresh baseline migration is the cleanest approach when changing database provi
 
 ---
 
-## Issue 11 — NDJSON Download Live-Test Intermittent Failure
+## Issue 11 - NDJSON Download Live-Test Intermittent Failure
 
 ### Symptom
 
@@ -1301,7 +1301,7 @@ This was 1 of 280 tests: **279 passed, 1 failed**. Consistent across both local 
 
 Running `live-test.ps1` against the running server. The test suite reports individual PASS/FAIL for each assertion.
 
-### Root Cause — Timing/Ordering Issue in Test Script
+### Root Cause - Timing/Ordering Issue in Test Script
 
 **The test logic:**
 ```powershell
@@ -1370,20 +1370,20 @@ Likely cause: the early test requests haven't been flushed to the
 
 This is intentionally left unfixed because:
 
-1. **Not a regression** — same behavior before Phase 3
-2. **No SCIM impact** — log download is an admin/diagnostic feature
-3. **Intermittent** — depends on test execution timing
-4. **Correct in isolation** — endpoint works correctly when tested individually
-5. **Fix would require** changing test script ordering or adding delays — introduces test fragility
+1. **Not a regression** - same behavior before Phase 3
+2. **No SCIM impact** - log download is an admin/diagnostic feature
+3. **Intermittent** - depends on test execution timing
+4. **Correct in isolation** - endpoint works correctly when tested individually
+5. **Fix would require** changing test script ordering or adding delays - introduces test fragility
 
 ---
 
-## Issue 12 — LoggingService Raw SQL Uses SQLite-Specific Syntax
+## Issue 12 - LoggingService Raw SQL Uses SQLite-Specific Syntax
 
 | Field | Value |
 |---|---|
-| **Severity** | P0 — Runtime crash |
-| **Detection** | Test audit — unit test review + E2E runs |
+| **Severity** | P0 - Runtime crash |
+| **Detection** | Test audit - unit test review + E2E runs |
 | **File** | `api/src/modules/logging/logging.service.ts` |
 | **Root Cause** | Three SQLite-specific raw SQL patterns survived the migration |
 
@@ -1391,9 +1391,9 @@ This is intentionally left unfixed because:
 
 Raw SQL queries in `LoggingService` used SQLite syntax that PostgreSQL rejects:
 
-1. **`ORDER BY rowid`** — SQLite's implicit `rowid` does not exist in PostgreSQL
-2. **Unquoted table name** `RequestLog` — PostgreSQL is case-sensitive for unquoted identifiers; the Prisma-generated table name is `"RequestLog"` (mixed case)
-3. **`?` placeholders** — SQLite uses positional `?` but PostgreSQL requires `$1`, `$2`, etc.
+1. **`ORDER BY rowid`** - SQLite's implicit `rowid` does not exist in PostgreSQL
+2. **Unquoted table name** `RequestLog` - PostgreSQL is case-sensitive for unquoted identifiers; the Prisma-generated table name is `"RequestLog"` (mixed case)
+3. **`?` placeholders** - SQLite uses positional `?` but PostgreSQL requires `$1`, `$2`, etc.
 
 ### Diagnosis
 
@@ -1426,12 +1426,12 @@ All column names now use double-quoted identifiers (`"id"`, `"identifier"`, `"cr
 
 ---
 
-## Issue 13 — AdminController Reports Stale `databaseProvider: 'sqlite'`
+## Issue 13 - AdminController Reports Stale `databaseProvider: 'sqlite'`
 
 | Field | Value |
 |---|---|
-| **Severity** | P2 — Incorrect metadata |
-| **Detection** | Test audit — code review |
+| **Severity** | P2 - Incorrect metadata |
+| **Detection** | Test audit - code review |
 | **File** | `api/src/modules/scim/controllers/admin.controller.ts` |
 | **Root Cause** | Hardcoded string literal not updated during migration |
 
@@ -1453,11 +1453,11 @@ storage: { databaseProvider: 'postgresql', ... }
 
 ---
 
-## Issue 14 — E2E Assertion Still Expects `'sqlite'` Provider String
+## Issue 14 - E2E Assertion Still Expects `'sqlite'` Provider String
 
 | Field | Value |
 |---|---|
-| **Severity** | P2 — Test failure |
+| **Severity** | P2 - Test failure |
 | **Detection** | E2E test run after Issue 13 fix |
 | **File** | `api/test/e2e/admin-version.e2e-spec.ts` |
 | **Root Cause** | E2E assertion matched the old `'sqlite'` value |
@@ -1484,12 +1484,12 @@ expect(res.body.storage).toEqual(
 
 ---
 
-## Issue 15 — PostgreSQL UUID Column Rejects Non-UUID Strings (P2007 → 500)
+## Issue 15 - PostgreSQL UUID Column Rejects Non-UUID Strings (P2007 → 500)
 
 | Field | Value |
 |---|---|
-| **Severity** | P0 — 8 E2E test failures |
-| **Detection** | E2E test run — 8 failures across 3 suites |
+| **Severity** | P0 - 8 E2E test failures |
+| **Detection** | E2E test run - 8 failures across 3 suites |
 | **Files** | `prisma-user.repository.ts`, `prisma-group.repository.ts` (+ new `uuid-guard.ts`) |
 | **Root Cause** | PostgreSQL `@db.Uuid` column type enforces UUID format at the database level |
 
@@ -1542,7 +1542,7 @@ PostgreSQL: scimId column is @db.Uuid → rejects "does-not-exist"
 Prisma P2007 error → unhandled → 500 Internal Server Error
 ```
 
-**Root Cause:** In Phase 2 (SQLite), `scimId` was a plain `TEXT` column that accepted any string. In Phase 3, `scimId` is `String @db.Uuid` — a native PostgreSQL UUID column that **rejects** any value not conforming to UUID format (`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`). When E2E tests use test IDs like `"does-not-exist"` or `"nonexistent"`, PostgreSQL throws a validation error before the query even executes.
+**Root Cause:** In Phase 2 (SQLite), `scimId` was a plain `TEXT` column that accepted any string. In Phase 3, `scimId` is `String @db.Uuid` - a native PostgreSQL UUID column that **rejects** any value not conforming to UUID format (`xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`). When E2E tests use test IDs like `"does-not-exist"` or `"nonexistent"`, PostgreSQL throws a validation error before the query even executes.
 
 **Behavioral Change:** SQLite → returns `null` (not found) → 404. PostgreSQL → throws P2007 → 500.
 
@@ -1570,38 +1570,38 @@ export function isValidUuid(value: string): boolean {
 | `PrismaGroupRepository` | `findByScimId` | `if (!isValidUuid(scimId)) return null;` |
 | `PrismaGroupRepository` | `findWithMembers` | `if (!isValidUuid(scimId)) return null;` |
 
-**Logic:** If the input is not a valid UUID, return `null` immediately (for single lookups) or filter out invalid values (for batch lookups) — restoring the same "not found" behavior that SQLite had. This prevents the non-UUID string from ever reaching PostgreSQL.
+**Logic:** If the input is not a valid UUID, return `null` immediately (for single lookups) or filter out invalid values (for batch lookups) - restoring the same "not found" behavior that SQLite had. This prevents the non-UUID string from ever reaching PostgreSQL.
 
 **Why at the repository layer (not service/controller):**
 
-1. **Defense in depth** — the guard sits closest to the database boundary
-2. **Semantically correct** — "not a UUID" ≡ "cannot exist in a UUID column" ≡ `null` (not found)
-3. **No SCIM contract change** — the service layer still sees `null` → returns 404 as before
-4. **Not needed for InMemory** — `InMemoryRepository` uses a plain `Map<string, ...>` with no type constraint
+1. **Defense in depth** - the guard sits closest to the database boundary
+2. **Semantically correct** - "not a UUID" ≡ "cannot exist in a UUID column" ≡ `null` (not found)
+3. **No SCIM contract change** - the service layer still sees `null` → returns 404 as before
+4. **Not needed for InMemory** - `InMemoryRepository` uses a plain `Map<string, ...>` with no type constraint
 
 ### Test Coverage
 
-- **`uuid-guard.spec.ts`** — 15 unit tests (valid v1/v4/v7/mixed-case + invalid inputs)
-- **`prisma-user.repository.spec.ts`** — 3 new tests (null for non-UUID, filter non-UUID, empty array for all non-UUID)
-- **`prisma-group.repository.spec.ts`** — 2 new tests (null for non-UUID findByScimId, null for non-UUID findWithMembers)
+- **`uuid-guard.spec.ts`** - 15 unit tests (valid v1/v4/v7/mixed-case + invalid inputs)
+- **`prisma-user.repository.spec.ts`** - 3 new tests (null for non-UUID, filter non-UUID, empty array for all non-UUID)
+- **`prisma-group.repository.spec.ts`** - 2 new tests (null for non-UUID findByScimId, null for non-UUID findWithMembers)
 - **All 857 unit tests pass** (28 suites)
-- **All 184 E2E tests pass** (15 suites) — the 8 previous failures now return proper 404
+- **All 184 E2E tests pass** (15 suites) - the 8 previous failures now return proper 404
 
 ### RFC Compliance Note
 
 Per RFC 7643 §3.1, the `id` attribute is:
 > "A unique identifier for a SCIM resource **as defined by the service provider**."
 
-The RFC does not mandate UUID format — `id` is opaque and service-provider-defined. However, using UUIDs is a widely adopted best practice (all RFC examples use UUID format: `"2819c223-7f76-453a-919d-413861904646"`). Our choice of `@db.Uuid` is valid but requires the UUID guard to handle non-UUID lookup attempts gracefully.
+The RFC does not mandate UUID format - `id` is opaque and service-provider-defined. However, using UUIDs is a widely adopted best practice (all RFC examples use UUID format: `"2819c223-7f76-453a-919d-413861904646"`). Our choice of `@db.Uuid` is valid but requires the UUID guard to handle non-UUID lookup attempts gracefully.
 
 ---
 
-## Issue 16 — SCIM ID Leak: Client-Supplied `id` Overrides Server-Assigned `scimId`
+## Issue 16 - SCIM ID Leak: Client-Supplied `id` Overrides Server-Assigned `scimId`
 
 | Property | Value |
 |---|---|
 | **Severity** | 🔴 Critical (data integrity / security) |
-| **Detection** | Manual testing — GET by `id` returns 404, but `id` appears in list response |
+| **Detection** | Manual testing - GET by `id` returns 404, but `id` appears in list response |
 | **Files** | `endpoint-scim-users.service.ts`, `endpoint-scim-users.service.spec.ts`, `user-lifecycle.e2e-spec.ts`, `live-test.ps1` |
 | **Root Cause** | `...rawPayload` spread in `toScimUserResource()` overwrites server-assigned `id` with client-supplied value |
 
@@ -1638,11 +1638,11 @@ flowchart TD
 
 The SCIM ID leak had **three potential attack vectors**, each requiring its own defense:
 
-1. **POST body** — Client sends `{ id: 'fake', userName: '...' }`. The `extractAdditionalAttributes()` method strips `id`, `userName`, `externalId`, and `active` from the DTO before storing as `rawPayload`. **Defense already existed** but was undocumented.
+1. **POST body** - Client sends `{ id: 'fake', userName: '...' }`. The `extractAdditionalAttributes()` method strips `id`, `userName`, `externalId`, and `active` from the DTO before storing as `rawPayload`. **Defense already existed** but was undocumented.
 
-2. **Response serialization** — Even if `rawPayload` somehow contained an `id` field, `toScimUserResource()` does `delete rawPayload.id` before the spread, then sets `id: user.scimId` AFTER the spread. **Defense already existed** via `delete rawPayload.id` + post-spread `id: user.scimId`.
+2. **Response serialization** - Even if `rawPayload` somehow contained an `id` field, `toScimUserResource()` does `delete rawPayload.id` before the spread, then sets `id: user.scimId` AFTER the spread. **Defense already existed** via `delete rawPayload.id` + post-spread `id: user.scimId`.
 
-3. **PATCH no-path replace** — Client sends `PATCH` with `{ op: 'replace', value: { id: 'attacker-id', displayName: 'New' } }`. The `stripReservedAttributes()` method filtered `userName`, `externalId`, and `active` but **did NOT include `id` in the reserved set**. This was the gap.
+3. **PATCH no-path replace** - Client sends `PATCH` with `{ op: 'replace', value: { id: 'attacker-id', displayName: 'New' } }`. The `stripReservedAttributes()` method filtered `userName`, `externalId`, and `active` but **did NOT include `id` in the reserved set**. This was the gap.
 
 ### Resolution
 
@@ -1667,7 +1667,7 @@ private toScimUserResource(user: UserRecord, baseUrl: string): ScimUserResource 
     return {
       schemas: [SCIM_CORE_USER_SCHEMA],
       ...rawPayload,
-      id: user.scimId,  // Override AFTER spread — guaranteed correct
+      id: user.scimId,  // Override AFTER spread - guaranteed correct
       // ...
     };
 }
@@ -1684,19 +1684,19 @@ private stripReservedAttributes(payload: Record<string, unknown>): Record<string
 ### Test Coverage
 
 **5 unit tests added** (`endpoint-scim-users.service.spec.ts`):
-- `should not leak client-supplied id into the response` — POST with client `id`, verify response uses `scimId`
-- `should strip id from the stored rawPayload` — verify `rawPayload` in DB create call has no `id`
-- `should use scimId even when rawPayload contains id` — GET with leaked `rawPayload.id`
-- `should include scimId in meta.location, not rawPayload id` — location uses `scimId`
-- `should strip id from no-path replace value` — PATCH with `id` in value object
+- `should not leak client-supplied id into the response` - POST with client `id`, verify response uses `scimId`
+- `should strip id from the stored rawPayload` - verify `rawPayload` in DB create call has no `id`
+- `should use scimId even when rawPayload contains id` - GET with leaked `rawPayload.id`
+- `should include scimId in meta.location, not rawPayload id` - location uses `scimId`
+- `should strip id from no-path replace value` - PATCH with `id` in value object
 
 **4 E2E tests added** (`user-lifecycle.e2e-spec.ts`):
-- `should ignore client-supplied id and assign server-generated id` — POST + verify
-- `should allow GET by server-assigned id when client supplied a different id` — GET + 404 check
-- `should not allow id override via no-path replace PATCH` — PATCH + verify
-- `should ignore client-supplied id in PUT body` — PUT + verify
+- `should ignore client-supplied id and assign server-generated id` - POST + verify
+- `should allow GET by server-assigned id when client supplied a different id` - GET + 404 check
+- `should not allow id override via no-path replace PATCH` - PATCH + verify
+- `should ignore client-supplied id in PUT body` - PUT + verify
 
-**15 live tests added** (`live-test.ps1` — Section 3e):
+**15 live tests added** (`live-test.ps1` - Section 3e):
 - POST with client-supplied `id` → server ignores it
 - `meta.location` uses server-assigned id
 - GET by server-assigned id succeeds
@@ -1713,7 +1713,7 @@ This means the server MUST always control the `id` value. Clients SHOULD NOT inc
 
 ---
 
-## Issue 17 — Version Endpoint Reports Obsolete Blob Storage Fields
+## Issue 17 - Version Endpoint Reports Obsolete Blob Storage Fields
 
 | Property | Value |
 |---|---|
@@ -1725,10 +1725,10 @@ This means the server MUST always control the `id` value. Clients SHOULD NOT inc
 ### Symptoms
 
 The `GET /admin/version` response included obsolete fields:
-- `storage.blobBackupConfigured` — no longer relevant (blob backup was SQLite-specific)
-- `storage.blobAccount` — Azure Blob Storage account name
-- `storage.blobContainer` — Azure Blob Storage container name
-- `deployment.backupMode` — blob backup mode
+- `storage.blobBackupConfigured` - no longer relevant (blob backup was SQLite-specific)
+- `storage.blobAccount` - Azure Blob Storage account name
+- `storage.blobContainer` - Azure Blob Storage container name
+- `deployment.backupMode` - blob backup mode
 
 These fields referenced the old SQLite + Azure Blob Storage architecture that was replaced by PostgreSQL in Phase 3.
 
@@ -1740,9 +1740,9 @@ Updated `VersionInfo` interface and `getVersion()` method:
 - `blobBackupConfigured`, `blobAccount`, `blobContainer`, `backupMode`
 
 **Added fields:**
-- `storage.persistenceBackend` — reports active backend (`'postgres'` or `'inmemory'`)
-- `storage.connectionPool.maxConnections` — pg.Pool max connections
-- `deployment.migratePhase` — `'Phase 3 — PostgreSQL Migration'`
+- `storage.persistenceBackend` - reports active backend (`'postgres'` or `'inmemory'`)
+- `storage.connectionPool.maxConnections` - pg.Pool max connections
+- `deployment.migratePhase` - `'Phase 3 - PostgreSQL Migration'`
 
 **Version bumped:** `0.10.0` → `0.11.0`
 
@@ -1753,7 +1753,7 @@ Updated `VersionInfo` interface and `getVersion()` method:
 
 ---
 
-## Issue 18 — False Positive Test Audit: 29 Tests Passing for Wrong Reasons
+## Issue 18 - False Positive Test Audit: 29 Tests Passing for Wrong Reasons
 
 ### Detection
 
@@ -1765,15 +1765,15 @@ Multiple anti-patterns had accumulated across the test suite:
 
 | Pattern | Count | Level | Description |
 |---------|-------|-------|-------------|
-| Tautological assertion | 1 | E2E | `toBeGreaterThanOrEqual(0)` — always true |
-| Empty-loop assertion skip | 3 | E2E | `for (x of arr) { expect(x)... }` — zero iterations when array empty |
-| Conditional guard skip | 2 | E2E | `if (results.length > 0) { expect(...) }` — skips all assertions on empty |
+| Tautological assertion | 1 | E2E | `toBeGreaterThanOrEqual(0)` - always true |
+| Empty-loop assertion skip | 3 | E2E | `for (x of arr) { expect(x)... }` - zero iterations when array empty |
+| Conditional guard skip | 2 | E2E | `if (results.length > 0) { expect(...) }` - skips all assertions on empty |
 | Missing negative assertion | 1 | E2E | Tests happy path only, doesn't verify rejection |
-| Overly permissive assertion | 1 | E2E | `expect([200, 400]).toContain(status)` — accepts contradictory outcomes |
+| Overly permissive assertion | 1 | E2E | `expect([200, 400]).toContain(status)` - accepts contradictory outcomes |
 | Weak `toBeDefined()` only | 7 | Unit | Config validation tests don't verify stored values |
 | No assertions at all | 1 | Unit | Test has zero `expect()` calls |
 | Weak `.not.toThrow()` only | 2 | Unit | onModuleInit tests don't verify side effects |
-| Hardcoded `$true` | 2 | Live | `Test-Result -Success ($true)` — always passes |
+| Hardcoded `$true` | 2 | Live | `Test-Result -Success ($true)` - always passes |
 | Unguarded delete + `$true` | 3 | Live | DELETE not in try/catch, then hardcoded pass |
 | Vacuously true on empty | 4 | Live | Loop flag stays `$true` when collection empty |
 | Fallback `$true` branch | 2 | Live | Empty result treated as success instead of failure |
@@ -1788,7 +1788,7 @@ All 29 false positives fixed across 10 files:
 - `attribute-projection.e2e-spec.ts`: Replaced `if` guard with `expect(length).toBeGreaterThan(0)` assertion
 - `search-endpoint.e2e-spec.ts`: Same conditional guard → assertion fix
 - `edge-cases.e2e-spec.ts`: Pinned empty Operations behavior to `400` (server's actual behavior)
-- `rfc-compliance.e2e-spec.ts`: Added negative test — sends empty `schemas: []` → expects `400`
+- `rfc-compliance.e2e-spec.ts`: Added negative test - sends empty `schemas: []` → expects `400`
 
 **Unit (10 fixes in 2 files):**
 - `endpoint.service.spec.ts`: 7 config validation tests now verify `result.config!.MultiOpPatchRequestAddMultipleMembersToGroup` equals expected value; 2 onModuleInit tests now verify `setEndpointLevel` was not called
@@ -1803,22 +1803,22 @@ All 29 false positives fixed across 10 files:
 |-------|-------|--------|--------|
 | Unit | 862 | 28 | All pass |
 | E2E | 193 | 15 | All pass |
-| Live | 302 | — | 301 pass, 1 known failure (NDJSON field-name drift) |
+| Live | 302 | - | 301 pass, 1 known failure (NDJSON field-name drift) |
 
 ---
 
-## Issue 19 — Version Endpoint: Container Info, Timezone Fix, Credential Masking
+## Issue 19 - Version Endpoint: Container Info, Timezone Fix, Credential Masking
 
 | Field | Value |
 |-------|-------|
 | **Severity** | 🟡 Low (informational + security) |
-| **Detection** | User report — timezone shows "UTC", no container metadata, DB credentials visible |
+| **Detection** | User report - timezone shows "UTC", no container metadata, DB credentials visible |
 | **Files** | `admin.controller.ts`, `client.ts`, `admin-version.e2e-spec.ts`, docs (4 files) |
 | **Root Cause** | Version endpoint lacked container metadata; `maskSensitiveUrl()` only masked query params |
 
 ### Symptoms
 
-1. **Timezone shows "UTC"**: Docker containers legitimately report UTC via `Intl.DateTimeFormat()`. Not a bug, but unhelpful — no UTC offset information provided.
+1. **Timezone shows "UTC"**: Docker containers legitimately report UTC via `Intl.DateTimeFormat()`. Not a bug, but unhelpful - no UTC offset information provided.
 2. **No container metadata**: When running in Docker, no information about the app container (id, name, image) or database container (host, port, name).
 3. **Database credentials leak**: `maskSensitiveUrl()` only masked `token=`/`secret=`/`password=` query params but not userinfo in connection strings like `postgresql://scim:scim@postgres:5432/scimdb`.
 
@@ -1831,7 +1831,7 @@ All 29 false positives fixed across 10 files:
 - **New `buildContainerInfo()`**: Reads container ID from `/proc/self/cgroup` or hostname, parses `DATABASE_URL` for db metadata.
 - **New `readContainerId()`**: Multi-source container ID detection (cgroup → mountinfo → hostname fallback).
 
-**`web/src/api/client.ts`**: Updated `VersionInfo` type — replaced `databaseProvider: 'sqlite'`, blob fields with `databaseProvider: 'postgresql'`, `persistenceBackend`, `connectionPool`, `utcOffset`, `container` block.
+**`web/src/api/client.ts`**: Updated `VersionInfo` type - replaced `databaseProvider: 'sqlite'`, blob fields with `databaseProvider: 'postgresql'`, `persistenceBackend`, `connectionPool`, `utcOffset`, `container` block.
 
 **`admin-version.e2e-spec.ts`**: Added `utcOffset` regex check (`/^[+-]\d{2}:\d{2}$/`), added userinfo masking assertion.
 
@@ -1862,7 +1862,7 @@ Verified with `scim-results (22).json`: **25/25 passed + 7 preview, 0 false posi
 | 13 | AdminController stale `'sqlite'` | Test audit / code review | Hardcoded string not updated | `'sqlite'` → `'postgresql'` | 1 |
 | 14 | E2E assertion expects `'sqlite'` | E2E test run | Assertion matched old value | Updated assertion string | 1 |
 | 15 | UUID P2007 crash (8 failures) | E2E test run (8 failures) | `@db.Uuid` rejects non-UUID strings | `uuid-guard.ts` + repository guards | ~30 |
-| 16 | SCIM ID leak — client `id` overrides `scimId` | Manual testing | `...rawPayload` spread overwrites `id` + PATCH missing `id` in reserved set | Added `'id'` to `stripReservedAttributes()` | ~1 (+ 24 tests) |
+| 16 | SCIM ID leak - client `id` overrides `scimId` | Manual testing | `...rawPayload` spread overwrites `id` + PATCH missing `id` in reserved set | Added `'id'` to `stripReservedAttributes()` | ~1 (+ 24 tests) |
 | 17 | Version endpoint reports obsolete blob fields | Code review | `getVersion()` still has SQLite/Blob fields | Replaced with `persistenceBackend`, `connectionPool`, `migratePhase` | ~20 |
 | 18 | False positive test audit (29 tests) | Manual audit + systematic scan | Tautological assertions, empty-loop skips, hardcoded `$true`, conditional guards | Strengthened assertions across 10 files (5 E2E, 2 unit, 1 live) | ~80 |
 | 19 | Version endpoint: container info, timezone, credential masking | User report + code review | No container metadata, timezone shows only "UTC", DB credentials leak in `maskSensitiveUrl()` | Added `container` block, `utcOffset`, userinfo regex mask | ~100 |
@@ -1871,9 +1871,9 @@ Verified with `scim-results (22).json`: **25/25 passed + 7 preview, 0 false posi
 
 - **19 distinct issues** encountered and resolved (18 fixed, 1 accepted)
 - **~17 files** required fixes beyond the planned Phase 3 changes
-- **Cascading discovery** — Issues 1→2→3→4 formed a chain revealed by progressive compilation
+- **Cascading discovery** - Issues 1→2→3→4 formed a chain revealed by progressive compilation
 - **Test infrastructure** (Issues 5-8) required the most diagnosis effort due to misleading error messages
 - **Docker** (Issues 9-10) were quick fixes once root causes were identified
 - **Post-migration audit** (Issues 12-15) found SQLite remnants missed during the initial migration pass
-- **UUID guard** (Issue 15) was the most impactful — 8 E2E failures with a single root cause requiring a new utility plus 4 repository method changes
-- **False positive audit** (Issue 18) identified 29 tests across all levels that were passing for wrong reasons — now all strengthened
+- **UUID guard** (Issue 15) was the most impactful - 8 E2E failures with a single root cause requiring a new utility plus 4 repository method changes
+- **False positive audit** (Issue 18) identified 29 tests across all levels that were passing for wrong reasons - now all strengthened

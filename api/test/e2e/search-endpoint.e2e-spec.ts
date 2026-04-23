@@ -144,7 +144,7 @@ describe('POST /.search (E2E)', () => {
       const body = searchRequest({ excludedAttributes: 'members' });
       const res = await scimPost(app, `${basePath}/Groups/.search`, token, body).expect(200);
 
-      // Guard: group was created above — must appear in results
+      // Guard: group was created above - must appear in results
       expect(res.body.Resources.length).toBeGreaterThan(0);
       expect(res.body.Resources[0].members).toBeUndefined();
       expect(res.body.Resources[0].displayName).toBeDefined();

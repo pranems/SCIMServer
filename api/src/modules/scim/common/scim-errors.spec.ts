@@ -80,7 +80,7 @@ describe('createScimError', () => {
     });
 
     it('should not include diagnostics extension when no context and no diagnostics', () => {
-      // Outside request scope — no correlation context
+      // Outside request scope - no correlation context
       const err = createScimError({ status: 400, detail: 'test' });
       const body = err.getResponse() as Record<string, unknown>;
       expect(body[DIAGNOSTICS_URN]).toBeUndefined();
@@ -104,7 +104,7 @@ describe('createScimError', () => {
       const { AsyncLocalStorage } = require('async_hooks');
       const { getCorrelationContext } = require('../../logging/scim-logger.service');
 
-      // We need to use ScimLogger's runWithContext — but since createScimError reads
+      // We need to use ScimLogger's runWithContext - but since createScimError reads
       // the module-level correlationStorage directly via getCorrelationContext(),
       // we verify it works by calling within a ScimLogger context.
       const ScimLoggerModule = require('../../logging/scim-logger.service');
@@ -186,7 +186,7 @@ describe('createScimError', () => {
             status: 404,
             detail: 'Not found',
             scimType: 'noTarget',
-            // NO diagnostics param — should still auto-enrich from context
+            // NO diagnostics param - should still auto-enrich from context
           });
           body = err.getResponse() as Record<string, unknown>;
         },

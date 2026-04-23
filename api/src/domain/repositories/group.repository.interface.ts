@@ -1,11 +1,11 @@
 /**
- * IGroupRepository — persistence port for SCIM Group resources.
+ * IGroupRepository - persistence port for SCIM Group resources.
  *
  * Implementations:
  *   - PrismaGroupRepository  (PostgreSQL via Prisma)
  *   - InMemoryGroupRepository (testing / lightweight deployments)
  *
- * Phase 3: displayNameLower parameter renamed to displayName — CITEXT/InMemory
+ * Phase 3: displayNameLower parameter renamed to displayName - CITEXT/InMemory
  * handles case-insensitive comparison without a pre-computed lowercase column.
  */
 import type {

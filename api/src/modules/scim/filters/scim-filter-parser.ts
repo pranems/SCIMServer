@@ -1,5 +1,5 @@
 /**
- * SCIM 2.0 Filter Parser — RFC 7644 §3.4.2.2
+ * SCIM 2.0 Filter Parser - RFC 7644 §3.4.2.2
  *
  * Implements the full SCIM filter ABNF grammar:
  *   FILTER    = attrExp / logExp / valuePath / *1"not" "(" FILTER ")"
@@ -46,7 +46,7 @@ export interface NotNode {
   filter: FilterNode;
 }
 
-/** Value path expression: attrPath[valFilter] — e.g. emails[type eq "work"] */
+/** Value path expression: attrPath[valFilter] - e.g. emails[type eq "work"] */
 export interface ValuePathNode {
   type: 'valuePath';
   attrPath: string;
@@ -146,10 +146,10 @@ function tokenize(input: string): Token[] {
       while (i < input.length && /[\d.]/.test(input[i])) i++;
       // Verify next char is whitespace, bracket, paren, or EOF (not part of an identifier)
       if (i === numStart + (input[numStart] === '-' ? 1 : 0)) {
-        // No digits found — treat as identifier start below
+        // No digits found - treat as identifier start below
         i = numStart;
       } else if (i < input.length && /[a-zA-Z_:]/.test(input[i])) {
-        // Part of an identifier (e.g., attribute name starting with digits — unlikely but safe)
+        // Part of an identifier (e.g., attribute name starting with digits - unlikely but safe)
         i = numStart;
       } else {
         tokens.push({ type: 'NUMBER', value: input.slice(numStart, i), position: numStart });
@@ -407,8 +407,8 @@ export function parseScimFilter(filterStr: string): FilterNode {
  *   - Dotted paths:  "name.givenName" → resource.name.givenName
  *   - URN paths:     "urn:...:User:department" → resource["urn:...:User"].department
  *
- * @param resource — The SCIM resource (plain object)
- * @param attrPath — The attribute path string
+ * @param resource - The SCIM resource (plain object)
+ * @param attrPath - The attribute path string
  * @returns The resolved value, or undefined if not found
  */
 export function resolveAttrPath(resource: Record<string, unknown>, attrPath: string): unknown {
@@ -448,7 +448,7 @@ function resolveSimplePath(obj: Record<string, unknown>, path: string): unknown 
  * When caseExact=true, string comparisons are case-sensitive.
  */
 function compareValues(op: ScimCompareOp, actual: unknown, expected: unknown, caseExact = false): boolean {
-  // "pr" (presence) — attribute has a non-null, non-empty value
+  // "pr" (presence) - attribute has a non-null, non-empty value
   if (op === 'pr') {
     if (actual === undefined || actual === null) return false;
     if (typeof actual === 'string' && actual.length === 0) return false;
@@ -517,9 +517,9 @@ function compareValues(op: ScimCompareOp, actual: unknown, expected: unknown, ca
 /**
  * Evaluate a parsed SCIM filter AST against a resource object.
  *
- * @param node — The root AST node from parseScimFilter()
- * @param resource — The SCIM resource to test
- * @param caseExactAttrs — Optional set of lowercase attribute names/paths that are caseExact:true (R-CASE-1)
+ * @param node - The root AST node from parseScimFilter()
+ * @param resource - The SCIM resource to test
+ * @param caseExactAttrs - Optional set of lowercase attribute names/paths that are caseExact:true (R-CASE-1)
  * @returns true if the resource matches the filter
  *
  * @example

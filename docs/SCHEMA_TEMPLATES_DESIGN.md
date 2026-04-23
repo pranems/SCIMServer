@@ -1,4 +1,4 @@
-# Endpoint Profile Configuration — Design Document
+# Endpoint Profile Configuration - Design Document
 
 > **Version**: 0.28.0 | **Phase**: 13 | **Status**: ✅ Implementation Complete
 > **RFC References**: RFC 7643 §2–§7; RFC 7644 §4; RFC 7642 §5
@@ -9,31 +9,31 @@
 ## Table of Contents
 
 - [1. Problem Statement](#1-problem-statement)
-- [2. Design Principle — Use the Standard](#2-design-principle--use-the-standard)
+- [2. Design Principle - Use the Standard](#2-design-principle--use-the-standard)
 - [3. RFC Foundations](#3-rfc-foundations)
   - [3.1 The Three Discovery Documents](#31-the-three-discovery-documents)
   - [3.2 What the RFCs Require vs. Allow](#32-what-the-rfcs-require-vs-allow)
   - [3.3 The Tighten-Only Principle](#33-the-tighten-only-principle)
-- [4. Current Admin API — Redundancy Audit](#4-current-admin-api--redundancy-audit)
+- [4. Current Admin API - Redundancy Audit](#4-current-admin-api--redundancy-audit)
 - [5. The Unified Design](#5-the-unified-design)
   - [5.1 Core Idea](#51-core-idea)
-  - [5.2 The Endpoint Object — Before & After](#52-the-endpoint-object--before--after)
-  - [5.3 Embedded Profile — Design Rationale](#53-embedded-profile--design-rationale)
+  - [5.2 The Endpoint Object - Before & After](#52-the-endpoint-object--before--after)
+  - [5.3 Embedded Profile - Design Rationale](#53-embedded-profile--design-rationale)
   - [5.4 Named Presets](#54-named-presets)
   - [5.5 Built-in Presets Summary](#55-built-in-presets-summary)
   - [5.6 RFC-Aware Auto-Expand](#56-rfc-aware-auto-expand)
   - [5.7 Validation Engine](#57-validation-engine)
 - [6. Unified Admin API](#6-unified-admin-api)
   - [6.1 Complete API Surface](#61-complete-api-surface)
-  - [6.2 Endpoint Creation — Three Paths](#62-endpoint-creation--three-paths)
+  - [6.2 Endpoint Creation - Three Paths](#62-endpoint-creation--three-paths)
   - [6.3 Endpoint Lifecycle](#63-endpoint-lifecycle)
   - [6.4 PATCH Merge Strategy](#64-patch-merge-strategy)
   - [6.5 What Gets Eliminated](#65-what-gets-eliminated)
 - [7. Architecture](#7-architecture)
   - [7.1 High-Level Architecture](#71-high-level-architecture)
-  - [7.2 Request Flow — Discovery](#72-request-flow--discovery)
+  - [7.2 Request Flow - Discovery](#72-request-flow--discovery)
   - [7.3 Data Model Changes](#73-data-model-changes)
-- [8. Built-in Presets — Complete Definitions](#8-built-in-presets--complete-definitions)
+- [8. Built-in Presets - Complete Definitions](#8-built-in-presets--complete-definitions)
   - [8.1 entra-id (Default)](#81-entra-id-default)
   - [8.2 entra-id-minimal](#82-entra-id-minimal)
   - [8.3 rfc-standard](#83-rfc-standard)
@@ -45,27 +45,27 @@
   - [9.2 Derived Settings (2)](#92-derived-settings-2)
 - [10. RFC Compliance Analysis](#10-rfc-compliance-analysis)
   - [10.1 Required Attributes Audit](#101-required-attributes-audit)
-  - [10.2 Guardrails — RFC vs. Project](#102-guardrails--rfc-vs-project)
+  - [10.2 Guardrails - RFC vs. Project](#102-guardrails--rfc-vs-project)
   - [10.3 What Can Be Customized](#103-what-can-be-customized)
   - [10.4 What Cannot Be Customized](#104-what-cannot-be-customized)
 - [11. Feature-by-Feature Validation](#11-feature-by-feature-validation)
 - [12. Examples](#12-examples)
-  - [12.1 Quick Start — Default Preset](#121-quick-start--default-preset)
+  - [12.1 Quick Start - Default Preset](#121-quick-start--default-preset)
   - [12.2 Explicit Preset Selection](#122-explicit-preset-selection)
   - [12.3 Inline Profile at Creation](#123-inline-profile-at-creation)
   - [12.4 Preset + Customize (Hybrid)](#124-preset--customize-hybrid)
   - [12.5 Clone from Existing Server](#125-clone-from-existing-server)
-  - [12.6 Minimal Input — Auto-Expand](#126-minimal-input--auto-expand)
+  - [12.6 Minimal Input - Auto-Expand](#126-minimal-input--auto-expand)
 - [13. Deployment Notes](#13-deployment-notes)
 - [14. Resolved Design Decisions](#14-resolved-design-decisions)
 - [15. Implementation Plan](#15-implementation-plan)
-  - [15.1 Phase 1 — Data Model & Presets](#151-phase-1--data-model--presets)
-  - [15.2 Phase 2 — Validation Engine](#152-phase-2--validation-engine)
-  - [15.3 Phase 3 — Admin API Changes](#153-phase-3--admin-api-changes)
-  - [15.4 Phase 4 — Registry Hydration Refactor](#154-phase-4--registry-hydration-refactor)
-  - [15.5 Phase 5 — InMemory Backend Alignment](#155-phase-5--inmemory-backend-alignment)
-  - [15.6 Phase 6 — Test Suite](#156-phase-6--test-suite)
-  - [15.7 Phase 7 — Cleanup & Documentation](#157-phase-7--cleanup--documentation)
+  - [15.1 Phase 1 - Data Model & Presets](#151-phase-1--data-model--presets)
+  - [15.2 Phase 2 - Validation Engine](#152-phase-2--validation-engine)
+  - [15.3 Phase 3 - Admin API Changes](#153-phase-3--admin-api-changes)
+  - [15.4 Phase 4 - Registry Hydration Refactor](#154-phase-4--registry-hydration-refactor)
+  - [15.5 Phase 5 - InMemory Backend Alignment](#155-phase-5--inmemory-backend-alignment)
+  - [15.6 Phase 6 - Test Suite](#156-phase-6--test-suite)
+  - [15.7 Phase 7 - Cleanup & Documentation](#157-phase-7--cleanup--documentation)
   - [15.8 Dependency Graph](#158-dependency-graph)
   - [15.9 Effort Estimate](#159-effort-estimate)
 - [16. Open / Deferred Items](#16-open--deferred-items)
@@ -89,7 +89,7 @@ POST /admin/endpoints/:id/credentials            Register auth credential (per-c
 | # | Problem | Impact |
 |---|---------|--------|
 | 1 | **No way to declare which core attributes an endpoint supports** | `/Schemas` always returns all 20+ User attributes even if the endpoint uses 5 |
-| 2 | **No way to tighten attribute characteristics** | Can't express "require `emails` on User" — a universal real-world need |
+| 2 | **No way to tighten attribute characteristics** | Can't express "require `emails` on User" - a universal real-world need |
 | 3 | **No single view of endpoint's complete schema** | Must query 3 APIs + parse config flags to understand what an endpoint does |
 | 4 | **No reusable profiles** | Every endpoint configured from scratch; can't say "make it like Entra ID" |
 | 5 | **Redundant APIs** | Extension schemas and resource types have their own CRUD when they could live inside the endpoint profile |
@@ -122,7 +122,7 @@ graph TB
 
 ---
 
-## 2. Design Principle — Use the Standard
+## 2. Design Principle - Use the Standard
 
 The RFCs already define the exact JSON format for everything we need to configure:
 
@@ -137,8 +137,8 @@ The RFCs already define the exact JSON format for everything we need to configur
 - Eliminate every proprietary DTO/interface
 - Reuse existing TypeScript types (`ScimSchemaDefinition`, `ScimResourceType`)
 - Enable "clone from any SCIM server" by copying its discovery responses
-- Make the discovery endpoints trivial — just serve the stored config
-- Enable infrastructure-as-code — full endpoint config in one POST
+- Make the discovery endpoints trivial - just serve the stored config
+- Enable infrastructure-as-code - full endpoint config in one POST
 ---
 
 ## 3. RFC Foundations
@@ -167,7 +167,7 @@ Together, these three documents tell a client everything it needs to know to int
 |---|:---:|---|---|
 | `id` | **true** | readOnly | Server-assigned |
 | `userName` | **true** | readWrite | **Only RFC-mandated client-supplied required attribute** |
-| All others (`name`, `displayName`, `emails`, `active`, `phoneNumbers`, `addresses`, `roles`, `groups`, `password`, etc.) | false | varies | Optional — server's discretion per RFC 7643 §2.6 |
+| All others (`name`, `displayName`, `emails`, `active`, `phoneNumbers`, `addresses`, `roles`, `groups`, `password`, etc.) | false | varies | Optional - server's discretion per RFC 7643 §2.6 |
 
 #### Group Resource (RFC 7643 §4.2)
 
@@ -176,7 +176,7 @@ Together, these three documents tell a client everything it needs to know to int
 | `id` | **true** | readOnly | Server-assigned |
 | `displayName` | **true** | readWrite | **Only RFC-mandated client-supplied required attribute** |
 | `members`, `externalId` | false | varies | Optional |
-| `active` |  | — | **Not in RFC**  our project addition for deactivation support |
+| `active` |  | - | **Not in RFC**  our project addition for deactivation support |
 
 #### Common Attributes (RFC 7643 §3.1)
 
@@ -213,21 +213,21 @@ Real-world examples: Entra ID requires `emails`, Okta requires `name`, Google re
 
 ---
 
-## 4. Current Admin API — Redundancy Audit
+## 4. Current Admin API - Redundancy Audit
 
 | Current API | Routes | DB Table | Redundant? | Why |
 |---|---|---|:---:|---|
-| **EndpointController** | `POST/GET/PATCH/DELETE /admin/endpoints` | `Endpoint` | ❌ Keep | Core endpoint CRUD — still needed |
-| **AdminSchemaController** | `POST/GET/DELETE /admin/endpoints/:id/schemas` | `EndpointSchema` | **✅ Merge** | Extension schemas are just Schema documents — they belong inside the endpoint profile |
-| **AdminResourceTypeController** | `POST/GET/DELETE /admin/endpoints/:id/resource-types` | `EndpointResourceType` | **✅ Merge** | Resource types are just ResourceType documents — they belong inside the endpoint profile |
-| **AdminCredentialController** | `POST/GET/DELETE /admin/endpoints/:id/credentials` | `EndpointCredential` | ❌ Keep | Security concern — credentials are orthogonal to schema |
-| **Config flags** | Inside `Endpoint.config` JSONB | — | **✅ Merge** | Behavioral flags belong inside the unified endpoint profile |
+| **EndpointController** | `POST/GET/PATCH/DELETE /admin/endpoints` | `Endpoint` | ❌ Keep | Core endpoint CRUD - still needed |
+| **AdminSchemaController** | `POST/GET/DELETE /admin/endpoints/:id/schemas` | `EndpointSchema` | **✅ Merge** | Extension schemas are just Schema documents - they belong inside the endpoint profile |
+| **AdminResourceTypeController** | `POST/GET/DELETE /admin/endpoints/:id/resource-types` | `EndpointResourceType` | **✅ Merge** | Resource types are just ResourceType documents - they belong inside the endpoint profile |
+| **AdminCredentialController** | `POST/GET/DELETE /admin/endpoints/:id/credentials` | `EndpointCredential` | ❌ Keep | Security concern - credentials are orthogonal to schema |
+| **Config flags** | Inside `Endpoint.config` JSONB | - | **✅ Merge** | Behavioral flags belong inside the unified endpoint profile |
 
-**What gets merged into `profile`**: Schemas + ResourceTypes + ServiceProviderConfig + settings — single `profile` JSONB on the `Endpoint` record.
+**What gets merged into `profile`**: Schemas + ResourceTypes + ServiceProviderConfig + settings - single `profile` JSONB on the `Endpoint` record.
 
 **What stays separate**: Credentials (security concern, different lifecycle).
 
-**Tables that become obsolete**: `EndpointSchema`, `EndpointResourceType` — their data moves into `Endpoint.profile`.
+**Tables that become obsolete**: `EndpointSchema`, `EndpointResourceType` - their data moves into `Endpoint.profile`.
 
 #### Config Migration: Before vs. After
 
@@ -267,22 +267,22 @@ erDiagram
         uuid id PK
         string name UK
         string displayName
-        jsonb profile "NEW — replaces config + 2 tables"
+        jsonb profile "NEW - replaces config + 2 tables"
         boolean active
         datetime createdAt
         datetime updatedAt
     }
     EndpointSchema {
         uuid id PK
-        string schemaUrn "REMOVED — now in profile.schemas[]"
+        string schemaUrn "REMOVED - now in profile.schemas[]"
     }
     EndpointResourceType {
         uuid id PK
-        string name "REMOVED — now in profile.resourceTypes[]"
+        string name "REMOVED - now in profile.resourceTypes[]"
     }
     EndpointCredential {
         uuid id PK
-        string credentialType "KEPT — security concern"
+        string credentialType "KEPT - security concern"
         string credentialHash
     }
 ```
@@ -297,16 +297,16 @@ An endpoint's complete schema configuration is a single JSON document containing
 
 ```typescript
 interface EndpointProfile {
-  schemas: ScimSchemaDefinition[];       // RFC 7643 §7 — attribute definitions
-  resourceTypes: ScimResourceType[];     // RFC 7643 §6 — resource type declarations
-  serviceProviderConfig: ServiceProviderConfig;  // RFC 7644 §4 — capability advertisement
+  schemas: ScimSchemaDefinition[];       // RFC 7643 §7 - attribute definitions
+  resourceTypes: ScimResourceType[];     // RFC 7643 §6 - resource type declarations
+  serviceProviderConfig: ServiceProviderConfig;  // RFC 7644 §4 - capability advertisement
   settings: ProfileSettings;             // Project-specific behavioral flags
 }
 ```
 
 The first three are **native SCIM RFC formats**. The fourth is the only project-specific addition (not governed by any RFC).
 
-### 5.2 The Endpoint Object — Before & After
+### 5.2 The Endpoint Object - Before & After
 
 **Before (current):**
 
@@ -331,7 +331,7 @@ Endpoint
    EndpointCredential[]      Stays separate (security concern)
 ```
 
-### 5.3 Embedded Profile — Design Rationale
+### 5.3 Embedded Profile - Design Rationale
 
 We embed the profile directly in the `Endpoint` record rather than using a separate `/endpoint-profile` sub-resource. The rationale:
 
@@ -506,7 +506,7 @@ DELETE /admin/endpoints/:id/credentials/:cid  # Revoke credential
 GET    /admin/endpoints/:id/stats             # Resource counts
 ```
 
-### 6.2 Endpoint Creation — Three Paths
+### 6.2 Endpoint Creation - Three Paths
 
 ```
  Path A: Default (90% of cases  Entra ID)
@@ -718,7 +718,7 @@ flowchart TB
     style REG fill:#fffbe6,stroke:#faad14
 ```
 
-### 7.2 Request Flow — Discovery
+### 7.2 Request Flow - Discovery
 
 ```mermaid
 sequenceDiagram
@@ -885,7 +885,7 @@ WHERE  name = 'contoso';
 
 ---
 
-## 8. Built-in Presets — Complete Definitions
+## 8. Built-in Presets - Complete Definitions
 
 ### 8.1 `entra-id` (Default)
 
@@ -1348,7 +1348,7 @@ These are the absolute minimums that the validation engine enforces  everything 
 | `displayName` | `required: true` |  Auto-injected if missing |
 | Everything else | `required: false`  operator's discretion |  |
 
-### 10.2 Guardrails — RFC vs. Project
+### 10.2 Guardrails - RFC vs. Project
 
 | Guardrail | Source | Basis |
 |---|:---:|---|
@@ -1471,7 +1471,7 @@ All 38 existing SCIM features validated against the embedded profile model:
 
 ## 12. Examples
 
-### 12.1 Quick Start — Default Preset
+### 12.1 Quick Start - Default Preset
 
 **Request:**
 ```http
@@ -1652,7 +1652,7 @@ curl -X POST http://localhost:6000/admin/endpoints \
   }"
 ```
 
-### 12.6 Minimal Input — Auto-Expand
+### 12.6 Minimal Input - Auto-Expand
 
 Operator writes only what differs from RFC baseline:
 
@@ -1834,7 +1834,7 @@ All design decisions finalized during the March 912, 2026 design sessions.
 
 ## 15. Implementation Plan
 
-### 15.1 Phase 1 — Data Model & Presets
+### 15.1 Phase 1 - Data Model & Presets
 
 > **Goal:** Add the `profile` JSONB column, define RFC baselines and preset constants.
 > **Estimated effort:** 1.5 days
@@ -1873,7 +1873,7 @@ All design decisions finalized during the March 912, 2026 design sessions.
 
 ---
 
-### 15.2 Phase 2 — Validation Engine
+### 15.2 Phase 2 - Validation Engine
 
 > **Goal:** Implement auto-expand, auto-inject, tighten-only validation, and SPC truthfulness.
 > **Estimated effort:** 23 days | **Highest complexity phase**
@@ -1920,7 +1920,7 @@ All design decisions finalized during the March 912, 2026 design sessions.
 
 ---
 
-### 15.3 Phase 3 — Admin API Changes
+### 15.3 Phase 3 - Admin API Changes
 
 > **Goal:** Wire up new endpoint creation flow, preset read-only API, remove old controllers.
 > **Estimated effort:** 2 days
@@ -1989,7 +1989,7 @@ All design decisions finalized during the March 912, 2026 design sessions.
 
 ---
 
-### 15.4 Phase 4 — Registry Hydration Refactor
+### 15.4 Phase 4 - Registry Hydration Refactor
 
 > **Goal:** Make `ScimSchemaRegistry` hydrate from `Endpoint.profile` instead of separate tables.
 > **Estimated effort:** 1.5 days
@@ -2028,7 +2028,7 @@ All design decisions finalized during the March 912, 2026 design sessions.
 
 ---
 
-### 15.5 Phase 5 — InMemory Backend Alignment
+### 15.5 Phase 5 - InMemory Backend Alignment
 
 > **Goal:** Ensure InMemory persistence uses the same profile model.
 > **Estimated effort:** 1 day
@@ -2055,7 +2055,7 @@ All design decisions finalized during the March 912, 2026 design sessions.
 
 ---
 
-### 15.6 Phase 6 — Test Suite
+### 15.6 Phase 6 - Test Suite
 
 > **Goal:** Full test coverage  unit, E2E, live integration.
 > **Estimated effort:** 23 days
@@ -2137,7 +2137,7 @@ All design decisions finalized during the March 912, 2026 design sessions.
 
 ---
 
-### 15.7 Phase 7 — Cleanup & Documentation
+### 15.7 Phase 7 - Cleanup & Documentation
 
 > **Goal:** Remove dead code, update docs, bump version.
 > **Estimated effort:** 1 day
@@ -2333,34 +2333,34 @@ flowchart TB
 
 | Document | Relevance |
 |----------|-----------|
-| [SCHEMA_LIFECYCLE_AND_REGISTRY.md](SCHEMA_LIFECYCLE_AND_REGISTRY.md) | Current registry internals — `profile` hydration replaces multi-table boot |
-| [SCHEMA_CUSTOMIZATION_GUIDE.md](SCHEMA_CUSTOMIZATION_GUIDE.md) | Operator guide — will need rewrite for unified API |
+| [SCHEMA_LIFECYCLE_AND_REGISTRY.md](SCHEMA_LIFECYCLE_AND_REGISTRY.md) | Current registry internals - `profile` hydration replaces multi-table boot |
+| [SCHEMA_CUSTOMIZATION_GUIDE.md](SCHEMA_CUSTOMIZATION_GUIDE.md) | Operator guide - will need rewrite for unified API |
 | [RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md) | RFC rules that constrain the validation engine |
-| [SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md](SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md) | Behavior matrices — simplified by unified config |
-| [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | Config flags — now `profile.settings` |
-| [G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md](G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md) | Custom RTs — now inline in `profile.resourceTypes[]` |
-| [COMPLETE_AGNOSTIC_SCIM_ARCHITECTURE.md](COMPLETE_AGNOSTIC_SCIM_ARCHITECTURE.md) | Agnostic architecture — this design realizes the `ISchemaRepository` vision |
-| [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](DISCOVERY_ENDPOINTS_RFC_AUDIT.md) | Discovery accuracy — trivially satisfied when config IS the discovery response |
-| [NEXT_ITEMS_V0.28.0_ROADMAP.md](NEXT_ITEMS_V0.28.0_ROADMAP.md) | v0.28.0 roadmap — this feature is the flagship item |
+| [SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md](SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md) | Behavior matrices - simplified by unified config |
+| [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | Config flags - now `profile.settings` |
+| [G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md](G8B_CUSTOM_RESOURCE_TYPE_REGISTRATION.md) | Custom RTs - now inline in `profile.resourceTypes[]` |
+| [COMPLETE_AGNOSTIC_SCIM_ARCHITECTURE.md](COMPLETE_AGNOSTIC_SCIM_ARCHITECTURE.md) | Agnostic architecture - this design realizes the `ISchemaRepository` vision |
+| [DISCOVERY_ENDPOINTS_RFC_AUDIT.md](DISCOVERY_ENDPOINTS_RFC_AUDIT.md) | Discovery accuracy - trivially satisfied when config IS the discovery response |
+| [NEXT_ITEMS_V0.28.0_ROADMAP.md](NEXT_ITEMS_V0.28.0_ROADMAP.md) | v0.28.0 roadmap - this feature is the flagship item |
 
 ---
 
-## 18. Phase 14 — Profile-as-Cached-Runtime-Context Simplification (v0.29.0)
+## 18. Phase 14 - Profile-as-Cached-Runtime-Context Simplification (v0.29.0)
 
-> **Status**: 📐 Design Finalized — Ready for Implementation
+> **Status**: 📐 Design Finalized - Ready for Implementation
 > **Estimated effort**: ~6.5 days | **Net effect**: ~−500 lines, zero DB calls per SCIM request
 
 ### 18.1 Motivation
 
 Phase 13 introduced profile-based configuration but left three redundant in-memory representations:
 
-1. **InMemoryEndpoints Map** (EndpointService) — full records, InMemory backend only
-2. **endpointOverlays Map** (ScimSchemaRegistry) — schemas/RTs/SPC, all backends
-3. **EndpointContextStorage** (AsyncLocalStorage) — settings only, per-request
+1. **InMemoryEndpoints Map** (EndpointService) - full records, InMemory backend only
+2. **endpointOverlays Map** (ScimSchemaRegistry) - schemas/RTs/SPC, all backends
+3. **EndpointContextStorage** (AsyncLocalStorage) - settings only, per-request
 
 Phase 14 collapses all three into **one universal endpoint cache** with the profile as the single runtime source of truth.
 
-### 18.2 Architecture — Before vs. After
+### 18.2 Architecture - Before vs. After
 
 ```mermaid
 flowchart LR
@@ -2383,7 +2383,7 @@ flowchart LR
 
 ### 18.3 Implementation Phases
 
-#### Phase 14.1 — Endpoint Cache + Context Carries Profile (2 days)
+#### Phase 14.1 - Endpoint Cache + Context Carries Profile (2 days)
 
 - Add `cacheById` + `cacheByName` Maps to EndpointService
 - `onModuleInit()` warms cache from DB (both Prisma and InMemory)
@@ -2395,27 +2395,27 @@ flowchart LR
 - Add `getConfig()` compat shim: returns `profile.settings`
 - Controllers store profile in context, extract `config` locally for service compat
 
-#### Phase 14.2 — Discovery From Cache (1 day)
+#### Phase 14.2 - Discovery From Cache (1 day)
 
 - Discovery controller serves `profile.schemas`, `profile.resourceTypes`, `profile.serviceProviderConfig` directly from cached endpoint
 - Root-level discovery (`/scim/Schemas` etc.) served from expanded `rfc-standard` preset cached at startup
 - ScimDiscoveryService simplified to thin wrapper
 
-#### Phase 14.3 — Derive Flags From Profile (1 day)
+#### Phase 14.3 - Derive Flags From Profile (1 day)
 
 - `CustomResourceTypesEnabled` → derived from `profile.resourceTypes` having non-User/Group entries (D9)
 - `BulkOperationsEnabled` → derived from `profile.serviceProviderConfig.bulk.supported` (D8)
 - Remove both flags from `ENDPOINT_CONFIG_FLAGS`, `EndpointConfig`, `ProfileSettings`, `validateEndpointConfig`
 - Generic controller resolves resource types from profile, not registry
 
-#### Phase 14.4 — Gut ScimSchemaRegistry (1.5 days)
+#### Phase 14.4 - Gut ScimSchemaRegistry (1.5 days)
 
 - Remove: overlays, boot hydration, registration methods, global layer, extension tracking
 - Keep: root-level discovery defaults + `buildResourceSchemas()` helper
 - Registry shrinks from ~857 lines to ~100 lines
 - ScimSchemaHelpers reads schemas from profile parameter instead of registry
 
-#### Phase 14.5 — Cleanup + Tests + Version (1 day)
+#### Phase 14.5 - Cleanup + Tests + Version (1 day)
 
 - Delete dead files (endpoint-resource-type.model.ts, create-endpoint-resource-type.dto.ts + spec)
 - Remove dead symbols from endpoint-config.interface.ts

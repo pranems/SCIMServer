@@ -3,7 +3,7 @@
     Single-source version bump for the entire SCIMServer project.
 
 .DESCRIPTION
-    The canonical version lives in api/package.json — the single source of truth.
+    The canonical version lives in api/package.json - the single source of truth.
 
     This script performs a COMPREHENSIVE find-and-replace of the old version string
     across EVERY text file in the repo (not just .md), covering:
@@ -11,7 +11,7 @@
       - .github/prompts/*.prompt.md  (Copilot prompt files)
       - .github/copilot-instructions.md
       - JSON files: OpenAPI spec, version-latest badge, etc.
-      - PowerShell scripts (.ps1) — deploy, live-test, setup, etc.
+      - PowerShell scripts (.ps1) - deploy, live-test, setup, etc.
       - TypeScript source comments (.ts)
       - YAML CI workflows (.yml)
       - Dockerfiles
@@ -19,14 +19,14 @@
       - api/package-lock.json  (synced via npm)
 
     EXCLUDED (never modified):
-      - node_modules/         — third-party dependencies
-      - dist/                 — build artifacts
-      - coverage*/            — test coverage reports
-      - test-results/         — ephemeral test output
-      - api/package-lock.json — synced separately via npm
-      - .git/                 — git internals
-      - Binary files          — images, fonts, etc.
-      - This script itself    — bump-version.ps1 contains example versions in comments
+      - node_modules/         - third-party dependencies
+      - dist/                 - build artifacts
+      - coverage*/            - test coverage reports
+      - test-results/         - ephemeral test output
+      - api/package-lock.json - synced separately via npm
+      - .git/                 - git internals
+      - Binary files          - images, fonts, etc.
+      - This script itself    - bump-version.ps1 contains example versions in comments
 
     After replacement, it also:
       - Syncs api/package-lock.json via `npm install --package-lock-only`
@@ -71,7 +71,7 @@ if (-not $NewVersion) {
 }
 
 if ($NewVersion -eq $oldVersion) {
-    Write-Host "Version is already $oldVersion — nothing to do." -ForegroundColor Yellow
+    Write-Host "Version is already $oldVersion - nothing to do." -ForegroundColor Yellow
     return
 }
 
@@ -85,7 +85,7 @@ Write-Host ""
 Write-Host "╔══════════════════════════════════════════════════════╗" -ForegroundColor Cyan
 Write-Host "║  SCIMServer Version Bump: $oldVersion → $NewVersion" -ForegroundColor Cyan
 Write-Host "╚══════════════════════════════════════════════════════╝" -ForegroundColor Cyan
-if ($DryRun) { Write-Host "   (DRY RUN — no files will be modified)" -ForegroundColor Yellow }
+if ($DryRun) { Write-Host "   (DRY RUN - no files will be modified)" -ForegroundColor Yellow }
 Write-Host ""
 
 $touchedFiles  = [System.Collections.Generic.List[string]]::new()
@@ -128,7 +128,7 @@ $excludeDirPatterns = @(
 )
 $excludeFileNames = @(
     'package-lock.json',   # synced separately via npm
-    'bump-version.ps1'     # this script — contains example versions in comments
+    'bump-version.ps1'     # this script - contains example versions in comments
 )
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -207,7 +207,7 @@ if (Test-Path $changelogPath) {
     $newEntry = "## [$NewVersion] - $today`n`n> TODO: Describe changes for $NewVersion`n`n"
 
     if ($clContent.Contains("## [$NewVersion]")) {
-        Write-Host "   ⏭️  Entry for $NewVersion already exists — skipped" -ForegroundColor DarkGray
+        Write-Host "   ⏭️  Entry for $NewVersion already exists - skipped" -ForegroundColor DarkGray
     } else {
         $marker = "## [$oldVersion]"
         if ($clContent.Contains($marker)) {
@@ -219,13 +219,13 @@ if (Test-Path $changelogPath) {
             $touchedFiles.Add('CHANGELOG.md')
             $script:totalReplaces += 1
         } else {
-            Write-Host "   ⚠️  Could not find marker '$marker' in CHANGELOG — manual edit needed" -ForegroundColor Yellow
+            Write-Host "   ⚠️  Could not find marker '$marker' in CHANGELOG - manual edit needed" -ForegroundColor Yellow
         }
     }
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 5: Verification scan — confirm zero remaining old-version references
+# STEP 5: Verification scan - confirm zero remaining old-version references
 # ══════════════════════════════════════════════════════════════════════════════
 Write-Host "5️⃣  Verification scan..." -ForegroundColor White
 $remainingHits = Get-ChildItem -Path $repoRoot -Recurse -File -Force |
@@ -243,14 +243,14 @@ $remainingHits = Get-ChildItem -Path $repoRoot -Recurse -File -Force |
     Select-String $oldVersion -SimpleMatch
 
 if ($remainingHits.Count -eq 0) {
-    Write-Host "   ✅ Zero remaining '$oldVersion' references — clean!" -ForegroundColor Green
+    Write-Host "   ✅ Zero remaining '$oldVersion' references - clean!" -ForegroundColor Green
 } else {
     Write-Host "   ℹ️  $($remainingHits.Count) remaining '$oldVersion' references (historical/expected):" -ForegroundColor Yellow
     foreach ($h in $remainingHits) {
         $rel = $h.Path.Replace($repoRoot + '\', '')
         Write-Host "      $rel`:$($h.LineNumber)" -ForegroundColor DarkGray
     }
-    Write-Host "   These are historical references (e.g., 'Implemented in v$oldVersion') — no action needed." -ForegroundColor DarkGray
+    Write-Host "   These are historical references (e.g., 'Implemented in v$oldVersion') - no action needed." -ForegroundColor DarkGray
 }
 
 # ══════════════════════════════════════════════════════════════════════════════

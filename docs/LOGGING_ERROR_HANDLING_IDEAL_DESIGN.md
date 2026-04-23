@@ -1,7 +1,7 @@
 # Error Handling Architecture & Ideal Design
 
 > **Version:** 3.0 · **Source-verified against:** v0.35.0 · **Rewritten from scratch:** April 13, 2026  
-> Describes the *as-built* error handling architecture plus design principles — every claim verified against source.
+> Describes the *as-built* error handling architecture plus design principles - every claim verified against source.
 
 ---
 
@@ -40,7 +40,7 @@ The error handling architecture follows 9 core principles, all implemented in th
 | 1 | **RFC 7644 §3.12 compliance** | `status` as string, `schemas` array with Error URN, `scimType` vocabulary |
 | 2 | **Content-Type: application/scim+json** | Both exception filters set this header on all SCIM error responses |
 | 3 | **Self-service RCA via diagnostics** | Every SCIM error includes `requestId`, `endpointId`, `logsUrl` in diagnostics extension |
-| 4 | **Correlation context auto-enrichment** | `createScimError()` reads `getCorrelationContext()` — no DI injection needed |
+| 4 | **Correlation context auto-enrichment** | `createScimError()` reads `getCorrelationContext()` - no DI injection needed |
 | 5 | **Layered error boundaries** | Domain (RepositoryError) → Service (handleRepositoryError) → Filter (ScimExceptionFilter/GlobalExceptionFilter) |
 | 6 | **Tiered log levels** | 5xx=ERROR, 401/403=WARN, 404=DEBUG, other 4xx=INFO |
 | 7 | **No sensitive data leakage** | Internal error details never exposed to client; logger sanitizes secrets |
@@ -136,7 +136,7 @@ flowchart TD
 NestJS applies `APP_FILTER` providers in **reverse registration order** (last registered runs first). The registration order ensures correct catch precedence:
 
 ```typescript
-// scim.module.ts — registration order
+// scim.module.ts - registration order
 { provide: APP_FILTER, useClass: GlobalExceptionFilter },   // registered first → runs LAST
 { provide: APP_FILTER, useClass: ScimExceptionFilter },      // registered second → runs FIRST
 ```
@@ -179,7 +179,7 @@ Every SCIM error response conforms to:
 | Requirement | Status | Implementation |
 |------------|--------|----------------|
 | `schemas` array with Error URN | Yes | Both filters include `[SCIM_ERROR_SCHEMA]` |
-| `status` as **string** (not number) | Yes | `body.status = String(status)` — enforced in both filters |
+| `status` as **string** (not number) | Yes | `body.status = String(status)` - enforced in both filters |
 | `Content-Type: application/scim+json` | Yes | `response.setHeader('Content-Type', 'application/scim+json; charset=utf-8')` |
 | `scimType` vocabulary from Table 9 | Yes | `SCIM_ERROR_TYPE` enum in `scim-constants.ts` |
 | `detail` human-readable message | Yes | Always present |
@@ -225,9 +225,9 @@ flowchart LR
 ```
 
 **Three enrichment points:**
-1. `createScimError()` — reads correlation context + explicit diagnostics
-2. `ScimExceptionFilter` — adds diagnostics if not already present (G.4 fallback)
-3. `GlobalExceptionFilter` — adds diagnostics from correlation context for raw errors
+1. `createScimError()` - reads correlation context + explicit diagnostics
+2. `ScimExceptionFilter` - adds diagnostics if not already present (G.4 fallback)
+3. `GlobalExceptionFilter` - adds diagnostics from correlation context for raw errors
 
 ---
 
@@ -253,12 +253,12 @@ throw createScimError({
 
 ### Key Behaviors
 
-1. **Auto-enriches from correlation context** — reads `getCorrelationContext()` to add `requestId`, `endpointId`, `logsUrl` without DI
-2. **logsUrl computation** — routes to endpoint-scoped logs when `endpointId` is available, admin logs otherwise:
+1. **Auto-enriches from correlation context** - reads `getCorrelationContext()` to add `requestId`, `endpointId`, `logsUrl` without DI
+2. **logsUrl computation** - routes to endpoint-scoped logs when `endpointId` is available, admin logs otherwise:
    - With endpoint: `/scim/endpoints/{endpointId}/logs/recent?requestId={requestId}`
    - Without: `/scim/admin/log-config/recent?requestId={requestId}`
-3. **Only adds extension if meaningful** — skips `SCIM_DIAGNOSTICS_URN` if no fields are populated
-4. **Preserves scimType** — passes through to response body for client-side error handling
+3. **Only adds extension if meaningful** - skips `SCIM_DIAGNOSTICS_URN` if no fields are populated
+4. **Preserves scimType** - passes through to response body for client-side error handling
 
 ---
 
@@ -409,7 +409,7 @@ function handleRepositoryError(
       diagnostics: { errorCode: 'DATABASE_ERROR', triggeredBy: 'database' },
     });
   }
-  // Non-RepositoryError — re-throw for GlobalExceptionFilter
+  // Non-RepositoryError - re-throw for GlobalExceptionFilter
   throw error;
 }
 ```
@@ -577,7 +577,7 @@ The `SCIM_ERROR_TYPE` object enumerates all RFC 7644 Table 9 error keywords:
 }
 ```
 
-Note: Internal error details (`TypeError`, stack traces) are NEVER exposed to the client — only logged server-side.
+Note: Internal error details (`TypeError`, stack traces) are NEVER exposed to the client - only logged server-side.
 
 ### 415 Unsupported Media Type
 
@@ -623,7 +623,7 @@ Complete reference of every HTTP error status the server can return, with exact 
 | _(from PatchError)_ | `VALIDATION_PATCH` | _(dynamic)_ | PatchEngine rejects operation (invalidPath, invalidValue, noTarget, mutability) |
 | `invalidValue` | `HARD_DELETE_DISABLED` | User hard delete is not enabled | DELETE when `UserHardDeleteEnabled=false` |
 | `invalidValue` | `SOFT_DELETE_DISABLED` | User soft-delete is not enabled | PATCH `active=false` when `UserSoftDeleteEnabled=false` |
-| — | `DELETE_DISABLED` | Group/resource deletion is disabled | DELETE when `GroupHardDeleteEnabled=false` |
+| - | `DELETE_DISABLED` | Group/resource deletion is disabled | DELETE when `GroupHardDeleteEnabled=false` |
 | `invalidValue` | `BULK_INVALID_OPERATION` | POST operation requires data / missing schema | Invalid bulk operation structure |
 | `invalidPath` | `BULK_INVALID_OPERATION` | Unsupported resource type in bulk path | Bulk path is not `/Users` or `/Groups` |
 | `invalidValue` | `BULK_UNRESOLVED_BULKID` | Unresolved bulkId reference | bulkId not defined by a prior POST |
@@ -650,14 +650,14 @@ Complete reference of every HTTP error status the server can return, with exact 
 
 | scimType | errorCode | detail (pattern) | Trigger |
 |----------|-----------|-------------------|--------|
-| `noTarget` | `RESOURCE_NOT_FOUND` | Resource {id} not found. | GET/PATCH/PUT/DELETE by ID — not found |
-| — | — | Schema "{urn}" not found. | Discovery: unknown schema URN |
-| — | — | ResourceType "{id}" not found. | Discovery: unknown resource type |
-| — | — | Resource not found. | `SchemaDiscoveryEnabled=false` |
-| `noTarget` | — | No User resource found matching "..." | `/Me` — JWT `sub` doesn't match any user |
-| — | — | No custom resource type registered at "/..." | Custom RT path not configured |
-| — | — | Endpoint "{id}" not found | Admin endpoint CRUD |
-| — | — | Unknown preset "...". Valid presets: ... | Invalid preset name |
+| `noTarget` | `RESOURCE_NOT_FOUND` | Resource {id} not found. | GET/PATCH/PUT/DELETE by ID - not found |
+| - | - | Schema "{urn}" not found. | Discovery: unknown schema URN |
+| - | - | ResourceType "{id}" not found. | Discovery: unknown resource type |
+| - | - | Resource not found. | `SchemaDiscoveryEnabled=false` |
+| `noTarget` | - | No User resource found matching "..." | `/Me` - JWT `sub` doesn't match any user |
+| - | - | No custom resource type registered at "/..." | Custom RT path not configured |
+| - | - | Endpoint "{id}" not found | Admin endpoint CRUD |
+| - | - | Unknown preset "...". Valid presets: ... | Invalid preset name |
 
 ### 409 Conflict
 
@@ -696,7 +696,7 @@ Complete reference of every HTTP error status the server can return, with exact 
 | errorCode | detail | Trigger |
 |-----------|--------|---------|
 | `DATABASE_ERROR` | Failed to {operation}: ... | RepositoryError with code `UNKNOWN` |
-| — | Internal server error | Unhandled Error/TypeError (GlobalExceptionFilter) |
+| - | Internal server error | Unhandled Error/TypeError (GlobalExceptionFilter) |
 | `DATABASE_ERROR` | Failed to retrieve updated group. | Post-write re-fetch returns null |
 
 ### 503 Service Unavailable

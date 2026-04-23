@@ -21,7 +21,7 @@ import {
 } from './helpers/fixtures';
 
 /**
- * Test Gaps Audit #4 — Cross-feature integration & HTTP compliance gaps:
+ * Test Gaps Audit #4 - Cross-feature integration & HTTP compliance gaps:
  *
  * 1. Location header on POST 201 responses
  * 2. endpointId persisted in RequestLog (admin/logs endpoint-scoped queries)
@@ -32,7 +32,7 @@ import {
  * 7. ETag + Bulk combo (per-op If-Match)
  * 8. Three-flag combo: StrictSchema + SoftDelete + RequireIfMatch
  */
-describe('Test Gaps Audit #4 — Cross-feature integration & HTTP compliance (E2E)', () => {
+describe('Test Gaps Audit #4 - Cross-feature integration & HTTP compliance (E2E)', () => {
   let app: INestApplication;
   let token: string;
 
@@ -134,7 +134,7 @@ describe('Test Gaps Audit #4 — Cross-feature integration & HTTP compliance (E2
       // Create a user first
       const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
 
-      // Attempt bulk DELETE — should be blocked when hard-delete is disabled
+      // Attempt bulk DELETE - should be blocked when hard-delete is disabled
       const bulkBody = {
         schemas: ['urn:ietf:params:scim:api:messages:2.0:BulkRequest'],
         failOnErrors: 0,
@@ -187,7 +187,7 @@ describe('Test Gaps Audit #4 — Cross-feature integration & HTTP compliance (E2
 
       expect(res.body.Operations[0].status).toBe('200');
 
-      // Verify user is now soft-deleted (active=false) — still visible via GET
+      // Verify user is now soft-deleted (active=false) - still visible via GET
       const getRes = await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(200);
       expect(getRes.body.active).toBe(false);
     });
@@ -216,7 +216,7 @@ describe('Test Gaps Audit #4 — Cross-feature integration & HTTP compliance (E2
       // Soft-delete via PATCH
       await scimPatch(app, `${basePath}/Users/${user.id}`, token, deactivateUserPatch()).expect(200);
 
-      // GET should still return 200 — soft-deleted users are visible with active:false
+      // GET should still return 200 - soft-deleted users are visible with active:false
       const getRes = await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(200);
       expect(getRes.body.active).toBe(false);
 
@@ -369,7 +369,7 @@ describe('Test Gaps Audit #4 — Cross-feature integration & HTTP compliance (E2
         })
         .expect(200);
 
-      // User is soft-deleted — GET returns 200 with active=false
+      // User is soft-deleted - GET returns 200 with active=false
       const softRes = await scimGet(app, `${basePath}/Users/${user.id}`, token).expect(200);
       expect(softRes.body.active).toBe(false);
     });
@@ -429,7 +429,7 @@ describe('Test Gaps Audit #4 — Cross-feature integration & HTTP compliance (E2
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // 9. IgnoreReadOnly + StrictSchema + VerbosePatch — three-way combo
+  // 9. IgnoreReadOnly + StrictSchema + VerbosePatch - three-way combo
   // ═══════════════════════════════════════════════════════════════════
 
   describe('IgnoreReadOnly + StrictSchema + VerbosePatch combo', () => {
@@ -449,7 +449,7 @@ describe('Test Gaps Audit #4 — Cross-feature integration & HTTP compliance (E2
     it('should strip readOnly id in PATCH silently (IgnoreReadOnly) while enforcing StrictSchema', async () => {
       const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
 
-      // PATCH with readOnly 'id' — should be silently stripped, not rejected
+      // PATCH with readOnly 'id' - should be silently stripped, not rejected
       const res = await scimPatch(app, `${basePath}/Users/${user.id}`, token, {
         schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
         Operations: [
@@ -464,7 +464,7 @@ describe('Test Gaps Audit #4 — Cross-feature integration & HTTP compliance (E2
     it('should reject unknown attribute even with IgnoreReadOnly ON (StrictSchema enforced)', async () => {
       const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
 
-      // POST with unknown attribute — StrictSchema should reject
+      // POST with unknown attribute - StrictSchema should reject
       const badUser = validUser();
       (badUser as any).totallyUnknownField = 'bad';
       await scimPost(app, `${basePath}/Users`, token, badUser).expect(400);

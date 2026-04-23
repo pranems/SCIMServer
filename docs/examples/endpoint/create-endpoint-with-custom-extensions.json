@@ -1,11 +1,11 @@
 {
   "_comment": "One-click examples: Creating endpoints with custom extensions (all combinations)",
-  "_usage": "POST /scim/admin/endpoints — Copy any top-level object as request body",
+  "_usage": "POST /scim/admin/endpoints - Copy any top-level object as request body",
   "_docs": "See ENDPOINT_PROFILE_ARCHITECTURE.md, SCHEMA_CUSTOMIZATION_GUIDE.md",
 
 
   "1_user_extension_basic": {
-    "_comment": "Custom extension on User — single scalar attribute",
+    "_comment": "Custom extension on User - single scalar attribute",
     "name": "user-ext-basic",
     "profile": {
       "schemas": [
@@ -37,7 +37,7 @@
 
 
   "2_user_extension_full_characteristics": {
-    "_comment": "Custom extension on User — all mutability/returned characteristics demonstrated",
+    "_comment": "Custom extension on User - all mutability/returned characteristics demonstrated",
     "name": "user-ext-full",
     "profile": {
       "schemas": [
@@ -49,7 +49,7 @@
           "attributes": [
             { "name": "badgeNumber",      "type": "string",   "multiValued": false, "required": false, "mutability": "readWrite",  "returned": "default", "caseExact": true,  "uniqueness": "server",  "description": "Unique badge (readWrite, default, unique)" },
             { "name": "costCenter",       "type": "string",   "multiValued": false, "required": false, "mutability": "readWrite",  "returned": "default", "caseExact": false, "uniqueness": "none",    "description": "Cost center (readWrite, default)" },
-            { "name": "secretToken",      "type": "string",   "multiValued": false, "required": false, "mutability": "writeOnly",  "returned": "never",   "caseExact": true,  "uniqueness": "none",    "description": "Write-only — never returned in responses" },
+            { "name": "secretToken",      "type": "string",   "multiValued": false, "required": false, "mutability": "writeOnly",  "returned": "never",   "caseExact": true,  "uniqueness": "none",    "description": "Write-only - never returned in responses" },
             { "name": "hireDate",         "type": "dateTime", "multiValued": false, "required": false, "mutability": "immutable",  "returned": "default", "caseExact": false, "uniqueness": "none",    "description": "Set once on create, cannot be changed" },
             { "name": "internalNotes",    "type": "string",   "multiValued": false, "required": false, "mutability": "readWrite",  "returned": "request", "caseExact": false, "uniqueness": "none",    "description": "Only returned when ?attributes=internalNotes" },
             { "name": "tags",             "type": "string",   "multiValued": true,  "required": false, "mutability": "readWrite",  "returned": "default", "caseExact": false, "uniqueness": "none",    "description": "Multi-valued string array" },
@@ -76,7 +76,7 @@
 
 
   "3_group_extension": {
-    "_comment": "Custom extension on Group only — User remains standard",
+    "_comment": "Custom extension on Group only - User remains standard",
     "name": "group-ext",
     "profile": {
       "schemas": [
@@ -266,7 +266,7 @@
 
 
   "7_required_extension": {
-    "_comment": "Required extension — ALL users MUST include extension data on create",
+    "_comment": "Required extension - ALL users MUST include extension data on create",
     "name": "required-ext",
     "profile": {
       "schemas": [
@@ -275,7 +275,7 @@
         {
           "id": "urn:example:scim:extension:onboarding:2.0:User",
           "name": "OnboardingExtension",
-          "description": "Mandatory onboarding data — required on every user",
+          "description": "Mandatory onboarding data - required on every user",
           "attributes": [
             { "name": "enrollmentId", "type": "string",  "multiValued": false, "required": true,  "mutability": "immutable", "returned": "default", "caseExact": true,  "uniqueness": "server" },
             { "name": "sponsor",      "type": "string",  "multiValued": false, "required": true,  "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "none" }
@@ -498,7 +498,7 @@
 
 
   "_13_patch_add_extension_to_existing_endpoint": {
-    "_comment": "PATCH /scim/admin/endpoints/{id} — Add extension to an existing endpoint. NOTE: schemas + resourceTypes must be sent together (replace semantics)",
+    "_comment": "PATCH /scim/admin/endpoints/{id} - Add extension to an existing endpoint. NOTE: schemas + resourceTypes must be sent together (replace semantics)",
     "_method": "PATCH",
     "_path": "/scim/admin/endpoints/{id}",
     "profile": {
@@ -526,7 +526,7 @@
 
 
   "_usage_create_user_with_extension": {
-    "_comment": "POST /scim/endpoints/{endpointId}/Users — Create user with extension data (use with any endpoint above)",
+    "_comment": "POST /scim/endpoints/{endpointId}/Users - Create user with extension data (use with any endpoint above)",
     "_method": "POST",
     "_path": "/scim/endpoints/{endpointId}/Users",
     "schemas": [
@@ -548,7 +548,7 @@
 
 
   "_usage_patch_extension_attribute": {
-    "_comment": "PATCH /scim/endpoints/{endpointId}/Users/{userId} — Patch extension attribute",
+    "_comment": "PATCH /scim/endpoints/{endpointId}/Users/{userId} - Patch extension attribute",
     "_method": "PATCH",
     "_path": "/scim/endpoints/{endpointId}/Users/{userId}",
     "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
@@ -570,7 +570,7 @@
 
 
   "_usage_create_group_with_extension": {
-    "_comment": "POST /scim/endpoints/{endpointId}/Groups — Create group with extension data",
+    "_comment": "POST /scim/endpoints/{endpointId}/Groups - Create group with extension data",
     "_method": "POST",
     "_path": "/scim/endpoints/{endpointId}/Groups",
     "schemas": [

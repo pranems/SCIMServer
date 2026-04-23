@@ -1,6 +1,6 @@
-# RFC 7643 — Canonical Schema Representations (Normative Extracts)
+# RFC 7643 - Canonical Schema Representations (Normative Extracts)
 
-> **Source**: [RFC 7643 §8.7.1](https://datatracker.ietf.org/doc/html/rfc7643#section-8.7.1) — Resource Schema Representation  
+> **Source**: [RFC 7643 §8.7.1](https://datatracker.ietf.org/doc/html/rfc7643#section-8.7.1) - Resource Schema Representation  
 > **Fetched**: 2026-04-16 from https://datatracker.ietf.org/doc/html/rfc7643  
 > **Purpose**: Authoritative reference for attribute-level compliance audits  
 > **RFC Status**: Standards Track (September 2015), Updated by RFC 9865  
@@ -15,18 +15,18 @@
 | §2.2 | Attribute Characteristics | Lists 7 characteristics with defaults |
 | §2.3 | Attribute Data Types | string, boolean, decimal, integer, dateTime, binary, reference, complex |
 | §2.4 | Multi-Valued Attributes | Default sub-attrs: type, primary, display, value, $ref |
-| §3.1 | Common Attributes | id, externalId, meta — NOT part of schema attrs, but part of every resource |
+| §3.1 | Common Attributes | id, externalId, meta - NOT part of schema attrs, but part of every resource |
 | §4.1 | User Resource Schema | Singular + multi-valued User attributes |
 | §4.2 | Group Resource Schema | displayName + members |
 | §4.3 | Enterprise User Schema Extension | employeeNumber, costCenter, organization, division, department, manager |
 | §5 | ServiceProviderConfig | patch, bulk, filter, sort, etag, changePassword, authenticationSchemes |
 | §6 | ResourceType Schema | id, name, endpoint, schema, schemaExtensions |
-| §7 | Schema Definition | Schema of schemas — 11 characteristics |
+| §7 | Schema Definition | Schema of schemas - 11 characteristics |
 | §8.7.1 | Resource Schema Representation | **Normative** JSON for User, Group, EnterpriseUser schemas |
 
 ---
 
-## §2.2 — Attribute Characteristic Defaults (Verbatim)
+## §2.2 - Attribute Characteristic Defaults (Verbatim)
 
 > If not otherwise stated in Section 7, SCIM attributes have the following characteristics:
 >
@@ -38,39 +38,39 @@
 > - "uniqueness" is "none"
 > - "type" is "string"
 
-## §2.3.2 — Booleans
+## §2.3.2 - Booleans
 
 > A boolean has no case sensitivity or uniqueness.
 
 *(This means `uniqueness` SHOULD NOT be specified on boolean attributes.)*
 
-## §2.3.7 — References
+## §2.3.7 - References
 
 > A reference is case exact.
 
-## §2.3.8 — Complex
+## §2.3.8 - Complex
 
 > A complex attribute has no uniqueness or case sensitivity.
 
-## §2.4 — Multi-Valued Attribute Default Sub-Attributes (Verbatim)
+## §2.4 - Multi-Valued Attribute Default Sub-Attributes (Verbatim)
 
 > If not otherwise defined, the default set of sub-attributes for a multi-valued attribute is as follows:
 >
-> **type** — A label indicating the attribute's function, e.g., "work" or "home".
+> **type** - A label indicating the attribute's function, e.g., "work" or "home".
 >
-> **primary** — A Boolean value indicating the 'primary' or preferred attribute value for this attribute.
+> **primary** - A Boolean value indicating the 'primary' or preferred attribute value for this attribute.
 >
-> **display** — A human-readable name, primarily used for display purposes and having a mutability of "immutable".
+> **display** - A human-readable name, primarily used for display purposes and having a mutability of "immutable".
 >
-> **value** — The attribute's significant value, e.g., email address, phone number.
+> **value** - The attribute's significant value, e.g., email address, phone number.
 >
-> **$ref** — The reference URI of a target resource, if the attribute is a reference.
+> **$ref** - The reference URI of a target resource, if the attribute is a reference.
 
 **⚠️ RFC Internal Inconsistency**: §2.4 says `display` has `mutability: "immutable"`, but §8.7.1 schema representations specify `mutability: "readWrite"` for `display` sub-attributes. The §8.7.1 representation takes precedence as the normative schema definition.
 
 ---
 
-## §3.1 — Common Attributes (Verbatim Characteristics)
+## §3.1 - Common Attributes (Verbatim Characteristics)
 
 ### `id`
 - "Each representation of the resource MUST include a non-empty 'id' value."
@@ -80,7 +80,7 @@
 - `mutability: "readOnly"`
 - `returned: "always"`
 - **Note**: §3.1 does NOT specify `required` for `id`. Since `mutability: "readOnly"` means the server assigns it, `required: false` is the correct schema characteristic (clients don't provide it).
-- **Note**: `id` is a common attribute — "not defined in any particular schema" per §3.1. §3.1 says "For backward compatibility, some existing schema definitions MAY list common attributes as part of the schema."
+- **Note**: `id` is a common attribute - "not defined in any particular schema" per §3.1. §3.1 says "For backward compatibility, some existing schema definitions MAY list common attributes as part of the schema."
 
 ### `externalId`
 - `caseExact: true`
@@ -97,13 +97,13 @@
 
 ---
 
-## §8.7.1 — User Schema Representation (Normative JSON Extract)
+## §8.7.1 - User Schema Representation (Normative JSON Extract)
 
 **Schema URI**: `urn:ietf:params:scim:schemas:core:2.0:User`
 
 ### User Attributes (in RFC order)
 
-**Note**: `id`, `externalId`, and `meta` are NOT listed in §8.7.1 — they are common attributes from §3.1.
+**Note**: `id`, `externalId`, and `meta` are NOT listed in §8.7.1 - they are common attributes from §3.1.
 
 ```json
 [
@@ -296,16 +296,16 @@
 ```
 
 **Key observations about the RFC §8.7.1 User schema**:
-1. `id`, `externalId`, `meta` are NOT listed — they are common attributes from §3.1
-2. `uniqueness` is NOT specified on boolean attributes (`active`, `primary` sub-attrs) — per §2.3.2, booleans have "no uniqueness"
-3. `uniqueness` is NOT specified on all parent-level multi-valued attrs — inconsistent (emails has it, phoneNumbers doesn't)
+1. `id`, `externalId`, `meta` are NOT listed - they are common attributes from §3.1
+2. `uniqueness` is NOT specified on boolean attributes (`active`, `primary` sub-attrs) - per §2.3.2, booleans have "no uniqueness"
+3. `uniqueness` is NOT specified on all parent-level multi-valued attrs - inconsistent (emails has it, phoneNumbers doesn't)
 4. `display` sub-attribute IS present on emails, phoneNumbers, ims, photos, groups, entitlements, roles, x509Certificates
-5. `emails.value.required = false`, `emails.value.returned = "default"` — NOT `true`/`"always"`
-6. `userName.returned = "default"` — NOT `"always"`
+5. `emails.value.required = false`, `emails.value.returned = "default"` - NOT `true`/`"always"`
+6. `userName.returned = "default"` - NOT `"always"`
 
 ---
 
-## §8.7.1 — Group Schema Representation (Normative JSON Extract)
+## §8.7.1 - Group Schema Representation (Normative JSON Extract)
 
 **Schema URI**: `urn:ietf:params:scim:schemas:core:2.0:Group`
 
@@ -346,15 +346,15 @@
 
 **Key observations about the RFC §8.7.1 Group schema**:
 1. `displayName.required = false` in schema (⚠️ contradicts §4.2 prose which says "REQUIRED")
-2. `displayName.returned = "default"`, `displayName.uniqueness = "none"` — NOT `"always"` / `"server"`
-3. `members` has only 3 sub-attributes: `value`, `$ref`, `type` — NO `display` sub-attribute
-4. `members.value.required = false`, `members.value.returned = "default"` — NOT `true` / `"always"`
-5. `members.type.canonicalValues = ["User", "Group"]` — our implementation omits these
+2. `displayName.returned = "default"`, `displayName.uniqueness = "none"` - NOT `"always"` / `"server"`
+3. `members` has only 3 sub-attributes: `value`, `$ref`, `type` - NO `display` sub-attribute
+4. `members.value.required = false`, `members.value.returned = "default"` - NOT `true` / `"always"`
+5. `members.type.canonicalValues = ["User", "Group"]` - our implementation omits these
 6. No `id`, `externalId`, `meta` in the schema attributes (common attributes per §3.1)
 
 ---
 
-## §8.7.1 — Enterprise User Schema Representation (Normative JSON Extract)
+## §8.7.1 - Enterprise User Schema Representation (Normative JSON Extract)
 
 **Schema URI**: `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User`
 
@@ -394,7 +394,7 @@
 
 ---
 
-## §8.6 — ResourceType Representation (Normative JSON Extract)
+## §8.6 - ResourceType Representation (Normative JSON Extract)
 
 ```json
 [
@@ -431,11 +431,11 @@
 ]
 ```
 
-**Note**: RFC example has `"required": true` for EnterpriseUser extension. Our implementation uses `false`, which is a server choice — both are valid.
+**Note**: RFC example has `"required": true` for EnterpriseUser extension. Our implementation uses `false`, which is a server choice - both are valid.
 
 ---
 
-## §8.5 — ServiceProviderConfig Representation (Normative JSON Extract)
+## §8.5 - ServiceProviderConfig Representation (Normative JSON Extract)
 
 ```json
 {
@@ -482,5 +482,5 @@
 |---|---|---|---|---|
 | 1 | `display` mutability | `"immutable"` | `"readWrite"` | §8.7.1 takes precedence (normative schema) |
 | 2 | Group `displayName` required | §4.2: "REQUIRED" | `"required": false` | Schema representation takes precedence; REQUIRED refers to the resource, not the schema attribute |
-| 3 | `uniqueness` on booleans | §2.3.2: "no uniqueness" | Not specified | Omission is correct — booleans have no uniqueness |
+| 3 | `uniqueness` on booleans | §2.3.2: "no uniqueness" | Not specified | Omission is correct - booleans have no uniqueness |
 | 4 | `uniqueness` on parent multi-valued | Implied `"none"` | Inconsistent (emails: yes, phoneNumbers: no) | RFC is inconsistent; including is safer |

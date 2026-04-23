@@ -1,5 +1,5 @@
 /**
- * uuid-guard — Unit tests for the PostgreSQL UUID format validation guard.
+ * uuid-guard - Unit tests for the PostgreSQL UUID format validation guard.
  *
  * Ensures `isValidUuid` correctly accepts valid UUID v1-v7 strings and
  * rejects malformed / non-UUID inputs that would cause PostgreSQL P2007

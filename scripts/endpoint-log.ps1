@@ -6,10 +6,10 @@
     Convenience script to set, get, or clear per-endpoint log level overrides
     via the SCIMServer admin API. Supports:
 
-    1. set   — Set endpoint log level (DEBUG, TRACE, INFO, WARN, ERROR)
-    2. get   — Show current log config (highlights endpoint overrides)
-    3. clear — Remove endpoint override (reverts to global level)
-    4. tail  — Live-stream logs filtered to a specific endpoint
+    1. set   - Set endpoint log level (DEBUG, TRACE, INFO, WARN, ERROR)
+    2. get   - Show current log config (highlights endpoint overrides)
+    3. clear - Remove endpoint override (reverts to global level)
+    4. tail  - Live-stream logs filtered to a specific endpoint
 
 .PARAMETER Action
     Operation: set | get | clear | tail
@@ -219,7 +219,7 @@ function Invoke-Clear {
 
     try {
         Invoke-RestMethod -Uri $url -Headers (Get-Headers) -Method Delete
-        Write-Ok "Endpoint override removed — reverted to global level"
+        Write-Ok "Endpoint override removed - reverted to global level"
 
         # Show updated config
         Write-Step "Updated configuration"
@@ -244,7 +244,7 @@ function Invoke-Tail {
     if ($Level) { $qs += "level=$Level" }
     $url = "$AdminBase/stream?" + ($qs -join '&')
 
-    Write-Step "Live log stream for endpoint — press Ctrl+C to stop"
+    Write-Step "Live log stream for endpoint - press Ctrl+C to stop"
     Write-Info "Endpoint: $EndpointId"
     Write-Info "Level:    $($Level ?? 'ALL')"
     Write-Info "URL:      $url"
@@ -285,7 +285,7 @@ function Invoke-Tail {
                 Write-Ok "Connected to log stream"
             }
             elseif ($line.StartsWith(':')) {
-                # SSE keep-alive — ignore
+                # SSE keep-alive - ignore
             }
             elseif ($line.Trim()) {
                 Write-Host $line -ForegroundColor DarkGray

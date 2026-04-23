@@ -1,6 +1,6 @@
 #!/usr/bin/env npx ts-node
 /**
- * Phase 2 Data Migration Script — Unified scim_resource Table
+ * Phase 2 Data Migration Script - Unified scim_resource Table
  *
  * Migrates existing data from the legacy ScimUser/ScimGroup/GroupMember tables
  * to the unified ScimResource/ResourceMember tables.
@@ -10,8 +10,8 @@
  *   npx ts-node ../scripts/migrate-to-unified-resource.ts
  *
  * Safety:
- *   - Additive only — does NOT delete data from legacy tables
- *   - Idempotent — skips resources that already exist in scim_resource
+ *   - Additive only - does NOT delete data from legacy tables
+ *   - Idempotent - skips resources that already exist in scim_resource
  *   - Logs progress to stdout
  */
 

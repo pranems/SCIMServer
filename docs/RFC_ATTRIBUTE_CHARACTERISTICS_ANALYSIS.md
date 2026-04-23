@@ -1,4 +1,4 @@
-# RFC 7643 Attribute Characteristics — Complete Analysis
+# RFC 7643 Attribute Characteristics - Complete Analysis
 
 > **Version:** 0.29.0 · **Updated:** March 17, 2026  
 > **RFC References:** [RFC 7643](https://datatracker.ietf.org/doc/html/rfc7643) §2.1–§2.4, [RFC 7644](https://datatracker.ietf.org/doc/html/rfc7644) §3  
@@ -8,8 +8,8 @@
 
 ## Table of Contents
 
-- [Overview — What Are Attribute Characteristics?](#overview--what-are-attribute-characteristics)
-- [All 15 Characteristics — Complete Reference](#all-15-characteristics--complete-reference)
+- [Overview - What Are Attribute Characteristics?](#overview--what-are-attribute-characteristics)
+- [All 15 Characteristics - Complete Reference](#all-15-characteristics--complete-reference)
 - [Enforcement Architecture](#enforcement-architecture)
 - [Characteristic 1: type](#1-type)
 - [Characteristic 2: multiValued](#2-multivalued)
@@ -22,14 +22,14 @@
 - [Characteristic 9: referenceTypes](#9-referencetypes)
 - [Characteristic 10: subAttributes](#10-subattributes)
 - [Characteristic 11: description](#11-description)
-- [Industry Norms — How Major Vendors Compare](#industry-norms--how-major-vendors-compare)
+- [Industry Norms - How Major Vendors Compare](#industry-norms--how-major-vendors-compare)
 - [Coverage Summary & Compliance Score](#coverage-summary--compliance-score)
 - [Open Gaps & Roadmap](#open-gaps--roadmap)
 - [Test Coverage per Characteristic](#test-coverage-per-characteristic)
 
 ---
 
-## Overview — What Are Attribute Characteristics?
+## Overview - What Are Attribute Characteristics?
 
 RFC 7643 §2 defines **metadata properties on every SCIM attribute** that describe how the attribute behaves. These characteristics govern:
 
@@ -73,21 +73,21 @@ graph TD
 
 ---
 
-## All 15 Characteristics — Complete Reference
+## All 15 Characteristics - Complete Reference
 
 | # | Characteristic | RFC §ref | Values | Normative Keyword | SCIMServer Status |
 |---|---|---|---|---|---|
 | 1 | `type` | §2.1, §2.3 | string, boolean, integer, decimal, dateTime, complex, reference, binary | Implicit MUST | ✅ Full |
 | 2 | `multiValued` | §2.1 | true, false | Implicit MUST | ✅ Full |
 | 3 | `required` | §2.1 | true, false | MUST on create/replace | ✅ Full |
-| 4a | `mutability: readOnly` | §2.2 | — | **SHALL NOT** modify | ✅ Full |
-| 4b | `mutability: readWrite` | §2.2 | — | MAY | ✅ Full |
-| 4c | `mutability: immutable` | §2.2 | — | **SHALL NOT** after set | ✅ Full |
-| 4d | `mutability: writeOnly` | §2.2 | — | **SHALL NOT** return | ✅ Full |
-| 5a | `returned: always` | §2.4 | — | Always return | ✅ Full |
-| 5b | `returned: default` | §2.4 | — | Default behavior | ✅ Full |
-| 5c | `returned: never` | §2.4 | — | Never return | ✅ Full |
-| 5d | `returned: request` | §2.4 | — | Write responses only | ✅ Full |
+| 4a | `mutability: readOnly` | §2.2 | - | **SHALL NOT** modify | ✅ Full |
+| 4b | `mutability: readWrite` | §2.2 | - | MAY | ✅ Full |
+| 4c | `mutability: immutable` | §2.2 | - | **SHALL NOT** after set | ✅ Full |
+| 4d | `mutability: writeOnly` | §2.2 | - | **SHALL NOT** return | ✅ Full |
+| 5a | `returned: always` | §2.4 | - | Always return | ✅ Full |
+| 5b | `returned: default` | §2.4 | - | Default behavior | ✅ Full |
+| 5c | `returned: never` | §2.4 | - | Never return | ✅ Full |
+| 5d | `returned: request` | §2.4 | - | Write responses only | ✅ Full |
 | 6 | `uniqueness` | §2.1 | none, server, global | SHOULD (not MUST) | ⚠️ Partial |
 | 7 | `caseExact` | §2.1 | true, false | SHOULD preserve | ⚠️ Partial |
 | 8 | `canonicalValues` | §2.1 | string[] | SHOULD accept non-canonical | ✅ Full |
@@ -191,7 +191,7 @@ graph TD
 
 ### SCIMServer Enforcement
 
-**Location:** `SchemaValidator.validateSingleValue()` — [schema-validator.ts#L304](../api/src/domain/validation/schema-validator.ts)
+**Location:** `SchemaValidator.validateSingleValue()` - [schema-validator.ts#L304](../api/src/domain/validation/schema-validator.ts)
 
 ```typescript
 // Simplified logic:
@@ -207,7 +207,7 @@ switch (attrDef.type) {
 }
 ```
 
-### Example — Type Validation Error
+### Example - Type Validation Error
 
 ```http
 POST /scim/endpoints/{id}/Users
@@ -245,7 +245,7 @@ When `multiValued: true`, the value MUST be a JSON array. When `multiValued: fal
 
 ### SCIMServer Enforcement
 
-**Location:** `SchemaValidator.validateAttribute()` — [schema-validator.ts#L251](../api/src/domain/validation/schema-validator.ts)
+**Location:** `SchemaValidator.validateAttribute()` - [schema-validator.ts#L251](../api/src/domain/validation/schema-validator.ts)
 
 ```typescript
 if (attrDef.multiValued) {
@@ -257,7 +257,7 @@ if (attrDef.multiValued) {
 }
 ```
 
-### Example — Multi-Valued Attribute
+### Example - Multi-Valued Attribute
 
 ```json
 {
@@ -290,13 +290,13 @@ if (attrDef.multiValued) {
 
 ### Key RFC Nuance
 
-`required` applies to **POST (create) and PUT (replace)** only. RFC 7644 §3.5.2 says PATCH only modifies specific attributes — missing attributes are not changed, so `required` does not apply to PATCH.
+`required` applies to **POST (create) and PUT (replace)** only. RFC 7644 §3.5.2 says PATCH only modifies specific attributes - missing attributes are not changed, so `required` does not apply to PATCH.
 
-Additionally, `mutability: readOnly` exempts `required` checks. Attributes like `id` are `required: true` + `readOnly` — clients don't provide them; the server generates them.
+Additionally, `mutability: readOnly` exempts `required` checks. Attributes like `id` are `required: true` + `readOnly` - clients don't provide them; the server generates them.
 
 ### SCIMServer Enforcement
 
-**Location:** `SchemaValidator.validate()` — [schema-validator.ts#L73](../api/src/domain/validation/schema-validator.ts)
+**Location:** `SchemaValidator.validate()` - [schema-validator.ts#L73](../api/src/domain/validation/schema-validator.ts)
 
 ```typescript
 // Only enforce required on create/replace (not patch)
@@ -311,7 +311,7 @@ if (operation === 'create' || operation === 'replace') {
 }
 ```
 
-### Example — Missing Required Attribute
+### Example - Missing Required Attribute
 
 ```http
 POST /scim/endpoints/{id}/Users
@@ -381,17 +381,17 @@ graph LR
 | 3 | PATCH stripping | scim-service-helpers.ts | `stripReadOnlyPatchOps()` | Filters PATCH ops targeting readOnly attrs |
 | 4 | PATCH pre-validation (G8c) | schema-validator.ts | `validatePatchOperationValue()` | Rejects readOnly paths in strict mode: 400 `mutability` |
 
-**Sub-attribute handling (R-MUT-2):** ReadOnly sub-attributes within readWrite parents are stripped individually. Example: `name.formatted` is readOnly inside `name` (readWrite) — `name.formatted` is stripped but `name.givenName` is preserved.
+**Sub-attribute handling (R-MUT-2):** ReadOnly sub-attributes within readWrite parents are stripped individually. Example: `name.formatted` is readOnly inside `name` (readWrite) - `name.formatted` is stripped but `name.givenName` is preserved.
 
 ### 4b. `mutability: readWrite`
 
-Default — no restrictions. Accepted on write, included in responses.
+Default - no restrictions. Accepted on write, included in responses.
 
 ### 4c. `mutability: immutable`
 
 **RFC:** *"The attribute MAY be defined at resource creation...but SHALL NOT be changed thereafter."*
 
-**Location:** `SchemaValidator.checkImmutable()` — [schema-validator.ts#L480](../api/src/domain/validation/schema-validator.ts)
+**Location:** `SchemaValidator.checkImmutable()` - [schema-validator.ts#L480](../api/src/domain/validation/schema-validator.ts)
 
 Called on **PUT** to compare existing vs. incoming resource:
 
@@ -416,9 +416,9 @@ Handles: scalar values, complex objects (deep comparison), multi-valued arrays (
 |---|-------|--------|
 | 1 | Response stripping | `collectReturnedCharacteristics()` maps writeOnly → returned:never (R-MUT-1) |
 | 2 | Filter blocking | `validateFilterAttributePaths()` rejects writeOnly attrs in filter expressions (CROSS-03) |
-| 3 | Write acceptance | No rejection — writeOnly values are accepted and stored |
+| 3 | Write acceptance | No rejection - writeOnly values are accepted and stored |
 
-### Example — Lexmark Custom Extension (writeOnly)
+### Example - Lexmark Custom Extension (writeOnly)
 
 ```http
 POST /scim/endpoints/{id}/Users
@@ -434,7 +434,7 @@ Content-Type: application/scim+json
 }
 ```
 
-**Response: 201 Created** — `badgeCode` and `pin` are **absent** from the response:
+**Response: 201 Created** - `badgeCode` and `pin` are **absent** from the response:
 
 ```json
 {
@@ -445,7 +445,7 @@ Content-Type: application/scim+json
 }
 ```
 
-Even `?attributes=urn:ietf:params:scim:schemas:extension:custom:2.0:User:badgeCode` will NOT return the value — `returned: never` is absolute.
+Even `?attributes=urn:ietf:params:scim:schemas:extension:custom:2.0:User:badgeCode` will NOT return the value - `returned: never` is absolute.
 
 **Coverage:** ✅ Full for all 4 mutability values · **Tests:** `readonly-stripping.e2e-spec.ts` (17 tests), `p2-attribute-characteristics.e2e-spec.ts` (13 tests), `returned-characteristic.e2e-spec.ts`, `lexmark-isv.e2e-spec.ts` (writeOnly tests)
 
@@ -467,8 +467,8 @@ graph TD
 
 ### Key RFC Rules
 
-1. **`always`** overrides `excludedAttributes` — `id`, `meta`, `schemas` are ALWAYS returned
-2. **`never`** overrides `attributes` — even explicit `?attributes=password` won't return it
+1. **`always`** overrides `excludedAttributes` - `id`, `meta`, `schemas` are ALWAYS returned
+2. **`never`** overrides `attributes` - even explicit `?attributes=password` won't return it
 3. **`request`** appears in POST/PUT/PATCH responses but NOT in GET/LIST unless `?attributes=` names it
 4. **`default`** appears unless `excludedAttributes` names it
 
@@ -477,9 +477,9 @@ graph TD
 | returned value | Enforcement location | Method |
 |---|---|---|
 | `always` | scim-attribute-projection.ts | `ALWAYS_RETURNED_BASE` + `getAlwaysReturnedForResource()` (R-RET-1) |
-| `default` | scim-attribute-projection.ts | `excludeAttrs()` — removed only if named in `excludedAttributes` |
-| `never` | scim-attribute-projection.ts | `stripReturnedNever()` — applied to ALL responses |
-| `request` | scim-attribute-projection.ts | `stripRequestOnlyAttrs()` — stripped on reads unless in `?attributes=` |
+| `default` | scim-attribute-projection.ts | `excludeAttrs()` - removed only if named in `excludedAttributes` |
+| `never` | scim-attribute-projection.ts | `stripReturnedNever()` - applied to ALL responses |
+| `request` | scim-attribute-projection.ts | `stripRequestOnlyAttrs()` - stripped on reads unless in `?attributes=` |
 
 ### Sub-attribute `returned: always` (R-RET-3)
 
@@ -497,12 +497,12 @@ GET /Users/{id}?attributes=emails
 
 | Scenario | `?attributes=` | `?excludedAttributes=` | `returned: always` | `returned: never` | Result |
 |----------|---------------|----------------------|--------------------|--------------------|--------|
-| No params | — | — | Included | Excluded | Default attrs returned |
-| Include list | `userName,emails` | — | Still included | Still excluded | Only named + always |
-| Exclude list | — | `phoneNumbers` | Still included | Still excluded | All default minus excluded |
+| No params | - | - | Included | Excluded | Default attrs returned |
+| Include list | `userName,emails` | - | Still included | Still excluded | Only named + always |
+| Exclude list | - | `phoneNumbers` | Still included | Still excluded | All default minus excluded |
 | Both (illegal) | `userName` | `emails` | `attributes` wins per RFC 7644 §3.4.2.5 | Still excluded | Only named + always |
-| never + attributes | `password` | — | n/a | **Still excluded** | `password` NOT returned |
-| always + excluded | — | `id` | **Still included** | n/a | `id` IS returned |
+| never + attributes | `password` | - | n/a | **Still excluded** | `password` NOT returned |
+| always + excluded | - | `id` | **Still included** | n/a | `id` IS returned |
 
 **Coverage:** ✅ Full · **Tests:** `returned-characteristic.e2e-spec.ts`, `attribute-projection.e2e-spec.ts`, `p2-attribute-characteristics.e2e-spec.ts`, `lexmark-isv.e2e-spec.ts`
 
@@ -512,9 +512,9 @@ GET /Users/{id}?attributes=emails
 
 ### What RFC 7643 §2.1 Says
 
-> `none` — *"The values are not intended to be unique in any way."*
-> `server` — *"The value SHOULD be unique within the context of the current SCIM endpoint."*
-> `global` — *"The value SHOULD be globally unique."*
+> `none` - *"The values are not intended to be unique in any way."*
+> `server` - *"The value SHOULD be unique within the context of the current SCIM endpoint."*
+> `global` - *"The value SHOULD be globally unique."*
 
 **Key word: SHOULD, not MUST.** Uniqueness enforcement is recommended but not mandatory.
 
@@ -528,7 +528,7 @@ GET /Users/{id}?attributes=emails
 | Custom ext attrs | `uniqueness: "server"` | ⚠️ No | Not schema-driven for arbitrary attributes |
 | Any attr | `uniqueness: "global"` | ❌ No | Cross-endpoint uniqueness not implemented |
 
-### Example — Uniqueness Violation
+### Example - Uniqueness Violation
 
 ```http
 POST /scim/endpoints/{id}/Users
@@ -546,7 +546,7 @@ Content-Type: application/scim+json
 }
 ```
 
-**Coverage:** ⚠️ Partial — Hardcoded for `userName`, `externalId`, `displayName`. Not schema-driven for arbitrary custom extension attributes. `global` not implemented.
+**Coverage:** ⚠️ Partial - Hardcoded for `userName`, `externalId`, `displayName`. Not schema-driven for arbitrary custom extension attributes. `global` not implemented.
 
 ---
 
@@ -560,12 +560,12 @@ Content-Type: application/scim+json
 
 | Context | Enforced? | How |
 |---------|-----------|-----|
-| **Filter evaluation (in-memory)** | ✅ Yes | `compareValues()` in scim-filter-parser.ts — lowercases both sides when `caseExact: false` |
-| **Filter evaluation (Prisma)** | ✅ Yes | `buildColumnFilter()` — `citext` columns = case-insensitive, `text` columns = case-sensitive |
+| **Filter evaluation (in-memory)** | ✅ Yes | `compareValues()` in scim-filter-parser.ts - lowercases both sides when `caseExact: false` |
+| **Filter evaluation (Prisma)** | ✅ Yes | `buildColumnFilter()` - `citext` columns = case-insensitive, `text` columns = case-sensitive |
 | **Uniqueness checks** | ⚠️ Partial | `userName` uses citext (always case-insensitive ✅), `externalId` uses text (always case-sensitive ✅), but not schema-driven for custom attrs |
 | **Sort ordering** | ⚠️ No | DB collation determines sort order, not schema caseExact |
 
-### Example — caseExact in Filter
+### Example - caseExact in Filter
 
 Given: `userName` has `caseExact: false`, `externalId` has `caseExact: true`
 
@@ -577,7 +577,7 @@ GET /Users?filter=externalId eq "EXT-001"
 → Does NOT match user with externalId "ext-001" (case-sensitive)
 ```
 
-**Coverage:** ⚠️ Partial — Full for filters, partial for write-path uniqueness
+**Coverage:** ⚠️ Partial - Full for filters, partial for write-path uniqueness
 
 ---
 
@@ -587,11 +587,11 @@ GET /Users?filter=externalId eq "EXT-001"
 
 > *"A collection of suggested canonical values that MAY be used. The service provider SHOULD accept non-canonical values."*
 
-**Key: SHOULD accept non-canonical.** The RFC explicitly says validators SHOULD NOT reject non-canonical values. Our implementation validates against canonical values — this is **stricter than RFC requires** but more practical for data quality.
+**Key: SHOULD accept non-canonical.** The RFC explicitly says validators SHOULD NOT reject non-canonical values. Our implementation validates against canonical values - this is **stricter than RFC requires** but more practical for data quality.
 
 ### SCIMServer Enforcement
 
-**Location:** `SchemaValidator.validateSingleValue()` — V10 block at [schema-validator.ts#L304](../api/src/domain/validation/schema-validator.ts)
+**Location:** `SchemaValidator.validateSingleValue()` - V10 block at [schema-validator.ts#L304](../api/src/domain/validation/schema-validator.ts)
 
 ```typescript
 if (attrDef.canonicalValues?.length && typeof value === 'string') {
@@ -613,14 +613,14 @@ Comparison is always case-insensitive. Example canonical values: `emails.type` �
 
 > *"A multi-valued array of JSON strings that indicate the SCIM resource types that may be referenced. Each reference attribute MAY contain a 'referenceTypes' property."*
 
-Note the **MAY** — this is purely advisory metadata.
+Note the **MAY** - this is purely advisory metadata.
 
 ### SCIMServer Enforcement
 
 `referenceTypes` values are:
 - ✅ **Declared** in schema attribute definitions
 - ✅ **Exposed** via `/Schemas` discovery endpoint
-- ❌ **Not validated** at runtime — a `$ref` declared as `referenceTypes: ["User"]` will accept a value pointing to a Group
+- ❌ **Not validated** at runtime - a `$ref` declared as `referenceTypes: ["User"]` will accept a value pointing to a Group
 
 ### Why This Is Acceptable
 
@@ -641,7 +641,7 @@ No major SCIM implementation (Entra ID, Okta, Ping, OneLogin) validates referenc
 
 ### SCIMServer Enforcement
 
-**Location:** `SchemaValidator.validateSubAttributes()` — [schema-validator.ts#L422](../api/src/domain/validation/schema-validator.ts)
+**Location:** `SchemaValidator.validateSubAttributes()` - [schema-validator.ts#L422](../api/src/domain/validation/schema-validator.ts)
 
 Full recursive validation:
 - **Required sub-attributes** (V9): Checked on create/replace
@@ -651,7 +651,7 @@ Full recursive validation:
 - **ReadOnly sub-attribute stripping** (R-MUT-2): Within readWrite parents
 - **returned:always sub-attributes** (R-RET-3): Preserved during projection
 
-### Example — Complex Attribute with Sub-attributes
+### Example - Complex Attribute with Sub-attributes
 
 ```json
 {
@@ -682,7 +682,7 @@ Purely informational. Exposed via `/Schemas` discovery endpoint. Not used for va
 
 ---
 
-## Industry Norms — How Major Vendors Compare
+## Industry Norms - How Major Vendors Compare
 
 | Characteristic | Entra ID | Okta | Ping | OneLogin | **SCIMServer** |
 |---|---|---|---|---|---|
@@ -705,26 +705,26 @@ Purely informational. Exposed via `/Schemas` discovery endpoint. Not used for va
 ### Enforcement Tier Breakdown
 
 ```
-TIER 1 — UNIVERSALLY ENFORCED (all vendors + SCIMServer)
+TIER 1 - UNIVERSALLY ENFORCED (all vendors + SCIMServer)
 ├── type, required, multiValued, subAttributes
 ├── mutability: readOnly, writeOnly
 ├── returned: always, never
 └── description (informational)
 
-TIER 2 — COMMONLY ENFORCED (most good implementations + SCIMServer)
+TIER 2 - COMMONLY ENFORCED (most good implementations + SCIMServer)
 ├── mutability: immutable
 ├── uniqueness: server (hardcoded attrs)
 ├── returned: default
 ├── caseExact (filter evaluation)
 └── canonicalValues
 
-TIER 3 — RARELY ENFORCED (strictest only — SCIMServer partial)
+TIER 3 - RARELY ENFORCED (strictest only - SCIMServer partial)
 ├── uniqueness: server (schema-driven) ← SCIMServer: partial
 ├── caseExact (write-path uniqueness) ← SCIMServer: partial
 ├── returned: request ← SCIMServer: ✅ Full
 └── mutability: readOnly sub-attributes ← SCIMServer: ✅ Full
 
-TIER 4 — ALMOST NEVER ENFORCED (no vendor does this)
+TIER 4 - ALMOST NEVER ENFORCED (no vendor does this)
 ├── referenceTypes validation
 ├── uniqueness: global
 └── canonicalValues as hard restriction (RFC says DON'T)
@@ -739,11 +739,11 @@ TIER 4 — ALMOST NEVER ENFORCED (no vendor does this)
 | **Characteristics** | 13 | 2 | 0 | 15 |
 | **Percentage** | 87% | 13% | 0% | 100% |
 
-**Compliance vs. RFC MUST/SHALL requirements:** 100% — all mandatory (MUST/SHALL) behavior is fully enforced.
+**Compliance vs. RFC MUST/SHALL requirements:** 100% - all mandatory (MUST/SHALL) behavior is fully enforced.
 
-**Compliance vs. RFC SHOULD requirements:** ~94% — the two SHOULD-level items (schema-driven uniqueness:server, caseExact on writes) are partially enforced via hardcoded patterns.
+**Compliance vs. RFC SHOULD requirements:** ~94% - the two SHOULD-level items (schema-driven uniqueness:server, caseExact on writes) are partially enforced via hardcoded patterns.
 
-**Compliance vs. industry norms:** Top-tier — ahead of Entra ID, OneLogin, Ping; on par with Okta. Only implementation fully enforcing `returned: request` and `mutability: readOnly` sub-attribute stripping.
+**Compliance vs. industry norms:** Top-tier - ahead of Entra ID, OneLogin, Ping; on par with Okta. Only implementation fully enforcing `returned: request` and `mutability: readOnly` sub-attribute stripping.
 
 ---
 
@@ -753,8 +753,8 @@ TIER 4 — ALMOST NEVER ENFORCED (no vendor does this)
 |---|-----|-------------|--------|-------------------|
 | 1 | `uniqueness: server` not schema-driven | SHOULD | Custom extensions can't declare unique attrs | Add `assertSchemaUniqueness()` helper |
 | 2 | `caseExact` not used for write-path uniqueness | SHOULD | DB collation drives comparison, not schema | Use caseExact in uniqueness helper |
-| 3 | `referenceTypes` not validated | MAY | $ref values not checked against type | Skip — no vendor does this |
-| 4 | `uniqueness: global` not implemented | SHOULD | Cross-endpoint uniqueness not enforced | Skip — breaks multi-tenancy |
+| 3 | `referenceTypes` not validated | MAY | $ref values not checked against type | Skip - no vendor does this |
+| 4 | `uniqueness: global` not implemented | SHOULD | Cross-endpoint uniqueness not enforced | Skip - breaks multi-tenancy |
 
 ### Recommended Implementation for Gap 1+2
 

@@ -1,4 +1,4 @@
-﻿import {
+import {
   CanActivate,
   ExecutionContext,
   Injectable,
@@ -21,7 +21,7 @@ import type { IEndpointCredentialRepository } from '../../domain/repositories/en
 import { EndpointService } from '../endpoint/services/endpoint.service';
 import { getConfigBoolean, ENDPOINT_CONFIG_FLAGS, type EndpointConfig } from '../endpoint/endpoint-config.interface';
 
-// bcrypt is heavy — lazy-load via dynamic import cached on first use
+// bcrypt is heavy - lazy-load via dynamic import cached on first use
 let bcryptCompare: (data: string, hash: string) => Promise<boolean>;
 async function loadBcryptCompare(): Promise<typeof bcryptCompare> {
   if (!bcryptCompare) {
@@ -202,7 +202,7 @@ export class SharedSecretGuard implements CanActivate {
       }
 
       this.logger.debug(LogCategory.AUTH, 'Per-endpoint credential mismatch, falling back to OAuth/legacy', { endpointId });
-      return false; // No match — fall through to OAuth/legacy
+      return false; // No match - fall through to OAuth/legacy
     } catch (error) {
       // If endpoint not found or any error, fall through to global auth
       this.logger.debug(LogCategory.AUTH, 'Per-endpoint credential check failed, falling back', {

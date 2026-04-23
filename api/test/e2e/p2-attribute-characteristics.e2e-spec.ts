@@ -138,7 +138,7 @@ describe('P2 Attribute Characteristics (E2E)', () => {
         token,
       ).expect(200);
 
-      // displayName is returned:'always' — must NOT be excluded
+      // displayName is returned:'always' - must NOT be excluded
       expect(res.body.displayName).toBe('KeepMe');
     });
   });
@@ -212,7 +212,7 @@ describe('P2 Attribute Characteristics (E2E)', () => {
         validUser({ password: 'WriteOnlySecret1!' }),
       ).expect(201);
 
-      // password has mutability:'writeOnly' — R-MUT-1 defense-in-depth
+      // password has mutability:'writeOnly' - R-MUT-1 defense-in-depth
       expect(res.body.password).toBeUndefined();
     });
 
@@ -266,7 +266,7 @@ describe('P2 Attribute Characteristics (E2E)', () => {
       const ext = getRes.body['urn:ietf:params:scim:schemas:extension:enterprise:2.0:User'];
       if (ext?.manager) {
         expect(ext.manager.value).toBeDefined();
-        // manager.displayName is readOnly — should have been stripped on input
+        // manager.displayName is readOnly - should have been stripped on input
         // (it may or may not be server-populated, but the client value shouldn't persist)
       }
     });
@@ -434,7 +434,7 @@ describe('P2 Attribute Characteristics (E2E)', () => {
         token,
       ).expect(200);
 
-      // id has returned:always — cannot be excluded
+      // id has returned:always - cannot be excluded
       expect(res.body.id).toBeDefined();
     });
 

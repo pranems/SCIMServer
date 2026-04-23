@@ -1,5 +1,5 @@
 /**
- * Unit Tests — Built-in Profile Presets (compile-time embedded)
+ * Unit Tests - Built-in Profile Presets (compile-time embedded)
  *
  * Validates all 5 built-in presets have correct structure, the lookup
  * functions work, the default preset is entra-id, and each preset's
@@ -63,11 +63,11 @@ describe('built-in-presets', () => {
       expect(BUILT_IN_PRESETS.has(PRESET_USER_ONLY_WITH_CUSTOM_EXT)).toBe(true);
     });
 
-    it('should not contain "custom" (decision D13 — dropped)', () => {
+    it('should not contain "custom" (decision D13 - dropped)', () => {
       expect(BUILT_IN_PRESETS.has('custom')).toBe(false);
     });
 
-    it('should not contain old "standard" name (decision D12 — renamed to rfc-standard)', () => {
+    it('should not contain old "standard" name (decision D12 - renamed to rfc-standard)', () => {
       expect(BUILT_IN_PRESETS.has('standard')).toBe(false);
     });
 
@@ -305,11 +305,11 @@ describe('built-in-presets', () => {
     const preset = getBuiltInPreset('minimal');
     const { profile } = preset;
 
-    it('should have 2 schemas (User + Group — no extensions)', () => {
+    it('should have 2 schemas (User + Group - no extensions)', () => {
       expect(profile.schemas).toHaveLength(2);
     });
 
-    it('should NOT include EnterpriseUser (decision D11 — minimal excluded)', () => {
+    it('should NOT include EnterpriseUser (decision D11 - minimal excluded)', () => {
       const eu = profile.schemas!.find(s => s.id === SCIM_ENTERPRISE_USER_SCHEMA);
       expect(eu).toBeUndefined();
     });
@@ -348,7 +348,7 @@ describe('built-in-presets', () => {
     const preset = getBuiltInPreset('user-only');
     const { profile } = preset;
 
-    it('should have 2 schemas (User + EnterpriseUser — no Group)', () => {
+    it('should have 2 schemas (User + EnterpriseUser - no Group)', () => {
       expect(profile.schemas).toHaveLength(2);
       const ids = profile.schemas!.map(s => s.id);
       expect(ids).toContain(SCIM_CORE_USER_SCHEMA);
@@ -356,7 +356,7 @@ describe('built-in-presets', () => {
       expect(ids).not.toContain(SCIM_CORE_GROUP_SCHEMA);
     });
 
-    it('should have only 1 resource type (User — no Group)', () => {
+    it('should have only 1 resource type (User - no Group)', () => {
       expect(profile.resourceTypes).toHaveLength(1);
       expect(profile.resourceTypes![0].name).toBe('User');
     });
@@ -391,7 +391,7 @@ describe('built-in-presets', () => {
       expect(ids).not.toContain(SCIM_CORE_GROUP_SCHEMA);
     });
 
-    it('should have only 1 resource type (User — no Group)', () => {
+    it('should have only 1 resource type (User - no Group)', () => {
       expect(profile.resourceTypes).toHaveLength(1);
       expect(profile.resourceTypes![0].name).toBe('User');
     });
@@ -440,7 +440,7 @@ describe('built-in-presets', () => {
     });
   });
 
-  describe('all presets — structural validity', () => {
+  describe('all presets - structural validity', () => {
     for (const presetName of PRESET_NAMES) {
       describe(`${presetName}`, () => {
         const preset = getBuiltInPreset(presetName);
@@ -534,7 +534,7 @@ describe('built-in-presets', () => {
 
   // ─── entra-id User attribute completeness (SCIM Validator compat) ─────
 
-  describe('entra-id User schema — SCIM Validator attribute completeness', () => {
+  describe('entra-id User schema - SCIM Validator attribute completeness', () => {
     const profile = getBuiltInPreset('entra-id').profile;
     const userSchema = profile.schemas!.find(s => s.id === SCIM_CORE_USER_SCHEMA);
     const attrNames = (userSchema!.attributes as any[]).map((a: any) => a.name);

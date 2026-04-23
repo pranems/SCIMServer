@@ -1,8 +1,8 @@
-# Phase 1 — Repository Pattern (Ports & Adapters)
+# Phase 1 - Repository Pattern (Ports & Adapters)
 
 > **Status**: ✅ COMPLETED  
 > **Difficulty**: 🟢 Low  
-> **Risk**: 🟢 Low — additive changes only, no data migration  
+> **Risk**: 🟢 Low - additive changes only, no data migration  
 > **LOC Impact**: ~600 lines added, ~80 lines changed in services  
 > **Test Coverage**: 80 new unit tests (32 user, 38 group, 10 module)
 
@@ -12,8 +12,8 @@
 
 1. [Overview](#1-overview)
 2. [Goals & Motivation](#2-goals--motivation)
-3. [Architecture — Before](#3-architecture--before)
-4. [Architecture — After](#4-architecture--after)
+3. [Architecture - Before](#3-architecture--before)
+4. [Architecture - After](#4-architecture--after)
 5. [Dependency Graph](#5-dependency-graph)
 6. [File Inventory](#6-file-inventory)
 7. [Domain Models](#7-domain-models)
@@ -21,8 +21,8 @@
 9. [Implementation: Prisma Adapter](#9-implementation-prisma-adapter)
 10. [Implementation: In-Memory Adapter](#10-implementation-in-memory-adapter)
 11. [Dynamic Module Wiring](#11-dynamic-module-wiring)
-12. [Service Refactoring — Before vs After](#12-service-refactoring--before-vs-after)
-13. [Request Flow — Before vs After](#13-request-flow--before-vs-after)
+12. [Service Refactoring - Before vs After](#12-service-refactoring--before-vs-after)
+13. [Request Flow - Before vs After](#13-request-flow--before-vs-after)
 14. [Configuration](#14-configuration)
 15. [Testing Strategy](#15-testing-strategy)
 16. [Deployment Impact](#16-deployment-impact)
@@ -33,7 +33,7 @@
 
 ## 1. Overview
 
-Phase 1 introduces the **Repository Pattern** (also known as Ports & Adapters or Hexagonal Architecture) to decouple SCIM business logic from Prisma ORM internals. Services no longer import `PrismaService` directly — instead, they depend on **domain interfaces** injected via NestJS DI tokens.
+Phase 1 introduces the **Repository Pattern** (also known as Ports & Adapters or Hexagonal Architecture) to decouple SCIM business logic from Prisma ORM internals. Services no longer import `PrismaService` directly - instead, they depend on **domain interfaces** injected via NestJS DI tokens.
 
 This is the foundational phase that enables all subsequent phases (PostgreSQL migration, in-memory testing, unified resource table) to proceed without touching business logic.
 
@@ -46,12 +46,12 @@ This is the foundational phase that enables all subsequent phases (PostgreSQL mi
 | **Decouple persistence** | Services should not know if data comes from SQLite, PostgreSQL, or memory |
 | **Enable testability** | In-memory repositories allow fast unit tests without DB setup |
 | **Prepare for Phase 3** | PostgreSQL migration only changes repository implementations, not services |
-| **Follow SOLID principles** | Dependency Inversion — depend on abstractions, not concretions |
+| **Follow SOLID principles** | Dependency Inversion - depend on abstractions, not concretions |
 | **Enable PERSISTENCE_BACKEND toggle** | Switch between Prisma and InMemory via environment variable |
 
 ---
 
-## 3. Architecture — Before
+## 3. Architecture - Before
 
 ### Before: Direct Prisma Coupling
 
@@ -136,7 +136,7 @@ export class EndpointScimUsersService {
 
 ---
 
-## 4. Architecture — After
+## 4. Architecture - After
 
 ### After: Repository Pattern (Ports & Adapters)
 
@@ -199,7 +199,7 @@ flowchart TB
 ```
 
 **Benefits:**
-- Services depend only on **domain interfaces** — zero Prisma imports
+- Services depend only on **domain interfaces** - zero Prisma imports
 - Repository implementations contain all ORM-specific logic
 - Swap backends via `PERSISTENCE_BACKEND` env var without code changes
 - In-memory adapter enables instant unit tests
@@ -252,7 +252,7 @@ api/src/
 │       └── repository.tokens.ts           ← USER_REPOSITORY, GROUP_REPOSITORY tokens
 └── infrastructure/
     └── repositories/
-        ├── repository.module.ts               ← RepositoryModule.register() — dynamic DI wiring
+        ├── repository.module.ts               ← RepositoryModule.register() - dynamic DI wiring
         ├── prisma/
         │   ├── prisma-user.repository.ts      ← PrismaUserRepository implements IUserRepository
         │   └── prisma-group.repository.ts     ← PrismaGroupRepository implements IGroupRepository
@@ -281,7 +281,7 @@ api/src/
 
 ## 7. Domain Models
 
-### UserRecord — Domain Model
+### UserRecord - Domain Model
 
 ```typescript
 // api/src/domain/models/user.model.ts
@@ -300,7 +300,7 @@ export interface UserRecord {
 }
 ```
 
-### GroupRecord with Members — Domain Model
+### GroupRecord with Members - Domain Model
 
 ```typescript
 // api/src/domain/models/group.model.ts
@@ -407,7 +407,7 @@ classDiagram
 
 ## 8. Repository Interfaces
 
-### IUserRepository — 7 Methods
+### IUserRepository - 7 Methods
 
 ```typescript
 // api/src/domain/repositories/user.repository.interface.ts
@@ -434,7 +434,7 @@ export interface IUserRepository {
 }
 ```
 
-### IGroupRepository — 9 Methods
+### IGroupRepository - 9 Methods
 
 ```typescript
 // api/src/domain/repositories/group.repository.interface.ts
@@ -477,13 +477,13 @@ export interface IGroupRepository {
 | `findAll` / `findAllWithMembers` | ✅ | ✅ | GET /Users?filter=..., GET /Groups?filter=... |
 | `update` | ✅ | ✅ | PUT /Users/:id, PUT /Groups/:id, PATCH |
 | `delete` | ✅ | ✅ | DELETE /Users/:id, DELETE /Groups/:id |
-| `findConflict` | ✅ | — | Uniqueness check (userName, externalId) |
-| `findByScimIds` | ✅ | — | Group member resolution (batch) |
-| `findWithMembers` | — | ✅ | GET /Groups/:id (with member list) |
-| `findByDisplayName` | — | ✅ | Group displayName uniqueness |
-| `findByExternalId` | — | ✅ | Group externalId uniqueness |
-| `addMembers` | — | ✅ | PATCH /Groups/:id (Add members) |
-| `updateGroupWithMembers` | — | ✅ | PUT /Groups/:id (replace members) |
+| `findConflict` | ✅ | - | Uniqueness check (userName, externalId) |
+| `findByScimIds` | ✅ | - | Group member resolution (batch) |
+| `findWithMembers` | - | ✅ | GET /Groups/:id (with member list) |
+| `findByDisplayName` | - | ✅ | Group displayName uniqueness |
+| `findByExternalId` | - | ✅ | Group externalId uniqueness |
+| `addMembers` | - | ✅ | PATCH /Groups/:id (Add members) |
+| `updateGroupWithMembers` | - | ✅ | PUT /Groups/:id (replace members) |
 
 ---
 
@@ -538,7 +538,7 @@ export class PrismaUserRepository implements IUserRepository {
 }
 ```
 
-### PrismaGroupRepository — Transactional Member Update
+### PrismaGroupRepository - Transactional Member Update
 
 ```typescript
 // api/src/infrastructure/repositories/prisma/prisma-group.repository.ts
@@ -547,7 +547,7 @@ async updateGroupWithMembers(
   data: GroupUpdateInput,
   members: MemberCreateInput[],
 ): Promise<void> {
-  // Prisma $transaction ensures atomicity — contained in infrastructure layer
+  // Prisma $transaction ensures atomicity - contained in infrastructure layer
   await this.prisma.$transaction(
     async (tx: Prisma.TransactionClient) => {
       await tx.scimGroup.update({
@@ -577,7 +577,7 @@ async updateGroupWithMembers(
 
 ## 10. Implementation: In-Memory Adapter
 
-### InMemoryUserRepository — Map-Based Storage
+### InMemoryUserRepository - Map-Based Storage
 
 ```typescript
 // api/src/infrastructure/repositories/inmemory/inmemory-user.repository.ts
@@ -615,7 +615,7 @@ export class InMemoryUserRepository implements IUserRepository {
       }
     }
 
-    // Sorting — mimics SQL ORDER BY
+    // Sorting - mimics SQL ORDER BY
     const sortField = orderBy?.field ?? 'createdAt';
     const sortDir = orderBy?.direction ?? 'asc';
     results.sort((a, b) => { /* string comparison */ });
@@ -631,17 +631,17 @@ export class InMemoryUserRepository implements IUserRepository {
 
 | Decision | Rationale |
 |----------|-----------|
-| Return `{ ...record }` (spread copy) | Prevents callers from mutating internal state — mimics DB isolation |
+| Return `{ ...record }` (spread copy) | Prevents callers from mutating internal state - mimics DB isolation |
 | `Map<string, Record>` as storage | O(1) lookup by internal ID, O(n) scan for filters (acceptable for testing) |
 | `randomUUID()` for IDs | Matches real UUID behavior without DB sequences |
-| `clear()` method | Not on interface — only available for test teardowns |
+| `clear()` method | Not on interface - only available for test teardowns |
 | Case-insensitive userName matching | `userName.toLowerCase()` comparison in `findConflict` |
 
 ---
 
 ## 11. Dynamic Module Wiring
 
-### RepositoryModule — The Switchboard
+### RepositoryModule - The Switchboard
 
 ```typescript
 // api/src/infrastructure/repositories/repository.module.ts
@@ -730,9 +730,9 @@ export const GROUP_REPOSITORY = 'GROUP_REPOSITORY';
 
 ---
 
-## 12. Service Refactoring — Before vs After
+## 12. Service Refactoring - Before vs After
 
-### Users Service — Constructor
+### Users Service - Constructor
 
 ```diff
   // endpoint-scim-users.service.ts
@@ -759,21 +759,21 @@ export const GROUP_REPOSITORY = 'GROUP_REPOSITORY';
   ) {}
 ```
 
-### Users Service — Query Example
+### Users Service - Query Example
 
 ```diff
   // Finding a user by SCIM ID
 
-  // ❌ BEFORE — Prisma-specific query syntax
+  // ❌ BEFORE - Prisma-specific query syntax
 - const user = await this.prisma.scimUser.findFirst({
 -   where: { scimId, endpointId },
 - });
 
-  // ✅ AFTER — Clean domain interface call
+  // ✅ AFTER - Clean domain interface call
 + const user = await this.userRepo.findByScimId(endpointId, scimId);
 ```
 
-### Groups Service — Constructor (Two Repositories)
+### Groups Service - Constructor (Two Repositories)
 
 ```diff
   // endpoint-scim-groups.service.ts
@@ -788,7 +788,7 @@ export const GROUP_REPOSITORY = 'GROUP_REPOSITORY';
     private readonly logger: ScimLogger,
   ) {}
 
-  // ✅ AFTER — Injects BOTH repositories (needs users for member resolution)
+  // ✅ AFTER - Injects BOTH repositories (needs users for member resolution)
 + import { Inject } from '@nestjs/common';
 + import type { IGroupRepository } from '../../../domain/repositories/group.repository.interface';
 + import type { IUserRepository } from '../../../domain/repositories/user.repository.interface';
@@ -805,26 +805,26 @@ export const GROUP_REPOSITORY = 'GROUP_REPOSITORY';
   ) {}
 ```
 
-### Groups Service — Member Resolution Example
+### Groups Service - Member Resolution Example
 
 ```diff
   // Resolving member SCIM IDs to internal IDs for group creation
 
-  // ❌ BEFORE — Direct Prisma query with relations
+  // ❌ BEFORE - Direct Prisma query with relations
 - const members = await this.prisma.scimUser.findMany({
 -   where: { scimId: { in: memberScimIds }, endpointId },
 -   select: { id: true, scimId: true },
 - });
 
-  // ✅ AFTER — Repository method encapsulates query
+  // ✅ AFTER - Repository method encapsulates query
 + const members = await this.userRepo.findByScimIds(endpointId, memberScimIds);
 ```
 
 ---
 
-## 13. Request Flow — Before vs After
+## 13. Request Flow - Before vs After
 
-### Create User — Before (Direct Prisma)
+### Create User - Before (Direct Prisma)
 
 ```mermaid
 sequenceDiagram
@@ -851,7 +851,7 @@ sequenceDiagram
     CTRL-->>IDP: 201 Created
 ```
 
-### Create User — After (Repository Pattern)
+### Create User - After (Repository Pattern)
 
 ```mermaid
 sequenceDiagram
@@ -921,7 +921,7 @@ docker run -e PERSISTENCE_BACKEND=inmemory scimserver:latest
 ### Example: Default Prisma Backend (no change needed)
 
 ```bash
-# Prisma is the default — no env var needed
+# Prisma is the default - no env var needed
 npm run start:dev
 
 # Or explicitly set
@@ -937,9 +937,9 @@ PERSISTENCE_BACKEND=prisma npm run start:dev
 ```mermaid
 flowchart TB
     subgraph Unit["Unit Tests (80 new)"]
-        UT1["InMemoryUserRepository — 32 tests"]
-        UT2["InMemoryGroupRepository — 38 tests"]
-        UT3["RepositoryModule — 10 tests"]
+        UT1["InMemoryUserRepository - 32 tests"]
+        UT2["InMemoryGroupRepository - 38 tests"]
+        UT3["RepositoryModule - 10 tests"]
     end
 
     subgraph Integration["E2E Tests (184 existing)"]
@@ -971,7 +971,7 @@ flowchart TB
 | E2E tests (existing) | 184 | HTTP-level SCIM compliance | ~30s |
 | Live integration tests (existing) | 280 | Full-stack against running server | ~60s |
 
-### Sample Test — Conflict Detection
+### Sample Test - Conflict Detection
 
 ```typescript
 // inmemory-user.repository.spec.ts
@@ -1000,7 +1000,7 @@ describe('findConflict', () => {
       // ...
     });
 
-    // Excluding user1 from conflict check — no conflict
+    // Excluding user1 from conflict check - no conflict
     const conflict = await repo.findConflict('ep1', 'ALICE', undefined, 'user1');
     expect(conflict).toBeNull();
   });
@@ -1035,7 +1035,7 @@ pwsh scripts/live-test.ps1 -BaseUrl http://localhost:6000
 | **Docker Production** | None | No Dockerfile changes |
 | **Azure Container Apps** | None | No Bicep/infra changes |
 
-Phase 1 is **purely additive** — new files, modified service constructors, same database schema, same API behavior. Zero deployment artifacts change.
+Phase 1 is **purely additive** - new files, modified service constructors, same database schema, same API behavior. Zero deployment artifacts change.
 
 ---
 
@@ -1048,7 +1048,7 @@ Phase 1 is **purely additive** — new files, modified service constructors, sam
 | 3 | Delete `domain/` and `infrastructure/repositories/` directories | No data impact |
 
 **Rollback time**: ~5 minutes (git revert)  
-**Data risk**: None — schema unchanged, data unchanged
+**Data risk**: None - schema unchanged, data unchanged
 
 ---
 
@@ -1059,9 +1059,9 @@ Phase 1 is **purely additive** — new files, modified service constructors, sam
 | **Start with interfaces** | Defining `IUserRepository` and `IGroupRepository` first made implementations straightforward |
 | **Domain models mirror Prisma types** | Kept 1:1 mapping to minimize service changes; evolution happens in Phase 2 |
 | **Global DI module simplifies imports** | `global: true` on `RepositoryModule` avoids re-importing in every feature module |
-| **Detached copies in InMemory** | Returning `{ ...record }` prevents subtle mutation bugs — matches DB isolation |
+| **Detached copies in InMemory** | Returning `{ ...record }` prevents subtle mutation bugs - matches DB isolation |
 | **Test the switchboard** | `repository.module.spec.ts` validates that env var actually changes DI bindings |
-| **Backward compatibility first** | All 184 E2E + 280 live tests pass without changes — proof of zero regression |
+| **Backward compatibility first** | All 184 E2E + 280 live tests pass without changes - proof of zero regression |
 
 ---
 
@@ -1085,6 +1085,6 @@ flowchart LR
 ```
 
 Phase 1 directly unblocks:
-- **Phase 2** (Unified Resource Table) — repository implementations absorb table changes
-- **Phase 5** (Domain PATCH Engine) — clean domain layer ready for PATCH extraction
-- **Phase 10** (/Me Endpoint) — repository pattern enables user lookup by auth context
+- **Phase 2** (Unified Resource Table) - repository implementations absorb table changes
+- **Phase 5** (Domain PATCH Engine) - clean domain layer ready for PATCH extraction
+- **Phase 10** (/Me Endpoint) - repository pattern enables user lookup by auth context

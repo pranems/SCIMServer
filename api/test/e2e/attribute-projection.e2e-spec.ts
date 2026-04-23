@@ -111,7 +111,7 @@ describe('Attribute Projection (E2E)', () => {
       await scimPost(app, `${basePath}/Groups`, token, validGroup({ members: [{ value: user.id }] })).expect(201);
 
       const res = await scimGet(app, `${basePath}/Groups?attributes=displayName&count=5`, token).expect(200);
-      // Guard: group was created above — must appear in results
+      // Guard: group was created above - must appear in results
       expect(res.body.Resources.length).toBeGreaterThan(0);
       const group = res.body.Resources[0];
       expect(group.displayName).toBeDefined();
@@ -154,7 +154,7 @@ describe('Attribute Projection (E2E)', () => {
 
   // ───────────── G8g: Write-Response Attribute Projection (RFC 7644 §3.9) ─────────────
 
-  describe('G8g — Write-response attributes/excludedAttributes projection', () => {
+  describe('G8g - Write-response attributes/excludedAttributes projection', () => {
 
     describe('POST /Users with projection params', () => {
       it('should return only requested attributes on POST create', async () => {

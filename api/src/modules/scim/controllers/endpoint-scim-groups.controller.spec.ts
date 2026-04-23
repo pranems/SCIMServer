@@ -449,7 +449,7 @@ describe('EndpointScimGroupsController', () => {
 
   // ───────────── G8e: returned characteristic filtering ─────────────
 
-  describe('G8e — returned:request attribute filtering', () => {
+  describe('G8e - returned:request attribute filtering', () => {
     it('POST createGroup should strip returned:request attributes from response', async () => {
       const createDto: CreateGroupDto = {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
@@ -544,7 +544,7 @@ describe('EndpointScimGroupsController', () => {
 
   // ───────────── G8g: write-response attribute projection ─────────────
 
-  describe('G8g — write-response attributes/excludedAttributes projection', () => {
+  describe('G8g - write-response attributes/excludedAttributes projection', () => {
     const fullGroup = {
       schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
       id: 'scim-grp-g8g',
@@ -688,7 +688,7 @@ describe('EndpointScimGroupsController', () => {
       expect(result.id).toBe('scim-grp-g8g'); // always-returned
     });
 
-    it('POST with both attributes AND excludedAttributes — attributes takes precedence', async () => {
+    it('POST with both attributes AND excludedAttributes - attributes takes precedence', async () => {
       mockGroupsService.createGroupForEndpoint.mockResolvedValue({ ...fullGroup });
 
       const result = await controller.createGroup(
@@ -699,7 +699,7 @@ describe('EndpointScimGroupsController', () => {
         'members'                    // also try to exclude members
       );
 
-      // Per RFC 7644: attributes takes precedence — members IS in the include list
+      // Per RFC 7644: attributes takes precedence - members IS in the include list
       expect(result.displayName).toBe('G8g Test Group');
       expect(result.members).toBeDefined(); // included via attributes
       expect(result.id).toBe('scim-grp-g8g'); // always-returned
@@ -740,7 +740,7 @@ describe('EndpointScimGroupsController', () => {
         { schemas: fullGroup.schemas, displayName: 'G8g Test Group' } as CreateGroupDto,
         mockRequest,
         undefined,
-        'members'  // excludedAttributes — no explicit request for secretTag
+        'members'  // excludedAttributes - no explicit request for secretTag
       );
 
       // returned:'request' is stripped because it's not in an attributes= list

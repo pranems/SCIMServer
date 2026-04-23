@@ -1,4 +1,4 @@
-﻿import { Module, type NestModule, type MiddlewareConsumer } from '@nestjs/common';
+import { Module, type NestModule, type MiddlewareConsumer } from '@nestjs/common';
 import { APP_INTERCEPTOR, APP_FILTER } from '@nestjs/core';
 
 import { LoggingModule } from '../logging/logging.module';
@@ -45,7 +45,7 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     EndpointScimDiscoveryController,
     ScimMeController,
     EndpointLogController,
-    // Generic controller MUST be registered LAST — its wildcard :resourceType
+    // Generic controller MUST be registered LAST - its wildcard :resourceType
     // param would otherwise shadow built-in routes like /Users, /Groups, etc.
     EndpointScimGenericController,
   ],
@@ -61,7 +61,7 @@ import { ScimContentTypeValidationMiddleware } from './middleware/scim-content-t
     // Exception filters: NestJS applies APP_FILTERs in reverse order (last registered = runs first).
     // GlobalExceptionFilter catches non-HttpException errors (raw Error, TypeError, PrismaError).
     // ScimExceptionFilter catches HttpException and formats as SCIM error.
-    // Registration order: Global first, then Scim — so Scim runs first, Global is the fallback.
+    // Registration order: Global first, then Scim - so Scim runs first, Global is the fallback.
     {
       provide: APP_FILTER,
       useClass: GlobalExceptionFilter
@@ -85,8 +85,8 @@ export class ScimModule implements NestModule {
 
   /**
    * Register middleware on ALL routes:
-   * 1. AsyncLocalStorage middleware — ensures endpoint context is isolated per request
-   * 2. Content-Type validation — rejects non-JSON Content-Types on SCIM endpoint routes (RFC 7644 §3.1)
+   * 1. AsyncLocalStorage middleware - ensures endpoint context is isolated per request
+   * 2. Content-Type validation - rejects non-JSON Content-Types on SCIM endpoint routes (RFC 7644 §3.1)
    */
   configure(consumer: MiddlewareConsumer): void {
     consumer.apply(this.endpointContext.createMiddleware()).forRoutes('*');

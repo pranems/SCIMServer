@@ -1,5 +1,5 @@
 /**
- * Unit Tests — Auto-Expand Service (Phase 13, Steps 2.1 + 2.2)
+ * Unit Tests - Auto-Expand Service (Phase 13, Steps 2.1 + 2.2)
  *
  * Tests shorthand → full expansion, "all" shorthand, auto-inject of
  * required attributes, project defaults, and Group active.

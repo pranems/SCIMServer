@@ -12,7 +12,7 @@
       3. Updates the production Container App image to the dev-validated tag
       4. Verifies the production deployment is healthy
 
-    This is a safe, zero-downtime operation — Azure Container Apps performs a rolling
+    This is a safe, zero-downtime operation - Azure Container Apps performs a rolling
     update with health probes ensuring the new revision is ready before routing traffic.
 
 .PARAMETER ProdResourceGroup
@@ -69,7 +69,7 @@ $ErrorActionPreference = 'Stop'
 
 Write-Host "" -ForegroundColor Cyan
 Write-Host "=============================================" -ForegroundColor Cyan
-Write-Host "  SCIMServer — Promote to Production" -ForegroundColor Cyan
+Write-Host "  SCIMServer - Promote to Production" -ForegroundColor Cyan
 Write-Host "=============================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -158,7 +158,7 @@ if (-not $SkipDevVerification -and $DevResourceGroup) {
             }
         }
     } else {
-        Write-Host "   ⚠️  Could not retrieve dev FQDN — skipping health check" -ForegroundColor Yellow
+        Write-Host "   ⚠️  Could not retrieve dev FQDN - skipping health check" -ForegroundColor Yellow
     }
 } else {
     Write-Host "⏭️  Step 1/3: Dev verification skipped" -ForegroundColor Gray
@@ -182,7 +182,7 @@ Write-Host "   Current prod image: $prodImage" -ForegroundColor Gray
 Write-Host "   Desired prod image: $desiredImage" -ForegroundColor Yellow
 
 if ($prodImage -eq $desiredImage) {
-    Write-Host "   ✅ Production already running $ImageTag — nothing to do." -ForegroundColor Green
+    Write-Host "   ✅ Production already running $ImageTag - nothing to do." -ForegroundColor Green
     exit 0
 }
 

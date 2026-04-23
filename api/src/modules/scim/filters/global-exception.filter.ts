@@ -34,7 +34,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
   constructor(private readonly logger: ScimLogger) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
-    // HttpException subclasses are handled by ScimExceptionFilter — re-throw
+    // HttpException subclasses are handled by ScimExceptionFilter - re-throw
     // so NestJS routes them to the more specific filter.
     if (exception instanceof HttpException) {
       throw exception;

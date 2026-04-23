@@ -6,26 +6,26 @@
 **Version**: v0.22.0  
 **Status**: ✅ Complete  
 **RFC References**:
-- [RFC 7643 §2.2 — Mutability](https://datatracker.ietf.org/doc/html/rfc7643#section-2.2)
-- [RFC 7644 §3.5.2 — Modifying with PATCH](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2)
-- [RFC 7644 §3.12 — Error Handling](https://datatracker.ietf.org/doc/html/rfc7644#section-3.12)
+- [RFC 7643 §2.2 - Mutability](https://datatracker.ietf.org/doc/html/rfc7643#section-2.2)
+- [RFC 7644 §3.5.2 - Modifying with PATCH](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2)
+- [RFC 7644 §3.12 - Error Handling](https://datatracker.ietf.org/doc/html/rfc7644#section-3.12)
 
 ### Problem Statement
 
 Prior to v0.22.0, readOnly attributes sent by clients in POST/PUT bodies were handled inconsistently:
 
-1. **`groups` in POST/PUT** — Silently stored in `rawPayload` and served back to clients, even though `groups` is `mutability: 'readOnly'` (RFC 7643 §4.1). This created phantom data that doesn't reflect actual group memberships.
-2. **`meta` in POST/PUT** — Leaked into `rawPayload` in Users and Groups `extractAdditionalAttributes()`. Harmless but dirty — dead data polluting storage.
-3. **`manager.displayName` (sub-attribute)** — `readOnly` sub-attribute of `readWrite` parent `manager`. Client-supplied value stored AND served back because `validateSingleValue()` has no mutability guard. Live in ALL modes.
-4. **Groups `id` client-controlled** — `createGroupForEndpoint()` accepted client-supplied `id` as `scimId` instead of always generating `randomUUID()`. Direct RFC 7643 §3.1 violation (`id` is server-assigned).
-5. **PATCH readOnly in non-strict mode** — When `StrictSchemaValidation` is OFF (default), PATCH operations targeting readOnly attributes (`groups`, `meta`) were silently applied by the PatchEngine with zero validation.
-6. **No client feedback** — Clients sending readOnly attributes received no indication their data was ignored. Industry peers (Okta, Ping, AWS SSO) return warning extensions.
+1. **`groups` in POST/PUT** - Silently stored in `rawPayload` and served back to clients, even though `groups` is `mutability: 'readOnly'` (RFC 7643 §4.1). This created phantom data that doesn't reflect actual group memberships.
+2. **`meta` in POST/PUT** - Leaked into `rawPayload` in Users and Groups `extractAdditionalAttributes()`. Harmless but dirty - dead data polluting storage.
+3. **`manager.displayName` (sub-attribute)** - `readOnly` sub-attribute of `readWrite` parent `manager`. Client-supplied value stored AND served back because `validateSingleValue()` has no mutability guard. Live in ALL modes.
+4. **Groups `id` client-controlled** - `createGroupForEndpoint()` accepted client-supplied `id` as `scimId` instead of always generating `randomUUID()`. Direct RFC 7643 §3.1 violation (`id` is server-assigned).
+5. **PATCH readOnly in non-strict mode** - When `StrictSchemaValidation` is OFF (default), PATCH operations targeting readOnly attributes (`groups`, `meta`) were silently applied by the PatchEngine with zero validation.
+6. **No client feedback** - Clients sending readOnly attributes received no indication their data was ignored. Industry peers (Okta, Ping, AWS SSO) return warning extensions.
 
 ### Solution
 
 A **schema-driven strip-and-warn pipeline** that:
 
-- **Always strips** readOnly attributes from POST/PUT bodies before storage (no flag needed — mandatory per RFC)
+- **Always strips** readOnly attributes from POST/PUT bodies before storage (no flag needed - mandatory per RFC)
 - **Always strips** readOnly PATCH operations in non-strict mode (baseline safety)
 - **Optionally warns** clients via a response extension URN when readOnly attributes were ignored
 - **Preserves** existing G8c hard-reject behavior for strict mode PATCH (400 error)
@@ -33,11 +33,11 @@ A **schema-driven strip-and-warn pipeline** that:
 
 ### RFC 7643 §2.2 Compliance
 
-> **readOnly** — The attribute SHALL NOT be modified. [...] A "readOnly" attribute
+> **readOnly** - The attribute SHALL NOT be modified. [...] A "readOnly" attribute
 > MAY be included in the request body from the client, but the service provider
 > SHALL ignore the provided value.
 
-The RFC explicitly allows clients to **send** readOnly attributes — but the server **SHALL ignore** them. This means:
+The RFC explicitly allows clients to **send** readOnly attributes - but the server **SHALL ignore** them. This means:
 
 1. Returning 400 for readOnly attributes in POST/PUT is **stricter than the RFC mandates** (but permitted by SHOULD-level language)
 2. The **correct baseline** behavior is to silently strip + optionally warn
@@ -52,16 +52,16 @@ Client Request (POST / PUT / PATCH)
     │
     ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  1. ensureSchema()      — validate schemas[] array          │
-│  2. enforceStrictSchema — reject unknown extension URNs     │
-│  3. coerceBooleans      — "True"→true before validation     │
-│  4. validatePayload     — StrictSchemaValidation gate       │
+│  1. ensureSchema()      - validate schemas[] array          │
+│  2. enforceStrictSchema - reject unknown extension URNs     │
+│  3. coerceBooleans      - "True"→true before validation     │
+│  4. validatePayload     - StrictSchemaValidation gate       │
 │                                                             │
-│  ★ 5. stripReadOnly()   — NEW: remove readOnly attrs        │
+│  ★ 5. stripReadOnly()   - NEW: remove readOnly attrs        │
 │     ├── POST/PUT: stripReadOnlyAttributes(payload, schemas) │
 │     └── PATCH:   stripReadOnlyPatchOps(ops, schemas)        │
 │                                                             │
-│  6. Business logic      — uniqueness, create/update         │
+│  6. Business logic      - uniqueness, create/update         │
 └─────────────────────────────────────────────────────────────┘
     │
     ▼
@@ -85,7 +85,7 @@ Client Request (POST / PUT / PATCH)
 
 ### POST/PUT Behavior
 
-Always strip readOnly attributes. No flag needed — this is mandatory RFC behavior.
+Always strip readOnly attributes. No flag needed - this is mandatory RFC behavior.
 Warning URN in response is gated by `IncludeWarningAboutIgnoredReadOnlyAttribute`.
 
 ## Configuration Flags
@@ -148,7 +148,7 @@ Example response with warning:
 | Attribute | Type | ReadOnly | Notes |
 |-----------|------|:---:|-------|
 | `manager` | complex | ❌ (readWrite) | Parent is writable |
-| `manager.displayName` | string | ✅ | ReadOnly sub-attr of readWrite parent. Phase 2 — deferred to sub-attr implementation. |
+| `manager.displayName` | string | ✅ | ReadOnly sub-attr of readWrite parent. Phase 2 - deferred to sub-attr implementation. |
 
 ### Core Group Schema
 
@@ -207,7 +207,7 @@ The `EndpointContextStorage` gets `addWarnings()` and `getWarnings()` methods. S
 
 #### AsyncLocalStorage Middleware (Critical Fix)
 
-**Problem**: The initial implementation used `AsyncLocalStorage.enterWith()` in the controller guard to set the endpoint context. However, NestJS's interceptor pipeline (`ScimContentTypeInterceptor`, `ScimEtagInterceptor` via `APP_INTERCEPTOR`) creates new async boundaries. `enterWith()` scopes the store to the current execution context only — child async operations spawned by interceptors lose the store reference.
+**Problem**: The initial implementation used `AsyncLocalStorage.enterWith()` in the controller guard to set the endpoint context. However, NestJS's interceptor pipeline (`ScimContentTypeInterceptor`, `ScimEtagInterceptor` via `APP_INTERCEPTOR`) creates new async boundaries. `enterWith()` scopes the store to the current execution context only - child async operations spawned by interceptors lose the store reference.
 
 **Root Cause**: `storage.getStore()` returned `undefined` inside service methods because the interceptor pipeline broke the `enterWith()` continuation chain.
 
@@ -227,10 +227,10 @@ Request → Express Middleware (storage.run({...}))
 
 **Key design decisions:**
 
-1. **`createMiddleware()`** — `EndpointContextStorage` exposes a factory method returning Express middleware: `(req, res, next) => this.storage.run({ endpointId: '', baseUrl: '' }, next)`
-2. **`setContext()` mutates** — instead of replacing the store with `enterWith()`, it mutates the existing store object created by the middleware. This preserves the `storage.run()` scope chain.
-3. **`ScimModule.configure()`** — `ScimModule` implements `NestModule` and registers the middleware on `forRoutes('*')` via the NestJS `MiddlewareConsumer`.
-4. **Warnings survive `setContext()`** — `setContext()` does NOT reset the `warnings` array, so warnings accumulated before or after context setup are preserved.
+1. **`createMiddleware()`** - `EndpointContextStorage` exposes a factory method returning Express middleware: `(req, res, next) => this.storage.run({ endpointId: '', baseUrl: '' }, next)`
+2. **`setContext()` mutates** - instead of replacing the store with `enterWith()`, it mutates the existing store object created by the middleware. This preserves the `storage.run()` scope chain.
+3. **`ScimModule.configure()`** - `ScimModule` implements `NestModule` and registers the middleware on `forRoutes('*')` via the NestJS `MiddlewareConsumer`.
+4. **Warnings survive `setContext()`** - `setContext()` does NOT reset the `warnings` array, so warnings accumulated before or after context setup are preserved.
 
 ```mermaid
 sequenceDiagram
@@ -246,7 +246,7 @@ sequenceDiagram
     Note over ExpressMiddleware: Creates store scope
     
     ExpressMiddleware->>Guard: next()
-    Guard->>Guard: setContext() — mutates store.endpointId, store.baseUrl
+    Guard->>Guard: setContext() - mutates store.endpointId, store.baseUrl
     
     Guard->>Interceptor: passes through
     Note over Interceptor: Same store reference ✅
@@ -325,9 +325,9 @@ if (warnings.length > 0 && getConfigBoolean(config, ENDPOINT_CONFIG_FLAGS.INCLUD
 
 ### Sub-Attribute readOnly Validation
 
-**Gap**: `validateSingleValue()` in `schema-validator.ts` performs type-only validation — no mutability guard. `validateSubAttributes()` delegates to `validateSingleValue()` without adding its own readOnly check. This means readOnly sub-attributes of readWrite parents (e.g., `manager.displayName`) pass validation silently.
+**Gap**: `validateSingleValue()` in `schema-validator.ts` performs type-only validation - no mutability guard. `validateSubAttributes()` delegates to `validateSingleValue()` without adding its own readOnly check. This means readOnly sub-attributes of readWrite parents (e.g., `manager.displayName`) pass validation silently.
 
-**Impact**: Client-supplied `manager.displayName` is stored and served back. Low severity — `manager.displayName` is typically derived from the `manager.value` reference.
+**Impact**: Client-supplied `manager.displayName` is stored and served back. Low severity - `manager.displayName` is typically derived from the `manager.value` reference.
 
 **Planned Fix**: Add readOnly check in `validateSubAttributes()` or `validateSingleValue()` for sub-attrs of readWrite parents. The strip helper will also need recursion into readWrite complex attrs to strip readOnly sub-keys.
 
@@ -397,7 +397,7 @@ graph LR
 | `ValidationWarning` type | ~2 | Interface shape; warnings array in ValidationResult |
 | Service integration | ~6 | Strip called in create/replace/patch for Users and Groups |
 
-### E2E Tests (17 tests — `readonly-stripping.e2e-spec.ts`)
+### E2E Tests (17 tests - `readonly-stripping.e2e-spec.ts`)
 
 | Test Area | Count | Description |
 |-----------|-------|-------------|
@@ -408,20 +408,20 @@ graph LR
 | Warning URN | 5 | Warning present when flag ON; absent when OFF; correct shape; URN on PUT; URN on PATCH |
 | PATCH behavior matrix | 3 | strict OFF → strip; strict+ignore → strip; strict without ignore → G8c 400 |
 
-### Live Integration Tests (Section 9t — Implemented)
+### Live Integration Tests (Section 9t - Implemented)
 
 | Test ID | Description |
 |---------|-------------|
-| 9t.1 | POST /Users with groups[] — groups stripped, not in response |
-| 9t.2 | POST /Users with meta — meta stripped, server meta used |
-| 9t.3 | PUT /Users with groups + meta — both stripped |
-| 9t.4 | PATCH /Users replace groups — op stripped (non-strict) |
+| 9t.1 | POST /Users with groups[] - groups stripped, not in response |
+| 9t.2 | POST /Users with meta - meta stripped, server meta used |
+| 9t.3 | PUT /Users with groups + meta - both stripped |
+| 9t.4 | PATCH /Users replace groups - op stripped (non-strict) |
 | 9t.5 | Warning URN when flag enabled |
 | 9t.6 | No warning URN when flag disabled |
-| 9t.7 | PATCH /Users replace groups (strict + ignore flag) — strip instead of 400 |
-| 9t.8 | PATCH /Users replace id — always 400 |
-| 9t.9 | POST /Groups — server assigns id, client id ignored |
-| 9t.10 | POST /Groups with meta — meta not in rawPayload |
+| 9t.7 | PATCH /Users replace groups (strict + ignore flag) - strip instead of 400 |
+| 9t.8 | PATCH /Users replace id - always 400 |
+| 9t.9 | POST /Groups - server assigns id, client id ignored |
+| 9t.10 | POST /Groups with meta - meta not in rawPayload |
 
 ## Files Changed
 
@@ -449,7 +449,7 @@ graph LR
 
 This feature addresses multiple gaps from the migration plan:
 
-- **G8d** (partial): readOnly attribute handling on POST/PUT — strip instead of reject
+- **G8d** (partial): readOnly attribute handling on POST/PUT - strip instead of reject
 - **BF-1**: Groups `id` client-controlled (RFC 7643 §3.1 violation)
 - **BF-2**: `meta` leak into rawPayload (data hygiene)
 - **Industry alignment**: Warning extension URN (Okta, Ping, AWS SSO pattern)

@@ -1,5 +1,5 @@
 /**
- * Unit Tests — Endpoint Profile Service / Orchestrator (Phase 13, Step 2.5)
+ * Unit Tests - Endpoint Profile Service / Orchestrator (Phase 13, Step 2.5)
  *
  * Tests the full pipeline: expand → inject → tighten-only → SPC → structural.
  * Tests preset validation, error aggregation, and edge cases.
@@ -401,7 +401,7 @@ describe('endpoint-profile.service (orchestrator)', () => {
 
   describe('orphan extension schema', () => {
     it('should accept profile with extension schema not referenced by any RT', () => {
-      // An extension exists in schemas[] but no RT references it — allowed (not all schemas must be bound)
+      // An extension exists in schemas[] but no RT references it - allowed (not all schemas must be bound)
       const input: ShorthandProfileInput = {
         schemas: [
           { id: SCIM_CORE_USER_SCHEMA, name: 'User', attributes: [{ name: 'userName' }] },
@@ -417,7 +417,7 @@ describe('endpoint-profile.service (orchestrator)', () => {
           etag: { supported: false }, changePassword: { supported: false } },
       };
       const result = validateAndExpandProfile(input);
-      // Orphan extension is allowed — just not advertised on any RT
+      // Orphan extension is allowed - just not advertised on any RT
       expect(result.valid).toBe(true);
       expect(result.profile!.schemas.length).toBe(2);
     });

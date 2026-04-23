@@ -66,7 +66,7 @@ describe('GlobalExceptionFilter', () => {
 
   // ─── SCIM routes: raw Error handling ──────────────────────────────
 
-  describe('SCIM routes — raw Error', () => {
+  describe('SCIM routes - raw Error', () => {
     it('should return SCIM-compliant 500 for raw Error on SCIM route', () => {
       const error = new Error('User with id xyz not found');
       const host = createHost('/scim/endpoints/ep-123/Users');
@@ -126,7 +126,7 @@ describe('GlobalExceptionFilter', () => {
       filter.catch(error, host);
 
       const body = mockResponse.json.mock.calls[0][0];
-      // Detail must be generic — NEVER leak internal error messages to clients
+      // Detail must be generic - NEVER leak internal error messages to clients
       expect(body.detail).toBe('Internal server error');
       expect(body.detail).not.toContain('password');
       expect(body.detail).not.toContain('FATAL');
@@ -135,7 +135,7 @@ describe('GlobalExceptionFilter', () => {
 
   // ─── SCIM routes: non-Error values ────────────────────────────────
 
-  describe('SCIM routes — non-Error thrown values', () => {
+  describe('SCIM routes - non-Error thrown values', () => {
     it('should handle string thrown value', () => {
       const host = createHost('/scim/endpoints/ep-123/Groups');
 

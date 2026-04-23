@@ -1,6 +1,6 @@
 # SCIMServer
 
-Production-ready, multi-tenant SCIM 2.0 server purpose-built for Microsoft Entra ID provisioning — with a built-in observability UI, full RFC compliance, and four deployment options.
+Production-ready, multi-tenant SCIM 2.0 server purpose-built for Microsoft Entra ID provisioning - with a built-in observability UI, full RFC compliance, and four deployment options.
 
 | | |
 |---|---|
@@ -41,18 +41,18 @@ Production-ready, multi-tenant SCIM 2.0 server purpose-built for Microsoft Entra
 | **Full SCIM surface** | Users, Groups, custom resource types, Schemas, ResourceTypes, ServiceProviderConfig, Bulk, /Me, .search |
 | **Entra-validated** | 25/25 Microsoft SCIM Validator tests pass with 0 false positives |
 | **Multi-tenant isolation** | Each endpoint owns its schemas, resources, config flags, and optional dedicated credentials |
-| **6 endpoint presets** | `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `user-only-with-custom-ext` — with tighten-only validation |
-| **Schema-driven validation** | RFC 7643 §2 attribute characteristics — type, required, mutability, returned, uniqueness, caseExact. Pre-computed URN-dot-path cache with zero per-request tree walks |
+| **6 endpoint presets** | `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `user-only-with-custom-ext` - with tighten-only validation |
+| **Schema-driven validation** | RFC 7643 §2 attribute characteristics - type, required, mutability, returned, uniqueness, caseExact. Pre-computed URN-dot-path cache with zero per-request tree walks |
 | **Built-in observability UI** | Real-time activity feed, searchable log viewer, endpoint management dashboard |
 | **3-tier auth** | Per-endpoint bcrypt → OAuth 2.0 JWT → global shared secret fallback chain |
 | **ISV profiles** | Vendor-specific presets with custom extensions + writeOnly/returned:never support |
-| **Cloud-ready** | Azure Container Apps with scale-to-zero, Docker Compose, or local dev — all first-class |
+| **Cloud-ready** | Azure Container Apps with scale-to-zero, Docker Compose, or local dev - all first-class |
 
 ---
 
 ## Quick Start
 
-### Option A — Docker Compose (recommended)
+### Option A - Docker Compose (recommended)
 
 ```bash
 git clone https://github.com/pranems/SCIMServer.git
@@ -62,7 +62,7 @@ docker compose up -d          # PostgreSQL 17 + API on port 8080
 
 Open http://localhost:8080/admin for the observability UI.
 
-### Option B — Local Development
+### Option B - Local Development
 
 ```bash
 cd api
@@ -73,7 +73,7 @@ PERSISTENCE_BACKEND=inmemory JWT_SECRET=dev SCIM_SHARED_SECRET=dev OAUTH_CLIENT_
 
 Server starts on http://localhost:3000. Set `PORT=6000` to use port 6000.
 
-### Option C — Azure Container Apps
+### Option C - Azure Container Apps
 
 ```bash
 cd scripts
@@ -83,7 +83,7 @@ cd scripts
 See [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) for detailed setup.  
 For sovereign/gov clouds (Azure Gov, BLEU France, China): see [SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md).
 
-### Option D — Pre-built Docker Image
+### Option D - Pre-built Docker Image
 
 ```bash
 docker run -d -p 8080:8080 \
@@ -331,7 +331,7 @@ Content-Type: application/json
 
 ## Endpoint Profiles & Presets
 
-Every endpoint is created with a **profile** — a unified JSONB document containing schemas, resource types, service provider config, and behavioral settings.
+Every endpoint is created with a **profile** - a unified JSONB document containing schemas, resource types, service provider config, and behavioral settings.
 
 ### 6 Built-in Presets
 
@@ -467,14 +467,14 @@ Content-Type: application/json
 |----------|----------|---------|-------------|
 | `PORT` | No | `3000` | Server listen port |
 | `PERSISTENCE_BACKEND` | No | `prisma` | `prisma` (PostgreSQL) or `inmemory` |
-| `DATABASE_URL` | If prisma | — | PostgreSQL connection string |
-| `JWT_SECRET` | Yes | — | Secret for OAuth JWT signing |
-| `SCIM_SHARED_SECRET` | Yes | — | Global bearer token for shared-secret auth |
-| `OAUTH_CLIENT_SECRET` | Yes | — | OAuth client credentials secret |
+| `DATABASE_URL` | If prisma | - | PostgreSQL connection string |
+| `JWT_SECRET` | Yes | - | Secret for OAuth JWT signing |
+| `SCIM_SHARED_SECRET` | Yes | - | Global bearer token for shared-secret auth |
+| `OAUTH_CLIENT_SECRET` | Yes | - | OAuth client credentials secret |
 | `OAUTH_CLIENT_ID` | No | `scimserver-client` | OAuth client ID |
 | `OAUTH_CLIENT_SCOPES` | No | `scim.read,scim.write,scim.manage` | Comma-separated OAuth scopes |
 | `API_PREFIX` | No | `scim` | URL prefix for all routes |
-| `NODE_ENV` | No | — | `production`, `development`, `test` |
+| `NODE_ENV` | No | - | `production`, `development`, `test` |
 | `LOG_LEVEL` | No | `info` | Global log level (TRACE/DEBUG/INFO/WARN/ERROR/FATAL/OFF) |
 
 ---
@@ -525,7 +525,7 @@ Invoke-RestMethod "$base/scim/admin/log-config/recent?limit=25" -Headers $h | Co
 
 ### Audit Trail
 
-Returns CONFIG, ENDPOINT, and AUTH events — config changes, endpoint CRUD, auth successes/failures.
+Returns CONFIG, ENDPOINT, and AUTH events - config changes, endpoint CRUD, auth successes/failures.
 
 ```http
 GET /scim/admin/log-config/audit?limit=100 HTTP/1.1
@@ -586,7 +586,7 @@ Invoke-RestMethod "$base/scim/admin/log-config/recent?requestId=f47ac10b-..." -H
 ### More Operations
 
 ```powershell
-# Download logs (Azure — files are ephemeral in container)
+# Download logs (Azure - files are ephemeral in container)
 Invoke-RestMethod "$base/scim/admin/log-config/download" -Headers $h -OutFile "logs.ndjson"
 
 # Search persistent history by userName/email
@@ -601,7 +601,7 @@ Invoke-RestMethod -Method PUT "$base/scim/admin/log-config/level/TRACE" -Headers
 Invoke-RestMethod -Method PUT "$base/scim/admin/log-config/level/INFO" -Headers $h
 ```
 
-> **Full reference:** [REMOTE_DEBUGGING_AND_DIAGNOSIS.md](docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md) — 20 troubleshooting scenarios, log file layout, SSE live stream, per-endpoint isolation, 4 diagnosis workflows.
+> **Full reference:** [REMOTE_DEBUGGING_AND_DIAGNOSIS.md](docs/REMOTE_DEBUGGING_AND_DIAGNOSIS.md) - 20 troubleshooting scenarios, log file layout, SSE live stream, per-endpoint isolation, 4 diagnosis workflows.
 
 ---
 
@@ -615,7 +615,7 @@ Invoke-RestMethod -Method PUT "$base/scim/admin/log-config/level/INFO" -Headers 
 | **E2E** | 46 | 965 | Jest + supertest + NestJS testing |
 | **Live Integration** | 43 sections | ~753 | PowerShell (live-test.ps1) |
 | **ISV Live (Lexmark)** | 13 sections | 112 | PowerShell (lexmark-live-test.ps1) |
-| **Total** | **~184** | **~5,012** | — |
+| **Total** | **~184** | **~5,012** | - |
 
 ### Run Tests
 
@@ -724,4 +724,4 @@ Full documentation is in the [`docs/`](docs/) directory. Key documents:
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+MIT - see [LICENSE](LICENSE) for details.

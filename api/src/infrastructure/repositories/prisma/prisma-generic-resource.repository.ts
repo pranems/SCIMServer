@@ -1,5 +1,5 @@
 /**
- * PrismaGenericResourceRepository — IGenericResourceRepository backed by Prisma (PostgreSQL).
+ * PrismaGenericResourceRepository - IGenericResourceRepository backed by Prisma (PostgreSQL).
  *
  * Phase 8b: Queries the unified `ScimResource` table with the custom resourceType
  * discriminator. JSONB payload contains all resource attributes.

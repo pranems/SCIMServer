@@ -1,15 +1,15 @@
-# Manager PATCH String Coercion — Complex Attribute Relaxation for SCIM Compliance
+# Manager PATCH String Coercion - Complex Attribute Relaxation for SCIM Compliance
 
 ## Overview
 
 **Feature**: Accept raw string values for complex PATCH attributes (manager) in strict schema validation  
 **Version**: v0.38.0 (pending)  
-**Status**: 🔧 Analysis Complete — Implementation Pending  
+**Status**: 🔧 Analysis Complete - Implementation Pending  
 **RFC References**:
-- [RFC 7643 §2.3.8 — Complex Attributes](https://datatracker.ietf.org/doc/html/rfc7643#section-2.3.8)
-- [RFC 7643 §4.3 — Enterprise User Extension](https://datatracker.ietf.org/doc/html/rfc7643#section-4.3)
-- [RFC 7644 §3.5.2 — Modifying with PATCH](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2)
-- [RFC 7644 §3.5.2.3 — Replace Operation (empty-value removal)](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2.3)
+- [RFC 7643 §2.3.8 - Complex Attributes](https://datatracker.ietf.org/doc/html/rfc7643#section-2.3.8)
+- [RFC 7643 §4.3 - Enterprise User Extension](https://datatracker.ietf.org/doc/html/rfc7643#section-4.3)
+- [RFC 7644 §3.5.2 - Modifying with PATCH](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2)
+- [RFC 7644 §3.5.2.3 - Replace Operation (empty-value removal)](https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2.3)
 - [Postel's Law (Robustness Principle)](https://en.wikipedia.org/wiki/Robustness_principle)
 
 ### Problem Statement
@@ -62,7 +62,7 @@ Client sends: PATCH path=urn:...:User:manager  value="uuid-string"
 │    typeof "uuid-string" !== 'object'  →  ❌ ERROR 400          │
 │    "Attribute 'manager' must be a complex object, got string." │
 │                                                                 │
-│  ❌ REQUEST BLOCKED — never reaches Patch Engine               │
+│  ❌ REQUEST BLOCKED - never reaches Patch Engine               │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -126,13 +126,13 @@ Client sends: PATCH path=urn:...:User:manager  value=""
 
 ## RFC Analysis
 
-### RFC 7643 §2.3.8 — Complex Attributes
+### RFC 7643 §2.3.8 - Complex Attributes
 
 > Complex attributes ... contain a set of sub-attributes. Each sub-attribute is described using the same schema definition format.
 
 A complex attribute's **canonical representation** is always a JSON object: `{"value": "...", "displayName": "..."}`.
 
-### RFC 7643 §4.3 — Enterprise User: `manager`
+### RFC 7643 §4.3 - Enterprise User: `manager`
 
 The `manager` attribute is defined as:
 
@@ -153,23 +153,23 @@ Sub-attributes:
 
 RFC 7643 does **not** define a "shorthand string form" for complex attributes. The canonical wire format is always an object.
 
-### RFC 7644 §3.5.2.1 — Add Operation
+### RFC 7644 §3.5.2.1 - Add Operation
 
 > If the target location specifies a complex attribute, a set of sub-attributes SHALL be specified in the value.
 
-Strictly interpreted, `value: "uuid"` is non-compliant — the value should be `{"value": "uuid"}`.
+Strictly interpreted, `value: "uuid"` is non-compliant - the value should be `{"value": "uuid"}`.
 
-### RFC 7644 §3.5.2.3 — Replace Operation (Empty-Value Removal)
+### RFC 7644 §3.5.2.3 - Replace Operation (Empty-Value Removal)
 
 > If the value is set to the attribute's default or an **empty value**, the attribute SHALL be removed from the resource.
 
 This normatively defines that `value: ""`, `value: null`, and `value: {"value": ""}` are **removal signals**, not type-validation candidates.
 
-### RFC 7644 §3.12 — Service Provider Configuration / Robustness
+### RFC 7644 §3.12 - Service Provider Configuration / Robustness
 
 > Service providers SHOULD be liberal in what they accept and conservative in what they emit.
 
-This is **Postel's Law** — the server should accept `"uuid"` and coerce it to `{"value": "uuid"}` internally, while always emitting the canonical complex form in responses.
+This is **Postel's Law** - the server should accept `"uuid"` and coerce it to `{"value": "uuid"}` internally, while always emitting the canonical complex form in responses.
 
 ### The Industry Norm
 
@@ -207,7 +207,7 @@ This establishes the **de facto industry standard**: a conformant SCIM server **
 | No-path merge | `scim-patch-path.ts` | `resolveNoPathValue()` | Routes URN keys through `applyExtensionUpdate()` (same wrapping) |
 | Extension dispatch | `user-patch-engine.ts` | `applyAddOrReplace()` | Detects `isExtensionPath()` and delegates to `applyExtensionUpdate()` |
 
-### Call Chain (Current — Fails)
+### Call Chain (Current - Fails)
 
 ```
 Controller.updateUser()  @Patch('Users/:id')
@@ -226,7 +226,7 @@ Controller.updateUser()  @Patch('Users/:id')
               └── (never reached) post-PATCH validation
 ```
 
-### Call Chain (Fixed — Succeeds)
+### Call Chain (Fixed - Succeeds)
 
 ```
 Controller.updateUser()
@@ -251,14 +251,14 @@ Inside the `case 'complex':` block at ~line 354, add two guards **before** the e
 
 ```typescript
 case 'complex':
-  // Guard 1: RFC 7644 §3.5.2.3 — In patch mode, empty values are removal
-  // signals. Skip type validation entirely — the Patch Engine will handle
+  // Guard 1: RFC 7644 §3.5.2.3 - In patch mode, empty values are removal
+  // signals. Skip type validation entirely - the Patch Engine will handle
   // removal via isEmptyScimValue().
   if (options.mode === 'patch' && SchemaValidator.isEmptyRemovalValue(value)) {
     break;
   }
 
-  // Guard 2: Robustness Principle — Accept raw strings for complex attrs
+  // Guard 2: Robustness Principle - Accept raw strings for complex attrs
   // that have a 'value' sub-attribute of type 'string'. Microsoft Entra ID
   // sends "manager": "uuid" instead of "manager": {"value": "uuid"}.
   // The Patch Engine wraps these in applyExtensionUpdate().
@@ -269,7 +269,7 @@ case 'complex':
       sa => sa.name.toLowerCase() === 'value' && sa.type === 'string'
     )
   ) {
-    break;  // Allow — Patch Engine will wrap to {value: string}
+    break;  // Allow - Patch Engine will wrap to {value: string}
   }
 
   // Existing check (unchanged)
@@ -312,11 +312,11 @@ private static isEmptyRemovalValue(value: unknown): boolean {
 
 | Concern | Mitigation |
 |---|---|
-| **Only affects PATCH mode** | Guards check `options.mode === 'patch'` — create/replace still require correct types |
-| **Only for attrs with `value` sub-attr** | Guard 2 checks `attrDef.subAttributes` for a `value` sub-attr of type `string` — doesn't relax arbitrary complex attrs |
+| **Only affects PATCH mode** | Guards check `options.mode === 'patch'` - create/replace still require correct types |
+| **Only for attrs with `value` sub-attr** | Guard 2 checks `attrDef.subAttributes` for a `value` sub-attr of type `string` - doesn't relax arbitrary complex attrs |
 | **No new coercion logic** | The validator just stops blocking; the Patch Engine already has the correct wrapping logic in `applyExtensionUpdate()` |
 | **Empty values already handled** | `isEmptyScimValue()` in the Patch Engine already handles removal; the validator just stops blocking before it |
-| **Post-PATCH validation unchanged** | The schema validation that runs *after* patch application still validates the resulting payload (which will have `manager: {value: "uuid"}` — a valid complex object) |
+| **Post-PATCH validation unchanged** | The schema validation that runs *after* patch application still validates the resulting payload (which will have `manager: {value: "uuid"}` - a valid complex object) |
 
 ## Database Storage
 
@@ -362,7 +362,7 @@ model ScimResource {
 
 ## Request / Response Examples
 
-### Example 1: Add Manager (Raw String — Currently Fails)
+### Example 1: Add Manager (Raw String - Currently Fails)
 
 **Request:**
 
@@ -386,7 +386,7 @@ Authorization: Bearer <token>
 }
 ```
 
-**Current Response (400 — broken):**
+**Current Response (400 - broken):**
 
 ```json
 {
@@ -425,7 +425,7 @@ Authorization: Bearer <token>
 }
 ```
 
-### Example 2: Replace Manager (Raw String — Currently Fails)
+### Example 2: Replace Manager (Raw String - Currently Fails)
 
 **Request:**
 
@@ -444,7 +444,7 @@ Authorization: Bearer <token>
 
 Same 400 error. After fix: 200 with `manager.value` set to the new UUID.
 
-### Example 3: Remove Manager (Empty String — Currently Fails)
+### Example 3: Remove Manager (Empty String - Currently Fails)
 
 **Request:**
 
@@ -480,9 +480,9 @@ Same 400 error. After fix: 200 with `manager.value` set to the new UUID.
 }
 ```
 
-Note: `manager` key is **absent** from the extension block — the attribute was removed.
+Note: `manager` key is **absent** from the extension block - the attribute was removed.
 
-### Example 4: Add Manager (Object — Already Works)
+### Example 4: Add Manager (Object - Already Works)
 
 ```json
 {
@@ -521,13 +521,13 @@ This no-path style works because the extension attributes (`employeeNumber`, `de
 
 | Variant | Path | Value | Behavior |
 |---|---|---|---|
-| **A. Replace with object** | `urn:...:User:manager` | `{"value": "MGR-123"}` | ✅ Works — canonical form |
+| **A. Replace with object** | `urn:...:User:manager` | `{"value": "MGR-123"}` | ✅ Works - canonical form |
 | **B. Add with object** | `urn:...:User:manager` | `{"value": "MGR-123", "displayName": "Bob"}` | ✅ Works |
 | **C. Add/Replace string** | `urn:...:User:manager` | `"MGR-123"` | ❌ Fails (this fix) |
-| **D. Remove (explicit)** | `urn:...:User:manager` | *(none)* | ✅ Works — `op: "remove"` |
+| **D. Remove (explicit)** | `urn:...:User:manager` | *(none)* | ✅ Works - `op: "remove"` |
 | **E. Replace empty string** | `urn:...:User:manager` | `""` | ❌ Fails (this fix) |
 | **F. Replace empty object** | `urn:...:User:manager` | `{"value": ""}` | ❌ Fails (this fix) |
-| **G. Replace null** | `urn:...:User:manager` | `null` | ✅ Works — `validateSingleValue` returns early on null |
+| **G. Replace null** | `urn:...:User:manager` | `null` | ✅ Works - `validateSingleValue` returns early on null |
 | **H. No-path merge** | *(none)* | `{"urn:...:User:manager": "MGR-123"}` | Depends on no-path validation path |
 
 ## SCIM Validator Results (Before Fix)
@@ -538,14 +538,14 @@ From the attached [scim-results (33)_manager.json](../scim-results%20(33)_manage
 |---|---|---|---|---|
 | ✅ | POST /Users (create with manager object) | Pass | 201 | Manager as `{value: "..."}` is valid |
 | ✅ | PATCH /Users - Replace Attributes | Pass | 200 | No-path merge with string extension attrs |
-| ✅ | PATCH /Users - Add Attributes | Pass | 200 | Same — no manager sent as raw string |
+| ✅ | PATCH /Users - Add Attributes | Pass | 200 | Same - no manager sent as raw string |
 | ✅ | PATCH /Users - Update userName | Pass | 200 | No manager involvement |
-| ✅ | PATCH /Users - Disable User | Pass | 200 | `active: false` — no manager |
+| ✅ | PATCH /Users - Disable User | Pass | 200 | `active: false` - no manager |
 | ❌ | **PATCH /Users - Add Manager** | **Fail** | **400** | `value: "uuid"` rejected by strict validator |
 | ❌ | **PATCH /Users - Replace Manager** | **Fail** | **400** | `value: "uuid"` rejected by strict validator |
 | ❌ | **PATCH /Users - Remove Manager** | **Fail** | **400** | `value: ""` rejected by strict validator |
 
-**`SFComplianceFailed: true`** — all three failures are caused by the same root cause.
+**`SFComplianceFailed: true`** - all three failures are caused by the same root cause.
 
 ## End-to-End Data Flow Diagram
 
@@ -652,7 +652,7 @@ classDiagram
 
 ## Test Plan
 
-### Unit Tests (TDD — write RED first)
+### Unit Tests (TDD - write RED first)
 
 | Test File | Test Description | Input | Expected |
 |---|---|---|---|
@@ -678,13 +678,13 @@ classDiagram
 
 | Test ID | Description |
 |---|---|
-| 9m.1 | PATCH add manager with raw string — 200 + manager.value correct |
-| 9m.2 | PATCH replace manager with raw string — 200 + manager.value updated |
-| 9m.3 | PATCH remove manager with empty string — 200 + manager absent |
-| 9m.4 | PATCH remove manager with `{value:""}` — 200 + manager absent |
-| 9m.5 | PATCH add manager with correct object form — 200 + manager.value correct |
-| 9m.6 | GET after add — confirms manager persisted in DB |
-| 9m.7 | Re-run SCIM Validator — all 3 previously-failing tests now pass |
+| 9m.1 | PATCH add manager with raw string - 200 + manager.value correct |
+| 9m.2 | PATCH replace manager with raw string - 200 + manager.value updated |
+| 9m.3 | PATCH remove manager with empty string - 200 + manager absent |
+| 9m.4 | PATCH remove manager with `{value:""}` - 200 + manager absent |
+| 9m.5 | PATCH add manager with correct object form - 200 + manager.value correct |
+| 9m.6 | GET after add - confirms manager persisted in DB |
+| 9m.7 | Re-run SCIM Validator - all 3 previously-failing tests now pass |
 
 ## Mermaid Diagrams
 
@@ -705,7 +705,7 @@ flowchart TD
     G -->|No| F
     G -->|Yes| H{Has 'value' sub-attr<br/>of type string?}
 
-    H -->|Yes| I["✅ ALLOW<br/>Postel's Law — Patch Engine wraps"]
+    H -->|Yes| I["✅ ALLOW<br/>Postel's Law - Patch Engine wraps"]
     H -->|No| F
 
     F -->|Yes: valid object| J[Validate sub-attributes]
@@ -728,9 +728,9 @@ flowchart TD
 
 ## Configuration
 
-This fix has **no configuration flags**. The relaxation applies only in `patch` mode and only for complex attributes with a `value` sub-attribute. It is always active when strict schema validation is enabled — it makes strict validation compatible with real-world clients rather than adding a toggle.
+This fix has **no configuration flags**. The relaxation applies only in `patch` mode and only for complex attributes with a `value` sub-attribute. It is always active when strict schema validation is enabled - it makes strict validation compatible with real-world clients rather than adding a toggle.
 
-**Rationale**: The fix aligns the pre-validator with the Patch Engine's existing behavior and with the Microsoft SCIM Validator's expectations. A toggle would add complexity without value — if strict validation is enabled, it should still pass the official compliance tests.
+**Rationale**: The fix aligns the pre-validator with the Patch Engine's existing behavior and with the Microsoft SCIM Validator's expectations. A toggle would add complexity without value - if strict validation is enabled, it should still pass the official compliance tests.
 
 ## Impact on SCIM Validator Compliance
 

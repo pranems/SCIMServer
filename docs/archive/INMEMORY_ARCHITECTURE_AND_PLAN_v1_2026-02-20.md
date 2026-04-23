@@ -2,14 +2,14 @@
 
 > **Version**: 1.0 · **Date**: 2026-02-20
 > **Companion documents**: `IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md` (PostgreSQL) · `MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md`
-> **Scope**: In-memory `Map`-based repository implementation that fulfills the same `IResourceRepository` interface as the PostgreSQL path — for testing, dev, demo, and lightweight deployments.
+> **Scope**: In-memory `Map`-based repository implementation that fulfills the same `IResourceRepository` interface as the PostgreSQL path - for testing, dev, demo, and lightweight deployments.
 > **Note**: Test counts in this doc (e.g., 280 live) are the baseline at time of writing. See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) for current baseline.
 
 ---
 
 ## Table of Contents
 
-1. [Executive Summary — Why In-Memory?](#1-executive-summary--why-in-memory)
+1. [Executive Summary - Why In-Memory?](#1-executive-summary--why-in-memory)
 2. [PostgreSQL vs In-Memory Comparison Matrix](#2-postgresql-vs-in-memory-comparison-matrix)
 3. [Architecture Overview](#3-architecture-overview)
 4. [Data Model (In-Memory Stores)](#4-data-model-in-memory-stores)
@@ -19,16 +19,16 @@
 8. [Persistence Snapshots (Optional)](#8-persistence-snapshots-optional)
 9. [Trade-offs & Limitations](#9-trade-offs--limitations)
 10. [Deployment Modes](#10-deployment-modes)
-11. [Migration Plan — Current → In-Memory](#11-migration-plan--current--in-memory)
+11. [Migration Plan - Current → In-Memory](#11-migration-plan--current--in-memory)
 12. [Migration Phase Details](#12-migration-phase-details)
 13. [Testing Strategy](#13-testing-strategy)
-14. [Decision Framework — When to Use Which](#14-decision-framework--when-to-use-which)
-15. [Appendix A — Mermaid Diagrams](#15-appendix-a--mermaid-diagrams)
-16. [Appendix B — Comparative Code Examples](#16-appendix-b--comparative-code-examples)
+14. [Decision Framework - When to Use Which](#14-decision-framework--when-to-use-which)
+15. [Appendix A - Mermaid Diagrams](#15-appendix-a--mermaid-diagrams)
+16. [Appendix B - Comparative Code Examples](#16-appendix-b--comparative-code-examples)
 
 ---
 
-## 1. Executive Summary — Why In-Memory?
+## 1. Executive Summary - Why In-Memory?
 
 The ideal architecture (see `IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md`) defines **Persistence Agnosticism** as Design Principle P4:
 
@@ -38,18 +38,18 @@ An in-memory repository implementation fulfills several critical needs:
 
 | Need | How In-Memory Serves It |
 |------|-------------------------|
-| **Unit Testing** | Tests run in <5ms per suite — no database startup, no migrations, no teardown |
+| **Unit Testing** | Tests run in <5ms per suite - no database startup, no migrations, no teardown |
 | **Integration Testing** | Full SCIM request pipeline testable without Docker Compose or PostgreSQL |
-| **Demo/POC** | Zero-dependency `npx scimserver` experience — no database to provision |
+| **Demo/POC** | Zero-dependency `npx scimserver` experience - no database to provision |
 | **Development** | Instant restarts, no migration drift, full feature parity for SCIM logic |
 | **CI/CD** | GitHub Actions pipelines run without `services: postgres` container |
 | **Edge/Embedded** | Deploy as sidecar or serverless function with no external dependencies |
 
 ### What It Is NOT
 
-- **Not a replacement for PostgreSQL in production** — data is lost on process restart (unless snapshot persistence is enabled)
-- **Not a performance optimization** — in-memory filtering is O(n) vs PostgreSQL's O(log n) with indexes
-- **Not a scaling solution** — single-process, single-instance by definition
+- **Not a replacement for PostgreSQL in production** - data is lost on process restart (unless snapshot persistence is enabled)
+- **Not a performance optimization** - in-memory filtering is O(n) vs PostgreSQL's O(log n) with indexes
+- **Not a scaling solution** - single-process, single-instance by definition
 
 ---
 
@@ -60,7 +60,7 @@ An in-memory repository implementation fulfills several critical needs:
 | Feature | PostgreSQL | In-Memory | Notes |
 |---------|-----------|-----------|-------|
 | **SCIM CRUD (Users/Groups)** | ✅ Full | ✅ Full | Same `IResourceRepository` interface |
-| **SCIM PATCH (all ops)** | ✅ Full | ✅ Full | PatchEngine is pure domain — persistence-agnostic |
+| **SCIM PATCH (all ops)** | ✅ Full | ✅ Full | PatchEngine is pure domain - persistence-agnostic |
 | **Filter: `eq` operator** | ✅ DB index | ✅ `Map.get()` O(1) | In-memory is actually faster for eq on indexed fields |
 | **Filter: `co`/`sw`/`ew`** | ✅ pg_trgm GIN | ✅ `String.includes/startsWith/endsWith` | In-memory is O(n) scan; PostgreSQL uses GIN index |
 | **Filter: JSONB path** | ✅ `payload @>` | ✅ Deep object traversal | In-memory navigates JS objects directly |
@@ -101,7 +101,7 @@ An in-memory repository implementation fulfills several critical needs:
 | **Data persistence** | ✅ Survives restarts/crashes | ❌ Lost (unless snapshot enabled) |
 | **Backup & recovery** | ✅ pg_dump, Azure Backup, PITR | ⚠️ JSON snapshot to file (manual) |
 | **Concurrent writes** | ✅ Row-level locks, MVCC | ⚠️ Single-threaded Node.js (safe but sequential) |
-| **Schema migrations** | ✅ Prisma Migrate | N/A — no schema to migrate |
+| **Schema migrations** | ✅ Prisma Migrate | N/A - no schema to migrate |
 | **Connection limit** | Configurable pool | N/A |
 | **Cold start** | ~2-3s (pool warmup) | ~10ms |
 | **Docker image size** | Same (Prisma client bundled) | Smaller (no Prisma, no query engines) |
@@ -111,7 +111,7 @@ An in-memory repository implementation fulfills several critical needs:
 
 ## 3. Architecture Overview
 
-The key insight: the **in-memory implementation sits entirely in the Infrastructure layer**. All layers above it — Domain, Application, Presentation — are completely unchanged.
+The key insight: the **in-memory implementation sits entirely in the Infrastructure layer**. All layers above it - Domain, Application, Presentation - are completely unchanged.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -127,7 +127,7 @@ The key insight: the **in-memory implementation sits entirely in the Infrastruct
 │  PatchEngine · FilterPlanner · SchemaValidator · MetaBuilder     │
 │              ← IDENTICAL for both PostgreSQL and In-Memory →     │
 ├─────────────────────────────────────────────────────────────────┤
-│ DATA ACCESS LAYER — Repository Interfaces (Ports)                │
+│ DATA ACCESS LAYER - Repository Interfaces (Ports)                │
 │  IResourceRepository · IEndpointRepository · ISchemaRepository     │
 │              ← IDENTICAL interface for both implementations →    │
 ├──────────────────────┬──────────────────────────────────────────┤
@@ -361,8 +361,8 @@ erDiagram
 | `endpoint_schema` | `schemas: Map<endpointId, SchemaModel[]>` | Linear scan within endpoint's schemas |
 | `endpoint_resource_type` | `resourceTypes: Map<endpointId, ResourceTypeModel[]>` | Linear scan within endpoint's types |
 | `endpoint_credential` | `credentials: Map<endpointId, CredentialModel[]>` | Linear scan within endpoint's credentials |
-| GIN index on `payload JSONB` | No index — full scan + deep object traversal | O(n) per query |
-| pg_trgm GIN for `co`/`sw`/`ew` | No index — `String.includes/startsWith/endsWith` | O(n) per query |
+| GIN index on `payload JSONB` | No index - full scan + deep object traversal | O(n) per query |
+| pg_trgm GIN for `co`/`sw`/`ew` | No index - `String.includes/startsWith/endsWith` | O(n) per query |
 
 ---
 
@@ -698,7 +698,7 @@ flowchart TD
 ### Sort Implementation
 
 ```typescript
-// In-Memory sort — works on any attribute path
+// In-Memory sort - works on any attribute path
 function sortResources(
   resources: ScimResourceModel[],
   sortBy: string,
@@ -739,7 +739,7 @@ function paginate<T>(items: T[], startIndex: number, count: number): { items: T[
 
 ## 7. ETag, Versioning & Concurrency
 
-### ETag — Identical Behavior
+### ETag - Identical Behavior
 
 Both implementations use the same `version` integer and the same ETag format:
 
@@ -782,7 +782,7 @@ sequenceDiagram
 | **Isolation** | READ COMMITTED (default) | Sequential execution = serializable |
 
 ```typescript
-// In-Memory Bulk — no true transactions, but can implement rollback log
+// In-Memory Bulk - no true transactions, but can implement rollback log
 async processBulk(endpointId: string, ops: BulkOperation[]): Promise<BulkResponse> {
   const undoLog: Array<() => void> = [];
   const results: BulkResult[] = [];
@@ -949,7 +949,7 @@ export class SnapshotService implements OnModuleInit, OnModuleDestroy {
 |----------|-------------|
 | **Unit tests** | No setup, instant, deterministic |
 | **Integration tests** | Full pipeline without Docker |
-| **Demos** | `npm start` — no database needed |
+| **Demos** | `npm start` - no database needed |
 | **Small deployments** (<10K resources) | Fast enough, zero ops burden |
 | **Development** | No migration drift, instant restart |
 | **CI/CD** | No `services: postgres` in GitHub Actions |
@@ -1021,15 +1021,15 @@ flowchart TB
 
 | Aspect | PostgreSQL Dockerfile | In-Memory Dockerfile |
 |--------|---------------------|---------------------|
-| **Build stages** | 4 (web → api → deps → runtime) | 3 (web → api → runtime) — skip Prisma WASM |
-| **Runtime deps** | `@prisma/client`, WASM query engines | None — all in-memory |
+| **Build stages** | 4 (web → api → deps → runtime) | 3 (web → api → runtime) - skip Prisma WASM |
+| **Runtime deps** | `@prisma/client`, WASM query engines | None - all in-memory |
 | **Image size** | ~350 MB | ~200 MB (no Prisma engines) |
 | **Entrypoint** | `prisma migrate deploy && node dist/main.js` | `node dist/main.js` |
 | **Health check** | Same | Same |
 | **Compose services** | `postgres:17-alpine` + app | App only |
 
 ```dockerfile
-# Dockerfile.memory — simplified for in-memory mode
+# Dockerfile.memory - simplified for in-memory mode
 FROM node:24-alpine AS build
 WORKDIR /app
 COPY api/package*.json ./
@@ -1052,7 +1052,7 @@ CMD ["node", "dist/main.js"]
 
 ---
 
-## 11. Migration Plan — Current → In-Memory
+## 11. Migration Plan - Current → In-Memory
 
 ### Overview
 
@@ -1100,42 +1100,42 @@ flowchart LR
 
 | Phase | PostgreSQL Path | In-Memory Path | Shared? |
 |-------|----------------|----------------|---------|
-| P1 — Repository Pattern | Extract `IResourceRepository` interface | Same | ✅ 100% |
-| P2 — Unified Resource Model | `scim_resource` Prisma model + migration | `ScimResourceModel` TypeScript type only | ✅ Model shared, storage differs |
-| P3 — Storage Implementation | PostgreSQL migration (CITEXT, JSONB, GIN, schema changes, Docker Compose postgres service) | `InMemoryResourceRepository` (~200 LOC) | ❌ Entirely different |
-| P4 — Filter Expansion | SQL operators (ILIKE, JSONB `@>`, pg_trgm) | `evaluateFilter()` with deep object traversal | ❌ Different implementation, same interface |
-| P5 — PATCH Engine | Pure domain — no DB dependency | Same | ✅ 100% |
-| P6 — Discovery | `endpoint_schema` table (PostgreSQL) | `schemas Map` | ⚠️ Interface shared, storage differs |
-| P7 — ETag & Versioning | `version INT` column, `FOR UPDATE` lock | `version` property, single-thread safe | ⚠️ Same logic, different concurrency model |
-| P8 — Schema Validation | Pure domain | Same | ✅ 100% |
-| P9 — Bulk Operations | `BEGIN`/`COMMIT` transaction | Undo log or best-effort | ⚠️ Different transaction semantics |
-| P10 — /Me Endpoint | Pure application logic | Same | ✅ 100% |
-| P11 — Per-Endpoint Credentials | `endpoint_credential` table | `credentials Map` | ⚠️ Interface shared, storage differs |
-| P12 — Sort & Cleanup | `ORDER BY` SQL | `Array.sort()` | ⚠️ Same result, different implementation |
+| P1 - Repository Pattern | Extract `IResourceRepository` interface | Same | ✅ 100% |
+| P2 - Unified Resource Model | `scim_resource` Prisma model + migration | `ScimResourceModel` TypeScript type only | ✅ Model shared, storage differs |
+| P3 - Storage Implementation | PostgreSQL migration (CITEXT, JSONB, GIN, schema changes, Docker Compose postgres service) | `InMemoryResourceRepository` (~200 LOC) | ❌ Entirely different |
+| P4 - Filter Expansion | SQL operators (ILIKE, JSONB `@>`, pg_trgm) | `evaluateFilter()` with deep object traversal | ❌ Different implementation, same interface |
+| P5 - PATCH Engine | Pure domain - no DB dependency | Same | ✅ 100% |
+| P6 - Discovery | `endpoint_schema` table (PostgreSQL) | `schemas Map` | ⚠️ Interface shared, storage differs |
+| P7 - ETag & Versioning | `version INT` column, `FOR UPDATE` lock | `version` property, single-thread safe | ⚠️ Same logic, different concurrency model |
+| P8 - Schema Validation | Pure domain | Same | ✅ 100% |
+| P9 - Bulk Operations | `BEGIN`/`COMMIT` transaction | Undo log or best-effort | ⚠️ Different transaction semantics |
+| P10 - /Me Endpoint | Pure application logic | Same | ✅ 100% |
+| P11 - Per-Endpoint Credentials | `endpoint_credential` table | `credentials Map` | ⚠️ Interface shared, storage differs |
+| P12 - Sort & Cleanup | `ORDER BY` SQL | `Array.sort()` | ⚠️ Same result, different implementation |
 
 ### Effort Comparison
 
 | Phase | PostgreSQL LOC | In-Memory LOC | In-Memory Effort |
 |-------|---------------|---------------|-----------------|
-| P1 — Repository Pattern | ~300 | ~300 | Same (shared) |
-| P2 — Unified Model | ~400 (schema + migration) | ~100 (TypeScript only) | 75% less |
-| P3 — Storage Impl | ~600 (Prisma + Docker + Bicep) | ~250 | 60% less |
-| P4 — Filters | ~300 (SQL builder) | ~150 (JS evaluator) | 50% less |
-| P5 — PATCH Engine | ~400 | ~400 | Same (shared) |
-| P6 — Discovery | ~200 | ~100 | 50% less |
-| P7 — ETag | ~150 | ~80 | 47% less |
-| P8 — Schema Validation | ~200 | ~200 | Same (shared) |
-| P9 — Bulk Operations | ~250 | ~200 | 20% less |
-| P10 — /Me | ~80 | ~80 | Same (shared) |
-| P11 — Credentials | ~200 | ~100 | 50% less |
-| P12 — Sort & Cleanup | ~200 | ~100 | 50% less |
+| P1 - Repository Pattern | ~300 | ~300 | Same (shared) |
+| P2 - Unified Model | ~400 (schema + migration) | ~100 (TypeScript only) | 75% less |
+| P3 - Storage Impl | ~600 (Prisma + Docker + Bicep) | ~250 | 60% less |
+| P4 - Filters | ~300 (SQL builder) | ~150 (JS evaluator) | 50% less |
+| P5 - PATCH Engine | ~400 | ~400 | Same (shared) |
+| P6 - Discovery | ~200 | ~100 | 50% less |
+| P7 - ETag | ~150 | ~80 | 47% less |
+| P8 - Schema Validation | ~200 | ~200 | Same (shared) |
+| P9 - Bulk Operations | ~250 | ~200 | 20% less |
+| P10 - /Me | ~80 | ~80 | Same (shared) |
+| P11 - Credentials | ~200 | ~100 | 50% less |
+| P12 - Sort & Cleanup | ~200 | ~100 | 50% less |
 | **Total** | **~3280** | **~2060** | **~37% less** |
 
 ---
 
 ## 12. Migration Phase Details
 
-### Phase 3M — InMemory Repository Implementation
+### Phase 3M - InMemory Repository Implementation
 
 This replaces PostgreSQL Phase 3 (database migration) with a much simpler in-memory implementation.
 
@@ -1183,16 +1183,16 @@ async findByUserName(endpointId: string, userName: string): Promise<ScimResource
 #### Step 3M.4: Wire Dynamic Module
 
 ```typescript
-// PersistenceModule.forRoot('memory') — see §3 Architecture Overview
+// PersistenceModule.forRoot('memory') - see §3 Architecture Overview
 // Controlled by DB_DRIVER environment variable
 ```
 
-### Phase 4M — In-Memory Filter Evaluation
+### Phase 4M - In-Memory Filter Evaluation
 
 Since there's no database to push filters to, all filtering happens in JavaScript:
 
 ```typescript
-// In-Memory filter evaluator — handles all SCIM operators
+// In-Memory filter evaluator - handles all SCIM operators
 function evaluateScimFilter(
   resource: ScimResourceModel,
   ast: FilterNode,
@@ -1249,7 +1249,7 @@ function resolveAttributePath(resource: ScimResourceModel, path: string): unknow
   // Navigate payload for nested/extension attributes
   return path.split('.').reduce((obj: any, key) => {
     if (Array.isArray(obj)) {
-      // Multi-valued attribute — check if any element has this key
+      // Multi-valued attribute - check if any element has this key
       return obj.map(item => item?.[key]).find(v => v !== undefined);
     }
     return obj?.[key];
@@ -1265,7 +1265,7 @@ function resolveAttributePath(resource: ScimResourceModel, path: string): unknow
 
 ```mermaid
 flowchart TB
-    subgraph UNIT["Unit Tests (Both — InMemory repo)"]
+    subgraph UNIT["Unit Tests (Both - InMemory repo)"]
         U1["PatchEngine tests<br/>~80 tests, <5ms"]
         U2["FilterParser tests<br/>~40 tests"]
         U3["SchemaValidator tests<br/>~30 tests"]
@@ -1300,16 +1300,16 @@ flowchart TB
 ### Running Tests Per Mode
 
 ```bash
-# Unit tests — always use InMemory (fast, no setup)
+# Unit tests - always use InMemory (fast, no setup)
 npm test
 
-# Integration tests — In-Memory (CI default)
+# Integration tests - In-Memory (CI default)
 DB_DRIVER=memory npm run test:e2e
 
-# Integration tests — PostgreSQL (pre-deploy validation)
+# Integration tests - PostgreSQL (pre-deploy validation)
 DB_DRIVER=postgresql DATABASE_URL=postgresql://... npm run test:e2e
 
-# Live tests — works against either mode
+# Live tests - works against either mode
 npm run test:smoke
 ```
 
@@ -1325,7 +1325,7 @@ npm run test:smoke
 
 ---
 
-## 14. Decision Framework — When to Use Which
+## 14. Decision Framework - When to Use Which
 
 ```mermaid
 flowchart TD
@@ -1364,7 +1364,7 @@ flowchart TD
 
 ---
 
-## 15. Appendix A — Mermaid Diagrams
+## 15. Appendix A - Mermaid Diagrams
 
 ### Complete SCIM Create User Flow (In-Memory)
 
@@ -1442,9 +1442,9 @@ sequenceDiagram
 
 ---
 
-## 16. Appendix B — Comparative Code Examples
+## 16. Appendix B - Comparative Code Examples
 
-### Creating a User — Side by Side
+### Creating a User - Side by Side
 
 ```typescript
 // ═══════════════════════════════════════════════
@@ -1496,11 +1496,11 @@ async create(input: ResourceCreateInput): Promise<ScimResourceModel> {
 }
 ```
 
-### Filtering — Side by Side
+### Filtering - Side by Side
 
 ```typescript
 // ═══════════════════════════════════════════════
-// PostgreSQL — SQL push-down
+// PostgreSQL - SQL push-down
 // ═══════════════════════════════════════════════
 // Filter: userName co "john" AND active eq true
 const where = {
@@ -1513,7 +1513,7 @@ const results = await prisma.scimResource.findMany({ where });
 // Uses pg_trgm GIN index + B-tree index
 
 // ═══════════════════════════════════════════════
-// In-Memory — JavaScript evaluation
+// In-Memory - JavaScript evaluation
 // ═══════════════════════════════════════════════
 // Same filter: userName co "john" AND active eq true
 const results = Array.from(endpointResources.values())
@@ -1524,23 +1524,23 @@ const results = Array.from(endpointResources.values())
 // Full scan of all resources in endpoint
 ```
 
-### Unique Constraint — Side by Side
+### Unique Constraint - Side by Side
 
 ```typescript
 // ═══════════════════════════════════════════════
-// PostgreSQL — Database-enforced uniqueness
+// PostgreSQL - Database-enforced uniqueness
 // ═══════════════════════════════════════════════
 try {
   await prisma.scimResource.create({ data: { userName: 'john@example.com', ... } });
 } catch (e) {
   if (e.code === 'P2002') {
-    // Unique constraint violation — CITEXT makes this case-insensitive
+    // Unique constraint violation - CITEXT makes this case-insensitive
     throw createScimError({ status: 409, detail: 'userName already exists' });
   }
 }
 
 // ═══════════════════════════════════════════════
-// In-Memory — Application-enforced uniqueness
+// In-Memory - Application-enforced uniqueness
 // ═══════════════════════════════════════════════
 const existing = this.store.userNameIndex
   .get(endpointId)

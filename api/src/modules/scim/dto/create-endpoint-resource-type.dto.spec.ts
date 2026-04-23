@@ -1,5 +1,5 @@
 /**
- * CreateEndpointResourceTypeDto — DTO validation tests.
+ * CreateEndpointResourceTypeDto - DTO validation tests.
  *
  * Verifies class-validator decorators on the DTO used for
  * POST /admin/endpoints/:endpointId/resource-types.

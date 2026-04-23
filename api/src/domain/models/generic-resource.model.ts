@@ -1,8 +1,8 @@
 /**
- * GenericResource domain model — represents a custom SCIM resource stored
+ * GenericResource domain model - represents a custom SCIM resource stored
  * in the polymorphic ScimResource table with an arbitrary resourceType discriminator.
  *
- * Phase 8b: Generic resources are simpler than User/Group — they don't have
+ * Phase 8b: Generic resources are simpler than User/Group - they don't have
  * type-specific fields like userName or members. All attributes beyond the
  * SCIM core (id, externalId, meta, schemas) are stored in the JSONB payload.
  */

@@ -1,5 +1,5 @@
 /**
- * SCIM Bulk Request DTO — RFC 7644 §3.7
+ * SCIM Bulk Request DTO - RFC 7644 §3.7
  *
  * POST /Bulk allows clients to send multiple SCIM operations
  * in a single HTTP request. Each operation specifies a method,

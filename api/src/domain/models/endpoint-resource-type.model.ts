@@ -1,5 +1,5 @@
 /**
- * EndpointResourceType domain model — represents a custom SCIM resource type
+ * EndpointResourceType domain model - represents a custom SCIM resource type
  * registered for a specific endpoint.
  *
  * Phase 8b: Allows endpoints to register resource types beyond User/Group

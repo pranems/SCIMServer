@@ -1,4 +1,4 @@
-# SCIM Validator Run #32 — Successful False Positive Analysis
+# SCIM Validator Run #32 - Successful False Positive Analysis
 
 ## Overview
 
@@ -13,17 +13,17 @@
 
 | # | Test | False Positives Found | Severity |
 |---|------|-----------------------|----------|
-| 1 | Create duplicate → 409 | 0 | — |
+| 1 | Create duplicate → 409 | 0 | - |
 | 2 | Filter existing user → 200 | 3 | Medium–High |
-| 3 | Filter non-existing → 200 | 0 | — |
+| 3 | Filter non-existing → 200 | 0 | - |
 | 4 | Filter different case → 200 | 3 | Medium–High (same as #2) |
 | 5 | PATCH userName → 200 | 3 | Medium–High |
 | 6 | PATCH disable → 200 | 2 | Medium |
-| 7 | DELETE verify → 404 | 0 | — |
+| 7 | DELETE verify → 404 | 0 | - |
 | P1 | Multi-op PATCH different attrs | 1 | Low |
 | P2 | Multi-op PATCH same attr | 1 | Low |
-| P3 | DELETE non-existent → 404 | 0 | — |
-| P4 | DELETE twice → 404 | 0 | — |
+| P3 | DELETE non-existent → 404 | 0 | - |
+| P4 | DELETE twice → 404 | 0 | - |
 | **Total** | | **~7 unique issues** | |
 
 ---
@@ -68,7 +68,7 @@
 
 **Problem**: The `meta.location` URI contains `/scim/v2/` but the actual request was sent without `/v2/`. RFC 7644 §3.1 defines `meta.location` as *"the URI of the resource being returned"*. If a client uses the request URL path and the location path differs, the location is not canonically aligned with the client's view of the resource.
 
-**Analysis**: This is a **deliberate design choice** — the server's `buildBaseUrl()` function ([base-url.util.ts#L12-L18](api/src/modules/scim/common/base-url.util.ts#L12-L18)) always advertises the RFC 7644 §3.13 versioned path `/scim/v2` as the canonical URL, while a rewrite middleware in `main.ts` accepts `/scim/v2/*` → `/scim/*`. Both paths resolve to the same resource. This is technically acceptable per RFC 7644 (the URI in `meta.location` is a canonical permalink), but it could confuse strict validators or clients that compare their request URL to the location.
+**Analysis**: This is a **deliberate design choice** - the server's `buildBaseUrl()` function ([base-url.util.ts#L12-L18](api/src/modules/scim/common/base-url.util.ts#L12-L18)) always advertises the RFC 7644 §3.13 versioned path `/scim/v2` as the canonical URL, while a rewrite middleware in `main.ts` accepts `/scim/v2/*` → `/scim/*`. Both paths resolve to the same resource. This is technically acceptable per RFC 7644 (the URI in `meta.location` is a canonical permalink), but it could confuse strict validators or clients that compare their request URL to the location.
 
 **Severity**: Low-Medium. Not a strict violation since `/scim/v2/...` is a valid, dereferenceable URL that returns the same resource. However, it IS a deviation that a thorough validator should flag as a warning.
 
@@ -85,7 +85,7 @@
 
 **Analysis**: RFC 7644 §3.5.2 states the response to a successful PATCH is the modified resource as if a GET was issued. Unlike POST (201), the RFC does NOT require a `Location` header on PATCH responses. The server correctly provides `meta.location` in the body.
 
-**Verdict**: **NOT a false positive** — `Location` header is only required on 201 Created. No issue here.
+**Verdict**: **NOT a false positive** - `Location` header is only required on 201 Created. No issue here.
 
 ---
 
@@ -96,9 +96,9 @@
 
 **Observed**: `meta.version` and `ETag` header use `W/"v1"`, `W/"v2"`, etc.
 
-**Analysis**: RFC 7644 §3.14 states: *"the Version attribute value MUST be the HTTPS ETag for the value"*. RFC 7232 §2.3 defines ETags as either strong (`"xyzzy"`) or weak (`W/"xyzzy"`). The format `W/"v1"` is a valid weak ETag — the `v` prefix is just a cosmetic choice, not a violation.
+**Analysis**: RFC 7644 §3.14 states: *"the Version attribute value MUST be the HTTPS ETag for the value"*. RFC 7232 §2.3 defines ETags as either strong (`"xyzzy"`) or weak (`W/"xyzzy"`). The format `W/"v1"` is a valid weak ETag - the `v` prefix is just a cosmetic choice, not a violation.
 
-**Verdict**: **NOT a false positive** — the format is valid per HTTP ETag semantics.
+**Verdict**: **NOT a false positive** - the format is valid per HTTP ETag semantics.
 
 ---
 
@@ -111,7 +111,7 @@
 
 **Analysis**: The server sets `itemsPerPage` to the actual number of resources in the current page (`paginatedResources.length`). When there are 0 results, this correctly becomes 0. RFC 7644 §3.4.2 states `itemsPerPage` is *"the number of resources returned in a list response page"*, so 0 is semantically correct.
 
-**Verdict**: **NOT a false positive** — fully compliant.
+**Verdict**: **NOT a false positive** - fully compliant.
 
 ---
 
@@ -124,7 +124,7 @@
 
 **Analysis**: RFC 7644 §3.4.2 Table 3 states the `Resources` attribute is `REQUIRED` when `totalResults` is non-zero. When `totalResults` is 0, including an empty array is acceptable (explicit vs. omitting it). This is the common implementation pattern and not a violation.
 
-**Verdict**: **NOT a false positive** — acceptable and common practice.
+**Verdict**: **NOT a false positive** - acceptable and common practice.
 
 ---
 
@@ -135,9 +135,9 @@
 
 **Observed**: `"status": "409"`, `"status": "404"`
 
-**Analysis**: RFC 7644 §3.12 states the `status` attribute in error responses is *"The HTTP status code (see Section 6 of [RFC7231]) expressed as a JSON string."* — emphasis on **JSON string**. The server correctly returns status as a string, not a number.
+**Analysis**: RFC 7644 §3.12 states the `status` attribute in error responses is *"The HTTP status code (see Section 6 of [RFC7231]) expressed as a JSON string."* - emphasis on **JSON string**. The server correctly returns status as a string, not a number.
 
-**Verdict**: **NOT a false positive** — fully compliant.
+**Verdict**: **NOT a false positive** - fully compliant.
 
 ---
 
@@ -214,7 +214,7 @@ All fields correct. Empty array with `totalResults: 0` is acceptable.
 
 ### TEST 4: Filter Different Case → 200 ⚠️ **Same 3 false positives as TEST 2**
 
-Same response structure as TEST 2 — issues FP-1 and FP-2 apply identically.
+Same response structure as TEST 2 - issues FP-1 and FP-2 apply identically.
 
 ---
 
@@ -266,7 +266,7 @@ Same response structure as TEST 2 — issues FP-1 and FP-2 apply identically.
 |-------|--------|-------|
 | Error schema | ✅ | Correct |
 | 404 status string | ✅ | `"404"` |
-| `scimType` | ⚠️ **FP-8** | See FP-8 — `noTarget` used for resource 404 is a minor semantic mismatch but not a strict violation |
+| `scimType` | ⚠️ **FP-8** | See FP-8 - `noTarget` used for resource 404 is a minor semantic mismatch but not a strict violation |
 | Content-Type | ✅ | Correct |
 
 Note: `scimType` is OPTIONAL on error responses (RFC 7644 §3.12), so even the semantic mismatch is harmless.
@@ -282,7 +282,7 @@ Note: `scimType` is OPTIONAL on error responses (RFC 7644 §3.12), so even the s
 | `displayName` replaced | ✅ | Correct |
 | **Empty custom ext `{}`** | ⚠️ **FP-1** | Same persistent issue |
 
-**Note on `preferredLanguage` absence**: The attribute has `returned: "default"` in the schema. After a `remove` operation, the attribute no longer exists on the resource. Its absence from the response is correct — `returned: "default"` means it's returned when it has a value, not that a null placeholder must be present.
+**Note on `preferredLanguage` absence**: The attribute has `returned: "default"` in the schema. After a `remove` operation, the attribute no longer exists on the resource. Its absence from the response is correct - `returned: "default"` means it's returned when it has a value, not that a null placeholder must be present.
 
 ---
 
@@ -319,7 +319,7 @@ Second DELETE correctly returns 404. (Note: RFC 7644 §3.6 says DELETE of alread
 
 | ID | Issue | Occurrences | Fix |
 |----|-------|-------------|-----|
-| **FP-2** | `meta.location` uses `/v2/` but request used non-`/v2/` path | All resource responses | By design — `buildBaseUrl()` always advertises `/scim/v2` as canonical. Consider documenting this or optionally deriving from the original request URL. |
+| **FP-2** | `meta.location` uses `/v2/` but request used non-`/v2/` path | All resource responses | By design - `buildBaseUrl()` always advertises `/scim/v2` as canonical. Consider documenting this or optionally deriving from the original request URL. |
 | **FP-8** | `scimType: "noTarget"` on 404 resource lookups | 3 tests | Technically allowed (custom scimType values are permitted). Could omit `scimType` entirely on 404s for cleaner semantics, or keep as-is since many SCIM implementations use this pattern. |
 
 ---

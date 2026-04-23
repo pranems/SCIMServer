@@ -72,7 +72,7 @@ describe('semverNewer', () => {
   });
 
   it('correctly compares 0.9.1 vs 0.34.0', () => {
-    // This was the old hardcoded fallback — verify it is indeed older
+    // This was the old hardcoded fallback - verify it is indeed older
     expect(semverNewer('0.34.0', '0.9.1')).toBe(true);
     expect(semverNewer('0.9.1', '0.34.0')).toBe(false);
   });

@@ -1,5 +1,5 @@
 /**
- * Unit tests for shared SCIM service helpers (G17 — Service Deduplication).
+ * Unit tests for shared SCIM service helpers (G17 - Service Deduplication).
  *
  * Tests cover:
  *  - parseJson: safe JSON parsing with fallback
@@ -419,13 +419,13 @@ describe('ScimSchemaHelpers', () => {
       const config = { StrictSchemaValidation: 'false' } as any;
       const dto = { schemas: [CORE_URN], userName: 'alice', unknownField: 'bad' } as Record<string, unknown>;
 
-      // Unknown attrs should NOT throw when strict is off — only required is enforced
+      // Unknown attrs should NOT throw when strict is off - only required is enforced
       expect(() => helpers.validatePayloadSchema(dto, 'ep-1', config, 'create')).not.toThrow();
     });
 
     it('should skip validation entirely for PATCH when strict is off', () => {
       const dto = { schemas: [CORE_URN] };
-      // No throw — PATCH with strict OFF skips everything
+      // No throw - PATCH with strict OFF skips everything
       helpers.validatePayloadSchema(dto, 'ep-1', { StrictSchemaValidation: 'false' } as any, 'patch');
     });
 
@@ -1079,7 +1079,7 @@ describe('stripReadOnlyPatchOps', () => {
   });
 });
 
-// ─── sanitizeBooleanStringsByParent — Parent-context-aware coercion ─────────
+// ─── sanitizeBooleanStringsByParent - Parent-context-aware coercion ─────────
 
 describe('sanitizeBooleanStringsByParent', () => {
   const CORE_URN = 'urn:ietf:params:scim:schemas:core:2.0:user';
@@ -1120,7 +1120,7 @@ describe('sanitizeBooleanStringsByParent', () => {
   });
 
   it('should NOT coerce string value that matches boolean name in wrong parent', () => {
-    // roles[].value = "true" — value is NOT in boolMap for "roles" parent
+    // roles[].value = "true" - value is NOT in boolMap for "roles" parent
     const obj: Record<string, unknown> = {
       roles: [{ value: 'true', primary: 'True' }],
     };
@@ -1130,7 +1130,7 @@ describe('sanitizeBooleanStringsByParent', () => {
   });
 
   it('should NOT coerce "active" inside extension object when not in extension map', () => {
-    // Extension has active as string — not in boolMap under its URN key
+    // Extension has active as string - not in boolMap under its URN key
     const obj: Record<string, unknown> = {
       active: 'True',
       'urn:custom:ext': { active: 'True' },
@@ -1179,7 +1179,7 @@ describe('sanitizeBooleanStringsByParent', () => {
   it('should not coerce non-true/false string values', () => {
     const obj: Record<string, unknown> = { active: 'yes' };
     sanitizeBooleanStringsByParent(obj, boolMap, CORE_URN);
-    expect(obj.active).toBe('yes'); // not "true"/"false" — untouched
+    expect(obj.active).toBe('yes'); // not "true"/"false" - untouched
   });
 
   it('should handle addresses[].primary', () => {
@@ -1527,7 +1527,7 @@ describe('handleRepositoryError', () => {
       rawError, 'create user', mockLogger, 'scim.user' as any,
     )).toThrow(TypeError);
 
-    // Should NOT log — let GlobalExceptionFilter handle it
+    // Should NOT log - let GlobalExceptionFilter handle it
     expect(mockLogger.error).not.toHaveBeenCalled();
   });
 

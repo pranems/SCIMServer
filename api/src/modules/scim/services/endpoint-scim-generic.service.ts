@@ -1,5 +1,5 @@
 /**
- * EndpointScimGenericService — Phase 8b Generic SCIM Resource Service
+ * EndpointScimGenericService - Phase 8b Generic SCIM Resource Service
  *
  * Handles CRUD operations for custom resource types registered via the
  * Admin API. Resources are stored in the polymorphic ScimResource table
@@ -155,7 +155,7 @@ export class EndpointScimGenericService {
     // GEN-11: Validate schemas array includes the core schema (same as ensureSchema)
     ensureSchema(body.schemas as string[] | undefined, coreSchema);
 
-    // GEN-11: Strict schema enforcement — reject undeclared/unregistered extension URNs
+    // GEN-11: Strict schema enforcement - reject undeclared/unregistered extension URNs
     this.enforceStrictSchemaValidation(body, resourceType, endpointId, config);
 
     // GEN-03: Coerce boolean strings ("True"/"False") → native booleans before validation
@@ -179,7 +179,7 @@ export class EndpointScimGenericService {
     const displayName = typeof body.displayName === 'string' ? body.displayName : null;
     const active = body.active !== false;
 
-    // externalId and displayName are NOT checked for uniqueness — saved as received per RFC 7643.
+    // externalId and displayName are NOT checked for uniqueness - saved as received per RFC 7643.
 
     const scimId = randomUUID();
 
@@ -263,7 +263,7 @@ export class EndpointScimGenericService {
     }
 
     // GEN-12: Config-aware soft-delete guard (RFC 7644 §3.6)
-    // [Removed in Settings v7: deletedAt no longer exists — DELETE always hard-deletes]
+    // [Removed in Settings v7: deletedAt no longer exists - DELETE always hard-deletes]
 
     return this.toScimResponse(record, resourceType);
   }
@@ -365,7 +365,7 @@ export class EndpointScimGenericService {
     // GEN-11: Validate schemas array includes the core schema
     ensureSchema(body.schemas as string[] | undefined, coreSchema);
 
-    // GEN-11: Strict schema enforcement — reject undeclared/unregistered extension URNs
+    // GEN-11: Strict schema enforcement - reject undeclared/unregistered extension URNs
     this.enforceStrictSchemaValidation(body, resourceType, endpointId, config);
 
     // GEN-03: Coerce boolean strings before schema validation
@@ -391,11 +391,11 @@ export class EndpointScimGenericService {
     }
 
     // GEN-12: Config-aware soft-delete guard
-    // [Removed in Settings v7: deletedAt no longer exists — DELETE always hard-deletes]
+    // [Removed in Settings v7: deletedAt no longer exists - DELETE always hard-deletes]
 
     enforceIfMatch(existing.version, ifMatch, config);
 
-    // GEN-02: Immutable attribute enforcement — compare existing with incoming
+    // GEN-02: Immutable attribute enforcement - compare existing with incoming
     this.checkImmutableAttributes(existing, body, resourceType, endpointId, config);
 
     // Strip readOnly attributes using precomputed cache (RFC 7643 §2.2)
@@ -413,7 +413,7 @@ export class EndpointScimGenericService {
     const displayName = typeof body.displayName === 'string' ? body.displayName : null;
     const active = body.active !== false;
 
-    // externalId and displayName are NOT checked for uniqueness — saved as received per RFC 7643.
+    // externalId and displayName are NOT checked for uniqueness - saved as received per RFC 7643.
 
     // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
     const uniqueAttrsPut = this.getSchemaCacheForRT(resourceType, endpointId)?.uniqueAttrs ?? [];
@@ -495,7 +495,7 @@ export class EndpointScimGenericService {
     }
 
     // GEN-12: Config-aware soft-delete guard
-    // [Removed in Settings v7: deletedAt no longer exists — DELETE always hard-deletes]
+    // [Removed in Settings v7: deletedAt no longer exists - DELETE always hard-deletes]
 
     enforceIfMatch(existing.version, ifMatch, config);
 
@@ -531,7 +531,7 @@ export class EndpointScimGenericService {
         coercePatchOpBooleans(patchDto.Operations, boolMap, coreUrnLower);
       }
 
-      // GEN-01: Pre-PATCH validation — validate each operation value against schema
+      // GEN-01: Pre-PATCH validation - validate each operation value against schema
       for (const [opIndex, op] of patchDto.Operations.entries()) {
         const preResult = SchemaValidator.validatePatchOperationValue(
           op.op, op.path, op.value, schemaDefs,
@@ -560,7 +560,7 @@ export class EndpointScimGenericService {
     try {
       payload = JSON.parse(existing.rawPayload);
     } catch (e) {
-      this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Corrupt rawPayload in PATCH — using empty object', {
+      this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Corrupt rawPayload in PATCH - using empty object', {
         scimId: existing.scimId, endpointId, error: (e as Error).message,
       });
       payload = {};
@@ -614,7 +614,7 @@ export class EndpointScimGenericService {
       ? patchedPayload.active !== false
       : existing.active;
 
-    // GEN-01: Post-PATCH schema validation — validate the resulting payload
+    // GEN-01: Post-PATCH schema validation - validate the resulting payload
     {
       const resultPayload: Record<string, unknown> = {
         schemas: [resourceType.schema],
@@ -633,7 +633,7 @@ export class EndpointScimGenericService {
       this.checkImmutableAttributes(existing, resultPayload, resourceType, endpointId, config);
     }
 
-    // externalId and displayName are NOT checked for uniqueness — saved as received per RFC 7643.
+    // externalId and displayName are NOT checked for uniqueness - saved as received per RFC 7643.
 
     // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
     {
@@ -710,7 +710,7 @@ export class EndpointScimGenericService {
     }
 
     // GEN-12: Config-aware soft-delete guard (double-delete → 404)
-    // [Removed in Settings v7: deletedAt no longer exists — DELETE always hard-deletes]
+    // [Removed in Settings v7: deletedAt no longer exists - DELETE always hard-deletes]
 
     enforceIfMatch(existing.version, ifMatch, config);
 
@@ -753,7 +753,7 @@ export class EndpointScimGenericService {
     try {
       payload = JSON.parse(record.rawPayload);
     } catch (e) {
-      this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Corrupt rawPayload in toScimResponse — using empty object', {
+      this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Corrupt rawPayload in toScimResponse - using empty object', {
         scimId: record.scimId, endpointId: record.endpointId, error: (e as Error).message,
       });
       payload = {};
@@ -763,7 +763,7 @@ export class EndpointScimGenericService {
     try {
       meta = record.meta ? JSON.parse(record.meta) : {};
     } catch (e) {
-      this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Corrupt meta in toScimResponse — using empty object', {
+      this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Corrupt meta in toScimResponse - using empty object', {
         scimId: record.scimId, endpointId: record.endpointId, error: (e as Error).message,
       });
       meta = {};
@@ -784,7 +784,7 @@ export class EndpointScimGenericService {
     const visibleExtUrns = stripNeverReturnedFromPayload(payload, neverByParent, coreUrnLower, extSchemaUrns);
     const schemas: string[] = [resourceType.schema, ...visibleExtUrns];
 
-    // Remove schemas from payload — we built it dynamically above (G19 / FP-1)
+    // Remove schemas from payload - we built it dynamically above (G19 / FP-1)
     delete payload.schemas;
 
     return {
@@ -798,7 +798,7 @@ export class EndpointScimGenericService {
   // ─── Validation Helpers (dynamic core URN equivalents of ScimSchemaHelpers) ──
 
   /**
-   * GEN-11: Strict schema enforcement — reject undeclared/unregistered extension URNs.
+   * GEN-11: Strict schema enforcement - reject undeclared/unregistered extension URNs.
    * Dynamic-URN equivalent of ScimSchemaHelpers.enforceStrictSchemaValidation().
    */
   private enforceStrictSchemaValidation(
@@ -977,7 +977,7 @@ export class EndpointScimGenericService {
     config?: EndpointConfig,
   ): void {
     // G1: Immutable enforcement runs unconditionally (RFC 7643 §2.2 "SHALL NOT")
-    // Previously gated by StrictSchemaValidation — removed per P4 analysis
+    // Previously gated by StrictSchemaValidation - removed per P4 analysis
 
     const existingPayload = this.buildExistingPayload(existing, resourceType);
     const schemas = this.buildSchemaDefinitionsFromPayload(incomingDto, resourceType, endpointId);

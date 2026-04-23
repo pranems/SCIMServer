@@ -41,7 +41,7 @@ describe('UserPatchEngine', () => {
     it('should replace active with boolean true', () => {
       const result = apply([{ op: 'replace', path: 'active', value: true }], { active: false });
       expect(result.extractedFields.active).toBe(true);
-      // active is a reserved attribute — stripped from rawPayload (managed as DB column)
+      // active is a reserved attribute - stripped from rawPayload (managed as DB column)
     });
 
     it('should replace active with string "True" (Entra compat)', () => {
@@ -559,7 +559,7 @@ describe('UserPatchEngine', () => {
 
     it('should NOT correctly resolve custom URN without extensionUrns config', () => {
       // Without the custom URN in config, the URN path contains "2.0" which
-      // causes misparsing — this is the bug that BUG-001 fixes
+      // causes misparsing - this is the bug that BUG-001 fixes
       const result = apply(
         [{ op: 'replace', path: `${CUSTOM_URN}:customField`, value: 'val' }],
         undefined,

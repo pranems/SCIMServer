@@ -3,7 +3,7 @@ import { LoggingService } from './logging.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScimLogger } from './scim-logger.service';
 
-describe('LoggingService — Auto-Prune', () => {
+describe('LoggingService - Auto-Prune', () => {
   let service: LoggingService;
   let prisma: { requestLog: { deleteMany: jest.Mock; count: jest.Mock; findMany: jest.Mock; create: jest.Mock; createMany: jest.Mock } };
   let logger: { info: jest.Mock; error: jest.Mock; debug: jest.Mock; warn: jest.Mock; trace: jest.Mock };
@@ -180,7 +180,7 @@ describe('LoggingService — Auto-Prune', () => {
   describe('runAutoPrune (via pruneOldLogs)', () => {
     it('should handle pruneOldLogs errors gracefully', async () => {
       prisma.requestLog.deleteMany.mockRejectedValue(new Error('DB connection lost'));
-      // pruneOldLogs will throw — runAutoPrune catches it
+      // pruneOldLogs will throw - runAutoPrune catches it
       // We test directly that pruneOldLogs throws
       await expect(service.pruneOldLogs(1)).rejects.toThrow('DB connection lost');
     });

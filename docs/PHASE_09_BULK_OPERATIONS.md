@@ -1,4 +1,4 @@
-# Phase 9 — Bulk Operations (RFC 7644 §3.7)
+# Phase 9 - Bulk Operations (RFC 7644 §3.7)
 
 > **Version**: v0.19.0 | **Phase**: 9 | **Status**: ✅ Complete  
 > **RFC References**: RFC 7644 §3.7 (Bulk Operations)  
@@ -12,7 +12,7 @@ Phase 9 implements **SCIM Bulk Operations** per [RFC 7644 §3.7](https://datatra
 
 - **Cross-operation references** via `bulkId` resolution
 - **Fail-fast** via `failOnErrors` threshold
-- **Per-operation error isolation** — individual failures don't abort the batch (unless `failOnErrors` triggers)
+- **Per-operation error isolation** - individual failures don't abort the batch (unless `failOnErrors` triggers)
 - **Both User and Group** resource types
 
 This feature is **gated behind the `BulkOperationsEnabled` per-endpoint configuration flag** (default: `false`), ensuring zero impact on existing deployments.
@@ -56,7 +56,7 @@ graph TD
 |----------|-----------|
 | **Per-endpoint flag gating** | Zero-risk opt-in; existing endpoints unaffected |
 | **Sequential processing** | RFC 7644 §3.7 requires ordered execution for `bulkId` cross-referencing |
-| **Delegates to existing services** | Reuses `EndpointScimUsersService` and `EndpointScimGroupsService` — no duplicated CRUD logic |
+| **Delegates to existing services** | Reuses `EndpointScimUsersService` and `EndpointScimGroupsService` - no duplicated CRUD logic |
 | **Per-operation error isolation** | Individual operation failures return in-band error results; batch continues unless `failOnErrors` threshold reached |
 | **`bulkId` Map\<string, string\>** | POST operations populate the map; subsequent operations resolve `bulkId:ref` references in paths and data |
 | **Payload size guard** | `content-length` checked against `BULK_MAX_PAYLOAD_SIZE` (1MB) before processing; returns 413 with `scimType: 'tooLarge'` |
@@ -241,7 +241,7 @@ The processor maintains a `Map<string, string>` that maps `bulkId` values to act
 | `0` (default) | Process all operations regardless of failures |
 | `N > 0` | Stop processing after `N` cumulative errors |
 
-When processing stops early due to `failOnErrors`, remaining operations are not included in the response — only processed operations appear.
+When processing stops early due to `failOnErrors`, remaining operations are not included in the response - only processed operations appear.
 
 ---
 

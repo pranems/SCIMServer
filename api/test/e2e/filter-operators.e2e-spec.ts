@@ -123,7 +123,7 @@ describe('Filter Operators (E2E)', () => {
         token,
       ).expect(200);
 
-      // User was created with explicit displayName — must be found
+      // User was created with explicit displayName - must be found
       expect(res.body.totalResults).toBeGreaterThanOrEqual(1);
     });
   });
@@ -265,7 +265,7 @@ describe('Filter Operators (E2E)', () => {
       ).expect(200);
 
       // ne with non-UUID: guard returns contradictory filter → 0 results
-      // (rather than crash). This is acceptable — a non-UUID can never
+      // (rather than crash). This is acceptable - a non-UUID can never
       // match a UUID column, so ne should logically return all, but the
       // guard prioritizes safety over accuracy for this edge case.
       expect(res.body).toHaveProperty('totalResults');

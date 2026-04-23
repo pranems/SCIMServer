@@ -10,7 +10,7 @@
  *
  * Phase 3: Column maps reference actual column names (userName, displayName)
  *   because PostgreSQL CITEXT handles case-insensitive comparison natively.
- * Phase 4: Full operator push-down — co/sw/ew via Prisma string filters
+ * Phase 4: Full operator push-down - co/sw/ew via Prisma string filters
  *   (leveraging pg_trgm GIN indexes), gt/ge/lt/le for ordering comparisons,
  *   pr for presence, ne for negation. AND/OR compound push-down added.
  *
@@ -34,7 +34,7 @@ type ColumnType = 'citext' | 'text' | 'varchar' | 'boolean' | 'uuid';
 interface ColumnMapping {
   /** Prisma model field name (e.g. 'userName', 'displayName') */
   column: string;
-  /** PostgreSQL column type — drives operator translation */
+  /** PostgreSQL column type - drives operator translation */
   type: ColumnType;
 }
 
@@ -207,8 +207,8 @@ function buildFilterResult(
  *
  * NOT pushed (returns null):
  *   - Attributes not in the column map (e.g. emails.value, name.givenName)
- *   - NotNode (not (...)) — Prisma NOT is possible but deferred for simplicity
- *   - ValuePathNode (attrPath[valFilter]) — requires JSONB query
+ *   - NotNode (not (...)) - Prisma NOT is possible but deferred for simplicity
+ *   - ValuePathNode (attrPath[valFilter]) - requires JSONB query
  */
 function tryPushToDb(
   ast: FilterNode,
@@ -221,7 +221,7 @@ function tryPushToDb(
     case 'logical':
       return pushLogicalToDb(ast as LogicalNode, columnMap);
 
-    // not() and valuePath[] — cannot push (yet)
+    // not() and valuePath[] - cannot push (yet)
     default:
       return null;
   }
@@ -263,7 +263,7 @@ function buildColumnFilter(
   const isCaseInsensitive = type === 'citext' || type === 'varchar';
 
   // UUID columns: validate the value before sending to PostgreSQL.
-  // Per RFC 7643, SCIM `id` is a string — clients may send non-UUID values.
+  // Per RFC 7643, SCIM `id` is a string - clients may send non-UUID values.
   // A non-UUID value can never match a @db.Uuid column, so return a
   // contradictory filter that yields zero results instead of crashing.
   if (type === 'uuid' && typeof value === 'string' && !isValidUuid(value)) {
@@ -329,7 +329,7 @@ function buildColumnFilter(
  *   we still can't use partial push because the un-pushable side would be lost.
  *   Instead, we fall back to full in-memory evaluation for safety.
  *
- * OR: Both sides must be pushable — if either side can't push, we must fetchAll
+ * OR: Both sides must be pushable - if either side can't push, we must fetchAll
  *   because we can't guarantee completeness.
  */
 function pushLogicalToDb(
@@ -341,7 +341,7 @@ function pushLogicalToDb(
 
   if (node.op === 'and') {
     if (left && right) return { AND: [left, right] };
-    // Partial push is unsafe — the un-pushed side filters would be lost
+    // Partial push is unsafe - the un-pushed side filters would be lost
     return null;
   }
 

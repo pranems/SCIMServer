@@ -360,11 +360,11 @@ describe('ActivityController', () => {
     });
   });
 
-  // ── getActivitySummary — uses count() for all fields ───────────────────────
+  // ── getActivitySummary - uses count() for all fields ───────────────────────
 
-  describe('getActivitySummary — SQL-level counting', () => {
+  describe('getActivitySummary - SQL-level counting', () => {
     it('should use count() for all summary fields (no findMany)', async () => {
-      // All 4 fields should use count() — no findMany at all
+      // All 4 fields should use count() - no findMany at all
       (prismaService.requestLog.count as jest.Mock)
         .mockResolvedValueOnce(100)   // last24Hours
         .mockResolvedValueOnce(500)   // lastWeek

@@ -450,7 +450,7 @@ Test-Result -Success (-not $hasBadgeInPost) -Message "6.2: badgeCode NOT in POST
 Test-Result -Success (-not $hasPinInPost) -Message "6.3: pin NOT in POST response (returned:never)"
 
 # Check returned:never on GET response
-Write-Host "`n--- GET user — verify returned:never ---" -ForegroundColor Cyan
+Write-Host "`n--- GET user - verify returned:never ---" -ForegroundColor Cyan
 $getCustom = Invoke-RestMethod -Uri "$scimBase/Users/$CustomUserId" -Headers $headers
 $getExtData = $getCustom."urn:ietf:params:scim:schemas:extension:custom:2.0:User"
 $hasBadgeInGet = ($null -ne $getExtData) -and ($null -ne $getExtData.badgeCode)
@@ -459,7 +459,7 @@ Test-Result -Success (-not $hasBadgeInGet) -Message "6.4: badgeCode NOT in GET r
 Test-Result -Success (-not $hasPinInGet) -Message "6.5: pin NOT in GET response (returned:never)"
 
 # Check returned:never on list response
-Write-Host "`n--- List users — verify returned:never ---" -ForegroundColor Cyan
+Write-Host "`n--- List users - verify returned:never ---" -ForegroundColor Cyan
 $listAll = Invoke-RestMethod -Uri "$scimBase/Users" -Headers $headers
 $listCustomUser = $listAll.Resources | Where-Object { $_.id -eq $CustomUserId }
 $listExtData = $listCustomUser."urn:ietf:params:scim:schemas:extension:custom:2.0:User"
@@ -830,7 +830,7 @@ $elapsed = (Get-Date) - $script:startTime
 $finishedAt = Get-Date
 
 Write-Host "`n`n╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Magenta
-Write-Host "║   LEXMARK ISV LIVE TEST — FINAL SUMMARY                     ║" -ForegroundColor Magenta
+Write-Host "║   LEXMARK ISV LIVE TEST - FINAL SUMMARY                     ║" -ForegroundColor Magenta
 Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Magenta
 Write-Host "Tests Passed: $testsPassed" -ForegroundColor Green
 Write-Host "Tests Failed: $testsFailed" -ForegroundColor $(if ($testsFailed -eq 0) { "Green" } else { "Red" })

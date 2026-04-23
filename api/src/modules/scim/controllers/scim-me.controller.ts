@@ -1,5 +1,5 @@
 /**
- * SCIM /Me Endpoint Controller (Phase 10 — RFC 7644 §3.11)
+ * SCIM /Me Endpoint Controller (Phase 10 - RFC 7644 §3.11)
  *
  * "/Me" is a URI alias for the User resource associated with the
  * currently authenticated subject. All operations (GET, PATCH, PUT,
@@ -14,7 +14,7 @@
  * When OAuth is not used (legacy shared-secret auth) or the `sub` claim
  * does not correspond to any User resource, 404 is returned.
  *
- * @see RFC 7644 §3.11 — "/Me" Authenticated Subject Alias
+ * @see RFC 7644 §3.11 - "/Me" Authenticated Subject Alias
  */
 import {
   Controller,
@@ -47,7 +47,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 /**
- * /Me Controller — RFC 7644 §3.11
+ * /Me Controller - RFC 7644 §3.11
  *
  * Routes: /scim/endpoints/{endpointId}/Me
  *

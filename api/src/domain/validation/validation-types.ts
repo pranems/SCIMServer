@@ -1,5 +1,5 @@
 /**
- * Schema Validation Types — Phase 8
+ * Schema Validation Types - Phase 8
  *
  * Pure domain types for SCIM payload validation against schema definitions.
  * No NestJS or Prisma dependencies.
@@ -19,7 +19,7 @@ export interface ValidationError {
 
 /**
  * A non-fatal validation warning (e.g. readOnly attribute silently ignored).
- * @see RFC 7643 §2.2 — readOnly attributes MAY be sent but SHALL be ignored
+ * @see RFC 7643 §2.2 - readOnly attributes MAY be sent but SHALL be ignored
  */
 export interface ValidationWarning {
   /** Dot-path to the attribute that triggered the warning */
@@ -65,7 +65,7 @@ export interface ValidationResult {
  * When it encounters a key starting with `urn:`, it switches to that URN as the
  * new parentPath.  For all other keys, it appends `.${key}` to the current path.
  *
- * @see RFC 7643 §2 — Attribute Characteristics
+ * @see RFC 7643 §2 - Attribute Characteristics
  * @see docs/SCHEMA_AND_RESOURCETYPE_DATA_STRUCTURE_ANALYSIS.md
  */
 export interface SchemaCharacteristicsCache {
@@ -81,7 +81,7 @@ export interface SchemaCharacteristicsCache {
   immutableByParent: Map<string, Set<string>>;
   /** Parent → Set of caseExact:true child attribute names */
   caseExactByParent: Map<string, Set<string>>;
-  /** Pre-flattened set of caseExact:true attribute paths (lowercase, dotted for sub-attrs) — consumer convenience */
+  /** Pre-flattened set of caseExact:true attribute paths (lowercase, dotted for sub-attrs) - consumer convenience */
   caseExactPaths: Set<string>;
   /** Unique-server attributes with schema URN context (for JSONB uniqueness) */
   uniqueAttrs: Array<{ schemaUrn: string | null; attrName: string; caseExact: boolean }>;
@@ -97,7 +97,7 @@ export interface SchemaCharacteristicsCache {
   extensionSchemaMap: Map<string, SchemaDefinition>;
   /** Parent → Set of mutability:'readOnly' child attribute names */
   readOnlyByParent: Map<string, Set<string>>;
-  /** Precomputed readOnly attribute sets — structured shape for stripReadOnlyAttributes */
+  /** Precomputed readOnly attribute sets - structured shape for stripReadOnlyAttributes */
   readOnlyCollected: {
     core: Set<string>;
     extensions: Map<string, Set<string>>;
@@ -147,6 +147,6 @@ export interface SchemaDefinition {
 export interface ValidationOptions {
   /** Whether strict mode is active (unknown attributes → error) */
   strictMode: boolean;
-  /** Operation mode — 'create' | 'replace' enforce required attributes; 'patch' does not */
+  /** Operation mode - 'create' | 'replace' enforce required attributes; 'patch' does not */
   mode: 'create' | 'replace' | 'patch';
 }

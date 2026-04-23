@@ -75,7 +75,7 @@ describe('Discovery Endpoints (E2E)', () => {
 
       // The response should contain User, EnterpriseUser, and Group schemas
       const body = res.body;
-      // Could be a ListResponse or direct array — handle both
+      // Could be a ListResponse or direct array - handle both
       const schemas = body.Resources ?? body;
       const ids = Array.isArray(schemas) ? schemas.map((s: { id: string }) => s.id) : [];
 
@@ -141,7 +141,7 @@ describe('Discovery Endpoints (E2E)', () => {
       const res = await scimGet(app, `${basePath}/Schemas/urn:ietf:params:scim:schemas:core:2.0:Group`, token).expect(200);
       const displayName = res.body.attributes.find((a: any) => a.name === 'displayName');
       expect(displayName).toBeDefined();
-      expect(displayName.uniqueness).toBe('none'); // RFC 7643 §8.7.1 — presets may tighten to 'server'
+      expect(displayName.uniqueness).toBe('none'); // RFC 7643 §8.7.1 - presets may tighten to 'server'
     });
 
     it('should include uniqueness:none on Group externalId (R-UNIQ-1)', async () => {

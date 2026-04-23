@@ -13,9 +13,9 @@
 ## Table of Contents
 
 1. [Overview](#1-overview)
-2. [Feature 1 — Soft / Hard Delete](#2-feature-1--soft--hard-delete)
-3. [Feature 2 — Strict Schema Validation](#3-feature-2--strict-schema-validation)
-4. [Feature 3 — Custom Extension URNs (msfttest)](#4-feature-3--custom-extension-urns-msfttest)
+2. [Feature 1 - Soft / Hard Delete](#2-feature-1--soft--hard-delete)
+3. [Feature 2 - Strict Schema Validation](#3-feature-2--strict-schema-validation)
+4. [Feature 3 - Custom Extension URNs (msfttest)](#4-feature-3--custom-extension-urns-msfttest)
 5. [Architecture & Flow Diagrams](#5-architecture--flow-diagrams)
 6. [Configuration Reference](#6-configuration-reference)
 7. [API Request / Response Examples](#7-api-request--response-examples)
@@ -37,11 +37,11 @@ Three features were implemented to bring the SCIM Server closer to production-re
 
 > **Settings v7 change:** Soft-delete has been removed. DELETE always hard-deletes. `UserSoftDeleteEnabled` now controls whether PATCH active=false is allowed. `ReprovisionOnConflictForSoftDeletedResource` and `deletedAt` have been removed. `guardSoftDeleted()` no longer exists.
 
-All features are **per-endpoint** — each SCIM endpoint can independently enable/disable these behaviors via its config object.
+All features are **per-endpoint** - each SCIM endpoint can independently enable/disable these behaviors via its config object.
 
 ---
 
-## 2. Feature 1 — User Deactivation Gate
+## 2. Feature 1 - User Deactivation Gate
 
 ### 2.1 Behavior
 
@@ -53,8 +53,8 @@ All features are **per-endpoint** — each SCIM endpoint can independently enabl
 
 | Config Value | PATCH active=false |
 |--------------|-------------------|
-| `UserSoftDeleteEnabled: true` (default) | Allowed — sets `active = false` |
-| `UserSoftDeleteEnabled: false` | Rejected — 400 error |
+| `UserSoftDeleteEnabled: true` (default) | Allowed - sets `active = false` |
+| `UserSoftDeleteEnabled: false` | Rejected - 400 error |
 
 ### 2.2 Config Flag
 
@@ -90,7 +90,7 @@ Accepted values: `true`, `false`, `"True"`, `"False"`, `"1"`, `"0"`.
 
 ---
 
-## 3. Feature 2 — Strict Schema Validation
+## 3. Feature 2 - Strict Schema Validation
 
 ### 3.1 Behavior
 
@@ -212,7 +212,7 @@ private enforceStrictSchemaValidation(
 
 ---
 
-## 4. Feature 3 — Custom Extension URNs (msfttest)
+## 4. Feature 3 - Custom Extension URNs (msfttest)
 
 ### 4.1 New URN Constants
 
@@ -391,8 +391,8 @@ Authorization: Bearer <token>
 | `PatchOpAllowRemoveAllMembers` | boolean | `true` | Allow removing all members via `path=members` |
 | `VerbosePatchSupported` | boolean | `false` | Dot-notation path resolution in PATCH |
 | `logLevel` | string/number | *(unset)* | Per-endpoint log level override |
-| **`SoftDeleteEnabled`** | boolean | **`false`** | ✨ **NEW** — Soft delete on DELETE |
-| **`StrictSchemaValidation`** | boolean | **`false`** | ✨ **NEW** — Enforce extension schemas |
+| **`SoftDeleteEnabled`** | boolean | **`false`** | ✨ **NEW** - Soft delete on DELETE |
+| **`StrictSchemaValidation`** | boolean | **`false`** | ✨ **NEW** - Enforce extension schemas |
 | `RequireIfMatch` | boolean | `false` | Require If-Match header on PUT/PATCH/DELETE |
 | `AllowAndCoerceBooleanStrings` | boolean | `true` | Coerce boolean strings ("True"/"False") to native booleans before validation |
 
@@ -417,7 +417,7 @@ Authorization: Bearer <admin-token>
 
 ## 7. API Request / Response Examples
 
-### 7.1 Soft Delete — User
+### 7.1 Soft Delete - User
 
 **Request**:
 ```http
@@ -432,7 +432,7 @@ HTTP/1.1 204 No Content
 
 **Database after**: The user record has `active = false` but is not physically deleted.
 
-**Subsequent GET** (RFC 7644 §3.6 — all operations return 404):
+**Subsequent GET** (RFC 7644 §3.6 - all operations return 404):
 ```http
 GET /scim/endpoint-1/Users/abc-def-123
 Authorization: Bearer <token>
@@ -456,7 +456,7 @@ Authorization: Bearer <token>
 HTTP/1.1 404 Not Found
 ```
 
-**LIST after soft-delete** — soft-deleted resource is omitted from results.
+**LIST after soft-delete** - soft-deleted resource is omitted from results.
 
 **Response** (with `SoftDeleteEnabled: false` or default):
 ```
@@ -465,7 +465,7 @@ HTTP/1.1 204 No Content
 
 **Database after**: The user record is physically removed.
 
-### 7.2 Strict Schema Validation — Rejection
+### 7.2 Strict Schema Validation - Rejection
 
 **Request** (with `StrictSchemaValidation: true`):
 ```http
@@ -494,7 +494,7 @@ Authorization: Bearer <token>
 }
 ```
 
-### 7.3 Strict Schema Validation — Acceptance
+### 7.3 Strict Schema Validation - Acceptance
 
 **Request** (same endpoint with `StrictSchemaValidation: true`):
 ```json
@@ -527,7 +527,7 @@ Authorization: Bearer <token>
 }
 ```
 
-### 7.4 Discovery — Schemas Endpoint
+### 7.4 Discovery - Schemas Endpoint
 
 **Request**:
 ```http

@@ -1,5 +1,5 @@
 /**
- * Domain Validation — barrel export (Phase 8)
+ * Domain Validation - barrel export (Phase 8)
  */
 export { SchemaValidator } from './schema-validator';
 

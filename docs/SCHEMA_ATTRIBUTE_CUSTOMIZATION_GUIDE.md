@@ -2,7 +2,7 @@
 
 > **Version**: 1.0 · **Date**: April 16, 2026 · **Status**: ✅ Complete (source-verified)  
 > **SCIMServer**: v0.37.1 · **Audience**: Operators, ISV admins, Entra ID integration engineers  
-> **Scope**: Per-endpoint attribute characteristic changes — canonicalValues, required, mutability, uniqueness, caseExact, returned
+> **Scope**: Per-endpoint attribute characteristic changes - canonicalValues, required, mutability, uniqueness, caseExact, returned
 
 ---
 
@@ -24,11 +24,11 @@
 ## Table of Contents
 
 1. [Overview](#1-overview)
-2. [RFC Foundation — Attribute Characteristics](#2-rfc-foundation--attribute-characteristics)
+2. [RFC Foundation - Attribute Characteristics](#2-rfc-foundation--attribute-characteristics)
 3. [How Characteristics Are Enforced](#3-how-characteristics-are-enforced)
 4. [Tighten-Only Rules](#4-tighten-only-rules)
 5. [Step-by-Step: Modifying Attribute Characteristics](#5-step-by-step-modifying-attribute-characteristics)
-6. [Characteristic Reference — What Each One Controls](#6-characteristic-reference--what-each-one-controls)
+6. [Characteristic Reference - What Each One Controls](#6-characteristic-reference--what-each-one-controls)
 7. [Scenarios & Worked Examples](#7-scenarios--worked-examples)
 8. [PATCH Merge Semantics](#8-patch-merge-semantics)
 9. [Config Flags That Affect Enforcement](#9-config-flags-that-affect-enforcement)
@@ -41,7 +41,7 @@
 
 ## 1. Overview
 
-Every attribute in a SCIM schema has **characteristics** — metadata properties that control how the attribute behaves during writes, reads, filters, and responses. SCIMServer lets you customize these characteristics **per-endpoint** through the profile system.
+Every attribute in a SCIM schema has **characteristics** - metadata properties that control how the attribute behaves during writes, reads, filters, and responses. SCIMServer lets you customize these characteristics **per-endpoint** through the profile system.
 
 ### What You Can Do
 
@@ -81,11 +81,11 @@ flowchart LR
 
 ### Key Principle
 
-You can only **tighten** (make more restrictive) characteristics on RFC-defined schemas. You cannot loosen them below the RFC 7643 baseline. Custom schemas have no baseline — full control.
+You can only **tighten** (make more restrictive) characteristics on RFC-defined schemas. You cannot loosen them below the RFC 7643 baseline. Custom schemas have no baseline - full control.
 
 ---
 
-## 2. RFC Foundation — Attribute Characteristics
+## 2. RFC Foundation - Attribute Characteristics
 
 RFC 7643 §2.2 and §7 define 7 attribute characteristics with defaults:
 
@@ -97,23 +97,23 @@ RFC 7643 §2.2 and §7 define 7 attribute characteristics with defaults:
 | `mutability` | `readWrite` | §7 | When the attribute can be set/changed |
 | `returned` | `default` | §7 | When the attribute appears in responses |
 | `uniqueness` | `none` | §7 | Whether values must be unique |
-| `type` | `string` | §7 | Data type (structural — cannot be changed) |
+| `type` | `string` | §7 | Data type (structural - cannot be changed) |
 
 ### Mutability Values (RFC 7643 §7)
 
 | Value | Meaning |
 |-------|---------|
 | `readWrite` | Client can set and update at any time |
-| `immutable` | Client can set at creation (POST) only — no changes afterward |
-| `readOnly` | Server-managed — client MUST NOT set or change |
-| `writeOnly` | Client can set — value MUST NOT be returned in responses |
+| `immutable` | Client can set at creation (POST) only - no changes afterward |
+| `readOnly` | Server-managed - client MUST NOT set or change |
+| `writeOnly` | Client can set - value MUST NOT be returned in responses |
 
 ### Returned Values (RFC 7643 §7)
 
 | Value | Meaning |
 |-------|---------|
 | `always` | Always included in responses regardless of query params |
-| `default` | Included by default — removable via `excludedAttributes` |
+| `default` | Included by default - removable via `excludedAttributes` |
 | `request` | Only returned when explicitly listed in `?attributes=` |
 | `never` | MUST NOT appear in any response (e.g., `password`) |
 
@@ -129,7 +129,7 @@ RFC 7643 §2.2 and §7 define 7 attribute characteristics with defaults:
 
 > When `"canonicalValues"` is specified, service providers **MAY restrict** accepted values to the specified values.
 
-The RFC uses **MAY** — enforcement is the provider's choice. SCIMServer enforces when `StrictSchemaValidation = true`.
+The RFC uses **MAY** - enforcement is the provider's choice. SCIMServer enforces when `StrictSchemaValidation = true`.
 
 ---
 
@@ -146,9 +146,9 @@ The RFC uses **MAY** — enforcement is the provider's choice. SCIMServer enforc
 | `mutability: writeOnly` | Filter (`?filter=`) | 400 | `invalidFilter` | No |
 | `canonicalValues` | POST, PUT, PATCH | 400 | `invalidValue` | Yes |
 | `multiValued` | POST, PUT, PATCH | 400 | `invalidSyntax` | Yes |
-| `returned: never` | All responses | — | — | No (always active) |
-| `returned: request` | GET, LIST, SEARCH responses | — | — | No (always active) |
-| `caseExact` | Filter evaluation (`eq`, `co`, `sw`, `ew`) | — | — | No (always active) |
+| `returned: never` | All responses | - | - | No (always active) |
+| `returned: request` | GET, LIST, SEARCH responses | - | - | No (always active) |
+| `caseExact` | Filter evaluation (`eq`, `co`, `sw`, `ew`) | - | - | No (always active) |
 | `uniqueness: server` | POST, PUT, PATCH | 409 | `uniqueness` | No (always active) |
 | Unknown attributes | POST, PUT, PATCH | 400 | `invalidSyntax` | Yes |
 | `schemas[]` URN validation | POST, PUT, PATCH | 400 | `invalidValue` | Yes |
@@ -197,7 +197,7 @@ When overriding attributes on **RFC-defined schemas** (User, Group, EnterpriseUs
 | **`uniqueness`** | Lower rank: `none → server → global` | Higher rank: `server → none` | No |
 | **`caseExact`** | `false → true` | `true → false` | No |
 | **`returned`** | Any change **except** from `never` | `never → anything` | Partial |
-| **`canonicalValues`** | Add/change freely | — | No |
+| **`canonicalValues`** | Add/change freely | - | No |
 
 ### Rank Order (Lower = Tighter)
 
@@ -205,7 +205,7 @@ When overriding attributes on **RFC-defined schemas** (User, Group, EnterpriseUs
 
 **Uniqueness**: `global (0)` < `server (1)` < `none (2)`
 
-### Custom Schemas — No Restrictions
+### Custom Schemas - No Restrictions
 
 Tighten-only rules are **skipped entirely** for custom extension schemas (e.g., `urn:mycompany:scim:ext:hr:2.0:User`). No RFC baseline exists, so you define everything from scratch with full control.
 
@@ -242,38 +242,38 @@ Response 400:
 | Admin API (GET/PATCH endpoints) | `Authorization: Bearer <token>` + `Content-Type: application/json` |
 | SCIM API (POST/PUT/PATCH resources) | `Authorization: Bearer <token>` + `Content-Type: application/scim+json` |
 
-### Step 1 — GET Current Endpoint
+### Step 1 - GET Current Endpoint
 
 ```http
 GET /scim/admin/endpoints/{endpointId}
 Authorization: Bearer <token>
 ```
 
-Save `response.profile.schemas` — the full array you'll modify and return.
+Save `response.profile.schemas` - the full array you'll modify and return.
 
-### Step 2 — Modify Target Attributes
+### Step 2 - Modify Target Attributes
 
 Find the attribute in the schemas array and change/add the characteristics you want.
 
-**Top-level attribute** — directly in `schemas[].attributes[]`:
+**Top-level attribute** - directly in `schemas[].attributes[]`:
 ```json
 { "name": "title", "type": "string", "canonicalValues": ["Engineer", "PM"], ... }
 ```
 
-**Sub-attribute** — inside `schemas[].attributes[].subAttributes[]`:
+**Sub-attribute** - inside `schemas[].attributes[].subAttributes[]`:
 ```json
 { "name": "addresses", "subAttributes": [
     { "name": "country", "canonicalValues": ["US", "IN"], ... }
 ]}
 ```
 
-**Extension attribute** — in the extension schema's `attributes[]`:
+**Extension attribute** - in the extension schema's `attributes[]`:
 ```json
 { "id": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
   "attributes": [{ "name": "department", "canonicalValues": ["HR", "Finance"], ... }]}
 ```
 
-### Step 3 — PATCH the Endpoint
+### Step 3 - PATCH the Endpoint
 
 ```http
 PATCH /scim/admin/endpoints/{endpointId}
@@ -289,7 +289,7 @@ Content-Type: application/json
 
 > **CRITICAL**: `profile.schemas` is **replaced wholesale**. Include ALL schemas with ALL attributes. Omitting a schema or attribute removes it from the endpoint.
 
-### Step 4 (Optional) — Enable StrictSchemaValidation
+### Step 4 (Optional) - Enable StrictSchemaValidation
 
 If not already enabled, add to the same PATCH:
 ```json
@@ -301,19 +301,19 @@ If not already enabled, add to the same PATCH:
 }
 ```
 
-`settings` uses shallow merge — only the keys you provide are changed.
+`settings` uses shallow merge - only the keys you provide are changed.
 
 ---
 
-## 6. Characteristic Reference — What Each One Controls
+## 6. Characteristic Reference - What Each One Controls
 
-### 6.1 canonicalValues — Restrict Allowed Values
+### 6.1 canonicalValues - Restrict Allowed Values
 
 | Property | Detail |
 |----------|--------|
 | **Type** | `string[]` (array of allowed values) |
 | **Default** | None (any value accepted) |
-| **Enforced** | POST, PUT, PATCH — when `StrictSchemaValidation = true` |
+| **Enforced** | POST, PUT, PATCH - when `StrictSchemaValidation = true` |
 | **Matching** | Case-insensitive (`"engineer"` = `"Engineer"`) |
 | **Applies to** | `type: "string"` attributes only |
 | **Error** | `400 invalidValue` |
@@ -332,13 +332,13 @@ Attribute 'title' value 'CEO' is not one of the canonical values: [Engineer, PM]
 
 ---
 
-### 6.2 required — Make Attributes Mandatory
+### 6.2 required - Make Attributes Mandatory
 
 | Property | Detail |
 |----------|--------|
 | **Type** | `boolean` |
 | **Default** | `false` |
-| **Enforced** | POST (create), PUT (replace) — NOT on PATCH |
+| **Enforced** | POST (create), PUT (replace) - NOT on PATCH |
 | **Tighten-only** | Can change `false → true`, not `true → false` (RFC schemas) |
 | **Error** | `400 invalidValue` |
 
@@ -352,15 +352,15 @@ Attribute 'title' value 'CEO' is not one of the canonical values: [Engineer, PM]
 Required attribute 'displayName' is missing.
 ```
 
-**Note:** `readOnly` required attributes (like `id`) are exempt — the server generates them.
+**Note:** `readOnly` required attributes (like `id`) are exempt - the server generates them.
 
 ---
 
-### 6.3 mutability — Control Write Access
+### 6.3 mutability - Control Write Access
 
 | Property | Detail |
 |----------|--------|
-| **Type** | `string` — `readOnly`, `readWrite`, `immutable`, `writeOnly` |
+| **Type** | `string` - `readOnly`, `readWrite`, `immutable`, `writeOnly` |
 | **Default** | `readWrite` |
 | **Enforced** | POST, PUT, PATCH |
 | **Tighten-only** | Can only tighten: `readWrite → immutable → readOnly` |
@@ -375,7 +375,7 @@ Required attribute 'displayName' is missing.
 | `readOnly` | ❌ Client cannot set | ❌ Client cannot set | ❌ Client cannot set | ✅ Return |
 | `writeOnly` | ✅ Set | ✅ Change | ✅ Change | ❌ Never returned |
 
-**Example — make `employeeNumber` immutable:**
+**Example - make `employeeNumber` immutable:**
 ```json
 { "name": "employeeNumber", "type": "string", "mutability": "immutable" }
 ```
@@ -386,13 +386,13 @@ Required attribute 'displayName' is missing.
 
 ---
 
-### 6.4 returned — Control Response Visibility
+### 6.4 returned - Control Response Visibility
 
 | Property | Detail |
 |----------|--------|
-| **Type** | `string` — `always`, `default`, `request`, `never` |
+| **Type** | `string` - `always`, `default`, `request`, `never` |
 | **Default** | `default` |
-| **Enforced** | Response projection — always active (no config flag needed) |
+| **Enforced** | Response projection - always active (no config flag needed) |
 | **Tighten-only** | Can change freely **except** `never → anything` (locked) |
 
 **Response behavior matrix:**
@@ -404,7 +404,7 @@ Required attribute 'displayName' is missing.
 | `request` | ❌ Omitted | ✅ Only if listed | ❌ Omitted |
 | `never` | ❌ Stripped | ❌ Stripped | ❌ Stripped |
 
-**Example — make `ims` only returned on request:**
+**Example - make `ims` only returned on request:**
 ```json
 { "name": "ims", "type": "complex", "returned": "request" }
 ```
@@ -413,16 +413,16 @@ Required attribute 'displayName' is missing.
 
 ---
 
-### 6.5 caseExact — Control Filter Case-Sensitivity
+### 6.5 caseExact - Control Filter Case-Sensitivity
 
 | Property | Detail |
 |----------|--------|
 | **Type** | `boolean` |
 | **Default** | `false` (case-insensitive) |
-| **Enforced** | Filter evaluation (`eq`, `co`, `sw`, `ew` operators) — always active |
+| **Enforced** | Filter evaluation (`eq`, `co`, `sw`, `ew` operators) - always active |
 | **Tighten-only** | Can change `false → true`, not `true → false` |
 
-**Example — make `externalId` case-sensitive:**
+**Example - make `externalId` case-sensitive:**
 ```json
 { "name": "externalId", "type": "string", "caseExact": true }
 ```
@@ -431,17 +431,17 @@ Required attribute 'displayName' is missing.
 
 ---
 
-### 6.6 uniqueness — Enforce Value Uniqueness
+### 6.6 uniqueness - Enforce Value Uniqueness
 
 | Property | Detail |
 |----------|--------|
-| **Type** | `string` — `none`, `server`, `global` |
+| **Type** | `string` - `none`, `server`, `global` |
 | **Default** | `none` |
-| **Enforced** | Service layer + DB — always active (no config flag needed) |
+| **Enforced** | Service layer + DB - always active (no config flag needed) |
 | **Tighten-only** | Can only tighten: `none → server → global` |
 | **Error** | `409 uniqueness` |
 
-**Example — make `displayName` unique:**
+**Example - make `displayName` unique:**
 ```json
 { "name": "displayName", "type": "string", "uniqueness": "server" }
 ```
@@ -459,9 +459,9 @@ Required attribute 'displayName' is missing.
 
 ---
 
-### 6.7 type and multiValued — Structural (Immutable)
+### 6.7 type and multiValued - Structural (Immutable)
 
-These are **structural** characteristics that **cannot be changed** — not even tightened.
+These are **structural** characteristics that **cannot be changed** - not even tightened.
 
 | Property | Values | Note |
 |----------|--------|------|
@@ -474,7 +474,7 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 
 ## 7. Scenarios & Worked Examples
 
-### Scenario A — Value Restriction: `title` → Engineer / PM
+### Scenario A - Value Restriction: `title` → Engineer / PM
 
 **Characteristic:** `canonicalValues`  
 **Schema:** `urn:ietf:params:scim:schemas:core:2.0:User`  
@@ -493,7 +493,7 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 
 ---
 
-### Scenario B — Value Restriction on Sub-Attribute: `addresses.country` → US / IN
+### Scenario B - Value Restriction on Sub-Attribute: `addresses.country` → US / IN
 
 **Characteristic:** `canonicalValues` on sub-attribute  
 **Schema:** `urn:ietf:params:scim:schemas:core:2.0:User` → `addresses` → `country`
@@ -515,7 +515,7 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 
 ---
 
-### Scenario C — Value Restriction on Extension: `department` → HR / Finance
+### Scenario C - Value Restriction on Extension: `department` → HR / Finance
 
 **Characteristic:** `canonicalValues` on extension attribute  
 **Schema:** `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User`
@@ -533,7 +533,7 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 
 ---
 
-### Scenario D — Override RFC Default: Restrict `emails.type` to Work Only
+### Scenario D - Override RFC Default: Restrict `emails.type` to Work Only
 
 **Characteristic:** `canonicalValues` override  
 **RFC default:** `["work", "home", "other"]` → Override to `["work"]`
@@ -551,7 +551,7 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 
 ---
 
-### Scenario E — Make Attribute Required + Value-Restricted
+### Scenario E - Make Attribute Required + Value-Restricted
 
 **Characteristics:** `required: true` + `canonicalValues`
 
@@ -569,7 +569,7 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 
 ---
 
-### Scenario F — Make Attribute Immutable (Set Once)
+### Scenario F - Make Attribute Immutable (Set Once)
 
 **Characteristic:** `mutability: "immutable"`
 
@@ -580,7 +580,7 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 
 | Test | Operation | Result |
 |------|-----------|--------|
-| POST with `"employeeNumber": "E001"` | Create | **Accepted** — value stored |
+| POST with `"employeeNumber": "E001"` | Create | **Accepted** - value stored |
 | PUT with `"employeeNumber": "E002"` | Replace (changed) | **400**: `Attribute 'employeeNumber' is immutable and cannot be changed` |
 | PATCH replace `employeeNumber` → `"E002"` | Modify (changed) | **400**: same |
 | PUT with `"employeeNumber": "E001"` | Same value | **Accepted** (no change detected) |
@@ -588,7 +588,7 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 
 ---
 
-### Scenario G — Hide Attribute from Responses
+### Scenario G - Hide Attribute from Responses
 
 **Characteristic:** `returned: "request"`
 
@@ -605,7 +605,7 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 
 ---
 
-### Scenario H — Enforce Uniqueness on displayName
+### Scenario H - Enforce Uniqueness on displayName
 
 **Characteristic:** `uniqueness: "server"`
 
@@ -622,7 +622,7 @@ Any attempt to change these on an RFC-defined attribute returns a `400` tighten-
 
 ---
 
-### Scenario I — Combine Multiple Characteristic Changes
+### Scenario I - Combine Multiple Characteristic Changes
 
 Apply several changes to a single attribute:
 
@@ -644,7 +644,7 @@ Apply several changes to a single attribute:
 
 ---
 
-### Scenario J — Custom Extension: Full Control
+### Scenario J - Custom Extension: Full Control
 
 Custom schemas bypass tighten-only rules. Define anything:
 
@@ -667,7 +667,7 @@ Custom schemas bypass tighten-only rules. Define anything:
 
 ---
 
-### Scenario K — Remove Value Restrictions
+### Scenario K - Remove Value Restrictions
 
 To remove `canonicalValues`, simply omit the property or set it to `[]`:
 
@@ -680,7 +680,7 @@ After PATCH, `title` accepts any string value again.
 
 ---
 
-### Scenario L — Value Restriction on PATCH Operations
+### Scenario L - Value Restriction on PATCH Operations
 
 canonicalValues enforcement applies to **all write paths** equally:
 
@@ -759,8 +759,8 @@ flowchart LR
 
 | Flag | Default | Effect on Attribute Enforcement |
 |------|---------|------|
-| `StrictSchemaValidation` | `true` | **true**: Full validation — type, required, mutability, canonicalValues, unknown attrs, dateTime, schemas[] URNs |
-| | | **false**: Lenient — only `required` on create/replace; PATCH gets no schema validation; canonicalValues not checked |
+| `StrictSchemaValidation` | `true` | **true**: Full validation - type, required, mutability, canonicalValues, unknown attrs, dateTime, schemas[] URNs |
+| | | **false**: Lenient - only `required` on create/replace; PATCH gets no schema validation; canonicalValues not checked |
 
 ### Interaction Matrix
 
@@ -824,7 +824,7 @@ flowchart LR
 
 | Check | How to Fix |
 |-------|-----------|
-| `StrictSchemaValidation` is `"True"` | GET endpoint → check `profile.settings` — add via PATCH if missing |
+| `StrictSchemaValidation` is `"True"` | GET endpoint → check `profile.settings` - add via PATCH if missing |
 | `canonicalValues` saved correctly | GET endpoint → find attribute → verify array is present and non-empty |
 | Attribute is `type: "string"` | canonicalValues only enforced on strings |
 | Using correct endpoint ID | SCIM URL must match the endpoint you PATCHed |
@@ -851,13 +851,13 @@ Check that you're testing with a **default** GET (no `?attributes=` param). The 
 
 ### "Immutable attribute change was accepted"
 
-Immutable enforcement requires `StrictSchemaValidation = true`. Also, the attribute must have had a value set previously — setting it for the first time is always allowed.
+Immutable enforcement requires `StrictSchemaValidation = true`. Also, the attribute must have had a value set previously - setting it for the first time is always allowed.
 
 ---
 
 ## 12. One-Click Templates
 
-### Template A — PowerShell: Add canonicalValues (Generic)
+### Template A - PowerShell: Add canonicalValues (Generic)
 
 ```powershell
 # ═══════ CONFIGURE ═══════
@@ -892,7 +892,7 @@ $result = Invoke-RestMethod -Method Patch -Uri "$baseUrl/scim/admin/endpoints/$e
 Write-Host "Updated: $($result.name) at $($result.updatedAt)"
 ```
 
-### Template B — PowerShell: Change Any Characteristic (Generic)
+### Template B - PowerShell: Change Any Characteristic (Generic)
 
 ```powershell
 # ═══════ CONFIGURE ═══════
@@ -918,7 +918,7 @@ $result = Invoke-RestMethod -Method Patch -Uri "$baseUrl/scim/admin/endpoints/$e
 Write-Host "Updated: $($result.name) at $($result.updatedAt)"
 ```
 
-### Template C — cURL: Add canonicalValues
+### Template C - cURL: Add canonicalValues
 
 ```bash
 # Step 1: GET and save schemas
@@ -926,7 +926,7 @@ curl -s -H "Authorization: Bearer TOKEN" \
   https://SERVER/scim/admin/endpoints/ENDPOINT_ID \
   | jq '.profile.schemas' > schemas.json
 
-# Step 2: Modify schemas.json — add canonicalValues to target attribute
+# Step 2: Modify schemas.json - add canonicalValues to target attribute
 
 # Step 3: PATCH
 curl -s -X PATCH \
@@ -936,7 +936,7 @@ curl -s -X PATCH \
   https://SERVER/scim/admin/endpoints/ENDPOINT_ID
 ```
 
-### Template D — Complete Worked Example (3 Value Restrictions)
+### Template D - Complete Worked Example (3 Value Restrictions)
 
 ```
 ==========================================================================
@@ -952,22 +952,22 @@ curl -s -X PATCH \
                  (urn:ietf:params:scim:schemas:core:2.0:User → addresses → country)
 ==========================================================================
 
-STEP 1 — GET
+STEP 1 - GET
 GET .../scim/admin/endpoints/a4225b6d-...
 Authorization: Bearer changeme-scim
 → 200 OK (save profile.schemas)
 
-STEP 2 — PATCH (add canonicalValues, send all schemas back)
+STEP 2 - PATCH (add canonicalValues, send all schemas back)
 PATCH .../scim/admin/endpoints/a4225b6d-...
 Authorization: Bearer changeme-scim
 Content-Type: application/json
 Body: {"profile":{"schemas":[ ...all 7 schemas with canonicalValues added... ]}}
 → 200 OK
 
-STEP 3 — TEST title="CEO"           → 400 invalidValue
-STEP 4 — TEST department="Marketing" → 400 invalidValue
-STEP 5 — TEST country="UK"          → 400 invalidValue
-STEP 6 — TEST all valid values      → 201 Created
+STEP 3 - TEST title="CEO"           → 400 invalidValue
+STEP 4 - TEST department="Marketing" → 400 invalidValue
+STEP 5 - TEST country="UK"          → 400 invalidValue
+STEP 6 - TEST all valid values      → 201 Created
 
 MATCHING IS CASE-INSENSITIVE: "engineer" = "Engineer" = "ENGINEER"
 ==========================================================================
@@ -981,7 +981,7 @@ MATCHING IS CASE-INSENSITIVE: "engineer" = "Engineer" = "ENGINEER"
 
 | Characteristic | Default | Tighten | Loosen | Enforced When |
 |---------------|---------|:-------:|:------:|---------------|
-| `canonicalValues` | `[]` | ✅ | — | StrictSchema=true |
+| `canonicalValues` | `[]` | ✅ | - | StrictSchema=true |
 | `required` | `false` | ✅ →`true` | ❌ | StrictSchema=true (full); always (partial) |
 | `mutability` | `readWrite` | ✅ →`immutable`→`readOnly` | ❌ | StrictSchema=true |
 | `returned` | `default` | ✅ (except from `never`) | ❌ from `never` | Always |

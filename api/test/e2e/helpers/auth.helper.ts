@@ -37,7 +37,7 @@ export async function getAuthToken(app: INestApplication): Promise<string> {
 
 /**
  * Returns the legacy shared-secret bearer token for auth.
- * Simpler than OAuth — useful for quick tests.
+ * Simpler than OAuth - useful for quick tests.
  */
 export function getLegacyToken(): string {
   return 'e2e-test-secret';

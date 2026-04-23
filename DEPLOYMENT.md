@@ -10,13 +10,13 @@ This document covers all deployment methods for SCIMServer. For the quickest sta
 
 ### Deployment Entry Points
 
-SCIMServer provides 3 ways to deploy to Azure — all ultimately call `scripts/deploy-azure.ps1`:
+SCIMServer provides 3 ways to deploy to Azure - all ultimately call `scripts/deploy-azure.ps1`:
 
 | Entry Point | Usage | What It Does |
 |-------------|-------|-------------|
 | **`bootstrap.ps1`** → `setup.ps1` | `iex (iwr .../bootstrap.ps1).Content` | Downloads `setup.ps1`, prompts for all config, auto-provisions PostgreSQL |
-| **`deploy.ps1`** | `iex (irm .../deploy.ps1)` | One-click wrapper — prompts for config, downloads repo ZIP (or uses local), auto-provisions PostgreSQL |
-| **`scripts/deploy-azure.ps1`** | `.\scripts\deploy-azure.ps1 -ProvisionPostgres` | Core engine — full parameter control, supports BYO PostgreSQL via `-DatabaseUrl` |
+| **`deploy.ps1`** | `iex (irm .../deploy.ps1)` | One-click wrapper - prompts for config, downloads repo ZIP (or uses local), auto-provisions PostgreSQL |
+| **`scripts/deploy-azure.ps1`** | `.\scripts\deploy-azure.ps1 -ProvisionPostgres` | Core engine - full parameter control, supports BYO PostgreSQL via `-DatabaseUrl` |
 
 All three auto-generate secrets (SCIM, JWT, OAuth) if not provided, and deploy a VNet-isolated Container App with PostgreSQL Flexible Server.
 
@@ -28,7 +28,7 @@ iex (iwr https://raw.githubusercontent.com/pranems/SCIMServer/master/bootstrap.p
 
 Prompts for Resource Group, App Name, Region, and SCIM Secret. Provisions all Azure resources automatically (VNet, Container Apps Environment, Container App, Log Analytics, PostgreSQL Flexible Server).
 
-> **How it works:** `bootstrap.ps1` downloads `setup.ps1` from GitHub → `setup.ps1` downloads `deploy-azure.ps1` + Bicep templates → calls `deploy-azure.ps1 -ProvisionPostgres`. No local repo clone needed — no credentials beyond your Azure subscription required. The container image (`ghcr.io/pranems/scimserver:latest`) is public and pulls anonymously.
+> **How it works:** `bootstrap.ps1` downloads `setup.ps1` from GitHub → `setup.ps1` downloads `deploy-azure.ps1` + Bicep templates → calls `deploy-azure.ps1 -ProvisionPostgres`. No local repo clone needed - no credentials beyond your Azure subscription required. The container image (`ghcr.io/pranems/scimserver:latest`) is public and pulls anonymously.
 
 > **Sovereign/gov cloud users:** The one-liners download scripts from `raw.githubusercontent.com` which may be blocked in BLEU, Azure China, or air-gapped environments. Clone the repo from a machine with internet access, then run `scripts/deploy-azure.ps1` directly. See [docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md).
 
@@ -38,7 +38,7 @@ Prompts for Resource Group, App Name, Region, and SCIM Secret. Provisions all Az
 iex (irm 'https://raw.githubusercontent.com/pranems/SCIMServer/master/deploy.ps1')
 ```
 
-Same result — interactive prompts for all configuration. If run from within a cloned repo, it uses the local `scripts/deploy-azure.ps1` instead of downloading.
+Same result - interactive prompts for all configuration. If run from within a cloned repo, it uses the local `scripts/deploy-azure.ps1` instead of downloading.
 
 ### Scripted Deploy (From Cloned Repo)
 
@@ -54,7 +54,7 @@ Optional parameters: `-JwtSecret`, `-OauthClientSecret`, `-ImageTag`, `-Database
 
 > **PostgreSQL required (Phase 3):** SCIMServer uses PostgreSQL as its persistence backend. Provide either `-DatabaseUrl "postgresql://..."` (existing server) or `-ProvisionPostgres` (the script will deploy an Azure Database for PostgreSQL Flexible Server via `infra/postgres.bicep`, ~$15-25/mo additional).
 
-> The deployment script prints three secrets at the end (SCIM bearer, JWT signing, OAuth client). **Store each value securely** — they are not stored anywhere else.
+> The deployment script prints three secrets at the end (SCIM bearer, JWT signing, OAuth client). **Store each value securely** - they are not stored anywhere else.
 
 ### Quick Log Access (after deploy)
 
@@ -95,7 +95,7 @@ curl "https://<app-url>/scim/admin/log-config/download?format=json" -H "Authoriz
 - **HTTPS**: Automatic TLS certificate management
 - **VNet Isolation**: All inter-service traffic stays within the virtual network
 - **Scale to Zero**: Minimal cost when idle
-- **Managed Identity**: No credentials in environment — system-assigned identity
+- **Managed Identity**: No credentials in environment - system-assigned identity
 - **Log Analytics**: Centralized logging with 30-day retention
 - **PostgreSQL WAL backup**: Azure-native automated backup (7-day retention via `backupRetentionDays`)
 
@@ -103,18 +103,18 @@ curl "https://<app-url>/scim/admin/log-config/download?format=json" -H "Authoriz
 
 ## Dev / Prod Separation (Recommended)
 
-When the production instance has active users, deploy a **separate dev resource group** for development. This gives full blast-radius isolation — the production deployment is never touched during development.
+When the production instance has active users, deploy a **separate dev resource group** for development. This gives full blast-radius isolation - the production deployment is never touched during development.
 
 ### Architecture
 
 ```
-scimserver-rg           ← PROD (users) — do not touch
+scimserver-rg           ← PROD (users) - do not touch
 ├── VNet, subnets
 ├── Container Apps Env + Log Analytics
 ├── PostgreSQL Flexible Server (scimdb)
 └── Container App: scimserver2 (ghcr.io/pranems/scimserver:0.37.0)
 
-scimserver-rg-dev       ← DEV (your iteration) — fully isolated
+scimserver-rg-dev       ← DEV (your iteration) - fully isolated
 ├── VNet, subnets
 ├── Container Apps Env + Log Analytics
 ├── PostgreSQL Flexible Server (scimdb)
@@ -280,7 +280,7 @@ VITE_SCIM_TOKEN=changeme
 - **SCIM API**: http://localhost:3000/scim
 - **Web UI**: http://localhost:5173
 
-### Authentication (3-Tier Fallback — v0.21.0)
+### Authentication (3-Tier Fallback - v0.21.0)
 
 SCIMServer uses a **3-tier authentication fallback chain** via `SharedSecretGuard` (global `APP_GUARD`). Each incoming `Authorization: Bearer <token>` is evaluated in order:
 
@@ -298,7 +298,7 @@ SCIMServer uses a **3-tier authentication fallback chain** via `SharedSecretGuar
 Enable the `PerEndpointCredentialsEnabled` flag on an endpoint to allow credential CRUD:
 
 ```powershell
-# Create credential (returns plaintext token ONCE — store it securely)
+# Create credential (returns plaintext token ONCE - store it securely)
 Invoke-RestMethod -Method POST -Uri "http://localhost:3000/scim/admin/endpoints/<endpointId>/credentials" `
   -Headers @{ Authorization = "Bearer changeme" } `
   -ContentType "application/json"
@@ -436,5 +436,5 @@ For the complete walkthrough: [docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZ
 | Guide | Description |
 |-------|-------------|
 | [docs/ENDPOINT_LIFECYCLE_AND_USAGE.md](docs/ENDPOINT_LIFECYCLE_AND_USAGE.md) | Hands-on endpoint lifecycle, API recipes, common operations |
-| [docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) | Azure Government, BLEU (France), China — sovereign cloud deployment |
+| [docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md](docs/SOVEREIGN_AND_GOV_CLOUD_DEPLOYMENT.md) | Azure Government, BLEU (France), China - sovereign cloud deployment |
 | [docs/COMPLETE_API_REFERENCE.md](docs/COMPLETE_API_REFERENCE.md) | Full REST API reference with curl/PowerShell examples |

@@ -1,6 +1,6 @@
-# SCIM Extensions Deep Analysis — Top 3 Recommendations
+# SCIM Extensions Deep Analysis - Top 3 Recommendations
 
-> **⚠️ SUPERSEDED** — This v2 document (Feb 17) has been superseded by the v3 architecture docs (Feb 20, 2026) and the comprehensive schema documentation suite (Mar 2026). The three recommendations here (fix discovery, extension registry, filter push-down) are now covered in the 12-phase Migration Plan. **Retained for**: Three-Pillar RFC framework, per-endpoint isolation 4-layer audit (§2A), ServiceProviderConfig RFC compliance gaps (§2B), dead config flag inventory (§2C — 7 of 12 flags are dead code), and `schemas[]` array bug finding (§2.5).
+> **⚠️ SUPERSEDED** - This v2 document (Feb 17) has been superseded by the v3 architecture docs (Feb 20, 2026) and the comprehensive schema documentation suite (Mar 2026). The three recommendations here (fix discovery, extension registry, filter push-down) are now covered in the 12-phase Migration Plan. **Retained for**: Three-Pillar RFC framework, per-endpoint isolation 4-layer audit (§2A), ServiceProviderConfig RFC compliance gaps (§2B), dead config flag inventory (§2C - 7 of 12 flags are dead code), and `schemas[]` array bug finding (§2.5).
 > **See**: [`RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md`](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md) · [`SCHEMA_LIFECYCLE_AND_REGISTRY.md`](SCHEMA_LIFECYCLE_AND_REGISTRY.md) · [`SCHEMA_CUSTOMIZATION_GUIDE.md`](SCHEMA_CUSTOMIZATION_GUIDE.md) · [`SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md`](SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md)
 
 > **Date**: February 17, 2026 (v2)  
@@ -13,21 +13,21 @@
 
 ## Table of Contents
 
-1A. [Design Philosophy — The Three RFC Pillars](#1a-design-philosophy--the-three-rfc-pillars)  
+1A. [Design Philosophy - The Three RFC Pillars](#1a-design-philosophy--the-three-rfc-pillars)  
 1B. [Executive Summary](#1b-executive-summary)  
-2. [Current Architecture — What We Found](#2-current-architecture--what-we-found)  
+2. [Current Architecture - What We Found](#2-current-architecture--what-we-found)  
 2A. [Per-Endpoint Isolation Audit](#2a-per-endpoint-isolation-audit)  
 2B. [ServiceProviderConfig Audit](#2b-serviceproviderconfig-audit)  
-2C. [Endpoint Config Flags — Live vs Dead](#2c-endpoint-config-flags--live-vs-dead)  
-3. [Recommendation #1 — Fix the `schemas` Array & All Discovery Endpoints](#3-recommendation-1--fix-the-schemas-array--all-discovery-endpoints)  
-4. [Recommendation #2 — Build a Pluggable Extension Registry](#4-recommendation-2--build-a-pluggable-extension-registry)  
-5. [Recommendation #3 — Enterprise Extension Filter Push-Down](#5-recommendation-3--enterprise-extension-filter-push-down)  
+2C. [Endpoint Config Flags - Live vs Dead](#2c-endpoint-config-flags--live-vs-dead)  
+3. [Recommendation #1 - Fix the `schemas` Array & All Discovery Endpoints](#3-recommendation-1--fix-the-schemas-array--all-discovery-endpoints)  
+4. [Recommendation #2 - Build a Pluggable Extension Registry](#4-recommendation-2--build-a-pluggable-extension-registry)  
+5. [Recommendation #3 - Enterprise Extension Filter Push-Down](#5-recommendation-3--enterprise-extension-filter-push-down)  
 6. [Implementation Priority Matrix](#6-implementation-priority-matrix)  
 7. [References](#7-references)
 
 ---
 
-## 1A. Design Philosophy — The Three RFC Pillars
+## 1A. Design Philosophy - The Three RFC Pillars
 
 Every recommendation in this document is grounded in these three RFCs and the design principles they imply.
 
@@ -47,34 +47,34 @@ Every recommendation in this document is grounded in these three RFCs and the de
 ├───┬──────────────────────────────────────────────────┬─────────┬───────────┤
 │ # │ Principle                                        │ RFC     │ Current   │
 ├───┼──────────────────────────────────────────────────┼─────────┼───────────┤
-│ 1 │ Schema is the Source of Truth — behavior          │ §7      │ ⚠️ PARTIAL│
+│ 1 │ Schema is the Source of Truth - behavior          │ §7      │ ⚠️ PARTIAL│
 │   │ (mutability, returnability, filtering, case       │ RFC7643 │ Hardcoded │
 │   │ sensitivity) derived from schema definitions,     │         │ per-attr  │
 │   │ not hardcoded per-attribute.                      │         │           │
 ├───┼──────────────────────────────────────────────────┼─────────┼───────────┤
-│ 2 │ Resource Types are Pluggable — server should      │ §3.2    │ ❌ NO     │
+│ 2 │ Resource Types are Pluggable - server should      │ §3.2    │ ❌ NO     │
 │   │ not be "User + Group only"; resource types        │ RFC7643 │ Hardcoded │
 │   │ should be registrations that can be added,        │         │ User+Group│
 │   │ removed, or customized per endpoint.                │         │           │
 ├───┼──────────────────────────────────────────────────┼─────────┼───────────┤
-│ 3 │ Discovery Drives the Contract — /SPC,             │ §4      │ ❌ NO     │
+│ 3 │ Discovery Drives the Contract - /SPC,             │ §4      │ ❌ NO     │
 │   │ /Schemas, /ResourceTypes must be per-endpoint,      │ RFC7644 │ Static    │
 │   │ truthful, and generated from actual server        │         │ hardcoded │
-│   │ capabilities — never hardcoded.                   │         │ identical │
+│   │ capabilities - never hardcoded.                   │         │ identical │
 ├───┼──────────────────────────────────────────────────┼─────────┼───────────┤
-│ 4 │ Multi-Tenancy is URL-Based — URL prefix           │ §6      │ ✅ YES    │
+│ 4 │ Multi-Tenancy is URL-Based - URL prefix           │ §6      │ ✅ YES    │
 │   │ (/{endpointId}/Users) is the most standard and      │ RFC7644 │ endpoints/│
 │   │ discoverable approach.                            │         │ :endpointId│
 ├───┼──────────────────────────────────────────────────┼─────────┼───────────┤
-│ 5 │ Attribute Characteristics are Not Optional —       │ §2.2    │ ⚠️ PARTIAL│
+│ 5 │ Attribute Characteristics are Not Optional -       │ §2.2    │ ⚠️ PARTIAL│
 │   │ mutability, returned, uniqueness, caseExact,      │ RFC7643 │ Some attrs│
 │   │ required from RFC 7643 must govern CRUD behavior. │         │ honored   │
 ├───┼──────────────────────────────────────────────────┼─────────┼───────────┤
-│ 6 │ Errors are Structured — RFC 7644 §3.12 mandates   │ §3.12   │ ✅ YES    │
+│ 6 │ Errors are Structured - RFC 7644 §3.12 mandates   │ §3.12   │ ✅ YES    │
 │   │ JSON error responses with schemas, status,        │ RFC7644 │ ScimError │
 │   │ scimType, and detail.                             │         │ class     │
 ├───┼──────────────────────────────────────────────────┼─────────┼───────────┤
-│ 7 │ Simplicity Through Generalization — generic        │ all     │ ❌ NO     │
+│ 7 │ Simplicity Through Generalization - generic        │ all     │ ❌ NO     │
 │   │ engine that processes any resource type through    │         │ Separate  │
 │   │ schema-driven rules is simpler than per-resource  │         │ User/Group│
 │   │ hardcoded logic.                                  │         │ services  │
@@ -84,10 +84,10 @@ Every recommendation in this document is grounded in these three RFCs and the de
 ### How Each Recommendation Maps to Principles
 
 ```
-  Principle 1  ──►  Rec #2 (Extension Registry — schema as source of truth)
+  Principle 1  ──►  Rec #2 (Extension Registry - schema as source of truth)
   Principle 2  ──►  Rec #2 (Pluggable resource types via registry)
   Principle 3  ──►  Rec #1 (Fix all 3 discovery endpoints + SPC)
-  Principle 4  ──►  §2A audit (per-endpoint isolation — already strong)
+  Principle 4  ──►  §2A audit (per-endpoint isolation - already strong)
   Principle 5  ──►  Rec #2 (attribute characteristics in registry defs)
   Principle 6  ──►  Already implemented (ScimError class)
   Principle 7  ──►  Rec #2 (generic extension engine, future ResourceType engine)
@@ -118,15 +118,15 @@ After auditing every layer of the SCIMServer codebase against all three SCIM RFC
 
 **The good news**: The rawPayload JSON-blob storage pattern already preserves and returns extension data correctly. The PATCH path utilities already handle `urn:`-prefixed paths for add/replace/remove. Per-endpoint isolation at the DB layer (composite unique constraints, FK cascades) and routing layer (`AsyncLocalStorage` context) is solid. These are strong foundations to build on.
 
-**The problem**: The metadata layer is disconnected from the config layer — discovery endpoints (including ServiceProviderConfig) are hardcoded and identical across all endpoints, schemas arrays never include extension URNs, and 7 of 12 endpoint config flags are dead code. The server tells clients one story while behaving differently.
+**The problem**: The metadata layer is disconnected from the config layer - discovery endpoints (including ServiceProviderConfig) are hardcoded and identical across all endpoints, schemas arrays never include extension URNs, and 7 of 12 endpoint config flags are dead code. The server tells clients one story while behaving differently.
 
-> **Design Principle #3 violated**: "Discovery Drives the Contract" — /ServiceProviderConfig, /Schemas, /ResourceTypes must be per-endpoint, truthful, and generated from actual server capabilities — never hardcoded.
+> **Design Principle #3 violated**: "Discovery Drives the Contract" - /ServiceProviderConfig, /Schemas, /ResourceTypes must be per-endpoint, truthful, and generated from actual server capabilities - never hardcoded.
 
 ---
 
-## 2. Current Architecture — What We Found
+## 2. Current Architecture - What We Found
 
-### 2.1 Data Flow — How Extensions Traverse the System Today
+### 2.1 Data Flow - How Extensions Traverse the System Today
 
 ```
                         ┌─────────────────────────────────────────────────────┐
@@ -200,7 +200,7 @@ After auditing every layer of the SCIMServer codebase against all three SCIM RFC
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2 Current Discovery Endpoints — What Clients See
+### 2.2 Current Discovery Endpoints - What Clients See
 
 ```
 Client                              SCIMServer
@@ -236,14 +236,14 @@ Client                              SCIMServer
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│  scim-patch-path.ts — Extension Path Resolution               │
+│  scim-patch-path.ts - Extension Path Resolution               │
 ├───────────────────────────────────────────────────────────────┤
 │                                                               │
 │  KNOWN_EXTENSION_URNS = [                                     │
 │    'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User│
 │  ]                                                            │
 │  ▲                                                            │
-│  │ ❌ Hardcoded array — cannot add custom extensions          │
+│  │ ❌ Hardcoded array - cannot add custom extensions          │
 │  │    without code change                                     │
 │                                                               │
 │  isExtensionPath("urn:...:enterprise:2.0:User:department")    │
@@ -268,7 +268,7 @@ Client                              SCIMServer
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│  apply-scim-filter.ts — DB Push-Down vs In-Memory             │
+│  apply-scim-filter.ts - DB Push-Down vs In-Memory             │
 ├───────────────────────────────────────────────────────────────┤
 │                                                               │
 │  DB Push-Down (fast, indexed):                                │
@@ -294,7 +294,7 @@ Client                              SCIMServer
 └───────────────────────────────────────────────────────────────┘
 ```
 
-### 2.5 Dead Code — The `INCLUDE_ENTERPRISE_SCHEMA` Flag
+### 2.5 Dead Code - The `INCLUDE_ENTERPRISE_SCHEMA` Flag
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -313,10 +313,10 @@ Client                              SCIMServer
 │  }                                                               │
 │                                                                  │
 │  ⚠️ This flag is DEFINED but NEVER CONSUMED:                    │
-│    • toScimUserResource() — ignores it                           │
-│    • schemas.controller.ts — ignores it                          │
-│    • resource-types.controller.ts — ignores it                   │
-│    • endpoint-scim-discovery.controller.ts — ignores it          │
+│    • toScimUserResource() - ignores it                           │
+│    • schemas.controller.ts - ignores it                          │
+│    • resource-types.controller.ts - ignores it                   │
+│    • endpoint-scim-discovery.controller.ts - ignores it          │
 │                                                                  │
 │  This was clearly INTENDED to control enterprise extension       │
 │  behavior per-endpoint, but the implementation was never wired.  │
@@ -327,7 +327,7 @@ Client                              SCIMServer
 
 ## 2A. Per-Endpoint Isolation Audit
 
-> **Design Principle #4**: "Multi-Tenancy is URL-Based — RFC 7644 §6 gives three patterns: URL prefix, subdomain, HTTP header. For a multi-endpoint testing server, URL prefix (/{endpointId}/Users) is the most standard and discoverable approach."
+> **Design Principle #4**: "Multi-Tenancy is URL-Based - RFC 7644 §6 gives three patterns: URL prefix, subdomain, HTTP header. For a multi-endpoint testing server, URL prefix (/{endpointId}/Users) is the most standard and discoverable approach."
 
 ### What Works Well (Endpoint Isolation Foundations)
 
@@ -335,7 +335,7 @@ The server's per-endpoint isolation is **architecturally sound** across the DB, 
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────────┐
-│  PER-ENDPOINT ISOLATION — WHAT THE SERVER DOES RIGHT                          │
+│  PER-ENDPOINT ISOLATION - WHAT THE SERVER DOES RIGHT                          │
 ├───────────────────────────────────────────────────────────────────────────────┤
 │                                                                               │
 │  ┌─── LAYER 1: Database Isolation ─────────────────────────────────────────┐ │
@@ -380,7 +380,7 @@ The server's per-endpoint isolation is **architecturally sound** across the DB, 
 │  │  └────────────────────────────────────────────────────────────────┘     │ │
 │  │                                                                         │ │
 │  │  Any service in the call chain can read the current endpoint's          │ │
-│  │  config via EndpointContextStorage.getConfig() — no parameter drilling. │ │
+│  │  config via EndpointContextStorage.getConfig() - no parameter drilling. │ │
 │  └─────────────────────────────────────────────────────────────────────────┘ │
 │                                                                               │
 │  ┌─── LAYER 4: Config Stored Per-Endpoint ─────────────────────────────────┐ │
@@ -443,7 +443,7 @@ Despite the strong foundations, **the discovery layer ignores per-endpoint confi
 └───────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Per-Endpoint Discovery — RFC 7644 §4 Requirement
+### Per-Endpoint Discovery - RFC 7644 §4 Requirement
 
 RFC 7644 §4 states that discovery endpoints allow clients to understand the server's capabilities. In a multi-endpoint system, this means each endpoint's discovery responses **must reflect that endpoint's actual configuration**.
 
@@ -485,7 +485,7 @@ RFC 7644 §4 states that discovery endpoints allow clients to understand the ser
 
 ## 2B. ServiceProviderConfig Audit
 
-> **Design Principle #3**: "Discovery Drives the Contract — /ServiceProviderConfig, /Schemas, /ResourceTypes must be per-endpoint, truthful, and generated from actual server capabilities — never hardcoded."
+> **Design Principle #3**: "Discovery Drives the Contract - /ServiceProviderConfig, /Schemas, /ResourceTypes must be per-endpoint, truthful, and generated from actual server capabilities - never hardcoded."
 
 ### Current State
 
@@ -516,21 +516,21 @@ The ServiceProviderConfig (SPC) endpoint exists in two places:
 }
 ```
 
-### RFC 7644 §4 Analysis — What ServiceProviderConfig MUST Contain
+### RFC 7644 §4 Analysis - What ServiceProviderConfig MUST Contain
 
 RFC 7644 §4 Table 1 defines the required SPC attributes:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│  ServiceProviderConfig — RFC 7644 §4 Compliance Check                    │
+│  ServiceProviderConfig - RFC 7644 §4 Compliance Check                    │
 ├──────────────────────┬──────────┬──────────────┬────────────────────────┤
 │  Attribute           │ Required │ Current      │ Assessment             │
 ├──────────────────────┼──────────┼──────────────┼────────────────────────┤
 │  schemas             │ Yes      │ ✅ present   │ Correct                │
 │  documentationUri    │ No       │ ❌ missing   │ Should point to docs   │
-│  patch.supported     │ Yes      │ ✅ true      │ Correct — server does  │
+│  patch.supported     │ Yes      │ ✅ true      │ Correct - server does  │
 │                      │          │              │ support PATCH          │
-│  bulk.supported      │ Yes      │ ✅ true      │ Correct — bulk         │
+│  bulk.supported      │ Yes      │ ✅ true      │ Correct - bulk         │
 │                      │          │              │ supported (v0.19.0)    │
 │  bulk.maxOperations  │ Required │ ✅ 1000      │ Correct                │
 │                      │ if bulk  │              │                        │
@@ -539,7 +539,7 @@ RFC 7644 §4 Table 1 defines the required SPC attributes:
 │  filter.supported    │ Yes      │ ✅ true      │ Correct                │
 │  filter.maxResults   │ Required │ ✅ 200       │ Correct                │
 │                      │ if filter│              │                        │
-│  changePassword      │ Yes      │ ✅ false     │ Correct — not a SCIM   │
+│  changePassword      │ Yes      │ ✅ false     │ Correct - not a SCIM   │
 │  .supported          │          │              │ password endpoint      │
 │  sort.supported      │ Yes      │ ✅ false     │ Correct                │
 │  etag.supported      │ Yes      │ ✅ true      │ ⚠️ Claims true but    │
@@ -555,15 +555,15 @@ RFC 7644 §4 Table 1 defines the required SPC attributes:
 │     RFC 7644 §4 says: "A bulk configuration option whose content         │
 │     itself is a complex type defining supported and maxOperations."       │
 │                                                                          │
-│  2. SPC is identical for all endpoints — violates Principle #3           │
+│  2. SPC is identical for all endpoints - violates Principle #3           │
 │     (Discovery Drives the Contract). If endpoint A has enterprise        │
 │     schema enabled and endpoint B doesn't, the SPC should reflect        │
 │     the difference.                                                      │
 │                                                                          │
-│  3. No meta object — RFC 7643 §3.1 says all resources SHOULD have       │
+│  3. No meta object - RFC 7643 §3.1 says all resources SHOULD have       │
 │     meta with location and resourceType.                                 │
 │                                                                          │
-│  4. No documentationUri — RFC 7644 §4 defines this optional field        │
+│  4. No documentationUri - RFC 7644 §4 defines this optional field        │
 │     pointing to human-readable help.                                     │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
@@ -613,7 +613,7 @@ RFC 7644 §4 Table 1 defines the required SPC attributes:
 }
 ```
 
-### SPC-Aware Config Flags (New — to Wire Up)
+### SPC-Aware Config Flags (New - to Wire Up)
 
 The per-endpoint SPC response should be **dynamically built from the endpoint's config**. This captures capabilities that differ per endpoint:
 
@@ -667,15 +667,15 @@ The per-endpoint SPC response should be **dynamically built from the endpoint's 
 
 ---
 
-## 2C. Endpoint Config Flags — Live vs Dead
+## 2C. Endpoint Config Flags - Live vs Dead
 
-> **Design Principle #1**: "Schema is the Source of Truth" — If a config flag exists, it should govern behavior. Dead flags violate this principle because they promise configurability that doesn't exist.
+> **Design Principle #1**: "Schema is the Source of Truth" - If a config flag exists, it should govern behavior. Dead flags violate this principle because they promise configurability that doesn't exist.
 
 ### Complete Config Flag Inventory
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────┐
-│  ENDPOINT CONFIG FLAGS — FULL AUDIT (endpoint-config.interface.ts, 338 lines) │
+│  ENDPOINT CONFIG FLAGS - FULL AUDIT (endpoint-config.interface.ts, 338 lines) │
 ├──────────────────────────────────────────────────────────┬──────────┬──────────┤
 │  Flag                                                    │ Default  │ Status   │
 ├──────────────────────────────────────────────────────────┼──────────┼──────────┤
@@ -761,17 +761,17 @@ The per-endpoint SPC response should be **dynamically built from the endpoint's 
                                  (e.g., custom CORS, rate-limit hints)
 ```
 
-These flags represent **per-endpoint configurability as a first-class feature** — the architecture was designed for this. Wiring them up completes the original design intent.
+These flags represent **per-endpoint configurability as a first-class feature** - the architecture was designed for this. Wiring them up completes the original design intent.
 
 ---
 
-## 2D. Current Architecture Coupling — What Must Change
+## 2D. Current Architecture Coupling - What Must Change
 
 Before presenting recommendations, here is a structural map of what's tightly coupled today and what the principles demand:
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────────┐
-│  CURRENT ARCHITECTURE — TIGHT COUPLING MAP                                    │
+│  CURRENT ARCHITECTURE - TIGHT COUPLING MAP                                    │
 ├───────────────────────────────────────────────────────────────────────────────┤
 │                                                                               │
 │                    ┌─────────────────────┐                                    │
@@ -920,7 +920,7 @@ Before presenting recommendations, here is a structural map of what's tightly co
 │                             ▼                                                │
 │  ┌─ Storage Layer ─────────────────────────────────────────────────────────┐ │
 │  │  SQLite / PostgreSQL / MongoDB / CosmosDB / In-Memory                   │ │
-│  │  (swappable via DI — never referenced above repository interface)       │ │
+│  │  (swappable via DI - never referenced above repository interface)       │ │
 │  └─────────────────────────────────────────────────────────────────────────┘ │
 └───────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -939,11 +939,11 @@ Before presenting recommendations, here is a structural map of what's tightly co
 
 ---
 
-## 4. Recommendation #1 — Schema-Driven Resource Engine
+## 4. Recommendation #1 - Schema-Driven Resource Engine
 
 > **Principles**: #1 (Schema is Source of Truth), #5 (Attribute Characteristics Not Optional), #7 (Simplicity Through Generalization)
 
-### 4.1 The Problem — Hardcoded Attribute Behavior
+### 4.1 The Problem - Hardcoded Attribute Behavior
 
 Today, every attribute behavior is hardcoded:
 
@@ -992,7 +992,7 @@ Today, every attribute behavior is hardcoded:
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.2 The Design — Schema-Driven Attribute Resolution
+### 4.2 The Design - Schema-Driven Attribute Resolution
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
@@ -1034,7 +1034,7 @@ Today, every attribute behavior is hardcoded:
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.3 SchemaRegistry — Per-Endpoint Schema Storage
+### 4.3 SchemaRegistry - Per-Endpoint Schema Storage
 
 ```typescript
 /**
@@ -1192,7 +1192,7 @@ On first endpoint creation (or migration), these are copied into the endpoint's 
 }
 ```
 
-### 4.5 ScimResourceEngine — Generic CRUD
+### 4.5 ScimResourceEngine - Generic CRUD
 
 ```typescript
 /**
@@ -1343,7 +1343,7 @@ export class ScimResourceEngine {
     for (const [key, value] of Object.entries(resource)) {
       const attrDef = this.schemaRegistry.resolveAttribute(schema, key);
       if (!attrDef) {
-        // Unknown attribute or extension — pass through
+        // Unknown attribute or extension - pass through
         result[key] = value;
         continue;
       }
@@ -1401,7 +1401,7 @@ export class ScimResourceEngine {
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
-│  PATCH — CURRENT vs SCHEMA-DRIVEN                                         │
+│  PATCH - CURRENT vs SCHEMA-DRIVEN                                         │
 ├───────────────────────────────────────────────────────────────────────────┤
 │                                                                           │
 │  CURRENT (hardcoded path matching):                                       │
@@ -1453,7 +1453,7 @@ export class ScimResourceEngine {
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.7 ResourceTypeRegistry — Pluggable Resource Types
+### 4.7 ResourceTypeRegistry - Pluggable Resource Types
 
 ```typescript
 /**
@@ -1554,11 +1554,11 @@ export class ResourceTypeRegistry {
 
 ---
 
-## 5. Recommendation #2 — Persistence Abstraction Layer
+## 5. Recommendation #2 - Persistence Abstraction Layer
 
 > **Principles**: #7 (Simplicity), Separation of Concerns, Testability
 
-### 5.1 The Problem — Tight Prisma Coupling
+### 5.1 The Problem - Tight Prisma Coupling
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
@@ -1603,7 +1603,7 @@ export class ResourceTypeRegistry {
 └───────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 5.2 The Design — Repository Interface
+### 5.2 The Design - Repository Interface
 
 ```typescript
 /**
@@ -1637,7 +1637,7 @@ export interface ScimResourceRepository {
    * Find all resources matching a filter, with pagination.
    * Returns the total count (for ListResponse.totalResults) and the page.
    *
-   * The filter is a parsed AST (FilterNode) — the implementation
+   * The filter is a parsed AST (FilterNode) - the implementation
    * decides how much to push to the DB vs evaluate in-memory.
    */
   findAll(
@@ -1703,11 +1703,11 @@ export interface StoredResource {
 }
 ```
 
-### 5.3 Repository Implementations — Comparison
+### 5.3 Repository Implementations - Comparison
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
-│  REPOSITORY IMPLEMENTATIONS — TRADE-OFFS                                  │
+│  REPOSITORY IMPLEMENTATIONS - TRADE-OFFS                                  │
 ├───────────────────────────────────────────────────────────────────────────┤
 │                                                                           │
 │  ┌─── PrismaDocumentRepository (current DB, improved) ─────────────────┐ │
@@ -1804,7 +1804,7 @@ Schemas themselves need a repository to support per-endpoint customization:
  * Separate from resource storage because:
  *   1. Schemas are read on every request (cache-friendly)
  *   2. Schemas change rarely (different write pattern)
- *   3. Schemas drive behavior — they are configuration, not data
+ *   3. Schemas drive behavior - they are configuration, not data
  */
 export interface SchemaStorageRepository {
   /** Get all schemas for an endpoint. */
@@ -1907,15 +1907,15 @@ export interface SchemaStorageRepository {
 
 ---
 
-## 6. Recommendation #3 — Config-Driven Discovery Layer
+## 6. Recommendation #3 - Config-Driven Discovery Layer
 
 > **Principles**: #3 (Discovery Drives the Contract), #4 (Multi-Tenancy is URL-Based)
 
-### 6.1 The Problem — Static Discovery
+### 6.1 The Problem - Static Discovery
 
 All discovery endpoints return identical hardcoded JSON regardless of endpoint configuration. See §2A, §2B, §2C for the detailed audit. The core issue: discovery doesn't reflect reality.
 
-### 6.2 The Design — Discovery Generated from Registry
+### 6.2 The Design - Discovery Generated from Registry
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
@@ -2094,7 +2094,7 @@ GET /endpoints/acme-corp/Schemas/urn:ietf:params:scim:schemas:core:2.0:User HTTP
 ```
 
 ```http
-# Step 4: Client creates a user — engine uses schema to validate
+# Step 4: Client creates a user - engine uses schema to validate
 POST /endpoints/acme-corp/Users HTTP/1.1
 Content-Type: application/scim+json
 
@@ -2132,7 +2132,7 @@ Content-Type: application/scim+json
 ```
 
 Notice:
-- `"id": "should-be-ignored"` was stripped (mutability: readOnly — schema says ignore on POST)
+- `"id": "should-be-ignored"` was stripped (mutability: readOnly - schema says ignore on POST)
 - `"password"` was stored but **not returned** (returned: "never")
 - `schemas[]` array includes enterprise URN (engine detected extension data)
 - `meta` was server-generated (mutability: readOnly)
@@ -2188,7 +2188,7 @@ Notice:
 
 ## 7. Implementation Priority Matrix
 
-### 7.1 Phased Migration — From Current to Target
+### 7.1 Phased Migration - From Current to Target
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────┐
@@ -2202,7 +2202,7 @@ Notice:
 │  │  • Ship bundled schema JSON files (core-user, core-group,           │ │
 │  │    enterprise-user, service-provider-config)                        │ │
 │  │  • Add SCIM_ENTERPRISE_USER_SCHEMA constant                         │ │
-│  │  • NO behavioral changes yet — just adding new code alongside old   │ │
+│  │  • NO behavioral changes yet - just adding new code alongside old   │ │
 │  └─────────────────────────────────────────────────────────────────────┘ │
 │                      │                                                    │
 │                      ▼                                                    │
@@ -2262,11 +2262,11 @@ Notice:
 
 | Phase | New Files | Modified Files | Deleted Files |
 |-------|-----------|---------------|---------------|
-| **0** | `interfaces/repository.ts`, `interfaces/schema.ts`, `interfaces/resource-type.ts`, `schemas/*.json` (4 files) | `scim-constants.ts` (+1 constant) | — |
-| **1** | `repositories/prisma-document.repository.ts`, `repositories/in-memory.repository.ts` | `endpoint-scim-users.service.ts`, `endpoint-scim-groups.service.ts`, `scim.module.ts` | — |
-| **2** | `registries/schema.registry.ts`, `registries/resource-type.registry.ts`, `repositories/schema-storage.repository.ts` | `endpoint-scim-discovery.controller.ts`, `schemas.controller.ts`, `resource-types.controller.ts`, `service-provider-config.controller.ts`, `schema.prisma` (+2 tables) | — |
+| **0** | `interfaces/repository.ts`, `interfaces/schema.ts`, `interfaces/resource-type.ts`, `schemas/*.json` (4 files) | `scim-constants.ts` (+1 constant) | - |
+| **1** | `repositories/prisma-document.repository.ts`, `repositories/in-memory.repository.ts` | `endpoint-scim-users.service.ts`, `endpoint-scim-groups.service.ts`, `scim.module.ts` | - |
+| **2** | `registries/schema.registry.ts`, `registries/resource-type.registry.ts`, `repositories/schema-storage.repository.ts` | `endpoint-scim-discovery.controller.ts`, `schemas.controller.ts`, `resource-types.controller.ts`, `service-provider-config.controller.ts`, `schema.prisma` (+2 tables) | - |
 | **3** | `engine/scim-resource.engine.ts`, `controllers/generic-scim.controller.ts` | `scim.module.ts` | (Optional) `endpoint-scim-users.service.ts`, `endpoint-scim-groups.service.ts` replaced by engine |
-| **4** | `repositories/postgres-json.repository.ts` | `scim.module.ts` | — |
+| **4** | `repositories/postgres-json.repository.ts` | `scim.module.ts` | - |
 
 ### 7.3 File Structure (Target)
 
@@ -2297,8 +2297,8 @@ api/src/modules/scim/
 │   ├── discovery.controller.ts          ← Per-endpoint /Schemas, /ResourceTypes, /SPC
 │   └── admin.controller.ts              ← Schema/ResourceType management
 ├── filters/
-│   ├── scim-filter-parser.ts            ← (kept — already good)
-│   └── scim-exception.filter.ts         ← (kept — already good)
+│   ├── scim-filter-parser.ts            ← (kept - already good)
+│   └── scim-exception.filter.ts         ← (kept - already good)
 ├── common/
 │   ├── scim-constants.ts
 │   ├── scim-types.ts
@@ -2313,7 +2313,7 @@ api/src/modules/scim/
 │  ARCHITECTURE VERIFICATION                                              │
 ├────────────────────────────────────────────────────────────────────────┤
 │                                                                        │
-│  Principle #1 — Schema is Source of Truth:                             │
+│  Principle #1 - Schema is Source of Truth:                             │
 │  ☐ Attribute validation reads from SchemaDefinition, not hardcoded    │
 │  ☐ PATCH mutability check reads from attrDef.mutability               │
 │  ☐ Response shaping reads from attrDef.returned                       │
@@ -2322,25 +2322,25 @@ api/src/modules/scim/
 │  ☐ Uniqueness check reads from attrDef.uniqueness                     │
 │  ☐ normalizeObjectKeys map is ELIMINATED                              │
 │                                                                        │
-│  Principle #2 — Resource Types Pluggable:                              │
+│  Principle #2 - Resource Types Pluggable:                              │
 │  ☐ POST /admin/endpoints/:id/resourcetypes adds new type              │
 │  ☐ CRUD immediately works for new type via GenericScimController      │
 │  ☐ /ResourceTypes reflects new type                                    │
 │  ☐ Other endpoints UNAFFECTED                                          │
 │                                                                        │
-│  Principle #3 — Discovery Drives Contract:                             │
+│  Principle #3 - Discovery Drives Contract:                             │
 │  ☐ /Schemas generated from SchemaRegistry per endpoint                │
 │  ☐ /ResourceTypes generated from ResourceTypeRegistry per endpoint    │
 │  ☐ /ServiceProviderConfig has all RFC fields, config-aware            │
 │  ☐ Different endpoints → different discovery responses                 │
 │                                                                        │
-│  Principle #4 — Multi-Tenancy URL-Based:                               │
+│  Principle #4 - Multi-Tenancy URL-Based:                               │
 │  ☐ All CRUD at /endpoints/:endpointId/:resourceType                   │
-│  ☐ Data isolated per endpoint (existing — already works)              │
+│  ☐ Data isolated per endpoint (existing - already works)              │
 │  ☐ Schemas isolated per endpoint (NEW)                                 │
 │  ☐ Resource types isolated per endpoint (NEW)                          │
 │                                                                        │
-│  Principle #7 — Simplicity Through Generalization:                     │
+│  Principle #7 - Simplicity Through Generalization:                     │
 │  ☐ Single ScimResourceEngine replaces 2 services (~1400L → ~400L)     │
 │  ☐ Single GenericScimController replaces 2 controllers                │
 │  ☐ ZERO hardcoded attribute names in engine                            │
@@ -2360,23 +2360,23 @@ api/src/modules/scim/
 
 | Document | Link |
 | -------- | ---- |
-| RFC 7642 — SCIM Definitions, Overview, Concepts | https://datatracker.ietf.org/doc/html/rfc7642 |
-| RFC 7643 — SCIM Core Schema | https://datatracker.ietf.org/doc/html/rfc7643 |
-| RFC 7643 §2.2 — Attribute Characteristics | https://datatracker.ietf.org/doc/html/rfc7643#section-2.2 |
-| RFC 7643 §3.1 — schemas attribute | https://datatracker.ietf.org/doc/html/rfc7643#section-3.1 |
-| RFC 7643 §3.2 — Resource Types | https://datatracker.ietf.org/doc/html/rfc7643#section-3.2 |
-| RFC 7643 §3.3 — Schema Extensions | https://datatracker.ietf.org/doc/html/rfc7643#section-3.3 |
-| RFC 7643 §4.3 — Enterprise User | https://datatracker.ietf.org/doc/html/rfc7643#section-4.3 |
-| RFC 7643 §7 — Schema Definition | https://datatracker.ietf.org/doc/html/rfc7643#section-7 |
-| RFC 7643 §8.7 — ResourceType | https://datatracker.ietf.org/doc/html/rfc7643#section-8.7 |
-| RFC 7644 — SCIM Protocol | https://datatracker.ietf.org/doc/html/rfc7644 |
-| RFC 7644 §3.4.2 — Filtering | https://datatracker.ietf.org/doc/html/rfc7644#section-3.4.2 |
-| RFC 7644 §3.5.1 — PUT (Replace) | https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.1 |
-| RFC 7644 §3.5.2 — PATCH | https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2 |
-| RFC 7644 §3.7 — Bulk Operations | https://datatracker.ietf.org/doc/html/rfc7644#section-3.7 |
-| RFC 7644 §3.12 — Error Responses | https://datatracker.ietf.org/doc/html/rfc7644#section-3.12 |
-| RFC 7644 §4 — Discovery Endpoints | https://datatracker.ietf.org/doc/html/rfc7644#section-4 |
-| RFC 7644 §6 — Multi-Tenancy | https://datatracker.ietf.org/doc/html/rfc7644#section-6 |
+| RFC 7642 - SCIM Definitions, Overview, Concepts | https://datatracker.ietf.org/doc/html/rfc7642 |
+| RFC 7643 - SCIM Core Schema | https://datatracker.ietf.org/doc/html/rfc7643 |
+| RFC 7643 §2.2 - Attribute Characteristics | https://datatracker.ietf.org/doc/html/rfc7643#section-2.2 |
+| RFC 7643 §3.1 - schemas attribute | https://datatracker.ietf.org/doc/html/rfc7643#section-3.1 |
+| RFC 7643 §3.2 - Resource Types | https://datatracker.ietf.org/doc/html/rfc7643#section-3.2 |
+| RFC 7643 §3.3 - Schema Extensions | https://datatracker.ietf.org/doc/html/rfc7643#section-3.3 |
+| RFC 7643 §4.3 - Enterprise User | https://datatracker.ietf.org/doc/html/rfc7643#section-4.3 |
+| RFC 7643 §7 - Schema Definition | https://datatracker.ietf.org/doc/html/rfc7643#section-7 |
+| RFC 7643 §8.7 - ResourceType | https://datatracker.ietf.org/doc/html/rfc7643#section-8.7 |
+| RFC 7644 - SCIM Protocol | https://datatracker.ietf.org/doc/html/rfc7644 |
+| RFC 7644 §3.4.2 - Filtering | https://datatracker.ietf.org/doc/html/rfc7644#section-3.4.2 |
+| RFC 7644 §3.5.1 - PUT (Replace) | https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.1 |
+| RFC 7644 §3.5.2 - PATCH | https://datatracker.ietf.org/doc/html/rfc7644#section-3.5.2 |
+| RFC 7644 §3.7 - Bulk Operations | https://datatracker.ietf.org/doc/html/rfc7644#section-3.7 |
+| RFC 7644 §3.12 - Error Responses | https://datatracker.ietf.org/doc/html/rfc7644#section-3.12 |
+| RFC 7644 §4 - Discovery Endpoints | https://datatracker.ietf.org/doc/html/rfc7644#section-4 |
+| RFC 7644 §6 - Multi-Tenancy | https://datatracker.ietf.org/doc/html/rfc7644#section-6 |
 | SQLite json_extract | https://www.sqlite.org/json1.html#jex |
 | PostgreSQL JSONB | https://www.postgresql.org/docs/current/functions-json.html |
 | Repository Pattern | https://martinfowler.com/eaaCatalog/repository.html |
@@ -2405,7 +2405,7 @@ api/src/modules/scim/
 
 ---
 
-> *Generated from full codebase audit on February 17, 2026 (v3 — unconstrained architecture).*
+> *Generated from full codebase audit on February 17, 2026 (v3 - unconstrained architecture).*
 > *All findings verified against actual source code with exact line numbers.*
 > *Analysis grounded in Three-Pillar RFC framework: RFC 7642 + RFC 7643 + RFC 7644.*
 > *Architecture designed per seven core principles derived from RFCs.*

@@ -19,7 +19,7 @@ import {
 } from './helpers/fixtures';
 
 /**
- * Test gaps audit #3 — Covers remaining E2E gaps identified in the comprehensive audit:
+ * Test gaps audit #3 - Covers remaining E2E gaps identified in the comprehensive audit:
  *
  * 1. returned:request on LIST with ?attributes= (present when requested)
  * 2. returned:request on .search (absent by default, present when requested)
@@ -27,7 +27,7 @@ import {
  * 4. ETag header on LIST responses
  * 5. returned:request on write-response (POST/PUT/PATCH with ?attributes=)
  */
-describe('Test Gaps Audit #3 — Remaining projection & characteristic gaps (E2E)', () => {
+describe('Test Gaps Audit #3 - Remaining projection & characteristic gaps (E2E)', () => {
   let app: INestApplication;
   let token: string;
 
@@ -197,7 +197,7 @@ describe('Test Gaps Audit #3 — Remaining projection & characteristic gaps (E2E
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // 4. returned:request on LIST — present when ?attributes= requests it
+  // 4. returned:request on LIST - present when ?attributes= requests it
   // ═══════════════════════════════════════════════════════════════════
 
   describe('returned:request on LIST with ?attributes=', () => {

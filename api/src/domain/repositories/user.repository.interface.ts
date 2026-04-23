@@ -1,11 +1,11 @@
 /**
- * IUserRepository — persistence port for SCIM User resources.
+ * IUserRepository - persistence port for SCIM User resources.
  *
  * Implementations:
  *   - PrismaUserRepository  (PostgreSQL via Prisma)
  *   - InMemoryUserRepository (testing / lightweight deployments)
  *
- * Phase 3: userNameLower column removed — CITEXT/InMemory handles
+ * Phase 3: userNameLower column removed - CITEXT/InMemory handles
  * case-insensitive comparison without a pre-computed lowercase column.
  */
 import type {
@@ -49,7 +49,7 @@ export interface IUserRepository {
    * case-insensitively (via CITEXT or toLowerCase).
    * Optionally excludes a record with the given `scimId` (for PUT/PATCH).
    *
-   * Note: externalId and displayName are NOT checked for uniqueness —
+   * Note: externalId and displayName are NOT checked for uniqueness -
    * they are saved as received per RFC 7643.
    *
    * @returns The conflicting record's identifiers, or `null` if unique.

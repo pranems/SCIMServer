@@ -1,5 +1,5 @@
 /**
- * Domain PATCH Engine — barrel export (Phase 5)
+ * Domain PATCH Engine - barrel export (Phase 5)
  */
 export { PatchError } from './patch-error';
 

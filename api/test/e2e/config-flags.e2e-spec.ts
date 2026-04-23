@@ -341,7 +341,7 @@ describe('Config Flags (E2E)', () => {
       });
 
       // The server may either reject (400) or accept and store as string.
-      // Either behavior is valid — the key is it doesn't crash.
+      // Either behavior is valid - the key is it doesn't crash.
       expect([201, 400]).toContain(res.status);
       if (res.status === 400) {
         expect(res.body.status).toBe('400');

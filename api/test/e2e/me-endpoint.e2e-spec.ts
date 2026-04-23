@@ -13,7 +13,7 @@ import {
 import { validUser, resetFixtureCounter } from './helpers/fixtures';
 
 /**
- * /Me Endpoint E2E tests — RFC 7644 §3.11
+ * /Me Endpoint E2E tests - RFC 7644 §3.11
  *
  * The /Me endpoint is a URI alias for the User resource associated with
  * the currently authenticated subject. The JWT `sub` claim is matched

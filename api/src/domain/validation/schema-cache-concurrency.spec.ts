@@ -1,16 +1,16 @@
 /**
- * Schema Characteristics Cache — Concurrency & Isolation Tests
+ * Schema Characteristics Cache - Concurrency & Isolation Tests
  *
  * Validates that the _schemaCaches on EndpointProfile is safe under all
  * concurrent access patterns:
  *
- * Level 1 — Pure function: buildCharacteristicsCache idempotency
- * Level 2 — Profile mutation: lazy cache write on shared profile object
- * Level 3 — AsyncLocalStorage isolation: per-request profile references
- * Level 4 — Interleaved async: simulated concurrent SCIM requests
- * Level 5 — Cache invalidation: admin profile update during active requests
- * Level 6 — Serialization guard: instanceof Map rejects JSON artifacts
- * Level 7 — readOnlyCollected consistency: derived shape matches source
+ * Level 1 - Pure function: buildCharacteristicsCache idempotency
+ * Level 2 - Profile mutation: lazy cache write on shared profile object
+ * Level 3 - AsyncLocalStorage isolation: per-request profile references
+ * Level 4 - Interleaved async: simulated concurrent SCIM requests
+ * Level 5 - Cache invalidation: admin profile update during active requests
+ * Level 6 - Serialization guard: instanceof Map rejects JSON artifacts
+ * Level 7 - readOnlyCollected consistency: derived shape matches source
  */
 import { AsyncLocalStorage } from 'async_hooks';
 import { SchemaValidator } from './schema-validator';
@@ -18,7 +18,7 @@ import type { SchemaDefinition, SchemaCharacteristicsCache } from './validation-
 import { flattenParentChildMap } from '../../modules/scim/common/scim-service-helpers';
 import type { EndpointProfile } from '../../modules/scim/endpoint-profile/endpoint-profile.types';
 
-// Test cache key — simulates the coreSchemaUrn used in production
+// Test cache key - simulates the coreSchemaUrn used in production
 const TEST_KEY = 'urn:ietf:params:scim:schemas:core:2.0:User';
 
 /** Helper: set cache on profile under the test key */
@@ -90,7 +90,7 @@ function buildMockProfile(schemas = ALL_SCHEMAS): EndpointProfile {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// Level 1: Pure Function — buildCharacteristicsCache Idempotency
+// Level 1: Pure Function - buildCharacteristicsCache Idempotency
 // ═══════════════════════════════════════════════════════════════════════
 
 describe('Level 1: buildCharacteristicsCache idempotency', () => {
@@ -98,7 +98,7 @@ describe('Level 1: buildCharacteristicsCache idempotency', () => {
     const cache1 = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
     const cache2 = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
 
-    // Structural equality — same keys, same values
+    // Structural equality - same keys, same values
     expect([...cache1.booleansByParent.keys()].sort()).toEqual([...cache2.booleansByParent.keys()].sort());
     for (const [key, set1] of cache1.booleansByParent) {
       const set2 = cache2.booleansByParent.get(key);
@@ -147,7 +147,7 @@ describe('Level 1: buildCharacteristicsCache idempotency', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// Level 2: Profile Mutation — Lazy Cache Write on Shared Object
+// Level 2: Profile Mutation - Lazy Cache Write on Shared Object
 // ═══════════════════════════════════════════════════════════════════════
 
 describe('Level 2: lazy cache write on shared profile object', () => {
@@ -168,7 +168,7 @@ describe('Level 2: lazy cache write on shared profile object', () => {
     const cache = SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS);
     setProfileCache(profile, cache);
 
-    // Simulate second getSchemaCache() call — should return same reference
+    // Simulate second getSchemaCache() call - should return same reference
     const cachedRef = getProfileCache(profile);
     expect(cachedRef).toBe(cache);
     expect(cachedRef!.booleansByParent).toBe(cache.booleansByParent);
@@ -181,10 +181,10 @@ describe('Level 2: lazy cache write on shared profile object', () => {
     setProfileCache(profile, cache1);
     setProfileCache(profile, cache2);
 
-    // Last write wins — cache2 is the current value
+    // Last write wins - cache2 is the current value
     expect(getProfileCache(profile)).toBe(cache2);
     expect(getProfileCache(profile)).not.toBe(cache1);
-    // Both caches have identical content — no data loss
+    // Both caches have identical content - no data loss
     expect([...cache1.booleansByParent.keys()].sort()).toEqual([...cache2.booleansByParent.keys()].sort());
   });
 
@@ -222,7 +222,7 @@ describe('Level 2: lazy cache write on shared profile object', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// Level 3: AsyncLocalStorage Isolation — Per-Request Profile References
+// Level 3: AsyncLocalStorage Isolation - Per-Request Profile References
 // ═══════════════════════════════════════════════════════════════════════
 
 describe('Level 3: AsyncLocalStorage per-request isolation', () => {
@@ -313,7 +313,7 @@ describe('Level 3: AsyncLocalStorage per-request isolation', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// Level 4: Interleaved Async — Simulated Concurrent SCIM Requests
+// Level 4: Interleaved Async - Simulated Concurrent SCIM Requests
 // ═══════════════════════════════════════════════════════════════════════
 
 describe('Level 4: interleaved async requests on shared profile', () => {
@@ -388,7 +388,7 @@ describe('Level 4: interleaved async requests on shared profile', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// Level 5: Cache Invalidation — Profile Update During Active Requests
+// Level 5: Cache Invalidation - Profile Update During Active Requests
 // ═══════════════════════════════════════════════════════════════════════
 
 describe('Level 5: profile update during active requests', () => {
@@ -481,7 +481,7 @@ describe('Level 5: profile update during active requests', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// Level 6: Serialization Guard — instanceof Map Rejects JSON Artifacts
+// Level 6: Serialization Guard - instanceof Map Rejects JSON Artifacts
 // ═══════════════════════════════════════════════════════════════════════
 
 describe('Level 6: instanceof Map serialization guard', () => {

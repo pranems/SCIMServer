@@ -249,9 +249,9 @@ export class LogConfigController {
    * Server-Sent Events (SSE) endpoint for real-time log tailing.
    *
    * Streams log entries as they occur. Supports optional query filters:
-   *   ?level=WARN      — only entries ≥ WARN
-   *   ?category=http   — only entries matching category
-   *   ?endpointId=xxx  — only entries for a specific endpoint
+   *   ?level=WARN      - only entries ≥ WARN
+   *   ?category=http   - only entries matching category
+   *   ?endpointId=xxx  - only entries for a specific endpoint
    *
    * Usage:
    *   curl -N https://host/scim/admin/log-config/stream?level=INFO
@@ -311,11 +311,11 @@ export class LogConfigController {
    * Download recent log entries as a JSON or NDJSON file.
    *
    * Query params:
-   *   ?format=ndjson  — Newline-delimited JSON (default)
-   *   ?format=json    — JSON array
-   *   ?limit=500      — Max entries (default: all in ring buffer, max 500)
-   *   ?level=WARN     — Minimum level filter
-   *   ?category=http  — Category filter
+   *   ?format=ndjson  - Newline-delimited JSON (default)
+   *   ?format=json    - JSON array
+   *   ?limit=500      - Max entries (default: all in ring buffer, max 500)
+   *   ?level=WARN     - Minimum level filter
+   *   ?category=http  - Category filter
    *
    * The response is a downloadable file with Content-Disposition header.
    */
@@ -347,7 +347,7 @@ export class LogConfigController {
     if (outputFormat === 'json') {
       res.send(JSON.stringify(entries, null, 2));
     } else {
-      // NDJSON — one JSON object per line
+      // NDJSON - one JSON object per line
       const ndjson = entries.map(e => JSON.stringify(e)).join('\n') + '\n';
       res.send(ndjson);
     }
