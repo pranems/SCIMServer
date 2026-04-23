@@ -1,7 +1,7 @@
 # 📚 SCIMServer Documentation Index
 
-> **Version:** 0.37.3 · **Updated:** April 21, 2026  
-> 68 active docs in `docs/` · 49 E2E suites (1,025 pass) · 84 unit suites (3,345 pass) · 6 built-in presets
+> **Version:** 0.38.0 - **Updated:** April 22, 2026  
+> 69 active docs in `docs/` - 50 E2E suites (1,032 pass) - 84 unit suites (3,362 pass) - 6 built-in presets
 
 ---
 
@@ -71,6 +71,7 @@
 | [G8E_RETURNED_CHARACTERISTIC_FILTERING.md](G8E_RETURNED_CHARACTERISTIC_FILTERING.md) | Response `returned` characteristic filtering |
 | [G8F_GROUP_UNIQUENESS_PUT_PATCH.md](G8F_GROUP_UNIQUENESS_PUT_PATCH.md) | Group displayName uniqueness on PUT/PATCH |
 | [G8G_WRITE_RESPONSE_ATTRIBUTE_PROJECTION.md](G8G_WRITE_RESPONSE_ATTRIBUTE_PROJECTION.md) | Write-response attribute projection |
+| [G8H_PRIMARY_ATTRIBUTE_ENFORCEMENT.md](G8H_PRIMARY_ATTRIBUTE_ENFORCEMENT.md) | Primary sub-attribute enforcement (RFC 7643 section 2.4) - tri-state config |
 | [G11_PER_ENDPOINT_CREDENTIALS.md](G11_PER_ENDPOINT_CREDENTIALS.md) | Per-endpoint credentials - 3-tier auth chain |
 | [PHASE_09_BULK_OPERATIONS.md](PHASE_09_BULK_OPERATIONS.md) | Bulk operations (RFC 7644 §3.7) |
 | [PHASE_10_ME_ENDPOINT.md](PHASE_10_ME_ENDPOINT.md) | /Me endpoint (RFC 7644 §3.11) |
@@ -150,12 +151,12 @@
 
 ---
 
-## Current Test Counts (v0.37.3)
+## Current Test Counts (v0.38.0)
 
 | Suite | Suites | Tests | Status |
 |-------|--------|-------|--------|
-| Unit | 84 | 3,345 | ✅ All pass |
-| E2E | 49 | 1,025 | ✅ All pass |
-| Live (main) | 43 sections | ~760 | ✅ All pass |
-| Live (Lexmark ISV) | 13 sections | 112 | ✅ All pass |
-| **Total** | **~186** | **~5,100** | **✅ All pass** |
+| Unit | 84 | 3,362 | All pass |
+| E2E | 50 | 1,032 | All pass |
+| Live (main) | 44 sections | ~768 | All pass |
+| Live (Lexmark ISV) | 13 sections | 112 | All pass |
+| **Total** | **~191** | **~5,274** | **All pass** |

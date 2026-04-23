@@ -75,6 +75,9 @@ export class EndpointScimUsersService {
     // Uses parent-context-aware maps for precision (prevents name-collision false positives).
     this.schemaHelpers.coerceBooleansByParentIfEnabled(dto as Record<string, unknown>, endpointId, config);
 
+    // G8h: Enforce primary sub-attribute constraint (RFC 7643 section 2.4)
+    this.schemaHelpers.enforcePrimaryConstraint(dto as Record<string, unknown>, endpointId, config);
+
     this.schemaHelpers.validatePayloadSchema(dto, endpointId, config, 'create');
 
     // Strip readOnly attributes (RFC 7643 §2.2: server SHALL ignore client-supplied readOnly values)
@@ -275,6 +278,9 @@ export class EndpointScimUsersService {
 
     // Coerce boolean strings before schema validation (same as create path - parent-aware)
     this.schemaHelpers.coerceBooleansByParentIfEnabled(dto as Record<string, unknown>, endpointId, config);
+
+    // G8h: Enforce primary sub-attribute constraint (RFC 7643 section 2.4)
+    this.schemaHelpers.enforcePrimaryConstraint(dto as Record<string, unknown>, endpointId, config);
 
     this.schemaHelpers.validatePayloadSchema(dto, endpointId, config, 'replace');
 
@@ -551,6 +557,9 @@ export class EndpointScimUsersService {
     // PATCH filter expressions like roles[primary eq "True"] can materialise string
     // literals into the result payload - this converts them to native booleans.
     this.schemaHelpers.coerceBooleansByParentIfEnabled(resultPayload, endpointId, config);
+
+    // G8h: Enforce primary on merged post-PATCH payload (RFC 7643 section 2.4)
+    this.schemaHelpers.enforcePrimaryConstraint(resultPayload, endpointId, config);
 
     this.schemaHelpers.validatePayloadSchema(resultPayload, endpointId, config, 'patch');
 

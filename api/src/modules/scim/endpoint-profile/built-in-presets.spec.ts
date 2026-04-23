@@ -216,8 +216,8 @@ describe('built-in-presets', () => {
       expect(profile.settings!.SoftDeleteEnabled).toBeUndefined();
     });
 
-    it('should have 5 settings total', () => {
-      expect(Object.keys(profile.settings!)).toHaveLength(5);
+    it('should have 6 settings total', () => {
+      expect(Object.keys(profile.settings!)).toHaveLength(6);
     });
   });
 
@@ -295,7 +295,7 @@ describe('built-in-presets', () => {
 
     it('should have StrictSchemaValidation in settings (settings v7)', () => {
       expect(profile.settings!.StrictSchemaValidation).toBe('True');
-      expect(Object.keys(profile.settings!)).toHaveLength(1);
+      expect(Object.keys(profile.settings!)).toHaveLength(2);
     });
   });
 
@@ -562,9 +562,9 @@ describe('built-in-presets', () => {
   // ─── Preset settings differentiation ──────────────────────────────────
 
   describe('preset settings differentiation', () => {
-    it('entra-id should have 5 non-empty settings (settings v7)', () => {
+    it('entra-id should have 6 non-empty settings (settings v7 + G8h)', () => {
       const { settings } = getBuiltInPreset('entra-id').profile;
-      expect(Object.keys(settings!).length).toBe(5);
+      expect(Object.keys(settings!).length).toBe(6);
       for (const [key, value] of Object.entries(settings!)) {
         if (key !== 'logLevel') {
           expect(typeof value).toBe('string');
@@ -572,15 +572,16 @@ describe('built-in-presets', () => {
       }
     });
 
-    it('entra-id-minimal should have AllowAndCoerceBooleanStrings + StrictSchemaValidation', () => {
+    it('entra-id-minimal should have AllowAndCoerceBooleanStrings + StrictSchemaValidation + PrimaryEnforcement', () => {
       const { settings } = getBuiltInPreset('entra-id-minimal').profile;
-      expect(Object.keys(settings!)).toEqual(expect.arrayContaining(['AllowAndCoerceBooleanStrings', 'StrictSchemaValidation']));
-      expect(Object.keys(settings!)).toHaveLength(2);
+      expect(Object.keys(settings!)).toEqual(expect.arrayContaining(['AllowAndCoerceBooleanStrings', 'StrictSchemaValidation', 'PrimaryEnforcement']));
+      expect(Object.keys(settings!)).toHaveLength(3);
     });
 
-    it('rfc-standard should have StrictSchemaValidation only (settings v7)', () => {
+    it('rfc-standard should have StrictSchemaValidation + PrimaryEnforcement (settings v7)', () => {
       const { settings } = getBuiltInPreset('rfc-standard').profile;
-      expect(Object.keys(settings!)).toEqual(['StrictSchemaValidation']);
+      expect(Object.keys(settings!)).toEqual(expect.arrayContaining(['StrictSchemaValidation', 'PrimaryEnforcement']));
+      expect(Object.keys(settings!)).toHaveLength(2);
     });
 
     it('minimal should have empty settings', () => {

@@ -97,6 +97,10 @@ export interface ProfileSettings {
   /** Strip (don't reject) readOnly PATCH ops */
   IgnoreReadOnlyAttributesInPatch?: boolean | string;
 
+  // ─── G8h: Primary enforcement ────────────────────────────────────
+  /** Primary enforcement mode: normalize (default), reject, or passthrough (RFC 7643 section 2.4) */
+  PrimaryEnforcement?: 'normalize' | 'reject' | 'passthrough' | string;
+
   // ─── Deprecated (settings v7 clean break) ────────────────────────
   /** @deprecated Replaced by UserSoftDeleteEnabled + UserHardDeleteEnabled */
   SoftDeleteEnabled?: boolean | string;

@@ -5,6 +5,32 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.38.0] - 2026-04-22
+
+### Feature - G8h: Primary Sub-Attribute Enforcement (RFC 7643 section 2.4)
+
+- **feat(g8h)**: Configurable `PrimaryEnforcement` tri-state flag (normalize/reject/passthrough)
+  - `normalize` (default): keeps first `primary=true`, sets rest to `false`, logs WARN
+  - `reject`: returns 400 `invalidValue` if >1 `primary=true` detected
+  - `passthrough`: stores as-is (legacy behavior, no enforcement)
+- **feat(config)**: New `PrimaryEnforcement` config flag in `ENDPOINT_CONFIG_FLAGS`
+  - Type: `primaryEnforcement` (tri-state string)
+  - Validation: accepts `normalize`, `reject`, `passthrough` (case-insensitive)
+- **feat(presets)**: Preset defaults - entra-id/entra-id-minimal: `normalize`, rfc-standard: `reject`
+- Schema-driven: automatically applies to any multi-valued complex attribute with boolean `primary` sub-attribute
+- Enforcement points: POST create, PUT replace, PATCH post-merge (all 3 service layers: User, Group, Generic)
+- Per-attribute independence: constraint is per multi-valued attribute, not per resource
+
+### Test Coverage
+
+| Suite | Count | Delta |
+|-------|-------|-------|
+| Unit tests | 3,362 | +17 (12 core + 5 service) |
+| Unit suites | 84 | +0 |
+| E2E tests | 1,032 | +7 |
+| E2E suites | 50 | +1 |
+| Live tests | ~768 | +8 (section 9z-P) |
+
 ## [0.37.3] - 2026-04-21
 
 ### Release - Full Validation Pipeline

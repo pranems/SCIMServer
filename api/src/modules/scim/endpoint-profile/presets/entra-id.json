@@ -1025,7 +1025,8 @@
       "MultiMemberPatchOpForGroupEnabled": "True",
       "PatchOpAllowRemoveAllMembers": "True",
       "VerbosePatchSupported": "True",
-      "StrictSchemaValidation": "True"
+      "StrictSchemaValidation": "True",
+      "PrimaryEnforcement": "normalize"
     }
   }
 }

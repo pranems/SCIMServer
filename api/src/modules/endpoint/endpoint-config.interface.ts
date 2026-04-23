@@ -147,6 +147,25 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * where stdout is the log sink and container-local files are ephemeral.
    */
   LOG_FILE_ENABLED: 'logFileEnabled',
+
+  /**
+   * Controls enforcement of the RFC 7643 section 2.4 primary sub-attribute constraint
+   * on multi-valued complex attributes (emails, phoneNumbers, ims, photos, etc.).
+   * RFC rule: "The primary attribute value 'true' MUST appear no more than once."
+   *
+   * Accepts a tri-state string value:
+   * - "normalize" (default): keep first primary=true, set rest to false, log WARN.
+   *   Safe for Azure AD/Entra ID and Okta which may send duplicate primaries.
+   * - "reject": return 400 invalidValue if >1 primary=true detected.
+   *   Use for strict RFC compliance testing.
+   * - "passthrough": store as-is with no enforcement (legacy behavior).
+   *
+   * Scope: POST, PUT, PATCH (all write paths - pre-persist and post-merge).
+   * Schema-driven: automatically applies to any multi-valued complex attribute
+   * with a boolean primary sub-attribute, including custom extensions.
+   * @see RFC 7643 section 2.4 - Multi-Valued Attributes
+   */
+  PRIMARY_ENFORCEMENT: 'PrimaryEnforcement',
 } as const;
 
 /**
@@ -157,7 +176,7 @@ export type EndpointConfigFlag = typeof ENDPOINT_CONFIG_FLAGS[keyof typeof ENDPO
 // ─── Flag Definitions - Single Source of Truth ───────────────────────────────
 
 /** Valid types for flag definitions. */
-type FlagType = 'boolean' | 'logLevel';
+type FlagType = 'boolean' | 'logLevel' | 'primaryEnforcement';
 
 /** Metadata for a single endpoint config flag. */
 export interface EndpointConfigFlagDefinition {
@@ -329,6 +348,16 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'When false, per-endpoint file logging is disabled. ' +
       'Set false in Docker/Azure where stdout is the log sink.',
   },
+  PRIMARY_ENFORCEMENT: {
+    key: ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT,
+    type: 'primaryEnforcement',
+    default: undefined, // string default handled by getConfigString fallback to 'normalize'
+    description:
+      'Controls primary sub-attribute enforcement on multi-valued complex attributes (RFC 7643 section 2.4). ' +
+      '"normalize" (default): keeps first primary=true, sets rest to false, logs WARN. ' +
+      '"reject": returns 400 invalidValue if >1 primary=true. ' +
+      '"passthrough": stores as-is (no enforcement).',
+  },
 };
 
 // ─── Endpoint Configuration Interface ────────────────────────────────────────
@@ -355,6 +384,7 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.SCHEMA_DISCOVERY_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.LOG_FILE_ENABLED]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT]?: string;
   /** Allow any additional configuration flags. */
   [key: string]: unknown;
 }
@@ -494,6 +524,30 @@ function validateLogLevelFlag(config: Record<string, any>, flagName: string): vo
   }
 }
 
+/** Valid primary enforcement mode values (case-insensitive). */
+const VALID_PRIMARY_ENFORCEMENT_VALUES = ['normalize', 'reject', 'passthrough'];
+
+/**
+ * Validate a primaryEnforcement config flag value.
+ */
+function validatePrimaryEnforcementFlag(config: Record<string, any>, flagName: string): void {
+  const value = config[flagName];
+  if (value === undefined) return;
+  if (typeof value === 'string') {
+    if (!VALID_PRIMARY_ENFORCEMENT_VALUES.includes(value.toLowerCase())) {
+      throw new Error(
+        `Invalid value "${value}" for config flag "${flagName}". ` +
+        `Allowed values: "normalize", "reject", "passthrough" (case-insensitive).`,
+      );
+    }
+  } else {
+    throw new Error(
+      `Invalid type for config flag "${flagName}". ` +
+      `Expected string ("normalize"/"reject"/"passthrough"), got ${typeof value}.`,
+    );
+  }
+}
+
 /**
  * Validate endpoint configuration.
  * Driven by ENDPOINT_CONFIG_FLAGS_DEFINITIONS - no manual flag list to maintain.
@@ -509,6 +563,8 @@ export function validateEndpointConfig(config: Record<string, any> | undefined):
       validateBooleanFlag(config, def.key);
     } else if (def.type === 'logLevel') {
       validateLogLevelFlag(config, def.key);
+    } else if (def.type === 'primaryEnforcement') {
+      validatePrimaryEnforcementFlag(config, def.key);
     }
   }
 }

@@ -644,6 +644,237 @@ describe('ScimSchemaHelpers', () => {
       expect(() => helpers.validateFilterPaths('meta.created gt "2025-01-01"', 'ep-1')).not.toThrow();
     });
   });
+
+  // ─── G8h: enforcePrimaryConstraint ──────────────────────────────────────
+
+  describe('enforcePrimaryConstraint', () => {
+    const coreSchemaWithEmails = {
+      id: CORE_URN,
+      name: 'User',
+      attributes: [
+        { name: 'userName', type: 'string', multiValued: false, required: true, mutability: 'readWrite' },
+        {
+          name: 'emails',
+          type: 'complex',
+          multiValued: true,
+          required: false,
+          mutability: 'readWrite',
+          subAttributes: [
+            { name: 'value', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+            { name: 'type', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+            { name: 'primary', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite' },
+          ],
+        },
+        {
+          name: 'phoneNumbers',
+          type: 'complex',
+          multiValued: true,
+          required: false,
+          mutability: 'readWrite',
+          subAttributes: [
+            { name: 'value', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+            { name: 'primary', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite' },
+          ],
+        },
+      ],
+    };
+
+    beforeEach(() => {
+      mockRegistry.getSchema.mockReturnValue(coreSchemaWithEmails);
+      mockRegistry.getExtensionUrns.mockReturnValue([]);
+    });
+
+    // Test 1: Single primary=true - no mutation
+    it('should not mutate when only one primary=true exists (normalize)', () => {
+      const payload: Record<string, unknown> = {
+        emails: [
+          { value: 'a@x.com', type: 'work', primary: true },
+          { value: 'b@x.com', type: 'home', primary: false },
+        ],
+      };
+      helpers.enforcePrimaryConstraint(payload, 'ep-1', { PrimaryEnforcement: 'normalize' });
+      expect((payload.emails as any[])[0].primary).toBe(true);
+      expect((payload.emails as any[])[1].primary).toBe(false);
+    });
+
+    // Test 2: Zero primaries - no mutation
+    it('should not mutate when no primary=true exists (normalize)', () => {
+      const payload: Record<string, unknown> = {
+        emails: [
+          { value: 'a@x.com', type: 'work' },
+          { value: 'b@x.com', type: 'home' },
+        ],
+      };
+      helpers.enforcePrimaryConstraint(payload, 'ep-1', { PrimaryEnforcement: 'normalize' });
+      expect((payload.emails as any[])[0].primary).toBeUndefined();
+      expect((payload.emails as any[])[1].primary).toBeUndefined();
+    });
+
+    // Test 3: Multiple primaries - normalize keeps first
+    it('should keep first primary=true and set rest to false (normalize)', () => {
+      const payload: Record<string, unknown> = {
+        emails: [
+          { value: 'a@x.com', type: 'work', primary: true },
+          { value: 'b@x.com', type: 'home', primary: true },
+          { value: 'c@x.com', type: 'other', primary: true },
+        ],
+      };
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      helpers.enforcePrimaryConstraint(payload, 'ep-1', { PrimaryEnforcement: 'normalize' });
+      expect((payload.emails as any[])[0].primary).toBe(true);
+      expect((payload.emails as any[])[1].primary).toBe(false);
+      expect((payload.emails as any[])[2].primary).toBe(false);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[PrimaryEnforcement]'));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('emails'));
+      warnSpy.mockRestore();
+    });
+
+    // Test 4: Multiple primaries - reject throws 400
+    it('should throw 400 invalidValue when multiple primaries detected (reject)', () => {
+      const payload: Record<string, unknown> = {
+        emails: [
+          { value: 'a@x.com', primary: true },
+          { value: 'b@x.com', primary: true },
+        ],
+      };
+      try {
+        helpers.enforcePrimaryConstraint(payload, 'ep-1', { PrimaryEnforcement: 'reject' });
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+        const body = e.getResponse();
+        expect(body.scimType).toBe('invalidValue');
+        expect(body.detail).toContain('primary');
+        expect(body.detail).toContain('emails');
+      }
+    });
+
+    // Test 5: Multiple primaries - passthrough does nothing
+    it('should not mutate payload when mode is passthrough', () => {
+      const payload: Record<string, unknown> = {
+        emails: [
+          { value: 'a@x.com', primary: true },
+          { value: 'b@x.com', primary: true },
+        ],
+      };
+      helpers.enforcePrimaryConstraint(payload, 'ep-1', { PrimaryEnforcement: 'passthrough' });
+      expect((payload.emails as any[])[0].primary).toBe(true);
+      expect((payload.emails as any[])[1].primary).toBe(true);
+    });
+
+    // Test 6: Multi-attribute independence - each checked separately
+    it('should check each multi-valued attribute independently', () => {
+      const payload: Record<string, unknown> = {
+        emails: [
+          { value: 'a@x.com', primary: true },
+          { value: 'b@x.com', primary: true },
+        ],
+        phoneNumbers: [
+          { value: '+1-555-0100', primary: true },
+        ],
+      };
+      helpers.enforcePrimaryConstraint(payload, 'ep-1', { PrimaryEnforcement: 'normalize' });
+      // emails: second primary cleared
+      expect((payload.emails as any[])[0].primary).toBe(true);
+      expect((payload.emails as any[])[1].primary).toBe(false);
+      // phoneNumbers: only one - untouched
+      expect((payload.phoneNumbers as any[])[0].primary).toBe(true);
+    });
+
+    // Test 7: Empty array - no crash
+    it('should handle empty array gracefully', () => {
+      const payload: Record<string, unknown> = {
+        emails: [],
+      };
+      expect(() =>
+        helpers.enforcePrimaryConstraint(payload, 'ep-1', { PrimaryEnforcement: 'normalize' }),
+      ).not.toThrow();
+    });
+
+    // Test 8: Non-array value - no crash
+    it('should handle non-array value gracefully', () => {
+      const payload: Record<string, unknown> = {
+        emails: 'not-an-array',
+      };
+      expect(() =>
+        helpers.enforcePrimaryConstraint(payload, 'ep-1', { PrimaryEnforcement: 'normalize' }),
+      ).not.toThrow();
+    });
+
+    // Test 9: Single entry array - no mutation
+    it('should not mutate single-entry array with primary=true', () => {
+      const payload: Record<string, unknown> = {
+        emails: [{ value: 'a@x.com', primary: true }],
+      };
+      helpers.enforcePrimaryConstraint(payload, 'ep-1', { PrimaryEnforcement: 'normalize' });
+      expect((payload.emails as any[])[0].primary).toBe(true);
+    });
+
+    // Test 10: Default mode when flag absent -> normalize
+    it('should default to normalize when PrimaryEnforcement is not set', () => {
+      const payload: Record<string, unknown> = {
+        emails: [
+          { value: 'a@x.com', primary: true },
+          { value: 'b@x.com', primary: true },
+        ],
+      };
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      helpers.enforcePrimaryConstraint(payload, 'ep-1', undefined);
+      expect((payload.emails as any[])[0].primary).toBe(true);
+      expect((payload.emails as any[])[1].primary).toBe(false);
+      warnSpy.mockRestore();
+    });
+
+    // Test 11: Case-insensitive mode parsing
+    it('should accept mode values case-insensitively', () => {
+      const payload: Record<string, unknown> = {
+        emails: [
+          { value: 'a@x.com', primary: true },
+          { value: 'b@x.com', primary: true },
+        ],
+      };
+      // "REJECT" should work same as "reject"
+      try {
+        helpers.enforcePrimaryConstraint(payload, 'ep-1', { PrimaryEnforcement: 'REJECT' });
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+      }
+    });
+
+    // Test 12: Attribute without primary sub-attr is skipped
+    it('should skip multi-valued complex attrs without primary sub-attribute', () => {
+      const schemaNoEmailPrimary = {
+        id: CORE_URN,
+        name: 'User',
+        attributes: [
+          {
+            name: 'tags',
+            type: 'complex',
+            multiValued: true,
+            required: false,
+            mutability: 'readWrite',
+            subAttributes: [
+              { name: 'value', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+              { name: 'type', type: 'string', multiValued: false, required: false, mutability: 'readWrite' },
+              // no primary sub-attribute
+            ],
+          },
+        ],
+      };
+      mockRegistry.getSchema.mockReturnValue(schemaNoEmailPrimary);
+
+      const payload: Record<string, unknown> = {
+        tags: [
+          { value: 'tag1' },
+          { value: 'tag2' },
+        ],
+      };
+      expect(() =>
+        helpers.enforcePrimaryConstraint(payload, 'ep-1', { PrimaryEnforcement: 'normalize' }),
+      ).not.toThrow();
+    });
+  });
 });
 
 // ─── SCIM_WARNING_URN constant ──────────────────────────────────────────────

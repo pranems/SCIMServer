@@ -25,6 +25,7 @@ import type {
 import { GENERIC_RESOURCE_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import {
   getConfigBoolean,
+  getConfigString,
   ENDPOINT_CONFIG_FLAGS,
   type EndpointConfig,
 } from '../../endpoint/endpoint-config.interface';
@@ -160,6 +161,9 @@ export class EndpointScimGenericService {
 
     // GEN-03: Coerce boolean strings ("True"/"False") → native booleans before validation
     this.coerceBooleanStringsIfEnabled(body, resourceType, endpointId, config);
+
+    // G8h: Enforce primary sub-attribute constraint (RFC 7643 section 2.4)
+    this.enforcePrimaryConstraint(body, resourceType, endpointId, config);
 
     // GEN-01: Attribute-level payload validation against schema definitions
     this.validatePayloadSchema(body, resourceType, endpointId, config, 'create');
@@ -370,6 +374,9 @@ export class EndpointScimGenericService {
 
     // GEN-03: Coerce boolean strings before schema validation
     this.coerceBooleanStringsIfEnabled(body, resourceType, endpointId, config);
+
+    // G8h: Enforce primary sub-attribute constraint (RFC 7643 section 2.4)
+    this.enforcePrimaryConstraint(body, resourceType, endpointId, config);
 
     // GEN-01: Attribute-level payload validation
     this.validatePayloadSchema(body, resourceType, endpointId, config, 'replace');
@@ -627,6 +634,10 @@ export class EndpointScimGenericService {
       }
       // Coerce boolean strings in post-PATCH payload
       this.coerceBooleanStringsIfEnabled(resultPayload, resourceType, endpointId, config);
+
+      // G8h: Enforce primary on merged post-PATCH payload (RFC 7643 section 2.4)
+      this.enforcePrimaryConstraint(resultPayload, resourceType, endpointId, config);
+
       this.validatePayloadSchema(resultPayload, resourceType, endpointId, config, 'patch');
 
       // GEN-02: Immutable attribute enforcement on PATCH result
@@ -915,6 +926,86 @@ export class EndpointScimGenericService {
     const boolMap = this.getBooleansByParentForRT(resourceType, endpointId);
     const coreUrnLower = this.getSchemaCacheForRT(resourceType, endpointId)?.coreSchemaUrn ?? resourceType.schema.toLowerCase();
     sanitizeBooleanStringsByParent(dto, boolMap, coreUrnLower);
+  }
+
+  /**
+   * G8h: Enforce primary sub-attribute constraint (RFC 7643 section 2.4).
+   * Generic service equivalent of ScimSchemaHelpers.enforcePrimaryConstraint().
+   *
+   * Uses the resource-type-specific schema definitions to identify multi-valued
+   * complex attributes with a boolean primary sub-attribute.
+   */
+  private enforcePrimaryConstraint(
+    payload: Record<string, unknown>,
+    resourceType: ScimResourceType,
+    endpointId: string,
+    config?: EndpointConfig,
+  ): void {
+    const rawMode = getConfigString(config, ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT);
+    const mode = (rawMode ?? 'normalize').toLowerCase();
+    if (mode === 'passthrough') return;
+
+    const schemas = this.getSchemaDefinitions(resourceType, endpointId);
+    for (const schema of schemas) {
+      for (const attr of schema.attributes) {
+        if (!attr.multiValued || attr.type !== 'complex') continue;
+        const hasPrimarySub = attr.subAttributes?.some(
+          (sa: SchemaAttributeDefinition) => sa.name.toLowerCase() === 'primary' && sa.type === 'boolean',
+        );
+        if (!hasPrimarySub) continue;
+
+        const isCoreSchema = 'isCoreSchema' in schema ? (schema as any).isCoreSchema : true;
+        let arr: Record<string, unknown>[] | undefined;
+        if (isCoreSchema) {
+          const val = payload[attr.name];
+          if (Array.isArray(val)) arr = val as Record<string, unknown>[];
+        } else {
+          const extObj = payload[schema.id] as Record<string, unknown> | undefined;
+          if (extObj && typeof extObj === 'object') {
+            const val = extObj[attr.name];
+            if (Array.isArray(val)) arr = val as Record<string, unknown>[];
+          }
+        }
+
+        if (!arr || arr.length < 2) continue;
+
+        let primaryCount = 0;
+        let firstPrimaryIdx = -1;
+        for (let i = 0; i < arr.length; i++) {
+          if (arr[i]?.primary === true) {
+            primaryCount++;
+            if (firstPrimaryIdx === -1) firstPrimaryIdx = i;
+          }
+        }
+        if (primaryCount <= 1) continue;
+
+        if (mode === 'reject') {
+          throw createScimError({
+            status: 400,
+            scimType: 'invalidValue',
+            detail: `The 'primary' attribute value 'true' MUST appear no more than once `
+              + `in '${attr.name}' (found ${primaryCount}). [RFC 7643 section 2.4]`,
+            diagnostics: {
+              errorCode: 'PRIMARY_CONSTRAINT_VIOLATION',
+              attributePath: attr.name,
+              triggeredBy: 'PrimaryEnforcement',
+              extra: { primaryCount },
+            },
+          });
+        }
+
+        // mode === 'normalize': keep first, clear rest
+        for (let i = 0; i < arr.length; i++) {
+          if (arr[i]?.primary === true && i !== firstPrimaryIdx) {
+            arr[i].primary = false;
+          }
+        }
+        console.warn(
+          `[PrimaryEnforcement] Normalized '${attr.name}': kept index ${firstPrimaryIdx}, `
+          + `cleared ${primaryCount - 1} extra primary=true`,
+        );
+      }
+    }
   }
 
   /**

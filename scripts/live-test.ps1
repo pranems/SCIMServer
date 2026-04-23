@@ -8015,6 +8015,120 @@ try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$mgrEpId" -Method DE
 Write-Host "`n--- 9z-N: Manager PATCH String Coercion Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-P: PRIMARY SUB-ATTRIBUTE ENFORCEMENT (G8h)
+$script:currentSection = "9z-P: Primary Enforcement"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-P: PRIMARY SUB-ATTRIBUTE ENFORCEMENT (G8h)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# 9z-P.1: Create endpoint with PrimaryEnforcement=normalize
+$g8hNormBody = @{ name = "g8h-norm-test-$(Get-Date -Format 'HHmmss')"; profilePreset = "rfc-standard" } | ConvertTo-Json
+$g8hNormEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $g8hNormBody -ContentType "application/json"
+$g8hNormEpId = $g8hNormEp.id
+$g8hNormBase = "$baseUrl$($g8hNormEp.scimBasePath)"
+# PATCH settings: PrimaryEnforcement=normalize, StrictSchemaValidation=False
+$g8hNormPatch = @{ profile = @{ settings = @{ PrimaryEnforcement = "normalize"; StrictSchemaValidation = "False" } } } | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$g8hNormEpId" -Method PATCH -Headers $headers -Body $g8hNormPatch -ContentType "application/json" | Out-Null
+Test-Result -Success ($null -ne $g8hNormEpId) -Message "9z-P.1: Create endpoint with PrimaryEnforcement=normalize"
+
+# 9z-P.2: POST user with 2 primary emails - should normalize
+$g8hUserBody = @{
+  schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+  userName = "g8h-norm-$(Get-Date -Format 'HHmmss')@test.com"
+  emails = @(
+    @{ value = "a@x.com"; type = "work"; primary = $true },
+    @{ value = "b@x.com"; type = "home"; primary = $true }
+  )
+} | ConvertTo-Json -Depth 5
+$g8hUser = Invoke-RestMethod -Uri "$g8hNormBase/Users" -Method POST -Headers $headers -Body $g8hUserBody -ContentType "application/scim+json"
+$g8hEmails = $g8hUser.emails
+$g8hFirstPrimary = $g8hEmails[0].primary -eq $true
+$g8hSecondNotPrimary = $g8hEmails[1].primary -eq $false
+Test-Result -Success ($g8hFirstPrimary -and $g8hSecondNotPrimary) -Message "9z-P.2: POST normalize - first email primary=true, second=false"
+
+# 9z-P.3: POST user with 0 primaries - valid, no mutation
+$g8hUser0Body = @{
+  schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+  userName = "g8h-zero-$(Get-Date -Format 'HHmmss')@test.com"
+  emails = @(
+    @{ value = "c@x.com"; type = "work" },
+    @{ value = "d@x.com"; type = "home" }
+  )
+} | ConvertTo-Json -Depth 5
+$g8hUser0 = Invoke-RestMethod -Uri "$g8hNormBase/Users" -Method POST -Headers $headers -Body $g8hUser0Body -ContentType "application/scim+json"
+$g8hZeroOk = ($g8hUser0.emails[0].primary -ne $true) -and ($g8hUser0.emails[1].primary -ne $true)
+Test-Result -Success $g8hZeroOk -Message "9z-P.3: POST with 0 primaries - accepted without mutation"
+
+# 9z-P.4: Create endpoint with PrimaryEnforcement=reject
+$g8hRejBody = @{ name = "g8h-rej-test-$(Get-Date -Format 'HHmmss')"; profilePreset = "rfc-standard" } | ConvertTo-Json
+$g8hRejEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $g8hRejBody -ContentType "application/json"
+$g8hRejEpId = $g8hRejEp.id
+$g8hRejBase = "$baseUrl$($g8hRejEp.scimBasePath)"
+$g8hRejPatch = @{ profile = @{ settings = @{ PrimaryEnforcement = "reject"; StrictSchemaValidation = "False" } } } | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$g8hRejEpId" -Method PATCH -Headers $headers -Body $g8hRejPatch -ContentType "application/json" | Out-Null
+Test-Result -Success ($null -ne $g8hRejEpId) -Message "9z-P.4: Create endpoint with PrimaryEnforcement=reject"
+
+# 9z-P.5: POST user with 2 primary emails - should get 400
+$g8hRejUserBody = @{
+  schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+  userName = "g8h-rej-$(Get-Date -Format 'HHmmss')@test.com"
+  emails = @(
+    @{ value = "a@rej.com"; type = "work"; primary = $true },
+    @{ value = "b@rej.com"; type = "home"; primary = $true }
+  )
+} | ConvertTo-Json -Depth 5
+$g8hRejOk = $false
+try {
+  Invoke-RestMethod -Uri "$g8hRejBase/Users" -Method POST -Headers $headers -Body $g8hRejUserBody -ContentType "application/scim+json" -ErrorAction Stop
+} catch {
+  $g8hRejStatus = $_.Exception.Response.StatusCode.value__
+  $g8hRejOk = $g8hRejStatus -eq 400
+}
+Test-Result -Success $g8hRejOk -Message "9z-P.5: POST reject - 400 on duplicate primary"
+
+# 9z-P.6: Create endpoint with PrimaryEnforcement=passthrough
+$g8hPassBody = @{ name = "g8h-pass-test-$(Get-Date -Format 'HHmmss')"; profilePreset = "rfc-standard" } | ConvertTo-Json
+$g8hPassEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $g8hPassBody -ContentType "application/json"
+$g8hPassEpId = $g8hPassEp.id
+$g8hPassBase = "$baseUrl$($g8hPassEp.scimBasePath)"
+$g8hPassPatch = @{ profile = @{ settings = @{ PrimaryEnforcement = "passthrough"; StrictSchemaValidation = "False" } } } | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$g8hPassEpId" -Method PATCH -Headers $headers -Body $g8hPassPatch -ContentType "application/json" | Out-Null
+Test-Result -Success ($null -ne $g8hPassEpId) -Message "9z-P.6: Create endpoint with PrimaryEnforcement=passthrough"
+
+# 9z-P.7: POST user with 2 primary emails - should store both
+$g8hPassUserBody = @{
+  schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+  userName = "g8h-pass-$(Get-Date -Format 'HHmmss')@test.com"
+  emails = @(
+    @{ value = "a@pass.com"; type = "work"; primary = $true },
+    @{ value = "b@pass.com"; type = "home"; primary = $true }
+  )
+} | ConvertTo-Json -Depth 5
+$g8hPassUser = Invoke-RestMethod -Uri "$g8hPassBase/Users" -Method POST -Headers $headers -Body $g8hPassUserBody -ContentType "application/scim+json"
+$g8hPassEmails = $g8hPassUser.emails
+$g8hPassBothPrimary = ($g8hPassEmails[0].primary -eq $true) -and ($g8hPassEmails[1].primary -eq $true)
+Test-Result -Success $g8hPassBothPrimary -Message "9z-P.7: POST passthrough - both emails primary=true preserved"
+
+# 9z-P.8: Cross-attribute independence
+$g8hCrossBody = @{
+  schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+  userName = "g8h-cross-$(Get-Date -Format 'HHmmss')@test.com"
+  emails = @( @{ value = "e@x.com"; type = "work"; primary = $true } )
+  phoneNumbers = @( @{ value = "+1-555-0100"; type = "work"; primary = $true } )
+} | ConvertTo-Json -Depth 5
+$g8hCross = Invoke-RestMethod -Uri "$g8hNormBase/Users" -Method POST -Headers $headers -Body $g8hCrossBody -ContentType "application/scim+json"
+$g8hCrossOk = ($g8hCross.emails[0].primary -eq $true) -and ($g8hCross.phoneNumbers[0].primary -eq $true)
+Test-Result -Success $g8hCrossOk -Message "9z-P.8: Cross-attribute - 1 primary email + 1 primary phone = valid"
+
+# Cleanup: delete test endpoints
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$g8hNormEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$g8hRejEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$g8hPassEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+Write-Host "`n--- 9z-P: Primary Sub-Attribute Enforcement Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

@@ -86,6 +86,9 @@ export class EndpointScimGroupsService {
     // Coerce boolean strings ("True"/"False") to native booleans before schema validation (parent-aware)
     this.schemaHelpers.coerceBooleansByParentIfEnabled(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
+    // G8h: Enforce primary sub-attribute constraint (RFC 7643 section 2.4)
+    this.schemaHelpers.enforcePrimaryConstraint(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
+
     this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, endpointConfig, 'create');
 
     // Strip readOnly attributes from POST payload (RFC 7643 §2.2)
@@ -379,6 +382,9 @@ export class EndpointScimGroupsService {
     // Coerce boolean strings in post-PATCH payload before schema validation (parent-aware)
     this.schemaHelpers.coerceBooleansByParentIfEnabled(resultPayload, endpointId, endpointConfig);
 
+    // G8h: Enforce primary on merged post-PATCH payload (RFC 7643 section 2.4)
+    this.schemaHelpers.enforcePrimaryConstraint(resultPayload, endpointId, endpointConfig);
+
     this.schemaHelpers.validatePayloadSchema(resultPayload, endpointId, endpointConfig, 'patch');
 
     // H-2: Immutable attribute enforcement - compare existing state with PATCH result
@@ -443,6 +449,9 @@ export class EndpointScimGroupsService {
 
     // Coerce boolean strings before schema validation (same as create path - parent-aware)
     this.schemaHelpers.coerceBooleansByParentIfEnabled(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
+
+    // G8h: Enforce primary sub-attribute constraint (RFC 7643 section 2.4)
+    this.schemaHelpers.enforcePrimaryConstraint(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
     this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, endpointConfig, 'replace');
 
