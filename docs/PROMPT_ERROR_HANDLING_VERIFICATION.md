@@ -146,8 +146,8 @@ TOTAL: __/55 PASS
 ## Latest Run
 
 ```
-Date: April 21, 2026
-Version: 0.37.3
+Date: April 23, 2026
+Version: 0.38.0
 Executor: AI (Claude Opus 4.6, source-verified)
 
 Section 1 (SCIM Format): 5/5 PASS
@@ -171,9 +171,9 @@ Previous PARTIALs from v0.37.1 remain accepted by-design:
 - I.5: Wrapped NestJS exceptions don't get `scimType` (RFC 7644 says optional)
 - I.8: Pre-interceptor 415 errors lack diagnostics.requestId (correlation context not yet established)
 
-Improvements since v0.37.1:
-- `createScimError()` calls: 57 → 77 (growth from error-handling + manager PATCH audit)
-- All 77 calls verified to have `diagnostics.errorCode` ✅
-- 6 silent `catch {}` blocks fixed with DEBUG logging (credential repo, service helpers, generic service)
-- `safeStringify()` circular reference handler added to logger - 3 downstream call sites protected
-- Manager PATCH error path verified: pre-validation + PatchError catch both have full diagnostics
+Improvements since v0.37.3:
+- `createScimError()` calls: 77 -> 79 (G8h added 2 PRIMARY_CONSTRAINT_VIOLATION calls)
+- All 79 calls verified to have `diagnostics.errorCode` (22 distinct errorCode values)
+- G8h PrimaryEnforcement: `reject` mode returns 400 with `scimType: 'invalidValue'` + diagnostics
+- GenericService `enforcePrimaryConstraint`: 2 `console.warn` upgraded to `scimLogger.warn()`
+- ScimSchemaHelpers `enforcePrimaryConstraint`: 2 `console.warn` remain (no DI logger - accepted)

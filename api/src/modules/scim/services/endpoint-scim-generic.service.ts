@@ -995,9 +995,10 @@ export class EndpointScimGenericService {
 
         if (mode === 'passthrough') {
           // Store as-is but warn about the RFC violation
-          console.warn(
+          this.scimLogger.warn(LogCategory.SCIM_RESOURCE,
             `[PrimaryEnforcement] Multiple primary=true in '${attr.name}' (found ${primaryCount}). `
             + `Stored as-is (passthrough mode). [RFC 7643 section 2.4]`,
+            { endpointId, attributePath: attr.name, primaryCount },
           );
           continue;
         }
@@ -1008,9 +1009,10 @@ export class EndpointScimGenericService {
             arr[i].primary = false;
           }
         }
-        console.warn(
+        this.scimLogger.warn(LogCategory.SCIM_RESOURCE,
           `[PrimaryEnforcement] Normalized '${attr.name}': kept index ${firstPrimaryIdx}, `
           + `cleared ${primaryCount - 1} extra primary=true`,
+          { endpointId, attributePath: attr.name, firstPrimaryIdx, clearedCount: primaryCount - 1 },
         );
       }
     }
