@@ -942,8 +942,7 @@ export class EndpointScimGenericService {
     config?: EndpointConfig,
   ): void {
     const rawMode = getConfigString(config, ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT);
-    const mode = (rawMode ?? 'normalize').toLowerCase();
-    if (mode === 'passthrough') return;
+    const mode = (rawMode ?? 'passthrough').toLowerCase();
 
     const schemas = this.getSchemaDefinitions(resourceType, endpointId);
     for (const schema of schemas) {
@@ -992,6 +991,15 @@ export class EndpointScimGenericService {
               extra: { primaryCount },
             },
           });
+        }
+
+        if (mode === 'passthrough') {
+          // Store as-is but warn about the RFC violation
+          console.warn(
+            `[PrimaryEnforcement] Multiple primary=true in '${attr.name}' (found ${primaryCount}). `
+            + `Stored as-is (passthrough mode). [RFC 7643 section 2.4]`,
+          );
+          continue;
         }
 
         // mode === 'normalize': keep first, clear rest

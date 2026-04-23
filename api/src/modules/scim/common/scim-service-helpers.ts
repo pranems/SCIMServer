@@ -1064,9 +1064,9 @@ export class ScimSchemaHelpers {
    * sub-attribute in the schema definition, count entries where primary === true.
    *
    * Behavior by mode:
-   * - "normalize" (default): keep first primary=true, set rest to false + WARN log
+   * - "passthrough" (default): store as-is but WARN log when >1 primary=true
+   * - "normalize": keep first primary=true, set rest to false + WARN log
    * - "reject": throw 400 invalidValue if >1 primary=true
-   * - "passthrough": no-op
    *
    * Schema-driven: uses profile-aware schema definitions to detect which
    * attributes have a primary sub-attribute. Works automatically with custom
@@ -1078,8 +1078,7 @@ export class ScimSchemaHelpers {
     config?: EndpointConfig,
   ): void {
     const rawMode = getConfigString(config, ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT);
-    const mode = (rawMode ?? 'normalize').toLowerCase();
-    if (mode === 'passthrough') return;
+    const mode = (rawMode ?? 'passthrough').toLowerCase();
 
     const schemas = this.getSchemaDefinitions(endpointId);
     for (const schema of schemas) {
@@ -1129,6 +1128,15 @@ export class ScimSchemaHelpers {
               extra: { primaryCount },
             },
           });
+        }
+
+        if (mode === 'passthrough') {
+          // Store as-is but warn about the RFC violation
+          console.warn(
+            `[PrimaryEnforcement] Multiple primary=true in '${attr.name}' (found ${primaryCount}). `
+            + `Stored as-is (passthrough mode). [RFC 7643 section 2.4]`,
+          );
+          continue;
         }
 
         // mode === 'normalize': keep first, clear rest

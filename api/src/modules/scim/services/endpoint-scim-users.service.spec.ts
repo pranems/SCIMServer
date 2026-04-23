@@ -3074,7 +3074,7 @@ describe('EndpointScimUsersService', () => {
       mockUserRepo.findAll.mockResolvedValue([]);
     });
 
-    it('should normalize multiple primary=true emails on POST create (default normalize)', async () => {
+    it('should passthrough multiple primary=true emails on POST create (default passthrough)', async () => {
       const dto = {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
         userName: 'primary-test@example.com',
@@ -3090,14 +3090,14 @@ describe('EndpointScimUsersService', () => {
         rawPayload: '{}',
       });
 
-      // Default config: PrimaryEnforcement absent -> "normalize"
+      // Default config: PrimaryEnforcement absent -> "passthrough" (warn but no mutation)
       await service.createUserForEndpoint(dto as any, baseUrl, endpointId);
 
-      // Verify the stored payload has only first primary=true
+      // Verify the stored payload keeps both primaries (passthrough)
       const createCall = mockUserRepo.create.mock.calls[0][0];
       const storedPayload = JSON.parse(createCall.rawPayload);
       expect(storedPayload.emails[0].primary).toBe(true);
-      expect(storedPayload.emails[1].primary).toBe(false);
+      expect(storedPayload.emails[1].primary).toBe(true);
     });
 
     it('should reject multiple primary=true emails on POST create (reject mode)', async () => {
@@ -3150,7 +3150,7 @@ describe('EndpointScimUsersService', () => {
       expect(storedPayload.emails[1].primary).toBe(true);
     });
 
-    it('should normalize multiple primary=true on PUT replace', async () => {
+    it('should normalize multiple primary=true on PUT replace (normalize mode)', async () => {
       const dto = {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
         userName: 'put-test@example.com',
@@ -3171,7 +3171,8 @@ describe('EndpointScimUsersService', () => {
         rawPayload: '{}',
       });
 
-      await service.replaceUserForEndpoint('scim-123', dto as any, baseUrl, endpointId);
+      const config = { PrimaryEnforcement: 'normalize' };
+      await service.replaceUserForEndpoint('scim-123', dto as any, baseUrl, endpointId, config as any);
 
       const updateCall = mockUserRepo.update.mock.calls[0];
       const storedPayload = JSON.parse(updateCall[1].rawPayload);

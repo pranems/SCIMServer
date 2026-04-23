@@ -154,11 +154,12 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * RFC rule: "The primary attribute value 'true' MUST appear no more than once."
    *
    * Accepts a tri-state string value:
-   * - "normalize" (default): keep first primary=true, set rest to false, log WARN.
+   * - "passthrough" (default): store as-is but log WARN when >1 primary=true.
+   *   Backward-compatible, zero data mutation, gives admin visibility.
+   * - "normalize": keep first primary=true, set rest to false, log WARN.
    *   Safe for Azure AD/Entra ID and Okta which may send duplicate primaries.
    * - "reject": return 400 invalidValue if >1 primary=true detected.
    *   Use for strict RFC compliance testing.
-   * - "passthrough": store as-is with no enforcement (legacy behavior).
    *
    * Scope: POST, PUT, PATCH (all write paths - pre-persist and post-merge).
    * Schema-driven: automatically applies to any multi-valued complex attribute
@@ -351,12 +352,12 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
   PRIMARY_ENFORCEMENT: {
     key: ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT,
     type: 'primaryEnforcement',
-    default: undefined, // string default handled by getConfigString fallback to 'normalize'
+    default: undefined, // string default handled by getConfigString fallback to 'passthrough'
     description:
       'Controls primary sub-attribute enforcement on multi-valued complex attributes (RFC 7643 section 2.4). ' +
-      '"normalize" (default): keeps first primary=true, sets rest to false, logs WARN. ' +
-      '"reject": returns 400 invalidValue if >1 primary=true. ' +
-      '"passthrough": stores as-is (no enforcement).',
+      '"passthrough" (default): stores as-is but logs WARN when >1 primary=true. ' +
+      '"normalize": keeps first primary=true, sets rest to false, logs WARN. ' +
+      '"reject": returns 400 invalidValue if >1 primary=true.',
   },
 };
 

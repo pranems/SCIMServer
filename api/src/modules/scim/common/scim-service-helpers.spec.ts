@@ -749,17 +749,21 @@ describe('ScimSchemaHelpers', () => {
       }
     });
 
-    // Test 5: Multiple primaries - passthrough does nothing
-    it('should not mutate payload when mode is passthrough', () => {
+    // Test 5: Multiple primaries - passthrough stores as-is but warns
+    it('should not mutate payload when mode is passthrough but log WARN', () => {
       const payload: Record<string, unknown> = {
         emails: [
           { value: 'a@x.com', primary: true },
           { value: 'b@x.com', primary: true },
         ],
       };
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
       helpers.enforcePrimaryConstraint(payload, 'ep-1', { PrimaryEnforcement: 'passthrough' });
       expect((payload.emails as any[])[0].primary).toBe(true);
       expect((payload.emails as any[])[1].primary).toBe(true);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[PrimaryEnforcement]'));
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('emails'));
+      warnSpy.mockRestore();
     });
 
     // Test 6: Multi-attribute independence - each checked separately
@@ -810,8 +814,8 @@ describe('ScimSchemaHelpers', () => {
       expect((payload.emails as any[])[0].primary).toBe(true);
     });
 
-    // Test 10: Default mode when flag absent -> normalize
-    it('should default to normalize when PrimaryEnforcement is not set', () => {
+    // Test 10: Default mode when flag absent -> passthrough (warn but don't mutate)
+    it('should default to passthrough when PrimaryEnforcement is not set', () => {
       const payload: Record<string, unknown> = {
         emails: [
           { value: 'a@x.com', primary: true },
@@ -820,8 +824,11 @@ describe('ScimSchemaHelpers', () => {
       };
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
       helpers.enforcePrimaryConstraint(payload, 'ep-1', undefined);
+      // passthrough: both remain true (no mutation)
       expect((payload.emails as any[])[0].primary).toBe(true);
-      expect((payload.emails as any[])[1].primary).toBe(false);
+      expect((payload.emails as any[])[1].primary).toBe(true);
+      // but should still warn
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[PrimaryEnforcement]'));
       warnSpy.mockRestore();
     });
 

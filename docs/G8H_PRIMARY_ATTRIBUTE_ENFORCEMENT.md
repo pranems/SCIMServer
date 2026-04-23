@@ -126,9 +126,9 @@ A single per-endpoint configuration flag `PrimaryEnforcement` with three modes:
 
 | Mode | Behavior | Use Case |
 |---|---|---|
-| `"normalize"` **(default)** | Keep **first** `primary: true`, set rest to `false`, log WARN | Production - Azure AD, Okta, any real client |
+| `"passthrough"` **(default)** | Store as-is but **WARN log** when >1 `primary: true` | Backward compatibility, zero data mutation, admin visibility |
+| `"normalize"` | Keep **first** `primary: true`, set rest to `false`, log WARN | Production - Azure AD, Okta, any real client |
 | `"reject"` | Return **400 invalidValue** if >1 `primary: true` detected | Strict RFC compliance testing |
-| `"passthrough"` | Store as-is (no enforcement) | Backward compatibility, custom integrations |
 
 ### Why Tri-State (Not Boolean)
 
@@ -203,7 +203,7 @@ The **post-merge** enforcement is the authoritative check. The pre-PATCH check i
 | **Flag name** | `PrimaryEnforcement` |
 | **Constant** | `ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT` |
 | **Type** | `string` (tri-state: `"normalize"`, `"reject"`, `"passthrough"`) |
-| **Default** | `"normalize"` |
+| **Default** | `"passthrough"` |
 | **Scope** | POST, PUT, PATCH (all write paths) |
 | **RFC ref** | RFC 7643 section 2.4 |
 
@@ -211,16 +211,16 @@ The **post-merge** enforcement is the authoritative check. The pre-PATCH check i
 
 ```
 1. Explicit value in endpoint config/settings  --> use it
-2. Not set                                      --> default to "normalize"
+2. Not set                                      --> default to "passthrough"
 ```
 
 ### Valid Values
 
 | Value | Case-sensitive? | Behavior |
 |---|---|---|
+| `"passthrough"` | Case-insensitive | Store as-is + WARN log |
 | `"normalize"` | Case-insensitive | First-wins normalization + WARN log |
 | `"reject"` | Case-insensitive | 400 invalidValue error |
-| `"passthrough"` | Case-insensitive | No enforcement (current behavior) |
 | Any other string | - | Validation error on endpoint config save |
 
 ### Admin API Usage
@@ -449,11 +449,11 @@ Any custom extension that defines a multi-valued complex attribute with a `prima
 
 ### Mode x Input Matrix
 
-| Input | `"normalize"` | `"reject"` | `"passthrough"` |
+| Input | `"passthrough"` | `"normalize"` | `"reject"` |
 |---|---|---|---|
 | 0 primaries | Pass-through | Pass-through | Pass-through |
 | 1 primary=true | Pass-through | Pass-through | Pass-through |
-| 2+ primary=true | Keep first, set rest to false + WARN | 400 invalidValue | Store as-is |
+| 2+ primary=true | Store as-is + WARN | Keep first, set rest to false + WARN | 400 invalidValue |
 | Empty array `[]` | Pass-through | Pass-through | Pass-through |
 | Single entry `[{primary:true}]` | Pass-through | Pass-through | Pass-through |
 | primary=false for all | Pass-through | Pass-through | Pass-through |
@@ -850,7 +850,7 @@ classDiagram
 | # | Decision | Rationale | Alternatives Considered |
 |---|---|---|---|
 | D1 | Tri-state string flag (not boolean) | Three distinct behaviors (normalize/reject/passthrough) cannot be represented by a boolean. Matches `logLevel` precedent. | Two boolean flags (`PrimaryValidationEnabled` + `PrimaryNormalizationEnabled`) - rejected due to ambiguous interaction |
-| D2 | Default to `"normalize"` (not `"reject"`) | Industry norm - Azure AD, Okta, and all major SCIM clients may send duplicate primaries. Rejecting breaks provisioning. | Default `"reject"` for RFC strictness - rejected because it would break Azure AD |
+| D2 | Default to `"passthrough"` (not `"normalize"` or `"reject"`) | Zero breaking change - existing payloads stored identically to pre-G8h. Admin visibility via WARN log. Presets can opt in to `"normalize"` for Azure AD. | Default `"normalize"` - rejected because it mutates data without explicit opt-in. Default `"reject"` - rejected because it would break Azure AD |
 | D3 | First-wins normalization (not last-wins) | Most natural reading of ordered JSON arrays. Matches Azure AD's observed behavior. | Last-wins - rejected because less intuitive and no RFC precedent |
 | D4 | Schema-driven detection (not hardcoded attribute list) | Automatically works with custom extensions. Single implementation for all resource types. | Hardcoded list of `['emails', 'phoneNumbers', ...]` - rejected because doesn't support custom extensions |
 | D5 | Post-merge enforcement for PATCH (not just pre-PATCH) | PATCH add can create duplicate primaries that only exist in the merged state. The pre-PATCH check alone misses this. | Pre-PATCH only - rejected because it misses the add-creates-duplicate scenario |
