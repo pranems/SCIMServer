@@ -1,6 +1,6 @@
 # SCIMServer - Endpoint Lifecycle & Usage Quick Reference
 
-> **Version:** 0.35.0 · **Updated:** April 10, 2026  
+> **Version:** 0.38.0 · **Updated:** April 23, 2026  
 > A hands-on guide for anyone new to the project: create, configure, use, and manage SCIM endpoints
 
 ---

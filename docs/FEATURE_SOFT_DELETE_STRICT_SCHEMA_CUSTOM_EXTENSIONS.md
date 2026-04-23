@@ -2,8 +2,8 @@
 
 > **Cross-reference**: For strict schema validation internals and custom extension registration details, see [`SCHEMA_LIFECYCLE_AND_REGISTRY.md`](SCHEMA_LIFECYCLE_AND_REGISTRY.md) and [`SCHEMA_CUSTOMIZATION_GUIDE.md`](SCHEMA_CUSTOMIZATION_GUIDE.md). This document remains the canonical reference for the **UserSoftDeleteEnabled** feature.
 
-> **Version**: 2.0  
-> **Date**: 2026-04-09  
+> **Version**: 2.1  
+> **Date**: 2026-04-23  
 > **Status**: Updated for Settings v7  
 > **Config flags**: `UserSoftDeleteEnabled`, `StrictSchemaValidation`  
 > **Extension URNs**: 4 msfttest schemas registered globally

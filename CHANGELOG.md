@@ -21,15 +21,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enforcement points: POST create, PUT replace, PATCH post-merge (all 3 service layers: User, Group, Generic)
 - Per-attribute independence: constraint is per multi-valued attribute, not per resource
 
-### Test Coverage
+### RFC 7643 S8.7.1 Schema Compliance (2026-04-23)
+
+- **fix(rfc)**: Exhaustive audit against RFC 7643 S8.7.1 normative JSON found 55 schema attribute characteristic gaps - all fixed in `scim-schemas.constants.ts`
+- Added missing `uniqueness: 'none'` on 38 string attributes/sub-attributes
+- Added missing `caseExact: false` on 13 sub-attributes
+- Added missing `canonicalValues: []` on 3 type sub-attributes
+- Fixed EnterpriseUser description: 'Enterprise User Extension' -> 'Enterprise User'
+
+### Test Coverage (2026-04-23 - includes audit #5)
 
 | Suite | Count | Delta |
 |-------|-------|-------|
-| Unit tests | 3,362 | +17 (12 core + 5 service) |
+| Unit tests | 3,378 | +33 (17 g8h + 16 audit #5) |
 | Unit suites | 84 | +0 |
-| E2E tests | 1,032 | +7 |
-| E2E suites | 50 | +1 |
-| Live tests | ~768 | +8 (section 9z-P) |
+| E2E tests | 1,074 | +42 (7 g8h + 37 audit #5 - new file) |
+| E2E suites | 51 | +2 (primary-enforcement + test-gaps-audit-5) |
+| Live tests | ~789 | +29 (8 g8h + 21 audit #5 section 9z-Q) |
+
+### Documentation (2026-04-23)
+
+- **docs**: Full freshness audit - 15 files updated (version headers, test counts)
+- **docs**: Added `PrimaryEnforcement` flag section to ENDPOINT_CONFIG_FLAGS_REFERENCE.md
+- **docs**: Updated pipeline-unit.json and pipeline-e2e.json with current counts
+- **docs**: Synced version-latest.json to v0.38.0
 
 ## [0.37.3] - 2026-04-21
 

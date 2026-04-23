@@ -1,7 +1,7 @@
 # Endpoint Profile Architecture - Complete Flow Reference
 
-> **Version**: v0.29.0  
-> **Date**: 2026-03-16  
+> **Version**: v0.38.0  
+> **Date**: 2026-04-23  
 > **Status**: Source-of-truth documentation  
 > **Scope**: All endpoint profile creation, update, validation, expansion, runtime, and discovery flows
 

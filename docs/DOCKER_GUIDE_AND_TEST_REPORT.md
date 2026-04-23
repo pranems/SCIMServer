@@ -2,7 +2,7 @@
 
 > **⚠️ PARTIAL HISTORICAL CONTENT:** Sections describing Azure Files mounts, blob snapshot restore logic, and `BackupService` cron are SQLite-era (pre-v0.11.0) and no longer apply. The startup flow, environment variables, and test results are current.
 
-> **Date:** February 11, 2026  
+> **Date:** April 23, 2026  
 > **Image:** `scimserver:live-test` (496 MB, Alpine Linux)  
 > **Test Result (historical run):** ✅ **212/212 tests passed** in 4.9s  
 > **Current baseline:** ✅ All live integration tests passed (local + Docker + Azure). 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current counts.  

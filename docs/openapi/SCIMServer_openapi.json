@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "SCIMServer API",
-    "version": "0.37.3",
+    "version": "0.38.0",
     "description": "Complete SCIM 2.0 Server - 82 endpoints across 19 controllers.\n\nMulti-tenant endpoint architecture, OAuth 2.0, per-endpoint credentials, bulk operations, /Me endpoint, custom resource types, database browser, activity feed, per-endpoint logs, structured logging.\n\nAll SCIM paths are scoped under /endpoints/{endpointId}. Admin paths are under /admin.\nGlobal prefix: /scim (configurable via API_PREFIX). URL rewriting: /scim/v2/* → /scim/*.",
     "contact": { "name": "SCIMServer", "url": "https://github.com/pranems/SCIMServer" },
     "license": { "name": "MIT", "url": "https://opensource.org/licenses/MIT" }

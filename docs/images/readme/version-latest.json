@@ -1,5 +1,5 @@
 {
-  "version": "0.37.3",
+  "version": "0.38.0",
   "service": {
     "name": "SCIMServer API",
     "environment": "production",
@@ -57,6 +57,6 @@
     }
   },
   "deployment": {
-    "migratePhase": "Phase 17 - Manager PATCH string coercion + test gap audit (v0.37.3)"
+    "migratePhase": "Phase 18 - Primary sub-attribute enforcement + RFC compliance + test gap audit #5 (v0.38.0)"
   }
 }

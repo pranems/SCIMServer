@@ -1,12 +1,12 @@
 # Endpoint Configuration Flags - Complete Reference
 
-> **Status:** Living document · **Last Updated:** 2026-04-09
+> **Status:** Living document · **Last Updated:** 2026-04-23
 >
 > Authoritative reference for all per-endpoint configuration flags in SCIMServer.
 > Covers flag definitions, defaults, type handling, precedence rules, applicability matrices,
 > flag interaction combinations, request/response examples, and decision-flow diagrams.
 >
-> **Settings v7 (v0.35.0):** 4 flags removed, 5 added, 2 defaults changed. See [CHANGELOG.md](../CHANGELOG.md) for migration guide.
+> **Settings v7 (v0.35.0):** 4 flags removed, 5 added, 2 defaults changed. **v0.38.0:** Added `PrimaryEnforcement` tri-state flag. See [CHANGELOG.md](../CHANGELOG.md) for migration guide.
 
 ---
 
@@ -43,8 +43,9 @@
    - 4.13 [IgnoreReadOnlyAttributesInPatch](#413-ignorereadonlyattributesinpatch)
    - 4.14 [logFileEnabled](#414-logfileenabled) *(new in v0.33.0)*
    - 4.15 [logLevel](#415-loglevel)
-   - 4.16 [CustomResourceTypesEnabled](#416-customresourcetypesenabled) *(derived)*
-   - 4.17 [BulkOperationsEnabled](#417-bulkoperationsenabled) *(derived)*
+   - 4.16 [PrimaryEnforcement](#416-primaryenforcement) *(new in v0.38.0)*
+   - 4.17 [CustomResourceTypesEnabled](#417-customresourcetypesenabled) *(derived)*
+   - 4.18 [BulkOperationsEnabled](#418-bulkoperationsenabled) *(derived)*
 5. [Flag Applicability Matrix](#5-flag-applicability-matrix)
 6. [Flag Interaction & Precedence](#6-flag-interaction--precedence)
 7. [Flag Combination Examples](#7-flag-combination-examples)
@@ -56,9 +57,9 @@
 
 ## 1. Overview
 
-SCIMServer supports **14 per-endpoint configuration flags** (plus 1 per-endpoint log level override) that control SCIM protocol behavior.
+SCIMServer supports **15 per-endpoint configuration flags** (plus 1 per-endpoint log level override and 1 tri-state enforcement mode) that control SCIM protocol behavior.
 
-> **v0.28.0 Profile Model:** Of the 14 flags, **12 boolean settings + logLevel** are persisted in `profile.settings` (the `EndpointProfile.settings` JSONB). Two capabilities are **derived at runtime** from the profile structure:
+> **v0.28.0 Profile Model:** Of the 15 flags, **13 boolean settings + logLevel + PrimaryEnforcement** are persisted in `profile.settings` (the `EndpointProfile.settings` JSONB). Two capabilities are **derived at runtime** from the profile structure:
 > - **`CustomResourceTypesEnabled`** → derived from `profile.resourceTypes` entries beyond User/Group (decision D9)
 > - **`BulkOperationsEnabled`** → derived from `profile.serviceProviderConfig.bulk.supported` (decision D8)
 >
@@ -100,6 +101,7 @@ api/src/modules/endpoint/endpoint-config.interface.ts
 | 13 | `IgnoreReadOnlyAttributesInPatch` | `IGNORE_READONLY_ATTRIBUTES_IN_PATCH` | `false` | boolean | PATCH | Strip+warn instead of 400 for readOnly PATCH ops |
 | 14 | `logFileEnabled` | `LOG_FILE_ENABLED` | `false` | boolean | Logging | Enable per-endpoint log file under `logs/endpoints/` |
 | 15 | `logLevel` | `LOG_LEVEL` | *(unset)* | string/number | All requests | Per-endpoint log level override |
+| 16 | `PrimaryEnforcement` | `PRIMARY_ENFORCEMENT` | **`passthrough`** | tri-state string | POST, PUT, PATCH | Primary sub-attribute enforcement: `normalize`/`reject`/`passthrough` |
 | - | `CustomResourceTypesEnabled` | *derived* | `false` | boolean | Admin API, SCIM CRUD | **Derived:** Implied by custom entries in `profile.resourceTypes` |
 | - | `BulkOperationsEnabled` | *derived* | `false` | boolean | POST /Bulk | **Derived:** Implied by `profile.serviceProviderConfig.bulk.supported` |
 
@@ -141,6 +143,7 @@ All other flags resolve to their defaults. Settings v7 defaults mean **out of th
 | MultiOpPatchRequest…Add | **True** | false | false | false |
 | MultiOpPatchRequest…Remove | **True** | false | false | false |
 | PatchOpAllowRemoveAllMembers | **True** | *true (default)* | *true (default)* | *true (default)* |
+| PrimaryEnforcement | **normalize** | **reject** | *passthrough (default)* | *passthrough (default)* |
 | UserSoftDeleteEnabled | *true (default)* | *true (default)* | *true (default)* | *true (default)* |
 | StrictSchemaValidation | false | false | false | false |
 | RequireIfMatch | false | false | false | false |
@@ -165,6 +168,7 @@ All other flags resolve to their defaults. Settings v7 defaults mean **out of th
 | 11 | **IncludeWarningAboutIgnoredReadOnlyAttribute** | Write responses include `urn:scimserver:api:messages:2.0:Warning` extension listing readOnly attributes that were stripped. | ReadOnly attributes stripped silently - no indication in the response. |
 | 12 | **IgnoreReadOnlyAttributesInPatch** | When `StrictSchemaValidation` is ON: PATCH ops targeting readOnly attributes are **stripped + warned** instead of rejected. No effect when strict is OFF. | With strict schema ON: PATCH ops on readOnly attributes → **400 Bad Request** (`mutability` error). |
 | 13 | **logLevel** | *(string, not boolean)* - Overrides the global `LOG_LEVEL` for this endpoint. Values: `TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, `FATAL`, `OFF`. | Global `LOG_LEVEL` is used (default: `INFO`). |
+| 14 | **PrimaryEnforcement** | *(tri-state string)* - `normalize`: auto-fix >1 primary; `reject`: 400 error; `passthrough`: store as-is + WARN log. Applies to all multi-valued complex attrs with `primary` sub-attr. | `passthrough` (default): no mutation, WARN logged when >1 primary detected. |
 
 ---
 
@@ -962,6 +966,76 @@ With this config, a PATCH replacing `groups` will be silently stripped and a war
 
 ---
 
+### 4.16 PrimaryEnforcement
+
+| Property | Value |
+|----------|-------|
+| **Config key** | `PrimaryEnforcement` |
+| **Constant** | `ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT` |
+| **Default** | **`passthrough`** (logs WARN when >1 primary=true detected) |
+| **Type** | tri-state string: `normalize`, `reject`, `passthrough` (case-insensitive) |
+| **Scope** | POST, PUT, PATCH (all write paths) |
+| **Added** | v0.38.0 |
+
+**Purpose:** Controls how the server handles multi-valued complex attributes (e.g., `emails`, `phoneNumbers`, `addresses`) where more than one element has `primary: true`. RFC 7643 section 2.4 states: "The primary attribute value 'true' MUST appear no more than once."
+
+**Modes:**
+
+| Mode | Behavior | Use case |
+|------|----------|----------|
+| `normalize` | Keeps the first `primary=true`, sets all subsequent to `false`, logs WARN | Entra ID / defensive - auto-fix bad input |
+| `reject` | Returns 400 `invalidValue` if >1 `primary=true` detected | Strict RFC compliance |
+| `passthrough` | Stores as-is with no mutation, logs WARN when violation detected | Zero data mutation / legacy compat (default) |
+
+**Preset defaults:**
+
+| Preset | Value |
+|--------|-------|
+| `entra-id` / `entra-id-minimal` | `normalize` |
+| `rfc-standard` | `reject` |
+| `minimal` / `user-only` / `user-only-with-custom-ext` | *(unset - passthrough)* |
+
+**Schema-driven:** Automatically applies to any multi-valued complex attribute whose schema defines a boolean `primary` sub-attribute. Per-attribute independence: each multi-valued attribute is evaluated independently (e.g., emails and phoneNumbers can each have their own primary).
+
+**Example - reject mode:**
+
+```json
+// POST /Users with reject mode -> 400
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+  "userName": "test@example.com",
+  "emails": [
+    { "value": "a@x.com", "type": "work", "primary": true },
+    { "value": "b@x.com", "type": "home", "primary": true }
+  ]
+}
+
+// Response: 400
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
+  "status": "400",
+  "scimType": "invalidValue",
+  "detail": "Attribute 'emails' has 2 elements with primary=true; RFC 7643 S2.4 allows at most 1."
+}
+```
+
+**Setting via admin API:**
+
+```json
+PATCH /scim/admin/endpoints/{id}
+{
+  "profile": {
+    "settings": {
+      "PrimaryEnforcement": "reject"
+    }
+  }
+}
+```
+
+> **See also:** [G8H_PRIMARY_ATTRIBUTE_ENFORCEMENT.md](G8H_PRIMARY_ATTRIBUTE_ENFORCEMENT.md) for full design, architecture, and test coverage.
+
+---
+
 ## 5. Flag Applicability Matrix
 
 Which flags affect which HTTP methods and resource types:
@@ -982,6 +1056,7 @@ Which flags affect which HTTP methods and resource types:
 | `PerEndpointCredentialsEnabled` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `IncludeWarningAboutIgnored...` | ✅ | ✅ | ✅ | - | - | - | ✅ | ✅ |
 | `IgnoreReadOnlyAttributesInPatch` | - | - | ✅ | - | - | - | ✅ | ✅ |
+| `PrimaryEnforcement` | ✅ | ✅ | ✅ | - | - | - | ✅ | ✅ |
 | `logLevel` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 ---

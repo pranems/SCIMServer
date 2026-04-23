@@ -1,7 +1,7 @@
 # 📚 SCIMServer Documentation Index
 
-> **Version:** 0.38.0 - **Updated:** April 22, 2026  
-> 69 active docs in `docs/` - 50 E2E suites (1,032 pass) - 84 unit suites (3,362 pass) - 6 built-in presets
+> **Version:** 0.38.0 - **Updated:** April 23, 2026  
+> 69 active docs in `docs/` - 51 E2E suites (1,074 pass) - 84 unit suites (3,378 pass) - 6 built-in presets
 
 ---
 
@@ -11,7 +11,7 @@
 |----------|-------------|
 | [README.md](../README.md) | Overview, quick start, architecture, compliance, deployment |
 | [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) | Living stats - LoC, test counts, dependency versions, architecture |
-| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 → v0.37.3 |
+| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 → v0.38.0 |
 | [admin.md](../admin.md) | Release workflow (version, tag, publish, update) |
 
 ## Deployment Guides
@@ -85,7 +85,7 @@
 
 | Document | Description |
 |----------|-------------|
-| [P5_RFC_SCHEMA_PRESET_COMPLIANCE_AUDIT.md](P5_RFC_SCHEMA_PRESET_COMPLIANCE_AUDIT.md) | **Latest (v0.37.1)** - RFC-verified schema/preset audit, 13 critical gaps, 19 findings, fetched RFC source saved in `docs/rfcs/` |
+| [P5_RFC_SCHEMA_PRESET_COMPLIANCE_AUDIT.md](P5_RFC_SCHEMA_PRESET_COMPLIANCE_AUDIT.md) | **Latest (v0.38.0)** - RFC-verified schema/preset audit, 13 critical gaps + 55 characteristic fixes, fetched RFC source saved in `docs/rfcs/` |
 | [P4_ATTRIBUTE_CHARACTERISTIC_DEEP_ANALYSIS.md](P4_ATTRIBUTE_CHARACTERISTIC_DEEP_ANALYSIS.md) | **v0.37.0** - source-verified gap analysis, 19 gaps, 3 actionable fixes |
 | [ATTRIBUTE_CHARACTERISTICS_GAPS.md](ATTRIBUTE_CHARACTERISTICS_GAPS.md) | Gap matrix - characteristic enforcement status |
 | [RFC7643_ATTRIBUTE_CHARACTERISTICS_FULL_AUDIT.md](RFC7643_ATTRIBUTE_CHARACTERISTICS_FULL_AUDIT.md) | Full RFC 7643 attribute characteristic audit |
@@ -155,8 +155,8 @@
 
 | Suite | Suites | Tests | Status |
 |-------|--------|-------|--------|
-| Unit | 84 | 3,362 | All pass |
-| E2E | 50 | 1,032 | All pass |
+| Unit | 84 | 3,378 | All pass |
+| E2E | 51 | 1,074 | All pass |
 | Live (main) | 44 sections | ~768 | All pass |
 | Live (Lexmark ISV) | 13 sections | 112 | All pass |
 | **Total** | **~191** | **~5,274** | **All pass** |

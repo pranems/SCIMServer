@@ -1,6 +1,6 @@
 # Logging & Error Handling Quality Audit
 
-> **Version:** 3.0 · **Source-verified against:** v0.35.0 · **Audited:** April 13, 2026  
+> **Version:** 3.0 · **Source-verified against:** v0.38.0 · **Audited:** April 13, 2026  
 > Complete gap register with code evidence, severity, and resolution recommendations.
 
 ---

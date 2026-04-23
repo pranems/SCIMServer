@@ -283,7 +283,7 @@ After completing the audit, review **this prompt itself** for freshness:
 1. **Endpoint count**: If the endpoint/controller count changed from 76/18, update all references in this prompt (Steps 1B, 2B, 2E, 5.4).
 2. **New document categories**: If new types of docs (e.g., performance benchmarks, security audit docs, ADRs) were added, add a new sub-section under Step 2.
 3. **New artifact directories**: If new artifact folders beyond `openapi/`, `postman/`, `insomnia/`, `examples/`, `images/readme/` were created, add them to Section E.
-4. **New config flags**: If the flag count changed from 14 boolean + logLevel (12 persisted in ProfileSettings + 2 derived), update all references.
+4. **New config flags**: If the flag count changed from 15 boolean + logLevel + PrimaryEnforcement (13 persisted in ProfileSettings + 2 derived), update all references.
 5. **New log categories**: If `LogCategory` enum changed from 14 entries, update Section 1G and the format migration table.
 6. **New presets**: If presets beyond the current 6 were added, update Section 1G and cross-consistency checks.
 7. **New bulk/SPC constants**: If `BULK_MAX_OPERATIONS`, `BULK_MAX_PAYLOAD_SIZE`, or `maxResults` changed, update format migration table.
@@ -328,8 +328,7 @@ Apply updates directly to this file (`.github/prompts/auditAndUpdateDocs.prompt.
 | 2026-04-10 | v0.34.0 | Post-P4 fixes full audit | ~20 across 16 files | Endpoint count 76→82 (19 controllers), test counts propagation (3,185 unit/923 E2E/45 suites), version headers 0.31.0→0.34.0 in 8 docs, StrictSchema default documented as false (actual: true), P4 immutable/required now unconditional |
 | 2026-04-16 | v0.37.1 | Post error-handling audit | 12 across 9 files + 1 JSON | Unit 83→84 suites / 3,265→3,311 tests (error-handling + generic-resource tests), maxOperations 100→1000 in 2 files, stale backup module ref, doc count 65→67, pipeline-unit.json regenerated |
 | 2026-04-17 | v0.37.1 | Post logging+tests audit | 10 across 8 files + 2 JSONs | Unit 3,311→3,318 (+7 interceptor/endpointId), E2E 46→47 suites / 969→986 (+17 test-gaps-audit-4), phantom `backup` category in recent-logs-latest.json (regenerated), pipeline-e2e.json regenerated, CHANGELOG/Session updated with endpointId persistence + Bicep logging defaults |
-| 2026-04-21 | v0.37.2 | Post manager PATCH fix + test gap audit | ~25 across 10 files + 2 JSONs + 1 HTML | Unit 3,318→3,345 (+27 schema-validator/service tests), E2E 47→49 suites / 986→1,025 (+39 manager-patch/error-allowlist/group-filters/projection), doc count 67→68, version headers 0.37.1→0.37.2 in 7 files, phantom `backup` category in recent-logs-latest.html, pipeline JSONs regenerated |
-
+| 2026-04-21 | v0.37.2 | Post manager PATCH fix + test gap audit | ~25 across 10 files + 2 JSONs + 1 HTML | Unit 3,318→3,345 (+27 schema-validator/service tests), E2E 47→49 suites / 986→1,025 (+39 manager-patch/error-allowlist/group-filters/projection), doc count 67→68, version headers 0.37.1→0.37.2 in 7 files, phantom `backup` category in recent-logs-latest.html, pipeline JSONs regenerated || 2026-04-23 | v0.38.0 | Post G8h + RFC audit + test gap audit #5 | ~30 across 22 files + 3 JSONs | Version 0.37.x->0.38.0 in 18 files, test counts 3,345->3,378 unit / 1,025->1,074 E2E / 49->51 suites, added PrimaryEnforcement flag section to ENDPOINT_CONFIG_FLAGS_REFERENCE.md, pipeline JSONs regenerated, version-latest.json synced, CHANGELOG updated with RFC + audit entries, OpenAPI/Postman/Insomnia version refs |
 ### Common Staleness Patterns Discovered
 
 | Pattern | Files Typically Affected | Detection Method |

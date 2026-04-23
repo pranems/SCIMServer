@@ -1,6 +1,6 @@
 # Logging Verification Prompt (Self-Improving)
 
-> **Version:** 3.3 · **Source-verified against:** v0.37.3 · **Regenerated:** April 21, 2026  
+> **Version:** 3.3 · **Source-verified against:** v0.38.0 · **Regenerated:** April 21, 2026  
 > Automated checklist - run against source to verify logging completeness.
 
 ---
