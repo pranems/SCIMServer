@@ -2669,4 +2669,118 @@ describe('EndpointScimGroupsService', () => {
       ).rejects.toThrow(TypeError);
     });
   });
+
+  // ===========================================================================
+  // Test Gaps Audit #5 - Missing unit tests
+  // ===========================================================================
+
+  describe('Test Gaps Audit #5: PatchOpAllowRemoveAllMembers ON standalone', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+    const endpointId = 'endpoint-1';
+
+    it('should allow blanket remove all members when flag is ON (standalone, no StrictSchema override)', async () => {
+      const config: EndpointConfig = {
+        PatchOpAllowRemoveAllMembers: 'True',
+        StrictSchemaValidation: 'False',
+      };
+
+      mockGroupRepo.findWithMembers.mockResolvedValue({
+        ...mockGroup,
+        members: [
+          { userId: mockUser.id, groupId: mockGroup.id, user: { ...mockUser } },
+        ],
+      });
+      mockGroupRepo.findByDisplayName.mockResolvedValue(null);
+      mockGroupRepo.updateGroupWithMembers.mockResolvedValue({
+        ...mockGroup,
+        members: [],
+      });
+
+      const dto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'remove', path: 'members' }],
+      };
+
+      const result = await service.patchGroupForEndpoint(mockGroup.scimId, dto as any, baseUrl, endpointId, config);
+      expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
+    });
+
+    it('should reject blanket remove all members when flag is OFF (standalone)', async () => {
+      const config: EndpointConfig = {
+        PatchOpAllowRemoveAllMembers: 'False',
+        StrictSchemaValidation: 'False',
+      };
+
+      mockGroupRepo.findWithMembers.mockResolvedValue({
+        ...mockGroup,
+        members: [
+          { userId: mockUser.id, groupId: mockGroup.id, user: { ...mockUser } },
+        ],
+      });
+
+      const dto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'remove', path: 'members' }],
+      };
+
+      await expect(
+        service.patchGroupForEndpoint(mockGroup.scimId, dto as any, baseUrl, endpointId, config),
+      ).rejects.toThrow(HttpException);
+    });
+  });
+
+  describe('Test Gaps Audit #5: RequireIfMatch default OFF for Groups', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+    const endpointId = 'endpoint-1';
+
+    it('should allow DELETE without If-Match when RequireIfMatch is not configured', async () => {
+      mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+      mockGroupRepo.delete.mockResolvedValue(undefined);
+
+      const config: EndpointConfig = {};
+
+      await service.deleteGroupForEndpoint(mockGroup.scimId, endpointId, config);
+
+      expect(mockGroupRepo.delete).toHaveBeenCalled();
+    });
+
+    it('should allow PATCH without If-Match when RequireIfMatch is undefined', async () => {
+      mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
+      mockGroupRepo.findByDisplayName.mockResolvedValue(null);
+      mockGroupRepo.updateGroupWithMembers.mockResolvedValue(mockGroup);
+
+      const dto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', value: { displayName: 'Updated' } }],
+      };
+
+      const config: EndpointConfig = { StrictSchemaValidation: 'False' };
+
+      const result = await service.patchGroupForEndpoint(
+        mockGroup.scimId, dto as any, baseUrl, endpointId, config,
+      );
+
+      expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
+    });
+  });
+
+  describe('Test Gaps Audit #5: GroupHardDeleteEnabled OFF', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+    const endpointId = 'endpoint-1';
+
+    it('should throw 400 when GroupHardDeleteEnabled is False', async () => {
+      const config: EndpointConfig = { GroupHardDeleteEnabled: 'False' };
+
+      await expect(
+        service.deleteGroupForEndpoint(mockGroup.scimId, endpointId, config),
+      ).rejects.toThrow(HttpException);
+
+      try {
+        await service.deleteGroupForEndpoint(mockGroup.scimId, endpointId, config);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+      }
+    });
+  });
 });

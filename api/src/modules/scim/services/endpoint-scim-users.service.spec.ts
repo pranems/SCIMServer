@@ -3204,4 +3204,120 @@ describe('EndpointScimUsersService', () => {
       expect(storedPayload.emails[1].primary).toBe(false);
     });
   });
+
+  // ===========================================================================
+  // Test Gaps Audit #5 - Missing unit tests
+  // ===========================================================================
+
+  describe('Test Gaps Audit #5: RequireIfMatch default OFF behavior', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+    const endpointId = 'endpoint-1';
+
+    it('should allow PUT without If-Match when RequireIfMatch is not configured (default OFF)', async () => {
+      mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+      mockUserRepo.findConflict.mockResolvedValue(null);
+      mockUserRepo.update.mockResolvedValue({ ...mockUser, displayName: 'Updated' });
+
+      const dto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'test@example.com',
+        displayName: 'Updated',
+      };
+
+      // Config with no RequireIfMatch key at all (undefined = default OFF)
+      const config: EndpointConfig = {};
+
+      const result = await service.replaceUserForEndpoint(
+        mockUser.scimId, dto as any, baseUrl, endpointId, config,
+      );
+
+      expect(result.userName).toBe(mockUser.userName);
+      expect(mockUserRepo.update).toHaveBeenCalled();
+    });
+
+    it('should allow DELETE without If-Match when RequireIfMatch is not configured', async () => {
+      mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+      mockUserRepo.delete.mockResolvedValue(undefined);
+
+      const config: EndpointConfig = {};
+
+      await service.deleteUserForEndpoint(mockUser.scimId, endpointId, config);
+
+      expect(mockUserRepo.delete).toHaveBeenCalled();
+    });
+  });
+
+  describe('Test Gaps Audit #5: POST missing required userName', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+    const endpointId = 'endpoint-1';
+
+    it('should throw 400 when userName is missing from POST payload with StrictSchema ON', async () => {
+      const dto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        displayName: 'Missing UserName',
+        active: true,
+      };
+
+      const config: EndpointConfig = { StrictSchemaValidation: 'True' };
+
+      try {
+        await service.createUserForEndpoint(dto as any, baseUrl, endpointId, config);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(HttpException);
+        expect(e.getStatus()).toBe(400);
+      }
+    });
+  });
+
+  describe('Test Gaps Audit #5: PrimaryEnforcement + StrictSchema combo', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+    const endpointId = 'endpoint-1';
+
+    it('should reject both unknown attrs (StrictSchema) and multiple primaries (reject mode)', async () => {
+      const dto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'combo-test@example.com',
+        unknownField: 'should reject',
+        emails: [
+          { value: 'a@x.com', type: 'work', primary: true },
+          { value: 'b@x.com', type: 'home', primary: true },
+        ],
+      };
+
+      const config: EndpointConfig = {
+        StrictSchemaValidation: 'True',
+        PrimaryEnforcement: 'reject',
+      };
+
+      // StrictSchema should reject first (before primary check) due to unknownField
+      await expect(
+        service.createUserForEndpoint(dto as any, baseUrl, endpointId, config),
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('should reject multiple primaries when payload is otherwise valid (reject mode)', async () => {
+      const dto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'multi-primary-strict@example.com',
+        emails: [
+          { value: 'a@x.com', type: 'work', primary: true },
+          { value: 'b@x.com', type: 'home', primary: true },
+        ],
+      };
+
+      const config: EndpointConfig = {
+        StrictSchemaValidation: 'True',
+        PrimaryEnforcement: 'reject',
+      };
+
+      try {
+        await service.createUserForEndpoint(dto as any, baseUrl, endpointId, config);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(HttpException);
+        expect(e.getStatus()).toBe(400);
+      }
+    });
+  });
 });

@@ -139,7 +139,7 @@ Specifically check:
 - Every E2E test scenario should have a corresponding live test in `scripts/live-test.ps1`
 - Live tests should cover both local (port 6000) and Docker (port 8080) scenarios
 - Verify all live test sections in `scripts/live-test.ps1` exist by grepping for `TEST SECTION`
-- Ensure new sections use the next available number (check current highest before `Section 10`; as of v0.38.0 the latest is **9z-N**)
+- Ensure new sections use the next available number (check current highest before `Section 10`; as of v0.38.0 the latest is **9z-Q**)
 
 ### H. Resource-Type Symmetry
 
@@ -313,7 +313,7 @@ Every API endpoint response must be verified for **shape integrity** - not just 
 | Map/Set objects never serialize to `{}` in JSON responses | ✅ | implicit | ✅ |
 | `_links` values match endpoint ID | ✅ | ✅ | ✅ |
 | Extension URNs scoped per resource type (User ≠ Group) | ✅ | N/A | ? |
-| SCIM error responses contain only documented fields | ? | ? | ? |
+| SCIM error responses contain only documented fields | ✅ | ✅ | ✅ |
 | List envelope has only `totalResults` + `endpoints` | ? | ✅ | ✅ |
 
 **Anti-Pattern to avoid:**
@@ -649,12 +649,12 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
-| Unit  | 3,345  | ?     | +?    |
-| E2E   | 1,017  | ?     | +?    |
-| Live  | ~990   | ?     | +?    |
+| Unit  | 3,378  | ?     | +?    |
+| E2E   | 1,074  | ?     | +?    |
+| Live  | ~789   | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
-> *Last updated: v0.38.0 - Manager PATCH String Coercion + Test Gap Audit (2026-04-21)*
+> *Last updated: v0.38.0 - Test Gaps Audit #5 (2026-04-23)*
 
 4. Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts.
 

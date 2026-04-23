@@ -8129,6 +8129,278 @@ try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$g8hPassEpId" -Metho
 Write-Host "`n--- 9z-P: Primary Sub-Attribute Enforcement Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-Q: TEST GAPS AUDIT #5 - COMPREHENSIVE GAP CLOSURE
+$script:currentSection = "9z-Q: Test Gaps Audit #5"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-Q: TEST GAPS AUDIT #5 - COMPREHENSIVE GAP CLOSURE" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# --- 9z-Q.1: POST duplicate userName -> 409 ---
+Write-Host "`n--- 9z-Q.1: POST duplicate userName -> 409 ---" -ForegroundColor Cyan
+$q1UserName = "q1-dup-$(Get-Random)@test.com"
+$q1Body1 = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $q1UserName
+    displayName = "Q1 First User"
+    active = $true
+} | ConvertTo-Json
+$q1User1 = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $q1Body1 -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $q1User1.id) -Message "9z-Q.1a: Created first user"
+
+$q1Body2 = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $q1UserName
+    displayName = "Q1 Duplicate User"
+    active = $true
+} | ConvertTo-Json
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $q1Body2 -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9z-Q.1b: Duplicate userName should return 409"
+} catch {
+    $q1Status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q1Status -eq 409) -Message "9z-Q.1b: Duplicate userName returns 409 (got $q1Status)"
+}
+
+# --- 9z-Q.2: POST duplicate userName case-insensitive -> 409 ---
+Write-Host "`n--- 9z-Q.2: POST duplicate userName case-insensitive -> 409 ---" -ForegroundColor Cyan
+try {
+    $q2Body = @{
+        schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+        userName = $q1UserName.ToUpper()
+        displayName = "Q2 Case Dup"
+        active = $true
+    } | ConvertTo-Json
+    $null = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $q2Body -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9z-Q.2: Case-insensitive duplicate should return 409"
+} catch {
+    $q2Status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q2Status -eq 409) -Message "9z-Q.2: Case-insensitive duplicate returns 409 (got $q2Status)"
+}
+
+# --- 9z-Q.3: POST missing required userName -> 400 ---
+Write-Host "`n--- 9z-Q.3: POST missing userName -> 400 ---" -ForegroundColor Cyan
+try {
+    $q3Body = @{
+        schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+        displayName = "No UserName"
+        active = $true
+    } | ConvertTo-Json
+    $null = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $q3Body -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9z-Q.3: Missing userName should return 400"
+} catch {
+    $q3Status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q3Status -eq 400) -Message "9z-Q.3: Missing userName returns 400 (got $q3Status)"
+}
+
+# --- 9z-Q.4: POST missing schemas array -> 400 ---
+Write-Host "`n--- 9z-Q.4: POST missing schemas -> 400 ---" -ForegroundColor Cyan
+try {
+    $q4Body = @{
+        userName = "q4-noschemas-$(Get-Random)@test.com"
+        displayName = "No Schemas"
+    } | ConvertTo-Json
+    $null = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $q4Body -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9z-Q.4: Missing schemas should return 400"
+} catch {
+    $q4Status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q4Status -eq 400) -Message "9z-Q.4: Missing schemas returns 400 (got $q4Status)"
+}
+
+# --- 9z-Q.5: .search returns always-returned fields (id, schemas, meta) ---
+Write-Host "`n--- 9z-Q.5: .search returned:always ---" -ForegroundColor Cyan
+$q5SearchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:SearchRequest")
+    filter = "userName eq `"$q1UserName`""
+    startIndex = 1
+    count = 10
+} | ConvertTo-Json
+$q5Result = Invoke-RestMethod -Uri "$scimBase/Users/.search" -Method POST -Headers $headers -Body $q5SearchBody -ContentType "application/scim+json"
+Test-Result -Success ($q5Result.totalResults -ge 1) -Message "9z-Q.5a: .search found user"
+$q5Resource = $q5Result.Resources[0]
+Test-Result -Success ($null -ne $q5Resource.id) -Message "9z-Q.5b: .search resource has id (returned:always)"
+Test-Result -Success ($null -ne $q5Resource.schemas) -Message "9z-Q.5c: .search resource has schemas (returned:always)"
+Test-Result -Success ($null -ne $q5Resource.meta) -Message "9z-Q.5d: .search resource has meta (returned:always)"
+
+# --- 9z-Q.6: PATCH case-insensitive uniqueness -> 409 ---
+Write-Host "`n--- 9z-Q.6: PATCH case-insensitive uniqueness -> 409 ---" -ForegroundColor Cyan
+$q6User2Name = "q6-target-$(Get-Random)@test.com"
+$q6Body = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $q6User2Name
+    displayName = "Q6 Target"
+    active = $true
+} | ConvertTo-Json
+$q6User2 = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $q6Body -ContentType "application/scim+json"
+try {
+    $q6PatchBody = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+        Operations = @(@{
+            op = "replace"
+            path = "userName"
+            value = $q1UserName.ToUpper()
+        })
+    } | ConvertTo-Json -Depth 4
+    $null = Invoke-RestMethod -Uri "$scimBase/Users/$($q6User2.id)" -Method PATCH -Headers $headers -Body $q6PatchBody -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9z-Q.6: Case-insensitive PATCH uniqueness should return 409"
+} catch {
+    $q6Status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q6Status -eq 409) -Message "9z-Q.6: PATCH case-insensitive uniqueness returns 409 (got $q6Status)"
+}
+
+# --- 9z-Q.7: ETag on single-resource GET ---
+Write-Host "`n--- 9z-Q.7: ETag on single GET ---" -ForegroundColor Cyan
+$q7Raw = Invoke-WebRequest -Uri "$scimBase/Users/$($q1User1.id)" -Method GET -Headers $headers
+$q7EtagHeader = $q7Raw.Headers['ETag']
+$q7EtagValue = if ($q7EtagHeader -is [array]) { $q7EtagHeader[0] } else { $q7EtagHeader }
+Test-Result -Success ($null -ne $q7EtagValue -and $q7EtagValue.Length -gt 0) -Message "9z-Q.7a: Single GET has ETag header"
+Test-Result -Success ($q7EtagValue -like 'W/"v*"') -Message "9z-Q.7b: ETag format W/`"v...`" (got $q7EtagValue)"
+
+# --- 9z-Q.8: 412 Precondition Failed (stale If-Match) ---
+Write-Host "`n--- 9z-Q.8: 412 stale If-Match ---" -ForegroundColor Cyan
+$q8StaleEtag = $q7EtagValue
+# Bump the version via PATCH
+$q8PatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{ op = "replace"; path = "displayName"; value = "Q8 Bumped" })
+} | ConvertTo-Json -Depth 4
+$null = Invoke-RestMethod -Uri "$scimBase/Users/$($q1User1.id)" -Method PATCH -Headers $headers -Body $q8PatchBody -ContentType "application/scim+json"
+try {
+    $q8PutBody = @{
+        schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+        userName = $q1UserName
+        displayName = "Stale ETag PUT"
+    } | ConvertTo-Json
+    $q8StaleHeaders = @{ Authorization = $headers.Authorization; 'Content-Type' = 'application/scim+json'; 'If-Match' = $q8StaleEtag }
+    $null = Invoke-RestMethod -Uri "$scimBase/Users/$($q1User1.id)" -Method PUT -Headers $q8StaleHeaders -Body $q8PutBody
+    Test-Result -Success $false -Message "9z-Q.8: Stale If-Match should return 412"
+} catch {
+    $q8Status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q8Status -eq 412) -Message "9z-Q.8: Stale If-Match returns 412 (got $q8Status)"
+}
+
+# --- 9z-Q.9: POST duplicate Group displayName -> 409 ---
+Write-Host "`n--- 9z-Q.9: Duplicate Group displayName -> 409 ---" -ForegroundColor Cyan
+$q9GroupName = "Q9-Group-$(Get-Random)"
+$q9GroupBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = $q9GroupName
+} | ConvertTo-Json
+$q9Group1 = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $q9GroupBody -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $q9Group1.id) -Message "9z-Q.9a: Created first group"
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $q9GroupBody -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9z-Q.9b: Duplicate Group displayName should return 409"
+} catch {
+    $q9Status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q9Status -eq 409) -Message "9z-Q.9b: Duplicate Group displayName returns 409 (got $q9Status)"
+}
+
+# --- 9z-Q.10: RequireIfMatch=True endpoint - 428 without If-Match ---
+Write-Host "`n--- 9z-Q.10: RequireIfMatch=True -> 428 ---" -ForegroundColor Cyan
+$q10EpBody = @{
+    name = "q10-ifmatch-$(Get-Random)"
+    displayName = "Q10 IfMatch Test"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json
+$q10Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $q10EpBody -ContentType "application/json"
+$q10EpId = $q10Ep.id
+$q10SettingsBody = @{ profile = @{ settings = @{ RequireIfMatch = "True" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$q10EpId" -Method PATCH -Headers $headers -Body $q10SettingsBody -ContentType "application/json" | Out-Null
+$q10ScimBase = "$baseUrl/scim/endpoints/$q10EpId"
+
+$q10UserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "q10-user-$(Get-Random)@test.com"
+    displayName = "Q10 User"
+    active = $true
+} | ConvertTo-Json
+$q10User = Invoke-RestMethod -Uri "$q10ScimBase/Users" -Method POST -Headers $headers -Body $q10UserBody -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $q10User.id) -Message "9z-Q.10a: POST works even with RequireIfMatch=True (exempt)"
+
+try {
+    $q10PatchBody = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+        Operations = @(@{ op = "replace"; path = "displayName"; value = "Q10 Patched" })
+    } | ConvertTo-Json -Depth 4
+    $null = Invoke-RestMethod -Uri "$q10ScimBase/Users/$($q10User.id)" -Method PATCH -Headers $headers -Body $q10PatchBody -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9z-Q.10b: PATCH without If-Match should return 428"
+} catch {
+    $q10Status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q10Status -eq 428) -Message "9z-Q.10b: PATCH without If-Match returns 428 (got $q10Status)"
+}
+
+# --- 9z-Q.11: SchemaDiscovery disabled -> 404 on all discovery endpoints ---
+Write-Host "`n--- 9z-Q.11: SchemaDiscovery disabled -> 404 ---" -ForegroundColor Cyan
+$q11EpBody = @{
+    name = "q11-nodisc-$(Get-Random)"
+    displayName = "Q11 No Discovery"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json
+$q11Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $q11EpBody -ContentType "application/json"
+$q11EpId = $q11Ep.id
+$q11Settings = @{ profile = @{ settings = @{ SchemaDiscoveryEnabled = "False" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$q11EpId" -Method PATCH -Headers $headers -Body $q11Settings -ContentType "application/json" | Out-Null
+$q11ScimBase = "$baseUrl/scim/endpoints/$q11EpId"
+
+try {
+    $null = Invoke-RestMethod -Uri "$q11ScimBase/Schemas" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9z-Q.11a: /Schemas should 404 when discovery disabled"
+} catch {
+    $q11aStatus = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q11aStatus -eq 404) -Message "9z-Q.11a: /Schemas returns 404 when disabled (got $q11aStatus)"
+}
+try {
+    $null = Invoke-RestMethod -Uri "$q11ScimBase/ResourceTypes" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9z-Q.11b: /ResourceTypes should 404 when discovery disabled"
+} catch {
+    $q11bStatus = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q11bStatus -eq 404) -Message "9z-Q.11b: /ResourceTypes returns 404 when disabled (got $q11bStatus)"
+}
+try {
+    $null = Invoke-RestMethod -Uri "$q11ScimBase/ServiceProviderConfig" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9z-Q.11c: /ServiceProviderConfig should 404 when discovery disabled"
+} catch {
+    $q11cStatus = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q11cStatus -eq 404) -Message "9z-Q.11c: /ServiceProviderConfig returns 404 when disabled (got $q11cStatus)"
+}
+
+# Verify CRUD still works with discovery disabled
+$q11CrudBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "q11-crud-$(Get-Random)@test.com"
+    displayName = "Q11 CRUD"
+    active = $true
+} | ConvertTo-Json
+$q11CrudUser = Invoke-RestMethod -Uri "$q11ScimBase/Users" -Method POST -Headers $headers -Body $q11CrudBody -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $q11CrudUser.id) -Message "9z-Q.11d: CRUD still works when discovery disabled"
+
+# --- 9z-Q.12: SCIM error response key allowlist ---
+Write-Host "`n--- 9z-Q.12: Error response key allowlist ---" -ForegroundColor Cyan
+$q12ErrorAllowedKeys = @("schemas", "status", "scimType", "detail", "diagnostics")
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase/Users/nonexistent-00000000-0000-0000-0000-000000000000" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9z-Q.12a: GET nonexistent should 404"
+} catch {
+    $q12ErrorBody = $_.ErrorDetails.Message | ConvertFrom-Json
+    $q12ExtraKeys = @()
+    foreach ($k in ($q12ErrorBody | Get-Member -MemberType NoteProperty).Name) {
+        if ($k -notin $q12ErrorAllowedKeys) { $q12ExtraKeys += $k }
+    }
+    Test-Result -Success ($q12ExtraKeys.Count -eq 0) -Message "9z-Q.12a: 404 error has only allowed keys (extra: $($q12ExtraKeys -join ', '))"
+}
+
+# --- Cleanup ---
+Write-Host "`n--- 9z-Q Cleanup ---" -ForegroundColor Cyan
+try { Invoke-RestMethod -Uri "$scimBase/Users/$($q1User1.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$scimBase/Users/$($q6User2.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$scimBase/Groups/$($q9Group1.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$q10EpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$q11EpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+Write-Host "`n--- 9z-Q: Test Gaps Audit #5 Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

@@ -1842,3 +1842,58 @@ describe('assertSchemaUniqueness triggeredBy (P5)', () => {
     }
   });
 });
+
+// ─── Test Gaps Audit #5: Additional helper tests ───────────────────────────
+
+describe('Test Gaps Audit #5: enforceIfMatch edge cases', () => {
+  it('should NOT throw when RequireIfMatch is undefined and If-Match is absent', () => {
+    // Default OFF: no config key at all - enforceIfMatch(version, ifMatch?, config?)
+    expect(() => {
+      enforceIfMatch(1, undefined, {});
+    }).not.toThrow();
+  });
+
+  it('should NOT throw when RequireIfMatch is False string and If-Match is absent', () => {
+    expect(() => {
+      enforceIfMatch(1, undefined, { RequireIfMatch: 'False' });
+    }).not.toThrow();
+  });
+
+  it('should throw 412 when If-Match is stale', () => {
+    try {
+      enforceIfMatch(2, 'W/"v1"', {});
+      fail('should have thrown');
+    } catch (e: any) {
+      expect(e.getStatus()).toBe(412);
+    }
+  });
+
+  it('should throw 428 when RequireIfMatch is true and If-Match is absent', () => {
+    try {
+      enforceIfMatch(1, undefined, { RequireIfMatch: 'True' });
+      fail('should have thrown');
+    } catch (e: any) {
+      expect(e.getStatus()).toBe(428);
+    }
+  });
+
+  it('should allow wildcard If-Match (*)', () => {
+    expect(() => {
+      enforceIfMatch(5, '*', { RequireIfMatch: 'True' });
+    }).not.toThrow();
+  });
+});
+
+describe('Test Gaps Audit #5: assertSchemaUniqueness allows non-unique attrs', () => {
+  it('should NOT throw when uniqueAttrs list is empty', () => {
+    const payload = { userName: 'test@example.com', externalId: 'dup-ext' };
+    const existing = [
+      { scimId: 'ex-1', rawPayload: JSON.stringify({ externalId: 'dup-ext' }) },
+    ];
+
+    // Empty uniqueAttrs = no uniqueness check
+    expect(() => {
+      assertSchemaUniqueness('ep-1', payload, [], existing);
+    }).not.toThrow();
+  });
+});
