@@ -176,7 +176,7 @@ sequenceDiagram
     participant DB as PostgreSQL
 
     C->>G: POST /scim/endpoints/{id}/Users<br>Authorization: Bearer {token}
-    G->>G: 1. Check @Public()<br>2. Per-endpoint bcrypt<br>3. OAuth JWT<br>4. Shared secret
+    G->>G: 1. Check Public decorator<br>2. Per-endpoint bcrypt<br>3. OAuth JWT<br>4. Shared secret
     G-->>C: 401 if all fail
     G->>M: Authenticated request
     M->>M: X-Request-Id (UUID)<br>Content-Type check<br>Endpoint context (ALS)
@@ -330,7 +330,7 @@ SCIMServer implements a 3-tier authentication chain. Each request is evaluated a
 
 ```mermaid
 flowchart TD
-    A[Incoming Request] --> B{@Public route?}
+    A[Incoming Request] --> B{Public route?}
     B -->|Yes| Z[Allow]
     B -->|No| C{URL has /endpoints/uuid/?}
     C -->|Yes| D{PerEndpointCredentialsEnabled?}
