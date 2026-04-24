@@ -103,8 +103,8 @@ scripts/
 
 ### Why?
 
-- Unit tests should **never** touch a database — if they're slow, developers stop running them.
-- E2E tests need a real app instance — different setup lifecycle.
+- Unit tests should **never** touch a database - if they're slow, developers stop running them.
+- E2E tests need a real app instance - different setup lifecycle.
 - CI can run them as separate stages with independent failure reporting.
 
 ---
@@ -152,8 +152,8 @@ describe('UserService', () => {
 
 - `describe` = **class or method** name
 - `it` = **"should" + expected behavior** (reads as an English sentence)
-- **No test numbers** — names are self-documenting
-- **One behavior per `it`** — multiple `expect()` is fine if they verify the same behavior
+- **No test numbers** - names are self-documenting
+- **One behavior per `it`** - multiple `expect()` is fine if they verify the same behavior
 
 ---
 
@@ -171,7 +171,7 @@ describe('UserService', () => {
 
 ```typescript
 beforeEach(async () => {
-  // Reset DB between tests — Prisma migrate reset or truncate all tables
+  // Reset DB between tests - Prisma migrate reset or truncate all tables
   await prisma.$executeRawUnsafe(`DELETE FROM "User"`);
   await prisma.$executeRawUnsafe(`DELETE FROM "Group"`);
 });
@@ -221,9 +221,9 @@ export const validUser = (overrides = {}) => ({
 
 ### Why helpers?
 
-- **DRY** — auth and request boilerplate written once
-- **Consistent** — all tests use the same Content-Type, auth flow
-- **Updatable** — change auth mechanism in one place, all tests follow
+- **DRY** - auth and request boilerplate written once
+- **Consistent** - all tests use the same Content-Type, auth flow
+- **Updatable** - change auth mechanism in one place, all tests follow
 
 ---
 
@@ -277,14 +277,14 @@ coverageThreshold: {
 |---|----------------|
 | 1 | **Colocate** unit tests next to source files (`*.spec.ts`) |
 | 2 | **Separate** E2E tests into `test/e2e/` with their own Jest config |
-| 3 | **Keep `npm test` fast** — unit only, < 10 seconds |
-| 4 | **Isolate every test** — own data, own cleanup, no ordering dependencies |
-| 5 | **Extract helpers** — auth, request builders, and fixture factories |
-| 6 | **Name tests as sentences** — `should [verb] when [condition]` |
-| 7 | **Use two Jest configs** — different timeouts, matchers, and setup |
-| 8 | **Enforce coverage in CI** — 80% line, 75% branch minimum |
-| 9 | **Keep smoke tests thin** — verify deployment works, not exhaustive logic |
-| 10 | **Fail fast in CI** — lint → unit → e2e → build → deploy → smoke |
+| 3 | **Keep `npm test` fast** - unit only, < 10 seconds |
+| 4 | **Isolate every test** - own data, own cleanup, no ordering dependencies |
+| 5 | **Extract helpers** - auth, request builders, and fixture factories |
+| 6 | **Name tests as sentences** - `should [verb] when [condition]` |
+| 7 | **Use two Jest configs** - different timeouts, matchers, and setup |
+| 8 | **Enforce coverage in CI** - 80% line, 75% branch minimum |
+| 9 | **Keep smoke tests thin** - verify deployment works, not exhaustive logic |
+| 10 | **Fail fast in CI** - lint → unit → e2e → build → deploy → smoke |
 
 ---
 
@@ -292,7 +292,7 @@ coverageThreshold: {
 
 ### `import type` Erases DTO Classes at Runtime (Fixed 2026-02-11)
 
-**Problem:** Four controller files used `import type { CreateUserDto }` instead of `import { CreateUserDto }`. TypeScript's `import type` erases the class at compile time — it becomes `undefined` at runtime.
+**Problem:** Four controller files used `import type { CreateUserDto }` instead of `import { CreateUserDto }`. TypeScript's `import type` erases the class at compile time - it becomes `undefined` at runtime.
 
 **Impact:**
 - NestJS `ValidationPipe` with `transform: true` couldn't instantiate the DTO via `class-transformer`
@@ -302,9 +302,9 @@ coverageThreshold: {
 - The `emails` field and other non-colliding properties worked fine, masking the bug
 
 **Fix:** Changed `import type { ... }` → `import { ... }` for all DTO classes in:
-- `endpoint-scim-users.controller.ts` — `CreateUserDto`, `PatchUserDto`
-- `endpoint-scim-groups.controller.ts` — `CreateGroupDto`, `PatchGroupDto`
-- `endpoint-scim.controller.ts` — all 4 DTOs
-- `admin.controller.ts` — `CreateGroupDto`, `CreateUserDto`
+- `endpoint-scim-users.controller.ts` - `CreateUserDto`, `PatchUserDto`
+- `endpoint-scim-groups.controller.ts` - `CreateGroupDto`, `PatchGroupDto`
+- `endpoint-scim.controller.ts` - all 4 DTOs
+- `admin.controller.ts` - `CreateGroupDto`, `CreateUserDto`
 
 **Lesson:** Never use `import type` for classes consumed by NestJS decorators (`@Body()`, `@Param()`) or dependency injection. The `import type` syntax is only safe for pure type annotations (interfaces, generics, function parameter/return types).

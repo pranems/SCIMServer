@@ -27,7 +27,7 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
-      // Unsafe-* family: off — codebase handles raw JSON/SCIM payloads extensively
+      // Unsafe-* family: off - codebase handles raw JSON/SCIM payloads extensively
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',

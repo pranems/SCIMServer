@@ -49,7 +49,7 @@ You are executing the **next roadmap phase** under enterprise delivery standards
    - Fresh latest container + current as-is live tests
 5. **Failure Handling**
    - Diagnose precisely, document root cause, apply minimal robust fix, and re-run impacted gates.
-6. **Keep the final Docker container running** after all validation gates pass. Do not stop or remove it — leave it available for the user to inspect and interact with.
+6. **Keep the final Docker container running** after all validation gates pass. Do not stop or remove it - leave it available for the user to inspect and interact with.
 
 ## Required Documentation Pack
 Create/update the following artifacts for this phase:
@@ -92,13 +92,13 @@ For each issue encountered in this phase:
 ## Self-Improvement & Documentation Update
 After all validation gates pass:
 1. **Update all project documentation** to reflect this phase's outcomes:
-   - `Session_starter.md` — progress log, version, test counts, assistant memory
-   - `CHANGELOG.md` — version bump entry with full test counts and feature summary
-   - `docs/CONTEXT_INSTRUCTIONS.md` — new gotchas, constraints, or architectural decisions
-   - `docs/INDEX.md` — add references to any new phase docs created
-   - `docs/PROJECT_HEALTH_AND_STATS.md` — update test counts, codebase metrics, and phase status
-   - `docs/SCIM_COMPLIANCE.md` — update compliance status for affected RFC sections
-   - `package.json` — bump version number
+   - `Session_starter.md` - progress log, version, test counts, assistant memory
+   - `CHANGELOG.md` - version bump entry with full test counts and feature summary
+   - `docs/CONTEXT_INSTRUCTIONS.md` - new gotchas, constraints, or architectural decisions
+   - `docs/INDEX.md` - add references to any new phase docs created
+   - `docs/PROJECT_HEALTH_AND_STATS.md` - update test counts, codebase metrics, and phase status
+   - `docs/SCIM_COMPLIANCE.md` - update compliance status for affected RFC sections
+   - `package.json` - bump version number
 2. **Review this prompt template** for lessons learned:
    - Did any step prove unnecessary or missing?
    - Were there recurring issues that a new checklist item could prevent?
@@ -118,4 +118,4 @@ Return a structured handoff with:
 - Residual risks and next-phase carry-overs
 - Project docs updated (list)
 - Template improvement notes (if any)
-- Docker container status (image tag, container name/ID, port mapping — confirm running)
+- Docker container status (image tag, container name/ID, port mapping - confirm running)

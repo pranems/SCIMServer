@@ -4,7 +4,7 @@
  * Used by all Prisma repository implementations to convert
  * Prisma-specific errors into typed RepositoryError instances.
  *
- * @see RepositoryError — domain/errors/repository-error.ts
+ * @see RepositoryError - domain/errors/repository-error.ts
  */
 import { RepositoryError } from '../../../domain/errors/repository-error';
 
@@ -12,12 +12,12 @@ import { RepositoryError } from '../../../domain/errors/repository-error';
  * Translate a Prisma error into a typed RepositoryError.
  *
  * Prisma error codes handled:
- *   P2025 — Record not found (update/delete on nonexistent record)
- *   P2002 — Unique constraint violation
- *   P1001 — Can't reach database server
- *   P1002 — Database server reached but connection timed out
- *   P1008 — Operations timed out
- *   P1017 — Server has closed the connection
+ *   P2025 - Record not found (update/delete on nonexistent record)
+ *   P2002 - Unique constraint violation
+ *   P1001 - Can't reach database server
+ *   P1002 - Database server reached but connection timed out
+ *   P1008 - Operations timed out
+ *   P1017 - Server has closed the connection
  *
  * @param error   The caught error (may be PrismaClientKnownRequestError or any Error)
  * @param context Human-readable description of the operation (e.g., "User update(abc-123)")

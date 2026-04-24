@@ -1,4 +1,4 @@
-# G8b — Custom Resource Type Registration
+# G8b - Custom Resource Type Registration
 
 > **Cross-reference**: For conceptual overview and operator guide, see [`SCHEMA_CUSTOMIZATION_GUIDE.md`](SCHEMA_CUSTOMIZATION_GUIDE.md) §Custom Resource Types. This document remains the canonical **implementation** reference (code-level files, test inventory).
 
@@ -46,7 +46,7 @@ graph TD
 | Decision | Rationale |
 |----------|-----------|
 | **Per-endpoint flag gating** | Zero-risk opt-in; existing endpoints unaffected |
-| **Polymorphic `ScimResource` table** | Reuses existing `resourceType` column as discriminator — no new tables for data |
+| **Polymorphic `ScimResource` table** | Reuses existing `resourceType` column as discriminator - no new tables for data |
 | **Dedicated `EndpointResourceType` table** | Clean metadata model; cascade-deletes with endpoint |
 | **SchemaRegistry overlay** | Runtime in-memory merge of global + per-endpoint types; DB-hydrated on startup |
 | **Wildcard controller (LAST in module)** | `:resourceType` route catches custom paths; registered last to avoid shadowing `/Users`, `/Groups` |

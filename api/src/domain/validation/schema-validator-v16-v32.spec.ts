@@ -1,5 +1,5 @@
 /**
- * Phase 8 Next — V32 (Filter attribute validation),
+ * Phase 8 Next - V32 (Filter attribute validation),
  *                G8e (collectReturnedCharacteristics)
  *
  * Tests for:

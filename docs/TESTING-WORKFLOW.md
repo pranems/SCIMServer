@@ -1,7 +1,7 @@
 # 🧪 Testing Pre-Release Changes
 
 > **Status**: Living workflow guide  
-> **Last Updated**: March 1, 2026
+> **Last Updated**: April 23, 2026
 
 This guide explains how to test new features before releasing them to production users.
 
@@ -199,15 +199,15 @@ Or specific version:
 - Random names without prefix (won't trigger test build)
 
 ### Testing Checklist
-- [ ] Lint passes (`cd api && npm run lint`) — 0 errors expected
+- [ ] Lint passes (`cd api && npm run lint`) - 0 errors expected
 - [ ] Backend compiles (`cd api && npm run build`)
 - [ ] Frontend compiles (`cd web && npm run build`)
-- [ ] Unit tests pass (`cd api && npm test`) — see [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for expected counts
-- [ ] E2E tests pass (`cd api && npm run test:e2e`) — see PROJECT_HEALTH_AND_STATS.md
-- [ ] Unit coverage meets thresholds (`cd api && npm run test:cov`) — branches 75%, functions 90%, lines 80%
+- [ ] Unit tests pass (`cd api && npm test`) - see [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for expected counts
+- [ ] E2E tests pass (`cd api && npm run test:e2e`) - see PROJECT_HEALTH_AND_STATS.md
+- [ ] Unit coverage meets thresholds (`cd api && npm run test:cov`) - branches 75%, functions 90%, lines 80%
 - [ ] E2E coverage report generated (`cd api && npm run test:e2e:cov`) → `coverage-e2e/`
-- [ ] Live integration tests pass (`.\scripts\live-test.ps1`) — see PROJECT_HEALTH_AND_STATS.md
-- [ ] Live tests pass in verbose mode (`.\scripts\live-test.ps1 -Verbose`) — intercepted API output
+- [ ] Live integration tests pass (`.\scripts\live-test.ps1`) - see PROJECT_HEALTH_AND_STATS.md
+- [ ] Live tests pass in verbose mode (`.\scripts\live-test.ps1 -Verbose`) - intercepted API output
 - [ ] SCIM Validator passes (`25/25 required + 7 preview`)
 - [ ] Local testing done (if possible)
 - [ ] Test image deployed to Azure
@@ -233,7 +233,7 @@ Coverage thresholds (enforced in `jest.config.ts`):
 
 ---
 
-## 🧪 Live Test Script — Multi-Environment Usage
+## 🧪 Live Test Script - Multi-Environment Usage
 
 The live test script (`scripts/live-test.ps1`) runs integration assertions against a running SCIMServer instance. It supports any deployment target via CLI parameters.
 
@@ -242,21 +242,21 @@ The live test script (`scripts/live-test.ps1`) runs integration assertions again
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `-BaseUrl` | `http://localhost:6000` | Full URL of the running SCIMServer (no trailing slash) |
-| `-ClientId` | `scimserver-client` | OAuth `client_id` — must match the server's `OAUTH_CLIENT_ID` env var |
-| `-ClientSecret` | `changeme-oauth` | OAuth `client_secret` — must match the server's `OAUTH_CLIENT_SECRET` env var |
+| `-ClientId` | `scimserver-client` | OAuth `client_id` - must match the server's `OAUTH_CLIENT_ID` env var |
+| `-ClientSecret` | `changeme-oauth` | OAuth `client_secret` - must match the server's `OAUTH_CLIENT_SECRET` env var |
 | `-Verbose` | off | Print full HTTP request/response bodies for debugging |
 
 ### Scenario 1: Local Development (ts-node-dev)
 
-Start the server from the `api/` directory, then run tests. In dev mode, if `OAUTH_CLIENT_SECRET` is not set, a random secret is auto-generated and printed to the console — copy it into `-ClientSecret`.
+Start the server from the `api/` directory, then run tests. In dev mode, if `OAUTH_CLIENT_SECRET` is not set, a random secret is auto-generated and printed to the console - copy it into `-ClientSecret`.
 
 ```powershell
-# Terminal 1 — start server
+# Terminal 1 - start server
 cd api
 $env:PORT = 6000
 npx ts-node-dev --respawn --transpile-only src/main.ts
 
-# Terminal 2 — run tests (use the auto-generated secret from server output)
+# Terminal 2 - run tests (use the auto-generated secret from server output)
 .\scripts\live-test.ps1
 # Or with a known secret:
 $env:OAUTH_CLIENT_SECRET = "changeme-oauth"   # set on server side
@@ -387,4 +387,4 @@ az containerapp revision list -n <app-name> -g <rg> -o table
 
 ---
 
-**Last Updated:** March 2026
+**Last Updated:** April 2026

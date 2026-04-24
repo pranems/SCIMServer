@@ -1,5 +1,5 @@
 /**
- * Unit Tests — Tighten-Only Validator (Phase 13, Step 2.3)
+ * Unit Tests - Tighten-Only Validator (Phase 13, Step 2.3)
  *
  * Validates that attribute characteristic overrides are correctly
  * accepted (tightening) or rejected (loosening) for each dimension.

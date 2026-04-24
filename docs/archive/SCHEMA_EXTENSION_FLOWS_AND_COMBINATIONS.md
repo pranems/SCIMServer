@@ -1,4 +1,4 @@
-# Schema Extension Flows & Combinations — Behavior Matrices
+# Schema Extension Flows & Combinations - Behavior Matrices
 
 > **⚠️ Partially Superseded (v0.28.0)**: The `EndpointSchema` and `EndpointResourceType` tables/repos (including `IEndpointSchemaRepository`, `IEndpointResourceTypeRepository`) were removed in Phase 13. Schema data now lives in `Endpoint.profile` JSONB. See [SCHEMA_TEMPLATES_DESIGN.md](SCHEMA_TEMPLATES_DESIGN.md).
 
@@ -37,11 +37,11 @@ This document provides exhaustive behavior matrices covering every combination o
 | Valid URN, valid endpoint, valid RT | provided | `"Group"` | ✅ Registered per-endpoint | Overlay |
 | Valid URN, valid endpoint, no RT | provided | `undefined` | ✅ Registered per-endpoint (schema only, no RT link) | Overlay |
 | Valid URN, no endpoint | `undefined` | `"User"` | ✅ Registered globally | Global |
-| Core schema URN | provided | any | ❌ Error: "Cannot overwrite core schema" | — |
-| Duplicate URN (same endpoint) | provided | any | ❌ 409: Schema already registered | — |
+| Core schema URN | provided | any | ❌ Error: "Cannot overwrite core schema" | - |
+| Duplicate URN (same endpoint) | provided | any | ❌ 409: Schema already registered | - |
 | Duplicate URN (different endpoint) | different | any | ✅ Registered (per-endpoint isolation) | Overlay |
-| Empty URN | any | any | ❌ Error: Non-empty id required | — |
-| Invalid endpoint | nonexistent | any | ❌ 404: Endpoint not found | — |
+| Empty URN | any | any | ❌ Error: Non-empty id required | - |
+| Invalid endpoint | nonexistent | any | ❌ 404: Endpoint not found | - |
 
 ### 1.2 Unregistration Outcomes
 
@@ -133,7 +133,7 @@ This document provides exhaustive behavior matrices covering every combination o
 | `true` | `false` | `meta.created` in op | ❌ 400: readOnly attribute |
 | `true` | `true` | `meta.created` in op | ✅ Silently stripped |
 
-> **Note**: `id` is never rejected (even in strict mode) — it's always stripped to let downstream G8c handle it. This prevents double-error reporting.
+> **Note**: `id` is never rejected (even in strict mode) - it's always stripped to let downstream G8c handle it. This prevents double-error reporting.
 
 ### 3.4 readOnly Attribute Handling Across Operations
 
@@ -177,7 +177,7 @@ This document provides exhaustive behavior matrices covering every combination o
 | Config Flag | SPC Field Affected | `false` Value | `true` Value |
 |-------------|-------------------|---------------|--------------|
 | `BulkOperationsEnabled` | `bulk.supported` | `false` | `true` |
-| All others | — | No change | No change |
+| All others | - | No change | No change |
 
 > The SPC is generated dynamically using `ScimSchemaRegistry.getServiceProviderConfig(config)`. Only `bulk.supported` changes based on config; all other SPC values are static.
 
@@ -191,7 +191,7 @@ This document provides exhaustive behavior matrices covering every combination o
 |----------------|-----------------|-----------------|
 | `schemas: ["core:User"]`, no extension data | ✅ Accept | ✅ Accept |
 | `schemas: ["core:User", "enterprise:User"]`, with enterprise data | ✅ Accept | ✅ Accept |
-| `schemas: ["core:User", "enterprise:User"]`, NO enterprise data | ✅ Accept | ✅ Accept (URN declared, no data — harmless) |
+| `schemas: ["core:User", "enterprise:User"]`, NO enterprise data | ✅ Accept | ✅ Accept (URN declared, no data - harmless) |
 | `schemas: ["core:User"]`, WITH enterprise data in body | ✅ Accept (extension data stored) | ❌ 400: Undeclared extension data |
 | `schemas: ["core:User", "urn:unknown"]`, with unknown data | ✅ Accept (unknown stored) | ❌ 400: Unregistered schema URN |
 | No `schemas` field | ✅ Accept (auto-built) | ❌ 400: Missing schemas |
@@ -210,7 +210,7 @@ This document provides exhaustive behavior matrices covering every combination o
 | Group with no extensions | `["urn:...core:2.0:Group"]` |
 | Custom RT "Device" | `["urn:...core:2.0:Device"]` |
 
-> Built by `ScimDiscoveryService.buildResourceSchemas()` — only includes URNs where `payload[urn] !== undefined`.
+> Built by `ScimDiscoveryService.buildResourceSchemas()` - only includes URNs where `payload[urn] !== undefined`.
 
 ---
 
@@ -278,7 +278,7 @@ const urnMatch = path.match(/^(urn:[^.]+(?:\.\d+)*(?::[^.]+)*)\.(.+)$/);
 |------|----------|---------------|--------|
 | `urn:example:2.0:User.department` | `urn:example:2.0:User` | `department` | Navigate into `payload["urn:example:2.0:User"]["department"]` |
 | `urn:example:2.0:User.address.city` | `urn:example:2.0:User` | `address.city` | Navigate into `payload["urn:example:2.0:User"]["address"]["city"]` |
-| `displayName` | No match | — | Navigate into `payload["displayName"]` directly |
+| `displayName` | No match | - | Navigate into `payload["displayName"]` directly |
 
 ### 7.3 PATCH Operation × Extension × Result
 
@@ -287,10 +287,10 @@ const urnMatch = path.match(/^(urn:[^.]+(?:\.\d+)*(?::[^.]+)*)\.(.+)$/);
 | `add` | `urn:ext:department` | `"Eng"` | No extension data | `{"urn:ext": {"department": "Eng"}}` created |
 | `add` | `urn:ext:department` | `"Eng"` | `{"urn:ext": {"floor": 3}}` | `{"urn:ext": {"floor": 3, "department": "Eng"}}` merged |
 | `replace` | `urn:ext:department` | `"Mkt"` | `{"urn:ext": {"department": "Eng"}}` | `{"urn:ext": {"department": "Mkt"}}` |
-| `remove` | `urn:ext:department` | — | `{"urn:ext": {"department": "Eng", "floor": 3}}` | `{"urn:ext": {"floor": 3}}` |
-| `remove` | `urn:ext` | — | `{"urn:ext": {"department": "Eng"}}` | Extension block removed entirely |
-| `add` (no path) | — | `{"urn:ext": {"department": "Eng"}}` | No extension data | Extension block added to root |
-| `replace` (no path) | — | `{"urn:ext": {"department": "Eng"}}` | `{"urn:ext": {"floor": 3}}` | Extension block replaced entirely |
+| `remove` | `urn:ext:department` | - | `{"urn:ext": {"department": "Eng", "floor": 3}}` | `{"urn:ext": {"floor": 3}}` |
+| `remove` | `urn:ext` | - | `{"urn:ext": {"department": "Eng"}}` | Extension block removed entirely |
+| `add` (no path) | - | `{"urn:ext": {"department": "Eng"}}` | No extension data | Extension block added to root |
+| `replace` (no path) | - | `{"urn:ext": {"department": "Eng"}}` | `{"urn:ext": {"floor": 3}}` | Extension block replaced entirely |
 
 ---
 
@@ -348,8 +348,8 @@ const urnMatch = path.match(/^(urn:[^.]+(?:\.\d+)*(?::[^.]+)*)\.(.+)$/);
 | Scenario | `IEndpointSchemaRepository` | `IEndpointResourceTypeRepository` | Hydration |
 |----------|----------------------------|------------------------------------|-----------|
 | Both repos provided | ✅ Injected | ✅ Injected | Full hydration |
-| Schema repo only | ✅ Injected | `@Optional()` — null | Schema hydration only |
-| Neither repo (standalone) | `@Optional()` — null | `@Optional()` — null | Built-in schemas only |
+| Schema repo only | ✅ Injected | `@Optional()` - null | Schema hydration only |
+| Neither repo (standalone) | `@Optional()` - null | `@Optional()` - null | Built-in schemas only |
 
 ---
 
@@ -362,7 +362,7 @@ const urnMatch = path.match(/^(urn:[^.]+(?:\.\d+)*(?::[^.]+)*)\.(.+)$/);
 | Core schema URN | 400 | `invalidValue` | Cannot overwrite core schema: {urn} |
 | Duplicate URN | 409 | `uniqueness` | Schema already registered: {urn} |
 | Empty URN | 400 | `invalidValue` | Schema URN must not be empty |
-| Endpoint not found | 404 | — | Endpoint not found: {id} |
+| Endpoint not found | 404 | - | Endpoint not found: {id} |
 
 ### 10.2 Custom Resource Type Registration Errors
 
@@ -372,7 +372,7 @@ const urnMatch = path.match(/^(urn:[^.]+(?:\.\d+)*(?::[^.]+)*)\.(.+)$/);
 | Reserved name | 400 | `invalidValue` | Reserved resource type name: {name} |
 | Reserved path | 400 | `invalidValue` | Reserved endpoint path: {path} |
 | Duplicate name | 409 | `uniqueness` | Resource type already registered: {name} |
-| Endpoint not found | 404 | — | Endpoint not found: {id} |
+| Endpoint not found | 404 | - | Endpoint not found: {id} |
 
 ### 10.3 Schema Validation Errors (Strict Mode)
 
@@ -380,12 +380,12 @@ const urnMatch = path.match(/^(urn:[^.]+(?:\.\d+)*(?::[^.]+)*)\.(.+)$/);
 |-----------|------------|----------------|
 | Missing `schemas[]` | V25 | Missing required attribute: schemas |
 | Missing core URN in `schemas[]` | V25 | Core schema URN not found in schemas array |
-| Unregistered extension URN | — | Unregistered schema URN: {urn} |
+| Unregistered extension URN | - | Unregistered schema URN: {urn} |
 | Missing required attribute | V9 | Missing required attribute: {name} |
 | Type mismatch | V31 | Expected {type} for attribute: {name} |
-| readOnly attribute on write | — | Attribute '{name}' is readOnly |
+| readOnly attribute on write | - | Attribute '{name}' is readOnly |
 | Immutable attribute changed | H-2 | Cannot modify immutable attribute: {name} |
-| Unknown attribute | — | Unknown attribute: {name} |
+| Unknown attribute | - | Unknown attribute: {name} |
 | Invalid dateTime format | V31 | Invalid dateTime format for: {name} |
 | Invalid canonical value | V10 | Invalid value for {name}: {value} |
 
@@ -492,33 +492,33 @@ sequenceDiagram
     participant SCIM as SCIM API
     participant Val as SchemaValidator
 
-    Note over Op: Phase 1 — Registration
+    Note over Op: Phase 1 - Registration
     Op->>Admin: POST /admin/endpoints/ep1/schemas<br/>{schemaUrn, attributes[]}
     Admin->>Admin: Validate endpoint + check duplicate
     Admin->>Repo: create(record)
     Admin->>Reg: registerExtension(def, "User", false, "ep1")
     Reg->>Reg: Store in endpointOverlays["ep1"]
 
-    Note over Op: Phase 2 — Discovery Verification
+    Note over Op: Phase 2 - Discovery Verification
     Op->>Disc: GET /endpoints/ep1/Schemas
     Disc->>Reg: getAllSchemas("ep1")
     Reg-->>Disc: Global + Overlay schemas
     Disc-->>Op: ListResponse with new extension
 
-    Note over Op: Phase 3 — Usage
+    Note over Op: Phase 3 - Usage
     Op->>SCIM: POST /endpoints/ep1/Users<br/>{schemas: [..., extUrn], extUrn: {dept: "Eng"}}
     SCIM->>Val: validate(payload, schemas) [if strict]
     Val-->>SCIM: Valid
     SCIM->>SCIM: Store in JSONB
 
-    Note over Op: Phase 4 — Read Back
+    Note over Op: Phase 4 - Read Back
     Op->>SCIM: GET /endpoints/ep1/Users/:id
     SCIM->>SCIM: Load from JSONB
     SCIM->>SCIM: buildResourceSchemas() → includes extUrn
     SCIM->>SCIM: Apply returned filtering
     SCIM-->>Op: Response with extension data
 
-    Note over Op: Phase 5 — Deregistration (optional)
+    Note over Op: Phase 5 - Deregistration (optional)
     Op->>Admin: DELETE /admin/endpoints/ep1/schemas/:urn
     Admin->>Repo: delete(ep1, urn)
     Admin->>Reg: unregisterExtension(urn, "ep1")

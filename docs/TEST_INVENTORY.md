@@ -1,4 +1,4 @@
-# Complete Test Inventory — SCIMServer
+# Complete Test Inventory - SCIMServer
 
 > **Generated**: Auto-generated test inventory  
 > **Project**: `c:\Users\v-prasrane\source\repos\SCIMServer\api`  
@@ -35,13 +35,13 @@
   - **verbosePatch=true, extensionUrns=undefined**: resolve dot-notation to nested object, still resolve extension URN, handle dot-notation + extension URN in sequence
   - **verbosePatch=true, extensionUrns=[custom URNs]**: resolve custom URN A/B paths, handle both custom URNs in single PATCH, handle dot-notation alongside custom extension URNs, remove custom extension attribute, handle enterprise + custom + dot-notation + core all in one request
 - **No-path merge with extension URN keys (UserPatchEngine)**: resolve enterprise URN key, resolve custom URN key, resolve multiple extension URN keys, resolve extension URN keys + dot-notation
-- **Enterprise URN — add operation (UserPatchEngine)**: add enterprise extension attribute, add to existing extension block, overwrite enterprise attribute
+- **Enterprise URN - add operation (UserPatchEngine)**: add enterprise extension attribute, add to existing extension block, overwrite enterprise attribute
 - **MSFT test extension URNs (UserPatchEngine)**: replace/add/remove via MSFT custom/IETF URN, handle all three URNs in one request
 - **GroupMemberPatchConfig flag matrix**: allowMultiMemberAdd (accept/reject/single), allowMultiMemberRemove (accept/reject/single), allowRemoveAllMembers (clear/reject), mixed flag combinations
-- **GroupPatchEngine — MSFT extension URNs**: replace/add/remove via MSFT custom group URN, handle MSFT extension + member ops, no-path with MSFT extension URN key
+- **GroupPatchEngine - MSFT extension URNs**: replace/add/remove via MSFT custom group URN, handle MSFT extension + member ops, no-path with MSFT extension URN key
 - **Empty value removal in extension attributes**: remove when null, remove when empty string
 - **Complex extension attribute values**: store complex object, store array, replace existing, handle boolean and number values
-- **GroupPatchEngine — extension + flag combination flows**: add extension + single member, fail on multi-member add but succeed on extension op, replace extension + displayName + remove member
+- **GroupPatchEngine - extension + flag combination flows**: add extension + single member, fail on multi-member add but succeed on extension op, replace extension + displayName + remove member
 - **Inactive user + extension attribute operations**: add/remove extension on inactive user, reactivate + add extension + dot-notation
 - **Multiple extension blocks in rawPayload** (User + Group): independently update two extension blocks, add to one ext and remove from another
 
@@ -68,12 +68,12 @@
   - **extension URN support**: replace/add/remove via URN-prefixed path, resolve extension URN keys in no-path
 
 ### 1.5 `src/domain/patch/patch-engine-v19-v20.spec.ts`
-- **V19 — prototype pollution guard (UserPatchEngine)**: reject \_\_proto\_\_ in dot-notation, constructor in path, prototype in path, \_\_proto\_\_ as simple path, strip \_\_proto\_\_ from no-path merge objects, allow normal dot-notation
-- **V19 — prototype pollution guard (GroupPatchEngine)**: strip \_\_proto\_\_/constructor/prototype from no-path replace objects
-- **V19 — deep dot-notation prototype pollution**: reject deeply nested \_\_proto\_\_, constructor in second segment, accept safe multi-segment
-- **V20 — reserved attribute stripping (UserPatchEngine)**: strip meta/schemas/id from rawPayload via add/replace ops, allow non-reserved
-- **V20 — reserved attribute stripping — additional edge cases**: strip multiple reserved in single no-path, meta via replace with path, schemas via add with path
-- **V20 — reserved attribute stripping (GroupPatchEngine)**: strip meta/schemas from no-path replace, pass id through in groups, allow non-reserved
+- **V19 - prototype pollution guard (UserPatchEngine)**: reject \_\_proto\_\_ in dot-notation, constructor in path, prototype in path, \_\_proto\_\_ as simple path, strip \_\_proto\_\_ from no-path merge objects, allow normal dot-notation
+- **V19 - prototype pollution guard (GroupPatchEngine)**: strip \_\_proto\_\_/constructor/prototype from no-path replace objects
+- **V19 - deep dot-notation prototype pollution**: reject deeply nested \_\_proto\_\_, constructor in second segment, accept safe multi-segment
+- **V20 - reserved attribute stripping (UserPatchEngine)**: strip meta/schemas/id from rawPayload via add/replace ops, allow non-reserved
+- **V20 - reserved attribute stripping - additional edge cases**: strip multiple reserved in single no-path, meta via replace with path, schemas via add with path
+- **V20 - reserved attribute stripping (GroupPatchEngine)**: strip meta/schemas from no-path replace, pass id through in groups, allow non-reserved
 
 ### 1.6 `src/domain/patch/patch-error.spec.ts`
 - **PatchError**: extends Error, set name, capture status/detail/scimType, stack trace, different HTTP status codes
@@ -97,25 +97,25 @@
   - **custom extension URN support**: replace/add/remove custom extension, resolve in no-path, NOT resolve without config
 
 ### 1.8 `src/domain/validation/extension-flags-validation.spec.ts`
-- **Extension schema — canonical values (V10)**: accept valid, reject non-canonical (strict), accept case-insensitively, reject via PATCH pre-validation, reject invalid employeeType
-- **Extension block validation — non-object shapes**: skip array/string/number, accept empty object
-- **Immutable extension attributes — checkImmutable**: reject change, accept unchanged, accept absent, accept first-time set
+- **Extension schema - canonical values (V10)**: accept valid, reject non-canonical (strict), accept case-insensitively, reject via PATCH pre-validation, reject invalid employeeType
+- **Extension block validation - non-object shapes**: skip array/string/number, accept empty object
+- **Immutable extension attributes - checkImmutable**: reject change, accept unchanged, accept absent, accept first-time set
 - **Extension validation across strictMode × mode matrix**: valid ext, missing required, unknown ext
-- **Multi-extension schemas — flag matrix interactions**: both required, one missing, patch mode permissive, partial, reject/accept unknown URN
-- **validatePatchOperationValue — extension complex types**: validate/reject complex, validate/reject integer, validate/reject no-path extension
+- **Multi-extension schemas - flag matrix interactions**: both required, one missing, patch mode permissive, partial, reject/accept unknown URN
+- **validatePatchOperationValue - extension complex types**: validate/reject complex, validate/reject integer, validate/reject no-path extension
 - **Group schema with custom extension**: validate/reject group extension, accept/reject unknown attrs, validate patch mode
-- **Extension attributes — all SCIM types**: accept/reject each type, complex sub-attributes, multi-valued
+- **Extension attributes - all SCIM types**: accept/reject each type, complex sub-attributes, multi-valued
 - **Extension mutability flags across modes**: readOnly/writeOnly/immutable/readWrite on create/replace/patch
-- **Error accumulation — core + multiple extensions**: accumulate errors across core + extensions
+- **Error accumulation - core + multiple extensions**: accumulate errors across core + extensions
 
 ### 1.9 `src/domain/validation/schema-validator-comprehensive.spec.ts`
 - **flag combination matrix**: required attribute enforcement per mode, unknown attribute enforcement per strictMode, valid payload passes all 6 combinations, readOnly attribute rejected on create/replace but not patch
 - **exhaustive type validation**: string/boolean/integer/decimal/reference/binary/dateTime (accept/reject each), complex type variations
 - **dateTime format edge cases**: extensive date format tests
-- **mutability — immutable/writeOnly/readOnly**: allow/reject per operation mode
-- **multi-valued arrays — all types**: accept/reject string/integer/decimal/boolean/reference/dateTime/binary arrays, multiple errors
+- **mutability - immutable/writeOnly/readOnly**: allow/reject per operation mode
+- **multi-valued arrays - all types**: accept/reject string/integer/decimal/boolean/reference/dateTime/binary arrays, multiple errors
 - **core Group schema validation**: valid Group, require displayName, reject non-array members, unknown attributes, empty members
-- **extension schema — deep validation**: required extension attrs (create/replace/patch), type validation, readOnly extension, complex sub-attributes, unknown extension attrs, case-insensitive matching
+- **extension schema - deep validation**: required extension attrs (create/replace/patch), type validation, readOnly extension, complex sub-attributes, unknown extension attrs, case-insensitive matching
 - **custom extension schemas**: validate/reject custom extension
 - **multiple extension schemas simultaneously**: two/three extensions, catch errors
 - **deeply nested complex sub-attributes**: full name, phoneNumbers, addresses validation
@@ -126,8 +126,8 @@
 - **readOnly sub-attributes in multi-valued complex**: members display sub-attr
 - **Group schema with extension**: validate/reject Group with custom extension
 - **additional edge cases**: undefined values, 0, negative integer, empty string, false, MAX_SAFE_INTEGER, NaN, Infinity, deeply nested unknown, large number of attributes, large multi-valued array, unregistered extension URN, only extension block, scimType in errors
-- **multi-valued complex — mixed valid and invalid**: report errors per element
-- **patch mode — permissive required checking**: skip required on patch, still enforce type/strict
+- **multi-valued complex - mixed valid and invalid**: report errors per element
+- **patch mode - permissive required checking**: skip required on patch, still enforce type/strict
 - **validation error structure**: include path/message/scimType, array index, extension URN prefix
 
 ### 1.10 `src/domain/validation/schema-validator-v16-v32.spec.ts`
@@ -136,16 +136,16 @@
 - **SchemaValidator.collectReturnedCharacteristics (G8e)**: collect returned:never/request, from multiple schemas, from sub-attributes, lowercase, ignore always/default, empty list, without returned property, case-insensitive, from real User schema
 
 ### 1.11 `src/domain/validation/schema-validator-v2-v10-v25-v31.spec.ts`
-- **V2 — validatePatchOperationValue**: pass/reject simple string, complex sub-attribute, no-path object, skip remove, value-filter paths, extension attribute, unknown paths
-- **V9 — required sub-attribute enforcement**: reject missing required on create, pass when present, skip on patch
-- **V10 — canonical value enforcement**: pass/reject canonical values, sub-attribute
-- **V25 — schemas array validation**: reject non-string, unknown URN (strict), pass valid, reject non-array
-- **V31 — strict xsd:dateTime format validation**: accept valid ISO 8601 (Z, offset, fractional), reject date-only/no-timezone/non-string/garbage
-- **V2 — additional cases**: add operation, no-path add with extension, multi-valued attribute array, canonical via PATCH
-- **V9 — required sub-attributes in multi-valued and extension**: reject multi-valued complex missing required, extension complex missing required
-- **V25 — schemas in non-strict mode**: accept unknown URN, accept empty schemas
-- **V31 — dateTime additional edge cases**: negative offset, fractional + positive offset, out-of-range month, space separator
-- **G8c — readOnly attribute rejection in PATCH**: path-based (replace/add/remove readOnly, allow readWrite, sub-attr, extension, value-filter), no-path (reject/allow readOnly core/extension, skip reserved keys), case-insensitive, remove operations
+- **V2 - validatePatchOperationValue**: pass/reject simple string, complex sub-attribute, no-path object, skip remove, value-filter paths, extension attribute, unknown paths
+- **V9 - required sub-attribute enforcement**: reject missing required on create, pass when present, skip on patch
+- **V10 - canonical value enforcement**: pass/reject canonical values, sub-attribute
+- **V25 - schemas array validation**: reject non-string, unknown URN (strict), pass valid, reject non-array
+- **V31 - strict xsd:dateTime format validation**: accept valid ISO 8601 (Z, offset, fractional), reject date-only/no-timezone/non-string/garbage
+- **V2 - additional cases**: add operation, no-path add with extension, multi-valued attribute array, canonical via PATCH
+- **V9 - required sub-attributes in multi-valued and extension**: reject multi-valued complex missing required, extension complex missing required
+- **V25 - schemas in non-strict mode**: accept unknown URN, accept empty schemas
+- **V31 - dateTime additional edge cases**: negative offset, fractional + positive offset, out-of-range month, space separator
+- **G8c - readOnly attribute rejection in PATCH**: path-based (replace/add/remove readOnly, allow readWrite, sub-attr, extension, value-filter), no-path (reject/allow readOnly core/extension, skip reserved keys), case-insensitive, remove operations
 
 ### 1.12 `src/domain/validation/schema-validator.spec.ts`
 - **SchemaValidator**: valid payloads (minimal, all required, optional omitted, null optional, skip reserved)
@@ -153,17 +153,17 @@
   - **type checking**: each type (string/boolean/integer/decimal/reference/binary/dateTime/complex) accept/reject, unknown type
   - **mutability constraints**: readOnly rejected on create/replace, allow readWrite/writeOnly/immutable
   - **multi-valued enforcement**: reject/accept non-array/array/empty, reject array for single-valued, validate each element
-  - **strict mode — unknown attributes**: ignore/reject unknown, multiple unknown, not flag reserved
+  - **strict mode - unknown attributes**: ignore/reject unknown, multiple unknown, not flag reserved
   - **sub-attribute validation**: validate/reject sub-attrs, unknown sub-attrs strict/non-strict
   - **extension schema validation**: validate under URN key, wrong type, missing required, absent block, unknown extension attrs
   - **case-insensitive attribute matching**: attribute names, sub-attribute names
   - **multi-valued complex elements**: validate each, reject invalid sub-attr
   - **edge cases**: empty schemas, only reserved keys, multiple schemas, no matching schema, collect all errors
   - **checkImmutable**: no immutable attrs, first write, unchanged, changed, omitted, null, extension, multi-valued complex, multiple violations, case-insensitive, same complex, changed complex
-  - **collectReturnedCharacteristics — R-MUT-1 writeOnly**: writeOnly → never, explicitly never, not readWrite/readOnly
-  - **collectReturnedCharacteristics — R-RET-3 alwaysSubs**: sub-attrs with returned:always, no always sub-attrs
-  - **collectCaseExactAttributes — R-CASE-1**: top-level, sub-attr dotted path, both parent and sub, empty set
-  - **collectReadOnlyAttributes — R-MUT-2 sub-attrs**: readOnly sub-attrs within readWrite parents (core/extension), NOT sub-attrs of readOnly parents
+  - **collectReturnedCharacteristics - R-MUT-1 writeOnly**: writeOnly → never, explicitly never, not readWrite/readOnly
+  - **collectReturnedCharacteristics - R-RET-3 alwaysSubs**: sub-attrs with returned:always, no always sub-attrs
+  - **collectCaseExactAttributes - R-CASE-1**: top-level, sub-attr dotted path, both parent and sub, empty set
+  - **collectReadOnlyAttributes - R-MUT-2 sub-attrs**: readOnly sub-attrs within readWrite parents (core/extension), NOT sub-attrs of readOnly parents
 
 ### 1.13 `src/infrastructure/repositories/inmemory/inmemory-endpoint-resource-type.repository.spec.ts`
 - **InMemoryEndpointResourceTypeRepository**: create (generated UUID, reject duplicate name, reject duplicate path), findByEndpointId (return all, empty for unknown), findAll (all records), findByEndpointAndName (find/return null), deleteByEndpointAndName (delete/return false), deleteByEndpointId (delete all/return 0)
@@ -187,10 +187,10 @@
 - **PrismaEndpointSchemaRepository**: create (correct data, map record, default nulls, default required), findByEndpointId (query matching, mapped records, empty), findAll (no where, map all, empty), findByEndpointAndUrn (composite key, mapped/null), deleteByEndpointAndUrn (delete/false), deleteByEndpointId (deleteMany/0), record mapping (preserve JSONB, empty attributes)
 
 ### 1.20 `src/infrastructure/repositories/prisma/prisma-group.repository.spec.ts`
-- **PrismaGroupRepository (Phase 2 — unified table)**: create (insert with resourceType "Group", map row), findByScimId (with resourceType, null non-UUID, null not found), findWithMembers (null non-UUID, include membersAsGroup, map ResourceMember, handle null memberResourceId), findAllWithMembers (include resourceType + membersAsGroup, merge dbFilter, map all), update (by id), delete (by id), findByDisplayName (scope to Group, exclude scimId), findByExternalId (scope to Group, mapped), addMembers (insert into resourceMember, skip empty), updateGroupWithMembers (transaction, no members when empty)
+- **PrismaGroupRepository (Phase 2 - unified table)**: create (insert with resourceType "Group", map row), findByScimId (with resourceType, null non-UUID, null not found), findWithMembers (null non-UUID, include membersAsGroup, map ResourceMember, handle null memberResourceId), findAllWithMembers (include resourceType + membersAsGroup, merge dbFilter, map all), update (by id), delete (by id), findByDisplayName (scope to Group, exclude scimId), findByExternalId (scope to Group, mapped), addMembers (insert into resourceMember, skip empty), updateGroupWithMembers (transaction, no members when empty)
 
 ### 1.21 `src/infrastructure/repositories/prisma/prisma-user.repository.spec.ts`
-- **PrismaUserRepository (Phase 2 — unified table)**: create (insert with resourceType "User", map row), findByScimId (with resourceType filter, null non-UUID, null not found, mapped), findAll (include resourceType, merge dbFilter, custom orderBy, map all), update (by id), delete (by id), findConflict (scope to User, check userName/externalId, exclude scimId, mapped/null), findByScimIds (empty input, with resourceType, filter non-UUID, empty when all non-UUID)
+- **PrismaUserRepository (Phase 2 - unified table)**: create (insert with resourceType "User", map row), findByScimId (with resourceType filter, null non-UUID, null not found, mapped), findAll (include resourceType, merge dbFilter, custom orderBy, map all), update (by id), delete (by id), findConflict (scope to User, check userName/externalId, exclude scimId, mapped/null), findByScimIds (empty input, with resourceType, filter non-UUID, empty when all non-UUID)
 
 ### 1.22 `src/infrastructure/repositories/prisma/uuid-guard.spec.ts`
 - **isValidUuid**: accept v4 (lowercase/uppercase/mixed), v1, v7, nil-equivalent; reject empty, plain text, slug, without hyphens, extra chars, wrong segment, invalid hex, numeric, spaces
@@ -222,7 +222,7 @@
 - **ENDPOINT_CONFIG_FLAGS**: all expected keys
 - **getConfigBoolean**: undefined/non-existent/boolean true/false/strings "true"/"True"/"TRUE"/"false"/"False"/"1"/"0"/other/number/object, MultiOpPatch flag
 - **getConfigString**: undefined/non-existent/string/boolean/number/object/custom flags
-- **validateEndpointConfig**: undefined/empty config; validation for each of 14+ flags (MultiOpPatchAdd/Remove, PatchOpAllowRemoveAllMembers, VerbosePatchSupported, logLevel, UserSoftDeleteEnabled, StrictSchemaValidation, AllowAndCoerceBooleanStrings, RequireIfMatch, ReprovisionOnConflict, CustomResourceTypesEnabled, BulkOperationsEnabled, PerEndpointCredentialsEnabled, IncludeWarningAboutIgnoredReadOnlyAttribute, IgnoreReadOnlyAttributesInPatch) — each with boolean/string/invalid/error message tests
+- **validateEndpointConfig**: undefined/empty config; validation for each of 14+ flags (MultiOpPatchAdd/Remove, PatchOpAllowRemoveAllMembers, VerbosePatchSupported, logLevel, UserSoftDeleteEnabled, StrictSchemaValidation, AllowAndCoerceBooleanStrings, RequireIfMatch, ReprovisionOnConflict, CustomResourceTypesEnabled, BulkOperationsEnabled, PerEndpointCredentialsEnabled, IncludeWarningAboutIgnoredReadOnlyAttribute, IgnoreReadOnlyAttributesInPatch) - each with boolean/string/invalid/error message tests
 - **DEFAULT_ENDPOINT_CONFIG**: expected defaults, logLevel undefined
 - **getConfigBooleanWithDefault**: undefined/missing/actual/parse strings/default for AllowAndCoerceBooleanStrings
 
@@ -340,12 +340,12 @@
 - **CreateEndpointSchemaDto**: pass complete valid, required fields only, empty attributes; schemaUrn (fail missing/empty/long/non-string); name (fail missing/empty/long); description (pass omitted, fail non-string); resourceTypeId (pass omitted, fail long); required (pass omitted/true, fail non-boolean); attributes (fail missing/non-array); SchemaAttributeDto (pass valid/all optional, fail missing name/type, non-boolean multiValued/required, accept nested subAttributes)
 
 ### 1.58 `src/modules/scim/dto/dto-hardening.spec.ts`
-- **V15 — PatchOperationDto.op @IsIn**: accept add/Replace, reject delete/patch
-- **V14 — PatchUserDto/PatchGroupDto.Operations @ArrayMaxSize**: accept 1/1000, reject >1000
-- **V28 — CreateUserDto.userName @IsNotEmpty**: accept non-empty, reject empty/whitespace
-- **V7 — GroupMemberDto.value @IsNotEmpty**: accept non-empty, reject empty
-- **V5 — SearchRequestDto**: accept valid, reject invalid sortOrder/startIndex/count, accept empty; @MaxLength (attributes/excludedAttributes/filter/sortBy)
-- **CreateGroupDto — displayName @IsNotEmpty**: reject empty, accept non-empty
+- **V15 - PatchOperationDto.op @IsIn**: accept add/Replace, reject delete/patch
+- **V14 - PatchUserDto/PatchGroupDto.Operations @ArrayMaxSize**: accept 1/1000, reject >1000
+- **V28 - CreateUserDto.userName @IsNotEmpty**: accept non-empty, reject empty/whitespace
+- **V7 - GroupMemberDto.value @IsNotEmpty**: accept non-empty, reject empty
+- **V5 - SearchRequestDto**: accept valid, reject invalid sortOrder/startIndex/count, accept empty; @MaxLength (attributes/excludedAttributes/filter/sortBy)
+- **CreateGroupDto - displayName @IsNotEmpty**: reject empty, accept non-empty
 - **V15 additional**: accept remove/Remove/Add, reject empty string/numeric op
 - **CreateUserDto additional**: reject empty schemas, non-boolean active, accept boolean, reject non-string/accept string externalId
 - **CreateGroupDto schemas @ArrayNotEmpty**: reject empty, accept non-empty
@@ -361,7 +361,7 @@
 - **ScimExceptionFilter**: defined; SCIM error responses (Content-Type, status as string, preserve body, 409 conflict, 500 ISE); Non-SCIM HttpExceptions (wrap generic, handle object-based, fallback to error field)
 
 ### 1.61 `src/modules/scim/filters/scim-filter-parser.spec.ts`
-- **ScimFilterParser**: parseScimFilter — simple comparisons (eq/ne/co/sw/ew/gt/ge/lt/le/pr, boolean/false/null/numeric, dotted path, case-insensitive operators); logical expressions (AND, OR, precedence, chained AND); NOT and grouping (NOT, grouped, complex grouping); value paths (basic, compound filter); URN paths (URN-prefixed attribute); error handling (empty/unterminated/missing value/unexpected token)
+- **ScimFilterParser**: parseScimFilter - simple comparisons (eq/ne/co/sw/ew/gt/ge/lt/le/pr, boolean/false/null/numeric, dotted path, case-insensitive operators); logical expressions (AND, OR, precedence, chained AND); NOT and grouping (NOT, grouped, complex grouping); value paths (basic, compound filter); URN paths (URN-prefixed attribute); error handling (empty/unterminated/missing value/unexpected token)
   - **evaluateFilter**: eq (case-insensitive, different value, boolean, null missing), ne (differ/equal), co (substring, case-insensitive), sw (prefix/non-prefix), ew (suffix), gt/ge/lt/le (dates, le), pr (present/missing/non-empty/empty array), AND (both/one side), OR (either/neither), NOT (negate both), dotted paths (nested/meta), value paths (match/no match/compound/partial fail), URN paths (extension/nested), complex real-world filters (Entra ID, compound OR+pr, deeply nested); R-CASE-1 (case-sensitive eq/co/sw for caseExact, case-insensitive for non-caseExact, propagate through AND/OR/NOT); resolveAttrPath (top-level/dotted/undefined/URN/case-insensitive); depth guard V12 (moderate nesting, exceed MAX_FILTER_DEPTH, deeply nested parens, exactly 50 levels); extractFilterPaths (single/multiple/deduplicate/valuePath/NOT/pr/dotted/URN)
 
 ### 1.62 `src/modules/scim/interceptors/scim-content-type.interceptor.spec.ts`
@@ -393,8 +393,8 @@
   - **config flag combinations**: StrictSchema, hard-delete despite other flags, reject unknown extension
   - **ETag & Conditional Requests**: patchGroup (match/mismatch/428 no header/wildcard), replaceGroup (match/mismatch/428), deleteGroup (match/mismatch/428), ETag format W/"v{N}"
   - **AllowAndCoerceBooleanStrings**: create (coerce "True"/"False", reject when disabled, coerce complex sub-attrs, not coerce non-boolean, pass through without extension); replace (coerce/reject); patch (coerce in replace value/post-PATCH/add); flag interaction matrix (StrictSchema×Coerce combinations)
-  - **G8e — returned characteristic filtering**: strip returned:never, getRequestOnlyAttributes
-  - **G8f — uniqueness enforcement on PUT/PATCH**: replace (reject displayName/externalId conflict, allow self-update, pass excludeScimId, skip null externalId); patch (reject displayName/externalId conflict, allow self, pass excludeScimId, skip null externalId)
+  - **G8e - returned characteristic filtering**: strip returned:never, getRequestOnlyAttributes
+  - **G8f - uniqueness enforcement on PUT/PATCH**: replace (reject displayName/externalId conflict, allow self-update, pass excludeScimId, skip null externalId); patch (reject displayName/externalId conflict, allow self, pass excludeScimId, skip null externalId)
 
 ### 1.67 `src/modules/scim/services/endpoint-scim-users.service.spec.ts`
 - **EndpointScimUsersService**: ~150+ tests covering:
@@ -412,16 +412,16 @@
   - **config flag combinations**: UserSoftDeleteEnabled + StrictSchema both true, enforce strict PATCH with deactivation, reject unknown extension, allow valid extension with all flags
   - **ETag & Conditional Requests**: patchUser (match/mismatch/428/RequireIfMatch=false/wildcard), replaceUser (match/mismatch/428), deleteUser (match/mismatch/428), ETag format W/"v{N}", W/"v1" for new resources
   - **AllowAndCoerceBooleanStrings**: create (coerce "True"/"False", reject when disabled, not coerce non-boolean); replace (coerce/reject); flag interaction matrix (StrictSchema×Coerce combinations)
-  - **G8e — returned characteristic filtering**: strip password from response/create, preserve non-password, getRequestOnlyAttributes
+  - **G8e - returned characteristic filtering**: strip password from response/create, preserve non-password, getRequestOnlyAttributes
 
 ### 1.68 `src/modules/scim/services/sanitize-boolean-strings.spec.ts`
-- **sanitizeBooleanStrings — schema-aware (V16/V17)**: convert "true"/"false" for boolean keys, case-insensitively, NOT convert non-boolean keys, recurse nested, handle already-boolean/null/undefined/numeric/non-true-false, deeply nested, not touch non-boolean keys, empty booleanKeys, empty object, mixed array items
+- **sanitizeBooleanStrings - schema-aware (V16/V17)**: convert "true"/"false" for boolean keys, case-insensitively, NOT convert non-boolean keys, recurse nested, handle already-boolean/null/undefined/numeric/non-true-false, deeply nested, not touch non-boolean keys, empty booleanKeys, empty object, mixed array items
 
 ### 1.69 `src/modules/scim/services/scim-metadata.service.spec.ts`
 - **ScimMetadataService**: buildLocation (build URL, strip trailing slash, without trailing slash, different resource types, UUIDs); currentIsoTimestamp (valid ISO 8601, close to now)
 
 ### 1.70 `src/modules/scim/utils/scim-patch-path.spec.ts`
-- **scim-patch-path utilities**: isValuePath (brackets true/false, extension URN false); parseValuePath (emails/addresses, without sub-attribute, null for simple/empty/malformed/missing bracket, co/sw/ne operators, case-insensitive); isExtensionPath (enterprise true, URN itself false, simple false, valuePath false, case-insensitive, mixed casing); parseExtensionPath (manager/department, null URN itself/unrecognised, mixed-case, all-lowercase); matchesFilter (eq case-insensitive, different values, missing attribute, coerce non-string, unsupported operator fallback, null, case-mismatched attribute, uppercase, case-mismatched different value, boolean true/false against string, unsupported operator boolean); applyValuePathUpdate (update matching, no modify when missing/no match, replace entire element, update addresses, skip non-object, only first matching); removeValuePathEntry (remove sub-attr, remove entire element, no-op no match/no array); applyExtensionUpdate (add to existing, create if not exist, replace, handle string, remove for empty value/""/null/{value:null}, NOT remove non-empty); removeExtensionAttribute (remove, no-op when absent, leave empty); addValuePathEntry (create array, add new element, update existing, replace entire, create criteria, handle phoneNumbers); applyExtensionUpdate — manager string wrapping (wrap string, NOT wrap non-manager, pass through object); resolveNoPathValue (dot-notation to nested, create nested, resolve extension URN, flat keys, mixed types, not clobber siblings, wrap manager URN, custom extension URN keys, NOT resolve without extensionUrns)
+- **scim-patch-path utilities**: isValuePath (brackets true/false, extension URN false); parseValuePath (emails/addresses, without sub-attribute, null for simple/empty/malformed/missing bracket, co/sw/ne operators, case-insensitive); isExtensionPath (enterprise true, URN itself false, simple false, valuePath false, case-insensitive, mixed casing); parseExtensionPath (manager/department, null URN itself/unrecognised, mixed-case, all-lowercase); matchesFilter (eq case-insensitive, different values, missing attribute, coerce non-string, unsupported operator fallback, null, case-mismatched attribute, uppercase, case-mismatched different value, boolean true/false against string, unsupported operator boolean); applyValuePathUpdate (update matching, no modify when missing/no match, replace entire element, update addresses, skip non-object, only first matching); removeValuePathEntry (remove sub-attr, remove entire element, no-op no match/no array); applyExtensionUpdate (add to existing, create if not exist, replace, handle string, remove for empty value/""/null/{value:null}, NOT remove non-empty); removeExtensionAttribute (remove, no-op when absent, leave empty); addValuePathEntry (create array, add new element, update existing, replace entire, create criteria, handle phoneNumbers); applyExtensionUpdate - manager string wrapping (wrap string, NOT wrap non-manager, pass through object); resolveNoPathValue (dot-notation to nested, create nested, resolve extension URN, flat keys, mixed types, not clobber siblings, wrap manager URN, custom extension URN keys, NOT resolve without extensionUrns)
 
 ### 1.71 `src/modules/web/web.controller.spec.ts`
 - **WebController**: defined; serveWebApp (call res.sendFile with index.html)
@@ -447,7 +447,7 @@
 
 ### 2.4 `test/e2e/attribute-projection.e2e-spec.ts`
 - **Attribute Projection (E2E)**: GET Users/Users/:id/Groups/Groups/:id with attributes/excludedAttributes params; Precedence rules
-- **G8g — Write-response projection**: POST/PUT/PATCH Users/Groups with attributes/excludedAttributes, both params (attributes takes precedence), always-returned protection, dotted sub-attribute path
+- **G8g - Write-response projection**: POST/PUT/PATCH Users/Groups with attributes/excludedAttributes, both params (attributes takes precedence), always-returned protection, dotted sub-attribute path
 
 ### 2.5 `test/e2e/authentication.e2e-spec.ts`
 - **Authentication (E2E)**: POST /oauth/token (issue token, reject invalid secret/unsupported grant_type/missing client_id); Auth Guard (reject without auth/malformed, accept OAuth/legacy); Public routes (allow /oauth/token and /oauth/test without auth)
@@ -495,7 +495,7 @@
 - **ReadOnly Attribute Stripping (RFC 7643 §2.2)**: POST Users (strip id/meta/groups, preserve readWrite); PUT Users (strip id+meta); PATCH Users (strip readOnly path-based, strip from no-path, return 400 targeting id); POST Groups (assign server UUID); Warning URN (include when enabled+stripped, NOT when disabled/no attrs/PUT+stripped/PATCH+stripped); PATCH readOnly behavior matrix (strict ON + IgnorePatchRO OFF → 400, strict ON + IgnorePatchRO ON → strip, strict OFF → strip silently)
 
 ### 2.20 `test/e2e/returned-characteristic.e2e-spec.ts`
-- **Returned Attribute Characteristic (G8e E2E)**: returned:never — password stripped from all responses (POST/GET/:id/GET list/PUT/PATCH/POST .search, GET ?attributes=password); password in schema discovery (returned:never in /Schemas)
+- **Returned Attribute Characteristic (G8e E2E)**: returned:never - password stripped from all responses (POST/GET/:id/GET list/PUT/PATCH/POST .search, GET ?attributes=password); password in schema discovery (returned:never in /Schemas)
 
 ### 2.21 `test/e2e/rfc-compliance.e2e-spec.ts`
 - **RFC Compliance (E2E)**: RFC 7644 §3.1 (201 Created, meta.location, Location header for Users/Groups); §3.4.2 (ListResponse schema, totalResults/startIndex/itemsPerPage, 1-based startIndex); §3.5.2 (PatchOp schema required, add/replace operations); §3.6 (204 No Content); §3.12 (Error schema, status as string, detail); §2.4 meta attribute (resourceType/created/lastModified/location, Group meta); §2.1 case-insensitive attributes (filter userName, reject duplicate); Content-Type (GET/POST/error responses, 409); §3.12 409 error format; meta.lastModified (update on PATCH, not on GET); HTTP error status coverage (404 unknown path, 401 no auth POST/GET, 404 non-existent user/group, 400 missing userName/displayName); Content-Type Acceptance (application/json, application/scim+json); SCIM status always string (409, 404, 400)
@@ -510,7 +510,7 @@
 - **POST /.search (E2E)**: POST Users/.search (ListResponse schema, HTTP 200, application/scim+json, attributes projection, excludedAttributes, list all, respect count); POST Groups/.search (ListResponse, excludedAttributes=members)
 
 ### 2.25 `test/e2e/soft-delete-flags.e2e-spec.ts`
-- **Delete Lifecycle, Flag Combinations & PATCH Paths (E2E)**: Hard Delete — Users (hard-delete 204+404, double-delete 404, exclude from LIST, filter active eq false/true, 404 PATCH re-activate); Hard Delete — Groups (hard-delete, double-delete, exclude from LIST, active attribute); PATCH on hard-deleted users (404 displayName/valuePath/extension URN/dot-notation); Config flag combinations (UserSoftDeleteEnabled+StrictSchema, UserSoftDeleteEnabled+MultiOpPatch, UserSoftDeleteEnabled=False+StrictSchema=True, UserSoftDeleteEnabled+VerbosePatch+RemoveAll=False, all flags enabled); StrictSchemaValidation (reject/allow unknown extension); PATCH path patterns (valuePath phoneNumber replace/add, valuePath address remove, chain valuePath+extension+no-path); AllowAndCoerceBooleanStrings (accept "True"/"False", reject when OFF+Strict, coerce on PUT/PATCH, PATCH filter roles, StrictSchema×Coerce matrix, preserve non-boolean, Groups extension boolean strings); Settings v7 — POST collision always 409 (no reprovision) (Users/Groups)
+- **Delete Lifecycle, Flag Combinations & PATCH Paths (E2E)**: Hard Delete - Users (hard-delete 204+404, double-delete 404, exclude from LIST, filter active eq false/true, 404 PATCH re-activate); Hard Delete - Groups (hard-delete, double-delete, exclude from LIST, active attribute); PATCH on hard-deleted users (404 displayName/valuePath/extension URN/dot-notation); Config flag combinations (UserSoftDeleteEnabled+StrictSchema, UserSoftDeleteEnabled+MultiOpPatch, UserSoftDeleteEnabled=False+StrictSchema=True, UserSoftDeleteEnabled+VerbosePatch+RemoveAll=False, all flags enabled); StrictSchemaValidation (reject/allow unknown extension); PATCH path patterns (valuePath phoneNumber replace/add, valuePath address remove, chain valuePath+extension+no-path); AllowAndCoerceBooleanStrings (accept "True"/"False", reject when OFF+Strict, coerce on PUT/PATCH, PATCH filter roles, StrictSchema×Coerce matrix, preserve non-boolean, Groups extension boolean strings); Settings v7 - POST collision always 409 (no reprovision) (Users/Groups)
 
 ### 2.26 `test/e2e/sorting.e2e-spec.ts`
 - **Sorting (RFC 7644 §3.4.2.3) E2E**: ServiceProviderConfig (sort supported); GET Users with sortBy (userName asc default/desc, displayName asc, fall back unknown, case-insensitive, combine with pagination/filter); POST Users/.search (sortBy asc/desc); GET Groups with sortBy (displayName asc/desc); POST Groups/.search (asc/desc)

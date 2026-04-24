@@ -19,7 +19,7 @@ import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 
 /**
- * Endpoint-specific SCIM Discovery Controller — **PRIMARY** for multi-tenant use.
+ * Endpoint-specific SCIM Discovery Controller - **PRIMARY** for multi-tenant use.
  *
  * Handles metadata / discovery endpoints scoped to a specific endpoint:
  *   - /scim/endpoints/{endpointId}/Schemas
@@ -42,7 +42,7 @@ import { LogCategory } from '../../logging/log-levels';
  * `/scim/ServiceProviderConfig`) return global defaults without
  * endpoint context and are primarily for tooling / admin use.
  *
- * RFC 7644 §4 — SHALL NOT require authentication.
+ * RFC 7644 §4 - SHALL NOT require authentication.
  */
 @Public()
 @Controller('endpoints/:endpointId')
@@ -104,7 +104,7 @@ export class EndpointScimDiscoveryController {
   /**
    * GET /scim/endpoints/{endpointId}/Schemas/:uri
    * Returns a single schema definition by URN for this endpoint.
-   * @see RFC 7644 §4 — HTTP GET to retrieve individual schema
+   * @see RFC 7644 §4 - HTTP GET to retrieve individual schema
    */
   @Get('Schemas/:uri')
   @Header('Content-Type', 'application/scim+json')
@@ -138,7 +138,7 @@ export class EndpointScimDiscoveryController {
   /**
    * GET /scim/endpoints/{endpointId}/ResourceTypes/:id
    * Returns a single resource type definition by id for this endpoint.
-   * @see RFC 7644 §4 — HTTP GET to retrieve individual resource type
+   * @see RFC 7644 §4 - HTTP GET to retrieve individual resource type
    */
   @Get('ResourceTypes/:id')
   @Header('Content-Type', 'application/scim+json')

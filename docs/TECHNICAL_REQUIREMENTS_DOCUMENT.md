@@ -1,4 +1,4 @@
-# SCIMServer — Technical Requirements Document (TRD)
+# SCIMServer - Technical Requirements Document (TRD)
 
 > **Version**: 1.1  
 > **Date**: March 1, 2026  
@@ -46,18 +46,18 @@ SCIMServer is a **SCIM 2.0 provisioning visibility and monitoring tool** for Mic
 
 | ID | Requirement | RFC Section | Priority |
 |----|------------|-------------|----------|
-| FR-001 | **POST** — Create a new User resource | §3.3 | **P0** |
-| FR-002 | **POST** — Create a new Group resource | §3.3 | **P0** |
-| FR-003 | **GET** — Retrieve a single User by `id` | §3.4.1 | **P0** |
-| FR-004 | **GET** — Retrieve a single Group by `id` | §3.4.1 | **P0** |
-| FR-005 | **GET** — List Users with pagination and filtering | §3.4.2 | **P0** |
-| FR-006 | **GET** — List Groups with pagination and filtering | §3.4.2 | **P0** |
-| FR-007 | **PUT** — Full replace of a User resource | §3.5.1 | **P0** |
-| FR-008 | **PUT** — Full replace of a Group resource | §3.5.1 | **P0** |
-| FR-009 | **PATCH** — Partial update of a User resource | §3.5.2 | **P0** |
-| FR-010 | **PATCH** — Partial update of a Group resource | §3.5.2 | **P0** |
-| FR-011 | **DELETE** — Remove a User resource | §3.6 | **P0** |
-| FR-012 | **DELETE** — Remove a Group resource | §3.6 | **P0** |
+| FR-001 | **POST** - Create a new User resource | §3.3 | **P0** |
+| FR-002 | **POST** - Create a new Group resource | §3.3 | **P0** |
+| FR-003 | **GET** - Retrieve a single User by `id` | §3.4.1 | **P0** |
+| FR-004 | **GET** - Retrieve a single Group by `id` | §3.4.1 | **P0** |
+| FR-005 | **GET** - List Users with pagination and filtering | §3.4.2 | **P0** |
+| FR-006 | **GET** - List Groups with pagination and filtering | §3.4.2 | **P0** |
+| FR-007 | **PUT** - Full replace of a User resource | §3.5.1 | **P0** |
+| FR-008 | **PUT** - Full replace of a Group resource | §3.5.1 | **P0** |
+| FR-009 | **PATCH** - Partial update of a User resource | §3.5.2 | **P0** |
+| FR-010 | **PATCH** - Partial update of a Group resource | §3.5.2 | **P0** |
+| FR-011 | **DELETE** - Remove a User resource | §3.6 | **P0** |
+| FR-012 | **DELETE** - Remove a Group resource | §3.6 | **P0** |
 
 #### FR-2.1.2 PATCH Operations (RFC 7644 §3.5.2)
 
@@ -67,7 +67,7 @@ SCIMServer is a **SCIM 2.0 provisioning visibility and monitoring tool** for Mic
 | FR-021 | Support `replace` operation for all attribute types | **P0** |
 | FR-022 | Support `remove` operation for all attribute types | **P0** |
 | FR-023 | PATCH `op` values accepted case-insensitively (`Add`/`add`/`ADD`) | **P0** |
-| FR-024 | PATCH with no `path` — value object merged into resource | **P0** |
+| FR-024 | PATCH with no `path` - value object merged into resource | **P0** |
 | FR-025 | PATCH with simple path (`active`, `userName`, `displayName`) | **P0** |
 | FR-026 | PATCH with valuePath filter (`emails[type eq "work"].value`) | **P0** |
 | FR-027 | PATCH with extension URN path (`urn:...:enterprise:2.0:User:manager`) | **P0** |
@@ -104,8 +104,8 @@ SCIMServer is a **SCIM 2.0 provisioning visibility and monitoring tool** for Mic
 
 | ID | Requirement | Priority |
 |----|------------|----------|
-| FR-070 | `attributes` query parameter — return only specified attributes | **P1** |
-| FR-071 | `excludedAttributes` query parameter — exclude specified attributes | **P1** |
+| FR-070 | `attributes` query parameter - return only specified attributes | **P1** |
+| FR-071 | `excludedAttributes` query parameter - exclude specified attributes | **P1** |
 | FR-072 | Default return: all attributes except those with `returned: never` | **P1** |
 
 #### FR-2.1.6 Sorting (RFC 7644 §3.4.2.3)
@@ -116,7 +116,7 @@ SCIMServer is a **SCIM 2.0 provisioning visibility and monitoring tool** for Mic
 | FR-081 | `sortOrder` parameter (`ascending`/`descending`) | **P2** |
 | FR-082 | ServiceProviderConfig advertises sorting capability accurately | **P0** |
 
-#### FR-2.1.7 Bulk Operations (RFC 7644 §3.7) — Optional
+#### FR-2.1.7 Bulk Operations (RFC 7644 §3.7) - Optional
 
 | ID | Requirement | Priority |
 |----|------------|----------|
@@ -140,16 +140,16 @@ SCIMServer is a **SCIM 2.0 provisioning visibility and monitoring tool** for Mic
 | FR-110 | `id` | String | Server-assigned | readOnly | true | **P0** |
 | FR-111 | `externalId` | String | Optional | readWrite | true | **P0** |
 | FR-112 | `userName` | String | Required | readWrite | false | **P0** |
-| FR-113 | `name` | Complex | Optional | readWrite | — | **P0** |
+| FR-113 | `name` | Complex | Optional | readWrite | - | **P0** |
 | FR-114 | `displayName` | String | Optional | readWrite | false | **P0** |
-| FR-115 | `emails` | Multi-valued | Optional | readWrite | — | **P0** |
-| FR-116 | `active` | Boolean | Optional | readWrite | — | **P0** |
-| FR-117 | `phoneNumbers` | Multi-valued | Optional | readWrite | — | **P1** |
-| FR-118 | `addresses` | Multi-valued | Optional | readWrite | — | **P1** |
-| FR-119 | `photos` | Multi-valued | Optional | readWrite | — | **P2** |
-| FR-120 | `roles` | Multi-valued | Optional | readWrite | — | **P2** |
+| FR-115 | `emails` | Multi-valued | Optional | readWrite | - | **P0** |
+| FR-116 | `active` | Boolean | Optional | readWrite | - | **P0** |
+| FR-117 | `phoneNumbers` | Multi-valued | Optional | readWrite | - | **P1** |
+| FR-118 | `addresses` | Multi-valued | Optional | readWrite | - | **P1** |
+| FR-119 | `photos` | Multi-valued | Optional | readWrite | - | **P2** |
+| FR-120 | `roles` | Multi-valued | Optional | readWrite | - | **P2** |
 | FR-121 | `title`, `nickName`, `profileUrl`, `userType`, `preferredLanguage`, `locale`, `timezone` | String | Optional | readWrite | varies | **P1** |
-| FR-122 | `meta` | Complex | Server-managed | readOnly | — | **P0** |
+| FR-122 | `meta` | Complex | Server-managed | readOnly | - | **P0** |
 
 #### FR-2.2.2 Group Resource (RFC 7643 §4.2)
 
@@ -158,10 +158,10 @@ SCIMServer is a **SCIM 2.0 provisioning visibility and monitoring tool** for Mic
 | FR-130 | `id` | String | Server-assigned | readOnly | **P0** |
 | FR-131 | `displayName` | String | Required | readWrite | **P0** |
 | FR-132 | `members` | Multi-valued | Optional | readWrite | **P0** |
-| FR-133 | `members[].value` | String | Required per member | — | **P0** |
-| FR-134 | `members[].display` | String | Optional | — | **P0** |
-| FR-135 | `members[].$ref` | URI | Optional (recommended) | — | **P1** |
-| FR-136 | `members[].type` | String | Optional (`User`/`Group`) | — | **P1** |
+| FR-133 | `members[].value` | String | Required per member | - | **P0** |
+| FR-134 | `members[].display` | String | Optional | - | **P0** |
+| FR-135 | `members[].$ref` | URI | Optional (recommended) | - | **P1** |
+| FR-136 | `members[].type` | String | Optional (`User`/`Group`) | - | **P1** |
 | FR-137 | `externalId` | String | Optional | readWrite | **P0** |
 | FR-138 | `meta` | Complex | Server-managed | readOnly | **P0** |
 
@@ -191,9 +191,9 @@ SCIMServer is a **SCIM 2.0 provisioning visibility and monitoring tool** for Mic
 
 | ID | Requirement | Priority |
 |----|------------|----------|
-| FR-160 | `GET /ServiceProviderConfig` — Advertise capabilities | **P0** |
-| FR-161 | `GET /ResourceTypes` — List supported resource types | **P0** |
-| FR-162 | `GET /Schemas` — Return full schema definitions | **P0** |
+| FR-160 | `GET /ServiceProviderConfig` - Advertise capabilities | **P0** |
+| FR-161 | `GET /ResourceTypes` - List supported resource types | **P0** |
+| FR-162 | `GET /Schemas` - Return full schema definitions | **P0** |
 
 ### 2.4 Error Handling (RFC 7644 §3.12)
 
@@ -252,12 +252,12 @@ SCIMServer is a **SCIM 2.0 provisioning visibility and monitoring tool** for Mic
 |----|------------|----------|
 | FR-400 | Log all incoming SCIM requests (method, URL, headers, body) | **P0** |
 | FR-401 | Log all SCIM responses (status, headers, body, duration) | **P0** |
-| FR-402 | Human-readable activity feed — translate SCIM JSON into natural language | **P0** |
+| FR-402 | Human-readable activity feed - translate SCIM JSON into natural language | **P0** |
 | FR-403 | Searchable/filterable log viewer | **P0** |
 | FR-404 | Request/response detail drill-down | **P0** |
 | FR-405 | Visual change alerts (favicon badge, tab notification) | **P1** |
-| FR-406 | User browser — list users with derived identifiers and group memberships | **P1** |
-| FR-407 | Group browser — list groups with member details | **P1** |
+| FR-406 | User browser - list users with derived identifiers and group memberships | **P1** |
+| FR-407 | Group browser - list groups with member details | **P1** |
 | FR-408 | Dashboard statistics (totals, 24h activity, active users) | **P1** |
 | FR-409 | Keepalive request filtering (hide Entra probes from activity feed) | **P1** |
 
@@ -332,7 +332,7 @@ SCIMServer is a **SCIM 2.0 provisioning visibility and monitoring tool** for Mic
 |----|------------|--------|
 | NFR-010 | Data durability | PostgreSQL WAL + Azure-managed 7-day PITR backup |
 | NFR-011 | Crash recovery | Auto-restore from latest snapshot on restart |
-| NFR-012 | Container restart tolerance | Stateless API + PostgreSQL — no data loss on restart |
+| NFR-012 | Container restart tolerance | Stateless API + PostgreSQL - no data loss on restart |
 
 ### 10.3 Security
 
@@ -354,7 +354,7 @@ SCIMServer is a **SCIM 2.0 provisioning visibility and monitoring tool** for Mic
 
 ---
 
-## Appendix A — SCIM Error Codes Reference
+## Appendix A - SCIM Error Codes Reference
 
 | HTTP Status | scimType | When |
 |-------------|----------|------|
@@ -362,13 +362,13 @@ SCIMServer is a **SCIM 2.0 provisioning visibility and monitoring tool** for Mic
 | 400 | `invalidValue` | Invalid attribute value |
 | 400 | `invalidPath` | Unsupported PATCH path |
 | 400 | `invalidSyntax` | Malformed request body |
-| 401 | — | Missing or invalid authentication |
+| 401 | - | Missing or invalid authentication |
 | 404 | `noTarget` | Resource not found |
 | 409 | `uniqueness` | Duplicate userName (Users) or displayName (Groups) |
 | 413 | `tooLarge` | Request exceeds size limit |
-| 500 | — | Internal server error |
+| 500 | - | Internal server error |
 
-## Appendix B — Priority Legend
+## Appendix B - Priority Legend
 
 | Priority | Meaning |
 |----------|---------|

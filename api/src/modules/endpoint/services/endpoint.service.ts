@@ -35,7 +35,7 @@ export interface ResourceTypeSummary {
   extensionCount: number;
 }
 
-/** SPC capability flags summary — mirrors ServiceProviderConfig.supported booleans */
+/** SPC capability flags summary - mirrors ServiceProviderConfig.supported booleans */
 export interface ServiceProviderConfigSummary {
   patch: boolean;
   bulk: boolean;
@@ -71,9 +71,9 @@ export interface EndpointResponse {
   name: string;
   displayName?: string;
   description?: string;
-  /** Full profile — included when view=full (single-endpoint GET default) */
+  /** Full profile - included when view=full (single-endpoint GET default) */
   profile?: EndpointProfile;
-  /** Profile digest — included when view=summary (list default) */
+  /** Profile digest - included when view=summary (list default) */
   profileSummary?: ProfileSummary;
   active: boolean;
   scimBasePath: string;
@@ -120,7 +120,7 @@ export interface EndpointStatsResponse {
 
 // ─── Internal Cache Type ──────────────────────────────────────────────────
 
-/** Internal cache representation — keeps Date objects and full profile for fast access */
+/** Internal cache representation - keeps Date objects and full profile for fast access */
 interface CachedEndpoint {
   id: string;
   name: string;
@@ -167,7 +167,7 @@ export class EndpointService implements OnModuleInit {
    */
   async onModuleInit(): Promise<void> {
     if (this.isInMemoryBackend) {
-      this.scimLogger.debug(LogCategory.ENDPOINT, 'InMemory backend — endpoint cache starts empty.');
+      this.scimLogger.debug(LogCategory.ENDPOINT, 'InMemory backend - endpoint cache starts empty.');
       return;
     }
 
@@ -429,7 +429,7 @@ export class EndpointService implements OnModuleInit {
     const cached = this.cacheById.get(endpointId) ?? this.cacheByName.get(endpointId);
     if (cached) return this.toResponse(cached, view);
 
-    // Cache miss — try DB (Prisma only; InMemory is always in cache)
+    // Cache miss - try DB (Prisma only; InMemory is always in cache)
     if (this.isInMemoryBackend) {
       throw new NotFoundException(`Endpoint "${endpointId}" not found`);
     }
@@ -442,7 +442,7 @@ export class EndpointService implements OnModuleInit {
         where: { id: endpointId }
       });
     } catch (e) {
-      // ID lookup failed (e.g., invalid UUID) — will try by name below
+      // ID lookup failed (e.g., invalid UUID) - will try by name below
       this.scimLogger.debug(LogCategory.ENDPOINT, 'Endpoint ID lookup failed, trying by name', { endpointId, error: (e as Error).message });
     }
 
@@ -614,8 +614,8 @@ export class EndpointService implements OnModuleInit {
 
   /**
    * Merge a partial profile update into the current endpoint profile.
-   * - `settings` — deep-merged (additive, individual keys can be overwritten)
-   * - `schemas`, `resourceTypes`, `serviceProviderConfig` — replaced wholesale
+   * - `settings` - deep-merged (additive, individual keys can be overwritten)
+   * - `schemas`, `resourceTypes`, `serviceProviderConfig` - replaced wholesale
    *
    * If `schemas` or `resourceTypes` are provided they are validated & expanded.
    */
@@ -624,7 +624,7 @@ export class EndpointService implements OnModuleInit {
     partial: Partial<import('../../scim/endpoint-profile/endpoint-profile.types').ShorthandProfileInput>,
   ): EndpointProfile | undefined {
     if (!current) {
-      // No existing profile — validate the partial as a full profile
+      // No existing profile - validate the partial as a full profile
       const result = validateAndExpandProfile(partial);
       if (!result.valid) {
         throw new BadRequestException(`Profile validation failed: ${result.errors.map((e: any) => e.detail).join('; ')}`);

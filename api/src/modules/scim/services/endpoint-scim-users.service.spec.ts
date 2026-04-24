@@ -1346,7 +1346,7 @@ describe('EndpointScimUsersService', () => {
   });
 
   // ═══════════════════════════════════════════════════════════
-  // UserSoftDeleteEnabled — PATCH active=false gate
+  // UserSoftDeleteEnabled - PATCH active=false gate
   // ═══════════════════════════════════════════════════════════
 
   describe('UserSoftDeleteEnabled PATCH gate', () => {
@@ -1768,7 +1768,7 @@ describe('EndpointScimUsersService', () => {
   // ───────────── SCIM ID LEAK PREVENTION (Issue 16) ─────────────
 
   describe('SCIM ID leak prevention', () => {
-    describe('createUserForEndpoint — client-supplied id must be ignored', () => {
+    describe('createUserForEndpoint - client-supplied id must be ignored', () => {
       it('should not leak client-supplied id into the response', async () => {
         const createDto: CreateUserDto = {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
@@ -1825,7 +1825,7 @@ describe('EndpointScimUsersService', () => {
       });
     });
 
-    describe('toScimUserResource — rawPayload id must never override scimId', () => {
+    describe('toScimUserResource - rawPayload id must never override scimId', () => {
       it('should use scimId even when rawPayload contains id', async () => {
         const userWithLeakedId = {
           ...mockUser,
@@ -1871,7 +1871,7 @@ describe('EndpointScimUsersService', () => {
       });
     });
 
-    describe('PATCH — stripReservedAttributes must strip id', () => {
+    describe('PATCH - stripReservedAttributes must strip id', () => {
       it('should strip id from no-path replace value', async () => {
         const patchDto: PatchUserDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
@@ -2750,9 +2750,9 @@ describe('EndpointScimUsersService', () => {
         expect(result).toBeDefined();
 
         const storedPayload = JSON.parse(mockUserRepo.create.mock.calls[0][0].rawPayload);
-        // "value" is a string-type attribute — should NOT be coerced
+        // "value" is a string-type attribute - should NOT be coerced
         expect(storedPayload.roles[0].value).toBe('true');
-        // "primary" is a boolean-type attribute — should be coerced
+        // "primary" is a boolean-type attribute - should be coerced
         expect(storedPayload.roles[0].primary).toBe(true);
       });
     });
@@ -2901,7 +2901,7 @@ describe('EndpointScimUsersService', () => {
         expect(result).toBeDefined();
 
         const storedPayload = JSON.parse(mockUserRepo.create.mock.calls[0][0].rawPayload);
-        // String pass-through — not coerced
+        // String pass-through - not coerced
         expect(storedPayload.roles[0].primary).toBe('True');
       });
     });
@@ -2909,10 +2909,10 @@ describe('EndpointScimUsersService', () => {
 
   // ───────────── G8e: returned characteristic filtering ─────────────
 
-  describe('G8e — returned characteristic filtering', () => {
+  describe('G8e - returned characteristic filtering', () => {
     const baseUrl = 'http://localhost:3000/scim/endpoints/endpoint-1';
 
-    describe('toScimUserResource — returned:never stripping', () => {
+    describe('toScimUserResource - returned:never stripping', () => {
       it('should strip password from response when rawPayload contains it', async () => {
         const userWithPassword = {
           ...mockUser,
@@ -3059,6 +3059,265 @@ describe('EndpointScimUsersService', () => {
       await expect(
         service.replaceUserForEndpoint('scim-123', validCreateDto as any, baseUrl, endpointId),
       ).rejects.toThrow(TypeError);
+    });
+  });
+
+  // ─── G8h: Primary sub-attribute enforcement ────────────────────────────
+
+  describe('G8h: enforcePrimaryConstraint on write paths', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+    const endpointId = 'endpoint-1';
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+      mockUserRepo.findConflict.mockResolvedValue(null);
+      mockUserRepo.findAll.mockResolvedValue([]);
+    });
+
+    it('should passthrough multiple primary=true emails on POST create (default passthrough)', async () => {
+      const dto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'primary-test@example.com',
+        emails: [
+          { value: 'a@x.com', type: 'work', primary: true },
+          { value: 'b@x.com', type: 'home', primary: true },
+        ],
+      };
+
+      mockUserRepo.create.mockResolvedValue({
+        ...mockUser,
+        userName: dto.userName,
+        rawPayload: '{}',
+      });
+
+      // Default config: PrimaryEnforcement absent -> "passthrough" (warn but no mutation)
+      await service.createUserForEndpoint(dto as any, baseUrl, endpointId);
+
+      // Verify the stored payload keeps both primaries (passthrough)
+      const createCall = mockUserRepo.create.mock.calls[0][0];
+      const storedPayload = JSON.parse(createCall.rawPayload);
+      expect(storedPayload.emails[0].primary).toBe(true);
+      expect(storedPayload.emails[1].primary).toBe(true);
+    });
+
+    it('should reject multiple primary=true emails on POST create (reject mode)', async () => {
+      const dto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'primary-reject@example.com',
+        emails: [
+          { value: 'a@x.com', type: 'work', primary: true },
+          { value: 'b@x.com', type: 'home', primary: true },
+        ],
+      };
+
+      const config = { PrimaryEnforcement: 'reject' };
+
+      try {
+        await service.createUserForEndpoint(dto as any, baseUrl, endpointId, config as any);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+        const body = e.getResponse();
+        expect(body.scimType).toBe('invalidValue');
+        expect(body.detail).toContain('primary');
+        expect(body.detail).toContain('emails');
+      }
+    });
+
+    it('should passthrough multiple primary=true emails on POST create (passthrough mode)', async () => {
+      const dto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'primary-passthrough@example.com',
+        emails: [
+          { value: 'a@x.com', type: 'work', primary: true },
+          { value: 'b@x.com', type: 'home', primary: true },
+        ],
+      };
+
+      mockUserRepo.create.mockResolvedValue({
+        ...mockUser,
+        userName: dto.userName,
+        rawPayload: '{}',
+      });
+
+      const config = { PrimaryEnforcement: 'passthrough' };
+      await service.createUserForEndpoint(dto as any, baseUrl, endpointId, config as any);
+
+      // Both primaries should be kept as-is
+      const createCall = mockUserRepo.create.mock.calls[0][0];
+      const storedPayload = JSON.parse(createCall.rawPayload);
+      expect(storedPayload.emails[0].primary).toBe(true);
+      expect(storedPayload.emails[1].primary).toBe(true);
+    });
+
+    it('should normalize multiple primary=true on PUT replace (normalize mode)', async () => {
+      const dto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'put-test@example.com',
+        emails: [
+          { value: 'a@x.com', type: 'work', primary: true },
+          { value: 'b@x.com', type: 'home', primary: true },
+        ],
+      };
+
+      mockUserRepo.findByScimId.mockResolvedValue({
+        ...mockUser,
+        userName: dto.userName,
+        rawPayload: '{"emails":[]}',
+      });
+      mockUserRepo.update.mockResolvedValue({
+        ...mockUser,
+        userName: dto.userName,
+        rawPayload: '{}',
+      });
+
+      const config = { PrimaryEnforcement: 'normalize' };
+      await service.replaceUserForEndpoint('scim-123', dto as any, baseUrl, endpointId, config as any);
+
+      const updateCall = mockUserRepo.update.mock.calls[0];
+      const storedPayload = JSON.parse(updateCall[1].rawPayload);
+      expect(storedPayload.emails[0].primary).toBe(true);
+      expect(storedPayload.emails[1].primary).toBe(false);
+    });
+
+    it('should not mutate when only one primary=true (no-op)', async () => {
+      const dto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'single-primary@example.com',
+        emails: [
+          { value: 'a@x.com', type: 'work', primary: true },
+          { value: 'b@x.com', type: 'home', primary: false },
+        ],
+      };
+
+      mockUserRepo.create.mockResolvedValue({
+        ...mockUser,
+        userName: dto.userName,
+        rawPayload: '{}',
+      });
+
+      await service.createUserForEndpoint(dto as any, baseUrl, endpointId);
+
+      const createCall = mockUserRepo.create.mock.calls[0][0];
+      const storedPayload = JSON.parse(createCall.rawPayload);
+      expect(storedPayload.emails[0].primary).toBe(true);
+      expect(storedPayload.emails[1].primary).toBe(false);
+    });
+  });
+
+  // ===========================================================================
+  // Test Gaps Audit #5 - Missing unit tests
+  // ===========================================================================
+
+  describe('Test Gaps Audit #5: RequireIfMatch default OFF behavior', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+    const endpointId = 'endpoint-1';
+
+    it('should allow PUT without If-Match when RequireIfMatch is not configured (default OFF)', async () => {
+      mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+      mockUserRepo.findConflict.mockResolvedValue(null);
+      mockUserRepo.update.mockResolvedValue({ ...mockUser, displayName: 'Updated' });
+
+      const dto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'test@example.com',
+        displayName: 'Updated',
+      };
+
+      // Config with no RequireIfMatch key at all (undefined = default OFF)
+      const config: EndpointConfig = {};
+
+      const result = await service.replaceUserForEndpoint(
+        mockUser.scimId, dto as any, baseUrl, endpointId, config,
+      );
+
+      expect(result.userName).toBe(mockUser.userName);
+      expect(mockUserRepo.update).toHaveBeenCalled();
+    });
+
+    it('should allow DELETE without If-Match when RequireIfMatch is not configured', async () => {
+      mockUserRepo.findByScimId.mockResolvedValue(mockUser);
+      mockUserRepo.delete.mockResolvedValue(undefined);
+
+      const config: EndpointConfig = {};
+
+      await service.deleteUserForEndpoint(mockUser.scimId, endpointId, config);
+
+      expect(mockUserRepo.delete).toHaveBeenCalled();
+    });
+  });
+
+  describe('Test Gaps Audit #5: POST missing required userName', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+    const endpointId = 'endpoint-1';
+
+    it('should throw 400 when userName is missing from POST payload with StrictSchema ON', async () => {
+      const dto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        displayName: 'Missing UserName',
+        active: true,
+      };
+
+      const config: EndpointConfig = { StrictSchemaValidation: 'True' };
+
+      try {
+        await service.createUserForEndpoint(dto as any, baseUrl, endpointId, config);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(HttpException);
+        expect(e.getStatus()).toBe(400);
+      }
+    });
+  });
+
+  describe('Test Gaps Audit #5: PrimaryEnforcement + StrictSchema combo', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+    const endpointId = 'endpoint-1';
+
+    it('should reject both unknown attrs (StrictSchema) and multiple primaries (reject mode)', async () => {
+      const dto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'combo-test@example.com',
+        unknownField: 'should reject',
+        emails: [
+          { value: 'a@x.com', type: 'work', primary: true },
+          { value: 'b@x.com', type: 'home', primary: true },
+        ],
+      };
+
+      const config: EndpointConfig = {
+        StrictSchemaValidation: 'True',
+        PrimaryEnforcement: 'reject',
+      };
+
+      // StrictSchema should reject first (before primary check) due to unknownField
+      await expect(
+        service.createUserForEndpoint(dto as any, baseUrl, endpointId, config),
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('should reject multiple primaries when payload is otherwise valid (reject mode)', async () => {
+      const dto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'multi-primary-strict@example.com',
+        emails: [
+          { value: 'a@x.com', type: 'work', primary: true },
+          { value: 'b@x.com', type: 'home', primary: true },
+        ],
+      };
+
+      const config: EndpointConfig = {
+        StrictSchemaValidation: 'True',
+        PrimaryEnforcement: 'reject',
+      };
+
+      try {
+        await service.createUserForEndpoint(dto as any, baseUrl, endpointId, config);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(HttpException);
+        expect(e.getStatus()).toBe(400);
+      }
     });
   });
 });

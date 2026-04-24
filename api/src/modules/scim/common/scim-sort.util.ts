@@ -1,5 +1,5 @@
 /**
- * SCIM Sort Utility — RFC 7644 §3.4.2.3
+ * SCIM Sort Utility - RFC 7644 §3.4.2.3
  *
  * Maps SCIM attribute names (e.g. "userName", "meta.created") to
  * database field names and resolves sort direction.
@@ -49,7 +49,7 @@ export interface SortParams {
  * Resolve a SCIM sortBy + sortOrder into a database-level sort specification for Users.
  *
  * @param sortBy          SCIM attribute path (e.g. "userName", "meta.created"). Case-insensitive.
- * @param sortOrder       "ascending" | "descending" — defaults to "ascending" per RFC 7644.
+ * @param sortOrder       "ascending" | "descending" - defaults to "ascending" per RFC 7644.
  * @param caseExactPaths  Optional set of caseExact attribute paths from schema cache.
  * @returns               Database-level sort params with caseExact flag.
  */
@@ -79,7 +79,7 @@ export function resolveUserSortParams(
  * Resolve a SCIM sortBy + sortOrder into a database-level sort specification for Groups.
  *
  * @param sortBy          SCIM attribute path (e.g. "displayName", "meta.created"). Case-insensitive.
- * @param sortOrder       "ascending" | "descending" — defaults to "ascending" per RFC 7644.
+ * @param sortOrder       "ascending" | "descending" - defaults to "ascending" per RFC 7644.
  * @param caseExactPaths  Optional set of caseExact attribute paths from schema cache.
  * @returns               Database-level sort params with caseExact flag.
  */

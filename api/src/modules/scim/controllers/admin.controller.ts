@@ -1,4 +1,4 @@
-﻿import {
+import {
   Body,
   Controller,
   Get,
@@ -119,7 +119,7 @@ export class AdminController {
     if (result.endpoints.length > 0) {
       return result.endpoints[0].id;
     }
-    // No endpoints exist — create a default one
+    // No endpoints exist - create a default one
     const created = await this.endpointService.createEndpoint({ name: 'default' });
     return created.id;
   }
@@ -291,7 +291,7 @@ export class AdminController {
     for (const ep of result.endpoints) {
       try {
         await this.usersService.deleteUserForEndpoint(id, ep.id);
-        return; // Success — user found and deleted
+        return; // Success - user found and deleted
       } catch {
         // Not found in this endpoint, try next
       }
@@ -326,7 +326,7 @@ export class AdminController {
     const offsetMins = String(absMinutes % 60).padStart(2, '0');
     const utcOffset = `${offsetSign}${offsetHours}:${offsetMins}`;
 
-    // Container info — populated only when running in a container
+    // Container info - populated only when running in a container
     const containerized = this.isContainerized();
     const containerBlock = containerized ? this.buildContainerInfo(databaseUrl) : undefined;
 
@@ -379,7 +379,7 @@ export class AdminController {
         containerApp: process.env.SCIM_APP,
         registry: process.env.SCIM_REGISTRY,
         currentImage,
-        migratePhase: `Phase 9 — Bulk Operations (v${version})`
+        migratePhase: `Phase 9 - Bulk Operations (v${version})`
       }
     };
   }
@@ -466,7 +466,7 @@ export class AdminController {
         if (match) return match[1].substring(0, 12);
       }
     } catch {
-      // Ignore read errors — not every environment has /proc
+      // Ignore read errors - not every environment has /proc
     }
     // Fallback: hostname is the short container ID in Docker
     const hostname = os.hostname();

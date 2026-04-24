@@ -3,7 +3,7 @@
 > **Document Purpose**: Complete API operation guide for the multi-member PATCH endpoint configuration flags.
 > 
 > **Created**: February 3, 2026  
-> **Last Updated**: February 23, 2026 (v4 - Added UserSoftDeleteEnabled and StrictSchemaValidation flags)
+> **Last Updated**: April 23, 2026 (v0.38.0)
 
 ## Overview
 

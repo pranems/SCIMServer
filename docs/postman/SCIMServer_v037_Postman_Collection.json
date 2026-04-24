@@ -1,8 +1,8 @@
 {
   "info": {
-    "name": "SCIMServer v0.37.3 — Complete API Collection",
+    "name": "SCIMServer v0.38.0 - Complete API Collection",
     "_postman_id": "scimserver-v0372-complete",
-    "description": "Complete Postman collection for SCIMServer v0.37.3 — all 82 endpoints across 19 controllers.\n\nSet collection variables:\n- baseUrl: http://localhost:6000/scim\n- token: your bearer token or shared secret\n- endpointId: UUID of target endpoint\n- userId: UUID of target user\n- groupId: UUID of target group",
+    "description": "Complete Postman collection for SCIMServer v0.38.0 - all 82 endpoints across 19 controllers.\n\nSet collection variables:\n- baseUrl: http://localhost:6000/scim\n- token: your bearer token or shared secret\n- endpointId: UUID of target endpoint\n- userId: UUID of target user\n- groupId: UUID of target group",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -17,7 +17,7 @@
   "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
   "item": [
     {
-      "name": "01 — Health & OAuth",
+      "name": "01 - Health & OAuth",
       "item": [
         {
           "name": "GET Health Check",
@@ -40,7 +40,7 @@
       ]
     },
     {
-      "name": "02 — Admin Endpoint Management",
+      "name": "02 - Admin Endpoint Management",
       "item": [
         {
           "name": "POST Create Endpoint",
@@ -96,7 +96,7 @@
       ]
     },
     {
-      "name": "03 — Admin Credentials",
+      "name": "03 - Admin Credentials",
       "item": [
         {
           "name": "POST Create Credential",
@@ -119,7 +119,7 @@
       ]
     },
     {
-      "name": "04 — Discovery (Root)",
+      "name": "04 - Discovery (Root)",
       "item": [
         { "name": "GET ServiceProviderConfig", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/ServiceProviderConfig", "host": ["{{baseUrl}}"], "path": ["ServiceProviderConfig"] }, "auth": { "type": "noauth" } } },
         { "name": "GET Schemas", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/Schemas", "host": ["{{baseUrl}}"], "path": ["Schemas"] }, "auth": { "type": "noauth" } } },
@@ -129,7 +129,7 @@
       ]
     },
     {
-      "name": "05 — Discovery (Endpoint-Scoped)",
+      "name": "05 - Discovery (Endpoint-Scoped)",
       "item": [
         { "name": "GET Endpoint SPC", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/ServiceProviderConfig", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "ServiceProviderConfig"] }, "auth": { "type": "noauth" } } },
         { "name": "GET Endpoint Schemas", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Schemas", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Schemas"] }, "auth": { "type": "noauth" } } },
@@ -139,7 +139,7 @@
       ]
     },
     {
-      "name": "06 — SCIM Users",
+      "name": "06 - SCIM Users",
       "item": [
         {
           "name": "POST Create User",
@@ -160,7 +160,7 @@
       ]
     },
     {
-      "name": "07 — SCIM Groups",
+      "name": "07 - SCIM Groups",
       "item": [
         {
           "name": "POST Create Group",
@@ -178,7 +178,7 @@
       ]
     },
     {
-      "name": "08 — SCIM /Me",
+      "name": "08 - SCIM /Me",
       "item": [
         { "name": "GET /Me", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Me", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Me"] }, "description": "Requires OAuth JWT with sub claim matching a userName" } },
         { "name": "PUT /Me", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/endpoints/{{endpointId}}/Me", "host": ["{{baseUrl}}"], "path": ["endpoints", "{{endpointId}}", "Me"] }, "header": [{ "key": "Content-Type", "value": "application/scim+json" }], "body": { "mode": "raw", "raw": "{\n  \"schemas\": [\"urn:ietf:params:scim:schemas:core:2.0:User\"],\n  \"userName\": \"me@example.com\",\n  \"displayName\": \"Updated Me\"\n}" } } },
@@ -187,7 +187,7 @@
       ]
     },
     {
-      "name": "09 — SCIM Bulk",
+      "name": "09 - SCIM Bulk",
       "item": [
         {
           "name": "POST Bulk Operations",
@@ -196,7 +196,7 @@
       ]
     },
     {
-      "name": "10 — Admin General",
+      "name": "10 - Admin General",
       "item": [
         { "name": "GET Version", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/version", "host": ["{{baseUrl}}"], "path": ["admin", "version"] } } },
         { "name": "GET Logs", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/logs?page=1&pageSize=20&hideKeepalive=true", "host": ["{{baseUrl}}"], "path": ["admin", "logs"], "query": [{ "key": "page", "value": "1" }, { "key": "pageSize", "value": "20" }, { "key": "hideKeepalive", "value": "true" }] } } },
@@ -209,7 +209,7 @@
       ]
     },
     {
-      "name": "11 — Log Config",
+      "name": "11 - Log Config",
       "item": [
         { "name": "GET Log Config", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/log-config", "host": ["{{baseUrl}}"], "path": ["admin", "log-config"] } } },
         { "name": "PUT Update Log Config", "request": { "method": "PUT", "url": { "raw": "{{baseUrl}}/admin/log-config", "host": ["{{baseUrl}}"], "path": ["admin", "log-config"] }, "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"globalLevel\": \"DEBUG\",\n  \"includePayloads\": true,\n  \"includeStackTraces\": false\n}" } } },
@@ -220,13 +220,13 @@
         { "name": "GET Recent Logs", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/log-config/recent?limit=50", "host": ["{{baseUrl}}"], "path": ["admin", "log-config", "recent"], "query": [{ "key": "limit", "value": "50" }] } } },
         { "name": "GET Recent Logs (filtered)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/log-config/recent?level=ERROR&category=scim.user", "host": ["{{baseUrl}}"], "path": ["admin", "log-config", "recent"], "query": [{ "key": "level", "value": "ERROR" }, { "key": "category", "value": "scim.user" }] } } },
         { "name": "DELETE Clear Log Buffer", "request": { "method": "DELETE", "url": { "raw": "{{baseUrl}}/admin/log-config/recent", "host": ["{{baseUrl}}"], "path": ["admin", "log-config", "recent"] } } },
-        { "name": "GET Log Stream (SSE)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/log-config/stream?level=INFO", "host": ["{{baseUrl}}"], "path": ["admin", "log-config", "stream"], "query": [{ "key": "level", "value": "INFO" }] }, "description": "Server-Sent Events — keep connection open" } },
+        { "name": "GET Log Stream (SSE)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/log-config/stream?level=INFO", "host": ["{{baseUrl}}"], "path": ["admin", "log-config", "stream"], "query": [{ "key": "level", "value": "INFO" }] }, "description": "Server-Sent Events - keep connection open" } },
         { "name": "GET Download Logs (JSON)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/log-config/download?format=json&limit=100", "host": ["{{baseUrl}}"], "path": ["admin", "log-config", "download"], "query": [{ "key": "format", "value": "json" }, { "key": "limit", "value": "100" }] } } },
         { "name": "GET Download Logs (NDJSON)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/log-config/download?format=ndjson&limit=500", "host": ["{{baseUrl}}"], "path": ["admin", "log-config", "download"], "query": [{ "key": "format", "value": "ndjson" }, { "key": "limit", "value": "500" }] } } }
       ]
     },
     {
-      "name": "12 — Database Browser",
+      "name": "12 - Database Browser",
       "item": [
         { "name": "GET Browse Users", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/database/users?page=1&limit=50", "host": ["{{baseUrl}}"], "path": ["admin", "database", "users"], "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "50" }] } } },
         { "name": "GET Browse Users (search)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/database/users?search=john&active=true", "host": ["{{baseUrl}}"], "path": ["admin", "database", "users"], "query": [{ "key": "search", "value": "john" }, { "key": "active", "value": "true" }] } } },
@@ -237,7 +237,7 @@
       ]
     },
     {
-      "name": "13 — Activity Feed",
+      "name": "13 - Activity Feed",
       "item": [
         { "name": "GET Activities", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/activity?page=1&limit=50&hideKeepalive=true", "host": ["{{baseUrl}}"], "path": ["admin", "activity"], "query": [{ "key": "page", "value": "1" }, { "key": "limit", "value": "50" }, { "key": "hideKeepalive", "value": "true" }] } } },
         { "name": "GET Activities (filtered)", "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/admin/activity?type=user&severity=error", "host": ["{{baseUrl}}"], "path": ["admin", "activity"], "query": [{ "key": "type", "value": "user" }, { "key": "severity", "value": "error" }] } } },

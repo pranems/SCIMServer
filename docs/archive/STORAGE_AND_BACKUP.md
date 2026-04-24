@@ -1,6 +1,6 @@
 # Storage & Backup Architecture
 
-> **Status**: ⚠️ **HISTORICAL** — This document describes the SQLite + Azure Files hybrid storage model used prior to v0.11.0. Since Phase 3 (v0.11.0), SCIMServer uses **PostgreSQL 17** as its primary database. The SQLite file paths, hybrid backup architecture, and blob snapshot workflows described below no longer apply to current deployments. Retained for historical context.  
+> **Status**: ⚠️ **HISTORICAL** - This document describes the SQLite + Azure Files hybrid storage model used prior to v0.11.0. Since Phase 3 (v0.11.0), SCIMServer uses **PostgreSQL 17** as its primary database. The SQLite file paths, hybrid backup architecture, and blob snapshot workflows described below no longer apply to current deployments. Retained for historical context.  
 > **Last Updated**: February 24, 2026 (marked historical)  
 > **Baseline**: SCIMServer v0.10.0 (pre-PostgreSQL migration)
 
@@ -138,9 +138,9 @@ Truncated to 24 characters per Azure naming rules (lowercase, no hyphens).
 | Aspect | Detail |
 |--------|--------|
 | **RPO** | Maximum 5 minutes of data loss if container crashes between backups |
-| **Scaling** | Keep `maxReplicas: 1` — SQLite is single-writer only |
-| **Backup failures** | Non-blocking — app continues running; logged as errors |
-| **Zero data loss** | Requires migration to PostgreSQL/MySQL — see [SQLITE_COMPROMISE_ANALYSIS.md](SQLITE_COMPROMISE_ANALYSIS.md) for full roadmap |
+| **Scaling** | Keep `maxReplicas: 1` - SQLite is single-writer only |
+| **Backup failures** | Non-blocking - app continues running; logged as errors |
+| **Zero data loss** | Requires migration to PostgreSQL/MySQL - see [SQLITE_COMPROMISE_ANALYSIS.md](SQLITE_COMPROMISE_ANALYSIS.md) for full roadmap |
 
 ---
 

@@ -1,5 +1,5 @@
 /**
- * GenericPatchEngine — Phase 8b Generic SCIM PATCH Engine
+ * GenericPatchEngine - Phase 8b Generic SCIM PATCH Engine
  *
  * Applies RFC 7644 §3.5.2 PATCH operations to a generic SCIM resource payload.
  *
@@ -254,7 +254,7 @@ export class GenericPatchEngine {
     for (let i = 0; i < segments.length - 1; i++) {
       const seg = segments[i];
       if (typeof current[seg] !== 'object' || current[seg] === null) {
-        return; // Path doesn't exist — no-op
+        return; // Path doesn't exist - no-op
       }
       current = current[seg] as Record<string, unknown>;
     }

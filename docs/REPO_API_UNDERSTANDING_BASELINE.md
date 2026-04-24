@@ -1,8 +1,8 @@
 # Repo + API Understanding Baseline (Code-Verified)
 
 > **Status**: Living implementation baseline  
-> **Last Updated**: March 1, 2026  
-> **Baseline**: SCIMServer (current release)
+> **Last Updated**: April 23, 2026  
+> **Baseline**: SCIMServer v0.38.0
 
 This document captures the current implementation reality after reading core repo and API sources. It is intended to prevent documentation drift.
 
@@ -28,13 +28,13 @@ This document captures the current implementation reality after reading core rep
 
 ---
 
-## 3) Authentication Model (3-Tier Fallback — v0.21.0)
+## 3) Authentication Model (3-Tier Fallback - v0.21.0)
 
 All non-public routes are protected by `SharedSecretGuard` (global `APP_GUARD`) with a 3-tier fallback chain:
 
-1. **Tier 1 — Per-endpoint bcrypt credentials**: If `PerEndpointCredentialsEnabled` is `true` on the endpoint and the endpoint has active, non-expired credentials, the bearer token is verified via `bcrypt.compare()`. Admin CRUD at `/scim/admin/endpoints/:id/credentials`.
-2. **Tier 2 — OAuth 2.0 JWT**: Token is decoded/verified via `OAuthService.validateAccessToken()`. OAuth token endpoint: `POST /scim/oauth/token` (`grant_type=client_credentials`).
-3. **Tier 3 — Global shared secret**: Direct comparison with `SCIM_SHARED_SECRET` env var.
+1. **Tier 1 - Per-endpoint bcrypt credentials**: If `PerEndpointCredentialsEnabled` is `true` on the endpoint and the endpoint has active, non-expired credentials, the bearer token is verified via `bcrypt.compare()`. Admin CRUD at `/scim/admin/endpoints/:id/credentials`.
+2. **Tier 2 - OAuth 2.0 JWT**: Token is decoded/verified via `OAuthService.validateAccessToken()`. OAuth token endpoint: `POST /scim/oauth/token` (`grant_type=client_credentials`).
+3. **Tier 3 - Global shared secret**: Direct comparison with `SCIM_SHARED_SECRET` env var.
 
 - All tiers fail → `401 Unauthorized`, `WWW-Authenticate: Bearer realm="SCIM"`.
 - In production:

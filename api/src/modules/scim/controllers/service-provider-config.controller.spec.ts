@@ -77,7 +77,7 @@ describe('ServiceProviderConfigController', () => {
       expect(result.authenticationSchemes[0].specUri).toContain('rfc6750');
     });
 
-    it('should include primary:true on authentication scheme (D6 — RFC 7643 §5)', () => {
+    it('should include primary:true on authentication scheme (D6 - RFC 7643 §5)', () => {
       const result = controller.getConfig();
       expect(result.authenticationSchemes[0].primary).toBe(true);
     });

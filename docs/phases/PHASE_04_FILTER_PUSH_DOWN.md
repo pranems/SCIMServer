@@ -1,8 +1,8 @@
-# Phase 4 — Filter Push-Down Expansion
+# Phase 4 - Filter Push-Down Expansion
 
 ## Summary
 
-**Gap:** G4 — Filter push-down only for `eq` on 3 columns  
+**Gap:** G4 - Filter push-down only for `eq` on 3 columns  
 **Severity:** HIGH  
 **Goal:** Full SCIM operator push-down via PostgreSQL ILIKE, Prisma string filters, and `pg_trgm` GIN indexes. Compound AND/OR filter push-down.
 
@@ -67,8 +67,8 @@ These filter patterns still use `fetchAll: true` + in-memory evaluation:
 | `emails.value eq "x@y.com"` | Dotted/nested attribute not in column map |
 | `name.givenName co "John"` | Dotted/nested attribute not in column map |
 | `urn:...:User:department eq "Sales"` | URN-prefixed attribute not in column map |
-| `emails[type eq "work"]` | ValuePath node — requires JSONB query |
-| `not (active eq false)` | NOT node — deferred for simplicity |
+| `emails[type eq "work"]` | ValuePath node - requires JSONB query |
+| `not (active eq false)` | NOT node - deferred for simplicity |
 | `userName eq "j" and emails.value eq "x"` | AND with un-pushable side |
 | `userName eq "j" or emails.value eq "x"` | OR with un-pushable side |
 
@@ -80,8 +80,8 @@ These can be addressed in future phases via JSONB `@>` operators and `NOT` push-
 |------|--------|
 | `api/src/modules/scim/filters/apply-scim-filter.ts` | Expanded column maps with type info, full operator push-down, AND/OR compound support |
 | `api/src/modules/scim/filters/apply-scim-filter.spec.ts` | Updated tests: previously in-memory tests now verify DB push-down |
-| `api/src/infrastructure/repositories/inmemory/prisma-filter-evaluator.ts` | **NEW** — Evaluates Prisma-style WHERE clauses against in-memory records |
-| `api/src/infrastructure/repositories/inmemory/prisma-filter-evaluator.spec.ts` | **NEW** — Unit tests for the filter evaluator |
+| `api/src/infrastructure/repositories/inmemory/prisma-filter-evaluator.ts` | **NEW** - Evaluates Prisma-style WHERE clauses against in-memory records |
+| `api/src/infrastructure/repositories/inmemory/prisma-filter-evaluator.spec.ts` | **NEW** - Unit tests for the filter evaluator |
 | `api/src/infrastructure/repositories/inmemory/inmemory-user.repository.ts` | Uses `matchesPrismaFilter()` instead of manual equality loop |
 | `api/src/infrastructure/repositories/inmemory/inmemory-group.repository.ts` | Uses `matchesPrismaFilter()` instead of manual equality loop |
 
@@ -98,13 +98,13 @@ These can be addressed in future phases via JSONB `@>` operators and `NOT` push-
 
 Instead of maintaining separate filtering logic in each InMemory repository, we created a shared `matchesPrismaFilter()` utility that evaluates a subset of Prisma WHERE clause objects against in-memory records. This:
 
-1. **Maintains backend parity** — InMemory repos produce the same results as Prisma repos for all pushed filters
-2. **Centralizes logic** — One function handles all Prisma filter shapes instead of per-repo custom loops
-3. **Enables testing** — Unit tests verify the evaluator independently of any repository
+1. **Maintains backend parity** - InMemory repos produce the same results as Prisma repos for all pushed filters
+2. **Centralizes logic** - One function handles all Prisma filter shapes instead of per-repo custom loops
+3. **Enables testing** - Unit tests verify the evaluator independently of any repository
 
 ## Testing
 
-- Unit tests: `apply-scim-filter.spec.ts` — verifies all operators produce correct Prisma WHERE shapes
-- Unit tests: `prisma-filter-evaluator.spec.ts` — verifies in-memory evaluation of Prisma filter shapes
+- Unit tests: `apply-scim-filter.spec.ts` - verifies all operators produce correct Prisma WHERE shapes
+- Unit tests: `prisma-filter-evaluator.spec.ts` - verifies in-memory evaluation of Prisma filter shapes
 - E2E tests: Existing 193 E2E tests exercise filter paths end-to-end
 - Live tests: Existing 302 live tests verify SCIM compliance including filter operations

@@ -1,7 +1,7 @@
-# SCIMServer — Technical Design Document (TDD)
+# SCIMServer - Technical Design Document (TDD)
 
-> **Version**: 1.2  
-> **Date**: March 1, 2026  
+> **Version**: 1.3  
+> **Date**: April 23, 2026  
 > **Status**: Current as-built architecture  
 > **Tech Stack**: NestJS 11 · TypeScript 5 · Prisma 7 · PostgreSQL 17 · React 19 · Vite 7 · Azure Container Apps
 
@@ -60,7 +60,7 @@ api/
 │   ├── main.ts                  # Application bootstrap (NestFactory)
 │   ├── modules/
 │   │   ├── app/
-│   │   │   └── app.module.ts    # Root module — imports all feature modules
+│   │   │   └── app.module.ts    # Root module - imports all feature modules
 │   │   ├── scim/
 │   │   │   ├── scim.module.ts
 │   │   │   ├── controllers/     # SCIM endpoint controllers
@@ -105,12 +105,12 @@ AppModule
 ├── PrismaModule (@Global)
 │   └── PrismaService → OnModuleInit/OnModuleDestroy, $connect/$disconnect
 ├── AuthModule
-│   └── SharedSecretGuard (APP_GUARD — global)
+│   └── SharedSecretGuard (APP_GUARD - global)
 ├── OAuthModule
 │   ├── OAuthController → POST /oauth/token, GET /oauth/.well-known
 │   └── OAuthService → JWT generation/validation
 ├── LoggingModule (@Global)
-│   ├── RequestLoggingInterceptor (APP_INTERCEPTOR — global, correlation IDs)
+│   ├── RequestLoggingInterceptor (APP_INTERCEPTOR - global, correlation IDs)
 │   ├── ScimLogger → Structured leveled logger (AsyncLocalStorage correlation)
 │   ├── LogConfigController → /admin/log-config (11 REST endpoints)
 │   ├── LogQueryService → Shared query/stream/download logic
@@ -144,7 +144,7 @@ AppModule
 
 | Module | Purpose | Key Exports |
 |--------|---------|-------------|
-| **PrismaModule** | Global database access | `PrismaService` — Extended Prisma client with lifecycle |
+| **PrismaModule** | Global database access | `PrismaService` - Extended Prisma client with lifecycle |
 | **AuthModule** | Authentication | `SharedSecretGuard` (global), `@Public` decorator |
 | **OAuthModule** | OAuth 2.0 flows | `OAuthController`, `OAuthService` |
 | **ScimModule** | Core SCIM protocol | Controllers, services, interceptors, utilities |
@@ -152,7 +152,7 @@ AppModule
 | **LoggingModule** | Structured logging, traceability, admin config | `ScimLogger` (global), `RequestLoggingInterceptor`, `LogConfigController`, `LogQueryService`, `LoggingService`, `FileLogTransport` |
 | **DatabaseModule** | Dashboard data | `DatabaseController`, `DatabaseService` |
 | **ActivityParserModule** | Activity feed | `ActivityParserService` (898 lines of parsing) |
-| **WebModule** | SPA serving | `WebController` — serves pre-built React app |
+| **WebModule** | SPA serving | `WebController` - serves pre-built React app |
 
 ---
 
@@ -236,7 +236,7 @@ const config = ctx?.config;
 
 ---
 
-## 4. API Layer — Route Map
+## 4. API Layer - Route Map
 
 ### 4.1 SCIM Protocol Routes
 
@@ -304,7 +304,7 @@ const config = ctx?.config;
 
 ---
 
-## 5. Service Layer — Detailed Design
+## 5. Service Layer - Detailed Design
 
 ### 5.1 EndpointScimUsersService (585 lines)
 
@@ -322,11 +322,11 @@ const config = ctx?.config;
 | `deleteUser(endpointId, id)` | scimId | void | Delete ScimResource + cascade ResourceMember cleanup |
 
 **Private Helpers**:
-- `validateCreatePayload()` — SCIM schema validation, required field checks
-- `matchesFilter()` — Case-insensitive property lookup for filter evaluation
-- `formatUserResponse()` — Parse payload JSONB → ScimUserResource with meta
-- `normalizeObjectKeys()` — Lowercase all keys for case-insensitive no-path PATCH merge
-- `isExtensionPath()` / `applyExtensionPatchOp()` — URN-based extension attribute handling
+- `validateCreatePayload()` - SCIM schema validation, required field checks
+- `matchesFilter()` - Case-insensitive property lookup for filter evaluation
+- `formatUserResponse()` - Parse payload JSONB → ScimUserResource with meta
+- `normalizeObjectKeys()` - Lowercase all keys for case-insensitive no-path PATCH merge
+- `isExtensionPath()` / `applyExtensionPatchOp()` - URN-based extension attribute handling
 
 ### 5.2 EndpointScimGroupsService (632 lines)
 
@@ -335,10 +335,10 @@ const config = ctx?.config;
 **Public Methods**: Same CRUD pattern as Users plus per-endpoint config flag handling.
 
 **Config-Driven Behavior**:
-- `MultiOpPatchRequestAddMultipleMembersToGroup` — Whether to accept array of members in a single add operation
-- `MultiOpPatchRequestRemoveMultipleMembersFromGroup` — Whether to accept array of member removes
-- `PatchOpAllowRemoveAllMembers` — Whether `remove` with no filter removes all group members
-- `VerbosePatchSupported` — Enables dot-notation path resolution in PATCH operations (e.g., `name.givenName` navigates into nested `name` object)
+- `MultiOpPatchRequestAddMultipleMembersToGroup` - Whether to accept array of members in a single add operation
+- `MultiOpPatchRequestRemoveMultipleMembersFromGroup` - Whether to accept array of member removes
+- `PatchOpAllowRemoveAllMembers` - Whether `remove` with no filter removes all group members
+- `VerbosePatchSupported` - Enables dot-notation path resolution in PATCH operations (e.g., `name.givenName` navigates into nested `name` object)
 
 **Member Management**:
 - `GroupMember` records linked by `groupId` + `userId` (nullable for unresolved references)
@@ -421,14 +421,14 @@ OAuth 2.0 `client_credentials` grant:
 │  │ userName        (CITEXT, case-insensitive) │
 │  │ displayName     (CITEXT, case-insensitive) │
 │  │ active          (Boolean, default true)  │
-│  │ payload         (JSONB — full SCIM JSON) │
+│  │ payload         (JSONB - full SCIM JSON) │
 │  │ version         (Int, monotonic ETag)    │
 │  │ meta            (text)                   │
 │  │ createdAt / updatedAt                    │
 │  │──────────────────────────────────────────│
 │  │ UQ: (endpointId, scimId)                 │
-│  │ UQ: (endpointId, userName) — CITEXT      │
-│  │ UQ: (endpointId, displayName) — CITEXT   │
+│  │ UQ: (endpointId, userName) - CITEXT      │
+│  │ UQ: (endpointId, displayName) - CITEXT   │
 │  │ UQ: (endpointId, resourceType, externalId)│
 │  │ IDX: (endpointId, resourceType)          │
 │  └──────────────────────┬───────────────────┘
@@ -472,7 +472,7 @@ OAuth 2.0 `client_credentials` grant:
 
 | Aspect | Current Design |
 |--------|---------------|
-| **SCIM Attributes** | Stored as `payload` (JSONB) — full SCIM resource JSON (native PostgreSQL JSON type) |
+| **SCIM Attributes** | Stored as `payload` (JSONB) - full SCIM resource JSON (native PostgreSQL JSON type) |
 | **Derived Columns** | `userName` (CITEXT), `active`, `externalId` (TEXT), `displayName` (CITEXT) extracted for queries |
 | **Meta** | Stored as separate `meta` column (text) |
 | **Group Members** | Normalized into `ResourceMember` junction table |
@@ -531,7 +531,7 @@ Incoming Request
 **Key design properties:**
 - **Graceful fallback**: Per-endpoint check errors (missing repo, bcrypt failure, etc.) silently fall through to OAuth/legacy. Valid tokens are never blocked.
 - **Lazy bcrypt loading**: The native `bcrypt` module is loaded via dynamic `import()` only on first use, then cached. Endpoints not using per-endpoint credentials incur zero bcrypt overhead.
-- **Optional injection**: `@Optional() @Inject(ENDPOINT_CREDENTIAL_REPOSITORY)` and `@Optional() @Inject(EndpointService)` — guard works correctly even when credential repo is unavailable.
+- **Optional injection**: `@Optional() @Inject(ENDPOINT_CREDENTIAL_REPOSITORY)` and `@Optional() @Inject(EndpointService)` - guard works correctly even when credential repo is unavailable.
 - **Request decoration**: `req.authType` is set to `'endpoint_credential'`, `'oauth'`, or `'legacy'` so downstream controllers can distinguish auth method. `req.authCredentialId` is set for per-endpoint credentials.
 
 ### 7.2 OAuth 2.0 Token Flow
@@ -563,9 +563,9 @@ Client                                  SCIMServer
 ### 7.3 Public Routes
 
 Routes bypassing authentication via `@Public()` decorator:
-- `POST /scim/oauth/token` — Token endpoint
-- `GET /scim/oauth/.well-known/openid-configuration` — Discovery
-- `GET /` — SPA serving
+- `POST /scim/oauth/token` - Token endpoint
+- `GET /scim/oauth/.well-known/openid-configuration` - Discovery
+- `GET /` - SPA serving
 - Static assets (`/assets/*`)
 
 ---
@@ -723,9 +723,9 @@ CMD ["node", "dist/main.js"]
 
 | Script | Purpose |
 |--------|---------|
-| `bootstrap.ps1` | No-clone one-liner — downloads `setup.ps1` from GitHub, provisions full Azure stack |
-| `setup.ps1` | Interactive Azure deploy — prompts for config, downloads Bicep templates, calls `deploy-azure.ps1 -ProvisionPostgres` |
-| `deploy.ps1` | Alternative one-liner — prompts for config, downloads repo ZIP or uses local scripts, calls `deploy-azure.ps1 -ProvisionPostgres` |
+| `bootstrap.ps1` | No-clone one-liner - downloads `setup.ps1` from GitHub, provisions full Azure stack |
+| `setup.ps1` | Interactive Azure deploy - prompts for config, downloads Bicep templates, calls `deploy-azure.ps1 -ProvisionPostgres` |
+| `deploy.ps1` | Alternative one-liner - prompts for config, downloads repo ZIP or uses local scripts, calls `deploy-azure.ps1 -ProvisionPostgres` |
 | `scripts/deploy-azure.ps1` | Core 5-step Azure provisioning (RG → Network → PG → Environment → Container App) |
 
 ---
@@ -737,7 +737,7 @@ CMD ["node", "dist/main.js"]
 - **Framework**: Jest 30 with `ts-jest` transform
 - **Test Location**: `api/test/` directory
 - **Test Pattern**: `*.spec.ts` and `*.test.ts`
-- **Current matrix**: See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts — all passing
+- **Current matrix**: See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts - all passing
 
 ### 11.2 Test Categories
 
@@ -797,11 +797,11 @@ CMD ["node", "dist/main.js"]
 | `VerbosePatchSupported` | boolean | false | Enable dot-notation path resolution in PATCH (e.g., `name.givenName`) |
 | `excludeMeta` | boolean | false | Omit meta from responses |
 | `excludeSchemas` | boolean | false | Omit schemas from responses |
-| `customSchemaUrn` | string | — | Custom schema URN to advertise |
+| `customSchemaUrn` | string | - | Custom schema URN to advertise |
 | `includeEnterpriseSchema` | boolean | false | Include Enterprise User extension |
 | `strictMode` | boolean | false | Enforce strict SCIM validation |
 | `legacyMode` | boolean | false | Enable legacy behavior |
-| `customHeaders` | object | — | Custom response headers |
+| `customHeaders` | object | - | Custom response headers |
 
 ---
 

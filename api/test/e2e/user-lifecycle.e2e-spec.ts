@@ -298,7 +298,7 @@ describe('User Lifecycle (E2E)', () => {
       await scimDelete(app, `${basePath}/Users/does-not-exist`, token).expect(404);
     });
 
-    it('should be idempotent — second delete returns 404', async () => {
+    it('should be idempotent - second delete returns 404', async () => {
       const created = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
 
       await scimDelete(app, `${basePath}/Users/${created.id}`, token).expect(204);

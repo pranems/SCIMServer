@@ -1,5 +1,5 @@
 /**
- * Prisma Filter Evaluator — In-Memory Implementation
+ * Prisma Filter Evaluator - In-Memory Implementation
  *
  * Evaluates Prisma-style WHERE clause objects against in-memory records.
  * Used by InMemory repositories to support the same filter shapes that
@@ -35,7 +35,7 @@ export function matchesPrismaFilter(
   filter: Record<string, unknown>,
 ): boolean {
   for (const [key, condition] of Object.entries(filter)) {
-    // Compound: AND — all sub-filters must match
+    // Compound: AND - all sub-filters must match
     if (key === 'AND') {
       const clauses = condition as Record<string, unknown>[];
       if (!clauses.every((clause) => matchesPrismaFilter(record, clause))) {
@@ -44,7 +44,7 @@ export function matchesPrismaFilter(
       continue;
     }
 
-    // Compound: OR — at least one sub-filter must match
+    // Compound: OR - at least one sub-filter must match
     if (key === 'OR') {
       const clauses = condition as Record<string, unknown>[];
       if (!clauses.some((clause) => matchesPrismaFilter(record, clause))) {
@@ -160,7 +160,7 @@ function matchOperator(stored: unknown, opObj: Record<string, unknown>): boolean
     return compareOrdered(stored, opObj.lte, 'lte');
   }
 
-  // Unknown operator shape — don't match (safe default)
+  // Unknown operator shape - don't match (safe default)
   return false;
 }
 

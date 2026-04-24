@@ -1,12 +1,12 @@
 /**
- * Phase 8.5 Gap Tests — DTO hardening (V3, V5, V7, V14, V15, V28)
+ * Phase 8.5 Gap Tests - DTO hardening (V3, V5, V7, V14, V15, V28)
  *
  * Tests for:
- *  V14 — @ArrayMaxSize on Operations
- *  V15 — @IsIn on PatchOperationDto.op
- *  V28 — @IsNotEmpty on userName
- *  V5  — Validators on SearchRequestDto
- *  V7  — @IsNotEmpty on GroupMemberDto.value
+ *  V14 - @ArrayMaxSize on Operations
+ *  V15 - @IsIn on PatchOperationDto.op
+ *  V28 - @IsNotEmpty on userName
+ *  V5  - Validators on SearchRequestDto
+ *  V7  - @IsNotEmpty on GroupMemberDto.value
  */
 
 import 'reflect-metadata';
@@ -21,7 +21,7 @@ import { SearchRequestDto } from './search-request.dto';
 
 // ─── V15: PatchOperationDto.op must be add/replace/remove ─────────────────────
 
-describe('V15 — PatchOperationDto.op @IsIn validation', () => {
+describe('V15 - PatchOperationDto.op @IsIn validation', () => {
   it('should accept op = "add"', async () => {
     const dto = plainToInstance(PatchOperationDto, { op: 'add', path: 'userName', value: 'x' });
     const errors = await validate(dto);
@@ -54,7 +54,7 @@ describe('V15 — PatchOperationDto.op @IsIn validation', () => {
 
 // ─── V14: ArrayMaxSize on PatchUserDto.Operations ─────────────────────────────
 
-describe('V14 — PatchUserDto.Operations @ArrayMaxSize', () => {
+describe('V14 - PatchUserDto.Operations @ArrayMaxSize', () => {
   it('should accept 1 operation', async () => {
     const dto = plainToInstance(PatchUserDto, {
       schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
@@ -90,7 +90,7 @@ describe('V14 — PatchUserDto.Operations @ArrayMaxSize', () => {
 
 // ─── V14: ArrayMaxSize on PatchGroupDto.Operations ────────────────────────────
 
-describe('V14 — PatchGroupDto.Operations @ArrayMaxSize', () => {
+describe('V14 - PatchGroupDto.Operations @ArrayMaxSize', () => {
   it('should reject > 1000 operations', async () => {
     const ops = Array.from({ length: 1001 }, () => ({ op: 'add', value: [{ value: 'uid' }] }));
     const dto = plainToInstance(PatchGroupDto, {
@@ -105,7 +105,7 @@ describe('V14 — PatchGroupDto.Operations @ArrayMaxSize', () => {
 
 // ─── V28: CreateUserDto.userName @IsNotEmpty ──────────────────────────────────
 
-describe('V28 — CreateUserDto.userName @IsNotEmpty', () => {
+describe('V28 - CreateUserDto.userName @IsNotEmpty', () => {
   it('should accept non-empty userName', async () => {
     const dto = plainToInstance(CreateUserDto, {
       schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
@@ -137,14 +137,14 @@ describe('V28 — CreateUserDto.userName @IsNotEmpty', () => {
     });
     const errors = await validate(dto);
     const userNameErrors = errors.filter(e => e.property === 'userName');
-    // @IsNotEmpty does not reject whitespace — this is expected behavior
+    // @IsNotEmpty does not reject whitespace - this is expected behavior
     expect(userNameErrors).toHaveLength(0);
   });
 });
 
 // ─── V7: GroupMemberDto.value @IsNotEmpty ──────────────────────────────────────
 
-describe('V7 — GroupMemberDto.value @IsNotEmpty', () => {
+describe('V7 - GroupMemberDto.value @IsNotEmpty', () => {
   it('should accept non-empty member value', async () => {
     const dto = plainToInstance(GroupMemberDto, { value: 'user-123' });
     const errors = await validate(dto);
@@ -161,7 +161,7 @@ describe('V7 — GroupMemberDto.value @IsNotEmpty', () => {
 
 // ─── V5: SearchRequestDto validators ──────────────────────────────────────────
 
-describe('V5 — SearchRequestDto validators', () => {
+describe('V5 - SearchRequestDto validators', () => {
   it('should accept a valid search request', async () => {
     const dto = plainToInstance(SearchRequestDto, {
       filter: 'userName eq "alice"',
@@ -210,7 +210,7 @@ describe('V5 — SearchRequestDto validators', () => {
 
 // ─── CreateGroupDto hardening ─────────────────────────────────────────────────
 
-describe('CreateGroupDto — displayName @IsNotEmpty', () => {
+describe('CreateGroupDto - displayName @IsNotEmpty', () => {
   it('should reject empty displayName', async () => {
     const dto = plainToInstance(CreateGroupDto, {
       schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
@@ -232,9 +232,9 @@ describe('CreateGroupDto — displayName @IsNotEmpty', () => {
   });
 });
 
-// ─── V15: PatchOperationDto.op — additional edge cases ────────────────────────
+// ─── V15: PatchOperationDto.op - additional edge cases ────────────────────────
 
-describe('V15 — PatchOperationDto.op additional edge cases', () => {
+describe('V15 - PatchOperationDto.op additional edge cases', () => {
   it('should accept op = "remove"', async () => {
     const dto = plainToInstance(PatchOperationDto, { op: 'remove', path: 'nickName' });
     const errors = await validate(dto);
@@ -273,7 +273,7 @@ describe('V15 — PatchOperationDto.op additional edge cases', () => {
 
 // ─── V5: SearchRequestDto @MaxLength edge cases ──────────────────────────────
 
-describe('V5 — SearchRequestDto @MaxLength enforcement', () => {
+describe('V5 - SearchRequestDto @MaxLength enforcement', () => {
   it('should reject attributes exceeding 2000 characters', async () => {
     const dto = plainToInstance(SearchRequestDto, { attributes: 'a'.repeat(2001) });
     const errors = await validate(dto);
@@ -328,9 +328,9 @@ describe('V5 — SearchRequestDto @MaxLength enforcement', () => {
   });
 });
 
-// ─── CreateUserDto — schemas, active, externalId validation ───────────────────
+// ─── CreateUserDto - schemas, active, externalId validation ───────────────────
 
-describe('CreateUserDto — additional validators', () => {
+describe('CreateUserDto - additional validators', () => {
   it('should reject empty schemas array (@ArrayNotEmpty)', async () => {
     const dto = plainToInstance(CreateUserDto, {
       schemas: [],
@@ -352,7 +352,7 @@ describe('CreateUserDto — additional validators', () => {
     });
     const errors = await validate(dto);
     const activeErrors = errors.filter(e => e.property === 'active');
-    expect(activeErrors.length).toBe(0); // no DTO-level rejection — schema layer handles this
+    expect(activeErrors.length).toBe(0); // no DTO-level rejection - schema layer handles this
   });
 
   it('should accept boolean active', async () => {
@@ -390,9 +390,9 @@ describe('CreateUserDto — additional validators', () => {
   });
 });
 
-// ─── CreateGroupDto — schemas @ArrayNotEmpty ──────────────────────────────────
+// ─── CreateGroupDto - schemas @ArrayNotEmpty ──────────────────────────────────
 
-describe('CreateGroupDto — schemas @ArrayNotEmpty', () => {
+describe('CreateGroupDto - schemas @ArrayNotEmpty', () => {
   it('should reject empty schemas array', async () => {
     const dto = plainToInstance(CreateGroupDto, {
       schemas: [],
@@ -415,9 +415,9 @@ describe('CreateGroupDto — schemas @ArrayNotEmpty', () => {
   });
 });
 
-// ─── GroupMemberDto — display and type validation ─────────────────────────────
+// ─── GroupMemberDto - display and type validation ─────────────────────────────
 
-describe('GroupMemberDto — field type validation', () => {
+describe('GroupMemberDto - field type validation', () => {
   it('should reject non-string display', async () => {
     const dto = plainToInstance(GroupMemberDto, { value: 'user-1', display: 123 as any });
     const errors = await validate(dto);

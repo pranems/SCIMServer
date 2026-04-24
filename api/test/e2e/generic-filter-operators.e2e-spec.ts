@@ -5,13 +5,13 @@ import { getAuthToken } from './helpers/auth.helper';
 import { resetFixtureCounter } from './helpers/fixtures';
 
 /**
- * Generic Resource Filter Operators — E2E
+ * Generic Resource Filter Operators - E2E
  *
  * Validates that the generic service (custom resource types) supports all 10
  * RFC 7644 §3.4.2.2 filter operators (eq, ne, co, sw, ew, gt, ge, lt, le, pr)
  * plus AND/OR compound expressions. Gap G6 resolution.
  *
- * Prior to this fix, only `eq` on displayName/externalId was supported —
+ * Prior to this fix, only `eq` on displayName/externalId was supported -
  * all other operators returned 400 invalidFilter.
  */
 describe('Generic Resource Filter Operators (E2E)', () => {
@@ -114,7 +114,7 @@ describe('Generic Resource Filter Operators (E2E)', () => {
 
   // ── eq (equals) ──────────────────────────────────────────────────────
 
-  it('eq — should filter by displayName eq (case-insensitive)', async () => {
+  it('eq - should filter by displayName eq (case-insensitive)', async () => {
     const res = await request(app.getHttpServer())
       .get(`${basePath}?filter=displayName eq "Alpha Sensor"`)
       .set('Authorization', `Bearer ${token}`)
@@ -124,7 +124,7 @@ describe('Generic Resource Filter Operators (E2E)', () => {
     expect(res.body.Resources[0]).toHaveProperty('displayName', 'Alpha Sensor');
   });
 
-  it('eq — should filter by externalId eq (case-sensitive)', async () => {
+  it('eq - should filter by externalId eq (case-sensitive)', async () => {
     const res = await request(app.getHttpServer())
       .get(`${basePath}?filter=externalId eq "ext-beta"`)
       .set('Authorization', `Bearer ${token}`)
@@ -136,7 +136,7 @@ describe('Generic Resource Filter Operators (E2E)', () => {
 
   // ── ne (not equals) ─────────────────────────────────────────────────
 
-  it('ne — should exclude matching resources', async () => {
+  it('ne - should exclude matching resources', async () => {
     const res = await request(app.getHttpServer())
       .get(`${basePath}?filter=displayName ne "Delta Probe"`)
       .set('Authorization', `Bearer ${token}`)
@@ -150,13 +150,13 @@ describe('Generic Resource Filter Operators (E2E)', () => {
 
   // ── co (contains) ───────────────────────────────────────────────────
 
-  it('co — should filter by displayName co (contains)', async () => {
+  it('co - should filter by displayName co (contains)', async () => {
     const res = await request(app.getHttpServer())
       .get(`${basePath}?filter=displayName co "Sensor"`)
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
-    // Alpha Sensor, Beta Sensor, Gamma Sensor — NOT Delta Probe
+    // Alpha Sensor, Beta Sensor, Gamma Sensor - NOT Delta Probe
     expect(res.body.totalResults).toBe(3);
     for (const r of res.body.Resources) {
       expect(r.displayName).toContain('Sensor');
@@ -165,7 +165,7 @@ describe('Generic Resource Filter Operators (E2E)', () => {
 
   // ── sw (startsWith) ─────────────────────────────────────────────────
 
-  it('sw — should filter by displayName sw (startsWith)', async () => {
+  it('sw - should filter by displayName sw (startsWith)', async () => {
     const res = await request(app.getHttpServer())
       .get(`${basePath}?filter=displayName sw "Beta"`)
       .set('Authorization', `Bearer ${token}`)
@@ -177,7 +177,7 @@ describe('Generic Resource Filter Operators (E2E)', () => {
 
   // ── ew (endsWith) ───────────────────────────────────────────────────
 
-  it('ew — should filter by displayName ew (endsWith)', async () => {
+  it('ew - should filter by displayName ew (endsWith)', async () => {
     const res = await request(app.getHttpServer())
       .get(`${basePath}?filter=displayName ew "Probe"`)
       .set('Authorization', `Bearer ${token}`)
@@ -189,7 +189,7 @@ describe('Generic Resource Filter Operators (E2E)', () => {
 
   // ── pr (presence) ───────────────────────────────────────────────────
 
-  it('pr — should filter by externalId pr (presence)', async () => {
+  it('pr - should filter by externalId pr (presence)', async () => {
     const res = await request(app.getHttpServer())
       .get(`${basePath}?filter=externalId pr`)
       .set('Authorization', `Bearer ${token}`)
@@ -201,7 +201,7 @@ describe('Generic Resource Filter Operators (E2E)', () => {
 
   // ── AND compound ────────────────────────────────────────────────────
 
-  it('and — should filter with AND compound', async () => {
+  it('and - should filter with AND compound', async () => {
     const res = await request(app.getHttpServer())
       .get(`${basePath}?filter=displayName co "Sensor" and externalId eq "ext-gamma"`)
       .set('Authorization', `Bearer ${token}`)
@@ -213,7 +213,7 @@ describe('Generic Resource Filter Operators (E2E)', () => {
 
   // ── OR compound ─────────────────────────────────────────────────────
 
-  it('or — should filter with OR compound', async () => {
+  it('or - should filter with OR compound', async () => {
     const res = await request(app.getHttpServer())
       .get(`${basePath}?filter=displayName eq "Alpha Sensor" or displayName eq "Delta Probe"`)
       .set('Authorization', `Bearer ${token}`)
@@ -226,7 +226,7 @@ describe('Generic Resource Filter Operators (E2E)', () => {
 
   // ── In-memory fallback: filter on custom attribute ──────────────────
 
-  it('eq on custom attribute — should fallback to in-memory filtering', async () => {
+  it('eq on custom attribute - should fallback to in-memory filtering', async () => {
     const res = await request(app.getHttpServer())
       .get(`${basePath}?filter=sensorName eq "gamma"`)
       .set('Authorization', `Bearer ${token}`)
@@ -236,7 +236,7 @@ describe('Generic Resource Filter Operators (E2E)', () => {
     expect(res.body.Resources[0].sensorName).toBe('gamma');
   });
 
-  it('co on custom attribute — in-memory contains', async () => {
+  it('co on custom attribute - in-memory contains', async () => {
     const res = await request(app.getHttpServer())
       .get(`${basePath}?filter=location co "Building"`)
       .set('Authorization', `Bearer ${token}`)
@@ -248,7 +248,7 @@ describe('Generic Resource Filter Operators (E2E)', () => {
 
   // ── POST /.search with filter ───────────────────────────────────────
 
-  it('POST /.search — should support filter in search request body', async () => {
+  it('POST /.search - should support filter in search request body', async () => {
     const res = await request(app.getHttpServer())
       .post(`${basePath}/.search`)
       .set('Authorization', `Bearer ${token}`)

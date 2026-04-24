@@ -1,5 +1,5 @@
 /**
- * E2E Tests — Endpoint Profile (Phase 13, Step 6)
+ * E2E Tests - Endpoint Profile (Phase 13, Step 6)
  *
  * Tests the profile-based endpoint creation and
  * profile PATCH merge behavior introduced by Phase 13.

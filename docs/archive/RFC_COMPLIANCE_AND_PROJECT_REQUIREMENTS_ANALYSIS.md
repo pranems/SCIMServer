@@ -1,6 +1,6 @@
 # RFC Compliance & Project Requirements Analysis
 
-> **⚠️ OUTDATED** — Written at v0.14.0 (now v0.24.0). RFC compliance matrices and phase status are stale. For current schema/extension compliance, see [`RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md`](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md). **Retained for**: G1–G20 project goals, 12-phase roadmap, removed flags analysis (7 flags with RFC justification), and architecture evolution plan.
+> **⚠️ OUTDATED** - Written at v0.14.0 (now v0.24.0). RFC compliance matrices and phase status are stale. For current schema/extension compliance, see [`RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md`](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md). **Retained for**: G1–G20 project goals, 12-phase roadmap, removed flags analysis (7 flags with RFC justification), and architecture evolution plan.
 
 > **Version**: 1.0 | **Date**: 2026-02-20 | **Project Version**: v0.14.0  
 > **Scope**: RFC 7643 (Core Schema) + RFC 7644 (Protocol) compliance mapping, 20 project goals (G1–G20), removed flags analysis, and per-endpoint extensibility roadmap
@@ -172,8 +172,8 @@ The SCIM server (v0.14.0) has completed **Phases 1–6** of a 12-phase migration
 | Return 200 OK or 204 No Content | MUST/MAY | ✅ | 5 | 200 with full body |
 | Path filter expressions | MUST support for remove | ✅ | 5 | valuePath filters |
 | Multi-valued primary attribute handling | SHALL | ✅ | 5 | Auto-clears other primaries |
-| 400 noTarget for unmatched filter | SHALL | ✅ | 5 | — |
-| 400 mutability for readOnly modifications | SHALL | ⚠️ | 8 | Partial — full validation in Phase 8 |
+| 400 noTarget for unmatched filter | SHALL | ✅ | 5 | - |
+| 400 mutability for readOnly modifications | SHALL | ⚠️ | 8 | Partial - full validation in Phase 8 |
 
 ### 2.10 Deleting Resources (RFC 7644 §3.6)
 
@@ -395,7 +395,7 @@ The SCIM server (v0.14.0) has completed **Phases 1–6** of a 12-phase migration
 |---|---|---|---|---|---|
 | **G1** | Queries execute against PostgreSQL instead of in-memory arrays | 🔴 | ✅ | 3 | RFC 7644 §3.4.2 (scalability) |
 | **G2** | User/Group share `scim_resource` table (polymorphic) | 🔴 | ✅ | 2 | RFC 7643 §3 (resource abstraction) |
-| **G3** | Prisma repository implements `ScimResourceRepository` interface | 🔴 | ✅ | 1 | — (architecture) |
+| **G3** | Prisma repository implements `ScimResourceRepository` interface | 🔴 | ✅ | 1 | - (architecture) |
 | **G4** | Filter push-down to SQL (no in-memory filtering) | 🔴 | ✅ | 4 | RFC 7644 §3.4.2.2 (performance) |
 | **G5** | PATCH engine with proper add/remove/replace semantics | 🟡 | ✅ | 5 | RFC 7644 §3.5.2 |
 | **G6** | Collision detection for unique attributes | 🟡 | ✅ | 3 | RFC 7644 §3.3 (409 Conflict) |
@@ -403,16 +403,16 @@ The SCIM server (v0.14.0) has completed **Phases 1–6** of a 12-phase migration
 | **G8** | Schema validation against declared attribute schemas | 🟢 | 🔲 | 8 | RFC 7643 §7 |
 | **G9** | Bulk operations with bulkId resolution | 🟢 | 🔲 | 9 | RFC 7644 §3.7 |
 | **G10** | /Me endpoint mapping authenticated user | ⚪ | 🔲 | 10 | RFC 7644 §3.11 |
-| **G11** | Per-endpoint credential management | 🟡 | 🔲 | 11 | — (security) |
+| **G11** | Per-endpoint credential management | 🟡 | 🔲 | 11 | - (security) |
 | **G12** | Sorting with SQL push-down | ⚪ | 🔲 | 12 | RFC 7644 §3.4.2.3 |
 | **G13** | POST /.search cleanup and optimization | ⚪ | 🔲 | 12 | RFC 7644 §3.4.3 |
 | **G14** | Case-insensitive attribute filtering | 🟡 | ✅ | 4 | RFC 7644 §3.4.2.2 |
 | **G15** | Multi-valued attribute PATCH (primary handling) | 🟡 | ✅ | 5 | RFC 7644 §3.5.2 |
 | **G16** | Discovery endpoints (ServiceProviderConfig, Schemas, ResourceTypes) | 🟡 | ✅ | 6 | RFC 7644 §4 |
 | **G17** | Extension schema support (Enterprise User) | 🟢 | ⚠️ | 6/8 | RFC 7643 §3.3, §4.3 |
-| **G18** | Dead code and unused flag cleanup | ⚪ | 🔲 | 12 | — (maintenance) |
+| **G18** | Dead code and unused flag cleanup | ⚪ | 🔲 | 12 | - (maintenance) |
 | **G19** | Dynamic extension schema detection (replaces INCLUDE_ENTERPRISE_SCHEMA flag) | 🟢 | ✅ | 6 | RFC 7643 §3.3 |
-| **G20** | Endpoint schema persistence (admin CRUD for schemas) | 🟢 | ✅ | 6 | — (admin tooling) |
+| **G20** | Endpoint schema persistence (admin CRUD for schemas) | 🟢 | ✅ | 6 | - (admin tooling) |
 
 ### Summary
 
@@ -453,7 +453,7 @@ gantt
 
 #### Phase 1: Repository Pattern ✅
 - **Goal**: G3
-- **RFC Coverage**: Architecture foundation — no direct RFC section
+- **RFC Coverage**: Architecture foundation - no direct RFC section
 - **Deliverables**: `ScimResourceRepository` interface, Prisma + InMemory implementations
 - **Impact**: Enables all subsequent phases via clean abstractions
 
@@ -563,13 +563,13 @@ During **Phase 6** (Data-Driven Discovery), **7 configuration flags** were ident
 
 | # | Flag Name | Was RFC Required? | Was Project Required? | Code Consuming It? | Verdict |
 |---|---|---|---|---|---|
-| 1 | `EXCLUDE_META` | ❌ **NO** — would VIOLATE RFC | ❌ | None | Dead code — RFC says `meta` SHOULD be included |
-| 2 | `EXCLUDE_SCHEMAS` | ❌ **NO** — would VIOLATE RFC | ❌ | None | Dead code — RFC REQUIRES `schemas[]` on all resources |
-| 3 | `CUSTOM_SCHEMA_URN` | ❌ **NO** — no RFC basis | ❌ | None | Dead code — URN namespaces are IETF-registered |
-| 4 | `INCLUDE_ENTERPRISE_SCHEMA` | ❌ **NO** — replaced by dynamic detection | ❌ (superseded by G19) | None | Dead code — Phase 6 auto-detects extensions |
-| 5 | `STRICT_MODE` | ⚠️ **RFC-ADJACENT** | ✅ (reintroduced in Phase 7/8) | None | Dead code — defined but never consumed; will be properly implemented |
-| 6 | `LEGACY_MODE` | ❌ **NO** — no RFC basis | ❌ | None | Dead code — SCIM 1.1 compat has no RFC 7643/7644 basis |
-| 7 | `CUSTOM_HEADERS` | ❌ **NO** — no RFC basis | ❌ | None | Dead code — custom response headers aren't in any RFC |
+| 1 | `EXCLUDE_META` | ❌ **NO** - would VIOLATE RFC | ❌ | None | Dead code - RFC says `meta` SHOULD be included |
+| 2 | `EXCLUDE_SCHEMAS` | ❌ **NO** - would VIOLATE RFC | ❌ | None | Dead code - RFC REQUIRES `schemas[]` on all resources |
+| 3 | `CUSTOM_SCHEMA_URN` | ❌ **NO** - no RFC basis | ❌ | None | Dead code - URN namespaces are IETF-registered |
+| 4 | `INCLUDE_ENTERPRISE_SCHEMA` | ❌ **NO** - replaced by dynamic detection | ❌ (superseded by G19) | None | Dead code - Phase 6 auto-detects extensions |
+| 5 | `STRICT_MODE` | ⚠️ **RFC-ADJACENT** | ✅ (reintroduced in Phase 7/8) | None | Dead code - defined but never consumed; will be properly implemented |
+| 6 | `LEGACY_MODE` | ❌ **NO** - no RFC basis | ❌ | None | Dead code - SCIM 1.1 compat has no RFC 7643/7644 basis |
+| 7 | `CUSTOM_HEADERS` | ❌ **NO** - no RFC basis | ❌ | None | Dead code - custom response headers aren't in any RFC |
 
 ### Detailed Justifications
 
@@ -601,13 +601,13 @@ The `schemas` attribute is **REQUIRED** on all SCIM resources. A flag to exclude
 
 #### 3. `CUSTOM_SCHEMA_URN`
 
-SCIM schema URIs follow the IETF-registered namespace `urn:ietf:params:scim:schemas:`. Custom URN overrides have no RFC basis — extension schemas use their own URN namespace (e.g., `urn:example:custom:schema`) registered per RFC 7643 §10.3.
+SCIM schema URIs follow the IETF-registered namespace `urn:ietf:params:scim:schemas:`. Custom URN overrides have no RFC basis - extension schemas use their own URN namespace (e.g., `urn:example:custom:schema`) registered per RFC 7643 §10.3.
 
 **Verdict**: No RFC basis. Proper extension schemas are supported via the data-driven discovery system (Phase 6).
 
 #### 4. `INCLUDE_ENTERPRISE_SCHEMA`
 
-This flag was a static boolean to hard-code Enterprise User extension inclusion. Phase 6 replaced this with **dynamic detection** — the system automatically detects which extensions are present on a resource by examining the `schemas[]` array and the stored attribute data.
+This flag was a static boolean to hard-code Enterprise User extension inclusion. Phase 6 replaced this with **dynamic detection** - the system automatically detects which extensions are present on a resource by examining the `schemas[]` array and the stored attribute data.
 
 **Verdict**: Superseded by G19 (dynamic extension detection). The removal is an improvement.
 
@@ -620,7 +620,7 @@ that the requested operation succeeds only if the supplied ETag
 matches the latest service provider resource"
 ```
 
-`STRICT_MODE` was intended to control If-Match enforcement and unknown attribute rejection. While the concept has RFC basis (conditional requests + schema validation), the flag itself was **never consumed** — no code path checked its value.
+`STRICT_MODE` was intended to control If-Match enforcement and unknown attribute rejection. While the concept has RFC basis (conditional requests + schema validation), the flag itself was **never consumed** - no code path checked its value.
 
 **Verdict**: The **concept** will be properly re-implemented in Phases 7 and 8 as a per-endpoint config flag (`strictMode`) with actual runtime enforcement:
 - Phase 7: If-Match → 428 Precondition Required (when strictMode enabled)
@@ -681,7 +681,7 @@ graph TD
 | 2 | `MULTI_OP_PATCH_REMOVE_MULTIPLE_MEMBERS_FROM_GROUP` | `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | boolean | `true` | `endpoint-scim-groups.service.ts` | RFC 7644 §3.5.2.2 |
 | 3 | `PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS` | `PatchOpAllowRemoveAllMembers` | boolean | `true` | `endpoint-scim-groups.service.ts` | RFC 7644 §3.5.2.2 |
 | 4 | `VERBOSE_PATCH_SUPPORTED` | `VerbosePatchSupported` | boolean | `true` | `endpoint-scim-users.service.ts` | RFC 7644 §3.5.2 |
-| 5 | `LOG_LEVEL` | `logLevel` | string | `"info"` | Operational logging | — (operational) |
+| 5 | `LOG_LEVEL` | `logLevel` | string | `"info"` | Operational logging | - (operational) |
 
 ### Flag Consumption Locations
 
@@ -720,7 +720,7 @@ sequenceDiagram
 
 **Flag 4 (Verbose PATCH)**: RFC 7644 §3.5.2 states: "the server either MUST return a 200 OK response code and the entire resource within the response body... or MAY return HTTP status code 204 (No Content)." The `VerbosePatchSupported` flag controls whether the server returns 200+body or 204. Both are RFC-compliant.
 
-**Flag 5 (logLevel)**: Operational — no RFC relevance.
+**Flag 5 (logLevel)**: Operational - no RFC relevance.
 
 ---
 
@@ -787,7 +787,7 @@ New flags to be added:
 | `requireIfMatch` | 7 | Requires If-Match header on PUT/PATCH/DELETE |
 | `rejectUnknownAttributes` | 8 | Rejects attributes not in declared schema |
 
-Implementation approach: **Guard-level enforcement** — the `EndpointGuard` will check these flags before the request reaches the service layer, returning 428 or 400 immediately.
+Implementation approach: **Guard-level enforcement** - the `EndpointGuard` will check these flags before the request reaches the service layer, returning 428 or 400 immediately.
 
 ### Phase 9–10: Interceptor Pattern
 
@@ -851,7 +851,7 @@ class PatchStrategyFactory {
 
 ### How Extensibility Requirements Are Met
 
-The project's core extensibility requirement — **per-endpoint behavior change via flags** — is addressed across phases:
+The project's core extensibility requirement - **per-endpoint behavior change via flags** - is addressed across phases:
 
 | Phase | Extensibility Capability |
 |---|---|
@@ -863,7 +863,7 @@ The project's core extensibility requirement — **per-endpoint behavior change 
 | **11** | Per-endpoint credential isolation (each endpoint can have unique auth) |
 | **12** | Sorting behavior flags per endpoint |
 
-The underlying architecture — `endpoint.config` JSONB column → `EndpointContextStorage` (AsyncLocalStorage) → `getConfigBoolean()`/`getConfigString()` — is already in place and scales to unlimited flags without schema changes (JSONB is schemaless).
+The underlying architecture - `endpoint.config` JSONB column → `EndpointContextStorage` (AsyncLocalStorage) → `getConfigBoolean()`/`getConfigString()` - is already in place and scales to unlimited flags without schema changes (JSONB is schemaless).
 
 ---
 
@@ -899,10 +899,10 @@ graph LR
 | 6 | §4 (ServiceProviderConfig), §5 (SPConfig schema), §6 (ResourceType), §7 (Schema) | +5% |
 | 7 | §3.14 (ETags, If-Match, 412) | +2% |
 | 8 | §7 (schema validation enforcement), §3.5.2 (mutability) | +1% |
-| 9 | §3.7 (Bulk) — optional | +1% |
-| 10 | §3.11 (/Me) — optional | +0.5% |
+| 9 | §3.7 (Bulk) - optional | +1% |
+| 10 | §3.11 (/Me) - optional | +0.5% |
 | 11 | §2 (auth), §6 (multi-tenancy) | +0% (security) |
-| 12 | §3.4.2.3 (sorting) — optional | +0.5% |
+| 12 | §3.4.2.3 (sorting) - optional | +0.5% |
 
 ---
 
@@ -1069,4 +1069,4 @@ graph LR
 
 ---
 
-> **Document End** — This document should be updated as phases 7–12 are completed.
+> **Document End** - This document should be updated as phases 7–12 are completed.

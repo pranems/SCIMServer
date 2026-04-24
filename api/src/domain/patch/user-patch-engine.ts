@@ -2,7 +2,7 @@
  * User PATCH Engine (Phase 5)
  *
  * Pure domain class that applies SCIM PATCH operations to a user's in-memory state.
- * Zero NestJS / Prisma / DB dependencies — takes plain data in, returns plain data out.
+ * Zero NestJS / Prisma / DB dependencies - takes plain data in, returns plain data out.
  *
  * Responsibilities:
  *   - Operation dispatch (add / replace / remove)
@@ -12,7 +12,7 @@
  *
  * The calling service handles: DB load, uniqueness checks, DB save, meta generation.
  *
- * @see RFC 7644 §3.5.2 — Modifying with PATCH
+ * @see RFC 7644 §3.5.2 - Modifying with PATCH
  */
 
 import {
@@ -264,7 +264,7 @@ export class UserPatchEngine {
       }
       if ('displayName' in updateObj) {
         displayName = UserPatchEngine.extractNullableStringValue(updateObj.displayName, 'displayName');
-        // Keep displayName in updateObj — must remain in rawPayload (response built from it)
+        // Keep displayName in updateObj - must remain in rawPayload (response built from it)
       }
       if ('externalId' in updateObj) {
         externalId = UserPatchEngine.extractNullableStringValue(updateObj.externalId, 'externalId');

@@ -1,7 +1,7 @@
 # Error Handling Verification Prompt (Self-Improving)
 
-> **Version:** 3.3 · **Source-verified against:** v0.37.3 · **Regenerated:** April 21, 2026  
-> Automated checklist — run against source to verify error handling completeness.
+> **Version:** 3.3 · **Source-verified against:** v0.38.0 · **Regenerated:** April 21, 2026  
+> Automated checklist - run against source to verify error handling completeness.
 
 ---
 
@@ -62,8 +62,8 @@ This is a **self-improving audit prompt** for verifying that SCIMServer's error 
 |---|-------|---------------|----------|
 | 5.1 | `handleRepositoryError()` logs at ERROR | Check helper function | `logger.error(...)` for RepositoryError |
 | 5.2 | `handleRepositoryError()` uses `createScimError()` | Check throw | Yes, with mapped status |
-| 5.3 | Non-RepositoryError re-thrown | Check else branch | `throw error` — to GlobalExceptionFilter |
-| 5.4 | All SCIM services use `handleRepositoryError()` | Grep service files | Users, Groups, Generic — all use it |
+| 5.3 | Non-RepositoryError re-thrown | Check else branch | `throw error` - to GlobalExceptionFilter |
+| 5.4 | All SCIM services use `handleRepositoryError()` | Grep service files | Users, Groups, Generic - all use it |
 
 ### 6. HTTP Status Code Coverage
 
@@ -146,8 +146,8 @@ TOTAL: __/55 PASS
 ## Latest Run
 
 ```
-Date: April 21, 2026
-Version: 0.37.3
+Date: April 23, 2026
+Version: 0.38.0
 Executor: AI (Claude Opus 4.6, source-verified)
 
 Section 1 (SCIM Format): 5/5 PASS
@@ -164,16 +164,33 @@ Section 10 (Auth Errors): 6/6 PASS
 TOTAL: 55/55 PASS
 ```
 
-All 55 infrastructure checks PASS. Extended A-K deep audit (35 checks): 35 PASS, 0 PARTIAL, 0 FAIL.
+All 55 infrastructure checks PASS.
+
+**Extended A-K deep audit (79 checks):**
+
+| Section | Score | Checks |
+|---------|-------|--------|
+| A (Repository Layer) | 8/8 | RepositoryError wrapping, wrapPrismaError mapping, InMemory+Prisma parity |
+| B (Service Layer) | 14/14 | 404/409/400/412/428 paths, PatchError catch, handleRepositoryError, schema/immutable/required/filter |
+| C (Filter Chain) | 10/10 | SCIM body preservation, NestJS wrapping, catch-all 500, non-SCIM routes, tiered logging |
+| D (Diagnostics) | 6/6 | triggeredBy correctness (20 flagged / 59 unflagged), requestId/endpointId auto-population, logsUrl routing |
+| E (Auth) | 6/6 | Missing/invalid token, OAuth expiry fallthrough, credential check error isolation, FATAL on missing secret |
+| F (Bulk) | 5/5 | Error isolation, failOnErrors threshold, SCIM error body in results, non-HttpException caught |
+| G (Admin) | 7/7 | 404/400/403 paths, preset 404, credential not found, PerEndpointCredentials gate |
+| H (Content-Type) | 4/4 | 415 rejection, empty body pass-through, both SCIM+JSON and JSON accepted |
+| I (Format) | 8/8 | schemas[], string status, Content-Type, detail, scimType, no leakage, X-Request-Id |
+| J (Edge Cases) | 6/6 | Corrupt JSON fallback, null/string thrown, circular refs, large messages |
+| K (Response Body) | 6/6 | Map/Set stripping, _schemaCaches removal, SCIM-only error fields, extension URN isolation |
+| **TOTAL** | **80/80** | **0 FAIL, 0 PARTIAL** |
 
 Previous PARTIALs from v0.37.1 remain accepted by-design:
-- B.14: Filter syntax errors omit `triggeredBy` (correct — unconditional check pattern)
+- B.14: Filter syntax errors omit `triggeredBy` (correct - unconditional check pattern)
 - I.5: Wrapped NestJS exceptions don't get `scimType` (RFC 7644 says optional)
 - I.8: Pre-interceptor 415 errors lack diagnostics.requestId (correlation context not yet established)
 
-Improvements since v0.37.1:
-- `createScimError()` calls: 57 → 77 (growth from error-handling + manager PATCH audit)
-- All 77 calls verified to have `diagnostics.errorCode` ✅
-- 6 silent `catch {}` blocks fixed with DEBUG logging (credential repo, service helpers, generic service)
-- `safeStringify()` circular reference handler added to logger — 3 downstream call sites protected
-- Manager PATCH error path verified: pre-validation + PatchError catch both have full diagnostics
+**Key metrics:**
+- `createScimError()` calls: 79 across 10 files - ALL 79 have diagnostics.errorCode (22 distinct values)
+- `handleRepositoryError()`: called from 12 catch blocks across 3 services
+- `triggeredBy` usage: 20/79 calls carry it (all config-flag-gated validations), 59 correctly omit it
+- G8h PrimaryEnforcement: 2 new `PRIMARY_CONSTRAINT_VIOLATION` error paths, both fully diagnosed
+- GenericService `enforcePrimaryConstraint`: `console.warn` upgraded to `scimLogger.warn()` in this session

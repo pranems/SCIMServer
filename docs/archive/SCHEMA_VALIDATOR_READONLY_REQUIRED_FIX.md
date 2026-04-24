@@ -1,4 +1,4 @@
-# SchemaValidator — readOnly + required Attribute Fix
+# SchemaValidator - readOnly + required Attribute Fix
 
 > **Document Purpose**: Root cause analysis and fix reference for the `id` required+readOnly catch-22 bug that caused 65 test failures (24 unit + 41 E2E), plus the G8f mock drift fix (1 additional failure).
 >
@@ -25,9 +25,9 @@ This bug was dormant until tests enabled `StrictSchemaValidation: true` alongsid
 
 | Root Cause | Category | Failures | Description |
 |-----------|----------|----------|-------------|
-| A — readOnly+required catch-22 | code-bug | 59 | SchemaValidator impossible constraint on `id` |
-| B — G8f mock drift (cascade) | test-bug | 5 | Earlier failures left unconsumed `mockResolvedValueOnce` items leaking into G8f tests |
-| B — G8f mock drift (inherent) | test-bug | 1 | Test called `replaceGroupForEndpoint` twice but mocked `findWithMembers` only once |
+| A - readOnly+required catch-22 | code-bug | 59 | SchemaValidator impossible constraint on `id` |
+| B - G8f mock drift (cascade) | test-bug | 5 | Earlier failures left unconsumed `mockResolvedValueOnce` items leaking into G8f tests |
+| B - G8f mock drift (inherent) | test-bug | 1 | Test called `replaceGroupForEndpoint` twice but mocked `findWithMembers` only once |
 
 ### Solution Summary
 
@@ -36,18 +36,18 @@ This bug was dormant until tests enabled `StrictSchemaValidation: true` alongsid
 
 ---
 
-## Root Cause A — The Catch-22 in Detail
+## Root Cause A - The Catch-22 in Detail
 
 ### Schema Constants (Dual-Purpose)
 
 The schema constants in `scim-schemas.constants.ts` serve two purposes:
 
-1. **Discovery** — Returned by `GET /Schemas` endpoint (RFC 7643 §7)
-2. **Validation** — Used by `SchemaValidator.validate()` for payload checks
+1. **Discovery** - Returned by `GET /Schemas` endpoint (RFC 7643 §7)
+2. **Validation** - Used by `SchemaValidator.validate()` for payload checks
 
-For **discovery**, `id` being `required: true` is correct — RFC 7643 §3.1 states the `id` attribute "is REQUIRED" (meaning: every resource representation MUST include it). Clients reading `/Schemas` should see that `id` is required in responses.
+For **discovery**, `id` being `required: true` is correct - RFC 7643 §3.1 states the `id` attribute "is REQUIRED" (meaning: every resource representation MUST include it). Clients reading `/Schemas` should see that `id` is required in responses.
 
-For **validation**, `required: true` on a `readOnly` attribute is nonsensical — the client is forbidden from providing it, so demanding it from the client creates an impossible constraint.
+For **validation**, `required: true` on a `readOnly` attribute is nonsensical - the client is forbidden from providing it, so demanding it from the client creates an impossible constraint.
 
 ```
 ┌──────────────────────────────────────────────────┐
@@ -87,7 +87,7 @@ Client POST body:
                 ├─ 'userName': mutability=readWrite → validate type → ✅
                 └─ (id not in payload → nothing to check)
 
-Result: FAIL — "Required attribute 'id' is missing" (400)
+Result: FAIL - "Required attribute 'id' is missing" (400)
 ```
 
 If the client tried to include `id`:
@@ -109,10 +109,10 @@ Client POST body:
                 ├─ 'id': RESERVED_KEYS → skip ← ⚠️ skipped entirely!
                 └─ 'userName': validate type → ✅
 
-Result: PASS — but client should NOT send id
+Result: PASS - but client should NOT send id
 ```
 
-Note: `id` is in the `RESERVED_KEYS` set (line 35-40), so the mutability readOnly check at line 249 is *never reached* for `id`. This means including `id` in the body actually "works" — but only because the validator skips it entirely as a reserved key, and the service layer later strips it via `stripReservedAttributes()`.
+Note: `id` is in the `RESERVED_KEYS` set (line 35-40), so the mutability readOnly check at line 249 is *never reached* for `id`. This means including `id` in the body actually "works" - but only because the validator skips it entirely as a reserved key, and the service layer later strips it via `stripReservedAttributes()`.
 
 ### The Catch-22 Visual
 
@@ -147,7 +147,7 @@ Note: `id` is in the `RESERVED_KEYS` set (line 35-40), so the mutability readOnl
 
 RFC 7643 §2.2 states:
 
-> **readOnly** — The attribute SHALL NOT be modified. [...] A "readOnly" attribute is server-assigned.
+> **readOnly** - The attribute SHALL NOT be modified. [...] A "readOnly" attribute is server-assigned.
 
 Server-assigned attributes are the server's responsibility, not the client's. The required check should not demand them from client payloads.
 
@@ -186,12 +186,12 @@ Client POST body:
                 ├─ 'schemas': RESERVED_KEYS → skip
                 └─ 'userName': mutability=readWrite → validate type → ✅
 
-Result: PASS ✅ — correct behavior
+Result: PASS ✅ - correct behavior
 ```
 
 ### What the Fix Preserves
 
-The original intention — *"On create/replace, reject payloads missing required attributes"* — is fully preserved for **all client-writable attributes**:
+The original intention - *"On create/replace, reject payloads missing required attributes"* - is fully preserved for **all client-writable attributes**:
 
 | Attribute | `required` | `mutability` | Before Fix | After Fix |
 |-----------|-----------|-------------|------------|-----------|
@@ -203,7 +203,7 @@ The original intention — *"On create/replace, reject payloads missing required
 
 ---
 
-## Root Cause B — G8f Test Mock Drift
+## Root Cause B - G8f Test Mock Drift
 
 ### The Problem
 
@@ -229,7 +229,7 @@ mockGroupRepo.findByDisplayName.mockResolvedValueOnce(conflictGroup);
 
 ### Cascade Effect
 
-5 of the 6 G8f failures were **cascade** — not inherent bugs. When Root Cause A caused earlier tests in the same suite to fail, their unconsumed `mockResolvedValueOnce` items leaked into the G8f tests via the mock queue. `jest.clearAllMocks()` (used in `afterEach`) clears mock call history but does **NOT** clear the `mockResolvedValueOnce` queue — that requires `jest.resetAllMocks()`.
+5 of the 6 G8f failures were **cascade** - not inherent bugs. When Root Cause A caused earlier tests in the same suite to fail, their unconsumed `mockResolvedValueOnce` items leaked into the G8f tests via the mock queue. `jest.clearAllMocks()` (used in `afterEach`) clears mock call history but does **NOT** clear the `mockResolvedValueOnce` queue - that requires `jest.resetAllMocks()`.
 
 Fixing Root Cause A made the earlier tests pass and consume their mocks properly, automatically resolving 5 of the 6 G8f cascade failures.
 
@@ -355,12 +355,12 @@ SchemaValidator.validate(payload, schemas, options)
 
 | Component | File | Role |
 |-----------|------|------|
-| `SchemaValidator.validate()` | `api/src/domain/validation/schema-validator.ts` | Pure domain validator — required check + per-attribute validation |
-| `RESERVED_KEYS` | `api/src/domain/validation/schema-validator.ts` (line 35) | Set of `{schemas, id, externalId, meta}` — skipped in per-attribute loop |
-| `validatePayloadSchema()` | `api/src/modules/scim/common/scim-service-helpers.ts` | Service-layer wrapper — only runs when `StrictSchemaValidation` is ON |
-| `USER_SCHEMA_ATTRIBUTES` | `api/src/modules/scim/discovery/scim-schemas.constants.ts` | Schema constants — `id` is `required:true, mutability:'readOnly'` (RFC-correct for discovery) |
-| `GROUP_SCHEMA_ATTRIBUTES` | `api/src/modules/scim/discovery/scim-schemas.constants.ts` | Same pattern — `id` with `required:true, mutability:'readOnly'` |
-| `stripReservedAttributes()` | `api/src/modules/scim/services/` | Service-layer utility — removes `id` from client payloads before persistence |
+| `SchemaValidator.validate()` | `api/src/domain/validation/schema-validator.ts` | Pure domain validator - required check + per-attribute validation |
+| `RESERVED_KEYS` | `api/src/domain/validation/schema-validator.ts` (line 35) | Set of `{schemas, id, externalId, meta}` - skipped in per-attribute loop |
+| `validatePayloadSchema()` | `api/src/modules/scim/common/scim-service-helpers.ts` | Service-layer wrapper - only runs when `StrictSchemaValidation` is ON |
+| `USER_SCHEMA_ATTRIBUTES` | `api/src/modules/scim/discovery/scim-schemas.constants.ts` | Schema constants - `id` is `required:true, mutability:'readOnly'` (RFC-correct for discovery) |
+| `GROUP_SCHEMA_ATTRIBUTES` | `api/src/modules/scim/discovery/scim-schemas.constants.ts` | Same pattern - `id` with `required:true, mutability:'readOnly'` |
+| `stripReservedAttributes()` | `api/src/modules/scim/services/` | Service-layer utility - removes `id` from client payloads before persistence |
 
 ### Why the Fix is at the Validator, Not the Constants
 
@@ -369,7 +369,7 @@ SchemaValidator.validate(payload, schemas, options)
 │              Alternative: Change constants?              │
 │                                                         │
 │  Option A: Set id.required = false                      │
-│    ❌ Breaks GET /Schemas response — RFC 7643 §3.1     │
+│    ❌ Breaks GET /Schemas response - RFC 7643 §3.1     │
 │       says id "is REQUIRED" (must appear in responses)  │
 │                                                         │
 │  Option B: Split into discovery vs validation schemas   │
@@ -388,23 +388,23 @@ SchemaValidator.validate(payload, schemas, options)
 
 ## RFC Compliance
 
-### RFC 7643 §2.2 — Mutability
+### RFC 7643 §2.2 - Mutability
 
-> **readOnly** — The attribute SHALL NOT be modified. [...] A "readOnly" attribute is assigned by the service provider. [...] The attribute SHALL be ignored when provided by the client.
+> **readOnly** - The attribute SHALL NOT be modified. [...] A "readOnly" attribute is assigned by the service provider. [...] The attribute SHALL be ignored when provided by the client.
 
-This explicitly states that readOnly attributes are **server-assigned** — the server is responsible for providing them, not the client. Demanding them from the client in the required check violates this principle.
+This explicitly states that readOnly attributes are **server-assigned** - the server is responsible for providing them, not the client. Demanding them from the client in the required check violates this principle.
 
-### RFC 7643 §3.1 — Common Attributes
+### RFC 7643 §3.1 - Common Attributes
 
-> **id** — A unique identifier for a SCIM resource as defined by the service provider. [...] "id" is singularly unique [...] REQUIRED.
+> **id** - A unique identifier for a SCIM resource as defined by the service provider. [...] "id" is singularly unique [...] REQUIRED.
 
 The word "REQUIRED" here means the attribute MUST appear in the **resource representation** (responses). It does not mean the client must provide it in the request body. The service provider assigns `id` during resource creation.
 
-### RFC 7644 §3.1 — Creating Resources (POST)
+### RFC 7644 §3.1 - Creating Resources (POST)
 
 > The service provider SHALL process the POST request to create a new resource [...] and assign a unique identifier.
 
-The spec explicitly says the server "SHALL assign" the identifier — confirming the client does not provide it.
+The spec explicitly says the server "SHALL assign" the identifier - confirming the client does not provide it.
 
 ---
 
@@ -457,11 +457,11 @@ Key test groups that were failing:
 
 ## Related Documentation
 
-- [RFC 7643 §2.2 — Attribute Mutability](https://datatracker.ietf.org/doc/html/rfc7643#section-2.2)
-- [RFC 7643 §3.1 — Common Attributes](https://datatracker.ietf.org/doc/html/rfc7643#section-3.1)
-- [RFC 7644 §3.1 — Creating Resources](https://datatracker.ietf.org/doc/html/rfc7644#section-3.1)
-- [G8c — PATCH readOnly Pre-Validation](G8C_PATCH_READONLY_PREVALIDATION.md) — Related readOnly enforcement for PATCH operations
-- [G8f — Group Uniqueness PUT/PATCH](G8F_GROUP_UNIQUENESS_PUT_PATCH.md) — The G8f feature where mock drift was found
-- [ENDPOINT_CONFIG_FLAGS_REFERENCE](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) — `StrictSchemaValidation` flag reference
-- [SELF_IMPROVING_TEST_HEALTH_PROMPT](SELF_IMPROVING_TEST_HEALTH_PROMPT.md) — Reusable diagnostic prompt with patterns from this fix
-- [ISSUES_BUGS_ROOT_CAUSE_ANALYSIS](ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md) — Prior root cause analysis patterns
+- [RFC 7643 §2.2 - Attribute Mutability](https://datatracker.ietf.org/doc/html/rfc7643#section-2.2)
+- [RFC 7643 §3.1 - Common Attributes](https://datatracker.ietf.org/doc/html/rfc7643#section-3.1)
+- [RFC 7644 §3.1 - Creating Resources](https://datatracker.ietf.org/doc/html/rfc7644#section-3.1)
+- [G8c - PATCH readOnly Pre-Validation](G8C_PATCH_READONLY_PREVALIDATION.md) - Related readOnly enforcement for PATCH operations
+- [G8f - Group Uniqueness PUT/PATCH](G8F_GROUP_UNIQUENESS_PUT_PATCH.md) - The G8f feature where mock drift was found
+- [ENDPOINT_CONFIG_FLAGS_REFERENCE](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) - `StrictSchemaValidation` flag reference
+- [SELF_IMPROVING_TEST_HEALTH_PROMPT](SELF_IMPROVING_TEST_HEALTH_PROMPT.md) - Reusable diagnostic prompt with patterns from this fix
+- [ISSUES_BUGS_ROOT_CAUSE_ANALYSIS](ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md) - Prior root cause analysis patterns

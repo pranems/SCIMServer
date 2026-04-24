@@ -125,8 +125,13 @@ When working on development projects:
 - Build incrementally on documented progress and achievements
 - Use MCP servers for accurate, up-to-date information when needed
 
+## Character Rules (CRITICAL)
+- NEVER use em-dash (`-`, U+2014) anywhere in the codebase - not in code, comments, strings, docs, commit messages, changelogs, or any generated/edited file
+- Always use a single hyphen (`-`) where an em-dash would otherwise appear
+- This applies to ALL file types: `.ts`, `.js`, `.json`, `.md`, `.ps1`, `.yml`, `.html`, `.css`, `.mjs`, etc.
+
 ## Git Commit Rules (CRITICAL)
-- NEVER use `git commit --amend` unless explicitly specified by the user — always create new commits with `git commit -m "..."`
+- NEVER use `git commit --amend` unless explicitly specified by the user - always create new commits with `git commit -m "..."`
 - NEVER rewrite history on commits that have been pushed
 - Always use `git add -A; git commit -m "<descriptive message>"` for saving progress
 
@@ -134,15 +139,15 @@ When working on development projects:
 
 Every feature or significant change commit MUST include ALL of the following before committing. Do NOT skip any item:
 
-1. **Unit Tests** — Service-level (`.service.spec.ts`) and Controller-level (`.controller.spec.ts`) tests covering the new behavior
-2. **E2E Tests** — End-to-end spec (`test/e2e/*.e2e-spec.ts`) exercising the feature through HTTP
-3. **Live Integration Tests** — New test section in `scripts/live-test.ps1` covering the feature for all deployment scenarios (local server on port 6000, Docker container on port 8080, Azure). Must be runnable with both `.\live-test.ps1` (local) and `.\live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "docker-secret"` (Docker)
-4. **Feature Documentation** — Dedicated doc in `docs/` (e.g., `docs/G8E_RETURNED_CHARACTERISTIC_FILTERING.md`) with architecture, RFC references, Mermaid diagrams, implementation details, and test coverage tables
-5. **INDEX.md Update** — Add the new feature doc reference to `docs/INDEX.md`
-6. **CHANGELOG.md Update** — Version bump entry with full test counts and feature summary
-7. **Session & Context Updates** — Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts, version, and feature status
-8. **Version Management** — Bump version in `package.json` and all relevant version references
-9. **Response Contract Tests** — Verify API responses contain ONLY documented fields (key allowlist assertion at unit + E2E + live levels). Internal runtime fields (prefixed with `_`) must never appear in responses. Use `expect(ALLOWED_KEYS).toContain(key)` pattern, not just `toHaveProperty`.
+1. **Unit Tests** - Service-level (`.service.spec.ts`) and Controller-level (`.controller.spec.ts`) tests covering the new behavior
+2. **E2E Tests** - End-to-end spec (`test/e2e/*.e2e-spec.ts`) exercising the feature through HTTP
+3. **Live Integration Tests** - New test section in `scripts/live-test.ps1` covering the feature for all deployment scenarios (local server on port 6000, Docker container on port 8080, Azure). Must be runnable with both `.\live-test.ps1` (local) and `.\live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "docker-secret"` (Docker)
+4. **Feature Documentation** - Dedicated doc in `docs/` (e.g., `docs/G8E_RETURNED_CHARACTERISTIC_FILTERING.md`) with architecture, RFC references, Mermaid diagrams, implementation details, and test coverage tables
+5. **INDEX.md Update** - Add the new feature doc reference to `docs/INDEX.md`
+6. **CHANGELOG.md Update** - Version bump entry with full test counts and feature summary
+7. **Session & Context Updates** - Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts, version, and feature status
+8. **Version Management** - Bump version in `package.json` and all relevant version references
+9. **Response Contract Tests** - Verify API responses contain ONLY documented fields (key allowlist assertion at unit + E2E + live levels). Internal runtime fields (prefixed with `_`) must never appear in responses. Use `expect(ALLOWED_KEYS).toContain(key)` pattern, not just `toHaveProperty`.
 
 **Live Test Conventions:**
 - New sections go before TEST SECTION 10 (DELETE OPERATIONS / Cleanup)

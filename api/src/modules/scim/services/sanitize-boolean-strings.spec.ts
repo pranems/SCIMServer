@@ -1,5 +1,5 @@
 /**
- * Phase 8 Next — V16/V17: Schema-aware boolean sanitization logic
+ * Phase 8 Next - V16/V17: Schema-aware boolean sanitization logic
  *
  * Tests the pure algorithm underlying sanitizeBooleanStrings
  * without NestJS service dependencies.
@@ -24,7 +24,7 @@ function sanitizeBooleanStrings(obj: Record<string, unknown>, booleanKeys: Set<s
   }
 }
 
-describe('sanitizeBooleanStrings — schema-aware (V16/V17)', () => {
+describe('sanitizeBooleanStrings - schema-aware (V16/V17)', () => {
   const booleanKeys = new Set(['active', 'primary']);
 
   it('should convert string "true" to boolean true for known boolean keys', () => {
@@ -56,12 +56,12 @@ describe('sanitizeBooleanStrings — schema-aware (V16/V17)', () => {
     sanitizeBooleanStrings(obj, booleanKeys);
 
     const roles = obj.roles as Array<Record<string, unknown>>;
-    // "value" and "display" are NOT boolean keys — must remain untouched
+    // "value" and "display" are NOT boolean keys - must remain untouched
     expect(roles[0].value).toBe('true');
     expect(roles[0].display).toBe('True Admin');
     expect(roles[1].value).toBe('false');
     expect(roles[1].display).toBe('False Flag');
-    // "primary" IS a boolean key — must be converted
+    // "primary" IS a boolean key - must be converted
     expect(roles[0].primary).toBe(true);
     expect(roles[1].primary).toBe(false);
   });
@@ -94,7 +94,7 @@ describe('sanitizeBooleanStrings — schema-aware (V16/V17)', () => {
   it('should ignore numeric and non-true/false strings', () => {
     const obj: Record<string, unknown> = { active: 'yes', primary: '1' };
     sanitizeBooleanStrings(obj, booleanKeys);
-    // "yes" and "1" are not "true"/"false" — should remain as-is
+    // "yes" and "1" are not "true"/"false" - should remain as-is
     expect(obj.active).toBe('yes');
     expect(obj.primary).toBe('1');
   });

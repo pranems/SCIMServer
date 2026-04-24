@@ -1,8 +1,8 @@
-# Phase 5 — Domain-Layer PATCH Engine
+# Phase 5 - Domain-Layer PATCH Engine
 
 ## Summary
 
-**Gap:** G5 — Inline PATCH logic coupled to NestJS services  
+**Gap:** G5 - Inline PATCH logic coupled to NestJS services  
 **Severity:** MEDIUM  
 **Goal:** Extract SCIM PATCH operations from service classes into standalone, pure-domain PatchEngine classes with zero framework dependencies.
 
@@ -11,14 +11,14 @@
 ### Before (Phase 4)
 - `endpoint-scim-users.service.ts` (~626 lines) contained `applyPatchOperationsForEndpoint()` (~140 lines) + 6 inline helper methods for path parsing, attribute extraction, and dot-notation handling
 - `endpoint-scim-groups.service.ts` (~677 lines) contained `handleReplace()`, `handleAdd()`, `handleRemove()`, `toMemberDto()`, `ensureUniqueMembers()` inline methods
-- PATCH logic was tightly coupled to NestJS `@Injectable()` services — untestable without full DI setup
-- No domain-layer error boundary — HTTP exceptions thrown directly from business logic
+- PATCH logic was tightly coupled to NestJS `@Injectable()` services - untestable without full DI setup
+- No domain-layer error boundary - HTTP exceptions thrown directly from business logic
 
 ### After (Phase 5)
-- **`UserPatchEngine`** — pure static class (~290 lines) with `apply()` method handling all SCIM path types
-- **`GroupPatchEngine`** — pure static class (~240 lines) with `apply()` method handling member operations + config flags
-- **`PatchError`** — domain error class (no NestJS dependency) with `status`, `scimType`, `message`
-- **`PatchConfig` / `GroupMemberPatchConfig`** — typed interfaces for config flag passing
+- **`UserPatchEngine`** - pure static class (~290 lines) with `apply()` method handling all SCIM path types
+- **`GroupPatchEngine`** - pure static class (~240 lines) with `apply()` method handling member operations + config flags
+- **`PatchError`** - domain error class (no NestJS dependency) with `status`, `scimType`, `message`
+- **`PatchConfig` / `GroupMemberPatchConfig`** - typed interfaces for config flag passing
 - Services reduced to thin orchestrators: load → delegate → catch → save
 - `endpoint-scim-users.service.ts` reduced from ~626 to ~415 lines (~34% reduction)
 - `endpoint-scim-groups.service.ts` reduced from ~677 to ~465 lines (~31% reduction)
@@ -125,14 +125,14 @@ Services catch `PatchError` and convert to NestJS `HttpException` via `createSci
 - **GroupPatchEngine:** 37 tests covering all operations, member management, config flag enforcement, error handling
 
 ### Full Suite Results
-- **984/984 unit tests passing** (29 suites) — up from 911
+- **984/984 unit tests passing** (29 suites) - up from 911
 - **193/193 E2E tests passing** (15 suites)
 - Docker build succeeded, container healthy
 
 ## Design Decisions
 
-1. **Static classes over instances** — Engines are pure functions with no state; static `apply()` avoids unnecessary instantiation
-2. **Config as resolved booleans** — Services read config flags; engines receive resolved values via typed interfaces
-3. **Domain error boundary** — `PatchError` carries HTTP status + SCIM type without importing NestJS; services handle conversion
-4. **Existing path utilities preserved** — `scim-patch-path.ts` remains as-is; UserPatchEngine imports its utilities rather than duplicating
-5. **Services as orchestrators** — Load record → build state → delegate to engine → catch errors → save result
+1. **Static classes over instances** - Engines are pure functions with no state; static `apply()` avoids unnecessary instantiation
+2. **Config as resolved booleans** - Services read config flags; engines receive resolved values via typed interfaces
+3. **Domain error boundary** - `PatchError` carries HTTP status + SCIM type without importing NestJS; services handle conversion
+4. **Existing path utilities preserved** - `scim-patch-path.ts` remains as-is; UserPatchEngine imports its utilities rather than duplicating
+5. **Services as orchestrators** - Load record → build state → delegate to engine → catch errors → save result

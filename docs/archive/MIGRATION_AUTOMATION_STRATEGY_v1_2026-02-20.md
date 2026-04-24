@@ -1,4 +1,4 @@
-# Migration Automation Strategy — PostgreSQL + In-Memory
+# Migration Automation Strategy - PostgreSQL + In-Memory
 
 > **Version**: 1.0 · **Date**: 2026-02-20
 > **Companion docs**: `IDEAL_SCIM_ARCHITECTURE_v3_2026-02-20.md` · `MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md` · `INMEMORY_ARCHITECTURE_AND_PLAN_v1_2026-02-20.md`
@@ -14,15 +14,15 @@
 3. [Automation Assessment by Phase](#3-automation-assessment-by-phase)
 4. [What CAN Be Automated](#4-what-can-be-automated)
 5. [What CANNOT Be Automated](#5-what-cannot-be-automated)
-6. [AI-Assisted Workflow — How It Works](#6-ai-assisted-workflow--how-it-works)
+6. [AI-Assisted Workflow - How It Works](#6-ai-assisted-workflow--how-it-works)
 7. [Phase-by-Phase Automation Breakdown](#7-phase-by-phase-automation-breakdown)
-8. [Timeline Comparison — Manual vs Automated](#8-timeline-comparison--manual-vs-automated)
+8. [Timeline Comparison - Manual vs Automated](#8-timeline-comparison--manual-vs-automated)
 9. [Parallel Execution Strategy](#9-parallel-execution-strategy)
 10. [Risk & Mitigation](#10-risk--mitigation)
 11. [Tooling & Infrastructure Requirements](#11-tooling--infrastructure-requirements)
 12. [Quality Gates & Verification](#12-quality-gates--verification)
-13. [Appendix A — Current Prisma Call-Site Inventory](#13-appendix-a--current-prisma-call-site-inventory)
-14. [Appendix B — Generated File Map](#14-appendix-b--generated-file-map)
+13. [Appendix A - Current Prisma Call-Site Inventory](#13-appendix-a--current-prisma-call-site-inventory)
+14. [Appendix B - Generated File Map](#14-appendix-b--generated-file-map)
 
 ---
 
@@ -58,7 +58,7 @@ The 12-phase migration from the current SQLite/Prisma architecture to dual Postg
 
 ```mermaid
 gantt
-    title Migration Timeline — Manual vs Automated (Both Paths)
+    title Migration Timeline - Manual vs Automated (Both Paths)
     dateFormat  YYYY-MM-DD
     axisFormat  Week %W
 
@@ -123,13 +123,13 @@ flowchart TB
 | `endpoint-scim-groups.service.ts` | **10** | `scimGroup`, `groupMember`, `$transaction` | High |
 | `endpoint.service.ts` | **15** | `endpoint`, `scimUser`, `scimGroup`, `groupMember`, `requestLog` | Medium |
 | `database.service.ts` | **11** | `scimUser`, `scimGroup`, `requestLog` | Low |
-| **Total** | **46** | 5 models | — |
+| **Total** | **46** | 5 models | - |
 
 ### Prisma Call Patterns (What AI Must Learn)
 
 ```mermaid
 flowchart LR
-    subgraph PATTERNS["46 Prisma Call Sites — 7 Patterns"]
+    subgraph PATTERNS["46 Prisma Call Sites - 7 Patterns"]
         P1["create<br/>4 sites"]
         P2["findFirst<br/>14 sites"]
         P3["findMany<br/>6 sites"]
@@ -158,7 +158,7 @@ flowchart LR
 |---------|-------------|:-----:|:-------------------:|:------------:|
 | **Users** | `applyPatchOperationsForEndpoint()` | **~180** | `add`, `replace`, `remove` on: `active`, `userName`, `externalId`, extension URNs, valuePath filters, dot-notation, no-path objects | 60% |
 | **Groups** | `handleReplace()` + `handleAdd()` + `handleRemove()` | **~250** | `replace` (displayName, externalId, members), `add` (members with multi-flag), `remove` (members with filter/value/removeAll) | 65% |
-| **Total PATCH logic** | — | **~430** | 15+ operation variants | ~62% |
+| **Total PATCH logic** | - | **~430** | 15+ operation variants | ~62% |
 
 ---
 
@@ -208,20 +208,20 @@ flowchart TB
 
 | Phase | Total LOC | AI-Generated LOC | Human-Written LOC | AI % | Human Review Hours |
 |-------|:---------:|:-----------------:|:-----------------:|:----:|:------------------:|
-| P1 — Repository Pattern | ~300 | ~270 | ~30 | 90% | 2h |
-| P2 — Unified Model | ~400 | ~340 | ~60 | 85% | 3h |
-| P3 — PostgreSQL Impl | ~600 | ~420 | ~180 | 70% | 8h |
-| P3M — InMemory Impl | ~250 | ~238 | ~12 | 95% | 1h |
-| P4 — SQL Filters | ~300 | ~225 | ~75 | 75% | 4h |
-| P4M — InMemory Filters | ~150 | ~135 | ~15 | 90% | 1h |
-| P5 — PATCH Engine | ~400 | ~240 | ~160 | 60% | 12h |
-| P6 — Discovery | ~200 | ~140 | ~60 | 70% | 4h |
-| P7 — ETag | ~150 | ~128 | ~22 | 85% | 2h |
-| P8 — Schema Validation | ~200 | ~140 | ~60 | 70% | 4h |
-| P9 — Bulk Operations | ~250 | ~188 | ~62 | 75% | 4h |
-| P10 — /Me Endpoint | ~80 | ~76 | ~4 | 95% | 0.5h |
-| P11 — Credentials | ~200 | ~170 | ~30 | 85% | 2h |
-| P12 — Sort & Cleanup | ~200 | ~170 | ~30 | 85% | 2h |
+| P1 - Repository Pattern | ~300 | ~270 | ~30 | 90% | 2h |
+| P2 - Unified Model | ~400 | ~340 | ~60 | 85% | 3h |
+| P3 - PostgreSQL Impl | ~600 | ~420 | ~180 | 70% | 8h |
+| P3M - InMemory Impl | ~250 | ~238 | ~12 | 95% | 1h |
+| P4 - SQL Filters | ~300 | ~225 | ~75 | 75% | 4h |
+| P4M - InMemory Filters | ~150 | ~135 | ~15 | 90% | 1h |
+| P5 - PATCH Engine | ~400 | ~240 | ~160 | 60% | 12h |
+| P6 - Discovery | ~200 | ~140 | ~60 | 70% | 4h |
+| P7 - ETag | ~150 | ~128 | ~22 | 85% | 2h |
+| P8 - Schema Validation | ~200 | ~140 | ~60 | 70% | 4h |
+| P9 - Bulk Operations | ~250 | ~188 | ~62 | 75% | 4h |
+| P10 - /Me Endpoint | ~80 | ~76 | ~4 | 95% | 0.5h |
+| P11 - Credentials | ~200 | ~170 | ~30 | 85% | 2h |
+| P12 - Sort & Cleanup | ~200 | ~170 | ~30 | 85% | 2h |
 | **Totals** | **~3,680** | **~2,880** | **~800** | **78%** | **~49.5h** |
 
 ---
@@ -234,7 +234,7 @@ These are mechanical transformations where existing code provides a complete tem
 
 ```mermaid
 flowchart TB
-    subgraph TIER1["Tier 1 — Near-Full Automation (85-95%)"]
+    subgraph TIER1["Tier 1 - Near-Full Automation (85-95%)"]
         T1A["Extract IResourceRepository<br/>interface from 46 Prisma calls"]
         T1B["Generate InMemoryResourceRepository<br/>Map-based CRUD: ~200 LOC"]
         T1C["Generate InMemoryStore singleton<br/>Map structures + indexes"]
@@ -350,11 +350,11 @@ The PATCH logic (430 LOC across 2 services) is the **least automatable** because
 // 10. remove + dot-notation → remove nested field
 ```
 
-**AI can extract these into a PatchEngine class**, but a human must verify that each of the 15+ operation variants produces RFC-correct results — especially when operations interact (e.g., `add` then `remove` on same attribute in one PATCH request).
+**AI can extract these into a PatchEngine class**, but a human must verify that each of the 15+ operation variants produces RFC-correct results - especially when operations interact (e.g., `add` then `remove` on same attribute in one PATCH request).
 
 ---
 
-## 6. AI-Assisted Workflow — How It Works
+## 6. AI-Assisted Workflow - How It Works
 
 ### Session-Based Development with Copilot Agent
 
@@ -366,7 +366,7 @@ sequenceDiagram
     participant TEST as Test Suite
 
     rect rgb(230, 245, 255)
-        Note over DEV,TEST: Phase 1 — Repository Pattern (~1 day)
+        Note over DEV,TEST: Phase 1 - Repository Pattern (~1 day)
         DEV->>AI: "Read users.service.ts and groups.service.ts.<br/>Extract all Prisma calls into IResourceRepository."
         AI->>CODE: read_file × 2 (1,422 LOC)
         AI->>CODE: grep 'this.prisma.' (46 matches)
@@ -410,7 +410,7 @@ sequenceDiagram
 
 ### Prompt Templates for Each Phase
 
-#### Phase 1 — Repository Extraction Prompt
+#### Phase 1 - Repository Extraction Prompt
 
 ```
 Read these files:
@@ -431,7 +431,7 @@ Then generate BOTH:
 3. PersistenceModule.forRoot(driver) dynamic NestJS module
 ```
 
-#### Phase 5 — PATCH Engine Extraction Prompt
+#### Phase 5 - PATCH Engine Extraction Prompt
 
 ```
 Read these methods:
@@ -454,7 +454,7 @@ Do NOT simplify or optimize the RFC compliance logic.
 
 ## 7. Phase-by-Phase Automation Breakdown
 
-### Phase 1 — Repository Pattern (🟢 90% Automatable)
+### Phase 1 - Repository Pattern (🟢 90% Automatable)
 
 ```mermaid
 flowchart LR
@@ -499,7 +499,7 @@ flowchart LR
 | Run test suite, fix failures | **Human** + AI | variable | **1h** |
 | **Total** | | **~750** | **~4h** |
 
-### Phase 3 — PostgreSQL Migration (🟡 70% Automatable)
+### Phase 3 - PostgreSQL Migration (🟡 70% Automatable)
 
 | Step | Actor | What | Time |
 |------|-------|------|------|
@@ -513,7 +513,7 @@ flowchart LR
 | Performance validation with indexes | **Human** | Create test data, verify GIN queries, tune if needed | **2h** |
 | **Total** | | | **~1 week** |
 
-### Phase 3M — In-Memory Implementation (🟢 95% Automatable)
+### Phase 3M - In-Memory Implementation (🟢 95% Automatable)
 
 | Step | Actor | What | Time |
 |------|-------|------|------|
@@ -524,7 +524,7 @@ flowchart LR
 | Review + quick test | **Human** | Sanity check, run unit tests with in-memory | **1h** |
 | **Total** | | **~250 LOC** | **~2h** |
 
-### Phase 5 — PATCH Engine (🔴 60% Automatable)
+### Phase 5 - PATCH Engine (🔴 60% Automatable)
 
 ```mermaid
 flowchart TB
@@ -558,7 +558,7 @@ flowchart TB
 | Regression test against Entra ID connector | **Human** | Manual provisioning test with real Entra | **2h** |
 | **Total** | | **~400 LOC + ~80 tests** | **~1.5 weeks** |
 
-### Phases 6-12 — Feature Phases (🟢🟡 70-95% Automatable)
+### Phases 6-12 - Feature Phases (🟢🟡 70-95% Automatable)
 
 ```mermaid
 flowchart LR
@@ -598,17 +598,17 @@ flowchart LR
 
 ---
 
-## 8. Timeline Comparison — Manual vs Automated
+## 8. Timeline Comparison - Manual vs Automated
 
-### Single Developer — Sequential
+### Single Developer - Sequential
 
 ```mermaid
 gantt
-    title Single Developer — Manual vs Automated
+    title Single Developer - Manual vs Automated
     dateFormat  YYYY-MM-DD
     axisFormat  Week %W
 
-    section Manual — PG Only (16 weeks)
+    section Manual - PG Only (16 weeks)
     P1 Repository     :m1, 2026-03-02, 2w
     P2 Unified Model  :m2, after m1, 2w
     P3 PostgreSQL     :m3, after m2, 2w
@@ -622,7 +622,7 @@ gantt
     P11 Credentials   :m11, after m3, 2w
     P12 Sort          :m12, after m4, 2w
 
-    section Automated — Both Paths (5-6 weeks)
+    section Automated - Both Paths (5-6 weeks)
     P1 Repository     :crit, a1, 2026-03-02, 4d
     P2 Unified Model  :crit, a2, after a1, 3d
     P3+P3M Storage    :a3, after a2, 5d
@@ -640,13 +640,13 @@ gantt
 | In-Memory only (1 dev) | 10 weeks | 3-4 weeks | **2.8x** |
 | Both parallel (1 dev) | 16 weeks | 5-6 weeks | **2.9x** |
 | Both sequential (1 dev) | 26 weeks | 7-8 weeks | **3.5x** |
-| Both parallel (2 devs, manual) | 16 weeks | — | — |
-| Both parallel (2 devs, automated) | — | 4-5 weeks | **3.5x** |
+| Both parallel (2 devs, manual) | 16 weeks | - | - |
+| Both parallel (2 devs, automated) | - | 4-5 weeks | **3.5x** |
 
 ### Where Time Is Saved
 
 ```mermaid
-pie title Time Allocation — Automated Both Paths (5-6 weeks)
+pie title Time Allocation - Automated Both Paths (5-6 weeks)
     "AI Code Generation" : 20
     "Human Review & Refinement" : 25
     "PATCH Engine (partially manual)" : 25
@@ -748,18 +748,18 @@ TOTAL: ~4-5 weeks with 2 developers (automated)
 
 | File/Module | Dev A (PostgreSQL) | Dev B (InMemory + Domain) |
 |-------------|:-:|:-:|
-| `PrismaResourceRepository` | ✅ | — |
-| `InMemoryResourceRepository` | — | ✅ |
-| `InMemoryStore` | — | ✅ |
-| `PatchEngine` | — | ✅ |
-| `SchemaValidator` | — | ✅ |
-| `BulkProcessor` | — | ✅ |
+| `PrismaResourceRepository` | ✅ | - |
+| `InMemoryResourceRepository` | - | ✅ |
+| `InMemoryStore` | - | ✅ |
+| `PatchEngine` | - | ✅ |
+| `SchemaValidator` | - | ✅ |
+| `BulkProcessor` | - | ✅ |
 | `PersistenceModule` | ✅ (PG providers) | ✅ (InMem providers) |
-| `FilterPlanner` (SQL) | ✅ | — |
-| `evaluateFilter()` (JS) | — | ✅ |
-| Prisma schema / migrations | ✅ | — |
-| Dockerfile / Bicep | ✅ | — |
-| Dockerfile.memory | — | ✅ |
+| `FilterPlanner` (SQL) | ✅ | - |
+| `evaluateFilter()` (JS) | - | ✅ |
+| Prisma schema / migrations | ✅ | - |
+| Dockerfile / Bicep | ✅ | - |
+| Dockerfile.memory | - | ✅ |
 | Service files (users/groups) | ✅ (repo injection) | ✅ (PATCH extraction) |
 
 > **⚠️ Single conflict point**: Service files are modified by both tracks. Solution: Dev A completes repository injection in Week 1 (P1), Dev B starts PATCH extraction only after P1 merges.
@@ -772,7 +772,7 @@ TOTAL: ~4-5 weeks with 2 developers (automated)
 
 ```mermaid
 quadrantChart
-    title Risk Assessment — Automated Migration
+    title Risk Assessment - Automated Migration
     x-axis Low Impact --> High Impact
     y-axis Low Probability --> High Probability
 
@@ -840,7 +840,7 @@ flowchart LR
 ### CI Pipeline Changes
 
 ```yaml
-# .github/workflows/build-test.yml — Updated for dual drivers
+# .github/workflows/build-test.yml - Updated for dual drivers
 
 jobs:
   test-inmemory:
@@ -882,7 +882,7 @@ jobs:
 
 ## 12. Quality Gates & Verification
 
-### Test Matrix — Both Drivers
+### Test Matrix - Both Drivers
 
 | Test Suite | In-Memory | PostgreSQL | What It Catches |
 |-----------|:---------:|:----------:|-----------------|
@@ -911,7 +911,7 @@ flowchart TD
 
 ---
 
-## 13. Appendix A — Current Prisma Call-Site Inventory
+## 13. Appendix A - Current Prisma Call-Site Inventory
 
 ### endpoint-scim-users.service.ts (10 calls)
 
@@ -981,22 +981,22 @@ flowchart TD
 
 ---
 
-## 14. Appendix B — Generated File Map
+## 14. Appendix B - Generated File Map
 
 ### New Files Created by Phase
 
 ```mermaid
 flowchart TB
-    subgraph P1_FILES["Phase 1 — Repository Pattern"]
+    subgraph P1_FILES["Phase 1 - Repository Pattern"]
         F1["src/domain/interfaces/<br/>├── i-resource-repository.ts<br/>├── i-membership-repository.ts<br/>├── i-endpoint-repository.ts<br/>├── i-log-repository.ts<br/>└── domain-types.ts"]
         F2["src/infrastructure/persistence/<br/>├── persistence.module.ts<br/>├── prisma/<br/>│   ├── prisma-resource.repository.ts<br/>│   ├── prisma-membership.repository.ts<br/>│   └── prisma-endpoint.repository.ts<br/>└── memory/<br/>    ├── in-memory-store.ts<br/>    ├── in-memory-resource.repository.ts<br/>    ├── in-memory-membership.repository.ts<br/>    └── in-memory-endpoint.repository.ts"]
     end
 
-    subgraph P3_FILES["Phase 3 — PostgreSQL"]
+    subgraph P3_FILES["Phase 3 - PostgreSQL"]
         F3["prisma/migrations/<br/>└── YYYYMMDD_unified_resource/<br/>    └── migration.sql<br/>prisma/schema.prisma (updated)<br/>scripts/migrate-data.ts"]
     end
 
-    subgraph P5_FILES["Phase 5 — PATCH Engine"]
+    subgraph P5_FILES["Phase 5 - PATCH Engine"]
         F4["src/domain/services/<br/>├── patch-engine.ts<br/>└── patch-engine.spec.ts"]
     end
 
@@ -1032,7 +1032,7 @@ flowchart TB
 
 ---
 
-## Summary — Decision Matrix
+## Summary - Decision Matrix
 
 | If you have... | Recommended approach | Expected timeline |
 |----------------|---------------------|:-----------------:|
@@ -1040,6 +1040,6 @@ flowchart TB
 | 1 dev, PG only, AI-assisted | AI generates repos + code, human reviews | **4-5 weeks** |
 | 1 dev, both paths, AI-assisted | AI generates both impls in parallel after P1 | **5-6 weeks** |
 | 2 devs, both paths, AI-assisted | Dev A: PG track, Dev B: InMem + domain | **4-5 weeks** |
-| 1 dev, InMem only, AI-assisted | Fastest path — skip PG entirely | **3-4 weeks** |
+| 1 dev, InMem only, AI-assisted | Fastest path - skip PG entirely | **3-4 weeks** |
 
-**Bottom line**: AI automation reduces the migration from a **~4-month project** to a **~5-6 week sprint** — with both storage backends delivered and tested.
+**Bottom line**: AI automation reduces the migration from a **~4-month project** to a **~5-6 week sprint** - with both storage backends delivered and tested.

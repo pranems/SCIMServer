@@ -1,5 +1,5 @@
 /**
- * RepositoryModule — dynamic module that provides IUserRepository, IGroupRepository,
+ * RepositoryModule - dynamic module that provides IUserRepository, IGroupRepository,
  * and other persistence repositories.
  *
  * Selects the persistence backend via the PERSISTENCE_BACKEND environment variable:
@@ -32,7 +32,7 @@ export class RepositoryModule {
   private static cachedModule: DynamicModule | null = null;
   private static cachedBackend: string | null = null;
 
-  /** @internal — reset cache between tests */
+  /** @internal - reset cache between tests */
   static resetCache(): void {
     this.cachedModule = null;
     this.cachedBackend = null;
@@ -62,7 +62,7 @@ export class RepositoryModule {
       return this.cachedModule;
     }
 
-    // Default: Prisma (PostgreSQL — Phase 3)
+    // Default: Prisma (PostgreSQL - Phase 3)
     this.cachedModule = {
       module: RepositoryModule,
       global: true,

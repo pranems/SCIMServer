@@ -4,7 +4,7 @@ import { PrismaService } from '../../../src/modules/prisma/prisma.service';
 /**
  * Truncates all SCIM data tables (Users, Groups, GroupMembers, Endpoints, RequestLogs).
  *
- * ⚠️  Global nuke — incompatible with parallel test execution.
+ * ⚠️  Global nuke - incompatible with parallel test execution.
  * Prefer `cleanupEndpoints()` for parallel-safe per-test isolation.
  * Kept for the 2 spec files that test cross-endpoint/admin behavior
  * and must run with `maxWorkers: 1` or in their own shard.
@@ -26,7 +26,7 @@ export async function resetDatabase(app: INestApplication): Promise<void> {
  * Deletes specific endpoints and all their child data (resources, members,
  * schemas, request logs) via CASCADE.
  *
- * Safe for parallel execution — only touches data owned by the calling test.
+ * Safe for parallel execution - only touches data owned by the calling test.
  */
 export async function cleanupEndpoints(
   app: INestApplication,

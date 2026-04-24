@@ -45,7 +45,7 @@ export class ScimExceptionFilter implements ExceptionFilter {
       return;
     }
 
-    // Log the exception — level varies by status class:
+    // Log the exception - level varies by status class:
     //   5xx → ERROR (server fault, operator should investigate)
     //   401/403 → WARN (potential security event)
     //   404 → DEBUG (routine probe, especially from Entra ID)

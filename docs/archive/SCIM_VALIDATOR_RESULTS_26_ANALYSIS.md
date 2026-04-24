@@ -1,4 +1,4 @@
-# SCIM Validator Results #26 — Deep Root-Cause Analysis
+# SCIM Validator Results #26 - Deep Root-Cause Analysis
 
 > **Date:** 2026-02-25
 > **Results File:** `scim-results (26).json`
@@ -16,7 +16,7 @@
 | **Failed (Mandatory)** | 13 | ❌ |
 | **Preview (Passed)** | 3 | ✅ |
 | **Preview (Failed)** | 4 | ❌ |
-| **Total** | 30 | — |
+| **Total** | 30 | - |
 
 **All 17 failures (13 mandatory + 4 preview) share a single root cause:**
 
@@ -46,7 +46,7 @@ The Microsoft SCIM Validator sends `"primary": "True"` (string `"True"`) in the 
 }
 ```
 
-**Critical flag:** `StrictSchemaValidation: "True"` — enables `SchemaValidator.validate()` on every write (POST, PUT, PATCH). Without this flag, `validatePayloadSchema()` returns immediately without type-checking, and all 30 tests would pass.
+**Critical flag:** `StrictSchemaValidation: "True"` - enables `SchemaValidator.validate()` on every write (POST, PUT, PATCH). Without this flag, `validatePayloadSchema()` returns immediately without type-checking, and all 30 tests would pass.
 
 ---
 
@@ -73,28 +73,28 @@ The Microsoft SCIM Validator sends `"primary": "True"` (string `"True"`) in the 
 
 | # | Test Name | Description | Actual | Root Cause Category |
 |---|-----------|-------------|--------|---------------------|
-| F1 | POST /Users | Create User #1 | 400 | A — Direct POST reject |
-| F2 | POST /Users | Create User #2 | 400 | A — Direct POST reject |
-| F3 | Get /Users filter | Test filter Users | 400 | A — POST prerequisite failed |
-| F4 | PATCH /Users/Id | Replace Attributes Verbose | 400 | A — POST prerequisite failed |
-| F5 | PATCH /Users/Id | Update userName | 400 | A — POST prerequisite failed |
-| F6 | PATCH /Users/Id | Disable User | 400 | A — POST prerequisite failed |
-| F7 | PATCH /Users/Id | Add Attributes Verbose | 400 | B — Post-PATCH validation |
-| F8 | PATCH /Users/Id | Add Manager | 400 | A — POST prerequisite failed |
-| F9 | PATCH /Users/Id | Replace Manager | 400 | A — POST prerequisite failed |
-| F10 | PATCH /Users/Id | Remove Manager | 400 | A — POST prerequisite failed |
-| F11 | DELETE /Users/Id | Delete a User | 400 | A — POST prerequisite failed |
-| F12 | PATCH /Groups/Id | Add Member | 400 | C — Member user POST failed |
-| F13 | PATCH /Groups/Id | Remove Member | 400 | C — Member user POST failed |
+| F1 | POST /Users | Create User #1 | 400 | A - Direct POST reject |
+| F2 | POST /Users | Create User #2 | 400 | A - Direct POST reject |
+| F3 | Get /Users filter | Test filter Users | 400 | A - POST prerequisite failed |
+| F4 | PATCH /Users/Id | Replace Attributes Verbose | 400 | A - POST prerequisite failed |
+| F5 | PATCH /Users/Id | Update userName | 400 | A - POST prerequisite failed |
+| F6 | PATCH /Users/Id | Disable User | 400 | A - POST prerequisite failed |
+| F7 | PATCH /Users/Id | Add Attributes Verbose | 400 | B - Post-PATCH validation |
+| F8 | PATCH /Users/Id | Add Manager | 400 | A - POST prerequisite failed |
+| F9 | PATCH /Users/Id | Replace Manager | 400 | A - POST prerequisite failed |
+| F10 | PATCH /Users/Id | Remove Manager | 400 | A - POST prerequisite failed |
+| F11 | DELETE /Users/Id | Delete a User | 400 | A - POST prerequisite failed |
+| F12 | PATCH /Groups/Id | Add Member | 400 | C - Member user POST failed |
+| F13 | PATCH /Groups/Id | Remove Member | 400 | C - Member user POST failed |
 
 ### ❌ 4 Failed Preview Tests
 
 | # | Test Name | Description | Actual | Root Cause Category |
 |---|-----------|-------------|--------|---------------------|
-| P1 | PATCH /Users/Id | Multiple Ops different attrs | 400 | A — POST prerequisite failed |
-| P2 | PATCH /Users/Id | Multiple Ops same attr | 400 | A — POST prerequisite failed |
-| P3 | DELETE /Users/Id | POST → 201 expected, got 400 | 400 | A — Direct POST reject |
-| P4 | PATCH /Groups/Id | Multiple Ops same attr | 400 | C — Member user POST failed |
+| P1 | PATCH /Users/Id | Multiple Ops different attrs | 400 | A - POST prerequisite failed |
+| P2 | PATCH /Users/Id | Multiple Ops same attr | 400 | A - POST prerequisite failed |
+| P3 | DELETE /Users/Id | POST → 201 expected, got 400 | 400 | A - Direct POST reject |
+| P4 | PATCH /Groups/Id | Multiple Ops same attr | 400 | C - Member user POST failed |
 
 ### ✅ 3 Passed Preview Tests
 
@@ -147,7 +147,7 @@ flowchart TD
 
 ## 5. Detailed Failure Analysis by Category
 
-### Category A — Direct POST Rejection (11 tests: F1-F6, F8-F11, P1-P3)
+### Category A - Direct POST Rejection (11 tests: F1-F6, F8-F11, P1-P3)
 
 Every User test in the validator begins by POSTing a new User with a full payload including `roles`. The validator sends:
 
@@ -188,7 +188,7 @@ Content-Type: application/scim+json; charset=utf-8
 }
 ```
 
-> **Note:** `emails[].primary`, `addresses[].primary`, and `phoneNumbers[].primary` are all sent as proper booleans (`true`). Only `roles[].primary` uses the string `"True"` — this is a known Microsoft SCIM Validator behavior.
+> **Note:** `emails[].primary`, `addresses[].primary`, and `phoneNumbers[].primary` are all sent as proper booleans (`true`). Only `roles[].primary` uses the string `"True"` - this is a known Microsoft SCIM Validator behavior.
 
 **Response (400):**
 ```json
@@ -202,11 +202,11 @@ Content-Type: application/scim+json; charset=utf-8
 
 Since the user cannot be created, every subsequent test that requires an existing user (filter, PATCH, DELETE) retries the same POST, gets the same 400, and fails with empty results.
 
-### Category B — Post-PATCH Validation (1 test: F7)
+### Category B - Post-PATCH Validation (1 test: F7)
 
 The "Patch User - Add Attributes Verbose Request" test uses a **two-step approach**:
 
-**Step 1 — Create minimal user (succeeds):**
+**Step 1 - Create minimal user (succeeds):**
 ```http
 POST .../Users HTTP/1.1
 ```
@@ -218,7 +218,7 @@ POST .../Users HTTP/1.1
 ```
 → **201 Created** ✅ (no `roles` in payload → schema validation passes)
 
-**Step 2 — PATCH with individual add ops (fails):**
+**Step 2 - PATCH with individual add ops (fails):**
 ```http
 PATCH .../Users/167dbf70-19d7-4507-b29e-a9fe88bf286e HTTP/1.1
 ```
@@ -251,13 +251,13 @@ After the PATCH engine completes, the service runs **post-PATCH validation** (`v
 ```
 
 **36 assertion failures** cascade from this:
-- `displayName`, `title`, `preferredLanguage`, `userType`, `nickName`, `locale`, `timezone`, `profileUrl` — all missing
-- `emails[type eq "work"].value` / `.primary`, `phoneNumbers[*].value`, `addresses[*].*` — all missing
-- `name.*` (givenName, familyName, formatted, etc.) — all missing
-- Enterprise extension attrs — all missing
-- `roles[primary eq "True"].*` — all missing
+- `displayName`, `title`, `preferredLanguage`, `userType`, `nickName`, `locale`, `timezone`, `profileUrl` - all missing
+- `emails[type eq "work"].value` / `.primary`, `phoneNumbers[*].value`, `addresses[*].*` - all missing
+- `name.*` (givenName, familyName, formatted, etc.) - all missing
+- Enterprise extension attrs - all missing
+- `roles[primary eq "True"].*` - all missing
 
-### Category C — Member User Creation Failed (3 tests: F12, F13, P4)
+### Category C - Member User Creation Failed (3 tests: F12, F13, P4)
 
 The "Patch Group - Add Member" and "Remove Member" tests need a User to exist first (as the group member). The validator sends a POST /Users with a full payload including `roles[{primary: "True"}]`. This POST fails with 400 → no member user exists → group membership operations cannot be tested.
 
@@ -272,7 +272,7 @@ POST .../Users HTTP/1.1
   // ... same full payload pattern
 }
 ```
-→ **400 BadRequest** — same `roles[0].primary` error
+→ **400 BadRequest** - same `roles[0].primary` error
 
 ---
 
@@ -309,15 +309,15 @@ sequenceDiagram
 
 | Step | File | Line | What Happens |
 |------|------|------|-------------|
-| 1 | `main.ts` | ~72 | `ValidationPipe({ transform: true, enableImplicitConversion: true })` — only affects declared DTO properties |
-| 2 | `create-user.dto.ts` | — | `roles` not declared → passes through as raw `[key: string]: unknown` |
+| 1 | `main.ts` | ~72 | `ValidationPipe({ transform: true, enableImplicitConversion: true })` - only affects declared DTO properties |
+| 2 | `create-user.dto.ts` | - | `roles` not declared → passes through as raw `[key: string]: unknown` |
 | 3 | `endpoint-scim-users.service.ts` | L51 | `createUserForEndpoint()` entry |
 | 4 | `endpoint-scim-users.service.ts` | L54 | `validatePayloadSchema(dto)` call |
 | 5 | `endpoint-scim-users.service.ts` | L359 | Gate: `if (!getConfigBoolean(config, STRICT_SCHEMA_VALIDATION)) return;` |
 | 6 | `schema-validator.ts` | L248 | Multi-valued handling → iterates `roles[]` |
 | 7 | `schema-validator.ts` | L362 | Complex sub-attribute recursion → walks `roles[0].primary` |
 | 8 | `schema-validator.ts` | L308-313 | `case 'boolean': typeof value !== 'boolean'` → error pushed |
-| 9 | `endpoint-scim-users.service.ts` | L645 | `sanitizeBooleanStrings()` — exists but only runs in `toScimUserResource()` (READ path) |
+| 9 | `endpoint-scim-users.service.ts` | L645 | `sanitizeBooleanStrings()` - exists but only runs in `toScimUserResource()` (READ path) |
 
 ### The Missing Link
 
@@ -337,25 +337,25 @@ READ PATH (current):
 
 ## 7. RFC Analysis: Who's Right?
 
-### RFC 7643 §2.2 — Attribute Data Types
+### RFC 7643 §2.2 - Attribute Data Types
 
 > **boolean**: A Boolean value, i.e., `true` or `false`.
 
 The `roles` attribute's `primary` sub-attribute is declared as type `"boolean"` in the SCIM User schema (RFC 7643 §4.1). **Strictly, the RFC says `primary` MUST be a boolean.** The string `"True"` is not a valid boolean according to JSON (RFC 8259 §3).
 
-### RFC 7644 §3.12 — Robustness Principle (Postel's Law)
+### RFC 7644 §3.12 - Robustness Principle (Postel's Law)
 
 > **"Implementers SHOULD be liberal in what they accept from other implementations."**
 
 RFC 7644 explicitly invokes the robustness principle. A server should accept common client deviations if the intent is unambiguous. `"True"` → `true` is an unambiguous boolean coercion.
 
-### RFC 7644 §3.5.2 — PATCH Operations
+### RFC 7644 §3.5.2 - PATCH Operations
 
 The PATCH path `roles[primary eq "True"]` follows SCIM PATCH filter syntax (RFC 7644 §3.5.2.2):
 
 > `attribute[valueFilter].subAttribute`
 
-The filter `primary eq "True"` matches elements where `primary` equals the **string** `"True"`. When no match is found and the op is `add`, the PATCH engine creates a new element with the filter literal as the value — producing `{primary: "True"}`.
+The filter `primary eq "True"` matches elements where `primary` equals the **string** `"True"`. When no match is found and the op is `add`, the PATCH engine creates a new element with the filter literal as the value - producing `{primary: "True"}`.
 
 ### Verdict
 
@@ -366,7 +366,7 @@ The filter `primary eq "True"` matches elements where `primary` equals the **str
 | Server coercing `"True"` → `true` | Slightly liberal | Recommended by RFC 7644 §3.12 (Postel's Law) |
 | `roles[primary eq "True"]` in PATCH | Valid SCIM filter syntax | Creates string-typed `primary` on new elements |
 
-**Conclusion:** The server is technically RFC-compliant in rejecting the string, but **pragmatically wrong** — it breaks interoperability with Microsoft's own SCIM Validator, which is the primary certification tool for Entra ID provisioning.
+**Conclusion:** The server is technically RFC-compliant in rejecting the string, but **pragmatically wrong** - it breaks interoperability with Microsoft's own SCIM Validator, which is the primary certification tool for Entra ID provisioning.
 
 ---
 
@@ -374,18 +374,18 @@ The filter `primary eq "True"` matches elements where `primary` equals the **str
 
 | Behavior | `StrictSchemaValidation: "True"` (current) | `StrictSchemaValidation: "False"` |
 |----------|-------------------------------------------|-----------------------------------|
-| POST /Users with `roles[{primary: "True"}]` | ❌ 400 — SchemaValidator rejects | ✅ 201 — stored as string in DB |
+| POST /Users with `roles[{primary: "True"}]` | ❌ 400 - SchemaValidator rejects | ✅ 201 - stored as string in DB |
 | GET /Users (response) | N/A (user never created) | ✅ `sanitizeBooleanStrings` converts `"True"`→`true` |
-| PATCH post-validation | ❌ 400 — rejects after patch | ✅ Not run (gate returns early) |
+| PATCH post-validation | ❌ 400 - rejects after patch | ✅ Not run (gate returns early) |
 | SCIM Validator score | 10 pass / 13 fail | 25 pass / 0 fail (historically) |
-| RFC compliance (strict) | Higher — rejects malformed input | Lower — accepts malformed input silently |
+| RFC compliance (strict) | Higher - rejects malformed input | Lower - accepts malformed input silently |
 | Interoperability | ❌ Broken with MS validator | ✅ Works with all known clients |
 
 ---
 
 ## 9. Detailed Request/Response Evidence
 
-### F1 — POST /Users (Create User)
+### F1 - POST /Users (Create User)
 
 <details>
 <summary>Full Request</summary>
@@ -475,12 +475,12 @@ ETag: W/"ce-zY7GfGnvf2aSqZIZcAtyWCZZQC0"
 
 </details>
 
-### F7 — PATCH /Users/Id (Add Attributes Verbose)
+### F7 - PATCH /Users/Id (Add Attributes Verbose)
 
 This is the only test that uses a different failure path:
 
 <details>
-<summary>Step 1 — Minimal User Creation (succeeds)</summary>
+<summary>Step 1 - Minimal User Creation (succeeds)</summary>
 
 ```http
 POST .../Users HTTP/1.1
@@ -497,7 +497,7 @@ Content-Type: application/scim+json; charset=utf-8
 </details>
 
 <details>
-<summary>Step 2 — PATCH with 36 add operations (fails)</summary>
+<summary>Step 2 - PATCH with 36 add operations (fails)</summary>
 
 ```http
 PATCH .../Users/167dbf70-19d7-4507-b29e-a9fe88bf286e HTTP/1.1
@@ -534,7 +534,7 @@ PATCH engine processes `roles[primary eq "True"]`:
 </details>
 
 <details>
-<summary>Response (400) — 36 assertion failures</summary>
+<summary>Response (400) - 36 assertion failures</summary>
 
 ```json
 {
@@ -624,7 +624,7 @@ async createUserForEndpoint(dto, baseUrl, endpointId, config) {
 
 The same fix is needed in:
 - `replaceUserForEndpoint()` (PUT flow, line ~192)
-- `patchUserForEndpoint()` — in the post-PATCH validation path (line ~556), coerce the result payload before validating
+- `patchUserForEndpoint()` - in the post-PATCH validation path (line ~556), coerce the result payload before validating
 - The Group service equivalents (`endpoint-scim-groups.service.ts`) if Groups ever gain boolean sub-attributes
 
 ### PATCH Filter Path Fix

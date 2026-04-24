@@ -1,6 +1,6 @@
 # Logging & Error Handling Quality Audit
 
-> **Version:** 3.0 · **Source-verified against:** v0.35.0 · **Audited:** April 13, 2026  
+> **Version:** 3.0 · **Source-verified against:** v0.38.0 · **Audited:** April 13, 2026  
 > Complete gap register with code evidence, severity, and resolution recommendations.
 
 ---
@@ -26,18 +26,18 @@
 
 | Field | Value |
 |-------|-------|
-| **Severity** | Low (dead code — not wired) |
+| **Severity** | Low (dead code - not wired) |
 | **File** | `api/src/auth/scim-auth.guard.ts` |
 | **Lines** | 7, 28–47 |
-| **Status** | Open — delete recommended |
+| **Status** | Open - delete recommended |
 
 **Evidence:**
 
 ```typescript
-// Line 7 — hardcoded credential
+// Line 7 - hardcoded credential
 private readonly legacyBearerToken = 'S@g@r!2011';
 
-// Lines 28-47 — raw console.* (5 occurrences)
+// Lines 28-47 - raw console.* (5 occurrences)
 console.log('🔍 Attempting OAuth token validation...');
 console.log('✅ OAuth authentication successful:', payload.client_id);
 console.log('🔍 Using legacy bearer token authentication...');
@@ -115,7 +115,7 @@ this.scimLogger?.info(LogCategory.DATABASE,
 - Log download files
 - Any log aggregator (ELK, Azure Monitor)
 
-**Recommendation:** Redact credentials — log only host/database:
+**Recommendation:** Redact credentials - log only host/database:
 
 ```typescript
 const dbUrl = process.env.DATABASE_URL;
@@ -147,7 +147,7 @@ catch (error) {
 
 **Impact:** In production (default `LOG_LEVEL=INFO`), failed authentication attempts are invisible. This prevents detection of brute-force or credential-stuffing attacks.
 
-**Comparison:** The same file's `oauth.controller.ts` correctly logs token generation failures at WARN — inconsistency.
+**Comparison:** The same file's `oauth.controller.ts` correctly logs token generation failures at WARN - inconsistency.
 
 **Recommendation:** Change from `debug` to `warn`:
 
@@ -179,8 +179,8 @@ try {
 **Impact:** Any Prisma error (including connection failures, timeouts) is converted to a 404. A database outage would appear to the client as "endpoint not found" instead of a 500/503, making diagnosis difficult.
 
 **Note:** The same file has 3 other catch blocks that are intentional:
-- Lines 436, 446: Fallback pattern (try ID then name) — correct
-- Line 193: Cache warming failure logged at WARN — correct
+- Lines 436, 446: Fallback pattern (try ID then name) - correct
+- Line 193: Cache warming failure logged at WARN - correct
 
 **Recommendation:** Differentiate error types:
 
@@ -222,7 +222,7 @@ if (!process.env.DATABASE_URL) {
 
 ### GAP-07 through GAP-20: Previously Identified Gaps (Resolved)
 
-These gaps were identified in v1.0/v2.0 audits and have been **resolved** in the current v0.35.0 codebase:
+These gaps were identified in v1.0/v2.0 audits and have been **resolved** in the current v0.38.0 codebase:
 
 | # | Gap Description | Resolution | Verified In |
 |---|----------------|------------|-------------|
@@ -249,7 +249,7 @@ These gaps were identified in v1.0/v2.0 audits and have been **resolved** in the
 |------|---------|---------|
 | **handleRepositoryError consistency** | All 3 SCIM services use it for all repository writes | `endpoint-scim-users.service.ts`, `endpoint-scim-groups.service.ts`, `endpoint-scim-generic.service.ts` |
 | **enrichContext coverage** | All SCIM service CRUD methods call `enrichContext({resourceType, operation})` | Verified in all 3 services |
-| **LogCategory usage** | No misuse of `GENERAL` category in production code — all log calls use specific categories | Codebase grep confirmed |
+| **LogCategory usage** | No misuse of `GENERAL` category in production code - all log calls use specific categories | Codebase grep confirmed |
 | **createScimError adoption** | All SCIM error paths use `createScimError()` (no raw `throw new HttpException()` for SCIM routes) | Verified except bulk processor (GAP-02) |
 | **Content-Type header** | Both exception filters set `application/scim+json; charset=utf-8` on all SCIM error responses | Both filters verified |
 | **Stack trace control** | `includeStackTraces` config flag respected; stacks never leaked to client | `scim-logger.service.ts` L327–329 |
@@ -266,35 +266,35 @@ These gaps were identified in v1.0/v2.0 audits and have been **resolved** in the
 
 | Area | Unit Tests | E2E Tests | Live Tests | Coverage |
 |------|-----------|-----------|------------|----------|
-| ScimLogger (core) | 666 lines | — | — | Full |
-| Log levels/categories | 193 lines | — | — | Full |
+| ScimLogger (core) | 666 lines | - | - | Full |
+| Log levels/categories | 193 lines | - | - | Full |
 | Log config API | 533 lines | 350 lines | Section 9j | Full |
-| Request interceptor | 258 lines | — | — | Full |
-| File transport | 137 lines | — | — | Full |
-| Rotating writer | 85 lines | — | — | Full |
-| Endpoint log isolation | 218 lines | 126 lines | — | Full |
+| Request interceptor | 258 lines | - | - | Full |
+| File transport | 137 lines | - | - | Full |
+| Rotating writer | 85 lines | - | - | Full |
+| Endpoint log isolation | 218 lines | 126 lines | - | Full |
 
 ### Error Handling Test Coverage
 
 | Area | Unit Tests | E2E Tests | Coverage |
 |------|-----------|-----------|----------|
-| GlobalExceptionFilter | 242 lines | — | Full |
-| ScimExceptionFilter | 191 lines | — | Full |
-| createScimError factory | 208 lines | — | Full |
-| RepositoryError | 51 lines | — | Full |
-| Prisma error mapping | 46 lines | — | Full |
-| PatchError | 47 lines | — | Full |
-| handleRepositoryError | In helpers spec (1,215 lines) | — | Full |
-| SCIM error format compliance | — | 345 lines | Full |
-| HTTP error codes | — | 165 lines | Full |
-| RCA diagnostics | — | 171 lines | Full |
+| GlobalExceptionFilter | 242 lines | - | Full |
+| ScimExceptionFilter | 191 lines | - | Full |
+| createScimError factory | 208 lines | - | Full |
+| RepositoryError | 51 lines | - | Full |
+| Prisma error mapping | 46 lines | - | Full |
+| PatchError | 47 lines | - | Full |
+| handleRepositoryError | In helpers spec (1,215 lines) | - | Full |
+| SCIM error format compliance | - | 345 lines | Full |
+| HTTP error codes | - | 165 lines | Full |
+| RCA diagnostics | - | 171 lines | Full |
 
 ---
 
 ## Severity Distribution
 
 ```mermaid
-pie title Gap Severity Distribution (v0.35.0)
+pie title Gap Severity Distribution (v0.38.0)
     "Critical" : 0
     "High" : 1
     "Medium" : 4

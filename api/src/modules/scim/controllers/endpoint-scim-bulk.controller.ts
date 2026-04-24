@@ -1,5 +1,5 @@
 /**
- * Endpoint-specific SCIM Bulk Controller — RFC 7644 §3.7
+ * Endpoint-specific SCIM Bulk Controller - RFC 7644 §3.7
  *
  * POST /scim/endpoints/{endpointId}/Bulk
  *
@@ -100,7 +100,7 @@ export class EndpointScimBulkController {
       });
     }
 
-    // ── Payload size guard (approximate — based on content-length) ─────
+    // ── Payload size guard (approximate - based on content-length) ─────
     const contentLength = parseInt(req.headers['content-length'] ?? '0', 10);
     if (contentLength > BULK_MAX_PAYLOAD_SIZE) {
       throw createScimError({

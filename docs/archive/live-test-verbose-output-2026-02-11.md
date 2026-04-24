@@ -1,4 +1,4 @@
-# 🧪 SCIM Server — Verbose Live Test Report
+# 🧪 SCIM Server - Verbose Live Test Report
 
 > **Date:** February 11, 2026  
 > **Target:** `http://localhost:6000`  
@@ -36,7 +36,7 @@
 
 ## Step 1: Get OAuth Token
 
-> 🔍 **VERBOSE MODE ENABLED** — request/response details will be shown
+> 🔍 **VERBOSE MODE ENABLED** - request/response details will be shown
 
 ```
 📋 Token endpoint: http://localhost:6000/scim/oauth/token
@@ -658,7 +658,7 @@ PATCH .../Groups/b0fb1c57-...
 { "Operations": [{ "op": "add", "path": "members", "value": [
   { "value": "user1-id" }, { "value": "user2-id" }, { "value": "user3-id" }
 ] }] }
-← 200 OK — 3 members added in single operation
+← 200 OK - 3 members added in single operation
 ```
 
 | # | Test | Result |
@@ -705,7 +705,7 @@ PATCH .../Groups/0f5a57ef-...
 { "Operations": [{ "op": "remove", "path": "members", "value": [
   { "value": "user1-id" }, { "value": "user2-id" }
 ] }] }
-← 200 OK — members: []
+← 200 OK - members: []
 ```
 
 | # | Test | Result |
@@ -1140,7 +1140,7 @@ GET .../Users?attributes=userName,displayName&excludedAttributes=displayName&cou
 | # | Test | Result |
 |---|------|--------|
 | 25 | Precedence test: attributes includes userName | ✅ |
-| 26 | Precedence test: attributes wins — displayName included despite excludedAttributes | ✅ |
+| 26 | Precedence test: attributes wins - displayName included despite excludedAttributes | ✅ |
 
 ---
 

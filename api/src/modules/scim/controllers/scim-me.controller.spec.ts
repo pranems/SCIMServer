@@ -1,5 +1,5 @@
 /**
- * Unit tests for ScimMeController (Phase 10 — RFC 7644 §3.11)
+ * Unit tests for ScimMeController (Phase 10 - RFC 7644 §3.11)
  *
  * Tests cover:
  *  - GET /Me: resolves authenticated user and delegates to Users service

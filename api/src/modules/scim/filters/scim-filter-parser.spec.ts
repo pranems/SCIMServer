@@ -9,7 +9,7 @@ import type { FilterNode, CompareNode, LogicalNode, NotNode, ValuePathNode } fro
 // ─── Parser Tests ────────────────────────────────────────────────────────────
 
 describe('ScimFilterParser', () => {
-  describe('parseScimFilter — simple comparisons', () => {
+  describe('parseScimFilter - simple comparisons', () => {
     it('should parse eq with string value', () => {
       const ast = parseScimFilter('userName eq "john"') as CompareNode;
       expect(ast.type).toBe('compare');
@@ -86,7 +86,7 @@ describe('ScimFilterParser', () => {
     });
   });
 
-  describe('parseScimFilter — logical expressions', () => {
+  describe('parseScimFilter - logical expressions', () => {
     it('should parse AND', () => {
       const ast = parseScimFilter('userName eq "john" and active eq true') as LogicalNode;
       expect(ast.type).toBe('logical');
@@ -115,7 +115,7 @@ describe('ScimFilterParser', () => {
     });
   });
 
-  describe('parseScimFilter — NOT and grouping', () => {
+  describe('parseScimFilter - NOT and grouping', () => {
     it('should parse NOT expression', () => {
       const ast = parseScimFilter('not (active eq false)') as NotNode;
       expect(ast.type).toBe('not');
@@ -135,7 +135,7 @@ describe('ScimFilterParser', () => {
     });
   });
 
-  describe('parseScimFilter — value paths', () => {
+  describe('parseScimFilter - value paths', () => {
     it('should parse value path filter', () => {
       const ast = parseScimFilter('emails[type eq "work"]') as ValuePathNode;
       expect(ast.type).toBe('valuePath');
@@ -151,7 +151,7 @@ describe('ScimFilterParser', () => {
     });
   });
 
-  describe('parseScimFilter — URN paths', () => {
+  describe('parseScimFilter - URN paths', () => {
     it('should parse URN-prefixed attribute as a single attribute path', () => {
       const ast = parseScimFilter(
         'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department eq "Engineering"'
@@ -162,7 +162,7 @@ describe('ScimFilterParser', () => {
     });
   });
 
-  describe('parseScimFilter — error handling', () => {
+  describe('parseScimFilter - error handling', () => {
     it('should throw on empty filter', () => {
       expect(() => parseScimFilter('')).toThrow();
     });
@@ -518,9 +518,9 @@ describe('resolveAttrPath', () => {
 
 // ─── V12: Filter Depth Guard ─────────────────────────────────────────────────
 
-describe('ScimFilterParser — depth guard (V12)', () => {
+describe('ScimFilterParser - depth guard (V12)', () => {
   it('should parse moderately nested filters without error', () => {
-    // 10 levels of nesting — well within limit
+    // 10 levels of nesting - well within limit
     const filter = '(' .repeat(10) + 'userName eq "a"' + ')'.repeat(10);
     const ast = parseScimFilter(filter);
     expect(ast).toBeDefined();
@@ -547,7 +547,7 @@ describe('ScimFilterParser — depth guard (V12)', () => {
   });
 
   it('should accept exactly 50 levels of nesting', () => {
-    // Exactly at the boundary — should still succeed
+    // Exactly at the boundary - should still succeed
     const filter = '(' .repeat(50) + 'userName eq "a"' + ')'.repeat(50);
     expect(() => parseScimFilter(filter)).not.toThrow();
   });

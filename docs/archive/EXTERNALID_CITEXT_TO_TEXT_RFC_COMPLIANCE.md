@@ -1,4 +1,4 @@
-# externalId CITEXT → TEXT — RFC 7643 `caseExact` Compliance Fix
+# externalId CITEXT → TEXT - RFC 7643 `caseExact` Compliance Fix
 
 > **Date:** February 25, 2026  
 > **Version:** v0.17.2  
@@ -22,7 +22,7 @@
 
 ## 1. Executive Summary
 
-The `externalId` column in the `ScimResource` table used PostgreSQL's `CITEXT` (case-insensitive text) type, causing both equality comparisons and uniqueness constraints to be case-insensitive. This violated RFC 7643 §3.1, which defines `externalId` with `caseExact: true` — meaning filter comparisons, value storage, and uniqueness checks must all be case-sensitive. A client storing `externalId = "ABC-123"` and another storing `externalId = "abc-123"` on the same endpoint were incorrectly blocked with 409 Conflict, and filtering for one case would incorrectly return the other. The fix changes the column from `CITEXT` to `TEXT`, updates the filter engine to omit `mode: 'insensitive'` for case-exact attributes, and aligns all test expectations with RFC-correct behavior. After the fix: 2,096 unit tests, 368 E2E tests, and 334/334 Docker live tests all pass with zero failures.
+The `externalId` column in the `ScimResource` table used PostgreSQL's `CITEXT` (case-insensitive text) type, causing both equality comparisons and uniqueness constraints to be case-insensitive. This violated RFC 7643 §3.1, which defines `externalId` with `caseExact: true` - meaning filter comparisons, value storage, and uniqueness checks must all be case-sensitive. A client storing `externalId = "ABC-123"` and another storing `externalId = "abc-123"` on the same endpoint were incorrectly blocked with 409 Conflict, and filtering for one case would incorrectly return the other. The fix changes the column from `CITEXT` to `TEXT`, updates the filter engine to omit `mode: 'insensitive'` for case-exact attributes, and aligns all test expectations with RFC-correct behavior. After the fix: 2,096 unit tests, 368 E2E tests, and 334/334 Docker live tests all pass with zero failures.
 
 ---
 
@@ -30,7 +30,7 @@ The `externalId` column in the `ScimResource` table used PostgreSQL's `CITEXT` (
 
 ### 2.1 The Specification
 
-**RFC 7643 §3.1 — Common Attributes:**
+**RFC 7643 §3.1 - Common Attributes:**
 
 > ```
 > externalId
@@ -41,7 +41,7 @@ The `externalId` column in the `ScimResource` table used PostgreSQL's `CITEXT` (
 >   by the service provider.
 > ```
 
-**RFC 7643 §2.2 — Attribute Characteristics:**
+**RFC 7643 §2.2 - Attribute Characteristics:**
 
 | Characteristic | Value |
 |---|---|
@@ -51,11 +51,11 @@ The `externalId` column in the `ScimResource` table used PostgreSQL's `CITEXT` (
 | `returned` | `default` |
 | `uniqueness` | `none` |
 
-**RFC 7643 §2.4 — caseExact semantics:**
+**RFC 7643 §2.4 - caseExact semantics:**
 
 > *"For attributes with type 'string', the 'caseExact' characteristic determines how string value comparisons are handled."*
 
-**RFC 7644 §3.4.2.2 — Filtering:**
+**RFC 7644 §3.4.2.2 - Filtering:**
 
 > *"...case sensitivity for String type attributes SHALL be determined by the attribute's caseExact characteristic."*
 
@@ -65,17 +65,17 @@ The Prisma schema used `@db.Citext` for the `externalId` column:
 
 ```prisma
 // BEFORE (incorrect)
-externalId  String?  @db.Citext  // CITEXT — case-insensitive per SCIM RFC §3.1
+externalId  String?  @db.Citext  // CITEXT - case-insensitive per SCIM RFC §3.1
 ```
 
-PostgreSQL `CITEXT` makes **all** operations on the column case-insensitive — `=`, `LIKE`, `ILIKE`, unique indexes, `ORDER BY`. This means the database-level unique constraint `@@unique([endpointId, resourceType, externalId])` also becomes case-insensitive, incorrectly rejecting case-variant values.
+PostgreSQL `CITEXT` makes **all** operations on the column case-insensitive - `=`, `LIKE`, `ILIKE`, unique indexes, `ORDER BY`. This means the database-level unique constraint `@@unique([endpointId, resourceType, externalId])` also becomes case-insensitive, incorrectly rejecting case-variant values.
 
 ### 2.3 The Symptom
 
 The Microsoft SCIM Validator live test `"Case-variant group externalId should be allowed (caseExact=true)"` **failed**:
 
 ```
-Test 978: FAIL — Case-variant group externalId should be allowed (caseExact=true)
+Test 978: FAIL - Case-variant group externalId should be allowed (caseExact=true)
   Expected: 201 Created
   Actual:   409 Conflict
 ```
@@ -93,7 +93,7 @@ Additionally, filtering for `externalId eq "ABC-DEF-1234"` would match a resourc
 | POST `externalId="ABC"` then POST `externalId="ABC"` | 409 Conflict | 409 Conflict | Server-enforced uniqueness (same value) |
 | `userName eq "ALICE"` matches `alice` | ✅ Matches (correct) | ✅ Matches (correct) | §4.1: userName caseExact=false |
 
-### 2.5 caseExact Matrix — All Core Attributes
+### 2.5 caseExact Matrix - All Core Attributes
 
 ```
 ┌────────────────────┬───────────┬─────────────────┬────────────────────┐
@@ -128,7 +128,7 @@ Additionally, filtering for `externalId eq "ABC-DEF-1234"` would match a resourc
 | File | Why No Change Needed |
 |---|---|
 | `scim-schemas.constants.ts` | Already declares `caseExact: true` for externalId on both User and Group |
-| `prisma-filter-evaluator.ts` | In-memory evaluator — `matchEquality` does exact `===`, in-memory filter path not affected by this DB-layer change |
+| `prisma-filter-evaluator.ts` | In-memory evaluator - `matchEquality` does exact `===`, in-memory filter path not affected by this DB-layer change |
 | `prisma-filter-evaluator.spec.ts` | Tests cover in-memory path; no CITEXT interaction |
 | `endpoint-scim-users.service.ts` | Service passes filter to repository; no externalId-specific logic |
 
@@ -157,10 +157,10 @@ ALTER TABLE "ScimResource" ALTER COLUMN "externalId" SET DATA TYPE TEXT;
 
 ```prisma
 // BEFORE
-externalId  String?  @db.Citext  // CITEXT — case-insensitive per SCIM RFC §3.1
+externalId  String?  @db.Citext  // CITEXT - case-insensitive per SCIM RFC §3.1
 
 // AFTER
-externalId  String?  @db.Text    // TEXT — case-sensitive per RFC 7643 §3.1 (caseExact=true)
+externalId  String?  @db.Text    // TEXT - case-sensitive per RFC 7643 §3.1 (caseExact=true)
 ```
 
 ### 4.2 Filter Engine Type System
@@ -178,7 +178,7 @@ externalid:  { column: 'externalId',  type: 'varchar' },
 externalid:  { column: 'externalId',  type: 'text' },  // caseExact=true per RFC 7643
 ```
 
-### 4.3 Filter Translation — Before vs After
+### 4.3 Filter Translation - Before vs After
 
 #### `eq` operator (equality)
 
@@ -205,7 +205,7 @@ graph LR
     B -->|text| D["{ externalId: { contains: 'grp' } } ✅<br/>No mode → case-sensitive LIKE"]
 ```
 
-**Before** (type was `varchar` — treated same as `citext`):
+**Before** (type was `varchar` - treated same as `citext`):
 ```json
 { "externalId": { "contains": "grp", "mode": "insensitive" } }
 ```
@@ -217,7 +217,7 @@ graph LR
 ```
 → Generates: `WHERE "externalId" LIKE '%grp%'` (case-sensitive)
 
-### 4.4 Filter Engine Code — Key Implementation
+### 4.4 Filter Engine Code - Key Implementation
 
 ```typescript
 function buildColumnFilter(
@@ -255,7 +255,7 @@ function buildColumnFilter(
 }
 ```
 
-### 4.5 Data Flow — Filter Request Through Stack
+### 4.5 Data Flow - Filter Request Through Stack
 
 ```mermaid
 sequenceDiagram
@@ -290,7 +290,7 @@ sequenceDiagram
 
 #### Case-variant externalId creation (now allowed)
 
-**Request 1 — Create group with lowercase externalId:**
+**Request 1 - Create group with lowercase externalId:**
 
 ```http
 POST /scim/endpoint/{id}/Groups HTTP/1.1
@@ -317,7 +317,7 @@ Location: /scim/endpoint/{id}/Groups/{uuid}
 }
 ```
 
-**Request 2 — Create different group with UPPERCASE externalId:**
+**Request 2 - Create different group with UPPERCASE externalId:**
 
 ```http
 POST /scim/endpoint/{id}/Groups HTTP/1.1
@@ -343,7 +343,7 @@ HTTP/1.1 409 Conflict
 }
 ```
 
-**After (TEXT) — Correct per RFC:**
+**After (TEXT) - Correct per RFC:**
 ```http
 HTTP/1.1 201 Created
 
@@ -363,7 +363,7 @@ GET /scim/endpoint/{id}/Groups?filter=externalId eq "EXT-ENG-001" HTTP/1.1
 Authorization: Bearer <token>
 ```
 
-**Before (CITEXT) — returned BOTH groups:**
+**Before (CITEXT) - returned BOTH groups:**
 ```json
 {
   "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
@@ -375,7 +375,7 @@ Authorization: Bearer <token>
 }
 ```
 
-**After (TEXT) — returns only exact match:**
+**After (TEXT) - returns only exact match:**
 ```json
 {
   "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
@@ -392,9 +392,9 @@ Authorization: Bearer <token>
 GET /scim/endpoint/{id}/Users?filter=userName eq "ALICE@EXAMPLE.COM" HTTP/1.1
 ```
 
-Still returns users with `userName = "alice@example.com"` — correct because `userName` has `caseExact: false` and the column remains `CITEXT`.
+Still returns users with `userName = "alice@example.com"` - correct because `userName` has `caseExact: false` and the column remains `CITEXT`.
 
-### 4.7 Column Type Mapping — Complete Reference
+### 4.7 Column Type Mapping - Complete Reference
 
 | SCIM Attribute | `caseExact` | Prisma Type | PostgreSQL Type | Filter `eq` | Filter `co`/`sw`/`ew` |
 |---|---|---|---|---|---|
@@ -419,7 +419,7 @@ ALTER TABLE "ScimResource" ALTER COLUMN "externalId" SET DATA TYPE TEXT;
 This statement:
 - Changes the column type from `CITEXT` to `TEXT` 
 - The existing unique index `ScimResource_endpointId_resourceType_externalId_key` is automatically updated
-- No data loss — existing values are preserved exactly as stored
+- No data loss - existing values are preserved exactly as stored
 - The index now performs case-sensitive comparisons
 
 ### 5.2 Deployment Steps
@@ -488,7 +488,7 @@ docker exec scimserver-postgres psql -U scim -d scimdb \
 | `scim-validator-compliance.e2e` | Allow User with same externalId different case | 201 (not 409) for case-variant externalId |
 | `scim-validator-compliance.e2e` | Allow Group with same externalId different case | 201 (not 409) for case-variant externalId |
 | `groups.service.spec` | Filter groups by externalId case-sensitively | Service layer correct with TEXT column |
-| `live-test.ps1` | Case-variant group externalId allowed | **The previously-failing test — now passes** |
+| `live-test.ps1` | Case-variant group externalId allowed | **The previously-failing test - now passes** |
 | `live-test.ps1` | UPPERCASE externalId does NOT match | TEXT case-sensitive verification |
 | `live-test.ps1` | MixedCase externalId does NOT match | TEXT case-sensitive verification |
 | `live-test.ps1` | User externalId case-sensitive filter | Exact + different case assertions |
@@ -497,7 +497,7 @@ docker exec scimserver-postgres psql -U scim -d scimdb \
 
 | File | Tests Changed | Old Expectation | New Expectation | Reason |
 |---|---|---|---|---|
-| `apply-scim-filter.spec.ts` | 4 (externalId co/sw — Group + User) | `{ contains: 'val', mode: 'insensitive' }` | `{ contains: 'val' }` | TEXT = no `mode` |
+| `apply-scim-filter.spec.ts` | 4 (externalId co/sw - Group + User) | `{ contains: 'val', mode: 'insensitive' }` | `{ contains: 'val' }` | TEXT = no `mode` |
 | `scim-validator-compliance.e2e-spec.ts` | 2 (Group/User externalId filter ≠ case) | `totalResults: 1` | `totalResults: 0` | Case-sensitive → no match |
 | `scim-validator-compliance.e2e-spec.ts` | 2 (Group/User externalId uniqueness) | `expect(409)` | `expect(201)` | Case-variant = different value |
 | `scim-validator-compliance.e2e-spec.ts` | 1 (Group externalId exact match) | Filter different case, expect 1 | Filter same case, expect 1 | Positive test for exact match |
@@ -515,9 +515,9 @@ docker exec scimserver-postgres psql -U scim -d scimdb \
 | Existing data with case variants in same endpoint | No existing production data has this (CITEXT prevented it). Migration is safe. |
 | `externalId` is `NULL` | TEXT handles NULL same as CITEXT. No change. |
 | Attribute name casing (`EXTERNALID eq ...`) | Attribute names are always lowercased in the filter parser. Unaffected. |
-| `userName` / `displayName` remain CITEXT | Correct — both have `caseExact: false`. No change needed. |
+| `userName` / `displayName` remain CITEXT | Correct - both have `caseExact: false`. No change needed. |
 | In-memory persistence backend | `matchEquality` in `prisma-filter-evaluator.ts` already does exact `===` comparison (strings are case-sensitive by default in JS). No change needed. |
-| `ne` / `pr` operators on externalId | `ne` uses `{ not: value }` — TEXT handles this correctly. `pr` checks `NOT NULL`. Both unaffected. |
+| `ne` / `pr` operators on externalId | `ne` uses `{ not: value }` - TEXT handles this correctly. `pr` checks `NOT NULL`. Both unaffected. |
 | `gt` / `lt` / `ge` / `le` on externalId | These are string comparison operators. TEXT does lexicographic case-sensitive comparison. Correct per RFC. |
 
 ### 7.2 Risks & Trade-offs
@@ -539,10 +539,10 @@ docker exec scimserver-postgres psql -U scim -d scimdb \
 
 ## References
 
-- [RFC 7643 — SCIM Core Schema](https://tools.ietf.org/html/rfc7643) — §2.2 (caseExact), §2.4 (characteristics), §3.1 (externalId), §4.1 (User), §4.2 (Group)
-- [RFC 7644 — SCIM Protocol](https://tools.ietf.org/html/rfc7644) — §3.4.2.2 (filtering, caseExact SHALL determine sensitivity)
-- [PostgreSQL CITEXT docs](https://www.postgresql.org/docs/current/citext.html) — Case-insensitive text type
-- [Prisma column types](https://www.prisma.io/docs/concepts/components/prisma-schema/data-model) — `@db.Citext` vs `@db.Text`
+- [RFC 7643 - SCIM Core Schema](https://tools.ietf.org/html/rfc7643) - §2.2 (caseExact), §2.4 (characteristics), §3.1 (externalId), §4.1 (User), §4.2 (Group)
+- [RFC 7644 - SCIM Protocol](https://tools.ietf.org/html/rfc7644) - §3.4.2.2 (filtering, caseExact SHALL determine sensitivity)
+- [PostgreSQL CITEXT docs](https://www.postgresql.org/docs/current/citext.html) - Case-insensitive text type
+- [Prisma column types](https://www.prisma.io/docs/concepts/components/prisma-schema/data-model) - `@db.Citext` vs `@db.Text`
 
 ---
 

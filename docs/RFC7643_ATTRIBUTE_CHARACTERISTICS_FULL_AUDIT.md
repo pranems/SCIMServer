@@ -1,31 +1,31 @@
-# RFC 7643 §2 — Attribute Characteristics Full Audit
+# RFC 7643 §2 - Attribute Characteristics Full Audit
 
 ## Overview
 
 **Feature**: Comprehensive audit of all 11 RFC 7643 §2 attribute characteristics across every SCIM flow, sub-attribute, DB storage layer, and discovery endpoint
 **Version**: v0.22.0 (audit baseline)
 **Date**: 2026-03-01
-**Status**: 🔍 Audit complete — **20 remaining work items** catalogued across 3 priority tiers
+**Status**: 🔍 Audit complete - **20 remaining work items** catalogued across 3 priority tiers
 **RFC References**:
-- [RFC 7643 §2 — Attribute Characteristics](https://datatracker.ietf.org/doc/html/rfc7643#section-2)
-- [RFC 7643 §2.2 — Mutability](https://datatracker.ietf.org/doc/html/rfc7643#section-2.2)
-- [RFC 7643 §2.3 — Data Types](https://datatracker.ietf.org/doc/html/rfc7643#section-2.3)
-- [RFC 7643 §2.4 — Returned / Required / Uniqueness / CaseExact](https://datatracker.ietf.org/doc/html/rfc7643#section-2.4)
-- [RFC 7643 §4.1 — Core User Schema](https://datatracker.ietf.org/doc/html/rfc7643#section-4.1)
-- [RFC 7643 §4.2 — Core Group Schema](https://datatracker.ietf.org/doc/html/rfc7643#section-4.2)
-- [RFC 7643 §4.3 — Enterprise User Extension](https://datatracker.ietf.org/doc/html/rfc7643#section-4.3)
-- [RFC 7643 §7 — Schema Definition](https://datatracker.ietf.org/doc/html/rfc7643#section-7)
-- [RFC 7644 §3.4.2.5 — Attribute Projection](https://datatracker.ietf.org/doc/html/rfc7644#section-3.4.2.5)
+- [RFC 7643 §2 - Attribute Characteristics](https://datatracker.ietf.org/doc/html/rfc7643#section-2)
+- [RFC 7643 §2.2 - Mutability](https://datatracker.ietf.org/doc/html/rfc7643#section-2.2)
+- [RFC 7643 §2.3 - Data Types](https://datatracker.ietf.org/doc/html/rfc7643#section-2.3)
+- [RFC 7643 §2.4 - Returned / Required / Uniqueness / CaseExact](https://datatracker.ietf.org/doc/html/rfc7643#section-2.4)
+- [RFC 7643 §4.1 - Core User Schema](https://datatracker.ietf.org/doc/html/rfc7643#section-4.1)
+- [RFC 7643 §4.2 - Core Group Schema](https://datatracker.ietf.org/doc/html/rfc7643#section-4.2)
+- [RFC 7643 §4.3 - Enterprise User Extension](https://datatracker.ietf.org/doc/html/rfc7643#section-4.3)
+- [RFC 7643 §7 - Schema Definition](https://datatracker.ietf.org/doc/html/rfc7643#section-7)
+- [RFC 7644 §3.4.2.5 - Attribute Projection](https://datatracker.ietf.org/doc/html/rfc7644#section-3.4.2.5)
 
 ### Problem Statement
 
-After closing all 27 migration gaps (G1—G20) through v0.22.0, a comprehensive per-characteristic, per-flow, per-sub-attribute audit was needed to:
+After closing all 27 migration gaps (G1-G20) through v0.22.0, a comprehensive per-characteristic, per-flow, per-sub-attribute audit was needed to:
 
 1. **Confirm full RFC 7643 §2 compliance** for each of the 11 attribute characteristics across all 7 SCIM flows
-2. **Audit sub-attribute characteristics** — ensure recursive enforcement for every complex attribute's sub-attributes
-3. **Verify DB storage alignment** — confirm column types and constraints match schema definitions
-4. **Validate `/Schemas` discovery** — ensure all characteristics are correctly exposed to clients
-5. **Catalogue any remaining gaps** not captured by the G1—G20 framework
+2. **Audit sub-attribute characteristics** - ensure recursive enforcement for every complex attribute's sub-attributes
+3. **Verify DB storage alignment** - confirm column types and constraints match schema definitions
+4. **Validate `/Schemas` discovery** - ensure all characteristics are correctly exposed to clients
+5. **Catalogue any remaining gaps** not captured by the G1-G20 framework
 
 ### Solution
 
@@ -140,32 +140,32 @@ Per RFC 7643 §2, each SCIM attribute definition includes these 11 characteristi
 | Characteristic | POST | PUT | PATCH | GET | LIST | Filter | Discovery | Overall |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | **name** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ **Complete** |
-| **type** | ✅1 | ✅1 | ✅1 | — | — | — | ✅ | ✅ **Complete** (strict) |
-| **multiValued** | ✅1 | ✅1 | ✅1 | — | — | — | ✅ | ✅ **Complete** (strict) |
-| **required** | ✅1 | ✅1 | ✅2 | — | — | — | ✅ | ✅ **Complete** (strict) |
-| **mutability:readOnly** | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ **Complete** |
-| **mutability:readWrite** | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ **Complete** |
-| **mutability:immutable** | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ **Complete** |
-| **mutability:writeOnly** | ✅ | ✅ | ✅ | ✅3 | ✅3 | — | ✅ | ⚠️ **Functional** |
-| **returned:always** | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | — | ✅ | ⚠️ **Gap** |
-| **returned:default** | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ **Complete** |
-| **returned:never** | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ **Complete** |
-| **returned:request** | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ **Complete** |
-| **caseExact** | — | — | — | — | — | ⚠️ | ✅ | ⚠️ **Gap** |
-| **uniqueness** | ⚠️ | ⚠️ | ⚠️ | — | — | — | ⚠️ | ⚠️ **Gap** |
-| **canonicalValues** | ✅1 | ✅1 | ✅1 | — | — | — | ✅ | ✅ **Complete** (strict) |
-| **referenceTypes** | ❌ | ❌ | ❌ | — | — | — | ✅ | ❌ **Not Enforced** |
-| **description** | — | — | — | — | — | — | ✅ | ✅ **Complete** |
+| **type** | ✅1 | ✅1 | ✅1 | - | - | - | ✅ | ✅ **Complete** (strict) |
+| **multiValued** | ✅1 | ✅1 | ✅1 | - | - | - | ✅ | ✅ **Complete** (strict) |
+| **required** | ✅1 | ✅1 | ✅2 | - | - | - | ✅ | ✅ **Complete** (strict) |
+| **mutability:readOnly** | ✅ | ✅ | ✅ | ✅ | ✅ | - | ✅ | ✅ **Complete** |
+| **mutability:readWrite** | ✅ | ✅ | ✅ | ✅ | ✅ | - | ✅ | ✅ **Complete** |
+| **mutability:immutable** | ✅ | ✅ | ✅ | ✅ | ✅ | - | ✅ | ✅ **Complete** |
+| **mutability:writeOnly** | ✅ | ✅ | ✅ | ✅3 | ✅3 | - | ✅ | ⚠️ **Functional** |
+| **returned:always** | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ⚠️ | - | ✅ | ⚠️ **Gap** |
+| **returned:default** | ✅ | ✅ | ✅ | ✅ | ✅ | - | ✅ | ✅ **Complete** |
+| **returned:never** | ✅ | ✅ | ✅ | ✅ | ✅ | - | ✅ | ✅ **Complete** |
+| **returned:request** | ✅ | ✅ | ✅ | ✅ | ✅ | - | ✅ | ✅ **Complete** |
+| **caseExact** | - | - | - | - | - | ⚠️ | ✅ | ⚠️ **Gap** |
+| **uniqueness** | ⚠️ | ⚠️ | ⚠️ | - | - | - | ⚠️ | ⚠️ **Gap** |
+| **canonicalValues** | ✅1 | ✅1 | ✅1 | - | - | - | ✅ | ✅ **Complete** (strict) |
+| **referenceTypes** | ❌ | ❌ | ❌ | - | - | - | ✅ | ❌ **Not Enforced** |
+| **description** | - | - | - | - | - | - | ✅ | ✅ **Complete** |
 
 > 1 Gated behind `StrictSchemaValidation` flag
-> 2 PATCH mode skips required check (correct — PATCH is partial)
+> 2 PATCH mode skips required check (correct - PATCH is partial)
 > 3 writeOnly enforcement via `returned:never` coupling only
 
 ---
 
 ## Characteristic-by-Characteristic Deep Audit
 
-### 4.1 `name` — ✅ Complete
+### 4.1 `name` - ✅ Complete
 
 **RFC**: Attribute names MUST be case-insensitive (RFC 7643 §2.1).
 
@@ -182,9 +182,9 @@ Per RFC 7643 §2, each SCIM attribute definition includes these 11 characteristi
 
 ---
 
-### 4.2 `type` — ✅ Complete (strict-gated)
+### 4.2 `type` - ✅ Complete (strict-gated)
 
-**RFC**: 8 data types — string, boolean, integer, decimal, dateTime, reference, binary, complex (RFC 7643 §2.3).
+**RFC**: 8 data types - string, boolean, integer, decimal, dateTime, reference, binary, complex (RFC 7643 §2.3).
 
 **Type validation in `validateSingleValue()` (`schema-validator.ts`)**:
 
@@ -213,7 +213,7 @@ All 8 types are validated on POST/PUT/PATCH via `SchemaValidator.validate()`. Ga
 
 ---
 
-### 4.3 `multiValued` — ✅ Complete (strict-gated)
+### 4.3 `multiValued` - ✅ Complete (strict-gated)
 
 **RFC**: `multiValued: true` -> value MUST be an array. `false` -> MUST be a scalar (RFC 7643 §2.4).
 
@@ -225,7 +225,7 @@ Enforced in `SchemaValidator.validate()`: `multiValued && !Array.isArray()` -> e
 
 ---
 
-### 4.4 `required` — ✅ Complete (strict-gated)
+### 4.4 `required` - ✅ Complete (strict-gated)
 
 **RFC**: `required: true` -> attribute MUST be present on create/replace. Server-assigned readOnly+required attrs (e.g., `id`) are exempt (RFC 7643 §2.4, §7).
 
@@ -239,41 +239,41 @@ Enforced in `SchemaValidator.validate()`: `multiValued && !Array.isArray()` -> e
 
 | Resource | Attribute | required | readOnly | Enforcement |
 |---|---|:---:|:---:|---|
-| User | `id` | ✅ | ✅ | Exempt — server-assigned |
+| User | `id` | ✅ | ✅ | Exempt - server-assigned |
 | User | `userName` | ✅ | ❌ | Client MUST provide on POST/PUT |
-| Group | `id` | ✅ | ✅ | Exempt — server-assigned |
+| Group | `id` | ✅ | ✅ | Exempt - server-assigned |
 | Group | `displayName` | ✅ | ❌ | Client MUST provide on POST/PUT |
 | emails[] | `value` | ✅ | ❌ | V9: required within each email object |
 | phoneNumbers[] | `value` | ✅ | ❌ | V9: required within each phone object |
 | members[] | `value` | ✅ | ❌ | V9: required within each member object |
 
-**Sub-attributes**: ✅ V9 enforcement in `validateSubAttributes()` — if complex value is present, required sub-attrs must exist.
+**Sub-attributes**: ✅ V9 enforcement in `validateSubAttributes()` - if complex value is present, required sub-attrs must exist.
 **Remaining**: None.
 
 ---
 
-### 4.5 `mutability` — Mixed Status
+### 4.5 `mutability` - Mixed Status
 
 RFC 7643 §2.2 defines 4 mutability modes:
 
-#### 4.5.1 `readOnly` — ✅ Complete
+#### 4.5.1 `readOnly` - ✅ Complete
 
 | Flow | Implementation | File |
 |---|---|---|
 | POST | SchemaValidator rejects (strict) + `stripReadOnlyAttributesFromPayload()` always strips | `schema-validator.ts`, `scim-service-helpers.ts` |
 | PUT | Same as POST | same |
 | PATCH | `stripReadOnlyFromPatchOps()` strips + G8c `validatePatchOperationValue()` pre-validates | `scim-service-helpers.ts`, `schema-validator.ts` |
-| GET/LIST | ReadOnly attrs returned normally (server-assigned) | — |
+| GET/LIST | ReadOnly attrs returned normally (server-assigned) | - |
 
 **ReadOnly attrs**: `id`, `meta` (+5 sub-attrs), `groups` (+4 sub-attrs), `manager.displayName`.
 
-**Sub-attribute gap**: `stripReadOnlyAttributes()` only strips **top-level** readOnly attributes. ReadOnly sub-attributes within readWrite parents (e.g., `manager.displayName` inside readWrite `manager`) are **not stripped** on POST/PUT. Similarly, `validateSubAttributes()` does not check sub-attribute `mutability` — only `required`, `type`, and unknown attrs. The code contains: `// Sub-attribute stripping (e.g. manager.displayName inside readWrite parent) is deferred to Phase 2.`
+**Sub-attribute gap**: `stripReadOnlyAttributes()` only strips **top-level** readOnly attributes. ReadOnly sub-attributes within readWrite parents (e.g., `manager.displayName` inside readWrite `manager`) are **not stripped** on POST/PUT. Similarly, `validateSubAttributes()` does not check sub-attribute `mutability` - only `required`, `type`, and unknown attrs. The code contains: `// Sub-attribute stripping (e.g. manager.displayName inside readWrite parent) is deferred to Phase 2.`
 
 For PATCH, `validatePatchOperationValue()` (G8c) catches path-based ops targeting readOnly sub-attrs (e.g., `path: "manager.displayName"` → resolves and checks), but no-path PATCH ops with nested readOnly sub-attrs within the value object are not validated at the sub-attribute level.
 
 | ID | Gap | Effort | Priority |
 |---|---|---|---|
-| R-MUT-2 | Strip/validate readOnly sub-attrs within readWrite parents (e.g., `manager.displayName`) on POST/PUT/PATCH — update `collectReadOnlyAttributes()` and `validateSubAttributes()` | 2 hr | P2 |
+| R-MUT-2 | Strip/validate readOnly sub-attrs within readWrite parents (e.g., `manager.displayName`) on POST/PUT/PATCH - update `collectReadOnlyAttributes()` and `validateSubAttributes()` | 2 hr | P2 |
 
 **ReadOnly stripping chain (v0.22.0)**:
 
@@ -290,11 +290,11 @@ flowchart TD
     G --> H
 ```
 
-#### 4.5.2 `readWrite` — ✅ Complete
+#### 4.5.2 `readWrite` - ✅ Complete
 
-Default mutability. No special enforcement needed — accepted on all write flows, returned in all read flows.
+Default mutability. No special enforcement needed - accepted on all write flows, returned in all read flows.
 
-#### 4.5.3 `immutable` — ✅ Complete
+#### 4.5.3 `immutable` - ✅ Complete
 
 | Flow | Implementation |
 |---|---|
@@ -309,11 +309,11 @@ Default mutability. No special enforcement needed — accepted on all write flow
 
 **Immutable attrs**: Group `members[].value`, `members[].display`, `members[].type`.
 
-#### 4.5.4 `writeOnly` — ⚠️ Functional (gap for custom schemas)
+#### 4.5.4 `writeOnly` - ⚠️ Functional (gap for custom schemas)
 
 | Flow | Implementation |
 |---|---|
-| POST/PUT/PATCH | ✅ SchemaValidator does NOT reject writeOnly (correct per RFC — it should be accepted) |
+| POST/PUT/PATCH | ✅ SchemaValidator does NOT reject writeOnly (correct per RFC - it should be accepted) |
 | GET/LIST | ✅ `password` stripped via `returned: 'never'` in `toScimResource()` |
 
 **Analysis**: The only `writeOnly` attribute is `password`, which also has `returned: 'never'`. The writeOnly semantics are achieved indirectly through `returned: 'never'` stripping. This works correctly for `password`.
@@ -326,11 +326,11 @@ Default mutability. No special enforcement needed — accepted on all write flow
 
 ---
 
-### 4.6 `returned` — Mixed Status
+### 4.6 `returned` - Mixed Status
 
 RFC 7643 §2.4 defines 4 returned modes:
 
-#### 4.6.1 `always` — ⚠️ Gap (semi-hardcoded)
+#### 4.6.1 `always` - ⚠️ Gap (semi-hardcoded)
 
 **Implementation**: `ALWAYS_RETURNED_BASE` in `scim-attribute-projection.ts`:
 
@@ -359,11 +359,11 @@ const ALWAYS_RETURNED_BASE = new Set(['schemas', 'id', 'meta', 'username']);
 | R-RET-2 | Add Group `active` to always-returned set | 15 min | P2 |
 | R-RET-3 | Enforce sub-attr `returned: 'always'` at projection level (when `?attributes=emails.type`, force-include `emails.value`) | 3 hr | P2 |
 
-#### 4.6.2 `default` — ✅ Complete
+#### 4.6.2 `default` - ✅ Complete
 
-Default behavior — returned in all responses unless excluded via `excludedAttributes`.
+Default behavior - returned in all responses unless excluded via `excludedAttributes`.
 
-#### 4.6.3 `never` — ✅ Complete
+#### 4.6.3 `never` - ✅ Complete
 
 | Flow | Implementation |
 |---|---|
@@ -372,17 +372,17 @@ Default behavior — returned in all responses unless excluded via `excludedAttr
 
 Implementation: `collectReturnedCharacteristics()` builds `never` Set from schema definitions (walks sub-attributes recursively). Applied to ALL responses (POST/PUT/PATCH/GET/LIST).
 
-#### 4.6.4 `request` — ✅ Complete
+#### 4.6.4 `request` - ✅ Complete
 
 | Flow | Implementation |
 |---|---|
-| All responses | Controller calls `applyAttributeProjection()` with `requestOnlyAttrs` — strips unless in `?attributes=` |
+| All responses | Controller calls `applyAttributeProjection()` with `requestOnlyAttrs` - strips unless in `?attributes=` |
 
 Infrastructure fully functional. Tested with synthetic schemas. No built-in attributes currently use `returned: 'request'`.
 
 ---
 
-### 4.7 `caseExact` — ⚠️ Gap (JSONB filter not schema-driven)
+### 4.7 `caseExact` - ⚠️ Gap (JSONB filter not schema-driven)
 
 **RFC**: `caseExact: false` -> comparisons MUST be case-insensitive. `caseExact: true` -> case-sensitive (RFC 7643 §2.4).
 
@@ -415,9 +415,9 @@ The in-memory `evaluateFilter()` in `scim-filter-parser.ts` does **not** consult
 
 ---
 
-### 4.8 `uniqueness` — ⚠️ Gap (DB-only, missing from discovery)
+### 4.8 `uniqueness` - ⚠️ Gap (DB-only, missing from discovery)
 
-**RFC**: `none` — no uniqueness. `server` — unique per service provider. `global` — globally unique (RFC 7643 §2.4).
+**RFC**: `none` - no uniqueness. `server` - unique per service provider. `global` - globally unique (RFC 7643 §2.4).
 
 **Current enforcement**:
 
@@ -439,7 +439,7 @@ DB constraints enforce uniqueness correctly at runtime, but the `uniqueness` pro
 
 ---
 
-### 4.9 `canonicalValues` — ✅ Complete (strict-gated)
+### 4.9 `canonicalValues` - ✅ Complete (strict-gated)
 
 **RFC**: Collection of suggested/enforced enumeration values (RFC 7643 §2.4).
 
@@ -457,7 +457,7 @@ DB constraints enforce uniqueness correctly at runtime, but the `uniqueness` pro
 
 ---
 
-### 4.10 `referenceTypes` — ❌ Not Enforced at Runtime
+### 4.10 `referenceTypes` - ❌ Not Enforced at Runtime
 
 **RFC**: For `type: 'reference'`, specifies valid target types (RFC 7643 §2.3.7).
 
@@ -483,7 +483,7 @@ DB constraints enforce uniqueness correctly at runtime, but the `uniqueness` pro
 
 ---
 
-### 4.11 `description` — ✅ Complete
+### 4.11 `description` - ✅ Complete
 
 Purely informational. All attributes have `description` in constants. Exposed in `/Schemas` discovery. No enforcement needed.
 
@@ -495,7 +495,7 @@ Each complex attribute's sub-attributes carry their own characteristics. This se
 
 ### 5.1 User `name` sub-attributes
 
-Parent: `name` — type: complex, multiValued: false, mutability: readWrite, returned: default
+Parent: `name` - type: complex, multiValued: false, mutability: readWrite, returned: default
 
 | Sub-Attr | type | multiValued | required | mutability | returned | caseExact | Status |
 |---|---|:---:|:---:|---|---|:---:|:---:|
@@ -517,13 +517,13 @@ Parent: `name` — type: complex, multiValued: false, mutability: readWrite, ret
 
 ### 5.2 User `emails` sub-attributes
 
-Parent: `emails` — type: complex, multiValued: true, mutability: readWrite, returned: default
+Parent: `emails` - type: complex, multiValued: true, mutability: readWrite, returned: default
 
 | Sub-Attr | type | multiValued | required | mutability | returned | caseExact | canonicalValues | Status |
 |---|---|:---:|:---:|---|---|:---:|---|:---:|
-| value | string | false | **true** | readWrite | **always** | false | — | ⚠️ |
+| value | string | false | **true** | readWrite | **always** | false | - | ⚠️ |
 | type | string | false | false | readWrite | default | false | [work,home,other] | ✅ |
-| primary | boolean | false | false | readWrite | default | — | — | ✅ |
+| primary | boolean | false | false | readWrite | default | - | - | ✅ |
 
 **Gap**: `emails[].value` has `returned: 'always'` but projection does NOT enforce sub-attribute always-returned. If `?attributes=emails.type`, response may include `emails[].type` without forcing `emails[].value`.
 
@@ -533,21 +533,21 @@ Parent: `emails` — type: complex, multiValued: true, mutability: readWrite, re
 
 ### 5.3 User `phoneNumbers` sub-attributes
 
-Parent: `phoneNumbers` — type: complex, multiValued: true, mutability: readWrite, returned: default
+Parent: `phoneNumbers` - type: complex, multiValued: true, mutability: readWrite, returned: default
 
 | Sub-Attr | type | multiValued | required | mutability | returned | caseExact | canonicalValues | Status |
 |---|---|:---:|:---:|---|---|:---:|---|:---:|
-| value | string | false | **true** | readWrite | default | false | — | ✅ |
+| value | string | false | **true** | readWrite | default | false | - | ✅ |
 | type | string | false | false | readWrite | default | false | [work,home,mobile,fax,pager,other] | ✅ |
-| primary | boolean | false | false | readWrite | default | — | — | ✅ |
+| primary | boolean | false | false | readWrite | default | - | - | ✅ |
 
-**Status**: ✅ Complete — all characteristics properly defined and enforced.
+**Status**: ✅ Complete - all characteristics properly defined and enforced.
 
 ---
 
 ### 5.4 User `addresses` sub-attributes
 
-Parent: `addresses` — type: complex, multiValued: true, mutability: readWrite, returned: default
+Parent: `addresses` - type: complex, multiValued: true, mutability: readWrite, returned: default
 
 | Sub-Attr | type | multiValued | required | mutability | returned | caseExact | Status |
 |---|---|:---:|:---:|---|---|:---:|:---:|
@@ -558,7 +558,7 @@ Parent: `addresses` — type: complex, multiValued: true, mutability: readWrite,
 | postalCode | string | false | false | readWrite | default | (not set) | ⚠️ |
 | country | string | false | false | readWrite | default | (not set) | ⚠️ |
 | type | string | false | false | readWrite | default | false | ✅ |
-| primary | boolean | false | false | readWrite | default | — | ✅ |
+| primary | boolean | false | false | readWrite | default | - | ✅ |
 
 **Gap**: `caseExact` not set on most address sub-attrs. Per RFC 7643 §4.1.2 these should be `caseExact: false`.
 
@@ -570,7 +570,7 @@ Parent: `addresses` — type: complex, multiValued: true, mutability: readWrite,
 
 ### 5.5 User `roles` sub-attributes
 
-Parent: `roles` — type: complex, multiValued: true, mutability: readWrite, returned: default
+Parent: `roles` - type: complex, multiValued: true, mutability: readWrite, returned: default
 
 | Sub-Attr | type | multiValued | required | mutability | returned | Status |
 |---|---|:---:|:---:|---|---|:---:|
@@ -585,7 +585,7 @@ Parent: `roles` — type: complex, multiValued: true, mutability: readWrite, ret
 
 ### 5.6 User `groups` sub-attributes
 
-Parent: `groups` — type: complex, multiValued: true, **mutability: readOnly**, returned: default
+Parent: `groups` - type: complex, multiValued: true, **mutability: readOnly**, returned: default
 
 | Sub-Attr | type | multiValued | required | mutability | returned | caseExact | referenceTypes | Status |
 |---|---|:---:|:---:|---|---|:---:|---|:---:|
@@ -594,13 +594,13 @@ Parent: `groups` — type: complex, multiValued: true, **mutability: readOnly**,
 | display | string | false | false | **readOnly** | default | false | ' + D + ' | ✅ |
 | type | string | false | false | **readOnly** | default | false | ['direct','indirect'] | ✅ |
 
-**Status**: ✅ Complete — all sub-attrs correctly marked readOnly (matching parent). `$ref` has `referenceTypes`. `type` has `canonicalValues`.
+**Status**: ✅ Complete - all sub-attrs correctly marked readOnly (matching parent). `$ref` has `referenceTypes`. `type` has `canonicalValues`.
 
 ---
 
 ### 5.7 User `meta` sub-attributes
 
-Parent: `meta` — type: complex, multiValued: false, **mutability: readOnly**, returned: default
+Parent: `meta` - type: complex, multiValued: false, **mutability: readOnly**, returned: default
 
 | Sub-Attr | type | multiValued | required | mutability | returned | caseExact | referenceTypes | Status |
 |---|---|:---:|:---:|---|---|:---:|---|:---:|
@@ -610,19 +610,19 @@ Parent: `meta` — type: complex, multiValued: false, **mutability: readOnly**, 
 | location | **reference** | false | false | readOnly | default | true | ['uri'] | ✅ |
 | version | string | false | false | readOnly | default | true | ' + D + ' | ✅ |
 
-**Status**: ✅ Complete — all server-assigned/readOnly. `meta` in `ALWAYS_RETURNED_BASE`.
+**Status**: ✅ Complete - all server-assigned/readOnly. `meta` in `ALWAYS_RETURNED_BASE`.
 
 ---
 
 ### 5.8 EnterpriseUser `manager` sub-attributes
 
-Parent: `manager` — type: complex, multiValued: false, mutability: readWrite, returned: default
+Parent: `manager` - type: complex, multiValued: false, mutability: readWrite, returned: default
 
 | Sub-Attr | type | multiValued | required | mutability | returned | referenceTypes | Status |
 |---|---|:---:|:---:|---|---|---|:---:|
-| value | string | false | false | readWrite | default | — | ✅ |
+| value | string | false | false | readWrite | default | - | ✅ |
 | $ref | **reference** | false | false | readWrite | default | ['User'] | ✅ |
-| displayName | string | false | false | **readOnly** | default | — | ✅ |
+| displayName | string | false | false | **readOnly** | default | - | ✅ |
 
 **Status**: ✅ Characteristics defined correctly. `displayName` correctly marked readOnly (server SHOULD resolve from target User).
 
@@ -638,24 +638,24 @@ Additional enhancements:
 
 ---
 
-### 5.9 Group `members` sub-attributes — ⚠️ Critical Gap
+### 5.9 Group `members` sub-attributes - ⚠️ Critical Gap
 
-Parent: `members` — type: complex, multiValued: true, mutability: readWrite, returned: default
+Parent: `members` - type: complex, multiValued: true, mutability: readWrite, returned: default
 
 | Sub-Attr | type | multiValued | required | mutability | returned | referenceTypes | Status |
 |---|---|:---:|:---:|---|---|---|:---:|
-| value | string | false | **true** | **immutable** | **always** | — | ⚠️ |
-| display | string | false | false | **immutable** | default | — | ✅ |
-| type | string | false | false | **immutable** | default | — | ✅ |
-| **$ref** | **MISSING** | — | — | — | — | — | ❌ |
+| value | string | false | **true** | **immutable** | **always** | - | ⚠️ |
+| display | string | false | false | **immutable** | default | - | ✅ |
+| type | string | false | false | **immutable** | default | - | ✅ |
+| **$ref** | **MISSING** | - | - | - | - | - | ❌ |
 
 **Critical gaps**:
 
 1. ❌ **`$ref` sub-attribute is MISSING** from `GROUP_SCHEMA_ATTRIBUTES`. Per RFC 7643 §4.2, members SHOULD include `$ref` with `type: 'reference'`, `referenceTypes: ['User', 'Group']`, `mutability: 'immutable'`.
 2. ⚠️ `members[].value` has `returned: 'always'` but sub-attr always-returned is not enforced at projection level.
 
-**Mutability**: ✅ All sub-attrs correctly marked `immutable` — `checkImmutableAttributes()` deep-compares on PUT/PATCH.
-**Required**: ✅ `value` is `required: true` — enforced by V9 in `validateSubAttributes()`.
+**Mutability**: ✅ All sub-attrs correctly marked `immutable` - `checkImmutableAttributes()` deep-compares on PUT/PATCH.
+**Required**: ✅ `value` is `required: true` - enforced by V9 in `validateSubAttributes()`.
 
 (R-REF-1 and R-RET-3 cover these gaps.)
 
@@ -698,7 +698,7 @@ model ScimResource {
 | `externalId` | Text column | Extracted from payload; uniqueness enforced |
 | `active` | Boolean column | Extracted from payload |
 | `meta` | Not stored | Server-generated from `createdAt`/`updatedAt`/`scimId` |
-| `password` | **JSONB payload** | ⚠️ Stored as cleartext — writeOnly + returned:never prevents exposure |
+| `password` | **JSONB payload** | ⚠️ Stored as cleartext - writeOnly + returned:never prevents exposure |
 | All other attrs | JSONB payload | Arrays, objects, scalars preserved by JSONB |
 | Extension attrs | JSONB under URN key | `payload["urn:..."] = {...}` |
 
@@ -729,16 +729,16 @@ The `/Schemas` endpoint serves attribute definitions from `scim-schemas.constant
 
 | Characteristic | Exposed | Gap |
 |---|:---:|---|
-| name | ✅ | — |
-| type | ✅ | — |
-| multiValued | ✅ | — |
-| required | ✅ | — |
-| description | ✅ | — |
-| mutability | ✅ | — |
-| returned | ✅ | — |
+| name | ✅ | - |
+| type | ✅ | - |
+| multiValued | ✅ | - |
+| required | ✅ | - |
+| description | ✅ | - |
+| mutability | ✅ | - |
+| returned | ✅ | - |
 | caseExact | ⚠️ | Missing on `name.*`, `addresses.*` sub-attrs |
 | uniqueness | ⚠️ | Missing on Group `displayName`, User/Group `externalId` |
-| canonicalValues | ✅ | — |
+| canonicalValues | ✅ | - |
 | referenceTypes | ✅ | Except Group `members.$ref` missing entirely |
 | subAttributes | ✅ | Properly nested for all complex attrs |
 
@@ -746,7 +746,7 @@ The `/Schemas` endpoint serves attribute definitions from `scim-schemas.constant
 
 ## Mermaid Diagrams
 
-### POST /Users — Full Characteristic Enforcement Trace
+### POST /Users - Full Characteristic Enforcement Trace
 
 ```mermaid
 sequenceDiagram
@@ -850,9 +850,9 @@ flowchart TD
 
 ---
 
-## Remaining Work Items — Complete List
+## Remaining Work Items - Complete List
 
-### Priority 1 — Schema & Discovery Completeness (~1 hour)
+### Priority 1 - Schema & Discovery Completeness (~1 hour)
 
 Quick constant-file fixes that improve `/Schemas` discovery correctness.
 
@@ -863,7 +863,7 @@ Quick constant-file fixes that improve `/Schemas` discovery correctness.
 | **R-SUB-1** | Add `caseExact: false` to all name sub-attrs (`formatted`, `familyName`, `givenName`, `middleName`, `honorificPrefix`, `honorificSuffix`) | 10 min | `scim-schemas.constants.ts` |
 | **R-SUB-3** | Add `caseExact: false` to address sub-attrs (`formatted`, `streetAddress`, `locality`, `region`, `postalCode`, `country`) | 10 min | `scim-schemas.constants.ts` |
 
-### Priority 2 — Behavioral Gaps (~10 hours)
+### Priority 2 - Behavioral Gaps (~10 hours)
 
 Fixes real RFC non-compliance that affects runtime behavior.
 
@@ -871,12 +871,12 @@ Fixes real RFC non-compliance that affects runtime behavior.
 |---|---|---|---|
 | **R-RET-1** | Make `ALWAYS_RETURNED` schema-driven: add `always` Set to `collectReturnedCharacteristics()`, replace hardcoded `ALWAYS_RETURNED_BASE` | 2 hr | Correct `excludedAttributes` handling for dynamic/custom schemas |
 | **R-RET-2** | Add Group `active` to always-returned set (interim fix before R-RET-1) | 15 min | Group `active` survives `?excludedAttributes=active` |
-| **R-RET-3** | Enforce sub-attr `returned: 'always'` at projection level — when a complex attr appears in response, its always-returned sub-attrs must also appear (e.g., `emails[].value`, `members[].value`) | 3 hr | Sub-attr always-returned compliance |
+| **R-RET-3** | Enforce sub-attr `returned: 'always'` at projection level - when a complex attr appears in response, its always-returned sub-attrs must also appear (e.g., `emails[].value`, `members[].value`) | 3 hr | Sub-attr always-returned compliance |
 | **R-MUT-1** | Response builder: treat `mutability: 'writeOnly'` as implying `returned: 'never'` for defense-in-depth | 1 hr | Custom schemas with writeOnly won't leak data |
-| **R-MUT-2** | Strip/validate readOnly sub-attrs within readWrite parents (e.g., `manager.displayName`) — update `collectReadOnlyAttributes()` to walk sub-attributes + `validateSubAttributes()` to check mutability | 2 hr | Correct readOnly enforcement for nested attrs |
+| **R-MUT-2** | Strip/validate readOnly sub-attrs within readWrite parents (e.g., `manager.displayName`) - update `collectReadOnlyAttributes()` to walk sub-attributes + `validateSubAttributes()` to check mutability | 2 hr | Correct readOnly enforcement for nested attrs |
 | **R-CASE-1** | In-memory `evaluateFilter()` should accept schema defs and consult `caseExact` when comparing JSONB/extension attribute values | 3 hr | Correct case-sensitivity for JSONB filters |
 
-### Priority 3 — Advanced RFC Compliance (~23 hours)
+### Priority 3 - Advanced RFC Compliance (~23 hours)
 
 Nice-to-have enhancements for stricter compliance and cross-resource integrity.
 
@@ -897,9 +897,9 @@ Nice-to-have enhancements for stricter compliance and cross-resource integrity.
 
 | Priority | Items | Effort | Nature |
 |---|:---:|---|---|
-| P1 — Schema/Discovery | 4 | ~1 hr | Constants file updates | ✅ Complete (v0.23.0) |
-| P2 — Behavioral | 6 | ~12 hr | Code changes + tests | ✅ Complete (v0.24.0) |
-| P3 — Advanced | 10 | ~23 hr | New features + tests | Not started |
+| P1 - Schema/Discovery | 4 | ~1 hr | Constants file updates | ✅ Complete (v0.23.0) |
+| P2 - Behavioral | 6 | ~12 hr | Code changes + tests | ✅ Complete (v0.24.0) |
+| P3 - Advanced | 10 | ~23 hr | New features + tests | Not started |
 | **Total** | **20** | **~36 hr** | | P1+P2 done |
 
 ---
@@ -922,22 +922,22 @@ Each P1/P2 work item when implemented should include:
 
 | File | Lines | Purpose |
 |---|:---:|---|
-| `api/src/domain/validation/validation-types.ts` | 78 | `SchemaAttributeDefinition` interface — all 11 characteristics |
-| `api/src/domain/validation/schema-validator.ts` | 1,122 | Core validation engine — validate, checkImmutable, collectReturned/ReadOnly |
+| `api/src/domain/validation/validation-types.ts` | 78 | `SchemaAttributeDefinition` interface - all 11 characteristics |
+| `api/src/domain/validation/schema-validator.ts` | 1,122 | Core validation engine - validate, checkImmutable, collectReturned/ReadOnly |
 | `api/src/modules/scim/discovery/scim-schemas.constants.ts` | 561 | User/EnterpriseUser/Group schema attribute definitions |
 | `api/src/modules/scim/discovery/scim-schema-registry.ts` | 759 | ScimSchemaAttribute interface, registry for discovery |
 | `api/src/modules/scim/common/scim-attribute-projection.ts` | 320 | ALWAYS_RETURNED, projection, stripReturnedNever |
-| `api/src/modules/scim/common/scim-service-helpers.ts` | — | stripReadOnly*, validatePayload*, checkImmutable* helpers |
+| `api/src/modules/scim/common/scim-service-helpers.ts` | - | stripReadOnly*, validatePayload*, checkImmutable* helpers |
 | `api/src/modules/scim/filters/apply-scim-filter.ts` | 298 | Column-type-based caseExact, filter push-down |
-| `api/src/modules/scim/services/endpoint-scim-users.service.ts` | — | User CRUD with schema enforcement calls |
-| `api/src/modules/scim/services/endpoint-scim-groups.service.ts` | — | Group CRUD with schema enforcement calls |
-| `api/src/modules/scim/services/endpoint-scim-generic.service.ts` | — | Generic CRUD with dynamic schema resolution |
-| `api/src/domain/patch/user-patch-engine.ts` | — | User PatchEngine (no schema awareness) |
-| `api/src/domain/patch/group-patch-engine.ts` | — | Group PatchEngine (no schema awareness) |
-| `api/src/domain/patch/generic-patch-engine.ts` | — | Generic PatchEngine (no schema awareness) |
-| `api/src/modules/scim/controllers/endpoint-scim-users.controller.ts` | — | Controller-layer projection calls |
-| `api/src/modules/scim/controllers/schemas.controller.ts` | — | /Schemas discovery endpoint |
-| `api/prisma/schema.prisma` | — | DB model: ScimResource with indexed columns + JSONB payload |
+| `api/src/modules/scim/services/endpoint-scim-users.service.ts` | - | User CRUD with schema enforcement calls |
+| `api/src/modules/scim/services/endpoint-scim-groups.service.ts` | - | Group CRUD with schema enforcement calls |
+| `api/src/modules/scim/services/endpoint-scim-generic.service.ts` | - | Generic CRUD with dynamic schema resolution |
+| `api/src/domain/patch/user-patch-engine.ts` | - | User PatchEngine (no schema awareness) |
+| `api/src/domain/patch/group-patch-engine.ts` | - | Group PatchEngine (no schema awareness) |
+| `api/src/domain/patch/generic-patch-engine.ts` | - | Generic PatchEngine (no schema awareness) |
+| `api/src/modules/scim/controllers/endpoint-scim-users.controller.ts` | - | Controller-layer projection calls |
+| `api/src/modules/scim/controllers/schemas.controller.ts` | - | /Schemas discovery endpoint |
+| `api/prisma/schema.prisma` | - | DB model: ScimResource with indexed columns + JSONB payload |
 
 ---
 

@@ -58,7 +58,7 @@ describe('apply-scim-filter', () => {
 
     it('should return zero-result filter when id eq value is not a valid UUID', () => {
       const result = buildUserFilter('id eq "not-a-uuid"');
-      // Non-UUID values can never match a @db.Uuid column — guard returns
+      // Non-UUID values can never match a @db.Uuid column - guard returns
       // a contradictory filter instead of crashing PostgreSQL.
       expect(result.dbWhere).toBeDefined();
       expect(result.fetchAll).toBe(false);
@@ -364,11 +364,11 @@ describe('apply-scim-filter', () => {
 
     // ─── SCIM Validator: externalId (caseExact=true per RFC 7643 §3.1) ──────────
 
-    it('should preserve value case for externalId eq (TEXT — case-sensitive)', () => {
+    it('should preserve value case for externalId eq (TEXT - case-sensitive)', () => {
       const result = buildGroupFilter('externalId eq "ABC-DEF-1234"');
       expect(result.dbWhere).toEqual({ externalId: 'ABC-DEF-1234' });
       expect(result.fetchAll).toBe(false);
-      // Value is passed as-is — TEXT column does case-sensitive comparison
+      // Value is passed as-is - TEXT column does case-sensitive comparison
     });
 
     it('should push externalId eq with mixed case to DB without lowering', () => {
@@ -384,13 +384,13 @@ describe('apply-scim-filter', () => {
       expect(result.fetchAll).toBe(false);
     });
 
-    it('should push co filter on externalId to DB (case-sensitive — caseExact=true)', () => {
+    it('should push co filter on externalId to DB (case-sensitive - caseExact=true)', () => {
       const result = buildGroupFilter('externalId co "grp"');
       expect(result.dbWhere).toEqual({ externalId: { contains: 'grp' } });
       expect(result.fetchAll).toBe(false);
     });
 
-    it('should push sw filter on externalId to DB (case-sensitive — caseExact=true)', () => {
+    it('should push sw filter on externalId to DB (case-sensitive - caseExact=true)', () => {
       const result = buildGroupFilter('externalId sw "ext-"');
       expect(result.dbWhere).toEqual({ externalId: { startsWith: 'ext-' } });
       expect(result.fetchAll).toBe(false);

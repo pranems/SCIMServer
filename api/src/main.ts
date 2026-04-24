@@ -1,4 +1,4 @@
-﻿import 'reflect-metadata';
+import 'reflect-metadata';
 import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import type { Request, Response, NextFunction } from 'express';
 import { NestFactory } from '@nestjs/core';
@@ -25,7 +25,7 @@ async function bootstrap(): Promise<void> {
   // RFC 7644 §1.3 URL rewrite: SCIM endpoints are published at /scim/v2/* (spec-aligned)
   // but controllers are mounted at the /scim global prefix. This middleware rewrites
   // incoming /scim/v2/* → /scim/* so that both URL forms work. This is intentional
-  // permanent behavior — Entra ID, setup scripts, and live tests all use /scim/v2 URLs.
+  // permanent behavior - Entra ID, setup scripts, and live tests all use /scim/v2 URLs.
   // Changing the global prefix to 'scim/v2' is not feasible because it would break
   // admin routes (/scim/admin/*) and endpoint routes (/scim/endpoints/*).
   app.use((req: Request, _res: Response, next: NextFunction) => {
@@ -40,7 +40,7 @@ async function bootstrap(): Promise<void> {
     next();
   });
 
-  // Early X-Request-Id middleware — runs before guards and interceptors so that
+  // Early X-Request-Id middleware - runs before guards and interceptors so that
   // 401/403/415 error responses also carry the correlation header.
   app.use((req: Request, res: Response, next: NextFunction) => {
     const requestId = (req.headers['x-request-id'] as string) || randomUUID();
@@ -98,7 +98,7 @@ async function bootstrap(): Promise<void> {
   const requestTimeoutMs = Number(process.env.REQUEST_TIMEOUT_MS) || 120_000;
   await app.listen(port);
 
-  // Set HTTP server request timeout — prevents any single request from blocking
+  // Set HTTP server request timeout - prevents any single request from blocking
   // the event loop indefinitely (e.g., slow DB queries, N+1 bugs).
   // Default: 120 seconds (Node.js default). Override with REQUEST_TIMEOUT_MS env var.
   const httpServer = app.getHttpServer();

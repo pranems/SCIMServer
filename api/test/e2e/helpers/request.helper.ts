@@ -302,7 +302,7 @@ export async function createEndpointWithConfig(
   }
 
   // Sync BulkOperationsEnabled to profile.serviceProviderConfig.bulk.supported
-  // Only PATCH when disabling — rfc-standard preset already has bulk=true with maxOps/maxPayload
+  // Only PATCH when disabling - rfc-standard preset already has bulk=true with maxOps/maxPayload
   if (config['BulkOperationsEnabled'] !== undefined) {
     const bulkSupported = String(config['BulkOperationsEnabled']).toLowerCase() === 'true';
     if (!bulkSupported) {

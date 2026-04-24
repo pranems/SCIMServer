@@ -104,4 +104,4 @@ To bring the current implementation to the ideal state, the following phased app
 
 The current repository has an excellent foundation, particularly with its multi-endpoint routing and the existence of a formal AST parser for SCIM filters. However, the reliance on SQLite and stringified JSON payloads forces severe compromises in performance (in-memory filtering) and maintainability (manual PATCH manipulation).
 
-By executing this migration plan—starting with the database layer and moving up to dynamic schemas and query pushdown—the system will achieve strict RFC compliance, infinite extensibility, and enterprise-grade performance.
+By executing this migration plan-starting with the database layer and moving up to dynamic schemas and query pushdown-the system will achieve strict RFC compliance, infinite extensibility, and enterprise-grade performance.

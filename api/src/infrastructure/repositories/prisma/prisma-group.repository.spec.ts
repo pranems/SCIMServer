@@ -1,5 +1,5 @@
 /**
- * PrismaGroupRepository — Unit tests for Phase 3 PostgreSQL migration.
+ * PrismaGroupRepository - Unit tests for Phase 3 PostgreSQL migration.
  *
  * Verifies that all queries target `scimResource` with `resourceType: 'Group'`,
  * that members use `resourceMember` (not `groupMember`), and that the mapping
@@ -41,7 +41,7 @@ function createMockPrismaService(): PrismaService {
   } as unknown as PrismaService;
 }
 
-// Valid UUID constants used in tests — PostgreSQL UUID columns reject non-UUID strings
+// Valid UUID constants used in tests - PostgreSQL UUID columns reject non-UUID strings
 const GRP_SCIM_ID = '10000000-0000-4000-a000-000000000001';
 
 function fakeGroupResource(overrides: Record<string, unknown> = {}) {
@@ -78,7 +78,7 @@ function fakeResourceMember(overrides: Record<string, unknown> = {}) {
 
 // ─── Test suite ───────────────────────────────────────────────────────────────
 
-describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
+describe('PrismaGroupRepository (Phase 2 - unified table)', () => {
   let repo: PrismaGroupRepository;
   let prisma: PrismaService;
 
@@ -485,7 +485,7 @@ describe('PrismaGroupRepository (Phase 2 — unified table)', () => {
 
       expect(prisma.$transaction).toHaveBeenCalled();
 
-      // The transaction function was called — verify its operations via the mock tx
+      // The transaction function was called - verify its operations via the mock tx
       const txFn = (prisma.$transaction as jest.Mock).mock.calls[0][0];
       const tx = {
         scimResource: { update: jest.fn() },

@@ -128,7 +128,7 @@ export function matchesFilter(
   filterValue: string,
   caseExact = false,
 ): boolean {
-  // RFC 7643 §2.1: attribute names are case-insensitive — find the key regardless of casing
+  // RFC 7643 §2.1: attribute names are case-insensitive - find the key regardless of casing
   const lowerAttr = filterAttribute.toLowerCase();
   const actual = Object.entries(item).find(([k]) => k.toLowerCase() === lowerAttr)?.[1];
 
@@ -348,7 +348,7 @@ export function applyExtensionUpdate(
 /**
  * Determines whether a SCIM PATCH value represents an "empty" or "unset" intent.
  *
- * Per RFC 7644 §3.5.2.3 — "replace":
+ * Per RFC 7644 §3.5.2.3 - "replace":
  *   If the target location specifies a single-valued attribute, the attribute's
  *   value is replaced.  If the target location specifies a multi-valued attribute
  *   and a value selection filter ("valuePath"), the selected values are replaced.
@@ -424,7 +424,7 @@ export function resolveNoPathValue(
         rawPayload[key] = value;
       }
     } else if (key.startsWith('urn:')) {
-      // URN key (e.g. "urn:example:custom:2.0:User") — store as-is.
+      // URN key (e.g. "urn:example:custom:2.0:User") - store as-is.
       // URNs may contain dots (version segments like "2.0") which are NOT
       // JSON path separators. RFC 2141 URN syntax must be preserved atomically.
       if (typeof value === 'object' && value !== null && !Array.isArray(value)) {

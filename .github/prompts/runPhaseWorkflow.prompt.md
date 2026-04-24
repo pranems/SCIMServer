@@ -32,7 +32,7 @@ You are executing the next project phase in a phased migration roadmap.
    - Start a fresh local instance and run as-is live tests
    - Build a fresh latest local container, run it, and run as-is live tests against it
 5. If failures appear, diagnose root cause, implement minimal robust fixes, and re-run impacted tests until green.
-6. **Keep the final Docker container running** after all validations pass. Do not stop or remove it — leave it available for the user to inspect and interact with.
+6. **Keep the final Docker container running** after all validations pass. Do not stop or remove it - leave it available for the user to inspect and interact with.
 
 ## Documentation Deliverables
 Create/update two detailed phase documents:
@@ -76,13 +76,13 @@ Must include for each issue faced during this phase:
 ## Self-Improvement & Documentation Update
 After phase implementation is validated and complete:
 1. **Update all project documentation** to reflect this phase's outcomes:
-   - `Session_starter.md` — progress log, version, test counts, assistant memory
-   - `CHANGELOG.md` — version bump entry with feature summary and test counts
-   - `docs/CONTEXT_INSTRUCTIONS.md` — new gotchas, constraints, or architectural decisions
-   - `docs/INDEX.md` — add references to any new phase docs created
-   - `docs/PROJECT_HEALTH_AND_STATS.md` — update test counts, codebase metrics, and phase status
-   - `docs/SCIM_COMPLIANCE.md` — update compliance status for affected RFC sections
-   - `package.json` — bump version number
+   - `Session_starter.md` - progress log, version, test counts, assistant memory
+   - `CHANGELOG.md` - version bump entry with feature summary and test counts
+   - `docs/CONTEXT_INSTRUCTIONS.md` - new gotchas, constraints, or architectural decisions
+   - `docs/INDEX.md` - add references to any new phase docs created
+   - `docs/PROJECT_HEALTH_AND_STATS.md` - update test counts, codebase metrics, and phase status
+   - `docs/SCIM_COMPLIANCE.md` - update compliance status for affected RFC sections
+   - `package.json` - bump version number
 2. **Review this prompt template** for lessons learned:
    - Did any step prove unnecessary or missing?
    - Were there recurring issues that a new checklist item could prevent?
@@ -100,4 +100,4 @@ Return a concise final report with:
 - On-track assessment
 - Final commit message suggestion
 - Any residual risks or follow-ups
-- Docker container status (image tag, container name/ID, port mapping — confirm running)
+- Docker container status (image tag, container name/ID, port mapping - confirm running)

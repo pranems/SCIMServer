@@ -1,5 +1,5 @@
 /**
- * EndpointScimGenericService — Phase 8b Generic SCIM Resource Service
+ * EndpointScimGenericService - Phase 8b Generic SCIM Resource Service
  *
  * Handles CRUD operations for custom resource types registered via the
  * Admin API. Resources are stored in the polymorphic ScimResource table
@@ -25,6 +25,7 @@ import type {
 import { GENERIC_RESOURCE_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import {
   getConfigBoolean,
+  getConfigString,
   ENDPOINT_CONFIG_FLAGS,
   type EndpointConfig,
 } from '../../endpoint/endpoint-config.interface';
@@ -155,11 +156,14 @@ export class EndpointScimGenericService {
     // GEN-11: Validate schemas array includes the core schema (same as ensureSchema)
     ensureSchema(body.schemas as string[] | undefined, coreSchema);
 
-    // GEN-11: Strict schema enforcement — reject undeclared/unregistered extension URNs
+    // GEN-11: Strict schema enforcement - reject undeclared/unregistered extension URNs
     this.enforceStrictSchemaValidation(body, resourceType, endpointId, config);
 
     // GEN-03: Coerce boolean strings ("True"/"False") → native booleans before validation
     this.coerceBooleanStringsIfEnabled(body, resourceType, endpointId, config);
+
+    // G8h: Enforce primary sub-attribute constraint (RFC 7643 section 2.4)
+    this.enforcePrimaryConstraint(body, resourceType, endpointId, config);
 
     // GEN-01: Attribute-level payload validation against schema definitions
     this.validatePayloadSchema(body, resourceType, endpointId, config, 'create');
@@ -179,7 +183,7 @@ export class EndpointScimGenericService {
     const displayName = typeof body.displayName === 'string' ? body.displayName : null;
     const active = body.active !== false;
 
-    // externalId and displayName are NOT checked for uniqueness — saved as received per RFC 7643.
+    // externalId and displayName are NOT checked for uniqueness - saved as received per RFC 7643.
 
     const scimId = randomUUID();
 
@@ -263,7 +267,7 @@ export class EndpointScimGenericService {
     }
 
     // GEN-12: Config-aware soft-delete guard (RFC 7644 §3.6)
-    // [Removed in Settings v7: deletedAt no longer exists — DELETE always hard-deletes]
+    // [Removed in Settings v7: deletedAt no longer exists - DELETE always hard-deletes]
 
     return this.toScimResponse(record, resourceType);
   }
@@ -365,11 +369,14 @@ export class EndpointScimGenericService {
     // GEN-11: Validate schemas array includes the core schema
     ensureSchema(body.schemas as string[] | undefined, coreSchema);
 
-    // GEN-11: Strict schema enforcement — reject undeclared/unregistered extension URNs
+    // GEN-11: Strict schema enforcement - reject undeclared/unregistered extension URNs
     this.enforceStrictSchemaValidation(body, resourceType, endpointId, config);
 
     // GEN-03: Coerce boolean strings before schema validation
     this.coerceBooleanStringsIfEnabled(body, resourceType, endpointId, config);
+
+    // G8h: Enforce primary sub-attribute constraint (RFC 7643 section 2.4)
+    this.enforcePrimaryConstraint(body, resourceType, endpointId, config);
 
     // GEN-01: Attribute-level payload validation
     this.validatePayloadSchema(body, resourceType, endpointId, config, 'replace');
@@ -391,11 +398,11 @@ export class EndpointScimGenericService {
     }
 
     // GEN-12: Config-aware soft-delete guard
-    // [Removed in Settings v7: deletedAt no longer exists — DELETE always hard-deletes]
+    // [Removed in Settings v7: deletedAt no longer exists - DELETE always hard-deletes]
 
     enforceIfMatch(existing.version, ifMatch, config);
 
-    // GEN-02: Immutable attribute enforcement — compare existing with incoming
+    // GEN-02: Immutable attribute enforcement - compare existing with incoming
     this.checkImmutableAttributes(existing, body, resourceType, endpointId, config);
 
     // Strip readOnly attributes using precomputed cache (RFC 7643 §2.2)
@@ -413,7 +420,7 @@ export class EndpointScimGenericService {
     const displayName = typeof body.displayName === 'string' ? body.displayName : null;
     const active = body.active !== false;
 
-    // externalId and displayName are NOT checked for uniqueness — saved as received per RFC 7643.
+    // externalId and displayName are NOT checked for uniqueness - saved as received per RFC 7643.
 
     // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
     const uniqueAttrsPut = this.getSchemaCacheForRT(resourceType, endpointId)?.uniqueAttrs ?? [];
@@ -495,7 +502,7 @@ export class EndpointScimGenericService {
     }
 
     // GEN-12: Config-aware soft-delete guard
-    // [Removed in Settings v7: deletedAt no longer exists — DELETE always hard-deletes]
+    // [Removed in Settings v7: deletedAt no longer exists - DELETE always hard-deletes]
 
     enforceIfMatch(existing.version, ifMatch, config);
 
@@ -531,7 +538,7 @@ export class EndpointScimGenericService {
         coercePatchOpBooleans(patchDto.Operations, boolMap, coreUrnLower);
       }
 
-      // GEN-01: Pre-PATCH validation — validate each operation value against schema
+      // GEN-01: Pre-PATCH validation - validate each operation value against schema
       for (const [opIndex, op] of patchDto.Operations.entries()) {
         const preResult = SchemaValidator.validatePatchOperationValue(
           op.op, op.path, op.value, schemaDefs,
@@ -560,7 +567,7 @@ export class EndpointScimGenericService {
     try {
       payload = JSON.parse(existing.rawPayload);
     } catch (e) {
-      this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Corrupt rawPayload in PATCH — using empty object', {
+      this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Corrupt rawPayload in PATCH - using empty object', {
         scimId: existing.scimId, endpointId, error: (e as Error).message,
       });
       payload = {};
@@ -614,7 +621,7 @@ export class EndpointScimGenericService {
       ? patchedPayload.active !== false
       : existing.active;
 
-    // GEN-01: Post-PATCH schema validation — validate the resulting payload
+    // GEN-01: Post-PATCH schema validation - validate the resulting payload
     {
       const resultPayload: Record<string, unknown> = {
         schemas: [resourceType.schema],
@@ -627,13 +634,17 @@ export class EndpointScimGenericService {
       }
       // Coerce boolean strings in post-PATCH payload
       this.coerceBooleanStringsIfEnabled(resultPayload, resourceType, endpointId, config);
+
+      // G8h: Enforce primary on merged post-PATCH payload (RFC 7643 section 2.4)
+      this.enforcePrimaryConstraint(resultPayload, resourceType, endpointId, config);
+
       this.validatePayloadSchema(resultPayload, resourceType, endpointId, config, 'patch');
 
       // GEN-02: Immutable attribute enforcement on PATCH result
       this.checkImmutableAttributes(existing, resultPayload, resourceType, endpointId, config);
     }
 
-    // externalId and displayName are NOT checked for uniqueness — saved as received per RFC 7643.
+    // externalId and displayName are NOT checked for uniqueness - saved as received per RFC 7643.
 
     // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
     {
@@ -710,7 +721,7 @@ export class EndpointScimGenericService {
     }
 
     // GEN-12: Config-aware soft-delete guard (double-delete → 404)
-    // [Removed in Settings v7: deletedAt no longer exists — DELETE always hard-deletes]
+    // [Removed in Settings v7: deletedAt no longer exists - DELETE always hard-deletes]
 
     enforceIfMatch(existing.version, ifMatch, config);
 
@@ -753,7 +764,7 @@ export class EndpointScimGenericService {
     try {
       payload = JSON.parse(record.rawPayload);
     } catch (e) {
-      this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Corrupt rawPayload in toScimResponse — using empty object', {
+      this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Corrupt rawPayload in toScimResponse - using empty object', {
         scimId: record.scimId, endpointId: record.endpointId, error: (e as Error).message,
       });
       payload = {};
@@ -763,7 +774,7 @@ export class EndpointScimGenericService {
     try {
       meta = record.meta ? JSON.parse(record.meta) : {};
     } catch (e) {
-      this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Corrupt meta in toScimResponse — using empty object', {
+      this.scimLogger.warn(LogCategory.SCIM_RESOURCE, 'Corrupt meta in toScimResponse - using empty object', {
         scimId: record.scimId, endpointId: record.endpointId, error: (e as Error).message,
       });
       meta = {};
@@ -784,7 +795,7 @@ export class EndpointScimGenericService {
     const visibleExtUrns = stripNeverReturnedFromPayload(payload, neverByParent, coreUrnLower, extSchemaUrns);
     const schemas: string[] = [resourceType.schema, ...visibleExtUrns];
 
-    // Remove schemas from payload — we built it dynamically above (G19 / FP-1)
+    // Remove schemas from payload - we built it dynamically above (G19 / FP-1)
     delete payload.schemas;
 
     return {
@@ -798,7 +809,7 @@ export class EndpointScimGenericService {
   // ─── Validation Helpers (dynamic core URN equivalents of ScimSchemaHelpers) ──
 
   /**
-   * GEN-11: Strict schema enforcement — reject undeclared/unregistered extension URNs.
+   * GEN-11: Strict schema enforcement - reject undeclared/unregistered extension URNs.
    * Dynamic-URN equivalent of ScimSchemaHelpers.enforceStrictSchemaValidation().
    */
   private enforceStrictSchemaValidation(
@@ -918,6 +929,96 @@ export class EndpointScimGenericService {
   }
 
   /**
+   * G8h: Enforce primary sub-attribute constraint (RFC 7643 section 2.4).
+   * Generic service equivalent of ScimSchemaHelpers.enforcePrimaryConstraint().
+   *
+   * Uses the resource-type-specific schema definitions to identify multi-valued
+   * complex attributes with a boolean primary sub-attribute.
+   */
+  private enforcePrimaryConstraint(
+    payload: Record<string, unknown>,
+    resourceType: ScimResourceType,
+    endpointId: string,
+    config?: EndpointConfig,
+  ): void {
+    const rawMode = getConfigString(config, ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT);
+    const mode = (rawMode ?? 'passthrough').toLowerCase();
+
+    const schemas = this.getSchemaDefinitions(resourceType, endpointId);
+    for (const schema of schemas) {
+      for (const attr of schema.attributes) {
+        if (!attr.multiValued || attr.type !== 'complex') continue;
+        const hasPrimarySub = attr.subAttributes?.some(
+          (sa: SchemaAttributeDefinition) => sa.name.toLowerCase() === 'primary' && sa.type === 'boolean',
+        );
+        if (!hasPrimarySub) continue;
+
+        const isCoreSchema = 'isCoreSchema' in schema ? (schema as any).isCoreSchema : true;
+        let arr: Record<string, unknown>[] | undefined;
+        if (isCoreSchema) {
+          const val = payload[attr.name];
+          if (Array.isArray(val)) arr = val as Record<string, unknown>[];
+        } else {
+          const extObj = payload[schema.id] as Record<string, unknown> | undefined;
+          if (extObj && typeof extObj === 'object') {
+            const val = extObj[attr.name];
+            if (Array.isArray(val)) arr = val as Record<string, unknown>[];
+          }
+        }
+
+        if (!arr || arr.length < 2) continue;
+
+        let primaryCount = 0;
+        let firstPrimaryIdx = -1;
+        for (let i = 0; i < arr.length; i++) {
+          if (arr[i]?.primary === true) {
+            primaryCount++;
+            if (firstPrimaryIdx === -1) firstPrimaryIdx = i;
+          }
+        }
+        if (primaryCount <= 1) continue;
+
+        if (mode === 'reject') {
+          throw createScimError({
+            status: 400,
+            scimType: 'invalidValue',
+            detail: `The 'primary' attribute value 'true' MUST appear no more than once `
+              + `in '${attr.name}' (found ${primaryCount}). [RFC 7643 section 2.4]`,
+            diagnostics: {
+              errorCode: 'PRIMARY_CONSTRAINT_VIOLATION',
+              attributePath: attr.name,
+              triggeredBy: 'PrimaryEnforcement',
+              extra: { primaryCount },
+            },
+          });
+        }
+
+        if (mode === 'passthrough') {
+          // Store as-is but warn about the RFC violation
+          this.scimLogger.warn(LogCategory.SCIM_RESOURCE,
+            `[PrimaryEnforcement] Multiple primary=true in '${attr.name}' (found ${primaryCount}). `
+            + `Stored as-is (passthrough mode). [RFC 7643 section 2.4]`,
+            { endpointId, attributePath: attr.name, primaryCount },
+          );
+          continue;
+        }
+
+        // mode === 'normalize': keep first, clear rest
+        for (let i = 0; i < arr.length; i++) {
+          if (arr[i]?.primary === true && i !== firstPrimaryIdx) {
+            arr[i].primary = false;
+          }
+        }
+        this.scimLogger.warn(LogCategory.SCIM_RESOURCE,
+          `[PrimaryEnforcement] Normalized '${attr.name}': kept index ${firstPrimaryIdx}, `
+          + `cleared ${primaryCount - 1} extra primary=true`,
+          { endpointId, attributePath: attr.name, firstPrimaryIdx, clearedCount: primaryCount - 1 },
+        );
+      }
+    }
+  }
+
+  /**
    * Get the precomputed cache for a resource type, or build one on the fly.
    * Mirrors the pattern used by ScimSchemaHelpers.getSchemaCache().
    */
@@ -977,7 +1078,7 @@ export class EndpointScimGenericService {
     config?: EndpointConfig,
   ): void {
     // G1: Immutable enforcement runs unconditionally (RFC 7643 §2.2 "SHALL NOT")
-    // Previously gated by StrictSchemaValidation — removed per P4 analysis
+    // Previously gated by StrictSchemaValidation - removed per P4 analysis
 
     const existingPayload = this.buildExistingPayload(existing, resourceType);
     const schemas = this.buildSchemaDefinitionsFromPayload(incomingDto, resourceType, endpointId);

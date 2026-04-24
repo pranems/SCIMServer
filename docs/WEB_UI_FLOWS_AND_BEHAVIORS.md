@@ -1,7 +1,7 @@
 # Web UI Flows, Paths & Behaviors
 
-> **Version:** 1.0 · **Source-verified against:** v0.35.0 · **Created:** April 14, 2026  
-> Every statement references the actual source file — nothing is assumed.
+> **Version:** 1.0 · **Source-verified against:** v0.38.0 · **Created:** April 14, 2026  
+> Every statement references the actual source file - nothing is assumed.
 
 ---
 
@@ -12,12 +12,12 @@
 3. [Component Tree](#3-component-tree)
 4. [Theme System](#4-theme-system)
 5. [Authentication Flow](#5-authentication-flow)
-6. [Screen 1 — Header Bar](#6-screen-1--header-bar)
-7. [Screen 2 — Activity Feed](#7-screen-2--activity-feed)
-8. [Screen 3 — Raw Logs](#8-screen-3--raw-logs)
-9. [Screen 4 — Database Browser](#9-screen-4--database-browser)
-10. [Screen 5 — Manual Provision](#10-screen-5--manual-provision)
-11. [Screen 6 — Footer & Upgrade Banner](#11-screen-6--footer--upgrade-banner)
+6. [Screen 1 - Header Bar](#6-screen-1--header-bar)
+7. [Screen 2 - Activity Feed](#7-screen-2--activity-feed)
+8. [Screen 3 - Raw Logs](#8-screen-3--raw-logs)
+9. [Screen 4 - Database Browser](#9-screen-4--database-browser)
+10. [Screen 5 - Manual Provision](#10-screen-5--manual-provision)
+11. [Screen 6 - Footer & Upgrade Banner](#11-screen-6--footer--upgrade-banner)
 12. [Data Source Matrix](#12-data-source-matrix)
 13. [API Endpoints Used by UI](#13-api-endpoints-used-by-ui)
 14. [State Management](#14-state-management)
@@ -79,11 +79,11 @@ graph TD
 | Framework | React | 19.x | Component rendering |
 | Build | Vite | 7.x | Dev server + production bundler |
 | Language | TypeScript | 5.9 | Type safety |
-| Styling | CSS Modules | — | Scoped component styles (8 `.module.css` files) |
-| Theming | CSS Custom Properties | — | Light/dark via `data-theme` attribute |
+| Styling | CSS Modules | - | Scoped component styles (8 `.module.css` files) |
+| Theming | CSS Custom Properties | - | Light/dark via `data-theme` attribute |
 | Testing | Vitest + Testing Library | 4.x | Component + utility tests |
-| State | React hooks (`useState`, `useContext`) | — | No external state library |
-| API | Native `fetch` | — | No Axios/SWR/React Query |
+| State | React hooks (`useState`, `useContext`) | - | No external state library |
+| API | Native `fetch` | - | No Axios/SWR/React Query |
 
 **No charting libraries.** All "visualizations" are plain HTML: number cards, colored badges, tables, and CSS-styled lists.
 
@@ -175,13 +175,13 @@ sequenceDiagram
 **Token storage:** `localStorage` key `scimserver.authToken`  
 **Token events:** Custom DOM events `scimserver:token-changed` and `scimserver:token-invalid`  
 **Cross-tab sync:** `window.addEventListener('storage', ...)` detects token changes from other tabs  
-**Auth wrapper:** `fetchWithAuth()` in `web/src/api/client.ts` — auto-injects header, clears token on 401
+**Auth wrapper:** `fetchWithAuth()` in `web/src/api/client.ts` - auto-injects header, clears token on 401
 
 **Source:** `web/src/auth/token.ts` (54 lines), `web/src/hooks/useAuth.tsx` (70 lines)
 
 ---
 
-## 6. Screen 1 — Header Bar
+## 6. Screen 1 - Header Bar
 
 **Component:** `web/src/components/Header.tsx` (68 lines)  
 **Styling:** `web/src/components/Header.module.css` (203 lines)  
@@ -199,14 +199,14 @@ sequenceDiagram
 | Logo (blue [S] square) | Hardcoded inline SVG | **Static** |
 | "SCIMServer" | Hardcoded `<h1>` | **Static** |
 | "SCIM 2.0 Provisioning Monitor" | Hardcoded `<p>` | **Static** |
-| Green dot + "Active" | Hardcoded CSS animation + text | **Static** — always shows green regardless of server health |
+| Green dot + "Active" | Hardcoded CSS animation + text | **Static** - always shows green regardless of server health |
 | "Token required" | Shown when `tokenConfigured === false` | **Dynamic** (client state from `useAuth`) |
 | "Set Token" / "Change Token" | Toggles on `tokenConfigured` prop | **Dynamic** |
 | Theme toggle (☀️/🌙) | Reads `useTheme().theme` | **Dynamic** (client state from localStorage) |
 
 ---
 
-## 7. Screen 2 — Activity Feed
+## 7. Screen 2 - Activity Feed
 
 **Component:** `web/src/components/activity/ActivityFeed.tsx` (597 lines)  
 **Styling:** `web/src/components/activity/ActivityFeed.module.css` (551 lines)  
@@ -244,7 +244,7 @@ sequenceDiagram
 |---------|-------------|----------------|----------|-----------|
 | Summary cards (4) | `GET /scim/admin/activity/summary` | `ActivityController.getActivitySummary()` | `requestLog` (counts with date filters + keepalive exclusion) | Refreshed on mount + every 10s when auto-refresh ON |
 | Activity list | `GET /scim/admin/activity?page=&limit=&type=&severity=&search=&hideKeepalive=` | `ActivityController.getActivities()` → `ActivityParserService.parseActivity()` | `requestLog` (full rows parsed into human-readable summaries) | Refreshed on mount + every 10s (silent) |
-| Pagination | Same response `.pagination` | Computed from `count()` result | — | Same as above |
+| Pagination | Same response `.pagination` | Computed from `count()` result | - | Same as above |
 
 ### Activity Item Fields
 
@@ -270,13 +270,13 @@ sequenceDiagram
 | **Type filter** | Select dropdown | Client-side filter applied after server fetch |
 | **Severity filter** | Select dropdown | Client-side filter applied after server fetch |
 | **Search** | Text input | Sent to server as `?search=` param (searches URL, identifier, request/response bodies) |
-| **Hide keepalive** | Checkbox | Sent to server as `?hideKeepalive=true` — backend excludes Entra probe requests before pagination |
+| **Hide keepalive** | Checkbox | Sent to server as `?hideKeepalive=true` - backend excludes Entra probe requests before pagination |
 | **Pagination** | Prev/Next buttons | Server-side: changes `?page=` param |
 | **Empty state** | No results | Shows 📭 icon + "No activities found" |
 
 ---
 
-## 8. Screen 3 — Raw Logs
+## 8. Screen 3 - Raw Logs
 
 **Component:** Inline in `web/src/App.tsx` (lines 608–657)  
 **Sub-components:** `LogFilters.tsx` (52 lines), `LogList.tsx` (123 lines), `LogDetail.tsx` (213 lines)
@@ -296,7 +296,7 @@ sequenceDiagram
 │  │ Time │ Method │ Status │ Duration │Identifier │ URL             │
 │  ├──────┼────────┼────────┼──────────┼───────────┼─────────────────┤
 │  │10:51 │ POST   │  201   │  45ms    │ jdoe@...  │ /Users          │
-│  │10:50 │ GET    │  200   │  12ms    │ —         │ /Users?filter=..│
+│  │10:50 │ GET    │  200   │  12ms    │ -         │ /Users?filter=..│
 │  └──────┴────────┴────────┴──────────┴───────────┴─────────────────┘
 │                                                                     │
 │  ┌─── Log Detail Modal (click any row) ───────────────────────────┐ │
@@ -316,7 +316,7 @@ sequenceDiagram
 | Log list | `GET /scim/admin/logs?page=&method=&status=&hasError=&urlContains=&search=&since=&until=&hideKeepalive=` | `AdminController.listLogs()` → `LoggingService.listLogs()` | `requestLog` | On mount + on filter change + auto-refresh 10s |
 | Log detail | `GET /scim/admin/logs/:id` | `AdminController.getLog()` → `LoggingService.getLog()` | `requestLog` | On row click (fetches full record with headers/bodies) |
 | Clear logs | `POST /scim/admin/logs/clear` | `AdminController.clearLogs()` | `requestLog` (truncate) | User-triggered |
-| Pagination | Response `.total`, `.page`, `.pageSize`, `.hasNext`, `.hasPrev` | Computed in `LoggingService` | — | Same as log list |
+| Pagination | Response `.total`, `.page`, `.pageSize`, `.hasNext`, `.hasPrev` | Computed in `LoggingService` | - | Same as log list |
 
 ### Log Detail Fields
 
@@ -349,7 +349,7 @@ sequenceDiagram
 
 ---
 
-## 9. Screen 4 — Database Browser
+## 9. Screen 4 - Database Browser
 
 **Component:** `web/src/components/database/DatabaseBrowser.tsx` (476 lines)  
 **Sub-components:** `StatisticsTab.tsx` (122 lines), `UsersTab.tsx` (161 lines), `GroupsTab.tsx` (115 lines)
@@ -395,12 +395,12 @@ sequenceDiagram
 | Statistics: group count | Same endpoint | Same | `scimResource` (count by `resourceType='Group'`) | **Dynamic** |
 | Statistics: request counts | Same endpoint | Same | `requestLog` (count + count where `createdAt >= 24h`) | **Dynamic** |
 | Statistics: database type | Same endpoint `.database` | Returns `{ type: 'PostgreSQL', persistenceBackend: 'prisma' }` or `{ type: 'In-Memory', persistenceBackend: 'inmemory' }` | Computed from `PERSISTENCE_BACKEND` env | **Dynamic** |
-| Tab counts | Same response | `statistics?.users.total`, `statistics?.groups.total` | — | **Dynamic** |
+| Tab counts | Same response | `statistics?.users.total`, `statistics?.groups.total` | - | **Dynamic** |
 | Users list | `GET /admin/database/users?page=&limit=&search=&active=` | `DatabaseService.getUsers()` | `scimResource` (findMany + JSONB spread + join for groups) | **Dynamic** |
 | Groups list | `GET /admin/database/groups?page=&limit=&search=` | `DatabaseService.getGroups()` | `scimResource` (findMany + `_count` for members) | **Dynamic** |
-| User detail modal | Pre-loaded from users list | — | — | From list response (no additional API call) |
-| Group detail modal | Pre-loaded from groups list | — | — | From list response |
-| Delete user | `POST /admin/users/{id}/delete` | `AdminController.deleteUser()` → searches all endpoints → `UsersService.deleteUserForEndpoint()` | `scimResource` | **Dynamic** — refreshes users + stats after success |
+| User detail modal | Pre-loaded from users list | - | - | From list response (no additional API call) |
+| Group detail modal | Pre-loaded from groups list | - | - | From list response |
+| Delete user | `POST /admin/users/{id}/delete` | `AdminController.deleteUser()` → searches all endpoints → `UsersService.deleteUserForEndpoint()` | `scimResource` | **Dynamic** - refreshes users + stats after success |
 
 ### User Modal Fields
 
@@ -419,7 +419,7 @@ sequenceDiagram
 
 ---
 
-## 10. Screen 5 — Manual Provision
+## 10. Screen 5 - Manual Provision
 
 **Component:** `web/src/components/manual/ManualProvision.tsx` (417 lines)  
 **Styling:** `web/src/components/manual/ManualProvision.module.css` (290 lines)
@@ -487,7 +487,7 @@ sequenceDiagram
 
 ---
 
-## 11. Screen 6 — Footer & Upgrade Banner
+## 11. Screen 6 - Footer & Upgrade Banner
 
 ### Footer
 
@@ -592,7 +592,7 @@ flowchart LR
 | Activity Summary | 10s | ON | Same as above | Fetched alongside activity list |
 | Raw Logs | 10s | OFF | `auto && token && !loading && !selected` | `setInterval` via `loadRef.current` (uses ref to avoid re-render loop) |
 | GitHub releases | 5 min | ON | `token` present | `setInterval` in `useEffect` |
-| Header status | None | — | — | Always shows "Active" (hardcoded) |
+| Header status | None | - | - | Always shows "Active" (hardcoded) |
 
 ---
 
@@ -642,13 +642,13 @@ flowchart LR
 | # | Item | Detail | Severity |
 |---|------|--------|----------|
 | 1 | "Active" indicator is static | Always shows green regardless of actual server health | Low |
-| 2 | No charting | All metrics are plain number cards — no time-series, pie charts, or histograms | Low |
+| 2 | No charting | All metrics are plain number cards - no time-series, pie charts, or histograms | Low |
 | 3 | No endpoint management UI | Backend has full CRUD for endpoints, but the UI has no endpoint admin screen | Medium |
 | 4 | No SSE live log consumption | Backend has `GET /admin/log-config/stream` (SSE), but the UI doesn't use it | Low |
 | 5 | No audit trail viewer | Backend has `GET /admin/log-config/audit`, but no UI | Low |
-| 6 | User detail from list data | Modal shows data from the list fetch, not a fresh detail call — could be slightly stale after list load | Low |
-| 7 | Keepalive suppressed banner | Code exists but `suppressedCount` is always 0 (dead branch since backend filters) | None — cleanup only |
-| 8 | Test version banner | Code exists but `deployment.currentImage` is always undefined from backend | None — by design for non-Docker |
+| 6 | User detail from list data | Modal shows data from the list fetch, not a fresh detail call - could be slightly stale after list load | Low |
+| 7 | Keepalive suppressed banner | Code exists but `suppressedCount` is always 0 (dead branch since backend filters) | None - cleanup only |
+| 8 | Test version banner | Code exists but `deployment.currentImage` is always undefined from backend | None - by design for non-Docker |
 | 9 | `web/package.json` version stale | Shows `0.24.0` but doesn't affect UI (UI reads from API `package.json` which is `0.35.0`) | None |
 
 ---
@@ -657,23 +657,23 @@ flowchart LR
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `web/src/App.tsx` | 683 | Root component — tabs, modals, footer, version, upgrade banner |
-| `web/src/main.tsx` | 5 | React entry point — `createRoot().render(<App />)` |
-| `web/src/theme.css` | 148 | CSS custom properties — light/dark themes |
-| `web/src/app.module.css` | 468 | Root layout — page, toolbar, modals, footer |
-| `web/src/api/client.ts` | 298 | API client — `fetchLogs`, `fetchLocalVersion`, `createManualUser/Group`, `fetchWithAuth` |
-| `web/src/auth/token.ts` | 54 | Token storage — localStorage + custom events |
-| `web/src/hooks/useAuth.tsx` | 70 | Auth context provider — token state, cross-tab sync |
-| `web/src/hooks/useTheme.tsx` | 42 | Theme context provider — dark/light toggle |
+| `web/src/App.tsx` | 683 | Root component - tabs, modals, footer, version, upgrade banner |
+| `web/src/main.tsx` | 5 | React entry point - `createRoot().render(<App />)` |
+| `web/src/theme.css` | 148 | CSS custom properties - light/dark themes |
+| `web/src/app.module.css` | 468 | Root layout - page, toolbar, modals, footer |
+| `web/src/api/client.ts` | 298 | API client - `fetchLogs`, `fetchLocalVersion`, `createManualUser/Group`, `fetchWithAuth` |
+| `web/src/auth/token.ts` | 54 | Token storage - localStorage + custom events |
+| `web/src/hooks/useAuth.tsx` | 70 | Auth context provider - token state, cross-tab sync |
+| `web/src/hooks/useTheme.tsx` | 42 | Theme context provider - dark/light toggle |
 | `web/src/utils/keepalive.ts` | 53 | Entra keepalive probe detection |
-| `web/src/components/Header.tsx` | 68 | Sticky header — logo, status, token button, theme toggle |
-| `web/src/components/LogList.tsx` | 123 | Request log table — method/status badges, row click |
-| `web/src/components/LogDetail.tsx` | 213 | Log detail modal — collapsible JSON sections, copy/download |
-| `web/src/components/LogFilters.tsx` | 52 | Filter bar — method, status, error, URL, search, date range |
-| `web/src/components/activity/ActivityFeed.tsx` | 597 | Activity feed — summary cards, parsed activity list, filters, auto-refresh |
-| `web/src/components/database/DatabaseBrowser.tsx` | 476 | Database browser — tab orchestration, modals, delete |
-| `web/src/components/database/StatisticsTab.tsx` | 122 | Statistics cards — user/group/activity/database counts |
-| `web/src/components/database/UsersTab.tsx` | 161 | Users list — search, filter, pagination, row click |
-| `web/src/components/database/GroupsTab.tsx` | 115 | Groups list — search, pagination, row click |
-| `web/src/components/manual/ManualProvision.tsx` | 417 | Manual provisioning — user + group forms with result display |
-| `web/index.html` | ~45 | HTML shell — meta, fallback section, root div |
+| `web/src/components/Header.tsx` | 68 | Sticky header - logo, status, token button, theme toggle |
+| `web/src/components/LogList.tsx` | 123 | Request log table - method/status badges, row click |
+| `web/src/components/LogDetail.tsx` | 213 | Log detail modal - collapsible JSON sections, copy/download |
+| `web/src/components/LogFilters.tsx` | 52 | Filter bar - method, status, error, URL, search, date range |
+| `web/src/components/activity/ActivityFeed.tsx` | 597 | Activity feed - summary cards, parsed activity list, filters, auto-refresh |
+| `web/src/components/database/DatabaseBrowser.tsx` | 476 | Database browser - tab orchestration, modals, delete |
+| `web/src/components/database/StatisticsTab.tsx` | 122 | Statistics cards - user/group/activity/database counts |
+| `web/src/components/database/UsersTab.tsx` | 161 | Users list - search, filter, pagination, row click |
+| `web/src/components/database/GroupsTab.tsx` | 115 | Groups list - search, pagination, row click |
+| `web/src/components/manual/ManualProvision.tsx` | 417 | Manual provisioning - user + group forms with result display |
+| `web/index.html` | ~45 | HTML shell - meta, fallback section, root div |

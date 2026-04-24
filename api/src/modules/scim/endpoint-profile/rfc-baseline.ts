@@ -1,5 +1,5 @@
 /**
- * RFC Baseline Constants — Phase 13
+ * RFC Baseline Constants - Phase 13
  *
  * Canonical RFC 7643 attribute definitions used by the auto-expand engine
  * to fill missing fields when operators provide shorthand attribute input.
@@ -25,13 +25,13 @@ import type { ScimSchemaAttribute } from '../discovery/scim-schema-registry';
 
 // ─── Re-exports ─────────────────────────────────────────────────────────────
 
-/** RFC 7643 §4.1 — Complete User schema attributes (includes §3.1 common: id, externalId, meta) */
+/** RFC 7643 §4.1 - Complete User schema attributes (includes §3.1 common: id, externalId, meta) */
 export { USER_SCHEMA_ATTRIBUTES as RFC_USER_ATTRIBUTES } from '../discovery/scim-schemas.constants';
 
-/** RFC 7643 §4.3 — Complete Enterprise User extension attributes */
+/** RFC 7643 §4.3 - Complete Enterprise User extension attributes */
 export { ENTERPRISE_USER_ATTRIBUTES as RFC_ENTERPRISE_USER_ATTRIBUTES } from '../discovery/scim-schemas.constants';
 
-/** RFC 7643 §4.2 — Complete Group schema attributes (includes project's `active` addition) */
+/** RFC 7643 §4.2 - Complete Group schema attributes (includes project's `active` addition) */
 export { GROUP_SCHEMA_ATTRIBUTES as RFC_GROUP_ATTRIBUTES } from '../discovery/scim-schemas.constants';
 
 // ─── Attribute Lookup Maps ──────────────────────────────────────────────────
@@ -107,7 +107,7 @@ export const RFC_REQUIRED_ATTRIBUTES: ReadonlyMap<string, readonly string[]> = n
 /**
  * Project-default attributes auto-injected on all resource type schemas.
  * These are NOT RFC-required, but most IdP clients expect them.
- * See design doc §10.2 — "Project" guardrails.
+ * See design doc §10.2 - "Project" guardrails.
  */
 export const PROJECT_AUTO_INJECT_ATTRIBUTES: readonly string[] = [
   'externalId',
@@ -116,7 +116,7 @@ export const PROJECT_AUTO_INJECT_ATTRIBUTES: readonly string[] = [
 
 /**
  * Group-specific project attribute: `active` is always included on Group.
- * Not in RFC 7643 §4.2 — our project addition for soft-delete support.
+ * Not in RFC 7643 §4.2 - our project addition for soft-delete support.
  * See design doc decision D7.
  */
 export const GROUP_ALWAYS_INCLUDE_ATTRIBUTES: readonly string[] = [

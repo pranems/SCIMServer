@@ -38,7 +38,7 @@ $phase2Result = $null
 
 function Write-Phase($phase, $step, $message) {
     Write-Host "`n========================================" -ForegroundColor Cyan
-    Write-Host " Phase $phase — Step $step : $message" -ForegroundColor Cyan
+    Write-Host " Phase $phase - Step $step : $message" -ForegroundColor Cyan
     Write-Host "========================================" -ForegroundColor Cyan
 }
 
@@ -68,11 +68,11 @@ function Wait-ForEndpoint($url, $timeoutSeconds = 60, $label = "endpoint") {
 }
 
 # ══════════════════════════════════════════════════════════════
-# PHASE 1 — Local Build & Validation
+# PHASE 1 - Local Build & Validation
 # ══════════════════════════════════════════════════════════════
 if (-not $SkipLocal) {
     Write-Host "`n╔══════════════════════════════════════════╗" -ForegroundColor White
-    Write-Host   "║     PHASE 1 — LOCAL BUILD & VALIDATION   ║" -ForegroundColor White
+    Write-Host   "║     PHASE 1 - LOCAL BUILD & VALIDATION   ║" -ForegroundColor White
     Write-Host   "╚══════════════════════════════════════════╝" -ForegroundColor White
 
     # Step 1: Clean build
@@ -96,7 +96,7 @@ if (-not $SkipLocal) {
         npx jest --no-coverage 2>&1 | Tee-Object -Variable unitOutput
         $unitLine = ($unitOutput | Select-String "Tests:.*passed").Line
         if ($LASTEXITCODE -ne 0) { throw "Unit tests failed" }
-        Write-Result "Unit tests passed — $unitLine" $true
+        Write-Result "Unit tests passed - $unitLine" $true
     } catch {
         Write-Result "Unit tests FAILED: $_" $false
         Pop-Location
@@ -109,7 +109,7 @@ if (-not $SkipLocal) {
         npm run test:e2e 2>&1 | Tee-Object -Variable e2eOutput
         $e2eLine = ($e2eOutput | Select-String "Tests:.*passed").Line
         if ($LASTEXITCODE -ne 0) { throw "E2E tests failed" }
-        Write-Result "E2E tests passed — $e2eLine" $true
+        Write-Result "E2E tests passed - $e2eLine" $true
     } catch {
         Write-Result "E2E tests FAILED: $_" $false
         Pop-Location
@@ -142,7 +142,7 @@ if (-not $SkipLocal) {
         if ($VerboseTests) { $liveArgs += "-Verbose" }
         & $liveTestScript @liveArgs 2>&1 | Tee-Object -Variable liveOutput
         $liveLine = ($liveOutput | Select-String "passed").Line | Select-Object -Last 1
-        Write-Result "Live tests (local) — $liveLine" $true
+        Write-Result "Live tests (local) - $liveLine" $true
         $phase1Result = $liveLine
     } catch {
         Write-Result "Live tests (local) FAILED: $_" $false
@@ -166,11 +166,11 @@ if (-not $SkipLocal) {
 }
 
 # ══════════════════════════════════════════════════════════════
-# PHASE 2 — Docker Build & Validation
+# PHASE 2 - Docker Build & Validation
 # ══════════════════════════════════════════════════════════════
 if (-not $SkipDocker) {
     Write-Host "`n╔══════════════════════════════════════════╗" -ForegroundColor White
-    Write-Host   "║    PHASE 2 — DOCKER BUILD & VALIDATION   ║" -ForegroundColor White
+    Write-Host   "║    PHASE 2 - DOCKER BUILD & VALIDATION   ║" -ForegroundColor White
     Write-Host   "╚══════════════════════════════════════════╝" -ForegroundColor White
 
     Push-Location $repoRoot
@@ -239,7 +239,7 @@ if (-not $SkipDocker) {
         if ($VerboseTests) { $liveArgs += "-Verbose" }
         & $liveTestScript @liveArgs 2>&1 | Tee-Object -Variable dockerLiveOutput
         $dockerLiveLine = ($dockerLiveOutput | Select-String "passed").Line | Select-Object -Last 1
-        Write-Result "Live tests (Docker) — $dockerLiveLine" $true
+        Write-Result "Live tests (Docker) - $dockerLiveLine" $true
         $phase2Result = $dockerLiveLine
     } catch {
         Write-Result "Live tests (Docker) FAILED: $_" $false

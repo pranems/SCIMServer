@@ -1,4 +1,4 @@
-# Schema Lifecycle & Registry — Technical Internals
+# Schema Lifecycle & Registry - Technical Internals
 
 > **⚠️ Partially Superseded (v0.28.0)**: The `EndpointSchema` and `EndpointResourceType` tables/repos were removed in Phase 13. Schema data now lives in `Endpoint.profile` JSONB. See [SCHEMA_TEMPLATES_DESIGN.md](SCHEMA_TEMPLATES_DESIGN.md).
 
@@ -71,10 +71,10 @@ This document is the canonical technical reference for how SCIM schemas, extensi
 
 ---
 
-## 2. ScimSchemaRegistry — Central Lifecycle Manager
+## 2. ScimSchemaRegistry - Central Lifecycle Manager
 
 **File**: `api/src/modules/scim/discovery/scim-schema-registry.ts` (759 LOC)  
-**Class**: `ScimSchemaRegistry` — `@Injectable()`, implements `OnModuleInit`
+**Class**: `ScimSchemaRegistry` - `@Injectable()`, implements `OnModuleInit`
 
 ### 2.1 Data Structures
 
@@ -128,7 +128,7 @@ sequenceDiagram
     Note over Registry: Registry fully hydrated<br/>Ready for discovery + validation
 ```
 
-### 2.3 `loadBuiltInSchemas()` — What Gets Registered at Boot
+### 2.3 `loadBuiltInSchemas()` - What Gets Registered at Boot
 
 | Schema URN | Resource Type | Layer | Protected |
 |------------|--------------|-------|-----------|
@@ -140,7 +140,7 @@ sequenceDiagram
 | `urn:ietf:params:scim:schemas:extension:msfttest:User` | User | Global | ❌ |
 | `urn:ietf:params:scim:schemas:extension:msfttest:Group` | Group | Global | ❌ |
 
-**Microsoft test extension structure** — Each msfttest extension has a single attribute:
+**Microsoft test extension structure** - Each msfttest extension has a single attribute:
 
 ```typescript
 {
@@ -236,7 +236,7 @@ For each global resource type (User, Group), the merged result includes:
 
 ---
 
-## 3. Schema Definitions — Static Constants
+## 3. Schema Definitions - Static Constants
 
 **File**: `api/src/modules/scim/discovery/scim-schemas.constants.ts` (565 LOC)
 
@@ -245,14 +245,14 @@ For each global resource type (User, Group), the merged result includes:
 | Constant | Lines | Attributes | Description |
 |----------|-------|------------|-------------|
 | `USER_SCHEMA_ATTRIBUTES` | ~200 | 20 top-level | `id`, `userName`, `name` (6 subs), `displayName`, `nickName`, `profileUrl`, `title`, `userType`, `preferredLanguage`, `locale`, `timezone`, `active`, `emails` (3 subs), `phoneNumbers` (3 subs), `addresses` (8 subs), `roles` (4 subs), `groups` (4 subs, readOnly), `password` (writeOnly, returned:never), `externalId`, `meta` (5 subs, readOnly) |
-| `ENTERPRISE_USER_ATTRIBUTES` | ~50 | 6 top-level | `employeeNumber`, `costCenter`, `organization`, `division`, `department`, `manager` (3 subs — `value`, `$ref`, `displayName` [readOnly]) |
+| `ENTERPRISE_USER_ATTRIBUTES` | ~50 | 6 top-level | `employeeNumber`, `costCenter`, `organization`, `division`, `department`, `manager` (3 subs - `value`, `$ref`, `displayName` [readOnly]) |
 | `GROUP_SCHEMA_ATTRIBUTES` | ~80 | 6 top-level | `id`, `displayName`, `members` (4 subs), `externalId`, `active`, `meta` (5 subs) |
-| `SCIM_USER_SCHEMA_DEFINITION` | — | — | Full `ScimSchemaDefinition` wrapping `USER_SCHEMA_ATTRIBUTES` |
-| `SCIM_ENTERPRISE_USER_SCHEMA_DEFINITION` | — | — | Full `ScimSchemaDefinition` wrapping `ENTERPRISE_USER_ATTRIBUTES` |
-| `SCIM_GROUP_SCHEMA_DEFINITION` | — | — | Full `ScimSchemaDefinition` wrapping `GROUP_SCHEMA_ATTRIBUTES` |
-| `SCIM_USER_RESOURCE_TYPE` | — | — | `endpoint: '/Users'`, `schemaExtensions: [EnterpriseUser]` |
-| `SCIM_GROUP_RESOURCE_TYPE` | — | — | `endpoint: '/Groups'`, `schemaExtensions: []` |
-| `SCIM_SERVICE_PROVIDER_CONFIG` | — | — | `patch:true`, `bulk:true/1000/1MB`, `filter:true/200`, `sort:true`, `etag:true`, `changePassword:false` |
+| `SCIM_USER_SCHEMA_DEFINITION` | - | - | Full `ScimSchemaDefinition` wrapping `USER_SCHEMA_ATTRIBUTES` |
+| `SCIM_ENTERPRISE_USER_SCHEMA_DEFINITION` | - | - | Full `ScimSchemaDefinition` wrapping `ENTERPRISE_USER_ATTRIBUTES` |
+| `SCIM_GROUP_SCHEMA_DEFINITION` | - | - | Full `ScimSchemaDefinition` wrapping `GROUP_SCHEMA_ATTRIBUTES` |
+| `SCIM_USER_RESOURCE_TYPE` | - | - | `endpoint: '/Users'`, `schemaExtensions: [EnterpriseUser]` |
+| `SCIM_GROUP_RESOURCE_TYPE` | - | - | `endpoint: '/Groups'`, `schemaExtensions: []` |
+| `SCIM_SERVICE_PROVIDER_CONFIG` | - | - | `patch:true`, `bulk:true/1000/1MB`, `filter:true/200`, `sort:true`, `etag:true`, `changePassword:false` |
 
 ### 3.2 Runtime Immutability
 
@@ -264,7 +264,7 @@ export const SCIM_GROUP_SCHEMA_DEFINITION = deepFreeze({ ... });
 // etc.
 ```
 
-This means these objects cannot be modified at runtime — `Object.isFrozen()` returns `true` recursively. The constants serve as templates that the registry reads from but never mutates.
+This means these objects cannot be modified at runtime - `Object.isFrozen()` returns `true` recursively. The constants serve as templates that the registry reads from but never mutates.
 
 ### 3.3 Key Attribute Characteristics
 
@@ -283,10 +283,10 @@ This means these objects cannot be modified at runtime — `Object.isFrozen()` r
 
 ---
 
-## 4. SchemaValidator — Pure Domain Validation Engine
+## 4. SchemaValidator - Pure Domain Validation Engine
 
 **File**: `api/src/domain/validation/schema-validator.ts` (1205 LOC)  
-**Class**: `SchemaValidator` — Pure domain class, **zero NestJS dependencies**, all methods are `static`
+**Class**: `SchemaValidator` - Pure domain class, **zero NestJS dependencies**, all methods are `static`
 
 ### 4.1 Validation Flow
 
@@ -469,7 +469,7 @@ export class CreateEndpointSchemaDto {
 
 ---
 
-## 6. Admin Controllers — Runtime Schema Mutation
+## 6. Admin Controllers - Runtime Schema Mutation
 
 ### 6.1 AdminSchemaController
 
@@ -555,7 +555,7 @@ sequenceDiagram
 ### 7.1 Discovery Controller
 
 **File**: `api/src/modules/scim/controllers/endpoint-scim-discovery.controller.ts` (152 LOC)  
-**Decorator**: `@Public()` — No authentication required (RFC 7644 §4)
+**Decorator**: `@Public()` - No authentication required (RFC 7644 §4)
 
 | Route | Method | Delegates To |
 |-------|--------|-------------|
@@ -586,7 +586,7 @@ getSchemaByUrn(urn, endpointId?) {
 
 ### 7.3 Response Schema Building
 
-**`buildResourceSchemas()`** — Dynamically builds the `schemas[]` array for outbound resources:
+**`buildResourceSchemas()`** - Dynamically builds the `schemas[]` array for outbound resources:
 
 ```typescript
 buildResourceSchemas(payload, coreSchema, extensionUrns?, endpointId?) {
@@ -600,7 +600,7 @@ buildResourceSchemas(payload, coreSchema, extensionUrns?, endpointId?) {
 }
 ```
 
-Only includes extension URNs that actually have data in the payload — matching RFC 7643 §3.1 semantics.
+Only includes extension URNs that actually have data in the payload - matching RFC 7643 §3.1 semantics.
 
 ---
 
@@ -668,7 +668,7 @@ getSchemaDefinitions(endpointId):
 ### 9.1 Generic Controller
 
 **File**: `api/src/modules/scim/controllers/endpoint-scim-generic.controller.ts` (269 LOC)  
-**Route**: `endpoints/:endpointId/:resourceType` — Wildcard catch-all  
+**Route**: `endpoints/:endpointId/:resourceType` - Wildcard catch-all  
 **Registration**: LAST in NestJS module to avoid conflicting with `/Users`, `/Groups`, `/Schemas`, etc.
 
 #### Route Resolution
@@ -853,10 +853,10 @@ export interface ScimResourceType {
 
 | File | LOC | Layer | Purpose |
 |------|-----|-------|---------|
-| `scim-schema-registry.ts` | 759 | Application | Central registry — lifecycle, merge, query |
-| `schema-validator.ts` | 1205 | Domain | Pure validation engine — all static methods |
+| `scim-schema-registry.ts` | 759 | Application | Central registry - lifecycle, merge, query |
+| `schema-validator.ts` | 1205 | Domain | Pure validation engine - all static methods |
 | `scim-schemas.constants.ts` | 565 | Application | Deep-frozen schema definitions |
-| `scim-service-helpers.ts` | 754 | Application | Service integration — config-gated helpers |
+| `scim-service-helpers.ts` | 754 | Application | Service integration - config-gated helpers |
 | `endpoint-config.interface.ts` | 442 | Config | Config flags + defaults + validators |
 | `endpoint-scim-generic.controller.ts` | 269 | Controller | Wildcard SCIM CRUD for custom RTs |
 | `endpoint-scim-generic.service.ts` | 587 | Service | Generic resource CRUD + schema resolution |

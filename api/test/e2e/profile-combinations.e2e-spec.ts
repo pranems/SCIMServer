@@ -1,5 +1,5 @@
 /**
- * E2E Tests — Profile Configuration Combinations
+ * E2E Tests - Profile Configuration Combinations
  *
  * Comprehensive coverage of all endpoint profile content combinations:
  * - Custom extension schemas on User and Group
@@ -136,7 +136,7 @@ describe('Profile Configuration Combinations (E2E)', () => {
       // Extension data should be in response
       expect(res.body[EXT_URN]?.badgeNumber).toBe('B12345');
       expect(res.body[EXT_URN]?.costCenter).toBe('Engineering');
-      // returned:never — secretToken should NOT be in response
+      // returned:never - secretToken should NOT be in response
       expect(res.body[EXT_URN]?.secretToken).toBeUndefined();
       // Multi-valued array
       expect(res.body[EXT_URN]?.tags).toEqual(['vip', 'engineering']);
@@ -475,10 +475,10 @@ describe('Profile Configuration Combinations (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // G. No Extension (minimal preset — no Enterprise, no msfttest)
+  // G. No Extension (minimal preset - no Enterprise, no msfttest)
   // ═══════════════════════════════════════════════════════════════════
 
-  describe('minimal preset — no extensions at all', () => {
+  describe('minimal preset - no extensions at all', () => {
     let epId: string;
 
     beforeAll(async () => {
@@ -663,10 +663,10 @@ describe('Profile Configuration Combinations (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // J. Partial PATCH — Settings Deep-Merge (Phase 14)
+  // J. Partial PATCH - Settings Deep-Merge (Phase 14)
   // ═══════════════════════════════════════════════════════════════════
 
-  describe('Partial PATCH — settings deep-merge', () => {
+  describe('Partial PATCH - settings deep-merge', () => {
     let epId: string;
 
     beforeAll(async () => {
@@ -751,10 +751,10 @@ describe('Profile Configuration Combinations (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // K. Partial PATCH — SPC Replacement
+  // K. Partial PATCH - SPC Replacement
   // ═══════════════════════════════════════════════════════════════════
 
-  describe('Partial PATCH — SPC replacement', () => {
+  describe('Partial PATCH - SPC replacement', () => {
     let epId: string;
 
     beforeAll(async () => {
@@ -801,10 +801,10 @@ describe('Profile Configuration Combinations (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // L. Partial PATCH — Schema Replacement
+  // L. Partial PATCH - Schema Replacement
   // ═══════════════════════════════════════════════════════════════════
 
-  describe('Partial PATCH — schema replacement', () => {
+  describe('Partial PATCH - schema replacement', () => {
     let epId: string;
 
     beforeAll(async () => {
@@ -824,7 +824,7 @@ describe('Profile Configuration Combinations (E2E)', () => {
     it('should replace schemas via partial profile PATCH', async () => {
       // When replacing schemas, resourceTypes must also be provided to maintain
       // structural integrity (every RT.schema and RT.schemaExtensions[].schema
-      // must exist in the schemas array). This is intentional — prevents
+      // must exist in the schemas array). This is intentional - prevents
       // accidental removal of resource types by forgetting a schema.
       await request(app.getHttpServer())
         .patch(`/scim/admin/endpoints/${epId}`)
@@ -859,10 +859,10 @@ describe('Profile Configuration Combinations (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // M. Partial PATCH — Combined profile sections + settings
+  // M. Partial PATCH - Combined profile sections + settings
   // ═══════════════════════════════════════════════════════════════════
 
-  describe('Partial PATCH — combined settings + SPC + schemas', () => {
+  describe('Partial PATCH - combined settings + SPC + schemas', () => {
     let epId: string;
 
     beforeAll(async () => {
@@ -906,7 +906,7 @@ describe('Profile Configuration Combinations (E2E)', () => {
 
     it('should update schemas + settings in one PATCH', async () => {
       // When replacing schemas, resourceTypes must also be provided to maintain
-      // structural integrity — prevents accidental RT removal.
+      // structural integrity - prevents accidental RT removal.
       await request(app.getHttpServer())
         .patch(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
@@ -952,10 +952,10 @@ describe('Profile Configuration Combinations (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // N. Partial PATCH — Add custom extension via PATCH
+  // N. Partial PATCH - Add custom extension via PATCH
   // ═══════════════════════════════════════════════════════════════════
 
-  describe('Partial PATCH — add extension via profile PATCH', () => {
+  describe('Partial PATCH - add extension via profile PATCH', () => {
     let epId: string;
     const EXT_URN = 'urn:test:scim:extension:badge:2.0:User';
 
@@ -1028,10 +1028,10 @@ describe('Profile Configuration Combinations (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // O. Partial PATCH — displayName + active + profile combined
+  // O. Partial PATCH - displayName + active + profile combined
   // ═══════════════════════════════════════════════════════════════════
 
-  describe('Partial PATCH — displayName + active + profile combined', () => {
+  describe('Partial PATCH - displayName + active + profile combined', () => {
     let epId: string;
 
     beforeAll(async () => {

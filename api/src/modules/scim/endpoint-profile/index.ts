@@ -1,5 +1,5 @@
 /**
- * Endpoint Profile Module — Phase 13
+ * Endpoint Profile Module - Phase 13
  *
  * Barrel export for the endpoint-profile sub-module.
  */

@@ -1,5 +1,5 @@
 /**
- * Extension Schema Validation — Flag Combinations & Flow Tests
+ * Extension Schema Validation - Flag Combinations & Flow Tests
  *
  * Covers gaps in SchemaValidator for:
  *  - Extension schema with canonical value enforcement (V10 gap)
@@ -81,7 +81,7 @@ const ALL_OPTS: { label: string; opts: ValidationOptions }[] = [
 // 1. Extension Canonical Value Enforcement (V10 gap)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('Extension schema — canonical values (V10)', () => {
+describe('Extension schema - canonical values (V10)', () => {
   const core = coreSchema([makeAttr({ name: 'userName', required: true })]);
   const ext = extSchema([
     makeAttr({
@@ -162,13 +162,13 @@ describe('Extension schema — canonical values (V10)', () => {
 // 2. Extension Block as Array (should reject)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('Extension block validation — non-object shapes', () => {
+describe('Extension block validation - non-object shapes', () => {
   const core = coreSchema([makeAttr({ name: 'userName', required: true })]);
   const ext = extSchema([
     makeAttr({ name: 'department' }),
   ]);
 
-  // The current validator does NOT validate the extension block shape —
+  // The current validator does NOT validate the extension block shape -
   // non-object values are silently skipped. These tests document actual behavior.
   it('should silently skip extension block as an array (no crash)', () => {
     const payload = {
@@ -177,7 +177,7 @@ describe('Extension block validation — non-object shapes', () => {
       [ENTERPRISE_ID]: [{ department: 'Eng' }],
     };
     const result = SchemaValidator.validate(payload as any, [core, ext], STRICT_CREATE);
-    // Not rejected — validator skips non-object extension blocks
+    // Not rejected - validator skips non-object extension blocks
     expect(result.valid).toBe(true);
   });
 
@@ -213,10 +213,10 @@ describe('Extension block validation — non-object shapes', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 3. Immutable Extension Attributes — checkImmutable
+// 3. Immutable Extension Attributes - checkImmutable
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('Immutable extension attributes — checkImmutable', () => {
+describe('Immutable extension attributes - checkImmutable', () => {
   const core = coreSchema([makeAttr({ name: 'userName', required: true })]);
   const ext = extSchema([
     makeAttr({ name: 'employeeId', mutability: 'immutable' }),
@@ -284,7 +284,7 @@ describe('Immutable extension attributes — checkImmutable', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 4. Extension Validation — strictMode × mode Matrix
+// 4. Extension Validation - strictMode × mode Matrix
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Extension validation across strictMode × mode matrix', () => {
@@ -364,7 +364,7 @@ describe('Extension validation across strictMode × mode matrix', () => {
 // 5. Multi-Extension + strictMode × mode Combinations
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('Multi-extension schemas — flag matrix interactions', () => {
+describe('Multi-extension schemas - flag matrix interactions', () => {
   const core = coreSchema([makeAttr({ name: 'userName', required: true })]);
   const ext1 = extSchema([
     makeAttr({ name: 'dept', required: true }),
@@ -440,10 +440,10 @@ describe('Multi-extension schemas — flag matrix interactions', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 6. validatePatchOperationValue — Extension Complex Types
+// 6. validatePatchOperationValue - Extension Complex Types
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('validatePatchOperationValue — extension complex types', () => {
+describe('validatePatchOperationValue - extension complex types', () => {
   const core = coreSchema([makeAttr({ name: 'userName', required: true })]);
   const ext = extSchema([
     makeAttr({
@@ -532,10 +532,10 @@ describe('validatePatchOperationValue — extension complex types', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 7. Extension on Group Schema — Validation
+// 7. Extension on Group Schema - Validation
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('Group schema with custom extension — validation', () => {
+describe('Group schema with custom extension - validation', () => {
   const groupCore = coreGroupSchema([
     makeAttr({ name: 'displayName', required: true }),
     makeAttr({
@@ -612,10 +612,10 @@ describe('Group schema with custom extension — validation', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 8. Extension Type Validation — All SCIM Types
+// 8. Extension Type Validation - All SCIM Types
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('Extension attributes — all SCIM types', () => {
+describe('Extension attributes - all SCIM types', () => {
   const core = coreSchema([makeAttr({ name: 'userName', required: true })]);
 
   const typeCases: {
@@ -814,10 +814,10 @@ describe('Extension mutability flags across modes', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 10. Error Accumulation — Core + Multiple Extensions
+// 10. Error Accumulation - Core + Multiple Extensions
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('Error accumulation — core + multiple extensions', () => {
+describe('Error accumulation - core + multiple extensions', () => {
   const core = coreSchema([
     makeAttr({ name: 'userName', required: true }),
     makeAttr({ name: 'active', type: 'boolean' }),

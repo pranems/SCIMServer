@@ -1,12 +1,12 @@
-# SCIM Discovery & Per-Endpoint Schema Extensions — Comprehensive Reference
+# SCIM Discovery & Per-Endpoint Schema Extensions - Comprehensive Reference
 
-> **⚠️ LARGELY SUPERSEDED** — The registry architecture, admin API flows, startup hydration, registration/unregistration lifecycle, discovery merging, and CRUD examples in this document are now covered by the comprehensive schema documentation suite (Mar 2026). **Retained for**: DTO validation rules (`CreateEndpointSchemaDto`, `SchemaAttributeDto`) and error response catalog (401/404/409/403/400 with exact JSON).
+> **⚠️ LARGELY SUPERSEDED** - The registry architecture, admin API flows, startup hydration, registration/unregistration lifecycle, discovery merging, and CRUD examples in this document are now covered by the comprehensive schema documentation suite (Mar 2026). **Retained for**: DTO validation rules (`CreateEndpointSchemaDto`, `SchemaAttributeDto`) and error response catalog (401/404/409/403/400 with exact JSON).
 >
 > **v0.28.0 Note**: The `EndpointSchema` / `EndpointResourceType` tables, `IEndpointSchemaRepository` / `IEndpointResourceTypeRepository` interfaces, and the `POST/GET/DELETE /admin/endpoints/:id/schemas` & `/resource-types` admin routes referenced here were **deleted** in Phase 13. Schema data now lives in `Endpoint.profile` JSONB. See [SCHEMA_TEMPLATES_DESIGN.md](SCHEMA_TEMPLATES_DESIGN.md).
 >
 > **See**: [`SCHEMA_LIFECYCLE_AND_REGISTRY.md`](SCHEMA_LIFECYCLE_AND_REGISTRY.md) · [`SCHEMA_CUSTOMIZATION_GUIDE.md`](SCHEMA_CUSTOMIZATION_GUIDE.md) · [`SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md`](SCHEMA_EXTENSION_FLOWS_AND_COMBINATIONS.md) · [`RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md`](RFC_SCHEMA_AND_EXTENSIONS_REFERENCE.md)
 
-> **Phase 6 — Data-Driven Discovery**
+> **Phase 6 - Data-Driven Discovery**
 > Last updated: 2026-02-24
 
 ---
@@ -319,7 +319,7 @@ Authorization: Bearer <token>
 Accept: application/scim+json
 ```
 
-**Response (200 OK) — Default (no custom extensions):**
+**Response (200 OK) - Default (no custom extensions):**
 ```json
 {
   "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
@@ -445,7 +445,7 @@ Accept: application/scim+json
 }
 ```
 
-**Response (200 OK) — With custom extension registered:**
+**Response (200 OK) - With custom extension registered:**
 
 After registering a custom extension (e.g., badge schema on the User RT), `totalResults` becomes 4 and the `Resources` array includes the extension:
 
@@ -500,7 +500,7 @@ Authorization: Bearer <token>
 Accept: application/scim+json
 ```
 
-**Response (200 OK) — Default:**
+**Response (200 OK) - Default:**
 ```json
 {
   "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
@@ -541,7 +541,7 @@ Accept: application/scim+json
 }
 ```
 
-**Response (200 OK) — With custom extension on User RT:**
+**Response (200 OK) - With custom extension on User RT:**
 ```json
 {
   "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
@@ -590,7 +590,7 @@ Accept: application/scim+json
 
 ### 4.3 GET /ServiceProviderConfig
 
-Returns the server's capability declaration (static — not affected by schema extensions).
+Returns the server's capability declaration (static - not affected by schema extensions).
 
 **Request:**
 ```http
@@ -635,7 +635,7 @@ Base path: `/scim/admin/endpoints`
 
 All endpoints require OAuth Bearer Token authentication.
 
-### 5.1 POST — Register Schema Extension
+### 5.1 POST - Register Schema Extension
 
 **`POST /scim/admin/endpoints/:endpointId/schemas`**
 
@@ -739,7 +739,7 @@ Content-Type: application/json
 
 ---
 
-### 5.2 GET — List Schemas for Endpoint
+### 5.2 GET - List Schemas for Endpoint
 
 **`GET /scim/admin/endpoints/:endpointId/schemas`**
 
@@ -750,7 +750,7 @@ Host: localhost:3000
 Authorization: Bearer <token>
 ```
 
-**Response (200 OK) — Empty:**
+**Response (200 OK) - Empty:**
 ```json
 {
   "totalResults": 0,
@@ -758,7 +758,7 @@ Authorization: Bearer <token>
 }
 ```
 
-**Response (200 OK) — With registered extensions:**
+**Response (200 OK) - With registered extensions:**
 ```json
 {
   "totalResults": 1,
@@ -781,7 +781,7 @@ Authorization: Bearer <token>
 
 ---
 
-### 5.3 GET — Get Schema by URN
+### 5.3 GET - Get Schema by URN
 
 **`GET /scim/admin/endpoints/:endpointId/schemas/:urn`**
 
@@ -812,7 +812,7 @@ Authorization: Bearer <token>
 
 ---
 
-### 5.4 DELETE — Remove Schema Extension
+### 5.4 DELETE - Remove Schema Extension
 
 **`DELETE /scim/admin/endpoints/:endpointId/schemas/:urn`**
 
@@ -878,7 +878,7 @@ sequenceDiagram
 | Decision | Rationale |
 |----------|-----------|
 | `@Optional()` on repo injection | Allows ScimSchemaRegistry to work without persistence (unit tests, in-memory mode) |
-| Error catch in `onModuleInit()` | Logs error but does not crash app — degraded mode with only built-in schemas |
+| Error catch in `onModuleInit()` | Logs error but does not crash app - degraded mode with only built-in schemas |
 | `findAll()` not `findByEndpointId()` | Single query loads all extensions across all endpoints |
 | re-uses `registerExtension()` | Ensures same code path for API registration and startup hydration |
 
@@ -1015,7 +1015,7 @@ When `getAllResourceTypes(endpointId)` is called:
 |-------|------|-------------|----------|
 | `schemaUrn` | `string` | MinLength: 1, MaxLength: 512 | ✅ |
 | `name` | `string` | MinLength: 1, MaxLength: 255 | ✅ |
-| `description` | `string` | — | ❌ |
+| `description` | `string` | - | ❌ |
 | `resourceTypeId` | `string` | MaxLength: 50. Must be `"User"` or `"Group"` (validated by registry) | ❌ |
 | `required` | `boolean` | Default: `false` | ❌ |
 | `attributes` | `SchemaAttributeDto[]` | Nested validation, recursive | ✅ |
@@ -1024,16 +1024,16 @@ When `getAllResourceTypes(endpointId)` is called:
 
 | Field | Type | Constraints | Required |
 |-------|------|-------------|----------|
-| `name` | `string` | — | ✅ |
-| `type` | `string` | — | ✅ |
-| `multiValued` | `boolean` | — | ✅ |
-| `required` | `boolean` | — | ✅ |
-| `description` | `string` | — | ❌ |
-| `mutability` | `string` | — | ❌ |
-| `returned` | `string` | — | ❌ |
-| `caseExact` | `boolean` | — | ❌ |
-| `uniqueness` | `string` | — | ❌ |
-| `referenceTypes` | `string[]` | — | ❌ |
+| `name` | `string` | - | ✅ |
+| `type` | `string` | - | ✅ |
+| `multiValued` | `boolean` | - | ✅ |
+| `required` | `boolean` | - | ✅ |
+| `description` | `string` | - | ❌ |
+| `mutability` | `string` | - | ❌ |
+| `returned` | `string` | - | ❌ |
+| `caseExact` | `boolean` | - | ❌ |
+| `uniqueness` | `string` | - | ❌ |
+| `referenceTypes` | `string[]` | - | ❌ |
 | `subAttributes` | `SchemaAttributeDto[]` | Recursive nested validation | ❌ |
 
 ### Example: Complex Attribute with SubAttributes
@@ -1145,7 +1145,7 @@ GET /scim/endpoints/e1e2e3e4-.../Schemas HTTP/1.1
 Authorization: Bearer <token>
 ```
 
-Response: `totalResults: 8` — includes the custom extension
+Response: `totalResults: 8` - includes the custom extension
 
 #### Step 5: Verify ResourceTypes Shows Merged Extensions
 
@@ -1174,7 +1174,7 @@ GET /scim/endpoints/e1e2e3e4-.../Schemas HTTP/1.1
 Authorization: Bearer <token>
 ```
 
-Response: `totalResults: 7` — custom extension removed
+Response: `totalResults: 7` - custom extension removed
 
 ---
 
@@ -1376,7 +1376,7 @@ export const ENDPOINT_SCHEMA_REPOSITORY = 'ENDPOINT_SCHEMA_REPOSITORY';
 | File | Tests | What's Tested |
 |------|-------|---------------|
 | `scim-schema-registry.spec.ts` | 56 | Global/per-endpoint registration, merge logic, unregister, core schema protection, `onModuleInit` hydration (8 tests), edge cases |
-| `scim-discovery.service.spec.ts` | — | Delegated query building, `buildResourceSchemas()` |
+| `scim-discovery.service.spec.ts` | - | Delegated query building, `buildResourceSchemas()` |
 | `prisma-endpoint-schema.repository.spec.ts` | 22 | All 6 repository methods with mocked PrismaService, record mapping |
 | `inmemory-endpoint-schema.repository.spec.ts` | 15 | All 6 methods with in-memory storage, uniqueness enforcement |
 | `admin-schema.controller.spec.ts` | 12 | Controller unit tests with mocked dependencies |
@@ -1388,9 +1388,9 @@ export const ENDPOINT_SCHEMA_REPOSITORY = 'ENDPOINT_SCHEMA_REPOSITORY';
 | File | Tests | What's Tested |
 |------|-------|---------------|
 | `admin-schema.e2e-spec.ts` | 19 | Full HTTP lifecycle: auth (3), POST (5), GET list (4), GET by URN (2), DELETE (2), Discovery integration (3) |
-| `discovery-endpoints.e2e-spec.ts` | 9 | ServiceProviderConfig (3), Schemas (2), ResourceTypes (4) — verifies built-in schemas |
+| `discovery-endpoints.e2e-spec.ts` | 9 | ServiceProviderConfig (3), Schemas (2), ResourceTypes (4) - verifies built-in schemas |
 
-### Total: 52 unit suites / 1301 tests, 16 E2E suites / 215 tests — All passing ✅
+### Total: 52 unit suites / 1301 tests, 16 E2E suites / 215 tests - All passing ✅
 
 ---
 

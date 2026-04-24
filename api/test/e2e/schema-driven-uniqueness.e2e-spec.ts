@@ -1,5 +1,5 @@
 /**
- * E2E Tests — Schema-Driven Uniqueness Enforcement (RFC 7643 §2.1)
+ * E2E Tests - Schema-Driven Uniqueness Enforcement (RFC 7643 §2.1)
  *
  * Tests that custom extension attributes with `uniqueness: "server"` are
  * enforced on POST, PUT, and PATCH when the attribute is declared in the
@@ -126,10 +126,10 @@ describe('Schema-Driven Uniqueness Enforcement (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // A. POST — Schema-driven uniqueness on create
+  // A. POST - Schema-driven uniqueness on create
   // ═══════════════════════════════════════════════════════════════════
 
-  describe('POST — uniqueness on create', () => {
+  describe('POST - uniqueness on create', () => {
     let user1Id: string;
 
     afterAll(async () => {
@@ -178,7 +178,7 @@ describe('Schema-Driven Uniqueness Enforcement (E2E)', () => {
         displayName: 'Uniqueness User 3',
         active: true,
         [EXT_URN]: {
-          employeeBadge: 'badge-001', // different case — should be allowed
+          employeeBadge: 'badge-001', // different case - should be allowed
           department: 'HR',
         },
       }).expect(201);
@@ -196,7 +196,7 @@ describe('Schema-Driven Uniqueness Enforcement (E2E)', () => {
         active: true,
         [EXT_URN]: {
           employeeBadge: 'BADGE-999',
-          badgeAlias: 'ALPHA', // same as user1's "alpha" — case-insensitive
+          badgeAlias: 'ALPHA', // same as user1's "alpha" - case-insensitive
         },
       });
       expect(res.status).toBe(409);
@@ -212,7 +212,7 @@ describe('Schema-Driven Uniqueness Enforcement (E2E)', () => {
         active: true,
         [EXT_URN]: {
           employeeBadge: 'BADGE-005',
-          department: 'Engineering', // same as user1 — should be allowed
+          department: 'Engineering', // same as user1 - should be allowed
         },
       }).expect(201);
 
@@ -222,10 +222,10 @@ describe('Schema-Driven Uniqueness Enforcement (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // B. PUT — Schema-driven uniqueness on replace
+  // B. PUT - Schema-driven uniqueness on replace
   // ═══════════════════════════════════════════════════════════════════
 
-  describe('PUT — uniqueness on replace', () => {
+  describe('PUT - uniqueness on replace', () => {
     let userAId: string;
     let userBId: string;
     let userBName: string;
@@ -282,10 +282,10 @@ describe('Schema-Driven Uniqueness Enforcement (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════
-  // C. PATCH — Schema-driven uniqueness on modify
+  // C. PATCH - Schema-driven uniqueness on modify
   // ═══════════════════════════════════════════════════════════════════
 
-  describe('PATCH — uniqueness on modify', () => {
+  describe('PATCH - uniqueness on modify', () => {
     let userXId: string;
     let userYId: string;
 
@@ -367,7 +367,7 @@ describe('Schema-Driven Uniqueness Enforcement (E2E)', () => {
 
     it('should not trigger schema-driven uniqueness for rfc-standard preset (no custom unique attrs)', async () => {
       const t = ts();
-      // Create two users — only userName uniqueness should apply, not extension attrs
+      // Create two users - only userName uniqueness should apply, not extension attrs
       await scimPost(app, `${scimBasePath(stdEpId)}/Users`, token, {
         schemas: [CORE_SCHEMA],
         userName: `std-u1-${t}@example.com`,
@@ -381,7 +381,7 @@ describe('Schema-Driven Uniqueness Enforcement (E2E)', () => {
         displayName: 'Standard User 2',
         active: true,
       }).expect(201);
-      // Both succeed — no uniqueness conflict on non-unique attrs
+      // Both succeed - no uniqueness conflict on non-unique attrs
     });
   });
 });

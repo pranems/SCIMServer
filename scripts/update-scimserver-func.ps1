@@ -274,7 +274,7 @@ Some other warning line
     if (-not $Quiet) { Write-Host $updateCommand -ForegroundColor Yellow }
 
     if ($persistenceMode -eq 'inmemory') {
-        Write-Log "NOTE: In-memory mode — data will be lost on container restart" 'WARN' Yellow
+        Write-Log "NOTE: In-memory mode - data will be lost on container restart" 'WARN' Yellow
     }
 
     if ($DryRun -or $SelfTest) { Write-Log "DryRun/SelfTest: exiting before execution" 'INFO' Cyan; return }

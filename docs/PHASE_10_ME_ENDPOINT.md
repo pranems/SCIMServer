@@ -1,4 +1,4 @@
-# Phase 10 — /Me Endpoint (RFC 7644 §3.11)
+# Phase 10 - /Me Endpoint (RFC 7644 §3.11)
 
 > **Version**: v0.20.0 | **Gap**: G10 | **Status**: ✅ Complete
 
@@ -38,9 +38,9 @@ sequenceDiagram
 
 | Scenario | HTTP Status | SCIM Error |
 |----------|-------------|------------|
-| Legacy auth (no JWT) | 404 | `noTarget` — /Me requires OAuth with JWT sub claim |
-| JWT missing `sub` claim | 404 | `noTarget` — JWT has no sub claim |
-| No User with matching userName | 404 | `noTarget` — No User resource found |
+| Legacy auth (no JWT) | 404 | `noTarget` - /Me requires OAuth with JWT sub claim |
+| JWT missing `sub` claim | 404 | `noTarget` - JWT has no sub claim |
+| No User with matching userName | 404 | `noTarget` - No User resource found |
 
 ## Implementation
 
@@ -48,7 +48,7 @@ sequenceDiagram
 
 | File | Purpose |
 |------|---------|
-| `api/src/modules/scim/controllers/scim-me.controller.ts` | Controller — identity resolution + CRUD delegation |
+| `api/src/modules/scim/controllers/scim-me.controller.ts` | Controller - identity resolution + CRUD delegation |
 | `api/src/modules/scim/controllers/scim-me.controller.spec.ts` | 11 unit tests |
 | `api/test/e2e/me-endpoint.e2e-spec.ts` | 10 E2E tests |
 | `scripts/live-test.ps1` (section 9r) | 15 live integration tests |
@@ -66,7 +66,7 @@ All operations support `?attributes=` and `?excludedAttributes=` query parameter
 
 ### Identity Resolution Strategy
 
-1. Check `request.authType === 'oauth'` — reject legacy auth with 404
+1. Check `request.authType === 'oauth'` - reject legacy auth with 404
 2. Extract `sub` claim from `request.oauth`
 3. Query `listUsersForEndpoint({ filter: 'userName eq "${sub}"', count: 1 })`
 4. Return `Resources[0].id` or throw 404
@@ -82,8 +82,8 @@ All operations support `?attributes=` and `?excludedAttributes=` query parameter
 
 ## RFC References
 
-- **RFC 7644 §3.11** — "/Me" Authenticated Subject Alias
-- **RFC 7644 §3.2** — Creating Resources (POST)
-- **RFC 7644 §3.5.1** — Replacing with PUT
-- **RFC 7644 §3.5.2** — Modifying with PATCH
-- **RFC 7644 §3.6** — Deleting Resources
+- **RFC 7644 §3.11** - "/Me" Authenticated Subject Alias
+- **RFC 7644 §3.2** - Creating Resources (POST)
+- **RFC 7644 §3.5.1** - Replacing with PUT
+- **RFC 7644 §3.5.2** - Modifying with PATCH
+- **RFC 7644 §3.6** - Deleting Resources

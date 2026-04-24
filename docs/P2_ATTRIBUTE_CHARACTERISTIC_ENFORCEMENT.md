@@ -1,26 +1,26 @@
-# P2 — Attribute Characteristic Enforcement (RFC 7643 §2)
+# P2 - Attribute Characteristic Enforcement (RFC 7643 §2)
 
 ## Overview
 
-**Feature**: RFC 7643 §2 attribute characteristics — 6 behavioral gap fixes  
+**Feature**: RFC 7643 §2 attribute characteristics - 6 behavioral gap fixes  
 **Version**: current  
 **Status**: ✅ Complete  
-**RFC Reference**: [RFC 7643 §2 — Attribute Characteristics](https://datatracker.ietf.org/doc/html/rfc7643#section-2)  
+**RFC Reference**: [RFC 7643 §2 - Attribute Characteristics](https://datatracker.ietf.org/doc/html/rfc7643#section-2)  
 **Predecessor**: G8e (v0.17.4), ReadOnly Stripping (v0.22.0), P1 Schema/Discovery (v0.23.0)
 
 ### Problem Statement
 
-After the RFC 7643 §2 full audit ([RFC7643_ATTRIBUTE_CHARACTERISTICS_FULL_AUDIT.md](RFC7643_ATTRIBUTE_CHARACTERISTICS_FULL_AUDIT.md)), 6 behavioral gaps remained in the "P2 — Behavioral" priority tier. These gaps meant:
+After the RFC 7643 §2 full audit ([RFC7643_ATTRIBUTE_CHARACTERISTICS_FULL_AUDIT.md](RFC7643_ATTRIBUTE_CHARACTERISTICS_FULL_AUDIT.md)), 6 behavioral gaps remained in the "P2 - Behavioral" priority tier. These gaps meant:
 
-1. **`returned:"always"` partially hardcoded** — Only `schemas`, `id`, `meta` were guaranteed always-returned. `userName` (User) and `displayName` / `active` (Group) could be excluded via `?excludedAttributes=`, violating RFC 7643 §7.
-2. **Sub-attribute `returned:"always"` not enforced** — `emails[].value`, `members[].value` could be stripped by `?attributes=emails.type`, violating §2.4.
-3. **`writeOnly` → `returned:"never"` not enforced** — The `password` attribute had `mutability:"writeOnly"` but was not systematically stripped as `returned:"never"` in responses.
-4. **ReadOnly sub-attributes not stripped on mutation** — `name.formatted` (readOnly) and `manager.displayName` (readOnly) were accepted in POST/PUT payloads instead of being silently stripped.
-5. **`caseExact` filtering was column-type-based, not schema-driven** — In-memory filter evaluation did not consult schema `caseExact` definitions; it relied solely on Prisma column types.
+1. **`returned:"always"` partially hardcoded** - Only `schemas`, `id`, `meta` were guaranteed always-returned. `userName` (User) and `displayName` / `active` (Group) could be excluded via `?excludedAttributes=`, violating RFC 7643 §7.
+2. **Sub-attribute `returned:"always"` not enforced** - `emails[].value`, `members[].value` could be stripped by `?attributes=emails.type`, violating §2.4.
+3. **`writeOnly` → `returned:"never"` not enforced** - The `password` attribute had `mutability:"writeOnly"` but was not systematically stripped as `returned:"never"` in responses.
+4. **ReadOnly sub-attributes not stripped on mutation** - `name.formatted` (readOnly) and `manager.displayName` (readOnly) were accepted in POST/PUT payloads instead of being silently stripped.
+5. **`caseExact` filtering was column-type-based, not schema-driven** - In-memory filter evaluation did not consult schema `caseExact` definitions; it relied solely on Prisma column types.
 
 ### Solution
 
-Six targeted code changes that make all characteristic enforcement **schema-driven** — reading attribute metadata from `SchemaAttributeDefinition` rather than hardcoded lists:
+Six targeted code changes that make all characteristic enforcement **schema-driven** - reading attribute metadata from `SchemaAttributeDefinition` rather than hardcoded lists:
 
 | ID | Gap | Fix |
 |---|---|---|
@@ -77,7 +77,7 @@ Six targeted code changes that make all characteristic enforcement **schema-driv
 │    → Set<string> of caseExact=true attribute names              │
 │                                                                 │
 │  All data read from SchemaAttributeDefinition.returned,         │
-│  .mutability, .caseExact — no hardcoded lists                   │
+│  .mutability, .caseExact - no hardcoded lists                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -88,9 +88,9 @@ Six targeted code changes that make all characteristic enforcement **schema-driv
 | `getAlwaysReturnedForResource()` | `scim-attribute-projection.ts` | Merges `ALWAYS_RETURNED_BASE` + `schemaAlwaysReturned` param + Group `active`/`displayName` detection |
 | `applyAttributeProjection()` | `scim-attribute-projection.ts` | Enhanced with `schemaAlwaysReturned` and `alwaysSubs` params for R-RET-1/2/3 |
 | `stripReturnedNever()` | `scim-attribute-projection.ts` | Strips `returned:"never"` + `writeOnly` attrs from ALL responses (R-MUT-1) |
-| `collectReturnedCharacteristics()` | `schema-validator.ts` | Returns `{ never, request, always, alwaysSubs }` — R-MUT-1 adds writeOnly to `never` |
-| `collectReadOnlyAttributes()` | `schema-validator.ts` | Returns `{ core, extensions, coreSubAttrs, extensionSubAttrs }` — R-MUT-2 sub-attr maps |
-| `collectCaseExactAttributes()` | `schema-validator.ts` | Returns `Set<string>` of attrs where `caseExact=true` — R-CASE-1 |
+| `collectReturnedCharacteristics()` | `schema-validator.ts` | Returns `{ never, request, always, alwaysSubs }` - R-MUT-1 adds writeOnly to `never` |
+| `collectReadOnlyAttributes()` | `schema-validator.ts` | Returns `{ core, extensions, coreSubAttrs, extensionSubAttrs }` - R-MUT-2 sub-attr maps |
+| `collectCaseExactAttributes()` | `schema-validator.ts` | Returns `Set<string>` of attrs where `caseExact=true` - R-CASE-1 |
 | `stripReadOnlyAttributes()` | `scim-service-helpers.ts` | Walks `coreSubAttrs` for R-MUT-2 sub-attr stripping (e.g., `name.formatted`, `manager.displayName`) |
 | `stripReadOnlyPatchOps()` | `scim-service-helpers.ts` | Filters PATCH ops targeting readOnly sub-attrs (R-MUT-2 for PATCH) |
 | `buildUserFilter()` / `buildGroupFilter()` | `apply-scim-filter.ts` | Accept `caseExactAttrs` param, pass to `evaluateFilter()` for R-CASE-1 |
@@ -100,7 +100,7 @@ Six targeted code changes that make all characteristic enforcement **schema-driv
 
 ### R-RET-1: Schema-Driven Always-Returned
 
-**Before**: Hardcoded `ALWAYS_RETURNED = new Set(['schemas', 'id', 'meta'])` — `userName` excluded by `?excludedAttributes=userName`.
+**Before**: Hardcoded `ALWAYS_RETURNED = new Set(['schemas', 'id', 'meta'])` - `userName` excluded by `?excludedAttributes=userName`.
 
 **After**: `ALWAYS_RETURNED_BASE` includes `userName`. `getAlwaysReturnedForResource()` merges in any schema-provided `schemaAlwaysReturned` set, ensuring all `returned:"always"` attributes survive exclusion.
 
@@ -248,11 +248,11 @@ E2E coverage via existing attribute-projection, filter, and write-operation test
 | `api/src/domain/validation/schema-validator.ts` | ~1,200 | `collectReturnedCharacteristics()` R-MUT-1 writeOnly + R-RET-3 alwaysSubs, `collectCaseExactAttributes()` R-CASE-1, `collectReadOnlyAttributes()` R-MUT-2 sub-attr maps |
 | `api/src/modules/scim/filters/apply-scim-filter.ts` | 299 | `buildUserFilter()` / `buildGroupFilter()` accept `caseExactAttrs`, pass to `evaluateFilter()` |
 | `api/src/modules/scim/filters/scim-filter-parser.ts` | ~600 | `evaluateFilter()` `caseExactAttrs` parameter for R-CASE-1 |
-| `api/src/modules/scim/discovery/scim-schemas.constants.ts` | 561 | Schema attribute definitions — `returned`, `mutability`, `caseExact` values verified/corrected |
-| `api/src/modules/scim/services/endpoint-scim-users.service.ts` | — | Plumbed `schemaAlwaysReturned`, `alwaysSubs`, `caseExactAttrs` through service calls |
-| `api/src/modules/scim/services/endpoint-scim-groups.service.ts` | — | Same — Group service plumbing |
-| `api/src/modules/scim/controllers/endpoint-scim-users.controller.ts` | — | Passes collected characteristics to projection calls |
-| `api/src/modules/scim/controllers/endpoint-scim-groups.controller.ts` | — | Same — Group controller plumbing |
+| `api/src/modules/scim/discovery/scim-schemas.constants.ts` | 561 | Schema attribute definitions - `returned`, `mutability`, `caseExact` values verified/corrected |
+| `api/src/modules/scim/services/endpoint-scim-users.service.ts` | - | Plumbed `schemaAlwaysReturned`, `alwaysSubs`, `caseExactAttrs` through service calls |
+| `api/src/modules/scim/services/endpoint-scim-groups.service.ts` | - | Same - Group service plumbing |
+| `api/src/modules/scim/controllers/endpoint-scim-users.controller.ts` | - | Passes collected characteristics to projection calls |
+| `api/src/modules/scim/controllers/endpoint-scim-groups.controller.ts` | - | Same - Group controller plumbing |
 | `scripts/live-test.ps1` | +170 | Section 9v: 13 live integration tests for all 6 P2 items |
 
 ## RFC Compliance Impact

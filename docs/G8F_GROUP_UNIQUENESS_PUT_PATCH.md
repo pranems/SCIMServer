@@ -1,10 +1,10 @@
-# G8f — Group Uniqueness Enforcement on PUT/PATCH
+# G8f - Group Uniqueness Enforcement on PUT/PATCH
 
-> **Document Purpose**: Feature reference for the G8f gap closure — `displayName` uniqueness enforcement on Group PUT and PATCH operations.
+> **Document Purpose**: Feature reference for the G8f gap closure - `displayName` uniqueness enforcement on Group PUT and PATCH operations.
 >
 > **Created**: February 26, 2026  
-> **Updated**: April 10, 2026 (v0.35.0 — P4 unconditional immutable enforcement)  
-> **Version**: v0.35.0  
+> **Updated**: April 23, 2026 (v0.38.0)  
+> **Version**: v0.38.0  
 > **RFC Reference**: RFC 7644 §3.5.1 (Replacing with PUT), RFC 7644 §3.5.2 (Modifying with PATCH), RFC 7643 §2.4 (uniqueness)
 
 ---
@@ -13,7 +13,7 @@
 
 **Gap G8f** identified a data integrity bug: `assertUniqueDisplayName()` existed in `EndpointScimGroupsService` but was only called during POST (create) operations. PUT (replace) and PATCH (modify) operations bypassed displayName uniqueness validation entirely.
 
-### v0.33.0 Update — externalId Uniqueness Removed
+### v0.33.0 Update - externalId Uniqueness Removed
 
 As of v0.33.0, `externalId` uniqueness enforcement has been **completely removed** for both Users and Groups. This aligns with RFC 7643 §2.4 which declares `externalId` as `uniqueness: "none"`. The `assertUniqueExternalId()` method has been deleted from the Group service. Only `displayName` uniqueness (`uniqueness: "server"`) is enforced.
 
@@ -22,7 +22,7 @@ As of v0.33.0, `externalId` uniqueness enforcement has been **completely removed
 | Attribute | `uniqueness` | Enforced? | Method |
 |-----------|-------------|-----------|--------|
 | Group `displayName` | `"server"` | ✅ Yes (POST/PUT/PATCH) | `assertUniqueDisplayName()` |
-| Group `externalId` | `"none"` | ❌ No — saved as received | *(removed in v0.33.0)* |
+| Group `externalId` | `"none"` | ❌ No - saved as received | *(removed in v0.33.0)* |
 
 ---
 
@@ -76,7 +76,7 @@ PUT /Groups/abc { displayName: "Engineering" }
 ### PATCH Path (lines ~335-343)
 
 ```typescript
-// G8f: Uniqueness enforcement on PATCH — displayName and externalId must remain unique
+// G8f: Uniqueness enforcement on PATCH - displayName and externalId must remain unique
 await this.assertUniqueDisplayName(displayName, endpointId, scimId);
 if (externalId) {
   await this.assertUniqueExternalId(externalId, endpointId, scimId);
@@ -88,7 +88,7 @@ Positioned after `checkImmutableAttributes()` and post-PATCH `validatePayloadSch
 ### PUT Path (lines ~410-418)
 
 ```typescript
-// G8f: Uniqueness enforcement on PUT — displayName and externalId must remain unique
+// G8f: Uniqueness enforcement on PUT - displayName and externalId must remain unique
 await this.assertUniqueDisplayName(dto.displayName, endpointId, scimId);
 const newExternalId = typeof (dto as Record<string, unknown>).externalId === 'string'
   ? (dto as Record<string, unknown>).externalId as string
@@ -180,7 +180,7 @@ Both methods return a standard SCIM error:
 
 ## Related Documentation
 
-- [RFC Attribute Characteristics Analysis](RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md) — Gap G8f definition
-- [MIGRATION_PLAN_CURRENT_TO_IDEAL_v3](MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md) — Phase 8 gap table
-- [COLLISION-TESTING-GUIDE](COLLISION-TESTING-GUIDE.md) — Entra collision (409) testing patterns
-- [ISSUES_BUGS_ROOT_CAUSE_ANALYSIS](ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md) — Prior collision-related issues
+- [RFC Attribute Characteristics Analysis](RFC_ATTRIBUTE_CHARACTERISTICS_ANALYSIS.md) - Gap G8f definition
+- [MIGRATION_PLAN_CURRENT_TO_IDEAL_v3](MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md) - Phase 8 gap table
+- [COLLISION-TESTING-GUIDE](COLLISION-TESTING-GUIDE.md) - Entra collision (409) testing patterns
+- [ISSUES_BUGS_ROOT_CAUSE_ANALYSIS](ISSUES_BUGS_ROOT_CAUSE_ANALYSIS.md) - Prior collision-related issues

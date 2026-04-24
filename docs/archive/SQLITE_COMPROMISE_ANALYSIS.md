@@ -19,7 +19,7 @@
    - [3.5 Feature Limitations](#35-feature-limitations)
    - [3.6 Storage & Backup](#36-storage--backup)
 4. [Impact Flow Diagrams](#4-impact-flow-diagrams)
-5. [Request Examples — What Changes with PostgreSQL](#5-request-examples--what-changes-with-postgresql)
+5. [Request Examples - What Changes with PostgreSQL](#5-request-examples--what-changes-with-postgresql)
 6. [Summary Matrix](#6-summary-matrix)
 7. [Migration Recommendations](#7-migration-recommendations)
 8. [Migration Effort Estimate](#8-migration-effort-estimate)
@@ -110,7 +110,7 @@ The recommended migration target is **Azure Database for PostgreSQL – Flexible
 
 ### 3.1 Schema & Data Model
 
-#### 3.1.1 `userNameLower` Derived Column — Case-Insensitive Uniqueness Workaround
+#### 3.1.1 `userNameLower` Derived Column - Case-Insensitive Uniqueness Workaround
 
 **Severity**: HIGH  
 **Files**: `api/prisma/schema.prisma`, `api/src/modules/scim/filters/apply-scim-filter.ts`
@@ -134,7 +134,7 @@ data: {
 }
 ```
 
-**PostgreSQL solution** — use `CITEXT` extension and remove the derived column:
+**PostgreSQL solution** - use `CITEXT` extension and remove the derived column:
 ```prisma
 model ScimUser {
   userName String @db.Citext  // Native case-insensitive type
@@ -146,7 +146,7 @@ model ScimUser {
 
 ---
 
-#### 3.1.2 `displayNameLower` Derived Column — Same Pattern for Groups
+#### 3.1.2 `displayNameLower` Derived Column - Same Pattern for Groups
 
 **Severity**: HIGH  
 **Files**: `api/prisma/schema.prisma`, `api/src/modules/scim/filters/apply-scim-filter.ts`
@@ -165,7 +165,7 @@ model ScimGroup {
 
 ---
 
-#### 3.1.3 `rawPayload` as TEXT — No Native JSON Column
+#### 3.1.3 `rawPayload` as TEXT - No Native JSON Column
 
 **Severity**: MEDIUM  
 **Files**: `api/prisma/schema.prisma` (ScimUser.rawPayload, ScimGroup.rawPayload, Endpoint.config)
@@ -178,7 +178,7 @@ config        String?  // Endpoint config serialized as JSON string
 
 **What this means**: No database-level JSON validation, no JSON path queries, no JSON indexes. All complex SCIM filter operations must deserialize every record in application memory.
 
-**Example — current in-memory filter flow**:
+**Example - current in-memory filter flow**:
 
 ```
 SCIM Client Request:
@@ -261,7 +261,7 @@ Switching providers requires either a full migration reset or `prisma migrate re
 
 ### 3.2 Concurrency & Locking
 
-#### 3.2.1 WAL Mode + busy_timeout — Single Writer Lock Mitigation
+#### 3.2.1 WAL Mode + busy_timeout - Single Writer Lock Mitigation
 
 **Severity**: CRITICAL  
 **File**: `api/src/modules/prisma/prisma.service.ts`
@@ -304,7 +304,7 @@ const busyResult = await this.$queryRawUnsafe<...>('PRAGMA busy_timeout = 15000;
 
 ---
 
-#### 3.2.2 Buffered Request Logging — Write Lock Contention Avoidance
+#### 3.2.2 Buffered Request Logging - Write Lock Contention Avoidance
 
 **Severity**: CRITICAL  
 **File**: `api/src/modules/logging/logging.service.ts`
@@ -317,7 +317,7 @@ private static readonly FLUSH_INTERVAL_MS = 3_000;  // flush every 3 seconds
 private static readonly MAX_BUFFER_SIZE = 50;        // or when 50 entries accumulate
 ```
 
-**Timeline — what happens on crash**:
+**Timeline - what happens on crash**:
 
 ```
 t=0.0s  Request 1 → logged to buffer (not in DB)
@@ -329,7 +329,7 @@ t=2.5s  ★ CONTAINER CRASH ★
 t=3.0s  (would have been flush time)
 ```
 
-**PostgreSQL eliminates this**: Each log entry can be an independent `INSERT` without blocking SCIM transactions — no buffering needed, no data loss window.
+**PostgreSQL eliminates this**: Each log entry can be an independent `INSERT` without blocking SCIM transactions - no buffering needed, no data loss window.
 
 ---
 
@@ -355,7 +355,7 @@ await this.prisma.$transaction(async (tx) => {
 }, { maxWait: 10000, timeout: 30000 });
 ```
 
-**Why this pattern exists**: Every millisecond inside `$transaction` holds the SQLite global write lock. Moving SELECTs outside reduces lock hold time. With PostgreSQL's row-level locking, this optimization is unnecessary — the SELECTs inside a transaction don't block other writers.
+**Why this pattern exists**: Every millisecond inside `$transaction` holds the SQLite global write lock. Moving SELECTs outside reduces lock hold time. With PostgreSQL's row-level locking, this optimization is unnecessary - the SELECTs inside a transaction don't block other writers.
 
 ---
 
@@ -378,7 +378,7 @@ These timeouts exist because a concurrent Group PATCH may be waiting for the sin
 **File**: `api/test/e2e/jest-e2e.config.ts`
 
 ```typescript
-// Run sequentially — E2E tests share a single SQLite DB file
+// Run sequentially - E2E tests share a single SQLite DB file
 maxWorkers: 1,
 ```
 
@@ -388,7 +388,7 @@ With PostgreSQL, tests can run in parallel using isolated schemas (`CREATE SCHEM
 
 ### 3.3 Infrastructure & Deployment
 
-#### 3.3.1 Single Replica Constraint — No Horizontal Scaling
+#### 3.3.1 Single Replica Constraint - No Horizontal Scaling
 
 **Severity**: CRITICAL  
 **File**: `infra/containerapp.bicep`
@@ -417,11 +417,11 @@ POST /Users (→ Replica A)          GET /Users/123 (→ Replica B)
 
 **Impact**: Zero horizontal scalability. Zero high availability. Single point of failure.
 
-**PostgreSQL eliminates this entirely** — all replicas connect to the same shared database.
+**PostgreSQL eliminates this entirely** - all replicas connect to the same shared database.
 
 ---
 
-#### 3.3.2 Ephemeral Storage — Data Loss on Container Restart
+#### 3.3.2 Ephemeral Storage - Data Loss on Container Restart
 
 **Severity**: CRITICAL  
 **File**: `infra/containerapp.bicep`, `api/docker-entrypoint.sh`
@@ -430,7 +430,7 @@ POST /Users (→ Replica A)          GET /Users/123 (→ Replica B)
 { name: 'DATABASE_URL', value: 'file:/tmp/local-data/scim.db' }
 ```
 
-The database lives at `/tmp/local-data/scim.db` — ephemeral container storage. When the container restarts (deployment, scaling event, crash, Azure infrastructure maintenance), the file system is wiped.
+The database lives at `/tmp/local-data/scim.db` - ephemeral container storage. When the container restarts (deployment, scaling event, crash, Azure infrastructure maintenance), the file system is wiped.
 
 **Data loss timeline**:
 
@@ -448,7 +448,7 @@ t=5m  App restarts, restores from t=0m backup
 
 ---
 
-#### 3.3.3 Azure Files Not Usable — Hybrid Storage Architecture
+#### 3.3.3 Azure Files Not Usable - Hybrid Storage Architecture
 
 **Severity**: HIGH  
 **Files**: `docs/STORAGE_AND_BACKUP.md`, `api/src/modules/backup/backup.service.ts`
@@ -458,10 +458,10 @@ SQLite cannot run directly on network-mounted storage (Azure Files / SMB) becaus
 | Issue | Detail |
 |-------|--------|
 | **I/O Latency** | Network round-trip adds 1-5ms per I/O op → 100-1000× slower than local SSD |
-| **Lock Files** | SQLite uses `.db-journal`, `.db-shm`, `.db-wal` in same directory — lock semantics break on SMB |
+| **Lock Files** | SQLite uses `.db-journal`, `.db-shm`, `.db-wal` in same directory - lock semantics break on SMB |
 | **Corruption** | Concurrent access from multiple SMB sessions can corrupt the database |
 
-This forced the **hybrid storage architecture** — the most complex piece of the infrastructure:
+This forced the **hybrid storage architecture** - the most complex piece of the infrastructure:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -487,7 +487,7 @@ This forced the **hybrid storage architecture** — the most complex piece of th
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**PostgreSQL eliminates all of this**. `DATABASE_URL=postgresql://...` — done.
+**PostgreSQL eliminates all of this**. `DATABASE_URL=postgresql://...` - done.
 
 ---
 
@@ -534,7 +534,7 @@ for (const file of [testDbPath, `${testDbPath}-journal`, `${testDbPath}-wal`]) {
   try {
     if (fs.existsSync(file)) fs.unlinkSync(file);
   } catch {
-    // File still locked by Prisma — global-setup will recreate it
+    // File still locked by Prisma - global-setup will recreate it
   }
 }
 ```
@@ -612,13 +612,13 @@ All other operators fall back to `fetchAll: true` → full table scan + in-memor
 
 ### 3.5 Feature Limitations
 
-#### 3.5.1 No CITEXT / ILIKE — Application-Level Case Insensitivity
+#### 3.5.1 No CITEXT / ILIKE - Application-Level Case Insensitivity
 
 **Severity**: HIGH
 
 Every string comparison that should be case-insensitive (per RFC 7643 §2.1, `caseExact: false` is the default for SCIM string attributes) requires explicit `.toLowerCase()` in application code.
 
-**Example — create user flow**:
+**Example - create user flow**:
 
 ```
 SCIM Request:
@@ -660,7 +660,7 @@ await this.$queryRawUnsafe<Array<{ journal_mode: string }>>('PRAGMA journal_mode
 await this.$queryRawUnsafe<Array<{ busy_timeout: number }>>('PRAGMA busy_timeout = 15000;');
 ```
 
-SQLite PRAGMAs are executed via `$queryRawUnsafe` — bypassing Prisma's type safety. PostgreSQL configuration is done via connection parameters or `ALTER SYSTEM`, not in-band SQL.
+SQLite PRAGMAs are executed via `$queryRawUnsafe` - bypassing Prisma's type safety. PostgreSQL configuration is done via connection parameters or `ALTER SYSTEM`, not in-band SQL.
 
 ---
 
@@ -687,7 +687,7 @@ await this.prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(TRUNCATE);');
 await copyFile(this.localDbPath, this.azureFilesBackupPath);
 ```
 
-**PostgreSQL**: Backups are handled by Azure's managed backup service — no application-level backup code needed at all.
+**PostgreSQL**: Backups are handled by Azure's managed backup service - no application-level backup code needed at all.
 
 ---
 
@@ -778,7 +778,7 @@ With PostgreSQL: All 6 operations execute concurrently (~15ms total)
  ├─ t=6m   Client creates 100 more users (300 total)
  ├─ t=10m  ★ Backup #2 → blob (300 users saved)
  ├─ t=11m  Client creates 50 groups + assigns members
- ├─ t=14m  ★ CRASH ★ (50 groups LOST — next backup was at t=15m)
+ ├─ t=14m  ★ CRASH ★ (50 groups LOST - next backup was at t=15m)
  │
  Container B (restarts)
  ├─ t=15m  Start → Restore from blob (300 users, 0 groups)
@@ -791,7 +791,7 @@ With PostgreSQL: All 6 operations execute concurrently (~15ms total)
 
 ---
 
-## 5. Request Examples — What Changes with PostgreSQL
+## 5. Request Examples - What Changes with PostgreSQL
 
 ### 5.1 Complex SCIM Filter Query
 
@@ -803,7 +803,7 @@ Authorization: Bearer eyJhbGciOiJI...
 Accept: application/scim+json
 ```
 
-**Current (SQLite)** — Application executes:
+**Current (SQLite)** - Application executes:
 ```sql
 -- Step 1: Full table scan (cannot push "co" or bracket filter to SQLite)
 SELECT * FROM ScimUser WHERE endpointId = 'ep-001'
@@ -827,7 +827,7 @@ WHERE "endpointId" = 'ep-001'
   AND "rawPayload"->'emails'->0->>'value' ILIKE '%example.com%'
 ```
 
-### 5.2 POST Create User — Header Comparison
+### 5.2 POST Create User - Header Comparison
 
 **Request**:
 ```http
@@ -871,10 +871,10 @@ Location: https://scimserver-app.eastus.azurecontainerapps.io/scim/endpoints/ep-
 | SQL | `INSERT INTO ScimUser (userName, userNameLower, rawPayload, ...) VALUES (?, ?, ?, ...)` | `INSERT INTO "ScimUser" ("userName", "rawPayload", ...) VALUES ($1, $2::jsonb, ...)` |
 | Columns | 2 columns for userName (original + lowercase) | 1 column (`CITEXT`) |
 | JSON storage | `JSON.stringify()` → TEXT | Direct JSONB insertion with validation |
-| Uniqueness check | `UNIQUE(endpointId, userNameLower)` | `UNIQUE(endpointId, userName)` — CITEXT handles casing |
+| Uniqueness check | `UNIQUE(endpointId, userNameLower)` | `UNIQUE(endpointId, userName)` - CITEXT handles casing |
 | Concurrent safety | Global write lock held | Row-level lock only |
 
-### 5.3 Backup Configuration — ENV Variables
+### 5.3 Backup Configuration - ENV Variables
 
 **Current (SQLite)**:
 ```env
@@ -887,7 +887,7 @@ BLOB_BACKUP_INTERVAL_MIN=5
 **PostgreSQL**:
 ```env
 DATABASE_URL=postgresql://scimadmin:***@scimserver-pg.postgres.database.azure.com:5432/scimdb?sslmode=require
-# No backup env vars needed — Azure manages backups automatically
+# No backup env vars needed - Azure manages backups automatically
 ```
 
 ---
@@ -922,7 +922,7 @@ DATABASE_URL=postgresql://scimadmin:***@scimserver-pg.postgres.database.azure.co
 | 3.6.2 | Binary file copy backup | Backup | MEDIUM | ✅ `pg_dump` / PITR | None |
 | 3.6.3 | Storage infra for file-based DB | Backup | LOW | ✅ Not needed | Low (remove Bicep) |
 
-**Totals**: 4 CRITICAL, 8 HIGH, 11 MEDIUM, 5 LOW — **28 compromises total**
+**Totals**: 4 CRITICAL, 8 HIGH, 11 MEDIUM, 5 LOW - **28 compromises total**
 
 ---
 
@@ -933,7 +933,7 @@ DATABASE_URL=postgresql://scimadmin:***@scimserver-pg.postgres.database.azure.co
 | Property | Recommendation |
 |----------|---------------|
 | **Service** | Azure Database for PostgreSQL – Flexible Server |
-| **SKU** | Burstable B1ms (1 vCore, 2 GB RAM) — sufficient for SCIM workloads |
+| **SKU** | Burstable B1ms (1 vCore, 2 GB RAM) - sufficient for SCIM workloads |
 | **Storage** | 32 GB Premium SSD (auto-grow enabled) |
 | **HA** | Zone-redundant (optional, enables 99.99% SLA) |
 | **Backup** | 7-day retention with PITR (configurable up to 35 days) |
@@ -959,8 +959,8 @@ DATABASE_URL=postgresql://scimadmin:***@scimserver-pg.postgres.database.azure.co
 #### Phase 2: Application Code Cleanup (2-3 days)
 
 1. Remove `PRAGMA` statements from `PrismaService.onModuleInit()`
-2. Simplify `LoggingService` — remove buffering, use direct `create()` per request
-3. Remove pre-transaction member resolution pattern (optional — still valid but unnecessary)
+2. Simplify `LoggingService` - remove buffering, use direct `create()` per request
+3. Remove pre-transaction member resolution pattern (optional - still valid but unnecessary)
 4. Reduce transaction timeouts to `{ maxWait: 2000, timeout: 5000 }`
 5. Expand `tryPushToDb()` to support `co`, `sw`, `ew`, `gt`, `lt` operators
 6. Simplify `createMany` identifier backfill using `RETURNING`
@@ -979,7 +979,7 @@ DATABASE_URL=postgresql://scimadmin:***@scimserver-pg.postgres.database.azure.co
 
 #### Phase 4: Test Updates (1 day)
 
-1. Update `jest-e2e.config.ts` — set `maxWorkers: 4` for parallel execution
+1. Update `jest-e2e.config.ts` - set `maxWorkers: 4` for parallel execution
 2. Remove `global-teardown.ts` file cleanup logic
 3. Update `global-setup.ts` to create isolated PostgreSQL test schemas
 4. Remove `-journal` and `-wal` file references
@@ -996,7 +996,7 @@ If PostgreSQL migration is not immediately feasible, these should be implemented
 | 4 | **Add connection pooling via Prisma** `connection_limit` | P2 | 15 min |
 | 5 | **Add DB size monitoring endpoint** | P2 | 1 hour |
 
-**Highest priority**: Fix 3.6.1 (WAL checkpoint before backup) — without this, backups may be inconsistent.
+**Highest priority**: Fix 3.6.1 (WAL checkpoint before backup) - without this, backups may be inconsistent.
 
 ---
 

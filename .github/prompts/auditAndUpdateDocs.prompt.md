@@ -4,11 +4,11 @@ description: Audit all project docs, JSONs, and artifacts for staleness and upda
 argument-hint: Optional scope like a feature name (e.g. "G8g"), doc file path, or "all" for full audit.
 ---
 
-Perform a comprehensive documentation freshness audit across the entire project. For every doc, JSON artifact, and explanatory resource, verify it reflects the **current** codebase state and update anything stale. This is a **generic, project-wide** prompt — not scoped to a single feature.
+Perform a comprehensive documentation freshness audit across the entire project. For every doc, JSON artifact, and explanatory resource, verify it reflects the **current** codebase state and update anything stale. This is a **generic, project-wide** prompt - not scoped to a single feature.
 
 ---
 
-## Step 1 — Gather Current State (Source-of-Truth Discovery)
+## Step 1 - Gather Current State (Source-of-Truth Discovery)
 
 ### 1A. Read Project Context
 Read `Session_starter.md`, `docs/CONTEXT_INSTRUCTIONS.md`, `docs/INDEX.md`, `docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md`, `CHANGELOG.md`, and `package.json` to capture the current version, feature set, test counts, and flag inventory.
@@ -24,18 +24,18 @@ Read **every** `*.controller.ts` file in `api/src/modules/` to build an authorit
 - Query parameters via `@Query()` decorators
 - Guard and interceptor registrations
 
-**Baseline**: The server has **82 endpoints across 19 controllers** — verify this count after any feature additions.
+**Baseline**: The server has **82 endpoints across 19 controllers** - verify this count after any feature additions.
 
 ### 1C. DTO & Response Shape Verification
 Read all `*.dto.ts` files and key interfaces to verify documented request/response shapes:
-- `api/src/modules/scim/dto/` — CreateUserDto, CreateGroupDto, PatchUserDto, PatchGroupDto, ManualUserDto, ManualGroupDto, SearchRequestDto, BulkRequestDto, ListQueryDto
-- `api/src/modules/endpoint/dto/` — CreateEndpointDto, UpdateEndpointDto
-- `api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts` — EndpointProfile, ProfileSettings, ServiceProviderConfig, ShorthandProfileInput
-- `api/src/modules/scim/common/scim-types.ts` — ScimUserResource, ScimGroupResource, ScimListResponse, ScimMeta
-- `api/src/modules/scim/discovery/scim-schemas.constants.ts` — SCIM_SERVICE_PROVIDER_CONFIG constant
-- `api/src/modules/endpoint/services/endpoint.service.ts` — EndpointResponse, EndpointStatsResponse, PresetListResponse
-- `api/src/modules/activity-parser/activity-parser.service.ts` — ActivitySummary
-- `api/src/modules/logging/log-levels.ts` — LogLevel enum, LogCategory enum (verify category count)
+- `api/src/modules/scim/dto/` - CreateUserDto, CreateGroupDto, PatchUserDto, PatchGroupDto, ManualUserDto, ManualGroupDto, SearchRequestDto, BulkRequestDto, ListQueryDto
+- `api/src/modules/endpoint/dto/` - CreateEndpointDto, UpdateEndpointDto
+- `api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts` - EndpointProfile, ProfileSettings, ServiceProviderConfig, ShorthandProfileInput
+- `api/src/modules/scim/common/scim-types.ts` - ScimUserResource, ScimGroupResource, ScimListResponse, ScimMeta
+- `api/src/modules/scim/discovery/scim-schemas.constants.ts` - SCIM_SERVICE_PROVIDER_CONFIG constant
+- `api/src/modules/endpoint/services/endpoint.service.ts` - EndpointResponse, EndpointStatsResponse, PresetListResponse
+- `api/src/modules/activity-parser/activity-parser.service.ts` - ActivitySummary
+- `api/src/modules/logging/log-levels.ts` - LogLevel enum, LogCategory enum (verify category count)
 
 ### 1D. Scan Tests
 Enumerate `*.spec.ts`, `*.e2e-spec.ts`, and `scripts/live-test.ps1` sections for current test counts and coverage scope. Cross-reference with `api/pipeline-unit.json` and `api/pipeline-e2e.json`.
@@ -47,13 +47,13 @@ Check `docs/openapi/`, `docs/postman/`, `docs/insomnia/`, `docs/examples/`, `doc
 Read `api/prisma/schema.prisma` for current data model, models, fields (especially `profile Json?` vs legacy `config String?`), and relationships.
 
 ### 1G. Read Constants & Enums
-- `api/src/modules/logging/log-levels.ts` — LogCategory enum (currently 14 categories: http, auth, scim.user, scim.group, scim.patch, scim.filter, scim.discovery, endpoint, database, oauth, scim.bulk, scim.resource, config, general)
-- `api/src/modules/scim/dto/bulk-request.dto.ts` — BULK_MAX_OPERATIONS (1000), BULK_MAX_PAYLOAD_SIZE (1048576)
-- Profile presets — currently 6: `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `user-only-with-custom-ext`
+- `api/src/modules/logging/log-levels.ts` - LogCategory enum (currently 14 categories: http, auth, scim.user, scim.group, scim.patch, scim.filter, scim.discovery, endpoint, database, oauth, scim.bulk, scim.resource, config, general)
+- `api/src/modules/scim/dto/bulk-request.dto.ts` - BULK_MAX_OPERATIONS (1000), BULK_MAX_PAYLOAD_SIZE (1048576)
+- Profile presets - currently 6: `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `user-only-with-custom-ext`
 
 ---
 
-## Step 2 — Audit Each Document Category
+## Step 2 - Audit Each Document Category
 
 For every document listed in `docs/INDEX.md`, check:
 
@@ -82,7 +82,7 @@ For every document listed in `docs/INDEX.md`, check:
 | **Request/response examples** | Headers, URLs, bodies, status codes accurate? |
 | **Entra ID recommended config** | Still valid for latest features? |
 | **Endpoint count** | Does "82 endpoints" / "19 controllers" match actual count? |
-| **Filter operator support** | All operators listed as fully supported (`eq`, `ne`, `co`, `sw`, `ew`, `pr`, `gt`, `ge`, `lt`, `le`, `and`, `or`, `not`) — no stale "limited support" notes |
+| **Filter operator support** | All operators listed as fully supported (`eq`, `ne`, `co`, `sw`, `ew`, `pr`, `gt`, `ge`, `lt`, `le`, `and`, `or`, `not`) - no stale "limited support" notes |
 | **Query parameter completeness** | `sortBy`, `sortOrder`, `attributes`, `excludedAttributes` documented on all list/get endpoints |
 | **Bulk/Me/Custom resources** | All three listed in core endpoint tables |
 | **Quick reference cards** | ASCII art reference cards include all routes (presets/:name, by-name/:name, /:id/stats, ?view param) |
@@ -136,7 +136,7 @@ For every document listed in `docs/INDEX.md`, check:
 
 | Check | What to verify |
 |-------|----------------|
-| **Log categories** | Only list categories that exist in `LogCategory` enum (11 categories — no phantom `backup`) |
+| **Log categories** | Only list categories that exist in `LogCategory` enum (11 categories - no phantom `backup`) |
 | **Bulk constants** | `maxOperations: 1000` (not 100), `failOnErrors` field present |
 | **Auth scheme completeness** | `specUri`, `documentationUri`, `primary` fields on authenticationSchemes |
 | **Mutability casing** | RFC 7643 requires lowercase: `readWrite`, `readOnly`, `immutable`, `writeOnly` (not PascalCase) |
@@ -186,7 +186,7 @@ Search across ALL docs for stale data formats that have been superseded:
 | `"config": { "FlagName": "True" }` | `"profile": { "settings": { "FlagName": "True" } }` | `grep -r '"config":' docs/` (exclude archive/, REMOTE_DEBUGGING, ENDPOINT_CONFIG_FLAGS migration notes) |
 | `config String?` (Prisma) | `profile Json?` | Search for `config` in schema blocks |
 | `maxOperations: 100` | `maxOperations: 1000` | Search for `maxOperations` |
-| `"backup"` log category | Remove — only 14 categories exist | Search for `backup` in log category lists |
+| `"backup"` log category | Remove - only 14 categories exist | Search for `backup` in log category lists |
 | `mutability: "ReadWrite"` | `mutability: "readWrite"` (lowercase per RFC 7643) | Search for PascalCase mutability values |
 | Root-level SCIM paths `/Users` | Endpoint-scoped `/endpoints/{eid}/Users` | Ensure all operational examples use multi-tenant paths |
 | `"8 endpoints"` (LogConfigController) | `"10 endpoints"` | Search for endpoint count near log-config |
@@ -194,7 +194,7 @@ Search across ALL docs for stale data formats that have been superseded:
 
 ---
 
-## Step 3 — Documentation Norms (Mandatory for All Updates)
+## Step 3 - Documentation Norms (Mandatory for All Updates)
 
 Every updated or new doc section **MUST** include the following where applicable:
 
@@ -244,11 +244,11 @@ Every updated or new doc section **MUST** include the following where applicable
 
 ---
 
-## Step 4 — Apply Updates
+## Step 4 - Apply Updates
 
 For each stale item found:
 
-1. **Update in-place**: Edit the existing document — do NOT create new files unless a genuinely new topic needs its own doc.
+1. **Update in-place**: Edit the existing document - do NOT create new files unless a genuinely new topic needs its own doc.
 2. **Preserve structure**: Keep the existing document layout; add/update sections as needed.
 3. **Update `docs/INDEX.md`**: If any new docs were created or descriptions changed, update the index.
 4. **Update version/date headers**: Bump `Last Updated` and `Version` fields in doc headers.
@@ -257,18 +257,18 @@ For each stale item found:
 
 ---
 
-## Step 5 — Verify Cross-Consistency
+## Step 5 - Verify Cross-Consistency
 
 After all updates, perform a final cross-check:
 
 1. **Version consistency**: `package.json` version matches all doc headers, `CHANGELOG.md`, `Session_starter.md`, `CONTEXT_INSTRUCTIONS.md`, and `PROJECT_HEALTH_AND_STATS.md`.
 2. **Test count consistency**: Unit, E2E, and live counts match across all documents that reference them.
-3. **Flag count consistency**: All docs that reference flag counts or list flag names are in sync with `ProfileSettings` interface (13 boolean flags + logLevel; settings v7).
+3. **Flag count consistency**: All docs that reference flag counts or list flag names are in sync with `ProfileSettings` interface (13 boolean flags + logLevel + PrimaryEnforcement; settings v7).
 4. **Endpoint count consistency**: All docs that mention endpoint counts say "82 endpoints across 19 controllers" (or the updated number if features were added).
 5. **Link validation**: All `[text](path)` links in docs resolve to existing files. Check for renamed/deleted targets.
 6. **Index completeness**: Every doc in `docs/` has an entry in `docs/INDEX.md`.
 7. **Preset count**: All docs that list presets include all 6: `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `user-only-with-custom-ext`.
-8. **Log category count**: All docs listing log categories show exactly 14 (not 11 — added scim.bulk, scim.resource, config in v0.33.0).
+8. **Log category count**: All docs listing log categories show exactly 14 (not 11 - added scim.bulk, scim.resource, config in v0.33.0).
 9. **Date header freshness**: No doc has a "Last Updated" date older than the current version's release date.
 10. **API collection coverage**: OpenAPI/Postman/Insomnia collections cover 100% of endpoints. INDEX.md description reflects actual coverage.
 11. **Format migration completeness**: No remaining `"config": {` patterns in active docs (outside archive/ and intentional migration notes).
@@ -276,14 +276,14 @@ After all updates, perform a final cross-check:
 
 ---
 
-## Step 6 — Self-Update This Prompt
+## Step 6 - Self-Update This Prompt
 
 After completing the audit, review **this prompt itself** for freshness:
 
 1. **Endpoint count**: If the endpoint/controller count changed from 76/18, update all references in this prompt (Steps 1B, 2B, 2E, 5.4).
 2. **New document categories**: If new types of docs (e.g., performance benchmarks, security audit docs, ADRs) were added, add a new sub-section under Step 2.
 3. **New artifact directories**: If new artifact folders beyond `openapi/`, `postman/`, `insomnia/`, `examples/`, `images/readme/` were created, add them to Section E.
-4. **New config flags**: If the flag count changed from 14 boolean + logLevel (12 persisted in ProfileSettings + 2 derived), update all references.
+4. **New config flags**: If the flag count changed from 15 boolean + logLevel + PrimaryEnforcement (13 persisted in ProfileSettings + 2 derived), update all references.
 5. **New log categories**: If `LogCategory` enum changed from 14 entries, update Section 1G and the format migration table.
 6. **New presets**: If presets beyond the current 6 were added, update Section 1G and cross-consistency checks.
 7. **New bulk/SPC constants**: If `BULK_MAX_OPERATIONS`, `BULK_MAX_PAYLOAD_SIZE`, or `maxResults` changed, update format migration table.
@@ -308,8 +308,8 @@ Apply updates directly to this file (`.github/prompts/auditAndUpdateDocs.prompt.
 - Use lowercase for SCIM attribute characteristics per RFC 7643 (`readWrite`, not `ReadWrite`).
 - When recreating API collections (OpenAPI/Postman/Insomnia), target 100% endpoint coverage.
 - Verify status codes from source decorators, not from documentation assumptions.
-- When fixing stale `"config"` format, check ENDPOINT_CONFIG_FLAGS_REFERENCE.md migration notes — some `"config"` references are intentional historical examples.
-- For log category lists, always verify against `LogCategory` enum in source — do not add categories that don't exist.
+- When fixing stale `"config"` format, check ENDPOINT_CONFIG_FLAGS_REFERENCE.md migration notes - some `"config"` references are intentional historical examples.
+- For log category lists, always verify against `LogCategory` enum in source - do not add categories that don't exist.
 - Quick reference cards (ASCII art) must match the actual route inventory.
 
 ---
@@ -328,8 +328,9 @@ Apply updates directly to this file (`.github/prompts/auditAndUpdateDocs.prompt.
 | 2026-04-10 | v0.34.0 | Post-P4 fixes full audit | ~20 across 16 files | Endpoint count 76→82 (19 controllers), test counts propagation (3,185 unit/923 E2E/45 suites), version headers 0.31.0→0.34.0 in 8 docs, StrictSchema default documented as false (actual: true), P4 immutable/required now unconditional |
 | 2026-04-16 | v0.37.1 | Post error-handling audit | 12 across 9 files + 1 JSON | Unit 83→84 suites / 3,265→3,311 tests (error-handling + generic-resource tests), maxOperations 100→1000 in 2 files, stale backup module ref, doc count 65→67, pipeline-unit.json regenerated |
 | 2026-04-17 | v0.37.1 | Post logging+tests audit | 10 across 8 files + 2 JSONs | Unit 3,311→3,318 (+7 interceptor/endpointId), E2E 46→47 suites / 969→986 (+17 test-gaps-audit-4), phantom `backup` category in recent-logs-latest.json (regenerated), pipeline-e2e.json regenerated, CHANGELOG/Session updated with endpointId persistence + Bicep logging defaults |
-| 2026-04-21 | v0.37.2 | Post manager PATCH fix + test gap audit | ~25 across 10 files + 2 JSONs + 1 HTML | Unit 3,318→3,345 (+27 schema-validator/service tests), E2E 47→49 suites / 986→1,025 (+39 manager-patch/error-allowlist/group-filters/projection), doc count 67→68, version headers 0.37.1→0.37.2 in 7 files, phantom `backup` category in recent-logs-latest.html, pipeline JSONs regenerated |
-
+| 2026-04-21 | v0.37.2 | Post manager PATCH fix + test gap audit | ~25 across 10 files + 2 JSONs + 1 HTML | Unit 3,318->3,345 (+27 schema-validator/service tests), E2E 47->49 suites / 986->1,025 (+39 manager-patch/error-allowlist/group-filters/projection), doc count 67->68, version headers 0.37.1->0.37.2 in 7 files, phantom `backup` category in recent-logs-latest.html, pipeline JSONs regenerated |
+| 2026-04-23 | v0.38.0 | Post G8h + RFC audit + test gap audit #5 | ~30 across 22 files + 3 JSONs | Version 0.37.x->0.38.0 in 18 files, test counts 3,345->3,378 unit / 1,025->1,074 E2E / 49->51 suites, added PrimaryEnforcement flag section to ENDPOINT_CONFIG_FLAGS_REFERENCE.md, pipeline JSONs regenerated, version-latest.json synced, CHANGELOG updated with RFC + audit entries, OpenAPI/Postman/Insomnia version refs |
+| 2026-04-23 | v0.38.0 | Post passthrough-default freshness audit | ~55 across ~30 files | PrimaryEnforcement default normalize->passthrough in CHANGELOG + G8H doc (10 fixes), version headers 0.35.0->0.38.0 in 20+ docs, test counts propagated (3,378/1,074/~789) to 8 docs, flag counts 13+logLevel->13+logLevel+PrimaryEnforcement in 4 docs, doc count 68->69, Session_starter Status/Current Focus updated |
 ### Common Staleness Patterns Discovered
 
 | Pattern | Files Typically Affected | Detection Method |
@@ -343,6 +344,6 @@ Apply updates directly to this file (`.github/prompts/auditAndUpdateDocs.prompt.
 | Stale Prisma schema in inline blocks | MULTI_ENDPOINT_GUIDE, TECHNICAL_DESIGN_DOCUMENT | Search for `config String?` in code blocks |
 | API collection coverage gap | INDEX.md descriptions, OpenAPI/Postman/Insomnia files | Count operations vs 82 baseline |
 | Stale "Last Updated" date headers | ENDPOINT_CONFIG_FLAGS_REFERENCE, SCIM_REFERENCE | Search for `Last Updated.*2026-` and compare |
-| Stale feature support notes | SCIM_REFERENCE (filter operators) | Search for "limited support" |
-- Every numeric claim (test counts, flag counts, LoC) must be freshly measured — never copy from stale docs.
+| Stale feature support notes | SCIM_REFERENCE (filter operators) | Search for \"limited support\" |\n| Stale PrimaryEnforcement default | G8H doc, CHANGELOG, ENDPOINT_CONFIG_FLAGS | Search for `normalize (default)` or `default.*normalize` - should be `passthrough (default)` |
+- Every numeric claim (test counts, flag counts, LoC) must be freshly measured - never copy from stale docs.
 - Use the `updateProjectHealth` prompt for full stats refresh if `PROJECT_HEALTH_AND_STATS.md` is significantly stale.

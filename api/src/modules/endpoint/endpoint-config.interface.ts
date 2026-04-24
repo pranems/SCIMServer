@@ -60,12 +60,12 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * are automatically coerced to native booleans before schema validation and storage.
    * This enables interoperability with clients like Microsoft Entra ID that send boolean
    * values as strings (e.g., roles[].primary = "True" instead of true).
-   * Scope: All paths — POST/PUT body, PATCH values, PATCH filter literals, GET/LIST output.
+   * Scope: All paths - POST/PUT body, PATCH values, PATCH filter literals, GET/LIST output.
    * Supersedes StrictSchemaValidation for boolean type checks when enabled.
    * When false, string boolean values are passed through as-is and will be rejected
    * by StrictSchemaValidation if that flag is also enabled.
    * In practice: keep true unless all clients send proper JSON booleans.
-   * @see RFC 7643 §2.2 — Boolean attribute type
+   * @see RFC 7643 §2.2 - Boolean attribute type
    */
   ALLOW_AND_COERCE_BOOLEAN_STRINGS: 'AllowAndCoerceBooleanStrings',
 
@@ -85,7 +85,7 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * attributes that were silently stripped from the incoming payload.
    * When false (default), stripping happens silently without response annotation.
    * In practice: enable during development/debugging to see which attributes were stripped.
-   * @see RFC 7643 §2.2 — readOnly mutability
+   * @see RFC 7643 §2.2 - readOnly mutability
    */
   INCLUDE_WARNING_ABOUT_IGNORED_READONLY_ATTRIBUTE: 'IncludeWarningAboutIgnoredReadOnlyAttribute',
 
@@ -96,7 +96,7 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * Has no effect when StrictSchemaValidation is OFF (stripping always happens regardless).
    * In practice: enable alongside StrictSchemaValidation for Entra ID, which sends readOnly
    * attributes like `groups` and `id` in PATCH operations.
-   * @see RFC 7643 §2.2 — readOnly mutability
+   * @see RFC 7643 §2.2 - readOnly mutability
    */
   IGNORE_READONLY_ATTRIBUTES_IN_PATCH: 'IgnoreReadOnlyAttributesInPatch',
 
@@ -126,7 +126,7 @@ export const ENDPOINT_CONFIG_FLAGS = {
   /**
    * When true (default), a single PATCH operation can add/remove multiple members
    * on a Group: value: [{value:"id1"},{value:"id2"}].
-   * When false, only one member per PATCH op — multiple members in value array → 400 error.
+   * When false, only one member per PATCH op - multiple members in value array → 400 error.
    * In practice: keep true; most SCIM clients (Entra ID, Okta) send multi-member PATCH ops.
    */
   MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED: 'MultiMemberPatchOpForGroupEnabled',
@@ -147,6 +147,26 @@ export const ENDPOINT_CONFIG_FLAGS = {
    * where stdout is the log sink and container-local files are ephemeral.
    */
   LOG_FILE_ENABLED: 'logFileEnabled',
+
+  /**
+   * Controls enforcement of the RFC 7643 section 2.4 primary sub-attribute constraint
+   * on multi-valued complex attributes (emails, phoneNumbers, ims, photos, etc.).
+   * RFC rule: "The primary attribute value 'true' MUST appear no more than once."
+   *
+   * Accepts a tri-state string value:
+   * - "passthrough" (default): store as-is but log WARN when >1 primary=true.
+   *   Backward-compatible, zero data mutation, gives admin visibility.
+   * - "normalize": keep first primary=true, set rest to false, log WARN.
+   *   Safe for Azure AD/Entra ID and Okta which may send duplicate primaries.
+   * - "reject": return 400 invalidValue if >1 primary=true detected.
+   *   Use for strict RFC compliance testing.
+   *
+   * Scope: POST, PUT, PATCH (all write paths - pre-persist and post-merge).
+   * Schema-driven: automatically applies to any multi-valued complex attribute
+   * with a boolean primary sub-attribute, including custom extensions.
+   * @see RFC 7643 section 2.4 - Multi-Valued Attributes
+   */
+  PRIMARY_ENFORCEMENT: 'PrimaryEnforcement',
 } as const;
 
 /**
@@ -154,10 +174,10 @@ export const ENDPOINT_CONFIG_FLAGS = {
  */
 export type EndpointConfigFlag = typeof ENDPOINT_CONFIG_FLAGS[keyof typeof ENDPOINT_CONFIG_FLAGS];
 
-// ─── Flag Definitions — Single Source of Truth ───────────────────────────────
+// ─── Flag Definitions - Single Source of Truth ───────────────────────────────
 
 /** Valid types for flag definitions. */
-type FlagType = 'boolean' | 'logLevel';
+type FlagType = 'boolean' | 'logLevel' | 'primaryEnforcement';
 
 /** Metadata for a single endpoint config flag. */
 export interface EndpointConfigFlagDefinition {
@@ -172,14 +192,14 @@ export interface EndpointConfigFlagDefinition {
 }
 
 /**
- * ENDPOINT_CONFIG_FLAGS_DEFINITIONS — Single source of truth for all endpoint config flags.
+ * ENDPOINT_CONFIG_FLAGS_DEFINITIONS - Single source of truth for all endpoint config flags.
  *
  * Each entry defines the flag's runtime key (via ENDPOINT_CONFIG_FLAGS constant),
  * data type, default value, and human-readable description.
  *
  * All other constructs (DEFAULT_ENDPOINT_CONFIG, validateEndpointConfig)
  * are derived from this registry. To add a new flag, add it to ENDPOINT_CONFIG_FLAGS
- * and then add an entry here — everything else is automatic.
+ * and then add an entry here - everything else is automatic.
  */
 export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFlagDefinition> = {
   PATCH_OP_ALLOW_REMOVE_ALL_MEMBERS: {
@@ -306,7 +326,7 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
     description:
       'When true (default), a single PATCH operation can add/remove multiple members ' +
       'on a Group: value: [{value:"id1"},{value:"id2"}]. ' +
-      'When false, only one member per PATCH op — multiple members → 400. ' +
+      'When false, only one member per PATCH op - multiple members → 400. ' +
       'Keep true; most SCIM clients (Entra ID, Okta) send multi-member PATCH ops.',
   },
   SCHEMA_DISCOVERY_ENABLED: {
@@ -328,6 +348,16 @@ export const ENDPOINT_CONFIG_FLAGS_DEFINITIONS: Record<string, EndpointConfigFla
       'Each endpoint gets its own log file named after the endpoint. ' +
       'When false, per-endpoint file logging is disabled. ' +
       'Set false in Docker/Azure where stdout is the log sink.',
+  },
+  PRIMARY_ENFORCEMENT: {
+    key: ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT,
+    type: 'primaryEnforcement',
+    default: undefined, // string default handled by getConfigString fallback to 'passthrough'
+    description:
+      'Controls primary sub-attribute enforcement on multi-valued complex attributes (RFC 7643 section 2.4). ' +
+      '"passthrough" (default): stores as-is but logs WARN when >1 primary=true. ' +
+      '"normalize": keeps first primary=true, sets rest to false, logs WARN. ' +
+      '"reject": returns 400 invalidValue if >1 primary=true.',
   },
 };
 
@@ -355,6 +385,7 @@ export interface EndpointConfig {
   [ENDPOINT_CONFIG_FLAGS.MULTI_MEMBER_PATCH_OP_FOR_GROUP_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.SCHEMA_DISCOVERY_ENABLED]?: boolean | string;
   [ENDPOINT_CONFIG_FLAGS.LOG_FILE_ENABLED]?: boolean | string;
+  [ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT]?: string;
   /** Allow any additional configuration flags. */
   [key: string]: unknown;
 }
@@ -362,7 +393,7 @@ export interface EndpointConfig {
 // ─── Derived: Default configuration (from definitions) ───────────────────────
 
 /**
- * Default configuration values — derived from ENDPOINT_CONFIG_FLAGS_DEFINITIONS.
+ * Default configuration values - derived from ENDPOINT_CONFIG_FLAGS_DEFINITIONS.
  * Not hand-maintained: add a new flag to ENDPOINT_CONFIG_FLAGS_DEFINITIONS
  * and the default automatically appears here.
  */
@@ -413,7 +444,7 @@ export function getConfigBoolean(config: EndpointConfig | undefined, key: string
 }
 
 /**
- * @deprecated Use getConfigBoolean() instead — it now falls back to centrally-defined
+ * @deprecated Use getConfigBoolean() instead - it now falls back to centrally-defined
  * defaults from ENDPOINT_CONFIG_FLAGS_DEFINITIONS, making per-call-site defaults unnecessary.
  *
  * Kept for backward compatibility during migration.
@@ -494,9 +525,33 @@ function validateLogLevelFlag(config: Record<string, any>, flagName: string): vo
   }
 }
 
+/** Valid primary enforcement mode values (case-insensitive). */
+const VALID_PRIMARY_ENFORCEMENT_VALUES = ['normalize', 'reject', 'passthrough'];
+
+/**
+ * Validate a primaryEnforcement config flag value.
+ */
+function validatePrimaryEnforcementFlag(config: Record<string, any>, flagName: string): void {
+  const value = config[flagName];
+  if (value === undefined) return;
+  if (typeof value === 'string') {
+    if (!VALID_PRIMARY_ENFORCEMENT_VALUES.includes(value.toLowerCase())) {
+      throw new Error(
+        `Invalid value "${value}" for config flag "${flagName}". ` +
+        `Allowed values: "normalize", "reject", "passthrough" (case-insensitive).`,
+      );
+    }
+  } else {
+    throw new Error(
+      `Invalid type for config flag "${flagName}". ` +
+      `Expected string ("normalize"/"reject"/"passthrough"), got ${typeof value}.`,
+    );
+  }
+}
+
 /**
  * Validate endpoint configuration.
- * Driven by ENDPOINT_CONFIG_FLAGS_DEFINITIONS — no manual flag list to maintain.
+ * Driven by ENDPOINT_CONFIG_FLAGS_DEFINITIONS - no manual flag list to maintain.
  *
  * @param config - The endpoint configuration to validate
  * @throws Error if validation fails
@@ -509,6 +564,8 @@ export function validateEndpointConfig(config: Record<string, any> | undefined):
       validateBooleanFlag(config, def.key);
     } else if (def.type === 'logLevel') {
       validateLogLevelFlag(config, def.key);
+    } else if (def.type === 'primaryEnforcement') {
+      validatePrimaryEnforcementFlag(config, def.key);
     }
   }
 }

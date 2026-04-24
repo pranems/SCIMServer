@@ -751,7 +751,7 @@ describe('ScimLogger', () => {
       const unsub = logger.subscribe(e => entries.push(e));
 
       logger.runWithContext({ requestId: 'req-undef' }, () => {
-        // No enrichContext calls — fields should be undefined
+        // No enrichContext calls - fields should be undefined
         logger.info(LogCategory.HTTP, 'No enrichment');
       });
 
@@ -791,7 +791,7 @@ describe('ScimLogger', () => {
       const smallLogger = new ScimLogger();
       smallLogger.updateConfig({ format: 'json' });
 
-      // Add 5 entries — only last 3 should survive
+      // Add 5 entries - only last 3 should survive
       for (let i = 0; i < 5; i++) {
         smallLogger.info(LogCategory.HTTP, `entry-${i}`);
       }

@@ -1,5 +1,5 @@
 /**
- * E2E Tests — Schema Characteristics Cache Integration
+ * E2E Tests - Schema Characteristics Cache Integration
  *
  * Validates that the precomputed schema cache produces correct end-to-end
  * behavior across all SCIM operations. Tests cover:
@@ -63,7 +63,7 @@ describe('Schema Cache Integration (E2E)', () => {
               attributes: extAttrs.length > 0 ? extAttrs : [
                 { name: 'department', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default' },
                 { name: 'badge', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'never', description: 'writeOnly badge' },
-                { name: 'active', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'String active — NOT boolean' },
+                { name: 'active', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'String active - NOT boolean' },
                 { name: 'score', type: 'integer', multiValued: false, required: false, mutability: 'readOnly', returned: 'default', description: 'ReadOnly computed score' },
               ],
             },
@@ -88,7 +88,7 @@ describe('Schema Cache Integration (E2E)', () => {
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  // 1. Boolean Coercion — Parent-Aware Precision
+  // 1. Boolean Coercion - Parent-Aware Precision
   // ═══════════════════════════════════════════════════════════════════════
 
   describe('Boolean coercion via cache (parent-aware)', () => {
@@ -113,7 +113,7 @@ describe('Schema Cache Integration (E2E)', () => {
       });
       const res = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
 
-      // Extension active is declared as string — must remain string "True"
+      // Extension active is declared as string - must remain string "True"
       const extBlock = res.body[EXT_URN];
       expect(extBlock).toBeDefined();
       expect(extBlock.active).toBe('True'); // NOT boolean true
@@ -154,8 +154,8 @@ describe('Schema Cache Integration (E2E)', () => {
 
       const ext = res.body[EXT_URN];
       expect(ext).toBeDefined();
-      expect(ext.badge).toBeUndefined(); // returned:never — must not appear
-      expect(ext.department).toBe('HR'); // returned:default — should appear
+      expect(ext.badge).toBeUndefined(); // returned:never - must not appear
+      expect(ext.department).toBe('HR'); // returned:default - should appear
     });
 
     it('should strip returned:never from LIST response', async () => {
@@ -206,7 +206,7 @@ describe('Schema Cache Integration (E2E)', () => {
       });
       const res = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
 
-      // score is readOnly — stripped from input, not in output
+      // score is readOnly - stripped from input, not in output
       const ext = res.body[EXT_URN];
       if (ext) {
         expect(ext.score).toBeUndefined();
@@ -272,7 +272,7 @@ describe('Schema Cache Integration (E2E)', () => {
       const epId = res1.body.id;
       const basePath = scimBasePath(epId);
 
-      // Create user — no extension
+      // Create user - no extension
       const u1 = validUser();
       const cr = await scimPost(app, `${basePath}/Users`, token, u1).expect(201);
       const userId = cr.body.id;
@@ -306,7 +306,7 @@ describe('Schema Cache Integration (E2E)', () => {
         })
         .expect(200);
 
-      // Create user with new extension — should work since cache was refreshed
+      // Create user with new extension - should work since cache was refreshed
       const u2 = validUser({
         [NEW_EXT]: { level: 'Senior' },
       });
@@ -359,10 +359,10 @@ describe('Schema Cache Integration (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════
-  // 6. Multiple Requests Same Endpoint — Cache Reuse
+  // 6. Multiple Requests Same Endpoint - Cache Reuse
   // ═══════════════════════════════════════════════════════════════════════
 
-  describe('Multiple requests same endpoint — cache reuse', () => {
+  describe('Multiple requests same endpoint - cache reuse', () => {
     let epId: string;
     let basePath: string;
 
@@ -509,7 +509,7 @@ describe('Schema Cache Integration (E2E)', () => {
 
     it('should treat externalId as case-sensitive in filter (caseExact=true)', async () => {
       const res = await scimGet(app, `${basePath}/Users?filter=externalId eq "CaseSensitive-001"`, token).expect(200);
-      // externalId is caseExact:true — should match exactly 1
+      // externalId is caseExact:true - should match exactly 1
       expect(res.body.totalResults).toBe(1);
       expect(res.body.Resources[0].externalId).toBe('CaseSensitive-001');
     });
@@ -581,7 +581,7 @@ describe('Schema Cache Integration (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════
-  // 10. Returned:request — Excluded by Default, Included with ?attributes=
+  // 10. Returned:request - Excluded by Default, Included with ?attributes=
   // ═══════════════════════════════════════════════════════════════════════
 
   describe('Returned:request attribute projection', () => {
@@ -647,7 +647,7 @@ describe('Schema Cache Integration (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════
-  // 11. AlwaysReturnedSubs — Sub-Attributes with returned:'always'
+  // 11. AlwaysReturnedSubs - Sub-Attributes with returned:'always'
   // ═══════════════════════════════════════════════════════════════════════
 
   describe('AlwaysReturnedSubs via cache', () => {
@@ -728,7 +728,7 @@ describe('Schema Cache Integration (E2E)', () => {
         { op: 'replace', path: `${EXT_URN}:department`, value: 'Ops' },
       ])).expect(200);
       expect(patchRes.body[EXT_URN]?.department).toBe('Ops');
-      // score is readOnly — should not appear even if somehow sent
+      // score is readOnly - should not appear even if somehow sent
       expect(patchRes.body[EXT_URN]?.score).toBeUndefined();
     });
   });

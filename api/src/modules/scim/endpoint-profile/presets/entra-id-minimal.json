@@ -395,7 +395,8 @@
     },
     "settings": {
       "AllowAndCoerceBooleanStrings": "True",
-      "StrictSchemaValidation": "True"
+      "StrictSchemaValidation": "True",
+      "PrimaryEnforcement": "normalize"
     }
   }
 }

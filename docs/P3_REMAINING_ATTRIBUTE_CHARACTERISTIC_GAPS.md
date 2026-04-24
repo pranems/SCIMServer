@@ -1,20 +1,20 @@
-# P3 — Remaining Attribute Characteristic Gaps (RFC 7643 §2)
+# P3 - Remaining Attribute Characteristic Gaps (RFC 7643 §2)
 
 ## Overview
 
 **Feature**: Comprehensive audit of ALL RFC 7643 §2 attribute characteristic enforcement across every service, operation, and config combination  
-**Version**: v0.32.0  
-**Date**: 2026-04-01  
-**Status**: Re-audited against source code (sole source of truth) — all GEN-01..GEN-12 resolved; G6 resolved in v0.32.0; 9 remaining gaps  
-**Test Counts**: 3,185 unit (80 suites) · 923 E2E (45 suites) · ~739 live assertions · ~4,959 total
+**Version**: v0.38.0  
+**Date**: 2026-04-23  
+**Status**: Re-audited against source code (sole source of truth) - all GEN-01..GEN-12 resolved; G6 resolved in v0.32.0; 9 remaining gaps  
+**Test Counts**: 3,378 unit (84 suites) · 1,074 E2E (51 suites) · ~789 live assertions · ~5,353 total
 
 **RFC References**:
-- [RFC 7643 §2 — Attribute Characteristics](https://datatracker.ietf.org/doc/html/rfc7643#section-2)
-- [RFC 7643 §2.2 — Mutability](https://datatracker.ietf.org/doc/html/rfc7643#section-2.2)
-- [RFC 7643 §2.3.7 — Reference Types](https://datatracker.ietf.org/doc/html/rfc7643#section-2.3.7)
-- [RFC 7643 §2.4 — Returned / Required / Uniqueness / CaseExact](https://datatracker.ietf.org/doc/html/rfc7643#section-2.4)
-- [RFC 7644 §3.9 — Attribute Projection](https://datatracker.ietf.org/doc/html/rfc7644#section-3.9)
-- [RFC 7644 §3.14 — ETags / Conditional Requests](https://datatracker.ietf.org/doc/html/rfc7644#section-3.14)
+- [RFC 7643 §2 - Attribute Characteristics](https://datatracker.ietf.org/doc/html/rfc7643#section-2)
+- [RFC 7643 §2.2 - Mutability](https://datatracker.ietf.org/doc/html/rfc7643#section-2.2)
+- [RFC 7643 §2.3.7 - Reference Types](https://datatracker.ietf.org/doc/html/rfc7643#section-2.3.7)
+- [RFC 7643 §2.4 - Returned / Required / Uniqueness / CaseExact](https://datatracker.ietf.org/doc/html/rfc7643#section-2.4)
+- [RFC 7644 §3.9 - Attribute Projection](https://datatracker.ietf.org/doc/html/rfc7644#section-3.9)
+- [RFC 7644 §3.14 - ETags / Conditional Requests](https://datatracker.ietf.org/doc/html/rfc7644#section-3.14)
 
 ---
 
@@ -27,7 +27,7 @@ All data below is derived directly from source code inspection. No doc-to-doc as
 | Enforcement Point | Generic | Users | Groups | Source Location |
 |---|:---:|:---:|:---:|---|
 | POST body stripping (top-level + sub-attrs) | ✅ | ✅ | ✅ | `stripReadOnlyAttributes()` in `scim-service-helpers.ts` L175–L277 |
-| PUT body stripping | ✅ | ✅ | ✅ | Same — called in each service's `replaceResource()` |
+| PUT body stripping | ✅ | ✅ | ✅ | Same - called in each service's `replaceResource()` |
 | PATCH op stripping (non-strict) | ✅ | ✅ | ✅ | `stripReadOnlyPatchOps()` in `scim-service-helpers.ts` L291–L431 |
 | PATCH pre-validation (strict mode, G8c) | ✅ | ✅ | ✅ | `validatePatchOperationValue()` in `schema-validator.ts` L880–L960 |
 | Strict + IgnorePatchRO OFF → 400 | ✅ | ✅ | ✅ | Generic L448–L457 · Users L468–L480 · Groups L322–L336 |
@@ -183,64 +183,64 @@ All 12 items from the original Generic Service Parity audit are now confirmed re
 
 ## Remaining Gaps (9 items)
 
-### Gap G1 — Immutable enforcement only active in strict mode
+### Gap G1 - Immutable enforcement only active in strict mode
 - **Severity**: Medium
 - **Scope**: All services (Generic, Users, Groups)
-- **RFC**: §2.2 — `immutable` attributes SHOULD NOT be changed after creation
+- **RFC**: §2.2 - `immutable` attributes SHOULD NOT be changed after creation
 - **Current**: `checkImmutableAttributes()` is gated by `StrictSchemaValidation` config flag. Non-strict endpoints allow silent mutation of immutable attributes.
 - **Impact**: Endpoints without strict mode silently accept immutable attribute changes on PUT/PATCH.
 
-### Gap G2 — Required attribute enforcement only in strict mode
+### Gap G2 - Required attribute enforcement only in strict mode
 - **Severity**: Medium
 - **Scope**: All services
-- **RFC**: §2.2 — `required` attributes MUST be present
+- **RFC**: §2.2 - `required` attributes MUST be present
 - **Current**: `SchemaValidator.validate()` checks required only when `StrictSchemaValidation` is enabled.
 - **Impact**: Non-strict endpoints accept payloads missing required attributes.
 
-### Gap G3 — Schema-declared uniqueness on arbitrary attributes not enforced
+### Gap G3 - Schema-declared uniqueness on arbitrary attributes not enforced
 - **Severity**: Medium
 - **Scope**: All services
-- **RFC**: §2.4 — `uniqueness: server|global` SHOULD be enforced
+- **RFC**: §2.4 - `uniqueness: server|global` SHOULD be enforced
 - **Current**: Uniqueness is hardcoded to specific columns (userName, displayName, externalId). Schema-declared `uniqueness` characteristic on other attributes is ignored.
 - **Impact**: Custom attributes with `uniqueness: server` are not unique-checked.
 
-### Gap G4 — referenceTypes not validated
+### Gap G4 - referenceTypes not validated
 - **Severity**: Low
 - **Scope**: All services
-- **RFC**: §2.3.7 — `referenceTypes` constrains what types of URIs a reference attribute can hold
+- **RFC**: §2.3.7 - `referenceTypes` constrains what types of URIs a reference attribute can hold
 - **Current**: `SchemaValidator` does not validate reference attribute values against declared `referenceTypes`.
 - **Impact**: Reference attributes accept any string value regardless of declared type constraints.
 
-### Gap G5 — $ref URI not systematically generated
+### Gap G5 - $ref URI not systematically generated
 - **Severity**: Low
 - **Scope**: All services
-- **RFC**: §8.2 — `$ref` should be a URI to the referenced resource
+- **RFC**: §8.2 - `$ref` should be a URI to the referenced resource
 - **Current**: `$ref` URIs are not generated from schema `referenceTypes` declarations.
 - **Impact**: Clients cannot follow `$ref` links to resolve referenced resources.
 
-### ~~Gap G6 — Generic filter engine limited to eq only~~ ✅ RESOLVED (v0.32.0)
+### ~~Gap G6 - Generic filter engine limited to eq only~~ ✅ RESOLVED (v0.32.0)
 - **Resolution**: Wired `buildGenericFilter()` from `apply-scim-filter.ts` into `endpoint-scim-generic.service.ts`, replacing the regex-based `parseSimpleFilter()`. All 10 RFC 7644 operators + AND/OR compound expressions now supported with DB push-down for displayName/externalId/id and in-memory fallback for custom attributes.
 
-### Gap G7 — Generic sorting is in-memory
+### Gap G7 - Generic sorting is in-memory
 - **Severity**: Low
 - **Scope**: Generic service only
 - **Current**: Generic resources sort via in-memory `localeCompare()` after fetching all records. Users/Groups use DB-level ORDER BY.
 - **Impact**: Performance degrades with large record sets; sorting may differ from DB collation rules.
 
-### Gap G8 — caseExact on DB filter push-down not schema-driven
+### Gap G8 - caseExact on DB filter push-down not schema-driven
 - **Severity**: Low
 - **Scope**: Users, Groups (DB push-down path)
-- **RFC**: §2.2 — `caseExact` controls comparison semantics
+- **RFC**: §2.2 - `caseExact` controls comparison semantics
 - **Current**: DB push-down uses hardcoded column types (`citext` = case-insensitive, `text` = case-sensitive) rather than schema-declared `caseExact`. In-memory path does use schema-driven caseExact.
-- **Impact**: Minimal — column types align with RFC defaults for standard attributes. Custom extensions may not honor caseExact correctly.
+- **Impact**: Minimal - column types align with RFC defaults for standard attributes. Custom extensions may not honor caseExact correctly.
 
-### Gap G9 — No type coercion beyond booleans
+### Gap G9 - No type coercion beyond booleans
 - **Severity**: Low
 - **Scope**: All services
 - **Current**: `coerceBooleanStringsIfEnabled()` handles `"True"`/`"False"` → `true`/`false`. No coercion for `string→integer`, `string→decimal`, or other type mismatches.
 - **Impact**: Clients sending `"42"` for an integer attribute get a type validation error in strict mode rather than coercion.
 
-### Gap G10 — caseExact not enforced on uniqueness checks
+### Gap G10 - caseExact not enforced on uniqueness checks
 - **Severity**: Low
 - **Scope**: All services
 - **Current**: Uniqueness comparison relies on DB column collation (citext for userName/displayName, text for externalId). Schema-declared `caseExact` is not consulted.
@@ -330,9 +330,9 @@ Legend: Green = fully enforced across all services · Orange = partial/strict-mo
 
 | Suite | Count | Suites |
 |---|:---:|:---:|
-| Unit | 3,185 | 80 |
-| E2E | 923 | 45 |
-| **Total** | **4,108** | **125** |
+| Unit | 3,378 | 84 |
+| E2E | 1,074 | 51 |
+| **Total** | **4,452** | **135** |
 
 ---
 
@@ -340,10 +340,10 @@ Legend: Green = fully enforced across all services · Orange = partial/strict-mo
 
 | Priority | Gaps | Rationale |
 |---|---|---|
-| **P1 — Should Fix** | G1, G2 | Core RFC compliance; immutable/required should be enforced even without strict mode |
-| **P2 — Nice to Have** | G3, G7, G9 | Uniqueness on custom attrs, sorting performance, type coercion beyond booleans |
-| **P3 — Low Priority** | G4, G5, G8, G10 | referenceTypes, $ref, caseExact edge cases — minimal real-world impact |
+| **P1 - Should Fix** | G1, G2 | Core RFC compliance; immutable/required should be enforced even without strict mode |
+| **P2 - Nice to Have** | G3, G7, G9 | Uniqueness on custom attrs, sorting performance, type coercion beyond booleans |
+| **P3 - Low Priority** | G4, G5, G8, G10 | referenceTypes, $ref, caseExact edge cases - minimal real-world impact |
 
 ---
 
-*Document updated 2026-04-01 (G6 resolved in v0.32.0). Source files are the single source of truth — not this document.*
+*Document updated 2026-04-01 (G6 resolved in v0.32.0). Source files are the single source of truth - not this document.*

@@ -1,4 +1,4 @@
-# Phase 8 — Schema Validation: Complete Remaining-Work Analysis
+# Phase 8 - Schema Validation: Complete Remaining-Work Analysis
 
 > **Date:** 2026-03-01  
 > **Author:** Copilot Session Analysis  
@@ -9,13 +9,13 @@
 ## Table of Contents
 
 1. [Executive Summary](#1-executive-summary)
-2. [Phase 8 Part 1 — Done vs Remaining](#2-phase-8-part-1--done-vs-remaining)
+2. [Phase 8 Part 1 - Done vs Remaining](#2-phase-8-part-1--done-vs-remaining)
 3. [Architecture Diagrams](#3-architecture-diagrams)
 4. [Validation Pipeline Deep Dive](#4-validation-pipeline-deep-dive)
 5. [Request / Response Examples](#5-request--response-examples)
 6. [Database State & Config Flags](#6-database-state--config-flags)
 7. [Known Gaps & Edge Cases](#7-known-gaps--edge-cases)
-8. [Phase 8 Part 2 — Full Scope Analysis](#8-phase-8-part-2--full-scope-analysis)
+8. [Phase 8 Part 2 - Full Scope Analysis](#8-phase-8-part-2--full-scope-analysis)
 9. [Test Coverage Inventory](#9-test-coverage-inventory)
 10. [Git Status & Commit Readiness](#10-git-status--commit-readiness)
 11. [Risk Assessment](#11-risk-assessment)
@@ -51,7 +51,7 @@ Phase 8 Part 2 is a substantial separate feature requiring new DB models, Prisma
 
 ---
 
-## 2. Phase 8 Part 1 — Done vs Remaining
+## 2. Phase 8 Part 1 - Done vs Remaining
 
 ### Migration Plan Requirements vs Implementation
 
@@ -61,8 +61,8 @@ Phase 8 Part 2 is a substantial separate feature requiring new DB models, Prisma
 | 2 | Attribute type checking (string, boolean, integer, decimal, dateTime, reference, binary, complex) | §2.1 `type` | ✅ Done | `schema-validator.ts` L240–L337 |
 | 3 | Mutability enforcement (readOnly rejection) | §2.1 `mutability` | ✅ Done | `schema-validator.ts` L195–L203 |
 | 4 | Unknown attribute detection (strict mode) | §3.1 | ✅ Done | `schema-validator.ts` L133–L140 |
-| 5 | Schema loading from `ScimSchemaRegistry` | — | ✅ Done | `endpoint-scim-users.service.ts` L362–L376 |
-| 6 | Integration with service layer (create + replace) | — | ✅ Done | Users L54, L192 / Groups L64, L269 |
+| 5 | Schema loading from `ScimSchemaRegistry` | - | ✅ Done | `endpoint-scim-users.service.ts` L362–L376 |
+| 6 | Integration with service layer (create + replace) | - | ✅ Done | Users L54, L192 / Groups L64, L269 |
 | 7 | SCIM error responses (400 + scimType) | §3.12 | ✅ Done | `validatePayloadSchema()` in both services |
 
 ### Extra Features Beyond Plan (Implemented)
@@ -232,7 +232,7 @@ sequenceDiagram
     Note over ValidationPipe: class-validator:<br/>@IsString() userName<br/>@IsBoolean() active
     ValidationPipe->>Service: Transformed DTO
 
-    Service->>Service: ensureSchema() — verify schemas[] URN
+    Service->>Service: ensureSchema() - verify schemas[] URN
 
     Service->>SSV: enforceStrictSchemaValidation(dto, endpointId, config)
     SSV->>Registry: getExtensionUrns(endpointId)
@@ -294,12 +294,12 @@ replaceUserForEndpoint(scimId, dto, baseUrl, endpointId, config, ifMatch?)
 └── 9. buildScimUserResource(...)
 ```
 
-### 4.3 Not Called on PATCH — Why
+### 4.3 Not Called on PATCH - Why
 
 PATCH operations use `Operations[]` array with `op`/`path`/`value` structure (RFC 7644 §3.5.2). The `validatePayloadSchema()` method validates **resource payloads**, not PATCH operation arrays. PATCH operations are validated by the `UserPatchEngine` / `GroupPatchEngine` (Phase 5), which handles path parsing, op validation, and value application.
 
 ```json
-// PATCH body — this is NOT a resource payload
+// PATCH body - this is NOT a resource payload
 {
   "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
   "Operations": [
@@ -365,7 +365,7 @@ private validatePayloadSchema(
 
 ## 5. Request / Response Examples
 
-### 5.1 Successful Create — Strict Mode ON
+### 5.1 Successful Create - Strict Mode ON
 
 **Endpoint Config (DB):**
 ```json
@@ -664,7 +664,7 @@ SchemaValidator.validate():
 { "StrictSchemaValidation": "False" }
 ```
 
-**Request:** (same as §5.3 — unknown attributes)
+**Request:** (same as §5.3 - unknown attributes)
 ```json
 {
   "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
@@ -683,7 +683,7 @@ SchemaValidator.validate():
 }
 ```
 
-### 5.8 PUT (Replace) — Rejected with Unknown Attribute
+### 5.8 PUT (Replace) - Rejected with Unknown Attribute
 
 **Request:**
 ```http
@@ -709,7 +709,7 @@ If-Match: W/"v1"
 }
 ```
 
-### 5.9 Group — Rejected with Unknown Attribute
+### 5.9 Group - Rejected with Unknown Attribute
 
 **Request:**
 ```http
@@ -812,8 +812,8 @@ LIMIT 3;
 
 | StrictSchemaValidation | enforceStrictSchemaValidation | validatePayloadSchema | Behavior |
 |:----------------------|:-----------------------------|:---------------------|:---------|
-| `"True"` / `true` | ✅ Runs | ✅ Runs | Full validation — URN check + attribute validation |
-| `"False"` / `false` | ❌ Skipped | ❌ Skipped | Lenient — anything accepted |
+| `"True"` / `true` | ✅ Runs | ✅ Runs | Full validation - URN check + attribute validation |
+| `"False"` / `false` | ❌ Skipped | ❌ Skipped | Lenient - anything accepted |
 | `undefined` / missing | ❌ Skipped | ❌ Skipped | Default = lenient |
 | `"true"` (lowercase) | ✅ Runs | ✅ Runs | `getConfigBoolean` handles case-insensitive |
 | `"1"` | ✅ Runs | ✅ Runs | Truthy string evaluation |
@@ -840,7 +840,7 @@ LIMIT 3;
 | **What's missing** | `validatePayloadSchema()` is not called on PATCH. Individual `Operations[].value` fields are not type-checked against schema |
 | **Impact** | A PATCH like `{"op":"replace","path":"active","value":"yes"}` would set active to the string "yes" without type error |
 | **Why it's by design** | PATCH body is `PatchOp` schema, not resource schema. The `PatchEngine` handles path parsing and value application. Adding per-operation value validation would require complex path-to-attrDef resolution |
-| **Severity** | Low — NestJS ValidationPipe handles DTO-declared properties; complex attrs are stored as-is in rawPayload JSON |
+| **Severity** | Low - NestJS ValidationPipe handles DTO-declared properties; complex attrs are stored as-is in rawPayload JSON |
 | **Future mitigation** | Phase 8.1 could add `PatchOperationValidator.validateValue(attrDef, value)` |
 
 **Example of unvalidated PATCH:**
@@ -865,7 +865,7 @@ This would be accepted if `name` is a non-DTO attribute stored in rawPayload. Th
 | **What's missing** | `mutability: "immutable"` means set-once-then-locked. Currently, the validator rejects `readOnly` but accepts `immutable` on both create and replace |
 | **Impact** | An immutable attribute could be changed via PUT after initial creation |
 | **RFC reference** | RFC 7643 §2.1: "An attribute with mutability 'immutable' can only be set once and SHOULD NOT be changed after." |
-| **Severity** | Low — no standard User/Group attributes have `immutable` mutability; this only applies to custom schemas |
+| **Severity** | Low - no standard User/Group attributes have `immutable` mutability; this only applies to custom schemas |
 | **Future mitigation** | Add immutable check in `validateAttribute()`: if mode = 'replace' and attr.mutability = 'immutable' → error |
 
 ### 7.3 NestJS ValidationPipe Implicit Type Coercion
@@ -875,19 +875,19 @@ This would be accepted if `name` is a non-DTO attribute stored in rawPayload. Th
 | **What happens** | `enableImplicitConversion: true` coerces DTO-declared properties before schema validation |
 | **Example** | `active: "yes"` → `active: true`, `userName: 12345` → `userName: "12345"` |
 | **Impact** | DTO-declared properties are always the correct type by the time `SchemaValidator` sees them |
-| **Why it's correct** | This is intentional for Entra ID compatibility — Microsoft sometimes sends wrong types |
+| **Why it's correct** | This is intentional for Entra ID compatibility - Microsoft sometimes sends wrong types |
 | **Documented** | E2E test §13 explicitly documents this behavior with 3 tests |
 
 **Coercion flow:**
 ```
 Client sends: { "active": "yes", "name": "John" }
                      ↓                    ↓
-ValidationPipe:  active → true       name → "John" (no coercion — index sig)
+ValidationPipe:  active → true       name → "John" (no coercion - index sig)
                      ↓                    ↓
 SchemaValidator: boolean ✓          string ≠ complex → ERROR ✓
 ```
 
-### 7.4 Phase 8 Part 2 — Entirely Outstanding
+### 7.4 Phase 8 Part 2 - Entirely Outstanding
 
 See [§8](#8-phase-8-part-2--full-scope-analysis) for full analysis.
 
@@ -899,16 +899,16 @@ See [§8](#8-phase-8-part-2--full-scope-analysis) for full analysis.
 
 | # | Area | Gap | Exploit Scenario |
 |---|------|-----|-----------------|
-| **V1** | Service Layer | **Schema validation disabled by default** — `StrictSchemaValidation=false` skips ALL type/required/mutability/unknown-attribute checks | `userName: 12345`, `active: "sure"`, `emails: "not-an-array"` all stored verbatim |
-| **V2** | Service Layer | **PATCH operations have zero schema validation** — `patchUserForEndpoint`/`patchGroupForEndpoint` never call `validatePayloadSchema` | `PATCH { op: "replace", path: "emails", value: "garbage" }` corrupts resource |
+| **V1** | Service Layer | **Schema validation disabled by default** - `StrictSchemaValidation=false` skips ALL type/required/mutability/unknown-attribute checks | `userName: 12345`, `active: "sure"`, `emails: "not-an-array"` all stored verbatim |
+| **V2** | Service Layer | **PATCH operations have zero schema validation** - `patchUserForEndpoint`/`patchGroupForEndpoint` never call `validatePayloadSchema` | `PATCH { op: "replace", path: "emails", value: "garbage" }` corrupts resource |
 | **V3** | DTO | **`PatchOperationDto.value` is `unknown`** with no class-validator decorator | 10,000-level nested object → stack overflow; 1M-element array → memory exhaustion |
 | **V4** | Service Layer | **No payload size limit** on `rawPayload` / body size | 100MB JSON body → DB bloat, memory exhaustion |
-| **V5** | DTO | **`SearchRequestDto` has zero class-validator decorators** — `count`, `startIndex`, `sortOrder` unvalidated | `count: -1` or `999999999` bypasses pagination; `startIndex: 0` → off-by-one |
+| **V5** | DTO | **`SearchRequestDto` has zero class-validator decorators** - `count`, `startIndex`, `sortOrder` unvalidated | `count: -1` or `999999999` bypasses pagination; `startIndex: 0` → off-by-one |
 | **V6** | DTO | **Index signature `[key: string]: unknown`** allows `__proto__`, `constructor` keys | Prototype pollution via `{ "__proto__": { "isAdmin": true } }` spread in response |
-| **V7** | Groups | **Member `value` not format-validated** — accepts `""`, extreme lengths | Ghost members with empty IDs; DB column overflow with 10K-char strings |
-| **V8** | SchemaValidator | **`immutable` mutability not enforced** on replace/PATCH — treated same as `readWrite` | Client changes `userName` after creation, breaking identity invariants |
+| **V7** | Groups | **Member `value` not format-validated** - accepts `""`, extreme lengths | Ghost members with empty IDs; DB column overflow with 10K-char strings |
+| **V8** | SchemaValidator | **`immutable` mutability not enforced** on replace/PATCH - treated same as `readWrite` | Client changes `userName` after creation, breaking identity invariants |
 
-**Example — V1 (type corruption with default config):**
+**Example - V1 (type corruption with default config):**
 ```json
 POST /scim/v2/endpoints/ep-1/Users
 {
@@ -919,9 +919,9 @@ POST /scim/v2/endpoints/ep-1/Users
   "name": [1, 2, 3]
 }
 ```
-With `StrictSchemaValidation=false` (default): **201 Created** — all corrupt values stored in `rawPayload`.
+With `StrictSchemaValidation=false` (default): **201 Created** - all corrupt values stored in `rawPayload`.
 
-**Example — V2 (PATCH bypasses all schema checks):**
+**Example - V2 (PATCH bypasses all schema checks):**
 ```json
 PATCH /scim/v2/endpoints/ep-1/Users/{id}
 {
@@ -933,9 +933,9 @@ PATCH /scim/v2/endpoints/ep-1/Users/{id}
   ]
 }
 ```
-Even with `StrictSchemaValidation=true`: **200 OK** — PATCH never invokes `SchemaValidator`.
+Even with `StrictSchemaValidation=true`: **200 OK** - PATCH never invokes `SchemaValidator`.
 
-**Example — V6 (prototype pollution via index signature):**
+**Example - V6 (prototype pollution via index signature):**
 ```json
 POST /scim/v2/endpoints/ep-1/Users
 {
@@ -951,20 +951,20 @@ Stored in `rawPayload` and spread via `{ ...rawPayload, ... }` in `toScimUserRes
 
 | # | Area | Gap | Status |
 |---|------|-----|--------|
-| **V9** | SchemaValidator | **Required sub-attributes not checked** — `emails[].value` is `required:true` but `{ emails: [{ type: "work" }] }` accepted without `value` | ⚠️ **Partial** — sub-attr type checking works but required sub-attr enforcement still missing |
-| **V10** | SchemaValidator | **`canonicalValues` not enforced** — `emails[].type` accepts any string including `"<script>alert(1)</script>"` | ❌ Open |
-| **V11** | Extensions | **Garbage URN keys accepted** when strict mode off — `"urn:evil:garbage:schema": {}` stored and echoed in responses | ❌ Open |
-| **V12** | Filter Parser | **No recursion depth limit** — `filter=((((...10000 levels...))))` → stack overflow crash | ❌ Open |
-| **V13** | Filter Parser | **No filter string length limit** — 1MB string value → expensive `ILIKE '%...%'` query | ❌ Open |
-| **V14** | PATCH DTO | **No `@ArrayMaxSize()`** on `Operations[]` — 100,000 ops in single request → CPU exhaustion | ❌ Open |
+| **V9** | SchemaValidator | **Required sub-attributes not checked** - `emails[].value` is `required:true` but `{ emails: [{ type: "work" }] }` accepted without `value` | ⚠️ **Partial** - sub-attr type checking works but required sub-attr enforcement still missing |
+| **V10** | SchemaValidator | **`canonicalValues` not enforced** - `emails[].type` accepts any string including `"<script>alert(1)</script>"` | ❌ Open |
+| **V11** | Extensions | **Garbage URN keys accepted** when strict mode off - `"urn:evil:garbage:schema": {}` stored and echoed in responses | ❌ Open |
+| **V12** | Filter Parser | **No recursion depth limit** - `filter=((((...10000 levels...))))` → stack overflow crash | ❌ Open |
+| **V13** | Filter Parser | **No filter string length limit** - 1MB string value → expensive `ILIKE '%...%'` query | ❌ Open |
+| **V14** | PATCH DTO | **No `@ArrayMaxSize()`** on `Operations[]` - 100,000 ops in single request → CPU exhaustion | ❌ Open |
 | **V15** | PATCH DTO | **`op` not constrained** to `["add","replace","remove"]` at DTO validation layer | ❌ Open |
-| **V16** | Service Layer | **`sanitizeBooleanStrings` corrupts data** — converts `roles[].value = "true"` (legitimate string) to boolean `true` across all string attrs | ❌ Open |
-| **V17** | Service Layer | **`sanitizeBooleanStrings` missing in Groups service** — inconsistent behavior vs Users | ❌ Open |
-| **V18** | PATCH Path | **valuePath regex rejects valid SCIM paths** — `emails[primary eq true]` (boolean filter) fails parsing, silently falls through | ❌ Open |
+| **V16** | Service Layer | **`sanitizeBooleanStrings` corrupts data** - converts `roles[].value = "true"` (legitimate string) to boolean `true` across all string attrs | ❌ Open |
+| **V17** | Service Layer | **`sanitizeBooleanStrings` missing in Groups service** - inconsistent behavior vs Users | ❌ Open |
+| **V18** | PATCH Path | **valuePath regex rejects valid SCIM paths** - `emails[primary eq true]` (boolean filter) fails parsing, silently falls through | ❌ Open |
 | **V19** | PATCH Engine | **Dot-notation allows arbitrary nested object creation** + potential `__proto__` pollution via `{ op: "replace", path: "__proto__.polluted", value: true }` | ❌ Open |
-| **V20** | PATCH Engine | **`stripReservedAttributes` missing `meta` and `schemas`** — PATCH can inject `{ "meta": { "created": "1970-01-01" } }` into rawPayload | ❌ Open |
+| **V20** | PATCH Engine | **`stripReservedAttributes` missing `meta` and `schemas`** - PATCH can inject `{ "meta": { "created": "1970-01-01" } }` into rawPayload | ❌ Open |
 
-**Example — V9 (missing required sub-attribute):**
+**Example - V9 (missing required sub-attribute):**
 ```json
 POST /scim/v2/endpoints/ep-1/Users
 {
@@ -973,9 +973,9 @@ POST /scim/v2/endpoints/ep-1/Users
   "emails": [{ "type": "work" }]
 }
 ```
-Schema defines `emails[].value` as `required: true` — accepted without error because `validateSubAttributes()` only checks type of provided keys, never checks for missing required sub-attributes.
+Schema defines `emails[].value` as `required: true` - accepted without error because `validateSubAttributes()` only checks type of provided keys, never checks for missing required sub-attributes.
 
-**Example — V12 (filter stack overflow):**
+**Example - V12 (filter stack overflow):**
 ```
 GET /scim/v2/endpoints/ep-1/Users?filter=((((((((((((((((((((((userName eq "a")))))))))))))))))))))))
 ```
@@ -988,15 +988,15 @@ GET /scim/v2/endpoints/ep-1/Users?filter=((((((((((((((((((((((userName eq "a"))
 | **V21** | SchemaValidator | `uniqueness` characteristic defined but not enforced for extension attributes | ❌ Open |
 | **V22** | SchemaValidator | `caseExact` defined but ignored in validation and filter comparisons | ❌ Open |
 | **V23** | SchemaValidator | `writeOnly`/`returned:"never"` attributes leaked in GET responses via `{ ...rawPayload }` spread | ❌ Open |
-| **V24** | Groups Service | **Client-supplied `id` accepted** for groups (`dto.id && typeof dto.id === 'string' ? dto.id : randomUUID()`) — should be server-assigned per RFC 7643 §3.1 | ❌ Open |
-| **V25** | Service Layer | `schemas` array allows duplicates, empty strings, garbage URNs alongside required URN | ⚠️ **Partial** — core schema presence checked but no URN format/duplicate validation |
+| **V24** | Groups Service | **Client-supplied `id` accepted** for groups (`dto.id && typeof dto.id === 'string' ? dto.id : randomUUID()`) - should be server-assigned per RFC 7643 §3.1 | ❌ Open |
+| **V25** | Service Layer | `schemas` array allows duplicates, empty strings, garbage URNs alongside required URN | ⚠️ **Partial** - core schema presence checked but no URN format/duplicate validation |
 | **V26** | DTO | Filter string in `POST /.search` has no length limit | ❌ Open |
 | **V27** | PATCH Engine | Group member remove regex rejects valid complex valuePath syntax (e.g., `members[value eq "a" or value eq "b"]`) | ❌ Open |
-| **V28** | DTO | `userName` allows whitespace-only (`"  "`) — no `@IsNotEmpty()` or `@MinLength(1)` | ❌ Open |
+| **V28** | DTO | `userName` allows whitespace-only (`"  "`) - no `@IsNotEmpty()` or `@MinLength(1)` | ❌ Open |
 | **V29** | PATCH Engine | `displayName` has no string length limit in PATCH operations | ❌ Open |
 | **V30** | PATCH Engine | Non-string `externalId` silently nullified to `null` (`typeof operation.value === 'string' ? ... : null`) instead of rejected with type error | ❌ Open |
-| **V31** | SchemaValidator | `dateTime` uses `Date.parse()` which accepts non-ISO formats like `"Dec 25, 1995"` — not RFC 3339 strict | ❌ Open |
-| **V32** | Filter Parser | Attribute names not semantically validated — nonsensical paths cause full-table scans with in-memory evaluation | ❌ Open |
+| **V31** | SchemaValidator | `dateTime` uses `Date.parse()` which accepts non-ISO formats like `"Dec 25, 1995"` - not RFC 3339 strict | ❌ Open |
+| **V32** | Filter Parser | Attribute names not semantically validated - nonsensical paths cause full-table scans with in-memory evaluation | ❌ Open |
 | **V33** | PATCH Engine | No per-request operation count throttling (defense-in-depth) | ❌ Open |
 
 #### Gap Distribution by Layer
@@ -1015,15 +1015,15 @@ pie title Validation Gaps by Architectural Layer (28 remaining)
 
 | Proposed Sub-Phase | Gaps Addressed | Focus | Effort |
 |:-------------------|:---------------|:------|:-------|
-| **Phase 8.5** — Input Hardening | V1 (always-on basic validation), V3, ~~V4~~ ✅, V5, V6, V14, V15, V28 | DTO + prototype pollution (payload size done) | ~5-7 hrs |
-| **Phase 8.1** — Mutability Enforcement | V2 (PATCH pre-validation remaining), ~~V8~~ ✅, V19, V20 | PatchEngine schema awareness (immutable done) | ~4-6 hrs |
-| **Phase 8.6** — Sub-attribute & Canonical Validation | V9, V10, V25, V31 | SchemaValidator completeness | ~4-5 hrs |
-| **Phase 8.3** — Response Shaping | V16, V17, V23 | sanitizeBooleanStrings fix + returned filtering | ~6-8 hrs |
-| **Phase 8.7** — Filter Hardening | V12, V13, V26, V32, V33 | Depth/length limits, semantic validation | ~3-4 hrs |
-| **Phase 8.8** — PATCH Path Robustness | V18, V27, V29, V30 | valuePath regex + edge case handling | ~3-4 hrs |
+| **Phase 8.5** - Input Hardening | V1 (always-on basic validation), V3, ~~V4~~ ✅, V5, V6, V14, V15, V28 | DTO + prototype pollution (payload size done) | ~5-7 hrs |
+| **Phase 8.1** - Mutability Enforcement | V2 (PATCH pre-validation remaining), ~~V8~~ ✅, V19, V20 | PatchEngine schema awareness (immutable done) | ~4-6 hrs |
+| **Phase 8.6** - Sub-attribute & Canonical Validation | V9, V10, V25, V31 | SchemaValidator completeness | ~4-5 hrs |
+| **Phase 8.3** - Response Shaping | V16, V17, V23 | sanitizeBooleanStrings fix + returned filtering | ~6-8 hrs |
+| **Phase 8.7** - Filter Hardening | V12, V13, V26, V32, V33 | Depth/length limits, semantic validation | ~3-4 hrs |
+| **Phase 8.8** - PATCH Path Robustness | V18, V27, V29, V30 | valuePath regex + edge case handling | ~3-4 hrs |
 | **Standalone fixes** | V7, V11, V24 | Member validation, garbage URN rejection, group ID server-assigned | ~2-3 hrs |
 
-**Total additional estimated effort: ~27-35 hours** (revised after reanalysis — 2 resolved, 3 partial)
+**Total additional estimated effort: ~27-35 hours** (revised after reanalysis - 2 resolved, 3 partial)
 
 #### Reanalysis Status (2026-02-24)
 
@@ -1031,8 +1031,8 @@ pie title Validation Gaps by Architectural Layer (28 remaining)
 
 | Status | Count | Gaps |
 |--------|-------|------|
-| ✅ **RESOLVED** | 2 | **V4** (payload size limit — `json({ limit: '5mb' })` in `main.ts`), **V8** (immutable enforcement — `SchemaValidator.checkImmutable()` + service calls in PUT/PATCH for Users & Groups) |
-| ⚠️ **PARTIALLY FIXED** | 3 | **V2** (post-PATCH `validatePayloadSchema()` added in both services — catches result corruption, but input values still not pre-validated before PatchEngine runs), **V9** (sub-attribute type checking works recursively, but `required` sub-attribute enforcement still missing — `emails[].value` being `required:true` is not verified), **V25** (core schema URN presence checked, but no format validation or duplicate rejection for `schemas[]` array entries) |
+| ✅ **RESOLVED** | 2 | **V4** (payload size limit - `json({ limit: '5mb' })` in `main.ts`), **V8** (immutable enforcement - `SchemaValidator.checkImmutable()` + service calls in PUT/PATCH for Users & Groups) |
+| ⚠️ **PARTIALLY FIXED** | 3 | **V2** (post-PATCH `validatePayloadSchema()` added in both services - catches result corruption, but input values still not pre-validated before PatchEngine runs), **V9** (sub-attribute type checking works recursively, but `required` sub-attribute enforcement still missing - `emails[].value` being `required:true` is not verified), **V25** (core schema URN presence checked, but no format validation or duplicate rejection for `schemas[]` array entries) |
 | ❌ **STILL OPEN** | 28 | V1, V3, V5, V6, V7, V10–V22, V23, V24, V26–V33 |
 
 ```mermaid
@@ -1046,14 +1046,14 @@ pie title Gap Resolution Status (33 total)
 - The **2 resolved gaps** (V4, V8) were addressed by Phase 8 implementation work (H-1/H-2 sub-phases)
 - The **3 partial fixes** provide defense-in-depth but leave attack surface open (V2: malformed PATCH values execute before post-validation catches them; V9: type-correct but missing-required sub-attrs pass through; V25: garbage URNs accepted alongside valid core URN)
 - All **6 remaining HIGH gaps** (V1, V2 partial, V3, V5, V6, V7) should be prioritized in Phase 8.5 (Input Hardening)
-- **No regressions detected** — all previously working validation continues to function correctly
+- **No regressions detected** - all previously working validation continues to function correctly
 
 #### Root Cause Analysis
 
 Most HIGH gaps stem from **two root design decisions**:
 
-1. **Schema validation is opt-in** (`StrictSchemaValidation=false` default) — so with default config, zero attribute-level type/required/mutability validation runs on POST/PUT
-2. **PATCH operations bypass schema validation entirely** — even when strict mode is on, only POST/PUT are validated; PATCH values go straight to the PatchEngine unchecked
+1. **Schema validation is opt-in** (`StrictSchemaValidation=false` default) - so with default config, zero attribute-level type/required/mutability validation runs on POST/PUT
+2. **PATCH operations bypass schema validation entirely** - even when strict mode is on, only POST/PUT are validated; PATCH values go straight to the PatchEngine unchecked
 
 **Recommended fix priority:**
 1. Split basic type validation (always-on) from strict validation (unknown-attr rejection)
@@ -1062,16 +1062,16 @@ Most HIGH gaps stem from **two root design decisions**:
 
 ---
 
-## 8. Phase 8 Part 2 — Full Scope Analysis
+## 8. Phase 8 Part 2 - Full Scope Analysis
 
 ### 8.1 What It Is
 
-Phase 8 Part 2 adds **Custom Resource Type Registration** — the ability to register resource types beyond the hardcoded User/Group (e.g., Device, Application, Organization) via the Admin API, per-endpoint, without code changes.
+Phase 8 Part 2 adds **Custom Resource Type Registration** - the ability to register resource types beyond the hardcoded User/Group (e.g., Device, Application, Organization) via the Admin API, per-endpoint, without code changes.
 
 ### 8.2 Implementation Status
 
 ```
-Phase 8 Part 2  ████████████████████ 100% — DONE (v0.18.0)
+Phase 8 Part 2  ████████████████████ 100% - DONE (v0.18.0)
 ```
 
 ### 8.3 Required Deliverables
@@ -1406,9 +1406,9 @@ A  docs/phases/PHASE_08_SCHEMA_VALIDATION.md           ← NEW: 906 lines
 ### 10.3 Suggested Commit Message
 
 ```
-feat(validation): Phase 8 — Schema Validation Engine (v0.17.0 → v0.18.0)
+feat(validation): Phase 8 - Schema Validation Engine (v0.17.0 → v0.18.0)
 
-Resolves: G8 (No schema validation — MEDIUM)
+Resolves: G8 (No schema validation - MEDIUM)
 
 Adds a pure-domain SchemaValidator class (383 lines, zero framework
 dependencies) that validates SCIM payloads against schema attribute
@@ -1435,7 +1435,7 @@ Tests (246 new):
 - 19 service-level tests (11 users + 8 groups)
 - 49 E2E tests (14 sections)
 
-Final counts: 1685 unit (54 suites), 342 E2E (19 suites), 318 live — all passing.
+Final counts: 1685 unit (54 suites), 342 E2E (19 suites), 318 live - all passing.
 
 16 files changed (6 new, 10 modified).
 ```
@@ -1497,10 +1497,10 @@ const TYPE_VALIDATORS = {
 
 ```typescript
 const RESERVED_KEYS = new Set([
-  'schemas',     // RFC 7643 §3.1 — always present, handled by ensureSchema()
-  'id',          // RFC 7643 §3.1 — server-assigned, stripped by stripReservedAttributes()
-  'externalId',  // RFC 7643 §3.1 — client-supplied but handled separately
-  'meta',        // RFC 7643 §3.1 — server-generated metadata
+  'schemas',     // RFC 7643 §3.1 - always present, handled by ensureSchema()
+  'id',          // RFC 7643 §3.1 - server-assigned, stripped by stripReservedAttributes()
+  'externalId',  // RFC 7643 §3.1 - client-supplied but handled separately
+  'meta',        // RFC 7643 §3.1 - server-generated metadata
 ]);
 ```
 

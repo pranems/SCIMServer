@@ -141,7 +141,7 @@ describe('GenericPatchEngine', () => {
     });
   });
 
-  // ─── Extension URN paths (DOT separator — legacy) ──────────────────
+  // ─── Extension URN paths (DOT separator - legacy) ──────────────────
 
   describe('extension URN paths (DOT separator)', () => {
     const urn = 'urn:example:ext:device:2.0';
@@ -176,7 +176,7 @@ describe('GenericPatchEngine', () => {
     });
   });
 
-  // ─── Extension URN paths (COLON separator — RFC-compliant) ─────────
+  // ─── Extension URN paths (COLON separator - RFC-compliant) ─────────
 
   describe('extension URN paths (COLON separator with extensionUrns)', () => {
     const urn = 'urn:ietf:params:scim:schemas:extension:custom:2.0:User';
@@ -234,7 +234,7 @@ describe('GenericPatchEngine', () => {
 
   // ─── V19: Prototype pollution guard ─────────────────────────────
 
-  describe('V19 — prototype pollution guard', () => {
+  describe('V19 - prototype pollution guard', () => {
     it('should reject add op with __proto__ in path', () => {
       const engine = new GenericPatchEngine(makePayload());
       expect(() =>

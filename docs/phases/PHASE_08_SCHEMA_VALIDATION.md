@@ -1,4 +1,4 @@
-# Phase 8 — Schema Validation Engine
+# Phase 8 - Schema Validation Engine
 
 > **Status:** Complete | **Version:** v0.17.0 | **Date:** 2026-02-24  
 > **RFC References:** RFC 7643 §2.1, §2.2, §4, §7 | RFC 7644 §3.3, §3.5.1, §3.12
@@ -23,13 +23,13 @@
 
 ## 1. Overview
 
-Phase 8 introduces a **pure-domain Schema Validation Engine** that validates incoming SCIM resource payloads against registered schema attribute definitions. The engine enforces RFC 7643 §2.1 attribute characteristics — type, required, mutability, multiplicity, and sub-attributes — with zero NestJS or Prisma dependencies.
+Phase 8 introduces a **pure-domain Schema Validation Engine** that validates incoming SCIM resource payloads against registered schema attribute definitions. The engine enforces RFC 7643 §2.1 attribute characteristics - type, required, mutability, multiplicity, and sub-attributes - with zero NestJS or Prisma dependencies.
 
 ### Key Design Decisions
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| **Layer** | Pure domain class | Same pattern as Phase 5 PatchEngine — testable without framework, portable |
+| **Layer** | Pure domain class | Same pattern as Phase 5 PatchEngine - testable without framework, portable |
 | **Activation** | Gated behind existing `StrictSchemaValidation` flag | No new config flags; reuses established per-endpoint toggle |
 | **Schema source** | `ScimSchemaRegistry` (Phase 6) | Single source of truth for attribute definitions |
 | **Error format** | SCIM RFC 7644 §3.12 error response | Consistent with existing error handling |
@@ -190,9 +190,9 @@ sequenceDiagram
     VP->>VP: class-transformer (implicit type coercion)
     VP->>VP: class-validator (@IsString, @IsBoolean, etc.)
     VP->>S: Validated + transformed DTO
-    S->>S: ensureSchema() — verify schemas[] array
-    S->>SSV: enforceStrictSchemaValidation() — URN check
-    S->>PSV: validatePayloadSchema() — attribute check
+    S->>S: ensureSchema() - verify schemas[] array
+    S->>SSV: enforceStrictSchemaValidation() - URN check
+    S->>PSV: validatePayloadSchema() - attribute check
     PSV->>SV: SchemaValidator.validate(dto, schemas, options)
     SV-->>PSV: ValidationResult { valid, errors[] }
     alt valid
@@ -524,7 +524,7 @@ Content-Type: application/scim+json
 
 ### Accepted: Same Payload in Lenient Mode (Strict OFF)
 
-When `StrictSchemaValidation` is `False` or not set, the same payloads above that were rejected (unknown attrs, wrong types) are **accepted** — only `enforceStrictSchemaValidation` (extension URN check) and standard NestJS `ValidationPipe` checks apply.
+When `StrictSchemaValidation` is `False` or not set, the same payloads above that were rejected (unknown attrs, wrong types) are **accepted** - only `enforceStrictSchemaValidation` (extension URN check) and standard NestJS `ValidationPipe` checks apply.
 
 ---
 
@@ -559,13 +559,13 @@ flowchart LR
 ### Validation Pipeline Order Within `createUserForEndpoint()`
 
 ```
-1. ensureSchema()                    — Check schemas[] contains core User URN
-2. enforceStrictSchemaValidation()   — Reject unknown extension URNs (Phase 2)
-3. validatePayloadSchema()           — Attribute-level validation (Phase 8) ← NEW
-4. this.logger.info(...)             — Log the create operation
-5. stripReservedAttributes()         — Remove id, meta from payload
-6. repository.create(...)            — Persist to database
-7. buildScimUserResource(...)        — Build SCIM response
+1. ensureSchema()                    - Check schemas[] contains core User URN
+2. enforceStrictSchemaValidation()   - Reject unknown extension URNs (Phase 2)
+3. validatePayloadSchema()           - Attribute-level validation (Phase 8) ← NEW
+4. this.logger.info(...)             - Log the create operation
+5. stripReservedAttributes()         - Remove id, meta from payload
+6. repository.create(...)            - Persist to database
+7. buildScimUserResource(...)        - Build SCIM response
 ```
 
 ---
@@ -586,7 +586,7 @@ flowchart TB
 
 ### Extension Validation Examples
 
-**Enterprise Extension — Valid:**
+**Enterprise Extension - Valid:**
 ```json
 {
   "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User",
@@ -598,9 +598,9 @@ flowchart TB
   }
 }
 ```
-**Result:** ✅ 201 Created — all types match schema definitions.
+**Result:** ✅ 201 Created - all types match schema definitions.
 
-**Enterprise Extension — Invalid (manager as string):**
+**Enterprise Extension - Invalid (manager as string):**
 ```json
 {
   "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
@@ -608,7 +608,7 @@ flowchart TB
   }
 }
 ```
-**Result:** ❌ 400 — `manager` must be complex object, got string.
+**Result:** ❌ 400 - `manager` must be complex object, got string.
 
 **Unknown Extension URN (Not Registered):**
 ```json
@@ -617,7 +617,7 @@ flowchart TB
   "urn:custom:ext:1.0": { "field1": "val1" }
 }
 ```
-**Result:** ❌ 400 — Rejected by `enforceStrictSchemaValidation()` (unknown URN in `schemas[]`). The `SchemaValidator` itself skips unknown extension URNs (they are caught by the earlier check).
+**Result:** ❌ 400 - Rejected by `enforceStrictSchemaValidation()` (unknown URN in `schemas[]`). The `SchemaValidator` itself skips unknown extension URNs (they are caught by the earlier check).
 
 ---
 
@@ -659,7 +659,7 @@ schemaRegistry.registerSchema('urn:myorg:scim:ext:custom:1.0', {
   }
 }
 ```
-**Result:** ✅ Validated — `projectCode` is string ✓, `clearanceLevel` is integer ✓, `tags` is array of complex ✓.
+**Result:** ✅ Validated - `projectCode` is string ✓, `clearanceLevel` is integer ✓, `tags` is array of complex ✓.
 
 ### Comprehensive Unit Test for Custom Extensions
 
@@ -712,7 +712,7 @@ flowchart LR
     A["Client sends:<br/>active: 'yes'"] --> B["class-transformer<br/>enableImplicitConversion"]
     B --> C["DTO property:<br/>@IsBoolean() active<br/>→ coerced to true"]
     C --> D["Service receives:<br/>active: true ✅"]
-    D --> E["SchemaValidator sees<br/>boolean — valid"]
+    D --> E["SchemaValidator sees<br/>boolean - valid"]
 ```
 
 | Client Sends | DTO Property | class-transformer | Service Receives | Schema Validator |
@@ -722,11 +722,11 @@ flowchart LR
 | `userName: 12345` | `@IsString()` userName | `12345` → `"12345"` | `"12345"` | Valid (string) |
 | `displayName: 42` | `@IsString()` displayName | `42` → `"42"` | `"42"` | Valid (string) |
 
-**Why this is NOT a bug:** The `enableImplicitConversion` is intentional for Entra ID compatibility — Microsoft's provisioning agent sometimes sends numbers where strings are expected, and the coercion ensures these are accepted gracefully.
+**Why this is NOT a bug:** The `enableImplicitConversion` is intentional for Entra ID compatibility - Microsoft's provisioning agent sometimes sends numbers where strings are expected, and the coercion ensures these are accepted gracefully.
 
 **Resolution:** Documented the coercion behavior in E2E test §13 ("DTO Implicit Conversion Behaviour") with explicit tests proving the coercion works as expected. The `SchemaValidator` correctly validates **non-DTO properties** that bypass class-transformer (e.g., `name`, `emails`, `phoneNumbers`, `addresses`, extension attributes).
 
-**Why this resolution:** Changing `enableImplicitConversion` to `false` would break Microsoft Entra ID interoperability — a core requirement. The SchemaValidator applies where it matters most: on complex multi-valued attributes and extensions that don't have explicit DTO decorators.
+**Why this resolution:** Changing `enableImplicitConversion` to `false` would break Microsoft Entra ID interoperability - a core requirement. The SchemaValidator applies where it matters most: on complex multi-valued attributes and extensions that don't have explicit DTO decorators.
 
 ---
 
@@ -749,7 +749,7 @@ const RESERVED_KEYS = new Set([
 ]);
 ```
 
-**Resolution:** Added `RESERVED_KEYS` set at the top of `SchemaValidator`. These keys are skipped entirely during validation. `externalId` is included because while it's listed in User schema attributes, it's also a common reserved payload key that's handled separately by the service (and the schema registry lists it — so without exclusion it would cause double-validation confusion). E2E tests in §14 verify that client-supplied `id` and `meta` are accepted without error and correctly overridden by the server.
+**Resolution:** Added `RESERVED_KEYS` set at the top of `SchemaValidator`. These keys are skipped entirely during validation. `externalId` is included because while it's listed in User schema attributes, it's also a common reserved payload key that's handled separately by the service (and the schema registry lists it - so without exclusion it would cause double-validation confusion). E2E tests in §14 verify that client-supplied `id` and `meta` are accepted without error and correctly overridden by the server.
 
 **Why this resolution over alternatives:**
 - Alternative A: Add `id`/`meta`/`externalId` as schema attributes → Would falsely pass type validation for `id` (it's a string but could be UUID vs user-supplied) and `meta` (complex structure that varies).
@@ -770,16 +770,16 @@ validateSubAttributes() → directly calls validateSingleValue()
                           (skips mutability check)
 ```
 
-**Resolution:** This is **by design** per RFC 7643 §2.2. Sub-attribute mutability is informational for the service provider — it indicates which sub-attributes the server will populate (e.g., `manager.displayName` is resolved by the server from the manager's User record). Rejecting client input for readOnly sub-attributes would break Entra ID provisioning where the client may include all available fields. The 3 E2E tests that initially expected 400 for this scenario were corrected to match the actual design.
+**Resolution:** This is **by design** per RFC 7643 §2.2. Sub-attribute mutability is informational for the service provider - it indicates which sub-attributes the server will populate (e.g., `manager.displayName` is resolved by the server from the manager's User record). Rejecting client input for readOnly sub-attributes would break Entra ID provisioning where the client may include all available fields. The 3 E2E tests that initially expected 400 for this scenario were corrected to match the actual design.
 
 **Why NOT enforce sub-attribute mutability:**
-1. **Entra ID compatibility** — Microsoft sends `manager.displayName` in PATCH payloads
+1. **Entra ID compatibility** - Microsoft sends `manager.displayName` in PATCH payloads
 2. **RFC 7643 §2.2** states readOnly means "the attribute SHALL NOT be modified" but this applies to the *service provider's storage behavior*, not input rejection
-3. **Precedent** — Azure AD SCIM reference implementation accepts readOnly sub-attributes
+3. **Precedent** - Azure AD SCIM reference implementation accepts readOnly sub-attributes
 
 ---
 
-### Issue 4: E2E Failures — 14 Tests Got 201 Instead of 400
+### Issue 4: E2E Failures - 14 Tests Got 201 Instead of 400
 
 **Symptom:** First E2E test run: 29/43 passed, 14 failed. All 14 expected HTTP 400 but got 201.
 

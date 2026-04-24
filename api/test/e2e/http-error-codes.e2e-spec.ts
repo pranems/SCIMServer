@@ -11,7 +11,7 @@ import {
 import { validUser, validGroup, resetFixtureCounter } from './helpers/fixtures';
 
 /**
- * RFC 7644 §3.12 — HTTP Error Code E2E tests.
+ * RFC 7644 §3.12 - HTTP Error Code E2E tests.
  *
  * Validates that the server returns correct HTTP status codes for
  * protocol-level errors:

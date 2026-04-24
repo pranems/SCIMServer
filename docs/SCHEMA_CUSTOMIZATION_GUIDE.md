@@ -1,4 +1,4 @@
-# Schema Customization Guide — Operator Reference
+# Schema Customization Guide - Operator Reference
 
 > **Version**: 3.0 · **Date**: April 13, 2026 · **Status**: ✅ Complete (source-verified)  
 > **Audience**: Operators, DevOps engineers, ISVs configuring SCIM schema extensions & custom resource types  
@@ -49,7 +49,7 @@
 
 ### The Profile Model (v0.28.0+)
 
-Schema customization is done **entirely through the endpoint profile** — a single JSONB document attached to each endpoint. There are **no separate admin schema/resource-type routes**; everything is defined at endpoint creation or updated via `PATCH`.
+Schema customization is done **entirely through the endpoint profile** - a single JSONB document attached to each endpoint. There are **no separate admin schema/resource-type routes**; everything is defined at endpoint creation or updated via `PATCH`.
 
 ```mermaid
 flowchart LR
@@ -96,10 +96,10 @@ A profile has four sections:
 
 ### Key Architecture Points
 
-1. **Extension data is stored in `rawPayload`** — the JSONB blob alongside core attributes. No separate table.
-2. **Extension URNs must start with `urn:`** — the server detects extensions by checking payload keys that start with `urn:`.
-3. **`schemas[]` array on resources is built dynamically** — from visible extension URN keys present in the stored payload.
-4. **Each endpoint is fully isolated** — extension schemas on one endpoint don't affect another.
+1. **Extension data is stored in `rawPayload`** - the JSONB blob alongside core attributes. No separate table.
+2. **Extension URNs must start with `urn:`** - the server detects extensions by checking payload keys that start with `urn:`.
+3. **`schemas[]` array on resources is built dynamically** - from visible extension URN keys present in the stored payload.
+4. **Each endpoint is fully isolated** - extension schemas on one endpoint don't affect another.
 
 ---
 
@@ -146,7 +146,7 @@ POST /scim/admin/endpoints
 1. **Expansion**: Core schemas with `"attributes": "all"` get expanded to full RFC 7643 attribute lists. Custom extension schemas are used as-is (no RFC baseline exists).
 2. **Auto-inject**: `id`, `userName`, `externalId`, `meta` are injected into User schema if missing. `id`, `displayName`, `externalId`, `meta`, `active` are injected into Group schema.
 3. **Structural validation**: Server verifies that every `schemaExtensions[].schema` references a schema in the `schemas[]` array.
-4. **Cache build**: A `SchemaCharacteristicsCache` is lazily built at first access — producing O(1) lookup maps for booleans, returned characteristics, uniqueness, case-exactness, readOnly/immutable attributes, all keyed by URN-qualified dot-paths.
+4. **Cache build**: A `SchemaCharacteristicsCache` is lazily built at first access - producing O(1) lookup maps for booleans, returned characteristics, uniqueness, case-exactness, readOnly/immutable attributes, all keyed by URN-qualified dot-paths.
 
 ### The Three-Part Pattern
 
@@ -258,7 +258,7 @@ You can bind multiple extensions to a single resource type. Each extension is a 
 }
 ```
 
-**Usage** — Creating a user with all three extensions:
+**Usage** - Creating a user with all three extensions:
 
 ```json
 POST /scim/endpoints/{endpointId}/Users
@@ -427,7 +427,7 @@ Setting `"required": true` in the resource type binding means **every** created 
 
 With `StrictSchemaValidation: "True"`, a `POST /Users` that omits the required extension's URN from `schemas[]` or omits required attributes within it will be rejected with `400`.
 
-> **Caution**: Required extensions are strict. Use sparingly — every resource of that type must include the extension data.
+> **Caution**: Required extensions are strict. Use sparingly - every resource of that type must include the extension data.
 
 ---
 
@@ -511,7 +511,7 @@ Custom resource types can also have schema extensions:
 
 ## 11. Adding Extensions to Existing Endpoints (PATCH)
 
-> **Important**: `schemas` and `resourceTypes` use **Replace** merge semantics. You must send the complete arrays — including all existing schemas/RTs plus the new extension.
+> **Important**: `schemas` and `resourceTypes` use **Replace** merge semantics. You must send the complete arrays - including all existing schemas/RTs plus the new extension.
 
 ```json
 PATCH /scim/admin/endpoints/{id}
@@ -550,18 +550,18 @@ PATCH /scim/admin/endpoints/{id}
 
 ### When Does It Take Effect?
 
-**Immediately — on the very next SCIM request. No restart required.**
+**Immediately - on the very next SCIM request. No restart required.**
 
 The PATCH handler follows this pipeline:
 
-1. `mergeProfilePartial()` — replaces `schemas`/`resourceTypes`, shallow-merges `settings`/`serviceProviderConfig`
-2. `validateAndExpandProfile()` — runs the full 5-step validation pipeline on the merged profile (if validation fails, nothing changes → `400`)
-3. **In-memory cache updated** — the cached endpoint object is replaced synchronously
-4. **`_schemaCaches` cleared** — the lazy schema characteristics cache is deleted, forcing a rebuild on first access
-5. `profileChangeListener` fired — notifies any registered listeners
+1. `mergeProfilePartial()` - replaces `schemas`/`resourceTypes`, shallow-merges `settings`/`serviceProviderConfig`
+2. `validateAndExpandProfile()` - runs the full 5-step validation pipeline on the merged profile (if validation fails, nothing changes → `400`)
+3. **In-memory cache updated** - the cached endpoint object is replaced synchronously
+4. **`_schemaCaches` cleared** - the lazy schema characteristics cache is deleted, forcing a rebuild on first access
+5. `profileChangeListener` fired - notifies any registered listeners
 6. **200 OK** returned with the updated endpoint
 
-Every subsequent SCIM request reads from the in-memory cache, so the new extension is visible instantly — in discovery (`/Schemas`, `/ResourceTypes`), in validation, and in characteristic enforcement.
+Every subsequent SCIM request reads from the in-memory cache, so the new extension is visible instantly - in discovery (`/Schemas`, `/ResourceTypes`), in validation, and in characteristic enforcement.
 
 ### Impact on Existing Resources
 
@@ -569,7 +569,7 @@ Every subsequent SCIM request reads from the in-memory cache, so the new extensi
 |----------|----------|
 | Existing resources **without** extension data | Continue to work. Extension data is optional (unless `required: true`). |
 | New resources created **after** the PATCH | Extension data accepted, validated, and stored per the new schema definition. |
-| `GET` on existing resources | No change — extension data isn't retroactively added. Only visible if the resource has extension data stored. |
+| `GET` on existing resources | No change - extension data isn't retroactively added. Only visible if the resource has extension data stored. |
 | **Removing** an extension via PATCH | Data persists in `rawPayload` but becomes invisible to discovery. Strict mode will reject subsequent PUTs with the removed URN. |
 
 ---
@@ -617,7 +617,7 @@ curl -X POST "http://localhost:6000/scim/endpoints/${ENDPOINT_ID}/Users" \
 }
 ```
 
-> **Note**: `secretToken` is NOT in the response — it's `returned: "never"` / `mutability: "writeOnly"`.
+> **Note**: `secretToken` is NOT in the response - it's `returned: "never"` / `mutability: "writeOnly"`.
 
 ### Creating a Group with Extension Data
 
@@ -640,7 +640,7 @@ curl -X POST "http://localhost:6000/scim/endpoints/${ENDPOINT_ID}/Groups" \
 
 ### Extension Data on GET
 
-Extension data roundtrips through GET — both single-resource and list responses. `schemas[]` is built dynamically from visible extension URN keys:
+Extension data roundtrips through GET - both single-resource and list responses. `schemas[]` is built dynamically from visible extension URN keys:
 
 ```json
 GET /scim/endpoints/{endpointId}/Users/{userId}
@@ -763,7 +763,7 @@ flowchart TD
 | Flag | Default | Effect |
 |------|---------|--------|
 | `StrictSchemaValidation` | `true` (entra-id preset) | Full validation: types, required, unknowns, schemas[] array, canonical values |
-| *(flag off)* | — | Required-only validation: just checks required attributes exist |
+| *(flag off)* | - | Required-only validation: just checks required attributes exist |
 
 ### What Strict Validation Checks
 
@@ -826,7 +826,7 @@ curl -s "http://localhost:6000/scim/endpoints/${ENDPOINT_ID}/ResourceTypes" \
 
 ### Cross-endpoint isolation
 
-Extensions on endpoint A **never** appear in endpoint B's discovery or affect endpoint B's validation — even if they share the same server.
+Extensions on endpoint A **never** appear in endpoint B's discovery or affect endpoint B's validation - even if they share the same server.
 
 > **All discovery endpoints are unauthenticated** (`@Public()` decorator) per RFC 7644 §4. They require no bearer token.
 
@@ -851,18 +851,18 @@ Extensions on endpoint A **never** appear in endpoint B's discovery or affect en
 
 | Characteristic | Required | Values | Default when omitted |
 |----------------|----------|--------|---------------------|
-| `name` | Yes | Any string | — |
-| `type` | Yes | See table above | — |
-| `multiValued` | Yes | `true` / `false` | — |
-| `required` | Yes | `true` / `false` | — |
+| `name` | Yes | Any string | - |
+| `type` | Yes | See table above | - |
+| `multiValued` | Yes | `true` / `false` | - |
+| `required` | Yes | `true` / `false` | - |
 | `mutability` | Recommended | `readOnly` · `readWrite` · `immutable` · `writeOnly` | `readWrite` |
 | `returned` | Recommended | `always` · `never` · `default` · `request` | `default` |
 | `caseExact` | No | `true` / `false` | `false` |
 | `uniqueness` | No | `none` · `server` · `global` | `none` |
-| `description` | No | Any string | — |
-| `referenceTypes` | No | Array of strings | — |
-| `subAttributes` | Only for `complex` | Array of attribute definitions | — |
-| `canonicalValues` | No | Array of strings | — |
+| `description` | No | Any string | - |
+| `referenceTypes` | No | Array of strings | - |
+| `subAttributes` | Only for `complex` | Array of attribute definitions | - |
+| `canonicalValues` | No | Array of strings | - |
 
 ### Mutability × Returned Matrix
 
@@ -929,7 +929,7 @@ When operators override attributes on RFC schemas, changes must be same-or-tight
 | `caseExact` | `false → true` | `true → false` |
 | `returned` | Cannot change `never` | Loosening `never` |
 
-> **Custom schemas (non-RFC URNs)** have no baseline — tighten-only validation is skipped; attributes are used as-is.
+> **Custom schemas (non-RFC URNs)** have no baseline - tighten-only validation is skipped; attributes are used as-is.
 
 ### SPC Truthfulness Rules
 
@@ -966,14 +966,14 @@ When operators override attributes on RFC schemas, changes must be same-or-tight
 | Use `StrictSchemaValidation: "True"` in production | Catches malformed payloads early |
 | Define `subAttributes` for complex types | Required for nested object validation |
 | Use Prisma (PostgreSQL) for persistent deployments | InMemory mode loses all data on restart |
-| Send `schemas` + `resourceTypes` together on PATCH | Replace semantics — orphaned references get rejected |
+| Send `schemas` + `resourceTypes` together on PATCH | Replace semantics - orphaned references get rejected |
 | Test PATCH operations with URN-prefixed paths | Extension paths have specific syntax |
 
 ### ❌ DON'T
 
 | Anti-Pattern | Consequence |
 |--------------|-------------|
-| Use `"attributes": "all"` on custom schemas | Only works for known RFC schemas — custom schemas have no baseline |
+| Use `"attributes": "all"` on custom schemas | Only works for known RFC schemas - custom schemas have no baseline |
 | Try to override `type` or `multiValued` on core schemas | Tighten-only validation rejects this |
 | Omit `schemas[]` from SCIM payloads when strict is on | `400: Missing required attribute: schemas` |
 | Use non-`urn:` prefixes for extension IDs | Server detects extensions by `urn:` prefix on payload keys |
@@ -981,7 +981,7 @@ When operators override attributes on RFC schemas, changes must be same-or-tight
 | Create extensions with empty attributes arrays | Technically valid but adds no value |
 | Set `required: true` on extensions unless needed | Every resource must include the extension data |
 | Change attribute characteristics after deployment | Changes to `type`, `mutability`, `returned` break existing clients |
-| Claim `changePassword.supported: true` in SPC | Not implemented — rejected by SPC truthfulness validation |
+| Claim `changePassword.supported: true` in SPC | Not implemented - rejected by SPC truthfulness validation |
 | Set `filter.maxResults` > 10,000 or < 1 | SPC validation rejects out-of-range values |
 
 ---
@@ -1003,7 +1003,7 @@ When operators override attributes on RFC schemas, changes must be same-or-tight
 | `400: Unknown attribute: ...` (strict mode) | Attribute not defined in any registered schema for the resource type | Add the attribute to the extension schema, or disable strict mode |
 | `400: Attribute '...' is readOnly` (strict mode) | Tried to set a readOnly attribute on create/PUT | Remove the attribute from the payload |
 | `400: ResourceType "..." references schema "..." not in schemas array` | PATCH replaced schemas without including all RT-referenced schemas | Send both `schemas` and `resourceTypes` together |
-| `409: Conflict — uniqueness violation` | Extension attribute with `uniqueness: "server"` has a duplicate value | Use a unique value for that attribute |
+| `409: Conflict - uniqueness violation` | Extension attribute with `uniqueness: "server"` has a duplicate value | Use a unique value for that attribute |
 
 ### Extension Data After Schema Removal
 
@@ -1061,15 +1061,15 @@ sequenceDiagram
     Note over Client,DB: 2. Create user with extension
     Client->>Server: POST /Users { schemas: [core, ext], [extUrn]: { attrs } }
     Server->>Server: enforceStrictSchemaValidation()
-    Server->>Server: validatePayloadSchema() — type/required/unknown checks
+    Server->>Server: validatePayloadSchema() - type/required/unknown checks
     Server->>Server: stripReadOnlyAttributes()
-    Server->>Server: extractAdditionalAttributes() — ext stays in rawPayload
+    Server->>Server: extractAdditionalAttributes() - ext stays in rawPayload
     Server->>DB: Store rawPayload (JSON with ext data)
 
     Note over Client,DB: 3. GET user
     Client->>Server: GET /Users/{id}
     Server->>DB: Fetch rawPayload
-    Server->>Server: stripNeverReturnedFromPayload() — remove writeOnly/never
+    Server->>Server: stripNeverReturnedFromPayload() - remove writeOnly/never
     Server->>Server: Build schemas[] from visible extension URN keys
     Server->>Client: { schemas: [core, ext], [extUrn]: { visible attrs }, ... }
 ```
@@ -1111,4 +1111,4 @@ sequenceDiagram
 
 ---
 
-*Last updated: April 13, 2026 · Source-verified against v0.35.0 codebase*
+*Last updated: April 23, 2026 · Source-verified against v0.38.0 codebase*

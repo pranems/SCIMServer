@@ -1,6 +1,6 @@
-# SCIMServer — Sovereign & Government Cloud Deployment Guide
+# SCIMServer - Sovereign & Government Cloud Deployment Guide
 
-> **Version:** 0.35.0 · **Updated:** April 10, 2026  
+> **Version:** 0.38.0 · **Updated:** April 23, 2026  
 > Covers: Azure Government (US), Azure China (21Vianet), Azure BLEU (France), Azure Germany, and custom sovereign environments
 
 ---
@@ -27,13 +27,13 @@
 
 ## 1. Overview
 
-SCIMServer is a standard Docker container running on Azure Container Apps with PostgreSQL. Because it uses no proprietary Azure-only services (beyond Container Apps + PG Flexible Server), it deploys to **any Azure cloud environment** — including sovereign and government clouds — with only two adjustments:
+SCIMServer is a standard Docker container running on Azure Container Apps with PostgreSQL. Because it uses no proprietary Azure-only services (beyond Container Apps + PG Flexible Server), it deploys to **any Azure cloud environment** - including sovereign and government clouds - with only two adjustments:
 
 1. **Set the correct Azure cloud** (`az cloud set`)
 2. **Choose an available region** within that cloud
 3. **(Optional)** Mirror the container image to a registry accessible from that cloud
 
-Everything else — the Bicep templates, deploy script, VNet isolation, and PostgreSQL configuration — works identically.
+Everything else - the Bicep templates, deploy script, VNet isolation, and PostgreSQL configuration - works identically.
 
 ---
 
@@ -44,7 +44,7 @@ Everything else — the Bicep templates, deploy script, VNet isolation, and Post
 | **Azure Public** | `AzureCloud` | portal.azure.com | login.microsoftonline.com | eastus, westeurope, etc. |
 | **Azure Government (US)** | `AzureUSGovernment` | portal.azure.us | login.microsoftonline.us | usgovvirginia, usgovarizona, usgovtexas |
 | **Azure China (21Vianet)** | `AzureChinaCloud` | portal.azure.cn | login.chinacloudapi.cn | chinanorth3, chinaeast3 |
-| **Azure Germany** | `AzureGermanCloud` | — (migrated) | — | germanywestcentral (now on AzureCloud) |
+| **Azure Germany** | `AzureGermanCloud` | - (migrated) | - | germanywestcentral (now on AzureCloud) |
 | **Azure BLEU (France)** | See [Section 6](#6-deploying-to-azure-bleu-france) | bleu.azure.com | Separate tenant | francesouth, francecentral |
 
 > **Note:** Azure Germany (legacy) has been mostly migrated to standard `AzureCloud` regions (`germanywestcentral`, `germanynorth`). New deployments should use `AzureCloud` with a German region.
@@ -118,7 +118,7 @@ az cloud set --name AzureUSGovernment
 # Azure China (21Vianet)
 az cloud set --name AzureChinaCloud
 
-# Azure Public (default — to switch back)
+# Azure Public (default - to switch back)
 az cloud set --name AzureCloud
 ```
 
@@ -207,7 +207,7 @@ Azure BLEU is a sovereign cloud operated by Bleu (a joint venture of Capgemini a
 
 1. **Obtain BLEU subscription** through your organization's procurement
 2. **Verify service availability**: Container Apps and PostgreSQL Flexible Server support in BLEU
-3. **Container image**: ghcr.io is likely not accessible — mirror to BLEU's ACR (see [Section 9](#9-container-registry-considerations))
+3. **Container image**: ghcr.io is likely not accessible - mirror to BLEU's ACR (see [Section 9](#9-container-registry-considerations))
 4. **Network requirements**: BLEU may have stricter network isolation requirements
 
 ### Deployment Steps
@@ -319,7 +319,7 @@ docker push scimservercn.azurecr.cn/scimserver:latest
 |--------|-------------|-------------|
 | **Portal** | portal.azure.com | portal.azure.cn |
 | **ACR suffix** | `.azurecr.io` | `.azurecr.cn` |
-| **ghcr.io** | Accessible | **Blocked** — must mirror to ACR |
+| **ghcr.io** | Accessible | **Blocked** - must mirror to ACR |
 | **Entra ID** | login.microsoftonline.com | login.chinacloudapi.cn |
 
 ---
@@ -373,9 +373,9 @@ docker run -d -p 8080:8080 \
 
 ## 9. Persistence Options (No PostgreSQL?)
 
-SCIMServer supports **three persistence modes**. If your sovereign cloud doesn't have Azure PostgreSQL Flexible Server available — or you simply want to get running quickly before setting up a database — you have options.
+SCIMServer supports **three persistence modes**. If your sovereign cloud doesn't have Azure PostgreSQL Flexible Server available - or you simply want to get running quickly before setting up a database - you have options.
 
-### Option A: In-Memory Mode (Fastest Start — No Database Required)
+### Option A: In-Memory Mode (Fastest Start - No Database Required)
 
 Set `PERSISTENCE_BACKEND=inmemory` and SCIMServer runs entirely without a database. All data lives in memory and is lost when the container restarts. This is ideal for:
 
@@ -388,7 +388,7 @@ Set `PERSISTENCE_BACKEND=inmemory` and SCIMServer runs entirely without a databa
 
 ```powershell
 # Deploy without -ProvisionPostgres and without -DatabaseUrl
-# The deploy script will prompt — choose option [1] and provide a dummy DATABASE_URL
+# The deploy script will prompt - choose option [1] and provide a dummy DATABASE_URL
 # Then override via Container App env var:
 
 az containerapp update -n scimserver-gov -g scimserver-gov-rg \
@@ -471,7 +471,7 @@ This creates a B1ms instance (~$15-25/mo) with automated daily backups, 7-day PI
 
 ### Option D: BYO PostgreSQL (Any External Database)
 
-Connect to any PostgreSQL 14+ instance — cloud-managed, self-hosted, or on-premises:
+Connect to any PostgreSQL 14+ instance - cloud-managed, self-hosted, or on-premises:
 
 ```powershell
 .\ scripts\deploy-azure.ps1 \
@@ -589,8 +589,8 @@ The Entra provisioning configuration is otherwise identical:
 ### Data Residency
 
 SCIMServer stores data in two locations:
-1. **PostgreSQL** — All SCIM resources (users, groups, memberships, credentials, logs)
-2. **Container memory** — Transient request processing only (no persistent state in memory besides in-memory mode)
+1. **PostgreSQL** - All SCIM resources (users, groups, memberships, credentials, logs)
+2. **Container memory** - Transient request processing only (no persistent state in memory besides in-memory mode)
 
 When deployed to a sovereign cloud:
 - PostgreSQL data resides **only** in the selected region
@@ -737,7 +737,7 @@ az cloud set --name AzureCloud
 
 ## See Also
 
-- [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) — Standard Azure deployment guide
-- [DEPLOYMENT.md](../DEPLOYMENT.md) — All deployment options comparison
-- [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) — Docker deployment details
-- [README.md](../README.md) — Quick start and overview
+- [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) - Standard Azure deployment guide
+- [DEPLOYMENT.md](../DEPLOYMENT.md) - All deployment options comparison
+- [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) - Docker deployment details
+- [README.md](../README.md) - Quick start and overview

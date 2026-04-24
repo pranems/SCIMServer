@@ -1,4 +1,4 @@
-# Next Items — v0.28.0 Roadmap
+# Next Items - v0.28.0 Roadmap
 
 > **Purpose**: Prioritized work items for the next release, with rationale, impact analysis, and proposed fixes.
 >
@@ -14,12 +14,12 @@
 
 - [1. Executive Summary](#1-executive-summary)
 - [2. Priority Matrix](#2-priority-matrix)
-- [3. P0 — Live Test Infrastructure Fix (5 uniqueness + 1 required)](#3-p0--live-test-infrastructure-fix-5-uniqueness--1-required)
-- [4. P1A — Content-Type Negotiation (HTTP 415)](#4-p1a--content-type-negotiation-http-415)
-- [5. P1B — Collection-Level Method Rejection (HTTP 405)](#5-p1b--collection-level-method-rejection-http-405)
-- [6. P1C — Immutable Enforcement Always-On](#6-p1c--immutable-enforcement-always-on)
-- [7. P1D — Required Attribute Enforcement Always-On](#7-p1d--required-attribute-enforcement-always-on)
-- [8. P2A — Generic Filter Engine Upgrade (AST-based)](#8-p2a--generic-filter-engine-upgrade-ast-based)
+- [3. P0 - Live Test Infrastructure Fix (5 uniqueness + 1 required)](#3-p0--live-test-infrastructure-fix-5-uniqueness--1-required)
+- [4. P1A - Content-Type Negotiation (HTTP 415)](#4-p1a--content-type-negotiation-http-415)
+- [5. P1B - Collection-Level Method Rejection (HTTP 405)](#5-p1b--collection-level-method-rejection-http-405)
+- [6. P1C - Immutable Enforcement Always-On](#6-p1c--immutable-enforcement-always-on)
+- [7. P1D - Required Attribute Enforcement Always-On](#7-p1d--required-attribute-enforcement-always-on)
+- [8. P2A - Generic Filter Engine Upgrade (AST-based)](#8-p2a--generic-filter-engine-upgrade-ast-based)
 - [9. Deferred Items (P2–P3)](#9-deferred-items-p2p3)
 - [10. Estimated Impact](#10-estimated-impact)
 - [11. Architecture Diagrams](#11-architecture-diagrams)
@@ -33,11 +33,11 @@ v0.27.0 closed all 15 Generic Service Parity gaps (GEN-01..GEN-12 + 3 P0 fixes) 
 
 | Failures | Category | Root Cause | Fix Type |
 |:---:|---|---|---|
-| 5 | Uniqueness (9x.1-2, 9x.4-6) | **Test infrastructure** — PowerShell status code extraction | Script fix |
-| 1 | Required (9x.8) | **Test infrastructure** — same PS extraction issue | Script fix |
-| 2 | Content-Type (9w.1-2) | **Missing feature** — no HTTP 415 middleware | New middleware |
-| 2 | Collection methods (9w.5-6) | **Missing feature** — no explicit 405 routes | New routes |
-| 2 | Immutable (9w.10, 9w.12) | **Config gating** — strict-mode-only enforcement | Remove gate |
+| 5 | Uniqueness (9x.1-2, 9x.4-6) | **Test infrastructure** - PowerShell status code extraction | Script fix |
+| 1 | Required (9x.8) | **Test infrastructure** - same PS extraction issue | Script fix |
+| 2 | Content-Type (9w.1-2) | **Missing feature** - no HTTP 415 middleware | New middleware |
+| 2 | Collection methods (9w.5-6) | **Missing feature** - no explicit 405 routes | New routes |
+| 2 | Immutable (9w.10, 9w.12) | **Config gating** - strict-mode-only enforcement | Remove gate |
 
 Key insight: **6 of 12 failures are test script bugs, not server bugs.** The server correctly returns 409/400 but the PowerShell error handling extracts an empty status code. Fixing the test script alone resolves 50% of failures.
 
@@ -49,18 +49,18 @@ Key insight: **6 of 12 failures are test script bugs, not server bugs.** The ser
 
 | Priority | Item | Failures Fixed | Effort | Why This Order |
 |---|---|:---:|---|---|
-| **P0** | Live test script fix (§3) | 6 | Small (1 file) | Highest ROI — fixes 50% of failures with a 1-line pattern change |
-| **P1A** | Content-Type 415 (§4) | 2 | Small (1 file) | RFC 7644 §3.1 MUST — simple Express middleware |
-| **P1B** | Collection 405 (§5) | 2 | Small (2 files) | RFC 7644 §3.2 — explicit route handlers |
-| **P1C** | Immutable always-on (§6) | 2 | Medium (4 files) | RFC 7643 §2.2 SHOULD — removes incorrect strict gating |
-| **P1D** | Required always-on (§7) | 0 (but closes Gap G2) | Medium (3 files) | RFC 7643 §2.4 — required enforcement should not be optional |
-| **P2A** | Generic filter upgrade (§8) | 0 (closes Gap G6) | Large (2 files) | Usability — brings Generic to parity with Users/Groups filtering |
+| **P0** | Live test script fix (§3) | 6 | Small (1 file) | Highest ROI - fixes 50% of failures with a 1-line pattern change |
+| **P1A** | Content-Type 415 (§4) | 2 | Small (1 file) | RFC 7644 §3.1 MUST - simple Express middleware |
+| **P1B** | Collection 405 (§5) | 2 | Small (2 files) | RFC 7644 §3.2 - explicit route handlers |
+| **P1C** | Immutable always-on (§6) | 2 | Medium (4 files) | RFC 7643 §2.2 SHOULD - removes incorrect strict gating |
+| **P1D** | Required always-on (§7) | 0 (but closes Gap G2) | Medium (3 files) | RFC 7643 §2.4 - required enforcement should not be optional |
+| **P2A** | Generic filter upgrade (§8) | 0 (closes Gap G6) | Large (2 files) | Usability - brings Generic to parity with Users/Groups filtering |
 
 **Total failures resolved**: 12/12 → **0 remaining**
 
 ---
 
-## 3. P0 — Live Test Infrastructure Fix (5 uniqueness + 1 required)
+## 3. P0 - Live Test Infrastructure Fix (5 uniqueness + 1 required)
 
 ### What's Failing
 
@@ -128,7 +128,7 @@ The E2E tests (`user-uniqueness-required.e2e-spec.ts`) exercise the same code pa
 
 ---
 
-## 4. P1A — Content-Type Negotiation (HTTP 415)
+## 4. P1A - Content-Type Negotiation (HTTP 415)
 
 ### What's Failing
 
@@ -155,7 +155,7 @@ app.use(json({
 }));
 ```
 
-When `text/xml` arrives, the body simply isn't parsed (`req.body = undefined`). The request still reaches the controller, which processes it with an empty body — no error is thrown.
+When `text/xml` arrives, the body simply isn't parsed (`req.body = undefined`). The request still reaches the controller, which processes it with an empty body - no error is thrown.
 
 ### Proposed Fix
 
@@ -187,12 +187,12 @@ app.use((req, res, next) => {
 | Type | Count | Description |
 |---|:---:|---|
 | Unit | 0 | Middleware is integration-tested via E2E |
-| E2E | 0 | Already covered by `http-error-codes.e2e-spec.ts` (13 tests) — currently these tests mock the behavior; after the fix they'll validate real 415 responses |
+| E2E | 0 | Already covered by `http-error-codes.e2e-spec.ts` (13 tests) - currently these tests mock the behavior; after the fix they'll validate real 415 responses |
 | Live | 0 | 9w.1 and 9w.2 will flip from FAIL to PASS |
 
 ---
 
-## 5. P1B — Collection-Level Method Rejection (HTTP 405)
+## 5. P1B - Collection-Level Method Rejection (HTTP 405)
 
 ### What's Failing
 
@@ -205,7 +205,7 @@ app.use((req, res, next) => {
 
 RFC 7644 §3.2 defines which HTTP methods are allowed on collection endpoints (GET, POST, POST `.search`). PUT, PATCH, and DELETE on collection URIs should return 404 or 405.
 
-Note: 9w.7 and 9w.8 (DELETE on collections) already PASS — they correctly return 404. The PUT/PATCH failures may be a combination of NestJS routing (PUT/PATCH without `:id` potentially matching the generic resource type controller's wildcard route) and the same PowerShell status extraction issue.
+Note: 9w.7 and 9w.8 (DELETE on collections) already PASS - they correctly return 404. The PUT/PATCH failures may be a combination of NestJS routing (PUT/PATCH without `:id` potentially matching the generic resource type controller's wildcard route) and the same PowerShell status extraction issue.
 
 ### Root Cause Analysis
 
@@ -249,7 +249,7 @@ Fixing the PS extraction first (P0) is likely to resolve these as well. If the s
 
 ---
 
-## 6. P1C — Immutable Enforcement Always-On
+## 6. P1C - Immutable Enforcement Always-On
 
 ### What's Failing
 
@@ -260,7 +260,7 @@ Fixing the PS extraction first (P0) is likely to resolve these as well. If the s
 
 ### Why This Is P1
 
-RFC 7643 §2.2 says immutable means the attribute "**may be set during resource creation (e.g., POST) or can be set to an existing value during resource replacement (e.g., PUT)**". This is a MUST-level behavioral requirement — immutability is a fundamental data integrity guarantee, not a validation strictness preference.
+RFC 7643 §2.2 says immutable means the attribute "**may be set during resource creation (e.g., POST) or can be set to an existing value during resource replacement (e.g., PUT)**". This is a MUST-level behavioral requirement - immutability is a fundamental data integrity guarantee, not a validation strictness preference.
 
 The `StrictSchemaValidation` flag was intended for **schema validation** (unknown attributes, type checking). Immutable enforcement is a **data model constraint**, not a schema validation rule. These are conceptually different:
 - Schema validation: "Is the payload well-formed?" → Configurable
@@ -284,10 +284,10 @@ Same pattern in `api/src/modules/scim/services/endpoint-scim-generic.service.ts`
 ### Proposed Fix
 
 **Files to modify** (4):
-1. `api/src/modules/scim/common/scim-service-helpers.ts` — Remove the `StrictSchemaValidation` gate from `checkImmutableAttributes()`
-2. `api/src/modules/scim/services/endpoint-scim-generic.service.ts` — Same removal in the generic version
-3. `api/src/modules/scim/common/scim-service-helpers.spec.ts` — Update test: "strict OFF → pass" test becomes "strict OFF → still rejects immutable change"
-4. `api/src/domain/validation/schema-validator.ts` — No change needed (the `checkImmutable()` method itself has no gate)
+1. `api/src/modules/scim/common/scim-service-helpers.ts` - Remove the `StrictSchemaValidation` gate from `checkImmutableAttributes()`
+2. `api/src/modules/scim/services/endpoint-scim-generic.service.ts` - Same removal in the generic version
+3. `api/src/modules/scim/common/scim-service-helpers.spec.ts` - Update test: "strict OFF → pass" test becomes "strict OFF → still rejects immutable change"
+4. `api/src/domain/validation/schema-validator.ts` - No change needed (the `checkImmutable()` method itself has no gate)
 
 **Before**:
 ```typescript
@@ -316,9 +316,9 @@ export function checkImmutableAttributes(
 
 | Impact | Description |
 |---|---|
-| **Endpoints with strict ON** | No change — already enforced |
-| **Endpoints with strict OFF** | **Behavior change** — immutable mutations now rejected with 400 |
-| **Entra ID compatibility** | Safe — Entra does not mutate `employeeNumber` or other immutable attributes on PUT/PATCH |
+| **Endpoints with strict ON** | No change - already enforced |
+| **Endpoints with strict OFF** | **Behavior change** - immutable mutations now rejected with 400 |
+| **Entra ID compatibility** | Safe - Entra does not mutate `employeeNumber` or other immutable attributes on PUT/PATCH |
 | **Backward compatibility** | Minor breaking change for clients that relied on mutating immutable fields with strict OFF. Documented in CHANGELOG as intentional RFC compliance fix. |
 
 ### Tests Needed
@@ -331,7 +331,7 @@ export function checkImmutableAttributes(
 
 ---
 
-## 7. P1D — Required Attribute Enforcement Always-On
+## 7. P1D - Required Attribute Enforcement Always-On
 
 ### What It Closes
 
@@ -363,9 +363,9 @@ The entire `SchemaValidator.validate()` call is gated, which bundles required ch
 **Approach**: Extract required-only validation into a separate always-on call, while keeping type/unknown-attr validation behind the strict flag.
 
 **Files to modify** (3):
-1. `api/src/domain/validation/schema-validator.ts` — Add `validateRequired(payload, schemas, mode)` method that only checks required attributes
-2. `api/src/modules/scim/common/scim-service-helpers.ts` — Call `validateRequired()` unconditionally before the strict-gated `validate()` call
-3. `api/src/modules/scim/services/endpoint-scim-generic.service.ts` — Same pattern for generic resources
+1. `api/src/domain/validation/schema-validator.ts` - Add `validateRequired(payload, schemas, mode)` method that only checks required attributes
+2. `api/src/modules/scim/common/scim-service-helpers.ts` - Call `validateRequired()` unconditionally before the strict-gated `validate()` call
+3. `api/src/modules/scim/services/endpoint-scim-generic.service.ts` - Same pattern for generic resources
 
 **New method in schema-validator.ts**:
 ```typescript
@@ -405,7 +405,7 @@ export function validatePayloadSchema(config, payload, schemas, mode) {
 
 ### Impact Analysis
 
-Same as P1C — endpoints with strict ON see no change. Endpoints with strict OFF will now reject payloads missing required attributes (only affects `userName` for Users, `displayName` for Groups).
+Same as P1C - endpoints with strict ON see no change. Endpoints with strict OFF will now reject payloads missing required attributes (only affects `userName` for Users, `displayName` for Groups).
 
 ### Tests Needed
 
@@ -417,11 +417,11 @@ Same as P1C — endpoints with strict ON see no change. Endpoints with strict OF
 
 ---
 
-## 8. P2A — Generic Filter Engine Upgrade (AST-based)
+## 8. P2A - Generic Filter Engine Upgrade (AST-based)
 
 ### What It Closes
 
-**Gap G6**: Generic filter engine limited to `eq` only — `co`, `sw`, `ew`, `gt`, `lt`, `AND`/`OR` all return 400.
+**Gap G6**: Generic filter engine limited to `eq` only - `co`, `sw`, `ew`, `gt`, `lt`, `AND`/`OR` all return 400.
 
 ### Why This Is P2
 
@@ -452,8 +452,8 @@ This is a regex-based single-operator parser. Users/Groups use the full AST at `
 ### Proposed Fix
 
 **Files to modify** (2):
-1. `api/src/modules/scim/filters/apply-scim-filter.ts` — Add `buildGenericFilter()` export with a generic column map
-2. `api/src/modules/scim/services/endpoint-scim-generic.service.ts` — Replace `parseSimpleFilter()` with `buildGenericFilter()` + in-memory fallback
+1. `api/src/modules/scim/filters/apply-scim-filter.ts` - Add `buildGenericFilter()` export with a generic column map
+2. `api/src/modules/scim/services/endpoint-scim-generic.service.ts` - Replace `parseSimpleFilter()` with `buildGenericFilter()` + in-memory fallback
 
 **Generic column map**:
 ```typescript
@@ -474,7 +474,7 @@ const GENERIC_DB_COLUMNS: Record<string, string> = {
 
 ### Effort Estimate
 
-This is the largest item — requires understanding the AST filter infrastructure and adapting it for Generic resources (which use JSON blob storage rather than typed columns). The in-memory evaluation already works for the inmemory backend; the integration work is primarily in the Prisma path.
+This is the largest item - requires understanding the AST filter infrastructure and adapting it for Generic resources (which use JSON blob storage rather than typed columns). The in-memory evaluation already works for the inmemory backend; the integration work is primarily in the Prisma path.
 
 **Estimated**: 2–3 hours including tests.
 
@@ -492,7 +492,7 @@ This is the largest item — requires understanding the AST filter infrastructur
 
 These items are tracked but not proposed for v0.28.0:
 
-### P2 — Nice to Have
+### P2 - Nice to Have
 
 | ID | Gap | Why Deferred |
 |---|---|---|
@@ -500,7 +500,7 @@ These items are tracked but not proposed for v0.28.0:
 | G7 | Generic sorting in-memory (performance) | Only matters with large datasets; no complaints yet |
 | G9 | No type coercion beyond booleans | String→integer coercion is edge-case; strict mode catches mismatches |
 
-### P3 — Low Priority
+### P3 - Low Priority
 
 | ID | Gap | Why Deferred |
 |---|---|---|
@@ -634,8 +634,8 @@ graph LR
 | Document | Relevance |
 |---|---|
 | [P3_REMAINING_ATTRIBUTE_CHARACTERISTIC_GAPS.md](P3_REMAINING_ATTRIBUTE_CHARACTERISTIC_GAPS.md) | Source of Gaps G1, G2, G6 (closing 3 of 10) |
-| [CL_V0.27.0_INMEMORY_BUGFIXES_AND_GENERIC_PARITY.md](CL_V0.27.0_INMEMORY_BUGFIXES_AND_GENERIC_PARITY.md) | Previous release — context for remaining 12 failures |
-| [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | `StrictSchemaValidation` flag reference — P1C/P1D change its scope |
+| [CL_V0.27.0_INMEMORY_BUGFIXES_AND_GENERIC_PARITY.md](CL_V0.27.0_INMEMORY_BUGFIXES_AND_GENERIC_PARITY.md) | Previous release - context for remaining 12 failures |
+| [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) | `StrictSchemaValidation` flag reference - P1C/P1D change its scope |
 | [LIVE_TEST_NORMS_AND_BEST_PRACTICES.md](LIVE_TEST_NORMS_AND_BEST_PRACTICES.md) | Live test conventions for new sections |
 | [SCIM_RFC_COMPLIANCE_LAYER.md](SCIM_RFC_COMPLIANCE_LAYER.md) | RFC compliance mapping for 415/405/immutable/required |
 | [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) | Test count tracking |
@@ -643,4 +643,4 @@ graph LR
 
 ---
 
-*Document generated 2026-03-03. This is a planning document — implementation details may evolve during development.*
+*Document generated 2026-03-03. This is a planning document - implementation details may evolve during development.*

@@ -8,7 +8,7 @@ Generate a well-structured, accurate commit message for the current staged and u
 
 ---
 
-## Step 1 — Gather Changes
+## Step 1 - Gather Changes
 
 1. **Get all changed files**: Use `get_changed_files` to retrieve diffs for staged and unstaged changes.
 2. **Read context**: Read `package.json` for current version and `CHANGELOG.md` for the latest version entry to understand the release context.
@@ -16,16 +16,16 @@ Generate a well-structured, accurate commit message for the current staged and u
 
 ---
 
-## Step 2 — Classify Changes
+## Step 2 - Classify Changes
 
 Group every changed file into one of these categories, in **priority order**:
 
 | Priority | Category | File patterns | Examples |
 |----------|----------|---------------|----------|
 | 1 | **Source code** | `api/src/**/*.ts` (non-spec) | Services, controllers, guards, DTOs, utilities, modules |
-| 2 | **Tests — Unit** | `api/src/**/*.spec.ts` | Service specs, controller specs, utility specs |
-| 3 | **Tests — E2E** | `api/test/e2e/*.e2e-spec.ts` | Integration/E2E specs |
-| 4 | **Tests — Live** | `scripts/live-test.ps1` | Live integration test sections |
+| 2 | **Tests - Unit** | `api/src/**/*.spec.ts` | Service specs, controller specs, utility specs |
+| 3 | **Tests - E2E** | `api/test/e2e/*.e2e-spec.ts` | Integration/E2E specs |
+| 4 | **Tests - Live** | `scripts/live-test.ps1` | Live integration test sections |
 | 5 | **Configuration** | `*.json`, `*.config.*`, `*.yml`, `Dockerfile*`, `*.bicep` | package.json, tsconfig, docker-compose, jest config, Prisma schema |
 | 6 | **Documentation** | `docs/**/*.md`, `*.md` (root), `.github/**/*.md` | Feature docs, README, CHANGELOG, prompts |
 | 7 | **Scripts & Infra** | `scripts/**`, `infra/**`, `*.ps1`, `*.sh` | Deploy scripts, setup scripts, Bicep templates |
@@ -33,12 +33,12 @@ Group every changed file into one of these categories, in **priority order**:
 
 For each category with changes, note:
 - Number of files changed
-- Brief summary of what changed (not line-by-line — semantic summary)
+- Brief summary of what changed (not line-by-line - semantic summary)
 - Whether it's a new file, modification, or deletion
 
 ---
 
-## Step 3 — Determine Commit Type
+## Step 3 - Determine Commit Type
 
 Based on the changes, select the appropriate conventional commit type:
 
@@ -57,16 +57,16 @@ If changes span multiple types, use the **highest-impact type** (usually `feat` 
 
 ---
 
-## Step 4 — Generate Commit Message
+## Step 4 - Generate Commit Message
 
 Follow this format:
 
 ```
-<type>(<scope>): <subject line — max 72 chars>
+<type>(<scope>): <subject line - max 72 chars>
 
-<body — what changed and why, grouped by priority>
+<body - what changed and why, grouped by priority>
 
-<footer — breaking changes, issue refs, test counts>
+<footer - breaking changes, issue refs, test counts>
 ```
 
 ### Rules
@@ -106,7 +106,7 @@ Version: v0.19.1 → v0.19.2
 
 ---
 
-## Step 5 — Output
+## Step 5 - Output
 
 Present the commit message in a fenced code block ready to copy-paste. Also provide:
 
@@ -116,7 +116,7 @@ Present the commit message in a fenced code block ready to copy-paste. Also prov
 
 ---
 
-## Step 6 — Self-Update This Prompt
+## Step 6 - Self-Update This Prompt
 
 After generating the commit message, review **this prompt itself** for improvements:
 

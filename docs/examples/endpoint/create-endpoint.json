@@ -31,7 +31,7 @@
   "create_with_user_only_preset": {
     "name": "user-only-endpoint",
     "displayName": "User Only",
-    "description": "Users only — no groups support",
+    "description": "Users only - no groups support",
     "profilePreset": "user-only"
   },
 
@@ -97,7 +97,7 @@
   },
 
   "patch_endpoint_settings": {
-    "_comment": "PATCH /scim/admin/endpoints/{id} — deep-merges settings",
+    "_comment": "PATCH /scim/admin/endpoints/{id} - deep-merges settings",
     "profile": {
       "settings": {
         "UserSoftDeleteEnabled": "True",

@@ -1,4 +1,4 @@
-﻿import { Inject, Injectable, Optional } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { IUserRepository } from '../../domain/repositories/user.repository.interface';
 import type { IGroupRepository } from '../../domain/repositories/group.repository.interface';
@@ -42,7 +42,7 @@ export class DatabaseService {
     const where: any = {};
     
     if (search) {
-      // Only search text-compatible columns — scimId is @db.Uuid and
+      // Only search text-compatible columns - scimId is @db.Uuid and
       // cannot use 'contains' without crashing PostgreSQL.
       where.OR = [
         { userName: { contains: search, mode: 'insensitive' } },
@@ -181,7 +181,7 @@ export class DatabaseService {
       }
       throw new Error('User not found');
     }
-    // Guard: id column is @db.Uuid — reject non-UUID to avoid PostgreSQL crash
+    // Guard: id column is @db.Uuid - reject non-UUID to avoid PostgreSQL crash
     if (!isValidUuid(id)) {
       // Log at DEBUG to distinguish UUID rejection from genuine DB not-found
       if (this.loggingService) {

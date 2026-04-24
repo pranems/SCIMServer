@@ -1,5 +1,5 @@
 /**
- * SchemaValidator.buildCharacteristicsCache — Unit Tests
+ * SchemaValidator.buildCharacteristicsCache - Unit Tests
  *
  * Tests the precomputed Parent→Children map cache builder.
  * Verifies all 10 maps are correctly populated from schema definitions
@@ -164,7 +164,7 @@ describe('SchemaValidator.buildCharacteristicsCache', () => {
     });
 
     it('should put extension never-returned "active" in neverReturnedByParent under extension key', () => {
-      // Extension: active has returned:never — in extension's parent key, not __top__
+      // Extension: active has returned:never - in extension's parent key, not __top__
       const extKey = 'urn:custom:collision:2.0:user';
       expect(collisionCache.neverReturnedByParent.get(extKey)?.has('active')).toBe(true);
     });
@@ -262,7 +262,7 @@ describe('SchemaValidator.buildCharacteristicsCache', () => {
 
   describe('uniqueAttrs', () => {
     it('should NOT include hardcoded column-promoted attrs (userName, id, displayName, externalId)', () => {
-      // These are handled by the service layer directly — excluded from cache
+      // These are handled by the service layer directly - excluded from cache
       const attrNames = cache.uniqueAttrs.map(a => a.attrName.toLowerCase());
       expect(attrNames).not.toContain('username');
       expect(attrNames).not.toContain('id');
@@ -307,7 +307,7 @@ describe('SchemaValidator.buildCharacteristicsCache', () => {
   describe('alwaysReturnedSubs', () => {
     it('should be empty when no sub-attributes have returned:always', () => {
       // Our test fixtures don't have returned:always on sub-attrs
-      // This is correct — meta sub-attrs are returned:default
+      // This is correct - meta sub-attrs are returned:default
       expect(extractSubs(cache.alwaysReturnedByParent).size).toBe(0);
     });
 
@@ -625,9 +625,9 @@ describe('SchemaValidator.buildCharacteristicsCache', () => {
       const c = SchemaValidator.buildCharacteristicsCache([CORE_USER_SCHEMA, extWithCE], ['urn:test:ce:ext']);
       // Core id is caseExact:true under __top__
       expect(c.caseExactByParent.get(CORE_USER_URN)?.has('id')).toBe(true);
-      // Extension id is caseExact:false — NOT under extension key
+      // Extension id is caseExact:false - NOT under extension key
       expect(c.caseExactByParent.get('urn:test:ce:ext')?.has('id')).toBeFalsy();
-      // Extension badge is caseExact:true — under extension key
+      // Extension badge is caseExact:true - under extension key
       expect(c.caseExactByParent.get('urn:test:ce:ext')?.has('badge')).toBe(true);
     });
 
@@ -1014,7 +1014,7 @@ describe('SchemaValidator.buildCharacteristicsCache', () => {
 
       // ext1: badge is returned:never
       expect(c.neverReturnedByParent.get('urn:test:ext1')?.has('badge')).toBe(true);
-      // ext2: badge is returned:default — NOT in neverReturned
+      // ext2: badge is returned:default - NOT in neverReturned
       expect(c.neverReturnedByParent.get('urn:test:ext2')?.has('badge')).toBeFalsy();
 
       // ext1: badge is caseExact:true
@@ -1037,7 +1037,7 @@ describe('SchemaValidator.buildCharacteristicsCache', () => {
     });
 
     it('should return false for URNs with dots only in version numbers', () => {
-      // The dot in "2.0" is before the last colon — not a sub-attr separator
+      // The dot in "2.0" is before the last colon - not a sub-attr separator
       expect(isSubAttrKey('urn:ietf:params:scim:schemas:extension:enterprise:2.0:User')).toBe(false);
       expect(isSubAttrKey('urn:test:ext:1.0:Schema')).toBe(false);
     });
@@ -1157,7 +1157,7 @@ describe('SchemaValidator.buildCharacteristicsCache', () => {
         ['urn:test:ext:collision'],
       );
 
-      // Extension sub-attr 'priority' is readOnly — should appear in extensionSubAttrs
+      // Extension sub-attr 'priority' is readOnly - should appear in extensionSubAttrs
       const extSubMap = c.readOnlyCollected.extensionSubAttrs;
       const extEntry = extSubMap.get('urn:test:ext:collision');
       expect(extEntry).toBeDefined();

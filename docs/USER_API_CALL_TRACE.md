@@ -1,4 +1,4 @@
-# User API — Annotated Call Trace + Diagrams
+# User API - Annotated Call Trace + Diagrams
 
 > Updated: March 1, 2026 · Flow reflects current RequestLoggingInterceptor + ScimLogger behavior
 
@@ -138,7 +138,7 @@ Prisma `RequestLog` model stores captured request/response for UI debugging. Exa
 
 ## 5) Mermaid diagrams
 
-### Create user — sequence (success & uniqueness collision)
+### Create user - sequence (success & uniqueness collision)
 
 ```mermaid
 sequenceDiagram
@@ -190,7 +190,7 @@ sequenceDiagram
   ReqLog-->>Client: persist request metadata (buffered)
 ```
 
-### List & Get user — sequence
+### List & Get user - sequence
 
 ```mermaid
 sequenceDiagram

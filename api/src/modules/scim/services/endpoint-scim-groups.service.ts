@@ -86,6 +86,9 @@ export class EndpointScimGroupsService {
     // Coerce boolean strings ("True"/"False") to native booleans before schema validation (parent-aware)
     this.schemaHelpers.coerceBooleansByParentIfEnabled(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
+    // G8h: Enforce primary sub-attribute constraint (RFC 7643 section 2.4)
+    this.schemaHelpers.enforcePrimaryConstraint(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
+
     this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, endpointConfig, 'create');
 
     // Strip readOnly attributes from POST payload (RFC 7643 §2.2)
@@ -107,7 +110,7 @@ export class EndpointScimGroupsService {
       ? (dto as Record<string, unknown>).externalId as string
       : null;
 
-    // Check for duplicate displayName — always throw 409 on conflict
+    // Check for duplicate displayName - always throw 409 on conflict
     const displayNameConflict = await this.groupRepo.findByDisplayName(endpointId, dto.displayName);
     if (displayNameConflict) {
       this.logger.info(LogCategory.SCIM_GROUP, `Uniqueness conflict on POST: displayName '${dto.displayName}'`, {
@@ -127,10 +130,10 @@ export class EndpointScimGroupsService {
       });
     }
 
-    // Note: externalId is NOT checked for uniqueness — saved as received per RFC 7643.
+    // Note: externalId is NOT checked for uniqueness - saved as received per RFC 7643.
 
     const now = new Date();
-    // BF-1: Server MUST generate id (RFC 7643 §2.2 — id is readOnly, server-assigned)
+    // BF-1: Server MUST generate id (RFC 7643 §2.2 - id is readOnly, server-assigned)
     const scimId = randomUUID();
 
     // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
@@ -299,7 +302,7 @@ export class EndpointScimGroupsService {
       }
     }
 
-    // V2: Pre-PATCH validation — validate each operation value against schema definitions
+    // V2: Pre-PATCH validation - validate each operation value against schema definitions
     if (strictSchemaEnabled) {
       const resultPayloadPlaceholder: Record<string, unknown> = {
         schemas: [SCIM_CORE_GROUP_SCHEMA],
@@ -361,7 +364,7 @@ export class EndpointScimGroupsService {
 
     const { displayName, externalId, members: memberDtos, payload: rawPayload } = patchResult;
 
-    // H-1: Post-PATCH schema validation — validate the resulting payload
+    // H-1: Post-PATCH schema validation - validate the resulting payload
     const resultPayload: Record<string, unknown> = {
       schemas: [SCIM_CORE_GROUP_SCHEMA],
       displayName,
@@ -379,13 +382,16 @@ export class EndpointScimGroupsService {
     // Coerce boolean strings in post-PATCH payload before schema validation (parent-aware)
     this.schemaHelpers.coerceBooleansByParentIfEnabled(resultPayload, endpointId, endpointConfig);
 
+    // G8h: Enforce primary on merged post-PATCH payload (RFC 7643 section 2.4)
+    this.schemaHelpers.enforcePrimaryConstraint(resultPayload, endpointId, endpointConfig);
+
     this.schemaHelpers.validatePayloadSchema(resultPayload, endpointId, endpointConfig, 'patch');
 
-    // H-2: Immutable attribute enforcement — compare existing state with PATCH result
+    // H-2: Immutable attribute enforcement - compare existing state with PATCH result
     this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(group), resultPayload, endpointId, endpointConfig);
 
-    // G8f: Uniqueness enforcement on PATCH — only displayName must remain unique
-    // externalId is NOT checked — saved as received per RFC 7643.
+    // G8f: Uniqueness enforcement on PATCH - only displayName must remain unique
+    // externalId is NOT checked - saved as received per RFC 7643.
     await this.assertUniqueDisplayName(displayName, endpointId, scimId);
 
     // Schema-driven uniqueness for custom extension attributes (RFC 7643 §2.1)
@@ -441,8 +447,11 @@ export class EndpointScimGroupsService {
 
     this.schemaHelpers.enforceStrictSchemaValidation(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
-    // Coerce boolean strings before schema validation (same as create path — parent-aware)
+    // Coerce boolean strings before schema validation (same as create path - parent-aware)
     this.schemaHelpers.coerceBooleansByParentIfEnabled(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
+
+    // G8h: Enforce primary sub-attribute constraint (RFC 7643 section 2.4)
+    this.schemaHelpers.enforcePrimaryConstraint(dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
     this.schemaHelpers.validatePayloadSchema(dto as unknown as Record<string, unknown>, endpointId, endpointConfig, 'replace');
 
@@ -468,11 +477,11 @@ export class EndpointScimGroupsService {
     // Phase 7: Pre-write If-Match enforcement
     enforceIfMatch(group.version, ifMatch, endpointConfig);
 
-    // H-2: Immutable attribute enforcement — compare existing resource with incoming payload
+    // H-2: Immutable attribute enforcement - compare existing resource with incoming payload
     this.schemaHelpers.checkImmutableAttributes(this.buildExistingPayload(group), dto as unknown as Record<string, unknown>, endpointId, endpointConfig);
 
-    // G8f: Uniqueness enforcement on PUT — only displayName must remain unique
-    // externalId is NOT checked — saved as received per RFC 7643.
+    // G8f: Uniqueness enforcement on PUT - only displayName must remain unique
+    // externalId is NOT checked - saved as received per RFC 7643.
     await this.assertUniqueDisplayName(dto.displayName, endpointId, scimId);
     const newExternalId = typeof (dto as Record<string, unknown>).externalId === 'string'
       ? (dto as Record<string, unknown>).externalId as string
@@ -563,7 +572,7 @@ export class EndpointScimGroupsService {
     endpointId: string,
     excludeScimId?: string
   ): Promise<void> {
-    // Phase 3: Pass original name — CITEXT (PostgreSQL) / toLowerCase (InMemory) handles case-insensitivity
+    // Phase 3: Pass original name - CITEXT (PostgreSQL) / toLowerCase (InMemory) handles case-insensitivity
     const conflict = await this.groupRepo.findByDisplayName(endpointId, displayName, excludeScimId);
 
     if (conflict) {
@@ -647,8 +656,8 @@ export class EndpointScimGroupsService {
     delete rawPayload.displayName;
     delete rawPayload.members;
     delete rawPayload.externalId;
-    delete rawPayload.id;  // RFC 7643 §3.1: id is server-assigned — never let rawPayload override
-    // Remove schemas from rawPayload — we build it dynamically below (G19 / FP-1)
+    delete rawPayload.id;  // RFC 7643 §3.1: id is server-assigned - never let rawPayload override
+    // Remove schemas from rawPayload - we build it dynamically below (G19 / FP-1)
     delete rawPayload.schemas;
 
     // G8e: Strip returned:'never' attributes + build schemas[] dynamically (G19 / FP-1)

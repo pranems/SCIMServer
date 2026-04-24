@@ -1,5 +1,5 @@
 /**
- * Custom Jest Reporter — writes a structured JSON results file.
+ * Custom Jest Reporter - writes a structured JSON results file.
  *
  * Output format mirrors the SCIM Validator results style:
  * - Top-level metadata: run info, timing, counts
@@ -96,7 +96,7 @@ class JsonResultsReporter implements Reporter {
     _testResult: TestResult,
     _aggregatedResult: AggregatedResult,
   ): void {
-    // no-op — we process everything in onRunComplete
+    // no-op - we process everything in onRunComplete
   }
 
   onRunComplete(

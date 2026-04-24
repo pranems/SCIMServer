@@ -677,7 +677,7 @@ describe('SchemaValidator', () => {
     });
   });
 
-  // ── checkImmutable — H-2 immutable attribute enforcement ──────────────
+  // ── checkImmutable - H-2 immutable attribute enforcement ──────────────
 
   describe('checkImmutable', () => {
     it('should pass when no immutable attributes are defined', () => {
@@ -894,7 +894,7 @@ describe('SchemaValidator', () => {
 
   // ── P2 R-MUT-1: writeOnly → returned:never defense-in-depth ─────────
 
-  describe('collectReturnedCharacteristics — R-MUT-1 writeOnly', () => {
+  describe('collectReturnedCharacteristics - R-MUT-1 writeOnly', () => {
     it('should add writeOnly mutability attrs to never set even without explicit returned:never', () => {
       const schema = makeCoreSchema([
         makeAttr({ name: 'password', mutability: 'writeOnly', returned: 'default' }),
@@ -933,7 +933,7 @@ describe('SchemaValidator', () => {
 
   // ── P2 R-RET-3: alwaysSubs collection ──────────────────────────────
 
-  describe('collectReturnedCharacteristics — R-RET-3 alwaysSubs', () => {
+  describe('collectReturnedCharacteristics - R-RET-3 alwaysSubs', () => {
     it('should collect sub-attrs with returned:always into alwaysSubs map', () => {
       const schema = makeCoreSchema([
         makeAttr({
@@ -975,7 +975,7 @@ describe('SchemaValidator', () => {
 
   // ── P2 R-CASE-1: collectCaseExactAttributes ────────────────────────
 
-  describe('collectCaseExactAttributes — R-CASE-1', () => {
+  describe('collectCaseExactAttributes - R-CASE-1', () => {
     it('should collect top-level caseExact attributes as lowercase names', () => {
       const schema = makeCoreSchema([
         makeAttr({ name: 'id', caseExact: true }),
@@ -1045,7 +1045,7 @@ describe('SchemaValidator', () => {
 
   // ── P2: collectReadOnlyAttributes with sub-attrs ────────────────────
 
-  describe('collectReadOnlyAttributes — R-MUT-2 sub-attrs', () => {
+  describe('collectReadOnlyAttributes - R-MUT-2 sub-attrs', () => {
     it('should collect readOnly sub-attrs within readWrite parents into coreSubAttrs', () => {
       const schema = makeCoreSchema([
         makeAttr({
@@ -1107,14 +1107,14 @@ describe('SchemaValidator', () => {
 
       const result = SchemaValidator.collectReadOnlyAttributes([schema]);
 
-      // meta is top-level readOnly — entire object is stripped
+      // meta is top-level readOnly - entire object is stripped
       expect(result.core.has('meta')).toBe(true);
       // No sub-attrs collected since parent is readOnly
       expect(result.coreSubAttrs.has('meta')).toBe(false);
     });
   });
 
-  // ── validateRequired — G2 unconditional required-only validation ──────
+  // ── validateRequired - G2 unconditional required-only validation ──────
 
   describe('validateRequired', () => {
     it('should detect missing required attribute on create', () => {

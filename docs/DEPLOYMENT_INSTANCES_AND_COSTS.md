@@ -1,9 +1,9 @@
 # Deployment Instances, Costs & Load Analysis
 
-> **Last Updated:** 2026-04-10 | **Version:** 0.35.0 | **Branch:** `feat/torfc1stscimsvr`  
-> **Status:** Living Document — Updated after each validation pipeline run
+> **Last Updated:** 2026-04-23 | **Version:** 0.38.0 | **Branch:** `feat/torfc1stscimsvr`  
+> **Status:** Living Document - Updated after each validation pipeline run
 
-### Related Docs (avoid duplication — this doc is the canonical source for costs & load)
+### Related Docs (avoid duplication - this doc is the canonical source for costs & load)
 - **Setup procedures:** [DEPLOYMENT.md](../DEPLOYMENT.md) (all deployment methods), [AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md) (Azure step-by-step)
 - **Docker details:** [DOCKER_GUIDE_AND_TEST_REPORT.md](DOCKER_GUIDE_AND_TEST_REPORT.md) (Dockerfile, entrypoint, build stages)
 - **Azure troubleshooting:** [AZURE_DEPLOYMENT_ISSUES_AND_FIXES.md](AZURE_DEPLOYMENT_ISSUES_AND_FIXES.md) (historical issue resolutions)
@@ -120,7 +120,7 @@ az containerapp logs show -n scimserver2 -g scimserver-rg --tail 30
 
 ---
 
-## Azure Cost Breakdown — Current (Idle/Light Use)
+## Azure Cost Breakdown - Current (Idle/Light Use)
 
 ### Provisioned Resources
 
@@ -165,7 +165,7 @@ az group delete -n scimserver-rg --yes --no-wait
 
 ---
 
-## Load Scenario Performance — By Deployment Type
+## Load Scenario Performance - By Deployment Type
 
 ### SMALL: 10 EP × 100 Users × 10 Groups × 10 Members/Group
 
@@ -265,7 +265,7 @@ az group delete -n scimserver-rg --yes --no-wait
 
 | Scenario | PostgreSQL | Container App | Estimated Total $/mo |
 |----------|-----------|---------------|----------------------|
-| Small (≤1K resources) | B1ms — keep current | 0.5 vCPU / 1 GiB — keep current | ~$61 |
+| Small (≤1K resources) | B1ms - keep current | 0.5 vCPU / 1 GiB - keep current | ~$61 |
 | Medium (≤100K resources) | Upgrade to B2ms (2 vCore) | Scale to 1 vCPU / 2 GiB | ~$108 |
 | Large (≤1M resources) | Upgrade to GP D4s_v3 (4 vCore) | Scale to 2 vCPU / 4 GiB, 2 replicas | ~$400 |
 | Enterprise (>1M) | GP D8s_v3+ or Hyperscale Citus | 4 vCPU / 8 GiB, 3+ replicas, autoscale | $800+ |
@@ -283,7 +283,7 @@ Enterprise → Connection limits + write amplification (need pgBouncer + read re
 
 - Local and Docker have **no cost** but share your machine's resources
 - For Medium+, ensure PostgreSQL has ≥4 GB `shared_buffers` and `work_mem=64MB`
-- Docker default memory limit is 2 GB — increase via Docker Desktop settings for Large
+- Docker default memory limit is 2 GB - increase via Docker Desktop settings for Large
 - Local can handle Large if your machine has ≥16 GB RAM and SSD storage
 
 ---

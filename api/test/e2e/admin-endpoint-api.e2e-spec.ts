@@ -1,5 +1,5 @@
 /**
- * E2E Tests — Admin Endpoint API Improvements
+ * E2E Tests - Admin Endpoint API Improvements
  *
  * Tests the enhanced admin/endpoints API responses:
  * - Envelope response { totalResults, endpoints[] }
@@ -49,7 +49,7 @@ describe('Admin Endpoint API (E2E)', () => {
   // Feature 1: Envelope Response
   // ═══════════════════════════════════════════════════════════════════════
 
-  describe('GET /scim/admin/endpoints — envelope response', () => {
+  describe('GET /scim/admin/endpoints - envelope response', () => {
     it('should return { totalResults, endpoints[] } envelope', async () => {
       const res = await request(app.getHttpServer())
         .get('/scim/admin/endpoints')
@@ -65,7 +65,7 @@ describe('Admin Endpoint API (E2E)', () => {
     });
 
     it('should return empty envelope when filtering with no matches', async () => {
-      // Create active endpoint, then filter for inactive — should be empty or not match
+      // Create active endpoint, then filter for inactive - should be empty or not match
       const res = await request(app.getHttpServer())
         .get('/scim/admin/endpoints?active=false')
         .set('Authorization', `Bearer ${token}`)
@@ -361,7 +361,7 @@ describe('Admin Endpoint API (E2E)', () => {
   // Feature 8: Nested Stats
   // ═══════════════════════════════════════════════════════════════════════
 
-  describe('GET /scim/admin/endpoints/:id/stats — nested format', () => {
+  describe('GET /scim/admin/endpoints/:id/stats - nested format', () => {
     it('should return nested stats with users, groups, groupMembers, requestLogs', async () => {
       const res = await request(app.getHttpServer())
         .get(`/scim/admin/endpoints/${endpointId}/stats`)
@@ -572,7 +572,7 @@ describe('Admin Endpoint API (E2E)', () => {
         })
         .expect(201);
 
-      // Now GET the admin endpoint — profile must still be clean
+      // Now GET the admin endpoint - profile must still be clean
       const adminRes = await request(app.getHttpServer())
         .get(`/scim/admin/endpoints/${endpointId}`)
         .set('Authorization', `Bearer ${token}`)

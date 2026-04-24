@@ -1,5 +1,5 @@
 /**
- * E2E Tests — Test Gap Audit (Phase 13 Completion)
+ * E2E Tests - Test Gap Audit (Phase 13 Completion)
  *
  * Covers HIGH and MEDIUM priority gaps identified by the addMissingTests audit:
  *
@@ -45,7 +45,7 @@ describe('Test Gap Audit (E2E)', () => {
   });
 
   beforeEach(() => {
-    // Intentionally NOT resetting fixture counter — this file uses unique
+    // Intentionally NOT resetting fixture counter - this file uses unique
     // timestamps/random to avoid collision between tests sharing endpoints
   });
 
@@ -90,7 +90,7 @@ describe('Test Gap Audit (E2E)', () => {
       expect(patchRes.body.id).toBe(userId); // unchanged
     });
 
-    it('should not reject the PATCH — just silently strip', async () => {
+    it('should not reject the PATCH - just silently strip', async () => {
       const basePath = scimBasePath(endpointId);
       const ts = Date.now();
       const user = validUser({
@@ -138,7 +138,7 @@ describe('Test Gap Audit (E2E)', () => {
       const created = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
       const userId = created.body.id;
 
-      // POST includes 'id' in body (readOnly) — should be stripped and warned
+      // POST includes 'id' in body (readOnly) - should be stripped and warned
       const postRes = await scimPost(app, `${basePath}/Users`, token, {
         ...validUser(),
         id: 'client-supplied-id',
@@ -236,7 +236,7 @@ describe('Test Gap Audit (E2E)', () => {
 
       // entra-id: 7 schemas (User, Group, EnterpriseUser, 4x msfttest)
       expect(entraSchemas.body.totalResults).toBe(7);
-      // minimal: 2 schemas (User, Group — no extensions)
+      // minimal: 2 schemas (User, Group - no extensions)
       expect(minimalSchemas.body.totalResults).toBe(2);
       // rfc-standard: 3 schemas (User, Group, EnterpriseUser)
       expect(rfcSchemas.body.totalResults).toBe(3);
@@ -316,7 +316,7 @@ describe('Test Gap Audit (E2E)', () => {
 
       // Discovery should reflect the inline profile
       const schemas = await scimGet(app, `${scimBasePath(epId)}/Schemas`, token).expect(200);
-      // Only 1 schema (User) — no Group, no extensions
+      // Only 1 schema (User) - no Group, no extensions
       expect(schemas.body.totalResults).toBe(1);
 
       const rts = await scimGet(app, `${scimBasePath(epId)}/ResourceTypes`, token).expect(200);
@@ -326,7 +326,7 @@ describe('Test Gap Audit (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════
-  // M4: Profile validation — loosening required attributes
+  // M4: Profile validation - loosening required attributes
   // ═══════════════════════════════════════════════════════════════════════
 
   describe('M4: Profile validation rejects loosening', () => {
@@ -499,7 +499,7 @@ describe('Test Gap Audit (E2E)', () => {
     it('should handle mixed-case attribute names on write-response projection', async () => {
       const basePath = scimBasePath(endpointId);
 
-      // POST with ?attributes=UserName (mixed case) — use unique user
+      // POST with ?attributes=UserName (mixed case) - use unique user
       const ts = Date.now();
       const uniqueUser = validUser({
         userName: `mixedcase-${ts}@test.com`,
@@ -519,7 +519,7 @@ describe('Test Gap Audit (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════
-  // Preset API — removed (presets are now compile-time embedded)
+  // Preset API - removed (presets are now compile-time embedded)
   // Preset list/detail/reload routes no longer exist.
   // ═══════════════════════════════════════════════════════════════════════
 

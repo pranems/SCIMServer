@@ -1,9 +1,9 @@
 /**
- * Built-in Profile Presets — Compile-time embedded
+ * Built-in Profile Presets - Compile-time embedded
  *
  * Presets are statically imported from co-located JSON files at build time.
  * Each JSON file is a complete BuiltInPreset (metadata + profile)
- * with fully expanded attribute definitions — no shorthand abbreviations.
+ * with fully expanded attribute definitions - no shorthand abbreviations.
  *
  * Default preset: `entra-id` (decision D5).
  *
@@ -57,7 +57,7 @@ const presetMap = new Map<string, BuiltInPreset>([
   [PRESET_USER_ONLY_WITH_CUSTOM_EXT, userOnlyWithCustomExtJson as unknown as BuiltInPreset],
 ]);
 
-/** Backward compat aliases — resolve old names to current preset names */
+/** Backward compat aliases - resolve old names to current preset names */
 const PRESET_ALIASES: Record<string, string> = {
   'lexmark': PRESET_USER_ONLY_WITH_CUSTOM_EXT,
 };

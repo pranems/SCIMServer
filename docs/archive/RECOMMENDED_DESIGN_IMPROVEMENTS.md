@@ -1,8 +1,8 @@
-# SCIM — RFC-First Design Recommendations for a Multi-Endpoint Server
+# SCIM - RFC-First Design Recommendations for a Multi-Endpoint Server
 
-> ⚠️ **FUTURE VISION — NOT YET IMPLEMENTED.** This document describes an aspirational schema-driven architecture. The current codebase uses a different (simpler) approach. See `MULTI_ENDPOINT_GUIDE.md` for the as-built architecture.
+> ⚠️ **FUTURE VISION - NOT YET IMPLEMENTED.** This document describes an aspirational schema-driven architecture. The current codebase uses a different (simpler) approach. See `MULTI_ENDPOINT_GUIDE.md` for the as-built architecture.
 
-> **Version**: 2.0 — Complete rewrite with RFC-first thinking  
+> **Version**: 2.0 - Complete rewrite with RFC-first thinking  
 > **Date**: Feb 2026  
 > **Perspective**: Designed purely from SCIM RFCs (7642, 7643, 7644) for extensibility, simplicity, and discoverability  
 > **Guiding Principle**: What would the ideal multi-endpoint SCIM 2.0 server look like if we started from the RFCs alone?
@@ -44,19 +44,19 @@
 
 ### 1.2 Core Design Principles (Derived from RFCs)
 
-1. **Schema is the Source of Truth** — Every behavior (mutability, returnability, filtering, case sensitivity) should be derived from schema definitions, not hardcoded per-attribute. RFC 7643 §7 defines the schema definition format; the server should load it and act on it.
+1. **Schema is the Source of Truth** - Every behavior (mutability, returnability, filtering, case sensitivity) should be derived from schema definitions, not hardcoded per-attribute. RFC 7643 §7 defines the schema definition format; the server should load it and act on it.
 
-2. **Resource Types are Pluggable** — RFC 7643 §3.2 says _"SCIM may be extended to define new classes of resources by defining a resource type."_ The server should not be "User + Group only" — it should treat resource types as registrations that can be added, removed, or customized per endpoint.
+2. **Resource Types are Pluggable** - RFC 7643 §3.2 says _"SCIM may be extended to define new classes of resources by defining a resource type."_ The server should not be "User + Group only" - it should treat resource types as registrations that can be added, removed, or customized per endpoint.
 
-3. **Discovery Drives the Contract** — RFC 7644 §4 defines `/ServiceProviderConfig`, `/Schemas`, `/ResourceTypes` as the client's way to understand the server. These must be per-endpoint, truthful, and generated from actual server capabilities — never hardcoded.
+3. **Discovery Drives the Contract** - RFC 7644 §4 defines `/ServiceProviderConfig`, `/Schemas`, `/ResourceTypes` as the client's way to understand the server. These must be per-endpoint, truthful, and generated from actual server capabilities - never hardcoded.
 
-4. **Multi-Tenancy is URL-Based** — RFC 7644 §6 gives three patterns: URL prefix, subdomain, HTTP header. For a multi-endpoint testing server, URL prefix (`/{endpointId}/Users`) is the most standard and discoverable approach.
+4. **Multi-Tenancy is URL-Based** - RFC 7644 §6 gives three patterns: URL prefix, subdomain, HTTP header. For a multi-endpoint testing server, URL prefix (`/{endpointId}/Users`) is the most standard and discoverable approach.
 
-5. **Attribute Characteristics are Not Optional** — `mutability`, `returned`, `uniqueness`, `caseExact`, `required` from RFC 7643 §2.2 must govern CRUD behavior. Read-only attributes are ignored on PUT. "never" returned attributes don't appear in responses. "always" returned attributes can't be excluded.
+5. **Attribute Characteristics are Not Optional** - `mutability`, `returned`, `uniqueness`, `caseExact`, `required` from RFC 7643 §2.2 must govern CRUD behavior. Read-only attributes are ignored on PUT. "never" returned attributes don't appear in responses. "always" returned attributes can't be excluded.
 
-6. **Errors are Structured** — RFC 7644 §3.12 mandates JSON error responses with `schemas`, `status`, `scimType`, and `detail`. Every error path must comply.
+6. **Errors are Structured** - RFC 7644 §3.12 mandates JSON error responses with `schemas`, `status`, `scimType`, and `detail`. Every error path must comply.
 
-7. **Simplicity Through Generalization** — A generic engine that processes _any_ resource type through schema-driven rules is simpler and more reliable than per-resource-type hardcoded logic.
+7. **Simplicity Through Generalization** - A generic engine that processes _any_ resource type through schema-driven rules is simpler and more reliable than per-resource-type hardcoded logic.
 
 ---
 
@@ -99,12 +99,12 @@ Admin (non-SCIM):
 
 ### 2.3 Why This Matters
 
-Identity providers (Entra ID, Okta, OneLogin, Ping) configure a single **"Endpoint URL"** and append standard SCIM paths. If the server uses `/scim/endpoints/{id}/Users`, the endpoint URL becomes `https://host/scim/endpoints/{id}` — this leaks the implementation term "endpoints" and is non-standard. Using `/scim/v2/{endpointId}` makes the base URL opaque and version-aware per RFC 7644 §3.13.
+Identity providers (Entra ID, Okta, OneLogin, Ping) configure a single **"Endpoint URL"** and append standard SCIM paths. If the server uses `/scim/endpoints/{id}/Users`, the endpoint URL becomes `https://host/scim/endpoints/{id}` - this leaks the implementation term "endpoints" and is non-standard. Using `/scim/v2/{endpointId}` makes the base URL opaque and version-aware per RFC 7644 §3.13.
 
 ### 2.4 Endpoint Isolation Model
 
 Per RFC 7644 §6.2:
-- **SCIM `id`s** need not be globally unique — they must be unique within a endpoint
+- **SCIM `id`s** need not be globally unique - they must be unique within a endpoint
 - **`externalId`** must be unique within the resources of the same type in a endpoint
 - `meta.location` must include the full endpoint-scoped URL
 
@@ -165,7 +165,7 @@ interface ResourceTypeDefinition {
 Adding a new resource type (e.g., `Device`, `Application`, `Role`) should require:
 1. Define its schema (attributes + characteristics)
 2. Register the resource type with a endpoint
-3. Routes and CRUD handlers are generated automatically — **no new controller code**
+3. Routes and CRUD handlers are generated automatically - **no new controller code**
 
 ### 3.3 Per-Endpoint Resource Type Configuration
 
@@ -208,7 +208,7 @@ The generic resource handler should automatically inject and manage these for AL
 
 ### 4.1 What the RFC Says
 
-> **RFC 7643 §7**: Schema definitions include `id` (URI), `name`, `description`, and `attributes` — each with `name`, `type`, `multiValued`, `description`, `required`, `canonicalValues`, `caseExact`, `mutability`, `returned`, `uniqueness`, `subAttributes`, `referenceTypes`.
+> **RFC 7643 §7**: Schema definitions include `id` (URI), `name`, `description`, and `attributes` - each with `name`, `type`, `multiValued`, `description`, `required`, `canonicalValues`, `caseExact`, `mutability`, `returned`, `uniqueness`, `subAttributes`, `referenceTypes`.
 
 > **RFC 7643 §2.1**: "A resource is a collection of attributes identified by one or more schemas."
 
@@ -284,7 +284,7 @@ Store all SCIM resources in a unified way that doesn't require schema-per-column
 │  groupId       UUID FK → ScimResource (where resourceType = Group)    │
 │  memberId      UUID FK → ScimResource (any resource type)             │
 │  memberScimId  String   (denormalized for efficient SCIM $ref)        │
-│  memberType    String   ("User", "Group" — for nested groups)         │
+│  memberType    String   ("User", "Group" - for nested groups)         │
 │  display       String?  (denormalized for display field)              │
 │                                                                       │
 │  @@unique([groupId, memberId])                                        │
@@ -327,9 +327,9 @@ Store all SCIM resources in a unified way that doesn't require schema-per-column
 ### 4.5 Uniqueness Enforcement
 
 Per RFC 7643 §7 attribute definition, `uniqueness` can be:
-- `"none"` — no constraint
-- `"server"` — unique across the server (within the endpoint, per resource type)
-- `"global"` — unique globally across all endpoints
+- `"none"` - no constraint
+- `"server"` - unique across the server (within the endpoint, per resource type)
+- `"global"` - unique globally across all endpoints
 
 The schema engine should read the `uniqueness` characteristic and enforce it:
 
@@ -369,7 +369,7 @@ async function enforceUniqueness(
 
 > **RFC 7643 §2.2**: Attributes have characteristics: `required`, `canonicalValues`, `caseExact`, `mutability`, `returned`, `uniqueness`, `referenceTypes`
 
-> **RFC 7644 §3.5.1** (PUT): "readWrite, writeOnly — values SHALL replace. readOnly — values SHALL be ignored. immutable — if no existing values, new values SHALL be applied."
+> **RFC 7644 §3.5.1** (PUT): "readWrite, writeOnly - values SHALL replace. readOnly - values SHALL be ignored. immutable - if no existing values, new values SHALL be applied."
 
 > **RFC 7644 §3.9**: `attributes` and `excludedAttributes` query parameters control which attributes appear in responses.
 
@@ -503,10 +503,10 @@ Per RFC 7643 §2.3, the schema engine should validate incoming values against th
 │  Input: PatchOp { op, path?, value }                           │
 │                                                                │
 │  Step 1: Parse path → ParsedPath {                             │
-│            schemaUri?  — extension namespace                   │
-│            attrName    — top-level attribute                   │
-│            subAttr?    — sub-attribute after "."               │
-│            valueFilter? — [type eq "work"] predicate           │
+│            schemaUri?  - extension namespace                   │
+│            attrName    - top-level attribute                   │
+│            subAttr?    - sub-attribute after "."               │
+│            valueFilter? - [type eq "work"] predicate           │
 │          }                                                     │
 │                                                                │
 │  Step 2: Resolve target attribute in schema registry           │
@@ -574,7 +574,7 @@ When a PATCH path is `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User
 Per RFC 7644 §3.5.2:
 > "Each PATCH operation represents a single change to be applied to the same SCIM resource... all operations MUST be applied or nothing."
 
-All operations within a single PATCH request must be **atomic** — if any operation fails, the entire PATCH is rolled back and the resource is unchanged.
+All operations within a single PATCH request must be **atomic** - if any operation fails, the entire PATCH is rolled back and the resource is unchanged.
 
 ---
 
@@ -614,7 +614,7 @@ interface AttrPath {
 function parseFilter(input: string): FilterNode { ... }
 ```
 
-### 7.3 Filter Operators — Complete Semantics
+### 7.3 Filter Operators - Complete Semantics
 
 | Operator | Name | Behavior | caseExact=false |
 |----------|------|----------|-----------------|
@@ -635,7 +635,7 @@ function parseFilter(input: string): FilterNode { ... }
 
 Two approaches depending on the persistence layer:
 
-**Approach A — Database-side (recommended for production)**:
+**Approach A - Database-side (recommended for production)**:
 ```
 FilterNode → SQL/Query builder AST → Database query
 ```
@@ -662,7 +662,7 @@ WHERE endpoint_id = $1
   AND (data->>'active')::boolean = true
 ```
 
-**Approach B — Application-side (acceptable for test/dev server)**:
+**Approach B - Application-side (acceptable for test/dev server)**:
 ```
 Fetch all resources for endpoint → Evaluate FilterNode in-memory → Return matches
 ```
@@ -687,8 +687,8 @@ interface SearchRequest {
 ```
 
 Two levels of POST search:
-- `POST {baseUrl}/.search` — searches across all resource types (RFC 7644 §3.4.3)
-- `POST {baseUrl}/Users/.search` — searches within a resource type
+- `POST {baseUrl}/.search` - searches across all resource types (RFC 7644 §3.4.3)
+- `POST {baseUrl}/Users/.search` - searches within a resource type
 
 This is required for queries that are too complex or sensitive for URL query strings (RFC 7644 §7.5.2: "Sensitive information SHALL NOT be transmitted over request URIs").
 
@@ -699,9 +699,9 @@ This is required for queries that are too complex or sensitive for URL query str
 ### 8.1 What the RFC Says
 
 > **RFC 7644 §4**: Three discovery endpoints that MUST exist:
-> - `/ServiceProviderConfig` — what the server can do
-> - `/Schemas` — what schemas exist
-> - `/ResourceTypes` — what resource types exist
+> - `/ServiceProviderConfig` - what the server can do
+> - `/Schemas` - what schemas exist
+> - `/ResourceTypes` - what resource types exist
 
 > Filter/sort/pagination on discovery endpoints SHALL be ignored. If a filter is provided on ServiceProviderConfig, respond with 403 Forbidden.
 
@@ -755,7 +755,7 @@ function buildServiceProviderConfig(endpoint: Endpoint): ServiceProviderConfig {
 }
 ```
 
-### 8.3 /Schemas — Generated from Schema Registry
+### 8.3 /Schemas - Generated from Schema Registry
 
 The `/Schemas` endpoint should return schemas **dynamically generated from the schema registry**, not from hardcoded JSON. This ensures:
 - Custom extensions appear in `/Schemas`
@@ -771,7 +771,7 @@ GET /scim/v2/{endpointId}/Schemas/urn:ietf:params:scim:schemas:core:2.0:User
 → Single schema definition with full attribute metadata
 ```
 
-### 8.4 /ResourceTypes — Generated from Resource Type Registry
+### 8.4 /ResourceTypes - Generated from Resource Type Registry
 
 ```
 GET /scim/v2/{endpointId}/ResourceTypes
@@ -869,7 +869,7 @@ Every resource mutation (create, update, patch) generates a new ETag:
 
 ```typescript
 function generateETag(resource: ScimResource): string {
-  // Content-hash approach — deterministic and verifiable
+  // Content-hash approach - deterministic and verifiable
   const hash = crypto.createHash('sha256')
     .update(JSON.stringify(resource.data) + resource.lastModified.toISOString())
     .digest('hex')
@@ -887,7 +887,7 @@ function generateETag(resource: ScimResource): string {
 | `If-Match: W/"abc"` | DELETE | Proceed only if current ETag matches | 412 Precondition Failed |
 | `If-None-Match: W/"abc"` | GET | Return 304 Not Modified if ETag matches | (not an error) |
 | `If-None-Match: *` | POST | Prevent duplicate creation | 409 Conflict |
-| No header | Any | Unconditional — always proceed | — |
+| No header | Any | Unconditional - always proceed | - |
 
 ### 10.4 ETag Storage
 
@@ -928,7 +928,7 @@ class ScimError extends Error {
 }
 ```
 
-### 11.3 RFC 7644 Table 9 — scimType Values
+### 11.3 RFC 7644 Table 9 - scimType Values
 
 | scimType | Status | Meaning |
 |----------|--------|---------|
@@ -950,7 +950,7 @@ class ScimError extends Error {
 | 200 | Successful GET, PUT, PATCH, Bulk, Search | Resource or ListResponse body |
 | 201 | Successful POST (create) | `Location` header + created resource body |
 | 204 | Successful DELETE | No body |
-| 304 | Conditional GET — ETag matches | No body |
+| 304 | Conditional GET - ETag matches | No body |
 | 400 | Bad request (with scimType detail) | Error body |
 | 401 | Missing or invalid authentication | `WWW-Authenticate` header + Error body |
 | 403 | Forbidden (inactive endpoint, filter on /ServiceProviderConfig) | Error body |
@@ -1044,10 +1044,10 @@ Once registered:
 
 ### 12.4 Extension Lifecycle Rules
 
-1. **Schema URI is the primary key** — each extension is identified by its full URI
-2. **`schemas` array is auto-managed** — adding extension data adds the URI; removing all extension data removes the URI
-3. **Validation uses extension schema** — attribute characteristics (type, required, mutability, returned) apply to extension attributes just like core attributes
-4. **Extensions are per-resource-type** — an extension can be linked to one or more resource types via `schemaExtensions` in the ResourceType definition
+1. **Schema URI is the primary key** - each extension is identified by its full URI
+2. **`schemas` array is auto-managed** - adding extension data adds the URI; removing all extension data removes the URI
+3. **Validation uses extension schema** - attribute characteristics (type, required, mutability, returned) apply to extension attributes just like core attributes
+4. **Extensions are per-resource-type** - an extension can be linked to one or more resource types via `schemaExtensions` in the ResourceType definition
 
 ---
 
@@ -1059,7 +1059,7 @@ Once registered:
 
 > **RFC 7644 §7.5.2**: "Sensitive information SHALL NOT be transmitted over request URIs." This is why POST-based search exists.
 
-> **RFC 7643 §9.3**: Privacy — "Information should be shared on an as-needed basis." Per-endpoint identifier isolation is recommended.
+> **RFC 7643 §9.3**: Privacy - "Information should be shared on an as-needed basis." Per-endpoint identifier isolation is recommended.
 
 > **RFC 7644 §7**: Full security considerations section covering TLS, token validation, bearer token risks, cross-endpoint isolation.
 
@@ -1254,14 +1254,14 @@ interface PaginatedResponse<T> {
 
 ### 17.1 RFC Compliance Gaps
 
-> **Phase 1 (Foundation — RFC Compliance Core) was completed Feb 2026.** Items marked ✅ below are now implemented. 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
+> **Phase 1 (Foundation - RFC Compliance Core) was completed Feb 2026.** Items marked ✅ below are now implemented. 📊 See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts.
 
 | RFC Requirement | RFC Section | Current State | Status |
 |----------------|-------------|---------------|--------|
 | **Filter operators** beyond `eq` | 7644 §3.4.2.2 | `eq` fully implemented (case-insensitive); `co`, `sw`, `ew`, `gt`, `lt`, `ge`, `le`, `ne` supported via ABNF parser | ✅ Implemented |
 | **Schema-driven validation** | 7643 §7 | ✅ SchemaValidator (~950 lines) validates per schema definitions | ✅ Done (v0.17.0) |
 | **POST /.search** | 7644 §3.4.3 | ✅ Implemented for Users and Groups with filter, pagination, attributes, excludedAttributes | ✅ Implemented |
-| **Bulk operations** | 7644 §3.7 | ✅ Implemented (v0.19.0) — `bulk.supported: true`, maxOperations: 1000 | ✅ Done |
+| **Bulk operations** | 7644 §3.7 | ✅ Implemented (v0.19.0) - `bulk.supported: true`, maxOperations: 1000 | ✅ Done |
 | **Sorting** | 7644 §3.4.2.3 | Not implemented (correctly advertised as `sort.supported: false`) | 🟡 Optional |
 | **ETag conditional enforcement** | 7644 §3.14 | ✅ Weak ETags on all responses; `If-None-Match` → 304 Not Modified | ✅ Implemented |
 | **`attributes`/`excludedAttributes` params** | 7644 §3.9 | ✅ Implemented on all GET and POST /.search endpoints (Users + Groups) | ✅ Implemented |
@@ -1312,7 +1312,7 @@ interface PaginatedResponse<T> {
 
 ## 18. Implementation Roadmap
 
-### Phase 1: Foundation — RFC Compliance Core ✅ COMPLETED (Feb 2026)
+### Phase 1: Foundation - RFC Compliance Core ✅ COMPLETED (Feb 2026)
 
 **Goal**: Make the existing server truthfully RFC-compliant for the features it already supports.
 
@@ -1324,11 +1324,11 @@ interface PaginatedResponse<T> {
 | 1.2 | Implement `attributes` / `excludedAttributes` on all endpoints (Users + Groups, GET + POST /.search) | ✅ Done | `scim-attribute-projection.ts` |
 | 1.3 | ETag / `If-None-Match` → 304 Not Modified | ✅ Done | `scim-etag.interceptor.ts` |
 | 1.4 | POST `/.search` endpoint (Users + Groups) | ✅ Done | `search-request.dto.ts` |
-| 1.5 | Centralize error handling — `ScimError` class + NestJS exception filter | ✅ Done | `scim-exception.filter.ts` |
+| 1.5 | Centralize error handling - `ScimError` class + NestJS exception filter | ✅ Done | `scim-exception.filter.ts` |
 | 1.6 | Clean up dead code | ✅ Done | Mega-controller, legacy services removed |
 | 1.7 | `Content-Type: application/scim+json` on all responses (including errors) | ✅ Done | `scim-content-type.interceptor.ts` |
 
-### Phase 2: Schema Engine — The Core Abstraction
+### Phase 2: Schema Engine - The Core Abstraction
 
 **Goal**: Move from hardcoded-per-attribute logic to a schema-driven engine.
 
@@ -1340,7 +1340,7 @@ interface PaginatedResponse<T> {
 | 2.4 | Schema-validate all incoming resources on POST/PUT using registry definitions | 🟡 Medium | Medium |
 | 2.5 | Move PATCH path parsing to shared parser with filter engine | 🟡 Medium | Medium |
 
-### Phase 3: Storage Abstraction — Decouple Persistence
+### Phase 3: Storage Abstraction - Decouple Persistence
 
 **Goal**: Separate SCIM protocol logic from database implementation.
 
@@ -1364,7 +1364,7 @@ interface PaginatedResponse<T> {
 | 4.4 | Per-endpoint auth configuration (bearer, client creds, shared secret, none) | 🟡 Medium | Large |
 | 4.5 | Per-endpoint behavior flags with typed configuration | 🟡 Medium | Medium |
 
-### Phase 5: Advanced Features — Full RFC Coverage
+### Phase 5: Advanced Features - Full RFC Coverage
 
 **Goal**: Implement the remaining optional RFC features.
 
@@ -1409,13 +1409,13 @@ interface PaginatedResponse<T> {
 │  │  ┌───────▼─────────────────────▼──────────────────────▼───────────┐  │  │
 │  │  │                Attribute Processor                              │  │  │
 │  │  │  (mutability, returned, caseExact, uniqueness, required,       │  │  │
-│  │  │   type validation — ALL driven by schema definitions)          │  │  │
+│  │  │   type validation - ALL driven by schema definitions)          │  │  │
 │  │  └──────────────────────────┬─────────────────────────────────────┘  │  │
 │  │                             │                                        │  │
 │  │  ┌──────────────────────────▼─────────────────────────────────────┐  │  │
 │  │  │              Generic Resource Handler                           │  │  │
-│  │  │  (one handler for ALL resource types — create, read, replace,  │  │  │
-│  │  │   patch, delete, list, search, bulk — no per-type hardcoding)  │  │  │
+│  │  │  (one handler for ALL resource types - create, read, replace,  │  │  │
+│  │  │   patch, delete, list, search, bulk - no per-type hardcoding)  │  │  │
 │  │  └──────────────────────────┬─────────────────────────────────────┘  │  │
 │  └─────────────────────────────┼────────────────────────────────────────┘  │
 │                                │                                          │
@@ -1444,19 +1444,19 @@ interface PaginatedResponse<T> {
 
 | From (Current) | To (RFC-First) |
 |----------------|----------------|
-| **Hardcoded per-resource logic** — separate UserService, GroupService with duplicated CRUD | **Generic resource handler** — one handler processes any resource type through schema-driven rules |
-| **Column-per-attribute persistence** — schema migrations for every attribute change | **Document-based storage** — JSONB stores any resource shape; schema changes need zero DB migrations |
-| **Static discovery responses** — same hardcoded JSON for all endpoints | **Dynamic discovery** — per-endpoint, truthful, auto-generated from registries |
+| **Hardcoded per-resource logic** - separate UserService, GroupService with duplicated CRUD | **Generic resource handler** - one handler processes any resource type through schema-driven rules |
+| **Column-per-attribute persistence** - schema migrations for every attribute change | **Document-based storage** - JSONB stores any resource shape; schema changes need zero DB migrations |
+| **Static discovery responses** - same hardcoded JSON for all endpoints | **Dynamic discovery** - per-endpoint, truthful, auto-generated from registries |
 
 ### Design Philosophy Summarized
 
 > **This architecture treats SCIM schemas as runtime data, not compile-time code.**
 >
-> Adding a new resource type, extension, or attribute characteristic requires **zero code changes** — only configuration. The server is a generic SCIM protocol engine that any organization can configure for their identity management needs.
+> Adding a new resource type, extension, or attribute characteristic requires **zero code changes** - only configuration. The server is a generic SCIM protocol engine that any organization can configure for their identity management needs.
 >
 > The SCIM RFCs designed the protocol to be this way. The schema definition format (RFC 7643 §7), the resource type system (RFC 7643 §6), and the discovery endpoints (RFC 7644 §4) all point to a server that is **self-describing, extensible, and discoverable by design**.
 
 ---
 
 > _"Make it fast, cheap, and easy to move users in to, out of, and around the cloud."_  
-> — RFC 7642 §2.1, summarizing the motivation behind SCIM
+> - RFC 7642 §2.1, summarizing the motivation behind SCIM

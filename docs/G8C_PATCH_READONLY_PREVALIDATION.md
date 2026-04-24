@@ -1,6 +1,6 @@
-# G8c — PATCH readOnly Pre-Validation
+# G8c - PATCH readOnly Pre-Validation
 
-> **Document Purpose**: Feature reference for the G8c gap closure — readOnly mutability enforcement during PATCH operations.
+> **Document Purpose**: Feature reference for the G8c gap closure - readOnly mutability enforcement during PATCH operations.
 >
 > **Created**: February 25, 2026
 > **Version**: v0.17.3
@@ -10,7 +10,7 @@
 
 ## Overview
 
-**Gap G8c** in the [MIGRATION_PLAN_CURRENT_TO_IDEAL_v3](MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md) identified that PATCH operations did not enforce `mutability: 'readOnly'` constraints. Attributes declared as `readOnly` in the SCIM schema (e.g., `groups`, `meta`) could be silently modified via PATCH add/replace/remove operations — a direct RFC compliance violation.
+**Gap G8c** in the [MIGRATION_PLAN_CURRENT_TO_IDEAL_v3](MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md) identified that PATCH operations did not enforce `mutability: 'readOnly'` constraints. Attributes declared as `readOnly` in the SCIM schema (e.g., `groups`, `meta`) could be silently modified via PATCH add/replace/remove operations - a direct RFC compliance violation.
 
 ### Problem Statement
 
@@ -19,15 +19,15 @@ Before v0.17.3, the `SchemaValidator.validatePatchOperationValue()` method perfo
 - `PATCH replace groups` → silently accepted (should be 400)
 - `PATCH add {"groups": [...]}` → silently accepted (should be 400)
 - `PATCH remove groups` → silently accepted (should be 400)
-- `PATCH replace groups[value eq "x"].display` → silently accepted (should be 400 — parent `groups` is readOnly)
+- `PATCH replace groups[value eq "x"].display` → silently accepted (should be 400 - parent `groups` is readOnly)
 
 ### Solution
 
 Added readOnly mutability pre-validation directly in `validatePatchOperationValue()`, which runs inside the `if (StrictSchemaValidation)` guard in both `endpoint-scim-users.service.ts` and `endpoint-scim-groups.service.ts`. This ensures:
 
-1. **Entra compatibility**: When `StrictSchemaValidation` is `false` (default), readOnly checks are skipped — matching Azure AD / Microsoft Entra behavior.
+1. **Entra compatibility**: When `StrictSchemaValidation` is `false` (default), readOnly checks are skipped - matching Azure AD / Microsoft Entra behavior.
 2. **RFC compliance**: When `StrictSchemaValidation` is `true`, all PATCH operations targeting readOnly attributes are rejected with HTTP 400.
-3. **Zero PatchEngine changes**: The fix lives in the validation layer, not the patch engine — maintaining clean separation of concerns.
+3. **Zero PatchEngine changes**: The fix lives in the validation layer, not the patch engine - maintaining clean separation of concerns.
 
 ---
 
@@ -75,19 +75,19 @@ Service Layer (endpoint-scim-users.service.ts / endpoint-scim-groups.service.ts)
 
 ## RFC Compliance
 
-### RFC 7643 §2.2 — Mutability
+### RFC 7643 §2.2 - Mutability
 
 > **readOnly**: The attribute SHALL NOT be modified.
 
 The SCIM standard explicitly states that `readOnly` attributes cannot be modified by any operation. This includes PATCH `add`, `replace`, and `remove` operations.
 
-### RFC 7643 §4.1 — User Schema
+### RFC 7643 §4.1 - User Schema
 
 The `groups` attribute is defined as:
 
-> **groups** — A list of groups to which the user belongs [...]. This attribute has a mutability of **"readOnly"**.
+> **groups** - A list of groups to which the user belongs [...]. This attribute has a mutability of **"readOnly"**.
 
-### RFC 7644 §3.5.2 — Modifying with PATCH
+### RFC 7644 §3.5.2 - Modifying with PATCH
 
 > If the target attribute of a PATCH operation is readOnly, the service provider SHOULD return a 400 error.
 
@@ -168,7 +168,7 @@ Added `groups` attribute to `USER_SCHEMA_ATTRIBUTES` in `scim-schemas.constants.
 }
 ```
 
-This was previously missing entirely from the schema constants, meaning `/Schemas` endpoint did not expose `groups` in the User schema — also an RFC compliance gap now resolved.
+This was previously missing entirely from the schema constants, meaning `/Schemas` endpoint did not expose `groups` in the User schema - also an RFC compliance gap now resolved.
 
 ---
 
@@ -178,8 +178,8 @@ This was previously missing entirely from the schema constants, meaning `/Schema
 
 | Flag Value | Behavior |
 |------------|----------|
-| `true` | readOnly mutability enforced on PATCH — 400 returned |
-| `false` (default) | readOnly checks skipped — Entra-compatible |
+| `true` | readOnly mutability enforced on PATCH - 400 returned |
+| `false` (default) | readOnly checks skipped - Entra-compatible |
 
 Set via endpoint config:
 ```http
@@ -246,6 +246,6 @@ File: `api/test/e2e/schema-validation.e2e-spec.ts` (§15)
 
 ## Migration Plan Impact
 
-- **Gap G8c**: ✅ CLOSED — PatchEngine readOnly pre-validation is now enforced via `SchemaValidator.validatePatchOperationValue()`
+- **Gap G8c**: ✅ CLOSED - PatchEngine readOnly pre-validation is now enforced via `SchemaValidator.validatePatchOperationValue()`
 - **Heat Map**: `schema-validator.ts` moves to GREEN (all G8c validations implemented)
 - **Remaining gaps**: G10 (/Me endpoint), G11 (per-endpoint credentials), G12 (sorting), G17 (User/Group service duplication)

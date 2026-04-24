@@ -177,7 +177,7 @@ describe('ActivityParserService', () => {
     });
 
     it('should not crash when identifier is a non-UUID string', async () => {
-      // This was the exact production crash scenario — non-UUID identifiers
+      // This was the exact production crash scenario - non-UUID identifiers
       // passed to resolveUserName → prisma.scimResource.findFirst on @db.Uuid column
       const activity = await service.parseActivity({
         id: 'log-3',

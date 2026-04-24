@@ -1,6 +1,6 @@
 # H-1 & H-2: Architecture Analysis, Deliberation & Implementation
 
-> **Date:** 2026-02-24 | **Version:** v0.17.0 (implemented)  
+> **Date:** 2026-04-23 | **Version:** v0.38.0 (implemented)  
 > **Scope:** PATCH SchemaValidator integration (H-1) and Immutable attribute enforcement (H-2)  
 > **Status:** ✅ IMPLEMENTED
 
@@ -45,12 +45,12 @@ The `SchemaValidator.validateAttribute()` method (line 202) only checks for `rea
 if (attrDef.mutability === 'readOnly' && (options.mode === 'create' || options.mode === 'replace')) {
 ```
 
-`immutable` attributes — which MAY be set on creation but MUST NOT be changed thereafter — are not enforced. On PUT/PATCH, a client could change an immutable attribute's value without error.
+`immutable` attributes - which MAY be set on creation but MUST NOT be changed thereafter - are not enforced. On PUT/PATCH, a client could change an immutable attribute's value without error.
 
 **Current schema attributes with `mutability: 'immutable'`:**
-- `Group.members.value` — the member user ID
-- `Group.members.display` — the member display name
-- `Group.members.type` — the member type (e.g., "User")
+- `Group.members.value` - the member user ID
+- `Group.members.display` - the member display name
+- `Group.members.type` - the member type (e.g., "User")
 
 These are sub-attributes of the multi-valued `members` complex attribute. In practice, group member replacement works via add/remove operations, not by modifying individual member sub-attributes, so the current gap has **low live impact**. However, any custom extension schemas with `immutable` top-level attributes would be silently modifiable.
 
@@ -66,7 +66,7 @@ Immutable enforcement requires comparing the **existing** resource state with th
 
 1. **`toScimUserResource()`** (endpoint-scim-users.service.ts L475-505): Already reconstructs a full SCIM-shaped object from a DB record by merging `rawPayload` + first-class columns (`userName`, `displayName`, `externalId`, `active`) + `schemas[]` + `meta`.
 
-2. **`toScimGroupResource()`** (endpoint-scim-groups.service.ts L547-590): Same pattern for groups — merges `rawPayload` + first-class columns + members + `schemas[]` + `meta`.
+2. **`toScimGroupResource()`** (endpoint-scim-groups.service.ts L547-590): Same pattern for groups - merges `rawPayload` + first-class columns + members + `schemas[]` + `meta`.
 
 3. **PUT flow** (endpoint-scim-users.service.ts L182-230): Already fetches the existing DB record (`user = repo.findByScimId()`) before applying the update. The record is available but NOT reconstructed as a SCIM object for comparison.
 
@@ -78,7 +78,7 @@ Immutable enforcement requires comparing the **existing** resource state with th
 
 Rather than introducing a new data-fetch round-trip, we propose extracting a **data-only payload builder** that:
 - Takes a DB record
-- Returns a flat SCIM-shaped object (no `meta`, no `location` — just attribute data)
+- Returns a flat SCIM-shaped object (no `meta`, no `location` - just attribute data)
 - Can be compared field-by-field against the incoming payload
 
 This is essentially `toScimUserResource()` minus the `meta` block and `id` override. We'll add a `toScimPayload()` helper for this purpose.
@@ -91,10 +91,10 @@ This is essentially `toScimUserResource()` minus the `meta` block and `id` overr
 
 | # | Approach | Pros | Cons | Verdict |
 |---|----------|------|------|---------|
-| 1 | **Post-operation validation** — validate the *result* of PatchEngine against schemas | Clean separation; PatchEngine stays pure; catches all invalid states | Requires reconstructing full SCIM object from PatchEngine result | ✅ Selected for H-1 |
-| 2 | **Pre-operation path validation** — resolve each PATCH path to its schema attribute and validate before applying | More granular error messages; can reject before any state change | Very complex (path→attrDef resolution for all path formats); breaks PatchEngine purity | ❌ Too complex |
-| 3 | **SchemaValidator.checkImmutable(existing, incoming, schemas)** — new pure domain method | Clean; reusable across PUT and PATCH; no PatchEngine changes | Needs existing resource as SCIM payload | ✅ Selected for H-2 |
-| 4 | **Inline immutability check in services** — ad-hoc comparison in each service method | Simple; no new API | Code duplication; not testable in isolation; maintenance debt | ❌ Rejected |
+| 1 | **Post-operation validation** - validate the *result* of PatchEngine against schemas | Clean separation; PatchEngine stays pure; catches all invalid states | Requires reconstructing full SCIM object from PatchEngine result | ✅ Selected for H-1 |
+| 2 | **Pre-operation path validation** - resolve each PATCH path to its schema attribute and validate before applying | More granular error messages; can reject before any state change | Very complex (path→attrDef resolution for all path formats); breaks PatchEngine purity | ❌ Too complex |
+| 3 | **SchemaValidator.checkImmutable(existing, incoming, schemas)** - new pure domain method | Clean; reusable across PUT and PATCH; no PatchEngine changes | Needs existing resource as SCIM payload | ✅ Selected for H-2 |
+| 4 | **Inline immutability check in services** - ad-hoc comparison in each service method | Simple; no new API | Code duplication; not testable in isolation; maintenance debt | ❌ Rejected |
 
 ### Selected Design
 
@@ -139,7 +139,7 @@ Both H-1 and H-2 validations are gated behind `StrictSchemaValidation=true`, con
 
 ### Implementation Order
 
-1. `SchemaValidator.checkImmutable()` — pure domain method (H-2)
+1. `SchemaValidator.checkImmutable()` - pure domain method (H-2)
 2. Unit tests for `checkImmutable()` (H-2)
 3. Private `buildExistingPayload()` helper in both services (shared infra for H-1 + H-2)
 4. PATCH validation call in user service (H-1)
@@ -178,7 +178,7 @@ this.validatePayloadSchema(resultPayload, endpointId, config, 'patch');
 ### Key Notes
 
 - `mode: 'patch'` skips required-attribute checks (RFC 7644 §3.5.2: PATCH doesn't need to supply all required attributes)
-- `readOnly` check still runs — catches cases where PatchEngine somehow sets a readOnly attribute
+- `readOnly` check still runs - catches cases where PatchEngine somehow sets a readOnly attribute
 - Type validation catches type mismatches introduced by PATCH (e.g., string where boolean expected)
 - Extension URN attributes validated against registered schemas
 
@@ -188,7 +188,7 @@ this.validatePayloadSchema(resultPayload, endpointId, config, 'patch');
 
 ### Design
 
-`SchemaValidator.checkImmutable()` — a new pure static method:
+`SchemaValidator.checkImmutable()` - a new pure static method:
 
 ```typescript
 static checkImmutable(
@@ -219,7 +219,7 @@ Since these are sub-attributes of `members` (multi-valued complex), immutability
 
 ### Extension Considerations
 
-Custom extension schemas registered via admin API may define top-level `immutable` attributes. The generic `checkImmutable()` method handles these uniformly — it iterates all schema attribute definitions regardless of whether they're core or extension.
+Custom extension schemas registered via admin API may define top-level `immutable` attributes. The generic `checkImmutable()` method handles these uniformly - it iterates all schema attribute definitions regardless of whether they're core or extension.
 
 ---
 

@@ -65,7 +65,7 @@ function makeGroupState(overrides: Partial<GroupPatchState> = {}): GroupPatchSta
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 1. PatchConfig — verbosePatch × extensionUrns Combinations
+// 1. PatchConfig - verbosePatch × extensionUrns Combinations
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('PatchConfig flag combinations (UserPatchEngine)', () => {
@@ -127,7 +127,7 @@ describe('PatchConfig flag combinations (UserPatchEngine)', () => {
     const config: PatchConfig = { verbosePatch: false, extensionUrns: [] };
 
     it('should NOT resolve enterprise URN when extensionUrns is explicitly empty', () => {
-      // extensionUrns=[] is NOT undefined — no fallback to KNOWN_EXTENSION_URNS
+      // extensionUrns=[] is NOT undefined - no fallback to KNOWN_EXTENSION_URNS
       const ops: PatchOperation[] = [
         { op: 'replace', path: `${ENTERPRISE_URN}:department`, value: 'Eng' },
       ];
@@ -270,7 +270,7 @@ describe('PatchConfig flag combinations (UserPatchEngine)', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 2. No-path Merge — Extension URN Keys + Regular Keys + Dot-notation
+// 2. No-path Merge - Extension URN Keys + Regular Keys + Dot-notation
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('No-path merge with extension URN keys (UserPatchEngine)', () => {
@@ -346,7 +346,7 @@ describe('No-path merge with extension URN keys (UserPatchEngine)', () => {
 // 3. Enterprise URN add Operation (gap: only replace/remove tested before)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('Enterprise URN — add operation (UserPatchEngine)', () => {
+describe('Enterprise URN - add operation (UserPatchEngine)', () => {
   const config: PatchConfig = { verbosePatch: false };
 
   it('should add enterprise extension attribute via path', () => {
@@ -455,7 +455,7 @@ describe('MSFT test extension URNs (UserPatchEngine)', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 5. GroupMemberPatchConfig — Flag Combinations
+// 5. GroupMemberPatchConfig - Flag Combinations
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('GroupMemberPatchConfig flag matrix', () => {
@@ -613,10 +613,10 @@ describe('GroupMemberPatchConfig flag matrix', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 6. GroupPatchEngine — Extension URN with MSFT URNs
+// 6. GroupPatchEngine - Extension URN with MSFT URNs
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('GroupPatchEngine — MSFT extension URNs', () => {
+describe('GroupPatchEngine - MSFT extension URNs', () => {
   const config: GroupMemberPatchConfig = {
     allowMultiMemberAdd: true,
     allowMultiMemberRemove: true,
@@ -806,10 +806,10 @@ describe('Complex extension attribute values (UserPatchEngine)', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 9. GroupPatchEngine — Extension + Member Flag Combinations
+// 9. GroupPatchEngine - Extension + Member Flag Combinations
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('GroupPatchEngine — extension + flag combination flows', () => {
+describe('GroupPatchEngine - extension + flag combination flows', () => {
   it('should add extension + single member (multi-add disabled)', () => {
     const config: GroupMemberPatchConfig = {
       allowMultiMemberAdd: false,
@@ -912,7 +912,7 @@ describe('Soft-deleted user + extension attribute operations', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 11. Multiple Extension Blocks — Across Engines
+// 11. Multiple Extension Blocks - Across Engines
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Multiple extension blocks in rawPayload (UserPatchEngine)', () => {

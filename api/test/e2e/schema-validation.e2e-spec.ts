@@ -28,7 +28,7 @@ import {
  *     displayName → string) are implicitly type-coerced BEFORE the service sees them.
  *   - The SchemaValidator skips reserved keys (schemas, id, externalId, meta) via RESERVED_KEYS.
  *   - Non-DTO properties (name, emails, phoneNumbers, addresses, etc.) pass through the
- *     `[key: string]: unknown` index signature WITHOUT type coercion — these are where
+ *     `[key: string]: unknown` index signature WITHOUT type coercion - these are where
  *     validatePayloadSchema does its real work.
  *
  * References: RFC 7643 §2 (SCIM Schema), RFC 7644 §3.3 (Creating Resources)
@@ -66,7 +66,7 @@ describe('Schema Validation (E2E)', () => {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // §1 — Complex Attribute Type Validation
+  // §1 - Complex Attribute Type Validation
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Complex attribute type validation', () => {
@@ -114,7 +114,7 @@ describe('Schema Validation (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // §2 — Multi-valued / Single-valued Enforcement
+  // §2 - Multi-valued / Single-valued Enforcement
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Multi-valued enforcement', () => {
@@ -164,7 +164,7 @@ describe('Schema Validation (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // §3 — Unknown Attribute Rejection
+  // §3 - Unknown Attribute Rejection
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Unknown attribute rejection', () => {
@@ -224,7 +224,7 @@ describe('Schema Validation (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // §4 — Sub-attribute Type Validation
+  // §4 - Sub-attribute Type Validation
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Sub-attribute type validation', () => {
@@ -272,7 +272,7 @@ describe('Schema Validation (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // §5 — Enterprise Extension Type Validation
+  // §5 - Enterprise Extension Type Validation
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Enterprise extension type validation', () => {
@@ -366,7 +366,7 @@ describe('Schema Validation (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // §6 — Group Schema Validation
+  // §6 - Group Schema Validation
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Group schema validation', () => {
@@ -394,7 +394,7 @@ describe('Schema Validation (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // §7 — PUT (Replace) with Schema Validation
+  // §7 - PUT (Replace) with Schema Validation
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('PUT (replace) with schema validation', () => {
@@ -462,7 +462,7 @@ describe('Schema Validation (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // §8 — Error Response Format
+  // §8 - Error Response Format
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Error response format', () => {
@@ -503,7 +503,7 @@ describe('Schema Validation (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // §9 — Flag On/Off Comparison
+  // §9 - Flag On/Off Comparison
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Strict mode flag on/off comparison', () => {
@@ -542,7 +542,7 @@ describe('Schema Validation (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // §10 — Extension URN Edge Cases
+  // §10 - Extension URN Edge Cases
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Extension URN edge cases', () => {
@@ -598,7 +598,7 @@ describe('Schema Validation (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // §11 — Complex Realistic Payloads
+  // §11 - Complex Realistic Payloads
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Complex realistic payloads', () => {
@@ -690,7 +690,7 @@ describe('Schema Validation (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // §12 — Cross-resource Schema Isolation
+  // §12 - Cross-resource Schema Isolation
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Cross-resource schema isolation', () => {
@@ -701,7 +701,7 @@ describe('Schema Validation (E2E)', () => {
       await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201);
       await scimPost(app, `${basePath}/Groups`, token, validGroup()).expect(201);
 
-      // Invalid user (name as string — complex type error)
+      // Invalid user (name as string - complex type error)
       await scimPost(app, `${basePath}/Users`, token, validUser({
         name: 'flat' as any,
       })).expect(400);
@@ -731,7 +731,7 @@ describe('Schema Validation (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // §13 — DTO Implicit Conversion Behaviour Documentation
+  // §13 - DTO Implicit Conversion Behaviour Documentation
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('DTO implicit conversion behaviour', () => {
@@ -773,7 +773,7 @@ describe('Schema Validation (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // §14 — Reserved Keys Behaviour (id, meta, externalId)
+  // §14 - Reserved Keys Behaviour (id, meta, externalId)
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('Reserved keys behaviour', () => {
@@ -807,10 +807,10 @@ describe('Schema Validation (E2E)', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // §15 — G8c: readOnly Mutability Pre-validation in PATCH
+  // §15 - G8c: readOnly Mutability Pre-validation in PATCH
   // ═══════════════════════════════════════════════════════════════════════════
 
-  describe('G8c — readOnly attribute rejection in PATCH (strict mode)', () => {
+  describe('G8c - readOnly attribute rejection in PATCH (strict mode)', () => {
     it('should reject PATCH replace on readOnly attribute (groups) with 400', async () => {
       const { basePath } = await strictEndpoint();
 
@@ -877,7 +877,7 @@ describe('Schema Validation (E2E)', () => {
       const createRes = await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201);
       const userId = createRes.body.id;
 
-      // PATCH readWrite attributes — should succeed
+      // PATCH readWrite attributes - should succeed
       const patchRes = await scimPatch(app, `${basePath}/Users/${userId}`, token, patchOp([
         { op: 'replace', path: 'displayName', value: 'Updated Name' },
       ])).expect(200);
@@ -886,14 +886,14 @@ describe('Schema Validation (E2E)', () => {
     });
   });
 
-  describe('G8c — readOnly PATCH accepted when strict mode off (lenient)', () => {
+  describe('G8c - readOnly PATCH accepted when strict mode off (lenient)', () => {
     it('should accept PATCH on readOnly attribute when StrictSchemaValidation is off', async () => {
       const { basePath } = await lenientEndpoint();
 
       const createRes = await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201);
       const userId = createRes.body.id;
 
-      // readOnly check is gated behind StrictSchemaValidation — should not reject
+      // readOnly check is gated behind StrictSchemaValidation - should not reject
       // (PatchEngine may throw its own error, or handle it gracefully)
       const patchRes = await scimPatch(app, `${basePath}/Users/${userId}`, token, patchOp([
         { op: 'replace', path: 'displayName', value: 'Lenient Update' },

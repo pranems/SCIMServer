@@ -36,7 +36,7 @@ You are executing the **next MVP phase** in a phased migration roadmap.
    - Local instance + existing live tests pass
    - Fresh latest container + existing live tests pass
 4. If any failure occurs, fix root cause minimally and re-run impacted validation.
-5. **Keep the final Docker container running** after all validations pass. Do not stop or remove it — leave it available for the user to inspect and interact with.
+5. **Keep the final Docker container running** after all validations pass. Do not stop or remove it - leave it available for the user to inspect and interact with.
 
 ## Required Artifacts (Lean)
 Produce two concise docs/sections:
@@ -66,12 +66,12 @@ For each issue in this phase:
 ## Self-Improvement & Documentation Update
 After MVP validation is complete:
 1. **Update project documentation** to reflect this phase's outcomes:
-   - `Session_starter.md` — progress log, version, test counts
-   - `CHANGELOG.md` — version bump with feature summary
-   - `docs/CONTEXT_INSTRUCTIONS.md` — new gotchas or constraints discovered
-   - `docs/INDEX.md` — add references to any new phase docs
-   - `docs/PROJECT_HEALTH_AND_STATS.md` — update test counts and phase status
-   - `package.json` — bump version number
+   - `Session_starter.md` - progress log, version, test counts
+   - `CHANGELOG.md` - version bump with feature summary
+   - `docs/CONTEXT_INSTRUCTIONS.md` - new gotchas or constraints discovered
+   - `docs/INDEX.md` - add references to any new phase docs
+   - `docs/PROJECT_HEALTH_AND_STATS.md` - update test counts and phase status
+   - `package.json` - bump version number
 2. **Review this prompt template** for improvements:
    - Were any steps missing or unnecessary?
    - Apply identified improvements to this prompt and its variants.
@@ -87,4 +87,4 @@ Return:
 - On-track verdict
 - Brief commit message
 - Project docs updated (list)
-- Docker container status (image tag, container name/ID, port — confirm running)
+- Docker container status (image tag, container name/ID, port - confirm running)

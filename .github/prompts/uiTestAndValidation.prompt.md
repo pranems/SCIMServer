@@ -1,6 +1,6 @@
 ---
 name: uiTestAndValidation
-description: "Run all web UI tests, audit coverage gaps, add missing tests, and validate the build. Fully automated — no user input required."
+description: "Run all web UI tests, audit coverage gaps, add missing tests, and validate the build. Fully automated - no user input required."
 mode: "agent"
 argument-hint: Optional scope like "Header" or "ActivityFeed" to narrow the audit to a single component.
 ---
@@ -10,12 +10,12 @@ Run the web UI test suite, audit test coverage gaps, add missing tests, validate
 ### Execution Rules
 
 - **Never stop to ask the user.** Make reasonable decisions and proceed.
-- **Parallelize reads** — read multiple source files at once with parallel tool calls.
-- **Batch terminal commands** — chain commands with `;` instead of running them one at a time.
-- **Redirect output to files** — use `*> c:\temp\vitest-*.txt` to avoid terminal scrollback issues, then `Select-String` the results.
-- **Fix failures inline** — if a test fails, read the source, fix the test, rerun. Don't ask if you should fix it.
-- **One vitest run per step** — don't re-run to "confirm". Trust the first green result.
-- **Skip unchanged syncs** — only sync `api/public/` if source (non-test) files were changed.
+- **Parallelize reads** - read multiple source files at once with parallel tool calls.
+- **Batch terminal commands** - chain commands with `;` instead of running them one at a time.
+- **Redirect output to files** - use `*> c:\temp\vitest-*.txt` to avoid terminal scrollback issues, then `Select-String` the results.
+- **Fix failures inline** - if a test fails, read the source, fix the test, rerun. Don't ask if you should fix it.
+- **One vitest run per step** - don't re-run to "confirm". Trust the first green result.
+- **Skip unchanged syncs** - only sync `api/public/` if source (non-test) files were changed.
 
 ---
 
@@ -24,15 +24,15 @@ Run the web UI test suite, audit test coverage gaps, add missing tests, validate
 **Stack:** React 19 + Vite 7 + TypeScript 5.9, tested with Vitest + @testing-library/react + @testing-library/user-event + jsdom.
 
 **Source layout:**
-- `web/src/utils/` — Pure utility functions (keepalive detection, etc.)
-- `web/src/auth/` — Token storage (localStorage, events)
-- `web/src/hooks/` — React context hooks (useAuth, useTheme)
-- `web/src/api/client.ts` — API client (fetchLogs, fetchLocalVersion, etc.)
-- `web/src/components/` — UI components (Header, LogList, LogDetail, LogFilters)
-- `web/src/components/activity/` — ActivityFeed component
-- `web/src/components/database/` — DatabaseBrowser, StatisticsTab, UsersTab, GroupsTab
-- `web/src/components/manual/` — ManualProvision component
-- `web/src/App.tsx` — Root app (tab navigation, token modal, upgrade banner, semver logic)
+- `web/src/utils/` - Pure utility functions (keepalive detection, etc.)
+- `web/src/auth/` - Token storage (localStorage, events)
+- `web/src/hooks/` - React context hooks (useAuth, useTheme)
+- `web/src/api/client.ts` - API client (fetchLogs, fetchLocalVersion, etc.)
+- `web/src/components/` - UI components (Header, LogList, LogDetail, LogFilters)
+- `web/src/components/activity/` - ActivityFeed component
+- `web/src/components/database/` - DatabaseBrowser, StatisticsTab, UsersTab, GroupsTab
+- `web/src/components/manual/` - ManualProvision component
+- `web/src/App.tsx` - Root app (tab navigation, token modal, upgrade banner, semver logic)
 
 **Test config:** `web/vite.config.ts` → `test` block with jsdom environment, setup in `web/src/test/setup.ts`.
 
@@ -45,7 +45,7 @@ npm run test:watch # vitest (interactive watch mode)
 
 ---
 
-## Step 1 — Run Existing Tests
+## Step 1 - Run Existing Tests
 
 ```powershell
 cd web; npx vitest run *> c:\temp\vitest-step1.txt; type c:\temp\vitest-step1.txt | Select-String "Test Files|Tests |Duration|FAIL"
@@ -59,7 +59,7 @@ If any tests fail, immediately read the failing test + source component, fix whi
 
 ---
 
-## Step 2 — Inventory Test Coverage
+## Step 2 - Inventory Test Coverage
 
 Build a coverage matrix of all source files vs test files:
 
@@ -87,7 +87,7 @@ For each ❌ GAP, read the source file and determine what is testable with Vites
 
 ---
 
-## Step 3 — Add Missing Tests
+## Step 3 - Add Missing Tests
 
 For each gap identified in Step 2, create a test file following these conventions:
 
@@ -123,24 +123,24 @@ describe('ComponentName', () => {
 
 ### Priority Order for Gap Closure
 
-1. **`api/client.ts`** — Mock fetch, test URL building, auth header injection, error status handling (401 → token cleared)
-2. **`App.tsx`** — Test footer content (no "Made by", version from API), tab navigation, token modal display
-3. **`ActivityFeed.tsx`** — Test summary cards render, activity list renders, filter dropdowns work, auto-refresh toggle
-4. **`DatabaseBrowser.tsx`** — Test sub-tab switching (Statistics/Users/Groups), modal open/close, delete confirmation
+1. **`api/client.ts`** - Mock fetch, test URL building, auth header injection, error status handling (401 → token cleared)
+2. **`App.tsx`** - Test footer content (no "Made by", version from API), tab navigation, token modal display
+3. **`ActivityFeed.tsx`** - Test summary cards render, activity list renders, filter dropdowns work, auto-refresh toggle
+4. **`DatabaseBrowser.tsx`** - Test sub-tab switching (Statistics/Users/Groups), modal open/close, delete confirmation
 
 ### Patterns Discovered
 
 **Presentational components (StatisticsTab, UsersTab, GroupsTab):** Pass props directly, spy on callbacks with `vi.fn()`. No providers needed. These are the easiest to test.
 
-**Components with `vi.mock`:** ManualProvision uses `createManualUser`/`createManualGroup` from `api/client.ts` — mock the module with `vi.mock('../../api/client', () => ({ ... }))` and pre-set a token via `setStoredToken('test-token')` before each test.
+**Components with `vi.mock`:** ManualProvision uses `createManualUser`/`createManualGroup` from `api/client.ts` - mock the module with `vi.mock('../../api/client', () => ({ ... }))` and pre-set a token via `setStoredToken('test-token')` before each test.
 
-**Emoji in headings:** Component headings like `👥 Users` need regex matchers (`/Users/`) or `getAllByRole('heading')` — exact text match will fail due to emoji prefix.
+**Emoji in headings:** Component headings like `👥 Users` need regex matchers (`/Users/`) or `getAllByRole('heading')` - exact text match will fail due to emoji prefix.
 
 **API client (`api/client.ts`):** Mock global `fetch` with `vi.stubGlobal('fetch', mockFetch)`, set a token via `setStoredToken('test-token')` in `beforeEach`. Use `await import('./client')` after mocks are in place. Test URL construction, auth header injection, 401 → token cleared, error detail extraction from SCIM error responses.
 
 ---
 
-## Step 4 — Validate Build
+## Step 4 - Validate Build
 
 ```powershell
 cd web; npm run build *> c:\temp\vitest-build.txt; type c:\temp\vitest-build.txt | Select-String "built|error"
@@ -150,7 +150,7 @@ Confirm: "built in" message present, no "error" lines.
 
 ---
 
-## Step 5 — Sync Public Assets
+## Step 5 - Sync Public Assets
 
 Only if **source** (non-test) files were modified:
 
@@ -162,7 +162,7 @@ If only test files were added, skip this step.
 
 ---
 
-## Step 6 — Report
+## Step 6 - Report
 
 Print a summary table:
 
@@ -199,7 +199,7 @@ After each run of this prompt, update THIS FILE with:
 | Date | Tests | Files | Gaps Closed | Notes |
 |------|-------|-------|-------------|-------|
 | 2026-04-17 | 164 | 17 | 1 | Closed App.tsx (12 tests: token modal show/hide/pre-existing, 4 tab navigation, 3 footer content, version display). All source files now have co-located tests. 0 remaining gaps. |
-| 2026-04-14 | 152 | 16 | 2 | Closed ActivityFeed (13 tests), DatabaseBrowser (10 tests). Live data verified: version, summary, stats, users, groups, backup 404 — all correct. 1 remaining gap: App.tsx. |
+| 2026-04-14 | 152 | 16 | 2 | Closed ActivityFeed (13 tests), DatabaseBrowser (10 tests). Live data verified: version, summary, stats, users, groups, backup 404 - all correct. 1 remaining gap: App.tsx. |
 | 2026-04-14 | 129 | 14 | 5 | Closed api/client.ts (13 tests). Live data verification: all endpoints correct after Fix #1–3. |
 | 2026-04-14 | 116 | 13 | 4 | Closed StatisticsTab (10), UsersTab (10), GroupsTab (7), ManualProvision (12). |
-| 2026-04-13 | 75 | 9 | — | Initial creation. All 75 pass. |
+| 2026-04-13 | 75 | 9 | - | Initial creation. All 75 pass. |

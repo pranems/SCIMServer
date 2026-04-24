@@ -64,7 +64,7 @@ graph LR
 
 ## 3) Detailed Step-by-Step Plan
 
-## Phase 1 — Contract and Safety Foundations
+## Phase 1 - Contract and Safety Foundations
 
 ### 1.1 Freeze protocol contracts with tests
 - Add/extend test matrix for:
@@ -93,7 +93,7 @@ Acceptance:
 
 ---
 
-## Phase 2 — Persist Dynamic Schemas, ResourceTypes, and Endpoint Config
+## Phase 2 - Persist Dynamic Schemas, ResourceTypes, and Endpoint Config
 
 ### 2.1 Add persistence models (initially alongside current models)
 Create new tables/entities:
@@ -129,7 +129,7 @@ Acceptance:
 
 ---
 
-## Phase 3 — Persistence Migration to PostgreSQL + Repository Implementations
+## Phase 3 - Persistence Migration to PostgreSQL + Repository Implementations
 
 ### 3.1 Move from SQLite to PostgreSQL
 - Update datasource provider.
@@ -154,7 +154,7 @@ Acceptance:
 
 ---
 
-## Phase 4 — Filter Pushdown and Query Planning
+## Phase 4 - Filter Pushdown and Query Planning
 
 ### 4.1 Add AST planner layer
 - Convert parsed AST into a query plan object.
@@ -178,7 +178,7 @@ Acceptance:
 
 ---
 
-## Phase 5 — PATCH + Attribute Characteristics + ETag Hardening
+## Phase 5 - PATCH + Attribute Characteristics + ETag Hardening
 
 ### 5.1 Central schema validator service
 Create one reusable validator enforcing full attribute characteristics:
@@ -216,7 +216,7 @@ Acceptance:
 
 ---
 
-## Phase 6 — Optional RFC Features (/Bulk and /Me)
+## Phase 6 - Optional RFC Features (/Bulk and /Me)
 
 ### 6.1 `/Bulk`
 - Add bulk transaction orchestrator.
@@ -232,7 +232,7 @@ Acceptance:
 
 ---
 
-## Phase 7 — Operational Hardening and Rollout
+## Phase 7 - Operational Hardening and Rollout
 
 ### 7.1 Feature-flagged rollout
 - Enable dynamic discovery and schema validation per endpoint.

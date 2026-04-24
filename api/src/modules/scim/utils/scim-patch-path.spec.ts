@@ -740,7 +740,7 @@ describe('scim-patch-path utilities', () => {
       expect(ext?.customAttr).toBe('custom-val');
     });
 
-    it('should store URN keys with dots atomically — not split as dot-notation', () => {
+    it('should store URN keys with dots atomically - not split as dot-notation', () => {
       const CUSTOM_URN = 'urn:example:custom:2.0:User';
       const payload: Record<string, unknown> = {};
       // Without extensionUrns, the URN:attr path is not parsed as an extension path,

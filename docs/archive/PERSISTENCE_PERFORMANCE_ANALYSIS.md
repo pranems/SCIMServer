@@ -1,7 +1,7 @@
-# Persistence & Performance Analysis — SCIM Server
+# Persistence & Performance Analysis - SCIM Server
 
 > **Date**: February 2026  
-> **Status**: ✅ **Critical fixes 1–3 implemented** (introduced in v0.9.1 and retained in v0.10.0) — SCIM validator now at 24/24 passing.  
+> **Status**: ✅ **Critical fixes 1–3 implemented** (introduced in v0.9.1 and retained in v0.10.0) - SCIM validator now at 24/24 passing.  
 > **Scope**: End-to-end analysis of SQLite persistence patterns, write contention, SCIM validator failures, and holistic improvement recommendations.  
 > **Audience**: Development team, reviewers, future contributors.  
 > **See also**: [SCIM_GROUP_PERFORMANCE_ANALYSIS.md](SCIM_GROUP_PERFORMANCE_ANALYSIS.md) for the detailed timeline and interaction diagrams.
@@ -12,7 +12,7 @@
 
 1. [Executive Summary](#1-executive-summary)
 2. [Architecture Overview](#2-architecture-overview)
-3. [Root Cause Analysis — SCIM Validator Failures](#3-root-cause-analysis--scim-validator-failures)
+3. [Root Cause Analysis - SCIM Validator Failures](#3-root-cause-analysis--scim-validator-failures)
    - 3.1 [Issue 1: displayName Filter Full-Table Scan](#31-issue-1-displayname-filter-full-table-scan)
    - 3.2 [Issue 2: Member Resolution Inside Transaction](#32-issue-2-member-resolution-inside-transaction)
    - 3.3 [Issue 3: SQLite Write Lock Contention from Request Logging](#33-issue-3-sqlite-write-lock-contention-from-request-logging)
@@ -21,10 +21,10 @@
 5. [Holistic Persistence Analysis](#5-holistic-persistence-analysis)
    - 5.1 [Log Accumulation & Unbounded Growth](#51-log-accumulation--unbounded-growth)
    - 5.2 [N+1 Query Pattern in Log Listing](#52-n1-query-pattern-in-log-listing)
-   - 5.3 [assertUniqueDisplayName — O(N) Full Scan](#53-assertuniquedisplayname--on-full-scan)
-   - 5.4 [getActivitySummary — Memory Explosion](#54-getactivitysummary--memory-explosion)
+   - 5.3 [assertUniqueDisplayName - O(N) Full Scan](#53-assertuniquedisplayname--on-full-scan)
+   - 5.4 [getActivitySummary - Memory Explosion](#54-getactivitysummary--memory-explosion)
    - 5.5 [Backup Without WAL Checkpoint](#55-backup-without-wal-checkpoint)
-   - 5.6 [Group Create — Missing Transaction](#56-group-create--missing-transaction)
+   - 5.6 [Group Create - Missing Transaction](#56-group-create--missing-transaction)
    - 5.7 [Full-Text Search on TEXT Blobs](#57-full-text-search-on-text-blobs)
 6. [DB Logging vs. File-Based Logging](#6-db-logging-vs-file-based-logging)
 7. [Recommended Fixes](#7-recommended-fixes)
@@ -92,7 +92,7 @@ Fixes 1–3 resolved all 3 SCIM validator failures. Fix 4 remains as a future op
 
 ---
 
-## 3. Root Cause Analysis — SCIM Validator Failures
+## 3. Root Cause Analysis - SCIM Validator Failures
 
 ### 3.1 Issue 1: displayName Filter Full-Table Scan
 
@@ -133,7 +133,7 @@ Step 3: Falls back to in-memory filtering
 | With DB push-down | `SELECT * FROM ScimGroup WHERE displayName = ? AND endpointId = ?` | ~1ms | ~5ms |
 | Without (current) | `SELECT * FROM ScimGroup WHERE endpointId = ?` + JS filter | ~10ms | ~500ms+ |
 
-**Example — What the Validator Sends vs What Happens**:
+**Example - What the Validator Sends vs What Happens**:
 
 ```json
 // SCIM Validator Request
@@ -151,7 +151,7 @@ GET /scim/endpoints/ep1/Groups?filter=displayName eq "Test_Group_fc2d1a6b"
 
 The code has this comment:
 ```
-NOTE: displayName is intentionally excluded — SQLite performs
+NOTE: displayName is intentionally excluded - SQLite performs
 case-sensitive comparisons by default and there is no lowercase
 column for displayName. Pushing it to the DB would fail the
 RFC 7643 §2.1 requirement that attribute comparisons are
@@ -183,7 +183,7 @@ This is a valid concern, but the solution should be adding a `displayNameLower` 
 └────────────────────────────────────────────────────────────────┘
 ```
 
-**DB Table Example — What Step 3 Does Inside the Transaction**:
+**DB Table Example - What Step 3 Does Inside the Transaction**:
 
 Given PATCH body `{ "Operations": [{ "op": "add", "path": "members", "value": [{ "value": "user-scim-id-1" }] }] }`:
 
@@ -201,7 +201,7 @@ WHERE scimId IN ('user-scim-id-1') AND endpointId = 'ep1';
 | clx2def... | `user-scim-id-2` | ep1 | bob@contoso.com |
 | ... 50 more users ... | ... | ... | ... |
 
-This `findMany` is fast alone (~1ms), but while the transaction holds the write lock, **no other write can proceed** — including request logging.
+This `findMany` is fast alone (~1ms), but while the transaction holds the write lock, **no other write can proceed** - including request logging.
 
 ---
 
@@ -270,7 +270,7 @@ if (memberDtos.length > 0) {
 }
 ```
 
-**DB Table Example — Updating Only displayName**:
+**DB Table Example - Updating Only displayName**:
 
 ```
 PATCH /Groups/group-123
@@ -379,7 +379,7 @@ Beyond the SCIM validator failures, there are several additional persistence pat
 | Light (dev) | 100 | ~2 KB | 200 KB | 6 MB |
 | Medium (small org) | 1,000 | ~3 KB | 3 MB | 90 MB |
 | Heavy (large org) | 10,000 | ~5 KB | 50 MB | 1.5 GB |
-| SCIM validator run | 500 in 5 min | ~4 KB | 2 MB per run | — |
+| SCIM validator run | 500 in 5 min | ~4 KB | 2 MB per run | - |
 
 The only cleanup mechanism is a manual `POST /scim/admin/logs/clear` endpoint. No TTL, no cron rotation, no size limit.
 
@@ -389,7 +389,7 @@ The only cleanup mechanism is a manual `POST /scim/admin/logs/clear` endpoint. N
 
 ### 5.2 N+1 Query Pattern in Log Listing
 
-**Location**: `api/src/modules/logging/logging.service.ts` — `mapLog()` → `resolveUserDisplayName()`
+**Location**: `api/src/modules/logging/logging.service.ts` - `mapLog()` → `resolveUserDisplayName()`
 
 **Problem**: When listing logs, each log entry triggers an individual `resolveUserDisplayName()` call that executes up to 2 DB queries:
 
@@ -423,7 +423,7 @@ const nameMap = new Map(users.map(u => [u.scimId, extractDisplayName(u)]));
 
 ---
 
-### 5.3 assertUniqueDisplayName — O(N) Full Scan
+### 5.3 assertUniqueDisplayName - O(N) Full Scan
 
 **Location**: `api/src/modules/scim/services/endpoint-scim-groups.service.ts` lines 355–370
 
@@ -463,7 +463,7 @@ Then `assertUniqueDisplayName` becomes a simple try/catch on the DB constraint.
 
 ---
 
-### 5.4 getActivitySummary — Memory Explosion
+### 5.4 getActivitySummary - Memory Explosion
 
 **Location**: `api/src/modules/activity-parser/activity.controller.ts`
 
@@ -497,7 +497,7 @@ await this.prisma.$queryRawUnsafe('PRAGMA wal_checkpoint(TRUNCATE);');
 
 ---
 
-### 5.6 Group Create — Missing Transaction
+### 5.6 Group Create - Missing Transaction
 
 **Location**: `api/src/modules/scim/services/endpoint-scim-groups.service.ts` lines 82–100
 
@@ -514,7 +514,7 @@ if (members.length > 0) {
 
 If the member creation fails, the group exists without its members. While the SCIM validator may handle this gracefully (it refetches), it's an atomicity gap.
 
-**Suggestion**: Wrap in a transaction (lightweight — no user resolution needed since members come from the request):
+**Suggestion**: Wrap in a transaction (lightweight - no user resolution needed since members come from the request):
 
 ```typescript
 await this.prisma.$transaction(async (tx) => {
@@ -529,7 +529,7 @@ await this.prisma.$transaction(async (tx) => {
 
 ### 5.7 Full-Text Search on TEXT Blobs
 
-**Location**: `api/src/modules/logging/logging.service.ts` — search filter
+**Location**: `api/src/modules/logging/logging.service.ts` - search filter
 
 **Problem**: The search functionality performs `contains` searches across 6 large TEXT columns:
 
@@ -566,7 +566,7 @@ Every request writes to the `RequestLog` table in SQLite, competing with SCIM op
 - ❌ Competes for SQLite writer lock (Issue #3)
 - ❌ Two writes per request (create + identifier update)
 - ❌ Large TEXT columns (headers, bodies) bloat the DB
-- ❌ No rotation — grows unbounded
+- ❌ No rotation - grows unbounded
 - ❌ Makes SCIM operations slower (the primary use case)
 
 ### Alternative: File-Based Logging Per Endpoint
@@ -591,11 +591,11 @@ Each line is a JSON object (JSONL format):
 ```
 
 **Advantages**:
-- ✅ **Zero contention** with SCIM operations — file writes don't touch SQLite
+- ✅ **Zero contention** with SCIM operations - file writes don't touch SQLite
 - ✅ Natural rotation (daily files, easy to prune old files)
-- ✅ Can use Node.js `appendFileSync` or buffered writes — extremely fast
-- ✅ Endpoint isolation — each endpoint's logs are separate
-- ✅ Smaller footprint — only store summary, not full bodies
+- ✅ Can use Node.js `appendFileSync` or buffered writes - extremely fast
+- ✅ Endpoint isolation - each endpoint's logs are separate
+- ✅ Smaller footprint - only store summary, not full bodies
 - ✅ Can store full bodies in separate detail files only when needed
 
 **Disadvantages**:
@@ -632,9 +632,9 @@ The best approach is a **hybrid**: use file-based logging for the hot path (ever
 
 ---
 
-## 7. Recommended Fixes — ✅ Critical Fixes Implemented
+## 7. Recommended Fixes - ✅ Critical Fixes Implemented
 
-### Fix 1: Add `displayName` to GROUP_DB_COLUMNS — ✅ IMPLEMENTED (introduced in v0.9.1)
+### Fix 1: Add `displayName` to GROUP_DB_COLUMNS - ✅ IMPLEMENTED (introduced in v0.9.1)
 
 **File**: `api/src/modules/scim/filters/apply-scim-filter.ts`
 
@@ -653,7 +653,7 @@ Additionally, `assertUniqueDisplayName` was refactored from O(N) `findMany` full
 
 ---
 
-### Fix 2: Move Member Resolution Outside Transaction — ✅ IMPLEMENTED (introduced in v0.9.1)
+### Fix 2: Move Member Resolution Outside Transaction - ✅ IMPLEMENTED (introduced in v0.9.1)
 
 **File**: `api/src/modules/scim/services/endpoint-scim-groups.service.ts`
 
@@ -686,7 +686,7 @@ await this.prisma.$transaction(async (tx) => {
 
 ---
 
-### Fix 3: Buffered Request Logging — ✅ IMPLEMENTED (introduced in v0.9.1)
+### Fix 3: Buffered Request Logging - ✅ IMPLEMENTED (introduced in v0.9.1)
 
 **File**: `api/src/modules/logging/logging.service.ts`
 
@@ -732,13 +732,13 @@ private async flushLogs(): Promise<void> {
 
 | # | Issue | Location | Severity | Status |
 |---|-------|----------|----------|--------|
-| 1 | displayName missing from GROUP_DB_COLUMNS | apply-scim-filter.ts | **High** | ✅ Fixed (current v0.10.0 baseline; introduced in v0.9.1) — `displayNameLower` column + DB push-down |
-| 2 | User resolution inside transaction | endpoint-scim-groups.service.ts | **High** | ✅ Fixed (current v0.10.0 baseline; introduced in v0.9.1) — moved outside `$transaction` |
-| 3 | Per-request fire-and-forget log writes | logging.service.ts | **Critical** | ✅ Fixed (current v0.10.0 baseline; introduced in v0.9.1) — buffered logging (3s / 50 entries) |
+| 1 | displayName missing from GROUP_DB_COLUMNS | apply-scim-filter.ts | **High** | ✅ Fixed (current v0.10.0 baseline; introduced in v0.9.1) - `displayNameLower` column + DB push-down |
+| 2 | User resolution inside transaction | endpoint-scim-groups.service.ts | **High** | ✅ Fixed (current v0.10.0 baseline; introduced in v0.9.1) - moved outside `$transaction` |
+| 3 | Per-request fire-and-forget log writes | logging.service.ts | **Critical** | ✅ Fixed (current v0.10.0 baseline; introduced in v0.9.1) - buffered logging (3s / 50 entries) |
 | 4 | Delete-all + recreate members pattern | endpoint-scim-groups.service.ts | **Medium** | Open |
 | 5 | No log rotation/cleanup | RequestLog model | **High** | Open |
 | 6 | N+1 queries in listLogs | logging.service.ts | **High** | Open |
-| 7 | assertUniqueDisplayName O(N) scan | endpoint-scim-groups.service.ts | **Medium** | ✅ Fixed (current v0.10.0 baseline; introduced in v0.9.1) — `findFirst` with `displayNameLower` index |
+| 7 | assertUniqueDisplayName O(N) scan | endpoint-scim-groups.service.ts | **Medium** | ✅ Fixed (current v0.10.0 baseline; introduced in v0.9.1) - `findFirst` with `displayNameLower` index |
 | 8 | getActivitySummary unbounded query | activity.controller.ts | **High** | Open |
 | 9 | No WAL checkpoint before backup | backup.service.ts | **Low** | Open |
 | 10 | Group create missing transaction | endpoint-scim-groups.service.ts | **Low** | Open |

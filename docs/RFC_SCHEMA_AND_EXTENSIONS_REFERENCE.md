@@ -74,7 +74,7 @@ The RFCs allow some behavioral choices at the **implementation level** (not per-
 | Decision | RFC Basis | Notes |
 |----------|-----------|-------|
 | Which optional attributes to support | RFC 7643 §2.6 | `required:false` attributes can be accepted or ignored |
-| Whether to enforce canonical values | RFC 7643 §2.3.1 | E.g., `emails.type` = "work", "home", etc. — enforcement is optional |
+| Whether to enforce canonical values | RFC 7643 §2.3.1 | E.g., `emails.type` = "work", "home", etc. - enforcement is optional |
 | Maximum `totalResults` for filters | RFC 7644 §3.4.2 | Server can limit result set sizes |
 | Whether to support `sort` | RFC 7644 §3.4.2.3 | Feature is optional per SPC |
 | Whether to support `bulk` | RFC 7644 §3.7 | Feature is optional per SPC |
@@ -87,7 +87,7 @@ The RFCs allow some behavioral choices at the **implementation level** (not per-
 
 ### 2.1 The Extension Mechanism
 
-SCIM extends resources through **schema extensions** — namespaced blocks of additional attributes attached to an existing resource type. This is the **primary and only** extensibility mechanism defined by the RFCs.
+SCIM extends resources through **schema extensions** - namespaced blocks of additional attributes attached to an existing resource type. This is the **primary and only** extensibility mechanism defined by the RFCs.
 
 > **RFC 7643 §3.3**: "SCIM allows for extension of its fixed core schemas using an 'extension' model. Extensions are defined using the same format as a schema definition, identified by a unique URI."
 
@@ -141,7 +141,7 @@ RFC 7643 §3.1 defines the `schemas` attribute:
 
 ### 2.5 Extension Attribute Characteristics
 
-Extension attributes have the **same characteristics** as core attributes (type, mutability, returned, required, etc.). The same immutability rules apply — once defined, an extension's attribute characteristics cannot be changed.
+Extension attributes have the **same characteristics** as core attributes (type, mutability, returned, required, etc.). The same immutability rules apply - once defined, an extension's attribute characteristics cannot be changed.
 
 ---
 
@@ -208,11 +208,11 @@ The RFC explicitly defines ResourceType as a discovery mechanism:
 
 **Key accuracy rules:**
 
-1. **`/Schemas` must return ALL schemas** — core + extensions + custom resource type schemas
-2. **`/ResourceTypes` must list ALL resource types** — built-in + custom, with accurate `schemaExtensions[]`
-3. **`/ServiceProviderConfig` must reflect actual capabilities** — not aspirational; if `bulk.supported: true`, Bulk MUST work
-4. **Discovery endpoints do not require authentication** — RFC 7644 §4 explicitly says these "do not require authentication"
-5. **Schema definitions must include all attribute characteristics** — type, mutability, returned, required, caseExact, uniqueness, subAttributes
+1. **`/Schemas` must return ALL schemas** - core + extensions + custom resource type schemas
+2. **`/ResourceTypes` must list ALL resource types** - built-in + custom, with accurate `schemaExtensions[]`
+3. **`/ServiceProviderConfig` must reflect actual capabilities** - not aspirational; if `bulk.supported: true`, Bulk MUST work
+4. **Discovery endpoints do not require authentication** - RFC 7644 §4 explicitly says these "do not require authentication"
+5. **Schema definitions must include all attribute characteristics** - type, mutability, returned, required, caseExact, uniqueness, subAttributes
 
 ### 4.3 Extension Visibility in Discovery
 
@@ -235,10 +235,10 @@ The following topics are **not addressed** by RFC 7642, 7643, or 7644. These are
 
 | Topic | RFC Position | Industry Consensus |
 |-------|-------------|-------------------|
-| **Can extensions be added at runtime?** | Silent | Yes — most implementations support dynamic extension registration |
-| **Can extensions be removed at runtime?** | Silent | Dangerous — removing extensions can break existing clients; additive-only is safer |
-| **Can attribute definitions within extensions change?** | Silent | Avoid — attribute characteristics should be stable once published; changing `mutability` or `type` breaks clients |
-| **Can new resource types be registered at runtime?** | Silent | Yes — some implementations support dynamic resource type creation |
+| **Can extensions be added at runtime?** | Silent | Yes - most implementations support dynamic extension registration |
+| **Can extensions be removed at runtime?** | Silent | Dangerous - removing extensions can break existing clients; additive-only is safer |
+| **Can attribute definitions within extensions change?** | Silent | Avoid - attribute characteristics should be stable once published; changing `mutability` or `type` breaks clients |
+| **Can new resource types be registered at runtime?** | Silent | Yes - some implementations support dynamic resource type creation |
 | **Deploy-time vs. runtime configuration?** | Silent | Industry favors deploy-time for core config, runtime for extensions |
 
 ### 5.2 Extension Lifecycle Management
@@ -269,19 +269,19 @@ The following matrix shows how `schemas[]` should be validated based on the RFC 
 
 | Scenario | RFC Expectation | `StrictSchemaValidation: false` | `StrictSchemaValidation: true` |
 |----------|----------------|--------------------------------|-------------------------------|
-| `schemas[]` missing entirely | Should be rejected per §3.1 | Accepted (schemas[] auto-built) | Rejected — 400 |
-| `schemas[]` has core URN only, extension data present | Should include extension URNs | Accepted | Rejected — 400 (undeclared extension data) |
-| `schemas[]` has extension URN, no matching extension data | Permissive per §3.1 | Accepted | Accepted (URN declared but no data — harmless) |
-| `schemas[]` has unknown URN | Not addressed | Accepted (unknown URN ignored) | Rejected — 400 (unregistered schema) |
+| `schemas[]` missing entirely | Should be rejected per §3.1 | Accepted (schemas[] auto-built) | Rejected - 400 |
+| `schemas[]` has core URN only, extension data present | Should include extension URNs | Accepted | Rejected - 400 (undeclared extension data) |
+| `schemas[]` has extension URN, no matching extension data | Permissive per §3.1 | Accepted | Accepted (URN declared but no data - harmless) |
+| `schemas[]` has unknown URN | Not addressed | Accepted (unknown URN ignored) | Rejected - 400 (unregistered schema) |
 | `schemas[]` has correct core + correct extensions | Correct per §3.1 | Accepted | Accepted |
 
 ### 6.2 On Outbound Responses (GET / LIST)
 
 | Behavior | RFC Expectation | Our Implementation |
 |----------|----------------|-------------------|
-| `schemas[]` reflects present extensions | YES — §3.1 requires it | ✅ Built dynamically by `buildResourceSchemas()` |
-| Extension URN in `schemas[]` only if extension data exists | YES — §3.1 | ✅ Checks for URN key in payload |
-| Core URN always present | YES — §3.1 | ✅ Always included first |
+| `schemas[]` reflects present extensions | YES - §3.1 requires it | ✅ Built dynamically by `buildResourceSchemas()` |
+| Extension URN in `schemas[]` only if extension data exists | YES - §3.1 | ✅ Checks for URN key in payload |
+| Core URN always present | YES - §3.1 | ✅ Always included first |
 
 ---
 
@@ -430,11 +430,11 @@ When no `path` is specified, the `value` object is merged into the resource root
 
 ### 10.2 Industry Norms for Extension Lifecycle
 
-1. **Additive-only is the safest pattern** — Extensions should only be added, never removed or redefined
-2. **Version via new URN** — Instead of changing an extension, create a new version: `custom:3.0:User`
-3. **Extension discovery is critical** — Clients rely on `/Schemas` and `/ResourceTypes` to detect available extensions
-4. **Unknown extensions should be ignored** — Permissive implementations store and echo back unknown extension blocks
-5. **`schemas[]` mismatch is usually tolerated** — Most implementations auto-build `schemas[]` on responses rather than rejecting mismatched inbound `schemas[]`
+1. **Additive-only is the safest pattern** - Extensions should only be added, never removed or redefined
+2. **Version via new URN** - Instead of changing an extension, create a new version: `custom:3.0:User`
+3. **Extension discovery is critical** - Clients rely on `/Schemas` and `/ResourceTypes` to detect available extensions
+4. **Unknown extensions should be ignored** - Permissive implementations store and echo back unknown extension blocks
+5. **`schemas[]` mismatch is usually tolerated** - Most implementations auto-build `schemas[]` on responses rather than rejecting mismatched inbound `schemas[]`
 
 ---
 

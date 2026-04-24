@@ -462,7 +462,7 @@ describe('EndpointScimGenericService', () => {
   // externalId and displayName are no longer checked for uniqueness on custom resource types.
   // These tests verify PUT/PATCH succeed when there are no schema-driven uniqueness constraints.
 
-  describe('replaceResource — no externalId/displayName uniqueness', () => {
+  describe('replaceResource - no externalId/displayName uniqueness', () => {
     it('should allow PUT even when another resource has the same externalId', async () => {
       mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
       mockGenericRepo.update.mockResolvedValue({
@@ -489,7 +489,7 @@ describe('EndpointScimGenericService', () => {
 
   // ─── Uniqueness on PATCH ──────────────────────────────────────────────
 
-  describe('patchResource — no externalId/displayName uniqueness', () => {
+  describe('patchResource - no externalId/displayName uniqueness', () => {
     it('should allow PATCH even when displayName collides (no uniqueness enforcement)', async () => {
       mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
       mockGenericRepo.update.mockResolvedValue({
@@ -515,7 +515,7 @@ describe('EndpointScimGenericService', () => {
 
   // ─── readOnly attribute stripping on CREATE ───────────────────────────
 
-  describe('createResource — readOnly attribute stripping', () => {
+  describe('createResource - readOnly attribute stripping', () => {
     it('should strip readOnly attributes from POST body without error', async () => {
       mockGenericRepo.create.mockResolvedValue(mockGenericRecord);
 
@@ -540,7 +540,7 @@ describe('EndpointScimGenericService', () => {
 
   // ─── Sorting in LIST ──────────────────────────────────────────────────
 
-  describe('listResources — sorting', () => {
+  describe('listResources - sorting', () => {
     it('should sort by displayName ascending by default', async () => {
       const records = [
         { ...mockGenericRecord, id: 'r3', scimId: 's3', displayName: 'Charlie', rawPayload: JSON.stringify({ displayName: 'Charlie' }) },
@@ -580,7 +580,7 @@ describe('EndpointScimGenericService', () => {
     });
   });
 
-  // ─── toScimResponse — output processing ──────────────────────────────
+  // ─── toScimResponse - output processing ──────────────────────────────
 
   describe('toScimResponse output processing', () => {
     it('should include meta.version matching the record version', async () => {
@@ -616,7 +616,7 @@ describe('EndpointScimGenericService', () => {
 
   // ─── If-Match validation ──────────────────────────────────────────────
 
-  describe('replaceResource — If-Match enforcement', () => {
+  describe('replaceResource - If-Match enforcement', () => {
     it('should accept matching If-Match header', async () => {
       mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
       mockGenericRepo.findByExternalId.mockResolvedValue(null);
@@ -665,7 +665,7 @@ describe('EndpointScimGenericService', () => {
     });
   });
 
-  describe('patchResource — If-Match enforcement', () => {
+  describe('patchResource - If-Match enforcement', () => {
     it('should reject mismatched If-Match on PATCH with 412', async () => {
       mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
 
@@ -689,7 +689,7 @@ describe('EndpointScimGenericService', () => {
     });
   });
 
-  describe('deleteResource — If-Match enforcement', () => {
+  describe('deleteResource - If-Match enforcement', () => {
     it('should reject mismatched If-Match on DELETE with 412', async () => {
       mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
 
@@ -710,7 +710,7 @@ describe('EndpointScimGenericService', () => {
 
   // ─── PATCH add operation ──────────────────────────────────────────────
 
-  describe('patchResource — add operation', () => {
+  describe('patchResource - add operation', () => {
     it('should apply PATCH add operation on a new attribute', async () => {
       mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
       mockGenericRepo.findByExternalId.mockResolvedValue(null);
@@ -743,7 +743,7 @@ describe('EndpointScimGenericService', () => {
 
   // ─── PATCH remove operation ───────────────────────────────────────────
 
-  describe('patchResource — remove operation', () => {
+  describe('patchResource - remove operation', () => {
     it('should apply PATCH remove operation', async () => {
       mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
       mockGenericRepo.findByExternalId.mockResolvedValue(null);
@@ -771,7 +771,7 @@ describe('EndpointScimGenericService', () => {
 
   // ─── Filter parsing in LIST ───────────────────────────────────────────
 
-  describe('listResources — filter parsing', () => {
+  describe('listResources - filter parsing', () => {
     it('should pass displayName eq filter to repository with Prisma case-insensitive match', async () => {
       mockGenericRepo.findAll.mockResolvedValue([]);
 
@@ -989,7 +989,7 @@ describe('EndpointScimGenericService', () => {
 
   // ─── Boolean coercion wiring ─────────────────────────────────────────
 
-  describe('createResource — boolean coercion', () => {
+  describe('createResource - boolean coercion', () => {
     it('should coerce boolean string "True" to true in POST body', async () => {
       mockGenericRepo.findByExternalId.mockResolvedValue(null);
       mockGenericRepo.findByDisplayName.mockResolvedValue(null);
@@ -1010,7 +1010,7 @@ describe('EndpointScimGenericService', () => {
     });
   });
 
-  describe('replaceResource — boolean coercion', () => {
+  describe('replaceResource - boolean coercion', () => {
     it('should coerce boolean strings in PUT body', async () => {
       mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
       mockGenericRepo.findByExternalId.mockResolvedValue(null);
@@ -1032,7 +1032,7 @@ describe('EndpointScimGenericService', () => {
 
   // ─── returned:never stripping in output ─────────────────────────────
 
-  describe('toScimResponse — returned:never stripping', () => {
+  describe('toScimResponse - returned:never stripping', () => {
     it('should strip returned:never attributes from generic resource response', async () => {
       // Simulate a record whose rawPayload contains a "password" field
       const recordWithPassword = {
@@ -1057,7 +1057,7 @@ describe('EndpointScimGenericService', () => {
 
   // ─── readOnly stripping on PUT ──────────────────────────────────────
 
-  describe('replaceResource — readOnly attribute stripping', () => {
+  describe('replaceResource - readOnly attribute stripping', () => {
     it('should strip readOnly attributes from PUT body without error', async () => {
       mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
       mockGenericRepo.findByExternalId.mockResolvedValue(null);
@@ -1067,8 +1067,8 @@ describe('EndpointScimGenericService', () => {
       const body = {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:Device'],
         displayName: 'Updated',
-        id: 'client-supplied-id', // readOnly — should be silently stripped
-        meta: { resourceType: 'Device' }, // readOnly — should be silently stripped
+        id: 'client-supplied-id', // readOnly - should be silently stripped
+        meta: { resourceType: 'Device' }, // readOnly - should be silently stripped
       };
 
       const result = await service.replaceResource(
@@ -1082,14 +1082,14 @@ describe('EndpointScimGenericService', () => {
 
   // ─── readOnly stripping on PATCH ops ────────────────────────────────
 
-  describe('patchResource — readOnly PATCH ops stripping', () => {
+  describe('patchResource - readOnly PATCH ops stripping', () => {
     it('should handle PATCH ops targeting readOnly attributes gracefully', async () => {
       mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
       mockGenericRepo.findByExternalId.mockResolvedValue(null);
       mockGenericRepo.findByDisplayName.mockResolvedValue(null);
       mockGenericRepo.update.mockResolvedValue({ ...mockGenericRecord, version: 2 });
 
-      // PATCH op targeting a readOnly attribute — should be stripped or handled gracefully
+      // PATCH op targeting a readOnly attribute - should be stripped or handled gracefully
       const result = await service.patchResource(
         'scim-dev-001',
         {
@@ -1109,7 +1109,7 @@ describe('EndpointScimGenericService', () => {
 
   // ─── Immutable checking on PUT ──────────────────────────────────────
 
-  describe('replaceResource — immutable attribute enforcement', () => {
+  describe('replaceResource - immutable attribute enforcement', () => {
     it('should not throw when replacing with same values (no immutable violations)', async () => {
       mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
       mockGenericRepo.findByExternalId.mockResolvedValue(null);
@@ -1131,7 +1131,7 @@ describe('EndpointScimGenericService', () => {
 
   // ─── Post-PATCH uniqueness enforcement ──────────────────────────────
 
-  describe('patchResource — post-PATCH uniqueness', () => {
+  describe('patchResource - post-PATCH uniqueness', () => {
     it('should allow PATCH when displayName collides (no uniqueness enforcement)', async () => {
       mockGenericRepo.findByScimId.mockResolvedValue(mockGenericRecord);
       mockGenericRepo.update.mockResolvedValue({
@@ -1155,9 +1155,9 @@ describe('EndpointScimGenericService', () => {
     });
   });
 
-  // ─── RequireIfMatch — 428 behavior ────────────────────────────────────
+  // ─── RequireIfMatch - 428 behavior ────────────────────────────────────
 
-  describe('replaceResource — RequireIfMatch 428 enforcement', () => {
+  describe('replaceResource - RequireIfMatch 428 enforcement', () => {
     const requireIfMatchConfig = {
       [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: 'true',
     } as EndpointConfig;
@@ -1210,7 +1210,7 @@ describe('EndpointScimGenericService', () => {
     });
   });
 
-  describe('patchResource — RequireIfMatch 428 enforcement', () => {
+  describe('patchResource - RequireIfMatch 428 enforcement', () => {
     const requireIfMatchConfig = {
       [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: 'true',
     } as EndpointConfig;
@@ -1238,7 +1238,7 @@ describe('EndpointScimGenericService', () => {
     });
   });
 
-  describe('deleteResource — RequireIfMatch 428 enforcement', () => {
+  describe('deleteResource - RequireIfMatch 428 enforcement', () => {
     const requireIfMatchConfig = {
       [ENDPOINT_CONFIG_FLAGS.REQUIRE_IF_MATCH]: 'true',
     } as EndpointConfig;
@@ -1338,7 +1338,7 @@ describe('EndpointScimGenericService', () => {
         'scim-dev-001', baseUrl, endpointId, deviceResourceType,
       );
 
-      // Should not throw — falls back to empty payload
+      // Should not throw - falls back to empty payload
       expect(result).toBeDefined();
       expect(result.id).toBe('scim-dev-001');
     });

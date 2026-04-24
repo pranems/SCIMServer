@@ -1,7 +1,7 @@
 # Issues, Bugs & Root Cause Analysis
 
 > **Date**: February 23, 2026 (updated)
-> **Scope**: Full session — infrastructure fixes, feature implementation (soft delete, strict schema validation, custom extension URNs), comprehensive test expansion (unit + E2E for flag combinations, PATCH paths, soft-delete interactions), validation pipeline, Docker rebuild
+> **Scope**: Full session - infrastructure fixes, feature implementation (soft delete, strict schema validation, custom extension URNs), comprehensive test expansion (unit + E2E for flag combinations, PATCH paths, soft-delete interactions), validation pipeline, Docker rebuild
 > **Environment**: Windows, NestJS + Prisma 7 + PostgreSQL 17, Docker Compose, Jest 30, PowerShell 7
 > **Note**: Test counts cited in fix results below (e.g., 318/318) are point-in-time snapshots. See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) for current baseline.
 
@@ -12,7 +12,7 @@
 | # | Issue | Severity | Category |
 |---|-------|----------|----------|
 | 1 | [Prisma Migration Ordering Failure](#1-prisma-migration-ordering-failure-p3018p3009) | **Critical** | Infrastructure |
-| 2 | [npm Audit — 36 Vulnerabilities](#2-npm-audit--36-vulnerabilities) | Low | Dependencies |
+| 2 | [npm Audit - 36 Vulnerabilities](#2-npm-audit--36-vulnerabilities) | Low | Dependencies |
 | 3 | [GroupUpdateInput Missing `active` Field](#3-groupupdateinput-missing-active-field) | **High** | Compilation |
 | 4 | [Schema Registry Test Count Assertions Stale](#4-schema-registry-test-count-assertions-stale) | **High** | Test Failures |
 | 5 | [Live Test PowerShell Parse Errors (Unicode)](#5-live-test-powershell-parse-errors-unicode) | **Critical** | Test Infrastructure |
@@ -31,16 +31,16 @@
 ### Symptoms
 
 ```
-Error: P3018 — A migration failed to apply. New migrations cannot be applied
+Error: P3018 - A migration failed to apply. New migrations cannot be applied
 before the error is recovered from.
-Error: P3009 — migrate found failed migrations in the target database.
+Error: P3009 - migrate found failed migrations in the target database.
 ```
 
 `npx prisma migrate deploy` refused to run any new migrations. The database's `_prisma_migrations` table contained a failed entry that blocked all subsequent migration attempts.
 
 ### Diagnosis
 
-1. Ran `npx prisma migrate deploy` — got P3018/P3009 referencing a specific migration.
+1. Ran `npx prisma migrate deploy` - got P3018/P3009 referencing a specific migration.
 2. Inspected `api/prisma/migrations/` directory and the `_prisma_migrations` table.
 3. Found that a migration had a **timestamp older than an already-applied migration**, violating Prisma's requirement that migrations are applied in lexicographic (timestamp) order.
 4. The failed migration was recorded in the database with `rolled_back_at = NULL` and `finished_at = NULL`, permanently blocking the pipeline.
@@ -53,7 +53,7 @@ A migration SQL file was created with a timestamp that placed it **before** an a
 
 1. **Renamed** the migration directory to use a timestamp that placed it **after** the last successfully applied migration.
 2. **Deleted** the failed migration entry from the `_prisma_migrations` table in the database.
-3. Re-ran `npx prisma migrate deploy` — migration applied cleanly.
+3. Re-ran `npx prisma migrate deploy` - migration applied cleanly.
 
 ### Why This Fix
 
@@ -61,7 +61,7 @@ Prisma's migration engine is append-only and timestamp-ordered. The only way to 
 
 ---
 
-## 2. npm Audit — 36 Vulnerabilities
+## 2. npm Audit - 36 Vulnerabilities
 
 ### Symptoms
 
@@ -75,7 +75,7 @@ Running `npm audit` inside `api/` reported 36 vulnerabilities across multiple pa
 
 1. Ran `npm audit` and examined the output.
 2. Cross-referenced every vulnerable package against `package.json`.
-3. Confirmed **all 36 vulnerabilities exist exclusively in devDependencies** — packages like `jest`, `ts-jest`, `@types/*`, `eslint`, and their transitive dependency trees.
+3. Confirmed **all 36 vulnerabilities exist exclusively in devDependencies** - packages like `jest`, `ts-jest`, `@types/*`, `eslint`, and their transitive dependency trees.
 4. None of the vulnerable packages are included in the production Docker image (which uses `npm ci --omit=dev`).
 
 ### Root Cause
@@ -84,11 +84,11 @@ Upstream dev-tooling packages had known vulnerabilities in their transitive depe
 
 ### Fix Applied
 
-**No fix applied** — intentional decision.
+**No fix applied** - intentional decision.
 
 ### Why This Fix
 
-- All vulnerabilities are in **devDependencies only** — they never ship to production.
+- All vulnerabilities are in **devDependencies only** - they never ship to production.
 - The production Docker build (`npm ci --omit=dev`) excludes them entirely.
 - Force-resolving transitive devDependency versions can break tooling compatibility.
 - The risk is zero for production deployments; the cost of fixing outweighs the benefit.
@@ -110,12 +110,12 @@ TypeScript compilation failed after adding soft-delete logic to `endpoint-scim-g
 
 1. Added soft-delete logic to `deleteGroupForEndpoint()`: instead of hard-deleting, call `groupRepo.update(group.id, { active: false })`.
 2. TypeScript immediately flagged `active` as not a valid property on `GroupUpdateInput`.
-3. Checked `api/src/domain/models/group.model.ts` — the `GroupUpdateInput` interface had `displayName`, `externalId`, and `members` but **no `active` field**.
+3. Checked `api/src/domain/models/group.model.ts` - the `GroupUpdateInput` interface had `displayName`, `externalId`, and `members` but **no `active` field**.
 4. Confirmed that `UserUpdateInput` already had `active?: boolean` (users already supported activation/soft-delete).
 
 ### Root Cause
 
-The `GroupUpdateInput` interface was designed before soft-delete was a requirement. Groups historically only support `displayName`, `externalId`, and `members` updates. The `active` attribute was never included because SCIM groups don't traditionally have an activation lifecycle — but our soft-delete feature needs it.
+The `GroupUpdateInput` interface was designed before soft-delete was a requirement. Groups historically only support `displayName`, `externalId`, and `members` updates. The `active` attribute was never included because SCIM groups don't traditionally have an activation lifecycle - but our soft-delete feature needs it.
 
 ### Fix Applied
 
@@ -154,17 +154,17 @@ After adding 4 msfttest built-in schemas to `ScimSchemaRegistry`, **4 test suite
 ### Diagnosis
 
 1. Ran the full test suite (`npm test`) after all production code changes.
-2. Identified 4 failing suites — all related to schema discovery and listing.
+2. Identified 4 failing suites - all related to schema discovery and listing.
 3. The pattern was clear: every assertion comparing schema/extension **counts** was off by exactly 4 (schemas) or 2 (extensions per resource type).
 4. Traced to `scim-schema-registry.ts` → `loadBuiltInSchemas()` which now registers:
-   - **Before**: 3 schemas (Core User, Core Group, Enterprise User) — 1 User extension, 0 Group extensions
-   - **After**: 7 schemas (+4 msfttest) — 3 User extensions, 2 Group extensions
+   - **Before**: 3 schemas (Core User, Core Group, Enterprise User) - 1 User extension, 0 Group extensions
+   - **After**: 7 schemas (+4 msfttest) - 3 User extensions, 2 Group extensions
 
 ### Root Cause
 
 When new built-in schemas were added to the registry, **hardcoded count assertions in test files were not updated**. The tests were asserting the old counts (3 schemas, 1 extension, 0 extensions) which no longer reflected reality.
 
-This is a classic "test maintenance debt" issue — tests that assert exact counts instead of structural properties become brittle when the underlying data grows.
+This is a classic "test maintenance debt" issue - tests that assert exact counts instead of structural properties become brittle when the underlying data grows.
 
 ### Fix Applied
 
@@ -179,7 +179,7 @@ Updated assertions across 10 test files with the following count changes:
 
 ### Why This Fix
 
-- The production code was correct — the tests needed updating to reflect the new reality.
+- The production code was correct - the tests needed updating to reflect the new reality.
 - Each count was verified against the actual registry output to ensure correctness.
 - Alternative (dynamic counting) was considered but rejected: exact counts serve as regression guards, ensuring no accidental schema additions or removals.
 
@@ -203,27 +203,27 @@ Running `scripts/live-test.ps1` with **any** PowerShell version produced cascadi
 
 ### Diagnosis
 
-1. First attempt: Ran `powershell -ExecutionPolicy Bypass -File scripts/live-test.ps1` — got parse error at line 1907.
-2. Examined the file at the reported lines — found **em-dash characters** (`—`, U+2014) embedded in string literals.
-3. PowerShell was interpreting `—` as `--` (double-dash) followed by a space, then trying to parse the next word as a unary operator expression — causing a syntax error.
+1. First attempt: Ran `powershell -ExecutionPolicy Bypass -File scripts/live-test.ps1` - got parse error at line 1907.
+2. Examined the file at the reported lines - found **em-dash characters** (`-`, U+2014) embedded in string literals.
+3. PowerShell was interpreting `-` as `--` (double-dash) followed by a space, then trying to parse the next word as a unary operator expression - causing a syntax error.
 4. Fixed the first two instances, but more errors appeared downstream at line ~2796.
-5. Searched the entire file systematically — found **section sign characters** (`§`, U+00A7) used in test message strings (e.g., "RFC S7.3.2" using `§` for the section symbol).
+5. Searched the entire file systematically - found **section sign characters** (`§`, U+00A7) used in test message strings (e.g., "RFC S7.3.2" using `§` for the section symbol).
 6. PowerShell's parser choked on `§` because it's not a valid identifier character in certain contexts.
-7. The character encoding of the file also mattered — PowerShell 5 uses Windows-1252 by default, which can misinterpret multi-byte UTF-8 sequences.
+7. The character encoding of the file also mattered - PowerShell 5 uses Windows-1252 by default, which can misinterpret multi-byte UTF-8 sequences.
 
 ### Root Cause
 
 The `live-test.ps1` script contained **non-ASCII Unicode characters** in string literals:
 
-- **Em-dash** (`—`, U+2014): Used in 2 test message strings as a stylistic dash. PowerShell's parser treats `--` as a parameter/operator prefix, and the UTF-8 em-dash gets confused with this.
+- **Em-dash** (`-`, U+2014): Used in 2 test message strings as a stylistic dash. PowerShell's parser treats `--` as a parameter/operator prefix, and the UTF-8 em-dash gets confused with this.
 - **Section sign** (`§`, U+00A7): Used in ~4 RFC reference strings (e.g., `"RFC §7.3.2"`). Not valid in PowerShell's default codepage parsing.
 
 These characters were likely introduced by copy-pasting from RFC documents or documentation with typographic formatting.
 
 ### Fix Applied
 
-1. **Replaced all em-dashes** (`—`) with ASCII double-dash (`--`) — 2 instances.
-2. **Replaced all section signs** (`§`) with ASCII letter `S` — 4 instances.
+1. **Replaced all em-dashes** (`-`) with ASCII double-dash (`--`) - 2 instances.
+2. **Replaced all section signs** (`§`) with ASCII letter `S` - 4 instances.
 3. **Saved the file with UTF-8 BOM** (Byte Order Mark) encoding to ensure PowerShell correctly identifies the file as UTF-8.
 
 Automated via Python script:
@@ -240,7 +240,7 @@ with open('scripts/live-test.ps1', 'w', encoding='utf-8-sig') as f:  # UTF-8 BOM
 
 - **ASCII replacement**: PowerShell scripts should use only ASCII characters in source code to avoid encoding-dependent parse failures across different systems and PS versions.
 - **UTF-8 BOM**: PowerShell 5.x defaults to Windows-1252 encoding. The BOM (`\xEF\xBB\xBF`) is the standard way to signal UTF-8 encoding to Windows PowerShell, preventing misinterpretation of any remaining multi-byte characters.
-- **Semantic equivalence**: `--` and `S` convey the same meaning as `—` and `§` in test message strings.
+- **Semantic equivalence**: `--` and `S` convey the same meaning as `-` and `§` in test message strings.
 
 ---
 
@@ -261,7 +261,7 @@ After fixing the Unicode parse errors, running with Windows PowerShell 5.1 (`pow
 2. Script parsed successfully (after Unicode fix) but failed at the first `Invoke-RestMethod` call.
 3. The `-AllowInsecureRedirect` parameter was used throughout the script.
 4. Checked PowerShell documentation: `-AllowInsecureRedirect` was **introduced in PowerShell 7.4** (part of the `Microsoft.PowerShell.Utility` module update).
-5. Ran `where.exe pwsh` — found PowerShell 7 installed at `C:\Program Files\PowerShell\7\pwsh.exe`.
+5. Ran `where.exe pwsh` - found PowerShell 7 installed at `C:\Program Files\PowerShell\7\pwsh.exe`.
 
 ### Root Cause
 
@@ -275,7 +275,7 @@ The `live-test.ps1` script uses the `-AllowInsecureRedirect` parameter on `Invok
 & "C:\Program Files\PowerShell\7\pwsh.exe" -ExecutionPolicy Bypass -File scripts/live-test.ps1 ...
 ```
 
-No code change was needed — this was an **environment issue**, not a code bug.
+No code change was needed - this was an **environment issue**, not a code bug.
 
 ### Why This Fix
 
@@ -300,8 +300,8 @@ Live tests connected successfully to the Docker container on port 8080 but **eve
 
 ### Diagnosis
 
-1. Ran live tests with default parameters — all tests after the auth step failed.
-2. Checked the test script's default `-ClientSecret` — it defaults to `changeme-oauth`.
+1. Ran live tests with default parameters - all tests after the auth step failed.
+2. Checked the test script's default `-ClientSecret` - it defaults to `changeme-oauth`.
 3. Checked `docker-compose.yml` for the API container's environment variables:
    ```yaml
    OAUTH_CLIENT_SECRET: devscimclientsecret
@@ -324,7 +324,7 @@ Passed the correct secret as a command-line parameter:
 
 ### Why This Fix
 
-- The dual-secret design is intentional — local dev and Docker environments should have independent credentials.
+- The dual-secret design is intentional - local dev and Docker environments should have independent credentials.
 - Hardcoding the Docker secret into the script would break local development workflows.
 - The correct fix is to pass the environment-appropriate secret at invocation time.
 
@@ -362,7 +362,7 @@ One live test consistently failed: creating a group with `externalId = "ext-grou
    Step 3: Create group with externalId = "ext-group-123"         → 201 ❌ (expected 409)
    ```
 
-3. **After Step 2**, the externalId `"ext-group-123"` was **no longer in use** — it had been replaced with `"updated-ext-789"`. So Step 3's attempt to create a new group with `"ext-group-123"` **correctly succeeded** (no conflict), but the test expected it to fail.
+3. **After Step 2**, the externalId `"ext-group-123"` was **no longer in use** - it had been replaced with `"updated-ext-789"`. So Step 3's attempt to create a new group with `"ext-group-123"` **correctly succeeded** (no conflict), but the test expected it to fail.
 
 4. The test was checking "duplicate externalId → 409" but was using a **stale externalId** that had already been freed by the preceding PATCH operation.
 
@@ -416,14 +416,14 @@ Two E2E tests in `discovery-endpoints.e2e-spec.ts` failed after adding 4 msfttes
 
 ### Diagnosis
 
-1. Ran full E2E suite (`npm run test:e2e`) — 2 failures in `discovery-endpoints.e2e-spec.ts`.
+1. Ran full E2E suite (`npm run test:e2e`) - 2 failures in `discovery-endpoints.e2e-spec.ts`.
 2. First test asserted `totalResults === 3` for `/Schemas` but now 7 schemas exist (3 core + 4 msfttest extensions).
 3. Second test asserted `schemaExtensions.length === 1` on the User resource type, but now 3 extensions exist (Enterprise User + 2 msfttest User extensions).
 4. These assertions had been correct before the custom extension URNs were added in the same v0.15.0 cycle, but the E2E file was not updated when the unit test discovery specs were updated.
 
 ### Root Cause
 
-Same class of issue as [Issue #4](#4-schema-registry-test-count-assertions-stale), but affecting E2E tests instead of unit tests. The discovery E2E spec used **hardcoded exact counts** that became stale when the `ScimSchemaRegistry` grew by 4 schemas. The unit test discovery specs had been updated in the same session, but the E2E spec was missed — a classic "partial update" oversight across test levels.
+Same class of issue as [Issue #4](#4-schema-registry-test-count-assertions-stale), but affecting E2E tests instead of unit tests. The discovery E2E spec used **hardcoded exact counts** that became stale when the `ScimSchemaRegistry` grew by 4 schemas. The unit test discovery specs had been updated in the same session, but the E2E spec was missed - a classic "partial update" oversight across test levels.
 
 ### Fix Applied
 
@@ -457,7 +457,7 @@ After implementing v0.15.0 features and rebuilding the Docker image, the version
 
 1. Ran `Invoke-RestMethod http://localhost:8080/scim/admin/version` against the running Docker container.
 2. Response showed `"version": "0.13.0"` despite having rebuilt with `docker compose up --build -d`.
-3. Checked `api/package.json` — the `version` field was still `"0.13.0"`.
+3. Checked `api/package.json` - the `version` field was still `"0.13.0"`.
 4. The version endpoint reads from `package.json` at runtime, so the Docker image inherited the stale value.
 
 ### Root Cause
@@ -497,7 +497,7 @@ pwsh -File scripts/live-test.ps1 -BaseUrl "http://localhost:8080" `
 
 ### Diagnosis
 
-1. Ran live tests with `-OAuthSecret "devscimclientsecret"` — all authenticated tests failed.
+1. Ran live tests with `-OAuthSecret "devscimclientsecret"` - all authenticated tests failed.
 2. Checked the script's `param()` block:
    ```powershell
    param(
@@ -507,7 +507,7 @@ pwsh -File scripts/live-test.ps1 -BaseUrl "http://localhost:8080" `
    )
    ```
 3. The parameter is named `$ClientSecret`, not `$OAuthSecret`. PowerShell **silently ignores** unknown parameters when using `-File` invocation mode (unlike `-Command` which errors).
-4. Similarly, there is no `-SharedSecret` parameter — the shared secret is hardcoded or uses a different mechanism.
+4. Similarly, there is no `-SharedSecret` parameter - the shared secret is hardcoded or uses a different mechanism.
 5. Because the parameters were silently ignored, the script fell back to its default `$ClientSecret = "changeme-oauth"`, which doesn't match Docker's `OAUTH_CLIENT_SECRET=devscimclientsecret`.
 
 ### Root Cause
@@ -527,10 +527,10 @@ pwsh -File scripts/live-test.ps1 -BaseUrl "http://localhost:8080" `
 
 ### Why This Fix
 
-- The script's parameter naming is intentional — `$ClientSecret` matches the OAuth client credentials grant flow terminology.
+- The script's parameter naming is intentional - `$ClientSecret` matches the OAuth client credentials grant flow terminology.
 - Renaming would break existing CI/CD or other callers that use `-ClientSecret`.
 - The lesson is: **always verify parameter names** in the script's `param()` block before invocation.
-- PowerShell's silent parameter dropping in `-File` mode is a well-known gotcha — consider adding `[CmdletBinding()]` to the script to enable strict parameter binding.
+- PowerShell's silent parameter dropping in `-File` mode is a well-known gotcha - consider adding `[CmdletBinding()]` to the script to enable strict parameter binding.
 
 ---
 
@@ -543,10 +543,10 @@ pwsh -File scripts/live-test.ps1 -BaseUrl "http://localhost:8080" `
 ### Diagnosis
 
 1. Checked RFC 7643 §2.4 attribute characteristic definitions:
-   - `User.externalId` — `uniqueness: "none"`, `caseExact: true`
-   - `User.displayName` — no `uniqueness` field declared (implicit `"none"`)
-   - `Group.externalId` — `uniqueness: "none"`, `caseExact: true`
-2. Checked the schema metadata in `rfc-standard.json` — confirmed all three are `uniqueness: "none"` or undeclared.
+   - `User.externalId` - `uniqueness: "none"`, `caseExact: true`
+   - `User.displayName` - no `uniqueness` field declared (implicit `"none"`)
+   - `Group.externalId` - `uniqueness: "none"`, `caseExact: true`
+2. Checked the schema metadata in `rfc-standard.json` - confirmed all three are `uniqueness: "none"` or undeclared.
 3. Found enforcement at **three layers** despite schema saying "none":
    - **DB**: `@@unique([endpointId, displayName])` and `@@unique([endpointId, resourceType, externalId])` in Prisma schema
    - **User service**: `findConflict()` checks both `userName` AND `externalId` via `OR` condition
@@ -564,7 +564,7 @@ pwsh -File scripts/live-test.ps1 -BaseUrl "http://localhost:8080" `
 ### Fix Applied
 
 1. **Database**: Dropped `@@unique` constraints on `displayName` and `externalId`, replaced with `@@index` for query performance
-2. **User service**: Removed `externalId` from `findConflict()` — now only checks `userName`
+2. **User service**: Removed `externalId` from `findConflict()` - now only checks `userName`
 3. **User repository**: `findConflict()` signature changed from `(endpointId, userName, externalId?, excludeScimId?)` to `(endpointId, userName, excludeScimId?)`
 4. **Group service**: Deleted `assertUniqueExternalId()` method and all callers
 5. **Generic service**: Deleted entire `findConflict()` method and all callers (no uniqueness enforcement for custom resource types)
@@ -574,8 +574,8 @@ pwsh -File scripts/live-test.ps1 -BaseUrl "http://localhost:8080" `
 
 ### Why This Fix
 
-- Aligns with RFC 7643 §2.4 specification — `uniqueness: "none"` means no constraints
-- `externalId` is described in RFC 7643 §3.1 as "an identifier for the resource as defined by the provisioning client" — it is not server-managed
+- Aligns with RFC 7643 §2.4 specification - `uniqueness: "none"` means no constraints
+- `externalId` is described in RFC 7643 §3.1 as "an identifier for the resource as defined by the provisioning client" - it is not server-managed
 - Multiple provisioning systems may assign the same `externalId` values without conflict
 - `Group.displayName` remains unique because the schema declares `uniqueness: "server"`
 
@@ -614,7 +614,7 @@ pwsh -File scripts/live-test.ps1 -BaseUrl "http://localhost:8080" `
 
 6. **DevDependency vulnerabilities**: npm audit noise from devDependencies is normal and expected. Document the triage decision to avoid re-investigating in future sessions.
 
-7. **Partial test updates across levels**: When a production change affects test counts or structure, audit **all** test levels (unit, E2E, live) — not just the ones that happen to run first. Use `grep` to find all occurrences of the affected assertions.
+7. **Partial test updates across levels**: When a production change affects test counts or structure, audit **all** test levels (unit, E2E, live) - not just the ones that happen to run first. Use `grep` to find all occurrences of the affected assertions.
 
 8. **Version bumps are easy to miss**: When a feature spans multiple sessions, the `package.json` version bump may be done in docs but not in the actual manifest. Consider CI validation that `package.json` version matches the latest CHANGELOG heading.
 

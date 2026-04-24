@@ -1,5 +1,5 @@
 /**
- * Comprehensive SchemaValidator Tests — Phase 8
+ * Comprehensive SchemaValidator Tests - Phase 8
  *
  * Covers exhaustive combinations of:
  *  - Flag matrix: strictMode (on/off) × mode (create/replace/patch)
@@ -69,13 +69,13 @@ const OPTION_MATRIX: { label: string; opts: ValidationOptions }[] = [
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-describe('SchemaValidator — Comprehensive', () => {
+describe('SchemaValidator - Comprehensive', () => {
 
   // ═══════════════════════════════════════════════════════════════════════
   // 1. Flag combination matrix
   // ═══════════════════════════════════════════════════════════════════════
 
-  describe('flag combination matrix — strictMode × mode', () => {
+  describe('flag combination matrix - strictMode × mode', () => {
     const schema = makeCoreUserSchema([
       makeAttr({ name: 'userName', type: 'string', required: true }),
       makeAttr({ name: 'active', type: 'boolean' }),
@@ -168,7 +168,7 @@ describe('SchemaValidator — Comprehensive', () => {
         }
 
         for (const v of invalid) {
-          // Skip null — null is always valid (treated as "not set")
+          // Skip null - null is always valid (treated as "not set")
           if (v === null) continue;
           it(`should reject ${JSON.stringify(v)}`, () => {
             const payload = { schemas: [CORE_USER_SCHEMA_ID], field: v };
@@ -238,12 +238,12 @@ describe('SchemaValidator — Comprehensive', () => {
 
     it.each([
       'not-a-date',
-      '2025-13-01',  // invalid month — also no time/tz
+      '2025-13-01',  // invalid month - also no time/tz
       'yesterday',
       '',  // empty string
-      '2025-01-15',  // date-only (no time) — RFC 7643 §2.3.5 requires xsd:dateTime
-      '2025-01-15T10:30:00',  // no timezone — xsd:dateTime requires Z or ±HH:MM
-      'Tue, 15 Jan 2025 10:30:00 GMT',  // RFC 2822 — not xsd:dateTime
+      '2025-01-15',  // date-only (no time) - RFC 7643 §2.3.5 requires xsd:dateTime
+      '2025-01-15T10:30:00',  // no timezone - xsd:dateTime requires Z or ±HH:MM
+      'Tue, 15 Jan 2025 10:30:00 GMT',  // RFC 2822 - not xsd:dateTime
     ])('should reject invalid dateTime: "%s"', (dt) => {
       const payload = { schemas: [CORE_USER_SCHEMA_ID], ts: dt };
       expect(SchemaValidator.validate(payload, [schema], opts).valid).toBe(false);
@@ -251,10 +251,10 @@ describe('SchemaValidator — Comprehensive', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════
-  // 4. Mutability varieties — immutable, writeOnly
+  // 4. Mutability varieties - immutable, writeOnly
   // ═══════════════════════════════════════════════════════════════════════
 
-  describe('mutability — immutable attribute', () => {
+  describe('mutability - immutable attribute', () => {
     const schema = makeCoreUserSchema([
       makeAttr({ name: 'userName', required: true }),
       makeAttr({ name: 'immField', mutability: 'immutable' }),
@@ -279,7 +279,7 @@ describe('SchemaValidator — Comprehensive', () => {
     });
   });
 
-  describe('mutability — writeOnly attribute', () => {
+  describe('mutability - writeOnly attribute', () => {
     const schema = makeCoreUserSchema([
       makeAttr({ name: 'userName', required: true }),
       makeAttr({ name: 'password', mutability: 'writeOnly' }),
@@ -304,13 +304,13 @@ describe('SchemaValidator — Comprehensive', () => {
     });
   });
 
-  describe('mutability — readOnly combined with type checking', () => {
+  describe('mutability - readOnly combined with type checking', () => {
     const schema = makeCoreUserSchema([
       makeAttr({ name: 'userName', required: true }),
       makeAttr({ name: 'readOnlyField', mutability: 'readOnly', type: 'string' }),
     ]);
 
-    it('readOnly error takes precedence — no type error reported', () => {
+    it('readOnly error takes precedence - no type error reported', () => {
       const payload = { schemas: [CORE_USER_SCHEMA_ID], userName: 'a', readOnlyField: 42 };
       const result = SchemaValidator.validate(payload, [schema], { strictMode: false, mode: 'create' });
       expect(result.valid).toBe(false);
@@ -323,7 +323,7 @@ describe('SchemaValidator — Comprehensive', () => {
   // 5. Multi-valued arrays of every type
   // ═══════════════════════════════════════════════════════════════════════
 
-  describe('multi-valued arrays — all types', () => {
+  describe('multi-valued arrays - all types', () => {
     const opts: ValidationOptions = { strictMode: false, mode: 'create' };
 
     it('should accept multi-valued string array', () => {
@@ -512,10 +512,10 @@ describe('SchemaValidator — Comprehensive', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════
-  // 7. Extension schema validation — deep coverage
+  // 7. Extension schema validation - deep coverage
   // ═══════════════════════════════════════════════════════════════════════
 
-  describe('extension schema — deep validation', () => {
+  describe('extension schema - deep validation', () => {
     const coreSchema = makeCoreUserSchema([
       makeAttr({ name: 'userName', required: true }),
     ]);
@@ -719,7 +719,7 @@ describe('SchemaValidator — Comprehensive', () => {
       });
     });
 
-    describe('unknown extension attributes — strict vs lenient', () => {
+    describe('unknown extension attributes - strict vs lenient', () => {
       const extSchema = makeExtensionSchema([
         makeAttr({ name: 'employeeNumber', type: 'string' }),
       ]);
@@ -920,7 +920,7 @@ describe('SchemaValidator — Comprehensive', () => {
         schemas: [CORE_USER_SCHEMA_ID],
         userName: 'a',
         [CUSTOM_EXT_ID]: { customTag: 'only custom' },
-        // Enterprise ext not present — that's OK
+        // Enterprise ext not present - that's OK
       };
       const result = SchemaValidator.validate(payload, [coreSchema, ext1, ext2], { strictMode: true, mode: 'create' });
       expect(result.valid).toBe(true);
@@ -1163,7 +1163,7 @@ describe('SchemaValidator — Comprehensive', () => {
       };
       // null for extension block → urn key starts with 'urn:' and value is null
       // The code checks: if (value && typeof value === 'object' && !Array.isArray(value))
-      // null fails the truthiness check, so it skips validation — valid
+      // null fails the truthiness check, so it skips validation - valid
       const result = SchemaValidator.validate(payload, [coreSchema, extSchema], { strictMode: true, mode: 'create' });
       expect(result.valid).toBe(true);
     });
@@ -1342,7 +1342,7 @@ describe('SchemaValidator — Comprehensive', () => {
           manager: { value: 'mgr-1', displayName: 'Cannot set this' },
         },
       };
-      // validateSubAttributes calls validateSingleValue — mutability is NOT checked at sub-attr level
+      // validateSubAttributes calls validateSingleValue - mutability is NOT checked at sub-attr level
       const result = SchemaValidator.validate(payload, [realUserSchema, enterpriseExt], { strictMode: true, mode: 'create' });
       expect(result.valid).toBe(true);
     });
@@ -1352,7 +1352,7 @@ describe('SchemaValidator — Comprehensive', () => {
   // 14. Attribute characteristic properties (caseExact, uniqueness, returned)
   // ═══════════════════════════════════════════════════════════════════════
 
-  describe('attribute characteristics — caseExact, uniqueness, returned', () => {
+  describe('attribute characteristics - caseExact, uniqueness, returned', () => {
     // These are metadata properties that don't affect validation logic directly,
     // but we verify they don't cause validation failures when present
 
@@ -1627,7 +1627,7 @@ describe('SchemaValidator — Comprehensive', () => {
         userName: 'a',
         'urn:example:unregistered:ext': { foo: 'bar', baz: 42 },
       };
-      // SchemaValidator does not flag unknown extension URNs — that's enforceStrictSchemaValidation's job
+      // SchemaValidator does not flag unknown extension URNs - that's enforceStrictSchemaValidation's job
       const result = SchemaValidator.validate(payload, [core], { strictMode: true, mode: 'create' });
       expect(result.valid).toBe(true);
     });
@@ -1667,7 +1667,7 @@ describe('SchemaValidator — Comprehensive', () => {
   // 18. Multi-valued complex with mixed valid/invalid elements
   // ═══════════════════════════════════════════════════════════════════════
 
-  describe('multi-valued complex — mixed valid and invalid elements', () => {
+  describe('multi-valued complex - mixed valid and invalid elements', () => {
     const emailsAttr = makeAttr({
       name: 'emails',
       type: 'complex',
@@ -1727,10 +1727,10 @@ describe('SchemaValidator — Comprehensive', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════
-  // 19. Patch mode — permissive behavior
+  // 19. Patch mode - permissive behavior
   // ═══════════════════════════════════════════════════════════════════════
 
-  describe('patch mode — permissive required checking', () => {
+  describe('patch mode - permissive required checking', () => {
     const coreSchema = makeCoreUserSchema([
       makeAttr({ name: 'userName', type: 'string', required: true }),
       makeAttr({ name: 'displayName', type: 'string', required: true }),

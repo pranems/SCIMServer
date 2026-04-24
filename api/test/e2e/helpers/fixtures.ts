@@ -129,7 +129,7 @@ export function removeMultipleMembersPatch(userIds: string[]): PatchFixture {
   ]);
 }
 
-/** PATCH with no path — merge value object into resource. */
+/** PATCH with no path - merge value object into resource. */
 export function noPathMergePatch(
   op: 'replace' | 'add',
   value: Record<string, unknown>,

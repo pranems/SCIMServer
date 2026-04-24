@@ -10,9 +10,9 @@ argument-hint: >
   "self-improve", or a specific endpoint path to narrow the audit.
 ---
 
-# API Contract Verification — Self-Improving Prompt
+# API Contract Verification - Self-Improving Prompt
 
-Perform a comprehensive API response contract verification across **all ~82 endpoints**, at **all test levels** (unit, integration, E2E, live). This ensures every JSON response matches its documented shape exactly — no leaked internal fields, no missing required fields, no Map/Set serialization artifacts. This prompt **learns from each execution** and **updates itself** with new findings.
+Perform a comprehensive API response contract verification across **all ~82 endpoints**, at **all test levels** (unit, integration, E2E, live). This ensures every JSON response matches its documented shape exactly - no leaked internal fields, no missing required fields, no Map/Set serialization artifacts. This prompt **learns from each execution** and **updates itself** with new findings.
 
 ---
 
@@ -71,26 +71,26 @@ This prompt was created after a production bug where:
 1. `_schemaCaches` (an internal runtime cache containing ES6 Map/Set objects) leaked into admin endpoint GET responses
 2. Map objects serialized to `{}` via `JSON.stringify`, exposing empty internal fields
 3. `getExtensionUrns()` returned extensions from ALL resource types instead of filtering per `coreSchemaUrn`
-4. 4 of 16 Azure endpoints showed the leak — none of the 3,300+ tests caught it
+4. 4 of 16 Azure endpoints showed the leak - none of the 3,300+ tests caught it
 
 **Root cause**: Every test asserted field presence (`toHaveProperty`) but none asserted field absence (`not.toHaveProperty`) or exclusive key sets (`Object.keys().sort() === allowlist`).
 
 ---
 
-## Step 1 — Discovery: Inventory ALL API Endpoints
+## Step 1 - Discovery: Inventory ALL API Endpoints
 
 > **Self-improvement note:** Every execution must re-scan for new endpoints. If the count differs from `totalEndpoints` in metadata, update the inventory.
 
 ### 1.1 Read Context Files
 
-1. `Session_starter.md` — project state, version, test counts
-2. `docs/COMPLETE_API_REFERENCE.md` — documented endpoints
-3. `docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md` — config flag behaviors
-4. `docs/INDEX.md` — feature documentation index
+1. `Session_starter.md` - project state, version, test counts
+2. `docs/COMPLETE_API_REFERENCE.md` - documented endpoints
+3. `docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md` - config flag behaviors
+4. `docs/INDEX.md` - feature documentation index
 
 ### 1.2 Controller Survey
 
-Scan ALL controllers in `api/src/modules/` — list every `@Get`, `@Post`, `@Put`, `@Patch`, `@Delete` handler:
+Scan ALL controllers in `api/src/modules/` - list every `@Get`, `@Post`, `@Put`, `@Patch`, `@Delete` handler:
 
 ```bash
 grep -rn "@Get\|@Post\|@Put\|@Patch\|@Delete" api/src/modules/ --include="*.controller.ts"
@@ -98,21 +98,21 @@ grep -rn "@Get\|@Post\|@Put\|@Patch\|@Delete" api/src/modules/ --include="*.cont
 
 ### 1.3 Complete Endpoint Inventory (~82 endpoints)
 
-#### Category A — Health & Web (Public)
+#### Category A - Health & Web (Public)
 
 | # | Method | Path | Controller | Auth |
 |---|--------|------|------------|------|
 | A1 | GET | `/scim/health` | `HealthController` | None |
 | A2 | GET | `/` | `WebController` | None |
 
-#### Category B — OAuth (Public)
+#### Category B - OAuth (Public)
 
 | # | Method | Path | Controller | Auth |
 |---|--------|------|------------|------|
 | B1 | GET | `/scim/oauth/test` | `OAuthController` | None |
 | B2 | POST | `/scim/oauth/token` | `OAuthController` | client_credentials |
 
-#### Category C — Discovery: Root-Level (Public)
+#### Category C - Discovery: Root-Level (Public)
 
 | # | Method | Path | Controller | Auth |
 |---|--------|------|------------|------|
@@ -122,7 +122,7 @@ grep -rn "@Get\|@Post\|@Put\|@Patch\|@Delete" api/src/modules/ --include="*.cont
 | C4 | GET | `/scim/ResourceTypes` | `ResourceTypesController` | None |
 | C5 | GET | `/scim/ResourceTypes/:id` | `ResourceTypesController` | None |
 
-#### Category D — Discovery: Endpoint-Scoped (Public)
+#### Category D - Discovery: Endpoint-Scoped (Public)
 
 | # | Method | Path | Controller | Auth |
 |---|--------|------|------------|------|
@@ -132,7 +132,7 @@ grep -rn "@Get\|@Post\|@Put\|@Patch\|@Delete" api/src/modules/ --include="*.cont
 | D4 | GET | `/scim/endpoints/:eid/ResourceTypes` | `EndpointScimDiscoveryController` | None |
 | D5 | GET | `/scim/endpoints/:eid/ResourceTypes/:id` | `EndpointScimDiscoveryController` | None |
 
-#### Category E — Admin: Endpoint Management (Bearer)
+#### Category E - Admin: Endpoint Management (Bearer)
 
 | # | Method | Path | Controller | Auth |
 |---|--------|------|------------|------|
@@ -146,7 +146,7 @@ grep -rn "@Get\|@Post\|@Put\|@Patch\|@Delete" api/src/modules/ --include="*.cont
 | E8 | DELETE | `/scim/admin/endpoints/:id` | `EndpointController` | Admin Bearer |
 | E9 | GET | `/scim/admin/endpoints/:id/stats` | `EndpointController` | Admin Bearer |
 
-#### Category F — Admin: Per-Endpoint Credentials (Bearer)
+#### Category F - Admin: Per-Endpoint Credentials (Bearer)
 
 | # | Method | Path | Controller | Auth |
 |---|--------|------|------------|------|
@@ -154,7 +154,7 @@ grep -rn "@Get\|@Post\|@Put\|@Patch\|@Delete" api/src/modules/ --include="*.cont
 | F2 | GET | `/scim/admin/endpoints/:eid/credentials` | `AdminCredentialController` | Admin Bearer |
 | F3 | DELETE | `/scim/admin/endpoints/:eid/credentials/:cid` | `AdminCredentialController` | Admin Bearer |
 
-#### Category G — Admin: General (Bearer)
+#### Category G - Admin: General (Bearer)
 
 | # | Method | Path | Controller | Auth |
 |---|--------|------|------------|------|
@@ -167,7 +167,7 @@ grep -rn "@Get\|@Post\|@Put\|@Patch\|@Delete" api/src/modules/ --include="*.cont
 | G7 | POST | `/scim/admin/groups/manual` | `AdminController` | Admin Bearer |
 | G8 | POST | `/scim/admin/users/:id/delete` | `AdminController` | Admin Bearer |
 
-#### Category H — Admin: Log Configuration (Bearer)
+#### Category H - Admin: Log Configuration (Bearer)
 
 | # | Method | Path | Controller | Auth |
 |---|--------|------|------------|------|
@@ -185,7 +185,7 @@ grep -rn "@Get\|@Post\|@Put\|@Patch\|@Delete" api/src/modules/ --include="*.cont
 | H12 | GET | `/scim/admin/log-config/prune` | `LogConfigController` | Admin Bearer |
 | H13 | PUT | `/scim/admin/log-config/prune` | `LogConfigController` | Admin Bearer |
 
-#### Category I — Admin: Database Browser (Bearer)
+#### Category I - Admin: Database Browser (Bearer)
 
 | # | Method | Path | Controller | Auth |
 |---|--------|------|------------|------|
@@ -195,14 +195,14 @@ grep -rn "@Get\|@Post\|@Put\|@Patch\|@Delete" api/src/modules/ --include="*.cont
 | I4 | GET | `/scim/admin/database/groups/:id` | `DatabaseController` | Admin Bearer |
 | I5 | GET | `/scim/admin/database/statistics` | `DatabaseController` | Admin Bearer |
 
-#### Category J — Admin: Activity Feed (Bearer)
+#### Category J - Admin: Activity Feed (Bearer)
 
 | # | Method | Path | Controller | Auth |
 |---|--------|------|------------|------|
 | J1 | GET | `/scim/admin/activity` | `ActivityController` | Admin Bearer |
 | J2 | GET | `/scim/admin/activity/summary` | `ActivityController` | Admin Bearer |
 
-#### Category K — SCIM: Users (Bearer)
+#### Category K - SCIM: Users (Bearer)
 
 | # | Method | Path | Controller | Auth |
 |---|--------|------|------------|------|
@@ -214,7 +214,7 @@ grep -rn "@Get\|@Post\|@Put\|@Patch\|@Delete" api/src/modules/ --include="*.cont
 | K6 | PATCH | `/scim/endpoints/:eid/Users/:id` | `EndpointScimUsersController` | Endpoint Bearer |
 | K7 | DELETE | `/scim/endpoints/:eid/Users/:id` | `EndpointScimUsersController` | Endpoint Bearer |
 
-#### Category L — SCIM: Groups (Bearer)
+#### Category L - SCIM: Groups (Bearer)
 
 | # | Method | Path | Controller | Auth |
 |---|--------|------|------------|------|
@@ -226,7 +226,7 @@ grep -rn "@Get\|@Post\|@Put\|@Patch\|@Delete" api/src/modules/ --include="*.cont
 | L6 | PATCH | `/scim/endpoints/:eid/Groups/:id` | `EndpointScimGroupsController` | Endpoint Bearer |
 | L7 | DELETE | `/scim/endpoints/:eid/Groups/:id` | `EndpointScimGroupsController` | Endpoint Bearer |
 
-#### Category M — SCIM: /Me (OAuth JWT)
+#### Category M - SCIM: /Me (OAuth JWT)
 
 | # | Method | Path | Controller | Auth |
 |---|--------|------|------------|------|
@@ -235,13 +235,13 @@ grep -rn "@Get\|@Post\|@Put\|@Patch\|@Delete" api/src/modules/ --include="*.cont
 | M3 | PATCH | `/scim/endpoints/:eid/Me` | `ScimMeController` | OAuth JWT |
 | M4 | DELETE | `/scim/endpoints/:eid/Me` | `ScimMeController` | OAuth JWT |
 
-#### Category N — SCIM: Bulk (Bearer)
+#### Category N - SCIM: Bulk (Bearer)
 
 | # | Method | Path | Controller | Auth |
 |---|--------|------|------------|------|
 | N1 | POST | `/scim/endpoints/:eid/Bulk` | `EndpointScimBulkController` | Endpoint Bearer |
 
-#### Category O — SCIM: Custom / Generic Resources (Bearer)
+#### Category O - SCIM: Custom / Generic Resources (Bearer)
 
 | # | Method | Path | Controller | Auth |
 |---|--------|------|------------|------|
@@ -253,7 +253,7 @@ grep -rn "@Get\|@Post\|@Put\|@Patch\|@Delete" api/src/modules/ --include="*.cont
 | O6 | PATCH | `/scim/endpoints/:eid/:resourceType/:id` | `EndpointScimGenericController` | Endpoint Bearer |
 | O7 | DELETE | `/scim/endpoints/:eid/:resourceType/:id` | `EndpointScimGenericController` | Endpoint Bearer |
 
-#### Category P — Endpoint-Scoped Logs (Bearer)
+#### Category P - Endpoint-Scoped Logs (Bearer)
 
 | # | Method | Path | Controller | Auth |
 |---|--------|------|------------|------|
@@ -264,7 +264,7 @@ grep -rn "@Get\|@Post\|@Put\|@Patch\|@Delete" api/src/modules/ --include="*.cont
 
 ---
 
-## Step 2 — Define Response Contracts
+## Step 2 - Define Response Contracts
 
 > **Self-improvement note:** When new response fields are added to any DTO, interface, or serializer, update the corresponding allowlist below. When new `_`-prefixed runtime fields are added to any class, add them to the denylist.
 
@@ -288,8 +288,8 @@ These fields must **NEVER** appear in any API response at any level:
 | Endpoint | Method | Response Keys (Allowlist) |
 |----------|--------|--------------------------|
 | E1: Create endpoint | POST | `id, name, displayName, description, profile, active, scimBasePath, createdAt, updatedAt, _links` |
-| E2: List endpoints | GET | Envelope: `totalResults, endpoints[]` — each element = summary shape |
-| E3: List presets | GET | `presets[]` — each: `name, displayName, description` |
+| E2: List endpoints | GET | Envelope: `totalResults, endpoints[]` - each element = summary shape |
+| E3: List presets | GET | `presets[]` - each: `name, displayName, description` |
 | E4: Get preset | GET | Full preset object with profile content |
 | E5: Get endpoint (full) | GET | `id, name, displayName, description, profile, active, scimBasePath, createdAt, updatedAt, _links` |
 | E5+`?view=summary` | GET | `id, name, displayName, description, profileSummary, active, scimBasePath, createdAt, updatedAt, _links` |
@@ -404,7 +404,7 @@ Each operation result: `method, bulkId, version, location, status, response`
 
 ---
 
-## Step 3 — Complete API Flow & Combination Matrix
+## Step 3 - Complete API Flow & Combination Matrix
 
 > **Self-improvement note:** When new flows or edge-case combinations are discovered, add them here. Flows that caused bugs get marked with ⚡.
 
@@ -475,9 +475,9 @@ Each operation result: `method, bulkId, version, location, status, response`
 | F-E3 | POST missing required field (userName) | SCIM Error, status=400 | `invalidValue` |
 | F-E4 | PATCH with invalid path | SCIM Error, status=400 | `invalidPath` |
 | F-E5 | PUT with wrong ETag | SCIM Error, status=412 | `preconditionFailed` |
-| F-E6 | Auth with invalid token | 401 Unauthorized | — |
-| F-E7 | Auth with wrong endpoint credential | 403 Forbidden | — |
-| F-E8 | POST to inactive endpoint | 404 Not Found | — |
+| F-E6 | Auth with invalid token | 401 Unauthorized | - |
+| F-E7 | Auth with wrong endpoint credential | 403 Forbidden | - |
+| F-E8 | POST to inactive endpoint | 404 Not Found | - |
 | F-E9 | Bulk exceeding maxOperations | SCIM Error, status=413 | `tooMany` |
 | F-E10 | Filter with invalid syntax | SCIM Error, status=400 | `invalidFilter` |
 
@@ -513,7 +513,7 @@ Each operation result: `method, bulkId, version, location, status, response`
 
 ---
 
-## Step 4 — Audit Existing Tests & Map Coverage
+## Step 4 - Audit Existing Tests & Map Coverage
 
 > **Self-improvement note:** Re-audit this matrix on every execution. Update cells from ❌ to ✅ as tests are added.
 
@@ -550,23 +550,23 @@ Each operation result: `method, bulkId, version, location, status, response`
 | F-U2: User PATCH variants | ⚠️ | ✅ | ✅ | No strict shape check |
 | F-U3: User list/filter/search | ⚠️ | ✅ | ✅ | No ListResponse shape check |
 | F-U4: Duplicate user | ⚠️ | ✅ | ✅ | Error shape not strict |
-| F-U5: Soft-delete flow | ❌ | ✅ | ✅ | — |
-| F-U6: ETag precondition | ❌ | ✅ | ✅ | — |
-| F-U7: returned:never | ❌ | ✅ | ✅ | — |
+| F-U5: Soft-delete flow | ❌ | ✅ | ✅ | - |
+| F-U6: ETag precondition | ❌ | ✅ | ✅ | - |
+| F-U7: returned:never | ❌ | ✅ | ✅ | - |
 | F-G1-G5: Group flows | ⚠️ | ✅ | ✅ | No strict shape check |
 | F-X1-X3: Cross-resource | ❌ | ⚠️ | ⚠️ | Partial coverage |
 | ⚡ F-A1: Cache leak detection | ❌ | ✅ | ✅ 9z-M | E2E + Live |
-| F-A2-A5: Admin+SCIM flows | ❌ | ⚠️ | ✅ | — |
+| F-A2-A5: Admin+SCIM flows | ❌ | ⚠️ | ✅ | - |
 | F-D1-D4: Discovery consistency | ❌ | ✅ | ✅ | No strict shape |
-| F-M1-M4: /Me flows | ❌ | ✅ | ✅ | — |
+| F-M1-M4: /Me flows | ❌ | ✅ | ✅ | - |
 | F-E1-E10: Error paths | ⚠️ | ✅ | ✅ | Error shape not strict |
 | Config flag combos | ❌ | ✅ | ✅ | Many combos untested |
 | F-GR1-GR4: Generic resource | ❌ | ⚠️ | ⚠️ | Partial |
-| F-L1-L3: Endpoint logs | ❌ | ⚠️ | ⚠️ | — |
+| F-L1-L3: Endpoint logs | ❌ | ⚠️ | ⚠️ | - |
 
 ---
 
-## Step 5 — Implement Missing Contract Tests
+## Step 5 - Implement Missing Contract Tests
 
 > **Self-improvement note:** When new patterns are discovered or invented, add them here. Mark existing patterns as "verified working" after successful execution.
 
@@ -683,7 +683,7 @@ await request(app.getHttpServer())
   .send(userPayload)
   .expect(201);
 
-// 2. Read admin endpoint — must still be clean
+// 2. Read admin endpoint - must still be clean
 const adminRes = await request(app.getHttpServer())
   .get(`/scim/admin/endpoints/${endpointId}`)
   .expect(200);
@@ -755,7 +755,7 @@ it('should return correct shape on user create', async () => {
   // Functional assertions (existing)
   expect(res.body.userName).toBe(userPayload.userName);
 
-  // Contract assertions (NEW — add to every test)
+  // Contract assertions (NEW - add to every test)
   assertNoDeniedKeysDeep(res.body, '', 'POST /Users');
   assertMetaShape(res.body.meta);
   expect(res.headers.location).toContain(res.body.id);
@@ -791,7 +791,7 @@ describe('UserService contract (integration)', () => {
 
 ---
 
-## Step 6 — Verification Checklist
+## Step 6 - Verification Checklist
 
 ### 6.1 Run Tests at All Levels
 
@@ -854,18 +854,18 @@ After running, fill in this matrix (copy into audit history):
 
 ---
 
-## Step 7 — Anti-Patterns to Avoid
+## Step 7 - Anti-Patterns to Avoid
 
 > **Self-improvement note:** When a new anti-pattern is discovered during an audit, add it to this table with the date.
 
 | # | Anti-Pattern | Why It Fails | Correct Pattern | Discovered |
 |---|-------------|-------------|-----------------|------------|
 | 1 | `expect(result).toHaveProperty('profile')` | Catches missing fields but NOT leaked extra fields | Use key allowlist: `expect(ALLOWED).toContain(key)` | 2026-04-17 |
-| 2 | `expect(result.profile).toBeDefined()` | Same — presence-only, no shape enforcement | Assert exact key set | 2026-04-17 |
+| 2 | `expect(result.profile).toBeDefined()` | Same - presence-only, no shape enforcement | Assert exact key set | 2026-04-17 |
 | 3 | `expect(result).toMatchObject({...})` | Ignores extra properties by design | Combine with `Object.keys()` check | 2026-04-17 |
 | 4 | Testing only fresh mock objects | Misses runtime mutations (cache attachment) | Add temporal coupling tests | 2026-04-17 |
 | 5 | Asserting only in unit tests | Misses serialization issues (Map→`{}`) | Test at E2E + live level too | 2026-04-17 |
-| 6 | Hardcoding expected key count | Brittle — breaks on legitimate additions | Use named allowlist array | 2026-04-17 |
+| 6 | Hardcoding expected key count | Brittle - breaks on legitimate additions | Use named allowlist array | 2026-04-17 |
 | 7 | Testing happy path only | Misses error response shape violations | Test all error codes + shapes | 2026-04-17 |
 | 8 | Skipping nested object shape checks | Leaked fields may be in sub-objects | Use `assertNoDeniedKeysDeep` recursion | 2026-04-17 |
 | 9 | Contract tests only at one level | Serialization bugs affect E2E/live but not unit | Contract tests at all 4 levels | 2026-04-17 |
@@ -873,12 +873,12 @@ After running, fill in this matrix (copy into audit history):
 
 ---
 
-## Step 8 — Standing Rules
+## Step 8 - Standing Rules
 
 - Every new API endpoint MUST have a response contract test at **unit + E2E + live** level
 - Every response contract test MUST include both **allowlist AND denylist** assertions
 - `_`-prefixed fields (except `_links`) are ALWAYS internal and must NEVER appear in responses
-- Map/Set objects must NEVER reach JSON serialization — strip or convert before response
+- Map/Set objects must NEVER reach JSON serialization - strip or convert before response
 - Temporal coupling tests are REQUIRED for any endpoint sharing in-memory state with SCIM operations
 - Live test Section 9z-M verifies contracts against deployed instances
 - **Every flow in Step 3 must have corresponding tests at all applicable levels**
@@ -891,33 +891,33 @@ After running, fill in this matrix (copy into audit history):
 
 ---
 
-## Step 9 — Priority-Ordered Implementation Backlog
+## Step 9 - Priority-Ordered Implementation Backlog
 
 > **Self-improvement note:** Re-prioritize this list on each execution based on risk, coverage gaps, and recent bugs.
 
 | Priority | Task | Category | Effort | Risk | Status |
 |----------|------|----------|--------|------|--------|
-| P0 | Create shared `contract-assertions.ts` helper module | Infra | LOW | — | ✅ Done (exec #3) |
-| P0 | Add strict allowlist to ALL SCIM resource responses (K, L, O) — unit + E2E + live | Contract | HIGH | Critical — current gap | ✅ E2E done (exec #1+3), unit/live pending |
-| P0 | Add strict error shape assertion to ALL error path tests (F-E1 to F-E10) | Contract | MED | High — silent shape drift | ✅ E2E done (exec #1+3) |
-| P0 | Add ListResponse shape assertion to ALL list/search endpoints | Contract | MED | High — envelope leak risk | ✅ E2E done (exec #1) |
-| P1 | Add temporal coupling test at E2E level (F-A1) — not just live | Contract | LOW | High — only live catches it | ✅ Done (exec #3) |
-| P1 | Add denylist deep scan to ALL existing E2E lifecycle tests | Contract | MED | Med — retrofit existing tests | ✅ E2E done (exec #1+3) |
-| P2 | Add discovery endpoint shape contracts (C1-C5, D1-D5) | Contract | MED | Med — RFC compliance | Not started |
-| P2 | Add admin credential response shape tests (F1-F3) — verify no `clientSecret` leak | Contract | LOW | Med — secret leak risk | Not started |
-| P2 | Add OAuth token response shape tests (B2) | Contract | LOW | Med — auth surface | Not started |
-| P3 | Add admin log config shape tests (H1-H13) | Contract | MED | Low — internal API | Not started |
-| P3 | Add admin database browser shape tests (I1-I5) | Contract | MED | Low — internal API | Not started |
-| P3 | Add admin activity feed shape tests (J1-J2) | Contract | LOW | Low — internal API | Not started |
-| P3 | Add endpoint-scoped log shape tests (P1-P4) | Contract | LOW | Low — internal API | Not started |
-| P4 | Add config flag combination matrix tests | Flow | HIGH | Med — interaction bugs | Not started |
-| P4 | Add all cross-resource flow tests (F-X1 to F-X3) | Flow | MED | Med — integration bugs | Not started |
-| P4 | Add generic resource parity flow tests (F-GR1 to F-GR4) | Flow | MED | Med — parity gaps | Not started |
-| P5 | Integration-level contract tests (service layer with real DB) | Contract | HIGH | Low — defense in depth | Not started |
+| P0 | Create shared `contract-assertions.ts` helper module | Infra | LOW | - | ✅ Done (exec #3) |
+| P0 | Add strict allowlist to ALL SCIM resource responses (K, L, O) - unit + E2E + live | Contract | HIGH | Critical - current gap | ✅ E2E done (exec #1+3), unit/live pending |
+| P0 | Add strict error shape assertion to ALL error path tests (F-E1 to F-E10) | Contract | MED | High - silent shape drift | ✅ E2E done (exec #1+3) |
+| P0 | Add ListResponse shape assertion to ALL list/search endpoints | Contract | MED | High - envelope leak risk | ✅ E2E done (exec #1) |
+| P1 | Add temporal coupling test at E2E level (F-A1) - not just live | Contract | LOW | High - only live catches it | ✅ Done (exec #3) |
+| P1 | Add denylist deep scan to ALL existing E2E lifecycle tests | Contract | MED | Med - retrofit existing tests | ✅ E2E done (exec #1+3) |
+| P2 | Add discovery endpoint shape contracts (C1-C5, D1-D5) | Contract | MED | Med - RFC compliance | Not started |
+| P2 | Add admin credential response shape tests (F1-F3) - verify no `clientSecret` leak | Contract | LOW | Med - secret leak risk | Not started |
+| P2 | Add OAuth token response shape tests (B2) | Contract | LOW | Med - auth surface | Not started |
+| P3 | Add admin log config shape tests (H1-H13) | Contract | MED | Low - internal API | Not started |
+| P3 | Add admin database browser shape tests (I1-I5) | Contract | MED | Low - internal API | Not started |
+| P3 | Add admin activity feed shape tests (J1-J2) | Contract | LOW | Low - internal API | Not started |
+| P3 | Add endpoint-scoped log shape tests (P1-P4) | Contract | LOW | Low - internal API | Not started |
+| P4 | Add config flag combination matrix tests | Flow | HIGH | Med - interaction bugs | Not started |
+| P4 | Add all cross-resource flow tests (F-X1 to F-X3) | Flow | MED | Med - integration bugs | Not started |
+| P4 | Add generic resource parity flow tests (F-GR1 to F-GR4) | Flow | MED | Med - parity gaps | Not started |
+| P5 | Integration-level contract tests (service layer with real DB) | Contract | HIGH | Low - defense in depth | Not started |
 
 ---
 
-## Step 10 — Self-Improvement Execution (MANDATORY)
+## Step 10 - Self-Improvement Execution (MANDATORY)
 
 > **This step runs at the END of every execution. It is NOT optional.**
 
@@ -974,7 +974,7 @@ After completing the audit, update **THIS FILE** (`apiContractVerification.promp
 
 ```bash
 git add .github/prompts/apiContractVerification.prompt.md
-git commit -m "chore(prompt): self-improve apiContractVerification — execution #N
+git commit -m "chore(prompt): self-improve apiContractVerification - execution #N
 
 Updated: [list what changed]
 Coverage: X/82 endpoints (Y%)

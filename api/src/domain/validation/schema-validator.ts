@@ -1,5 +1,5 @@
 /**
- * SchemaValidator — Phase 8: SCIM Payload Validation Engine
+ * SchemaValidator - Phase 8: SCIM Payload Validation Engine
  *
  * Pure domain class (zero NestJS/Prisma dependencies) that validates
  * SCIM resource payloads against schema attribute definitions.
@@ -16,8 +16,8 @@
  *  9. Strict ISO 8601 dateTime format validation (V31)
  * 10. schemas array validation (V25)
  *
- * @see RFC 7643 §2.1 — Attribute Characteristics
- * @see RFC 7643 §7 — Schema Definition
+ * @see RFC 7643 §2.1 - Attribute Characteristics
+ * @see RFC 7643 §7 - Schema Definition
  */
 
 import type {
@@ -103,7 +103,7 @@ export class SchemaValidator {
 
     // ── 1. Required attribute check (create/replace only) ──────────────
     // RFC 7643 §2.2: readOnly attributes are server-assigned and MUST NOT be
-    // provided by clients — therefore they are exempt from the required check.
+    // provided by clients - therefore they are exempt from the required check.
     // Without this exemption, `id` (required:true + mutability:readOnly) would
     // be impossible to satisfy: omitting it fails "required", including it fails
     // "readOnly". The required check still enforces client-writable attributes
@@ -235,7 +235,7 @@ export class SchemaValidator {
     options: ValidationOptions,
     errors: ValidationError[],
   ): void {
-    // Null/undefined values are valid (means "not set") — required check is done separately
+    // Null/undefined values are valid (means "not set") - required check is done separately
     if (value === null || value === undefined) return;
 
     // ── Mutability check ──
@@ -352,7 +352,7 @@ export class SchemaValidator {
 
       case 'complex':
         // RFC 7644 §3.5.2.3: In patch mode, empty values (null, "", {"value":""})
-        // are removal signals — skip type validation. The Patch Engine handles
+        // are removal signals - skip type validation. The Patch Engine handles
         // removal via isEmptyScimValue().
         if (options.mode === 'patch' && SchemaValidator.isEmptyRemovalValue(value)) {
           break;
@@ -393,7 +393,7 @@ export class SchemaValidator {
         break;
 
       default:
-        // Unknown type — skip validation (forward-compatible)
+        // Unknown type - skip validation (forward-compatible)
         break;
     }
 
@@ -476,7 +476,7 @@ export class SchemaValidator {
   // ─── Required-only validation (G2) ─────────────────────────────────
 
   /**
-   * Validate ONLY required attributes — without any type/unknown/mutability checks.
+   * Validate ONLY required attributes - without any type/unknown/mutability checks.
    * Used when StrictSchemaValidation is OFF to enforce RFC 7643 §2.4 "MUST" unconditionally.
    *
    * @param payload - The incoming request body
@@ -737,7 +737,7 @@ export class SchemaValidator {
   }
 
   /**
-   * Case-insensitive key existence check — SCIM attribute names are case-insensitive.
+   * Case-insensitive key existence check - SCIM attribute names are case-insensitive.
    */
   private static findKeyIgnoreCase(
     obj: Record<string, unknown>,
@@ -949,7 +949,7 @@ export class SchemaValidator {
    *
    * Resolves the PATCH path to the matching schema attribute definition and
    * validates the operation value against it:
-   *  - readOnly mutability check (G8c) — rejects add/replace/remove targeting readOnly attrs
+   *  - readOnly mutability check (G8c) - rejects add/replace/remove targeting readOnly attrs
    *  - type checking, canonical values, etc.
    *
    * Does NOT check required (patch mode) or immutable (done post-PATCH by H-2).
@@ -992,7 +992,7 @@ export class SchemaValidator {
 
     const opLower = op.toLowerCase();
 
-    // No path — value is an object whose keys are top-level attributes
+    // No path - value is an object whose keys are top-level attributes
     if (!path) {
       if (value && typeof value === 'object' && !Array.isArray(value)) {
         const obj = value as Record<string, unknown>;
@@ -1047,7 +1047,7 @@ export class SchemaValidator {
     const attrDef = this.resolvePatchPath(path, coreAttributes, extensionSchemas);
 
     // G8c: Also check if the ROOT attribute in the path chain is readOnly.
-    // e.g. "groups[value eq \"x\"].display" — `groups` is readOnly, so the
+    // e.g. "groups[value eq \"x\"].display" - `groups` is readOnly, so the
     // entire sub-path is unreachable for client writes.
     const rootAttrDef = this.resolveRootAttribute(path, coreAttributes, extensionSchemas);
 
@@ -1061,7 +1061,7 @@ export class SchemaValidator {
     }
 
     if (attrDef) {
-      // G8c: readOnly mutability pre-check — reject any operation targeting a readOnly attr
+      // G8c: readOnly mutability pre-check - reject any operation targeting a readOnly attr
       if (attrDef.mutability === 'readOnly') {
         errors.push({
           path,
@@ -1182,10 +1182,10 @@ export class SchemaValidator {
    * Collect attribute names grouped by their `returned` characteristic.
    *
    * Per RFC 7643 §2.4:
-   *  - `never`   — MUST NOT be returned in any response
-   *  - `request` — returned only when explicitly requested via `attributes` param
-   *  - `always`  — always included in responses (id, schemas, meta, etc.)
-   *  - `default` — returned by default, excludable via `excludedAttributes`
+   *  - `never`   - MUST NOT be returned in any response
+   *  - `request` - returned only when explicitly requested via `attributes` param
+   *  - `always`  - always included in responses (id, schemas, meta, etc.)
+   *  - `default` - returned by default, excludable via `excludedAttributes`
    *
    * @param schemas  Core + extension schema definitions
    * @returns Object with `never` and `request` sets of lowercase attribute names
@@ -1196,9 +1196,9 @@ export class SchemaValidator {
     const never = new Set<string>();
     const request = new Set<string>();
     const always = new Set<string>();
-    // R-RET-3: Sub-attr returned:'always' — map of parentAttrLower → Set<subAttrNameLower>
+    // R-RET-3: Sub-attr returned:'always' - map of parentAttrLower → Set<subAttrNameLower>
     const alwaysSubs = new Map<string, Set<string>>();
-    // AUDIT-2: Sub-attr returned:'request' — map of parentAttrLower → Set<subAttrNameLower>
+    // AUDIT-2: Sub-attr returned:'request' - map of parentAttrLower → Set<subAttrNameLower>
     const requestSubs = new Map<string, Set<string>>();
 
     const collect = (attrs: readonly SchemaAttributeDefinition[], parentName?: string): void => {
@@ -1233,7 +1233,7 @@ export class SchemaValidator {
           never.add(attr.name.toLowerCase());
         }
         // Sub-attributes inherit parent returned if not specified,
-        // but individual sub-attrs can override — collect those too
+        // but individual sub-attrs can override - collect those too
         if (attr.subAttributes) {
           collect(attr.subAttributes, attr.name.toLowerCase());
         }
@@ -1290,7 +1290,7 @@ export class SchemaValidator {
    * `uniqueness: 'server'` from the schema definitions.
    *
    * Only collects attributes that can reasonably be checked for uniqueness:
-   * - Top-level (not sub-attributes — those would require JSONB unnesting)
+   * - Top-level (not sub-attributes - those would require JSONB unnesting)
    * - Non-multiValued (arrays have ambiguous uniqueness semantics)
    * - Non-complex (complex attrs would need deep comparison)
    *
@@ -1314,7 +1314,7 @@ export class SchemaValidator {
           !attr.multiValued &&
           attr.type !== 'complex'
         ) {
-          // Skip column-promoted attributes — they're already handled
+          // Skip column-promoted attributes - they're already handled
           // by the hardcoded uniqueness checks (userName, externalId, displayName)
           const lowerName = attr.name.toLowerCase();
           if (lowerName === 'username' || lowerName === 'externalid' || lowerName === 'displayname' || lowerName === 'id') {
@@ -1411,10 +1411,10 @@ export class SchemaValidator {
    * in a single tree walk. Produces URN-qualified dot-path maps for all characteristics.
    *
    * The parent key is a URN-qualified dot-path (lowercase):
-   * - `urn:...:core:2.0:user`               — core schema top-level attributes
-   * - `urn:...:enterprise:2.0:user`          — extension schema top-level attributes
-   * - `urn:...:core:2.0:user.emails`         — sub-attributes within core complex parent
-   * - `urn:...:enterprise:2.0:user.manager`  — sub-attributes within extension complex parent
+   * - `urn:...:core:2.0:user`               - core schema top-level attributes
+   * - `urn:...:enterprise:2.0:user`          - extension schema top-level attributes
+   * - `urn:...:core:2.0:user.emails`         - sub-attributes within core complex parent
+   * - `urn:...:enterprise:2.0:user.manager`  - sub-attributes within extension complex parent
    *
    * This eliminates name-collision ambiguity at any nesting depth.
    *
@@ -1656,7 +1656,7 @@ export class SchemaValidator {
       }
     }
 
-    // Core attribute — first segment
+    // Core attribute - first segment
     const rootName = cleanPath.split('.')[0];
     return coreAttributes.get(rootName.toLowerCase());
   }

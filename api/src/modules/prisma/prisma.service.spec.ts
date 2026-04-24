@@ -1,7 +1,7 @@
 /**
  * PrismaService Unit Tests
  *
- * Phase 3: Tests the PostgreSQL adapter lifecycle — constructor fallback URL,
+ * Phase 3: Tests the PostgreSQL adapter lifecycle - constructor fallback URL,
  * InMemory skip logic in onModuleInit/onModuleDestroy, and pool cleanup.
  *
  * Note: These tests mock `pg.Pool` and `PrismaPg` to avoid needing a real

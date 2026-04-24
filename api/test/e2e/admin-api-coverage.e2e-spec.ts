@@ -12,7 +12,7 @@ import {
 import { validUser, validGroup, resetFixtureCounter } from './helpers/fixtures';
 
 /**
- * Admin API Coverage — Database Browser, Activity Feed, Manual Operations, Health
+ * Admin API Coverage - Database Browser, Activity Feed, Manual Operations, Health
  *
  * Covers endpoints previously missing from E2E:
  *   GET  /admin/database/users
@@ -121,7 +121,7 @@ describe('Admin API Coverage (E2E)', () => {
           .get('/scim/admin/database/users?search=nonexistent-xyz-query')
           .set('Authorization', `Bearer ${token}`);
 
-        // Database browser uses Prisma directly — may 500 in InMemory mode
+        // Database browser uses Prisma directly - may 500 in InMemory mode
         expect([200, 500]).toContain(res.status);
         if (res.status === 200) {
           expect(res.body).toHaveProperty('users');
@@ -136,7 +136,7 @@ describe('Admin API Coverage (E2E)', () => {
           .get(`/scim/admin/database/users/${userId}`)
           .set('Authorization', `Bearer ${token}`);
 
-        // Database browser uses Prisma directly — may 500 in InMemory mode
+        // Database browser uses Prisma directly - may 500 in InMemory mode
         expect([200, 500]).toContain(res.status);
         if (res.status === 200) {
           expect(res.body).toHaveProperty('id');

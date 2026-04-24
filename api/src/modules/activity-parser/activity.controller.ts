@@ -1,4 +1,4 @@
-﻿import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoggingService } from '../logging/logging.service';
 import { ActivityParserService, ActivitySummary } from './activity-parser.service';
@@ -181,7 +181,7 @@ export class ActivityController {
     // Common exclusion: admin traffic should never count as SCIM operations
     const notAdmin = { url: { not: { contains: '/admin/' } } };
 
-    // SQL-level keepalive exclusion — Entra keepalive probes are:
+    // SQL-level keepalive exclusion - Entra keepalive probes are:
     // method=GET + url contains /Users + identifier IS NULL + status < 400 + url has ?filter=
     // We EXCLUDE these by using NOT { AND: [all keepalive conditions] }
     const notKeepalive = {

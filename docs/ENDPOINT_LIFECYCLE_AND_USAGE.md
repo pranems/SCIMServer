@@ -1,6 +1,6 @@
-# SCIMServer — Endpoint Lifecycle & Usage Quick Reference
+# SCIMServer - Endpoint Lifecycle & Usage Quick Reference
 
-> **Version:** 0.35.0 · **Updated:** April 10, 2026  
+> **Version:** 0.38.0 · **Updated:** April 23, 2026  
 > A hands-on guide for anyone new to the project: create, configure, use, and manage SCIM endpoints
 
 ---
@@ -26,7 +26,7 @@
 
 ## 1. Concept: What Is an Endpoint?
 
-An **endpoint** in SCIMServer is an isolated tenant — a completely separate SCIM namespace with its own:
+An **endpoint** in SCIMServer is an isolated tenant - a completely separate SCIM namespace with its own:
 - Users and Groups (no cross-contamination between endpoints)
 - Configuration flags (deactivation control, strict schema, boolean coercion, etc.)
 - Schema profile (which SCIM attributes are exposed)
@@ -162,12 +162,12 @@ echo "Endpoint: $ENDPOINT_ID"
 
 Endpoints are created with sensible defaults from the selected preset. **If you create an endpoint with no explicit settings** (or use the default `entra-id` preset), the following behavior applies out of the box:
 
-- **DELETE is hard-delete** — resources permanently removed
-- **Schema validation is lenient** — extension data accepted without strict URN checks
-- **`If-Match` is optional** — ETags validated when provided, but not required
-- **ReadOnly attributes silently stripped** — no error, no warning
-- **Boolean coercion ON** — `"True"`/`"False"` strings auto-converted to booleans (Entra compatibility)
-- **Dot-notation PATCH ON** — `name.givenName` paths resolved correctly (Entra compatibility)
+- **DELETE is hard-delete** - resources permanently removed
+- **Schema validation is lenient** - extension data accepted without strict URN checks
+- **`If-Match` is optional** - ETags validated when provided, but not required
+- **ReadOnly attributes silently stripped** - no error, no warning
+- **Boolean coercion ON** - `"True"`/`"False"` strings auto-converted to booleans (Entra compatibility)
+- **Dot-notation PATCH ON** - `name.givenName` paths resolved correctly (Entra compatibility)
 
 For the complete default-by-default behavior matrix and true/false effect of each flag, see [ENDPOINT_CONFIG_FLAGS_REFERENCE.md §2.1–2.2](ENDPOINT_CONFIG_FLAGS_REFERENCE.md#21-default-behavior--what-happens-out-of-the-box).
 
@@ -196,21 +196,21 @@ Invoke-RestMethod -Uri "$BASE/scim/admin/endpoints/$ENDPOINT_ID" -Method PATCH -
 | Flag | Default | Description |
 |------|---------|-------------|
 | `AllowAndCoerceBooleanStrings` | True | Coerce `"True"`/`"False"` to booleans |
-| `VerbosePatchSupported` | — | Enable dot-notation PATCH paths |
-| `UserSoftDeleteEnabled` | — | Allow PATCH `active=false` (user deactivation) |
-| `StrictSchemaValidation` | — | Require extension URNs in `schemas[]` |
-| `RequireIfMatch` | — | Require `If-Match` header on writes |
-| `PerEndpointCredentialsEnabled` | — | Enable per-endpoint credentials |
-| `IncludeWarningAboutIgnoredReadOnlyAttribute` | — | Warning header for readOnly stripping |
-| `IgnoreReadOnlyAttributesInPatch` | — | Strip readOnly PATCH ops (don't error) |
-| `MultiOpPatchRequestAddMultipleMembersToGroup` | — | Multi-member PATCH add |
-| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | — | Multi-member PATCH remove |
-| `PatchOpAllowRemoveAllMembers` | — | Allow remove-all via `path=members` |
-| `logLevel` | — | Per-endpoint log level override |
+| `VerbosePatchSupported` | - | Enable dot-notation PATCH paths |
+| `UserSoftDeleteEnabled` | - | Allow PATCH `active=false` (user deactivation) |
+| `StrictSchemaValidation` | - | Require extension URNs in `schemas[]` |
+| `RequireIfMatch` | - | Require `If-Match` header on writes |
+| `PerEndpointCredentialsEnabled` | - | Enable per-endpoint credentials |
+| `IncludeWarningAboutIgnoredReadOnlyAttribute` | - | Warning header for readOnly stripping |
+| `IgnoreReadOnlyAttributesInPatch` | - | Strip readOnly PATCH ops (don't error) |
+| `MultiOpPatchRequestAddMultipleMembersToGroup` | - | Multi-member PATCH add |
+| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | - | Multi-member PATCH remove |
+| `PatchOpAllowRemoveAllMembers` | - | Allow remove-all via `path=members` |
+| `logLevel` | - | Per-endpoint log level override |
 
 ### Add a Custom Extension to an Existing Endpoint
 
-You can PATCH custom extensions into an already-running endpoint. `schemas` and `resourceTypes` use **replace** semantics — send complete arrays. `settings` and `SPC` are preserved.
+You can PATCH custom extensions into an already-running endpoint. `schemas` and `resourceTypes` use **replace** semantics - send complete arrays. `settings` and `SPC` are preserved.
 
 ```powershell
 $extensionPatch = @{
@@ -237,7 +237,7 @@ $extensionPatch = @{
 Invoke-RestMethod -Uri "$BASE/scim/admin/endpoints/$ENDPOINT_ID" -Method PATCH -Headers $headers -Body $extensionPatch
 ```
 
-> **Takes effect immediately** — no restart required. The in-memory cache is updated synchronously and `_schemaCaches` is lazily rebuilt on the next request. Discovery, validation, and characteristic enforcement all reflect the new extension instantly. Existing resources without extension data continue working normally. See [SCHEMA_CUSTOMIZATION_GUIDE.md §11](SCHEMA_CUSTOMIZATION_GUIDE.md#11-adding-extensions-to-existing-endpoints-patch) for all combination examples.
+> **Takes effect immediately** - no restart required. The in-memory cache is updated synchronously and `_schemaCaches` is lazily rebuilt on the next request. Discovery, validation, and characteristic enforcement all reflect the new extension instantly. Existing resources without extension data continue working normally. See [SCHEMA_CUSTOMIZATION_GUIDE.md §11](SCHEMA_CUSTOMIZATION_GUIDE.md#11-adding-extensions-to-existing-endpoints-patch) for all combination examples.
 
 ---
 
@@ -406,7 +406,7 @@ Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Users/$USER_ID" -Metho
 # Returns 204 No Content
 ```
 
-DELETE always hard-deletes — the row is physically removed from the database. There is no soft-delete concept. To deactivate a user without deleting, use PATCH to set `active = false` (requires `UserSoftDeleteEnabled = True`, which is the default).
+DELETE always hard-deletes - the row is physically removed from the database. There is no soft-delete concept. To deactivate a user without deleting, use PATCH to set `active = false` (requires `UserSoftDeleteEnabled = True`, which is the default).
 
 ---
 
@@ -486,7 +486,7 @@ Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/ResourceTypes"
 
 ## Step 10: Delete the Endpoint
 
-**Warning:** This cascades — deletes ALL users, groups, memberships, credentials, and logs for this endpoint.
+**Warning:** This cascades - deletes ALL users, groups, memberships, credentials, and logs for this endpoint.
 
 ```powershell
 Invoke-RestMethod -Uri "$BASE/scim/admin/endpoints/$ENDPOINT_ID" -Method DELETE -Headers $headers
@@ -543,7 +543,7 @@ $allUsers.Resources | ConvertTo-Json -Depth 10 | Out-File users-export.json
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│  SCIMServer Endpoint Lifecycle — Quick Reference           │
+│  SCIMServer Endpoint Lifecycle - Quick Reference           │
 ├────────────────────────────────────────────────────────────┤
 │                                                            │
 │  AUTH:                                                     │
@@ -587,8 +587,8 @@ $allUsers.Resources | ConvertTo-Json -Depth 10 | Out-File users-export.json
 
 ## See Also
 
-- [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) — Full API reference with every endpoint
-- [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md) — Profile system internals
-- [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) — All configuration flags
-- [MULTI_ENDPOINT_GUIDE.md](MULTI_ENDPOINT_GUIDE.md) — Multi-tenant architecture details
-- [SCIM_REFERENCE.md](SCIM_REFERENCE.md) — SCIM v2 protocol reference
+- [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) - Full API reference with every endpoint
+- [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md) - Profile system internals
+- [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) - All configuration flags
+- [MULTI_ENDPOINT_GUIDE.md](MULTI_ENDPOINT_GUIDE.md) - Multi-tenant architecture details
+- [SCIM_REFERENCE.md](SCIM_REFERENCE.md) - SCIM v2 protocol reference

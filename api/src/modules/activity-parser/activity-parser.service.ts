@@ -1,4 +1,4 @@
-﻿import { Injectable, Optional, Inject } from '@nestjs/common';
+import { Injectable, Optional, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ScimLogger } from '../logging/scim-logger.service';
 import { LogCategory } from '../logging/log-levels';
@@ -46,7 +46,7 @@ export class ActivityParserService {
     createdAt: string;
     identifier?: string;
   }): Promise<ActivitySummary> {
-    // Guard against malformed log entries — null/undefined method would throw TypeError
+    // Guard against malformed log entries - null/undefined method would throw TypeError
     if (!log.method || !log.url) {
       return {
         id: log.id,
@@ -767,7 +767,7 @@ export class ActivityParserService {
    * Resolve user ID to display name
    */
   private async resolveUserName(userId: string): Promise<string> {
-    // Guard: scimId is @db.Uuid — reject non-UUID identifiers to avoid
+    // Guard: scimId is @db.Uuid - reject non-UUID identifiers to avoid
     // PostgreSQL "invalid input syntax for type uuid" errors that
     // waste pool connections and flood logs.
     if (!isValidUuid(userId)) {
@@ -806,7 +806,7 @@ export class ActivityParserService {
    * Resolve group ID to display name
    */
   private async resolveGroupName(groupId: string): Promise<string> {
-    // Guard: scimId is @db.Uuid — skip lookup for non-UUID values.
+    // Guard: scimId is @db.Uuid - skip lookup for non-UUID values.
     if (!isValidUuid(groupId)) {
       this.logger?.trace(LogCategory.DATABASE, 'resolveGroupName: skipped lookup for non-UUID identifier', { groupId });
       return groupId;

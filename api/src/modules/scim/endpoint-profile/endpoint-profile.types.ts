@@ -1,5 +1,5 @@
 /**
- * Endpoint Profile Types — Phase 13
+ * Endpoint Profile Types - Phase 13
  *
  * Defines the `EndpointProfile` interface that replaces the fragmented
  * `Endpoint.config` + `EndpointSchema` + `EndpointResourceType` model
@@ -15,7 +15,7 @@ import type { SchemaCharacteristicsCache } from '../../../domain/validation/vali
 
 // ─── ServiceProviderConfig ─────────────────────────────────────────────────
 
-/** RFC 7644 §4 — Capability sub-objects */
+/** RFC 7644 §4 - Capability sub-objects */
 export interface SpcCapability {
   supported: boolean;
 }
@@ -38,7 +38,7 @@ export interface SpcAuthenticationScheme {
   primary?: boolean;
 }
 
-/** RFC 7644 §4 — ServiceProviderConfig shape stored in the profile */
+/** RFC 7644 §4 - ServiceProviderConfig shape stored in the profile */
 export interface ServiceProviderConfig {
   schemas?: readonly string[];
   documentationUri?: string;
@@ -97,6 +97,10 @@ export interface ProfileSettings {
   /** Strip (don't reject) readOnly PATCH ops */
   IgnoreReadOnlyAttributesInPatch?: boolean | string;
 
+  // ─── G8h: Primary enforcement ────────────────────────────────────
+  /** Primary enforcement mode: normalize (default), reject, or passthrough (RFC 7643 section 2.4) */
+  PrimaryEnforcement?: 'normalize' | 'reject' | 'passthrough' | string;
+
   // ─── Deprecated (settings v7 clean break) ────────────────────────
   /** @deprecated Replaced by UserSoftDeleteEnabled + UserHardDeleteEnabled */
   SoftDeleteEnabled?: boolean | string;
@@ -104,7 +108,7 @@ export interface ProfileSettings {
   MultiOpPatchRequestAddMultipleMembersToGroup?: boolean | string;
   /** @deprecated Replaced by MultiMemberPatchOpForGroupEnabled */
   MultiOpPatchRequestRemoveMultipleMembersFromGroup?: boolean | string;
-  /** @deprecated Removed — POST collision always 409 */
+  /** @deprecated Removed - POST collision always 409 */
   ReprovisionOnConflictForSoftDeletedResource?: boolean | string;
 
   /** Enable per-endpoint log file under logs/endpoints/ */
@@ -116,24 +120,24 @@ export interface ProfileSettings {
 // ─── EndpointProfile ───────────────────────────────────────────────────────
 
 /**
- * The unified endpoint profile — stored as a single JSONB column on Endpoint.
+ * The unified endpoint profile - stored as a single JSONB column on Endpoint.
  *
  * Contains three RFC-native discovery document sections plus project settings:
- * - `schemas`             — RFC 7643 §7 schema definitions
- * - `resourceTypes`       — RFC 7643 §6 resource type declarations
- * - `serviceProviderConfig` — RFC 7644 §4 capability advertisement
- * - `settings`            — Project-specific behavioral flags (not RFC-governed)
+ * - `schemas`             - RFC 7643 §7 schema definitions
+ * - `resourceTypes`       - RFC 7643 §6 resource type declarations
+ * - `serviceProviderConfig` - RFC 7644 §4 capability advertisement
+ * - `settings`            - Project-specific behavioral flags (not RFC-governed)
  *
  * @see docs/SCHEMA_TEMPLATES_DESIGN.md §5.1
  */
 export interface EndpointProfile {
-  /** RFC 7643 §7 — Schema definitions with attribute characteristics */
+  /** RFC 7643 §7 - Schema definitions with attribute characteristics */
   schemas: ScimSchemaDefinition[];
 
-  /** RFC 7643 §6 — Resource type declarations with extension bindings */
+  /** RFC 7643 §6 - Resource type declarations with extension bindings */
   resourceTypes: ScimResourceType[];
 
-  /** RFC 7644 §4 — Server capability advertisement */
+  /** RFC 7644 §4 - Server capability advertisement */
   serviceProviderConfig: ServiceProviderConfig;
 
   /** Project-specific behavioral flags (13 persisted + extensible) */
@@ -151,7 +155,7 @@ export interface EndpointProfile {
 // ─── Shorthand Types ───────────────────────────────────────────────────────
 
 /**
- * Shorthand schema input — used in presets and by operators.
+ * Shorthand schema input - used in presets and by operators.
  * Attributes can be:
  * - "all"        → expand to full RFC attribute list for this schema
  * - object[]     → array of attribute definitions (may be partial for known RFC attrs)
@@ -165,7 +169,7 @@ export interface ShorthandSchemaInput {
 }
 
 /**
- * Shorthand profile input — what operators can submit.
+ * Shorthand profile input - what operators can submit.
  * The server auto-expands this into a full EndpointProfile.
  */
 export interface ShorthandProfileInput {

@@ -88,3 +88,17 @@ api/unit-final.json
 SCIMServer-standalone.zip
 standalone/
 endpoint-creation-output.txt
+
+# Debug/test JSON artifacts (local-only throwaway captures)
+admin-logs.json
+admin-post-logs.json
+create-user-test-action.json
+ep-logs.json
+test-input.json
+trigger-output.json
+user-workflow-def.json
+workflows.json
+
+# Stale API collection exports (superseded by versioned copies)
+docs/insomnia/SCIMServer_v031_*.json
+docs/postman/SCIMServer_v031_*.json

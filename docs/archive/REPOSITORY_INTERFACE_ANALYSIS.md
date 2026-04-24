@@ -1,7 +1,7 @@
 # Repository Interface & Implementation Analysis
 
 > **Date:** 2026-02-20  
-> **Phase:** 3 — PostgreSQL Migration  
+> **Phase:** 3 - PostgreSQL Migration  
 > **Branch:** `feat/torfc1stscimsvr`  
 
 ---
@@ -68,7 +68,7 @@
 | `addMembers` | ✅ | ✅ | ✅ |
 | `updateGroupWithMembers` | ✅ | ✅ | ✅ |
 
-Both `clear()` methods exist only on InMemory implementations (test helper, not in interface). This is correct — it's used by test setup/teardown only.
+Both `clear()` methods exist only on InMemory implementations (test helper, not in interface). This is correct - it's used by test setup/teardown only.
 
 **Verdict:** Full parity. Every interface method has matching implementations in both backends.
 
@@ -94,7 +94,7 @@ Both approaches produce identical behavior for SCIM case-insensitive attribute c
 
 This asymmetry is correct:
 - The guard exists **because of** PostgreSQL's strict UUID column type
-- InMemory doesn't need it — the `Map.get()` returns `undefined` naturally
+- InMemory doesn't need it - the `Map.get()` returns `undefined` naturally
 - Both produce the same observable behavior: non-existent ID → `null` → 404
 
 ---
@@ -113,7 +113,7 @@ This asymmetry is correct:
 
 The repository layer is well-designed:
 
-- **Interfaces are minimal and complete** — no missing operations for SCIM CRUD + uniqueness
+- **Interfaces are minimal and complete** - no missing operations for SCIM CRUD + uniqueness
 - **Both implementations have full method parity**
 - **Case-sensitivity is correctly handled** in both backends
 - **UUID guard asymmetry is architecturally correct** (guards where needed, no-ops where not)

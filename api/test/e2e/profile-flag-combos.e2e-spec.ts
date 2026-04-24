@@ -1,5 +1,5 @@
 /**
- * E2E Tests — Profile-Based Configuration & Flag Combinations (Phase 13)
+ * E2E Tests - Profile-Based Configuration & Flag Combinations (Phase 13)
  *
  * Replaces removed E2E tests (admin-schema, custom-resource-types,
  * immutable-enforcement, returned-request, generic-parity-fixes) by
@@ -62,7 +62,7 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
       const originalSchemaCount = epRes.body.profile.schemas.length;
       const originalRtCount = epRes.body.profile.resourceTypes.length;
 
-      // PATCH only settings — admin endpoint PATCH may return 200 or 204
+      // PATCH only settings - admin endpoint PATCH may return 200 or 204
       await request(app.getHttpServer())
         .patch(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
@@ -187,7 +187,7 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
       });
       const basePath = scimBasePath(epId);
 
-      // POST with boolean string "True" — server may accept or reject
+      // POST with boolean string "True" - server may accept or reject
       // depending on which validation fires first. Test that the combo doesn't crash.
       const res = await scimPost(app, `${basePath}/Users`, token, {
         schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
@@ -196,7 +196,7 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
         active: 'True' as any,
       });
 
-      // Either 201 (accepted leniently) or 400 (strict rejected) — both are valid
+      // Either 201 (accepted leniently) or 400 (strict rejected) - both are valid
       expect([201, 400]).toContain(res.status);
     });
   });
@@ -220,7 +220,7 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
         active: true,
       }).expect(201);
 
-      // Soft-delete — need If-Match header when RequireIfMatch is ON
+      // Soft-delete - need If-Match header when RequireIfMatch is ON
       const getFirst = await scimGet(app, `${basePath}/Users/${user.body.id}`, token).expect(200);
       const etag = getFirst.headers['etag'];
 

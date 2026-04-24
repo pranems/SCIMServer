@@ -110,7 +110,7 @@ export function getCorrelationContext(): CorrelationContext | undefined {
 }
 
 /**
- * ScimLogger — Structured, leveled, correlation-aware logger for SCIMServer.
+ * ScimLogger - Structured, leveled, correlation-aware logger for SCIMServer.
  *
  * Features:
  * - RFC 5424-inspired log levels: TRACE → DEBUG → INFO → WARN → ERROR → FATAL
@@ -400,7 +400,7 @@ export class ScimLogger {
     try {
       return JSON.stringify(value, null, indent);
     } catch {
-      // Circular reference or other serialization failure — use a replacer
+      // Circular reference or other serialization failure - use a replacer
       const seen = new WeakSet();
       return JSON.stringify(value, (_key, val) => {
         if (typeof val === 'object' && val !== null) {
@@ -429,7 +429,7 @@ export class ScimLogger {
         if (serialized.length > this.config.maxPayloadSizeBytes) {
           result[key] = serialized.slice(0, this.config.maxPayloadSizeBytes) + `...[truncated]`;
         } else if (serialized.includes('[Circular]')) {
-          // Circular reference detected — store the safe-serialized string to prevent
+          // Circular reference detected - store the safe-serialized string to prevent
           // downstream JSON.stringify crashes (e.g., in FileLogTransport).
           result[key] = serialized;
         } else {
@@ -451,7 +451,7 @@ export class ScimLogger {
     }
   }
 
-  /** JSON structured output — one line per entry, ideal for log aggregation (ELK, Azure Monitor). */
+  /** JSON structured output - one line per entry, ideal for log aggregation (ELK, Azure Monitor). */
   private emitJson(level: LogLevel, entry: StructuredLogEntry): void {
     const line = this.safeStringify(entry);
     switch (level) {

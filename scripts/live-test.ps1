@@ -445,17 +445,17 @@ try {
     try {
         Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method PATCH -Headers $headers -Body $resetBody -ContentType "application/json" | Out-Null
     } catch {
-        Write-Host "    ⚠️ RequireIfMatch reset still failed — subsequent tests will use If-Match:* as safety net" -ForegroundColor Yellow
+        Write-Host "    ⚠️ RequireIfMatch reset still failed - subsequent tests will use If-Match:* as safety net" -ForegroundColor Yellow
     }
 }
 
-# Write headers include If-Match:* as a safety net — works regardless of RequireIfMatch setting.
+# Write headers include If-Match:* as a safety net - works regardless of RequireIfMatch setting.
 # If-Match:* is valid per RFC 7232 §3.1 and means "match any version".
 $headers = @{ Authorization = $headers['Authorization']; 'Content-Type' = 'application/json'; 'If-Match' = '*' }
 
 # Also add If-Match:* to the main $headers so ALL subsequent Invoke-RestMethod calls
 # (83+ PATCH/PUT/DELETE across Sections 3-10) are protected. If-Match:* is harmless on
-# GET/POST — the server ignores it on reads and creates.
+# GET/POST - the server ignores it on reads and creates.
 $headers['If-Match'] = '*'
 
 # ============================================
@@ -801,12 +801,12 @@ Write-Host "`n--- Test: externalId NOT Unique (Saved as Received) ---" -Foregrou
 $dupExtBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
     userName = "dup-ext-test@test.com"
-    externalId = "ext-pag-1"  # Same externalId as another user — allowed
+    externalId = "ext-pag-1"  # Same externalId as another user - allowed
     active = $true
 } | ConvertTo-Json
 try {
     $dupExtResult = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $dupExtBody
-    Test-Result -Success ($dupExtResult.externalId -eq "ext-pag-1") -Message "Duplicate externalId accepted (uniqueness:none) — 201"
+    Test-Result -Success ($dupExtResult.externalId -eq "ext-pag-1") -Message "Duplicate externalId accepted (uniqueness:none) - 201"
 } catch {
     $code = $_.Exception.Response.StatusCode.value__
     Test-Result -Success $false -Message "Duplicate externalId should be accepted (uniqueness:none), got $code"
@@ -968,12 +968,12 @@ Test-Result -Success ($extGroup.externalId -eq "ext-group-123") -Message "Group 
 $filteredGroups = Invoke-RestMethod -Uri "$scimBase/Groups?filter=externalId eq `"ext-group-123`"" -Method GET -Headers $headers
 Test-Result -Success ($filteredGroups.totalResults -eq 1) -Message "Filter groups by externalId returns exactly 1 group"
 
-# Test: Filter groups by externalId with DIFFERENT CASE — should NOT match (TEXT = case-sensitive, caseExact=true)
+# Test: Filter groups by externalId with DIFFERENT CASE - should NOT match (TEXT = case-sensitive, caseExact=true)
 Write-Host "`n--- Test: Group externalId Case-Sensitive Filter (RFC 7643 §3.1 caseExact=true) ---" -ForegroundColor Cyan
 $extIdFilterCIGroup = Invoke-RestMethod -Uri "$scimBase/Groups?filter=externalId eq `"EXT-GROUP-123`"" -Method GET -Headers $headers
 Test-Result -Success ($extIdFilterCIGroup.totalResults -eq 0) -Message "Filter group with UPPERCASE externalId does NOT match (TEXT case-sensitive)"
 
-# Test: Filter groups by externalId with mixed case — should NOT match
+# Test: Filter groups by externalId with mixed case - should NOT match
 $extIdFilterMixed = Invoke-RestMethod -Uri "$scimBase/Groups?filter=externalId eq `"Ext-Group-123`"" -Method GET -Headers $headers
 Test-Result -Success ($extIdFilterMixed.totalResults -eq 0) -Message "Filter group with MixedCase externalId does NOT match (TEXT case-sensitive)"
 
@@ -1016,7 +1016,7 @@ $dupExtGroupBody = @{
 } | ConvertTo-Json
 try {
     $dupExtGroupResult = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $dupExtGroupBody
-    Test-Result -Success ($dupExtGroupResult.externalId -eq "updated-ext-789") -Message "Duplicate group externalId accepted (uniqueness:none) — 201"
+    Test-Result -Success ($dupExtGroupResult.externalId -eq "updated-ext-789") -Message "Duplicate group externalId accepted (uniqueness:none) - 201"
 } catch {
     $code = $_.Exception.Response.StatusCode.value__
     Test-Result -Success $false -Message "Duplicate group externalId should be accepted (uniqueness:none), got $code"
@@ -2371,7 +2371,7 @@ try {
     $badCatStatus = $_.Exception.Response.StatusCode.value__
     Test-Result -Success ($badCatStatus -eq 400) -Message "Unknown category returns 400"
     # NestJS HttpException wraps body as { statusCode, message: { error, availableCategories } }
-    # or { error, availableCategories } depending on version — check both structures
+    # or { error, availableCategories } depending on version - check both structures
     try {
         $errBody = $_.ErrorDetails.Message | ConvertFrom-Json
         $cats = $null
@@ -2380,7 +2380,7 @@ try {
         if ($cats) {
             Test-Result -Success ($cats.Count -ge 14) -Message "Unknown category response includes $($cats.Count) available categories"
         } else {
-            # Body parsed but structure different — pass if error text present
+            # Body parsed but structure different - pass if error text present
             $errText = $_.ErrorDetails.Message
             Test-Result -Success ($errText -match 'Unknown category' -or $errText -match 'availableCategories') -Message "Unknown category error body has expected content"
         }
@@ -2609,7 +2609,7 @@ $logConfigAfterUpdate = Invoke-RestMethod -Uri "$baseUrl/scim/admin/log-config" 
 $epLevelAfterUpdate = $logConfigAfterUpdate.endpointLevels.$logLevelEndpointId
 Test-Result -Success ($epLevelAfterUpdate -ne $null) -Message "Endpoint level updated in log-config after PATCH"
 
-# --- Update endpoint config without logLevel (should preserve it — settings merge is additive) ---
+# --- Update endpoint config without logLevel (should preserve it - settings merge is additive) ---
 Write-Host "`n--- PATCH config without logLevel (additive merge) ---" -ForegroundColor Cyan
 $removeLogLevelBody = @{
     profile = @{ settings = @{
@@ -2618,7 +2618,7 @@ $removeLogLevelBody = @{
 } | ConvertTo-Json -Depth 4
 
 $clearedEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$logLevelEndpointId" -Method PATCH -Headers $headers -Body $removeLogLevelBody
-# Settings merge is additive (shallow merge) — omitting logLevel does NOT clear it.
+# Settings merge is additive (shallow merge) - omitting logLevel does NOT clear it.
 # The logLevel should still be TRACE from the previous PATCH.
 Test-Result -Success ($clearedEndpoint.profile.settings.logLevel -eq "TRACE") -Message "Endpoint profile.settings preserves logLevel (additive merge)"
 Test-Result -Success ($clearedEndpoint.profile.settings.strictMode -eq $true) -Message "Other settings flags preserved"
@@ -2736,7 +2736,7 @@ Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$boolCoerceEndpointId" -Me
 $boolCoerceScimBase = "$baseUrl/scim/endpoints/$boolCoerceEndpointId"
 Test-Result -Success ($null -ne $boolCoerceEndpointId) -Message "Created bool-coerce endpoint: $boolCoerceEndpointId"
 
-# Test 9f.1: POST user with roles[].primary = "True" — should coerce to boolean true
+# Test 9f.1: POST user with roles[].primary = "True" - should coerce to boolean true
 Write-Host "`n--- Test 9f.1: POST User with boolean string 'True' in roles[].primary ---" -ForegroundColor Cyan
 $coerceUserBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
@@ -2755,7 +2755,7 @@ try {
     Test-Result -Success $false -Message "POST user with boolean string should succeed: $_"
 }
 
-# Test 9f.2: POST user with emails[].primary = "False" — should coerce to boolean false
+# Test 9f.2: POST user with emails[].primary = "False" - should coerce to boolean false
 Write-Host "`n--- Test 9f.2: POST User with boolean string 'False' in emails[].primary ---" -ForegroundColor Cyan
 $coerceUser2Body = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
@@ -2777,7 +2777,7 @@ try {
     Test-Result -Success $false -Message "POST user with False boolean string should succeed: $_"
 }
 
-# Test 9f.3: PUT user with boolean string — should coerce
+# Test 9f.3: PUT user with boolean string - should coerce
 Write-Host "`n--- Test 9f.3: PUT User with boolean string coercion ---" -ForegroundColor Cyan
 if ($coerceUserId) {
     $putCoerceBody = @{
@@ -2797,7 +2797,7 @@ if ($coerceUserId) {
     }
 }
 
-# Test 9f.4: PATCH user with boolean string in value object — should coerce
+# Test 9f.4: PATCH user with boolean string in value object - should coerce
 Write-Host "`n--- Test 9f.4: PATCH User with boolean string coercion ---" -ForegroundColor Cyan
 if ($coerceUserId) {
     $patchCoerceBody = @{
@@ -2822,7 +2822,7 @@ if ($coerceUserId) {
     }
 }
 
-# Test 9f.5: Create endpoint with coercion OFF + StrictSchema ON — should reject boolean strings
+# Test 9f.5: Create endpoint with coercion OFF + StrictSchema ON - should reject boolean strings
 Write-Host "`n--- Test 9f.5: Reject boolean string when flag is OFF ---" -ForegroundColor Cyan
 $rejectEndpointBody = @{
     name = "bool-reject-ep-$(Get-Random)"
@@ -2944,7 +2944,7 @@ Write-Host "========================================" -ForegroundColor Yellow
 #   - "always"  : Always returned (id, schemas, meta)
 #   - "default" : Returned unless excludedAttributes lists it
 #   - "request" : Only returned when explicitly requested via ?attributes=
-#   - "never"   : NEVER returned (e.g. password) — even if explicitly requested
+#   - "never"   : NEVER returned (e.g. password) - even if explicitly requested
 #
 # G8e ensures the server enforces returned:"never" for password across ALL operations.
 
@@ -2960,8 +2960,8 @@ $g8eUserBody = @{
     active = $true
 } | ConvertTo-Json -Depth 3
 
-# Test 9l.1: POST /Users with password — response must NOT contain password
-Write-Host "`n--- Test 9l.1: POST /Users with password — password stripped from response ---" -ForegroundColor Cyan
+# Test 9l.1: POST /Users with password - response must NOT contain password
+Write-Host "`n--- Test 9l.1: POST /Users with password - password stripped from response ---" -ForegroundColor Cyan
 $g8eUser = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $g8eUserBody
 $g8eUserId = $g8eUser.id
 Test-Result -Success ($null -ne $g8eUserId) -Message "POST /Users with password returns ID: $g8eUserId"
@@ -2969,24 +2969,24 @@ Test-Result -Success ($null -eq $g8eUser.password) -Message "POST /Users respons
 Test-Result -Success ($null -ne $g8eUser.userName) -Message "POST /Users response still contains userName"
 Test-Result -Success ($null -ne $g8eUser.displayName) -Message "POST /Users response still contains displayName"
 
-# Test 9l.2: GET /Users/:id — password must NOT be present
-Write-Host "`n--- Test 9l.2: GET /Users/:id — password stripped ---" -ForegroundColor Cyan
+# Test 9l.2: GET /Users/:id - password must NOT be present
+Write-Host "`n--- Test 9l.2: GET /Users/:id - password stripped ---" -ForegroundColor Cyan
 $g8eGetUser = Invoke-RestMethod -Uri "$scimBase/Users/$g8eUserId" -Method GET -Headers $headers
 Test-Result -Success ($null -eq $g8eGetUser.password) -Message "GET /Users/:id does NOT return password"
 Test-Result -Success ($g8eGetUser.userName -like "g8e-returned-test-*") -Message "GET /Users/:id returns userName correctly"
 
-# Test 9l.3: GET /Users (list) — no resource should contain password
-Write-Host "`n--- Test 9l.3: GET /Users list — password stripped from all resources ---" -ForegroundColor Cyan
+# Test 9l.3: GET /Users (list) - no resource should contain password
+Write-Host "`n--- Test 9l.3: GET /Users list - password stripped from all resources ---" -ForegroundColor Cyan
 $g8eListResult = Invoke-RestMethod -Uri "$scimBase/Users?filter=userName sw `"g8e-returned-test-`"" -Method GET -Headers $headers
 $g8eHasPassword = $false
 foreach ($res in $g8eListResult.Resources) {
     if ($null -ne $res.password) { $g8eHasPassword = $true; break }
 }
-Test-Result -Success (-not $g8eHasPassword) -Message "GET /Users list — no resource contains password"
+Test-Result -Success (-not $g8eHasPassword) -Message "GET /Users list - no resource contains password"
 Test-Result -Success ($g8eListResult.totalResults -ge 1) -Message "GET /Users list found g8e test user"
 
-# Test 9l.4: PUT /Users/:id with password — response must NOT contain password
-Write-Host "`n--- Test 9l.4: PUT /Users with password — password stripped from response ---" -ForegroundColor Cyan
+# Test 9l.4: PUT /Users/:id with password - response must NOT contain password
+Write-Host "`n--- Test 9l.4: PUT /Users with password - password stripped from response ---" -ForegroundColor Cyan
 $g8ePutBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
     userName = $g8eUser.userName
@@ -2998,8 +2998,8 @@ $g8ePutResult = Invoke-RestMethod -Uri "$scimBase/Users/$g8eUserId" -Method PUT 
 Test-Result -Success ($null -eq $g8ePutResult.password) -Message "PUT /Users response does NOT contain password (returned:never)"
 Test-Result -Success ($g8ePutResult.displayName -eq "G8e Put Updated") -Message "PUT /Users response shows updated displayName"
 
-# Test 9l.5: PATCH /Users/:id — response must NOT contain password
-Write-Host "`n--- Test 9l.5: PATCH /Users — password stripped from response ---" -ForegroundColor Cyan
+# Test 9l.5: PATCH /Users/:id - response must NOT contain password
+Write-Host "`n--- Test 9l.5: PATCH /Users - password stripped from response ---" -ForegroundColor Cyan
 $g8ePatchBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
     Operations = @(@{
@@ -3014,8 +3014,8 @@ $g8ePatchResult = Invoke-RestMethod -Uri "$scimBase/Users/$g8eUserId" -Method PA
 Test-Result -Success ($null -eq $g8ePatchResult.password) -Message "PATCH /Users response does NOT contain password (returned:never)"
 Test-Result -Success ($g8ePatchResult.displayName -eq "G8e Patch Updated") -Message "PATCH /Users response shows updated displayName"
 
-# Test 9l.6: POST /Users/.search — password must NOT appear in search results
-Write-Host "`n--- Test 9l.6: POST /Users/.search — password stripped from results ---" -ForegroundColor Cyan
+# Test 9l.6: POST /Users/.search - password must NOT appear in search results
+Write-Host "`n--- Test 9l.6: POST /Users/.search - password stripped from results ---" -ForegroundColor Cyan
 $g8eSearchBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:SearchRequest")
     filter = "userName eq `"$($g8eUser.userName)`""
@@ -3027,24 +3027,24 @@ $g8eSearchHasPwd = $false
 foreach ($res in $g8eSearchResult.Resources) {
     if ($null -ne $res.password) { $g8eSearchHasPwd = $true; break }
 }
-Test-Result -Success (-not $g8eSearchHasPwd) -Message "POST /Users/.search — no resource contains password"
+Test-Result -Success (-not $g8eSearchHasPwd) -Message "POST /Users/.search - no resource contains password"
 Test-Result -Success ($g8eSearchResult.totalResults -ge 1) -Message "POST /Users/.search found g8e test user"
 
-# Test 9l.7: GET /Users?attributes=password — password still NOT returned (returned:never overrides explicit request)
-Write-Host "`n--- Test 9l.7: GET /Users?attributes=password — returned:never overrides explicit request ---" -ForegroundColor Cyan
+# Test 9l.7: GET /Users?attributes=password - password still NOT returned (returned:never overrides explicit request)
+Write-Host "`n--- Test 9l.7: GET /Users?attributes=password - returned:never overrides explicit request ---" -ForegroundColor Cyan
 $g8eAttrPwd = Invoke-RestMethod -Uri "$scimBase/Users/$g8eUserId`?attributes=password" -Method GET -Headers $headers
-Test-Result -Success ($null -eq $g8eAttrPwd.password) -Message "GET /Users/:id?attributes=password — password NOT returned (returned:never wins)"
-Test-Result -Success ($null -ne $g8eAttrPwd.id) -Message "GET /Users/:id?attributes=password — id still returned (always-returned)"
-Test-Result -Success ($null -ne $g8eAttrPwd.schemas) -Message "GET /Users/:id?attributes=password — schemas still returned (always-returned)"
+Test-Result -Success ($null -eq $g8eAttrPwd.password) -Message "GET /Users/:id?attributes=password - password NOT returned (returned:never wins)"
+Test-Result -Success ($null -ne $g8eAttrPwd.id) -Message "GET /Users/:id?attributes=password - id still returned (always-returned)"
+Test-Result -Success ($null -ne $g8eAttrPwd.schemas) -Message "GET /Users/:id?attributes=password - schemas still returned (always-returned)"
 
-# Test 9l.8: GET /Users?attributes=password,userName — password stripped, userName included
-Write-Host "`n--- Test 9l.8: GET /Users?attributes=password,userName — mixed request ---" -ForegroundColor Cyan
+# Test 9l.8: GET /Users?attributes=password,userName - password stripped, userName included
+Write-Host "`n--- Test 9l.8: GET /Users?attributes=password,userName - mixed request ---" -ForegroundColor Cyan
 $g8eMixedAttr = Invoke-RestMethod -Uri "$scimBase/Users/$g8eUserId`?attributes=password,userName" -Method GET -Headers $headers
-Test-Result -Success ($null -eq $g8eMixedAttr.password) -Message "GET ?attributes=password,userName — password not returned"
-Test-Result -Success ($null -ne $g8eMixedAttr.userName) -Message "GET ?attributes=password,userName — userName IS returned"
+Test-Result -Success ($null -eq $g8eMixedAttr.password) -Message "GET ?attributes=password,userName - password not returned"
+Test-Result -Success ($null -ne $g8eMixedAttr.userName) -Message "GET ?attributes=password,userName - userName IS returned"
 
-# Test 9l.9: GET /Schemas — verify password attribute has returned:never and mutability:writeOnly
-Write-Host "`n--- Test 9l.9: GET /Schemas — password attribute metadata ---" -ForegroundColor Cyan
+# Test 9l.9: GET /Schemas - verify password attribute has returned:never and mutability:writeOnly
+Write-Host "`n--- Test 9l.9: GET /Schemas - password attribute metadata ---" -ForegroundColor Cyan
 $g8eSchemas = Invoke-RestMethod -Uri "$scimBase/Schemas" -Method GET -Headers $headers
 $userSchema = $g8eSchemas.Resources | Where-Object { $_.id -eq "urn:ietf:params:scim:schemas:core:2.0:User" }
 Test-Result -Success ($null -ne $userSchema) -Message "Schemas endpoint returns User schema"
@@ -3058,8 +3058,8 @@ if ($userSchema) {
     }
 }
 
-# Test 9l.10: POST /Users/.search with attributes=password — password NOT in results
-Write-Host "`n--- Test 9l.10: POST /.search with attributes=password — returned:never wins ---" -ForegroundColor Cyan
+# Test 9l.10: POST /Users/.search with attributes=password - password NOT in results
+Write-Host "`n--- Test 9l.10: POST /.search with attributes=password - returned:never wins ---" -ForegroundColor Cyan
 $g8eSearchAttrBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:SearchRequest")
     filter = "userName eq `"$($g8eUser.userName)`""
@@ -3072,9 +3072,9 @@ $g8eSearchAttrHasPwd = $false
 foreach ($res in $g8eSearchAttrResult.Resources) {
     if ($null -ne $res.password) { $g8eSearchAttrHasPwd = $true; break }
 }
-Test-Result -Success (-not $g8eSearchAttrHasPwd) -Message "POST /.search attributes=password — password NOT returned (never wins)"
+Test-Result -Success (-not $g8eSearchAttrHasPwd) -Message "POST /.search attributes=password - password NOT returned (never wins)"
 if ($g8eSearchAttrResult.Resources.Count -gt 0) {
-    Test-Result -Success ($null -ne $g8eSearchAttrResult.Resources[0].userName) -Message "POST /.search attributes=password,userName — userName IS returned"
+    Test-Result -Success ($null -ne $g8eSearchAttrResult.Resources[0].userName) -Message "POST /.search attributes=password,userName - userName IS returned"
 }
 
 # Cleanup: Delete G8e test user
@@ -3106,9 +3106,9 @@ Write-Host "══════════════════════�
 # ─────────────────────────────────────────────────────────────────────────────
 $script:currentSection = "9m-A: Custom Schema Extensions (SKIPPED)"
 Write-Host "`n`n────────────────────────────────────────────────────" -ForegroundColor Yellow
-Write-Host "  9m-A: CUSTOM SCHEMA EXTENSIONS — SKIPPED (Admin API removed v0.28.0)" -ForegroundColor Yellow
+Write-Host "  9m-A: CUSTOM SCHEMA EXTENSIONS - SKIPPED (Admin API removed v0.28.0)" -ForegroundColor Yellow
 Write-Host "────────────────────────────────────────────────────" -ForegroundColor Yellow
-Test-Result -Success $true -Message "9m-A: SKIPPED — Admin Schema API removed; schemas now in endpoint profile"
+Test-Result -Success $true -Message "9m-A: SKIPPED - Admin Schema API removed; schemas now in endpoint profile"
 
 # ── 9m-A REPLACEMENT: Test custom extension via inline profile ──
 $extEpBody = @{
@@ -3147,7 +3147,7 @@ Test-Result -Success ($extUserGet."urn:test:live:ext:User".badgeNumber -eq "B99"
 try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$extEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
 Test-Result -Success $true -Message "9m-A.P5: Cleaned up extension endpoint"
 
-# Skip old Admin Schema API tests (dead code below — left for reference)
+# Skip old Admin Schema API tests (dead code below - left for reference)
 function Skip-OldSection9mA {
 $SchExtEndpointId = $schExtEndpoint.id
 $scimBaseSchExt = "$baseUrl/scim/endpoints/$SchExtEndpointId"
@@ -3167,7 +3167,7 @@ $adminBaseSchExt2 = "$baseUrl/scim/admin/endpoints/$SchExtEndpoint2Id"
 
 # ── ADMIN CRUD ──────────────────────────────────────────────────────────────
 
-# --- Test 9m-A.1: List schemas — initially empty ---
+# --- Test 9m-A.1: List schemas - initially empty ---
 Write-Host "`n--- Test 9m-A.1: List schemas on empty endpoint ---" -ForegroundColor Cyan
 $emptyList = Invoke-RestMethod -Uri "$adminBaseSchExt/schemas" -Method GET -Headers $headers
 Test-Result -Success ($emptyList.totalResults -eq 0) -Message "9m-A.1 Empty endpoint has 0 custom schemas (totalResults=$($emptyList.totalResults))"
@@ -3249,18 +3249,18 @@ $customGroupExtBody = @{
 $grpReg = Invoke-RestMethod -Uri "$adminBaseSchExt/schemas" -Method POST -Headers $headers -Body $customGroupExtBody -ContentType "application/json"
 Test-Result -Success ($grpReg.schemaUrn -eq $customGroupExtUrn) -Message "9m-A.7 Custom Group extension registered"
 
-# --- Test 9m-A.8: List all schemas — should have 3 ---
+# --- Test 9m-A.8: List all schemas - should have 3 ---
 Write-Host "`n--- Test 9m-A.8: List all registered schemas ---" -ForegroundColor Cyan
 $schemaList = Invoke-RestMethod -Uri "$adminBaseSchExt/schemas" -Method GET -Headers $headers
 Test-Result -Success ($schemaList.totalResults -eq 3) -Message "9m-A.8 Endpoint has $($schemaList.totalResults) custom schemas"
 
-# --- Test 9m-A.9: GET by URN — custom User extension ---
+# --- Test 9m-A.9: GET by URN - custom User extension ---
 Write-Host "`n--- Test 9m-A.9: GET schema by URN ---" -ForegroundColor Cyan
 $encodedUrn = [System.Uri]::EscapeDataString($customUserExtUrn)
 $schemaByUrn = Invoke-RestMethod -Uri "$adminBaseSchExt/schemas/$encodedUrn" -Method GET -Headers $headers
 Test-Result -Success ($schemaByUrn.schemaUrn -eq $customUserExtUrn -and $schemaByUrn.attributes.Count -eq 6) -Message "9m-A.9 GET by URN returns correct schema ($($schemaByUrn.attributes.Count) attributes)"
 
-# --- Test 9m-A.10: GET by URN — 404 for non-existent ---
+# --- Test 9m-A.10: GET by URN - 404 for non-existent ---
 Write-Host "`n--- Test 9m-A.10: GET non-existent URN returns 404 ---" -ForegroundColor Cyan
 $fakeUrn = [System.Uri]::EscapeDataString("urn:fake:nonexistent")
 try {
@@ -3271,7 +3271,7 @@ try {
     Test-Result -Success ($statusCode -eq 404) -Message "9m-A.10 Non-existent URN returns 404 (HTTP $statusCode)"
 }
 
-# --- Test 9m-A.11: Cross-endpoint isolation — Endpoint 2 only has 1 schema ---
+# --- Test 9m-A.11: Cross-endpoint isolation - Endpoint 2 only has 1 schema ---
 Write-Host "`n--- Test 9m-A.11: Cross-endpoint schema isolation ---" -ForegroundColor Cyan
 $ep2Schemas = Invoke-RestMethod -Uri "$adminBaseSchExt2/schemas" -Method GET -Headers $headers
 Test-Result -Success ($ep2Schemas.totalResults -eq 1) -Message "9m-A.11 Endpoint 2 only has $($ep2Schemas.totalResults) schema (isolated from Endpoint 1's 3)"
@@ -3361,7 +3361,7 @@ $putExtData = $putExtUser."$customUserExtUrn"
 Test-Result -Success ($putExtData.badgeNumber -eq "BADGE-002" -and $putExtData.costCenter -eq "CC-ENGINEERING") -Message "9m-A.20 PUT updates extension data (badge=$($putExtData.badgeNumber))"
 
 # --- Test 9m-A.21: PATCH add extension attribute ---
-# internalCode has returned:request — not in default response; verify via GET ?attributes=
+# internalCode has returned:request - not in default response; verify via GET ?attributes=
 Write-Host "`n--- Test 9m-A.21: PATCH add extension attribute ---" -ForegroundColor Cyan
 $patchAddBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
@@ -3494,9 +3494,9 @@ Write-Host "`n--- 9m-A: Custom Schema Extensions Tests Complete ---" -Foreground
 # ─────────────────────────────────────────────────────────────────────────────
 $script:currentSection = "9m-B: Custom Resource Types (SKIPPED)"
 Write-Host "`n`n────────────────────────────────────────────────────" -ForegroundColor Yellow
-Write-Host "  9m-B: CUSTOM RESOURCE TYPES — SKIPPED (Admin API removed v0.28.0)" -ForegroundColor Yellow
+Write-Host "  9m-B: CUSTOM RESOURCE TYPES - SKIPPED (Admin API removed v0.28.0)" -ForegroundColor Yellow
 Write-Host "────────────────────────────────────────────────────" -ForegroundColor Yellow
-Test-Result -Success $true -Message "9m-B: SKIPPED — Admin RT API removed; resource types now in endpoint profile"
+Test-Result -Success $true -Message "9m-B: SKIPPED - Admin RT API removed; resource types now in endpoint profile"
 
 # ── 9m-B REPLACEMENT: Cross-endpoint isolation via profile ──
 $isoWithBody = @{ name = "live-iso-w-$(Get-Random)"; profile = @{
@@ -3548,7 +3548,7 @@ $G8bNoFlagEndpointId = $g8bNoFlagEndpoint.id
 
 # ── CONFIG FLAG GATING ──────────────────────────────────────────────────────
 
-# --- Test 9m-B.1: Config flag gating — should 403 when flag not enabled ---
+# --- Test 9m-B.1: Config flag gating - should 403 when flag not enabled ---
 Write-Host "`n--- Test 9m-B.1: Config flag gating (should 403 when disabled) ---" -ForegroundColor Cyan
 $deviceSchema = @{
     name = "Device"
@@ -3775,21 +3775,21 @@ $appRes = Invoke-RestMethod -Uri "$scimBaseG8b/Applications" -Method POST -Heade
 $g8bAppId = $appRes.id
 Test-Result -Success ($null -ne $g8bAppId -and $appRes.meta.resourceType -eq "Application") -Message "9m-B.21 Application created (id=$g8bAppId)"
 
-# --- Test 9m-B.22: List resource types — should have 2 ---
+# --- Test 9m-B.22: List resource types - should have 2 ---
 Write-Host "`n--- Test 9m-B.22: List resource types shows 2 ---" -ForegroundColor Cyan
 $rtListing = Invoke-RestMethod -Uri "$adminBaseG8b/resource-types" -Method GET -Headers $headers
 Test-Result -Success ($rtListing.totalResults -eq 2) -Message "9m-B.22 List resource types returns $($rtListing.totalResults) items"
 
 # ── ENDPOINT ISOLATION ──────────────────────────────────────────────────────
 
-# --- Test 9m-B.23: Endpoint isolation — other endpoints should NOT see Devices ---
+# --- Test 9m-B.23: Endpoint isolation - other endpoints should NOT see Devices ---
 Write-Host "`n--- Test 9m-B.23: Endpoint isolation ---" -ForegroundColor Cyan
 try {
     $null = Invoke-RestMethod -Uri "$scimBase/Devices" -Method GET -Headers $headers
     Test-Result -Success $false -Message "9m-B.23 Main endpoint should NOT serve /Devices"
 } catch {
     $statusCode = $_.Exception.Response.StatusCode.value__
-    Test-Result -Success ($statusCode -eq 404) -Message "9m-B.23 Endpoint isolation works — main endpoint returns 404 for /Devices (HTTP $statusCode)"
+    Test-Result -Success ($statusCode -eq 404) -Message "9m-B.23 Endpoint isolation works - main endpoint returns 404 for /Devices (HTTP $statusCode)"
 }
 
 # --- Test 9m-B.24: Built-in /Users still works on G8b endpoint ---
@@ -3840,9 +3840,9 @@ Write-Host "`n--- 9m-B: Custom Resource Type Tests Complete ---" -ForegroundColo
 # ─────────────────────────────────────────────────────────────────────────────
 $script:currentSection = "9m-C: Schema Customization Combos (SKIPPED)"
 Write-Host "`n`n────────────────────────────────────────────────────" -ForegroundColor Yellow
-Write-Host "  9m-C: SCHEMA CUSTOMIZATION COMBINATIONS — SKIPPED (Admin API removed v0.28.0)" -ForegroundColor Yellow
+Write-Host "  9m-C: SCHEMA CUSTOMIZATION COMBINATIONS - SKIPPED (Admin API removed v0.28.0)" -ForegroundColor Yellow
 Write-Host "────────────────────────────────────────────────────" -ForegroundColor Yellow
-Test-Result -Success $true -Message "9m-C: SKIPPED — uses deleted Admin RT API; combos tested in profile-combinations.e2e-spec.ts"
+Test-Result -Success $true -Message "9m-C: SKIPPED - uses deleted Admin RT API; combos tested in profile-combinations.e2e-spec.ts"
 
 function Skip-OldSection9mC {
 #   Tests combining custom schema extensions with custom resource types,
@@ -4214,7 +4214,7 @@ Write-Host "`n--- Test 9m-C.28: Admin lists all resource types on combo endpoint
 $comboAdminRTs = Invoke-RestMethod -Uri "$adminBaseCombo/resource-types" -Method GET -Headers $headers
 Test-Result -Success ($comboAdminRTs.totalResults -eq 2) -Message "9m-C.28 Combo endpoint has $($comboAdminRTs.totalResults) custom resource types"
 
-# ── COMBO 6: Cross-type isolation — extensions scoped to correct RT ─────────
+# ── COMBO 6: Cross-type isolation - extensions scoped to correct RT ─────────
 
 # --- Test 9m-C.29: Printer path does not serve Vehicles, vice versa ---
 Write-Host "`n--- Test 9m-C.29: Cross-type path isolation ---" -ForegroundColor Cyan
@@ -4254,7 +4254,7 @@ Write-Host "`n--- Test 9m-C.32: Delete extension while resources exist ---" -For
 $encodedPrinterExt = [System.Uri]::EscapeDataString($printerExtUrn)
 try {
     $null = Invoke-RestMethod -Uri "$adminBaseCombo/schemas/$encodedPrinterExt" -Method DELETE -Headers $headers
-    # Extension deleted — verify resource still accessible
+    # Extension deleted - verify resource still accessible
     $printerAfterExtDelete = Invoke-RestMethod -Uri "$scimBaseCombo/Printers/$comboPrinterId" -Method GET -Headers $headers
     Test-Result -Success ($null -ne $printerAfterExtDelete.id) -Message "9m-C.32 Extension deleted, Printer resource still accessible"
 } catch {
@@ -4280,7 +4280,7 @@ try { Invoke-RestMethod -Uri "$scimBaseStrict/Users/$strictComboUserId" -Method 
 Write-Host "`n--- 9m-C: Schema Customization Combination Tests Complete ---" -ForegroundColor Green
 } # End Skip-OldSection9mC
 Write-Host "`n═══════════════════════════════════════════════════════════════" -ForegroundColor Yellow
-Write-Host "TEST SECTION 9m: SCHEMA CUSTOMIZATION — ALL SUBSECTIONS COMPLETE" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9m: SCHEMA CUSTOMIZATION - ALL SUBSECTIONS COMPLETE" -ForegroundColor Yellow
 Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Yellow
 
 # ============================================
@@ -4318,7 +4318,7 @@ $bulkNoFlagEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Me
 $BulkNoFlagEndpointId = $bulkNoFlagEndpoint.id
 $scimBaseBulkNoFlag = "$baseUrl/scim/endpoints/$BulkNoFlagEndpointId"
 
-# --- Test 9n.1: Config flag gating — should 403 when disabled ---
+# --- Test 9n.1: Config flag gating - should 403 when disabled ---
 Write-Host "`n--- Test 9n.1: Config flag gating (should 403 when disabled) ---" -ForegroundColor Cyan
 $bulkBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
@@ -4334,7 +4334,7 @@ try {
     Test-Result -Success ($statusCode -eq 403) -Message "9n.1 Config flag gating rejects when disabled (HTTP $statusCode)"
 }
 
-# --- Test 9n.2: Config flag — should succeed when enabled ---
+# --- Test 9n.2: Config flag - should succeed when enabled ---
 Write-Host "`n--- Test 9n.2: Config flag gating (should succeed when enabled) ---" -ForegroundColor Cyan
 try {
     $bulkResult = Invoke-RestMethod -Uri "$scimBaseBulk/Bulk" -Method POST -Headers $headers -Body $bulkBody -ContentType "application/scim+json"
@@ -4543,7 +4543,7 @@ try {
     Test-Result -Success $false -Message "9n.9 bulkId cross-referencing failed: $_"
 }
 
-# --- Test 9n.10: failOnErrors — stop after threshold ---
+# --- Test 9n.10: failOnErrors - stop after threshold ---
 Write-Host "`n--- Test 9n.10: failOnErrors threshold ---" -ForegroundColor Cyan
 $failOnErrorsBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
@@ -4572,7 +4572,7 @@ try {
     Test-Result -Success $false -Message "9n.10 failOnErrors test failed: $_"
 }
 
-# --- Test 9n.11: Request validation — missing schema ---
+# --- Test 9n.11: Request validation - missing schema ---
 Write-Host "`n--- Test 9n.11: Missing schema validation ---" -ForegroundColor Cyan
 $noSchemaBody = @{
     schemas = @("urn:wrong:schema")
@@ -4768,7 +4768,7 @@ $g8fGroupB = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $he
 $g8fGroupBId = $g8fGroupB.id
 Test-Result -Success ($null -ne $g8fGroupBId) -Message "G8f setup: Created GroupB (id=$g8fGroupBId)"
 
-# Test 9o.1: PUT — changing displayName to GroupA's name → 409
+# Test 9o.1: PUT - changing displayName to GroupA's name → 409
 Write-Host "`n--- Test 9o.1: PUT GroupB with GroupA's displayName → 409 ---" -ForegroundColor Cyan
 $g8fPutConflictBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
@@ -4782,7 +4782,7 @@ try {
     Test-Result -Success ($status -eq 409) -Message "PUT with conflicting displayName returns 409 (got $status)"
 }
 
-# Test 9o.2: PUT — self-update keeping same displayName → 200
+# Test 9o.2: PUT - self-update keeping same displayName → 200
 Write-Host "`n--- Test 9o.2: PUT GroupA keeping own displayName → 200 ---" -ForegroundColor Cyan
 $g8fPutSelfBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
@@ -4796,7 +4796,7 @@ try {
     Test-Result -Success $false -Message "PUT self-update should succeed: $_"
 }
 
-# Test 9o.3: PUT — duplicate externalId allowed (uniqueness:none per RFC 7643)
+# Test 9o.3: PUT - duplicate externalId allowed (uniqueness:none per RFC 7643)
 Write-Host "`n--- Test 9o.3: PUT GroupB with GroupA's externalId → 200 (allowed) ---" -ForegroundColor Cyan
 $g8fPutExtConflictBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
@@ -4811,7 +4811,7 @@ try {
     Test-Result -Success $false -Message "PUT with duplicate externalId should succeed (uniqueness:none), got $status"
 }
 
-# Test 9o.4: PATCH — changing displayName to GroupA's name → 409
+# Test 9o.4: PATCH - changing displayName to GroupA's name → 409
 Write-Host "`n--- Test 9o.4: PATCH GroupB with GroupA's displayName → 409 ---" -ForegroundColor Cyan
 $g8fPatchConflictBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
@@ -4828,7 +4828,7 @@ try {
     Test-Result -Success ($status -eq 409) -Message "PATCH with conflicting displayName returns 409 (got $status)"
 }
 
-# Test 9o.5: PATCH — update to unique displayName → 200
+# Test 9o.5: PATCH - update to unique displayName → 200
 Write-Host "`n--- Test 9o.5: PATCH GroupB with unique displayName → 200 ---" -ForegroundColor Cyan
 $g8fNewName = "G8f-Unique-$(Get-Random)"
 $g8fPatchUniqueBody = @{
@@ -4845,7 +4845,7 @@ try {
     Test-Result -Success $false -Message "PATCH with unique displayName should succeed: $_"
 }
 
-# Test 9o.6: PATCH — duplicate externalId allowed (uniqueness:none per RFC 7643)
+# Test 9o.6: PATCH - duplicate externalId allowed (uniqueness:none per RFC 7643)
 Write-Host "`n--- Test 9o.6: PATCH GroupB with GroupA's externalId → 200 (allowed) ---" -ForegroundColor Cyan
 $g8fPatchExtConflictBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
@@ -4902,7 +4902,7 @@ $g8gUserBody = @{
     active = $true
 } | ConvertTo-Json -Depth 3
 
-# Test 9p.1: POST /Users?attributes=userName — only userName + always-returned in response
+# Test 9p.1: POST /Users?attributes=userName - only userName + always-returned in response
 Write-Host "`n--- Test 9p.1: POST /Users?attributes=userName --- projection on create ---" -ForegroundColor Cyan
 $g8gPostResult = Invoke-RestMethod -Uri "$scimBase/Users?attributes=userName" -Method POST -Headers $headers -Body $g8gUserBody
 $g8gUserId = $g8gPostResult.id
@@ -4912,7 +4912,7 @@ Test-Result -Success ($null -ne $g8gPostResult.schemas) -Message "POST with ?att
 Test-Result -Success ($null -eq $g8gPostResult.displayName) -Message "POST with ?attributes=userName omits displayName (not requested)"
 Test-Result -Success ($null -eq $g8gPostResult.emails) -Message "POST with ?attributes=userName omits emails (not requested)"
 
-# Test 9p.2: PUT /Users/:id?attributes=displayName — only displayName + always-returned
+# Test 9p.2: PUT /Users/:id?attributes=displayName - only displayName + always-returned
 Write-Host "`n--- Test 9p.2: PUT /Users?attributes=displayName --- projection on replace ---" -ForegroundColor Cyan
 $g8gPutBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
@@ -4925,7 +4925,7 @@ Test-Result -Success ($g8gPutResult.displayName -eq "G8g Put Updated") -Message 
 Test-Result -Success ($null -ne $g8gPutResult.id) -Message "PUT ?attributes=displayName returns id (always-returned)"
 Test-Result -Success ($null -eq $g8gPutResult.emails) -Message "PUT ?attributes=displayName omits emails (not requested)"
 
-# Test 9p.3: PATCH /Users/:id?excludedAttributes=name,emails — omit specified
+# Test 9p.3: PATCH /Users/:id?excludedAttributes=name,emails - omit specified
 Write-Host "`n--- Test 9p.3: PATCH /Users?excludedAttributes=name,emails --- omit specified ---" -ForegroundColor Cyan
 $g8gPatchBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
@@ -4940,7 +4940,7 @@ Test-Result -Success ($null -ne $g8gPatchResult.userName) -Message "PATCH ?exclu
 Test-Result -Success ($null -eq $g8gPatchResult.name) -Message "PATCH ?excludedAttributes=name,emails omits name (excluded)"
 Test-Result -Success ($null -eq $g8gPatchResult.emails) -Message "PATCH ?excludedAttributes=name,emails omits emails (excluded)"
 
-# Test 9p.4: POST /Groups?attributes=displayName — projection on group create
+# Test 9p.4: POST /Groups?attributes=displayName - projection on group create
 Write-Host "`n--- Test 9p.4: POST /Groups?attributes=displayName --- projection on group create ---" -ForegroundColor Cyan
 $g8gGroupBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
@@ -4952,7 +4952,7 @@ Test-Result -Success ($null -ne $g8gGroupId) -Message "POST Groups ?attributes=d
 Test-Result -Success ($null -ne $g8gGroupResult.displayName) -Message "POST Groups ?attributes=displayName returns displayName (requested)"
 Test-Result -Success ($null -eq $g8gGroupResult.members) -Message "POST Groups ?attributes=displayName omits members (not requested)"
 
-# Test 9p.5: PUT /Groups/:id?excludedAttributes=members — omit members on replace
+# Test 9p.5: PUT /Groups/:id?excludedAttributes=members - omit members on replace
 Write-Host "`n--- Test 9p.5: PUT /Groups?excludedAttributes=members --- omit members ---" -ForegroundColor Cyan
 $g8gGroupPutBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
@@ -4962,7 +4962,7 @@ $g8gGroupPutResult = Invoke-RestMethod -Uri "$scimBase/Groups/${g8gGroupId}?excl
 Test-Result -Success ($g8gGroupPutResult.displayName -eq "G8g-ProjGroup-Updated") -Message "PUT Groups ?excludedAttributes=members returns displayName (not excluded)"
 Test-Result -Success ($null -eq $g8gGroupPutResult.members) -Message "PUT Groups ?excludedAttributes=members omits members (excluded)"
 
-# Test 9p.6: PATCH /Groups?attributes=displayName — only requested attrs
+# Test 9p.6: PATCH /Groups?attributes=displayName - only requested attrs
 Write-Host "`n--- Test 9p.6: PATCH /Groups?attributes=displayName --- projection on group patch ---" -ForegroundColor Cyan
 $g8gGroupPatchBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
@@ -4976,7 +4976,7 @@ Test-Result -Success ($g8gGroupPatchResult.displayName -eq "G8g-ProjGroup-Patche
 Test-Result -Success ($null -ne $g8gGroupPatchResult.id) -Message "PATCH Groups ?attributes=displayName returns id (always-returned)"
 Test-Result -Success ($null -eq $g8gGroupPatchResult.members) -Message "PATCH Groups ?attributes=displayName omits members (not requested)"
 
-# Test 9p.7: POST /Users with BOTH attributes AND excludedAttributes — attributes wins
+# Test 9p.7: POST /Users with BOTH attributes AND excludedAttributes - attributes wins
 Write-Host "`n--- Test 9p.7: POST /Users with BOTH params --- attributes takes precedence ---" -ForegroundColor Cyan
 $g8gBothBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
@@ -4988,12 +4988,12 @@ $g8gBothBody = @{
 } | ConvertTo-Json -Depth 3
 $g8gBothResult = Invoke-RestMethod -Uri "$scimBase/Users?attributes=userName,displayName&excludedAttributes=displayName" -Method POST -Headers $headers -Body $g8gBothBody
 $g8gBothUserId = $g8gBothResult.id
-Test-Result -Success ($null -ne $g8gBothResult.userName) -Message "Both params: attributes wins — userName present (requested)"
-Test-Result -Success ($null -ne $g8gBothResult.displayName) -Message "Both params: attributes wins — displayName present (in attributes list)"
+Test-Result -Success ($null -ne $g8gBothResult.userName) -Message "Both params: attributes wins - userName present (requested)"
+Test-Result -Success ($null -ne $g8gBothResult.displayName) -Message "Both params: attributes wins - displayName present (in attributes list)"
 Test-Result -Success ($null -ne $g8gBothResult.id) -Message "Both params: id present (always-returned)"
 Test-Result -Success ($null -eq $g8gBothResult.emails) -Message "Both params: emails absent (not in attributes list)"
 
-# Test 9p.8: POST /Users with excludedAttributes=id,schemas,meta — always-returned protection
+# Test 9p.8: POST /Users with excludedAttributes=id,schemas,meta - always-returned protection
 Write-Host "`n--- Test 9p.8: excludedAttributes=id,schemas,meta --- always-returned protection ---" -ForegroundColor Cyan
 $g8gAlwaysBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
@@ -5008,7 +5008,7 @@ Test-Result -Success ($null -ne $g8gAlwaysResult.schemas) -Message "Always-retur
 Test-Result -Success ($null -ne $g8gAlwaysResult.meta) -Message "Always-returned protection: meta present (cannot be excluded)"
 Test-Result -Success ($null -ne $g8gAlwaysResult.userName) -Message "Always-returned protection: userName present (always-returned for User)"
 
-# Test 9p.9: PUT /Users?excludedAttributes=emails,name — omit specified on PUT
+# Test 9p.9: PUT /Users?excludedAttributes=emails,name - omit specified on PUT
 Write-Host "`n--- Test 9p.9: PUT /Users?excludedAttributes=emails,name --- omit specified on replace ---" -ForegroundColor Cyan
 $g8gPutExclBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
@@ -5197,13 +5197,13 @@ Test-Result -Success ($meGet.id -eq $meUserId) -Message "GET /Me: returns correc
 Test-Result -Success ($meGet.userName -eq $ClientId) -Message "GET /Me: userName matches JWT sub"
 Test-Result -Success ($null -ne $meGet.meta) -Message "GET /Me: includes meta"
 
-# Test 9r.2: GET /Me?attributes=userName — attribute projection
+# Test 9r.2: GET /Me?attributes=userName - attribute projection
 Write-Host "`n--- Test 9r.2: GET /Me?attributes=userName ---" -ForegroundColor Cyan
 $meGetProj = Invoke-RestMethod -Uri "$scimBase/Me?attributes=userName" -Method GET -Headers $headers
 Test-Result -Success ($null -ne $meGetProj.userName) -Message "GET /Me?attributes=userName: userName present"
 Test-Result -Success ($null -eq $meGetProj.displayName) -Message "GET /Me?attributes=userName: displayName omitted"
 
-# Test 9r.3: PATCH /Me — update displayName
+# Test 9r.3: PATCH /Me - update displayName
 Write-Host "`n--- Test 9r.3: PATCH /Me ---" -ForegroundColor Cyan
 $mePatchBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
@@ -5221,7 +5221,7 @@ Write-Host "`n--- Test 9r.4: Verify PATCH /Me persisted ---" -ForegroundColor Cy
 $meGetAfterPatch = Invoke-RestMethod -Uri "$scimBase/Me" -Method GET -Headers $headers
 Test-Result -Success ($meGetAfterPatch.displayName -eq "Me Patched") -Message "GET /Me after PATCH: displayName persisted"
 
-# Test 9r.5: PUT /Me — full replace
+# Test 9r.5: PUT /Me - full replace
 Write-Host "`n--- Test 9r.5: PUT /Me ---" -ForegroundColor Cyan
 $mePutBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
@@ -5251,7 +5251,7 @@ try {
     Test-Result -Success ($code -eq 404) -Message "DELETE /Me: returns 404 after deletion"
 }
 
-# Test 9r.8: GET /Me when no matching user — 404
+# Test 9r.8: GET /Me when no matching user - 404
 Write-Host "`n--- Test 9r.8: GET /Me with no matching user ---" -ForegroundColor Cyan
 try {
     $null = Invoke-RestMethod -Uri "$scimBase/Me" -Method GET -Headers $headers
@@ -5428,7 +5428,7 @@ $patchBody = @{ profile = @{ settings = @{ IncludeWarningAboutIgnoredReadOnlyAtt
 Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$roEpId" -Method PATCH -Headers $headers -Body $patchBody -ContentType "application/json" | Out-Null
 $roScimBase = "$baseUrl/scim/endpoints/$roEpId"
 
-# 9t.1: POST /Users with client-supplied id — should be stripped, server UUID assigned
+# 9t.1: POST /Users with client-supplied id - should be stripped, server UUID assigned
 Write-Host "`n--- 9t.1: POST /Users strips client id ---" -ForegroundColor Cyan
 $roUser1Body = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
@@ -5463,7 +5463,7 @@ Test-Result -Success ($roPut.id -eq $roUserId) -Message "9t.3: PUT does not over
 Test-Result -Success ($roPut.displayName -eq "PUT Updated") -Message "9t.3: readWrite attrs updated via PUT"
 Test-Result -Success ($roPut.schemas -contains "urn:scimserver:api:messages:2.0:Warning") -Message "9t.3: Warning URN in PUT response"
 
-# 9t.4: PATCH targeting readOnly attribute (path-based) — silently stripped
+# 9t.4: PATCH targeting readOnly attribute (path-based) - silently stripped
 Write-Host "`n--- 9t.4: PATCH readOnly attr stripped ---" -ForegroundColor Cyan
 $roPatchBody = @{
     schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
@@ -5497,7 +5497,7 @@ $noWarnUser = Invoke-RestMethod -Uri "$noWarnBase/Users" -Method POST -Headers $
 Test-Result -Success ($noWarnUser.schemas -notcontains "urn:scimserver:api:messages:2.0:Warning") -Message "9t.5: No warning URN when flag disabled"
 Test-Result -Success ($noWarnUser.id -ne "should-strip-silently") -Message "9t.5: id still stripped even without warning"
 
-# 9t.6: PATCH id returns 400 (never stripped — G8c hard-reject)
+# 9t.6: PATCH id returns 400 (never stripped - G8c hard-reject)
 Write-Host "`n--- 9t.6: PATCH id returns 400 ---" -ForegroundColor Cyan
 $strictEpBody = @{
     name = "strict-patch-id-$(Get-Random)"
@@ -5525,7 +5525,7 @@ try {
     Test-Result -Success ($statusCode -eq 400) -Message "9t.6: PATCH id returns 400 (G8c hard-reject)"
 }
 
-# 9t.7: POST /Groups with client id — server assigns UUID
+# 9t.7: POST /Groups with client id - server assigns UUID
 Write-Host "`n--- 9t.7: POST /Groups strips client id ---" -ForegroundColor Cyan
 $roGroupBody = @{
     schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
@@ -5755,13 +5755,13 @@ $p2GroupPayload = @{
 $p2Group = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $p2GroupPayload -ContentType "application/scim+json"
 $p2GroupId = $p2Group.id
 
-# Groups: active was removed in settings v7 — should NOT be present
+# Groups: active was removed in settings v7 - should NOT be present
 $p2GroupExclude = Invoke-RestMethod -Uri "$scimBase/Groups/${p2GroupId}?excludedAttributes=active" -Method GET -Headers $headers
-Test-Result -Success ($null -eq $p2GroupExclude.active) -Message "9v.6: GET /Groups/:id?excludedAttributes=active — active absent (settings v7)"
+Test-Result -Success ($null -eq $p2GroupExclude.active) -Message "9v.6: GET /Groups/:id?excludedAttributes=active - active absent (settings v7)"
 
-# Groups: active was removed in settings v7 — should NOT be present
+# Groups: active was removed in settings v7 - should NOT be present
 $p2GroupAttrs = Invoke-RestMethod -Uri "$scimBase/Groups/${p2GroupId}?attributes=displayName" -Method GET -Headers $headers
-Test-Result -Success ($null -eq $p2GroupAttrs.active) -Message "9v.7: GET /Groups/:id?attributes=displayName — active absent (settings v7)"
+Test-Result -Success ($null -eq $p2GroupAttrs.active) -Message "9v.7: GET /Groups/:id?attributes=displayName - active absent (settings v7)"
 
 # --- R-RET-1: Schema-driven returned:always (Group displayName) ---
 Write-Host "`n--- R-RET-1: Schema-driven returned:always ---" -ForegroundColor Cyan
@@ -6134,8 +6134,8 @@ $x9UserBodyB = @{
 $x9UserB = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $x9UserBodyB -ContentType "application/scim+json"
 Test-Result -Success ($null -ne $x9UserA.id -and $null -ne $x9UserB.id) -Message "9x.0: Created two users for uniqueness collision tests"
 
-# ─────────────── 9x.1–9x.4: uniqueness:server — User PUT 409 ───────────────
-Write-Host "`n--- 9x: uniqueness:server — User PUT ---" -ForegroundColor Cyan
+# ─────────────── 9x.1–9x.4: uniqueness:server - User PUT 409 ───────────────
+Write-Host "`n--- 9x: uniqueness:server - User PUT ---" -ForegroundColor Cyan
 
 # 9x.1: PUT User B with User A's userName → 409
 $x9PutConflictBody = @{
@@ -6196,8 +6196,8 @@ try {
     Test-Result -Success ($statusCode -eq 409) -Message "9x.4: PUT case-insensitive userName collision returns 409"
 }
 
-# ─────────────── 9x.5–9x.7: uniqueness:server — User PATCH 409 ───────────────
-Write-Host "`n--- 9x: uniqueness:server — User PATCH ---" -ForegroundColor Cyan
+# ─────────────── 9x.5–9x.7: uniqueness:server - User PATCH 409 ───────────────
+Write-Host "`n--- 9x: uniqueness:server - User PATCH ---" -ForegroundColor Cyan
 
 # 9x.5: PATCH User B replace userName → User A's userName → 409
 $x9PatchUserNameBody = @{
@@ -6252,8 +6252,8 @@ $x9PatchOkBody = @{
 $x9PatchOk = Invoke-RestMethod -Uri "$scimBase/Users/$($x9UserB.id)" -Method PATCH -Headers $headers -Body $x9PatchOkBody -ContentType "application/scim+json"
 Test-Result -Success ($x9PatchOk.displayName -eq "9x Patched OK") -Message "9x.7: PATCH non-unique field succeeds (200)"
 
-# ─────────────── 9x.8–9x.9: required:true — PUT enforcement ───────────────
-Write-Host "`n--- 9x: required:true — PUT enforcement ---" -ForegroundColor Cyan
+# ─────────────── 9x.8–9x.9: required:true - PUT enforcement ───────────────
+Write-Host "`n--- 9x: required:true - PUT enforcement ---" -ForegroundColor Cyan
 
 # 9x.8: PUT missing required userName → 400
 $x9PutNoUserNameBody = @{
@@ -6337,9 +6337,9 @@ Write-Host "`n--- 9x: User Uniqueness, Required PUT, Returned on PATCH/.search T
 $script:currentSection = "9y: Generic Parity Fixes (SKIPPED)"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
-Write-Host "TEST SECTION 9y: GENERIC RESOURCE PARITY FIXES — SKIPPED (Admin API removed v0.28.0)" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9y: GENERIC RESOURCE PARITY FIXES - SKIPPED (Admin API removed v0.28.0)" -ForegroundColor Yellow
 Write-Host "========================================" -ForegroundColor Yellow
-Test-Result -Success $true -Message "9y: SKIPPED — uses deleted Admin RT API; parity tested in profile-combinations.e2e-spec.ts"
+Test-Result -Success $true -Message "9y: SKIPPED - uses deleted Admin RT API; parity tested in profile-combinations.e2e-spec.ts"
 
 function Skip-OldSection9y {
 # --- Setup: Create endpoint with RequireIfMatch (custom resource types derived from profile) ---
@@ -6611,7 +6611,7 @@ $p18 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Me
 Test-Result -Success ($p18.profile.settings.UserSoftDeleteEnabled -eq "True") -Message "9z.18: PATCH added UserSoftDeleteEnabled via profile.settings"
 Test-Result -Success ($p18.profile.settings.UserSoftDeleteEnabled -eq "True") -Message "9z.19: profile.settings reflects UserSoftDeleteEnabled"
 
-# 9z.20: PATCH add second setting — first should be preserved
+# 9z.20: PATCH add second setting - first should be preserved
 $pBody20 = @{ profile = @{ settings = @{ StrictSchemaValidation = "True" } } } | ConvertTo-Json -Depth 4
 $p20 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$($patchEp.id)" -Method PATCH -Headers $headers -Body $pBody20
 Test-Result -Success ($p20.profile.settings.UserSoftDeleteEnabled -eq "True") -Message "9z.20: UserSoftDeleteEnabled preserved after second PATCH"
@@ -6747,7 +6747,7 @@ if ($cacheEpId) {
         $cu1Id = $null
     }
 
-    # 9z-C.3: Extension active should remain string "True" (NOT coerced — parent-aware precision)
+    # 9z-C.3: Extension active should remain string "True" (NOT coerced - parent-aware precision)
     if ($cu1Id) {
         $extBlock = $cu1.$cacheExtUrn
         $extActiveOk = $extBlock.active -eq "True" -and $extBlock.active -is [string]
@@ -6824,7 +6824,7 @@ if ($cacheEpId) {
         }
     }
 
-    # 9z-C.9: Consistency — 3 rapid POSTs should all show same cache behavior
+    # 9z-C.9: Consistency - 3 rapid POSTs should all show same cache behavior
     $consistencyOk = $true
     for ($i = 1; $i -le 3; $i++) {
         try {
@@ -7086,7 +7086,7 @@ try {
 }
 
 if ($dpEpId) {
-    # --- 9z-E.2: POST with both extensions — pin stripped, secretToken ext removed entirely (FP-1) ---
+    # --- 9z-E.2: POST with both extensions - pin stripped, secretToken ext removed entirely (FP-1) ---
     Write-Host "`n--- PATCH Coercion + FP-1 Tests ---" -ForegroundColor Cyan
     $dpUserBody = @{
         schemas = @("urn:ietf:params:scim:schemas:core:2.0:User", $dpExtUrn, $dpSecretUrn)
@@ -7118,10 +7118,10 @@ if ($dpEpId) {
         Test-Result -Success ($null -eq $extBlock.pin) -Message "9z-E.4: Extension pin (returned:never) stripped from POST response"
     }
 
-    # 9z-E.5: SecretOnly extension removed entirely (FP-1 — all attrs are returned:never)
+    # 9z-E.5: SecretOnly extension removed entirely (FP-1 - all attrs are returned:never)
     if ($dpUserId) {
         $secretExtPresent = $null -ne $dpUser.$dpSecretUrn
-        Test-Result -Success (-not $secretExtPresent) -Message "9z-E.5: FP-1 — SecretOnly extension removed entirely (all attrs returned:never)"
+        Test-Result -Success (-not $secretExtPresent) -Message "9z-E.5: FP-1 - SecretOnly extension removed entirely (all attrs returned:never)"
     }
 
     # 9z-E.6: schemas[] should NOT include SecretOnly URN (removed by FP-1)
@@ -7139,7 +7139,7 @@ if ($dpEpId) {
     # --- 9z-E.8–10: PATCH boolean coercion in operation values ---
     Write-Host "`n--- PATCH Operation Value Boolean Coercion ---" -ForegroundColor Cyan
     if ($dpUserId) {
-        # 9z-E.8: PATCH replace with no-path object value — active="False" coerced
+        # 9z-E.8: PATCH replace with no-path object value - active="False" coerced
         $patchBody = @{
             schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
             Operations = @(@{
@@ -7155,7 +7155,7 @@ if ($dpEpId) {
             Test-Result -Success $false -Message "9z-E.8: PATCH no-path failed: $_"
         }
 
-        # 9z-E.10: PATCH with path — active="True" coerced
+        # 9z-E.10: PATCH with path - active="True" coerced
         $patchPathBody = @{
             schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
             Operations = @(@{
@@ -7221,7 +7221,7 @@ if ($dpEpId) {
 Write-Host "`n--- 9z-E: URN Dot-Path Cache Tests Complete ---" -ForegroundColor Green
 
 # ============================================
-# TEST SECTION 9z-F: GENERIC RESOURCE FILTER OPERATORS (G6 — RFC 7644 §3.4.2.2) (v0.32.0)
+# TEST SECTION 9z-F: GENERIC RESOURCE FILTER OPERATORS (G6 - RFC 7644 §3.4.2.2) (v0.32.0)
 $script:currentSection = "9z-F: Generic Filter Operators"
 # ============================================
 Write-Host "`n`n========================================" -ForegroundColor Yellow
@@ -7825,7 +7825,7 @@ $contractUser = @{
 $contractCreated = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $contractUser
 Test-Result -Success ($null -ne $contractCreated.id) -Message "9z-M.4.setup: Created user to trigger cache"
 
-# Now GET admin endpoint — profile must still be clean
+# Now GET admin endpoint - profile must still be clean
 $postScimEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$EndpointId" -Method GET -Headers $headers
 $postScimProfileKeys = $postScimEndpoint.profile.PSObject.Properties.Name
 Test-Result -Success ('_schemaCaches' -notin $postScimProfileKeys) -Message "9z-M.4: _schemaCaches absent AFTER SCIM operations"
@@ -8013,6 +8013,392 @@ try { Invoke-RestMethod -Uri "$mgrScimBase/Users/$mgrUserId" -Method DELETE -Hea
 try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$mgrEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
 
 Write-Host "`n--- 9z-N: Manager PATCH String Coercion Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-P: PRIMARY SUB-ATTRIBUTE ENFORCEMENT (G8h)
+$script:currentSection = "9z-P: Primary Enforcement"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-P: PRIMARY SUB-ATTRIBUTE ENFORCEMENT (G8h)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# 9z-P.1: Create endpoint with PrimaryEnforcement=normalize
+$g8hNormBody = @{ name = "g8h-norm-test-$(Get-Date -Format 'HHmmss')"; profilePreset = "rfc-standard" } | ConvertTo-Json
+$g8hNormEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $g8hNormBody -ContentType "application/json"
+$g8hNormEpId = $g8hNormEp.id
+$g8hNormBase = "$baseUrl$($g8hNormEp.scimBasePath)"
+# PATCH settings: PrimaryEnforcement=normalize, StrictSchemaValidation=False
+$g8hNormPatch = @{ profile = @{ settings = @{ PrimaryEnforcement = "normalize"; StrictSchemaValidation = "False" } } } | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$g8hNormEpId" -Method PATCH -Headers $headers -Body $g8hNormPatch -ContentType "application/json" | Out-Null
+Test-Result -Success ($null -ne $g8hNormEpId) -Message "9z-P.1: Create endpoint with PrimaryEnforcement=normalize"
+
+# 9z-P.2: POST user with 2 primary emails - should normalize
+$g8hUserBody = @{
+  schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+  userName = "g8h-norm-$(Get-Date -Format 'HHmmss')@test.com"
+  emails = @(
+    @{ value = "a@x.com"; type = "work"; primary = $true },
+    @{ value = "b@x.com"; type = "home"; primary = $true }
+  )
+} | ConvertTo-Json -Depth 5
+$g8hUser = Invoke-RestMethod -Uri "$g8hNormBase/Users" -Method POST -Headers $headers -Body $g8hUserBody -ContentType "application/scim+json"
+$g8hEmails = $g8hUser.emails
+$g8hFirstPrimary = $g8hEmails[0].primary -eq $true
+$g8hSecondNotPrimary = $g8hEmails[1].primary -eq $false
+Test-Result -Success ($g8hFirstPrimary -and $g8hSecondNotPrimary) -Message "9z-P.2: POST normalize - first email primary=true, second=false"
+
+# 9z-P.3: POST user with 0 primaries - valid, no mutation
+$g8hUser0Body = @{
+  schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+  userName = "g8h-zero-$(Get-Date -Format 'HHmmss')@test.com"
+  emails = @(
+    @{ value = "c@x.com"; type = "work" },
+    @{ value = "d@x.com"; type = "home" }
+  )
+} | ConvertTo-Json -Depth 5
+$g8hUser0 = Invoke-RestMethod -Uri "$g8hNormBase/Users" -Method POST -Headers $headers -Body $g8hUser0Body -ContentType "application/scim+json"
+$g8hZeroOk = ($g8hUser0.emails[0].primary -ne $true) -and ($g8hUser0.emails[1].primary -ne $true)
+Test-Result -Success $g8hZeroOk -Message "9z-P.3: POST with 0 primaries - accepted without mutation"
+
+# 9z-P.4: Create endpoint with PrimaryEnforcement=reject
+$g8hRejBody = @{ name = "g8h-rej-test-$(Get-Date -Format 'HHmmss')"; profilePreset = "rfc-standard" } | ConvertTo-Json
+$g8hRejEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $g8hRejBody -ContentType "application/json"
+$g8hRejEpId = $g8hRejEp.id
+$g8hRejBase = "$baseUrl$($g8hRejEp.scimBasePath)"
+$g8hRejPatch = @{ profile = @{ settings = @{ PrimaryEnforcement = "reject"; StrictSchemaValidation = "False" } } } | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$g8hRejEpId" -Method PATCH -Headers $headers -Body $g8hRejPatch -ContentType "application/json" | Out-Null
+Test-Result -Success ($null -ne $g8hRejEpId) -Message "9z-P.4: Create endpoint with PrimaryEnforcement=reject"
+
+# 9z-P.5: POST user with 2 primary emails - should get 400
+$g8hRejUserBody = @{
+  schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+  userName = "g8h-rej-$(Get-Date -Format 'HHmmss')@test.com"
+  emails = @(
+    @{ value = "a@rej.com"; type = "work"; primary = $true },
+    @{ value = "b@rej.com"; type = "home"; primary = $true }
+  )
+} | ConvertTo-Json -Depth 5
+$g8hRejOk = $false
+try {
+  Invoke-RestMethod -Uri "$g8hRejBase/Users" -Method POST -Headers $headers -Body $g8hRejUserBody -ContentType "application/scim+json" -ErrorAction Stop
+} catch {
+  $g8hRejStatus = $_.Exception.Response.StatusCode.value__
+  $g8hRejOk = $g8hRejStatus -eq 400
+}
+Test-Result -Success $g8hRejOk -Message "9z-P.5: POST reject - 400 on duplicate primary"
+
+# 9z-P.6: Create endpoint with PrimaryEnforcement=passthrough
+$g8hPassBody = @{ name = "g8h-pass-test-$(Get-Date -Format 'HHmmss')"; profilePreset = "rfc-standard" } | ConvertTo-Json
+$g8hPassEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $g8hPassBody -ContentType "application/json"
+$g8hPassEpId = $g8hPassEp.id
+$g8hPassBase = "$baseUrl$($g8hPassEp.scimBasePath)"
+$g8hPassPatch = @{ profile = @{ settings = @{ PrimaryEnforcement = "passthrough"; StrictSchemaValidation = "False" } } } | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$g8hPassEpId" -Method PATCH -Headers $headers -Body $g8hPassPatch -ContentType "application/json" | Out-Null
+Test-Result -Success ($null -ne $g8hPassEpId) -Message "9z-P.6: Create endpoint with PrimaryEnforcement=passthrough"
+
+# 9z-P.7: POST user with 2 primary emails - should store both
+$g8hPassUserBody = @{
+  schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+  userName = "g8h-pass-$(Get-Date -Format 'HHmmss')@test.com"
+  emails = @(
+    @{ value = "a@pass.com"; type = "work"; primary = $true },
+    @{ value = "b@pass.com"; type = "home"; primary = $true }
+  )
+} | ConvertTo-Json -Depth 5
+$g8hPassUser = Invoke-RestMethod -Uri "$g8hPassBase/Users" -Method POST -Headers $headers -Body $g8hPassUserBody -ContentType "application/scim+json"
+$g8hPassEmails = $g8hPassUser.emails
+$g8hPassBothPrimary = ($g8hPassEmails[0].primary -eq $true) -and ($g8hPassEmails[1].primary -eq $true)
+Test-Result -Success $g8hPassBothPrimary -Message "9z-P.7: POST passthrough - both emails primary=true preserved"
+
+# 9z-P.8: Cross-attribute independence
+$g8hCrossBody = @{
+  schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+  userName = "g8h-cross-$(Get-Date -Format 'HHmmss')@test.com"
+  emails = @( @{ value = "e@x.com"; type = "work"; primary = $true } )
+  phoneNumbers = @( @{ value = "+1-555-0100"; type = "work"; primary = $true } )
+} | ConvertTo-Json -Depth 5
+$g8hCross = Invoke-RestMethod -Uri "$g8hNormBase/Users" -Method POST -Headers $headers -Body $g8hCrossBody -ContentType "application/scim+json"
+$g8hCrossOk = ($g8hCross.emails[0].primary -eq $true) -and ($g8hCross.phoneNumbers[0].primary -eq $true)
+Test-Result -Success $g8hCrossOk -Message "9z-P.8: Cross-attribute - 1 primary email + 1 primary phone = valid"
+
+# Cleanup: delete test endpoints
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$g8hNormEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$g8hRejEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$g8hPassEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+Write-Host "`n--- 9z-P: Primary Sub-Attribute Enforcement Tests Complete ---" -ForegroundColor Green
+
+# ============================================
+# TEST SECTION 9z-Q: TEST GAPS AUDIT #5 - COMPREHENSIVE GAP CLOSURE
+$script:currentSection = "9z-Q: Test Gaps Audit #5"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-Q: TEST GAPS AUDIT #5 - COMPREHENSIVE GAP CLOSURE" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# --- 9z-Q.1: POST duplicate userName -> 409 ---
+Write-Host "`n--- 9z-Q.1: POST duplicate userName -> 409 ---" -ForegroundColor Cyan
+$q1UserName = "q1-dup-$(Get-Random)@test.com"
+$q1Body1 = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $q1UserName
+    displayName = "Q1 First User"
+    active = $true
+} | ConvertTo-Json
+$q1User1 = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $q1Body1 -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $q1User1.id) -Message "9z-Q.1a: Created first user"
+
+$q1Body2 = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $q1UserName
+    displayName = "Q1 Duplicate User"
+    active = $true
+} | ConvertTo-Json
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $q1Body2 -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9z-Q.1b: Duplicate userName should return 409"
+} catch {
+    $q1Status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q1Status -eq 409) -Message "9z-Q.1b: Duplicate userName returns 409 (got $q1Status)"
+}
+
+# --- 9z-Q.2: POST duplicate userName case-insensitive -> 409 ---
+Write-Host "`n--- 9z-Q.2: POST duplicate userName case-insensitive -> 409 ---" -ForegroundColor Cyan
+try {
+    $q2Body = @{
+        schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+        userName = $q1UserName.ToUpper()
+        displayName = "Q2 Case Dup"
+        active = $true
+    } | ConvertTo-Json
+    $null = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $q2Body -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9z-Q.2: Case-insensitive duplicate should return 409"
+} catch {
+    $q2Status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q2Status -eq 409) -Message "9z-Q.2: Case-insensitive duplicate returns 409 (got $q2Status)"
+}
+
+# --- 9z-Q.3: POST missing required userName -> 400 ---
+Write-Host "`n--- 9z-Q.3: POST missing userName -> 400 ---" -ForegroundColor Cyan
+try {
+    $q3Body = @{
+        schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+        displayName = "No UserName"
+        active = $true
+    } | ConvertTo-Json
+    $null = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $q3Body -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9z-Q.3: Missing userName should return 400"
+} catch {
+    $q3Status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q3Status -eq 400) -Message "9z-Q.3: Missing userName returns 400 (got $q3Status)"
+}
+
+# --- 9z-Q.4: POST missing schemas array -> 400 ---
+Write-Host "`n--- 9z-Q.4: POST missing schemas -> 400 ---" -ForegroundColor Cyan
+try {
+    $q4Body = @{
+        userName = "q4-noschemas-$(Get-Random)@test.com"
+        displayName = "No Schemas"
+    } | ConvertTo-Json
+    $null = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $q4Body -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9z-Q.4: Missing schemas should return 400"
+} catch {
+    $q4Status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q4Status -eq 400) -Message "9z-Q.4: Missing schemas returns 400 (got $q4Status)"
+}
+
+# --- 9z-Q.5: .search returns always-returned fields (id, schemas, meta) ---
+Write-Host "`n--- 9z-Q.5: .search returned:always ---" -ForegroundColor Cyan
+$q5SearchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:SearchRequest")
+    filter = "userName eq `"$q1UserName`""
+    startIndex = 1
+    count = 10
+} | ConvertTo-Json
+$q5Result = Invoke-RestMethod -Uri "$scimBase/Users/.search" -Method POST -Headers $headers -Body $q5SearchBody -ContentType "application/scim+json"
+Test-Result -Success ($q5Result.totalResults -ge 1) -Message "9z-Q.5a: .search found user"
+$q5Resource = $q5Result.Resources[0]
+Test-Result -Success ($null -ne $q5Resource.id) -Message "9z-Q.5b: .search resource has id (returned:always)"
+Test-Result -Success ($null -ne $q5Resource.schemas) -Message "9z-Q.5c: .search resource has schemas (returned:always)"
+Test-Result -Success ($null -ne $q5Resource.meta) -Message "9z-Q.5d: .search resource has meta (returned:always)"
+
+# --- 9z-Q.6: PATCH case-insensitive uniqueness -> 409 ---
+Write-Host "`n--- 9z-Q.6: PATCH case-insensitive uniqueness -> 409 ---" -ForegroundColor Cyan
+$q6User2Name = "q6-target-$(Get-Random)@test.com"
+$q6Body = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = $q6User2Name
+    displayName = "Q6 Target"
+    active = $true
+} | ConvertTo-Json
+$q6User2 = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $q6Body -ContentType "application/scim+json"
+try {
+    $q6PatchBody = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+        Operations = @(@{
+            op = "replace"
+            path = "userName"
+            value = $q1UserName.ToUpper()
+        })
+    } | ConvertTo-Json -Depth 4
+    $null = Invoke-RestMethod -Uri "$scimBase/Users/$($q6User2.id)" -Method PATCH -Headers $headers -Body $q6PatchBody -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9z-Q.6: Case-insensitive PATCH uniqueness should return 409"
+} catch {
+    $q6Status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q6Status -eq 409) -Message "9z-Q.6: PATCH case-insensitive uniqueness returns 409 (got $q6Status)"
+}
+
+# --- 9z-Q.7: ETag on single-resource GET ---
+Write-Host "`n--- 9z-Q.7: ETag on single GET ---" -ForegroundColor Cyan
+$q7Raw = Invoke-WebRequest -Uri "$scimBase/Users/$($q1User1.id)" -Method GET -Headers $headers
+$q7EtagHeader = $q7Raw.Headers['ETag']
+$q7EtagValue = if ($q7EtagHeader -is [array]) { $q7EtagHeader[0] } else { $q7EtagHeader }
+Test-Result -Success ($null -ne $q7EtagValue -and $q7EtagValue.Length -gt 0) -Message "9z-Q.7a: Single GET has ETag header"
+Test-Result -Success ($q7EtagValue -like 'W/"v*"') -Message "9z-Q.7b: ETag format W/`"v...`" (got $q7EtagValue)"
+
+# --- 9z-Q.8: 412 Precondition Failed (stale If-Match) ---
+Write-Host "`n--- 9z-Q.8: 412 stale If-Match ---" -ForegroundColor Cyan
+$q8StaleEtag = $q7EtagValue
+# Bump the version via PATCH
+$q8PatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{ op = "replace"; path = "displayName"; value = "Q8 Bumped" })
+} | ConvertTo-Json -Depth 4
+$null = Invoke-RestMethod -Uri "$scimBase/Users/$($q1User1.id)" -Method PATCH -Headers $headers -Body $q8PatchBody -ContentType "application/scim+json"
+try {
+    $q8PutBody = @{
+        schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+        userName = $q1UserName
+        displayName = "Stale ETag PUT"
+    } | ConvertTo-Json
+    $q8StaleHeaders = @{ Authorization = $headers.Authorization; 'Content-Type' = 'application/scim+json'; 'If-Match' = $q8StaleEtag }
+    $null = Invoke-RestMethod -Uri "$scimBase/Users/$($q1User1.id)" -Method PUT -Headers $q8StaleHeaders -Body $q8PutBody
+    Test-Result -Success $false -Message "9z-Q.8: Stale If-Match should return 412"
+} catch {
+    $q8Status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q8Status -eq 412) -Message "9z-Q.8: Stale If-Match returns 412 (got $q8Status)"
+}
+
+# --- 9z-Q.9: POST duplicate Group displayName -> 409 ---
+Write-Host "`n--- 9z-Q.9: Duplicate Group displayName -> 409 ---" -ForegroundColor Cyan
+$q9GroupName = "Q9-Group-$(Get-Random)"
+$q9GroupBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = $q9GroupName
+} | ConvertTo-Json
+$q9Group1 = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $q9GroupBody -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $q9Group1.id) -Message "9z-Q.9a: Created first group"
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase/Groups" -Method POST -Headers $headers -Body $q9GroupBody -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9z-Q.9b: Duplicate Group displayName should return 409"
+} catch {
+    $q9Status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q9Status -eq 409) -Message "9z-Q.9b: Duplicate Group displayName returns 409 (got $q9Status)"
+}
+
+# --- 9z-Q.10: RequireIfMatch=True endpoint - 428 without If-Match ---
+Write-Host "`n--- 9z-Q.10: RequireIfMatch=True -> 428 ---" -ForegroundColor Cyan
+$q10EpBody = @{
+    name = "q10-ifmatch-$(Get-Random)"
+    displayName = "Q10 IfMatch Test"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json
+$q10Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $q10EpBody -ContentType "application/json"
+$q10EpId = $q10Ep.id
+$q10SettingsBody = @{ profile = @{ settings = @{ RequireIfMatch = "True" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$q10EpId" -Method PATCH -Headers $headers -Body $q10SettingsBody -ContentType "application/json" | Out-Null
+$q10ScimBase = "$baseUrl/scim/endpoints/$q10EpId"
+
+$q10UserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "q10-user-$(Get-Random)@test.com"
+    displayName = "Q10 User"
+    active = $true
+} | ConvertTo-Json
+$q10User = Invoke-RestMethod -Uri "$q10ScimBase/Users" -Method POST -Headers $headers -Body $q10UserBody -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $q10User.id) -Message "9z-Q.10a: POST works even with RequireIfMatch=True (exempt)"
+
+try {
+    $q10PatchBody = @{
+        schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+        Operations = @(@{ op = "replace"; path = "displayName"; value = "Q10 Patched" })
+    } | ConvertTo-Json -Depth 4
+    $null = Invoke-RestMethod -Uri "$q10ScimBase/Users/$($q10User.id)" -Method PATCH -Headers $headers -Body $q10PatchBody -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9z-Q.10b: PATCH without If-Match should return 428"
+} catch {
+    $q10Status = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q10Status -eq 428) -Message "9z-Q.10b: PATCH without If-Match returns 428 (got $q10Status)"
+}
+
+# --- 9z-Q.11: SchemaDiscovery disabled -> 404 on all discovery endpoints ---
+Write-Host "`n--- 9z-Q.11: SchemaDiscovery disabled -> 404 ---" -ForegroundColor Cyan
+$q11EpBody = @{
+    name = "q11-nodisc-$(Get-Random)"
+    displayName = "Q11 No Discovery"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json
+$q11Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $q11EpBody -ContentType "application/json"
+$q11EpId = $q11Ep.id
+$q11Settings = @{ profile = @{ settings = @{ SchemaDiscoveryEnabled = "False" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$q11EpId" -Method PATCH -Headers $headers -Body $q11Settings -ContentType "application/json" | Out-Null
+$q11ScimBase = "$baseUrl/scim/endpoints/$q11EpId"
+
+try {
+    $null = Invoke-RestMethod -Uri "$q11ScimBase/Schemas" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9z-Q.11a: /Schemas should 404 when discovery disabled"
+} catch {
+    $q11aStatus = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q11aStatus -eq 404) -Message "9z-Q.11a: /Schemas returns 404 when disabled (got $q11aStatus)"
+}
+try {
+    $null = Invoke-RestMethod -Uri "$q11ScimBase/ResourceTypes" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9z-Q.11b: /ResourceTypes should 404 when discovery disabled"
+} catch {
+    $q11bStatus = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q11bStatus -eq 404) -Message "9z-Q.11b: /ResourceTypes returns 404 when disabled (got $q11bStatus)"
+}
+try {
+    $null = Invoke-RestMethod -Uri "$q11ScimBase/ServiceProviderConfig" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9z-Q.11c: /ServiceProviderConfig should 404 when discovery disabled"
+} catch {
+    $q11cStatus = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($q11cStatus -eq 404) -Message "9z-Q.11c: /ServiceProviderConfig returns 404 when disabled (got $q11cStatus)"
+}
+
+# Verify CRUD still works with discovery disabled
+$q11CrudBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "q11-crud-$(Get-Random)@test.com"
+    displayName = "Q11 CRUD"
+    active = $true
+} | ConvertTo-Json
+$q11CrudUser = Invoke-RestMethod -Uri "$q11ScimBase/Users" -Method POST -Headers $headers -Body $q11CrudBody -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $q11CrudUser.id) -Message "9z-Q.11d: CRUD still works when discovery disabled"
+
+# --- 9z-Q.12: SCIM error response key allowlist ---
+Write-Host "`n--- 9z-Q.12: Error response key allowlist ---" -ForegroundColor Cyan
+$q12ErrorAllowedKeys = @("schemas", "status", "scimType", "detail", "diagnostics")
+try {
+    $null = Invoke-RestMethod -Uri "$scimBase/Users/nonexistent-00000000-0000-0000-0000-000000000000" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9z-Q.12a: GET nonexistent should 404"
+} catch {
+    $q12ErrorBody = $_.ErrorDetails.Message | ConvertFrom-Json
+    $q12ExtraKeys = @()
+    foreach ($k in ($q12ErrorBody | Get-Member -MemberType NoteProperty).Name) {
+        if ($k -notin $q12ErrorAllowedKeys) { $q12ExtraKeys += $k }
+    }
+    Test-Result -Success ($q12ExtraKeys.Count -eq 0) -Message "9z-Q.12a: 404 error has only allowed keys (extra: $($q12ExtraKeys -join ', '))"
+}
+
+# --- Cleanup ---
+Write-Host "`n--- 9z-Q Cleanup ---" -ForegroundColor Cyan
+try { Invoke-RestMethod -Uri "$scimBase/Users/$($q1User1.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$scimBase/Users/$($q6User2.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$scimBase/Groups/$($q9Group1.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$q10EpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$q11EpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+Write-Host "`n--- 9z-Q: Test Gaps Audit #5 Tests Complete ---" -ForegroundColor Green
 
 # ============================================
 # TEST SECTION 10: DELETE OPERATIONS

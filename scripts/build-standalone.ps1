@@ -12,7 +12,7 @@
       - Launcher scripts (start.bat, start.ps1)
     
     All configuration (port, secrets, DB) is set at *runtime* via the
-    launcher scripts or environment variables — nothing is hardcoded into
+    launcher scripts or environment variables - nothing is hardcoded into
     the build.
 
     Optionally bundles a portable Node.js binary so the target machine
@@ -212,7 +212,7 @@ Write-Host "[6/7] Creating launcher scripts..." -ForegroundColor Yellow
 @"
 @echo off
 REM ============================================
-REM  SCIMServer v$ProjectVersion — Standalone Launcher
+REM  SCIMServer v$ProjectVersion - Standalone Launcher
 REM  All settings come from environment variables.
 REM  Set them before running, or accept the defaults.
 REM ============================================
@@ -239,14 +239,14 @@ if exist "%~dp0node\node.exe" (
 )
 "@ | Set-Content -Path (Join-Path $OutPath "start.bat") -Encoding ASCII
 
-# --- start.ps1 (PowerShell — full-featured launcher) ---
+# --- start.ps1 (PowerShell - full-featured launcher) ---
 @"
 <#
 .SYNOPSIS
     Start SCIMServer v$ProjectVersion in standalone mode.
 .DESCRIPTION
     All configuration is via parameters or environment variables.
-    Nothing is hardcoded — set secrets via env vars before deploying to production.
+    Nothing is hardcoded - set secrets via env vars before deploying to production.
 .PARAMETER Port
     Port to listen on (default: $Port, or `$env:PORT)
 .PARAMETER Backend
@@ -309,7 +309,7 @@ Write-Host "  Press Ctrl+C to stop.`n" -ForegroundColor Gray
 @"
 @echo off
 REM ============================================
-REM  SCIMServer v$ProjectVersion — PostgreSQL Mode
+REM  SCIMServer v$ProjectVersion - PostgreSQL Mode
 REM  Edit the settings below to match your DB.
 REM ============================================
 
@@ -347,9 +347,9 @@ if exist "%~dp0node\node.exe" (
 
 # --- README ---
 @"
-# SCIMServer v$ProjectVersion — Standalone Package
+# SCIMServer v$ProjectVersion - Standalone Package
 
-## Quick Start (In-Memory — No Database)
+## Quick Start (In-Memory - No Database)
 
 Double-click **start.bat** or run:
 
@@ -386,7 +386,7 @@ $( if ($IncludePostgres) { @"
 
 ## Bundled PostgreSQL (Fully Airgapped)
 
-Double-click **start-bundled-postgres.bat** — it will:
+Double-click **start-bundled-postgres.bat** - it will:
 1. Initialize a local PostgreSQL instance (first run only)
 2. Start PostgreSQL on port 5432
 3. Create the ``scimdb`` database
@@ -404,7 +404,7 @@ To stop PostgreSQL separately: ``stop-postgres.bat``
 
 ## Requirements
 
-- **Node.js $MinNodeVersion+** (v$( if ($NodeVersion) { $NodeVersion } else { "24" } ) recommended) — unless this package includes a bundled node.exe
+- **Node.js $MinNodeVersion+** (v$( if ($NodeVersion) { $NodeVersion } else { "24" } ) recommended) - unless this package includes a bundled node.exe
 - No internet access required
 - No Docker required
 
@@ -474,7 +474,7 @@ if ($IncludePostgres) {
         @"
 @echo off
 REM ============================================
-REM  SCIMServer v$ProjectVersion — Bundled PostgreSQL
+REM  SCIMServer v$ProjectVersion - Bundled PostgreSQL
 REM  Initializes and starts a local PostgreSQL,
 REM  then launches SCIMServer connected to it.
 REM ============================================
@@ -576,7 +576,7 @@ if exist "%PGDATA%\postmaster.pid" (
     Start SCIMServer v$ProjectVersion with bundled PostgreSQL.
 .DESCRIPTION
     Initializes a local PostgreSQL instance (if needed), starts it,
-    runs migrations, and launches SCIMServer — all from bundled binaries.
+    runs migrations, and launches SCIMServer - all from bundled binaries.
     No internet, no Docker, no external database required.
 .PARAMETER Port
     SCIMServer port (default: $Port)
@@ -691,7 +691,7 @@ if ($Zip) {
 
 # ── Done ──
 $folderSizeMB = [math]::Round(((Get-ChildItem -Recurse $OutPath | Measure-Object -Property Length -Sum).Sum / 1MB), 1)
-Write-Host "`n=== Build Complete — SCIMServer v$ProjectVersion ===" -ForegroundColor Green
+Write-Host "`n=== Build Complete - SCIMServer v$ProjectVersion ===" -ForegroundColor Green
 Write-Host "Standalone package: $OutPath ($folderSizeMB MB)" -ForegroundColor White
 if ($IncludeNode) {
     Write-Host "Bundled Node.js:   v$NodeVersion" -ForegroundColor White

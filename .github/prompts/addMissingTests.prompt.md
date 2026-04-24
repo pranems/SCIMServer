@@ -1,17 +1,17 @@
 ---
 name: addMissingTests
-description: Audit and add missing tests at all levels — unit, E2E, and live integration — covering all features, config flag combinations, attribute characteristics, and edge cases.
+description: Audit and add missing tests at all levels - unit, E2E, and live integration - covering all features, config flag combinations, attribute characteristics, and edge cases.
 argument-hint: Optional scope like a feature name (e.g. "G8g"), file path, or flag name to narrow the audit.
 ---
 
-Perform a comprehensive test gap audit across the entire project and add any missing tests. This is a **generic, project-wide** prompt — not scoped to any single feature or recent change.
+Perform a comprehensive test gap audit across the entire project and add any missing tests. This is a **generic, project-wide** prompt - not scoped to any single feature or recent change.
 
 ---
 
-## Step 1 — Inventory Current Coverage
+## Step 1 - Inventory Current Coverage
 
 1. **Read project context**: Read `Session_starter.md`, `docs/CONTEXT_INSTRUCTIONS.md`, `docs/ENDPOINT_CONFIG_FLAGS_REFERENCE.md`, and `CHANGELOG.md` to understand the full feature set, all config flags, attribute characteristics, and current version.
-2. **Read implementation source of truth**: Read `api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts` for the `ProfileSettings` interface — the canonical flag list with types and defaults. Also read `api/src/modules/endpoint/services/endpoint.service.ts` for derived flags.
+2. **Read implementation source of truth**: Read `api/src/modules/scim/endpoint-profile/endpoint-profile.types.ts` for the `ProfileSettings` interface - the canonical flag list with types and defaults. Also read `api/src/modules/endpoint/services/endpoint.service.ts` for derived flags.
 3. **List all test files**: Enumerate all `*.spec.ts` (unit), `*.e2e-spec.ts` (E2E), and `scripts/live-test.ps1` sections to catalog what is already tested.
 4. **Collect test names**: For each spec file, run `grep -n 'describe\|it(' <file>` to build a complete test inventory.
 5. **Map features to tests**: For each implemented feature/flag/characteristic, verify that corresponding tests exist at all three levels (unit, E2E, live).
@@ -19,7 +19,7 @@ Perform a comprehensive test gap audit across the entire project and add any mis
 
 ---
 
-## Step 2 — Identify Gaps
+## Step 2 - Identify Gaps
 
 Audit for missing tests in these categories:
 
@@ -103,21 +103,21 @@ Specifically check:
 
 | Error Scenario | Expected Status | Expected scimType | Tested? |
 |---------------|----------------|-------------------|---------|
-| Invalid/malformed `attributes` value (e.g., `,,`, `   `) | 200 (gracefully ignored) or 400 | — | ? |
-| Non-existent attribute name in `?attributes=` | 200 (treated as empty match) | — | ? |
-| Empty string `?attributes=` | 200 (full response) | — | ? |
-| Spaces in attribute list `?attributes=userName , displayName` | 200 (trimmed) | — | ? |
-| Mixed case `?attributes=UserName,DISPLAYNAME` | 200 (case-insensitive) | — | ? |
-| `?excludedAttributes=id` attempt on always-returned | 200 (id still present) | — | ? |
-| `?attributes=password` requesting returned:never | 200 (password still absent) | — | ? |
+| Invalid/malformed `attributes` value (e.g., `,,`, `   `) | 200 (gracefully ignored) or 400 | - | ? |
+| Non-existent attribute name in `?attributes=` | 200 (treated as empty match) | - | ? |
+| Empty string `?attributes=` | 200 (full response) | - | ? |
+| Spaces in attribute list `?attributes=userName , displayName` | 200 (trimmed) | - | ? |
+| Mixed case `?attributes=UserName,DISPLAYNAME` | 200 (case-insensitive) | - | ? |
+| `?excludedAttributes=id` attempt on always-returned | 200 (id still present) | - | ? |
+| `?attributes=password` requesting returned:never | 200 (password still absent) | - | ? |
 | Missing required field on POST | 400 | invalidValue | ? |
 | Missing required field on PUT | 400 | invalidValue | ? |
 | readOnly field in PATCH body | 400 | mutability | ? |
 | Immutable field changed on PUT | 400 | mutability | ? |
 | Uniqueness collision POST/PUT/PATCH | 409 | uniqueness | ? |
-| Bulk with invalid operation | 200 (per-op 400 in response) | — | ? |
-| Bulk without BulkOperationsEnabled | 403 | — | ? |
-| Custom resource type without flag enabled | 404 | — | ? |
+| Bulk with invalid operation | 200 (per-op 400 in response) | - | ? |
+| Bulk without BulkOperationsEnabled | 403 | - | ? |
+| Custom resource type without flag enabled | 404 | - | ? |
 
 ### F. Cross-Feature Integration
 
@@ -139,7 +139,7 @@ Specifically check:
 - Every E2E test scenario should have a corresponding live test in `scripts/live-test.ps1`
 - Live tests should cover both local (port 6000) and Docker (port 8080) scenarios
 - Verify all live test sections in `scripts/live-test.ps1` exist by grepping for `TEST SECTION`
-- Ensure new sections use the next available number (check current highest before `Section 10`; as of v0.38.0 the latest is **9z-N**)
+- Ensure new sections use the next available number (check current highest before `Section 10`; as of v0.38.0 the latest is **9z-Q**)
 
 ### H. Resource-Type Symmetry
 
@@ -205,11 +205,11 @@ For every behavior tested on Users, verify the equivalent exists for Groups (and
 | `EndpointContext.profile` stored via `setContext()` | ✅ | implicit | ? |
 | `getProfile()` returns stored profile | ✅ | N/A | ? |
 | `getConfig()` compat shim returns `profile.settings` | ✅ | implicit | ? |
-| **Cache does not leak to API** — `_schemaCaches` stripped from `toFullResponse()` | ✅ | ✅ | ✅ |
-| **`getExtensionUrns()` filters by `coreSchemaUrn`** — User service gets only User extensions | ✅ | N/A | ? |
-| **`getExtensionUrns()` RT isolation** — Group service gets only Group extensions | ✅ | N/A | ? |
-| **`getExtensionUrns()` cache hit** — returns cached extensionUrns when valid Map exists | ✅ | N/A | ? |
-| **`getExtensionUrns()` fallback** — falls back to global registry when no RTs match | ✅ | N/A | ? |
+| **Cache does not leak to API** - `_schemaCaches` stripped from `toFullResponse()` | ✅ | ✅ | ✅ |
+| **`getExtensionUrns()` filters by `coreSchemaUrn`** - User service gets only User extensions | ✅ | N/A | ? |
+| **`getExtensionUrns()` RT isolation** - Group service gets only Group extensions | ✅ | N/A | ? |
+| **`getExtensionUrns()` cache hit** - returns cached extensionUrns when valid Map exists | ✅ | N/A | ? |
+| **`getExtensionUrns()` fallback** - falls back to global registry when no RTs match | ✅ | N/A | ? |
 
 ### L. Registry Simplification + Derived Flags (Phase 14.2–14.4)
 
@@ -238,8 +238,8 @@ For every behavior tested on Users, verify the equivalent exists for Groups (and
 | `scimBasePath` field (renamed from `scimEndpoint`) | ✅ | ✅ | ✅ |
 | `_links` (self, stats, credentials, scim) on all responses | ✅ | ✅ | ✅ |
 | ISO 8601 string timestamps (`createdAt`, `updatedAt`) | ✅ | ✅ | ✅ |
-| `GET /admin/endpoints/presets` — list with summaries | ✅ | ✅ | ✅ |
-| `GET /admin/endpoints/presets/:name` — full profile | ✅ | ✅ | ✅ |
+| `GET /admin/endpoints/presets` - list with summaries | ✅ | ✅ | ✅ |
+| `GET /admin/endpoints/presets/:name` - full profile | ✅ | ✅ | ✅ |
 | Unknown preset → 404 | ✅ | ✅ | ✅ |
 | Nested stats: `users.{total,active,softDeleted}`, groups, etc. | ✅ | ✅ | ✅ |
 | Old flat stats format absent (`totalUsers`, etc.) | ✅ | ✅ | ✅ |
@@ -247,11 +247,11 @@ For every behavior tested on Users, verify the equivalent exists for Groups (and
 | `ProfileSummary`: serviceProviderConfig boolean flags | ✅ | ✅ | ✅ |
 | `ProfileSummary`: activeSettings (non-default only) | ✅ | ✅ | ✅ |
 | `buildProfileSummary` handles empty/extension schemas | ✅ | N/A | N/A |
-| **Response key allowlist** — full view has ONLY documented keys, no extras | ✅ | ✅ | ✅ |
-| **Response key allowlist** — summary view has ONLY documented keys | ✅ | ✅ | ✅ |
-| **Profile key allowlist** — only `schemas, settings, resourceTypes, serviceProviderConfig` | ✅ | ✅ | ✅ |
-| **No `_schemaCaches` in API response** — internal runtime cache stripped | ✅ | ✅ | ✅ |
-| **Profile clean after SCIM operations** — GET admin endpoint after SCIM CRUD shows no cache artifacts | ✅ | ✅ | ✅ |
+| **Response key allowlist** - full view has ONLY documented keys, no extras | ✅ | ✅ | ✅ |
+| **Response key allowlist** - summary view has ONLY documented keys | ✅ | ✅ | ✅ |
+| **Profile key allowlist** - only `schemas, settings, resourceTypes, serviceProviderConfig` | ✅ | ✅ | ✅ |
+| **No `_schemaCaches` in API response** - internal runtime cache stripped | ✅ | ✅ | ✅ |
+| **Profile clean after SCIM operations** - GET admin endpoint after SCIM CRUD shows no cache artifacts | ✅ | ✅ | ✅ |
 
 ### N. Logging & Error Handling (v0.32.0 overhaul)
 
@@ -301,7 +301,7 @@ For every behavior tested on Users, verify the equivalent exists for Groups (and
 
 ### Q. API Response Contract Enforcement (v0.37.2)
 
-Every API endpoint response must be verified for **shape integrity** — not just "does field X exist?" but "does ONLY field X exist?" (allowlist) and "does internal field Y NOT exist?" (denylist).
+Every API endpoint response must be verified for **shape integrity** - not just "does field X exist?" but "does ONLY field X exist?" (allowlist) and "does internal field Y NOT exist?" (denylist).
 
 | Scenario | Unit | E2E | Live |
 |----------|------|-----|------|
@@ -313,15 +313,15 @@ Every API endpoint response must be verified for **shape integrity** — not jus
 | Map/Set objects never serialize to `{}` in JSON responses | ✅ | implicit | ✅ |
 | `_links` values match endpoint ID | ✅ | ✅ | ✅ |
 | Extension URNs scoped per resource type (User ≠ Group) | ✅ | N/A | ? |
-| SCIM error responses contain only documented fields | ? | ? | ? |
+| SCIM error responses contain only documented fields | ✅ | ✅ | ✅ |
 | List envelope has only `totalResults` + `endpoints` | ? | ✅ | ✅ |
 
 **Anti-Pattern to avoid:**
 ```typescript
-// ❌ BAD — catches absence but NOT leakage of extra fields
+// ❌ BAD - catches absence but NOT leakage of extra fields
 expect(result).toHaveProperty('profile');
 
-// ✅ GOOD — catches both absence AND leakage
+// ✅ GOOD - catches both absence AND leakage
 for (const key of Object.keys(result)) {
   expect(ALLOWED_KEYS).toContain(key);
 }
@@ -415,10 +415,10 @@ expect(res.body).toMatchObject({
 - Tests must work in all modes: local (`-BaseUrl http://localhost:6000`), Docker (`-BaseUrl http://localhost:8080 -ClientSecret "docker-secret"`), and Azure
 
 **Key variables available:**
-- `$baseUrl` — Server root (e.g., `http://localhost:6000`)
-- `$scimBase` — SCIM base for the test endpoint (`$baseUrl/scim/endpoints/$EndpointId`)
-- `$headers` — `@{ Authorization = "Bearer $Token"; 'Content-Type' = 'application/json' }`
-- `$EndpointId`, `$UserId`, `$GroupId` — IDs created in earlier setup sections
+- `$baseUrl` - Server root (e.g., `http://localhost:6000`)
+- `$scimBase` - SCIM base for the test endpoint (`$baseUrl/scim/endpoints/$EndpointId`)
+- `$headers` - `@{ Authorization = "Bearer $Token"; 'Content-Type' = 'application/json' }`
+- `$EndpointId`, `$UserId`, `$GroupId` - IDs created in earlier setup sections
 
 #### Pattern 1: Basic CRUD test with setup/verify/cleanup
 
@@ -641,26 +641,26 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 
 ---
 
-## Step 4 — Verify
+## Step 4 - Verify
 
-1. Run unit tests: `cd api; npx jest --forceExit` — confirm all pass.
-2. Run E2E tests: `cd api; npx jest --config test/e2e/jest-e2e.config.ts --forceExit` — confirm all pass.
+1. Run unit tests: `cd api; npx jest --forceExit` - confirm all pass.
+2. Run E2E tests: `cd api; npx jest --config test/e2e/jest-e2e.config.ts --forceExit` - confirm all pass.
 3. Report added test counts in this format:
 
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
-| Unit  | 3,345  | ?     | +?    |
-| E2E   | 1,017  | ?     | +?    |
-| Live  | ~990   | ?     | +?    |
+| Unit  | 3,378  | ?     | +?    |
+| E2E   | 1,074  | ?     | +?    |
+| Live  | ~789   | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
-> *Last updated: v0.38.0 - Manager PATCH String Coercion + Test Gap Audit (2026-04-21)*
+> *Last updated: v0.38.0 - Test Gaps Audit #5 (2026-04-23)*
 
 4. Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts.
 
 ---
 
-## Step 5 — Self-Update This Prompt
+## Step 5 - Self-Update This Prompt
 
 After completing the audit and implementation, review **this prompt itself** for staleness:
 
@@ -689,7 +689,7 @@ If any updates are needed, apply them directly to this file (`.github/prompts/ad
 - Every test must clean up its own resources (create → test → delete).
 - Test both the happy path AND the error path for every feature.
 - Use `toMatchObject()` for partial JSON matching, `toHaveProperty()` for field presence.
-- **API Response Contract**: Every test that reads an API response MUST include a key allowlist OR denylist assertion. Presence-only tests (`toHaveProperty`) are insufficient — they catch missing fields but not leaked internal fields.
+- **API Response Contract**: Every test that reads an API response MUST include a key allowlist OR denylist assertion. Presence-only tests (`toHaveProperty`) are insufficient - they catch missing fields but not leaked internal fields.
 - **Internal Field Denylist**: Runtime-only fields prefixed with `_` (e.g., `_schemaCaches`, `_prismaMetadata`) must NEVER appear in API responses. Add explicit `not.toHaveProperty('_schemaCaches')` assertions.
 - **Serialization Safety**: Map/Set objects serialize to `{}` via `JSON.stringify`. Any field containing Maps must be stripped before API response serialization.
 - Live tests must work with `-BaseUrl http://localhost:8080 -ClientSecret "devscimclientsecret"` (Docker mode).

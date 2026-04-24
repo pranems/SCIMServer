@@ -1,5 +1,5 @@
 /**
- * E2E Tests — Group Parity & Flag Interaction Gaps
+ * E2E Tests - Group Parity & Flag Interaction Gaps
  *
  * Fills coverage gaps identified in the test gap audit:
  * - Group readOnly stripping on PUT/PATCH
@@ -222,7 +222,7 @@ describe('Group Parity & Flag Interaction Gaps (E2E)', () => {
       // Verify it's gone
       await scimGet(app, `${rpBasePath}/Groups/${original.id}`, token).expect(404);
 
-      // Re-POST with same displayName — should either reprovision or create new
+      // Re-POST with same displayName - should either reprovision or create new
       const reprovisioned = (await scimPost(app, `${rpBasePath}/Groups`, token,
         validGroup({ displayName: groupName, externalId: 'reprov-ext-2' })).expect(201)).body;
 
@@ -296,7 +296,7 @@ describe('Group Parity & Flag Interaction Gaps (E2E)', () => {
       const user = validUser();
       const created = await scimPost(app, `${basePath}/Users`, token, user).expect(201);
 
-      // PATCH with readOnly attr — default behavior (no strict, no ignore) is to silently strip
+      // PATCH with readOnly attr - default behavior (no strict, no ignore) is to silently strip
       const patch = patchOp([
         { op: 'replace', value: { id: 'bad-id', displayName: 'patched' } },
       ]);
@@ -496,7 +496,7 @@ describe('Group Parity & Flag Interaction Gaps (E2E)', () => {
       // displayName should still be present (it's returned:always for Groups)
       expect(res.body.displayName).toBeDefined();
       // externalId should be excluded from response (returned:default, excluded)
-      // Note: externalId may be null if not set — just verify projection doesn't break
+      // Note: externalId may be null if not set - just verify projection doesn't break
     });
 
     it('should apply ?attributes= to PUT /Groups response', async () => {

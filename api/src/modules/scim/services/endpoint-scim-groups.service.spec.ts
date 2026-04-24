@@ -558,7 +558,7 @@ describe('EndpointScimGroupsService', () => {
       });
     });
 
-    describe('MultiMemberPatchOpForGroupEnabled — remove operations (settings v7)', () => {
+    describe('MultiMemberPatchOpForGroupEnabled - remove operations (settings v7)', () => {
       const groupWithMultipleMembers = {
         ...mockGroup,
         members: [
@@ -737,7 +737,7 @@ describe('EndpointScimGroupsService', () => {
 
         mockGroupRepo.findWithMembers.mockResolvedValue(groupWithMultipleMembers);
         mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
-        // Settings v7: PatchOpAllowRemoveAllMembers defaults to false — must explicitly enable
+        // Settings v7: PatchOpAllowRemoveAllMembers defaults to false - must explicitly enable
         mockEndpointContext.getConfig.mockReturnValue({ PatchOpAllowRemoveAllMembers: true, StrictSchemaValidation: 'False' });
 
         await service.patchGroupForEndpoint(mockGroup.scimId, patchDto, 'http://localhost:3000/scim', mockEndpoint.id);
@@ -1666,7 +1666,7 @@ describe('EndpointScimGroupsService', () => {
   });
 
   // ═══════════════════════════════════════════════════════════
-  // DELETE + GET / LIST interactions (Groups — always hard-delete)
+  // DELETE + GET / LIST interactions (Groups - always hard-delete)
   // ═══════════════════════════════════════════════════════════
 
   describe('DELETE + GET/LIST interactions (Groups)', () => {
@@ -2033,7 +2033,7 @@ describe('EndpointScimGroupsService', () => {
         expect(result).toBeDefined();
 
         const storedPayload = JSON.parse(mockGroupRepo.create.mock.calls[0][0].rawPayload);
-        // "value" is string-type — should NOT be coerced
+        // "value" is string-type - should NOT be coerced
         expect(storedPayload[TEST_GROUP_EXT_URN]?.tags[0]?.value).toBe('true');
         // "active" in unregistered extension is also NOT coerced (parent-aware precision)
         expect(storedPayload[TEST_GROUP_EXT_URN]?.tags[0]?.active).toBe('True');
@@ -2171,7 +2171,7 @@ describe('EndpointScimGroupsService', () => {
           displayName: 'Bool coerce after patch',
         };
 
-        // No strict validation — just test coercion path runs
+        // No strict validation - just test coercion path runs
         const config: EndpointConfig = { StrictSchemaValidation: 'False' };
 
         mockGroupRepo.findWithMembers
@@ -2329,7 +2329,7 @@ describe('EndpointScimGroupsService', () => {
         expect(result).toBeDefined();
 
         const storedPayload = JSON.parse(mockGroupRepo.create.mock.calls[0][0].rawPayload);
-        // String pass-through — not coerced
+        // String pass-through - not coerced
         expect(storedPayload[TEST_GROUP_EXT_URN]?.verified).toBe('True');
       });
     });
@@ -2337,10 +2337,10 @@ describe('EndpointScimGroupsService', () => {
 
   // ───────────── G8e: returned characteristic filtering ─────────────
 
-  describe('G8e — returned characteristic filtering', () => {
+  describe('G8e - returned characteristic filtering', () => {
     const baseUrl = 'http://localhost:3000/scim/endpoints/endpoint-1';
 
-    describe('toScimGroupResource — returned:never stripping', () => {
+    describe('toScimGroupResource - returned:never stripping', () => {
       it('should strip returned:never attributes from group response', async () => {
         const groupWithExtra = {
           ...mockGroup,
@@ -2372,10 +2372,10 @@ describe('EndpointScimGroupsService', () => {
   });
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // G8f — Group uniqueness enforcement on PUT/PATCH
+  // G8f - Group uniqueness enforcement on PUT/PATCH
   // ═══════════════════════════════════════════════════════════════════════════
 
-  describe('G8f — uniqueness enforcement on PUT/PATCH', () => {
+  describe('G8f - uniqueness enforcement on PUT/PATCH', () => {
     const baseUrl = 'http://localhost:3000/scim';
 
     const conflictGroup = {
@@ -2388,7 +2388,7 @@ describe('EndpointScimGroupsService', () => {
 
     // ─── PUT (replaceGroupForEndpoint) ─────────────────────────────────
 
-    describe('replaceGroupForEndpoint — uniqueness', () => {
+    describe('replaceGroupForEndpoint - uniqueness', () => {
       it('should reject PUT with 409 when displayName conflicts with another group', async () => {
         const replaceDto: CreateGroupDto = {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
@@ -2420,7 +2420,7 @@ describe('EndpointScimGroupsService', () => {
       });
 
       it('should reject PUT with 409 when externalId conflicts with another group', async () => {
-        // externalId is no longer checked for uniqueness — this test verifies PUT succeeds
+        // externalId is no longer checked for uniqueness - this test verifies PUT succeeds
         const replaceDto: CreateGroupDto = {
           schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
           displayName: 'Unique Name',
@@ -2448,7 +2448,7 @@ describe('EndpointScimGroupsService', () => {
         mockGroupRepo.findWithMembers
           .mockResolvedValueOnce(mockGroup) // lookup
           .mockResolvedValueOnce(mockGroup); // return after update
-        // assertUniqueDisplayName with excludeScimId — no conflict
+        // assertUniqueDisplayName with excludeScimId - no conflict
         mockGroupRepo.findByDisplayName.mockResolvedValueOnce(null);
         mockGroupRepo.updateGroupWithMembers.mockResolvedValue(undefined);
 
@@ -2488,7 +2488,7 @@ describe('EndpointScimGroupsService', () => {
 
     // ─── PATCH (patchGroupForEndpoint) ─────────────────────────────────
 
-    describe('patchGroupForEndpoint — uniqueness', () => {
+    describe('patchGroupForEndpoint - uniqueness', () => {
       it('should reject PATCH with 409 when displayName conflicts with another group', async () => {
         const patchDto: PatchGroupDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
@@ -2519,7 +2519,7 @@ describe('EndpointScimGroupsService', () => {
       });
 
       it('should reject PATCH with 409 when externalId conflicts with another group', async () => {
-        // externalId is no longer checked for uniqueness — this test verifies PATCH succeeds
+        // externalId is no longer checked for uniqueness - this test verifies PATCH succeeds
         const patchDto: PatchGroupDto = {
           schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
           Operations: [
@@ -2667,6 +2667,120 @@ describe('EndpointScimGroupsService', () => {
       await expect(
         service.deleteGroupForEndpoint(mockGroup.scimId, endpointId),
       ).rejects.toThrow(TypeError);
+    });
+  });
+
+  // ===========================================================================
+  // Test Gaps Audit #5 - Missing unit tests
+  // ===========================================================================
+
+  describe('Test Gaps Audit #5: PatchOpAllowRemoveAllMembers ON standalone', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+    const endpointId = 'endpoint-1';
+
+    it('should allow blanket remove all members when flag is ON (standalone, no StrictSchema override)', async () => {
+      const config: EndpointConfig = {
+        PatchOpAllowRemoveAllMembers: 'True',
+        StrictSchemaValidation: 'False',
+      };
+
+      mockGroupRepo.findWithMembers.mockResolvedValue({
+        ...mockGroup,
+        members: [
+          { userId: mockUser.id, groupId: mockGroup.id, user: { ...mockUser } },
+        ],
+      });
+      mockGroupRepo.findByDisplayName.mockResolvedValue(null);
+      mockGroupRepo.updateGroupWithMembers.mockResolvedValue({
+        ...mockGroup,
+        members: [],
+      });
+
+      const dto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'remove', path: 'members' }],
+      };
+
+      const result = await service.patchGroupForEndpoint(mockGroup.scimId, dto as any, baseUrl, endpointId, config);
+      expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
+    });
+
+    it('should reject blanket remove all members when flag is OFF (standalone)', async () => {
+      const config: EndpointConfig = {
+        PatchOpAllowRemoveAllMembers: 'False',
+        StrictSchemaValidation: 'False',
+      };
+
+      mockGroupRepo.findWithMembers.mockResolvedValue({
+        ...mockGroup,
+        members: [
+          { userId: mockUser.id, groupId: mockGroup.id, user: { ...mockUser } },
+        ],
+      });
+
+      const dto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'remove', path: 'members' }],
+      };
+
+      await expect(
+        service.patchGroupForEndpoint(mockGroup.scimId, dto as any, baseUrl, endpointId, config),
+      ).rejects.toThrow(HttpException);
+    });
+  });
+
+  describe('Test Gaps Audit #5: RequireIfMatch default OFF for Groups', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+    const endpointId = 'endpoint-1';
+
+    it('should allow DELETE without If-Match when RequireIfMatch is not configured', async () => {
+      mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
+      mockGroupRepo.delete.mockResolvedValue(undefined);
+
+      const config: EndpointConfig = {};
+
+      await service.deleteGroupForEndpoint(mockGroup.scimId, endpointId, config);
+
+      expect(mockGroupRepo.delete).toHaveBeenCalled();
+    });
+
+    it('should allow PATCH without If-Match when RequireIfMatch is undefined', async () => {
+      mockGroupRepo.findWithMembers.mockResolvedValue(mockGroup);
+      mockGroupRepo.findByDisplayName.mockResolvedValue(null);
+      mockGroupRepo.updateGroupWithMembers.mockResolvedValue(mockGroup);
+
+      const dto = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'replace', value: { displayName: 'Updated' } }],
+      };
+
+      const config: EndpointConfig = { StrictSchemaValidation: 'False' };
+
+      const result = await service.patchGroupForEndpoint(
+        mockGroup.scimId, dto as any, baseUrl, endpointId, config,
+      );
+
+      expect(mockGroupRepo.updateGroupWithMembers).toHaveBeenCalled();
+    });
+  });
+
+  describe('Test Gaps Audit #5: GroupHardDeleteEnabled OFF', () => {
+    const baseUrl = 'http://localhost:3000/scim';
+    const endpointId = 'endpoint-1';
+
+    it('should throw 400 when GroupHardDeleteEnabled is False', async () => {
+      const config: EndpointConfig = { GroupHardDeleteEnabled: 'False' };
+
+      await expect(
+        service.deleteGroupForEndpoint(mockGroup.scimId, endpointId, config),
+      ).rejects.toThrow(HttpException);
+
+      try {
+        await service.deleteGroupForEndpoint(mockGroup.scimId, endpointId, config);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+      }
     });
   });
 });

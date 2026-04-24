@@ -1,4 +1,4 @@
-# Ideal Multi-Endpoint SCIM 2.0 Server — RFC-First Architecture v3
+# Ideal Multi-Endpoint SCIM 2.0 Server - RFC-First Architecture v3
 
 > **Version**: 3.0 · **Date**: 2026-02-20
 > **Approach**: Ground-up, RFC-first. No legacy assumptions.
@@ -24,8 +24,8 @@
 14. [Authentication & Authorization](#14-authentication--authorization)
 15. [API Route Map](#15-api-route-map)
 16. [Non-Functional Requirements](#16-non-functional-requirements)
-17. [Appendix A — Complete Mermaid Diagrams](#17-appendix-a--complete-mermaid-diagrams)
-18. [Appendix B — Example JSON Payloads](#18-appendix-b--example-json-payloads)
+17. [Appendix A - Complete Mermaid Diagrams](#17-appendix-a--complete-mermaid-diagrams)
+18. [Appendix B - Example JSON Payloads](#18-appendix-b--example-json-payloads)
 
 ---
 
@@ -35,7 +35,7 @@
 |---|-----------|-----------|
 | P1 | **RFC-First** | Every API decision traces to a specific RFC section. Non-compliance is an explicit, documented deviation. |
 | P2 | **Simplicity** | Each concern has exactly one owner. No flag-branching inside domain logic; behavior variation lives in configuration, not `if` blocks. |
-| P3 | **Extensibility** | New resource types (Device, Application) require zero code changes — only `endpoint_schema` + `endpoint_resource_type` rows. |
+| P3 | **Extensibility** | New resource types (Device, Application) require zero code changes - only `endpoint_schema` + `endpoint_resource_type` rows. |
 | P4 | **Persistence Agnosticism** | Domain logic depends only on Repository interfaces. PostgreSQL, SQLite, or DynamoDB can be swapped without touching business rules. |
 | P5 | **Optimal Efficiency** | Filters are pushed to the database. In-memory fallback is a measurable exception, not the default. |
 | P6 | **Endpoint Isolation** | Each endpoint (endpoint) has independent schema definitions, config flags, resources, and log streams. Cross-endpoint data leakage is structurally impossible. |
@@ -129,7 +129,7 @@
 | Presentation | Application | Domain, Infrastructure | §3.1, §3.12 |
 | Application | Domain, Repository interfaces | Infrastructure | §3.3, §3.7 |
 | Domain | Repository interfaces only | Framework, DB | §3.5.2, §3.4.2 |
-| Infrastructure | External libraries | Domain logic | — |
+| Infrastructure | External libraries | Domain logic | - |
 
 **Key rule**: Domain layer has **zero** imports from `@nestjs/*`, `@prisma/*`, or any database driver. This ensures:
 - Unit tests run in <100ms with in-memory mocks
@@ -146,25 +146,25 @@ Each **endpoint** (called "endpoint" in the current codebase) is a fully isolate
 |---------|-------------------|---------------|
 | Schema definitions | `endpoint_schema` rows per endpoint | §7643 §7 |
 | Resource types | `endpoint_resource_type` rows per endpoint | §7643 §6 |
-| Config flags | `endpoint.config` JSONB column | — |
+| Config flags | `endpoint.config` JSONB column | - |
 | Resources (Users/Groups) | `scim_resource.endpoint_id` foreign key | §7644 §3 |
-| Request logs | `request_log.endpoint_id` foreign key | — |
-| Auth credentials | `endpoint_credential` rows per endpoint | — |
+| Request logs | `request_log.endpoint_id` foreign key | - |
+| Auth credentials | `endpoint_credential` rows per endpoint | - |
 
-### Current State Assessment — What's Already Strong
+### Current State Assessment - What's Already Strong
 
-> _Sourced from per-endpoint isolation audit — see `SCIM_EXTENSIONS_DEEP_ANALYSIS.md` §2A for detailed 4-layer analysis._
+> _Sourced from per-endpoint isolation audit - see `SCIM_EXTENSIONS_DEEP_ANALYSIS.md` §2A for detailed 4-layer analysis._
 
 The current codebase already provides **architecturally sound multi-endpoint isolation** across 4 layers:
 
 | Layer | Mechanism | Assessment |
 |-------|-----------|------------|
-| **Database** | Composite unique constraints (`endpointId` + `userName`/`displayName`); FK cascades ensure `ON DELETE CASCADE` from endpoint → resources | **Strong** — no cross-endpoint data leakage possible |
-| **URL** | `@Controller('endpoints/:endpointId')` prefix on all resource controllers | **Strong** — every request is scoped by URL parameter |
-| **Runtime** | `AsyncLocalStorage` carries `endpointId` through the request lifecycle | **Strong** — service layer always has endpoint context |
-| **Config** | Per-endpoint JSON blob (`EndpointService.getConfig()`) stores endpoint-specific flags | **Partial** — blob is loaded correctly but 7 of 12 flags are dead code (see G20) |
+| **Database** | Composite unique constraints (`endpointId` + `userName`/`displayName`); FK cascades ensure `ON DELETE CASCADE` from endpoint → resources | **Strong** - no cross-endpoint data leakage possible |
+| **URL** | `@Controller('endpoints/:endpointId')` prefix on all resource controllers | **Strong** - every request is scoped by URL parameter |
+| **Runtime** | `AsyncLocalStorage` carries `endpointId` through the request lifecycle | **Strong** - service layer always has endpoint context |
+| **Config** | Per-endpoint JSON blob (`EndpointService.getConfig()`) stores endpoint-specific flags | **Partial** - blob is loaded correctly but 7 of 12 flags are dead code (see G20) |
 
-**One gap remains:** The **discovery layer** (`/Schemas`, `/ResourceTypes`, `/ServiceProviderConfig`) ignores per-endpoint config entirely — it returns the same hardcoded response for all endpoints. This is addressed by Phase 6 of the Migration Plan.
+**One gap remains:** The **discovery layer** (`/Schemas`, `/ResourceTypes`, `/ServiceProviderConfig`) ignores per-endpoint config entirely - it returns the same hardcoded response for all endpoints. This is addressed by Phase 6 of the Migration Plan.
 
 ### Endpoint Config Flags (JSONB)
 
@@ -629,7 +629,7 @@ Every CRUD operation follows the same pipeline, parameterized by endpoint contex
 └──────────────────────────────┘
 ```
 
-### 7.2 Create (POST) — RFC 7644 §3.3
+### 7.2 Create (POST) - RFC 7644 §3.3
 
 | Requirement | Implementation | RFC Ref |
 |-------------|---------------|---------|
@@ -640,7 +640,7 @@ Every CRUD operation follows the same pipeline, parameterized by endpoint contex
 | `userName` uniqueness (case-insensitive) | CITEXT unique index per endpoint | §7643 §2.1 |
 | `externalId` uniqueness per endpoint | Partial unique index (WHERE NOT NULL) | §3.3 |
 
-### 7.3 Read (GET) — RFC 7644 §3.4.1
+### 7.3 Read (GET) - RFC 7644 §3.4.1
 
 | Requirement | Implementation | RFC Ref |
 |-------------|---------------|---------|
@@ -649,7 +649,7 @@ Every CRUD operation follows the same pipeline, parameterized by endpoint contex
 | ETag in response | `meta.version` = `W/"v{version}"` | §3.14 |
 | If-None-Match → 304 | Interceptor compares header with current version | §3.14 |
 
-### 7.4 List (GET) — RFC 7644 §3.4.2
+### 7.4 List (GET) - RFC 7644 §3.4.2
 
 | Requirement | Implementation | RFC Ref |
 |-------------|---------------|---------|
@@ -658,11 +658,11 @@ Every CRUD operation follows the same pipeline, parameterized by endpoint contex
 | `startIndex` / `count` | `Paginator.paginate()` (1-based) | §3.4.2.4 |
 | ListResponse envelope | `{schemas, totalResults, startIndex, itemsPerPage, Resources}` | §3.4.2 |
 
-### 7.5 Replace (PUT) — RFC 7644 §3.5.1
+### 7.5 Replace (PUT) - RFC 7644 §3.5.1
 
 Full replacement of resource. All mutable attributes from the request body overwrite existing values. Read-only and immutable attributes are preserved. If-Match precondition is checked before the write.
 
-### 7.6 Delete (DELETE) — RFC 7644 §3.6
+### 7.6 Delete (DELETE) - RFC 7644 §3.6
 
 Returns 204 No Content. Also cascades: deletes `resource_member` rows where this resource is a member.
 
@@ -681,7 +681,7 @@ The PATCH engine is the most complex component. It MUST be a pure domain service
 | `replace` | Yes | Overwrite attribute value. Error if immutable/readOnly. | §3.5.2.3 |
 | `replace` | No | Merge, overwriting existing keys | §3.5.2.3 |
 | `remove` | Yes | Delete attribute or array element matching filter | §3.5.2.2 |
-| `remove` | No | **Error** — RFC requires path for remove | §3.5.2.2 |
+| `remove` | No | **Error** - RFC requires path for remove | §3.5.2.2 |
 
 ### 8.2 Path Resolution
 
@@ -704,7 +704,7 @@ The PATCH engine is the most complex component. It MUST be a pure domain service
 ### 8.3 PatchEngine Interface
 
 ```typescript
-// Domain layer — no framework imports
+// Domain layer - no framework imports
 interface IPatchEngine {
   /**
    * Apply PATCH operations to a resource payload.
@@ -739,7 +739,7 @@ The `schemaDefinition` parameter enables the PatchEngine to:
 3. Identify multi-valued vs single-valued for correct `add` behavior
 4. Handle sub-attributes for complex types
 
-### 8.4 Member PATCH — Special Handling
+### 8.4 Member PATCH - Special Handling
 
 Group member operations have specialized logic because members are stored in a separate table:
 
@@ -1110,14 +1110,14 @@ This prevents a token valid for Endpoint A from accessing Endpoint B's data.
 | **Me** | | | | |
 | GET | `/endpoints/{id}/Me` | MeController | §3.11 | 200, 501 |
 | **Admin (non-SCIM)** | | | | |
-| POST | `/admin/endpoints` | EndpointController | — | 201 |
-| GET | `/admin/endpoints` | EndpointController | — | 200 |
-| PATCH | `/admin/endpoints/{id}` | EndpointController | — | 200 |
-| DELETE | `/admin/endpoints/{id}` | EndpointController | — | 204 |
-| POST | `/admin/endpoints/{id}/resource-types` | AdminResourceTypeController | — | 201, 400, 409 |
-| GET | `/admin/endpoints/{id}/resource-types` | AdminResourceTypeController | — | 200 |
-| GET | `/admin/endpoints/{id}/resource-types/{name}` | AdminResourceTypeController | — | 200, 404 |
-| DELETE | `/admin/endpoints/{id}/resource-types/{name}` | AdminResourceTypeController | — | 204, 404 |
+| POST | `/admin/endpoints` | EndpointController | - | 201 |
+| GET | `/admin/endpoints` | EndpointController | - | 200 |
+| PATCH | `/admin/endpoints/{id}` | EndpointController | - | 200 |
+| DELETE | `/admin/endpoints/{id}` | EndpointController | - | 204 |
+| POST | `/admin/endpoints/{id}/resource-types` | AdminResourceTypeController | - | 201, 400, 409 |
+| GET | `/admin/endpoints/{id}/resource-types` | AdminResourceTypeController | - | 200 |
+| GET | `/admin/endpoints/{id}/resource-types/{name}` | AdminResourceTypeController | - | 200, 404 |
+| DELETE | `/admin/endpoints/{id}/resource-types/{name}` | AdminResourceTypeController | - | 204, 404 |
 | **Custom Resource Types (generic)** | | | | |
 | POST | `/endpoints/{id}/{ResourceType}` | GenericController | §3.3 | 201, 400, 404, 409 |
 | GET | `/endpoints/{id}/{ResourceType}` | GenericController | §3.4.2 | 200, 400, 404 |
@@ -1168,7 +1168,7 @@ This prevents a token valid for Endpoint A from accessing Endpoint B's data.
 
 ---
 
-## 17. Appendix A — Complete Mermaid Diagrams
+## 17. Appendix A - Complete Mermaid Diagrams
 
 ### A.1 Create User Sequence
 
@@ -1256,7 +1256,7 @@ sequenceDiagram
 
 ---
 
-## 18. Appendix B — Example JSON Payloads
+## 18. Appendix B - Example JSON Payloads
 
 ### B.1 Create User Request
 
@@ -1320,7 +1320,7 @@ sequenceDiagram
 }
 ```
 
-### B.3 PATCH Request — Multi-Operation
+### B.3 PATCH Request - Multi-Operation
 
 ```json
 {
@@ -1379,7 +1379,7 @@ sequenceDiagram
 }
 ```
 
-### B.6 Endpoint Config — Full Example
+### B.6 Endpoint Config - Full Example
 
 ```json
 {

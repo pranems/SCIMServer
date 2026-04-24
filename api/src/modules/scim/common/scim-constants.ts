@@ -1,4 +1,4 @@
-﻿export const SCIM_CORE_USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User';
+export const SCIM_CORE_USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User';
 export const SCIM_CORE_GROUP_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:Group';
 export const SCIM_ENTERPRISE_USER_SCHEMA = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User';
 export const SCIM_LIST_RESPONSE_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:ListResponse';
@@ -11,7 +11,7 @@ export const SCIM_SEARCH_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:SearchR
 
 /**
  * Custom diagnostics extension URN for SCIM error responses.
- * Added to error bodies to enable self-service RCA — contains
+ * Added to error bodies to enable self-service RCA - contains
  * requestId, endpointId, triggeredBy, and logsUrl.
  * RFC 7644 §3.12 does not prohibit additional fields in error responses.
  */
@@ -41,7 +41,7 @@ export const DEFAULT_COUNT = 100;
 export const MAX_COUNT = 200;
 
 /**
- * RFC 7644 §3.12 — Standard SCIM error scimType values.
+ * RFC 7644 §3.12 - Standard SCIM error scimType values.
  * These are the "detail error keyword" values defined in Table 9.
  * @see https://datatracker.ietf.org/doc/html/rfc7644#section-3.12
  */

@@ -1,5 +1,5 @@
 /**
- * AdminCredentialController — Admin API for managing per-endpoint SCIM credentials.
+ * AdminCredentialController - Admin API for managing per-endpoint SCIM credentials.
  *
  * Phase 11: Provides CRUD endpoints to create, list, and revoke per-endpoint
  * bearer tokens. Tokens are bcrypt-hashed before storage; the plaintext is
@@ -8,9 +8,9 @@
  * Gated behind the `PerEndpointCredentialsEnabled` per-endpoint config flag.
  *
  * Routes:
- *   POST   /admin/endpoints/:endpointId/credentials              — Create new credential
- *   GET    /admin/endpoints/:endpointId/credentials              — List credentials (hash masked)
- *   DELETE /admin/endpoints/:endpointId/credentials/:credentialId — Revoke (deactivate) credential
+ *   POST   /admin/endpoints/:endpointId/credentials              - Create new credential
+ *   GET    /admin/endpoints/:endpointId/credentials              - List credentials (hash masked)
+ *   DELETE /admin/endpoints/:endpointId/credentials/:credentialId - Revoke (deactivate) credential
  */
 import {
   BadRequestException,

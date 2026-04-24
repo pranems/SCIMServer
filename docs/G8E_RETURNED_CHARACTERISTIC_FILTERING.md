@@ -1,19 +1,19 @@
-# G8e — Response `returned` Characteristic Filtering
+# G8e - Response `returned` Characteristic Filtering
 
 ## Overview
 
 **Feature**: RFC 7643 §2.4 `returned` attribute characteristic enforcement  
 **Version**: v0.17.4  
 **Status**: ✅ Complete  
-**RFC Reference**: [RFC 7643 §2.4 — Attribute Characteristics](https://datatracker.ietf.org/doc/html/rfc7643#section-2.4)
+**RFC Reference**: [RFC 7643 §2.4 - Attribute Characteristics](https://datatracker.ietf.org/doc/html/rfc7643#section-2.4)
 
 ### Problem Statement
 
 Prior to G8e, the SCIM server did not enforce the `returned` attribute characteristic defined in RFC 7643 §2.4. This meant:
 
-1. **`returned:'never'` attributes (e.g. `password`) were exposed in responses** — a security violation where sensitive write-only data leaked back to clients in POST, PUT, PATCH, GET, and LIST responses.
-2. **`returned:'request'` attributes were always included** — attributes meant to appear only when explicitly requested via the `attributes` query parameter were returned by default, increasing payload size and exposing data unnecessarily.
-3. **The `password` attribute was missing from the User schema definition** — `/Schemas` discovery did not declare `password` at all, violating RFC 7643 §4.1.
+1. **`returned:'never'` attributes (e.g. `password`) were exposed in responses** - a security violation where sensitive write-only data leaked back to clients in POST, PUT, PATCH, GET, and LIST responses.
+2. **`returned:'request'` attributes were always included** - attributes meant to appear only when explicitly requested via the `attributes` query parameter were returned by default, increasing payload size and exposing data unnecessarily.
+3. **The `password` attribute was missing from the User schema definition** - `/Schemas` discovery did not declare `password` at all, violating RFC 7643 §4.1.
 
 ### Solution
 
@@ -77,8 +77,8 @@ A **two-layer filtering architecture** that enforces `returned` characteristics 
 |-----------|------|---------|
 | `collectReturnedCharacteristics()` | `schema-validator.ts` | Walks schema attribute definitions, collects `returned:'never'` and `returned:'request'` names into two Sets |
 | `stripReturnedNever()` | `scim-attribute-projection.ts` | Deletes never-returned attributes from resource objects, including inside extension URN objects |
-| `stripRequestOnlyAttrs()` | `scim-attribute-projection.ts` | Internal helper — strips `returned:'request'` attrs unless explicitly listed in `attributes` param |
-| `applyAttributeProjection()` | `scim-attribute-projection.ts` | Enhanced with `requestOnlyAttrs` 4th parameter — integrates request-only stripping with existing projection |
+| `stripRequestOnlyAttrs()` | `scim-attribute-projection.ts` | Internal helper - strips `returned:'request'` attrs unless explicitly listed in `attributes` param |
+| `applyAttributeProjection()` | `scim-attribute-projection.ts` | Enhanced with `requestOnlyAttrs` 4th parameter - integrates request-only stripping with existing projection |
 | `getRequestOnlyAttributes()` | Users/Groups service | Public method returning `Set<string>` of request-only attribute names for the endpoint |
 | `getUserReturnedCharacteristics()` | Users service | Private helper combining schema collection with `collectReturnedCharacteristics()` |
 | `getUserSchemaDefinitions()` | Users service | Gets core + extension schema definitions from `ScimSchemaRegistry` |
@@ -200,7 +200,7 @@ static collectReturnedCharacteristics(
 
 ## Configuration
 
-This feature has **no configuration flags** — `returned` characteristic enforcement is mandatory per RFC 7643 §2.4 and applies to all endpoints unconditionally. Unlike G8c (which is gated behind `StrictSchemaValidation`), G8e cannot be disabled.
+This feature has **no configuration flags** - `returned` characteristic enforcement is mandatory per RFC 7643 §2.4 and applies to all endpoints unconditionally. Unlike G8c (which is gated behind `StrictSchemaValidation`), G8e cannot be disabled.
 
 ## Test Coverage
 
@@ -231,20 +231,20 @@ This feature has **no configuration flags** — `returned` characteristic enforc
 |-----------|-------|-------------|
 | `returned-characteristic.e2e-spec.ts` | 8 | POST password not returned; GET password not returned; LIST password stripped from all resources; PUT password stripped; PATCH password stripped; SEARCH password stripped; `?attributes=password` still excluded; `/Schemas` shows `password` with `returned:'never'` |
 
-### Live Integration Tests (10 new — Section 9l)
+### Live Integration Tests (10 new - Section 9l)
 
 | Test ID | Description |
 |---------|-------------|
-| 9l.1 | POST /Users with password — password stripped from response |
-| 9l.2 | GET /Users/:id — password stripped |
-| 9l.3 | GET /Users list — password stripped from all resources |
-| 9l.4 | PUT /Users with password — password stripped from response |
-| 9l.5 | PATCH /Users — password stripped from response |
-| 9l.6 | POST /Users/.search — password stripped from results |
-| 9l.7 | GET /Users?attributes=password — returned:never overrides explicit request |
-| 9l.8 | GET /Users?attributes=password,userName — mixed request (password stripped, userName returned) |
-| 9l.9 | GET /Schemas — password attribute metadata (returned=never, mutability=writeOnly) |
-| 9l.10 | POST /.search with attributes=password — returned:never wins |
+| 9l.1 | POST /Users with password - password stripped from response |
+| 9l.2 | GET /Users/:id - password stripped |
+| 9l.3 | GET /Users list - password stripped from all resources |
+| 9l.4 | PUT /Users with password - password stripped from response |
+| 9l.5 | PATCH /Users - password stripped from response |
+| 9l.6 | POST /Users/.search - password stripped from results |
+| 9l.7 | GET /Users?attributes=password - returned:never overrides explicit request |
+| 9l.8 | GET /Users?attributes=password,userName - mixed request (password stripped, userName returned) |
+| 9l.9 | GET /Schemas - password attribute metadata (returned=never, mutability=writeOnly) |
+| 9l.10 | POST /.search with attributes=password - returned:never wins |
 
 **Live test results**: 361/361 passing on both local (inmemory) and Docker (PostgreSQL) deployments.
 
@@ -283,9 +283,9 @@ This feature has **no configuration flags** — `returned` characteristic enforc
 
 G8e implements item **G8e** from the migration plan (`MIGRATION_PLAN_CURRENT_TO_IDEAL_v3_2026-02-20.md`):
 
-> **G8e**: Response filtering based on `returned` value — `always`, `default`, `never`, `request`
+> **G8e**: Response filtering based on `returned` value - `always`, `default`, `never`, `request`
 
-**Status**: ✅ DONE — `returned:'never'` and `returned:'request'` fully enforced. `returned:'always'` and `returned:'default'` were already handled by existing attribute projection logic.
+**Status**: ✅ DONE - `returned:'never'` and `returned:'request'` fully enforced. `returned:'always'` and `returned:'default'` were already handled by existing attribute projection logic.
 
 ## Mermaid Diagrams
 

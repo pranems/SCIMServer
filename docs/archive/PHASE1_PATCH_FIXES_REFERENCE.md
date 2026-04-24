@@ -1,4 +1,4 @@
-# Phase 1 PATCH Fixes — Detailed Reference
+# Phase 1 PATCH Fixes - Detailed Reference
 
 > **Scope**: 5 changes resolving 7 of 13 Microsoft SCIM Validator failures  
 > **RFC References**: RFC 7643 (Schema), RFC 7644 (Protocol), RFC 7643 §8 (Extension Schema)  
@@ -8,20 +8,20 @@
 
 ## Table of Contents
 
-1. [Change 1 — Content-Type: application/scim+json](#change-1--content-type-applicationscimjson)
-2. [Change 2 — No-Path PATCH Replace for Users](#change-2--no-path-patch-replace-for-users)
-3. [Change 3 — No-Path PATCH Replace for Groups](#change-3--no-path-patch-replace-for-groups)
-4. [Change 4 — ValuePath Filter Expressions](#change-4--valuepath-filter-expressions)
-5. [Change 5 — Enterprise Extension URN Paths](#change-5--enterprise-extension-urn-paths)
+1. [Change 1 - Content-Type: application/scim+json](#change-1--content-type-applicationscimjson)
+2. [Change 2 - No-Path PATCH Replace for Users](#change-2--no-path-patch-replace-for-users)
+3. [Change 3 - No-Path PATCH Replace for Groups](#change-3--no-path-patch-replace-for-groups)
+4. [Change 4 - ValuePath Filter Expressions](#change-4--valuepath-filter-expressions)
+5. [Change 5 - Enterprise Extension URN Paths](#change-5--enterprise-extension-urn-paths)
 6. [Branch Priority & Decision Tree](#branch-priority--decision-tree)
 
 ---
 
-## Change 1 — Content-Type: application/scim+json
+## Change 1 - Content-Type: application/scim+json
 
 ### SCIM Specification
 
-**RFC 7644 §3.1 — Background** states:
+**RFC 7644 §3.1 - Background** states:
 
 > *"SCIM is a protocol that, like any other, has its own rules about the
 > form and content of data exchanged between client and server. These
@@ -31,7 +31,7 @@
 >
 > *Clients and servers SHOULD use the "application/scim+json" media type."*
 
-**RFC 7644 §3.1 — Request/Response**:
+**RFC 7644 §3.1 - Request/Response**:
 
 > *"Responses MUST be identified using the following media type:
 > `application/scim+json`"*
@@ -71,7 +71,7 @@ Host: localhost:6000
 Accept: application/scim+json
 ```
 
-### Response — BEFORE Fix
+### Response - BEFORE Fix
 
 ```http
 HTTP/1.1 200 OK
@@ -80,7 +80,7 @@ Content-Type: application/json; charset=utf-8   ← WRONG
 { "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"], ... }
 ```
 
-### Response — AFTER Fix
+### Response - AFTER Fix
 
 ```http
 HTTP/1.1 200 OK
@@ -114,17 +114,17 @@ ScimContentTypeInterceptor.intercept()
 
 ---
 
-## Change 2 — No-Path PATCH Replace for Users
+## Change 2 - No-Path PATCH Replace for Users
 
 ### SCIM Specification
 
-**RFC 7644 §3.5.2.1 — Replace** states:
+**RFC 7644 §3.5.2.1 - Replace** states:
 
 > *"If 'path' is omitted, the target is assumed to be the resource
 > itself. The value attribute SHALL contain a set of one or more
 > attributes that are to be replaced."*
 
-This means when a PATCH operation has `op: "replace"` with **no `path`**, the entire `value` object's keys should be treated as top-level attributes to replace on the resource. Keys like `userName`, `externalId`, `active` must update their dedicated database columns — not be dumped into a generic JSON blob.
+This means when a PATCH operation has `op: "replace"` with **no `path`**, the entire `value` object's keys should be treated as top-level attributes to replace on the resource. Keys like `userName`, `externalId`, `active` must update their dedicated database columns - not be dumped into a generic JSON blob.
 
 **RFC 7644 §3.5.2.1 Example** (simplified):
 
@@ -152,7 +152,7 @@ The `applyPatchOperationsForEndpoint()` method now has a dedicated branch for no
 ```mermaid
 flowchart TD
     A["PATCH operation received<br/>op='replace', path=undefined"] --> B{"typeof value === 'object'<br/>&& value !== null?"}
-    B -->|No| Z["Skip — no applicable branch"]
+    B -->|No| Z["Skip - no applicable branch"]
     B -->|Yes| C["Create shallow copy:<br/>updateObj = { ...value }"]
     
     C --> D{"'userName' in updateObj?"}
@@ -262,16 +262,16 @@ flowchart LR
 
 ---
 
-## Change 3 — No-Path PATCH Replace for Groups
+## Change 3 - No-Path PATCH Replace for Groups
 
 ### SCIM Specification
 
-Same as Change 2 — **RFC 7644 §3.5.2.1**:
+Same as Change 2 - **RFC 7644 §3.5.2.1**:
 
 > *"If 'path' is omitted, the target is assumed to be the resource
 > itself."*
 
-Additionally, for Groups the `externalId` attribute is defined in **RFC 7643 §3.1 — Common Attributes**:
+Additionally, for Groups the `externalId` attribute is defined in **RFC 7643 §3.1 - Common Attributes**:
 
 > *"A String that is an identifier for the resource as defined by the
 > provisioning client."*
@@ -345,7 +345,7 @@ Content-Type: application/scim+json
 }
 ```
 
-### Response — BEFORE Fix (400 Error)
+### Response - BEFORE Fix (400 Error)
 
 ```json
 {
@@ -358,7 +358,7 @@ Content-Type: application/scim+json
 
 The old code only accepted a raw string for no-path replace. An object triggered the `typeof value !== 'string'` validation error.
 
-### Response — AFTER Fix (200 OK)
+### Response - AFTER Fix (200 OK)
 
 ```json
 {
@@ -416,17 +416,17 @@ flowchart LR
 
 ---
 
-## Change 4 — ValuePath Filter Expressions
+## Change 4 - ValuePath Filter Expressions
 
 ### SCIM Specification
 
-**RFC 7644 §3.5.2 — Modifying with PATCH** defines `valuePath`:
+**RFC 7644 §3.5.2 - Modifying with PATCH** defines `valuePath`:
 
 > *"Each operation against an attribute MUST be compatible with the
 > attribute's mutability and schema ... For multi-valued attributes,
 > a filter (valuePath) can be specified to select specific values."*
 
-**RFC 7644 §3.5.2.1 — Replace** with valuePath:
+**RFC 7644 §3.5.2.1 - Replace** with valuePath:
 
 > *"If the target location path specifies a multi-valued attribute for
 > which a value selection filter is supplied, the filter will be used to
@@ -449,11 +449,11 @@ Example: `emails[type eq "work"].value` means:
 ### What Changed
 
 New utility file `scim-patch-path.ts` provides:
-- `isValuePath(path)` — detects bracket expressions
-- `parseValuePath(path)` — regex extraction into structured `ValuePathExpression`
-- `matchesFilter(item, attr, op, val)` — case-insensitive filter matching
-- `applyValuePathUpdate(payload, parsed, value)` — in-place update of matching element
-- `removeValuePathEntry(payload, parsed)` — removal of matching element or sub-attribute
+- `isValuePath(path)` - detects bracket expressions
+- `parseValuePath(path)` - regex extraction into structured `ValuePathExpression`
+- `matchesFilter(item, attr, op, val)` - case-insensitive filter matching
+- `applyValuePathUpdate(payload, parsed, value)` - in-place update of matching element
+- `removeValuePathEntry(payload, parsed)` - removal of matching element or sub-attribute
 
 ### Parsing Diagram
 
@@ -501,7 +501,7 @@ flowchart TD
     style H fill:#fff9c4
 ```
 
-### Example Request — Replace Work Email Value
+### Example Request - Replace Work Email Value
 
 ```http
 PATCH /scim/endpoints/ep-001/Users/abc-123 HTTP/1.1
@@ -585,7 +585,7 @@ flowchart LR
 | `emails[0].primary` | ❌ Unchanged | Not the targeted sub-attribute |
 | `emails[1]` | ❌ Unchanged | Does not match filter `type eq "work"` |
 
-### Example Request — Remove Work Email Entirely
+### Example Request - Remove Work Email Entirely
 
 ```http
 PATCH /scim/endpoints/ep-001/Users/abc-123 HTTP/1.1
@@ -653,23 +653,23 @@ Per RFC 7644 §3.4.2.2, the parser regex supports:
 
 ---
 
-## Change 5 — Enterprise Extension URN Paths
+## Change 5 - Enterprise Extension URN Paths
 
 ### SCIM Specification
 
-**RFC 7643 §3.3 — Attribute Extensions** defines the mechanism:
+**RFC 7643 §3.3 - Attribute Extensions** defines the mechanism:
 
 > *"SCIM allows for extensions to define additional schema that
 > extends existing resources and/or creates new resource types."*
 
-**RFC 7643 §8 — Enterprise User Extension** defines the URN:
+**RFC 7643 §8 - Enterprise User Extension** defines the URN:
 
 > *`urn:ietf:params:scim:schemas:extension:enterprise:2.0:User`*
 >
 > *Attributes: employeeNumber, costCenter, organization, division,
 > department, manager.*
 
-**RFC 7644 §3.10 — PATCH Path Filter** for extensions:
+**RFC 7644 §3.10 - PATCH Path Filter** for extensions:
 
 > *"attrPath  = [URI ":"] ATTRNAME *1subAttr"*
 >
@@ -685,10 +685,10 @@ Must be interpreted as: **within the extension schema `urn:...:User`**, update t
 ### What Changed
 
 New functions in `scim-patch-path.ts`:
-- `isExtensionPath(path)` — checks if path starts with a known extension URN + `:`
-- `parseExtensionPath(path)` — splits into `{ schemaUrn, attributePath }`
-- `applyExtensionUpdate(payload, parsed, value)` — creates/updates nested attribute in extension object
-- `removeExtensionAttribute(payload, parsed)` — removes attribute from extension object
+- `isExtensionPath(path)` - checks if path starts with a known extension URN + `:`
+- `parseExtensionPath(path)` - splits into `{ schemaUrn, attributePath }`
+- `applyExtensionUpdate(payload, parsed, value)` - creates/updates nested attribute in extension object
+- `removeExtensionAttribute(payload, parsed)` - removes attribute from extension object
 
 ### URN Parsing Diagram
 
@@ -731,7 +731,7 @@ flowchart TD
     style E2 fill:#c8e6c9
 ```
 
-### Example Request — Add Manager
+### Example Request - Add Manager
 
 ```http
 PATCH /scim/endpoints/ep-001/Users/abc-123 HTTP/1.1
@@ -794,7 +794,7 @@ Content-Type: application/scim+json
 
 **Before the fix**: The path `urn:ietf:...:User:manager` fell through to the generic simple-path branch, which stored it as a **flat key**: `rawPayload["urn:...:User:manager"] = {...}`. This created a sibling key next to the existing `rawPayload["urn:...:User"]` object instead of nesting `manager` inside it. The SCIM Validator expected nested structure and failed.
 
-### Example Request — Remove Manager
+### Example Request - Remove Manager
 
 ```http
 PATCH /scim/endpoints/ep-001/Users/abc-123 HTTP/1.1
@@ -919,8 +919,8 @@ flowchart TD
 | Priority | Branch | Why it must come first |
 |----------|--------|----------------------|
 | 1-3 | `active` / `username` / `externalid` | DB columns must be caught before generic handlers would store them in rawPayload |
-| 4 | Extension URN | Must be checked before valuePath — URN paths contain `:` but never `[`, so there's no ambiguity, but checking first avoids accidental partial-match on the simple-path fallback |
-| 5 | ValuePath | Must be checked before simple-path — `emails[type eq "work"].value` contains dots and brackets that would be treated as a literal key name by the simple-path handler |
+| 4 | Extension URN | Must be checked before valuePath - URN paths contain `:` but never `[`, so there's no ambiguity, but checking first avoids accidental partial-match on the simple-path fallback |
+| 5 | ValuePath | Must be checked before simple-path - `emails[type eq "work"].value` contains dots and brackets that would be treated as a literal key name by the simple-path handler |
 | 6 | Simple path | Catch-all for any remaining named attribute |
 | 7 | No-path object | Only fires when path is truly absent; must be last to avoid false matches |
 

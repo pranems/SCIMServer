@@ -1,5 +1,5 @@
 /**
- * Unit tests for SCIM Sort Utility — RFC 7644 §3.4.2.3
+ * Unit tests for SCIM Sort Utility - RFC 7644 §3.4.2.3
  */
 import {
   resolveUserSortParams,
@@ -147,7 +147,7 @@ describe('scim-sort.util', () => {
 
   // ─── G6: writeOnly attributes in sortBy ─────────────────────────
 
-  describe('G6 — writeOnly attribute in sortBy silently ignored', () => {
+  describe('G6 - writeOnly attribute in sortBy silently ignored', () => {
     it('should fall back to default sort for password (writeOnly, not in sort map)', () => {
       const result = resolveUserSortParams('password');
       expect(result.field).toBe('createdAt'); // silent fallback per RFC 7644 §3.4.2.3
@@ -160,7 +160,7 @@ describe('scim-sort.util', () => {
     });
 
     it('should NOT leak writeOnly attribute values via sort ordering', () => {
-      // Password is writeOnly — if it were in the sort map, an attacker could
+      // Password is writeOnly - if it were in the sort map, an attacker could
       // infer password values by observing sort ordering. The silent fallback
       // to createdAt prevents this. RFC 7644 §3.4.2.3: unknown attrs SHALL be ignored.
       const userResult = resolveUserSortParams('password');
