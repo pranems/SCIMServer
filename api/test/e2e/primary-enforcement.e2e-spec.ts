@@ -15,6 +15,7 @@ import {
   scimPut,
   scimPatch,
   createEndpointWithConfig,
+  createEndpoint,
   scimBasePath,
 } from './helpers/request.helper';
 import {
@@ -149,6 +150,29 @@ describe('G8h: PrimaryEnforcement = reject', () => {
     expect(res.body.detail).toContain('primary');
     expect(res.body.detail).toContain('emails');
   });
+
+  it('PATCH adding duplicate primaries should return 400', async () => {
+    // Create user with one email
+    const created = (await scimPost(app, `${basePath}/Users`, token, validUser({
+      emails: [{ value: 'orig@x.com', type: 'work', primary: true }],
+    })).expect(201)).body;
+
+    // PATCH replace emails with 2 primaries
+    const res = await scimPatch(app, `${basePath}/Users/${created.id}`, token, {
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+      Operations: [{
+        op: 'replace',
+        path: 'emails',
+        value: [
+          { value: 'a@x.com', type: 'work', primary: true },
+          { value: 'b@x.com', type: 'home', primary: true },
+        ],
+      }],
+    }).expect(400);
+
+    expect(res.body.scimType).toBe('invalidValue');
+    expect(res.body.detail).toContain('primary');
+  });
 });
 
 // ─── passthrough mode ───────────────────────────────────────────────────────
@@ -171,6 +195,74 @@ describe('G8h: PrimaryEnforcement = passthrough', () => {
       ],
     })).expect(201);
 
+    const emails = res.body.emails;
+    expect(emails).toHaveLength(2);
+    expect(emails[0].primary).toBe(true);
+    expect(emails[1].primary).toBe(true);
+  });
+
+  it('PATCH replacing emails with 2 primaries should store both as-is', async () => {
+    // Create user first
+    const created = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+    // PATCH replace emails with 2 primaries - passthrough stores as-is
+    const res = await scimPatch(app, `${basePath}/Users/${created.id}`, token, {
+      schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+      Operations: [{
+        op: 'replace',
+        path: 'emails',
+        value: [
+          { value: 'a@x.com', type: 'work', primary: true },
+          { value: 'b@x.com', type: 'home', primary: true },
+        ],
+      }],
+    }).expect(200);
+
+    const emails = res.body.emails;
+    expect(emails).toHaveLength(2);
+    expect(emails[0].primary).toBe(true);
+    expect(emails[1].primary).toBe(true);
+  });
+});
+
+// ─── default mode (no flag set) ─────────────────────────────────────────────
+
+describe('G8h: PrimaryEnforcement = default (not explicitly set)', () => {
+  let endpointId: string;
+  let basePath: string;
+
+  beforeEach(async () => {
+    resetFixtureCounter();
+    // Create endpoint with 'minimal' preset which does NOT set PrimaryEnforcement.
+    // Code default should be 'passthrough'.
+    const request = await import('supertest');
+    const res = await request.default(app.getHttpServer())
+      .post('/scim/admin/endpoints')
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ name: `e2e-default-primary-${Date.now()}`, profilePreset: 'minimal' })
+      .expect(201);
+    endpointId = res.body.id;
+    basePath = scimBasePath(endpointId);
+
+    // PATCH StrictSchemaValidation=False for backward compat (minimal defaults to true)
+    await request.default(app.getHttpServer())
+      .patch(`/scim/admin/endpoints/${endpointId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .set('Content-Type', 'application/json')
+      .send({ profile: { settings: { StrictSchemaValidation: 'False' } } })
+      .expect(200);
+  });
+
+  it('POST /Users with 2 primary emails should passthrough (default mode)', async () => {
+    const res = await scimPost(app, `${basePath}/Users`, token, validUser({
+      emails: [
+        { value: 'a@x.com', type: 'work', primary: true },
+        { value: 'b@x.com', type: 'home', primary: true },
+      ],
+    })).expect(201);
+
+    // Default is passthrough - both primaries stored as-is
     const emails = res.body.emails;
     expect(emails).toHaveLength(2);
     expect(emails[0].primary).toBe(true);

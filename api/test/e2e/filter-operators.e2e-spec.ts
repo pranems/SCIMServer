@@ -281,4 +281,99 @@ describe('Filter Operators (E2E)', () => {
       expect(res.body.totalResults).toBe(0);
     });
   });
+
+  // ───────────── gt / ge / lt / le (ordering operators) ─────────────
+
+  describe('gt/ge/lt/le ordering operators', () => {
+    it('should find users with userName gt a given value', async () => {
+      await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'alpha-gt@test.com' })).expect(201);
+      await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'zulu-gt@test.com' })).expect(201);
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Users?filter=userName gt "m"`,
+        token,
+      ).expect(200);
+
+      // 'zulu-gt@test.com' > 'm', 'alpha-gt@test.com' < 'm'
+      expect(res.body.totalResults).toBe(1);
+      expect(res.body.Resources[0].userName).toBe('zulu-gt@test.com');
+    });
+
+    it('should find users with userName ge a given value', async () => {
+      await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'match-ge@test.com' })).expect(201);
+      await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'alpha-ge@test.com' })).expect(201);
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Users?filter=userName ge "match-ge@test.com"`,
+        token,
+      ).expect(200);
+
+      // 'match-ge@test.com' >= 'match-ge@test.com' (exact match included)
+      expect(res.body.totalResults).toBeGreaterThanOrEqual(1);
+      expect(res.body.Resources.some((r: Record<string, unknown>) => r.userName === 'match-ge@test.com')).toBe(true);
+    });
+
+    it('should find users with userName lt a given value', async () => {
+      await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'alpha-lt@test.com' })).expect(201);
+      await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'zulu-lt@test.com' })).expect(201);
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Users?filter=userName lt "m"`,
+        token,
+      ).expect(200);
+
+      // 'alpha-lt@test.com' < 'm', 'zulu-lt@test.com' > 'm'
+      expect(res.body.totalResults).toBe(1);
+      expect(res.body.Resources[0].userName).toBe('alpha-lt@test.com');
+    });
+
+    it('should find users with userName le a given value', async () => {
+      await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'match-le@test.com' })).expect(201);
+      await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'zulu-le@test.com' })).expect(201);
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Users?filter=userName le "match-le@test.com"`,
+        token,
+      ).expect(200);
+
+      // 'match-le@test.com' <= 'match-le@test.com' (exact match included)
+      expect(res.body.totalResults).toBeGreaterThanOrEqual(1);
+      expect(res.body.Resources.some((r: Record<string, unknown>) => r.userName === 'match-le@test.com')).toBe(true);
+      // zulu-le should NOT be included (> match)
+      expect(res.body.Resources.some((r: Record<string, unknown>) => r.userName === 'zulu-le@test.com')).toBe(false);
+    });
+
+    it('should filter Groups with displayName gt', async () => {
+      await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'Alpha Group GT' })).expect(201);
+      await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'Zulu Group GT' })).expect(201);
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Groups?filter=displayName gt "M"`,
+        token,
+      ).expect(200);
+
+      // 'Zulu Group GT' > 'M', 'Alpha Group GT' < 'M'
+      expect(res.body.totalResults).toBe(1);
+      expect(res.body.Resources[0].displayName).toBe('Zulu Group GT');
+    });
+
+    it('should filter Groups with displayName lt', async () => {
+      await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'Alpha Group LT' })).expect(201);
+      await scimPost(app, `${basePath}/Groups`, token, validGroup({ displayName: 'Zulu Group LT' })).expect(201);
+
+      const res = await scimGet(
+        app,
+        `${basePath}/Groups?filter=displayName lt "M"`,
+        token,
+      ).expect(200);
+
+      expect(res.body.totalResults).toBe(1);
+      expect(res.body.Resources[0].displayName).toBe('Alpha Group LT');
+    });
+  });
 });
