@@ -1386,4 +1386,144 @@ describe('EndpointScimGenericService', () => {
       }
     });
   });
+
+  // ─── G8h: PrimaryEnforcement on generic resources ────────────────────
+
+  describe('G8h: PrimaryEnforcement on generic resources', () => {
+    // Schema definition with a multi-valued complex attribute that has a primary sub-attribute
+    const deviceSchemaWithPrimary = {
+      id: 'urn:ietf:params:scim:schemas:core:2.0:Device',
+      name: 'Device',
+      attributes: [
+        { name: 'displayName', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default' },
+        {
+          name: 'contacts',
+          type: 'complex',
+          multiValued: true,
+          required: false,
+          mutability: 'readWrite',
+          returned: 'default',
+          subAttributes: [
+            { name: 'value', type: 'string', multiValued: false },
+            { name: 'type', type: 'string', multiValued: false },
+            { name: 'primary', type: 'boolean', multiValued: false },
+          ],
+        },
+      ],
+    };
+
+    const deviceWithPrimarySchema: ScimResourceType = {
+      ...deviceResourceType,
+      schemaExtensions: [],
+    };
+
+    const bodyWithDuplicatePrimary = {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:Device'],
+      displayName: 'Primary Test Device',
+      contacts: [
+        { value: 'a@x.com', type: 'admin', primary: true },
+        { value: 'b@x.com', type: 'tech', primary: true },
+      ],
+    };
+
+    // Set up EndpointContextStorage to return a profile with the Device schema
+    // that includes a contacts attribute with primary sub-attribute
+    function setupProfileWithPrimarySchema(): void {
+      const mockStorage = service['endpointContext'] as any;
+      mockStorage.getProfile = jest.fn().mockReturnValue({
+        schemas: [deviceSchemaWithPrimary],
+        resourceTypes: [{ name: 'Device', endpoint: '/Devices', schema: deviceSchemaWithPrimary.id }],
+      });
+    }
+
+    it('createResource should normalize duplicate primaries when PrimaryEnforcement=normalize', async () => {
+      setupProfileWithPrimarySchema();
+      const config: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT]: 'normalize',
+      };
+
+      mockGenericRepo.create.mockResolvedValue({
+        ...mockGenericRecord,
+        rawPayload: JSON.stringify({
+          displayName: 'Primary Test Device',
+          contacts: [
+            { value: 'a@x.com', type: 'admin', primary: true },
+            { value: 'b@x.com', type: 'tech', primary: false },
+          ],
+        }),
+      });
+
+      // normalize mode should not throw - it auto-fixes
+      const body = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Device'],
+        displayName: 'Primary Test Device',
+        contacts: [
+          { value: 'a@x.com', type: 'admin', primary: true },
+          { value: 'b@x.com', type: 'tech', primary: true },
+        ],
+      };
+      const result = await service.createResource(body, baseUrl, endpointId, deviceWithPrimarySchema, config);
+
+      expect(result).toBeDefined();
+      expect(mockGenericRepo.create).toHaveBeenCalledTimes(1);
+      // Verify the body was mutated: second primary should be cleared
+      expect(body.contacts[0].primary).toBe(true);
+      expect(body.contacts[1].primary).toBe(false);
+    });
+
+    it('createResource should reject duplicate primaries when PrimaryEnforcement=reject', async () => {
+      setupProfileWithPrimarySchema();
+      const config: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT]: 'reject',
+      };
+
+      const body = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Device'],
+        displayName: 'Primary Test Device',
+        contacts: [
+          { value: 'a@x.com', type: 'admin', primary: true },
+          { value: 'b@x.com', type: 'tech', primary: true },
+        ],
+      };
+
+      try {
+        await service.createResource(body, baseUrl, endpointId, deviceWithPrimarySchema, config);
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+        const resp = e.getResponse();
+        expect(resp.scimType).toBe('invalidValue');
+        expect(resp.detail).toContain('primary');
+        expect(resp.detail).toContain('contacts');
+      }
+    });
+
+    it('createResource should passthrough duplicate primaries when PrimaryEnforcement=passthrough', async () => {
+      setupProfileWithPrimarySchema();
+      const config: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.PRIMARY_ENFORCEMENT]: 'passthrough',
+      };
+
+      mockGenericRepo.create.mockResolvedValue({
+        ...mockGenericRecord,
+        rawPayload: JSON.stringify(bodyWithDuplicatePrimary),
+      });
+
+      const body = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:Device'],
+        displayName: 'Primary Test Device',
+        contacts: [
+          { value: 'a@x.com', type: 'admin', primary: true },
+          { value: 'b@x.com', type: 'tech', primary: true },
+        ],
+      };
+      const result = await service.createResource(body, baseUrl, endpointId, deviceWithPrimarySchema, config);
+
+      expect(result).toBeDefined();
+      expect(mockGenericRepo.create).toHaveBeenCalledTimes(1);
+      // Passthrough: both primaries should remain true (no mutation)
+      expect(body.contacts[0].primary).toBe(true);
+      expect(body.contacts[1].primary).toBe(true);
+    });
+  });
 });

@@ -8401,6 +8401,161 @@ try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$q11EpId" -Method DE
 Write-Host "`n--- 9z-Q: Test Gaps Audit #5 Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-R: TEST GAPS AUDIT #6 - FILTER ORDERING + PRIMARY DEFAULT
+$script:currentSection = "9z-R: Audit #6"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-R: TEST GAPS AUDIT #6 - FILTER ORDERING + PRIMARY DEFAULT" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# --- Setup: Create test endpoint with minimal preset (no PrimaryEnforcement set) ---
+Write-Host "`n--- Setup: Create Endpoint with Minimal Preset ---" -ForegroundColor Cyan
+$r1EpBody = @{
+    name = "live-test-9zr-$(Get-Random)"
+    displayName = "9z-R Audit Endpoint"
+    profilePreset = "minimal"
+} | ConvertTo-Json
+$r1Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $r1EpBody
+$r1EpId = $r1Ep.id
+$scimBaseR = "$baseUrl/scim/endpoints/$r1EpId"
+Test-Result -Success ($null -ne $r1EpId) -Message "9z-R.setup: Created endpoint with minimal preset"
+
+# PATCH StrictSchemaValidation=False for test compat
+$r1SettingsBody = @{ profile = @{ settings = @{ StrictSchemaValidation = "False" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$r1EpId" -Method PATCH -Headers $headers -Body $r1SettingsBody -ContentType "application/json" | Out-Null
+
+# --- Test 9z-R.1: Default PrimaryEnforcement = passthrough ---
+Write-Host "`n--- Test 9z-R.1: Default PrimaryEnforcement (passthrough) ---" -ForegroundColor Cyan
+$r1UserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "9zr-primary-default-$(Get-Random)@test.com"
+    displayName = "9z-R Primary Default Test"
+    active = $true
+    emails = @(
+        @{ value = "a-default@x.com"; type = "work"; primary = $true },
+        @{ value = "b-default@x.com"; type = "home"; primary = $true }
+    )
+} | ConvertTo-Json -Depth 3
+$r1User = Invoke-RestMethod -Uri "$scimBaseR/Users" -Method POST -Headers $headers -Body $r1UserBody -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $r1User.id) -Message "9z-R.1: POST with 2 primary emails succeeds (passthrough default)"
+$r1Emails = $r1User.emails
+Test-Result -Success ($r1Emails[0].primary -eq $true -and $r1Emails[1].primary -eq $true) -Message "9z-R.2: Both primary=true stored as-is (passthrough)"
+
+# --- Test 9z-R.3: PATCH reject mode on a different endpoint ---
+Write-Host "`n--- Test 9z-R.3: PATCH reject mode ---" -ForegroundColor Cyan
+$r2EpBody = @{
+    name = "live-test-9zr-reject-$(Get-Random)"
+    displayName = "9z-R Reject Endpoint"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json
+$r2Ep = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $r2EpBody
+$r2EpId = $r2Ep.id
+$scimBaseR2 = "$baseUrl/scim/endpoints/$r2EpId"
+
+# rfc-standard already has PrimaryEnforcement=reject, but set StrictSchema=False
+$r2SettingsBody = @{ profile = @{ settings = @{ StrictSchemaValidation = "False" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$r2EpId" -Method PATCH -Headers $headers -Body $r2SettingsBody -ContentType "application/json" | Out-Null
+
+# Create a user first
+$r2User1Body = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "9zr-reject-$(Get-Random)@test.com"
+    displayName = "9z-R Reject User"
+    active = $true
+    emails = @(@{ value = "one@x.com"; type = "work"; primary = $true })
+} | ConvertTo-Json -Depth 3
+$r2User1 = Invoke-RestMethod -Uri "$scimBaseR2/Users" -Method POST -Headers $headers -Body $r2User1Body -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $r2User1.id) -Message "9z-R.3: Created user for PATCH reject test"
+
+# PATCH to add duplicate primaries - should be rejected (400)
+$r2PatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        path = "emails"
+        value = @(
+            @{ value = "a@x.com"; type = "work"; primary = $true },
+            @{ value = "b@x.com"; type = "home"; primary = $true }
+        )
+    })
+} | ConvertTo-Json -Depth 5
+try {
+    $null = Invoke-RestMethod -Uri "$scimBaseR2/Users/$($r2User1.id)" -Method PATCH -Headers $headers -Body $r2PatchBody -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9z-R.4: PATCH with 2 primaries should be rejected (reject mode)"
+} catch {
+    $statusCode = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($statusCode -eq 400) -Message "9z-R.4: PATCH with 2 primaries rejected with 400 (got $statusCode)"
+}
+
+# --- Test 9z-R.5-8: Filter ordering operators (gt/ge/lt/le) ---
+Write-Host "`n--- Test 9z-R.5: Filter Ordering Operators ---" -ForegroundColor Cyan
+$r3User1Body = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "alpha-filter-9zr-$(Get-Random)@test.com"
+    displayName = "Alpha User"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$r3User1 = Invoke-RestMethod -Uri "$scimBaseR/Users" -Method POST -Headers $headers -Body $r3User1Body -ContentType "application/scim+json"
+
+$r3User2Body = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "zulu-filter-9zr-$(Get-Random)@test.com"
+    displayName = "Zulu User"
+    active = $true
+} | ConvertTo-Json -Depth 3
+$r3User2 = Invoke-RestMethod -Uri "$scimBaseR/Users" -Method POST -Headers $headers -Body $r3User2Body -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $r3User1.id -and $null -ne $r3User2.id) -Message "9z-R.5: Created 2 users for filter ordering tests"
+
+# gt operator
+$gtResult = Invoke-RestMethod -Uri "$scimBaseR/Users?filter=userName gt `"m`"" -Method GET -Headers $headers
+Test-Result -Success ($gtResult.totalResults -ge 1) -Message "9z-R.6: userName gt 'm' returns results (zulu)"
+
+# lt operator
+$ltResult = Invoke-RestMethod -Uri "$scimBaseR/Users?filter=userName lt `"m`"" -Method GET -Headers $headers
+Test-Result -Success ($ltResult.totalResults -ge 1) -Message "9z-R.7: userName lt 'm' returns results (alpha)"
+
+# ge operator (exact match included)
+$geResult = Invoke-RestMethod -Uri "$scimBaseR/Users?filter=userName ge `"$($r3User1.userName)`"" -Method GET -Headers $headers
+Test-Result -Success ($geResult.totalResults -ge 1) -Message "9z-R.8: userName ge exact match included"
+
+# le operator (exact match included)
+$leResult = Invoke-RestMethod -Uri "$scimBaseR/Users?filter=userName le `"$($r3User1.userName)`"" -Method GET -Headers $headers
+Test-Result -Success ($leResult.totalResults -ge 1) -Message "9z-R.9: userName le exact match included"
+
+# --- Test 9z-R.10-11: Group filter ordering ---
+Write-Host "`n--- Test 9z-R.10: Group Filter Ordering ---" -ForegroundColor Cyan
+$r4Grp1Body = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = "Alpha Group 9zR"
+} | ConvertTo-Json -Depth 3
+$r4Grp1 = Invoke-RestMethod -Uri "$scimBaseR/Groups" -Method POST -Headers $headers -Body $r4Grp1Body -ContentType "application/scim+json"
+
+$r4Grp2Body = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = "Zulu Group 9zR"
+} | ConvertTo-Json -Depth 3
+$r4Grp2 = Invoke-RestMethod -Uri "$scimBaseR/Groups" -Method POST -Headers $headers -Body $r4Grp2Body -ContentType "application/scim+json"
+
+$grpGtResult = Invoke-RestMethod -Uri "$scimBaseR/Groups?filter=displayName gt `"M`"" -Method GET -Headers $headers
+Test-Result -Success ($grpGtResult.totalResults -eq 1 -and $grpGtResult.Resources[0].displayName -eq "Zulu Group 9zR") -Message "9z-R.10: Group displayName gt 'M' returns Zulu only"
+
+$grpLtResult = Invoke-RestMethod -Uri "$scimBaseR/Groups?filter=displayName lt `"M`"" -Method GET -Headers $headers
+Test-Result -Success ($grpLtResult.totalResults -eq 1 -and $grpLtResult.Resources[0].displayName -eq "Alpha Group 9zR") -Message "9z-R.11: Group displayName lt 'M' returns Alpha only"
+
+# --- Cleanup ---
+Write-Host "`n--- 9z-R: Cleanup ---" -ForegroundColor Cyan
+try { Invoke-RestMethod -Uri "$scimBaseR/Users/$($r1User.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$scimBaseR/Users/$($r3User1.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$scimBaseR/Users/$($r3User2.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$scimBaseR/Groups/$($r4Grp1.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$scimBaseR/Groups/$($r4Grp2.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$scimBaseR2/Users/$($r2User1.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$r1EpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$r2EpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+Write-Host "`n--- 9z-R: Test Gaps Audit #6 Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
