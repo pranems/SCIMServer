@@ -10,9 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Feature - G8h: Primary Sub-Attribute Enforcement (RFC 7643 section 2.4)
 
 - **feat(g8h)**: Configurable `PrimaryEnforcement` tri-state flag (normalize/reject/passthrough)
-  - `normalize` (default): keeps first `primary=true`, sets rest to `false`, logs WARN
+  - `passthrough` (default): stores as-is + WARN log when >1 `primary=true` detected
+  - `normalize`: keeps first `primary=true`, sets rest to `false`, logs WARN
   - `reject`: returns 400 `invalidValue` if >1 `primary=true` detected
-  - `passthrough`: stores as-is (legacy behavior, no enforcement)
 - **feat(config)**: New `PrimaryEnforcement` config flag in `ENDPOINT_CONFIG_FLAGS`
   - Type: `primaryEnforcement` (tri-state string)
   - Validation: accepts `normalize`, `reject`, `passthrough` (case-insensitive)
@@ -41,7 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation (2026-04-23)
 
-- **docs**: Full freshness audit - 15 files updated (version headers, test counts)
+- **refactor(g8h)**: Changed `PrimaryEnforcement` default from `normalize` to `passthrough` with WARN log
+  - Zero data mutation by default - backward compatible
+  - Passthrough now logs WARN when >1 primary=true detected (was silent)
+  - Presets unchanged: entra-id=normalize, rfc-standard=reject
+- **docs**: Full freshness audit - ~30 files updated (version headers, test counts, flag counts, PrimaryEnforcement default)
 - **docs**: Added `PrimaryEnforcement` flag section to ENDPOINT_CONFIG_FLAGS_REFERENCE.md
 - **docs**: Updated pipeline-unit.json and pipeline-e2e.json with current counts
 - **docs**: Synced version-latest.json to v0.38.0

@@ -120,5 +120,5 @@ Activity Feed shows the failed `POST /Users` and no new user is inserted in the 
 
 ---
 
-**Last Updated**: April 2026 | **Version**: 0.33.0+
+**Last Updated**: April 2026 | **Version**: 0.38.0
 

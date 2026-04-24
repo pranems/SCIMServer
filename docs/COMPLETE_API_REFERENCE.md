@@ -230,7 +230,7 @@ Content-Type: application/json
 
 **Response: 200 OK** - Updated endpoint.
 
-> **All per-endpoint config flags** (13 booleans + `logLevel`) are documented in [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md).
+> **All per-endpoint config flags** (13 booleans + `logLevel` + `PrimaryEnforcement`) are documented in [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md).
 
 ### DELETE /scim/admin/endpoints/:endpointId
 

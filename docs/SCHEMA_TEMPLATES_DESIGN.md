@@ -41,7 +41,7 @@
   - [8.5 user-only](#85-user-only)
   - [8.6 Preset Comparison Matrix](#86-preset-comparison-matrix)
 - [9. Settings Reference](#9-settings-reference)
-  - [9.1 Persisted Settings (13)](#91-persisted-settings-13)
+  - [9.1 Persisted Settings (15)](#91-persisted-settings-15)
   - [9.2 Derived Settings (2)](#92-derived-settings-2)
 - [10. RFC Compliance Analysis](#10-rfc-compliance-analysis)
   - [10.1 Required Attributes Audit](#101-required-attributes-audit)
@@ -1259,7 +1259,7 @@ flowchart TD
 
 ## 9. Settings Reference
 
-### 9.1 Persisted Settings (13)
+### 9.1 Persisted Settings (15)
 
 These settings live in `profile.settings` and are persisted as part of the endpoint profile.
 
@@ -1299,7 +1299,7 @@ flowchart TB
             SORT_CAP["sort.supported"]
             ETAG_CAP["etag.supported"]
         end
-        subgraph Settings["settings (13 persisted)"]
+        subgraph Settings["settings (15 persisted)"]
             SD["UserSoftDeleteEnabled"]
             SSV["StrictSchemaValidation"]
             ABC["AllowAndCoerceBooleanStrings"]
@@ -1861,7 +1861,7 @@ All design decisions finalized during the March 912, 2026 design sessions.
 
 | Action | File (NEW) | Details |
 |---|---|---|
-| Define `EndpointProfile` | `src/modules/scim/endpoint-profile/endpoint-profile.types.ts` | `{ schemas, resourceTypes, serviceProviderConfig, settings }`. Reuse existing `ScimSchemaDefinition`, `ScimResourceType` from `scim-schema-registry.ts`. Define `ProfileSettings` with the 13 persisted flags. |
+| Define `EndpointProfile` | `src/modules/scim/endpoint-profile/endpoint-profile.types.ts` | `{ schemas, resourceTypes, serviceProviderConfig, settings }`. Reuse existing `ScimSchemaDefinition`, `ScimResourceType` from `scim-schema-registry.ts`. Define `ProfileSettings` with the 15 persisted flags. |
 
 **Step 1.4  Built-in preset definitions**
 
@@ -2443,4 +2443,4 @@ flowchart LR
 
 ---
 
-*Last updated: March 13, 2026*
+*Last updated: April 23, 2026*

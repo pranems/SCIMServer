@@ -263,7 +263,7 @@ After all updates, perform a final cross-check:
 
 1. **Version consistency**: `package.json` version matches all doc headers, `CHANGELOG.md`, `Session_starter.md`, `CONTEXT_INSTRUCTIONS.md`, and `PROJECT_HEALTH_AND_STATS.md`.
 2. **Test count consistency**: Unit, E2E, and live counts match across all documents that reference them.
-3. **Flag count consistency**: All docs that reference flag counts or list flag names are in sync with `ProfileSettings` interface (13 boolean flags + logLevel; settings v7).
+3. **Flag count consistency**: All docs that reference flag counts or list flag names are in sync with `ProfileSettings` interface (13 boolean flags + logLevel + PrimaryEnforcement; settings v7).
 4. **Endpoint count consistency**: All docs that mention endpoint counts say "82 endpoints across 19 controllers" (or the updated number if features were added).
 5. **Link validation**: All `[text](path)` links in docs resolve to existing files. Check for renamed/deleted targets.
 6. **Index completeness**: Every doc in `docs/` has an entry in `docs/INDEX.md`.
@@ -328,7 +328,9 @@ Apply updates directly to this file (`.github/prompts/auditAndUpdateDocs.prompt.
 | 2026-04-10 | v0.34.0 | Post-P4 fixes full audit | ~20 across 16 files | Endpoint count 76→82 (19 controllers), test counts propagation (3,185 unit/923 E2E/45 suites), version headers 0.31.0→0.34.0 in 8 docs, StrictSchema default documented as false (actual: true), P4 immutable/required now unconditional |
 | 2026-04-16 | v0.37.1 | Post error-handling audit | 12 across 9 files + 1 JSON | Unit 83→84 suites / 3,265→3,311 tests (error-handling + generic-resource tests), maxOperations 100→1000 in 2 files, stale backup module ref, doc count 65→67, pipeline-unit.json regenerated |
 | 2026-04-17 | v0.37.1 | Post logging+tests audit | 10 across 8 files + 2 JSONs | Unit 3,311→3,318 (+7 interceptor/endpointId), E2E 46→47 suites / 969→986 (+17 test-gaps-audit-4), phantom `backup` category in recent-logs-latest.json (regenerated), pipeline-e2e.json regenerated, CHANGELOG/Session updated with endpointId persistence + Bicep logging defaults |
-| 2026-04-21 | v0.37.2 | Post manager PATCH fix + test gap audit | ~25 across 10 files + 2 JSONs + 1 HTML | Unit 3,318→3,345 (+27 schema-validator/service tests), E2E 47→49 suites / 986→1,025 (+39 manager-patch/error-allowlist/group-filters/projection), doc count 67→68, version headers 0.37.1→0.37.2 in 7 files, phantom `backup` category in recent-logs-latest.html, pipeline JSONs regenerated || 2026-04-23 | v0.38.0 | Post G8h + RFC audit + test gap audit #5 | ~30 across 22 files + 3 JSONs | Version 0.37.x->0.38.0 in 18 files, test counts 3,345->3,378 unit / 1,025->1,074 E2E / 49->51 suites, added PrimaryEnforcement flag section to ENDPOINT_CONFIG_FLAGS_REFERENCE.md, pipeline JSONs regenerated, version-latest.json synced, CHANGELOG updated with RFC + audit entries, OpenAPI/Postman/Insomnia version refs |
+| 2026-04-21 | v0.37.2 | Post manager PATCH fix + test gap audit | ~25 across 10 files + 2 JSONs + 1 HTML | Unit 3,318->3,345 (+27 schema-validator/service tests), E2E 47->49 suites / 986->1,025 (+39 manager-patch/error-allowlist/group-filters/projection), doc count 67->68, version headers 0.37.1->0.37.2 in 7 files, phantom `backup` category in recent-logs-latest.html, pipeline JSONs regenerated |
+| 2026-04-23 | v0.38.0 | Post G8h + RFC audit + test gap audit #5 | ~30 across 22 files + 3 JSONs | Version 0.37.x->0.38.0 in 18 files, test counts 3,345->3,378 unit / 1,025->1,074 E2E / 49->51 suites, added PrimaryEnforcement flag section to ENDPOINT_CONFIG_FLAGS_REFERENCE.md, pipeline JSONs regenerated, version-latest.json synced, CHANGELOG updated with RFC + audit entries, OpenAPI/Postman/Insomnia version refs |
+| 2026-04-23 | v0.38.0 | Post passthrough-default freshness audit | ~55 across ~30 files | PrimaryEnforcement default normalize->passthrough in CHANGELOG + G8H doc (10 fixes), version headers 0.35.0->0.38.0 in 20+ docs, test counts propagated (3,378/1,074/~789) to 8 docs, flag counts 13+logLevel->13+logLevel+PrimaryEnforcement in 4 docs, doc count 68->69, Session_starter Status/Current Focus updated |
 ### Common Staleness Patterns Discovered
 
 | Pattern | Files Typically Affected | Detection Method |
@@ -342,6 +344,6 @@ Apply updates directly to this file (`.github/prompts/auditAndUpdateDocs.prompt.
 | Stale Prisma schema in inline blocks | MULTI_ENDPOINT_GUIDE, TECHNICAL_DESIGN_DOCUMENT | Search for `config String?` in code blocks |
 | API collection coverage gap | INDEX.md descriptions, OpenAPI/Postman/Insomnia files | Count operations vs 82 baseline |
 | Stale "Last Updated" date headers | ENDPOINT_CONFIG_FLAGS_REFERENCE, SCIM_REFERENCE | Search for `Last Updated.*2026-` and compare |
-| Stale feature support notes | SCIM_REFERENCE (filter operators) | Search for "limited support" |
+| Stale feature support notes | SCIM_REFERENCE (filter operators) | Search for \"limited support\" |\n| Stale PrimaryEnforcement default | G8H doc, CHANGELOG, ENDPOINT_CONFIG_FLAGS | Search for `normalize (default)` or `default.*normalize` - should be `passthrough (default)` |
 - Every numeric claim (test counts, flag counts, LoC) must be freshly measured - never copy from stale docs.
 - Use the `updateProjectHealth` prompt for full stats refresh if `PROJECT_HEALTH_AND_STATS.md` is significantly stale.

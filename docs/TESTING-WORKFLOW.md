@@ -1,7 +1,7 @@
 # 🧪 Testing Pre-Release Changes
 
 > **Status**: Living workflow guide  
-> **Last Updated**: March 1, 2026
+> **Last Updated**: April 23, 2026
 
 This guide explains how to test new features before releasing them to production users.
 
@@ -387,4 +387,4 @@ az containerapp revision list -n <app-name> -g <rg> -o table
 
 ---
 
-**Last Updated:** March 2026
+**Last Updated:** April 2026

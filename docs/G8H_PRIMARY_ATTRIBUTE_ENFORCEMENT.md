@@ -160,7 +160,7 @@ Service Layer (endpoint-scim-users.service.ts / groups / generic)
     |
     +-- *** enforcePrimaryConstraint() ***  <-- G8h NEW
     |       |
-    |       +-- Read PrimaryEnforcement from config (default: "normalize")
+    |       +-- Read PrimaryEnforcement from config (default: "passthrough")
     |       +-- For each multi-valued complex attr with primary sub-attr:
     |       |     +-- Count entries where primary === true
     |       |     +-- If count <= 1: no-op (valid)
@@ -263,9 +263,9 @@ PRIMARY_ENFORCEMENT: {
   default: undefined, // string default handled by getConfigString fallback
   description:
     'Controls primary sub-attribute enforcement on multi-valued complex attributes (RFC 7643 section 2.4). ' +
-    '"normalize" (default): keeps first primary=true, sets rest to false, logs WARN. ' +
-    '"reject": returns 400 invalidValue if >1 primary=true. ' +
-    '"passthrough": stores as-is (no enforcement).',
+    '"passthrough" (default): stores as-is + WARN log when >1 primary=true. ' +
+    '"normalize": keeps first primary=true, sets rest to false, logs WARN. ' +
+    '"reject": returns 400 invalidValue if >1 primary=true.',,
 },
 ```
 
@@ -274,7 +274,7 @@ PRIMARY_ENFORCEMENT: {
 In `endpoint-profile.types.ts`:
 
 ```typescript
-/** Primary enforcement mode: normalize (default), reject, or passthrough (RFC 7643 section 2.4) */
+/** Primary enforcement mode: passthrough (default), normalize, or reject (RFC 7643 section 2.4) */
 PrimaryEnforcement?: 'normalize' | 'reject' | 'passthrough' | string;
 ```
 
@@ -290,9 +290,9 @@ In `ScimSchemaHelpers` class (`scim-service-helpers.ts`):
  * in the schema definition, count entries where primary === true.
  *
  * Behavior by mode:
- * - "normalize" (default): keep first primary=true, set rest to false + WARN log
+ * - "passthrough" (default): store as-is + WARN log when >1 primary=true
+ * - "normalize": keep first primary=true, set rest to false + WARN log
  * - "reject": throw 400 invalidValue if >1 primary=true
- * - "passthrough": no-op
  *
  * Schema-driven: uses profile-aware schema definitions to detect which
  * attributes have a primary sub-attribute. Works automatically with custom
@@ -564,9 +564,9 @@ The Generic service resolves schemas dynamically per resource type, so the enfor
 | `entra-id` | `"normalize"` | Azure AD sometimes sends multiple primaries - must accept gracefully |
 | `entra-id-minimal` | `"normalize"` | Same interop reasoning |
 | `rfc-standard` | `"reject"` | Strict RFC compliance |
-| `minimal` | *(absent - default)* | Defaults to `"normalize"` |
-| `user-only` | *(absent - default)* | Defaults to `"normalize"` |
-| `user-only-with-custom-ext` | *(absent - default)* | Defaults to `"normalize"` |
+| `minimal` | *(absent - default)* | Defaults to `"passthrough"` |
+| `user-only` | *(absent - default)* | Defaults to `"passthrough"` |
+| `user-only-with-custom-ext` | *(absent - default)* | Defaults to `"passthrough"` |
 
 ---
 
@@ -615,7 +615,7 @@ Response: **200 OK** (or 201 Created) with normalized payload where only the fir
 | 8 | Empty array - no-op | normalize | No crash on empty arrays |
 | 9 | Non-array value - no-op | normalize | Graceful handling of non-array values |
 | 10 | Primary after boolean coercion | normalize | Works correctly after "True" -> true coercion |
-| 11 | Default mode when flag absent | - | Defaults to "normalize" |
+| 11 | Default mode when flag absent | - | Defaults to "passthrough" |
 | 12 | Case-insensitive mode parsing | - | "Normalize", "REJECT" accepted |
 
 ### Service-Level Unit Tests (Users, Groups)

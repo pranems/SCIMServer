@@ -1111,4 +1111,4 @@ sequenceDiagram
 
 ---
 
-*Last updated: April 13, 2026 · Source-verified against v0.35.0 codebase*
+*Last updated: April 23, 2026 · Source-verified against v0.38.0 codebase*

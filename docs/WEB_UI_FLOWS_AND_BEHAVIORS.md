@@ -1,6 +1,6 @@
 # Web UI Flows, Paths & Behaviors
 
-> **Version:** 1.0 · **Source-verified against:** v0.35.0 · **Created:** April 14, 2026  
+> **Version:** 1.0 · **Source-verified against:** v0.38.0 · **Created:** April 14, 2026  
 > Every statement references the actual source file - nothing is assumed.
 
 ---

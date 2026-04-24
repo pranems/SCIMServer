@@ -1,6 +1,6 @@
 # RFC 7643 Attribute Characteristics - Complete Analysis
 
-> **Version:** 0.29.0 · **Updated:** March 17, 2026  
+> **Version:** 0.38.0 · **Updated:** April 23, 2026  
 > **RFC References:** [RFC 7643](https://datatracker.ietf.org/doc/html/rfc7643) §2.1–§2.4, [RFC 7644](https://datatracker.ietf.org/doc/html/rfc7644) §3  
 > **Coverage:** 13/15 fully enforced, 2 partial, 0 critical gaps
 

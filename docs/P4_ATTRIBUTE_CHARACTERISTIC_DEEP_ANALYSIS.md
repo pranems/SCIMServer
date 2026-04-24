@@ -3,11 +3,11 @@
 ## Overview
 
 **Feature**: Comprehensive re-audit of ALL RFC 7643 §2 attribute characteristic enforcement across every service, operation, config combination, and code path  
-**Version**: v0.35.0  
-**Date**: 2026-04-10  
+**Version**: v0.38.0  
+**Date**: 2026-04-23  
 **Status**: Source-code-verified gap analysis - 19 gaps catalogued, 3 actionable fixes identified  
 **Methodology**: Full RFC re-read → all prior audit docs re-read → source code inspection (sole source of truth)  
-**Test Baseline**: 3,193 unit (80 suites) · 939 E2E (45 suites) · ~739 live assertions · ~4,971 total  
+**Test Baseline**: 3,378 unit (84 suites) · 1,074 E2E (51 suites) · ~789 live assertions · ~5,353 total  
 **Predecessor**: P3 (v0.32.0), P2 (v0.24.0), Cross-Cutting Concern Audit (v0.31.0), RFC7643 Full Audit (v0.22.0)
 
 **RFC References**:

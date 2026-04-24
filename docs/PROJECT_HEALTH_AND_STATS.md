@@ -14,7 +14,7 @@
 | **Unit test LoC** | 32,776 |
 | **E2E test files** (`api/test/e2e/**/*.e2e-spec.ts`) | 51 |
 | **E2E test LoC** | ~14,300 |
-| **Documentation files** (`docs/**/*.md`) | ~125 (68 active + 57 archived) |
+| **Documentation files** (`docs/**/*.md`) | ~125 (69 active + 56 archived) |
 | **Scripts** (`scripts/*.ps1`) | 18 |
 | **Total project files** | ~400+ |
 

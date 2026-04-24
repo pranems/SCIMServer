@@ -2,7 +2,7 @@
 
 > **Purpose**: This file provides complete project context for AI coding assistants (GitHub Copilot, etc.) to enable productive sessions without re-discovery of architecture, patterns, and decisions.  
 > **Version**: 0.38.0  
-> **Last Updated**: April 21, 2026
+> **Last Updated**: April 23, 2026
 
 ---
 
@@ -76,7 +76,7 @@ api/src/modules/scim/controllers/
 api/src/modules/scim/common/
   scim-sort.util.ts                                      # sortBy/sortOrder mapping utility (v0.20.0)
 api/src/modules/endpoint/
-  endpoint-config.interface.ts                           # 13 boolean flags + logLevel (settings v7) + helpers
+  endpoint-config.interface.ts                           # 13 boolean flags + logLevel + PrimaryEnforcement (settings v7) + helpers
   endpoint-context.storage.ts                            # AsyncLocalStorage for endpoint context
 api/src/modules/scim/filters/
   scim-filter-parser.ts                                  # Filter AST attribute path extraction
@@ -427,7 +427,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 5. Add tests
 6. Update [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) - flag summary table (§2), defaults matrix (§2.1), and true/false behavior (§2.2)
 
-> **Flag defaults quick ref:** `AllowAndCoerceBooleanStrings` and `PatchOpAllowRemoveAllMembers` default to `true`. All other boolean flags default to `false`. When no profile/preset is specified on endpoint creation, the `entra-id` preset is applied (sets 5 flags to `True`).
+> **Flag defaults quick ref:** `AllowAndCoerceBooleanStrings` and `PatchOpAllowRemoveAllMembers` default to `true`. `PrimaryEnforcement` defaults to `passthrough`. All other boolean flags default to `false`. When no profile/preset is specified on endpoint creation, the `entra-id` preset is applied (sets 5 flags to `True`, PrimaryEnforcement to `normalize`).
 
 ### Adding a new admin API route:
 1. Add method to appropriate controller (`AdminController`, `DatabaseController`, etc.)

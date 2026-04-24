@@ -222,7 +222,7 @@ if (!process.env.DATABASE_URL) {
 
 ### GAP-07 through GAP-20: Previously Identified Gaps (Resolved)
 
-These gaps were identified in v1.0/v2.0 audits and have been **resolved** in the current v0.35.0 codebase:
+These gaps were identified in v1.0/v2.0 audits and have been **resolved** in the current v0.38.0 codebase:
 
 | # | Gap Description | Resolution | Verified In |
 |---|----------------|------------|-------------|
@@ -294,7 +294,7 @@ These gaps were identified in v1.0/v2.0 audits and have been **resolved** in the
 ## Severity Distribution
 
 ```mermaid
-pie title Gap Severity Distribution (v0.35.0)
+pie title Gap Severity Distribution (v0.38.0)
     "Critical" : 0
     "High" : 1
     "Medium" : 4

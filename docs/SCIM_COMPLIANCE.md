@@ -2,7 +2,7 @@
 
 > RFC compliance status and Microsoft Entra ID provisioning compatibility for SCIMServer.
 
-**Last Updated:** March 1, 2026
+**Last Updated:** April 23, 2026
 
 ---
 

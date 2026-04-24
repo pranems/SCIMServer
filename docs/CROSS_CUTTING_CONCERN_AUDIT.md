@@ -1,9 +1,9 @@
 # Cross-Cutting Concern Audit - All Attribute Characteristics
 
-**Status:** Current | **Last Updated:** 2026-04-01 | **Baseline:** v0.31.0  
+**Status:** Current | **Last Updated:** 2026-04-23 | **Baseline:** v0.38.0  
 **Scope:** mutability, returned, uniqueness, required, caseExact - all flows, all resource types, all config combinations  
 **RFC References:** RFC 7643 §2 (Attribute Characteristics), RFC 7644 §3 (Protocol Operations)  
-**Test Baseline:** 3,185 unit (80 suites) · 923 E2E (45 suites) · ~739 live + 112 Lexmark - ALL PASSING
+**Test Baseline:** 3,378 unit (84 suites) · 1,074 E2E (51 suites) · ~789 live + 112 Lexmark - ALL PASSING
 
 ---
 
@@ -362,4 +362,4 @@ All three services follow the same v0.31.0 response-building pattern using share
 
 ---
 
-*Generated from source at v0.31.0 (2026-04-01). Cross-verified against all service, controller, helper, validator, projection, sort, and filter source files.*
+*Generated from source at v0.31.0 (2026-04-01), updated at v0.38.0 (2026-04-23). Cross-verified against all service, controller, helper, validator, projection, sort, and filter source files.*

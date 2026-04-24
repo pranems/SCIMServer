@@ -1,6 +1,6 @@
 # SCIMServer Deployment Options
 
-> Updated: April 13, 2026 · v0.35.0 · Scope: production + local deployment paths
+> Updated: April 23, 2026 · v0.38.0 · Scope: production + local deployment paths
 
 This document covers all deployment methods for SCIMServer. For the quickest start, use the Azure deployment described in the main [README.md](./README.md). For the most comprehensive Azure guide with architecture diagrams, see [docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md](docs/AZURE_DEPLOYMENT_AND_USAGE_GUIDE.md).
 
@@ -112,7 +112,7 @@ scimserver-rg           ← PROD (users) - do not touch
 ├── VNet, subnets
 ├── Container Apps Env + Log Analytics
 ├── PostgreSQL Flexible Server (scimdb)
-└── Container App: scimserver2 (ghcr.io/pranems/scimserver:0.37.0)
+└── Container App: scimserver2 (ghcr.io/pranems/scimserver:0.38.0)
 
 scimserver-rg-dev       ← DEV (your iteration) - fully isolated
 ├── VNet, subnets
