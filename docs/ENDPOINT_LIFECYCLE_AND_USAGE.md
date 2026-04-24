@@ -1,594 +1,437 @@
-# SCIMServer - Endpoint Lifecycle & Usage Quick Reference
+# Endpoint Lifecycle & Usage Guide
 
-> **Version:** 0.38.0 · **Updated:** April 23, 2026  
-> A hands-on guide for anyone new to the project: create, configure, use, and manage SCIM endpoints
+> **Version:** 0.38.0 - **Updated:** April 24, 2026  
+> Quick-start recipes for common SCIMServer operations
 
 ---
 
 ## Table of Contents
 
-1. [Concept: What Is an Endpoint?](#1-concept-what-is-an-endpoint)
-2. [Lifecycle Overview](#2-lifecycle-overview)
-3. [Step 1: Get Authenticated](#step-1-get-authenticated)
-4. [Step 2: Create an Endpoint](#step-2-create-an-endpoint)
-5. [Step 3: Configure the Endpoint](#step-3-configure-the-endpoint)
-6. [Step 4: Provision Users & Groups](#step-4-provision-users--groups)
-7. [Step 5: Query & Filter Resources](#step-5-query--filter-resources)
-8. [Step 6: Update Resources (PUT/PATCH)](#step-6-update-resources-putpatch)
-9. [Step 7: Delete Resources](#step-7-delete-resources)
-10. [Step 8: Manage Endpoint Credentials](#step-8-manage-endpoint-credentials)
-11. [Step 9: Monitor & Observe](#step-9-monitor--observe)
-12. [Step 10: Delete the Endpoint](#step-10-delete-the-endpoint)
-13. [Common Recipes](#common-recipes)
-14. [Quick Reference Card](#quick-reference-card)
+- [Endpoint Lifecycle](#endpoint-lifecycle)
+- [User Provisioning Recipes](#user-provisioning-recipes)
+- [Group Management Recipes](#group-management-recipes)
+- [PATCH Operations Cookbook](#patch-operations-cookbook)
+- [Filtering & Search Recipes](#filtering--search-recipes)
+- [Credential Management](#credential-management)
+- [Monitoring & Debugging](#monitoring--debugging)
+- [Entra ID Integration](#entra-id-integration)
 
 ---
 
-## 1. Concept: What Is an Endpoint?
+## Endpoint Lifecycle
 
-An **endpoint** in SCIMServer is an isolated tenant - a completely separate SCIM namespace with its own:
-- Users and Groups (no cross-contamination between endpoints)
-- Configuration flags (deactivation control, strict schema, boolean coercion, etc.)
-- Schema profile (which SCIM attributes are exposed)
-- Optional per-endpoint credentials
-- Request logs
-
-Endpoints can be referenced by **UUID or name** in all URLs:
-
-```
-/scim/endpoints/a1b2c3d4-e5f6-7890-abcd-ef1234567890/Users   ← by ID
-/scim/endpoints/my-tenant/Users                               ← by name
-```
-
-Think of each endpoint as a separate SCIM server instance running within a single SCIMServer deployment.
-
-```
-SCIMServer Instance
-├── Endpoint A (Entra ID production)  → /scim/endpoints/{id-a}/Users
-├── Endpoint B (Entra ID staging)     → /scim/endpoints/{id-b}/Users
-├── Endpoint C (Lexmark integration)  → /scim/endpoints/{id-c}/Users
-└── Endpoint D (RFC testing)          → /scim/endpoints/{id-d}/Users
-```
-
----
-
-## 2. Lifecycle Overview
-
-```mermaid
-flowchart LR
-    A[Create Endpoint] --> B[Configure Settings]
-    B --> C[Set Up Credentials]
-    C --> D[Provision Users/Groups]
-    D --> E[Query & Filter]
-    E --> F[Update via PUT/PATCH]
-    F --> G[Monitor & Observe]
-    G --> H{Done?}
-    H -->|No| D
-    H -->|Yes| I[Delete Endpoint]
-```
-
----
-
-## Step 1: Get Authenticated
-
-All examples below use `$BASE` for your server URL and `$TOKEN` for the auth token.
-
-### Using Shared Secret (Simplest)
-
-```powershell
-$BASE = "http://localhost:8080"        # or your Azure URL
-$TOKEN = "your-scim-shared-secret"
-$headers = @{
-    Authorization = "Bearer $TOKEN"
-    "Content-Type" = "application/json"
-}
-```
-
-### Using OAuth 2.0 (Production)
-
-```powershell
-$BASE = "http://localhost:8080"
-$tokenResponse = Invoke-RestMethod -Uri "$BASE/scim/oauth/token" -Method POST -Body @{
-    grant_type    = "client_credentials"
-    client_id     = "scimserver-client"
-    client_secret = "your-oauth-client-secret"
-}
-$TOKEN = $tokenResponse.access_token
-$headers = @{
-    Authorization = "Bearer $TOKEN"
-    "Content-Type" = "application/json"
-}
-```
-
-### curl Equivalent
+### 1. Create
 
 ```bash
-BASE="http://localhost:8080"
-TOKEN=$(curl -s -X POST "$BASE/scim/oauth/token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d 'grant_type=client_credentials&client_id=scimserver-client&client_secret=your-oauth-secret' \
-  | jq -r .access_token)
-```
-
----
-
-## Step 2: Create an Endpoint
-
-### Using a Built-in Preset (Recommended)
-
-```powershell
-$body = @{
-    name          = "my-tenant"
-    displayName   = "My Production Tenant"
-    profilePreset = "entra-id"
-} | ConvertTo-Json
-
-$endpoint = Invoke-RestMethod -Uri "$BASE/scim/admin/endpoints" -Method POST -Headers $headers -Body $body
-$ENDPOINT_ID = $endpoint.id
-Write-Host "Endpoint created: $ENDPOINT_ID"
-```
-
-### Available Presets
-
-| Preset | Use Case | Schemas | Resource Types |
-|--------|----------|---------|---------------|
-| `entra-id` (default) | Microsoft Entra ID provisioning | 7 | User + Group |
-| `entra-id-minimal` | Entra with minimal attributes | 7 | User + Group |
-| `rfc-standard` | Pure RFC compliance testing | 3 | User + Group |
-| `minimal` | Bare minimum | 2 | User + Group |
-| `user-only` | User-only provisioning | 2 | User |
-| `lexmark` | Lexmark Cloud Print | 3 | User |
-
-### List Available Presets
-
-```powershell
-Invoke-RestMethod -Uri "$BASE/scim/admin/endpoints/presets" -Headers $headers | ConvertTo-Json -Depth 5
-```
-
-### curl Equivalent
-
-```bash
-ENDPOINT_ID=$(curl -s -X POST "$BASE/scim/admin/endpoints" \
-  -H "Authorization: Bearer $TOKEN" \
+# From preset
+curl -X POST http://localhost:8080/scim/admin/endpoints \
+  -H "Authorization: Bearer changeme-scim" \
   -H "Content-Type: application/json" \
-  -d '{"name":"my-tenant","profilePreset":"entra-id"}' \
-  | jq -r .id)
-echo "Endpoint: $ENDPOINT_ID"
+  -d '{"name":"prod","profilePreset":"entra-id"}'
+```
+
+### 2. Configure
+
+```bash
+# Update settings
+curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/json" \
+  -d '{"profile":{"settings":{"RequireIfMatch":true,"PerEndpointCredentialsEnabled":true}}}'
+```
+
+### 3. Use
+
+```bash
+# SCIM operations
+curl -X POST http://localhost:8080/scim/endpoints/{id}/Users \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/scim+json" \
+  -d '{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"user@example.com"}'
+```
+
+### 4. Monitor
+
+```bash
+# Stats
+curl http://localhost:8080/scim/admin/endpoints/{id}/stats \
+  -H "Authorization: Bearer changeme-scim"
+
+# Live logs
+curl -N http://localhost:8080/scim/endpoints/{id}/logs/stream \
+  -H "Authorization: Bearer changeme-scim"
+```
+
+### 5. Deactivate
+
+```bash
+# Blocks all SCIM operations (returns 403), preserves data
+curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/json" \
+  -d '{"active":false}'
+```
+
+### 6. Reactivate
+
+```bash
+curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/json" \
+  -d '{"active":true}'
+```
+
+### 7. Delete
+
+```bash
+# Cascades all resources, logs, credentials
+curl -X DELETE http://localhost:8080/scim/admin/endpoints/{id} \
+  -H "Authorization: Bearer changeme-scim"
 ```
 
 ---
 
-## Step 3: Configure the Endpoint
+## User Provisioning Recipes
 
-Endpoints are created with sensible defaults from the selected preset. **If you create an endpoint with no explicit settings** (or use the default `entra-id` preset), the following behavior applies out of the box:
+### Create Basic User
 
-- **DELETE is hard-delete** - resources permanently removed
-- **Schema validation is lenient** - extension data accepted without strict URN checks
-- **`If-Match` is optional** - ETags validated when provided, but not required
-- **ReadOnly attributes silently stripped** - no error, no warning
-- **Boolean coercion ON** - `"True"`/`"False"` strings auto-converted to booleans (Entra compatibility)
-- **Dot-notation PATCH ON** - `name.givenName` paths resolved correctly (Entra compatibility)
+```bash
+curl -X POST http://localhost:8080/scim/endpoints/{id}/Users \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/scim+json" \
+  -d '{
+    "schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],
+    "userName":"jane@example.com",
+    "displayName":"Jane Doe",
+    "active":true
+  }'
+```
 
-For the complete default-by-default behavior matrix and true/false effect of each flag, see [ENDPOINT_CONFIG_FLAGS_REFERENCE.md §2.1–2.2](ENDPOINT_CONFIG_FLAGS_REFERENCE.md#21-default-behavior--what-happens-out-of-the-box).
+### Create User with Enterprise Extension
 
-You can customize behavior per-endpoint by PATCHing settings:
-
-### Enable Common Flags
-
-```powershell
-$settings = @{
-    profile = @{
-        settings = @{
-            UserSoftDeleteEnabled                    = "True"   # Allow PATCH active=false
-            StrictSchemaValidation                   = "True"   # Require correct schemas[]
-            RequireIfMatch                           = "True"   # Require ETag on PUT/PATCH/DELETE
-            AllowAndCoerceBooleanStrings             = "True"   # Accept "True"/"False" strings
-            PerEndpointCredentialsEnabled             = "True"   # Enable per-endpoint auth
-        }
+```bash
+curl -X POST http://localhost:8080/scim/endpoints/{id}/Users \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/scim+json" \
+  -d '{
+    "schemas":[
+      "urn:ietf:params:scim:schemas:core:2.0:User",
+      "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
+    ],
+    "userName":"jane@example.com",
+    "name":{"givenName":"Jane","familyName":"Doe"},
+    "displayName":"Jane Doe",
+    "emails":[{"value":"jane@example.com","type":"work","primary":true}],
+    "active":true,
+    "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User":{
+      "department":"Engineering",
+      "costCenter":"CC-1234",
+      "manager":{"value":"mgr-id","displayName":"Bob Manager"}
     }
-} | ConvertTo-Json -Depth 5
-
-Invoke-RestMethod -Uri "$BASE/scim/admin/endpoints/$ENDPOINT_ID" -Method PATCH -Headers $headers -Body $settings
+  }'
 ```
 
-### All Available Flags
+### Find User by userName
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `AllowAndCoerceBooleanStrings` | True | Coerce `"True"`/`"False"` to booleans |
-| `VerbosePatchSupported` | - | Enable dot-notation PATCH paths |
-| `UserSoftDeleteEnabled` | - | Allow PATCH `active=false` (user deactivation) |
-| `StrictSchemaValidation` | - | Require extension URNs in `schemas[]` |
-| `RequireIfMatch` | - | Require `If-Match` header on writes |
-| `PerEndpointCredentialsEnabled` | - | Enable per-endpoint credentials |
-| `IncludeWarningAboutIgnoredReadOnlyAttribute` | - | Warning header for readOnly stripping |
-| `IgnoreReadOnlyAttributesInPatch` | - | Strip readOnly PATCH ops (don't error) |
-| `MultiOpPatchRequestAddMultipleMembersToGroup` | - | Multi-member PATCH add |
-| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | - | Multi-member PATCH remove |
-| `PatchOpAllowRemoveAllMembers` | - | Allow remove-all via `path=members` |
-| `logLevel` | - | Per-endpoint log level override |
-
-### Add a Custom Extension to an Existing Endpoint
-
-You can PATCH custom extensions into an already-running endpoint. `schemas` and `resourceTypes` use **replace** semantics - send complete arrays. `settings` and `SPC` are preserved.
-
-```powershell
-$extensionPatch = @{
-    profile = @{
-        schemas = @(
-            @{ id = "urn:ietf:params:scim:schemas:core:2.0:User"; name = "User"; attributes = "all" },
-            @{ id = "urn:ietf:params:scim:schemas:core:2.0:Group"; name = "Group"; attributes = "all" },
-            @{ id = "urn:example:ext:hr:2.0:User"; name = "HRExtension"
-               attributes = @(
-                   @{ name = "badgeNumber"; type = "string"; multiValued = $false; required = $false; mutability = "readWrite"; returned = "default" }
-               )
-            }
-        )
-        resourceTypes = @(
-            @{ id = "User"; name = "User"; endpoint = "/Users"; description = "User"
-               schema = "urn:ietf:params:scim:schemas:core:2.0:User"
-               schemaExtensions = @(@{ schema = "urn:example:ext:hr:2.0:User"; required = $false }) },
-            @{ id = "Group"; name = "Group"; endpoint = "/Groups"; description = "Group"
-               schema = "urn:ietf:params:scim:schemas:core:2.0:Group"; schemaExtensions = @() }
-        )
-    }
-} | ConvertTo-Json -Depth 10
-
-Invoke-RestMethod -Uri "$BASE/scim/admin/endpoints/$ENDPOINT_ID" -Method PATCH -Headers $headers -Body $extensionPatch
+```bash
+curl "http://localhost:8080/scim/endpoints/{id}/Users?filter=userName%20eq%20%22jane%40example.com%22" \
+  -H "Authorization: Bearer changeme-scim"
 ```
 
-> **Takes effect immediately** - no restart required. The in-memory cache is updated synchronously and `_schemaCaches` is lazily rebuilt on the next request. Discovery, validation, and characteristic enforcement all reflect the new extension instantly. Existing resources without extension data continue working normally. See [SCHEMA_CUSTOMIZATION_GUIDE.md §11](SCHEMA_CUSTOMIZATION_GUIDE.md#11-adding-extensions-to-existing-endpoints-patch) for all combination examples.
+### Deactivate User (Soft Delete)
 
----
-
-## Step 4: Provision Users & Groups
-
-### Create a User
-
-```powershell
-$user = @{
-    schemas     = @("urn:ietf:params:scim:schemas:core:2.0:User")
-    userName    = "jdoe@example.com"
-    displayName = "John Doe"
-    active      = $true
-    name        = @{ givenName = "John"; familyName = "Doe" }
-    emails      = @(@{ value = "jdoe@example.com"; type = "work"; primary = $true })
-} | ConvertTo-Json -Depth 5
-
-$scimHeaders = @{
-    Authorization  = "Bearer $TOKEN"
-    "Content-Type" = "application/scim+json"
-}
-
-$createdUser = Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Users" -Method POST -Headers $scimHeaders -Body $user
-$USER_ID = $createdUser.id
-Write-Host "User created: $USER_ID"
+```bash
+curl -X PATCH http://localhost:8080/scim/endpoints/{id}/Users/{uid} \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/scim+json" \
+  -d '{
+    "schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+    "Operations":[{"op":"replace","path":"active","value":false}]
+  }'
 ```
 
-### Create a Group
+### Hard Delete User
 
-```powershell
-$group = @{
-    schemas     = @("urn:ietf:params:scim:schemas:core:2.0:Group")
-    displayName = "Engineering"
-} | ConvertTo-Json
-
-$createdGroup = Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Groups" -Method POST -Headers $scimHeaders -Body $group
-$GROUP_ID = $createdGroup.id
-```
-
-### Add User to Group (PATCH)
-
-```powershell
-$addMember = @{
-    schemas    = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
-    Operations = @(@{
-        op    = "add"
-        path  = "members"
-        value = @(@{ value = $USER_ID })
-    })
-} | ConvertTo-Json -Depth 5
-
-Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Groups/$GROUP_ID" -Method PATCH -Headers $scimHeaders -Body $addMember
+```bash
+curl -X DELETE http://localhost:8080/scim/endpoints/{id}/Users/{uid} \
+  -H "Authorization: Bearer changeme-scim"
 ```
 
 ---
 
-## Step 5: Query & Filter Resources
+## Group Management Recipes
 
-### List All Users
+### Create Group with Members
 
-```powershell
-$users = Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Users" -Headers @{ Authorization = "Bearer $TOKEN" }
-Write-Host "Total users: $($users.totalResults)"
+```bash
+curl -X POST http://localhost:8080/scim/endpoints/{id}/Groups \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/scim+json" \
+  -d '{
+    "schemas":["urn:ietf:params:scim:schemas:core:2.0:Group"],
+    "displayName":"Engineering",
+    "members":[{"value":"user-id-1"},{"value":"user-id-2"}]
+  }'
 ```
 
-### Filter Users
+### Add Members to Group
 
-```powershell
-# By userName
-$filtered = Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Users?filter=userName eq `"jdoe@example.com`"" -Headers @{ Authorization = "Bearer $TOKEN" }
-
-# By displayName (contains)
-$filtered = Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Users?filter=displayName co `"John`"" -Headers @{ Authorization = "Bearer $TOKEN" }
-
-# Active users only
-$filtered = Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Users?filter=active eq true" -Headers @{ Authorization = "Bearer $TOKEN" }
+```bash
+curl -X PATCH http://localhost:8080/scim/endpoints/{id}/Groups/{gid} \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/scim+json" \
+  -d '{
+    "schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+    "Operations":[{
+      "op":"add","path":"members",
+      "value":[{"value":"new-user-id-1"},{"value":"new-user-id-2"}]
+    }]
+  }'
 ```
 
-### Supported Filter Operators
+### Remove Member from Group
 
-| Operator | Example | Description |
-|----------|---------|-------------|
-| `eq` | `userName eq "jdoe"` | Equal |
-| `ne` | `active ne false` | Not equal |
-| `co` | `displayName co "John"` | Contains |
-| `sw` | `userName sw "j"` | Starts with |
-| `ew` | `userName ew ".com"` | Ends with |
-| `pr` | `externalId pr` | Present (not null) |
-| `gt`, `ge`, `lt`, `le` | `meta.created gt "2026-01-01"` | Comparison |
-| `and`, `or` | `active eq true and userName co "j"` | Compound |
-
-### Attribute Projection
-
-```powershell
-# Return only specific attributes
-$slim = Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Users?attributes=userName,displayName,active" -Headers @{ Authorization = "Bearer $TOKEN" }
-
-# Exclude specific attributes
-$trimmed = Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Users?excludedAttributes=emails,phoneNumbers" -Headers @{ Authorization = "Bearer $TOKEN" }
-```
-
-### Sorting & Pagination
-
-```powershell
-$sorted = Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Users?sortBy=userName&sortOrder=ascending&startIndex=1&count=10" -Headers @{ Authorization = "Bearer $TOKEN" }
-```
-
-### POST /.search
-
-```powershell
-$search = @{
-    schemas    = @("urn:ietf:params:scim:api:messages:2.0:SearchRequest")
-    filter     = "displayName co `"John`""
-    startIndex = 1
-    count      = 10
-    sortBy     = "userName"
-    attributes = @("userName", "displayName")
-} | ConvertTo-Json -Depth 3
-
-$results = Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Users/.search" -Method POST -Headers $scimHeaders -Body $search
+```bash
+curl -X PATCH http://localhost:8080/scim/endpoints/{id}/Groups/{gid} \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/scim+json" \
+  -d '{
+    "schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+    "Operations":[{
+      "op":"remove","path":"members[value eq \"user-id-to-remove\"]"
+    }]
+  }'
 ```
 
 ---
 
-## Step 6: Update Resources (PUT/PATCH)
+## PATCH Operations Cookbook
 
-### PUT (Full Replace)
+### Replace Simple Attribute
 
-```powershell
-$replacement = @{
-    schemas     = @("urn:ietf:params:scim:schemas:core:2.0:User")
-    userName    = "jdoe@example.com"
-    displayName = "John Updated Doe"
-    active      = $true
-} | ConvertTo-Json
-
-Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Users/$USER_ID" -Method PUT `
-    -Headers @{ Authorization = "Bearer $TOKEN"; "Content-Type" = "application/scim+json"; "If-Match" = 'W/"1"' } `
-    -Body $replacement
+```json
+{"op":"replace","path":"displayName","value":"New Name"}
 ```
 
-### PATCH (Partial Update)
+### Replace Nested Attribute (dot-notation)
 
-```powershell
-$patch = @{
-    schemas    = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
-    Operations = @(
-        @{ op = "replace"; path = "displayName"; value = "Jane Doe" },
-        @{ op = "replace"; path = "active"; value = $false },
-        @{ op = "add"; path = "nickName"; value = "JD" },
-        @{ op = "remove"; path = "title" }
-    )
-} | ConvertTo-Json -Depth 5
+Requires `VerbosePatchSupported: true`:
 
-Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Users/$USER_ID" -Method PATCH -Headers $scimHeaders -Body $patch
+```json
+{"op":"replace","path":"name.givenName","value":"Jane"}
 ```
 
----
+### Add Multi-Valued Entry
 
-## Step 7: Delete Resources
-
-### Hard Delete (Default)
-
-```powershell
-Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Users/$USER_ID" -Method DELETE -Headers @{ Authorization = "Bearer $TOKEN" }
-# Returns 204 No Content
+```json
+{"op":"add","path":"emails","value":[{"value":"work@example.com","type":"work","primary":true}]}
 ```
 
-DELETE always hard-deletes - the row is physically removed from the database. There is no soft-delete concept. To deactivate a user without deleting, use PATCH to set `active = false` (requires `UserSoftDeleteEnabled = True`, which is the default).
+### Replace via ValuePath Filter
 
----
-
-## Step 8: Manage Endpoint Credentials
-
-For multi-tenant isolation, create per-endpoint credentials instead of using the global shared secret.
-
-### Enable Credentials on the Endpoint
-
-```powershell
-$body = @{ profile = @{ settings = @{ PerEndpointCredentialsEnabled = "True" } } } | ConvertTo-Json -Depth 4
-Invoke-RestMethod -Uri "$BASE/scim/admin/endpoints/$ENDPOINT_ID" -Method PATCH -Headers $headers -Body $body
+```json
+{"op":"replace","path":"emails[type eq \"work\"].value","value":"new-work@example.com"}
 ```
 
-### Create a Credential
+### Remove via ValuePath Filter
 
-```powershell
-$cred = Invoke-RestMethod -Uri "$BASE/scim/admin/endpoints/$ENDPOINT_ID/credentials" -Method POST -Headers $headers
-$ENDPOINT_TOKEN = $cred.token  # ← Store this! Only returned once.
-Write-Host "Endpoint token: $ENDPOINT_TOKEN"
+```json
+{"op":"remove","path":"phoneNumbers[type eq \"fax\"]"}
 ```
 
-### Use the Endpoint-Specific Token
+### Update Extension Attribute
 
-```powershell
-# This token only works for SCIM operations on this specific endpoint
-$endpointHeaders = @{ Authorization = "Bearer $ENDPOINT_TOKEN"; "Content-Type" = "application/scim+json" }
-Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Users" -Headers $endpointHeaders
+```json
+{"op":"replace","path":"urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department","value":"Product"}
 ```
 
-### List & Revoke Credentials
+### No-Path Replace (Full Resource Merge)
 
-```powershell
-# List (hashes never exposed)
-Invoke-RestMethod -Uri "$BASE/scim/admin/endpoints/$ENDPOINT_ID/credentials" -Headers $headers
-
-# Revoke
-Invoke-RestMethod -Uri "$BASE/scim/admin/endpoints/$ENDPOINT_ID/credentials/$CRED_ID" -Method DELETE -Headers $headers
+```json
+{"op":"replace","value":{"displayName":"New Name","active":false}}
 ```
 
 ---
 
-## Step 9: Monitor & Observe
+## Filtering & Search Recipes
 
-### Web Dashboard
+### Common Filters
 
-Open your server URL in a browser:
+```bash
+# Exact match
+?filter=userName eq "jane@example.com"
 
-```
-http://localhost:8080/          # Local / Docker
-https://your-app.azurecontainerapps.io/  # Azure
-```
+# Starts with
+?filter=userName sw "jane"
 
-### Admin API
+# Contains
+?filter=displayName co "Smith"
 
-```powershell
-# Endpoint stats
-Invoke-RestMethod -Uri "$BASE/scim/admin/endpoints/$ENDPOINT_ID" -Headers $headers | ConvertTo-Json -Depth 5
+# Active users
+?filter=active eq true
 
-# Recent logs
-Invoke-RestMethod -Uri "$BASE/scim/admin/log-config/recent?limit=25" -Headers $headers
+# Combined (AND)
+?filter=active eq true and userName sw "j"
 
-# App version & runtime info
-Invoke-RestMethod -Uri "$BASE/scim/admin/version" -Headers $headers
-```
+# Combined (OR)
+?filter=displayName co "Smith" or displayName co "Jones"
 
-### Discovery Endpoints (No Auth Required)
+# External ID present
+?filter=externalId pr
 
-```powershell
-# Per-endpoint discovery
-Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/ServiceProviderConfig"
-Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Schemas"
-Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/ResourceTypes"
+# Created after date
+?filter=meta.created gt "2026-01-01T00:00:00Z"
 ```
 
----
+### POST .search (Long Filters)
 
-## Step 10: Delete the Endpoint
-
-**Warning:** This cascades - deletes ALL users, groups, memberships, credentials, and logs for this endpoint.
-
-```powershell
-Invoke-RestMethod -Uri "$BASE/scim/admin/endpoints/$ENDPOINT_ID" -Method DELETE -Headers $headers
-# Returns 204 No Content
-```
-
----
-
-## Common Recipes
-
-### Recipe: Quick Entra ID Setup
-
-```powershell
-# 1. Create endpoint
-$ep = Invoke-RestMethod -Uri "$BASE/scim/admin/endpoints" -Method POST -Headers $headers `
-    -Body '{"name":"entra-prod","profilePreset":"entra-id"}'
-
-# 2. Print the Entra configuration values
-Write-Host "Tenant URL:   $BASE/scim/v2/endpoints/$($ep.id)/"
-Write-Host "Secret Token: $TOKEN"
-```
-
-### Recipe: Bulk User Import
-
-```powershell
-$bulk = @{
-    schemas    = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
-    Operations = @(
-        @{ method = "POST"; path = "/Users"; bulkId = "u1"; data = @{
-            schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
-            userName = "alice@example.com"; displayName = "Alice"
-        }},
-        @{ method = "POST"; path = "/Users"; bulkId = "u2"; data = @{
-            schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
-            userName = "bob@example.com"; displayName = "Bob"
-        }}
-    )
-} | ConvertTo-Json -Depth 5
-
-# Requires rfc-standard preset (bulk.supported = true)
-Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Bulk" -Method POST -Headers $scimHeaders -Body $bulk
-```
-
-### Recipe: Export All Users as JSON
-
-```powershell
-$allUsers = Invoke-RestMethod -Uri "$BASE/scim/endpoints/$ENDPOINT_ID/Users?count=200" -Headers @{ Authorization = "Bearer $TOKEN" }
-$allUsers.Resources | ConvertTo-Json -Depth 10 | Out-File users-export.json
+```bash
+curl -X POST http://localhost:8080/scim/endpoints/{id}/Users/.search \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/scim+json" \
+  -d '{
+    "schemas":["urn:ietf:params:scim:api:messages:2.0:SearchRequest"],
+    "filter":"userName sw \"a\" or userName sw \"b\" or userName sw \"c\"",
+    "startIndex":1,"count":50,
+    "sortBy":"userName","sortOrder":"ascending",
+    "attributes":["userName","displayName","emails"]
+  }'
 ```
 
 ---
 
-## Quick Reference Card
+## Credential Management
 
+### Enable Per-Endpoint Credentials
+
+```bash
+curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/json" \
+  -d '{"profile":{"settings":{"PerEndpointCredentialsEnabled":true}}}'
 ```
-┌────────────────────────────────────────────────────────────┐
-│  SCIMServer Endpoint Lifecycle - Quick Reference           │
-├────────────────────────────────────────────────────────────┤
-│                                                            │
-│  AUTH:                                                     │
-│  POST /scim/oauth/token                                    │
-│  Authorization: Bearer <shared-secret | oauth-jwt | cred>  │
-│                                                            │
-│  ENDPOINT MGMT (Admin API):                                │
-│  POST   /scim/admin/endpoints              Create           │
-│  GET    /scim/admin/endpoints              List (?view,act) │
-│  GET    /scim/admin/endpoints/:id          Get (?view)      │
-│  GET    /scim/admin/endpoints/by-name/:n   Get by name      │
-│  PATCH  /scim/admin/endpoints/:id          Update settings  │
-│  DELETE /scim/admin/endpoints/:id          Delete (cascade!)│
-│  GET    /scim/admin/endpoints/:id/stats    Endpoint stats   │
-│  GET    /scim/admin/endpoints/presets      List presets     │
-│  GET    /scim/admin/endpoints/presets/:n   Get preset detail│
-│                                                            │
-│  SCIM OPERATIONS:                                          │
-│  POST   /scim/endpoints/:id/Users           Create user    │
-│  GET    /scim/endpoints/:id/Users           List/filter     │
-│  GET    /scim/endpoints/:id/Users/:uid      Get by ID       │
-│  PUT    /scim/endpoints/:id/Users/:uid      Replace          │
-│  PATCH  /scim/endpoints/:id/Users/:uid      Partial update   │
-│  DELETE /scim/endpoints/:id/Users/:uid      Delete           │
-│  (Same pattern for /Groups, /Me, /Bulk, /.search)          │
-│                                                            │
-│  DISCOVERY (No auth):                                      │
-│  GET /scim/endpoints/:id/ServiceProviderConfig              │
-│  GET /scim/endpoints/:id/Schemas                            │
-│  GET /scim/endpoints/:id/ResourceTypes                      │
-│                                                            │
-│  CREDENTIALS:                                              │
-│  POST   /scim/admin/endpoints/:id/credentials   Create     │
-│  GET    /scim/admin/endpoints/:id/credentials   List        │
-│  DELETE /scim/admin/endpoints/:id/credentials/:cid Revoke   │
-│                                                            │
-└────────────────────────────────────────────────────────────┘
+
+### Create Credential
+
+```bash
+curl -X POST http://localhost:8080/scim/admin/endpoints/{id}/credentials \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/json" \
+  -d '{"label":"entra-connector","credentialType":"bearer"}'
+# Save the returned token - it is shown only once!
+```
+
+### Use Scoped Token
+
+```bash
+curl http://localhost:8080/scim/endpoints/{id}/Users \
+  -H "Authorization: Bearer scim_ep_..."
+```
+
+### Revoke Credential
+
+```bash
+curl -X DELETE http://localhost:8080/scim/admin/endpoints/{id}/credentials/{credId} \
+  -H "Authorization: Bearer changeme-scim"
 ```
 
 ---
 
-## See Also
+## Monitoring & Debugging
 
-- [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) - Full API reference with every endpoint
-- [ENDPOINT_PROFILE_ARCHITECTURE.md](ENDPOINT_PROFILE_ARCHITECTURE.md) - Profile system internals
-- [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) - All configuration flags
-- [MULTI_ENDPOINT_GUIDE.md](MULTI_ENDPOINT_GUIDE.md) - Multi-tenant architecture details
-- [SCIM_REFERENCE.md](SCIM_REFERENCE.md) - SCIM v2 protocol reference
+### Live Log Stream
+
+```bash
+# All endpoints
+curl -N http://localhost:8080/scim/admin/log-config/stream \
+  -H "Authorization: Bearer changeme-scim"
+
+# Specific endpoint
+curl -N http://localhost:8080/scim/endpoints/{id}/logs/stream \
+  -H "Authorization: Bearer changeme-scim"
+```
+
+### Increase Log Verbosity
+
+```bash
+# Global
+curl -X PUT http://localhost:8080/scim/admin/log-config/level/DEBUG \
+  -H "Authorization: Bearer changeme-scim"
+
+# Per-endpoint
+curl -X PUT http://localhost:8080/scim/admin/log-config/endpoint/{id}/TRACE \
+  -H "Authorization: Bearer changeme-scim"
+```
+
+### Query Recent Errors
+
+```bash
+curl "http://localhost:8080/scim/admin/log-config/recent?level=ERROR&limit=20" \
+  -H "Authorization: Bearer changeme-scim"
+```
+
+### Download Logs
+
+```bash
+curl http://localhost:8080/scim/admin/log-config/download?format=ndjson \
+  -H "Authorization: Bearer changeme-scim" -o logs.ndjson
+```
+
+### Check Endpoint Stats
+
+```bash
+curl http://localhost:8080/scim/admin/endpoints/{id}/stats \
+  -H "Authorization: Bearer changeme-scim"
+# {"users":150,"groups":12,"groupMembers":340,"requestLogs":4200}
+```
+
+---
+
+## Entra ID Integration
+
+### 1. Create Entra-Compatible Endpoint
+
+```bash
+curl -X POST http://localhost:8080/scim/admin/endpoints \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"entra-prod","profilePreset":"entra-id"}'
+```
+
+### 2. Note the SCIM URL
+
+The response includes `scimBasePath`. Your Entra ID tenant URL is:
+
+```
+http://localhost:8080/scim/endpoints/{endpointId}/
+```
+
+### 3. Configure Entra ID
+
+In Azure Portal > Enterprise Application > Provisioning:
+- **Tenant URL:** `https://your-domain/scim/endpoints/{endpointId}/`
+- **Secret Token:** Your `SCIM_SHARED_SECRET` value
+
+### 4. URL Rewrite for /scim/v2/
+
+Entra ID may send requests to `/scim/v2/*`. SCIMServer auto-rewrites these:
+
+```
+/scim/v2/endpoints/{id}/Users  ->  /scim/endpoints/{id}/Users
+```
+
+### 5. Test Connection
+
+Entra ID's "Test Connection" will call `GET /scim/endpoints/{id}/Users?filter=userName eq "nonexistent"`. This should return an empty ListResponse (200 OK).
+
+### 6. Monitor Provisioning
+
+```bash
+# Watch live
+curl -N http://localhost:8080/scim/endpoints/{id}/logs/stream \
+  -H "Authorization: Bearer changeme-scim"
+
+# Check audit trail
+curl "http://localhost:8080/scim/admin/logs?page=1&pageSize=50" \
+  -H "Authorization: Bearer changeme-scim"
+```

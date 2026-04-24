@@ -1,608 +1,351 @@
-# Endpoint Profile Architecture - Complete Flow Reference
+# Endpoint Profile Architecture
 
-> **Version**: v0.38.0  
-> **Date**: 2026-04-23  
-> **Status**: Source-of-truth documentation  
-> **Scope**: All endpoint profile creation, update, validation, expansion, runtime, and discovery flows
+> **Version:** 0.38.0 - **Updated:** April 24, 2026  
+> **Source of truth:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/)
 
 ---
 
 ## Table of Contents
 
-1. [Overview](#1-overview)
-2. [Profile Data Model](#2-profile-data-model)
-3. [Creation Flows (POST)](#3-creation-flows-post)
-4. [Update Flows (PATCH)](#4-update-flows-patch)
-5. [Expansion Pipeline](#5-expansion-pipeline)
-6. [Validation Pipeline](#6-validation-pipeline)
-7. [Runtime Usage](#7-runtime-usage)
-8. [Discovery Endpoints](#8-discovery-endpoints)
-9. [Built-in Presets](#9-built-in-presets)
-10. [Combination Matrix](#10-combination-matrix)
-11. [Error Catalog](#11-error-catalog)
+- [Overview](#overview)
+- [Profile Structure](#profile-structure)
+- [Profile Creation Flow](#profile-creation-flow)
+- [Built-In Presets](#built-in-presets)
+- [Auto-Expand Engine](#auto-expand-engine)
+- [Tighten-Only Validation](#tighten-only-validation)
+- [Schema Characteristics Cache](#schema-characteristics-cache)
+- [Profile Merging on PATCH](#profile-merging-on-patch)
+- [Shorthand Syntax](#shorthand-syntax)
+- [Examples](#examples)
 
 ---
 
-## 1. Overview
+## Overview
 
-Every SCIM endpoint has a **profile** - the single source of truth for its schema definitions,
-resource type declarations, server capability advertisement, and behavioral settings.
+Every endpoint has a **profile** that fully defines its SCIM behavior. A profile is the single source of truth for:
+
+1. **What schemas** are available (attributes, types, characteristics)
+2. **What resource types** are supported (Users, Groups, custom types)
+3. **What capabilities** the endpoint advertises (bulk, sort, filter, ETag)
+4. **How the endpoint behaves** (validation, PATCH, delete, auth flags)
 
 ```mermaid
-graph LR
-    subgraph "Input Sources (v0.29.0)"
-        A[profilePreset<br/>'entra-id']
-        B[profile<br/>inline JSON]
-        D[none<br/>default]
-    end
-
-    subgraph "Pipeline"
-        E[expandProfile]
-        F[autoInject]
-        G[tightenOnlyValidation]
-        H[spcTruthfulness]
-        I[structuralValidation]
-    end
-
-    subgraph "Stored Profile"
-        J[schemas]
-        K[resourceTypes]
-        L[serviceProviderConfig]
-        M[settings]
-    end
-
-    A --> E
-    B --> E
-    D -->|entra-id preset| E
-
-    E --> F --> G --> H --> I
-    I --> J & K & L & M
+flowchart TD
+    A[Operator Input] -->|profilePreset: 'entra-id'| B[Preset Loader]
+    A -->|profile: {...}| C[Inline Profile]
+    B --> D[Auto-Expand Engine]
+    C --> D
+    D -->|Expand 'all' attrs<br>Fill from RFC baseline| E[Tighten-Only Validator]
+    E -->|Reject loosening| F[Schema Cache Builder]
+    F -->|Precompute characteristic maps| G[Stored EndpointProfile]
+    G --> H[SCIM Services]
+    G --> I[Discovery Endpoints]
+    G --> J[Schema Validator]
 ```
-
-> **v0.29.0**: The legacy `config` admin API field has been removed.
-> All endpoint behavioral settings go through `profile.settings`.
-> Bulk operations are controlled by `profile.serviceProviderConfig.bulk.supported`.
-> Custom resource types are enabled by adding entries to `profile.resourceTypes`.
-
-**Key principle**: The profile is expanded from API inputs using RFC baselines as merge defaults.
-Custom schemas and extensions carry exactly the attributes the operator provides - no global
-hardcoded injection for unknown schemas.
 
 ---
 
-## 2. Profile Data Model
+## Profile Structure
 
-### `EndpointProfile` (stored)
+A full expanded profile has 4 top-level sections:
 
 ```typescript
 interface EndpointProfile {
-  schemas: ScimSchemaDefinition[];      // Full expanded attribute definitions
-  resourceTypes: ScimResourceType[];    // RT declarations with extension bindings
-  serviceProviderConfig: ServiceProviderConfig;  // RFC 7644 §4 capability advertisement
-  settings: ProfileSettings;            // Behavioral flags (12 persisted + logLevel)
+  schemas: ScimSchemaDefinition[];       // RFC 7643 S7
+  resourceTypes: ScimResourceType[];      // RFC 7643 S6
+  serviceProviderConfig: ServiceProviderConfig;  // RFC 7644 S4
+  settings: ProfileSettings;              // Project-specific flags
 }
 ```
 
-### `ShorthandProfileInput` (API input)
+### schemas[]
+
+Each schema definition includes:
 
 ```typescript
-interface ShorthandProfileInput {
-  schemas?: ShorthandSchemaInput[];     // Can use 'all' or partial attrs
-  resourceTypes?: ScimResourceType[];   // Same as stored format
-  serviceProviderConfig?: Partial<ServiceProviderConfig>;  // Partial OK
-  settings?: ProfileSettings;           // Partial OK
+interface ScimSchemaDefinition {
+  id: string;        // URN (e.g., "urn:ietf:params:scim:schemas:core:2.0:User")
+  name: string;      // Human name (e.g., "User")
+  description?: string;
+  attributes: ScimSchemaAttribute[];
 }
 ```
 
-### Schema attribute resolution modes
+Each attribute has RFC 7643 S2 characteristics:
 
-| `attributes` value | Behavior | Example |
-|-------------------|----------|---------|
-| `'all'` | Lookup full RFC attribute list for known schemas. **Throws for custom schemas** - they have no RFC baseline. | `{ id: 'urn:...:User', attributes: 'all' }` |
-| `Partial<Attr>[]` | Each partial attribute merged with RFC baseline (if known). Explicit overrides win. Custom attributes used as-is. | `[{ name: 'displayName', required: true }]` |
-| `undefined` | Passthrough extension - empty attributes. Extension data stored/returned without validation. | MSFT test extensions |
+```typescript
+interface ScimSchemaAttribute {
+  name: string;
+  type: 'string' | 'boolean' | 'integer' | 'decimal' | 'dateTime' | 'reference' | 'complex' | 'binary';
+  multiValued: boolean;
+  description?: string;
+  required: boolean;
+  canonicalValues?: string[];
+  caseExact: boolean;
+  mutability: 'readOnly' | 'readWrite' | 'immutable' | 'writeOnly';
+  returned: 'always' | 'default' | 'request' | 'never';
+  uniqueness: 'none' | 'server' | 'global';
+  subAttributes?: ScimSchemaAttribute[];      // For complex types
+  referenceTypes?: string[];                   // For references
+}
+```
+
+### resourceTypes[]
+
+```typescript
+interface ScimResourceType {
+  id: string;       // e.g., "User"
+  name: string;
+  endpoint: string; // e.g., "/Users"
+  schema: string;   // Core schema URN
+  schemaExtensions?: SchemaExtensionRef[];
+}
+
+interface SchemaExtensionRef {
+  schema: string;   // Extension schema URN
+  required: boolean;
+}
+```
+
+### serviceProviderConfig
+
+```typescript
+interface ServiceProviderConfig {
+  patch: { supported: boolean };
+  bulk: { supported: boolean; maxOperations?: number; maxPayloadSize?: number };
+  filter: { supported: boolean; maxResults?: number };
+  changePassword: { supported: boolean };
+  sort: { supported: boolean };
+  etag: { supported: boolean };
+  authenticationSchemes?: AuthenticationScheme[];
+}
+```
+
+### settings
+
+See [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) for all 16 flags.
 
 ---
 
-## 3. Creation Flows (POST)
-
-### `POST /scim/admin/endpoints`
-
-```mermaid
-flowchart TD
-    Start[POST body] --> NameCheck{name valid?}
-    NameCheck -->|No| E400a[400: Invalid name]
-    NameCheck -->|Yes| MutExcl{profilePreset<br/>AND profile?}
-    MutExcl -->|Both| E400b[400: Cannot specify both]
-    MutExcl -->|OK| Resolve
-
-    Resolve --> HasPreset{profilePreset?}
-    HasPreset -->|Yes| LookupPreset[getBuiltInPreset]
-    LookupPreset -->|Not found| E400c[400: Unknown preset]
-    LookupPreset -->|Found| Expand
-
-    HasPreset -->|No| HasProfile{profile?}
-    HasProfile -->|Yes| ValidateSettings{settings valid?}
-    ValidateSettings -->|No| E400s[400: Invalid flag value]
-    ValidateSettings -->|Yes| Expand
-
-    HasProfile -->|No| Default[getBuiltInPreset<br/>'entra-id']
-    Default --> Expand
-
-    Expand[validateAndExpandProfile] -->|Invalid| E400d[400: Validation failed]
-    Expand -->|Valid| Persist[Cache + DB + Listener]
-    Persist --> R201[201 Created]
-```
-
-### Input priority table
-
-| # | Condition | Profile source | Base preset |
-|---|-----------|---------------|------------|
-| 1 | `profilePreset` set | Named preset's shorthand input | Named preset |
-| 2 | `profile` set | Inline shorthand input | N/A - input IS the profile |
-| 3 | None provided | `entra-id` preset default | `entra-id` |
-
-> **What this means for settings:** When no profile or preset is specified, the `entra-id` preset sets 5 behavioral flags to `True` (`AllowAndCoerceBooleanStrings`, `VerbosePatchSupported`, `MultiOp…Add`, `MultiOp…Remove`, `PatchOpAllowRemoveAllMembers`). All other flags default to `false`. DELETE is hard-delete, schema validation is lenient, `If-Match` is optional. See [ENDPOINT_CONFIG_FLAGS_REFERENCE.md §2.1](ENDPOINT_CONFIG_FLAGS_REFERENCE.md#21-default-behavior--what-happens-out-of-the-box) for the complete matrix.
-
-### Examples
-
-**Example 1: Preset creation**
-```json
-POST /scim/admin/endpoints
-{ "name": "my-endpoint", "profilePreset": "rfc-standard" }
-```
-Result: Full RFC 7643 profile - User + EnterpriseUser + Group, all capabilities.
-
-**Example 2: Inline profile with custom extension**
-```json
-POST /scim/admin/endpoints
-{
-  "name": "hr-endpoint",
-  "profile": {
-    "schemas": [
-      { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
-      {
-        "id": "urn:example:hr:2.0:User",
-        "name": "HRExtension",
-        "attributes": [
-          { "name": "badgeNumber", "type": "string", "multiValued": false, "required": false,
-            "mutability": "readWrite", "returned": "default" },
-          { "name": "secretToken", "type": "string", "multiValued": false, "required": false,
-            "mutability": "writeOnly", "returned": "never" }
-        ]
-      },
-      { "id": "urn:ietf:params:scim:schemas:core:2.0:Group", "name": "Group", "attributes": "all" }
-    ],
-    "resourceTypes": [
-      { "id": "User", "name": "User", "endpoint": "/Users",
-        "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
-        "schemaExtensions": [{ "schema": "urn:example:hr:2.0:User", "required": false }] },
-      { "id": "Group", "name": "Group", "endpoint": "/Groups",
-        "schema": "urn:ietf:params:scim:schemas:core:2.0:Group",
-        "schemaExtensions": [] }
-    ],
-    "serviceProviderConfig": { "patch": { "supported": true }, "bulk": { "supported": false },
-      "filter": { "supported": true, "maxResults": 200 }, "sort": { "supported": true },
-      "etag": { "supported": true }, "changePassword": { "supported": false } }
-  }
-}
-```
-Result: `urn:example:hr:2.0:User` custom extension with `secretToken` (returned:never) - stripped from all responses.
-
-**Example 3: Default creation (no input)**
-```json
-POST /scim/admin/endpoints
-{ "name": "default-endpoint" }
-```
-Result: `entra-id` preset - scoped User attributes, MSFT test extensions, no bulk.
-
-**Example 4: Settings-based creation**
-
-> **v0.28.0**: The legacy `config` field has been removed. Use `profile.settings` for boolean flags and `profile.serviceProviderConfig` for capabilities.
-
-```json
-POST /scim/admin/endpoints
-{
-  "name": "custom-settings",
-  "profile": {
-    "settings": { "UserSoftDeleteEnabled": "True" },
-    "serviceProviderConfig": { "bulk": { "supported": true } }
-  }
-}
-```
-Result: `rfc-standard` base + `bulk.supported=true` in SPC + `UserSoftDeleteEnabled` in `settings`.
-
----
-
-## 4. Update Flows (PATCH)
-
-### `PATCH /scim/admin/endpoints/:id`
-
-> **v0.28.0**: The legacy `config` field has been removed from PATCH. Use `profile` exclusively.
-
-```mermaid
-flowchart TD
-    Start[PATCH body] --> HasProfile{profile in body?}
-
-    HasProfile -->|Yes| Merge[mergeProfilePartial]
-    HasProfile -->|No| OtherFields[displayName/description/<br/>active only]
-
-    Merge --> Validate[validateAndExpandProfile]
-    OtherFields --> Update
-
-    Validate -->|Invalid| E400b[400: Validation failed]
-    Validate -->|Valid| Update[Cache + DB + Listener]
-    Update --> R200[200 OK]
-```
-
-### Merge semantics per profile section
-
-| Section | Strategy | Implication |
-|---------|----------|-------------|
-| `schemas` | **Replace** | New array replaces old. Must include ALL schemas needed by RTs. |
-| `resourceTypes` | **Replace** | New array replaces old. Must reference existing schemas. |
-| `serviceProviderConfig` | **Shallow merge** | `{ ...current.SPC, ...partial.SPC }` - unmentioned capabilities preserved. |
-| `settings` | **Shallow merge** (additive) | `{ ...current.settings, ...partial.settings }` - unmentioned flags preserved. |
-
-### Structural integrity rule
-
-When `schemas` are replaced, all `resourceTypes` must reference schemas in the new set.
-The server **intentionally rejects** orphaned RT references to prevent accidental loss
-of resource type endpoints:
-
-```
-PATCH { "profile": { "schemas": [User] } }
-→ 400: ResourceType "Group" references schema "core:2.0:Group" not in schemas array.
-```
-
-**Correct approach**: Send both `schemas` and `resourceTypes` together:
-```json
-PATCH {
-  "profile": {
-    "schemas": [{ "id": "urn:...:User", "name": "User", "attributes": "all" }],
-    "resourceTypes": [{ "id": "User", "name": "User", "endpoint": "/Users",
-      "schema": "urn:...:User", "schemaExtensions": [] }]
-  }
-}
-```
-
-### Examples
-
-**Example 5: Add a setting (additive merge)**
-```json
-PATCH /scim/admin/endpoints/:id
-{ "profile": { "settings": { "UserSoftDeleteEnabled": "True" } } }
-```
-Result: `UserSoftDeleteEnabled` added to existing settings. Schemas, RTs, SPC unchanged.
-
-**Example 6: Replace SPC (shallow merge)**
-```json
-PATCH /scim/admin/endpoints/:id
-{ "profile": { "serviceProviderConfig": { "bulk": { "supported": false } } } }
-```
-Result: `bulk.supported` set to false. Other SPC fields (patch, filter, etc.) preserved.
-
-**Example 7: Add custom extension via PATCH**
-```json
-PATCH /scim/admin/endpoints/:id
-{
-  "profile": {
-    "schemas": [
-      { "id": "urn:...:User", "name": "User", "attributes": "all" },
-      { "id": "urn:custom:badge:2.0:User", "name": "Badge",
-        "attributes": [{ "name": "badge", "type": "string", "multiValued": false,
-          "required": false, "mutability": "readWrite", "returned": "default" }] },
-      { "id": "urn:...:Group", "name": "Group", "attributes": "all" }
-    ],
-    "resourceTypes": [
-      { "id": "User", "name": "User", "endpoint": "/Users", "schema": "urn:...:User",
-        "schemaExtensions": [{ "schema": "urn:custom:badge:2.0:User", "required": false }] },
-      { "id": "Group", "name": "Group", "endpoint": "/Groups", "schema": "urn:...:Group",
-        "schemaExtensions": [] }
-    ]
-  }
-}
-```
-Result: Custom `Badge` extension added. Existing settings and SPC preserved.
-
-### Immediate Effect - No Restart Required
-
-All profile PATCHes (examples 5–7) take effect **immediately** on the next SCIM request. The update pipeline:
-
-1. `mergeProfilePartial()` merges the partial into the current profile (replace for schemas/RTs, shallow-merge for settings/SPC)
-2. `validateAndExpandProfile()` validates the merged result (fails → 400, nothing changes)
-3. In-memory endpoint cache is updated synchronously
-4. `_schemaCaches` is deleted - lazily rebuilt on first request access
-5. `profileChangeListener` fires for any registered listeners
-
-There is no deferred reload, no scheduler, and no eventual consistency - the new profile is immediately visible to discovery, validation, and characteristic enforcement.
-
-**Existing resources** without extension data continue working normally. Extension data is only returned for resources that have it stored in their `rawPayload`.
-
----
-
-## 5. Expansion Pipeline
-
-### `expandProfile(input) → EndpointProfile`
-
-```mermaid
-flowchart LR
-    subgraph "Step 1: expandSchema"
-        A1["'all'"] -->|RFC lookup| A2[Full attribute list]
-        A3["Partial[]"] -->|merge with baseline| A4[Expanded attributes]
-        A5[undefined] --> A6["[] (passthrough)"]
-    end
-
-    subgraph "Step 2: autoInject"
-        B1[RFC Required] -->|"id, userName/displayName"| B2[Prepend missing]
-        B3[Project Defaults] -->|"externalId, meta"| B2
-        B4[Group-specific] -->|"active"| B2
-    end
-
-    subgraph "Step 3: SPC defaults"
-        C1[Explicit SPC] --> C2["{...defaults, ...explicit}"]
-    end
-
-    A2 & A4 & A6 --> B2 --> C2
-```
-
-### Attribute expansion rules
-
-For each attribute in a schema where the schema has an RFC baseline:
-
-```
-finalAttribute = {
-  ...rfcBaselineAttribute,     // type, multiValued, returned, mutability, etc.
-  ...operatorOverrides,        // explicit overrides win (e.g. required: true)
-  subAttributes: operator.subAttributes ?? baseline.subAttributes
-}
-```
-
-For custom schemas (no RFC baseline): attributes are used exactly as provided.
-
-### Auto-inject rules
-
-| Layer | Attributes | Condition |
-|-------|-----------|-----------|
-| RFC Required | `id` (readOnly, returned:always), `userName`/`displayName` | If missing from schema |
-| Project Defaults | `externalId`, `meta` (complex, readOnly) | If missing from schema |
-| Group-specific | `active` (boolean) | Group schema only, if missing |
-
-These are injected **regardless** of whether the operator provided them - they are server-essential.
-
----
-
-## 6. Validation Pipeline
-
-### `validateAndExpandProfile(input) → { valid, errors, profile }`
-
-```mermaid
-flowchart TD
-    Input[ShorthandProfileInput] --> Expand[expandProfile]
-    Expand -->|throws| ExpandErr[EXPAND_ERROR]
-
-    Expand --> TightenOnly[runTightenOnlyValidation]
-    TightenOnly --> SpcTruth[validateSpcTruthfulness]
-    SpcTruth --> Structure[validateStructure]
-
-    TightenOnly -->|errors| Collect
-    SpcTruth -->|errors| Collect
-    Structure -->|errors| Collect[Aggregate errors]
-
-    Collect -->|any errors| Invalid["{ valid: false, errors }"]
-    Collect -->|no errors| Valid["{ valid: true, profile }"]
-```
-
-### Tighten-only validation
-
-Compares operator's attribute characteristics against RFC baseline:
-
-| Characteristic | Allowed changes | Rejected |
-|---------------|----------------|----------|
-| `type` | None | Any change |
-| `multiValued` | None | Any change |
-| `required` | `false → true` | `true → false` |
-| `mutability` | `readWrite → immutable → readOnly` | Loosening |
-| `uniqueness` | `none → server → global` | Loosening |
-| `caseExact` | `false → true` | `true → false` |
-| `returned` | Any except from `never` | `never → *` |
-
-Custom schemas (no baseline) - **skipped entirely**.
-
-### Structural validation
-
-| Check | Error |
-|-------|-------|
-| No schemas | `MISSING_SCHEMAS` |
-| No resourceTypes | `MISSING_RESOURCE_TYPES` |
-| RT's `schema` not in schemas | `RT_MISSING_SCHEMA` |
-| RT's extension `schema` not in schemas | `RT_MISSING_EXTENSION_SCHEMA` |
-| Duplicate schema IDs | `DUPLICATE_SCHEMA` |
-| Duplicate RT names | `DUPLICATE_RT` |
-
----
-
-## 7. Runtime Usage
-
-### Request lifecycle
+## Profile Creation Flow
 
 ```mermaid
 sequenceDiagram
-    participant Client
-    participant Controller
-    participant EndpointService
-    participant EndpointContext
-    participant ScimService
-    participant SchemaHelpers
+    participant Op as Operator
+    participant EC as EndpointController
+    participant ES as EndpointService
+    participant AE as AutoExpandService
+    participant TV as TightenOnlyValidator
+    participant DB as Database
 
-    Client->>Controller: POST/GET/PUT/PATCH /endpoints/:id/Users
-    Controller->>EndpointService: getEndpoint(id)
-    EndpointService-->>Controller: { profile, config, active }
-    Controller->>EndpointContext: setContext({ profile, config, endpointId })
-
-    Controller->>ScimService: createUser/patchUser/etc.
-    ScimService->>SchemaHelpers: getReturnedCharacteristics(endpointId)
-    SchemaHelpers->>EndpointContext: getProfile()
-    EndpointContext-->>SchemaHelpers: profile (with custom extensions)
-    SchemaHelpers-->>ScimService: { never, request, always, alwaysSubs }
-
-    Note over ScimService: Uses profile schemas for:<br/>• returned:never stripping<br/>• Boolean key detection<br/>• Immutable enforcement<br/>• Extension URN discovery<br/>• Filter path validation
+    Op->>EC: POST /scim/admin/endpoints<br>{name, profilePreset: "entra-id"}
+    EC->>ES: create(dto)
+    ES->>ES: Load preset JSON from BUILT_IN_PRESETS
+    ES->>AE: validateAndExpandProfile(shorthand)
+    AE->>AE: For each schema:<br>1. Expand "all" to full RFC attrs<br>2. Merge partial attrs with baseline<br>3. Auto-inject id, externalId, meta
+    AE->>TV: Validate characteristic overrides
+    TV->>TV: Check tighten-only rules<br>(required, mutability, uniqueness, etc.)
+    TV-->>AE: Validation result
+    AE-->>ES: Expanded EndpointProfile
+    ES->>ES: Build schema characteristics cache
+    ES->>DB: INSERT Endpoint with profile
+    DB-->>ES: Created endpoint
+    ES->>ES: Add to in-memory cache (by id + name)
+    ES-->>EC: EndpointResponse
+    EC-->>Op: 201 Created
 ```
 
-### Profile-aware schema resolution
+---
 
-`ScimSchemaHelpers.getProfileAwareSchemaDefinitions()` filters profile schemas to only
-those relevant to the current resource type:
+## Built-In Presets
 
-1. Build set of relevant URNs: `{ coreSchemaUrn } ∪ { ext.schema for each RT using this core }`
-2. For each relevant URN: prefer profile schema, fall back to global registry
-3. This ensures User service doesn't see Group schema attributes and vice versa
+6 presets are compiled into the application from JSON files in `api/src/modules/scim/endpoint-profile/presets/`:
+
+| Preset | File | Default | Description |
+|--------|------|---------|-------------|
+| `entra-id` | entra-id.json | **Yes** | Full Entra ID provisioning. All RFC user/group attributes + 4 Microsoft test extensions. EnterpriseUser. |
+| `entra-id-minimal` | entra-id-minimal.json | No | Core identity fields only + 4 Microsoft test extensions. EnterpriseUser. |
+| `rfc-standard` | rfc-standard.json | No | Full RFC 7643 compliance. All capabilities enabled (bulk, sort). No vendor extensions. |
+| `minimal` | minimal.json | No | Bare minimum User + Group. No extensions. |
+| `user-only` | user-only.json | No | User provisioning only. No Group resource type. EnterpriseUser included. |
+| `user-only-with-custom-ext` | user-only-with-custom-ext.json | No | User-only with custom extension demonstrating writeOnly/returned:never attributes. |
+
+**Backward compatibility alias:** `'lexmark'` resolves to `'user-only-with-custom-ext'`
+
+### Preset Capabilities Comparison
+
+| Capability | entra-id | entra-id-minimal | rfc-standard | minimal | user-only | user-only-with-custom-ext |
+|-----------|----------|-----------------|-------------|---------|-----------|---------------------------|
+| Users | Yes | Yes | Yes | Yes | Yes | Yes |
+| Groups | Yes | Yes | Yes | Yes | No | No |
+| EnterpriseUser | Yes | Yes | Yes | No | Yes | Yes |
+| Custom extensions | 4 msft | 4 msft | None | None | None | 1 custom |
+| Bulk | No | No | Yes (1000) | No | No | No |
+| Sort | No | No | Yes | No | Yes | Yes |
+| ETag | Yes | Yes | Yes | No | Yes | No |
+| Filter max | 200 | 200 | 200 | 100 | 200 | 200 |
+| PrimaryEnforcement | normalize | normalize | reject | passthrough | passthrough | passthrough |
 
 ---
 
-## 8. Discovery Endpoints
+## Auto-Expand Engine
 
-All discovery responses are built **directly from the stored profile** - not from any global registry.
+The auto-expand engine (implemented in `auto-expand.service.ts`) converts shorthand profile input into a fully qualified EndpointProfile:
 
-| Endpoint | Source | Enrichment |
-|----------|--------|------------|
-| `GET /Schemas` | `profile.schemas` | Adds `schemas: [Schema URN]`, `meta: { resourceType: 'Schema' }` |
-| `GET /Schemas/:urn` | `profile.schemas.find(s => s.id === urn)` | Same enrichment. 404 if not found. |
-| `GET /ResourceTypes` | `profile.resourceTypes` | Adds `schemas: [ResourceType URN]`, `meta:` |
-| `GET /ResourceTypes/:id` | `profile.resourceTypes.find(r => r.id === id)` | 404 if not found. |
-| `GET /ServiceProviderConfig` | `profile.serviceProviderConfig` | Merges with global `meta`, `schemas`, `authenticationSchemes` |
+### Step 1: Schema Expansion
 
----
+When a schema uses `"attributes": "all"`, it's expanded to the complete RFC 7643 attribute list for that schema URN:
 
-## 9. Built-in Presets
+```json
+// Input (shorthand)
+{ "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" }
 
-```mermaid
-graph TD
-    subgraph "entra-id (DEFAULT)"
-        EA["User: 14 scoped attrs<br/>+ EnterpriseUser: all<br/>+ Group: all<br/>+ 4× msfttest passthrough"]
-        EB["patch✓ filter✓ etag✓<br/>bulk✗ sort✗ changePwd✗"]
-        EC["AllowAndCoerceBooleanStrings: True"]
-    end
-
-    subgraph "rfc-standard"
-        RA["User: all<br/>+ EnterpriseUser: all<br/>+ Group: all"]
-        RB["ALL capabilities ✓<br/>(except changePwd)"]
-        RC["settings: {}"]
-    end
-
-    subgraph "minimal"
-        MA["User: 6 attrs<br/>+ Group: 3 attrs<br/>NO extensions"]
-        MB["patch✓ filter✓<br/>everything else ✗"]
-    end
-
-    subgraph "user-only"
-        UA["User: 8 attrs<br/>+ EnterpriseUser: all<br/>NO Group"]
-        UB["patch✓ filter✓ sort✓ etag✓<br/>bulk✗ changePwd✗"]
-    end
-
-    subgraph "entra-id-minimal"
-        EMA["User: 6 attrs<br/>+ EnterpriseUser: all<br/>+ Group: 3 attrs<br/>+ 4× msfttest"]
-        EMB["Same as entra-id"]
-    end
-```
-
-| Preset | Schemas | User RTs | Group RTs | Extensions | Bulk | Sort |
-|--------|:-------:|:--------:|:---------:|:----------:|:----:|:----:|
-| `entra-id` | 7 | 1 (3 ext) | 1 (2 ext) | Enterprise + 4×msft | No | No |
-| `entra-id-minimal` | 7 | 1 (3 ext) | 1 (2 ext) | Enterprise + 4×msft | No | No |
-| `rfc-standard` | 3 | 1 (1 ext) | 1 (0 ext) | EnterpriseUser | Yes | Yes |
-| `minimal` | 2 | 1 (0 ext) | 1 (0 ext) | None | No | No |
-| `user-only` | 2 | 1 (1 ext) | **None** | EnterpriseUser | No | No |
-
----
-
-## 10. Combination Matrix
-
-### Creation input combinations
-
-| `profilePreset` | `profile` | Result |
-|:---------------:|:---------:|--------|
-| Set | - | Named preset expanded |
-| Set | Set | **400**: Cannot specify both |
-| - | Set | Inline profile expanded |
-| - | - | `entra-id` default preset |
-
-### Update (PATCH) combinations
-
-| `profile` | `displayName`/`active`/etc | Result |
-|:---------:|:--------------------------:|--------|
-| Set | Optional | Profile merged + fields updated |
-| - | Set | Only metadata fields updated, profile unchanged |
-| - | - | No-op (200 with unchanged endpoint) |
-
-### Profile section update combinations
-
-| `schemas` | `resourceTypes` | `SPC` | `settings` | Behavior |
-|:---------:|:--------------:|:-----:|:----------:|----------|
-| Set | Set | - | - | Both replaced. Must be structurally valid. |
-| Set | - | - | - | Schemas replaced. **400 if existing RTs reference missing schemas.** |
-| - | Set | - | - | RTs replaced. **400 if new RTs reference missing schemas.** |
-| - | - | Set | - | SPC shallow-merged. Schemas/RTs untouched. |
-| - | - | - | Set | Settings shallow-merged. Everything else untouched. |
-| Set | Set | Set | Set | All sections updated. Full revalidation. |
-| Set | - | - | Set | Schemas replaced + settings merged. **400 if RT mismatch.** |
-| - | - | Set | Set | SPC + settings merged. Safe - no structural impact. |
-
----
-
-## 11. Error Catalog
-
-### Profile validation errors
-
-| Code | Trigger | HTTP Status | Detail |
-|------|---------|:-----------:|--------|
-| `EXPAND_ERROR` | Schema expansion failed (e.g. `'all'` on custom schema) | 400 | `expandProfile` threw |
-| `TIGHTEN_TYPE` | Type changed from RFC baseline | 400 | Cannot change type of 'X' on 'schemaId' |
-| `TIGHTEN_MULTIVALUED` | multiValued changed | 400 | Cannot change multiValued |
-| `TIGHTEN_REQUIRED` | Required loosened (`true → false`) | 400 | Cannot loosen required |
-| `TIGHTEN_MUTABILITY` | Mutability loosened | 400 | Cannot loosen mutability |
-| `TIGHTEN_RETURNED` | returned:never loosened | 400 | Cannot loosen returned:never |
-| `SPC_UNIMPLEMENTED` | `changePassword.supported: true` | 400 | Server does not implement changePassword |
-| `SPC_INVALID_VALUE` | maxResults < 1 or > 10000 | 400 | Invalid SPC numeric value |
-| `MISSING_SCHEMAS` | No schemas in profile | 400 | Profile must contain at least one schema |
-| `MISSING_RESOURCE_TYPES` | No resourceTypes | 400 | Profile must contain at least one resourceType |
-| `RT_MISSING_SCHEMA` | RT core schema not in schemas[] | 400 | ResourceType "X" references missing schema |
-| `RT_MISSING_EXTENSION_SCHEMA` | RT extension schema not in schemas[] | 400 | ResourceType "X" extension references missing schema |
-| `DUPLICATE_SCHEMA` | Same schema ID twice | 400 | Duplicate schema id |
-| `DUPLICATE_RT` | Same RT name twice | 400 | Duplicate resource type name |
-
-### Admin API errors
-
-| Condition | HTTP Status | Detail |
-|-----------|:-----------:|--------|
-| Invalid endpoint name | 400 | Name must match `[a-zA-Z0-9_-]+` |
-| `profilePreset` + `profile` both set | 400 | Cannot specify both |
-| Unknown preset name | 400 | Unknown preset "X". Valid: entra-id, ... |
-| Duplicate endpoint name | 400 | Endpoint "X" already exists |
-| Invalid settings value | 400 | Invalid value "Yes" for flag "X". Allowed: True/False/1/0 |
-
----
-
-## 12. Database Storage
-
-### Prisma Schema
-
-The `Endpoint` model stores the profile as a JSONB column:
-
-```prisma
-model Endpoint {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  displayName String?
-  description String?
-  profile     Json?    // Full EndpointProfile stored as JSONB
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+// Expanded output
+{ "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": [
+    { "name": "userName", "type": "string", "required": true, "uniqueness": "server", ... },
+    { "name": "name", "type": "complex", "subAttributes": [...], ... },
+    { "name": "displayName", "type": "string", ... },
+    // ... all 20+ RFC attributes
+  ]
 }
 ```
 
-### Stored Profile JSON (example from DB)
+### Step 2: Attribute Merging
+
+For partial attribute definitions, the engine merges with the RFC baseline:
+
+```json
+// Input: operator overrides just required
+{ "name": "displayName", "required": true }
+
+// Merged with RFC baseline
+{
+  "name": "displayName",
+  "type": "string",          // filled from baseline
+  "multiValued": false,      // filled from baseline
+  "required": true,          // operator override wins
+  "mutability": "readWrite", // filled from baseline
+  "returned": "default",     // filled from baseline
+  "uniqueness": "none",      // filled from baseline
+  "caseExact": false         // filled from baseline
+}
+```
+
+### Step 3: Auto-Inject
+
+Required structural attributes are auto-injected if missing:
+
+| Schema | Auto-Injected |
+|--------|---------------|
+| User | `id` (readOnly), `userName` (required) |
+| Group | `id` (readOnly), `displayName` (required) |
+| All schemas | `externalId`, `meta` |
+| Group (project) | `active` (for soft-delete support) |
+
+---
+
+## Tighten-Only Validation
+
+After expansion, each attribute's characteristics are validated against the RFC baseline. Operators can only **tighten** constraints, never loosen them:
+
+```mermaid
+flowchart LR
+    A[Operator provides<br>mutability: readWrite] --> B{RFC baseline?}
+    B -->|readOnly| C[REJECT: Cannot loosen<br>readOnly to readWrite]
+    B -->|readWrite| D[ALLOW: Same level]
+    B -->|immutable| E[REJECT: Cannot loosen<br>immutable to readWrite]
+```
+
+### Tighten-Only Rules
+
+| Characteristic | Allowed Changes | Blocked Changes |
+|----------------|----------------|-----------------|
+| `required` | `false` - `true` | `true` - `false` |
+| `mutability` | readWrite - immutable, readWrite - readOnly | readOnly - readWrite, immutable - readWrite |
+| `uniqueness` | none - server, none - global, server - global | global - none, server - none |
+| `caseExact` | `false` - `true` | `true` - `false` |
+| `type` | **Cannot change** | Any change rejected |
+| `multiValued` | **Cannot change** | Any change rejected |
+
+### Error on Violation
+
+```json
+{
+  "statusCode": 400,
+  "message": "Tighten-only validation failed",
+  "errors": [
+    {
+      "schemaId": "urn:ietf:params:scim:schemas:core:2.0:User",
+      "attributeName": "userName",
+      "characteristic": "mutability",
+      "baselineValue": "readWrite",
+      "providedValue": "readOnly",
+      "message": "Cannot change type for attribute 'userName'"
+    }
+  ]
+}
+```
+
+---
+
+## Schema Characteristics Cache
+
+After profile expansion and validation, precomputed characteristic maps are built and stored with the profile for runtime performance:
+
+```mermaid
+flowchart TD
+    A[Expanded Profile] --> B[Cache Builder]
+    B --> C[neverReturnedAttributes<br>Set of attrs with returned:never]
+    B --> D[alwaysReturnedAttributes<br>Set of attrs with returned:always]
+    B --> E[requestReturnedAttributes<br>Set of attrs with returned:request]
+    B --> F[readOnlyAttributes<br>Set of attrs with mutability:readOnly]
+    B --> G[requiredAttributes<br>Set of attrs with required:true]
+    B --> H[coreSchemaAttrMap<br>Map for fast lookup]
+    B --> I[extensionSchemaMap<br>Map of URN to attr maps]
+```
+
+These caches enable O(1) lookups during request processing instead of scanning the full schema definition on every request.
+
+**Note:** The `_schemaCaches` field is runtime-only and is never included in API responses.
+
+---
+
+## Profile Merging on PATCH
+
+When updating an endpoint via PATCH, profile sections are merged with different strategies:
+
+| Section | Merge Strategy | Rationale |
+|---------|---------------|-----------|
+| `settings` | **Deep merge** | Individual flags can be toggled without re-specifying all |
+| `schemas` | **Replace** | Schema definitions are structural - partial merge would be ambiguous |
+| `resourceTypes` | **Replace** | Resource types are structural |
+| `serviceProviderConfig` | **Replace** | SPC is a unit configuration |
+
+```bash
+# Only updates RequireIfMatch, all other settings preserved
+curl -X PATCH http://localhost:8080/scim/admin/endpoints/{id} \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/json" \
+  -d '{"profile": {"settings": {"RequireIfMatch": true}}}'
+```
+
+---
+
+## Shorthand Syntax
+
+Operators use **ShorthandProfileInput** for concise definitions. The auto-expand engine converts this to full EndpointProfile.
+
+### Shorthand vs Full
+
+| Shorthand Feature | Expansion |
+|-------------------|-----------|
+| `"attributes": "all"` | Full RFC attribute list for the schema |
+| Partial attribute `{ "name": "emails", "required": true }` | Merged with RFC baseline |
+| Missing `subAttributes` | Filled from RFC baseline (complex types) |
+| Missing structural attrs (id, meta, externalId) | Auto-injected |
+| Omitted characteristics | Filled from RFC baseline |
+
+### Full Shorthand Example
 
 ```json
 {
@@ -610,46 +353,142 @@ model Endpoint {
     {
       "id": "urn:ietf:params:scim:schemas:core:2.0:User",
       "name": "User",
-      "description": "User Account",
       "attributes": [
-        { "name": "id", "type": "string", "multiValued": false, "required": true,
-          "mutability": "readOnly", "returned": "always", "caseExact": true, "uniqueness": "server" },
-        { "name": "userName", "type": "string", "multiValued": false, "required": true,
-          "mutability": "readWrite", "returned": "default", "caseExact": false, "uniqueness": "server" },
-        "... (20+ attributes)"
+        { "name": "userName" },
+        { "name": "displayName" },
+        { "name": "emails" },
+        { "name": "active" },
+        { "name": "password" }
       ]
     },
-    { "id": "urn:...:Group", "name": "Group", "attributes": ["..."] }
+    {
+      "id": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+      "name": "EnterpriseUser",
+      "attributes": "all"
+    },
+    {
+      "id": "urn:example:schemas:custom:2.0:User",
+      "name": "CustomExtension",
+      "attributes": [
+        { "name": "badgeCode", "type": "string", "mutability": "writeOnly", "returned": "never" },
+        { "name": "internalId", "type": "string", "mutability": "readOnly", "returned": "always" }
+      ]
+    }
   ],
   "resourceTypes": [
-    { "id": "User", "name": "User", "endpoint": "/Users",
+    {
+      "id": "User",
+      "name": "User",
+      "endpoint": "/Users",
       "schema": "urn:ietf:params:scim:schemas:core:2.0:User",
-      "schemaExtensions": [] }
+      "schemaExtensions": [
+        { "schema": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User", "required": false },
+        { "schema": "urn:example:schemas:custom:2.0:User", "required": false }
+      ]
+    }
   ],
   "serviceProviderConfig": {
     "patch": { "supported": true },
     "bulk": { "supported": false },
     "filter": { "supported": true, "maxResults": 200 },
-    "sort": { "supported": false },
-    "etag": { "supported": true },
-    "changePassword": { "supported": false }
+    "sort": { "supported": true },
+    "etag": { "supported": true }
   },
   "settings": {
-    "AllowAndCoerceBooleanStrings": "True"
+    "StrictSchemaValidation": true,
+    "PrimaryEnforcement": "normalize"
   }
 }
 ```
 
-### InMemory Storage
-
-When `PERSISTENCE_BACKEND=inmemory`, endpoints are stored in a `Map<string, EndpointResponse>`
-keyed by endpoint ID. The profile is the same JSON structure, held in memory.
-
 ---
 
-## Version History
+## Examples
 
-| Date | Change |
-|------|--------|
-| 2026-03-16 | v0.29.0 - Remove legacy config references, add DB storage section, update combination matrices |
-| 2026-03-16 | Initial - comprehensive profile flow documentation from source code audit |
+### Create Endpoint with Preset
+
+```bash
+curl -X POST http://localhost:8080/scim/admin/endpoints \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "prod", "profilePreset": "entra-id"}'
+```
+
+### Create Endpoint with Preset + Overrides
+
+```bash
+curl -X POST http://localhost:8080/scim/admin/endpoints \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "strict-prod",
+    "profilePreset": "entra-id",
+    "profile": {
+      "settings": {
+        "RequireIfMatch": true,
+        "PrimaryEnforcement": "reject",
+        "PerEndpointCredentialsEnabled": true
+      }
+    }
+  }'
+```
+
+### Create Endpoint with Inline Profile
+
+```bash
+curl -X POST http://localhost:8080/scim/admin/endpoints \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "custom-app",
+    "profile": {
+      "schemas": [
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" }
+      ],
+      "resourceTypes": [
+        { "id": "User", "name": "User", "endpoint": "/Users", "schema": "urn:ietf:params:scim:schemas:core:2.0:User" }
+      ],
+      "serviceProviderConfig": {
+        "patch": { "supported": true },
+        "bulk": { "supported": false },
+        "filter": { "supported": true, "maxResults": 100 }
+      },
+      "settings": {
+        "StrictSchemaValidation": false
+      }
+    }
+  }'
+```
+
+### Create Endpoint with Custom Resource Type
+
+```bash
+curl -X POST http://localhost:8080/scim/admin/endpoints \
+  -H "Authorization: Bearer changeme-scim" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "devices",
+    "profile": {
+      "schemas": [
+        { "id": "urn:ietf:params:scim:schemas:core:2.0:User", "name": "User", "attributes": "all" },
+        {
+          "id": "urn:example:schemas:2.0:Device",
+          "name": "Device",
+          "attributes": [
+            { "name": "serialNumber", "type": "string", "required": true, "uniqueness": "server" },
+            { "name": "model", "type": "string" },
+            { "name": "firmware", "type": "string", "mutability": "readOnly" },
+            { "name": "location", "type": "complex", "subAttributes": [
+              { "name": "building", "type": "string" },
+              { "name": "floor", "type": "integer" }
+            ]}
+          ]
+        }
+      ],
+      "resourceTypes": [
+        { "id": "User", "name": "User", "endpoint": "/Users", "schema": "urn:ietf:params:scim:schemas:core:2.0:User" },
+        { "id": "Device", "name": "Device", "endpoint": "/Devices", "schema": "urn:example:schemas:2.0:Device" }
+      ]
+    }
+  }'
+```
