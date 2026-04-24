@@ -50,9 +50,10 @@ api/src/modules/scim/controllers/
   endpoint-scim-bulk.controller.ts                       # Bulk Operations controller (RFC 7644 §3.7)
   endpoint-scim-discovery.controller.ts                  # SCIM discovery - PRIMARY endpoint-scoped (multi-tenant)
 api/src/modules/scim/services/
-  endpoint-scim-users.service.ts    (528 lines)          # Users business logic (G17 dedup: −29%)
-  endpoint-scim-groups.service.ts   (627 lines)          # Groups business logic (G17 dedup: −28%)
-  bulk-processor.service.ts         (395 lines)          # Bulk operation processor with bulkId resolution
+  endpoint-scim-users.service.ts    (671 lines)          # Users business logic
+  endpoint-scim-groups.service.ts   (722 lines)          # Groups business logic
+  endpoint-scim-generic.service.ts  (1261 lines)         # Custom resource type CRUD
+  bulk-processor.service.ts         (439 lines)          # Bulk operation processor with bulkId resolution
   scim-metadata.service.ts                               # buildLocation, timestamp
 api/src/modules/scim/common/
   scim-service-helpers.ts           (353 lines)          # G17: parseJson, ensureSchema, enforceIfMatch, sanitizeBooleanStrings, ScimSchemaHelpers
@@ -76,7 +77,7 @@ api/src/modules/scim/controllers/
 api/src/modules/scim/common/
   scim-sort.util.ts                                      # sortBy/sortOrder mapping utility (v0.20.0)
 api/src/modules/endpoint/
-  endpoint-config.interface.ts                           # 13 boolean flags + logLevel + PrimaryEnforcement (settings v7) + helpers
+  endpoint-config.interface.ts                           # 13 boolean flags + logLevel + PrimaryEnforcement + logFileEnabled (16 flags) + helpers
   endpoint-context.storage.ts                            # AsyncLocalStorage for endpoint context
 api/src/modules/scim/filters/
   scim-filter-parser.ts                                  # Filter AST attribute path extraction
@@ -102,10 +103,10 @@ api/src/modules/database/
   database.controller.ts                                 # Dashboard data APIs
   database.service.ts                                    # User/group/stats queries
 api/src/modules/activity-parser/
-  activity-parser.service.ts       (898 lines)           # Log → human-readable activity
+  activity-parser.service.ts                             # Log -> human-readable activity
 api/src/oauth/
   oauth.controller.ts                                    # Token + discovery endpoints
-  oauth.service.ts                 (138 lines)           # JWT generation/validation
+  oauth.service.ts                                       # JWT generation/validation
 api/src/modules/prisma/prisma.service.ts                 # Extended PrismaClient
 api/src/modules/web/web.controller.ts                    # SPA serving
 api/prisma/schema.prisma                                 # 5 models: Endpoint, RequestLog, ScimResource, ResourceMember, EndpointCredential
@@ -402,7 +403,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 6. **Auto-generated secrets** - In dev mode, `SCIM_SHARED_SECRET` and `OAUTH_CLIENT_SECRET` are auto-generated and logged to console. NEVER do this in production.
 7. **ValidationPipe whitelist: false** - We do NOT strip unknown properties, because SCIM resources have arbitrary attributes in extensions
 8. **The `/scim/v2` rewrite** - Express middleware in `main.ts` rewrites `/scim/v2/*` to `/scim/*` for spec compliance
-9. **SchemaValidator** - 950-line pure domain class for RFC 7643 payload validation. Gated behind `StrictSchemaValidation` config flag. Validates type, mutability (readOnly + immutable), required attrs, unknown attrs, sub-attributes, canonicalValues, size limits. New: `collectBooleanAttributeNames()` for schema-aware boolean coercion, `collectReadOnlyAttributes()` for readOnly stripping, `validateFilterAttributePaths()` for filter validation (V32).
+9. **SchemaValidator** - 1,664-line pure domain class for RFC 7643 payload validation. Gated behind `StrictSchemaValidation` config flag. Validates type, mutability (readOnly + immutable), required attrs, unknown attrs, sub-attributes, canonicalValues, size limits. New: `collectBooleanAttributeNames()` for schema-aware boolean coercion, `collectReadOnlyAttributes()` for readOnly stripping, `validateFilterAttributePaths()` for filter validation (V32).
 10. **Repository Pattern** - `IUserRepository`/`IGroupRepository` interfaces injected via tokens. `PERSISTENCE_BACKEND` env var toggles between `prisma` and `inmemory` implementations.
 11. **G2 is DONE + G17 RESOLVED (v0.20.0)** - Database uses a single unified `ScimResource` table. G17 service code deduplication completed: 13+ duplicate private methods extracted into `scim-service-helpers.ts` (`parseJson`, `ensureSchema`, `enforceIfMatch`, `sanitizeBooleanStrings`, `ScimSchemaHelpers`). All 27 migration gaps (G1–G20) are now closed.
 12. **3-tier auth guard** - `SharedSecretGuard` now implements 3-tier fallback: per-endpoint bcrypt credentials → OAuth JWT → global `SCIM_SHARED_SECRET`. Per-endpoint credentials use lazy-loaded native bcrypt (12 rounds, cached after first use). Active + non-expired credentials only.
@@ -427,7 +428,7 @@ Six behavioral fixes from the RFC 7643 §2 attribute characteristics audit:
 5. Add tests
 6. Update [ENDPOINT_CONFIG_FLAGS_REFERENCE.md](ENDPOINT_CONFIG_FLAGS_REFERENCE.md) - flag summary table (§2), defaults matrix (§2.1), and true/false behavior (§2.2)
 
-> **Flag defaults quick ref:** `AllowAndCoerceBooleanStrings` and `PatchOpAllowRemoveAllMembers` default to `true`. `PrimaryEnforcement` defaults to `passthrough`. All other boolean flags default to `false`. When no profile/preset is specified on endpoint creation, the `entra-id` preset is applied (sets 5 flags to `True`, PrimaryEnforcement to `normalize`).
+> **Flag defaults quick ref:** `AllowAndCoerceBooleanStrings`, `UserSoftDeleteEnabled`, `UserHardDeleteEnabled`, `GroupHardDeleteEnabled`, `MultiMemberPatchOpForGroupEnabled`, `SchemaDiscoveryEnabled`, `StrictSchemaValidation`, and `logFileEnabled` default to `true`. `PatchOpAllowRemoveAllMembers`, `VerbosePatchSupported`, `RequireIfMatch`, `PerEndpointCredentialsEnabled`, `IncludeWarningAboutIgnoredReadOnlyAttribute`, and `IgnoreReadOnlyAttributesInPatch` default to `false`. `PrimaryEnforcement` defaults to `passthrough`. When no profile/preset is specified on endpoint creation, the `entra-id` preset is applied (sets several flags, PrimaryEnforcement to `normalize`).
 
 ### Adding a new admin API route:
 1. Add method to appropriate controller (`AdminController`, `DatabaseController`, etc.)

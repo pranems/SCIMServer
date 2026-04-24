@@ -1,56 +1,87 @@
-# SCIM v2 Reference & Examples
+# SCIM 2.0 Protocol Reference
 
-> **Status**: Living reference  
-> **Last Updated**: April 23, 2026  
-> **Baseline**: SCIMServer (current release)
-
-> Implementation-agnostic SCIM 2.0 API reference with runnable example payloads.
+> **Version:** 0.38.0 - **Updated:** April 24, 2026  
+> Quick reference for SCIM operations with SCIMServer-specific examples
 
 ---
 
-## Basics
+## Table of Contents
 
-| Item | Value |
-|------|-------|
-| Specification | RFC 7643 (Schema), RFC 7644 (Protocol) |
-| Media Type | `application/scim+json` (also accepts `application/json`) |
-| Auth | `Authorization: Bearer <token>` (OAuth 2.0 bearer) |
-| Error Format | `{"schemas":["urn:...:Error"], "status":"404", "scimType":"...", "detail":"..."}` |
-
----
-
-## Core Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/ServiceProviderConfig` | Server capabilities |
-| `GET` | `/Schemas` | Schema definitions |
-| `GET` | `/ResourceTypes` | User/Group resource types |
-| `POST` | `/Users` | Create user (201 + Location) |
-| `GET` | `/Users` | List users (filter, pagination, projection) |
-| `GET` | `/Users/{id}` | Get user by ID |
-| `POST` | `/Users/.search` | Search users via POST body |
-| `PUT` | `/Users/{id}` | Replace user |
-| `PATCH` | `/Users/{id}` | Partial update user |
-| `DELETE` | `/Users/{id}` | Delete user (204). Always hard-deletes (row removed) |
-| `POST` | `/Groups` | Create group (201 + Location) |
-| `GET` | `/Groups` | List groups |
-| `GET` | `/Groups/{id}` | Get group by ID |
-| `POST` | `/Groups/.search` | Search groups via POST body |
-| `PUT` | `/Groups/{id}` | Replace group |
-| `PATCH` | `/Groups/{id}` | Partial update group |
-| `DELETE` | `/Groups/{id}` | Delete group (204). Always hard-deletes (row removed) |
-| `POST` | `/Bulk` | Bulk operations (RFC 7644 §3.7) - requires `bulk.supported = true` |
-| `GET` | `/Me` | Get current authenticated user (requires OAuth JWT with `sub` claim) |
-| `PUT` | `/Me` | Replace current user |
-| `PATCH` | `/Me` | Partial update current user |
-| `DELETE` | `/Me` | Delete current user |
+- [URL Structure](#url-structure)
+- [Resource Operations](#resource-operations)
+- [User Resource](#user-resource)
+- [Group Resource](#group-resource)
+- [PATCH Operations](#patch-operations)
+- [Filtering](#filtering)
+- [Sorting & Pagination](#sorting--pagination)
+- [Attribute Projection](#attribute-projection)
+- [Bulk Operations](#bulk-operations)
+- [Discovery Endpoints](#discovery-endpoints)
+- [Error Handling](#error-handling)
+- [Schema URNs](#schema-urns)
 
 ---
 
-## Example Payloads
+## URL Structure
 
-### Full User Resource (Core + Enterprise Extension)
+All SCIM operations are scoped to an endpoint:
+
+```
+{base}/scim/endpoints/{endpointId}/{ResourceType}
+{base}/scim/endpoints/{endpointId}/{ResourceType}/{resourceId}
+```
+
+**Examples:**
+```
+http://localhost:8080/scim/endpoints/a1b2c3d4-.../Users
+http://localhost:8080/scim/endpoints/a1b2c3d4-.../Users/f47ac10b-...
+http://localhost:8080/scim/endpoints/a1b2c3d4-.../Groups
+http://localhost:8080/scim/endpoints/a1b2c3d4-.../Groups/g1234567-...
+http://localhost:8080/scim/endpoints/a1b2c3d4-.../Bulk
+http://localhost:8080/scim/endpoints/a1b2c3d4-.../Me
+http://localhost:8080/scim/endpoints/a1b2c3d4-.../Users/.search
+```
+
+**Entra ID URL rewrite:** `/scim/v2/*` is auto-rewritten to `/scim/*` for Entra ID compatibility.
+
+---
+
+## Resource Operations
+
+| Operation | HTTP Method | URL | Status | Description |
+|-----------|------------|-----|--------|-------------|
+| Create | POST | `/{type}` | 201 | Create resource, returns Location + ETag |
+| Read | GET | `/{type}/{id}` | 200 | Get single resource. Supports If-None-Match (304) |
+| List | GET | `/{type}` | 200 | List with filter, sort, pagination, projection |
+| Replace | PUT | `/{type}/{id}` | 200 | Full replacement. Supports If-Match |
+| Modify | PATCH | `/{type}/{id}` | 200 | Partial update via operations. Supports If-Match |
+| Delete | DELETE | `/{type}/{id}` | 204 | Remove resource. Supports If-Match |
+| Search | POST | `/{type}/.search` | 200 | Server-side search via POST body |
+
+### Delete Behavior
+
+| Config Flag | Default | DELETE Behavior |
+|------------|---------|-----------------|
+| `UserHardDeleteEnabled` | `true` | Permanently removes user row |
+| `GroupHardDeleteEnabled` | `true` | Permanently removes group + memberships |
+| When disabled | - | Returns 400 (deletion not permitted) |
+
+**Soft delete** is separate: PATCH `active: false` deactivates the user (sets `deletedAt` timestamp). Controlled by `UserSoftDeleteEnabled` flag.
+
+---
+
+## User Resource
+
+### Minimal User (POST)
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+  "userName": "jane@example.com"
+}
+```
+
+### Full User (POST)
 
 ```json
 {
@@ -58,256 +89,353 @@
     "urn:ietf:params:scim:schemas:core:2.0:User",
     "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"
   ],
-  "id": "2819c223-7f76-453a-919d-413861904646",
-  "externalId": "701984",
-  "userName": "bjensen@example.com",
+  "userName": "jane@example.com",
+  "externalId": "ext-001",
   "name": {
-    "formatted": "Ms. Barbara J Jensen, III",
-    "familyName": "Jensen",
-    "givenName": "Barbara"
+    "formatted": "Ms. Jane M. Doe",
+    "familyName": "Doe",
+    "givenName": "Jane",
+    "middleName": "Marie",
+    "honorificPrefix": "Ms.",
+    "honorificSuffix": "III"
   },
-  "displayName": "Babs Jensen",
+  "displayName": "Jane Doe",
+  "nickName": "jdoe",
+  "profileUrl": "https://example.com/jane",
+  "title": "Senior Engineer",
+  "userType": "Employee",
+  "preferredLanguage": "en-US",
+  "locale": "en-US",
+  "timezone": "America/New_York",
   "active": true,
+  "password": "secret123",
   "emails": [
-    { "value": "bjensen@example.com", "type": "work", "primary": true },
-    { "value": "babs@jensen.org", "type": "home" }
+    { "value": "jane@example.com", "type": "work", "primary": true },
+    { "value": "jane.home@example.com", "type": "home" }
   ],
   "phoneNumbers": [
-    { "value": "+1-555-555-8377", "type": "work" }
+    { "value": "+1-555-0100", "type": "work" },
+    { "value": "+1-555-0101", "type": "mobile" }
   ],
   "addresses": [
-    { "streetAddress": "100 Universal City Plaza", "locality": "Hollywood", "region": "CA", "postalCode": "91608", "country": "US", "type": "work" }
-  ],
-  "roles": [
-    { "value": "Manager", "type": "work", "primary": true }
+    {
+      "streetAddress": "100 Main St",
+      "locality": "Springfield",
+      "region": "IL",
+      "postalCode": "62701",
+      "country": "US",
+      "type": "work",
+      "primary": true
+    }
   ],
   "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User": {
-    "employeeNumber": "701984",
-    "costCenter": "4130",
-    "organization": "Universal Studios",
-    "department": "Tour Operations",
-    "manager": { "value": "26118915-6090-4610-87e4-49d8ca9f808d", "displayName": "John Smith" }
-  },
-  "meta": {
-    "resourceType": "User",
-    "created": "2026-01-23T04:56:22Z",
-    "lastModified": "2026-02-11T05:30:00Z",
-    "location": "https://example.com/scim/v2/Users/2819c223-7f76-453a-919d-413861904646",
-    "version": "W/\"2026-02-11T05:30:00.000Z\""
+    "employeeNumber": "EMP-001",
+    "costCenter": "CC-1234",
+    "organization": "Engineering",
+    "division": "Product",
+    "department": "Backend",
+    "manager": {
+      "value": "manager-scim-id",
+      "displayName": "Bob Manager"
+    }
   }
 }
 ```
 
-### Full Group Resource
+### User Response
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+  "id": "f47ac10b-...",
+  "userName": "jane@example.com",
+  "displayName": "Jane Doe",
+  "active": true,
+  "externalId": null,
+  "meta": {
+    "resourceType": "User",
+    "created": "2026-04-24T10:00:00.000Z",
+    "lastModified": "2026-04-24T10:00:00.000Z",
+    "location": "http://localhost:8080/scim/v2/endpoints/{epId}/Users/f47ac10b-...",
+    "version": "W/\"1\""
+  }
+}
+```
+
+**Note:** `password` is never returned (`returned: never`). `id` and `meta` are server-assigned (`mutability: readOnly`).
+
+---
+
+## Group Resource
+
+### Group (POST)
 
 ```json
 {
   "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
-  "id": "e9e30dba-f08f-4109-8486-d5c6a331660a",
-  "displayName": "Engineering",
-  "externalId": "group-eng-001",
+  "displayName": "Engineering Team",
   "members": [
-    { "value": "2819c223-7f76-453a-919d-413861904646", "display": "Babs Jensen", "type": "User" }
+    { "value": "user-scim-id-1" },
+    { "value": "user-scim-id-2" }
+  ]
+}
+```
+
+### Group Response
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+  "id": "g1234567-...",
+  "displayName": "Engineering Team",
+  "members": [
+    { "value": "user-scim-id-1", "display": "jane@example.com", "type": "User" },
+    { "value": "user-scim-id-2", "display": "john@example.com", "type": "User" }
   ],
   "meta": {
     "resourceType": "Group",
-    "created": "2026-01-23T04:56:22Z",
-    "lastModified": "2026-02-11T05:30:00Z",
-    "location": "https://example.com/scim/v2/Groups/e9e30dba-f08f-4109-8486-d5c6a331660a",
-    "version": "W/\"2026-02-11T05:30:00.000Z\""
+    "created": "2026-04-24T10:00:00.000Z",
+    "lastModified": "2026-04-24T10:00:00.000Z",
+    "location": "http://localhost:8080/scim/v2/endpoints/{epId}/Groups/g1234567-...",
+    "version": "W/\"1\""
   }
 }
 ```
 
-### ListResponse
+**Uniqueness:** `displayName` is unique per endpoint (409 on conflict).
+
+---
+
+## PATCH Operations
+
+### Request Format
+
+```json
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [
+    { "op": "add|replace|remove", "path": "...", "value": "..." }
+  ]
+}
+```
+
+### Path Styles
+
+| Style | Example | Notes |
+|-------|---------|-------|
+| Simple | `"displayName"` | Direct top-level attribute |
+| Dot-notation | `"name.givenName"` | Requires `VerbosePatchSupported` |
+| ValuePath | `"emails[type eq \"work\"].value"` | Filter-based targeting |
+| Extension URN | `"urn:...:enterprise:2.0:User:department"` | Extension namespace |
+| No-path | omit `path` | Merge `value` as partial resource |
+
+### Common Patterns
+
+```json
+// Replace simple attribute
+{ "op": "replace", "path": "displayName", "value": "New Name" }
+
+// Add email
+{ "op": "add", "path": "emails", "value": [{ "value": "new@example.com", "type": "home" }] }
+
+// Replace specific email value
+{ "op": "replace", "path": "emails[type eq \"work\"].value", "value": "updated@example.com" }
+
+// Remove phone number
+{ "op": "remove", "path": "phoneNumbers[type eq \"fax\"]" }
+
+// Update extension attribute
+{ "op": "replace", "path": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department", "value": "Product" }
+
+// Deactivate user (soft-delete)
+{ "op": "replace", "path": "active", "value": false }
+
+// Add members to group
+{ "op": "add", "path": "members", "value": [{ "value": "user-id-1" }, { "value": "user-id-2" }] }
+
+// Remove specific member
+{ "op": "remove", "path": "members[value eq \"user-id-to-remove\"]" }
+
+// No-path merge
+{ "op": "replace", "value": { "displayName": "New", "title": "Lead" } }
+```
+
+---
+
+## Filtering
+
+### Syntax
+
+```
+GET /Users?filter={expression}
+```
+
+### Operators
+
+| Operator | Syntax | Example |
+|----------|--------|---------|
+| Equal | `eq` | `userName eq "jane"` |
+| Not equal | `ne` | `active ne false` |
+| Contains | `co` | `displayName co "Smith"` |
+| Starts with | `sw` | `userName sw "j"` |
+| Ends with | `ew` | `emails.value ew "@example.com"` |
+| Greater than | `gt` | `meta.created gt "2026-01-01"` |
+| Greater or equal | `ge` | `meta.lastModified ge "2026-01-01"` |
+| Less than | `lt` | `meta.created lt "2026-12-31"` |
+| Less or equal | `le` | `meta.lastModified le "2026-12-31"` |
+| Present | `pr` | `externalId pr` |
+
+### Logical Operators
+
+```
+userName sw "j" and active eq true
+displayName co "Smith" or displayName co "Jones"
+not (active eq false)
+```
+
+### ValuePath Filter
+
+```
+emails[type eq "work"].value co "@example.com"
+```
+
+---
+
+## Sorting & Pagination
+
+### Query Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `sortBy` | `meta.created` | Attribute to sort by |
+| `sortOrder` | `ascending` | `ascending` or `descending` |
+| `startIndex` | `1` | 1-based pagination offset |
+| `count` | `100` | Results per page (max 1000) |
+
+### List Response Format
 
 ```json
 {
   "schemas": ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
-  "totalResults": 1,
+  "totalResults": 42,
   "startIndex": 1,
-  "itemsPerPage": 1,
-  "Resources": [ { "...": "..." } ]
+  "itemsPerPage": 10,
+  "Resources": [ ... ]
 }
 ```
 
 ---
 
-## Filtering (RFC 7644 §3.4.2.2)
+## Attribute Projection
 
-### Query Parameters
+| Parameter | Effect |
+|-----------|--------|
+| `?attributes=userName,emails` | Return ONLY these + always-returned (schemas, id, meta) |
+| `?excludedAttributes=phoneNumbers` | Return all defaults EXCEPT these |
 
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| `filter` | Filter expression | `filter=userName eq "bjensen@example.com"` |
-| `startIndex` | 1-based pagination start | `startIndex=1` |
-| `count` | Page size | `count=25` |
-| `attributes` | Return only these attributes | `attributes=userName,displayName` |
-| `excludedAttributes` | Exclude these attributes | `excludedAttributes=emails,members` |
-| `sortBy` | Sort by attribute | `sortBy=userName` |
-| `sortOrder` | Sort direction | `sortOrder=ascending` or `sortOrder=descending` |
+### `returned` Characteristic
 
-### Operators
-
-| Operator | Description | Example |
-|----------|-------------|---------|
-| `eq` | Equal | `userName eq "bjensen"` |
-| `ne` | Not equal | `active ne false` |
-| `co` | Contains | `userName co "jensen"` |
-| `sw` | Starts with | `userName sw "bjen"` |
-| `ew` | Ends with | `userName ew "sen"` |
-| `pr` | Present (has value) | `externalId pr` |
-| `and` / `or` / `not` | Logical operators | `userName eq "a" and active eq true` |
-
-> **SCIMServer note:** All filter operators (`eq`, `ne`, `co`, `sw`, `ew`, `pr`, `gt`, `ge`, `lt`, `le`) are fully implemented with case-insensitive matching per RFC 7643 §2.1. Logical operators `and`, `or`, `not` are also supported.
+| Value | Always in response? | Excludable? | Needs explicit `?attributes=`? |
+|-------|---------------------|-------------|-------------------------------|
+| `always` | Yes | No | No |
+| `default` | Yes | Yes | No |
+| `request` | No | N/A | Yes |
+| `never` | Never | N/A | N/A |
 
 ---
 
-## POST /.search (RFC 7644 §3.4.3)
-
-Search via POST body instead of query parameters:
+## Bulk Operations
 
 ```json
 {
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:SearchRequest"],
-  "filter": "userName eq \"bjensen@example.com\"",
-  "startIndex": 1,
-  "count": 10,
-  "attributes": "userName,displayName",
-  "excludedAttributes": "emails"
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:BulkRequest"],
+  "failOnErrors": 2,
+  "Operations": [
+    { "method": "POST", "path": "/Users", "bulkId": "u1", "data": { ... } },
+    { "method": "POST", "path": "/Groups", "bulkId": "g1", "data": { "members": [{ "value": "bulkId:u1" }] } },
+    { "method": "PUT", "path": "/Users/{id}", "version": "W/\"1\"", "data": { ... } },
+    { "method": "PATCH", "path": "/Groups/{id}", "data": { ... } },
+    { "method": "DELETE", "path": "/Users/{id}" }
+  ]
 }
 ```
 
-Returns `200 OK` with a ListResponse (not 201).
+Limits: 1,000 operations, 1 MB payload. Requires `bulk.supported: true` in SPC.
 
 ---
 
-## PATCH Operations (RFC 7644 §3.5.2)
+## Discovery Endpoints
 
-### Replace displayName
+No authentication required (RFC 7644 S4):
 
-```json
-{
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [
-    { "op": "replace", "path": "displayName", "value": "New Name" }
-  ]
-}
-```
+| Endpoint | Description |
+|----------|-------------|
+| `GET /scim/Schemas` | All schema definitions |
+| `GET /scim/Schemas/{urn}` | Single schema by URN |
+| `GET /scim/ResourceTypes` | All resource types |
+| `GET /scim/ResourceTypes/{id}` | Single resource type |
+| `GET /scim/ServiceProviderConfig` | Server capabilities |
 
-### Add Member to Group
+Per-endpoint discovery (returns endpoint-specific schema/RTs/SPC):
 
-```json
-{
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [
-    { "op": "add", "path": "members", "value": [{ "value": "user-uuid-here" }] }
-  ]
-}
-```
-
-### Remove Member by Filter
-
-```json
-{
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [
-    { "op": "remove", "path": "members[value eq \"user-uuid-here\"]" }
-  ]
-}
-```
-
-### No-Path Replace (Object Merge)
-
-```json
-{
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [
-    { "op": "replace", "value": { "displayName": "Updated Name", "active": false } }
-  ]
-}
-```
-
-### Update Email by ValuePath Filter
-
-```json
-{
-  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-  "Operations": [
-    { "op": "replace", "path": "emails[type eq \"work\"].value", "value": "newemail@example.com" }
-  ]
-}
-```
+| Endpoint | Description |
+|----------|-------------|
+| `GET /scim/endpoints/{id}/Schemas` | Endpoint schemas |
+| `GET /scim/endpoints/{id}/ResourceTypes` | Endpoint resource types |
+| `GET /scim/endpoints/{id}/ServiceProviderConfig` | Endpoint SPC |
 
 ---
 
-## ETag / Conditional Requests (RFC 7644 §3.14)
+## Error Handling
 
-| Header | Direction | Behavior |
-|--------|-----------|----------|
-| `ETag` | Response | Weak ETag (`W/"<timestamp>"`) on GET/POST/PUT/PATCH |
-| `If-None-Match` | Request | Send ETag value; returns 304 Not Modified if resource unchanged |
-| `If-Match` | Request | Optimistic concurrency; returns 412 Precondition Failed if stale |
-
-```bash
-# Get resource with ETag
-curl -i GET /Users/123
-# → ETag: W/"2026-02-11T22:42:00.940Z"
-
-# Conditional GET (returns 304 if unchanged)
-curl -H 'If-None-Match: W/"2026-02-11T22:42:00.940Z"' GET /Users/123
-# → 304 Not Modified
-```
-
----
-
-## Error Response Format (RFC 7644 §3.12)
+### SCIM Error Format
 
 ```json
 {
   "schemas": ["urn:ietf:params:scim:api:messages:2.0:Error"],
   "status": "409",
   "scimType": "uniqueness",
-  "detail": "User with userName 'bjensen@example.com' already exists"
+  "detail": "User with userName 'jane@example.com' already exists",
+  "urn:scimserver:api:messages:2.0:Diagnostics": {
+    "requestId": "550e8400-...",
+    "endpointId": "a1b2c3d4-...",
+    "logsUrl": "/scim/endpoints/a1b2c3d4-.../logs/recent?requestId=550e8400-..."
+  }
 }
 ```
 
-Common status codes: `400` (Bad Request), `401` (Unauthorized), `403` (Forbidden), `404` (Not Found), `409` (Conflict), `500` (Internal Server Error).
+### Error Types
+
+| scimType | Status | Cause |
+|----------|--------|-------|
+| `uniqueness` | 409 | Duplicate userName or displayName |
+| `invalidFilter` | 400 | Malformed filter expression |
+| `invalidSyntax` | 400 | Malformed request body |
+| `invalidPath` | 400 | Invalid PATCH path |
+| `noTarget` | 400 | PATCH target not found |
+| `invalidValue` | 400 | Value fails validation |
+| `mutability` | 400 | readOnly/immutable modification attempt |
+| `versionMismatch` | 412 | If-Match ETag mismatch |
+| `tooMany` | 400 | Too many results |
+| `sensitive` | 403 | Blocked operation |
+| `tooLarge` | 413 | Payload too large |
 
 ---
 
-## Quick Reference: curl Examples
+## Schema URNs
 
-```bash
-# Get OAuth token
-TOKEN=$(curl -s -X POST http://localhost:6000/scim/oauth/token \
-  -d "client_id=scimserver-client&client_secret=changeme-oauth&grant_type=client_credentials" \
-  | jq -r '.access_token')
-
-# Create user
-curl -X POST http://localhost:6000/scim/endpoints/$EID/Users \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/scim+json" \
-  -d '{"schemas":["urn:ietf:params:scim:schemas:core:2.0:User"],"userName":"jane@example.com","active":true}'
-
-# List users with filter & projection
-curl "http://localhost:6000/scim/endpoints/$EID/Users?filter=userName%20eq%20%22jane%40example.com%22&attributes=userName,displayName" \
-  -H "Authorization: Bearer $TOKEN"
-
-# Search users via POST
-curl -X POST "http://localhost:6000/scim/endpoints/$EID/Users/.search" \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/scim+json" \
-  -d '{"schemas":["urn:ietf:params:scim:api:messages:2.0:SearchRequest"],"filter":"active eq true","count":10}'
-
-# PATCH user
-curl -X PATCH http://localhost:6000/scim/endpoints/$EID/Users/$UID \
-  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/scim+json" \
-  -d '{"schemas":["urn:ietf:params:scim:api:messages:2.0:PatchOp"],"Operations":[{"op":"replace","path":"displayName","value":"Updated"}]}'
-
-# Delete user
-curl -X DELETE http://localhost:6000/scim/endpoints/$EID/Users/$UID \
-  -H "Authorization: Bearer $TOKEN"
-```
-
----
-
-*Consolidated from: SCIM_V2_REFERENCE, SCIM_FULL_EXAMPLES*
+| URN | Purpose |
+|-----|---------|
+| `urn:ietf:params:scim:schemas:core:2.0:User` | Core User |
+| `urn:ietf:params:scim:schemas:core:2.0:Group` | Core Group |
+| `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User` | Enterprise User |
+| `urn:ietf:params:scim:api:messages:2.0:ListResponse` | List response |
+| `urn:ietf:params:scim:api:messages:2.0:PatchOp` | PATCH request |
+| `urn:ietf:params:scim:api:messages:2.0:BulkRequest` | Bulk request |
+| `urn:ietf:params:scim:api:messages:2.0:BulkResponse` | Bulk response |
+| `urn:ietf:params:scim:api:messages:2.0:SearchRequest` | POST .search |
+| `urn:ietf:params:scim:api:messages:2.0:Error` | Error response |
+| `urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig` | SPC |
+| `urn:ietf:params:scim:schemas:core:2.0:Schema` | Schema definition |
+| `urn:ietf:params:scim:schemas:core:2.0:ResourceType` | Resource type |
+| `urn:scimserver:api:messages:2.0:Diagnostics` | Diagnostics extension |

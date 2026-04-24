@@ -150,10 +150,10 @@ sequenceDiagram
     participant OAuth as OAuthService
     participant ENV as process.env
 
-    Note over SAG: ⚠️ CRITICAL: Hardcoded<br/>S@g@r!2011 plaintext.<br/><br/>Uses console.log<br/>not NestJS Logger.<br/><br/>May still guard<br/>some routes.
+    Note over SAG: CRITICAL: Hardcoded<br/>legacy plaintext secret.<br/><br/>Uses console.log<br/>not NestJS Logger.<br/><br/>May still guard<br/>some routes.
 
     C->>SSG: Authorization: Bearer <token>
-    SSG->>SSG: Check @Public() decorator
+    SSG->>SSG: Check Public decorator
     alt Route is public
         SSG-->>C: 200 (skip auth)
     end

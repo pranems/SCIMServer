@@ -171,7 +171,7 @@ graph TB
     end
 
     subgraph "Auth (Global APP_GUARD)"
-        GUARD["SharedSecretGuard<br/>@Public() bypasses on all discovery"]
+        GUARD["SharedSecretGuard<br/>Public decorator bypasses on all discovery"]
     end
 
     ROOT_SPC -->|"no endpointId"| SDS
@@ -182,10 +182,10 @@ graph TB
     REG --> GL
     REG --> EPO
 
-    GUARD -.->|"@Public()"| ROOT_SPC
-    GUARD -.->|"@Public()"| ROOT_RT
-    GUARD -.->|"@Public()"| ROOT_SCH
-    GUARD -.->|"@Public()"| EP_DISC
+    GUARD -.->|"Public"| ROOT_SPC
+    GUARD -.->|"Public"| ROOT_RT
+    GUARD -.->|"Public"| ROOT_SCH
+    GUARD -.->|"Public"| EP_DISC
 
     style EP_DISC fill:#bdf,stroke:#08f,color:#000
     style GUARD fill:#9f9,stroke:#0c0,color:#000
@@ -253,8 +253,8 @@ sequenceDiagram
     participant S as ScimDiscoveryService
 
     C->>G: GET /ServiceProviderConfig (no auth header)
-    G->>G: Check @Public() metadata
-    Note over G: ✅ @Public() on all discovery controllers
+    G->>G: Check Public metadata
+    Note over G: Public on all discovery controllers
     G->>D: Forward request (bypass auth)
     D->>S: getServiceProviderConfig()
     S->>C: 200 + SPC JSON

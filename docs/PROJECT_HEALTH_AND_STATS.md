@@ -24,9 +24,9 @@
 |-------|--------|-------|------|--------|
 | **Unit** | 84 | 3,378 | 0 | ✅ All pass |
 | **E2E** | 51 | 1,074 | 0 | ✅ All pass |
-| **Live (main)** | 53 sections | ~789 | 0 | ✅ All pass |
-| **Live (Lexmark ISV)** | 13 sections | 112 | 0 | ✅ All pass |
-| **Total** | **~201** | **~5,353** | 0 | ✅ All pass |
+| **Live (main)** | 57 sections | ~789 | 0 | All pass |
+| **Live (Lexmark ISV)** | 13 sections | 112 | 0 | All pass |
+| **Total** | **~205** | **~5,353** | 0 | All pass |
 
 ### Unit Test Suites (84)
 

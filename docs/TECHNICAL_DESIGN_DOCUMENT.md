@@ -1,813 +1,622 @@
-# SCIMServer - Technical Design Document (TDD)
+# Technical Design Document
 
-> **Version**: 1.3  
-> **Date**: April 23, 2026  
-> **Status**: Current as-built architecture  
-> **Tech Stack**: NestJS 11 · TypeScript 5 · Prisma 7 · PostgreSQL 17 · React 19 · Vite 7 · Azure Container Apps
+> **Version:** 0.38.0 - **Updated:** April 24, 2026  
+> As-built architecture documentation derived from source code
 
 ---
 
-## 1. Architecture Overview
+## Table of Contents
 
-### 1.1 High-Level Architecture
-
-```
-┌───────────────────────────────────────────────────────────────┐
-│                       Azure Container Apps                     │
-│  ┌───────────────────────────────────────────────────────────┐ │
-│  │                      Docker Container                     │ │
-│  │                                                           │ │
-│  │  ┌─────────────┐  ┌─────────────────────────────────────┐ │ │
-│  │  │   React SPA  │  │          NestJS Server (port 3000) │ │ │
-│  │  │ (pre-built   │  │  ┌──────────────────────────────┐  │ │ │
-│  │  │  static in   │  │  │     Express HTTP Layer        │  │ │ │
-│  │  │  /public)    │  │  │  CORS · JSON · ValidationPipe │  │ │ │
-│  │  │              │  │  ├──────────────────────────────┤  │ │ │
-│  │  │   Served via │  │  │     Global Guards             │  │ │ │
-│  │  │   Static     │  │  │   SharedSecretGuard (auth)    │  │ │ │
-│  │  │   Assets     │  │  ├──────────────────────────────┤  │ │ │
-│  │  │              │  │  │     Global Interceptors       │  │ │ │
-│  │  │              │  │  │  ScimContentType              │  │ │ │
-│  │  │              │  │  │  RequestLogging               │  │ │ │
-│  │  │              │  │  ├──────────────────────────────┤  │ │ │
-│  │  │              │  │  │        Controllers            │  │ │ │
-│  │  │              │  │  │   SCIM · Admin · OAuth · Web  │  │ │ │
-│  │  │              │  │  ├──────────────────────────────┤  │ │ │
-│  │  │              │  │  │         Services              │  │ │ │
-│  │  │              │  │  │  Users · Groups · Endpoint ·  │  │ │ │
-│  │  │              │  │  │  Auth · Logging · DB │  │ │ │
-│  │  │              │  │  ├──────────────────────────────┤  │ │ │
-│  │  │              │  │  │     Prisma ORM + PostgreSQL     │  │ │ │
-│  │  └─────────────┘  │  └──────────────────────────────┘  │ │ │
-│  │                                                           │ │
-│  └───────────────────────────────────────────────────────────┘ │
-│                          │                                      │
-│  ┌───────────────────────▼─────────────────────────────────────┐│
-
-```
-
-### 1.2 Project Directory Structure
-
-```
-api/
-├── prisma/
-│   ├── schema.prisma            # Database schema definition (5 models)
-│   └── migrations/              # Prisma migration history
-├── public/                      # Pre-built React SPA assets
-│   ├── index.html
-│   └── assets/
-├── src/
-│   ├── main.ts                  # Application bootstrap (NestFactory)
-│   ├── modules/
-│   │   ├── app/
-│   │   │   └── app.module.ts    # Root module - imports all feature modules
-│   │   ├── scim/
-│   │   │   ├── scim.module.ts
-│   │   │   ├── controllers/     # SCIM endpoint controllers
-│   │   │   ├── services/        # SCIM business logic
-│   │   │   ├── dto/             # Request/response DTOs
-│   │   │   ├── interceptors/    # ScimContentTypeInterceptor
-│   │   │   └── common/          # Constants, types, errors, utilities
-│   │   ├── endpoint/            # Endpoint management (admin CRUD)
-│   │   ├── auth/                # SharedSecretGuard, @Public decorator
-│   │   ├── logging/             # ScimLogger, LogConfigController, RequestLoggingInterceptor, log-levels
-
-│   │   ├── database/            # Dashboard data queries (users/groups/stats)
-│   │   ├── activity-parser/     # SCIM log → human-readable activity
-│   │   ├── prisma/              # PrismaService (global)
-│   │   ├── web/                 # SPA serving controller
-│   │   └── admin/               # Admin panel API routes
-│   └── oauth/                   # OAuth 2.0 client_credentials module
-└── test/                        # Jest suites (unit + e2e coverage; see current matrix)
-
-web/                             # React SPA source (Vite dev server)
-├── src/
-│   ├── App.tsx
-│   └── components/
-├── vite.config.ts
-└── package.json
-
-infra/                           # Azure IaC (Bicep templates)
-scripts/                         # PowerShell deployment scripts
-docs/                            # Documentation
-```
+- [System Architecture](#system-architecture)
+- [Module Structure](#module-structure)
+- [Domain Layer](#domain-layer)
+- [Infrastructure Layer](#infrastructure-layer)
+- [Request Lifecycle](#request-lifecycle)
+- [Data Model](#data-model)
+- [Multi-Tenant Isolation](#multi-tenant-isolation)
+- [Profile Engine](#profile-engine)
+- [Schema Validation Engine](#schema-validation-engine)
+- [PATCH Engine Architecture](#patch-engine-architecture)
+- [Filter & Sort Engine](#filter--sort-engine)
+- [Authentication Architecture](#authentication-architecture)
+- [Logging Architecture](#logging-architecture)
+- [Error Handling Architecture](#error-handling-architecture)
+- [Technology Stack](#technology-stack)
 
 ---
 
-## 2. Module Architecture
+## System Architecture
 
-### 2.1 NestJS Module Dependency Graph
+```mermaid
+flowchart TB
+    subgraph Client Layer
+        C1[Entra ID]
+        C2[SCIM Client]
+        C3[Admin UI]
+    end
 
-```
-AppModule
-├── ConfigModule.forRoot({ isGlobal: true })
-├── ScheduleModule.forRoot()
-├── PrismaModule (@Global)
-│   └── PrismaService → OnModuleInit/OnModuleDestroy, $connect/$disconnect
-├── AuthModule
-│   └── SharedSecretGuard (APP_GUARD - global)
-├── OAuthModule
-│   ├── OAuthController → POST /oauth/token, GET /oauth/.well-known
-│   └── OAuthService → JWT generation/validation
-├── LoggingModule (@Global)
-│   ├── RequestLoggingInterceptor (APP_INTERCEPTOR - global, correlation IDs)
-│   ├── ScimLogger → Structured leveled logger (AsyncLocalStorage correlation)
-│   ├── LogConfigController → /admin/log-config (11 REST endpoints)
-│   ├── LogQueryService → Shared query/stream/download logic
-│   ├── LoggingService → RequestLog persistence (buffered DB writes)
-│   ├── FileLogTransport → Main + per-endpoint log files
-│   └── RotatingFileWriter → Size-based file rotation
-├── ScimModule
-│   ├── EndpointScimUsersController
-│   ├── EndpointScimGroupsController
-│   ├── ServiceProviderConfigController
-│   ├── ResourceTypesController
-│   ├── SchemasController
-│   ├── EndpointScimUsersService
-│   ├── EndpointScimGroupsService
-│   ├── ScimMetadataService
-│   ├── EndpointContextStorage
-│   ├── ScimContentTypeInterceptor (APP_INTERCEPTOR)
-│   └── ScimExceptionFilter (APP_FILTER)
-├── EndpointModule
-│   ├── EndpointController
-│   └── EndpointService
-├── DatabaseModule
-│   └── DatabaseController + DatabaseService
-├── ActivityParserModule
-│   └── ActivityParserService
-└── WebModule
-    └── WebController → serves SPA
-```
+    subgraph NestJS Application
+        subgraph Middleware
+            MW1[X-Request-Id]
+            MW2[Content-Type Validation]
+            MW3[AsyncLocalStorage Context]
+        end
 
-### 2.2 Module Responsibilities
+        subgraph Guards
+            G1[SharedSecretGuard<br>3-tier auth chain]
+        end
 
-| Module | Purpose | Key Exports |
-|--------|---------|-------------|
-| **PrismaModule** | Global database access | `PrismaService` - Extended Prisma client with lifecycle |
-| **AuthModule** | Authentication | `SharedSecretGuard` (global), `@Public` decorator |
-| **OAuthModule** | OAuth 2.0 flows | `OAuthController`, `OAuthService` |
-| **ScimModule** | Core SCIM protocol | Controllers, services, interceptors, utilities |
-| **EndpointModule** | Multi-endpoint management | `EndpointController`, `EndpointService` |
-| **LoggingModule** | Structured logging, traceability, admin config | `ScimLogger` (global), `RequestLoggingInterceptor`, `LogConfigController`, `LogQueryService`, `LoggingService`, `FileLogTransport` |
-| **DatabaseModule** | Dashboard data | `DatabaseController`, `DatabaseService` |
-| **ActivityParserModule** | Activity feed | `ActivityParserService` (898 lines of parsing) |
-| **WebModule** | SPA serving | `WebController` - serves pre-built React app |
+        subgraph Interceptors
+            I1[ScimContentType]
+            I2[ScimEtag]
+            I3[RequestLogging]
+        end
 
----
+        subgraph Controllers [19 Controllers - 83 Routes]
+            Admin[Admin + Endpoint + Credential]
+            SCIM[Users + Groups + Bulk + Me + Generic]
+            Disc[Discovery - Schemas, RT, SPC]
+            Log[LogConfig + EndpointLog]
+            Other[Database + Activity + Health + OAuth + Web]
+        end
 
-## 3. Request Lifecycle
+        subgraph Services
+            ES[EndpointService<br>Cache by id+name]
+            US[UsersService]
+            GS[GroupsService]
+            GenS[GenericService]
+            BS[BulkProcessorService]
+            DS[DiscoveryService]
+        end
 
-### 3.1 Full Request Pipeline
+        subgraph Domain
+            PE[Patch Engines<br>User, Group, Generic]
+            SV[SchemaValidator<br>10 validation types]
+            AP[AttributeProjection]
+            FP[FilterParser + Evaluator]
+        end
+    end
 
-```
-Client (Entra ID / Postman / SCIM Client)
-  │
-  ▼
-Express Middleware (main.ts)
-  │  ├── Double-slash normalization: // → /
-  │  ├── /scim/v2 → /scim rewrite
-  │  ├── CORS headers
-  │  ├── JSON body parser (5MB, scim+json & json)
-  │  └── ValidationPipe (whitelist: false, transform: true)
-  │
-  ▼
-SharedSecretGuard (global APP_GUARD)
-  │  ├── Check @Public decorator → bypass if public
-  │  ├── Extract Bearer token
-  │  ├── Try 1: Per-endpoint bcrypt credential (if PerEndpointCredentialsEnabled)
-  │  │   ├── extractEndpointId() from URL regex
-  │  │   ├── Load active, non-expired credentials from EndpointCredentialRepository
-  │  │   ├── bcrypt.compare(token, hash) for each credential
-  │  │   └── Match → set req.authType = 'endpoint_credential', req.authCredentialId
-  │  ├── Try 2: OAuthService.validateAccessToken(jwt) → set req.oauth, req.authType = 'oauth'
-  │  ├── Try 3: Compare token === SCIM_SHARED_SECRET → set req.authType = 'legacy'
-  │  └── Reject: 401 with WWW-Authenticate: Bearer realm="SCIM"
-  │
-  ▼
-RequestLoggingInterceptor (global APP_INTERCEPTOR)
-  │  ├── Record start time
-  │  ├── Pass to handler
-  │  └── Log request+response to RequestLog table (async, fire-and-forget)
-  │
-  ▼
-ScimContentTypeInterceptor (global APP_INTERCEPTOR)
-  │  └── After handler: set Content-Type: application/scim+json; charset=utf-8
-  │
-  ▼
-ScimExceptionFilter (global APP_FILTER)
-  │  └── On error: set Content-Type: application/scim+json, ensure string "status"
-  │
-  ▼
-Controller Method (route-matched)
-  │  ├── @Param('endpointId') extraction
-  │  ├── validateEndpoint() → verify endpoint exists & active
-  │  ├── EndpointContextStorage.setContext() → AsyncLocalStorage
-  │  └── Delegate to service method
-  │
-  ▼
-Service Method
-  │  ├── Business logic (SCIM operations)
-  │  ├── Prisma queries/mutations
-  │  ├── SCIM error creation (createScimError)
-  │  └── Return SCIM-formatted response
-  │
-  ▼
-Response (JSON with application/scim+json Content-Type)
-```
+    subgraph Infrastructure
+        subgraph Repositories
+            PR[Prisma Repositories]
+            IR[InMemory Repositories]
+        end
+        DB[(PostgreSQL 17<br>5 tables)]
+    end
 
-### 3.2 Endpoint Context Propagation
-
-The `EndpointContextStorage` uses Node.js `AsyncLocalStorage` to propagate per-request endpoint context through the call stack without explicit parameter passing:
-
-```typescript
-// Middleware sets context via AsyncLocalStorage
-this.endpointContextStorage.setContext({
-  endpointId: endpoint.id,
-  baseUrl: buildBaseUrl(request),
-  profile: endpoint.profile
-});
-
-// Any downstream service can read it
-const ctx = this.endpointContextStorage.getContext();
-const endpointId = ctx?.endpointId;
-const config = ctx?.config;
+    C1 & C2 --> MW1
+    C3 --> MW1
+    MW1 --> MW2 --> MW3 --> G1
+    G1 --> I1 --> I2 --> I3
+    I3 --> Controllers
+    Controllers --> Services
+    Services --> Domain
+    Services --> ES
+    Services --> Repositories
+    PR --> DB
 ```
 
 ---
 
-## 4. API Layer - Route Map
+## Module Structure
 
-### 4.1 SCIM Protocol Routes
+The NestJS application is composed of 11 modules:
 
-| Method | Route | Controller | Description |
-|--------|-------|------------|-------------|
-| `POST` | `/scim/endpoints/{endpointId}/Users` | `EndpointScimUsersController` | Create User |
-| `GET` | `/scim/endpoints/{endpointId}/Users` | `EndpointScimUsersController` | List/Filter Users |
-| `GET` | `/scim/endpoints/{endpointId}/Users/{id}` | `EndpointScimUsersController` | Get User by ID |
-| `PUT` | `/scim/endpoints/{endpointId}/Users/{id}` | `EndpointScimUsersController` | Replace User |
-| `PATCH` | `/scim/endpoints/{endpointId}/Users/{id}` | `EndpointScimUsersController` | Partial Update User |
-| `DELETE` | `/scim/endpoints/{endpointId}/Users/{id}` | `EndpointScimUsersController` | Delete User |
-| `POST` | `/scim/endpoints/{endpointId}/Groups` | `EndpointScimGroupsController` | Create Group |
-| `GET` | `/scim/endpoints/{endpointId}/Groups` | `EndpointScimGroupsController` | List/Filter Groups |
-| `GET` | `/scim/endpoints/{endpointId}/Groups/{id}` | `EndpointScimGroupsController` | Get Group by ID |
-| `PUT` | `/scim/endpoints/{endpointId}/Groups/{id}` | `EndpointScimGroupsController` | Replace Group |
-| `PATCH` | `/scim/endpoints/{endpointId}/Groups/{id}` | `EndpointScimGroupsController` | Partial Update Group |
-| `DELETE` | `/scim/endpoints/{endpointId}/Groups/{id}` | `EndpointScimGroupsController` | Delete Group |
+```mermaid
+flowchart TD
+    App[AppModule] --> Config[ConfigModule<br>isGlobal: true]
+    App --> Schedule[ScheduleModule<br>Cron jobs]
+    App --> Auth[AuthModule<br>SharedSecretGuard]
+    App --> Prisma[PrismaModule<br>DB connection]
+    App --> Endpoint[EndpointModule<br>CRUD + cache]
+    App --> SCIM[ScimModule<br>12 controllers, 7 services]
+    App --> Logging[LoggingModule<br>Ring buffer, SSE, files]
+    App --> Database[DatabaseModule<br>DB browser]
+    App --> Activity[ActivityParserModule]
+    App --> OAuth[OAuthModule<br>JWT token service]
+    App --> Web[WebModule<br>SPA serving]
 
-### 4.2 SCIM Discovery Routes
+    Auth --> OAuth
+    Auth --> Endpoint
+    SCIM --> Prisma
+    SCIM --> Logging
+    SCIM --> Endpoint
+```
 
-| Method | Route | Controller | Description |
-|--------|-------|------------|-------------|
-| `GET` | `/scim/endpoints/{endpointId}/Schemas` | `EndpointScimDiscoveryController` | List Schemas |
-| `GET` | `/scim/endpoints/{endpointId}/ResourceTypes` | `EndpointScimDiscoveryController` | List Resource Types |
-| `GET` | `/scim/endpoints/{endpointId}/ServiceProviderConfig` | `EndpointScimDiscoveryController` | Server Capabilities |
-| `GET` | `/scim/ServiceProviderConfig` | `ServiceProviderConfigController` | Global SP Config |
-| `GET` | `/scim/ResourceTypes` | `ResourceTypesController` | Global Resource Types |
-| `GET` | `/scim/Schemas` | `SchemasController` | Global Schemas |
+### ScimModule Internals
 
-### 4.3 Admin Routes
+The largest module registers:
 
-| Method | Route | Controller | Description |
-|--------|-------|------------|-------------|
-| `POST` | `/scim/admin/endpoints` | `EndpointController` | Create endpoint |
-| `GET` | `/scim/admin/endpoints` | `EndpointController` | List endpoints |
-| `GET` | `/scim/admin/endpoints/{id}` | `EndpointController` | Get endpoint |
-| `PATCH` | `/scim/admin/endpoints/{id}` | `EndpointController` | Update endpoint |
-| `DELETE` | `/scim/admin/endpoints/{id}` | `EndpointController` | Delete endpoint |
-| `GET` | `/scim/admin/endpoints/{id}/stats` | `EndpointController` | Endpoint statistics |
-| `GET` | `/scim/admin/logs` | `AdminController` | List request logs |
-| `GET` | `/scim/admin/logs/{id}` | `AdminController` | Log detail |
-| `POST` | `/scim/admin/logs/clear` | `AdminController` | Clear logs |
-| `GET` | `/scim/admin/activity` | `ActivityController` | Activity feed |
-| `GET` | `/scim/admin/database/users` | `DatabaseController` | Browse users |
-| `GET` | `/scim/admin/database/groups` | `DatabaseController` | Browse groups |
-| `GET` | `/scim/admin/database/users/{id}` | `DatabaseController` | User detail |
-| `GET` | `/scim/admin/database/groups/{id}` | `DatabaseController` | Group detail |
-| `GET` | `/scim/admin/database/statistics` | `DatabaseController` | Dashboard stats |
-| `GET` | `/scim/admin/info` | `AdminController` | App info |
-
-### 4.4 OAuth Routes
-
-| Method | Route | Controller | Description |
-|--------|-------|------------|-------------|
-| `POST` | `/scim/oauth/token` | `OAuthController` | Token endpoint |
-| `GET` | `/scim/oauth/.well-known/openid-configuration` | `OAuthController` | Discovery |
-
-### 4.5 SPA Routes
-
-| Method | Route | Controller | Description |
-|--------|-------|------------|-------------|
-| `GET` | `/` | `WebController` | Serve SPA |
-| `GET` | `/admin` | `WebController` | Serve SPA |
-| `GET` | `/admin/*` | `WebController` | Serve SPA (client-side routing) |
+- **12 controllers** (EndpointScimGenericController registered LAST to avoid path shadowing)
+- **7 services** (Users, Groups, Generic, Bulk, Discovery, Metadata, SchemaRegistry)
+- **2 global filters** (GlobalExceptionFilter, ScimExceptionFilter)
+- **2 global interceptors** (ScimContentTypeInterceptor, ScimEtagInterceptor)
+- **2 middleware** (EndpointContextStorage on all routes, ContentTypeValidation on endpoint routes)
 
 ---
 
-## 5. Service Layer - Detailed Design
+## Domain Layer
 
-### 5.1 EndpointScimUsersService (585 lines)
+Pure business logic with zero NestJS/Prisma dependencies:
 
-**Responsibilities**: Full SCIM User lifecycle with RFC 7643/7644 compliance.
+```
+api/src/domain/
++-- patch/
+|   +-- user-patch-engine.ts       # User PATCH logic (454 lines)
+|   +-- group-patch-engine.ts      # Group PATCH logic (372 lines)
+|   +-- generic-patch-engine.ts    # Custom resource PATCH (shares user engine)
+|   +-- patch-types.ts             # PatchOperation, PatchConfig, PatchResult
+|   +-- patch-error.ts             # Typed PATCH errors
++-- validation/
+|   +-- schema-validator.ts        # 10 validation types (1,664 lines)
+|   +-- validation-types.ts        # Validation options and results
++-- models/
+|   +-- user.model.ts              # User domain model
+|   +-- group.model.ts             # Group domain model
+|   +-- generic-resource.model.ts  # Custom resource model
+|   +-- endpoint-credential.model.ts
+|   +-- endpoint-resource-type.model.ts
++-- repositories/
+|   +-- user.repository.interface.ts
+|   +-- group.repository.interface.ts
+|   +-- generic-resource.repository.interface.ts
+|   +-- endpoint-credential.repository.interface.ts
+|   +-- repository.tokens.ts       # DI tokens
++-- errors/
+    +-- repository-error.ts        # Domain error types
+```
 
-**Public Methods**:
+### Design Principles
 
-| Method | Input | Output | Key Logic |
-|--------|-------|--------|-----------|
-| `createUser(endpointId, dto, baseUrl)` | CreateUserDto | ScimUserResource | Generate UUID scimId, validate userName uniqueness (case-insensitive via CITEXT column), persist payload as JSONB, create meta |
-| `listUsers(endpointId, baseUrl, filter?, startIndex?, count?)` | Query params | ScimListResponse | Parse filter string, case-insensitive attribute matching (`eq` operator), 1-based pagination, MAX_COUNT=200 |
-| `getUser(endpointId, id, baseUrl)` | scimId | ScimUserResource | Lookup by `endpointId + scimId`, parse payload, build meta.location |
-| `updateUser(endpointId, id, dto, baseUrl)` | Full resource | ScimUserResource | Full PUT replace: re-validate userName uniqueness, update payload + derived columns |
-| `patchUser(endpointId, id, patchDto, baseUrl)` | PatchOp[] | ScimUserResource | Process each op sequentially: `add`, `replace`, `remove` with support for no-path, simple path, valuePath, extension URN path |
-| `deleteUser(endpointId, id)` | scimId | void | Delete ScimResource + cascade ResourceMember cleanup |
-
-**Private Helpers**:
-- `validateCreatePayload()` - SCIM schema validation, required field checks
-- `matchesFilter()` - Case-insensitive property lookup for filter evaluation
-- `formatUserResponse()` - Parse payload JSONB → ScimUserResource with meta
-- `normalizeObjectKeys()` - Lowercase all keys for case-insensitive no-path PATCH merge
-- `isExtensionPath()` / `applyExtensionPatchOp()` - URN-based extension attribute handling
-
-### 5.2 EndpointScimGroupsService (632 lines)
-
-**Responsibilities**: Full SCIM Group lifecycle with configurable member-management behavior.
-
-**Public Methods**: Same CRUD pattern as Users plus per-endpoint config flag handling.
-
-**Config-Driven Behavior**:
-- `MultiOpPatchRequestAddMultipleMembersToGroup` - Whether to accept array of members in a single add operation
-- `MultiOpPatchRequestRemoveMultipleMembersFromGroup` - Whether to accept array of member removes
-- `PatchOpAllowRemoveAllMembers` - Whether `remove` with no filter removes all group members
-- `VerbosePatchSupported` - Enables dot-notation path resolution in PATCH operations (e.g., `name.givenName` navigates into nested `name` object)
-
-**Member Management**:
-- `GroupMember` records linked by `groupId` + `userId` (nullable for unresolved references)
-- Member `value` field = ScimResource.scimId (resolved) or external reference
-- Member `display` derived from user's displayName or userName
-- Cascade delete on group deletion
-
-### 5.3 ScimMetadataService (14 lines)
-
-Minimal service providing:
-- `buildLocation(baseUrl, resourceType, id)` → full SCIM location URI
-- `currentIsoTimestamp()` → ISO 8601 timestamp
-
-### 5.4 EndpointService (~175 lines)
-
-CRUD for Endpoint management:
-- Validates endpoint name uniqueness
-- Validates config JSON structure via `validateEndpointConfig()`
-- Cascade delete removes all associated Users, Groups, Logs (via Prisma relations)
-
-### 5.5 RequestLogService / LoggingService (481 lines)
-
-- Records every HTTP request/response in `RequestLog` table
-- Auto-derives `identifier` field from SCIM request paths/bodies (userName, displayName, externalId)
-- Async fire-and-forget (does not block response)
-
-### 5.6 ActivityParserService (898 lines)
-
-Transforms raw `RequestLog` entries into human-readable activity feed items:
-- Parses SCIM JSON payloads to extract meaningful descriptions
-- Detects keepalive/probe requests and marks them
-- Groups related operations (create → patch → delete sequences)
-
-### 5.7 OAuthService (138 lines)
-
-OAuth 2.0 `client_credentials` grant:
-- Reads `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET` from environment
-- Auto-generates secret in dev mode
-- Issues JWT with 1-hour expiry
-- Validates JWT tokens via NestJS `JwtService`
-- Scope checking: `scim.read`, `scim.write`, `scim.manage`
+- **Domain isolation**: Patch engines and schema validator have zero framework dependencies
+- **Repository pattern**: Interfaces in domain, implementations in infrastructure
+- **DI tokens**: NestJS injection tokens defined in `repository.tokens.ts`
 
 ---
 
-## 6. Data Model
-
-### 6.1 Entity Relationship Diagram
+## Infrastructure Layer
 
 ```
-┌──────────────────┐
-│     Endpoint     │
-│──────────────────│
-│ id        (PK)   │
-│ name      (UQ)   │
-│ displayName      │
-│ description      │
-│ config    (JSON)  │
-│ active           │
-│ createdAt        │
-│ updatedAt        │
-├──────────────────┤
-│ has many →       │
-│  ScimResource    │──────┐
-│  RequestLog      │  │   │
-│  EndpointSchema  │  │   │
-│  EndpointResType │  │   │
-│  EndpointCred    │  │   │
-└──────────────────┘  │   │
-                      │   │
-┌─────────────────────┤   │
-│                     │   │
-│  ┌──────────────────▼───▼──────────────────┐
-│  │       ScimResource (unified table)       │
-│  │──────────────────────────────────────────│
-│  │ id              (PK, UUID)               │
-│  │ endpointId      (FK → Endpoint)          │
-│  │ resourceType    (VARCHAR: 'User'/'Group')│
-│  │ scimId          (UUID)                   │
-│  │ externalId      (TEXT, caseExact)        │
-│  │ userName        (CITEXT, case-insensitive) │
-│  │ displayName     (CITEXT, case-insensitive) │
-│  │ active          (Boolean, default true)  │
-│  │ payload         (JSONB - full SCIM JSON) │
-│  │ version         (Int, monotonic ETag)    │
-│  │ meta            (text)                   │
-│  │ createdAt / updatedAt                    │
-│  │──────────────────────────────────────────│
-│  │ UQ: (endpointId, scimId)                 │
-│  │ UQ: (endpointId, userName) - CITEXT      │
-│  │ UQ: (endpointId, displayName) - CITEXT   │
-│  │ UQ: (endpointId, resourceType, externalId)│
-│  │ IDX: (endpointId, resourceType)          │
-│  └──────────────────────┬───────────────────┘
-│                         │ has many
-│                         ▼
-│  ┌──────────────────────────────────────────┐
-│  │         ResourceMember                    │
-│  │──────────────────────────────────────────│
-│  │ id               (PK, UUID)              │
-│  │ groupResourceId  (FK → ScimResource)     │
-│  │ memberResourceId (FK → ScimResource, nullable) │
-│  │ value            (SCIM member reference) │
-│  │ type             ("User" / "Group")      │
-│  │ display          (derived displayName)   │
-│  │ createdAt                                │
-│  └──────────────────────────────────────────┘
-
-┌──────────────────────────────────────────────┐
-│            RequestLog                         │
-│──────────────────────────────────────────────│
-│ id              (PK)                          │
-│ endpointId      (FK → Endpoint, SET NULL)     │
-│ method          (HTTP method)                 │
-│ url             (full URL)                    │
-│ status          (HTTP status code)            │
-│ durationMs      (response time)               │
-│ requestHeaders  (JSON text)                   │
-│ requestBody     (JSON text)                   │
-│ responseHeaders (JSON text)                   │
-│ responseBody    (JSON text)                   │
-│ errorMessage                                  │
-│ errorStack                                    │
-│ identifier      (auto-derived: userName etc)  │
-│ createdAt                                     │
-│──────────────────────────────────────────────│
-│ IDX: createdAt, method, status, endpointId    │
-└──────────────────────────────────────────────┘
+api/src/infrastructure/repositories/
++-- repository.module.ts           # Dynamic registration (prisma vs inmemory)
++-- prisma/
+|   +-- prisma-user.repository.ts
+|   +-- prisma-group.repository.ts
+|   +-- prisma-generic-resource.repository.ts
+|   +-- prisma-endpoint-credential.repository.ts
+|   +-- prisma-error.util.ts       # Prisma error mapping
+|   +-- uuid-guard.ts              # UUID format validation
++-- inmemory/
+    +-- inmemory-user.repository.ts
+    +-- inmemory-group.repository.ts
+    +-- inmemory-generic-resource.repository.ts
+    +-- prisma-filter-evaluator.ts  # In-memory filter evaluation
 ```
 
-### 6.2 Data Storage Strategy
+### Repository Selection
 
-| Aspect | Current Design |
-|--------|---------------|
-| **SCIM Attributes** | Stored as `payload` (JSONB) - full SCIM resource JSON (native PostgreSQL JSON type) |
-| **Derived Columns** | `userName` (CITEXT), `active`, `externalId` (TEXT), `displayName` (CITEXT) extracted for queries |
-| **Meta** | Stored as separate `meta` column (text) |
-| **Group Members** | Normalized into `ResourceMember` junction table |
-| **Config** | Endpoint `config` column as JSON string |
-| **Request Logs** | Headers and bodies stored as JSON strings |
+Controlled by `PERSISTENCE_BACKEND` env var:
 
-### 6.3 Uniqueness Constraints
-
-| Scope | Constraint | Columns |
-|-------|-----------|---------|
-| Per-endpoint | ScimResource SCIM ID | `(endpointId, scimId)` |
-| Per-endpoint | ScimResource userName (case-insensitive) | `(endpointId, userName)` CITEXT |
-| Per-endpoint | ScimResource externalId | `(endpointId, resourceType, externalId)` |
-| Per-endpoint | ScimResource displayName | `(endpointId, displayName)` CITEXT |
-| Per-endpoint | ScimResource SCIM ID | `(endpointId, scimId)` |
-| Global | Endpoint name | `(name)` |
+| Value | Backend | Use Case |
+|-------|---------|----------|
+| `prisma` | PostgreSQL via Prisma ORM | Production, Docker |
+| `inmemory` | In-memory Maps | Unit tests, E2E tests |
 
 ---
 
-## 7. Authentication Flow
+## Request Lifecycle
 
-### 7.1 3-Tier Authentication (v0.21.0)
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant MW as Middleware Stack
+    participant G as SharedSecretGuard
+    participant IC as Interceptors
+    participant Ctrl as Controller
+    participant Svc as Service
+    participant Dom as Domain
+    participant Repo as Repository
+    participant DB as PostgreSQL
 
-The `SharedSecretGuard` (registered as global `APP_GUARD`) implements a 3-tier fallback chain. Each tier is tried in order; the first successful match authenticates the request.
-
-```
-Incoming Request
-  │
-  ├── Check @Public decorator → Skip auth (discovery endpoints, OAuth token, web UI)
-  │
-  ├── Extract: Authorization: Bearer <token>
-  │
-  ├── Tier 1: Per-Endpoint Bcrypt Credentials (v0.21.0)
-  │   ├── extractEndpointId() from URL regex: /\/endpoints\/([0-9a-f-]{36})\//i
-  │   ├── Check PerEndpointCredentialsEnabled flag for endpoint
-  │   ├── Load active, non-expired credentials via IEndpointCredentialRepository
-  │   ├── Lazy-load bcrypt (dynamic import, cached after first use)
-  │   ├── bcrypt.compare(token, credentialHash) for each credential
-  │   ├── Match → set req.authType = 'endpoint_credential', req.authCredentialId
-  │   └── No match / error → fall through to Tier 2
-  │
-  ├── Tier 2: OAuth 2.0 JWT
-  │   ├── Decode JWT via JwtService
-  │   ├── Verify signature, expiry, client_id
-  │   ├── Set req.oauth = payload, req.authType = 'oauth'
-  │   └── ✓ Authenticated
-  │
-  └── Tier 3: Legacy Shared Secret
-      ├── Compare token === env.SCIM_SHARED_SECRET
-      ├── Set req.authType = 'legacy'
-      └── ✓ Authenticated
-
-  All tiers fail → 401 Unauthorized + WWW-Authenticate: Bearer realm="SCIM"
-```
-
-**Key design properties:**
-- **Graceful fallback**: Per-endpoint check errors (missing repo, bcrypt failure, etc.) silently fall through to OAuth/legacy. Valid tokens are never blocked.
-- **Lazy bcrypt loading**: The native `bcrypt` module is loaded via dynamic `import()` only on first use, then cached. Endpoints not using per-endpoint credentials incur zero bcrypt overhead.
-- **Optional injection**: `@Optional() @Inject(ENDPOINT_CREDENTIAL_REPOSITORY)` and `@Optional() @Inject(EndpointService)` - guard works correctly even when credential repo is unavailable.
-- **Request decoration**: `req.authType` is set to `'endpoint_credential'`, `'oauth'`, or `'legacy'` so downstream controllers can distinguish auth method. `req.authCredentialId` is set for per-endpoint credentials.
-
-### 7.2 OAuth 2.0 Token Flow
-
-```
-Client                                  SCIMServer
-  │                                        │
-  │  POST /scim/oauth/token                │
-  │  grant_type=client_credentials         │
-  │  client_id=xxx                         │
-  │  client_secret=yyy                     │
-  │  scope=scim.read scim.write            │
-  │ ─────────────────────────────────────► │
-  │                                        │  Validate credentials
-  │                                        │  Generate JWT (1hr expiry)
-  │  { access_token: "eyJ...",             │
-  │    token_type: "Bearer",               │
-  │    expires_in: 3600 }                  │
-  │ ◄───────────────────────────────────── │
-  │                                        │
-  │  GET /scim/endpoints/{id}/Users        │
-  │  Authorization: Bearer eyJ...          │
-  │ ─────────────────────────────────────► │
-  │                                        │  Validate JWT
-  │  { Resources: [...] }                  │
-  │ ◄───────────────────────────────────── │
-```
-
-### 7.3 Public Routes
-
-Routes bypassing authentication via `@Public()` decorator:
-- `POST /scim/oauth/token` - Token endpoint
-- `GET /scim/oauth/.well-known/openid-configuration` - Discovery
-- `GET /` - SPA serving
-- Static assets (`/assets/*`)
-
----
-
-## 8. SCIM Protocol Implementation Details
-
-### 8.1 PATCH Operation Processing
-
-```
-PATCH /scim/endpoints/{eid}/Users/{id}
-Body: { schemas: ["...PatchOp"], Operations: [...] }
-
-For each Operation:
-  ├── Normalize op name: lowercase comparison
-  │
-  ├── No path (op on whole resource):
-  │   ├── normalizeObjectKeys(value) → lowercase all keys
-  │   └── Merge value into parsed rawPayload
-  │
-  ├── Simple path (e.g., "active", "displayName"):
-  │   └── Direct property set/replace/remove on parsed payload
-  │
-  ├── valuePath (e.g., "emails[type eq \"work\"].value"):
-  │   ├── parseValuePath() → { attribute, filter, subAttribute }
-  │   ├── Find matching element in multi-valued attribute
-  │   └── Apply add/replace/remove to matching element
-  │
-  └── Extension URN path (e.g., "urn:...:enterprise:2.0:User:department"):
-      ├── parseExtensionPath() → { urn, attribute }
-      ├── Resolve case-insensitive URN match in schemas array
-      └── Apply op to extension attribute in payload
-```
-
-### 8.2 Filter Processing
-
-```
-GET /scim/endpoints/{eid}/Users?filter=userName eq "john@example.com"
-
-1. Parse filter: tokenize into (attribute, operator, value)
-2. Case-insensitive attribute resolution:
-   - "username" matches "userName", "USERNAME", etc.
-3. Retrieve all users for endpoint from DB
-4. In-memory filter: matchesFilter(parsedPayload, filterTokens)
-   - Property lookup via case-insensitive key matching
-   - String comparison per caseExact rules
-5. Apply pagination (startIndex, count)
-6. Return ListResponse
-```
-
-### 8.3 Resource Format (rawPayload Strategy)
-
-```
-Database Row:                          SCIM Response:
-┌─────────────────────┐               ┌─────────────────────────────┐
-│ scimId: "abc123"    │               │ {                           │
-│ userName: "john"    │   format()    │   "schemas": ["...User"],   │
-│ active: true        │ ──────────►  │   "id": "abc123",           │
-│ payload: {...}      │               │   "userName": "john",       │
-│ meta: "{...}"       │               │   "emails": [...],          │
-└─────────────────────┘               │   "name": {...},            │
-                                      │   "meta": { ... }           │
-                                      │ }                           │
-                                      └─────────────────────────────┘
+    C->>MW: HTTP Request
+    Note over MW: 1. X-Request-Id (UUID)<br>2. /scim/v2/* rewrite<br>3. AsyncLocalStorage context<br>4. Content-Type validation
+    MW->>G: Authenticated request
+    Note over G: 3-tier auth chain:<br>1. Per-endpoint bcrypt<br>2. OAuth JWT<br>3. Shared secret
+    G->>IC: Authorized request
+    Note over IC: 1. ScimContentType (response headers)<br>2. ScimEtag (conditional caching)<br>3. RequestLogging (audit trail)
+    IC->>Ctrl: Routed request
+    Ctrl->>Svc: Business operation
+    Note over Svc: 1. Resolve endpoint profile<br>2. Check endpoint active<br>3. Enforce config flags
+    Svc->>Dom: Schema validation + PATCH
+    Note over Dom: SchemaValidator (10 checks)<br>PatchEngine (pure logic)<br>AttributeProjection
+    Svc->>Repo: Data access
+    Repo->>DB: SQL via Prisma
+    DB-->>Repo: Result
+    Repo-->>Svc: Domain model
+    Note over Svc: Build response:<br>meta, location, schemas[],<br>projection, never-returned strip
+    Svc-->>Ctrl: SCIM resource
+    Ctrl-->>C: HTTP Response
 ```
 
 ---
 
-## 9. Frontend Architecture
+## Data Model
 
-### 9.1 React SPA Structure
+5 tables in PostgreSQL 17 with 3 extensions (`citext`, `pgcrypto`, `pg_trgm`):
 
+```mermaid
+erDiagram
+    Endpoint ||--o{ ScimResource : "owns"
+    Endpoint ||--o{ RequestLog : "logs"
+    Endpoint ||--o{ EndpointCredential : "authenticates"
+    ScimResource ||--o{ ResourceMember : "group has members"
+    ScimResource ||--o{ ResourceMember : "user is member of"
+
+    Endpoint {
+        uuid id PK
+        string name UK
+        string displayName
+        string description
+        jsonb profile
+        boolean active
+        timestamp createdAt
+        timestamp updatedAt
+    }
+
+    ScimResource {
+        uuid id PK
+        string scimId
+        uuid endpointId FK
+        string resourceType "User/Group/custom"
+        citext userName
+        citext displayName
+        string externalId
+        boolean active
+        jsonb payload "Full SCIM resource"
+        int version "Auto-increment ETag"
+        timestamp deletedAt "Soft delete"
+        timestamp createdAt
+        timestamp updatedAt
+    }
+
+    RequestLog {
+        uuid id PK
+        uuid endpointId FK
+        string method
+        string url
+        int status
+        int durationMs
+        text requestHeaders
+        text requestBody
+        text responseHeaders
+        text responseBody
+        string identifier
+        timestamp createdAt
+    }
+
+    EndpointCredential {
+        uuid id PK
+        uuid endpointId FK
+        string credentialType "bearer/oauth_client"
+        string label
+        string tokenHash "bcrypt"
+        boolean active
+        jsonb metadata
+        timestamp expiresAt
+        timestamp createdAt
+        timestamp updatedAt
+    }
+
+    ResourceMember {
+        uuid id PK
+        uuid groupId FK "cascade delete"
+        uuid memberId FK "set null"
+    }
 ```
-web/src/
-├── App.tsx                    # Root component with routing
-├── components/
-│   ├── Header.tsx             # Navigation bar
-│   ├── RequestLogList.tsx     # Log table with filtering
-│   ├── RequestLogDetail.tsx   # Single log drill-down
-│   ├── LogFilters.tsx         # Filter controls
-│   ├── ActivityFeed.tsx       # Human-readable activity
-│   ├── ManualProvisioning.tsx # Manual user/group creation form
-│   └── DatabaseExplorer.tsx   # User/group data browser
-└── styles/                    # CSS modules
-```
 
-### 9.2 Frontend-Backend Communication
+### Key Indexes
 
-- **Development**: Vite dev server on port 5173, proxied to NestJS on port 3000
-- **Production**: React app pre-built into `api/public/` as static assets, served by NestJS
+| Index | Columns | Purpose |
+|-------|---------|---------|
+| ScimResource unique | `[endpointId, scimId]` | SCIM ID uniqueness per endpoint |
+| ScimResource unique | `[endpointId, userName]` | userName uniqueness per endpoint |
+| RequestLog composite | `[endpointId, createdAt]` | Endpoint-scoped log queries |
+| RequestLog composite | `[endpointId, identifier, createdAt]` | Activity feed queries |
+| RequestLog composite | `[status, createdAt]` | Error log filtering |
 
-### 9.3 Build Pipeline
+### Polymorphic Storage
 
-```bash
-# Development (web/)
-npm run dev          # Vite HMR on :5173
+`ScimResource` uses a polymorphic pattern with `resourceType` discriminator:
 
-# Production build (web/)
-npm run build        # Output to api/public/
+| resourceType | First-Class Columns Used |
+|-------------|-------------------------|
+| `User` | userName, displayName, externalId, active |
+| `Group` | displayName, externalId, active |
+| Custom types | displayName, externalId (userName used for custom uniqueness) |
 
-# API server (api/)
-npm run start:dev    # NestJS with --watch
-npm run build        # tsc → dist/
-npm run start:prod   # node dist/main.js
-```
+The `payload` JSONB column stores the full SCIM resource representation. First-class columns are extracted for indexing, filtering, and uniqueness enforcement.
 
 ---
 
-## 10. Infrastructure & Deployment
+## Multi-Tenant Isolation
 
-### 10.1 Azure Resource Architecture
+```mermaid
+flowchart TD
+    subgraph Request Processing
+        R[Incoming Request<br>/scim/endpoints/UUID/Users]
+        ALS[AsyncLocalStorage<br>EndpointContextStorage]
+        EP[EndpointService<br>Cache lookup by UUID]
+    end
 
-```
-Azure Resource Group
-├── Container Apps Environment (containerapp-env.bicep)
-│   └── Container App (containerapp.bicep)
-│       ├── Image: ghcr.io/pranems/scimserver:<tag>
-│       ├── Min replicas: 0 (scale-to-zero)
-│       ├── Max replicas: 1
-│       ├── CPU: 0.5, Memory: 1Gi
-│       └── Env vars: DATABASE_URL, SCIM_SHARED_SECRET, JWT_SECRET, OAUTH_CLIENT_SECRET
-├── Azure Container Registry (acr.bicep)
-├── Azure PostgreSQL Flexible Server (postgres.bicep)
-│   ├── Sku: Standard_B1ms (Burstable)
-│   └── Built-in WAL backup (7-day PITR)
-├── Virtual Network (networking.bicep)
-│   ├── aca-infra-subnet → Container Apps Environment
-│   ├── aca-runtime-subnet → Container App workloads
-│   └── private-endpoints-subnet → future private endpoints
-└── Log Analytics Workspace
+    R --> ALS
+    ALS --> EP
+    EP --> |Profile + Config| S[Service Layer]
+    S --> |WHERE endpointId = UUID| DB[(Database)]
 ```
 
-### 10.2 Docker Configuration
+### Isolation Mechanisms
 
-```dockerfile
-# Multi-stage build (Dockerfile)
-FROM node:24-alpine AS builder
-WORKDIR /app
-COPY api/package*.json ./
-RUN npm ci
-COPY api/ .
-RUN npx prisma generate
-RUN npm run build
-
-FROM node:24-alpine
-WORKDIR /app
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/public ./public
-EXPOSE 3000
-CMD ["node", "dist/main.js"]
-```
-
-### 10.3 Deployment Scripts
-
-| Script | Purpose |
-|--------|---------|
-| `bootstrap.ps1` | No-clone one-liner - downloads `setup.ps1` from GitHub, provisions full Azure stack |
-| `setup.ps1` | Interactive Azure deploy - prompts for config, downloads Bicep templates, calls `deploy-azure.ps1 -ProvisionPostgres` |
-| `deploy.ps1` | Alternative one-liner - prompts for config, downloads repo ZIP or uses local scripts, calls `deploy-azure.ps1 -ProvisionPostgres` |
-| `scripts/deploy-azure.ps1` | Core 5-step Azure provisioning (RG → Network → PG → Environment → Container App) |
+1. **URL-based scoping**: All SCIM operations include `:endpointId` in the URL path
+2. **AsyncLocalStorage**: Per-request endpoint context stored in Node.js ALS (zero-overhead thread-local)
+3. **Database WHERE clause**: Every repository query includes `endpointId` filter
+4. **Composite unique indexes**: userName uniqueness is per-endpoint, not global
+5. **Cascade delete**: Deleting an endpoint cascades to all its resources, logs, and credentials
+6. **In-memory cache**: EndpointService maintains a Map by ID and by name for fast lookups
 
 ---
 
-## 11. Testing Architecture
+## Profile Engine
 
-### 11.1 Test Framework
+```mermaid
+flowchart LR
+    subgraph Input
+        P1[Preset Name<br>e.g., entra-id]
+        P2[Inline Profile<br>shorthand JSON]
+    end
 
-- **Framework**: Jest 30 with `ts-jest` transform
-- **Test Location**: `api/test/` directory
-- **Test Pattern**: `*.spec.ts` and `*.test.ts`
-- **Current matrix**: See [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md#test-suite-summary) for current test counts - all passing
+    subgraph Processing
+        L[Preset Loader<br>6 built-in presets]
+        E[Auto-Expand<br>attrs: all -> RFC list]
+        T[Tighten-Only<br>Validator]
+        C[Schema Cache<br>Builder]
+    end
 
-### 11.2 Test Categories
+    subgraph Output
+        EP[EndpointProfile<br>schemas + RTs + SPC + settings]
+    end
 
-| Suite | Tests | Covers |
-|-------|-------|--------|
-| SCIM Users CRUD | ~60 | Create, Get, List, Update, Delete users |
-| SCIM Groups CRUD | ~50 | Create, Get, List, Update, Delete groups |
-| PATCH Operations | ~45 | Add/Replace/Remove for all path types |
-| Case-Insensitivity | ~23 | RFC 7643 §2.1 case-insensitive behavior |
-| Filtering | ~30 | Filter parsing, matching, operators |
-| Multi-Endpoint | ~20 | Isolation, cross-endpoint prevention |
-| Authentication | ~15 | OAuth + legacy auth flows |
-| Discovery | ~12 | ServiceProviderConfig, ResourceTypes, Schemas |
-| Error Handling | ~20 | SCIM error format, status codes |
-| Group Members | ~25 | Member add/remove/replace, multi-member PATCH |
-| Activity Parser | ~17 | Log → activity translation |
+    P1 --> L --> E
+    P2 --> E
+    E --> T --> C --> EP
+```
 
-### 11.3 Test Configuration
+### Components
 
-```typescript
-// jest.config.ts
+| Component | File | Responsibility |
+|-----------|------|---------------|
+| Built-in presets | `built-in-presets.ts` + `presets/*.json` | 6 compiled preset definitions |
+| Auto-expand service | `auto-expand.service.ts` | Expand "all", merge partial attrs with RFC baseline |
+| Tighten-only validator | `tighten-only-validator.ts` | Reject loosening of attribute characteristics |
+| RFC baseline | `rfc-baseline.ts` | Canonical RFC 7643 attribute definitions |
+| Endpoint profile service | `endpoint-profile.service.ts` | Orchestrate expansion + validation |
+
+---
+
+## Schema Validation Engine
+
+The `SchemaValidator` (1,664 lines) performs 10 validation types:
+
+```mermaid
+flowchart TD
+    P[Payload] --> V1[V1: Required Attrs]
+    V1 --> V2[V2: Type Checking]
+    V2 --> V3[V3: Mutability]
+    V3 --> V4[V4: Unknown Attrs]
+    V4 --> V5[V5: Multi/Single-Value]
+    V5 --> V6[V6: Sub-Attributes]
+    V6 --> V7[V7: Canonical Values]
+    V7 --> V8[V8: Required Sub-Attrs]
+    V8 --> V9[V9: DateTime Format]
+    V9 --> V10[V10: schemas array]
+    V10 --> R{Valid?}
+    R -->|Yes| OK[Process]
+    R -->|No| ERR[400 Error]
+```
+
+### Validation Contexts
+
+| Context | Required Check | ReadOnly Check | Unknown Attr Check |
+|---------|---------------|----------------|-------------------|
+| `create` | Yes | Strip | Yes (strict mode) |
+| `replace` | Yes | Strip | Yes (strict mode) |
+| `patch` (per-op) | No | Reject or strip | No |
+| `patch` (post-merge) | Yes | N/A | Yes (strict mode) |
+
+---
+
+## PATCH Engine Architecture
+
+Three pure-domain PATCH engines with shared infrastructure:
+
+```mermaid
+flowchart TD
+    subgraph Shared
+        PP[scim-patch-path.ts<br>Path parsing + operations]
+        PT[patch-types.ts<br>Type definitions]
+        PE[patch-error.ts<br>Error types]
+    end
+
+    subgraph Engines
+        UPE[UserPatchEngine<br>454 lines]
+        GPE[GroupPatchEngine<br>372 lines]
+        GenPE[GenericPatchEngine<br>Uses UserPatchEngine]
+    end
+
+    PP --> UPE & GPE & GenPE
+    PT --> UPE & GPE & GenPE
+    PE --> UPE & GPE & GenPE
+```
+
+### Path Types Supported
+
+| Type | Example | Parser |
+|------|---------|--------|
+| Simple | `displayName` | Direct key lookup |
+| ValuePath | `emails[type eq "work"].value` | `parseValuePath()` regex |
+| Extension URN | `urn:...:enterprise:2.0:User:dept` | `parseExtensionPath()` |
+| Dot-notation | `name.givenName` | Requires `VerbosePatchSupported` flag |
+| No-path | `{"op":"replace","value":{...}}` | `resolveNoPathValue()` |
+
+---
+
+## Filter & Sort Engine
+
+### Filter Parser
+
+The `scim-filter-parser.ts` (608 lines) implements a recursive-descent parser for the SCIM filter grammar (RFC 7644 S3.4.2.2):
+
+```
+filter     = attrPath SP compareOp SP value
+           / attrPath SP "pr"
+           / filter SP ("and" / "or") SP filter
+           / "not" SP "(" filter ")"
+           / "(" filter ")"
+           / attrPath "[" valFilter "]"
+```
+
+### Filter Evaluation Strategy
+
+```mermaid
+flowchart TD
+    F[SCIM Filter String] --> P[Parser -> AST]
+    P --> E{Pushable to DB?}
+    E -->|Yes| PD[Prisma WHERE clause<br>eq, ne, co, sw, ew, gt, ge, lt, le, pr, and, or]
+    E -->|No| IM[In-memory evaluation<br>not, valuePath, unmapped attrs]
+    PD --> DB[(PostgreSQL)]
+    DB --> R[Results]
+    IM --> R
+```
+
+### Sort Resolution
+
+| SCIM sortBy | User DB Column | Group DB Column |
+|-------------|---------------|-----------------|
+| `id` | `scimId` | `scimId` |
+| `userName` | `userName` | N/A |
+| `displayName` | `displayName` | `displayName` |
+| `externalId` | `externalId` | `externalId` |
+| `active` | `active` | N/A |
+| `meta.created` | `createdAt` | `createdAt` |
+| `meta.lastModified` | `updatedAt` | `updatedAt` |
+
+Default: `createdAt ascending`
+
+---
+
+## Authentication Architecture
+
+```mermaid
+flowchart TD
+    R[Request] --> PUB{Public decorator?}
+    PUB -->|Yes| ALLOW[Allow]
+    PUB -->|No| EP{Endpoint URL?}
+    EP -->|Yes| CRED{PerEndpointCredentials?}
+    CRED -->|Enabled| BC[bcrypt compare<br>against stored hashes]
+    BC -->|Match| ALLOW
+    BC -->|No match| JWT
+    CRED -->|Disabled| JWT
+    EP -->|No| JWT
+    JWT{OAuth JWT?} -->|Valid signature + expiry| ALLOW
+    JWT -->|Invalid| SS
+    SS{Shared Secret?} -->|Match| ALLOW
+    SS -->|No match| DENY[401 Unauthorized]
+```
+
+### Auth Types Set on Request
+
+| Auth Method | `req.authType` | `/Me` Support |
+|-------------|---------------|---------------|
+| Per-endpoint credential | `'endpoint'` | No (404) |
+| OAuth JWT | `'oauth'` | Yes (sub claim) |
+| Shared secret | `'legacy'` | No (404) |
+
+---
+
+## Logging Architecture
+
+### Components
+
+| Component | File | Responsibility |
+|-----------|------|---------------|
+| ScimLogger | `scim-logger.service.ts` | Central structured logger |
+| Ring Buffer | Built into ScimLogger | In-memory circular buffer |
+| SSE Emitter | Built into ScimLogger | Live stream via Server-Sent Events |
+| File Writer | `rotating-file-writer.ts` | Rotating log file output |
+| Request Interceptor | `request-logging.interceptor.ts` | HTTP audit trail to RequestLog table |
+| Log Query Service | `log-query.service.ts` | Query ring buffer and DB logs |
+
+### Log Levels
+
+`TRACE` (0) < `DEBUG` (1) < `INFO` (2) < `WARN` (3) < `ERROR` (4) < `FATAL` (5)
+
+### Per-Endpoint Log Isolation
+
+Each endpoint can have:
+- Independent log level override via `logLevel` setting
+- Dedicated log file under `logs/endpoints/{endpointId}/`
+- Filtered SSE stream at `/scim/endpoints/{id}/logs/stream`
+- Filtered ring buffer at `/scim/endpoints/{id}/logs/recent`
+
+---
+
+## Error Handling Architecture
+
+Two-layer exception filter chain (NestJS processes in reverse registration order):
+
+```mermaid
+flowchart TD
+    E[Exception Thrown] --> SF{HttpException?}
+    SF -->|Yes| SCIM[ScimExceptionFilter]
+    SF -->|No| GF[GlobalExceptionFilter]
+
+    SCIM --> IS{SCIM route?}
+    IS -->|Yes| SE[SCIM Error Response<br>schemas, status, scimType, detail]
+    IS -->|No| HE[Standard HTTP error]
+
+    GF --> IS2{SCIM route?}
+    IS2 -->|Yes| SE2[SCIM 500 Error<br>with Diagnostics extension]
+    IS2 -->|No| HE2[NestJS 500 error]
+```
+
+### Diagnostics Extension
+
+All SCIM errors are enriched with `urn:scimserver:api:messages:2.0:Diagnostics`:
+
+```json
 {
-  moduleFileExtensions: ['js', 'json', 'ts'],
-  rootDir: '.',
-  testRegex: '.*\\.spec\\.ts$',
-  transform: { '^.+\\.(t|j)s$': 'ts-jest' },
-  collectCoverageFrom: ['**/*.(t|j)s'],
-  coverageDirectory: '../coverage',
-  testEnvironment: 'node'
+  "requestId": "X-Request-Id correlation UUID",
+  "endpointId": "endpoint UUID",
+  "logsUrl": "/scim/endpoints/{id}/logs/recent?requestId={rid}"
 }
 ```
 
 ---
 
-## 12. Configuration Management
+## Technology Stack
 
-### 12.1 Environment Variables
-
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `PORT` | `3000` | HTTP server port |
-| `API_PREFIX` | `scim` | Global route prefix |
-| `DATABASE_URL` | *(required)* | PostgreSQL connection string |
-| `SCIM_SHARED_SECRET` | Auto-generated | Legacy bearer auth token |
-| `OAUTH_CLIENT_ID` | Auto-generated | OAuth client identifier |
-| `OAUTH_CLIENT_SECRET` | Auto-generated | OAuth client secret |
-| `OAUTH_CLIENT_SCOPES` | `scim.read,scim.write,scim.manage` | Allowed OAuth scopes |
-| `NODE_ENV` | `development` | Environment mode |
-
-### 12.2 Per-Endpoint Configuration Flags
-
-| Flag | Type | Default | Purpose |
-|------|------|---------|---------|
-| `MultiOpPatchRequestAddMultipleMembersToGroup` | boolean | false | Allow multi-member add in single PATCH |
-| `MultiOpPatchRequestRemoveMultipleMembersFromGroup` | boolean | false | Allow multi-member remove in single PATCH |
-| `PatchOpAllowRemoveAllMembers` | boolean | false | Allow remove-all-members operation |
-| `VerbosePatchSupported` | boolean | false | Enable dot-notation path resolution in PATCH (e.g., `name.givenName`) |
-| `excludeMeta` | boolean | false | Omit meta from responses |
-| `excludeSchemas` | boolean | false | Omit schemas from responses |
-| `customSchemaUrn` | string | - | Custom schema URN to advertise |
-| `includeEnterpriseSchema` | boolean | false | Include Enterprise User extension |
-| `strictMode` | boolean | false | Enforce strict SCIM validation |
-| `legacyMode` | boolean | false | Enable legacy behavior |
-| `customHeaders` | object | - | Custom response headers |
-
----
-
-> **Historical Note:** This design originally used 28 documented SQLite-specific compromises
-> (single-writer lock, derived lowercase columns, buffered logging, ephemeral storage, etc.).
-> These were all resolved by the Phase 3 PostgreSQL migration (v0.11.0). For the historical audit, see
-> [SQLITE_COMPROMISE_ANALYSIS.md](SQLITE_COMPROMISE_ANALYSIS.md).
-
-*This document describes the as-built architecture of SCIMServer as of March 2026.*
+| Layer | Technology | Version | Purpose |
+|-------|-----------|---------|---------|
+| Runtime | Node.js | 24 | JavaScript runtime |
+| Framework | NestJS | 11.1 | DI, modules, HTTP, guards |
+| Language | TypeScript | 5.9 | Type safety |
+| ORM | Prisma | 7.4 | Type-safe database access |
+| Database | PostgreSQL | 17 | Primary data store |
+| PG Extensions | citext, pgcrypto, pg_trgm | - | Case-insensitive, crypto, trigram |
+| Auth | @nestjs/jwt, bcrypt | - | JWT signing, password hashing |
+| Validation | class-validator, class-transformer | - | DTO validation |
+| Testing | Jest | 30.2 | Unit + E2E testing |
+| E2E HTTP | Supertest | 7.2 | HTTP testing |
+| Frontend | React, Vite | 19, 7 | Admin UI |
+| Container | Docker (node:24-alpine) | - | Production deployment |
+| Infrastructure | Azure Bicep | - | Azure Container Apps |
