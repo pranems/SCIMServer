@@ -1453,7 +1453,7 @@ describe('coercePatchOpBooleans', () => {
     expect((ops[0].value as any[])[1].active).toBe(true);
   });
 
-  it('should NOT coerce scalar values', () => {
+  it('should NOT coerce scalar non-boolean attribute strings', () => {
     const ops = [{ op: 'replace', path: 'displayName', value: 'True' }];
     coercePatchOpBooleans(ops, boolMap, CORE_URN);
     expect(ops[0].value).toBe('True');
@@ -1496,6 +1496,101 @@ describe('coercePatchOpBooleans', () => {
   it('should handle empty operations array', () => {
     const ops: Array<{ op: string; value?: unknown }> = [];
     expect(() => coercePatchOpBooleans(ops, boolMap, CORE_URN)).not.toThrow();
+  });
+
+  // ── Scalar path-based boolean coercion (Entra ID fix) ──────────────
+
+  it('should coerce scalar "True" to true for path:"active"', () => {
+    const ops = [{ op: 'Replace', path: 'active', value: 'True' }];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect(ops[0].value).toBe(true);
+  });
+
+  it('should coerce scalar "False" to false for path:"active"', () => {
+    const ops = [{ op: 'Replace', path: 'active', value: 'False' }];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect(ops[0].value).toBe(false);
+  });
+
+  it('should coerce case-insensitively: "true", "TRUE", "false"', () => {
+    const ops1 = [{ op: 'replace', path: 'active', value: 'true' }];
+    coercePatchOpBooleans(ops1, boolMap, CORE_URN);
+    expect(ops1[0].value).toBe(true);
+
+    const ops2 = [{ op: 'replace', path: 'active', value: 'FALSE' }];
+    coercePatchOpBooleans(ops2, boolMap, CORE_URN);
+    expect(ops2[0].value).toBe(false);
+  });
+
+  it('should NOT coerce scalar string for non-boolean path', () => {
+    const ops = [{ op: 'replace', path: 'displayName', value: 'True' }];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect(ops[0].value).toBe('True');
+  });
+
+  it('should coerce scalar boolean in sub-attribute path with value filter', () => {
+    const ops = [{ op: 'replace', path: 'emails[type eq "work"].primary', value: 'True' }];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect(ops[0].value).toBe(true);
+  });
+
+  it('should NOT coerce scalar for non-boolean sub-attribute path', () => {
+    const ops = [{ op: 'replace', path: 'emails[type eq "work"].value', value: 'True' }];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect(ops[0].value).toBe('True');
+  });
+
+  it('should coerce scalar boolean in extension URN path', () => {
+    const EXT_URN_LOWER = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:user';
+    const extBoolMap = new Map<string, Set<string>>([
+      [CORE_URN, new Set(['active'])],
+      [EXT_URN_LOWER, new Set(['securityenabled'])],
+    ]);
+    const ops = [{ op: 'Replace', path: 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:securityEnabled', value: 'False' }];
+    coercePatchOpBooleans(ops, extBoolMap, CORE_URN);
+    expect(ops[0].value).toBe(false);
+  });
+
+  it('should NOT coerce extension path for non-boolean extension attribute', () => {
+    const EXT_URN_LOWER = 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:user';
+    const extBoolMap = new Map<string, Set<string>>([
+      [CORE_URN, new Set(['active'])],
+      [EXT_URN_LOWER, new Set(['securityenabled'])],
+    ]);
+    const ops = [{ op: 'Replace', path: 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department', value: 'True' }];
+    coercePatchOpBooleans(ops, extBoolMap, CORE_URN);
+    expect(ops[0].value).toBe('True');
+  });
+
+  it('should coerce scalar boolean with dotted core path (name.givenName would NOT be boolean)', () => {
+    // Only boolean sub-attrs should be coerced; name.givenName is string
+    const ops = [{ op: 'replace', path: 'name.givenName', value: 'True' }];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect(ops[0].value).toBe('True');
+  });
+
+  it('should handle mixed scalar and object ops in same batch', () => {
+    const ops = [
+      { op: 'Replace', path: 'active', value: 'False' },
+      { op: 'Replace', value: { active: 'True', displayName: 'Test' } },
+    ];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect(ops[0].value).toBe(false);
+    expect((ops[1].value as any).active).toBe(true);
+    expect((ops[1].value as any).displayName).toBe('Test');
+  });
+
+  it('should NOT coerce non-true/false string values for boolean path', () => {
+    const ops = [{ op: 'replace', path: 'active', value: 'yes' }];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect(ops[0].value).toBe('yes');
+  });
+
+  it('should NOT coerce scalar when path is missing (handled as object case)', () => {
+    // No path, scalar value - not a valid SCIM op but should be safe
+    const ops = [{ op: 'replace', value: 'True' }];
+    coercePatchOpBooleans(ops, boolMap, CORE_URN);
+    expect(ops[0].value).toBe('True');
   });
 });
 

@@ -5,6 +5,23 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.38.1] - 2026-04-27
+
+### Bugfix - PATCH Scalar Boolean String Coercion (Entra ID Fix)
+
+- **fix(patch)**: `coercePatchOpBooleans()` now handles scalar string values with explicit paths
+  - Previously only handled object and array value shapes
+  - Missing: `{op:"Replace", path:"active", value:"True"}` (standard Entra ID format)
+  - Root cause: Entra ID SCIM Validator sends boolean values as strings in path-based PATCH ops
+  - All PATCH operations from Entra ID Validator returned 400: "Attribute 'active' must be a boolean, got string"
+- **feat(coerce)**: New `coerceScalarPatchValue()` helper resolves SCIM paths to boolMap entries
+  - Handles core paths (`active`), dotted paths (`emails.primary`), value-filter paths
+    (`emails[type eq "work"].primary`), and extension URN paths (`urn:...:enterprise:2.0:User:field`)
+  - Uses longest-prefix URN matching to handle dots in version numbers (e.g. `2.0`)
+  - Single fix point: shared function used by Users, Groups, and Generic services
+- **test**: 13 new unit tests, 4 new E2E tests, 5 new live tests (section 9z-S)
+- **docs**: `PATCH_SCALAR_BOOLEAN_COERCION.md` with architecture diagram, path resolution table
+
 ## [0.38.0] - 2026-04-22
 
 ### Feature - G8h: Primary Sub-Attribute Enforcement (RFC 7643 section 2.4)

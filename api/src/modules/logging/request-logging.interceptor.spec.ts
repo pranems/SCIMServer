@@ -1,6 +1,7 @@
-import { CallHandler, ExecutionContext } from '@nestjs/common';
+import { CallHandler, ExecutionContext, HttpException, NotFoundException, ConflictException } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
 import { RequestLoggingInterceptor } from './request-logging.interceptor';
+import { SCIM_ERROR_SCHEMA } from '../scim/common/scim-constants';
 
 describe('RequestLoggingInterceptor', () => {
   let interceptor: RequestLoggingInterceptor;
@@ -342,6 +343,65 @@ describe('RequestLoggingInterceptor', () => {
         expect(result).toEqual(responseBody);
       },
       complete: () => done(),
+    });
+  });
+
+  // ── Error response body capture ──────────────────────────────────────
+
+  describe('error response body capture', () => {
+    it('should include SCIM error responseBody for HttpException errors', (done) => {
+      const { context } = createMockContext({ method: 'POST', url: '/scim/Users' });
+      const err = new ConflictException({
+        schemas: [SCIM_ERROR_SCHEMA],
+        detail: 'User already exists',
+        status: '409',
+        scimType: 'uniqueness',
+      });
+      const handler: CallHandler = { handle: () => throwError(() => err) };
+
+      interceptor.intercept(context, handler).subscribe({
+        error: () => {
+          const call = mockLoggingService.recordRequest.mock.calls[0][0];
+          expect(call.responseBody).toBeDefined();
+          expect(call.responseBody.schemas).toContain(SCIM_ERROR_SCHEMA);
+          expect(call.responseBody.detail).toBe('User already exists');
+          expect(call.responseBody.status).toBe('409');
+          done();
+        },
+      });
+    });
+
+    it('should build SCIM error responseBody for non-SCIM HttpException', (done) => {
+      const { context } = createMockContext({ method: 'GET', url: '/scim/Users/nonexistent' });
+      const err = new NotFoundException('Resource not found');
+      const handler: CallHandler = { handle: () => throwError(() => err) };
+
+      interceptor.intercept(context, handler).subscribe({
+        error: () => {
+          const call = mockLoggingService.recordRequest.mock.calls[0][0];
+          expect(call.responseBody).toBeDefined();
+          expect(call.responseBody.schemas).toContain(SCIM_ERROR_SCHEMA);
+          expect(call.responseBody.status).toBe('404');
+          done();
+        },
+      });
+    });
+
+    it('should build generic error responseBody for non-HttpException errors', (done) => {
+      const { context } = createMockContext({ method: 'POST', url: '/scim/Users' });
+      const err = new Error('Database connection lost');
+      const handler: CallHandler = { handle: () => throwError(() => err) };
+
+      interceptor.intercept(context, handler).subscribe({
+        error: () => {
+          const call = mockLoggingService.recordRequest.mock.calls[0][0];
+          expect(call.responseBody).toBeDefined();
+          expect(call.responseBody.schemas).toContain(SCIM_ERROR_SCHEMA);
+          expect(call.responseBody.detail).toBe('Database connection lost');
+          expect(call.responseBody.status).toBe('500');
+          done();
+        },
+      });
     });
   });
 });

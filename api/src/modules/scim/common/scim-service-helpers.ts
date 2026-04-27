@@ -220,6 +220,15 @@ export function sanitizeBooleanStringsByParent(
  * Extracted from the identical loop in Users/Groups/Generic PATCH flows.
  * Walks each operation's value and coerces string booleans to native booleans.
  *
+ * Handles three value shapes:
+ *  1. Object value (no-path replace): walks recursively via sanitizeBooleanStringsByParent
+ *  2. Array value: walks each element recursively
+ *  3. Scalar string value with path (e.g. path:"active", value:"True"):
+ *     resolves the SCIM path to its parent URN-dot-path and attribute name,
+ *     then coerces if the attribute is boolean-typed in the boolMap.
+ *     This covers standard Entra ID PATCH operations that send boolean
+ *     values as strings (e.g. {"op":"Replace","path":"active","value":"False"}).
+ *
  * @param operations  The PATCH operations array
  * @param boolMap     URN-dot-path→Children map of boolean attribute names
  * @param coreUrnLower  The lowercase core schema URN for root parentPath
@@ -238,8 +247,98 @@ export function coercePatchOpBooleans(
           sanitizeBooleanStringsByParent(item as Record<string, unknown>, boolMap, coreUrnLower);
         }
       }
+    } else if (typeof op.value === 'string' && op.path) {
+      // Scalar string value with explicit path - resolve and coerce if boolean
+      const coerced = coerceScalarPatchValue(op.path, op.value, boolMap, coreUrnLower);
+      if (coerced !== undefined) {
+        op.value = coerced;
+      }
     }
   }
+}
+
+/**
+ * Resolve a SCIM PATCH path to its parent URN-dot-path and leaf attribute name,
+ * then coerce the scalar string value if the attribute is boolean-typed.
+ *
+ * Path formats handled:
+ *  - "active"                         -> parent=coreUrn, leaf="active"
+ *  - "name.givenName"                 -> parent=coreUrn.name, leaf="givenname"
+ *  - "emails[type eq \"work\"].primary" -> parent=coreUrn.emails, leaf="primary"
+ *  - "urn:...:ext:2.0:User:field"     -> parent=extUrnLower, leaf="field"
+ *  - "urn:...:ext:2.0:User:manager.displayName" -> parent=extUrnLower.manager, leaf="displayname"
+ *
+ * @param path         The SCIM PATCH operation path
+ * @param value        The scalar string value to possibly coerce
+ * @param boolMap      URN-dot-path -> Children map of boolean attribute names
+ * @param coreUrnLower The lowercase core schema URN
+ * @returns true/false if coerced, undefined if not a boolean attribute
+ */
+function coerceScalarPatchValue(
+  path: string,
+  value: string,
+  boolMap: Map<string, Set<string>>,
+  coreUrnLower: string,
+): boolean | undefined {
+  const lower = value.toLowerCase();
+  if (lower !== 'true' && lower !== 'false') return undefined;
+
+  // Strip value filters: emails[type eq "work"].primary -> emails.primary
+  const cleanPath = path.replace(/\[.*?\]/g, '');
+  const cleanLower = cleanPath.toLowerCase();
+
+  let parentPath: string;
+  let leafName: string;
+
+  // Check for extension URN prefix by finding the longest matching URN key in boolMap
+  // Extension paths use ':' after the URN (e.g. urn:...:enterprise:2.0:User:department)
+  if (cleanLower.startsWith('urn:')) {
+    // Collect all URN-based keys from boolMap and find the longest matching prefix.
+    // boolMap keys are either base URNs (e.g. "urn:...:core:2.0:user") or
+    // sub-paths (e.g. "urn:...:core:2.0:user.emails"). Both can match.
+    let matchedUrn: string | undefined;
+    let matchedLen = 0;
+    for (const mapKey of boolMap.keys()) {
+      if (!mapKey.startsWith('urn:')) continue;
+      // Check if the clean path starts with this map key followed by ':' or '.'
+      // This works for both base URNs and dotted sub-paths
+      if (cleanLower.startsWith(mapKey + ':') || cleanLower.startsWith(mapKey + '.')) {
+        if (mapKey.length > matchedLen) {
+          matchedUrn = mapKey;
+          matchedLen = mapKey.length;
+        }
+      }
+    }
+
+    if (!matchedUrn) return undefined;
+
+    // Extract the remainder after the matched URN + separator character
+    const remainder = cleanLower.slice(matchedUrn.length + 1);
+    if (!remainder) return undefined;
+
+    const segments = remainder.split('.');
+    leafName = segments[segments.length - 1];
+    if (segments.length === 1) {
+      parentPath = matchedUrn;
+    } else {
+      parentPath = `${matchedUrn}.${segments.slice(0, -1).join('.')}`;
+    }
+  } else {
+    // Core attribute path: "active", "name.givenName", etc.
+    const segments = cleanLower.split('.');
+    leafName = segments[segments.length - 1];
+    if (segments.length === 1) {
+      parentPath = coreUrnLower;
+    } else {
+      parentPath = `${coreUrnLower}.${segments.slice(0, -1).join('.')}`;
+    }
+  }
+
+  const children = boolMap.get(parentPath);
+  if (children?.has(leafName)) {
+    return lower === 'true';
+  }
+  return undefined;
 }
 
 /**

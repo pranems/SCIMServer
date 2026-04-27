@@ -8556,6 +8556,159 @@ try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$r2EpId" -Method DEL
 Write-Host "`n--- 9z-R: Test Gaps Audit #6 Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-S: PATCH SCALAR BOOLEAN STRING COERCION (Entra ID Fix)
+$script:currentSection = "9z-S: Patch Scalar Bool Coercion"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-S: PATCH SCALAR BOOLEAN STRING COERCION" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+Write-Host "Validates that PATCH ops with path + scalar string boolean values" -ForegroundColor Gray
+Write-Host "(e.g. path:'active', value:'True') are coerced when AllowAndCoerceBooleanStrings=True." -ForegroundColor Gray
+Write-Host "This fixes Entra ID SCIM Validator 400 errors on PATCH operations." -ForegroundColor Gray
+
+# Create a dedicated endpoint with strict schema + boolean coercion enabled
+$sEpBody = @{
+    name = "live-9z-S-scalar-bool-$(Get-Random)"
+    profile = @{
+        settings = @{
+            StrictSchemaValidation = "True"
+            AllowAndCoerceBooleanStrings = "True"
+            UserSoftDeleteEnabled = "True"
+        }
+    }
+} | ConvertTo-Json -Depth 5
+$sEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $sEpBody -ContentType "application/json"
+$sEpId = $sEp.id
+$sBase = "$baseUrl/scim/endpoints/$sEpId"
+
+# Create a test user
+$sUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "scalar-bool-test@live.com"
+    displayName = "Scalar Bool Test"
+    active = $true
+    emails = @(@{ type = "work"; value = "sb@live.com"; primary = $true })
+} | ConvertTo-Json -Depth 5
+$sUser = Invoke-RestMethod -Uri "$sBase/Users" -Method POST -Headers $headers -Body $sUserBody -ContentType "application/scim+json"
+$sUserId = $sUser.id
+
+# Test 1: PATCH active="True" (scalar string) should succeed
+Write-Host "`n--- Test: PATCH path:active value:'True' (scalar string) ---" -ForegroundColor Cyan
+$p1Body = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "Replace"; path = "active"; value = "True" },
+        @{ op = "Replace"; path = "displayName"; value = "Updated via scalar bool" }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    $p1Res = Invoke-RestMethod -Uri "$sBase/Users/$sUserId" -Method PATCH -Headers $headers -Body $p1Body -ContentType "application/scim+json"
+    $p1Ok = ($p1Res.active -eq $true) -and ($p1Res.displayName -eq "Updated via scalar bool")
+    Test-Result -Success $p1Ok -Message "PATCH active='True' coerced to boolean true: active=$($p1Res.active), displayName=$($p1Res.displayName)"
+} catch {
+    Test-Result -Success $false -Message "PATCH active='True' failed: $($_.Exception.Message)"
+}
+
+# Test 2: PATCH active="False" (scalar string) should deactivate user
+Write-Host "`n--- Test: PATCH path:active value:'False' (scalar string, soft-delete) ---" -ForegroundColor Cyan
+$p2Body = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "Replace"; path = "active"; value = "False" }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    $p2Res = Invoke-RestMethod -Uri "$sBase/Users/$sUserId" -Method PATCH -Headers $headers -Body $p2Body -ContentType "application/scim+json"
+    Test-Result -Success ($p2Res.active -eq $false) -Message "PATCH active='False' coerced to boolean false: active=$($p2Res.active)"
+} catch {
+    Test-Result -Success $false -Message "PATCH active='False' failed: $($_.Exception.Message)"
+}
+
+# Reactivate user for next test
+$reactivateBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{ op = "Replace"; path = "active"; value = $true })
+} | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Uri "$sBase/Users/$sUserId" -Method PATCH -Headers $headers -Body $reactivateBody -ContentType "application/scim+json" | Out-Null
+
+# Test 3: PATCH sub-attribute with value filter: emails[type eq "work"].primary = "False"
+Write-Host "`n--- Test: PATCH emails[type eq 'work'].primary = 'False' (sub-attr scalar bool) ---" -ForegroundColor Cyan
+$p3Body = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "Replace"; path = 'emails[type eq "work"].primary'; value = "False" }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    $p3Res = Invoke-RestMethod -Uri "$sBase/Users/$sUserId" -Method PATCH -Headers $headers -Body $p3Body -ContentType "application/scim+json"
+    $workEmail = $p3Res.emails | Where-Object { $_.type -eq "work" }
+    Test-Result -Success ($workEmail.primary -eq $false) -Message "PATCH emails.primary='False' coerced: primary=$($workEmail.primary)"
+} catch {
+    Test-Result -Success $false -Message "PATCH emails.primary='False' failed: $($_.Exception.Message)"
+}
+
+# Test 4: Non-boolean path should NOT be coerced (displayName stays "True")
+Write-Host "`n--- Test: PATCH displayName='True' stays string (not coerced) ---" -ForegroundColor Cyan
+$p4Body = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "Replace"; path = "displayName"; value = "True" }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    $p4Res = Invoke-RestMethod -Uri "$sBase/Users/$sUserId" -Method PATCH -Headers $headers -Body $p4Body -ContentType "application/scim+json"
+    Test-Result -Success ($p4Res.displayName -eq "True") -Message "PATCH displayName='True' not coerced: displayName=$($p4Res.displayName)"
+} catch {
+    Test-Result -Success $false -Message "PATCH displayName='True' failed: $($_.Exception.Message)"
+}
+
+# Test 5: With AllowAndCoerceBooleanStrings=False + StrictSchema=True, PATCH active="True" should be rejected
+Write-Host "`n--- Test: PATCH active='True' with coercion OFF -> 400 ---" -ForegroundColor Cyan
+$sEp2Body = @{
+    name = "live-9z-S-nocoerce-$(Get-Random)"
+    profile = @{
+        settings = @{
+            StrictSchemaValidation = "True"
+            AllowAndCoerceBooleanStrings = "False"
+        }
+    }
+} | ConvertTo-Json -Depth 5
+$sEp2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $sEp2Body -ContentType "application/json"
+$sEp2Id = $sEp2.id
+$sBase2 = "$baseUrl/scim/endpoints/$sEp2Id"
+
+$sUser2Body = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "nocoerce-test@live.com"
+    displayName = "No Coerce Bool"
+    active = $true
+} | ConvertTo-Json -Depth 5
+$sUser2 = Invoke-RestMethod -Uri "$sBase2/Users" -Method POST -Headers $headers -Body $sUser2Body -ContentType "application/scim+json"
+$sUser2Id = $sUser2.id
+
+$p5Body = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(
+        @{ op = "Replace"; path = "active"; value = "True" }
+    )
+} | ConvertTo-Json -Depth 5
+try {
+    Invoke-RestMethod -Uri "$sBase2/Users/$sUser2Id" -Method PATCH -Headers $headers -Body $p5Body -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "PATCH active='True' should have been rejected"
+} catch {
+    $errStatus = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($errStatus -eq 400) -Message "PATCH active='True' with coercion OFF correctly rejected: $errStatus"
+}
+
+# Cleanup
+try { Invoke-RestMethod -Uri "$sBase/Users/$sUserId" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$sBase2/Users/$sUser2Id" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$sEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$sEp2Id" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+Write-Host "`n--- 9z-S: Patch Scalar Boolean Coercion Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================

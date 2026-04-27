@@ -1,6 +1,7 @@
 import {
   CallHandler,
   ExecutionContext,
+  HttpException,
   Injectable,
   NestInterceptor
 } from '@nestjs/common';
@@ -12,6 +13,7 @@ import { randomUUID } from 'node:crypto';
 import { LoggingService } from './logging.service';
 import { ScimLogger } from './scim-logger.service';
 import { LogCategory } from './log-levels';
+import { SCIM_ERROR_SCHEMA } from '../scim/common/scim-constants';
 
 @Injectable()
 export class RequestLoggingInterceptor implements NestInterceptor {
@@ -117,6 +119,9 @@ export class RequestLoggingInterceptor implements NestInterceptor {
                 this.scimLogger.error(LogCategory.HTTP, msg, error, data);
               }
 
+              // Derive the response body that the exception filter will send
+              const errorResponseBody = this.buildErrorResponseBody(error);
+
               // Persist to database
               void this.loggingService.recordRequest({
                 method: request.method,
@@ -126,6 +131,7 @@ export class RequestLoggingInterceptor implements NestInterceptor {
                 requestHeaders: { ...request.headers },
                 requestBody: request.body,
                 responseHeaders: response.getHeaders() as Record<string, unknown>,
+                responseBody: errorResponseBody,
                 error,
                 endpointId,
               });
@@ -143,5 +149,44 @@ export class RequestLoggingInterceptor implements NestInterceptor {
     }
 
     return response.statusCode;
+  }
+
+  /**
+   * Reconstruct the SCIM error response body that the exception filter will
+   * send. This mirrors the logic in ScimExceptionFilter so that the log entry
+   * contains the actual response payload the client receives.
+   */
+  private buildErrorResponseBody(error: unknown): Record<string, unknown> | undefined {
+    if (!(error instanceof HttpException)) {
+      // Non-HttpException errors - the GlobalExceptionFilter produces a generic body
+      const msg = error instanceof Error ? error.message : String(error);
+      return {
+        schemas: [SCIM_ERROR_SCHEMA],
+        detail: msg || 'Internal server error',
+        status: '500',
+      };
+    }
+
+    const status = error.getStatus();
+    const exceptionResponse = error.getResponse();
+
+    if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
+      const raw = exceptionResponse as Record<string, unknown>;
+      // If already a SCIM-formatted body, return as-is
+      if (Array.isArray(raw.schemas) && (raw.schemas as string[]).includes(SCIM_ERROR_SCHEMA)) {
+        return { ...raw, status: String(raw.status ?? status) };
+      }
+      return {
+        schemas: [SCIM_ERROR_SCHEMA],
+        detail: (raw.message ?? raw.error ?? error.message) as string,
+        status: String(status),
+      };
+    }
+
+    return {
+      schemas: [SCIM_ERROR_SCHEMA],
+      detail: typeof exceptionResponse === 'string' ? exceptionResponse : error.message,
+      status: String(status),
+    };
   }
 }
