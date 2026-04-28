@@ -2957,6 +2957,7 @@ describe('EndpointScimUsersService', () => {
       it('should preserve non-password attributes while stripping password', async () => {
         const userWithMixed = {
           ...mockUser,
+          displayName: 'Mixed User',
           rawPayload: JSON.stringify({
             displayName: 'Mixed User',
             password: 'Secret!',

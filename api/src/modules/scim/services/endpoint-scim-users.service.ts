@@ -615,12 +615,16 @@ export class EndpointScimUsersService {
     delete rawPayload.id;
     // Remove schemas from rawPayload - we built it dynamically above (G19 / FP-1)
     delete rawPayload.schemas;
+    // GAP-2: Remove displayName from rawPayload - DB column is authoritative
+    // (matches Groups' hardened pattern: delete blob copy, then set explicit DB column)
+    delete rawPayload.displayName;
 
     return {
       schemas,
       ...rawPayload,
       id: user.scimId,
       userName: user.userName,
+      displayName: user.displayName ?? undefined,
       externalId: user.externalId ?? undefined,
       active: user.active,
       meta

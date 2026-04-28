@@ -612,12 +612,15 @@ export class EndpointScimGenericService {
 
     const patchedPayload = patchEngine.getResult();
 
-    // Extract updated top-level fields from patched payload
-    const externalId = typeof patchedPayload.externalId === 'string'
-      ? patchedPayload.externalId
+    // Extract updated top-level fields from patched payload.
+    // GAP-1 fix: Detect field removal - when key is absent after patch, the field
+    // was removed. Use 'in' check to distinguish "removed" (absent) from "unchanged"
+    // (still present). Fallback to existing only when the field was NOT part of the patch.
+    const externalId = 'externalId' in patchedPayload
+      ? (typeof patchedPayload.externalId === 'string' ? patchedPayload.externalId : null)
       : existing.externalId;
-    const displayName = typeof patchedPayload.displayName === 'string'
-      ? patchedPayload.displayName
+    const displayName = 'displayName' in patchedPayload
+      ? (typeof patchedPayload.displayName === 'string' ? patchedPayload.displayName : null)
       : existing.displayName;
     const active = patchedPayload.active !== undefined
       ? patchedPayload.active !== false

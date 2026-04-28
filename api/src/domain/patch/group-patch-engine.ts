@@ -106,7 +106,20 @@ export class GroupPatchEngine {
               operation, members, config.allowMultiMemberAdd,
             );
             break;
-          case 'remove':
+          case 'remove': {
+            // GAP-1: Column-promoted field remove handlers (RFC 7644 §3.5.2.2)
+            const removePath = operation.path?.toLowerCase();
+            if (removePath === 'displayname') {
+              throw new PatchError(
+                400,
+                "Cannot remove required attribute 'displayName'. displayName is required for Group resources (RFC 7643 §4.2).",
+                'invalidValue',
+              );
+            }
+            if (removePath === 'externalid') {
+              externalId = null;
+              break;
+            }
             // Check for extension path first; otherwise delegate to member-only handler
             if (operation.path && isExtensionPath(operation.path, config.extensionUrns)) {
               const extParsed = parseExtensionPath(operation.path, config.extensionUrns);
@@ -119,6 +132,7 @@ export class GroupPatchEngine {
               operation, members, config.allowMultiMemberRemove, config.allowRemoveAllMembers, config.caseExactPaths,
             );
             break;
+          }
         }
       } catch (err) {
         if (err instanceof PatchError && err.operationIndex === undefined) {
