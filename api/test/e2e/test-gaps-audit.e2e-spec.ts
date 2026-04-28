@@ -652,13 +652,13 @@ describe('Test Gap Audit (E2E)', () => {
       expect(spc.body.bulk.supported).toBe(true);
     });
 
-    it('after PATCH settings SoftDeleteEnabled=True, SPC remains unchanged (settings do not affect SPC)', async () => {
-      // PATCH to add SoftDeleteEnabled
+    it('after PATCH settings UserSoftDeleteEnabled=True, SPC remains unchanged (settings do not affect SPC)', async () => {
+      // PATCH to add UserSoftDeleteEnabled
       await request(app.getHttpServer())
         .patch(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
         .set('Content-Type', 'application/json')
-        .send({ profile: { settings: { SoftDeleteEnabled: 'True' } } })
+        .send({ profile: { settings: { UserSoftDeleteEnabled: 'True' } } })
         .expect(200);
 
       // SPC should remain the same (SPC is profile-level, settings only touches profile.settings)
@@ -670,7 +670,7 @@ describe('Test Gap Audit (E2E)', () => {
         .get(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      expect(ep.body.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(ep.body.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
     });
   });
 });

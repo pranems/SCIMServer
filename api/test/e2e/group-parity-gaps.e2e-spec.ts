@@ -172,7 +172,7 @@ describe('Group Parity & Flag Interaction Gaps (E2E)', () => {
 
     beforeEach(async () => {
       resetFixtureCounter();
-      endpointId = await createEndpointWithConfig(app, token, { SoftDeleteEnabled: 'True' });
+      endpointId = await createEndpointWithConfig(app, token, { UserSoftDeleteEnabled: 'True' });
       basePath = scimBasePath(endpointId);
       const group = validGroup();
       const created = await scimPost(app, `${basePath}/Groups`, token, group).expect(201);
@@ -209,7 +209,7 @@ describe('Group Parity & Flag Interaction Gaps (E2E)', () => {
       const groupName = `reprovision-test-${Date.now()}`;
 
       // Create endpoint fresh for this test to avoid conflicts
-      const rpEndpointId = await createEndpointWithConfig(app, token, { SoftDeleteEnabled: 'True' });
+      const rpEndpointId = await createEndpointWithConfig(app, token, { UserSoftDeleteEnabled: 'True' });
       const rpBasePath = scimBasePath(rpEndpointId);
 
       // Create original group
@@ -386,7 +386,7 @@ describe('Group Parity & Flag Interaction Gaps (E2E)', () => {
     beforeEach(async () => {
       resetFixtureCounter();
       endpointId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
+        UserSoftDeleteEnabled: 'True',
       });
       basePath = scimBasePath(endpointId);
 

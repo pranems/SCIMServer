@@ -137,12 +137,37 @@ describe('Endpoint Profile (E2E)', () => {
         .patch(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
         .set('Content-Type', 'application/json')
-        .send({ profile: { settings: { SoftDeleteEnabled: 'True' } } })
+        .send({ profile: { settings: { UserSoftDeleteEnabled: 'True' } } })
         .expect(200);
 
       // settings are stored in profile.settings
       expect(res.body.profile?.settings).toBeDefined();
-      expect(res.body.profile.settings.SoftDeleteEnabled).toBe('True');
+      expect(res.body.profile.settings.UserSoftDeleteEnabled).toBe('True');
+    });
+
+    it('should migrate deprecated SoftDeleteEnabled to UserSoftDeleteEnabled', async () => {
+      const name = `compat-${Date.now()}`;
+      const createRes = await request(app.getHttpServer())
+        .post('/scim/admin/endpoints')
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ name, profilePreset: 'rfc-standard' })
+        .expect(201);
+
+      const epId = createRes.body.id;
+
+      // Send the DEPRECATED key name
+      const res = await request(app.getHttpServer())
+        .patch(`/scim/admin/endpoints/${epId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/json')
+        .send({ profile: { settings: { SoftDeleteEnabled: 'True' } } })
+        .expect(200);
+
+      // Should be migrated to the current key
+      expect(res.body.profile.settings.UserSoftDeleteEnabled).toBe('True');
+      // Deprecated key should NOT appear in response
+      expect(res.body.profile.settings.SoftDeleteEnabled).toBeUndefined();
     });
 
     // NOTE: Test "should reject invalid config flag values" removed.
