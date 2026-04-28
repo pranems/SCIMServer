@@ -8709,6 +8709,132 @@ try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$sEp2Id" -Method DEL
 Write-Host "`n--- 9z-S: Patch Scalar Boolean Coercion Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-T: STRUCTURED DIAGNOSTICS ENRICHMENT (G9 / v0.39.0)
+$script:currentSection = "9z-T: Diagnostics Enrichment"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-T: STRUCTURED DIAGNOSTICS ENRICHMENT (G9)" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# --- Setup: Create endpoint with StrictSchemaValidation=True ---
+Write-Host "`n--- Setup: Endpoint with StrictSchemaValidation=True ---" -ForegroundColor Cyan
+$diagEpBody = @{
+    name = "live-test-diag-$(Get-Random)"
+    displayName = "Diagnostics Test Endpoint"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json
+$diagEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $diagEpBody -ContentType "application/json"
+$diagEpId = $diagEndpoint.id
+$settingsBody = @{ profile = @{ settings = @{ StrictSchemaValidation = "True" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$diagEpId" -Method PATCH -Headers $headers -Body $settingsBody -ContentType "application/json" | Out-Null
+$diagScimBase = "$baseUrl/scim/endpoints/$diagEpId"
+Test-Result -Success ($null -ne $diagEpId) -Message "9z-T.setup: Created endpoint with StrictSchemaValidation=True"
+
+# --- Test 9z-T.1: attributePaths in strict schema validation ---
+Write-Host "`n--- Test 9z-T.1: attributePaths in strict schema validation ---" -ForegroundColor Cyan
+$badUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "9zt-test-$(Get-Random)@test.com"
+    bogusField1 = "value1"
+    bogusField2 = "value2"
+} | ConvertTo-Json
+try {
+    $null = Invoke-RestMethod -Uri "$diagScimBase/Users" -Method POST -Headers $headers -Body $badUserBody -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9z-T.1: Should have been rejected by strict validation"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    $errBody = $_.ErrorDetails.Message | ConvertFrom-Json -ErrorAction SilentlyContinue
+    $diag = $errBody.'urn:scimserver:api:messages:2.0:Diagnostics'
+    Test-Result -Success ($code -eq 400) -Message "9z-T.1: Strict validation returns 400 (got $code)"
+    Test-Result -Success ($diag.errorCode -eq 'VALIDATION_SCHEMA') -Message "9z-T.2: errorCode is VALIDATION_SCHEMA"
+    Test-Result -Success ($diag.triggeredBy -eq 'StrictSchemaValidation') -Message "9z-T.3: triggeredBy is StrictSchemaValidation"
+    Test-Result -Success ($null -ne $diag.attributePaths) -Message "9z-T.4: attributePaths is present"
+    Test-Result -Success ($diag.attributePaths -contains 'bogusField1') -Message "9z-T.5: attributePaths contains bogusField1"
+    Test-Result -Success ($diag.attributePaths -contains 'bogusField2') -Message "9z-T.6: attributePaths contains bogusField2"
+    Test-Result -Success ($null -ne $diag.attributePath) -Message "9z-T.7: attributePath is set (first path)"
+}
+
+# --- Test 9z-T.8: activeConfig in diagnostics ---
+Write-Host "`n--- Test 9z-T.8: activeConfig in diagnostics ---" -ForegroundColor Cyan
+Test-Result -Success ($null -ne $diag.activeConfig) -Message "9z-T.8: activeConfig is present"
+if ($diag.activeConfig) {
+    Test-Result -Success ($diag.activeConfig.StrictSchemaValidation -eq $true) -Message "9z-T.9: activeConfig.StrictSchemaValidation is true"
+}
+
+# --- Test 9z-T.10: filterExpression in filter errors ---
+Write-Host "`n--- Test 9z-T.10: filterExpression in filter errors ---" -ForegroundColor Cyan
+$badFilter = "userName eq ""test"" AND (((invalid"
+try {
+    $null = Invoke-RestMethod -Uri "$diagScimBase/Users?filter=$([uri]::EscapeDataString($badFilter))" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9z-T.10: Bad filter should return 400"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    $errBody = $_.ErrorDetails.Message | ConvertFrom-Json -ErrorAction SilentlyContinue
+    $filterDiag = $errBody.'urn:scimserver:api:messages:2.0:Diagnostics'
+    Test-Result -Success ($code -eq 400) -Message "9z-T.10: Bad filter returns 400 (got $code)"
+    Test-Result -Success ($filterDiag.errorCode -eq 'FILTER_INVALID') -Message "9z-T.11: errorCode is FILTER_INVALID"
+    Test-Result -Success ($null -ne $filterDiag.filterExpression) -Message "9z-T.12: filterExpression is present"
+    Test-Result -Success ($null -ne $filterDiag.parseError) -Message "9z-T.13: parseError is present"
+}
+
+# --- Test 9z-T.14: 409 uniqueness diagnostics ---
+Write-Host "`n--- Test 9z-T.14: Uniqueness conflict diagnostics ---" -ForegroundColor Cyan
+# Create endpoint WITHOUT strict for uniqueness test
+$diagEp2Body = @{
+    name = "live-test-diag2-$(Get-Random)"
+    displayName = "Diagnostics Uniqueness Endpoint"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json
+$diagEp2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $diagEp2Body -ContentType "application/json"
+$diagEp2Id = $diagEp2.id
+$diagScimBase2 = "$baseUrl/scim/endpoints/$diagEp2Id"
+
+$uniqueUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "9zt-unique-$(Get-Random)@test.com"
+    displayName = "Uniqueness Test"
+    active = $true
+} | ConvertTo-Json
+$origUser = Invoke-RestMethod -Uri "$diagScimBase2/Users" -Method POST -Headers $headers -Body $uniqueUserBody -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $origUser.id) -Message "9z-T.14: Created first user for uniqueness test"
+
+# Post duplicate
+try {
+    $null = Invoke-RestMethod -Uri "$diagScimBase2/Users" -Method POST -Headers $headers -Body $uniqueUserBody -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9z-T.15: Duplicate should return 409"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    $errBody = $_.ErrorDetails.Message | ConvertFrom-Json -ErrorAction SilentlyContinue
+    $uqDiag = $errBody.'urn:scimserver:api:messages:2.0:Diagnostics'
+    Test-Result -Success ($code -eq 409) -Message "9z-T.15: Duplicate returns 409 (got $code)"
+    Test-Result -Success ($null -ne $uqDiag.conflictingResourceId) -Message "9z-T.16: conflictingResourceId present"
+    Test-Result -Success ($null -ne $uqDiag.conflictingAttribute) -Message "9z-T.17: conflictingAttribute present"
+    Test-Result -Success ($null -ne $uqDiag.incomingValue) -Message "9z-T.18: incomingValue present"
+}
+
+# --- Test 9z-T.19: Diagnostics key allowlist ---
+Write-Host "`n--- Test 9z-T.19: Diagnostics key allowlist ---" -ForegroundColor Cyan
+$allowedDiagKeys = @('requestId','endpointId','logsUrl','operation','triggeredBy','errorCode','attributePath','attributePaths','schemaUrn','conflictingResourceId','conflictingAttribute','incomingValue','failedOperationIndex','failedPath','failedOp','currentETag','parseError','filterExpression','activeConfig','primaryCount')
+if ($diag) {
+    $diagKeys = ($diag | Get-Member -MemberType NoteProperty).Name
+    $unknownKeys = $diagKeys | Where-Object { $_ -notin $allowedDiagKeys }
+    Test-Result -Success ($unknownKeys.Count -eq 0) -Message "9z-T.19: No unknown keys in diagnostics (found: $($unknownKeys -join ','))"
+    Test-Result -Success ($diagKeys -notcontains '_schemaCaches') -Message "9z-T.20: No _schemaCaches leak"
+    # No _ prefixed keys
+    $internalKeys = $diagKeys | Where-Object { $_.StartsWith('_') }
+    Test-Result -Success ($internalKeys.Count -eq 0) -Message "9z-T.21: No internal _ prefixed keys"
+}
+
+# --- Cleanup ---
+Write-Host "`n--- Cleanup ---" -ForegroundColor Cyan
+try { Invoke-RestMethod -Uri "$diagScimBase2/Users/$($origUser.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$diagEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$diagEp2Id" -Method DELETE -Headers $headers | Out-Null } catch {}
+Test-Result -Success $true -Message "9z-T.cleanup: Deleted test endpoints"
+
+Write-Host "`n--- 9z-T: Diagnostics Enrichment Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
