@@ -1932,7 +1932,7 @@ describe('assertSchemaUniqueness triggeredBy (P5)', () => {
       fail('should have thrown');
     } catch (e: any) {
       const diag = e.getResponse()[SCIM_DIAGNOSTICS_URN];
-      expect(diag.conflictingAttribute).toBe(`${extUrn}:costCenter`);
+      expect(diag.conflictingAttribute).toBe(`${extUrn}.costCenter`);
       expect(diag.conflictingResourceId).toBe('existing-ext-7');
     }
   });

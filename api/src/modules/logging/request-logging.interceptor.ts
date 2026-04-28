@@ -1,7 +1,6 @@
 import {
   CallHandler,
   ExecutionContext,
-  HttpException,
   Injectable,
   NestInterceptor
 } from '@nestjs/common';
@@ -13,7 +12,21 @@ import { randomUUID } from 'node:crypto';
 import { LoggingService } from './logging.service';
 import { ScimLogger } from './scim-logger.service';
 import { LogCategory } from './log-levels';
-import { SCIM_ERROR_SCHEMA } from '../scim/common/scim-constants';
+
+/**
+ * Metadata stashed on the request object by the interceptor so that
+ * exception filters can call `recordRequest()` with full timing data
+ * and the **actual** response body they build.
+ */
+export interface RequestLoggingMeta {
+  startedAt: number;
+  requestHeaders: Record<string, unknown>;
+  requestBody: unknown;
+  endpointId?: string;
+}
+
+/** Key used to stash RequestLoggingMeta on the Express request object. */
+export const REQUEST_LOGGING_META_KEY = '__scim_logging_meta';
 
 @Injectable()
 export class RequestLoggingInterceptor implements NestInterceptor {
@@ -61,6 +74,15 @@ export class RequestLoggingInterceptor implements NestInterceptor {
             });
           }
 
+          // Stash timing metadata on request so exception filters can
+          // call recordRequest() with the ACTUAL response body they build.
+          (request as any)[REQUEST_LOGGING_META_KEY] = {
+            startedAt,
+            requestHeaders: { ...request.headers },
+            requestBody: request.body,
+            endpointId,
+          } as RequestLoggingMeta;
+
           next.handle().pipe(
             tap((responseBody: unknown) => {
               const durationMs = Date.now() - startedAt;
@@ -100,41 +122,10 @@ export class RequestLoggingInterceptor implements NestInterceptor {
               });
             }),
             catchError((error: unknown) => {
-              const durationMs = Date.now() - startedAt;
-              const status = this.extractStatusCode(error, response);
-              const msg = `← ${status} ${request.method} ${request.originalUrl ?? request.url}`;
-              const data = { status, durationMs };
-
-              // Tiered log level matching ScimExceptionFilter (P9):
-              //   5xx → ERROR, 401/403 → WARN, 404 → DEBUG, other 4xx → INFO, unknown → ERROR
-              if (status && status >= 500) {
-                this.scimLogger.error(LogCategory.HTTP, msg, error, data);
-              } else if (status === 401 || status === 403) {
-                this.scimLogger.warn(LogCategory.HTTP, msg, data);
-              } else if (status === 404) {
-                this.scimLogger.debug(LogCategory.HTTP, msg, data);
-              } else if (status && status >= 400) {
-                this.scimLogger.info(LogCategory.HTTP, msg, data);
-              } else {
-                this.scimLogger.error(LogCategory.HTTP, msg, error, data);
-              }
-
-              // Derive the response body that the exception filter will send
-              const errorResponseBody = this.buildErrorResponseBody(error);
-
-              // Persist to database
-              void this.loggingService.recordRequest({
-                method: request.method,
-                url: request.originalUrl ?? request.url,
-                status,
-                durationMs,
-                requestHeaders: { ...request.headers },
-                requestBody: request.body,
-                responseHeaders: response.getHeaders() as Record<string, unknown>,
-                responseBody: errorResponseBody,
-                error,
-                endpointId,
-              });
+              // Error DB persistence + logging is handled by the exception
+              // filters (ScimExceptionFilter / GlobalExceptionFilter) which
+              // have access to the ACTUAL response body they build.
+              // The filters read timing metadata from REQUEST_LOGGING_META_KEY.
               throw error;
             })
           ).subscribe(subscriber);
@@ -143,50 +134,4 @@ export class RequestLoggingInterceptor implements NestInterceptor {
     });
   }
 
-  private extractStatusCode(error: unknown, response: Response): number | undefined {
-    if (typeof (error as { status?: number })?.status === 'number') {
-      return (error as { status?: number }).status;
-    }
-
-    return response.statusCode;
-  }
-
-  /**
-   * Reconstruct the SCIM error response body that the exception filter will
-   * send. This mirrors the logic in ScimExceptionFilter so that the log entry
-   * contains the actual response payload the client receives.
-   */
-  private buildErrorResponseBody(error: unknown): Record<string, unknown> | undefined {
-    if (!(error instanceof HttpException)) {
-      // Non-HttpException errors - the GlobalExceptionFilter produces a generic body
-      const msg = error instanceof Error ? error.message : String(error);
-      return {
-        schemas: [SCIM_ERROR_SCHEMA],
-        detail: msg || 'Internal server error',
-        status: '500',
-      };
-    }
-
-    const status = error.getStatus();
-    const exceptionResponse = error.getResponse();
-
-    if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
-      const raw = exceptionResponse as Record<string, unknown>;
-      // If already a SCIM-formatted body, return as-is
-      if (Array.isArray(raw.schemas) && (raw.schemas as string[]).includes(SCIM_ERROR_SCHEMA)) {
-        return { ...raw, status: String(raw.status ?? status) };
-      }
-      return {
-        schemas: [SCIM_ERROR_SCHEMA],
-        detail: (raw.message ?? raw.error ?? error.message) as string,
-        status: String(status),
-      };
-    }
-
-    return {
-      schemas: [SCIM_ERROR_SCHEMA],
-      detail: typeof exceptionResponse === 'string' ? exceptionResponse : error.message,
-      status: String(status),
-    };
-  }
 }

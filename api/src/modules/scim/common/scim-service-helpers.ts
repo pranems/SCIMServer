@@ -941,7 +941,12 @@ export class ScimSchemaHelpers {
           status: 400,
           scimType: result.errors[0]?.scimType ?? 'invalidValue',
           detail: `Schema validation failed: ${details}`,
-          diagnostics: { errorCode: 'VALIDATION_SCHEMA', triggeredBy: 'RequiredAttributeCheck' },
+          diagnostics: {
+            errorCode: 'VALIDATION_SCHEMA',
+            triggeredBy: 'RequiredAttributeCheck',
+            attributePaths: result.errors.map((e) => e.path),
+            activeConfig: { StrictSchemaValidation: false },
+          },
         });
       }
       return;
@@ -962,7 +967,12 @@ export class ScimSchemaHelpers {
         status: 400,
         scimType: result.errors[0]?.scimType ?? 'invalidValue',
         detail: `Schema validation failed: ${details}`,
-        diagnostics: { errorCode: 'VALIDATION_SCHEMA', triggeredBy: 'StrictSchemaValidation' },
+        diagnostics: {
+          errorCode: 'VALIDATION_SCHEMA',
+          triggeredBy: 'StrictSchemaValidation',
+          attributePaths: result.errors.map((e) => e.path),
+          activeConfig: { StrictSchemaValidation: true },
+        },
       });
     }
   }
@@ -1288,7 +1298,13 @@ export class ScimSchemaHelpers {
         status: 400,
         scimType: 'invalidFilter',
         detail: `Filter validation failed: ${details}`,
-        diagnostics: { errorCode: 'VALIDATION_FILTER', triggeredBy: 'StrictSchemaValidation' },
+        diagnostics: {
+          errorCode: 'VALIDATION_FILTER',
+          triggeredBy: 'StrictSchemaValidation',
+          attributePaths: result.errors.map((e) => e.path),
+          activeConfig: { StrictSchemaValidation: true },
+          filterExpression: filter,
+        },
       });
     }
   }
@@ -1412,6 +1428,7 @@ export class ScimSchemaHelpers {
         diagnostics: {
           errorCode: 'VALIDATION_IMMUTABLE',
           attributePath: result.errors[0]?.path,
+          attributePaths: result.errors.map((e) => e.path),
         },
       });
     }
@@ -1545,7 +1562,7 @@ export function assertSchemaUniqueness(
 
       if (uniquenessValuesMatch(incomingValue, existingValue, desc.caseExact)) {
         const attrPath = desc.schemaUrn
-          ? `${desc.schemaUrn}:${desc.attrName}`
+          ? `${desc.schemaUrn}.${desc.attrName}`
           : desc.attrName;
         throw createScimError({
           status: 409,

@@ -1,7 +1,6 @@
-import { CallHandler, ExecutionContext, HttpException, NotFoundException, ConflictException } from '@nestjs/common';
+import { CallHandler, ExecutionContext } from '@nestjs/common';
 import { of, throwError } from 'rxjs';
-import { RequestLoggingInterceptor } from './request-logging.interceptor';
-import { SCIM_ERROR_SCHEMA } from '../scim/common/scim-constants';
+import { RequestLoggingInterceptor, REQUEST_LOGGING_META_KEY } from './request-logging.interceptor';
 
 describe('RequestLoggingInterceptor', () => {
   let interceptor: RequestLoggingInterceptor;
@@ -158,7 +157,7 @@ describe('RequestLoggingInterceptor', () => {
     });
   });
 
-  it('should pass endpointId to recordRequest on error', (done) => {
+  it('should NOT call recordRequest on error (delegated to exception filters)', (done) => {
     const { context } = createMockContext({ method: 'GET', url: '/scim/endpoints/ep-err456/Users/bad' });
     const testError = new Error('not found');
     (testError as any).status = 404;
@@ -166,12 +165,7 @@ describe('RequestLoggingInterceptor', () => {
 
     interceptor.intercept(context, handler).subscribe({
       error: () => {
-        expect(mockLoggingService.recordRequest).toHaveBeenCalledWith(
-          expect.objectContaining({
-            url: '/scim/endpoints/ep-err456/Users/bad',
-            endpointId: 'ep-err456',
-          }),
-        );
+        expect(mockLoggingService.recordRequest).not.toHaveBeenCalled();
         done();
       },
     });
@@ -190,7 +184,7 @@ describe('RequestLoggingInterceptor', () => {
     });
   });
 
-  it('should log errors and re-throw them', (done) => {
+  it('should re-throw errors without calling recordRequest or logging', (done) => {
     const { context } = createMockContext({ method: 'POST', url: '/scim/Users' });
     const testError = new Error('Test error');
     const handler: CallHandler = { handle: () => throwError(() => testError) };
@@ -198,90 +192,65 @@ describe('RequestLoggingInterceptor', () => {
     interceptor.intercept(context, handler).subscribe({
       error: (err) => {
         expect(err).toBe(testError);
-        expect(mockScimLogger.error).toHaveBeenCalled();
-        expect(mockLoggingService.recordRequest).toHaveBeenCalledWith(
-          expect.objectContaining({
-            method: 'POST',
-            url: '/scim/Users',
-            error: testError,
-          }),
-        );
+        // Error logging + DB persistence is now handled by exception filters
+        expect(mockLoggingService.recordRequest).not.toHaveBeenCalled();
         done();
       },
     });
   });
 
-  describe('catchError log level should match status code (P9)', () => {
-    function createHttpError(status: number): Error & { status: number; getStatus?: () => number } {
-      const err = new Error(`HTTP ${status}`) as Error & { status: number; getStatus?: () => number };
-      err.status = status;
-      err.getStatus = () => status;
-      return err;
-    }
+  // ── Metadata stashing for exception filters ─────────────────────────
 
-    it('should log 404 at DEBUG, not ERROR', (done) => {
-      const { context } = createMockContext({ method: 'GET', url: '/scim/Users/nonexistent' });
-      const handler: CallHandler = { handle: () => throwError(() => createHttpError(404)) };
+  describe('request metadata stashing', () => {
+    it('should stash timing metadata on request for exception filters', (done) => {
+      const { context, request } = createMockContext({
+        method: 'POST',
+        url: '/scim/endpoints/ep-meta/Users',
+        body: { userName: 'test@example.com' },
+      });
+      const handler: CallHandler = { handle: () => of({ id: 'u1' }) };
 
       interceptor.intercept(context, handler).subscribe({
-        error: () => {
-          expect(mockScimLogger.debug).toHaveBeenCalledWith(
-            expect.any(String),
-            expect.stringContaining('404'),
-            expect.any(Object),
-          );
-          expect(mockScimLogger.error).not.toHaveBeenCalled();
+        complete: () => {
+          const meta = request[REQUEST_LOGGING_META_KEY];
+          expect(meta).toBeDefined();
+          expect(meta.startedAt).toEqual(expect.any(Number));
+          expect(meta.requestBody).toEqual({ userName: 'test@example.com' });
+          expect(meta.endpointId).toBe('ep-meta');
+          expect(meta.requestHeaders).toBeDefined();
           done();
         },
       });
     });
 
-    it('should log 401 at WARN, not ERROR', (done) => {
-      const { context } = createMockContext({ method: 'GET', url: '/scim/Users' });
-      const handler: CallHandler = { handle: () => throwError(() => createHttpError(401)) };
+    it('should stash metadata even when request errors', (done) => {
+      const { context, request } = createMockContext({
+        method: 'POST',
+        url: '/scim/endpoints/ep-err/Users',
+        body: { userName: 'dupe@example.com' },
+      });
+      const handler: CallHandler = { handle: () => throwError(() => new Error('conflict')) };
 
       interceptor.intercept(context, handler).subscribe({
         error: () => {
-          expect(mockScimLogger.warn).toHaveBeenCalledWith(
-            expect.any(String),
-            expect.stringContaining('401'),
-            expect.any(Object),
-          );
-          expect(mockScimLogger.error).not.toHaveBeenCalled();
+          const meta = request[REQUEST_LOGGING_META_KEY];
+          expect(meta).toBeDefined();
+          expect(meta.startedAt).toEqual(expect.any(Number));
+          expect(meta.requestBody).toEqual({ userName: 'dupe@example.com' });
+          expect(meta.endpointId).toBe('ep-err');
           done();
         },
       });
     });
 
-    it('should log 400 at INFO, not ERROR', (done) => {
-      const { context } = createMockContext({ method: 'POST', url: '/scim/Users' });
-      const handler: CallHandler = { handle: () => throwError(() => createHttpError(400)) };
+    it('should have undefined endpointId in metadata for non-endpoint URLs', (done) => {
+      const { context, request } = createMockContext({ url: '/scim/ServiceProviderConfig' });
+      const handler: CallHandler = { handle: () => of({}) };
 
       interceptor.intercept(context, handler).subscribe({
-        error: () => {
-          expect(mockScimLogger.info).toHaveBeenCalledWith(
-            expect.any(String),
-            expect.stringContaining('400'),
-            expect.any(Object),
-          );
-          expect(mockScimLogger.error).not.toHaveBeenCalled();
-          done();
-        },
-      });
-    });
-
-    it('should log 500 at ERROR', (done) => {
-      const { context } = createMockContext({ method: 'POST', url: '/scim/Users' });
-      const handler: CallHandler = { handle: () => throwError(() => createHttpError(500)) };
-
-      interceptor.intercept(context, handler).subscribe({
-        error: () => {
-          expect(mockScimLogger.error).toHaveBeenCalledWith(
-            expect.any(String),
-            expect.stringContaining('500'),
-            expect.any(Object),
-            expect.any(Object),
-          );
+        complete: () => {
+          const meta = request[REQUEST_LOGGING_META_KEY];
+          expect(meta.endpointId).toBeUndefined();
           done();
         },
       });
@@ -343,65 +312,6 @@ describe('RequestLoggingInterceptor', () => {
         expect(result).toEqual(responseBody);
       },
       complete: () => done(),
-    });
-  });
-
-  // ── Error response body capture ──────────────────────────────────────
-
-  describe('error response body capture', () => {
-    it('should include SCIM error responseBody for HttpException errors', (done) => {
-      const { context } = createMockContext({ method: 'POST', url: '/scim/Users' });
-      const err = new ConflictException({
-        schemas: [SCIM_ERROR_SCHEMA],
-        detail: 'User already exists',
-        status: '409',
-        scimType: 'uniqueness',
-      });
-      const handler: CallHandler = { handle: () => throwError(() => err) };
-
-      interceptor.intercept(context, handler).subscribe({
-        error: () => {
-          const call = mockLoggingService.recordRequest.mock.calls[0][0];
-          expect(call.responseBody).toBeDefined();
-          expect(call.responseBody.schemas).toContain(SCIM_ERROR_SCHEMA);
-          expect(call.responseBody.detail).toBe('User already exists');
-          expect(call.responseBody.status).toBe('409');
-          done();
-        },
-      });
-    });
-
-    it('should build SCIM error responseBody for non-SCIM HttpException', (done) => {
-      const { context } = createMockContext({ method: 'GET', url: '/scim/Users/nonexistent' });
-      const err = new NotFoundException('Resource not found');
-      const handler: CallHandler = { handle: () => throwError(() => err) };
-
-      interceptor.intercept(context, handler).subscribe({
-        error: () => {
-          const call = mockLoggingService.recordRequest.mock.calls[0][0];
-          expect(call.responseBody).toBeDefined();
-          expect(call.responseBody.schemas).toContain(SCIM_ERROR_SCHEMA);
-          expect(call.responseBody.status).toBe('404');
-          done();
-        },
-      });
-    });
-
-    it('should build generic error responseBody for non-HttpException errors', (done) => {
-      const { context } = createMockContext({ method: 'POST', url: '/scim/Users' });
-      const err = new Error('Database connection lost');
-      const handler: CallHandler = { handle: () => throwError(() => err) };
-
-      interceptor.intercept(context, handler).subscribe({
-        error: () => {
-          const call = mockLoggingService.recordRequest.mock.calls[0][0];
-          expect(call.responseBody).toBeDefined();
-          expect(call.responseBody.schemas).toContain(SCIM_ERROR_SCHEMA);
-          expect(call.responseBody.detail).toBe('Database connection lost');
-          expect(call.responseBody.status).toBe('500');
-          done();
-        },
-      });
     });
   });
 });

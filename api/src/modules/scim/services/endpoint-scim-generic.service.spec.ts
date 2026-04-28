@@ -1387,6 +1387,241 @@ describe('EndpointScimGenericService', () => {
     });
   });
 
+  // ─── Structured attributePaths in validation diagnostics ────────────
+
+  describe('attributePaths in validation error diagnostics', () => {
+    const deviceSchemaForValidation = {
+      id: 'urn:ietf:params:scim:schemas:core:2.0:Device',
+      name: 'Device',
+      attributes: [
+        { name: 'displayName', type: 'string', multiValued: false, required: true, mutability: 'readWrite', returned: 'default' },
+        { name: 'serialNumber', type: 'string', multiValued: false, required: false, mutability: 'immutable', returned: 'default' },
+        { name: 'active', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite', returned: 'default' },
+      ],
+    };
+
+    const extSchema = {
+      id: 'urn:example:extension:2.0:Device',
+      name: 'ExampleDeviceExtension',
+      attributes: [
+        { name: 'location', type: 'string', multiValued: false, required: false, mutability: 'readWrite', returned: 'default' },
+      ],
+    };
+
+    const deviceRTWithExt: ScimResourceType = {
+      ...deviceResourceType,
+      schemaExtensions: [{ schema: extSchema.id, required: false }],
+    };
+
+    function setupValidationProfile(): void {
+      const mockStorage = service['endpointContext'] as any;
+      mockStorage.getProfile = jest.fn().mockReturnValue({
+        schemas: [deviceSchemaForValidation, extSchema],
+        resourceTypes: [{
+          name: 'Device', endpoint: '/Devices', schema: deviceSchemaForValidation.id,
+          schemaExtensions: [{ schema: extSchema.id, required: false }],
+        }],
+      });
+    }
+
+    it('should include attributePaths in strict schema validation errors (CREATE)', async () => {
+      setupValidationProfile();
+      const config: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+      };
+
+      mockGenericRepo.findAll.mockResolvedValue([]);
+
+      try {
+        await service.createResource(
+          {
+            schemas: [deviceSchemaForValidation.id],
+            displayName: 'Test Device',
+            unknownField1: 'value1',
+            unknownField2: 'value2',
+          },
+          baseUrl, endpointId, deviceResourceType, config,
+        );
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+        const body = e.getResponse();
+        const diag = body[SCIM_DIAGNOSTICS_URN];
+        expect(diag).toBeDefined();
+        expect(diag.errorCode).toBe('VALIDATION_SCHEMA');
+        expect(diag.triggeredBy).toBe('StrictSchemaValidation');
+        // NEW: attributePaths should contain all failing paths
+        expect(diag.attributePaths).toBeDefined();
+        expect(Array.isArray(diag.attributePaths)).toBe(true);
+        expect(diag.attributePaths.length).toBeGreaterThanOrEqual(2);
+        expect(diag.attributePaths).toContain('unknownField1');
+        expect(diag.attributePaths).toContain('unknownField2');
+        // attributePath should be the first error's path
+        expect(diag.attributePath).toBeDefined();
+      }
+    });
+
+    it('should include attributePaths in immutable attribute violation errors (REPLACE)', async () => {
+      setupValidationProfile();
+      const config: EndpointConfig = {};
+
+      const existingRecord: GenericResourceRecord = {
+        ...mockGenericRecord,
+        rawPayload: JSON.stringify({
+          displayName: 'Test Device',
+          serialNumber: 'SN-ORIGINAL',
+        }),
+      };
+      mockGenericRepo.findByScimId.mockResolvedValue(existingRecord);
+      mockGenericRepo.update.mockResolvedValue(existingRecord);
+
+      try {
+        await service.replaceResource(
+          mockGenericRecord.scimId,
+          {
+            schemas: [deviceSchemaForValidation.id],
+            displayName: 'Test Device',
+            serialNumber: 'SN-CHANGED', // immutable attribute changed
+          },
+          baseUrl, endpointId, deviceResourceType, config,
+        );
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+        const body = e.getResponse();
+        const diag = body[SCIM_DIAGNOSTICS_URN];
+        expect(diag).toBeDefined();
+        expect(diag.errorCode).toBe('VALIDATION_IMMUTABLE');
+        // NEW: attributePaths should contain all immutable violations
+        expect(diag.attributePaths).toBeDefined();
+        expect(diag.attributePaths).toContain('serialNumber');
+        expect(diag.attributePath).toBe('serialNumber');
+      }
+    });
+
+    it('should include attributePaths in required attribute validation errors', async () => {
+      setupValidationProfile();
+      const config: EndpointConfig = {
+        // non-strict mode - only required checks run
+        [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: false,
+      };
+
+      mockGenericRepo.findAll.mockResolvedValue([]);
+
+      try {
+        await service.createResource(
+          {
+            schemas: [deviceSchemaForValidation.id],
+            // displayName is required but missing
+            serialNumber: 'SN-001',
+          },
+          baseUrl, endpointId, deviceResourceType, config,
+        );
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+        const body = e.getResponse();
+        const diag = body[SCIM_DIAGNOSTICS_URN];
+        expect(diag).toBeDefined();
+        expect(diag.errorCode).toBe('VALIDATION_SCHEMA');
+        expect(diag.triggeredBy).toBe('RequiredAttributeCheck');
+        // NEW: attributePaths should contain the missing required paths
+        expect(diag.attributePaths).toBeDefined();
+        expect(diag.attributePaths).toContain('displayName');
+        expect(diag.attributePath).toBe('displayName');
+      }
+    });
+
+    it('should include schemaUrn for extension attribute errors', async () => {
+      setupValidationProfile();
+      const config: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+      };
+
+      mockGenericRepo.findAll.mockResolvedValue([]);
+
+      try {
+        await service.createResource(
+          {
+            schemas: [deviceSchemaForValidation.id, extSchema.id],
+            displayName: 'Test',
+            [extSchema.id]: {
+              location: 'Building A',
+              bogusExtAttr: 'should fail',
+            },
+          },
+          baseUrl, endpointId, deviceRTWithExt, config,
+        );
+        fail('should have thrown');
+      } catch (e: any) {
+        expect(e.getStatus()).toBe(400);
+        const body = e.getResponse();
+        const diag = body[SCIM_DIAGNOSTICS_URN];
+        expect(diag).toBeDefined();
+        expect(diag.errorCode).toBe('VALIDATION_SCHEMA');
+        // NEW: attributePaths should contain URN-qualified path
+        expect(diag.attributePaths).toBeDefined();
+        expect(diag.attributePaths.length).toBeGreaterThanOrEqual(1);
+        // Path should use dot notation with URN prefix
+        const path = diag.attributePaths[0];
+        expect(path).toContain(extSchema.id);
+        expect(path).toContain('bogusExtAttr');
+      }
+    });
+
+    it('should include activeConfig in strict schema validation diagnostics', async () => {
+      setupValidationProfile();
+      const config: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: true,
+      };
+
+      mockGenericRepo.findAll.mockResolvedValue([]);
+
+      try {
+        await service.createResource(
+          {
+            schemas: [deviceSchemaForValidation.id],
+            displayName: 'Test',
+            unknownField: 'value',
+          },
+          baseUrl, endpointId, deviceResourceType, config,
+        );
+        fail('should have thrown');
+      } catch (e: any) {
+        const body = e.getResponse();
+        const diag = body[SCIM_DIAGNOSTICS_URN];
+        expect(diag.activeConfig).toBeDefined();
+        expect(diag.activeConfig.StrictSchemaValidation).toBe(true);
+      }
+    });
+
+    it('should include activeConfig in required attribute validation diagnostics', async () => {
+      setupValidationProfile();
+      const config: EndpointConfig = {
+        [ENDPOINT_CONFIG_FLAGS.STRICT_SCHEMA_VALIDATION]: false,
+      };
+
+      mockGenericRepo.findAll.mockResolvedValue([]);
+
+      try {
+        await service.createResource(
+          {
+            schemas: [deviceSchemaForValidation.id],
+            // displayName is required but missing
+            serialNumber: 'SN-001',
+          },
+          baseUrl, endpointId, deviceResourceType, config,
+        );
+        fail('should have thrown');
+      } catch (e: any) {
+        const body = e.getResponse();
+        const diag = body[SCIM_DIAGNOSTICS_URN];
+        expect(diag.activeConfig).toBeDefined();
+        expect(diag.activeConfig.StrictSchemaValidation).toBe(false);
+      }
+    });
+  });
+
   // ─── G8h: PrimaryEnforcement on generic resources ────────────────────
 
   describe('G8h: PrimaryEnforcement on generic resources', () => {

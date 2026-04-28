@@ -2,6 +2,8 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import { GlobalExceptionFilter } from './global-exception.filter';
 import { SCIM_ERROR_SCHEMA, SCIM_DIAGNOSTICS_URN } from '../common/scim-constants';
 import { ScimLogger } from '../../logging/scim-logger.service';
+import { LoggingService } from '../../logging/logging.service';
+import { REQUEST_LOGGING_META_KEY } from '../../logging/request-logging.interceptor';
 import * as scimLoggerModule from '../../logging/scim-logger.service';
 
 describe('GlobalExceptionFilter', () => {
@@ -10,8 +12,10 @@ describe('GlobalExceptionFilter', () => {
     status: jest.Mock;
     setHeader: jest.Mock;
     json: jest.Mock;
+    getHeaders: jest.Mock;
   };
   let mockHost: any;
+  let mockLoggingService: { recordRequest: jest.Mock };
 
   const mockScimLogger = {
     trace: jest.fn(),
@@ -25,19 +29,37 @@ describe('GlobalExceptionFilter', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    filter = new GlobalExceptionFilter(mockScimLogger as unknown as ScimLogger);
+    mockLoggingService = { recordRequest: jest.fn() };
+    filter = new GlobalExceptionFilter(
+      mockScimLogger as unknown as ScimLogger,
+      mockLoggingService as unknown as LoggingService,
+    );
     mockResponse = {
       status: jest.fn().mockReturnThis(),
       setHeader: jest.fn().mockReturnThis(),
       json: jest.fn().mockReturnThis(),
+      getHeaders: jest.fn().mockReturnValue({}),
     };
   });
 
   function createHost(url: string = '/scim/endpoints/ep-123/Users'): any {
+    const request: any = {
+      originalUrl: url,
+      url,
+      method: 'POST',
+      headers: { 'user-agent': 'test' },
+      body: {},
+      [REQUEST_LOGGING_META_KEY]: {
+        startedAt: Date.now() - 25,
+        requestHeaders: { 'user-agent': 'test' },
+        requestBody: {},
+        endpointId: url.match(/\/endpoints\/([^/]+)/)?.[1],
+      },
+    };
     return {
       switchToHttp: () => ({
         getResponse: () => mockResponse,
-        getRequest: () => ({ originalUrl: url, url, method: 'POST' }),
+        getRequest: () => request,
       }),
       getArgs: () => [],
       getArgByIndex: () => undefined,
@@ -298,6 +320,56 @@ describe('GlobalExceptionFilter', () => {
 
       const body = mockResponse.json.mock.calls[0][0];
       expect(body[SCIM_DIAGNOSTICS_URN]).toBeUndefined();
+    });
+  });
+
+  // ── Error request log persistence ──────────────────────────────────
+
+  describe('error request log persistence', () => {
+    it('should call recordRequest with the SCIM 500 error body for SCIM routes', () => {
+      const error = new Error('Unexpected null reference');
+      const host = createHost('/scim/endpoints/ep-123/Users');
+
+      filter.catch(error, host);
+
+      expect(mockLoggingService.recordRequest).toHaveBeenCalledTimes(1);
+      const call = mockLoggingService.recordRequest.mock.calls[0][0];
+      expect(call.status).toBe(500);
+      expect(call.responseBody).toBeDefined();
+      expect(call.responseBody.schemas).toContain(SCIM_ERROR_SCHEMA);
+      expect(call.responseBody.detail).toBe('Internal server error');
+      expect(call.responseBody.status).toBe('500');
+    });
+
+    it('should include timing metadata from interceptor', () => {
+      const error = new TypeError('Cannot read properties');
+      const host = createHost('/scim/endpoints/ep-timing/Users');
+
+      filter.catch(error, host);
+
+      const call = mockLoggingService.recordRequest.mock.calls[0][0];
+      expect(call.durationMs).toBeGreaterThanOrEqual(0);
+      expect(call.endpointId).toBe('ep-timing');
+      expect(call.method).toBe('POST');
+    });
+
+    it('should NOT call recordRequest for non-SCIM routes', () => {
+      const error = new Error('Static file missing');
+      const host = createHost('/admin/config');
+
+      filter.catch(error, host);
+
+      expect(mockLoggingService.recordRequest).not.toHaveBeenCalled();
+    });
+
+    it('should pass the error object to recordRequest', () => {
+      const error = new Error('DB connection lost');
+      const host = createHost('/scim/Users');
+
+      filter.catch(error, host);
+
+      const call = mockLoggingService.recordRequest.mock.calls[0][0];
+      expect(call.error).toBe(error);
     });
   });
 });

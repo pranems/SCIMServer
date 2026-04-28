@@ -214,6 +214,165 @@ describe('createScimError', () => {
       expect(diag.triggeredBy).toBeUndefined();
     });
 
+    // ── Phase 1: attributePaths + schemaUrn enrichment ─────────────────
+
+    it('should include attributePaths array in diagnostics when provided', () => {
+      const err = createScimError({
+        status: 400,
+        detail: 'Schema validation failed',
+        diagnostics: {
+          errorCode: 'VALIDATION_SCHEMA',
+          triggeredBy: 'StrictSchemaValidation',
+          attributePaths: [
+            'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User.costCenter',
+            'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User.organization',
+          ],
+        },
+      });
+      const body = err.getResponse() as Record<string, unknown>;
+      const diag = body[DIAGNOSTICS_URN] as Record<string, unknown>;
+      expect(diag).toBeDefined();
+      expect(diag.attributePaths).toEqual([
+        'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User.costCenter',
+        'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User.organization',
+      ]);
+    });
+
+    it('should set attributePath to first element of attributePaths when attributePath not explicitly set', () => {
+      const err = createScimError({
+        status: 400,
+        detail: 'Schema validation failed',
+        diagnostics: {
+          errorCode: 'VALIDATION_SCHEMA',
+          attributePaths: ['emails[0].type', 'name.givenName'],
+        },
+      });
+      const body = err.getResponse() as Record<string, unknown>;
+      const diag = body[DIAGNOSTICS_URN] as Record<string, unknown>;
+      expect(diag.attributePath).toBe('emails[0].type');
+      expect(diag.attributePaths).toEqual(['emails[0].type', 'name.givenName']);
+    });
+
+    it('should NOT override explicit attributePath when attributePaths also provided', () => {
+      const err = createScimError({
+        status: 400,
+        detail: 'Immutable violation',
+        diagnostics: {
+          errorCode: 'VALIDATION_IMMUTABLE',
+          attributePath: 'externalId',
+          attributePaths: ['externalId', 'userName'],
+        },
+      });
+      const body = err.getResponse() as Record<string, unknown>;
+      const diag = body[DIAGNOSTICS_URN] as Record<string, unknown>;
+      expect(diag.attributePath).toBe('externalId');
+      expect(diag.attributePaths).toEqual(['externalId', 'userName']);
+    });
+
+    it('should include schemaUrn in diagnostics when provided', () => {
+      const err = createScimError({
+        status: 400,
+        detail: 'Schema validation failed',
+        diagnostics: {
+          errorCode: 'VALIDATION_SCHEMA',
+          schemaUrn: 'urn:ietf:params:scim:schemas:extension:enterprise:2.0:User',
+        },
+      });
+      const body = err.getResponse() as Record<string, unknown>;
+      const diag = body[DIAGNOSTICS_URN] as Record<string, unknown>;
+      expect(diag.schemaUrn).toBe('urn:ietf:params:scim:schemas:extension:enterprise:2.0:User');
+    });
+
+    it('should omit attributePaths from diagnostics when empty array provided', () => {
+      const err = createScimError({
+        status: 400,
+        detail: 'test',
+        diagnostics: {
+          errorCode: 'VALIDATION_SCHEMA',
+          attributePaths: [],
+        },
+      });
+      const body = err.getResponse() as Record<string, unknown>;
+      const diag = body[DIAGNOSTICS_URN] as Record<string, unknown>;
+      expect(diag.attributePaths).toBeUndefined();
+    });
+
+    it('should include single-element attributePaths and set attributePath', () => {
+      const err = createScimError({
+        status: 400,
+        detail: 'test',
+        diagnostics: {
+          errorCode: 'VALIDATION_IMMUTABLE',
+          attributePaths: ['userName'],
+        },
+      });
+      const body = err.getResponse() as Record<string, unknown>;
+      const diag = body[DIAGNOSTICS_URN] as Record<string, unknown>;
+      expect(diag.attributePath).toBe('userName');
+      expect(diag.attributePaths).toEqual(['userName']);
+    });
+
+    // ── Phase 3: activeConfig snapshot ───────────────────────────────
+
+    it('should include activeConfig in diagnostics when provided', () => {
+      const err = createScimError({
+        status: 400,
+        detail: 'Schema validation failed',
+        diagnostics: {
+          errorCode: 'VALIDATION_SCHEMA',
+          triggeredBy: 'StrictSchemaValidation',
+          activeConfig: {
+            StrictSchemaValidation: true,
+            IgnoreReadOnlyAttributesInPatch: false,
+          },
+        },
+      });
+      const body = err.getResponse() as Record<string, unknown>;
+      const diag = body[DIAGNOSTICS_URN] as Record<string, unknown>;
+      expect(diag.activeConfig).toBeDefined();
+      expect((diag.activeConfig as Record<string, unknown>).StrictSchemaValidation).toBe(true);
+      expect((diag.activeConfig as Record<string, unknown>).IgnoreReadOnlyAttributesInPatch).toBe(false);
+    });
+
+    it('should omit activeConfig when not provided', () => {
+      const err = createScimError({
+        status: 400,
+        detail: 'test',
+        diagnostics: { errorCode: 'VALIDATION_SCHEMA' },
+      });
+      const body = err.getResponse() as Record<string, unknown>;
+      const diag = body[DIAGNOSTICS_URN] as Record<string, unknown>;
+      expect(diag.activeConfig).toBeUndefined();
+    });
+
+    // ── Phase 4: filterExpression ────────────────────────────────────
+
+    it('should include filterExpression in diagnostics when provided', () => {
+      const err = createScimError({
+        status: 400,
+        detail: 'Filter validation failed',
+        scimType: 'invalidFilter',
+        diagnostics: {
+          errorCode: 'VALIDATION_FILTER',
+          filterExpression: 'userName eq "test" and bogusAttr pr',
+        },
+      });
+      const body = err.getResponse() as Record<string, unknown>;
+      const diag = body[DIAGNOSTICS_URN] as Record<string, unknown>;
+      expect(diag.filterExpression).toBe('userName eq "test" and bogusAttr pr');
+    });
+
+    it('should omit filterExpression when not provided', () => {
+      const err = createScimError({
+        status: 400,
+        detail: 'test',
+        diagnostics: { errorCode: 'VALIDATION_FILTER' },
+      });
+      const body = err.getResponse() as Record<string, unknown>;
+      const diag = body[DIAGNOSTICS_URN] as Record<string, unknown>;
+      expect(diag.filterExpression).toBeUndefined();
+    });
+
     it('should auto-read operation from correlation context when not in diagnostics (Step 3.3)', () => {
       const ScimLoggerModule = require('../../logging/scim-logger.service');
       const logger = new ScimLoggerModule.ScimLogger();

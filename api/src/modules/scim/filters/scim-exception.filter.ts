@@ -9,6 +9,8 @@ import type { Response, Request } from 'express';
 import { SCIM_ERROR_SCHEMA, SCIM_DIAGNOSTICS_URN } from '../common/scim-constants';
 import { ScimLogger, getCorrelationContext } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
+import { LoggingService } from '../../logging/logging.service';
+import { REQUEST_LOGGING_META_KEY, RequestLoggingMeta } from '../../logging/request-logging.interceptor';
 
 /**
  * Global exception filter for SCIM endpoints.
@@ -26,7 +28,10 @@ import { LogCategory } from '../../logging/log-levels';
  */
 @Catch(HttpException)
 export class ScimExceptionFilter implements ExceptionFilter {
-  constructor(private readonly logger: ScimLogger) {}
+  constructor(
+    private readonly logger: ScimLogger,
+    private readonly loggingService: LoggingService,
+  ) {}
 
   catch(exception: HttpException, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
@@ -123,5 +128,36 @@ export class ScimExceptionFilter implements ExceptionFilter {
       .status(status)
       .setHeader('Content-Type', 'application/scim+json; charset=utf-8')
       .json(body);
+
+    // Persist the error request log with the EXACT response body the client receives
+    this.persistErrorLog(request, response, status, body, exception);
+  }
+
+  /**
+   * Persist the error request to the request log database.
+   * Reads timing metadata stashed by RequestLoggingInterceptor.
+   */
+  private persistErrorLog(
+    request: Request,
+    response: Response,
+    status: number,
+    responseBody: Record<string, unknown>,
+    error: HttpException,
+  ): void {
+    const meta: RequestLoggingMeta | undefined = (request as any)[REQUEST_LOGGING_META_KEY];
+    const durationMs = meta ? Date.now() - meta.startedAt : undefined;
+
+    void this.loggingService.recordRequest({
+      method: request?.method ?? 'UNKNOWN',
+      url: request?.originalUrl ?? request?.url ?? '',
+      status,
+      durationMs,
+      requestHeaders: meta?.requestHeaders ?? { ...(request?.headers ?? {}) },
+      requestBody: meta?.requestBody ?? request?.body,
+      responseHeaders: response.getHeaders() as Record<string, unknown>,
+      responseBody,
+      error,
+      endpointId: meta?.endpointId,
+    });
   }
 }
