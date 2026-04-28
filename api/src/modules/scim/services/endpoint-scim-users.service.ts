@@ -184,7 +184,7 @@ export class EndpointScimUsersService {
         status: 400,
         scimType: 'invalidFilter',
         detail: `Unsupported or invalid filter expression: '${filter}'.`,
-        diagnostics: { errorCode: 'FILTER_INVALID', parseError: (e as Error).message },
+        diagnostics: { errorCode: 'FILTER_INVALID', parseError: (e as Error).message, filterExpression: filter },
       });
     }
 
@@ -496,6 +496,7 @@ export class EndpointScimUsersService {
               failedOperationIndex: opIndex,
               failedPath: op.path,
               failedOp: op.op,
+              attributePaths: preResult.errors.map(e => e.path).filter(Boolean),
             },
           });
         }

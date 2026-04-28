@@ -18,8 +18,10 @@ export interface ScimErrorDiagnostics {
 
   /** SCIM operation that triggered the error: create, replace, patch, delete */
   operation?: string;
-  /** Attribute path (dot-notation or URN-qualified) that caused the error */
+  /** Attribute path (dot-notation or URN-qualified) that caused the error (first path if multiple) */
   attributePath?: string;
+  /** All failing attribute paths when multiple attributes fail validation */
+  attributePaths?: string[];
   /** Schema URN where the failing attribute is defined */
   schemaUrn?: string;
 
@@ -50,6 +52,13 @@ export interface ScimErrorDiagnostics {
 
   /** Original parse error detail (for invalidFilter) */
   parseError?: string;
+  /** Original filter expression string (for structured diagnostics) */
+  filterExpression?: string;
+
+  // ── Config snapshot ───────────────────────────────────────────────
+
+  /** Relevant endpoint config flags active at time of error */
+  activeConfig?: Record<string, unknown>;
 
   /** Additional diagnostic context (catch-all) */
   extra?: Record<string, unknown>;
@@ -102,6 +111,13 @@ export function createScimError({ status, detail, scimType, diagnostics }: ScimE
     // Attribute-level RCA context
     if (diagnostics?.operation) diag.operation = diagnostics.operation;
     else if (ctx?.operation) diag.operation = ctx.operation;
+    if (diagnostics?.attributePaths && diagnostics.attributePaths.length > 0) {
+      diag.attributePaths = diagnostics.attributePaths;
+      // Auto-set attributePath to first path if not explicitly provided
+      if (!diagnostics.attributePath) {
+        diag.attributePath = diagnostics.attributePaths[0];
+      }
+    }
     if (diagnostics?.attributePath) diag.attributePath = diagnostics.attributePath;
     if (diagnostics?.schemaUrn) diag.schemaUrn = diagnostics.schemaUrn;
 
@@ -118,6 +134,12 @@ export function createScimError({ status, detail, scimType, diagnostics }: ScimE
     // ETag / filter context
     if (diagnostics?.currentETag) diag.currentETag = diagnostics.currentETag;
     if (diagnostics?.parseError) diag.parseError = diagnostics.parseError;
+    if (diagnostics?.filterExpression) diag.filterExpression = diagnostics.filterExpression;
+
+    // Config snapshot
+    if (diagnostics?.activeConfig && Object.keys(diagnostics.activeConfig).length > 0) {
+      diag.activeConfig = diagnostics.activeConfig;
+    }
 
     if (diagnostics?.extra) {
       Object.assign(diag, diagnostics.extra);

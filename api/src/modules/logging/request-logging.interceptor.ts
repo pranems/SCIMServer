@@ -13,6 +13,21 @@ import { LoggingService } from './logging.service';
 import { ScimLogger } from './scim-logger.service';
 import { LogCategory } from './log-levels';
 
+/**
+ * Metadata stashed on the request object by the interceptor so that
+ * exception filters can call `recordRequest()` with full timing data
+ * and the **actual** response body they build.
+ */
+export interface RequestLoggingMeta {
+  startedAt: number;
+  requestHeaders: Record<string, unknown>;
+  requestBody: unknown;
+  endpointId?: string;
+}
+
+/** Key used to stash RequestLoggingMeta on the Express request object. */
+export const REQUEST_LOGGING_META_KEY = '__scim_logging_meta';
+
 @Injectable()
 export class RequestLoggingInterceptor implements NestInterceptor {
   constructor(
@@ -59,6 +74,15 @@ export class RequestLoggingInterceptor implements NestInterceptor {
             });
           }
 
+          // Stash timing metadata on request so exception filters can
+          // call recordRequest() with the ACTUAL response body they build.
+          (request as any)[REQUEST_LOGGING_META_KEY] = {
+            startedAt,
+            requestHeaders: { ...request.headers },
+            requestBody: request.body,
+            endpointId,
+          } as RequestLoggingMeta;
+
           next.handle().pipe(
             tap((responseBody: unknown) => {
               const durationMs = Date.now() - startedAt;
@@ -98,37 +122,10 @@ export class RequestLoggingInterceptor implements NestInterceptor {
               });
             }),
             catchError((error: unknown) => {
-              const durationMs = Date.now() - startedAt;
-              const status = this.extractStatusCode(error, response);
-              const msg = `← ${status} ${request.method} ${request.originalUrl ?? request.url}`;
-              const data = { status, durationMs };
-
-              // Tiered log level matching ScimExceptionFilter (P9):
-              //   5xx → ERROR, 401/403 → WARN, 404 → DEBUG, other 4xx → INFO, unknown → ERROR
-              if (status && status >= 500) {
-                this.scimLogger.error(LogCategory.HTTP, msg, error, data);
-              } else if (status === 401 || status === 403) {
-                this.scimLogger.warn(LogCategory.HTTP, msg, data);
-              } else if (status === 404) {
-                this.scimLogger.debug(LogCategory.HTTP, msg, data);
-              } else if (status && status >= 400) {
-                this.scimLogger.info(LogCategory.HTTP, msg, data);
-              } else {
-                this.scimLogger.error(LogCategory.HTTP, msg, error, data);
-              }
-
-              // Persist to database
-              void this.loggingService.recordRequest({
-                method: request.method,
-                url: request.originalUrl ?? request.url,
-                status,
-                durationMs,
-                requestHeaders: { ...request.headers },
-                requestBody: request.body,
-                responseHeaders: response.getHeaders() as Record<string, unknown>,
-                error,
-                endpointId,
-              });
+              // Error DB persistence + logging is handled by the exception
+              // filters (ScimExceptionFilter / GlobalExceptionFilter) which
+              // have access to the ACTUAL response body they build.
+              // The filters read timing metadata from REQUEST_LOGGING_META_KEY.
               throw error;
             })
           ).subscribe(subscriber);
@@ -137,11 +134,4 @@ export class RequestLoggingInterceptor implements NestInterceptor {
     });
   }
 
-  private extractStatusCode(error: unknown, response: Response): number | undefined {
-    if (typeof (error as { status?: number })?.status === 'number') {
-      return (error as { status?: number }).status;
-    }
-
-    return response.statusCode;
-  }
 }

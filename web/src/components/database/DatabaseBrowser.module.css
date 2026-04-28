@@ -95,7 +95,7 @@
 /* Statistics Tab Styles */
 .statisticsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 20px;
   margin-bottom: 24px;
 }
@@ -123,11 +123,137 @@
   gap: 8px;
 }
 
+/* Stat card internal layout - used by StatisticsTab.tsx */
+.statHeader {
+  margin-bottom: 4px;
+}
+
+.statContent {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.statMain {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.statNumber {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--accent-primary);
+  line-height: 1;
+}
+
+.statLabel {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.statBreakdown {
+  display: flex;
+  gap: 20px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+}
+
+.statItem {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
 .statValue {
   font-size: 32px;
   font-weight: 700;
   color: var(--accent-primary);
   margin: 0 0 8px 0;
+}
+
+.statLabelSmall {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.statNote {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 193, 7, 0.15);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 6px;
+  color: #ffc107;
+  font-size: 13px;
+}
+
+/* Active/inactive color coding on stat breakdown */
+.statItemActive .statValue,
+.statItemActive .statNumber {
+  color: #28a745;
+}
+
+.statItemInactive .statValue,
+.statItemInactive .statNumber {
+  color: #dc3545;
+}
+
+/* Clickable stat items */
+.statClickable {
+  cursor: pointer;
+  padding: 4px 8px;
+  margin: -4px -8px;
+  border-radius: 6px;
+  transition: background-color 0.15s ease;
+}
+
+.statClickable:hover {
+  background: var(--background-hover);
+}
+
+/* Refresh header */
+.statsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.refreshInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.refreshButton {
+  background: transparent;
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.refreshButton:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.refreshButton.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .statSubtitle {
@@ -641,7 +767,6 @@
   .statisticsGrid {
     grid-template-columns: 1fr;
   }
-
   .pagination {
     flex-direction: column;
     gap: 12px;

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { UsersTab } from './UsersTab';
 import { GroupsTab } from './GroupsTab';
 import { StatisticsTab } from './StatisticsTab';
@@ -48,6 +48,16 @@ interface Statistics {
 
 type TabType = 'statistics' | 'users' | 'groups';
 
+// Debounce hook - delays value updates to reduce API calls during typing
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+  return debounced;
+}
+
 export const DatabaseBrowser: React.FC = () => {
   const { token } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('statistics');
@@ -57,6 +67,8 @@ export const DatabaseBrowser: React.FC = () => {
   const [usersLoading, setUsersLoading] = useState(false);
   const [groupsLoading, setGroupsLoading] = useState(false);
   const [statisticsLoading, setStatisticsLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Modal state
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
@@ -83,8 +95,17 @@ export const DatabaseBrowser: React.FC = () => {
   });
   const [groupsSearchTerm, setGroupsSearchTerm] = useState('');
 
-  const fetchUsers = async () => {
-    if (!token) {
+  // Debounce search inputs (300ms) to avoid firing API calls per keystroke
+  const debouncedUsersSearch = useDebouncedValue(usersSearchTerm, 300);
+  const debouncedGroupsSearch = useDebouncedValue(groupsSearchTerm, 300);
+
+  // Use refs for fetch functions so intervals always call latest version
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
+
+  const fetchUsers = useCallback(async () => {
+    const currentToken = tokenRef.current;
+    if (!currentToken) {
       setUsers([]);
       setUsersLoading(false);
       return;
@@ -97,10 +118,10 @@ export const DatabaseBrowser: React.FC = () => {
         limit: usersPagination.limit.toString(),
       });
 
-      if (usersSearchTerm) params.append('search', usersSearchTerm);
+      if (debouncedUsersSearch) params.append('search', debouncedUsersSearch);
       if (usersActiveFilter) params.append('active', usersActiveFilter);
       const response = await fetch(`/scim/admin/database/users?${params}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${currentToken}` }
       });
       if (!response.ok) throw new Error('Failed to fetch users');
 
@@ -112,10 +133,11 @@ export const DatabaseBrowser: React.FC = () => {
     } finally {
       setUsersLoading(false);
     }
-  };
+  }, [usersPagination.page, usersPagination.limit, debouncedUsersSearch, usersActiveFilter]);
 
-  const fetchGroups = async () => {
-    if (!token) {
+  const fetchGroups = useCallback(async () => {
+    const currentToken = tokenRef.current;
+    if (!currentToken) {
       setGroups([]);
       setGroupsLoading(false);
       return;
@@ -128,9 +150,9 @@ export const DatabaseBrowser: React.FC = () => {
         limit: groupsPagination.limit.toString(),
       });
 
-      if (groupsSearchTerm) params.append('search', groupsSearchTerm);
+      if (debouncedGroupsSearch) params.append('search', debouncedGroupsSearch);
       const response = await fetch(`/scim/admin/database/groups?${params}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${currentToken}` }
       });
       if (!response.ok) throw new Error('Failed to fetch groups');
 
@@ -142,10 +164,11 @@ export const DatabaseBrowser: React.FC = () => {
     } finally {
       setGroupsLoading(false);
     }
-  };
+  }, [groupsPagination.page, groupsPagination.limit, debouncedGroupsSearch]);
 
-  const fetchStatistics = async () => {
-    if (!token) {
+  const fetchStatistics = useCallback(async () => {
+    const currentToken = tokenRef.current;
+    if (!currentToken) {
       setStatistics(null);
       setStatisticsLoading(false);
       return;
@@ -154,20 +177,54 @@ export const DatabaseBrowser: React.FC = () => {
     setStatisticsLoading(true);
     try {
       const response = await fetch('/scim/admin/database/statistics', {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${currentToken}` }
       });
       if (!response.ok) throw new Error('Failed to fetch statistics');
 
       const data = await response.json();
       setStatistics(data);
+      setLastUpdated(new Date());
     } catch (error) {
       console.error('Error fetching statistics:', error);
     } finally {
       setStatisticsLoading(false);
     }
-  };
+  }, []);
 
-  // Load data when tab changes or search/filter changes
+  // Ref to always call the latest fetchStatistics from interval
+  const fetchStatisticsRef = useRef(fetchStatistics);
+  fetchStatisticsRef.current = fetchStatistics;
+
+  // Auto-refresh statistics every 30 seconds (only when tab is active)
+  useEffect(() => {
+    if (activeTab === 'statistics' && token) {
+      refreshTimerRef.current = setInterval(() => {
+        fetchStatisticsRef.current();
+      }, 30000);
+    }
+    return () => {
+      if (refreshTimerRef.current) {
+        clearInterval(refreshTimerRef.current);
+        refreshTimerRef.current = null;
+      }
+    };
+  }, [activeTab, token]);
+
+  // Navigation from statistics to users/groups with optional filter
+  const handleStatNavigate = useCallback((tab: 'users' | 'groups', filter?: string) => {
+    setActiveTab(tab);
+    if (tab === 'users' && filter !== undefined) {
+      setUsersActiveFilter(filter);
+      setUsersPagination(prev => ({ ...prev, page: 1 }));
+    }
+  }, []);
+
+  // Stable refresh callback for StatisticsTab
+  const handleStatRefresh = useCallback(() => {
+    fetchStatisticsRef.current();
+  }, []);
+
+  // Load data when tab changes or debounced search/filter changes
   useEffect(() => {
     if (!token) {
       setStatistics(null);
@@ -187,17 +244,17 @@ export const DatabaseBrowser: React.FC = () => {
     } else if (activeTab === 'statistics') {
       fetchStatistics();
     }
-  }, [activeTab, usersPagination.page, usersSearchTerm, usersActiveFilter, groupsPagination.page, groupsSearchTerm, token]);
+  }, [activeTab, usersPagination.page, debouncedUsersSearch, usersActiveFilter, groupsPagination.page, debouncedGroupsSearch, token, fetchUsers, fetchGroups, fetchStatistics]);
 
-  const handleUserClick = (user: User) => {
+  const handleUserClick = useCallback((user: User) => {
     setSelectedUser(user);
     setShowUserModal(true);
-  };
+  }, []);
 
-  const handleGroupClick = (group: Group) => {
+  const handleGroupClick = useCallback((group: Group) => {
     setSelectedGroup(group);
     setShowGroupModal(true);
-  };
+  }, []);
 
   const handleDeleteUser = async (user: User) => {
     if (!token) return;
@@ -230,38 +287,38 @@ export const DatabaseBrowser: React.FC = () => {
     }
   };
 
-  const closeUserModal = () => {
+  const closeUserModal = useCallback(() => {
     setShowUserModal(false);
     setSelectedUser(null);
-  };
+  }, []);
 
-  const closeGroupModal = () => {
+  const closeGroupModal = useCallback(() => {
     setShowGroupModal(false);
     setSelectedGroup(null);
-  };
+  }, []);
 
-  const handleUsersSearch = (term: string) => {
+  const handleUsersSearch = useCallback((term: string) => {
     setUsersSearchTerm(term);
     setUsersPagination(prev => ({ ...prev, page: 1 }));
-  };
+  }, []);
 
-  const handleUsersFilterChange = (filter: string) => {
+  const handleUsersFilterChange = useCallback((filter: string) => {
     setUsersActiveFilter(filter);
     setUsersPagination(prev => ({ ...prev, page: 1 }));
-  };
+  }, []);
 
-  const handleUsersPageChange = (page: number) => {
+  const handleUsersPageChange = useCallback((page: number) => {
     setUsersPagination(prev => ({ ...prev, page }));
-  };
+  }, []);
 
-  const handleGroupsSearch = (term: string) => {
+  const handleGroupsSearch = useCallback((term: string) => {
     setGroupsSearchTerm(term);
     setGroupsPagination(prev => ({ ...prev, page: 1 }));
-  };
+  }, []);
 
-  const handleGroupsPageChange = (page: number) => {
+  const handleGroupsPageChange = useCallback((page: number) => {
     setGroupsPagination(prev => ({ ...prev, page }));
-  };
+  }, []);
 
   return (
     <div className={styles.databaseBrowser}>
@@ -293,7 +350,13 @@ export const DatabaseBrowser: React.FC = () => {
 
       <div className={styles.tabContainer}>
         {activeTab === 'statistics' && (
-          <StatisticsTab statistics={statistics} loading={statisticsLoading} />
+          <StatisticsTab
+            statistics={statistics}
+            loading={statisticsLoading}
+            lastUpdated={lastUpdated}
+            onRefresh={handleStatRefresh}
+            onNavigate={handleStatNavigate}
+          />
         )}
         {activeTab === 'users' && (
           <UsersTab

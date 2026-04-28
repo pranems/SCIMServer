@@ -301,7 +301,7 @@ export class EndpointScimGenericService {
         status: 400,
         scimType: 'invalidFilter',
         detail: `Invalid or unsupported filter expression: '${params.filter}'.`,
-        diagnostics: { errorCode: 'FILTER_INVALID', parseError: (e as Error).message },
+        diagnostics: { errorCode: 'FILTER_INVALID', parseError: (e as Error).message, filterExpression: params.filter },
       });
     }
 
@@ -556,6 +556,8 @@ export class EndpointScimGenericService {
               failedOperationIndex: opIndex,
               failedPath: op.path,
               failedOp: op.op,
+              attributePaths: preResult.errors.map(e => e.path).filter(Boolean),
+              activeConfig: { StrictSchemaValidation: true },
             },
           });
         }
@@ -882,7 +884,12 @@ export class EndpointScimGenericService {
           status: 400,
           scimType: result.errors[0]?.scimType ?? 'invalidValue',
           detail: `Schema validation failed: ${details}`,
-          diagnostics: { errorCode: 'VALIDATION_SCHEMA', triggeredBy: 'RequiredAttributeCheck' },
+          diagnostics: {
+            errorCode: 'VALIDATION_SCHEMA',
+            triggeredBy: 'RequiredAttributeCheck',
+            attributePaths: result.errors.map((e) => e.path),
+            activeConfig: { StrictSchemaValidation: false },
+          },
         });
       }
       return;
@@ -902,7 +909,12 @@ export class EndpointScimGenericService {
         status: 400,
         scimType: result.errors[0]?.scimType ?? 'invalidValue',
         detail: `Schema validation failed: ${details}`,
-        diagnostics: { errorCode: 'VALIDATION_SCHEMA', triggeredBy: 'StrictSchemaValidation' },
+        diagnostics: {
+          errorCode: 'VALIDATION_SCHEMA',
+          triggeredBy: 'StrictSchemaValidation',
+          attributePaths: result.errors.map((e) => e.path),
+          activeConfig: { StrictSchemaValidation: true },
+        },
       });
     }
   }
@@ -1102,6 +1114,7 @@ export class EndpointScimGenericService {
         diagnostics: {
           errorCode: 'VALIDATION_IMMUTABLE',
           attributePath: result.errors[0]?.path,
+          attributePaths: result.errors.map((e) => e.path),
         },
       });
     }
@@ -1239,7 +1252,13 @@ export class EndpointScimGenericService {
         status: 400,
         scimType: 'invalidFilter',
         detail: `Filter validation failed: ${details}`,
-        diagnostics: { errorCode: 'VALIDATION_FILTER', triggeredBy: 'StrictSchemaValidation' },
+        diagnostics: {
+          errorCode: 'VALIDATION_FILTER',
+          triggeredBy: 'StrictSchemaValidation',
+          attributePaths: result.errors.map((e) => e.path),
+          activeConfig: { StrictSchemaValidation: true },
+          filterExpression: filter,
+        },
       });
     }
   }

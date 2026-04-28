@@ -5,6 +5,54 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.39.0] - 2026-04-28
+
+### Feature - Structured SCIM Error Diagnostics Enrichment (G9)
+
+- **feat(diagnostics)**: `attributePaths` array in all validation error diagnostics
+  - Every schema validation, immutable, required-attribute, and filter-path error now includes
+    structured `attributePaths: string[]` listing ALL failing attribute paths
+  - `attributePath` auto-set to first path when not explicitly provided
+  - Replaces need to parse semicolon-joined `detail` text for programmatic error handling
+  - Applied to ALL 9 validation call sites across generic, users, and groups services
+
+- **feat(diagnostics)**: `activeConfig` snapshot on validation errors
+  - Every schema validation error now includes `activeConfig: { StrictSchemaValidation: true/false }`
+  - Enables RCA without separately querying endpoint profile settings
+
+- **feat(diagnostics)**: `filterExpression` in filter error diagnostics
+  - Both `FILTER_INVALID` (parse error) and `VALIDATION_FILTER` (unknown attribute) errors
+    now include the original filter string as a structured diagnostics field
+  - Previously only embedded in `detail` prose text
+
+- **fix(diagnostics)**: Normalized extension attribute path separator from colon to dot
+  - `assertSchemaUniqueness` `conflictingAttribute` for extensions now uses
+    `urn:...:User.attrName` (dot) instead of `urn:...:User:attrName` (colon)
+  - Consistent with all other path formats in the system
+
+- **Tests**: 3417 unit + 5 E2E diagnostics tests pass
+  - 27 scim-errors.spec.ts (10 new)
+  - 68 endpoint-scim-generic.service.spec.ts (6 new)
+  - 140 scim-service-helpers.spec.ts (1 updated)
+  - 5 diagnostics-enrichment.e2e-spec.ts (all new)
+
+## [0.38.1] - 2026-04-27
+
+### Bugfix - PATCH Scalar Boolean String Coercion (Entra ID Fix)
+
+- **fix(patch)**: `coercePatchOpBooleans()` now handles scalar string values with explicit paths
+  - Previously only handled object and array value shapes
+  - Missing: `{op:"Replace", path:"active", value:"True"}` (standard Entra ID format)
+  - Root cause: Entra ID SCIM Validator sends boolean values as strings in path-based PATCH ops
+  - All PATCH operations from Entra ID Validator returned 400: "Attribute 'active' must be a boolean, got string"
+- **feat(coerce)**: New `coerceScalarPatchValue()` helper resolves SCIM paths to boolMap entries
+  - Handles core paths (`active`), dotted paths (`emails.primary`), value-filter paths
+    (`emails[type eq "work"].primary`), and extension URN paths (`urn:...:enterprise:2.0:User:field`)
+  - Uses longest-prefix URN matching to handle dots in version numbers (e.g. `2.0`)
+  - Single fix point: shared function used by Users, Groups, and Generic services
+- **test**: 13 new unit tests, 4 new E2E tests, 5 new live tests (section 9z-S)
+- **docs**: `PATCH_SCALAR_BOOLEAN_COERCION.md` with architecture diagram, path resolution table
+
 ## [0.38.0] - 2026-04-22
 
 ### Feature - G8h: Primary Sub-Attribute Enforcement (RFC 7643 section 2.4)

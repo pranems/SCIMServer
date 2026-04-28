@@ -614,5 +614,99 @@ describe('Config Flags (E2E)', () => {
       expect(diag.errorCode).toBe('SOFT_DELETE_DISABLED');
       expect(diag.triggeredBy).toBe('UserSoftDeleteEnabled');
     });
+
+    // ── Scalar Boolean Coercion in PATCH operations (Entra ID fix) ──────
+
+    it('StrictSchema + BooleanStrings: PATCH with scalar path:"active" value:"True" succeeds', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        StrictSchemaValidation: 'True',
+        AllowAndCoerceBooleanStrings: 'True',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      // Create a user first
+      const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+
+      // PATCH with scalar string "True" on path "active" - Entra ID pattern
+      const patch = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [
+          { op: 'Replace', path: 'active', value: 'True' },
+          { op: 'Replace', path: 'displayName', value: 'Updated Name' },
+        ],
+      };
+      const res = await scimPatch(app, `${basePath}/Users/${user.id}`, token, patch).expect(200);
+      expect(res.body.active).toBe(true);
+      expect(res.body.displayName).toBe('Updated Name');
+    });
+
+    it('StrictSchema + BooleanStrings: PATCH with scalar path:"active" value:"False" deactivates', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        StrictSchemaValidation: 'True',
+        AllowAndCoerceBooleanStrings: 'True',
+        UserSoftDeleteEnabled: 'True',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const user = (await scimPost(app, `${basePath}/Users`, token, validUser()).expect(201)).body;
+      expect(user.active).toBe(true);
+
+      // PATCH active="False" (string) should be coerced and deactivate
+      const patch = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'Replace', path: 'active', value: 'False' }],
+      };
+      const res = await scimPatch(app, `${basePath}/Users/${user.id}`, token, patch).expect(200);
+      expect(res.body.active).toBe(false);
+    });
+
+    it('StrictSchema + BooleanStrings OFF: PATCH with scalar path:"active" value:"True" rejected', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        StrictSchemaValidation: 'True',
+        AllowAndCoerceBooleanStrings: 'False',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const user = (await scimPost(app, `${basePath}/Users`, token, {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: `patch-nocoerce-${Date.now()}@test.com`,
+        displayName: 'No Coerce Test',
+        active: true,
+      }).expect(201)).body;
+
+      // PATCH with string "True" should fail when coercion is OFF + strict is ON
+      const patch = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'Replace', path: 'active', value: 'True' }],
+      };
+      const res = await scimPatch(app, `${basePath}/Users/${user.id}`, token, patch).expect(400);
+      expect(res.body.detail).toContain('boolean');
+    });
+
+    it('StrictSchema + BooleanStrings: PATCH sub-attr value filter boolean coerced', async () => {
+      const endpointId = await createEndpointWithConfig(app, token, {
+        StrictSchemaValidation: 'True',
+        AllowAndCoerceBooleanStrings: 'True',
+      });
+      const basePath = scimBasePath(endpointId);
+
+      const user = (await scimPost(app, `${basePath}/Users`, token, {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: `patch-subattr-${Date.now()}@test.com`,
+        displayName: 'SubAttr Test',
+        active: true,
+        emails: [{ type: 'work', value: 'sub@test.com', primary: true }],
+      }).expect(201)).body;
+
+      // PATCH emails[type eq "work"].primary with string "False" should succeed
+      const patch = {
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:PatchOp'],
+        Operations: [{ op: 'Replace', path: 'emails[type eq "work"].primary', value: 'False' }],
+      };
+      const res = await scimPatch(app, `${basePath}/Users/${user.id}`, token, patch).expect(200);
+      // The primary field should be coerced to false
+      const workEmail = res.body.emails?.find((e: any) => e.type === 'work');
+      expect(workEmail?.primary).toBe(false);
+    });
   });
 });

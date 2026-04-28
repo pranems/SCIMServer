@@ -1,7 +1,7 @@
 # SCIMServer Documentation Index
 
-> **Version:** 0.38.0 - **Updated:** April 24, 2026  
-> 83 API routes - 19 controllers - 6 presets - 16 config flags - 5,274 tests
+> **Version:** 0.39.0 - **Updated:** April 28, 2026  
+> 82 API routes - 18 controllers - 6 presets - 16 config flags - 4,499 tests (3,417 unit + 1,082 E2E)
 
 ---
 
@@ -11,7 +11,7 @@
 |----------|-------------|
 | [README.md](../README.md) | Overview, architecture, quick start, compliance, deployment, full API summary |
 | [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) | Living stats - LoC, test counts, dependency versions, architecture |
-| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 to v0.38.0 |
+| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 to v0.39.0 |
 | [admin.md](../admin.md) | Release workflow (version, tag, publish, update) |
 
 ## Deployment Guides
@@ -78,6 +78,7 @@
 | [PHASE_12_SORTING_AND_DEDUP.md](PHASE_12_SORTING_AND_DEDUP.md) | Sorting + service deduplication |
 | [READONLY_ATTRIBUTE_STRIPPING_AND_WARNINGS.md](READONLY_ATTRIBUTE_STRIPPING_AND_WARNINGS.md) | ReadOnly attribute stripping & warning headers |
 | [MANAGER_PATCH_STRING_COERCION.md](MANAGER_PATCH_STRING_COERCION.md) | Manager PATCH string coercion - complex attribute relaxation |
+| [PATCH_SCALAR_BOOLEAN_COERCION.md](PATCH_SCALAR_BOOLEAN_COERCION.md) | PATCH scalar boolean string coercion - Entra ID SCIM Validator fix |
 | [P2_ATTRIBUTE_CHARACTERISTIC_ENFORCEMENT.md](P2_ATTRIBUTE_CHARACTERISTIC_ENFORCEMENT.md) | Attribute characteristic enforcement (Phase P2) |
 | [P3_REMAINING_ATTRIBUTE_CHARACTERISTIC_GAPS.md](P3_REMAINING_ATTRIBUTE_CHARACTERISTIC_GAPS.md) | Remaining characteristic gaps (Phase P3) |
 
