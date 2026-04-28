@@ -1,7 +1,7 @@
 # SCIMServer Documentation Index
 
-> **Version:** 0.38.1 - **Updated:** April 27, 2026  
-> 83 API routes - 19 controllers - 6 presets - 16 config flags - 5,296 tests
+> **Version:** 0.39.0 - **Updated:** April 28, 2026  
+> 82 API routes - 18 controllers - 6 presets - 16 config flags - 4,499 tests (3,417 unit + 1,082 E2E)
 
 ---
 
@@ -11,7 +11,7 @@
 |----------|-------------|
 | [README.md](../README.md) | Overview, architecture, quick start, compliance, deployment, full API summary |
 | [PROJECT_HEALTH_AND_STATS.md](PROJECT_HEALTH_AND_STATS.md) | Living stats - LoC, test counts, dependency versions, architecture |
-| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 to v0.38.0 |
+| [CHANGELOG.md](../CHANGELOG.md) | Version history from v0.1.0 to v0.39.0 |
 | [admin.md](../admin.md) | Release workflow (version, tag, publish, update) |
 
 ## Deployment Guides
