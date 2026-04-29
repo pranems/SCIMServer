@@ -178,7 +178,7 @@ TOTAL: __/73 PASS
 ## Latest Run
 
 ```
-Date: April 28, 2026
+Date: April 29, 2026
 Version: 0.40.0
 Executor: AI (Claude Opus 4.6, source-verified)
 
@@ -198,27 +198,29 @@ Section 12 (Factory): 4/4 PASS
 TOTAL: 73/73 PASS
 ```
 
-Re-verified after v0.40.0 (G8h PrimaryEnforcement + RFC S8.7.1 compliance + test-gaps-audit-5/6).
+Re-verified after v0.40.0 (test-gaps-audit-6: 30 E2E + 28 live tests added).
 
 **Infrastructure layer: 73/73 PASS** - all checklist items verified against source.
 
 **Service-level deep audit (beyond checklist):**
-- `createScimError()` calls: **79 total across 10 files - ALL 79 have diagnostics.errorCode** ✅
-  - G8h added 2 new calls with errorCode `PRIMARY_CONSTRAINT_VIOLATION` (scim-service-helpers.ts + generic service)
+- `createScimError()` calls: **79 total across 12 files - ALL 79 have diagnostics.errorCode** ✅
   - 22 distinct errorCode values in use
-- `enrichContext()` calls: all 18 SCIM service methods set operation + resourceType ✅
-- Silent `catch {}` blocks: 5 accepted (admin.controller.ts x4, rotating-file-writer.ts x1) - no new silent catches from G8h ✅
-- `scim-auth.guard.ts`: 4 bare `console.log` calls - ACCEPTED (legacy guard, rarely used; `shared-secret.guard.ts` uses ScimLogger properly)
+  - File distribution: bulk-processor(18), generic-service(15), groups-service(13), users-service(11), scim-service-helpers(11), scim-discovery(4), scim-me(3), bulk-controller(2), etag-interceptor(1), content-type-middleware(1)
+- `enrichContext()` calls: all 19 SCIM service methods set operation + resourceType ✅
+  - generic-service(6), groups-service(6), users-service(6), bulk-processor(1)
+- Silent `catch {}` blocks: 7 accepted (admin.controller.ts x4, rotating-file-writer.ts x1, activity-parser.service.ts x2) ✅
+- `console.warn` inventory: 5 total, all accepted:
+  - scim-service-helpers.ts: 3 (`parseJson` fallback, `enforcePrimaryConstraint` passthrough mode, normalize mode) - static utility class without DI
+  - oauth.module.ts: 1 (dev JWT secret warning) - startup-only
+  - prisma.service.ts: 1 (fallback DATABASE_URL warning) - startup-only
+- `console.log` inventory: 4 in `scim-auth.guard.ts` (legacy guard, rarely used; primary auth uses `SharedSecretGuard` with proper ScimLogger) - ACCEPTED
 - Auth guard logging: complete (12 distinct events across all auth paths) ✅
 - Bulk processor: INFO start/completion, WARN per-op failures, enrichContext per sub-op ✅
 - `safeStringify()`: circular reference handling verified in 3 downstream call sites ✅
 
-**Fixes applied in this run:**
-- `endpoint-scim-generic.service.ts`: 2 `console.warn` calls in `enforcePrimaryConstraint()` replaced with `this.scimLogger.warn(LogCategory.SCIM_RESOURCE, ...)` with structured context (endpointId, attributePath, primaryCount)
-  - Passthrough mode warn (L1001) and normalize mode warn (L1011) now use proper ScimLogger
-
 **Not fixed (accepted risks):**
-- `scim-service-helpers.ts`: 2 `console.warn` calls in `ScimSchemaHelpers.enforcePrimaryConstraint()` (passthrough + normalize modes) - class has no ScimLogger DI; callers (User/Group services) invoke it as a utility; console.warn still emits to stderr and is captured by container log aggregation
+- `scim-service-helpers.ts`: 3 `console.warn` calls (parseJson, enforcePrimaryConstraint passthrough + normalize) - static utility class has no ScimLogger DI; console.warn still emits to stderr and is captured by container log aggregation
 - `admin.controller.ts`: 4 bare catches in `deleteUser` loop, `getDeploymentInfo`, `readContainerId`, `readPackageVersion` - diagnostic utility methods not on SCIM hot path
 - `scim-auth.guard.ts`: 4 `console.log` calls - legacy guard kept for backward compat; primary auth uses `SharedSecretGuard` with proper ScimLogger
 - `rotating-file-writer.ts`: 1 bare catch on `fstat` - file transport edge case, non-critical
+- `activity-parser.service.ts`: 2 bare catches in summary parsing - best-effort parsing, non-critical
