@@ -139,7 +139,7 @@ Specifically check:
 - Every E2E test scenario should have a corresponding live test in `scripts/live-test.ps1`
 - Live tests should cover both local (port 6000) and Docker (port 8080) scenarios
 - Verify all live test sections in `scripts/live-test.ps1` exist by grepping for `TEST SECTION`
-- Ensure new sections use the next available number (check current highest before `Section 10`; as of v0.38.0 the latest is **9z-Q**)
+- Ensure new sections use the next available number (check current highest before `Section 10`; as of v0.40.0 the latest is **9z-U**)
 
 ### H. Resource-Type Symmetry
 
@@ -649,12 +649,12 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
-| Unit  | 3,378  | ?     | +?    |
-| E2E   | 1,074  | ?     | +?    |
-| Live  | ~789   | ?     | +?    |
+| Unit  | 3,429  | ?     | +?    |
+| E2E   | 1,128  | ?     | +?    |
+| Live  | ~817   | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
-> *Last updated: v0.38.0 - Test Gaps Audit #5 (2026-04-23)*
+> *Last updated: v0.40.0 - Test Gaps Audit #6 (2026-04-28)*
 
 4. Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts.
 

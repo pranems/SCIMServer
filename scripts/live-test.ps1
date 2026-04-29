@@ -8835,6 +8835,376 @@ Test-Result -Success $true -Message "9z-T.cleanup: Deleted test endpoints"
 Write-Host "`n--- 9z-T: Diagnostics Enrichment Tests Complete ---" -ForegroundColor Green
 
 # ============================================
+# TEST SECTION 9z-U: TEST GAPS AUDIT #6 - CROSS-FEATURE INTEGRATION
+$script:currentSection = "9z-U: Test Gaps Audit #6"
+# ============================================
+Write-Host "`n`n========================================" -ForegroundColor Yellow
+Write-Host "TEST SECTION 9z-U: TEST GAPS AUDIT #6 - CROSS-FEATURE INTEGRATION" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
+
+# --- Test 9z-U.1: GroupHardDeleteEnabled=False - PUT/PATCH still work ---
+Write-Host "`n--- Test 9z-U.1: GroupHardDeleteEnabled=False ---" -ForegroundColor Cyan
+$ghdeEpBody = @{
+    name = "live-test-ghde-$(Get-Random)"
+    displayName = "GroupHardDelete Test"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json
+$ghdeEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $ghdeEpBody -ContentType "application/json"
+$ghdeEpId = $ghdeEp.id
+$ghdeSettings = @{ profile = @{ settings = @{ GroupHardDeleteEnabled = "False" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ghdeEpId" -Method PATCH -Headers $headers -Body $ghdeSettings -ContentType "application/json" | Out-Null
+$ghdeScimBase = "$baseUrl/scim/endpoints/$ghdeEpId"
+
+$ghdeGroupBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = "ghde-group-$(Get-Random)"
+} | ConvertTo-Json
+$ghdeGroup = Invoke-RestMethod -Uri "$ghdeScimBase/Groups" -Method POST -Headers $headers -Body $ghdeGroupBody -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $ghdeGroup.id) -Message "9z-U.1: Created group on GroupHardDelete=False endpoint"
+
+# PUT should still work
+$ghdePutBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:Group")
+    displayName = "ghde-group-updated-$(Get-Random)"
+} | ConvertTo-Json
+$ghdePutResult = Invoke-RestMethod -Uri "$ghdeScimBase/Groups/$($ghdeGroup.id)" -Method PUT -Headers $headers -Body $ghdePutBody -ContentType "application/scim+json"
+Test-Result -Success ($ghdePutResult.displayName -like "ghde-group-updated-*") -Message "9z-U.2: PUT /Groups still works when GroupHardDelete=False"
+
+# PATCH should still work
+$ghdePatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        path = "displayName"
+        value = "ghde-patched-$(Get-Random)"
+    })
+} | ConvertTo-Json -Depth 4
+$ghdePatchResult = Invoke-RestMethod -Uri "$ghdeScimBase/Groups/$($ghdeGroup.id)" -Method PATCH -Headers $headers -Body $ghdePatchBody -ContentType "application/scim+json"
+Test-Result -Success ($ghdePatchResult.displayName -like "ghde-patched-*") -Message "9z-U.3: PATCH /Groups still works when GroupHardDelete=False"
+
+# DELETE should be blocked
+try {
+    $null = Invoke-RestMethod -Uri "$ghdeScimBase/Groups/$($ghdeGroup.id)" -Method DELETE -Headers $headers
+    Test-Result -Success $false -Message "9z-U.4: DELETE should be blocked"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 400) -Message "9z-U.4: DELETE /Groups blocked with 400 (got $code)"
+}
+
+# GET should still work
+$ghdeGetResult = Invoke-RestMethod -Uri "$ghdeScimBase/Groups/$($ghdeGroup.id)" -Method GET -Headers $headers
+Test-Result -Success ($ghdeGetResult.id -eq $ghdeGroup.id) -Message "9z-U.5: GET /Groups still works when GroupHardDelete=False"
+
+# Cleanup
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ghdeEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+# --- Test 9z-U.6: SoftDelete + ETag - GET soft-deleted returns 404 ---
+Write-Host "`n--- Test 9z-U.6: SoftDelete + ETag interaction ---" -ForegroundColor Cyan
+$sdeEpBody = @{
+    name = "live-test-sde-$(Get-Random)"
+    displayName = "SoftDelete ETag Test"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json
+$sdeEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $sdeEpBody -ContentType "application/json"
+$sdeEpId = $sdeEp.id
+$sdeSettings = @{ profile = @{ settings = @{ UserSoftDeleteEnabled = "True"; RequireIfMatch = "True" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$sdeEpId" -Method PATCH -Headers $headers -Body $sdeSettings -ContentType "application/json" | Out-Null
+$sdeScimBase = "$baseUrl/scim/endpoints/$sdeEpId"
+
+$sdeUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "sde-test-$(Get-Random)@test.com"
+    displayName = "SDE Test User"
+    active = $true
+} | ConvertTo-Json
+$sdeUser = Invoke-RestMethod -Uri "$sdeScimBase/Users" -Method POST -Headers $headers -Body $sdeUserBody -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $sdeUser.id) -Message "9z-U.6: Created user for SoftDelete+ETag test"
+
+# Get ETag
+$sdeGetRaw = Invoke-WebRequest -Uri "$sdeScimBase/Users/$($sdeUser.id)" -Method GET -Headers $headers
+$sdeEtag = $sdeGetRaw.Headers['ETag']
+$sdeEtagVal = if ($sdeEtag -is [array]) { $sdeEtag[0] } else { $sdeEtag }
+Test-Result -Success ($null -ne $sdeEtagVal) -Message "9z-U.7: Got ETag header"
+
+# Soft-delete via DELETE with If-Match
+$sdeDelHeaders = @{ Authorization="Bearer $Token"; 'Content-Type'='application/json'; 'If-Match'=$sdeEtagVal }
+Invoke-WebRequest -Uri "$sdeScimBase/Users/$($sdeUser.id)" -Method DELETE -Headers $sdeDelHeaders -SkipHttpErrorCheck | Out-Null
+
+# GET soft-deleted should return 404 (not 428)
+try {
+    $null = Invoke-RestMethod -Uri "$sdeScimBase/Users/$($sdeUser.id)" -Method GET -Headers $headers
+    Test-Result -Success $false -Message "9z-U.8: GET soft-deleted should return 404"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 404) -Message "9z-U.8: GET soft-deleted returns 404 (got $code)"
+}
+
+# Cleanup
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$sdeEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+# --- Test 9z-U.9: Bulk + RequireIfMatch PUT/DELETE ---
+Write-Host "`n--- Test 9z-U.9: Bulk + RequireIfMatch ---" -ForegroundColor Cyan
+$bulkIfmEpBody = @{
+    name = "live-test-bulk-ifm-$(Get-Random)"
+    displayName = "Bulk IfMatch Test"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json
+$bulkIfmEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $bulkIfmEpBody -ContentType "application/json"
+$bulkIfmEpId = $bulkIfmEp.id
+$bulkIfmSettings = @{ profile = @{ settings = @{ RequireIfMatch = "True" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bulkIfmEpId" -Method PATCH -Headers $headers -Body $bulkIfmSettings -ContentType "application/json" | Out-Null
+$bulkIfmScimBase = "$baseUrl/scim/endpoints/$bulkIfmEpId"
+
+# Create a user for bulk ops
+$bulkIfmUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "bulk-ifm-$(Get-Random)@test.com"
+    displayName = "Bulk IfMatch User"
+    active = $true
+} | ConvertTo-Json
+$bulkIfmUser = Invoke-RestMethod -Uri "$bulkIfmScimBase/Users" -Method POST -Headers $headers -Body $bulkIfmUserBody -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $bulkIfmUser.id) -Message "9z-U.9: Created user for Bulk+IfMatch test"
+
+# Bulk PUT without If-Match -> should return 428 per-op
+$bulkPutBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+    failOnErrors = 0
+    Operations = @(@{
+        method = "PUT"
+        path = "/Users/$($bulkIfmUser.id)"
+        data = @{
+            schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+            userName = $bulkIfmUser.userName
+        }
+    })
+} | ConvertTo-Json -Depth 5
+$bulkPutResult = Invoke-RestMethod -Uri "$bulkIfmScimBase/Bulk" -Method POST -Headers $headers -Body $bulkPutBody -ContentType "application/scim+json"
+$putOpStatus = $bulkPutResult.Operations[0].status
+Test-Result -Success ($putOpStatus -eq "428") -Message "9z-U.10: Bulk PUT without If-Match returns 428 per-op (got $putOpStatus)"
+
+# Bulk DELETE without If-Match -> should return 428 per-op
+$bulkDelBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+    failOnErrors = 0
+    Operations = @(@{
+        method = "DELETE"
+        path = "/Users/$($bulkIfmUser.id)"
+    })
+} | ConvertTo-Json -Depth 5
+$bulkDelResult = Invoke-RestMethod -Uri "$bulkIfmScimBase/Bulk" -Method POST -Headers $headers -Body $bulkDelBody -ContentType "application/scim+json"
+$delOpStatus = $bulkDelResult.Operations[0].status
+Test-Result -Success ($delOpStatus -eq "428") -Message "9z-U.11: Bulk DELETE without If-Match returns 428 per-op (got $delOpStatus)"
+
+# Bulk PATCH with valid If-Match -> should succeed
+$bulkIfmGetRaw = Invoke-WebRequest -Uri "$bulkIfmScimBase/Users/$($bulkIfmUser.id)" -Method GET -Headers $headers
+$bulkIfmEtag = $bulkIfmGetRaw.Headers['ETag']
+$bulkIfmEtagVal = if ($bulkIfmEtag -is [array]) { $bulkIfmEtag[0] } else { $bulkIfmEtag }
+$bulkPatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:BulkRequest")
+    failOnErrors = 0
+    Operations = @(@{
+        method = "PATCH"
+        path = "/Users/$($bulkIfmUser.id)"
+        version = $bulkIfmEtagVal
+        data = @{
+            schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+            Operations = @(@{
+                op = "replace"
+                path = "displayName"
+                value = "Bulk Patched With ETag"
+            })
+        }
+    })
+} | ConvertTo-Json -Depth 6
+$bulkPatchResult = Invoke-RestMethod -Uri "$bulkIfmScimBase/Bulk" -Method POST -Headers $headers -Body $bulkPatchBody -ContentType "application/scim+json"
+$patchOpStatus = $bulkPatchResult.Operations[0].status
+Test-Result -Success ($patchOpStatus -eq "200") -Message "9z-U.12: Bulk PATCH with valid If-Match succeeds (got $patchOpStatus)"
+
+# Cleanup
+try { Invoke-RestMethod -Uri "$bulkIfmScimBase/Users/$($bulkIfmUser.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$bulkIfmEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+# --- Test 9z-U.13: Four-flag combo (StrictSchema + IgnoreReadOnly + IncludeWarning + VerbosePatch) ---
+Write-Host "`n--- Test 9z-U.13: Four-flag combo ---" -ForegroundColor Cyan
+$fourFlagEpBody = @{
+    name = "live-test-4flag-$(Get-Random)"
+    displayName = "Four Flag Test"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json
+$fourFlagEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $fourFlagEpBody -ContentType "application/json"
+$fourFlagEpId = $fourFlagEp.id
+$fourFlagSettings = @{ profile = @{ settings = @{
+    StrictSchemaValidation = "True"
+    IgnoreReadOnlyAttributesInPatch = "True"
+    IncludeWarningAboutIgnoredReadOnlyAttribute = "True"
+    VerbosePatchSupported = "True"
+} } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$fourFlagEpId" -Method PATCH -Headers $headers -Body $fourFlagSettings -ContentType "application/json" | Out-Null
+$fourFlagScimBase = "$baseUrl/scim/endpoints/$fourFlagEpId"
+
+$fourFlagUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "4flag-$(Get-Random)@test.com"
+    displayName = "Four Flag User"
+    active = $true
+} | ConvertTo-Json
+$fourFlagUser = Invoke-RestMethod -Uri "$fourFlagScimBase/Users" -Method POST -Headers $headers -Body $fourFlagUserBody -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $fourFlagUser.id) -Message "9z-U.13: Created user for four-flag combo test"
+
+# PATCH with readOnly id via no-path merge -> should strip id, succeed
+$fourFlagPatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        value = @{ id = "hacker-id"; displayName = "FourFlagPatched" }
+    })
+} | ConvertTo-Json -Depth 4
+$fourFlagPatchResult = Invoke-RestMethod -Uri "$fourFlagScimBase/Users/$($fourFlagUser.id)" -Method PATCH -Headers $headers -Body $fourFlagPatchBody -ContentType "application/scim+json"
+Test-Result -Success ($fourFlagPatchResult.id -eq $fourFlagUser.id) -Message "9z-U.14: readOnly id was NOT changed (stripped)"
+Test-Result -Success ($fourFlagPatchResult.displayName -eq "FourFlagPatched") -Message "9z-U.15: displayName was updated"
+
+# PATCH with dot-notation -> VerbosePatch should resolve
+$dotPatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        path = "name.givenName"
+        value = "DotResolved"
+    })
+} | ConvertTo-Json -Depth 4
+$dotPatchResult = Invoke-RestMethod -Uri "$fourFlagScimBase/Users/$($fourFlagUser.id)" -Method PATCH -Headers $headers -Body $dotPatchBody -ContentType "application/scim+json"
+Test-Result -Success ($dotPatchResult.name.givenName -eq "DotResolved") -Message "9z-U.16: VerbosePatch resolved name.givenName"
+
+# PATCH with unknown attr -> StrictSchema should reject
+$unknownPatchBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
+    Operations = @(@{
+        op = "replace"
+        value = @{ displayName = "Valid"; bogusAttribute = "Invalid" }
+    })
+} | ConvertTo-Json -Depth 4
+try {
+    $null = Invoke-RestMethod -Uri "$fourFlagScimBase/Users/$($fourFlagUser.id)" -Method PATCH -Headers $headers -Body $unknownPatchBody -ContentType "application/scim+json"
+    Test-Result -Success $false -Message "9z-U.17: Unknown attr should be rejected"
+} catch {
+    $code = $_.Exception.Response.StatusCode.value__
+    Test-Result -Success ($code -eq 400) -Message "9z-U.17: StrictSchema rejects unknown attr with 400 (got $code)"
+}
+
+# Cleanup
+try { Invoke-RestMethod -Uri "$fourFlagScimBase/Users/$($fourFlagUser.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$fourFlagEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+# --- Test 9z-U.18: PrimaryEnforcement + BooleanStrings combo ---
+Write-Host "`n--- Test 9z-U.18: PrimaryEnforcement + BooleanStrings ---" -ForegroundColor Cyan
+$primBoolEpBody = @{
+    name = "live-test-primbool-$(Get-Random)"
+    displayName = "PrimaryEnforcement + BoolStr Test"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json
+$primBoolEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $primBoolEpBody -ContentType "application/json"
+$primBoolEpId = $primBoolEp.id
+$primBoolSettings = @{ profile = @{ settings = @{
+    PrimaryEnforcement = "normalize"
+    AllowAndCoerceBooleanStrings = "True"
+} } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$primBoolEpId" -Method PATCH -Headers $headers -Body $primBoolSettings -ContentType "application/json" | Out-Null
+$primBoolScimBase = "$baseUrl/scim/endpoints/$primBoolEpId"
+
+# POST with string boolean primaries - should coerce + normalize to 1
+$primBoolUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "primbool-$(Get-Random)@test.com"
+    emails = @(
+        @{ value = "a@test.com"; type = "work"; primary = "True" }
+        @{ value = "b@test.com"; type = "home"; primary = "True" }
+    )
+} | ConvertTo-Json -Depth 4
+$primBoolUser = Invoke-RestMethod -Uri "$primBoolScimBase/Users" -Method POST -Headers $headers -Body $primBoolUserBody -ContentType "application/scim+json"
+$primCount = ($primBoolUser.emails | Where-Object { $_.primary -eq $true }).Count
+Test-Result -Success ($primCount -eq 1) -Message "9z-U.18: Normalize mode reduced to 1 primary ($primCount found)"
+Test-Result -Success ($null -ne $primBoolUser.id) -Message "9z-U.19: User created with coerced+normalized primaries"
+
+# Cleanup
+try { Invoke-RestMethod -Uri "$primBoolScimBase/Users/$($primBoolUser.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$primBoolEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+# --- Test 9z-U.20: .search body-level attributes/excludedAttributes ---
+Write-Host "`n--- Test 9z-U.20: .search body-level projection ---" -ForegroundColor Cyan
+$searchProjUserBody = @{
+    schemas = @("urn:ietf:params:scim:schemas:core:2.0:User")
+    userName = "searchproj-$(Get-Random)@test.com"
+    displayName = "Search Projection User"
+    active = $true
+} | ConvertTo-Json
+$searchProjUser = Invoke-RestMethod -Uri "$scimBase/Users" -Method POST -Headers $headers -Body $searchProjUserBody -ContentType "application/scim+json"
+Test-Result -Success ($null -ne $searchProjUser.id) -Message "9z-U.20: Created user for .search body projection test"
+
+# .search with body attributes=userName
+$searchAttrBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:SearchRequest")
+    startIndex = 1
+    count = 100
+    attributes = "userName"
+} | ConvertTo-Json
+$searchAttrResult = Invoke-RestMethod -Uri "$scimBase/Users/.search" -Method POST -Headers $headers -Body $searchAttrBody -ContentType "application/scim+json"
+$searchResources = $searchAttrResult.Resources | Where-Object { $_.id -eq $searchProjUser.id }
+if ($searchResources) {
+    $firstRes = $searchResources[0]
+    Test-Result -Success ($null -ne $firstRes.userName) -Message "9z-U.21: .search body attributes includes userName"
+    Test-Result -Success ($null -ne $firstRes.id) -Message "9z-U.22: .search body attributes includes always-returned id"
+    Test-Result -Success ($null -eq $firstRes.displayName) -Message "9z-U.23: .search body attributes excludes displayName"
+} else {
+    Test-Result -Success $false -Message "9z-U.21: Created user not found in .search results"
+}
+
+# .search with body excludedAttributes=displayName
+$searchExclBody = @{
+    schemas = @("urn:ietf:params:scim:api:messages:2.0:SearchRequest")
+    startIndex = 1
+    count = 100
+    excludedAttributes = "displayName"
+} | ConvertTo-Json
+$searchExclResult = Invoke-RestMethod -Uri "$scimBase/Users/.search" -Method POST -Headers $headers -Body $searchExclBody -ContentType "application/scim+json"
+$exclResources = $searchExclResult.Resources | Where-Object { $_.id -eq $searchProjUser.id }
+if ($exclResources) {
+    $exclRes = $exclResources[0]
+    Test-Result -Success ($null -ne $exclRes.userName) -Message "9z-U.24: .search body excludedAttributes keeps userName"
+    Test-Result -Success ($null -ne $exclRes.id) -Message "9z-U.25: .search body excludedAttributes keeps always-returned id"
+    Test-Result -Success ($null -eq $exclRes.displayName) -Message "9z-U.26: .search body excludedAttributes removes displayName"
+} else {
+    Test-Result -Success $false -Message "9z-U.24: Created user not found in .search results"
+}
+
+# Cleanup
+try { Invoke-RestMethod -Uri "$scimBase/Users/$($searchProjUser.id)" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+# --- Test 9z-U.27: logFileEnabled toggle via PATCH ---
+Write-Host "`n--- Test 9z-U.27: logFileEnabled toggle ---" -ForegroundColor Cyan
+$logToggleEpBody = @{
+    name = "live-test-logtoggle-$(Get-Random)"
+    displayName = "Log Toggle Test"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json
+$logToggleEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $logToggleEpBody -ContentType "application/json"
+$logToggleEpId = $logToggleEp.id
+
+# Disable
+$logDisableBody = @{ profile = @{ settings = @{ logFileEnabled = "False" } } } | ConvertTo-Json -Depth 4
+$logDisableResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$logToggleEpId" -Method PATCH -Headers $headers -Body $logDisableBody -ContentType "application/json"
+Test-Result -Success ($logDisableResult.profile.settings.logFileEnabled -eq "False") -Message "9z-U.27: logFileEnabled set to False"
+
+# Re-enable
+$logEnableBody = @{ profile = @{ settings = @{ logFileEnabled = "True" } } } | ConvertTo-Json -Depth 4
+$logEnableResult = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$logToggleEpId" -Method PATCH -Headers $headers -Body $logEnableBody -ContentType "application/json"
+Test-Result -Success ($logEnableResult.profile.settings.logFileEnabled -eq "True") -Message "9z-U.28: logFileEnabled set back to True"
+
+# Cleanup
+try { Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$logToggleEpId" -Method DELETE -Headers $headers | Out-Null } catch {}
+
+Write-Host "`n--- 9z-U: Test Gaps Audit #6 Tests Complete ---" -ForegroundColor Green
+
+# ============================================
 # TEST SECTION 10: DELETE OPERATIONS
 $script:currentSection = "10: Cleanup"
 # ============================================
