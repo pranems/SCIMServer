@@ -12,7 +12,7 @@
 | **Source LoC** | 29,837 |
 | **Unit test files** (`api/src/**/*.spec.ts`) | 84 |
 | **Unit test LoC** | 32,776 |
-| **E2E test files** (`api/test/e2e/**/*.e2e-spec.ts`) | 53 |
+| **E2E test files** (`api/test/e2e/**/*.e2e-spec.ts`) | 54 |
 | **E2E test LoC** | ~14,300 |
 | **Documentation files** (`docs/**/*.md`) | ~125 (69 active + 56 archived) |
 | **Scripts** (`scripts/*.ps1`) | 18 |
@@ -23,10 +23,10 @@
 | Layer | Suites | Tests | Skip | Status |
 |-------|--------|-------|------|--------|
 | **Unit** | 84 | 3,429 | 0 | ✅ All pass |
-| **E2E** | 53 | 1,128 | 0 | ✅ All pass |
+| **E2E** | 54 | 1,149 | 0 | ✅ All pass |
 | **Live (main)** | 60 sections | ~817 | 0 | All pass |
 | **Live (Lexmark ISV)** | 13 sections | 112 | 0 | All pass |
-| **Total** | **~210** | **~5,486** | 0 | All pass |
+| **Total** | **~211** | **~5,507** | 0 | All pass |
 
 ### Unit Test Suites (84)
 
