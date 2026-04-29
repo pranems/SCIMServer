@@ -146,7 +146,7 @@ TOTAL: __/55 PASS
 ## Latest Run
 
 ```
-Date: April 28, 2026
+Date: April 29, 2026
 Version: 0.40.0
 Executor: AI (Claude Opus 4.6, source-verified)
 
@@ -166,14 +166,14 @@ TOTAL: 55/55 PASS
 
 All 55 infrastructure checks PASS.
 
-**Extended A-K deep audit (79 checks):**
+**Extended A-K deep audit (80 checks):**
 
 | Section | Score | Checks |
 |---------|-------|--------|
 | A (Repository Layer) | 8/8 | RepositoryError wrapping, wrapPrismaError mapping, InMemory+Prisma parity |
 | B (Service Layer) | 14/14 | 404/409/400/412/428 paths, PatchError catch, handleRepositoryError, schema/immutable/required/filter |
 | C (Filter Chain) | 10/10 | SCIM body preservation, NestJS wrapping, catch-all 500, non-SCIM routes, tiered logging |
-| D (Diagnostics) | 6/6 | triggeredBy correctness (20 flagged / 59 unflagged), requestId/endpointId auto-population, logsUrl routing |
+| D (Diagnostics) | 6/6 | triggeredBy correctness (25 flagged / 54 unflagged), requestId/endpointId auto-population, logsUrl routing |
 | E (Auth) | 6/6 | Missing/invalid token, OAuth expiry fallthrough, credential check error isolation, FATAL on missing secret |
 | F (Bulk) | 5/5 | Error isolation, failOnErrors threshold, SCIM error body in results, non-HttpException caught |
 | G (Admin) | 7/7 | 404/400/403 paths, preset 404, credential not found, PerEndpointCredentials gate |
@@ -189,8 +189,9 @@ Previous PARTIALs from v0.37.1 remain accepted by-design:
 - I.8: Pre-interceptor 415 errors lack diagnostics.requestId (correlation context not yet established)
 
 **Key metrics:**
-- `createScimError()` calls: 79 across 10 files - ALL 79 have diagnostics.errorCode (22 distinct values)
-- `handleRepositoryError()`: called from 12 catch blocks across 3 services
-- `triggeredBy` usage: 20/79 calls carry it (all config-flag-gated validations), 59 correctly omit it
-- G8h PrimaryEnforcement: 2 new `PRIMARY_CONSTRAINT_VIOLATION` error paths, both fully diagnosed
-- GenericService `enforcePrimaryConstraint`: `console.warn` upgraded to `scimLogger.warn()` in this session
+- `createScimError()` calls: 79 across 12 files - ALL 79 have diagnostics.errorCode (22 distinct values)
+- `handleRepositoryError()`: called from 13 catch blocks across 3 services
+- `triggeredBy` usage: 25/79 calls carry it (all config-flag-gated validations), 54 correctly omit it
+- `SCIM_ERROR_TYPE` enum: 11 values covering RFC 7644 Table 9
+- `ScimErrorDiagnostics`: 17 declared fields + 3 auto-enriched = 20 total diagnostic fields
+- Auth guard: 3 auth types, each with enrichContext() on success, WARN on failure, FATAL on missing secret in prod
