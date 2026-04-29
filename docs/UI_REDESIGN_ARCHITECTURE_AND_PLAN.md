@@ -33,6 +33,18 @@
 22. [Frontend Observability](#22-frontend-observability)
 23. [Migration Strategy for Existing Users](#23-migration-strategy-for-existing-users)
 24. [Prompt Chain Methodology](#24-prompt-chain-methodology)
+    - [24.1 Stage Taxonomy](#241-stage-taxonomy)
+    - [24.2 Pipeline Topology](#242-pipeline-topology)
+    - [24.3 Reusable Prompt Templates](#243-reusable-prompt-templates)
+    - [24.4 Bias-Removal Phrases](#244-bias-removal-phrases-the-unlock-words)
+    - [24.5 Hallucination Detection Checklist](#245-hallucination-detection-checklist)
+    - [24.6 Subagent Delegation Strategy](#246-subagent-delegation-strategy)
+    - [24.7 Context Window Management](#247-context-window-management)
+    - [24.8 Quality Gates Per Stage](#248-quality-gates-per-stage)
+    - [24.9 Anti-Patterns](#249-anti-patterns)
+    - [24.10 Failure Modes Observed and Recoveries](#2410-failure-modes-observed-and-recoveries)
+    - [24.11 The Single Bootstrap Mega-Prompt](#2411-the-single-bootstrap-mega-prompt)
+    - [24.12 The Meta-Lesson](#2412-the-meta-lesson)
 
 ---
 
@@ -1377,24 +1389,313 @@ No new environment variables required for the UI. The same `VITE_API_BASE`, `VIT
 
 ## 24. Prompt Chain Methodology
 
-This document was produced through a systematic 12-prompt investigation chain. This methodology forms a reusable **architecture decision pipeline** for any major redesign:
+> **Purpose of this section.** Convert our 12-stage investigation into a **reusable architecture decision pipeline** that anyone can copy, parameterize, and apply to a different project. Below: stage taxonomy, executable prompt templates, bias-removal phrases, hallucination detection checklist, subagent delegation rules, quality gates, anti-patterns, observed failure modes, and a single **bootstrap mega-prompt**.
 
-| Stage | Prompt Intent | Key Question | Outcome |
+### 24.1 Stage Taxonomy
+
+Each stage of the chain has a distinct **constraint** (what it forbids), an **artifact** (what it produces), and a **validation source** (how its output is checked by a later stage). The constraint is the value-creator: removing it collapses the stage into the previous one.
+
+| # | Stage | Bias Removed / Constraint | Artifact Produced | Validated By |
+|---|---|---|---|---|
+| 1 | Competitive scan | Forbid mentioning current implementation | N alternatives with verdict table | Stage 7 (testability), Stage 9 (multi-mode) |
+| 2 | Direction crystallization | Forbid "we'll figure it out later" | Concrete tech stack + phase outline | Stage 3 (perf), Stage 10 (sequencing) |
+| 3 | Performance impact analysis | Forbid hand-waving (numbers required) | Bottleneck list with metrics (queries/req, ms, KB) | Stage 4 (solutions) |
+| 4 | Solution design | Forbid solutions that don't address Stage 3's metrics | Architectural changes mapped to bottlenecks | Stage 7 (test boundaries), Stage 8 (CI feasibility) |
+| 5 | Unconstrained exploration R1 | Forbid using only the original tech stack | ≥3 ideas not in initial plan | Stage 6 (further unconstrained) |
+| 6 | Unconstrained exploration R2 | Forbid using *any* prior context (company, audience, stack) | First-principles alternatives | Stage 11 (decision log) |
+| 7 | Testability validation | Forbid components without defined test boundaries | 4-tier test pyramid mapping | Stage 8 (automation) |
+| 8 | Automation validation | Forbid quality gates that need humans | Zero-human CI pipeline with budgets | Stage 10 (sequence respects gates) |
+| 9 | Multi-environment validation | Forbid coupling to one deployment mode | Mode-agnostic DI rule + CI matrix | Stage 10 (each step works in all modes) |
+| 10 | Implementation sequencing | Forbid steps without explicit dependencies | DAG of ≤1-day steps | Stage 11 (every step traceable to a decision) |
+| 11 | Formal documentation | Forbid undocumented decisions | RFC-style doc with decision log | Stage 12 (gap analysis) |
+| 12 | Gap-filling enhancement | Forbid skipping the "what's missing" question | Additional sections covering blind spots | This section |
+
+### 24.2 Pipeline Topology
+
+```mermaid
+flowchart TD
+    S1[1. Competitive Scan<br/>no current state] --> S2[2. Direction]
+    S2 --> S3[3. Perf Impact<br/>numbers required]
+    S3 --> S4[4. Solution Design]
+    S4 --> S5[5. Unconstrained R1]
+    S5 --> S6[6. Unconstrained R2<br/>no prior context]
+    S6 --> S7[7. Testability]
+    S7 --> S8[8. Automation]
+    S8 --> S9[9. Multi-Env]
+    S9 --> S10[10. Sequencing]
+    S10 --> S11[11. Documentation]
+    S11 --> S12[12. Gap Filling]
+
+    S3 -.validates.-> S2
+    S7 -.validates.-> S4
+    S8 -.validates.-> S7
+    S9 -.validates.-> S4
+    S10 -.validates.-> S9
+    S12 -.validates.-> S11
+
+    style S1 fill:#dbeafe,stroke:#1e40af
+    style S6 fill:#dbeafe,stroke:#1e40af
+    style S12 fill:#fce7f3,stroke:#9d174d
+```
+
+Solid arrows = forward flow. Dotted arrows = back-validation: a later stage can force a return to an earlier one if its constraint is violated.
+
+### 24.3 Reusable Prompt Templates
+
+Substitute `{{project}}`, `{{domain}}`, `{{current_stack}}`, `{{audience}}`, `{{constraints}}` for your context.
+
+#### Stage 1 - Competitive Scan
+```text
+You are an architecture researcher. Ignore everything {{project}} currently does.
+Research the 8-10 leading products in the {{domain}} space. For each, extract:
+the dominant UI metaphor, primary navigation pattern, density choice (compact vs
+spacious), notable interaction (e.g., command palette, live data), and one
+unique design principle. Produce a verdict table with columns:
+[Product | Metaphor | Best Idea | Adopt? Yes/No/Adapt | Reasoning].
+Conclude with 3-5 distinct UI options that synthesize the best ideas.
+Do NOT reference {{current_stack}} or audience expectations yet.
+```
+
+#### Stage 3 - Performance Impact Analysis
+```text
+For each proposed change in the previous step, quantify the impact on:
+- Database queries per request (count, type)
+- p50/p95 latency (estimate or measured)
+- Bundle size delta (KB gzipped)
+- Memory footprint (heap, MB)
+- Network round trips per user action
+Identify all N+1 query risks, count(*) storms, synchronous filesystem reads,
+and unbounded loops. Provide a number for each. Hand-waving disqualifies a row.
+```
+
+#### Stage 6 - Unconstrained Exploration Round 2
+```text
+Forget everything we've discussed. Pretend you have never seen this codebase.
+You are designing this from scratch in {{current_year}} with no constraints:
+- Not bound to {{current_stack}}
+- Not bound to {{audience}}'s familiarity
+- Not bound to existing infrastructure
+- Not bound to team skills
+What architecture would you choose? What would you NOT choose that I'm
+likely to assume? Argue against my likely defaults. Cite specific products
+or papers that support your alternative.
+```
+
+#### Stage 7 - Testability Validation
+```text
+For each architectural component in the plan, answer:
+1. What is its test boundary (unit / integration / E2E / contract)?
+2. What does it depend on, and how is that dependency mocked or stubbed?
+3. Can it be tested without a network, a database, or a browser?
+4. What is the smallest reproducer that exercises its full behavior?
+Flag any component that fails any of these. Propose a refactor that
+makes it testable without changing its public contract.
+```
+
+#### Stage 8 - Automation Validation
+```text
+Design a CI pipeline that enforces every quality gate without human review.
+For each gate, specify:
+- Tool (lint, type-check, test runner, axe-core, Lighthouse, etc.)
+- Time budget (must be < {{ci_budget_minutes}} total)
+- Failure mode (block PR, warn, auto-fix)
+- Coverage requirement (% lines, branches, mutation score)
+List every gate that currently relies on human judgment and replace it
+with an automated equivalent or accept the residual risk explicitly.
+```
+
+#### Stage 9 - Multi-Environment Validation
+```text
+List every deployment / runtime mode the product must support:
+{{modes}} (e.g., in-memory, Postgres, Docker, standalone, cloud).
+For each component, prove it works in every mode by either:
+(a) showing it depends only on abstractions present in all modes, or
+(b) providing a mode-specific adapter with a parity test.
+Output a matrix [Component x Mode] with pass/fail and the test that proves it.
+```
+
+#### Stage 10 - Implementation Sequencing
+```text
+Produce a directed acyclic graph of implementation steps. Each step must:
+- Take <= 1 day for one engineer
+- List explicit inputs (files/types it needs) and outputs (files/types it creates)
+- Identify all upstream dependencies by step number
+- Map to a Decision Log entry
+- Be independently testable
+Group into phases. Identify the critical path. Flag any step that, if it
+slips, blocks >= 3 downstream steps.
+```
+
+#### Stage 12 - Gap Filling
+```text
+Review the entire plan. List every architectural concern that a senior
+reviewer would raise but the document does not address. Use this checklist:
+accessibility, error boundaries, security (CSP, PII, secrets, authn/authz),
+code splitting, responsive/mobile, observability/telemetry, internationalization,
+backward compatibility, migration path, abandonment plan, on-call runbook.
+For each gap, either add a new section or justify omission explicitly.
+```
+
+### 24.4 Bias-Removal Phrases (the "unlock words")
+
+Specific phrasings that empirically produced better, less-anchored output:
+
+| Phrase | Effect |
+|---|---|
+| "Ignore what we currently have" | Prevents anchoring to existing implementation |
+| "Forget everything we discussed" | Forces fresh framing in a context-loaded session |
+| "What is the strongest argument **against** your recommendation?" | Surfaces hidden risk and weakens motivated reasoning |
+| "If you started from scratch in {{year}}" | Defeats path-dependence and outdated tooling |
+| "What would Linear / Stripe / Raycast do?" | Imports specific design vocabulary instead of generic advice |
+| "Cite a real product or paper for each claim" | Suppresses fabrication; surfaces sourceless assertions |
+| "Numbers required - hand-waving disqualifies" | Forces estimation discipline |
+| "What would a senior reviewer flag?" | Triggers gap-finding mode |
+
+### 24.5 Hallucination Detection Checklist
+
+Run this against every stage's output before accepting it:
+
+1. **Cite-check** - Does each library/API claim have a verifiable source (docs URL, GitHub repo, npm package)? Open one and confirm.
+2. **Version-check** - Are framework versions current major? (TanStack Query v5, not v3; React 19, not 17.)
+3. **Compile-check** - Does generated code pass `tsc --noEmit` against the real project config?
+4. **Lint-check** - Does it pass the project's actual ESLint rules?
+5. **Cross-check** - Ask the same question framed two different ways. Compare answers; investigate discrepancies.
+6. **Reverse-check** - Ask "what's wrong with this answer?" Treat strong agreement as a red flag (model sycophancy).
+7. **Numeric sanity** - Any number ending in `.0` or suspiciously round (1000ms, 100KB) is probably invented; demand a derivation.
+8. **API existence** - For any non-trivial API call, search the actual library source / docs.
+
+### 24.6 Subagent Delegation Strategy
+
+When to delegate research vs synthesize inline:
+
+| Task Type | Delegate to Subagent | Do Inline |
+|---|---|---|
+| Multi-file inventory across the repo | Yes | |
+| Web research across 5+ URLs | Yes | |
+| Parallel competitive analysis | Yes | |
+| Long-running test execution | Yes | |
+| Architectural synthesis / decision-making | | Yes |
+| Edits to the working codebase | | Yes |
+| Final document assembly | | Yes |
+| User-facing communication | | Yes |
+
+Rule of thumb: **delegate breadth, retain depth.** Subagents are stateless and fast at parallel reads; the main agent owns synthesis, decisions, and writes.
+
+### 24.7 Context Window Management
+
+For pipelines that approach context limits (>200K tokens):
+
+1. **Persist decisions immediately** - Every approved decision goes into a Decision Log file (markdown) so it survives a context reset.
+2. **Synthesize at stage boundaries** - Produce a 200-word "context block" per stage; carry that forward, drop the verbose deliberation.
+3. **Re-inject only the synthesis** - When starting a new sub-conversation, paste the latest synthesis + relevant file contents, not the full transcript.
+4. **Externalize reference data** - Long competitive matrices, RFC excerpts, schema dumps go into separate docs that the agent reads on demand.
+5. **Use file-based state** - The document being produced *is* the persistent context; later stages append rather than re-deriving.
+
+### 24.8 Quality Gates Per Stage
+
+Move forward only when:
+
+| Stage | Gate |
+|---|---|
+| 1, 5, 6 | >= 3 distinct alternatives evaluated; no "winner-takes-all" framing |
+| 3 | Every bottleneck has a numeric metric (queries, ms, KB, MB) |
+| 4 | Every solution maps to >= 1 Stage-3 metric and improves it |
+| 7 | Every component has a test boundary and a stub/mock plan |
+| 8 | Every quality gate is automated; manual gates are explicit residual risk |
+| 9 | Matrix [Component x Mode] is fully populated; no "TBD" cells |
+| 10 | Every step is <= 1 day, has inputs/outputs, and traces to a decision |
+| 11 | Every decision has rationale + alternatives + verdict |
+| 12 | Gap checklist run; rejected gaps have written justification |
+
+### 24.9 Anti-Patterns
+
+What we deliberately avoided (and you should too):
+
+- **Decision-by-default** - Accepting the first AI suggestion without comparison.
+- **Premature commitment** - Locking in a tech stack before competitive research.
+- **Single-source bias** - Researching only one product category (e.g., only enterprise admin tools).
+- **Skipping unconstrained rounds** - Going straight from "current state" to "plan" without removing context.
+- **Plan without risk assessment** - Listing tasks without listing what could go wrong.
+- **Rationale-free decisions** - "We picked X" without "because Y, despite Z, instead of W".
+- **Solo-mode validation** - Validating only against the favored deployment mode.
+- **Test-after-the-fact** - Defining tests after writing the code instead of as part of the architecture.
+- **Doc-as-afterthought** - Writing the design doc after implementation; the doc *is* the design artifact.
+
+### 24.10 Failure Modes Observed and Recoveries
+
+Honest log of what went wrong during this session and how the chain self-corrected:
+
+| Failure Mode | Stage | Symptom | Recovery |
 |---|---|---|---|
-| 1 | Remove anchoring bias | "What do the best products do, ignoring what we have?" | 4 UI options with competitive analysis |
-| 2 | Crystallize direction | "What's the concrete plan?" | Hybrid architecture + tech stack + phases |
-| 3 | Validate backend feasibility | "What's the performance impact on the backend?" | 4 bottlenecks identified (N+1, COUNT storms, FS reads) |
-| 4 | Design solutions | "What architectural changes solve the problems found?" | 7 backend suggestions (StatsProjection, NameResolver, BFF) |
-| 5 | Unconstrained exploration (round 1) | "Best architectures anywhere, no constraints" | TanStack stack, Event sourcing lite, CQRS, SSE multiplexing |
-| 6 | Unconstrained exploration (round 2) | "Remove ALL bias - company, tech, audience" | Linear/Raycast patterns, shadcn/ui alternative, 6 design principles |
-| 7 | Testability validation | "Can every layer be tested independently?" | 4-tier test pyramid, TanStack improves testability, MSW integration tier |
-| 8 | Automation validation | "Zero-human-effort quality enforcement" | 4-stage CI pipeline, contract types, a11y gate, visual regression |
-| 9 | Multi-environment validation | "Does this work in all 5 deployment modes?" | Mode-agnostic DI rule, CI matrix, parity test suite |
-| 10 | Implementation sequencing | "Exact step-by-step order with dependencies" | 42 steps, 6 phases, dependency graph, 9-14 day estimate |
-| 11 | Formal documentation | "Create comprehensive doc per project norms" | 1,033-line document with Mermaid diagrams and decision log |
-| 12 | Enhancement & gap filling | "Add everything missing" | 8 additional sections: a11y, errors, security, code splitting, responsive, observability, migration, methodology |
+| Anchoring to Fluent UI | Initial | Recommendations stayed within Microsoft ecosystem | Stage 6 unconstrained round surfaced shadcn/ui as superior alt for general audience |
+| Missed FS reads in perf analysis | Stage 3 R1 | Bottleneck list was 3 items; should have been 4 | Re-ran with framing "list every synchronous I/O on the request path" |
+| Step plan missed shared types | Stage 10 R1 | Frontend and backend started defining `DashboardResponse` independently | Added Phase 0.1 explicitly: shared types as single source of truth |
+| Test counts went stale | Cross-cutting | Doc cited "1,128 tests" after suite grew to 1,149 | Established freshness audit as standing pre-commit step |
+| Decision log too thin | Stage 11 R1 | Decisions listed verdict but not rejected alternatives | Added "Alternatives Considered" column to every D-entry |
+| No accessibility section | Stage 11 | WCAG never mentioned despite UI focus | Stage 12 gap-fill added Section 17 |
 
-**Key insight:** The chain progressively narrows from unconstrained exploration (Stages 1, 5, 6) to concrete implementation details (Stages 9-12), ensuring creativity isn't constrained too early but rigor is applied before execution begins. Each stage validates assumptions from the previous stage - performance concerns (Stage 3) informed the backend design (Stage 4), which informed testability requirements (Stage 7), which informed automation strategy (Stage 8).
+### 24.11 The Single Bootstrap Mega-Prompt
+
+For applying this methodology to a new project in one shot. Paste this, then iterate stage-by-stage:
+
+```text
+You are conducting a 12-stage architecture decision pipeline for {{project}},
+a {{one_line_description}}. The output is a formal RFC-style document.
+
+PROJECT CONTEXT
+- Domain: {{domain}}
+- Audience: {{audience}}
+- Current stack: {{current_stack}}
+- Deployment modes: {{modes}}
+- Hard constraints: {{constraints}}
+- Non-goals: {{non_goals}}
+
+PIPELINE - run each stage in order, gating on its quality criteria:
+
+  1. Competitive scan        (constraint: ignore current state; >= 8 products)
+  2. Direction crystallize   (constraint: pick a concrete approach)
+  3. Performance impact      (constraint: numbers required, no hand-waving)
+  4. Solution design         (constraint: each solution maps to a Stage-3 metric)
+  5. Unconstrained R1        (constraint: >= 3 ideas not in current plan)
+  6. Unconstrained R2        (constraint: forget all prior context)
+  7. Testability             (constraint: every component has a test boundary)
+  8. Automation              (constraint: zero-human quality gates)
+  9. Multi-environment       (constraint: matrix covers all deployment modes)
+ 10. Sequencing              (constraint: <= 1-day steps with explicit deps)
+ 11. Documentation           (constraint: every decision has rationale + alts)
+ 12. Gap filling             (constraint: run the senior-reviewer checklist)
+
+RULES
+- After each stage, summarize in <= 200 words and ask me to approve before continuing.
+- Cite real sources for every library, API, or pattern claim.
+- Forbidden phrasings: "modern", "best-in-class", "industry-standard" without
+  citation; "should be fine", "probably works", "roughly".
+- Every architectural component must answer:
+  (a) what is its test boundary?
+  (b) does it work in all deployment modes?
+  (c) what is its perf impact in queries/ms/KB?
+- Use the bias-removal phrases when stuck: "ignore what we have",
+  "argue against your own recommendation", "what would a senior reviewer flag?"
+
+DELIVERABLE
+A single markdown document with: TOC, blockquote metadata header,
+Mermaid diagrams, decision log with verdict + alternatives, risk assessment,
+multi-mode matrix, file inventory, day-by-day implementation plan.
+
+Begin with Stage 1.
+```
+
+### 24.12 The Meta-Lesson
+
+The best architectural outcomes come from **deliberate sequencing of perspectives**, not from any single brilliant prompt. Each stage's value lies in *what it forbids*: Stage 1 forbids looking at current state; Stage 6 forbids using context from Stage 5; Stage 9 forbids accepting any decision that breaks a deployment target; Stage 12 forbids ending without a gap analysis.
+
+A skilled operator's job is not to write the perfect prompt. It is to **enforce the constraints stage-by-stage**, refuse to advance until each gate is met, and feed the output of one stage as the validated input of the next. The model supplies breadth and recall; the operator supplies sequencing and refusal.
+
+**Three principles to remember:**
+
+1. **Constraints create insight.** Removing context (Stage 6) and demanding numbers (Stage 3) produce more value than open-ended brainstorming.
+2. **Validation is structural.** Every stage validates a prior stage; trust the chain, not any single answer.
+3. **The document is the outcome.** Conversations decay; written decisions with rationale and alternatives endure. Optimize for what survives the context window.
 
 ---
 
