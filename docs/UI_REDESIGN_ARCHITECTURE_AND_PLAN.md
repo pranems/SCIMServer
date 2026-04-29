@@ -25,6 +25,14 @@
 14. [File Inventory](#14-file-inventory)
 15. [Risk Assessment](#15-risk-assessment)
 16. [Decision Log](#16-decision-log)
+17. [Accessibility Strategy](#17-accessibility-strategy)
+18. [Error Handling & Resilience](#18-error-handling--resilience)
+19. [Security Considerations](#19-security-considerations)
+20. [Code Splitting & Lazy Loading](#20-code-splitting--lazy-loading)
+21. [Responsive & Mobile Strategy](#21-responsive--mobile-strategy)
+22. [Frontend Observability](#22-frontend-observability)
+23. [Migration Strategy for Existing Users](#23-migration-strategy-for-existing-users)
+24. [Prompt Chain Methodology](#24-prompt-chain-methodology)
 
 ---
 
@@ -1029,4 +1037,365 @@ All 84 existing routes remain completely unchanged. The new UI consumes them thr
 
 ---
 
-*Document auto-generated from deep architectural analysis and competitive research conducted April 29, 2026.*
+## 17. Accessibility Strategy
+
+### 17.1 WCAG 2.1 AA Compliance Targets
+
+| WCAG Criterion | Requirement | Implementation |
+|---|---|---|
+| 1.1.1 Non-text Content | All images/icons have text alternatives | Fluent UI icons include `aria-label`; SVG charts have `<title>` + `<desc>` |
+| 1.3.1 Info and Relationships | Structure conveyed through markup | Semantic HTML: `<nav>`, `<main>`, `<header>`, `<table>` with `<th scope>` |
+| 1.3.2 Meaningful Sequence | DOM order matches visual order | Flexbox/grid with logical source order; no CSS `order` for content |
+| 1.4.3 Contrast (Minimum) | 4.5:1 for normal text, 3:1 for large | Fluent UI tokens guarantee compliant contrast in both themes |
+| 1.4.11 Non-text Contrast | 3:1 for UI components | Badge/status indicators have both color + icon/text (no color-only info) |
+| 2.1.1 Keyboard | All functionality keyboard-operable | Tab/Enter/Space/Arrow/Escape for all interactive elements |
+| 2.1.2 No Keyboard Trap | Focus can always be moved away | Modal focus trap with Escape key exit; Drawer with Escape close |
+| 2.4.1 Bypass Blocks | Skip to main content | "Skip to main content" link before sidebar |
+| 2.4.3 Focus Order | Logical tab sequence | Sidebar -> Header actions -> Main content -> Footer |
+| 2.4.7 Focus Visible | Visible focus indicator | Fluent UI focus ring tokens (2px solid, high contrast) |
+| 4.1.2 Name, Role, Value | All components expose identity to AT | Fluent UI components are ARIA-compliant by default |
+
+### 17.2 Data Table Accessibility
+
+Data tables (Users, Groups, Logs) are the primary UI element. Following WAI-ARIA APG Table Pattern and Inclusive Components guidance:
+
+```html
+<!-- Accessible table structure -->
+<table aria-label="Users in production endpoint">
+  <caption>
+    <h3>Users</h3>
+    <small>Showing 1-50 of 847 (scroll to see more)</small>
+  </caption>
+  <thead>
+    <tr>
+      <th scope="col" role="columnheader" aria-sort="ascending">
+        userName
+        <button aria-label="sort by userName in descending order">
+          <SortIcon />
+        </button>
+      </th>
+      <th scope="col">displayName</th>
+      <th scope="col">active</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th scope="row">john.doe@contoso.com</th>
+      <td>John Doe</td>
+      <td><Badge aria-label="Active">Active</Badge></td>
+    </tr>
+  </tbody>
+</table>
+```
+
+**Key patterns:**
+- `<th scope="col">` for column headers, `<th scope="row">` for first column (userName)
+- `aria-sort` on the currently sorted column
+- Sort buttons with descriptive `aria-label` stating target state (not current)
+- `<caption>` for table identification (readable by screen reader T-key navigation)
+- Scrollable containers get `tabindex="0"` + `role="group"` + `aria-labelledby` only when content overflows
+
+### 17.3 Command Palette Accessibility
+
+Following WAI-ARIA Combobox Pattern:
+- `role="combobox"` on the search input
+- `role="listbox"` on the results list
+- `aria-activedescendant` for virtual focus (keyboard arrow navigation)
+- `aria-expanded` toggling on open/close
+- Live region (`aria-live="polite"`) announcing result count on filter change
+
+### 17.4 Automated Enforcement
+
+Every Playwright E2E spec includes an axe-core scan after page load:
+
+```typescript
+import AxeBuilder from '@axe-core/playwright';
+
+async function checkA11y(page: Page) {
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa'])
+    .exclude('.recharts-wrapper') // Charts handled separately
+    .analyze();
+  expect(results.violations).toEqual([]);
+}
+```
+
+CI blocks merge on any WCAG 2.1 AA violation.
+
+---
+
+## 18. Error Handling & Resilience
+
+### 18.1 Error Boundary Architecture
+
+```mermaid
+flowchart TD
+    subgraph "Error Boundary Hierarchy"
+        ROOT[RootErrorBoundary<br>Catches fatal crashes<br>Shows full-page recovery UI]
+        ROOT --> LAYOUT[LayoutErrorBoundary<br>Catches sidebar/header errors<br>Falls back to minimal shell]
+        LAYOUT --> ROUTE[RouteErrorBoundary<br>Per-route error handling<br>Shows in-place error message]
+        ROUTE --> QUERY[QueryErrorBoundary<br>Per-query error handling<br>Shows retry button]
+    end
+```
+
+### 18.2 Error States by Type
+
+| Error Type | Status | UI Response | Recovery |
+|---|---|---|---|
+| **Network offline** | 0 | Banner: "You're offline - showing cached data" | Auto-retry on reconnect via `navigator.onLine` |
+| **401 Unauthorized** | 401 | Token modal auto-opens | User re-enters token; all queries retry |
+| **403 Forbidden** | 403 | Inline message: "Insufficient permissions" | Show available actions only |
+| **404 Not Found** | 404 | Route-level: "Endpoint not found" with back link | Navigate to endpoint list |
+| **500 Server Error** | 500 | Query-level: error message + retry button | Click retry, query re-executes |
+| **Timeout** | - | Query-level: "Request timed out" + retry | Automatic retry with backoff (TanStack Query) |
+| **SSE disconnection** | - | Banner: "Live updates paused - reconnecting..." | Auto-reconnect with exponential backoff |
+| **Stale cache** | - | Show stale data + background fetch indicator | Transparent to user (SWR pattern) |
+
+### 18.3 Optimistic Mutation Rollback
+
+```typescript
+// Example: Delete user with optimistic removal + rollback on error
+const deleteUser = useMutation({
+  mutationFn: (userId: string) => api.deleteUser(endpointId, userId),
+  onMutate: async (userId) => {
+    await queryClient.cancelQueries(['endpoint', endpointId, 'users']);
+    const previous = queryClient.getQueryData(['endpoint', endpointId, 'users']);
+    queryClient.setQueryData(['endpoint', endpointId, 'users'], (old) => ({
+      ...old,
+      items: old.items.filter(u => u.id !== userId),
+      total: old.total - 1,
+    }));
+    return { previous };
+  },
+  onError: (_err, _userId, context) => {
+    // Rollback: restore previous data
+    queryClient.setQueryData(['endpoint', endpointId, 'users'], context.previous);
+    toast.error('Failed to delete user. Please try again.');
+  },
+  onSettled: () => {
+    queryClient.invalidateQueries(['endpoint', endpointId, 'users']);
+    queryClient.invalidateQueries(['dashboard']);
+  },
+});
+```
+
+---
+
+## 19. Security Considerations
+
+### 19.1 Token Management
+
+| Concern | Current | After Redesign |
+|---|---|---|
+| Token storage | `localStorage` | `localStorage` (same - admin tool, not public app) |
+| Token exposure | Visible in DevTools | Same - acceptable for admin tool behind network controls |
+| 401 handling | Auto-clear + modal | Same + TanStack Query global `onError` handler |
+| XSS prevention | React auto-escaping | Same + CSP headers recommended |
+| CSRF | Not applicable (Bearer token auth) | Same |
+
+### 19.2 Content Security Policy
+
+Recommended CSP headers for the new UI:
+
+```
+Content-Security-Policy:
+  default-src 'self';
+  script-src 'self';
+  style-src 'self' 'unsafe-inline';  /* Required for Fluent UI CSS-in-JS */
+  img-src 'self' data:;
+  connect-src 'self' https://api.github.com;  /* Version check */
+  font-src 'self';
+```
+
+### 19.3 Sensitive Data Handling
+
+- JSON tree viewer: Credential hashes are **never** returned by the API (only metadata)
+- Log detail viewer: Request/response bodies may contain PII - no client-side caching of log bodies (only metadata cached, bodies fetched on-demand via `fetchLog(id)`)
+- Export functions: Warn user before exporting data that may contain PII
+
+---
+
+## 20. Code Splitting & Lazy Loading
+
+### 20.1 Route-Based Splitting Strategy
+
+```typescript
+// Each route loads its component lazily
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const EndpointsPage = lazy(() => import('./pages/EndpointsPage'));
+const EndpointDetail = lazy(() => import('./pages/endpoint/EndpointDetailLayout'));
+const GlobalLogsPage = lazy(() => import('./pages/GlobalLogsPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+```
+
+### 20.2 Expected Chunk Sizes
+
+| Chunk | Content | Size (gzip) | Loaded When |
+|---|---|---|---|
+| `main` | React, Router, Query, Zustand, AppShell, Sidebar | ~70KB | Always |
+| `dashboard` | KPI cards, Recharts, RequestChart | ~50KB | Navigate to `/` |
+| `endpoints` | EndpointCard, CreateModal | ~15KB | Navigate to `/endpoints` |
+| `endpoint-detail` | TabBar, DataTable, DetailDrawer | ~40KB | Navigate to `/endpoints/:id` |
+| `schemas` | SchemaTree, AttributeBadge | ~10KB | Navigate to schemas tab |
+| `command-palette` | cmdk, search result components | ~5KB | Ctrl+K pressed (deferred) |
+| `settings` | Config flag toggles, log config forms | ~10KB | Navigate to `/settings` |
+
+### 20.3 Prefetching Strategy
+
+```typescript
+// Prefetch endpoint detail when hovering over endpoint card
+<Link
+  to="/endpoints/$endpointId"
+  params={{ endpointId: ep.id }}
+  preload="intent"  // TanStack Router: prefetch on hover/focus
+>
+  <EndpointCard endpoint={ep} />
+</Link>
+```
+
+When a user hovers over an endpoint card, the route's `loader` fires in the background, fetching the endpoint overview data. By the time they click, both the JavaScript chunk AND the data are already loaded. Navigation feels instant.
+
+---
+
+## 21. Responsive & Mobile Strategy
+
+### 21.1 Breakpoint System
+
+| Breakpoint | Width | Layout Change |
+|---|---|---|
+| **Desktop** | >= 1024px | Sidebar expanded + main content |
+| **Tablet** | 768-1023px | Sidebar collapsed (icons only) + main content |
+| **Mobile** | < 768px | Sidebar hidden (hamburger menu) + full-width content |
+
+### 21.2 Data Table Responsiveness
+
+Following the Inclusive Components pattern - tables remain semantic `<table>` elements at all breakpoints:
+
+- **Desktop**: Full table with all columns visible
+- **Tablet**: Horizontal scroll with `overflow-x: auto`, `tabindex="0"` for keyboard scroll, "(scroll to see more)" caption hint
+- **Mobile**: Transform to stacked card layout using CSS (`@media (max-width: 768px)`) - each row becomes a card with label-value pairs
+
+### 21.3 Touch Considerations
+
+- Minimum touch target: 44x44px (WCAG 2.5.8)
+- Swipe gestures: None (avoid hidden interactions)
+- Long-press: None (use explicit buttons instead)
+- Drawer panels: Full-width on mobile (not side slide-over)
+
+---
+
+## 22. Frontend Observability
+
+### 22.1 Performance Monitoring
+
+```typescript
+// Report Web Vitals to console or analytics
+import { onCLS, onFID, onLCP, onFCP, onTTFB } from 'web-vitals';
+
+function reportMetric(metric: Metric) {
+  // Send to /admin/client-metrics or console
+  console.debug(`[WebVital] ${metric.name}: ${metric.value.toFixed(1)}ms`);
+}
+
+onCLS(reportMetric);   // Cumulative Layout Shift (target: < 0.1)
+onFID(reportMetric);   // First Input Delay (target: < 100ms)
+onLCP(reportMetric);   // Largest Contentful Paint (target: < 2.5s)
+```
+
+### 22.2 Query Performance Tracking
+
+```typescript
+// TanStack Query global callbacks for observability
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      onError: (error) => {
+        console.error('[Query Error]', error);
+      },
+    },
+  },
+  queryCache: new QueryCache({
+    onError: (error, query) => {
+      console.error(`[Cache Error] ${query.queryKey}:`, error);
+    },
+  }),
+});
+```
+
+### 22.3 Error Tracking
+
+| What | How | Destination |
+|---|---|---|
+| Unhandled exceptions | `window.onerror` + React Error Boundaries | Console + optional external service |
+| Query failures | TanStack Query `onError` callbacks | Console with query key context |
+| SSE disconnections | EventSource `onerror` handler | Console + reconnection counter |
+| Navigation errors | Router error boundaries | In-app error page |
+| Render performance | React Profiler API (dev only) | DevTools |
+
+---
+
+## 23. Migration Strategy for Existing Users
+
+### 23.1 Phased Rollout
+
+```mermaid
+flowchart LR
+    subgraph "Phase 1: Side-by-Side"
+        OLD1[Old UI<br>Default at /] --> NEW1[New UI<br>Behind ?ui=next]
+    end
+
+    subgraph "Phase 2: Opt-In Default"
+        OLD2[Old UI<br>Behind ?ui=legacy] --> NEW2[New UI<br>Default at /]
+    end
+
+    subgraph "Phase 3: Removal"
+        NEW3[New UI only<br>Old UI removed]
+    end
+
+    Phase1 --> Phase2 --> Phase3
+
+    style OLD1 fill:#868e96,color:#fff
+    style OLD2 fill:#868e96,color:#fff
+    style NEW1 fill:#51cf66,color:#fff
+    style NEW2 fill:#51cf66,color:#fff
+    style NEW3 fill:#51cf66,color:#fff
+```
+
+### 23.2 URL Backward Compatibility
+
+The old UI has no URLs (everything is tab state). There are no bookmarks or saved links to break. The migration is URL-additive only - every new URL is net-new functionality.
+
+### 23.3 API Backward Compatibility
+
+All existing admin API endpoints remain unchanged. The new BFF endpoints (`/admin/dashboard`, `/admin/endpoints/:id/overview`) are additive. Any tool or script calling the existing admin API continues to work without modification.
+
+### 23.4 Configuration Backward Compatibility
+
+No new environment variables required for the UI. The same `VITE_API_BASE`, `VITE_SCIM_TOKEN`, theme preference in `localStorage` - all carry forward unchanged.
+
+---
+
+## 24. Prompt Chain Methodology
+
+This document was produced through a systematic 12-prompt investigation chain. This methodology forms a reusable **architecture decision pipeline** for any major redesign:
+
+| Stage | Prompt Intent | Key Question | Outcome |
+|---|---|---|---|
+| 1 | Remove anchoring bias | "What do the best products do, ignoring what we have?" | 4 UI options with competitive analysis |
+| 2 | Crystallize direction | "What's the concrete plan?" | Hybrid architecture + tech stack + phases |
+| 3 | Validate backend feasibility | "What's the performance impact on the backend?" | 4 bottlenecks identified (N+1, COUNT storms, FS reads) |
+| 4 | Design solutions | "What architectural changes solve the problems found?" | 7 backend suggestions (StatsProjection, NameResolver, BFF) |
+| 5 | Unconstrained exploration (round 1) | "Best architectures anywhere, no constraints" | TanStack stack, Event sourcing lite, CQRS, SSE multiplexing |
+| 6 | Unconstrained exploration (round 2) | "Remove ALL bias - company, tech, audience" | Linear/Raycast patterns, shadcn/ui alternative, 6 design principles |
+| 7 | Testability validation | "Can every layer be tested independently?" | 4-tier test pyramid, TanStack improves testability, MSW integration tier |
+| 8 | Automation validation | "Zero-human-effort quality enforcement" | 4-stage CI pipeline, contract types, a11y gate, visual regression |
+| 9 | Multi-environment validation | "Does this work in all 5 deployment modes?" | Mode-agnostic DI rule, CI matrix, parity test suite |
+| 10 | Implementation sequencing | "Exact step-by-step order with dependencies" | 42 steps, 6 phases, dependency graph, 9-14 day estimate |
+| 11 | Formal documentation | "Create comprehensive doc per project norms" | 1,033-line document with Mermaid diagrams and decision log |
+| 12 | Enhancement & gap filling | "Add everything missing" | 8 additional sections: a11y, errors, security, code splitting, responsive, observability, migration, methodology |
+
+**Key insight:** The chain progressively narrows from unconstrained exploration (Stages 1, 5, 6) to concrete implementation details (Stages 9-12), ensuring creativity isn't constrained too early but rigor is applied before execution begins. Each stage validates assumptions from the previous stage - performance concerns (Stage 3) informed the backend design (Stage 4), which informed testability requirements (Stage 7), which informed automation strategy (Stage 8).
+
+---
+
+*Document produced from deep architectural analysis, competitive research across 10+ products, accessibility standards research (WCAG 2.1, WAI-ARIA APG), and systematic prompt-chain methodology conducted April 29, 2026.*
