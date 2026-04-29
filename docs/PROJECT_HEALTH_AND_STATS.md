@@ -1,6 +1,6 @@
 # Project Health & Stats
 
-> **Version:** 0.38.0 · **Updated:** April 23, 2026 · **Status:** Production-ready
+> **Version:** 0.40.0 - **Updated:** April 28, 2026 - **Status:** Production-ready
 
 ---
 
@@ -12,7 +12,7 @@
 | **Source LoC** | 29,837 |
 | **Unit test files** (`api/src/**/*.spec.ts`) | 84 |
 | **Unit test LoC** | 32,776 |
-| **E2E test files** (`api/test/e2e/**/*.e2e-spec.ts`) | 51 |
+| **E2E test files** (`api/test/e2e/**/*.e2e-spec.ts`) | 54 |
 | **E2E test LoC** | ~14,300 |
 | **Documentation files** (`docs/**/*.md`) | ~125 (69 active + 56 archived) |
 | **Scripts** (`scripts/*.ps1`) | 18 |
@@ -22,11 +22,11 @@
 
 | Layer | Suites | Tests | Skip | Status |
 |-------|--------|-------|------|--------|
-| **Unit** | 84 | 3,378 | 0 | ✅ All pass |
-| **E2E** | 51 | 1,074 | 0 | ✅ All pass |
-| **Live (main)** | 57 sections | ~789 | 0 | All pass |
+| **Unit** | 84 | 3,429 | 0 | ✅ All pass |
+| **E2E** | 54 | 1,149 | 0 | ✅ All pass |
+| **Live (main)** | 60 sections | ~817 | 0 | All pass |
 | **Live (Lexmark ISV)** | 13 sections | 112 | 0 | All pass |
-| **Total** | **~205** | **~5,353** | 0 | All pass |
+| **Total** | **~211** | **~5,507** | 0 | All pass |
 
 ### Unit Test Suites (84)
 
@@ -35,9 +35,9 @@
 **Auth/OAuth (3):** auth guard, OAuth controller, OAuth service  
 **Modules (60):** controllers, services, DTOs, filters, interceptors, endpoint-profile, discovery, logging, database, activity-parser, web
 
-### E2E Test Suites (51)
+### E2E Test Suites (54)
 
-`admin-api-coverage`, `admin-endpoint-api`, `admin-version`, `advanced-patch`, `api-response-contracts`, `attribute-projection`, `authentication`, `bulk-operations`, `config-flags`, `custom-resource-types`, `discovery-endpoints`, `edge-cases`, `endpoint-isolation`, `endpoint-profile`, `endpoint-scoped-logs`, `error-handling`, `etag-conditional`, `filter-operators`, `generic-filter-operators`, `group-lifecycle`, `group-parity-gaps`, `http-error-codes`, `lexmark-isv`, `log-config`, `manager-patch-string-coercion`, `me-endpoint`, `multi-endpoint-isolation`, `p2-attribute-characteristics`, `p4-attribute-fixes`, `per-endpoint-credentials`, `primary-enforcement`, `profile-combinations`, `profile-flag-combos`, `rca-diagnostics`, `readonly-stripping`, `returned-characteristic`, `rfc-compliance`, `schema-cache-integration`, `schema-driven-uniqueness`, `schema-validation`, `scim-validator-compliance`, `search-endpoint`, `soft-delete-flags`, `sorting`, `test-gaps-audit`, `test-gaps-audit-2`, `test-gaps-audit-3`, `test-gaps-audit-4`, `test-gaps-audit-5`, `user-lifecycle`, `user-uniqueness-required`
+`admin-api-coverage`, `admin-endpoint-api`, `admin-version`, `advanced-patch`, `api-response-contracts`, `api-response-contracts-2`, `attribute-projection`, `authentication`, `bulk-operations`, `config-flags`, `custom-resource-types`, `diagnostics-enrichment`, `discovery-endpoints`, `edge-cases`, `endpoint-isolation`, `endpoint-profile`, `endpoint-scoped-logs`, `error-handling`, `etag-conditional`, `filter-operators`, `generic-filter-operators`, `group-lifecycle`, `group-parity-gaps`, `http-error-codes`, `lexmark-isv`, `log-config`, `manager-patch-string-coercion`, `me-endpoint`, `multi-endpoint-isolation`, `p2-attribute-characteristics`, `p4-attribute-fixes`, `per-endpoint-credentials`, `primary-enforcement`, `profile-combinations`, `profile-flag-combos`, `rca-diagnostics`, `readonly-stripping`, `returned-characteristic`, `rfc-compliance`, `schema-cache-integration`, `schema-driven-uniqueness`, `schema-validation`, `scim-validator-compliance`, `search-endpoint`, `soft-delete-flags`, `sorting`, `test-gaps-audit`, `test-gaps-audit-2`, `test-gaps-audit-3`, `test-gaps-audit-4`, `test-gaps-audit-5`, `test-gaps-audit-6`, `user-lifecycle`, `user-uniqueness-required`
 
 ## Architecture Overview
 

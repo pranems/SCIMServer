@@ -6,7 +6,7 @@
  * and SCIM operations are fully independent and concurrent-safe.
  *
  * Endpoints:
- *   EP-A: rfc-standard + SoftDeleteEnabled + StrictSchemaValidation
+ *   EP-A: rfc-standard + UserSoftDeleteEnabled + StrictSchemaValidation
  *   EP-B: minimal + VerbosePatchSupported (no extensions, no bulk)
  *   EP-C: Custom inline profile with HR extension (returned:never field)
  *   EP-D: entra-id preset (scoped User attrs, MSFT extensions, no bulk, boolean coercion)
@@ -45,7 +45,7 @@ describe('Multi-Endpoint Isolation (E2E)', () => {
       .patch(`/scim/admin/endpoints/${epA}`)
       .set('Authorization', `Bearer ${token}`)
       .set('Content-Type', 'application/json')
-      .send({ profile: { settings: { SoftDeleteEnabled: 'True', StrictSchemaValidation: 'True' } } })
+      .send({ profile: { settings: { UserSoftDeleteEnabled: 'True', StrictSchemaValidation: 'True' } } })
       .expect(200);
 
     // EP-B: minimal + VerbosePatch + StrictSchema OFF (for lenient tests)

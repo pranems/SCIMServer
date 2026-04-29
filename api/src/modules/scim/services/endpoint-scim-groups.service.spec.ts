@@ -1086,7 +1086,7 @@ describe('EndpointScimGroupsService', () => {
     });
 
     describe('hard delete (Groups always hard-delete, gated by GroupHardDeleteEnabled)', () => {
-      it('should hard-delete group when SoftDeleteEnabled is false', async () => {
+      it('should hard-delete group when GroupHardDeleteEnabled defaults to true', async () => {
         mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
         mockGroupRepo.delete.mockResolvedValue(undefined);
 
@@ -1097,7 +1097,7 @@ describe('EndpointScimGroupsService', () => {
         expect(mockGroupRepo.update).not.toHaveBeenCalled();
       });
 
-      it('should hard-delete group when SoftDeleteEnabled is "False" (string)', async () => {
+      it('should hard-delete group when config has string values (GroupHardDeleteEnabled defaults to true)', async () => {
         mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
         mockGroupRepo.delete.mockResolvedValue(undefined);
 
@@ -1118,7 +1118,7 @@ describe('EndpointScimGroupsService', () => {
         expect(mockGroupRepo.update).not.toHaveBeenCalled();
       });
 
-      it('should hard-delete group when config has no SoftDeleteEnabled key', async () => {
+      it('should hard-delete group when config has no GroupHardDeleteEnabled key (defaults to true)', async () => {
         mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
         mockGroupRepo.delete.mockResolvedValue(undefined);
 
@@ -1715,7 +1715,7 @@ describe('EndpointScimGroupsService', () => {
   // ═══════════════════════════════════════════════════════════
 
   describe('config flag combinations (Groups)', () => {
-    it('should hard-delete when SoftDeleteEnabled=false despite other flags', async () => {
+    it('should hard-delete when GroupHardDeleteEnabled defaults to true despite other flags', async () => {
       mockGroupRepo.findByScimId.mockResolvedValue(mockGroup);
       mockGroupRepo.delete.mockResolvedValue(mockGroup);
 

@@ -3,8 +3,8 @@
 > **Document Purpose**: Feature reference for the G8f gap closure - `displayName` uniqueness enforcement on Group PUT and PATCH operations.
 >
 > **Created**: February 26, 2026  
-> **Updated**: April 23, 2026 (v0.38.0)  
-> **Version**: v0.38.0  
+> **Updated**: April 28, 2026 (v0.40.0)  
+> **Version**: v0.40.0  
 > **RFC Reference**: RFC 7644 §3.5.1 (Replacing with PUT), RFC 7644 §3.5.2 (Modifying with PATCH), RFC 7643 §2.4 (uniqueness)
 
 ---

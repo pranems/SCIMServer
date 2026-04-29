@@ -1,6 +1,6 @@
 # H-1 & H-2: Architecture Analysis, Deliberation & Implementation
 
-> **Date:** 2026-04-23 | **Version:** v0.38.0 (implemented)  
+> **Date:** 2026-04-28 | **Version:** v0.40.0 (implemented)  
 > **Scope:** PATCH SchemaValidator integration (H-1) and Immutable attribute enforcement (H-2)  
 > **Status:** ✅ IMPLEMENTED
 

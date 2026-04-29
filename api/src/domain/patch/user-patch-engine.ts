@@ -145,10 +145,13 @@ export class UserPatchEngine {
               config,
             ));
         } else {
-          ({ active, rawPayload } =
-            UserPatchEngine.applyRemove(
-              originalPath, path, active, rawPayload, config,
-            ));
+          const removeResult = UserPatchEngine.applyRemove(
+            originalPath, path, active, rawPayload, config,
+          );
+          active = removeResult.active;
+          rawPayload = removeResult.rawPayload;
+          if ('externalId' in removeResult) externalId = removeResult.externalId as string | null;
+          if ('displayName' in removeResult) displayName = removeResult.displayName as string | null;
         }
       } catch (err) {
         if (err instanceof PatchError && err.operationIndex === undefined) {
@@ -289,9 +292,27 @@ export class UserPatchEngine {
     active: boolean,
     rawPayload: Record<string, unknown>,
     config: PatchConfig,
-  ) {
+  ): { active: boolean; rawPayload: Record<string, unknown>; externalId?: null; displayName?: null } {
     if (path === 'active') {
       return { active: false, rawPayload: { ...rawPayload, active: false } };
+    }
+
+    // GAP-1: Column-promoted field remove handlers (RFC 7644 §3.5.2.2)
+    if (path === 'username') {
+      throw new PatchError(
+        400,
+        "Cannot remove required attribute 'userName'. userName is required for User resources (RFC 7643 §4.1).",
+        'invalidValue',
+      );
+    }
+
+    if (path === 'externalid') {
+      return { active, rawPayload, externalId: null };
+    }
+
+    if (path === 'displayname') {
+      rawPayload = UserPatchEngine.removeAttribute(rawPayload, originalPath ?? 'displayName');
+      return { active, rawPayload, displayName: null };
     }
 
     if (originalPath && isExtensionPath(originalPath, config.extensionUrns)) {

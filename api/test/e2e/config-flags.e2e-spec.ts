@@ -421,7 +421,7 @@ describe('Config Flags (E2E)', () => {
     it('ReprovisionOnConflict WITHOUT SoftDelete: 409 conflict (reprovision has no effect)', async () => {
       const endpointId = await createEndpointWithConfig(app, token, {
         ReprovisionOnConflictForSoftDeletedResource: 'True',
-        SoftDeleteEnabled: 'False',
+        UserSoftDeleteEnabled: 'False',
       });
       const basePath = scimBasePath(endpointId);
 

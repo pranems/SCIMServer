@@ -1,7 +1,7 @@
 # Schema Attribute Customization Guide
 
-> **Version**: 1.0 · **Date**: April 16, 2026 · **Status**: ✅ Complete (source-verified)  
-> **SCIMServer**: v0.38.0 · **Audience**: Operators, ISV admins, Entra ID integration engineers  
+> **Version**: 1.0 - **Date**: April 28, 2026 - **Status**: ✅ Complete (source-verified)  
+> **SCIMServer**: v0.40.0 - **Audience**: Operators, ISV admins, Entra ID integration engineers  
 > **Scope**: Per-endpoint attribute characteristic changes - canonicalValues, required, mutability, uniqueness, caseExact, returned
 
 ---

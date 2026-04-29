@@ -1,6 +1,6 @@
 # SCIM 2.0 RFC Compliance
 
-> **Version:** 0.38.0 - **Updated:** April 24, 2026  
+> **Version:** 0.40.0 - **Updated:** April 28, 2026  
 > **Source of truth:** [api/src/modules/scim/](../api/src/modules/scim/)  
 > **Status:** 100% compliant with RFC 7643 (Core Schema) and RFC 7644 (Protocol)
 
@@ -359,9 +359,9 @@ Compliance is verified through 4 layers of testing:
 
 | Layer | Count | Coverage |
 |-------|-------|----------|
-| **Unit tests** | 3,378 (84 suites) | Schema validation, PATCH engines, filter parsing, attribute projection |
-| **E2E tests** | 1,074 (51 suites) | Full HTTP request/response verification for all operations |
-| **Live tests** | ~789 (57 sections) | Real HTTP against running server - all deployment targets |
+| **Unit tests** | 3,429 (84 suites) | Schema validation, PATCH engines, filter parsing, attribute projection |
+| **E2E tests** | 1,149 (54 suites) | Full HTTP request/response verification for all operations |
+| **Live tests** | ~817 (60 sections) | Real HTTP against running server - all deployment targets |
 | **ISV tests** | 112 (13 sections) | Lexmark SCIM Validator compliance verification |
 
 ### Key Test Suites

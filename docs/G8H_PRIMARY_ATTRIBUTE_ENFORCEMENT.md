@@ -3,7 +3,7 @@
 > **Document Purpose**: Feature reference for the G8h enhancement - configurable enforcement of the RFC 7643 section 2.4 `primary` sub-attribute constraint on multi-valued complex attributes.
 >
 > **Created**: April 22, 2026
-> **Version**: v0.38.0
+> **Version**: v0.40.0
 > **Status**: Complete
 > **RFC Reference**: [RFC 7643 section 2.4 - Multi-Valued Attributes](https://datatracker.ietf.org/doc/html/rfc7643#section-2.4)
 
@@ -226,12 +226,8 @@ The **post-merge** enforcement is the authoritative check. The pre-PATCH check i
 ### Admin API Usage
 
 ```json
-// Set via endpoint config (legacy path)
-PUT /admin/endpoints/:id
-{ "config": { "PrimaryEnforcement": "normalize" } }
-
-// Set via profile settings (profile path)
-PUT /admin/endpoints/:id
+// Set via profile settings
+PATCH /admin/endpoints/:id
 {
   "profile": {
     "settings": {

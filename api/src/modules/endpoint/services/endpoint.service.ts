@@ -372,6 +372,8 @@ export class EndpointService implements OnModuleInit {
 
     // Persist + cache
     if (this.isInMemoryBackend) {
+      // Normalize any deprecated settings keys before caching
+      this.normalizeStaleSettingsKeys(resolvedProfile);
       const now = new Date();
       const id = randomUUID();
       const cached: CachedEndpoint = {
@@ -535,6 +537,9 @@ export class EndpointService implements OnModuleInit {
       if (dto.profile) {
         newProfile = this.mergeProfilePartial(newProfile, dto.profile);
       }
+
+      // Normalize any deprecated settings keys after merge
+      this.normalizeStaleSettingsKeys(newProfile);
 
       // Legacy config merge into profile.settings for backward compat
       const updated: CachedEndpoint = {
@@ -819,6 +824,30 @@ export class EndpointService implements OnModuleInit {
 
   // ─── Internal Helpers ───────────────────────────────────────────────
 
+  /**
+   * Normalize deprecated settings keys to their current names.
+   * Called from both toCached() (DB path) and in-memory CRUD paths so
+   * deprecated keys never survive in the cached profile regardless of
+   * persistence backend.
+   */
+  private normalizeStaleSettingsKeys(profile: EndpointProfile | undefined): void {
+    if (!profile?.settings) return;
+    const s = profile.settings as Record<string, unknown>;
+    const STALE_KEY_MAP: Record<string, string> = {
+      SoftDeleteEnabled: 'UserSoftDeleteEnabled',
+      MultiOpPatchRequestAddMultipleMembersToGroup: 'MultiMemberPatchOpForGroupEnabled',
+      MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'MultiMemberPatchOpForGroupEnabled',
+    };
+    for (const [oldKey, newKey] of Object.entries(STALE_KEY_MAP)) {
+      if (oldKey in s && !(newKey in s)) {
+        s[newKey] = s[oldKey];
+      }
+      if (oldKey in s) {
+        delete s[oldKey];
+      }
+    }
+  }
+
   private toCached(endpoint: Endpoint): CachedEndpoint {
     const profile = endpoint.profile as Record<string, any> | null;
     const typedProfile = profile as EndpointProfile | undefined;
@@ -830,23 +859,7 @@ export class EndpointService implements OnModuleInit {
     }
 
     // Normalize stale settings keys from pre-v0.29 profiles to current names.
-    // These old keys may persist in the DB from endpoints created before the rename.
-    if (typedProfile?.settings) {
-      const s = typedProfile.settings as Record<string, unknown>;
-      const STALE_KEY_MAP: Record<string, string> = {
-        SoftDeleteEnabled: 'UserSoftDeleteEnabled',
-        MultiOpPatchRequestAddMultipleMembersToGroup: 'MultiMemberPatchOpForGroupEnabled',
-        MultiOpPatchRequestRemoveMultipleMembersFromGroup: 'MultiMemberPatchOpForGroupEnabled',
-      };
-      for (const [oldKey, newKey] of Object.entries(STALE_KEY_MAP)) {
-        if (oldKey in s && !(newKey in s)) {
-          s[newKey] = s[oldKey];
-        }
-        if (oldKey in s) {
-          delete s[oldKey];
-        }
-      }
-    }
+    this.normalizeStaleSettingsKeys(typedProfile);
 
     return {
       id: endpoint.id,

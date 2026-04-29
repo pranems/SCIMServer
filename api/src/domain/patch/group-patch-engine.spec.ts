@@ -487,4 +487,50 @@ describe('GroupPatchEngine', () => {
       expect(result.members.map(m => m.value)).toEqual(['user-1']);
     });
   });
+
+  // ── GAP-1: Remove on column-promoted fields (RFC 7644 §3.5.2.2) ──
+
+  describe('remove column-promoted fields', () => {
+    it('should remove externalId - sets to null', () => {
+      const result = apply(
+        [{ op: 'remove', path: 'externalId' }],
+        { externalId: 'grp-ext-001' },
+      );
+      expect(result.externalId).toBeNull();
+    });
+
+    it('should remove externalId case-insensitively', () => {
+      const result = apply(
+        [{ op: 'remove', path: 'ExternalId' }],
+        { externalId: 'grp-ext-001' },
+      );
+      expect(result.externalId).toBeNull();
+    });
+
+    it('should reject remove on displayName with 400 (required attribute)', () => {
+      expect(() =>
+        apply([{ op: 'remove', path: 'displayName' }]),
+      ).toThrow(PatchError);
+      try {
+        apply([{ op: 'remove', path: 'displayName' }]);
+      } catch (e: any) {
+        expect(e.status).toBe(400);
+        expect(e.message).toContain('required');
+      }
+    });
+
+    it('should reject remove on DisplayName case-insensitively', () => {
+      expect(() =>
+        apply([{ op: 'remove', path: 'DisplayName' }]),
+      ).toThrow(PatchError);
+    });
+
+    it('should allow remove externalId then add new externalId via replace', () => {
+      const result = apply([
+        { op: 'remove', path: 'externalId' },
+        { op: 'replace', path: 'externalId', value: 'new-ext' },
+      ], { externalId: 'old-ext' });
+      expect(result.externalId).toBe('new-ext');
+    });
+  });
 });

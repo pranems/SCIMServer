@@ -144,6 +144,68 @@ describe('UserPatchEngine', () => {
       expect(() => apply([{ op: 'remove' }])).toThrow(PatchError);
       expect(() => apply([{ op: 'remove' }])).toThrow('Remove operation requires a path');
     });
+
+    // ── GAP-1: Remove on column-promoted fields (RFC 7644 §3.5.2.2) ──
+
+    it('should remove externalId - sets extracted field to null', () => {
+      const result = apply(
+        [{ op: 'remove', path: 'externalId' }],
+        { externalId: 'ext-001' },
+      );
+      expect(result.extractedFields.externalId).toBeNull();
+    });
+
+    it('should remove externalId case-insensitively', () => {
+      const result = apply(
+        [{ op: 'remove', path: 'ExternalId' }],
+        { externalId: 'ext-001' },
+      );
+      expect(result.extractedFields.externalId).toBeNull();
+    });
+
+    it('should remove displayName - sets extracted field to null', () => {
+      const result = apply(
+        [{ op: 'remove', path: 'displayName' }],
+        { displayName: 'John Doe' },
+      );
+      expect(result.extractedFields.displayName).toBeNull();
+    });
+
+    it('should remove displayName from rawPayload', () => {
+      const result = apply(
+        [{ op: 'remove', path: 'displayName' }],
+        { displayName: 'John Doe', rawPayload: { displayName: 'John Doe', title: 'Eng' } },
+      );
+      expect(result.extractedFields.displayName).toBeNull();
+      expect(result.payload.displayName).toBeUndefined();
+      expect(result.payload.title).toBe('Eng');
+    });
+
+    it('should reject remove on userName with 400 (required attribute)', () => {
+      expect(() =>
+        apply([{ op: 'remove', path: 'userName' }]),
+      ).toThrow(PatchError);
+      try {
+        apply([{ op: 'remove', path: 'userName' }]);
+      } catch (e: any) {
+        expect(e.status).toBe(400);
+        expect(e.message).toContain('required');
+      }
+    });
+
+    it('should reject remove on UserName case-insensitively with 400', () => {
+      expect(() =>
+        apply([{ op: 'remove', path: 'UserName' }]),
+      ).toThrow(PatchError);
+    });
+
+    it('should allow remove externalId then add new externalId', () => {
+      const result = apply([
+        { op: 'remove', path: 'externalId' },
+        { op: 'add', path: 'externalId', value: 'new-ext' },
+      ], { externalId: 'old-ext' });
+      expect(result.extractedFields.externalId).toBe('new-ext');
+    });
   });
 
   // ── ValuePath expressions ──────────────────────────────────────────

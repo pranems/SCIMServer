@@ -313,7 +313,7 @@ describe('Profile Configuration Combinations (E2E)', () => {
     it('SoftDelete + StrictSchema: both enforced independently', async () => {
       const { createEndpointWithConfig } = await import('./helpers/request.helper');
       const epId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
+        UserSoftDeleteEnabled: 'True',
         StrictSchemaValidation: 'True',
       });
       expect(epId).toBeDefined();
@@ -321,7 +321,7 @@ describe('Profile Configuration Combinations (E2E)', () => {
         .get(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      expect(ep.body.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(ep.body.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
       expect(ep.body.profile?.settings?.StrictSchemaValidation).toBe('True');
     });
 
@@ -342,7 +342,7 @@ describe('Profile Configuration Combinations (E2E)', () => {
     it('all flags set: SoftDelete + Strict + RequireIfMatch + BooleanStrings + Reprovision + PerEndpointCreds', async () => {
       const { createEndpointWithConfig } = await import('./helpers/request.helper');
       const epId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
+        UserSoftDeleteEnabled: 'True',
         StrictSchemaValidation: 'True',
         RequireIfMatch: 'True',
         AllowAndCoerceBooleanStrings: 'True',
@@ -688,10 +688,10 @@ describe('Profile Configuration Combinations (E2E)', () => {
         .patch(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
         .set('Content-Type', 'application/json')
-        .send({ profile: { settings: { SoftDeleteEnabled: 'True' } } })
+        .send({ profile: { settings: { UserSoftDeleteEnabled: 'True' } } })
         .expect(200);
-      expect(res.body.profile?.settings?.SoftDeleteEnabled).toBe('True');
-      expect(res.body.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(res.body.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
+      expect(res.body.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
     });
 
     it('should preserve existing settings when adding another', async () => {
@@ -702,7 +702,7 @@ describe('Profile Configuration Combinations (E2E)', () => {
         .send({ profile: { settings: { StrictSchemaValidation: 'True' } } })
         .expect(200);
       // Both should exist
-      expect(res.body.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(res.body.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
       expect(res.body.profile?.settings?.StrictSchemaValidation).toBe('True');
     });
 
@@ -711,9 +711,9 @@ describe('Profile Configuration Combinations (E2E)', () => {
         .patch(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
         .set('Content-Type', 'application/json')
-        .send({ profile: { settings: { SoftDeleteEnabled: 'False' } } })
+        .send({ profile: { settings: { UserSoftDeleteEnabled: 'False' } } })
         .expect(200);
-      expect(res.body.profile?.settings?.SoftDeleteEnabled).toBe('False');
+      expect(res.body.profile?.settings?.UserSoftDeleteEnabled).toBe('False');
       // Other setting should still be there
       expect(res.body.profile?.settings?.StrictSchemaValidation).toBe('True');
     });
@@ -886,7 +886,7 @@ describe('Profile Configuration Combinations (E2E)', () => {
         .set('Content-Type', 'application/json')
         .send({
           profile: {
-            settings: { SoftDeleteEnabled: 'True', RequireIfMatch: 'True' },
+            settings: { UserSoftDeleteEnabled: 'True', RequireIfMatch: 'True' },
             serviceProviderConfig: {
               patch: { supported: true }, bulk: { supported: false },
               filter: { supported: true, maxResults: 100 }, sort: { supported: false },
@@ -896,7 +896,7 @@ describe('Profile Configuration Combinations (E2E)', () => {
         })
         .expect(200);
 
-      expect(res.body.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(res.body.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
       expect(res.body.profile?.settings?.RequireIfMatch).toBe('True');
 
       const spc = await scimGet(app, `${scimBasePath(epId)}/ServiceProviderConfig`, token).expect(200);
@@ -942,7 +942,7 @@ describe('Profile Configuration Combinations (E2E)', () => {
         .get(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
-      expect(ep.body.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(ep.body.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
       expect(ep.body.profile?.settings?.VerbosePatchSupported).toBe('True');
     });
 
@@ -1056,12 +1056,12 @@ describe('Profile Configuration Combinations (E2E)', () => {
         .send({
           displayName: 'Updated Display',
           active: true,
-          profile: { settings: { SoftDeleteEnabled: 'True' } },
+          profile: { settings: { UserSoftDeleteEnabled: 'True' } },
         })
         .expect(200);
       expect(res.body.displayName).toBe('Updated Display');
       expect(res.body.active).toBe(true);
-      expect(res.body.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(res.body.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
     });
   });
 });

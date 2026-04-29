@@ -1,6 +1,6 @@
 # Endpoint Configuration Flags Reference
 
-> **Version:** 0.38.0 - **Updated:** April 24, 2026  
+> **Version:** 0.40.0 - **Updated:** April 28, 2026  
 > **Source of truth:** [endpoint-config.interface.ts](../api/src/modules/endpoint/endpoint-config.interface.ts)  
 > 16 flags: 13 boolean + 1 log level + 1 tri-state string + 1 boolean (logFile)
 

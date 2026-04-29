@@ -67,7 +67,7 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
         .patch(`/scim/admin/endpoints/${epId}`)
         .set('Authorization', `Bearer ${token}`)
         .set('Content-Type', 'application/json')
-        .send({ profile: { settings: { SoftDeleteEnabled: 'True' } } });
+        .send({ profile: { settings: { UserSoftDeleteEnabled: 'True' } } });
 
       // GET to verify the merge result
       const getRes = await request(app.getHttpServer())
@@ -76,7 +76,7 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
         .expect(200);
 
       // Settings should include the new flag + preserved defaults
-      expect(getRes.body.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(getRes.body.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
       expect(getRes.body.profile?.settings?.AllowAndCoerceBooleanStrings).toBe('True'); // preserved
 
       // Profile sections unchanged
@@ -97,7 +97,7 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
   describe('SoftDelete + Reprovision combo', () => {
     it('should reprovision soft-deleted user on conflict when both flags ON', async () => {
       const epId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
+        UserSoftDeleteEnabled: 'True',
         ReprovisionOnConflictForSoftDeletedResource: 'True',
       });
       const basePath = scimBasePath(epId);
@@ -208,7 +208,7 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
   describe('RequireIfMatch + SoftDelete combo', () => {
     it('should return 404 for soft-deleted resource (before ETag check)', async () => {
       const epId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
+        UserSoftDeleteEnabled: 'True',
         RequireIfMatch: 'True',
       });
       const basePath = scimBasePath(epId);
@@ -328,7 +328,7 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
   describe('Settings via profile PATCH', () => {
     it('should accept multiple settings flags on create', async () => {
       const epId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
+        UserSoftDeleteEnabled: 'True',
         StrictSchemaValidation: 'True',
         RequireIfMatch: 'True',
       });
@@ -338,14 +338,14 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(res.body.profile?.settings?.SoftDeleteEnabled).toBe('True');
+      expect(res.body.profile?.settings?.UserSoftDeleteEnabled).toBe('True');
       expect(res.body.profile?.settings?.StrictSchemaValidation).toBe('True');
       expect(res.body.profile?.settings?.RequireIfMatch).toBe('True');
     });
 
     it('should PATCH settings flags independently', async () => {
       const epId = await createEndpointWithConfig(app, token, {
-        SoftDeleteEnabled: 'True',
+        UserSoftDeleteEnabled: 'True',
       });
 
       // Add another flag via PATCH
@@ -361,7 +361,7 @@ describe('Profile Configuration & Flag Combinations (E2E)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(res.body.profile?.settings?.SoftDeleteEnabled).toBe('True'); // preserved
+      expect(res.body.profile?.settings?.UserSoftDeleteEnabled).toBe('True'); // preserved
       expect(res.body.profile?.settings?.VerbosePatchSupported).toBe('True'); // added
     });
 

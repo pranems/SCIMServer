@@ -1,6 +1,6 @@
 # Error Handling Architecture & Ideal Design
 
-> **Version:** 3.0 · **Source-verified against:** v0.38.0 · **Rewritten from scratch:** April 13, 2026  
+> **Version:** 3.0 - **Source-verified against:** v0.40.0 - **Rewritten from scratch:** April 13, 2026  
 > Describes the *as-built* error handling architecture plus design principles - every claim verified against source.
 
 ---

@@ -1,6 +1,6 @@
 # Technical Design Document
 
-> **Version:** 0.38.0 - **Updated:** April 24, 2026  
+> **Version:** 0.40.0 - **Updated:** April 28, 2026  
 > As-built architecture documentation derived from source code
 
 ---
@@ -52,7 +52,7 @@ flowchart TB
             I3[RequestLogging]
         end
 
-        subgraph Controllers [19 Controllers - 83 Routes]
+        subgraph Controllers [19 Controllers - 84 Routes]
             Admin[Admin + Endpoint + Credential]
             SCIM[Users + Groups + Bulk + Me + Generic]
             Disc[Discovery - Schemas, RT, SPC]

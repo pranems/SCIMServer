@@ -1,6 +1,6 @@
 # PATCH Scalar Boolean String Coercion (Entra ID Fix)
 
-> **Version**: 0.38.1
+> **Version**: 0.40.0
 > **RFC**: 7644 S3.5.2 (PATCH operations), 7643 S2.2 (Attribute types)
 > **Flag**: `AllowAndCoerceBooleanStrings` (default: `true`)
 

@@ -1,6 +1,6 @@
 # Azure Deployment & Usage Guide
 
-> **Version:** 0.38.0 - **Updated:** April 24, 2026  
+> **Version:** 0.40.0 - **Updated:** April 28, 2026  
 > **Source of truth:** [deploy.ps1](../deploy.ps1), [scripts/deploy-azure.ps1](../scripts/deploy-azure.ps1), [infra/](../infra/)
 
 ---
@@ -323,7 +323,7 @@ https://your-app.azurecontainerapps.io/admin
 .\scripts\deploy-azure.ps1 `
   -ResourceGroup "rg-scim" `
   -AppName "scimserver" `
-  -ImageTag "0.39.0" `
+  -ImageTag "0.40.0" `
   -ScimSecret "existing-secret" `
   -JwtSecret "existing-jwt-secret" `
   -OauthClientSecret "existing-oauth-secret" `

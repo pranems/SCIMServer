@@ -12,7 +12,7 @@ argument-hint: >
 
 # API Contract Verification - Self-Improving Prompt
 
-Perform a comprehensive API response contract verification across **all ~82 endpoints**, at **all test levels** (unit, integration, E2E, live). This ensures every JSON response matches its documented shape exactly - no leaked internal fields, no missing required fields, no Map/Set serialization artifacts. This prompt **learns from each execution** and **updates itself** with new findings.
+Perform a comprehensive API response contract verification across **all ~84 endpoints**, at **all test levels** (unit, integration, E2E, live). This ensures every JSON response matches its documented shape exactly - no leaked internal fields, no missing required fields, no Map/Set serialization artifacts. This prompt **learns from each execution** and **updates itself** with new findings.
 
 ---
 
@@ -52,15 +52,15 @@ Perform a comprehensive API response contract verification across **all ~82 endp
 ### Execution Metadata
 
 ```yaml
-promptVersion: 2.1.0
-lastExecution: 2026-04-21
-executionCount: 3
-totalEndpoints: 82
-coveredEndpoints: 22
-coveragePercent: 26.8%
+promptVersion: 2.2.0
+lastExecution: 2026-04-29
+executionCount: 4
+totalEndpoints: 84
+coveredEndpoints: 43
+coveragePercent: 51.2%
 testSuiteCount: 84
-totalTests: 3345
-lastKnownVersion: v0.37.2
+totalTests: 3429
+lastKnownVersion: v0.40.0
 ```
 
 ---
@@ -401,6 +401,7 @@ Each operation result: `method, bulkId, version, location, status, response`
 | `access_token` | Yes | JWT string |
 | `token_type` | Yes | `"Bearer"` |
 | `expires_in` | Yes | Integer (seconds) |
+| `scope` | Yes | String |
 
 ---
 
@@ -522,21 +523,21 @@ Each operation result: `method, bulkId, version, location, status, response`
 | Category | Endpoints | Unit Allowlist | Unit Denylist | E2E Allowlist | E2E Denylist | Live Allowlist | Live Denylist | Temporal |
 |----------|-----------|---------------|---------------|---------------|--------------|----------------|---------------|----------|
 | A. Health/Web | A1-A2 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | N/A |
-| B. OAuth | B1-B2 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | N/A |
-| C. Discovery (root) | C1-C5 | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | N/A |
-| D. Discovery (scoped) | D1-D5 | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | N/A |
+| B. OAuth | B1-B2 | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | N/A |
+| C. Discovery (root) | C1-C5 | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | N/A |
+| D. Discovery (scoped) | D1-D5 | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | N/A |
 | E. Admin Endpoints | E1-E9 | ✅ | ✅ | ✅ 9z-M | ✅ | ✅ 9z-M | ✅ 9z-M | ✅ 9z-M |
-| F. Admin Credentials | F1-F3 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | N/A |
-| G. Admin General | G1-G8 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | N/A |
+| F. Admin Credentials | F1-F3 | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | N/A |
+| G. Admin General | G1-G8 | ❌ | ❌ | ✅ G1 | ✅ G1 | ❌ | ❌ | N/A |
 | H. Admin Log Config | H1-H13 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | N/A |
-| I. Admin Database | I1-I5 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | N/A |
+| I. Admin Database | I1-I5 | ❌ | ❌ | ✅ I5 | ✅ I5 | ❌ | ❌ | N/A |
 | J. Admin Activity | J1-J2 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | N/A |
 | K. SCIM Users | K1-K7 | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | N/A |
 | L. SCIM Groups | L1-L7 | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | N/A |
 | M. SCIM /Me | M1-M4 | ❌ | ❌ | ⚠️ | ❌ | ❌ | ❌ | N/A |
 | N. SCIM Bulk | N1 | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | N/A |
 | O. SCIM Generic | O1-O7 | ❌ | ❌ | ⚠️ | ❌ | ❌ | ❌ | N/A |
-| P. Endpoint Logs | P1-P4 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | N/A |
+| P. Endpoint Logs | P1-P4 | ❌ | ❌ | ✅ P1,P4 | ✅ P1,P4 | ❌ | ❌ | N/A |
 | SCIM Error shape | All errors | ❌ | ❌ | ✅ | ✅ | ❌ | ❌ | N/A |
 | SCIM ListResponse | All lists | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | N/A |
 
@@ -557,7 +558,7 @@ Each operation result: `method, bulkId, version, location, status, response`
 | F-X1-X3: Cross-resource | ❌ | ⚠️ | ⚠️ | Partial coverage |
 | ⚡ F-A1: Cache leak detection | ❌ | ✅ | ✅ 9z-M | E2E + Live |
 | F-A2-A5: Admin+SCIM flows | ❌ | ⚠️ | ✅ | - |
-| F-D1-D4: Discovery consistency | ❌ | ✅ | ✅ | No strict shape |
+| F-D1-D4: Discovery consistency | ❌ | ✅ | ✅ | Strict allowlist + denylist |
 | F-M1-M4: /Me flows | ❌ | ✅ | ✅ | - |
 | F-E1-E10: Error paths | ⚠️ | ✅ | ✅ | Error shape not strict |
 | Config flag combos | ❌ | ✅ | ✅ | Many combos untested |
@@ -998,16 +999,16 @@ Before committing the update, verify:
 
 Track these metrics across executions to ensure the prompt is actually improving:
 
-| Metric | Exec #1 | Exec #2 | Exec #3 | Trend |
-|--------|---------|---------|---------|-------|
-| Endpoints cataloged | 82 | 82 | 82 | Stable |
-| Endpoints with strict contract tests | 8 | 8 | 22 | ↑ |
-| Coverage % | 9.8% | 9.8% | 26.8% | ↑↑ |
-| Flows documented | 51 | 51 | 51 | Stable |
-| Flows with tests at all levels | 0 | 0 | 1 | ↑ |
-| Anti-patterns documented | 10 | 10 | 10 | Stable |
-| Test patterns documented | 7 | 7 | 8 | ↑ |
-| Bugs found by this prompt | 1 | 1 | 1 | Stable |
+| Metric | Exec #1 | Exec #2 | Exec #3 | Exec #4 | Trend |
+|--------|---------|---------|---------|---------|-------|
+| Endpoints cataloged | 82 | 82 | 82 | 84 | ↑ |
+| Endpoints with strict contract tests | 8 | 8 | 22 | 43 | ↑↑ |
+| Coverage % | 9.8% | 9.8% | 26.8% | 51.2% | ↑↑↑ |
+| Flows documented | 51 | 51 | 51 | 51 | Stable |
+| Flows with tests at all levels | 0 | 0 | 1 | 1 | Stable |
+| Anti-patterns documented | 10 | 10 | 10 | 10 | Stable |
+| Test patterns documented | 7 | 7 | 8 | 8 | Stable |
+| Bugs found by this prompt | 1 | 1 | 1 | 1 | Stable |
 
 ---
 
@@ -1020,3 +1021,4 @@ Track these metrics across executions to ensure the prompt is actually improving
 | 1 | 2026-04-17 | v0.37.2 | 1.0.0 | Initial creation. `_schemaCaches` leak found in 4/16 Azure endpoints. Extension URN cross-contamination confirmed. 3 endpoints had stale settings keys. | Unit: +12, E2E: +4, Live: Section 9z-M (+10 assertions) | 8/82 (9.8%) |
 | 2 | 2026-04-17 | v0.37.2 | 2.0.0 | Self-improving rewrite. Added all 82 endpoints to inventory across 16 categories. Added 51 flows across 10 categories. Added 4 test levels. Defined 7 reusable test patterns (TS + PowerShell). Identified 17 backlog items prioritized P0-P5. Expanded anti-patterns from 5 to 10. Contract coverage baseline: only admin endpoints (E category) have strict tests at live level. | Patterns defined, no new tests yet | 8/82 (9.8%) |
 | 3 | 2026-04-21 | v0.37.2 | 2.1.0 | Execution #3: Created shared `contract-assertions.ts` helper module. Added 3 new E2E contract tests: admin list endpoints envelope allowlist (GET /endpoints), Bulk response contract (POST /Bulk), temporal coupling cache-leak detection (F-A1 at E2E level). Coverage improved from ⚠️ to ✅ for Users/Groups/Bulk/ListResponse/Error categories. All P0 and P1 backlog items now Done at E2E level. Total E2E contract tests: 22 (was 19). | +1 helper file, +3 E2E tests, 6 backlog items closed | 22/82 (26.8%) |
+| 4 | 2026-04-29 | v0.40.0 | 2.2.0 | Execution #4: Added 21 new E2E contract tests in `api-response-contracts-2.e2e-spec.ts` covering 8 previously-uncovered categories: Discovery root (C1-C5: SPC allowlist, Schemas/RT ListResponse+resource allowlist+denylist), Discovery scoped (D1/D2/D4), OAuth token (B2: allowlist with scope field discovered), Admin version (G1: denylist), Admin credentials (F1-F2: token on create only, no token/hash leak on list), DB stats (I5: denylist), Endpoint logs (P1/P4: denylist), SCIM errors (3 strict allowlist+denylist tests), ListResponse envelope (3 strict allowlist tests). Corrected totalEndpoints 82->84 (HealthController + WebController miscounted). Discovered `scope` field in OAuth token response - added to allowlist. Context-aware denylist: `endpointId` is internal for SCIM responses but legitimate for admin/log responses - split into SCIM_DENYLIST and ADMIN_DENYLIST. Shared `contract-assertions.ts` helper still orphaned (no files import it) - all tests use inline copies. | +21 E2E tests, +1 test file | 43/84 (51.2%) |
