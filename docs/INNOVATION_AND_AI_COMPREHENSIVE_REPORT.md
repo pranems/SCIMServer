@@ -2,7 +2,7 @@
 
 > **Version:** 0.40.0 - **Date:** April 28, 2026 - **Period:** January 1, 2026 - April 28, 2026
 > **Starting Baseline (Jan 1):** v0.8.13, ~212 live tests, basic SCIM CRUD + SQLite, no prompt system
-> **Current State (Apr 28):** v0.40.0, 84 unit suites (3,429 tests), 53 E2E suites (1,128 tests), ~817 live assertions - ALL PASSING
+> **Current State (Apr 29):** v0.40.0, 84 unit suites (3,429 tests), 54 E2E suites (1,149 tests), ~817 live assertions - ALL PASSING
 
 ---
 
@@ -474,5 +474,5 @@ gantt
 ---
 
 *Generated: April 28, 2026 - v0.40.0 - Period: Jan 1 - Apr 28, 2026*
-*Source-verified against pipeline-unit.json (3,429 pass) and pipeline-e2e.json (1,128 total)*
+*Source-verified against pipeline-unit.json (3,429 pass) and pipeline-e2e.json (1,149 total)*
 *Contributor start: approx. February 2026; all 14 prompts, 13 phases, and 27 gap closures delivered in this period*

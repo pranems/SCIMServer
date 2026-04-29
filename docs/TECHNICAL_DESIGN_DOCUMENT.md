@@ -52,7 +52,7 @@ flowchart TB
             I3[RequestLogging]
         end
 
-        subgraph Controllers [19 Controllers - 83 Routes]
+        subgraph Controllers [19 Controllers - 84 Routes]
             Admin[Admin + Endpoint + Credential]
             SCIM[Users + Groups + Bulk + Me + Generic]
             Disc[Discovery - Schemas, RT, SPC]

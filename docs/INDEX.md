@@ -1,7 +1,7 @@
 # SCIMServer Documentation Index
 
 > **Version:** 0.40.0 - **Updated:** April 28, 2026  
-> 83 API routes - 19 controllers - 6 presets - 16 config flags - 4,557 tests (3,429 unit + 1,128 E2E)
+> 84 API routes - 19 controllers - 6 presets - 16 config flags - 4,578 tests (3,429 unit + 1,149 E2E)
 
 ---
 
@@ -29,7 +29,7 @@
 
 | Document | Description |
 |----------|-------------|
-| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** - all 83 routes, request/response examples, route summary table |
+| [COMPLETE_API_REFERENCE.md](COMPLETE_API_REFERENCE.md) | **Full REST API** - all 84 routes, request/response examples, route summary table |
 | [ENDPOINT_LIFECYCLE_AND_USAGE.md](ENDPOINT_LIFECYCLE_AND_USAGE.md) | **Quick start** - endpoint lifecycle, CRUD recipes, Entra ID integration |
 | [TECHNICAL_DESIGN_DOCUMENT.md](TECHNICAL_DESIGN_DOCUMENT.md) | As-built architecture - layers, modules, data flow, Prisma schema |
 | [USER_API_CALL_TRACE.md](USER_API_CALL_TRACE.md) | Annotated end-to-end POST /Users call trace |
@@ -137,9 +137,9 @@
 
 | Artifact | Location | Description |
 |----------|----------|-------------|
-| OpenAPI Spec | [openapi/](openapi/) | OpenAPI 3.0 spec - all 83 endpoints, full schemas |
-| Postman Collection | [postman/](postman/) | Importable Postman collection - all 83 endpoints, 14 folders |
-| Insomnia Collection | [insomnia/](insomnia/) | Importable Insomnia workspace - all 83 endpoints, 14 folders |
+| OpenAPI Spec | [openapi/](openapi/) | OpenAPI 3.0 spec - all 84 endpoints, full schemas |
+| Postman Collection | [postman/](postman/) | Importable Postman collection - all 84 endpoints, 14 folders |
+| Insomnia Collection | [insomnia/](insomnia/) | Importable Insomnia workspace - all 84 endpoints, 14 folders |
 | Example JSONs | [examples/](examples/) | Request/response samples for all resource types |
 | Extension Examples | [examples/endpoint/](examples/endpoint/) | One-click endpoint+extension combos |
 | Mermaid Diagrams | [create-user-sequence.mmd](create-user-sequence.mmd) | Sequence diagrams |
@@ -157,10 +157,10 @@
 | Suite | Suites | Tests | Status |
 |-------|--------|-------|--------|
 | Unit | 84 | 3,429 | All pass |
-| E2E | 53 | 1,128 | All pass |
+| E2E | 54 | 1,149 | All pass |
 | Live (main) | 60 sections | ~817 | All pass |
 | Live (Lexmark ISV) | 13 sections | 112 | All pass |
-| **Total** | **~210** | **~5,486** | **All pass** |
+| **Total** | **~211** | **~5,507** | **All pass** |
 
 ---
 

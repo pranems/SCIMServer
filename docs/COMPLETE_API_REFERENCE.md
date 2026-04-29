@@ -2,7 +2,7 @@
 
 > **Version:** 0.40.0 - **Updated:** April 28, 2026  
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)  
-> **83 routes** across 19 controllers
+> **84 routes** across 19 controllers
 
 ---
 

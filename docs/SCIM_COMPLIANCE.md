@@ -360,7 +360,7 @@ Compliance is verified through 4 layers of testing:
 | Layer | Count | Coverage |
 |-------|-------|----------|
 | **Unit tests** | 3,429 (84 suites) | Schema validation, PATCH engines, filter parsing, attribute projection |
-| **E2E tests** | 1,128 (53 suites) | Full HTTP request/response verification for all operations |
+| **E2E tests** | 1,149 (54 suites) | Full HTTP request/response verification for all operations |
 | **Live tests** | ~817 (60 sections) | Real HTTP against running server - all deployment targets |
 | **ISV tests** | 112 (13 sections) | Lexmark SCIM Validator compliance verification |
 
