@@ -1,8 +1,8 @@
 # SCIMServer - Comprehensive Innovation & AI Usage Report (Jan-Apr 2026)
 
-> **Version:** 0.38.0 - **Date:** April 23, 2026 - **Period:** January 1, 2026 - April 23, 2026
+> **Version:** 0.40.0 - **Date:** April 28, 2026 - **Period:** January 1, 2026 - April 28, 2026
 > **Starting Baseline (Jan 1):** v0.8.13, ~212 live tests, basic SCIM CRUD + SQLite, no prompt system
-> **Current State (Apr 23):** v0.38.0, 84 unit suites (3,381 tests), 51 E2E suites (1,083 tests), ~800 live assertions - ALL PASSING
+> **Current State (Apr 28):** v0.40.0, 84 unit suites (3,429 tests), 53 E2E suites (1,128 tests), ~817 live assertions - ALL PASSING
 
 ---
 
@@ -68,7 +68,7 @@ graph TD
 
 The `Session_starter.md` (440 lines) + `copilot-instructions.md` combination creates a project memory system:
 
-- **Session_starter.md** carries ~70 chronological achievement entries from v0.3.0 to v0.38.0
+- **Session_starter.md** carries ~70 chronological achievement entries from v0.3.0 to v0.40.0
 - **copilot-instructions.md** mandates reading Session_starter.md first, updating it with progress, enforcing character rules (no em-dash), and defines a **9-item Feature Commit Checklist**
 - Together they ensure AI sessions across days/weeks maintain context continuity
 
@@ -473,6 +473,6 @@ gantt
 
 ---
 
-*Generated: April 23, 2026 - v0.38.0 - Period: Jan 1 - Apr 23, 2026*
-*Source-verified against pipeline-unit.json (3,378 pass) and pipeline-e2e.json (1,074 total, 1,062 pass)*
+*Generated: April 28, 2026 - v0.40.0 - Period: Jan 1 - Apr 28, 2026*
+*Source-verified against pipeline-unit.json (3,429 pass) and pipeline-e2e.json (1,128 total)*
 *Contributor start: approx. February 2026; all 14 prompts, 13 phases, and 27 gap closures delivered in this period*

@@ -5,6 +5,31 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.40.0] - 2026-04-28
+
+### Test - Test Gaps Audit #6: Cross-Feature Integration & Coverage Gaps
+
+- **test(e2e)**: 30 new E2E tests in `test-gaps-audit-6.e2e-spec.ts` covering:
+  - Custom Resource Type + projection (`?attributes=`/`?excludedAttributes=` on GET/POST/PUT/LIST)
+  - Custom Resource Type + StrictSchema=true (unknown attrs rejected on POST/PUT)
+  - Bulk + RequireIfMatch for PUT/DELETE (428 per-op without If-Match)
+  - Bulk with valid If-Match version succeeding (200 per-op)
+  - GroupHardDeleteEnabled=False: PUT/PATCH/GET still work, DELETE blocked
+  - POST /.search with `?excludedAttributes=` query param (Users + Groups)
+  - `excludedAttributes` cannot override always-returned on LIST
+  - SoftDelete + ETag: GET/PUT on soft-deleted user returns 404 (not 412/428)
+  - Four-flag combo: StrictSchema + IgnoreReadOnly + IncludeWarning + VerbosePatch
+  - PrimaryEnforcement + BooleanStrings coercion combo (normalize + reject)
+  - PerEndpointCredentials + RequireIfMatch deeper combo
+  - logFileEnabled toggle via profile PATCH
+  - SCIM error response key allowlist, Bulk response operation-level key allowlist
+  - .search body-level `attributes`/`excludedAttributes` projection
+- **test(live)**: 28 new live test assertions in section 9z-U covering:
+  - GroupHardDeleteEnabled=False, SoftDelete+ETag, Bulk+RequireIfMatch
+  - Four-flag combo, PrimaryEnforcement+BooleanStrings, .search body projection
+  - logFileEnabled toggle
+- **Tests**: 3,429 unit (84 suites) + 1,128 E2E (53 suites) + ~817 live assertions
+
 ## [0.39.0] - 2026-04-28
 
 ### Feature - Structured SCIM Error Diagnostics Enrichment (G9)

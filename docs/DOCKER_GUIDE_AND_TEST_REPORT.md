@@ -1,6 +1,6 @@
 # Docker Guide
 
-> **Version:** 0.38.0 - **Updated:** April 24, 2026  
+> **Version:** 0.40.0 - **Updated:** April 28, 2026  
 > **Source of truth:** [Dockerfile](../Dockerfile), [docker-compose.yml](../docker-compose.yml)
 
 ---
@@ -257,7 +257,7 @@ pwsh ./lexmark-live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "chang
 docker build -t scimserver:latest .
 
 # Build with image tag arg
-docker build --build-arg IMAGE_TAG=0.38.0 -t scimserver:0.38.0 .
+docker build --build-arg IMAGE_TAG=0.40.0 -t scimserver:0.40.0 .
 
 # Run standalone (requires external PostgreSQL)
 docker run -d \
@@ -278,7 +278,7 @@ docker run -d \
 docker pull ghcr.io/your-org/scimserver:latest
 
 # Pull specific version
-docker pull ghcr.io/your-org/scimserver:0.38.0
+docker pull ghcr.io/your-org/scimserver:0.40.0
 
 # Run
 docker run -d -p 8080:8080 \

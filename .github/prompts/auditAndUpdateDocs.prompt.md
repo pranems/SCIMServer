@@ -24,7 +24,7 @@ Read **every** `*.controller.ts` file in `api/src/modules/` to build an authorit
 - Query parameters via `@Query()` decorators
 - Guard and interceptor registrations
 
-**Baseline**: The server has **82 endpoints across 19 controllers** - verify this count after any feature additions.
+**Baseline**: The server has **83 endpoints across 19 controllers** - verify this count after any feature additions.
 
 ### 1C. DTO & Response Shape Verification
 Read all `*.dto.ts` files and key interfaces to verify documented request/response shapes:
@@ -81,7 +81,7 @@ For every document listed in `docs/INDEX.md`, check:
 | **Flag interaction table** | Are all known flag combinations documented? |
 | **Request/response examples** | Headers, URLs, bodies, status codes accurate? |
 | **Entra ID recommended config** | Still valid for latest features? |
-| **Endpoint count** | Does "82 endpoints" / "19 controllers" match actual count? |
+| **Endpoint count** | Does "83 endpoints" / "19 controllers" match actual count? |
 | **Filter operator support** | All operators listed as fully supported (`eq`, `ne`, `co`, `sw`, `ew`, `pr`, `gt`, `ge`, `lt`, `le`, `and`, `or`, `not`) - no stale "limited support" notes |
 | **Query parameter completeness** | `sortBy`, `sortOrder`, `attributes`, `excludedAttributes` documented on all list/get endpoints |
 | **Bulk/Me/Custom resources** | All three listed in core endpoint tables |
@@ -118,7 +118,7 @@ For every document listed in `docs/INDEX.md`, check:
 
 | Check | What to verify |
 |-------|----------------|
-| **Endpoint coverage** | Does the collection cover all 82 endpoints (19 controllers)? Calculate coverage % |
+| **Endpoint coverage** | Does the collection cover all 83 endpoints (19 controllers)? Calculate coverage % |
 | **Multi-tenant path structure** | All SCIM paths use `/endpoints/{endpointId}/...` (not root `/Users`, `/Groups`) |
 | **Route accuracy** | Every path in the collection matches an actual controller route |
 | **Query parameters** | All `?view`, `?active`, `?filter`, `?sortBy`, `?sortOrder`, `?attributes`, `?excludedAttributes`, `?startIndex`, `?count` params documented |
@@ -164,7 +164,7 @@ For every document listed in `docs/INDEX.md`, check:
 | **Feature list** | All implemented features/phases listed |
 | **Open gaps** | Remaining gaps list is current |
 | **Stack versions** | Node, NestJS, Prisma, TS, Jest versions current |
-| **Endpoint count** | 82 endpoints / 19 controllers (or updated if changed) |
+| **Endpoint count** | 83 endpoints / 19 controllers (or updated if changed) |
 | **Doc count** | Total active docs in `docs/` matches INDEX.md header |
 
 ### G. Deployment & Infra Docs
@@ -264,7 +264,7 @@ After all updates, perform a final cross-check:
 1. **Version consistency**: `package.json` version matches all doc headers, `CHANGELOG.md`, `Session_starter.md`, `CONTEXT_INSTRUCTIONS.md`, and `PROJECT_HEALTH_AND_STATS.md`.
 2. **Test count consistency**: Unit, E2E, and live counts match across all documents that reference them.
 3. **Flag count consistency**: All docs that reference flag counts or list flag names are in sync with `ProfileSettings` interface (13 boolean flags + logLevel + PrimaryEnforcement; settings v7).
-4. **Endpoint count consistency**: All docs that mention endpoint counts say "82 endpoints across 19 controllers" (or the updated number if features were added).
+4. **Endpoint count consistency**: All docs that mention endpoint counts say "83 endpoints across 19 controllers" (or the updated number if features were added).
 5. **Link validation**: All `[text](path)` links in docs resolve to existing files. Check for renamed/deleted targets.
 6. **Index completeness**: Every doc in `docs/` has an entry in `docs/INDEX.md`.
 7. **Preset count**: All docs that list presets include all 6: `entra-id`, `entra-id-minimal`, `rfc-standard`, `minimal`, `user-only`, `user-only-with-custom-ext`.
@@ -280,7 +280,7 @@ After all updates, perform a final cross-check:
 
 After completing the audit, review **this prompt itself** for freshness:
 
-1. **Endpoint count**: If the endpoint/controller count changed from 76/18, update all references in this prompt (Steps 1B, 2B, 2E, 5.4).
+1. **Endpoint count**: If the endpoint/controller count changed from 83/19, update all references in this prompt (Steps 1B, 2B, 2E, 5.4).
 2. **New document categories**: If new types of docs (e.g., performance benchmarks, security audit docs, ADRs) were added, add a new sub-section under Step 2.
 3. **New artifact directories**: If new artifact folders beyond `openapi/`, `postman/`, `insomnia/`, `examples/`, `images/readme/` were created, add them to Section E.
 4. **New config flags**: If the flag count changed from 15 boolean + logLevel + PrimaryEnforcement (13 persisted in ProfileSettings + 2 derived), update all references.
@@ -331,6 +331,7 @@ Apply updates directly to this file (`.github/prompts/auditAndUpdateDocs.prompt.
 | 2026-04-21 | v0.37.2 | Post manager PATCH fix + test gap audit | ~25 across 10 files + 2 JSONs + 1 HTML | Unit 3,318->3,345 (+27 schema-validator/service tests), E2E 47->49 suites / 986->1,025 (+39 manager-patch/error-allowlist/group-filters/projection), doc count 67->68, version headers 0.37.1->0.37.2 in 7 files, phantom `backup` category in recent-logs-latest.html, pipeline JSONs regenerated |
 | 2026-04-23 | v0.38.0 | Post G8h + RFC audit + test gap audit #5 | ~30 across 22 files + 3 JSONs | Version 0.37.x->0.38.0 in 18 files, test counts 3,345->3,378 unit / 1,025->1,074 E2E / 49->51 suites, added PrimaryEnforcement flag section to ENDPOINT_CONFIG_FLAGS_REFERENCE.md, pipeline JSONs regenerated, version-latest.json synced, CHANGELOG updated with RFC + audit entries, OpenAPI/Postman/Insomnia version refs |
 | 2026-04-23 | v0.38.0 | Post passthrough-default freshness audit | ~55 across ~30 files | PrimaryEnforcement default normalize->passthrough in CHANGELOG + G8H doc (10 fixes), version headers 0.35.0->0.38.0 in 20+ docs, test counts propagated (3,378/1,074/~789) to 8 docs, flag counts 13+logLevel->13+logLevel+PrimaryEnforcement in 4 docs, doc count 68->69, Session_starter Status/Current Focus updated |
+| 2026-04-29 | v0.40.0 | Post test-gaps-audit-6 + diagnostics enrichment | ~90 across ~35 files + 2 JSONs | Version 0.38.x/0.39.0->0.40.0 in 30+ docs, test counts 3,378->3,429 unit / 1,074->1,128 E2E / 51->53 suites / ~789->~817 live / 57->60 sections, endpoint count 82->83, CHANGELOG v0.40.0 entry added, pipeline JSONs regenerated, version-latest.json synced, stale "config" format in G8H doc fixed, MANAGER_PATCH_STRING_COERCION status updated to Implemented |
 ### Common Staleness Patterns Discovered
 
 | Pattern | Files Typically Affected | Detection Method |
@@ -342,7 +343,7 @@ Apply updates directly to this file (`.github/prompts/auditAndUpdateDocs.prompt.
 | Missing routes in endpoint tables | MULTI_ENDPOINT_GUIDE, SCIM_REFERENCE, ENDPOINT_LIFECYCLE | Compare table rows vs controller survey |
 | Missing query params (?view, ?active) | ENDPOINT_LIFECYCLE, MULTI_ENDPOINT_GUIDE | Compare `@Query()` decorators vs docs |
 | Stale Prisma schema in inline blocks | MULTI_ENDPOINT_GUIDE, TECHNICAL_DESIGN_DOCUMENT | Search for `config String?` in code blocks |
-| API collection coverage gap | INDEX.md descriptions, OpenAPI/Postman/Insomnia files | Count operations vs 82 baseline |
+| API collection coverage gap | INDEX.md descriptions, OpenAPI/Postman/Insomnia files | Count operations vs 83 baseline |
 | Stale "Last Updated" date headers | ENDPOINT_CONFIG_FLAGS_REFERENCE, SCIM_REFERENCE | Search for `Last Updated.*2026-` and compare |
 | Stale feature support notes | SCIM_REFERENCE (filter operators) | Search for \"limited support\" |\n| Stale PrimaryEnforcement default | G8H doc, CHANGELOG, ENDPOINT_CONFIG_FLAGS | Search for `normalize (default)` or `default.*normalize` - should be `passthrough (default)` |
 - Every numeric claim (test counts, flag counts, LoC) must be freshly measured - never copy from stale docs.

@@ -1,6 +1,6 @@
 # Technical Design Document
 
-> **Version:** 0.38.0 - **Updated:** April 24, 2026  
+> **Version:** 0.40.0 - **Updated:** April 28, 2026  
 > As-built architecture documentation derived from source code
 
 ---

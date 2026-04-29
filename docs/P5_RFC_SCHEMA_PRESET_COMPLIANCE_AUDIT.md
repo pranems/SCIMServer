@@ -3,12 +3,12 @@
 ## Overview
 
 **Feature**: Line-by-line compliance audit of all built-in schema definitions, profile presets, ResourceType definitions, and ServiceProviderConfig against RFC 7643/7644 canonical JSON representations  
-**Version**: v0.38.0  
+**Version**: v0.40.0  
 **Date**: 2026-04-23  
 **Status**: Audit complete - **13 critical findings, ~16 warnings, 7 info items, 3 RFC ambiguities** (original P5 audit). Follow-up RFC S8.7.1 audit (v0.38.0) fixed 55 additional characteristic gaps.  
 **Methodology**: **RFC 7643 fetched live from IETF datatracker** → §8.7.1 normative JSON extracted → field-by-field comparison against `scim-schemas.constants.ts` (baseline) and all 6 preset JSONs  
 **RFC Source**: [RFC 7643 fetched 2026-04-16](https://datatracker.ietf.org/doc/html/rfc7643) - canonical schema extracts saved to [docs/rfcs/RFC7643_SCHEMA_EXTRACT.md](rfcs/RFC7643_SCHEMA_EXTRACT.md)  
-**Test Baseline**: 3,378 unit (84 suites) · 1,074 E2E (51 suites) · ~789 live assertions · ~5,353 total  
+**Test Baseline**: 3,429 unit (84 suites) - 1,128 E2E (53 suites) - ~817 live assertions - ~5,486 total  
 **Predecessor**: P4 (v0.35.0), P3 (v0.32.0), P2 (v0.24.0), Discovery Endpoints RFC Audit (v0.19.3)
 
 **RFC References** (all verified against fetched source):

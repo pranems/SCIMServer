@@ -3,8 +3,8 @@
 ## Overview
 
 **Feature**: Accept raw string values for complex PATCH attributes (manager) in strict schema validation  
-**Version**: v0.38.0 (pending)  
-**Status**: 🔧 Analysis Complete - Implementation Pending  
+**Version**: v0.40.0  
+**Status**: ✅ Implemented  
 **RFC References**:
 - [RFC 7643 §2.3.8 - Complex Attributes](https://datatracker.ietf.org/doc/html/rfc7643#section-2.3.8)
 - [RFC 7643 §4.3 - Enterprise User Extension](https://datatracker.ietf.org/doc/html/rfc7643#section-4.3)

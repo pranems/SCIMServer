@@ -1,6 +1,6 @@
 # SCIMServer - Sovereign & Government Cloud Deployment Guide
 
-> **Version:** 0.38.0 · **Updated:** April 23, 2026  
+> **Version:** 0.40.0 - **Updated:** April 28, 2026  
 > Covers: Azure Government (US), Azure China (21Vianet), Azure BLEU (France), Azure Germany, and custom sovereign environments
 
 ---

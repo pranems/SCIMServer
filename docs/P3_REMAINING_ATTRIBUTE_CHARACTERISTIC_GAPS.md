@@ -3,10 +3,10 @@
 ## Overview
 
 **Feature**: Comprehensive audit of ALL RFC 7643 §2 attribute characteristic enforcement across every service, operation, and config combination  
-**Version**: v0.38.0  
+**Version**: v0.40.0  
 **Date**: 2026-04-23  
 **Status**: Re-audited against source code (sole source of truth) - all GEN-01..GEN-12 resolved; G6 resolved in v0.32.0; 9 remaining gaps  
-**Test Counts**: 3,378 unit (84 suites) · 1,074 E2E (51 suites) · ~789 live assertions · ~5,353 total
+**Test Counts**: 3,429 unit (84 suites) - 1,128 E2E (53 suites) - ~817 live assertions - ~5,486 total
 
 **RFC References**:
 - [RFC 7643 §2 - Attribute Characteristics](https://datatracker.ietf.org/doc/html/rfc7643#section-2)
@@ -330,9 +330,9 @@ Legend: Green = fully enforced across all services · Orange = partial/strict-mo
 
 | Suite | Count | Suites |
 |---|:---:|:---:|
-| Unit | 3,378 | 84 |
-| E2E | 1,074 | 51 |
-| **Total** | **4,452** | **135** |
+| Unit | 3,429 | 84 |
+| E2E | 1,128 | 53 |
+| **Total** | **4,557** | **137** |
 
 ---
 

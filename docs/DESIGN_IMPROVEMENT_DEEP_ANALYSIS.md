@@ -1,9 +1,9 @@
-# Design Improvement Deep Analysis - v0.38.0
+# Design Improvement Deep Analysis - v0.40.0
 
-**Status:** Current | **Last Updated:** 2026-04-23 | **Baseline:** v0.38.0  
+**Status:** Current | **Last Updated:** 2026-04-28 | **Baseline:** v0.40.0  
 **Scope:** Full source-verified audit - architecture, SOLID, DRY, security, RFC compliance, DTO validation, data layer, maintainability  
 **RFC References:** RFC 7643 (SCIM Core Schema), RFC 7644 (SCIM Protocol)  
-**Test Baseline:** 3,378 unit (84 suites) · 1,074 E2E (51 suites) · ~789 live + 112 Lexmark - ALL PASSING  
+**Test Baseline:** 3,429 unit (84 suites) - 1,128 E2E (53 suites) - ~817 live + 112 Lexmark - ALL PASSING  
 **Files Audited:** 60+ source files across all layers  
 **Overall Rating:** **B+ (7.5/10)**
 
@@ -758,11 +758,11 @@ model ResourceMember {
 
 | Metric | Value | Assessment |
 |--------|------:|:----------:|
-| Unit tests | 3,378 (84 suites) | ✅ Excellent coverage |
-| E2E tests | 1,074 (51 suites) | ✅ Comprehensive |
-| Live tests (main) | ~789 (53 sections) | ✅ Deployment verification |
+| Unit tests | 3,429 (84 suites) | ✅ Excellent coverage |
+| E2E tests | 1,128 (53 suites) | ✅ Comprehensive |
+| Live tests (main) | ~817 (60 sections) | ✅ Deployment verification |
 | Live tests (Lexmark ISV) | 112 (13 sections) | ✅ Vendor-specific validation |
-| **Total** | **~5,353** | ✅ Production-grade |
+| **Total** | **~5,486** | ✅ Production-grade |
 | Parallel E2E | `maxWorkers=4` with worker-prefixed fixtures | ✅ Proper isolation |
 | False positive audit | Conducted (29 FPs fixed) | ✅ Assertion quality verified |
 | Zero skipped tests | 0 `skip`/`xdescribe`/`xit` | ✅ No hidden debt |
@@ -951,7 +951,7 @@ Based on recurring design patterns and trade-offs identified in this audit, the 
 ```mermaid
 %%{init: {'theme': 'default'}}%%
 radar
-    title SCIMServer v0.38.0 - Quality Radar
+    title SCIMServer v0.40.0 - Quality Radar
     "RFC Compliance" : 93
     "Security" : 60
     "SOLID" : 65
@@ -966,4 +966,4 @@ radar
 
 ---
 
-*This document was produced by deep analysis of 60+ source files across all architectural layers, verified against RFC 7643 (SCIM Core Schema) and RFC 7644 (SCIM Protocol), and cross-referenced with the project's existing test suite (3,378 unit + 1,074 E2E tests). All line numbers, file paths, and code snippets are sourced directly from the v0.38.0 codebase.*
+*This document was produced by deep analysis of 60+ source files across all architectural layers, verified against RFC 7643 (SCIM Core Schema) and RFC 7644 (SCIM Protocol), and cross-referenced with the project's existing test suite (3,429 unit + 1,128 E2E tests). All line numbers, file paths, and code snippets are sourced directly from the v0.40.0 codebase.*

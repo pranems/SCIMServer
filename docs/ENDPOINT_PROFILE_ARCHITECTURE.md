@@ -1,6 +1,6 @@
 # Endpoint Profile Architecture
 
-> **Version:** 0.38.0 - **Updated:** April 24, 2026  
+> **Version:** 0.40.0 - **Updated:** April 28, 2026  
 > **Source of truth:** [endpoint-profile/](../api/src/modules/scim/endpoint-profile/)
 
 ---

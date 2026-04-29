@@ -1,6 +1,6 @@
 # Logging Verification Prompt (Self-Improving)
 
-> **Version:** 3.3 · **Source-verified against:** v0.38.0 · **Regenerated:** April 21, 2026  
+> **Version:** 3.3 - **Source-verified against:** v0.40.0 - **Regenerated:** April 21, 2026  
 > Automated checklist - run against source to verify logging completeness.
 
 ---
@@ -178,8 +178,8 @@ TOTAL: __/73 PASS
 ## Latest Run
 
 ```
-Date: April 23, 2026
-Version: 0.38.0
+Date: April 28, 2026
+Version: 0.40.0
 Executor: AI (Claude Opus 4.6, source-verified)
 
 Section 1 (Core): 6/6 PASS
@@ -198,7 +198,7 @@ Section 12 (Factory): 4/4 PASS
 TOTAL: 73/73 PASS
 ```
 
-Re-verified after v0.38.0 (G8h PrimaryEnforcement + RFC S8.7.1 compliance + test-gaps-audit-5).
+Re-verified after v0.40.0 (G8h PrimaryEnforcement + RFC S8.7.1 compliance + test-gaps-audit-5/6).
 
 **Infrastructure layer: 73/73 PASS** - all checklist items verified against source.
 

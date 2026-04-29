@@ -1,6 +1,6 @@
 # Logging & Observability Guide
 
-> **Version:** 4.0 · **Source-verified against:** v0.38.0 · **Rewritten:** April 13, 2026  
+> **Version:** 4.0 - **Source-verified against:** v0.40.0 - **Rewritten:** April 13, 2026  
 > Every statement in this document references the actual source file and line - nothing is assumed.
 
 ---

@@ -1,7 +1,7 @@
 # 🧪 Testing Pre-Release Changes
 
 > **Status**: Living workflow guide  
-> **Last Updated**: April 23, 2026
+> **Last Updated**: April 28, 2026
 
 This guide explains how to test new features before releasing them to production users.
 

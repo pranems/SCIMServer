@@ -1,6 +1,6 @@
 # Complete API Reference
 
-> **Version:** 0.38.0 - **Updated:** April 24, 2026  
+> **Version:** 0.40.0 - **Updated:** April 28, 2026  
 > **Base URL:** `http://localhost:{PORT}/scim` (configurable via `API_PREFIX` env var)  
 > **83 routes** across 19 controllers
 
@@ -116,9 +116,9 @@ Authorization: Bearer changeme-scim
 
 ```json
 {
-  "version": "0.38.0",
+  "version": "0.40.0",
   "commit": "a1b2c3d",
-  "buildTime": "2026-04-24T08:00:00.000Z",
+  "buildTime": "2026-04-28T08:00:00.000Z",
   "service": "SCIMServer",
   "runtime": {
     "node": "v24.0.0",
@@ -139,7 +139,7 @@ Authorization: Bearer changeme-scim
   },
   "container": {
     "hostname": "scimserver-abc123",
-    "image": "ghcr.io/your-org/scimserver:0.38.0"
+    "image": "ghcr.io/your-org/scimserver:0.40.0"
   },
   "deployment": {
     "resourceGroup": "rg-scim",
@@ -1629,8 +1629,8 @@ Host: localhost:8080
 ```json
 {
   "message": "OAuth endpoint is working",
-  "timestamp": "2026-04-24T10:00:00.000Z",
-  "version": "0.38.0"
+  "timestamp": "2026-04-28T10:00:00.000Z",
+  "version": "0.40.0"
 }
 ```
 
