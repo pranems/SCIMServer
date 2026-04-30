@@ -98,8 +98,13 @@ export interface ProfileSettings {
   IgnoreReadOnlyAttributesInPatch?: boolean | string;
 
   // ─── G8h: Primary enforcement ────────────────────────────────────
-  /** Primary enforcement mode: normalize (default), reject, or passthrough (RFC 7643 section 2.4) */
-  PrimaryEnforcement?: 'normalize' | 'reject' | 'passthrough' | string;
+  /**
+   * Primary enforcement mode: normalize (default), reject, or passthrough
+   * (RFC 7643 section 2.4). The `(string & {})` intersection preserves the
+   * literal-union autocomplete in IDEs while accepting any string value
+   * coming from JSON config (validated downstream).
+   */
+  PrimaryEnforcement?: 'normalize' | 'reject' | 'passthrough' | (string & {});
 
   // ─── Deprecated (settings v7 clean break) ────────────────────────
   /** @deprecated Replaced by UserSoftDeleteEnabled + UserHardDeleteEnabled */

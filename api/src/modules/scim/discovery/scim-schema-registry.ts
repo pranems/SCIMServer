@@ -84,6 +84,7 @@ export class ScimSchemaRegistry implements OnModuleInit {
   private defaultResourceTypes: ScimResourceType[] = [];
   private defaultSpc: Record<string, any> = SCIM_SERVICE_PROVIDER_CONFIG;
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- NestJS OnModuleInit signature requires Promise<void>
   async onModuleInit(): Promise<void> {
     try {
       const preset = getBuiltInPreset('rfc-standard');

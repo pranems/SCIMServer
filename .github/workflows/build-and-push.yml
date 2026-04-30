@@ -37,13 +37,9 @@ jobs:
         working-directory: api
         run: npm ci --no-audit --no-fund
 
-      # Lint is informational in this commit - 58 pre-existing errors exist
-      # because CI never ran lint before. Cleanup tracked as a follow-up commit;
-      # remove `continue-on-error` once they are resolved.
-      - name: Lint API (informational)
+      - name: Lint API
         working-directory: api
         run: npm run lint
-        continue-on-error: true
 
       - name: Generate Prisma client (required for type-check + tests)
         working-directory: api

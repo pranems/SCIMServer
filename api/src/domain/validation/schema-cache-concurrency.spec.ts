@@ -364,7 +364,7 @@ describe('Level 4: interleaved async requests on shared profile', () => {
     const seenIds: string[] = [];
 
     const req1 = new Promise<void>((resolve) => {
-      als.run({ profile: sharedProfile, requestId: 'r1' }, async () => {
+      void als.run({ profile: sharedProfile, requestId: 'r1' }, async () => {
         await new Promise(r => setTimeout(r, 5)); // yield
         seenIds.push(als.getStore()!.requestId);
         resolve();
@@ -372,7 +372,7 @@ describe('Level 4: interleaved async requests on shared profile', () => {
     });
 
     const req2 = new Promise<void>((resolve) => {
-      als.run({ profile: sharedProfile, requestId: 'r2' }, async () => {
+      void als.run({ profile: sharedProfile, requestId: 'r2' }, async () => {
         await new Promise(r => setTimeout(r, 2)); // yield
         seenIds.push(als.getStore()!.requestId);
         resolve();
@@ -406,7 +406,7 @@ describe('Level 5: profile update during active requests', () => {
 
     // Start "SCIM request" using profileV1
     const scimRequest = new Promise<void>((resolve) => {
-      als.run({ profile: endpointCache.current }, async () => {
+      void als.run({ profile: endpointCache.current }, async () => {
         // Request gets profile reference at start
         const reqProfile = als.getStore()!.profile;
         expect(reqProfile).toBe(profileV1);
@@ -661,7 +661,7 @@ describe('Level 8: multi-endpoint cache isolation', () => {
     const seenProfiles: string[] = [];
 
     const reqA = new Promise<void>((resolve) => {
-      als.run({ profile: profileA, endpointId: 'ep-1' }, async () => {
+      void als.run({ profile: profileA, endpointId: 'ep-1' }, async () => {
         setProfileCache(profileA, SchemaValidator.buildCharacteristicsCache(ALL_SCHEMAS, EXT_URNS));
         await new Promise(r => setTimeout(r, 5)); // yield
         seenProfiles.push(als.getStore()!.endpointId);
@@ -672,7 +672,7 @@ describe('Level 8: multi-endpoint cache isolation', () => {
     });
 
     const reqB = new Promise<void>((resolve) => {
-      als.run({ profile: profileB, endpointId: 'ep-2' }, async () => {
+      void als.run({ profile: profileB, endpointId: 'ep-2' }, async () => {
         setProfileCache(profileB, SchemaValidator.buildCharacteristicsCache([CORE_SCHEMA], []));
         await new Promise(r => setTimeout(r, 2)); // yield
         seenProfiles.push(als.getStore()!.endpointId);

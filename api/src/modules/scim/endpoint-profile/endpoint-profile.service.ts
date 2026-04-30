@@ -16,7 +16,7 @@
  */
 import type { EndpointProfile, ShorthandProfileInput, ServiceProviderConfig } from './endpoint-profile.types';
 import { expandProfile } from './auto-expand.service';
-import { validateAttributeTightenOnly, type TightenOnlyError } from './tighten-only-validator';
+import { validateAttributeTightenOnly } from './tighten-only-validator';
 import { RFC_SCHEMA_ATTRIBUTE_MAPS } from './rfc-baseline';
 
 // ─── Validation Result ──────────────────────────────────────────────────

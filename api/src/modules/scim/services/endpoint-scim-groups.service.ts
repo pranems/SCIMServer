@@ -6,7 +6,6 @@ import type { IUserRepository } from '../../../domain/repositories/user.reposito
 import type {
   GroupWithMembers,
   GroupCreateInput,
-  GroupUpdateInput,
   MemberCreateInput,
   MemberRecord,
 } from '../../../domain/models/group.model';
@@ -180,7 +179,7 @@ export class EndpointScimGroupsService {
     return this.toScimGroupResource(withMembers, baseUrl, endpointId);
   }
 
-  async getGroupForEndpoint(scimId: string, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimGroupResource> {
+  async getGroupForEndpoint(scimId: string, baseUrl: string, endpointId: string, _config?: EndpointConfig): Promise<ScimGroupResource> {
     this.logger.enrichContext({ resourceType: 'Group', resourceId: scimId, operation: 'get' });
     this.logger.debug(LogCategory.SCIM_GROUP, 'Get group', { scimId, endpointId });
     const group = await this.groupRepo.findWithMembers(endpointId, scimId);
@@ -196,7 +195,7 @@ export class EndpointScimGroupsService {
     { filter, startIndex = 1, count = DEFAULT_COUNT, sortBy, sortOrder }: ListGroupsParams,
     baseUrl: string,
     endpointId: string,
-    config?: EndpointConfig,
+    _config?: EndpointConfig,
   ): Promise<ScimListResponse<ScimGroupResource>> {
     this.logger.enrichContext({ resourceType: 'Group', operation: 'list' });
 

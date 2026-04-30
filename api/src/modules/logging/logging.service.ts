@@ -64,6 +64,7 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
 
   // ── Auto-prune lifecycle ──
 
+  // eslint-disable-next-line @typescript-eslint/require-await -- NestJS OnModuleInit signature requires Promise<void>
   async onModuleInit(): Promise<void> {
     if (this.autoPruneEnabled && !this.isInMemoryBackend) {
       this.logger.info(LogCategory.DATABASE, `Auto-prune enabled: retention=${this.autoPruneRetentionDays}d, interval=${this.autoPruneIntervalMs}ms`);

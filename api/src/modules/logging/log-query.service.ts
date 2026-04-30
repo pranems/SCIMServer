@@ -126,7 +126,7 @@ export class LogQueryService {
     res: Response,
     options: LogQueryOptions & { format?: string; filenamePrefix?: string },
   ): void {
-    const { count, entries } = this.queryRecentLogs(options);
+    const { count: _count, entries } = this.queryRecentLogs(options);
 
     const outputFormat = options.format === 'json' ? 'json' : 'ndjson';
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);

@@ -987,7 +987,7 @@ export class ScimSchemaHelpers {
    */
   buildSchemaDefinitions(
     dto: Record<string, unknown>,
-    endpointId: string,
+    _endpointId: string,
   ): SchemaDefinition[] {
     const profile = this.endpointContextStorage?.getProfile?.();
     const profileSchemaMap = new Map<string, ScimSchemaDefinition>();
@@ -1039,7 +1039,7 @@ export class ScimSchemaHelpers {
    * profile schemas are used (they include custom extensions with full
    * attribute characteristics). Falls back to the global ScimSchemaRegistry.
    */
-  getSchemaDefinitions(endpointId?: string): SchemaDefinition[] {
+  getSchemaDefinitions(_endpointId?: string): SchemaDefinition[] {
     return this.getProfileAwareSchemaDefinitions();
   }
 
@@ -1318,7 +1318,7 @@ export class ScimSchemaHelpers {
    * Note: reads _schemaCaches directly (not via getSchemaCache()) to avoid
    * circular calls - getSchemaCache() calls getExtensionUrns() during build.
    */
-  getExtensionUrns(endpointId?: string): readonly string[] {
+  getExtensionUrns(_endpointId?: string): readonly string[] {
     // Check cache directly - avoid getSchemaCache() to prevent circular call
     const profile = this.endpointContextStorage?.getProfile?.();
     const cacheKey = this.coreSchemaUrn;
@@ -1398,7 +1398,7 @@ export class ScimSchemaHelpers {
     existingPayload: Record<string, unknown>,
     incomingDto: Record<string, unknown>,
     endpointId: string,
-    config?: EndpointConfig,
+    _config?: EndpointConfig,
   ): void {
     // G1: Immutable enforcement runs unconditionally (RFC 7643 §2.2 "SHALL NOT")
     // Previously gated by StrictSchemaValidation - removed per P4 analysis

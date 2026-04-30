@@ -7,10 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI - Lint Cleanup: Remove continue-on-error
+
+- **fix(lint)**: Closed all 58 pre-existing lint errors that had built up because CI never ran lint:
+  - **30 `require-await` errors**: Added file-level `eslint-disable` headers to 4 InMemory repos (`inmemory-user.repository.ts`, `inmemory-group.repository.ts`, `inmemory-generic-resource.repository.ts`, `inmemory-endpoint-credential.repository.ts`) - methods MUST be async to satisfy `Promise<T>` interface contracts. Added per-line disable on 2 NestJS `onModuleInit` lifecycle hooks (`logging.service.ts`, `scim-schema-registry.ts`).
+  - **5 `no-floating-promises` errors** in `schema-cache-concurrency.spec.ts`: prefixed `als.run(...)` calls with `void`.
+  - **4 unused imports removed**: `ServiceProviderConfig` (endpoint.service.ts), `TightenOnlyError` (endpoint-profile.service.ts), `BULK_MAX_OPERATIONS` (bulk-processor.service.ts), `GroupUpdateInput` (endpoint-scim-groups.service.ts).
+  - **3 `no-redundant-type-constituents`** in endpoint-profile.types.ts L102: `'normalize' | 'reject' | 'passthrough' | string` -> `'normalize' | 'reject' | 'passthrough' | (string & {})` (preserves IDE autocomplete on the literal union while still accepting any string).
+  - **~16 unused params underscore-prefixed**: `id`, `count`, `databaseUrl`, multiple `endpointId`/`config` args across `scim-service-helpers.ts`, `endpoint-scim-users.service.ts`, `endpoint-scim-groups.service.ts`, `endpoint-scim-generic.service.ts`, `admin.controller.ts`, `file-log-transport.ts`, `log-query.service.ts`. Underscore prefix matches `argsIgnorePattern: '^_'` in `eslint.config.mjs`.
+- **ci(workflows)**: Removed `continue-on-error: true` from the lint step in both `build-and-push.yml` and `build-test.yml`. Lint is now blocking.
+- **Behavior**: Zero behavior changes. All 3,429 unit tests + 1,100 E2E (inmemory mode) still pass.
+
 ### CI - OPS-1: Gate Image Push on Full Test Suite
 
 - **ci(workflows)**: Added `validate` job to `.github/workflows/build-and-push.yml` and `.github/workflows/build-test.yml` that runs before any docker build/push:
-  - `npm run lint` (API, **informational** for now - see note below)
+  - `npm run lint` (API) - **blocking**
   - `npx prisma generate` (required for type-check + tests)
   - `npm test` (API unit, 3,429 tests, default mock-based) - **blocking**
   - `npm run test:e2e` (API E2E, 1,100 tests in inmemory mode) - **blocking**
@@ -21,8 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ci(workflows)**: `build-test.yml` branch trigger expanded to include `feat/**`, `ci/**`, `fix/**` (was only `test/**`, `dev/**`, `feature/**`)
 - **rationale**: Existing 3 workflows built and pushed images without ever running tests. The first commit of the rethought 6-week plan closes this gap, enabling all downstream safety mechanisms (blue/green, digest pinning, synthetic monitoring) to be trusted.
 - **inmemory-mode E2E exclusions**: `endpoint-scoped-logs.e2e-spec.ts` and `log-config.e2e-spec.ts` each contain one test that filters persistent logs by `minDurationMs` - a query the InMemory log repository does not implement. These two tests run against the real Prisma backend in the post-deploy live-test suite (`scripts/live-test.ps1`). Excluded from CI to keep the pipeline fast and PG-free; total CI E2E count is 1,100 of 1,149 specs (49 specs covered by live tests).
-- **known debt**: Lint reports 58 pre-existing errors (mostly `require-await` on InMemory repo methods that satisfy an async interface contract, and `no-unused-vars` for params that need underscore prefix). These have built up because CI never ran lint. Marked as `continue-on-error: true` in the validate job so the test gate ships today; cleanup is queued as the next commit on this branch, after which `continue-on-error` will be removed.
-- **next**: lint cleanup, then OPS-2 (digest pinning in `scripts/promote-to-prod.ps1`), OPS-5 (Container Apps blue/green via `revisionsMode: multiple`), Tier-0 security batch (S-1 through S-5, R-1, DTO-1)
+- **next**: OPS-2 (digest pinning in `scripts/promote-to-prod.ps1`), OPS-5 (Container Apps blue/green via `revisionsMode: multiple`), Tier-0 security batch (S-1 through S-5, R-1, DTO-1)
 
 ## [0.40.0] - 2026-04-28
 

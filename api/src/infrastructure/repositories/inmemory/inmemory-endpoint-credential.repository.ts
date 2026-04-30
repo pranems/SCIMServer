@@ -1,7 +1,11 @@
 /**
  * In-memory repository for EndpointCredential (Phase 11).
  * Used when PERSISTENCE_BACKEND=inmemory (E2E tests, dev).
+ *
+ * NOTE: Methods are async to satisfy IEndpointCredentialRepository (Promise<T>
+ * return types) even when no await is needed in the in-memory implementation.
  */
+/* eslint-disable @typescript-eslint/require-await */
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { IEndpointCredentialRepository } from '../../../domain/repositories/endpoint-credential.repository.interface';

@@ -6,7 +6,11 @@
  *
  * Phase 4: Uses matchesPrismaFilter() to evaluate Prisma-style WHERE clauses
  * produced by the expanded filter push-down (co/sw/ew/ne/gt/ge/lt/le/pr + AND/OR).
+ *
+ * NOTE: Methods are async to satisfy IUserRepository (Promise<T> return types)
+ * even when no await is needed in the in-memory implementation.
  */
+/* eslint-disable @typescript-eslint/require-await */
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { IUserRepository } from '../../../domain/repositories/user.repository.interface';

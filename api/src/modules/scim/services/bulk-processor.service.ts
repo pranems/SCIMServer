@@ -24,7 +24,7 @@ import type {
   BulkOperationResult,
   BulkResponse,
 } from '../dto/bulk-request.dto';
-import { SCIM_BULK_RESPONSE_SCHEMA, BULK_MAX_OPERATIONS } from '../dto/bulk-request.dto';
+import { SCIM_BULK_RESPONSE_SCHEMA } from '../dto/bulk-request.dto';
 import { ScimLogger } from '../../logging/scim-logger.service';
 import { LogCategory } from '../../logging/log-levels';
 
