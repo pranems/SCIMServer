@@ -54,7 +54,7 @@ Before executing, internally answer at least three of these (output the answers 
 
 Do the work. Edit files, run commands, write tests - whatever the task requires. Follow the project's standing rules:
 
-- **NEVER** use em-dash (`—`) anywhere - use a single hyphen `-` instead. This applies to code, comments, strings, docs, commit messages, and generated content.
+- **NEVER** use em-dash characters (Unicode `U+2014`) anywhere - always use a single hyphen `-` instead. This applies to code, comments, strings, docs, commit messages, and any generated content. Verify with `Select-String -Pattern ([char]0x2014)`.
 - **NEVER** use `git commit --amend` unless the user explicitly asks.
 - Always use `git add -A; git commit -m "..."` to save progress.
 - Match existing code conventions discovered in Step 0.
