@@ -5,6 +5,25 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### CI - OPS-1: Gate Image Push on Full Test Suite
+
+- **ci(workflows)**: Added `validate` job to `.github/workflows/build-and-push.yml` and `.github/workflows/build-test.yml` that runs before any docker build/push:
+  - `npm run lint` (API, **informational** for now - see note below)
+  - `npx prisma generate` (required for type-check + tests)
+  - `npm test` (API unit, 3,429 tests, default mock-based) - **blocking**
+  - `npm run test:e2e` (API E2E, 1,100 tests in inmemory mode) - **blocking**
+  - `npm test` (web Vitest, 172 tests) - **blocking**
+  - `npm run build` (web production bundle, ~80 KB gz) - **blocking**
+- **ci(workflows)**: `build-and-push` job now declares `needs: validate` - no image is published unless all blocking checks pass
+- **ci(workflows)**: `build-and-push.yml` image tags now include `sha-<short>` for SHA-based traceability; build summary surfaces the `sha256:` digest for digest-pinning in promote-to-prod (OPS-2 follow-up)
+- **ci(workflows)**: `build-test.yml` branch trigger expanded to include `feat/**`, `ci/**`, `fix/**` (was only `test/**`, `dev/**`, `feature/**`)
+- **rationale**: Existing 3 workflows built and pushed images without ever running tests. The first commit of the rethought 6-week plan closes this gap, enabling all downstream safety mechanisms (blue/green, digest pinning, synthetic monitoring) to be trusted.
+- **inmemory-mode E2E exclusions**: `endpoint-scoped-logs.e2e-spec.ts` and `log-config.e2e-spec.ts` each contain one test that filters persistent logs by `minDurationMs` - a query the InMemory log repository does not implement. These two tests run against the real Prisma backend in the post-deploy live-test suite (`scripts/live-test.ps1`). Excluded from CI to keep the pipeline fast and PG-free; total CI E2E count is 1,100 of 1,149 specs (49 specs covered by live tests).
+- **known debt**: Lint reports 58 pre-existing errors (mostly `require-await` on InMemory repo methods that satisfy an async interface contract, and `no-unused-vars` for params that need underscore prefix). These have built up because CI never ran lint. Marked as `continue-on-error: true` in the validate job so the test gate ships today; cleanup is queued as the next commit on this branch, after which `continue-on-error` will be removed.
+- **next**: lint cleanup, then OPS-2 (digest pinning in `scripts/promote-to-prod.ps1`), OPS-5 (Container Apps blue/green via `revisionsMode: multiple`), Tier-0 security batch (S-1 through S-5, R-1, DTO-1)
+
 ## [0.40.0] - 2026-04-28
 
 ### Test - Test Gaps Audit #6: Cross-Feature Integration & Coverage Gaps
