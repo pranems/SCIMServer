@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Test - R-1: Race-Condition Regression Guard
+
+- **test(e2e)**: Added concurrent-POST regression test in `edge-cases.e2e-spec.ts` that asserts `Promise.all` of two POSTs with the same userName resolves to exactly `[201, 409]` (sorted) with `scimType: 'uniqueness'` - never `[201, 500]` as it would pre-fix.
+- **finding**: Audit was stale - all 3 Prisma `create()` calls already wrap errors with `wrapPrismaError()` (User L64, Group L85, Generic L59). The shared utility correctly maps Prisma `P2002` to `RepositoryError('CONFLICT')`, which the service layer translates to SCIM 409. R-1 was effectively closed in earlier work, just not reflected in the audit.
+- **Validation**: `edge-cases.e2e-spec.ts` 21/21 pass (was 20). Prior unit-level CONFLICT tests in `prisma-{user,group,generic-resource}.repository.spec.ts` still pass.
+- **doc updates**: marked R-1 Closed in `docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md` and `docs/DELIVERY_PLAN.md`.
+
 ### Security - S-2: Timing-Safe Token Comparison
 
 - **security(auth)**: Replaced bare `===` / `!==` token comparisons with `crypto.timingSafeEqual()` via a new shared `safeCompare()` helper to eliminate the timing-side-channel that allows progressive byte-by-byte secret guessing. Two call sites updated:

@@ -164,6 +164,29 @@ describe('Edge Cases (E2E)', () => {
       await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'DupUser@test.com' })).expect(201);
       await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'dupuser@test.com' })).expect(409);
     });
+
+    // R-1 regression guard: concurrent POSTs with the same unique userName must
+    // result in exactly one 201 + one 409, never two 201s and never a raw 500.
+    // Pre-fix, prisma-user.repository.create() did not wrap errors, so a P2002
+    // race-loss returned 500 with raw stack instead of 409 invalidValue.
+    // See docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md R-1.
+    it('R-1: concurrent POST of same userName returns 1x201 + 1x409 (no 500)', async () => {
+      const userName = `race-${Date.now()}@test.com`;
+      const body = validUser({ userName });
+      const [resA, resB] = await Promise.all([
+        scimPost(app, `${basePath}/Users`, token, { ...body }),
+        scimPost(app, `${basePath}/Users`, token, { ...body }),
+      ]);
+      const statuses = [resA.status, resB.status].sort((a, b) => a - b);
+      // Exactly one created, exactly one conflict; no 500 leaked.
+      expect(statuses).toEqual([201, 409]);
+      const conflict = resA.status === 409 ? resA : resB;
+      expect(conflict.body).toMatchObject({
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:Error'],
+        status: '409',
+        scimType: 'uniqueness',
+      });
+    });
   });
 
   // ───────────── Large Payload ─────────────

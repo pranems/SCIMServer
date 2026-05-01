@@ -476,7 +476,7 @@ abstract class BaseScimController {
 
 | ID | Severity | File(s) | Issue | Impact |
 |----|:--------:|---------|-------|--------|
-| **R-1** | 🔴 HIGH | `prisma/*.repository.ts` | `create()` missing `try/catch` + `wrapPrismaError()`. On P2002 unique-constraint race during concurrent creates, raw `PrismaClientKnownRequestError` escapes → **500 instead of 409**. `update()` and `delete()` correctly wrap errors. | Data integrity |
+| **R-1** | � CLOSED | `prisma/*.repository.ts` | All 3 Prisma `create()` calls wrap errors with `wrapPrismaError()` (User L64, Group L85, Generic L59); P2002 maps to `RepositoryError('CONFLICT')` which the service layer translates to SCIM 409 `uniqueness`. Race-condition E2E regression guard in `edge-cases.e2e-spec.ts`. | Data integrity |
 | **R-2** | 🔴 HIGH | All repo interfaces | **Leaky Prisma filter abstraction** - `dbFilter?: Record<string, unknown>` passes Prisma `WhereInput` shapes through domain interfaces. InMemory repos had to build a 200-line `prisma-filter-evaluator.ts` to emulate Prisma query semantics. | Architecture coupling |
 | **R-3** | 🟡 MEDIUM | `prisma-endpoint-credential.repository.ts` | Silent `catch {}` blocks in `findById`, `deactivate`, `delete` - swallow ALL errors including connection failures and permissions errors. Only P2025 (not found) should return null. | Masked failures |
 | **R-4** | 🟡 MEDIUM | All Prisma repos | `toUserRecord()`, `toGroupRecord()`, `toGenericRecord()` mapping functions are ~15 lines each with 80% identical structure (same cast pattern + payload stringification). | DRY violation |
