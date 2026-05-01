@@ -37,13 +37,16 @@ jobs:
         working-directory: api
         run: npm ci --no-audit --no-fund
 
+      # Prisma client must be generated BEFORE lint so type-aware ESLint rules
+      # (no-redundant-type-constituents, require-await) can resolve @prisma/client
+      # types. Without it those types appear as 'error' types and trip lint.
+      - name: Generate Prisma client (required for lint + type-check + tests)
+        working-directory: api
+        run: npx prisma generate
+
       - name: Lint API
         working-directory: api
         run: npm run lint
-
-      - name: Generate Prisma client (required for type-check + tests)
-        working-directory: api
-        run: npx prisma generate
 
       # Migration linter - blocks destructive Prisma DDL on new migrations.
       # Historical destructives are accepted via api/prisma/.migration-lint-baseline.json
@@ -120,6 +123,19 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      # OPS-3: Trivy CVE scan on the just-pushed image. Fails the build on
+      # any HIGH or CRITICAL OS-package or library vulnerability. Lower
+      # severities are reported but do not gate the release.
+      - name: Trivy image scan (HIGH+CRITICAL gating)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          format: table
+          exit-code: '1'
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          vuln-type: os,library
 
       - name: Summary
         run: |
