@@ -838,7 +838,7 @@ xychart-beta
 | 2 | Add `crypto.timingSafeEqual()` for all secret/token comparisons | 1h | High | `shared-secret.guard.ts` L134, `oauth.service.ts` L80 | **Closed** |
 | 3 | Replace `console.log`/`console.error` in `ScimAuthGuard` with `ScimLogger` (closed by #1 - guard deleted) | 30m | Medium | `auth/scim-auth.guard.ts` | **Closed** |
 | 4 | Make CORS origin configurable via `CORS_ORIGIN` env var | 30m | Medium | `main.ts` L48 | Open |
-| 5 | Add `@@unique([groupResourceId, memberResourceId])` to `ResourceMember` + Prisma migration | 1h | High | `schema.prisma`, new migration | Open |
+| 5 | Add `@@unique([groupResourceId, value])` to `ResourceMember` + Prisma migration | 1h | High | `schema.prisma`, new migration | **Closed** |
 
 ### Tier 1 - Architecture (High ROI)
 

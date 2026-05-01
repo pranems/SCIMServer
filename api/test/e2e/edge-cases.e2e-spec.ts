@@ -276,6 +276,62 @@ describe('Edge Cases (E2E)', () => {
     });
   });
 
+  // ───────────── Group Member Deduplication ─────────────
+
+  describe('Group member deduplication (Tier-0 #5)', () => {
+    // Tier-0 #5: duplicate (groupResourceId, value) rows are blocked at the DB
+    // by @@unique. The service layer dedupes the API input BEFORE reaching the
+    // repo, so the API contract is silent dedup (idempotent add). The DB
+    // constraint is defense-in-depth against direct DB writes / repo bugs.
+    it('should silently dedupe duplicate members on POST', async () => {
+      const userARes = await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'mem-a@test.com' })).expect(201);
+      const userBRes = await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'mem-b@test.com' })).expect(201);
+      const aId = userARes.body.id;
+      const bId = userBRes.body.id;
+
+      const groupRes = await scimPost(app, `${basePath}/Groups`, token, validGroup({
+        members: [
+          { value: aId, display: 'A' },
+          { value: aId, display: 'A again' },   // duplicate
+          { value: bId, display: 'B' },
+          { value: aId, display: 'A third' },   // another duplicate
+        ],
+      })).expect(201);
+
+      // Exactly 2 unique members, first occurrence wins.
+      expect(groupRes.body.members).toHaveLength(2);
+      const values = (groupRes.body.members as Array<{ value: string; display?: string }>)
+        .map((m) => m.value);
+      expect(values.sort()).toEqual([aId, bId].sort());
+    });
+
+    it('should silently dedupe duplicate members on PUT', async () => {
+      const userRes = await scimPost(app, `${basePath}/Users`, token, validUser({ userName: 'mem-c@test.com' })).expect(201);
+      const cId = userRes.body.id;
+
+      const groupRes = await scimPost(app, `${basePath}/Groups`, token, validGroup({
+        displayName: 'putdup',
+        members: [{ value: cId }],
+      })).expect(201);
+
+      const putRes = await request(app.getHttpServer())
+        .put(`${basePath}/Groups/${groupRes.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .set('Content-Type', 'application/scim+json')
+        .send({
+          schemas: ['urn:ietf:params:scim:schemas:core:2.0:Group'],
+          displayName: 'putdup',
+          members: [
+            { value: cId, display: 'first' },
+            { value: cId, display: 'duplicate' },
+          ],
+        })
+        .expect(200);
+
+      expect(putRes.body.members).toHaveLength(1);
+    });
+  });
+
   // ───────────── PascalCase PATCH ops ─────────────
 
   describe('PascalCase PATCH op values (Entra compatibility)', () => {

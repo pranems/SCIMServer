@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Data - Tier-0 #5: ResourceMember Unique Constraint + Service Dedupe
+
+- **schema(prisma)**: Added `@@unique([groupResourceId, value])` to `ResourceMember` (`api/prisma/schema.prisma`). SCIM identifies a member by its `value` sub-attribute (always populated), so this is the correct unique key. `memberResourceId` is nullable for external members and unsuitable for the constraint.
+- **migration**: New `20260430120000_resource_member_unique_value` SQL migration deduplicates any existing `(groupResourceId, value)` duplicates BEFORE applying the unique index. Dedup keeps the row with the smallest `createdAt` (oldest), with `id` as tiebreaker. Idempotent and additive-safe per standing rules.
+- **feat(group-service)**: Added input dedup in `resolveMemberInputs()` (`endpoint-scim-groups.service.ts`) - silent dedupe of duplicate member values in API requests, first occurrence wins. SCIM-compliant behavior (idempotent add). The DB constraint is now defense-in-depth against direct DB writes / repo bugs, not the primary enforcement path.
+- **test(security)**: New `api/src/security/required-schema-constraints.spec.ts` - extensible spec that asserts Prisma `schema.prisma` declares specific constraints by audit ID. Currently covers Tier-0 #5; future schema-level defenses add a new entry.
+- **test(e2e)**: 2 new dedup tests in `edge-cases.e2e-spec.ts`:
+  - POST `/Groups` with `members: [A, A, B, A]` returns 201 with exactly 2 unique members
+  - PUT `/Groups/:id` with duplicate values returns 200 with deduped result
+- **TDD process** (red-green):
+  1. RED: wrote `required-schema-constraints.spec.ts`; ran it; failed because `@@unique([groupResourceId, value])` was missing.
+  2. GREEN: added the constraint to `schema.prisma`, hand-wrote the dedupe-then-constrain migration, added service-layer dedupe; spec passed; new E2E tests passed; full suite green.
+- **Validation**: 3,442 unit (86 suites; +1 schema-constraint spec, +1 test), 1,104 E2E inmemory (24 in edge-cases, +2), 0 lint errors.
+- **doc updates**: marked Tier-0 #5 Closed in `docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md` (Tier-0 list) and `docs/DELIVERY_PLAN.md` (Closed table + removed from Tier-0 open).
+
 ### Security - DTO-1: Filter Length Cap at Parser Entry Point
 
 - **security(filter)**: Added centralized `MAX_FILTER_LENGTH = 10000` cap inside `parseScimFilter()` (`api/src/modules/scim/filters/scim-filter-parser.ts`). Closes the memory/CPU DoS vector where an attacker could submit a megabyte-scale filter expression and force the tokenizer + parser to walk every byte (worst-case quadratic in some grouping patterns) before push-down decided anything.

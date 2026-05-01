@@ -616,13 +616,25 @@ export class EndpointScimGroupsService {
     memberDtos: GroupMemberDto[],
     endpointId: string,
   ): Promise<MemberCreateInput[]> {
-    const values = memberDtos.map((m) => m.value);
+    // Tier-0 #5: dedupe by SCIM `value` BEFORE storing. The DB has a
+    // @@unique([groupResourceId, value]) constraint as defense-in-depth, but
+    // a duplicate in the API request is benign (idempotent add) - we keep the
+    // first occurrence and silently drop the rest, matching common SCIM impls.
+    const seen = new Set<string>();
+    const dedupedDtos: GroupMemberDto[] = [];
+    for (const m of memberDtos) {
+      if (m.value === undefined || m.value === null || seen.has(m.value)) continue;
+      seen.add(m.value);
+      dedupedDtos.push(m);
+    }
+
+    const values = dedupedDtos.map((m) => m.value);
     const users = values.length > 0
       ? await this.userRepo.findByScimIds(endpointId, values)
       : [];
     const userMap = new Map(users.map((u) => [u.scimId, u.id] as const));
 
-    return memberDtos.map((m) => ({
+    return dedupedDtos.map((m) => ({
       userId: userMap.get(m.value) ?? null,
       value: m.value,
       type: m.type ?? null,

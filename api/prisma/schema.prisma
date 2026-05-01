@@ -109,6 +109,12 @@ model ResourceMember {
   group  ScimResource  @relation("GroupMembers", fields: [groupResourceId], references: [id], onDelete: Cascade)
   member ScimResource? @relation("MemberResources", fields: [memberResourceId], references: [id], onDelete: SetNull)
 
+  // Tier-0 #5: prevent duplicate memberships at DB level. SCIM identifies a
+  // member by its `value` sub-attribute (always populated), so this is the
+  // correct unique key (memberResourceId is nullable for external members).
+  // The migration `20260430120000_resource_member_unique_value` deduplicates
+  // any existing rows BEFORE applying the constraint.
+  @@unique([groupResourceId, value])
   @@index([groupResourceId])
   @@index([memberResourceId])
 }
