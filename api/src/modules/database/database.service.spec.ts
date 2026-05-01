@@ -30,6 +30,26 @@ describe('DatabaseService', () => {
   const mockUserRepo = { findAll: jest.fn().mockResolvedValue([]), findByScimId: jest.fn() };
   const mockGroupRepo = { findAllWithMembers: jest.fn().mockResolvedValue([]), findWithMembers: jest.fn() };
 
+  // DatabaseService reads PERSISTENCE_BACKEND in a constructor field initializer
+  // (private readonly isInMemoryBackend = process.env.PERSISTENCE_BACKEND === 'inmemory').
+  // If a developer's shell has PERSISTENCE_BACKEND=inmemory set (common during
+  // E2E debugging), every test in this suite silently routes through the
+  // in-memory branch and bypasses the mocked PrismaService -> 30 misleading
+  // failures. Pin the env var to 'prisma' here so these unit tests are
+  // hermetic regardless of shell state, and restore the original value after.
+  let originalPersistenceBackend: string | undefined;
+  beforeAll(() => {
+    originalPersistenceBackend = process.env.PERSISTENCE_BACKEND;
+    process.env.PERSISTENCE_BACKEND = 'prisma';
+  });
+  afterAll(() => {
+    if (originalPersistenceBackend === undefined) {
+      delete process.env.PERSISTENCE_BACKEND;
+    } else {
+      process.env.PERSISTENCE_BACKEND = originalPersistenceBackend;
+    }
+  });
+
   beforeEach(async () => {
     prisma = {
       scimResource: {
