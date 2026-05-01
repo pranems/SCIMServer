@@ -254,6 +254,26 @@ describe('Edge Cases (E2E)', () => {
 
       expect(res.body.totalResults).toBe(0);
     });
+
+    // DTO-1 regression guard: oversized filter must be rejected with 400
+    // invalidFilter, not silently parsed (memory DoS) or returning 500.
+    // The cap is enforced inside parseScimFilter (centralized at parser entry).
+    it('DTO-1: should reject filter exceeding 10000 characters with 400 invalidFilter', async () => {
+      const longValue = 'a'.repeat(11000);
+      const longFilter = `userName eq "${longValue}"`;
+      const res = await scimGet(
+        app,
+        `${basePath}/Users?filter=${encodeURIComponent(longFilter)}`,
+        token,
+      );
+      expect(res.status).toBe(400);
+      expect(res.body).toMatchObject({
+        schemas: ['urn:ietf:params:scim:api:messages:2.0:Error'],
+        status: '400',
+      });
+      // Either invalidFilter or invalidValue depending on which layer rejected
+      expect(['invalidFilter', 'invalidValue']).toContain(res.body.scimType);
+    });
   });
 
   // ───────────── PascalCase PATCH ops ─────────────

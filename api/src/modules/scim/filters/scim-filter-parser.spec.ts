@@ -178,6 +178,28 @@ describe('ScimFilterParser', () => {
     it('should throw on unexpected token after valid expression', () => {
       expect(() => parseScimFilter('userName eq "john" extra')).toThrow(/Unexpected/);
     });
+
+    // DTO-1: filter length cap. Without this guard an attacker can submit a
+    // 1+ MB filter expression, forcing tokenizer + parser to walk every byte
+    // (worst-case quadratic in some grouping patterns) and exhausting memory
+    // before push-down decides anything. Centralized at the parser so every
+    // entry point (GET ?filter=, POST /.search filter, profile validation)
+    // shares the same limit.
+    it('DTO-1: should throw on filter exceeding 10000 characters', () => {
+      const longFilter = 'userName eq "' + 'a'.repeat(10001) + '"';
+      expect(() => parseScimFilter(longFilter)).toThrow(/too long|exceeds maximum length|10000/i);
+    });
+
+    it('DTO-1: should accept filter at exactly 10000 characters', () => {
+      // Build a valid filter that hits the 10000-char limit exactly.
+      // Pattern: `userName eq "...padding..."` - we pad the value.
+      const prefix = 'userName eq "';
+      const suffix = '"';
+      const valueLen = 10000 - prefix.length - suffix.length;
+      const filterAt10000 = prefix + 'a'.repeat(valueLen) + suffix;
+      expect(filterAt10000.length).toBe(10000);
+      expect(() => parseScimFilter(filterAt10000)).not.toThrow();
+    });
   });
 });
 

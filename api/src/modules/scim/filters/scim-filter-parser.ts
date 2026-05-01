@@ -217,9 +217,21 @@ function tokenize(input: string): Token[] {
 /**
  * Maximum nesting depth for filter expressions.
  * Prevents stack overflow from adversarial deeply-nested filters like
- * `((((...50+ levels...))))` even within the 10000-char DTO limit.
+ * `((((...50+ levels...))))` even within the 10000-char filter length cap.
  */
 const MAX_FILTER_DEPTH = 50;
+
+/**
+ * Maximum filter string length.
+ * Centralized at the parser so every entry point - GET ?filter=, POST /.search
+ * filter body, profile validation - shares the same cap. Prevents memory DoS
+ * from megabyte-scale filter expressions that would force tokenizer + parser
+ * to walk every byte (worst-case quadratic in some grouping patterns) before
+ * push-down decides anything.
+ *
+ * Closes DTO-1 (DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md and DELIVERY_PLAN.md section 3.2).
+ */
+export const MAX_FILTER_LENGTH = 10000;
 
 class Parser {
   private tokens: Token[];
@@ -391,6 +403,14 @@ class Parser {
 export function parseScimFilter(filterStr: string): FilterNode {
   if (!filterStr || !filterStr.trim()) {
     throw new Error('Filter expression cannot be empty');
+  }
+  // DTO-1: cap filter length BEFORE tokenization. The cap protects against
+  // memory and CPU exhaustion from adversarially-large input.
+  if (filterStr.length > MAX_FILTER_LENGTH) {
+    throw new Error(
+      `Filter expression too long (${filterStr.length} chars). ` +
+        `Maximum supported length is ${MAX_FILTER_LENGTH} characters.`,
+    );
   }
   const tokens = tokenize(filterStr.trim());
   const parser = new Parser(tokens);

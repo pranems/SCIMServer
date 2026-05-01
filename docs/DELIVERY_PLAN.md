@@ -156,7 +156,8 @@ Each defect: ID, file path with line, severity, hours, "done when". No grouping 
 | **S-1** | `api/src/auth/scim-auth.guard.ts` (deleted) | `ef9673b` | Dead guard with hardcoded `S@g@r!2011` deleted via TDD |
 | **S-3** | `api/src/auth/scim-auth.guard.ts` (deleted) | `ef9673b` | 5 `console.log`/`console.error` calls in auth path deleted with the guard |
 | **S-2** | [api/src/modules/auth/shared-secret.guard.ts](../api/src/modules/auth/shared-secret.guard.ts), [api/src/oauth/oauth.service.ts](../api/src/oauth/oauth.service.ts) | `bf9ab73` | `safeCompare()` helper using `crypto.timingSafeEqual()`; 14 unit tests; +1 OAuth length-mismatch test; permanent regression guards |
-| **R-1** | [api/src/infrastructure/repositories/prisma/prisma-user.repository.ts](../api/src/infrastructure/repositories/prisma/prisma-user.repository.ts) (and Group, Generic) | (this commit) | Audit was stale - all 3 Prisma `create()` calls already wrapped with `wrapPrismaError`. Added race-condition E2E regression guard in `edge-cases.e2e-spec.ts`: `Promise.all` of two concurrent POSTs with same userName asserts exactly `[201, 409]` with `scimType: 'uniqueness'`, never `[201, 500]`. |
+| **R-1** | [api/src/infrastructure/repositories/prisma/prisma-user.repository.ts](../api/src/infrastructure/repositories/prisma/prisma-user.repository.ts) (and Group, Generic) | `1a475e2` | Audit was stale - all 3 Prisma `create()` calls already wrapped with `wrapPrismaError`. Added race-condition E2E regression guard in `edge-cases.e2e-spec.ts`. |
+| **DTO-1** | [api/src/modules/scim/filters/scim-filter-parser.ts](../api/src/modules/scim/filters/scim-filter-parser.ts) | (this commit) | New exported `MAX_FILTER_LENGTH = 10000` enforced at parser entry point - covers ALL call paths (GET ?filter=, POST /.search, profile validation, generic service). Unit + E2E regression guards. Centralized cap is a stronger guarantee than DTO-only validation since `ListQueryDto` was not actually wired into list controllers. |
 
 ### 3.2 Open - Tier 0 (Week 1 Day 3-4)
 
@@ -164,7 +165,6 @@ Each defect: ID, file path with line, severity, hours, "done when". No grouping 
 |---|---|---|---|---|
 | **S-4** | [api/src/main.ts#L48](../api/src/main.ts) | MEDIUM | 2 | `origin: process.env.CORS_ORIGIN?.split(',') ?? false`; E2E test rejects from disallowed origin |
 | **S-5** | [api/src/main.ts#L88](../api/src/main.ts) | MEDIUM | 1 | ADR-004 written documenting decision (recommend keep with mitigation) |
-| **DTO-1** | [api/src/modules/scim/dto/list-query.dto.ts](../api/src/modules/scim/dto/list-query.dto.ts) | HIGH | 2 | Hardened to `SearchRequestDto` parity; E2E with 11 KB filter returns 400 |
 | **Tier-0 #5** | [api/prisma/schema.prisma](../api/prisma/schema.prisma) | HIGH | 3 | `@@unique([groupResourceId, memberResourceId])` + new migration; duplicate-member E2E returns 409 |
 
 ### 3.3 Open - Operational (Week 1 Day 5 + Week 2)
@@ -626,7 +626,8 @@ These are intentionally **NOT** in this plan and represent decisions to remove f
 | 2026-04-30 | S-1, S-3: delete dead `ScimAuthGuard` via TDD; add permanent regression guard | `ef9673b` | ✅ Shipped on `ci/validate-before-push` |
 | 2026-04-30 | DELIVERY_PLAN.md: consolidated 6-week execution plan | `b014c32` | ✅ Shipped on `ci/validate-before-push` |
 | 2026-04-30 | S-2: timing-safe token comparison via shared `safeCompare()` (TDD) | `bf9ab73` | ✅ Shipped on `ci/validate-before-push` |
-| 2026-04-30 | R-1: race-condition E2E regression guard (impl already present from prior work) | (this commit) | ✅ Shipped on `ci/validate-before-push` |
+| 2026-04-30 | R-1: race-condition E2E regression guard (impl already present from prior work) | `1a475e2` | ✅ Shipped on `ci/validate-before-push` |
+| 2026-04-30 | DTO-1: filter length cap at parser entry point + unit + E2E regression guards (TDD) | (this commit) | ✅ Shipped on `ci/validate-before-push` |
 
 **Validation as of 2026-04-30**:
 - Unit: 3,439 / 3,439 pass (85 suites; +1 spec for safeCompare with 14 tests; +1 OAuth length-mismatch test)

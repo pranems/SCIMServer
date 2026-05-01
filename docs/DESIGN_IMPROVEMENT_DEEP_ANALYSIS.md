@@ -544,7 +544,7 @@ graph LR
 
 | ID | Severity | DTO | Gap | Recommendation |
 |----|:--------:|-----|-----|----------------|
-| **DTO-1** | 🔴 HIGH | `ListQueryDto` | No `@MaxLength` on `filter`, missing `sortBy`/`sortOrder`/`attributes`/`excludedAttributes` declarations | Harden to parity with `SearchRequestDto` |
+| **DTO-1** | � CLOSED | `scim-filter-parser.ts` | Centralized `MAX_FILTER_LENGTH = 10000` constant enforced at `parseScimFilter()` entry point - covers ALL call paths (GET ?filter=, POST /.search, profile validation, generic service). Stronger than DTO-only validation since `ListQueryDto` is not actually wired into list controllers. Unit + E2E regression guards. | Harden to parity with `SearchRequestDto` |
 | **DTO-2** | 🟡 MEDIUM | `CreateUserDto` | `[key: string]: unknown` index signature allows arbitrary top-level properties bypassing validation. No `@MaxLength` on `userName`. No `@ValidateNested` on complex attrs (`emails`, `name`, `phoneNumbers`) | Add `@MaxLength(255)` to `userName`, consider `@ValidateNested` for critical sub-objects |
 | **DTO-3** | 🟡 MEDIUM | `PatchOperationDto` | `path` has no `@MaxLength` - oversized PATCH paths impact performance | Add `@MaxLength(500)` |
 | **DTO-4** | 🟡 MEDIUM | `OAuthController` | `TokenRequest` is a plain interface - no class-validator decorators. `client_secret` could be object/array | Convert to DTO class with `@IsString()` validators |

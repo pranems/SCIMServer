@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security - DTO-1: Filter Length Cap at Parser Entry Point
+
+- **security(filter)**: Added centralized `MAX_FILTER_LENGTH = 10000` cap inside `parseScimFilter()` (`api/src/modules/scim/filters/scim-filter-parser.ts`). Closes the memory/CPU DoS vector where an attacker could submit a megabyte-scale filter expression and force the tokenizer + parser to walk every byte (worst-case quadratic in some grouping patterns) before push-down decided anything.
+- **insight**: The audit recommended hardening `ListQueryDto`, but `ListQueryDto` is **not wired into list controllers** - they use bare `@Query('filter')` strings. A DTO-only fix would have been silently inert. The cap at the parser entry point is a stronger guarantee because every call path (GET `?filter=`, POST `/.search`, profile validation, generic service filter) shares the same enforcement.
+- **TDD process** (red-green):
+  1. RED: added 2 unit tests in `scim-filter-parser.spec.ts` (10001-char throws, exactly-10000 accepted); ran them; first failed.
+  2. GREEN: added length cap before `tokenize()` call in `parseScimFilter()`; both unit tests passed.
+  3. Added E2E in `edge-cases.e2e-spec.ts` asserting GET `?filter=<11000 chars>` returns 400 with SCIM `invalidFilter` (or `invalidValue`); passed immediately, confirming the existing `buildUserFilter` error-translation path correctly maps parser exceptions to 400.
+- **export**: `MAX_FILTER_LENGTH` is now an exported constant so other tools (UI validation, future migration, observability) can reference the same number.
+- **Validation**: 3,441 unit (87 in scim-filter-parser, +2), 1,102 E2E inmemory (22 in edge-cases, +1), 0 lint errors.
+- **doc updates**: marked DTO-1 Closed in `docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md` and `docs/DELIVERY_PLAN.md` (Closed table + Tier-0 list); CHANGELOG entry; corrected the rationale (parser cap, not DTO hardening).
+
 ### Test - R-1: Race-Condition Regression Guard
 
 - **test(e2e)**: Added concurrent-POST regression test in `edge-cases.e2e-spec.ts` that asserts `Promise.all` of two POSTs with the same userName resolves to exactly `[201, 409]` (sorted) with `scimType: 'uniqueness'` - never `[201, 500]` as it would pre-fix.
