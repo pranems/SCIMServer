@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security - S-4: Configurable CORS Origin
+
+- **security(cors)**: Replaced unconditional `origin: true` in `api/src/main.ts` with `parseCorsOrigin(process.env.CORS_ORIGIN)`. Backward-compatible: env var unset/empty/`*` retains the previous allow-all behavior.
+- **feat(security)**: New `api/src/security/cors-origin.ts` helper exporting `parseCorsOrigin(raw)` returning `boolean | string | string[]` for direct use as Express cors `origin` option. Behavior matrix:
+  - `undefined` / `''` / `'   '` / `'*'` → `true` (allow all - default)
+  - `'false'` / `'none'` (case-insensitive) → `false` (no CORS)
+  - `'https://app.example.com'` → single string
+  - `'https://a.example.com,https://b.example.com'` → string array allowlist
+  - Single-entry comma list collapses to string; whitespace trimmed; empty entries dropped
+- **test(security)**: 13 unit tests in `api/src/security/cors-origin.spec.ts` covering all branches (undefined, empty, whitespace, `*`, deny keywords case-insensitive, single origin, allowlist, trim-around-commas, drop-empties, all-empty-after-trim → false, single-entry-with-trailing-comma → string).
+- **infra(bicep)**: Added `corsOrigin` parameter to `infra/containerapp.bicep`, wired into `CORS_ORIGIN` env var on the Container App. Default empty string preserves current allow-all behavior on existing deployments.
+- **runtime**: `credentials` flag now auto-enabled when an allowlist is configured (`corsOrigin !== true`), required for cookies/auth headers to work cross-origin against a specific origin.
+- **test(security)**: Extended `forbidden-source-patterns.spec.ts` with S-4 entry. The literal `origin: true,` in `main.ts` is now a forbidden pattern - if it reappears it would defeat the configurability and force allow-all on every deployment.
+- **TDD process**: RED - wrote 13-test spec referencing non-existent `parseCorsOrigin`; ran it; failed with TS2306 (module has no exports). GREEN - implemented helper; 13/13 pass. Wired into `main.ts`; ran full suite; 3,456 unit + 1,104 E2E + 0 lint errors all green.
+- **doc**: Marked S-4 closed in `docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md`.
+
 ### Data - Tier-0 #5: ResourceMember Unique Constraint + Service Dedupe
 
 - **schema(prisma)**: Added `@@unique([groupResourceId, value])` to `ResourceMember` (`api/prisma/schema.prisma`). SCIM identifies a member by its `value` sub-attribute (always populated), so this is the correct unique key. `memberResourceId` is nullable for external members and unsuitable for the constraint.

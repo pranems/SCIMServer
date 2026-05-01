@@ -83,6 +83,20 @@ const FORBIDDEN_PATTERNS: ReadonlyArray<ForbiddenPattern> = [
     needle: 'client.clientSecret !' + '== clientSecret',
     onlyInPaths: ['oauth/oauth.service.ts'],
   },
+  {
+    id: 'S-4',
+    rationale:
+      'CORS origin must be configurable via the CORS_ORIGIN env var, not ' +
+      'hardcoded to `true`. A reappearance of `origin: true` (the literal ' +
+      'unconditional allow-all) in main.ts would defeat the configurability ' +
+      'and force allow-all in every deployment. The default is preserved by ' +
+      'parseCorsOrigin(undefined) returning true, not by hardcoding true here. ' +
+      'See docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md S-4 and ' +
+      'api/src/security/cors-origin.ts.',
+    // The literal hardcoded option that must not reappear:
+    needle: 'origin: ' + 'true,',
+    onlyInPaths: ['main.ts'],
+  },
 ];
 
 interface Violation {

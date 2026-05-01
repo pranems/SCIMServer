@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
 import { AppModule } from './modules/app/app.module';
+import { parseCorsOrigin } from './security/cors-origin';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -48,12 +49,19 @@ async function bootstrap(): Promise<void> {
     next();
   });
 
-  // Enable CORS for web client access
+  // S-4: CORS origin is configurable via the CORS_ORIGIN env var.
+  // Unset/empty defaults to `true` (allow-all) to preserve backward
+  // compatibility with the previous unconditional `origin: true`.
+  // Set CORS_ORIGIN=https://app.example.com,https://other.example.com to
+  // restrict in production. CORS_ORIGIN=false disables CORS entirely.
+  // See api/src/security/cors-origin.ts for the full behavior matrix.
+  const corsOrigin = parseCorsOrigin(process.env.CORS_ORIGIN);
+  const corsCredentials = corsOrigin !== true;
   app.enableCors({
-    origin: true,  // Allow all origins for now - web client is served from same container
+    origin: corsOrigin,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-    credentials: false  // Set to false since we're allowing all origins
+    credentials: corsCredentials,
   });
 
   // Serve static files (web client) from /public directory
