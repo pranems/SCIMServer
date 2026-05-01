@@ -2,8 +2,16 @@
 
 This file intentionally trimmed for clarity. Full historic log kept in git history.
 
+### Active Execution Reference
+
+**`docs/DELIVERY_PLAN.md` is the canonical execution plan** for the current `ci/validate-before-push` branch and the 6-week production-hardening + UI-redesign sequence. All upcoming commits should:
+- Reference a named defect ID from [DELIVERY_PLAN.md §3](docs/DELIVERY_PLAN.md#3-named-defect-inventory)
+- Follow the TDD process from [DELIVERY_PLAN.md §7](docs/DELIVERY_PLAN.md#7-tdd-process-rules)
+- Update the [Progress Log in §11](docs/DELIVERY_PLAN.md#11-progress-log) on commit
+
 ### Recent Key Achievements (Chronological)
 | Date | Achievement |
+| 2026-04-30 | docs **DELIVERY_PLAN.md (v0.40.0 + 3 commits on `ci/validate-before-push`):** Created consolidated 6-week execution plan reconciling UI redesign + Tier-0 security + CI/CD upgrades into one operating-model document (12 sections, 4 Mermaid diagrams, 1 Gantt). Names every defect with file path + hours + "done when". Replaces all prior phase-based session plans. Three commits already shipped to support it: `5f2376b` (OPS-1 validate gate), `1a22771` (lint cleanup, 58 errors -> 0), `ef9673b` (S-1, S-3 delete dead ScimAuthGuard via TDD with permanent regression guard at `api/src/security/forbidden-source-patterns.spec.ts`). **Validation: 3,422 unit (84 suites), 1,100 E2E inmemory (52 suites), 0 lint errors - ALL PASSING.** |
 | 2026-04-28 | test **Test Gaps Audit #6 (v0.40.0):** Comprehensive audit per `addMissingTests.prompt.md`. Closed 15 E2E gaps, 28 live assertions. E2E: Custom resource type + projection (GET/POST/PUT/LIST with ?attributes=/?excludedAttributes=), Custom resource type + StrictSchema (POST/PUT reject unknown attrs), Bulk + RequireIfMatch for PUT/DELETE (428 per-op), Bulk valid If-Match succeeds, GroupHardDeleteEnabled=False PUT/PATCH/GET still work, .search body-level attributes/excludedAttributes, SoftDelete + ETag conditional GET/PUT 404, Four-flag combo (StrictSchema+IgnoreReadOnly+IncludeWarning+VerbosePatch), PrimaryEnforcement+BooleanStrings combo, PerEndpointCredentials+RequireIfMatch deeper combo, logFileEnabled toggle, error response key allowlist, Bulk response key allowlist. Live: section 9z-U (28 sub-tests covering GroupHardDelete, SoftDelete+ETag, Bulk+RequireIfMatch, four-flag combo, PrimaryEnforcement+BooleanStrings, .search body projection, logFileEnabled toggle). **3,429 unit (84 suites), 1,149 E2E (54 suites), ~817 live assertions - ALL PASSING.** |
 | 2026-04-28 | feat **Structured SCIM Error Diagnostics Enrichment (v0.39.0):** `attributePaths[]` array, `activeConfig` snapshot, `filterExpression` field on all validation errors. +5 E2E, +17 unit tests. Live: section 9z-T (21 sub-tests). |
 | 2026-04-27 | fix **PATCH Scalar Boolean String Coercion (v0.38.1):** RCA'd Entra ID SCIM Validator 400 errors on all PATCH/POST operations against Himanshu-ISV-1 endpoint. Root cause: `coercePatchOpBooleans()` missed scalar string values with explicit paths (e.g. `path:"active", value:"True"`). Entra sends boolean values as strings in path-based PATCH ops. Added `coerceScalarPatchValue()` helper with longest-prefix URN matching for extension paths. Single shared function fix covers Users/Groups/Generic services. +13 unit tests, +4 E2E tests, +5 live tests (section 9z-S). Doc: PATCH_SCALAR_BOOLEAN_COERCION.md. |

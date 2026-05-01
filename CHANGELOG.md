@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs - DELIVERY_PLAN.md: Consolidated 6-Week Execution Plan
+
+- **docs(plan)**: Created `docs/DELIVERY_PLAN.md` (12 sections, 4 Mermaid diagrams, 1 Gantt chart, ~600 lines) reconciling all prior session deliberations into one operating-model document:
+  - Section 1: what the prior 10-week plan got wrong and why this is the third iteration
+  - Section 2: reality assessment by dimension (CI/CD, deploy, data/IDs, tests, security, UI) with green/red status callouts
+  - Section 3: named defect inventory split into Closed (this branch), Tier 0 open, operational open, UI backend, UI frontend, Tier 1-3 backlog
+  - Section 4: target operating model diagram showing dev loop -> build -> dev RG -> human gate -> blue/green prod -> steady-state monitoring
+  - Section 5: fully-automated CI/CD pipeline diagram with all 6 stages and what each stage gates
+  - Section 6: six-week sequencing with Gantt chart, daily breakdown for week 1, parallel-track tables for weeks 2-3
+  - Section 7: TDD red-green-refactor process rules with examples from this branch
+  - Section 8: cross-cutting standing rules (no em-dash, additive migrations, etc)
+  - Section 9: risk map per phase
+  - Section 10: explicit non-goals (16 items removed from prior plans with rationale)
+  - Section 11: progress log seeded with the 3 commits already shipped (`5f2376b`, `1a22771`, `ef9673b`)
+  - Section 12: cross-references to existing planning docs and source-of-truth files
+- **docs(index)**: Added DELIVERY_PLAN.md entry to `docs/INDEX.md` Architecture & Design section.
+- **session_starter**: Added DELIVERY_PLAN.md as the canonical execution reference for the active branch.
+
 ### Security - S-1, S-3: Delete Dead `ScimAuthGuard`
 
 - **security(auth)**: Deleted `api/src/auth/scim-auth.guard.ts` and its spec - the guard was unreferenced dead code containing a hardcoded legacy bearer token (`S@g@r!2011`, S-1) and 5 `console.log`/`console.error` calls bypassing structured logging (S-3). Confirmed unreferenced by repo-wide grep returning only the file itself and its own spec. All routes are protected by `SharedSecretGuard` (`api/src/modules/auth/shared-secret.guard.ts`).
