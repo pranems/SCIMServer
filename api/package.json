@@ -29,7 +29,8 @@
     "build:standalone:zip": "pwsh ../scripts/build-standalone.ps1 -Zip",
     "build:standalone:full": "pwsh ../scripts/build-standalone.ps1 -IncludeNode -Zip",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev --name init"
+    "prisma:migrate": "prisma migrate dev --name init",
+    "check:trivyignore": "ts-node --transpile-only src/scripts/check-trivyignore.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.13",

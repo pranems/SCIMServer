@@ -4,11 +4,13 @@
 # expiry date. CI re-evaluates on every build; an unjustified entry will be
 # spotted in code review.
 #
-# Format:
-#   <CVE-ID>
-#   exp:<YYYY-MM-DD>
-# (lines starting with `#` are comments and ignored by Trivy)
-# Trivy reads only the bare CVE IDs; the surrounding comments are for humans.
+# REQUIRED machine-readable fields (parsed by api/scripts/check-trivyignore.mjs):
+#   Reviewed:    <YYYY-MM-DD>   when the rationale below was last validated
+#   Re-check-by: <YYYY-MM-DD>   deadline for the next periodic review
+#                               (script default cadence: 90 days)
+#
+# Trivy itself only reads bare CVE IDs; the surrounding comments are for
+# humans and the review-staleness check (.github/workflows/trivyignore-review.yml).
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CVE-2026-4800 — lodash 4.17.21 → "fixed" in 4.18.0
@@ -21,9 +23,11 @@
 #            (which requires attacker-controlled input to a lodash sink we do
 #            not expose — chevrotain only uses lodash internally for AST work
 #            on Prisma schema files at build time, never at request time).
-# Reviewed: 2026-04-30
-# Owner:    @pranems
-# Re-check: when chevrotain or lodash publishes a real fix.
+# Owner:       @pranems
+# Reviewed:    2026-04-30
+# Re-check-by: 2026-07-30
+# Re-check action: when chevrotain or lodash publishes a real fix, drop the
+#                  override and remove this entry.
 CVE-2026-4800
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -37,10 +41,11 @@ CVE-2026-4800
 #            authors and CLI flags - never attacker-controlled HTTP input.
 #            The runtime risk is zero. The proper fix is a base-image bump
 #            once node:24-alpine ships an npm with the patched tinyglobby.
-# Reviewed: 2026-04-30
-# Owner:    @pranems
-# Re-check: monitor https://github.com/nodejs/docker-node/releases for
-#           an updated node:24-alpine; remove this entry when `docker run
-#           --rm node:24-alpine npm exec -- node -p \"require('picomatch/package.json').version\"`
-#           reports >= 4.0.4.
+# Owner:       @pranems
+# Reviewed:    2026-04-30
+# Re-check-by: 2026-07-30
+# Re-check action: monitor https://github.com/nodejs/docker-node/releases for
+#                  an updated node:24-alpine; remove this entry when
+#                  `docker run --rm node:24-alpine npm exec -- node -p
+#                   "require('picomatch/package.json').version"` reports >= 4.0.4.
 CVE-2026-33671
