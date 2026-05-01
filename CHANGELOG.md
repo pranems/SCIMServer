@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI - OPS-4: CODEOWNERS + PR Template
+
+- **feat(github)**: New `.github/CODEOWNERS` declares `@pranems` as the default owner across all paths plus explicit ownership for `api/`, `web/`, `infra/`, `scripts/`, top-level Dockerfiles, `docker-compose*.yml`, `.github/`, and the living-doc set (`docs/`, `Session_starter.md`, `CHANGELOG.md`, `README.md`, `DEPLOYMENT.md`, `admin.md`). GitHub auto-requests review on every PR touching a matched path.
+- **feat(github)**: New `.github/pull_request_template.md` surfaces the standing Feature/Bug-Fix Commit Checklist as actual checkboxes plus four standing-rules acknowledgments (no em-dash, no amend on pushed history, no committed secrets, additive-only migrations) and a destructive-migration override block tied to `ALLOW_DESTRUCTIVE_MIGRATION=1`.
+- **test(security)**: New `api/src/security/required-governance-files.spec.ts` (17 tests) asserts both files exist and contain the required structural elements: CODEOWNERS has global `*` owner + `api/` + `.github/` paths; PR template has all 9 checklist items, em-dash reminder, migration-linter override section, and DELIVERY_PLAN.md cross-reference.
+- **TDD process**: RED - 17 tests against non-existent files; ran spec; 17/17 fail. GREEN - created both files matching the contract; 17/17 pass.
+- **Validation**: 3,493 unit (89 suites; +1 for required-governance-files with 17 tests) + 1,104 E2E (52 suites) + 0 lint errors.
+
 ### CI - Migration Linter (Additive-Only Enforcement)
 
 - **feat(scripts)**: New `api/src/scripts/lint-migrations.ts` scans Prisma migration SQL for forbidden destructive DDL:
