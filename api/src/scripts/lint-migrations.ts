@@ -152,7 +152,12 @@ async function loadBaseline(baselinePath: string): Promise<BaselineFile | null> 
 }
 
 function sha256(content: string): string {
-  return createHash('sha256').update(content, 'utf8').digest('hex');
+  // Normalize CRLF -> LF before hashing so the same migration file hashes
+  // identically on Windows (CRLF working tree) and Linux CI (LF working tree).
+  // Without this, baseline hashes generated on one platform never match the
+  // other, re-flagging baselined historical destructives on every CI run.
+  const normalized = content.replace(/\r\n/g, '\n');
+  return createHash('sha256').update(normalized, 'utf8').digest('hex');
 }
 
 export async function lintMigrations(options: LintOptions): Promise<LintResult> {

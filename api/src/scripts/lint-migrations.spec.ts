@@ -186,10 +186,14 @@ describe('lintMigrations', () => {
     ): Promise<string> {
       // Compute the SHA-256 of each provided file and write the baseline file
       // one level up from the migrations dir (the default location).
+      // IMPORTANT: hash MUST normalize CRLF -> LF to match the linter's hash,
+      // otherwise tests pass on the dev machine but baselined files re-flag
+      // on a different-EOL platform.
       const { createHash } = await import('node:crypto');
       const acceptedHashes: Record<string, string> = {};
       for (const [rel, content] of Object.entries(files)) {
-        acceptedHashes[rel] = createHash('sha256').update(content, 'utf8').digest('hex');
+        const normalized = content.replace(/\r\n/g, '\n');
+        acceptedHashes[rel] = createHash('sha256').update(normalized, 'utf8').digest('hex');
       }
       const baselinePath = path.join(dir, '..', '.migration-lint-baseline.json');
       await fs.writeFile(baselinePath, JSON.stringify({ acceptedHashes }, null, 2), 'utf8');
@@ -243,6 +247,36 @@ describe('lintMigrations', () => {
       // No baseline file written.
       const result = await lintMigrations({ migrationsDir: dir });
       expect(result.ok).toBe(true);
+    });
+
+    it('matches baseline regardless of line-ending style (CRLF vs LF)', async () => {
+      // Regression: SQL files have CRLF on Windows working trees and LF on
+      // Linux CI checkouts. The linter hash must normalize line endings or
+      // the baseline never matches across platforms - causing CI to re-flag
+      // every historical destructive that the dev machine accepts.
+      const lf = `DROP TABLE "Old";\nDROP COLUMN "x" FROM "y";\n`;
+      const crlf = lf.replace(/\n/g, '\r\n');
+      // 1) Migration on disk uses CRLF (Windows checkout), baseline generated from LF.
+      const dir = await makeTempMigrationsDir({
+        '20260205000000_destructive/migration.sql': crlf,
+      });
+      await setupBaseline(dir, {
+        '20260205000000_destructive/migration.sql': lf,
+      });
+      const result = await lintMigrations({ migrationsDir: dir });
+      expect(result.ok).toBe(true);
+      expect(result.violations).toEqual([]);
+
+      // 2) Reverse: migration on disk uses LF (Linux CI checkout), baseline from CRLF.
+      const dir2 = await makeTempMigrationsDir({
+        '20260205000001_destructive/migration.sql': lf,
+      });
+      await setupBaseline(dir2, {
+        '20260205000001_destructive/migration.sql': crlf,
+      });
+      const result2 = await lintMigrations({ migrationsDir: dir2 });
+      expect(result2.ok).toBe(true);
+      expect(result2.violations).toEqual([]);
     });
   });
 });

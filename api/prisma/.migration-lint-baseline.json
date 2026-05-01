@@ -1,10 +1,8 @@
 {
-  "_comment": "Baseline of historical destructive Prisma migrations accepted before the migration linter shipped. Each entry maps a relative migration path to the SHA-256 of its content. The linter (api/src/scripts/lint-migrations.ts) skips files whose hash matches; any edit to a baselined file invalidates its entry and re-flags the violations. NEW destructive migrations require ALLOW_DESTRUCTIVE_MIGRATION=1 in CI plus a justification in the PR description.",
-  "_seeAlso": "docs/DELIVERY_PLAN.md Week 1 Day 4; docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md additive-only-migrations standing rule.",
   "acceptedHashes": {
-    "20260223203811_externalid_citext_case_insensitive/migration.sql": "78d3468fa24092f9d963fb52922906d145bc33c534c2f79f9163d4240f263561",
-    "20260225181836_externalid_citext_to_text/migration.sql": "96b8b45c1486416c2dfb90d467fb33eaec708f8af0289ba242bc023c20bef6af",
-    "20260313031330_add_endpoint_profile/migration.sql": "8fb9d4bb453b428d79309626aad7531c54766580302a816d7fa4e9f3485842ee",
-    "20260416025138_add_requestlog_perf_indexes/migration.sql": "f05c4b9ed940a5b80ae984f53ecfde8eb078b179751ceb494d5e0e60704ddbbc"
+    "20260223203811_externalid_citext_case_insensitive/migration.sql": "ffa7699111d4310261f4f6effbd2938129ad73eb9e23fbf3420b38b6a1b28adf",
+    "20260225181836_externalid_citext_to_text/migration.sql": "82e8f52ffd50d624b6b54704a9ed0094b11091aa8912fa65be2b443b85b00aa1",
+    "20260313031330_add_endpoint_profile/migration.sql": "e147ac0160281b19005f797b34b4e89a84cfccc97986e8a67963640fe23cd70e",
+    "20260416025138_add_requestlog_perf_indexes/migration.sql": "223308023c15c34d63df9b61ad4af691e48261a7a62f8a2e7434ccb0291a87a6"
   }
 }
