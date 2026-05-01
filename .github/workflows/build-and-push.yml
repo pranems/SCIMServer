@@ -137,7 +137,7 @@ jobs:
       # any HIGH or CRITICAL OS-package or library vulnerability. Lower
       # severities are reported but do not gate the release.
       - name: Trivy image scan (HIGH+CRITICAL gating)
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
           format: table
