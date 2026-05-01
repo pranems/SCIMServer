@@ -25,3 +25,22 @@
 # Owner:    @pranems
 # Re-check: when chevrotain or lodash publishes a real fix.
 CVE-2026-4800
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CVE-2026-33671 - picomatch 4.0.3 ReDoS (extglob patterns)
+# Package: picomatch (bundled inside the base image's npm CLI at
+#          /usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules/picomatch)
+# Rationale: This is npm's INTERNAL copy of picomatch shipped inside the
+#            node:24-alpine base image. It is unreachable by package.json
+#            overrides because npm is a global tool, not a project dep. npm
+#            only processes file-system glob patterns supplied by package.json
+#            authors and CLI flags - never attacker-controlled HTTP input.
+#            The runtime risk is zero. The proper fix is a base-image bump
+#            once node:24-alpine ships an npm with the patched tinyglobby.
+# Reviewed: 2026-04-30
+# Owner:    @pranems
+# Re-check: monitor https://github.com/nodejs/docker-node/releases for
+#           an updated node:24-alpine; remove this entry when `docker run
+#           --rm node:24-alpine npm exec -- node -p \"require('picomatch/package.json').version\"`
+#           reports >= 4.0.4.
+CVE-2026-33671
