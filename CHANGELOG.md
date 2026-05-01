@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI - Migration Linter (Additive-Only Enforcement)
+
+- **feat(scripts)**: New `api/src/scripts/lint-migrations.ts` scans Prisma migration SQL for forbidden destructive DDL:
+  - `DROP TABLE`, `DROP COLUMN` - permanent data loss
+  - `ALTER COLUMN ... TYPE` - silent truncation/coercion
+  - `RENAME TO` / `RENAME COLUMN` - silent client breakage
+  - `INSERT ... SELECT FROM <table>` - data movement risk (use expand-contract instead)
+- **feat(scripts)**: Baseline file `api/prisma/.migration-lint-baseline.json` accepts the 4 historical destructive migrations (externalId citext fixes, endpoint-profile drop tables, requestlog deletedAt drop) by SHA-256 hash. Any edit to a baselined file invalidates its entry and re-flags the violations - the file content is the contract, not the path.
+- **feat(ci)**: New `Lint Prisma migrations` step in both `.github/workflows/build-and-push.yml` and `.github/workflows/build-test.yml` validate jobs. Runs after `prisma generate`, before unit tests. Blocks image push if any new destructive migration appears without `ALLOW_DESTRUCTIVE_MIGRATION=1` override.
+- **test(scripts)**: 19 unit tests in `api/src/scripts/lint-migrations.spec.ts` covering: empty/missing dir, additive migrations, every forbidden pattern, INSERT...VALUES negative case, multi-line SELECT FROM, multi-violation aggregation, allowDestructive override, non-SQL file ignoring, baseline-by-hash skipping, baseline-mismatch re-flagging, no-baseline back-compat.
+- **TDD process**: RED - 15-test spec referencing non-existent `lintMigrations`; ran it; failed with TS2307 (module not found). GREEN - implemented; 15/15 pass. Added baseline support; +4 tests; 19/19 pass. Verified against real migrations: 11 migrations / 0 violations after baseline applied.
+- **standing rule reinforcement**: This closes the gap in DELIVERY_PLAN.md Week 1 Day 4 ("Migration linter in CI"). Combined with the additive-only convention from `.github/copilot-instructions.md`, destructive migrations now require explicit acknowledgment in 3 places: PR description, ALLOW_DESTRUCTIVE_MIGRATION=1 env, and a justification commit.
+- **Validation**: 3,476 unit (88 suites; +1 for lint-migrations with 19 tests) + 1,104 E2E (52 suites) + 0 lint errors.
+
 ### Security - S-5: ADR-004 Decision on enableImplicitConversion
 
 - **docs(adr)**: New `docs/adr/ADR-004-enable-implicit-conversion.md` documents the decision to keep `enableImplicitConversion: true` in the global ValidationPipe. Risk acknowledged and explicitly mitigated:

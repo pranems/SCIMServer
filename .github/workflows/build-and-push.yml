@@ -45,6 +45,14 @@ jobs:
         working-directory: api
         run: npx prisma generate
 
+      # Migration linter - blocks destructive Prisma DDL on new migrations.
+      # Historical destructives are accepted via api/prisma/.migration-lint-baseline.json
+      # (SHA-256 hash allowlist). Set ALLOW_DESTRUCTIVE_MIGRATION=1 in CI plus
+      # justify in the PR description to override for new destructive migrations.
+      - name: Lint Prisma migrations (additive-only enforcement)
+        working-directory: api
+        run: npx ts-node --transpile-only src/scripts/lint-migrations.ts
+
       - name: Unit tests (API)
         working-directory: api
         run: npm test
