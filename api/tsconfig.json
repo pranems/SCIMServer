@@ -9,6 +9,7 @@
     "target": "es2022",
     "sourceMap": true,
     "outDir": "dist",
+    "rootDir": "./",
     "baseUrl": "./",
     "incremental": true,
     "forceConsistentCasingInFileNames": true,
@@ -17,6 +18,11 @@
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "moduleResolution": "node",
+    // TypeScript 6 deprecates 'baseUrl' and 'moduleResolution: node' (TS 7 removal).
+    // We acknowledge the deprecation here; the proper migration to 'paths' alone +
+    // 'moduleResolution: bundler' is tracked separately and out of scope for the
+    // dependency-bump consolidation.
+    "ignoreDeprecations": "6.0",
     "types": ["node", "jest"],
     "paths": {
       "@app/*": ["src/*"]
