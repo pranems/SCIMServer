@@ -253,10 +253,10 @@ Implemented TDD approach with comprehensive test coverage:
 All 27 migration gaps (G1-G20) fully resolved. v0.38.0 shipped with G8h Primary Sub-Attribute Enforcement (tri-state PrimaryEnforcement flag: passthrough default + normalize/reject), RFC 7643 S8.7.1 schema compliance (55 characteristic fixes), and comprehensive test-gap audit #5. **Current version: v0.38.0 with 3,378 unit (84 suites), 1,074 E2E (51 suites), ~789 live assertions - ALL PASSING.** Top remaining work is operational hardening + simplification: delete dead `ScimAuthGuard`, add timing-safe secret comparison, restrict CORS, replace shallow `/health` with dependency-aware readiness/liveness.
 
 ### Known Technical Debt (from code audit)
-- **SECURITY:** Hardcoded legacy bearer token `S@g@r!2011` in `scim-auth.guard.ts` - should come from env only
-- **LOGGING:** 5 `console.log`/`console.error` calls in `scim-auth.guard.ts` - should use NestJS Logger
-- **AUTH:** `SharedSecretGuard` + `OAuthService` still use direct string equality for secret comparison - should use timing-safe compare
-- **CORS:** `origin: true` (wildcard) in `main.ts` - should be restricted for production
+- **SECURITY:** ~~Hardcoded legacy bearer token `S@g@r!2011` in `scim-auth.guard.ts`~~ **CLOSED 2026-04-30** - dead guard deleted; permanent regression guard at `api/src/security/forbidden-source-patterns.spec.ts`
+- **LOGGING:** ~~5 `console.log`/`console.error` calls in `scim-auth.guard.ts`~~ **CLOSED 2026-04-30** - file deleted as part of S-1
+- **AUTH:** `SharedSecretGuard` + `OAuthService` still use direct string equality for secret comparison - should use timing-safe compare (S-2, open)
+- **CORS:** `origin: true` (wildcard) in `main.ts` - should be restricted for production (S-4, open)
 - **HEALTH/OPS:** `/health` only returns process uptime/timestamp - no DB/readiness signal for ACA probes or troubleshooting
 - **DOC FRESHNESS:** Living docs currently disagree on version/test counts/schema findings; P5 audit findings are partially stale against current `scim-schemas.constants.ts`
 - **NAMING:** `resultPayloadPlaceholder` variable names in User/Group services - minor cleanup

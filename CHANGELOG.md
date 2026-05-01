@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security - S-1, S-3: Delete Dead `ScimAuthGuard`
+
+- **security(auth)**: Deleted `api/src/auth/scim-auth.guard.ts` and its spec - the guard was unreferenced dead code containing a hardcoded legacy bearer token (`S@g@r!2011`, S-1) and 5 `console.log`/`console.error` calls bypassing structured logging (S-3). Confirmed unreferenced by repo-wide grep returning only the file itself and its own spec. All routes are protected by `SharedSecretGuard` (`api/src/modules/auth/shared-secret.guard.ts`).
+- **test(security)**: Added `api/src/security/forbidden-source-patterns.spec.ts` as a permanent regression guard. Walks `api/src/**/*.ts` on every CI run and fails if either the literal credential string or the `ScimAuthGuard` class identifier reappears. Forbidden patterns are constructed at runtime so the spec itself does not contain the literals. Pattern table is extensible - add an entry whenever a credential, class, or smell is removed that must never come back.
+- **TDD process**: This commit followed strict red-green-refactor:
+  1. RED: wrote `forbidden-source-patterns.spec.ts` first; ran it; both patterns failed with explicit violation reports pointing to the dead guard files.
+  2. GREEN: deleted `scim-auth.guard.ts`, `scim-auth.guard.spec.ts`, and the now-empty `api/src/auth/` directory; spec immediately turned green.
+  3. Confirmed full unit (3,422) + E2E (1,100 inmemory) + lint (0 errors) all green.
+- **doc updates**: marked `S-1` and `S-3` as Closed in `docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md`, removed entries from `docs/LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md` (GAP-01) and `docs/PROMPT_LOGGING_VERIFICATION.md`; updated `docs/TEST_INVENTORY.md` to reference the new security spec; updated `Session_starter.md` Known Technical Debt list.
+- **net test count**: 3,422 unit (was 3,429; deleted spec had 9 tests, new security spec has 2 = -7 net). Suite count unchanged at 84 (one spec file replaced another).
+- **next**: S-2 (timingSafeEqual), S-4 (CORS_ORIGIN env var), S-5 (ADR-004 decision on enableImplicitConversion), R-1 (wrapPrismaError on create), DTO-1 (harden ListQueryDto), Tier-0 #5 (ResourceMember unique).
+
 ### CI - Lint Cleanup: Remove continue-on-error
 
 - **fix(lint)**: Closed all 58 pre-existing lint errors that had built up because CI never ran lint:

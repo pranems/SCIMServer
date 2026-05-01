@@ -19,14 +19,12 @@
 
 ## 1. Unit Test Files (73 files)
 
-### 1.1 `src/auth/scim-auth.guard.spec.ts`
-- **ScimAuthGuard**
-  - `it` should be defined
-  - **missing auth header**: should throw UnauthorizedException when no authorization header
-  - **invalid auth type**: should reject non-Bearer auth type; should reject missing token after Bearer
-  - **OAuth token validation**: should authenticate with valid OAuth token; should call validateAccessToken with the token
-  - **legacy bearer token**: should authenticate with legacy bearer token; should not call OAuth validation for legacy token
-  - **failed authentication**: should throw UnauthorizedException when OAuth validation fails
+### 1.1 `src/security/forbidden-source-patterns.spec.ts`
+- **Security regression: forbidden source patterns**
+  - **[S-1] is absent from api/src/**/*.ts**: scans all source files for the deleted hardcoded legacy bearer credential
+  - **[S-1/S-3] is absent from api/src/**/*.ts**: scans all source files for any reappearance of the deleted `ScimAuthGuard` class identifier
+  - Patterns constructed at runtime so the spec itself does not contain the forbidden literals.
+  - Replaces the previous `src/auth/scim-auth.guard.spec.ts` which was deleted along with the dead guard.
 
 ### 1.2 `src/domain/patch/extension-and-flags.spec.ts`
 - **PatchConfig flag combinations (UserPatchEngine)**
@@ -570,7 +568,7 @@
 ### Unit Test Files
 | # | File Path |
 |---|---|
-| 1 | `src/auth/scim-auth.guard.spec.ts` |
+| 1 | `src/security/forbidden-source-patterns.spec.ts` |
 | 2 | `src/domain/patch/extension-and-flags.spec.ts` |
 | 3 | `src/domain/patch/generic-patch-engine.spec.ts` |
 | 4 | `src/domain/patch/group-patch-engine.spec.ts` |

@@ -213,7 +213,7 @@ Re-verified after v0.40.0 (test-gaps-audit-6: 30 E2E + 28 live tests added).
   - scim-service-helpers.ts: 3 (`parseJson` fallback, `enforcePrimaryConstraint` passthrough mode, normalize mode) - static utility class without DI
   - oauth.module.ts: 1 (dev JWT secret warning) - startup-only
   - prisma.service.ts: 1 (fallback DATABASE_URL warning) - startup-only
-- `console.log` inventory: 4 in `scim-auth.guard.ts` (legacy guard, rarely used; primary auth uses `SharedSecretGuard` with proper ScimLogger) - ACCEPTED
+- `console.log` inventory: ~~4 in `scim-auth.guard.ts`~~ **0 - file deleted 2026-04-30 (S-1, S-3 closed)**
 - Auth guard logging: complete (12 distinct events across all auth paths) ✅
 - Bulk processor: INFO start/completion, WARN per-op failures, enrichContext per sub-op ✅
 - `safeStringify()`: circular reference handling verified in 3 downstream call sites ✅
@@ -221,6 +221,6 @@ Re-verified after v0.40.0 (test-gaps-audit-6: 30 E2E + 28 live tests added).
 **Not fixed (accepted risks):**
 - `scim-service-helpers.ts`: 3 `console.warn` calls (parseJson, enforcePrimaryConstraint passthrough + normalize) - static utility class has no ScimLogger DI; console.warn still emits to stderr and is captured by container log aggregation
 - `admin.controller.ts`: 4 bare catches in `deleteUser` loop, `getDeploymentInfo`, `readContainerId`, `readPackageVersion` - diagnostic utility methods not on SCIM hot path
-- `scim-auth.guard.ts`: 4 `console.log` calls - legacy guard kept for backward compat; primary auth uses `SharedSecretGuard` with proper ScimLogger
+- `scim-auth.guard.ts`: ~~4 `console.log` calls~~ **file deleted 2026-04-30; permanent regression guard at `api/src/security/forbidden-source-patterns.spec.ts`**
 - `rotating-file-writer.ts`: 1 bare catch on `fstat` - file transport edge case, non-critical
 - `activity-parser.service.ts`: 2 bare catches in summary parsing - best-effort parsing, non-critical
