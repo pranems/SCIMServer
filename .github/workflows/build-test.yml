@@ -9,6 +9,12 @@ on:
       - 'feat/**'
       - 'ci/**'
       - 'fix/**'
+  # Required so the workflow runs on Dependabot (and any fork) PRs into master.
+  # Without this, branch protection blocks every Dependabot PR forever because
+  # the validate / build-and-push contexts never appear (no push trigger fires
+  # for `dependabot/**` branches).
+  pull_request:
+    branches: [master]
   workflow_dispatch:
     inputs:
       test_tag:

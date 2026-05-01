@@ -7,7 +7,7 @@
 #############################
 # Stage 1: Build web frontend (React + Vite)
 #############################
-FROM node:24-alpine AS web-build
+FROM node:25-alpine AS web-build
 WORKDIR /web
 
 # Copy package files first for better layer caching
@@ -25,7 +25,7 @@ RUN npm run build && \
 #############################
 # Stage 2: Build API (NestJS) with aggressive optimization
 #############################
-FROM node:24-alpine AS api-build
+FROM node:25-alpine AS api-build
 WORKDIR /app
 
 # openssl needed for Prisma migration engine (Rust binary used by prisma migrate deploy)
@@ -56,7 +56,7 @@ RUN cp prisma.config.ts /tmp/prisma.config.ts && \
 #############################
 # Stage 3: Minimal runtime using distroless-like approach
 #############################
-FROM node:24-alpine AS runtime
+FROM node:25-alpine AS runtime
 WORKDIR /app
 
 # openssl needed for Prisma migration engine at container startup
