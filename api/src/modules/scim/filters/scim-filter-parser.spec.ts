@@ -200,6 +200,30 @@ describe('ScimFilterParser', () => {
       expect(filterAt10000.length).toBe(10000);
       expect(() => parseScimFilter(filterAt10000)).not.toThrow();
     });
+
+    // S-6 (CodeQL: js/type-confusion-through-parameter-tampering): Express
+    // parses ?filter=a&filter=b as ['a','b']. Without an explicit type guard
+    // the parser would call .length / .trim() on the array - .length returns
+    // the element count (passes the cap) and .trim() throws a confusing
+    // TypeError leaking the parser internals. Worse, an attacker controls
+    // whether they hit the .length or .trim() branch by varying repetitions,
+    // creating a DoS or filter-bypass primitive. Hard-fail at entry instead.
+    it('S-6: should reject non-string filter (array from duplicated query param)', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(() => parseScimFilter(['userName eq "a"', 'userName eq "b"'] as any)).toThrow(
+        /must be a string/i,
+      );
+    });
+
+    it('S-6: should reject non-string filter (number)', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(() => parseScimFilter(42 as any)).toThrow(/must be a string/i);
+    });
+
+    it('S-6: should reject non-string filter (object)', () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      expect(() => parseScimFilter({ filter: 'x' } as any)).toThrow(/must be a string/i);
+    });
   });
 });
 

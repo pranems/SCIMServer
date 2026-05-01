@@ -401,6 +401,20 @@ class Parser {
  * @throws Error with position details for malformed filters
  */
 export function parseScimFilter(filterStr: string): FilterNode {
+  // S-6 (CodeQL js/type-confusion-through-parameter-tampering): Express
+  // parses ?filter=a&filter=b as a string array. Without this guard the
+  // parser would call .length / .trim() / regex on the array - .length
+  // returns the element count (silently bypassing MAX_FILTER_LENGTH) and
+  // .trim() throws a confusing TypeError leaking parser internals. An
+  // attacker controls which branch they hit by varying the parameter
+  // repetition, creating a DoS or filter-bypass primitive. Hard-fail here
+  // so every entry point (GET ?filter=, POST /.search, profile validation)
+  // shares the same single-typed contract.
+  if (typeof filterStr !== 'string') {
+    throw new Error(
+      `Filter expression must be a string, got ${Array.isArray(filterStr) ? 'array' : typeof filterStr}`,
+    );
+  }
   if (!filterStr || !filterStr.trim()) {
     throw new Error('Filter expression cannot be empty');
   }
