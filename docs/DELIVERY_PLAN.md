@@ -155,12 +155,12 @@ Each defect: ID, file path with line, severity, hours, "done when". No grouping 
 | **Lint debt** | 21 source files | `1a22771` | All 58 pre-existing lint errors closed; `continue-on-error` removed |
 | **S-1** | `api/src/auth/scim-auth.guard.ts` (deleted) | `ef9673b` | Dead guard with hardcoded `S@g@r!2011` deleted via TDD |
 | **S-3** | `api/src/auth/scim-auth.guard.ts` (deleted) | `ef9673b` | 5 `console.log`/`console.error` calls in auth path deleted with the guard |
+| **S-2** | [api/src/modules/auth/shared-secret.guard.ts](../api/src/modules/auth/shared-secret.guard.ts), [api/src/oauth/oauth.service.ts](../api/src/oauth/oauth.service.ts) | (next commit) | `safeCompare()` helper using `crypto.timingSafeEqual()`; 14 unit tests; +1 OAuth length-mismatch test; permanent regression guards |
 
 ### 3.2 Open - Tier 0 (Week 1 Day 3-4)
 
 | ID | File | Severity | Hours | Done when |
 |---|---|---|---|---|
-| **S-2** | [api/src/modules/auth/shared-secret.guard.ts#L134](../api/src/modules/auth/shared-secret.guard.ts), [api/src/oauth/oauth.service.ts#L80](../api/src/oauth/oauth.service.ts) | HIGH | 2 | `safeCompare()` using `crypto.timingSafeEqual()` replaces `===`; unit test asserts equal-length comparison |
 | **S-4** | [api/src/main.ts#L48](../api/src/main.ts) | MEDIUM | 2 | `origin: process.env.CORS_ORIGIN?.split(',') ?? false`; E2E test rejects from disallowed origin |
 | **S-5** | [api/src/main.ts#L88](../api/src/main.ts) | MEDIUM | 1 | ADR-004 written documenting decision (recommend keep with mitigation) |
 | **R-1** | All 3 [api/src/infrastructure/repositories/prisma-*.repository.ts](../api/src/infrastructure/repositories/) | HIGH | 2 | `wrapPrismaError()` on `create()`; race-condition E2E returns 409 not 500 |
@@ -624,11 +624,13 @@ These are intentionally **NOT** in this plan and represent decisions to remove f
 | 2026-04-30 | OPS-1: validate job gates image push | `5f2376b` | ✅ Shipped on `ci/validate-before-push` |
 | 2026-04-30 | Lint cleanup: 58 errors -> 0; remove `continue-on-error` | `1a22771` | ✅ Shipped on `ci/validate-before-push` |
 | 2026-04-30 | S-1, S-3: delete dead `ScimAuthGuard` via TDD; add permanent regression guard | `ef9673b` | ✅ Shipped on `ci/validate-before-push` |
+| 2026-04-30 | DELIVERY_PLAN.md: consolidated 6-week execution plan | `b014c32` | ✅ Shipped on `ci/validate-before-push` |
+| 2026-04-30 | S-2: timing-safe token comparison via shared `safeCompare()` (TDD) | (this commit) | ✅ Shipped on `ci/validate-before-push` |
 
 **Validation as of 2026-04-30**:
-- Unit: 3,422 / 3,422 pass (84 suites)
+- Unit: 3,439 / 3,439 pass (85 suites; +1 spec for safeCompare with 14 tests; +1 OAuth length-mismatch test)
 - E2E (inmemory): 1,100 / 1,100 pass (52 suites)
-- Lint: 0 errors (was 58 at start of branch)
+- Lint: 0 errors
 - Em-dash scan: clean
 
 ---

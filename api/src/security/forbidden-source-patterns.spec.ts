@@ -26,6 +26,12 @@ interface ForbiddenPattern {
   extensions?: ReadonlyArray<string>;
   /** Glob-style relative-path prefixes to skip in addition to the defaults. */
   excludeDirs?: ReadonlyArray<string>;
+  /**
+   * Restrict the scan to a specific relative path (or list of paths) instead
+   * of the whole src/ tree. Useful when the needle is a generic operator like
+   * `===` that is fine elsewhere but forbidden in one specific file.
+   */
+  onlyInPaths?: ReadonlyArray<string>;
 }
 
 // Default exclusions: build output, generated code, third-party, and this
@@ -56,6 +62,26 @@ const FORBIDDEN_PATTERNS: ReadonlyArray<ForbiddenPattern> = [
       'docs/LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md.',
     // Class identifier as it would appear in declarations or imports:
     needle: 'Scim' + 'AuthGuard',
+  },
+  {
+    id: 'S-2 (shared-secret.guard)',
+    rationale:
+      'Token comparison must use safeCompare() (timing-safe). ' +
+      'A reappearance of the literal `=== expectedSecret` would ' +
+      'reintroduce a timing-side-channel leak. ' +
+      'See docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md S-2.',
+    needle: '=' + '=' + '= expectedSecret',
+    onlyInPaths: ['modules/auth/shared-secret.guard.ts'],
+  },
+  {
+    id: 'S-2 (oauth.service)',
+    rationale:
+      'OAuth client_secret comparison must use safeCompare() (timing-safe). ' +
+      'A reappearance of `client.clientSecret !== clientSecret` would ' +
+      'reintroduce a timing-side-channel leak. ' +
+      'See docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md S-2.',
+    needle: 'client.clientSecret !' + '== clientSecret',
+    onlyInPaths: ['oauth/oauth.service.ts'],
   },
 ];
 
@@ -91,7 +117,22 @@ async function walkTypeScriptFiles(
 async function scanForPattern(pattern: ForbiddenPattern): Promise<Violation[]> {
   const extensions = pattern.extensions ?? ['.ts'];
   const excludeDirs = [...DEFAULT_EXCLUDE_DIRS, ...(pattern.excludeDirs ?? [])];
-  const files = await walkTypeScriptFiles(SRC_ROOT, excludeDirs, extensions);
+  let files: string[];
+  if (pattern.onlyInPaths && pattern.onlyInPaths.length > 0) {
+    files = pattern.onlyInPaths.map(p => path.resolve(SRC_ROOT, p));
+    // Validate listed files exist - silent miss would mask a deletion bug.
+    for (const f of files) {
+      try {
+        await fs.access(f);
+      } catch {
+        throw new Error(
+          `Pattern [${pattern.id}] declares onlyInPaths file that does not exist: ${path.relative(SRC_ROOT, f)}`,
+        );
+      }
+    }
+  } else {
+    files = await walkTypeScriptFiles(SRC_ROOT, excludeDirs, extensions);
+  }
   const violations: Violation[] = [];
   for (const file of files) {
     const content = await fs.readFile(file, 'utf8');

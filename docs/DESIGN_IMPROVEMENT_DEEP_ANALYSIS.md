@@ -248,7 +248,7 @@ sequenceDiagram
 | ID | Severity | File | Line(s) | Issue | RFC | Status |
 |----|:--------:|------|------:|-------|-----|:------:|
 | **S-1** | � CLOSED | `auth/scim-auth.guard.ts` (deleted) | 7 | Hardcoded credential `S@g@r!2011` in source code history. Resolved by deleting `ScimAuthGuard` entirely (it was unreferenced dead code; `SharedSecretGuard` covers all routes). Permanent regression guard added: `src/security/forbidden-source-patterns.spec.ts`. | - | **Closed** |
-| **S-2** | 🔴 HIGH | `auth/shared-secret.guard.ts` | 134 | `token === expectedSecret` - timing-attack vulnerable. Same in `oauth.service.ts` L80 (`client.clientSecret !== clientSecret`). Should use `crypto.timingSafeEqual()`. | - | **Open** |
+| **S-2** | � CLOSED | `auth/shared-secret.guard.ts` L134, `oauth.service.ts` L80 | Token compares now use `crypto.timingSafeEqual()` via shared `safeCompare()` helper. 14 unit tests cover identical/unequal/length-mismatch/utf8/non-string and verify `timingSafeEqual` is the underlying primitive (via spy). Permanent regression guards added to `forbidden-source-patterns.spec.ts` for both call sites. | - | **Closed** |
 | **S-3** | 🟢 CLOSED | `auth/scim-auth.guard.ts` (deleted) | 28–47 | 5× `console.log`/`console.error` in auth path. Resolved by deleting `ScimAuthGuard` entirely (the only call site of these `console.*` calls). | - | **Closed** |
 | **S-4** | 🟡 MEDIUM | `main.ts` | 48 | `origin: true` (Allow all CORS origins). Comment says "for now" - unchanged since v0.3.0 (Sep 2025). Should be configurable via `CORS_ORIGIN` env var. | - | **Open** |
 | **S-5** | 🟡 MEDIUM | `main.ts` | 88 | `enableImplicitConversion: true` in `ValidationPipe` - causes `"123"` → `123` type coercion. Combined with DTO index signatures, allows type confusion injection. | - | **Open** |
@@ -835,7 +835,7 @@ xychart-beta
 | # | Item | Effort | Impact | Files | Status |
 |:-:|------|:------:|:------:|-------|:------:|
 | 1 | Remove hardcoded `S@g@r!2011` from `ScimAuthGuard` - delete entire guard since `SharedSecretGuard` covers all routes | 1h | Critical | `auth/scim-auth.guard.ts`, regression spec | **Closed** |
-| 2 | Add `crypto.timingSafeEqual()` for all secret/token comparisons | 1h | High | `shared-secret.guard.ts` L134, `oauth.service.ts` L80 | Open |
+| 2 | Add `crypto.timingSafeEqual()` for all secret/token comparisons | 1h | High | `shared-secret.guard.ts` L134, `oauth.service.ts` L80 | **Closed** |
 | 3 | Replace `console.log`/`console.error` in `ScimAuthGuard` with `ScimLogger` (closed by #1 - guard deleted) | 30m | Medium | `auth/scim-auth.guard.ts` | **Closed** |
 | 4 | Make CORS origin configurable via `CORS_ORIGIN` env var | 30m | Medium | `main.ts` L48 | Open |
 | 5 | Add `@@unique([groupResourceId, memberResourceId])` to `ResourceMember` + Prisma migration | 1h | High | `schema.prisma`, new migration | Open |

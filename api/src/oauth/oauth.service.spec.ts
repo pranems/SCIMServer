@@ -108,6 +108,19 @@ describe('OAuthService', () => {
       ).toThrow('Invalid client credentials');
     });
 
+    // S-2 regression: safeCompare must not throw on length mismatch.
+    // Pre-fix, `client.clientSecret !== clientSecret` returned a quick false;
+    // post-fix, safeCompare guards length BEFORE calling crypto.timingSafeEqual
+    // (which would throw on length mismatch).
+    it('should reject when client_secret length differs (no throw via timingSafeEqual)', () => {
+      expect(
+        () => service.generateAccessToken('test-client', 'shorter'),
+      ).toThrow('Invalid client credentials');
+      expect(
+        () => service.generateAccessToken('test-client', 'much-longer-secret-than-default'),
+      ).toThrow('Invalid client credentials');
+    });
+
     it('should grant all client scopes when none requested', async () => {
       const result = await service.generateAccessToken('test-client', 'test-secret');
       expect(result.scope).toContain('scim.read');

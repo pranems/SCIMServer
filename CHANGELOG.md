@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security - S-2: Timing-Safe Token Comparison
+
+- **security(auth)**: Replaced bare `===` / `!==` token comparisons with `crypto.timingSafeEqual()` via a new shared `safeCompare()` helper to eliminate the timing-side-channel that allows progressive byte-by-byte secret guessing. Two call sites updated:
+  - [api/src/modules/auth/shared-secret.guard.ts#L134](api/src/modules/auth/shared-secret.guard.ts) - legacy global bearer token comparison
+  - [api/src/oauth/oauth.service.ts#L80](api/src/oauth/oauth.service.ts) - OAuth client_secret comparison
+- **feat(security)**: New `api/src/security/safe-compare.ts` - timing-safe string comparison. UTF-8 aware, length-mismatch returns false without throwing (since `crypto.timingSafeEqual` throws on mismatched-length input).
+- **test(security)**: 14 new unit tests in `api/src/security/safe-compare.spec.ts`:
+  - identical strings (empty, short, 1024-byte) return true
+  - unequal same-length strings return false
+  - length-mismatch returns false without throwing
+  - utf8 multi-byte handling (`a` vs `ä` returns false on byte length)
+  - null / undefined / number / object / array return false (defensive)
+  - **spy assertion** that `crypto.timingSafeEqual` is the underlying primitive for equal-length inputs (catches future replacement with `===`)
+  - **spy assertion** that `crypto.timingSafeEqual` is NOT called when lengths differ (would throw)
+- **test(oauth)**: +1 length-mismatch regression test in `oauth.service.spec.ts` - verifies safeCompare's length guard prevents `timingSafeEqual` from throwing on shorter/longer client secrets.
+- **test(security)**: Extended `forbidden-source-patterns.spec.ts` with two new path-scoped patterns (S-2 entries) that block `=== expectedSecret` from reappearing in `shared-secret.guard.ts` and `client.clientSecret !== clientSecret` from reappearing in `oauth.service.ts`. New `onlyInPaths` field added to the pattern interface for file-scoped checks.
+- **TDD process**: red-green-refactor:
+  1. RED: wrote `safe-compare.spec.ts` with 14 tests; ran it; failed at compile because `safe-compare.ts` did not exist.
+  2. GREEN: created `safe-compare.ts` with `timingSafeEqual`-based impl; spec turned 14/14 green.
+  3. Wired into the two call sites; ran full suite to confirm zero regressions.
+- **Validation**: 3,439 unit (85 suites; +1 new spec, +14 new tests), 1,100 E2E inmemory, 0 lint errors.
+- **doc updates**: marked `S-2` Closed in `docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md` and Tier-0 #2 Closed; updated `docs/DELIVERY_PLAN.md` Closed-defects table and Progress Log.
+
 ### Docs - DELIVERY_PLAN.md: Consolidated 6-Week Execution Plan
 
 - **docs(plan)**: Created `docs/DELIVERY_PLAN.md` (12 sections, 4 Mermaid diagrams, 1 Gantt chart, ~600 lines) reconciling all prior session deliberations into one operating-model document:
