@@ -60,6 +60,26 @@ describe('ActivityController', () => {
     }));
   };
 
+  // ActivityController reads PERSISTENCE_BACKEND in a constructor field initializer
+  // (private readonly isInMemoryBackend = process.env.PERSISTENCE_BACKEND === 'inmemory').
+  // If a developer's shell has PERSISTENCE_BACKEND=inmemory set (common during
+  // E2E debugging), every test silently routes through getActivitiesInMemory()
+  // and bypasses the mocked PrismaService -> misleading "Number of calls: 0"
+  // failures. Pin the env var to 'prisma' here so these unit tests are
+  // hermetic regardless of shell state, and restore the original value after.
+  let originalPersistenceBackend: string | undefined;
+  beforeAll(() => {
+    originalPersistenceBackend = process.env.PERSISTENCE_BACKEND;
+    process.env.PERSISTENCE_BACKEND = 'prisma';
+  });
+  afterAll(() => {
+    if (originalPersistenceBackend === undefined) {
+      delete process.env.PERSISTENCE_BACKEND;
+    } else {
+      process.env.PERSISTENCE_BACKEND = originalPersistenceBackend;
+    }
+  });
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ActivityController],
