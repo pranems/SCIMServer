@@ -71,7 +71,7 @@
     "ts-jest": "^29.4.6",
     "ts-node": "10.9.2",
     "ts-node-dev": "2.0.0",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.56.0"
   },
   "// overrides": "OPS-3 / Trivy gate: pin transitive deps to patched versions for known HIGH CVEs. Each entry MUST cite the CVE so future maintainers can drop it once the upstream chain catches up. Reviewed 2026-04-30. See .github/workflows/build-and-push.yml Trivy step.",
