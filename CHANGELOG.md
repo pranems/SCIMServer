@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Ops - OPS-2: Digest Pinning in promote-to-prod
+
+- **fix(scripts)**: `scripts/promote-to-prod.ps1` now resolves the dev image's immutable SHA-256 digest BEFORE updating production. Production is pinned with `image@sha256:<digest>` instead of the previous mutable `image:<tag>` form. A re-pushed tag can no longer silently change prod after promotion.
+- **mechanism**: `docker buildx imagetools inspect ghcr.io/.../scimserver:$ImageTag` returns metadata including a `Digest:` line; the script parses that line, validates non-empty, and constructs `$desiredImage = "ghcr.io/.../scimserver@$devDigest"`. Failure to resolve the digest fails the script before any prod change.
+- **rollback compatibility**: The rollback hint emitted at the end of the script uses `$prodImage` (the prior digest-pinned production image, captured before the swap). For the very first OPS-2-aware promotion, `$prodImage` may still be the prior tag-pinned form; that is the only emergency rollback that still uses a tag, and only once.
+- **observability**: The script now prints the resolved digest twice - once after resolution (`Resolved digest: sha256:...`) and once in the confirmation block (`Pinned via immutable digest: sha256:...`) - so the operator sees exactly what bytes ship.
+- **test(scripts)**: New `api/src/scripts/promote-to-prod-digest.spec.ts` (9 tests) source-scans the script and asserts: uses `docker buildx imagetools inspect`, captures into `$devDigest`, constructs `$desiredImage` with `@$devDigest`, does NOT assign a tag-form to `$desiredImage`, reads prior `$prodImage` for rollback, prints rollback hint, exposes digest in Write-Host output, refuses to proceed if digest resolution fails, preserves -SkipDevVerification / -SkipProdVerification flags.
+- **TDD process**: RED - 9 source-scan tests against original tag-pinning script; ran spec; 6/9 fail (3 pass on existing structure: $prodImage, rollback mention, skip flags). GREEN - replaced tag-pin with digest resolution + pin; 9/9 pass.
+- **Validation**: 3,515 unit (90 suites; +9 OPS-2 source-scan tests) + 1,104 E2E (52 suites) + 0 lint errors.
+
 ### CI - OPS-3: Supply-Chain Alerting (Dependabot + CodeQL + Trivy)
 
 - **feat(github)**: New `.github/dependabot.yml` covers 4 ecosystems with weekly Monday cadence and grouped patch+minor updates: npm in `/api`, npm in `/web`, github-actions in `/`, docker in `/`. Each ecosystem caps open PRs (3-5) so the queue cannot flood. Reviewers and labels declared per ecosystem.

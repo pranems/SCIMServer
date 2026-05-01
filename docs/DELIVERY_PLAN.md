@@ -633,13 +633,16 @@ These are intentionally **NOT** in this plan and represent decisions to remove f
 | 2026-04-30 | S-5: ADR-004 documented decision to keep `enableImplicitConversion: true` with explicit mitigations; new `mustBePresent: true` regression-spec mode locks the decision in source | `4e9860f` | ✅ Shipped on `ci/validate-before-push` |
 | 2026-04-30 | Migration linter: scans Prisma SQL for DROP/RENAME/ALTER COLUMN TYPE/INSERT SELECT FROM; SHA-256 baseline for 4 historical destructives; 19 unit tests; wired into both CI workflows (TDD) | (this commit) | ✅ Shipped on `ci/validate-before-push` |
 | 2026-04-30 | OPS-4: CODEOWNERS + pull_request_template.md + 17-test regression spec asserting structural integrity (TDD) | `a7f9fa0` | ✅ Shipped on `ci/validate-before-push` |
-| 2026-04-30 | OPS-3: Dependabot (4 ecosystems weekly) + CodeQL (security-extended) + Trivy (HIGH/CRITICAL gating in both build workflows); +13 governance tests (TDD) | (this commit) | ✅ Shipped on `ci/validate-before-push` |
+| 2026-04-30 | OPS-3: Dependabot (4 ecosystems weekly) + CodeQL (security-extended) + Trivy (HIGH/CRITICAL gating in both build workflows); +13 governance tests (TDD) | `2db07fb` | ✅ Shipped on `ci/validate-before-push` |
+| 2026-04-30 | OPS-2: digest pinning in promote-to-prod.ps1 - prod now uses `image@sha256:...` not `image:tag`; 9 source-scan regression tests (TDD) | (this commit) | ✅ Shipped on `ci/validate-before-push` |
 
 **Validation as of 2026-04-30**:
-- Unit: 3,506 / 3,506 pass (89 suites; +13 OPS-3 tests in existing governance spec)
+- Unit: 3,515 / 3,515 pass (90 suites; +9 OPS-2 source-scan tests)
 - E2E (inmemory): 1,104 / 1,104 pass (52 suites)
 - Lint: 0 errors
 - Em-dash scan: clean
+
+**Tier-0 closure status**: All 6 Tier-0 security/data items + 4 OPS items (OPS-1, OPS-2, OPS-3, OPS-4) + migration linter shipped. Week 1 of DELIVERY_PLAN complete.
 
 ---
 
