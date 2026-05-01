@@ -12,6 +12,7 @@ import type { Request, Response } from 'express';
 
 import { SCIM_ERROR_SCHEMA } from '../scim/common/scim-constants';
 import * as crypto from 'node:crypto';
+import { safeCompare } from '../../security/safe-compare';
 import { OAuthService } from '../../oauth/oauth.service';
 import { IS_PUBLIC_KEY } from './public.decorator';
 import { ScimLogger } from '../logging/scim-logger.service';
@@ -131,7 +132,9 @@ export class SharedSecretGuard implements CanActivate {
     }
 
     // ── Legacy global bearer token ───────────────────────────────────
-    if (token === expectedSecret) {
+    // S-2: timing-safe comparison via safeCompare prevents byte-by-byte
+    // guessing of the configured shared secret via response-time analysis.
+    if (safeCompare(token, expectedSecret)) {
       this.logger.info(LogCategory.AUTH, 'Legacy bearer token authentication successful');
       request.authType = 'legacy';
       this.logger.enrichContext({ authType: 'legacy' });

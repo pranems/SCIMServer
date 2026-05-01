@@ -32,6 +32,11 @@ COPY --from=web-build /web/dist ./public
 
 # Generate Prisma 7 client (→ src/generated/prisma), compile TS
 # Phase 3: No db push needed — migrations run at container startup against PostgreSQL
+# DATABASE_URL must be set because prisma.config.ts uses env('DATABASE_URL')
+# which throws at config-load time if missing - even for `prisma generate`
+# which never opens a connection. The placeholder is overridden at runtime
+# by docker-entrypoint.sh.
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 RUN npx prisma generate && \
     npx tsc -p tsconfig.build.json
 

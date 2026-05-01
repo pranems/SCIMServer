@@ -27,27 +27,13 @@
 | Field | Value |
 |-------|-------|
 | **Severity** | Low (dead code - not wired) |
-| **File** | `api/src/auth/scim-auth.guard.ts` |
+| **File** | `api/src/auth/scim-auth.guard.ts` (deleted) |
 | **Lines** | 7, 28–47 |
-| **Status** | Open - delete recommended |
+| **Status** | **Closed** - file deleted on branch `ci/validate-before-push` |
 
-**Evidence:**
+**Resolution:** Deleted both `api/src/auth/scim-auth.guard.ts` and `api/src/auth/scim-auth.guard.spec.ts`. Confirmed unreferenced via repo-wide grep. All routes are protected by `SharedSecretGuard` (`api/src/modules/auth/shared-secret.guard.ts`).
 
-```typescript
-// Line 7 - hardcoded credential
-private readonly legacyBearerToken = 'S@g@r!2011';
-
-// Lines 28-47 - raw console.* (5 occurrences)
-console.log('🔍 Attempting OAuth token validation...');
-console.log('✅ OAuth authentication successful:', payload.client_id);
-console.log('🔍 Using legacy bearer token authentication...');
-console.log('✅ Legacy authentication successful');
-console.error('❌ Authentication failed:', errorMessage);
-```
-
-**Impact:** `ScimAuthGuard` is NOT registered in any module and NOT used with `@UseGuards` anywhere. The active guard is `SharedSecretGuard`. However, the hardcoded credential exists in source history.
-
-**Recommendation:** Delete `scim-auth.guard.ts` and `scim-auth.guard.spec.ts`. They are fully superseded by `shared-secret.guard.ts` which uses structured logging, correlation context, and environment-based secrets.
+**Permanent regression guard:** `api/src/security/forbidden-source-patterns.spec.ts` scans all `api/src/**/*.ts` on every CI run and fails if either the literal credential string `S@g@r!2011` or the `ScimAuthGuard` class identifier reappears anywhere in source. Forbidden patterns are constructed at runtime so the spec itself does not contain the literals.
 
 ---
 

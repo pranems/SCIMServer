@@ -194,7 +194,7 @@ sequenceDiagram
 
 | Layer | File | Lines | SRP | Notes |
 |-------|------|------:|:---:|-------|
-| **Entrypoint** | `main.ts` | 92 | ✅ | Open CORS (S-4), `enableImplicitConversion` (S-5) |
+| **Entrypoint** | `main.ts` | 92 | ✅ | CORS configurable via `parseCorsOrigin(process.env.CORS_ORIGIN)` (S-4 closed); `enableImplicitConversion` (S-5 closed via ADR-004 with regression-locked decision) |
 | **Auth (Legacy)** | `auth/scim-auth.guard.ts` | 40 | ❌ | **CRITICAL:** Hardcoded credential + console.log |
 | **Auth (Modern)** | `modules/auth/shared-secret.guard.ts` | 200 | ✅ | 3-tier auth, proper Logger. Uses `===` not `timingSafeEqual` |
 | **OAuth** | `oauth/oauth.service.ts` | 118 | ✅ | `client.clientSecret !== clientSecret` - timing-unsafe |
@@ -247,20 +247,17 @@ sequenceDiagram
 
 | ID | Severity | File | Line(s) | Issue | RFC | Status |
 |----|:--------:|------|------:|-------|-----|:------:|
-| **S-1** | 🔴 CRITICAL | `auth/scim-auth.guard.ts` | 7 | Hardcoded credential `S@g@r!2011` in source code history. Any repo reader can authenticate. | - | **Open** |
-| **S-2** | 🔴 HIGH | `auth/shared-secret.guard.ts` | 134 | `token === expectedSecret` - timing-attack vulnerable. Same in `oauth.service.ts` L80 (`client.clientSecret !== clientSecret`). Should use `crypto.timingSafeEqual()`. | - | **Open** |
-| **S-3** | 🟡 MEDIUM | `auth/scim-auth.guard.ts` | 28–47 | 5× `console.log`/`console.error` in auth path - bypasses structured logging pipeline. Auth events invisible to SSE stream, log download, and audit trail. | - | **Open** |
-| **S-4** | 🟡 MEDIUM | `main.ts` | 48 | `origin: true` (Allow all CORS origins). Comment says "for now" - unchanged since v0.3.0 (Sep 2025). Should be configurable via `CORS_ORIGIN` env var. | - | **Open** |
-| **S-5** | 🟡 MEDIUM | `main.ts` | 88 | `enableImplicitConversion: true` in `ValidationPipe` - causes `"123"` → `123` type coercion. Combined with DTO index signatures, allows type confusion injection. | - | **Open** |
+| **S-1** | � CLOSED | `auth/scim-auth.guard.ts` (deleted) | 7 | Hardcoded credential `S@g@r!2011` in source code history. Resolved by deleting `ScimAuthGuard` entirely (it was unreferenced dead code; `SharedSecretGuard` covers all routes). Permanent regression guard added: `src/security/forbidden-source-patterns.spec.ts`. | - | **Closed** |
+| **S-2** | � CLOSED | `auth/shared-secret.guard.ts` L134, `oauth.service.ts` L80 | Token compares now use `crypto.timingSafeEqual()` via shared `safeCompare()` helper. 14 unit tests cover identical/unequal/length-mismatch/utf8/non-string and verify `timingSafeEqual` is the underlying primitive (via spy). Permanent regression guards added to `forbidden-source-patterns.spec.ts` for both call sites. | - | **Closed** |
+| **S-3** | 🟢 CLOSED | `auth/scim-auth.guard.ts` (deleted) | 28–47 | 5× `console.log`/`console.error` in auth path. Resolved by deleting `ScimAuthGuard` entirely (the only call site of these `console.*` calls). | - | **Closed** |
+| **S-4** | � CLOSED | `main.ts` (was line 48) | - | `origin: true` replaced with `parseCorsOrigin(process.env.CORS_ORIGIN)`. Default unchanged when env var unset (backward-compat); accepts `*`, `false`/`none`, single origin, or comma-separated allowlist. `credentials: true` auto-enabled when an allowlist is configured. New helper at `api/src/security/cors-origin.ts` with 13 unit tests. Bicep parameterized via `corsOrigin` param. Permanent regression guard added. | - | **Closed** |
+| **S-5** | � CLOSED (Accepted Risk) | `main.ts` (line 100) | - | Decision documented in [docs/adr/ADR-004-enable-implicit-conversion.md](adr/ADR-004-enable-implicit-conversion.md): keep `enableImplicitConversion: true` because (a) every DTO field has explicit class-validator decorators, (b) DTO-1 closed the largest practical exploit surface (filter length cap), (c) the literal is now locked in by a `mustBePresent: true` regression rule in `forbidden-source-patterns.spec.ts`. Any change requires updating the ADR. | - | **Closed (Accepted Risk)** |
 
-### S-1 Evidence
+### S-1 Resolution
 
-```typescript
-// api/src/auth/scim-auth.guard.ts - Line 7
-@Injectable()
-export class ScimAuthGuard implements CanActivate {
-  private readonly legacyBearerToken = 'S@g@r!2011';  // ⚠️ PLAINTEXT IN SOURCE
-```
+Deleted `api/src/auth/scim-auth.guard.ts` and `api/src/auth/scim-auth.guard.spec.ts` (commit on branch `ci/validate-before-push`). The guard was never registered in any NestJS module - confirmed by repo-wide grep returning only its own file and spec. All routes are protected by `SharedSecretGuard` (`api/src/modules/auth/shared-secret.guard.ts`) which uses structured logging and environment-based secrets.
+
+A new permanent regression test (`src/security/forbidden-source-patterns.spec.ts`) scans all `api/src/**/*.ts` files on every CI run and fails if either the literal credential string or the `ScimAuthGuard` class identifier reappears. Patterns are constructed at runtime so the test file itself does not contain the forbidden literals.
 
 ### S-2 Recommended Fix
 
@@ -479,7 +476,7 @@ abstract class BaseScimController {
 
 | ID | Severity | File(s) | Issue | Impact |
 |----|:--------:|---------|-------|--------|
-| **R-1** | 🔴 HIGH | `prisma/*.repository.ts` | `create()` missing `try/catch` + `wrapPrismaError()`. On P2002 unique-constraint race during concurrent creates, raw `PrismaClientKnownRequestError` escapes → **500 instead of 409**. `update()` and `delete()` correctly wrap errors. | Data integrity |
+| **R-1** | � CLOSED | `prisma/*.repository.ts` | All 3 Prisma `create()` calls wrap errors with `wrapPrismaError()` (User L64, Group L85, Generic L59); P2002 maps to `RepositoryError('CONFLICT')` which the service layer translates to SCIM 409 `uniqueness`. Race-condition E2E regression guard in `edge-cases.e2e-spec.ts`. | Data integrity |
 | **R-2** | 🔴 HIGH | All repo interfaces | **Leaky Prisma filter abstraction** - `dbFilter?: Record<string, unknown>` passes Prisma `WhereInput` shapes through domain interfaces. InMemory repos had to build a 200-line `prisma-filter-evaluator.ts` to emulate Prisma query semantics. | Architecture coupling |
 | **R-3** | 🟡 MEDIUM | `prisma-endpoint-credential.repository.ts` | Silent `catch {}` blocks in `findById`, `deactivate`, `delete` - swallow ALL errors including connection failures and permissions errors. Only P2025 (not found) should return null. | Masked failures |
 | **R-4** | 🟡 MEDIUM | All Prisma repos | `toUserRecord()`, `toGroupRecord()`, `toGenericRecord()` mapping functions are ~15 lines each with 80% identical structure (same cast pattern + payload stringification). | DRY violation |
@@ -547,7 +544,7 @@ graph LR
 
 | ID | Severity | DTO | Gap | Recommendation |
 |----|:--------:|-----|-----|----------------|
-| **DTO-1** | 🔴 HIGH | `ListQueryDto` | No `@MaxLength` on `filter`, missing `sortBy`/`sortOrder`/`attributes`/`excludedAttributes` declarations | Harden to parity with `SearchRequestDto` |
+| **DTO-1** | � CLOSED | `scim-filter-parser.ts` | Centralized `MAX_FILTER_LENGTH = 10000` constant enforced at `parseScimFilter()` entry point - covers ALL call paths (GET ?filter=, POST /.search, profile validation, generic service). Stronger than DTO-only validation since `ListQueryDto` is not actually wired into list controllers. Unit + E2E regression guards. | Harden to parity with `SearchRequestDto` |
 | **DTO-2** | 🟡 MEDIUM | `CreateUserDto` | `[key: string]: unknown` index signature allows arbitrary top-level properties bypassing validation. No `@MaxLength` on `userName`. No `@ValidateNested` on complex attrs (`emails`, `name`, `phoneNumbers`) | Add `@MaxLength(255)` to `userName`, consider `@ValidateNested` for critical sub-objects |
 | **DTO-3** | 🟡 MEDIUM | `PatchOperationDto` | `path` has no `@MaxLength` - oversized PATCH paths impact performance | Add `@MaxLength(500)` |
 | **DTO-4** | 🟡 MEDIUM | `OAuthController` | `TokenRequest` is a plain interface - no class-validator decorators. `client_secret` could be object/array | Convert to DTO class with `@IsString()` validators |
@@ -835,13 +832,13 @@ xychart-beta
 
 ### Tier 0 - Security (Fix Immediately)
 
-| # | Item | Effort | Impact | Files |
-|:-:|------|:------:|:------:|-------|
-| 1 | Remove hardcoded `S@g@r!2011` from `ScimAuthGuard` - delete entire guard if `SharedSecretGuard` covers all routes | 1h | Critical | `auth/scim-auth.guard.ts`, module registrations |
-| 2 | Add `crypto.timingSafeEqual()` for all secret/token comparisons | 1h | High | `shared-secret.guard.ts` L134, `oauth.service.ts` L80 |
-| 3 | Replace `console.log`/`console.error` in `ScimAuthGuard` with `ScimLogger` (or delete guard per #1) | 30m | Medium | `auth/scim-auth.guard.ts` |
-| 4 | Make CORS origin configurable via `CORS_ORIGIN` env var | 30m | Medium | `main.ts` L48 |
-| 5 | Add `@@unique([groupResourceId, memberResourceId])` to `ResourceMember` + Prisma migration | 1h | High | `schema.prisma`, new migration |
+| # | Item | Effort | Impact | Files | Status |
+|:-:|------|:------:|:------:|-------|:------:|
+| 1 | Remove hardcoded `S@g@r!2011` from `ScimAuthGuard` - delete entire guard since `SharedSecretGuard` covers all routes | 1h | Critical | `auth/scim-auth.guard.ts`, regression spec | **Closed** |
+| 2 | Add `crypto.timingSafeEqual()` for all secret/token comparisons | 1h | High | `shared-secret.guard.ts` L134, `oauth.service.ts` L80 | **Closed** |
+| 3 | Replace `console.log`/`console.error` in `ScimAuthGuard` with `ScimLogger` (closed by #1 - guard deleted) | 30m | Medium | `auth/scim-auth.guard.ts` | **Closed** |
+| 4 | Make CORS origin configurable via `CORS_ORIGIN` env var | 30m | Medium | `main.ts` L48 | Open |
+| 5 | Add `@@unique([groupResourceId, value])` to `ResourceMember` + Prisma migration | 1h | High | `schema.prisma`, new migration | **Closed** |
 
 ### Tier 1 - Architecture (High ROI)
 

@@ -404,7 +404,7 @@ export class AdminController {
   /**
    * Build container metadata block from available Docker / env sources.
    */
-  private buildContainerInfo(databaseUrl: string | undefined): NonNullable<VersionInfo['container']> {
+  private buildContainerInfo(_databaseUrl: string | undefined): NonNullable<VersionInfo['container']> {
     // Container ID: hostname inside Docker is the short container ID
     const containerId = this.readContainerId();
     const containerName = process.env.HOSTNAME || undefined;

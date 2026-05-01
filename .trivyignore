@@ -1,0 +1,46 @@
+# Trivy CVE allowlist — OPS-3 / build-and-push security gate.
+#
+# Each entry MUST include the CVE ID, the package, the rationale, and an
+# expiry date. CI re-evaluates on every build; an unjustified entry will be
+# spotted in code review.
+#
+# Format:
+#   <CVE-ID>
+#   exp:<YYYY-MM-DD>
+# (lines starting with `#` are comments and ignored by Trivy)
+# Trivy reads only the bare CVE IDs; the surrounding comments are for humans.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CVE-2026-4800 — lodash 4.17.21 → "fixed" in 4.18.0
+# Package: lodash (transitive via @chevrotain/cst-dts-gen, @chevrotain/gast,
+#                  pulled in by Prisma 7's @prisma/internals)
+# Rationale: lodash 4.18.0 was published, then deprecated by the maintainers
+#            with the explicit notice "Bad release. Please use lodash@4.17.21
+#            instead." (visible via `npm view lodash@4.18.0`). Forcing 4.18.0
+#            via npm overrides reintroduces a regression worse than the CVE
+#            (which requires attacker-controlled input to a lodash sink we do
+#            not expose — chevrotain only uses lodash internally for AST work
+#            on Prisma schema files at build time, never at request time).
+# Reviewed: 2026-04-30
+# Owner:    @pranems
+# Re-check: when chevrotain or lodash publishes a real fix.
+CVE-2026-4800
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CVE-2026-33671 - picomatch 4.0.3 ReDoS (extglob patterns)
+# Package: picomatch (bundled inside the base image's npm CLI at
+#          /usr/local/lib/node_modules/npm/node_modules/tinyglobby/node_modules/picomatch)
+# Rationale: This is npm's INTERNAL copy of picomatch shipped inside the
+#            node:24-alpine base image. It is unreachable by package.json
+#            overrides because npm is a global tool, not a project dep. npm
+#            only processes file-system glob patterns supplied by package.json
+#            authors and CLI flags - never attacker-controlled HTTP input.
+#            The runtime risk is zero. The proper fix is a base-image bump
+#            once node:24-alpine ships an npm with the patched tinyglobby.
+# Reviewed: 2026-04-30
+# Owner:    @pranems
+# Re-check: monitor https://github.com/nodejs/docker-node/releases for
+#           an updated node:24-alpine; remove this entry when `docker run
+#           --rm node:24-alpine npm exec -- node -p \"require('picomatch/package.json').version\"`
+#           reports >= 4.0.4.
+CVE-2026-33671

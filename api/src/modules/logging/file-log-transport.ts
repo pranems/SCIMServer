@@ -83,7 +83,7 @@ export class FileLogTransport {
     this.mainWriter?.close();
     this.mainWriter = null;
 
-    for (const [id, writer] of this.endpointWriters) {
+    for (const [_id, writer] of this.endpointWriters) {
       writer.close();
     }
     this.endpointWriters.clear();

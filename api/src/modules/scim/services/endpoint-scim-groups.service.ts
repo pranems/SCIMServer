@@ -6,7 +6,6 @@ import type { IUserRepository } from '../../../domain/repositories/user.reposito
 import type {
   GroupWithMembers,
   GroupCreateInput,
-  GroupUpdateInput,
   MemberCreateInput,
   MemberRecord,
 } from '../../../domain/models/group.model';
@@ -180,7 +179,7 @@ export class EndpointScimGroupsService {
     return this.toScimGroupResource(withMembers, baseUrl, endpointId);
   }
 
-  async getGroupForEndpoint(scimId: string, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimGroupResource> {
+  async getGroupForEndpoint(scimId: string, baseUrl: string, endpointId: string, _config?: EndpointConfig): Promise<ScimGroupResource> {
     this.logger.enrichContext({ resourceType: 'Group', resourceId: scimId, operation: 'get' });
     this.logger.debug(LogCategory.SCIM_GROUP, 'Get group', { scimId, endpointId });
     const group = await this.groupRepo.findWithMembers(endpointId, scimId);
@@ -196,7 +195,7 @@ export class EndpointScimGroupsService {
     { filter, startIndex = 1, count = DEFAULT_COUNT, sortBy, sortOrder }: ListGroupsParams,
     baseUrl: string,
     endpointId: string,
-    config?: EndpointConfig,
+    _config?: EndpointConfig,
   ): Promise<ScimListResponse<ScimGroupResource>> {
     this.logger.enrichContext({ resourceType: 'Group', operation: 'list' });
 
@@ -617,13 +616,25 @@ export class EndpointScimGroupsService {
     memberDtos: GroupMemberDto[],
     endpointId: string,
   ): Promise<MemberCreateInput[]> {
-    const values = memberDtos.map((m) => m.value);
+    // Tier-0 #5: dedupe by SCIM `value` BEFORE storing. The DB has a
+    // @@unique([groupResourceId, value]) constraint as defense-in-depth, but
+    // a duplicate in the API request is benign (idempotent add) - we keep the
+    // first occurrence and silently drop the rest, matching common SCIM impls.
+    const seen = new Set<string>();
+    const dedupedDtos: GroupMemberDto[] = [];
+    for (const m of memberDtos) {
+      if (m.value === undefined || m.value === null || seen.has(m.value)) continue;
+      seen.add(m.value);
+      dedupedDtos.push(m);
+    }
+
+    const values = dedupedDtos.map((m) => m.value);
     const users = values.length > 0
       ? await this.userRepo.findByScimIds(endpointId, values)
       : [];
     const userMap = new Map(users.map((u) => [u.scimId, u.id] as const));
 
-    return memberDtos.map((m) => ({
+    return dedupedDtos.map((m) => ({
       userId: userMap.get(m.value) ?? null,
       value: m.value,
       type: m.type ?? null,

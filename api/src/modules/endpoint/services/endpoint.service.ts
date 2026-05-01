@@ -10,7 +10,7 @@ import { LogCategory } from '../../logging/log-levels';
 import { parseLogLevel, logLevelName } from '../../logging/log-levels';
 import { validateAndExpandProfile } from '../../scim/endpoint-profile/endpoint-profile.service';
 import { getBuiltInPreset, DEFAULT_PRESET_NAME, BUILT_IN_PRESETS, PRESET_NAMES } from '../../scim/endpoint-profile/built-in-presets';
-import type { EndpointProfile, ServiceProviderConfig } from '../../scim/endpoint-profile/endpoint-profile.types';
+import type { EndpointProfile } from '../../scim/endpoint-profile/endpoint-profile.types';
 import type { IUserRepository } from '../../../domain/repositories/user.repository.interface';
 import type { IGroupRepository } from '../../../domain/repositories/group.repository.interface';
 import { USER_REPOSITORY, GROUP_REPOSITORY } from '../../../domain/repositories/repository.tokens';

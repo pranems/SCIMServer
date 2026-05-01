@@ -98,7 +98,7 @@ export class EndpointScimGenericService {
    */
   private getSchemaDefinitions(
     resourceType: ScimResourceType,
-    endpointId: string,
+    _endpointId: string,
   ): SchemaDefinition[] {
     const profile = this.endpointContext.getProfile?.();
     const profileSchemaMap = new Map<string, any>();
@@ -246,7 +246,7 @@ export class EndpointScimGenericService {
     baseUrl: string,
     endpointId: string,
     resourceType: ScimResourceType,
-    config?: EndpointConfig,
+    _config?: EndpointConfig,
   ): Promise<Record<string, unknown>> {
     this.scimLogger.enrichContext({ resourceType: resourceType.name, resourceId: scimId, operation: 'get' });
     this.scimLogger.debug(LogCategory.SCIM_RESOURCE, `Get ${resourceType.name}`, { scimId, endpointId });
@@ -279,7 +279,7 @@ export class EndpointScimGenericService {
     baseUrl: string,
     endpointId: string,
     resourceType: ScimResourceType,
-    config?: EndpointConfig,
+    _config?: EndpointConfig,
   ): Promise<Record<string, unknown>> {
     this.scimLogger.enrichContext({ resourceType: resourceType.name, operation: 'list' });
     this.scimLogger.info(LogCategory.SCIM_RESOURCE, `List ${resourceType.name}`, { endpointId, filter: params.filter });
@@ -1090,7 +1090,7 @@ export class EndpointScimGenericService {
     incomingDto: Record<string, unknown>,
     resourceType: ScimResourceType,
     endpointId: string,
-    config?: EndpointConfig,
+    _config?: EndpointConfig,
   ): void {
     // G1: Immutable enforcement runs unconditionally (RFC 7643 §2.2 "SHALL NOT")
     // Previously gated by StrictSchemaValidation - removed per P4 analysis
@@ -1149,7 +1149,7 @@ export class EndpointScimGenericService {
   private buildSchemaDefinitionsFromPayload(
     dto: Record<string, unknown>,
     resourceType: ScimResourceType,
-    endpointId: string,
+    _endpointId: string,
   ): SchemaDefinition[] {
     // Build profile schema lookup map
     const profile = this.endpointContext.getProfile?.();

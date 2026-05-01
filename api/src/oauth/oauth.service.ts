@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'node:crypto';
+import { safeCompare } from '../security/safe-compare';
 import { ScimLogger } from '../modules/logging/scim-logger.service';
 import { LogCategory } from '../modules/logging/log-levels';
 
@@ -75,7 +76,9 @@ export class OAuthService {
     // Validate client credentials
     const client = this.validClients.get(clientId);
 
-    if (!client || client.clientSecret !== clientSecret) {
+    // S-2: timing-safe comparison via safeCompare prevents byte-by-byte
+    // guessing of the configured client secret via response-time analysis.
+    if (!client || !safeCompare(client.clientSecret, clientSecret)) {
       this.logger.warn(LogCategory.OAUTH, 'Client validation failed', {
         clientFound: !!client,
       });

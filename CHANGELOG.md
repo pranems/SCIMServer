@@ -5,6 +5,191 @@ All notable changes to SCIMServer will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Ops - OPS-2: Digest Pinning in promote-to-prod
+
+- **fix(scripts)**: `scripts/promote-to-prod.ps1` now resolves the dev image's immutable SHA-256 digest BEFORE updating production. Production is pinned with `image@sha256:<digest>` instead of the previous mutable `image:<tag>` form. A re-pushed tag can no longer silently change prod after promotion.
+- **mechanism**: `docker buildx imagetools inspect ghcr.io/.../scimserver:$ImageTag` returns metadata including a `Digest:` line; the script parses that line, validates non-empty, and constructs `$desiredImage = "ghcr.io/.../scimserver@$devDigest"`. Failure to resolve the digest fails the script before any prod change.
+- **rollback compatibility**: The rollback hint emitted at the end of the script uses `$prodImage` (the prior digest-pinned production image, captured before the swap). For the very first OPS-2-aware promotion, `$prodImage` may still be the prior tag-pinned form; that is the only emergency rollback that still uses a tag, and only once.
+- **observability**: The script now prints the resolved digest twice - once after resolution (`Resolved digest: sha256:...`) and once in the confirmation block (`Pinned via immutable digest: sha256:...`) - so the operator sees exactly what bytes ship.
+- **test(scripts)**: New `api/src/scripts/promote-to-prod-digest.spec.ts` (9 tests) source-scans the script and asserts: uses `docker buildx imagetools inspect`, captures into `$devDigest`, constructs `$desiredImage` with `@$devDigest`, does NOT assign a tag-form to `$desiredImage`, reads prior `$prodImage` for rollback, prints rollback hint, exposes digest in Write-Host output, refuses to proceed if digest resolution fails, preserves -SkipDevVerification / -SkipProdVerification flags.
+- **TDD process**: RED - 9 source-scan tests against original tag-pinning script; ran spec; 6/9 fail (3 pass on existing structure: $prodImage, rollback mention, skip flags). GREEN - replaced tag-pin with digest resolution + pin; 9/9 pass.
+- **Validation**: 3,515 unit (90 suites; +9 OPS-2 source-scan tests) + 1,104 E2E (52 suites) + 0 lint errors.
+
+### CI - OPS-3: Supply-Chain Alerting (Dependabot + CodeQL + Trivy)
+
+- **feat(github)**: New `.github/dependabot.yml` covers 4 ecosystems with weekly Monday cadence and grouped patch+minor updates: npm in `/api`, npm in `/web`, github-actions in `/`, docker in `/`. Each ecosystem caps open PRs (3-5) so the queue cannot flood. Reviewers and labels declared per ecosystem.
+- **feat(github)**: New `.github/workflows/codeql.yml` runs javascript-typescript analysis with `security-extended,security-and-quality` query packs on push to master/feat-branches, on PRs to master, weekly on Monday 04:00 UTC, and on workflow_dispatch. Results surface as 'Code scanning alerts' on the PR; configure repo branch protection separately on GitHub to make them merge-blocking.
+- **feat(workflows)**: Added `aquasecurity/trivy-action@0.24.0` step to BOTH `.github/workflows/build-and-push.yml` AND `.github/workflows/build-test.yml` immediately after the docker build/push step. Configuration: `severity: HIGH,CRITICAL`, `exit-code: 1`, `ignore-unfixed: true`, `vuln-type: os,library`. Image is pinned by digest (`@${{ steps.build.outputs.digest }}`) so the scan targets the exact bytes that were pushed - no race window with mutable tags.
+- **test(security)**: Extended `api/src/security/required-governance-files.spec.ts` with 13 new OPS-3 assertions: dependabot.yml exists with 4 ecosystems and weekly schedule; codeql.yml exists with init+analyze+schedule; both build workflows reference aquasecurity/trivy-action with HIGH/CRITICAL severity gating. The spec now has 30 tests total.
+- **TDD process**: RED - extended spec with 13 new tests against non-existent configs; ran spec; 13/30 fail. GREEN - created dependabot.yml + codeql.yml + added Trivy steps to both workflows; 30/30 pass.
+- **Validation**: 3,506 unit (89 suites; +13 OPS-3 tests in existing governance spec) + 1,104 E2E (52 suites) + 0 lint errors.
+
+### CI - OPS-4: CODEOWNERS + PR Template
+
+- **feat(github)**: New `.github/CODEOWNERS` declares `@pranems` as the default owner across all paths plus explicit ownership for `api/`, `web/`, `infra/`, `scripts/`, top-level Dockerfiles, `docker-compose*.yml`, `.github/`, and the living-doc set (`docs/`, `Session_starter.md`, `CHANGELOG.md`, `README.md`, `DEPLOYMENT.md`, `admin.md`). GitHub auto-requests review on every PR touching a matched path.
+- **feat(github)**: New `.github/pull_request_template.md` surfaces the standing Feature/Bug-Fix Commit Checklist as actual checkboxes plus four standing-rules acknowledgments (no em-dash, no amend on pushed history, no committed secrets, additive-only migrations) and a destructive-migration override block tied to `ALLOW_DESTRUCTIVE_MIGRATION=1`.
+- **test(security)**: New `api/src/security/required-governance-files.spec.ts` (17 tests) asserts both files exist and contain the required structural elements: CODEOWNERS has global `*` owner + `api/` + `.github/` paths; PR template has all 9 checklist items, em-dash reminder, migration-linter override section, and DELIVERY_PLAN.md cross-reference.
+- **TDD process**: RED - 17 tests against non-existent files; ran spec; 17/17 fail. GREEN - created both files matching the contract; 17/17 pass.
+- **Validation**: 3,493 unit (89 suites; +1 for required-governance-files with 17 tests) + 1,104 E2E (52 suites) + 0 lint errors.
+
+### CI - Migration Linter (Additive-Only Enforcement)
+
+- **feat(scripts)**: New `api/src/scripts/lint-migrations.ts` scans Prisma migration SQL for forbidden destructive DDL:
+  - `DROP TABLE`, `DROP COLUMN` - permanent data loss
+  - `ALTER COLUMN ... TYPE` - silent truncation/coercion
+  - `RENAME TO` / `RENAME COLUMN` - silent client breakage
+  - `INSERT ... SELECT FROM <table>` - data movement risk (use expand-contract instead)
+- **feat(scripts)**: Baseline file `api/prisma/.migration-lint-baseline.json` accepts the 4 historical destructive migrations (externalId citext fixes, endpoint-profile drop tables, requestlog deletedAt drop) by SHA-256 hash. Any edit to a baselined file invalidates its entry and re-flags the violations - the file content is the contract, not the path.
+- **feat(ci)**: New `Lint Prisma migrations` step in both `.github/workflows/build-and-push.yml` and `.github/workflows/build-test.yml` validate jobs. Runs after `prisma generate`, before unit tests. Blocks image push if any new destructive migration appears without `ALLOW_DESTRUCTIVE_MIGRATION=1` override.
+- **test(scripts)**: 19 unit tests in `api/src/scripts/lint-migrations.spec.ts` covering: empty/missing dir, additive migrations, every forbidden pattern, INSERT...VALUES negative case, multi-line SELECT FROM, multi-violation aggregation, allowDestructive override, non-SQL file ignoring, baseline-by-hash skipping, baseline-mismatch re-flagging, no-baseline back-compat.
+- **TDD process**: RED - 15-test spec referencing non-existent `lintMigrations`; ran it; failed with TS2307 (module not found). GREEN - implemented; 15/15 pass. Added baseline support; +4 tests; 19/19 pass. Verified against real migrations: 11 migrations / 0 violations after baseline applied.
+- **standing rule reinforcement**: This closes the gap in DELIVERY_PLAN.md Week 1 Day 4 ("Migration linter in CI"). Combined with the additive-only convention from `.github/copilot-instructions.md`, destructive migrations now require explicit acknowledgment in 3 places: PR description, ALLOW_DESTRUCTIVE_MIGRATION=1 env, and a justification commit.
+- **Validation**: 3,476 unit (88 suites; +1 for lint-migrations with 19 tests) + 1,104 E2E (52 suites) + 0 lint errors.
+
+### Security - S-5: ADR-004 Decision on enableImplicitConversion
+
+- **docs(adr)**: New `docs/adr/ADR-004-enable-implicit-conversion.md` documents the decision to keep `enableImplicitConversion: true` in the global ValidationPipe. Risk acknowledged and explicitly mitigated:
+  1. Every typed DTO property has a class-validator decorator (`@IsString`, `@IsInt`, `@IsBoolean`, `@MaxLength`, `@IsIn`, etc.) that runs before the controller handler.
+  2. The `parseSimpleFilter()` length cap (DTO-1) closes the largest practical exploit surface.
+  3. The literal `enableImplicitConversion: true` in `main.ts` is now locked in by a regression rule.
+- **feat(security)**: Extended `forbidden-source-patterns.spec.ts` with a new `mustBePresent: true` mode for inverse regression rules. Used by the S-5 entry to assert the decision literal stays in source. Any future flip of the flag fails the test and forces an ADR update (either supersede with a new ADR or remove the regression rule).
+- **feat(main)**: Added inline ADR pointer comment in `api/src/main.ts` above the ValidationPipe configuration so future maintainers see the decision in context without grepping.
+- **TDD process**: This was a decision-driven rather than code-driven change. RED was 'create regression spec entry that asserts the literal must remain'; GREEN was 'add the inverse-mode flag and confirm the test passes'.
+- **doc**: Marked S-5 closed (Accepted Risk) in `docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md`. Added ADR to `docs/INDEX.md`.
+- **Validation**: 3,457 unit (87 suites; +1 from S-5 mustBePresent rule) + 1,104 E2E (52 suites) + 0 lint errors.
+
+### Security - S-4: Configurable CORS Origin
+
+- **security(cors)**: Replaced unconditional `origin: true` in `api/src/main.ts` with `parseCorsOrigin(process.env.CORS_ORIGIN)`. Backward-compatible: env var unset/empty/`*` retains the previous allow-all behavior.
+- **feat(security)**: New `api/src/security/cors-origin.ts` helper exporting `parseCorsOrigin(raw)` returning `boolean | string | string[]` for direct use as Express cors `origin` option. Behavior matrix:
+  - `undefined` / `''` / `'   '` / `'*'` → `true` (allow all - default)
+  - `'false'` / `'none'` (case-insensitive) → `false` (no CORS)
+  - `'https://app.example.com'` → single string
+  - `'https://a.example.com,https://b.example.com'` → string array allowlist
+  - Single-entry comma list collapses to string; whitespace trimmed; empty entries dropped
+- **test(security)**: 13 unit tests in `api/src/security/cors-origin.spec.ts` covering all branches (undefined, empty, whitespace, `*`, deny keywords case-insensitive, single origin, allowlist, trim-around-commas, drop-empties, all-empty-after-trim → false, single-entry-with-trailing-comma → string).
+- **infra(bicep)**: Added `corsOrigin` parameter to `infra/containerapp.bicep`, wired into `CORS_ORIGIN` env var on the Container App. Default empty string preserves current allow-all behavior on existing deployments.
+- **runtime**: `credentials` flag now auto-enabled when an allowlist is configured (`corsOrigin !== true`), required for cookies/auth headers to work cross-origin against a specific origin.
+- **test(security)**: Extended `forbidden-source-patterns.spec.ts` with S-4 entry. The literal `origin: true,` in `main.ts` is now a forbidden pattern - if it reappears it would defeat the configurability and force allow-all on every deployment.
+- **TDD process**: RED - wrote 13-test spec referencing non-existent `parseCorsOrigin`; ran it; failed with TS2306 (module has no exports). GREEN - implemented helper; 13/13 pass. Wired into `main.ts`; ran full suite; 3,456 unit + 1,104 E2E + 0 lint errors all green.
+- **doc**: Marked S-4 closed in `docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md`.
+
+### Data - Tier-0 #5: ResourceMember Unique Constraint + Service Dedupe
+
+- **schema(prisma)**: Added `@@unique([groupResourceId, value])` to `ResourceMember` (`api/prisma/schema.prisma`). SCIM identifies a member by its `value` sub-attribute (always populated), so this is the correct unique key. `memberResourceId` is nullable for external members and unsuitable for the constraint.
+- **migration**: New `20260430120000_resource_member_unique_value` SQL migration deduplicates any existing `(groupResourceId, value)` duplicates BEFORE applying the unique index. Dedup keeps the row with the smallest `createdAt` (oldest), with `id` as tiebreaker. Idempotent and additive-safe per standing rules.
+- **feat(group-service)**: Added input dedup in `resolveMemberInputs()` (`endpoint-scim-groups.service.ts`) - silent dedupe of duplicate member values in API requests, first occurrence wins. SCIM-compliant behavior (idempotent add). The DB constraint is now defense-in-depth against direct DB writes / repo bugs, not the primary enforcement path.
+- **test(security)**: New `api/src/security/required-schema-constraints.spec.ts` - extensible spec that asserts Prisma `schema.prisma` declares specific constraints by audit ID. Currently covers Tier-0 #5; future schema-level defenses add a new entry.
+- **test(e2e)**: 2 new dedup tests in `edge-cases.e2e-spec.ts`:
+  - POST `/Groups` with `members: [A, A, B, A]` returns 201 with exactly 2 unique members
+  - PUT `/Groups/:id` with duplicate values returns 200 with deduped result
+- **TDD process** (red-green):
+  1. RED: wrote `required-schema-constraints.spec.ts`; ran it; failed because `@@unique([groupResourceId, value])` was missing.
+  2. GREEN: added the constraint to `schema.prisma`, hand-wrote the dedupe-then-constrain migration, added service-layer dedupe; spec passed; new E2E tests passed; full suite green.
+- **Validation**: 3,442 unit (86 suites; +1 schema-constraint spec, +1 test), 1,104 E2E inmemory (24 in edge-cases, +2), 0 lint errors.
+- **doc updates**: marked Tier-0 #5 Closed in `docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md` (Tier-0 list) and `docs/DELIVERY_PLAN.md` (Closed table + removed from Tier-0 open).
+
+### Security - DTO-1: Filter Length Cap at Parser Entry Point
+
+- **security(filter)**: Added centralized `MAX_FILTER_LENGTH = 10000` cap inside `parseScimFilter()` (`api/src/modules/scim/filters/scim-filter-parser.ts`). Closes the memory/CPU DoS vector where an attacker could submit a megabyte-scale filter expression and force the tokenizer + parser to walk every byte (worst-case quadratic in some grouping patterns) before push-down decided anything.
+- **insight**: The audit recommended hardening `ListQueryDto`, but `ListQueryDto` is **not wired into list controllers** - they use bare `@Query('filter')` strings. A DTO-only fix would have been silently inert. The cap at the parser entry point is a stronger guarantee because every call path (GET `?filter=`, POST `/.search`, profile validation, generic service filter) shares the same enforcement.
+- **TDD process** (red-green):
+  1. RED: added 2 unit tests in `scim-filter-parser.spec.ts` (10001-char throws, exactly-10000 accepted); ran them; first failed.
+  2. GREEN: added length cap before `tokenize()` call in `parseScimFilter()`; both unit tests passed.
+  3. Added E2E in `edge-cases.e2e-spec.ts` asserting GET `?filter=<11000 chars>` returns 400 with SCIM `invalidFilter` (or `invalidValue`); passed immediately, confirming the existing `buildUserFilter` error-translation path correctly maps parser exceptions to 400.
+- **export**: `MAX_FILTER_LENGTH` is now an exported constant so other tools (UI validation, future migration, observability) can reference the same number.
+- **Validation**: 3,441 unit (87 in scim-filter-parser, +2), 1,102 E2E inmemory (22 in edge-cases, +1), 0 lint errors.
+- **doc updates**: marked DTO-1 Closed in `docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md` and `docs/DELIVERY_PLAN.md` (Closed table + Tier-0 list); CHANGELOG entry; corrected the rationale (parser cap, not DTO hardening).
+
+### Test - R-1: Race-Condition Regression Guard
+
+- **test(e2e)**: Added concurrent-POST regression test in `edge-cases.e2e-spec.ts` that asserts `Promise.all` of two POSTs with the same userName resolves to exactly `[201, 409]` (sorted) with `scimType: 'uniqueness'` - never `[201, 500]` as it would pre-fix.
+- **finding**: Audit was stale - all 3 Prisma `create()` calls already wrap errors with `wrapPrismaError()` (User L64, Group L85, Generic L59). The shared utility correctly maps Prisma `P2002` to `RepositoryError('CONFLICT')`, which the service layer translates to SCIM 409. R-1 was effectively closed in earlier work, just not reflected in the audit.
+- **Validation**: `edge-cases.e2e-spec.ts` 21/21 pass (was 20). Prior unit-level CONFLICT tests in `prisma-{user,group,generic-resource}.repository.spec.ts` still pass.
+- **doc updates**: marked R-1 Closed in `docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md` and `docs/DELIVERY_PLAN.md`.
+
+### Security - S-2: Timing-Safe Token Comparison
+
+- **security(auth)**: Replaced bare `===` / `!==` token comparisons with `crypto.timingSafeEqual()` via a new shared `safeCompare()` helper to eliminate the timing-side-channel that allows progressive byte-by-byte secret guessing. Two call sites updated:
+  - [api/src/modules/auth/shared-secret.guard.ts#L134](api/src/modules/auth/shared-secret.guard.ts) - legacy global bearer token comparison
+  - [api/src/oauth/oauth.service.ts#L80](api/src/oauth/oauth.service.ts) - OAuth client_secret comparison
+- **feat(security)**: New `api/src/security/safe-compare.ts` - timing-safe string comparison. UTF-8 aware, length-mismatch returns false without throwing (since `crypto.timingSafeEqual` throws on mismatched-length input).
+- **test(security)**: 14 new unit tests in `api/src/security/safe-compare.spec.ts`:
+  - identical strings (empty, short, 1024-byte) return true
+  - unequal same-length strings return false
+  - length-mismatch returns false without throwing
+  - utf8 multi-byte handling (`a` vs `ä` returns false on byte length)
+  - null / undefined / number / object / array return false (defensive)
+  - **spy assertion** that `crypto.timingSafeEqual` is the underlying primitive for equal-length inputs (catches future replacement with `===`)
+  - **spy assertion** that `crypto.timingSafeEqual` is NOT called when lengths differ (would throw)
+- **test(oauth)**: +1 length-mismatch regression test in `oauth.service.spec.ts` - verifies safeCompare's length guard prevents `timingSafeEqual` from throwing on shorter/longer client secrets.
+- **test(security)**: Extended `forbidden-source-patterns.spec.ts` with two new path-scoped patterns (S-2 entries) that block `=== expectedSecret` from reappearing in `shared-secret.guard.ts` and `client.clientSecret !== clientSecret` from reappearing in `oauth.service.ts`. New `onlyInPaths` field added to the pattern interface for file-scoped checks.
+- **TDD process**: red-green-refactor:
+  1. RED: wrote `safe-compare.spec.ts` with 14 tests; ran it; failed at compile because `safe-compare.ts` did not exist.
+  2. GREEN: created `safe-compare.ts` with `timingSafeEqual`-based impl; spec turned 14/14 green.
+  3. Wired into the two call sites; ran full suite to confirm zero regressions.
+- **Validation**: 3,439 unit (85 suites; +1 new spec, +14 new tests), 1,100 E2E inmemory, 0 lint errors.
+- **doc updates**: marked `S-2` Closed in `docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md` and Tier-0 #2 Closed; updated `docs/DELIVERY_PLAN.md` Closed-defects table and Progress Log.
+
+### Docs - DELIVERY_PLAN.md: Consolidated 6-Week Execution Plan
+
+- **docs(plan)**: Created `docs/DELIVERY_PLAN.md` (12 sections, 4 Mermaid diagrams, 1 Gantt chart, ~600 lines) reconciling all prior session deliberations into one operating-model document:
+  - Section 1: what the prior 10-week plan got wrong and why this is the third iteration
+  - Section 2: reality assessment by dimension (CI/CD, deploy, data/IDs, tests, security, UI) with green/red status callouts
+  - Section 3: named defect inventory split into Closed (this branch), Tier 0 open, operational open, UI backend, UI frontend, Tier 1-3 backlog
+  - Section 4: target operating model diagram showing dev loop -> build -> dev RG -> human gate -> blue/green prod -> steady-state monitoring
+  - Section 5: fully-automated CI/CD pipeline diagram with all 6 stages and what each stage gates
+  - Section 6: six-week sequencing with Gantt chart, daily breakdown for week 1, parallel-track tables for weeks 2-3
+  - Section 7: TDD red-green-refactor process rules with examples from this branch
+  - Section 8: cross-cutting standing rules (no em-dash, additive migrations, etc)
+  - Section 9: risk map per phase
+  - Section 10: explicit non-goals (16 items removed from prior plans with rationale)
+  - Section 11: progress log seeded with the 3 commits already shipped (`5f2376b`, `1a22771`, `ef9673b`)
+  - Section 12: cross-references to existing planning docs and source-of-truth files
+- **docs(index)**: Added DELIVERY_PLAN.md entry to `docs/INDEX.md` Architecture & Design section.
+- **session_starter**: Added DELIVERY_PLAN.md as the canonical execution reference for the active branch.
+
+### Security - S-1, S-3: Delete Dead `ScimAuthGuard`
+
+- **security(auth)**: Deleted `api/src/auth/scim-auth.guard.ts` and its spec - the guard was unreferenced dead code containing a hardcoded legacy bearer token (`S@g@r!2011`, S-1) and 5 `console.log`/`console.error` calls bypassing structured logging (S-3). Confirmed unreferenced by repo-wide grep returning only the file itself and its own spec. All routes are protected by `SharedSecretGuard` (`api/src/modules/auth/shared-secret.guard.ts`).
+- **test(security)**: Added `api/src/security/forbidden-source-patterns.spec.ts` as a permanent regression guard. Walks `api/src/**/*.ts` on every CI run and fails if either the literal credential string or the `ScimAuthGuard` class identifier reappears. Forbidden patterns are constructed at runtime so the spec itself does not contain the literals. Pattern table is extensible - add an entry whenever a credential, class, or smell is removed that must never come back.
+- **TDD process**: This commit followed strict red-green-refactor:
+  1. RED: wrote `forbidden-source-patterns.spec.ts` first; ran it; both patterns failed with explicit violation reports pointing to the dead guard files.
+  2. GREEN: deleted `scim-auth.guard.ts`, `scim-auth.guard.spec.ts`, and the now-empty `api/src/auth/` directory; spec immediately turned green.
+  3. Confirmed full unit (3,422) + E2E (1,100 inmemory) + lint (0 errors) all green.
+- **doc updates**: marked `S-1` and `S-3` as Closed in `docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md`, removed entries from `docs/LOGGING_ERROR_HANDLING_QUALITY_AUDIT.md` (GAP-01) and `docs/PROMPT_LOGGING_VERIFICATION.md`; updated `docs/TEST_INVENTORY.md` to reference the new security spec; updated `Session_starter.md` Known Technical Debt list.
+- **net test count**: 3,422 unit (was 3,429; deleted spec had 9 tests, new security spec has 2 = -7 net). Suite count unchanged at 84 (one spec file replaced another).
+- **next**: S-2 (timingSafeEqual), S-4 (CORS_ORIGIN env var), S-5 (ADR-004 decision on enableImplicitConversion), R-1 (wrapPrismaError on create), DTO-1 (harden ListQueryDto), Tier-0 #5 (ResourceMember unique).
+
+### CI - Lint Cleanup: Remove continue-on-error
+
+- **fix(lint)**: Closed all 58 pre-existing lint errors that had built up because CI never ran lint:
+  - **30 `require-await` errors**: Added file-level `eslint-disable` headers to 4 InMemory repos (`inmemory-user.repository.ts`, `inmemory-group.repository.ts`, `inmemory-generic-resource.repository.ts`, `inmemory-endpoint-credential.repository.ts`) - methods MUST be async to satisfy `Promise<T>` interface contracts. Added per-line disable on 2 NestJS `onModuleInit` lifecycle hooks (`logging.service.ts`, `scim-schema-registry.ts`).
+  - **5 `no-floating-promises` errors** in `schema-cache-concurrency.spec.ts`: prefixed `als.run(...)` calls with `void`.
+  - **4 unused imports removed**: `ServiceProviderConfig` (endpoint.service.ts), `TightenOnlyError` (endpoint-profile.service.ts), `BULK_MAX_OPERATIONS` (bulk-processor.service.ts), `GroupUpdateInput` (endpoint-scim-groups.service.ts).
+  - **3 `no-redundant-type-constituents`** in endpoint-profile.types.ts L102: `'normalize' | 'reject' | 'passthrough' | string` -> `'normalize' | 'reject' | 'passthrough' | (string & {})` (preserves IDE autocomplete on the literal union while still accepting any string).
+  - **~16 unused params underscore-prefixed**: `id`, `count`, `databaseUrl`, multiple `endpointId`/`config` args across `scim-service-helpers.ts`, `endpoint-scim-users.service.ts`, `endpoint-scim-groups.service.ts`, `endpoint-scim-generic.service.ts`, `admin.controller.ts`, `file-log-transport.ts`, `log-query.service.ts`. Underscore prefix matches `argsIgnorePattern: '^_'` in `eslint.config.mjs`.
+- **ci(workflows)**: Removed `continue-on-error: true` from the lint step in both `build-and-push.yml` and `build-test.yml`. Lint is now blocking.
+- **Behavior**: Zero behavior changes. All 3,429 unit tests + 1,100 E2E (inmemory mode) still pass.
+
+### CI - OPS-1: Gate Image Push on Full Test Suite
+
+- **ci(workflows)**: Added `validate` job to `.github/workflows/build-and-push.yml` and `.github/workflows/build-test.yml` that runs before any docker build/push:
+  - `npm run lint` (API) - **blocking**
+  - `npx prisma generate` (required for type-check + tests)
+  - `npm test` (API unit, 3,429 tests, default mock-based) - **blocking**
+  - `npm run test:e2e` (API E2E, 1,100 tests in inmemory mode) - **blocking**
+  - `npm test` (web Vitest, 172 tests) - **blocking**
+  - `npm run build` (web production bundle, ~80 KB gz) - **blocking**
+- **ci(workflows)**: `build-and-push` job now declares `needs: validate` - no image is published unless all blocking checks pass
+- **ci(workflows)**: `build-and-push.yml` image tags now include `sha-<short>` for SHA-based traceability; build summary surfaces the `sha256:` digest for digest-pinning in promote-to-prod (OPS-2 follow-up)
+- **ci(workflows)**: `build-test.yml` branch trigger expanded to include `feat/**`, `ci/**`, `fix/**` (was only `test/**`, `dev/**`, `feature/**`)
+- **rationale**: Existing 3 workflows built and pushed images without ever running tests. The first commit of the rethought 6-week plan closes this gap, enabling all downstream safety mechanisms (blue/green, digest pinning, synthetic monitoring) to be trusted.
+- **inmemory-mode E2E exclusions**: `endpoint-scoped-logs.e2e-spec.ts` and `log-config.e2e-spec.ts` each contain one test that filters persistent logs by `minDurationMs` - a query the InMemory log repository does not implement. These two tests run against the real Prisma backend in the post-deploy live-test suite (`scripts/live-test.ps1`). Excluded from CI to keep the pipeline fast and PG-free; total CI E2E count is 1,100 of 1,149 specs (49 specs covered by live tests).
+- **next**: OPS-2 (digest pinning in `scripts/promote-to-prod.ps1`), OPS-5 (Container Apps blue/green via `revisionsMode: multiple`), Tier-0 security batch (S-1 through S-5, R-1, DTO-1)
+
 ## [0.40.0] - 2026-04-28
 
 ### Test - Test Gaps Audit #6: Cross-Feature Integration & Coverage Gaps

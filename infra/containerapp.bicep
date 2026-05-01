@@ -38,6 +38,8 @@ param maxReplicas int = 1
 param cpuCores string = '0.5'
 @description('Optional memory per replica')
 param memory string = '1Gi'
+@description('CORS allowed origins. Default empty = allow all (S-4 backward compat). Comma-separated for allowlist (e.g. https://app.example.com,https://other.example.com), "false" or "none" to disable CORS entirely. See api/src/security/cors-origin.ts for the full behavior matrix.')
+param corsOrigin string = ''
 @description('GHCR username for pulling container images (optional, only for private packages)')
 param ghcrUsername string = ''
 @description('GHCR PAT token for pulling container images (optional, only for private packages)')
@@ -114,6 +116,8 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'PERSISTENCE_BACKEND', value: 'prisma' }
             { name: 'NODE_ENV', value: 'production' }
             { name: 'PORT', value: string(targetPort) }
+            // S-4: configurable CORS via parseCorsOrigin in api/src/security/cors-origin.ts
+            { name: 'CORS_ORIGIN', value: corsOrigin }
             // Metadata for in-app "Copy Update Command" (avoids discovery in update script)
             { name: 'SCIM_RG', value: resourceGroup().name }
             { name: 'SCIM_APP', value: appName }
@@ -121,7 +125,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'SCIM_CURRENT_IMAGE', value: '${acrLoginServer}/${image}' }
             // ── Production logging defaults ──
             // DEBUG captures full request lifecycle (→/←) for diagnosis;
-            // bodies are still persisted in RequestLog DB — no need for console payloads.
+            // bodies are still persisted in RequestLog DB - no need for console payloads.
             { name: 'LOG_LEVEL', value: 'DEBUG' }
             { name: 'LOG_FORMAT', value: 'json' }
             { name: 'LOG_FILE', value: '' }          // disable file logging (ephemeral container disk)

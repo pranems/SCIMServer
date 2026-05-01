@@ -80,5 +80,15 @@ export async function createTestApp(): Promise<INestApplication> {
   );
 
   await app.init();
+  // Bind the underlying http server to an ephemeral port BEFORE any test
+  // makes a request. Otherwise supertest's request(app.getHttpServer()) lazy-
+  // listens on each call and closes after the response. Concurrent
+  // Promise.all([req1, req2, ...]) then races multiple listen/close cycles
+  // on the SAME http.Server instance, which on a 2-core CI runner
+  // intermittently produces 'read ECONNRESET' (worker A closes the socket
+  // before worker B's response is fully flushed). Pre-listening keeps the
+  // server bound for the lifetime of the suite and makes supertest reuse
+  // the live socket. app.close() in afterAll() tears it down cleanly.
+  await app.listen(0);
   return app;
 }

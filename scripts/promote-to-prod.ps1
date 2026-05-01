@@ -176,13 +176,42 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($prodImage)) {
     exit 1
 }
 
-$desiredImage = "ghcr.io/pranems/scimserver:$ImageTag"
+# OPS-2: Resolve immutable SHA-256 digest BEFORE the swap, so prod is pinned
+# to the exact bytes that were verified in dev. A re-pushed tag cannot silently
+# change prod after this point. Without this, a `:tag` pin lets the registry
+# replace the image content under our feet.
+$tagRef = "ghcr.io/pranems/scimserver:$ImageTag"
+Write-Host "🔍 Resolving immutable digest for $tagRef ..." -ForegroundColor Cyan
+$digestOutput = docker buildx imagetools inspect $tagRef 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ Failed to resolve digest from registry." -ForegroundColor Red
+    Write-Host $digestOutput -ForegroundColor Red
+    Write-Host "   Hint: docker login ghcr.io may be required for private images." -ForegroundColor Yellow
+    exit 1
+}
+# Output line looks like: "Digest:    sha256:abc123..."
+$devDigest = $null
+foreach ($line in $digestOutput) {
+    if ($line -match '^Digest:\s+(sha256:[0-9a-f]+)') {
+        $devDigest = $Matches[1]
+        break
+    }
+}
+if ([string]::IsNullOrWhiteSpace($devDigest)) {
+    Write-Host "❌ Could not parse digest from buildx output. Refusing to promote with mutable tag." -ForegroundColor Red
+    Write-Host $digestOutput -ForegroundColor Red
+    exit 1
+}
+Write-Host "   ✅ Resolved digest: $devDigest" -ForegroundColor Green
+
+$desiredImage = "ghcr.io/pranems/scimserver@$devDigest"
 
 Write-Host "   Current prod image: $prodImage" -ForegroundColor Gray
 Write-Host "   Desired prod image: $desiredImage" -ForegroundColor Yellow
+Write-Host "   Pinned via immutable digest: $devDigest" -ForegroundColor Gray
 
 if ($prodImage -eq $desiredImage) {
-    Write-Host "   ✅ Production already running $ImageTag - nothing to do." -ForegroundColor Green
+    Write-Host "   ✅ Production already running $ImageTag at $devDigest - nothing to do." -ForegroundColor Green
     exit 0
 }
 
@@ -277,5 +306,9 @@ Write-Host ""
 Write-Host "📋 Post-promotion:" -ForegroundColor Cyan
 Write-Host "   • Run live tests: .\scripts\live-test.ps1 -BaseUrl `"https://$prodFqdn`" -ClientSecret `"<prod-secret>`"" -ForegroundColor Gray
 Write-Host "   • Stream logs:    az containerapp logs show -n $ProdAppName -g $ProdResourceGroup --type console --follow" -ForegroundColor Gray
+# OPS-2: rollback uses the digest-pinned form so the operator does not
+# accidentally fall back to a mutable tag in an emergency. $prodImage was
+# already digest-pinned (or, on the first OPS-2-aware promote, was the prior
+# tag-pinned image which is fine for the very first rollback).
 Write-Host "   • Rollback:       az containerapp update -n $ProdAppName -g $ProdResourceGroup --image $prodImage" -ForegroundColor Gray
 Write-Host ""

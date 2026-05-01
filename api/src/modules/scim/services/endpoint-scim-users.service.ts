@@ -150,7 +150,7 @@ export class EndpointScimUsersService {
     return this.toScimUserResource(created, baseUrl, endpointId);
   }
 
-  async getUserForEndpoint(scimId: string, baseUrl: string, endpointId: string, config?: EndpointConfig): Promise<ScimUserResource> {
+  async getUserForEndpoint(scimId: string, baseUrl: string, endpointId: string, _config?: EndpointConfig): Promise<ScimUserResource> {
     this.logger.enrichContext({ resourceType: 'User', resourceId: scimId, operation: 'get' });
     this.logger.debug(LogCategory.SCIM_USER, 'Get user', { scimId, endpointId });
     const user = await this.userRepo.findByScimId(endpointId, scimId);
@@ -167,7 +167,7 @@ export class EndpointScimUsersService {
     { filter, startIndex = 1, count = DEFAULT_COUNT, sortBy, sortOrder }: ListUsersParams,
     baseUrl: string,
     endpointId: string,
-    config?: EndpointConfig,
+    _config?: EndpointConfig,
   ): Promise<ScimListResponse<ScimUserResource>> {
     this.logger.enrichContext({ resourceType: 'User', operation: 'list' });
     if (count > MAX_COUNT) {

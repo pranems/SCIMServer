@@ -3,7 +3,11 @@
  *
  * Phase 8b: Stores custom SCIM resources in memory with resourceType discrimination.
  * Suitable for testing and lightweight deployments without a database.
+ *
+ * NOTE: Methods are async to satisfy IGenericResourceRepository (Promise<T>
+ * return types) even when no await is needed in the in-memory implementation.
  */
+/* eslint-disable @typescript-eslint/require-await */
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { IGenericResourceRepository } from '../../../domain/repositories/generic-resource.repository.interface';

@@ -73,5 +73,15 @@
     "ts-node-dev": "2.0.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.0"
+  },
+  "// overrides": "OPS-3 / Trivy gate: pin transitive deps to patched versions for known HIGH CVEs. Each entry MUST cite the CVE so future maintainers can drop it once the upstream chain catches up. Reviewed 2026-04-30. See .github/workflows/build-and-push.yml Trivy step.",
+  "overrides": {
+    "@hono/node-server": "1.19.10",
+    "defu": "6.1.5",
+    "effect": "3.20.0",
+    "hono": "4.12.4",
+    "multer": "2.1.1",
+    "path-to-regexp": "8.4.0",
+    "picomatch": "4.0.4"
   }
 }
