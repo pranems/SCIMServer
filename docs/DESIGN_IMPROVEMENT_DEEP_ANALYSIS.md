@@ -194,7 +194,7 @@ sequenceDiagram
 
 | Layer | File | Lines | SRP | Notes |
 |-------|------|------:|:---:|-------|
-| **Entrypoint** | `main.ts` | 92 | ✅ | CORS configurable via `parseCorsOrigin(process.env.CORS_ORIGIN)` (S-4 closed); `enableImplicitConversion` (S-5 - ADR pending) |
+| **Entrypoint** | `main.ts` | 92 | ✅ | CORS configurable via `parseCorsOrigin(process.env.CORS_ORIGIN)` (S-4 closed); `enableImplicitConversion` (S-5 closed via ADR-004 with regression-locked decision) |
 | **Auth (Legacy)** | `auth/scim-auth.guard.ts` | 40 | ❌ | **CRITICAL:** Hardcoded credential + console.log |
 | **Auth (Modern)** | `modules/auth/shared-secret.guard.ts` | 200 | ✅ | 3-tier auth, proper Logger. Uses `===` not `timingSafeEqual` |
 | **OAuth** | `oauth/oauth.service.ts` | 118 | ✅ | `client.clientSecret !== clientSecret` - timing-unsafe |
@@ -251,7 +251,7 @@ sequenceDiagram
 | **S-2** | � CLOSED | `auth/shared-secret.guard.ts` L134, `oauth.service.ts` L80 | Token compares now use `crypto.timingSafeEqual()` via shared `safeCompare()` helper. 14 unit tests cover identical/unequal/length-mismatch/utf8/non-string and verify `timingSafeEqual` is the underlying primitive (via spy). Permanent regression guards added to `forbidden-source-patterns.spec.ts` for both call sites. | - | **Closed** |
 | **S-3** | 🟢 CLOSED | `auth/scim-auth.guard.ts` (deleted) | 28–47 | 5× `console.log`/`console.error` in auth path. Resolved by deleting `ScimAuthGuard` entirely (the only call site of these `console.*` calls). | - | **Closed** |
 | **S-4** | � CLOSED | `main.ts` (was line 48) | - | `origin: true` replaced with `parseCorsOrigin(process.env.CORS_ORIGIN)`. Default unchanged when env var unset (backward-compat); accepts `*`, `false`/`none`, single origin, or comma-separated allowlist. `credentials: true` auto-enabled when an allowlist is configured. New helper at `api/src/security/cors-origin.ts` with 13 unit tests. Bicep parameterized via `corsOrigin` param. Permanent regression guard added. | - | **Closed** |
-| **S-5** | 🟡 MEDIUM | `main.ts` | 88 | `enableImplicitConversion: true` in `ValidationPipe` - causes `"123"` → `123` type coercion. Combined with DTO index signatures, allows type confusion injection. | - | **Open** |
+| **S-5** | � CLOSED (Accepted Risk) | `main.ts` (line 100) | - | Decision documented in [docs/adr/ADR-004-enable-implicit-conversion.md](adr/ADR-004-enable-implicit-conversion.md): keep `enableImplicitConversion: true` because (a) every DTO field has explicit class-validator decorators, (b) DTO-1 closed the largest practical exploit surface (filter length cap), (c) the literal is now locked in by a `mustBePresent: true` regression rule in `forbidden-source-patterns.spec.ts`. Any change requires updating the ADR. | - | **Closed (Accepted Risk)** |
 
 ### S-1 Resolution
 

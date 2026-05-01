@@ -629,11 +629,12 @@ These are intentionally **NOT** in this plan and represent decisions to remove f
 | 2026-04-30 | R-1: race-condition E2E regression guard (impl already present from prior work) | `1a475e2` | ✅ Shipped on `ci/validate-before-push` |
 | 2026-04-30 | DTO-1: filter length cap at parser entry point + unit + E2E regression guards (TDD) | `96d9b74` | ✅ Shipped on `ci/validate-before-push` |
 | 2026-04-30 | Tier-0 #5: ResourceMember `@@unique([groupResourceId, value])` + dedupe-then-constrain migration + service-layer dedupe + 2 E2E + schema-constraint regression spec (TDD) | `03ac00f` | ✅ Shipped on `ci/validate-before-push` |
-| 2026-04-30 | S-4: configurable CORS via `parseCorsOrigin(process.env.CORS_ORIGIN)` + 13 unit tests + Bicep `corsOrigin` param + regression guard for `origin: true` literal (TDD) | (this commit) | ✅ Shipped on `ci/validate-before-push` |
+| 2026-04-30 | S-4: configurable CORS via `parseCorsOrigin(process.env.CORS_ORIGIN)` + 13 unit tests + Bicep `corsOrigin` param + regression guard for `origin: true` literal (TDD) | `a0d590d` | ✅ Shipped on `ci/validate-before-push` |
+| 2026-04-30 | S-5: ADR-004 documented decision to keep `enableImplicitConversion: true` with explicit mitigations; new `mustBePresent: true` regression-spec mode locks the decision in source | (this commit) | ✅ Shipped on `ci/validate-before-push` |
 
 **Validation as of 2026-04-30**:
-- Unit: 3,456 / 3,456 pass (87 suites; +1 spec for cors-origin with 13 tests; +1 spec for safeCompare with 14 tests; +schema-constraint spec)
-- E2E (inmemory): 1,104 / 1,104 pass (52 suites; +2 from Tier-0 #5; +2 from DTO-1)
+- Unit: 3,457 / 3,457 pass (87 suites; +1 from S-5 must-be-present rule)
+- E2E (inmemory): 1,104 / 1,104 pass (52 suites)
 - Lint: 0 errors
 - Em-dash scan: clean
 

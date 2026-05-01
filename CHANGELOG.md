@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security - S-5: ADR-004 Decision on enableImplicitConversion
+
+- **docs(adr)**: New `docs/adr/ADR-004-enable-implicit-conversion.md` documents the decision to keep `enableImplicitConversion: true` in the global ValidationPipe. Risk acknowledged and explicitly mitigated:
+  1. Every typed DTO property has a class-validator decorator (`@IsString`, `@IsInt`, `@IsBoolean`, `@MaxLength`, `@IsIn`, etc.) that runs before the controller handler.
+  2. The `parseSimpleFilter()` length cap (DTO-1) closes the largest practical exploit surface.
+  3. The literal `enableImplicitConversion: true` in `main.ts` is now locked in by a regression rule.
+- **feat(security)**: Extended `forbidden-source-patterns.spec.ts` with a new `mustBePresent: true` mode for inverse regression rules. Used by the S-5 entry to assert the decision literal stays in source. Any future flip of the flag fails the test and forces an ADR update (either supersede with a new ADR or remove the regression rule).
+- **feat(main)**: Added inline ADR pointer comment in `api/src/main.ts` above the ValidationPipe configuration so future maintainers see the decision in context without grepping.
+- **TDD process**: This was a decision-driven rather than code-driven change. RED was 'create regression spec entry that asserts the literal must remain'; GREEN was 'add the inverse-mode flag and confirm the test passes'.
+- **doc**: Marked S-5 closed (Accepted Risk) in `docs/DESIGN_IMPROVEMENT_DEEP_ANALYSIS.md`. Added ADR to `docs/INDEX.md`.
+- **Validation**: 3,457 unit (87 suites; +1 from S-5 mustBePresent rule) + 1,104 E2E (52 suites) + 0 lint errors.
+
 ### Security - S-4: Configurable CORS Origin
 
 - **security(cors)**: Replaced unconditional `origin: true` in `api/src/main.ts` with `parseCorsOrigin(process.env.CORS_ORIGIN)`. Backward-compatible: env var unset/empty/`*` retains the previous allow-all behavior.

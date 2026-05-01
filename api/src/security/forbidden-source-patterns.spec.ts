@@ -32,6 +32,14 @@ interface ForbiddenPattern {
    * `===` that is fine elsewhere but forbidden in one specific file.
    */
   onlyInPaths?: ReadonlyArray<string>;
+  /**
+   * Inverse mode: assert the needle MUST be present (decision lock-in).
+   * Used when an explicit ADR has chosen a specific implementation and any
+   * future change must update the ADR rather than silently drift. The test
+   * fails if the needle disappears. Almost always paired with onlyInPaths
+   * since must-be-present rules target a specific file.
+   */
+  mustBePresent?: boolean;
 }
 
 // Default exclusions: build output, generated code, third-party, and this
@@ -96,6 +104,20 @@ const FORBIDDEN_PATTERNS: ReadonlyArray<ForbiddenPattern> = [
     // The literal hardcoded option that must not reappear:
     needle: 'origin: ' + 'true,',
     onlyInPaths: ['main.ts'],
+  },
+  {
+    id: 'S-5 (must-be-present)',
+    rationale:
+      'enableImplicitConversion: true is a deliberate decision documented in ' +
+      'docs/adr/ADR-004-enable-implicit-conversion.md. The risk is mitigated by ' +
+      'mandatory class-validator decorators on every DTO field plus DTO-1 length ' +
+      'caps. If this literal disappears from main.ts, either the ADR must be ' +
+      'superseded with a new ADR explaining the change, or this regression rule ' +
+      'must be removed. This guard runs in INVERSE mode (must-be-present) - see ' +
+      'mustBePresent flag below.',
+    needle: 'enableImplicitConversion: ' + 'true',
+    onlyInPaths: ['main.ts'],
+    mustBePresent: true,
   },
 ];
 
@@ -168,9 +190,21 @@ async function scanForPattern(pattern: ForbiddenPattern): Promise<Violation[]> {
 
 describe('Security regression: forbidden source patterns', () => {
   it.each(FORBIDDEN_PATTERNS.map(p => [p.id, p] as const))(
-    '[%s] is absent from api/src/**/*.ts',
+    '[%s] is absent from api/src/**/*.ts (or present when mustBePresent)',
     async (_id, pattern) => {
       const violations = await scanForPattern(pattern);
+      if (pattern.mustBePresent) {
+        if (violations.length === 0) {
+          throw new Error(
+            `Required pattern [${pattern.id}] disappeared from source.\n` +
+              `Rationale: ${pattern.rationale}\n` +
+              `Expected to find: ${JSON.stringify(pattern.needle)}\n` +
+              `In: ${(pattern.onlyInPaths ?? ['(any)']).join(', ')}\n`,
+          );
+        }
+        expect(violations.length).toBeGreaterThan(0);
+        return;
+      }
       if (violations.length > 0) {
         const formatted = violations
           .map(v => `  ${v.file}:${v.lineNumber}: ${v.line}`)

@@ -94,6 +94,11 @@ async function bootstrap(): Promise<void> {
       }
     })
   );
+  // S-5: enableImplicitConversion is intentionally enabled.
+  // Risk acknowledged and mitigated by mandatory class-validator decorators on
+  // every DTO field, the parseSimpleFilter length cap (DTO-1), and a regression
+  // guard in api/src/security/forbidden-source-patterns.spec.ts that locks in
+  // this literal. Any change requires updating docs/adr/ADR-004-enable-implicit-conversion.md.
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: false,
