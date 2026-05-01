@@ -136,6 +136,8 @@ jobs:
       # OPS-3: Trivy CVE scan on the just-pushed image. Fails the build on
       # any HIGH or CRITICAL OS-package or library vulnerability. Lower
       # severities are reported but do not gate the release.
+      # Documented exceptions live in repo-root .trivyignore (each entry
+      # MUST cite a CVE, rationale, owner, and re-check date).
       - name: Trivy image scan (HIGH+CRITICAL gating)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -145,6 +147,7 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           vuln-type: os,library
+          trivyignores: .trivyignore
 
       - name: Summary
         run: |

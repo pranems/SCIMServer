@@ -173,6 +173,7 @@ jobs:
       # OPS-3: Trivy CVE scan on the just-pushed test image. Same gating as
       # build-and-push.yml so test images can never become "well, it scanned
       # clean once when we ran it manually" snowflakes.
+      # Documented exceptions live in repo-root .trivyignore.
       - name: Trivy image scan (HIGH+CRITICAL gating)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -182,6 +183,7 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           vuln-type: os,library
+          trivyignores: .trivyignore
 
       - name: Summary
         run: |
