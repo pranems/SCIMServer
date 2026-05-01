@@ -101,4 +101,89 @@ describe('Required governance files', () => {
       expect(content?.toLowerCase()).toContain('delivery_plan');
     });
   });
+
+  describe('.github/dependabot.yml (OPS-3 - dependency update automation)', () => {
+    let content: string | null;
+
+    beforeAll(async () => {
+      content = await readIfExists(path.join(REPO_ROOT, '.github', 'dependabot.yml'));
+    });
+
+    it('exists at .github/dependabot.yml', () => {
+      expect(content).not.toBeNull();
+    });
+
+    it('declares package-ecosystem "npm" with directory api/', () => {
+      expect(content).toMatch(/package-ecosystem:\s*["']?npm["']?/);
+      expect(content).toMatch(/directory:\s*["']?\/api["']?/);
+    });
+
+    it('declares package-ecosystem "npm" with directory web/', () => {
+      expect(content).toMatch(/directory:\s*["']?\/web["']?/);
+    });
+
+    it('declares package-ecosystem "github-actions"', () => {
+      expect(content).toMatch(/package-ecosystem:\s*["']?github-actions["']?/);
+    });
+
+    it('declares package-ecosystem "docker"', () => {
+      expect(content).toMatch(/package-ecosystem:\s*["']?docker["']?/);
+    });
+
+    it('uses weekly schedule (avoids PR flooding from daily updates)', () => {
+      expect(content).toMatch(/interval:\s*["']?weekly["']?/);
+    });
+  });
+
+  describe('.github/workflows/codeql.yml (OPS-3 - static analysis)', () => {
+    let content: string | null;
+
+    beforeAll(async () => {
+      content = await readIfExists(
+        path.join(REPO_ROOT, '.github', 'workflows', 'codeql.yml'),
+      );
+    });
+
+    it('exists at .github/workflows/codeql.yml', () => {
+      expect(content).not.toBeNull();
+    });
+
+    it('uses the official github/codeql-action/init action', () => {
+      expect(content).toMatch(/github\/codeql-action\/init/);
+    });
+
+    it('uses the official github/codeql-action/analyze action', () => {
+      expect(content).toMatch(/github\/codeql-action\/analyze/);
+    });
+
+    it('analyzes javascript-typescript (covers both API and web)', () => {
+      expect(content).toMatch(/javascript-typescript|javascript|typescript/);
+    });
+
+    it('runs on a schedule (weekly background scan independent of PRs)', () => {
+      expect(content).toMatch(/schedule:/);
+      expect(content).toMatch(/cron:/);
+    });
+  });
+
+  describe('Trivy step in build workflows (OPS-3 - container CVE scanning)', () => {
+    it('build-and-push.yml runs aquasecurity/trivy-action on the built image', async () => {
+      const wf = await readIfExists(
+        path.join(REPO_ROOT, '.github', 'workflows', 'build-and-push.yml'),
+      );
+      expect(wf).not.toBeNull();
+      expect(wf).toMatch(/aquasecurity\/trivy-action/);
+      // Severity gate: must fail on at least HIGH+CRITICAL.
+      expect(wf).toMatch(/HIGH|CRITICAL/);
+    });
+
+    it('build-test.yml runs aquasecurity/trivy-action on the built image', async () => {
+      const wf = await readIfExists(
+        path.join(REPO_ROOT, '.github', 'workflows', 'build-test.yml'),
+      );
+      expect(wf).not.toBeNull();
+      expect(wf).toMatch(/aquasecurity\/trivy-action/);
+      expect(wf).toMatch(/HIGH|CRITICAL/);
+    });
+  });
 });

@@ -1,0 +1,69 @@
+# CodeQL static-analysis - OPS-3 (DELIVERY_PLAN.md Week 1 Day 5).
+#
+# Scans javascript-typescript across api/ and web/ on every PR to master,
+# every push to master, and weekly to catch advisories published after a
+# clean PR scan. Uses GitHub's hosted database; no infrastructure cost.
+#
+# Failures appear as "Code scanning alerts" on the PR and become merge
+# blockers via repo branch protection (configure separately on GitHub).
+
+name: CodeQL
+
+on:
+  push:
+    branches: ["master", "feat/**"]
+  pull_request:
+    branches: ["master"]
+  schedule:
+    # Weekly Monday 04:00 UTC - catches advisories published since last PR.
+    - cron: "0 4 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ["javascript-typescript"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24 (matches runtime)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: |
+            api/package-lock.json
+            web/package-lock.json
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # Default queries plus security-extended for higher recall on
+          # injection, hardcoded credentials, weak crypto, etc.
+          queries: security-extended,security-and-quality
+
+      - name: Install api dependencies (so CodeQL sees real types)
+        working-directory: api
+        run: npm ci --no-audit --no-fund
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci --no-audit --no-fund
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"

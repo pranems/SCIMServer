@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### CI - OPS-3: Supply-Chain Alerting (Dependabot + CodeQL + Trivy)
+
+- **feat(github)**: New `.github/dependabot.yml` covers 4 ecosystems with weekly Monday cadence and grouped patch+minor updates: npm in `/api`, npm in `/web`, github-actions in `/`, docker in `/`. Each ecosystem caps open PRs (3-5) so the queue cannot flood. Reviewers and labels declared per ecosystem.
+- **feat(github)**: New `.github/workflows/codeql.yml` runs javascript-typescript analysis with `security-extended,security-and-quality` query packs on push to master/feat-branches, on PRs to master, weekly on Monday 04:00 UTC, and on workflow_dispatch. Results surface as 'Code scanning alerts' on the PR; configure repo branch protection separately on GitHub to make them merge-blocking.
+- **feat(workflows)**: Added `aquasecurity/trivy-action@0.24.0` step to BOTH `.github/workflows/build-and-push.yml` AND `.github/workflows/build-test.yml` immediately after the docker build/push step. Configuration: `severity: HIGH,CRITICAL`, `exit-code: 1`, `ignore-unfixed: true`, `vuln-type: os,library`. Image is pinned by digest (`@${{ steps.build.outputs.digest }}`) so the scan targets the exact bytes that were pushed - no race window with mutable tags.
+- **test(security)**: Extended `api/src/security/required-governance-files.spec.ts` with 13 new OPS-3 assertions: dependabot.yml exists with 4 ecosystems and weekly schedule; codeql.yml exists with init+analyze+schedule; both build workflows reference aquasecurity/trivy-action with HIGH/CRITICAL severity gating. The spec now has 30 tests total.
+- **TDD process**: RED - extended spec with 13 new tests against non-existent configs; ran spec; 13/30 fail. GREEN - created dependabot.yml + codeql.yml + added Trivy steps to both workflows; 30/30 pass.
+- **Validation**: 3,506 unit (89 suites; +13 OPS-3 tests in existing governance spec) + 1,104 E2E (52 suites) + 0 lint errors.
+
 ### CI - OPS-4: CODEOWNERS + PR Template
 
 - **feat(github)**: New `.github/CODEOWNERS` declares `@pranems` as the default owner across all paths plus explicit ownership for `api/`, `web/`, `infra/`, `scripts/`, top-level Dockerfiles, `docker-compose*.yml`, `.github/`, and the living-doc set (`docs/`, `Session_starter.md`, `CHANGELOG.md`, `README.md`, `DEPLOYMENT.md`, `admin.md`). GitHub auto-requests review on every PR touching a matched path.

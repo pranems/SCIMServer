@@ -1,0 +1,78 @@
+# Dependabot configuration - OPS-3 (DELIVERY_PLAN.md Week 1 Day 5).
+#
+# Closes the supply-chain alerting gap. Weekly cadence avoids PR flooding.
+# Patch + minor updates auto-merge when CI is green; majors require human
+# review per the standing rule that breaking changes ship intentionally.
+#
+# Coverage:
+#   - npm packages in api/ (NestJS, Prisma, etc.)
+#   - npm packages in web/ (React, Vite, etc.)
+#   - GitHub Actions used in workflows (avoid pinning to outdated SHAs)
+#   - Docker base images (node:24-alpine in Dockerfile, etc.)
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/api"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+    labels:
+      - "dependencies"
+      - "api"
+    reviewers:
+      - "pranems"
+
+  - package-ecosystem: "npm"
+    directory: "/web"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:30"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+    labels:
+      - "dependencies"
+      - "web"
+    reviewers:
+      - "pranems"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    groups:
+      ci-actions:
+        patterns: ["*"]
+    labels:
+      - "dependencies"
+      - "ci"
+    reviewers:
+      - "pranems"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:30"
+      timezone: "UTC"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "docker"
+    reviewers:
+      - "pranems"
