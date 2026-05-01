@@ -108,6 +108,11 @@ jobs:
   build-and-push:
     needs: validate
     runs-on: ubuntu-latest
+    # Explicit job-level permissions (workflow-level grants the same, but a
+    # job-level block makes the intent unambiguous and matches build-and-push.yml).
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout repository
@@ -137,6 +142,17 @@ jobs:
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "Building test image with tag: ${TAG}"
 
+      # docker/metadata-action emits OCI labels including
+      # org.opencontainers.image.source which GHCR uses to auto-link the
+      # package to this repository on first push. Without this label, pushes
+      # to a pre-existing package owned by the user (not the repo) are denied
+      # with 'permission_denied: write_package'.
+      - name: Extract image labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
       - name: Build and push test image
         id: build
         uses: docker/build-push-action@v6
@@ -148,6 +164,7 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             IMAGE_TAG=${{ steps.tag.outputs.tag }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
