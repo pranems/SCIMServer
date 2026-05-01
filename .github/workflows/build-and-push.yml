@@ -20,6 +20,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    # prisma.config.ts uses env('DATABASE_URL') which throws at config-load time
+    # if the var is missing - even for `prisma generate` which doesn't connect.
+    # Tests run with PERSISTENCE_BACKEND=inmemory so the value is never used.
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
