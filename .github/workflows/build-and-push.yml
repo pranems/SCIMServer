@@ -69,9 +69,13 @@ jobs:
       # log repository does not honor. They run against real Prisma backend in
       # the post-deploy live-test suite (scripts/live-test.ps1). Excluded here
       # to keep CI fast and PG-free.
+      # --maxWorkers=2 matches the 2-core GitHub-hosted runner. The default
+      # config uses 4 workers (faster for local dev with more cores), but on
+      # CI the over-subscription causes ECONNRESET in parallel-HTTP tests
+      # (multi-endpoint-isolation: 4 simultaneous Promise.all POSTs).
       - name: E2E tests (API, in-memory backend)
         working-directory: api
-        run: npm run test:e2e -- --testPathIgnorePatterns 'endpoint-scoped-logs.e2e-spec.ts' --testPathIgnorePatterns 'log-config.e2e-spec.ts'
+        run: npm run test:e2e -- --maxWorkers=2 --testPathIgnorePatterns 'endpoint-scoped-logs.e2e-spec.ts' --testPathIgnorePatterns 'log-config.e2e-spec.ts'
         env:
           PERSISTENCE_BACKEND: inmemory
           SCIM_SHARED_SECRET: ci-shared-secret-not-for-production
