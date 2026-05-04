@@ -14,7 +14,12 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
+    "ignoreDeprecations": "6.0",
+    "paths": {
+      "@scim/types": ["../api/src/shared/types"],
+      "@scim/types/*": ["../api/src/shared/types/*"]
+    }
   },
   "include": ["src"],
   "references": []
