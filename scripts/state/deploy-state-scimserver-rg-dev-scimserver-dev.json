@@ -3,5 +3,5 @@
   "scimSecret": "changeme-scim",
   "jwtSecret": "changeme-jwt",
   "oauthClientSecret": "changeme-oauth",
-  "databaseUrl": "postgresql://scimadmin:ScimPg@dm1n2026!@scimserver-dev-pg.postgres.database.azure.com:5432/scimdb?sslmode=require"
+  "databaseUrl": "postgresql://scimadmin:ScimP0stgres%402026@scimserver-dev-pg.postgres.database.azure.com:5432/scimdb?sslmode=require"
 }
