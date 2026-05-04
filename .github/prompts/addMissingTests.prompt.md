@@ -412,7 +412,7 @@ expect(res.body).toMatchObject({
 - Check current highest section number and use sequential numbering (`9q`, `9r`, etc.)
 - Use `Get-Random` in resource names to avoid collisions across runs
 - Use `$scimBase` (SCIM endpoint base URL) and `$headers` (auth headers) established at script top
-- Tests must work in all modes: local (`-BaseUrl http://localhost:6000`), Docker (`-BaseUrl http://localhost:8080 -ClientSecret "docker-secret"`), and Azure
+- Tests must work in all modes: local (`-BaseUrl http://localhost:6000`), Docker (`-BaseUrl http://localhost:8080 -ClientSecret "changeme-oauth"`), and Azure
 
 **Key variables available:**
 - `$baseUrl` - Server root (e.g., `http://localhost:6000`)
@@ -649,9 +649,9 @@ Invoke-RestMethod -Uri "$scimBase/Users/$($projResult.id)" -Method DELETE -Heade
 
 | Level | Before | After | Delta |
 |-------|--------|-------|-------|
-| Unit  | 3,429  | ?     | +?    |
-| E2E   | 1,149  | ?     | +?    |
-| Live  | ~817   | ?     | +?    |
+| Unit  | 3,538  | ?     | +?    |
+| E2E   | ~1,104  | ?     | +?    |
+| Live  | ~867   | ?     | +?    |
 
 > *Source of truth for baseline counts: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 > *Last updated: v0.40.0 - API Contract Verification #4 (2026-04-29)*
@@ -692,4 +692,4 @@ If any updates are needed, apply them directly to this file (`.github/prompts/ad
 - **API Response Contract**: Every test that reads an API response MUST include a key allowlist OR denylist assertion. Presence-only tests (`toHaveProperty`) are insufficient - they catch missing fields but not leaked internal fields.
 - **Internal Field Denylist**: Runtime-only fields prefixed with `_` (e.g., `_schemaCaches`, `_prismaMetadata`) must NEVER appear in API responses. Add explicit `not.toHaveProperty('_schemaCaches')` assertions.
 - **Serialization Safety**: Map/Set objects serialize to `{}` via `JSON.stringify`. Any field containing Maps must be stripped before API response serialization.
-- Live tests must work with `-BaseUrl http://localhost:8080 -ClientSecret "devscimclientsecret"` (Docker mode).
+- Live tests must work with `-BaseUrl http://localhost:8080 -ClientSecret "changeme-oauth"` (Docker mode).

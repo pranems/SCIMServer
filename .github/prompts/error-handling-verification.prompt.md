@@ -16,7 +16,7 @@ The error handling system has these components:
 - `PatchError` domain exception - caught by services, converted to createScimError with failedOperationIndex/failedPath/failedOp
 - Diagnostics extension URN: `urn:scimserver:api:messages:2.0:Diagnostics`
 - Enriched correlation context via `AsyncLocalStorage`: requestId, endpointId, authType, resourceType, resourceId, operation, bulkOperationIndex
-- **82 endpoints across 19 controllers** - all SCIM routes produce SCIM-compliant error bodies
+- **84 endpoints across 19 controllers** - all SCIM routes produce SCIM-compliant error bodies
 
 ## Audit Checklist (Sections A–J)
 

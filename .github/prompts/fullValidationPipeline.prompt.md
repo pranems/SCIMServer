@@ -32,7 +32,7 @@ npx jest --no-coverage --json --outputFile=pipeline-unit.json 2>$null
 # Parse results:
 node -e "const r=JSON.parse(require('fs').readFileSync('pipeline-unit.json','utf8'));console.log('suites:',r.numPassedTestSuites+'/'+r.numTotalTestSuites,'tests:',r.numPassedTests+'/'+r.numTotalTests,'failed:',r.numFailedTests)"
 ```
-> **Baselines (v0.37.1):** 3,311 pass / 0 fail / 84 suites.
+> **Baselines (v0.40.0):** 3,538 pass / 0 fail / 91 suites.
 > *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 
 ### Step 3: Run E2E Tests
@@ -42,7 +42,7 @@ npx jest --config test/e2e/jest-e2e.config.ts --no-coverage --json --outputFile=
 # Parse results:
 node -e "const r=JSON.parse(require('fs').readFileSync('pipeline-e2e.json','utf8'));console.log('suites:',r.numPassedTestSuites+'/'+r.numTotalTestSuites,'tests:',r.numPassedTests+'/'+r.numTotalTests,'failed:',r.numFailedTests)"
 ```
-> **Baselines (v0.37.1):** 969 pass / 0 fail / 46 suites.
+> **Baselines (v0.40.0):** ~1,104 pass / 0 fail / 52 suites.
 > *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 > **E2E config path:** `test/e2e/jest-e2e.config.ts`
 
@@ -72,7 +72,7 @@ cd scripts
 .\live-test.ps1 -BaseUrl "http://localhost:6000" -ClientSecret "localoauthsecret123" *> ..\local-live-pipeline.txt
 ```
 > **Output capture:** Use `*>` (all PowerShell streams) not `>` (stdout only). The script writes to multiple output streams.
-> **Baselines (v0.34.0):** ~739 assertions.
+> **Baselines (v0.40.0):** ~867 assertions.
 > *Source of truth: [PROJECT_HEALTH_AND_STATS.md](../../docs/PROJECT_HEALTH_AND_STATS.md#test-suite-summary)*
 
 ### Step 6: Stop Local Instance
@@ -109,9 +109,9 @@ docker compose build --no-cache   # Full rebuild (~3-5 min)
 
 ```powershell
 # Set Docker-specific credentials explicitly (overrides any leftover local env vars)
-$env:OAUTH_CLIENT_SECRET = "devscimclientsecret"
-$env:SCIM_SHARED_SECRET = "devscimsharedsecret"
-$env:JWT_SECRET = "devjwtsecretkey123456"
+$env:OAUTH_CLIENT_SECRET = "changeme-oauth"
+$env:SCIM_SHARED_SECRET = "changeme-scim"
+$env:JWT_SECRET = "changeme-jwt"
 
 docker compose up -d --force-recreate
 ```
@@ -131,11 +131,11 @@ docker compose logs --tail 30 postgres
 ### Step 11: Run Live/Integration Tests Against Docker
 ```powershell
 cd scripts
-.\live-test.ps1 -BaseUrl "http://localhost:8080" -ClientSecret "devscimclientsecret" *> ..\docker-live-pipeline.txt
+.\live-test.ps1 -BaseUrl "http://localhost:8080" -ClientSecret "changeme-oauth" *> ..\docker-live-pipeline.txt
 ```
-> **Docker OAuth secret:** `devscimclientsecret` (default in docker-compose.yml)
-> **Docker legacy shared secret:** `devscimsharedsecret`
-> **Docker JWT secret:** `devjwtsecretkey123456`
+> **Docker OAuth secret:** `changeme-oauth` (default in docker-compose.yml)
+> **Docker legacy shared secret:** `changeme-scim`
+> **Docker JWT secret:** `changeme-jwt`
 > **Port:** 8080 (mapped from container)
 
 ### Step 12: Stop and Clean Up
@@ -148,9 +148,9 @@ docker compose down --remove-orphans
 
 | Credential | Env Var | Docker Default | Local Default | Standalone Default |
 |------------|---------|---------------|---------------|-------------------|
-| OAuth Client Secret | `OAUTH_CLIENT_SECRET` | `devscimclientsecret` | `localoauthsecret123` | `standalonesecret123` |
-| Legacy Shared Secret | `SCIM_SHARED_SECRET` | `devscimsharedsecret` | `local-secret` | `standalone-secret` |
-| JWT Secret | `JWT_SECRET` | `devjwtsecretkey123456` | `localjwtsecret123` | `standalonejwt123` |
+| OAuth Client Secret | `OAUTH_CLIENT_SECRET` | `changeme-oauth` | `localoauthsecret123` | `standalonesecret123` |
+| Legacy Shared Secret | `SCIM_SHARED_SECRET` | `changeme-scim` | `local-secret` | `standalone-secret` |
+| JWT Secret | `JWT_SECRET` | `changeme-jwt` | `localjwtsecret123` | `standalonejwt123` |
 | DB URL | `DATABASE_URL` | `postgresql://scim:scim@postgres:5432/scimdb` | N/A (inmemory) | N/A (inmemory) |
 
 ## Phase 3 - Standalone Build & Validation
@@ -312,9 +312,9 @@ if ($endpoints.totalResults -gt 0) {
 - Note any pre-existing failures explicitly so new regressions are clearly distinguishable.
 - For Azure, explicitly verify existing endpoints/data survived the deployment.
 
-## Known Pre-Existing Failures (v0.34.0)
+## Known Pre-Existing Failures (v0.40.0)
 
-**None.** All tests pass: **3,311 unit** (84 suites), **969 E2E** (46 suites), **~753 live**.
+**None.** All tests pass: **3,538 unit** (91 suites), **~1,104 E2E** (52 suites), **~867 live**.
 
 ## Entra ID Provisioning Configuration
 
@@ -332,7 +332,7 @@ CONFIGURE ENTRA ID
 | Target | Host:Port | OAuth Client Secret |
 |--------|-----------|--------------------|
 | Local | `localhost:6000` | `localoauthsecret123` |
-| Docker | `localhost:8080` | `devscimclientsecret` |
+| Docker | `localhost:8080` | `changeme-oauth` |
 | Standalone | `localhost:9090` | `standalonesecret123` |
 | Azure | `<app>.azurecontainerapps.io` (HTTPS) | Value from deploy script |
 
@@ -362,7 +362,7 @@ After completing the full pipeline, critically evaluate **this prompt itself** f
 13. **Did compose service names change?** `api` → `scimserver-api`, `postgres` → `scimserver-postgres`.
 14. **Did the Docker health check work?** Yes, both containers have built-in healthchecks. **Important:** The API healthcheck URL must be `/scim/health` (not `/health`) since the app uses `/scim` as the global prefix.
 15. **Did the Docker port mapping change?** 8080:8080 for API, 5432:5432 for PostgreSQL.
-16. **Did Docker credentials change?** OAuth: `devscimclientsecret`, Legacy: `devscimsharedsecret`, JWT: `devjwtsecretkey123456`. NOT `docker-secret`.
+16. **Did Docker credentials change?** OAuth: `changeme-oauth`, Legacy: `changeme-scim`, JWT: `changeme-jwt`. NOT `docker-secret`.
 17. **Did `--no-cache` take excessively long?** ~3-5 min. Cached build is ~30s. Made `--no-cache` optional.
 18. **Did Docker inherit wrong env vars?** YES - critical learning. PowerShell `$env:*` set in Phase 1 leaks into Docker via `${VAR:-default}` syntax. Always explicitly set Docker credentials before `docker compose up`. Verify with `docker exec scimserver-api env | Select-String "OAUTH"`.
 19. **Did `docker compose up -d` fail with stale container reference?** YES - after `docker compose down`, subsequent `up -d` can fail with "No such container" if orphaned references remain. Use `docker compose up -d --force-recreate` to fix.

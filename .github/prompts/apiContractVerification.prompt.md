@@ -3,7 +3,7 @@ name: apiContractVerification
 description: >
   Self-improving prompt that verifies every API endpoint returns exactly the
   documented response shape at ALL test levels (unit, integration, E2E, live).
-  Covers all ~82 endpoints, all flows, all combinations. Learns from each
+  Covers all ~84 endpoints, all flows, all combinations. Learns from each
   execution and updates itself with new findings, patterns, and coverage.
 argument-hint: >
   Optional scope like "admin endpoints", "SCIM Users", "full audit",
@@ -58,8 +58,8 @@ executionCount: 4
 totalEndpoints: 84
 coveredEndpoints: 43
 coveragePercent: 51.2%
-testSuiteCount: 84
-totalTests: 3429
+testSuiteCount: 91
+totalTests: 3538
 lastKnownVersion: v0.40.0
 ```
 
@@ -96,7 +96,7 @@ Scan ALL controllers in `api/src/modules/` - list every `@Get`, `@Post`, `@Put`,
 grep -rn "@Get\|@Post\|@Put\|@Patch\|@Delete" api/src/modules/ --include="*.controller.ts"
 ```
 
-### 1.3 Complete Endpoint Inventory (~82 endpoints)
+### 1.3 Complete Endpoint Inventory (~84 endpoints)
 
 #### Category A - Health & Web (Public)
 
@@ -807,7 +807,7 @@ cd api && npx jest --config test/e2e/jest-e2e.config.ts --forceExit
 cd scripts && .\live-test.ps1
 
 # Live tests (Docker)
-cd scripts && .\live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "docker-secret"
+cd scripts && .\live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "changeme-oauth"
 
 # Live tests (Azure)
 cd scripts && .\live-test.ps1 -BaseUrl https://your-app.azurecontainerapps.io -ClientSecret "your-secret"
@@ -978,7 +978,7 @@ git add .github/prompts/apiContractVerification.prompt.md
 git commit -m "chore(prompt): self-improve apiContractVerification - execution #N
 
 Updated: [list what changed]
-Coverage: X/82 endpoints (Y%)
+Coverage: X/84 endpoints (Y%)
 New findings: [any bugs or gaps found]"
 ```
 
