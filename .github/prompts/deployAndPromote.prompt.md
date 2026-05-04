@@ -1,10 +1,12 @@
 ---
 name: deployAndPromote
-description: End-to-end deployment pipeline - publish image, deploy to dev, run live tests, optionally promote to prod.
-argument-hint: "dev" (deploy to dev only), "prod" (promote to prod), "full" (dev + prod), or a specific version tag like "0.41.0".
+description: End-to-end deployment pipeline - publish image, deploy to dev, run live tests. Prod promotion is separate and only on explicit user request.
+argument-hint: "dev" (default - deploy to dev + live tests), "prod" (promote to prod - ONLY when user explicitly requests), or a specific version tag like "0.41.0".
 ---
 
 Automate the full build-deploy-verify cycle. Replaces the current manual 3-step dance (publish-ghcr.yml -> az containerapp update -> live-test.ps1).
+
+**IMPORTANT:** Prod promotion is NEVER automatic. Phase 4 (Promote to Prod) only runs when the user explicitly passes "prod" as argument or explicitly asks for promotion. Default behavior is dev-only.
 
 ---
 

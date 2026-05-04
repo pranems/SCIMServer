@@ -20,19 +20,35 @@ You are executing the next project phase in a phased migration roadmap.
 - Phase documentation targets: **{{phase_docs_paths}}**
 
 ## Execution Requirements
-1. **Implement only this phase** (no future-phase scope creep), while preserving compatibility with both backend modes.
-2. **Analyze current code and gaps** for this phase, then implement source-code changes needed to meet phase goals.
-3. **Add missing tests** relevant to this phase changes and any newly detected issues:
+1. **TDD (Red-Green-Refactor)** - Write failing test first, implement minimal code, refactor. No exceptions.
+2. **Implement only this phase** (no future-phase scope creep), while preserving compatibility with both backend modes.
+3. **Analyze current code and gaps** for this phase, then implement source-code changes needed to meet phase goals.
+4. **Add missing tests** relevant to this phase changes and any newly detected issues:
    - Unit tests for logic and edge cases
    - E2E tests for user-visible/API behavior
    - Live-test additions if runtime behavior coverage is missing
-4. Run verification in this order:
+5. Run verification in this order:
    - Unit tests must pass
    - Current as-is E2E tests must pass
    - Start a fresh local instance and run as-is live tests
    - Build a fresh latest local container, run it, and run as-is live tests against it
-5. If failures appear, diagnose root cause, implement minimal robust fixes, and re-run impacted tests until green.
-6. **Keep the final Docker container running** after all validations pass. Do not stop or remove it - leave it available for the user to inspect and interact with.
+6. If failures appear, diagnose root cause, implement minimal robust fixes, and re-run impacted tests until green.
+7. **Keep the final Docker container running** after all validations pass. Do not stop or remove it - leave it available for the user to inspect and interact with.
+
+## Mandatory Quality Gates (Standing Rule - see copilot-instructions.md)
+After implementation, execute ALL of these gates before considering work done:
+1. **addMissingTests** - Close remaining test gaps
+2. **apiContractVerification** - Response shape assertions
+3. **error-handling-verification** - Error path audit
+4. **logging-verification** - Logging completeness
+5. **auditAgainstRFC** - RFC 7643/7644 compliance
+6. **securityAudit** - Auth, secrets, input validation, PII, headers
+7. **performanceBenchmark** - p95 latency, DB query counts, memory
+8. **auditAndUpdateDocs** - Documentation freshness
+9. **fullValidationPipeline** - Local + Docker build & test
+10. **Deploy to dev + live tests** - Publish image, deploy to dev, run live-test.ps1 (867+ assertions)
+11. For UI changes: **uiTestAndValidation** - React/Vitest test suite
+- **Prod promotion is NEVER automatic** - only when user explicitly requests it
 
 ## Documentation Deliverables
 Create/update two detailed phase documents:

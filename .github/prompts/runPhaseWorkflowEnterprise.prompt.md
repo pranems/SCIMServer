@@ -24,10 +24,11 @@ You are executing the **next roadmap phase** under enterprise delivery standards
   - Container build/run: **{{container_build_command}}**, **{{container_run_command}}**
 
 ## Execution Policy
-1. Implement phase scope only; avoid unrelated refactors.
-2. Maintain behavior compatibility across both backend modes.
-3. Fix at root cause; avoid workaround-only patches.
-4. Keep changes auditable with clear mapping from requirement → code → tests.
+1. **TDD (Red-Green-Refactor)** - Write failing test first, implement minimal code, refactor. No exceptions.
+2. Implement phase scope only; avoid unrelated refactors.
+3. Maintain behavior compatibility across both backend modes.
+4. Fix at root cause; avoid workaround-only patches.
+5. Keep changes auditable with clear mapping from requirement -> code -> tests.
 
 ## Delivery Workflow
 1. **Gap & Impact Analysis**
@@ -47,9 +48,23 @@ You are executing the **next roadmap phase** under enterprise delivery standards
    - Current as-is E2E
    - Local running instance + current as-is live tests
    - Fresh latest container + current as-is live tests
-5. **Failure Handling**
+5. **Mandatory Quality Gates (Standing Rule - see copilot-instructions.md)**
+   After implementation, execute ALL of these gates:
+   - **addMissingTests** - Close remaining test gaps
+   - **apiContractVerification** - Response shape assertions
+   - **error-handling-verification** - Error path audit
+   - **logging-verification** - Logging completeness
+   - **auditAgainstRFC** - RFC 7643/7644 compliance
+   - **securityAudit** - Auth, secrets, input validation, PII, headers
+   - **performanceBenchmark** - p95 latency, DB query counts, memory
+   - **auditAndUpdateDocs** - Documentation freshness
+   - **fullValidationPipeline** - Local + Docker build & test
+   - **Deploy to dev + live tests** - Publish image, deploy to dev, run live-test.ps1 (867+ assertions)
+   - For UI changes: **uiTestAndValidation** - React/Vitest test suite
+   - **Prod promotion is NEVER automatic** - only when user explicitly requests it
+6. **Failure Handling**
    - Diagnose precisely, document root cause, apply minimal robust fix, and re-run impacted gates.
-6. **Keep the final Docker container running** after all validation gates pass. Do not stop or remove it - leave it available for the user to inspect and interact with.
+7. **Keep the final Docker container running** after all validation gates pass. Do not stop or remove it - leave it available for the user to inspect and interact with.
 
 ## Required Documentation Pack
 Create/update the following artifacts for this phase:

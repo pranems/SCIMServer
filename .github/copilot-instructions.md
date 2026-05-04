@@ -141,13 +141,42 @@ Every feature or significant change commit MUST include ALL of the following bef
 
 1. **Unit Tests** - Service-level (`.service.spec.ts`) and Controller-level (`.controller.spec.ts`) tests covering the new behavior
 2. **E2E Tests** - End-to-end spec (`test/e2e/*.e2e-spec.ts`) exercising the feature through HTTP
-3. **Live Integration Tests** - New test section in `scripts/live-test.ps1` covering the feature for all deployment scenarios (local server on port 6000, Docker container on port 8080, Azure). Must be runnable with both `.\live-test.ps1` (local) and `.\live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "docker-secret"` (Docker)
+3. **Live Integration Tests** - New test section in `scripts/live-test.ps1` covering the feature for all deployment scenarios (local server on port 6000, Docker container on port 8080, Azure). Must be runnable with both `.\live-test.ps1` (local) and `.\live-test.ps1 -BaseUrl http://localhost:8080 -ClientSecret "changeme-oauth"` (Docker)
 4. **Feature Documentation** - Dedicated doc in `docs/` (e.g., `docs/G8E_RETURNED_CHARACTERISTIC_FILTERING.md`) with architecture, RFC references, Mermaid diagrams, implementation details, and test coverage tables
 5. **INDEX.md Update** - Add the new feature doc reference to `docs/INDEX.md`
 6. **CHANGELOG.md Update** - Version bump entry with full test counts and feature summary
 7. **Session & Context Updates** - Update `Session_starter.md` and `docs/CONTEXT_INSTRUCTIONS.md` with new test counts, version, and feature status
 8. **Version Management** - Bump version in `package.json` and all relevant version references
 9. **Response Contract Tests** - Verify API responses contain ONLY documented fields (key allowlist assertion at unit + E2E + live levels). Internal runtime fields (prefixed with `_`) must never appear in responses. Use `expect(ALLOWED_KEYS).toContain(key)` pattern, not just `toHaveProperty`.
+
+## Mandatory Quality Gates (Standing Rule)
+
+After implementation AND before considering work complete, ALL of the following quality gates MUST be executed. Use TDD (Red-Green-Refactor) for all implementation.
+
+### Always Required (every change)
+1. **TDD** - Write failing test first, implement minimal code, refactor. No exceptions.
+2. **addMissingTests** prompt - Close any remaining test gaps (unit/E2E/live)
+3. **apiContractVerification** prompt - Verify response shapes match contracts
+4. **error-handling-verification** prompt - Audit all error paths
+5. **logging-verification** prompt - Verify logging completeness
+6. **auditAgainstRFC** prompt - RFC 7643/7644 compliance check
+7. **securityAudit** prompt - Auth, secrets, input validation, PII, headers
+8. **performanceBenchmark** prompt - p95 latency, DB query counts, memory
+9. **auditAndUpdateDocs** prompt - Documentation freshness across all docs
+10. **fullValidationPipeline** prompt - Local + Docker build & test
+11. **Deploy to dev + live tests** - Publish image, deploy to dev Azure Container App, run `live-test.ps1` (867+ assertions must pass)
+
+### Additional for UI changes
+12. **uiTestAndValidation** prompt - React/Vitest test suite
+
+### Prod promotion
+- **NEVER automatic** - Only triggered when user explicitly requests it via `deployAndPromote` prompt or manual `promote-to-prod.ps1`
+
+### Deployment Topology
+| Environment | App Name | OAuth Secret | FQDN |
+|-------------|----------|-------------|------|
+| Dev | `scimserver-dev` (scimserver-rg-dev) | `changeme-oauth` | `scimserver-dev.yellowrock-b029dcc6.westus2.azurecontainerapps.io` |
+| Prod | `scimserver2` (scimserver-rg) | `changeme-oauth` | `scimserver2.yellowsmoke-af7a3fff.eastus.azurecontainerapps.io` |
 
 **Live Test Conventions:**
 - New sections go before TEST SECTION 10 (DELETE OPERATIONS / Cleanup)

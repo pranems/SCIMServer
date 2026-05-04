@@ -19,10 +19,11 @@ You are executing the **next MVP phase** in a phased migration roadmap.
   - Fresh container build/run: **{{container_build_command}}**, **{{container_run_command}}**
 
 ## MVP Rules (Strict)
-1. Implement **only** what is required for this phase goal.
-2. Do not add extra features, refactors, or speculative architecture.
-3. Keep code changes surgical and reversible.
-4. Preserve behavior parity across both backend modes.
+1. **TDD (Red-Green-Refactor)** - Write failing test first, implement minimal code, refactor. No exceptions.
+2. Implement **only** what is required for this phase goal.
+3. Do not add extra features, refactors, or speculative architecture.
+4. Keep code changes surgical and reversible.
+5. Preserve behavior parity across both backend modes.
 
 ## Delivery Steps
 1. Identify the exact gap for this phase and implement the minimal fix.
@@ -37,6 +38,21 @@ You are executing the **next MVP phase** in a phased migration roadmap.
    - Fresh latest container + existing live tests pass
 4. If any failure occurs, fix root cause minimally and re-run impacted validation.
 5. **Keep the final Docker container running** after all validations pass. Do not stop or remove it - leave it available for the user to inspect and interact with.
+
+## Mandatory Quality Gates (Standing Rule - see copilot-instructions.md)
+After implementation, execute ALL of these gates:
+1. **addMissingTests** - Close remaining test gaps
+2. **apiContractVerification** - Response shape assertions
+3. **error-handling-verification** - Error path audit
+4. **logging-verification** - Logging completeness
+5. **auditAgainstRFC** - RFC 7643/7644 compliance
+6. **securityAudit** - Auth, secrets, input validation, PII, headers
+7. **performanceBenchmark** - p95 latency, DB query counts, memory
+8. **auditAndUpdateDocs** - Documentation freshness
+9. **fullValidationPipeline** - Local + Docker build & test
+10. **Deploy to dev + live tests** - Publish image, deploy to dev, run live-test.ps1 (867+ assertions)
+11. For UI changes: **uiTestAndValidation** - React/Vitest test suite
+- **Prod promotion is NEVER automatic** - only when user explicitly requests it
 
 ## Required Artifacts (Lean)
 Produce two concise docs/sections:

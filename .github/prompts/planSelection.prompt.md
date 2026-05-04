@@ -64,6 +64,21 @@ Output a structured block with:
 3. Refactor
 4. Commit with defect ID in message
 
+## Mandatory Quality Gates (copilot-instructions.md Standing Rule)
+ALL of these MUST pass before the item is considered done:
+1. addMissingTests
+2. apiContractVerification
+3. error-handling-verification
+4. logging-verification
+5. auditAgainstRFC
+6. securityAudit
+7. performanceBenchmark
+8. auditAndUpdateDocs
+9. fullValidationPipeline
+10. Deploy to dev + live tests (867+ assertions)
+11. For UI items: uiTestAndValidation
+- Prod promotion: NEVER automatic - separate user-triggered step
+
 ## Suggested Branch Name
 <type>/<defect-id-kebab> (e.g. feat/ui-b1-shared-types)
 
