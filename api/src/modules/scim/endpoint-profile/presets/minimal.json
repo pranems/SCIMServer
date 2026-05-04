@@ -67,7 +67,7 @@
                 "required": false,
                 "caseExact": false,
                 "mutability": "readWrite",
-                "returned": "default",
+                "returned": "always",
                 "description": "Email address value."
               },
               {
@@ -132,7 +132,7 @@
             "caseExact": false,
             "mutability": "readWrite",
             "returned": "default",
-            "uniqueness": "none",
+            "uniqueness": "server",
             "description": "A human-readable name for the Group."
           },
           {
@@ -150,7 +150,7 @@
                 "multiValued": false,
                 "required": false,
                 "mutability": "immutable",
-                "returned": "default",
+                "returned": "always",
                 "description": "Identifier of the member."
               },
               {

@@ -246,12 +246,12 @@ describe('ScimDiscoveryService', () => {
 
     // ─── P1: R-UNIQ-1 - uniqueness on Group attributes ───────────────────
 
-    it('should have uniqueness:none on Group displayName (RFC 7643 §8.7.1 baseline)', () => {
+    it('should have uniqueness:server on Group displayName (enforced at runtime)', () => {
       const result = service.getSchemas();
       const groupSchema = result.Resources.find((r: any) => r.id === SCIM_CORE_GROUP_SCHEMA)! as any;
       const displayName = groupSchema.attributes.find((a: any) => a.name === 'displayName');
       expect(displayName).toBeDefined();
-      expect(displayName.uniqueness).toBe('none'); // RFC 7643 §8.7.1 - presets may tighten to 'server'
+      expect(displayName.uniqueness).toBe('server');
     });
 
     it('should have uniqueness:none on Group externalId (R-UNIQ-1, RFC 7643 §3.1)', () => {
@@ -260,6 +260,28 @@ describe('ScimDiscoveryService', () => {
       const extId = groupSchema.attributes.find((a: any) => a.name === 'externalId');
       expect(extId).toBeDefined();
       expect(extId.uniqueness).toBe('none');
+    });
+
+    // ─── R-RET-3: Sub-attr returned:always on multi-valued value sub-attrs ───
+
+    it('should have returned:always on emails.value (R-RET-3, RFC 7643 §2.4)', () => {
+      const result = service.getSchemas();
+      const userSchema = result.Resources.find((r: any) => r.id === SCIM_CORE_USER_SCHEMA)! as any;
+      const emails = userSchema.attributes.find((a: any) => a.name === 'emails');
+      expect(emails).toBeDefined();
+      const valueSub = emails.subAttributes.find((s: any) => s.name === 'value');
+      expect(valueSub).toBeDefined();
+      expect(valueSub.returned).toBe('always');
+    });
+
+    it('should have returned:always on members.value (R-RET-3, RFC 7643 §2.4)', () => {
+      const result = service.getSchemas();
+      const groupSchema = result.Resources.find((r: any) => r.id === SCIM_CORE_GROUP_SCHEMA)! as any;
+      const members = groupSchema.attributes.find((a: any) => a.name === 'members');
+      expect(members).toBeDefined();
+      const valueSub = members.subAttributes.find((s: any) => s.name === 'value');
+      expect(valueSub).toBeDefined();
+      expect(valueSub.returned).toBe('always');
     });
   });
 

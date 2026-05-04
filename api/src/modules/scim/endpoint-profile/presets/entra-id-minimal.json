@@ -194,7 +194,7 @@
                 "multiValued": false,
                 "required": false,
                 "mutability": "readWrite",
-                "returned": "default",
+                "returned": "always",
                 "description": "The id of the SCIM resource representing the User's manager."
               },
               {

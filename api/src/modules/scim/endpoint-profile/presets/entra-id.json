@@ -333,7 +333,7 @@
                 "required": true,
                 "caseExact": false,
                 "mutability": "readWrite",
-                "returned": "default",
+                "returned": "always",
                 "description": "Phone number value."
               },
               {
@@ -392,7 +392,7 @@
                 "required": false,
                 "caseExact": false,
                 "mutability": "readWrite",
-                "returned": "default",
+                "returned": "always",
                 "description": "Instant messaging address value."
               },
               {
@@ -453,7 +453,7 @@
                 "required": false,
                 "caseExact": false,
                 "mutability": "readWrite",
-                "returned": "default",
+                "returned": "always",
                 "referenceTypes": [
                   "external"
                 ],
@@ -510,7 +510,7 @@
                 "multiValued": false,
                 "required": false,
                 "mutability": "readWrite",
-                "returned": "default",
+                "returned": "always",
                 "description": "The role value."
               },
               {
@@ -557,7 +557,7 @@
                 "multiValued": false,
                 "required": false,
                 "mutability": "readWrite",
-                "returned": "default",
+                "returned": "always",
                 "description": "The entitlement value."
               },
               {
@@ -706,7 +706,7 @@
                 "multiValued": false,
                 "required": false,
                 "mutability": "readWrite",
-                "returned": "default",
+                "returned": "always",
                 "description": "The id of the SCIM resource representing the User's manager."
               },
               {

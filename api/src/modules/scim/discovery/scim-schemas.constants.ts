@@ -173,7 +173,7 @@ export const USER_SCHEMA_ATTRIBUTES = [
     uniqueness: 'none',
     description: 'Email addresses for the user.',
     subAttributes: [
-      { name: 'value', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', description: 'Email address value.' },
+      { name: 'value', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'always', uniqueness: 'none', description: 'Email address value.' },
       { name: 'display', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', description: 'A human-readable name, primarily used for display purposes. READ-ONLY.' },
       { name: 'type', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', canonicalValues: ['work', 'home', 'other'], description: 'Label (e.g., "work", "home").' },
       { name: 'primary', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'Whether this is the primary email.' },
@@ -188,7 +188,7 @@ export const USER_SCHEMA_ATTRIBUTES = [
     returned: 'default',
     description: 'Phone numbers for the User.',
     subAttributes: [
-      { name: 'value', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', description: 'Phone number value.' },
+      { name: 'value', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'always', uniqueness: 'none', description: 'Phone number value.' },
       { name: 'display', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', description: 'A human-readable name, primarily used for display purposes. READ-ONLY.' },
       { name: 'type', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', canonicalValues: ['work', 'home', 'mobile', 'fax', 'pager', 'other'], description: 'Label (e.g., "work", "mobile", "fax").' },
       { name: 'primary', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'Whether this is the primary phone number.' },
@@ -223,7 +223,7 @@ export const USER_SCHEMA_ATTRIBUTES = [
     returned: 'default',
     description: 'Instant messaging addresses for the User.',
     subAttributes: [
-      { name: 'value', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', description: 'Instant messaging address value.' },
+      { name: 'value', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'always', uniqueness: 'none', description: 'Instant messaging address value.' },
       { name: 'display', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', description: 'A human-readable name, primarily used for display purposes. READ-ONLY.' },
       { name: 'type', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', canonicalValues: ['aim', 'gtalk', 'icq', 'xmpp', 'msn', 'skype', 'qq', 'yahoo'], description: 'Label (e.g., "aim", "gtalk").' },
       { name: 'primary', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'Whether this is the primary IM address.' },
@@ -238,7 +238,7 @@ export const USER_SCHEMA_ATTRIBUTES = [
     returned: 'default',
     description: 'URLs of photos of the User.',
     subAttributes: [
-      { name: 'value', type: 'reference', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', referenceTypes: ['external'], description: 'URL of a photo of the User.' },
+      { name: 'value', type: 'reference', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'always', uniqueness: 'none', referenceTypes: ['external'], description: 'URL of a photo of the User.' },
       { name: 'display', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', description: 'A human-readable name, primarily used for display purposes. READ-ONLY.' },
       { name: 'type', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', canonicalValues: ['photo', 'thumbnail'], description: 'Label (e.g., "photo", "thumbnail").' },
       { name: 'primary', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'Whether this is the primary photo.' },
@@ -253,7 +253,7 @@ export const USER_SCHEMA_ATTRIBUTES = [
     returned: 'default',
     description: 'A list of roles for the User.',
     subAttributes: [
-      { name: 'value', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', description: 'The role value.' },
+      { name: 'value', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'always', uniqueness: 'none', description: 'The role value.' },
       { name: 'display', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', description: 'The display name.' },
       { name: 'type', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', canonicalValues: [], description: 'The type label.' },
       { name: 'primary', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'Whether this is the primary role.' },
@@ -268,7 +268,7 @@ export const USER_SCHEMA_ATTRIBUTES = [
     returned: 'default',
     description: 'A list of entitlements for the User that represent a thing the User has.',
     subAttributes: [
-      { name: 'value', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', description: 'The entitlement value.' },
+      { name: 'value', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'always', uniqueness: 'none', description: 'The entitlement value.' },
       { name: 'display', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', description: 'The display name.' },
       { name: 'type', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', canonicalValues: [], description: 'The type label.' },
       { name: 'primary', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'Whether this is the primary entitlement.' },
@@ -284,7 +284,7 @@ export const USER_SCHEMA_ATTRIBUTES = [
     returned: 'default',
     description: 'A list of certificates issued to the User.',
     subAttributes: [
-      { name: 'value', type: 'binary', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', description: 'The DER-encoded X.509 certificate value.' },
+      { name: 'value', type: 'binary', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'always', uniqueness: 'none', description: 'The DER-encoded X.509 certificate value.' },
       { name: 'display', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', description: 'The display name.' },
       { name: 'type', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', canonicalValues: [], description: 'The type label.' },
       { name: 'primary', type: 'boolean', multiValued: false, required: false, mutability: 'readWrite', returned: 'default', description: 'Whether this is the primary certificate.' },
@@ -299,7 +299,7 @@ export const USER_SCHEMA_ATTRIBUTES = [
     returned: 'default',
     description: 'A list of groups to which the user belongs, either thorough direct membership, through nested groups, or dynamically calculated. (RFC 7643 §4.1)',
     subAttributes: [
-      { name: 'value', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readOnly', returned: 'default', uniqueness: 'none', description: 'The identifier of the User\'s group.' },
+      { name: 'value', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readOnly', returned: 'always', uniqueness: 'none', description: 'The identifier of the User\'s group.' },
       { name: '$ref', type: 'reference', multiValued: false, required: false, caseExact: false, mutability: 'readOnly', returned: 'default', uniqueness: 'none', referenceTypes: ['User', 'Group'], description: 'The URI of the corresponding "Group" resource.' },
       { name: 'display', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readOnly', returned: 'default', uniqueness: 'none', description: 'A human-readable name, primarily used for display purposes.' },
       { name: 'type', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readOnly', returned: 'default', uniqueness: 'none', canonicalValues: ['direct', 'indirect'], description: 'A label indicating the attribute\'s function (e.g., "direct" or "indirect").' },
@@ -413,7 +413,7 @@ export const ENTERPRISE_USER_ATTRIBUTES = [
     returned: 'default',
     description: 'The User\'s manager.',
     subAttributes: [
-      { name: 'value', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', description: 'The id of the SCIM resource representing the User\'s manager.' },
+      { name: 'value', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'always', uniqueness: 'none', description: 'The id of the SCIM resource representing the User\'s manager.' },
       { name: '$ref', type: 'reference', multiValued: false, required: false, caseExact: false, mutability: 'readWrite', returned: 'default', uniqueness: 'none', referenceTypes: ['User'], description: 'The URI of the SCIM resource representing the User\'s manager.' },
       { name: 'displayName', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'readOnly', returned: 'default', uniqueness: 'none', description: 'The displayName of the User\'s manager.' },
     ],
@@ -443,7 +443,7 @@ export const GROUP_SCHEMA_ATTRIBUTES = [
     caseExact: false,
     mutability: 'readWrite',
     returned: 'default',
-    uniqueness: 'none',
+    uniqueness: 'server',
     description: 'A human-readable name for the Group.',
   },
   {
@@ -455,7 +455,7 @@ export const GROUP_SCHEMA_ATTRIBUTES = [
     returned: 'default',
     description: 'A list of members of the Group.',
     subAttributes: [
-      { name: 'value', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'immutable', returned: 'default', uniqueness: 'none', description: 'Identifier of the member.' },
+      { name: 'value', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'immutable', returned: 'always', uniqueness: 'none', description: 'Identifier of the member.' },
       { name: '$ref', type: 'reference', multiValued: false, required: false, caseExact: false, mutability: 'immutable', returned: 'default', uniqueness: 'none', referenceTypes: ['User', 'Group'], description: 'The URI of the corresponding resource.' },
       { name: 'display', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'immutable', returned: 'default', uniqueness: 'none', description: 'The display name of the member.' },
       { name: 'type', type: 'string', multiValued: false, required: false, caseExact: false, mutability: 'immutable', returned: 'default', uniqueness: 'none', canonicalValues: ['User', 'Group'], description: 'The type of the member (e.g., "User").' },

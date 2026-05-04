@@ -8323,7 +8323,9 @@ try {
         schemas = @("urn:ietf:params:scim:api:messages:2.0:PatchOp")
         Operations = @(@{ op = "replace"; path = "displayName"; value = "Q10 Patched" })
     } | ConvertTo-Json -Depth 4
-    $null = Invoke-RestMethod -Uri "$q10ScimBase/Users/$($q10User.id)" -Method PATCH -Headers $headers -Body $q10PatchBody -ContentType "application/scim+json"
+    # Must send WITHOUT If-Match to trigger 428 - $headers has If-Match:* globally
+    $q10NoIfMatchHeaders = @{ Authorization = $headers['Authorization'] }
+    $null = Invoke-RestMethod -Uri "$q10ScimBase/Users/$($q10User.id)" -Method PATCH -Headers $q10NoIfMatchHeaders -Body $q10PatchBody -ContentType "application/scim+json"
     Test-Result -Success $false -Message "9z-Q.10b: PATCH without If-Match should return 428"
 } catch {
     $q10Status = $_.Exception.Response.StatusCode.value__
@@ -8377,7 +8379,7 @@ Test-Result -Success ($null -ne $q11CrudUser.id) -Message "9z-Q.11d: CRUD still 
 
 # --- 9z-Q.12: SCIM error response key allowlist ---
 Write-Host "`n--- 9z-Q.12: Error response key allowlist ---" -ForegroundColor Cyan
-$q12ErrorAllowedKeys = @("schemas", "status", "scimType", "detail", "diagnostics")
+$q12ErrorAllowedKeys = @("schemas", "status", "scimType", "detail", "diagnostics", "urn:scimserver:api:messages:2.0:Diagnostics")
 try {
     $null = Invoke-RestMethod -Uri "$scimBase/Users/nonexistent-00000000-0000-0000-0000-000000000000" -Method GET -Headers $headers
     Test-Result -Success $false -Message "9z-Q.12a: GET nonexistent should 404"
