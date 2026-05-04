@@ -646,6 +646,30 @@ These are intentionally **NOT** in this plan and represent decisions to remove f
 
 ---
 
+### Session: 2026-05-04
+
+| Date | Item | Commit | Status |
+|---|---|---|---|
+| 2026-05-04 | fix(build): set `rootDir=src` in `tsconfig.build.json` - fixes `dist/main.js` path in Docker image | `b2a031e` | ✅ Shipped to master |
+| 2026-05-04 | fix(live-test): 9z-S endpoint creation - `profilePreset` + two-step PATCH + missing `emails` field (4 commits) | `2707232`..`6707714` | ✅ Shipped to master |
+| 2026-05-04 | fix: close 5 live test failures via TDD - Group `displayName.uniqueness:server`, `value` sub-attr `returned:always` (RFC 7643 S2.4), error key allowlist, RequireIfMatch test headers | `1889833` | ✅ Shipped to master |
+| 2026-05-04 | Published image `ghcr.io/pranems/scimserver:0.40.2`; deployed to dev; promoted to prod with digest pinning | `666ff6b` | ✅ Both dev and prod running 0.40.2 |
+| 2026-05-04 | fix(promote): health URL `/health` -> `/scim/health` | `666ff6b` | ✅ Shipped to master |
+| 2026-05-04 | Synced dev credentials to match prod: `changeme-scim/jwt/oauth`, PG `ScimP0stgres@2026` | `8a61f63`, `facfcbf` | ✅ Both state files updated |
+| 2026-05-04 | feat(prompts): 5 new prompts (planSelection, securityAudit, performanceBenchmark, deployAndPromote, sessionWrapUp); refreshed stale baselines in 4 existing prompts (34 instances) | `2048b2c` | ✅ 21 total prompts, zero gaps |
+| 2026-05-04 | docs: mandatory quality gates (11 gates + TDD) added to `copilot-instructions.md` and all 5 workflow prompts; prod promotion explicitly separate | `ea9f588` | ✅ Standing rule documented |
+
+**Validation as of 2026-05-04**:
+- Unit: 3,538 / 3,538 pass (91 suites; +2 R-RET-3 sub-attr returned:always tests)
+- E2E (inmemory): ~1,104 pass (52 suites)
+- Live (dev Azure): 867 / 867 pass (0 fail)
+- Live (prod Azure): 867 pass (0 fail on core; 3 test-script issues in 9z-S/9z-U being addressed)
+- Both dev and prod running `ghcr.io/pranems/scimserver:0.40.2`
+
+**Next up**: UI-B1 through UI-B6 (UI Backend BFF, Weeks 2-3)
+
+---
+
 ## 12. References
 
 ### 12.1 Existing planning documents this synthesizes
