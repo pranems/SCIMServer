@@ -8570,16 +8570,11 @@ Write-Host "This fixes Entra ID SCIM Validator 400 errors on PATCH operations." 
 $sEpBody = @{
     name = "live-9z-S-scalar-bool-$(Get-Random)"
     profilePreset = "entra-id"
-    profile = @{
-        settings = @{
-            StrictSchemaValidation = "True"
-            AllowAndCoerceBooleanStrings = "True"
-            UserSoftDeleteEnabled = "True"
-        }
-    }
 } | ConvertTo-Json -Depth 5
 $sEp = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $sEpBody -ContentType "application/json"
 $sEpId = $sEp.id
+$sSettingsBody = @{ profile = @{ settings = @{ StrictSchemaValidation = "True"; AllowAndCoerceBooleanStrings = "True"; UserSoftDeleteEnabled = "True" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$sEpId" -Method PATCH -Headers $headers -Body $sSettingsBody -ContentType "application/json" | Out-Null
 $sBase = "$baseUrl/scim/endpoints/$sEpId"
 
 # Create a test user
@@ -8668,15 +8663,11 @@ Write-Host "`n--- Test: PATCH active='True' with coercion OFF -> 400 ---" -Foreg
 $sEp2Body = @{
     name = "live-9z-S-nocoerce-$(Get-Random)"
     profilePreset = "entra-id"
-    profile = @{
-        settings = @{
-            StrictSchemaValidation = "True"
-            AllowAndCoerceBooleanStrings = "False"
-        }
-    }
 } | ConvertTo-Json -Depth 5
 $sEp2 = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $sEp2Body -ContentType "application/json"
 $sEp2Id = $sEp2.id
+$sEp2Settings = @{ profile = @{ settings = @{ StrictSchemaValidation = "True"; AllowAndCoerceBooleanStrings = "False" } } } | ConvertTo-Json -Depth 4
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$sEp2Id" -Method PATCH -Headers $headers -Body $sEp2Settings -ContentType "application/json" | Out-Null
 $sBase2 = "$baseUrl/scim/endpoints/$sEp2Id"
 
 $sUser2Body = @{
