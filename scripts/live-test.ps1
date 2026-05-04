@@ -8569,7 +8569,7 @@ Write-Host "This fixes Entra ID SCIM Validator 400 errors on PATCH operations." 
 # Create a dedicated endpoint with strict schema + boolean coercion enabled
 $sEpBody = @{
     name = "live-9z-S-scalar-bool-$(Get-Random)"
-    preset = "entra-id"
+    profilePreset = "entra-id"
     profile = @{
         settings = @{
             StrictSchemaValidation = "True"
@@ -8667,7 +8667,7 @@ try {
 Write-Host "`n--- Test: PATCH active='True' with coercion OFF -> 400 ---" -ForegroundColor Cyan
 $sEp2Body = @{
     name = "live-9z-S-nocoerce-$(Get-Random)"
-    preset = "entra-id"
+    profilePreset = "entra-id"
     profile = @{
         settings = @{
             StrictSchemaValidation = "True"
