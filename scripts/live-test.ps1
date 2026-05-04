@@ -8675,6 +8675,7 @@ $sUser2Body = @{
     userName = "nocoerce-test@live.com"
     displayName = "No Coerce Bool"
     active = $true
+    emails = @(@{ type = "work"; value = "nocoerce@live.com"; primary = $true })
 } | ConvertTo-Json -Depth 5
 $sUser2 = Invoke-RestMethod -Uri "$sBase2/Users" -Method POST -Headers $headers -Body $sUser2Body -ContentType "application/scim+json"
 $sUser2Id = $sUser2.id
