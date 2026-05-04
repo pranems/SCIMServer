@@ -144,7 +144,7 @@ if (-not $SkipDevVerification -and $DevResourceGroup) {
         --query "properties.configuration.ingress.fqdn" --output tsv 2>$null
 
     if ($devFqdn) {
-        $devHealthUrl = "https://$devFqdn/health"
+        $devHealthUrl = "https://$devFqdn/scim/health"
         try {
             $devHealth = Invoke-RestMethod -Uri $devHealthUrl -Method Get -TimeoutSec 15 -ErrorAction Stop
             Write-Host "   ✅ Dev instance healthy: $devHealthUrl" -ForegroundColor Green
@@ -253,7 +253,7 @@ if (-not $SkipProdVerification) {
         --query "properties.configuration.ingress.fqdn" --output tsv 2>$null
 
     if ($prodFqdn) {
-        $prodHealthUrl = "https://$prodFqdn/health"
+        $prodHealthUrl = "https://$prodFqdn/scim/health"
         $maxAttempts = 12
         $delaySeconds = 10
         $healthy = $false
