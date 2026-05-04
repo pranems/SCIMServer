@@ -1,0 +1,7 @@
+{
+  "updatedAtUtc": "2026-05-04T19:00:00.0000000Z",
+  "scimSecret": "AzureScimS3cret2026!",
+  "jwtSecret": "AzureJwtS3cretKey2026!@#456",
+  "oauthClientSecret": "AzureOAuthCl13nt2026!",
+  "databaseUrl": "postgresql://scimadmin:ScimPg@dm1n2026!@scimserver-dev-pg.postgres.database.azure.com:5432/scimdb?sslmode=require"
+}
