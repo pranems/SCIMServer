@@ -6944,8 +6944,8 @@ $updatedAtPresent = $null -ne $singleFull.updatedAt
 Test-Result -Success $createdAtPresent -Message "9z-D.17: createdAt is present"
 Test-Result -Success $updatedAtPresent -Message "9z-D.18: updatedAt is present"
 # Verify they're valid dates (PowerShell may auto-convert to DateTime or keep as string)
-$createdValid = try { [DateTime]$singleFull.createdAt; $true } catch { $false }
-$updatedValid = try { [DateTime]$singleFull.updatedAt; $true } catch { $false }
+$createdValid = try { $null = [DateTime]$singleFull.createdAt; $true } catch { $false }
+$updatedValid = try { $null = [DateTime]$singleFull.updatedAt; $true } catch { $false }
 Test-Result -Success $createdValid -Message "9z-D.19: createdAt is a valid date"
 Test-Result -Success $updatedValid -Message "9z-D.20: updatedAt is a valid date"
 
