@@ -31,6 +31,8 @@ import { useEndpoint, useEndpointStats } from '../api/queries';
 import type { EndpointStatsResponse } from '@scim/types/dashboard.types';
 import { UsersTab } from './UsersTab';
 import { GroupsTab } from './GroupsTab';
+import { LogsTab } from './LogsTab';
+import { SettingsTab } from './SettingsTab';
 
 const useStyles = makeStyles({
   page: {
@@ -165,10 +167,10 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
           <div data-testid="tab-groups"><GroupsTab endpointId={endpointId} /></div>
         )}
         {activeTab === 'logs' && (
-          <PlaceholderTab name="Logs" testId="tab-logs" />
+          <div data-testid="tab-logs"><LogsTab endpointId={endpointId} /></div>
         )}
         {activeTab === 'settings' && (
-          <PlaceholderTab name="Settings" testId="tab-settings" />
+          <div data-testid="tab-settings"><SettingsTab endpointId={endpointId} /></div>
         )}
       </div>
     </div>
