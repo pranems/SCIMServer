@@ -11,6 +11,7 @@ import type {
   DashboardResponse,
   EndpointListResponse,
   EndpointResponse,
+  EndpointStatsResponse,
   VersionInfo,
   HealthResponse,
 } from '@scim/types/dashboard.types';
@@ -114,6 +115,16 @@ export function useEndpoint(id: string) {
   return useQuery<EndpointResponse>({
     queryKey: queryKeys.endpoints.detail(id),
     queryFn: () => fetchWithAuth(`/scim/admin/endpoints/${id}`),
+    enabled: !!id,
+    staleTime: 30_000,
+  });
+}
+
+/** Fetch endpoint stats */
+export function useEndpointStats(id: string) {
+  return useQuery<EndpointStatsResponse>({
+    queryKey: queryKeys.endpoints.stats(id),
+    queryFn: () => fetchWithAuth(`/scim/admin/endpoints/${id}/stats`),
     enabled: !!id,
     staleTime: 30_000,
   });

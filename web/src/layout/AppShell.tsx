@@ -19,6 +19,7 @@ import { AppHeader } from './AppHeader';
 import { AppSidebar } from './AppSidebar';
 import { DashboardPage } from '../pages/DashboardPage';
 import { EndpointsPage } from '../pages/EndpointsPage';
+import { EndpointDetailPage } from '../pages/EndpointDetailPage';
 
 const useStyles = makeStyles({
   root: {
@@ -88,7 +89,13 @@ const PlaceholderDashboard: React.FC = () => {
   // Simple pathname-based routing until TanStack Router is wired with real pages
   const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
 
-  if (pathname.startsWith('/endpoints')) {
+  // /endpoints/:id -> EndpointDetailPage
+  const endpointDetailMatch = pathname.match(/^\/endpoints\/([^/]+)/);
+  if (endpointDetailMatch) {
+    return <EndpointDetailPage endpointId={endpointDetailMatch[1]} />;
+  }
+
+  if (pathname === '/endpoints') {
     return <EndpointsPage />;
   }
 
