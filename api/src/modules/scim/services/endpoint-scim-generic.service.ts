@@ -16,6 +16,7 @@
  *   - returned:never stripping on output
  */
 import { Inject, Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 import type { IGenericResourceRepository } from '../../../domain/repositories/generic-resource.repository.interface';
 import type {
@@ -62,6 +63,7 @@ import { PatchError } from '../../../domain/patch/patch-error';
 import type { PatchOperation } from '../../../domain/patch/patch-types';
 import { parseScimFilter, extractFilterPaths } from '../filters/scim-filter-parser';
 import { buildGenericFilter } from '../filters/apply-scim-filter';
+import { SCIM_EVENTS } from '../../stats/scim-events';
 
 interface ListGenericParams {
   filter?: string;
@@ -86,6 +88,7 @@ export class EndpointScimGenericService {
     private readonly scimLogger: ScimLogger,
     private readonly schemaRegistry: ScimSchemaRegistry,
     private readonly endpointContext: EndpointContextStorage,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -235,6 +238,7 @@ export class EndpointScimGenericService {
       endpointId,
       resourceType: resourceType.name,
     });
+    this.eventEmitter.emit(SCIM_EVENTS.RESOURCE_CREATED, { endpointId, scimId, resourceType: resourceType.name });
 
     return this.toScimResponse(record, resourceType);
   }
@@ -750,6 +754,7 @@ export class EndpointScimGenericService {
       scimId,
       endpointId,
     });
+    this.eventEmitter.emit(SCIM_EVENTS.RESOURCE_DELETED, { endpointId, scimId, resourceType: resourceType.name });
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────────

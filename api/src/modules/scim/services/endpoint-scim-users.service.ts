@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 
 import type { IUserRepository } from '../../../domain/repositories/user.repository.interface';
@@ -38,6 +39,7 @@ import {
   assertSchemaUniqueness,
   handleRepositoryError,
 } from '../common/scim-service-helpers';
+import { SCIM_EVENTS } from '../../stats/scim-events';
 
 interface ListUsersParams {
   filter?: string;
@@ -62,6 +64,7 @@ export class EndpointScimUsersService {
     private readonly logger: ScimLogger,
     private readonly schemaRegistry: ScimSchemaRegistry,
     private readonly endpointContext: EndpointContextStorage,
+    private readonly eventEmitter: EventEmitter2,
   ) {
     this.schemaHelpers = new ScimSchemaHelpers(schemaRegistry, SCIM_CORE_USER_SCHEMA, endpointContext);
   }
@@ -147,6 +150,7 @@ export class EndpointScimUsersService {
     }
 
     this.logger.info(LogCategory.SCIM_USER, 'User created', { scimId, userName: dto.userName, endpointId });
+    this.eventEmitter.emit(SCIM_EVENTS.USER_CREATED, { endpointId, scimId, active: input.active });
     return this.toScimUserResource(created, baseUrl, endpointId);
   }
 
@@ -261,6 +265,11 @@ export class EndpointScimUsersService {
     }
 
     this.logger.info(LogCategory.SCIM_PATCH, 'User patched', { scimId, endpointId });
+    if (user.active !== updatedUser.active) {
+      this.eventEmitter.emit(SCIM_EVENTS.USER_STATUS_CHANGED, {
+        endpointId, scimId, previousActive: user.active, newActive: updatedUser.active,
+      });
+    }
     return this.toScimUserResource(updatedUser, baseUrl, endpointId);
   }
 
@@ -341,6 +350,11 @@ export class EndpointScimUsersService {
     }
 
     this.logger.info(LogCategory.SCIM_USER, 'User replaced', { scimId, userName: dto.userName, endpointId });
+    if (user.active !== updatedUser.active) {
+      this.eventEmitter.emit(SCIM_EVENTS.USER_STATUS_CHANGED, {
+        endpointId, scimId, previousActive: user.active, newActive: updatedUser.active,
+      });
+    }
     return this.toScimUserResource(updatedUser, baseUrl, endpointId);
   }
 
@@ -375,6 +389,7 @@ export class EndpointScimUsersService {
       handleRepositoryError(error, 'delete user', this.logger, LogCategory.SCIM_USER, { scimId, endpointId });
     }
     this.logger.info(LogCategory.SCIM_USER, 'User hard-deleted', { scimId, endpointId });
+    this.eventEmitter.emit(SCIM_EVENTS.USER_DELETED, { endpointId, scimId, active: user.active });
   }
 
   // ===== Private Helper Methods =====

@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EndpointScimGroupsService } from './endpoint-scim-groups.service';
 import { USER_REPOSITORY, GROUP_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { ScimMetadataService } from './scim-metadata.service';
@@ -105,6 +106,10 @@ describe('EndpointScimGroupsService', () => {
       providers: [
         EndpointScimGroupsService,
         ScimSchemaRegistry,
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
+        },
         {
           provide: GROUP_REPOSITORY,
           useValue: mockGroupRepo,

@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EndpointScimGenericService } from './endpoint-scim-generic.service';
 import { GENERIC_RESOURCE_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { ScimMetadataService } from './scim-metadata.service';
@@ -73,6 +74,10 @@ describe('EndpointScimGenericService', () => {
       providers: [
         EndpointScimGenericService,
         ScimSchemaRegistry,
+        {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
+        },
         {
           provide: GENERIC_RESOURCE_REPOSITORY,
           useValue: mockGenericRepo,

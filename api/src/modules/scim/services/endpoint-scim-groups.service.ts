@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { randomUUID } from 'node:crypto';
 
 import type { IGroupRepository } from '../../../domain/repositories/group.repository.interface';
@@ -43,6 +44,7 @@ import {
   assertSchemaUniqueness,
   handleRepositoryError,
 } from '../common/scim-service-helpers';
+import { SCIM_EVENTS } from '../../stats/scim-events';
 
 interface ListGroupsParams {
   filter?: string;
@@ -69,6 +71,7 @@ export class EndpointScimGroupsService {
     private readonly endpointContext: EndpointContextStorage,
     private readonly logger: ScimLogger,
     private readonly schemaRegistry: ScimSchemaRegistry,
+    private readonly eventEmitter: EventEmitter2,
   ) {
     this.schemaHelpers = new ScimSchemaHelpers(schemaRegistry, SCIM_CORE_GROUP_SCHEMA, endpointContext);
   }
@@ -176,6 +179,7 @@ export class EndpointScimGroupsService {
 
     const withMembers = await this.groupRepo.findWithMembers(endpointId, String(group.scimId));
     this.logger.info(LogCategory.SCIM_GROUP, 'Group created', { scimId, displayName: dto.displayName, endpointId });
+    this.eventEmitter.emit(SCIM_EVENTS.GROUP_CREATED, { endpointId, scimId, active: true });
     return this.toScimGroupResource(withMembers, baseUrl, endpointId);
   }
 
@@ -557,6 +561,7 @@ export class EndpointScimGroupsService {
       handleRepositoryError(error, 'delete group', this.logger, LogCategory.SCIM_GROUP, { scimId, endpointId });
     }
     this.logger.info(LogCategory.SCIM_GROUP, 'Group hard-deleted', { scimId, endpointId });
+    this.eventEmitter.emit(SCIM_EVENTS.GROUP_DELETED, { endpointId, scimId, active: true });
   }
 
   // ===== Private Helper Methods =====

@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { EndpointScimUsersService } from './endpoint-scim-users.service';
 import { USER_REPOSITORY } from '../../../domain/repositories/repository.tokens';
 import { ScimMetadataService } from './scim-metadata.service';
@@ -78,6 +79,10 @@ describe('EndpointScimUsersService', () => {
         EndpointScimUsersService,
         ScimSchemaRegistry,
         {
+          provide: EventEmitter2,
+          useValue: { emit: jest.fn() },
+        },
+        {
           provide: USER_REPOSITORY,
           useValue: mockUserRepo,
         },
@@ -148,6 +153,39 @@ describe('EndpointScimUsersService', () => {
           endpointId: mockEndpoint.id,
         })
       );
+    });
+
+    it('should emit USER_CREATED event after successful create', async () => {
+      const createDto: CreateUserDto = {
+        schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+        userName: 'event-user@example.com',
+        active: true,
+      };
+      mockUserRepo.findConflict.mockResolvedValue(null);
+      mockUserRepo.create.mockResolvedValue({ ...mockUser, userName: createDto.userName });
+
+      const module = await Test.createTestingModule({
+        providers: [
+          EndpointScimUsersService,
+          ScimSchemaRegistry,
+          { provide: EventEmitter2, useValue: { emit: jest.fn() } },
+          { provide: USER_REPOSITORY, useValue: mockUserRepo },
+          { provide: ScimMetadataService, useValue: mockMetadataService },
+          { provide: ScimLogger, useValue: mockScimLogger },
+          { provide: EndpointContextStorage, useValue: { setContext: jest.fn(), getEndpointId: jest.fn(), getConfig: jest.fn().mockReturnValue({}), addWarnings: jest.fn(), getWarnings: jest.fn().mockReturnValue([]) } },
+        ],
+      }).compile();
+      const svc = module.get(EndpointScimUsersService);
+      const emitter = module.get(EventEmitter2);
+      const registry = module.get(ScimSchemaRegistry);
+      await registry.onModuleInit();
+
+      await svc.createUserForEndpoint(createDto, 'http://localhost:3000/scim', mockEndpoint.id);
+
+      expect(emitter.emit).toHaveBeenCalledWith('scim.user.created', expect.objectContaining({
+        endpointId: mockEndpoint.id,
+        active: true,
+      }));
     });
 
     it('should enforce unique userName within endpoint', async () => {
