@@ -13,6 +13,7 @@ import {
   Card,
   Text,
   Badge,
+  Button,
   Spinner,
   Tab,
   TabList,
@@ -28,6 +29,7 @@ import {
   DocumentText24Regular,
 } from '@fluentui/react-icons';
 import { useEndpoint, useEndpointStats } from '../api/queries';
+import { useUIStore } from '../store/ui-store';
 import type { EndpointStatsResponse } from '@scim/types/dashboard.types';
 import { UsersTab } from './UsersTab';
 import { GroupsTab } from './GroupsTab';
@@ -103,6 +105,7 @@ interface EndpointDetailPageProps {
 export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpointId }) => {
   const classes = useStyles();
   const [activeTab, setActiveTab] = useState<TabValue>('overview');
+  const navigate = useUIStore((s) => s.navigate);
 
   const { data: endpoint, isLoading: loadingEndpoint, error: endpointError } = useEndpoint(endpointId);
   const { data: stats, isLoading: loadingStats } = useEndpointStats(endpointId);
@@ -125,6 +128,16 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
 
   return (
     <div className={classes.page} data-testid="endpoint-detail-page">
+      {/* Back button */}
+      <Button
+        appearance="subtle"
+        onClick={() => navigate('/endpoints')}
+        style={{ alignSelf: 'flex-start', marginBottom: '8px' }}
+        data-testid="back-to-endpoints"
+      >
+        ← Back to Endpoints
+      </Button>
+
       {/* Header: Name + Status */}
       <div className={classes.header}>
         <Subtitle1>{endpoint.displayName ?? endpoint.name}</Subtitle1>

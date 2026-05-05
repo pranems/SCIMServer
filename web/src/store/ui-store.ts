@@ -44,3 +44,10 @@ export const useUIStore = create<UIState>((set) => ({
     set({ currentPath: path });
   },
 }));
+
+// Listen for browser back/forward buttons (popstate)
+if (typeof window !== 'undefined') {
+  window.addEventListener('popstate', () => {
+    useUIStore.setState({ currentPath: window.location.pathname });
+  });
+}

@@ -26,6 +26,7 @@ import {
   CheckmarkCircle24Regular,
 } from '@fluentui/react-icons';
 import { useDashboard } from '../api/queries';
+import { useUIStore } from '../store/ui-store';
 import type { DashboardResponse, DashboardEndpoint } from '@scim/types/dashboard.types';
 
 const useStyles = makeStyles({
@@ -248,8 +249,13 @@ interface EndpointCardProps {
 
 const EndpointCard: React.FC<EndpointCardProps> = ({ endpoint }) => {
   const classes = useStyles();
+  const navigate = useUIStore((s) => s.navigate);
   return (
-    <Card className={classes.endpointCard} data-testid={`endpoint-card-${endpoint.id}`}>
+    <Card
+      className={classes.endpointCard}
+      data-testid={`endpoint-card-${endpoint.id}`}
+      onClick={() => navigate(`/endpoints/${endpoint.id}`)}
+    >
       <CardHeader
         header={
           <Text weight="semibold">{endpoint.displayName ?? endpoint.name}</Text>
