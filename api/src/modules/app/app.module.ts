@@ -5,6 +5,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 
 import { ActivityParserModule } from '../activity-parser/activity-parser.module';
 import { AuthModule } from '../auth/auth.module';
+import { DashboardModule } from '../dashboard/dashboard.module';
 import { DatabaseModule } from '../database/database.module';
 import { LoggingModule } from '../logging/logging.module';
 import { PrismaModule } from '../prisma/prisma.module';
@@ -21,6 +22,7 @@ import { OAuthModule } from '../../oauth/oauth.module';
     ScheduleModule.forRoot(),
     ActivityParserModule,
     AuthModule,
+    DashboardModule,
     DatabaseModule,
     PrismaModule,
     LoggingModule,
