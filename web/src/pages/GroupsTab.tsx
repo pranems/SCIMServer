@@ -1,17 +1,20 @@
 /**
  * GroupsTab - SCIM group list table for an endpoint.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import {
   makeStyles,
   tokens,
   Text,
   Badge,
+  Button,
   Spinner,
   Caption1,
   Subtitle2,
 } from '@fluentui/react-components';
 import { useEndpointGroups } from '../api/queries';
+
+const PAGE_SIZE = 20;
 
 const useStyles = makeStyles({
   container: { display: 'flex', flexDirection: 'column', gap: '12px' },
@@ -22,6 +25,7 @@ const useStyles = makeStyles({
   tr: { ':hover': { backgroundColor: tokens.colorNeutralBackground1Hover } },
   center: { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '150px' },
   empty: { textAlign: 'center' as const, padding: '32px', color: tokens.colorNeutralForeground3 },
+  pagination: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', padding: '12px 0' },
 });
 
 interface GroupsTabProps {
@@ -30,7 +34,8 @@ interface GroupsTabProps {
 
 export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
   const classes = useStyles();
-  const { data, isLoading, error } = useEndpointGroups(endpointId);
+  const [startIndex, setStartIndex] = useState(1);
+  const { data, isLoading, error } = useEndpointGroups(endpointId, { startIndex, count: PAGE_SIZE });
 
   if (isLoading) {
     return (
@@ -92,6 +97,14 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
           ))}
         </tbody>
       </table>
+
+      {total > PAGE_SIZE && (
+        <div className={classes.pagination} data-testid="groups-pagination">
+          <Button appearance="subtle" disabled={startIndex <= 1} onClick={() => setStartIndex(Math.max(1, startIndex - PAGE_SIZE))}>Previous</Button>
+          <Text>Page {Math.ceil(startIndex / PAGE_SIZE)}</Text>
+          <Button appearance="subtle" disabled={startIndex + PAGE_SIZE > total} onClick={() => setStartIndex(startIndex + PAGE_SIZE)}>Next</Button>
+        </div>
+      )}
     </div>
   );
 };

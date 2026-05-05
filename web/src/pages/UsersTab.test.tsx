@@ -84,4 +84,34 @@ describe('UsersTab', () => {
     wrap(<UsersTab endpointId="ep-1" />);
     expect(screen.getByText(/no users/i)).toBeInTheDocument();
   });
+
+  it('shows pagination controls when totalResults > pageSize', () => {
+    (useEndpointUsers as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { ...mockUsers, totalResults: 50, itemsPerPage: 20 },
+      isLoading: false, error: null,
+    });
+    wrap(<UsersTab endpointId="ep-1" />);
+    expect(screen.getByTestId('pagination')).toBeInTheDocument();
+    expect(screen.getByText('Page 1')).toBeInTheDocument();
+  });
+
+  it('does not show pagination when all results fit on one page', () => {
+    (useEndpointUsers as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockUsers, isLoading: false, error: null, // totalResults: 3, fits in one page
+    });
+    wrap(<UsersTab endpointId="ep-1" />);
+    expect(screen.queryByTestId('pagination')).not.toBeInTheDocument();
+  });
+
+  it('next button calls with incremented startIndex', () => {
+    (useEndpointUsers as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { ...mockUsers, totalResults: 50, itemsPerPage: 20 },
+      isLoading: false, error: null,
+    });
+    wrap(<UsersTab endpointId="ep-1" />);
+    const nextBtn = screen.getByTestId('pagination-next');
+    fireEvent.click(nextBtn);
+    // After click, useEndpointUsers should be called with startIndex=21
+    expect(useEndpointUsers).toHaveBeenCalledWith('ep-1', expect.objectContaining({ startIndex: 21 }));
+  });
 });

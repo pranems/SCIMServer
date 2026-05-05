@@ -1,18 +1,22 @@
 /**
  * LogsTab - filterable request log list for an endpoint.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import {
   makeStyles,
   tokens,
   Text,
   Badge,
+  Button,
   Spinner,
+  SearchBox,
   Caption1,
   Subtitle2,
 } from '@fluentui/react-components';
-import { fetchWithAuth, queryKeys } from '../api/queries';
+import { fetchWithAuth } from '../api/queries';
 import { useQuery } from '@tanstack/react-query';
+
+const PAGE_SIZE = 20;
 
 const useStyles = makeStyles({
   container: { display: 'flex', flexDirection: 'column', gap: '12px' },
@@ -24,6 +28,7 @@ const useStyles = makeStyles({
   center: { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '150px' },
   empty: { textAlign: 'center' as const, padding: '32px', color: tokens.colorNeutralForeground3 },
   method: { fontFamily: 'monospace', minWidth: '48px', textAlign: 'center' as const },
+  pagination: { display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '12px', padding: '12px 0' },
 });
 
 function methodColor(m: string): 'brand' | 'success' | 'warning' | 'danger' | 'informative' {
@@ -41,10 +46,18 @@ interface LogsTabProps {
 }
 
 /** Hook to fetch logs for an endpoint */
-export function useEndpointLogs(endpointId: string) {
-  return useQuery<{ items: any[]; total: number }>({
-    queryKey: ['endpoint-logs', endpointId],
-    queryFn: () => fetchWithAuth(`/scim/admin/logs?endpointId=${endpointId}&pageSize=50`),
+export function useEndpointLogs(endpointId: string, page: number = 1, search: string = '') {
+  return useQuery<{ items: any[]; total: number; page: number; pageSize: number; hasNext: boolean; hasPrev: boolean }>({
+    queryKey: ['endpoint-logs', endpointId, page, search],
+    queryFn: () => {
+      const params = new URLSearchParams({
+        endpointId,
+        pageSize: String(PAGE_SIZE),
+        page: String(page),
+      });
+      if (search) params.set('urlContains', search);
+      return fetchWithAuth(`/scim/admin/logs?${params.toString()}`);
+    },
     enabled: !!endpointId,
     staleTime: 10_000,
   });
@@ -52,7 +65,9 @@ export function useEndpointLogs(endpointId: string) {
 
 export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
   const classes = useStyles();
-  const { data, isLoading, error } = useEndpointLogs(endpointId);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const { data, isLoading, error } = useEndpointLogs(endpointId, page, search);
 
   if (isLoading) {
     return (
@@ -84,6 +99,13 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
     <div className={classes.container} data-testid="logs-tab">
       <div className={classes.header}>
         <Subtitle2>{data?.total ?? logs.length} logs</Subtitle2>
+        <SearchBox
+          placeholder="Filter by URL..."
+          value={search}
+          onChange={(_, d) => { setSearch(d.value); setPage(1); }}
+          data-testid="logs-tab-search"
+          style={{ minWidth: '200px' }}
+        />
       </div>
       <table className={classes.table}>
         <thead>
@@ -123,6 +145,14 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
           ))}
         </tbody>
       </table>
+
+      {(data?.total ?? 0) > PAGE_SIZE && (
+        <div className={classes.pagination} data-testid="logs-pagination">
+          <Button appearance="subtle" disabled={!data?.hasPrev} onClick={() => setPage(Math.max(1, page - 1))}>Previous</Button>
+          <Text>Page {page}</Text>
+          <Button appearance="subtle" disabled={!data?.hasNext} onClick={() => setPage(page + 1)}>Next</Button>
+        </div>
+      )}
     </div>
   );
 };

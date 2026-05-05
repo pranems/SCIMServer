@@ -6,17 +6,20 @@
  *
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md Phase 2 Step 2.4
  */
-import React from 'react';
+import React, { useState } from 'react';
 import {
   makeStyles,
   tokens,
   Text,
   Badge,
+  Button,
   Spinner,
   Caption1,
   Subtitle2,
 } from '@fluentui/react-components';
 import { useEndpointUsers } from '../api/queries';
+
+const PAGE_SIZE = 20;
 
 const useStyles = makeStyles({
   container: {
@@ -62,6 +65,13 @@ const useStyles = makeStyles({
     padding: '32px',
     color: tokens.colorNeutralForeground3,
   },
+  pagination: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '12px 0',
+  },
 });
 
 interface UsersTabProps {
@@ -70,7 +80,8 @@ interface UsersTabProps {
 
 export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
   const classes = useStyles();
-  const { data, isLoading, error } = useEndpointUsers(endpointId);
+  const [startIndex, setStartIndex] = useState(1);
+  const { data, isLoading, error } = useEndpointUsers(endpointId, { startIndex, count: PAGE_SIZE });
 
   if (isLoading) {
     return (
@@ -142,6 +153,28 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
           ))}
         </tbody>
       </table>
+
+      {total > PAGE_SIZE && (
+        <div className={classes.pagination} data-testid="pagination">
+          <Button
+            appearance="subtle"
+            disabled={startIndex <= 1}
+            onClick={() => setStartIndex(Math.max(1, startIndex - PAGE_SIZE))}
+            data-testid="pagination-prev"
+          >
+            Previous
+          </Button>
+          <Text>Page {Math.ceil(startIndex / PAGE_SIZE)}</Text>
+          <Button
+            appearance="subtle"
+            disabled={startIndex + PAGE_SIZE > total}
+            onClick={() => setStartIndex(startIndex + PAGE_SIZE)}
+            data-testid="pagination-next"
+          >
+            Next
+          </Button>
+        </div>
+      )}
     </div>
   );
 };
