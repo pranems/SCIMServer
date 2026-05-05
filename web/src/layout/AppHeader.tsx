@@ -12,9 +12,11 @@ import {
 import {
   WeatherMoon24Regular,
   WeatherSunny24Regular,
+  Key24Regular,
 } from '@fluentui/react-icons';
 import { HEADER_HEIGHT } from '../design/tokens';
 import { useUIStore } from '../store/ui-store';
+import { clearStoredToken, notifyTokenInvalid } from '../auth/token';
 
 const useStyles = makeStyles({
   header: {
@@ -56,6 +58,16 @@ export const AppHeader: React.FC = () => {
       </div>
 
       <div className={classes.actions}>
+        <Tooltip content="Change token" relationship="label">
+          <Button
+            appearance="subtle"
+            icon={<Key24Regular />}
+            onClick={() => { clearStoredToken(); notifyTokenInvalid(); }}
+            aria-label="Change token"
+            data-testid="change-token"
+            style={{ color: 'inherit' }}
+          />
+        </Tooltip>
         <Tooltip
           content={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
           relationship="label"

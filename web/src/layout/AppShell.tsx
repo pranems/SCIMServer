@@ -17,6 +17,7 @@ import { lightTheme, darkTheme } from '../design/theme';
 import { useUIStore } from '../store/ui-store';
 import { AppHeader } from './AppHeader';
 import { AppSidebar } from './AppSidebar';
+import { TokenGate } from './TokenGate';
 import { useSSE } from '../hooks/useSSE';
 import { DashboardPage } from '../pages/DashboardPage';
 import { EndpointsPage } from '../pages/EndpointsPage';
@@ -73,16 +74,18 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   return (
     <FluentProvider theme={theme}>
       <QueryClientProvider client={queryClient}>
-        <SSEProvider />
-        <div className={classes.root} data-testid="app-shell">
-          <AppHeader />
-          <div className={classes.body}>
-            <AppSidebar />
-            <main className={classes.content} data-testid="app-content">
-              {children ?? <PlaceholderDashboard />}
-            </main>
+        <TokenGate>
+          <SSEProvider />
+          <div className={classes.root} data-testid="app-shell">
+            <AppHeader />
+            <div className={classes.body}>
+              <AppSidebar />
+              <main className={classes.content} data-testid="app-content">
+                {children ?? <PlaceholderDashboard />}
+              </main>
+            </div>
           </div>
-        </div>
+        </TokenGate>
       </QueryClientProvider>
     </FluentProvider>
   );

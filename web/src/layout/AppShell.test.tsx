@@ -5,9 +5,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { AppShell } from './AppShell';
 import { useUIStore } from '../store/ui-store';
+import { setStoredToken } from '../auth/token';
 
-// Reset Zustand store between tests
+// Reset Zustand store + set auth token between tests
 beforeEach(() => {
+  setStoredToken('test-token');
   useUIStore.setState({
     sidebarCollapsed: false,
     commandPaletteOpen: false,
