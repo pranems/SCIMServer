@@ -20,6 +20,8 @@ import { AppSidebar } from './AppSidebar';
 import { DashboardPage } from '../pages/DashboardPage';
 import { EndpointsPage } from '../pages/EndpointsPage';
 import { EndpointDetailPage } from '../pages/EndpointDetailPage';
+import { LogsPage } from '../pages/LogsPage';
+import { SettingsPage } from '../pages/SettingsPage';
 
 const useStyles = makeStyles({
   root: {
@@ -97,6 +99,14 @@ const PlaceholderDashboard: React.FC = () => {
 
   if (pathname === '/endpoints') {
     return <EndpointsPage />;
+  }
+
+  if (pathname === '/logs') {
+    return <LogsPage />;
+  }
+
+  if (pathname === '/settings') {
+    return <SettingsPage />;
   }
 
   return <DashboardPage />;
