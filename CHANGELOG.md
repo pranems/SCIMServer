@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.41.0] - 2026-05-04
+
+### UI Redesign - Full Fluent UI v9 Frontend
+
+**Complete UI redesign from legacy tab-based app to modern Fluent UI v9 admin dashboard.**
+
+#### Backend BFF (UI-B1 through UI-B6)
+- **feat(ui-b1)**: Shared TypeScript type contracts (`dashboard.types.ts`) + `@scim/types` Vite alias for compile-time API/UI contract enforcement
+- **feat(ui-b2)**: `StatsProjectionService` - materialized in-memory counter cache with EventEmitter2 `@OnEvent` decorators, 60s periodic reconciliation, per-endpoint error isolation. Zero DB queries for dashboard stats. 39 unit tests.
+- **feat(ui-b3)**: Event emission from all 3 SCIM services (Users/Groups/Generic) - `USER_CREATED`, `USER_DELETED`, `USER_STATUS_CHANGED`, `GROUP_CREATED`, `GROUP_DELETED`, `RESOURCE_CREATED`, `RESOURCE_DELETED` events emitted after successful DB commit
+- **feat(ui-b4)**: `NameResolverService` - LRU cache (1000 entries, 5-min TTL) with batch `resolveUserNames()` for N+1 elimination in activity feed. 13 unit tests.
+- **perf(ui-b5)**: Cache version/container info at `AdminController` construction - eliminates per-request `package.json` + `/proc/self/cgroup` reads
+- **feat(ui-b6)**: `DashboardController` BFF - `GET /admin/dashboard` aggregates health, stats, endpoints, activity in single response with 0 DB queries. 9 unit tests.
+
+#### Frontend (Phases 1-5)
+- **Phase 1**: Fluent UI v9 design system (light/dark themes), TanStack Query v5, Zustand store, AppShell layout (collapsible sidebar + header), `fetchWithAuth` API wrapper, `?ui=next` feature flag. 16 tests.
+- **Phase 2**: DashboardPage (4 KPI cards, endpoint grid, activity feed), EndpointsPage (card grid with search), EndpointDetailPage (tabbed layout: Overview|Users|Groups|Logs|Settings), UsersTab (data table with active badges), GroupsTab (member counts), LogsTab (method/status badges), SettingsTab (config flags). 40 tests.
+- **Phase 3**: LogsPage (global logs with URL search), SettingsPage (version/health/storage info cards). 5 tests.
+- **Phase 4**: SSE real-time cache invalidation via `useSSE` hook - EventSource with exponential backoff reconnect, TanStack Query cache invalidation on SCIM mutation events. 6 tests.
+- **Phase 5**: Cutover - new Fluent UI is now the default, `?ui=legacy` preserved for rollback.
+
+#### Dependencies Added
+- `@fluentui/react-components`, `@fluentui/react-icons` (design system)
+- `@tanstack/react-query`, `@tanstack/react-router` (server state + routing)
+- `zustand` (client state - 3 values: sidebar, theme, command palette)
+- `recharts` (charts), `msw` (dev - API mocking)
+- `@nestjs/event-emitter` (backend EventEmitter2)
+
+#### Test Counts
+- API: 3,612 unit tests (95 suites) - ALL PASSING
+- Web: 233 vitest tests (29 files) - ALL PASSING
+- Total: 3,845 tests
+- Production build: succeeds
+
 ### Ops - OPS-2: Digest Pinning in promote-to-prod
 
 - **fix(scripts)**: `scripts/promote-to-prod.ps1` now resolves the dev image's immutable SHA-256 digest BEFORE updating production. Production is pinned with `image@sha256:<digest>` instead of the previous mutable `image:<tag>` form. A re-pushed tag can no longer silently change prod after promotion.
