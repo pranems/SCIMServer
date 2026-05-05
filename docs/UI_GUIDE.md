@@ -1,7 +1,8 @@
 # SCIMServer UI Guide - v0.41.0
 
-> **Status:** Active | **Last Updated:** 2026-05-04 | **Version:** 0.41.0  
-> New Fluent UI v9 is the **default**. Legacy tab-based UI available via `?ui=legacy`.
+> **Status:** Active | **Last Updated:** 2026-05-05 | **Version:** 0.41.0  
+> New Fluent UI v9 is the **default**. Legacy tab-based UI available via `?ui=legacy`.  
+> All screenshots below are from the **live Azure dev deployment** - verified by the smoke test.
 
 ---
 
@@ -45,6 +46,16 @@ Default (no query param)  -->  New Fluent UI (AppShell + Sidebar + Pages)
 ?ui=legacy                -->  Old tab-based UI (preserved for one release cycle)
 ?ui=next                  -->  New Fluent UI (alias, same as default)
 ```
+
+### First Visit: Token Dialog
+
+On first visit (no token stored), a Fluent UI dialog prompts for the bearer token:
+
+![Token dialog](screenshots/01-token-dialog.png)
+
+After entering the token and clicking **Save Token**, the dashboard loads:
+
+![Dashboard after login](screenshots/03-dashboard-after-login.png)
 
 ---
 
@@ -141,9 +152,9 @@ The app shell provides a consistent three-zone layout across all pages.
 
 | State | Screenshot | Description |
 |-------|------------|-------------|
-| Expanded sidebar | `01b-new-ui-sidebar-expanded.png` | Full 240px sidebar with text labels + icons |
-| Collapsed sidebar | `01c-new-ui-sidebar-collapsed.png` | Minimal 48px sidebar with icons only + tooltips |
-| Header | `01a-new-ui-header.png` | Brand-colored header bar with title and theme toggle |
+| Expanded sidebar | ![Expanded](screenshots/21-sidebar-expanded.png) | Full 240px sidebar with text labels + icons |
+| Collapsed sidebar | ![Collapsed](screenshots/22-sidebar-collapsed.png) | Minimal 48px sidebar with icons only + tooltips |
+| Header | ![Header](screenshots/03-dashboard-after-login.png) | Brand-colored header bar with title and theme toggle |
 
 ### Sidebar Navigation
 
@@ -165,6 +176,8 @@ The active nav item shows `aria-current="page"` and a highlighted background via
 **DB queries:** 0 for stats (in-memory `StatsProjectionService`), 1 for endpoints, 1 for recent logs
 
 ### Screenshot: `02-new-ui-dashboard-full.png`
+
+![Dashboard full](screenshots/04-dashboard-full.png)
 
 ### Layout
 
@@ -216,6 +229,8 @@ The active nav item shows `aria-current="page"` and a highlighted background via
 
 ### Screenshot: `03-new-ui-endpoints-page.png`
 
+![Endpoints page](screenshots/08-endpoints-page.png)
+
 ### Features
 - **Search filter**: Client-side filter by `name` or `displayName`
 - **Card grid**: Auto-fill responsive grid (`minmax(320px, 1fr)`)
@@ -239,6 +254,17 @@ The active nav item shows `aria-current="page"` and a highlighted background via
 **Data sources:** `useEndpoint(id)` + `useEndpointStats(id)`
 
 ### Screenshot: `04-new-ui-endpoint-detail.png`
+
+![Endpoint detail](screenshots/31-endpoint-detail-from-card.png)
+
+#### Tab Screenshots
+
+| Tab | Screenshot |
+|-----|------------|
+| Users | ![Users tab](screenshots/32-detail-tab-users.png) |
+| Groups | ![Groups tab](screenshots/32-detail-tab-groups.png) |
+| Logs | ![Logs tab](screenshots/32-detail-tab-logs.png) |
+| Settings | ![Settings tab](screenshots/32-detail-tab-settings.png) |
 
 ### Layout
 
@@ -282,6 +308,8 @@ The active nav item shows `aria-current="page"` and a highlighted background via
 
 ### Screenshot: `05-new-ui-logs-page.png`
 
+![Global logs](screenshots/16-logs-full.png)
+
 ### Features
 - **URL search**: Server-side filter via `urlContains` query parameter
 - **5-column table**: Method (colored badge), URL (monospace), Status (colored badge), Duration, Time
@@ -296,6 +324,8 @@ The active nav item shows `aria-current="page"` and a highlighted background via
 **Data sources:** `useVersion()` (60s stale) + `useHealth()` (10s stale, 30s refetch interval)
 
 ### Screenshot: `06-new-ui-settings-page.png`
+
+![Settings page](screenshots/14-settings-full.png)
 
 ### Cards
 
@@ -336,10 +366,8 @@ Theme preference is persisted to `localStorage` under key `scim-color-scheme`.
 
 | Theme | Screenshot | Key Visual Differences |
 |-------|------------|----------------------|
-| Light | `01d-new-ui-light-theme.png` | White backgrounds, dark text, blue brand bar |
-| Dark | `01e-new-ui-dark-theme.png` | Dark gray backgrounds, light text, darker brand bar |
-| Light (contrast) | `32a-a11y-contrast-light.png` | Same as light, captured for a11y review |
-| Dark (contrast) | `32b-a11y-contrast-dark.png` | Same as dark, captured for a11y review |
+| Light | ![Light](screenshots/18-theme-light.png) | White backgrounds, dark text, blue brand bar |
+| Dark | ![Dark](screenshots/19-theme-dark.png) | Dark gray backgrounds, light text, darker brand bar |
 
 ---
 
@@ -357,9 +385,8 @@ The UI adapts to three viewport tiers:
 
 | Viewport | Page | Screenshot |
 |----------|------|------------|
-| Mobile (375x812) | Dashboard | `08a-new-ui-mobile-dashboard.png` |
-| Mobile (375x812) | Endpoints | `08b-new-ui-mobile-endpoints.png` |
-| Mobile (375x812) | Settings | `08c-new-ui-mobile-settings.png` |
+| Mobile (375x812) | Dashboard | ![Mobile dashboard](screenshots/26-mobile-dashboard.png) |
+| Mobile (375x812) | Settings | ![Mobile settings](screenshots/27-mobile-settings.png) |
 | Tablet (768x1024) | Dashboard | `08d-new-ui-tablet-dashboard.png` |
 
 ---
@@ -428,9 +455,8 @@ The legacy UI uses:
 
 | View | Screenshot |
 |------|------------|
-| Default (activity) | `10-legacy-ui-full.png` |
-| Authenticated | `10a-legacy-ui-authenticated.png` |
-| Database browser | `12-legacy-ui-database-browser.png` |
+| Initial (token modal) | ![Legacy initial](screenshots/28-legacy-initial.png) |
+| After authentication | ![Legacy auth](screenshots/29-legacy-authenticated.png) |
 | Raw logs | `13-legacy-ui-logs.png` |
 | Manual provision | `14-legacy-ui-manual-provision.png` |
 | Light theme | `15a-legacy-ui-light-theme.png` |
