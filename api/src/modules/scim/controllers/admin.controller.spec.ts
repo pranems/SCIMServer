@@ -260,11 +260,23 @@ describe('AdminController', () => {
       }
     });
 
-    it('should use APP_VERSION env when available', () => {
+    it('should use APP_VERSION env when available', async () => {
       const orig = process.env.APP_VERSION;
       process.env.APP_VERSION = '99.0.0';
       try {
-        const result = controller.getVersion();
+        // Version is cached at construction time, so we need a fresh controller
+        const freshModule = await Test.createTestingModule({
+          controllers: [AdminController],
+          providers: [
+            { provide: LoggingService, useValue: mockLoggingService },
+            { provide: PrismaService, useValue: mockPrisma },
+            { provide: EndpointService, useValue: mockEndpointService },
+            { provide: EndpointScimUsersService, useValue: mockUsersService },
+            { provide: EndpointScimGroupsService, useValue: mockGroupsService },
+          ],
+        }).compile();
+        const freshController = freshModule.get(AdminController);
+        const result = freshController.getVersion();
         expect(result.version).toBe('99.0.0');
       } finally {
         if (orig) process.env.APP_VERSION = orig;

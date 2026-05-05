@@ -101,13 +101,22 @@ const serviceBootTime = new Date();
 
 @Controller('admin')
 export class AdminController {
+  /** Cached at construction - these values never change during runtime. */
+  private readonly cachedVersion: string;
+  private readonly cachedContainerized: boolean;
+  private readonly cachedContainerId: string | undefined;
+
   constructor(
     private readonly loggingService: LoggingService,
     private readonly prisma: PrismaService,
     private readonly usersService: EndpointScimUsersService,
     private readonly groupsService: EndpointScimGroupsService,
     private readonly endpointService: EndpointService,
-  ) {}
+  ) {
+    this.cachedVersion = process.env.APP_VERSION || this.readPackageVersion();
+    this.cachedContainerized = this.isContainerized();
+    this.cachedContainerId = this.readContainerId();
+  }
 
   /**
    * Get or create a default endpoint for admin operations.
@@ -302,7 +311,7 @@ export class AdminController {
   @Get('version')
   getVersion(): VersionInfo {
     // Prefer explicit env vars injected at build/deploy time
-    const version = process.env.APP_VERSION || this.readPackageVersion();
+    const version = this.cachedVersion;
     const commit = process.env.GIT_COMMIT;
     const buildTime = process.env.BUILD_TIME;
     const now = new Date();
@@ -326,8 +335,8 @@ export class AdminController {
     const offsetMins = String(absMinutes % 60).padStart(2, '0');
     const utcOffset = `${offsetSign}${offsetHours}:${offsetMins}`;
 
-    // Container info - populated only when running in a container
-    const containerized = this.isContainerized();
+    // Container info - use cached values (no per-request FS reads)
+    const containerized = this.cachedContainerized;
     const containerBlock = containerized ? this.buildContainerInfo(databaseUrl) : undefined;
 
     return {
@@ -406,7 +415,7 @@ export class AdminController {
    */
   private buildContainerInfo(_databaseUrl: string | undefined): NonNullable<VersionInfo['container']> {
     // Container ID: hostname inside Docker is the short container ID
-    const containerId = this.readContainerId();
+    const containerId = this.cachedContainerId;
     const containerName = process.env.HOSTNAME || undefined;
 
     // Docker image: injected via DOCKER_IMAGE env or label
