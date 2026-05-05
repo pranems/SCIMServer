@@ -129,3 +129,46 @@ export function useEndpointStats(id: string) {
     staleTime: 30_000,
   });
 }
+
+/** SCIM list response shape */
+export interface ScimListResponse {
+  schemas: string[];
+  totalResults: number;
+  startIndex: number;
+  itemsPerPage: number;
+  Resources: Record<string, unknown>[];
+}
+
+/** Fetch SCIM users for an endpoint */
+export function useEndpointUsers(endpointId: string, params?: { startIndex?: number; count?: number; filter?: string }) {
+  return useQuery<ScimListResponse>({
+    queryKey: queryKeys.users.byEndpoint(endpointId, params),
+    queryFn: () => {
+      const qp = new URLSearchParams();
+      if (params?.startIndex) qp.set('startIndex', String(params.startIndex));
+      if (params?.count) qp.set('count', String(params.count));
+      if (params?.filter) qp.set('filter', params.filter);
+      const qs = qp.toString();
+      return fetchWithAuth(`/scim/endpoints/${endpointId}/v2/Users${qs ? `?${qs}` : ''}`);
+    },
+    enabled: !!endpointId,
+    staleTime: 15_000,
+  });
+}
+
+/** Fetch SCIM groups for an endpoint */
+export function useEndpointGroups(endpointId: string, params?: { startIndex?: number; count?: number; filter?: string }) {
+  return useQuery<ScimListResponse>({
+    queryKey: queryKeys.groups.byEndpoint(endpointId, params),
+    queryFn: () => {
+      const qp = new URLSearchParams();
+      if (params?.startIndex) qp.set('startIndex', String(params.startIndex));
+      if (params?.count) qp.set('count', String(params.count));
+      if (params?.filter) qp.set('filter', params.filter);
+      const qs = qp.toString();
+      return fetchWithAuth(`/scim/endpoints/${endpointId}/v2/Groups${qs ? `?${qs}` : ''}`);
+    },
+    enabled: !!endpointId,
+    staleTime: 15_000,
+  });
+}

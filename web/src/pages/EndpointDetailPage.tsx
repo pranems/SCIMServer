@@ -29,6 +29,8 @@ import {
 } from '@fluentui/react-icons';
 import { useEndpoint, useEndpointStats } from '../api/queries';
 import type { EndpointStatsResponse } from '@scim/types/dashboard.types';
+import { UsersTab } from './UsersTab';
+import { GroupsTab } from './GroupsTab';
 
 const useStyles = makeStyles({
   page: {
@@ -157,10 +159,10 @@ export const EndpointDetailPage: React.FC<EndpointDetailPageProps> = ({ endpoint
           <OverviewTab stats={stats} loading={loadingStats} />
         )}
         {activeTab === 'users' && (
-          <PlaceholderTab name="Users" testId="tab-users" />
+          <div data-testid="tab-users"><UsersTab endpointId={endpointId} /></div>
         )}
         {activeTab === 'groups' && (
-          <PlaceholderTab name="Groups" testId="tab-groups" />
+          <div data-testid="tab-groups"><GroupsTab endpointId={endpointId} /></div>
         )}
         {activeTab === 'logs' && (
           <PlaceholderTab name="Logs" testId="tab-logs" />
