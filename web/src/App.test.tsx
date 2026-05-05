@@ -159,4 +159,16 @@ describe('App', () => {
       expect(versionText).toBeInTheDocument();
     });
   });
+
+  // ── ?ui=next Feature Flag ──────────────────────────────────────────
+
+  describe('?ui=next feature flag', () => {
+    it('renders legacy UI by default (no ?ui param)', () => {
+      // Default URL has no query params - should render legacy
+      render(<App />);
+      // Legacy UI has the token modal or the tab-based layout
+      // Just verify the new shell is NOT rendered
+      expect(screen.queryByTestId('app-shell')).not.toBeInTheDocument();
+    });
+  });
 });

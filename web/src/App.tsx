@@ -678,5 +678,27 @@ const AppWithTheme: React.FC = () => {
   );
 };
 
-export const App = AppWithTheme;
+/**
+ * Root App component with ?ui=next feature flag.
+ *
+ * - Default: renders existing tab-based legacy UI (AppWithTheme)
+ * - ?ui=next: renders new Fluent UI redesigned shell (AppShell)
+ * - ?ui=legacy: always renders legacy UI (useful after default flips)
+ *
+ * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md D9
+ * @see docs/DELIVERY_PLAN.md Phase 1.6
+ */
+export const App: React.FC = () => {
+  const params = new URLSearchParams(window.location.search);
+  const uiFlag = params.get('ui');
+
+  if (uiFlag === 'next') {
+    // Lazy-load the new UI shell to avoid bundling it for legacy users
+    const { AppShell } = require('./layout/AppShell');
+    return <AppShell />;
+  }
+
+  // Default: legacy tab-based UI
+  return <AppWithTheme />;
+};
 
