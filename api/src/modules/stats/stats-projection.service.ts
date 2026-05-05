@@ -23,6 +23,7 @@ import { GENERIC_RESOURCE_REPOSITORY } from '../../domain/repositories/repositor
 import type { IUserRepository } from '../../domain/repositories/user.repository.interface';
 import type { IGroupRepository } from '../../domain/repositories/group.repository.interface';
 import type { IGenericResourceRepository } from '../../domain/repositories/generic-resource.repository.interface';
+import { EndpointService } from '../endpoint/services/endpoint.service';
 
 import {
   SCIM_EVENTS,
@@ -60,8 +61,7 @@ export class StatsProjectionService implements OnModuleInit {
     @Optional()
     @Inject(GENERIC_RESOURCE_REPOSITORY)
     private readonly genericRepo: IGenericResourceRepository | null,
-    @Inject('EndpointService')
-    private readonly endpointService: { listEndpoints(): Promise<{ totalResults: number; endpoints: { id: string }[] }> },
+    private readonly endpointService: EndpointService,
   ) {}
 
   // ─── Lifecycle ──────────────────────────────────────────────────────
