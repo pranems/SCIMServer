@@ -17,6 +17,7 @@ import { lightTheme, darkTheme } from '../design/theme';
 import { useUIStore } from '../store/ui-store';
 import { AppHeader } from './AppHeader';
 import { AppSidebar } from './AppSidebar';
+import { useSSE } from '../hooks/useSSE';
 import { DashboardPage } from '../pages/DashboardPage';
 import { EndpointsPage } from '../pages/EndpointsPage';
 import { EndpointDetailPage } from '../pages/EndpointDetailPage';
@@ -72,6 +73,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   return (
     <FluentProvider theme={theme}>
       <QueryClientProvider client={queryClient}>
+        <SSEProvider />
         <div className={classes.root} data-testid="app-shell">
           <AppHeader />
           <div className={classes.body}>
@@ -110,4 +112,10 @@ const PlaceholderDashboard: React.FC = () => {
   }
 
   return <DashboardPage />;
+};
+
+/** SSE connection provider - invalidates TanStack Query cache on SCIM events */
+const SSEProvider: React.FC = () => {
+  useSSE();
+  return null;
 };
