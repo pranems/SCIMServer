@@ -10,6 +10,7 @@ import { ActivityFeed } from './components/activity/ActivityFeed';
 import { ManualProvision } from './components/manual/ManualProvision';
 import { ThemeProvider } from './hooks/useTheme';
 import { useAuth, AuthProvider } from './hooks/useAuth';
+import { AppShell } from './layout/AppShell';
 import './theme.css';
 import styles from './app.module.css';
 import { isKeepaliveLog } from './utils/keepalive';
@@ -679,26 +680,26 @@ const AppWithTheme: React.FC = () => {
 };
 
 /**
- * Root App component with ?ui=next feature flag.
+ * Root App component with UI toggle.
  *
- * - Default: renders existing tab-based legacy UI (AppWithTheme)
- * - ?ui=next: renders new Fluent UI redesigned shell (AppShell)
- * - ?ui=legacy: always renders legacy UI (useful after default flips)
+ * Phase 5 Cutover:
+ * - Default: renders new Fluent UI redesigned shell (AppShell)
+ * - ?ui=legacy: renders old tab-based UI (AppWithTheme)
+ * - ?ui=next: also renders new UI (kept for backwards compat)
  *
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md D9
- * @see docs/DELIVERY_PLAN.md Phase 1.6
+ * @see docs/DELIVERY_PLAN.md Phase 5
  */
 export const App: React.FC = () => {
   const params = new URLSearchParams(window.location.search);
   const uiFlag = params.get('ui');
 
-  if (uiFlag === 'next') {
-    // Lazy-load the new UI shell to avoid bundling it for legacy users
-    const { AppShell } = require('./layout/AppShell');
-    return <AppShell />;
+  if (uiFlag === 'legacy') {
+    // Opt-in to legacy UI for one release cycle
+    return <AppWithTheme />;
   }
 
-  // Default: legacy tab-based UI
-  return <AppWithTheme />;
+  // Default: new Fluent UI shell
+  return <AppShell />;
 };
 

@@ -370,14 +370,14 @@ Aggregates everything the dashboard needs in **one response** (0 DB queries):
 ```mermaid
 flowchart LR
     subgraph "Current: N+1 Pattern"
-        L1[Log Entry 1] --> Q1[SELECT ... WHERE scimId = 'id-1']
-        L2[Log Entry 2] --> Q2[SELECT ... WHERE scimId = 'id-2']
-        L3[Log Entry ...] --> Q3[SELECT ... WHERE scimId = 'id-...']
-        L50[Log Entry 50] --> Q50[SELECT ... WHERE scimId = 'id-50']
+        L1[Log Entry 1] --> Q1["SELECT WHERE scimId = id-1"]
+        L2[Log Entry 2] --> Q2["SELECT WHERE scimId = id-2"]
+        L3[Log Entry ...] --> Q3["SELECT WHERE scimId = id-..."]
+        L50[Log Entry 50] --> Q50["SELECT WHERE scimId = id-50"]
     end
 
     subgraph "New: Batched Pattern"
-        B1[Collect all IDs<br>from 50 entries] --> BQ[SELECT ... WHERE<br>scimId IN ('id-1', 'id-2', ..., 'id-50')]
+        B1[Collect all IDs<br>from 50 entries] --> BQ["SELECT WHERE scimId IN<br>id-1, id-2, ..., id-50"]
         BQ --> MAP[Map of id to displayName]
         MAP --> P1[Parse entry 1]
         MAP --> P2[Parse entry 2]

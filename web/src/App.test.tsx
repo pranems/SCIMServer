@@ -26,6 +26,11 @@ vi.mock('./components/Header', () => ({
   Header: () => <div data-testid="header">Header</div>,
 }));
 
+// Mock the new AppShell for isolation
+vi.mock('./layout/AppShell', () => ({
+  AppShell: () => <div data-testid="app-shell">AppShell</div>,
+}));
+
 // Mock API client
 vi.mock('./api/client', () => ({
   fetchLogs: vi.fn().mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 50, count: 0, hasNext: false, hasPrev: false }),
@@ -40,6 +45,11 @@ describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearStoredToken();
+    // Set legacy mode for these tests (they test legacy UI behavior)
+    Object.defineProperty(window, 'location', {
+      value: { ...window.location, search: '?ui=legacy' },
+      writable: true,
+    });
   });
 
   // ── Token Modal ────────────────────────────────────────────────────
@@ -160,14 +170,27 @@ describe('App', () => {
     });
   });
 
-  // ── ?ui=next Feature Flag ──────────────────────────────────────────
+  // ── UI Cutover ─────────────────────────────────────────────────────
 
-  describe('?ui=next feature flag', () => {
-    it('renders legacy UI by default (no ?ui param)', () => {
-      // Default URL has no query params - should render legacy
+  describe('UI cutover (Phase 5)', () => {
+    it('renders new Fluent UI by default', () => {
+      // Override to no query param (default)
+      Object.defineProperty(window, 'location', {
+        value: { ...window.location, search: '' },
+        writable: true,
+      });
       render(<App />);
-      // Legacy UI has the token modal or the tab-based layout
-      // Just verify the new shell is NOT rendered
+      // Default is now the new AppShell
+      expect(screen.getByTestId('app-shell')).toBeInTheDocument();
+    });
+
+    it('renders legacy UI with ?ui=legacy', () => {
+      Object.defineProperty(window, 'location', {
+        value: { ...window.location, search: '?ui=legacy' },
+        writable: true,
+      });
+      render(<App />);
+      // Legacy UI should NOT have app-shell
       expect(screen.queryByTestId('app-shell')).not.toBeInTheDocument();
     });
   });
