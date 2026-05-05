@@ -85,11 +85,12 @@ export const AppSidebar: React.FC = () => {
   const classes = useStyles();
   const collapsed = useUIStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const currentPath = useUIStore((s) => s.currentPath);
+  const navigate = useUIStore((s) => s.navigate);
 
-  // Derive active route from current pathname
-  const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
+  // Derive active route from store path
   const activeKey = NAV_ITEMS.find(
-    (item) => item.href === '/' ? pathname === '/' : pathname.startsWith(item.href),
+    (item) => item.href === '/' ? currentPath === '/' : currentPath.startsWith(item.href),
   )?.key ?? 'dashboard';
 
   return (
@@ -105,6 +106,10 @@ export const AppSidebar: React.FC = () => {
             <a
               key={item.key}
               href={item.href}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate(item.href);
+              }}
               className={`${classes.navItem} ${isActive ? classes.navItemActive : ''}`}
               aria-current={isActive ? 'page' : undefined}
             >

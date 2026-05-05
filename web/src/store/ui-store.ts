@@ -15,17 +15,22 @@ interface UIState {
   commandPaletteOpen: boolean;
   /** Current color scheme */
   colorScheme: 'light' | 'dark' | 'system';
+  /** Current pathname for client-side routing */
+  currentPath: string;
 
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleCommandPalette: () => void;
   setColorScheme: (scheme: 'light' | 'dark' | 'system') => void;
+  /** Navigate to a path (client-side, no page reload) */
+  navigate: (path: string) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
   sidebarCollapsed: false,
   commandPaletteOpen: false,
   colorScheme: (localStorage.getItem('scim-color-scheme') as 'light' | 'dark' | 'system') ?? 'system',
+  currentPath: typeof window !== 'undefined' ? window.location.pathname : '/',
 
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
@@ -33,5 +38,9 @@ export const useUIStore = create<UIState>((set) => ({
   setColorScheme: (scheme) => {
     localStorage.setItem('scim-color-scheme', scheme);
     set({ colorScheme: scheme });
+  },
+  navigate: (path) => {
+    window.history.pushState({}, '', path);
+    set({ currentPath: path });
   },
 }));

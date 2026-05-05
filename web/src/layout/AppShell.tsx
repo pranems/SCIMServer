@@ -81,7 +81,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
             <div className={classes.body}>
               <AppSidebar />
               <main className={classes.content} data-testid="app-content">
-                {children ?? <PlaceholderDashboard />}
+                {children ?? <AppRouter />}
               </main>
             </div>
           </div>
@@ -91,26 +91,25 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   );
 };
 
-/** Placeholder until Phase 2 dashboard page is built */
-const PlaceholderDashboard: React.FC = () => {
-  // Simple pathname-based routing until TanStack Router is wired with real pages
-  const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
+/** Client-side router - reads path from Zustand store */
+const AppRouter: React.FC = () => {
+  const currentPath = useUIStore((s) => s.currentPath);
 
   // /endpoints/:id -> EndpointDetailPage
-  const endpointDetailMatch = pathname.match(/^\/endpoints\/([^/]+)/);
+  const endpointDetailMatch = currentPath.match(/^\/endpoints\/([^/]+)/);
   if (endpointDetailMatch) {
     return <EndpointDetailPage endpointId={endpointDetailMatch[1]} />;
   }
 
-  if (pathname === '/endpoints') {
+  if (currentPath === '/endpoints') {
     return <EndpointsPage />;
   }
 
-  if (pathname === '/logs') {
+  if (currentPath === '/logs') {
     return <LogsPage />;
   }
 
-  if (pathname === '/settings') {
+  if (currentPath === '/settings') {
     return <SettingsPage />;
   }
 
