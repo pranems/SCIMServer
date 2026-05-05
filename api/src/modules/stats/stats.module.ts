@@ -13,10 +13,11 @@
 import { Module } from '@nestjs/common';
 import { EndpointModule } from '../endpoint/endpoint.module';
 import { StatsProjectionService } from './stats-projection.service';
+import { NameResolverService } from './name-resolver.service';
 
 @Module({
   imports: [EndpointModule],
-  providers: [StatsProjectionService],
-  exports: [StatsProjectionService],
+  providers: [StatsProjectionService, NameResolverService],
+  exports: [StatsProjectionService, NameResolverService],
 })
 export class StatsModule {}
