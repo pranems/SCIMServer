@@ -311,7 +311,7 @@ test.describe('Smoke Test - Complete User Flows', () => {
     await screenshot(page, '29-legacy-authenticated');
   });
 
-  test('12. Click endpoint card navigates to detail page', async ({ page }) => {
+  test('12. Click endpoint card navigates to detail page + all tabs load', async ({ page }) => {
     await page.goto('/');
     await page.evaluate((t) => localStorage.setItem('scimserver.authToken', t), TOKEN);
     await page.reload();
@@ -325,23 +325,30 @@ test.describe('Smoke Test - Complete User Flows', () => {
       await page.waitForTimeout(3000);
       await screenshot(page, '31-endpoint-detail-from-card');
 
-      // Should see the detail page with tabs
+      // MUST see the detail page
       const detailPage = page.getByTestId('endpoint-detail-page');
-      const hasDetail = await detailPage.isVisible().catch(() => false);
-      expect(hasDetail).toBeTruthy();
+      await expect(detailPage).toBeVisible({ timeout: 5000 });
 
-      // Should see the back button
+      // MUST see the back button
       const backBtn = page.getByTestId('back-to-endpoints');
       await expect(backBtn).toBeVisible();
 
-      // Click through each tab
+      // Click each tab and VERIFY no error text appears
       const tabs = ['Users', 'Groups', 'Logs', 'Settings'];
       for (const tabName of tabs) {
         const tab = page.getByRole('tab', { name: new RegExp(tabName, 'i') });
-        if (await tab.isVisible().catch(() => false)) {
-          await tab.click();
-          await page.waitForTimeout(2000);
-          await screenshot(page, `32-detail-tab-${tabName.toLowerCase()}`);
+        await expect(tab).toBeVisible();
+        await tab.click();
+        await page.waitForTimeout(3000);
+        await screenshot(page, `32-detail-tab-${tabName.toLowerCase()}`);
+
+        // CRITICAL: Verify no "Failed to load" error appears in the tab content
+        const bodyText = await page.textContent('body') ?? '';
+        if (bodyText.includes('Failed to load')) {
+          await screenshot(page, `32-detail-tab-${tabName.toLowerCase()}-ERROR`);
+          // Fail the test explicitly with the error message
+          const errorMatch = bodyText.match(/Failed to load[^.]+/);
+          expect(errorMatch).toBeNull();
         }
       }
 
@@ -349,6 +356,9 @@ test.describe('Smoke Test - Complete User Flows', () => {
       await backBtn.click();
       await page.waitForTimeout(2000);
       await screenshot(page, '33-back-to-endpoints');
+      // Verify we're back on a page (not 404)
+      const body = await page.textContent('body') ?? '';
+      expect(body).not.toContain('Cannot GET');
     }
   });
 

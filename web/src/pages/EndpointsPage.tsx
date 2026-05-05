@@ -137,14 +137,7 @@ export const EndpointsPage: React.FC = () => {
               }
             />
             <div className={classes.cardBody}>
-              <div className={classes.stat}>
-                <People20Regular />
-                <Body1>users</Body1>
-              </div>
-              <div className={classes.stat}>
-                <PeopleTeam20Regular />
-                <Body1>groups</Body1>
-              </div>
+              <Caption1 style={{ fontFamily: 'monospace' }}>{ep.scimBasePath}</Caption1>
             </div>
           </Card>
         ))}

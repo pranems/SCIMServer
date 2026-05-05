@@ -149,7 +149,7 @@ export function useEndpointUsers(endpointId: string, params?: { startIndex?: num
       if (params?.count) qp.set('count', String(params.count));
       if (params?.filter) qp.set('filter', params.filter);
       const qs = qp.toString();
-      return fetchWithAuth(`/scim/endpoints/${endpointId}/v2/Users${qs ? `?${qs}` : ''}`);
+      return fetchWithAuth(`/scim/endpoints/${endpointId}/Users${qs ? `?${qs}` : ''}`);
     },
     enabled: !!endpointId,
     staleTime: 15_000,
@@ -166,7 +166,7 @@ export function useEndpointGroups(endpointId: string, params?: { startIndex?: nu
       if (params?.count) qp.set('count', String(params.count));
       if (params?.filter) qp.set('filter', params.filter);
       const qs = qp.toString();
-      return fetchWithAuth(`/scim/endpoints/${endpointId}/v2/Groups${qs ? `?${qs}` : ''}`);
+      return fetchWithAuth(`/scim/endpoints/${endpointId}/Groups${qs ? `?${qs}` : ''}`);
     },
     enabled: !!endpointId,
     staleTime: 15_000,
