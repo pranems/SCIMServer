@@ -32,10 +32,11 @@ describe('AppShell', () => {
     expect(screen.getByText('Custom Content')).toBeInTheDocument();
   });
 
-  it('renders placeholder dashboard when no children', () => {
+  it('renders content area for pages', () => {
     render(<AppShell />);
 
-    expect(screen.getByText('New UI shell loaded. Phase 2 screens coming soon.')).toBeInTheDocument();
+    // Dashboard page will show loading state or content
+    expect(screen.getByTestId('app-content')).toBeInTheDocument();
   });
 });
 

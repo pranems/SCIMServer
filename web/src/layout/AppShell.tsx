@@ -17,6 +17,8 @@ import { lightTheme, darkTheme } from '../design/theme';
 import { useUIStore } from '../store/ui-store';
 import { AppHeader } from './AppHeader';
 import { AppSidebar } from './AppSidebar';
+import { DashboardPage } from '../pages/DashboardPage';
+import { EndpointsPage } from '../pages/EndpointsPage';
 
 const useStyles = makeStyles({
   root: {
@@ -82,9 +84,13 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
 };
 
 /** Placeholder until Phase 2 dashboard page is built */
-const PlaceholderDashboard: React.FC = () => (
-  <div style={{ padding: '16px' }}>
-    <h2>Dashboard</h2>
-    <p>New UI shell loaded. Phase 2 screens coming soon.</p>
-  </div>
-);
+const PlaceholderDashboard: React.FC = () => {
+  // Simple pathname-based routing until TanStack Router is wired with real pages
+  const pathname = typeof window !== 'undefined' ? window.location.pathname : '/';
+
+  if (pathname.startsWith('/endpoints')) {
+    return <EndpointsPage />;
+  }
+
+  return <DashboardPage />;
+};
