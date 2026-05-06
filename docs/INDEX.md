@@ -1,7 +1,7 @@
 # SCIMServer Documentation Index
 
-> **Version:** 0.40.0 - **Updated:** April 28, 2026  
-> 84 API routes - 19 controllers - 6 presets - 16 config flags - 4,578 tests (3,429 unit + 1,149 E2E)
+> **Version:** 0.42.0-alpha.1 - **Updated:** May 6, 2026  
+> 84 API routes - 19 controllers - 6 presets - 16 config flags - 4,909 tests (3,612 unit + 1,104 E2E + 268 web vitest)
 
 ---
 
@@ -44,6 +44,7 @@
 | [UI_GUIDE.md](UI_GUIDE.md) | **v0.41.0 UI Guide** - Fluent UI pages, screenshots (59), components, data flow, SSE, accessibility, theme system, legacy UI |
 | [UI_REDESIGN_ARCHITECTURE_AND_PLAN.md](UI_REDESIGN_ARCHITECTURE_AND_PLAN.md) | **UI Redesign** - architecture options, BFF layer, event-driven stats, 42-step implementation plan |
 | [UI_REDESIGN_REMAINING_GAPS_PLAN.md](UI_REDESIGN_REMAINING_GAPS_PLAN.md) | **Remaining Gaps Plan** - dependency-ordered Phases A-I to reach 100% UI redesign compliance, mutation layer, cutover lifecycle, ~120 new tests, 12-16 days |
+| [PHASE_A1_TANSTACK_ROUTER_FOUNDATION.md](PHASE_A1_TANSTACK_ROUTER_FOUNDATION.md) | **Phase A1 - TanStack Router Foundation** (v0.42.0-alpha.1) - additive scaffolding (10 route files + zod search schemas + test helper), +28 web tests, no production code wired in yet (A2 = cutover) |
 | [DELIVERY_PLAN.md](DELIVERY_PLAN.md) | **Active 6-week delivery plan** - reconciles UI redesign + Tier-0 security + CI/CD upgrades into one operating model with named defects, TDD process, blue/green to prod, progress log |
 | [adr/ADR-004-enable-implicit-conversion.md](adr/ADR-004-enable-implicit-conversion.md) | ADR-004 - keep `enableImplicitConversion: true` (S-5 closure with regression-locked decision) |
 

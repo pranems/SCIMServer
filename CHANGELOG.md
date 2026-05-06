@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.42.0-alpha.1] - 2026-05-06
+
+### UI Redesign - Phase A1: TanStack Router Foundation (Additive)
+
+**First step of [docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md](docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md). Pure scaffolding - no production code path uses the new router yet. Cutover happens in Phase A2 (`0.42.0-beta.1`).**
+
+- **feat(ui-router) A1.1** (commit `5a2a911`): Installed `zod` (runtime, for URL search-param schemas) and `@tanstack/router-devtools` (devDependency, lazy-loaded only in `import.meta.env.DEV`). Caught and corrected an initial install that placed devtools in `dependencies`.
+- **feat(ui-router) A1.2** (commit `dbdc0ef`): TDD-first creation of [web/src/routes/search-schemas.ts](web/src/routes/search-schemas.ts) with six zod schemas (`paginationSchema`, `usersSearchSchema`, `groupsSearchSchema`, `logsSearchSchema`, `globalLogsSearchSchema`, `endpointsSearchSchema`) and `TIME_RANGE_VALUES` constant. Conventions: `page` 1-indexed, `pageSize` capped at 100, `z.coerce.number()` for URL strings, empty-string filter normalized to `undefined`. **+20 unit tests.**
+- **feat(ui-router) A1.3-A1.5** (commit `c06ebcf`): TanStack Router route tree shipped as one coherent commit (route files cross-reference each other; splitting creates non-compiling intermediate states). New files: [web/src/routes/__root.tsx](web/src/routes/__root.tsx) (RootLayout = `<Outlet />` + dev-only `TanStackRouterDevtools` via `React.lazy`), [web/src/routes/index.tsx](web/src/routes/index.tsx), [web/src/routes/endpoints.tsx](web/src/routes/endpoints.tsx) with `endpointsSearchSchema` validateSearch, [web/src/routes/endpoints.$endpointId.tsx](web/src/routes/endpoints.$endpointId.tsx) layout route with typed `$endpointId` param, four nested tab routes (`endpoints.$endpointId.users.tsx`, `.groups.tsx`, `.logs.tsx`, `.settings.tsx`) each with their own search schema, [web/src/routes/logs.tsx](web/src/routes/logs.tsx) with `globalLogsSearchSchema`, [web/src/routes/settings.tsx](web/src/routes/settings.tsx). Assembly file [web/src/router.ts](web/src/router.ts) builds the tree (`endpointDetailRoute.addChildren([usersTab, groupsTab, logsTab, settingsTab])`, `rootRoute.addChildren([...])`), exports configured `router` with `defaultPreload: 'intent'` + `defaultPreloadStaleTime: 30_000`, and registers TypeScript module augmentation so `useParams`/`useSearch` infer the correct types in consumer components. **+4 unit tests** ([web/src/router.test.ts](web/src/router.test.ts)).
+- **feat(ui-router) A1.6** (commit `de8133a`): Created [web/src/test/router-test-utils.tsx](web/src/test/router-test-utils.tsx) - `renderWithRouter(ui, { initialUrl, routePath, ...renderOptions })` mounts UI inside fresh in-memory router so `useParams`, `useSearch`, and `<Link>` work in tests. Fresh `QueryClient` per call (retry: false, staleTime: Infinity); catch-all default `routePath: '/$'` with opt-in typed params via `routePath: '/endpoints/$endpointId/users'`. Tests use async `findByTestId` because `RouterProvider` resolves the initial route asynchronously (documented in helper JSDoc). **+4 unit tests** ([web/src/test/router-test-utils.test.tsx](web/src/test/router-test-utils.test.tsx)).
+- **chore(ui-router) A1.9-A1.10**: Version bumped to `0.42.0-alpha.1` in both [api/package.json](api/package.json) and [web/package.json](web/package.json) (lockstep). New feature doc [docs/PHASE_A1_TANSTACK_ROUTER_FOUNDATION.md](docs/PHASE_A1_TANSTACK_ROUTER_FOUNDATION.md) with 9 sections, 2 Mermaid diagrams (route tree, test helper sequence), risk register, and definition-of-done checklist. Updated [docs/INDEX.md](docs/INDEX.md) and [Session_starter.md](Session_starter.md).
+
+#### What did NOT ship in A1 (deferred to A2 cutover)
+- [web/src/App.tsx](web/src/App.tsx) still uses old structure (no `<RouterProvider />`)
+- [web/src/layout/AppShell.tsx](web/src/layout/AppShell.tsx) still uses `AppRouter` regex matcher
+- [web/src/store/ui-store.ts](web/src/store/ui-store.ts) still has `currentPath`, `navigate()`, popstate listener
+- Sidebar/Dashboard/Endpoints pages still use Zustand `navigate` (will become `<Link>` in A2)
+
+#### Test Counts (web only - API unchanged)
+- Web: 240 -> 268 vitest tests (+28: 20 schemas, 4 router config, 4 test helper). All passing.
+- API: 3,612 unit + 1,104 E2E (unchanged - A1 is frontend-only)
+- Production build: `vite build` clean (9.51s)
+- TypeScript: 0 errors in new files
+
+#### Quality Gates
+- **TDD discipline**: every step Red -> Green (test file created first, confirmed failing, then implementation)
+- **Live tests + dev deploy**: deferred to A2 cutover (A1 is additive, zero runtime impact - no behavior to live-test)
+- **Per-phase gates** (`addMissingTests`, `apiContractVerification`, etc.): run as block at A2 cutover when behavior changes
+
 ### Tooling
 - **feat(dev-tooling)**: Prod -> dev mirror + synthetic shape-coverage seeder. New scripts [api/src/scripts/mirror-prod-to-dev.ts](api/src/scripts/mirror-prod-to-dev.ts) (two `PrismaClient` instances, upsert-by-PK with PII verbatim, orphan filtering, capped `RequestLog` window) and [api/src/scripts/seed-shape-coverage.ts](api/src/scripts/seed-shape-coverage.ts) (6 deterministic-UUID `shape-*` endpoints covering RFC strict / Entra lenient / custom extension / soft-delete-only / per-endpoint creds / custom resource type, with 3 users + 2 groups each = ~30 SCIM resources for full combinatorial coverage). PowerShell orchestrator [scripts/mirror-prod-to-dev.ps1](scripts/mirror-prod-to-dev.ps1) auto-resolves DB URLs from Container App secrets, opens/removes temporary PG firewall rules, scrubs env on exit. New npm aliases `mirror:prod-to-dev` and `seed:shape-coverage`. New doc [docs/PROD_TO_DEV_MIRRORING_AND_FIXTURES.md](docs/PROD_TO_DEV_MIRRORING_AND_FIXTURES.md). Updated [docs/INDEX.md](docs/INDEX.md).
 
