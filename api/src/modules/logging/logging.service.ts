@@ -122,6 +122,13 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
   /**
    * Buffer a request log entry. The entry is written to the DB asynchronously
    * in batches to reduce per-request database write overhead.
+   *
+   * Successful GETs to the health endpoint are dropped without ever entering
+   * the buffer: they are pure liveness/readiness pings (k8s, Container Apps
+   * health probe, uptime monitors), produce no diagnostic value, and at
+   * default Container Apps probe cadence accumulate ~12k rows/day per replica.
+   * Failed health checks (status >= 400 or thrown error) ARE still recorded
+   * because they are exactly the cases an operator wants to see.
    */
   recordRequest({
     method,
@@ -135,6 +142,18 @@ export class LoggingService implements OnModuleDestroy, OnModuleInit {
     error,
     endpointId,
   }: CreateRequestLogOptions): void {
+    // Skip successful health probes - see method-level docstring.
+    // Matches: GET /health, /scim/health (with optional trailing slash or
+    // sub-path) when status is in [200, 400) and there is no error.
+    if (
+      method === 'GET' &&
+      !error &&
+      typeof status === 'number' && status >= 200 && status < 400 &&
+      /^\/(?:scim\/)?health(?:\/|$|\?)/.test(url)
+    ) {
+      return;
+    }
+
     if (this.isInMemoryBackend) {
       const errorMessage = this.extractErrorMessage(error);
       const errorStack = this.extractErrorStack(error);
