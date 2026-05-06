@@ -108,3 +108,5 @@ workflows.json
 # Stale API collection exports (superseded by versioned copies)
 docs/insomnia/SCIMServer_v031_*.json
 docs/postman/SCIMServer_v031_*.json
+
+api/.dev-db.tmp
