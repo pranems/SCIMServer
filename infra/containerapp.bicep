@@ -146,7 +146,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
               // Allow up to (10 + 5*30) = 160s for prisma migrate deploy + boot
               type: 'Startup'
               httpGet: {
-                path: '/health'
+                path: '/scim/health'
                 port: targetPort
                 scheme: 'HTTP'
               }
@@ -159,7 +159,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               type: 'Liveness'
               httpGet: {
-                path: '/health'
+                path: '/scim/health'
                 port: targetPort
                 scheme: 'HTTP'
               }
@@ -170,7 +170,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               type: 'Readiness'
               httpGet: {
-                path: '/health'
+                path: '/scim/health'
                 port: targetPort
                 scheme: 'HTTP'
               }
