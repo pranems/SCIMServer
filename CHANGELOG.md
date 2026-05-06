@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.42.0-beta.1] - 2026-05-06
+
+### UI Redesign - Phase A2: TanStack Router Cutover
+
+**Cutover commit. The legacy `currentPath` Zustand field, `navigate(path)` action, popstate listener, and the `AppRouter` regex matcher inside [AppShell.tsx](web/src/layout/AppShell.tsx) are all gone. URL is now the single source of truth for view state, owned by TanStack Router via `<RouterProvider />`.**
+
+#### What changed
+- **App.tsx**: default branch returns `<RouterProvider router={router} />`; `?ui=legacy` escape hatch retained one more release for operator rollback.
+- **AppShell.tsx**: stripped 5 page imports + the `AppRouter` regex matcher component. Now pure layout chrome (FluentProvider + QueryClientProvider + TokenGate + Header + Sidebar + `<main>{children}</main>`). The `__root` route renders `<AppShell><Outlet /></AppShell>`.
+- **AppSidebar.tsx**: `<a onClick={preventDefault + navigate}>` replaced with TanStack `<Link to={item.href}>`. Active-route highlight now reads pathname from `useRouterState({ select: s => s.location.pathname })` instead of `useUIStore.currentPath`. New `data-testid={\`nav-${item.key}\`}` attribute exposes link href for tests.
+- **ui-store.ts**: removed `currentPath` field, `navigate(path)` action, and the popstate listener. Zustand now holds 3 values only: `sidebarCollapsed`, `commandPaletteOpen`, `colorScheme`.
+- **DashboardPage.tsx, EndpointsPage.tsx**: card click handlers switched from `useUIStore.navigate(\`/endpoints/${id}\`)` to `useNavigate()({ to: '/endpoints/$endpointId', params: { endpointId } })`.
+- **EndpointDetailPage.tsx**: rewritten as a pure layout component. Removed `useState<TabValue>('overview')`, inline `OverviewTab`/`KpiCard`/`PlaceholderTab` sub-components, and the `{ activeTab === '...' && ... }` content switch. Active tab now derived from URL via `useRouterState`; tab content rendered through `<Outlet />`. Back button is a real `<Link to="/endpoints">` so middle-click and right-click work.
+- **OverviewTab.tsx (new)**: extracted from EndpointDetailPage as a standalone component bound to its own route (the `/` index child of `/endpoints/$endpointId`). Calls `useEndpointStats(endpointId)` directly.
+- **endpoints.$endpointId.index.tsx (new)**: new TanStack Router index child of the endpoint detail layout. Mounts `OverviewTab` at the bare `/endpoints/$endpointId` URL so the overview surface still appears when no other tab is active.
+- **__root.tsx**: now composes `<AppShell><Outlet /></AppShell>` (was bare `<Outlet />`). AppShell still owns the FluentProvider/QueryClientProvider/TokenGate stack so route content renders inside the same chrome as before.
+
+#### Test changes
+- **OverviewTab.test.tsx (new, +3 tests)**: loading state, KPI rendering, active-user subtitle.
+- **AppShell.test.tsx (+1 test, all wrapped in `renderWithRouter`)**: AppSidebar's `useRouterState` requires router context; new test asserts each nav item is a `<Link>` with the correct `href`. State-mutation assertions wrapped in `waitFor`.
+- **EndpointDetailPage.test.tsx (+2 tests, reshaped)**: rewritten as layout-only assertions wrapped in `renderWithRouter`. KPI assertions moved to OverviewTab.test.tsx. New tests assert URL-driven `aria-selected` per tab and that the back button renders an `<Link>` with `href="/endpoints"`.
+- **App.test.tsx (1 test made async)**: "renders new Fluent UI by default" now uses `await screen.findByTestId('app-shell')` because `RouterProvider` resolves the initial route asynchronously.
+- **router.test.ts (assertion updated)**: now expects 5 nested children under `endpointDetailRoute` (was 4) - the new index child for OverviewTab.
+
+#### Test counts
+- Web: 268 -> **274** vitest tests (+6: 3 OverviewTab + 1 AppShell nav-link + 2 EndpointDetailPage URL-driven)
+- API: 3,612 unit + 1,104 E2E (unchanged - frontend-only phase)
+- Production build: clean (`vite build` 1.03s)
+- Bundle size: 725.15 kB -> 873.94 kB (gzip 200.49 -> 243.95 kB). The +148 kB unminified is the runtime cost of TanStack Router being actually invoked instead of just imported. Phase H6 will introduce `size-limit` budgets.
+- TypeScript: 0 errors in touched files
+
+#### Quality gates
+- TDD discipline maintained throughout (tests updated before implementation in each affected file).
+- New feature doc [docs/PHASE_A2_TANSTACK_ROUTER_CUTOVER.md](docs/PHASE_A2_TANSTACK_ROUTER_CUTOVER.md) (10 sections, 2 Mermaid diagrams, risk register, behavior verification matrix, definition-of-done).
+- Live tests + dev deploy run as part of A2 closure (next step in this phase).
+
+#### What did not ship in A2 (deferred to A3+)
+- `useState(PAGE_SIZE)` in UsersTab/GroupsTab/LogsTab still owns pagination state -> Phase A3 will hoist into URL via `validateSearch`
+- `urlContains` filter on logs still local state -> A3
+- `preload="intent"` on Links not yet wired to actual loader functions -> A4
+- `?ui=legacy` switch + ~3,000 lines of legacy AppContent code retained -> Phase I1
+
 ## [0.42.0-alpha.1] - 2026-05-06
 
 ### UI Redesign - Phase A1: TanStack Router Foundation (Additive)

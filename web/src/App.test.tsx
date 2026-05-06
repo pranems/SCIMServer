@@ -173,15 +173,17 @@ describe('App', () => {
   // ── UI Cutover ─────────────────────────────────────────────────────
 
   describe('UI cutover (Phase 5)', () => {
-    it('renders new Fluent UI by default', () => {
+    it('renders new Fluent UI by default', async () => {
       // Override to no query param (default)
       Object.defineProperty(window, 'location', {
         value: { ...window.location, search: '' },
         writable: true,
       });
       render(<App />);
-      // Default is now the new AppShell
-      expect(screen.getByTestId('app-shell')).toBeInTheDocument();
+      // Default is now the TanStack Router-driven AppShell. RouterProvider
+      // resolves the initial route asynchronously, so the AppShell chrome
+      // shows up via findByTestId rather than the synchronous getByTestId.
+      expect(await screen.findByTestId('app-shell')).toBeInTheDocument();
     });
 
     it('renders legacy UI with ?ui=legacy', () => {

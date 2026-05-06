@@ -2,25 +2,22 @@
  * router.ts - TanStack Router configuration.
  *
  * Assembles the route tree from individual route files in src/routes/ and
- * builds the Router instance the application will mount in Phase A2.
+ * builds the Router instance the application mounts in App.tsx.
  *
- * Phase A1 (current): additive only. This module is created but not yet
- * imported by App.tsx, so all existing tests stay green and the running
- * UI continues to use the manual currentPath / regex matcher in
- * AppShell.AppRouter.
- *
- * Phase A2 will replace AppShell.AppRouter with <RouterProvider router=...
- * /> so URL-driven navigation becomes the single source of truth for view
- * state.
+ * Phase A2 (cutover): the Router is now mounted in App.tsx via
+ * <RouterProvider router={router} />. The legacy currentPath / regex
+ * matcher inside AppShell.AppRouter has been removed. URL is the single
+ * source of truth for view state.
  *
  * Route tree:
  *   /                                       DashboardPage
  *   /endpoints                              EndpointsPage
  *   /endpoints/$endpointId                  EndpointDetailPage (layout)
- *     +-- /users    (Phase A3 nested)       UsersTab
- *     +-- /groups   (Phase A3 nested)       GroupsTab
- *     +-- /logs     (Phase A3 nested)       LogsTab
- *     +-- /settings (Phase A3 nested)       SettingsTab
+ *     +-- /         (index)                 OverviewTab
+ *     +-- /users                            UsersTab
+ *     +-- /groups                           GroupsTab
+ *     +-- /logs                             LogsTab
+ *     +-- /settings                         SettingsTab
  *   /logs                                   LogsPage (global)
  *   /settings                               SettingsPage (global)
  *
@@ -32,6 +29,7 @@ import { rootRoute } from './routes/__root';
 import { indexRoute } from './routes/index';
 import { endpointsRoute } from './routes/endpoints';
 import { endpointDetailRoute } from './routes/endpoints.$endpointId';
+import { overviewTabRoute } from './routes/endpoints.$endpointId.index';
 import { usersTabRoute } from './routes/endpoints.$endpointId.users';
 import { groupsTabRoute } from './routes/endpoints.$endpointId.groups';
 import { logsTabRoute } from './routes/endpoints.$endpointId.logs';
@@ -39,8 +37,9 @@ import { settingsTabRoute } from './routes/endpoints.$endpointId.settings';
 import { logsRoute } from './routes/logs';
 import { settingsRoute } from './routes/settings';
 
-/** Endpoint detail layout with its 4 nested tab routes. */
+/** Endpoint detail layout with its 5 nested tab routes (overview + 4 explicit). */
 const endpointDetailRouteWithChildren = endpointDetailRoute.addChildren([
+  overviewTabRoute,
   usersTabRoute,
   groupsTabRoute,
   logsTabRoute,

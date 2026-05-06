@@ -1,20 +1,23 @@
 /**
  * __root.tsx - root route for the TanStack Router tree.
  *
- * This is the layout shell that wraps every page in the new URL-driven UI.
+ * This is the layout shell that wraps every page in the URL-driven UI.
  * It renders:
- *   - The existing AppShell (FluentProvider + QueryClientProvider + TokenGate
- *     + Header + Sidebar) which already owns the chrome
- *   - An <Outlet /> where child routes render their content
+ *   - The AppShell (FluentProvider + QueryClientProvider + TokenGate +
+ *     Header + Sidebar) which owns the chrome
+ *   - An <Outlet /> inside the shell's main content area where child
+ *     routes render their pages
  *   - <TanStackRouterDevtools /> in dev-only builds
  *
- * Phase A1 is additive only - this file is created but not wired into the
- * application until Phase A2 (cutover). All existing tests remain green.
+ * Phase A2 (cutover): the root route is now mounted by App.tsx via
+ * <RouterProvider router={router} />. The legacy AppRouter regex matcher
+ * has been removed from AppShell.
  *
- * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A
+ * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A2
  */
 import React from 'react';
 import { createRootRoute, Outlet } from '@tanstack/react-router';
+import { AppShell } from '../layout/AppShell';
 
 /**
  * Lazy-load the devtools so they are tree-shaken from production bundles.
@@ -28,14 +31,14 @@ const TanStackRouterDevtools = import.meta.env.DEV
 
 function RootLayout(): React.JSX.Element {
   return (
-    <>
+    <AppShell>
       <Outlet />
       {import.meta.env.DEV ? (
         <React.Suspense fallback={null}>
           <TanStackRouterDevtools />
         </React.Suspense>
       ) : null}
-    </>
+    </AppShell>
   );
 }
 

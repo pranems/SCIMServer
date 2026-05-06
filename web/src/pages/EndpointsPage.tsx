@@ -23,7 +23,7 @@ import {
   PeopleTeam20Regular,
 } from '@fluentui/react-icons';
 import { useEndpoints } from '../api/queries';
-import { useUIStore } from '../store/ui-store';
+import { useNavigate } from '@tanstack/react-router';
 
 const useStyles = makeStyles({
   page: {
@@ -72,7 +72,7 @@ export const EndpointsPage: React.FC = () => {
   const classes = useStyles();
   const { data, isLoading, error } = useEndpoints();
   const [search, setSearch] = useState('');
-  const navigate = useUIStore((s) => s.navigate);
+  const navigate = useNavigate();
 
   if (isLoading) {
     return (
@@ -117,7 +117,7 @@ export const EndpointsPage: React.FC = () => {
             key={ep.id}
             className={classes.card}
             data-testid={`endpoint-${ep.id}`}
-            onClick={() => navigate(`/endpoints/${ep.id}`)}
+            onClick={() => navigate({ to: '/endpoints/$endpointId', params: { endpointId: ep.id } })}
           >
             <CardHeader
               image={<Server24Regular />}

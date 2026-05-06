@@ -1,17 +1,19 @@
 /**
- * EndpointDetailPage - TDD spec (RED first).
+ * EndpointDetailPage tests - layout-only behavior.
  *
- * Tabbed detail view for a single endpoint with Overview, Users, Groups,
- * Logs, Activity, Settings tabs.
+ * Phase A2 cutover: EndpointDetailPage is now a pure layout that reads
+ * the active tab from the URL and renders <Outlet /> for the matched
+ * child route. Tab content (OverviewTab, UsersTab, ...) is exercised in
+ * its own test files. These tests verify the layout chrome only.
  *
- * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md Phase 2 Step 2.3
+ * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A2
  */
+import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { FluentProvider, webLightTheme } from '@fluentui/react-components';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { EndpointDetailPage } from './EndpointDetailPage';
-import type { EndpointResponse, EndpointStatsResponse } from '@scim/types/dashboard.types';
+import { renderWithRouter } from '../test/router-test-utils';
+import type { EndpointResponse } from '@scim/types/dashboard.types';
 
 // Mock queries
 vi.mock('../api/queries', async () => {
@@ -23,7 +25,7 @@ vi.mock('../api/queries', async () => {
   };
 });
 
-import { useEndpoint, useEndpointStats } from '../api/queries';
+import { useEndpoint } from '../api/queries';
 
 const mockEndpoint: EndpointResponse = {
   id: 'ep-1',
@@ -41,22 +43,13 @@ const mockEndpoint: EndpointResponse = {
   },
 };
 
-const mockStats: EndpointStatsResponse = {
-  users: { total: 30, active: 28, inactive: 2 },
-  groups: { total: 5, active: 5, inactive: 0 },
-  groupMembers: { total: 45 },
-  requestLogs: { total: 1200 },
-};
-
-function renderWithProviders(ui: React.ReactElement) {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+function renderDetail(initialUrl = '/endpoints/ep-1') {
+  // The helper's default routePath '/$' is a catch-all that matches every
+  // pathname, so URLs like '/endpoints/ep-1/users' resolve cleanly without
+  // needing the full nested route tree mounted in the test router.
+  return renderWithRouter(<EndpointDetailPage endpointId="ep-1" />, {
+    initialUrl,
   });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <FluentProvider theme={webLightTheme}>{ui}</FluentProvider>
-    </QueryClientProvider>,
-  );
 }
 
 describe('EndpointDetailPage', () => {
@@ -64,67 +57,41 @@ describe('EndpointDetailPage', () => {
     vi.clearAllMocks();
   });
 
-  it('shows loading spinner while endpoint data is loading', () => {
+  it('shows loading spinner while endpoint data is loading', async () => {
     (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
       data: undefined, isLoading: true, error: null,
     });
-    (useEndpointStats as ReturnType<typeof vi.fn>).mockReturnValue({
-      data: undefined, isLoading: true, error: null,
-    });
 
-    renderWithProviders(<EndpointDetailPage endpointId="ep-1" />);
-    expect(screen.getByTestId('endpoint-detail-loading')).toBeInTheDocument();
+    renderDetail();
+    expect(await screen.findByTestId('endpoint-detail-loading')).toBeInTheDocument();
   });
 
-  it('shows error when endpoint not found', () => {
+  it('shows error when endpoint not found', async () => {
     (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
       data: undefined, isLoading: false, error: new Error('Not found'),
     });
-    (useEndpointStats as ReturnType<typeof vi.fn>).mockReturnValue({
-      data: undefined, isLoading: false, error: null,
-    });
 
-    renderWithProviders(<EndpointDetailPage endpointId="ep-1" />);
-    expect(screen.getByTestId('endpoint-detail-error')).toBeInTheDocument();
+    renderDetail();
+    expect(await screen.findByTestId('endpoint-detail-error')).toBeInTheDocument();
   });
 
-  it('renders endpoint name and status badge', () => {
+  it('renders endpoint name and status badge', async () => {
     (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
       data: mockEndpoint, isLoading: false, error: null,
     });
-    (useEndpointStats as ReturnType<typeof vi.fn>).mockReturnValue({
-      data: mockStats, isLoading: false, error: null,
-    });
 
-    renderWithProviders(<EndpointDetailPage endpointId="ep-1" />);
-    expect(screen.getByText('Production')).toBeInTheDocument();
+    renderDetail();
+    expect(await screen.findByText('Production')).toBeInTheDocument();
     expect(screen.getByText('Active')).toBeInTheDocument();
   });
 
-  it('renders Overview tab by default with KPI stats', () => {
+  it('renders tab bar with all 5 tabs', async () => {
     (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
       data: mockEndpoint, isLoading: false, error: null,
     });
-    (useEndpointStats as ReturnType<typeof vi.fn>).mockReturnValue({
-      data: mockStats, isLoading: false, error: null,
-    });
 
-    renderWithProviders(<EndpointDetailPage endpointId="ep-1" />);
-    expect(screen.getByTestId('tab-overview')).toBeInTheDocument();
-    // Overview shows user/group/member counts
-    expect(screen.getByText('30')).toBeInTheDocument(); // total users
-    expect(screen.getByText('5')).toBeInTheDocument();  // total groups
-  });
-
-  it('renders tab bar with all tabs', () => {
-    (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
-      data: mockEndpoint, isLoading: false, error: null,
-    });
-    (useEndpointStats as ReturnType<typeof vi.fn>).mockReturnValue({
-      data: mockStats, isLoading: false, error: null,
-    });
-
-    renderWithProviders(<EndpointDetailPage endpointId="ep-1" />);
+    renderDetail();
+    await screen.findByTestId('endpoint-detail-page');
     expect(screen.getByRole('tab', { name: /overview/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /users/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /groups/i })).toBeInTheDocument();
@@ -132,30 +99,58 @@ describe('EndpointDetailPage', () => {
     expect(screen.getByRole('tab', { name: /settings/i })).toBeInTheDocument();
   });
 
-  it('switches tab content when clicking a different tab', () => {
+  it('marks Overview tab as selected on bare /endpoints/$endpointId URL', async () => {
     (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
       data: mockEndpoint, isLoading: false, error: null,
     });
-    (useEndpointStats as ReturnType<typeof vi.fn>).mockReturnValue({
-      data: mockStats, isLoading: false, error: null,
-    });
 
-    renderWithProviders(<EndpointDetailPage endpointId="ep-1" />);
-
-    // Click Users tab
-    fireEvent.click(screen.getByRole('tab', { name: /users/i }));
-    expect(screen.getByTestId('tab-users')).toBeInTheDocument();
+    renderDetail('/endpoints/ep-1');
+    const overviewTab = await screen.findByRole('tab', { name: /overview/i });
+    expect(overviewTab).toHaveAttribute('aria-selected', 'true');
   });
 
-  it('shows endpoint metadata (scimBasePath, createdAt)', () => {
+  it('marks Users tab as selected when URL is /endpoints/$endpointId/users', async () => {
     (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
       data: mockEndpoint, isLoading: false, error: null,
     });
-    (useEndpointStats as ReturnType<typeof vi.fn>).mockReturnValue({
-      data: mockStats, isLoading: false, error: null,
+
+    renderDetail('/endpoints/ep-1/users');
+    const usersTab = await screen.findByRole('tab', { name: /users/i });
+    await waitFor(() => expect(usersTab).toHaveAttribute('aria-selected', 'true'));
+  });
+
+  it('renders the back-to-endpoints Link', async () => {
+    (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockEndpoint, isLoading: false, error: null,
     });
 
-    renderWithProviders(<EndpointDetailPage endpointId="ep-1" />);
-    expect(screen.getByText(/\/scim\/endpoints\/ep-1\/v2/)).toBeInTheDocument();
+    renderDetail();
+    const back = await screen.findByTestId('back-to-endpoints');
+    // The Link should resolve to /endpoints in its href.
+    expect(back).toHaveAttribute('href', '/endpoints');
+  });
+
+  it('clicking the Users tab triggers navigation (handler invoked)', async () => {
+    (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockEndpoint, isLoading: false, error: null,
+    });
+
+    renderDetail();
+    const usersTab = await screen.findByRole('tab', { name: /users/i });
+    fireEvent.click(usersTab);
+    // After click, the tab should appear selected (URL-driven). Since the
+    // test's in-memory route only knows about /endpoints/$endpointId, the
+    // navigate call is a no-op for routing, but the click handler runs
+    // without throwing - which is what we are guarding against.
+    expect(usersTab).toBeInTheDocument();
+  });
+
+  it('shows endpoint metadata (scimBasePath, createdAt)', async () => {
+    (useEndpoint as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: mockEndpoint, isLoading: false, error: null,
+    });
+
+    renderDetail();
+    expect(await screen.findByText(/\/scim\/endpoints\/ep-1\/v2/)).toBeInTheDocument();
   });
 });

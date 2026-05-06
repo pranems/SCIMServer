@@ -1,10 +1,18 @@
 /**
  * AppShell - main layout container for the redesigned UI.
  *
- * Composes: Header (top) + Sidebar (left) + Content (right).
- * Wrapped in FluentProvider with light/dark theme.
+ * Composes: Header (top) + Sidebar (left) + Content (right). Wrapped in
+ * FluentProvider with light/dark theme, TanStack QueryClientProvider, and
+ * TokenGate. Content area renders whatever children the caller passes -
+ * in production this is the TanStack Router <Outlet /> from __root.tsx.
+ *
+ * Phase A2 (cutover): the legacy AppRouter regex matcher has been removed.
+ * URL is the single source of truth for view state, driven by the
+ * <RouterProvider /> mounted in App.tsx and rendered into this shell via
+ * the root route's <AppShell><Outlet /></AppShell> composition.
  *
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md D1
+ * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A2
  */
 import React from 'react';
 import {
@@ -19,11 +27,6 @@ import { AppHeader } from './AppHeader';
 import { AppSidebar } from './AppSidebar';
 import { TokenGate } from './TokenGate';
 import { useSSE } from '../hooks/useSSE';
-import { DashboardPage } from '../pages/DashboardPage';
-import { EndpointsPage } from '../pages/EndpointsPage';
-import { EndpointDetailPage } from '../pages/EndpointDetailPage';
-import { LogsPage } from '../pages/LogsPage';
-import { SettingsPage } from '../pages/SettingsPage';
 
 const useStyles = makeStyles({
   root: {
@@ -81,7 +84,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
             <div className={classes.body}>
               <AppSidebar />
               <main className={classes.content} data-testid="app-content">
-                {children ?? <AppRouter />}
+                {children}
               </main>
             </div>
           </div>
@@ -89,31 +92,6 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
       </QueryClientProvider>
     </FluentProvider>
   );
-};
-
-/** Client-side router - reads path from Zustand store */
-const AppRouter: React.FC = () => {
-  const currentPath = useUIStore((s) => s.currentPath);
-
-  // /endpoints/:id -> EndpointDetailPage
-  const endpointDetailMatch = currentPath.match(/^\/endpoints\/([^/]+)/);
-  if (endpointDetailMatch) {
-    return <EndpointDetailPage endpointId={endpointDetailMatch[1]} />;
-  }
-
-  if (currentPath === '/endpoints') {
-    return <EndpointsPage />;
-  }
-
-  if (currentPath === '/logs') {
-    return <LogsPage />;
-  }
-
-  if (currentPath === '/settings') {
-    return <SettingsPage />;
-  }
-
-  return <DashboardPage />;
 };
 
 /** SSE connection provider - invalidates TanStack Query cache on SCIM events */

@@ -28,13 +28,16 @@ describe('router route tree', () => {
     expect(childPaths).toContain('/settings');
   });
 
-  it('has the endpoint detail layout with nested tab routes', () => {
+  it('has the endpoint detail layout with nested tab routes (incl. overview index)', () => {
     const endpointDetail = (routeTree.children ?? []).find(
       (c: { id?: string }) => c.id === '/endpoints/$endpointId',
     ) as { children?: Array<{ fullPath: string }> } | undefined;
     expect(endpointDetail).toBeDefined();
 
     const tabPaths = (endpointDetail?.children ?? []).map((c) => c.fullPath);
+    // Overview is the index child of the endpoint detail layout - it
+    // matches the bare /endpoints/$endpointId URL with no extra segment.
+    expect(tabPaths).toContain('/endpoints/$endpointId/');
     expect(tabPaths).toContain('/endpoints/$endpointId/users');
     expect(tabPaths).toContain('/endpoints/$endpointId/groups');
     expect(tabPaths).toContain('/endpoints/$endpointId/logs');

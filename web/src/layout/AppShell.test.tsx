@@ -1,13 +1,20 @@
 /**
  * AppShell + AppSidebar + AppHeader - unit tests.
+ *
+ * Phase A2 cutover: AppSidebar now uses TanStack Router primitives
+ * (useRouterState, <Link>) so every render must happen inside a router
+ * context. The renderWithRouter helper mounts the supplied UI as the
+ * route component of an in-memory router so all hooks resolve.
  */
+import React from 'react';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { AppShell } from './AppShell';
 import { useUIStore } from '../store/ui-store';
 import { setStoredToken } from '../auth/token';
+import { renderWithRouter } from '../test/router-test-utils';
 
-// Reset Zustand store + set auth token between tests
+// Reset Zustand store + set auth token between tests.
 beforeEach(() => {
   setStoredToken('test-token');
   useUIStore.setState({
@@ -17,9 +24,16 @@ beforeEach(() => {
   });
 });
 
+async function renderShell(child?: React.ReactNode) {
+  const result = renderWithRouter(<AppShell>{child}</AppShell>, { initialUrl: '/' });
+  // RouterProvider resolves the initial route asynchronously.
+  await screen.findByTestId('app-shell');
+  return result;
+}
+
 describe('AppShell', () => {
-  it('renders header, sidebar, and content area', () => {
-    render(<AppShell />);
+  it('renders header, sidebar, and content area', async () => {
+    await renderShell();
 
     expect(screen.getByTestId('app-shell')).toBeInTheDocument();
     expect(screen.getByTestId('app-header')).toBeInTheDocument();
@@ -27,24 +41,24 @@ describe('AppShell', () => {
     expect(screen.getByTestId('app-content')).toBeInTheDocument();
   });
 
-  it('renders children in content area', () => {
-    render(<AppShell><div data-testid="custom-child">Custom Content</div></AppShell>);
+  it('renders children in content area', async () => {
+    await renderShell(<div data-testid="custom-child">Custom Content</div>);
 
     expect(screen.getByTestId('custom-child')).toBeInTheDocument();
     expect(screen.getByText('Custom Content')).toBeInTheDocument();
   });
 
-  it('renders content area for pages', () => {
-    render(<AppShell />);
+  it('renders content area for pages', async () => {
+    await renderShell();
 
-    // Dashboard page will show loading state or content
+    // Content area is always present even with no children.
     expect(screen.getByTestId('app-content')).toBeInTheDocument();
   });
 });
 
 describe('AppSidebar', () => {
-  it('renders all 4 nav items', () => {
-    render(<AppShell><div>test</div></AppShell>);
+  it('renders all 4 nav items', async () => {
+    await renderShell(<div>test</div>);
 
     expect(screen.getByText('Dashboard')).toBeInTheDocument();
     expect(screen.getByText('Endpoints')).toBeInTheDocument();
@@ -52,31 +66,40 @@ describe('AppSidebar', () => {
     expect(screen.getByText('Settings')).toBeInTheDocument();
   });
 
-  it('toggles collapsed state on button click', () => {
-    render(<AppShell />);
+  it('toggles collapsed state on button click', async () => {
+    await renderShell();
 
     const toggle = screen.getByTestId('sidebar-toggle');
     expect(useUIStore.getState().sidebarCollapsed).toBe(false);
 
     fireEvent.click(toggle);
-    expect(useUIStore.getState().sidebarCollapsed).toBe(true);
+    await waitFor(() => expect(useUIStore.getState().sidebarCollapsed).toBe(true));
+  });
+
+  it('exposes router-aware <Link> nav items', async () => {
+    await renderShell();
+
+    const dashLink = screen.getByTestId('nav-dashboard');
+    const endpointsLink = screen.getByTestId('nav-endpoints');
+    expect(dashLink).toHaveAttribute('href', '/');
+    expect(endpointsLink).toHaveAttribute('href', '/endpoints');
   });
 });
 
 describe('AppHeader', () => {
-  it('renders SCIMServer title', () => {
-    render(<AppShell />);
+  it('renders SCIMServer title', async () => {
+    await renderShell();
 
     expect(screen.getByText('SCIMServer')).toBeInTheDocument();
   });
 
-  it('toggles theme on button click', () => {
-    render(<AppShell />);
+  it('toggles theme on button click', async () => {
+    await renderShell();
 
     const themeBtn = screen.getByTestId('theme-toggle');
     expect(useUIStore.getState().colorScheme).toBe('light');
 
     fireEvent.click(themeBtn);
-    expect(useUIStore.getState().colorScheme).toBe('dark');
+    await waitFor(() => expect(useUIStore.getState().colorScheme).toBe('dark'));
   });
 });

@@ -18,6 +18,11 @@ vi.mock('../api/queries', async () => {
 
 import { useEndpoints } from '../api/queries';
 
+// Phase A2 note: EndpointsPage's Card click handler now calls
+// useNavigate() from TanStack Router. Without a RouterProvider in this
+// minimal test tree the hook prints a console warning and returns a
+// no-op. The tests below only assert read-side rendering behavior, never
+// click-driven navigation, so the warning is harmless.
 function renderWithProviders(ui: React.ReactElement) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
