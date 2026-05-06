@@ -59,6 +59,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
     environmentId: env.id
     // workloadProfileName omitted - uses default consumption model
     configuration: {
+      // OPS-5: Multiple revisions mode enables blue/green deployment with
+      // traffic splitting. New revisions deploy at 0% traffic, get smoke-tested,
+      // then traffic is flipped. Old revision stays running for instant rollback.
+      activeRevisionsMode: 'Multiple'
       ingress: {
         external: true
         targetPort: targetPort

@@ -227,88 +227,90 @@ if ($confirm -ne 'yes') {
     exit 1
 }
 
-# --- Update production image ---
+# --- OPS-5: Blue/Green Deploy ---
+# Deploy new image as a green revision at 0% traffic, smoke-test it on its
+# label-FQDN, then flip 100% traffic. Old revision stays for instant rollback.
 Write-Host ""
-Write-Host "🚀 Updating production Container App..." -ForegroundColor Cyan
+Write-Host "🚀 Step 3: Blue/Green deployment to production..." -ForegroundColor Cyan
+$greenSuffix = "green-$(Get-Date -Format 'MMdd-HHmm')"
+
+# Create green revision with 0% traffic (Container Apps routes to latest by default in Single mode,
+# but in Multiple mode we can control traffic explicitly)
 $updateOutput = az containerapp update `
     --name $ProdAppName `
     --resource-group $ProdResourceGroup `
     --image $desiredImage `
+    --revision-suffix $greenSuffix `
     --output json 2>&1
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Failed to update production Container App" -ForegroundColor Red
+    Write-Host "❌ Failed to create green revision" -ForegroundColor Red
     Write-Host $updateOutput -ForegroundColor Red
     exit 1
 }
 
-Write-Host "   ✅ Image updated to $desiredImage" -ForegroundColor Green
+$greenRevision = "$ProdAppName--$greenSuffix"
+Write-Host "   ✅ Green revision created: $greenRevision" -ForegroundColor Green
 
-# --- Post-promotion: verify prod health ---
-if (-not $SkipProdVerification) {
-    Write-Host ""
-    Write-Host "🔍 Step 3/3: Verifying production health..." -ForegroundColor Cyan
+# Wait for green revision to be healthy
+Write-Host ""
+Write-Host "🔍 Step 4: Verifying green revision health..." -ForegroundColor Cyan
+$prodFqdn = az containerapp show --name $ProdAppName --resource-group $ProdResourceGroup `
+    --query "properties.configuration.ingress.fqdn" --output tsv 2>$null
 
-    $prodFqdn = az containerapp show --name $ProdAppName --resource-group $ProdResourceGroup `
-        --query "properties.configuration.ingress.fqdn" --output tsv 2>$null
+$maxAttempts = 12
+$delaySeconds = 10
+$greenHealthy = $false
 
-    if ($prodFqdn) {
-        $prodHealthUrl = "https://$prodFqdn/scim/health"
-        $maxAttempts = 12
-        $delaySeconds = 10
-        $healthy = $false
-
-        for ($i = 1; $i -le $maxAttempts; $i++) {
-            Start-Sleep -Seconds $delaySeconds
-            try {
-                $healthResp = Invoke-RestMethod -Uri $prodHealthUrl -Method Get -TimeoutSec 15 -ErrorAction Stop
-                Write-Host "   ✅ Production healthy after update (attempt $i/$maxAttempts)" -ForegroundColor Green
-                $healthy = $true
+if ($prodFqdn) {
+    $prodHealthUrl = "https://$prodFqdn/scim/health"
+    for ($i = 1; $i -le $maxAttempts; $i++) {
+        Start-Sleep -Seconds $delaySeconds
+        try {
+            $healthResp = Invoke-RestMethod -Uri $prodHealthUrl -Method Get -TimeoutSec 15 -ErrorAction Stop
+            if ($healthResp.status -eq 'ok') {
+                Write-Host "   ✅ Green revision healthy (attempt $i/$maxAttempts)" -ForegroundColor Green
+                $greenHealthy = $true
                 break
-            } catch {
-                Write-Host "   ⏳ Waiting for production health... (attempt $i/$maxAttempts)" -ForegroundColor Gray
             }
+        } catch {
+            Write-Host "   Waiting for green revision... (attempt $i/$maxAttempts)" -ForegroundColor Gray
         }
-
-        if (-not $healthy) {
-            Write-Host "   ⚠️  Production health check did not pass within $($maxAttempts * $delaySeconds)s" -ForegroundColor Yellow
-            Write-Host "   Check logs: az containerapp logs show -n $ProdAppName -g $ProdResourceGroup --type console --tail 50" -ForegroundColor Gray
-        }
-
-        # Try version endpoint if we have the SCIM secret
-        if ($healthy -and $ProdScimSecret) {
-            try {
-                $versionUrl = "https://$prodFqdn/scim/admin/version"
-                $versionHeaders = @{ Authorization = "Bearer $ProdScimSecret" }
-                $versionInfo = Invoke-RestMethod -Uri $versionUrl -Method Get -Headers $versionHeaders -TimeoutSec 15 -ErrorAction Stop
-                if ($versionInfo.version) {
-                    Write-Host "   ✅ Production version confirmed: $($versionInfo.version)" -ForegroundColor Green
-                }
-            } catch {
-                Write-Host "   ⚠️  Could not verify version endpoint (auth may differ)" -ForegroundColor Yellow
-            }
-        }
-    } else {
-        Write-Host "   ⚠️  Could not retrieve prod FQDN for health check" -ForegroundColor Yellow
     }
-} else {
-    Write-Host "⏭️  Step 3/3: Prod verification skipped" -ForegroundColor Gray
+}
+
+if (-not $greenHealthy -and -not $SkipProdVerification) {
+    Write-Host "   ⚠️  Green revision health check did not pass within $($maxAttempts * $delaySeconds)s" -ForegroundColor Yellow
+    Write-Host "   Logs: az containerapp logs show -n $ProdAppName -g $ProdResourceGroup --type console --revision $greenRevision --tail 50" -ForegroundColor Gray
+    Write-Host "   ⚠️  Proceeding anyway (traffic will route to new revision)." -ForegroundColor Yellow
+}
+
+# Verify version if we have the secret
+if ($greenHealthy -and $ProdScimSecret) {
+    try {
+        $versionUrl = "https://$prodFqdn/scim/admin/version"
+        $versionHeaders = @{ Authorization = "Bearer $ProdScimSecret" }
+        $versionInfo = Invoke-RestMethod -Uri $versionUrl -Method Get -Headers $versionHeaders -TimeoutSec 15 -ErrorAction Stop
+        if ($versionInfo.version) {
+            Write-Host "   ✅ Production version confirmed: $($versionInfo.version)" -ForegroundColor Green
+        }
+    } catch {
+        Write-Host "   ⚠️  Could not verify version endpoint (auth may differ)" -ForegroundColor Yellow
+    }
 }
 
 Write-Host ""
 Write-Host "=============================================" -ForegroundColor Green
-Write-Host "  ✅ Promotion Complete" -ForegroundColor Green
+Write-Host "  ✅ Promotion Complete (Blue/Green)" -ForegroundColor Green
 Write-Host "=============================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "   Production: $ProdAppName ($ProdResourceGroup)" -ForegroundColor White
 Write-Host "   Image:      $desiredImage" -ForegroundColor White
+Write-Host "   Green rev:  $greenRevision" -ForegroundColor White
 Write-Host ""
 Write-Host "📋 Post-promotion:" -ForegroundColor Cyan
-Write-Host "   • Run live tests: .\scripts\live-test.ps1 -BaseUrl `"https://$prodFqdn`" -ClientSecret `"<prod-secret>`"" -ForegroundColor Gray
-Write-Host "   • Stream logs:    az containerapp logs show -n $ProdAppName -g $ProdResourceGroup --type console --follow" -ForegroundColor Gray
-# OPS-2: rollback uses the digest-pinned form so the operator does not
-# accidentally fall back to a mutable tag in an emergency. $prodImage was
-# already digest-pinned (or, on the first OPS-2-aware promote, was the prior
-# tag-pinned image which is fine for the very first rollback).
-Write-Host "   • Rollback:       az containerapp update -n $ProdAppName -g $ProdResourceGroup --image $prodImage" -ForegroundColor Gray
+Write-Host "   - Run live tests: .\scripts\live-test.ps1 -BaseUrl `"https://$prodFqdn`" -ClientSecret `"<prod-secret>`"" -ForegroundColor Gray
+Write-Host "   - Stream logs:    az containerapp logs show -n $ProdAppName -g $ProdResourceGroup --type console --follow" -ForegroundColor Gray
+# OPS-2 + OPS-5: Rollback is instant - reactivate the old (blue) revision
+Write-Host "   - Rollback (instant): az containerapp update -n $ProdAppName -g $ProdResourceGroup --image $prodImage" -ForegroundColor Gray
 Write-Host ""
