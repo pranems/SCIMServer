@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tooling
+- **feat(dev-tooling)**: Prod -> dev mirror + synthetic shape-coverage seeder. New scripts [api/src/scripts/mirror-prod-to-dev.ts](api/src/scripts/mirror-prod-to-dev.ts) (two `PrismaClient` instances, upsert-by-PK with PII verbatim, orphan filtering, capped `RequestLog` window) and [api/src/scripts/seed-shape-coverage.ts](api/src/scripts/seed-shape-coverage.ts) (6 deterministic-UUID `shape-*` endpoints covering RFC strict / Entra lenient / custom extension / soft-delete-only / per-endpoint creds / custom resource type, with 3 users + 2 groups each = ~30 SCIM resources for full combinatorial coverage). PowerShell orchestrator [scripts/mirror-prod-to-dev.ps1](scripts/mirror-prod-to-dev.ps1) auto-resolves DB URLs from Container App secrets, opens/removes temporary PG firewall rules, scrubs env on exit. New npm aliases `mirror:prod-to-dev` and `seed:shape-coverage`. New doc [docs/PROD_TO_DEV_MIRRORING_AND_FIXTURES.md](docs/PROD_TO_DEV_MIRRORING_AND_FIXTURES.md). Updated [docs/INDEX.md](docs/INDEX.md).
+
+### Planning
+- **docs(ui-redesign)**: Created [docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md](docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md) - dependency-ordered Phases A-I to reach 100% UI redesign compliance with [UI_REDESIGN_ARCHITECTURE_AND_PLAN.md](docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md). Verified 38% complete; identifies all gaps (BFF Overview endpoint, mutation layer, Activity/Schemas/Credentials tabs, Cmd+K, MSW, axe-core, visual regression, coverage gates, legacy cleanup). Includes 4 Mermaid diagrams (dependency graph, mutation sequence, cutover state diagram, deploy state machine), risk register, test coverage targets (~120 new tests), TDD/quality-gates discipline. 12-16 day estimate. Updated [docs/INDEX.md](docs/INDEX.md). Phase A (TanStack Router migration) starts next.
+
 ## [0.41.0] - 2026-05-04
 
 ### UI Redesign - Full Fluent UI v9 Frontend

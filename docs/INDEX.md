@@ -42,6 +42,7 @@
 | [WEB_UI_FLOWS_AND_BEHAVIORS.md](WEB_UI_FLOWS_AND_BEHAVIORS.md) | Web UI - 5 screens, data source matrix, Mermaid diagrams |
 | [UI_GUIDE.md](UI_GUIDE.md) | **v0.41.0 UI Guide** - Fluent UI pages, screenshots (59), components, data flow, SSE, accessibility, theme system, legacy UI |
 | [UI_REDESIGN_ARCHITECTURE_AND_PLAN.md](UI_REDESIGN_ARCHITECTURE_AND_PLAN.md) | **UI Redesign** - architecture options, BFF layer, event-driven stats, 42-step implementation plan |
+| [UI_REDESIGN_REMAINING_GAPS_PLAN.md](UI_REDESIGN_REMAINING_GAPS_PLAN.md) | **Remaining Gaps Plan** - dependency-ordered Phases A-I to reach 100% UI redesign compliance, mutation layer, cutover lifecycle, ~120 new tests, 12-16 days |
 | [DELIVERY_PLAN.md](DELIVERY_PLAN.md) | **Active 6-week delivery plan** - reconciles UI redesign + Tier-0 security + CI/CD upgrades into one operating model with named defects, TDD process, blue/green to prod, progress log |
 | [adr/ADR-004-enable-implicit-conversion.md](adr/ADR-004-enable-implicit-conversion.md) | ADR-004 - keep `enableImplicitConversion: true` (S-5 closure with regression-locked decision) |
 
