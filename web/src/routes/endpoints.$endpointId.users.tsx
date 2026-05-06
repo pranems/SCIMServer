@@ -1,10 +1,10 @@
 /**
  * endpoints.$endpointId.users.tsx - users tab route.
  *
- * Phase A1: placeholder route registered under the endpoint detail layout.
- * Wires the usersSearchSchema so pagination and SCIM filters live in the
- * URL. Phase A3 will replace EndpointDetailPage's internal tab state with
- * <Outlet /> so this route's component renders directly.
+ * Wires the usersSearchSchema so `?page=N&pageSize=N&filter=...` are
+ * parsed and exposed via `useSearch` inside UsersTab. State lives in
+ * the URL (Phase A3); UsersTab reads via useSearch and updates via
+ * useNavigate.
  */
 import { createRoute } from '@tanstack/react-router';
 import { endpointDetailRoute } from './endpoints.$endpointId';

@@ -1,8 +1,8 @@
 /**
  * endpoints.$endpointId.logs.tsx - per-endpoint logs tab route.
  *
- * Phase A1 placeholder; Phase A3 will wire URL-driven pagination and
- * the urlContains substring filter via logsSearchSchema.
+ * Wires logsSearchSchema; pagination + urlContains filter are
+ * URL-driven (Phase A3).
  */
 import { createRoute } from '@tanstack/react-router';
 import { endpointDetailRoute } from './endpoints.$endpointId';

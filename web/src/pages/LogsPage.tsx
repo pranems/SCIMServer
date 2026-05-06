@@ -1,8 +1,13 @@
 /**
  * LogsPage - global request logs page (all endpoints).
  * Accessible via /logs sidebar link.
+ *
+ * Phase A3: filter state (urlContains, endpointId, status, timeRange,
+ * page, pageSize) lives in the URL via globalLogsSearchSchema. The page
+ * component reads via useSearch and writes via useNavigate, with empty
+ * inputs normalized to undefined so URLs stay clean.
  */
-import React, { useState } from 'react';
+import React from 'react';
 import {
   makeStyles,
   tokens,
@@ -13,8 +18,12 @@ import {
   Subtitle1,
   Caption1,
 } from '@fluentui/react-components';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useQuery } from '@tanstack/react-query';
 import { fetchWithAuth } from '../api/queries';
+import type { GlobalLogsSearch } from '../routes/search-schemas';
+
+const LOGS_ROUTE_PATH = '/logs' as const;
 
 const useStyles = makeStyles({
   page: { display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '1400px' },
@@ -39,11 +48,24 @@ function methodColor(m: string): 'brand' | 'success' | 'warning' | 'danger' | 'i
 
 export const LogsPage: React.FC = () => {
   const classes = useStyles();
-  const [search, setSearch] = useState('');
+  const search = useSearch({ strict: false }) as Partial<GlobalLogsSearch>;
+  const urlContains = search.urlContains ?? '';
+  const navigate = useNavigate();
+
+  const updateFilter = (value: string): void => {
+    navigate({
+      to: LOGS_ROUTE_PATH,
+      search: (prev) => ({
+        ...(prev as GlobalLogsSearch),
+        urlContains: value.trim() === '' ? undefined : value,
+        page: 1, // reset pagination when the filter changes
+      }),
+    });
+  };
 
   const { data, isLoading, error } = useQuery<{ items: any[]; total: number }>({
-    queryKey: ['global-logs', search],
-    queryFn: () => fetchWithAuth(`/scim/admin/logs?pageSize=50${search ? `&urlContains=${encodeURIComponent(search)}` : ''}`),
+    queryKey: ['global-logs', urlContains],
+    queryFn: () => fetchWithAuth(`/scim/admin/logs?pageSize=50${urlContains ? `&urlContains=${encodeURIComponent(urlContains)}` : ''}`),
     staleTime: 10_000,
   });
 
@@ -71,8 +93,8 @@ export const LogsPage: React.FC = () => {
         <Subtitle1>Request Logs ({data?.total ?? 0})</Subtitle1>
         <SearchBox
           placeholder="Filter by URL..."
-          value={search}
-          onChange={(_, d) => setSearch(d.value)}
+          value={urlContains}
+          onChange={(_, d) => updateFilter(d.value)}
           data-testid="logs-search"
         />
       </div>

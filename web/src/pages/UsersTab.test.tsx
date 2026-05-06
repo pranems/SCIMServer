@@ -1,12 +1,17 @@
 /**
- * UsersTab - TDD spec (RED first).
- * Renders a paginated table of SCIM users for an endpoint.
+ * UsersTab tests.
+ *
+ * Phase A3: pagination state lives in the URL via usersSearchSchema.
+ * Tests now mount the component inside a router context (via
+ * renderWithRouter) seeded with the matching routePath + validateSearch
+ * so useSearch / useNavigate hooks resolve.
  */
+import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { FluentProvider, webLightTheme } from '@fluentui/react-components';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { UsersTab } from './UsersTab';
+import { renderWithRouter } from '../test/router-test-utils';
+import { usersSearchSchema } from '../routes/search-schemas';
 
 vi.mock('../api/queries', async () => {
   const actual = await vi.importActual('../api/queries');
@@ -15,13 +20,15 @@ vi.mock('../api/queries', async () => {
 
 import { useEndpointUsers } from '../api/queries';
 
-function wrap(ui: React.ReactElement) {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={qc}>
-      <FluentProvider theme={webLightTheme}>{ui}</FluentProvider>
-    </QueryClientProvider>,
-  );
+function wrap(
+  ui: React.ReactElement,
+  initialUrl = '/endpoints/ep-1/users',
+) {
+  return renderWithRouter(ui, {
+    initialUrl,
+    routePath: '/endpoints/$endpointId/users',
+    validateSearch: (raw) => usersSearchSchema.parse(raw),
+  });
 }
 
 const mockUsers = {
@@ -39,79 +46,99 @@ const mockUsers = {
 describe('UsersTab', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('shows loading state', () => {
+  it('shows loading state', async () => {
     (useEndpointUsers as ReturnType<typeof vi.fn>).mockReturnValue({
       data: undefined, isLoading: true, error: null,
     });
     wrap(<UsersTab endpointId="ep-1" />);
-    expect(screen.getByTestId('users-loading')).toBeInTheDocument();
+    expect(await screen.findByTestId('users-loading')).toBeInTheDocument();
   });
 
-  it('shows error state', () => {
+  it('shows error state', async () => {
     (useEndpointUsers as ReturnType<typeof vi.fn>).mockReturnValue({
       data: undefined, isLoading: false, error: new Error('Fail'),
     });
     wrap(<UsersTab endpointId="ep-1" />);
-    expect(screen.getByTestId('users-error')).toBeInTheDocument();
+    expect(await screen.findByTestId('users-error')).toBeInTheDocument();
   });
 
-  it('renders user table with correct columns', () => {
+  it('renders user table with correct columns', async () => {
     (useEndpointUsers as ReturnType<typeof vi.fn>).mockReturnValue({
       data: mockUsers, isLoading: false, error: null,
     });
     wrap(<UsersTab endpointId="ep-1" />);
-    expect(screen.getByText('alice@corp.com')).toBeInTheDocument();
+    expect(await screen.findByText('alice@corp.com')).toBeInTheDocument();
     expect(screen.getByText('Bob Jones')).toBeInTheDocument();
     expect(screen.getByText('3 users')).toBeInTheDocument();
   });
 
-  it('shows active/inactive badges', () => {
+  it('shows active/inactive badges', async () => {
     (useEndpointUsers as ReturnType<typeof vi.fn>).mockReturnValue({
       data: mockUsers, isLoading: false, error: null,
     });
     wrap(<UsersTab endpointId="ep-1" />);
+    await screen.findByText('alice@corp.com');
     const activeBadges = screen.getAllByText('Active');
     const inactiveBadges = screen.getAllByText('Inactive');
     expect(activeBadges.length).toBe(2);
     expect(inactiveBadges.length).toBe(1);
   });
 
-  it('shows empty state when no users', () => {
+  it('shows empty state when no users', async () => {
     (useEndpointUsers as ReturnType<typeof vi.fn>).mockReturnValue({
       data: { ...mockUsers, totalResults: 0, Resources: [] },
       isLoading: false, error: null,
     });
     wrap(<UsersTab endpointId="ep-1" />);
-    expect(screen.getByText(/no users/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no users/i)).toBeInTheDocument();
   });
 
-  it('shows pagination controls when totalResults > pageSize', () => {
+  it('shows pagination controls when totalResults > pageSize', async () => {
     (useEndpointUsers as ReturnType<typeof vi.fn>).mockReturnValue({
       data: { ...mockUsers, totalResults: 50, itemsPerPage: 20 },
       isLoading: false, error: null,
     });
     wrap(<UsersTab endpointId="ep-1" />);
-    expect(screen.getByTestId('pagination')).toBeInTheDocument();
+    expect(await screen.findByTestId('pagination')).toBeInTheDocument();
     expect(screen.getByText('Page 1')).toBeInTheDocument();
   });
 
-  it('does not show pagination when all results fit on one page', () => {
+  it('does not show pagination when all results fit on one page', async () => {
     (useEndpointUsers as ReturnType<typeof vi.fn>).mockReturnValue({
-      data: mockUsers, isLoading: false, error: null, // totalResults: 3, fits in one page
+      data: mockUsers, isLoading: false, error: null,
     });
     wrap(<UsersTab endpointId="ep-1" />);
+    await screen.findByText('alice@corp.com');
     expect(screen.queryByTestId('pagination')).not.toBeInTheDocument();
   });
 
-  it('next button calls with incremented startIndex', () => {
+  it('reads page from URL search params (?page=2 -> startIndex=21)', async () => {
+    (useEndpointUsers as ReturnType<typeof vi.fn>).mockReturnValue({
+      data: { ...mockUsers, totalResults: 50, itemsPerPage: 20 },
+      isLoading: false, error: null,
+    });
+    wrap(<UsersTab endpointId="ep-1" />, '/endpoints/ep-1/users?page=2');
+    await screen.findByTestId('pagination');
+    expect(useEndpointUsers).toHaveBeenCalledWith(
+      'ep-1',
+      expect.objectContaining({ startIndex: 21, count: 20 }),
+    );
+  });
+
+  it('next button navigates to next page (URL changes -> startIndex increments)', async () => {
     (useEndpointUsers as ReturnType<typeof vi.fn>).mockReturnValue({
       data: { ...mockUsers, totalResults: 50, itemsPerPage: 20 },
       isLoading: false, error: null,
     });
     wrap(<UsersTab endpointId="ep-1" />);
-    const nextBtn = screen.getByTestId('pagination-next');
+    const nextBtn = await screen.findByTestId('pagination-next');
     fireEvent.click(nextBtn);
-    // After click, useEndpointUsers should be called with startIndex=21
-    expect(useEndpointUsers).toHaveBeenCalledWith('ep-1', expect.objectContaining({ startIndex: 21 }));
+    // After URL change the hook is invoked again with startIndex=21.
+    await waitFor(() => {
+      expect(useEndpointUsers).toHaveBeenCalledWith(
+        'ep-1',
+        expect.objectContaining({ startIndex: 21 }),
+      );
+    });
   });
 });

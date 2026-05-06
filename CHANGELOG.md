@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.42.0-beta.2] - 2026-05-06
+
+### UI Redesign - Phase A3: Per-Page URL-Driven State
+
+**Pagination + filter inputs now live in the URL via TanStack Router's `useSearch` + `useNavigate`. Five list/filter views migrated from `useState` to URL-driven state, parsed by zod schemas defined in [search-schemas.ts](web/src/routes/search-schemas.ts) (Phase A1).**
+
+#### Components migrated
+- **[UsersTab.tsx](web/src/pages/UsersTab.tsx)**: `useState(startIndex)` removed; reads `page`/`pageSize` from `useSearch({ strict: false })`; Prev/Next buttons call `useNavigate({ to: '/endpoints/$endpointId/users', params, search: prev => ({...prev, page: N}) })`.
+- **[GroupsTab.tsx](web/src/pages/GroupsTab.tsx)**: same pattern with `groupsSearchSchema`.
+- **[LogsTab.tsx](web/src/pages/LogsTab.tsx)**: `useState(page)` + `useState(search)` removed; URL holds both `page` and `urlContains`. SearchBox typing dispatches navigate that resets to page 1 (typical filter-input UX). `useEndpointLogs` hook now accepts pageSize as a parameter so URL `?pageSize=50` flows through to the queryKey.
+- **[LogsPage.tsx](web/src/pages/LogsPage.tsx)**: `useState(search)` removed; reads `urlContains` from URL (globalLogsSearchSchema). Empty input normalizes to `undefined` before navigate so URLs stay clean (`?urlContains=` collapses to `/logs`).
+- **[EndpointsPage.tsx](web/src/pages/EndpointsPage.tsx)**: free-text filter `q` lives in the URL; SearchBox typing updates URL on every keystroke; client-side filter list derives from URL value.
+
+#### Test helper enhancement
+- **[router-test-utils.tsx](web/src/test/router-test-utils.tsx)** gained a `validateSearch?: (raw) => unknown` option so tests can mount a route with the same zod schema production uses. Prior to A3 the test route had no `validateSearch`, so `useSearch` returned raw URLSearchParams strings; now tests get the same parsed/coerced shape (numbers as numbers, defaults applied) as the live router.
+
+#### Test changes (+6)
+- **[router-test-utils.test.tsx](web/src/test/router-test-utils.test.tsx) +1**: "runs validateSearch when supplied so URL strings are coerced"
+- **[UsersTab.test.tsx](web/src/pages/UsersTab.test.tsx) +1**: "reads page from URL search params (?page=2 -> startIndex=21)"; existing "next button" test rewritten to assert hook re-invocation after navigate.
+- **[GroupsTab.test.tsx](web/src/pages/GroupsTab.test.tsx) +1**: same URL-driven page test as Users.
+- **[LogsTab.test.tsx](web/src/pages/LogsTab.test.tsx) +1**: "reads urlContains and page from URL search params" - asserts the queryKey passed to mockUseQuery includes the URL-derived page (3) and filter (`'Users'`).
+- **[LogsPage.test.tsx](web/src/pages/LogsPage.test.tsx) +1**: "reads urlContains from URL search params (queryKey changes)".
+- **[EndpointsPage.test.tsx](web/src/pages/EndpointsPage.test.tsx) +1**: "reads q filter from URL search params" - mounted at `/endpoints?q=dev` shows only the dev endpoint card, prod card filtered out.
+- All existing tests rewritten to use `renderWithRouter` instead of plain `render` + `QueryClientProvider` + `FluentProvider` since `useSearch`/`useNavigate` now require router context.
+
+#### Test counts
+- Web: 274 -> **280** vitest tests (+6)
+- API: 3,612 unit + 1,104 E2E (unchanged - frontend-only phase)
+- Production build: clean (`vite build` 10.36s)
+- TypeScript: 0 errors in touched files
+
+#### Why this matters
+- Views are now bookmarkable / shareable via URL (`/endpoints/abc/users?page=3` works on refresh + back-button navigation)
+- Browser back/forward navigates filter and pagination history, not just route changes
+- Removes ad-hoc `useState` + popstate juggling - URL is the single source of truth
+- Sets up Phase A4 loaders to prefetch data based on URL search params
+- New feature doc: [docs/PHASE_A3_PER_PAGE_URL_STATE.md](docs/PHASE_A3_PER_PAGE_URL_STATE.md) (9 sections, 1 Mermaid diagram, URL contract table, risk register)
+
 ## [0.42.0-beta.1] - 2026-05-06
 
 ### UI Redesign - Phase A2: TanStack Router Cutover

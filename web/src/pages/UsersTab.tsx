@@ -1,12 +1,16 @@
 /**
  * UsersTab - SCIM user list table for an endpoint.
  *
- * Uses Fluent DataGrid pattern with sort, active/inactive badges, and
- * pagination. Data from TanStack Query via useEndpointUsers hook.
+ * Phase A3 (per-page migration): pagination state lives in the URL via
+ * TanStack Router's `useSearch` + `useNavigate`. The previous
+ * `useState(startIndex)` has been removed; the URL
+ * `?page=N&pageSize=N` is now the single source of truth, parsed by
+ * usersSearchSchema (`web/src/routes/search-schemas.ts`).
  *
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md Phase 2 Step 2.4
+ * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A3
  */
-import React, { useState } from 'react';
+import React from 'react';
 import {
   makeStyles,
   tokens,
@@ -17,9 +21,11 @@ import {
   Caption1,
   Subtitle2,
 } from '@fluentui/react-components';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpointUsers } from '../api/queries';
+import type { UsersSearch } from '../routes/search-schemas';
 
-const PAGE_SIZE = 20;
+const USERS_ROUTE_PATH = '/endpoints/$endpointId/users' as const;
 
 const useStyles = makeStyles({
   container: {
@@ -80,8 +86,24 @@ interface UsersTabProps {
 
 export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
   const classes = useStyles();
-  const [startIndex, setStartIndex] = useState(1);
-  const { data, isLoading, error } = useEndpointUsers(endpointId, { startIndex, count: PAGE_SIZE });
+  // Strict-false fallback to defaults so the component still renders if
+  // mounted outside the typed route (e.g. in unit tests that haven't yet
+  // wired the route schema).
+  const search = useSearch({ strict: false }) as Partial<UsersSearch>;
+  const page = search.page ?? 1;
+  const pageSize = search.pageSize ?? 20;
+  const navigate = useNavigate();
+  const startIndex = (page - 1) * pageSize + 1;
+
+  const goToPage = (nextPage: number): void => {
+    navigate({
+      to: USERS_ROUTE_PATH,
+      params: (prev) => ({ ...prev, endpointId }),
+      search: (prev) => ({ ...(prev as UsersSearch), page: nextPage }),
+    });
+  };
+
+  const { data, isLoading, error } = useEndpointUsers(endpointId, { startIndex, count: pageSize });
 
   if (isLoading) {
     return (
@@ -154,21 +176,21 @@ export const UsersTab: React.FC<UsersTabProps> = ({ endpointId }) => {
         </tbody>
       </table>
 
-      {total > PAGE_SIZE && (
+      {total > pageSize && (
         <div className={classes.pagination} data-testid="pagination">
           <Button
             appearance="subtle"
-            disabled={startIndex <= 1}
-            onClick={() => setStartIndex(Math.max(1, startIndex - PAGE_SIZE))}
+            disabled={page <= 1}
+            onClick={() => goToPage(Math.max(1, page - 1))}
             data-testid="pagination-prev"
           >
             Previous
           </Button>
-          <Text>Page {Math.ceil(startIndex / PAGE_SIZE)}</Text>
+          <Text>Page {page}</Text>
           <Button
             appearance="subtle"
-            disabled={startIndex + PAGE_SIZE > total}
-            onClick={() => setStartIndex(startIndex + PAGE_SIZE)}
+            disabled={startIndex + pageSize > total}
+            onClick={() => goToPage(page + 1)}
             data-testid="pagination-next"
           >
             Next

@@ -1,8 +1,10 @@
 /**
  * logs.tsx - global logs page route at "/logs".
  *
- * Mounts the LogsPage. Phase D5 will wire endpoint, status, and time-range
- * filters via globalLogsSearchSchema search params.
+ * Wires globalLogsSearchSchema (page, pageSize, endpointId, status,
+ * timeRange, urlContains). LogsPage reads via useSearch and updates
+ * via useNavigate (Phase A3 - urlContains today; remaining filter
+ * inputs land in Phase D5).
  */
 import { createRoute } from '@tanstack/react-router';
 import { rootRoute } from './__root';

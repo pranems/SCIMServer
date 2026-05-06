@@ -49,6 +49,16 @@ export interface RenderWithRouterOptions extends Omit<RenderOptions, 'wrapper'> 
    * exposes `endpointId`).
    */
   routePath?: string;
+  /**
+   * Optional zod-style search-param validator passed straight through to
+   * `createRoute({ validateSearch })`. Required when the rendered
+   * component calls `useSearch({ from: routePath })` and expects parsed
+   * search params (Phase A3 per-page migration). The function receives
+   * the raw URL search params object and should return the validated /
+   * coerced shape; in production code this is typically the `.parse`
+   * method of one of the schemas in `web/src/routes/search-schemas.ts`.
+   */
+  validateSearch?: (input: Record<string, unknown>) => unknown;
 }
 
 /**
@@ -63,7 +73,12 @@ export interface RenderWithRouterOptions extends Omit<RenderOptions, 'wrapper'> 
  */
 export function renderWithRouter(
   ui: React.ReactElement,
-  { initialUrl = '/', routePath = '/$', ...renderOptions }: RenderWithRouterOptions = {},
+  {
+    initialUrl = '/',
+    routePath = '/$',
+    validateSearch,
+    ...renderOptions
+  }: RenderWithRouterOptions = {},
 ): RenderResult {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -80,6 +95,10 @@ export function renderWithRouter(
     getParentRoute: () => rootRoute,
     path: routePath,
     component: () => <>{ui}</>,
+    // Only set validateSearch when supplied - createRoute treats the
+    // property as `undefined` vs missing differently and we want the
+    // default route to behave exactly as before when no schema is given.
+    ...(validateSearch ? { validateSearch } : {}),
   });
 
   // Always include an exact "/" so initialUrl="/" resolves even when the

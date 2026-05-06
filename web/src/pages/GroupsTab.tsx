@@ -1,7 +1,10 @@
 /**
  * GroupsTab - SCIM group list table for an endpoint.
+ *
+ * Phase A3: pagination lives in the URL (`?page=N&pageSize=N`) via
+ * TanStack Router. State is derived from groupsSearchSchema.
  */
-import React, { useState } from 'react';
+import React from 'react';
 import {
   makeStyles,
   tokens,
@@ -12,9 +15,11 @@ import {
   Caption1,
   Subtitle2,
 } from '@fluentui/react-components';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { useEndpointGroups } from '../api/queries';
+import type { GroupsSearch } from '../routes/search-schemas';
 
-const PAGE_SIZE = 20;
+const GROUPS_ROUTE_PATH = '/endpoints/$endpointId/groups' as const;
 
 const useStyles = makeStyles({
   container: { display: 'flex', flexDirection: 'column', gap: '12px' },
@@ -34,8 +39,21 @@ interface GroupsTabProps {
 
 export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
   const classes = useStyles();
-  const [startIndex, setStartIndex] = useState(1);
-  const { data, isLoading, error } = useEndpointGroups(endpointId, { startIndex, count: PAGE_SIZE });
+  const search = useSearch({ strict: false }) as Partial<GroupsSearch>;
+  const page = search.page ?? 1;
+  const pageSize = search.pageSize ?? 20;
+  const navigate = useNavigate();
+  const startIndex = (page - 1) * pageSize + 1;
+
+  const goToPage = (nextPage: number): void => {
+    navigate({
+      to: GROUPS_ROUTE_PATH,
+      params: (prev) => ({ ...prev, endpointId }),
+      search: (prev) => ({ ...(prev as GroupsSearch), page: nextPage }),
+    });
+  };
+
+  const { data, isLoading, error } = useEndpointGroups(endpointId, { startIndex, count: pageSize });
 
   if (isLoading) {
     return (
@@ -98,11 +116,11 @@ export const GroupsTab: React.FC<GroupsTabProps> = ({ endpointId }) => {
         </tbody>
       </table>
 
-      {total > PAGE_SIZE && (
+      {total > pageSize && (
         <div className={classes.pagination} data-testid="groups-pagination">
-          <Button appearance="subtle" disabled={startIndex <= 1} onClick={() => setStartIndex(Math.max(1, startIndex - PAGE_SIZE))}>Previous</Button>
-          <Text>Page {Math.ceil(startIndex / PAGE_SIZE)}</Text>
-          <Button appearance="subtle" disabled={startIndex + PAGE_SIZE > total} onClick={() => setStartIndex(startIndex + PAGE_SIZE)}>Next</Button>
+          <Button appearance="subtle" disabled={page <= 1} onClick={() => goToPage(Math.max(1, page - 1))}>Previous</Button>
+          <Text>Page {page}</Text>
+          <Button appearance="subtle" disabled={startIndex + pageSize > total} onClick={() => goToPage(page + 1)}>Next</Button>
         </div>
       )}
     </div>

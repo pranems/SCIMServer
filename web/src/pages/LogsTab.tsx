@@ -1,7 +1,11 @@
 /**
  * LogsTab - filterable request log list for an endpoint.
+ *
+ * Phase A3: page + urlContains filter are URL-driven via
+ * logsSearchSchema. SearchBox typing dispatches a navigate that resets
+ * page to 1 (typical filter-input UX).
  */
-import React, { useState } from 'react';
+import React from 'react';
 import {
   makeStyles,
   tokens,
@@ -13,10 +17,13 @@ import {
   Caption1,
   Subtitle2,
 } from '@fluentui/react-components';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { fetchWithAuth } from '../api/queries';
 import { useQuery } from '@tanstack/react-query';
+import type { LogsSearch } from '../routes/search-schemas';
 
-const PAGE_SIZE = 20;
+const LOGS_ROUTE_PATH = '/endpoints/$endpointId/logs' as const;
+const DEFAULT_PAGE_SIZE = 20;
 
 const useStyles = makeStyles({
   container: { display: 'flex', flexDirection: 'column', gap: '12px' },
@@ -46,13 +53,13 @@ interface LogsTabProps {
 }
 
 /** Hook to fetch logs for an endpoint */
-export function useEndpointLogs(endpointId: string, page: number = 1, search: string = '') {
+export function useEndpointLogs(endpointId: string, page: number, search: string, pageSize: number = DEFAULT_PAGE_SIZE) {
   return useQuery<{ items: any[]; total: number; page: number; pageSize: number; hasNext: boolean; hasPrev: boolean }>({
-    queryKey: ['endpoint-logs', endpointId, page, search],
+    queryKey: ['endpoint-logs', endpointId, page, pageSize, search],
     queryFn: () => {
       const params = new URLSearchParams({
         endpointId,
-        pageSize: String(PAGE_SIZE),
+        pageSize: String(pageSize),
         page: String(page),
       });
       if (search) params.set('urlContains', search);
@@ -65,9 +72,34 @@ export function useEndpointLogs(endpointId: string, page: number = 1, search: st
 
 export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
   const classes = useStyles();
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const { data, isLoading, error } = useEndpointLogs(endpointId, page, search);
+  const search = useSearch({ strict: false }) as Partial<LogsSearch>;
+  const page = search.page ?? 1;
+  const pageSize = search.pageSize ?? DEFAULT_PAGE_SIZE;
+  const urlContains = search.urlContains ?? '';
+  const navigate = useNavigate();
+  const { data, isLoading, error } = useEndpointLogs(endpointId, page, urlContains, pageSize);
+
+  const updateSearch = (next: { page?: number; urlContains?: string }): void => {
+    navigate({
+      to: LOGS_ROUTE_PATH,
+      params: (prev) => ({ ...prev, endpointId }),
+      search: (prev) => {
+        const previous = prev as LogsSearch;
+        return {
+          ...previous,
+          // Always normalize empty filter -> undefined so URLs stay clean.
+          urlContains:
+            next.urlContains !== undefined
+              ? next.urlContains.trim() === ''
+                ? undefined
+                : next.urlContains
+              : previous.urlContains,
+          // When the filter changes, snap pagination back to page 1.
+          page: next.page ?? (next.urlContains !== undefined ? 1 : previous.page),
+        };
+      },
+    });
+  };
 
   if (isLoading) {
     return (
@@ -101,8 +133,8 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
         <Subtitle2>{data?.total ?? logs.length} logs</Subtitle2>
         <SearchBox
           placeholder="Filter by URL..."
-          value={search}
-          onChange={(_, d) => { setSearch(d.value); setPage(1); }}
+          value={urlContains}
+          onChange={(_, d) => updateSearch({ urlContains: d.value })}
           data-testid="logs-tab-search"
           style={{ minWidth: '200px' }}
         />
@@ -146,11 +178,11 @@ export const LogsTab: React.FC<LogsTabProps> = ({ endpointId }) => {
         </tbody>
       </table>
 
-      {(data?.total ?? 0) > PAGE_SIZE && (
+      {(data?.total ?? 0) > pageSize && (
         <div className={classes.pagination} data-testid="logs-pagination">
-          <Button appearance="subtle" disabled={!data?.hasPrev} onClick={() => setPage(Math.max(1, page - 1))}>Previous</Button>
+          <Button appearance="subtle" disabled={!data?.hasPrev} onClick={() => updateSearch({ page: Math.max(1, page - 1) })}>Previous</Button>
           <Text>Page {page}</Text>
-          <Button appearance="subtle" disabled={!data?.hasNext} onClick={() => setPage(page + 1)}>Next</Button>
+          <Button appearance="subtle" disabled={!data?.hasNext} onClick={() => updateSearch({ page: page + 1 })}>Next</Button>
         </div>
       )}
     </div>

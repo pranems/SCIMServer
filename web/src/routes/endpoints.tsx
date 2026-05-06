@@ -1,9 +1,9 @@
 /**
  * endpoints.tsx - endpoints list route at "/endpoints".
  *
- * Mounts EndpointsPage with optional search-query support via the
- * endpointsSearchSchema from search-schemas.ts. Phase A3 will wire the
- * search query to client-side filtering inside EndpointsPage.
+ * Mounts EndpointsPage with `q` search support via
+ * endpointsSearchSchema. EndpointsPage reads `q` from useSearch and
+ * updates via useNavigate (Phase A3).
  */
 import { createRoute } from '@tanstack/react-router';
 import { rootRoute } from './__root';

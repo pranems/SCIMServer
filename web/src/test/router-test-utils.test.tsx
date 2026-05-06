@@ -47,6 +47,36 @@ describe('renderWithRouter', () => {
     expect(await findByTestId('search')).toHaveTextContent('3/50');
   });
 
+  it('runs validateSearch when supplied so URL strings are coerced', async () => {
+    // Phase A3 contract: when a route component calls useSearch and
+    // expects parsed types (e.g. number not string for page), the test
+    // helper has to install a validateSearch fn. We assert here that the
+    // option is honored end-to-end.
+    interface ParsedSearch {
+      page: number;
+      pageSize: number;
+    }
+    function Probe(): React.JSX.Element {
+      const search = useSearch({ strict: false }) as ParsedSearch;
+      return (
+        <div data-testid="parsed">
+          page={search.page}|pageSize={search.pageSize}|pageType={typeof search.page}
+        </div>
+      );
+    }
+    const { findByTestId } = renderWithRouter(<Probe />, {
+      initialUrl: '/users?page=4&pageSize=25',
+      routePath: '/users',
+      validateSearch: (raw) => ({
+        page: Number(raw.page ?? 1),
+        pageSize: Number(raw.pageSize ?? 20),
+      }),
+    });
+    expect(await findByTestId('parsed')).toHaveTextContent(
+      'page=4|pageSize=25|pageType=number',
+    );
+  });
+
   it('renders <Link> components without crashing', async () => {
     const { findByTestId } = renderWithRouter(
       <Link to="/endpoints" data-testid="link">
