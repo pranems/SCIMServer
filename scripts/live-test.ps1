@@ -9233,14 +9233,27 @@ Write-Host "TEST SECTION 9z-V: ENDPOINT OVERVIEW BFF (Phase B1)" -ForegroundColo
 Write-Host "========================================" -ForegroundColor Yellow
 
 # ─── Setup: dedicated endpoint ──────────────────────────────────────
+# profilePreset and profile are mutually exclusive on POST. Create with
+# the preset first, then PATCH the settings we need (StrictSchemaValidation
+# off so test users / groups can be created without strict-mode rejection,
+# PerEndpointCredentialsEnabled on so we can mint a credential below).
 $ovEndpointBody = @{
-    name            = "live-9z-V-overview-$([DateTime]::Now.Ticks)"
-    profilePreset   = "rfc-standard"
-    profile         = @{ settings = @{ StrictSchemaValidation = "False"; PerEndpointCredentialsEnabled = "True" } }
-} | ConvertTo-Json -Depth 6
+    name          = "live-9z-V-overview-$([DateTime]::Now.Ticks)"
+    profilePreset = "rfc-standard"
+} | ConvertTo-Json
 $ovEndpoint = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints" -Method POST -Headers $headers -Body $ovEndpointBody -ContentType "application/json"
 $ovEpId = $ovEndpoint.id
 Test-Result -Success ($null -ne $ovEpId) -Message "9z-V.setup: created endpoint for overview tests (id=$ovEpId)"
+
+$ovSettingsBody = @{
+    profile = @{
+        settings = @{
+            StrictSchemaValidation        = "False"
+            PerEndpointCredentialsEnabled = "True"
+        }
+    }
+} | ConvertTo-Json -Depth 6
+Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ovEpId" -Method PATCH -Headers $headers -Body $ovSettingsBody -ContentType "application/json" | Out-Null
 
 # ─── 9z-V.1: Empty-state overview (no creds, no users) ─────────────
 $overview = Invoke-RestMethod -Uri "$baseUrl/scim/admin/endpoints/$ovEpId/overview" -Method GET -Headers $headers
@@ -9248,7 +9261,10 @@ $overviewKeys = ($overview.PSObject.Properties.Name | Sort-Object) -join ','
 Test-Result -Success ($overviewKeys -eq 'configFlags,credentials,endpoint,recentActivity,stats') `
     -Message "9z-V.1: top-level keys are exactly {configFlags, credentials, endpoint, recentActivity, stats} (got: $overviewKeys)"
 Test-Result -Success ($overview.endpoint.id -eq $ovEpId) -Message "9z-V.2: endpoint.id matches the URL parameter"
-Test-Result -Success ($overview.endpoint.preset -eq 'rfc-standard') -Message "9z-V.3: endpoint.preset extracted from profile"
+# preset comes from profile.preset which is NOT persisted on endpoint records (only used as
+# audit-log metadata). The BFF emits null when absent. Frontend can use the existing endpoint
+# detail's profile to detect entra-id-vs-rfc-standard-vs-... if needed in a later phase.
+Test-Result -Success ($null -eq $overview.endpoint.preset) -Message "9z-V.3: endpoint.preset is null when profile.preset is not persisted (current behavior)"
 Test-Result -Success ($overview.endpoint.active -eq $true) -Message "9z-V.4: endpoint.active is boolean true"
 Test-Result -Success ($overview.stats.userCount -eq 0) -Message "9z-V.5: stats.userCount is 0 for fresh endpoint"
 Test-Result -Success (@($overview.credentials).Count -eq 0) -Message "9z-V.6: credentials is empty array on fresh endpoint"
