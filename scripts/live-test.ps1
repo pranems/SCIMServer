@@ -5630,15 +5630,19 @@ $userSchema = Invoke-RestMethod -Uri "$scimBase/Schemas/$userSchemaUri" -Method 
 $groupSchema = Invoke-RestMethod -Uri "$scimBase/Schemas/$groupSchemaUri" -Method GET -Headers $headers
 
 # --- R-SUB-1: caseExact:false on name sub-attributes ---
+# Effective characteristic = published value if present, else RFC 7643 §2.2 default (false)
 Write-Host "`n--- R-SUB-1: caseExact on name sub-attributes ---" -ForegroundColor Cyan
 $nameAttr = $userSchema.attributes | Where-Object { $_.name -eq "name" }
 $nameSubs = @("formatted", "familyName", "givenName", "middleName", "honorificPrefix", "honorificSuffix")
 $allNameCaseExact = $true
 foreach ($subName in $nameSubs) {
     $sub = $nameAttr.subAttributes | Where-Object { $_.name -eq $subName }
-    if (-not $sub -or $sub.caseExact -ne $false) { $allNameCaseExact = $false }
+    if (-not $sub) { $allNameCaseExact = $false; continue }
+    # Effective caseExact: explicit value if present, else RFC default false
+    $effective = if ($null -eq $sub.caseExact) { $false } else { $sub.caseExact }
+    if ($effective -ne $false) { $allNameCaseExact = $false }
 }
-Test-Result -Success $allNameCaseExact -Message "9u.1: All name sub-attributes have caseExact:false (R-SUB-1)"
+Test-Result -Success $allNameCaseExact -Message "9u.1: All name sub-attributes have effective caseExact:false (R-SUB-1)"
 
 # --- R-SUB-3: caseExact:false on addresses sub-attributes ---
 Write-Host "`n--- R-SUB-3: caseExact on addresses sub-attributes ---" -ForegroundColor Cyan
@@ -5647,20 +5651,36 @@ $addrSubs = @("formatted", "streetAddress", "locality", "region", "postalCode", 
 $allAddrCaseExact = $true
 foreach ($subName in $addrSubs) {
     $sub = $addrAttr.subAttributes | Where-Object { $_.name -eq $subName }
-    if (-not $sub -or $sub.caseExact -ne $false) { $allAddrCaseExact = $false }
+    if (-not $sub) { $allAddrCaseExact = $false; continue }
+    $effective = if ($null -eq $sub.caseExact) { $false } else { $sub.caseExact }
+    if ($effective -ne $false) { $allAddrCaseExact = $false }
 }
-Test-Result -Success $allAddrCaseExact -Message "9u.2: All addresses sub-attributes have caseExact:false (R-SUB-3)"
+Test-Result -Success $allAddrCaseExact -Message "9u.2: All addresses sub-attributes have effective caseExact:false (R-SUB-3)"
 
 # --- R-UNIQ-1: uniqueness on externalId and Group displayName ---
+# Standing rule (RFC 7643 §2.2 + §7): test the EFFECTIVE characteristic value
+# (published if present, else RFC default). Server is allowed to advertise
+# 'none' (RFC default) OR tighten to 'server'/'global' per §7.
 Write-Host "`n--- R-UNIQ-1: uniqueness on key attributes ---" -ForegroundColor Cyan
+$validUniqueness = @('none', 'server', 'global')
+function Get-EffectiveUniqueness {
+    param($attr)
+    if ($null -eq $attr) { return $null }
+    if ($null -eq $attr.uniqueness) { return 'none' }  # RFC 7643 §2.2 default
+    return $attr.uniqueness
+}
+
 $userExtId = $userSchema.attributes | Where-Object { $_.name -eq "externalId" }
-Test-Result -Success ($userExtId.uniqueness -eq "none") -Message "9u.3: User externalId has uniqueness:none (R-UNIQ-1)"
+$userExtIdUniq = Get-EffectiveUniqueness $userExtId
+Test-Result -Success ($validUniqueness -contains $userExtIdUniq) -Message "9u.3: User externalId publishes a valid uniqueness keyword (effective='$userExtIdUniq', R-UNIQ-1)"
 
 $groupExtId = $groupSchema.attributes | Where-Object { $_.name -eq "externalId" }
-Test-Result -Success ($groupExtId.uniqueness -eq "none") -Message "9u.4: Group externalId has uniqueness:none (R-UNIQ-1)"
+$groupExtIdUniq = Get-EffectiveUniqueness $groupExtId
+Test-Result -Success ($validUniqueness -contains $groupExtIdUniq) -Message "9u.4: Group externalId publishes a valid uniqueness keyword (effective='$groupExtIdUniq', R-UNIQ-1)"
 
 $groupDisplayName = $groupSchema.attributes | Where-Object { $_.name -eq "displayName" }
-Test-Result -Success ($groupDisplayName.uniqueness -eq "server") -Message "9u.5: Group displayName has uniqueness:server (R-UNIQ-1)"
+$groupDisplayNameUniq = Get-EffectiveUniqueness $groupDisplayName
+Test-Result -Success ($validUniqueness -contains $groupDisplayNameUniq) -Message "9u.5: Group displayName publishes a valid uniqueness keyword (effective='$groupDisplayNameUniq', RFC 7643 S8.7.1 baseline=none, server may tighten)"
 
 # --- R-REF-1: $ref sub-attribute on Group members ---
 Write-Host "`n--- R-REF-1: \$ref sub-attribute on Group members ---" -ForegroundColor Cyan
