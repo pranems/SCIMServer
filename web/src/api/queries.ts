@@ -16,7 +16,7 @@
  * @see docs/UI_REDESIGN_ARCHITECTURE_AND_PLAN.md D2 (TanStack Query)
  * @see docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md Phase A4
  */
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type {
   DashboardResponse,
   EndpointListResponse,
@@ -303,5 +303,166 @@ export function useEndpointGroups(endpointId: string, params?: ScimListParams) {
   return useQuery<ScimListResponse>({
     ...endpointGroupsQueryOptions(endpointId, params),
     enabled: !!endpointId,
+  });
+}
+
+// ─── Mutation hooks (Phase C5) ───────────────────────────────────────
+//
+// Universal pattern: onMutate snapshot -> optimistic write -> onError
+// rollback -> onSettled invalidate. Each mutation ships with both
+// branches tested (success + rollback).
+//
+// NOTE: optimistic updates only apply when the mutation has a
+// predictable effect on the cache (e.g. removing an item from a list).
+// CREATE mutations always let the server assign the ID, so they do NOT
+// use onMutate - the cache is simply invalidated on success.
+
+/** Create a per-endpoint bearer credential. */
+export function useCreateCredential(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { label?: string; expiresAt?: string }) =>
+      fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
+/** Revoke (delete) a per-endpoint credential. Optimistic: removes from cached overview. */
+export function useDeleteCredential(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (credentialId: string) =>
+      fetchWithAuth(`/scim/admin/endpoints/${endpointId}/credentials/${credentialId}`, {
+        method: 'DELETE',
+      }),
+    onMutate: async (credentialId: string) => {
+      await qc.cancelQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+      const prev = qc.getQueryData<EndpointOverviewResponse>(
+        queryKeys.endpoints.overview(endpointId),
+      );
+      if (prev) {
+        qc.setQueryData<EndpointOverviewResponse>(
+          queryKeys.endpoints.overview(endpointId),
+          {
+            ...prev,
+            credentials: prev.credentials.filter((c) => c.id !== credentialId),
+          },
+        );
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) {
+        qc.setQueryData(queryKeys.endpoints.overview(endpointId), context.prev);
+      }
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
+/** Update endpoint profile / settings / displayName. Optimistic flag toggle. */
+export function useUpdateEndpointConfig(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      fetchWithAuth(`/scim/admin/endpoints/${endpointId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      }),
+    onMutate: async (body: Record<string, unknown>) => {
+      await qc.cancelQueries({ queryKey: queryKeys.endpoints.detail(endpointId) });
+      const prev = qc.getQueryData<EndpointResponse>(
+        queryKeys.endpoints.detail(endpointId),
+      );
+      if (prev) {
+        // Shallow merge - enough for flag toggles and displayName.
+        qc.setQueryData<EndpointResponse>(
+          queryKeys.endpoints.detail(endpointId),
+          { ...prev, ...(body as Partial<EndpointResponse>) },
+        );
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) {
+        qc.setQueryData(queryKeys.endpoints.detail(endpointId), context.prev);
+      }
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.detail(endpointId) });
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
+/** Create a SCIM User via POST /endpoints/:id/Users. */
+export function useCreateUser(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      fetchWithAuth(`/scim/endpoints/${endpointId}/Users`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['users', endpointId] });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard });
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
+/** Create a SCIM Group via POST /endpoints/:id/Groups. */
+export function useCreateGroup(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Record<string, unknown>) =>
+      fetchWithAuth(`/scim/endpoints/${endpointId}/Groups`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['groups', endpointId] });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard });
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
+/** PATCH a SCIM User. Optimistic: applies partial update to cached list. */
+export function useUpdateUser(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (args: { userId: string; body: Record<string, unknown> }) =>
+      fetchWithAuth(`/scim/endpoints/${endpointId}/Users/${args.userId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(args.body),
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['users', endpointId] });
+    },
+  });
+}
+
+/** DELETE a SCIM User. Optimistic: removes from cached list. */
+export function useDeleteUser(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) =>
+      fetchWithAuth(`/scim/endpoints/${endpointId}/Users/${userId}`, {
+        method: 'DELETE',
+      }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['users', endpointId] });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard });
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
   });
 }

@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.44.0] - 2026-05-06 - Phase C (Reusable Primitives + Mutation Layer)
+
+### UI Redesign - Phase C (C1 + C2 + C3 + C4 + C5)
+
+**Ships the primitive component library + mutation hooks that Phases D and E depend on. All 6 primitives are pure components with zero backend dependencies; the mutation layer builds on fetchWithAuth + TanStack Query's useMutation with optimistic updates + rollback + cache invalidation.**
+
+#### C1 - DetailDrawer
+- [web/src/components/primitives/DetailDrawer.tsx](web/src/components/primitives/DetailDrawer.tsx) - wraps Fluent UI `OverlayDrawer` (overlay, position=end). Slots: title (sticky header), children (scrollable body), footer (sticky action bar). Closes on ESC, backdrop click, X button. 6 unit tests.
+
+#### C2 - FormDialog
+- [web/src/components/primitives/FormDialog.tsx](web/src/components/primitives/FormDialog.tsx) - wraps Fluent UI `Dialog`. Manages submit/cancel buttons, busy state (spinner + disabled buttons), error banner, form onSubmit. 8 unit tests.
+
+#### C3 - EmptyState, LoadingSkeleton, ErrorBoundary
+- [EmptyState.tsx](web/src/components/primitives/EmptyState.tsx) - icon + title + body + optional CTA button. 7 unit tests.
+- [LoadingSkeleton.tsx](web/src/components/primitives/LoadingSkeleton.tsx) - wraps Fluent UI `Skeleton` + `SkeletonItem`. Props: count, width, height. Clamps to 1-100. 6 unit tests.
+- [ErrorBoundary.tsx](web/src/components/primitives/ErrorBoundary.tsx) - React error boundary with reset button, optional custom fallback, onError callback (for telemetry). Stack traces only in dev mode. 6 unit tests.
+
+#### C4 - KpiChart
+- [web/src/components/primitives/KpiChart.tsx](web/src/components/primitives/KpiChart.tsx) - sparkline area chart using recharts (already installed). Handles empty/single-point data with explicit fallback. Color scheme maps to Fluent UI tokens. 6 unit tests.
+
+#### C5 - Mutation Layer
+- 7 mutation hooks added to [web/src/api/queries.ts](web/src/api/queries.ts): `useCreateCredential`, `useDeleteCredential` (optimistic - removes from cached overview), `useUpdateEndpointConfig` (optimistic - shallow merge into cached detail), `useCreateUser`, `useCreateGroup`, `useUpdateUser`, `useDeleteUser`.
+- Universal pattern: onMutate snapshot -> optimistic write -> onError rollback -> onSettled invalidate.
+- 9 unit tests in [web/src/api/mutations.test.ts](web/src/api/mutations.test.ts) covering success paths + rollback for optimistic mutations.
+
+#### Barrel export
+- [web/src/components/primitives/index.ts](web/src/components/primitives/index.ts) re-exports all primitives so pages can do `import { EmptyState, DetailDrawer } from '../components/primitives'`.
+
+#### Test counts
+- Web vitest: 303 -> **351** (+48: 39 primitives + 9 mutations)
+- API unit/E2E/live unchanged (frontend-only phase)
+- Production build: clean (`vite build` 10.62s)
+
 ## [0.43.0] - 2026-05-06 - Phase B (BFF Overview + SSE Audit)
 
 ### UI Redesign - Phase B (B1 + B2 + B3)

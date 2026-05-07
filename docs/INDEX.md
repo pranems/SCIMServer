@@ -1,7 +1,7 @@
 # SCIMServer Documentation Index
 
-> **Version:** 0.43.0 - **Updated:** May 6, 2026  
-> 84 API routes - 19 controllers - 6 presets - 16 config flags - 5,066 tests (3,641 unit + 1,122 E2E + 303 web vitest) + 7 Playwright + 886 live SCIM
+> **Version:** 0.44.0 - **Updated:** May 6, 2026  
+> 84 API routes - 19 controllers - 6 presets - 16 config flags - 5,114 tests (3,641 unit + 1,122 E2E + 351 web vitest) + 7 Playwright + 888 live SCIM
 
 ---
 
