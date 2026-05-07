@@ -1,6 +1,6 @@
 # SCIMServer Documentation Index
 
-> **Version:** 0.42.0-beta.4 - **Updated:** May 6, 2026  
+> **Version:** 0.42.0 - **Updated:** May 6, 2026  
 > 84 API routes - 19 controllers - 6 presets - 16 config flags - 5,044 tests (3,632 unit + 1,119 E2E + 293 web vitest) + 7 Playwright A5 cases
 
 ---

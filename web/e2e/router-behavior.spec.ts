@@ -152,16 +152,17 @@ test.describe('Phase A3 router contract - URL search params', () => {
     await page.getByTestId('app-shell').waitFor({ state: 'visible' });
     await expect(page).toHaveURL(/[?&]urlContains=Users(\b|&)/);
 
-    // Wait for the input to mount.
-    const filter = page.getByTestId('logs-search');
-    await filter.waitFor({ state: 'visible' });
-    // SearchBox renders an inner <input>; check its value via locator.
-    const inputValue = await filter.locator('input').inputValue();
-    expect(inputValue).toBe('Users');
+    // Locate the input directly by its placeholder. Fluent UI v9
+    // SearchBox renders the data-testid on a wrapper <span>, but the
+    // accessible name of the inner <input> comes from its placeholder.
+    // page.getByPlaceholder is the most resilient selector here -
+    // independent of the wrapper structure.
+    await expect(page.getByPlaceholder('Filter by URL...')).toHaveValue('Users');
 
     await page.reload();
     await page.getByTestId('app-shell').waitFor({ state: 'visible' });
     await expect(page).toHaveURL(/[?&]urlContains=Users(\b|&)/);
+    await expect(page.getByPlaceholder('Filter by URL...')).toHaveValue('Users');
   });
 });
 

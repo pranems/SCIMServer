@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.42.0] - 2026-05-06 - Phase A complete (TanStack Router migration)
+
+### UI Redesign - Phase A complete (A1+A2+A3+A4+A5)
+
+**TanStack Router migration shipped end-to-end.** URL is the single source of truth for view state across in-app navigation, browser back/forward, deep-link refresh, and server-side SPA fallback. Every contract is locked in by both unit (isolated) and Playwright (real browser) tests.
+
+This release rolls up A1 through A5 (`0.42.0-alpha.1` -> `0.42.0-beta.5`) into the stable `0.42.0` minor, plus one final fix surfaced during A5 deploy verification:
+
+#### Final fix: spa-fallback path resolution (was beta.5)
+- **Bug**: After A5 deploy of beta.4, `curl https://scimserver-dev.../endpoints` returned the placeholder HTML ("SPA bundle not built") instead of the real index.html.
+- **Root cause**: [api/src/bootstrap/spa-fallback.ts](api/src/bootstrap/spa-fallback.ts) lives at `/app/dist/bootstrap/spa-fallback.js` at runtime - one level deeper than `main.js` at `/app/dist/main.js`. The single `..` in `resolveSpaIndexPath` was inherited from main.ts's path math but resolved to `/app/dist/public/index.html` (doesn't exist) instead of `/app/public/index.html`. The middleware silently fell back to the placeholder body.
+- **Fix**: walk up TWO `..` segments to reach `/app/`, then `public/index.html`. Updated docstring to explain the runtime container layout. spa-fallback.spec.ts assertion updated to match.
+- **Verified live**: `curl https://scimserver-dev.../endpoints` now returns the real bundled SPA shell (200 text/html) with the actual `<script src="/assets/index-...js">` and `<link rel="stylesheet" href="/assets/index-...css">` tags.
+
+#### Phase A roll-up
+| Sub-phase | What shipped | Tag |
+|-----------|--------------|-----|
+| A1 | TanStack Router foundation (additive scaffolding, 10 route files, zod search schemas, test helper) | 0.42.0-alpha.1 |
+| A2 | Cutover (RouterProvider mounted, AppRouter regex matcher removed, currentPath/navigate stripped, sidebar uses Link + useRouterState, EndpointDetailPage layout-only with Outlet) | 0.42.0-beta.1 |
+| A3 | Per-page URL state (UsersTab/GroupsTab/LogsTab/LogsPage/EndpointsPage all read state from URL via useSearch + useNavigate) | 0.42.0-beta.2 |
+| A4 | Route loaders + hover-prefetch (10 routes pre-fetch via queryClient.ensureQueryData; defaultPreload:'intent' warms cache before click; xxxQueryOptions helpers as single source of truth) | 0.42.0-beta.3 |
+| A5 | Playwright e2e + SPA fallback fix (real-browser tests lock in router contracts; surfaced & fixed deep-link 404 bug) | 0.42.0-beta.4/5 |
+
+#### Final test counts
+- API unit: **3,632** (was 3,612 baseline; +20 new spa-fallback unit tests)
+- API E2E: **1,119** (was 1,104; +15 spa-fallback e2e)
+- Web vitest: **293** (was 240; +53 across A1-A4)
+- Browser E2E (Playwright): **+7 cases** in router-behavior.spec.ts (run against deployed dev, not part of CI vitest count)
+- Live SCIM tests: **869** unchanged on every Phase A commit - confirms zero backend regression for a frontend-only migration
+- Production build: clean (`vite build` ~10s, `tsc --noEmit` 0 errors)
+
+#### Verified live on dev (v0.42.0-beta.5 -> 0.42.0)
+- 869/869 live SCIM tests pass
+- 7/7 Playwright router-behavior cases pass (pushState, back/forward, deep link, URL <-> input sync, refresh preserves filter, hover-prefetch fires network)
+- `curl /endpoints` returns SPA shell (not 404 JSON, not placeholder)
+- All 4 sidebar nav links use `<Link>` with `data-testid="nav-{key}"` and correct hrefs
+
+#### Cross-references
+- [PHASE_A1_TANSTACK_ROUTER_FOUNDATION.md](docs/PHASE_A1_TANSTACK_ROUTER_FOUNDATION.md)
+- [PHASE_A2_TANSTACK_ROUTER_CUTOVER.md](docs/PHASE_A2_TANSTACK_ROUTER_CUTOVER.md)
+- [PHASE_A3_PER_PAGE_URL_STATE.md](docs/PHASE_A3_PER_PAGE_URL_STATE.md)
+- [PHASE_A4_ROUTE_LOADERS.md](docs/PHASE_A4_ROUTE_LOADERS.md)
+- [PHASE_A5_PLAYWRIGHT_AND_SPA_FALLBACK.md](docs/PHASE_A5_PLAYWRIGHT_AND_SPA_FALLBACK.md)
+
+#### Next: Phase B (BFF Overview endpoint + mutations layer)
+
 ## [0.42.0-beta.4] - 2026-05-06
 
 ### UI Redesign - Phase A5: Playwright E2E + SPA Fallback Fix
