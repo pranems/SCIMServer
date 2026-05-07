@@ -39,12 +39,13 @@ describe('spa-fallback helper', () => {
 
     it('points at the bundled SPA, not the source tree', () => {
       // The middleware reads via __dirname which at runtime points at
-      // dist/bootstrap (or src/bootstrap during ts-jest). Either way
-      // the resolved path's parent of `public` is the api root.
+      // dist/bootstrap (or src/bootstrap during ts-jest). Walking up
+      // two levels lands at the api root (/app in containers) where
+      // the public/ folder with the SPA bundle lives.
       const p = resolveSpaIndexPath();
-      // Either dist/public/index.html (production) or src/public
-      // (test, which doesn't exist - placeholder kicks in).
-      expect(/[\\/](?:dist|src)[\\/]\.\.[\\/]public[\\/]index\.html$|[\\/]public[\\/]index\.html$/.test(p)).toBe(true);
+      // Accept either dist/bootstrap/../../public (production) or
+      // src/bootstrap/../../public (test); both resolve to <api>/public.
+      expect(/[\\/](?:dist|src)[\\/]bootstrap[\\/]\.\.[\\/]\.\.[\\/]public[\\/]index\.html$|[\\/]public[\\/]index\.html$/.test(p)).toBe(true);
     });
   });
 

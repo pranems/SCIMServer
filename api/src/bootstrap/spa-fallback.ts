@@ -32,9 +32,20 @@ export const SPA_PATH_PREFIXES = [
   '/settings',  // Phase A1+ - global settings page
 ] as const;
 
-/** Where the bundled SPA index.html lives relative to dist/main.js. */
+/** Where the bundled SPA index.html lives relative to the api root.
+ *
+ * Container layout (production Dockerfile):
+ *   /app/dist/main.js            <- entry point
+ *   /app/dist/bootstrap/spa-fallback.js  <- this file at runtime
+ *   /app/public/index.html       <- SPA bundle (from web/dist)
+ *
+ * So we walk up TWO levels from this file's runtime location to reach
+ * /app/, then join `public/index.html`. The previous single-`..` was
+ * inherited from main.ts which sits at /app/dist/main.js (one level
+ * up = /app/) - but this helper file is one level deeper.
+ */
 export function resolveSpaIndexPath(): string {
-  return join(__dirname, '..', 'public', 'index.html');
+  return join(__dirname, '..', '..', 'public', 'index.html');
 }
 
 /**
