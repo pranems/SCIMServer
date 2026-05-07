@@ -129,4 +129,48 @@ describe('ErrorBoundary', () => {
     // onError blew up.
     expect(screen.getByTestId('error-boundary')).toBeInTheDocument();
   });
+
+  it('auto-resets when resetKeys changes (route navigation pattern)', () => {
+    const valueRef = { shouldThrow: true };
+    const Tree = ({ resetKeys, value }: { resetKeys: ReadonlyArray<unknown>; value: typeof valueRef }) => (
+      <FluentProvider theme={webLightTheme}>
+        <ErrorBoundary resetKeys={resetKeys}>
+          <Boomer shouldThrow={value.shouldThrow} />
+        </ErrorBoundary>
+      </FluentProvider>
+    );
+
+    const { rerender } = render(<Tree resetKeys={['/endpoints/A']} value={valueRef} />);
+    expect(screen.getByTestId('error-boundary')).toBeInTheDocument();
+
+    // Simulate URL changing AND the underlying problem going away
+    // (different endpoint, different data, no longer throws).
+    valueRef.shouldThrow = false;
+    rerender(<Tree resetKeys={['/endpoints/B']} value={valueRef} />);
+
+    // Boundary auto-reset; children render again.
+    expect(screen.queryByTestId('error-boundary')).not.toBeInTheDocument();
+    expect(screen.getByTestId('happy-child')).toBeInTheDocument();
+  });
+
+  it('does NOT reset when resetKeys are unchanged across renders', () => {
+    const valueRef = { shouldThrow: true };
+    const Tree = ({ resetKeys, value }: { resetKeys: ReadonlyArray<unknown>; value: typeof valueRef }) => (
+      <FluentProvider theme={webLightTheme}>
+        <ErrorBoundary resetKeys={resetKeys}>
+          <Boomer shouldThrow={value.shouldThrow} />
+        </ErrorBoundary>
+      </FluentProvider>
+    );
+
+    const { rerender } = render(<Tree resetKeys={['/endpoints/A']} value={valueRef} />);
+    expect(screen.getByTestId('error-boundary')).toBeInTheDocument();
+
+    // Fix the underlying problem but keep resetKeys the SAME identity.
+    valueRef.shouldThrow = false;
+    rerender(<Tree resetKeys={['/endpoints/A']} value={valueRef} />);
+
+    // Same key -> boundary stays errored. (Manual reset still works.)
+    expect(screen.getByTestId('error-boundary')).toBeInTheDocument();
+  });
 });

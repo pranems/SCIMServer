@@ -74,10 +74,19 @@ export const queryKeys = {
     detail: (id: string) => ['logs', id] as const,
   },
   users: {
+    /**
+     * Prefix key for every per-endpoint Users list cache entry. Used by
+     * mutations and SSE invalidation: `invalidateQueries({ queryKey:
+     * queryKeys.users.all(id) })` matches every paginated/filtered
+     * variant under that endpoint via TanStack Query's prefix-match.
+     */
+     all: (endpointId: string) => ['users', endpointId] as const,
     byEndpoint: (endpointId: string, params?: Record<string, unknown>) =>
       ['users', endpointId, params] as const,
   },
   groups: {
+    /** Prefix key for every per-endpoint Groups list cache entry. */
+    all: (endpointId: string) => ['groups', endpointId] as const,
     byEndpoint: (endpointId: string, params?: Record<string, unknown>) =>
       ['groups', endpointId, params] as const,
   },
@@ -306,16 +315,82 @@ export function useEndpointGroups(endpointId: string, params?: ScimListParams) {
   });
 }
 
-// ─── Mutation hooks (Phase C5) ───────────────────────────────────────
+// ─── Mutation hooks (Phase C5 + v0.44.1 hardening) ───────────────────
 //
 // Universal pattern: onMutate snapshot -> optimistic write -> onError
 // rollback -> onSettled invalidate. Each mutation ships with both
 // branches tested (success + rollback).
 //
-// NOTE: optimistic updates only apply when the mutation has a
-// predictable effect on the cache (e.g. removing an item from a list).
-// CREATE mutations always let the server assign the ID, so they do NOT
-// use onMutate - the cache is simply invalidated on success.
+// CREATE mutations skip onMutate because the server assigns the id
+// (no deterministic optimistic shape).
+//
+// SCIM PATCH/DELETE mutations accept an optional `ifMatch` ETag
+// argument. When supplied it is forwarded as the If-Match request
+// header so endpoints with the `RequireIfMatch` config flag (G7) get
+// 412 / 428 enforcement instead of 200 OK with a stale write. The
+// drawer/UI code that triggers the mutation knows the latest ETag
+// from the cached resource and is responsible for passing it in.
+//
+// Universal patch helper: applies a partial body to every cached
+// SCIM-list page that contains the target resource. Used by the
+// optimistic User/Group PATCH hooks to make the row reflect the new
+// values immediately.
+
+interface ScimResource extends Record<string, unknown> {
+  id?: string;
+}
+
+interface MutationContextWithListSnapshots {
+  /**
+   * Snapshot of every list-cache entry that matched the prefix when
+   * the mutation began. onError walks this map and restores each
+   * entry verbatim.
+   */
+  prevLists: Array<[readonly unknown[], ScimListResponse | undefined]>;
+}
+
+/**
+ * Build an If-Match header object only when a non-empty value is
+ * supplied. Centralises the conditional so individual hooks stay
+ * readable.
+ */
+function ifMatchHeaders(ifMatch?: string): Record<string, string> | undefined {
+  if (!ifMatch || ifMatch.trim() === '') return undefined;
+  return { 'If-Match': ifMatch };
+}
+
+/**
+ * Apply `mutator` to every cached list response under `prefix` whose
+ * Resources contain a row whose id matches `targetId`. Returns the
+ * snapshot list so the caller can roll back.
+ */
+function patchListsContaining(
+  qc: ReturnType<typeof useQueryClient>,
+  prefix: readonly unknown[],
+  targetId: string,
+  mutator: (list: ScimListResponse) => ScimListResponse,
+): Array<[readonly unknown[], ScimListResponse | undefined]> {
+  const snapshots: Array<[readonly unknown[], ScimListResponse | undefined]> = [];
+  const matches = qc.getQueriesData<ScimListResponse>({ queryKey: prefix });
+  for (const [key, data] of matches) {
+    snapshots.push([key, data]);
+    if (!data) continue;
+    const resources = data.Resources as ScimResource[];
+    if (!resources.some((r) => r.id === targetId)) continue;
+    qc.setQueryData<ScimListResponse>(key, mutator(data));
+  }
+  return snapshots;
+}
+
+/** Restore every snapshot captured by `patchListsContaining`. */
+function restoreListSnapshots(
+  qc: ReturnType<typeof useQueryClient>,
+  snapshots: Array<[readonly unknown[], ScimListResponse | undefined]>,
+): void {
+  for (const [key, data] of snapshots) {
+    qc.setQueryData(key, data);
+  }
+}
 
 /** Create a per-endpoint bearer credential. */
 export function useCreateCredential(endpointId: string) {
@@ -412,7 +487,7 @@ export function useCreateUser(endpointId: string) {
         body: JSON.stringify(body),
       }),
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['users', endpointId] });
+      qc.invalidateQueries({ queryKey: queryKeys.users.all(endpointId) });
       qc.invalidateQueries({ queryKey: queryKeys.dashboard });
       qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
     },
@@ -429,38 +504,189 @@ export function useCreateGroup(endpointId: string) {
         body: JSON.stringify(body),
       }),
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['groups', endpointId] });
+      qc.invalidateQueries({ queryKey: queryKeys.groups.all(endpointId) });
       qc.invalidateQueries({ queryKey: queryKeys.dashboard });
       qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
     },
   });
 }
 
-/** PATCH a SCIM User. Optimistic: applies partial update to cached list. */
+/**
+ * PATCH a SCIM User. Optimistic: applies the body shallow-merge to
+ * every cached list page that contains the target row, then rolls
+ * back on error. Forwards `If-Match` when supplied so endpoints with
+ * `RequireIfMatch` enforce the ETag (RFC 7644 S3.1).
+ */
 export function useUpdateUser(endpointId: string) {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (args: { userId: string; body: Record<string, unknown> }) =>
+  return useMutation<
+    unknown,
+    Error,
+    { userId: string; body: Record<string, unknown>; ifMatch?: string },
+    MutationContextWithListSnapshots
+  >({
+    mutationFn: (args) =>
       fetchWithAuth(`/scim/endpoints/${endpointId}/Users/${args.userId}`, {
         method: 'PATCH',
         body: JSON.stringify(args.body),
+        headers: ifMatchHeaders(args.ifMatch),
       }),
+    onMutate: async (args) => {
+      await qc.cancelQueries({ queryKey: queryKeys.users.all(endpointId) });
+      const prevLists = patchListsContaining(
+        qc,
+        queryKeys.users.all(endpointId),
+        args.userId,
+        (list) => ({
+          ...list,
+          Resources: (list.Resources as ScimResource[]).map((r) =>
+            r.id === args.userId ? { ...r, ...args.body } : r,
+          ),
+        }),
+      );
+      return { prevLists };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prevLists) restoreListSnapshots(qc, context.prevLists);
+    },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['users', endpointId] });
+      qc.invalidateQueries({ queryKey: queryKeys.users.all(endpointId) });
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
     },
   });
 }
 
-/** DELETE a SCIM User. Optimistic: removes from cached list. */
+/**
+ * DELETE a SCIM User. Optimistic: removes the row from every cached
+ * list page, then rolls back on error. Forwards `If-Match` when
+ * supplied so endpoints with `RequireIfMatch` reject stale deletes.
+ */
 export function useDeleteUser(endpointId: string) {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (userId: string) =>
-      fetchWithAuth(`/scim/endpoints/${endpointId}/Users/${userId}`, {
+  return useMutation<
+    unknown,
+    Error,
+    string | { userId: string; ifMatch?: string },
+    MutationContextWithListSnapshots
+  >({
+    mutationFn: (args) => {
+      const { userId, ifMatch } =
+        typeof args === 'string' ? { userId: args, ifMatch: undefined } : args;
+      return fetchWithAuth(`/scim/endpoints/${endpointId}/Users/${userId}`, {
         method: 'DELETE',
-      }),
+        headers: ifMatchHeaders(ifMatch),
+      });
+    },
+    onMutate: async (args) => {
+      const userId = typeof args === 'string' ? args : args.userId;
+      await qc.cancelQueries({ queryKey: queryKeys.users.all(endpointId) });
+      const prevLists = patchListsContaining(
+        qc,
+        queryKeys.users.all(endpointId),
+        userId,
+        (list) => ({
+          ...list,
+          totalResults: Math.max(0, list.totalResults - 1),
+          Resources: (list.Resources as ScimResource[]).filter((r) => r.id !== userId),
+        }),
+      );
+      return { prevLists };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prevLists) restoreListSnapshots(qc, context.prevLists);
+    },
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: ['users', endpointId] });
+      qc.invalidateQueries({ queryKey: queryKeys.users.all(endpointId) });
+      qc.invalidateQueries({ queryKey: queryKeys.dashboard });
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
+/**
+ * PATCH a SCIM Group. Optimistic: shallow-merges `body` into every
+ * cached list page that contains the target row, then rolls back on
+ * error. Forwards `If-Match` when supplied.
+ */
+export function useUpdateGroup(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    unknown,
+    Error,
+    { groupId: string; body: Record<string, unknown>; ifMatch?: string },
+    MutationContextWithListSnapshots
+  >({
+    mutationFn: (args) =>
+      fetchWithAuth(`/scim/endpoints/${endpointId}/Groups/${args.groupId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(args.body),
+        headers: ifMatchHeaders(args.ifMatch),
+      }),
+    onMutate: async (args) => {
+      await qc.cancelQueries({ queryKey: queryKeys.groups.all(endpointId) });
+      const prevLists = patchListsContaining(
+        qc,
+        queryKeys.groups.all(endpointId),
+        args.groupId,
+        (list) => ({
+          ...list,
+          Resources: (list.Resources as ScimResource[]).map((r) =>
+            r.id === args.groupId ? { ...r, ...args.body } : r,
+          ),
+        }),
+      );
+      return { prevLists };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prevLists) restoreListSnapshots(qc, context.prevLists);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.groups.all(endpointId) });
+      qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
+    },
+  });
+}
+
+/**
+ * DELETE a SCIM Group. Optimistic: removes from every cached list
+ * page, then rolls back on error. Forwards `If-Match` when supplied.
+ */
+export function useDeleteGroup(endpointId: string) {
+  const qc = useQueryClient();
+  return useMutation<
+    unknown,
+    Error,
+    string | { groupId: string; ifMatch?: string },
+    MutationContextWithListSnapshots
+  >({
+    mutationFn: (args) => {
+      const { groupId, ifMatch } =
+        typeof args === 'string' ? { groupId: args, ifMatch: undefined } : args;
+      return fetchWithAuth(`/scim/endpoints/${endpointId}/Groups/${groupId}`, {
+        method: 'DELETE',
+        headers: ifMatchHeaders(ifMatch),
+      });
+    },
+    onMutate: async (args) => {
+      const groupId = typeof args === 'string' ? args : args.groupId;
+      await qc.cancelQueries({ queryKey: queryKeys.groups.all(endpointId) });
+      const prevLists = patchListsContaining(
+        qc,
+        queryKeys.groups.all(endpointId),
+        groupId,
+        (list) => ({
+          ...list,
+          totalResults: Math.max(0, list.totalResults - 1),
+          Resources: (list.Resources as ScimResource[]).filter((r) => r.id !== groupId),
+        }),
+      );
+      return { prevLists };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prevLists) restoreListSnapshots(qc, context.prevLists);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.groups.all(endpointId) });
       qc.invalidateQueries({ queryKey: queryKeys.dashboard });
       qc.invalidateQueries({ queryKey: queryKeys.endpoints.overview(endpointId) });
     },

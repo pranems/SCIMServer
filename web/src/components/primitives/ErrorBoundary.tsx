@@ -49,6 +49,19 @@ export interface ErrorBoundaryProps {
   fallback?: (props: { error: Error; reset: () => void }) => React.ReactNode;
   /** Called whenever a render error is caught. Useful for telemetry. */
   onError?: (error: Error, info: React.ErrorInfo) => void;
+  /**
+   * When any element of `resetKeys` changes between renders the
+   * boundary auto-resets, attempting to render its children again.
+   *
+   * Why this exists: TanStack Router does not unmount the
+   * `ErrorBoundary` when the URL changes within the same outlet, so a
+   * caught error from `/endpoints/A` would persist after navigating
+   * to `/endpoints/B` even though the underlying resource is different.
+   * Passing `resetKeys={[endpointId]}` (or the route path) lets the
+   * boundary recover automatically. Mirrors the API from
+   * `react-error-boundary` so the pattern is familiar.
+   */
+  resetKeys?: ReadonlyArray<unknown>;
   /** Override the default test id. */
   'data-testid'?: string;
 }
@@ -85,6 +98,24 @@ function DefaultErrorFallback(props: { error: Error; reset: () => void; testId: 
   );
 }
 
+/**
+ * Shallow-equality compare two readonly arrays. Used by ErrorBoundary
+ * to detect when any element of `resetKeys` has changed between
+ * renders. Nullish arrays compare equal to other nullish arrays.
+ */
+function arraysShallowEqual(
+  a: ReadonlyArray<unknown> | undefined,
+  b: ReadonlyArray<unknown> | undefined,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (!Object.is(a[i], b[i])) return false;
+  }
+  return true;
+}
+
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { error: null };
 
@@ -99,6 +130,15 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       } catch {
         // Don't let a bad onError handler crash the boundary too.
       }
+    }
+  }
+
+  componentDidUpdate(prevProps: ErrorBoundaryProps): void {
+    // Only consider auto-reset when we're currently in the errored
+    // state - resetting from a clean state is a no-op.
+    if (this.state.error === null) return;
+    if (!arraysShallowEqual(prevProps.resetKeys, this.props.resetKeys)) {
+      this.reset();
     }
   }
 

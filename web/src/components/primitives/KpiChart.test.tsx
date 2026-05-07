@@ -1,8 +1,12 @@
 /**
  * KpiChart primitive tests.
+ *
+ * NOTE: ResizeObserver is shimmed globally in `web/src/test/setup.ts`.
+ * Earlier versions of this file installed the shim in `beforeAll` but
+ * that pattern leaked across describe blocks and other test files.
  */
 import React from 'react';
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { FluentProvider, webLightTheme } from '@fluentui/react-components';
 import { KpiChart } from './KpiChart';
@@ -10,21 +14,6 @@ import { KpiChart } from './KpiChart';
 function wrap(ui: React.ReactElement) {
   return render(<FluentProvider theme={webLightTheme}>{ui}</FluentProvider>);
 }
-
-beforeAll(() => {
-  // recharts ResponsiveContainer measures its parent via ResizeObserver
-  // and forwards a 0x0 size to the chart unless we shim the API. jsdom
-  // doesn't include ResizeObserver, and zero-size renders a tooltip-only
-  // tree which would skip our area path. Stub a resize observer that
-  // immediately reports a sane non-zero box.
-  class StubResizeObserver {
-    observe(): void {}
-    unobserve(): void {}
-    disconnect(): void {}
-  }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (globalThis as any).ResizeObserver = StubResizeObserver;
-});
 
 describe('KpiChart', () => {
   it('renders the empty fallback when data is empty', () => {

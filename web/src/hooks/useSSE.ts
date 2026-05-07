@@ -105,11 +105,13 @@ export function computeInvalidations(
         keys.push(queryKeys.endpoints.overview(endpointId));
         // The byEndpoint key embeds the params object; passing only
         // [resource, endpointId] invalidates EVERY paginated variant
-        // (TanStack Query treats the missing tail as a wildcard).
+        // (TanStack Query treats the missing tail as a wildcard). Use
+        // the same factory the mutation hooks use so changes stay in
+        // lock-step (Phase C5 v0.44.1).
         if (channel === 'users') {
-          keys.push(['users', endpointId]);
+          keys.push(queryKeys.users.all(endpointId));
         } else if (channel === 'groups') {
-          keys.push(['groups', endpointId]);
+          keys.push(queryKeys.groups.all(endpointId));
         }
       }
       break;

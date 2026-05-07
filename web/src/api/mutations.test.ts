@@ -1,11 +1,12 @@
 /**
- * Mutation hook tests (Phase C5).
+ * Mutation hook tests (Phase C5 + v0.44.1 hardening).
  *
  * Each hook is tested for:
  *   1. Success path: mutationFn fires the correct HTTP call;
  *      onSettled invalidates the expected query keys.
  *   2. Rollback path (optimistic mutations only): onMutate snapshots
  *      the cache, onError restores it.
+ *   3. If-Match header propagation (PATCH/DELETE only).
  *
  * We mock globalThis.fetch and inspect the QueryClient's cache
  * directly rather than waiting for React renders - these are unit
@@ -23,7 +24,10 @@ import {
   useCreateGroup,
   useUpdateUser,
   useDeleteUser,
+  useUpdateGroup,
+  useDeleteGroup,
   queryKeys,
+  type ScimListResponse,
 } from './queries';
 import type { EndpointOverviewResponse, EndpointResponse } from '@scim/types/dashboard.types';
 
@@ -62,6 +66,31 @@ vi.mock('../auth/token', () => ({
   clearStoredToken: vi.fn(),
   notifyTokenInvalid: vi.fn(),
 }));
+
+/** Build a SCIM list response containing a single resource with the given id. */
+function seedUserList(qc: QueryClient, id: string, extra: Record<string, unknown> = {}) {
+  const list: ScimListResponse = {
+    schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+    totalResults: 1,
+    startIndex: 1,
+    itemsPerPage: 20,
+    Resources: [{ id, userName: 'alice@x.com', active: true, ...extra }],
+  };
+  qc.setQueryData(queryKeys.users.byEndpoint(EP_ID, { startIndex: 1, count: 20 }), list);
+  return list;
+}
+
+function seedGroupList(qc: QueryClient, id: string, extra: Record<string, unknown> = {}) {
+  const list: ScimListResponse = {
+    schemas: ['urn:ietf:params:scim:api:messages:2.0:ListResponse'],
+    totalResults: 1,
+    startIndex: 1,
+    itemsPerPage: 20,
+    Resources: [{ id, displayName: 'Engineering', ...extra }],
+  };
+  qc.setQueryData(queryKeys.groups.byEndpoint(EP_ID, { startIndex: 1, count: 20 }), list);
+  return list;
+}
 
 // ─── useCreateCredential ─────────────────────────────────────────────
 
@@ -108,10 +137,15 @@ describe('useDeleteCredential', () => {
       await result.current.mutateAsync('c1');
     });
 
-    // During onMutate the credential should have been optimistically removed.
-    // After onSettled an invalidate fires, but since fetch is mocked to return
-    // {} the data stays as whatever onMutate left. We can at least verify the
-    // DELETE was sent.
+    // Tightened (F-8): assert the optimistic cache state. By the time
+    // mutateAsync resolves, onMutate has already removed the row;
+    // onSettled has fired an invalidate but our mocked fetch returns
+    // an empty refetch so the optimistic state stays.
+    const cached = queryClient.getQueryData<EndpointOverviewResponse>(
+      queryKeys.endpoints.overview(EP_ID),
+    );
+    expect(cached?.credentials).toHaveLength(0);
+
     const calledUrl = fetchSpy.mock.calls[0][0] as string;
     expect(calledUrl).toContain(`/credentials/c1`);
   });
@@ -191,14 +225,34 @@ describe('useUpdateEndpointConfig', () => {
       queryKeys.endpoints.detail(EP_ID),
     );
     expect(cached?.name).toBe('x');
-    expect((cached as Record<string, unknown>).displayName).toBeUndefined();
+    const cachedAny = cached as unknown as { displayName?: unknown };
+    expect(cachedAny.displayName).toBeUndefined();
+  });
+
+  it('cold cache: still PATCHes and invalidates without an optimistic snapshot', async () => {
+    // F-7: previous coverage skipped this branch. Without seeded
+    // detail, onMutate snapshots nothing but onSettled must still
+    // fire its invalidations so a route loader picks up the change.
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = renderHook(() => useUpdateEndpointConfig(EP_ID), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({ displayName: 'New' });
+    });
+
+    await waitFor(() => {
+      const keys = invalidateSpy.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
+      expect(keys).toContain(JSON.stringify(queryKeys.endpoints.detail(EP_ID)));
+      expect(keys).toContain(JSON.stringify(queryKeys.endpoints.overview(EP_ID)));
+    });
   });
 });
 
 // ─── useCreateUser ───────────────────────────────────────────────────
 
 describe('useCreateUser', () => {
-  it('success: POSTs to the SCIM Users endpoint and invalidates user list + dashboard', async () => {
+  it('success: POSTs to the SCIM Users endpoint and invalidates user list + dashboard + overview', async () => {
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
@@ -212,8 +266,10 @@ describe('useCreateUser', () => {
 
     await waitFor(() => {
       const keys = invalidateSpy.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
-      expect(keys).toContain(JSON.stringify(['users', EP_ID]));
+      // F-6: assert all three invalidations the production code emits.
+      expect(keys).toContain(JSON.stringify(queryKeys.users.all(EP_ID)));
       expect(keys).toContain(JSON.stringify(queryKeys.dashboard));
+      expect(keys).toContain(JSON.stringify(queryKeys.endpoints.overview(EP_ID)));
     });
   });
 });
@@ -221,7 +277,7 @@ describe('useCreateUser', () => {
 // ─── useCreateGroup ──────────────────────────────────────────────────
 
 describe('useCreateGroup', () => {
-  it('success: POSTs to the SCIM Groups endpoint and invalidates group list + dashboard', async () => {
+  it('success: POSTs to the SCIM Groups endpoint and invalidates group list + dashboard + overview', async () => {
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
@@ -235,39 +291,144 @@ describe('useCreateGroup', () => {
 
     await waitFor(() => {
       const keys = invalidateSpy.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
-      expect(keys).toContain(JSON.stringify(['groups', EP_ID]));
+      expect(keys).toContain(JSON.stringify(queryKeys.groups.all(EP_ID)));
       expect(keys).toContain(JSON.stringify(queryKeys.dashboard));
+      expect(keys).toContain(JSON.stringify(queryKeys.endpoints.overview(EP_ID)));
     });
   });
 });
 
-// ─── useUpdateUser ───────────────────────────────────────────────────
+// ─── useUpdateUser (optimistic + If-Match) ──────────────────────────
 
 describe('useUpdateUser', () => {
-  it('success: PATCHes the SCIM User and invalidates user list', async () => {
+  it('success: optimistically merges body into the cached list page, then invalidates', async () => {
     const { wrapper, queryClient } = createWrapper();
-    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    seedUserList(queryClient, 'u1');
 
     const { result } = renderHook(() => useUpdateUser(EP_ID), { wrapper });
     await act(async () => {
-      await result.current.mutateAsync({ userId: 'u1', body: { Operations: [] } });
+      await result.current.mutateAsync({ userId: 'u1', body: { active: false } });
     });
 
-    const calledUrl = fetchSpy.mock.calls[0][0] as string;
-    expect(calledUrl).toContain(`/endpoints/${EP_ID}/Users/u1`);
     expect((fetchSpy.mock.calls[0][1] as RequestInit).method).toBe('PATCH');
+    const cached = queryClient.getQueryData<ScimListResponse>(
+      queryKeys.users.byEndpoint(EP_ID, { startIndex: 1, count: 20 }),
+    );
+    const row = cached?.Resources[0] as Record<string, unknown>;
+    expect(row.active).toBe(false);
+    expect(row.userName).toBe('alice@x.com');
+  });
 
-    await waitFor(() => {
-      const keys = invalidateSpy.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
-      expect(keys).toContain(JSON.stringify(['users', EP_ID]));
+  it('rollback: restores the cached list on server error', async () => {
+    const { wrapper, queryClient } = createWrapper();
+    seedUserList(queryClient, 'u1');
+    fetchSpy.mockResolvedValueOnce({ ok: false, status: 500, text: () => Promise.resolve('') });
+
+    const { result } = renderHook(() => useUpdateUser(EP_ID), { wrapper });
+    try {
+      await act(async () => {
+        await result.current.mutateAsync({ userId: 'u1', body: { active: false } });
+      });
+    } catch { /* expected */ }
+
+    const cached = queryClient.getQueryData<ScimListResponse>(
+      queryKeys.users.byEndpoint(EP_ID, { startIndex: 1, count: 20 }),
+    );
+    const row = cached?.Resources[0] as Record<string, unknown>;
+    expect(row.active).toBe(true); // rolled back
+  });
+
+  it('forwards If-Match header when supplied (RequireIfMatch endpoints)', async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useUpdateUser(EP_ID), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({
+        userId: 'u1',
+        body: { active: false },
+        ifMatch: 'W/"v3"',
+      });
     });
+
+    const headers = (fetchSpy.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    expect(headers['If-Match']).toBe('W/"v3"');
+  });
+
+  it('omits If-Match header when not supplied', async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useUpdateUser(EP_ID), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({ userId: 'u1', body: { active: false } });
+    });
+
+    const headers = (fetchSpy.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    expect(headers['If-Match']).toBeUndefined();
   });
 });
 
-// ─── useDeleteUser ───────────────────────────────────────────────────
+// ─── useDeleteUser (optimistic + If-Match) ──────────────────────────
 
 describe('useDeleteUser', () => {
-  it('success: DELETEs the SCIM User and invalidates user list + dashboard', async () => {
+  it('success: optimistically removes the row from every cached list page', async () => {
+    const { wrapper, queryClient } = createWrapper();
+    seedUserList(queryClient, 'u1');
+
+    const { result } = renderHook(() => useDeleteUser(EP_ID), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync('u1');
+    });
+
+    expect((fetchSpy.mock.calls[0][1] as RequestInit).method).toBe('DELETE');
+    const cached = queryClient.getQueryData<ScimListResponse>(
+      queryKeys.users.byEndpoint(EP_ID, { startIndex: 1, count: 20 }),
+    );
+    expect(cached?.Resources).toHaveLength(0);
+    expect(cached?.totalResults).toBe(0);
+  });
+
+  it('rollback: restores the cached list on server error', async () => {
+    const { wrapper, queryClient } = createWrapper();
+    seedUserList(queryClient, 'u1');
+    fetchSpy.mockResolvedValueOnce({ ok: false, status: 412, text: () => Promise.resolve('') });
+
+    const { result } = renderHook(() => useDeleteUser(EP_ID), { wrapper });
+    try {
+      await act(async () => { await result.current.mutateAsync('u1'); });
+    } catch { /* expected */ }
+
+    const cached = queryClient.getQueryData<ScimListResponse>(
+      queryKeys.users.byEndpoint(EP_ID, { startIndex: 1, count: 20 }),
+    );
+    expect(cached?.Resources).toHaveLength(1);
+    expect(cached?.totalResults).toBe(1);
+  });
+
+  it('forwards If-Match header when supplied via object form', async () => {
+    const { wrapper, queryClient } = createWrapper();
+    seedUserList(queryClient, 'u1');
+
+    const { result } = renderHook(() => useDeleteUser(EP_ID), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({ userId: 'u1', ifMatch: 'W/"v9"' });
+    });
+
+    const headers = (fetchSpy.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    expect(headers['If-Match']).toBe('W/"v9"');
+  });
+
+  it('accepts the legacy bare-string variant for backward compatibility', async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useDeleteUser(EP_ID), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync('u1');
+    });
+
+    const calledUrl = fetchSpy.mock.calls[0][0] as string;
+    expect(calledUrl).toContain('/Users/u1');
+    const headers = (fetchSpy.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    expect(headers['If-Match']).toBeUndefined();
+  });
+
+  it('invalidates user list + dashboard + overview on settle', async () => {
     const { wrapper, queryClient } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
 
@@ -276,14 +437,139 @@ describe('useDeleteUser', () => {
       await result.current.mutateAsync('u1');
     });
 
-    const calledUrl = fetchSpy.mock.calls[0][0] as string;
-    expect(calledUrl).toContain(`/endpoints/${EP_ID}/Users/u1`);
+    await waitFor(() => {
+      const keys = invalidateSpy.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
+      expect(keys).toContain(JSON.stringify(queryKeys.users.all(EP_ID)));
+      expect(keys).toContain(JSON.stringify(queryKeys.dashboard));
+      expect(keys).toContain(JSON.stringify(queryKeys.endpoints.overview(EP_ID)));
+    });
+  });
+});
+
+// ─── useUpdateGroup (optimistic + If-Match) ─────────────────────────
+
+describe('useUpdateGroup', () => {
+  it('success: optimistically merges body into the cached list page', async () => {
+    const { wrapper, queryClient } = createWrapper();
+    seedGroupList(queryClient, 'g1');
+
+    const { result } = renderHook(() => useUpdateGroup(EP_ID), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({ groupId: 'g1', body: { displayName: 'Renamed' } });
+    });
+
+    const url = fetchSpy.mock.calls[0][0] as string;
+    expect(url).toContain(`/endpoints/${EP_ID}/Groups/g1`);
+    expect((fetchSpy.mock.calls[0][1] as RequestInit).method).toBe('PATCH');
+
+    const cached = queryClient.getQueryData<ScimListResponse>(
+      queryKeys.groups.byEndpoint(EP_ID, { startIndex: 1, count: 20 }),
+    );
+    const row = cached?.Resources[0] as Record<string, unknown>;
+    expect(row.displayName).toBe('Renamed');
+  });
+
+  it('rollback: restores the cached group list on server error', async () => {
+    const { wrapper, queryClient } = createWrapper();
+    seedGroupList(queryClient, 'g1');
+    fetchSpy.mockResolvedValueOnce({ ok: false, status: 409, text: () => Promise.resolve('') });
+
+    const { result } = renderHook(() => useUpdateGroup(EP_ID), { wrapper });
+    try {
+      await act(async () => {
+        await result.current.mutateAsync({ groupId: 'g1', body: { displayName: 'Renamed' } });
+      });
+    } catch { /* expected */ }
+
+    const cached = queryClient.getQueryData<ScimListResponse>(
+      queryKeys.groups.byEndpoint(EP_ID, { startIndex: 1, count: 20 }),
+    );
+    const row = cached?.Resources[0] as Record<string, unknown>;
+    expect(row.displayName).toBe('Engineering');
+  });
+
+  it('forwards If-Match header when supplied', async () => {
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useUpdateGroup(EP_ID), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({
+        groupId: 'g1',
+        body: { displayName: 'X' },
+        ifMatch: 'W/"v2"',
+      });
+    });
+
+    const headers = (fetchSpy.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    expect(headers['If-Match']).toBe('W/"v2"');
+  });
+});
+
+// ─── useDeleteGroup (optimistic + If-Match) ─────────────────────────
+
+describe('useDeleteGroup', () => {
+  it('success: optimistically removes the row from every cached list page', async () => {
+    const { wrapper, queryClient } = createWrapper();
+    seedGroupList(queryClient, 'g1');
+
+    const { result } = renderHook(() => useDeleteGroup(EP_ID), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync('g1');
+    });
+
+    const url = fetchSpy.mock.calls[0][0] as string;
+    expect(url).toContain(`/endpoints/${EP_ID}/Groups/g1`);
     expect((fetchSpy.mock.calls[0][1] as RequestInit).method).toBe('DELETE');
+
+    const cached = queryClient.getQueryData<ScimListResponse>(
+      queryKeys.groups.byEndpoint(EP_ID, { startIndex: 1, count: 20 }),
+    );
+    expect(cached?.Resources).toHaveLength(0);
+    expect(cached?.totalResults).toBe(0);
+  });
+
+  it('rollback: restores the cached group list on server error', async () => {
+    const { wrapper, queryClient } = createWrapper();
+    seedGroupList(queryClient, 'g1');
+    fetchSpy.mockResolvedValueOnce({ ok: false, status: 412, text: () => Promise.resolve('') });
+
+    const { result } = renderHook(() => useDeleteGroup(EP_ID), { wrapper });
+    try {
+      await act(async () => { await result.current.mutateAsync('g1'); });
+    } catch { /* expected */ }
+
+    const cached = queryClient.getQueryData<ScimListResponse>(
+      queryKeys.groups.byEndpoint(EP_ID, { startIndex: 1, count: 20 }),
+    );
+    expect(cached?.Resources).toHaveLength(1);
+  });
+
+  it('forwards If-Match header when supplied via object form', async () => {
+    const { wrapper, queryClient } = createWrapper();
+    seedGroupList(queryClient, 'g1');
+
+    const { result } = renderHook(() => useDeleteGroup(EP_ID), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({ groupId: 'g1', ifMatch: 'W/"v5"' });
+    });
+
+    const headers = (fetchSpy.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
+    expect(headers['If-Match']).toBe('W/"v5"');
+  });
+
+  it('invalidates group list + dashboard + overview on settle', async () => {
+    const { wrapper, queryClient } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = renderHook(() => useDeleteGroup(EP_ID), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync('g1');
+    });
 
     await waitFor(() => {
       const keys = invalidateSpy.mock.calls.map((c) => JSON.stringify(c[0]?.queryKey));
-      expect(keys).toContain(JSON.stringify(['users', EP_ID]));
+      expect(keys).toContain(JSON.stringify(queryKeys.groups.all(EP_ID)));
       expect(keys).toContain(JSON.stringify(queryKeys.dashboard));
+      expect(keys).toContain(JSON.stringify(queryKeys.endpoints.overview(EP_ID)));
     });
   });
 });

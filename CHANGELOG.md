@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.44.1] - 2026-05-07 - Phase C Hardening (gap-fill before Phase D)
+
+### UI Redesign - Phase C v0.44.1 (gap-fill commit)
+
+**Closes 10 P0 findings surfaced by a deep retrospective audit of Phases A, B, C. Frontend-only commit, +0 backend tests, +17 web vitest tests (351 -> 368). Unblocks Phase E (write operations) by delivering the optimistic patterns + If-Match ETag support that User/Group detail drawers will rely on.**
+
+#### What this commit delivers
+
+- **F-1 Phase C feature doc** - new [docs/PHASE_C_PRIMITIVES_AND_MUTATIONS.md](docs/PHASE_C_PRIMITIVES_AND_MUTATIONS.md) (12 sections, 2 Mermaid diagrams - mutation universal pattern + per-page optimistic-delete sequence, component contract table, primitive consumer map for Phase D/E, risk register, definition-of-done with the standing 11 quality gates).
+- **F-3 True optimism for User PATCH/DELETE** - `useUpdateUser` and `useDeleteUser` now do `onMutate` snapshot -> per-page apply -> `onError` rollback -> `onSettled` invalidate. Previously the JSDoc claimed optimism but the implementation was non-optimistic.
+- **F-4 New `useUpdateGroup` / `useDeleteGroup`** - same optimistic contract as User equivalents. Phase E4 (User/Group detail drawer) blocker resolved.
+- **F-5 `If-Match` ETag header propagation** - all 4 PATCH/DELETE hooks (`useUpdateUser`, `useDeleteUser`, `useUpdateGroup`, `useDeleteGroup`) accept an optional `ifMatch` argument. Endpoints with `RequireIfMatch` (G7) now correctly return 412/428 when stale-ETag or no-ETag writes are submitted, instead of silently passing.
+- **F-6 Tightened `useCreateUser` / `useCreateGroup` tests** - now assert overview cache invalidation alongside dashboard + list invalidation.
+- **F-7 `useUpdateEndpointConfig` cache-miss test** - new test covers the cold-cache path where `onMutate` snapshots nothing but `onSettled` must still invalidate.
+- **F-8 `useDeleteCredential` post-settle assertion** - now asserts the cached overview's `credentials` array length is 0 after `mutateAsync` resolves (was previously only checking the URL).
+- **F-10 `ErrorBoundary.resetKeys`** - mirrors `react-error-boundary` API; auto-resets when any element of `resetKeys` changes between renders. Without this, errors caught from `/endpoints/A` would persist after URL navigates to `/endpoints/B` because TanStack Router's outlet doesn't unmount the boundary.
+- **F-11 `queryKeys.users.all(id)` / `queryKeys.groups.all(id)` factories** - mutation hooks AND `useSSE.computeInvalidations` both use the factories now (was string literals `['users', endpointId]` mixed with factories - inconsistent).
+- **F-15 Global `ResizeObserver` + `matchMedia` shims** - moved from `KpiChart.test.tsx` `beforeAll` to `web/src/test/setup.ts` so they apply to every test file uniformly.
+
+#### Internal helpers (queries.ts)
+
+- `ifMatchHeaders(ifMatch?)` - centralises the conditional header construction
+- `patchListsContaining(qc, prefix, targetId, mutator)` - walks every cached list page under `prefix` whose Resources contain `targetId`, applies `mutator`, returns snapshot for rollback
+- `restoreListSnapshots(qc, snapshots)` - restores every list-page snapshot verbatim on `onError`
+
+#### API shapes accepted by the new hooks
+
+```typescript
+// Bare-string variant (legacy, when no ETag enforcement is needed):
+useDeleteUser(epId).mutate('u1');
+useDeleteGroup(epId).mutate('g1');
+
+// Object variant (preferred for write operations):
+useDeleteUser(epId).mutate({ userId: 'u1', ifMatch: 'W/"v3"' });
+useUpdateUser(epId).mutate({ userId: 'u1', body: { active: false }, ifMatch: 'W/"v3"' });
+useUpdateGroup(epId).mutate({ groupId: 'g1', body: { displayName: 'X' }, ifMatch: 'W/"v2"' });
+```
+
+#### Test counts
+
+- Web vitest: 351 -> **368** (+17: 13 new mutation tests + 2 ErrorBoundary `resetKeys` + 2 from churn)
+- API unit / E2E / live SCIM unchanged (frontend-only commit; no backend changes)
+- Production build clean (`vite build` 9.77s, 877.80 kB / 244.81 kB gz - delta +0.86 kB gz)
+
+#### Why this matters before Phase D
+
+Phase E4 (User and Group detail drawer with PATCH) is the most write-heavy feature in the redesign and depends entirely on these primitives doing the right thing. Without v0.44.1:
+
+- Detail drawer would silently lose writes on RequireIfMatch endpoints (no If-Match header)
+- Optimistic patches in the drawer would be promises only - row would not flip until 30s staleTime expires
+- Group write parity would be unimplemented (Phase E4 covers BOTH User and Group editing)
+- A stale error in `/endpoints/A` would persist visually when the user navigates to `/endpoints/B`
+
+This commit closes those gaps before Phase D starts so Phases D and E can compose primitives without re-rolling them.
+
+#### Cross-references
+
+- [docs/PHASE_C_PRIMITIVES_AND_MUTATIONS.md](docs/PHASE_C_PRIMITIVES_AND_MUTATIONS.md) - feature doc with full architecture
+- [docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md](docs/UI_REDESIGN_REMAINING_GAPS_PLAN.md) S6 - parent plan
+- [docs/phases/PHASE_07_ETAG_CONDITIONAL_REQUESTS.md](docs/phases/PHASE_07_ETAG_CONDITIONAL_REQUESTS.md) - ETag + RequireIfMatch backend (basis for If-Match support)
+
 ## [0.44.0] - 2026-05-06 - Phase C (Reusable Primitives + Mutation Layer)
 
 ### UI Redesign - Phase C (C1 + C2 + C3 + C4 + C5)
